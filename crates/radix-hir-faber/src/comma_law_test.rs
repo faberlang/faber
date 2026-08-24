@@ -7,6 +7,7 @@
 //! away before this backend runs.
 
 use crate::surface::{KeywordSurface, TypeBindingKind};
+
 use crate::{empty_presentation, FaberCodegen};
 use radix_codegen_shared::CodeWriter;
 use radix_hir::{
@@ -21,6 +22,22 @@ use radix_types::{
     FuncSig, IndexExpr, NumericWidth, ParamType, Primitive, SemanticParamMode, Type, TypeTable,
 };
 use rustc_hash::FxHashMap;
+
+#[test]
+fn generic_applied_arg_preserves_index_kind() {
+    let mut types = TypeTable::new();
+    let base = types.intern(Type::Param(radix_lexer::Symbol(10)));
+    let size = types.intern_index(IndexExpr::Literal(3));
+    let applied = types.intern(Type::Applied(
+        base,
+        vec![radix_types::AppliedArg::Size(size)],
+    ));
+    assert!(matches!(
+        types.get(applied),
+        Type::Applied(_, args)
+            if matches!(args.as_slice(), [radix_types::AppliedArg::Size(id)] if *id == size)
+    ));
+}
 
 struct TestSurface;
 
@@ -771,7 +788,13 @@ fn type_positions_pin_fixed_and_item_shape_separators() {
     let dim3 = types.intern_index(IndexExpr::Literal(3));
     let shape = types.intern_index(IndexExpr::Tuple(vec![dim2, dim3]));
     let applied_base = types.intern(Type::Param(interner.intern("Result")));
-    let applied = types.intern(Type::Applied(applied_base, vec![textus, numerus]));
+    let applied = types.intern(Type::Applied(
+        applied_base,
+        vec![
+            radix_types::AppliedArg::Type(textus),
+            radix_types::AppliedArg::Type(numerus),
+        ],
+    ));
     let tuple = types.intern(Type::Tuple(vec![textus, numerus]));
     let function = types.intern(Type::Func(FuncSig {
         type_params: Vec::new(),

@@ -211,7 +211,10 @@ pub fn scrinium_payload_type_id(
     payload_ty: TypeId,
 ) -> TypeId {
     let base = scrinium_type_id(types, def_id);
-    types.intern(Type::Applied(base, vec![payload_ty]))
+    types.intern(Type::Applied(
+        base,
+        vec![radix_types::AppliedArg::Type(payload_ty)],
+    ))
 }
 
 pub fn status_type_id(types: &mut TypeTable, resolver: &Resolver) -> Option<TypeId> {
@@ -228,7 +231,10 @@ pub fn directional_view_payload_type_id(
     payload_ty: TypeId,
 ) -> TypeId {
     let base = types.intern(Type::Struct(view_def));
-    types.intern(Type::Applied(base, vec![payload_ty]))
+    types.intern(Type::Applied(
+        base,
+        vec![radix_types::AppliedArg::Type(payload_ty)],
+    ))
 }
 
 /// Return whether the parsed program needs compiler-owned frame types registered.

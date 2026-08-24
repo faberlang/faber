@@ -38,7 +38,10 @@ pub fn tuus_cursor_method_payload<'a>(
     if tuus_def_id != Some(*def_id) {
         return None;
     }
-    Some(type_args[0])
+    match type_args[0] {
+        radix_types::AppliedArg::Type(id) => Some(id),
+        radix_types::AppliedArg::Size(_) => None,
+    }
 }
 
 /// `DefId` of locals whose initializer is a direct `tuus<T>.cursor()` call.

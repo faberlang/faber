@@ -8,6 +8,23 @@ use crate::artifact::HirArtifact;
 use crate::error::HirArtifactError;
 use rustc_hash::FxHashSet;
 
+#[cfg(test)]
+#[test]
+fn generic_applied_arg_preserves_index_kind() {
+    let mut types = radix_types::TypeTable::new();
+    let base = types.intern(radix_types::Type::Param(radix_lexer::Symbol(10)));
+    let size = types.intern_index(radix_types::IndexExpr::Literal(3));
+    let applied = types.intern(radix_types::Type::Applied(
+        base,
+        vec![radix_types::AppliedArg::Size(size)],
+    ));
+    assert!(matches!(
+        types.get(applied),
+        radix_types::Type::Applied(_, args)
+            if matches!(args.as_slice(), [radix_types::AppliedArg::Size(id)] if *id == size)
+    ));
+}
+
 // ---------------------------------------------------------------------------
 // Referential integrity validation (U2.3)
 // ---------------------------------------------------------------------------
@@ -1940,7 +1957,10 @@ pub(crate) fn validate_referential_integrity(
             radix_types::Type::Applied(base, args) => {
                 check_type(*base)?;
                 for arg in args {
-                    check_type(*arg)?;
+                    match arg {
+                        radix_types::AppliedArg::Type(id) => check_type(*id)?,
+                        radix_types::AppliedArg::Size(id) => check_index(*id)?,
+                    }
                 }
             }
             radix_types::Type::Union(members) | radix_types::Type::Tuple(members) => {

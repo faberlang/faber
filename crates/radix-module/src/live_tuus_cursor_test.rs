@@ -6,6 +6,29 @@ use super::*;
 use crate::hir::{HirCallArg, HirExpression, HirExpressionKind, HirId};
 use crate::lexer::Symbol;
 use crate::semantic::{Primitive, Type, TypeId, TypeTable};
+use radix_types::{AppliedArg, IndexExpr};
+
+#[test]
+fn marker_hole_consumer_preserves_family_identity() {
+    let mut types = TypeTable::new();
+    let base = types.intern(Type::Param(Symbol(11)));
+    let size = types.intern_index(IndexExpr::Literal(3));
+    let applied = types.intern(Type::Applied(base, vec![AppliedArg::Size(size)]));
+    assert!(
+        matches!(types.get(applied), Type::Applied(_, args) if matches!(args.as_slice(), [AppliedArg::Size(id)] if *id == size))
+    );
+}
+
+#[test]
+fn generic_applied_arg_preserves_index_kind() {
+    let mut types = TypeTable::new();
+    let base = types.intern(Type::Param(Symbol(10)));
+    let size = types.intern_index(IndexExpr::Literal(3));
+    let applied = types.intern(Type::Applied(base, vec![AppliedArg::Size(size)]));
+    assert!(
+        matches!(types.get(applied), Type::Applied(_, args) if matches!(args.as_slice(), [AppliedArg::Size(id)] if *id == size))
+    );
+}
 use crate::test_support::test_span;
 
 /// Symbol for "cursor" — arbitrary value from an interner.
@@ -34,7 +57,7 @@ const TUUS_DEF_ID: DefId = DefId(42);
 /// Helper to make a `Type::Applied(Type::Struct(TUUS_DEF_ID), [`payload`])`.
 fn make_tuus_applied(types: &mut TypeTable, payload: TypeId) -> TypeId {
     let struct_id = types.intern(Type::Struct(TUUS_DEF_ID));
-    types.intern(Type::Applied(struct_id, vec![payload]))
+    types.intern(Type::Applied(struct_id, vec![AppliedArg::Type(payload)]))
 }
 
 // ── tuus_cursor_method_payload ──────────────────────────────────────────────
@@ -153,7 +176,7 @@ fn wrong_tuus_def_id_returns_none() {
     let textus_ty = types.primitive(Primitive::Textus);
     let wrong_def_id = DefId(99);
     let struct_id = types.intern(Type::Struct(wrong_def_id));
-    let applied_ty = types.intern(Type::Applied(struct_id, vec![textus_ty]));
+    let applied_ty = types.intern(Type::Applied(struct_id, vec![AppliedArg::Type(textus_ty)]));
     let receiver = HirExpression {
         id: HirId(0),
         kind: HirExpressionKind::Path(DefId(100)),
@@ -213,7 +236,7 @@ fn non_struct_base_type_returns_none() {
     let mut types = TypeTable::new();
     let textus_ty = types.primitive(Primitive::Textus);
     let enum_id = types.intern(Type::Enum(DefId(50)));
-    let applied_ty = types.intern(Type::Applied(enum_id, vec![textus_ty]));
+    let applied_ty = types.intern(Type::Applied(enum_id, vec![AppliedArg::Type(textus_ty)]));
     let receiver = HirExpression {
         id: HirId(0),
         kind: HirExpressionKind::Path(DefId(100)),

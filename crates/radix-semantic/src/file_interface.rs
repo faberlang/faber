@@ -555,8 +555,17 @@ fn snapshot_interface_type_inner(
                 module_identity,
             )?),
             args.iter()
-                .map(|arg| {
-                    snapshot_interface_type_inner(*arg, types, interner, resolver, module_identity)
+                .map(|arg| match arg {
+                    radix_types::AppliedArg::Type(id) => snapshot_interface_type_inner(
+                        *id,
+                        types,
+                        interner,
+                        resolver,
+                        module_identity,
+                    ),
+                    radix_types::AppliedArg::Size(_) => {
+                        Err(FileInterfaceError::IndexInferenceUnsupported)
+                    }
                 })
                 .collect::<FileInterfaceResult<Vec<_>>>()?,
         )),
@@ -739,7 +748,10 @@ fn import_interface_type_inner(
             let base = import_interface_type_inner(base, types, interner, resolver)?;
             let args = args
                 .iter()
-                .map(|arg| import_interface_type_inner(arg, types, interner, resolver))
+                .map(|arg| {
+                    import_interface_type_inner(arg, types, interner, resolver)
+                        .map(radix_types::AppliedArg::Type)
+                })
                 .collect::<FileInterfaceResult<Vec<_>>>()?;
             Ok(types.intern(Type::Applied(base, args)))
         }

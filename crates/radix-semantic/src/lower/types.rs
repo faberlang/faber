@@ -32,7 +32,26 @@ use crate::{
     CollectionKind, FuncSig, IndexExpr, IndexId, InferVar, ParamType, Primitive, SemanticParamMode,
     Type, TypeId,
 };
-use radix_syntax::{FiguraExpr, Ident, TypeExpr, TypeExprKind};
+use radix_syntax::{FiguraExpr, GenericArgExpr, GenericParamKind, Ident, TypeExpr, TypeExprKind};
+use radix_types::AppliedArg;
+
+fn generic_type_expr(arg: &GenericArgExpr) -> Option<TypeExpr> {
+    match arg {
+        GenericArgExpr::Type(ty) => Some(ty.clone()),
+        GenericArgExpr::Name(name) => Some(TypeExpr {
+            nullable: false,
+            mode: None,
+            kind: TypeExprKind::Named(name.clone(), Vec::new()),
+            span: name.span,
+            iuncta_label: None,
+        }),
+        GenericArgExpr::Size(_) => None,
+    }
+}
+
+fn generic_type_exprs(params: &[GenericArgExpr]) -> Option<Vec<TypeExpr>> {
+    params.iter().map(generic_type_expr).collect()
+}
 
 impl Lowerer<'_> {
     /// Lower a parser type expression into the interned semantic type table.
@@ -204,13 +223,172 @@ impl Lowerer<'_> {
         }
     }
 
+    fn lower_generic_type_arg(&mut self, arg: &GenericArgExpr) -> TypeId {
+        match arg {
+            GenericArgExpr::Type(ty) => self.lower_nested_type(ty),
+            GenericArgExpr::Name(name) => self.lower_named_type(name, &[]),
+            GenericArgExpr::Size(_) => {
+                self.error("generic_size_argument_in_type_position");
+                self.types.intern(Type::Error)
+            }
+        }
+    }
+
+    fn lower_generic_index_arg(&mut self, arg: &GenericArgExpr) -> Option<IndexId> {
+        match arg {
+            GenericArgExpr::Size(figura) => self.lower_figura_expr(figura).ok(),
+            GenericArgExpr::Type(ty) if matches!(ty.kind, TypeExprKind::Infer) => {
+                let var = self.types.fresh_index_infer_var();
+                Some(self.types.intern_index(IndexExpr::Infer(var)))
+            }
+            GenericArgExpr::Name(ident) => {
+                match self.lexical_generic_param_kind(ident.name) {
+                    Some(GenericParamKind::Magnitudo) => {
+                        Some(self.types.intern_index(IndexExpr::Param(ident.name)))
+                    }
+                    Some(GenericParamKind::Typus) => {
+                        self.error("generic_type_argument_in_size_position");
+                        None
+                    }
+                    None => match self.resolver.lookup(ident.name).and_then(|def_id| {
+                        self.resolver.get_symbol(def_id).map(|symbol| symbol.kind)
+                    }) {
+                        Some(crate::SymbolKind::IndexParam) => {
+                            Some(self.types.intern_index(IndexExpr::Param(ident.name)))
+                        }
+                        _ => {
+                            self.error("generic_type_argument_in_size_position");
+                            None
+                        }
+                    },
+                }
+            }
+            GenericArgExpr::Type(_) => {
+                self.error("generic_type_argument_in_size_position");
+                None
+            }
+        }
+    }
+
+    pub(super) fn lower_applied_arg(&mut self, arg: &GenericArgExpr) -> AppliedArg {
+        match arg {
+            GenericArgExpr::Size(_) => self
+                .lower_generic_index_arg(arg)
+                .map(AppliedArg::Size)
+                .unwrap_or_else(|| {
+                    AppliedArg::Size(self.types.intern_index(IndexExpr::Unspecified))
+                }),
+            GenericArgExpr::Type(ty) if matches!(ty.kind, TypeExprKind::Infer) => {
+                AppliedArg::Type(self.lower_nested_type(ty))
+            }
+            GenericArgExpr::Name(ident)
+                if matches!(
+                    self.lexical_generic_param_kind(ident.name),
+                    Some(GenericParamKind::Magnitudo)
+                ) =>
+            {
+                self.lower_generic_index_arg(arg)
+                    .map(AppliedArg::Size)
+                    .unwrap_or_else(|| {
+                        AppliedArg::Size(self.types.intern_index(IndexExpr::Unspecified))
+                    })
+            }
+            GenericArgExpr::Name(ident) => {
+                let is_index = self
+                    .resolver
+                    .lookup(ident.name)
+                    .and_then(|def_id| self.resolver.get_symbol(def_id))
+                    .is_some_and(|symbol| symbol.kind == crate::SymbolKind::IndexParam);
+                if is_index {
+                    self.lower_generic_index_arg(arg)
+                        .map(AppliedArg::Size)
+                        .unwrap_or_else(|| {
+                            AppliedArg::Size(self.types.intern_index(IndexExpr::Unspecified))
+                        })
+                } else {
+                    AppliedArg::Type(self.lower_generic_type_arg(arg))
+                }
+            }
+            GenericArgExpr::Type(ty) => AppliedArg::Type(self.lower_nested_type(ty)),
+        }
+    }
+
+    fn lower_declared_applied_args(
+        &mut self,
+        def_id: crate::DefId,
+        params: &[GenericArgExpr],
+    ) -> Vec<AppliedArg> {
+        let Some(kinds) = self
+            .resolver
+            .generic_param_kinds(def_id)
+            .map(ToOwned::to_owned)
+        else {
+            return params
+                .iter()
+                .map(|arg| self.lower_applied_arg(arg))
+                .collect();
+        };
+        if kinds.len() != params.len() {
+            self.error("generic_argument_arity_mismatch");
+        }
+        params
+            .iter()
+            .zip(kinds.iter())
+            .map(|(arg, kind)| match kind {
+                GenericParamKind::Typus => match arg {
+                    GenericArgExpr::Size(_) => {
+                        self.error("generic_argument_kind_mismatch");
+                        AppliedArg::Type(self.types.intern(Type::Error))
+                    }
+                    GenericArgExpr::Name(ident)
+                        if self
+                            .resolver
+                            .lookup(ident.name)
+                            .and_then(|id| self.resolver.get_symbol(id))
+                            .is_some_and(|symbol| symbol.kind == crate::SymbolKind::IndexParam) =>
+                    {
+                        self.error("generic_argument_kind_mismatch");
+                        AppliedArg::Type(self.types.intern(Type::Error))
+                    }
+                    _ => AppliedArg::Type(self.lower_generic_type_arg(arg)),
+                },
+                GenericParamKind::Magnitudo => match arg {
+                    GenericArgExpr::Type(ty) if !matches!(ty.kind, TypeExprKind::Infer) => {
+                        self.error("generic_argument_kind_mismatch");
+                        AppliedArg::Size(self.types.intern_index(IndexExpr::Unspecified))
+                    }
+                    GenericArgExpr::Name(ident)
+                        if !self
+                            .resolver
+                            .lookup(ident.name)
+                            .and_then(|id| self.resolver.get_symbol(id))
+                            .is_some_and(|symbol| symbol.kind == crate::SymbolKind::IndexParam)
+                            && !matches!(
+                                self.lexical_generic_param_kind(ident.name),
+                                Some(GenericParamKind::Magnitudo)
+                            ) =>
+                    {
+                        self.error("generic_argument_kind_mismatch");
+                        AppliedArg::Size(self.types.intern_index(IndexExpr::Unspecified))
+                    }
+                    _ => self
+                        .lower_generic_index_arg(arg)
+                        .map(AppliedArg::Size)
+                        .unwrap_or_else(|| {
+                            AppliedArg::Size(self.types.intern_index(IndexExpr::Unspecified))
+                        }),
+                },
+            })
+            .collect()
+    }
+
     /// Resolve a named type spelling before generic application.
     ///
     /// Primitive and collection names are language-owned spellings with fixed
     /// arity rules. User names must resolve to symbols that actually denote
     /// types; values, functions, and unresolved names become `Type::Error`
     /// rather than leaking expression-level definitions into type syntax.
-    fn lower_named_type(&mut self, name: &Ident, params: &[TypeExpr]) -> TypeId {
+    fn lower_named_type(&mut self, name: &Ident, params: &[GenericArgExpr]) -> TypeId {
         self.current_span = name.span;
 
         let name_text = self.interner.resolve(name.name).to_owned();
@@ -243,10 +421,14 @@ impl Lowerer<'_> {
         }
 
         if crate::numeric_width::standalone_width_type(name_str).is_some() {
+            let Some(type_params) = generic_type_exprs(params) else {
+                self.error("generic_size_argument_in_type_position");
+                return self.types.intern(Type::Error);
+            };
             let mut messages = Vec::new();
             let Some(ty) = crate::numeric_width::lower_standalone_width_type(
                 name_str,
-                params,
+                &type_params,
                 self.types,
                 &mut |message| messages.push(message.to_owned()),
             ) else {
@@ -275,7 +457,7 @@ impl Lowerer<'_> {
                 self.error("intervallum_arity");
                 return self.types.intern(Type::Error);
             }
-            let bound = self.lower_nested_type(&params[0]);
+            let bound = self.lower_generic_type_arg(&params[0]);
             if !crate::is_intervallum_bound_type(self.types, bound) {
                 self.error("intervallum_bound");
                 return self.types.intern(Type::Error);
@@ -290,7 +472,7 @@ impl Lowerer<'_> {
             };
             let payload_ty = match params {
                 [] => self.types.primitive(Primitive::Valor),
-                [payload] => self.lower_nested_type(payload),
+                [payload] => self.lower_generic_type_arg(payload),
                 _ => {
                     self.error("scrinium_arity");
                     return self.types.intern(Type::Error);
@@ -341,6 +523,10 @@ impl Lowerer<'_> {
             let elements: Vec<TypeId> = params
                 .iter()
                 .map(|param| {
+                    let GenericArgExpr::Type(param) = param else {
+                        self.error("iuncta_type_arg_shape");
+                        return self.types.intern(Type::Error);
+                    };
                     if matches!(param.kind, TypeExprKind::UnionHole) {
                         // A standalone ∪ is a heterogeneous accumulation hole for
                         // collection elements, not a valid monomorphic tuple
@@ -410,10 +596,7 @@ impl Lowerer<'_> {
             return base;
         }
 
-        let args = params
-            .iter()
-            .map(|param| self.lower_nested_type(param))
-            .collect();
+        let args = self.lower_declared_applied_args(def_id, params);
         self.types.intern(Type::Applied(base, args))
     }
 
@@ -424,9 +607,13 @@ impl Lowerer<'_> {
     /// `_` lowers as a monomorphic hole (solved later from the field witness);
     /// a standalone `∪` is not a valid ratio element and is rejected here so
     /// the issue points at the slot instead of leaking WARN017.
-    fn lower_ratio_type(&mut self, params: &[TypeExpr]) -> TypeId {
+    fn lower_ratio_type(&mut self, params: &[GenericArgExpr]) -> TypeId {
         let mut fields = Vec::with_capacity(params.len());
-        for param in params {
+        for arg in params {
+            let GenericArgExpr::Type(param) = arg else {
+                self.error("ratio_type_arg_shape");
+                continue;
+            };
             let Some(label) = param.iuncta_label.as_ref() else {
                 continue;
             };
@@ -442,7 +629,7 @@ impl Lowerer<'_> {
         self.types.record(fields)
     }
 
-    fn lower_locale_pack_type(&mut self, name: &str, params: &[TypeExpr]) -> Option<TypeId> {
+    fn lower_locale_pack_type(&mut self, name: &str, params: &[GenericArgExpr]) -> Option<TypeId> {
         let binding = self.locale_pack?.type_binding_kind(name)?;
         match binding {
             crate::locale::TypeBindingKind::Primitive(prim) => {
@@ -469,12 +656,16 @@ impl Lowerer<'_> {
         }
     }
 
-    fn lower_primitive_type(&mut self, prim: Primitive, params: &[TypeExpr]) -> TypeId {
+    fn lower_primitive_type(&mut self, prim: Primitive, params: &[GenericArgExpr]) -> TypeId {
+        let Some(type_params) = generic_type_exprs(params) else {
+            self.error("generic_size_argument_in_type_position");
+            return self.types.intern(Type::Error);
+        };
         if matches!(prim, Primitive::Numerus | Primitive::Fractus) {
             let mut messages = Vec::new();
             let ty = crate::numeric_width::lower_sized_primitive(
                 prim,
-                params,
+                &type_params,
                 self.interner,
                 self.types,
                 &mut |message| messages.push(message.to_owned()),
@@ -489,7 +680,7 @@ impl Lowerer<'_> {
         if matches!(prim, Primitive::Instans) {
             let mut messages = Vec::new();
             let ty = crate::instans_precision::lower_sized_instans(
-                params,
+                &type_params,
                 self.interner,
                 self.types,
                 &mut |message| messages.push(message.to_owned()),
@@ -514,22 +705,22 @@ impl Lowerer<'_> {
 
     /// Conversio `n ↦ ascii<N, Hex|Bin|Oct>` peels the format hint first, then
     /// lowers capacity-only `ascii<N>` through this helper.
-    pub(crate) fn lower_bounded_ascii_capacity(&mut self, capacity: &TypeExpr) -> TypeId {
+    pub(crate) fn lower_bounded_ascii_capacity(&mut self, capacity: &GenericArgExpr) -> TypeId {
         self.lower_bounded_primitive(Primitive::Ascii, std::slice::from_ref(capacity))
     }
 
-    fn lower_bounded_primitive(&mut self, prim: Primitive, params: &[TypeExpr]) -> TypeId {
+    fn lower_bounded_primitive(&mut self, prim: Primitive, params: &[GenericArgExpr]) -> TypeId {
         match params {
             [] => self.types.primitive(prim),
             [capacity]
                 if prim == Primitive::Ascii
-                    && type_expr_is_ascii_format_hint(capacity, self.interner) =>
+                    && generic_arg_is_ascii_format_hint(capacity, self.interner) =>
             {
                 self.error("ascii_format_hint_not_capacity");
                 self.types.intern(Type::Error)
             }
             [capacity] => {
-                let Some(capacity) = self.lower_capacity_index(capacity) else {
+                let Some(capacity) = self.lower_generic_index_arg(capacity) else {
                     return self.types.intern(Type::Error);
                 };
                 match prim {
@@ -547,58 +738,33 @@ impl Lowerer<'_> {
     }
 }
 
-fn type_expr_is_ascii_format_hint(param: &TypeExpr, interner: &radix_lexer::Interner) -> bool {
-    let TypeExprKind::Named(ident, nested) = &param.kind else {
-        return false;
-    };
-    nested.is_empty() && crate::numeric_width::is_ascii_format_hint(interner.resolve(ident.name))
+fn generic_arg_is_ascii_format_hint(
+    param: &GenericArgExpr,
+    interner: &radix_lexer::Interner,
+) -> bool {
+    match param {
+        GenericArgExpr::Name(ident) => {
+            crate::numeric_width::is_ascii_format_hint(interner.resolve(ident.name))
+        }
+        GenericArgExpr::Type(ty) => match &ty.kind {
+            TypeExprKind::Named(ident, nested) if nested.is_empty() => {
+                crate::numeric_width::is_ascii_format_hint(interner.resolve(ident.name))
+            }
+            _ => false,
+        },
+        GenericArgExpr::Size(_) => false,
+    }
 }
 
 impl Lowerer<'_> {
-    fn lower_capacity_index(&mut self, param: &TypeExpr) -> Option<crate::IndexId> {
-        if matches!(param.kind, TypeExprKind::Infer) {
-            let var = self.types.fresh_index_infer_var();
-            return Some(self.types.intern_index(crate::IndexExpr::Infer(var)));
-        }
-        let TypeExprKind::Named(ident, nested) = &param.kind else {
-            self.error("bounded_capacity_not_natural");
-            return None;
+    fn lower_modular_word_type(&mut self, params: &[GenericArgExpr]) -> TypeId {
+        let Some(type_params) = generic_type_exprs(params) else {
+            self.error("generic_size_argument_in_type_position");
+            return self.types.intern(Type::Error);
         };
-        if !nested.is_empty() {
-            self.error("bounded_capacity_not_natural");
-            return None;
-        }
-        let name = self.interner.resolve(ident.name);
-        if let Some(value) = radix_types::parse_natural_capacity(name) {
-            return Some(self.types.intern_index(crate::IndexExpr::Literal(value)));
-        }
-        let Some(def_id) = self.resolver.lookup(ident.name) else {
-            self.error("bounded_capacity_not_natural");
-            return None;
-        };
-        let Some(symbol) = self.resolver.get_symbol(def_id) else {
-            self.error("bounded_capacity_not_natural");
-            return None;
-        };
-        match symbol.kind {
-            crate::SymbolKind::IndexParam => {
-                Some(self.types.intern_index(crate::IndexExpr::Param(ident.name)))
-            }
-            crate::SymbolKind::TypeParam => {
-                self.error("figura_type_param_in_index");
-                None
-            }
-            _ => {
-                self.error("bounded_capacity_not_natural");
-                None
-            }
-        }
-    }
-
-    fn lower_modular_word_type(&mut self, params: &[TypeExpr]) -> TypeId {
         let mut messages = Vec::new();
         let ty = crate::numeric_width::lower_modular_word(
-            params,
+            &type_params,
             self.interner,
             self.types,
             &mut |message| {
@@ -611,7 +777,11 @@ impl Lowerer<'_> {
         ty
     }
 
-    fn lower_collection_type(&mut self, collection: CollectionKind, params: &[TypeExpr]) -> TypeId {
+    fn lower_collection_type(
+        &mut self,
+        collection: CollectionKind,
+        params: &[GenericArgExpr],
+    ) -> TypeId {
         if collection == CollectionKind::Lista {
             return self.lower_lista_type(params);
         }
@@ -621,20 +791,20 @@ impl Lowerer<'_> {
         }
         let lowered = params
             .iter()
-            .map(|param| self.lower_nested_type(param))
+            .map(|param| self.lower_generic_type_arg(param))
             .collect::<Vec<_>>();
         collection.lower(self.types, &lowered)
     }
 
-    fn lower_lista_type(&mut self, params: &[TypeExpr]) -> TypeId {
+    fn lower_lista_type(&mut self, params: &[GenericArgExpr]) -> TypeId {
         match params {
             [elem] => {
-                let elem = self.lower_nested_type(elem);
+                let elem = self.lower_generic_type_arg(elem);
                 self.types.array(elem)
             }
             [elem, capacity] => {
-                let elem = self.lower_nested_type(elem);
-                let Some(capacity) = self.lower_capacity_index(capacity) else {
+                let elem = self.lower_generic_type_arg(elem);
+                let Some(capacity) = self.lower_generic_index_arg(capacity) else {
                     return self.types.intern(Type::Error);
                 };
                 self.types.bounded_array(elem, capacity)
@@ -646,7 +816,7 @@ impl Lowerer<'_> {
         }
     }
 
-    fn lower_qualified_type(&mut self, path: &[Ident], params: &[TypeExpr]) -> TypeId {
+    fn lower_qualified_type(&mut self, path: &[Ident], params: &[GenericArgExpr]) -> TypeId {
         let Some((namespace, type_name)) = path.first().zip(path.last()) else {
             self.error("empty_qualified_type_path");
             return self.types.intern(Type::Error);
@@ -673,7 +843,7 @@ impl Lowerer<'_> {
             }
             let args = params
                 .iter()
-                .map(|param| self.lower_nested_type(param))
+                .map(|param| self.lower_applied_arg(param))
                 .collect();
             return self.types.intern(Type::Applied(type_id, args));
         }
@@ -692,7 +862,7 @@ impl Lowerer<'_> {
                 }
                 let args = params
                     .iter()
-                    .map(|param| self.lower_nested_type(param))
+                    .map(|param| self.lower_applied_arg(param))
                     .collect();
                 return self.types.intern(Type::Applied(type_id, args));
             }

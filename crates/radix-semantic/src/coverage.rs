@@ -396,7 +396,10 @@ fn type_children(ty: &Type) -> Vec<TypeId> {
         }
         Type::Applied(base, args) => {
             let mut children = vec![*base];
-            children.extend(args.iter().copied());
+            children.extend(args.iter().filter_map(|arg| match arg {
+                radix_types::AppliedArg::Type(id) => Some(*id),
+                radix_types::AppliedArg::Size(_) => None,
+            }));
             children
         }
         Type::Union(members) => members.clone(),

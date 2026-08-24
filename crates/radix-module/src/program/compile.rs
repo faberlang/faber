@@ -1379,6 +1379,42 @@ fn semantic_param_mode(mode: AstParamMode) -> SemanticParamMode {
     }
 }
 
+fn interface_type_from_generic_arg(
+    arg: &radix_syntax::GenericArgExpr,
+    interner: &crate::lexer::Interner,
+    type_params: &BTreeSet<&str>,
+    nominal_kinds: &BTreeMap<String, InterfaceNominalKind>,
+    ctx: &SnapshotContext,
+) -> Option<InterfaceTypeSnapshot> {
+    match arg {
+        radix_syntax::GenericArgExpr::Type(ty) => {
+            interface_type_from_type_expr(ty, interner, type_params, nominal_kinds, ctx)
+        }
+        radix_syntax::GenericArgExpr::Name(name) => {
+            let ty = TypeExpr {
+                nullable: false,
+                mode: None,
+                kind: TypeExprKind::Named(name.clone(), Vec::new()),
+                span: name.span,
+                iuncta_label: None,
+            };
+            interface_type_from_type_expr(&ty, interner, type_params, nominal_kinds, ctx)
+        }
+        radix_syntax::GenericArgExpr::Size(_) => None,
+    }
+}
+
+fn generic_arg_bare_name(arg: &radix_syntax::GenericArgExpr) -> Option<radix_syntax::Ident> {
+    match arg {
+        radix_syntax::GenericArgExpr::Name(name) => Some(name.clone()),
+        radix_syntax::GenericArgExpr::Type(ty) => match &ty.kind {
+            TypeExprKind::Named(name, params) if params.is_empty() => Some(name.clone()),
+            _ => None,
+        },
+        radix_syntax::GenericArgExpr::Size(_) => None,
+    }
+}
+
 fn interface_type_from_type_expr(
     ty: &TypeExpr,
     interner: &crate::lexer::Interner,
@@ -1423,43 +1459,39 @@ fn interface_type_from_type_expr(
                 };
             }
             if params.len() == 1 && base == "lista" {
-                let elem = interface_type_from_type_expr(&params[0], interner, type_params, nominal_kinds, ctx)?;
+                let elem = interface_type_from_generic_arg(&params[0], interner, type_params, nominal_kinds, ctx)?;
                 return Some(InterfaceTypeSnapshot::Array(Box::new(elem)));
             }
             if params.len() == 2 && (base == "tabula" || base == "dictum") {
-                let key = interface_type_from_type_expr(&params[0], interner, type_params, nominal_kinds, ctx)?;
-                let val = interface_type_from_type_expr(&params[1], interner, type_params, nominal_kinds, ctx)?;
+                let key = interface_type_from_generic_arg(&params[0], interner, type_params, nominal_kinds, ctx)?;
+                let val = interface_type_from_generic_arg(&params[1], interner, type_params, nominal_kinds, ctx)?;
                 return Some(InterfaceTypeSnapshot::Map(Box::new(key), Box::new(val)));
             }
             if params.len() == 1 && base == "copia" {
-                let elem = interface_type_from_type_expr(&params[0], interner, type_params, nominal_kinds, ctx)?;
+                let elem = interface_type_from_generic_arg(&params[0], interner, type_params, nominal_kinds, ctx)?;
                 return Some(InterfaceTypeSnapshot::Set(Box::new(elem)));
             }
             if params.len() == 1 {
                 // Applied form `numerus<u32>` / `int<u32>` / `fractus<f32>` /
                 // `float<f32>` (bare width markers are handled above).
-                if let TypeExprKind::Named(width_ident, width_params) = &params[0].kind {
-                    if width_params.is_empty() {
-                        let width_name = interner.resolve(width_ident.name);
-                        let family = match base {
-                            "numerus" | "int" => Some(Primitive::Numerus),
-                            "fractus" | "float" => Some(Primitive::Fractus),
-                            _ => None,
-                        };
-                        if let Some(prim) = family {
-                            if let Ok(width) = NumericWidth::from_marker(width_name, prim) {
-                                return Some(InterfaceTypeSnapshot::SizedNumeric(prim, width));
-                            }
+                if let Some(width_ident) = generic_arg_bare_name(&params[0]) {
+                    let width_name = interner.resolve(width_ident.name);
+                    let family = match base {
+                        "numerus" | "int" => Some(Primitive::Numerus),
+                        "fractus" | "float" => Some(Primitive::Fractus),
+                        _ => None,
+                    };
+                    if let Some(prim) = family {
+                        if let Ok(width) = NumericWidth::from_marker(width_name, prim) {
+                            return Some(InterfaceTypeSnapshot::SizedNumeric(prim, width));
                         }
                     }
                 }
             }
             if params.len() == 1 && base == "instans" {
-                if let TypeExprKind::Named(marker_ident, marker_params) = &params[0].kind {
-                    if marker_params.is_empty() {
-                        if let Ok(precision) = InstansPrecision::from_marker(interner.resolve(marker_ident.name)) {
-                            return Some(InterfaceTypeSnapshot::SizedInstans(precision));
-                        }
+                if let Some(marker_ident) = generic_arg_bare_name(&params[0]) {
+                    if let Ok(precision) = InstansPrecision::from_marker(interner.resolve(marker_ident.name)) {
+                        return Some(InterfaceTypeSnapshot::SizedInstans(precision));
                     }
                 }
             }
@@ -1469,7 +1501,7 @@ fn interface_type_from_type_expr(
             if base == "iuncta" && params.len() >= 2 {
                 let elements = params
                     .iter()
-                    .map(|element| interface_type_from_type_expr(element, interner, type_params, nominal_kinds, ctx))
+                    .map(|element| interface_type_from_generic_arg(element, interner, type_params, nominal_kinds, ctx))
                     .collect::<Option<Vec<_>>>()?;
                 return Some(InterfaceTypeSnapshot::Tuple(elements));
             }

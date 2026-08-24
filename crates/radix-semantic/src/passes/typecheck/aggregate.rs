@@ -356,6 +356,10 @@ impl TypeChecker<'_> {
 
         if self.nominal_is_generic(def_id) {
             let base = self.types.intern(Type::Struct(def_id));
+            let witnesses = witnesses
+                .into_iter()
+                .map(radix_types::AppliedArg::Type)
+                .collect();
             return self.types.intern(Type::Applied(base, witnesses));
         }
         self.types.intern(Type::Struct(def_id))

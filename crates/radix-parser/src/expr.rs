@@ -843,7 +843,7 @@ impl Parser {
         &mut self,
         start: Span,
         callee: Expr,
-        type_args: Vec<TypeExpr>,
+        type_args: Vec<GenericArgExpr>,
     ) -> Result<Expr, ParseError> {
         self.advance();
         let allows_template_labels = matches!(
@@ -1612,7 +1612,9 @@ impl Parser {
         let mut type_args = Vec::new();
         let mut labels = HashSet::new();
         loop {
-            type_args.push(self.parse_ratio_type_argument(&mut labels)?);
+            type_args.push(GenericArgExpr::Type(
+                self.parse_ratio_type_argument(&mut labels)?,
+            ));
             if !self.consume_item_separator(&TokenKind::GtAscii, "ratio_type_arguments")? {
                 break;
             }
@@ -2410,7 +2412,7 @@ impl Parser {
         Err(self.expected_expression_error("field_value_separator"))
     }
 
-    fn try_parse_type_args(&mut self) -> Result<Vec<TypeExpr>, ParseError> {
+    fn try_parse_type_args(&mut self) -> Result<Vec<GenericArgExpr>, ParseError> {
         if !self.eat(&TokenKind::LtAscii) {
             return Ok(Vec::new());
         }
@@ -2421,7 +2423,7 @@ impl Parser {
     ///
     /// Call-site lists use the same `typeArguments` production as named types,
     /// including NATURAL (`linear_from_raw<2, 2, 2>(…)`).
-    fn finish_type_args_list(&mut self) -> Result<Vec<TypeExpr>, ParseError> {
+    fn finish_type_args_list(&mut self) -> Result<Vec<GenericArgExpr>, ParseError> {
         let mut args = Vec::new();
         loop {
             args.push(self.parse_type_argument()?);
@@ -2438,7 +2440,7 @@ impl Parser {
     ///
     /// The postfix loop has already confirmed `<` is present; this helper consumes
     /// it and requires a well-formed `< type (, type)* >` list before `(`.
-    fn parse_call_type_args(&mut self) -> Result<Vec<TypeExpr>, ParseError> {
+    fn parse_call_type_args(&mut self) -> Result<Vec<GenericArgExpr>, ParseError> {
         if !self.eat(&TokenKind::LtAscii) {
             return Err(self.expected_expression_error("call_type_args_start"));
         }

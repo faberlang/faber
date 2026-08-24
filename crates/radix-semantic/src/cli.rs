@@ -860,7 +860,11 @@ impl CliBuilder<'_> {
             TypeExprKind::Named(name, params)
                 if self.interner.resolve(name.name) == "lista" && params.len() == 1 =>
             {
-                self.list_cli_type(&params[0], span)
+                let radix_syntax::GenericArgExpr::Type(element) = &params[0] else {
+                    self.error(span, ISSUE_UNSUPPORTED_TYPE_SHAPE);
+                    return CliType::Textus;
+                };
+                self.list_cli_type(element, span)
             }
             _ => {
                 self.error(span, ISSUE_UNSUPPORTED_TYPE_SHAPE);

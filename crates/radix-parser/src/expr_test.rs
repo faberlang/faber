@@ -14,6 +14,13 @@ use radix_syntax::{
     TypeExprKind,
 };
 
+fn generic_arg_type(arg: &radix_syntax::GenericArgExpr) -> &radix_syntax::TypeExpr {
+    match arg {
+        radix_syntax::GenericArgExpr::Type(ty) => ty,
+        other => panic!("expected type generic argument, got {other:?}"),
+    }
+}
+
 #[test]
 fn conversio_with_exit_arrow_recovery_parses() {
     let result = parse_ok(r#"fixum _ n ← "bad" ↦ numerus ⇥ 0"#);
@@ -124,7 +131,7 @@ fn conversio_lista_sugar_target_parses_as_type() {
         panic!("expected lista sugar target");
     };
     assert_eq!(result.interner.resolve(lista.name), "lista");
-    let TypeExprKind::Named(elem, _) = &params[0].kind else {
+    let TypeExprKind::Named(elem, _) = &generic_arg_type(&params[0]).kind else {
         panic!("expected width element");
     };
     assert_eq!(result.interner.resolve(elem.name), "u32");
@@ -597,15 +604,23 @@ fn parses_ratio_construction_as_verte_with_labeled_type() {
     assert_eq!(result.interner.resolve(name.name), "ratio");
     assert_eq!(params.len(), 2);
     assert_eq!(
-        result
-            .interner
-            .resolve(params[0].iuncta_label.as_ref().expect("g label").name),
+        result.interner.resolve(
+            generic_arg_type(&params[0])
+                .iuncta_label
+                .as_ref()
+                .expect("g label")
+                .name
+        ),
         "g"
     );
     assert_eq!(
-        result
-            .interner
-            .resolve(params[1].iuncta_label.as_ref().expect("w label").name),
+        result.interner.resolve(
+            generic_arg_type(&params[1])
+                .iuncta_label
+                .as_ref()
+                .expect("w label")
+                .name
+        ),
         "w"
     );
     let ExprKind::Object(object) = &verte.expr.kind else {

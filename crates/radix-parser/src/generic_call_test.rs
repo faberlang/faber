@@ -22,6 +22,13 @@ fn first_call_expr(result: &crate::ParseResult) -> &radix_syntax::CallExpr {
     call
 }
 
+fn generic_arg_type(arg: &radix_syntax::GenericArgExpr) -> &radix_syntax::TypeExpr {
+    match arg {
+        radix_syntax::GenericArgExpr::Type(ty) => ty,
+        other => panic!("expected type generic argument, got {other:?}"),
+    }
+}
+
 #[test]
 fn parses_explicit_type_args_on_direct_call() {
     let result = parse_ok(
@@ -31,7 +38,10 @@ fn parses_explicit_type_args_on_direct_call() {
     );
     let call = first_call_expr(&result);
     assert_eq!(call.type_args.len(), 1);
-    assert!(matches!(call.type_args[0].kind, TypeExprKind::Named(_, _)));
+    assert!(matches!(
+        generic_arg_type(&call.type_args[0]).kind,
+        TypeExprKind::Named(_, _)
+    ));
 }
 
 #[test]
@@ -110,8 +120,14 @@ fn parses_multiple_type_args_on_direct_call() {
     );
     let call = first_call_expr(&result);
     assert_eq!(call.type_args.len(), 2);
-    assert!(matches!(call.type_args[0].kind, TypeExprKind::Named(_, _)));
-    assert!(matches!(call.type_args[1].kind, TypeExprKind::Named(_, _)));
+    assert!(matches!(
+        generic_arg_type(&call.type_args[0]).kind,
+        TypeExprKind::Named(_, _)
+    ));
+    assert!(matches!(
+        generic_arg_type(&call.type_args[1]).kind,
+        TypeExprKind::Named(_, _)
+    ));
 }
 
 #[test]
@@ -126,8 +142,11 @@ fn parses_natural_type_args_on_direct_call() {
     let call = first_call_expr(&result);
     assert_eq!(call.type_args.len(), 3);
     for arg in &call.type_args {
-        let TypeExprKind::Named(name, params) = &arg.kind else {
-            panic!("expected NATURAL type argument, got {:?}", arg.kind);
+        let TypeExprKind::Named(name, params) = &generic_arg_type(arg).kind else {
+            panic!(
+                "expected NATURAL type argument, got {:?}",
+                generic_arg_type(arg).kind
+            );
         };
         assert!(params.is_empty());
         assert_eq!(result.interner.resolve(name.name), "2");

@@ -260,16 +260,26 @@ fn try_bind_generic_type_witness(
                 && expected_args
                     .iter()
                     .zip(actual_args.iter())
-                    .all(|(expected_arg, actual_arg)| {
-                        try_bind_generic_type_witness(
-                            types,
-                            *expected_arg,
-                            *actual_arg,
-                            generic_bindings,
-                            shape_bindings,
-                            seen,
-                        )
-                    })
+                    .all(
+                        |(expected_arg, actual_arg)| match (expected_arg, actual_arg) {
+                            (
+                                radix_types::AppliedArg::Type(expected),
+                                radix_types::AppliedArg::Type(actual),
+                            ) => try_bind_generic_type_witness(
+                                types,
+                                *expected,
+                                *actual,
+                                generic_bindings,
+                                shape_bindings,
+                                seen,
+                            ),
+                            (
+                                radix_types::AppliedArg::Size(expected),
+                                radix_types::AppliedArg::Size(actual),
+                            ) => try_bind_index_witness(types, *expected, *actual, shape_bindings),
+                            _ => false,
+                        },
+                    )
         }
         (Type::Union(expected_members), Type::Union(actual_members)) => try_bind_union_members(
             types,
@@ -785,7 +795,13 @@ fn instantiate_existing_type_id(
             let base = instantiate_existing_type_id(types, base, generic_bindings, span, index)?;
             let args = args
                 .iter()
-                .map(|arg| instantiate_existing_type_id(types, *arg, generic_bindings, span, index))
+                .map(|arg| match arg {
+                    radix_types::AppliedArg::Type(id) => {
+                        instantiate_existing_type_id(types, *id, generic_bindings, span, index)
+                            .map(radix_types::AppliedArg::Type)
+                    }
+                    radix_types::AppliedArg::Size(id) => Ok(radix_types::AppliedArg::Size(*id)),
+                })
                 .collect::<Result<Vec<_>, _>>()?;
             find_existing_type(types, &Type::Applied(base, args), span, index)
         }
@@ -1213,15 +1229,19 @@ fn instantiate_mutable_type_id(
             )?;
             let args = args
                 .iter()
-                .map(|arg| {
-                    instantiate_mutable_type_id(
+                .map(|arg| match arg {
+                    radix_types::AppliedArg::Type(id) => instantiate_mutable_type_id(
                         types,
-                        *arg,
+                        *id,
                         generic_bindings,
                         shape_bindings,
                         span,
                         index,
                     )
+                    .map(radix_types::AppliedArg::Type),
+                    radix_types::AppliedArg::Size(id) => Ok(radix_types::AppliedArg::Size(
+                        substitute_index_params(types, *id, shape_bindings),
+                    )),
                 })
                 .collect::<Result<Vec<_>, _>>()?;
             Ok(intern_or_find(types, &Type::Applied(base, args), index))
@@ -1427,7 +1447,15 @@ fn type_matches_candidate(types: &TypeTable, id: TypeId, candidate: &Type) -> bo
                 && a_args
                     .iter()
                     .zip(b_args.iter())
-                    .all(|(a_arg, b_arg)| types.equals(*a_arg, *b_arg))
+                    .all(|(a_arg, b_arg)| match (a_arg, b_arg) {
+                        (radix_types::AppliedArg::Type(a), radix_types::AppliedArg::Type(b)) => {
+                            types.equals(*a, *b)
+                        }
+                        (radix_types::AppliedArg::Size(a), radix_types::AppliedArg::Size(b)) => {
+                            types.index_equals(*a, *b)
+                        }
+                        _ => false,
+                    })
         }
         (Type::Union(a), Type::Union(b)) => {
             a.len() == b.len()
@@ -1529,9 +1557,12 @@ fn type_contains_param_inner(types: &TypeTable, ty: TypeId, seen: &mut FxHashSet
         }
         Type::Applied(base, args) => {
             type_contains_param_inner(types, *base, seen)
-                || args
-                    .iter()
-                    .any(|arg| type_contains_param_inner(types, *arg, seen))
+                || args.iter().any(|arg| match arg {
+                    radix_types::AppliedArg::Type(id) => {
+                        type_contains_param_inner(types, *id, seen)
+                    }
+                    radix_types::AppliedArg::Size(id) => index_contains_param(types, *id),
+                })
         }
         Type::Union(members) => members
             .iter()

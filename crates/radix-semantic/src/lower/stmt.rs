@@ -66,7 +66,10 @@ fn lista_element_labels(
     if interner.resolve(name.name) != "lista" || params.len() != 1 {
         return None;
     }
-    crate::tuple_labels::from_type_expr(&params[0], interner)
+    let radix_syntax::GenericArgExpr::Type(element) = &params[0] else {
+        return None;
+    };
+    crate::tuple_labels::from_type_expr(element, interner)
 }
 
 fn binding_pattern_has_name(

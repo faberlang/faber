@@ -1066,7 +1066,7 @@ pub struct IunctaExpr {
     pub elements: Vec<Expr>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Ident {
     pub name: Symbol,
     pub span: Span,
@@ -1196,7 +1196,7 @@ pub enum TernaryStyle {
 #[derive(Debug)]
 pub struct CallExpr {
     pub callee: Box<Expr>,
-    pub type_args: Vec<TypeExpr>,
+    pub type_args: Vec<GenericArgExpr>,
     pub args: Vec<Argument>,
 }
 
@@ -1391,7 +1391,7 @@ pub enum RangeKind {
 pub struct ConversioExpr {
     pub expr: Box<Expr>,
     pub target: ConversioTarget,
-    pub type_params: Vec<TypeExpr>,
+    pub type_params: Vec<GenericArgExpr>,
     pub recovery: Option<Box<Expr>>,
 }
 
@@ -1460,7 +1460,20 @@ pub struct TypeCheckExpr {
 // Types
 // =============================================================================
 
-#[derive(Debug)]
+/// One source-preserving generic application argument.
+///
+/// A bare identifier stays `Name` until the callee's declaration metadata is
+/// available. Natural literals, shape tuples, and index holes use `Size`;
+/// ordinary type syntax and explicit type holes use `Type` so the shipped
+/// marker-hole surface remains distinct from compile-time indices.
+#[derive(Debug, Clone)]
+pub enum GenericArgExpr {
+    Type(TypeExpr),
+    Size(FiguraExpr),
+    Name(Ident),
+}
+
+#[derive(Debug, Clone)]
 pub struct TypeExpr {
     /// Legacy `si` nullability marker.
     ///
@@ -1503,7 +1516,7 @@ pub enum TypeMode {
 }
 
 /// Type-level tensor shape (Figura) in `tensor<T, Figura>`.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum FiguraExpr {
     /// Inference hole: `_`.
     Infer,
@@ -1521,7 +1534,7 @@ pub enum FiguraExpr {
 /// source spelling such as `_`, generic application, collection syntax, function
 /// types, and inline unions so type checking can report errors against the
 /// syntax the user wrote.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum TypeExprKind {
     /// Inference hole: `_`.
     Infer,
@@ -1529,9 +1542,9 @@ pub enum TypeExprKind {
     /// hole consumes the whole type expression; it is distinct from `Infer`
     /// (monomorphic hole) and from `Union` (explicit member list).
     UnionHole,
-    Named(Ident, Vec<TypeExpr>),
+    Named(Ident, Vec<GenericArgExpr>),
     /// Qualified named type: `namespace.Type`.
-    Qualified(Vec<Ident>, Vec<TypeExpr>),
+    Qualified(Vec<Ident>, Vec<GenericArgExpr>),
     /// Indexed tensor: `tensor<T, Figura>`.
     Tensor(Box<TypeExpr>, FiguraExpr),
     /// Indexed sparse tensor: `sparsa<T, Figura>`.
@@ -1549,7 +1562,7 @@ pub enum TypeExprKind {
     Union(Vec<TypeExpr>),
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct FuncTypeExpr {
     pub params: Vec<TypeExpr>,
     pub ret: Box<TypeExpr>,

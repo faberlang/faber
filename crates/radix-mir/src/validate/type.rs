@@ -99,10 +99,17 @@ impl Validator<'_, '_> {
                     );
                     return None;
                 }
+                let type_args = args
+                    .into_iter()
+                    .map(|arg| match arg {
+                        radix_types::AppliedArg::Type(id) => Some(id),
+                        radix_types::AppliedArg::Size(_) => None,
+                    })
+                    .collect::<Option<Vec<_>>>()?;
                 let bindings = params
                     .iter()
                     .copied()
-                    .zip(args.into_iter().map(MirType::semantic))
+                    .zip(type_args.into_iter().map(MirType::semantic))
                     .collect::<MirGenericBindings>();
                 instantiate_existing_generic_type(self.context.types, raw_field_ty, &bindings, span)
                     .map_err(|error| self.error(error.span, error.message))
@@ -637,7 +644,9 @@ impl Validator<'_, '_> {
             Type::Applied(base, args) => {
                 self.validate_type_id(base, span, seen);
                 for arg in args {
-                    self.validate_type_id(arg, span, seen);
+                    if let radix_types::AppliedArg::Type(id) = arg {
+                        self.validate_type_id(id, span, seen);
+                    }
                 }
             }
             Type::Union(members) => {

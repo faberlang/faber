@@ -999,10 +999,17 @@ impl FunctionBuilder<'_> {
         if !matches!(self.types.get(*base), Type::Enum(def_id) if *def_id == parent) || params.len() != args.len() {
             return Some(field_ty);
         }
+        let type_args = args
+            .iter()
+            .map(|arg| match arg {
+                radix_types::AppliedArg::Type(id) => Some(*id),
+                radix_types::AppliedArg::Size(_) => None,
+            })
+            .collect::<Option<Vec<_>>>()?;
         let bindings = params
             .iter()
             .copied()
-            .zip(args.iter().copied().map(MirType::semantic))
+            .zip(type_args.into_iter().map(MirType::semantic))
             .collect::<MirGenericBindings>();
         instantiate_existing_generic_type(self.types, field_ty, &bindings, span)
             .map_err(|error| {

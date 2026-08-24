@@ -755,11 +755,14 @@ impl TypeChecker<'_> {
         let Type::Struct(def_id) = self.types.get(*base) else {
             return None;
         };
+        let radix_types::AppliedArg::Type(payload) = args[0] else {
+            return None;
+        };
         if Some(*def_id) == crate::builtins::frame_types::meus_def_id(self.resolver) {
-            return Some((DirectionalViewKind::Meus, args[0]));
+            return Some((DirectionalViewKind::Meus, payload));
         }
         if Some(*def_id) == crate::builtins::frame_types::tuus_def_id(self.resolver) {
-            return Some((DirectionalViewKind::Tuus, args[0]));
+            return Some((DirectionalViewKind::Tuus, payload));
         }
         None
     }
@@ -979,6 +982,10 @@ impl TypeChecker<'_> {
                 }
                 return if self.nominal_is_generic(parent) {
                     let base = self.types.intern(Type::Enum(parent));
+                    let witnesses = witnesses
+                        .into_iter()
+                        .map(radix_types::AppliedArg::Type)
+                        .collect();
                     self.types.intern(Type::Applied(base, witnesses))
                 } else {
                     self.types.intern(Type::Enum(parent))
@@ -1231,6 +1238,14 @@ impl TypeChecker<'_> {
             Type::Enum(def) | Type::Struct(def) => Some(*def),
             _ => None,
         };
-        (base_def == Some(def_id)).then(|| args.clone())
+        if base_def != Some(def_id) {
+            return None;
+        }
+        args.iter()
+            .map(|arg| match arg {
+                radix_types::AppliedArg::Type(id) => Some(*id),
+                radix_types::AppliedArg::Size(_) => None,
+            })
+            .collect()
     }
 }

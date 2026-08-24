@@ -6,7 +6,7 @@ use crate::test_support::args_have_no_legacy_message;
 use crate::test_support::{parse_ok, parse_program};
 use crate::{parse, ParseErrorKind};
 use radix_lexer::lex;
-use radix_syntax::{ClassMemberKind, ExprKind, FiguraExpr, StmtKind, TypeExprKind};
+use radix_syntax::{ClassMemberKind, ExprKind, FiguraExpr, GenericArgExpr, StmtKind, TypeExprKind};
 
 fn parse_errors_include_issue(source: &str, kind: ParseErrorKind, issue: &str) {
     let result = parse(lex(source));
@@ -45,6 +45,13 @@ fn expect_expected_issue(source: &str, issue: &str) -> crate::ParseError {
         "migrated parser diagnostic should not choose prose at emit site"
     );
     err
+}
+
+fn generic_arg_type(arg: &radix_syntax::GenericArgExpr) -> &radix_syntax::TypeExpr {
+    match arg {
+        radix_syntax::GenericArgExpr::Type(ty) => ty,
+        other => panic!("expected type generic argument, got {other:?}"),
+    }
 }
 
 #[test]
@@ -294,7 +301,10 @@ fn parses_lista_infer_element_hole() {
         panic!("expected lista type");
     };
     assert_eq!(result.interner.resolve(name.name), "lista");
-    assert!(matches!(params[0].kind, TypeExprKind::Infer));
+    assert!(matches!(
+        generic_arg_type(&params[0]).kind,
+        TypeExprKind::Infer
+    ));
 }
 
 #[test]
@@ -317,7 +327,7 @@ fn types_test_parses_proposed_bounded_type_forms() {
         assert_eq!(result.interner.resolve(name.name), *type_name);
         assert_eq!(params.len(), expected_params.len(), "{source}");
         for (param, expected) in params.iter().zip(expected_params.iter()) {
-            let TypeExprKind::Named(param_name, nested) = &param.kind else {
+            let TypeExprKind::Named(param_name, nested) = &generic_arg_type(param).kind else {
                 panic!("expected named type argument in {source}");
             };
             assert!(nested.is_empty(), "{source}");
@@ -389,6 +399,22 @@ fn matrix_without_figura_emits_structured_expected_issue() {
 }
 
 #[test]
+fn generic_applied_arg_preserves_literal_as_source_value() {
+    let result = parse_ok("typus Vector = Box<3>");
+    let program = result.program.as_ref().expect("program");
+    let StmtKind::TypeAlias(alias) = &program.statements[0].kind else {
+        panic!("expected type alias");
+    };
+    let TypeExprKind::Named(_, params) = &alias.ty.kind else {
+        panic!("expected named application");
+    };
+    assert!(matches!(
+        params[0],
+        GenericArgExpr::Size(FiguraExpr::Literal(3)),
+    ));
+}
+
+#[test]
 fn parses_tensor_sugar_with_infer_figura() {
     let result = parse_ok("functio f(tf32 value) → vacuum {}");
     let program = result.program.as_ref().expect("program");
@@ -440,7 +466,7 @@ fn parses_vector_long_form() {
         panic!("expected element type");
     };
     assert_eq!(result.interner.resolve(elem_name.name), "fractus");
-    let TypeExprKind::Named(width_elem, _) = &elem_params[0].kind else {
+    let TypeExprKind::Named(width_elem, _) = &generic_arg_type(&elem_params[0]).kind else {
         panic!("expected fractus width");
     };
     assert_eq!(result.interner.resolve(width_elem.name), "f32");
@@ -481,7 +507,7 @@ fn parses_matrix_long_form() {
         panic!("expected element type");
     };
     assert_eq!(result.interner.resolve(elem_name.name), "fractus");
-    let TypeExprKind::Named(width_elem, _) = &elem_params[0].kind else {
+    let TypeExprKind::Named(width_elem, _) = &generic_arg_type(&elem_params[0]).kind else {
         panic!("expected fractus width");
     };
     assert_eq!(result.interner.resolve(width_elem.name), "f32");
@@ -655,7 +681,7 @@ fn parses_lista_sugar_unsigned_width() {
     };
     assert_eq!(result.interner.resolve(lista.name), "lista");
     assert_eq!(params.len(), 1);
-    let TypeExprKind::Named(elem, _) = &params[0].kind else {
+    let TypeExprKind::Named(elem, _) = &generic_arg_type(&params[0]).kind else {
         panic!("expected width element");
     };
     assert_eq!(result.interner.resolve(elem.name), "u32");
@@ -672,7 +698,7 @@ fn parses_lista_sugar_float_width() {
         panic!("expected lista sugar desugar");
     };
     assert_eq!(result.interner.resolve(lista.name), "lista");
-    let TypeExprKind::Named(elem, _) = &params[0].kind else {
+    let TypeExprKind::Named(elem, _) = &generic_arg_type(&params[0]).kind else {
         panic!("expected width element");
     };
     assert_eq!(result.interner.resolve(elem.name), "f32");
@@ -751,11 +777,11 @@ fn parses_iuncta_tuple_type_with_two_elements() {
     };
     assert_eq!(result.interner.resolve(name.name), "iuncta");
     assert_eq!(params.len(), 2);
-    let TypeExprKind::Named(first, _) = &params[0].kind else {
+    let TypeExprKind::Named(first, _) = &generic_arg_type(&params[0]).kind else {
         panic!("expected first element type");
     };
     assert_eq!(result.interner.resolve(first.name), "textus");
-    let TypeExprKind::Named(second, _) = &params[1].kind else {
+    let TypeExprKind::Named(second, _) = &generic_arg_type(&params[1]).kind else {
         panic!("expected second element type");
     };
     assert_eq!(result.interner.resolve(second.name), "numerus");
@@ -774,13 +800,28 @@ fn parses_labeled_and_unlabeled_iuncta_type_arguments() {
     };
     assert_eq!(result.interner.resolve(name.name), "iuncta");
     assert_eq!(params.len(), 3);
-    assert!(matches!(params[0].kind, TypeExprKind::Named(_, _)));
-    assert!(matches!(params[1].kind, TypeExprKind::Named(_, _)));
-    assert!(matches!(params[2].kind, TypeExprKind::Named(_, _)));
-    let gx = params[0].iuncta_label.as_ref().expect("gx label");
+    assert!(matches!(
+        generic_arg_type(&params[0]).kind,
+        TypeExprKind::Named(_, _)
+    ));
+    assert!(matches!(
+        generic_arg_type(&params[1]).kind,
+        TypeExprKind::Named(_, _)
+    ));
+    assert!(matches!(
+        generic_arg_type(&params[2]).kind,
+        TypeExprKind::Named(_, _)
+    ));
+    let gx = generic_arg_type(&params[0])
+        .iuncta_label
+        .as_ref()
+        .expect("gx label");
     assert_eq!(result.interner.resolve(gx.name), "gx");
-    assert!(params[1].iuncta_label.is_none());
-    let fixum = params[2].iuncta_label.as_ref().expect("fixum label");
+    assert!(generic_arg_type(&params[1]).iuncta_label.is_none());
+    let fixum = generic_arg_type(&params[2])
+        .iuncta_label
+        .as_ref()
+        .expect("fixum label");
     assert_eq!(result.interner.resolve(fixum.name), "fixum");
 }
 
@@ -794,8 +835,14 @@ fn parses_labeled_iuncta_infer_argument() {
     let TypeExprKind::Named(_, params) = &func.params[0].ty.kind else {
         panic!("expected iuncta type");
     };
-    assert!(matches!(params[0].kind, TypeExprKind::Infer));
-    assert!(matches!(params[1].kind, TypeExprKind::Named(_, _)));
+    assert!(matches!(
+        generic_arg_type(&params[0]).kind,
+        TypeExprKind::Infer
+    ));
+    assert!(matches!(
+        generic_arg_type(&params[1]).kind,
+        TypeExprKind::Named(_, _)
+    ));
 }
 
 #[test]
@@ -956,13 +1003,13 @@ fn parses_iuncta_with_nested_types() {
     assert_eq!(result.interner.resolve(name.name), "iuncta");
     assert_eq!(params.len(), 2);
     // First param: lista<textus>
-    let TypeExprKind::Named(lista, lista_params) = &params[0].kind else {
+    let TypeExprKind::Named(lista, lista_params) = &generic_arg_type(&params[0]).kind else {
         panic!("expected lista type");
     };
     assert_eq!(result.interner.resolve(lista.name), "lista");
     assert_eq!(lista_params.len(), 1);
     // Second param: iuncta<numerus, fractus<f32>>
-    let TypeExprKind::Named(inner_iuncta, inner_params) = &params[1].kind else {
+    let TypeExprKind::Named(inner_iuncta, inner_params) = &generic_arg_type(&params[1]).kind else {
         panic!("expected inner iuncta type");
     };
     assert_eq!(result.interner.resolve(inner_iuncta.name), "iuncta");
@@ -981,13 +1028,22 @@ fn parses_ratio_type_with_mandatory_labels_and_holes() {
     };
     assert_eq!(result.interner.resolve(name.name), "ratio");
     assert_eq!(params.len(), 3);
-    assert!(matches!(params[0].kind, TypeExprKind::Named(_, _)));
-    assert!(matches!(params[1].kind, TypeExprKind::Infer));
-    assert!(matches!(params[2].kind, TypeExprKind::Named(_, _)));
+    assert!(matches!(
+        generic_arg_type(&params[0]).kind,
+        TypeExprKind::Named(_, _)
+    ));
+    assert!(matches!(
+        generic_arg_type(&params[1]).kind,
+        TypeExprKind::Infer
+    ));
+    assert!(matches!(
+        generic_arg_type(&params[2]).kind,
+        TypeExprKind::Named(_, _)
+    ));
     let labels = params
         .iter()
         .map(|param| {
-            param
+            generic_arg_type(param)
                 .iuncta_label
                 .as_ref()
                 .map(|label| result.interner.resolve(label.name))
@@ -1075,7 +1131,10 @@ fn parses_union_hole_lista_element() {
     };
     assert_eq!(result.interner.resolve(name.name), "lista");
     assert_eq!(params.len(), 1);
-    assert!(matches!(params[0].kind, TypeExprKind::UnionHole));
+    assert!(matches!(
+        generic_arg_type(&params[0]).kind,
+        TypeExprKind::UnionHole
+    ));
 }
 
 #[test]
@@ -1130,7 +1189,10 @@ fn parses_union_hole_tabula_value_slot() {
     };
     assert_eq!(result.interner.resolve(name.name), "tabula");
     assert_eq!(params.len(), 2);
-    assert!(matches!(params[1].kind, TypeExprKind::UnionHole));
+    assert!(matches!(
+        generic_arg_type(&params[1]).kind,
+        TypeExprKind::UnionHole
+    ));
 }
 
 #[test]

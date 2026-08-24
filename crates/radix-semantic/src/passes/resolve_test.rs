@@ -17,8 +17,8 @@ use radix_lexer::lex;
 use radix_lexer::{Interner, Span};
 use radix_parser::parse;
 use radix_syntax::{
-    BlockStmt, Expr, ExprKind, FuncDecl, IfBody, Param, Program, Stmt, StmtKind, TypeExpr,
-    TypeExprKind,
+    BlockStmt, Expr, ExprKind, FuncDecl, GenericArgExpr, IfBody, Param, Program, Stmt, StmtKind,
+    TypeExpr, TypeExprKind,
 };
 
 fn ident(interner: &mut Interner, name: &str) -> radix_syntax::Ident {
@@ -116,7 +116,7 @@ fn named_type_with_params(name: radix_syntax::Ident, params: Vec<TypeExpr>) -> T
     TypeExpr {
         nullable: false,
         mode: None,
-        kind: TypeExprKind::Named(name, params),
+        kind: TypeExprKind::Named(name, params.into_iter().map(GenericArgExpr::Type).collect()),
         span: Span::default(),
         iuncta_label: None,
     }

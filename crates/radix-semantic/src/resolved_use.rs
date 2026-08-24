@@ -357,7 +357,10 @@ impl UseVisitor<'_> {
             }
             Type::Applied(base, args) => {
                 let mut children = vec![base];
-                children.extend(args);
+                children.extend(args.into_iter().filter_map(|arg| match arg {
+                    radix_types::AppliedArg::Type(id) => Some(id),
+                    radix_types::AppliedArg::Size(_) => None,
+                }));
                 children
             }
             Type::Union(members) => members,

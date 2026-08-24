@@ -26,8 +26,8 @@ use std::cell::Cell;
 
 use super::ast::{
     ArrayElement, BindingPattern, BlockStmt, ClassMemberKind, ClausuraBody, ConversioTarget, Expr,
-    ExprKind, Ident, IfBody, ImportKind, NonNullKind, OptionalChainKind, Pattern, PatternBind,
-    PraefixumBody, Program, SecusClause, Stmt, StmtKind, TypeExpr, TypeExprKind,
+    ExprKind, GenericArgExpr, Ident, IfBody, ImportKind, NonNullKind, OptionalChainKind, Pattern,
+    PatternBind, PraefixumBody, Program, SecusClause, Stmt, StmtKind, TypeExpr, TypeExprKind,
 };
 
 /// Maximum AST nesting depth before the walker refuses to descend further.
@@ -428,8 +428,8 @@ pub fn walk_expr<V: Visitor>(visitor: &mut V, expr: &Expr) {
         }
         ExprKind::Call(call) => {
             visitor.visit_expr(&call.callee);
-            for ty in &call.type_args {
-                visitor.visit_type_expr(ty);
+            for arg in &call.type_args {
+                walk_generic_arg_expr(visitor, arg);
             }
             for arg in &call.args {
                 visitor.visit_expr(&arg.value);
@@ -506,8 +506,8 @@ pub fn walk_expr<V: Visitor>(visitor: &mut V, expr: &Expr) {
                 ConversioTarget::Explicit(ty) => visitor.visit_type_expr(ty),
                 ConversioTarget::Intervallum(operand) => visitor.visit_expr(operand),
             }
-            for ty in &conversio.type_params {
-                visitor.visit_type_expr(ty);
+            for arg in &conversio.type_params {
+                walk_generic_arg_expr(visitor, arg);
             }
             if let Some(recovery) = &conversio.recovery {
                 visitor.visit_expr(recovery);
@@ -666,7 +666,7 @@ pub fn walk_type_expr<V: Visitor>(visitor: &mut V, ty: &TypeExpr) {
         TypeExprKind::Named(name, params) => {
             visitor.visit_ident(name);
             for param in params {
-                visitor.visit_type_expr(param);
+                walk_generic_arg_expr(visitor, param);
             }
         }
         TypeExprKind::Qualified(path, params) => {
@@ -674,7 +674,7 @@ pub fn walk_type_expr<V: Visitor>(visitor: &mut V, ty: &TypeExpr) {
                 visitor.visit_ident(segment);
             }
             for param in params {
-                visitor.visit_type_expr(param);
+                walk_generic_arg_expr(visitor, param);
             }
         }
         TypeExprKind::Func(func) => {
@@ -688,6 +688,14 @@ pub fn walk_type_expr<V: Visitor>(visitor: &mut V, ty: &TypeExpr) {
                 visitor.visit_type_expr(m);
             }
         }
+    }
+}
+
+fn walk_generic_arg_expr<V: Visitor>(visitor: &mut V, arg: &GenericArgExpr) {
+    match arg {
+        GenericArgExpr::Type(ty) => visitor.visit_type_expr(ty),
+        GenericArgExpr::Size(figura) => walk_figura_expr(visitor, figura),
+        GenericArgExpr::Name(ident) => visitor.visit_ident(ident),
     }
 }
 

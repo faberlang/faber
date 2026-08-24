@@ -20,7 +20,9 @@
 
 use super::{ParseError, ParseErrorKind, Parser};
 use radix_lexer::{KeywordOwner, Span, Symbol, TokenKind};
-use radix_syntax::{FiguraExpr, FuncTypeExpr, Ident, TypeExpr, TypeExprKind, TypeMode};
+use radix_syntax::{
+    FiguraExpr, FuncTypeExpr, GenericArgExpr, Ident, TypeExpr, TypeExprKind, TypeMode,
+};
 use std::collections::HashSet;
 
 // TYPE PARSING
@@ -193,7 +195,7 @@ impl Parser {
                             .with_arg("issue", "promissum_alternate_uses_exit_arrow"));
                         }
                         self.expect(&TokenKind::GtAscii, "expected '>'")?;
-                        TypeExprKind::Named(name, vec![*success])
+                        TypeExprKind::Named(name, vec![GenericArgExpr::Type(*success)])
                     };
                     kind
                 } else if name_str == "tensor"
@@ -234,9 +236,9 @@ impl Parser {
                     let mut labels = HashSet::new();
                     loop {
                         let param = if name_str == "iuncta" {
-                            self.parse_iuncta_type_argument(&mut labels)?
+                            GenericArgExpr::Type(self.parse_iuncta_type_argument(&mut labels)?)
                         } else if path.len() == 1 && name_str == "ratio" {
-                            self.parse_ratio_type_argument(&mut labels)?
+                            GenericArgExpr::Type(self.parse_ratio_type_argument(&mut labels)?)
                         } else {
                             self.parse_type_argument()?
                         };
@@ -368,7 +370,7 @@ impl Parser {
         let elem = self.width_element_type_expr(width, name.span);
         Ok(TypeExprKind::Named(
             self.keyword_ident("lista", name.span),
-            vec![elem],
+            vec![GenericArgExpr::Type(elem)],
         ))
     }
 
@@ -505,7 +507,7 @@ impl Parser {
         } else {
             None
         };
-        let mut ty = self.parse_type_argument()?;
+        let mut ty = self.parse_type()?;
         ty.iuncta_label = iuncta_label;
         Ok(ty)
     }
@@ -540,24 +542,31 @@ impl Parser {
         Ok(ty)
     }
 
-    /// Parse one applied type argument: a type, or a NATURAL capacity.
+    /// Parse one applied argument without erasing its source kind.
     ///
-    /// NATURAL is interned as a named ident so later phases can read the
-    /// decimal spelling. Arity and primitive-params stay resolve errors.
+    /// Natural literals and shape tuples are compile-time size expressions.
+    /// Bare names stay unresolved until declaration metadata identifies the
+    /// corresponding generic parameter kind. Explicit `_` remains a type hole
+    /// here; a checked magnitudo slot reclassifies it as an index hole later.
     /// Call-site `typeArguments` share this production with named types.
-    pub(super) fn parse_type_argument(&mut self) -> Result<TypeExpr, ParseError> {
+    pub(super) fn parse_type_argument(&mut self) -> Result<GenericArgExpr, ParseError> {
         if let TokenKind::Integer(value) = self.peek().kind {
-            let span = self.current_span();
             self.advance();
-            return Ok(TypeExpr {
-                nullable: false,
-                mode: None,
-                kind: TypeExprKind::Named(self.keyword_ident(&value.to_string(), span), Vec::new()),
-                span,
-                iuncta_label: None,
-            });
+            return Ok(GenericArgExpr::Size(FiguraExpr::Literal(value)));
         }
-        self.parse_type()
+        if self.check(&TokenKind::LBracket) {
+            return Ok(GenericArgExpr::Size(self.parse_figura()?));
+        }
+        let ty = self.parse_type()?;
+        if let TypeExprKind::Named(name, nested) = &ty.kind {
+            if nested.is_empty() {
+                return Ok(GenericArgExpr::Name(Ident {
+                    name: name.name,
+                    span: name.span,
+                }));
+            }
+        }
+        Ok(GenericArgExpr::Type(ty))
     }
 
     /// Parse a tensor `Figura` in type position.

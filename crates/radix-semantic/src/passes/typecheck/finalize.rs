@@ -341,9 +341,10 @@ impl TypeChecker<'_> {
             Type::Intervallum(elem) => self.type_has_unsolved_union_hole(*elem),
             Type::Applied(base, args) => {
                 self.type_has_unsolved_union_hole(*base)
-                    || args
-                        .iter()
-                        .any(|arg| self.type_has_unsolved_union_hole(*arg))
+                    || args.iter().any(|arg| match arg {
+                        radix_types::AppliedArg::Type(id) => self.type_has_unsolved_union_hole(*id),
+                        radix_types::AppliedArg::Size(_) => false,
+                    })
             }
             _ => false,
         }
@@ -524,7 +525,9 @@ impl TypeChecker<'_> {
             Type::Applied(base, args) => {
                 self.collect_hole_shape_warnings(base, span);
                 for arg in args {
-                    self.collect_hole_shape_warnings(arg, span);
+                    if let radix_types::AppliedArg::Type(id) = arg {
+                        self.collect_hole_shape_warnings(id, span);
+                    }
                 }
             }
             // Aliases and all non-holey shapes: explicit alias uses are never

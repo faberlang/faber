@@ -801,6 +801,15 @@ impl TypeTable {
         result
     }
 
+    fn applied_args_equal(&self, a: AppliedArg, b: AppliedArg) -> bool {
+        match (a, b) {
+            (AppliedArg::Type(a), AppliedArg::Type(b)) => self.equals(a, b),
+            (AppliedArg::Size(a), AppliedArg::Size(b)) => self.index_equals(a, b),
+            (AppliedArg::Type(_), AppliedArg::Size(_))
+            | (AppliedArg::Size(_), AppliedArg::Type(_)) => false,
+        }
+    }
+
     /// Compare two type values structurally, using [`equals`](Self::equals) for
     /// child `TypeId`s so alias peeling and numeric coercion are honored. The
     /// comparison core is [`Self::type_equal_with_seen`]; this entry point
@@ -958,7 +967,7 @@ impl TypeTable {
                     && a_args
                         .iter()
                         .zip(b_args.iter())
-                        .all(|(a_arg, b_arg)| self.equals(*a_arg, *b_arg))
+                        .all(|(a_arg, b_arg)| self.applied_args_equal(*a_arg, *b_arg))
             }
             (Type::Infer(a_var), Type::Infer(b_var)) => a_var == b_var,
             (Type::InferUnion(a_var), Type::InferUnion(b_var)) => a_var == b_var,
@@ -1283,6 +1292,17 @@ impl Default for TypeTable {
     }
 }
 
+/// One checked argument in a nominal or alias application.
+///
+/// Type and compile-time index arguments remain distinct all the way through
+/// the semantic arena. Unsupported consumers must reject `Size` explicitly
+/// rather than manufacturing a `TypeId`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum AppliedArg {
+    Type(TypeId),
+    Size(IndexId),
+}
+
 /// Semantic type shapes understood by Radix after parsing.
 ///
 /// Variants encode compiler meaning rather than one-to-one source spelling.
@@ -1384,7 +1404,7 @@ pub enum Type {
     /// Generic type parameter that has not been substituted.
     Param(LexSymbol),
 
-    Applied(TypeId, Vec<TypeId>),
+    Applied(TypeId, Vec<AppliedArg>),
 
     Infer(InferVar),
 
@@ -1921,7 +1941,13 @@ fn type_refs_in_bounds(ty: &Type, types_len: usize, indices_len: usize) -> bool 
         Type::Record(fields) => fields.values().all(type_in_bounds),
         Type::Tuple(elems) => elems.iter().all(type_in_bounds),
         Type::Union(members) => members.iter().all(type_in_bounds),
-        Type::Applied(base, args) => type_in_bounds(base) && args.iter().all(type_in_bounds),
+        Type::Applied(base, args) => {
+            type_in_bounds(base)
+                && args.iter().all(|arg| match arg {
+                    AppliedArg::Type(id) => type_in_bounds(id),
+                    AppliedArg::Size(id) => index_in_bounds(id),
+                })
+        }
         Type::Func(sig) => {
             sig.params.iter().all(|p| type_in_bounds(&p.ty))
                 && type_in_bounds(&sig.ret)

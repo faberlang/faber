@@ -806,12 +806,14 @@ impl TypeChecker<'_> {
                     *base,
                     inside_from_valor_runtime,
                     seen,
-                ) || args.iter().any(|arg| {
-                    self.valor_extraction_type_needs_missing_width_runtime(
-                        *arg,
-                        inside_from_valor_runtime,
-                        seen,
-                    )
+                ) || args.iter().any(|arg| match arg {
+                    radix_types::AppliedArg::Type(id) => self
+                        .valor_extraction_type_needs_missing_width_runtime(
+                            *id,
+                            inside_from_valor_runtime,
+                            seen,
+                        ),
+                    radix_types::AppliedArg::Size(_) => false,
                 })
             }
             _ => false,
@@ -2137,7 +2139,14 @@ impl TypeChecker<'_> {
                 if let Type::Struct(def_id) =
                     self.types.get(self.resolve_inferred_type(base)).clone()
                 {
-                    self.check_struct_fields(def_id, entries, &args, span);
+                    let type_args: Vec<_> = args
+                        .iter()
+                        .filter_map(|arg| match arg {
+                            radix_types::AppliedArg::Type(id) => Some(*id),
+                            radix_types::AppliedArg::Size(_) => None,
+                        })
+                        .collect();
+                    self.check_struct_fields(def_id, entries, &type_args, span);
                     return Some(target_resolved);
                 }
                 None
@@ -2418,6 +2427,10 @@ impl TypeChecker<'_> {
         let witnesses =
             self.constructor_witnesses(def_id, &[], expected, radix_lexer::Span::default());
         let base_ty = self.types.intern(base);
+        let witnesses = witnesses
+            .into_iter()
+            .map(radix_types::AppliedArg::Type)
+            .collect();
         self.types.intern(Type::Applied(base_ty, witnesses))
     }
 

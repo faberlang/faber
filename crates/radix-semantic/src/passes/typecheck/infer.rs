@@ -98,7 +98,10 @@ impl TypeChecker<'_> {
             }
             Type::Applied(base, args) => {
                 let mut kids = vec![*base];
-                kids.extend(args.iter().copied());
+                kids.extend(args.iter().filter_map(|arg| match arg {
+                    radix_types::AppliedArg::Type(id) => Some(*id),
+                    radix_types::AppliedArg::Size(_) => None,
+                }));
                 kids
             }
             Type::Union(types) => types.clone(),
@@ -731,10 +734,22 @@ impl TypeChecker<'_> {
             return ty;
         }
         let mut vars = FxHashMap::default();
+        let mut shape_vars = FxHashMap::default();
         for (param, arg) in param_names.iter().zip(args.iter()) {
-            vars.insert(*param, *arg);
+            match arg {
+                radix_types::AppliedArg::Type(id) => {
+                    vars.insert(*param, *id);
+                }
+                radix_types::AppliedArg::Size(id) => {
+                    shape_vars.insert(*param, *id);
+                }
+            }
         }
-        let substituted = self.substitute_type_params(body, &mut vars, None);
+        let substituted = self.substitute_type_params(
+            body,
+            &mut vars,
+            (!shape_vars.is_empty()).then_some(&mut shape_vars),
+        );
         let substituted = self.resolve_inferred_type(substituted);
         // Peel chained alias applications (`type Y<T> = X<T>`).
         match self.types.get(substituted).clone() {

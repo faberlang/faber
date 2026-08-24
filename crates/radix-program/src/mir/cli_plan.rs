@@ -4,6 +4,23 @@ use super::*;
 use radix_module::driver::AnalyzedModule;
 use radix_module::file_interface::{FileExportKind, FileInterface};
 
+#[cfg(test)]
+#[test]
+fn generic_applied_arg_preserves_index_kind() {
+    let mut types = radix_types::TypeTable::new();
+    let base = types.intern(radix_types::Type::Param(radix_module::lexer::Symbol(10)));
+    let size = types.intern_index(radix_types::IndexExpr::Literal(3));
+    let applied = types.intern(radix_types::Type::Applied(
+        base,
+        vec![radix_types::AppliedArg::Size(size)],
+    ));
+    assert!(matches!(
+        types.get(applied),
+        radix_types::Type::Applied(_, args)
+            if matches!(args.as_slice(), [radix_types::AppliedArg::Size(id)] if *id == size)
+    ));
+}
+
 /// Names of the nominal exports (struct/enum/interface) declared by a source
 /// unit's own file interface — the identity-bearing nominals whose canonical
 /// home-module key is the source module's own identity.
@@ -1341,8 +1358,13 @@ pub(super) fn import_semantic_type_with_nominal(
             let base = import_semantic_type_with_nominal(source, target, base, imported, nominal);
             let args = args
                 .into_iter()
-                .map(|arg| {
-                    import_semantic_type_with_nominal(source, target, arg, imported, nominal)
+                .map(|arg| match arg {
+                    radix_types::AppliedArg::Type(id) => radix_types::AppliedArg::Type(
+                        import_semantic_type_with_nominal(source, target, id, imported, nominal),
+                    ),
+                    radix_types::AppliedArg::Size(id) => {
+                        radix_types::AppliedArg::Size(import_index_expr(source, target, id))
+                    }
                 })
                 .collect();
             target.intern(Type::Applied(base, args))

@@ -13,9 +13,21 @@ use crate::TypeId;
 use crate::{
     collection_type_specs, lookup_collection_type_spec, lookup_primitive_type_spec,
     lookup_tensor_family_type_spec, primitive_type_specs, tensor_family_type_specs, AccessMarker,
-    CollectionKind, FuncSig, ParamType, Primitive, SemanticMutability, SemanticParamMode,
-    TensorFamilyKind, Type, TypeParamConstraint, TypeTable,
+    AppliedArg, CollectionKind, FuncSig, ParamType, Primitive, SemanticMutability,
+    SemanticParamMode, TensorFamilyKind, Type, TypeParamConstraint, TypeTable,
 };
+
+#[test]
+fn generic_applied_arg_preserves_index_kind() {
+    let mut types = TypeTable::new();
+    let base = types.intern(Type::Param(radix_lexer::Symbol(1)));
+    let size = types.intern_index(IndexExpr::Literal(3));
+    let applied = types.intern(Type::Applied(base, vec![AppliedArg::Size(size)]));
+    assert!(matches!(
+        types.get(applied),
+        Type::Applied(_, args) if matches!(args.as_slice(), [AppliedArg::Size(found)] if *found == size)
+    ));
+}
 
 #[test]
 fn access_marker_facts_intern_as_ref_wrappers() {
@@ -1342,8 +1354,8 @@ fn f066_applied_invariant_assignable() {
     let numerus = types.primitive(Primitive::Numerus);
     let i64 = types.sized_numeric(Primitive::Numerus, NumericWidth::I64);
     let base = types.intern(Type::Struct(DefId(100)));
-    let applied_numerus = types.intern(Type::Applied(base, vec![numerus]));
-    let applied_i64 = types.intern(Type::Applied(base, vec![i64]));
+    let applied_numerus = types.intern(Type::Applied(base, vec![AppliedArg::Type(numerus)]));
+    let applied_i64 = types.intern(Type::Applied(base, vec![AppliedArg::Type(i64)]));
 
     // numerus == i64 via equals, so Applied should still be equal.
     assert!(

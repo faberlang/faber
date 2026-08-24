@@ -817,9 +817,12 @@ impl Lowerer<'_> {
             }
             Type::Applied(base, args) => {
                 self.type_param_domain_member_is_concrete(*base)
-                    && args
-                        .iter()
-                        .all(|arg| self.type_param_domain_member_is_concrete(*arg))
+                    && args.iter().all(|arg| match arg {
+                        radix_types::AppliedArg::Type(id) => {
+                            self.type_param_domain_member_is_concrete(*id)
+                        }
+                        radix_types::AppliedArg::Size(_) => true,
+                    })
             }
             Type::Union(types) => types
                 .iter()

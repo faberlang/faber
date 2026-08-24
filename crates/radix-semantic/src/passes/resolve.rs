@@ -56,9 +56,10 @@ use radix_hir::DefId;
 use radix_lexer::Interner;
 use radix_syntax::{
     AssignOp, BindingPattern, BlockStmt, CapeClause, ClausuraBody, ConversioTarget, DiscerneStmt,
-    Expr, ExprKind, FiguraExpr, IfBody, Pattern, PatternBind, ProbandumDecl, Program, SiStmt, Stmt,
-    StmtKind, TypeExpr, TypeExprKind, TypeParam,
+    Expr, ExprKind, FiguraExpr, GenericArgExpr, IfBody, Pattern, PatternBind, ProbandumDecl,
+    Program, SiStmt, Stmt, StmtKind, TypeExpr, TypeExprKind, TypeParam,
 };
+use radix_types::AppliedArg;
 use unicode_normalization::{char::is_combining_mark, UnicodeNormalization};
 
 const ISSUE_DUPLICATE_DEFINITION: &str = "duplicate_definition";
@@ -146,6 +147,22 @@ pub fn resolve(
 ) -> Result<(), Vec<SemanticError>> {
     let mut errors = Vec::new();
     let mut aliases = Vec::new();
+
+    // Bind ordered parameter kinds to declaration identities before any named
+    // application is lowered. This is the resolver/HIR identity seam; source
+    // spelling is never consulted for kind selection.
+    for stmt in &program.statements {
+        let (name, params) = match &stmt.kind {
+            StmtKind::TypeAlias(decl) => (&decl.name, &decl.type_params),
+            StmtKind::Class(decl) => (&decl.name, &decl.type_params),
+            StmtKind::Interface(decl) => (&decl.name, &decl.type_params),
+            StmtKind::Union(decl) => (&decl.name, &decl.type_params),
+            _ => continue,
+        };
+        if let Some(def_id) = resolver.lookup(name.name) {
+            resolver.register_generic_param_kinds(def_id, params.iter().map(|param| param.kind));
+        }
+    }
 
     // Gather alias declarations before resolving bodies so later alias lowering
     // can run against the full set of collected symbols.
@@ -1498,7 +1515,7 @@ fn resolve_type_expr(
                         {
                             errors.push(lowering_error(
                                 ISSUE_ASCII_FORMAT_HINT_NOT_CAPACITY,
-                                capacity.span,
+                                generic_arg_span(capacity),
                             ));
                         }
                         [capacity] => {
@@ -1521,14 +1538,14 @@ fn resolve_type_expr(
             }
             if CollectionKind::from_name(name_str) == Some(CollectionKind::Lista) {
                 match params.as_slice() {
-                    [elem] => resolve_type_expr(resolver, interner, elem, errors),
+                    [elem] => resolve_generic_arg(resolver, interner, elem, errors),
                     [elem, capacity] => {
-                        resolve_type_expr(resolver, interner, elem, errors);
+                        resolve_generic_arg(resolver, interner, elem, errors);
                         validate_capacity_index_param(resolver, interner, capacity, errors);
                     }
                     _ => {
                         for param in params {
-                            resolve_type_expr(resolver, interner, param, errors);
+                            resolve_generic_arg(resolver, interner, param, errors);
                         }
                     }
                 }
@@ -1538,7 +1555,7 @@ fn resolve_type_expr(
                 // Resolve type params before the incomplete/missing-figura
                 // error so unknown element types are reported too.
                 for param in params {
-                    resolve_type_expr(resolver, interner, param, errors);
+                    resolve_generic_arg(resolver, interner, param, errors);
                 }
                 if params.is_empty() {
                     errors.push(type_mismatch_error(ISSUE_TENSOR_INCOMPLETE, name.span));
@@ -1549,7 +1566,7 @@ fn resolve_type_expr(
             }
             if name_str == "sparsa" {
                 for param in params {
-                    resolve_type_expr(resolver, interner, param, errors);
+                    resolve_generic_arg(resolver, interner, param, errors);
                 }
                 if params.is_empty() {
                     errors.push(type_mismatch_error(ISSUE_SPARSA_INCOMPLETE, name.span));
@@ -1560,7 +1577,7 @@ fn resolve_type_expr(
             }
             if name_str == "atomic" {
                 for param in params {
-                    resolve_type_expr(resolver, interner, param, errors);
+                    resolve_generic_arg(resolver, interner, param, errors);
                 }
                 if params.is_empty() {
                     errors.push(type_mismatch_error(ISSUE_ATOMIC_INCOMPLETE, name.span));
@@ -1571,7 +1588,7 @@ fn resolve_type_expr(
             }
             if name_str == "vector" {
                 for param in params {
-                    resolve_type_expr(resolver, interner, param, errors);
+                    resolve_generic_arg(resolver, interner, param, errors);
                 }
                 if params.is_empty() {
                     errors.push(type_mismatch_error(ISSUE_VECTOR_INCOMPLETE, name.span));
@@ -1582,7 +1599,7 @@ fn resolve_type_expr(
             }
             if name_str == "matrix" {
                 for param in params {
-                    resolve_type_expr(resolver, interner, param, errors);
+                    resolve_generic_arg(resolver, interner, param, errors);
                 }
                 if params.is_empty() {
                     errors.push(type_mismatch_error(ISSUE_MATRIX_INCOMPLETE, name.span));
@@ -1592,13 +1609,13 @@ fn resolve_type_expr(
                 return;
             }
             for param in params {
-                resolve_type_expr(resolver, interner, param, errors);
+                resolve_generic_arg(resolver, interner, param, errors);
             }
         }
         TypeExprKind::Qualified(path, params) => {
             resolve_qualified_type_path(resolver, interner, path, errors);
             for param in params {
-                resolve_type_expr(resolver, interner, param, errors);
+                resolve_generic_arg(resolver, interner, param, errors);
             }
         }
         TypeExprKind::Func(func) => {
@@ -1616,6 +1633,43 @@ fn resolve_type_expr(
         TypeExprKind::Union(members) => {
             for m in members {
                 resolve_type_expr(resolver, interner, m, errors);
+            }
+        }
+    }
+}
+
+fn resolve_generic_arg(
+    resolver: &mut Resolver,
+    interner: &Interner,
+    arg: &GenericArgExpr,
+    errors: &mut Vec<SemanticError>,
+) {
+    match arg {
+        GenericArgExpr::Type(ty) => resolve_type_expr(resolver, interner, ty, errors),
+        GenericArgExpr::Size(figura) => resolve_figura_expr(resolver, figura, errors),
+        GenericArgExpr::Name(ident) => {
+            if is_builtin_type(interner.resolve(ident.name)) {
+                return;
+            }
+            let Some(def_id) = resolver.lookup(ident.name) else {
+                errors.push(undefined_type_error(ISSUE_UNKNOWN_TYPE, ident.span));
+                return;
+            };
+            let Some(symbol) = resolver.get_symbol(def_id) else {
+                errors.push(undefined_type_error(ISSUE_UNKNOWN_TYPE, ident.span));
+                return;
+            };
+            if !matches!(
+                symbol.kind,
+                SymbolKind::Struct
+                    | SymbolKind::Enum
+                    | SymbolKind::Interface
+                    | SymbolKind::TypeAlias
+                    | SymbolKind::TypeParam
+                    | SymbolKind::IndexParam
+                    | SymbolKind::Schema
+            ) {
+                errors.push(undefined_type_error(ISSUE_NAME_NOT_TYPE, ident.span));
             }
         }
     }
@@ -1651,25 +1705,59 @@ fn resolve_figura_expr(
     }
 }
 
+fn generic_arg_span(arg: &GenericArgExpr) -> radix_lexer::Span {
+    match arg {
+        GenericArgExpr::Type(ty) => ty.span,
+        GenericArgExpr::Size(FiguraExpr::Infer | FiguraExpr::Literal(_)) => {
+            radix_lexer::Span::default()
+        }
+        GenericArgExpr::Size(FiguraExpr::Var(ident)) => ident.span,
+        GenericArgExpr::Size(FiguraExpr::Tuple(dims)) => dims
+            .first()
+            .map(|dim| generic_figura_span(dim))
+            .unwrap_or_default(),
+        GenericArgExpr::Name(ident) => ident.span,
+    }
+}
+
+fn generic_figura_span(figura: &FiguraExpr) -> radix_lexer::Span {
+    match figura {
+        FiguraExpr::Infer | FiguraExpr::Literal(_) => radix_lexer::Span::default(),
+        FiguraExpr::Var(ident) => ident.span,
+        FiguraExpr::Tuple(dims) => dims.first().map(generic_figura_span).unwrap_or_default(),
+    }
+}
+
+fn generic_arg_named_shape(arg: &GenericArgExpr) -> Option<(&radix_syntax::Ident, bool)> {
+    match arg {
+        GenericArgExpr::Name(ident) => Some((ident, false)),
+        GenericArgExpr::Type(ty) => match &ty.kind {
+            TypeExprKind::Named(ident, nested) => Some((ident, !nested.is_empty())),
+            _ => None,
+        },
+        GenericArgExpr::Size(_) => None,
+    }
+}
+
 fn validate_instans_precision_param(
     interner: &Interner,
-    param: &TypeExpr,
+    param: &GenericArgExpr,
     errors: &mut Vec<SemanticError>,
 ) {
-    if matches!(param.kind, TypeExprKind::Infer) {
-        return;
-    }
-    let TypeExprKind::Named(ident, nested) = &param.kind else {
+    let Some((ident, nested)) = generic_arg_named_shape(param) else {
+        if matches!(param, GenericArgExpr::Type(ty) if matches!(ty.kind, TypeExprKind::Infer)) {
+            return;
+        }
         errors.push(undefined_type_error(
             ISSUE_PRECISION_MARKER_SHAPE,
-            param.span,
+            generic_arg_span(param),
         ));
         return;
     };
-    if !nested.is_empty() {
+    if nested {
         errors.push(undefined_type_error(
             ISSUE_PRECISION_MARKER_PARAMS,
-            param.span,
+            generic_arg_span(param),
         ));
         return;
     }
@@ -1679,37 +1767,48 @@ fn validate_instans_precision_param(
     }
 }
 
-fn named_type_is_ascii_format_hint(param: &TypeExpr, interner: &Interner) -> bool {
-    let TypeExprKind::Named(ident, nested) = &param.kind else {
-        return false;
-    };
-    nested.is_empty() && crate::numeric_width::is_ascii_format_hint(interner.resolve(ident.name))
+fn named_type_is_ascii_format_hint(param: &GenericArgExpr, interner: &Interner) -> bool {
+    generic_arg_named_shape(param).is_some_and(|(ident, nested)| {
+        !nested && crate::numeric_width::is_ascii_format_hint(interner.resolve(ident.name))
+    })
 }
 
 fn validate_capacity_index_param(
     resolver: &Resolver,
     interner: &Interner,
-    param: &TypeExpr,
+    param: &GenericArgExpr,
     errors: &mut Vec<SemanticError>,
 ) {
     match capacity_index_issue(param, resolver, interner) {
         None => {}
-        Some(issue) => errors.push(undefined_type_error(issue, param.span)),
+        Some(issue) => errors.push(undefined_type_error(issue, generic_arg_span(param))),
     }
 }
 
 fn capacity_index_issue(
-    param: &TypeExpr,
+    param: &GenericArgExpr,
     resolver: &Resolver,
     interner: &Interner,
 ) -> Option<&'static str> {
-    if matches!(param.kind, TypeExprKind::Infer) {
-        return None;
-    }
-    let TypeExprKind::Named(ident, nested) = &param.kind else {
-        return Some(ISSUE_BOUNDED_CAPACITY_NOT_NATURAL);
+    let (ident, nested) = match param {
+        GenericArgExpr::Size(FiguraExpr::Infer | FiguraExpr::Literal(_))
+        | GenericArgExpr::Type(TypeExpr {
+            kind: TypeExprKind::Infer,
+            ..
+        }) => return None,
+        GenericArgExpr::Size(FiguraExpr::Var(ident)) | GenericArgExpr::Name(ident) => {
+            (ident, false)
+        }
+        GenericArgExpr::Size(FiguraExpr::Tuple(_)) => {
+            return Some(ISSUE_BOUNDED_CAPACITY_NOT_NATURAL)
+        }
+        GenericArgExpr::Type(TypeExpr {
+            kind: TypeExprKind::Named(ident, nested),
+            ..
+        }) => (ident, !nested.is_empty()),
+        GenericArgExpr::Type(_) => return Some(ISSUE_BOUNDED_CAPACITY_NOT_NATURAL),
     };
-    if !nested.is_empty() {
+    if nested {
         return Some(ISSUE_BOUNDED_CAPACITY_NOT_NATURAL);
     }
     let name = interner.resolve(ident.name);
@@ -1731,19 +1830,31 @@ fn capacity_index_issue(
 
 fn validate_width_marker_param(
     interner: &Interner,
-    param: &TypeExpr,
+    param: &GenericArgExpr,
     prim: Primitive,
     errors: &mut Vec<SemanticError>,
 ) {
-    if matches!(param.kind, TypeExprKind::Infer) {
+    if matches!(
+        param,
+        GenericArgExpr::Type(TypeExpr {
+            kind: TypeExprKind::Infer,
+            ..
+        })
+    ) {
         return;
     }
-    let TypeExprKind::Named(ident, nested) = &param.kind else {
-        errors.push(undefined_type_error(ISSUE_WIDTH_MARKER_SHAPE, param.span));
+    let Some((ident, nested)) = generic_arg_named_shape(param) else {
+        errors.push(undefined_type_error(
+            ISSUE_WIDTH_MARKER_SHAPE,
+            generic_arg_span(param),
+        ));
         return;
     };
-    if !nested.is_empty() {
-        errors.push(undefined_type_error(ISSUE_WIDTH_MARKER_PARAMS, param.span));
+    if nested {
+        errors.push(undefined_type_error(
+            ISSUE_WIDTH_MARKER_PARAMS,
+            generic_arg_span(param),
+        ));
         return;
     }
     let marker = interner.resolve(ident.name);
@@ -1751,7 +1862,7 @@ fn validate_width_marker_param(
         return;
     }
     if let Err(err) = crate::NumericWidth::from_marker(marker, prim) {
-        errors.push(width_marker_error(err, prim, param.span));
+        errors.push(width_marker_error(err, prim, ident.span));
     }
 }
 
@@ -2996,7 +3107,7 @@ fn lower_atomic_type_expr(
 
 fn lower_bounded_primitive(
     prim: Primitive,
-    params: &[TypeExpr],
+    params: &[GenericArgExpr],
     resolver: &Resolver,
     interner: &Interner,
     types: &mut TypeTable,
@@ -3009,7 +3120,7 @@ fn lower_bounded_primitive(
             Err(TypeLowerError::Issue(ISSUE_ASCII_FORMAT_HINT_NOT_CAPACITY))
         }
         [capacity] => {
-            let capacity = lower_capacity_index(capacity, resolver, interner, types)?;
+            let capacity = lower_generic_index_arg(capacity, resolver, types)?;
             Ok(match prim {
                 Primitive::Ascii => types.bounded_ascii(capacity),
                 Primitive::Textus => types.bounded_textus(capacity),
@@ -3022,51 +3133,126 @@ fn lower_bounded_primitive(
 }
 
 fn lower_lista_type(
-    params: &[TypeExpr],
+    params: &[GenericArgExpr],
     resolver: &Resolver,
     interner: &Interner,
     types: &mut TypeTable,
 ) -> Result<TypeId, TypeLowerError> {
     match params {
         [elem] => {
-            let elem = lower_type_expr(elem, resolver, interner, types)?;
+            let elem = lower_generic_type_arg(elem, resolver, interner, types)?;
             Ok(types.array(elem))
         }
         [elem, capacity] => {
-            let elem = lower_type_expr(elem, resolver, interner, types)?;
-            let capacity = lower_capacity_index(capacity, resolver, interner, types)?;
+            let elem = lower_generic_type_arg(elem, resolver, interner, types)?;
+            let capacity = lower_generic_index_arg(capacity, resolver, types)?;
             Ok(types.bounded_array(elem, capacity))
         }
         _ => Err(TypeLowerError::CollectionArity(CollectionKind::Lista)),
     }
 }
 
-fn lower_capacity_index(
-    param: &TypeExpr,
+fn generic_type_expr(arg: &GenericArgExpr) -> Option<TypeExpr> {
+    match arg {
+        GenericArgExpr::Type(ty) => Some(ty.clone()),
+        GenericArgExpr::Name(name) => Some(TypeExpr {
+            nullable: false,
+            mode: None,
+            kind: TypeExprKind::Named(name.clone(), Vec::new()),
+            span: name.span,
+            iuncta_label: None,
+        }),
+        GenericArgExpr::Size(_) => None,
+    }
+}
+
+fn generic_type_exprs(params: &[GenericArgExpr]) -> Option<Vec<TypeExpr>> {
+    params.iter().map(generic_type_expr).collect()
+}
+
+fn lower_generic_type_arg(
+    arg: &GenericArgExpr,
     resolver: &Resolver,
     interner: &Interner,
     types: &mut TypeTable,
-) -> Result<crate::IndexId, TypeLowerError> {
-    if matches!(param.kind, TypeExprKind::Infer) {
-        let var = types.fresh_index_infer_var();
-        return Ok(types.intern_index(IndexExpr::Infer(var)));
+) -> Result<TypeId, TypeLowerError> {
+    match arg {
+        GenericArgExpr::Type(ty) => lower_type_expr(ty, resolver, interner, types),
+        GenericArgExpr::Name(name) => lower_named_type(name, &[], resolver, interner, types),
+        GenericArgExpr::Size(_) => Err(TypeLowerError::Issue(
+            "generic_size_argument_in_type_position",
+        )),
     }
-    if let Some(issue) = capacity_index_issue(param, resolver, interner) {
-        return Err(TypeLowerError::Issue(issue));
+}
+
+fn lower_generic_index_arg(
+    arg: &GenericArgExpr,
+    resolver: &Resolver,
+    types: &mut TypeTable,
+) -> Result<radix_types::IndexId, TypeLowerError> {
+    match arg {
+        GenericArgExpr::Size(figura) => {
+            crate::lower_figura_expr(figura, resolver, types).map_err(type_lower_error_from_message)
+        }
+        GenericArgExpr::Type(TypeExpr {
+            kind: TypeExprKind::Infer,
+            ..
+        }) => {
+            let var = types.fresh_index_infer_var();
+            Ok(types.intern_index(IndexExpr::Infer(var)))
+        }
+        GenericArgExpr::Name(ident) => {
+            let kind = resolver
+                .lookup(ident.name)
+                .and_then(|def_id| resolver.get_symbol(def_id))
+                .map(|symbol| symbol.kind);
+            match kind {
+                Some(SymbolKind::IndexParam) => {
+                    Ok(types.intern_index(IndexExpr::Param(ident.name)))
+                }
+                Some(SymbolKind::TypeParam) => {
+                    Err(TypeLowerError::Issue(ISSUE_FIGURA_TYPE_PARAM_IN_INDEX))
+                }
+                _ => Err(TypeLowerError::Issue(ISSUE_BOUNDED_CAPACITY_NOT_NATURAL)),
+            }
+        }
+        GenericArgExpr::Type(_) => Err(TypeLowerError::Issue(ISSUE_FIGURA_TYPE_PARAM_IN_INDEX)),
     }
-    let TypeExprKind::Named(ident, _) = &param.kind else {
-        return Err(TypeLowerError::Issue(ISSUE_BOUNDED_CAPACITY_NOT_NATURAL));
-    };
-    let name = interner.resolve(ident.name);
-    if let Some(value) = radix_types::parse_natural_capacity(name) {
-        return Ok(types.intern_index(IndexExpr::Literal(value)));
+}
+
+fn lower_applied_arg(
+    arg: &GenericArgExpr,
+    resolver: &Resolver,
+    interner: &Interner,
+    types: &mut TypeTable,
+) -> Result<AppliedArg, TypeLowerError> {
+    match arg {
+        GenericArgExpr::Size(_) => {
+            lower_generic_index_arg(arg, resolver, types).map(AppliedArg::Size)
+        }
+        GenericArgExpr::Type(ty) if matches!(ty.kind, TypeExprKind::Infer) => {
+            lower_type_expr(ty, resolver, interner, types).map(AppliedArg::Type)
+        }
+        GenericArgExpr::Name(ident) => {
+            let is_index = resolver
+                .lookup(ident.name)
+                .and_then(|def_id| resolver.get_symbol(def_id))
+                .is_some_and(|symbol| symbol.kind == SymbolKind::IndexParam);
+            if is_index {
+                lower_generic_index_arg(arg, resolver, types).map(AppliedArg::Size)
+            } else {
+                lower_generic_type_arg(arg, resolver, interner, types).map(AppliedArg::Type)
+            }
+        }
+        GenericArgExpr::Type(ty) => {
+            lower_type_expr(ty, resolver, interner, types).map(AppliedArg::Type)
+        }
     }
-    Ok(types.intern_index(IndexExpr::Param(ident.name)))
 }
 
 fn lower_named_type(
     name: &radix_syntax::Ident,
-    params: &[TypeExpr],
+    params: &[GenericArgExpr],
     resolver: &Resolver,
     interner: &Interner,
     types: &mut TypeTable,
@@ -3074,11 +3260,20 @@ fn lower_named_type(
     let name_str = interner.resolve(name.name);
 
     if name_str == "modulus" {
+        let Some(type_params) = generic_type_exprs(params) else {
+            return Err(TypeLowerError::Issue(
+                "generic_size_argument_in_type_position",
+            ));
+        };
         let mut error = None;
-        let ty =
-            crate::numeric_width::lower_modular_word(params, interner, types, &mut |message| {
+        let ty = crate::numeric_width::lower_modular_word(
+            &type_params,
+            interner,
+            types,
+            &mut |message| {
                 error = Some(message.to_owned());
-            });
+            },
+        );
         if let Some(message) = error {
             return Err(type_lower_error_from_message(&message));
         }
@@ -3086,11 +3281,22 @@ fn lower_named_type(
     }
 
     if let Some(prim) = Primitive::from_name(name_str) {
+        let Some(type_params) = generic_type_exprs(params) else {
+            if matches!(
+                prim,
+                Primitive::Numerus | Primitive::Fractus | Primitive::Instans
+            ) {
+                return Err(TypeLowerError::Issue(
+                    "generic_size_argument_in_type_position",
+                ));
+            }
+            return Err(TypeLowerError::Issue(ISSUE_PRIMITIVE_PARAMS));
+        };
         if matches!(prim, Primitive::Numerus | Primitive::Fractus) {
             let mut error = None;
             let ty = crate::numeric_width::lower_sized_primitive(
                 prim,
-                params,
+                &type_params,
                 interner,
                 types,
                 &mut |message| {
@@ -3105,7 +3311,7 @@ fn lower_named_type(
         if matches!(prim, Primitive::Instans) {
             let mut error = None;
             let ty = crate::instans_precision::lower_sized_instans(
-                params,
+                &type_params,
                 interner,
                 types,
                 &mut |message| {
@@ -3139,12 +3345,20 @@ fn lower_named_type(
         return Ok(types.sized_numeric(Primitive::Numerus, crate::NumericWidth::U8));
     }
 
+    let Some(type_params) = generic_type_exprs(params) else {
+        return Err(TypeLowerError::Issue(
+            "generic_size_argument_in_type_position",
+        ));
+    };
     let mut width_error = None;
-    if let Some(ty) =
-        crate::numeric_width::lower_standalone_width_type(name_str, params, types, &mut |message| {
+    if let Some(ty) = crate::numeric_width::lower_standalone_width_type(
+        name_str,
+        &type_params,
+        types,
+        &mut |message| {
             width_error = Some(message.to_owned());
-        })
-    {
+        },
+    ) {
         if let Some(message) = width_error {
             return Err(type_lower_error_from_message(&message));
         }
@@ -3165,7 +3379,7 @@ fn lower_named_type(
         if params.len() != 1 {
             return Err(TypeLowerError::Issue(ISSUE_INTERVALLUM_ARITY));
         }
-        let bound = lower_type_expr(&params[0], resolver, interner, types)?;
+        let bound = lower_generic_type_arg(&params[0], resolver, interner, types)?;
         if !crate::is_intervallum_bound_type(types, bound) {
             return Err(TypeLowerError::Issue(ISSUE_INTERVALLUM_BOUND));
         }
@@ -3178,7 +3392,7 @@ fn lower_named_type(
         };
         let payload_ty = match params {
             [] => types.primitive(Primitive::Valor),
-            [payload] => lower_type_expr(payload, resolver, interner, types)?,
+            [payload] => lower_generic_type_arg(payload, resolver, interner, types)?,
             _ => {
                 return Err(TypeLowerError::Issue(ISSUE_SCRINIUM_ARITY));
             }
@@ -3218,7 +3432,10 @@ fn lower_named_type(
 
     if name_str == "ratio" {
         let mut fields = Vec::with_capacity(params.len());
-        for param in params {
+        for arg in params {
+            let GenericArgExpr::Type(param) = arg else {
+                continue;
+            };
             let Some(label) = param.iuncta_label.as_ref() else {
                 continue;
             };
@@ -3237,7 +3454,7 @@ fn lower_named_type(
         }
         let lowered = params
             .iter()
-            .map(|param| lower_type_expr(param, resolver, interner, types))
+            .map(|param| lower_generic_type_arg(param, resolver, interner, types))
             .collect::<Result<Vec<_>, _>>()?;
         return Ok(collection.lower(types, &lowered));
     }
@@ -3280,14 +3497,14 @@ fn lower_named_type(
 
     let args = params
         .iter()
-        .map(|param| lower_type_expr(param, resolver, interner, types))
+        .map(|param| lower_applied_arg(param, resolver, interner, types))
         .collect::<Result<Vec<_>, _>>()?;
     Ok(types.intern(Type::Applied(base, args)))
 }
 
 fn lower_qualified_type(
     path: &[radix_syntax::Ident],
-    params: &[TypeExpr],
+    params: &[GenericArgExpr],
     resolver: &Resolver,
     interner: &Interner,
     types: &mut TypeTable,
@@ -3337,7 +3554,7 @@ fn lower_qualified_type(
         }
         let args = params
             .iter()
-            .map(|param| lower_type_expr(param, resolver, interner, types))
+            .map(|param| lower_applied_arg(param, resolver, interner, types))
             .collect::<Result<Vec<_>, _>>()?;
         return Ok(types.intern(Type::Applied(type_id, args)));
     }

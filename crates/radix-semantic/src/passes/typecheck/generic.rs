@@ -382,7 +382,14 @@ impl TypeChecker<'_> {
                 let base = self.substitute_type_params(base, vars, shape_vars.as_deref_mut());
                 let args = args
                     .iter()
-                    .map(|arg| self.substitute_type_params(*arg, vars, shape_vars.as_deref_mut()))
+                    .map(|arg| match arg {
+                        radix_types::AppliedArg::Type(id) => radix_types::AppliedArg::Type(
+                            self.substitute_type_params(*id, vars, shape_vars.as_deref_mut()),
+                        ),
+                        radix_types::AppliedArg::Size(id) => radix_types::AppliedArg::Size(
+                            self.substitute_index_params(*id, shape_vars.as_deref_mut()),
+                        ),
+                    })
                     .collect();
                 self.types.intern(Type::Applied(base, args))
             }
@@ -542,7 +549,14 @@ impl TypeChecker<'_> {
             Type::Applied(base, args) => {
                 self.collect_shape_params_in_type(base, out);
                 for arg in args {
-                    self.collect_shape_params_in_type(arg, out);
+                    match arg {
+                        radix_types::AppliedArg::Type(id) => {
+                            self.collect_shape_params_in_type(id, out);
+                        }
+                        radix_types::AppliedArg::Size(id) => {
+                            self.collect_shape_params_in_index(id, out);
+                        }
+                    }
                 }
             }
             _ => {}

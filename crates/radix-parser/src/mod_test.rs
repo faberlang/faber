@@ -15,6 +15,13 @@ use radix_syntax::{
     PatternBind, PraeparaKind, ProbaModifier, ScribeKind, SecusClause, StmtKind, TypeExprKind,
 };
 
+fn generic_arg_type(arg: &radix_syntax::GenericArgExpr) -> &radix_syntax::TypeExpr {
+    match arg {
+        radix_syntax::GenericArgExpr::Type(ty) => ty,
+        other => panic!("expected type generic argument, got {other:?}"),
+    }
+}
+
 #[test]
 fn parses_empty_source() {
     let result = parse_ok("");
@@ -506,7 +513,7 @@ incipit argumenta args {}
     };
     assert_eq!(symbol_name(&result, name.name), "lista");
     assert_eq!(params.len(), 1);
-    let TypeExprKind::Named(param_name, param_params) = &params[0].kind else {
+    let TypeExprKind::Named(param_name, param_params) = &generic_arg_type(&params[0]).kind else {
         panic!("expected named type parameter");
     };
     assert_eq!(symbol_name(&result, param_name.name), "textus");

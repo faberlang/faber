@@ -258,7 +258,10 @@ fn census_rows(types: &mut TypeTable) -> Vec<Type> {
         is_async: false,
         is_generator: false,
     }));
-    rows.push(Type::Applied(int64_ty, vec![float64_ty]));
+    rows.push(Type::Applied(
+        int64_ty,
+        vec![radix_types::AppliedArg::Type(float64_ty)],
+    ));
     // Internal (5): no layout row.
     rows.push(Type::Param(LexSymbol(2)));
     rows.push(Type::Infer(InferVar(0)));

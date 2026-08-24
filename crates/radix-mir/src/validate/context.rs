@@ -238,10 +238,17 @@ impl<'a> MirValidationContext<'a> {
         if params.len() != args.len() {
             return None;
         }
+        let type_args = args
+            .iter()
+            .map(|arg| match arg {
+                radix_types::AppliedArg::Type(id) => Some(*id),
+                radix_types::AppliedArg::Size(_) => None,
+            })
+            .collect::<Option<Vec<_>>>()?;
         let bindings = params
             .iter()
             .copied()
-            .zip(args.iter().copied().map(MirType::semantic))
+            .zip(type_args.into_iter().map(MirType::semantic))
             .collect::<MirGenericBindings>();
         let variants = self.enum_variants.get(enum_def)?;
         let tag_layout = compact_enum_tag_layout(variants.len());

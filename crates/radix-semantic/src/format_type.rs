@@ -6,6 +6,7 @@
 use super::{format_figura, MarkerFamily, Primitive, SemanticMutability, Type, TypeId, TypeTable};
 use radix_hir::DefId;
 use radix_lexer::{Interner, Symbol};
+use radix_types::AppliedArg;
 use rustc_hash::FxHashMap;
 
 /// Recover Faber source type syntax for one resolved [`TypeId`].
@@ -166,7 +167,10 @@ pub fn format_faber_type<F: Fn(DefId) -> String>(
             let base_str = format_faber_type(*base, types, interner, resolve_def);
             let args_str: Vec<String> = args
                 .iter()
-                .map(|a| format_faber_type(*a, types, interner, resolve_def))
+                .map(|arg| match arg {
+                    AppliedArg::Type(id) => format_faber_type(*id, types, interner, resolve_def),
+                    AppliedArg::Size(id) => format_figura(*id, types, interner),
+                })
                 .collect();
             format!("{}<{}>", base_str, args_str.join(", "))
         }

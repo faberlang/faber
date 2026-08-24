@@ -8,7 +8,7 @@
 use crate::Resolver;
 use radix_hir::DefId;
 use radix_lexer::{Interner, Symbol};
-use radix_syntax::{TypeExpr, TypeExprKind};
+use radix_syntax::{GenericArgExpr, TypeExpr, TypeExprKind};
 
 /// Extract per-position labels from an `iuncta<…>` type annotation.
 ///
@@ -25,7 +25,10 @@ pub fn from_type_expr(ty: &TypeExpr, interner: &Interner) -> Option<Vec<Option<S
     Some(
         params
             .iter()
-            .map(|param| param.iuncta_label.as_ref().map(|ident| ident.name))
+            .map(|param| match param {
+                GenericArgExpr::Type(ty) => ty.iuncta_label.as_ref().map(|ident| ident.name),
+                GenericArgExpr::Size(_) | GenericArgExpr::Name(_) => None,
+            })
             .collect(),
     )
 }

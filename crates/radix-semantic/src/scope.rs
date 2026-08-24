@@ -596,6 +596,10 @@ const BUILTIN_DEF_ID_BASE: u32 = 0x0000_0001;
 pub struct Resolver {
     scopes: Vec<Scope>,
     symbols: FxHashMap<DefId, Symbol>,
+    /// Ordered declaration-identity metadata for applied type arguments.
+    /// Kept separate from identifier spellings so kind selection is never
+    /// inferred from the source name.
+    generic_param_kinds: FxHashMap<DefId, Vec<radix_syntax::GenericParamKind>>,
     current_scope: ScopeId,
     next_def_id: u32,
     next_builtin_def_id: u32,
@@ -700,6 +704,7 @@ impl Resolver {
         Self {
             scopes: vec![global],
             symbols: FxHashMap::default(),
+            generic_param_kinds: FxHashMap::default(),
             current_scope: ScopeId(0),
             next_def_id: USER_DEF_ID_BASE,
             next_builtin_def_id: BUILTIN_DEF_ID_BASE,
@@ -2933,6 +2938,22 @@ impl Resolver {
         self.symbols.get_mut(&def_id)
     }
 
+    /// Record ordered generic parameter kinds for one declaration identity.
+    pub fn register_generic_param_kinds(
+        &mut self,
+        def_id: DefId,
+        kinds: impl IntoIterator<Item = radix_syntax::GenericParamKind>,
+    ) {
+        self.generic_param_kinds
+            .insert(def_id, kinds.into_iter().collect());
+    }
+
+    /// Return ordered generic parameter kinds for a declaration identity.
+    #[must_use]
+    pub fn generic_param_kinds(&self, def_id: DefId) -> Option<&[radix_syntax::GenericParamKind]> {
+        self.generic_param_kinds.get(&def_id).map(Vec::as_slice)
+    }
+
     /// Register the resolved relational schema metadata for a schema
     /// definition.
     pub fn register_schema(&mut self, def_id: DefId, schema: crate::SchemaDef) {
@@ -3131,6 +3152,7 @@ impl Resolver {
         Self {
             scopes: vec![global],
             symbols: FxHashMap::default(),
+            generic_param_kinds: FxHashMap::default(),
             current_scope: ScopeId(0),
             next_def_id: USER_DEF_ID_BASE,
             next_builtin_def_id: BUILTIN_DEF_ID_BASE,

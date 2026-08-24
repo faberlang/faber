@@ -558,9 +558,12 @@ impl TypeChecker<'_> {
                 .any(|member| self.destination_type_has_inference_hole_inner(*member, seen)),
             Type::Applied(base, args) => {
                 self.destination_type_has_inference_hole_inner(*base, seen)
-                    || args
-                        .iter()
-                        .any(|arg| self.destination_type_has_inference_hole_inner(*arg, seen))
+                    || args.iter().any(|arg| match arg {
+                        radix_types::AppliedArg::Type(id) => {
+                            self.destination_type_has_inference_hole_inner(*id, seen)
+                        }
+                        radix_types::AppliedArg::Size(_) => false,
+                    })
             }
             _ => false,
         }

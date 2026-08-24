@@ -35,7 +35,9 @@ use radix_hir::{
     HirArrayElement, HirBinOp, HirCallArg, HirConversioTarget, HirExpression, HirExpressionKind,
     HirLiteral, HirNonNullKind, HirObjectField, HirObjectKey, HirOptionalChainKind, HirUnOp,
 };
-use radix_syntax::{BinaryExpr, Expr, ExprKind, Literal, UnaryExpr};
+use radix_syntax::{
+    BinaryExpr, Expr, ExprKind, GenericArgExpr, Literal, TypeExpr, TypeExprKind, UnaryExpr,
+};
 
 /// Lower one AST expression into the HIR expression contract.
 ///
@@ -339,7 +341,7 @@ impl Lowerer<'_> {
         let type_args: Vec<TypeId> = call
             .type_args
             .iter()
-            .map(|ty| self.lower_type(ty))
+            .map(|arg| lower_call_generic_arg(self, arg))
             .collect();
         match &call.callee.kind {
             ExprKind::Literal(Literal::String(template)) => {
@@ -1350,6 +1352,25 @@ impl Lowerer<'_> {
     }
 }
 
+fn lower_call_generic_arg(lowerer: &mut Lowerer<'_>, arg: &GenericArgExpr) -> TypeId {
+    match lowerer.lower_applied_arg(arg) {
+        radix_types::AppliedArg::Type(id) => id,
+        radix_types::AppliedArg::Size(id) => match lowerer.types.get_index(id).clone() {
+            crate::IndexExpr::Literal(value) => {
+                let symbol = lowerer.interner.intern(&value.to_string());
+                lowerer.types.intern(crate::Type::Param(symbol))
+            }
+            crate::IndexExpr::Param(symbol) => lowerer.types.intern(crate::Type::Param(symbol)),
+            crate::IndexExpr::Infer(_)
+            | crate::IndexExpr::Unspecified
+            | crate::IndexExpr::Tuple(_) => {
+                lowerer.error("generic_call_size_shape_unsupported");
+                lowerer.types.intern(crate::Type::Error)
+            }
+        },
+    }
+}
+
 fn lower_conversio_target_type(
     lowerer: &mut Lowerer<'_>,
     ty: &radix_syntax::TypeExpr,
@@ -1366,9 +1387,13 @@ fn lower_conversio_target_type(
             if let Some(prim) = Primitive::from_name(lowerer.interner.resolve(ident.name))
                 && prim == Primitive::Instans =>
         {
+            let Some(type_params) = generic_type_exprs(target_params) else {
+                lowerer.error("generic_size_argument_in_type_position");
+                return lowerer.types.intern(crate::Type::Error);
+            };
             let mut messages = Vec::new();
             let ty_id = crate::instans_precision::lower_sized_instans(
-                target_params,
+                &type_params,
                 lowerer.interner,
                 lowerer.types,
                 &mut |message| messages.push(message.to_owned()),
@@ -1407,10 +1432,11 @@ fn lower_conversio_target_type(
                 target_params.get(1..).unwrap_or(&[]),
                 lowerer.interner,
             ));
-            let width_params = match target_params.first() {
-                Some(param) => std::slice::from_ref(param),
-                None => &[],
+            let Some(type_params) = generic_type_exprs(target_params) else {
+                lowerer.error("generic_size_argument_in_type_position");
+                return lowerer.types.intern(crate::Type::Error);
             };
+            let width_params = type_params.first().map(std::slice::from_ref).unwrap_or(&[]);
             let mut messages = Vec::new();
             let ty_id = crate::numeric_width::lower_sized_primitive(
                 prim,
@@ -1485,8 +1511,26 @@ fn apply_type_target_wrappers(
     ty_id
 }
 
+fn generic_type_expr(arg: &GenericArgExpr) -> Option<TypeExpr> {
+    match arg {
+        GenericArgExpr::Type(ty) => Some(ty.clone()),
+        GenericArgExpr::Name(name) => Some(TypeExpr {
+            nullable: false,
+            mode: None,
+            kind: TypeExprKind::Named(name.clone(), Vec::new()),
+            span: name.span,
+            iuncta_label: None,
+        }),
+        GenericArgExpr::Size(_) => None,
+    }
+}
+
+fn generic_type_exprs(args: &[GenericArgExpr]) -> Option<Vec<TypeExpr>> {
+    args.iter().map(generic_type_expr).collect()
+}
+
 fn conversio_radix_hints(
-    target_params: &[radix_syntax::TypeExpr],
+    target_params: &[GenericArgExpr],
     interner: &radix_lexer::Interner,
 ) -> Vec<radix_lexer::Symbol> {
     target_params
@@ -1497,7 +1541,7 @@ fn conversio_radix_hints(
 }
 
 fn ascii_format_hints(
-    target_params: &[radix_syntax::TypeExpr],
+    target_params: &[GenericArgExpr],
     interner: &radix_lexer::Interner,
 ) -> Vec<radix_lexer::Symbol> {
     target_params
@@ -1512,10 +1556,14 @@ fn ascii_format_hints(
 /// Only bare named syntax contributes a hint. More complex type expressions are
 /// still lowered as target types, but they are not collapsed into a single
 /// symbol because that would lose the structure typecheck needs later.
-fn conversio_hint_symbol(ty: &radix_syntax::TypeExpr) -> Option<radix_lexer::Symbol> {
-    match &ty.kind {
-        radix_syntax::TypeExprKind::Named(ident, _) => Some(ident.name),
-        _ => None,
+fn conversio_hint_symbol(arg: &GenericArgExpr) -> Option<radix_lexer::Symbol> {
+    match arg {
+        GenericArgExpr::Name(ident) => Some(ident.name),
+        GenericArgExpr::Type(ty) => match &ty.kind {
+            TypeExprKind::Named(ident, _) => Some(ident.name),
+            _ => None,
+        },
+        GenericArgExpr::Size(_) => None,
     }
 }
 

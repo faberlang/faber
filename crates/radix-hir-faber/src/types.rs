@@ -242,7 +242,14 @@ impl super::FaberCodegen {
                 let base_str = self.type_to_faber(*base, types, names, interner, surface);
                 let args_str: Vec<String> = args
                     .iter()
-                    .map(|a| self.type_to_faber(*a, types, names, interner, surface))
+                    .map(|arg| match arg {
+                        radix_types::AppliedArg::Type(id) => {
+                            self.type_to_faber(*id, types, names, interner, surface)
+                        }
+                        radix_types::AppliedArg::Size(id) => {
+                            crate::figura::format_figura(*id, types, interner)
+                        }
+                    })
                     .collect();
                 format!("{}<{}>", base_str, args_str.join(", "))
             }

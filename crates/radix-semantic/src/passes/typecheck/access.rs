@@ -722,7 +722,10 @@ impl TypeChecker<'_> {
             return None;
         }
         match self.types.get(self.resolve_inferred_type(object_ty)) {
-            Type::Applied(_, args) => args.first().copied(),
+            Type::Applied(_, args) => args.first().and_then(|arg| match arg {
+                radix_types::AppliedArg::Type(id) => Some(*id),
+                radix_types::AppliedArg::Size(_) => None,
+            }),
             Type::Struct(_) => Some(self.types.primitive(Primitive::Valor)),
             _ => None,
         }
