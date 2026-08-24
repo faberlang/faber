@@ -5,6 +5,11 @@ package workflow. These diagrams render natively on GitHub; the styled version
 of the compilation model also lives on
 [the documentation site](https://faberlang.dev/en-US/toolchain/radix.html).
 
+GPU computation follows the cross-repository ownership and execution contract
+in [GPU Execution Architecture](gpu-execution-architecture.md): Gradus owns ML
+semantics and Faber-authored kernels, Radix compiles target artifacts and
+execution facts, and Hosts binds and executes them on physical devices.
+
 ## Compilation model
 
 Faber's intermediate representation is the semantic authority. No target or
