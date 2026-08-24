@@ -124,15 +124,7 @@ impl FunctionBuilder<'_> {
             return None;
         };
         let reducer = self.lower_reducer_function(reducer, accumulator_ty)?;
-        self.lower_collection_cumulata(
-            receiver,
-            receiver_ty,
-            reducer,
-            initial,
-            result_ty,
-            accumulator_ty,
-            expr,
-        )
+        self.lower_collection_cumulata(receiver, receiver_ty, reducer, initial, result_ty, accumulator_ty, expr)
     }
 
     fn lower_collection_transform(
@@ -581,8 +573,7 @@ impl FunctionBuilder<'_> {
         let collection = self.lower_expr_value(receiver)?;
         let collection = self.materialize_operand_place(collection, collection_ty, receiver.span);
         let accumulator = self.lower_expr_value(initial)?;
-        let accumulator =
-            self.materialize_operand_place(accumulator, accumulator_ty, initial.span);
+        let accumulator = self.materialize_operand_place(accumulator, accumulator_ty, initial.span);
         let result = self.construct_temp(
             MirAggregateKind::Array,
             MirAggregateFields::Ordered(Vec::new()),
