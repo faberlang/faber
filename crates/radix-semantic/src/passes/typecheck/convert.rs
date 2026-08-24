@@ -869,10 +869,10 @@ impl TypeChecker<'_> {
             self.types.get(target_resolved).clone(),
         ) {
             // Register-in: exact static octeti window into a vector register.
-            (source_ty, Type::Vector(elem, width))
-                if matches!(source_ty, Type::BoundedOcteti { .. })
-                    || matches!(source_ty, Type::Primitive(Primitive::Octeti)) =>
-            {
+            (
+                Type::BoundedOcteti { .. } | Type::Primitive(Primitive::Octeti),
+                Type::Vector(elem, width),
+            ) => {
                 if !self.conversio_has_endian_hint(params) {
                     self.invalid_conversion(ISSUE_OCTETI_TO_VECTOR_UNSPECIFIED, span);
                     return Some(self.error_type);
