@@ -150,7 +150,7 @@ fn rewrite_block(
             emitted_lanes,
             multiplicity,
         );
-        if plan.is_none() {
+        let Some(plan) = plan else {
             rewrite_nested_stmt(
                 &mut block.statements[index],
                 root_locals,
@@ -164,8 +164,6 @@ fn rewrite_block(
                 emitted_lanes,
                 multiplicity,
             );
-        }
-        let Some(plan) = plan else {
             index += 1;
             continue;
         };
@@ -2015,9 +2013,7 @@ fn int_literal(value: i64, ids: &mut IdGen) -> HirExpressionKind {
             }),
         )
     } else {
-        // WHY: unroll bounds are non-negative by construction (loop indices).
-        #[allow(clippy::cast_sign_loss)]
-        HirExpressionKind::Literal(HirLiteral::Int(value as u64))
+        HirExpressionKind::Literal(HirLiteral::Int(value.unsigned_abs()))
     }
 }
 
@@ -2156,20 +2152,17 @@ impl MaskCollector<'_> {
                 if let Some(init) = &local.init {
                     self.scan_expr(init);
                     self.local_inits.insert(local.def_id, init.clone());
-                    if let Some(src) = path_def(init) {
-                        let resolved = self.resolve(src);
+                    if let Some(def) = path_def(init) {
+                        let resolved = self.resolve(def);
                         self.aliases.insert(local.def_id, resolved);
-                        if self.fill_defs.contains(&src) || self.is_fill_built(init) {
+                        if self.fill_defs.contains(&def) || self.is_fill_built(init) {
                             self.fill_defs.insert(local.def_id);
                         }
-                    } else if self.is_fill_built(init) {
-                        self.fill_defs.insert(local.def_id);
-                    }
-                    if let HirExpressionKind::Path(def) = init.kind {
-                        let resolved = self.resolve(def);
                         if self.tensor_params.contains(&resolved) {
                             self.data_use.insert(resolved);
                         }
+                    } else if self.is_fill_built(init) {
+                        self.fill_defs.insert(local.def_id);
                     }
                 }
             }
