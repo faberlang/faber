@@ -105,7 +105,7 @@ pub fn analyze_modes(
 /// Returns access violations as a list of [`SemanticError`]s.
 pub fn analyze_modes_with_regions(
     hir: &HirModule,
-    resolver: &Resolver,
+    _resolver: &Resolver,
     types: &TypeTable,
     regions: Option<&RegionFacts>,
 ) -> Result<(), Vec<SemanticError>> {
@@ -137,7 +137,7 @@ pub fn analyze(
 /// Returns borrow/lifetime violations as a list of [`SemanticError`]s.
 pub fn analyze_with_regions(
     hir: &HirModule,
-    resolver: &Resolver,
+    _resolver: &Resolver,
     types: &TypeTable,
     regions: Option<&RegionFacts>,
 ) -> Result<(), Vec<SemanticError>> {
@@ -533,11 +533,9 @@ impl<'a> BorrowChecker<'a> {
         // legal. Own-param transfers still run below.
         let rust_sim = callee.ty.is_some();
         let language_call_borrows = self.language_conflicts && !(rust_sim && self.rust_lifetime);
-        // Named function Paths leave `callee.ty` unset. Their mut/ref dest-call
-        // borrows are call-scoped in every pass: real Rust releases an
-        // argument's `&mut`/`&` reborrow when the call ends, so sequential use
-        // after a single `mut` param call stays legal (D-1). Push a call scope
-        // so even the rust-lifetime pass releases these at call end instead of
+        // Their mut/ref dest-call borrows are call-scoped in every pass: real
+        // Rust releases an argument's `&mut`/`&` reborrow when the call ends,
+        // so push a call scope that releases these at call end instead of
         // holding the borrow to end-of-block.
         let call_scoped = !rust_sim;
         if language_call_borrows || call_scoped {
@@ -911,7 +909,7 @@ impl<'a> BorrowChecker<'a> {
                 usage.mutated = true;
             }
         }
-        let (region_mut_live, region_any_live) = self.region_liveness(def_id);
+        let (_region_mut_live, region_any_live) = self.region_liveness(def_id);
         let state = self.states.entry(def_id).or_default();
         if state.moved {
             self.error(SemanticErrorKind::UseAfterMove, ISSUE_USE_AFTER_MOVE, span);
