@@ -1788,3 +1788,7 @@ mod kernel_test;
 #[cfg(test)]
 #[path = "value_test.rs"]
 mod value_test;
+
+#[cfg(test)]
+#[path = "extremum_test.rs"]
+mod extremum_test;
