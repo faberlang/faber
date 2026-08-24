@@ -12,19 +12,18 @@ use super::{
 use crate::TokenKind;
 
 // =============================================================================
-// SFR-1 (summa-filum-reduction): `filum` freedom pins
+// SFR-2 (summa-filum-reduction): `filum` registry pin
 //
-// `filum` is zero-hit across the corpus and absent from the keyword registry.
-// It must keep lexing as a plain identifier in every position until SFR-2
-// mints its row; SFR-2's mechanism choice (contextual vs reserved) must keep
-// these census/substring laws intact.
+// `filum` now has a tokenless contextual row, so it remains a plain identifier
+// outside the parser-owned expression slot.
 // =============================================================================
 
 #[test]
-fn filum_has_no_keyword_row_zero_hit_census() {
+fn filum_has_keyword_row_after_sfr2() {
+    // SFR-2 completion: the registered row carries the parser-owned surface.
     assert!(
-        lookup_keyword_spec("filum").is_none(),
-        "'filum' must have no KeywordSpec row before SFR-2 — zero corpus hits"
+        lookup_keyword_spec("filum").is_some(),
+        "'filum' must have a KeywordSpec row after SFR-2"
     );
 }
 
@@ -56,7 +55,7 @@ fn filum_lexes_as_plain_identifier_in_every_position() {
 #[test]
 fn filum_substring_law_keeps_containing_identifiers_plain() {
     // Identifiers that merely contain "filum" as a substring stay identifiers;
-    // the future keyword claim (if any) is exact-spelling only.
+    // the contextual keyword claim is exact-spelling only.
     for spelling in ["filum_x", "x_filum", "profilum", "filumensis"] {
         let result = crate::lex(spelling);
         assert!(result.success(), "'{spelling}' must lex cleanly");
