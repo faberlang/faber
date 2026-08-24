@@ -955,7 +955,6 @@ pub(super) fn lower_package_units<'a>(
     // are unreachable from the package's synthetic call graph are dropped
     // before they merge into the program (delivery §4.3).
     prune_unreachable_library_functions(&mut library_parts, &mut reachable_seed);
-    let _ = entry;
     let Some(entry) = package.nodes.get_mut(entry_id) else {
         unreachable!("entry id selected from program nodes");
     };
@@ -982,7 +981,6 @@ pub(super) fn lower_package_units<'a>(
         }
         ensure_unique_definition_sources(&merged.program, &entry_path)?;
     }
-    let _ = others;
     for mut library in library_parts {
         let offset = append_shifted_parts(
             &mut merged.program,
