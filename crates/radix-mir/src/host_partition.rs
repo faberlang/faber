@@ -1,4 +1,8 @@
-//! Host/device partition surface (NGAB1-U1 — the NGAB1 vertical-slice root).
+//! Host/device partition and partition-record surfaces.
+//!
+//! The base partition is the NGAB1-U1 vertical slice. The serializable
+//! partition record extends it with membership, region/callsite, and legality
+//! facts for DDCP3-U3.
 //!
 //! Given one analyzed and validated MIR program, this surface partitions the
 //! package into the **host side** (ordinary functions that become the native
