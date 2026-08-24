@@ -743,7 +743,6 @@ impl FunctionBuilder<'_> {
         expr: &HirExpression,
     ) -> Option<MirOperand> {
         let scrutinee_ty = self.expr_ty(scrutinee)?;
-        let bool_ty = MirType::semantic(self.types.primitive(Primitive::Bivalens));
         let scrutinee_place = self.materialize_operand_place(value.clone(), scrutinee_ty, scrutinee.span);
         let join_id = self.fresh_block(expr.span);
         let mut default_body = None;
@@ -764,64 +763,33 @@ impl FunctionBuilder<'_> {
             };
             match pattern {
                 HirPattern::Variant(variant, fields) => {
-                    let then_id = self.fresh_block(arm.span);
-                    let else_id = self.fresh_block(arm.span);
-                    let fields = if fields.is_empty() {
-                        MirAggregateFields::Ordered(Vec::new())
-                    } else {
-                        self.variant_pattern_probe_fields(*variant, &scrutinee_place, arm.span)?
-                    };
-                    let variant =
-                        self.construct_temp(MirAggregateKind::EnumVariant(*variant), fields, scrutinee_ty, arm.span);
-                    let condition = self.assign_temp(
-                        MirValueKind::Binary { op: MirBinOp::Eq, lhs: value.clone(), rhs: variant },
-                        bool_ty,
-                        arm.span,
-                    );
-                    self.terminate_current(
-                        MirTerminatorKind::Branch { condition, then_block: then_id, else_block: else_id },
-                        arm.span,
-                    );
-
-                    self.switch_to(then_id);
-                    self.bind_variant_payload(pattern, &scrutinee_place, scrutinee_ty, arm.span)?;
-                    self.lower_expr_value(&arm.body);
-                    reaches_join |= self.terminate_open_current(MirTerminatorKind::Goto(join_id), arm.span);
-
-                    self.switch_to(else_id);
+                    self.lower_unit_variant_arm(
+                        *variant,
+                        fields,
+                        pattern,
+                        &value,
+                        &scrutinee_place,
+                        scrutinee_ty,
+                        join_id,
+                        arm,
+                        &mut reaches_join,
+                    )?;
                 }
                 HirPattern::Alias(_, _, inner) if matches!(inner.as_ref(), HirPattern::Variant(_, _)) => {
-                    let then_id = self.fresh_block(arm.span);
-                    let else_id = self.fresh_block(arm.span);
-                    let HirPattern::Alias(_, _, inner) = pattern else {
-                        unreachable!("alias pattern shape was matched");
-                    };
                     let HirPattern::Variant(variant, fields) = inner.as_ref() else {
                         unreachable!("inner variant pattern shape was matched");
                     };
-                    let fields = if fields.is_empty() {
-                        MirAggregateFields::Ordered(Vec::new())
-                    } else {
-                        self.variant_pattern_probe_fields(*variant, &scrutinee_place, arm.span)?
-                    };
-                    let variant =
-                        self.construct_temp(MirAggregateKind::EnumVariant(*variant), fields, scrutinee_ty, arm.span);
-                    let condition = self.assign_temp(
-                        MirValueKind::Binary { op: MirBinOp::Eq, lhs: value.clone(), rhs: variant },
-                        bool_ty,
-                        arm.span,
-                    );
-                    self.terminate_current(
-                        MirTerminatorKind::Branch { condition, then_block: then_id, else_block: else_id },
-                        arm.span,
-                    );
-
-                    self.switch_to(then_id);
-                    self.bind_variant_payload(pattern, &scrutinee_place, scrutinee_ty, arm.span)?;
-                    self.lower_expr_value(&arm.body);
-                    reaches_join |= self.terminate_open_current(MirTerminatorKind::Goto(join_id), arm.span);
-
-                    self.switch_to(else_id);
+                    self.lower_unit_variant_arm(
+                        *variant,
+                        fields,
+                        pattern,
+                        &value,
+                        &scrutinee_place,
+                        scrutinee_ty,
+                        join_id,
+                        arm,
+                        &mut reaches_join,
+                    )?;
                 }
                 HirPattern::Wildcard if default_body.is_none() => {
                     default_body = Some((&arm.body, arm.span));
@@ -858,6 +826,51 @@ impl FunctionBuilder<'_> {
             self.seal_unreachable(join_id, expr.span);
             None
         }
+    }
+
+    /// Lower one unit-variant arm: probe the scrutinee, branch on equality with
+    /// the constructed variant, bind the payload, and route to the join block.
+    ///
+    /// `payload_pattern` is the whole arm pattern (a `Variant` or an `Alias`
+    /// wrapping one) so an alias binding layers on before the variant payload.
+    fn lower_unit_variant_arm(
+        &mut self,
+        variant: DefId,
+        fields: &[HirPattern],
+        payload_pattern: &HirPattern,
+        value: &MirOperand,
+        scrutinee_place: &MirPlace,
+        scrutinee_ty: MirType,
+        join_id: MirBlockId,
+        arm: &HirCasuArm,
+        reaches_join: &mut bool,
+    ) -> Option<()> {
+        let bool_ty = MirType::semantic(self.types.primitive(Primitive::Bivalens));
+        let then_id = self.fresh_block(arm.span);
+        let else_id = self.fresh_block(arm.span);
+        let fields = if fields.is_empty() {
+            MirAggregateFields::Ordered(Vec::new())
+        } else {
+            self.variant_pattern_probe_fields(variant, scrutinee_place, arm.span)?
+        };
+        let variant = self.construct_temp(MirAggregateKind::EnumVariant(variant), fields, scrutinee_ty, arm.span);
+        let condition = self.assign_temp(
+            MirValueKind::Binary { op: MirBinOp::Eq, lhs: value.clone(), rhs: variant },
+            bool_ty,
+            arm.span,
+        );
+        self.terminate_current(
+            MirTerminatorKind::Branch { condition, then_block: then_id, else_block: else_id },
+            arm.span,
+        );
+
+        self.switch_to(then_id);
+        self.bind_variant_payload(payload_pattern, scrutinee_place, scrutinee_ty, arm.span)?;
+        self.lower_expr_value(&arm.body);
+        *reaches_join |= self.terminate_open_current(MirTerminatorKind::Goto(join_id), arm.span);
+
+        self.switch_to(else_id);
+        Some(())
     }
 
     fn variant_pattern_probe_fields(
