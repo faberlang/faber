@@ -1164,12 +1164,6 @@ impl std::error::Error for LocalePackLoadError {
     }
 }
 
-impl From<toml::de::Error> for LocalePackLoadError {
-    fn from(error: toml::de::Error) -> Self {
-        Self::Toml(error)
-    }
-}
-
 /// Assemble the built-in Latin reader pack from the live compiler registries.
 #[must_use]
 pub fn latin_locale_pack() -> LocalePack {
