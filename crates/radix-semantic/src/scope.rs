@@ -489,6 +489,8 @@ fn skipped_member_surfaces(
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SymbolKind {
     Local,
+    /// Compiler-injected `@ nucleum lane "name"` binding.
+    Lane,
     Param,
     Function,
     Method,

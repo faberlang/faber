@@ -172,6 +172,7 @@ pub enum TokenKind {
     Fragment,
     Imperium,
     Longum,
+    Lane,
     Nomen,
     Nondum,
     Nucleum,
@@ -487,6 +488,7 @@ impl TokenKind {
                 | Fragment
                 | Imperium
                 | Longum
+                | Lane
                 | Nomen
                 | Nondum
                 | Nucleum

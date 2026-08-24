@@ -2145,9 +2145,21 @@ impl Parser {
         }
 
         let fragment = self.eat_annotation_ident(TokenKind::Fragment);
+        let lane = if self.eat_annotation_ident(TokenKind::Lane) {
+            Some(self.parse_nucleum_lane_value()?)
+        } else {
+            None
+        };
         self.expect_annotation_end("unexpected token after @ nucleum")?;
+        let lane_spans = lane
+            .as_ref()
+            .map_or_else(Vec::new, |_| vec![self.previous_span()]);
+        let lane_values = lane.iter().copied().collect();
         Ok(AnnotationKind::Nucleum(NucleumAnnotation {
             is_fragment: fragment,
+            lane,
+            lane_values,
+            lane_spans,
         }))
     }
 
@@ -2156,21 +2168,34 @@ impl Parser {
 
         let mut fragment = false;
         let mut saw_fragment_field = false;
+        let mut lane = None;
+        let mut lane_values = Vec::new();
+        let mut lane_spans = Vec::new();
         while !self.check(&TokenKind::RBrace) && !self.is_at_end() {
             let field_name = self.parse_annotation_field_name()?;
             let field_name_str = self.interner.resolve(field_name.name).to_owned();
             self.expect(&TokenKind::Eq, "expected '=' in annotation field")?;
 
-            if field_name_str != "fragment" {
-                return Err(self
-                    .invalid_annotation_error("invalid_nucleum_field")
-                    .with_arg("field", field_name_str));
+            match field_name_str.as_str() {
+                "fragment" => {
+                    if saw_fragment_field {
+                        return Err(self.invalid_annotation_error("duplicate_nucleum_field"));
+                    }
+                    saw_fragment_field = true;
+                    fragment = self.parse_nucleum_fragment_flag()?;
+                }
+                "lane" => {
+                    let value = self.parse_nucleum_lane_value()?;
+                    lane = Some(value);
+                    lane_values.push(value);
+                    lane_spans.push(self.previous_span());
+                }
+                _ => {
+                    return Err(self
+                        .invalid_annotation_error("invalid_nucleum_field")
+                        .with_arg("field", field_name_str));
+                }
             }
-            if saw_fragment_field {
-                return Err(self.invalid_annotation_error("duplicate_nucleum_field"));
-            }
-            saw_fragment_field = true;
-            fragment = self.parse_nucleum_fragment_flag()?;
 
             if !self.consume_item_separator(&TokenKind::RBrace, "nucleum_fields")? {
                 break;
@@ -2180,7 +2205,21 @@ impl Parser {
         self.expect(&TokenKind::RBrace, "expected '}' after annotation fields")?;
         Ok(AnnotationKind::Nucleum(NucleumAnnotation {
             is_fragment: fragment,
+            lane,
+            lane_values,
+            lane_spans,
         }))
+    }
+
+    fn parse_nucleum_lane_value(&mut self) -> Result<radix_lexer::Symbol, ParseError> {
+        let token = self.advance();
+        match token.kind {
+            TokenKind::String(symbol) | TokenKind::AsciiString(symbol) => Ok(symbol),
+            TokenKind::Eof => Err(self.invalid_annotation_error("missing_nucleum_lane_value")),
+            _ => Err(self
+                .invalid_annotation_error("non_string_nucleum_lane_value")
+                .with_arg("expected", "string literal")),
+        }
     }
 
     fn parse_nucleum_fragment_flag(&mut self) -> Result<bool, ParseError> {

@@ -4464,6 +4464,63 @@ fn lowers_nucleum_annotation_to_compute_shader_stage() {
 }
 
 #[test]
+fn lowers_named_nucleum_lane_to_runtime_parameter() {
+    let source = r#"
+@ nucleum lane "pos"
+functio copy(tf32[4] input, tf32[4] output) → vacuum {
+    output[pos] ← input[pos]
+}
+"#;
+    let mut unit = analyze(source);
+    let lowered = lower_analyzed_unit(&mut unit, Default::default()).expect("lane lowering succeeds");
+    let function = &lowered.program.functions[0];
+    let lane = function
+        .params
+        .iter()
+        .find(|param| param.mode == MirParamMode::Lane)
+        .expect("lane is a synthetic MIR parameter");
+    assert_eq!(unit.interner.resolve(lane.name.expect("lane name")), "pos");
+    assert_eq!(
+        lane.ty,
+        MirType::semantic(
+            unit.types
+                .sized_numeric(Primitive::Numerus, NumericWidth::U32)
+        )
+    );
+}
+
+#[test]
+fn braced_nucleum_lane_round_trips_through_hir_faber() {
+    let source = r#"
+@ nucleum { lane = "pos", fragment = verum }
+functio helper() → u32 {
+    redde pos
+}
+"#;
+    let unit = analyze(source);
+    let latin_pack = crate::locale::latin_locale_pack();
+    let surface = crate::locale::KeywordSurface::new(&latin_pack);
+    let output = crate::codegen::generate_from_analyzed_with_options(
+        Target::HirFaber,
+        &unit,
+        &surface,
+        crate::codegen::OutputMode::Application,
+        None,
+    )
+    .expect("braced lane HIR must emit");
+    let crate::Output::Faber(output) = output else {
+        panic!("expected Faber output");
+    };
+    assert!(
+        output
+            .code
+            .contains("@ nucleum { fragment = verum, lane = \"pos\" }"),
+        "braced lane fields must survive HIR Faber emission:\n{}",
+        output.code
+    );
+}
+
+#[test]
 fn lowers_vertex_annotation_to_vertex_shader_stage() {
     let mut unit = analyze("@ vertex\nfunctio vertex_entry() → vacuum { redde }");
     let program = lower_analyzed_unit(&mut unit, Default::default())

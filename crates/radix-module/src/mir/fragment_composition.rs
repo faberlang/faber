@@ -18,9 +18,9 @@ use crate::lexer::{Interner, Span};
 use crate::mir::{
     MirAggregate, MirAggregateFields, MirAggregateItem, MirBlock, MirBlockId, MirCallee, MirConversion, MirDeviceRole,
     MirFunction, MirFunctionId, MirIntrinsic, MirKeyValueOperand, MirLocal, MirLocalId, MirMonomorphization,
-    MirNamedOperand, MirOperand, MirOptionChainLink, MirOptionOp, MirPlace, MirPlaceBase, MirProjection,
-    MirRuntimeCall, MirStatement, MirStatementKind, MirTemp, MirTempId, MirTerminator, MirTerminatorKind, MirType,
-    MirValue, MirValueId, MirValueKind,
+    MirNamedOperand, MirOperand, MirOptionChainLink, MirOptionOp, MirParam, MirParamMode, MirPlace, MirPlaceBase,
+    MirProjection, MirRuntimeCall, MirStatement, MirStatementKind, MirTemp, MirTempId, MirTerminator,
+    MirTerminatorKind, MirType, MirValue, MirValueId, MirValueKind,
 };
 use rustc_hash::{FxHashMap, FxHashSet};
 use std::cell::Cell;
@@ -64,6 +64,8 @@ pub struct FragmentCompositionError {
     pub issue: &'static str,
     pub reason: &'static str,
     pub span: Span,
+    /// Secondary span for dual-site composition diagnostics.
+    pub definition_span: Option<Span>,
     pub args: Vec<DiagnosticArg>,
 }
 
@@ -302,6 +304,49 @@ impl CompositionPass<'_> {
             if !self.is_fragment(&callee) {
                 return;
             }
+            if let Some(fragment_lane) = lane_param(&callee) {
+                let caller_had_lane = self.function(caller_id).and_then(lane_param).is_some();
+                let promoted = !caller_had_lane && fragment_lane.mode == MirParamMode::Lane;
+                if promoted {
+                    self.add_propagated_lane_param(caller_id, fragment_lane);
+                }
+                let caller_lane = self.function(caller_id).and_then(lane_param);
+                let same_name = caller_lane
+                    .and_then(|caller| caller.name)
+                    .zip(fragment_lane.name)
+                    .is_some_and(|(caller, fragment)| caller == fragment);
+                let allowed = match caller_lane {
+                    None => false,
+                    Some(_) if fragment_lane.mode == MirParamMode::LaneInherited => same_name,
+                    Some(caller) => promoted || (caller.mode == MirParamMode::LaneInherited && same_name),
+                };
+                if !allowed {
+                    let mut diagnostic = error(
+                        "nucleum_lane_fragment_clash",
+                        "fragment lane binding conflicts with caller lane binding",
+                        site.span,
+                        vec![
+                            DiagnosticArg::new(
+                                "caller",
+                                caller_lane
+                                    .and_then(|param| param.name)
+                                    .and_then(|name| self.interner.map(|interner| interner.resolve(name)))
+                                    .unwrap_or("none"),
+                            ),
+                            DiagnosticArg::new(
+                                "fragment",
+                                fragment_lane
+                                    .name
+                                    .and_then(|name| self.interner.map(|interner| interner.resolve(name)))
+                                    .unwrap_or("lane"),
+                            ),
+                        ],
+                    );
+                    diagnostic.definition_span = Some(fragment_lane.span);
+                    self.errors.push(diagnostic);
+                    return;
+                }
+            }
             let depth = block_depth
                 .get(&site.block_id)
                 .copied()
@@ -378,6 +423,39 @@ impl CompositionPass<'_> {
         }
     }
 
+    fn add_propagated_lane_param(&mut self, caller_id: MirFunctionId, fragment_lane: &MirParam) {
+        let Some(index) = self
+            .functions
+            .iter()
+            .position(|function| function.id == caller_id)
+        else {
+            return;
+        };
+        let entry = self.is_entry(&self.functions[index]);
+        let mode = if entry {
+            MirParamMode::Lane
+        } else {
+            MirParamMode::LaneInherited
+        };
+        let mut ids = IdGen::from_function(&self.functions[index]);
+        let local = ids.next_local();
+        let function = &mut self.functions[index];
+        function.params.push(MirParam {
+            local,
+            name: fragment_lane.name,
+            ty: fragment_lane.ty,
+            mode,
+            span: fragment_lane.span,
+        });
+        function.locals.push(MirLocal {
+            id: local,
+            name: fragment_lane.name,
+            ty: fragment_lane.ty,
+            mutable: false,
+            span: fragment_lane.span,
+        });
+    }
+
     fn inline_call(&mut self, caller_id: MirFunctionId, site: &CallSite, callee: &MirFunction) -> Option<InlineBlocks> {
         let caller_index = self
             .functions
@@ -386,6 +464,10 @@ impl CompositionPass<'_> {
         if callee.blocks.is_empty() {
             return None;
         }
+        let caller_lane_local = self
+            .function(caller_id)
+            .and_then(lane_param)
+            .map(|param| param.local);
         let caller = &mut self.functions[caller_index];
         if site.block_index >= caller.blocks.len() {
             return None;
@@ -397,7 +479,12 @@ impl CompositionPass<'_> {
         let mut ids = IdGen::from_function(caller);
         let mut alpha = Alpha::default();
         let mut binds = Vec::new();
-        for (param, arg) in callee.params.iter().zip(site.args.iter()) {
+        for (param, arg) in callee
+            .params
+            .iter()
+            .filter(|param| !is_lane_param(param))
+            .zip(site.args.iter())
+        {
             let new_local = ids.next_local();
             alpha.locals.insert(param.local, new_local);
             caller.locals.push(MirLocal {
@@ -419,6 +506,11 @@ impl CompositionPass<'_> {
                 },
                 span: site.span,
             });
+        }
+        if let Some(fragment_lane) = lane_param(callee) {
+            if let Some(caller_lane_local) = caller_lane_local {
+                alpha.locals.insert(fragment_lane.local, caller_lane_local);
+            }
         }
         for local in &callee.locals {
             if alpha.locals.contains_key(&local.id) {
@@ -678,8 +770,16 @@ fn normalize_cycle(cycle: &[MirFunctionId]) -> Vec<MirFunctionId> {
     rotated
 }
 
+fn is_lane_param(param: &MirParam) -> bool {
+    matches!(param.mode, MirParamMode::Lane | MirParamMode::LaneInherited)
+}
+
+fn lane_param(function: &MirFunction) -> Option<&MirParam> {
+    function.params.iter().find(|param| is_lane_param(param))
+}
+
 fn error(issue: &'static str, reason: &'static str, span: Span, args: Vec<DiagnosticArg>) -> FragmentCompositionError {
-    FragmentCompositionError { issue, reason, span, args }
+    FragmentCompositionError { issue, reason, span, definition_span: None, args }
 }
 
 fn count_nodes(function: &MirFunction) -> u32 {

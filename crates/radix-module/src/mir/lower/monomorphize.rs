@@ -350,6 +350,7 @@ impl<'lowerer, 'unit> MonomorphizationState<'lowerer, 'unit> {
                     ),
                     issue: "invalid_mir_call_argument_type_mismatch".to_owned(),
                     span,
+                    definition_span: None,
                 });
                 return None;
             }

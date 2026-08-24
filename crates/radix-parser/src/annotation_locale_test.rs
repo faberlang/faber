@@ -23,6 +23,7 @@ impl KeywordPack for EnAnnotationPack {
             "fn" => Some("functio"),
             "kernel" => Some("nucleum"),
             "fragment" => Some("fragment"),
+            "lane" => Some("lane"),
             "public" => Some("publica"),
             "true" => Some("verum"),
             "false" => Some("falsum"),
@@ -34,6 +35,7 @@ impl KeywordPack for EnAnnotationPack {
         match latin_key {
             "nucleum" => Some("kernel"),
             "fragment" => Some("fragment"),
+            "lane" => Some("lane"),
             "publica" => Some("public"),
             _ => None,
         }
@@ -81,6 +83,14 @@ fn en_annotation_spelling_is_sealed_in_both_nucleum_forms() {
     assert!(parse_en("@ kernel { fragment = true }\nfn probe() { }\n").success());
     assert_wrong_locale_annotation("@ nucleum\nfn probe() { }\n", "kernel");
     assert_wrong_locale_annotation("@ nucleum { fragment = verum }\nfn probe() { }\n", "kernel");
+}
+
+#[test]
+fn en_nucleum_lane_modifier_is_sealed_in_both_directions() {
+    assert!(parse_en("@ kernel lane \"pos\"\nfn probe() { }\n").success());
+    assert!(parse_en("@ kernel { lane = \"pos\" }\nfn probe() { }\n").success());
+    assert_wrong_locale_annotation("@ nucleum lane \"pos\"\nfn probe() { }\n", "kernel");
+    assert_wrong_locale_annotation("@ nucleum { lane = \"pos\" }\nfn probe() { }\n", "kernel");
 }
 
 #[test]

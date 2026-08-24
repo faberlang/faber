@@ -1245,6 +1245,12 @@ pub static KEYWORD_SPECS: &[KeywordSpec] = &[
         category: KeywordKind::Annotation,
     },
     KeywordSpec {
+        text: "lane",
+        token_kind: Some(TokenKind::Lane),
+        scope: KeywordScope::Contextual(ANNOTATION_MODIFIER),
+        category: KeywordKind::Annotation,
+    },
+    KeywordSpec {
         text: "operandus",
         token_kind: Some(TokenKind::Operandus),
         scope: KeywordScope::Annotation,

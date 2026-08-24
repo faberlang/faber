@@ -191,18 +191,23 @@ impl<'a> InstantiationChecker<'a> {
             self.ty(caller, "layout", span, definition_span, Some(&expected), Some(&actual));
             return;
         }
-        if args.len() != sig.params.len() {
+        let callable_params = sig
+            .params
+            .iter()
+            .filter(|param| !matches!(param.mode, MirParamMode::Lane | MirParamMode::LaneInherited))
+            .collect::<Vec<_>>();
+        if args.len() != callable_params.len() {
             self.ty(
                 caller,
                 "argument",
                 span,
                 definition_span,
-                Some(&sig.params.len().to_string()),
+                Some(&callable_params.len().to_string()),
                 Some(&args.len().to_string()),
             );
             return;
         }
-        for (param, arg) in sig.params.iter().zip(args.iter()) {
+        for (param, arg) in callable_params.iter().zip(args.iter()) {
             if let Some(actual) = self.operand_ty(caller_fn, arg) {
                 if !self.types_fit(param.ty, actual) {
                     let expected = self.type_label(param.ty);
@@ -274,7 +279,12 @@ impl<'a> InstantiationChecker<'a> {
         sig: &MirFunction,
         args: &[MirOperand],
     ) -> Option<(String, String)> {
-        for (param, arg) in sig.params.iter().zip(args.iter()) {
+        for (param, arg) in sig
+            .params
+            .iter()
+            .filter(|param| !matches!(param.mode, MirParamMode::Lane | MirParamMode::LaneInherited))
+            .zip(args.iter())
+        {
             let Some(actual) = self.operand_ty(caller_fn, arg) else {
                 continue;
             };
@@ -293,7 +303,12 @@ impl<'a> InstantiationChecker<'a> {
         sig: &MirFunction,
         args: &[MirOperand],
     ) -> Option<(String, String)> {
-        for (param, arg) in sig.params.iter().zip(args.iter()) {
+        for (param, arg) in sig
+            .params
+            .iter()
+            .filter(|param| !matches!(param.mode, MirParamMode::Lane | MirParamMode::LaneInherited))
+            .zip(args.iter())
+        {
             if !self.needs_device_layout(param.ty) {
                 continue;
             }
@@ -460,7 +475,7 @@ impl<'a> InstantiationChecker<'a> {
 
     fn mode_legal(&self, expected: MirParamMode, arg: &MirOperand) -> bool {
         match expected {
-            MirParamMode::Owned => true,
+            MirParamMode::Owned | MirParamMode::Lane | MirParamMode::LaneInherited => true,
             MirParamMode::Ref | MirParamMode::MutRef | MirParamMode::Move => matches!(arg, MirOperand::Place(_)),
         }
     }
@@ -558,6 +573,7 @@ fn mode_label(mode: MirParamMode) -> &'static str {
         MirParamMode::Ref => "de",
         MirParamMode::MutRef => "in",
         MirParamMode::Move => "ex",
+        MirParamMode::Lane | MirParamMode::LaneInherited => "lane",
     }
 }
 

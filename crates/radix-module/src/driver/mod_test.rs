@@ -939,6 +939,7 @@ fn call_argument_type_mismatch_renders_code_file_line_and_expected_got() {
             .to_owned(),
         issue: "invalid_mir_call_argument_type_mismatch".to_owned(),
         span: crate::lexer::Span { start, end: start + 5 },
+        definition_span: None,
     }];
     let err = super::mir_errors_to_spanned(errors);
     let result = super::compile_codegen_error(analysis, "probe.fab", source, err);

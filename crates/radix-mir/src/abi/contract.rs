@@ -1,6 +1,6 @@
 use crate::{
-    MirCollectionOp, MirConstant, MirFunction, MirIntrinsic, MirOperand, MirParam, MirPlaceBase,
-    MirRuntimeCall, MirStatementKind, MirValidationContext,
+    MirCollectionOp, MirConstant, MirFunction, MirIntrinsic, MirOperand, MirParam, MirParamMode,
+    MirPlaceBase, MirRuntimeCall, MirStatementKind, MirValidationContext,
 };
 use radix_lexer::Interner;
 use radix_types::NumericWidth;
@@ -1147,8 +1147,12 @@ pub(crate) fn builtin_inputs_for_named_params(
     let mut inputs = Vec::new();
     for param in params {
         require_u32_index(param.ty, validation)?;
-        let builtin = named_builtin_for_param(param, interner)
-            .ok_or_else(|| MirAbiError::new(ERR_KERNEL_BUILTIN_UNKNOWN_NAME))?;
+        let builtin = if param.mode == MirParamMode::Lane {
+            MirKernelBuiltin::GlobalInvocationX
+        } else {
+            named_builtin_for_param(param, interner)
+                .ok_or_else(|| MirAbiError::new(ERR_KERNEL_BUILTIN_UNKNOWN_NAME))?
+        };
         if inputs
             .iter()
             .any(|input: &MirKernelBuiltinInput| input.builtin == builtin)

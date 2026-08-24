@@ -1,6 +1,6 @@
 use crate::{
     MirAggregateFields, MirAggregateItem, MirAggregateKind, MirFunction, MirLayoutKind, MirLocalId,
-    MirOperand, MirParam, MirPlace, MirPlaceBase, MirScalarLayout, MirStatementKind,
+    MirOperand, MirParam, MirParamMode, MirPlace, MirPlaceBase, MirScalarLayout, MirStatementKind,
     MirTerminatorKind, MirType, MirValidationContext,
 };
 use radix_lexer::Interner;
@@ -397,7 +397,8 @@ impl MirKernelSignature {
 
         let mut builtin_start = params.len();
         while builtin_start > 0
-            && named_builtin_for_param(&params[builtin_start - 1], interner).is_some()
+            && (params[builtin_start - 1].mode == MirParamMode::Lane
+                || named_builtin_for_param(&params[builtin_start - 1], interner).is_some())
         {
             builtin_start -= 1;
         }

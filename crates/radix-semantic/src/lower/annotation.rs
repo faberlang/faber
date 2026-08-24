@@ -496,18 +496,22 @@ impl Lowerer<'_> {
         span: Span,
     ) -> HirAnnotation {
         let family = self.intern_field_name("nucleum");
+        let mut fields = Vec::new();
         if nucleum.is_fragment {
-            return HirAnnotation::with_fields(
-                family,
-                vec![HirAnnotationField {
-                    name: self.intern_field_name("fragment"),
-                    value: HirAnnotationValue::Bool(true),
-                    span,
-                }],
+            fields.push(HirAnnotationField {
+                name: self.intern_field_name("fragment"),
+                value: HirAnnotationValue::Bool(true),
                 span,
-            );
+            });
         }
-        HirAnnotation::with_fields(family, Vec::new(), span)
+        if let Some(lane) = nucleum.lane {
+            fields.push(HirAnnotationField {
+                name: self.intern_field_name("lane"),
+                value: HirAnnotationValue::String(lane),
+                span: nucleum.lane_spans.first().copied().unwrap_or(span),
+            });
+        }
+        HirAnnotation::with_fields(family, fields, span)
     }
 
     fn lower_cli_annotation(&mut self, cli: &CliAnnotation, span: Span) -> HirAnnotation {

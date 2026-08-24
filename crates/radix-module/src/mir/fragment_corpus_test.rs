@@ -9,7 +9,7 @@ use crate::diagnostics::Diagnostic;
 use crate::driver::{self, AnalyzeRequest, Config, Session};
 use crate::lexer::Span;
 use crate::mir::{
-    device_roles_from_hir, MirBinOp, MirDeviceRole, MirFunction, MirOperand, MirPlaceBase, MirProgram,
+    device_roles_from_hir, MirBinOp, MirDeviceRole, MirFunction, MirOperand, MirParamMode, MirPlaceBase, MirProgram,
     MirStatementKind, MirValue, MirValueKind,
 };
 use crate::semantic::SemanticErrorKind;
@@ -37,7 +37,7 @@ fn assert_wrapper_route(source: &str) {
     );
     let has_entry = source.lines().any(|line| {
         let trimmed = line.trim();
-        trimmed == "@ nucleum" || trimmed.starts_with("@ nucleum {")
+        trimmed == "@ nucleum" || trimmed.starts_with("@ nucleum {") || trimmed.starts_with("@ nucleum lane ")
     });
     assert!(
         has_entry,
@@ -129,6 +129,130 @@ fn assert_composed(source: &str) {
         "no fragment call may survive the wrapper route: {:#?}",
         lowered.functions
     );
+}
+
+#[test]
+fn caller_and_fragment_lane_bindings_fail_with_composition_issue() {
+    let source = r#"
+@ nucleum fragment lane "pos"
+functio helper(fractus<f32> x) → fractus<f32> {
+    redde x
+}
+
+@ nucleum { lane = "pos" }
+functio k(fractus<f32> x) → fractus<f32> {
+    redde helper(x)
+}
+"#;
+    let mut analysis = analyze(source).unwrap_or_else(|errors| panic!("source analyzes: {errors:?}"));
+    let errors = crate::mir::lower_analyzed_unit(&mut analysis, Default::default())
+        .expect_err("caller/fragment lane clash must fail closed");
+    let error = expect_lower_issue(&errors, "nucleum_lane_fragment_clash");
+    assert!(
+        span_in(error.span, source, "helper(x)"),
+        "primary span must mark the caller: {:?}",
+        error.span
+    );
+    let definition_span = error
+        .definition_span
+        .expect("lane clash must retain the fragment declaration span");
+    assert!(
+        span_in(definition_span, source, "lane \"pos\""),
+        "secondary span must mark the fragment lane declaration: {:?}",
+        definition_span
+    );
+}
+
+#[test]
+fn fragment_lane_propagates_to_position_independent_caller() {
+    let source = r#"
+@ nucleum fragment lane "pos"
+functio helper() → u32 {
+    redde pos
+}
+
+@ nucleum
+functio k() → u32 {
+    redde helper()
+}
+"#;
+    let (analysis, lowered) = lower(source).unwrap_or_else(|errors| panic!("fragment lane must propagate: {errors:?}"));
+    let entry = kernel_function(&lowered.functions, &analysis);
+    assert!(
+        entry
+            .params
+            .iter()
+            .any(|param| param.mode == MirParamMode::Lane),
+        "fragment lane propagation must add the entry ABI position parameter: {entry:#?}"
+    );
+    assert!(surviving_fragment_calls(&lowered.functions, &[], &device_roles_from_hir(&analysis.hir)).is_empty());
+}
+
+#[test]
+fn caller_lane_is_visible_to_fragment_body_after_composition() {
+    let source = r#"
+@ nucleum fragment
+functio helper() → u32 {
+    redde pos
+}
+
+@ nucleum lane "pos"
+functio k() → u32 {
+    redde helper()
+}
+"#;
+    let (analysis, lowered) = lower(source).unwrap_or_else(|errors| panic!("caller lane must compose: {errors:?}"));
+    let entry = kernel_function(&lowered.functions, &analysis);
+    let lane_name = entry
+        .params
+        .iter()
+        .find(|param| param.mode == MirParamMode::Lane)
+        .and_then(|param| param.name);
+    assert!(lane_name.is_some(), "entry retains its source lane parameter: {entry:#?}");
+    assert!(
+        entry
+            .params
+            .iter()
+            .all(|param| param.mode != MirParamMode::LaneInherited),
+        "inherited lane parameters must be consumed during composition: {entry:#?}"
+    );
+    assert_eq!(
+        entry
+            .locals
+            .iter()
+            .filter(|local| local.name == lane_name)
+            .count(),
+        1,
+        "fragment lane storage must resolve to the caller's one position local: {entry:#?}"
+    );
+    assert!(surviving_fragment_calls(&lowered.functions, &[], &device_roles_from_hir(&analysis.hir)).is_empty());
+}
+
+#[test]
+fn transitive_fragment_chain_reuses_the_entry_lane_binding() {
+    let source = r#"
+@ nucleum fragment
+functio leaf() → u32 {
+    redde pos
+}
+
+@ nucleum fragment
+functio wrapper() → u32 {
+    redde leaf() + pos
+}
+
+@ nucleum lane "pos"
+functio k() → u32 {
+    redde wrapper()
+}
+"#;
+    let (analysis, lowered) = lower(source).unwrap_or_else(|errors| panic!("transitive lane must compose: {errors:?}"));
+    let entry = kernel_function(&lowered.functions, &analysis);
+    assert!(entry
+        .params
+        .iter()
+        .all(|param| param.mode != MirParamMode::LaneInherited));
+    assert!(surviving_fragment_calls(&lowered.functions, &[], &device_roles_from_hir(&analysis.hir)).is_empty());
 }
 
 #[test]

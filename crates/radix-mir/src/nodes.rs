@@ -252,7 +252,8 @@ impl MirFunction {
 /// Shallow ownership encoding for MIR parameter modes.
 ///
 /// The serde labels preserve the pre-D-14 wire spellings while the Rust
-/// variants mirror [`radix_types::SemanticParamMode`].
+/// variants mirror [`radix_types::SemanticParamMode`] plus compiler-owned lane
+/// binding markers.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum MirParamMode {
     #[serde(rename = "Owned")]
@@ -263,6 +264,12 @@ pub enum MirParamMode {
     MutRef,
     #[serde(rename = "Ex")]
     Move,
+    /// Compiler-injected `@ nucleum lane` position parameter.
+    #[serde(rename = "Lane")]
+    Lane,
+    /// Fragment-local lane parameter inherited from its composition caller.
+    #[serde(rename = "LaneInherited")]
+    LaneInherited,
 }
 
 /// Function parameter bound to the local slot that carries its runtime value.

@@ -717,6 +717,10 @@ fn invalid_annotation_message(args: &[DiagnosticArg]) -> Option<String> {
             let context = arg_value(args, "context")?;
             Some(format!("unexpected token after {context}"))
         }
+        "missing_nucleum_lane_value" => Some("@ nucleum lane requires a string value".to_owned()),
+        "non_string_nucleum_lane_value" => {
+            Some("@ nucleum lane value must be a string literal".to_owned())
+        }
         "wrong_locale_annotation" => {
             let annotation = arg_value(args, "annotation")?;
             Some(format!(
@@ -740,6 +744,9 @@ fn invalid_annotation_help(args: &[DiagnosticArg]) -> Option<String> {
             Some(format!("add {expected} in this annotation position"))
         }
         "unexpected_annotation_token" => Some("remove the trailing annotation token".to_owned()),
+        "missing_nucleum_lane_value" | "non_string_nucleum_lane_value" => {
+            Some("use `@ nucleum lane \"position\"` or braced `lane = \"position\"`".to_owned())
+        }
         "wrong_locale_annotation" => {
             let expected = quote_arg(args, "expected")?;
             Some(format!("use `@ {expected}` for this file's reader locale"))

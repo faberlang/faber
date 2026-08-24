@@ -954,6 +954,11 @@ fn semantic_invalid_operand_types_message(args: &[DiagnosticArg]) -> Option<Stri
         "NUCLEUM_FRAGMENT_TYPE" => nucleum_fragment_type_message(args),
         "NUCLEUM_FRAGMENT_CYCLE" => nucleum_fragment_cycle_message(args),
         "NUCLEUM_FRAGMENT_EXPANSION" => nucleum_fragment_expansion_message(args),
+        "nucleum_lane_fragment_clash" => {
+            let caller = arg_value(args, "caller")?;
+            let fragment = arg_value(args, "fragment")?;
+            Some(format!("fragment lane binding '{fragment}' conflicts with caller lane binding '{caller}'"))
+        }
         "gpu_builtin_type_args" => Some("GPU builtin call does not accept type arguments".to_owned()),
         "inferred_callee_type_args" => Some("inferred callee does not accept type arguments".to_owned()),
         "intrinsic_method_type_args" => Some("intrinsic method does not accept type arguments".to_owned()),
@@ -2474,6 +2479,25 @@ fn semantic_invalid_annotation_message(args: &[DiagnosticArg]) -> Option<String>
                 "conflicting @ radix lane annotations: '{existing}' and '{parsed}'"
             ))
         }
+        "nucleum_lane_invalid_identifier" => {
+            let name = arg_value(args, "name")?;
+            Some(format!(
+                "@ nucleum lane binding '{name}' is not a valid identifier"
+            ))
+        }
+        "nucleum_lane_collision" => {
+            let name = arg_value(args, "name")?;
+            Some(format!(
+                "@ nucleum lane binding '{name}' collides with a parameter or local"
+            ))
+        }
+        "nucleum_lane_conflicting" => {
+            let existing = arg_value(args, "existing")?;
+            let parsed = arg_value(args, "parsed")?;
+            Some(format!(
+                "conflicting @ nucleum lane bindings: '{existing}' and '{parsed}'"
+            ))
+        }
         "missing_directive" => Some("@ radix requires a directive such as `lane`".to_owned()),
         "missing_lane_value" => Some("@ radix lane requires a string value".to_owned()),
         "non_string_lane_value" => Some("@ radix lane value must be a string literal".to_owned()),
@@ -2582,6 +2606,9 @@ fn semantic_invalid_annotation_help(args: &[DiagnosticArg]) -> Option<String> {
             Some("use `@ radix typus T in textus octeti` or braced `@ radix { param = T, allowed = textus }` with at least one allowed type".to_owned())
         }
         "conflicting_lane"
+        | "nucleum_lane_invalid_identifier"
+        | "nucleum_lane_collision"
+        | "nucleum_lane_conflicting"
         | "missing_directive"
         | "missing_lane_value"
         | "non_string_lane_value"

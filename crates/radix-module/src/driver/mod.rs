@@ -878,6 +878,7 @@ fn generate_wgsl_text_output(
                     message: "MIR lowering produced no vertex function for a non-empty graphics shader body".to_owned(),
                     issue: "mir_lower_graphics_body_missing".to_owned(),
                     span: crate::lexer::Span::default(),
+                    definition_span: None,
                 }]));
             }
             if has_non_empty_fragment && fragment_mir.is_none() {
@@ -886,6 +887,7 @@ fn generate_wgsl_text_output(
                         .to_owned(),
                     issue: "mir_lower_graphics_body_missing".to_owned(),
                     span: crate::lexer::Span::default(),
+                    definition_span: None,
                 }]));
             }
 

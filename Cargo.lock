@@ -817,6 +817,7 @@ dependencies = [
  "serde",
  "serde_json",
  "toml",
+ "unicode-ident",
  "unicode-normalization",
 ]
 

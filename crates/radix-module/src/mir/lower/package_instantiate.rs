@@ -346,6 +346,7 @@ impl PackageInstantiate<'_> {
                     ),
                     issue: "invalid_mir_call_argument_type_mismatch".to_owned(),
                     span: call.span,
+                    definition_span: None,
                 });
                 return None;
             }

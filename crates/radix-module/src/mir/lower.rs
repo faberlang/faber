@@ -35,10 +35,10 @@ use crate::cli::{CliDefault, CliOperand, CliOption, CliType};
 use crate::driver::AnalyzedModule;
 use crate::hir::visit::{walk_expr, walk_program, HirVisitor};
 use crate::hir::{
-    DefId, HirArrayElement, HirBinOp, HirBlock, HirCape, HirCasuArm, HirConst, HirConversioTarget, HirExpression,
-    HirExpressionKind, HirField, HirFunction, HirItem, HirItemKind, HirIteraMode, HirLiteral, HirLocal, HirMethod,
-    HirNonNullKind, HirObjectField, HirObjectKey, HirOptionalChainKind, HirParamMode, HirPattern, HirRangeKind,
-    HirScribeKind, HirStatement, HirStatementKind, HirStruct, HirUnOp,
+    DefId, HirAnnotationValue, HirArrayElement, HirBinOp, HirBlock, HirCape, HirCasuArm, HirConst, HirConversioTarget,
+    HirExpression, HirExpressionKind, HirField, HirFunction, HirItem, HirItemKind, HirIteraMode, HirLiteral, HirLocal,
+    HirMethod, HirNonNullKind, HirObjectField, HirObjectKey, HirOptionalChainKind, HirParamMode, HirPattern,
+    HirRangeKind, HirScribeKind, HirStatement, HirStatementKind, HirStruct, HirUnOp,
 };
 use crate::lexer::{Interner, Span, Symbol};
 use crate::mir::{
@@ -84,14 +84,16 @@ pub use package_instantiate::instantiate_merged_generic_calls;
 /// Developer-facing MIR lowering diagnostic.
 ///
 /// MIR lowering errors describe gaps between the typed HIR surface and the MIR
-/// subset currently implemented. They intentionally keep only a span and message
-/// because the caller is a compiler inspection/probe surface, not the primary
-/// user diagnostic renderer.
+/// subset currently implemented. They carry the primary span and, for
+/// composition diagnostics, an optional secondary definition span. The caller
+/// is a compiler inspection/probe surface, not the primary user diagnostic
+/// renderer.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct MirError {
     pub message: String,
     pub issue: String,
     pub span: Span,
+    pub definition_span: Option<Span>,
 }
 
 impl MirError {
@@ -101,6 +103,7 @@ impl MirError {
             message: format!("unsupported MIR lowering: {what}"),
             issue: mir_lower_issue("unsupported_mir_lowering", &what),
             span,
+            definition_span: None,
         }
     }
 
@@ -110,12 +113,18 @@ impl MirError {
             message: format!("missing type information for MIR lowering: {what}"),
             issue: mir_lower_issue("missing_type_information_for_mir_lowering", &what),
             span,
+            definition_span: None,
         }
     }
 
     fn validation(span: Span, what: impl Into<String>) -> Self {
         let what = what.into();
-        Self { message: format!("invalid MIR: {what}"), issue: mir_lower_issue("invalid_mir", &what), span }
+        Self {
+            message: format!("invalid MIR: {what}"),
+            issue: mir_lower_issue("invalid_mir", &what),
+            span,
+            definition_span: None,
+        }
     }
 }
 
@@ -310,7 +319,12 @@ fn lower_analyzed_unit_with_options(
         if !instantiation_errors.is_empty() {
             return Err(instantiation_errors
                 .into_iter()
-                .map(|error| MirError { message: error.message(), issue: error.issue.to_owned(), span: error.span })
+                .map(|error| MirError {
+                    message: error.message(),
+                    issue: error.issue.to_owned(),
+                    span: error.span,
+                    definition_span: None,
+                })
                 .collect());
         }
         let composition_errors = super::fragment_composition::compose(
@@ -323,7 +337,12 @@ fn lower_analyzed_unit_with_options(
         if !composition_errors.is_empty() {
             return Err(composition_errors
                 .into_iter()
-                .map(|error| MirError { message: error.message(), issue: error.issue.to_owned(), span: error.span })
+                .map(|error| MirError {
+                    message: error.message(),
+                    issue: error.issue.to_owned(),
+                    span: error.span,
+                    definition_span: error.definition_span,
+                })
                 .collect());
         }
         let mut validation = LoweringContextMaps::collect(unit).validation;
@@ -926,12 +945,28 @@ impl<'a> MirLowerer<'a> {
                 for param in &function.params {
                     builder.add_param(param.def_id, param.name, param.ty, param.mode, param.span);
                 }
+                let explicit_lane = lane_binding_local(function, &self.unit.interner);
+                if let Some((def_id, name, ty, span)) = explicit_lane {
+                    builder.add_lane_param(def_id, name, ty, span);
+                }
+                if function.nucleum_fragment {
+                    for (def_id, name, ty, span) in inherited_lane_binding_locals(
+                        function,
+                        &self.unit.resolver,
+                        explicit_lane.map(|(def_id, ..)| def_id),
+                    ) {
+                        builder.add_inherited_lane_param(def_id, name, ty, span);
+                    }
+                }
                 (function.body.as_ref(), function.cli_args.as_ref())
             }
             CallableLoweringTarget::Method { struct_item, strukt, method, receiver_ty } => {
                 builder.add_param(struct_item.def_id, strukt.name, receiver_ty, HirParamMode::Owned, method.span);
                 for param in &method.func.params {
                     builder.add_param(param.def_id, param.name, param.ty, param.mode, param.span);
+                }
+                if let Some((def_id, name, ty, span)) = lane_binding_local(&method.func, &self.unit.interner) {
+                    builder.add_lane_param(def_id, name, ty, span);
                 }
                 (method.func.body.as_ref(), None)
             }
@@ -1029,6 +1064,56 @@ impl<'a> MirLowerer<'a> {
             synthetics,
         );
     }
+}
+
+fn lane_binding_local(function: &HirFunction, interner: &Interner) -> Option<(DefId, Symbol, TypeId, Span)> {
+    let lane = function.annotations.iter().find_map(|annotation| {
+        if interner.resolve(annotation.family) != "nucleum" {
+            return None;
+        }
+        annotation
+            .fields
+            .iter()
+            .find_map(|field| (interner.resolve(field.name) == "lane").then_some(field.value.clone()))
+    })?;
+    let HirAnnotationValue::String(name) = lane else {
+        return None;
+    };
+    let body = function.body.as_ref()?;
+    body.statements.iter().find_map(|statement| {
+        let HirStatementKind::Local(local) = &statement.kind else {
+            return None;
+        };
+        (local.runtime_provided && local.name == name).then_some((local.def_id, local.name, local.ty?, statement.span))
+    })
+}
+
+fn inherited_lane_binding_locals(
+    function: &HirFunction,
+    resolver: &crate::semantic::Resolver,
+    explicit_lane: Option<DefId>,
+) -> Vec<(DefId, Symbol, TypeId, Span)> {
+    let Some(body) = function.body.as_ref() else {
+        return Vec::new();
+    };
+    body.statements
+        .iter()
+        .filter_map(|statement| {
+            let HirStatementKind::Local(local) = &statement.kind else {
+                return None;
+            };
+            if !local.runtime_provided || Some(local.def_id) == explicit_lane {
+                return None;
+            }
+            let symbol = resolver.get_symbol(local.def_id)?;
+            (symbol.kind == crate::semantic::SymbolKind::Lane).then_some((
+                local.def_id,
+                local.name,
+                local.ty?,
+                statement.span,
+            ))
+        })
+        .collect()
 }
 
 /// Annotation exclusivity check shared by device-role and shader-stage
@@ -1391,6 +1476,32 @@ impl<'a> FunctionBuilder<'a> {
             .push(MirParam { local, name: Some(name), ty: mir_ty, mode: mir_mode, span });
         self.locals
             .push(MirLocalDecl { id: local, name: Some(name), ty: mir_ty, mutable, span });
+        self.bindings
+            .insert(def_id, LocalBinding { local, ty: mir_ty });
+    }
+
+    fn add_lane_param(&mut self, def_id: DefId, name: crate::lexer::Symbol, ty: TypeId, span: Span) {
+        self.add_lane_param_with_mode(def_id, name, ty, span, MirParamMode::Lane);
+    }
+
+    fn add_inherited_lane_param(&mut self, def_id: DefId, name: crate::lexer::Symbol, ty: TypeId, span: Span) {
+        self.add_lane_param_with_mode(def_id, name, ty, span, MirParamMode::LaneInherited);
+    }
+
+    fn add_lane_param_with_mode(
+        &mut self,
+        def_id: DefId,
+        name: crate::lexer::Symbol,
+        ty: TypeId,
+        span: Span,
+        mode: MirParamMode,
+    ) {
+        let local = self.next_local_id();
+        let mir_ty = MirType::semantic(ty);
+        self.params
+            .push(MirParam { local, name: Some(name), ty: mir_ty, mode, span });
+        self.locals
+            .push(MirLocalDecl { id: local, name: Some(name), ty: mir_ty, mutable: false, span });
         self.bindings
             .insert(def_id, LocalBinding { local, ty: mir_ty });
     }
