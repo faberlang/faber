@@ -95,6 +95,7 @@ pub struct Parser {
     options: ParseOptions,
     keyword_surface: KeywordSurfaceMode,
     reader_keyword_latin_keys: HashMap<String, String>,
+    reader_keyword_surfaces: HashMap<String, String>,
     reader_type_latin_keys: HashMap<String, String>,
 }
 
@@ -122,6 +123,7 @@ pub fn parse_with_options(lex_result: LexResult, options: ParseOptions) -> Parse
         tokens,
         errors,
         reader_keyword_latin_keys,
+        reader_keyword_surfaces,
         reader_type_latin_keys,
         keyword_surface,
         interner,
@@ -140,6 +142,7 @@ pub fn parse_with_options(lex_result: LexResult, options: ParseOptions) -> Parse
         interner,
         options,
         reader_keyword_latin_keys,
+        reader_keyword_surfaces,
         reader_type_latin_keys,
         keyword_surface,
     );
@@ -169,6 +172,7 @@ impl Parser {
             options,
             HashMap::new(),
             HashMap::new(),
+            HashMap::new(),
             KeywordSurfaceMode::RegistryDirect,
         )
     }
@@ -178,6 +182,7 @@ impl Parser {
         interner: Interner,
         options: ParseOptions,
         reader_keyword_latin_keys: HashMap<String, String>,
+        reader_keyword_surfaces: HashMap<String, String>,
         reader_type_latin_keys: HashMap<String, String>,
         keyword_surface: KeywordSurfaceMode,
     ) -> Self {
@@ -197,6 +202,7 @@ impl Parser {
             options,
             keyword_surface,
             reader_keyword_latin_keys,
+            reader_keyword_surfaces,
             reader_type_latin_keys,
         }
     }
@@ -1088,6 +1094,10 @@ mod schema_test;
 #[cfg(test)]
 #[path = "nucleum_annotation_test.rs"]
 mod nucleum_annotation_test;
+
+#[cfg(test)]
+#[path = "annotation_locale_test.rs"]
+mod annotation_locale_test;
 
 #[cfg(test)]
 #[path = "comma_law_test.rs"]

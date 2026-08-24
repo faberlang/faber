@@ -148,6 +148,16 @@ pub trait KeywordPack {
         None
     }
 
+    /// Latin keyword registry identity → the pack's declared source spelling.
+    ///
+    /// Parser diagnostics use this reverse view when a registered keyword is
+    /// written in an undeclared surface. Implementations may omit a row only
+    /// for intentionally partial test packs; the parser then falls back to the
+    /// canonical Latin spelling.
+    fn keyword_spelling(&self, _latin_key: &str) -> Option<&str> {
+        None
+    }
+
     /// Exact pack type spelling → Latin type registry identity.
     ///
     /// Type names are parser-visible identifiers, so pack-aware lexing records
@@ -182,6 +192,9 @@ pub struct LexResult {
 
     /// Exact source spelling → Latin contextual keyword identity, for parser-owned slots.
     pub reader_keyword_latin_keys: HashMap<String, String>,
+
+    /// Latin keyword identity → declared source spelling, for locale diagnostics.
+    pub reader_keyword_surfaces: HashMap<String, String>,
 
     /// Exact source spelling → Latin type identity, for parser-owned type slots.
     pub reader_type_latin_keys: HashMap<String, String>,

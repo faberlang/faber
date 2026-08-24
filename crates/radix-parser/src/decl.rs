@@ -23,8 +23,8 @@
 
 use super::{ParseError, ParseErrorKind, Parser};
 use radix_lexer::{
-    keyword_allowed_as_ident, keyword_spelling_for_token, lookup_keyword_spec, KeywordOwner,
-    KeywordScope, TokenKind,
+    keyword_allowed_as_ident, keyword_spelling_for_token, lookup_keyword_spec, KeywordKind,
+    KeywordOwner, KeywordScope, TokenKind,
 };
 #[allow(clippy::wildcard_imports)]
 use radix_syntax::*;
@@ -1822,6 +1822,37 @@ impl Parser {
         Ok(annotations)
     }
 
+    /// Return the active pack's spelling when `raw` is a registered annotation
+    /// family written in its undeclared Latin form.
+    ///
+    /// Ordinary extension annotations remain statement annotations. A spelling
+    /// that the registry already identifies as annotation-owned is different:
+    /// accepting its canonical Latin form under a translated pack would make a
+    /// mixed-locale file look valid while bypassing the pack surface gate.
+    fn untranslated_annotation_spelling(&self, raw: &str) -> Option<String> {
+        if self.keyword_claim_key_for_text(raw).is_some() {
+            return None;
+        }
+
+        let spec = lookup_keyword_spec(raw)?;
+        let annotation_owned = matches!(spec.category, KeywordKind::Annotation)
+            || matches!(
+                spec.scope,
+                KeywordScope::Contextual(owners)
+                    if owners
+                        .iter()
+                        .any(|owner| *owner == KeywordOwner::AnnotationName)
+            );
+        if !annotation_owned {
+            return None;
+        }
+
+        self.reader_keyword_surfaces
+            .get(spec.text)
+            .cloned()
+            .or_else(|| Some(spec.text.to_owned()))
+    }
+
     fn parse_annotation_kind(&mut self) -> Result<AnnotationKind, ParseError> {
         // Capture the annotation-name spelling as authored: the dispatch below
         // is surface-gated, so it must see the spelling before
@@ -1833,6 +1864,14 @@ impl Parser {
             }
             _ => None,
         };
+        if let Some(raw) = raw_annotation_name.as_deref() {
+            if let Some(expected) = self.untranslated_annotation_spelling(raw) {
+                return Err(self
+                    .invalid_annotation_error("wrong_locale_annotation")
+                    .with_arg("annotation", raw)
+                    .with_arg("expected", expected));
+            }
+        }
         let name = self.parse_annotation_name()?;
 
         // Dispatch on the consumed annotation name's keyword identity (any
