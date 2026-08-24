@@ -201,11 +201,9 @@ pub(crate) struct TypeChecker<'a> {
     /// Nucleus roles keyed by function/method `DefId`. Call legality now lives
     /// on the MIR instantiation/composition seam; typecheck no longer rejects
     /// fragment calls.
-    #[allow(dead_code)]
     pub nucleum_roles: FxHashMap<DefId, NucleumRole>,
 
     /// Method nucleum roles keyed by (struct-or-interface def, method name).
-    #[allow(dead_code)]
     pub method_nucleum_roles: FxHashMap<(DefId, Symbol), NucleumRole>,
 
     /// Constant declaration types available to path lookup.
