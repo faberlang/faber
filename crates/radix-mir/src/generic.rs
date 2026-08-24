@@ -1613,7 +1613,9 @@ pub fn fold_shape_size_constant(
                 // instead of truncating on 32-bit targets.
                 usize::try_from(a).ok()?
             } else {
-                let neg = usize::try_from(-a).ok()?;
+                // `checked_neg` fails closed for `a == i64::MIN` instead of
+                // panicking on the negation in debug builds.
+                let neg = usize::try_from(a.checked_neg()?).ok()?;
                 dims.len().checked_sub(neg)?
             };
             *dims.get(a_usize)?
