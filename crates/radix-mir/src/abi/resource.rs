@@ -2,7 +2,7 @@ use crate::{
     shader_contract::ShaderStageIoRole, MirCollectionOp, MirFunction, MirKernelAxis,
     MirKernelBuiltin, MirLayoutKind, MirLocalId, MirScalarLayout, MirType, MirValidationContext,
 };
-use radix_types::{IndexExpr, Primitive, Type};
+use radix_types::{IndexExpr, IndexId, Primitive, Type};
 use serde::Serialize;
 
 use super::{
@@ -202,6 +202,7 @@ pub struct MirKernelWorkgroupCount {
     pub y: u64,
     pub z: u64,
 }
+
 /// Collection-op-aware workgroup count for a dispatch grid under the
 /// effective workgroup (D-A1, delivery D-W6-A1).
 ///
@@ -281,6 +282,7 @@ pub(crate) fn ceil_div_dimension(dispatch: u64, workgroup: u32) -> Result<u64, M
     }
     Ok(effective_ceil_dimension(dispatch, workgroup))
 }
+
 pub(crate) fn reflect_kernel_resource(
     resource: &MirKernelResource,
     validation: &MirValidationContext<'_>,
@@ -469,13 +471,12 @@ pub(crate) fn require_kernel_device_view(
             "sparsa",
         ));
     }
-    if allow_host_owned_tensor_entry
+    let host_owned_entry = allow_host_owned_tensor_entry
         && view.storage == crate::MirTensorStorageLayout::HostOwned
-        && view.locus == crate::MirTensorLocusLayout::Host
-    {
-    } else if view.storage != crate::MirTensorStorageLayout::DeviceHandle
-        || view.locus != crate::MirTensorLocusLayout::Device
-    {
+        && view.locus == crate::MirTensorLocusLayout::Host;
+    let device_entry = view.storage == crate::MirTensorStorageLayout::DeviceHandle
+        && view.locus == crate::MirTensorLocusLayout::Device;
+    if !host_owned_entry && !device_entry {
         return Err(MirAbiError::new(ERR_KERNEL_TENSOR_STORAGE_LOCUS));
     }
     if !view.row_major || !view.contiguous || view.offset_elements != 0 {
@@ -573,7 +574,7 @@ pub(crate) fn device_view_element_count(
 }
 
 pub(crate) fn device_view_element_count_from_shape(
-    shape: radix_types::IndexId,
+    shape: IndexId,
     validation: &MirValidationContext<'_>,
 ) -> Result<u64, MirAbiError> {
     match validation.types.get_index(shape) {
