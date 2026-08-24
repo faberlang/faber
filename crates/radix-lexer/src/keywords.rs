@@ -822,6 +822,22 @@ pub static KEYWORD_SPECS: &[KeywordSpec] = &[
         scope: KeywordScope::Contextual(EXPRESSION_INTRODUCER),
         category: KeywordKind::Literal,
     },
+    // === Keywords: Sum-reduce expression ===
+    // `summa` opens the contextual expression and `filum` names its optional
+    // distributed clause. Both remain tokenless so parser-owned claims stay
+    // pack-driven without adding grammar-table token variants.
+    KeywordSpec {
+        text: "summa",
+        token_kind: None,
+        scope: KeywordScope::Contextual(EXPRESSION_INTRODUCER),
+        category: KeywordKind::Misc,
+    },
+    KeywordSpec {
+        text: "filum",
+        token_kind: None,
+        scope: KeywordScope::Contextual(EXPRESSION_INTRODUCER),
+        category: KeywordKind::Misc,
+    },
     // === Keywords: First-match selection ===
     // `primus_quem` is the dedicated first-match expression head and `ubi`
     // introduces its owned predicate tail. Both are tokenless: the parser

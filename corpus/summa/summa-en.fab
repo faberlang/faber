@@ -1,0 +1,35 @@
++++
+term = "summa"
+kind = "concept"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "annotation", "annotation_name", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "shape_suffix", "assignment", "place", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "expression", "summa_expr", "filum_clause", "apud_clause", "fixum_decl", "redde_stmt"]
+category = "collection"
+summary = "Distributed sum-reduce kernel admit: sum from … at [i] thread f const s { return <term> } inside @ kernel."
+syntax = "sum from <tf32[32]> at [i] thread f const s { return <term> }"
+related = ["summa", "filum", "tensor"]
+locale = "en"
++++
+
+# =============================================================================
+# sum thread — distributed sum-reduce admit inside @ kernel
+# =============================================================================
+#
+# What this teaches:
+#   • Declared distributed sum — the `thread` spelling lowers to the
+#     DistributedSum plan entry: cyclic per-lane term-body fold with exactly
+#     one lane collective at group exit and a broadcast result.
+#   • Term body — per-lane scalar computation with exactly one valued
+#     `return`; local mutation of term-local bindings is allowed.
+#   • Alignment — the source length must be a multiple of the 32-lane width
+#     in v1; K = 32 here. Tails (K % 32 ≠ 0) decline at admission.
+#
+# See also: sum, thread, kernel, at, tensor
+# =============================================================================
+
+@ kernel
+fn column_dot(tf32[32] a, tf32[1] out, u32 id) → void {
+    const f32 total ← sum from a at [i] thread f const s {
+        var f32 t ← s * 1.4140625
+        return t
+    }
+    out[id] ← total
+}
