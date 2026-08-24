@@ -5,9 +5,8 @@ use crate::input_shape::locale_without_package_error;
 use crate::package;
 use proba::{
     format_summary, has_solum_cases, inventory_cases, is_harness_filter_match,
-    run_proba_on_validated, run_proba_on_validated_with_function_ids, run_proba_source,
-    selection_skip_reason, source_skip_reason, CaseOutcome, CaseResult, ProbaCase, ProbaReport,
-    TestSelection,
+    run_proba_on_validated, run_proba_on_validated_with_function_ids, selection_skip_reason,
+    source_skip_reason, CaseOutcome, CaseResult, ProbaCase, ProbaReport, TestSelection,
 };
 use radix::module::driver::{Config, Session};
 use radix::program::test_source_filter::TestSourceFilter;
@@ -201,42 +200,6 @@ where
             .any(|path| radix::program::source_files::is_proba_source_path(path.as_ref()))
 }
 
-fn run_single_file(
-    config: &Config,
-    path: &Path,
-    selection: &TestSelection,
-    harness_filter: Option<&str>,
-    exact: bool,
-    include_ignored: bool,
-    focused: bool,
-) -> ProbaReport {
-    let source = match std::fs::read_to_string(path) {
-        Ok(s) => s,
-        Err(err) => {
-            eprintln!("error: could not read {}: {err}", path.display());
-            std::process::exit(1);
-        }
-    };
-    let session = Session::new(config.clone());
-    let name = path.display().to_string();
-    match run_source_with_focus(
-        &session,
-        &name,
-        &source,
-        selection,
-        harness_filter,
-        exact,
-        include_ignored,
-        focused,
-    ) {
-        Ok(report) => report,
-        Err(error) => {
-            print_run_error(&error);
-            std::process::exit(1);
-        }
-    }
-}
-
 fn run_single_file_with_options(
     config: &Config,
     path: &Path,
@@ -317,76 +280,6 @@ fn run_source_with_options(
         }
     }
     Ok((report, metadata))
-}
-
-fn run_source_with_focus(
-    session: &Session,
-    name: &str,
-    source: &str,
-    selection: &TestSelection,
-    harness_filter: Option<&str>,
-    exact: bool,
-    include_ignored: bool,
-    focused: bool,
-) -> Result<ProbaReport, radix::module::mir::RunSourceError> {
-    if !focused {
-        return run_proba_source(
-            session,
-            name,
-            source,
-            selection,
-            harness_filter,
-            exact,
-            include_ignored,
-        );
-    }
-    let mut analysis = radix::program::analyze_prepared_program_name(session, name, source)
-        .map_err(radix::module::mir::RunSourceError::Frontend)?;
-    let all_cases = inventory_cases(&analysis.hir, &analysis.interner);
-    let focused = focused || has_solum_cases(&all_cases);
-    let cases = if focused {
-        focused_cases(&all_cases)
-    } else {
-        all_cases.clone()
-    };
-    if cases.is_empty() {
-        let mut report = ProbaReport::default();
-        append_focus_skips(
-            &mut report,
-            Path::new(name),
-            &all_cases,
-            focused,
-            selection,
-            harness_filter,
-            exact,
-            include_ignored,
-        );
-        return Ok(report);
-    }
-    let lowered = radix::module::mir::lower_analyzed_unit(&mut analysis, Default::default())
-        .map_err(radix::module::mir::RunSourceError::Mir)?;
-    let mut report = run_proba_on_validated(
-        &lowered.validated,
-        &cases,
-        selection,
-        harness_filter,
-        exact,
-        include_ignored,
-    );
-    for result in &mut report.results {
-        result.unit_path = Path::new(name).to_path_buf();
-    }
-    append_focus_skips(
-        &mut report,
-        Path::new(name),
-        &all_cases,
-        focused,
-        selection,
-        harness_filter,
-        exact,
-        include_ignored,
-    );
-    Ok(report)
 }
 
 fn is_solum_case(case: &ProbaCase) -> bool {
