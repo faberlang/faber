@@ -1,0 +1,52 @@
++++
+term = "summa"
+kind = "concept"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "shape_suffix", "apud_clause", "fixum_decl", "redde_stmt", "expression", "maxima_expr", "incipit_stmt", "literal"]
+category = "collection"
+summary = "Maximum and minimum reductions over shaped tensors, with caller-stated coalesce identities and nihil on empty."
+syntax = "max from <tensor> at [i] [coalesce <identity>]"
+related = ["summa", "tensor", "nihil"]
+locale = "en"
++++
+
+# =============================================================================
+# max/min — shaped tensor extrema with caller-stated empty identity
+# =============================================================================
+#
+# What this teaches:
+#   • Sibling reductions — `max from` and `min from` are dedicated reductions,
+#     not configuration flags on `sum from`.
+#   • Static shape — a non-empty `tf32[4]` result is plain `f32`.
+#   • Caller identity — `coalesce` accepts a runtime value when the shape may
+#     be empty; the language does not invent a maximum or minimum identity.
+#   • Empty lookup — a zero-length tensor returns `null` when no identity is
+#     stated, so a caller that needs `f32` must state `coalesce` explicitly.
+#
+# Common mistakes:
+#   • hand-rolling a max loop instead of using the dedicated reduction head
+#   • treating `coalesce` as a declaration default rather than the empty-result
+#     identity at the call site
+#
+# See also: summa, tensor, null, coalesce
+# =============================================================================
+
+fn max_static(tf32[4] values) → f32 {
+    const f32 result ← max from values at [i]
+    return result
+}
+
+fn min_with_identity(tf32[4] values, f32 floor) → f32 {
+    const f32 result ← min from values at [i] coalesce floor
+    return result
+}
+
+fn max_dynamic<size Figura>(tensor<f32, Figura> values, f32 fallback) → f32 {
+    const f32 result ← max from values at [i] coalesce fallback
+    return result
+}
+
+fn max_empty() → f32 ∪ null {
+    const tf32[0] values ← empty
+    const f32 ∪ null result ← max from values at [i]
+    return result
+}
