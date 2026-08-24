@@ -8,7 +8,7 @@ use crate::{
 };
 use radix_hir::DefId;
 use radix_lexer::{Span, Symbol};
-use radix_types::{IndexExpr, NumericWidth, Primitive, Type};
+use radix_types::{IndexExpr, NumericWidth, Primitive, Type, TypeId};
 use rustc_hash::FxHashSet;
 
 impl Validator<'_, '_> {
@@ -584,9 +584,9 @@ impl Validator<'_, '_> {
 
     pub(crate) fn validate_type_id(
         &mut self,
-        ty: radix_types::TypeId,
+        ty: TypeId,
         span: Span,
-        seen: &mut FxHashSet<radix_types::TypeId>,
+        seen: &mut FxHashSet<TypeId>,
     ) {
         if !seen.insert(ty) {
             return;
