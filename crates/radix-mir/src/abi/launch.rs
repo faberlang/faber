@@ -381,6 +381,7 @@ impl MirGraphicsPipelineReflection {
         self
     }
 }
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct MirKernelLaunchBinding {
     pub binding_index: usize,
@@ -535,6 +536,7 @@ pub struct MirWebGpuDispatchWorkgroups {
     pub y: u64,
     pub z: u64,
 }
+
 pub(crate) fn validate_vertex_input_locations(
     inputs: &[MirVertexInputReflection],
 ) -> Result<(), MirAbiError> {
@@ -586,7 +588,9 @@ pub(crate) fn validate_fragment_output_locations(
 /// Cross-stage consistency: every fragment varying must match a vertex output
 /// varying by location, format, and interpolation. Called when a vertex and a
 /// fragment entry are emitted together.
+///
 /// # Errors
+///
 /// Returns an error when validation or type resolution fails. See [`MirAbiError`].
 pub fn validate_varying_consistency(
     vertex: &MirKernelReflection,
@@ -650,20 +654,15 @@ pub(crate) fn pipeline_layout_for_launch_bind_groups(
         bind_group_layouts,
     }
 }
+
 impl MirKernelLaunchPlan {
     pub fn webgpu_adapter(&self) -> MirWebGpuLaunchAdapter {
-        let bind_group_layout_descriptor_indexes = self
+        let bind_group_indexes = self
             .bind_groups
             .iter()
             .map(|group| group.bind_group_index)
             .collect::<Vec<_>>();
-        let bind_group_layout_descriptor_index_count = bind_group_layout_descriptor_indexes.len();
-        let bind_group_descriptor_indexes = self
-            .bind_groups
-            .iter()
-            .map(|group| group.bind_group_index)
-            .collect::<Vec<_>>();
-        let bind_group_descriptor_index_count = bind_group_descriptor_indexes.len();
+        let bind_group_index_count = bind_group_indexes.len();
         let vertex_buffer_layout_descriptor_indexes = self
             .vertex_inputs
             .iter()
@@ -676,16 +675,16 @@ impl MirKernelLaunchPlan {
         MirWebGpuLaunchAdapter {
             pipeline_layout_descriptor: webgpu_pipeline_layout_descriptor(&self.pipeline_layout),
             bind_group_layout_descriptor_count: self.bind_group_count,
-            bind_group_layout_descriptor_indexes,
-            bind_group_layout_descriptor_index_count,
+            bind_group_layout_descriptor_indexes: bind_group_indexes.clone(),
+            bind_group_layout_descriptor_index_count: bind_group_index_count,
             bind_group_layout_descriptors: self
                 .bind_groups
                 .iter()
                 .map(webgpu_bind_group_layout_descriptor)
                 .collect(),
             bind_group_descriptor_count: self.bind_group_count,
-            bind_group_descriptor_indexes,
-            bind_group_descriptor_index_count,
+            bind_group_descriptor_indexes: bind_group_indexes,
+            bind_group_descriptor_index_count: bind_group_index_count,
             bind_group_descriptors: self
                 .bind_groups
                 .iter()
