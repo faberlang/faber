@@ -535,6 +535,13 @@ impl<H: Host + ?Sized> Runner<'_, H> {
         true
     }
 
+    /// Record an error and drop the active frame. `run_until_depth` observes
+    /// the error list and stops; the frame drop keeps the depth guard exact.
+    fn fail(&mut self, error: RunnerError) {
+        self.errors.push(error);
+        self.frames.pop();
+    }
+
     fn run_until_depth(&mut self, min_depth: usize) {
         while self.frames.len() > min_depth {
             if !self.consume_step(Span::default()) {
@@ -547,8 +554,7 @@ impl<H: Host + ?Sized> Runner<'_, H> {
             let block_data = match self.block_snapshot(function_id, block_id) {
                 Ok(data) => data,
                 Err(error) => {
-                    self.errors.push(error);
-                    self.frames.pop();
+                    self.fail(error);
                     continue;
                 }
             };
@@ -562,8 +568,7 @@ impl<H: Host + ?Sized> Runner<'_, H> {
                         break;
                     }
                     Err(error) => {
-                        self.errors.push(error);
-                        self.frames.pop();
+                        self.fail(error);
                         break;
                     }
                 }
@@ -582,8 +587,7 @@ impl<H: Host + ?Sized> Runner<'_, H> {
                         Some(operand) => match self.eval_operand(&operand, terminator.span) {
                             Ok(value) => value,
                             Err(error) => {
-                                self.errors.push(error);
-                                self.frames.pop();
+                                self.fail(error);
                                 continue;
                             }
                         },
@@ -597,8 +601,7 @@ impl<H: Host + ?Sized> Runner<'_, H> {
                     let value = match self.eval_operand(&operand, terminator.span) {
                         Ok(value) => value,
                         Err(error) => {
-                            self.errors.push(error);
-                            self.frames.pop();
+                            self.fail(error);
                             continue;
                         }
                     };
@@ -619,8 +622,7 @@ impl<H: Host + ?Sized> Runner<'_, H> {
                             if let Err(error) =
                                 self.write_place(&destination, value, terminator.span)
                             {
-                                self.errors.push(error);
-                                self.frames.pop();
+                                self.fail(error);
                                 continue;
                             }
                         }
@@ -630,15 +632,13 @@ impl<H: Host + ?Sized> Runner<'_, H> {
                         if let Err(error) =
                             self.write_place(&error_place, error_value, terminator.span)
                         {
-                            self.errors.push(error);
-                            self.frames.pop();
+                            self.fail(error);
                             continue;
                         }
                         self.set_active_block(error_block, terminator.span);
                     }
                     Err(error) => {
-                        self.errors.push(error);
-                        self.frames.pop();
+                        self.fail(error);
                     }
                 },
                 MirTerminatorKind::Goto(target) => {
@@ -657,13 +657,11 @@ impl<H: Host + ?Sized> Runner<'_, H> {
                             );
                         }
                         Err(error) => {
-                            self.errors.push(error);
-                            self.frames.pop();
+                            self.fail(error);
                         }
                     },
                     Err(error) => {
-                        self.errors.push(error);
-                        self.frames.pop();
+                        self.fail(error);
                     }
                 },
                 MirTerminatorKind::Switch {
@@ -681,16 +679,14 @@ impl<H: Host + ?Sized> Runner<'_, H> {
                         self.set_active_block(target, terminator.span);
                     }
                     Err(error) => {
-                        self.errors.push(error);
-                        self.frames.pop();
+                        self.fail(error);
                     }
                 },
                 MirTerminatorKind::Unreachable => {
-                    self.errors.push(RunnerError::unsupported(
+                    self.fail(RunnerError::unsupported(
                         terminator.span,
                         &format!("terminator {:?}", terminator.kind),
                     ));
-                    self.frames.pop();
                 }
             }
         }
@@ -1097,9 +1093,8 @@ impl<H: Host + ?Sized> Runner<'_, H> {
             base: place.base.clone(),
             projections: place.projections[..place.projections.len() - 1].to_vec(),
         };
-        let Some(last) = place.projections.last() else {
-            return Err(RunnerError::internal(span, "empty projection path"));
-        };
+        // `is_empty()` returned above, so the last projection is present.
+        let last = &place.projections[place.projections.len() - 1];
         let mut current = self.read_place(&parent, span)?;
         current = self.project_write(current, last, value, span)?;
         self.write_place(&parent, current, span)
