@@ -5,8 +5,8 @@
   "lane": "mir",
   "generatedBy": "radix/scripta/emit-compat-json.py",
   "summary": {
-    "capable": 267,
-    "analyzable": 306
+    "capable": 269,
+    "analyzable": 310
   },
   "terms": [
     {
@@ -54,8 +54,8 @@
     {
       "term": "·",
       "rule": "operator-group",
-      "capable": 1,
-      "analyzable": 3
+      "capable": 2,
+      "analyzable": 4
     },
     {
       "term": "×",
@@ -553,7 +553,7 @@
       "term": "iuncta",
       "rule": "existing-home",
       "capable": 0,
-      "analyzable": 0
+      "analyzable": 1
     },
     {
       "term": "lege",
@@ -1056,8 +1056,8 @@
     {
       "term": "summa",
       "rule": "concept",
-      "capable": 1,
-      "analyzable": 2
+      "capable": 2,
+      "analyzable": 4
     },
     {
       "term": "tacet",

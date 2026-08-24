@@ -5,8 +5,8 @@
   "lane": "mir",
   "generatedBy": "radix/scripta/emit-compat-json.py",
   "summary": {
-    "capable": 230,
-    "analyzable": 306
+    "capable": 259,
+    "analyzable": 310
   },
   "terms": [
     {
@@ -54,8 +54,8 @@
     {
       "term": "·",
       "rule": "operator-group",
-      "capable": 2,
-      "analyzable": 3
+      "capable": 4,
+      "analyzable": 4
     },
     {
       "term": "×",
@@ -72,7 +72,7 @@
     {
       "term": "⊙",
       "rule": "operator-group",
-      "capable": 0,
+      "capable": 2,
       "analyzable": 2
     },
     {
@@ -216,7 +216,7 @@
     {
       "term": "↦",
       "rule": "operator-group",
-      "capable": 0,
+      "capable": 2,
       "analyzable": 13
     },
     {
@@ -420,7 +420,7 @@
     {
       "term": "fractus",
       "rule": "keyword",
-      "capable": 1,
+      "capable": 2,
       "analyzable": 2
     },
     {
@@ -510,7 +510,7 @@
     {
       "term": "in",
       "rule": "keyword",
-      "capable": 0,
+      "capable": 1,
       "analyzable": 1
     },
     {
@@ -546,14 +546,14 @@
     {
       "term": "itera",
       "rule": "keyword",
-      "capable": 3,
+      "capable": 8,
       "analyzable": 9
     },
     {
       "term": "iuncta",
       "rule": "existing-home",
-      "capable": 0,
-      "analyzable": 0
+      "capable": 1,
+      "analyzable": 1
     },
     {
       "term": "lege",
@@ -594,7 +594,7 @@
     {
       "term": "metior",
       "rule": "existing-home",
-      "capable": 0,
+      "capable": 1,
       "analyzable": 1
     },
     {
@@ -672,7 +672,7 @@
     {
       "term": "numerus",
       "rule": "keyword",
-      "capable": 2,
+      "capable": 3,
       "analyzable": 3
     },
     {
@@ -816,7 +816,7 @@
     {
       "term": "prima",
       "rule": "existing-home",
-      "capable": 0,
+      "capable": 1,
       "analyzable": 1
     },
     {
@@ -1056,8 +1056,8 @@
     {
       "term": "summa",
       "rule": "concept",
-      "capable": 0,
-      "analyzable": 2
+      "capable": 2,
+      "analyzable": 4
     },
     {
       "term": "tacet",
@@ -1092,7 +1092,7 @@
     {
       "term": "tensor",
       "rule": "keyword",
-      "capable": 1,
+      "capable": 10,
       "analyzable": 10
     },
     {
@@ -1128,7 +1128,7 @@
     {
       "term": "ultima",
       "rule": "existing-home",
-      "capable": 0,
+      "capable": 1,
       "analyzable": 1
     },
     {

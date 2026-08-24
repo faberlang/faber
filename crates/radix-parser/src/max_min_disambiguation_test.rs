@@ -115,6 +115,7 @@ fn maxima_and_minima_heads_parse_in_latin_and_english_surfaces() {
 fn extrema_transform_operand_is_parenthesized_and_has_no_thread_body() {
     for source in [
         "maxima ex (x + 1) apud [i]",
+        "max from (x * scale)",
         "min from (x * scale) at [i] coalesce fallback",
     ] {
         let result = if source.contains(" from ") {

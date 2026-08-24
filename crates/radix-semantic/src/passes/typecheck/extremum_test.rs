@@ -53,6 +53,29 @@ functio maximum<magnitudo N>(tensor<f32, [N]> xs) → f32 ∪ nihil {
 }
 
 #[test]
+fn binderless_extrema_keep_nullable_and_coalesce_typing() {
+    assert_accepts(
+        r"
+functio maximum<magnitudo N>(tensor<f32, [N]> xs) → f32 ∪ nihil {
+    redde maxima ex xs
+}
+
+functio minimum<magnitudo N>(tensor<f32, [N]> xs, f32 identity) → f32 {
+    redde minima ex xs vel identity
+}
+",
+    );
+    assert_rejects_with_issue(
+        r"
+functio maximum<magnitudo N>(tensor<f32, [N]> xs) → f32 {
+    redde maxima ex xs
+}
+",
+        "extremum_nullable_result_requires_coalesce",
+    );
+}
+
+#[test]
 fn caller_coalesce_identity_eliminates_dynamic_nihil() {
     assert_accepts(
         r"

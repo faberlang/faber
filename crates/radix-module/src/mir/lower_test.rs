@@ -5330,6 +5330,39 @@ fn sequential_summa_without_apud_lowers_rank1() {
 }
 
 #[test]
+fn binderless_extremum_runner_matches_apud_form() {
+    let source = r##"+++
+locale = "en"
++++
+
+fn maximum_without_apud(tf32[3] values) → f32 {
+    return max from values
+}
+
+fn maximum_with_apud(tf32[3] values) → f32 {
+    return max from values at [i]
+}
+
+main {
+    const list<f32> flat ← [1.0, 4.0, 2.0]
+    const tf32[] seed ← empty
+    const tf32[3] values ← seed.from_flat(flat, [3])
+    print maximum_without_apud(values)
+    print maximum_with_apud(values)
+}
+"##;
+    let mut host = crate::mir::BufferHost::default();
+    crate::mir::run_source(
+        &Session::new(Config::default().with_target(Target::HirTypeScript)),
+        "binderless-extremum.fab",
+        source,
+        &mut host,
+    )
+    .unwrap_or_else(|error| panic!("binderless and apud extrema must run: {error:?}"));
+    assert_eq!(host.stdout_lines, ["4.0", "4.0"]);
+}
+
+#[test]
 fn sequential_summa_numerus_term_folds_int_zero() {
     let dump = dump_source(
         r"functio total(tensor<i32, [4]> a) → i32 {
