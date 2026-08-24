@@ -207,7 +207,7 @@ pub(crate) fn build_report(
     entry_file: Option<&str>,
     entry_source: Option<&str>,
 ) -> CostReport {
-    let mut sites: Vec<CostSite> = sites
+    let mut sites: Vec<_> = sites
         .into_iter()
         .filter(|site| site_visible(site, min_class))
         .collect();
