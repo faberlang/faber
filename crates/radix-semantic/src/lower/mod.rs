@@ -926,7 +926,6 @@ impl<'a> Lowerer<'a> {
         }
     }
 
-    /// Lower an expression (delegates to expr.rs)
     fn lower_expr(&mut self, expr: &radix_syntax::Expr) -> HirExpression {
         expr::lower_expr(self, expr)
     }
