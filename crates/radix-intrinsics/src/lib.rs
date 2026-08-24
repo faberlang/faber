@@ -239,6 +239,7 @@ pub fn mir_is_higher_order_lista(entry: &MethodIntrinsic) -> bool {
         IntrinsicMirKind::HigherOrderFiltrata
             | IntrinsicMirKind::HigherOrderMap
             | IntrinsicMirKind::HigherOrderReduce
+            | IntrinsicMirKind::HigherOrderCumulata
     )
 }
 

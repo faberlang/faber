@@ -3326,6 +3326,22 @@ fn lowers_lista_reducta_with_synthetic_reducer() {
 }
 
 #[test]
+fn lowers_lista_cumulata_with_synthetic_reducer() {
+    let dump = dump_source(
+        r"functio prefixes(lista<numerus> xs) → lista<numerus> {
+  redde xs.cumulata((numerus acc, numerus x) ∴ acc + x, 0)
+}",
+    );
+
+    assert!(dump.contains("runtime collection length"));
+    assert!(dump.contains("runtime collection append"));
+    assert!(dump.contains("function f1"));
+    assert!(dump.contains("call f1"));
+    assert!(!dump.contains("method call before runtime/provider MIR lowering"));
+    assert!(!dump.contains("path that does not resolve to a local value"));
+}
+
+#[test]
 fn collection_callback_errors_do_not_publish_synthetic_functions() {
     use crate::hir::{DefId, HirExpression, HirExpressionKind, HirId, HirParam, HirParamMode};
     use crate::lexer::{Span, Symbol};

@@ -159,6 +159,10 @@ impl FunctionBuilder<'_> {
                             let initial = &args[1].expr;
                             self.lower_reducta(receiver, closure, initial, expr)
                         }
+                        crate::intrinsics::IntrinsicMirKind::HigherOrderCumulata => {
+                            let initial = &args[1].expr;
+                            self.lower_cumulata(receiver, closure, initial, expr)
+                        }
                         _ => None,
                     };
                 }

@@ -1,10 +1,13 @@
-//! Higher-order collection method lowering (`filtrata`, `mappata`, `reducta`).
+//! Higher-order collection method lowering (`filtrata`, `mappata`, `reducta`,
+//! `cumulata`).
 //!
 //! Collection transforms lower into explicit MIR loops over array receivers.
 //! Each callback is emitted as a synthetic closure function, then invoked once
 //! per element through the shared callable lowering path. Filtered results
 //! append only when the predicate returns true; mapped results append the
-//! callback return value directly; reduced results update an accumulator.
+//! callback return value directly; reduced results update an accumulator;
+//! cumulated results append the accumulator after every fold step (serial
+//! prefix scan).
 //!
 //! INVARIANTS
 //! ==========
@@ -85,6 +88,51 @@ impl FunctionBuilder<'_> {
         let result_ty = self.expr_ty(expr)?;
         let reducer = self.lower_reducer_function(reducer, result_ty)?;
         self.lower_collection_reduce(receiver, receiver_ty, reducer, initial, result_ty, expr)
+    }
+
+    /// `cumulata` — serial prefix scan over an array receiver.
+    ///
+    /// Same seam as `reducta` (two-parameter reducer closure, seeded
+    /// accumulator), but one prefix result is appended to the result array
+    /// after every fold step, mirroring the Rust codegen contract pinned by
+    /// `lista_cumulata_emits_serial_prefix_scan`.
+    pub(super) fn lower_cumulata(
+        &mut self,
+        receiver: &HirExpression,
+        reducer: &HirExpression,
+        initial: &HirExpression,
+        expr: &HirExpression,
+    ) -> Option<MirOperand> {
+        let Some(receiver_ty) = receiver.ty else {
+            self.errors
+                .push(MirError::missing_type(receiver.span, "collection cumulata receiver"));
+            return None;
+        };
+        if !matches!(self.normalized_type(receiver_ty), Type::Array(_)) {
+            self.errors.push(MirError::unsupported(
+                receiver.span,
+                "collection cumulata before array MIR lowering",
+            ));
+            return None;
+        }
+        let result_ty = self.expr_ty(expr)?;
+        let Some(accumulator_ty) = self.collection_element_ty(result_ty.semantic_id()) else {
+            self.errors.push(MirError::unsupported(
+                expr.span,
+                "collection cumulata result before array MIR lowering",
+            ));
+            return None;
+        };
+        let reducer = self.lower_reducer_function(reducer, accumulator_ty)?;
+        self.lower_collection_cumulata(
+            receiver,
+            receiver_ty,
+            reducer,
+            initial,
+            result_ty,
+            accumulator_ty,
+            expr,
+        )
     }
 
     fn lower_collection_transform(
@@ -513,6 +561,118 @@ impl FunctionBuilder<'_> {
 
         self.switch_to(after_id);
         Some(MirOperand::Place(accumulator))
+    }
+
+    fn lower_collection_cumulata(
+        &mut self,
+        receiver: &HirExpression,
+        receiver_ty: TypeId,
+        reducer: MirCallee,
+        initial: &HirExpression,
+        result_ty: MirType,
+        accumulator_ty: MirType,
+        expr: &HirExpression,
+    ) -> Option<MirOperand> {
+        let collection_ty = MirType::semantic(receiver_ty);
+        let numerus = MirType::semantic(self.types.primitive(Primitive::Numerus));
+        let bivalens = MirType::semantic(self.types.primitive(Primitive::Bivalens));
+        let vacuum = MirType::semantic(self.types.primitive(Primitive::Vacuum));
+
+        let collection = self.lower_expr_value(receiver)?;
+        let collection = self.materialize_operand_place(collection, collection_ty, receiver.span);
+        let accumulator = self.lower_expr_value(initial)?;
+        let accumulator =
+            self.materialize_operand_place(accumulator, accumulator_ty, initial.span);
+        let result = self.construct_temp(
+            MirAggregateKind::Array,
+            MirAggregateFields::Ordered(Vec::new()),
+            result_ty,
+            expr.span,
+        );
+        let result = self.materialize_operand_place(result, result_ty, expr.span);
+
+        let index = self.next_local_id();
+        self.locals
+            .push(MirLocalDecl { id: index, name: None, ty: numerus, mutable: true, span: expr.span });
+        self.assign(
+            MirPlace::local(index),
+            MirOperand::Constant(MirConstant::Int(0)),
+            numerus,
+            expr.span,
+        );
+
+        let length = self.runtime_call_value(
+            MirIntrinsic::Collection(MirCollectionOp::Length),
+            vec![MirOperand::Place(collection.clone())],
+            numerus,
+            expr.span,
+        );
+        if !self.current_is_open() {
+            return None;
+        }
+
+        let cond_id = self.fresh_block(expr.span);
+        let body_id = self.fresh_block(expr.span);
+        let append_id = self.fresh_block(expr.span);
+        let increment_id = self.fresh_block(expr.span);
+        let after_id = self.fresh_block(expr.span);
+        self.terminate_current(MirTerminatorKind::Goto(cond_id), expr.span);
+
+        self.switch_to(cond_id);
+        let continues = self.binary_temp(
+            MirBinOp::Lt,
+            MirOperand::Place(MirPlace::local(index)),
+            length,
+            bivalens,
+            expr.span,
+        );
+        self.terminate_current(
+            MirTerminatorKind::Branch { condition: continues, then_block: body_id, else_block: after_id },
+            expr.span,
+        );
+
+        self.switch_to(body_id);
+        let mut item_place = collection.clone();
+        item_place
+            .projections
+            .push(MirProjection::Index(MirOperand::Place(MirPlace::local(index))));
+        let next_accumulator = self.call_callback_callee(
+            reducer,
+            vec![MirOperand::Place(accumulator.clone()), MirOperand::Place(item_place)],
+            accumulator_ty,
+            expr.span,
+        );
+        self.assign(accumulator.clone(), next_accumulator, accumulator_ty, expr.span);
+        if !self.current_is_open() {
+            return None;
+        }
+        self.terminate_current(MirTerminatorKind::Goto(append_id), expr.span);
+
+        self.switch_to(append_id);
+        self.runtime_call_value(
+            MirIntrinsic::Collection(MirCollectionOp::Append),
+            vec![MirOperand::Place(result.clone()), MirOperand::Place(accumulator)],
+            vacuum,
+            expr.span,
+        );
+        if !self.current_is_open() {
+            return None;
+        }
+        self.terminate_current(MirTerminatorKind::Goto(increment_id), expr.span);
+
+        self.switch_to(increment_id);
+        let next = self.binary_temp(
+            MirBinOp::Add,
+            MirOperand::Place(MirPlace::local(index)),
+            MirOperand::Constant(MirConstant::Int(1)),
+            numerus,
+            expr.span,
+        );
+        self.assign(MirPlace::local(index), next, numerus, expr.span);
+        self.terminate_current(MirTerminatorKind::Goto(cond_id), expr.span);
+
+        self.switch_to(after_id);
+        Some(MirOperand::Place(result))
     }
 
     fn collection_element_ty(&self, ty: TypeId) -> Option<MirType> {
