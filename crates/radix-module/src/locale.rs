@@ -13,3 +13,7 @@ mod intrinsics_tests;
 #[cfg(test)]
 #[path = "intrinsic_pack_completeness_test.rs"]
 mod completeness_tests;
+
+#[cfg(test)]
+#[path = "keyword_pack_completeness_test.rs"]
+mod keyword_completeness_tests;
