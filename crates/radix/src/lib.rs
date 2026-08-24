@@ -2,6 +2,12 @@
 //!
 //! Library-only: no binary, no clap, no process exit. The developer `radix`
 //! binary lives in `radix-cli`.
+//!
+//! Registration surface, split by ownership: [`module`] re-exports the
+//! module-compiler APIs and module-owned types, [`cli`] the compiler CLI-IR,
+//! [`program`] whole-program package compilation, and [`services`] the
+//! admitted typed services. Module-compiler conveniences are additionally
+//! re-exported at the crate root.
 
 /// Fail-closed module compiler APIs and supporting module-owned types.
 pub mod module {
