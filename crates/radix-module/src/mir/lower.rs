@@ -2690,6 +2690,7 @@ fn unsupported_expr_kind_name(kind: &HirExpressionKind) -> &'static str {
         HirExpressionKind::Dum(_, _) => "dum before control-flow MIR lowering",
         HirExpressionKind::Itera(_, _, _, _, _, _) => "itera before iterator MIR lowering",
         HirExpressionKind::Summa { .. } => "summa before term-fold MIR lowering",
+        HirExpressionKind::Extremum { .. } => "max/min before extrema MIR lowering",
         // Unreachable from the lowering dispatcher (first-match lowers through
         // `collection_higher_order`); kept so this naming match stays exhaustive.
         HirExpressionKind::FirstMatch { .. } => "primus_quem before first-match MIR lowering",

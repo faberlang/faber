@@ -369,6 +369,7 @@ impl SummaBodyState {
             // treats the nested node as an unapproved effect, so the outer
             // body walk does not descend into it.
             HirExpressionKind::Summa { .. } => effect(checker, expr.span, "unapproved_effect"),
+            HirExpressionKind::Extremum { .. } => effect(checker, expr.span, "unapproved_effect"),
             // Same fragment-subset posture for the dedicated first-match
             // head: unadmitted until AFM-3/AFM-4, so never descended into.
             HirExpressionKind::FirstMatch { .. } => effect(checker, expr.span, "unapproved_effect"),

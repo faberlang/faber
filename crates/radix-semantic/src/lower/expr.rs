@@ -33,7 +33,8 @@ use crate::{Primitive, TypeId};
 use radix_diagnostics::DiagnosticArg;
 use radix_hir::{
     HirArrayElement, HirBinOp, HirCallArg, HirConversioTarget, HirExpression, HirExpressionKind,
-    HirLiteral, HirNonNullKind, HirObjectField, HirObjectKey, HirOptionalChainKind, HirUnOp,
+    HirExtremumOp, HirLiteral, HirNonNullKind, HirObjectField, HirObjectKey, HirOptionalChainKind,
+    HirUnOp,
 };
 use radix_syntax::{
     BinaryExpr, Expr, ExprKind, GenericArgExpr, Literal, TypeExpr, TypeExprKind, UnaryExpr,
@@ -94,12 +95,8 @@ pub fn lower_expr(lowerer: &mut Lowerer, expr: &Expr) -> HirExpression {
         ExprKind::TypeCheck(type_check) => lowerer.lower_type_check(type_check),
         ExprKind::Iuncta(iuncta) => lowerer.lower_iuncta(iuncta),
         ExprKind::Summa(summa) => lower_summa(lowerer, summa),
-        // M1 admits the parser source shape before the HIR reduction contract
-        // exists; keep semantic lowering fail-closed until M2 owns admission.
-        ExprKind::Maxima(_) | ExprKind::Minima(_) => {
-            lowerer.error("max_min_expression_unsupported");
-            HirExpressionKind::Error
-        }
+        ExprKind::Maxima(extremum) => lower_extremum(lowerer, extremum, HirExtremumOp::Max),
+        ExprKind::Minima(extremum) => lower_extremum(lowerer, extremum, HirExtremumOp::Min),
         // EOT-3M: `⇇` transfer lowers to the typed HIR node. The sink and
         // payloads are ordinary expressions; typecheck owns the unary
         // vacuum-returning callable rules and payload compatibility.
@@ -150,6 +147,31 @@ fn lower_summa(lowerer: &mut Lowerer, summa: &radix_syntax::SummaExpr) -> HirExp
         filum,
         binding: (binding_def_id, summa.binding.name),
         body,
+    }
+}
+
+/// Lower the sibling extrema source shape without inventing a term body.
+fn lower_extremum(
+    lowerer: &mut Lowerer,
+    extremum: &radix_syntax::ExtremumExpr,
+    op: HirExtremumOp,
+) -> HirExpressionKind {
+    let source = lower_expr(lowerer, &extremum.source);
+    let coordinates = extremum
+        .apud
+        .iter()
+        .map(|ident| (lowerer.next_def_id(), ident.name))
+        .collect();
+    let coalesce = extremum
+        .coalesce
+        .as_ref()
+        .map(|identity| Box::new(lower_expr(lowerer, identity)));
+
+    HirExpressionKind::Extremum {
+        op,
+        source: Box::new(source),
+        coordinates,
+        coalesce,
     }
 }
 

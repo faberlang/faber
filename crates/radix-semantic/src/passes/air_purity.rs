@@ -300,6 +300,15 @@ impl AirPurityChecker<'_> {
                 self.check_expr(source);
                 self.check_block(body);
             }
+            HirExpressionKind::Extremum {
+                source, coalesce, ..
+            } => {
+                self.reject(expr.span, "extremum_expression_unsupported");
+                self.check_expr(source);
+                if let Some(identity) = coalesce {
+                    self.check_expr(identity);
+                }
+            }
             HirExpressionKind::FirstMatch {
                 source,
                 coordinates,

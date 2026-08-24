@@ -81,6 +81,7 @@ pub mod collect;
 pub mod control;
 pub mod convert;
 pub mod expr;
+pub mod extremum;
 pub mod finalize;
 pub mod first_match;
 pub mod generic;
@@ -637,6 +638,10 @@ mod itera_apud_test;
 #[cfg(test)]
 #[path = "summa_test.rs"]
 mod summa_test;
+
+#[cfg(test)]
+#[path = "extremum_test.rs"]
+mod extremum_test;
 
 #[cfg(test)]
 #[path = "literal_inference_test.rs"]

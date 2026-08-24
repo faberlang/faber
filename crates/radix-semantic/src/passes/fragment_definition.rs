@@ -290,6 +290,15 @@ impl FragmentDefinitionChecker<'_> {
                 self.check_expr(source);
                 self.check_block(body);
             }
+            HirExpressionKind::Extremum {
+                source, coalesce, ..
+            } => {
+                self.effect(expr.span, "unapproved_effect");
+                self.check_expr(source);
+                if let Some(identity) = coalesce {
+                    self.check_expr(identity);
+                }
+            }
             HirExpressionKind::FirstMatch { source, body, .. } => {
                 // Unapproved until AFM-3/AFM-4 admit the head.
                 self.effect(expr.span, "unapproved_effect");

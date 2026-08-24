@@ -1756,6 +1756,30 @@ pub(super) fn rewrite_expr(
                 diagnostics,
             );
         }
+        HirExpressionKind::Extremum {
+            source, coalesce, ..
+        } => {
+            rewrite_expr(
+                unit_path,
+                source,
+                interner,
+                targets,
+                data_member_targets,
+                namespaces,
+                diagnostics,
+            );
+            if let Some(identity) = coalesce {
+                rewrite_expr(
+                    unit_path,
+                    identity,
+                    interner,
+                    targets,
+                    data_member_targets,
+                    namespaces,
+                    diagnostics,
+                );
+            }
+        }
         HirExpressionKind::FirstMatch { source, body, .. } => {
             rewrite_expr(
                 unit_path,

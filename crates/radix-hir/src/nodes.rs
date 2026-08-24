@@ -1047,6 +1047,22 @@ pub enum HirExpressionKind {
         body: HirBlock,
     },
 
+    /// Sibling extrema reduction with a caller-stated optional identity.
+    ///
+    /// Unlike `Summa`, this node has no term binder or body: the selected
+    /// operation is the combine. Typecheck chooses `T` for statically
+    /// non-empty shapes and `Option<T>` otherwise.
+    Extremum {
+        /// Maximum or minimum operation selected by the source head.
+        op: HirExtremumOp,
+        /// Iterable expression supplying the values.
+        source: Box<HirExpression>,
+        /// Coordinate bindings inherited from the shared `apud` production.
+        coordinates: Vec<(DefId, Symbol)>,
+        /// Caller-stated identity from the `vel`/coalesce tail.
+        coalesce: Option<Box<HirExpression>>,
+    },
+
     /// Dedicated `primus_quem` first-match selection.
     ///
     /// This is a source-declaration node only in AFM-2. Typecheck deliberately
@@ -1280,6 +1296,13 @@ pub enum HirNonNullKind {
 
     /// Assert then call.
     Call(Vec<HirCallArg>),
+}
+
+/// Maximum/minimum operation selected by an extrema reduction head.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum HirExtremumOp {
+    Max,
+    Min,
 }
 
 /// Iteration source mode lowered from `itera` syntax.

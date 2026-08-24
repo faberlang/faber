@@ -379,6 +379,20 @@ impl TypeChecker<'_> {
                 body,
                 expr.span,
             ),
+            HirExpressionKind::Extremum {
+                op,
+                source,
+                coordinates,
+                coalesce,
+            } => super::extremum::check_extremum_expr(
+                self,
+                *op,
+                source,
+                coordinates,
+                coalesce.as_mut(),
+                expected,
+                expr.span,
+            ),
             HirExpressionKind::FirstMatch {
                 source,
                 coordinates,

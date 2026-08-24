@@ -300,6 +300,20 @@ fn collect_expr_defs(
             registry.insert(binding.0);
             collect_block_defs(body, registry);
         }
+        HirExpressionKind::Extremum {
+            source,
+            coordinates,
+            coalesce,
+            ..
+        } => {
+            collect_expr_defs(source, registry);
+            for (def_id, _) in coordinates {
+                registry.insert(*def_id);
+            }
+            if let Some(identity) = coalesce {
+                collect_expr_defs(identity, registry);
+            }
+        }
         HirExpressionKind::FirstMatch {
             source,
             coordinates,
@@ -612,6 +626,14 @@ fn collect_hir_registry(artifact: &HirArtifact) -> FxHashSet<radix_hir::HirId> {
             HirExpressionKind::Summa { source, body, .. } => {
                 collect_expr(source, registry);
                 collect_block(body, registry);
+            }
+            HirExpressionKind::Extremum {
+                source, coalesce, ..
+            } => {
+                collect_expr(source, registry);
+                if let Some(identity) = coalesce {
+                    collect_expr(identity, registry);
+                }
             }
             HirExpressionKind::FirstMatch { source, body, .. } => {
                 collect_expr(source, registry);
@@ -1316,6 +1338,21 @@ pub(crate) fn validate_referential_integrity(
                 check_def(binding.0)?;
                 check_symbol(binding.1)?;
                 validate_block(body, check_symbol, check_def, check_hir, check_type)?;
+            }
+            HirExpressionKind::Extremum {
+                source,
+                coordinates,
+                coalesce,
+                ..
+            } => {
+                validate_expr(source, check_symbol, check_def, check_hir, check_type)?;
+                for (def_id, name) in coordinates {
+                    check_def(*def_id)?;
+                    check_symbol(*name)?;
+                }
+                if let Some(identity) = coalesce {
+                    validate_expr(identity, check_symbol, check_def, check_hir, check_type)?;
+                }
             }
             HirExpressionKind::FirstMatch {
                 source,

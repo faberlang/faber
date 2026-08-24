@@ -416,6 +416,20 @@ pub fn walk_expr<V: HirVisitor>(visitor: &mut V, expr: &HirExpression) {
             visitor.visit_expr(source);
             visitor.visit_block(body);
         }
+        HirExpressionKind::Extremum {
+            source,
+            coordinates,
+            coalesce,
+            ..
+        } => {
+            for (coordinate_def_id, coordinate_name) in coordinates {
+                visitor.visit_def(*coordinate_def_id, *coordinate_name);
+            }
+            visitor.visit_expr(source);
+            if let Some(identity) = coalesce {
+                visitor.visit_expr(identity);
+            }
+        }
         HirExpressionKind::FirstMatch {
             source,
             coordinates,
@@ -950,6 +964,20 @@ pub fn walk_expr_mut<V: HirVisitorMut>(visitor: &mut V, expr: &mut HirExpression
             visitor.visit_def(binding.0, binding.1);
             visitor.visit_expr_mut(source);
             visitor.visit_block_mut(body);
+        }
+        HirExpressionKind::Extremum {
+            source,
+            coordinates,
+            coalesce,
+            ..
+        } => {
+            for (coordinate_def_id, coordinate_name) in coordinates {
+                visitor.visit_def(*coordinate_def_id, *coordinate_name);
+            }
+            visitor.visit_expr_mut(source);
+            if let Some(identity) = coalesce {
+                visitor.visit_expr_mut(identity);
+            }
         }
         HirExpressionKind::FirstMatch {
             source,
