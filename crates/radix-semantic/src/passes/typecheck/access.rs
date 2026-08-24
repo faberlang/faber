@@ -588,6 +588,7 @@ impl TypeChecker<'_> {
         }
         let idx_ty = self.check_expr_allowing_direct_intervallum_step(index);
         let result = self.check_index_from_type(obj_ty, idx_ty, object.span, index.span);
+        super::tensor_index::reject_static_bounded_index_oob(self, obj_ty, index);
         self.reject_static_octeti_index_oob(object, index);
         result
     }
@@ -638,6 +639,7 @@ impl TypeChecker<'_> {
         let resolved = self.resolve_inferred_type(obj_ty);
         if let Type::Tensor(elem, shape) = self.types.get(resolved).clone() {
             self.check_tensor_bracket_index(elem, shape, idx_ty, object.span, index.span);
+            super::tensor_index::reject_static_bounded_index_oob(self, obj_ty, index);
             return elem;
         }
         if let Type::Tuple(elements) = self.types.get(resolved).clone() {

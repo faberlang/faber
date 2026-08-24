@@ -4,22 +4,27 @@ kind = "type"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "width_type_sugar", "shape_suffix", "figura", "figura_list", "array_literal", "assignment", "place", "vel_expr", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "expression", "literal", "nota_stmt"]
 category = "collection"
 canonical = false
-summary = "Tensor method policy parity for accipe, out-of-bounds reads, and ponde."
+summary = "Tensor method policy for static literal rejection and checked dynamic reads."
 syntax = "tensor.get(indices) | tensor.set(indices, value)"
 related = ["tensor", "accipe", "ponde", "lista"]
 locale = "en"
 +++
 
 # =============================================================================
-# tensor — Tensor method policy parity for accipe, out-of-bounds reads, and ponde.
+# tensor — Tensor method policy for static literal rejection and checked reads.
 # =============================================================================
 #
 # What this teaches:
-#   • Bounds checking — `accipe` returns `∪ nihil` for out-of-bounds indices
+#   • Literal bounds — a literal index outside an exact shape is a check error
+#   • Dynamic bounds — an in-bounds dynamic read is handler-free; an out-of-bounds
+#     dynamic read is a hard program error, never a recoverable `⇥` result
 #   • Mutation — `ponde` updates in-place at the given index
 #
-# Common mistakes:
-#   • assuming out-of-bounds access throws an error rather than returning nihil — accipe returns T ∪ nihil
+# The following are deliberate CHECK errors and stay commented so this positive
+# fixture retains an executable stdout oracle:
+#   input.get([9])   → index 9 is provably out of bounds for static bound 3
+#   input[-1]        → index -1 is provably out of bounds for static bound 3
+#   input[[3]]       → the same literal-only rejection through bracket sugar
 #
 # See also: tensor, accipe, ponde, lista
 # =============================================================================
@@ -31,7 +36,7 @@ locale = "en"
 #
 # EXPECTED stdout:
 #   2.0
-#   99.0
+#   2.0
 #   8.0
 
 main {
@@ -39,12 +44,13 @@ main {
     var tf32[3] input ← seed.from_flat([1.0, 2.0, 3.0], [3])
 
     const f32 in_bounds ← input.get([1]) coalesce 0.0
-    const f32 out_of_bounds ← input.get([9]) coalesce 99.0
+    const int dynamic_index ← 1
+    const f32 dynamic_in_bounds ← input.get([dynamic_index]) coalesce 0.0
 
     input.set([2], 8.0)
     const f32 updated ← input.get([2]) coalesce 0.0
 
     print in_bounds
-    print out_of_bounds
+    print dynamic_in_bounds
     print updated
 }

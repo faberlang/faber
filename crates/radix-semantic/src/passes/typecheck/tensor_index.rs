@@ -15,6 +15,7 @@ use radix_lexer::Span;
 use super::*;
 
 const ISSUE_INCOMPATIBLE_TENSOR_INDEX: &str = "incompatible_tensor_index";
+pub(super) const ISSUE_PROVABLY_OUT_OF_BOUNDS: &str = "index_provably_out_of_bounds";
 
 const TENSOR_STRUE: &str = "strue";
 const TENSOR_FORMA: &str = "forma";
@@ -356,6 +357,103 @@ fn constrain_result_from_static_list(
     if let Some(arg_shape) = static_numerus_list_index(checker, arg_expr) {
         checker.constrain_index_equal(result_shape, arg_shape, span);
     }
+}
+
+/// Reject a literal index that contradicts a receiver's literal static bound.
+///
+/// This is deliberately literal-only. Index parameters, inference holes,
+/// dynamic shapes, and arithmetic expressions all decline here and remain
+/// runtime policy. The diagnostic span is the index expression itself so the
+/// source location identifies the proven failure.
+pub(super) fn reject_static_bounded_index_oob(
+    checker: &mut TypeChecker<'_>,
+    receiver_ty: TypeId,
+    index: &HirExpression,
+) {
+    let resolved = checker.resolve_inferred_type(receiver_ty);
+    let (_, payload) = checker.types.peel_access_marker(resolved);
+    let receiver = checker.types.get(payload).clone();
+    let bounds = match receiver {
+        Type::BoundedArray { capacity, .. }
+        | Type::BoundedTextus { capacity }
+        | Type::BoundedAscii { capacity }
+        | Type::BoundedOcteti { capacity } => {
+            let capacity = checker.resolve_index(capacity);
+            let IndexExpr::Literal(value) = checker.types.get_index(capacity) else {
+                return;
+            };
+            vec![*value]
+        }
+        Type::Tensor(_, shape) => static_tensor_bounds(checker, shape),
+        _ => return,
+    };
+    let Some(indices) = static_index_literals(index) else {
+        return;
+    };
+    if indices.len() != bounds.len() {
+        return;
+    }
+    for (axis, (value, bound)) in indices.iter().zip(bounds).enumerate() {
+        if *value < 0 || u128::try_from(*value).map_or(true, |value| value >= u128::from(bound)) {
+            checker.invalid_operand_types_with_args(
+                ISSUE_PROVABLY_OUT_OF_BOUNDS,
+                index.span,
+                &[
+                    ("index", format_static_index(&indices)),
+                    ("bound", bound.to_string()),
+                    ("axis", axis.to_string()),
+                ],
+            );
+            return;
+        }
+    }
+}
+
+fn static_tensor_bounds(checker: &mut TypeChecker<'_>, shape: IndexId) -> Vec<u64> {
+    let shape = checker.resolve_index(shape);
+    match checker.types.get_index(shape).clone() {
+        IndexExpr::Literal(value) => vec![value],
+        IndexExpr::Tuple(dims) => dims
+            .into_iter()
+            .map(|dim| match checker.types.get_index(dim) {
+                IndexExpr::Literal(value) => Some(*value),
+                _ => None,
+            })
+            .collect::<Option<Vec<_>>>()
+            .unwrap_or_default(),
+        IndexExpr::Param(_) | IndexExpr::Infer(_) | IndexExpr::Unspecified => Vec::new(),
+    }
+}
+
+fn static_index_literals(expr: &HirExpression) -> Option<Vec<i128>> {
+    match &expr.kind {
+        HirExpressionKind::Array(elements) => elements
+            .iter()
+            .map(|element| match element {
+                HirArrayElement::Expr(inner) => static_signed_numerus_literal(inner),
+                HirArrayElement::Spread(_) => None,
+            })
+            .collect(),
+        _ => Some(vec![static_signed_numerus_literal(expr)?]),
+    }
+}
+
+fn static_signed_numerus_literal(expr: &HirExpression) -> Option<i128> {
+    match &expr.kind {
+        HirExpressionKind::Literal(HirLiteral::Int(value)) => Some(i128::from(*value)),
+        HirExpressionKind::Unary(radix_hir::HirUnOp::Neg, inner) => {
+            static_signed_numerus_literal(inner)?.checked_neg()
+        }
+        _ => None,
+    }
+}
+
+fn format_static_index(indices: &[i128]) -> String {
+    if indices.len() == 1 {
+        return indices[0].to_string();
+    }
+    let values = indices.iter().map(ToString::to_string).collect::<Vec<_>>();
+    format!("[{}]", values.join(", "))
 }
 
 fn static_numerus_literal(expr: &HirExpression) -> Option<u64> {

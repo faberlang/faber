@@ -2112,6 +2112,11 @@ fn semantic_type_mismatch_message(args: &[DiagnosticArg]) -> Option<String> {
         "intervallum_value_step_unsupported" => Some("range step is only supported by iteration or slicing".to_owned()),
         "intra_requires_intervallum_range" => Some("intra requires an intervallum range".to_owned()),
         "incompatible_tensor_index" => Some(crate::INCOMPATIBLE_INDEX_MSG.to_owned()),
+        "index_provably_out_of_bounds" => {
+            let index = arg_value(args, "index").map(str::to_owned).unwrap_or_else(|| "?".to_owned());
+            let bound = arg_value(args, "bound").map(str::to_owned).unwrap_or_else(|| "?".to_owned());
+            Some(format!("index {index} is provably out of bounds for static bound {bound}"))
+        }
         "invalid_cast" => Some("invalid cast".to_owned()),
         "itera_ab_source_requires_range" => Some("itera ab source must be a range expression".to_owned()),
         "itera_apud_arity_mismatch" => Some("apud coordinate count must equal the iterable rank".to_owned()),

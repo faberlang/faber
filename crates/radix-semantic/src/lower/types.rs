@@ -657,6 +657,15 @@ impl Lowerer<'_> {
     }
 
     fn lower_primitive_type(&mut self, prim: Primitive, params: &[GenericArgExpr]) -> TypeId {
+        // Bounded textus/ascii/octeti capacities are index arguments, not type
+        // arguments. Lower this family before the width/type-only helper so a
+        // literal capacity reaches the shared IndexExpr arena.
+        if matches!(
+            prim,
+            Primitive::Ascii | Primitive::Textus | Primitive::Octeti
+        ) {
+            return self.lower_bounded_primitive(prim, params);
+        }
         let Some(type_params) = generic_type_exprs(params) else {
             self.error("generic_size_argument_in_type_position");
             return self.types.intern(Type::Error);
@@ -689,12 +698,6 @@ impl Lowerer<'_> {
                 self.error_from_message(message);
             }
             return ty;
-        }
-        if matches!(
-            prim,
-            Primitive::Ascii | Primitive::Textus | Primitive::Octeti
-        ) {
-            return self.lower_bounded_primitive(prim, params);
         }
         if !params.is_empty() {
             self.error("primitive_params");

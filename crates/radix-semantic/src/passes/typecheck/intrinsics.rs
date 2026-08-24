@@ -419,6 +419,13 @@ pub(super) fn check_intrinsic_method_call(
             } else {
                 checker.check_known_method_args(args, params, ret, span)
             };
+            if entry.faber_name == "accipe" && !args.is_empty() {
+                super::tensor_index::reject_static_bounded_index_oob(
+                    checker,
+                    receiver_ty,
+                    &args[0].expr,
+                );
+            }
             if matches!(entry.receiver, radix_intrinsics::IntrinsicReceiver::Tensor) {
                 super::tensor_index::apply_tensor_intrinsic_shape_constraints(
                     checker,

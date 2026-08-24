@@ -3430,6 +3430,14 @@ fn lower_named_type(
     }
 
     if let Some(prim) = Primitive::from_name(name_str) {
+        // Bounded textus/ascii/octeti capacities are index arguments, so they
+        // must bypass the width/type-only generic argument path.
+        if matches!(
+            prim,
+            Primitive::Ascii | Primitive::Textus | Primitive::Octeti
+        ) {
+            return lower_bounded_primitive(prim, params, resolver, interner, types);
+        }
         let Some(type_params) = generic_type_exprs(params) else {
             if matches!(
                 prim,

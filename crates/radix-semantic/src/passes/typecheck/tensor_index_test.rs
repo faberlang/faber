@@ -29,6 +29,47 @@ fn rejects_with_issue(source: &str, issue: &str) {
 }
 
 #[test]
+fn bounded_tensor_literal_indices_reject_provable_oob_and_negative() {
+    rejects_with_issue(
+        r"incipit {
+  fixum tf32[3] grid ← vacua
+  fixum _ bad ← grid.accipe([3])
+  nota bad
+}",
+        "index_provably_out_of_bounds",
+    );
+    rejects_with_issue(
+        r"incipit {
+  fixum tf32[3] grid ← vacua
+  fixum _ bad ← grid[-1]
+  nota bad
+}",
+        "index_provably_out_of_bounds",
+    );
+}
+
+#[test]
+fn bounded_tensor_literal_indices_in_bounds_still_accept() {
+    accepts(
+        r"incipit {
+  fixum tf32[3] grid ← vacua
+  fixum _ good ← grid.accipe([2])
+  fixum _ sugar ← grid[1]
+}",
+    );
+}
+
+#[test]
+fn tensor_param_and_dynamic_shapes_decline_static_oob_check() {
+    accepts(
+        r"functio read<magnitudo N>(tensor<f32, [N]> param, tf32[] dynamic) → vacuum {
+  fixum _ a ← param.accipe([9])
+  fixum _ b ← dynamic.accipe([9])
+}",
+    );
+}
+
+#[test]
 fn tensor_structa_infers_shape_from_literal_shape_binding() {
     accepts(
         r"incipit {

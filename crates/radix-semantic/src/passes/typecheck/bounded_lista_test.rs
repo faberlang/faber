@@ -67,6 +67,50 @@ fn bounded_lista_accipe_and_index_return_element() {
 }
 
 #[test]
+fn bounded_lista_literal_indices_reject_provable_oob_and_negative() {
+    assert_rejects_with_issue(
+        r"incipit {
+    fixum lista<numerus, 8> xs ← vacua
+    fixum _ bad ← xs[8]
+    nota bad
+}",
+        "index_provably_out_of_bounds",
+    );
+    assert_rejects_with_issue(
+        r"incipit {
+    fixum lista<numerus, 8> xs ← vacua
+    fixum _ bad ← xs[-1]
+    nota bad
+}",
+        "index_provably_out_of_bounds",
+    );
+}
+
+#[test]
+fn bounded_cord_literal_indices_reject_provable_oob_and_negative() {
+    for source in [
+        r##"incipit {
+    fixum textus raw ← "a"
+    fixum textus<8> text ← raw ↦ textus<8>
+    fixum _ bad ← text[8]
+    nota bad
+}"##,
+        r"incipit {
+    fixum ascii<8> text ← 'a'
+    fixum _ bad ← text[-1]
+    nota bad
+}",
+        r"incipit {
+    fixum octeti<8> bytes ← |61| ↦ octeti<8>
+    fixum _ bad ← bytes[8]
+    nota bad
+}",
+    ] {
+        assert_rejects_with_issue(source, "index_provably_out_of_bounds");
+    }
+}
+
+#[test]
 fn bounded_lista_appende_requires_alternate_exit() {
     assert_rejects_with_issue(
         r"incipit {
