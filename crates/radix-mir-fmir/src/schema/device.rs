@@ -320,11 +320,11 @@ pub struct FmirReflectedResource {
     /// The declared binding index.
     pub binding: u32,
 }
-/// Backend selection request recorded in the image (N1.1). Fail-closed: an
-/// unknown value fails at parse time. Migrated to backend-id enum semantics
-/// (DDCP2-U2): an unknown selection id is `Unknown(String)` — representable
-/// on the image and rejected honestly at selection resolution, never
-/// silently remapped to a compiled-in backend.
+
+/// Backend selection request recorded in the image (N1.1). Migrated to
+/// backend-id enum semantics (DDCP2-U2): an unknown selection id is
+/// `Unknown(String)` — representable on the image and rejected honestly at
+/// selection resolution, never silently remapped to a compiled-in backend.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum FmirDeviceSelection {
