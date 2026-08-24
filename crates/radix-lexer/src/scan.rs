@@ -29,7 +29,7 @@
 //! an earlier lexical failure.
 
 use super::cursor::Cursor;
-use super::keywords::keyword_token_kind;
+use super::keywords::{keyword_specs, keyword_token_kind};
 use super::token::{Span, Symbol, Token, TokenKind};
 use super::{LexError, LexErrorKind, LexResult, LocaleSuggestion};
 use crate::KeywordPack;
@@ -197,6 +197,7 @@ pub struct Lexer<'a> {
     errors: Vec<LexError>,
     locale_suggestions: Vec<LocaleSuggestion>,
     reader_keyword_latin_keys: HashMap<String, String>,
+    reader_keyword_surfaces: HashMap<String, String>,
     reader_type_latin_keys: HashMap<String, String>,
     /// True once any non-trivia token has been emitted on the current line.
     line_has_code: bool,
@@ -214,6 +215,7 @@ impl<'a> Lexer<'a> {
             errors: Vec::new(),
             locale_suggestions: Vec::new(),
             reader_keyword_latin_keys: HashMap::new(),
+            reader_keyword_surfaces: HashMap::new(),
             reader_type_latin_keys: HashMap::new(),
             line_has_code: false,
         }
@@ -224,6 +226,12 @@ impl<'a> Lexer<'a> {
     pub fn with_locale_pack(mut self, pack: &'a dyn KeywordPack) -> Self {
         self.locale_pack = Some(pack);
         self.keyword_surface = crate::KeywordSurfaceMode::from_pack_id(Some(pack.pack_id()));
+        for spec in keyword_specs() {
+            if let Some(spelling) = pack.keyword_spelling(spec.text) {
+                self.reader_keyword_surfaces
+                    .insert(spec.text.to_owned(), spelling.to_owned());
+            }
+        }
         self
     }
 
@@ -243,6 +251,7 @@ impl<'a> Lexer<'a> {
             errors: self.errors,
             locale_suggestions: self.locale_suggestions,
             reader_keyword_latin_keys: self.reader_keyword_latin_keys,
+            reader_keyword_surfaces: self.reader_keyword_surfaces,
             reader_type_latin_keys: self.reader_type_latin_keys,
             keyword_surface: self.keyword_surface,
             interner: self.interner,

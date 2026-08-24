@@ -80,6 +80,7 @@ fn parser_over_with_pack(source: &str) -> Parser {
     let LexResult {
         tokens,
         reader_keyword_latin_keys,
+        reader_keyword_surfaces,
         reader_type_latin_keys,
         keyword_surface,
         interner,
@@ -90,6 +91,7 @@ fn parser_over_with_pack(source: &str) -> Parser {
         interner,
         ParseOptions::default(),
         reader_keyword_latin_keys,
+        reader_keyword_surfaces,
         reader_type_latin_keys,
         keyword_surface,
     )

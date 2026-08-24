@@ -2371,6 +2371,10 @@ impl radix_lexer::KeywordPack for LocalePack {
         LocalePack::keyword_latin_key(self, text)
     }
 
+    fn keyword_spelling(&self, latin_key: &str) -> Option<&str> {
+        self.keyword_surfaces.get(latin_key).map(String::as_str)
+    }
+
     fn type_latin_key(&self, text: &str) -> Option<&str> {
         LocalePack::type_latin_key(self, text)
     }

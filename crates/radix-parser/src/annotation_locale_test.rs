@@ -1,0 +1,90 @@
+//! Reader-surface sealing for registered annotation families.
+//!
+//! A non-Latin reader pack must not silently reinterpret a canonical Latin
+//! annotation spelling as an extension annotation. The pack's own spelling
+//! remains valid, while the same family in Latin is a structured parse error.
+
+use crate::{parse, ParseResult};
+use radix_lexer::{lex_with_locale_pack, KeywordPack, TokenKind};
+
+struct EnAnnotationPack;
+
+impl KeywordPack for EnAnnotationPack {
+    fn pack_id(&self) -> &'static str {
+        "en"
+    }
+
+    fn keyword_token_kind(&self, _text: &str) -> Option<TokenKind> {
+        None
+    }
+
+    fn keyword_latin_key(&self, text: &str) -> Option<&str> {
+        match text {
+            "fn" => Some("functio"),
+            "kernel" => Some("nucleum"),
+            "fragment" => Some("fragment"),
+            "public" => Some("publica"),
+            "true" => Some("verum"),
+            "false" => Some("falsum"),
+            _ => None,
+        }
+    }
+
+    fn keyword_spelling(&self, latin_key: &str) -> Option<&str> {
+        match latin_key {
+            "nucleum" => Some("kernel"),
+            "fragment" => Some("fragment"),
+            "publica" => Some("public"),
+            _ => None,
+        }
+    }
+
+    fn keyword_suggestion(&self, _text: &str) -> Option<String> {
+        None
+    }
+}
+
+fn parse_en(source: &str) -> ParseResult {
+    parse(lex_with_locale_pack(source, &EnAnnotationPack))
+}
+
+fn assert_wrong_locale_annotation(source: &str, expected: &str) {
+    let result = parse_en(source);
+    let error = result
+        .errors
+        .iter()
+        .find(|error| {
+            error
+                .args
+                .iter()
+                .any(|arg| arg.name == "issue" && arg.value == "wrong_locale_annotation")
+        })
+        .unwrap_or_else(|| {
+            panic!(
+                "expected wrong-locale annotation error, got {:?}",
+                result.errors
+            )
+        });
+    assert!(
+        error
+            .args
+            .iter()
+            .any(|arg| arg.name == "expected" && arg.value == expected),
+        "expected reader spelling {expected:?}, got {:?}",
+        error.args
+    );
+}
+
+#[test]
+fn en_annotation_spelling_is_sealed_in_both_nucleum_forms() {
+    assert!(parse_en("@ kernel\nfn probe() { }\n").success());
+    assert!(parse_en("@ kernel { fragment = true }\nfn probe() { }\n").success());
+    assert_wrong_locale_annotation("@ nucleum\nfn probe() { }\n", "kernel");
+    assert_wrong_locale_annotation("@ nucleum { fragment = verum }\nfn probe() { }\n", "kernel");
+}
+
+#[test]
+fn en_annotation_visibility_spelling_is_sealed() {
+    assert!(parse_en("@ public { }\nfn probe() { }\n").success());
+    assert_wrong_locale_annotation("@ publica { }\nfn probe() { }\n", "public");
+}
