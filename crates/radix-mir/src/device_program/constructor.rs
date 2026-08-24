@@ -369,10 +369,10 @@ pub fn build_device_program(
         .map(|function| function.id)
         .collect();
 
-    // (step function, param local) → (param position, update output slot)
-    // for the trainable params of the training loop — resolved once from the
-    // folded program so the per-slot aliasing can key on locals.
-    let mut param_updates: BTreeMap<(MirFunctionId, MirLocalId), (u32, u32)> = BTreeMap::new();
+    // (step function, param local) → update output slot for the trainable
+    // params of the training loop — resolved once from the folded program so
+    // the per-slot aliasing can key on locals.
+    let mut param_updates: BTreeMap<(MirFunctionId, MirLocalId), u32> = BTreeMap::new();
     if let Some(training) = training {
         for param in &training.trainable {
             if let Some(function) = folded_program
@@ -385,10 +385,7 @@ pub fn build_device_program(
                     .get(param.param_position as usize)
                     .map(|param| param.local)
                 {
-                    param_updates.insert(
-                        (param.step_function, param_local),
-                        (param.param_position, param.update_output),
-                    );
+                    param_updates.insert((param.step_function, param_local), param.update_output);
                 }
             }
         }
@@ -601,9 +598,9 @@ struct KernelBuilder<'a> {
     validation: &'a crate::MirValidationContext<'a>,
     /// `(function, local)` origins that persist across repeating steps.
     persistent_locals: BTreeSet<(MirFunctionId, MirLocalId)>,
-    /// (step function, param local) → (param position, update output slot)
-    /// for the trainable params of the training loop.
-    param_updates: BTreeMap<(MirFunctionId, MirLocalId), (u32, u32)>,
+    /// (step function, param local) → update output slot for the trainable
+    /// params of the training loop.
+    param_updates: BTreeMap<(MirFunctionId, MirLocalId), u32>,
     /// (step function, param position) → (companion DefId, gradient slot)
     /// for the gradient-flow links.
     gradient_links: BTreeMap<(MirFunctionId, u32), (u32, u32)>,
@@ -624,7 +621,7 @@ impl<'a> KernelBuilder<'a> {
         validation: &'a crate::MirValidationContext<'a>,
         companions: &MirCompanionMap,
         training: Option<&DeviceTrainingFacts>,
-        param_updates: BTreeMap<(MirFunctionId, MirLocalId), (u32, u32)>,
+        param_updates: BTreeMap<(MirFunctionId, MirLocalId), u32>,
     ) -> Self {
         let mut gradient_links = BTreeMap::new();
         let persistent_locals = training
@@ -921,7 +918,7 @@ impl<'a> KernelBuilder<'a> {
                     if full_tuple_slot {
                         self.param_updates
                             .iter()
-                            .find(|((_, _), (_, update_output))| *update_output == output_index)
+                            .find(|((_, _), update_output)| **update_output == output_index)
                             .and_then(|((_, param_local), _)| {
                                 param_buffer_by_local.get(param_local).copied()
                             })
