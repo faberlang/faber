@@ -23,7 +23,7 @@ use radix::module::mir::StdioHost;
 use radix::program::mir::DeviceSelection;
 use std::fs;
 use std::io;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::process::ExitCode;
 
 pub(super) fn cmd_run(args: RunArgs) {
@@ -63,8 +63,8 @@ pub(super) fn cmd_run(args: RunArgs) {
 /// Dispatch an interpreted input path to the package-MIR runner, archive
 /// extraction, or single-source runner. `faber run` always routes through
 /// this dispatch; nothing here compiles or invokes Cargo.
-pub(super) fn interpret_path(
-    path: &PathBuf,
+fn interpret_path(
+    path: &Path,
     program_args: &[String],
     locale: Option<&str>,
     diagnostics_locale: Option<&str>,
@@ -217,12 +217,12 @@ fn manifestless_file_declares_non_kernel_import(path: &Path) -> bool {
     let Ok(peeled) = radix::module::driver::peel_raw_source(&display_name, &raw_source) else {
         return false;
     };
-    let lex = match package::default_config_with_locale(radix::module::Target::HirTypeScript) {
-        Ok(config) => match config.locale_pack.as_ref() {
-            Some(pack) => radix::module::lexer::lex_with_locale_pack(peeled.body, pack),
-            None => radix::module::lexer::lex(peeled.body),
-        },
-        Err(_) => radix::module::lexer::lex(peeled.body),
+    let lex = match package::default_config_with_locale(radix::module::Target::HirTypeScript)
+        .ok()
+        .and_then(|config| config.locale_pack)
+    {
+        Some(pack) => radix::module::lexer::lex_with_locale_pack(peeled.body, &pack),
+        None => radix::module::lexer::lex(peeled.body),
     };
     let parse = radix::module::parser::parse(lex);
     let Some(program) = parse.program else {
