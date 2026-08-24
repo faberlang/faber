@@ -1325,6 +1325,86 @@ impl Parser {
         })
     }
 
+    /// Return whether the current expression head is a contextual extrema
+    /// reduction (`maxima ex` or `minima ex`).
+    fn is_extremum_expr_head(&self) -> Option<bool> {
+        if self.is_keyword_key("maxima") && self.keyword_ident_at(1) == Some(TokenKind::Ex) {
+            Some(true)
+        } else if self.is_keyword_key("minima") && self.keyword_ident_at(1) == Some(TokenKind::Ex) {
+            Some(false)
+        } else {
+            None
+        }
+    }
+
+    /// Parse the sibling `maxima ex` / `minima ex` reduction expression.
+    ///
+    /// The source is a complete expression, with an optional shared `apud`
+    /// coordinate clause. The `vel`/coalesce tail is owned by this reduction
+    /// and supplies the caller-stated identity; there is deliberately no
+    /// `filum` or term-body tail in this v1 grammar.
+    ///
+    /// GRAMMAR:
+    ///   extrema-expr := (`maxima` | `minima`) `ex` expression [apud-clause]
+    ///                   [`vel` expression]
+    fn parse_extremum_expr(&mut self, is_maximum: bool) -> Result<Expr, ParseError> {
+        let start = self.current_span();
+        debug_assert!(self
+            .is_extremum_expr_head()
+            .is_some_and(|maximum| maximum == is_maximum));
+        self.advance();
+        self.expect_keyword_ident(TokenKind::Ex, "expected 'ex' after reduction head")?;
+
+        let parsed_source = self.parse_expression()?;
+        let apud = if self.eat_keyword_ident(TokenKind::Apud) {
+            self.parse_apud_clause()?
+        } else {
+            Vec::new()
+        };
+
+        let mut source = parsed_source;
+        let mut coalesce = if self.eat_keyword_ident(TokenKind::Vel) {
+            Some(Box::new(self.parse_expression()?))
+        } else {
+            None
+        };
+
+        // With no coordinate delimiter, the ordinary expression parser may
+        // have already built the explicit `source vel identity` tail. Peel
+        // only that root form; parenthesized source coalescing remains inside
+        // the operand as intended.
+        if coalesce.is_none() && apud.is_empty() {
+            if let Expr {
+                kind:
+                    ExprKind::Binary(BinaryExpr {
+                        op: BinOp::Coalesce,
+                        lhs,
+                        rhs,
+                    }),
+                ..
+            } = source
+            {
+                source = *lhs;
+                coalesce = Some(rhs);
+            }
+        }
+
+        let extremum = ExtremumExpr {
+            source: Box::new(source),
+            apud,
+            coalesce,
+        };
+        Ok(Expr {
+            id: self.next_id(),
+            kind: if is_maximum {
+                ExprKind::Maxima(Box::new(extremum))
+            } else {
+                ExprKind::Minima(Box::new(extremum))
+            },
+            span: start.merge(self.previous_span()),
+        })
+    }
+
     /// Return whether the current expression head is the dedicated
     /// `primus_quem` first-match head.
     ///
@@ -1400,6 +1480,9 @@ impl Parser {
     /// object initialization. Anything that starts with a non-primary token must
     /// be introduced by an earlier precedence layer.
     fn parse_primary(&mut self) -> Result<Expr, ParseError> {
+        if let Some(is_maximum) = self.is_extremum_expr_head() {
+            return self.parse_extremum_expr(is_maximum);
+        }
         if self.is_summa_expr_head() {
             return self.parse_summa_expr();
         }

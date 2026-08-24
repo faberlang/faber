@@ -1365,6 +1365,14 @@ fn resolve_expr(
             resolve_block(resolver, interner, &expr.body, errors);
             resolver.exit_scope();
         }
+        ExprKind::Maxima(expr) | ExprKind::Minima(expr) => {
+            // M1 admits only the source shape. The reduction identity is an
+            // ordinary caller expression; no term/body scope exists to bind.
+            resolve_expr(resolver, interner, &expr.source, errors);
+            if let Some(identity) = &expr.coalesce {
+                resolve_expr(resolver, interner, identity, errors);
+            }
+        }
         ExprKind::FirstMatch(expr) => {
             resolve_expr(resolver, interner, &expr.source, errors);
             resolver.enter_scope(ScopeKind::Block);

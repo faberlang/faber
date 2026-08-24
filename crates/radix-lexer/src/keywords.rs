@@ -838,6 +838,21 @@ pub static KEYWORD_SPECS: &[KeywordSpec] = &[
         scope: KeywordScope::Contextual(EXPRESSION_INTRODUCER),
         category: KeywordKind::Misc,
     },
+    // `maxima`/`minima` are sibling contextual reduction heads. Their
+    // combine is the verb itself; the parser claims only `head ex` and never
+    // reserves the words for calls, receivers, or mid-expression names.
+    KeywordSpec {
+        text: "maxima",
+        token_kind: None,
+        scope: KeywordScope::Contextual(EXPRESSION_INTRODUCER),
+        category: KeywordKind::Misc,
+    },
+    KeywordSpec {
+        text: "minima",
+        token_kind: None,
+        scope: KeywordScope::Contextual(EXPRESSION_INTRODUCER),
+        category: KeywordKind::Misc,
+    },
     // === Keywords: First-match selection ===
     // `primus_quem` is the dedicated first-match expression head and `ubi`
     // introduces its owned predicate tail. Both are tokenless: the parser

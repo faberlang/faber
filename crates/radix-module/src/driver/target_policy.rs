@@ -423,6 +423,12 @@ fn scan_go_expr(expr: &Expr, file: &str, diagnostics: &mut Vec<Diagnostic>) {
             scan_go_expr(&summa.source, file, diagnostics);
             scan_go_block(&summa.body, file, diagnostics);
         }
+        ExprKind::Maxima(extremum) | ExprKind::Minima(extremum) => {
+            scan_go_expr(&extremum.source, file, diagnostics);
+            if let Some(identity) = &extremum.coalesce {
+                scan_go_expr(identity, file, diagnostics);
+            }
+        }
         ExprKind::FirstMatch(first_match) => {
             scan_go_expr(&first_match.source, file, diagnostics);
             scan_go_block(&first_match.body, file, diagnostics);
@@ -787,6 +793,12 @@ fn scan_rust_expr(expr: &Expr, file: &str, diagnostics: &mut Vec<Diagnostic>) {
         ExprKind::Summa(summa) => {
             scan_rust_expr(&summa.source, file, diagnostics);
             scan_rust_block(&summa.body, file, diagnostics);
+        }
+        ExprKind::Maxima(extremum) | ExprKind::Minima(extremum) => {
+            scan_rust_expr(&extremum.source, file, diagnostics);
+            if let Some(identity) = &extremum.coalesce {
+                scan_rust_expr(identity, file, diagnostics);
+            }
         }
         ExprKind::FirstMatch(first_match) => {
             scan_rust_expr(&first_match.source, file, diagnostics);

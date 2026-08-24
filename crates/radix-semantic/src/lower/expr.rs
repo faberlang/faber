@@ -94,6 +94,12 @@ pub fn lower_expr(lowerer: &mut Lowerer, expr: &Expr) -> HirExpression {
         ExprKind::TypeCheck(type_check) => lowerer.lower_type_check(type_check),
         ExprKind::Iuncta(iuncta) => lowerer.lower_iuncta(iuncta),
         ExprKind::Summa(summa) => lower_summa(lowerer, summa),
+        // M1 admits the parser source shape before the HIR reduction contract
+        // exists; keep semantic lowering fail-closed until M2 owns admission.
+        ExprKind::Maxima(_) | ExprKind::Minima(_) => {
+            lowerer.error("max_min_expression_unsupported");
+            HirExpressionKind::Error
+        }
         // EOT-3M: `⇇` transfer lowers to the typed HIR node. The sink and
         // payloads are ordinary expressions; typecheck owns the unary
         // vacuum-returning callable rules and payload compatibility.

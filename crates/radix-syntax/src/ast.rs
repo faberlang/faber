@@ -1007,6 +1007,13 @@ pub enum ExprKind {
     /// `summa` is immediately followed by `ex`; ordinary identifiers, calls,
     /// and receivers keep their existing meaning.
     Summa(Box<SummaExpr>),
+    /// Contextual maximum reduction: `maxima ex source ...`.
+    ///
+    /// Maxima/minima are sibling reductions, not summa configuration. Their
+    /// optional coalesce expression is the caller-stated identity.
+    Maxima(Box<ExtremumExpr>),
+    /// Contextual minimum reduction: `minima ex source ...`.
+    Minima(Box<ExtremumExpr>),
     /// Dedicated first-match selection: `primus_quem(source, ubi binder { predicate })`.
     ///
     /// The parser claims this spelling only in expression-head position when
@@ -1058,6 +1065,17 @@ pub struct SummaExpr {
     pub binding: Ident,
     /// Term body evaluated for each source element.
     pub body: BlockStmt,
+}
+
+/// Source shape shared by the contextual `maxima ex` and `minima ex` heads.
+#[derive(Debug)]
+pub struct ExtremumExpr {
+    /// Iterable expression whose elements feed the reduction.
+    pub source: Box<Expr>,
+    /// Optional coordinate names from the shared `apud` production.
+    pub apud: Vec<Ident>,
+    /// Caller-stated identity supplied by the coalesce/`vel` tail.
+    pub coalesce: Option<Box<Expr>>,
 }
 
 #[derive(Debug)]

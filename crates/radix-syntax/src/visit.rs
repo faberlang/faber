@@ -540,6 +540,15 @@ pub fn walk_expr<V: Visitor>(visitor: &mut V, expr: &Expr) {
             visitor.visit_ident(&summa.binding);
             visitor.visit_block(&summa.body);
         }
+        ExprKind::Maxima(extremum) | ExprKind::Minima(extremum) => {
+            visitor.visit_expr(&extremum.source);
+            for coordinate in &extremum.apud {
+                visitor.visit_ident(coordinate);
+            }
+            if let Some(identity) = &extremum.coalesce {
+                visitor.visit_expr(identity);
+            }
+        }
         ExprKind::FirstMatch(first_match) => {
             visitor.visit_expr(&first_match.source);
             for coordinate in &first_match.apud {
