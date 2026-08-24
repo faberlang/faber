@@ -271,3 +271,64 @@ fn unknown_dtype_fails_closed() {
         Err(ExecutorPlanAdmissionError::UnknownDtype { dtype }) if dtype == "F64"
     ));
 }
+
+fn gea1_bf16_payload() -> WireExecutorPlanV2 {
+    let mut payload = payload();
+    // [320, 960] BF16 weights occupy exactly 320 * 960 * 2 bytes.
+    payload.allocations[0].dtype = "BF16".to_owned();
+    payload.allocations[0].capacity_bytes = 614_400;
+    payload.views[0].logical_dims = vec![320, 960];
+    payload.views[0].strides = vec![960, 1];
+    payload.views[0].maximum_span = 614_400;
+    payload.views[1].logical_dims = vec![320];
+    payload.views[1].strides = vec![1];
+    payload.views[1].static_base = 0;
+    payload.views[1].maximum_span = 640;
+    payload.launch_bindings[0].view_span = 614_400;
+    payload
+}
+
+#[test]
+fn gea1_executor_plan_admits_complete_ranges() {
+    let payload = gea1_bf16_payload();
+    assert_eq!(payload.allocations[0].capacity_bytes, 320 * 960 * 2);
+    admit_executor_plan_v2(&payload, 1).expect("complete BF16 GEA1 ranges admit");
+}
+
+#[test]
+fn gea1_executor_plan_rejects_dtype_range_or_geometry_drift() {
+    let mut wrong_dtype = gea1_bf16_payload();
+    wrong_dtype.allocations[0].dtype = "F64".to_owned();
+    assert!(matches!(
+        admit_executor_plan_v2(&wrong_dtype, 1),
+        Err(ExecutorPlanAdmissionError::UnknownDtype { dtype }) if dtype == "F64"
+    ));
+
+    let mut short_range = gea1_bf16_payload();
+    short_range.views[0].maximum_span = 614_399;
+    assert!(matches!(
+        admit_executor_plan_v2(&short_range, 1),
+        Err(ExecutorPlanAdmissionError::InvalidFact { .. })
+    ));
+
+    let mut wrong_stride = gea1_bf16_payload();
+    wrong_stride.views[0].strides = vec![961, 1];
+    assert!(matches!(
+        admit_executor_plan_v2(&wrong_stride, 1),
+        Err(ExecutorPlanAdmissionError::InvalidFact { .. })
+    ));
+
+    let mut wrong_offset = gea1_bf16_payload();
+    wrong_offset.views[0].static_base = 1;
+    assert!(matches!(
+        admit_executor_plan_v2(&wrong_offset, 1),
+        Err(ExecutorPlanAdmissionError::InvalidFact { .. })
+    ));
+
+    let mut wrong_geometry = gea1_bf16_payload();
+    wrong_geometry.selections[0].kernel_index = 1;
+    assert!(matches!(
+        admit_executor_plan_v2(&wrong_geometry, 1),
+        Err(ExecutorPlanAdmissionError::SelectionShape { .. })
+    ));
+}

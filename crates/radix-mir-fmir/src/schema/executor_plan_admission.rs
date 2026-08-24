@@ -303,7 +303,7 @@ fn checked_view_elements(dims: &[u64], strides: &[u64]) -> Result<u64, ExecutorP
 
 fn dtype_width(dtype: &str) -> Result<u64, ExecutorPlanAdmissionError> {
     match dtype {
-        "F16" => Ok(2),
+        "F16" | "BF16" => Ok(2),
         "F32" | "U32" | "I32" => Ok(4),
         other => Err(ExecutorPlanAdmissionError::UnknownDtype {
             dtype: other.to_owned(),

@@ -301,7 +301,8 @@ impl<'a> DeviceSafeClassifier<'a> {
         match self.layouts.layout_for_type(ty) {
             Ok(layout) => match layout.kind {
                 MirLayoutKind::Scalar(
-                    MirScalarLayout::F32
+                    MirScalarLayout::Bf16
+                    | MirScalarLayout::F32
                     | MirScalarLayout::I32
                     | MirScalarLayout::U32
                     | MirScalarLayout::Bool,
@@ -337,7 +338,10 @@ impl<'a> DeviceSafeClassifier<'a> {
                         self.record_layout(format!("kernel device view rank {}", view.rank));
                     } else if !matches!(
                         view.element,
-                        MirScalarLayout::F32 | MirScalarLayout::I32 | MirScalarLayout::U32
+                        MirScalarLayout::Bf16
+                            | MirScalarLayout::F32
+                            | MirScalarLayout::I32
+                            | MirScalarLayout::U32
                     ) {
                         self.record_layout(format!(
                             "kernel device view element {}",
