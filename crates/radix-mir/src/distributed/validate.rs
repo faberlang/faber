@@ -400,7 +400,11 @@ impl fmt::Display for ValidateError {
                 self.class()
             ),
             Self::RepeatedPartition { partition } => {
-                write!(f, "{}: partition set contains {partition} twice", self.class())
+                write!(
+                    f,
+                    "{}: partition set contains {partition} twice",
+                    self.class()
+                )
             }
             Self::TopologyMismatch {
                 partition,
@@ -446,7 +450,11 @@ impl fmt::Display for ValidateError {
                 "{}: {value} declares primary {primary} outside its replica set",
                 self.class()
             ),
-            Self::ConflictingContracts { value, first, second } => write!(
+            Self::ConflictingContracts {
+                value,
+                first,
+                second,
+            } => write!(
                 f,
                 "{}: {value} declared twice — {first:?} vs {second:?}",
                 self.class()

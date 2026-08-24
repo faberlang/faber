@@ -1211,7 +1211,7 @@ fn indexed_output_write_target<'a>(
                 block = function.block_by_id(target)?;
             }
             MirTerminatorKind::Goto(_) if block_writes_output(block, output, index) => {
-                return Some(block)
+                return Some(block);
             }
             _ => return None,
         }

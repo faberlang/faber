@@ -287,7 +287,10 @@ impl fmt::Display for BoundaryAbiError {
             } => write!(
                 f,
                 "boundary call f{} → kernel f{} argument {position} carries element type ty#{} but the boundary declares ty#{} (wrong type)",
-                host.0, kernel.0, found.semantic_id().0, expected.semantic_id().0
+                host.0,
+                kernel.0,
+                found.semantic_id().0,
+                expected.semantic_id().0
             ),
             Self::Shape {
                 host,
@@ -300,10 +303,7 @@ impl fmt::Display for BoundaryAbiError {
                 "boundary call f{} → kernel f{} argument {position} carries element count {} but the boundary declares {expected_count} (wrong shape)",
                 host.0,
                 kernel.0,
-                found_count.map_or_else(
-                    || "unresolvable".to_owned(),
-                    |count| count.to_string(),
-                ),
+                found_count.map_or_else(|| "unresolvable".to_owned(), |count| count.to_string(),),
             ),
             Self::Lifetime {
                 host,
@@ -314,12 +314,20 @@ impl fmt::Display for BoundaryAbiError {
                 "boundary call f{} → kernel f{} writes its output into host parameter _{}; the region's output escapes into caller-owned storage (wrong lifetime)",
                 host.0, kernel.0, parameter.0
             ),
-            Self::Mutation { host, kernel, local } => write!(
+            Self::Mutation {
+                host,
+                kernel,
+                local,
+            } => write!(
                 f,
                 "boundary call f{} → kernel f{} writes its output into the same storage as its input _{}; the device input slot is read-only, writing it mutates a read-only resource",
                 host.0, kernel.0, local.0
             ),
-            Self::Observation { host, kernel, local } => write!(
+            Self::Observation {
+                host,
+                kernel,
+                local,
+            } => write!(
                 f,
                 "boundary call f{} → kernel f{} passes the kernel's own output (from _{} ) back in as an input; the region result is observed before the producing launch ran (observation of unlaunched work)",
                 host.0, kernel.0, local.0

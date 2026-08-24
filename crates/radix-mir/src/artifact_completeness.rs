@@ -202,7 +202,10 @@ impl fmt::Display for CompletenessError {
                 write!(f, "region {region} has no partition-record region row")
             }
             Self::RegionRecordMismatch { region } => {
-                write!(f, "region {region}: the record's region members disagree with the derived partition")
+                write!(
+                    f,
+                    "region {region}: the record's region members disagree with the derived partition"
+                )
             }
             Self::AbsentCallsite { region } => {
                 write!(f, "region {region} has no recorded callsite mapping")
@@ -211,13 +214,23 @@ impl fmt::Display for CompletenessError {
                 write!(f, "region {region} has no typed HostDeviceCall row")
             }
             Self::HostDeviceCallMismatch { region, detail } => {
-                write!(f, "region {region}: the typed HostDeviceCall disagrees with the derived partition ({detail})")
+                write!(
+                    f,
+                    "region {region}: the typed HostDeviceCall disagrees with the derived partition ({detail})"
+                )
             }
             Self::AbsentDispatchExtent { region } => {
-                write!(f, "region {region} has no derivable dispatch extent (missing dimension fact)")
+                write!(
+                    f,
+                    "region {region} has no derivable dispatch extent (missing dimension fact)"
+                )
             }
             Self::AbsentMemberEntry { region, kernel } => {
-                write!(f, "region {region} kernel f{} has no typed logical entrypoint identity", kernel.0)
+                write!(
+                    f,
+                    "region {region} kernel f{} has no typed logical entrypoint identity",
+                    kernel.0
+                )
             }
             Self::AbsentPacketEntrypointSymbol {
                 region,

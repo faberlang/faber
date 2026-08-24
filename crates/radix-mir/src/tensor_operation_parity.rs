@@ -122,8 +122,7 @@ pub const INDEXED_ACCESS_PARITY: &[TensorOperationParityRow] = &[
         family: TensorOperationFamily::IndexedAccess,
         target: TensorParityTarget::MetalText,
         status: TensorParityStatus::Rank1DeviceViewSupport,
-        evidence:
-            "crates/radix/src/mir/metal_text_test.rs::indexed_tensor_view_metal_text_target_emits_output_view_copy",
+        evidence: "crates/radix/src/mir/metal_text_test.rs::indexed_tensor_view_metal_text_target_emits_output_view_copy",
     },
     TensorOperationParityRow {
         family: TensorOperationFamily::IndexedAccess,

@@ -142,7 +142,11 @@ impl std::fmt::Display for MirCompanionInsertError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::DuplicatePrimal { primal } => {
-                write!(f, "duplicate companion relation row for primal DefId({})", primal.0)
+                write!(
+                    f,
+                    "duplicate companion relation row for primal DefId({})",
+                    primal.0
+                )
             }
             Self::ContradictoryEntry {
                 primal,
