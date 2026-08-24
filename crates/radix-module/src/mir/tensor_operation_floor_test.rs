@@ -61,7 +61,12 @@ fn tensor_operation_floor_families_map_required_mir_ops() {
         ),
         (
             TensorOperationFloorFamily::Reductions,
-            &[MirCollectionOp::Sum, MirCollectionOp::TensorMean][..],
+            &[
+                MirCollectionOp::Sum,
+                MirCollectionOp::TensorMean,
+                MirCollectionOp::TensorMax,
+                MirCollectionOp::TensorMin,
+            ][..],
         ),
         (TensorOperationFloorFamily::Rank2MatMul, &[MirCollectionOp::TensorMatMul][..]),
         // Activations: MirUnOp variants + TensorGelu/TensorRelu (MirCollectionOp activations).

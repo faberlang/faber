@@ -110,6 +110,8 @@ impl CollectionKernelPlan {
                 let reduce_op = match op {
                     MirCollectionOp::Sum => ReduceOp::Sum,
                     MirCollectionOp::TensorMean => ReduceOp::Mean,
+                    MirCollectionOp::TensorMax => ReduceOp::Max,
+                    MirCollectionOp::TensorMin => ReduceOp::Min,
                     _ => return None,
                 };
                 if !signature_matches_reduction(signature, length, workgroup_x, partials) {

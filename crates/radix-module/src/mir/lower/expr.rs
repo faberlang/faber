@@ -86,6 +86,9 @@ pub(super) trait HirExpressionLoweringVisitor {
             HirExpressionKind::Summa { source, coordinates, filum, binding, body } => {
                 self.visit_summa_expr(source, coordinates, filum.as_ref(), binding, body, expr)
             }
+            HirExpressionKind::Extremum { op, source, coalesce, .. } => {
+                self.visit_extremum_expr(*op, source, coalesce.as_deref(), expr)
+            }
             HirExpressionKind::FirstMatch { source, coordinates, binding, body } => {
                 self.visit_first_match_expr(source, coordinates, binding, body, expr)
             }
@@ -262,6 +265,13 @@ pub(super) trait HirExpressionLoweringVisitor {
         filum: Option<&(DefId, Symbol)>,
         binding: &(DefId, Symbol),
         body: &HirBlock,
+        expr: &HirExpression,
+    ) -> Option<MirOperand>;
+    fn visit_extremum_expr(
+        &mut self,
+        op: HirExtremumOp,
+        source: &HirExpression,
+        coalesce: Option<&HirExpression>,
         expr: &HirExpression,
     ) -> Option<MirOperand>;
     fn visit_first_match_expr(
@@ -631,6 +641,30 @@ impl HirExpressionLoweringVisitor for FunctionBuilder<'_> {
         expr: &HirExpression,
     ) -> Option<MirOperand> {
         self.lower_summa_expr(source, coordinates, filum, binding, body, expr)
+    }
+
+    fn visit_extremum_expr(
+        &mut self,
+        op: HirExtremumOp,
+        source: &HirExpression,
+        coalesce: Option<&HirExpression>,
+        expr: &HirExpression,
+    ) -> Option<MirOperand> {
+        let source = self.lower_expr_value(source)?;
+        let mut args = vec![source];
+        if let Some(identity) = coalesce {
+            args.push(self.lower_expr_value(identity)?);
+        }
+        let Some(type_id) = expr.ty else {
+            self.errors
+                .push(MirError::missing_type(expr.span, "extremum result"));
+            return None;
+        };
+        let op = match op {
+            HirExtremumOp::Max => MirCollectionOp::TensorMax,
+            HirExtremumOp::Min => MirCollectionOp::TensorMin,
+        };
+        Some(self.runtime_call_value(MirIntrinsic::Collection(op), args, MirType::semantic(type_id), expr.span))
     }
 
     fn visit_first_match_expr(

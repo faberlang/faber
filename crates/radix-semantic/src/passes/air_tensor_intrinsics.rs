@@ -16,6 +16,8 @@ pub(super) fn is_allowed_tensor_intrinsic(method: &str) -> bool {
             | "nega"
             | "summa"
             | "media"
+            | "maxima"
+            | "minima"
             | "matmul"
             | "transpone"
             | "forma"

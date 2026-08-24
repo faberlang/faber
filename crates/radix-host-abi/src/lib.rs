@@ -307,6 +307,8 @@ abi_string_family! {
         SYMBOL_TENSOR_MATMUL = "__faber_rt_v1_tensor_matmul",
         SYMBOL_TENSOR_SUM = "__faber_rt_v1_tensor_sum",
         SYMBOL_TENSOR_MEAN = "__faber_rt_v1_tensor_mean",
+        SYMBOL_TENSOR_MAX = "__faber_rt_v1_tensor_max",
+        SYMBOL_TENSOR_MIN = "__faber_rt_v1_tensor_min",
         SYMBOL_TENSOR_CONVERT = "__faber_rt_v1_tensor_convert",
         SYMBOL_SPARSE_NEW = "__faber_rt_v1_sparse_new",
         SYMBOL_SPARSE_GET = "__faber_rt_v1_sparse_get",

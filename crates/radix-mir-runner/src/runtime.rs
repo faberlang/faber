@@ -1281,6 +1281,8 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
             }
             MirCollectionOp::TensorMatMul => self.tensor_matmul(args, span, return_ty),
             MirCollectionOp::TensorMean => self.tensor_mean(args, span),
+            MirCollectionOp::TensorMax => self.tensor_extremum(args, span, f64::max, "max"),
+            MirCollectionOp::TensorMin => self.tensor_extremum(args, span, f64::min, "min"),
             MirCollectionOp::TensorLayerNorm => self.tensor_layernorm(args, span, return_ty),
             MirCollectionOp::TensorRmsNorm => self.tensor_rms_norm(args, span),
             MirCollectionOp::TensorRope => self.tensor_rope(args, span, false),
@@ -1982,6 +1984,39 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
             sum += numeric_as_f64(value, span)?;
         }
         Ok(Value::Float(sum / borrow.data.len() as f64))
+    }
+
+    fn tensor_extremum(
+        &mut self,
+        args: &[MirOperand],
+        span: Span,
+        op: fn(f64, f64) -> f64,
+        label: &str,
+    ) -> Result<Value, RunnerError> {
+        let Some(receiver) = args.first() else {
+            return Err(RunnerError::internal(span, format!("tensor {label} arity")));
+        };
+        if args.len() > 2 {
+            return Err(RunnerError::internal(span, format!("tensor {label} arity")));
+        }
+        let identity = if let Some(identity) = args.get(1) {
+            Some(numeric_as_f64(&self.eval_operand(identity, span)?, span)?)
+        } else {
+            None
+        };
+        let tensor = self.tensor_arg(receiver, span)?;
+        let borrow = tensor.borrow();
+        let mut values = borrow.data.iter();
+        let Some(first) = values.next() else {
+            return identity
+                .map(Value::Float)
+                .ok_or_else(|| RunnerError::internal(span, format!("tensor {label} empty")));
+        };
+        let mut result = numeric_as_f64(first, span)?;
+        for value in values {
+            result = op(result, numeric_as_f64(value, span)?);
+        }
+        Ok(Value::Float(result))
     }
 
     fn tensor_neg(&mut self, args: &[MirOperand], span: Span) -> Result<Value, RunnerError> {

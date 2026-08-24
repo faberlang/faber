@@ -175,6 +175,81 @@ fn transformer_recipe_ops_and_tensor_unaries_pass_target_entry_gate() {
     );
 }
 
+fn extremum_device_function(types: &mut TypeTable, op: MirCollectionOp) -> MirFunction {
+    let tensor = rank2_tensor_ty(types, [4, 4]);
+    let scalar = f32_ty(types);
+    let span = test_span();
+    MirFunction {
+        id: MirFunctionId(0),
+        source: Some(radix_hir::DefId(1)),
+        name: None,
+        params: vec![MirParam {
+            local: MirLocalId(0),
+            name: None,
+            ty: tensor,
+            mode: MirParamMode::Owned,
+            span,
+        }],
+        locals: vec![MirLocal {
+            id: MirLocalId(1),
+            name: None,
+            ty: scalar,
+            mutable: false,
+            span,
+        }],
+        temps: Vec::new(),
+        blocks: vec![MirBlock {
+            id: MirBlockId(0),
+            statements: vec![MirStatement {
+                kind: MirStatementKind::RuntimeCall {
+                    destination: Some(MirPlace::local(MirLocalId(1))),
+                    call: MirRuntimeCall {
+                        intrinsic: MirIntrinsic::Collection(op),
+                        args: vec![MirOperand::Place(MirPlace::local(MirLocalId(0)))],
+                        return_ty: scalar,
+                    },
+                },
+                span,
+            }],
+            terminator: MirTerminator {
+                kind: MirTerminatorKind::Return(Some(MirOperand::Place(MirPlace::local(
+                    MirLocalId(1),
+                )))),
+                span,
+            },
+            span,
+        }],
+        return_ty: scalar,
+        error_ty: None,
+        is_async: false,
+        is_generator: false,
+        shader_stage: None,
+        span,
+    }
+}
+
+#[test]
+fn max_min_reduction_ops_pass_target_entry_gate() {
+    for op in [MirCollectionOp::TensorMax, MirCollectionOp::TensorMin] {
+        let mut types = TypeTable::new();
+        let program = crate::MirProgram {
+            functions: vec![extremum_device_function(&mut types, op)],
+        };
+        let validated = ValidatedMir::new(program, MirValidationContext::new(&types))
+            .expect("the extremum body must remain well-formed MIR");
+        let device = MirDeviceContext::from_hir_roles(FxHashMap::from_iter([(
+            radix_hir::DefId(1),
+            MirDeviceRole::Kernel,
+        )]));
+
+        let verdict = classify_device_safe_for_target_entry(&validated, &device);
+        assert!(
+            verdict.is_capable(),
+            "{op:?} must pass the target-entry gate, got: {verdict:?}"
+        );
+    }
+}
+
 #[test]
 fn unplannable_collection_op_still_fails_target_entry_gate() {
     // The transformer admission is a CLOSED set (S6-P2): a genuinely

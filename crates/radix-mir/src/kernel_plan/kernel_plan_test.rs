@@ -334,6 +334,28 @@ fn mean_reduction_plan_sets_mean_op() {
 }
 
 #[test]
+fn max_and_min_reduction_plans_preserve_their_combine_ops() {
+    let signature = reduction_signature(1024, 256, 4);
+    let contract = CollectionOpContract::Reduction {
+        length: 1024,
+        workgroup_x: 256,
+        partials: 4,
+    };
+    for (op, expected) in [
+        (MirCollectionOp::TensorMax, ReduceOp::Max),
+        (MirCollectionOp::TensorMin, ReduceOp::Min),
+    ] {
+        let plan = CollectionKernelPlan::from_contract(&signature, &contract, op, None)
+            .expect("extremum contract builds a plan");
+        let CollectionKernelPlan::TreeReduction(reduction) = &plan else {
+            panic!("expected a tree-reduction plan");
+        };
+        assert_eq!(reduction.op, expected);
+        plan.validate().expect("extremum plan validates");
+    }
+}
+
+#[test]
 fn single_lane_reduction_has_load_barrier_only() {
     let signature = reduction_signature(1, 1, 1);
     let contract = CollectionOpContract::Reduction {

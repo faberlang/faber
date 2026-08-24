@@ -799,7 +799,12 @@ impl MirVisitor for DeviceSafeClassifier<'_> {
                 call:
                     MirRuntimeCall {
                         intrinsic:
-                            MirIntrinsic::Collection(MirCollectionOp::Sum | MirCollectionOp::TensorMean),
+                            MirIntrinsic::Collection(
+                                MirCollectionOp::Sum
+                                    | MirCollectionOp::TensorMean
+                                    | MirCollectionOp::TensorMax
+                                    | MirCollectionOp::TensorMin,
+                            ),
                         ..
                     },
                 ..

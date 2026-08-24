@@ -620,6 +620,8 @@ fn collection_op(op: MirCollectionOp) -> &'static str {
         MirCollectionOp::TensorMul => "tensor_mul",
         MirCollectionOp::TensorMatMul => "tensor_matmul",
         MirCollectionOp::TensorMean => "tensor_mean",
+        MirCollectionOp::TensorMax => "tensor_max",
+        MirCollectionOp::TensorMin => "tensor_min",
         MirCollectionOp::TensorLayerNorm => "tensor-layernorm",
         MirCollectionOp::TensorRmsNorm => "tensor-rms-norm",
         MirCollectionOp::TensorRope => "tensor-rope",

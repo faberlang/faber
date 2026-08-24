@@ -2365,6 +2365,8 @@ pub fn is_recipe_op(op: MirCollectionOp) -> bool {
         op,
         MirCollectionOp::Sum
             | MirCollectionOp::TensorMean
+            | MirCollectionOp::TensorMax
+            | MirCollectionOp::TensorMin
             | MirCollectionOp::TensorMatMul
             | MirCollectionOp::TensorTranspose
             | MirCollectionOp::TensorSumAxis
@@ -2631,6 +2633,10 @@ pub fn contract_shape_signature(
         } => {
             let reduce_op = if is_recipe_op_scan(function, MirCollectionOp::TensorMean) {
                 MirCollectionOp::TensorMean
+            } else if is_recipe_op_scan(function, MirCollectionOp::TensorMax) {
+                MirCollectionOp::TensorMax
+            } else if is_recipe_op_scan(function, MirCollectionOp::TensorMin) {
+                MirCollectionOp::TensorMin
             } else {
                 MirCollectionOp::Sum
             };

@@ -44,14 +44,14 @@ pub use lower::{lower, LowerError, LowerRequest};
 pub use nodes::{
     DefId, HirAnnotation, HirAnnotationField, HirAnnotationValue, HirArrayElement, HirAvailability, HirBinOp, HirBlock,
     HirBlockEnd, HirBreakableKind, HirCallArg, HirCape, HirCasuArm, HirConst, HirConversioTarget, HirCustodi,
-    HirCustodiClause, HirEnum, HirExpression, HirExpressionKind, HirField, HirFunction, HirId, HirImport,
-    HirImportItem, HirIncDec, HirIncDecOp, HirInterface, HirInterfaceMethod, HirItem, HirItemKind, HirIteraMode,
-    HirLiteral, HirLocal, HirMethod, HirModule, HirModuleEnd, HirNonNullKind, HirObjectField, HirObjectKey,
-    HirOptionalChainKind, HirOwnerRef, HirParam, HirParamMode, HirPattern, HirPresentation, HirRangeKind, HirReceiver,
-    HirRefKind, HirSchema, HirSchemaColumn, HirScribeKind, HirSourceAnchorId, HirStatement, HirStatementKind,
-    HirStruct, HirTestMetadata, HirTestModifier, HirTrivia, HirTriviaAttachment, HirTriviaOwner, HirTriviaOwnerKind,
-    HirTypeAlias, HirTypeParam, HirTypeParamConstraint, HirUnOp, HirVariant, HirVariantField, LibraryBinding,
-    LibraryIdentity, LibraryItem, LibraryItemKind, LibraryProvider, LibraryRegistry, NucleumRole,
+    HirCustodiClause, HirEnum, HirExpression, HirExpressionKind, HirExtremumOp, HirField, HirFunction, HirId,
+    HirImport, HirImportItem, HirIncDec, HirIncDecOp, HirInterface, HirInterfaceMethod, HirItem, HirItemKind,
+    HirIteraMode, HirLiteral, HirLocal, HirMethod, HirModule, HirModuleEnd, HirNonNullKind, HirObjectField,
+    HirObjectKey, HirOptionalChainKind, HirOwnerRef, HirParam, HirParamMode, HirPattern, HirPresentation, HirRangeKind,
+    HirReceiver, HirRefKind, HirSchema, HirSchemaColumn, HirScribeKind, HirSourceAnchorId, HirStatement,
+    HirStatementKind, HirStruct, HirTestMetadata, HirTestModifier, HirTrivia, HirTriviaAttachment, HirTriviaOwner,
+    HirTriviaOwnerKind, HirTypeAlias, HirTypeParam, HirTypeParamConstraint, HirUnOp, HirVariant, HirVariantField,
+    LibraryBinding, LibraryIdentity, LibraryItem, LibraryItemKind, LibraryProvider, LibraryRegistry, NucleumRole,
 };
 
 pub use radix_semantic::LoweredProgram;

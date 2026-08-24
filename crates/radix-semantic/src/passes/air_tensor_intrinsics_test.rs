@@ -9,6 +9,8 @@ const ADMITTED_INTRINSICS: &[&str] = &[
     "nega",
     "summa",
     "media",
+    "maxima",
+    "minima",
     "matmul",
     "transpone",
     "forma",

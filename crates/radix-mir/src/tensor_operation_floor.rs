@@ -86,7 +86,12 @@ impl TensorOperationFloorFamily {
                 MirCollectionOp::TensorMul,
                 MirCollectionOp::TensorDiv,
             ],
-            Self::Reductions => &[MirCollectionOp::Sum, MirCollectionOp::TensorMean],
+            Self::Reductions => &[
+                MirCollectionOp::Sum,
+                MirCollectionOp::TensorMean,
+                MirCollectionOp::TensorMax,
+                MirCollectionOp::TensorMin,
+            ],
             Self::Rank2MatMul => &[MirCollectionOp::TensorMatMul],
             // Most activation ops are MirUnOp variants (Relu, Sqrt, Exp, Log, …).
             // TensorGelu and TensorRelu are MirCollectionOp activations, tracked

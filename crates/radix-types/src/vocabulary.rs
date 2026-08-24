@@ -225,6 +225,10 @@ pub enum MirCollectionOp {
     TensorMul,
     TensorMatMul,
     TensorMean,
+    /// Tensor maximum reduction over all elements of the operand.
+    TensorMax,
+    /// Tensor minimum reduction over all elements of the operand.
+    TensorMin,
     /// Layer normalization: `(x - mean) / sqrt(var + eps)` with optional
     /// affine transform (gamma, beta). Axis and epsilon are trailing const
     /// operands in the `MirRuntimeCall::args` list, NOT a payload struct —

@@ -63,7 +63,7 @@ fn push_unique_builtin(builtins: &mut Vec<MirKernelBuiltin>, builtin: MirKernelB
 ///   so only output row 0 can ever be written.
 ///
 /// The corrected contract:
-/// - **reduction (Sum/Mean)**: `dispatch_size.x = n` (the grid covers the
+/// - **reduction (Sum/Mean/Max/Min)**: `dispatch_size.x = n` (the grid covers the
 ///   whole tensor), power-of-two workgroup `min(256, next_pow2(n))`, output
 ///   buffer sized to `workgroup_count = ceil(n/ws)` partial slots (one
 ///   per-workgroup partial; the host combines);
@@ -536,7 +536,10 @@ pub fn collection_op_contract(
                 continue;
             };
             match op {
-                MirCollectionOp::Sum | MirCollectionOp::TensorMean => {
+                MirCollectionOp::Sum
+                | MirCollectionOp::TensorMean
+                | MirCollectionOp::TensorMax
+                | MirCollectionOp::TensorMin => {
                     let Some(operand_ty) = args
                         .first()
                         .and_then(|arg| crate::local_ty::operand_local_ty(function, arg))

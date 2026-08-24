@@ -487,6 +487,8 @@ impl Validator<'_, '_> {
             | MirCollectionOp::TensorFlatten
             | MirCollectionOp::TensorMaterialize
             | MirCollectionOp::TensorMean
+            | MirCollectionOp::TensorMax
+            | MirCollectionOp::TensorMin
             | MirCollectionOp::TensorNeg
             | MirCollectionOp::TensorGelu
             | MirCollectionOp::TensorRelu
@@ -579,6 +581,15 @@ impl Validator<'_, '_> {
             // an optional trailing GGML type-id const.
             if !(2..=3).contains(&call.args.len()) {
                 self.error(span, "collection TensorGather expects 2 or 3 MIR arguments");
+            }
+        } else if matches!(op, MirCollectionOp::TensorMax | MirCollectionOp::TensorMin) {
+            // A caller-stated coalesce identity is an optional second scalar
+            // operand; the no-identity static path carries only the tensor.
+            if !(1..=2).contains(&call.args.len()) {
+                self.error(
+                    span,
+                    format!("collection {op:?} expects 1 or 2 MIR arguments"),
+                );
             }
         } else if matches!(op, MirCollectionOp::TensorBatchedAttention) {
             // This compiler-owned primitive has tensor peers followed by
@@ -1260,13 +1271,28 @@ impl Validator<'_, '_> {
                 }
                 self.require_tensor_type(call.return_ty, span, "tensor fill result is not tensor");
             }
-            MirCollectionOp::TensorMean => {
+            MirCollectionOp::TensorMean
+            | MirCollectionOp::TensorMax
+            | MirCollectionOp::TensorMin => {
                 let Some(receiver_ty) = first_arg_ty else {
                     return;
                 };
-                self.require_tensor_type(receiver_ty, span, "tensor mean receiver is not tensor");
+                self.require_tensor_type(
+                    receiver_ty,
+                    span,
+                    "tensor reduction receiver is not tensor",
+                );
                 if !self.is_numeric_type(call.return_ty) {
-                    self.error(span, "tensor mean result is not numeric");
+                    self.error(span, "tensor reduction result is not numeric");
+                }
+                if let Some(identity) = call
+                    .args
+                    .get(1)
+                    .and_then(|arg| self.validate_operand(scope, arg, span))
+                {
+                    if !self.is_numeric_type(identity) {
+                        self.error(span, "tensor reduction identity is not numeric");
+                    }
                 }
             }
             MirCollectionOp::TensorCruxEntropia => {

@@ -540,6 +540,10 @@ pub enum ReduceOp {
     Sum,
     /// Accumulation divided by the true tensor length.
     Mean,
+    /// Maximum fold over the tensor elements.
+    Max,
+    /// Minimum fold over the tensor elements.
+    Min,
 }
 
 /// Rank-2 transpose recipe (`[M,N] → [N,M]`, S5-U1).
