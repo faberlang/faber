@@ -465,6 +465,21 @@ fn diagnostics_check_reports_parse_record() {
 }
 
 #[test]
+fn diagnostics_check_accepts_frontmatter_on_proba_source() {
+    // The corpus fixture is a real frontmatter-bearing source; the `.proba`
+    // name exercises the adjacent test-manifest check surface.
+    let source = include_str!("../../../../corpus/proba/proba.fab");
+    let result = check_diagnostics_for_source("corpus/proba/proba.proba", source, false);
+
+    assert!(
+        result.success,
+        "frontmatter must be peeled before checking .proba: {:?}",
+        result.diagnostics
+    );
+    assert!(result.diagnostics.iter().all(|diagnostic| !diagnostic.is_error()));
+}
+
+#[test]
 fn diagnostics_check_reports_semantic_record() {
     let result = check_diagnostics_for_source("main.fab", "missing", false);
 

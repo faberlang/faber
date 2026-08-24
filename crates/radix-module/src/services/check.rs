@@ -44,27 +44,35 @@ pub fn check_diagnostics_for_source_with_locale_pack(
     templates: Option<&std::collections::BTreeMap<String, String>>,
 ) -> CheckDiagnosticsResult {
     let mut diagnostics = Vec::new();
+    let peeled = match crate::driver::peel_raw_source(name, source) {
+        Ok(peeled) => peeled,
+        Err(error) => {
+            diagnostics.push(crate::driver::source_load_diagnostic(name, &error));
+            return CheckDiagnosticsResult { diagnostics, success: false };
+        }
+    };
+    let body = peeled.body;
 
     // Honor the source's `+++ locale = "…" +++` frontmatter when the caller
     // supplied no explicit reader pack, mirroring the analysis driver. The
     // en-surface corpus depends on it: without the pack, `const`, `fn`, and
     // `import from …` spellings do not lex as keywords and check fails at
     // parse with no diagnostics of substance.
-    let mut resolved_pack = code_pack
-        .map(ToOwned::to_owned)
-        .or_else(|| crate::program::compile::frontmatter_locale_pack_from_source(name, source));
+    let mut resolved_pack = code_pack.map(ToOwned::to_owned).or_else(|| {
+        crate::program::compile::frontmatter_locale_pack_from_frontmatter(peeled.frontmatter.as_ref())
+    });
 
-    let lex_result = lex_check_source(source, resolved_pack.as_ref());
-    collect_locale_diagnostics(&mut diagnostics, name, source, &lex_result);
+    let lex_result = lex_check_source(body, resolved_pack.as_ref());
+    collect_locale_diagnostics(&mut diagnostics, name, body, &lex_result);
     if !lex_result.success() {
-        collect_lex_diagnostics(&mut diagnostics, name, source, &lex_result.errors);
+        collect_lex_diagnostics(&mut diagnostics, name, body, &lex_result.errors);
         return CheckDiagnosticsResult { diagnostics, success: false };
     }
 
     let parse_result = crate::parser::parse(lex_result);
     let had_parse_errors = !parse_result.success();
     if had_parse_errors {
-        collect_parse_diagnostics(&mut diagnostics, name, source, &parse_result.errors);
+        collect_parse_diagnostics(&mut diagnostics, name, body, &parse_result.errors);
     }
     let parse_error_spans: Vec<crate::lexer::Span> = parse_result.errors.iter().map(|err| err.span).collect();
     let Some((mut program, mut interner)) = parsed_check_program(parse_result, &mut diagnostics, name) else {
@@ -78,7 +86,7 @@ pub fn check_diagnostics_for_source_with_locale_pack(
     }
 
     let cli_analysis = crate::cli::analyze(&program, &interner);
-    collect_cli_diagnostics(&mut diagnostics, name, source, &cli_analysis.errors);
+    collect_cli_diagnostics(&mut diagnostics, name, body, &cli_analysis.errors);
     // Parse-phase diagnostics already collected must not stop analysis here;
     // CLI-analysis errors still do.
     if diagnostics
@@ -125,7 +133,7 @@ pub fn check_diagnostics_for_source_with_locale_pack(
         crate::semantic::analyze_with_cli(&program, &pass_config, &mut interner, cli_analysis.program.as_ref());
 
     let report =
-        collect_semantic_check_diagnostics(&mut diagnostics, name, source, &semantic_result.diagnostics, permissive);
+        collect_semantic_check_diagnostics(&mut diagnostics, name, body, &semantic_result.diagnostics, permissive);
 
     if permissive && report.downgraded > 0 {
         push_permissive_downgrade_diagnostic(&mut diagnostics, name, report.downgraded);

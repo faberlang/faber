@@ -1,4 +1,4 @@
-//! Generic TOML frontmatter for `.fab` source files.
+//! Generic TOML frontmatter for `.fab` and `.proba` source files.
 //!
 //! Frontmatter is driver-level metadata peeled before lexing. Any valid TOML
 //! document is accepted; `faber` and other tooling read known keys via accessors.

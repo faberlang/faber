@@ -1,7 +1,7 @@
 //! Pre-lex `+++` TOML frontmatter splitting.
 //!
 //! GRAMMAR:
-//!   fabFile := frontmatter? program
+//!   sourceFile := frontmatter? program
 //!   frontmatter := '+++' NEWLINE tomlBody NEWLINE '+++' NEWLINE?
 //!
 //! Frontmatter is stripped before lexing. The Faber lexer never tokenizes `+++`
