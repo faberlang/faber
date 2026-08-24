@@ -713,5 +713,5 @@ pub enum ModelCommand {
 #[derive(clap::Args, Debug)]
 pub struct ModelInspectArgs {
     /// Path to a .safetensors model file
-    pub path: std::path::PathBuf,
+    pub path: PathBuf,
 }
