@@ -55,8 +55,8 @@ use crate::{
 use radix_hir::DefId;
 use radix_lexer::Interner;
 use radix_syntax::{
-    AssignOp, BindingPattern, BlockStmt, ClausuraBody, ConversioTarget, DiscerneStmt, Expr,
-    ExprKind, FiguraExpr, IfBody, Pattern, PatternBind, ProbandumDecl, Program, SiStmt, Stmt,
+    AssignOp, BindingPattern, BlockStmt, CapeClause, ClausuraBody, ConversioTarget, DiscerneStmt,
+    Expr, ExprKind, FiguraExpr, IfBody, Pattern, PatternBind, ProbandumDecl, Program, SiStmt, Stmt,
     StmtKind, TypeExpr, TypeExprKind, TypeParam,
 };
 use unicode_normalization::{char::is_combining_mark, UnicodeNormalization};
@@ -411,17 +411,7 @@ fn resolve_stmt(
             resolve_if_body(resolver, interner, &stmt.body, errors);
             resolver.exit_scope();
             if let Some(catch) = &stmt.catch {
-                resolver.enter_scope(ScopeKind::Block);
-                define_symbol(
-                    resolver,
-                    catch.binding.name,
-                    catch.binding.span,
-                    SymbolKind::Local,
-                    false,
-                    errors,
-                );
-                resolve_block(resolver, interner, &catch.body, errors);
-                resolver.exit_scope();
+                resolve_catch_binding(resolver, interner, catch, errors);
             }
         }
         StmtKind::Itera(stmt) => {
@@ -446,17 +436,7 @@ fn resolve_stmt(
             resolve_if_body(resolver, interner, &stmt.body, errors);
             resolver.exit_scope();
             if let Some(catch) = &stmt.catch {
-                resolver.enter_scope(ScopeKind::Block);
-                define_symbol(
-                    resolver,
-                    catch.binding.name,
-                    catch.binding.span,
-                    SymbolKind::Local,
-                    false,
-                    errors,
-                );
-                resolve_block(resolver, interner, &catch.body, errors);
-                resolver.exit_scope();
+                resolve_catch_binding(resolver, interner, catch, errors);
             }
         }
         StmtKind::Elige(stmt) => {
@@ -469,17 +449,7 @@ fn resolve_stmt(
                 resolve_if_body(resolver, interner, &default.body, errors);
             }
             if let Some(catch) = &stmt.catch {
-                resolver.enter_scope(ScopeKind::Block);
-                define_symbol(
-                    resolver,
-                    catch.binding.name,
-                    catch.binding.span,
-                    SymbolKind::Local,
-                    false,
-                    errors,
-                );
-                resolve_block(resolver, interner, &catch.body, errors);
-                resolver.exit_scope();
+                resolve_catch_binding(resolver, interner, catch, errors);
             }
         }
         StmtKind::Discerne(stmt) => resolve_discerne(resolver, interner, stmt, errors),
@@ -494,17 +464,7 @@ fn resolve_stmt(
             resolve_block(resolver, interner, &stmt.body, errors);
             resolver.exit_scope();
             if let Some(catch) = &stmt.catch {
-                resolver.enter_scope(ScopeKind::Block);
-                define_symbol(
-                    resolver,
-                    catch.binding.name,
-                    catch.binding.span,
-                    SymbolKind::Local,
-                    false,
-                    errors,
-                );
-                resolve_block(resolver, interner, &catch.body, errors);
-                resolver.exit_scope();
+                resolve_catch_binding(resolver, interner, catch, errors);
             }
             if let Some(cond) = &stmt.while_ {
                 resolve_expr(resolver, interner, cond, errors);
@@ -598,17 +558,7 @@ fn resolve_stmt(
             resolve_block(resolver, interner, &stmt.body, errors);
             resolver.exit_scope();
             if let Some(catch) = &stmt.catch {
-                resolver.enter_scope(ScopeKind::Block);
-                define_symbol(
-                    resolver,
-                    catch.binding.name,
-                    catch.binding.span,
-                    SymbolKind::Local,
-                    false,
-                    errors,
-                );
-                resolve_block(resolver, interner, &catch.body, errors);
-                resolver.exit_scope();
+                resolve_catch_binding(resolver, interner, catch, errors);
             }
         }
         StmtKind::Probandum(test) => resolve_probandum(resolver, interner, test, errors),
@@ -739,6 +689,27 @@ fn resolve_block(
     resolver.exit_scope();
 }
 
+/// Resolve one `cape` clause: bind its error local in a fresh block scope and
+/// resolve the handler body.
+fn resolve_catch_binding(
+    resolver: &mut Resolver,
+    interner: &Interner,
+    catch: &CapeClause,
+    errors: &mut Vec<SemanticError>,
+) {
+    resolver.enter_scope(ScopeKind::Block);
+    define_symbol(
+        resolver,
+        catch.binding.name,
+        catch.binding.span,
+        SymbolKind::Local,
+        false,
+        errors,
+    );
+    resolve_block(resolver, interner, &catch.body, errors);
+    resolver.exit_scope();
+}
+
 fn resolve_if_body(
     resolver: &mut Resolver,
     interner: &Interner,
@@ -767,17 +738,7 @@ fn resolve_si_stmt(
     resolve_expr(resolver, interner, &stmt.cond, errors);
     resolve_if_body(resolver, interner, &stmt.then, errors);
     if let Some(catch) = &stmt.catch {
-        resolver.enter_scope(ScopeKind::Block);
-        define_symbol(
-            resolver,
-            catch.binding.name,
-            catch.binding.span,
-            SymbolKind::Local,
-            false,
-            errors,
-        );
-        resolve_block(resolver, interner, &catch.body, errors);
-        resolver.exit_scope();
+        resolve_catch_binding(resolver, interner, catch, errors);
     }
     if let Some(else_) = &stmt.else_ {
         resolve_secus_clause(resolver, interner, else_, errors);
@@ -816,33 +777,13 @@ fn resolve_secus_clause(
         radix_syntax::SecusClause::Block { body, catch, .. } => {
             resolve_block(resolver, interner, body, errors);
             if let Some(catch) = catch {
-                resolver.enter_scope(ScopeKind::Block);
-                define_symbol(
-                    resolver,
-                    catch.binding.name,
-                    catch.binding.span,
-                    SymbolKind::Local,
-                    false,
-                    errors,
-                );
-                resolve_block(resolver, interner, &catch.body, errors);
-                resolver.exit_scope();
+                resolve_catch_binding(resolver, interner, catch, errors);
             }
         }
         radix_syntax::SecusClause::Stmt { stmt, catch, .. } => {
             resolve_stmt(resolver, interner, stmt, errors);
             if let Some(catch) = catch {
-                resolver.enter_scope(ScopeKind::Block);
-                define_symbol(
-                    resolver,
-                    catch.binding.name,
-                    catch.binding.span,
-                    SymbolKind::Local,
-                    false,
-                    errors,
-                );
-                resolve_block(resolver, interner, &catch.body, errors);
-                resolver.exit_scope();
+                resolve_catch_binding(resolver, interner, catch, errors);
             }
         }
     }
@@ -1304,17 +1245,7 @@ fn resolve_expr(
                     resolve_block(resolver, interner, &stmt.body, errors);
                     resolver.exit_scope();
                     if let Some(catch) = &stmt.catch {
-                        resolver.enter_scope(ScopeKind::Block);
-                        define_symbol(
-                            resolver,
-                            catch.binding.name,
-                            catch.binding.span,
-                            SymbolKind::Local,
-                            false,
-                            errors,
-                        );
-                        resolve_block(resolver, interner, &catch.body, errors);
-                        resolver.exit_scope();
+                        resolve_catch_binding(resolver, interner, catch, errors);
                     }
                     if let Some(cond) = &stmt.while_ {
                         resolve_expr(resolver, interner, cond, errors);
