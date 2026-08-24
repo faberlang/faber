@@ -2757,12 +2757,9 @@ pub fn contract_shape_signature(
             };
         }
         CollectionOpContract::BatchedAttention {
-            kind,
             kv_heads,
-            q_per_kv,
             seq,
             head_dim,
-            hidden,
             output_elements,
             ..
         } => {
@@ -2819,7 +2816,6 @@ pub fn contract_shape_signature(
                 y: 1,
                 z: 1,
             };
-            let _ = (kind, kv_heads, q_per_kv, seq, head_dim, hidden);
         }
         CollectionOpContract::SsmConv1d {
             length, channels, ..
