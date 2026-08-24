@@ -42,9 +42,6 @@ pub(crate) fn tensor_literal_dims(
 pub(crate) fn is_kernel_element_layout(layout: MirScalarLayout) -> bool {
     matches!(
         layout,
-        MirScalarLayout::Bf16
-            | MirScalarLayout::F32
-            | MirScalarLayout::I32
-            | MirScalarLayout::U32
+        MirScalarLayout::Bf16 | MirScalarLayout::F32 | MirScalarLayout::I32 | MirScalarLayout::U32
     )
 }

@@ -17,8 +17,7 @@ use super::{
     logical_distributed_plan_hash, validate_wire_distributed_section, validate_wire_program,
     validate_wire_session_section, validate_wire_session_section_v2, FmirDeviceBackend,
     FmirDeviceSelection, MaterializationStage, PACKAGE_MIR_ARTIFACT_VERSION,
-    WIRE_DEVICE_PROGRAM_VERSION,
-    WIRE_DISTRIBUTED_SECTION_VERSION,
+    WIRE_DEVICE_PROGRAM_VERSION, WIRE_DISTRIBUTED_SECTION_VERSION,
 };
 use crate::schema::ARTIFACT_ABI_VERSION;
 
