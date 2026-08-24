@@ -16,7 +16,8 @@ use super::wire::WireDeviceProgram;
 use super::{
     logical_distributed_plan_hash, validate_wire_distributed_section, validate_wire_program,
     validate_wire_session_section, validate_wire_session_section_v2, FmirDeviceBackend,
-    MaterializationStage, PACKAGE_MIR_ARTIFACT_VERSION, WIRE_DEVICE_PROGRAM_VERSION,
+    FmirDeviceSelection, MaterializationStage, PACKAGE_MIR_ARTIFACT_VERSION,
+    WIRE_DEVICE_PROGRAM_VERSION,
     WIRE_DISTRIBUTED_SECTION_VERSION,
 };
 use crate::schema::ARTIFACT_ABI_VERSION;
@@ -216,9 +217,7 @@ pub(crate) fn check_selection_artifacts(
     device: &FmirDeviceSection,
 ) -> Result<(), crate::error::FmirImageError> {
     match &device.selection {
-        crate::schema::FmirDeviceSelection::Metal
-        | crate::schema::FmirDeviceSelection::Cuda
-        | crate::schema::FmirDeviceSelection::Amd => {
+        FmirDeviceSelection::Metal | FmirDeviceSelection::Cuda | FmirDeviceSelection::Amd => {
             let selected = device.selection.spelling();
             let present = device
                 .artifacts
@@ -231,12 +230,12 @@ pub(crate) fn check_selection_artifacts(
                 });
             }
         }
-        crate::schema::FmirDeviceSelection::Unknown(backend) => {
+        FmirDeviceSelection::Unknown(backend) => {
             return Err(crate::error::FmirImageError::NonAdmittedSelectedBackend {
                 backend: backend.clone(),
             });
         }
-        crate::schema::FmirDeviceSelection::Auto => {}
+        FmirDeviceSelection::Auto => {}
     }
     Ok(())
 }
