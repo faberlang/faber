@@ -606,18 +606,6 @@ pub fn execute_distributed(
     )
 }
 
-/// Start one long-lived hosts control owner and perform its explicit `load`.
-#[allow(dead_code)] // live from the dense device-runtime route
-pub fn open_device_session(
-    request: &DeviceExecuteRequest,
-    build_if_missing: bool,
-) -> Result<(DeviceExecuteSession, DeviceExecuteControlReceipt), HostSpawnError> {
-    open_device_session_at(
-        &resolve_host_cli(&request.backend, build_if_missing)?,
-        request,
-    )
-}
-
 /// Start a protocol-v2 owner. One load carries both prefill and scalar-decode
 /// programs plus explicit model/session identities.
 #[allow(dead_code)]
