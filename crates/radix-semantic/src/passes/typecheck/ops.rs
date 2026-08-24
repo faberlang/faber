@@ -922,21 +922,23 @@ impl TypeChecker<'_> {
                 elem
             }
             (Type::Tensor(lhs_elem, _), Type::Tensor(rhs_elem, _)) => {
-                let Some(elem) = self.glyph_numeric_element(op, lhs_elem, rhs_elem, lhs.span)
+                let Some(elem) =
+                    self.glyph_matmul_numeric_element(op, lhs_elem, rhs_elem, lhs.span)
                 else {
                     return self.error_type;
                 };
-                // WHY: shape-generics Phase 2 pin — rank-2 tensor×tensor only
-                // (delivery §7 OQ1 default). Routes through the same matmul
-                // contract as the `matmul` intrinsic, so whole-shape and
-                // non-rank-2 tensor operands fail closed with the contract's
-                // diagnostics and the two surfaces can never diverge.
+                // WHY: rank-2 receiver × rank-1 tensor is the GEMV promotion
+                // arm. It routes through the same matmul contract as the
+                // `matmul` intrinsic; the contract promotes the RHS to [K, 1]
+                // for dispatch and demotes the result back to rank 1. Whole
+                // shapes, rank-1 receivers, and higher ranks still fail closed
+                // with the contract diagnostics.
                 let result = super::tensor_index::tensor_with_fresh_shape(self, elem);
                 let result_shape = match self.types.get(result) {
                     Type::Tensor(_, shape) => *shape,
                     _ => fresh_tensor_result_missing_shape(),
                 };
-                super::tensor_index::constrain_matmul_result_shape(
+                super::tensor_index::constrain_glyph_matmul_result_shape(
                     self,
                     lhs_resolved,
                     rhs_resolved,
@@ -1286,6 +1288,39 @@ impl TypeChecker<'_> {
             return None;
         }
         Some((lhs_resolved, rhs_resolved))
+    }
+
+    /// Require numeric elements for tensor matmul, admitting only the packed
+    /// BF16-weight × F32-input combination. The result of that bounded arm is
+    /// F32; every other mixed pair remains fail-closed.
+    fn glyph_matmul_numeric_element(
+        &mut self,
+        op: HirBinOp,
+        lhs_elem: TypeId,
+        rhs_elem: TypeId,
+        span: radix_lexer::Span,
+    ) -> Option<TypeId> {
+        if !crate::numeric_width::is_tensor_numeric_element(self.types, lhs_elem)
+            || !crate::numeric_width::is_tensor_numeric_element(self.types, rhs_elem)
+        {
+            self.glyph_invalid_operand(op, GLYPH_OP_NUMERIC_ELEMENT_REQUIRED, span);
+            return None;
+        }
+        let mixed_bf16_f32 = op == HirBinOp::Dot
+            && matches!(
+                (
+                    crate::numeric_width::effective_width(self.types, lhs_elem),
+                    crate::numeric_width::effective_width(self.types, rhs_elem),
+                ),
+                (
+                    Some(crate::numeric_width::NumericWidth::BF16),
+                    Some(crate::numeric_width::NumericWidth::F32),
+                )
+            );
+        if mixed_bf16_f32 {
+            return Some(rhs_elem);
+        }
+        self.glyph_numeric_element(op, lhs_elem, rhs_elem, span)
     }
 
     /// Require numeric, strictly equal elements for a glyph product.

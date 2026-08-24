@@ -14,7 +14,13 @@ use crate::kernel_plan::{
 };
 
 fn shapes(m: u64, k: u64, n: u64) -> MatMulShapes {
-    MatMulShapes { m, k, n }
+    MatMulShapes {
+        m,
+        k,
+        n,
+        left_layout: crate::MirScalarLayout::F32,
+        right_layout: crate::MirScalarLayout::F32,
+    }
 }
 
 #[test]

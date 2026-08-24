@@ -1420,6 +1420,8 @@ fn causal_masked_softmax_whole_and_decomposed_seam() {
             m: T,
             k: T,
             n: HEAD_DIM,
+            left_layout: crate::MirScalarLayout::F32,
+            right_layout: crate::MirScalarLayout::F32,
         }),
     )
     .expect("the decomposed seam resolves a TiledMatMul plan");

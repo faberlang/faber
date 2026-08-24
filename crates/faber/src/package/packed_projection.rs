@@ -8,6 +8,7 @@ use radix_mir::abi::PackedStorageLayout;
 use radix_mir::kernel_plan::{
     admit_quantized_matmul, CollectionKernelPlan, MatMulShapes, QuantizedMatMulPlan,
 };
+use radix_mir::MirScalarLayout;
 
 /// One dense-rung projection (SmolLM2-360M pinned shapes).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -89,6 +90,8 @@ pub fn admit_packed_projection(
             m: op.m,
             k: op.k,
             n: op.n,
+            left_layout: MirScalarLayout::F32,
+            right_layout: MirScalarLayout::F32,
         },
     )
 }

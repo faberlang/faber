@@ -160,6 +160,8 @@ fn matmul_fixture_shapes() -> MatMulShapes {
         m: 17,
         k: 12,
         n: 33,
+        left_layout: crate::MirScalarLayout::F32,
+        right_layout: crate::MirScalarLayout::F32,
     }
 }
 
@@ -226,6 +228,8 @@ fn matmul_plan() -> MatMulPlan {
         m: shapes.m,
         k: shapes.k,
         n: shapes.n,
+        left_layout: shapes.left_layout,
+        right_layout: shapes.right_layout,
         tile,
         workgroup_x: tile,
         workgroup_y: tile,
@@ -420,7 +424,13 @@ fn matmul_plan_is_fully_populated() {
 
 #[test]
 fn matmul_contract_without_shapes_returns_none() {
-    let shapes = MatMulShapes { m: 16, k: 8, n: 32 };
+    let shapes = MatMulShapes {
+        m: 16,
+        k: 8,
+        n: 32,
+        left_layout: crate::MirScalarLayout::F32,
+        right_layout: crate::MirScalarLayout::F32,
+    };
     let signature = matmul_signature(shapes, 4, 2);
     let contract = CollectionOpContract::MatMul {
         dispatch_x: 4,
@@ -442,7 +452,17 @@ fn matmul_contract_without_shapes_returns_none() {
 fn matmul_plan_shapes_not_matching_dispatch_returns_none() {
     // Shapes say `33×8×33` → dispatch (5, 5), but the contract dispatches
     // (4, 2): the caller resolved shapes that disagree with the contract.
-    let signature = matmul_signature(MatMulShapes { m: 16, k: 8, n: 32 }, 4, 2);
+    let signature = matmul_signature(
+        MatMulShapes {
+            m: 16,
+            k: 8,
+            n: 32,
+            left_layout: crate::MirScalarLayout::F32,
+            right_layout: crate::MirScalarLayout::F32,
+        },
+        4,
+        2,
+    );
     let contract = CollectionOpContract::MatMul {
         dispatch_x: 4,
         dispatch_y: 2,
@@ -452,7 +472,13 @@ fn matmul_plan_shapes_not_matching_dispatch_returns_none() {
             &signature,
             &contract,
             MirCollectionOp::TensorMatMul,
-            Some(MatMulShapes { m: 33, k: 8, n: 33 }),
+            Some(MatMulShapes {
+                m: 33,
+                k: 8,
+                n: 33,
+                left_layout: crate::MirScalarLayout::F32,
+                right_layout: crate::MirScalarLayout::F32
+            }),
         )
         .is_none(),
         "shapes that disagree with the contract dispatch must not build a plan"
@@ -461,7 +487,17 @@ fn matmul_plan_shapes_not_matching_dispatch_returns_none() {
 
 #[test]
 fn matmul_contract_with_non_matmul_op_returns_none() {
-    let signature = matmul_signature(MatMulShapes { m: 16, k: 8, n: 32 }, 4, 2);
+    let signature = matmul_signature(
+        MatMulShapes {
+            m: 16,
+            k: 8,
+            n: 32,
+            left_layout: crate::MirScalarLayout::F32,
+            right_layout: crate::MirScalarLayout::F32,
+        },
+        4,
+        2,
+    );
     let contract = CollectionOpContract::MatMul {
         dispatch_x: 4,
         dispatch_y: 2,
@@ -471,7 +507,13 @@ fn matmul_contract_with_non_matmul_op_returns_none() {
             &signature,
             &contract,
             MirCollectionOp::Sum,
-            Some(MatMulShapes { m: 16, k: 8, n: 32 }),
+            Some(MatMulShapes {
+                m: 16,
+                k: 8,
+                n: 32,
+                left_layout: crate::MirScalarLayout::F32,
+                right_layout: crate::MirScalarLayout::F32
+            }),
         )
         .is_none(),
         "a reduction op must not produce a matmul plan"
@@ -534,7 +576,13 @@ fn transpose_contract_with_non_transpose_op_returns_none() {
             &signature,
             &contract,
             MirCollectionOp::TensorMatMul,
-            Some(MatMulShapes { m: 4, k: 4, n: 4 }),
+            Some(MatMulShapes {
+                m: 4,
+                k: 4,
+                n: 4,
+                left_layout: crate::MirScalarLayout::F32,
+                right_layout: crate::MirScalarLayout::F32
+            }),
         )
         .is_none(),
         "a matmul op must not produce a transpose plan"
@@ -609,7 +657,17 @@ fn validate_rejects_transpose_dispatch_mismatch() {
 fn matmul_signature_not_carrying_contract_returns_none() {
     // The output element count disagrees with the shapes: the signature
     // was not built from this contract.
-    let mut signature = matmul_signature(MatMulShapes { m: 16, k: 8, n: 32 }, 4, 2);
+    let mut signature = matmul_signature(
+        MatMulShapes {
+            m: 16,
+            k: 8,
+            n: 32,
+            left_layout: crate::MirScalarLayout::F32,
+            right_layout: crate::MirScalarLayout::F32,
+        },
+        4,
+        2,
+    );
     signature.output.element_count = 1;
     let contract = CollectionOpContract::MatMul {
         dispatch_x: 4,
@@ -620,7 +678,13 @@ fn matmul_signature_not_carrying_contract_returns_none() {
             &signature,
             &contract,
             MirCollectionOp::TensorMatMul,
-            Some(MatMulShapes { m: 16, k: 8, n: 32 }),
+            Some(MatMulShapes {
+                m: 16,
+                k: 8,
+                n: 32,
+                left_layout: crate::MirScalarLayout::F32,
+                right_layout: crate::MirScalarLayout::F32
+            }),
         )
         .is_none(),
         "a signature that does not carry the contract must not build a plan"
@@ -1511,7 +1575,17 @@ fn packed_layout_fixture(layout: crate::abi::PackedStorageLayout) -> CollectionO
 }
 
 fn quantized_matmul_signature(m: u64, k: u64, n: u64) -> MirKernelSignature {
-    matmul_signature(MatMulShapes { m, k, n }, n.div_ceil(8), m.div_ceil(8))
+    matmul_signature(
+        MatMulShapes {
+            m,
+            k,
+            n,
+            left_layout: crate::MirScalarLayout::F32,
+            right_layout: crate::MirScalarLayout::F32,
+        },
+        n.div_ceil(8),
+        m.div_ceil(8),
+    )
 }
 
 #[test]
@@ -1723,8 +1797,17 @@ fn bf16_plan_seam_pins_width_mapping_both_directions() {
 
     // Receipts row pinned as-is: Bf16 admits QuantizedMatMul via
     // NativeBf16Convert — no new kernels, Metal body unchanged.
-    let plan = admit_quantized_matmul_from_ggml_type_id(30, MatMulShapes { m: 8, k: 16, n: 16 })
-        .expect("BF16 type id 30 admits QuantizedMatMul");
+    let plan = admit_quantized_matmul_from_ggml_type_id(
+        30,
+        MatMulShapes {
+            m: 8,
+            k: 16,
+            n: 16,
+            left_layout: crate::MirScalarLayout::F32,
+            right_layout: crate::MirScalarLayout::F32,
+        },
+    )
+    .expect("BF16 type id 30 admits QuantizedMatMul");
     let CollectionKernelPlan::QuantizedMatMul(quantized) = &plan else {
         panic!("BF16 must admit QuantizedMatMul, got {plan:?}");
     };
@@ -1744,7 +1827,13 @@ fn bf16_plan_seam_pins_width_mapping_both_directions() {
 #[test]
 fn admit_quantized_matmul_falls_back_f32_to_tiled_matmul() {
     use crate::abi::PackedStorageLayout;
-    let shapes = MatMulShapes { m: 8, k: 16, n: 16 };
+    let shapes = MatMulShapes {
+        m: 8,
+        k: 16,
+        n: 16,
+        left_layout: crate::MirScalarLayout::F32,
+        right_layout: crate::MirScalarLayout::F32,
+    };
     let plan = admit_quantized_matmul(PackedStorageLayout::F32, shapes);
     assert!(
         matches!(plan, CollectionKernelPlan::TiledMatMul(_)),
@@ -1755,7 +1844,13 @@ fn admit_quantized_matmul_falls_back_f32_to_tiled_matmul() {
 
 #[test]
 fn admit_quantized_matmul_resolves_every_packed_section5_layout() {
-    let shapes = MatMulShapes { m: 8, k: 16, n: 16 };
+    let shapes = MatMulShapes {
+        m: 8,
+        k: 16,
+        n: 16,
+        left_layout: crate::MirScalarLayout::F32,
+        right_layout: crate::MirScalarLayout::F32,
+    };
     for (layout, class, elements, bytes) in section5_packed_layouts() {
         let plan = admit_quantized_matmul(layout, shapes);
         let CollectionKernelPlan::QuantizedMatMul(quantized) = &plan else {
@@ -1777,7 +1872,13 @@ fn q4k_ggml_id_admits_quantized_matmul_with_superblock_dequant() {
     // First-failing-oracle surface: a Q4_K GGML id (12) on the pre-02A
     // f32-only substrate had no admission helper and no dequant
     // resolution — `admit_quantized_matmul_from_ggml_type_id` did not exist.
-    let shapes = MatMulShapes { m: 8, k: 16, n: 16 };
+    let shapes = MatMulShapes {
+        m: 8,
+        k: 16,
+        n: 16,
+        left_layout: crate::MirScalarLayout::F32,
+        right_layout: crate::MirScalarLayout::F32,
+    };
     let plan = admit_quantized_matmul_from_ggml_type_id(12, shapes)
         .expect("Q4_K type id 12 is an admitted packed layout");
     let CollectionKernelPlan::QuantizedMatMul(quantized) = &plan else {
@@ -1795,7 +1896,13 @@ fn f16_ggml_id_admits_quantized_matmul_with_native_f16_convert() {
     // W1-U1 first-failing oracle: GGML type id 1 (F16) is outside the
     // closed set today. After admission it must resolve NativeF16Convert
     // and a QuantizedMatMul plan (same shape as NativeBf16Convert).
-    let shapes = MatMulShapes { m: 8, k: 16, n: 16 };
+    let shapes = MatMulShapes {
+        m: 8,
+        k: 16,
+        n: 16,
+        left_layout: crate::MirScalarLayout::F32,
+        right_layout: crate::MirScalarLayout::F32,
+    };
     let plan = admit_quantized_matmul_from_ggml_type_id(1, shapes)
         .expect("F16 type id 1 is an admitted packed layout");
     let CollectionKernelPlan::QuantizedMatMul(quantized) = &plan else {
@@ -1822,7 +1929,13 @@ fn mxfp4_ggml_id_admits_quantized_matmul_with_scaled_e8m0_group() {
     // (one E8M0 scale over a 32-element group) and a QuantizedMatMul plan.
     // Geometry is llama.cpp block_mxfp4: 32 elems / 17 bytes
     // (ggml.h:429 GGML_TYPE_MXFP4=39; ggml-common.h:214-219).
-    let shapes = MatMulShapes { m: 8, k: 16, n: 16 };
+    let shapes = MatMulShapes {
+        m: 8,
+        k: 16,
+        n: 16,
+        left_layout: crate::MirScalarLayout::F32,
+        right_layout: crate::MirScalarLayout::F32,
+    };
     let plan = admit_quantized_matmul_from_ggml_type_id(39, shapes)
         .expect("MXFP4 type id 39 is an admitted packed layout");
     let CollectionKernelPlan::QuantizedMatMul(quantized) = &plan else {
@@ -1844,7 +1957,13 @@ fn mxfp4_ggml_id_admits_quantized_matmul_with_scaled_e8m0_group() {
 
 #[test]
 fn unrepresentable_ggml_type_id_fails_closed() {
-    let shapes = MatMulShapes { m: 8, k: 16, n: 16 };
+    let shapes = MatMulShapes {
+        m: 8,
+        k: 16,
+        n: 16,
+        left_layout: crate::MirScalarLayout::F32,
+        right_layout: crate::MirScalarLayout::F32,
+    };
     let error = admit_quantized_matmul_from_ggml_type_id(99, shapes)
         .expect_err("GGML type id 99 is unrepresentable");
     assert_eq!(

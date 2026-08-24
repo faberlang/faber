@@ -807,6 +807,15 @@ pub struct WireTransposePlan {
     pub dispatch_x: u64,
 }
 
+/// Dense scalar layouts carried by the tiled-matmul wire plan. The dense
+/// recipe admits only F32 and BF16 operands; tiles widen into F32.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+pub enum WireMatMulLayout {
+    #[default]
+    F32,
+    Bf16,
+}
+
 /// Tiled-matmul recipe.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -817,6 +826,12 @@ pub struct WireMatMulPlan {
     pub k: u64,
     /// Right matrix columns `N`.
     pub n: u64,
+    /// Left operand scalar layout; defaults to F32 for legacy images.
+    #[serde(default)]
+    pub left_layout: WireMatMulLayout,
+    /// Right operand scalar layout; defaults to F32 for legacy images.
+    #[serde(default)]
+    pub right_layout: WireMatMulLayout,
     /// Square tile edge.
     pub tile: u32,
     /// Workgroup lane count on `x`.

@@ -316,6 +316,8 @@ pub(super) fn tiled_matmul_from_shapes(shapes: MatMulShapes) -> CollectionKernel
         m: shapes.m,
         k: shapes.k,
         n: shapes.n,
+        left_layout: shapes.left_layout,
+        right_layout: shapes.right_layout,
         tile,
         workgroup_x: tile,
         workgroup_y: tile,

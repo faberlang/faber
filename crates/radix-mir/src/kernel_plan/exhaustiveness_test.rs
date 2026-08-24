@@ -143,6 +143,8 @@ fn dummy_matmul() -> MatMulPlan {
         m: 1,
         k: 1,
         n: 1,
+        left_layout: crate::MirScalarLayout::F32,
+        right_layout: crate::MirScalarLayout::F32,
         tile: 1,
         workgroup_x: 1,
         workgroup_y: 1,

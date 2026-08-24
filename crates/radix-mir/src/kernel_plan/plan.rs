@@ -12,6 +12,7 @@
 
 #[allow(unused_imports)] // intra-doc links only; the plan pass lives in build.rs
 use crate::abi::CollectionOpContract;
+use crate::MirScalarLayout;
 
 /// Conservative device workgroup-memory limit in bytes (L12). Real devices
 /// advertise more (the M5 Max and RTX 5070 exceed this); 32KB keeps every
@@ -431,8 +432,12 @@ pub struct MatMulShapes {
     pub m: u64,
     /// Contracted inner dimension `K` (left columns / right rows).
     pub k: u64,
-    /// Right matrix columns `N`.
+    /// Right matrix columns `N` (one for a promoted rank-1 RHS).
     pub n: u64,
+    /// Element layout of the left operand; dense tiles widen into f32.
+    pub left_layout: MirScalarLayout,
+    /// Element layout of the right operand; dense tiles widen into f32.
+    pub right_layout: MirScalarLayout,
 }
 
 /// Tiled-matmul recipe (WGSL `radix-mir-wgsl/src/lib.rs:1610-1700`).
@@ -457,8 +462,12 @@ pub struct MatMulPlan {
     pub m: u64,
     /// Contracted inner dimension `K` (left columns / right rows).
     pub k: u64,
-    /// Right matrix columns `N`.
+    /// Right matrix columns `N` (one for a promoted rank-1 RHS).
     pub n: u64,
+    /// Element layout of the left operand; dense tiles stay f32 after load.
+    pub left_layout: MirScalarLayout,
+    /// Element layout of the right operand; dense tiles stay f32 after load.
+    pub right_layout: MirScalarLayout,
     /// Square tile edge; the contract dispatches one workgroup per
     /// `tile × tile` output tile.
     pub tile: u32,

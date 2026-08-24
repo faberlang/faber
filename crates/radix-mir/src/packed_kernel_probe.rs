@@ -54,7 +54,13 @@ fn bf16_quantized_matmul_matches_cpu_reference_without_weight_expansion() {
     let layout = PackedStorageLayout::Bf16;
     let plan = admit_quantized_matmul(
         layout,
-        crate::kernel_plan::MatMulShapes { m: 2, k: 2, n: 2 },
+        crate::kernel_plan::MatMulShapes {
+            m: 2,
+            k: 2,
+            n: 2,
+            left_layout: crate::MirScalarLayout::F32,
+            right_layout: crate::MirScalarLayout::F32,
+        },
     );
     let crate::kernel_plan::CollectionKernelPlan::QuantizedMatMul(quantized) = plan else {
         panic!("BF16 must admit QuantizedMatMul");
@@ -143,7 +149,13 @@ fn q5_0_block_dequant_matches_gi2_1_goldens() {
     let layout = PackedStorageLayout::Q5_0;
     let plan = admit_quantized_matmul(
         layout,
-        crate::kernel_plan::MatMulShapes { m: 1, k: 32, n: 32 },
+        crate::kernel_plan::MatMulShapes {
+            m: 1,
+            k: 32,
+            n: 32,
+            left_layout: crate::MirScalarLayout::F32,
+            right_layout: crate::MirScalarLayout::F32,
+        },
     );
     let crate::kernel_plan::CollectionKernelPlan::QuantizedMatMul(quantized) = plan else {
         panic!("Q5_0 must admit QuantizedMatMul");

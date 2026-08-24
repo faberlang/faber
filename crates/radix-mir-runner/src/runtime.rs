@@ -2177,11 +2177,13 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
         Ok(Value::Float(total_loss / last_dim as f64))
     }
 
-    /// Rank-2 matrix multiply over runner `Value` tensors.
+    /// Matrix multiply / GEMV over runner `Value` tensors.
     ///
-    /// Validates rank-2 on both operands, enforces matching inner dimension,
-    /// and performs the O(M·K·N) contraction. Integer overflow and element
-    /// width mismatch are the author's responsibility (per v1 scope).
+    /// Validates rank-2 on the receiver and rank-1 or rank-2 on the argument,
+    /// enforces the matching inner dimension, and performs the O(M·K·N)
+    /// contraction. A rank-1 argument produces a rank-1 result. Integer
+    /// overflow and element width mismatch are the author's responsibility
+    /// (per v1 scope).
     fn tensor_matmul(
         &mut self,
         args: &[MirOperand],
@@ -2202,7 +2204,8 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
         if l_shape.len() != 2 {
             return Err(RunnerError::internal(span, ERR_MATMUL_RECEIVER_RANK));
         }
-        if r_shape.len() != 2 {
+        let rhs_rank1 = r_shape.len() == 1;
+        if !rhs_rank1 && r_shape.len() != 2 {
             return Err(RunnerError::internal(span, ERR_MATMUL_ARGUMENT_RANK));
         }
         let k_left = l_shape[1];
@@ -2211,7 +2214,8 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
             return Err(RunnerError::internal(span, ERR_MATMUL_INNER_DIMENSION));
         }
         let m = l_shape[0];
-        let n = r_shape[1];
+        let n = if rhs_rank1 { 1 } else { r_shape[1] };
+        let output_shape = if rhs_rank1 { vec![m] } else { vec![m, n] };
         // Homogeneous numerus tensors take a typed ikj kernel: one classify
         // walk, then a tight numeric loop with row-major right-hand access.
         // Mixed / non-numeric tensors keep the borrowed Value fallback.
@@ -2222,7 +2226,7 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                 let cells = matmul_f64(&left_f, &right_f, m, k_left, n);
                 return Ok(tensor_value(
                     cells.into_iter().map(Value::Float).collect(),
-                    vec![m, n],
+                    output_shape.clone(),
                 ));
             }
             if let (Some(left_i), Some(right_i)) =
@@ -2231,7 +2235,7 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                 let cells = matmul_i64(&left_i, &right_i, m, k_left, n, width, span)?;
                 return Ok(tensor_value(
                     cells.into_iter().map(Value::Int).collect(),
-                    vec![m, n],
+                    output_shape.clone(),
                 ));
             }
             if let (Some(left_u), Some(right_u)) =
@@ -2240,13 +2244,13 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                 let cells = matmul_u64(&left_u, &right_u, m, k_left, n, width, span)?;
                 return Ok(tensor_value(
                     cells.into_iter().map(Value::UInt).collect(),
-                    vec![m, n],
+                    output_shape.clone(),
                 ));
             }
         }
         Ok(tensor_value(
             matmul_values(&borrow.data, &borrow_r.data, m, k_left, n, width, span)?,
-            vec![m, n],
+            output_shape,
         ))
     }
 

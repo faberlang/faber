@@ -141,6 +141,8 @@ fn dense_projections_admit_quantized_matmul_not_f32_tiled() {
                 m: projection.m,
                 k: projection.k,
                 n: projection.n,
+                left_layout: crate::MirScalarLayout::F32,
+                right_layout: crate::MirScalarLayout::F32,
             },
         );
         let CollectionKernelPlan::QuantizedMatMul(quantized) = plan else {
