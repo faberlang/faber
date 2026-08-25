@@ -103,8 +103,15 @@ fn tensor_extrema_coalesce_empty_runtime_tensors_with_identity() {
 }
 
 #[test]
-fn tensor_extrema_reject_empty_runtime_tensors_without_identity() {
-    let error = eval_extremum(MirCollectionOp::TensorMax, Vec::new(), None)
-        .expect_err("empty max must fail closed");
-    assert!(error.message.contains("tensor max empty"));
+fn tensor_extrema_return_nihil_for_empty_runtime_tensors_without_identity() {
+    assert_eq!(
+        eval_extremum(MirCollectionOp::TensorMax, Vec::new(), None)
+            .expect("uncoalesced empty max returns nihil"),
+        Value::Nil
+    );
+    assert_eq!(
+        eval_extremum(MirCollectionOp::TensorMin, Vec::new(), None)
+            .expect("uncoalesced empty min returns nihil"),
+        Value::Nil
+    );
 }

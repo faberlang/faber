@@ -2008,9 +2008,10 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
         let borrow = tensor.borrow();
         let mut values = borrow.data.iter();
         let Some(first) = values.next() else {
-            return identity
-                .map(Value::Float)
-                .ok_or_else(|| RunnerError::internal(span, format!("tensor {label} empty")));
+            return Ok(match identity {
+                Some(identity) => Value::Float(identity),
+                None => Value::Nil,
+            });
         };
         let mut result = numeric_as_f64(first, span)?;
         for value in values {
