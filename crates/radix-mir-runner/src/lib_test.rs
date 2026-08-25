@@ -4351,3 +4351,66 @@ fn conversio_padded_tensor_from_flat_fills_dead_slots() {
         "expected element-count failure, got {err:?}"
     );
 }
+
+#[test]
+fn lista_elementwise_dynamic_pair_checks_length_and_broadcasts() {
+    use crate::host::BufferHost;
+    use crate::Value;
+    use radix_lexer::Interner;
+    use radix_mir::MirValidationContext;
+    use radix_types::{Primitive, TypeTable};
+
+    let mut types = TypeTable::new();
+    let numerus = types.primitive(Primitive::Numerus);
+    let lista = types.array(numerus);
+    let context = MirValidationContext::new(&types);
+    let interner = Interner::new();
+    let mut host = BufferHost::default();
+    let mut program = MirProgram::new();
+    program.functions.push(make_function());
+    let mut runner = Runner::new(&program, &context, &types, &interner, &mut host);
+    runner.push_frame(MirFunctionId(0), MirBlockId(0));
+    runner.frames.last_mut().unwrap().values.insert(
+        MirValueId(0),
+        Value::Array(Rc::new(RefCell::new(vec![Value::Int(1), Value::Int(2)]))),
+    );
+    runner
+        .frames
+        .last_mut()
+        .unwrap()
+        .values
+        .insert(MirValueId(1), Value::Int(3));
+
+    let call = MirRuntimeCall {
+        intrinsic: MirIntrinsic::Collection(MirCollectionOp::ArrayMul),
+        args: vec![
+            MirOperand::Value(MirValueId(0)),
+            MirOperand::Value(MirValueId(1)),
+        ],
+        return_ty: MirType::semantic(lista),
+    };
+    let result = runner
+        .eval_runtime_call(&call, Span::default())
+        .expect("lista scalar broadcast should succeed");
+    assert_eq!(
+        result,
+        Value::Array(Rc::new(RefCell::new(vec![Value::Int(3), Value::Int(6)])))
+    );
+
+    runner.frames.last_mut().unwrap().values.insert(
+        MirValueId(2),
+        Value::Array(Rc::new(RefCell::new(vec![Value::Int(4)]))),
+    );
+    let mismatch = MirRuntimeCall {
+        intrinsic: MirIntrinsic::Collection(MirCollectionOp::ArrayAdd),
+        args: vec![
+            MirOperand::Value(MirValueId(0)),
+            MirOperand::Value(MirValueId(2)),
+        ],
+        return_ty: MirType::semantic(lista),
+    };
+    let error = runner
+        .eval_runtime_call(&mismatch, Span::default())
+        .expect_err("dynamic lista length mismatch is a hard error");
+    assert_eq!(error.issue, "runner_lista_elementwise_length_mismatch");
+}

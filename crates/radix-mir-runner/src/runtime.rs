@@ -1259,6 +1259,18 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
             MirCollectionOp::Maximum => self.map_numeric_pair(args, span, f64::max),
             MirCollectionOp::Approximate => self.approximate_fractus(args, span),
             MirCollectionOp::Sum => self.sum_numeric_array(args, return_ty, span),
+            MirCollectionOp::ArrayAdd => {
+                self.array_elementwise(args, span, "lista add", numeric_add, return_ty)
+            }
+            MirCollectionOp::ArraySub => {
+                self.array_elementwise(args, span, "lista sub", numeric_sub, return_ty)
+            }
+            MirCollectionOp::ArrayMul => {
+                self.array_elementwise(args, span, "lista mul", numeric_mul, return_ty)
+            }
+            MirCollectionOp::ArrayDiv => {
+                self.array_elementwise(args, span, "lista div", numeric_div, return_ty)
+            }
             MirCollectionOp::TensorSumAxis => self.tensor_sum_axis(args, span, return_ty),
             MirCollectionOp::TensorShape => self.tensor_shape(args, span),
             MirCollectionOp::TensorReshape => self.tensor_reshape(args, span),
@@ -1846,6 +1858,74 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
             borrow.data[data_start..data_end].to_vec(),
             shape,
         ))
+    }
+
+    /// Elementwise lista op with scalar broadcast. Unlike tensor broadcast,
+    /// list/list pairs have one legal shape: equal runtime length. A mismatch
+    /// is a hard internal runner error, matching the `ponde` strict-index
+    /// family rather than a recoverable `⇥` path.
+    fn array_elementwise(
+        &mut self,
+        args: &[MirOperand],
+        span: Span,
+        label: &'static str,
+        op: fn(&Value, &Value, NumericWidth, Span) -> Result<Value, RunnerError>,
+        return_ty: MirType,
+    ) -> Result<Value, RunnerError> {
+        let [left, right] = args else {
+            return Err(RunnerError::internal(span, format!("{label} arity")));
+        };
+        let left = self.eval_operand(left, span)?;
+        let right = self.eval_operand(right, span)?;
+        let element_ty = match self.types.get(return_ty.semantic_id()) {
+            Type::Array(element) | Type::BoundedArray { element, .. } => *element,
+            _ => {
+                return Err(RunnerError::internal(
+                    span,
+                    format!("{label} result type mismatch"),
+                ))
+            }
+        };
+        let width = effective_width(self.types, element_ty).unwrap_or(NumericWidth::I64);
+        match (&left, &right) {
+            (Value::Array(left), Value::Array(right)) => {
+                let left = left.borrow();
+                let right = right.borrow();
+                if left.len() != right.len() {
+                    return Err(RunnerError::internal_with_issue(
+                        span,
+                        format!("{label} length mismatch"),
+                        "runner_lista_elementwise_length_mismatch",
+                    ));
+                }
+                let values = left
+                    .iter()
+                    .zip(right.iter())
+                    .map(|(left, right)| op(left, right, width, span))
+                    .collect::<Result<Vec<_>, _>>()?;
+                Ok(array_value(values))
+            }
+            (Value::Array(left), scalar) => {
+                let left = left.borrow();
+                let values = left
+                    .iter()
+                    .map(|left| op(left, scalar, width, span))
+                    .collect::<Result<Vec<_>, _>>()?;
+                Ok(array_value(values))
+            }
+            (scalar, Value::Array(right)) => {
+                let right = right.borrow();
+                let values = right
+                    .iter()
+                    .map(|right| op(scalar, right, width, span))
+                    .collect::<Result<Vec<_>, _>>()?;
+                Ok(array_value(values))
+            }
+            _ => Err(RunnerError::internal(
+                span,
+                format!("{label} operand type mismatch"),
+            )),
+        }
     }
 
     /// Elementwise tensor op with scalar broadcast: if one arg is a scalar,

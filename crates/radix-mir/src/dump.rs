@@ -562,6 +562,10 @@ fn conversion_flavor(flavor: MirConversionFlavor) -> &'static str {
 
 fn collection_op(op: MirCollectionOp) -> &'static str {
     match op {
+        MirCollectionOp::ArrayAdd => "array_add",
+        MirCollectionOp::ArraySub => "array_sub",
+        MirCollectionOp::ArrayMul => "array_mul",
+        MirCollectionOp::ArrayDiv => "array_div",
         MirCollectionOp::Append => "append",
         MirCollectionOp::AppendImmutable => "append_immutable",
         MirCollectionOp::Put => "put",

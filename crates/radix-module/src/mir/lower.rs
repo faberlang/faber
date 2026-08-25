@@ -2110,6 +2110,15 @@ impl<'a> FunctionBuilder<'a> {
         if matches!(op, HirBinOp::Add | HirBinOp::Sub) && self.is_addita_plus_operands(lhs, rhs) {
             return self.lower_glyph_product(op, lhs, rhs, expr);
         }
+        // A1's numeric-list law has a dedicated MIR collection-op seam. Dynamic
+        // list pairs reach the runner for the hard length check; literal-bounded
+        // pairs are expanded to indexed array cells and skip that check because
+        // their equal extent is already a type fact.
+        if matches!(op, HirBinOp::Add | HirBinOp::Sub | HirBinOp::Mul | HirBinOp::Div)
+            && self.is_lista_arithmetic_operand(lhs, rhs)
+        {
+            return self.lower_lista_elementwise(op, lhs, rhs, expr);
+        }
         let Some(op) = mir_bin_op(op) else {
             self.errors
                 .push(MirError::unsupported(expr.span, "binary operator without a MIR primitive"));
@@ -2602,6 +2611,13 @@ impl<'a> FunctionBuilder<'a> {
                 | (Type::Vector(_, _), Type::Vector(_, _))
                 | (Type::Matrix(_, _), Type::Matrix(_, _))
         )
+    }
+
+    fn is_lista_arithmetic_operand(&self, lhs: &HirExpression, rhs: &HirExpression) -> bool {
+        [lhs.ty, rhs.ty]
+            .into_iter()
+            .flatten()
+            .any(|ty| matches!(self.normalized_type(ty), Type::Array(_) | Type::BoundedArray { .. }))
     }
 
     fn normalized_type(&self, mut ty: TypeId) -> &Type {

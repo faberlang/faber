@@ -5455,3 +5455,34 @@ functio k(tensor<f32, [256]> a) → f32 {
         "expected the FilumSum declaration in the MIR dump:\n{dump}"
     );
 }
+
+#[test]
+fn lista_elementwise_dynamic_pair_lowers_to_array_mir_op() {
+    let dump = dump_source(
+        r"functio addita(lista<numerus> a, lista<numerus> b) → lista<numerus> {
+    redde a + b
+}",
+    );
+    assert!(
+        dump.contains("runtime collection array_add"),
+        "dynamic lista arithmetic must use the runner collection op:\n{dump}"
+    );
+    assert!(!dump.contains("invalid MIR"), "dynamic lista arithmetic must validate:\n{dump}");
+}
+
+#[test]
+fn lista_elementwise_literal_bounds_expand_without_runtime_check() {
+    let dump = dump_source(
+        r"functio addita(lista<numerus, 3> a, lista<numerus, 3> b) → lista<numerus, 3> {
+    redde a + b
+}",
+    );
+    assert!(
+        dump.contains("construct array"),
+        "literal-bounded lista arithmetic must construct the result:\n{dump}"
+    );
+    assert!(
+        !dump.contains("runtime collection array_add"),
+        "literal-bounded lista arithmetic must skip the dynamic check:\n{dump}"
+    );
+}

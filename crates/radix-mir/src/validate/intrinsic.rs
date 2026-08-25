@@ -502,7 +502,11 @@ impl Validator<'_, '_> {
             | MirCollectionOp::Values
             | MirCollectionOp::CordCursor
             | MirCollectionOp::TensorCausalMaskedSoftmax => 1,
-            MirCollectionOp::Append
+            MirCollectionOp::ArrayAdd
+            | MirCollectionOp::ArraySub
+            | MirCollectionOp::ArrayMul
+            | MirCollectionOp::ArrayDiv
+            | MirCollectionOp::Append
             | MirCollectionOp::AppendImmutable
             | MirCollectionOp::Delete
             | MirCollectionOp::Index
@@ -1188,6 +1192,54 @@ impl Validator<'_, '_> {
                     call.return_ty,
                     span,
                     "tensor materialize result is not tensor",
+                );
+            }
+            MirCollectionOp::ArrayAdd
+            | MirCollectionOp::ArraySub
+            | MirCollectionOp::ArrayMul
+            | MirCollectionOp::ArrayDiv => {
+                let Some(left_ty) = first_arg_ty else {
+                    return;
+                };
+                let Some(left_element) = self.collection_element_ty(left_ty) else {
+                    self.error(span, "lista elementwise lhs is not a lista");
+                    return;
+                };
+                if let Some(right) = call.args.get(1) {
+                    let Some(right_ty) = self.validate_operand(scope, right, span) else {
+                        return;
+                    };
+                    match self.type_kind(right_ty) {
+                        Type::Array(element) | Type::BoundedArray { element, .. } => {
+                            self.require_assignable(
+                                MirType::semantic(*element),
+                                left_element,
+                                span,
+                                "lista elementwise element types differ",
+                            );
+                        }
+                        _ => self.require_assignable(
+                            right_ty,
+                            left_element,
+                            span,
+                            "lista elementwise scalar type mismatch",
+                        ),
+                    }
+                }
+                let (Type::Array(result_element)
+                | Type::BoundedArray {
+                    element: result_element,
+                    ..
+                }) = self.type_kind(call.return_ty)
+                else {
+                    self.error(span, "lista elementwise result is not a lista");
+                    return;
+                };
+                self.require_assignable(
+                    MirType::semantic(*result_element),
+                    left_element,
+                    span,
+                    "lista elementwise result element type mismatch",
                 );
             }
             MirCollectionOp::TensorReshape
@@ -1947,7 +1999,9 @@ impl Validator<'_, '_> {
 
     pub(crate) fn collection_element_ty(&self, collection_ty: MirType) -> Option<MirType> {
         match self.type_kind(collection_ty) {
-            Type::Array(inner) | Type::Set(inner) => Some(MirType::semantic(*inner)),
+            Type::Array(inner) | Type::BoundedArray { element: inner, .. } | Type::Set(inner) => {
+                Some(MirType::semantic(*inner))
+            }
             _ => None,
         }
     }

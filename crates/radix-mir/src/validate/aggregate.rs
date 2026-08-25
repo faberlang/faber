@@ -196,7 +196,9 @@ impl Validator<'_, '_> {
                 MirAggregateFields::Ordered(items),
             ) => {
                 let element_ty = match self.type_kind(aggregate.ty) {
-                    Type::Array(inner) | Type::Set(inner) => Some(MirType::semantic(*inner)),
+                    Type::Array(inner)
+                    | Type::BoundedArray { element: inner, .. }
+                    | Type::Set(inner) => Some(MirType::semantic(*inner)),
                     Type::Primitive(Primitive::Valor)
                         if matches!(aggregate.kind, MirAggregateKind::Array) =>
                     {

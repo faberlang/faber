@@ -215,6 +215,120 @@ impl FunctionBuilder<'_> {
         Some(value)
     }
 
+    /// Lower A1's numeric-list arithmetic law.
+    ///
+    /// Dynamic list pairs use a dedicated collection runtime op so the runner
+    /// can enforce the hard same-length error. A pair whose two list extents
+    /// are literal `BoundedArray` capacities is expanded into indexed MIR
+    /// cells, which is the current meaning of statically known length.
+    pub(super) fn lower_lista_elementwise(
+        &mut self,
+        op: HirBinOp,
+        lhs: &HirExpression,
+        rhs: &HirExpression,
+        expr: &HirExpression,
+    ) -> Option<MirOperand> {
+        let lhs_shape = lhs.ty.and_then(|ty| self.lista_shape(ty));
+        let rhs_shape = rhs.ty.and_then(|ty| self.lista_shape(ty));
+        if lhs_shape.is_none() && rhs_shape.is_none() {
+            self.errors
+                .push(MirError::unsupported(expr.span, "lista arithmetic without a lista operand"));
+            return None;
+        }
+        let collection_op = match op {
+            HirBinOp::Add => MirCollectionOp::ArrayAdd,
+            HirBinOp::Sub => MirCollectionOp::ArraySub,
+            HirBinOp::Mul => MirCollectionOp::ArrayMul,
+            HirBinOp::Div => MirCollectionOp::ArrayDiv,
+            _ => unreachable!("lista elementwise lowering only accepts arithmetic operators"),
+        };
+        let lhs_value = self.lower_expr_value(lhs)?;
+        let rhs_value = self.lower_expr_value(rhs)?;
+        let result_ty = self.expr_ty(expr)?;
+
+        let static_capacity = match (lhs_shape, rhs_shape) {
+            (Some((_, Some(lhs_capacity))), Some((_, Some(rhs_capacity)))) if lhs_capacity == rhs_capacity => {
+                Some(lhs_capacity)
+            }
+            (Some((_, Some(capacity))), None) | (None, Some((_, Some(capacity)))) => Some(capacity),
+            _ => None,
+        };
+        let Some(capacity) = static_capacity else {
+            return Some(self.runtime_call_value(
+                MirIntrinsic::Collection(collection_op),
+                vec![lhs_value, rhs_value],
+                result_ty,
+                expr.span,
+            ));
+        };
+
+        let lhs_place = if lhs_shape.is_some() {
+            Some(self.value_base_place(lhs_value.clone(), MirType::semantic(lhs.ty?), lhs.span)?)
+        } else {
+            None
+        };
+        let rhs_place = if rhs_shape.is_some() {
+            Some(self.value_base_place(rhs_value.clone(), MirType::semantic(rhs.ty?), rhs.span)?)
+        } else {
+            None
+        };
+        let scalar = if lhs_shape.is_none() { lhs_value } else { rhs_value };
+        let element_ty = lhs_shape
+            .map(|(element, _)| element)
+            .or_else(|| rhs_shape.map(|(element, _)| element))?;
+        let mir_op = match collection_op {
+            MirCollectionOp::ArrayAdd => MirBinOp::Add,
+            MirCollectionOp::ArraySub => MirBinOp::Sub,
+            MirCollectionOp::ArrayMul => MirBinOp::Mul,
+            MirCollectionOp::ArrayDiv => MirBinOp::Div,
+            _ => unreachable!("lista collection op mapping"),
+        };
+        let mut fields = Vec::with_capacity(capacity);
+        for index in 0..capacity {
+            let lhs = if let Some(place) = lhs_place.as_ref() {
+                lista_index_operand(place, index)?
+            } else {
+                scalar.clone()
+            };
+            let rhs = if let Some(place) = rhs_place.as_ref() {
+                lista_index_operand(place, index)?
+            } else {
+                scalar.clone()
+            };
+            let value = self.assign_temp(
+                MirValueKind::Binary { op: mir_op, lhs, rhs },
+                MirType::semantic(element_ty),
+                expr.span,
+            );
+            fields.push(MirAggregateItem::Operand(value));
+        }
+        Some(self.construct_temp(
+            MirAggregateKind::Array,
+            MirAggregateFields::Ordered(fields),
+            result_ty,
+            expr.span,
+        ))
+    }
+
+    fn lista_shape(&self, ty: TypeId) -> Option<(TypeId, Option<usize>)> {
+        match self.normalized_type(ty) {
+            Type::Array(element) => Some((*element, None)),
+            Type::BoundedArray { element, capacity } => {
+                let IndexExpr::Literal(capacity) = self.types.get_index(*capacity) else {
+                    return Some((*element, None));
+                };
+                let Some(capacity) = usize::try_from(*capacity).ok() else {
+                    return Some((*element, None));
+                };
+                if i64::try_from(capacity).is_err() {
+                    return Some((*element, None));
+                }
+                Some((*element, Some(capacity)))
+            }
+            _ => None,
+        }
+    }
+
     /// Lower a glyph-product binop (`·` `×` `⊗` `⊙` `⊘`) by operand family,
     /// reusing the vector/matrix method machinery and the collection-op
     /// intrinsic seam. Every unsupported shape/type combination fails closed
@@ -3127,6 +3241,15 @@ fn mir_diagnostic_kind(kind: HirScribeKind) -> MirDiagnosticKind {
         HirScribeKind::Mone => MirDiagnosticKind::Mone,
         HirScribeKind::Scribe => MirDiagnosticKind::Scribe,
     }
+}
+
+fn lista_index_operand(place: &MirPlace, index: usize) -> Option<MirOperand> {
+    let index = i64::try_from(index).ok()?;
+    let mut place = place.clone();
+    place
+        .projections
+        .push(MirProjection::Index(MirOperand::Constant(MirConstant::Int(index))));
+    Some(MirOperand::Place(place))
 }
 
 fn numeric_operator_binop(method_name: &str) -> Option<MirBinOp> {
