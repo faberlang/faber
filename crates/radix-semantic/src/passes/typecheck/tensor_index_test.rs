@@ -524,3 +524,33 @@ nota "rankagnostic ok"
         "matmul_receiver_shape_must_be_tuple",
     );
 }
+
+// --- S0-G8: vector lane access ---
+
+#[test]
+fn vector_bracket_index_yields_element_at_literal_width() {
+    accepts(
+        r"functio lane(vector<f32, 3> v, numerus i) → f32 {
+    redde v[i]
+}",
+    );
+}
+
+#[test]
+fn vector_bracket_index_yields_element_at_parametric_width() {
+    accepts(
+        r"functio lane<magnitudo N>(vector<f32, N> v, numerus i) → f32 {
+    redde v[i]
+}",
+    );
+}
+
+#[test]
+fn vector_bracket_index_requires_integer() {
+    rejects_with_issue(
+        r"functio lane(vector<f32, 3> v, fractus i) → f32 {
+    redde v[i]
+}",
+        "array_index_must_be_numerus",
+    );
+}

@@ -346,3 +346,34 @@ functio facere() → Eventum {
         "argument_type_mismatch",
     );
 }
+
+// --- S0-G8: applied-generic field projection ---
+
+#[test]
+fn applied_generic_field_read_substitutes_size_witness() {
+    test_support::assert_accepts(
+        r#"genus Capsa<magnitudo N> {
+    vector<f32, N> minima
+}
+
+functio minimum(Capsa<3> capsam) → vector<f32, 3> {
+    fixum vector<f32, 3> lo ← capsam.minima
+    redde lo
+}"#,
+    );
+}
+
+#[test]
+fn applied_generic_field_store_substitutes_size_witness() {
+    test_support::assert_accepts(
+        r#"genus Capsa<magnitudo N> {
+    vector<f32, N> minima
+}
+
+functio scribe(Capsa<3> capsam, vector<f32, 3> valor) → vector<f32, 3> {
+    varia Capsa<3> c ← capsam
+    c.minima ← valor
+    redde c.minima
+}"#,
+    );
+}

@@ -1381,12 +1381,21 @@ impl TypeChecker<'_> {
                 else {
                     return self.error_type;
                 };
-                let Some((lhs_n, rhs_m)) =
-                    self.glyph_vector_widths(op, lhs_width, rhs_width, lhs.span)
-                else {
-                    return self.error_type;
-                };
-                self.glyph_matrix_type(elem, lhs_n, rhs_m)
+                let (lhs_lit, rhs_lit) = (
+                    crate::literal_vector_width(lhs_width, self.types),
+                    crate::literal_vector_width(rhs_width, self.types),
+                );
+                if let (Some(lhs_n), Some(rhs_m)) = (lhs_lit, rhs_lit) {
+                    return self.glyph_matrix_type(elem, lhs_n, rhs_m);
+                }
+                // S0-G8: glyph-static but parametric widths keep the outer
+                // product symbolic — `vector<f32, N> ⊗ vector<f32, 1>` is
+                // `matrix<f32, [N, 1]>` instead of demanding literals.
+                if let Some(shape) = self.glyph_symbolic_outer_shape(lhs_width, rhs_width) {
+                    return self.types.matrix_with_shape(elem, shape);
+                }
+                self.glyph_invalid_operand(op, GLYPH_STATIC_SHAPE_REQUIRED, lhs.span);
+                self.error_type
             }
             _ => {
                 self.glyph_invalid_operand(op, GLYPH_OPERANDS_UNSUPPORTED, lhs.span);
@@ -1694,6 +1703,27 @@ impl TypeChecker<'_> {
             .types
             .intern_index(IndexExpr::Literal(u64::from(width)));
         self.types.vector_with_width(elem, width)
+    }
+
+    /// Symbolic `⊗` result shape `[lhs, rhs]` when both widths are
+    /// glyph-static terms (literal or param); anything less static stays a
+    /// genuine `glyph_static_shape_required` rejection from the caller.
+    fn glyph_symbolic_outer_shape(
+        &mut self,
+        lhs_width: crate::IndexId,
+        rhs_width: crate::IndexId,
+    ) -> Option<crate::IndexId> {
+        let glyph_static =
+            |expr: &IndexExpr| matches!(expr, IndexExpr::Literal(_) | IndexExpr::Param(_));
+        if !glyph_static(self.types.get_index(lhs_width))
+            || !glyph_static(self.types.get_index(rhs_width))
+        {
+            return None;
+        }
+        Some(
+            self.types
+                .intern_index(IndexExpr::Tuple(vec![lhs_width, rhs_width])),
+        )
     }
 
     /// The two raw dimension terms of a matrix shape, literal or parametric.

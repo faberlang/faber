@@ -39,11 +39,44 @@ impl TypeChecker<'_> {
         span: radix_lexer::Span,
         expected: Option<TypeId>,
     ) -> TypeId {
+        self.check_instantiated_call_impl(sig, explicit_type_args, args, span, expected, true)
+    }
+
+    /// Intrinsic-method argument checking with rigid shape terms.
+    ///
+    /// S0-G8: the intrinsic path builds its signature from the receiver's
+    /// type, so an `IndexExpr::Param` width inside it is the enclosing
+    /// generic body's rigid size param — not a callee shape param this call
+    /// must solve. Solving it trips the D6 unbound-shape rejection
+    /// (SEM014) on every parametric-receiver method call; here the shape
+    /// machinery is skipped and the parametric width stays rigid.
+    pub fn check_rigid_method_call(
+        &mut self,
+        sig: &FuncSig,
+        args: &mut [HirCallArg],
+        span: radix_lexer::Span,
+    ) -> TypeId {
+        self.check_instantiated_call_impl(sig, &[], args, span, None, false)
+    }
+
+    fn check_instantiated_call_impl(
+        &mut self,
+        sig: &FuncSig,
+        explicit_type_args: &[TypeId],
+        args: &mut [HirCallArg],
+        span: radix_lexer::Span,
+        expected: Option<TypeId>,
+        solve_shape_params: bool,
+    ) -> TypeId {
         // Magnitudo shape params are recognized by symbol identity: they lower
         // exclusively into `IndexExpr::Param` positions inside tensor/vector/
         // matrix/sparsa shapes, so the shape-param set is derived from the
         // signature rather than carried as a `FuncSig` field.
-        let shape_symbols = self.collect_shape_param_symbols(sig);
+        let shape_symbols = if solve_shape_params {
+            self.collect_shape_param_symbols(sig)
+        } else {
+            FxHashSet::default()
+        };
         let (sig, inferred_vars, shape_vars) = if explicit_type_args.is_empty() {
             let mut param_vars = FxHashMap::default();
             let mut shape_vars = self.shape_vars_for(sig, &shape_symbols);

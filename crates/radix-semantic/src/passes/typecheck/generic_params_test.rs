@@ -483,3 +483,37 @@ incipit {
         "argument_type_mismatch",
     );
 }
+
+// --- S0-G8: rigid shape params on intrinsic-method calls ---
+
+#[test]
+fn parametric_vector_intrinsic_method_keeps_rigid_width() {
+    // SameAsReceiver methods on a size-generic receiver: the body's rigid
+    // `N` is not a call-site shape param to solve (no SEM014).
+    accepts(
+        r"functio normata<magnitudo N>(vector<f32, N> v) → vector<f32, N> {
+    redde v.normalizata()
+}",
+    );
+}
+
+#[test]
+fn parametric_vector_scalar_multiplica_splats() {
+    // Scalar-operand elementwise multiply: the scalar broadcasts across the
+    // lanes; the result keeps the receiver shape at any width.
+    accepts(
+        r"functio scala<magnitudo N>(vector<f32, N> v, f32 s) → vector<f32, N> {
+    redde v.multiplica(s)
+}",
+    );
+}
+
+#[test]
+fn vector_scalar_multiplica_rejects_foreign_element() {
+    rejects_with_issue(
+        r"functio scala(vector<f32, 3> v, numerus n) → vector<f32, 3> {
+    redde v.multiplica(n)
+}",
+        "argument_type_mismatch",
+    );
+}

@@ -166,6 +166,15 @@ impl TypeChecker<'_> {
         if let Type::Tensor(elem, shape) = resolved_kind {
             return self.check_tensor_bracket_index(elem, shape, idx_ty, object_span, index_span);
         }
+        // S0-G8: vector lane access. A register vector lane is an O(1) scalar
+        // read — `v[i]` yields the element directly (no nullable wrap), at
+        // any width including parametric ones; the index must be integer.
+        if let Type::Vector(elem, _) = resolved_kind {
+            if !self.is_integer(idx_ty) {
+                self.invalid_operand_types(ISSUE_ARRAY_INDEX_MUST_BE_NUMERUS, index_span);
+            }
+            return elem;
+        }
         let kind = match resolved_kind {
             Type::Array(elem) | Type::BoundedArray { element: elem, .. } => {
                 Some((Some(elem), None, None))
@@ -311,11 +320,15 @@ impl TypeChecker<'_> {
                     {
                         return payload_ty;
                     }
+                    // S0-G8: an applied generic nominal projects its field
+                    // types through the application — `Box<3>.minima` is
+                    // `vector<f32, 3>`, not the declared `vector<f32, N>`.
+                    let field_ty = self.applied_field_type(object_ty, struct_def, field.ty);
                     if field.optional {
-                        let optional_ty = self.types.option(field.ty);
+                        let optional_ty = self.types.option(field_ty);
                         return self.project_ref_view(object_ty, optional_ty);
                     }
-                    return self.project_ref_view(object_ty, field.ty);
+                    return self.project_ref_view(object_ty, field_ty);
                 }
             }
             self.undefined_member("unknown_struct_field", span);
@@ -361,6 +374,42 @@ impl TypeChecker<'_> {
             return self.error_type;
         }
         self.error_type
+    }
+
+    /// Substitute an applied generic nominal's arguments into a field type.
+    ///
+    /// S0-G8: `Type::Applied` size arguments bind magnitudo slots exactly as
+    /// construction does (S0-G1) — `Box<3>` fields surface with width 3.
+    /// Non-applied receivers keep the declared field type unchanged.
+    fn applied_field_type(
+        &mut self,
+        object_ty: TypeId,
+        struct_def: DefId,
+        field_ty: TypeId,
+    ) -> TypeId {
+        let resolved = self.resolve_inferred_type(object_ty);
+        let Type::Applied(_, args) = self.types.get(resolved).clone() else {
+            return field_ty;
+        };
+        let Some(params) = self.type_params_by_def.get(&struct_def) else {
+            return field_ty;
+        };
+        let mut vars = FxHashMap::default();
+        let mut shape_vars = FxHashMap::default();
+        for (param, arg) in params.iter().zip(args.iter()) {
+            match arg {
+                radix_types::AppliedArg::Type(witness) => {
+                    vars.insert(*param, *witness);
+                }
+                radix_types::AppliedArg::Size(witness) => {
+                    shape_vars.insert(*param, *witness);
+                }
+            }
+        }
+        if vars.is_empty() && shape_vars.is_empty() {
+            return field_ty;
+        }
+        self.substitute_type_params(field_ty, &mut vars, Some(&mut shape_vars))
     }
 
     /// Field projections of a `ref` genus are `ref` views of referential fields.

@@ -533,3 +533,36 @@ fn glyph_hadamard_distinct_shape_params_reject() {
         "⊙",
     );
 }
+
+// --- S0-G8: size-parametric `⊗` outer product (symbolic shape contract) ---
+
+#[test]
+fn glyph_tensor_product_parametric_width_returns_symbolic_matrix() {
+    accepts(
+        r"functio scala<magnitudo N>(vector<f32, N> v, vector<f32, 1> w) → matrix<f32, [N, 1]> {
+    redde v ⊗ w
+}",
+    );
+}
+
+#[test]
+fn glyph_tensor_product_literal_widths_unchanged() {
+    accepts(
+        r"functio scala(vector<f32, 3> v, vector<f32, 2> w) → matrix<f32, [3, 2]> {
+    redde v ⊗ w
+}",
+    );
+}
+
+#[test]
+fn glyph_hadamard_parametric_width_still_fails_closed() {
+    // Only `⊗` publishes a symbolic shape; same-shape `⊙` keeps the literal
+    // demand so an unsolved parametric width cannot silently pass.
+    rejects_with_issue(
+        r"functio mask<magnitudo N>(vector<f32, N> a, vector<f32, N> b) → vector<f32, N> {
+    redde a ⊙ b
+}",
+        "glyph_static_shape_required",
+        "⊙",
+    );
+}

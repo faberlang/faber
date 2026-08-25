@@ -847,7 +847,7 @@ impl TypeChecker<'_> {
             is_async: false,
             is_generator: false,
         };
-        self.check_instantiated_call(&sig, &[], args, span, None)
+        self.check_rigid_method_call(&sig, args, span)
     }
 
     /// Checks direct call syntax, including enum variant construction.
