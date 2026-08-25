@@ -397,24 +397,26 @@ fn canonical_nominal_identity_key_shape_is_module_qualified() {
     );
 }
 
-// Fail-closed fixture (council-11 correct_before_next_phase): the library
-// exports an enum whose variant payload references a nominal from a module the
-// consumer never imports. The consumer analysis registers the enum shell
-// canonically (Color is identity-bearing, home module util, which the entry
-// imports) but the unresolvable variant drops the export — the entry's Color
-// carries only the resolvable variants (rubrum). The merge must therefore NOT
-// silently keep the library's source-local variant identity: build_variant_remap
-// fails closed on the unresolved variant (`caeruleum`) with an unknown-identity
-// diagnostic. (The nominal-level check in build_nominal_remap does not fire here
-// because Color IS present in the entry's canonical imported-nominal table.)
+// Sibling variant-payload fixture: the library exports an enum whose variant
+// payload references a nominal from a SIBLING module (`other`) the consumer
+// does not import directly. Since MRL-4 (radix 95b96b17d,
+// install_transitive_local_interfaces) the consumer's import contract installs
+// the payload module transitively, so `caeruleum` — and its `other.Weird`
+// payload — resolves in the consumer and the merge succeeds. The positive test
+// pins that CURRENT truth; the library-payload test below proves fail-closed
+// still fires where a payload module stays genuinely foreign to the consumer.
 const NOMINAL_VARIANT_OTHER: &str = "@ public\nclass Weird {\n    int gradus\n}\n";
 const NOMINAL_VARIANT_UTIL: &str = "import from \"./other\" * as otherModule\n\n@ public\nclass Gradus {\n    int gradus\n}\n\n@ public\nunion Color {\n    rubrum,\n    caeruleum { otherModule.Weird gradus }\n}\n\n@ public\nfn primus() → Color {\n    return Color.rubrum\n}\n";
 const NOMINAL_VARIANT_MAIN: &str =
     "import from \"./util\" * as utilModule\n\nmain {\n    print 1\n}\n";
 
+/// (a) Post-MRL-4 truth: the variant-payload sibling module registers in the
+/// consumer transitively, so the payload variant resolves and the merge does
+/// NOT fail closed. The fail-closed diagnostic this fixture used to pin is
+/// unreachable by design since MRL-4 (install_transitive_local_interfaces).
 #[test]
-fn identity_bearing_enum_variant_canonical_miss_fails_closed() {
-    let dir = crate::test_support::test_temp_dir("s1u2-variant-fail-closed");
+fn identity_bearing_enum_variant_sibling_payload_registers_transitively() {
+    let dir = crate::test_support::test_temp_dir("s1u2-variant-transitive");
     let entry = write_three_module_package(
         dir.as_ref(),
         NOMINAL_VARIANT_UTIL,
@@ -423,13 +425,155 @@ fn identity_bearing_enum_variant_canonical_miss_fails_closed() {
     );
     let config = Config::default();
 
+    with_interpreted_lowered_package_mir(
+        &config,
+        &entry,
+        &crate::test_support::test_mir_seams(),
+        |lowered| {
+            let validation = lowered.validated.validation();
+            let two_variant_enums = validation
+                .enum_variants
+                .iter()
+                .filter(|(_, variants)| variants.len() == 2)
+                .count();
+            assert_eq!(
+                two_variant_enums, 1,
+                "the payload variant must survive the remap into the merged program"
+            );
+        },
+    )
+    .expect("the transitively installed payload module must keep the variant resolvable, not fail closed");
+
+    let mut host = BufferHost::default();
+    run_package_mir(
+        &config,
+        &entry,
+        &crate::test_support::test_mir_seams(),
+        &mut host,
+    )
+    .expect("package MIR run");
+    assert_eq!(host.stdout_lines, vec!["1".to_owned()]);
+
+    // The resolver-level facts the drift probe found: the entry analysis
+    // registers the payload module's identity and resolves the payload
+    // variant through `variant_child`.
+    let package = crate::analyze::analyze_package(
+        &config,
+        &entry,
+        &crate::test_support::test_analysis_seams(),
+    )
+    .expect("analyze package");
+    let entry_id = package.entry.expect("package has an entry");
+    let entry_node = package
+        .nodes
+        .get(&entry_id)
+        .expect("entry id is a program node");
+    let resolver = &entry_node.analysis.resolver;
+    let mut interner = entry_node.analysis.interner.clone();
+    let other_identity = radix_module::file_interface::InterfaceLibraryIdentity {
+        provider: "package".to_owned(),
+        package: Some("fhir-nominal-distinct".to_owned()),
+        module_path: vec!["other".to_owned()],
+    };
+    assert!(
+        resolver.canonical_identity_known(&other_identity),
+        "the payload module identity must be known to the consumer analysis"
+    );
+    let util_identity = radix_module::file_interface::InterfaceLibraryIdentity {
+        provider: "package".to_owned(),
+        package: Some("fhir-nominal-distinct".to_owned()),
+        module_path: vec!["util".to_owned()],
+    };
+    let color_def = resolver
+        .imported_nominal_def_id(
+            radix_module::file_interface::InterfaceNominalKind::Enum,
+            Some(&util_identity),
+            interner.intern("Color"),
+        )
+        .expect("the consumer analysis must register the imported Color enum");
+    for variant_name in ["rubrum", "caeruleum"] {
+        assert!(
+            resolver
+                .variant_child(color_def, interner.intern(variant_name))
+                .is_some(),
+            "variant `{variant_name}` must resolve in the consumer analysis"
+        );
+    }
+}
+
+// (b) Remaining fail-closed scenario (the fixture's original intent): the
+// payload nominal's home module stays genuinely foreign to the consumer. The
+// transitive install follows only LOCAL imports of imported modules (MRL-4),
+// never LIBRARY imports — a variant payload naming a library nominal from a
+// module the consumer never imports still drops in phase 2, and the merge
+// fails closed because the enum's own home module (util) IS known to the
+// consumer (council-11 correct_before_next_phase: the unknown variant must
+// not silently retain its source-local identity).
+const NOMINAL_LIBRARY_MOD: &str =
+    "+++\nlocale = \"en\"\n+++\n@ public\nclass Something {\n    int gradus\n}\n";
+const NOMINAL_VARIANT_UTIL_LIBRARY: &str = "import from \"prov:mod\" * as provModule\n\n@ public\nclass Gradus {\n    int gradus\n}\n\n@ public\nunion Color {\n    rubrum,\n    caeruleum { provModule.Something gradus }\n}\n\n@ public\nfn primus() → Color {\n    return Color.rubrum\n}\n";
+const NOMINAL_VARIANT_MAIN_LIBRARY: &str =
+    "import from \"./util\" * as utilModule\n\nmain {\n    print 1\n}\n";
+
+/// Write a two-module package whose `util.fab` variant payload references a
+/// nominal from the lock-backed library `prov:mod`, plus the library module.
+fn write_nominal_library_package(
+    dir: &std::path::Path,
+    util_source: &str,
+    main_source: &str,
+) -> std::path::PathBuf {
+    let src = dir.join("src");
+    let library = dir.join("libhome").join("prov");
+    fs::create_dir_all(&src).expect("create package src");
+    fs::create_dir_all(library.join("src")).expect("create library src");
+    fs::write(
+        dir.join("faber.toml"),
+        r#"
+[package]
+name = "fhir-nominal-libvariant"
+version = "1.0.0"
+edition = "2026"
+
+[paths]
+source = "src"
+entry = "main.fab"
+
+[build]
+kind = "bin"
+
+[dependencies]
+prov = "1.0.0"
+"#,
+    )
+    .expect("write faber.toml");
+    let library_display = library.display();
+    let lock = format!(
+        "[[package]]\nname = \"prov\"\nversion = \"1.0.0\"\nsource = \"path:{library_display}\"\npackage_root = \"{library_display}\"\nkind = \"source\"\ntarget_language = \"\"\ntarget_triple = \"\"\ntarget_manifest = \"\"\ninterface_root = \"{library_display}/src\"\nartifact = \"\"\ncrate = \"\"\nrustc = \"\"\n"
+    );
+    fs::write(dir.join("faber.lock"), lock).expect("write faber.lock");
+    fs::write(library.join("src/mod.fab"), NOMINAL_LIBRARY_MOD).expect("write library module");
+    fs::write(src.join("util.fab"), util_source).expect("write util.fab");
+    fs::write(src.join("main.fab"), main_source).expect("write main.fab");
+    src.join("main.fab")
+}
+
+#[test]
+fn identity_bearing_enum_variant_library_payload_miss_fails_closed() {
+    let dir = crate::test_support::test_temp_dir("s1u2-variant-lib-fail-closed");
+    let entry = write_nominal_library_package(
+        dir.as_ref(),
+        NOMINAL_VARIANT_UTIL_LIBRARY,
+        NOMINAL_VARIANT_MAIN_LIBRARY,
+    );
+    let config = Config::default().with_stdlib(dir.join("libhome"));
+
     let errors = with_interpreted_lowered_package_mir(
         &config,
         &entry,
         &crate::test_support::test_mir_seams(),
         |_| {},
     )
-    .expect_err("identity-bearing enum with a consumer canonical miss must fail closed");
+    .expect_err("a library-payload variant of a known enum must fail closed");
     assert!(
         errors.iter().any(|diag| {
             diag.code == Some("PKG001")
