@@ -204,6 +204,9 @@ mod device_tests;
 #[path = "inference_blocker_matrix_test.rs"]
 mod inference_blocker_matrix_tests;
 #[cfg(test)]
+#[path = "infinity_literal_test.rs"]
+mod infinity_literal_tests;
+#[cfg(test)]
 #[path = "layout_test.rs"]
 mod layout_tests;
 #[cfg(test)]

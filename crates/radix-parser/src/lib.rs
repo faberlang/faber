@@ -1116,6 +1116,10 @@ mod summa_disambiguation_test;
 mod max_min_disambiguation_test;
 
 #[cfg(test)]
+#[path = "infinity_literal_test.rs"]
+mod infinity_literal_test;
+
+#[cfg(test)]
 #[path = "lt_divert_regression_test.rs"]
 mod lt_divert_regression_test;
 

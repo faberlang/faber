@@ -812,6 +812,14 @@ pub static KEYWORD_SPECS: &[KeywordSpec] = &[
         scope: KeywordScope::Contextual(LITERAL),
         category: KeywordKind::Literal,
     },
+    // `nonnumerus` is tokenless so the parser can claim it only in a literal
+    // slot; calls and declaration/member names remain ordinary identifiers.
+    KeywordSpec {
+        text: "nonnumerus",
+        token_kind: None,
+        scope: KeywordScope::Contextual(LITERAL),
+        category: KeywordKind::Literal,
+    },
     // Empty-collection expression marker. Tokenless (lexes as an identifier):
     // the parser claims `vacua` by spelling in its expression slot, so the
     // keyword registry only needs the emit surface for packs. Non-Global

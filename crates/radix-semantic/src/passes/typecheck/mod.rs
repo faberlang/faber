@@ -654,6 +654,10 @@ mod extremum_test;
 mod literal_inference_test;
 
 #[cfg(test)]
+#[path = "infinity_literal_test.rs"]
+mod infinity_literal_test;
+
+#[cfg(test)]
 #[path = "marker_hole_test.rs"]
 mod marker_hole_test;
 

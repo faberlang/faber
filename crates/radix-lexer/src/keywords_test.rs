@@ -11,6 +11,17 @@ use super::{
 };
 use crate::TokenKind;
 
+#[test]
+fn nonnumerus_registry_row_is_tokenless_literal_context() {
+    let spec = lookup_keyword_spec("nonnumerus").expect("nonnumerus should be registered");
+    assert_eq!(spec.category, KeywordKind::Literal);
+    assert!(spec.token_kind.is_none());
+    assert!(matches!(
+        spec.scope,
+        KeywordScope::Contextual(owners) if owners.contains(&KeywordOwner::Literal)
+    ));
+}
+
 // =============================================================================
 // SFR-2 (summa-filum-reduction): `filum` registry pin
 //

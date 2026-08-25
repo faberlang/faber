@@ -310,6 +310,7 @@ impl<'a> Lexer<'a> {
             '⊗' => TokenKind::CircledTimes,
             '⊙' => TokenKind::CircledDot,
             '⊘' => TokenKind::CircledDivide,
+            '∞' => TokenKind::Float(f64::INFINITY),
 
             // Postfix tensor transpose (tensor-glyphs family).
             'ᵀ' => TokenKind::Transpose,

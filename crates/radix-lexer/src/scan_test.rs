@@ -180,6 +180,33 @@ fn keyword_lookup_uses_nfkc_normalized_identifier_text() {
 }
 
 #[test]
+fn infinity_glyph_lexes_as_an_infinite_float() {
+    let result = lex("∞ -∞");
+    assert!(result.errors.is_empty(), "errors: {:?}", result.errors);
+    assert!(
+        matches!(result.tokens[0].kind, TokenKind::Float(value) if value.is_infinite() && value.is_sign_positive())
+    );
+    assert_eq!(result.tokens[1].kind, TokenKind::Minus);
+    assert!(
+        matches!(result.tokens[2].kind, TokenKind::Float(value) if value.is_infinite() && value.is_sign_positive())
+    );
+}
+
+#[test]
+fn nonnumerus_is_a_tokenless_literal_registry_row() {
+    let spec = lookup_keyword_spec("nonnumerus").expect("nonnumerus should be registered");
+    assert!(spec.token_kind.is_none());
+    assert!(
+        matches!(spec.scope, KeywordScope::Contextual(owners) if owners.contains(&crate::KeywordOwner::Literal))
+    );
+
+    let result = lex("nonnumerus");
+    assert!(result.errors.is_empty(), "errors: {:?}", result.errors);
+    assert!(matches!(result.tokens[0].kind, TokenKind::Ident(_)));
+    assert!(!result.reader_keyword_latin_keys.contains_key("nonnumerus"));
+}
+
+#[test]
 fn allocator_kind_names_are_not_keywords() {
     assert!(lookup_keyword_spec("arena").is_none());
     assert!(lookup_keyword_spec("page").is_none());

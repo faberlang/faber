@@ -1664,6 +1664,13 @@ impl Parser {
                     });
                 }
                 let ident = self.parse_primary_ident()?;
+                // Locale-aware `nonnumerus` claim: NaN is a literal only in
+                // the primary literal slot. A following `(` keeps the
+                // spelling available for ordinary `nan(...)` calls.
+                if self.keyword_claim_key(ident.name) == Some("nonnumerus")
+                    && self.peek().kind != TokenKind::LParen
+                {
+                    ExprKind::Literal(Literal::Float(f64::NAN))
                 // Locale-aware `vacua` claim: the empty-collection marker
                 // claims only through the pack-authoritative surface gate.
                 // Under `la`/no-pack the registry-direct fallback lets the
@@ -1671,7 +1678,7 @@ impl Parser {
                 // the lexer recorded a latin key for (the pack's own `vacua`
                 // row) claims — an undeclared Latin `vacua` stays an ordinary
                 // identifier.
-                if self.keyword_claim_key(ident.name) == Some("vacua") {
+                } else if self.keyword_claim_key(ident.name) == Some("vacua") {
                     ExprKind::Vacua(ident)
                 } else if self.is_ratio_constructor_surface(ident.name)
                     && self.check(&TokenKind::LtAscii)
