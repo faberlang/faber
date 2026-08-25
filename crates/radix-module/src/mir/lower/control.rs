@@ -63,6 +63,11 @@ enum CollectionIteraKind {
     // into N+1 guard-free unrolled arms; the literal capacity is carried so
     // the split stays base-lane MIR (never AIR).
     BoundedArray(TypeId, i64),
+    // Text iteration: `for from s const c` over `textus` rides
+    // the generic index loop — the bound is `Collection(Length)` (characters)
+    // and the element read is the scalar `s[i]` projection, whose runner
+    // carrier is the one-byte ascii lane.
+    Textus,
     Unsupported,
 }
 
@@ -1622,6 +1627,18 @@ impl FunctionBuilder<'_> {
                     }
                 }
                 Type::Array(item) => CollectionIteraKind::Array(*item),
+                // Text value iteration: only `ex` admits it,
+                // mirroring the queue/stack value-surface rule. The loop-local
+                // binding carries the checker's element row for textus
+                // iteration (the `numerus` fallback in typecheck/expr.rs), so
+                // green bodies convert through `c ↦ textus` exactly as
+                // checked — the gradus `_numeric` shape. At runtime the
+                // projection yields the one-byte ascii carrier, and
+                // value-directed conversion/equality join it with one-char
+                // textus per the documented scalar-index contract.
+                Type::Primitive(Primitive::Textus) if matches!(iter.mode, HirIteraMode::Ex) => {
+                    CollectionIteraKind::Textus
+                }
                 // Queue and stack share the array-backed carrier but not its
                 // access order. Only `ex` admits the value iteration surface;
                 // `de`/`ab` stay unsupported rather than inventing an index law.
@@ -1738,6 +1755,10 @@ impl FunctionBuilder<'_> {
                 (collection, MirType::semantic(*elem), false)
             }
             CollectionIteraKind::BoundedArray(elem, _) => (collection, MirType::semantic(*elem), false),
+            // The textus loop-local binding mirrors the checker's element row
+            // (numerus fallback); the element operand itself is the scalar
+            // `s[i]` projection read below.
+            CollectionIteraKind::Textus => (collection, numerus, false),
             CollectionIteraKind::Shaped { .. } => {
                 unreachable!("shaped collection itera returns through nested lowering above")
             }

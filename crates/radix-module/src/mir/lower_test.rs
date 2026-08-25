@@ -1804,6 +1804,105 @@ fn borrowed_pointee_outside_carrier_arms_keeps_fail_closed_decline() {
 }
 
 #[test]
+fn textus_itera_ex_lowers_to_index_loop_with_runtime_length() {
+    let dump = dump_source(
+        r#"functio numerumSeptem(textus s) → numerus {
+  varia numerus count ← 0
+  itera ex s fixum c {
+    fixum textus t ← c ↦ textus
+    si t ≡ "7" {
+      count ← count + 1
+    }
+  }
+  redde count
+}"#,
+    );
+    assert!(
+        !dump.contains("itera collection before iterator MIR lowering"),
+        "itera ex over textus must lower: {dump}"
+    );
+    assert!(
+        dump.contains("runtime collection length"),
+        "the textus loop bound is the runtime character length: {dump}"
+    );
+    assert!(dump.contains("branch "), "the textus loop must produce loop CFG: {dump}");
+}
+
+#[test]
+fn textus_itera_ex_runs_char_inspection_through_runner() {
+    // Run-row law for need: `itera ex` over textus executes through
+    // the MIR runner, yielding one character per iteration (the gradus
+    // `_numeric` shape — convert-assign the lane binding and inspect it).
+    let source = r#"functio numerumSeptem(textus s) → numerus {
+  varia numerus count ← 0
+  itera ex s fixum c {
+    fixum textus t ← c ↦ textus
+    si t ≡ "7" {
+      count ← count + 1
+    }
+  }
+  redde count
+}
+
+incipit {
+  nota numerumSeptem("707")
+  nota numerumSeptem("000")
+  nota numerumSeptem("")
+}"#;
+    let mut host = crate::mir::BufferHost::default();
+    crate::mir::run_source(
+        &Session::new(Config::default().with_target(Target::HirTypeScript)),
+        "textus-itera.fab",
+        source,
+        &mut host,
+    )
+    .unwrap_or_else(|error| panic!("textus itera ex must run: {error:?}"));
+    assert_eq!(host.stdout_lines, ["2", "0", "0"]);
+}
+
+#[test]
+fn textus_itera_de_and_scalar_receivers_keep_fail_closed_decline() {
+    // Only `ex` admits text value iteration (`de` would invent an index law);
+    // non-iterable scalars keep the generic decline fail-closed.
+    let de_case = r"functio indices(textus s) → numerus {
+  itera de s fixum i {
+    nota i
+  }
+  redde 0
+}";
+    let mut unit = analyze(de_case);
+    let errors = lower_analyzed_unit(&mut unit, Default::default())
+        .expect_err("itera de over textus stays outside the ex-only admission")
+        .into_iter()
+        .map(|error| error.message)
+        .collect::<Vec<_>>();
+    assert!(
+        errors
+            .iter()
+            .any(|message| message.contains("itera collection before iterator MIR lowering")),
+        "itera de over textus must keep the decline: {errors:?}"
+    );
+
+    let scalar_case = r"functio overScalar(numerus n) → vacuum {
+  itera ex n fixum x {
+    nota x
+  }
+}";
+    let mut unit = analyze(scalar_case);
+    let errors = lower_analyzed_unit(&mut unit, Default::default())
+        .expect_err("scalar itera ex keeps the fail-closed decline")
+        .into_iter()
+        .map(|error| error.message)
+        .collect::<Vec<_>>();
+    assert!(
+        errors
+            .iter()
+            .any(|message| message.contains("itera collection before iterator MIR lowering")),
+        "non-iterable scalar must keep the decline: {errors:?}"
+    );
+}
+
+#[test]
 fn tensor_itera_ex_rank1_lowers_to_literal_bound_index_loop() {
     let source = r"functio sumTensor(tensor<numerus, [8]> t) → numerus {
   varia numerus total ← 0
