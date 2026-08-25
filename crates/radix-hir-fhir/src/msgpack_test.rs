@@ -86,7 +86,7 @@ fn stub_artifact_round_trips_through_msgpack() {
 
 #[test]
 fn selective_import_round_trips_through_msgpack() {
-    let original = crate::artifact::tests::selective_import_artifact();
+    let original = crate::test_support::selective_import_artifact();
     let bytes = encode_msgpack(&original).expect("msgpack-encode selective HirArtifact");
     let decoded = decode_msgpack(&bytes).expect("msgpack-decode selective HirArtifact");
     assert_eq!(original, decoded);
@@ -106,7 +106,7 @@ fn selective_import_round_trips_through_msgpack() {
 
 #[test]
 fn selective_import_msgpack_decode_passes_referential_integrity() {
-    let artifact = crate::artifact::tests::selective_import_artifact();
+    let artifact = crate::test_support::selective_import_artifact();
     let bytes = encode_msgpack(&artifact).expect("encode");
     let decoded = decode_msgpack(&bytes).expect("selective artifact must validate");
     let radix_hir::HirItemKind::Import(import) = &decoded.hir.items[1].kind else {
@@ -117,7 +117,7 @@ fn selective_import_msgpack_decode_passes_referential_integrity() {
 
 #[test]
 fn transfer_round_trips_through_msgpack() {
-    let original = crate::artifact::tests::transfer_artifact();
+    let original = crate::test_support::transfer_artifact();
     let bytes = encode_msgpack(&original).expect("msgpack-encode transfer HirArtifact");
     let decoded = decode_msgpack(&bytes).expect("msgpack-decode transfer HirArtifact");
     assert_eq!(original, decoded);
@@ -144,7 +144,7 @@ fn transfer_round_trips_through_msgpack() {
 
 #[test]
 fn transfer_msgpack_decode_passes_referential_integrity() {
-    let artifact = crate::artifact::tests::transfer_artifact();
+    let artifact = crate::test_support::transfer_artifact();
     let bytes = encode_msgpack(&artifact).expect("encode");
     let decoded = decode_msgpack(&bytes).expect("transfer artifact must validate");
     let radix_hir::HirItemKind::Function(function) = &decoded.hir.items[0].kind else {
@@ -216,7 +216,7 @@ fn enums_encode_as_tag_maps() {
     );
 
     // Struct variant (Transfer): payload fields inlined next to "tag".
-    let transfer = crate::artifact::tests::transfer_artifact();
+    let transfer = crate::test_support::transfer_artifact();
     let value = parse(&encode_msgpack(&transfer).expect("encode"));
     let expr = get(&value, &["hir", "items"])
         .and_then(|v| match v {
@@ -293,8 +293,8 @@ fn no_width_or_dtype_fact_rides_a_float_opcode() {
     // dtype/shape facts are uint/int values under named keys.
     let fixtures = [
         stub_artifact(),
-        crate::artifact::tests::selective_import_artifact(),
-        crate::artifact::tests::transfer_artifact(),
+        crate::test_support::selective_import_artifact(),
+        crate::test_support::transfer_artifact(),
     ];
     for artifact in &fixtures {
         let value = parse(&encode_msgpack(artifact).expect("encode"));
@@ -525,7 +525,7 @@ fn multi_module_package() -> FhirPackage {
     let mut aux = pkg_module(
         "src/aux.fab",
         false,
-        &crate::artifact::tests::selective_import_artifact(),
+        &crate::test_support::selective_import_artifact(),
     );
     aux.library_imports = vec![LibraryImportWire {
         binding: "norma".to_owned(),
@@ -535,7 +535,7 @@ fn multi_module_package() -> FhirPackage {
     let mut math = pkg_module(
         "src/lib/math.fab",
         false,
-        &crate::artifact::tests::transfer_artifact(),
+        &crate::test_support::transfer_artifact(),
     );
     math.export_names = vec!["add".to_owned(), "sub".to_owned()];
     let mut main = pkg_module("src/main.fab", true, &stub_artifact());

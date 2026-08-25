@@ -87,3 +87,101 @@ pub(crate) fn stub_artifact() -> HirArtifact {
         gpu_builtins: Vec::new(),
     }
 }
+
+/// Artifact whose HIR carries one selective import (`importa ex "…" fixum …`).
+///
+/// The `HirImport.selective` marker is additive with `#[serde(default)]`
+/// (EOT-2M), so the wire carries it without a schema ratchet: v4 artifacts
+/// written before the field decode with `selective == false` (legacy
+/// namespace shape) and v4 artifacts written after carry it explicitly.
+pub(crate) fn selective_import_artifact() -> HirArtifact {
+    use radix_hir::HirImportItem;
+    use radix_types::USER_DEF_ID_BASE;
+
+    let mut artifact = stub_artifact();
+    artifact.interner = vec![
+        "main".to_string(),
+        "test".to_string(),
+        "norma:consolum".to_string(),
+        "dic".to_string(),
+        "output".to_string(),
+        "funde".to_string(),
+    ];
+    let import = radix_hir::HirImport {
+        path: Symbol(2),
+        visibility: radix_syntax::Visibility::Privata,
+        items: vec![
+            HirImportItem {
+                def_id: DefId(USER_DEF_ID_BASE + 40),
+                name: Symbol(3),
+                alias: Some(Symbol(4)),
+            },
+            HirImportItem {
+                def_id: DefId(USER_DEF_ID_BASE + 41),
+                name: Symbol(5),
+                alias: None,
+            },
+        ],
+        selective: true,
+    };
+    artifact.hir.items.push(radix_hir::HirItem {
+        id: HirId(1),
+        def_id: DefId(USER_DEF_ID_BASE + 42),
+        kind: radix_hir::HirItemKind::Import(import),
+        span: Span::default(),
+    });
+    artifact
+}
+
+/// Artifact whose HIR carries one `⇇` transfer statement in the function body.
+pub(crate) fn transfer_artifact() -> HirArtifact {
+    use radix_hir::{HirBlock, HirStatement, HirStatementKind};
+
+    let mut artifact = stub_artifact();
+    artifact.interner = vec!["main".to_string(), "test".to_string(), "funde".to_string()];
+    let transfer = radix_hir::HirExpression {
+        id: HirId(7),
+        ty: None,
+        kind: radix_hir::HirExpressionKind::Transfer {
+            sink: Box::new(radix_hir::HirExpression {
+                id: HirId(8),
+                ty: None,
+                kind: radix_hir::HirExpressionKind::Path(DefId(0)),
+                span: Span::default(),
+            }),
+            payloads: vec![
+                radix_hir::HirExpression {
+                    id: HirId(9),
+                    ty: None,
+                    kind: radix_hir::HirExpressionKind::Literal(radix_hir::HirLiteral::String(
+                        Symbol(2),
+                    )),
+                    span: Span::default(),
+                },
+                radix_hir::HirExpression {
+                    id: HirId(10),
+                    ty: None,
+                    kind: radix_hir::HirExpressionKind::Literal(radix_hir::HirLiteral::String(
+                        Symbol(2),
+                    )),
+                    span: Span::default(),
+                },
+            ],
+        },
+        span: Span::default(),
+    };
+    let radix_hir::HirItemKind::Function(function) = &mut artifact.hir.items[0].kind else {
+        panic!("stub artifact must carry a function item");
+    };
+    function.body = Some(HirBlock {
+        statements: vec![HirStatement {
+            id: HirId(11),
+            kind: HirStatementKind::Expr(transfer),
+            span: Span::default(),
+        }],
+        expr: None,
+        span: Span::default(),
+        ..Default::default()
+    });
+    artifact
+}
