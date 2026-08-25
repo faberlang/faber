@@ -13,8 +13,10 @@
 //!
 //! Direction 3 (AIR/device allowlist → owner): every AIR-lane tensor method
 //! name is registry-backed with a green MIR probe, on the permanent AIR-lane
-//! class list (a design fact, not a worklist), or on the ratchet. Pins the
-//! `mappata`/`filtrata` unarmed-admission residual.
+//! class list (a design fact, not a worklist), or on the ratchet. The
+//! candidate universe derives structurally from radix-semantic's admission
+//! sets — no hand-assembled mirror. Pins the `mappata`/`filtrata`
+//! unarmed-admission residual.
 //!
 //! The ratchet allowlist plus the permanent AIR-lane class list MUST equal the
 //! probe-derived gap set (set equality, both directions): a new gap turns red
@@ -25,8 +27,7 @@
 
 use crate::driver::{analyze_source, AnalyzeRequest, Config, Session};
 use crate::intrinsics::{
-    lookup_method, mir_collection_op, IntrinsicMirKind, IntrinsicParamKind, IntrinsicReceiver,
-    IntrinsicReturnKind, INTRINSICS,
+    lookup_method, mir_collection_op, IntrinsicParamKind, IntrinsicReceiver, IntrinsicReturnKind, INTRINSICS,
 };
 use radix_types::MirCollectionOp;
 use std::collections::BTreeSet;
@@ -82,7 +83,16 @@ fn dtypes_for(receiver: IntrinsicReceiver) -> Vec<Dtype> {
     match receiver {
         IntrinsicReceiver::Lista => lista_dtypes(),
         IntrinsicReceiver::Numeric => numeric_dtypes(),
-        IntrinsicReceiver::Fractus => vec![dtype("fractus", "fractus", "varia fractus r ← 1.5", "", "", "1.5", "fractus", "0")],
+        IntrinsicReceiver::Fractus => vec![dtype(
+            "fractus",
+            "fractus",
+            "varia fractus r ← 1.5",
+            "",
+            "",
+            "1.5",
+            "fractus",
+            "0",
+        )],
         IntrinsicReceiver::Tabula => vec![dtype(
             "textus→numerus",
             "tabula<textus, numerus>",
@@ -270,10 +280,7 @@ fn row_override(key: &str, dtype: &Dtype) -> Option<(Option<String>, Vec<String>
         "Tensor.crea/2" => (None, vec![el.clone(), "[3]".into()]),
         // Row gather selects rows of a `[rows, D]` table by bare integer ids.
         "Tensor.gather/1" => (Some(format!("{sugar}[4, 3] r")), vec!["ids".into()]),
-        "Tensor.matmul/1" => (
-            Some(format!("{sugar}[2, 3] r, {sugar}[3, 2] p")),
-            vec!["p".into()],
-        ),
+        "Tensor.matmul/1" => (Some(format!("{sugar}[2, 3] r, {sugar}[3, 2] p")), vec!["p".into()]),
         "Tensor.rms_norm/3" => (None, vec!["0".into(), el.clone(), "r".into()]),
         "Tensor.rope_norm/2" => (None, vec!["0".into(), "0".into()]),
         "Tensor.laminatio/2" => (None, vec!["0".into(), el.clone()]),
@@ -281,10 +288,7 @@ fn row_override(key: &str, dtype: &Dtype) -> Option<(Option<String>, Vec<String>
         "Tensor.laminatio/4" => (None, vec!["0".into(), el.clone(), "r".into(), "r".into()]),
         "Tensor.crux_entropia/1" => (None, vec!["r".into()]),
         // Matrix-vector application takes a conformable vector operand.
-        "Matrix.applica/1" => (
-            Some("matrix<fractus, [2, 2]> r, vf32[2] v".to_string()),
-            vec!["v".into()],
-        ),
+        "Matrix.applica/1" => (Some("matrix<fractus, [2, 2]> r, vf32[2] v".to_string()), vec!["v".into()]),
         // Same-width swizzle mask (width 3 receiver).
         "Vector.swizzle/1" => (None, vec!["\"xyz\"".into()]),
         "Tensor.pone/2" | "Sparsa.pone/2" => (None, vec![idx, el]),
@@ -307,7 +311,11 @@ fn arg_expr(kind: IntrinsicParamKind, dtype: &Dtype, receiver_expr: &str) -> Str
             format!("({} collectus, {} x) ∴ collectus + x", dtype.el_ty, dtype.el_ty)
         }
         IntrinsicParamKind::Accumulator => {
-            if dtype.el_ty == "fractus" { "0.0".into() } else { "0".into() }
+            if dtype.el_ty == "fractus" {
+                "0.0".into()
+            } else {
+                "0".into()
+            }
         }
         IntrinsicParamKind::NumerusArray => dtype.idx.to_string(),
         IntrinsicParamKind::ElementArray => "flat".into(),
@@ -323,8 +331,7 @@ fn row_key(row: &crate::intrinsics::MethodIntrinsic) -> String {
 fn probe_source(row: &crate::intrinsics::MethodIntrinsic, dtype: &Dtype, mutable: bool) -> String {
     let key = row_key(row);
     let sugar = dtype.name;
-    let (param_override, override_args) =
-        row_override(&key, dtype).map_or((None, Vec::new()), |(p, a)| (p, a));
+    let (param_override, override_args) = row_override(&key, dtype).map_or((None, Vec::new()), |(p, a)| (p, a));
     let (mut param, locals) = if let Some(param) = param_override {
         (param, dtype.locals.clone())
     } else if dtype.param.is_empty() {
@@ -343,7 +350,10 @@ fn probe_source(row: &crate::intrinsics::MethodIntrinsic, dtype: &Dtype, mutable
         param = dtype.extra_param.clone();
     }
     let args = if override_args.is_empty() {
-        row.params.iter().map(|p| arg_expr(*p, dtype, "r")).collect()
+        row.params
+            .iter()
+            .map(|p| arg_expr(*p, dtype, "r"))
+            .collect()
     } else {
         override_args
     };
@@ -412,9 +422,7 @@ fn probe(source: &str, session: &Session) -> ProbeOutcome {
                 lower.contains("method")
                     || lower.contains("intrinsic")
                     || d.args.iter().any(|a| {
-                        a.value.contains("method")
-                            || a.value.contains("intrinsic")
-                            || a.value.contains("bitwise")
+                        a.value.contains("method") || a.value.contains("intrinsic") || a.value.contains("bitwise")
                     })
             });
             if mentions_method {
@@ -427,7 +435,11 @@ fn probe(source: &str, session: &Session) -> ProbeOutcome {
     match crate::mir::lower_analyzed_unit(&mut analysis, Default::default()) {
         Ok(_) => ProbeOutcome::Lowered,
         Err(errors) => {
-            let joined = errors.iter().map(|e| e.message.clone()).collect::<Vec<_>>().join("; ");
+            let joined = errors
+                .iter()
+                .map(|e| e.message.clone())
+                .collect::<Vec<_>>()
+                .join("; ");
             if joined.contains("method call") {
                 // Both fallthrough shapes: the dispatch-chain miss
                 // ("method call before runtime/provider MIR lowering") and the
@@ -561,7 +573,10 @@ fn probe_registry_gaps(session: &Session) -> BTreeSet<String> {
                 .flat_map(|d| [probe_source(row, d, false), probe_source(row, d, true)])
                 .collect::<Vec<_>>()
                 .join("\n---\n");
-            panic!("row {} never admitted on any swept dtype — classify it:\n{sources}", row_key(row));
+            panic!(
+                "row {} never admitted on any swept dtype — classify it:\n{sources}",
+                row_key(row)
+            );
         }
     }
     // Every registry row is either owner-resolved or a gap — no row may
@@ -576,57 +591,17 @@ fn probe_registry_gaps(session: &Session) -> BTreeSet<String> {
 
 #[cfg(feature = "device")]
 fn probe_air_gaps(registry_gaps: &BTreeSet<String>) -> BTreeSet<String> {
-    // Candidate AIR-lane tensor method vocabulary: the public TENSOR_* name
-    // constants plus the higher-order registry names (`reducta`/`cumulata`/
-    // `mappata`/`filtrata`) and `silu`. This is a superset of the semantic
-    // admission sets (`is_allowed_tensor_intrinsic` ∪ `is_allowed_device_method`
-    // are private to radix-semantic; every name they admit is an AirTensorOp
-    // arm, a dedicated AIR dispatch, or one of these higher-order rows).
-    let mut candidates: BTreeSet<&'static str> = BTreeSet::new();
-    for name in [
-        crate::air::TENSOR_ADDITA,
-        crate::air::TENSOR_ADDITA_BIAS,
-        crate::air::TENSOR_SUBTRAHE,
-        crate::air::TENSOR_MULTIPLICA,
-        crate::air::TENSOR_DIVISIO,
-        crate::air::TENSOR_NEGA,
-        crate::air::TENSOR_SUMMA,
-        crate::air::TENSOR_MEDIA,
-        crate::air::TENSOR_MAXIMA,
-        crate::air::TENSOR_MINIMA,
-        crate::air::TENSOR_MATMUL,
-        crate::air::TENSOR_TRANSPONE,
-        crate::air::TENSOR_REPLE,
-        crate::air::TENSOR_FORMA,
-        crate::air::TENSOR_EXPONENTIA,
-        crate::air::TENSOR_LOGARITHMUS,
-        crate::air::TENSOR_ACTIVATIO_RELU,
-        crate::air::TENSOR_RADIX,
-        crate::air::TENSOR_GELU,
-        crate::air::TENSOR_TANGENS_HYPERBOLICUS,
-        crate::air::TENSOR_ACTIVATIO_SOFTMAX,
-        crate::air::TENSOR_LAMINATIO,
-        crate::air::TENSOR_SUMMA_AXIS,
-        crate::air::TENSOR_CRUX_ENTROPIA,
-        crate::air::TENSOR_RMS_NORM,
-        crate::air::TENSOR_ROPE_NORM,
-        crate::air::TENSOR_GATHER,
-        crate::air::TENSOR_CUMULATA,
-        "silu",
-    ] {
-        candidates.insert(name);
-    }
-    for row in INTRINSICS {
-        if matches!(
-            row.mir_kind,
-            IntrinsicMirKind::HigherOrderFiltrata
-                | IntrinsicMirKind::HigherOrderMap
-                | IntrinsicMirKind::HigherOrderReduce
-                | IntrinsicMirKind::HigherOrderCumulata
-        ) {
-            candidates.insert(row.faber_name);
-        }
-    }
+    // Candidate AIR-lane tensor method vocabulary: the radix-semantic
+    // admission row sets (`is_allowed_tensor_intrinsic` ∪
+    // `is_allowed_device_method`), derived structurally through their
+    // `#[doc(hidden)]` accessors. No hand-assembled mirror: allowlist growth
+    // in radix-semantic flows straight into direction 3 and must be
+    // consciously allowlisted or registry-backed.
+    let mut candidates: BTreeSet<&str> = BTreeSet::new();
+    candidates.extend(radix_semantic::passes::air_tensor_intrinsics::allowed_tensor_intrinsics());
+    candidates.extend(
+        radix_semantic::passes::fragment_definition::allowed_device_methods(),
+    );
     let mut gaps = BTreeSet::new();
     for name in candidates {
         // Armed := a registry Tensor row for the name whose direction-1 probe
@@ -835,8 +810,7 @@ fn every_mir_collection_op_variant_is_reachable_or_permanently_allowed() {
     }
 
     for op in &all {
-        let reachable =
-            registry_ops.contains(op) || permanent.contains(op) || air_statement_path.contains(op);
+        let reachable = registry_ops.contains(op) || permanent.contains(op) || air_statement_path.contains(op);
         assert!(
             reachable,
             "MirCollectionOp::{op:?} has no admission path (not registry-reachable, not AIR statement-path, not permanent)"

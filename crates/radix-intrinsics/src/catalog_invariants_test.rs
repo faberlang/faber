@@ -99,9 +99,15 @@ fn receivers_for_type_maps_semantic_families() {
     let bounded_queue = Type::BoundedQueue { element, capacity };
     let bounded_stack = Type::BoundedStack { element, capacity };
     assert_eq!(receivers_for_type(&queue), &[IntrinsicReceiver::Queue]);
-    assert_eq!(receivers_for_type(&bounded_queue), &[IntrinsicReceiver::Queue]);
+    assert_eq!(
+        receivers_for_type(&bounded_queue),
+        &[IntrinsicReceiver::Queue]
+    );
     assert_eq!(receivers_for_type(&stack), &[IntrinsicReceiver::Stack]);
-    assert_eq!(receivers_for_type(&bounded_stack), &[IntrinsicReceiver::Stack]);
+    assert_eq!(
+        receivers_for_type(&bounded_stack),
+        &[IntrinsicReceiver::Stack]
+    );
     assert!(receivers_for_type(&Type::Error).is_empty());
 }
 
@@ -131,7 +137,10 @@ fn queue_and_stack_methods_share_core_collection_walkers() {
         assert_eq!(mir_collection_op(pop_entry), Some(pop_op));
         let length_entry = lookup_method(receiver, "longitudo", 0).expect("queue/stack length row");
         assert_eq!(length_entry.return_kind, IntrinsicReturnKind::Numerus);
-        assert_eq!(mir_collection_op(length_entry), Some(MirCollectionOp::Length));
+        assert_eq!(
+            mir_collection_op(length_entry),
+            Some(MirCollectionOp::Length)
+        );
     }
 }
 
@@ -234,16 +243,24 @@ fn ratchet_registry_rows_are_codegen_only_and_unclassified() {
         (IntrinsicReceiver::Numeric, "complementata", 0, "MC2"),
         (IntrinsicReceiver::Vector, "crea", 0, "MC3"),
     ] {
-        let entry = lookup_method(receiver, name, arity)
-            .unwrap_or_else(|| panic!("ratchet row {name}/0 must stay in the registry until {unit} lands"));
+        let entry = lookup_method(receiver, name, arity).unwrap_or_else(|| {
+            panic!("ratchet row {name}/0 must stay in the registry until {unit} lands")
+        });
         assert_eq!(
             entry.mir_kind,
             IntrinsicMirKind::CodegenOnly,
             "{name}/0 must stay CodegenOnly until {unit} arms it"
         );
-        assert_eq!(mir_collection_op(entry), None, "{name}/0 has no collection op");
+        assert_eq!(
+            mir_collection_op(entry),
+            None,
+            "{name}/0 has no collection op"
+        );
         assert_eq!(mir_atomic_op(entry), None, "{name}/0 has no atomic op");
-        assert!(!mir_is_higher_order_lista(entry), "{name}/0 is not higher-order");
+        assert!(
+            !mir_is_higher_order_lista(entry),
+            "{name}/0 is not higher-order"
+        );
     }
 }
 

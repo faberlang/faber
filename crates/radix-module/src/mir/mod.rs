@@ -217,14 +217,11 @@ mod layout_tests;
 #[path = "nodes_test.rs"]
 mod nodes_tests;
 #[cfg(test)]
-#[path = "potentia_test.rs"]
-mod potentia_tests;
-#[cfg(test)]
 #[path = "numeric_unary_test.rs"]
 mod numeric_unary_tests;
 #[cfg(test)]
-#[path = "vector_crea_test.rs"]
-mod vector_crea_tests;
+#[path = "potentia_test.rs"]
+mod potentia_tests;
 #[cfg(test)]
 #[path = "rank2_reduction_readiness_test.rs"]
 mod rank2_reduction_readiness_tests;
@@ -249,6 +246,9 @@ mod ty_tests;
 #[cfg(test)]
 #[path = "unsigned_integer_test.rs"]
 mod unsigned_integer_tests;
+#[cfg(test)]
+#[path = "vector_crea_test.rs"]
+mod vector_crea_tests;
 
 #[cfg(test)]
 #[allow(unused_imports)]
