@@ -1745,3 +1745,13 @@ fn kernel_admission_rejects_sparse_storage_by_name() {
         assert_eq!(err.issue, "mir_kernel_sparse_storage_unsupported");
     }
 }
+
+#[test]
+fn kernel_admission_adds_rank_three_without_opening_rank_four() {
+    let rank3 = crate::MirDeviceViewLayout::device_handle_row_major(crate::MirScalarLayout::F32, 3);
+    require_kernel_device_view(rank3, false).expect("contiguous rank-3 device view is admitted");
+
+    let rank4 = crate::MirDeviceViewLayout::device_handle_row_major(crate::MirScalarLayout::F32, 4);
+    let error = require_kernel_device_view(rank4, false).expect_err("rank 4 stays fail-closed");
+    assert_eq!(error.message, "kernel device view rank 4");
+}

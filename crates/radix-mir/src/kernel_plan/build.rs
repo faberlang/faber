@@ -17,7 +17,7 @@ use super::validate::{
 use crate::abi::{CollectionOpContract, MirKernelSignature};
 use crate::{
     MirCollectionOp, MirConstant, MirFunction, MirKernelResourceAccess, MirKernelResourceRole,
-    MirLocalId, MirOperand, MirParam, MirPlaceBase, MirRuntimeCall, MirScalarLayout,
+    MirLocalId, MirOperand, MirParam, MirParamMode, MirPlaceBase, MirRuntimeCall, MirScalarLayout,
     MirStatementKind, MirValidationContext, MirValueKind, MirWorkgroupSize,
 };
 use radix_types::Type;
@@ -505,8 +505,10 @@ impl CollectionKernelPlan {
                 // (the last-axis extent; elements beyond `dim` are
                 // preserved unrotated). Per-position mode (the GI3-1
                 // contract amendment) is carried by the cos/sin table
-                // operand shapes — rank-2 `[rows, dim/2]` tables rotate
-                // every row at its own position. `TensorRopeHalf` selects
+                // operand shapes — the GEA2 route uses one interleaved
+                // `[rows, dim/2, 3]` table, while legacy rank-2
+                // `[rows, dim/2]` pairs rotate every row at its own
+                // position. `TensorRopeHalf` selects
                 // Qwen/NeoX rotate_half pairing; `TensorRope` stays llama
                 // consecutive-pair.
                 let (dims, axis) = transformer_recipe_shape(function, validation, op)?;
@@ -1063,43 +1065,84 @@ fn rope_plan_facts(
     if dim > width {
         return None;
     }
-    // Per-position mode is a typed fact of the kernel's table operands: the
-    // cos/sin tables are the two tensor params beyond the x operand and the
-    // statement destination. Rank-2 `[rows, dim/2]` tables select per-row
-    // rotation; rank-1 `[dim/2]` tables are the single-position mode.
+    // Per-position mode is a typed fact of the kernel's table operands. The
+    // current GEA2 route carries ONE frozen rank-3 `[rows, dim/2, 3]`
+    // interleaved table; its component 0 is the host-owned angle and the
+    // device reads cos/sin from components 1/2. Preserve the earlier
+    // rank-1/rank-2 two-table form for existing callers.
     let x_local = crate::read_analysis::operand_local(args.first()?)?;
-    let destination = rope_destination_local(function, op)?;
+    let destination = rope_destination_base(function, op)?;
+    // Source-level `mut` output params can be distinct from the runtime-call
+    // destination local after lowering. Exclude both identities so the
+    // canonical one-table route sees exactly the table resource.
+    let output_param = function
+        .params
+        .iter()
+        .find(|param| param.mode == MirParamMode::MutRef)
+        .map(|param| param.local);
     let tables: Vec<&MirParam> = function
         .params
         .iter()
         .filter(|param| {
             param.local != x_local
-                && param.local != destination
+                && !matches!(destination, MirPlaceBase::Local(local) if local == param.local)
+                && Some(param.local) != output_param
                 && crate::local_ty::local_ty(function, param.local).is_some_and(|ty| {
                     matches!(validation.types.get(ty.semantic_id()), Type::Tensor(..))
                 })
         })
         .collect();
-    let (per_row, rows) = if tables.len() == 2 {
-        let first_dims = crate::tensor_type::tensor_literal_dims(
-            crate::local_ty::local_ty(function, tables[0].local)?,
-            validation,
-        )
-        .ok()?;
-        match first_dims.as_slice() {
-            [_] => (false, 0),
-            [rows, _] => (true, *rows),
-            _ => return None,
+    let (per_row, rows) = match tables.as_slice() {
+        [table] => {
+            let table_dims = crate::tensor_type::tensor_literal_dims(
+                crate::local_ty::local_ty(function, table.local)?,
+                validation,
+            )
+            .ok()?;
+            let expected_rows = *dims.first()?;
+            let expected_pairs = dim / 2;
+            match table_dims.as_slice() {
+                [table_rows, table_pairs, components]
+                    if *table_rows == expected_rows
+                        && *table_pairs == expected_pairs
+                        && *components == 3 =>
+                {
+                    (true, *table_rows)
+                }
+                _ => return None,
+            }
         }
-    } else {
-        (false, 0)
+        [cos_table, sin_table] => {
+            let first_dims = crate::tensor_type::tensor_literal_dims(
+                crate::local_ty::local_ty(function, cos_table.local)?,
+                validation,
+            )
+            .ok()?;
+            let second_dims = crate::tensor_type::tensor_literal_dims(
+                crate::local_ty::local_ty(function, sin_table.local)?,
+                validation,
+            )
+            .ok()?;
+            if first_dims != second_dims {
+                return None;
+            }
+            match first_dims.as_slice() {
+                [pairs] if *pairs == dim / 2 => (false, 0),
+                [table_rows, pairs] if *table_rows == *dims.first()? && *pairs == dim / 2 => {
+                    (true, *table_rows)
+                }
+                _ => return None,
+            }
+        }
+        _ => return None,
     };
     Some((pos, dim, width, per_row, rows))
 }
 
-/// The `TensorRope` / `TensorRopeHalf` statement's destination local (the
-/// rotated output).
-fn rope_destination_local(function: &MirFunction, op: MirCollectionOp) -> Option<MirLocalId> {
+/// The `TensorRope` / `TensorRopeHalf` statement's destination base (the
+/// rotated output). A temporary destination is valid before the lowered
+/// output-forward assign, so the table scan must not reject it.
+fn rope_destination_base(function: &MirFunction, op: MirCollectionOp) -> Option<MirPlaceBase> {
     for block in &function.blocks {
         for statement in &block.statements {
             if crate::collection_ops::statement_collection_op(statement) != Some(op) {
@@ -1111,10 +1154,10 @@ fn rope_destination_local(function: &MirFunction, op: MirCollectionOp) -> Option
             let Some(place) = destination else {
                 return None;
             };
-            let MirPlaceBase::Local(local) = place.base else {
+            if !place.projections.is_empty() {
                 return None;
-            };
-            return Some(local);
+            }
+            return Some(place.base.clone());
         }
     }
     None

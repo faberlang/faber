@@ -482,7 +482,10 @@ pub(crate) fn require_kernel_device_view(
     if !view.row_major || !view.contiguous || view.offset_elements != 0 {
         return Err(MirAbiError::new("kernel device view layout"));
     }
-    if view.rank < 1 || view.rank > 2 {
+    // GEA2-U4b: the frozen interleaved RoPE table is a contiguous rank-3
+    // device view. Keep the existing storage, layout, and element gates
+    // unchanged; rank 3 is the only additive extension here.
+    if view.rank < 1 || view.rank > 3 {
         return Err(MirAbiError::new(format!(
             "kernel device view rank {}",
             view.rank
