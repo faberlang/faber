@@ -1190,7 +1190,7 @@ impl HirVisitor for BorrowChecker<'_> {
     fn visit_expr(&mut self, expr: &HirExpression) {
         match &expr.kind {
             HirExpressionKind::Path(def_id) => self.read_use(*def_id, expr.span),
-            HirExpressionKind::Call(callee, _, args) => {
+            HirExpressionKind::Call(callee, _, args, _) => {
                 self.visit_expr(callee);
                 self.check_call_args(callee, args);
             }
@@ -1265,7 +1265,7 @@ impl HirVisitor for BorrowChecker<'_> {
                 }
                 _ => self.visit_expr(inner),
             },
-            HirExpressionKind::MethodCall(receiver, _method, _type_args, args) => {
+            HirExpressionKind::MethodCall(receiver, _method, _type_args, args, _) => {
                 // Determine receiver semantics from the method call's return type.
                 // Methods returning Vacuum mutate the receiver in place; treat as
                 // a receiver write. The call may conflict with an existing borrow,

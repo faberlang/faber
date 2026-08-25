@@ -320,6 +320,7 @@ fn air_call_expr(id: u32, span: Span, callee: DefId) -> HirExpression {
             Box::new(HirExpression { id: HirId(id + 1), kind: HirExpressionKind::Path(callee), ty: None, span }),
             Vec::new(),
             Vec::new(),
+            None,
         ),
         ty: None,
         span,
@@ -512,6 +513,7 @@ fn reduction_call(
             method,
             Vec::new(),
             vec![arg(combine), arg(seed)],
+            None,
         ),
         ty: None,
         span,
@@ -764,6 +766,7 @@ fn gate_call(id: u32, callee: HirExpression, args: Vec<HirExpression>) -> HirExp
             args.into_iter()
                 .map(|arg| HirCallArg { name: None, spread: false, span: arg.span, expr: arg })
                 .collect(),
+            None,
         ),
     )
 }

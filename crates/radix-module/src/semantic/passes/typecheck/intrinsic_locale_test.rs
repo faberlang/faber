@@ -81,11 +81,11 @@ fn method_call_spellings(program: &HirModule, interner: &crate::lexer::Interner)
 
 fn collect_method_names(expr: &HirExpression, interner: &crate::lexer::Interner, out: &mut Vec<String>) {
     match &expr.kind {
-        HirExpressionKind::MethodCall(receiver, name, _, _) => {
+        HirExpressionKind::MethodCall(receiver, name, _, _, _) => {
             out.push(interner.resolve(*name).to_owned());
             collect_method_names(receiver, interner, out);
         }
-        HirExpressionKind::Call(callee, _, _) => collect_method_names(callee, interner, out),
+        HirExpressionKind::Call(callee, _, _, _) => collect_method_names(callee, interner, out),
         HirExpressionKind::Binary(_, lhs, rhs) => {
             collect_method_names(lhs, interner, out);
             collect_method_names(rhs, interner, out);

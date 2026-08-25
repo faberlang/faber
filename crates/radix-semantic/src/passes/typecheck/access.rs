@@ -386,8 +386,8 @@ impl TypeChecker<'_> {
             | HirExpressionKind::Array(_)
             | HirExpressionKind::Struct(_, _)
             | HirExpressionKind::Tuple(_, _)
-            | HirExpressionKind::Call(_, _, _)
-            | HirExpressionKind::MethodCall(_, _, _, _)
+            | HirExpressionKind::Call(_, _, _, _)
+            | HirExpressionKind::MethodCall(_, _, _, _, _)
             | HirExpressionKind::Gradient { .. }
             | HirExpressionKind::Binary(_, _, _)
             | HirExpressionKind::Unary(_, _)

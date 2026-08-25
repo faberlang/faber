@@ -2377,7 +2377,7 @@ impl TypeChecker<'_> {
     /// Whether a `∷` source is a variant-constructor call (finge-lowered
     /// `Call` whose callee path resolves to a variant).
     fn source_is_variant_constructor(&self, source: &HirExpression) -> bool {
-        let HirExpressionKind::Call(callee, _, _) = &source.kind else {
+        let HirExpressionKind::Call(callee, _, _, _) = &source.kind else {
             return false;
         };
         let HirExpressionKind::Path(def_id) = &callee.kind else {

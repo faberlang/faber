@@ -1410,7 +1410,7 @@ pub(super) fn rewrite_expr(
             namespaces,
             diagnostics,
         ),
-        HirExpressionKind::Call(callee, type_args, args) => {
+        HirExpressionKind::Call(callee, type_args, args, _) => {
             rewrite_call_args(
                 unit_path,
                 args,
@@ -1438,7 +1438,8 @@ pub(super) fn rewrite_expr(
                         ty: None,
                         span: receiver.span,
                     };
-                    expr.kind = HirExpressionKind::Call(Box::new(callee), Vec::new(), call_args);
+                    expr.kind =
+                        HirExpressionKind::Call(Box::new(callee), Vec::new(), call_args, None);
                     return;
                 }
                 if let Some(message) =
@@ -1483,7 +1484,7 @@ pub(super) fn rewrite_expr(
                 );
             }
         }
-        HirExpressionKind::MethodCall(receiver, method, type_args, args) => {
+        HirExpressionKind::MethodCall(receiver, method, type_args, args, _) => {
             rewrite_expr(
                 unit_path,
                 receiver,
@@ -1518,7 +1519,7 @@ pub(super) fn rewrite_expr(
                     ty: None,
                     span: receiver.span,
                 };
-                expr.kind = HirExpressionKind::Call(Box::new(callee), Vec::new(), call_args);
+                expr.kind = HirExpressionKind::Call(Box::new(callee), Vec::new(), call_args, None);
             } else if let Some(message) =
                 namespace_call_diagnostic(unit_path, receiver, *method, interner, namespaces)
             {
@@ -2364,7 +2365,7 @@ impl ShadowedAliasRewriter<'_> {
 impl HirVisitorMut for ShadowedAliasRewriter<'_> {
     fn visit_expr_mut(&mut self, expr: &mut HirExpression) {
         match &mut expr.kind {
-            HirExpressionKind::Call(callee, _, args) => {
+            HirExpressionKind::Call(callee, _, args, _) => {
                 if let HirExpressionKind::Field(receiver, method) = &callee.kind {
                     if let Some(synthetic) = self.import_target(receiver, *method, args.len()) {
                         **callee = HirExpression {
@@ -2376,7 +2377,7 @@ impl HirVisitorMut for ShadowedAliasRewriter<'_> {
                     }
                 }
             }
-            HirExpressionKind::MethodCall(receiver, method, type_args, args) => {
+            HirExpressionKind::MethodCall(receiver, method, type_args, args, _) => {
                 if let Some(synthetic) = self.import_target(receiver, *method, args.len()) {
                     let call_args = std::mem::take(args);
                     let callee = HirExpression {
@@ -2391,6 +2392,7 @@ impl HirVisitorMut for ShadowedAliasRewriter<'_> {
                             Box::new(callee),
                             std::mem::take(type_args),
                             call_args,
+                            None,
                         ),
                         ty: expr.ty,
                         span: expr.span,
@@ -2594,19 +2596,19 @@ impl LibraryMethodCallRewriter<'_> {
 impl HirVisitorMut for LibraryMethodCallRewriter<'_> {
     fn visit_expr_mut(&mut self, expr: &mut HirExpression) {
         match &mut expr.kind {
-            HirExpressionKind::MethodCall(receiver, method, type_args, args) => {
+            HirExpressionKind::MethodCall(receiver, method, type_args, args, _) => {
                 if let Some((callee, type_args, args)) =
                     self.synthetic_call_parts(receiver, *method, type_args, args)
                 {
                     *expr = HirExpression {
                         id: expr.id,
-                        kind: HirExpressionKind::Call(Box::new(callee), type_args, args),
+                        kind: HirExpressionKind::Call(Box::new(callee), type_args, args, None),
                         ty: expr.ty,
                         span: expr.span,
                     };
                 }
             }
-            HirExpressionKind::Call(callee, type_args, args) => {
+            HirExpressionKind::Call(callee, type_args, args, _) => {
                 let (receiver, method) = match &callee.kind {
                     HirExpressionKind::Field(receiver, method) => (receiver, *method),
                     HirExpressionKind::NonNull(receiver, HirNonNullKind::Member(method)) => {
@@ -2622,7 +2624,7 @@ impl HirVisitorMut for LibraryMethodCallRewriter<'_> {
                 {
                     *expr = HirExpression {
                         id: expr.id,
-                        kind: HirExpressionKind::Call(Box::new(new_callee), type_args, args),
+                        kind: HirExpressionKind::Call(Box::new(new_callee), type_args, args, None),
                         ty: expr.ty,
                         span: expr.span,
                     };

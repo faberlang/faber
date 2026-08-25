@@ -20,6 +20,7 @@
 #[allow(clippy::wildcard_imports)]
 // parent module provides shared imports for typechecking
 use super::*;
+use crate::format_faber_type;
 use radix_hir::HirCallArg;
 
 enum DirectionalViewKind {
@@ -39,6 +40,7 @@ const ISSUE_DYNAMIC_CALLEE_TYPE_ARGS: &str = "dynamic_callee_type_args";
 const ISSUE_DYNAMIC_RECEIVER_METHOD_TYPE_ARGS: &str = "dynamic_receiver_method_type_args";
 const ISSUE_FAILABLE_CALL_ENCLOSING_ERROR_TYPE_MISMATCH: &str =
     "failable_call_enclosing_error_type_mismatch";
+const ISSUE_FAILABLE_CALL_CONVERSION_ABSENT: &str = "failable_call_conversion_absent";
 const ISSUE_FAILABLE_CALL_HANDLER_ERROR_TYPE_MISMATCH: &str =
     "failable_call_handler_error_type_mismatch";
 const ISSUE_FAILABLE_CALL_REQUIRES_HANDLER: &str = "failable_call_requires_handler";
@@ -1016,6 +1018,25 @@ impl TypeChecker<'_> {
         self.error_type
     }
 
+    fn lookup_conversion_arm(&self, source: TypeId, destination: TypeId) -> Option<DefId> {
+        let Type::Enum(destination_def) = self.types.get(destination) else {
+            return None;
+        };
+        self.resolver.conversion_arm_for(*destination_def, source)
+    }
+
+    fn format_conversion_type_for_diagnostic(&self, ty: TypeId) -> String {
+        let Some(interner) = self.interner else {
+            return format!("{:?}", self.types.get(ty));
+        };
+        format_faber_type(ty, self.types, interner, &|def_id| {
+            self.resolver
+                .get_symbol(def_id)
+                .map(|symbol| interner.resolve(symbol.name).to_owned())
+                .unwrap_or_else(|| format!("Def{}", def_id.0))
+        })
+    }
+
     /// Enforces alternate-exit handling for functions that can produce errors.
     ///
     /// The function signature carries the contract: a failable call propagates
@@ -1044,6 +1065,29 @@ impl TypeChecker<'_> {
                 return false;
             }
             Some(ErrorSink::Function(func_err_ty)) => {
+                let source_ty = self.resolve_inferred_type(err_ty);
+                let destination_ty = self.resolve_inferred_type(func_err_ty);
+                if !self.types.is_assignable(source_ty, destination_ty) {
+                    if let Some(arm) = self.lookup_conversion_arm(source_ty, destination_ty) {
+                        self.pending_conversion = Some(arm);
+                        return false;
+                    }
+                    self.invalid_operand_types_with_args(
+                        ISSUE_FAILABLE_CALL_CONVERSION_ABSENT,
+                        span,
+                        &[
+                            (
+                                "source",
+                                self.format_conversion_type_for_diagnostic(source_ty),
+                            ),
+                            (
+                                "destination",
+                                self.format_conversion_type_for_diagnostic(destination_ty),
+                            ),
+                        ],
+                    );
+                    return false;
+                }
                 self.unify_assign_issue(
                     err_ty,
                     func_err_ty,

@@ -406,14 +406,14 @@ impl HirVisitor for UseVisitor<'_> {
                 self.record_local(*def_id, ResolvedUseKind::Path);
                 walk_expr(self, expr);
             }
-            HirExpressionKind::Call(callee, _, _) => {
+            HirExpressionKind::Call(callee, _, _, _) => {
                 if let HirExpressionKind::Path(def_id) = &callee.kind {
                     self.record_local(*def_id, ResolvedUseKind::Call);
                 }
                 // Full walk records nested expression uses (including callee path as Path).
                 walk_expr(self, expr);
             }
-            HirExpressionKind::MethodCall(_, _, _, _) => {
+            HirExpressionKind::MethodCall(_, _, _, _, _) => {
                 // Method resolution identity is effect-table owned; still walk nested exprs.
                 walk_expr(self, expr);
             }

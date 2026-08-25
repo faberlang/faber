@@ -647,7 +647,7 @@ impl HirVisitor for DeadSourceAnalyzer<'_> {
     fn visit_expr(&mut self, expr: &HirExpression) {
         match &expr.kind {
             HirExpressionKind::Path(def_id) => self.mark_path_used(*def_id),
-            HirExpressionKind::Call(callee, _, args) => {
+            HirExpressionKind::Call(callee, _, args, _) => {
                 self.visit_expr(callee);
                 let params = self.call_params(callee);
                 for (index, arg) in args.iter().enumerate() {

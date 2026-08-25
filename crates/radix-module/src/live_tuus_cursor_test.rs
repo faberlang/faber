@@ -75,7 +75,7 @@ fn valid_tuus_cursor_call_returns_payload_type() {
     };
     let expr = HirExpression {
         id: HirId(1),
-        kind: HirExpressionKind::MethodCall(Box::new(receiver), SYM_CURSOR, Vec::new(), Vec::new()),
+        kind: HirExpressionKind::MethodCall(Box::new(receiver), SYM_CURSOR, Vec::new(), Vec::new(), None),
         ty: None,
         span: test_span(),
     };
@@ -106,7 +106,7 @@ fn wrong_method_name_returns_none() {
     };
     let expr = HirExpression {
         id: HirId(1),
-        kind: HirExpressionKind::MethodCall(Box::new(receiver), SYM_FINGE, Vec::new(), Vec::new()),
+        kind: HirExpressionKind::MethodCall(Box::new(receiver), SYM_FINGE, Vec::new(), Vec::new(), None),
         ty: None,
         span: test_span(),
     };
@@ -128,7 +128,7 @@ fn type_args_present_returns_none() {
     };
     let expr = HirExpression {
         id: HirId(1),
-        kind: HirExpressionKind::MethodCall(Box::new(receiver), SYM_CURSOR, vec![textus_ty], Vec::new()),
+        kind: HirExpressionKind::MethodCall(Box::new(receiver), SYM_CURSOR, vec![textus_ty], Vec::new(), None),
         ty: None,
         span: test_span(),
     };
@@ -161,6 +161,7 @@ fn args_present_returns_none() {
             SYM_CURSOR,
             Vec::new(),
             vec![HirCallArg { name: None, spread: false, expr: arg, span: test_span() }],
+            None,
         ),
         ty: None,
         span: test_span(),
@@ -185,7 +186,7 @@ fn wrong_tuus_def_id_returns_none() {
     };
     let expr = HirExpression {
         id: HirId(1),
-        kind: HirExpressionKind::MethodCall(Box::new(receiver), SYM_CURSOR, Vec::new(), Vec::new()),
+        kind: HirExpressionKind::MethodCall(Box::new(receiver), SYM_CURSOR, Vec::new(), Vec::new(), None),
         ty: None,
         span: test_span(),
     };
@@ -206,7 +207,7 @@ fn primitive_receiver_type_returns_none() {
     };
     let expr = HirExpression {
         id: HirId(1),
-        kind: HirExpressionKind::MethodCall(Box::new(receiver), SYM_CURSOR, Vec::new(), Vec::new()),
+        kind: HirExpressionKind::MethodCall(Box::new(receiver), SYM_CURSOR, Vec::new(), Vec::new(), None),
         ty: None,
         span: test_span(),
     };
@@ -222,7 +223,7 @@ fn receiver_without_type_returns_none() {
         HirExpression { id: HirId(0), kind: HirExpressionKind::Path(DefId(100)), ty: None, span: test_span() };
     let expr = HirExpression {
         id: HirId(1),
-        kind: HirExpressionKind::MethodCall(Box::new(receiver), SYM_CURSOR, Vec::new(), Vec::new()),
+        kind: HirExpressionKind::MethodCall(Box::new(receiver), SYM_CURSOR, Vec::new(), Vec::new(), None),
         ty: None,
         span: test_span(),
     };
@@ -245,7 +246,7 @@ fn non_struct_base_type_returns_none() {
     };
     let expr = HirExpression {
         id: HirId(1),
-        kind: HirExpressionKind::MethodCall(Box::new(receiver), SYM_CURSOR, Vec::new(), Vec::new()),
+        kind: HirExpressionKind::MethodCall(Box::new(receiver), SYM_CURSOR, Vec::new(), Vec::new(), None),
         ty: None,
         span: test_span(),
     };
@@ -267,7 +268,7 @@ fn applied_type_with_zero_type_args_returns_none() {
     };
     let expr = HirExpression {
         id: HirId(1),
-        kind: HirExpressionKind::MethodCall(Box::new(receiver), SYM_CURSOR, Vec::new(), Vec::new()),
+        kind: HirExpressionKind::MethodCall(Box::new(receiver), SYM_CURSOR, Vec::new(), Vec::new(), None),
         ty: None,
         span: test_span(),
     };

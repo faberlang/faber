@@ -292,7 +292,7 @@ impl SummaBodyState {
                 self.walk_expr(checker, rhs);
             }
             HirExpressionKind::Unary(_, operand) => self.walk_expr(checker, operand),
-            HirExpressionKind::Call(callee, _, args) => {
+            HirExpressionKind::Call(callee, _, args, _) => {
                 self.walk_call(checker, callee, args, expr.span)
             }
             // EOT-3M (exhaustive-match completion): a transfer invokes its
@@ -314,7 +314,7 @@ impl SummaBodyState {
                     self.walk_expr(checker, selector);
                 }
             }
-            HirExpressionKind::MethodCall(receiver, method, _, args) => {
+            HirExpressionKind::MethodCall(receiver, method, _, args, _) => {
                 self.walk_method_call(checker, receiver, *method, args, expr.span);
             }
             HirExpressionKind::Field(object, _) => self.walk_expr(checker, object),

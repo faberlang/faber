@@ -329,11 +329,11 @@ pub fn walk_expr<V: HirVisitor>(visitor: &mut V, expr: &HirExpression) {
         | HirExpressionKind::Deref(operand)
         | HirExpressionKind::Panic(operand)
         | HirExpressionKind::Throw(operand) => visitor.visit_expr(operand),
-        HirExpressionKind::Call(callee, _, args) => {
+        HirExpressionKind::Call(callee, _, args, _) => {
             visitor.visit_expr(callee);
             walk_call_args(visitor, args);
         }
-        HirExpressionKind::MethodCall(receiver, _, _, args) => {
+        HirExpressionKind::MethodCall(receiver, _, _, args, _) => {
             visitor.visit_expr(receiver);
             walk_call_args(visitor, args);
         }
@@ -878,11 +878,11 @@ pub fn walk_expr_mut<V: HirVisitorMut>(visitor: &mut V, expr: &mut HirExpression
         | HirExpressionKind::Deref(operand)
         | HirExpressionKind::Panic(operand)
         | HirExpressionKind::Throw(operand) => visitor.visit_expr_mut(operand),
-        HirExpressionKind::Call(callee, _, args) => {
+        HirExpressionKind::Call(callee, _, args, _) => {
             visitor.visit_expr_mut(callee);
             walk_call_args_mut(visitor, args);
         }
-        HirExpressionKind::MethodCall(receiver, _, _, args) => {
+        HirExpressionKind::MethodCall(receiver, _, _, args, _) => {
             visitor.visit_expr_mut(receiver);
             walk_call_args_mut(visitor, args);
         }

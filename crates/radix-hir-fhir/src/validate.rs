@@ -345,7 +345,7 @@ fn collect_expr_defs(
         | HirExpressionKind::Deref(inner) => {
             collect_expr_defs(inner, registry);
         }
-        HirExpressionKind::Call(callee, _, args) => {
+        HirExpressionKind::Call(callee, _, args, _) => {
             collect_expr_defs(callee, registry);
             for arg in args {
                 collect_expr_defs(&arg.expr, registry);
@@ -360,7 +360,7 @@ fn collect_expr_defs(
                 collect_expr_defs(selector, registry);
             }
         }
-        HirExpressionKind::MethodCall(receiver, _, _, args) => {
+        HirExpressionKind::MethodCall(receiver, _, _, args, _) => {
             collect_expr_defs(receiver, registry);
             for arg in args {
                 collect_expr_defs(&arg.expr, registry);
@@ -648,7 +648,7 @@ fn collect_hir_registry(artifact: &HirArtifact) -> FxHashSet<radix_hir::HirId> {
             | HirExpressionKind::Deref(inner) => {
                 collect_expr(inner, registry);
             }
-            HirExpressionKind::Call(callee, _, args) => {
+            HirExpressionKind::Call(callee, _, args, _) => {
                 collect_expr(callee, registry);
                 for arg in args {
                     collect_expr(&arg.expr, registry);
@@ -669,7 +669,7 @@ fn collect_hir_registry(artifact: &HirArtifact) -> FxHashSet<radix_hir::HirId> {
                     collect_expr(selector, registry);
                 }
             }
-            HirExpressionKind::MethodCall(receiver, _, _, args) => {
+            HirExpressionKind::MethodCall(receiver, _, _, args, _) => {
                 collect_expr(receiver, registry);
                 for arg in args {
                     collect_expr(&arg.expr, registry);
@@ -1388,7 +1388,7 @@ pub(crate) fn validate_referential_integrity(
             HirExpressionKind::Unary(_, inner) => {
                 validate_expr(inner, check_symbol, check_def, check_hir, check_type)?;
             }
-            HirExpressionKind::Call(callee, type_args, args) => {
+            HirExpressionKind::Call(callee, type_args, args, _) => {
                 validate_expr(callee, check_symbol, check_def, check_hir, check_type)?;
                 for ty in type_args {
                     check_type(*ty)?;
@@ -1415,7 +1415,7 @@ pub(crate) fn validate_referential_integrity(
                     validate_expr(selector, check_symbol, check_def, check_hir, check_type)?;
                 }
             }
-            HirExpressionKind::MethodCall(receiver, method, type_args, args) => {
+            HirExpressionKind::MethodCall(receiver, method, type_args, args, _) => {
                 validate_expr(receiver, check_symbol, check_def, check_hir, check_type)?;
                 check_symbol(*method)?;
                 for ty in type_args {

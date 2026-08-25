@@ -2240,6 +2240,19 @@ impl Resolver {
             .map_or(&[], Vec::as_slice)
     }
 
+    /// Find the declaration-owned arm for one ordered destination/source pair.
+    ///
+    /// The resolver is the semantic environment shared by the analyzed module
+    /// graph. Keeping lookup on this existing registry makes the pair global to
+    /// that environment without introducing a second pass-owned registry.
+    #[must_use]
+    pub fn conversion_arm_for(&self, destination: DefId, source: TypeId) -> Option<DefId> {
+        self.conversion_arms(destination)
+            .iter()
+            .find(|arm| arm.source == source)
+            .map(|arm| arm.fn_def_id)
+    }
+
     #[must_use]
     pub fn imported_file_enums(&self) -> Vec<(DefId, TypeId, Vec<ImportedEnumVariant>)> {
         self.file_interfaces

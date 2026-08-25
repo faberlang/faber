@@ -703,6 +703,7 @@ fn package_mir_rewrites_gradient_call_and_selected_arguments() {
             }),
             Vec::new(),
             Vec::new(),
+            None,
         ),
         ty: None,
         span: Span::default(),
@@ -755,11 +756,11 @@ fn package_mir_rewrites_gradient_call_and_selected_arguments() {
     else {
         panic!("the linker must preserve the gradient node");
     };
-    let HirExpressionKind::Call(callee, _, _) = call.kind else {
+    let HirExpressionKind::Call(callee, _, _, _) = call.kind else {
         panic!("the gradient's forward expression must remain a call");
     };
     assert_eq!(callee.kind, HirExpressionKind::Path(forward_target));
-    let HirExpressionKind::Call(callee, _, _) = &selected_arguments[0].kind else {
+    let HirExpressionKind::Call(callee, _, _, _) = &selected_arguments[0].kind else {
         panic!("the first selected argument must remain a call");
     };
     assert_eq!(callee.kind, HirExpressionKind::Path(selector_target));

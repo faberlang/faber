@@ -102,7 +102,7 @@ impl TypeChecker<'_> {
             HirExpressionKind::Path(def_id) => self
                 .lookup_binding(*def_id)
                 .is_some_and(|info| info.scalar_text),
-            HirExpressionKind::MethodCall(_, name, _, args) if args.len() == 2 => {
+            HirExpressionKind::MethodCall(_, name, _, args, _) if args.len() == 2 => {
                 self.interner
                     .is_some_and(|interner| interner.resolve(*name) == "sectio")
                     && self.is_unit_sectio_span(&args[0].expr, &args[1].expr)

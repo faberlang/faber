@@ -206,7 +206,7 @@ impl AirPurityChecker<'_> {
                 }
             }
             HirExpressionKind::Unary(_, operand) => self.check_expr(operand),
-            HirExpressionKind::Call(callee, _, args) => self.check_call(callee, args, expr.span),
+            HirExpressionKind::Call(callee, _, args, _) => self.check_call(callee, args, expr.span),
             // EOT-3M (exhaustive-match completion): a transfer invokes an
             // arbitrary sink callable once per payload. A value sink cannot be
             // proven AIR-pure, so reject with the ordinary non-AIR-call issue
@@ -231,7 +231,7 @@ impl AirPurityChecker<'_> {
                     self.check_expr(selector);
                 }
             }
-            HirExpressionKind::MethodCall(receiver, method, _, args) => {
+            HirExpressionKind::MethodCall(receiver, method, _, args, _) => {
                 self.check_method_call(receiver, *method, args, expr.span);
             }
             HirExpressionKind::Field(object, _) => self.check_expr(object),

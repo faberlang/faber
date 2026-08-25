@@ -640,7 +640,7 @@ fn rewrite_nested_expr(
                 multiplicity,
             );
         }
-        HirExpressionKind::Call(callee, _, args) => {
+        HirExpressionKind::Call(callee, _, args, _) => {
             rewrite_nested_expr(
                 callee,
                 root_locals,
@@ -670,7 +670,7 @@ fn rewrite_nested_expr(
                 );
             }
         }
-        HirExpressionKind::MethodCall(receiver, _, _, args) => {
+        HirExpressionKind::MethodCall(receiver, _, _, args, _) => {
             rewrite_nested_expr(
                 receiver,
                 root_locals,
@@ -1616,7 +1616,7 @@ impl BodyDecline<'_> {
             // conditional lanes cannot chain a straight-line accumulator.
             HirExpressionKind::Itera(..) if self.at_loop_body_root && as_statement => {}
             HirExpressionKind::Itera(..) => self.reject(CAUSA_UNSUPPORTED_CONTROL),
-            HirExpressionKind::Call(callee, _, args) => {
+            HirExpressionKind::Call(callee, _, args, _) => {
                 if !matches!(&callee.kind, HirExpressionKind::Path(def) if self.lanes.lane_for(*def) == Some(RadixLane::Air))
                 {
                     self.reject(CAUSA_IMPURE);
@@ -1629,7 +1629,7 @@ impl BodyDecline<'_> {
                     self.scan_expr(&arg.expr, false);
                 }
             }
-            HirExpressionKind::MethodCall(receiver, method, _, args) => {
+            HirExpressionKind::MethodCall(receiver, method, _, args, _) => {
                 let name = self.interner.resolve(*method);
                 if !is_allowed_tensor_intrinsic(name) {
                     self.reject(CAUSA_IMPURE);
@@ -2123,7 +2123,7 @@ impl MaskCollector<'_> {
 
     fn is_fill_built(&self, expr: &HirExpression) -> bool {
         match &expr.kind {
-            HirExpressionKind::MethodCall(recv, method, _, _) => {
+            HirExpressionKind::MethodCall(recv, method, _, _, _) => {
                 is_fill_method(self.interner.resolve(*method)) || self.is_fill_built(recv)
             }
             HirExpressionKind::Path(def) => {
@@ -2181,7 +2181,7 @@ impl MaskCollector<'_> {
 
     fn scan_expr(&mut self, expr: &HirExpression) {
         match &expr.kind {
-            HirExpressionKind::MethodCall(recv, method, _, args) => {
+            HirExpressionKind::MethodCall(recv, method, _, args, _) => {
                 let name = self.interner.resolve(*method);
                 self.scan_expr(recv);
                 for arg in args {
@@ -2266,7 +2266,7 @@ impl MaskCollector<'_> {
                 self.scan_expr(cond);
                 self.scan_block(block);
             }
-            HirExpressionKind::Call(callee, _, args) => {
+            HirExpressionKind::Call(callee, _, args, _) => {
                 self.scan_expr(callee);
                 for arg in args {
                     self.scan_expr(&arg.expr);
@@ -2292,7 +2292,7 @@ fn is_masked_exit(
         HirExpressionKind::Path(def) => local_inits
             .get(def)
             .is_some_and(|init| is_masked_exit(init, mask_defs, local_inits, interner)),
-        HirExpressionKind::MethodCall(recv, method, _, args)
+        HirExpressionKind::MethodCall(recv, method, _, args, _)
             if interner.resolve(*method) == "multiplica" =>
         {
             is_mask_ref(recv, mask_defs, local_inits)
@@ -2413,7 +2413,7 @@ impl RuntimeLenGuard {
                 self.scan_expr(lhs);
                 self.scan_expr(rhs);
             }
-            HirExpressionKind::MethodCall(recv, _, _, args) => {
+            HirExpressionKind::MethodCall(recv, _, _, args, _) => {
                 self.scan_expr(recv);
                 for arg in args {
                     self.scan_expr(&arg.expr);

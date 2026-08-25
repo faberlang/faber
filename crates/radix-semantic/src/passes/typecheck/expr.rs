@@ -115,14 +115,17 @@ impl TypeChecker<'_> {
         expr: &mut HirExpression,
         expected: Option<TypeId>,
     ) -> TypeId {
+        let saved_pending_conversion = self.pending_conversion.take();
         let ty = match &mut expr.kind {
             HirExpressionKind::Path(def_id) => self.check_path(*def_id, expr.span),
             HirExpressionKind::Literal(lit) => self.literal_type(lit, expr.span, expected),
             HirExpressionKind::Vacua => self.check_vacua(expected, expr.span),
             HirExpressionKind::Binary(op, lhs, rhs) => self.check_binary(*op, lhs, rhs, expected),
             HirExpressionKind::Unary(op, operand) => self.check_unary(*op, operand, expected),
-            HirExpressionKind::Call(callee, type_args, args) => {
-                self.check_call(callee, type_args, args, expected)
+            HirExpressionKind::Call(callee, type_args, args, conversion) => {
+                let ty = self.check_call(callee, type_args, args, expected);
+                *conversion = self.pending_conversion.take();
+                ty
             }
             HirExpressionKind::Gradient { .. } => {
                 // Fail closed until tensor-glyphs 2B lands the operand
@@ -137,8 +140,10 @@ impl TypeChecker<'_> {
             HirExpressionKind::Transfer { sink, payloads } => {
                 self.check_transfer(sink, payloads, expr.span)
             }
-            HirExpressionKind::MethodCall(receiver, name, type_args, args) => {
-                self.check_method_call(receiver, name, type_args, args, expected)
+            HirExpressionKind::MethodCall(receiver, name, type_args, args, conversion) => {
+                let ty = self.check_method_call(receiver, name, type_args, args, expected);
+                *conversion = self.pending_conversion.take();
+                ty
             }
             HirExpressionKind::Field(object, name) => self.check_field(object, *name),
             HirExpressionKind::Index(object, index) => self.check_index(object, index),
@@ -607,6 +612,7 @@ impl TypeChecker<'_> {
         } else {
             ty
         };
+        self.pending_conversion = saved_pending_conversion;
         expr.ty = Some(self.resolve_inferred_type(ty));
         ty
     }

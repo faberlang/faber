@@ -30,6 +30,7 @@ fn call(id: u32, callee: HirExpression, args: Vec<HirExpression>) -> HirExpressi
             args.into_iter()
                 .map(|arg| HirCallArg { name: None, spread: false, span: arg.span, expr: arg })
                 .collect(),
+            None,
         ),
     )
 }
@@ -221,6 +222,7 @@ fn gate_rejected_shapes_carry_no_obligation() {
                 span: Span::new(0, 1),
                 expr: int_expr(10, 1),
             }],
+            None,
         ),
     );
     assert_eq!(
@@ -238,6 +240,7 @@ fn gate_rejected_shapes_carry_no_obligation() {
             Box::new(path_expr(15, 700)),
             Vec::new(),
             vec![HirCallArg { name: None, spread: true, span: Span::new(0, 1), expr: int_expr(16, 1) }],
+            None,
         ),
     );
     spread_arg.id = HirId(14);

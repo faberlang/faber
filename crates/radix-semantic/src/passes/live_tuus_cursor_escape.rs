@@ -253,7 +253,7 @@ impl HirVisitor for LiveTuusCursorEscapeChecker<'_> {
                     self.with_context(EscapeContext::Value, |checker| checker.visit_expr(recovery));
                 }
             }
-            HirExpressionKind::Call(callee, _, args) => {
+            HirExpressionKind::Call(callee, _, args, _) => {
                 self.visit_expr(callee);
                 for arg in args {
                     self.with_context(EscapeContext::CallArg, |checker| {
@@ -261,7 +261,7 @@ impl HirVisitor for LiveTuusCursorEscapeChecker<'_> {
                     });
                 }
             }
-            HirExpressionKind::MethodCall(receiver, _, _, args) => {
+            HirExpressionKind::MethodCall(receiver, _, _, args, _) => {
                 self.visit_expr(receiver);
                 for arg in args {
                     self.with_context(EscapeContext::CallArg, |checker| {

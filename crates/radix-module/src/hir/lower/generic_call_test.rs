@@ -50,7 +50,7 @@ fn assert_entry_method_call_type_args(source: &str, expected: usize) {
         let Some(init) = local.init.as_ref() else {
             continue;
         };
-        if let HirExpressionKind::MethodCall(_, _, type_args, _) = &init.kind {
+        if let HirExpressionKind::MethodCall(_, _, type_args, _, _) = &init.kind {
             assert_eq!(type_args.len(), expected);
             return;
         }

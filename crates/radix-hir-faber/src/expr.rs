@@ -134,7 +134,7 @@ impl super::FaberCodegen {
                 writer.write(&self.unop_to_faber(*op, surface));
                 self.write_expr_prec(operand, 12, types, names, interner, surface, writer);
             }
-            HirExpressionKind::Call(callee, type_args, args) => {
+            HirExpressionKind::Call(callee, type_args, args, _) => {
                 // Postfix expression forms bind tighter than every infix form
                 // currently emitted by this backend.
                 let mut wrote_finge = false;
@@ -154,7 +154,7 @@ impl super::FaberCodegen {
                     writer.write(")");
                 }
             }
-            HirExpressionKind::MethodCall(receiver, name, type_args, args) => {
+            HirExpressionKind::MethodCall(receiver, name, type_args, args, _) => {
                 self.write_expr_prec(receiver, 13, types, names, interner, surface, writer);
                 writer.write(".");
                 let method_name = self.method_spelling(receiver, *name, types, interner, surface);

@@ -253,7 +253,7 @@ fn walk_expr(expr: &HirExpression) -> ValueJudgment {
             ValueJudgment::OutsideSubset
         }
         HirExpressionKind::Path(_) => ValueJudgment::Pure(PurityTerm::Scalar(0)),
-        HirExpressionKind::Call(callee, _, args) => {
+        HirExpressionKind::Call(callee, _, args, _) => {
             if args.iter().any(|arg| arg.name.is_some() || arg.spread) {
                 return ValueJudgment::GateRejects;
             }

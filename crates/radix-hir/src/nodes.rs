@@ -981,7 +981,13 @@ pub enum HirExpressionKind {
     Vacua,
     Binary(HirBinOp, Box<HirExpression>, Box<HirExpression>),
     Unary(HirUnOp, Box<HirExpression>),
-    Call(Box<HirExpression>, Vec<TypeId>, Vec<HirCallArg>),
+    Call(
+        Box<HirExpression>,
+        Vec<TypeId>,
+        Vec<HirCallArg>,
+        /// Declaration-owned conversion arm selected for function-level propagation.
+        Option<DefId>,
+    ),
 
     /// Postfix gradient selection: `call(...) ∇` or `call(...) ∇ [places]`.
     ///
@@ -997,7 +1003,14 @@ pub enum HirExpressionKind {
     },
 
     /// Method call normalized from receiver syntax.
-    MethodCall(Box<HirExpression>, Symbol, Vec<TypeId>, Vec<HirCallArg>),
+    MethodCall(
+        Box<HirExpression>,
+        Symbol,
+        Vec<TypeId>,
+        Vec<HirCallArg>,
+        /// Declaration-owned conversion arm selected for function-level propagation.
+        Option<DefId>,
+    ),
     Field(Box<HirExpression>, Symbol),
     Index(Box<HirExpression>, Box<HirExpression>),
 

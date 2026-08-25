@@ -608,7 +608,7 @@ impl HirVisitor for LintContext<'_> {
                     self.visit_expr(recovery);
                 }
             }
-            HirExpressionKind::MethodCall(receiver, method, _, args) => {
+            HirExpressionKind::MethodCall(receiver, method, _, args, _) => {
                 self.mark_receiver_mutated_if_needed(receiver, *method, args.len());
                 self.visit_expr(receiver);
                 for arg in args {

@@ -1789,7 +1789,7 @@ incipit {
         panic!("expected local");
     };
     let init = local.init.as_ref().expect("initializer");
-    let HirExpressionKind::Call(callee, _, _) = &init.kind else {
+    let HirExpressionKind::Call(callee, _, _, _) = &init.kind else {
         panic!("expected call, got {:?}", init.kind);
     };
     assert!(
@@ -1865,7 +1865,7 @@ incipit {
         panic!("expected local");
     };
     let init = local.init.as_ref().expect("initializer");
-    let HirExpressionKind::Call(callee, _, _) = &init.kind else {
+    let HirExpressionKind::Call(callee, _, _, _) = &init.kind else {
         panic!("expected call, got {:?}", init.kind);
     };
     assert!(
@@ -1892,7 +1892,7 @@ incipit {
         panic!("expected local");
     };
     let init = local.init.as_ref().expect("initializer");
-    let HirExpressionKind::Call(callee, _, _) = &init.kind else {
+    let HirExpressionKind::Call(callee, _, _, _) = &init.kind else {
         panic!("expected call, got {:?}", init.kind);
     };
     assert!(

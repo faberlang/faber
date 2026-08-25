@@ -394,12 +394,12 @@ impl Lowerer<'_> {
                 let (recv, name) = self.flatten_dotted_method_callee(member);
                 let name = self.canonicalize_namespace_member(&recv, name);
                 let args = self.lower_call_args(&call.args);
-                HirExpressionKind::MethodCall(Box::new(recv), name, type_args, args)
+                HirExpressionKind::MethodCall(Box::new(recv), name, type_args, args, None)
             }
             _ => {
                 let callee = lower_expr(self, &call.callee);
                 let args = self.lower_call_args(&call.args);
-                HirExpressionKind::Call(Box::new(callee), type_args, args)
+                HirExpressionKind::Call(Box::new(callee), type_args, args, None)
             }
         }
     }
@@ -1074,7 +1074,7 @@ impl Lowerer<'_> {
 
         let call = HirExpression {
             id: self.next_hir_id(),
-            kind: HirExpressionKind::Call(Box::new(callee), Vec::new(), args),
+            kind: HirExpressionKind::Call(Box::new(callee), Vec::new(), args, None),
             ty: None,
             span: self.current_span,
         };
@@ -1341,7 +1341,7 @@ impl Lowerer<'_> {
                 span: arg.span,
             });
         }
-        HirExpressionKind::Call(Box::new(callee), Vec::new(), args)
+        HirExpressionKind::Call(Box::new(callee), Vec::new(), args, None)
     }
 
     fn lower_praefixum(&mut self, praefixum: &radix_syntax::PraefixumExpr) -> HirExpressionKind {

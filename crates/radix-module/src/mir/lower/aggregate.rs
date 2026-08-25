@@ -264,7 +264,7 @@ impl FunctionBuilder<'_> {
                 Some(self.construct_temp(MirAggregateKind::Set, MirAggregateFields::Ordered(fields), ty, expr.span))
             }
             Type::Enum(_) => {
-                let HirExpressionKind::Call(callee, _, args) = &source.kind else {
+                let HirExpressionKind::Call(callee, _, args, _) = &source.kind else {
                     self.errors.push(MirError::unsupported(
                         expr.span,
                         "enum construction from non-variant source before aggregate MIR lowering",

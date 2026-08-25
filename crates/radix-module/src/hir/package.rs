@@ -792,7 +792,7 @@ fn walk_block_callees(block: &HirBlock, index: &NucleumIndex, names: &mut Vec<St
 
 fn walk_expr_callees(expr: &HirExpression, index: &NucleumIndex, names: &mut Vec<String>) {
     match &expr.kind {
-        HirExpressionKind::Call(callee, _, args) => {
+        HirExpressionKind::Call(callee, _, args, _) => {
             if let HirExpressionKind::Path(def_id) = &callee.kind {
                 if index.roles.get(def_id) == Some(&NucleumRole::Fragment) {
                     if let Some(name) = index.names.get(def_id) {
@@ -805,7 +805,7 @@ fn walk_expr_callees(expr: &HirExpression, index: &NucleumIndex, names: &mut Vec
                 walk_expr_callees(&arg.expr, index, names);
             }
         }
-        HirExpressionKind::MethodCall(receiver, _, _, args) => {
+        HirExpressionKind::MethodCall(receiver, _, _, args, _) => {
             walk_expr_callees(receiver, index, names);
             for arg in args {
                 walk_expr_callees(&arg.expr, index, names);

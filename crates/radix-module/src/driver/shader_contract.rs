@@ -288,7 +288,7 @@ impl ContractCollector<'_> {
     /// registered contract-role function are contract facts; every other
     /// assertion is an ordinary program assertion and produces no facts.
     fn ingest_assertion(&mut self, cond: &HirExpression) {
-        let HirExpressionKind::Call(callee, _, args) = &cond.kind else {
+        let HirExpressionKind::Call(callee, _, args, _) = &cond.kind else {
             return;
         };
         let HirExpressionKind::Path(def_id) = &callee.kind else {

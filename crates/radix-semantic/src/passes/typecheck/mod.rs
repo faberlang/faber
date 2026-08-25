@@ -250,6 +250,11 @@ pub(crate) struct TypeChecker<'a> {
     /// Active alternate-exit target while checking `iace` or failable calls.
     pub current_error: Option<ErrorSink>,
 
+    /// Arm selected by the innermost checked failable call for function-level
+    /// propagation. The expression dispatcher consumes and restores this slot
+    /// so nested calls cannot leak their marker to an enclosing call.
+    pub pending_conversion: Option<DefId>,
+
     /// Whether the active body is a systems device entry/helper.
     pub current_device_function: bool,
 
@@ -426,6 +431,7 @@ impl<'a> TypeChecker<'a> {
             type_params_by_def: FxHashMap::default(),
             current_return: None,
             current_error: None,
+            pending_conversion: None,
             current_device_function: false,
             current_nucleum_entry: false,
             current_shader_function: false,

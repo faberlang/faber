@@ -16,7 +16,7 @@ pub fn tuus_cursor_method_payload<'a>(
     resolve_symbol: impl Fn(Symbol) -> &'a str,
     types: &TypeTable,
 ) -> Option<TypeId> {
-    let HirExpressionKind::MethodCall(receiver, method, type_args, args) = &expr.kind else {
+    let HirExpressionKind::MethodCall(receiver, method, type_args, args, _) = &expr.kind else {
         return None;
     };
     if !type_args.is_empty() || !args.is_empty() {

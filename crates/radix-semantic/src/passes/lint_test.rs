@@ -341,6 +341,7 @@ fn does_not_warn_on_varia_local_mutated_by_intrinsic_method() {
                                 expr: lit_expr(),
                                 span: test_span(),
                             }],
+                            None,
                         ),
                         ty: Some(types.primitive(Primitive::Vacuum)),
                         span: test_span(),

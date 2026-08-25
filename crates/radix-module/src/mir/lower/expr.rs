@@ -41,10 +41,12 @@ pub(super) trait HirExpressionLoweringVisitor {
             HirExpressionKind::Unary(op, operand) => self.visit_unary_expr(*op, operand, expr),
             HirExpressionKind::Binary(HirBinOp::Coalesce, lhs, rhs) => self.visit_coalesce_expr(lhs, rhs, expr),
             HirExpressionKind::Binary(op, lhs, rhs) => self.visit_binary_expr(*op, lhs, rhs, expr),
-            HirExpressionKind::Call(callee, type_args, args) => self.visit_call_expr(callee, type_args, args, expr),
+            HirExpressionKind::Call(callee, type_args, args, conversion) => {
+                self.visit_call_expr(callee, type_args, args, *conversion, expr)
+            }
             HirExpressionKind::Transfer { sink, payloads } => self.visit_transfer_expr(sink, payloads, expr),
-            HirExpressionKind::MethodCall(receiver, method, _, args) => {
-                self.visit_method_call_expr(receiver, *method, args, expr)
+            HirExpressionKind::MethodCall(receiver, method, _, args, conversion) => {
+                self.visit_method_call_expr(receiver, *method, args, *conversion, expr)
             }
             HirExpressionKind::Field(object, name) => self.visit_field_expr(object, *name, expr),
             HirExpressionKind::Index(object, index) => self.visit_index_expr(object, index, expr),
@@ -134,6 +136,7 @@ pub(super) trait HirExpressionLoweringVisitor {
         callee: &HirExpression,
         type_args: &[TypeId],
         args: &[HirCallArg],
+        conversion: Option<DefId>,
         expr: &HirExpression,
     ) -> Option<MirOperand>;
     fn visit_transfer_expr(
@@ -147,6 +150,7 @@ pub(super) trait HirExpressionLoweringVisitor {
         receiver: &HirExpression,
         method: Symbol,
         args: &[HirCallArg],
+        conversion: Option<DefId>,
         expr: &HirExpression,
     ) -> Option<MirOperand>;
     fn visit_field_expr(&mut self, object: &HirExpression, name: Symbol, expr: &HirExpression) -> Option<MirOperand>;
@@ -348,9 +352,10 @@ impl HirExpressionLoweringVisitor for FunctionBuilder<'_> {
         callee: &HirExpression,
         type_args: &[TypeId],
         args: &[HirCallArg],
+        conversion: Option<DefId>,
         expr: &HirExpression,
     ) -> Option<MirOperand> {
-        self.lower_call(callee, type_args, args, expr)
+        self.lower_call(callee, type_args, args, conversion, expr)
     }
 
     fn visit_transfer_expr(
@@ -373,7 +378,7 @@ impl HirExpressionLoweringVisitor for FunctionBuilder<'_> {
                 let callee = self
                     .closure_callee_for_operand(&sink_operand)
                     .map_or_else(|| MirCallee::Value(sink_operand.clone()), MirCallee::Closure);
-                self.lower_failable_call(callee, vec![arg], vacuum, err_ty, payload.span);
+                self.lower_failable_call(callee, vec![arg], vacuum, err_ty, None, payload.span);
             } else {
                 self.call_value_operand(sink_operand.clone(), vec![arg], vacuum, payload.span);
             }
@@ -386,9 +391,10 @@ impl HirExpressionLoweringVisitor for FunctionBuilder<'_> {
         receiver: &HirExpression,
         method: Symbol,
         args: &[HirCallArg],
+        conversion: Option<DefId>,
         expr: &HirExpression,
     ) -> Option<MirOperand> {
-        self.lower_method_call(receiver, method, args, expr)
+        self.lower_method_call(receiver, method, args, conversion, expr)
     }
 
     fn visit_field_expr(&mut self, object: &HirExpression, name: Symbol, expr: &HirExpression) -> Option<MirOperand> {

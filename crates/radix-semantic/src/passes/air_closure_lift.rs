@@ -273,7 +273,7 @@ impl HirVisitorMut for LiftVisitor<'_> {
 
     fn visit_expr_mut(&mut self, expr: &mut HirExpression) {
         if self.in_air_function {
-            if let HirExpressionKind::MethodCall(_, method, _, args) = &mut expr.kind {
+            if let HirExpressionKind::MethodCall(_, method, _, args, _) = &mut expr.kind {
                 let method_name = self.interner.resolve(*method);
                 if is_higher_order_method(method_name) {
                     if let Some(combine) = args.first_mut() {

@@ -151,7 +151,7 @@ incipit {
 fn field_expr_ty(expr: &radix_hir::HirExpression) -> Option<crate::TypeId> {
     match &expr.kind {
         radix_hir::HirExpressionKind::Field(_, _) => expr.ty,
-        radix_hir::HirExpressionKind::Call(_, _, args) => {
+        radix_hir::HirExpressionKind::Call(_, _, args, _) => {
             args.iter().find_map(|arg| field_expr_ty(&arg.expr))
         }
         radix_hir::HirExpressionKind::Scribe(_, items) => items.iter().find_map(field_expr_ty),

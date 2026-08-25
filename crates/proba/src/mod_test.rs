@@ -23,6 +23,25 @@ fn run(source: &str, selection: TestSelection) -> ProbaReport {
 }
 
 #[test]
+fn declared_error_conversion_propagates_through_mir_runner() {
+    let report = run(
+        r#"
+discretio Sourceum { Failed }
+discretio Destinatio { @ conversio Sourceum err { redde finge Converted {} ∷ Destinatio } Converted }
+functio source() → vacuum ⇥ Sourceum { iace finge Failed {} ∷ Sourceum }
+functio target() → vacuum ⇥ Destinatio { source() }
+proba "conversion" {
+    fac { target() }
+    cape err { adfirma err ≡ finge Converted {} ∷ Destinatio }
+}
+"#,
+        TestSelection::default(),
+    );
+    assert_eq!(report.passed(), 1, "report: {report:?}");
+    assert!(report.success(), "report: {report:?}");
+}
+
+#[test]
 fn passing_adfirma_reports_pass() {
     let report = run(
         r#"

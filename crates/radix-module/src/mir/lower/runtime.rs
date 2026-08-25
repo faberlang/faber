@@ -64,13 +64,14 @@ impl FunctionBuilder<'_> {
         receiver: &HirExpression,
         method: Symbol,
         args: &[HirCallArg],
+        conversion: Option<DefId>,
         expr: &HirExpression,
     ) -> Option<MirOperand> {
         if let Some(target) = self.genus_method_target(receiver, method) {
             let mut lowered_args = Vec::with_capacity(args.len() + 1);
             lowered_args.push(self.lower_expr_value(receiver)?);
             lowered_args.extend(self.lower_hir_call_args(args)?);
-            return self.lower_definition_call(target.def_id, Vec::new(), lowered_args, expr);
+            return self.lower_definition_call(target.def_id, Vec::new(), lowered_args, conversion, expr);
         }
 
         let imported_method_target = receiver.ty.and_then(|receiver_ty| {
@@ -108,7 +109,7 @@ impl FunctionBuilder<'_> {
                     .and_then(|functions| functions.get(&method))
                 {
                     let lowered_args = self.lower_hir_call_args(args)?;
-                    return self.lower_definition_call(*verb_def, Vec::new(), lowered_args, expr);
+                    return self.lower_definition_call(*verb_def, Vec::new(), lowered_args, conversion, expr);
                 }
                 let lowered_args = self.lower_hir_call_args(args)?;
                 let ty = self.expr_ty(expr)?;
@@ -1749,10 +1750,11 @@ impl FunctionBuilder<'_> {
         callee: &HirExpression,
         type_args: &[TypeId],
         args: &[HirCallArg],
+        conversion: Option<DefId>,
         expr: &HirExpression,
     ) -> Option<MirOperand> {
         if let HirExpressionKind::NonNull(_, HirNonNullKind::Member(name)) = callee.kind {
-            return self.lower_method_call(callee, name, args, expr);
+            return self.lower_method_call(callee, name, args, conversion, expr);
         }
 
         // Callable value: a local binding or non-path expression. Positional args,
@@ -1779,6 +1781,7 @@ impl FunctionBuilder<'_> {
                     lowered_args,
                     ty,
                     error_ty,
+                    conversion,
                     expr.span,
                 );
             }
@@ -1838,11 +1841,11 @@ impl FunctionBuilder<'_> {
         {
             if let Some(error_ty) = self.callable_error_ty(callee) {
                 let callee = MirCallee::definition_with_type_args(*def_id, explicit_type_args);
-                return self.lower_failable_call(callee, lowered_args, ty, error_ty, expr.span);
+                return self.lower_failable_call(callee, lowered_args, ty, error_ty, conversion, expr.span);
             }
         }
 
-        self.lower_definition_call(*def_id, explicit_type_args, lowered_args, expr)
+        self.lower_definition_call(*def_id, explicit_type_args, lowered_args, conversion, expr)
     }
 
     pub(super) fn lower_positional_call_args(&mut self, args: &[HirCallArg]) -> Option<Vec<MirOperand>> {
@@ -1853,12 +1856,36 @@ impl FunctionBuilder<'_> {
         Some(lowered)
     }
 
+    fn lower_propagated_error(
+        &mut self,
+        error_temp: MirTempId,
+        source_ty: MirType,
+        conversion: Option<DefId>,
+        span: Span,
+    ) -> MirOperand {
+        let Some(arm) = conversion else {
+            return MirOperand::Temp(error_temp);
+        };
+        let destination_ty = self.error_ty.unwrap_or(source_ty);
+        let converted = self.push_temp(destination_ty, span);
+        self.append_stmt(MirStatement {
+            kind: MirStatementKind::Call {
+                destination: Some(MirPlace::temp(converted)),
+                callee: MirCallee::definition(arm),
+                args: vec![MirOperand::Temp(error_temp)],
+            },
+            span,
+        });
+        MirOperand::Temp(converted)
+    }
+
     // consumes type_args and args into MIR statements
     fn lower_definition_call(
         &mut self,
         def_id: DefId,
         explicit_type_args: Vec<MirType>,
         lowered_args: Vec<MirOperand>,
+        conversion: Option<DefId>,
         expr: &HirExpression,
     ) -> Option<MirOperand> {
         let ty = self.expr_ty(expr)?;
@@ -1880,7 +1907,7 @@ impl FunctionBuilder<'_> {
         }
 
         if let Some(err_ty) = self.context.function_errors.get(&def_id).copied() {
-            return self.lower_failable_call(callee, lowered_args, ty, err_ty, expr.span);
+            return self.lower_failable_call(callee, lowered_args, ty, err_ty, conversion, expr.span);
         }
 
         if self.is_vacuum(ty) {
@@ -1917,6 +1944,7 @@ impl FunctionBuilder<'_> {
         lowered_args: Vec<MirOperand>,
         ty: MirType,
         err_ty: MirType,
+        conversion: Option<DefId>,
         span: Span,
     ) -> Option<MirOperand> {
         if let Some(handler) = self.handlers.last().cloned() {
@@ -1977,7 +2005,8 @@ impl FunctionBuilder<'_> {
                 span,
             );
             self.switch_to(error_block);
-            self.terminate_current(MirTerminatorKind::ReturnError(MirOperand::Temp(error_temp)), span);
+            let propagated = self.lower_propagated_error(error_temp, err_ty, conversion, span);
+            self.terminate_current(MirTerminatorKind::ReturnError(propagated), span);
             self.switch_to(ok_block);
             return Some(MirOperand::Constant(MirConstant::Unit));
         }
@@ -1995,7 +2024,8 @@ impl FunctionBuilder<'_> {
             span,
         );
         self.switch_to(error_block);
-        self.terminate_current(MirTerminatorKind::ReturnError(MirOperand::Temp(error_temp)), span);
+        let propagated = self.lower_propagated_error(error_temp, err_ty, conversion, span);
+        self.terminate_current(MirTerminatorKind::ReturnError(propagated), span);
         self.switch_to(ok_block);
         Some(MirOperand::Temp(destination))
     }

@@ -270,7 +270,7 @@ struct CallFinder(Vec<DefId>);
 
 impl HirVisitor for CallFinder {
     fn visit_expr(&mut self, expr: &HirExpression) {
-        if let HirExpressionKind::Call(callee, _, _) = &expr.kind {
+        if let HirExpressionKind::Call(callee, _, _, _) = &expr.kind {
             if let HirExpressionKind::Path(def_id) = &callee.kind {
                 self.0.push(*def_id);
             }

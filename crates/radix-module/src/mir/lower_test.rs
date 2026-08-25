@@ -623,6 +623,26 @@ functio caller() → numerus ⇥ textus {
 }
 
 #[test]
+fn lowers_declared_error_conversion_before_return_error() {
+    let dump = dump_source(
+        r#"
+discretio Sourceum { Failed }
+discretio Destinatio { @ conversio Sourceum err { redde finge Converted {} ∷ Destinatio } Converted }
+functio fail() → vacuum ⇥ Sourceum { iace finge Failed {} ∷ Sourceum }
+functio caller() → vacuum ⇥ Destinatio { fail() }
+"#,
+    );
+    let call = dump
+        .find("call def#1000000(%0)")
+        .expect("synthetic conversion arm call");
+    let return_error = dump[call..]
+        .find("return_error %1")
+        .map(|offset| call + offset)
+        .expect("converted value is propagated");
+    assert!(call < return_error, "conversion must precede ReturnError:\n{dump}");
+}
+
+#[test]
 fn lowers_mori_to_panic_runtime_call_and_unreachable() {
     let dump = dump_source(r#"functio impossible() → vacuum { mori "impossible state" }"#);
 

@@ -544,7 +544,7 @@ impl HirVisitor for HirAspectCollector<'_> {
         if let HirExpressionKind::Discerne { scrutinees, arms, exhaustive } = &expr.kind {
             self.record_discerne(expr, scrutinees, arms, *exhaustive);
         }
-        if let HirExpressionKind::MethodCall(_, method, _, args) = &expr.kind {
+        if let HirExpressionKind::MethodCall(_, method, _, args, _) = &expr.kind {
             self.record_mask_neutrality(expr, *method, args);
         }
         if let HirExpressionKind::Itera(mode, coordinates, _, _, source, _) = &expr.kind {
