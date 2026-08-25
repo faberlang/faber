@@ -9,8 +9,7 @@ use crate::file_interface::{
     FileExport, FileExportKind, FileInterface, InterfaceAliasExport, InterfaceAnnotationContract,
     InterfaceAnnotationContractField, InterfaceCallable, InterfaceEnumVariant, InterfaceGenericParam,
     InterfaceLibraryIdentity, InterfaceMethodExport, InterfaceNominalExport, InterfaceNominalKind,
-    InterfaceNominalType, InterfaceParam, InterfaceStructExport, InterfaceStructField,
-    InterfaceTypeSnapshot,
+    InterfaceNominalType, InterfaceParam, InterfaceStructExport, InterfaceStructField, InterfaceTypeSnapshot,
 };
 use crate::semantic::passes::visibility_annotation::VisibilityTier;
 use crate::semantic::{ContractFieldType, InstansPrecision, NumericWidth, Primitive, SemanticParamMode};
@@ -1349,13 +1348,7 @@ fn file_export_from_stmt(
                 kind: FileExportKind::TypeAlias(InterfaceAliasExport {
                     name,
                     params,
-                    body: interface_type_from_type_expr(
-                        &decl.ty,
-                        interner,
-                        &no_params,
-                        nominal_kinds,
-                        ctx,
-                    )?,
+                    body: interface_type_from_type_expr(&decl.ty, interner, &no_params, nominal_kinds, ctx)?,
                 }),
             })
         }
@@ -1401,10 +1394,7 @@ fn interface_generic_params(
 ) -> Vec<InterfaceGenericParam> {
     params
         .iter()
-        .map(|param| InterfaceGenericParam {
-            name: interner.resolve(param.name.name).to_owned(),
-            kind: param.kind,
-        })
+        .map(|param| InterfaceGenericParam { name: interner.resolve(param.name.name).to_owned(), kind: param.kind })
         .collect()
 }
 

@@ -1942,9 +1942,9 @@ impl Resolver {
             .get(&self.file_interface_export_key(interface, member)?)?
         {
             ImportedFileExport::Type(ty) => Some(ty.decl_param_kinds.clone()),
-            ImportedFileExport::Struct(strukt) => {
-                self.generic_param_kinds(strukt.def_id).map(ToOwned::to_owned)
-            }
+            ImportedFileExport::Struct(strukt) => self
+                .generic_param_kinds(strukt.def_id)
+                .map(ToOwned::to_owned),
             ImportedFileExport::Function(_) => None,
         }
     }

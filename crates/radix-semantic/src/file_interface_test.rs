@@ -17,20 +17,23 @@ fn file_interface_preserves_generic_size_literal_round_trip() {
     let base = types.vector_with_width(elem, width);
     let applied = types.intern(Type::Applied(base, vec![AppliedArg::Size(width)]));
 
-    let snapshot = snapshot_interface_type(applied, &types, &interner).expect("snapshot applied size");
+    let snapshot =
+        snapshot_interface_type(applied, &types, &interner).expect("snapshot applied size");
 
     let InterfaceTypeSnapshot::Applied(_, args) = &snapshot else {
         panic!("expected applied snapshot, got {snapshot:?}");
     };
     assert_eq!(
         args,
-        &vec![InterfaceAppliedArg::Size(InterfaceIndexSnapshot::Literal(3))]
+        &vec![InterfaceAppliedArg::Size(InterfaceIndexSnapshot::Literal(
+            3
+        ))]
     );
 
     let mut target_types = TypeTable::new();
     let mut target_interner = Interner::new();
-    let imported =
-        import_interface_type(&snapshot, &mut target_types, &mut target_interner).expect("import applied size");
+    let imported = import_interface_type(&snapshot, &mut target_types, &mut target_interner)
+        .expect("import applied size");
 
     let Type::Applied(_, args) = target_types.get(imported) else {
         panic!("expected imported applied type");
@@ -38,7 +41,10 @@ fn file_interface_preserves_generic_size_literal_round_trip() {
     assert_eq!(args.len(), 1);
     match &args[0] {
         AppliedArg::Size(index) => {
-            assert!(matches!(target_types.get_index(*index), IndexExpr::Literal(3)));
+            assert!(matches!(
+                target_types.get_index(*index),
+                IndexExpr::Literal(3)
+            ));
         }
         other => panic!("expected size argument, got {other:?}"),
     }
@@ -54,14 +60,17 @@ fn file_interface_preserves_generic_size_param_round_trip() {
     let base = types.vector_with_width(elem, width);
     let applied = types.intern(Type::Applied(base, vec![AppliedArg::Size(width)]));
 
-    let snapshot = snapshot_interface_type(applied, &types, &interner).expect("snapshot applied size param");
+    let snapshot =
+        snapshot_interface_type(applied, &types, &interner).expect("snapshot applied size param");
 
     let InterfaceTypeSnapshot::Applied(_, args) = &snapshot else {
         panic!("expected applied snapshot, got {snapshot:?}");
     };
     assert_eq!(
         args,
-        &vec![InterfaceAppliedArg::Size(InterfaceIndexSnapshot::Param("M".to_owned()))]
+        &vec![InterfaceAppliedArg::Size(InterfaceIndexSnapshot::Param(
+            "M".to_owned()
+        ))]
     );
 
     let mut target_types = TypeTable::new();
@@ -96,7 +105,8 @@ fn file_interface_preserves_generic_kinded_args_in_order() {
         vec![AppliedArg::Type(textus), AppliedArg::Size(width)],
     ));
 
-    let snapshot = snapshot_interface_type(applied, &types, &interner).expect("snapshot mixed args");
+    let snapshot =
+        snapshot_interface_type(applied, &types, &interner).expect("snapshot mixed args");
 
     let InterfaceTypeSnapshot::Applied(_, args) = &snapshot else {
         panic!("expected applied snapshot, got {snapshot:?}");

@@ -636,12 +636,10 @@ fn snapshot_interface_type_inner(
                         module_identity,
                     )
                     .map(InterfaceAppliedArg::Type),
-                    radix_types::AppliedArg::Size(index) => snapshot_interface_index(
-                        *index,
-                        types,
-                        interner,
-                    )
-                    .map(InterfaceAppliedArg::Size),
+                    radix_types::AppliedArg::Size(index) => {
+                        snapshot_interface_index(*index, types, interner)
+                            .map(InterfaceAppliedArg::Size)
+                    }
                 })
                 .collect::<FileInterfaceResult<Vec<_>>>()?,
         )),
@@ -843,19 +841,14 @@ fn import_interface_type_inner(
             let args = args
                 .iter()
                 .map(|arg| match arg {
-                    InterfaceAppliedArg::Type(ty) => import_interface_type_inner(
-                        ty,
-                        types,
-                        interner,
-                        resolver,
-                    )
-                    .map(radix_types::AppliedArg::Type),
-                    InterfaceAppliedArg::Size(index) => import_interface_index(
-                        index,
-                        types,
-                        interner,
-                    )
-                    .map(radix_types::AppliedArg::Size),
+                    InterfaceAppliedArg::Type(ty) => {
+                        import_interface_type_inner(ty, types, interner, resolver)
+                            .map(radix_types::AppliedArg::Type)
+                    }
+                    InterfaceAppliedArg::Size(index) => {
+                        import_interface_index(index, types, interner)
+                            .map(radix_types::AppliedArg::Size)
+                    }
                 })
                 .collect::<FileInterfaceResult<Vec<_>>>()?;
             Ok(types.intern(Type::Applied(base, args)))
