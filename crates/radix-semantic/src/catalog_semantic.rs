@@ -1216,7 +1216,7 @@ fn semantic_invalid_operand_types_help(args: &[DiagnosticArg]) -> Option<String>
         "string_operands_required" => Some("use textus operands for string addition".to_owned()),
         "object_field_requires_value" => Some("provide an explicit value for this object field".to_owned()),
         "vacua_requires_collection_type" => {
-            Some("give vacua a lista, tabula, copia, tensor, or sparsa context".to_owned())
+            Some("give vacua a lista, queue, stack, tabula, copia, tensor, or sparsa context".to_owned())
         }
         "textus_index_must_be_numerus_or_range" => Some("index textus with numerus or an integer range".to_owned()),
         "octeti_index_must_be_numerus_or_range" => Some("index octeti with numerus or an integer range".to_owned()),

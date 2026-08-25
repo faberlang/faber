@@ -40,8 +40,8 @@ use radix_lexer::{Span, Symbol};
 use radix_mir::{
     MirAggregate, MirAggregateFields, MirAggregateItem, MirAggregateKind, MirBlockId,
     MirCollectionOp, MirConstant, MirConversion, MirConversionFlavor, MirGradientOp, MirIntrinsic,
-    MirOperand, MirOptionChainLink, MirOptionOp, MirOptionUnwrapMode, MirProvider, MirProviderKind,
-    MirRuntimeCall, MirSermoOp, MirType, MirTypeCheckOp,
+    MirOperand, MirOptionChainLink, MirOptionOp, MirOptionUnwrapMode, MirPlaceBase, MirProvider,
+    MirProviderKind, MirRuntimeCall, MirSermoOp, MirType, MirTypeCheckOp,
 };
 use radix_runtime_contract::tensor::{
     tensor_dim_non_negative, tensor_flat_offset, tensor_shape_element_count,
@@ -1010,6 +1010,15 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                 let item = self.eval_operand(item, span)?;
                 match receiver {
                     Value::Array(cell) => {
+                        if let Some(capacity) = self.collection_capacity(receiver_operand, span)? {
+                            if cell.borrow().len() >= capacity {
+                                return Err(RunnerError::internal_with_issue(
+                                    span,
+                                    "bounded collection push at capacity",
+                                    "runner_collection_push_capacity",
+                                ));
+                            }
+                        }
                         cell.borrow_mut().push(item);
                         Ok(Value::Unit)
                     }
@@ -2943,6 +2952,60 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
     }
 
     // COLLECTION HELPERS
+
+    /// Read a literal capacity from a direct collection place. MIR values do
+    /// not carry their semantic type, so bounded queue/stack/list push uses
+    /// the active function's place declaration as the capacity witness.
+    fn collection_capacity(
+        &self,
+        operand: &MirOperand,
+        span: Span,
+    ) -> Result<Option<usize>, RunnerError> {
+        let MirOperand::Place(place) = operand else {
+            return Ok(None);
+        };
+        if !place.projections.is_empty() {
+            return Ok(None);
+        }
+        let Some(frame) = self.frames.last() else {
+            return Ok(None);
+        };
+        let function = self.function_by_id(frame.function, span)?;
+        let ty = match &place.base {
+            MirPlaceBase::Local(id) => function
+                .locals
+                .iter()
+                .find(|local| local.id == *id)
+                .map(|local| local.ty)
+                .or_else(|| {
+                    function
+                        .params
+                        .iter()
+                        .find(|param| param.local == *id)
+                        .map(|param| param.ty)
+                }),
+            MirPlaceBase::Temp(id) => function
+                .temps
+                .iter()
+                .find(|temp| temp.id == *id)
+                .map(|temp| temp.ty),
+        };
+        let Some(ty) = ty else {
+            return Ok(None);
+        };
+        let capacity = match self.types.get(ty.semantic_id()) {
+            Type::BoundedArray { capacity, .. }
+            | Type::BoundedQueue { capacity, .. }
+            | Type::BoundedStack { capacity, .. } => *capacity,
+            _ => return Ok(None),
+        };
+        let IndexExpr::Literal(capacity) = self.types.get_index(capacity) else {
+            return Ok(None);
+        };
+        usize::try_from(*capacity).map(Some).map_err(|_| {
+            RunnerError::internal(span, "bounded collection capacity does not fit runner")
+        })
+    }
 
     fn eval_map_snapshot(
         &mut self,

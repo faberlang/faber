@@ -3404,7 +3404,7 @@ fn tensor_add_invalid_broadcast_pair_fails_closed() {
 
 /// Evaluate a single collection runtime call with the given input value
 /// slots (mirrors the inline harness of the LayerNorm/Softmax smoke tests).
-fn evaluate_collection_call(
+pub(super) fn evaluate_collection_call(
     call: &MirRuntimeCall,
     inputs: Vec<(MirValueId, Value)>,
 ) -> Result<Value, RunnerError> {

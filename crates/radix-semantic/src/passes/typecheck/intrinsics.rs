@@ -62,7 +62,12 @@ impl IntrinsicTypeContext {
             };
         }
         match checker.types.get(resolved) {
-            Type::Array(inner) | Type::BoundedArray { element: inner, .. } => Self {
+            Type::Array(inner)
+            | Type::BoundedArray { element: inner, .. }
+            | Type::Queue(inner)
+            | Type::BoundedQueue { element: inner, .. }
+            | Type::Stack(inner)
+            | Type::BoundedStack { element: inner, .. } => Self {
                 inner: Some(*inner),
                 key: None,
                 value: None,
@@ -239,6 +244,8 @@ pub(super) fn check_intrinsic_method_call(
         && matches!(
             resolved,
             Type::BoundedArray { .. }
+                | Type::BoundedQueue { .. }
+                | Type::BoundedStack { .. }
                 | Type::BoundedTextus { .. }
                 | Type::BoundedAscii { .. }
                 | Type::BoundedOcteti { .. }

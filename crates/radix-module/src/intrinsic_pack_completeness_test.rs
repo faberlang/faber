@@ -3,7 +3,8 @@
 //! Proves that `stdlib/locale/en/pack.toml` maps **every** canonical
 //! intrinsic name in the compiler registry (`INTRINSICS`) to an English
 //! surface spelling, pins the four named example mappings from the delivery,
-//! and keeps the `la` pack identity-by-absence (no `[intrinsics]` rows).
+//! and keeps the queue/stack method names explicitly owned by every installed
+//! reader pack.
 //!
 //! The en pack is the complete catalog: the registry and the pack may only
 //! drift together. A registry row added without an en row, or an en row whose
@@ -70,11 +71,34 @@ fn en_pack_maps_the_four_named_examples() {
     assert_eq!(en.intrinsic_surface("appende"), Some("append"));
 }
 
-/// The la pack is untouched: still identity-by-absence for intrinsics.
+/// The queue/stack method vocabulary is explicit and canonical in every
+/// installed reader pack. This is a named-method surface, not a glyph alias.
 #[test]
-fn la_pack_stays_identity_by_absence() {
+fn queue_stack_method_rows_are_owned_by_all_installed_packs() {
+    for locale in ["la", "en", "th-TH", "ar", "zh-Hans", "zh-Hant", "vi", "hi"] {
+        let pack = owned_installed_pack(locale);
+        for (method, english_surface) in [
+            ("appende", "append"),
+            ("decapita", "remove_first"),
+            ("detrahe", "remove_last"),
+            ("longitudo", "length"),
+        ] {
+            let expected = if locale == "en" { english_surface } else { method };
+            assert_eq!(
+                pack.intrinsic_surface(method),
+                Some(expected),
+                "{locale} must own canonical queue/stack method row {method}"
+            );
+        }
+    }
+
     let la = owned_installed_pack("la");
-    assert!(la.intrinsics.is_empty(), "la pack must not own [intrinsics] rows");
-    assert!(la.intrinsic_surface("continet").is_none());
-    assert_eq!(la.intrinsic_canonical(IntrinsicReceiver::Lista, "contains"), None);
+    assert_eq!(
+        la.intrinsic_canonical(IntrinsicReceiver::Queue, "appende"),
+        Some("appende")
+    );
+    assert_eq!(
+        la.intrinsic_canonical(IntrinsicReceiver::Stack, "detrahe"),
+        Some("detrahe")
+    );
 }

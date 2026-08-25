@@ -156,6 +156,10 @@ fn intended_bucket(ty: &Type) -> Bucket {
         | Type::PromissumFailable(_, _)
         | Type::Cursor(_)
         | Type::AsyncCursor(_, _)
+        | Type::Queue(_)
+        | Type::BoundedQueue { .. }
+        | Type::Stack(_)
+        | Type::BoundedStack { .. }
         | Type::Ref(_, _)
         | Type::Interface(_)
         | Type::Func(_)

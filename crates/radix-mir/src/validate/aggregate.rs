@@ -198,6 +198,10 @@ impl Validator<'_, '_> {
                 let element_ty = match self.type_kind(aggregate.ty) {
                     Type::Array(inner)
                     | Type::BoundedArray { element: inner, .. }
+                    | Type::Queue(inner)
+                    | Type::BoundedQueue { element: inner, .. }
+                    | Type::Stack(inner)
+                    | Type::BoundedStack { element: inner, .. }
                     | Type::Set(inner) => Some(MirType::semantic(*inner)),
                     Type::Primitive(Primitive::Valor)
                         if matches!(aggregate.kind, MirAggregateKind::Array) =>
@@ -207,7 +211,7 @@ impl Validator<'_, '_> {
                     _ => {
                         self.error(
                             span,
-                            "ordered collection aggregate type is not array or set",
+                            "ordered collection aggregate type is not array, queue, stack, or set",
                         );
                         None
                     }

@@ -1336,6 +1336,8 @@ impl Parser {
                 | "copia"
                 | "promissum"
                 | "cursor"
+                | "queue"
+                | "stack"
                 | "tensor"
                 | "vector"
                 | "matrix"

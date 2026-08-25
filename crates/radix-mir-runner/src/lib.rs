@@ -727,7 +727,13 @@ impl<H: Host + ?Sized> Runner<'_, H> {
                             Err(error) => return Err(error),
                         }
                     }
-                    _ => self.eval_runtime_call(call, statement.span)?,
+                    _ => match self.eval_runtime_call(call, statement.span) {
+                        Ok(value) => value,
+                        Err(error) if error.issue == "runner_collection_push_capacity" => {
+                            return self.propagate_conversion_failure(error);
+                        }
+                        Err(error) => return Err(error),
+                    },
                 };
                 if let Some(destination) = destination {
                     self.write_place(destination, result, statement.span)?;
@@ -1796,3 +1802,7 @@ mod value_test;
 #[cfg(test)]
 #[path = "extremum_test.rs"]
 mod extremum_test;
+
+#[cfg(test)]
+#[path = "queue_stack_test.rs"]
+mod queue_stack_test;

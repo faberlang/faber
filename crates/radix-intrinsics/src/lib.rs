@@ -1,8 +1,8 @@
 //! Compiler-owned receiver intrinsic registry.
 //!
-//! Radix promotes a fixed catalog of `lista`, `tabula`, `copia`, `textus`,
-//! `ascii`, `numerus`, `fractus`, `tensor`, `matrix`, `vector`, `intervallum`,
-//! and `atomic`
+//! Radix promotes a fixed catalog of `lista`, `queue`, `stack`, `tabula`,
+//! `copia`, `textus`, `ascii`, `numerus`, `fractus`, `tensor`, `matrix`,
+//! `vector`, `intervallum`, and `atomic`
 //! methods. Semantic analysis, MIR lowering, and target backends consult this
 //! module instead of maintaining parallel string tables.
 
@@ -37,6 +37,8 @@ pub fn lookup_method(
 pub fn receivers_for_type(ty: &Type) -> &'static [IntrinsicReceiver] {
     match ty {
         Type::Array(_) | Type::BoundedArray { .. } => &[IntrinsicReceiver::Lista],
+        Type::Queue(_) | Type::BoundedQueue { .. } => &[IntrinsicReceiver::Queue],
+        Type::Stack(_) | Type::BoundedStack { .. } => &[IntrinsicReceiver::Stack],
         // WHY: `octeti` is semantic sugar for `lista<numerus<u8>>`. Routing it to
         // the Lista receiver family gives octeti values every `lista` method.
         // The assignability rule in `semantic/types.rs` makes the two types

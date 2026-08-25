@@ -32,6 +32,10 @@ pub enum IntrinsicReceiver {
     Intervallum,
     /// Storage-sensitive `atomic<T>` cell operations.
     Atomic,
+    /// FIFO `queue<T[, N]>` collection.
+    Queue,
+    /// LIFO `stack<T[, N]>` collection.
+    Stack,
     /// `regex` pattern carrier (compile-time literal; `consentit` match verb).
     Regex,
 }
@@ -282,6 +286,14 @@ pub static INTRINSICS: &[MethodIntrinsic] = &[
     intrinsic!(Textus, "recide", 0, &[], Textus, collection Trim),
     intrinsic!(Textus, "sectio", 2, &[IntrinsicParamKind::NumerusIndex, IntrinsicParamKind::NumerusIndex], Textus, collection Slice),
     intrinsic!(Textus, "vacua", 0, &[], Bool, collection IsEmpty),
+    // queue (FIFO)
+    intrinsic!(Queue, "appende", 1, &[IntrinsicParamKind::Inner], Vacuum, collection Append),
+    intrinsic!(Queue, "decapita", 0, &[], OptionInner, collection RemoveFirst),
+    intrinsic!(Queue, "longitudo", 0, &[], Numerus, collection Length),
+    // stack (LIFO)
+    intrinsic!(Stack, "appende", 1, &[IntrinsicParamKind::Inner], Vacuum, collection Append),
+    intrinsic!(Stack, "detrahe", 0, &[], OptionInner, collection RemoveLast),
+    intrinsic!(Stack, "longitudo", 0, &[], Numerus, collection Length),
     // numeric (numerus + fractus)
     intrinsic!(Numeric, "absolutum", 0, &[], SameAsReceiver, collection Absolute),
     intrinsic!(

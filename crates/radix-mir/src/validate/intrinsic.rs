@@ -1999,9 +1999,13 @@ impl Validator<'_, '_> {
 
     pub(crate) fn collection_element_ty(&self, collection_ty: MirType) -> Option<MirType> {
         match self.type_kind(collection_ty) {
-            Type::Array(inner) | Type::BoundedArray { element: inner, .. } | Type::Set(inner) => {
-                Some(MirType::semantic(*inner))
-            }
+            Type::Array(inner)
+            | Type::BoundedArray { element: inner, .. }
+            | Type::Queue(inner)
+            | Type::BoundedQueue { element: inner, .. }
+            | Type::Stack(inner)
+            | Type::BoundedStack { element: inner, .. }
+            | Type::Set(inner) => Some(MirType::semantic(*inner)),
             _ => None,
         }
     }

@@ -91,7 +91,12 @@ impl FunctionBuilder<'_> {
         };
         let ty = MirType::semantic(type_id);
         match self.normalized_type(type_id) {
-            Type::Array(_) => Some(self.construct_temp(
+            Type::Array(_)
+            | Type::BoundedArray { .. }
+            | Type::Queue(_)
+            | Type::BoundedQueue { .. }
+            | Type::Stack(_)
+            | Type::BoundedStack { .. } => Some(self.construct_temp(
                 MirAggregateKind::Array,
                 MirAggregateFields::Ordered(Vec::new()),
                 ty,

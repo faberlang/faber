@@ -36,6 +36,34 @@ fn dump_source(source: &str) -> String {
     dump_analyzed_unit(&mut unit).expect("MIR lowering succeeds")
 }
 
+#[test]
+fn queue_and_stack_methods_lower_to_core_collection_walkers() {
+    let queue = dump_source(
+        r#"incipit {
+    varia queue<numerus> q ← vacua
+    q.appende(1)
+    fixum numerus ∪ nihil item ← q.decapita()
+    fixum numerus size ← q.longitudo()
+    nota item
+    nota size
+}"#,
+    );
+    assert!(queue.contains("runtime collection append"), "missing queue push MIR: {queue}");
+    assert!(queue.contains("runtime collection remove_first"), "missing queue pop MIR: {queue}");
+    assert!(queue.contains("runtime collection length"), "missing queue length MIR: {queue}");
+
+    let stack = dump_source(
+        r#"incipit {
+    varia stack<textus> s ← vacua
+    s.appende("top")
+    fixum textus ∪ nihil item ← s.detrahe()
+    nota item
+}"#,
+    );
+    assert!(stack.contains("runtime collection append"), "missing stack push MIR: {stack}");
+    assert!(stack.contains("runtime collection remove_last"), "missing stack pop MIR: {stack}");
+}
+
 /// Return the body text of the first `bb0:` block in a MIR dump.
 ///
 /// WHY: breakable-block CFG bugs seal the entry block with `unreachable` while

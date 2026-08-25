@@ -94,7 +94,45 @@ fn receivers_for_type_maps_semantic_families() {
         receivers_for_type(&fractus),
         &[IntrinsicReceiver::Fractus, IntrinsicReceiver::Numeric]
     );
+    let queue = Type::Queue(element);
+    let stack = Type::Stack(element);
+    let bounded_queue = Type::BoundedQueue { element, capacity };
+    let bounded_stack = Type::BoundedStack { element, capacity };
+    assert_eq!(receivers_for_type(&queue), &[IntrinsicReceiver::Queue]);
+    assert_eq!(receivers_for_type(&bounded_queue), &[IntrinsicReceiver::Queue]);
+    assert_eq!(receivers_for_type(&stack), &[IntrinsicReceiver::Stack]);
+    assert_eq!(receivers_for_type(&bounded_stack), &[IntrinsicReceiver::Stack]);
     assert!(receivers_for_type(&Type::Error).is_empty());
+}
+
+#[test]
+fn queue_and_stack_methods_share_core_collection_walkers() {
+    for (receiver, push, pop, push_op, pop_op) in [
+        (
+            IntrinsicReceiver::Queue,
+            "appende",
+            "decapita",
+            MirCollectionOp::Append,
+            MirCollectionOp::RemoveFirst,
+        ),
+        (
+            IntrinsicReceiver::Stack,
+            "appende",
+            "detrahe",
+            MirCollectionOp::Append,
+            MirCollectionOp::RemoveLast,
+        ),
+    ] {
+        let push_entry = lookup_method(receiver, push, 1).expect("queue/stack push row");
+        assert_eq!(push_entry.return_kind, IntrinsicReturnKind::Vacuum);
+        assert_eq!(mir_collection_op(push_entry), Some(push_op));
+        let pop_entry = lookup_method(receiver, pop, 0).expect("queue/stack pop row");
+        assert_eq!(pop_entry.return_kind, IntrinsicReturnKind::OptionInner);
+        assert_eq!(mir_collection_op(pop_entry), Some(pop_op));
+        let length_entry = lookup_method(receiver, "longitudo", 0).expect("queue/stack length row");
+        assert_eq!(length_entry.return_kind, IntrinsicReturnKind::Numerus);
+        assert_eq!(mir_collection_op(length_entry), Some(MirCollectionOp::Length));
+    }
 }
 
 #[test]

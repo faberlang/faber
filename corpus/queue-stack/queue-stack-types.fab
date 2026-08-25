@@ -24,3 +24,29 @@ type TextStack = stack<string>
 type BoundedTextStack = stack<string, 8>
 
 fn accepts(queue<int> q, queue<int, 8> bounded_q, stack<string> s, stack<string, 8> bounded_s) → void {}
+
+# =============================================================================
+# C2 receiver methods — FIFO/LIFO walkers and the settled asymmetry
+# =============================================================================
+
+fn queue_walk(queue<int> input) → int ∪ null {
+  var queue<int> q ← input
+  q.append(1)
+  return q.remove_first()
+}
+
+fn stack_walk(stack<string> input) → string ∪ null {
+  var stack<string> s ← input
+  s.append("top")
+  return s.remove_last()
+}
+
+fn queue_length(queue<int> input) → int {
+  return input.length()
+}
+
+# Bounded push remains a recoverable alternate exit; empty pop is nullable.
+fn bounded_queue_push(queue<int, 2> input) → void ⇥ string {
+  var queue<int, 2> q ← input
+  q.append(1)
+}
