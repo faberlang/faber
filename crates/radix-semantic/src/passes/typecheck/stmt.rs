@@ -113,9 +113,15 @@ impl TypeChecker<'_> {
                     self.check_own_bind_rhs(init);
                 }
                 super::tensor_index::record_shape_witness_from_init(self, local.def_id, init);
+                self.warn_union_annotation_guardrails(*ty, init.span);
                 *ty
             }
-            (Some(ty), None) => *ty,
+            (Some(ty), None) => {
+                // Bare-annotation locals carry no own span; the declaration
+                // site is the best available teach location.
+                self.warn_union_annotation_guardrails(*ty, radix_lexer::Span::default());
+                *ty
+            }
             (None, Some(init)) => {
                 let inferred = self.check_expr(init);
                 super::tensor_index::record_shape_witness_from_init(self, local.def_id, init);
@@ -234,6 +240,10 @@ impl TypeChecker<'_> {
             HirStatementKind::Local(local) => self.check_local(local),
             HirStatementKind::Expr(expr) => {
                 let expr_ty = self.check_expr(expr);
+                // U1R: an `adfirma` whose condition narrows a binding holds
+                // for the rest of the block (failure aborts before control
+                // continues), so register the override after checking it.
+                self.apply_assert_refinement(expr);
                 if self.is_infer(self.resolve_inferred_type(expr_ty)) {
                     let vacuum = self.vacuum_type();
                     self.unify_assign_issue(
@@ -266,6 +276,7 @@ impl TypeChecker<'_> {
     /// inventing a bottom type for control-flow statements.
     pub fn check_block(&mut self, block: &mut HirBlock, expected: Option<TypeId>) -> TypeId {
         self.push_scope();
+        self.push_assert_refinement_frame();
         for stmt in &mut block.statements {
             self.check_stmt(stmt);
         }
@@ -274,6 +285,7 @@ impl TypeChecker<'_> {
         } else {
             self.vacuum_type()
         };
+        self.pop_assert_refinement_frame();
         self.pop_scope();
         ty
     }

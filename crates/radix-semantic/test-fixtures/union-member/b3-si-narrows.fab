@@ -1,0 +1,15 @@
+class Errata {
+    string message
+}
+
+class Bonum {
+    string payload
+}
+
+fn probe(Errata ∪ Bonum r) → string {
+    if r is Errata {
+        return r.message
+    } else {
+        return "ok"
+    }
+}

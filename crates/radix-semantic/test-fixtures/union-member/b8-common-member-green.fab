@@ -1,0 +1,12 @@
+class Errata {
+    string message
+}
+
+class Signum {
+    string message
+    string tag
+}
+
+fn probe(Errata ∪ Signum r) → string {
+    return r.message
+}

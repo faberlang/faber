@@ -1,0 +1,7 @@
+class Aliud {
+    string nuntius
+}
+
+fn probe(Aliud ∪ string v) → bool {
+    return v is int
+}

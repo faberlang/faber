@@ -46,7 +46,7 @@ use radix_lexer::{
     KeywordOwner, KeywordScope, KeywordSurfaceMode, LexResult, Span, Symbol, Token, TokenKind,
 };
 use radix_syntax::{CommentLine, Ident, Newline, NodeId, Program, Trivia};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 /// Result of the parsing phase for one compilation unit.
 ///
@@ -104,6 +104,13 @@ pub struct Parser {
     /// signature-only methods exist under an `abstractus` header and nowhere
     /// else; top-level bodyless functions remain governed by `options`.
     abstract_class_depth: u32,
+    /// Source spellings that declare a nominal type in this file (U1R).
+    ///
+    /// Populated by one pre-parse token scan so `est <name>` classification is
+    /// order-independent: a body referencing a type declared later in the file
+    /// still routes to `TypeCheck`. Cross-file imported types are not visible
+    /// here; those keep today's `Binary(Is)` value-equality classification.
+    declared_type_names: HashSet<String>,
 }
 
 /// Contextual parser policy supplied by compiler frontends.
@@ -223,7 +230,7 @@ impl Parser {
             .enumerate()
             .filter_map(|(i, tok)| (!tok.kind.is_trivia()).then_some(i))
             .collect();
-        Self {
+        let mut parser = Self {
             tokens,
             pos: 0,
             non_trivia_indices,
@@ -238,7 +245,62 @@ impl Parser {
             reader_type_latin_keys,
             has_latin_fallback,
             abstract_class_depth: 0,
+            declared_type_names: HashSet::new(),
+        };
+        parser.declared_type_names = parser.scan_declared_type_names();
+        parser
+    }
+
+    /// Collect the names this file declares as types (U1R est-RHS input).
+    ///
+    /// One linear token walk: after a token whose keyword identity introduces a
+    /// type declaration (`genus`, `implendum`, `ordo`, `discretio`, `typus` —
+    /// pack spellings included), the next identifier is the declared name.
+    /// Annotation-position `typus` rows (`@ radix typus T`) contribute type
+    /// parameter names, which is harmless for the est classifier.
+    fn scan_declared_type_names(&self) -> HashSet<String> {
+        let mut names = HashSet::new();
+        let mut expect_name = false;
+        for token in &self.tokens {
+            if token.kind.is_trivia() {
+                continue;
+            }
+            if expect_name {
+                if let TokenKind::Ident(sym) = token.kind {
+                    names.insert(self.interner.resolve(sym).to_owned());
+                }
+                expect_name = false;
+                continue;
+            }
+            let introduces_type_decl = match token.kind {
+                TokenKind::Genus
+                | TokenKind::Implendum
+                | TokenKind::Ordo
+                | TokenKind::Discretio
+                | TokenKind::Typus => true,
+                TokenKind::Ident(sym) => {
+                    let identity = self
+                        .keyword_claim_key(sym)
+                        .and_then(|latin| lookup_keyword_spec(latin))
+                        .and_then(|spec| spec.token_kind.clone());
+                    matches!(
+                        identity,
+                        Some(
+                            TokenKind::Genus
+                                | TokenKind::Implendum
+                                | TokenKind::Ordo
+                                | TokenKind::Discretio
+                                | TokenKind::Typus
+                        )
+                    )
+                }
+                _ => false,
+            };
+            if introduces_type_decl {
+                expect_name = true;
+            }
         }
+        names
     }
 
     /// Parse a complete Faber source file body.
@@ -639,7 +701,7 @@ impl Parser {
         }
     }
 
-    /// Peek whether the next token is an identifier naming a primitive type.
+    /// Peek whether the next token is an identifier naming a type.
     ///
     /// WHY: `est <type>` needs to disambiguate a type-name `RHS` from a value
     /// expression at parse time. The primitive type names (`numerus`, `textus`,
@@ -649,12 +711,20 @@ impl Parser {
     /// of those types (via `reader_type_latin_keys`) route the same way. This
     /// peek lets the parser route `est numerus` to `TypeCheck` without
     /// consuming the token.
+    ///
+    /// U1R extends the same classification to identifiers this file declares
+    /// as nominal types (`est Errata` → `TypeCheck`). A name that declares no
+    /// type stays value-equality `Binary(Is)` — an imported type is the
+    /// documented miss, not a parse guess.
     fn peek_starts_type_name(&self) -> bool {
         let TokenKind::Ident(sym) = self.peek().kind else {
             return false;
         };
         let source = self.interner.resolve(sym);
         if self.reader_type_latin_keys.contains_key(source) {
+            return true;
+        }
+        if self.declared_type_names.contains(source) {
             return true;
         }
         matches!(
@@ -1128,6 +1198,10 @@ mod claim_test;
 #[cfg(test)]
 #[path = "generic_call_test.rs"]
 mod generic_call_test;
+
+#[cfg(test)]
+#[path = "est_type_classification_test.rs"]
+mod est_type_classification_test;
 
 #[cfg(test)]
 #[path = "slot_helpers_test.rs"]

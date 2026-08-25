@@ -1,0 +1,7 @@
+fn probe(int ∪ string u) → int {
+    if u is int {
+        return u + 1
+    } else {
+        return u.length()
+    }
+}

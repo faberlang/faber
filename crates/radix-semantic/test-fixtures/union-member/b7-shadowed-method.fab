@@ -1,0 +1,13 @@
+class Alpha {
+    string tag
+    fn code(int n) → int { return n }
+}
+
+class Beta {
+    string tag
+    fn code(string s) → int { return 1 }
+}
+
+fn probe(Alpha ∪ Beta r) → int {
+    return r.code(5)
+}

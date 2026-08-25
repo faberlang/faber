@@ -52,6 +52,10 @@ const ISSUE_METHOD_CALL_TYPE_ARGS: &str = "method_call_type_args";
 const ISSUE_OCTETI_LITERAL_TEMPLATE_APPLICATION: &str = "octeti_literal_template_application";
 const ISSUE_SERMO_VIEW_PAYLOAD_TYPE_ARG_COUNT: &str = "sermo_view_payload_type_arg_count";
 const ISSUE_TEMPLATE_APPLICATION_TYPE_ARGS: &str = "template_application_type_args";
+const ISSUE_UNION_MEMBER_NOT_COMMON: &str = "union_member_not_common";
+const ISSUE_UNION_NOMINAL_MEMBERS: &str = "union_nominal_members";
+const ISSUE_UNION_NO_COMMON_MEMBERS: &str = "union_no_common_members";
+const ISSUE_UNION_METHOD_SIGNATURE_SHADOWED: &str = "union_method_signature_shadowed";
 const ISSUE_VARIANT_CONSTRUCTOR_TYPE_ARGS: &str = "variant_constructor_type_args";
 
 impl TypeChecker<'_> {
@@ -134,6 +138,14 @@ impl TypeChecker<'_> {
     fn method_display_name(&self, name: Symbol) -> String {
         self.interner.map_or_else(
             || "method".to_owned(),
+            |interner| interner.resolve(name).to_owned(),
+        )
+    }
+
+    /// Field-name spelling for union member attribution diagnostics (U1R).
+    pub(crate) fn member_display_name(&self, name: Symbol) -> String {
+        self.interner.map_or_else(
+            || "member".to_owned(),
             |interner| interner.resolve(name).to_owned(),
         )
     }
@@ -470,6 +482,36 @@ impl TypeChecker<'_> {
             );
             self.validate_interval_bound_call_args(*name, &sig, args);
             return ret;
+        }
+
+        // U1R common-member rule: a `∪` receiver calls a method only when
+        // every constituent declares it with one agreeing signature — a real
+        // signature, not the permissive sink this path used to fall through
+        // to. A miss names the constituents that lack the method.
+        if let Some(members) = self.union_members_of(receiver_ty) {
+            if let Some(sig) = self.union_common_method_signature(&members, *name) {
+                self.set_chorda_scalar_closure_context(*name);
+                let ret = self.check_instantiated_call(
+                    &sig,
+                    explicit_type_args,
+                    args,
+                    receiver.span,
+                    expected,
+                );
+                self.validate_interval_bound_call_args(*name, &sig, args);
+                return ret;
+            }
+            self.typecheck_call_arg_exprs(args);
+            let lacking = self.union_lacking_constituents(&members, *name);
+            self.undefined_member_with_args(
+                ISSUE_UNION_MEMBER_NOT_COMMON,
+                receiver.span,
+                &[
+                    ("member", self.method_display_name(*name)),
+                    ("lacking", lacking.join(", ")),
+                ],
+            );
+            return self.error_type;
         }
 
         let resolved_receiver_ty = self.resolve_inferred_type(receiver_ty);
@@ -1076,7 +1118,7 @@ impl TypeChecker<'_> {
         self.resolver.conversion_arm_for(*destination_def, source)
     }
 
-    fn format_conversion_type_for_diagnostic(&self, ty: TypeId) -> String {
+    pub(crate) fn format_union_constituent_type(&self, ty: TypeId) -> String {
         let Some(interner) = self.interner else {
             return format!("{:?}", self.types.get(ty));
         };
@@ -1086,6 +1128,229 @@ impl TypeChecker<'_> {
                 .map(|symbol| interner.resolve(symbol.name).to_owned())
                 .unwrap_or_else(|| format!("Def{}", def_id.0))
         })
+    }
+
+    /// One agreeing signature for a method every union constituent declares
+    /// (U1R common-member rule).
+    ///
+    /// Same-name methods with incompatible signatures across constituents
+    /// are simply not common members — the computation falls out, no extra
+    /// rule. Heritage-merged views are consulted through the ordinary
+    /// per-constituent `lookup_method_signature`.
+    fn union_common_method_signature(&self, members: &[TypeId], name: Symbol) -> Option<FuncSig> {
+        let mut common: Option<FuncSig> = None;
+        for member in members {
+            let sig = self.lookup_method_signature(*member, name)?;
+            match &common {
+                None => common = Some(sig),
+                Some(existing) => {
+                    if !self.func_sigs_agree(existing, &sig) {
+                        return None;
+                    }
+                }
+            }
+        }
+        common
+    }
+
+    /// Whether two declared signatures expose one callable contract (U1R).
+    ///
+    /// Compared constituent-to-constituent for the common-member rule:
+    /// parameter count, modes, optionality, parameter/return/error-channel
+    /// types, and the async/generator markers. Type arguments are compared
+    /// alias-transparently through `TypeTable::equals`.
+    fn func_sigs_agree(&self, lhs: &FuncSig, rhs: &FuncSig) -> bool {
+        if lhs.params.len() != rhs.params.len()
+            || lhs.is_async != rhs.is_async
+            || lhs.is_generator != rhs.is_generator
+        {
+            return false;
+        }
+        match (lhs.err, rhs.err) {
+            (None, None) => {}
+            (Some(lhs_err), Some(rhs_err)) => {
+                if !self.member_type_equals(lhs_err, rhs_err) {
+                    return false;
+                }
+            }
+            _ => return false,
+        }
+        if !self.member_type_equals(lhs.ret, rhs.ret) {
+            return false;
+        }
+        lhs.params.iter().zip(rhs.params.iter()).all(|(l, r)| {
+            l.mode == r.mode
+                && l.optional == r.optional
+                && self.member_type_equals(l.ty, r.ty)
+        })
+    }
+
+    /// Display names of the union constituents that do not declare `name`
+    /// (U1R attribution for the common-member miss).
+    fn union_lacking_constituents(&self, members: &[TypeId], name: Symbol) -> Vec<String> {
+        members
+            .iter()
+            .copied()
+            .filter(|member| self.lookup_method_signature(*member, name).is_none())
+            .map(|member| self.display_union_constituent(member))
+            .collect()
+    }
+
+    /// Union-of-nominal guardrail warnings at a written `∪` annotation
+    /// (U1R guardrails 1, 3, 4).
+    ///
+    /// Guardrail 1 teaches the member rule whenever a written union has two
+    /// or more nominal members. Guardrails 3 and 4 compute over the
+    /// heritage-merged member views and stay confined to all-nominal unions
+    /// — a mixed or primitive union has no honest declared-member view.
+    pub fn warn_union_annotation_guardrails(&mut self, annotation_ty: TypeId, span: radix_lexer::Span) {
+        let Some(members) = self.union_members_of(annotation_ty) else {
+            return;
+        };
+        let nominal: Vec<TypeId> = members
+            .iter()
+            .copied()
+            .filter(|member| self.constituent_is_nominal(*member))
+            .collect();
+        if nominal.len() < 2 {
+            return;
+        }
+        let display = members
+            .iter()
+            .map(|member| self.display_union_constituent(*member))
+            .collect::<Vec<_>>()
+            .join(" ∪ ");
+        // Guardrail 1: teach the member rule at the moment of writing.
+        self.push_warning(
+            WarningKind::UnionOfNominalMembers,
+            ISSUE_UNION_NOMINAL_MEMBERS,
+            span,
+            &[("union", display.clone())],
+        );
+        // Guardrail 3: an all-nominal union sharing no members is store-only.
+        if self.union_common_member_names(&members).is_empty() {
+            self.push_warning(
+                WarningKind::UnionNoCommonMembers,
+                ISSUE_UNION_NO_COMMON_MEMBERS,
+                span,
+                &[("union", display)],
+            );
+            return;
+        }
+        // Guardrail 4: same-name methods with incompatible signatures drop
+        // out of the common set silently — name the collision.
+        for name in self.union_shared_method_names(&members) {
+            let signatures: Vec<Option<FuncSig>> = members
+                .iter()
+                .copied()
+                .map(|member| self.lookup_method_signature(member, name))
+                .collect();
+            let mut agree = true;
+            let first = signatures.iter().find_map(|sig| sig.clone());
+            let Some(first) = first else {
+                continue;
+            };
+            for sig in signatures.iter().flatten() {
+                if !self.func_sigs_agree(&first, sig) {
+                    agree = false;
+                    break;
+                }
+            }
+            if !agree {
+                let method = self
+                    .interner
+                    .map(|interner| interner.resolve(name).to_owned())
+                    .unwrap_or_default();
+                self.push_warning(
+                    WarningKind::UnionMethodSignatureShadowed,
+                    ISSUE_UNION_METHOD_SIGNATURE_SHADOWED,
+                    span,
+                    &[("method", method), ("union", display.clone())],
+                );
+            }
+        }
+    }
+
+    /// Push one structured warning into the diagnostics stream.
+    pub(crate) fn push_warning(
+        &mut self,
+        kind: WarningKind,
+        issue: &'static str,
+        span: radix_lexer::Span,
+        args: &[(&'static str, String)],
+    ) {
+        let mut error = SemanticError::structured(SemanticErrorKind::Warning(kind), span)
+            .with_arg("issue", issue);
+        for (name, value) in args {
+            error = error.with_arg(name, value.clone());
+        }
+        self.errors.push(error);
+    }
+
+    /// Whether a union constituent is a nominal user type (U1R guardrails).
+    fn constituent_is_nominal(&self, member: TypeId) -> bool {
+        self.struct_def_from_type(member).is_some()
+            || self.interface_def_from_type(member).is_some()
+            || self.enum_def_from_type(member).is_some()
+    }
+
+    /// Declared member names of one union constituent (fields ∪ methods).
+    fn constituent_member_names(&self, member: TypeId) -> Vec<Symbol> {
+        let mut names: Vec<Symbol> = Vec::new();
+        if let Some(struct_def) = self.struct_def_from_type(member) {
+            if let Some(info) = self.structs.get(&struct_def) {
+                names.extend(info.fields.keys().copied());
+                names.extend(info.methods.keys().copied());
+            }
+            return names;
+        }
+        if let Some(interface_def) = self.interface_def_from_type(member) {
+            if let Some(methods) = self.interfaces.get(&interface_def) {
+                names.extend(methods.keys().copied());
+            }
+            return names;
+        }
+        if let Some(enum_def) = self.enum_def_from_type(member) {
+            names.extend(self.resolver.commune_fields(enum_def).iter().map(|f| f.name));
+        }
+        names
+    }
+
+    /// Member names every constituent of the union declares (U1R guardrail 3).
+    fn union_common_member_names(&self, members: &[TypeId]) -> Vec<Symbol> {
+        let mut sets: Vec<rustc_hash::FxHashSet<Symbol>> = members
+            .iter()
+            .map(|member| self.constituent_member_names(*member).into_iter().collect())
+            .collect();
+        let Some(first) = sets.pop() else {
+            return Vec::new();
+        };
+        first
+            .into_iter()
+            .filter(|name| sets.iter().all(|set| set.contains(name)))
+            .collect()
+    }
+
+    /// Method names two or more constituents of the union declare (U1R
+    /// guardrail 4 candidates).
+    fn union_shared_method_names(&self, members: &[TypeId]) -> Vec<Symbol> {
+        let mut count: rustc_hash::FxHashMap<Symbol, usize> = rustc_hash::FxHashMap::default();
+        for member in members {
+            for name in self.constituent_member_names(*member) {
+                if self.lookup_method_signature(*member, name).is_some() {
+                    *count.entry(name).or_insert(0) += 1;
+                }
+            }
+        }
+        count
+            .into_iter()
+            .filter(|(_, hits)| *hits >= 2)
+            .map(|(name, _)| name)
+            .collect()
+    }
+
+    fn format_conversion_type_for_diagnostic(&self, ty: TypeId) -> String {
+        self.format_union_constituent_type(ty)
     }
 
     /// Enforces alternate-exit handling for functions that can produce errors.

@@ -73,6 +73,10 @@ pub(crate) const WARNING_KINDS: &[WarningKind] = &[
     WarningKind::DiscouragedMutLocal,
     WarningKind::EmptyMarkerShadowing,
     WarningKind::UnboundedTextusIndex,
+    WarningKind::TypeTestMemberAbsent,
+    WarningKind::UnionOfNominalMembers,
+    WarningKind::UnionNoCommonMembers,
+    WarningKind::UnionMethodSignatureShadowed,
 ];
 
 // STABLE CODES
@@ -340,6 +344,14 @@ pub fn semantic_message(kind: SemanticErrorKind, args: &[DiagnosticArg]) -> Opti
         SemanticErrorKind::Warning(WarningKind::UnboundedTextusIndex) => {
             semantic_unbounded_textus_index_message(args)
         }
+        SemanticErrorKind::Warning(WarningKind::TypeTestMemberAbsent) => {
+            semantic_type_test_member_absent_message(args)
+        }
+        SemanticErrorKind::Warning(
+            WarningKind::UnionOfNominalMembers
+            | WarningKind::UnionNoCommonMembers
+            | WarningKind::UnionMethodSignatureShadowed,
+        ) => semantic_union_guardrail_message(args),
     }
 }
 
@@ -371,6 +383,14 @@ pub fn semantic_help(kind: SemanticErrorKind, args: &[DiagnosticArg]) -> Option<
         SemanticErrorKind::Warning(WarningKind::UnboundedTextusIndex) => {
             Some("convert to textus<N> for O(1) indexing or iterate scalars".to_owned())
         }
+        SemanticErrorKind::Warning(WarningKind::TypeTestMemberAbsent) => Some(
+            "narrow with a member the union declares, or fix the tested type".to_owned(),
+        ),
+        SemanticErrorKind::Warning(
+            WarningKind::UnionOfNominalMembers
+            | WarningKind::UnionNoCommonMembers
+            | WarningKind::UnionMethodSignatureShadowed,
+        ) => semantic_union_guardrail_help(args),
         _ => None,
     }
 }
@@ -1663,6 +1683,13 @@ fn semantic_undefined_member_message(args: &[DiagnosticArg]) -> Option<String> {
         "unknown_tuple_element_label" => Some("unknown tuple element label".to_owned()),
         "unknown_variant_field" => Some("unknown variant field".to_owned()),
         "unknown_union_field" => Some("unknown union field".to_owned()),
+        "union_member_not_common" => {
+            let member = arg_value(args, "member")?;
+            let lacking = arg_value(args, "lacking")?;
+            Some(format!(
+                "union member `{member}` is not common; lacking in: {lacking}"
+            ))
+        }
         _ => None,
     }
 }
@@ -1693,6 +1720,9 @@ fn semantic_undefined_member_help(args: &[DiagnosticArg]) -> Option<String> {
         }
         "unknown_variant_field" => Some("check the variant field name".to_owned()),
         "unknown_union_field" => Some("check the union's `@ commune` field name".to_owned()),
+        "union_member_not_common" => {
+            Some("narrow the receiver (`est M` branch, `discerne`) to recover per-member access".to_owned())
+        }
         _ => None,
     }
 }
@@ -2890,6 +2920,28 @@ fn warning_spec(kind: WarningKind) -> DiagnosticSpec {
             code: "WARN022",
             help: Some("convert to textus<N> for O(1) indexing or iterate scalars"),
         },
+        WarningKind::TypeTestMemberAbsent => DiagnosticSpec {
+            code: "WARN023",
+            help: Some("narrow with a member the union declares, or fix the tested type"),
+        },
+        WarningKind::UnionOfNominalMembers => DiagnosticSpec {
+            code: "WARN024",
+            help: Some(
+                "narrow with `est`/`discerne` to recover per-member access; both-at-once is `∩`",
+            ),
+        },
+        WarningKind::UnionNoCommonMembers => DiagnosticSpec {
+            code: "WARN025",
+            help: Some(
+                "narrow with `est`/`discerne` before any member access; the union itself is store-only",
+            ),
+        },
+        WarningKind::UnionMethodSignatureShadowed => DiagnosticSpec {
+            code: "WARN026",
+            help: Some(
+                "align the constituent signatures or rename one method to keep it common",
+            ),
+        },
     }
 }
 
@@ -2950,6 +3002,57 @@ fn semantic_union_hole_solved_monomorphically_help(args: &[DiagnosticArg]) -> Op
         "union_hole_solved_monomorphically" => {
             Some("use `_` if only one type is intended".to_owned())
         }
+        _ => None,
+    }
+}
+
+fn semantic_type_test_member_absent_message(args: &[DiagnosticArg]) -> Option<String> {
+    match arg_value(args, "issue")? {
+        "type_test_member_absent" => {
+            let ty = arg_value(args, "type")?;
+            let union = arg_value(args, "union")?;
+            Some(format!("type test `{ty}` is dead: not a member of `{union}`"))
+        }
+        _ => None,
+    }
+}
+
+fn semantic_union_guardrail_message(args: &[DiagnosticArg]) -> Option<String> {
+    match arg_value(args, "issue")? {
+        "union_nominal_members" => {
+            let union = arg_value(args, "union")?;
+            Some(format!(
+                "union `{union}` guarantees only the common members; narrow to recover per-member access"
+            ))
+        }
+        "union_no_common_members" => {
+            let union = arg_value(args, "union")?;
+            Some(format!("union `{union}` shares no members; it is store-only until narrowed"))
+        }
+        "union_method_signature_shadowed" => {
+            let method = arg_value(args, "method")?;
+            let union = arg_value(args, "union")?;
+            Some(format!(
+                "method `{method}` is not common in `{union}`: constituent signatures disagree"
+            ))
+        }
+        _ => None,
+    }
+}
+
+fn semantic_union_guardrail_help(args: &[DiagnosticArg]) -> Option<String> {
+    match arg_value(args, "issue")? {
+        "union_nominal_members" => Some(
+            "narrow with `est`/`discerne` to recover per-member access; both-at-once is `∩`"
+                .to_owned(),
+        ),
+        "union_no_common_members" => Some(
+            "narrow with `est`/`discerne` before any member access; the union itself is store-only"
+                .to_owned(),
+        ),
+        "union_method_signature_shadowed" => Some(
+            "align the constituent signatures or rename one method to keep it common".to_owned(),
+        ),
         _ => None,
     }
 }

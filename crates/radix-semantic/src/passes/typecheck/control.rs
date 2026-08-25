@@ -25,15 +25,21 @@
 //!   Compound conditions are conservative (nn-u2): `x non est nihil et …`
 //!   narrows the taken branch only (the conjunction requires the left
 //!   null-check conjunct), while `or` and non-`and` shapes never narrow.
+//! - U1R generalizes the seam to nominal member tests: `r est M` narrows the
+//!   taken branch to `M` and the fallthrough to the union minus `M` (`non est
+//!   M` mirrors), on immutable bindings only (varia refinement is open row 2).
+//!   `adfirma <cond>` narrows the REST of its block through an override frame
+//!   restored at block exit — a failed assert aborts, so control never
+//!   continues past it with the un-narrowed type.
 
 #[allow(clippy::wildcard_imports)]
 // parent module provides shared imports for typechecking
 use super::*;
 
-/// `(then_refinement, else_refinement)` pair for the null-check narrowing
-/// (nn-u1): each side is an optional `(DefId, narrowed TypeId)` for the
-/// visible binding; the untaken side is always `None`.
-type NullConditionRefinement = (Option<(DefId, TypeId)>, Option<(DefId, TypeId)>);
+/// `(then_refinement, else_refinement)` pair for condition narrowing
+/// (nn-u1 null checks, U1R nominal `est M` tests): each side is an optional
+/// `(DefId, narrowed TypeId)` for the visible binding.
+type ConditionRefinement = (Option<(DefId, TypeId)>, Option<(DefId, TypeId)>);
 
 impl TypeChecker<'_> {
     /// Check a catch clause for a handled alternate exit.
@@ -156,17 +162,17 @@ impl TypeChecker<'_> {
             let prev_error = self.current_error;
             self.current_error = Some(ErrorSink::Local(err_ty));
             self.check_condition(cond);
-            let (then_refine, _) = self.null_condition_refinement(cond);
+            let (then_refine, _) = self.condition_refinement(cond);
             let then_ty = self.check_block_with_refinement(then_block, expected, then_refine);
             self.current_error = prev_error;
             self.check_cape(catch, err_ty);
             then_ty
         } else {
             self.check_condition(cond);
-            let (then_refine, _) = self.null_condition_refinement(cond);
+            let (then_refine, _) = self.condition_refinement(cond);
             self.check_block_with_refinement(then_block, expected, then_refine)
         };
-        let (_, else_refine) = self.null_condition_refinement(cond);
+        let (_, else_refine) = self.condition_refinement(cond);
         let else_ty = match else_block {
             Some(block) => self.check_block_with_refinement(block, expected, else_refine),
             None => self.vacuum_type(),
@@ -190,13 +196,18 @@ impl TypeChecker<'_> {
         self.common_type(then_ty, else_ty, cond.span)
     }
 
-    /// Detect a direct null check on a visible binding and compute the
-    /// narrowing for each branch of the `si` (nn-u1/nn-u2).
+    /// Detect a narrowing condition on a visible immutable binding and compute
+    /// the refinement for each branch of the `si` (nn-u1/nn-u2, U1R).
     ///
     /// `x non est nihil` narrows the binding to its non-null core in the taken
     /// (then) branch; `x est nihil` narrows identically in the fallthrough
     /// (else) branch (Q3). The untaken side of each form keeps `T ∪ null`, so
-    /// only one side of the returned pair is ever set.
+    /// only one side of the null pair is ever set.
+    ///
+    /// U1R adds the `TypeCheck` node arm: `r est M` narrows the taken branch
+    /// to `M` and the fallthrough to the union minus `M`; `r non est M`
+    /// mirrors. A member test on a union that lacks `M` refines nothing (the
+    /// dead-test WARN fires at the expression site).
     ///
     /// Compound conditions are conservative (nn-u2). `x non est nihil et …`
     /// narrows the taken branch only: the whole conjunction being true
@@ -206,19 +217,22 @@ impl TypeChecker<'_> {
     /// unsound — `x` can be null while `x est nihil et y` is false). `or`
     /// never narrows: the disjunction's truth does not force the left
     /// operand's truth, so neither branch is refined. Non-`and` compound
-    /// shapes (and null checks that are not the leftmost `and` conjunct)
+    /// shapes (and tests that are not the leftmost `and` conjunct)
     /// stay un-narrowed.
     ///
     /// Returns `(then_refinement, else_refinement)`, each an optional
     /// `(DefId, narrowed TypeId)` for the visible binding.
-    fn null_condition_refinement(&mut self, cond: &HirExpression) -> NullConditionRefinement {
+    fn condition_refinement(&mut self, cond: &HirExpression) -> ConditionRefinement {
+        if let HirExpressionKind::TypeCheck { positive, expr, ty } = &cond.kind {
+            return self.type_check_refinement(*positive, expr, *ty);
+        }
         let HirExpressionKind::Binary(op, lhs, rhs) = &cond.kind else {
             return (None, None);
         };
         // Compound conjunction: keep only the taken-branch refinement of the
         // left conjunct; the fallthrough of `and` is never narrowed.
         if matches!(op, HirBinOp::And) {
-            let (then_refine, _) = self.null_condition_refinement(lhs);
+            let (then_refine, _) = self.condition_refinement(lhs);
             return (then_refine, None);
         }
         // `x non est nihil` narrows the taken branch; `x est nihil` narrows
@@ -238,7 +252,8 @@ impl TypeChecker<'_> {
         let Some(binding_ty) = self.lookup_binding(*def_id).map(|binding| binding.ty) else {
             return (None, None);
         };
-        let Some(refined) = self.peel_nullable_type(binding_ty) else {
+        let nihil = self.types.primitive(Primitive::Nihil);
+        let Some(refined) = self.peel_member_type(binding_ty, nihil) else {
             return (None, None);
         };
         if taken_branch_narrows {
@@ -248,34 +263,124 @@ impl TypeChecker<'_> {
         }
     }
 
-    /// Peel one nullable layer from a type to its non-null core, when the type
-    /// is representable as a null-check narrowing (nn-u1).
+    /// Refinement for a `TypeCheck` condition (`r est M` / `r non est M`,
+    /// U1R).
     ///
-    /// `Option(T)` narrows to `T`; a union containing `nihil` narrows to the
-    /// union of its remaining members (collapsed to the single member when
-    /// only one remains). Types with no nullable layer — and the degenerate
-    /// all-`nihil` union, which has nothing left to narrow to — return `None`
-    /// so callers leave the binding unchanged.
-    fn peel_nullable_type(&mut self, ty: TypeId) -> Option<TypeId> {
-        match self.types.get(self.resolve_inferred_type(ty)) {
-            Type::Option(inner) => Some(*inner),
-            Type::Union(members) => {
-                let nihil = self.types.primitive(Primitive::Nihil);
-                let mut remaining: Vec<TypeId> = members
-                    .iter()
-                    .copied()
-                    .filter(|member| !self.types.equals(*member, nihil))
-                    .collect();
-                match remaining.len() {
-                    0 => None,
-                    1 => Some(remaining[0]),
-                    _ => {
-                        remaining.sort_unstable_by_key(|member| member.0);
-                        Some(self.types.intern(Type::Union(remaining)))
-                    }
-                }
+    /// Only an immutable binding whose type is a union containing `M`
+    /// narrows (varia refinement needs reassignment invalidation — open row
+    /// 2, immutable-first). The taken branch of the positive test is `M`
+    /// itself; the fallthrough is the union minus `M`, collapsing to the
+    /// single remaining member and left unrefined when nothing remains (the
+    /// statically-unreachable branch). The negative test mirrors.
+    fn type_check_refinement(
+        &mut self,
+        positive: bool,
+        expr: &HirExpression,
+        member: TypeId,
+    ) -> ConditionRefinement {
+        let HirExpressionKind::Path(def_id) = &expr.kind else {
+            return (None, None);
+        };
+        let Some(binding) = self.lookup_binding(*def_id) else {
+            return (None, None);
+        };
+        if binding.mutable {
+            return (None, None);
+        }
+        let binding_ty = self.resolve_inferred_type(binding.ty);
+        let Some(members) = self.union_members_of(binding_ty) else {
+            return (None, None);
+        };
+        let member = self.resolve_inferred_type(member);
+        if !members
+            .iter()
+            .copied()
+            .any(|candidate| self.member_type_equals(candidate, member))
+        {
+            return (None, None);
+        }
+        let remainder = self.peel_member_type(binding_ty, member);
+        if positive {
+            (Some((*def_id, member)), remainder.map(|ty| (*def_id, ty)))
+        } else {
+            (remainder.map(|ty| (*def_id, ty)), Some((*def_id, member)))
+        }
+    }
+
+    /// WARN when a `TypeCheck` tests a member its operand union cannot hold
+    /// (U1R membership validation).
+    ///
+    /// A statically-false test is a dead test — a warning, not an error, so
+    /// the `Binary(Is)` value-equality semantics stay untouched; only the
+    /// `TypeCheck` node gains this check. Non-union operands keep today's
+    /// pass-through behavior.
+    pub(crate) fn warn_dead_type_test(
+        &mut self,
+        operand_ty: TypeId,
+        member: TypeId,
+        span: radix_lexer::Span,
+    ) {
+        let Some(members) = self.union_members_of(operand_ty) else {
+            return;
+        };
+        let member = self.resolve_inferred_type(member);
+        if members
+            .iter()
+            .copied()
+            .any(|candidate| self.member_type_equals(candidate, member))
+        {
+            return;
+        }
+        let member_display = self.display_union_constituent(member);
+        let operand_display = members
+            .iter()
+            .map(|candidate| self.display_union_constituent(*candidate))
+            .collect::<Vec<_>>()
+            .join(" ∪ ");
+        self.push_warning(
+            WarningKind::TypeTestMemberAbsent,
+            "type_test_member_absent",
+            span,
+            &[("type", member_display), ("union", operand_display)],
+        );
+    }
+
+    /// Alias-transparent structural equality for union member comparisons.
+    pub(crate) fn member_type_equals(&self, lhs: TypeId, rhs: TypeId) -> bool {
+        let lhs = self.resolve_inferred_type(lhs);
+        let rhs = self.resolve_inferred_type(rhs);
+        lhs == rhs || self.types.equals(lhs, rhs)
+    }
+
+    /// Peel one member from a union type, when the type is representable as a
+    /// member-test narrowing (nn-u1 generalized by U1R).
+    ///
+    /// `Option(T)` narrows to `T` only for the implicit `nihil` member; a
+    /// union narrows to the union of its remaining members (collapsed to the
+    /// single member when only one remains). Types with no such layer — and
+    /// the degenerate union that is entirely the peeled member, which has
+    /// nothing left to narrow to — return `None` so callers leave the binding
+    /// unchanged.
+    fn peel_member_type(&mut self, ty: TypeId, member: TypeId) -> Option<TypeId> {
+        let resolved = self.resolve_inferred_type(ty);
+        if let Type::Option(inner) = self.types.get(resolved) {
+            // Only the implicit `nihil` member peels an `Option` layer.
+            let nihil = self.types.primitive(Primitive::Nihil);
+            let member = self.resolve_inferred_type(member);
+            return (self.types.equals(member, nihil) || member == nihil).then_some(*inner);
+        }
+        let mut remaining: Vec<TypeId> = self
+            .union_members_of(resolved)?
+            .into_iter()
+            .filter(|candidate| !self.member_type_equals(*candidate, member))
+            .collect();
+        match remaining.len() {
+            0 => None,
+            1 => Some(remaining.remove(0)),
+            _ => {
+                remaining.sort_unstable_by_key(|candidate| candidate.0);
+                Some(self.types.intern(Type::Union(remaining)))
             }
-            _ => None,
         }
     }
 
@@ -325,5 +430,51 @@ impl TypeChecker<'_> {
             scope.insert(def_id, original);
         }
         self.binding_shadow.insert(def_id, original);
+    }
+
+    /// Open one assert-remainder frame for the block about to be checked
+    /// (U1R).
+    ///
+    /// `adfirma r est M` narrows the rest of its block: assert failure aborts
+    /// the program, so control never continues past the statement with the
+    /// un-narrowed type. Overrides registered while the block is checked are
+    /// restored in reverse here, so a narrowed type never escapes its block.
+    pub fn push_assert_refinement_frame(&mut self) {
+        self.assert_refinements.push(Vec::new());
+    }
+
+    /// Close the innermost assert-remainder frame, restoring every override
+    /// it registered (U1R).
+    pub fn pop_assert_refinement_frame(&mut self) {
+        let Some(frame) = self.assert_refinements.pop() else {
+            return;
+        };
+        for (def_id, saved) in frame.into_iter().rev() {
+            if let Some(original) = saved {
+                self.restore_binding(def_id, original);
+            }
+        }
+    }
+
+    /// Apply an assertion expression's taken-branch refinement for the rest
+    /// of its block (U1R).
+    ///
+    /// Only `adfirma` conditions with a narrowing `then` side register an
+    /// override (`adfirma r est M`, the null forms, and their conservative
+    /// compounds); other assertion shapes are checked and forgotten.
+    pub fn apply_assert_refinement(&mut self, expr: &HirExpression) {
+        let HirExpressionKind::Adfirma(cond, _) = &expr.kind else {
+            return;
+        };
+        let Some((def_id, ty)) = self.condition_refinement(cond).0 else {
+            return;
+        };
+        if self.assert_refinements.is_empty() {
+            return;
+        }
+        let saved = self.override_binding(def_id, ty);
+        if let Some(frame) = self.assert_refinements.last_mut() {
+            frame.push((def_id, saved));
+        }
     }
 }

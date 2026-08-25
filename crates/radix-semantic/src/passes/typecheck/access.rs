@@ -373,7 +373,108 @@ impl TypeChecker<'_> {
             self.undefined_member("unknown_tuple_element_label", span);
             return self.error_type;
         }
+        // U1R common-member rule: a `∪` receiver exposes only members every
+        // constituent exposes with one agreeing type. The miss is an
+        // attributed error naming the constituents that lack the member —
+        // not the silent ignotum sink this path used to fall through to.
+        if let Some(members) = self.union_members_of(object_ty) {
+            return self.check_union_field_from_type(&members, name, span);
+        }
         self.error_type
+    }
+
+    /// Common-member field access on a `∪` receiver (U1R).
+    ///
+    /// Every constituent must expose the field (through the same merged
+    /// heritage views single-receiver access uses) with one agreeing type;
+    /// otherwise the member is not common and the diagnostic names the
+    /// constituents that lack it, teaching the narrowing recovery (`est M`).
+    fn check_union_field_from_type(
+        &mut self,
+        members: &[TypeId],
+        name: Symbol,
+        span: radix_lexer::Span,
+    ) -> TypeId {
+        let mut lacking: Vec<String> = Vec::new();
+        let mut common: Option<TypeId> = None;
+        for member in members {
+            match self.union_constituent_field_type(*member, name) {
+                Some(field_ty) => match common {
+                    None => common = Some(field_ty),
+                    Some(existing) => {
+                        if !self.member_type_equals(existing, field_ty) {
+                            common = None;
+                            break;
+                        }
+                    }
+                },
+                None => lacking.push(self.display_union_constituent(*member)),
+            }
+        }
+        match common {
+            Some(field_ty) if lacking.is_empty() => field_ty,
+            _ => {
+                self.undefined_member_with_args(
+                    "union_member_not_common",
+                    span,
+                    &[
+                        ("member", self.member_display_name(name)),
+                        ("lacking", lacking.join(", ")),
+                    ],
+                );
+                self.error_type
+            }
+        }
+    }
+
+    /// One union constituent's field type for the common-member computation,
+    /// or `None` when the constituent does not expose the field (U1R).
+    fn union_constituent_field_type(&mut self, member: TypeId, name: Symbol) -> Option<TypeId> {
+        if let Some(struct_def) = self.struct_def_from_type(member) {
+            let field = self
+                .structs
+                .get(&struct_def)?
+                .fields
+                .get(&name)
+                .copied()?;
+            return Some(self.applied_field_type(member, struct_def, field.ty));
+        }
+        if let Some(enum_def) = self.enum_def_from_type(member) {
+            return self.resolver.commune_field(enum_def, name).map(|f| f.ty);
+        }
+        if matches!(
+            self.types.get(self.resolve_inferred_type(member)),
+            Type::Primitive(Primitive::Textus | Primitive::Ignotum)
+        ) && self
+            .interner
+            .is_some_and(|interner| interner.resolve(name) == "nuntius")
+        {
+            return Some(self.types.primitive(Primitive::Textus));
+        }
+        if let Type::Map(_, value_ty) = self.types.get(self.resolve_inferred_type(member)) {
+            return Some(*value_ty);
+        }
+        if let Type::Record(fields) = self.types.get(self.resolve_inferred_type(member)) {
+            return fields.get(&name).copied();
+        }
+        None
+    }
+
+    /// Display name of a union constituent for attribution diagnostics (U1R).
+    pub(crate) fn display_union_constituent(&self, member: TypeId) -> String {
+        let resolved = self.resolve_inferred_type(member);
+        match self.types.get(resolved) {
+            Type::Struct(def_id) | Type::Interface(def_id) | Type::Enum(def_id) => self
+                .resolver
+                .get_symbol(*def_id)
+                .and_then(|symbol| {
+                    self.interner
+                        .map(|interner| interner.resolve(symbol.name).to_owned())
+                })
+                .filter(|name| !name.is_empty())
+                .unwrap_or_else(|| self.format_union_constituent_type(resolved)),
+            _ => self.format_union_constituent_type(resolved),
+        }
     }
 
     /// Substitute an applied generic nominal's arguments into a field type.

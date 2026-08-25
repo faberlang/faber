@@ -1,0 +1,3 @@
+fn probe(int ∪ string u) {
+    print u.length
+}

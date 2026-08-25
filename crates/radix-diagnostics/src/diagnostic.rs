@@ -239,6 +239,18 @@ pub enum WarningKind {
     /// Scalar indexing on unbounded UTF-8 `textus` walks from the start and
     /// traps when the selected scalar is not representable as one ASCII byte.
     UnboundedTextusIndex,
+    /// An `est M` type test names a member its operand union cannot hold —
+    /// a statically dead test (U1R).
+    TypeTestMemberAbsent,
+    /// A written `∪` annotation has two or more nominal members; it
+    /// guarantees only the common members (U1R guardrail 1).
+    UnionOfNominalMembers,
+    /// An all-nominal `∪` whose constituents share no members is store-only
+    /// until narrowed (U1R guardrail 3).
+    UnionNoCommonMembers,
+    /// A same-name method with incompatible signatures across `∪`
+    /// constituents silently leaves the common set (U1R guardrail 4).
+    UnionMethodSignatureShadowed,
 }
 
 /// Semantic diagnostic categories used by passes and command policy.

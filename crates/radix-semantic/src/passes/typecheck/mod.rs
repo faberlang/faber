@@ -61,7 +61,7 @@ use crate::locale::LocalePack;
 use crate::{
     types::InferVar, FuncSig, IndexExpr, IndexInferState, MarkerFamily, NumericWidth, ParamType,
     Primitive, Resolver, SemanticError, SemanticErrorKind, SemanticParamMode, Type, TypeId,
-    TypeParamConstraint, TypeTable,
+    TypeParamConstraint, TypeTable, WarningKind,
 };
 use radix_hir::{
     DefId, HirArrayElement, HirAvailability, HirBinOp, HirBlock, HirCape, HirCasuArm,
@@ -99,6 +99,9 @@ pub mod stmt;
 pub mod summa;
 #[cfg(test)]
 pub mod relations_test;
+#[cfg(test)]
+#[path = "union_member_refinement_test.rs"]
+mod union_member_refinement_test;
 pub mod tensor_index;
 pub mod tensor_type_directed;
 
@@ -382,6 +385,11 @@ pub(crate) struct TypeChecker<'a> {
     /// `check_intrinsic_method_call`. `None` when no pack is selected: lookup
     /// keeps the surface-only (Latin-identity) behavior.
     pub locale_pack: Option<&'a LocalePack>,
+
+    /// Live assert-remainder override frames, one per block being checked
+    /// (U1R). `adfirma r est M` registers a narrowed binding here for the
+    /// rest of its block; block exit restores every override in reverse.
+    pub(crate) assert_refinements: Vec<Vec<(DefId, Option<BindingInfo>)>>,
 }
 
 /// Typecheck resolved HIR and attach table-local types to declarations and expressions.
@@ -509,6 +517,7 @@ impl<'a> TypeChecker<'a> {
             error_type,
             mark_chorda_scalar_closure_param: false,
             locale_pack: None,
+            assert_refinements: Vec::new(),
         }
     }
 

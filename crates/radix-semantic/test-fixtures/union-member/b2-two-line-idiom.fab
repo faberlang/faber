@@ -1,0 +1,13 @@
+class Errata {
+    string message
+}
+
+class Bonum {
+    string payload
+}
+
+fn probe(Errata ∪ Bonum r) → string {
+    assert r is Errata
+    assert r.message ≡ "boom"
+    return "done"
+}

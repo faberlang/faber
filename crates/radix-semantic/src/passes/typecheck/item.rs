@@ -53,6 +53,7 @@ impl TypeChecker<'_> {
             }
             let scalar_text = self.interval_bound_param_is_scalar_text(&func_name, idx, param.ty);
             let mutable = matches!(param.mode, HirParamMode::In);
+            self.warn_union_annotation_guardrails(param.ty, param.span);
             self.record_binding_name(param.def_id, param.name);
             self.insert_binding_with_scalar(param.def_id, param.ty, scalar_text, mutable);
         }

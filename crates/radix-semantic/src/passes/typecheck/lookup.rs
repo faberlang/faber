@@ -340,6 +340,24 @@ impl TypeChecker<'_> {
         None
     }
 
+    /// Members of a union type after alias transparency (U1R).
+    ///
+    /// `typus R = A ∪ B` and its unfolded union are the same type (BO-S-4
+    /// alias transparency), so the member rule, refinement, and dead-test
+    /// warning all compare through this peel. Non-union types (and the
+    /// `Option` rewrite a nihil union lowers to) return `None`.
+    pub(crate) fn union_members_of(&self, ty: TypeId) -> Option<Vec<TypeId>> {
+        let mut current = self.resolve_inferred_type(ty);
+        for _ in 0..8 {
+            match self.types.get(current) {
+                Type::Union(members) => return Some(members.clone()),
+                Type::Alias(_, inner) => current = self.resolve_inferred_type(*inner),
+                _ => return None,
+            }
+        }
+        None
+    }
+
     #[must_use]
     pub fn lookup_interface_method_info(
         &self,
