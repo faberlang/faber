@@ -616,6 +616,7 @@ pub struct ProbaCase {
 /// filtering, retries, and timing policy are owned by the test backend.
 #[derive(Debug, Clone)]
 pub enum ProbaModifier {
+    Erratur,
     Fragilis(i64),
     Futurum(Symbol),
     Metior,

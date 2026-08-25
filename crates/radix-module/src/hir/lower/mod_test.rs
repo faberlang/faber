@@ -300,7 +300,7 @@ probandum "outer suite" {
 
 #[test]
 fn lowers_all_test_modifiers_into_metadata() {
-    let source = r#"proba "modifier case" omitte "blocked by service" futurum "later" solum tag "smoke" temporis 5 metior repete 2 fragilis 1 solum_in "staging" {
+    let source = r#"proba "modifier case" erratur omitte "blocked by service" futurum "later" solum tag "smoke" temporis 5 metior repete 2 fragilis 1 solum_in "staging" {
     adfirma verum
 }"#;
 
@@ -317,6 +317,7 @@ fn lowers_all_test_modifiers_into_metadata() {
         .modifiers
         .iter()
         .map(|modifier| match modifier {
+            HirTestModifier::Erratur => "erratur".to_owned(),
             HirTestModifier::Omitte(reason) => format!("omitte({})", interner.resolve(*reason)),
             HirTestModifier::Futurum(reason) => format!("futurum({})", interner.resolve(*reason)),
             HirTestModifier::Solum => "solum".to_owned(),
@@ -332,6 +333,7 @@ fn lowers_all_test_modifiers_into_metadata() {
     assert_eq!(
         rendered,
         vec![
+            "erratur".to_owned(),
             "omitte(blocked by service)".to_owned(),
             "futurum(later)".to_owned(),
             "solum".to_owned(),

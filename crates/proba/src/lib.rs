@@ -56,6 +56,9 @@ pub struct ProbaCase {
 /// Resolved test-modifier view for selection and skip reporting.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ProbaModifierView {
+    /// Strict expected-error marker; only an error-channel escape satisfies it.
+    Erratur,
+
     Omitte(String),
     Futurum(String),
     Solum,
@@ -216,6 +219,7 @@ fn proba_case_from_metadata(
 
 fn resolve_modifier(modifier: &HirTestModifier, interner: &Interner) -> ProbaModifierView {
     match modifier {
+        HirTestModifier::Erratur => ProbaModifierView::Erratur,
         HirTestModifier::Omitte(reason) => {
             ProbaModifierView::Omitte(interner.resolve(*reason).to_owned())
         }
@@ -303,8 +307,8 @@ pub fn source_skip_reason(case: &ProbaCase) -> Option<String> {
 }
 
 /// How a case's remaining modifiers (`temporis` / `repete` / `solum_in` /
-/// `fragilis` / `metior`) are enforced. Every parsed modifier is either
-/// consumed here or rejected; none is silently ignored.
+/// `fragilis` / `metior` / `erratur`) are enforced. Every parsed modifier is
+/// either consumed here or rejected; none is silently ignored.
 enum ExecutionPlan {
     Reject {
         reason: String,
@@ -315,15 +319,18 @@ enum ExecutionPlan {
     Run {
         step_budget: Option<u64>,
         repeats: u64,
+        erratur: bool,
     },
 }
 
 fn execution_plan(modifiers: &[ProbaModifierView]) -> ExecutionPlan {
     let mut step_budget = None;
     let mut repeats = 1_u64;
+    let mut erratur = false;
     let mut solum_in = None;
     for modifier in modifiers {
         match modifier {
+            ProbaModifierView::Erratur => erratur = true,
             ProbaModifierView::Omitte(_)
             | ProbaModifierView::Futurum(_)
             | ProbaModifierView::Solum
@@ -371,6 +378,7 @@ fn execution_plan(modifiers: &[ProbaModifierView]) -> ExecutionPlan {
     ExecutionPlan::Run {
         step_budget,
         repeats,
+        erratur,
     }
 }
 
@@ -631,9 +639,10 @@ fn run_proba_cases(
             ExecutionPlan::Run {
                 step_budget,
                 repeats,
+                erratur,
             } => match function_id_for_case(case) {
                 Some(function_id) => {
-                    execute_case_repeated(validated, function_id, step_budget, repeats)
+                    execute_case_repeated(validated, function_id, step_budget, repeats, erratur)
                 }
                 None => CaseExecution::without_output(CaseOutcome::Blocked {
                     reason: format!(
@@ -670,10 +679,22 @@ fn execute_case_repeated(
     function_id: MirFunctionId,
     step_budget: Option<u64>,
     repeats: u64,
+    erratur: bool,
+) -> CaseExecution {
+    execute_repeated(repeats, || {
+        // Apply erratur inside each execution so a passing expected-error run
+        // does not trip the repeat loop's non-Passed short-circuit.
+        execute_case(validated, function_id, step_budget, erratur)
+    })
+}
+
+fn execute_repeated(
+    repeats: u64,
+    mut execute: impl FnMut() -> CaseExecution,
 ) -> CaseExecution {
     let mut last = CaseExecution::without_output(CaseOutcome::Passed);
     for _ in 0..repeats {
-        last = execute_case(validated, function_id, step_budget);
+        last = execute();
         if !matches!(last.outcome, CaseOutcome::Passed) {
             return last;
         }
@@ -685,6 +706,7 @@ fn execute_case(
     validated: &ValidatedMir<'_>,
     function_id: MirFunctionId,
     step_budget: Option<u64>,
+    erratur: bool,
 ) -> CaseExecution {
     let mut host = BufferHost::default();
     // Assertion failures call Host::abort which panics on BufferHost; catch as fail.
@@ -696,8 +718,7 @@ fn execute_case(
     }));
     std::panic::set_hook(previous_hook);
     let outcome = match trapped {
-        Ok(Ok(())) => CaseOutcome::Passed,
-        Ok(Err(errors)) => case_outcome_from_runner_errors(&errors),
+        Ok(run_result) => outcome_from_run_result(run_result, erratur),
         Err(payload) => {
             if let Some(reason) = host.last_abort.clone() {
                 CaseOutcome::Failed { message: reason }
@@ -722,6 +743,38 @@ fn captured_stdout(host: &BufferHost) -> Vec<String> {
         stdout.push(host.pending_stdout.clone());
     }
     stdout
+}
+
+/// Runner issue emitted when a failable call reaches a statement without an
+/// enclosing error sink. This is the only runner failure that represents the
+/// expected error-channel escape for `erratur`.
+const ISSUE_UNCAUGHT_ALTERNATE_RETURN: &str = "runner_uncaught_alternate_return_from_call";
+
+fn outcome_from_run_result(
+    result: Result<(), Vec<RunnerError>>,
+    erratur: bool,
+) -> CaseOutcome {
+    match result {
+        // Strict-xfail: an erratur case that completes cleanly is a suite
+        // failure, not a silently accepted pass.
+        Ok(()) if erratur => CaseOutcome::Failed {
+            message: "faber: erratur expected an error-channel escape, but the case passed"
+                .to_owned(),
+        },
+        Ok(()) => CaseOutcome::Passed,
+        // Flip only the runner's explicit uncaught alternate-return issue.
+        // Budget exhaustion, capability gaps, and other runner failures stay
+        // on their existing outcome paths below.
+        Err(errors) if erratur && is_error_channel_escape(&errors) => CaseOutcome::Passed,
+        Err(errors) => case_outcome_from_runner_errors(&errors),
+    }
+}
+
+fn is_error_channel_escape(errors: &[RunnerError]) -> bool {
+    !errors.is_empty()
+        && errors
+            .iter()
+            .all(|error| error.issue == ISSUE_UNCAUGHT_ALTERNATE_RETURN)
 }
 
 fn case_outcome_from_runner_errors(errors: &[RunnerError]) -> CaseOutcome {

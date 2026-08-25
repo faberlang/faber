@@ -1104,6 +1104,12 @@ pub static KEYWORD_SPECS: &[KeywordSpec] = &[
     },
     // === Keywords: Testing ===
     KeywordSpec {
+        text: "erratur",
+        token_kind: Some(TokenKind::Erratur),
+        scope: KeywordScope::TestOwned,
+        category: KeywordKind::Testing,
+    },
+    KeywordSpec {
         text: "fragilis",
         token_kind: Some(TokenKind::Fragilis),
         scope: KeywordScope::TestOwned,

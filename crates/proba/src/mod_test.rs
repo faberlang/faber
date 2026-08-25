@@ -1,6 +1,7 @@
 //! Unit tests for proba inventory and MIR-runner case runner.
 
 use super::*;
+use radix::mir::RunnerError;
 use radix::module::{Config, Session};
 use radix::program::analyze_prepared_program_name;
 use std::path::PathBuf;
@@ -565,4 +566,141 @@ fn solum_in_match_helper_covers_env_os_and_var() {
     assert!(super::solum_in_matches_in("CI", None, "macos", |name| {
         (name == "CI").then(|| "1".to_owned())
     }));
+}
+
+#[test]
+fn erratur_clean_pass_fails_strictly() {
+    let report = run(
+        r#"
+proba "unexpected pass" erratur {
+    adfirma 1 ≡ 1
+}
+"#,
+        TestSelection::default(),
+    );
+    assert_eq!(report.passed(), 0);
+    assert_eq!(report.failed(), 1);
+    match &report.results[0].outcome {
+        CaseOutcome::Failed { message } => assert!(message.contains("erratur")),
+        other => panic!("expected strict erratur failure, got {other:?}"),
+    }
+}
+
+#[test]
+fn erratur_is_carried_into_inventory() {
+    let analysis = analyze_prepared_program_name(
+        &session(),
+        "erratur_inventory.fab",
+        r#"
+proba "expected" erratur {
+    adfirma 1 ≡ 1
+}
+"#,
+    )
+    .expect("analyze");
+    let cases = inventory_cases(&analysis.hir, &analysis.interner);
+    assert!(matches!(
+        cases[0].modifiers.as_slice(),
+        [ProbaModifierView::Erratur]
+    ));
+}
+
+#[test]
+fn erratur_does_not_flip_fragilis_rejection() {
+    let report = run(
+        r#"
+proba "rejected flaky" erratur fragilis 1 {
+    adfirma 1 ≡ 1
+}
+"#,
+        TestSelection::default(),
+    );
+    assert_eq!(report.failed(), 1);
+    assert!(matches!(report.results[0].outcome, CaseOutcome::Failed { .. }));
+    assert!(!report.success());
+}
+
+#[test]
+fn erratur_does_not_flip_metior_rejection() {
+    let report = run(
+        r#"
+proba "rejected benchmark" erratur metior {
+    adfirma 1 ≡ 1
+}
+"#,
+        TestSelection::default(),
+    );
+    assert_eq!(report.failed(), 1);
+    assert!(matches!(report.results[0].outcome, CaseOutcome::Failed { .. }));
+    assert!(!report.success());
+}
+
+#[test]
+fn erratur_does_not_flip_temporis_budget_exhaustion() {
+    let report = run(
+        r#"
+proba "budget" erratur temporis 64 {
+    dum verum {
+        tacet
+    }
+}
+"#,
+        TestSelection::default(),
+    );
+    assert_eq!(report.failed(), 1);
+    match &report.results[0].outcome {
+        CaseOutcome::Failed { message } => assert!(message.contains("temporis")),
+        other => panic!("expected budget failure, got {other:?}"),
+    }
+}
+
+#[test]
+fn erratur_does_not_flip_assertion_abort() {
+    let report = run(
+        r#"
+proba "assertion" erratur {
+    adfirma 1 ≡ 2
+}
+"#,
+        TestSelection::default(),
+    );
+    assert_eq!(report.failed(), 1);
+    assert!(matches!(report.results[0].outcome, CaseOutcome::Failed { .. }));
+    assert!(!report.success());
+}
+
+#[test]
+fn erratur_flips_only_uncaught_error_channel_escapes() {
+    let escaped = RunnerError::internal(
+        radix::lexer::Span::default(),
+        "uncaught alternate return from call",
+    );
+    assert!(matches!(
+        outcome_from_run_result(Err(vec![escaped]), true),
+        CaseOutcome::Passed
+    ));
+
+    let unrelated = RunnerError::internal(radix::lexer::Span::default(), "host failed");
+    assert!(matches!(
+        outcome_from_run_result(Err(vec![unrelated]), true),
+        CaseOutcome::Failed { .. }
+    ));
+}
+
+#[test]
+fn erratur_flips_before_repete_short_circuit() {
+    let mut executions = 0;
+    let execution = execute_repeated(3, || {
+        executions += 1;
+        CaseExecution::without_output(outcome_from_run_result(
+            Err(vec![RunnerError::internal(
+                radix::lexer::Span::default(),
+                "uncaught alternate return from call",
+            )]),
+            true,
+        ))
+    });
+
+    assert_eq!(executions, 3);
+    assert!(matches!(execution.outcome, CaseOutcome::Passed));
 }

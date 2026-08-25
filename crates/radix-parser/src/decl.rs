@@ -1778,7 +1778,9 @@ impl Parser {
     fn parse_test_modifiers(&mut self) -> Result<Vec<ProbaModifier>, ParseError> {
         let mut modifiers = Vec::new();
         loop {
-            if self.eat_keyword_ident(TokenKind::Omitte) {
+            if self.eat_keyword_ident(TokenKind::Erratur) {
+                modifiers.push(ProbaModifier::Erratur);
+            } else if self.eat_keyword_ident(TokenKind::Omitte) {
                 let reason = self.parse_string()?;
                 modifiers.push(ProbaModifier::Omitte(reason));
             } else if self.eat_keyword_ident(TokenKind::Futurum) {

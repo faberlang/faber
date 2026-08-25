@@ -1926,7 +1926,7 @@ fn parses_probandum_with_all_modifiers() {
 probandum "suite" tag "parser" {
     praepara omnia {}
     postpara {}
-    proba "case" omitte "skip" futurum "later" solum tag "focus" temporis 5 metior repete 2 fragilis 1 solum_in "ci" {}
+    proba "case" erratur omitte "skip" futurum "later" solum tag "focus" temporis 5 metior repete 2 fragilis 1 solum_in "ci" {}
     probandum "nested" { proba "inner" {} }
 }
 "#,
@@ -1945,16 +1945,17 @@ probandum "suite" tag "parser" {
     assert_eq!(test.body.nested.len(), 1);
 
     let case = &test.body.tests[0];
-    assert_eq!(case.modifiers.len(), 9);
-    assert!(matches!(case.modifiers[0], ProbaModifier::Omitte(_)));
-    assert!(matches!(case.modifiers[1], ProbaModifier::Futurum(_)));
-    assert!(matches!(case.modifiers[2], ProbaModifier::Solum));
-    assert!(matches!(case.modifiers[3], ProbaModifier::Tag(_)));
-    assert!(matches!(case.modifiers[4], ProbaModifier::Temporis(5)));
-    assert!(matches!(case.modifiers[5], ProbaModifier::Metior));
-    assert!(matches!(case.modifiers[6], ProbaModifier::Repete(2)));
-    assert!(matches!(case.modifiers[7], ProbaModifier::Fragilis(1)));
-    assert!(matches!(case.modifiers[8], ProbaModifier::SolumIn(_)));
+    assert_eq!(case.modifiers.len(), 10);
+    assert!(matches!(case.modifiers[0], ProbaModifier::Erratur));
+    assert!(matches!(case.modifiers[1], ProbaModifier::Omitte(_)));
+    assert!(matches!(case.modifiers[2], ProbaModifier::Futurum(_)));
+    assert!(matches!(case.modifiers[3], ProbaModifier::Solum));
+    assert!(matches!(case.modifiers[4], ProbaModifier::Tag(_)));
+    assert!(matches!(case.modifiers[5], ProbaModifier::Temporis(5)));
+    assert!(matches!(case.modifiers[6], ProbaModifier::Metior));
+    assert!(matches!(case.modifiers[7], ProbaModifier::Repete(2)));
+    assert!(matches!(case.modifiers[8], ProbaModifier::Fragilis(1)));
+    assert!(matches!(case.modifiers[9], ProbaModifier::SolumIn(_)));
 }
 
 #[test]

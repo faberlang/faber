@@ -233,6 +233,7 @@ pub enum TokenKind {
     Per,
     Usque,
     // === Keywords: Testing ===
+    Erratur,
     Fragilis,
     Futurum,
     Metior,
@@ -465,6 +466,7 @@ impl TokenKind {
                 | Intra
                 | Per
                 | Usque
+                | Erratur
                 | Fragilis
                 | Futurum
                 | Metior

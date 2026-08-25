@@ -871,6 +871,7 @@ impl<'a> Lowerer<'a> {
     /// Preserve test-selection metadata without interpreting harness policy.
     fn lower_test_modifier(modifier: &ProbaModifier) -> HirTestModifier {
         match modifier {
+            ProbaModifier::Erratur => HirTestModifier::Erratur,
             ProbaModifier::Omitte(reason) => HirTestModifier::Omitte(*reason),
             ProbaModifier::Futurum(reason) => HirTestModifier::Futurum(*reason),
             ProbaModifier::Solum => HirTestModifier::Solum,

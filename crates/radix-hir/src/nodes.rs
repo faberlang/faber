@@ -382,6 +382,9 @@ pub struct HirTestMetadata {
 /// Test modifier taxonomy preserved for harness selection.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum HirTestModifier {
+    /// Coarse expected-error marker; the proba runner owns its strict-xfail policy.
+    Erratur,
+
     /// Skip marker with the source reason/label.
     Omitte(Symbol),
 

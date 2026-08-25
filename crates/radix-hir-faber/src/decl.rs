@@ -350,6 +350,9 @@ impl super::FaberCodegen {
         writer: &mut CodeWriter,
     ) {
         match modifier {
+            HirTestModifier::Erratur => {
+                writer.write(surface.keyword(TokenKind::Erratur));
+            }
             HirTestModifier::Omitte(reason) => {
                 self.write_quoted_test_token(TokenKind::Omitte, *reason, interner, surface, writer);
             }
