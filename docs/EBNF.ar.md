@@ -1528,7 +1528,7 @@ spellings on the right perform runtime variant/type tests, while `لاشيء`,
 `صواب`, `خطأ`, and ordinary value expressions use the value-test path. Radix
 currently recognizes type targets through a fixed core-type vocabulary. Extending
 that recognition to arbitrary declared types is a separate language decision.
-Use `≡` / `≠` (or `≢`) for structural value equality, `≅` / `≇` for promoted exact equality (same value after numeric widths join), `≈` / `≉` for fuzzy equality (tolerance match with Python-isclose defaults: rel_tol 1e-09, abs_tol 0.0), and `↦` for runtime conversion.
+Use `≡` / `≠` for structural value equality and `↦` for runtime conversion.
 
 Retired predicate keywords are not prefix unary syntax. Use `expr هو صواب`,
 `expr هو خطأ`, `expr هو لاشيء`, `expr ليس هو لاشيء`, `expr ≺ 0`, or

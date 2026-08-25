@@ -170,9 +170,7 @@ enum_member ::= IDENTIFIER ('=' ('-'? NUMBER | STRING))?
 discretio_decl ::= 'discretio' IDENTIFIER generic_params? '{' union_member* variant (',' variant)* '}'
 # formerly: unionMember
 # [056] union_member
-union_member ::= annotation* field_decl | conversio_arm
-# formerly: conversioArm
-conversio_arm ::= '@' ('conversio' | 'conversion') type_annotation IDENT? '{' stmt* '}'
+union_member ::= annotation* field_decl
 # [057] variant
 variant ::= IDENTIFIER ('{' variant_fields '}')?
 # formerly: variantFields
@@ -416,10 +414,10 @@ range_expr ::= additive_expr range_tail?
 range_tail ::= ('‥' | '…' | 'ante' | 'usque') additive_expr ('per' additive_expr)?
 # formerly: additive
 # [143] additive_expr
-additive_expr ::= multiplicative_expr (('+' | '-' | '⤒' | '⤓') multiplicative_expr)*
+additive_expr ::= multiplicative_expr (('+' | '-') multiplicative_expr)*
 # formerly: multiplicative
 # [144] multiplicative_expr
-multiplicative_expr ::= vel_expr (('*' | '/' | '%' | '·' | '×' | '⊗' | '⊙' | '⊘') vel_expr)*
+multiplicative_expr ::= vel_expr (('*' | '/' | '%' | '·' | '×' | '⊗' | '⊙') vel_expr)*
 # formerly: coalesce
 # [145] vel_expr
 vel_expr ::= unary_expr ('vel' vel_rhs)*
@@ -452,15 +450,13 @@ conversio_expr ::= '↦' type_annotation inline_recovery?
 inline_recovery ::= '⇥' unary_expr
 # formerly: call
 # [155] call_expr
-call_expr ::= primary (call_suffix | member_suffix | transpose_suffix | optional_suffix | non_null_suffix)*
+call_expr ::= primary (call_suffix | member_suffix | optional_suffix | non_null_suffix)*
 # formerly: callSuffix
 # [156] call_suffix
 call_suffix ::= call_type_args? '(' argument_list ')'
 # formerly: memberSuffix
 # [157] member_suffix
 member_suffix ::= '.' IDENTIFIER | '[' expression ']'
-# [157a] transpose_suffix
-transpose_suffix ::= 'ᵀ'
 # formerly: optionalSuffix
 # [158] optional_suffix
 optional_suffix ::= '?.' IDENTIFIER | '?[' expression ']' | '?(' argument_list ')'
@@ -476,14 +472,7 @@ argument ::= template_argument | 'sparge'? expression
 # [162] template_argument
 template_argument ::= 'sparge'? IDENTIFIER ':' expression
 # [163] literal
-# Non-finite literals are contextual floating-point values: `∞` is positive
-# infinity and `nonnumerus` is NaN. The named form is `nonnumerus` in the
-# Latin (`la`) pack and `nan` in every other shipped pack. Their width follows
-# a surrounding `f32` or `f64` context when present; bare `fractus` remains
-# unsized, and neither form has a width suffix. A leading `-` is supplied by
-# `unary_expr`, so `-∞` is unary negation of `∞`, not a separate token. A
-# `numerus` context rejects both forms (fail-closed); neither maps to an integer.
-literal ::= NUMBER | STRING | ASCII_STRING | BACKTICK_STRING | OCTETI_STRING | 'verum' | 'falsum' | 'nihil' | '∞' | 'nonnumerus'
+literal ::= NUMBER | STRING | ASCII_STRING | BACKTICK_STRING | OCTETI_STRING | 'verum' | 'falsum' | 'nihil'
 # [164] primary
 primary ::= IDENTIFIER | literal | 'ego' | array_literal | json_literal | typed_constructor | iuncta_expr | ad_expr | clausura_expr | praefixum_expr | scriptum_expr | lege_expr | first_match_expr | summa_expr | '(' expression ')'
 # formerly: adExpr
@@ -817,7 +806,6 @@ NO_NEWLINE ::=
 | [`call_expr`](#call-expr) | `#call-expr` | live | call |
 | [`call_suffix`](#call-suffix) | `#call-suffix` | live | callSuffix |
 | [`member_suffix`](#member-suffix) | `#member-suffix` | live | memberSuffix |
-| [`transpose_suffix`](#transpose-suffix) | `#transpose-suffix` | live | transposeSuffix |
 | [`optional_suffix`](#optional-suffix) | `#optional-suffix` | live | optionalSuffix |
 | [`non_null_suffix`](#non-null-suffix) | `#non-null-suffix` | live | nonNullSuffix |
 | [`argument_list`](#argument-list) | `#argument-list` | live | argumentList |
@@ -967,7 +955,6 @@ productions. It is not a second keyword authority.
 | Genus | `nexum` | link field |
 | Literals | `nihil` | none |
 | Declarations | `nomen` | import binding name |
-| Literals | `nonnumerus` | named NaN literal: `nonnumerus` in the Latin (`la`) pack, `nan` in every other shipped pack |
 | Boolean | `non` | not |
 | Diagnostics | `nota` | note |
 | Annotation | `nucleum` | kernel annotation |
@@ -1311,7 +1298,7 @@ into `faber.<module>.<verb>` calls. It is not a wildcard re-export and does not 
 
 
 - Declaration parameters (`genericParams`) and applied arguments (`typeArguments`) are distinct grammar categories. Applied arguments admit nested types and static `figura` values. `typeArguments` still admits `NATURAL`.
-- Applied `NATURAL` arguments are `magnitudo` capacity facts, not width markers. Shipped bounded forms use that slot: `lista<T, N>`, `queue<T, N>`, `stack<T, N>`, `textus<N>`, `ascii<N>`, `octeti<N>`. Width-marker families such as `numerus<i32>` stay the separate `widthTypeSugar` production below.
+- Applied `NATURAL` arguments are `magnitudo` capacity facts, not width markers. Shipped bounded forms use that slot: `lista<T, N>`, `textus<N>`, `ascii<N>`, `octeti<N>`. Width-marker families such as `numerus<i32>` stay the separate `widthTypeSugar` production below.
 - A second applied argument on a `↦` target (`numerus<W, Hex>`, `numerus<W, Be>`) is a convert-slot hint, not a type identity, not a width marker, and not a keyword. Live text-parse hints are `Hex` / `Bin` / `Oct`. `Be` / `Le` occupy that same Hex slot for endian unpack — both integer (`octeti[lo‥hi] ↦ numerus<W, Be|Le>`) and float windows (`octeti[lo‥hi] ↦ fractus<f32|f64, Be|Le>`, window 4/8, same fail rules as the integer rows). `Bits` occupies the same slot as an exact-width bitcast hint (reinterpretation, not value conversion; never a base). `typeArguments` is unchanged: these are ordinary `IDENTIFIER` arguments interpreted by conversio, not new `baseType` productions.
 - Type arguments admit the hole forms: `lista<∪>` infers a heterogeneous element union and `tabula<K, ∪>` a heterogeneous value union; `lista<_>` keeps the monomorphic single-inhabitant hole.
 - Explicit generic call-site lists use the same `typeArguments` production: `id<_>(x)` is a type hole (equivalent to omitted `id(x)` for a one-param callee), and mixed lists such as `both<_, textus>(a, b)` are legal. Arity stays exact (`both<_>` is still one argument). `∪` in that list is rejected (`explicit_union_type_arg_unsupported`): a callee type param is a monomorphic witness slot.
@@ -1397,10 +1384,6 @@ full wrap. Cross-width modular arithmetic is rejected.
 | -------------- | -------- |
 | `lista<T>`     | array    |
 | `lista<T, N>`  | shipped; bounded array; `N` is a `magnitudo` / `NATURAL` capacity, not a width marker. `lista<T, _>` is the capacity hole (infer `N`). |
-| `queue<T>`     | shipped; unbounded FIFO queue |
-| `queue<T, N>`  | shipped; bounded FIFO queue; `N` is a `magnitudo` / `NATURAL` capacity, not a width marker. `queue<T, _>` is the capacity hole (infer `N`). |
-| `stack<T>`     | shipped; unbounded LIFO stack |
-| `stack<T, N>`  | shipped; bounded LIFO stack; `N` is a `magnitudo` / `NATURAL` capacity, not a width marker. `stack<T, _>` is the capacity hole (infer `N`). |
 | `tabula<K,V>`  | map      |
 | `copia<T>`     | set      |
 | `promissum<T>` | promise  |
@@ -1526,14 +1509,6 @@ prefer sugar. Choose per module or file.
 ### Operators (by precedence, lowest to highest)
 
 
-**Postfix tensor transpose (`ᵀ`, U+1D40):** `valueᵀ` is rank-2-only
-sugar for the existing `transpone` intrinsic and `Transpose` plan entry. It
-maps `[M,N]` to `[N,M]`; rank-1 is a permanent decline because there is no
-row/column distinction, while rank-3+ waits for a batched-transpose consumer.
-The precedence interaction with parse-only gradient selection is settled law,
-not an open fork: `a · bᵀ ∇ [x]` parses `(a · bᵀ) ∇ [x]`, so the transpose
-suffix is consumed before the selection suffix. `⊤` remains unspent.
-
 **Exact-output transfer (`⇇`):** `sink ⇇ payload` invokes a callable sink value — one argument, `vacuum` result — once per payload. The operator performs no formatting, adds no separators or terminator, selects no channel, and runs no conversions: the bound value owns destination and behavior, and the compiler holds no console knowledge. A chain `sink ⇇ a ⇇ b` evaluates the sink expression once, each payload once left-to-right, and invokes the sink once per payload left-to-right; the chain result is `vacuum`. `⇇` binds above assignment and below ternary, so postfix calls, conversions, and string-constructor applications finish before transfer; formatting is explicit on the right (`output ⇇ "§ §
 "(a, b)`). Combined with selective value imports it replaces compiler-owned output statements with ordinary typed values.
 
@@ -1553,7 +1528,7 @@ spellings on the right perform runtime variant/type tests, while `nihil`,
 `verum`, `falsum`, and ordinary value expressions use the value-test path. Radix
 currently recognizes type targets through a fixed core-type vocabulary. Extending
 that recognition to arbitrary declared types is a separate language decision.
-Use `≡` / `≠` (or `≢`) for structural value equality, `≅` / `≇` for promoted exact equality (same value after numeric widths join), `≈` / `≉` for fuzzy equality (tolerance match with Python-isclose defaults: rel_tol 1e-09, abs_tol 0.0), and `↦` for runtime conversion.
+Use `≡` / `≠` for structural value equality and `↦` for runtime conversion.
 
 Retired predicate keywords are not prefix unary syntax. Use `expr est verum`,
 `expr est falsum`, `expr est nihil`, `expr non est nihil`, `expr ≺ 0`, or
@@ -1599,12 +1574,6 @@ Inline failure recovery uses `⇥` immediately after the conversio target (`↦ 
 Using `vel` as conversio recovery is rejected with a migration diagnostic. `vel` is local nullable elimination only (`x vel y`, parameter defaults) — not logical `aut`. A parenthesized conversio result may still combine with `vel` as ordinary defaulting.
 
 ### Call and Member Access
-
-A `call_expr` may continue with the zero-argument `transpose_suffix` `ᵀ`
-(U+1D40) after its ordinary primary/member/index chain. This is postfix
-source sugar, not a method spelling: semantic analysis applies the rank-2-only
-law and lowers the admitted form through the existing `transpone`/
-`Transpose` plan entry. `a · bᵀ ∇ [x]` is settled as `(a · bᵀ) ∇ [x]`.
 
 
 ### String And Template Literals
