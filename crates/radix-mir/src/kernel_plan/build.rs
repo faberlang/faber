@@ -16,8 +16,9 @@ use super::validate::{
 };
 use crate::abi::{CollectionOpContract, MirKernelSignature};
 use crate::{
-    MirCollectionOp, MirConstant, MirFunction, MirLocalId, MirOperand, MirParam, MirPlaceBase,
-    MirRuntimeCall, MirScalarLayout, MirStatementKind, MirValidationContext, MirWorkgroupSize,
+    MirCollectionOp, MirConstant, MirFunction, MirKernelResourceAccess, MirKernelResourceRole,
+    MirLocalId, MirOperand, MirParam, MirPlaceBase, MirRuntimeCall, MirScalarLayout,
+    MirStatementKind, MirValidationContext, MirValueKind, MirWorkgroupSize,
 };
 use radix_types::Type;
 
@@ -415,8 +416,8 @@ impl CollectionKernelPlan {
     /// recipes directly from the kernel function's typed facts:
     ///
     /// - `TensorSumAxis` → [`CollectionKernelPlan::AxisReduction`] with
-    ///   `op: Sum` and the axis from the trailing `MirConstant::Int` const
-    ///   operand (the S6-N1-frozen `AxisReductionPlan`);
+    ///   `op: Sum` and the axis from the trailing integer const operand (the
+    ///   S6-N1-frozen `AxisReductionPlan`);
     /// - `TensorSoftmax` → [`CollectionKernelPlan::RowSoftmax`] with the
     ///   last axis (the row-wise, numerically stable softmax recipe);
     /// - `TensorLayerNorm` → [`CollectionKernelPlan::LayerNormalization`]
@@ -477,8 +478,19 @@ impl CollectionKernelPlan {
                 if !signature_matches_transformer_counts(signature, count, count) {
                     return None;
                 }
-                let (epsilon_bits, width) =
+                let (epsilon_bits, width, gamma_local) =
                     rms_norm_const_facts(function, validation, &dims, axis)?;
+                // Gamma is data, but it must still be present in the typed
+                // kernel resource signature. This keeps plan admission tied
+                // to the source ABI without adding gamma to the wire plan.
+                let gamma_resource = signature.extra_inputs.iter().find(|resource| {
+                    resource.source_local == Some(gamma_local) && resource.element_count == width
+                })?;
+                if gamma_resource.role != MirKernelResourceRole::Input
+                    || gamma_resource.access != MirKernelResourceAccess::Read
+                {
+                    return None;
+                }
                 Some(CollectionKernelPlan::RmsNormalization(
                     RmsNormalizationPlan {
                         axis,
@@ -936,30 +948,70 @@ fn layer_norm_const_facts(
     true
 }
 
+/// Resolve a literal constant operand, including the single const-temp
+/// materialization the source frontend uses for floating-point literals.
+/// The resolver stays typed and local: it does not infer values from names or
+/// arbitrary expressions, and ambiguous/multi-assignment temps fail closed.
+fn literal_const_operand(function: &MirFunction, operand: &MirOperand) -> Option<MirConstant> {
+    if let MirOperand::Constant(constant) = operand {
+        return Some(constant.clone());
+    }
+    let temp = match operand {
+        MirOperand::Temp(temp) => *temp,
+        MirOperand::Place(place) if place.projections.is_empty() => {
+            let MirPlaceBase::Temp(temp) = place.base else {
+                return None;
+            };
+            temp
+        }
+        _ => return None,
+    };
+    let mut found = None;
+    for block in &function.blocks {
+        for statement in &block.statements {
+            let MirStatementKind::Assign { place, value } = &statement.kind else {
+                continue;
+            };
+            if place.projections.is_empty() && place.base == MirPlaceBase::Temp(temp) {
+                let MirValueKind::Operand(MirOperand::Constant(constant)) = &value.kind else {
+                    return None;
+                };
+                if found.is_some() {
+                    return None;
+                }
+                found = Some(constant);
+            }
+        }
+    }
+    found.cloned()
+}
+
 /// The `TensorRmsNorm` const-operand facts (GI3-1): the epsilon must be a
-/// `MirConstant::Float` (a const — never a value that would require
-/// inference, A3) that is finite and positive, and the mandatory affine
+/// finite, positive `MirConstant::Float`, either directly or through the
+/// frontend's single literal-const temp (never an inferred value, A3), and
+/// the mandatory affine
 /// gamma peer must be a rank-1 tensor of the normalization dimension (the
 /// CCI-1 source contract). Returns the f32 epsilon bits (the CCI-1
-/// `epsilon_bits` precedent — the op-precision f32 bits) and the
-/// normalization width; `None` when a const constraint fails.
+/// `epsilon_bits` precedent — the op-precision f32 bits), the normalization
+/// width, and the gamma source local; `None` when a const or typed-peer
+/// constraint fails.
 fn rms_norm_const_facts(
     function: &MirFunction,
     validation: &MirValidationContext<'_>,
     dims: &[u64],
     axis: u64,
-) -> Option<(u32, u64)> {
+) -> Option<(u32, u64, MirLocalId)> {
     let args = transformer_statement_args(function, MirCollectionOp::TensorRmsNorm)?;
     if args.len() != 4 {
         return None;
     }
-    let MirOperand::Constant(MirConstant::Float(epsilon)) = &args[2] else {
+    let MirConstant::Float(epsilon) = literal_const_operand(function, &args[2])? else {
         return None;
     };
     // WHY: the device recipe stores the operation-precision f32 bits; reject
     // overflow and underflow after the IEEE-754 narrowing below.
     #[allow(clippy::cast_possible_truncation)]
-    let epsilon = *epsilon as f32;
+    let epsilon = epsilon as f32;
     if !epsilon.is_finite() || epsilon <= 0.0 {
         return None;
     }
@@ -976,7 +1028,8 @@ fn rms_norm_const_facts(
     if gamma_dims.len() != 1 || gamma_dims[0] != norm_dim {
         return None;
     }
-    Some((epsilon.to_bits(), norm_dim))
+    let gamma_local = crate::read_analysis::operand_local(&args[3])?;
+    Some((epsilon.to_bits(), norm_dim, gamma_local))
 }
 
 /// The `TensorRope` / `TensorRopeHalf` const-operand facts (GI3-1): `pos`

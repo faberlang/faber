@@ -2876,13 +2876,13 @@ pub fn contract_shape_signature(
 /// The transformer recipes have no `CollectionOpContract` variant, so the
 /// plan pass cannot resolve one; the seam reconstructs exactly the facts the
 /// plan resolution requires: the recipe operand as the read input at its
-/// device-view element count (the flattened input dims) and the output
-/// buffer at the flattened output dims (input dims for the same-shape
-/// softmax/LN recipes; input dims minus the reduced axis for
-/// `TensorSumAxis`), under the generic 1D contract the ABI applies to these
-/// kernels. [`CollectionKernelPlan::from_transformer_op`]'s element-count
-/// cross-checks then pass for the subchain exactly as they do for a
-/// whole-function kernel.
+/// device-view element count (the flattened input dims), any typed affine or
+/// index peer as an extra read input, and the output buffer at the flattened
+/// output dims (input dims for the same-shape softmax/LN recipes; input dims
+/// minus the reduced axis for `TensorSumAxis`), under the generic 1D contract
+/// the ABI applies to these kernels. [`CollectionKernelPlan::from_transformer_op`]'s
+/// element-count cross-checks then pass for the subchain exactly as they do
+/// for a whole-function kernel.
 ///
 /// # Errors
 /// Returns [`PlanMappingError`] when the transformer recipe's typed shape
@@ -2947,6 +2947,25 @@ pub fn transformer_shape_signature(
     };
     signature.input.source_local = Some(operand_local);
     signature.output.source_local = recipe_destination_local_for(function, op);
+    // RMSNorm's affine gamma is a kernel resource, not a carried plan field.
+    // Bind the typed rank-1 peer here so both the plan/emitter lookup and the
+    // decomposition seam see the same stable input ordering: x, gamma, out.
+    if op == MirCollectionOp::TensorRmsNorm {
+        let gamma_local = rms_norm_gamma_local(function).ok_or_else(|| {
+            PlanMappingError::mapping(
+                "TensorRmsNorm gamma peer has no local in the transformer signature",
+            )
+        })?;
+        let gamma_ty = function_local_ty(function, gamma_local)?;
+        let (gamma_element_ty, gamma_count) = data_flow_element_ty_and_count(gamma_ty, validation)?;
+        signature.extra_inputs.push(storage_input_with_local(
+            1,
+            gamma_element_ty,
+            gamma_count,
+            gamma_local,
+        ));
+        signature.output.binding = 2;
+    }
     // Council-8 CB-3: the axis-reduction producer stamps its
     // producer-defined reduced-resource projection on the reduced OUTPUT
     // resource — the mapping a keep-dims consumer uses to address the
@@ -3074,6 +3093,16 @@ fn transformer_operand_local(function: &MirFunction, op: MirCollectionOp) -> Opt
         .find_map(crate::read_analysis::operand_local)
 }
 
+/// The RMSNorm affine gamma peer is the fourth runtime-call argument after
+/// the tensor operand and its two const plan facts. It is data, not a plan
+/// field, so the source/signature seam binds its local as a read resource.
+fn rms_norm_gamma_local(function: &MirFunction) -> Option<MirLocalId> {
+    let (call, _) = first_collection_call(function, |op| op == MirCollectionOp::TensorRmsNorm)?;
+    call.args
+        .get(3)
+        .and_then(crate::read_analysis::operand_local)
+}
+
 /// The emission signature for a decomposition subchain kernel (S5-U1b
 /// emitter seam): the contract-shaped recipe resources plus the subchain's
 /// data-flow inputs as read inputs, with the recipe operands' source locals
@@ -3172,10 +3201,9 @@ pub fn subchain_signature_for_emission_with_source(
 /// base signature comes from [`transformer_shape_signature`]).
 ///
 /// The transformer recipes bind exactly one recipe operand (the tensor the
-/// recipe reads); the const operands (axis / epsilon) and the optional
-/// affine pair (gamma / beta) are NOT recipe operands — the affine tensors
-/// are data-flow inputs when they are subchain params, and the consts are
-/// plan facts, never buffers.
+/// recipe reads). Const operands (axis / epsilon) remain plan facts, never
+/// buffers. RMSNorm's mandatory gamma peer is a typed extra read resource;
+/// other affine peers remain data-flow inputs when their recipe admits them.
 ///
 /// # Errors
 /// Returns [`PlanMappingError`] when the recipe operand's tensor type, a
@@ -3227,6 +3255,19 @@ pub fn transformer_subchain_signature_for_emission_with_source(
             extra.source_local = Some(ids_local);
         }
         bound.push(ids_local);
+    }
+    // RMSNorm's gamma peer is likewise already a typed resource in the
+    // transformer-shaped signature. Mark its local bound so the generic
+    // data-flow tail does not append a duplicate gamma buffer after it.
+    if let Some(gamma_local) = rms_norm_gamma_local(function) {
+        if let Some(extra) = signature
+            .extra_inputs
+            .iter_mut()
+            .find(|resource| resource.source_local == Some(gamma_local))
+        {
+            extra.source_local = Some(gamma_local);
+        }
+        bound.push(gamma_local);
     }
     finish_subchain_emission_signature(
         function,

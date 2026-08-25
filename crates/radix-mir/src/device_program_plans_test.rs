@@ -1887,6 +1887,43 @@ fn transformer_subchain_signature_binds_operand_and_output() {
 }
 
 #[test]
+fn rms_norm_signature_binds_gamma_as_a_kernel_resource() {
+    // GEA2-U4a: gamma is a typed read resource, not a field on the stable
+    // RmsNormalizationPlan. The source-shaped and emission signatures must
+    // agree on x, gamma, output binding order.
+    let mut types = TypeTable::new();
+    let function = rms_norm_function(&mut types);
+    let validation = MirValidationContext::new(&types);
+    let shape = transformer_shape_signature(&function, MirCollectionOp::TensorRmsNorm, &validation)
+        .expect("RMSNorm shape signature resolves");
+    assert_eq!(shape.input.source_local, Some(MirLocalId(0)));
+    assert_eq!(shape.input.element_count, 2 * 960);
+    assert_eq!(shape.extra_inputs.len(), 1);
+    assert_eq!(shape.extra_inputs[0].binding, 1);
+    assert_eq!(shape.extra_inputs[0].source_local, Some(MirLocalId(1)));
+    assert_eq!(shape.extra_inputs[0].element_count, 960);
+    assert_eq!(shape.output.binding, 2);
+
+    let emission = transformer_subchain_signature_for_emission(
+        &function,
+        MirCollectionOp::TensorRmsNorm,
+        &validation,
+        &[MirLocalId(2)],
+    )
+    .expect("RMSNorm emission signature resolves");
+    assert_eq!(emission.extra_inputs.len(), 1);
+    assert_eq!(emission.extra_inputs[0].source_local, Some(MirLocalId(1)));
+    assert_eq!(emission.output.binding, 2);
+    assert!(CollectionKernelPlan::from_transformer_op(
+        &shape,
+        &function,
+        &validation,
+        MirCollectionOp::TensorRmsNorm,
+    )
+    .is_some());
+}
+
+#[test]
 fn kernel_plan_for_function_derives_transpose_plan() {
     // S5-U1 admission: a transpose-bearing body resolves the rank-2
     // Transpose recipe over the contract-shaped signature.
@@ -2867,8 +2904,10 @@ fn rms_norm_function_resolves_rms_normalization_plan() {
     // the const operand, and the width from the operand dims.
     let mut types = TypeTable::new();
     let function = rms_norm_function(&mut types);
-    let signature = transformer_signature(2 * 960, 2 * 960);
     let validation = MirValidationContext::new(&types);
+    let signature =
+        transformer_shape_signature(&function, MirCollectionOp::TensorRmsNorm, &validation)
+            .expect("rms_norm shape signature resolves");
     let derived = kernel_plan_for_function(&function, &signature, &validation)
         .expect("rms_norm function facts resolve")
         .expect("rms_norm function carries a recipe plan");
