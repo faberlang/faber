@@ -1072,7 +1072,12 @@ fn semantic_invalid_operand_types_message(args: &[DiagnosticArg]) -> Option<Stri
             Some("cross product × is pinned to 3-vectors; other widths are rejected in Phase 1".to_owned())
         }
         "glyph_hadamard_shapes_mismatch" => {
-            Some("Hadamard product ⊙ requires operands with identical shapes".to_owned())
+            let op = arg_value(args, "op").unwrap_or("⊙");
+            Some(match op {
+                "⊘" => "Hadamard divide ⊘ requires operands with identical shapes",
+                _ => "Hadamard product ⊙ requires operands with identical shapes",
+            }
+            .to_owned())
         }
         "glyph_transpose_operands_unsupported" => {
             Some("postfix transpose ᵀ requires a built-in tensor operand".to_owned())
@@ -1245,7 +1250,12 @@ fn semantic_invalid_operand_types_help(args: &[DiagnosticArg]) -> Option<String>
             Some("× is pinned to 3-vectors in Phase 1; the 7-vector convention is deferred".to_owned())
         }
         "glyph_hadamard_shapes_mismatch" => {
-            Some("⊙ requires identical operand shapes; use ↦ to reshape before the product".to_owned())
+            let op = arg_value(args, "op").unwrap_or("⊙");
+            Some(match op {
+                "⊘" => "⊘ requires identical operand shapes; use ↦ to reshape before the divide",
+                _ => "⊙ requires identical operand shapes; use ↦ to reshape before the product",
+            }
+            .to_owned())
         }
         "glyph_transpose_operands_unsupported" => {
             Some("apply ᵀ to a tensor value".to_owned())

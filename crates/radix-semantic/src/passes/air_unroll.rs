@@ -2223,7 +2223,10 @@ impl MaskCollector<'_> {
             HirExpressionKind::Binary(op, lhs, rhs) => {
                 self.scan_expr(lhs);
                 self.scan_expr(rhs);
-                if matches!(*op, HirBinOp::Mul | HirBinOp::Hadamard) {
+                if matches!(
+                    *op,
+                    HirBinOp::Mul | HirBinOp::Hadamard | HirBinOp::HadamardDiv
+                ) {
                     if self.is_fill_built(lhs)
                         || self.is_fill_built(rhs)
                         || is_comparison(lhs)
@@ -2301,7 +2304,10 @@ fn is_masked_exit(
                     .is_some_and(|arg| is_mask_ref(&arg.expr, mask_defs, local_inits))
         }
         HirExpressionKind::Binary(op, lhs, rhs)
-            if matches!(*op, HirBinOp::Mul | HirBinOp::Hadamard) =>
+            if matches!(
+                *op,
+                HirBinOp::Mul | HirBinOp::Hadamard | HirBinOp::HadamardDiv
+            ) =>
         {
             is_mask_ref(lhs, mask_defs, local_inits) || is_mask_ref(rhs, mask_defs, local_inits)
         }

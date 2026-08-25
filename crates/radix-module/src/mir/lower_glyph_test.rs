@@ -323,6 +323,21 @@ functio elementwise(tensor<f32, [2, 2]> a, tensor<f32, [2, 2]> b) → tensor<f32
     assert!(!dump.contains("method call before runtime/provider MIR lowering"), "{dump}");
 }
 
+#[test]
+fn lowers_glyph_tensor_hadamard_divide_to_tensor_div_collection_op() {
+    let dump = dump_source(
+        r"
+functio elementwise(tensor<f32, [2, 2]> a, tensor<f32, [2, 2]> b) → tensor<f32, [2, 2]> {
+    redde a ⊘ b
+}
+",
+    );
+
+    assert!(dump.contains("runtime collection tensor_div"), "{dump}");
+    assert!(!dump.contains("glyph product binary operator"), "{dump}");
+    assert!(!dump.contains("method call before runtime/provider MIR lowering"), "{dump}");
+}
+
 // ===========================================================================
 // `+` / `-` addita / subtrahe family
 // ===========================================================================

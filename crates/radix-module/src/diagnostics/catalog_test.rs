@@ -2,15 +2,17 @@
 //! Proves: codes are unique per lex/parse/semantic phase; representative
 //! codes remain stable; argument helpers preserve quoting.
 
-use super::super::catalog_semantic::{semantic_message, semantic_spec};
-use super::super::catalog_syntax::{lex_message, lex_spec, parse_message, parse_spec};
-use super::super::locale_unknown_spec;
-use super::super::{unresolved_intrinsic_spec, unresolved_keyword_spec, unresolved_library_member_spec};
-use super::{arg_value, locale_suggestion_spec, quote_arg};
-use crate::diagnostics::DiagnosticArg;
+use crate::diagnostics::is_known_diagnostic_code;
 use crate::lexer::{LexErrorKind, HOMOGLYPH_ISSUE};
 use crate::parser::ParseErrorKind;
 use crate::semantic::{SemanticErrorKind, WarningKind};
+use radix_diagnostics::{
+    locale_suggestion_spec, locale_unknown_spec, unresolved_intrinsic_spec, unresolved_keyword_spec,
+    unresolved_library_member_spec, DiagnosticArg, DiagnosticSpec,
+};
+use radix_semantic::catalog::{arg_value, quote_arg};
+use radix_semantic::catalog_semantic::{semantic_message, semantic_spec};
+use radix_semantic::catalog_syntax::{lex_message, lex_spec, parse_message, parse_spec};
 use std::collections::HashSet;
 
 #[test]
@@ -271,26 +273,26 @@ fn arg_value_returns_none_for_empty_args() {
     assert_eq!(quote_arg(&args, "any"), None);
 }
 
-fn all_specs() -> Vec<super::super::DiagnosticSpec> {
-    super::super::all_diagnostic_specs()
+fn all_specs() -> Vec<DiagnosticSpec> {
+    crate::diagnostics::all_diagnostic_specs()
 }
 
 #[test]
 fn is_known_diagnostic_code_accepts_catalog_codes() {
-    assert!(super::super::is_known_diagnostic_code("WARN016"));
-    assert!(super::super::is_known_diagnostic_code("WARN017"));
-    assert!(super::super::is_known_diagnostic_code("SEM004"));
-    assert!(super::super::is_known_diagnostic_code("LEX001"));
-    assert!(super::super::is_known_diagnostic_code("PARSE011"));
-    assert!(super::super::is_known_diagnostic_code("UNRES001"));
-    assert!(super::super::is_known_diagnostic_code("UNRES002"));
-    assert!(super::super::is_known_diagnostic_code("UNRES003"));
+    assert!(is_known_diagnostic_code("WARN016"));
+    assert!(is_known_diagnostic_code("WARN017"));
+    assert!(is_known_diagnostic_code("SEM004"));
+    assert!(is_known_diagnostic_code("LEX001"));
+    assert!(is_known_diagnostic_code("PARSE011"));
+    assert!(is_known_diagnostic_code("UNRES001"));
+    assert!(is_known_diagnostic_code("UNRES002"));
+    assert!(is_known_diagnostic_code("UNRES003"));
 }
 
 #[test]
 fn is_known_diagnostic_code_rejects_unknown_codes() {
-    assert!(!super::super::is_known_diagnostic_code("WARN066"));
-    assert!(!super::super::is_known_diagnostic_code("FOO"));
-    assert!(!super::super::is_known_diagnostic_code(""));
-    assert!(!super::super::is_known_diagnostic_code("CODEGEN001"));
+    assert!(!is_known_diagnostic_code("WARN066"));
+    assert!(!is_known_diagnostic_code("FOO"));
+    assert!(!is_known_diagnostic_code(""));
+    assert!(!is_known_diagnostic_code("CODEGEN001"));
 }

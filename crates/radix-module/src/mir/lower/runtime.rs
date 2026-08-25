@@ -215,7 +215,7 @@ impl FunctionBuilder<'_> {
         Some(value)
     }
 
-    /// Lower a glyph-product binop (`·` `×` `⊗` `⊙`) by operand family,
+    /// Lower a glyph-product binop (`·` `×` `⊗` `⊙` `⊘`) by operand family,
     /// reusing the vector/matrix method machinery and the collection-op
     /// intrinsic seam. Every unsupported shape/type combination fails closed
     /// with a stable structured diagnostic — never a silent pass.
@@ -3061,6 +3061,9 @@ fn glyph_method_name(op: HirBinOp, lhs_ty: &Type, rhs_ty: &Type) -> Option<&'sta
         (HirBinOp::Hadamard, Type::Vector(..), Type::Vector(..)) => Some("multiplica"),
         (HirBinOp::Hadamard, Type::Matrix(..), Type::Matrix(..)) => Some("multiplica"),
         (HirBinOp::Hadamard, Type::Tensor(..), Type::Tensor(..)) => Some("multiplica"),
+        (HirBinOp::HadamardDiv, Type::Vector(..), Type::Vector(..)) => Some("divida"),
+        (HirBinOp::HadamardDiv, Type::Matrix(..), Type::Matrix(..)) => Some("divida"),
+        (HirBinOp::HadamardDiv, Type::Tensor(..), Type::Tensor(..)) => Some("divisio"),
         (HirBinOp::Add, Type::Vector(..), Type::Vector(..)) => Some("addita"),
         (HirBinOp::Add, Type::Matrix(..), Type::Matrix(..)) => Some("addita"),
         (HirBinOp::Add, Type::Tensor(..), Type::Tensor(..)) => Some("addita"),

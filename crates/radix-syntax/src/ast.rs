@@ -1167,6 +1167,7 @@ pub enum BinOp {
     Cross,         // × cross product (3-vectors)
     TensorProduct, // ⊗ outer / Kronecker product
     Hadamard,      // ⊙ Hadamard / elementwise product
+    HadamardDiv,   // ⊘ Hadamard / elementwise divide
     // Comparison
     Eq,
     NotEq,

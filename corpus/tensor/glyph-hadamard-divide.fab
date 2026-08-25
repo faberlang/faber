@@ -1,0 +1,45 @@
++++
+term = "⊘"
+kind = "operator-group"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "shape_suffix", "figura", "figura_list", "array_literal", "conversio_expr", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "redde_stmt", "expression", "literal", "nota_stmt"]
+category = "arithmetic"
+canonical = true
+summary = "Glyph Hadamard divide: identical-shape elementwise division on tensors."
+syntax = "<expression> ⊘ <expression>"
+related = ["tensor", "arithmetic"]
+locale = "en"
++++
+
+# =============================================================================
+# ⊘ — glyph Hadamard divide (identical-shape elementwise division).
+# =============================================================================
+#
+# What this teaches:
+#   • Hadamard divide — `a ⊘ b` divides elementwise under the same
+#     identical-shape contract as `a ⊙ b`; it is the glyph spelling of the
+#     tensor `divisio` method twin and the existing TensorDiv MIR operation.
+#   • This is not broadcasting — mismatched static shapes reject at typecheck,
+#     just as they do for `⊙`.
+#   • Device posture — `⊘` remains fail-closed until its first device
+#     consumer, matching the `⊗` family posture: it waits for that consumer
+#     rather than claiming an unproved device recipe.
+#
+# EXPECTED stdout:
+#   [2.0, 2.0, 3.0, 4.0]
+#
+# See also: tensor, arithmetic, ⊙, ⊘
+# =============================================================================
+
+fn hadamard_divide(tensor<f32, [2, 2]> numerator, tensor<f32, [2, 2]> denominator) → tensor<f32, [2, 2]> {
+    return numerator ⊘ denominator
+}
+
+main {
+    const list<f32> flat_numerator ← [2.0, 4.0, 9.0, 16.0]
+    const list<f32> flat_denominator ← [1.0, 2.0, 3.0, 4.0]
+    const tf32[] seed ← empty
+    var tf32[2, 2] numerator ← seed.from_flat(flat_numerator, [2, 2])
+    var tf32[2, 2] denominator ← seed.from_flat(flat_denominator, [2, 2])
+    const tf32[2, 2] result ← hadamard_divide(numerator, denominator)
+    print result.flatten()
+}

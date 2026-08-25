@@ -2669,7 +2669,7 @@ fn mir_bin_op(op: HirBinOp) -> Option<MirBinOp> {
         HirBinOp::InRange | HirBinOp::Between => None,
         // Glyph products are intercepted by `lower_binary` before this point;
         // keep the explicit fail-closed arm for any future caller.
-        HirBinOp::Dot | HirBinOp::Cross | HirBinOp::TensorProduct | HirBinOp::Hadamard => None,
+        HirBinOp::Dot | HirBinOp::Cross | HirBinOp::TensorProduct | HirBinOp::Hadamard | HirBinOp::HadamardDiv => None,
     }
 }
 

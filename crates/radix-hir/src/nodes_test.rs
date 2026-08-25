@@ -10,6 +10,7 @@ fn glyph_products_classify_consistently() {
         HirBinOp::Cross,
         HirBinOp::TensorProduct,
         HirBinOp::Hadamard,
+        HirBinOp::HadamardDiv,
     ] {
         assert!(
             op.is_glyph_product(),
@@ -50,4 +51,5 @@ fn glyph_spellings_match_the_pinned_codepoints() {
     assert_eq!(HirBinOp::Cross.glyph_spelling(), Some("×"));
     assert_eq!(HirBinOp::TensorProduct.glyph_spelling(), Some("⊗"));
     assert_eq!(HirBinOp::Hadamard.glyph_spelling(), Some("⊙"));
+    assert_eq!(HirBinOp::HadamardDiv.glyph_spelling(), Some("⊘"));
 }

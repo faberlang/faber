@@ -885,7 +885,7 @@ impl TypeChecker<'_> {
             HirBinOp::Dot => self.check_glyph_dot(op, lhs, rhs),
             HirBinOp::Cross => self.check_glyph_cross(op, lhs, rhs),
             HirBinOp::TensorProduct => self.check_glyph_tensor_product(op, lhs, rhs),
-            HirBinOp::Hadamard => self.check_glyph_hadamard(op, lhs, rhs),
+            HirBinOp::Hadamard | HirBinOp::HadamardDiv => self.check_glyph_hadamard(op, lhs, rhs),
         }
     }
 
@@ -1187,7 +1187,7 @@ impl TypeChecker<'_> {
         lhs_ty
     }
 
-    /// `⊙` Hadamard: identical built-in shapes produce the identical shape.
+    /// `⊙`/`⊘` Hadamard arithmetic: identical built-in shapes produce the identical shape.
     fn check_glyph_hadamard(
         &mut self,
         op: HirBinOp,

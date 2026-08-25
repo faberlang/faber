@@ -9,6 +9,9 @@
 mod convert;
 mod render;
 
+#[cfg(test)]
+mod catalog_test;
+
 pub use convert::{
     convert_from_lex_error as from_lex_error, convert_from_locale_suggestion as from_locale_suggestion,
     convert_from_parse_error as from_parse_error, convert_from_semantic_error as from_semantic_error,

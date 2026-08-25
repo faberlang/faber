@@ -242,7 +242,7 @@ fn vel_binds_tighter_than_multiplicative() {
 }
 
 // ---------------------------------------------------------------------------
-// Glyph products (`·` `×` `⊗` `⊙`) at multiplicative precedence
+// Glyph products (`·` `×` `⊗` `⊙` `⊘`) at multiplicative precedence
 // ---------------------------------------------------------------------------
 
 /// `a + b · c` parses as `a + (b · c)` — glyphs bind tighter than additive.
@@ -264,7 +264,28 @@ fn glyph_products_bind_tighter_than_additive() {
     assert_eq!(dot.op, BinOp::Dot);
 }
 
-/// All four glyph spellings map to their pinned `BinOp` variants.
+#[test]
+fn hadamard_divide_binds_at_multiplicative_precedence() {
+    let result = parse_ok("fixum _ value ← a + b ⊘ c");
+    let program = result.program.as_ref().expect("program");
+    let StmtKind::Var(var) = &program.statements[0].kind else {
+        panic!("expected variable declaration");
+    };
+    let expr = var.init.as_deref().expect("initializer");
+    let ExprKind::Binary(add) = &expr.kind else {
+        panic!("expected additive root, got {:?}", expr.kind);
+    };
+    assert_eq!(add.op, BinOp::Add);
+    let ExprKind::Binary(divide) = &add.rhs.kind else {
+        panic!(
+            "expected Hadamard divide on additive RHS, got {:?}",
+            add.rhs.kind
+        );
+    };
+    assert_eq!(divide.op, BinOp::HadamardDiv);
+}
+
+/// All five glyph spellings map to their pinned `BinOp` variants.
 #[test]
 fn glyph_products_map_to_pinned_binops() {
     for (spelling, expected) in [
@@ -272,6 +293,7 @@ fn glyph_products_map_to_pinned_binops() {
         ("×", BinOp::Cross),
         ("⊗", BinOp::TensorProduct),
         ("⊙", BinOp::Hadamard),
+        ("⊘", BinOp::HadamardDiv),
     ] {
         let source = format!("fixum _ value ← a {spelling} b");
         let result = parse_ok(&source);

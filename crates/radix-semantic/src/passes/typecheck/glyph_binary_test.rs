@@ -278,6 +278,28 @@ fn glyph_hadamard_matrix_shape_mismatch_rejects() {
     );
 }
 
+// --- `⊘` Hadamard divide (the exact `⊙` shape contract) ---
+
+#[test]
+fn glyph_hadamard_divide_identical_shapes_typecheck() {
+    accepts(
+        r"functio elementwise(tensor<f32, [2, 3]> a, tensor<f32, [2, 3]> b) → tensor<f32, [2, 3]> {
+    redde a ⊘ b
+}",
+    );
+}
+
+#[test]
+fn glyph_hadamard_divide_vector_shape_mismatch_rejects() {
+    rejects_with_issue(
+        r"functio elementwise(vector<f32, 3> a, vector<f32, 4> b) → vector<f32, 4> {
+    redde a ⊘ b
+}",
+        "glyph_hadamard_shapes_mismatch",
+        "⊘",
+    );
+}
+
 // --- `·` / `⊙` tensor arms over the symbolic contracts (shape-generics Phase 2) ---
 
 #[test]

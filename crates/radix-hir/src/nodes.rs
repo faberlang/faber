@@ -1399,6 +1399,7 @@ pub enum HirBinOp {
     Cross,         // × cross product (3-vectors)
     TensorProduct, // ⊗ outer / Kronecker product
     Hadamard,      // ⊙ Hadamard / elementwise product
+    HadamardDiv,   // ⊘ Hadamard / elementwise divide
     Eq,
     NotEq,
     ApproxEq,
@@ -1425,13 +1426,13 @@ pub enum HirBinOp {
 
 impl HirBinOp {
     /// Return whether this is one of the tensor-glyphs product operators
-    /// (`·` `×` `⊗` `⊙`). Lanes that have not implemented the glyph surface
+    /// (`·` `×` `⊗` `⊙` `⊘`). Lanes that have not implemented the glyph surface
     /// fail closed on these before any lowering or emission.
     #[must_use]
     pub fn is_glyph_product(&self) -> bool {
         matches!(
             self,
-            Self::Dot | Self::Cross | Self::TensorProduct | Self::Hadamard
+            Self::Dot | Self::Cross | Self::TensorProduct | Self::Hadamard | Self::HadamardDiv
         )
     }
 
@@ -1443,6 +1444,7 @@ impl HirBinOp {
             Self::Cross => Some("×"),
             Self::TensorProduct => Some("⊗"),
             Self::Hadamard => Some("⊙"),
+            Self::HadamardDiv => Some("⊘"),
             _ => None,
         }
     }

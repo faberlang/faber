@@ -299,6 +299,7 @@ impl Lowerer<'_> {
             radix_syntax::BinOp::Cross => HirBinOp::Cross,
             radix_syntax::BinOp::TensorProduct => HirBinOp::TensorProduct,
             radix_syntax::BinOp::Hadamard => HirBinOp::Hadamard,
+            radix_syntax::BinOp::HadamardDiv => HirBinOp::HadamardDiv,
             radix_syntax::BinOp::Eq => HirBinOp::Eq,
             radix_syntax::BinOp::NotEq => HirBinOp::NotEq,
             radix_syntax::BinOp::ApproxEq => HirBinOp::ApproxEq,

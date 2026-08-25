@@ -70,6 +70,7 @@ fn glyph_product_tokens_are_operators_not_keywords() {
         TokenKind::Cross,
         TokenKind::CircledTimes,
         TokenKind::CircledDot,
+        TokenKind::CircledDivide,
         TokenKind::Transpose,
         TokenKind::Nabla,
     ] {

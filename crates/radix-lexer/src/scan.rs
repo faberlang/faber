@@ -309,6 +309,7 @@ impl<'a> Lexer<'a> {
             '×' => TokenKind::Cross,
             '⊗' => TokenKind::CircledTimes,
             '⊙' => TokenKind::CircledDot,
+            '⊘' => TokenKind::CircledDivide,
 
             // Postfix tensor transpose (tensor-glyphs family).
             'ᵀ' => TokenKind::Transpose,

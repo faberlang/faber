@@ -465,7 +465,7 @@ impl Parser {
     /// Multiplicative over local nullable defaulting (`vel`).
     ///
     /// GRAMMAR:
-    ///   multiplicative := coalesce (('*' | '/' | '%' | '·' | '×' | '⊗' | '⊙') coalesce)*
+    ///   multiplicative := coalesce (('*' | '/' | '%' | '·' | '×' | '⊗' | '⊙' | '⊘') coalesce)*
     ///   coalesce       := unary (`vel` `vel_rhs`)*
     ///   `vel_rhs`        := unary (`range_op` unary (`per` unary)?)?
     ///
@@ -486,6 +486,7 @@ impl Parser {
                 TokenKind::Cross => BinOp::Cross,
                 TokenKind::CircledTimes => BinOp::TensorProduct,
                 TokenKind::CircledDot => BinOp::Hadamard,
+                TokenKind::CircledDivide => BinOp::HadamardDiv,
                 _ => break,
             };
             self.advance();

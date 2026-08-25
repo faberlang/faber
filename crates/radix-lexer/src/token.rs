@@ -288,10 +288,11 @@ pub enum TokenKind {
     Question,   // ?
 
     // === Glyph products (tensor-glyphs family) ===
-    MiddleDot,    // · U+00B7 inner product (dot / matvec / matmul)
-    Cross,        // × U+00D7 cross product (3-vectors)
-    CircledTimes, // ⊗ U+2297 outer / Kronecker product
-    CircledDot,   // ⊙ U+2299 Hadamard / elementwise product
+    MiddleDot,     // · U+00B7 inner product (dot / matvec / matmul)
+    Cross,         // × U+00D7 cross product (3-vectors)
+    CircledTimes,  // ⊗ U+2297 outer / Kronecker product
+    CircledDot,    // ⊙ U+2299 Hadamard / elementwise product
+    CircledDivide, // ⊘ U+2298 Hadamard / elementwise divide
 
     // === Postfix tensor transpose (tensor-glyphs family) ===
     Transpose, // ᵀ U+1D40 rank-2 postfix transpose sugar
