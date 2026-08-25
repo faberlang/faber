@@ -1872,8 +1872,7 @@ impl Parser {
         // annotation. In registry-direct (Latin) mode the raw fallback would
         // otherwise claim this undeclared alias before the locale gate sees it.
         if raw == "conversion"
-            && self.reader_keyword_latin_keys.get(raw).map(String::as_str)
-                != Some("conversio")
+            && self.reader_keyword_latin_keys.get(raw).map(String::as_str) != Some("conversio")
         {
             return self
                 .reader_keyword_surfaces

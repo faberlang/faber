@@ -175,10 +175,7 @@ fn queue_stack_arithmetic_rejects_mixed_kinds_and_non_numeric_elements() {
         "functio mixed(queue<numerus> q, stack<numerus> s) → queue<numerus> { redde q + s }",
         "functio text_queue(queue<textus> q, queue<textus> r) → queue<textus> { redde q + r }",
     ] {
-        crate::test_support::assert_rejects_with_issue(
-            source,
-            "numeric_queue_stack_operator_law",
-        );
+        crate::test_support::assert_rejects_with_issue(source, "numeric_queue_stack_operator_law");
     }
 }
 

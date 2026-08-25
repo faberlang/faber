@@ -58,9 +58,9 @@ pub fn check_diagnostics_for_source_with_locale_pack(
     // en-surface corpus depends on it: without the pack, `const`, `fn`, and
     // `import from …` spellings do not lex as keywords and check fails at
     // parse with no diagnostics of substance.
-    let mut resolved_pack = code_pack.map(ToOwned::to_owned).or_else(|| {
-        crate::program::compile::frontmatter_locale_pack_from_frontmatter(peeled.frontmatter.as_ref())
-    });
+    let mut resolved_pack = code_pack
+        .map(ToOwned::to_owned)
+        .or_else(|| crate::program::compile::frontmatter_locale_pack_from_frontmatter(peeled.frontmatter.as_ref()));
 
     let lex_result = lex_check_source(body, resolved_pack.as_ref());
     collect_locale_diagnostics(&mut diagnostics, name, body, &lex_result);

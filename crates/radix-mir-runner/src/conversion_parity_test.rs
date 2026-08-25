@@ -1,9 +1,7 @@
 //! E3 runner parity for synthetic conversion-arm calls.
 
 use super::*;
-use radix_mir::{
-    MirFunction, MirLocal, MirParam, MirStatement, MirTerminator, MirTemp,
-};
+use radix_mir::{MirFunction, MirLocal, MirParam, MirStatement, MirTemp, MirTerminator};
 use radix_types::Type;
 
 fn span() -> Span {
@@ -122,9 +120,7 @@ fn conversion_arm_call_runs_once_only_on_propagate_error_path() {
                 },
                 span: span(),
             }],
-            MirTerminatorKind::Return(Some(MirOperand::Place(MirPlace::local(
-                MirLocalId(0),
-            )))),
+            MirTerminatorKind::Return(Some(MirOperand::Place(MirPlace::local(MirLocalId(0))))),
         )],
         destination_mir_ty,
         None,
@@ -180,7 +176,13 @@ fn conversion_arm_call_runs_once_only_on_propagate_error_path() {
     };
 
     let program = MirProgram {
-        functions: vec![source_failure, source_success, conversion_arm, propagate(3, MirFunctionId(0)), propagate(4, MirFunctionId(1))],
+        functions: vec![
+            source_failure,
+            source_success,
+            conversion_arm,
+            propagate(3, MirFunctionId(0)),
+            propagate(4, MirFunctionId(1)),
+        ],
     };
     let context = MirValidationContext::new(&types);
     let mut host = BufferHost::default();
@@ -188,12 +190,23 @@ fn conversion_arm_call_runs_once_only_on_propagate_error_path() {
 
     runner.push_frame(MirFunctionId(3), MirBlockId(0));
     runner.run_until_depth(0);
-    assert!(runner.errors.is_empty(), "failure propagation should run: {:?}", runner.errors);
-    assert_eq!(runner.return_error, Some(Value::Str("raw-source-error".to_owned())));
+    assert!(
+        runner.errors.is_empty(),
+        "failure propagation should run: {:?}",
+        runner.errors
+    );
+    assert_eq!(
+        runner.return_error,
+        Some(Value::Str("raw-source-error".to_owned()))
+    );
 
     runner.push_frame(MirFunctionId(4), MirBlockId(0));
     runner.run_until_depth(0);
-    assert!(runner.errors.is_empty(), "successful call should run: {:?}", runner.errors);
+    assert!(
+        runner.errors.is_empty(),
+        "successful call should run: {:?}",
+        runner.errors
+    );
     assert_eq!(runner.return_value, Some(Value::Unit));
     assert_eq!(host.stdout_lines, ["conversion-arm-ran"]);
 }

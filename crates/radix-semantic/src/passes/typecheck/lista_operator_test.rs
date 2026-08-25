@@ -2,9 +2,9 @@
 //!
 //! Dynamic list lengths typecheck here; A2 owns the runtime equal-length check.
 
-use crate::Type;
 use crate::locale::LocalePack;
 use crate::test_support::{analyze_ok, assert_accepts, assert_rejects_with_issue};
+use crate::Type;
 use radix_diagnostics::Diagnostic;
 use radix_target::Target;
 

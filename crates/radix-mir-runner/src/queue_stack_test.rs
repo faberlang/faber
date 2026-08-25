@@ -5,8 +5,8 @@ use crate::host::BufferHost;
 use crate::Value;
 use radix_lexer::{Interner, Span};
 use radix_mir::{
-    MirBlockId, MirCollectionOp, MirFunction, MirFunctionId, MirIntrinsic, MirLocal,
-    MirOperand, MirPlace, MirProgram, MirRuntimeCall, MirType, MirValueId, MirValidationContext,
+    MirBlockId, MirCollectionOp, MirFunction, MirFunctionId, MirIntrinsic, MirLocal, MirOperand,
+    MirPlace, MirProgram, MirRuntimeCall, MirType, MirValidationContext, MirValueId,
 };
 use radix_types::{IndexExpr, Primitive, TypeId, TypeTable};
 use std::cell::RefCell;
@@ -30,12 +30,18 @@ fn queue_walk_is_fifo_and_length_tracks_live_window() {
     assert_eq!(
         evaluate_collection_call(
             &push,
-            vec![(MirValueId(0), Value::Array(items.clone())), (MirValueId(1), Value::Int(3))],
+            vec![
+                (MirValueId(0), Value::Array(items.clone())),
+                (MirValueId(1), Value::Int(3))
+            ],
         )
         .expect("queue push"),
         Value::Unit
     );
-    assert_eq!(*items.borrow(), vec![Value::Int(1), Value::Int(2), Value::Int(3)]);
+    assert_eq!(
+        *items.borrow(),
+        vec![Value::Int(1), Value::Int(2), Value::Int(3)]
+    );
 
     let pop = call(MirCollectionOp::RemoveFirst, 1);
     assert_eq!(
@@ -73,7 +79,10 @@ fn stack_walk_is_lifo_and_empty_pop_is_nihil() {
     assert_eq!(
         evaluate_collection_call(
             &pop,
-            vec![(MirValueId(0), Value::Array(Rc::new(RefCell::new(Vec::new()))))],
+            vec![(
+                MirValueId(0),
+                Value::Array(Rc::new(RefCell::new(Vec::new())))
+            )],
         )
         .expect("empty stack pop"),
         Value::Nil

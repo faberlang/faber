@@ -3100,10 +3100,9 @@ impl Resolver {
     pub fn from_snapshot(snapshot: radix_hir_fhir::ResolverSnapshot) -> Self {
         use radix_hir_fhir::FileExportSnapshot;
 
-        let conversion_arms = snapshot
-            .conversion_arms
-            .into_iter()
-            .fold(FxHashMap::default(), |mut arms, snapshot| {
+        let conversion_arms = snapshot.conversion_arms.into_iter().fold(
+            FxHashMap::default(),
+            |mut arms, snapshot| {
                 arms.entry(snapshot.destination)
                     .or_insert_with(Vec::new)
                     .push(ConversionArm {
@@ -3112,7 +3111,8 @@ impl Resolver {
                         span: snapshot.span,
                     });
                 arms
-            });
+            },
+        );
 
         // The FHIR snapshot is the codegen-facing surface and carries export
         // names without tiers; reconstruction marks every name `@ publica`.
@@ -3321,17 +3321,16 @@ impl Resolver {
             .conversion_arms
             .iter()
             .flat_map(|(&destination, arms)| {
-                arms.iter().map(move |arm| radix_hir_fhir::ConversionArmSnapshot {
-                    destination,
-                    source: arm.source,
-                    fn_def_id: arm.fn_def_id,
-                    span: arm.span,
-                })
+                arms.iter()
+                    .map(move |arm| radix_hir_fhir::ConversionArmSnapshot {
+                        destination,
+                        source: arm.source,
+                        fn_def_id: arm.fn_def_id,
+                        span: arm.span,
+                    })
             })
             .collect::<Vec<_>>();
-        conversion_arms.sort_by_key(|arm| {
-            (arm.destination.0, arm.source.0, arm.fn_def_id.0)
-        });
+        conversion_arms.sort_by_key(|arm| (arm.destination.0, arm.source.0, arm.fn_def_id.0));
 
         ResolverSnapshot {
             namespace_exports,

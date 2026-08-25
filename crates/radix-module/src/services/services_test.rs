@@ -476,7 +476,10 @@ fn diagnostics_check_accepts_frontmatter_on_proba_source() {
         "frontmatter must be peeled before checking .proba: {:?}",
         result.diagnostics
     );
-    assert!(result.diagnostics.iter().all(|diagnostic| !diagnostic.is_error()));
+    assert!(result
+        .diagnostics
+        .iter()
+        .all(|diagnostic| !diagnostic.is_error()));
 }
 
 #[test]
