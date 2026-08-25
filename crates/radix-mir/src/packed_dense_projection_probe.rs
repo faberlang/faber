@@ -91,14 +91,16 @@ struct Gi2Block {
 }
 
 /// Packed right operand GEMM: dequant one `Q8_0` block at the load that needs
-/// it. Never allocates an f32 tensor of the whole right operand.
+/// it. Never allocates an f32 tensor of the whole right operand. The packed
+/// right operand is the container's `[out][in]` row-major weight layout
+/// (out-row `col` holds the `k` input weights — GEA2-U5g layout truth).
 fn q8_0_projection_gemm(left: &[f32], packed: &[u8], m: usize, k: usize, n: usize) -> Vec<f32> {
     let mut out = vec![0.0f32; m * n];
     for row in 0..m {
         for col in 0..n {
             let mut acc = 0.0f32;
             for kk in 0..k {
-                let idx = kk * n + col;
+                let idx = col * k + kk;
                 let blk = idx / 32;
                 let elem = idx % 32;
                 let start = blk * 34;
@@ -173,8 +175,12 @@ fn dense_projections_match_cpu_reference_without_weight_expansion() {
             packed.extend_from_slice(&block);
             right.extend_from_slice(&values);
         }
+        // The packed right operand is laid out `[out][in]` (out-row `col`
+        // holds the `k` input weights, one golden block per 32 weights), so
+        // the left must be non-degenerate for the convention to be pinned:
+        // a unit-row left would read identically under either layout.
         let left: Vec<f32> = (0..m * k)
-            .map(|i| if i.is_multiple_of(k) { 1.0 } else { 0.0 })
+            .map(|i| ((i % k) as f32 + 1.0) * ((i / k) as f32 + 1.0))
             .collect();
         let got = q8_0_projection_gemm(&left, &packed, m, k, n);
         let expect = gemm_f32(&left, m, k, &right, n);

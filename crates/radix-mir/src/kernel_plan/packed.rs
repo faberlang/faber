@@ -492,9 +492,11 @@ pub fn dequant_packed_block(
     }
 }
 
-/// Dense f32 GEMM `C[M,N] = A[M,K] · B[K,N]` used by the packed-kernel
+/// Dense f32 GEMM `C[M,N] = A[M,K] · B[N,K]` used by the packed-kernel
 /// probes. The right operand is already dequanted **per block** — this is
-/// not a whole-model F32 materialization.
+/// not a whole-model F32 materialization. The right operand is the
+/// container's `[out][in]` row-major weight layout (out-row `col` holds the
+/// `k` input weights — GEA2-U5g layout truth).
 #[must_use]
 pub fn gemm_f32(left: &[f32], m: usize, k: usize, right: &[f32], n: usize) -> Vec<f32> {
     debug_assert_eq!(left.len(), m * k);
@@ -504,7 +506,7 @@ pub fn gemm_f32(left: &[f32], m: usize, k: usize, right: &[f32], n: usize) -> Ve
         for col in 0..n {
             let mut acc = 0.0f32;
             for inner in 0..k {
-                acc += left[row * k + inner] * right[inner * n + col];
+                acc += left[row * k + inner] * right[col * k + inner];
             }
             out[row * n + col] = acc;
         }

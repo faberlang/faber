@@ -16,7 +16,9 @@ fn bf16_bits_to_f32(bits: u16) -> f32 {
 
 /// In-kernel-style BF16 GEMM: convert each packed right-hand element at
 /// the load that needs it. Never allocates an f32 weight tensor of the
-/// whole right operand first.
+/// whole right operand first. The packed right operand is the container's
+/// `[out][in]` row-major weight layout (out-row `col` holds the `k` input
+/// weights — GEA2-U5g layout truth).
 #[allow(clippy::many_single_char_names)]
 fn bf16_quantized_matmul(
     left: &[f32],
@@ -31,7 +33,7 @@ fn bf16_quantized_matmul(
             let mut acc = 0.0f32;
             for kk in 0..k {
                 let a = left[row * k + kk];
-                let b = bf16_bits_to_f32(packed_right[kk * n + col]);
+                let b = bf16_bits_to_f32(packed_right[col * k + kk]);
                 acc += a * b;
             }
             out[row * n + col] = acc;
@@ -57,7 +59,7 @@ fn bf16_quantized_matmul_matches_cpu_reference_without_weight_expansion() {
         crate::kernel_plan::MatMulShapes {
             m: 2,
             k: 2,
-            n: 2,
+            n: 3,
             left_layout: crate::MirScalarLayout::F32,
             right_layout: crate::MirScalarLayout::F32,
         },
@@ -71,16 +73,22 @@ fn bf16_quantized_matmul_matches_cpu_reference_without_weight_expansion() {
     );
     assert_eq!((layout.block_elements(), layout.block_bytes()), (1, 2));
 
-    // 2×2 × 2×2: A is f32 activations; B is native BF16, converted per load.
+    // 2×2 × 2×3: A is f32 activations; B is native BF16 in the container's
+    // `[out][in]` row-major layout — out-row `col` holds the `k` input
+    // weights (GEA2-U5g layout truth). The non-square shape pins the
+    // convention: a `[k][n]` read of the same bytes would differ.
     let left = [1.0f32, 2.0, 3.0, 4.0];
-    let packed_right = [0x3f80u16, 0x4000, 0x4040, 0x4080]; // 1, 2, 3, 4
-    let got = bf16_quantized_matmul(&left, &packed_right, 2, 2, 2);
-    // Reference: convert-at-use, same f32 mul-add order.
+    let packed_right = [0x3f80u16, 0x4000, 0x4040, 0x4080, 0x40a0, 0x40c0]; // 1,2 | 3,4 | 5,6
+    let got = bf16_quantized_matmul(&left, &packed_right, 2, 2, 3);
+    // Reference: convert-at-use over the [out][in] rows, same f32 mul-add
+    // order.
     let expect = [
-        1.0 * 1.0 + 2.0 * 3.0, // 7
-        1.0 * 2.0 + 2.0 * 4.0, // 10
-        3.0 * 1.0 + 4.0 * 3.0, // 15
-        3.0 * 2.0 + 4.0 * 4.0, // 22
+        1.0 * 1.0 + 2.0 * 2.0, // 5
+        1.0 * 3.0 + 2.0 * 4.0, // 11
+        1.0 * 5.0 + 2.0 * 6.0, // 17
+        3.0 * 1.0 + 4.0 * 2.0, // 11
+        3.0 * 3.0 + 4.0 * 4.0, // 25
+        3.0 * 5.0 + 4.0 * 6.0, // 39
     ];
     assert_eq!(got, expect);
 }

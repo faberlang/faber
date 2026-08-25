@@ -141,10 +141,12 @@ pub fn dequant_q6_k(block: &[u8]) -> Result<[f32; 256], PackedDequantError> {
     Ok(y)
 }
 
-/// Packed GEMM over already-dequantized right columns: `C[m,n] = A[m,k] · W[k,n]`.
+/// Packed GEMM over already-dequantized right columns: `C[m,n] = A[m,k] · W`.
 ///
 /// The weight operand is the dequantized superblock (never a whole-model
-/// F32 table). Used by the R-PACK-02 per-layout probes.
+/// F32 table) in the container's `[out][in]` row-major layout (out-row
+/// `col` holds the `k` input weights — GEA2-U5g layout truth). Used by the
+/// R-PACK-02 per-layout probes.
 #[must_use]
 pub fn packed_gemm_f32(left: &[f32], right: &[f32], m: usize, k: usize, n: usize) -> Vec<f32> {
     let mut out = vec![0.0f32; m.saturating_mul(n)];
@@ -152,7 +154,7 @@ pub fn packed_gemm_f32(left: &[f32], right: &[f32], m: usize, k: usize, n: usize
         for col in 0..n {
             let mut acc = 0.0f32;
             for kk in 0..k {
-                acc += left[row * k + kk] * right[kk * n + col];
+                acc += left[row * k + kk] * right[col * k + kk];
             }
             out[row * n + col] = acc;
         }
