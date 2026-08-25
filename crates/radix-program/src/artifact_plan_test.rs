@@ -161,7 +161,7 @@ entry = "main.fab"
     .expect("entry");
     fs::write(
         root.join("src/extra/util.fab"),
-        "@ publica\nfn greet() → string {\n    return \"x\"\n}\n",
+        "@ public\nfn greet() → string {\n    return \"x\"\n}\n",
     )
     .expect("module");
     let package = analyze_package(
