@@ -1,0 +1,46 @@
++++
+term = "infinity"
+kind = "literal"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "unary_expr", "expression", "literal", "nota_stmt"]
+category = "literal"
+canonical = true
+summary = "Non-finite floating-point literals with contextual width, unary negation, and fail-closed integer contexts."
+syntax = "∞ | -∞ | nan"
+related = ["fractus", "numerus", "nan"]
+locale = "en"
++++
+
+# =============================================================================
+# infinity — Non-finite floating-point literals.
+# =============================================================================
+#
+# What this teaches:
+#   • `∞` is a positive floating-point literal, typed as f32 or f64 by context.
+#   • `-∞` is unary negation of `∞`, not a second literal token.
+#   • `nan` is the English contextual NaN literal (`nonnumerus` in the Latin
+#     pack) and follows the same float-width law.
+#   • Integer contexts fail closed: neither non-finite literal is a numerus.
+#
+# The rejected forms are deliberately kept as teaching comments rather than
+# executable statements:
+#   const numerus not_an_integer ← ∞
+#   const numerus not_a_number ← nan
+#   const numerus non_numerus_is_not_an_integer ← nonnumerus  # la spelling
+#
+# EXPECTED OUTPUT:
+#   inf
+#   inf
+#   -inf
+#   NaN
+
+main {
+    const f64 positive ← ∞
+    const f32 narrow ← ∞
+    const f64 negative ← -∞
+    const f32 quiet ← nan
+
+    print positive
+    print narrow
+    print negative
+    print quiet
+}

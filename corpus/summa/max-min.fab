@@ -52,8 +52,26 @@ fn max_dynamic<size Figura>(tensor<f32, Figura> values, f32 fallback) → f32 {
     return result
 }
 
-fn max_empty() → f32 ∪ null {
+fn max_empty() → f32 {
     const tf32[0] values ← empty
-    const f32 ∪ null result ← max from values at [i]
+    const f32 result ← max from values at [i] coalesce -∞
     return result
+}
+
+# EXPECTED OUTPUT:
+#   4.0
+#   1.0
+#   4.0
+#   -inf
+
+main {
+    const list<f32> flat ← [4.0, 1.0, 3.0, 2.0]
+    const tf32[] seed ← empty
+    const tf32[4] values ← seed.from_flat(flat, [4])
+    const tf32[4] scale ← seed.from_flat([1.0, 1.0, 1.0, 1.0], [4])
+
+    print max_static(values)
+    print min_with_identity(values, 99.0)
+    print max_scaled(values, scale)
+    print max_empty()
 }
