@@ -1,10 +1,10 @@
-//! Named-field MessagePack codec for the FHIR unit artifact (FPF-2).
+//! Named-field `MessagePack` codec for the FHIR unit artifact (FPF-2).
 //!
 //! Implements the field spec in
 //! `faber/docs/factory/fhir-package-format/spec.md` (FPF-1, faber `0a305c4`)
 //! for the unit schema v6:
 //!
-//! - **§1.1 named fields** — every struct is a MessagePack map keyed by the
+//! - **§1.1 named fields** — every struct is a `MessagePack` map keyed by the
 //!   serde field names of the defining type; never a compact array.
 //! - **§1.2 versioning** — `schema_version` is a named `uint` field read
 //!   first; mismatch fails closed before the payload is interpreted.
@@ -19,7 +19,7 @@
 //!   `str`, `bin` for byte payloads.
 //! - **§2 rows 10/13** — the `(DefId, …)` tuple families (`function_facts`
 //!   entries, `gpu_builtins`) are carried as named maps `{ def_id, facts }`
-//!   and `{ def_id, builtin }` per the spec's MessagePack type rules.
+//!   and `{ def_id, builtin }` per the spec's `MessagePack` type rules.
 //!
 //! Postcard envelope bytes are the retired legacy v1 wire: they fail closed
 //! with the named legacy error
@@ -28,10 +28,10 @@
 //! [`crate::package`] pinned to v1 for migration reads only.
 //!
 //! The codec is hand-rolled (no `rmp`/`rmp-serde` dependency): a generic
-//! serde `Serializer` over MessagePack bytes and a generic `Deserializer`
+//! serde `Serializer` over `MessagePack` bytes and a generic `Deserializer`
 //! over a parsed [`Value`] tree, so the whole directly-serde'd `HirModule`
 //! tree maps without per-type code. Multi-byte scalars are big-endian per
-//! the MessagePack specification.
+//! the `MessagePack` specification.
 
 use serde::de::{DeserializeSeed, EnumAccess, MapAccess, SeqAccess, VariantAccess, Visitor};
 use serde::ser::{
@@ -55,7 +55,7 @@ use crate::validate::validate_referential_integrity;
 use radix_hir::{HirModule, HirPresentation, LibraryRegistry};
 use radix_types::{DefId, TypeTableSnapshot};
 
-/// Maximum nesting depth accepted when parsing a MessagePack document.
+/// Maximum nesting depth accepted when parsing a `MessagePack` document.
 ///
 /// Fail-closed guard against stack exhaustion on hostile input; real unit
 /// artifacts nest far below this.
@@ -65,14 +65,14 @@ const MAX_DEPTH: usize = 1024;
 // Error type
 // ---------------------------------------------------------------------------
 
-/// Structured error for the FHIR MessagePack unit codec (fail-closed, F7).
+/// Structured error for the FHIR `MessagePack` unit codec (fail-closed, F7).
 #[derive(Debug)]
 pub enum MsgpackError {
     /// Serialization failed (unsupported data shape or oversized length).
     Encode(String),
-    /// The payload ended before a complete MessagePack value was read.
+    /// The payload ended before a complete `MessagePack` value was read.
     Truncated,
-    /// The payload is not a spec-conformant MessagePack unit value
+    /// The payload is not a spec-conformant `MessagePack` unit value
     /// (bad marker, non-UTF-8 string, wrong shape, missing named field).
     Decode(String),
     /// The unit value carries a schema version this codec does not support
@@ -148,10 +148,10 @@ impl serde::de::Error for MsgpackError {
 }
 
 // ---------------------------------------------------------------------------
-// Owned MessagePack value tree
+// Owned `MessagePack` value tree
 // ---------------------------------------------------------------------------
 
-/// Owned, self-describing MessagePack value (decode intermediate).
+/// Owned, self-describing `MessagePack` value (decode intermediate).
 #[derive(Debug, Clone, PartialEq)]
 enum Value {
     Nil,
@@ -167,7 +167,7 @@ enum Value {
 }
 
 impl Value {
-    /// Parses one complete MessagePack document; trailing bytes are rejected.
+    /// Parses one complete `MessagePack` document; trailing bytes are rejected.
     fn from_bytes(bytes: &[u8]) -> Result<Self, MsgpackError> {
         let mut pos = 0;
         let value = read_value(bytes, &mut pos, 0)?;
@@ -182,7 +182,7 @@ impl Value {
 }
 
 // ---------------------------------------------------------------------------
-// Writer primitives (big-endian, minimal-width per the MessagePack spec)
+// Writer primitives (big-endian, minimal-width per the `MessagePack` spec)
 // ---------------------------------------------------------------------------
 
 fn write_uint(out: &mut Vec<u8>, n: u64) {
@@ -190,13 +190,13 @@ fn write_uint(out: &mut Vec<u8>, n: u64) {
     let bytes = n.to_be_bytes();
     if n <= 0x7f {
         out.push(bytes[7]);
-    } else if n <= u64::from(u8::MAX) {
+    } else if u8::try_from(n).is_ok() {
         out.push(0xcc);
         out.push(bytes[7]);
-    } else if n <= u64::from(u16::MAX) {
+    } else if u16::try_from(n).is_ok() {
         out.push(0xcd);
         out.extend_from_slice(&bytes[6..8]);
-    } else if n <= u64::from(u32::MAX) {
+    } else if u32::try_from(n).is_ok() {
         out.push(0xce);
         out.extend_from_slice(&bytes[4..8]);
     } else {
@@ -378,7 +378,7 @@ fn read_value(bytes: &[u8], pos: &mut usize, depth: usize) -> Result<Value, Msgp
     let marker = read_u8(bytes, pos)?;
     match marker {
         0x00..=0x7f => Ok(Value::Uint(u64::from(marker))),
-        0xe0..=0xff => Ok(Value::Int(i64::from(marker as i8))),
+        0xe0..=0xff => Ok(Value::Int(i64::from(i8::from_ne_bytes([marker])))),
         0x80..=0x8f => read_map(bytes, pos, usize::from(marker & 0x0f), depth),
         0x90..=0x9f => read_array(bytes, pos, usize::from(marker & 0x0f), depth),
         0xa0..=0xbf => read_str(bytes, pos, usize::from(marker & 0x1f)),
@@ -463,14 +463,14 @@ fn read_map(
 }
 
 // ---------------------------------------------------------------------------
-// Generic serde Serializer over MessagePack bytes
+// Generic serde Serializer over `MessagePack` bytes
 // ---------------------------------------------------------------------------
 
 struct Serializer<'a> {
     out: &'a mut Vec<u8>,
 }
 
-impl<'a> Serializer<'a> {
+impl Serializer<'_> {
     fn elem<T: ?Sized + Serialize>(&mut self, value: &T) -> Result<(), MsgpackError> {
         value.serialize(Serializer {
             out: &mut *self.out,
@@ -484,7 +484,7 @@ struct Compound<'a> {
     out: &'a mut Vec<u8>,
 }
 
-impl<'a> Compound<'a> {
+impl Compound<'_> {
     fn elem<T: ?Sized + Serialize>(&mut self, value: &T) -> Result<(), MsgpackError> {
         value.serialize(Serializer {
             out: &mut *self.out,
@@ -1320,7 +1320,7 @@ impl From<HirArtifactDto> for HirArtifact {
 /// One module record on the package wire. Identical to
 /// [`FhirPackageModule`] except `unit`, which is the embedded unit's
 /// **nested named value** (a [`HirArtifactDto`] map, spec §1.1), not opaque
-/// nested bytes — the whole package is one MessagePack document (OQ-3
+/// nested bytes — the whole package is one `MessagePack` document (OQ-3
 /// ruling, confirmed at FPF-3 dispatch).
 #[derive(Serialize, Deserialize)]
 struct FhirPackageModuleDto {
@@ -1457,14 +1457,14 @@ impl FhirPackageDto {
     }
 }
 
-/// Reads a named `uint` field from a map value.
+/// Reads a named field from a map value.
 fn named_field<'a>(entries: &'a [(Value, Value)], key: &str) -> Result<&'a Value, MsgpackError> {
     entries
         .iter()
         .find(|(k, _)| matches!(k, Value::Str(s) if s == key))
         .map(|(_, v)| v)
         .ok_or_else(|| {
-            MsgpackError::Decode(format!("value must carry {key} as a named uint field"))
+            MsgpackError::Decode(format!("value must carry {key} as a named field"))
         })
 }
 
@@ -1476,13 +1476,10 @@ fn named_field<'a>(entries: &'a [(Value, Value)], key: &str) -> Result<&'a Value
 ///    unit's own `schema_version` must equal [`SCHEMA_VERSION`], with
 ///    module attribution.
 fn gate_package_versions(value: &Value) -> Result<(), MsgpackError> {
-    let entries = match value {
-        Value::Map(entries) => entries,
-        _ => {
-            return Err(MsgpackError::Decode(
-                "the package value must be a map of named fields".to_string(),
-            ));
-        }
+    let Value::Map(entries) = value else {
+        return Err(MsgpackError::Decode(
+            "the package value must be a map of named fields".to_string(),
+        ));
     };
     let found = named_field(entries, "package_schema_version")?
         .as_u64()
@@ -1565,7 +1562,7 @@ fn gate_package_versions(value: &Value) -> Result<(), MsgpackError> {
 
 /// Detects the retired postcard envelope prefix (OQ-1 version ratchet).
 ///
-/// A schema-v2+ package value is a top-level MessagePack **map**; the retired
+/// A schema-v2+ package value is a top-level `MessagePack` **map**; the retired
 /// postcard envelope begins with its `u32 package_schema_version` varint — a
 /// bare uint followed by the rest of the document. A varint prefix can never
 /// be a v2+ map value, so this shape is unambiguously legacy (no magic bytes
@@ -1588,13 +1585,13 @@ fn legacy_postcard_version(bytes: &[u8]) -> Option<u32> {
 // Public codec entry points
 // ---------------------------------------------------------------------------
 
-/// Serializes a [`HirArtifact`] to a spec-conformant named-field MessagePack
+/// Serializes a [`HirArtifact`] to a spec-conformant named-field `MessagePack`
 /// unit value (FPF-2). Postcard remains the live wire; this codec is additive.
 ///
 /// # Errors
 ///
 /// Returns [`MsgpackError::Encode`] if serialization fails (unsupported data
-/// shape or a length exceeding MessagePack's `u32` range); a valid artifact
+/// shape or a length exceeding `MessagePack`'s `u32` range); a valid artifact
 /// is expected to succeed.
 //
 // FPF-5 owns the unit-codec switch; the unit codec is consumed by the test
@@ -1607,7 +1604,7 @@ pub fn encode_msgpack(artifact: &HirArtifact) -> Result<Vec<u8>, MsgpackError> {
     Ok(out)
 }
 
-/// Deserializes and validates a [`HirArtifact`] from a MessagePack unit
+/// Deserializes and validates a [`HirArtifact`] from a `MessagePack` unit
 /// value, mirroring the postcard [`crate::decode::decode`] gates.
 ///
 /// # Version gate (§1.2, F3)
@@ -1619,7 +1616,7 @@ pub fn encode_msgpack(artifact: &HirArtifact) -> Result<Vec<u8>, MsgpackError> {
 ///
 /// # Fail-closed (F7)
 ///
-/// Malformed or truncated MessagePack input returns a structured
+/// Malformed or truncated `MessagePack` input returns a structured
 /// [`MsgpackError`]; the referential-integrity gate (U2.3) then validates
 /// every arena index before the artifact is returned.
 ///
@@ -1638,13 +1635,10 @@ pub fn decode_msgpack(bytes: &[u8]) -> Result<HirArtifact, MsgpackError> {
     let value = Value::from_bytes(bytes)?;
 
     // §1.2: the version is a named field read first; it gates the payload.
-    let version_entries = match &value {
-        Value::Map(entries) => entries,
-        _ => {
-            return Err(MsgpackError::Decode(
-                "the unit value must be a map of named fields".to_string(),
-            ));
-        }
+    let Value::Map(version_entries) = &value else {
+        return Err(MsgpackError::Decode(
+            "the unit value must be a map of named fields".to_string(),
+        ));
     };
     let found = version_entries
         .iter()
@@ -1675,7 +1669,7 @@ pub fn decode_msgpack(bytes: &[u8]) -> Result<HirArtifact, MsgpackError> {
     Ok(artifact)
 }
 
-/// Serializes a [`FhirPackage`] to a spec-conformant named-field MessagePack
+/// Serializes a [`FhirPackage`] to a spec-conformant named-field `MessagePack`
 /// package value (FPF-3): the envelope's named keys with each embedded unit
 /// carried as a **nested named value** (OQ-3), not opaque nested bytes.
 /// This is the live `.fhirpkg` wire since the FPF-5 switch (package schema
@@ -1694,7 +1688,7 @@ pub fn encode_package_msgpack(pkg: &FhirPackage) -> Result<Vec<u8>, MsgpackError
     Ok(out)
 }
 
-/// Deserializes and validates a [`FhirPackage`] from a MessagePack package
+/// Deserializes and validates a [`FhirPackage`] from a `MessagePack` package
 /// value (the live `.fhirpkg` wire since the FPF-5 switch, package schema
 /// v2), mirroring the gates of the retired postcard envelope codec:
 ///

@@ -344,7 +344,7 @@ fn genuine_floats_and_bytes_keep_their_native_types() {
     impl<'de> serde::Deserialize<'de> for BinDto {
         fn deserialize<D: serde::Deserializer<'de>>(d: D) -> Result<Self, D::Error> {
             struct V;
-            impl<'de> serde::de::Visitor<'de> for V {
+            impl serde::de::Visitor<'_> for V {
                 type Value = BinDto;
                 fn expecting(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
                     f.write_str("bin bytes")
@@ -836,7 +836,7 @@ fn package_msgpack_rejects_unit_failing_referential_integrity() {
     .expect("interner must exist") = Value::Array(Vec::new());
     match decode_package_msgpack(&reserialize(&value)) {
         Err(MsgpackError::InvalidPackage(FhirPackageError::MalformedUnit { module, .. })) => {
-            assert_eq!(module, "src/aux.fab")
+            assert_eq!(module, "src/aux.fab");
         }
         other => panic!("expected MalformedUnit, got {other:?}"),
     }
