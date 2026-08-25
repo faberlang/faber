@@ -738,11 +738,16 @@ fn mir_llvm_text_lowers_conversio(src: ConversioTypeFamily, tgt: ConversioTypeFa
 
 /// `true` when wasm-text can lower the pair to a runtime `Convert` call.
 ///
-/// Mirrors the v1 convert-symbol allow-list in `radix-mir-wasm`'s
-/// `runtime_value_v1_symbol`: text↔number plus `bivalens → textus`. Every
-/// other pair — even when both families are scalar-representable — hits the
-/// fail-closed "no v1 row" rejection (`mir-gap:convert_*` in the measured
-/// matrix) and is `NotEmitted`.
+/// Conservative oracle: predicts the Phase-2-era v1 allow-list (text↔scalar
+/// parse/render plus `bivalens → textus`). The current
+/// `radix-mir-wasm` dispatch (`convert_v1_symbol`) has grown well beyond it —
+/// inline core-Wasm scalar coercions (incl. `modulus`), octeti/instans/regex/
+/// valor rows, lista↔copia, tabula→lista, tensor/sparsa bridges, and
+/// lista↔cursor no-ops. Measurement owns these cells: the harness re-grounds
+/// fixture-backed verdicts and `CONVERSIO_MATRIX.md` → Measured divergences
+/// records the drift (wasm-text: 59 cells predicted `—` measured ✓). The
+/// prediction stays conservative so a cell is never claimed dedicated without
+/// a fixture.
 fn wasm_text_lowers_conversio(src: ConversioTypeFamily, tgt: ConversioTypeFamily) -> bool {
     matches!(
         (src, tgt),
