@@ -97,6 +97,8 @@ pub mod pattern;
 pub mod scalar_text;
 pub mod stmt;
 pub mod summa;
+#[cfg(test)]
+pub mod relations_test;
 pub mod tensor_index;
 pub mod tensor_type_directed;
 
@@ -117,11 +119,45 @@ pub(crate) struct BindingInfo {
 /// Struct member information collected before expression checking begins.
 pub(crate) struct StructInfo {
     /// Field contracts keyed by lowered field symbol.
+    ///
+    /// After heritage resolution this is the merged view: inherited fields are
+    /// present alongside own fields so literals, access, and lookup see the
+    /// full genus contract with zero call-site changes (ruling (a)).
     fields: FxHashMap<Symbol, StructFieldInfo>,
 
     /// Method signatures keyed by method name; receiver handling is performed
     /// by lookup/call checking rather than encoded in the signature table.
+    ///
+    /// Merged view after heritage resolution; own declarations win over
+    /// inherited ones (legal override).
     methods: FxHashMap<Symbol, FuncSig>,
+
+    /// Declaration spans keyed by method name for override diagnostics.
+    method_spans: FxHashMap<Symbol, radix_lexer::Span>,
+
+    /// Whether the genus itself was declared `abstractus`.
+    is_abstract: bool,
+
+    /// Method names declared without a body in this genus's own source.
+    own_bodyless: FxHashSet<Symbol>,
+
+    /// Method names with a body in this genus's own source.
+    own_bodied: FxHashSet<Symbol>,
+
+    /// Bodyless method names still unsatisfied anywhere in the merged view
+    /// (own bodyless plus inherited bodyless minus implemented names). A
+    /// concrete genus with any entry here fails concrete-completeness.
+    bodyless_methods: FxHashSet<Symbol>,
+}
+
+/// Direct heritage of one local genus declaration (type-algebra U1).
+#[derive(Clone)]
+pub(crate) struct StructHeritage {
+    /// Resolved `extends` target, if declared.
+    pub extends: Option<DefId>,
+
+    /// Resolved `implements` targets, in declaration order.
+    pub implements: Vec<DefId>,
 }
 
 /// Interface method contract plus availability metadata.
@@ -218,6 +254,22 @@ pub(crate) struct TypeChecker<'a> {
 
     /// Interface method contracts available to method lookup.
     pub interfaces: FxHashMap<DefId, FxHashMap<Symbol, InterfaceMethodInfo>>,
+
+    /// Direct heritage of local genus declarations, keyed by struct def.
+    pub struct_heritage: FxHashMap<DefId, StructHeritage>,
+
+    /// Local genus declarations in item order, with their spans, so heritage
+    /// resolution walks and reports in a deterministic sequence.
+    pub struct_order: Vec<(DefId, radix_lexer::Span)>,
+
+    /// Transitive `extends` chain (nearest ancestor first), keyed by struct
+    /// def. Cycle-cut and kind-checked during heritage resolution.
+    pub ancestor_structs: FxHashMap<DefId, Vec<DefId>>,
+
+    /// Transitive `implements` closure (own plus every ancestor's), keyed by
+    /// struct def. Interface-to-interface heritage is not in the grammar and
+    /// never contributes here.
+    pub implemented_interfaces: FxHashMap<DefId, FxHashSet<DefId>>,
 
     /// Type-alias declaration parameter names keyed by alias def-id, in
     /// declaration order. Populated from HIR items so applied alias types
@@ -422,6 +474,10 @@ impl<'a> TypeChecker<'a> {
             structs: FxHashMap::default(),
             json_structs: FxHashSet::default(),
             interfaces: FxHashMap::default(),
+            struct_heritage: FxHashMap::default(),
+            struct_order: Vec::new(),
+            ancestor_structs: FxHashMap::default(),
+            implemented_interfaces: FxHashMap::default(),
             alias_type_params: FxHashMap::default(),
             import_receivers: FxHashSet::default(),
             target,
@@ -490,7 +546,18 @@ impl<'a> TypeChecker<'a> {
                 .into_iter()
                 .map(|method| (method.name, method.sig))
                 .collect();
-            self.structs.insert(def_id, StructInfo { fields, methods });
+            self.structs.insert(
+                def_id,
+                StructInfo {
+                    fields,
+                    methods,
+                    method_spans: FxHashMap::default(),
+                    is_abstract: false,
+                    own_bodyless: FxHashSet::default(),
+                    own_bodied: FxHashSet::default(),
+                    bodyless_methods: FxHashSet::default(),
+                },
+            );
         }
     }
 

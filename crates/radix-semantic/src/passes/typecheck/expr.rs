@@ -433,7 +433,9 @@ impl TypeChecker<'_> {
                 recovery,
             } => self.check_conversio_assign(target, source, recovery.as_deref_mut(), expr.span),
             HirExpressionKind::Array(elements) => self.check_array(elements, expr.span, expected),
-            HirExpressionKind::Struct(def_id, fields) => self.check_struct_literal(*def_id, fields),
+            HirExpressionKind::Struct(def_id, fields) => {
+                self.check_struct_literal(*def_id, fields, expr.span)
+            }
             HirExpressionKind::Verte {
                 source,
                 target,

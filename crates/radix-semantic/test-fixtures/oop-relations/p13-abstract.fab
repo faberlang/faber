@@ -1,0 +1,13 @@
++++
+locale = "en"
++++
+
+abstract class Shape {
+    fn area() → float
+}
+
+class Square extends Shape {
+    float side
+
+    fn area() → float { return self.side * self.side }
+}

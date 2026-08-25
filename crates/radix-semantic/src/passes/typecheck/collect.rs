@@ -18,6 +18,19 @@
 // parent module provides shared imports for typechecking
 use super::*;
 
+/// Memberless view for builtin nominal receivers (sermo, directional views).
+fn empty_struct_info() -> StructInfo {
+    StructInfo {
+        fields: FxHashMap::default(),
+        methods: FxHashMap::default(),
+        method_spans: FxHashMap::default(),
+        is_abstract: false,
+        own_bodyless: FxHashSet::default(),
+        own_bodied: FxHashSet::default(),
+        bodyless_methods: FxHashSet::default(),
+    }
+}
+
 impl TypeChecker<'_> {
     pub fn callable_boundary_return(
         &mut self,
@@ -91,9 +104,14 @@ impl TypeChecker<'_> {
     ///
     /// Methods are stored as signatures rather than checked here so recursive
     /// and forward calls see the same declaration table as ordinary functions.
-    pub fn collect_struct(&mut self, def_id: DefId, struct_item: &HirStruct) {
+    /// Inherited members are merged later by [`Self::resolve_struct_heritage`]
+    /// so parent views are complete regardless of declaration order.
+    pub fn collect_struct(&mut self, def_id: DefId, struct_item: &HirStruct, span: radix_lexer::Span) {
         let mut fields = FxHashMap::default();
         let mut methods = FxHashMap::default();
+        let mut method_spans = FxHashMap::default();
+        let mut own_bodyless = FxHashSet::default();
+        let mut own_bodied = FxHashSet::default();
 
         if self.annotations_contain_json(&struct_item.annotations) {
             self.json_structs.insert(def_id);
@@ -114,6 +132,12 @@ impl TypeChecker<'_> {
         for method in &struct_item.methods {
             let sig = self.function_signature(&method.func);
             methods.insert(method.func.name, sig);
+            method_spans.insert(method.func.name, method.span);
+            if method.func.body.is_some() {
+                own_bodied.insert(method.func.name);
+            } else {
+                own_bodyless.insert(method.func.name);
+            }
             if let Some(role) = method.func.nucleum_role() {
                 self.nucleum_roles.insert(method.def_id, role);
                 self.method_nucleum_roles
@@ -129,7 +153,28 @@ impl TypeChecker<'_> {
                 .map(|param| param.name)
                 .collect(),
         );
-        self.structs.insert(def_id, StructInfo { fields, methods });
+
+        self.struct_heritage.insert(
+            def_id,
+            StructHeritage {
+                extends: struct_item.extends,
+                implements: struct_item.implements.clone(),
+            },
+        );
+        self.struct_order.push((def_id, span));
+
+        self.structs.insert(
+            def_id,
+            StructInfo {
+                fields,
+                methods,
+                method_spans,
+                is_abstract: struct_item.is_abstract,
+                own_bodyless,
+                own_bodied,
+                bodyless_methods: FxHashSet::default(),
+            },
+        );
     }
 
     fn collect_interface(&mut self, def_id: DefId, interface_item: &radix_hir::HirInterface) {
@@ -224,6 +269,11 @@ impl TypeChecker<'_> {
             StructInfo {
                 fields,
                 methods: FxHashMap::default(),
+                method_spans: FxHashMap::default(),
+                is_abstract: false,
+                own_bodyless: FxHashSet::default(),
+                own_bodied: FxHashSet::default(),
+                bodyless_methods: FxHashSet::default(),
             },
         );
     }
@@ -246,10 +296,7 @@ impl TypeChecker<'_> {
         };
         self.structs.insert(
             def_id,
-            StructInfo {
-                fields: FxHashMap::default(),
-                methods: FxHashMap::default(),
-            },
+            empty_struct_info(),
         );
     }
 
@@ -259,10 +306,7 @@ impl TypeChecker<'_> {
         };
         self.structs.insert(
             def_id,
-            StructInfo {
-                fields: FxHashMap::default(),
-                methods: FxHashMap::default(),
-            },
+            empty_struct_info(),
         );
     }
 
@@ -307,6 +351,11 @@ impl TypeChecker<'_> {
                 StructInfo {
                     fields,
                     methods: FxHashMap::default(),
+                    method_spans: FxHashMap::default(),
+                    is_abstract: false,
+                    own_bodyless: FxHashSet::default(),
+                    own_bodied: FxHashSet::default(),
+                    bodyless_methods: FxHashSet::default(),
                 },
             );
         }
@@ -368,7 +417,9 @@ impl TypeChecker<'_> {
                         }
                     }
                 }
-                HirItemKind::Struct(struct_item) => self.collect_struct(item.def_id, struct_item),
+                HirItemKind::Struct(struct_item) => {
+                    self.collect_struct(item.def_id, struct_item, item.span)
+                }
                 HirItemKind::Interface(interface_item) => {
                     self.collect_interface(item.def_id, interface_item)
                 }
@@ -392,5 +443,247 @@ impl TypeChecker<'_> {
                 }
             }
         }
+
+        // U1: heritage resolution runs after every local genus and implendum
+        // is collected so kind checks, the transitive walk, and the merged
+        // views are declaration-order independent.
+        self.resolve_struct_heritage();
+    }
+
+    /// Check and consume `HirStruct` heritage: kind checks, cycle detection,
+    /// merged member views, override/field-redeclaration diagnostics, and
+    /// concrete-completeness.
+    ///
+    /// Merging is compositional: each genus merges its parent's already-merged
+    /// view, so a parent's own ancestors arrive transitively and nearest
+    /// declarations win. Kind-invalid edges are dropped before the walk so a
+    /// bad clause does not cascade into member-merge noise.
+    fn resolve_struct_heritage(&mut self) {
+        let order = self.struct_order.clone();
+
+        // KIND: `extends` names a genus; `implet` names an implendum.
+        for (def_id, span) in &order {
+            let Some(mut heritage) = self.struct_heritage.get(def_id).cloned() else {
+                continue;
+            };
+            if let Some(parent) = heritage.extends {
+                if !self.structs.contains_key(&parent) {
+                    self.error_issue(
+                        SemanticErrorKind::TypeMismatch,
+                        ISSUE_EXTENDS_REQUIRES_GENUS,
+                        *span,
+                    );
+                    heritage.extends = None;
+                }
+            }
+            let mut implements = heritage.implements.clone();
+            implements.retain(|iface| self.interfaces.contains_key(iface));
+            let dropped = heritage.implements.len() - implements.len();
+            heritage.implements = implements;
+            if dropped > 0 {
+                self.error_issue(
+                    SemanticErrorKind::TypeMismatch,
+                    ISSUE_IMPLET_REQUIRES_IMPLENDUM,
+                    *span,
+                );
+            }
+            self.struct_heritage.insert(*def_id, heritage);
+        }
+
+        // CYCLE: transitive extends chain per genus, cut at the closing edge.
+        for (def_id, span) in &order {
+            let mut chain: Vec<DefId> = Vec::new();
+            let mut seen: FxHashSet<DefId> = FxHashSet::default();
+            let mut cursor = *def_id;
+            loop {
+                let Some(parent) = self
+                    .struct_heritage
+                    .get(&cursor)
+                    .and_then(|heritage| heritage.extends)
+                else {
+                    break;
+                };
+                if parent == *def_id || seen.contains(&parent) {
+                    self.error_issue(
+                        SemanticErrorKind::TypeMismatch,
+                        ISSUE_HERITAGE_CYCLE,
+                        *span,
+                    );
+                    // Cut the walk at the closing edge; the cycle members
+                    // already carry the diagnostic.
+                    if let Some(heritage) = self.struct_heritage.get_mut(&cursor) {
+                        heritage.extends = None;
+                    }
+                    break;
+                }
+                seen.insert(parent);
+                chain.push(parent);
+                cursor = parent;
+            }
+            self.ancestor_structs.insert(*def_id, chain);
+        }
+
+        // MERGE: parent-first compositional views (own members win).
+        let mut merged: FxHashSet<DefId> = FxHashSet::default();
+        for (def_id, _) in &order {
+            self.merge_heritage_into(*def_id, &mut merged);
+        }
+
+        // IMPLEMENTS closure: own plus every ancestor's declaration.
+        for (def_id, _) in &order {
+            let mut interfaces: FxHashSet<DefId> = FxHashSet::default();
+            if let Some(heritage) = self.struct_heritage.get(def_id) {
+                interfaces.extend(heritage.implements.iter().copied());
+            }
+            if let Some(ancestors) = self.ancestor_structs.get(def_id) {
+                for ancestor in ancestors {
+                    if let Some(heritage) = self.struct_heritage.get(ancestor) {
+                        interfaces.extend(heritage.implements.iter().copied());
+                    }
+                }
+            }
+            self.implemented_interfaces.insert(*def_id, interfaces);
+        }
+
+        // COMPLETENESS: a concrete genus implements every bodyless method in
+        // its full heritage closure.
+        for (def_id, span) in &order {
+            let Some(info) = self.structs.get(def_id) else {
+                continue;
+            };
+            if info.is_abstract || info.bodyless_methods.is_empty() {
+                continue;
+            }
+            let unsatisfied: Vec<Symbol> = info.bodyless_methods.iter().copied().collect();
+            for name in unsatisfied {
+                let name_text = self
+                    .interner
+                    .map(|interner| interner.resolve(name).to_owned())
+                    .unwrap_or_default();
+                self.errors.push(
+                    SemanticError::structured(SemanticErrorKind::TypeMismatch, *span)
+                        .with_arg("issue", ISSUE_ABSTRACT_METHOD_UNIMPLEMENTED)
+                        .with_arg("method", name_text),
+                );
+            }
+        }
+    }
+
+    /// Merge the parent's (already-merged) view into one genus's view.
+    ///
+    /// Own field redeclarations and incompatible method overrides are
+    /// diagnosed here; own declarations always win the merged slot. The
+    /// child's view is taken out of the table while merging so diagnostics can
+    /// be emitted mid-merge without aliasing the member maps.
+    fn merge_heritage_into(&mut self, def_id: DefId, merged: &mut FxHashSet<DefId>) {
+        if merged.contains(&def_id) {
+            return;
+        }
+        merged.insert(def_id);
+        let parent = self
+            .struct_heritage
+            .get(&def_id)
+            .and_then(|heritage| heritage.extends)
+            .filter(|parent| self.structs.contains_key(parent));
+        if let Some(parent) = parent {
+            self.merge_heritage_into(parent, merged);
+        }
+
+        let mut info = self
+            .structs
+            .remove(&def_id)
+            .expect("collected struct present during heritage merge");
+
+        let mut diagnostics: Vec<SemanticError> = Vec::new();
+        if let Some(parent) = parent {
+            let parent_info = self.structs.get(&parent).expect("parent collected");
+            let parent_fields = parent_info.fields.clone();
+            let parent_methods = parent_info.methods.clone();
+            let parent_method_spans = parent_info.method_spans.clone();
+            let parent_bodyless = parent_info.bodyless_methods.clone();
+            for (name, field) in parent_fields {
+                if info.fields.contains_key(&name) {
+                    // (a): no field shadowing under `sub` — the child's own
+                    // declaration is the diagnostic site.
+                    let span = info
+                        .fields
+                        .get(&name)
+                        .map(|own| own.span)
+                        .unwrap_or_default();
+                    diagnostics.push(
+                        SemanticError::structured(SemanticErrorKind::DefinitionDuplicate, span)
+                            .with_arg("issue", ISSUE_FIELD_REDECLARATION),
+                    );
+                } else {
+                    info.fields.insert(name, field);
+                }
+            }
+            for (name, sig) in parent_methods {
+                if let Some(own_sig) = info.methods.get(&name).cloned() {
+                    if !self.override_compatible(&own_sig, &sig) {
+                        let span = info
+                            .method_spans
+                            .get(&name)
+                            .copied()
+                            .unwrap_or_default();
+                        diagnostics.push(
+                            SemanticError::structured(SemanticErrorKind::TypeMismatch, span)
+                                .with_arg("issue", ISSUE_OVERRIDE_SIGNATURE_INCOMPATIBLE),
+                        );
+                    }
+                } else {
+                    info.method_spans
+                        .entry(name)
+                        .or_insert_with(|| parent_method_spans.get(&name).copied().unwrap_or_default());
+                    info.methods.insert(name, sig);
+                }
+            }
+            // Bodyless propagation: inherited unsatisfied names minus the ones
+            // this genus provides bodies for.
+            let mut bodyless = info.own_bodyless.clone();
+            bodyless.extend(parent_bodyless.iter().copied());
+            for name in info.own_bodied.iter() {
+                bodyless.remove(name);
+            }
+            info.bodyless_methods = bodyless;
+        } else {
+            info.bodyless_methods = info.own_bodyless.clone();
+        }
+
+        self.structs.insert(def_id, info);
+        self.errors.extend(diagnostics);
+    }
+
+    /// (a): override compatibility — same parameter count and modes, and
+    /// assignable return/error channels. Parameter types follow the ruling's
+    /// explicit list and are not compared.
+    fn override_compatible(&self, child: &FuncSig, parent: &FuncSig) -> bool {
+        if child.params.len() != parent.params.len() {
+            return false;
+        }
+        for (child_param, parent_param) in child.params.iter().zip(parent.params.iter()) {
+            if child_param.mode != parent_param.mode
+                || child_param.optional != parent_param.optional
+            {
+                return false;
+            }
+        }
+        if !self.assignable_with_heritage(child.ret, parent.ret) {
+            return false;
+        }
+        match (child.err, parent.err) {
+            (None, _) => true,
+            (Some(_), None) => false,
+            (Some(child_err), Some(parent_err)) => {
+                self.assignable_with_heritage(child_err, parent_err)
+            }
+        }
     }
 }
+
+const ISSUE_EXTENDS_REQUIRES_GENUS: &str = "extends_requires_genus";
+const ISSUE_IMPLET_REQUIRES_IMPLENDUM: &str = "implet_requires_implendum";
+const ISSUE_HERITAGE_CYCLE: &str = "heritage_cycle";
+const ISSUE_FIELD_REDECLARATION: &str = "field_redeclaration";
+const ISSUE_OVERRIDE_SIGNATURE_INCOMPATIBLE: &str = "override_signature_incompatible";
+const ISSUE_ABSTRACT_METHOD_UNIMPLEMENTED: &str = "abstract_method_unimplemented";

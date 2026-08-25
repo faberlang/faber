@@ -1,0 +1,15 @@
++++
+locale = "en"
++++
+
+class A {
+    string x
+}
+
+class B extends A { }
+
+class C extends B { }
+
+main {
+    print "cycle"
+}

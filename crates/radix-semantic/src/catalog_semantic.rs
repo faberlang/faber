@@ -1566,6 +1566,9 @@ fn semantic_duplicate_definition_message(args: &[DiagnosticArg]) -> Option<Strin
     match arg_value(args, "issue")? {
         "duplicate_definition" => Some("duplicate definition".to_owned()),
         "duplicate_commune_field" => Some("duplicate commune field".to_owned()),
+        "field_redeclaration" => {
+            Some("child genus redeclares an inherited field; fields cannot shadow under extends".to_owned())
+        }
         "union_variant_redeclares_shared_field" => {
             Some("variant redeclares a commune field".to_owned())
         }
@@ -1596,6 +1599,9 @@ fn semantic_duplicate_definition_help(args: &[DiagnosticArg]) -> Option<String> 
         ),
         "duplicate_commune_field" => {
             Some("declare each commune field once in the union region".to_owned())
+        }
+        "field_redeclaration" => {
+            Some("remove the redeclared field; inherited fields are already part of the child genus".to_owned())
         }
         "union_variant_redeclares_shared_field" => {
             Some("omit the commune field from the variant payload".to_owned())
@@ -2118,6 +2124,25 @@ fn semantic_prefer_string_template_message(args: &[DiagnosticArg]) -> Option<Str
 fn semantic_type_mismatch_message(args: &[DiagnosticArg]) -> Option<String> {
     match arg_value(args, "issue")? {
         "argument_type_mismatch" => Some("argument type mismatch".to_owned()),
+        "extends_requires_genus" => {
+            Some("extends clause must name a genus declaration".to_owned())
+        }
+        "implet_requires_implendum" => {
+            Some("implements clause must name an implendum declaration".to_owned())
+        }
+        "heritage_cycle" => Some("genus heritage forms an extends cycle".to_owned()),
+        "override_signature_incompatible" => {
+            Some("override signature is incompatible with the inherited method".to_owned())
+        }
+        "abstract_construction" => {
+            Some("abstract genus cannot be constructed; construct a concrete genus that extends it".to_owned())
+        }
+        "abstract_method_unimplemented" => {
+            let method = arg_value(args, "method")?;
+            Some(format!(
+                "concrete genus must provide a body for inherited bodyless method '{method}'"
+            ))
+        }
         "callee_not_callable" => Some("callee is not callable".to_owned()),
         "figura_not_index_param" => Some("name does not refer to an index parameter".to_owned()),
         "assignment_type_mismatch" => Some("assignment type mismatch".to_owned()),

@@ -98,6 +98,12 @@ pub struct Parser {
     reader_keyword_surfaces: HashMap<String, String>,
     reader_type_latin_keys: HashMap<String, String>,
     has_latin_fallback: bool,
+    /// Depth of `abstractus genus` member parsing (type-algebra U1).
+    ///
+    /// Bodyless `functio_method_decl`s parse only while this is non-zero, so
+    /// signature-only methods exist under an `abstractus` header and nowhere
+    /// else; top-level bodyless functions remain governed by `options`.
+    abstract_class_depth: u32,
 }
 
 /// Contextual parser policy supplied by compiler frontends.
@@ -231,6 +237,7 @@ impl Parser {
             reader_keyword_surfaces,
             reader_type_latin_keys,
             has_latin_fallback,
+            abstract_class_depth: 0,
         }
     }
 

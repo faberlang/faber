@@ -1,0 +1,28 @@
++++
+locale = "en"
++++
+
+interface Greets {
+    fn greet() → string
+}
+
+class Formal implements Greets {
+    fn greet() → string { return "good evening" }
+}
+
+class Casual implements Greets {
+    fn greet() → string { return "yo" }
+}
+
+fn greet_of(Greets g) → string {
+    return g.greet()
+}
+
+main {
+    const Formal a ← Formal {}
+    const Casual b ← Casual {}
+    const string out1 ← greet_of(a)
+    print out1
+    const string out2 ← greet_of(b)
+    print out2
+}

@@ -509,6 +509,14 @@ pub struct HirStruct {
 
     /// Resolved interfaces this type claims to implement.
     pub implements: Vec<DefId>,
+
+    /// Whether the source declared this genus `abstractus`.
+    ///
+    /// Abstract genera cannot be constructed and may declare bodyless methods;
+    /// concrete genera must complete every bodyless method in their heritage
+    /// closure (type-algebra U1).
+    #[serde(default)]
+    pub is_abstract: bool,
 }
 
 /// Field declaration inside a product type.

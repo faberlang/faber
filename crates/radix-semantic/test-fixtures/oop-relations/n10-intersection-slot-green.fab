@@ -1,0 +1,27 @@
++++
+locale = "en"
++++
+
+interface Readable {
+    fn read() → string
+}
+
+interface Seekable {
+    fn seek() → string
+}
+
+type Reversible = Readable ∩ Seekable
+
+class Doc implements Readable ∩ Seekable {
+    fn read() → string { return "r" }
+    fn seek() → string { return "s" }
+}
+
+fn probe(Reversible r) → void {
+    print "accepted"
+}
+
+main {
+    const Doc d ← Doc {}
+    probe(d)
+}

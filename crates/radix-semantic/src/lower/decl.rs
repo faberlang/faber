@@ -706,6 +706,7 @@ impl Lowerer<'_> {
             methods,
             extends,
             implements,
+            is_abstract: decl.is_abstract,
         };
 
         Some(HirItem {

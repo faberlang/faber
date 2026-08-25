@@ -1,0 +1,19 @@
++++
+locale = "en"
++++
+
+class Base {
+    string message
+}
+
+class Child extends Base { }
+
+fn probe(lista<Base> xs) → void {
+    print "probe"
+}
+
+main {
+    const Child c ← Child {message = "hi"}
+    const lista<Child> cs ← [c]
+    probe(cs)
+}

@@ -1,0 +1,15 @@
++++
+locale = "en"
++++
+
+abstract class Shape {
+    fn area() → float
+}
+
+class Circle extends Shape {
+    float radius
+}
+
+main {
+    print "missing"
+}

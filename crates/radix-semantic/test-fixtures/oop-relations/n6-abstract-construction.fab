@@ -1,0 +1,12 @@
++++
+locale = "en"
++++
+
+abstract class Shape {
+    fn area() → float { return 0.0 }
+}
+
+main {
+    const Shape s ← Shape {}
+    print s.area()
+}

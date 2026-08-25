@@ -1,0 +1,24 @@
++++
+locale = "en"
++++
+
+interface Greets {
+    fn greet() → string
+}
+
+class Hello implements Greets {
+    fn greet() → string { return "hello" }
+}
+
+fn failable() → vacuum ⇥ Greets ∪ string {
+    const Hello h ← Hello {}
+    throw h
+}
+
+main {
+    do {
+        failable()
+    } catch err {
+        print "caught"
+    }
+}

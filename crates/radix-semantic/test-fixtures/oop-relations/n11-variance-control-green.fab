@@ -1,0 +1,18 @@
++++
+locale = "en"
++++
+
+class Base {
+    string message
+}
+
+class Child extends Base { }
+
+fn probe(Base b) → string {
+    return b.message
+}
+
+main {
+    const Child c ← Child {message = "hi"}
+    print probe(c)
+}

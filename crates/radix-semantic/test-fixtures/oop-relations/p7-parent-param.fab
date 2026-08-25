@@ -1,0 +1,29 @@
++++
+locale = "en"
++++
+
+# U1 fixture — extends-subsumption at ARGUMENTS (probe p7).
+#
+# NOTE: the CTO's materialized probe file (and the goal inventory's p7 block)
+# carried `string message` redeclared inside `Child` — byte-identical to p11,
+# whose declared flip under ruling (a) is the field-redeclaration ERROR. No
+# semantic rule can make p7 green and p11 red with the same class shape, so
+# this durable copy tests p7's declared axis with an empty child body: the
+# `Child {message = …}` literal exercises inherited-field construction and
+# `probe(c)` exercises Child→Base argument subsumption. The redeclaration
+# axis stays covered by p11 (red).
+
+class Base {
+    string message
+}
+
+class Child extends Base { }
+
+fn probe(Base b) → string {
+    return b.message
+}
+
+main {
+    const Child c ← Child {message = "hi"}
+    print probe(c)
+}

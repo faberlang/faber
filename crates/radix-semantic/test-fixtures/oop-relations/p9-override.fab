@@ -1,0 +1,16 @@
++++
+locale = "en"
++++
+
+class Base {
+    fn name() → string { return "base" }
+}
+
+class Child extends Base {
+    fn name() → string { return "child" }
+}
+
+fn probe() → string {
+    const Child c ← Child {}
+    return c.name()
+}

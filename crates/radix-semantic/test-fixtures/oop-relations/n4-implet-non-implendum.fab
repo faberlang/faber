@@ -1,0 +1,15 @@
++++
+locale = "en"
++++
+
+class Base {
+    string message
+}
+
+class Weird implements Base {
+    string note
+}
+
+main {
+    print "kind"
+}

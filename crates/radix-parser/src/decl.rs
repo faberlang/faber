@@ -532,7 +532,7 @@ impl Parser {
 
         let body = if self.check(&TokenKind::LBrace) {
             Some(self.parse_block()?)
-        } else if self.options.allow_bodyless_functions {
+        } else if self.options.allow_bodyless_functions || self.abstract_class_depth > 0 {
             None
         } else {
             return Err(ParseError::structured(
@@ -754,10 +754,17 @@ impl Parser {
         }
         self.advance();
 
+        // Bodyless methods parse only while an `abstractus` header is open.
+        if is_abstract {
+            self.abstract_class_depth += 1;
+        }
         let mut members = Vec::new();
         while !self.check(&TokenKind::RBrace) && !self.is_at_end() {
             let member = self.parse_class_member()?;
             members.push(member);
+        }
+        if is_abstract {
+            self.abstract_class_depth -= 1;
         }
 
         // Trivia immediately before the consuming `}` has no following member
