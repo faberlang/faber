@@ -290,6 +290,13 @@ impl Lowerer<'_> {
         let rhs = lower_expr(self, &bin.rhs);
 
         let op = match bin.op {
+            // D2 preserves the dedicated parse nodes; D3 owns their
+            // elementwise clamp admission and lowering through the live
+            // maximus/minimus twins.
+            radix_syntax::BinOp::Maximum | radix_syntax::BinOp::Minimum => {
+                self.error("minmax_infix_semantics_pending");
+                return HirExpressionKind::Error;
+            }
             radix_syntax::BinOp::Add => HirBinOp::Add,
             radix_syntax::BinOp::Sub => HirBinOp::Sub,
             radix_syntax::BinOp::Mul => HirBinOp::Mul,

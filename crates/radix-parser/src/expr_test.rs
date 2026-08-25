@@ -242,6 +242,74 @@ fn vel_binds_tighter_than_multiplicative() {
 }
 
 // ---------------------------------------------------------------------------
+// Infix extrema (`⤒` / `⤓`) at additive precedence
+// ---------------------------------------------------------------------------
+
+#[test]
+fn minmax_glyphs_bind_at_additive_precedence() {
+    let result = parse_ok("fixum _ value ← a ⤒ b * c + d ⤓ e");
+    let program = result.program.as_ref().expect("program");
+    let StmtKind::Var(var) = &program.statements[0].kind else {
+        panic!("expected variable declaration");
+    };
+    let expr = var.init.as_deref().expect("initializer");
+    let ExprKind::Binary(minimum) = &expr.kind else {
+        panic!("expected minimum root, got {:?}", expr.kind);
+    };
+    assert_eq!(minimum.op, BinOp::Minimum);
+    let ExprKind::Binary(add) = &minimum.lhs.kind else {
+        panic!("expected additive lhs, got {:?}", minimum.lhs.kind);
+    };
+    assert_eq!(add.op, BinOp::Add);
+    let ExprKind::Binary(maximum) = &add.lhs.kind else {
+        panic!("expected maximum lhs, got {:?}", add.lhs.kind);
+    };
+    assert_eq!(maximum.op, BinOp::Maximum);
+    let ExprKind::Binary(product) = &maximum.rhs.kind else {
+        panic!("expected multiplicative RHS, got {:?}", maximum.rhs.kind);
+    };
+    assert_eq!(product.op, BinOp::Mul);
+}
+
+#[test]
+fn minmax_glyph_chaining_is_left_associative() {
+    let result = parse_ok("fixum _ value ← a ⤒ b ⤓ c");
+    let program = result.program.as_ref().expect("program");
+    let StmtKind::Var(var) = &program.statements[0].kind else {
+        panic!("expected variable declaration");
+    };
+    let ExprKind::Binary(outer) = &var.init.as_deref().expect("initializer").kind else {
+        panic!("expected binary expression");
+    };
+    assert_eq!(outer.op, BinOp::Minimum);
+    let ExprKind::Binary(inner) = &outer.lhs.kind else {
+        panic!("expected left-nested maximum");
+    };
+    assert_eq!(inner.op, BinOp::Maximum);
+}
+
+#[test]
+fn minmax_glyphs_chain_beside_additive_operators() {
+    let result = parse_ok("fixum _ value ← a + b ⤒ c - d");
+    let program = result.program.as_ref().expect("program");
+    let StmtKind::Var(var) = &program.statements[0].kind else {
+        panic!("expected variable declaration");
+    };
+    let ExprKind::Binary(sub) = &var.init.as_deref().expect("initializer").kind else {
+        panic!("expected subtraction root");
+    };
+    assert_eq!(sub.op, BinOp::Sub);
+    let ExprKind::Binary(maximum) = &sub.lhs.kind else {
+        panic!("expected maximum lhs");
+    };
+    assert_eq!(maximum.op, BinOp::Maximum);
+    let ExprKind::Binary(add) = &maximum.lhs.kind else {
+        panic!("expected addition under maximum");
+    };
+    assert_eq!(add.op, BinOp::Add);
+}
+
+// ---------------------------------------------------------------------------
 // Glyph products (`·` `×` `⊗` `⊙` `⊘`) at multiplicative precedence
 // ---------------------------------------------------------------------------
 

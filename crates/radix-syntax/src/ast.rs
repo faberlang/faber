@@ -1159,6 +1159,9 @@ pub enum BinOp {
     // Arithmetic
     Add,
     Sub,
+    // Infix extrema (minmax-infix-glyphs family; additive precedence)
+    Maximum, // ⤒ upper/max
+    Minimum, // ⤓ lower/min
     Mul,
     Div,
     Mod,

@@ -444,6 +444,14 @@ impl Parser {
         self.parse_additive_inner(false)
     }
 
+    /// Parse additive arithmetic and infix extrema at one left-associative tier.
+    ///
+    /// GRAMMAR:
+    ///   additive := multiplicative (('+' | '-' | '⤒' | '⤓') multiplicative)*
+    ///
+    /// WHY: `⤒` and `⤓` are pure arithmetic extrema, not multiplicative
+    /// operators. Keeping them in this loop makes `a ⤒ b ⤓ c` left-nested and
+    /// leaves the operator identity available for D3's semantic lowering.
     fn parse_additive_inner(&mut self, allow_conversio: bool) -> Result<Expr, ParseError> {
         let start = self.current_span();
         let mut left = self.parse_multiplicative_inner(allow_conversio)?;
@@ -452,6 +460,8 @@ impl Parser {
             let op = match self.peek().kind {
                 TokenKind::Plus => BinOp::Add,
                 TokenKind::Minus => BinOp::Sub,
+                TokenKind::Maximum => BinOp::Maximum,
+                TokenKind::Minimum => BinOp::Minimum,
                 _ => break,
             };
             self.advance();
