@@ -15,8 +15,8 @@ use crate::file_interface::{
 use crate::semantic::passes::visibility_annotation::VisibilityTier;
 use crate::semantic::{ContractFieldType, InstansPrecision, NumericWidth, Primitive, SemanticParamMode};
 use crate::syntax::{
-    Annotation, AnnotationFieldValue, AnnotationKind, AstParamMode, ClassDecl, ClassMemberKind, ExprKind,
-    FiguraExpr, ImportKind, Literal, Program, Stmt, StmtKind, TypeExpr, TypeExprKind,
+    Annotation, AnnotationFieldValue, AnnotationKind, AstParamMode, ClassDecl, ClassMemberKind, ExprKind, FiguraExpr,
+    ImportKind, Literal, Program, Stmt, StmtKind, TypeExpr, TypeExprKind,
 };
 use rustc_hash::FxHashMap;
 use std::cell::RefCell;
@@ -1643,9 +1643,13 @@ fn interface_type_from_type_expr(
             )?),
             interface_index_snapshot(figura, interner)?,
         )),
-        TypeExprKind::Atomic(element) => Some(InterfaceTypeSnapshot::Atomic(Box::new(
-            interface_type_from_type_expr(element, interner, type_params, nominal_kinds, ctx)?,
-        ))),
+        TypeExprKind::Atomic(element) => Some(InterfaceTypeSnapshot::Atomic(Box::new(interface_type_from_type_expr(
+            element,
+            interner,
+            type_params,
+            nominal_kinds,
+            ctx,
+        )?))),
         _ => None,
     }
 }
@@ -1657,15 +1661,10 @@ fn interface_type_from_type_expr(
 /// restore path), literals as `Literal`, and `[R, C]` shapes as `Tuple`.
 /// `Infer` fails the export, matching the analysis route's
 /// `IndexInferenceUnsupported` posture.
-fn interface_index_snapshot(
-    figura: &FiguraExpr,
-    interner: &crate::lexer::Interner,
-) -> Option<InterfaceIndexSnapshot> {
+fn interface_index_snapshot(figura: &FiguraExpr, interner: &crate::lexer::Interner) -> Option<InterfaceIndexSnapshot> {
     match figura {
         FiguraExpr::Literal(value) => Some(InterfaceIndexSnapshot::Literal(*value)),
-        FiguraExpr::Var(ident) => Some(InterfaceIndexSnapshot::Param(
-            interner.resolve(ident.name).to_owned(),
-        )),
+        FiguraExpr::Var(ident) => Some(InterfaceIndexSnapshot::Param(interner.resolve(ident.name).to_owned())),
         FiguraExpr::Tuple(dims) => dims
             .iter()
             .map(|dim| interface_index_snapshot(dim, interner))

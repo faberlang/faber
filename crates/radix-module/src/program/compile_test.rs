@@ -160,10 +160,7 @@ fn imported_shapes() → matrix<f32, [3, 3]> {
         vec![
             InterfaceParam {
                 ty: InterfaceTypeSnapshot::Vector(
-                    Box::new(InterfaceTypeSnapshot::SizedNumeric(
-                        Primitive::Fractus,
-                        NumericWidth::F32,
-                    )),
+                    Box::new(InterfaceTypeSnapshot::SizedNumeric(Primitive::Fractus, NumericWidth::F32,)),
                     InterfaceIndexSnapshot::Param("N".to_owned()),
                 ),
                 mode: SemanticParamMode::Owned,
@@ -171,10 +168,7 @@ fn imported_shapes() → matrix<f32, [3, 3]> {
             },
             InterfaceParam {
                 ty: InterfaceTypeSnapshot::Vector(
-                    Box::new(InterfaceTypeSnapshot::SizedNumeric(
-                        Primitive::Fractus,
-                        NumericWidth::F32,
-                    )),
+                    Box::new(InterfaceTypeSnapshot::SizedNumeric(Primitive::Fractus, NumericWidth::F32,)),
                     InterfaceIndexSnapshot::Param("N".to_owned()),
                 ),
                 mode: SemanticParamMode::Owned,
@@ -185,10 +179,7 @@ fn imported_shapes() → matrix<f32, [3, 3]> {
     assert_eq!(
         add.ret.as_ref(),
         &InterfaceTypeSnapshot::Vector(
-            Box::new(InterfaceTypeSnapshot::SizedNumeric(
-                Primitive::Fractus,
-                NumericWidth::F32,
-            )),
+            Box::new(InterfaceTypeSnapshot::SizedNumeric(Primitive::Fractus, NumericWidth::F32,)),
             InterfaceIndexSnapshot::Param("N".to_owned()),
         )
     );
@@ -201,10 +192,7 @@ fn imported_shapes() → matrix<f32, [3, 3]> {
     assert_eq!(
         strukt.fields[0].ty,
         InterfaceTypeSnapshot::Vector(
-            Box::new(InterfaceTypeSnapshot::SizedNumeric(
-                Primitive::Fractus,
-                NumericWidth::F32,
-            )),
+            Box::new(InterfaceTypeSnapshot::SizedNumeric(Primitive::Fractus, NumericWidth::F32,)),
             InterfaceIndexSnapshot::Param("N".to_owned()),
         )
     );

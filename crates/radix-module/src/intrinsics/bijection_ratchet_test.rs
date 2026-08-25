@@ -437,10 +437,7 @@ fn probe(source: &str, session: &Session) -> ProbeOutcome {
         Err(errors) => {
             let issues = errors.iter().map(|e| e.issue.as_str()).collect::<Vec<_>>();
             let joined = issues.join("; ");
-            if errors
-                .iter()
-                .any(|e| e.issue.contains("method_call"))
-            {
+            if errors.iter().any(|e| e.issue.contains("method_call")) {
                 // Both fallthrough shapes: the dispatch-chain miss
                 // ("method call before runtime/provider MIR lowering") and the
                 // generic expression miss ("method calls before receiver-aware

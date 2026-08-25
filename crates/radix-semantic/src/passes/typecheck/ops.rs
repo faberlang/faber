@@ -1697,7 +1697,10 @@ impl TypeChecker<'_> {
     }
 
     /// The two raw dimension terms of a matrix shape, literal or parametric.
-    fn matrix_shape_dims(&self, index_id: radix_types::IndexId) -> Option<(radix_types::IndexId, radix_types::IndexId)> {
+    fn matrix_shape_dims(
+        &self,
+        index_id: radix_types::IndexId,
+    ) -> Option<(radix_types::IndexId, radix_types::IndexId)> {
         let IndexExpr::Tuple(dims) = self.types.get_index(index_id) else {
             return None;
         };

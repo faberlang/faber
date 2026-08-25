@@ -778,10 +778,7 @@ pub(super) fn function_param_map(unit: &AnalyzedModule) -> FxHashMap<DefId, Vec<
                     function
                         .params
                         .iter()
-                        .map(|param| CallableParamMeta {
-                            optional: param.optional,
-                            default: param.default.as_ref(),
-                        })
+                        .map(|param| CallableParamMeta { optional: param.optional, default: param.default.as_ref() })
                         .collect(),
                 );
             }

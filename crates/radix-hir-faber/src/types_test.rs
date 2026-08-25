@@ -2314,11 +2314,23 @@ fn bounded_types_print_via_the_surface() {
 
     // Latin surface keeps the canonical spellings.
     assert_eq!(
-        codegen.type_to_faber(types.bounded_array(numerus, four), &types, &names, &interner, &LatinSurface),
+        codegen.type_to_faber(
+            types.bounded_array(numerus, four),
+            &types,
+            &names,
+            &interner,
+            &LatinSurface
+        ),
         "lista<numerus, 4>"
     );
     assert_eq!(
-        codegen.type_to_faber(types.bounded_textus(four), &types, &names, &interner, &LatinSurface),
+        codegen.type_to_faber(
+            types.bounded_textus(four),
+            &types,
+            &names,
+            &interner,
+            &LatinSurface
+        ),
         "textus<4>"
     );
 }

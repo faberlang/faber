@@ -1463,9 +1463,7 @@ fn named_field<'a>(entries: &'a [(Value, Value)], key: &str) -> Result<&'a Value
         .iter()
         .find(|(k, _)| matches!(k, Value::Str(s) if s == key))
         .map(|(_, v)| v)
-        .ok_or_else(|| {
-            MsgpackError::Decode(format!("value must carry {key} as a named field"))
-        })
+        .ok_or_else(|| MsgpackError::Decode(format!("value must carry {key} as a named field")))
 }
 
 /// Version gates read from the parsed package value **before** payload
