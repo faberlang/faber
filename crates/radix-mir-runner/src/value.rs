@@ -816,10 +816,11 @@ pub fn values_equal(left: &Value, right: &Value) -> bool {
         // values the bit pattern is the magnitude.
         (Value::Int(a), Value::UInt(b)) => u64::try_from(*a).is_ok_and(|a| a == *b),
         (Value::UInt(a), Value::Int(b)) => u64::try_from(*b).is_ok_and(|b| *a == b),
-        // `≈` promotes mixed integer/float operands to the joined float type
+        // `≅` promotes mixed integer/float operands to the joined float type
         // before exact comparison. Keep integer/unsigned comparison above
-        // lossless; only the float join uses the target f64 carrier, matching
-        // generated Rust's numeric promotion.
+        // lossless; only the promoted pair uses the target f64 carrier, matching
+        // generated Rust's numeric promotion. Fuzzy `≈` is a collection
+        // Approximate call and does not use this exact-value helper.
         (Value::Int(a), Value::Float(b)) => (*a as f64)
             .partial_cmp(b)
             .is_some_and(std::cmp::Ordering::is_eq),

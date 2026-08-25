@@ -310,8 +310,10 @@ pub enum TokenKind {
     ConversioAssign, // ↤ U+21A4
     EqEq,            // ≡
     EqEqEq,          // reserved; no source form
-    ApproxEq,        // ≅ / ≈
-    ApproxNotEq,     // ≇ / ≉
+    ApproxEq,        // ≅ promoted-exact
+    ApproxNotEq,     // ≇ promoted-exact negation
+    FuzzyEq,         // ≈ tolerance compare
+    FuzzyNotEq,      // ≉ tolerance compare negation
     BangEq,          // ≠ / ≢
     BangEqEq,        // reserved; no source form
     Lt,              // ≺

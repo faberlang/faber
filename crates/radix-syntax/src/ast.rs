@@ -1176,6 +1176,8 @@ pub enum BinOp {
     NotEq,
     ApproxEq,
     ApproxNotEq,
+    FuzzyEq,
+    FuzzyNotEq,
     StrictEq,
     StrictNotEq,
     Lt,

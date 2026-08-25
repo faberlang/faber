@@ -2110,6 +2110,23 @@ impl<'a> FunctionBuilder<'a> {
         if matches!(op, HirBinOp::Add | HirBinOp::Sub) && self.is_addita_plus_operands(lhs, rhs) {
             return self.lower_glyph_product(op, lhs, rhs, expr);
         }
+        if matches!(op, HirBinOp::FuzzyEq | HirBinOp::FuzzyNotEq) {
+            let lhs = self.lower_expr_value(lhs)?;
+            let rhs = self.lower_expr_value(rhs)?;
+            let ty = self.expr_ty(expr)?;
+            return Some(self.runtime_call_value(
+                MirIntrinsic::Collection(MirCollectionOp::Approximate),
+                vec![
+                    lhs,
+                    rhs,
+                    MirOperand::Constant(MirConstant::Float(1e-9)),
+                    MirOperand::Constant(MirConstant::Float(0.0)),
+                    MirOperand::Constant(MirConstant::Bool(matches!(op, HirBinOp::FuzzyNotEq))),
+                ],
+                ty,
+                expr.span,
+            ));
+        }
         // A1/C5 numeric collection laws have a dedicated MIR collection-op
         // seam. Dynamic pairs reach the runner for the hard live-length check;
         // literal-bounded lista pairs may still expand to indexed MIR cells,
@@ -2674,6 +2691,7 @@ fn mir_bin_op(op: HirBinOp) -> Option<MirBinOp> {
         HirBinOp::Div => Some(MirBinOp::Div),
         HirBinOp::Mod => Some(MirBinOp::Mod),
         HirBinOp::Eq | HirBinOp::StrictEq | HirBinOp::ApproxEq => Some(MirBinOp::Eq),
+        HirBinOp::FuzzyEq | HirBinOp::FuzzyNotEq => None,
         HirBinOp::NotEq | HirBinOp::StrictNotEq | HirBinOp::ApproxNotEq => Some(MirBinOp::NotEq),
         HirBinOp::Lt => Some(MirBinOp::Lt),
         HirBinOp::Gt => Some(MirBinOp::Gt),

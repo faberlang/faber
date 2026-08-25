@@ -3494,31 +3494,98 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
         args: &[MirOperand],
         span: Span,
     ) -> Result<Value, RunnerError> {
-        let [receiver, other, tolerance] = args else {
-            return Err(RunnerError::internal(span, "approximate comparison arity"));
+        match args {
+            [receiver, other, tolerance] => {
+                let receiver = numeric_as_f64(&self.eval_operand(receiver, span)?, span)?;
+                let other = numeric_as_f64(&self.eval_operand(other, span)?, span)?;
+                let tolerance = numeric_as_f64(&self.eval_operand(tolerance, span)?, span)?;
+                Ok(Value::Bool((receiver - other).abs() <= tolerance))
+            }
+            [receiver, other, rel_tol, abs_tol, negated] => {
+                let width = self.fuzzy_comparison_width(receiver, other, span);
+                let receiver = numeric_as_f64(&self.eval_operand(receiver, span)?, span)?;
+                let other = numeric_as_f64(&self.eval_operand(other, span)?, span)?;
+                let rel_tol = numeric_as_f64(&self.eval_operand(rel_tol, span)?, span)?;
+                let abs_tol = numeric_as_f64(&self.eval_operand(abs_tol, span)?, span)?;
+                let receiver = self.fuzzy_value(receiver, width);
+                let other = self.fuzzy_value(other, width);
+                let rel_tol = self.fuzzy_value(rel_tol, width);
+                let abs_tol = self.fuzzy_value(abs_tol, width);
+                let negated = matches!(self.eval_operand(negated, span)?, Value::Bool(true));
+                let limit = (rel_tol * receiver.abs().max(other.abs())).max(abs_tol);
+                let equal = (receiver - other).abs() <= limit;
+                Ok(Value::Bool(if negated { !equal } else { equal }))
+            }
+            _ => Err(RunnerError::internal(span, "approximate comparison arity")),
+        }
+    }
+
+    fn fuzzy_value(&self, value: f64, width: NumericWidth) -> f64 {
+        if matches!(width, NumericWidth::F64) {
+            value
+        } else {
+            #[expect(clippy::cast_possible_truncation)]
+            {
+                value as f32 as f64
+            }
+        }
+    }
+
+    fn fuzzy_comparison_width(
+        &self,
+        lhs: &MirOperand,
+        rhs: &MirOperand,
+        span: Span,
+    ) -> NumericWidth {
+        let mut saw_f32 = false;
+        for operand in [lhs, rhs] {
+            let Some(ty) = self.operand_semantic_type(operand, span) else {
+                continue;
+            };
+            match self.types.get(ty) {
+                Type::Primitive(Primitive::Fractus) => return NumericWidth::F64,
+                Type::SizedNumeric(Primitive::Fractus, width) => {
+                    if matches!(width, NumericWidth::F64) {
+                        return NumericWidth::F64;
+                    }
+                    saw_f32 = true;
+                }
+                _ => {}
+            }
+        }
+        if saw_f32 {
+            NumericWidth::F32
+        } else {
+            NumericWidth::F64
+        }
+    }
+
+    fn operand_semantic_type(&self, operand: &MirOperand, span: Span) -> Option<TypeId> {
+        let MirOperand::Place(place) = operand else {
+            return None;
         };
-        let receiver = self.eval_operand(receiver, span)?;
-        let other = self.eval_operand(other, span)?;
-        let tolerance = self.eval_operand(tolerance, span)?;
-        let Value::Float(receiver) = receiver else {
-            return Err(RunnerError::internal(
-                span,
-                "approximate receiver type mismatch",
-            ));
-        };
-        let Value::Float(other) = other else {
-            return Err(RunnerError::internal(
-                span,
-                "approximate argument type mismatch",
-            ));
-        };
-        let Value::Float(tolerance) = tolerance else {
-            return Err(RunnerError::internal(
-                span,
-                "approximate tolerance type mismatch",
-            ));
-        };
-        Ok(Value::Bool((receiver - other).abs() <= tolerance))
+        let frame = self.frames.last()?;
+        let function = self.function_by_id(frame.function, span).ok()?;
+        let ty = match place.base {
+            radix_mir::MirPlaceBase::Local(id) => function
+                .locals
+                .iter()
+                .find(|local| local.id == id)
+                .map(|local| local.ty)
+                .or_else(|| {
+                    function
+                        .params
+                        .iter()
+                        .find(|param| param.local == id)
+                        .map(|param| param.ty)
+                }),
+            radix_mir::MirPlaceBase::Temp(id) => function
+                .temps
+                .iter()
+                .find(|temp| temp.id == id)
+                .map(|temp| temp.ty),
+        }?;
+        Some(ty.semantic_id())
     }
 
     fn eval_option_chain(
@@ -4198,6 +4265,7 @@ fn matmul_values(
 fn numeric_as_f64(value: &Value, span: Span) -> Result<f64, RunnerError> {
     match value {
         Value::Int(value) => Ok(*value as f64),
+        Value::UInt(value) => Ok(*value as f64),
         Value::Float(value) => Ok(*value),
         _ => Err(RunnerError::internal(
             span,

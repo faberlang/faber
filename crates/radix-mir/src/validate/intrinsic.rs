@@ -549,8 +549,8 @@ impl Validator<'_, '_> {
             | MirCollectionOp::IntervalUnion
             | MirCollectionOp::IntervalContains
             | MirCollectionOp::IntervalClamp => 2,
+            MirCollectionOp::Approximate => 0,
             MirCollectionOp::Put
-            | MirCollectionOp::Approximate
             | MirCollectionOp::Slice
             | MirCollectionOp::Replace
             | MirCollectionOp::TensorSet
@@ -575,7 +575,11 @@ impl Validator<'_, '_> {
             // tensor inputs.
             MirCollectionOp::TensorBatchedAttention => 0,
         };
-        if matches!(op, MirCollectionOp::TensorLayerNorm) {
+        if matches!(op, MirCollectionOp::Approximate) {
+            if !matches!(call.args.len(), 3 | 5) {
+                self.error(span, "collection Approximate expects 3 or 5 MIR arguments");
+            }
+        } else if matches!(op, MirCollectionOp::TensorLayerNorm) {
             if !(3..=5).contains(&call.args.len()) {
                 self.error(span, "collection TensorLayerNorm expects 3-5 MIR arguments");
             }
@@ -1129,21 +1133,35 @@ impl Validator<'_, '_> {
                 let Some(receiver_ty) = first_arg_ty else {
                     return;
                 };
-                if !matches!(
-                    self.type_kind(receiver_ty),
-                    Type::Primitive(Primitive::Fractus) | Type::SizedNumeric(Primitive::Fractus, _)
-                ) {
-                    self.error(span, "approximate comparison receiver is not fractus");
-                    return;
-                }
-                for arg in call.args.iter().skip(1).take(2) {
-                    if let Some(arg_ty) = self.validate_operand(scope, arg, span) {
-                        self.require_assignable(
-                            arg_ty,
-                            receiver_ty,
-                            span,
-                            "approximate comparison argument type mismatch",
-                        );
+                if call.args.len() == 5 {
+                    if !matches!(
+                        self.type_kind(receiver_ty),
+                        Type::Primitive(Primitive::Numerus | Primitive::Fractus)
+                            | Type::SizedNumeric(Primitive::Numerus | Primitive::Fractus, _)
+                    ) {
+                        self.error(span, "fuzzy comparison receiver is not numeric");
+                    }
+                    for arg in call.args.iter().skip(1) {
+                        self.validate_operand(scope, arg, span);
+                    }
+                } else {
+                    if !matches!(
+                        self.type_kind(receiver_ty),
+                        Type::Primitive(Primitive::Fractus)
+                            | Type::SizedNumeric(Primitive::Fractus, _)
+                    ) {
+                        self.error(span, "approximate comparison receiver is not fractus");
+                        return;
+                    }
+                    for arg in call.args.iter().skip(1).take(2) {
+                        if let Some(arg_ty) = self.validate_operand(scope, arg, span) {
+                            self.require_assignable(
+                                arg_ty,
+                                receiver_ty,
+                                span,
+                                "approximate comparison argument type mismatch",
+                            );
+                        }
                     }
                 }
             }

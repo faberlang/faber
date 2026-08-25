@@ -1,4 +1,4 @@
-//! Typecheck probes for numeric value equality (`≈`, `≉`).
+//! Typecheck probes for numeric value equality (`≅`, `≇`).
 
 use crate::test_support;
 
@@ -28,7 +28,7 @@ fn numeric_value_equality_cases() -> Vec<ValueEqualityCase> {
 incipit {
     fixum numerus<u8> port ← 42 ∷ numerus<u8>
     fixum numerus count ← 42
-    adfirma port ≈ count
+    adfirma port ≅ count
 }
 ",
             expect: ValueEqualityExpect::Accepts,
@@ -46,7 +46,7 @@ incipit {
         },
         ValueEqualityCase {
             name: "numerus_fractus_approx_accepts",
-            source: "incipit { adfirma 1 ≈ 1.0 }",
+            source: "incipit { adfirma 1 ≅ 1.0 }",
             expect: ValueEqualityExpect::Accepts,
         },
         ValueEqualityCase {
@@ -56,21 +56,21 @@ incipit {
         },
         ValueEqualityCase {
             name: "fractus_approx_typechecks",
-            source: "incipit { adfirma 42.145 ∷ fractus<f64> ≈ 42.0 ∷ fractus<f64> }",
+            source: "incipit { adfirma 42.145 ∷ fractus<f64> ≅ 42.0 ∷ fractus<f64> }",
             expect: ValueEqualityExpect::Accepts,
         },
         ValueEqualityCase {
             name: "instans_cross_approx_rejects",
             source: r"
 functio same(instans<ns> fine, instans<ms> coarse) → bivalens {
-    redde fine ≈ coarse
+    redde fine ≅ coarse
 }
 ",
             expect: ValueEqualityExpect::RejectsIssue(NUMERIC_VALUE_EQ_ISSUE),
         },
         ValueEqualityCase {
             name: "ascii_textus_approx_rejects",
-            source: "incipit { si 'a' ≈ \"a\" { nota \"bad\" } }",
+            source: "incipit { si 'a' ≅ \"a\" { nota \"bad\" } }",
             expect: ValueEqualityExpect::RejectsIssue(NUMERIC_VALUE_EQ_ISSUE),
         },
         ValueEqualityCase {
@@ -79,7 +79,7 @@ functio same(instans<ns> fine, instans<ms> coarse) → bivalens {
 incipit {
     fixum numerus<i32> signed ← -1 ∷ numerus<i32>
     fixum numerus<u8> unsigned ← 255 ∷ numerus<u8>
-    adfirma signed ≈ unsigned
+    adfirma signed ≅ unsigned
 }
 ",
             expect: ValueEqualityExpect::Accepts,
@@ -88,14 +88,24 @@ incipit {
             name: "cross_width_params_approx_accepts",
             source: r"
 functio promoted(numerus left, numerus<u8> right) → bivalens {
-    redde left ≈ right
+    redde left ≅ right
 }
 ",
             expect: ValueEqualityExpect::Accepts,
         },
         ValueEqualityCase {
             name: "approx_not_eq_accepts",
-            source: "incipit { adfirma 1 ≉ 2 }",
+            source: "incipit { adfirma 1 ≇ 2 }",
+            expect: ValueEqualityExpect::Accepts,
+        },
+        ValueEqualityCase {
+            name: "fuzzy_near_values_typecheck",
+            source: "incipit { adfirma 42.0 ≈ 42.00000001 }",
+            expect: ValueEqualityExpect::Accepts,
+        },
+        ValueEqualityCase {
+            name: "fuzzy_not_eq_typecheck",
+            source: "incipit { adfirma 42.0 ≉ 42.145 }",
             expect: ValueEqualityExpect::Accepts,
         },
     ]

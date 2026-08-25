@@ -1404,6 +1404,8 @@ pub enum HirBinOp {
     NotEq,
     ApproxEq,
     ApproxNotEq,
+    FuzzyEq,
+    FuzzyNotEq,
     StrictEq,
     StrictNotEq,
     Lt,

@@ -744,7 +744,7 @@ fn lexes_equality_comparison_operators() {
 }
 
 #[test]
-fn lexes_equality_ladder_synonyms_to_pinned_tokens() {
+fn lexes_equality_ladder_to_split_tokens() {
     let result = lex("≡ ≢ ≅ ≇ ≈ ≉");
     assert!(result.errors.is_empty(), "errors: {:?}", result.errors);
     let kinds: Vec<TokenKind> = result.tokens.iter().map(|t| t.kind.clone()).collect();
@@ -755,8 +755,8 @@ fn lexes_equality_ladder_synonyms_to_pinned_tokens() {
             TokenKind::BangEq,
             TokenKind::ApproxEq,
             TokenKind::ApproxNotEq,
-            TokenKind::ApproxEq,
-            TokenKind::ApproxNotEq,
+            TokenKind::FuzzyEq,
+            TokenKind::FuzzyNotEq,
             TokenKind::Eof,
         ]
     );

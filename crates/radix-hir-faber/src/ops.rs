@@ -72,6 +72,8 @@ impl super::FaberCodegen {
             | HirBinOp::NotEq
             | HirBinOp::ApproxEq
             | HirBinOp::ApproxNotEq
+            | HirBinOp::FuzzyEq
+            | HirBinOp::FuzzyNotEq
             | HirBinOp::StrictEq
             | HirBinOp::StrictNotEq
             | HirBinOp::Is
@@ -120,8 +122,10 @@ impl super::FaberCodegen {
             HirBinOp::Hadamard => "⊙".to_owned(),
             HirBinOp::HadamardDiv => "⊘".to_owned(),
             HirBinOp::Eq | HirBinOp::StrictEq => "≡".to_owned(),
-            HirBinOp::ApproxEq => "≈".to_owned(),
-            HirBinOp::ApproxNotEq => "≉".to_owned(),
+            HirBinOp::ApproxEq => "≅".to_owned(),
+            HirBinOp::ApproxNotEq => "≇".to_owned(),
+            HirBinOp::FuzzyEq => "≈".to_owned(),
+            HirBinOp::FuzzyNotEq => "≉".to_owned(),
             HirBinOp::NotEq | HirBinOp::StrictNotEq => "≠".to_owned(),
             HirBinOp::Lt => "≺".to_owned(),
             HirBinOp::Gt => "≻".to_owned(),

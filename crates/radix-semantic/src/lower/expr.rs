@@ -333,6 +333,8 @@ impl Lowerer<'_> {
             radix_syntax::BinOp::NotEq => HirBinOp::NotEq,
             radix_syntax::BinOp::ApproxEq => HirBinOp::ApproxEq,
             radix_syntax::BinOp::ApproxNotEq => HirBinOp::ApproxNotEq,
+            radix_syntax::BinOp::FuzzyEq => HirBinOp::FuzzyEq,
+            radix_syntax::BinOp::FuzzyNotEq => HirBinOp::FuzzyNotEq,
             radix_syntax::BinOp::StrictEq => HirBinOp::StrictEq,
             radix_syntax::BinOp::StrictNotEq => HirBinOp::StrictNotEq,
             radix_syntax::BinOp::Lt => HirBinOp::Lt,

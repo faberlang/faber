@@ -353,9 +353,9 @@ fn hadamard_divide_binds_at_multiplicative_precedence() {
     assert_eq!(divide.op, BinOp::HadamardDiv);
 }
 
-/// Equality glyphs are parse-level synonyms; semantic re-seating belongs to a later unit.
+/// Equality glyphs retain distinct parse carriers for the promoted and fuzzy seats.
 #[test]
-fn equality_ladder_glyphs_pin_parse_tree_equivalence() {
+fn equality_ladder_glyphs_pin_semantic_split() {
     fn parsed_op(spelling: &str) -> BinOp {
         let result = parse_ok(&format!("fixum _ value ← a {spelling} b"));
         let program = result.program.as_ref().expect("program");
@@ -376,8 +376,10 @@ fn equality_ladder_glyphs_pin_parse_tree_equivalence() {
     assert_eq!(parsed_op("≢"), BinOp::NotEq);
     assert_eq!(parsed_op("≅"), BinOp::ApproxEq);
     assert_eq!(parsed_op("≇"), BinOp::ApproxNotEq);
-    assert_eq!(parsed_op("≅"), parsed_op("≈"));
-    assert_eq!(parsed_op("≇"), parsed_op("≉"));
+    assert_eq!(parsed_op("≈"), BinOp::FuzzyEq);
+    assert_eq!(parsed_op("≉"), BinOp::FuzzyNotEq);
+    assert_ne!(parsed_op("≅"), parsed_op("≈"));
+    assert_ne!(parsed_op("≇"), parsed_op("≉"));
     assert_eq!(parsed_op("≢"), parsed_op("≠"));
 }
 

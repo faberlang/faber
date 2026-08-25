@@ -504,11 +504,12 @@ impl TypeChecker<'_> {
         rhs_resolved
     }
 
-    /// Enforce numeric promotion join for `≈` and `≉`.
+    /// Enforce numeric promotion join for the promoted and fuzzy equality
+    /// pairs (`≅`/`≇` and `≈`/`≉`).
     ///
-    /// WHY: exact `≡` rejects cross-width numeric pairs; `≈` reuses the same
-    /// widening policy as arithmetic/ordering (`numeric_bin`) then compares at
-    /// the joined type in codegen.
+    /// WHY: exact `≡` rejects cross-width numeric pairs; both relaxed levels
+    /// reuse the same widening policy as arithmetic/ordering (`numeric_bin`),
+    /// then compare at the joined type in their respective lowerings.
     pub fn numeric_value_equality_types(
         &mut self,
         lhs: TypeId,
@@ -1082,7 +1083,10 @@ impl TypeChecker<'_> {
                 let (lhs_ty, rhs_ty) = self.check_arithmetic_operands(lhs, rhs, expected);
                 self.numeric_arithmetic_bin(lhs_ty, rhs_ty, lhs.span)
             }
-            HirBinOp::ApproxEq | HirBinOp::ApproxNotEq => {
+            HirBinOp::ApproxEq
+            | HirBinOp::ApproxNotEq
+            | HirBinOp::FuzzyEq
+            | HirBinOp::FuzzyNotEq => {
                 let lhs_ty = self.check_expr(lhs);
                 let rhs_ty = self.check_expr(rhs);
                 self.numeric_value_equality_types(lhs_ty, rhs_ty, lhs.span);
