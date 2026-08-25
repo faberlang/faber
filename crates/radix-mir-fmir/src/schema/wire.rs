@@ -918,6 +918,12 @@ pub enum WireOobPaddingPolicy {
 pub enum WireReduceOp {
     Sum,
     Mean,
+    /// Maximum fold over the tensor elements (the TensorMax twin; the
+    /// Metal tree-reduction emitter carries it — axis-reduction stays
+    /// Sum-only under the CB-W8 allow-list).
+    Max,
+    /// Minimum fold over the tensor elements (the TensorMin twin).
+    Min,
 }
 
 // ---------------------------------------------------------------------------

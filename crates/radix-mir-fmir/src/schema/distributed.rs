@@ -528,6 +528,8 @@ fn wire_reduce_op(op: WireReduceOp) -> ReduceOp {
     match op {
         WireReduceOp::Sum => ReduceOp::Sum,
         WireReduceOp::Mean => ReduceOp::Mean,
+        WireReduceOp::Max => ReduceOp::Max,
+        WireReduceOp::Min => ReduceOp::Min,
     }
 }
 
