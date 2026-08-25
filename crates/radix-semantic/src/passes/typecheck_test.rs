@@ -1270,6 +1270,32 @@ fn rejects_unknown_method_on_concrete_receiver() {
 }
 
 #[test]
+fn rejects_unknown_tensor_method_at_typecheck() {
+    // Tensor intrinsic misses must fail at check rather than infer a result
+    // that only fails later when a device target tries to lower it.
+    test_support::assert_rejects_with_issue(
+        "functio probe(tf32[2, 2] x) → tf32[2, 2] { redde x.silu() }",
+        "unknown_method",
+    );
+}
+
+#[test]
+fn rejects_unknown_vector_method_at_typecheck() {
+    test_support::assert_rejects_with_issue(
+        "functio probe(vector<f32, 2> x) → vector<f32, 2> { redde x.silu() }",
+        "unknown_method",
+    );
+}
+
+#[test]
+fn rejects_unknown_matrix_method_at_typecheck() {
+    test_support::assert_rejects_with_issue(
+        "functio probe(matrix<f32, [2, 2]> x) → matrix<f32, [2, 2]> { redde x.silu() }",
+        "unknown_method",
+    );
+}
+
+#[test]
 fn rejects_unknown_method_on_imported_struct_receiver() {
     // DX receipt a35e77d5: the tensor receiver was accidentally replaced by
     // `train.Seed` in four `from_flat` calls. Keep the imported nominal shape

@@ -442,6 +442,10 @@ impl TypeChecker<'_> {
         let (_, intrinsic_ty) = self.types.peel_access_marker(resolved_receiver_ty);
         let resolved_receiver = self.types.get(intrinsic_ty);
         let receiver_is_atomic = matches!(resolved_receiver, Type::Atomic(_));
+        let receiver_requires_known_method = matches!(
+            resolved_receiver,
+            Type::Tensor(_, _) | Type::Vector(_, _) | Type::Matrix(_, _)
+        );
         if super::intrinsics::receiver_supports_intrinsics(resolved_receiver) {
             if self.reject_explicit_type_args_on_dynamic_callee(
                 explicit_type_args,
@@ -474,6 +478,13 @@ impl TypeChecker<'_> {
                     super::intrinsics::ISSUE_ATOMIC_METHOD_REQUIRES_ATOMIC_RECEIVER,
                     receiver.span,
                 );
+                return self.error_type;
+            }
+            if receiver_requires_known_method {
+                // Tensor, vector, and matrix methods are closed compiler-owned
+                // surfaces. A registry miss must not manufacture an inferred
+                // result that survives check and fails only during lowering.
+                self.undefined_member("unknown_method", receiver.span);
                 return self.error_type;
             }
             return self.fresh_infer();
