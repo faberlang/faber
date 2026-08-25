@@ -37,7 +37,7 @@ locale = "en"
 #   1, 2, 3, 4 (expanded list elements).
 
 main {
-    const _ media ← [2, 3]
+    const list<int> media ← [2, 3]
     # → [1, 2, 3, 4]
     const _ numeri ← [1, spread media, 4]
 
