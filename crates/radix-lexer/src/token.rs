@@ -294,6 +294,10 @@ pub enum TokenKind {
     CircledDot,    // ⊙ U+2299 Hadamard / elementwise product
     CircledDivide, // ⊘ U+2298 Hadamard / elementwise divide
 
+    // === Infix extrema (minmax-infix-glyphs family) ===
+    Maximum, // ⤒ U+2912 max / upper bound
+    Minimum, // ⤓ U+2913 min / lower bound
+
     // === Postfix tensor transpose (tensor-glyphs family) ===
     Transpose, // ᵀ U+1D40 rank-2 postfix transpose sugar
 

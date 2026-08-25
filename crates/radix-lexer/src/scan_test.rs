@@ -597,6 +597,52 @@ fn lexes_glyph_products_mixed_with_arithmetic_chain() {
 }
 
 #[test]
+fn lexes_minmax_infix_glyphs() {
+    let result = lex("⤒ ⤓");
+    assert!(
+        result.errors.is_empty(),
+        "min/max glyphs must lex cleanly: {:?}",
+        result.errors
+    );
+    let kinds: Vec<TokenKind> = result.tokens.iter().map(|t| t.kind.clone()).collect();
+    assert_eq!(
+        kinds,
+        vec![TokenKind::Maximum, TokenKind::Minimum, TokenKind::Eof]
+    );
+}
+
+#[test]
+fn minmax_confusable_arrows_suggest_canonical_glyphs() {
+    // Live ↑/↓ remain PostInc/PostDec; the rejected neighbors below must teach
+    // authors the new to-bar glyph instead of silently accepting a lookalike.
+    for (source, suggestion) in [
+        ("⇡", "⤒"), // U+21E1 UPWARDS DASHED ARROW
+        ("⇣", "⤓"), // U+21E3 DOWNWARDS DASHED ARROW
+        ("⇑", "⤒"), // U+21D1 UPWARDS DOUBLE ARROW
+        ("⇓", "⤓"), // U+21D3 DOWNWARDS DOUBLE ARROW
+        ("↥", "⤒"), // U+21A5 UPWARDS ARROW FROM BAR
+        ("↧", "⤓"), // U+21A7 DOWNWARDS ARROW FROM BAR
+        ("⤈", "⤓"), // U+2908 DOWNWARDS ARROW WITH HORIZONTAL STROKE
+        ("⤉", "⤒"), // U+2909 UPWARDS ARROW WITH HORIZONTAL STROKE
+        ("⤊", "⤒"), // U+290A UPWARDS TRIPLE ARROW
+        ("⤋", "⤓"), // U+290B DOWNWARDS TRIPLE ARROW
+    ] {
+        assert_homoglyph_did_you_mean(source, source, suggestion);
+    }
+
+    let upward = lex("↑");
+    assert_eq!(
+        upward.tokens[0].kind,
+        TokenKind::PostInc,
+        "the existing postfix ↑ token is not a rejected confusable"
+    );
+    assert!(upward.errors.is_empty());
+    let downward = lex("↓");
+    assert_eq!(downward.tokens[0].kind, TokenKind::PostDec);
+    assert!(downward.errors.is_empty());
+}
+
+#[test]
 fn glyph_product_glyph_codepoints_are_distinct() {
     // Visual similarity is never permission to normalize a neighbor glyph.
     assert_eq!('\u{00B7}', '·'); // middle dot

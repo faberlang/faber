@@ -71,6 +71,8 @@ fn glyph_product_tokens_are_operators_not_keywords() {
         TokenKind::CircledTimes,
         TokenKind::CircledDot,
         TokenKind::CircledDivide,
+        TokenKind::Maximum,
+        TokenKind::Minimum,
         TokenKind::Transpose,
         TokenKind::Nabla,
     ] {

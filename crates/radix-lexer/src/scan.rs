@@ -314,6 +314,11 @@ impl<'a> Lexer<'a> {
             '⊗' => TokenKind::CircledTimes,
             '⊙' => TokenKind::CircledDot,
             '⊘' => TokenKind::CircledDivide,
+
+            // Infix extrema (minmax-infix-glyphs family).
+            '⤒' => TokenKind::Maximum,
+            '⤓' => TokenKind::Minimum,
+
             '∞' => TokenKind::Float(f64::INFINITY),
 
             // Postfix tensor transpose (tensor-glyphs family).
@@ -1028,6 +1033,19 @@ fn homoglyph_suggestion(c: char) -> Option<&'static str> {
         // Norms remain method-shaped. Keep the hint independent of any
         // reader-locale pack so lexer behavior is stable across locales.
         '‖' | '∥' => Some(".rms_norm(...)"),
+
+        // Vertical arrow neighbors outside the live ↑/↓ postfix pair. The
+        // Supplemental Arrows-A set is deliberately explicit: U+2908/U+2909
+        // carry a horizontal stroke and U+290A/U+290B carry three heads.
+        // Both forms are close enough to the to-bar glyphs to merit a hint.
+        '⤈' | '⤋' => Some("⤓"),
+        '⤉' | '⤊' => Some("⤒"),
+
+        // Other vertical arrows with the same directional reading and a bar,
+        // dash, or double head are rejected rather than normalized. ↑ and ↓
+        // are intentionally absent because they are already live tokens.
+        '⇣' | '⇓' | '↧' => Some("⤓"),
+        '⇡' | '⇑' | '↥' => Some("⤒"),
         _ => None,
     }
 }
