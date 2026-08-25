@@ -1616,7 +1616,7 @@ category = "type"
 
 [[files]]
 path = "ad/async-solum-leget.fab"
-term = "async solum leget"
+term = "async fs leget"
 kind = "concept"
 category = "ad"
 
@@ -1658,7 +1658,7 @@ category = "conversio"
 
 [[files]]
 path = "ad/solum-lege-generic.fab"
-term = "solum lege carpe hauri"
+term = "fs lege carpe hauri"
 kind = "concept"
 category = "ad"
 
