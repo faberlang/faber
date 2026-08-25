@@ -329,6 +329,34 @@ fn collection_kind_lowers_collection_types() {
 }
 
 #[test]
+fn collection_kind_lowers_queue_and_stack_types() {
+    let mut types = TypeTable::new();
+    let numerus = types.primitive(Primitive::Numerus);
+    let textus = types.primitive(Primitive::Textus);
+    let capacity = types.intern_index(IndexExpr::Literal(4));
+
+    let queue = CollectionKind::Queue.lower(&mut types, &[numerus]);
+    let stack = CollectionKind::Stack.lower(&mut types, &[textus]);
+    let bounded_queue = types.bounded_queue(numerus, capacity);
+    let bounded_stack = types.bounded_stack(textus, capacity);
+
+    assert!(matches!(types.get(queue), Type::Queue(inner) if *inner == numerus));
+    assert!(matches!(types.get(stack), Type::Stack(inner) if *inner == textus));
+    assert!(matches!(
+        types.get(bounded_queue),
+        Type::BoundedQueue { element, capacity: found }
+            if *element == numerus && *found == capacity
+    ));
+    assert!(matches!(
+        types.get(bounded_stack),
+        Type::BoundedStack { element, capacity: found }
+            if *element == textus && *found == capacity
+    ));
+    assert!(!types.equals(queue, bounded_queue));
+    assert!(!types.equals(stack, bounded_stack));
+}
+
+#[test]
 fn collection_kind_lowers_promissum_and_cursor() {
     let mut types = TypeTable::new();
     let numerus = types.primitive(Primitive::Numerus);
@@ -351,6 +379,14 @@ fn collection_kind_from_name_includes_host_route_collections() {
         CollectionKind::from_name("cursor"),
         Some(CollectionKind::Cursor)
     );
+    assert_eq!(
+        CollectionKind::from_name("queue"),
+        Some(CollectionKind::Queue)
+    );
+    assert_eq!(
+        CollectionKind::from_name("stack"),
+        Some(CollectionKind::Stack)
+    );
     assert_eq!(CollectionKind::from_name("tensor"), None);
     assert_eq!(CollectionKind::from_name("sparsa"), None);
 }
@@ -365,6 +401,8 @@ fn collection_type_surface_tracks_canonical_rows() {
     assert!(rows.contains(&("lista", CollectionKind::Lista, true)));
     assert!(rows.contains(&("tabula", CollectionKind::Tabula, true)));
     assert!(rows.contains(&("promissum", CollectionKind::Promissum, true)));
+    assert!(rows.contains(&("queue", CollectionKind::Queue, true)));
+    assert!(rows.contains(&("stack", CollectionKind::Stack, true)));
     assert_eq!(
         lookup_collection_type_spec("cursor").map(|spec| spec.kind),
         Some(CollectionKind::Cursor)

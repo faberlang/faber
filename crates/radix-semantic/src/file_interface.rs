@@ -189,6 +189,10 @@ pub struct InterfaceMethodExport {
 pub enum InterfaceTypeSnapshot {
     Primitive(Primitive),
     Array(Box<InterfaceTypeSnapshot>),
+    Queue(Box<InterfaceTypeSnapshot>),
+    BoundedQueue(Box<InterfaceTypeSnapshot>, InterfaceIndexSnapshot),
+    Stack(Box<InterfaceTypeSnapshot>),
+    BoundedStack(Box<InterfaceTypeSnapshot>, InterfaceIndexSnapshot),
     Map(Box<InterfaceTypeSnapshot>, Box<InterfaceTypeSnapshot>),
     Record(BTreeMap<String, InterfaceTypeSnapshot>),
     Set(Box<InterfaceTypeSnapshot>),
@@ -377,6 +381,32 @@ fn snapshot_interface_type_inner(
         Type::Array(element) => Ok(InterfaceTypeSnapshot::Array(Box::new(
             snapshot_interface_type_inner(*element, types, interner, resolver, module_identity)?,
         ))),
+        Type::Queue(element) => Ok(InterfaceTypeSnapshot::Queue(Box::new(
+            snapshot_interface_type_inner(*element, types, interner, resolver, module_identity)?,
+        ))),
+        Type::BoundedQueue { element, capacity } => Ok(InterfaceTypeSnapshot::BoundedQueue(
+            Box::new(snapshot_interface_type_inner(
+                *element,
+                types,
+                interner,
+                resolver,
+                module_identity,
+            )?),
+            snapshot_interface_index(*capacity, types, interner)?,
+        )),
+        Type::Stack(element) => Ok(InterfaceTypeSnapshot::Stack(Box::new(
+            snapshot_interface_type_inner(*element, types, interner, resolver, module_identity)?,
+        ))),
+        Type::BoundedStack { element, capacity } => Ok(InterfaceTypeSnapshot::BoundedStack(
+            Box::new(snapshot_interface_type_inner(
+                *element,
+                types,
+                interner,
+                resolver,
+                module_identity,
+            )?),
+            snapshot_interface_index(*capacity, types, interner)?,
+        )),
         Type::Map(key, value) => Ok(InterfaceTypeSnapshot::Map(
             Box::new(snapshot_interface_type_inner(
                 *key,
@@ -660,6 +690,24 @@ fn import_interface_type_inner(
         InterfaceTypeSnapshot::Array(element) => {
             let element = import_interface_type_inner(element, types, interner, resolver)?;
             Ok(types.array(element))
+        }
+        InterfaceTypeSnapshot::Queue(element) => {
+            let element = import_interface_type_inner(element, types, interner, resolver)?;
+            Ok(types.queue(element))
+        }
+        InterfaceTypeSnapshot::BoundedQueue(element, capacity) => {
+            let element = import_interface_type_inner(element, types, interner, resolver)?;
+            let capacity = import_interface_index(capacity, types, interner)?;
+            Ok(types.bounded_queue(element, capacity))
+        }
+        InterfaceTypeSnapshot::Stack(element) => {
+            let element = import_interface_type_inner(element, types, interner, resolver)?;
+            Ok(types.stack(element))
+        }
+        InterfaceTypeSnapshot::BoundedStack(element, capacity) => {
+            let element = import_interface_type_inner(element, types, interner, resolver)?;
+            let capacity = import_interface_index(capacity, types, interner)?;
+            Ok(types.bounded_stack(element, capacity))
         }
         InterfaceTypeSnapshot::Map(key, value) => {
             let key = import_interface_type_inner(key, types, interner, resolver)?;

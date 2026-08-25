@@ -366,6 +366,8 @@ fn type_children(ty: &Type) -> Vec<TypeId> {
         | Type::Set(element)
         | Type::Promissum(element)
         | Type::Cursor(element)
+        | Type::Queue(element)
+        | Type::Stack(element)
         | Type::Atomic(element)
         | Type::Intervallum(element)
         | Type::Option(element)
@@ -404,7 +406,9 @@ fn type_children(ty: &Type) -> Vec<TypeId> {
         }
         Type::Union(members) => members.clone(),
         Type::Tuple(elements) => elements.clone(),
-        Type::BoundedArray { element, .. } => vec![*element],
+        Type::BoundedArray { element, .. }
+        | Type::BoundedQueue { element, .. }
+        | Type::BoundedStack { element, .. } => vec![*element],
         Type::BoundedTextus { .. } | Type::BoundedAscii { .. } | Type::BoundedOcteti { .. } => {
             Vec::new()
         }

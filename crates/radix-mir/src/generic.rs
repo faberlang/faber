@@ -166,6 +166,8 @@ fn try_bind_generic_type_witness(
         | (Type::Set(expected_inner), Type::Set(actual_inner))
         | (Type::Promissum(expected_inner), Type::Promissum(actual_inner))
         | (Type::Cursor(expected_inner), Type::Cursor(actual_inner))
+        | (Type::Queue(expected_inner), Type::Queue(actual_inner))
+        | (Type::Stack(expected_inner), Type::Stack(actual_inner))
         | (Type::Intervallum(expected_inner), Type::Intervallum(actual_inner))
         | (Type::Option(expected_inner), Type::Option(actual_inner)) => {
             try_bind_generic_type_witness(
@@ -198,6 +200,36 @@ fn try_bind_generic_type_witness(
                     types,
                     *expected_inner,
                     *actual_inner,
+                    generic_bindings,
+                    shape_bindings,
+                    seen,
+                )
+        }
+        (
+            Type::BoundedQueue {
+                element: expected_element,
+                capacity: expected_capacity,
+            },
+            Type::BoundedQueue {
+                element: actual_element,
+                capacity: actual_capacity,
+            },
+        )
+        | (
+            Type::BoundedStack {
+                element: expected_element,
+                capacity: expected_capacity,
+            },
+            Type::BoundedStack {
+                element: actual_element,
+                capacity: actual_capacity,
+            },
+        ) => {
+            try_bind_index_witness(types, *expected_capacity, *actual_capacity, shape_bindings)
+                && try_bind_generic_type_witness(
+                    types,
+                    *expected_element,
+                    *actual_element,
                     generic_bindings,
                     shape_bindings,
                     seen,
@@ -699,6 +731,22 @@ fn instantiate_existing_type_id(
             index,
             Type::Cursor,
         ),
+        Type::Queue(inner) => instantiate_existing_unary_type(
+            types,
+            inner,
+            generic_bindings,
+            span,
+            index,
+            Type::Queue,
+        ),
+        Type::Stack(inner) => instantiate_existing_unary_type(
+            types,
+            inner,
+            generic_bindings,
+            span,
+            index,
+            Type::Stack,
+        ),
         Type::AsyncCursor(item, alternate) => {
             let item = instantiate_existing_type_id(types, item, generic_bindings, span, index)?;
             let alternate =
@@ -769,6 +817,24 @@ fn instantiate_existing_type_id(
             span,
             index,
             |element, capacity| Type::BoundedArray { element, capacity },
+        ),
+        Type::BoundedQueue { element, capacity } => instantiate_existing_indexed_type(
+            types,
+            element,
+            capacity,
+            generic_bindings,
+            span,
+            index,
+            |element, capacity| Type::BoundedQueue { element, capacity },
+        ),
+        Type::BoundedStack { element, capacity } => instantiate_existing_indexed_type(
+            types,
+            element,
+            capacity,
+            generic_bindings,
+            span,
+            index,
+            |element, capacity| Type::BoundedStack { element, capacity },
         ),
         Type::BoundedTextus { capacity } => {
             find_existing_type(types, &Type::BoundedTextus { capacity }, span, index)
@@ -1072,6 +1138,24 @@ fn instantiate_mutable_type_id(
             index,
             Type::Cursor,
         ),
+        Type::Queue(inner) => instantiate_mutable_unary_type(
+            types,
+            inner,
+            generic_bindings,
+            shape_bindings,
+            span,
+            index,
+            Type::Queue,
+        ),
+        Type::Stack(inner) => instantiate_mutable_unary_type(
+            types,
+            inner,
+            generic_bindings,
+            shape_bindings,
+            span,
+            index,
+            Type::Stack,
+        ),
         Type::AsyncCursor(item, alternate) => {
             let item = instantiate_mutable_type_id(
                 types,
@@ -1173,6 +1257,26 @@ fn instantiate_mutable_type_id(
             span,
             index,
             |element, capacity| Type::BoundedArray { element, capacity },
+        ),
+        Type::BoundedQueue { element, capacity } => instantiate_mutable_indexed_type(
+            types,
+            element,
+            capacity,
+            generic_bindings,
+            shape_bindings,
+            span,
+            index,
+            |element, capacity| Type::BoundedQueue { element, capacity },
+        ),
+        Type::BoundedStack { element, capacity } => instantiate_mutable_indexed_type(
+            types,
+            element,
+            capacity,
+            generic_bindings,
+            shape_bindings,
+            span,
+            index,
+            |element, capacity| Type::BoundedStack { element, capacity },
         ),
         Type::BoundedTextus { capacity } => {
             let capacity = substitute_index_params(types, capacity, shape_bindings);
@@ -1522,12 +1626,16 @@ fn type_contains_param_inner(types: &TypeTable, ty: TypeId, seen: &mut FxHashSet
         | Type::Set(inner)
         | Type::Promissum(inner)
         | Type::Cursor(inner)
+        | Type::Queue(inner)
+        | Type::Stack(inner)
         | Type::Atomic(inner)
         | Type::Intervallum(inner)
         | Type::Option(inner)
         | Type::Ref(_, inner)
         | Type::Alias(_, inner) => type_contains_param_inner(types, *inner, seen),
-        Type::BoundedArray { element, capacity } => {
+        Type::BoundedArray { element, capacity }
+        | Type::BoundedQueue { element, capacity }
+        | Type::BoundedStack { element, capacity } => {
             index_contains_param(types, *capacity)
                 || type_contains_param_inner(types, *element, seen)
         }

@@ -1242,6 +1242,18 @@ pub(super) fn import_semantic_type_with_nominal(
             let capacity = import_index_expr(source, target, capacity);
             target.bounded_array(element, capacity)
         }
+        Type::BoundedQueue { element, capacity } => {
+            let element =
+                import_semantic_type_with_nominal(source, target, element, imported, nominal);
+            let capacity = import_index_expr(source, target, capacity);
+            target.bounded_queue(element, capacity)
+        }
+        Type::BoundedStack { element, capacity } => {
+            let element =
+                import_semantic_type_with_nominal(source, target, element, imported, nominal);
+            let capacity = import_index_expr(source, target, capacity);
+            target.bounded_stack(element, capacity)
+        }
         Type::BoundedTextus { capacity } => {
             let capacity = import_index_expr(source, target, capacity);
             target.bounded_textus(capacity)
@@ -1291,6 +1303,14 @@ pub(super) fn import_semantic_type_with_nominal(
         Type::Cursor(inner) => {
             let inner = import_semantic_type_with_nominal(source, target, inner, imported, nominal);
             target.cursor(inner)
+        }
+        Type::Queue(inner) => {
+            let inner = import_semantic_type_with_nominal(source, target, inner, imported, nominal);
+            target.queue(inner)
+        }
+        Type::Stack(inner) => {
+            let inner = import_semantic_type_with_nominal(source, target, inner, imported, nominal);
+            target.stack(inner)
         }
         Type::AsyncCursor(item, alternate) => {
             let item = import_semantic_type_with_nominal(source, target, item, imported, nominal);

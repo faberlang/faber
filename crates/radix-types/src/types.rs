@@ -615,6 +615,26 @@ impl TypeTable {
         self.intern(Type::BoundedArray { element, capacity })
     }
 
+    /// Allocate an unbounded `queue<T>` collection.
+    pub fn queue(&mut self, element: TypeId) -> TypeId {
+        self.intern(Type::Queue(element))
+    }
+
+    /// Allocate a bounded `queue<T, N>` collection.
+    pub fn bounded_queue(&mut self, element: TypeId, capacity: IndexId) -> TypeId {
+        self.intern(Type::BoundedQueue { element, capacity })
+    }
+
+    /// Allocate an unbounded `stack<T>` collection.
+    pub fn stack(&mut self, element: TypeId) -> TypeId {
+        self.intern(Type::Stack(element))
+    }
+
+    /// Allocate a bounded `stack<T, N>` collection.
+    pub fn bounded_stack(&mut self, element: TypeId, capacity: IndexId) -> TypeId {
+        self.intern(Type::BoundedStack { element, capacity })
+    }
+
     /// Allocate a `textus<N>` bounded Unicode buffer.
     pub fn bounded_textus(&mut self, capacity: IndexId) -> TypeId {
         self.intern(Type::BoundedTextus { capacity })
@@ -884,13 +904,35 @@ impl TypeTable {
             | (Type::Option(ae), Type::Option(be))
             | (Type::Set(ae), Type::Set(be))
             | (Type::Promissum(ae), Type::Promissum(be))
-            | (Type::Cursor(ae), Type::Cursor(be)) => self.equals(*ae, *be),
+            | (Type::Cursor(ae), Type::Cursor(be))
+            | (Type::Queue(ae), Type::Queue(be))
+            | (Type::Stack(ae), Type::Stack(be)) => self.equals(*ae, *be),
             (
                 Type::BoundedArray {
                     element: ae,
                     capacity: ac,
                 },
                 Type::BoundedArray {
+                    element: be,
+                    capacity: bc,
+                },
+            ) => self.equals(*ae, *be) && self.index_equals(*ac, *bc),
+            (
+                Type::BoundedQueue {
+                    element: ae,
+                    capacity: ac,
+                },
+                Type::BoundedQueue {
+                    element: be,
+                    capacity: bc,
+                },
+            )
+            | (
+                Type::BoundedStack {
+                    element: ae,
+                    capacity: ac,
+                },
+                Type::BoundedStack {
                     element: be,
                     capacity: bc,
                 },
@@ -1191,7 +1233,9 @@ impl TypeTable {
             (Type::Array(from_elem), Type::Array(to_elem))
             | (Type::Set(from_elem), Type::Set(to_elem))
             | (Type::Promissum(from_elem), Type::Promissum(to_elem))
-            | (Type::Cursor(from_elem), Type::Cursor(to_elem)) => {
+            | (Type::Cursor(from_elem), Type::Cursor(to_elem))
+            | (Type::Queue(from_elem), Type::Queue(to_elem))
+            | (Type::Stack(from_elem), Type::Stack(to_elem)) => {
                 self.is_assignable(*from_elem, *to_elem)
             }
 
@@ -1230,6 +1274,26 @@ impl TypeTable {
                     capacity: from_cap,
                 },
                 Type::BoundedArray {
+                    element: to_elem,
+                    capacity: to_cap,
+                },
+            ) => self.is_assignable(*from_elem, *to_elem) && self.index_equals(*from_cap, *to_cap),
+            (
+                Type::BoundedQueue {
+                    element: from_elem,
+                    capacity: from_cap,
+                },
+                Type::BoundedQueue {
+                    element: to_elem,
+                    capacity: to_cap,
+                },
+            )
+            | (
+                Type::BoundedStack {
+                    element: from_elem,
+                    capacity: from_cap,
+                },
+                Type::BoundedStack {
                     element: to_elem,
                     capacity: to_cap,
                 },
@@ -1318,6 +1382,24 @@ pub enum Type {
 
     /// `lista<T, N>` bounded array. Distinct from unbounded [`Type::Array`].
     BoundedArray {
+        element: TypeId,
+        capacity: IndexId,
+    },
+
+    /// `queue<T>` FIFO collection.
+    Queue(TypeId),
+
+    /// `queue<T, N>` bounded FIFO collection. Distinct from [`Type::Queue`].
+    BoundedQueue {
+        element: TypeId,
+        capacity: IndexId,
+    },
+
+    /// `stack<T>` LIFO collection.
+    Stack(TypeId),
+
+    /// `stack<T, N>` bounded LIFO collection. Distinct from [`Type::Stack`].
+    BoundedStack {
         element: TypeId,
         capacity: IndexId,
     },
@@ -1468,6 +1550,11 @@ impl Hash for Type {
                 s.hash(state);
             }
             Self::BoundedArray { element, capacity } => {
+                element.hash(state);
+                capacity.hash(state);
+            }
+            Self::Queue(element) | Self::Stack(element) => element.hash(state),
+            Self::BoundedQueue { element, capacity } | Self::BoundedStack { element, capacity } => {
                 element.hash(state);
                 capacity.hash(state);
             }
@@ -1674,6 +1761,8 @@ pub enum CollectionKind {
     Copia,
     Promissum,
     Cursor,
+    Queue,
+    Stack,
 }
 
 impl CollectionKind {
@@ -1685,19 +1774,24 @@ impl CollectionKind {
     #[must_use]
     pub fn arity(self) -> usize {
         match self {
-            Self::Lista | Self::Copia | Self::Promissum | Self::Cursor => 1,
+            Self::Lista
+            | Self::Copia
+            | Self::Promissum
+            | Self::Cursor
+            | Self::Queue
+            | Self::Stack => 1,
             Self::Tabula => 2,
         }
     }
 
     /// Whether `n` is a legal applied-argument count for this family.
     ///
-    /// `lista` accepts one type argument (`lista<T>`) or a type plus a
-    /// magnitudo capacity (`lista<T, N>`). Other families stay exact.
+    /// `lista`, `queue`, and `stack` accept one type argument or a type plus a
+    /// magnitudo capacity. Other families stay exact.
     #[must_use]
     pub fn accepts_arity(self, n: usize) -> bool {
         match self {
-            Self::Lista => n == 1 || n == 2,
+            Self::Lista | Self::Queue | Self::Stack => n == 1 || n == 2,
             other => n == other.arity(),
         }
     }
@@ -1711,6 +1805,8 @@ impl CollectionKind {
             Self::Copia => "copia requires one type parameter",
             Self::Promissum => "promissum requires one type parameter",
             Self::Cursor => "cursor requires one type parameter",
+            Self::Queue => "queue requires one or two type parameters",
+            Self::Stack => "stack requires one or two type parameters",
         }
     }
 
@@ -1722,6 +1818,8 @@ impl CollectionKind {
             Self::Copia => types.set(params[0]),
             Self::Promissum => types.promissum(params[0]),
             Self::Cursor => types.cursor(params[0]),
+            Self::Queue => types.queue(params[0]),
+            Self::Stack => types.stack(params[0]),
         }
     }
 }
@@ -1764,6 +1862,16 @@ pub static COLLECTION_TYPE_SPECS: &[CollectionTypeSpec] = &[
     CollectionTypeSpec {
         text: "cursor",
         kind: CollectionKind::Cursor,
+        canonical: true,
+    },
+    CollectionTypeSpec {
+        text: "queue",
+        kind: CollectionKind::Queue,
+        canonical: true,
+    },
+    CollectionTypeSpec {
+        text: "stack",
+        kind: CollectionKind::Stack,
         canonical: true,
     },
 ];
@@ -1930,6 +2038,8 @@ fn type_refs_in_bounds(ty: &Type, types_len: usize, indices_len: usize) -> bool 
         | Type::Set(e)
         | Type::Promissum(e)
         | Type::Cursor(e)
+        | Type::Queue(e)
+        | Type::Stack(e)
         | Type::Option(e)
         | Type::Atomic(e)
         | Type::Intervallum(e)
@@ -1960,7 +2070,9 @@ fn type_refs_in_bounds(ty: &Type, types_len: usize, indices_len: usize) -> bool 
         Type::Tensor(e, s) | Type::Vector(e, s) | Type::Matrix(e, s) | Type::Sparsa(e, s) => {
             type_in_bounds(e) && index_in_bounds(s)
         }
-        Type::BoundedArray { element, capacity } => {
+        Type::BoundedArray { element, capacity }
+        | Type::BoundedQueue { element, capacity }
+        | Type::BoundedStack { element, capacity } => {
             type_in_bounds(element) && index_in_bounds(capacity)
         }
         Type::BoundedTextus { capacity }

@@ -273,6 +273,8 @@ impl<'a> DeviceSafeClassifier<'a> {
             | Type::PromissumFailable(_, _)
             | Type::AsyncCursor(_, _)
             | Type::Cursor(_)
+            | Type::Queue(_)
+            | Type::Stack(_)
             | Type::Sparsa(_, _)
             | Type::Intervallum(_)
             | Type::Option(_)
@@ -284,6 +286,8 @@ impl<'a> DeviceSafeClassifier<'a> {
             | Type::Applied(_, _)
             | Type::Union(_)
             | Type::BoundedArray { .. }
+            | Type::BoundedQueue { .. }
+            | Type::BoundedStack { .. }
             | Type::BoundedTextus { .. }
             | Type::BoundedAscii { .. }
             | Type::BoundedOcteti { .. } => {

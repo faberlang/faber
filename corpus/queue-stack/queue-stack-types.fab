@@ -1,0 +1,26 @@
++++
+term = "queue-stack"
+kind = "type"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "typus_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "functio_decl", "param_list", "parameter", "return_clause"]
+category = "collection"
+canonical = false
+summary = "Queue and stack core kinds with optional capacity parameters."
+syntax = "queue<T[, N]> / stack<T[, N]>"
+related = ["queue", "stack"]
+locale = "en"
++++
+
+# =============================================================================
+# queue<T[, N]> / stack<T[, N]> — C1 declaration surface
+# =============================================================================
+#
+# The unbounded and N-bounded forms are distinct semantic types. Runtime
+# receiver operations are later queue-stack units, not this declaration probe.
+# =============================================================================
+
+type IntQueue = queue<int>
+type BoundedIntQueue = queue<int, 8>
+type TextStack = stack<string>
+type BoundedTextStack = stack<string, 8>
+
+fn accepts(queue<int> q, queue<int, 8> bounded_q, stack<string> s, stack<string, 8> bounded_s) → void {}

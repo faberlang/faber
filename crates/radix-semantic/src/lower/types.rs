@@ -788,6 +788,9 @@ impl Lowerer<'_> {
         if collection == CollectionKind::Lista {
             return self.lower_lista_type(params);
         }
+        if matches!(collection, CollectionKind::Queue | CollectionKind::Stack) {
+            return self.lower_queue_stack_type(collection, params);
+        }
         if !collection.accepts_arity(params.len()) {
             self.error_from_message(collection.arity_error());
             return self.types.intern(Type::Error);
@@ -814,6 +817,38 @@ impl Lowerer<'_> {
             }
             _ => {
                 self.error_from_message(CollectionKind::Lista.arity_error());
+                self.types.intern(Type::Error)
+            }
+        }
+    }
+
+    fn lower_queue_stack_type(
+        &mut self,
+        collection: CollectionKind,
+        params: &[GenericArgExpr],
+    ) -> TypeId {
+        match params {
+            [elem] => {
+                let elem = self.lower_generic_type_arg(elem);
+                match collection {
+                    CollectionKind::Queue => self.types.queue(elem),
+                    CollectionKind::Stack => self.types.stack(elem),
+                    _ => unreachable!("queue/stack helper called for another collection"),
+                }
+            }
+            [elem, capacity] => {
+                let elem = self.lower_generic_type_arg(elem);
+                let Some(capacity) = self.lower_generic_index_arg(capacity) else {
+                    return self.types.intern(Type::Error);
+                };
+                match collection {
+                    CollectionKind::Queue => self.types.bounded_queue(elem, capacity),
+                    CollectionKind::Stack => self.types.bounded_stack(elem, capacity),
+                    _ => unreachable!("queue/stack helper called for another collection"),
+                }
+            }
+            _ => {
+                self.error_from_message(collection.arity_error());
                 self.types.intern(Type::Error)
             }
         }

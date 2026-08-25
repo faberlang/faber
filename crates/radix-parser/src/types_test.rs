@@ -308,6 +308,47 @@ fn parses_lista_infer_element_hole() {
 }
 
 #[test]
+fn types_test_parses_queue_and_stack_bounded_type_forms() {
+    let cases: &[(&str, &str, &[&str])] = &[
+        ("typus X = queue<numerus>", "queue", &["numerus"]),
+        ("typus X = queue<numerus, 8>", "queue", &["numerus", "8"]),
+        ("typus X = stack<textus>", "stack", &["textus"]),
+        ("typus X = stack<textus, 8>", "stack", &["textus", "8"]),
+    ];
+    for (source, type_name, expected_params) in cases {
+        let result = parse_ok(source);
+        let program = result.program.as_ref().expect("program");
+        let StmtKind::TypeAlias(alias) = &program.statements[0].kind else {
+            panic!("expected type alias in {source}");
+        };
+        let TypeExprKind::Named(name, params) = &alias.ty.kind else {
+            panic!("expected named type in {source}");
+        };
+        assert_eq!(result.interner.resolve(name.name), *type_name);
+        assert_eq!(params.len(), expected_params.len());
+        for (param, expected) in params.iter().zip(expected_params.iter().copied()) {
+            match (param, expected) {
+                (GenericArgExpr::Type(ty), expected) => {
+                    let TypeExprKind::Named(name, _) = &ty.kind else {
+                        panic!("expected named generic type argument, got {:?}", ty.kind);
+                    };
+                    assert_eq!(result.interner.resolve(name.name), expected);
+                }
+                (GenericArgExpr::Name(name), expected) => {
+                    assert_eq!(result.interner.resolve(name.name), expected);
+                }
+                (GenericArgExpr::Size(FiguraExpr::Literal(value)), "8") => {
+                    assert_eq!(*value, 8);
+                }
+                (other, expected) => {
+                    panic!("unexpected queue/stack argument {other:?}, expected {expected}")
+                }
+            }
+        }
+    }
+}
+
+#[test]
 fn types_test_parses_proposed_bounded_type_forms() {
     let cases: &[(&str, &str, &[&str])] = &[
         ("typus X = lista<numerus, 8>", "lista", &["numerus", "8"]),

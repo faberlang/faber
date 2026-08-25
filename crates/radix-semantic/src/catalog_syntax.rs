@@ -768,6 +768,12 @@ fn invalid_type_message(args: &[DiagnosticArg]) -> Option<String> {
     let issue = arg_value(args, "issue")?;
     match issue {
         "expected_type_name" => Some("expected type name".to_owned()),
+        "wrong_locale_type" => {
+            let ty = arg_value(args, "type")?;
+            Some(format!(
+                "type `{ty}` is not declared on this reader surface"
+            ))
+        }
         "postfix_array_syntax" => Some("postfix T[] syntax is removed".to_owned()),
         "lista_sugar_bracket_form" => Some("lista sugar has no bracket form".to_owned()),
         "matrix_sugar_missing_shape" => {
@@ -789,6 +795,9 @@ fn invalid_type_help(args: &[DiagnosticArg]) -> Option<String> {
     match issue {
         "expected_type_name" => {
             Some("start the type with an identifier, _, or function type".to_owned())
+        }
+        "wrong_locale_type" => {
+            Some("use the type spelling declared by this reader locale".to_owned())
         }
         "postfix_array_syntax" => Some("use lista<T>".to_owned()),
         "lista_sugar_bracket_form" => Some("use tensor sugar for shaped buffers".to_owned()),

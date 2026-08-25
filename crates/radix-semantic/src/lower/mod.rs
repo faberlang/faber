@@ -980,6 +980,8 @@ fn lowering_issue_args_from_message(message: &str) -> Vec<DiagnosticArg> {
         "copia requires one type parameter" => issue_args("copia_arity"),
         "promissum requires one type parameter" => issue_args("promissum_arity"),
         "cursor requires one type parameter" => issue_args("cursor_arity"),
+        "queue requires one or two type parameters" => issue_args("queue_arity"),
+        "stack requires one or two type parameters" => issue_args("stack_arity"),
         "f16, f32, f64, and bf16 are fractus widths; use fractus<f16>, fractus<f32>, fractus<f64>, or fractus<bf16>" => {
             issue_args("float_width_on_numerus")
         }

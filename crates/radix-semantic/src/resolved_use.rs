@@ -324,11 +324,15 @@ impl UseVisitor<'_> {
             | Type::Set(inner)
             | Type::Promissum(inner)
             | Type::Cursor(inner)
+            | Type::Queue(inner)
+            | Type::Stack(inner)
             | Type::Atomic(inner)
             | Type::Intervallum(inner)
             | Type::Option(inner)
             | Type::Ref(_, inner) => vec![inner],
-            Type::BoundedArray { element, .. } => vec![element],
+            Type::BoundedArray { element, .. }
+            | Type::BoundedQueue { element, .. }
+            | Type::BoundedStack { element, .. } => vec![element],
             Type::BoundedTextus { .. } | Type::BoundedAscii { .. } | Type::BoundedOcteti { .. } => {
                 Vec::new()
             }

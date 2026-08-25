@@ -669,9 +669,26 @@ impl Parser {
     fn canonical_type_ident(&mut self, ident: Ident) -> Ident {
         let source = self.interner.resolve(ident.name);
         let Some(latin_key) = self.reader_type_latin_keys.get(source).cloned() else {
+            if self.keyword_surface == KeywordSurfaceMode::PackAuthoritative
+                && Self::is_canonical_type_spelling(source)
+            {
+                self.errors.push(
+                    ParseError::structured(ParseErrorKind::TypeInvalid, ident.span)
+                        .with_arg("issue", "wrong_locale_type")
+                        .with_arg("type", source),
+                );
+            }
             return ident;
         };
         self.keyword_ident(&latin_key, ident.span)
+    }
+
+    fn is_canonical_type_spelling(source: &str) -> bool {
+        radix_types::lookup_primitive_type_spec(source).is_some_and(|spec| spec.canonical)
+            || radix_types::lookup_collection_type_spec(source).is_some_and(|spec| spec.canonical)
+            || radix_types::lookup_tensor_family_type_spec(source)
+                .is_some_and(|spec| spec.canonical)
+            || source == "modulus"
     }
 
     fn expect(&mut self, kind: &TokenKind, msg: &str) -> Result<&Token, ParseError> {

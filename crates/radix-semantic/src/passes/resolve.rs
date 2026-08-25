@@ -1620,12 +1620,21 @@ fn resolve_type_expr(
                     return;
                 }
             }
-            if CollectionKind::from_name(name_str) == Some(CollectionKind::Lista) {
-                match params.as_slice() {
-                    [elem] => resolve_generic_arg(resolver, interner, elem, errors),
-                    [elem, capacity] => {
-                        resolve_generic_arg(resolver, interner, elem, errors);
-                        validate_capacity_index_param(resolver, interner, capacity, errors);
+            if let Some(collection) = CollectionKind::from_name(name_str) {
+                match collection {
+                    CollectionKind::Lista | CollectionKind::Queue | CollectionKind::Stack => {
+                        match params.as_slice() {
+                            [elem] => resolve_generic_arg(resolver, interner, elem, errors),
+                            [elem, capacity] => {
+                                resolve_generic_arg(resolver, interner, elem, errors);
+                                validate_capacity_index_param(resolver, interner, capacity, errors);
+                            }
+                            _ => {
+                                for param in params {
+                                    resolve_generic_arg(resolver, interner, param, errors);
+                                }
+                            }
+                        }
                     }
                     _ => {
                         for param in params {
@@ -2001,6 +2010,8 @@ fn collection_arity_issue(collection: CollectionKind) -> &'static str {
         CollectionKind::Copia => "copia_arity",
         CollectionKind::Promissum => "promissum_arity",
         CollectionKind::Cursor => "cursor_arity",
+        CollectionKind::Queue => "queue_arity",
+        CollectionKind::Stack => "stack_arity",
     }
 }
 
@@ -2527,6 +2538,8 @@ fn is_builtin_type(name: &str) -> bool {
             | "copia"
             | "promissum"
             | "cursor"
+            | "queue"
+            | "stack"
             | "tensor"
             | "matrix"
             | "intervallum"
@@ -3325,6 +3338,35 @@ fn lower_lista_type(
     }
 }
 
+fn lower_queue_stack_type(
+    collection: CollectionKind,
+    params: &[GenericArgExpr],
+    resolver: &Resolver,
+    interner: &Interner,
+    types: &mut TypeTable,
+) -> Result<TypeId, TypeLowerError> {
+    match params {
+        [elem] => {
+            let elem = lower_generic_type_arg(elem, resolver, interner, types)?;
+            Ok(match collection {
+                CollectionKind::Queue => types.queue(elem),
+                CollectionKind::Stack => types.stack(elem),
+                _ => unreachable!("queue/stack helper called for another collection"),
+            })
+        }
+        [elem, capacity] => {
+            let elem = lower_generic_type_arg(elem, resolver, interner, types)?;
+            let capacity = lower_generic_index_arg(capacity, resolver, types)?;
+            Ok(match collection {
+                CollectionKind::Queue => types.bounded_queue(elem, capacity),
+                CollectionKind::Stack => types.bounded_stack(elem, capacity),
+                _ => unreachable!("queue/stack helper called for another collection"),
+            })
+        }
+        _ => Err(TypeLowerError::CollectionArity(collection)),
+    }
+}
+
 fn generic_type_expr(arg: &GenericArgExpr) -> Option<TypeExpr> {
     match arg {
         GenericArgExpr::Type(ty) => Some(ty.clone()),
@@ -3526,6 +3568,23 @@ fn lower_named_type(
         return Ok(types.sized_numeric(Primitive::Numerus, crate::NumericWidth::U8));
     }
 
+    if let Some(collection) = CollectionKind::from_name(name_str) {
+        if collection == CollectionKind::Lista {
+            return lower_lista_type(params, resolver, interner, types);
+        }
+        if matches!(collection, CollectionKind::Queue | CollectionKind::Stack) {
+            return lower_queue_stack_type(collection, params, resolver, interner, types);
+        }
+        if !collection.accepts_arity(params.len()) {
+            return Err(TypeLowerError::CollectionArity(collection));
+        }
+        let lowered = params
+            .iter()
+            .map(|param| lower_generic_type_arg(param, resolver, interner, types))
+            .collect::<Result<Vec<_>, _>>()?;
+        return Ok(collection.lower(types, &lowered));
+    }
+
     let Some(type_params) = generic_type_exprs(params) else {
         return Err(TypeLowerError::Issue(
             "generic_size_argument_in_type_position",
@@ -3624,20 +3683,6 @@ fn lower_named_type(
             fields.push((label.name, field_ty));
         }
         return Ok(types.record(fields));
-    }
-
-    if let Some(collection) = CollectionKind::from_name(name_str) {
-        if collection == CollectionKind::Lista {
-            return lower_lista_type(params, resolver, interner, types);
-        }
-        if !collection.accepts_arity(params.len()) {
-            return Err(TypeLowerError::CollectionArity(collection));
-        }
-        let lowered = params
-            .iter()
-            .map(|param| lower_generic_type_arg(param, resolver, interner, types))
-            .collect::<Result<Vec<_>, _>>()?;
-        return Ok(collection.lower(types, &lowered));
     }
 
     let Some(def_id) = resolver.lookup_type(name.name) else {

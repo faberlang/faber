@@ -54,6 +54,24 @@ impl super::FaberCodegen {
                 surface,
             ),
 
+            Type::Queue(elem) => self.format_unary_type(
+                surface.type_surface(TypeBindingKind::Collection(CollectionKind::Queue)),
+                *elem,
+                types,
+                names,
+                interner,
+                surface,
+            ),
+
+            Type::Stack(elem) => self.format_unary_type(
+                surface.type_surface(TypeBindingKind::Collection(CollectionKind::Stack)),
+                *elem,
+                types,
+                names,
+                interner,
+                surface,
+            ),
+
             Type::Map(key, value) => self.format_binary_type(
                 surface.type_surface(TypeBindingKind::Collection(CollectionKind::Tabula)),
                 *key,
@@ -271,6 +289,18 @@ impl super::FaberCodegen {
             Type::Error => "<error>".to_owned(),
             Type::BoundedArray { element, capacity } => format!(
                 "lista<{}, {}>",
+                self.type_to_faber(*element, types, names, interner, surface),
+                crate::figura::format_figura(*capacity, types, interner)
+            ),
+            Type::BoundedQueue { element, capacity } => format!(
+                "{}<{}, {}>",
+                surface.type_surface(TypeBindingKind::Collection(CollectionKind::Queue)),
+                self.type_to_faber(*element, types, names, interner, surface),
+                crate::figura::format_figura(*capacity, types, interner)
+            ),
+            Type::BoundedStack { element, capacity } => format!(
+                "{}<{}, {}>",
+                surface.type_surface(TypeBindingKind::Collection(CollectionKind::Stack)),
                 self.type_to_faber(*element, types, names, interner, surface),
                 crate::figura::format_figura(*capacity, types, interner)
             ),

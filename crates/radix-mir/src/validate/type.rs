@@ -608,6 +608,8 @@ impl Validator<'_, '_> {
             | Type::Set(inner)
             | Type::Promissum(inner)
             | Type::Cursor(inner)
+            | Type::Queue(inner)
+            | Type::Stack(inner)
             | Type::Tensor(inner, _)
             | Type::Vector(inner, _)
             | Type::Matrix(inner, _)
@@ -616,7 +618,9 @@ impl Validator<'_, '_> {
             | Type::Option(inner)
             | Type::Ref(_, inner)
             | Type::Alias(_, inner)
-            | Type::BoundedArray { element: inner, .. } => self.validate_type_id(inner, span, seen),
+            | Type::BoundedArray { element: inner, .. }
+            | Type::BoundedQueue { element: inner, .. }
+            | Type::BoundedStack { element: inner, .. } => self.validate_type_id(inner, span, seen),
             Type::BoundedTextus { .. } | Type::BoundedAscii { .. } | Type::BoundedOcteti { .. } => {
             }
             Type::PromissumFailable(success, alternate) | Type::AsyncCursor(success, alternate) => {

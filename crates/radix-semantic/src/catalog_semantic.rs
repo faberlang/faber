@@ -1762,6 +1762,8 @@ fn semantic_lowering_error_message(args: &[DiagnosticArg]) -> Option<String> {
         "copia_arity" => Some("copia requires one type parameter".to_owned()),
         "promissum_arity" => Some("promissum requires one type parameter".to_owned()),
         "cursor_arity" => Some("cursor requires one type parameter".to_owned()),
+        "queue_arity" => Some("queue requires one or two type parameters".to_owned()),
+        "stack_arity" => Some("stack requires one or two type parameters".to_owned()),
         "discerne_casu_pattern_required" => Some("discerne casu requires a pattern".to_owned()),
         "discerne_pattern_count" => {
             Some("discerne pattern count must match subject count".to_owned())

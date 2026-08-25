@@ -33,6 +33,24 @@ pub fn format_faber_type<F: Fn(DefId) -> String>(
             format_faber_type(*element, types, interner, resolve_def),
             format_figura(*capacity, types, interner)
         ),
+        Type::Queue(elem) => format!(
+            "queue<{}>",
+            format_faber_type(*elem, types, interner, resolve_def)
+        ),
+        Type::BoundedQueue { element, capacity } => format!(
+            "queue<{}, {}>",
+            format_faber_type(*element, types, interner, resolve_def),
+            format_figura(*capacity, types, interner)
+        ),
+        Type::Stack(elem) => format!(
+            "stack<{}>",
+            format_faber_type(*elem, types, interner, resolve_def)
+        ),
+        Type::BoundedStack { element, capacity } => format!(
+            "stack<{}, {}>",
+            format_faber_type(*element, types, interner, resolve_def),
+            format_figura(*capacity, types, interner)
+        ),
         Type::BoundedTextus { capacity } => {
             format!("textus<{}>", format_figura(*capacity, types, interner))
         }

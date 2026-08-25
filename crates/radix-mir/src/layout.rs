@@ -621,11 +621,15 @@ fn layout_kind_for_type(
         | Type::PromissumFailable(_, _)
         | Type::AsyncCursor(_, _)
         | Type::Cursor(_)
+        | Type::Queue(_)
+        | Type::Stack(_)
         | Type::Intervallum(_)
         | Type::Ref(_, _)
         | Type::Interface(_)
         | Type::Func(_)
-        | Type::Applied(_, _) => LayoutResolution::Resolved(MirLayoutKind::OpaqueHandle),
+        | Type::Applied(_, _)
+        | Type::BoundedQueue { .. }
+        | Type::BoundedStack { .. } => LayoutResolution::Resolved(MirLayoutKind::OpaqueHandle),
     };
     visiting.remove(&ty);
     memo.insert(ty, kind.clone());

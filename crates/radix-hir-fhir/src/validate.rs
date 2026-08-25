@@ -1922,6 +1922,8 @@ pub(crate) fn validate_referential_integrity(
             | radix_types::Type::Set(t)
             | radix_types::Type::Promissum(t)
             | radix_types::Type::Cursor(t)
+            | radix_types::Type::Queue(t)
+            | radix_types::Type::Stack(t)
             | radix_types::Type::Atomic(t)
             | radix_types::Type::Intervallum(t)
             | radix_types::Type::Option(t) => {
@@ -1950,6 +1952,14 @@ pub(crate) fn validate_referential_integrity(
             | radix_types::Type::Matrix(t, i)
             | radix_types::Type::Sparsa(t, i)
             | radix_types::Type::BoundedArray {
+                element: t,
+                capacity: i,
+            }
+            | radix_types::Type::BoundedQueue {
+                element: t,
+                capacity: i,
+            }
+            | radix_types::Type::BoundedStack {
                 element: t,
                 capacity: i,
             } => {

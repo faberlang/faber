@@ -602,6 +602,10 @@ mod bounded_identity_test;
 mod bounded_lista_test;
 
 #[cfg(test)]
+#[path = "queue_stack_test.rs"]
+mod queue_stack_test;
+
+#[cfg(test)]
 #[path = "lista_operator_test.rs"]
 mod lista_operator_test;
 
