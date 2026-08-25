@@ -452,11 +452,6 @@ fn probe(source: &str, session: &Session) -> ProbeOutcome {
 /// rows were dispositioned by MC4 onto `AIR_LANE_CLASSES` (ruled design
 /// surface, not worklist entries).
 const RATCHET: &[(&str, &str)] = &[
-    // MC2 — numeric-unary backfill (registry rows, `CodegenOnly`, no arm).
-    ("Numeric.nega/0", "MC2"),
-    ("Numeric.negativa/0", "MC2"),
-    ("Numeric.complementa/0", "MC2"),
-    ("Numeric.complementata/0", "MC2"),
     // MC3 — Vector.crea constructor backfill.
     ("Vector.crea/0", "MC3"),
 ];
