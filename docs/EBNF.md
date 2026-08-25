@@ -170,7 +170,9 @@ enum_member ::= IDENTIFIER ('=' ('-'? NUMBER | STRING))?
 discretio_decl ::= 'discretio' IDENTIFIER generic_params? '{' union_member* variant (',' variant)* '}'
 # formerly: unionMember
 # [056] union_member
-union_member ::= annotation* field_decl
+union_member ::= annotation* field_decl | conversio_arm
+# formerly: conversioArm
+conversio_arm ::= '@' ('conversio' | 'conversion') type_annotation IDENT? '{' stmt* '}'
 # [057] variant
 variant ::= IDENTIFIER ('{' variant_fields '}')?
 # formerly: variantFields
