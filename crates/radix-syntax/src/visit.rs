@@ -697,6 +697,11 @@ pub fn walk_type_expr<V: Visitor>(visitor: &mut V, ty: &TypeExpr) {
                 visitor.visit_type_expr(m);
             }
         }
+        TypeExprKind::Intersection(members) => {
+            for m in members {
+                visitor.visit_type_expr(m);
+            }
+        }
     }
 }
 

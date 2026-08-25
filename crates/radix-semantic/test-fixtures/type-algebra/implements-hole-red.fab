@@ -1,0 +1,9 @@
++++
+locale = "en"
++++
+interface Readable {
+    fn read() → string
+}
+class Doc implements _ {
+    fn read() → string { return "r" }
+}

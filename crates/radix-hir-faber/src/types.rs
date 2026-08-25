@@ -299,6 +299,11 @@ impl super::FaberCodegen {
             Type::Union(members) => {
                 self.format_union_type(members, types, names, interner, surface)
             }
+            Type::Intersection(members) => members
+                .iter()
+                .map(|member| self.type_to_faber(*member, types, names, interner, surface))
+                .collect::<Vec<_>>()
+                .join(" ∩ "),
             Type::Error => "<error>".to_owned(),
             Type::BoundedArray { element, capacity } => format!(
                 "{}<{}, {}>",

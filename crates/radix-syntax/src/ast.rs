@@ -1598,6 +1598,9 @@ pub enum TypeExprKind {
     Func(FuncTypeExpr),
     /// Inline union: `T ∪ U` (including `T ∪ nihil` for nullables).
     Union(Vec<TypeExpr>),
+    /// Inline intersection: `T ∩ U`. Binds tighter than `∪`; nested
+    /// intersection members are flattened at parse time like unions.
+    Intersection(Vec<TypeExpr>),
 }
 
 #[derive(Debug, Clone)]

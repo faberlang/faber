@@ -77,6 +77,23 @@ impl Parser {
     /// keyword-backed type name because it also exists as a value literal.
     pub(super) fn parse_type(&mut self) -> Result<TypeExpr, ParseError> {
         let start = self.current_span();
+        let core = self.parse_type_atom(start)?;
+        let core = self.parse_intersection_tail(core, start)?;
+        self.parse_union_tail(core, start)
+    }
+
+    /// Parse a union-member type: core plus any `∩` chain, but no `∪` tail.
+    ///
+    /// `∩` binds tighter than `∪`, so a cup member is itself an
+    /// intersection-level expression (`A ∩ B ∪ C` is `(A ∩ B) ∪ C`).
+    fn parse_union_member(&mut self) -> Result<TypeExpr, ParseError> {
+        let start = self.current_span();
+        let core = self.parse_type_atom(start)?;
+        self.parse_intersection_tail(core, start)
+    }
+
+    /// Parse one mode-prefixed, tail-free type core.
+    fn parse_type_atom(&mut self, start: Span) -> Result<TypeExpr, ParseError> {
 
         // Access marker: de/in/own/copy (prefix). Nullable is no longer a prefix; use T ∪ nihil.
         let mode = if self.eat_keyword_ident(TokenKind::De) {
@@ -299,7 +316,38 @@ impl Parser {
             span,
             iuncta_label: None,
         };
-        self.parse_union_tail(core, start)
+        Ok(core)
+    }
+
+    /// Consume a trailing intersection chain after a core type.
+    ///
+    /// Mirrors [`Self::parse_union_tail`]: nested intersection members are
+    /// flattened so `A ∩ (B ∩ C)` and `A ∩ B ∩ C` share one AST shape.
+    fn parse_intersection_tail(&mut self, first: TypeExpr, start: Span) -> Result<TypeExpr, ParseError> {
+        if !self.eat(&TokenKind::Cap) {
+            return Ok(first);
+        }
+        if matches!(first.kind, TypeExprKind::UnionHole) {
+            return Err(ParseError::structured(ParseErrorKind::TypeInvalid, start)
+                .with_arg("issue", "unexpected_cap_after_union_hole"));
+        }
+        let mut members = Vec::new();
+        flatten_intersection_member(first, &mut members);
+        loop {
+            let member = self.parse_union_member()?;
+            flatten_intersection_member(member, &mut members);
+            if !self.eat(&TokenKind::Cap) {
+                break;
+            }
+        }
+        let span = start.merge(self.previous_span());
+        Ok(TypeExpr {
+            nullable: false,
+            mode: None,
+            kind: TypeExprKind::Intersection(members),
+            span,
+            iuncta_label: None,
+        })
     }
 
     /// Consume a trailing union chain after a core type.
@@ -321,7 +369,7 @@ impl Parser {
         let mut members = Vec::new();
         flatten_union_member(first, &mut members);
         loop {
-            let member = self.parse_type()?;
+            let member = self.parse_union_member()?;
             if matches!(member.kind, TypeExprKind::UnionHole) {
                 return Err(
                     ParseError::structured(ParseErrorKind::TypeInvalid, member.span)
@@ -647,6 +695,35 @@ fn flatten_union_member(member: TypeExpr, members: &mut Vec<TypeExpr>) {
         TypeExprKind::Union(nested) => {
             for nested_member in nested {
                 flatten_union_member(nested_member, members);
+            }
+        }
+        kind => members.push(TypeExpr {
+            nullable,
+            mode,
+            kind,
+            span,
+            iuncta_label,
+        }),
+    }
+}
+
+fn flatten_intersection_member(member: TypeExpr, members: &mut Vec<TypeExpr>) {
+    if member.nullable || member.mode.is_some() {
+        members.push(member);
+        return;
+    }
+
+    let TypeExpr {
+        nullable,
+        mode,
+        kind,
+        span,
+        iuncta_label,
+    } = member;
+    match kind {
+        TypeExprKind::Intersection(nested) => {
+            for nested_member in nested {
+                flatten_intersection_member(nested_member, members);
             }
         }
         kind => members.push(TypeExpr {

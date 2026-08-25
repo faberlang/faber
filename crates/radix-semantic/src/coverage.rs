@@ -404,7 +404,7 @@ fn type_children(ty: &Type) -> Vec<TypeId> {
             }));
             children
         }
-        Type::Union(members) => members.clone(),
+        Type::Union(members) | Type::Intersection(members) => members.clone(),
         Type::Tuple(elements) => elements.clone(),
         Type::BoundedArray { element, .. }
         | Type::BoundedQueue { element, .. }

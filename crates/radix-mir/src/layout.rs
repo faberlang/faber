@@ -604,6 +604,10 @@ fn layout_kind_for_type(
         }
         Type::Enum(_) => LayoutResolution::Resolved(opaque_aggregate(MirAggregateFamily::Enum)),
         Type::Union(_) => LayoutResolution::Resolved(opaque_aggregate(MirAggregateFamily::Union)),
+        // No MIR aggregate family for intersections; nominal-only operands do
+        // not lower to MIR today, so resolve to no-layout rather than invent
+        // a carrier.
+        Type::Intersection(_) => LayoutResolution::NoLayout,
         Type::Tuple(_) => LayoutResolution::Resolved(physical_aggregate(MirAggregateFamily::Tuple)),
         Type::Primitive(
             Primitive::Ascii

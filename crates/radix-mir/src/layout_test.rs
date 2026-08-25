@@ -142,7 +142,8 @@ fn intended_bucket(ty: &Type) -> Bucket {
         | Type::Set(_)
         | Type::Option(_)
         | Type::Enum(_)
-        | Type::Union(_) => Bucket::OpaqueAggregate,
+        | Type::Union(_)
+        | Type::Intersection(_) => Bucket::OpaqueAggregate,
         Type::Param(_)
         | Type::Infer(_)
         | Type::InferUnion(_)

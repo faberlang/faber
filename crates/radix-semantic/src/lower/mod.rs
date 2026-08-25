@@ -1028,3 +1028,6 @@ fn retired_bare_object_literal_args() -> Vec<DiagnosticArg> {
 #[cfg(test)]
 #[path = "template_holes_test.rs"]
 mod template_holes_test;
+#[cfg(test)]
+#[path = "type_algebra_test.rs"]
+mod type_algebra_test;

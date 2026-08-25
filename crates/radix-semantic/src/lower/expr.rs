@@ -1175,8 +1175,8 @@ impl Lowerer<'_> {
         };
         self.pop_scope();
 
-        let ret = closure.ret.as_ref().map(|ret| self.lower_type(ret));
-        let err = closure.err.as_ref().map(|err| self.lower_type(err));
+        let ret = closure.ret.as_ref().map(|ret| self.lower_signature_type(ret));
+        let err = closure.err.as_ref().map(|err| self.lower_signature_type(err));
         HirExpressionKind::Clausura(params, ret, err, Box::new(body), closure.libera)
     }
 

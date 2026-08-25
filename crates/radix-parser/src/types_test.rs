@@ -1313,3 +1313,71 @@ fn union_hole_keeps_infer_and_binary_union_unchanged() {
         matches!(&members[1].kind, TypeExprKind::Named(n, _) if result.interner.resolve(n.name) == "textus")
     );
 }
+
+// ── U0: type-level `∩` (Cap) grammar ─────────────────────────────────────────
+
+#[test]
+fn parses_intersection_chain_and_flattens() {
+    let result = parse_ok("typus All = A ∩ B ∩ C");
+    let program = result.program.as_ref().expect("program");
+    let StmtKind::TypeAlias(alias) = &program.statements[0].kind else {
+        panic!("expected type alias");
+    };
+    let TypeExprKind::Intersection(members) = &alias.ty.kind else {
+        panic!("expected intersection type, got {:?}", alias.ty.kind);
+    };
+    assert_eq!(members.len(), 3);
+    for expected in ["A", "B", "C"] {
+        assert!(
+            members.iter().any(|m| matches!(&m.kind, TypeExprKind::Named(n, _)
+                if result.interner.resolve(n.name) == expected)),
+            "missing member {expected}"
+        );
+    }
+}
+
+#[test]
+fn intersection_binds_tighter_than_union() {
+    let result = parse_ok("typus Mixed = A ∩ B ∪ C");
+    let program = result.program.as_ref().expect("program");
+    let StmtKind::TypeAlias(alias) = &program.statements[0].kind else {
+        panic!("expected type alias");
+    };
+    let TypeExprKind::Union(members) = &alias.ty.kind else {
+        panic!("expected union at the top level, got {:?}", alias.ty.kind);
+    };
+    assert_eq!(members.len(), 2);
+    assert!(
+        matches!(&members[0].kind, TypeExprKind::Intersection(inner) if inner.len() == 2),
+        "first union member must be the A ∩ B intersection"
+    );
+    assert!(
+        matches!(&members[1].kind, TypeExprKind::Named(n, _) if result.interner.resolve(n.name) == "C")
+    );
+}
+
+#[test]
+fn implements_clause_accepts_cap_separator() {
+    let result = parse_ok("genus Doc implet Readable ∩ Seekable {}");
+    let program = result.program.as_ref().expect("program");
+    let StmtKind::Class(class) = &program.statements[0].kind else {
+        panic!("expected class");
+    };
+    assert_eq!(class.implements.len(), 2);
+    assert_eq!(result.interner.resolve(class.implements[0].name), "Readable");
+    assert_eq!(result.interner.resolve(class.implements[1].name), "Seekable");
+}
+
+#[test]
+fn implements_clause_rejects_union_separator() {
+    // R1: `∪` is not an implements item separator — disjunctive conformance is
+    // not parseable, so it fails closed.
+    let result = parse(lex("genus Doc implet Readable ∪ Seekable {}"));
+    assert!(!result.errors.is_empty(), "implements-∪ must not parse");
+}
+
+#[test]
+fn implements_clause_rejects_hole() {
+    let result = parse(lex("genus Doc implet _ {}"));
+    assert!(!result.errors.is_empty(), "implements hole must not parse");
+}

@@ -285,6 +285,7 @@ impl<'a> DeviceSafeClassifier<'a> {
             | Type::Func(_)
             | Type::Applied(_, _)
             | Type::Union(_)
+            | Type::Intersection(_)
             | Type::BoundedArray { .. }
             | Type::BoundedQueue { .. }
             | Type::BoundedStack { .. }

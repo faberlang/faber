@@ -670,7 +670,7 @@ impl Validator<'_, '_> {
                     }
                 }
             }
-            Type::Union(members) => {
+            Type::Union(members) | Type::Intersection(members) => {
                 for member in members {
                     self.validate_type_id(member, span, seen);
                 }

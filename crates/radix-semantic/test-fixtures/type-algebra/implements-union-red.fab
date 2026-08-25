@@ -1,0 +1,13 @@
++++
+locale = "en"
++++
+interface Readable {
+    fn read() → string
+}
+interface Seekable {
+    fn seek() → string
+}
+class Doc implements Readable ∪ Seekable {
+    fn read() → string { return "r" }
+    fn seek() → string { return "s" }
+}

@@ -440,8 +440,8 @@ impl Lowerer<'_> {
         }
         let cli_args = self.lower_cli_args_param(decl);
 
-        let ret_ty = decl.ret.as_ref().map(|ty| self.lower_type(ty));
-        let err_ty = decl.err.as_ref().map(|ty| self.lower_type(ty));
+        let ret_ty = decl.ret.as_ref().map(|ty| self.lower_signature_type(ty));
+        let err_ty = decl.err.as_ref().map(|ty| self.lower_signature_type(ty));
         self.push_scope();
         for param in &params {
             self.bind_local(param.name, param.def_id);
@@ -616,8 +616,8 @@ impl Lowerer<'_> {
                         self.prepend_runtime_provided_locals(body, lane_local.into_iter());
                     }
 
-                    let ret_ty = method.ret.as_ref().map(|ty| self.lower_type(ty));
-                    let err_ty = method.err.as_ref().map(|ty| self.lower_type(ty));
+                    let ret_ty = method.ret.as_ref().map(|ty| self.lower_signature_type(ty));
+                    let err_ty = method.err.as_ref().map(|ty| self.lower_signature_type(ty));
                     self.pop_type_params();
 
                     let posture =
@@ -963,8 +963,8 @@ impl Lowerer<'_> {
                 .iter()
                 .map(|param| self.lower_param(param, false))
                 .collect(),
-            ret_ty: method.ret.as_ref().map(|ty| self.lower_type(ty)),
-            err_ty: method.err.as_ref().map(|ty| self.lower_type(ty)),
+            ret_ty: method.ret.as_ref().map(|ty| self.lower_signature_type(ty)),
+            err_ty: method.err.as_ref().map(|ty| self.lower_signature_type(ty)),
             posture,
             span: method.span,
         }

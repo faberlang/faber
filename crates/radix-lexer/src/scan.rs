@@ -329,6 +329,7 @@ impl<'a> Lexer<'a> {
 
             '∴' => TokenKind::Therefore,
             '∪' => TokenKind::Cup,
+            '∩' => TokenKind::Cap,
             '+' => TokenKind::Plus,
             '*' => TokenKind::Star,
             '%' => TokenKind::Percent,

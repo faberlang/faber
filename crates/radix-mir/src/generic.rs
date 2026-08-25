@@ -880,6 +880,15 @@ fn instantiate_existing_type_id(
                 .collect::<Result<Vec<_>, _>>()?;
             find_existing_type(types, &Type::Union(members), span, index)
         }
+        Type::Intersection(members) => {
+            let members = members
+                .iter()
+                .map(|member| {
+                    instantiate_existing_type_id(types, *member, generic_bindings, span, index)
+                })
+                .collect::<Result<Vec<_>, _>>()?;
+            find_existing_type(types, &Type::Intersection(members), span, index)
+        }
         Type::Func(sig) => {
             let sig = FuncSig {
                 type_params: sig.type_params.clone(),
@@ -1366,6 +1375,22 @@ fn instantiate_mutable_type_id(
                 .collect::<Result<Vec<_>, _>>()?;
             Ok(intern_or_find(types, &Type::Union(members), index))
         }
+        Type::Intersection(members) => {
+            let members = members
+                .iter()
+                .map(|member| {
+                    instantiate_mutable_type_id(
+                        types,
+                        *member,
+                        generic_bindings,
+                        shape_bindings,
+                        span,
+                        index,
+                    )
+                })
+                .collect::<Result<Vec<_>, _>>()?;
+            Ok(intern_or_find(types, &Type::Intersection(members), index))
+        }
         Type::Func(sig) => {
             let sig = FuncSig {
                 type_params: sig.type_params.clone(),
@@ -1588,6 +1613,11 @@ fn type_matches_candidate(types: &TypeTable, id: TypeId, candidate: &Type) -> bo
                 && a.iter()
                     .all(|a_ty| b.iter().any(|b_ty| types.equals(*a_ty, *b_ty)))
         }
+        (Type::Intersection(a), Type::Intersection(b)) => {
+            a.len() == b.len()
+                && a.iter()
+                    .all(|a_ty| b.iter().any(|b_ty| types.equals(*a_ty, *b_ty)))
+        }
         (Type::Tuple(a_elems), Type::Tuple(b_elems)) => {
             a_elems.len() == b_elems.len()
                 && a_elems
@@ -1694,7 +1724,7 @@ fn type_contains_param_inner(types: &TypeTable, ty: TypeId, seen: &mut FxHashSet
                     radix_types::AppliedArg::Size(id) => index_contains_param(types, *id),
                 })
         }
-        Type::Union(members) => members
+        Type::Union(members) | Type::Intersection(members) => members
             .iter()
             .any(|member| type_contains_param_inner(types, *member, seen)),
         Type::Primitive(_)

@@ -210,6 +210,11 @@ pub fn format_faber_type<F: Fn(DefId) -> String>(
             format!("iuncta<{}>", args.join(", "))
         }
         Type::Union(_) => "ignotum".to_owned(),
+        Type::Intersection(members) => members
+            .iter()
+            .map(|member| format_faber_type(*member, types, interner, resolve_def))
+            .collect::<Vec<_>>()
+            .join(" ∩ "),
         Type::Error => "<error>".to_owned(),
     }
 }

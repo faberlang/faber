@@ -528,6 +528,7 @@ impl TypeName for Type {
             Type::Intervallum(_) => "intervallum",
             Type::ModularWord(_) => "modular",
             Type::Union(_) => "union",
+            Type::Intersection(_) => "intersection",
             Type::Ref(_, _) => "ref",
             Type::Func(_) => "func",
             Type::Record(_) => "record",

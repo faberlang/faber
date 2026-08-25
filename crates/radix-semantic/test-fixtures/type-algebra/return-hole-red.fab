@@ -1,0 +1,6 @@
++++
+locale = "en"
++++
+fn probe() → _ {
+    return 5
+}

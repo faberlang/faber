@@ -212,6 +212,10 @@ impl TypeTable {
                 members.sort_unstable_by_key(|id| id.0);
                 Type::Union(members)
             }
+            Type::Intersection(mut members) => {
+                members.sort_unstable_by_key(|id| id.0);
+                Type::Intersection(members)
+            }
             other => other,
         }
     }
@@ -1026,6 +1030,9 @@ impl TypeTable {
             (Type::Union(a_types), Type::Union(b_types)) => {
                 self.union_members_equal(a_types, b_types)
             }
+            (Type::Intersection(a_types), Type::Intersection(b_types)) => {
+                self.union_members_equal(a_types, b_types)
+            }
             (Type::Error, Type::Error) => true,
             _ => false,
         }
@@ -1507,6 +1514,13 @@ pub enum Type {
 
     Union(Vec<TypeId>),
 
+    /// Nominal intersection: `Readable ∩ Seekable`. Members are canonicalized
+    /// BO-S-4-identically to [`Type::Union`] (sorted by `TypeId` ordinal,
+    /// deduplicated, single-member degenerate collapsed at lowering). Operands
+    /// are nominal-only (interfaces/structs); primitive meets are rejected at
+    /// lowering, not modeled here.
+    Intersection(Vec<TypeId>),
+
     /// Ordered positional aggregate.
     Tuple(Vec<TypeId>),
 
@@ -1585,7 +1599,9 @@ impl Hash for Type {
                 family.hash(state);
                 var.hash(state);
             }
-            Self::Union(members) | Self::Tuple(members) => members.hash(state),
+            Self::Union(members) | Self::Tuple(members) | Self::Intersection(members) => {
+                members.hash(state)
+            }
             Self::Error => {}
         }
     }
@@ -2049,6 +2065,7 @@ fn type_refs_in_bounds(ty: &Type, types_len: usize, indices_len: usize) -> bool 
         Type::Record(fields) => fields.values().all(type_in_bounds),
         Type::Tuple(elems) => elems.iter().all(type_in_bounds),
         Type::Union(members) => members.iter().all(type_in_bounds),
+        Type::Intersection(members) => members.iter().all(type_in_bounds),
         Type::Applied(base, args) => {
             type_in_bounds(base)
                 && args.iter().all(|arg| match arg {

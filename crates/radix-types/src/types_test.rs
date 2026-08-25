@@ -1719,3 +1719,26 @@ fn parse_natural_capacity_accepts_decimal_digits_only() {
     assert_eq!(crate::parse_natural_capacity("N+1"), None);
     assert_eq!(crate::parse_natural_capacity("8u"), None);
 }
+
+// ── U0: Type::Intersection canonicalization ──────────────────────────────────
+
+#[test]
+fn intersection_interning_is_order_insensitive() {
+    let mut types = TypeTable::new();
+    let a = types.intern(Type::Struct(DefId(1)));
+    let b = types.intern(Type::Struct(DefId(2)));
+    let first = types.intern(Type::Intersection(vec![a, b]));
+    let second = types.intern(Type::Intersection(vec![b, a]));
+    assert_eq!(first, second, "member order must not affect identity");
+}
+
+#[test]
+fn intersection_equality_ignores_member_order() {
+    let mut types = TypeTable::new();
+    let a = types.intern(Type::Struct(DefId(1)));
+    let b = types.intern(Type::Struct(DefId(2)));
+    let first = types.intern(Type::Intersection(vec![a, b]));
+    let second = types.intern(Type::Intersection(vec![b, a]));
+    assert!(types.equals(first, second));
+    assert!(!types.equals(first, a));
+}

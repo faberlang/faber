@@ -1,0 +1,14 @@
++++
+locale = "en"
++++
+interface Readable {
+    fn read() → string
+}
+interface Seekable {
+    fn seek() → string
+}
+type Reversible = Readable ∩ Seekable
+
+fn probe(Reversible r) → void {
+    print r
+}

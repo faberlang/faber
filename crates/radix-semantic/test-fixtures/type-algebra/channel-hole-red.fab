@@ -1,0 +1,6 @@
++++
+locale = "en"
++++
+fn probe() → string ⇥ _ {
+    return "x"
+}

@@ -367,7 +367,7 @@ impl UseVisitor<'_> {
                 }));
                 children
             }
-            Type::Union(members) => members,
+            Type::Union(members) | Type::Intersection(members) => members,
             Type::Primitive(_)
             | Type::SizedNumeric(_, _)
             | Type::ModularWord(_)

@@ -65,6 +65,8 @@ use unicode_normalization::{char::is_combining_mark, UnicodeNormalization};
 const ISSUE_DUPLICATE_DEFINITION: &str = "duplicate_definition";
 const ISSUE_EMPTY_QUALIFIED_TYPE_PATH: &str = "empty_qualified_type_path";
 const ISSUE_EMPTY_UNION_TYPE: &str = "empty_union_type";
+const ISSUE_EMPTY_INTERSECTION_TYPE: &str = "empty_intersection_type";
+const ISSUE_INTERSECTION_PRIMITIVE_OPERAND: &str = "intersection_primitive_operand";
 const ISSUE_ATOMIC_ARITY: &str = "atomic_arity";
 const ISSUE_ATOMIC_ELEMENT: &str = "atomic_element";
 const ISSUE_ATOMIC_INCOMPLETE: &str = "atomic_incomplete";
@@ -1723,7 +1725,7 @@ fn resolve_type_expr(
                 resolve_type_expr(resolver, interner, err_ty, errors);
             }
         }
-        TypeExprKind::Union(members) => {
+        TypeExprKind::Union(members) | TypeExprKind::Intersection(members) => {
             for m in members {
                 resolve_type_expr(resolver, interner, m, errors);
             }
@@ -3129,6 +3131,28 @@ fn lower_type_expr_with_context(
                 is_async: false,
                 is_generator: false,
             })
+        }
+        TypeExprKind::Intersection(members) => {
+            // BO-S-4-identical to HIR-side intersection lowering: nominal
+            // operands only (R2), sorted dedup, single-member collapse.
+            if members.is_empty() {
+                return Err(TypeLowerError::Issue(ISSUE_EMPTY_INTERSECTION_TYPE));
+            }
+            let mut cleaned: Vec<TypeId> = Vec::with_capacity(members.len());
+            for m in members {
+                let lowered = lower_type_expr(m, resolver, interner, types)?;
+                if matches!(types.get(lowered), Type::Primitive(_)) {
+                    return Err(TypeLowerError::Issue(ISSUE_INTERSECTION_PRIMITIVE_OPERAND));
+                }
+                cleaned.push(lowered);
+            }
+            cleaned.sort_by_key(|id| (types.union_member_sort_key(*id).0, id.0));
+            cleaned.dedup_by(|a, b| types.equals(*a, *b));
+            if cleaned.len() == 1 {
+                cleaned[0]
+            } else {
+                types.intern(Type::Intersection(cleaned))
+            }
         }
         TypeExprKind::Union(members) => {
             if members.is_empty() {

@@ -1997,7 +1997,9 @@ pub(crate) fn validate_referential_integrity(
                     }
                 }
             }
-            radix_types::Type::Union(members) | radix_types::Type::Tuple(members) => {
+            radix_types::Type::Union(members)
+            | radix_types::Type::Intersection(members)
+            | radix_types::Type::Tuple(members) => {
                 for m in members {
                     check_type(*m)?;
                 }

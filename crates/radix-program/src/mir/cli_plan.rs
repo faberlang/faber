@@ -1398,6 +1398,15 @@ pub(super) fn import_semantic_type_with_nominal(
                 .collect();
             target.intern(Type::Union(members))
         }
+        Type::Intersection(members) => {
+            let members = members
+                .into_iter()
+                .map(|member| {
+                    import_semantic_type_with_nominal(source, target, member, imported, nominal)
+                })
+                .collect();
+            target.intern(Type::Intersection(members))
+        }
         Type::Tuple(members) => {
             let members = members
                 .into_iter()

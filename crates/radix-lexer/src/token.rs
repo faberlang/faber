@@ -270,6 +270,7 @@ pub enum TokenKind {
     Arrow,     // →
     ExitArrow, // ⇥
     Cup,       // ∪ inline union
+    Cap,       // ∩ inline intersection
     At,        // @
 
     // === Operators ===

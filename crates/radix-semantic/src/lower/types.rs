@@ -64,7 +64,7 @@ impl Lowerer<'_> {
     /// positions use [`Self::lower_parameter_type`] so scalar `ref`/`mut`
     /// markers can describe the parameter ABI.
     pub fn lower_type(&mut self, ty: &TypeExpr) -> TypeId {
-        self.lower_type_with_context(ty, false)
+        self.lower_type_with_context(ty, false, false)
     }
 
     /// Lower a type written in a parameter slot.
@@ -73,7 +73,16 @@ impl Lowerer<'_> {
     /// `own`/`copy` remain rejected on scalars and all markers remain rejected
     /// in ordinary binding/type positions.
     pub(super) fn lower_parameter_type(&mut self, ty: &TypeExpr) -> TypeId {
-        self.lower_type_with_context(ty, true)
+        self.lower_type_with_context(ty, true, false)
+    }
+
+    /// Lower a type written in a signature clause (return or error channel).
+    ///
+    /// Ruling (g): signature slots stay explicit — `_` and a standalone `∪`
+    /// are inference holes and are rejected here. Holes stay legal in local
+    /// bindings (`const _ v`, `const ∪ v`).
+    pub(super) fn lower_signature_type(&mut self, ty: &TypeExpr) -> TypeId {
+        self.lower_type_with_context(ty, false, true)
     }
 
     /// Lower a type nested inside another type expression.
@@ -89,8 +98,18 @@ impl Lowerer<'_> {
         self.lower_type(ty)
     }
 
-    fn lower_type_with_context(&mut self, ty: &TypeExpr, allow_scalar_ref_mut: bool) -> TypeId {
+    fn lower_type_with_context(
+        &mut self,
+        ty: &TypeExpr,
+        allow_scalar_ref_mut: bool,
+        signature_position: bool,
+    ) -> TypeId {
         self.current_span = ty.span;
+
+        if signature_position && matches!(ty.kind, TypeExprKind::Infer | TypeExprKind::UnionHole) {
+            self.error("signature_position_hole");
+            return self.types.intern(Type::Error);
+        }
 
         let mut ty_id = match &ty.kind {
             TypeExprKind::Infer => {
@@ -129,8 +148,11 @@ impl Lowerer<'_> {
                         }
                     })
                     .collect();
-                let ret = self.lower_nested_type(&func.ret);
-                let err = func.err.as_ref().map(|err| self.lower_nested_type(err));
+                let ret = self.lower_signature_type(&func.ret);
+                let err = func
+                    .err
+                    .as_ref()
+                    .map(|err| self.lower_signature_type(err));
                 self.types.function(FuncSig {
                     type_params: Vec::new(),
                     type_param_constraints: Vec::new(),
@@ -142,6 +164,7 @@ impl Lowerer<'_> {
                 })
             }
             TypeExprKind::Union(members) => self.lower_union_type(members),
+            TypeExprKind::Intersection(members) => self.lower_intersection_type(members),
         };
 
         if let Some(mode) = ty.mode {
@@ -220,6 +243,39 @@ impl Lowerer<'_> {
             self.types.option(base)
         } else {
             base
+        }
+    }
+
+    /// Normalize a source intersection into the canonical semantic shape.
+    ///
+    /// BO-S-4-identical to union lowering: collect → sort → adjacent dedup,
+    /// single-member collapse to the member. R2: operands are nominal-only
+    /// (interface/struct/alias-of-nominal); primitive operands are rejected —
+    /// the widening-lattice meet is deferred semantics, not sugar.
+    fn lower_intersection_type(&mut self, members: &[TypeExpr]) -> TypeId {
+        if members.is_empty() {
+            self.error("empty_intersection_type");
+            return self.types.intern(Type::Error);
+        }
+
+        let mut cleaned: Vec<TypeId> = Vec::with_capacity(members.len());
+        for member in members {
+            let lowered = self.lower_nested_type(member);
+            match self.types.get(lowered) {
+                Type::Primitive(_) => {
+                    self.error("intersection_primitive_operand");
+                    return self.types.intern(Type::Error);
+                }
+                _ => cleaned.push(lowered),
+            }
+        }
+
+        cleaned.sort_by_key(|id| (self.types.union_member_sort_key(*id).0, id.0));
+        cleaned.dedup_by(|a, b| self.types.equals(*a, *b));
+
+        match cleaned.as_slice() {
+            [only] => *only,
+            many => self.types.intern(Type::Intersection(many.to_vec())),
         }
     }
 

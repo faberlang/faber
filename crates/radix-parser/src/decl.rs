@@ -723,7 +723,22 @@ impl Parser {
         let mut implements = Vec::new();
         if self.eat_keyword_ident(TokenKind::Implet) {
             loop {
+                // R1: an implements slot is a named contract; holes are not
+                // conformance declarations and fail closed here.
+                if matches!(self.peek().kind, TokenKind::Underscore(_)) {
+                    return Err(ParseError::structured(
+                        ParseErrorKind::Expected,
+                        self.current_span(),
+                    )
+                    .with_arg("issue", "implements_slot_requires_name"));
+                }
                 implements.push(self.parse_decl_name()?);
+                // `∩` is the same separator as the comma: the implements
+                // clause is a conjunctive (intersection) list. `∪` and holes
+                // are not item separators, so they fail closed here (R1).
+                if self.eat(&TokenKind::Cap) {
+                    continue;
+                }
                 if !self.consume_item_separator(&TokenKind::LBrace, "class_implements")? {
                     break;
                 }

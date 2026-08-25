@@ -1785,6 +1785,15 @@ fn semantic_lowering_error_message(args: &[DiagnosticArg]) -> Option<String> {
         "empty_qualified_type_path" => Some("empty qualified type path".to_owned()),
         "empty_path_pattern" => Some("empty path pattern".to_owned()),
         "empty_union_type" => Some("empty union type".to_owned()),
+        "empty_intersection_type" => Some("empty intersection type".to_owned()),
+        "intersection_primitive_operand" => Some(
+            "intersection operands must be nominal types (interfaces or structs); intersection over primitives is not supported"
+                .to_owned(),
+        ),
+        "signature_position_hole" => Some(
+            "signature clauses stay explicit: inference holes ('_' and a lone '∪') are not allowed in return or error-channel position"
+                .to_owned(),
+        ),
         "ex_destructuring_not_expanded" => {
             Some("ex destructuring should be expanded before statement lowering".to_owned())
         }

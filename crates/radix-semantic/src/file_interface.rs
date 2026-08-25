@@ -653,6 +653,13 @@ fn snapshot_interface_type_inner(
             })
             .collect::<FileInterfaceResult<Vec<_>>>()
             .map(InterfaceTypeSnapshot::Union),
+        Type::Intersection(members) => members
+            .iter()
+            .map(|member| {
+                snapshot_interface_type_inner(*member, types, interner, resolver, module_identity)
+            })
+            .collect::<FileInterfaceResult<Vec<_>>>()
+            .map(InterfaceTypeSnapshot::Union),
         Type::Tuple(elements) => elements
             .iter()
             .map(|element| {
