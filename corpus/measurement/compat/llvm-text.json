@@ -5,8 +5,8 @@
   "lane": "mir",
   "generatedBy": "radix/scripta/emit-compat-json.py",
   "summary": {
-    "capable": 298,
-    "analyzable": 310
+    "capable": 280,
+    "analyzable": 303
   },
   "terms": [
     {
@@ -54,7 +54,7 @@
     {
       "term": "·",
       "rule": "operator-group",
-      "capable": 2,
+      "capable": 1,
       "analyzable": 4
     },
     {
@@ -144,13 +144,13 @@
     {
       "term": "![",
       "rule": "operator-group",
-      "capable": 1,
+      "capable": 0,
       "analyzable": 1
     },
     {
       "term": "!.",
       "rule": "operator-group",
-      "capable": 2,
+      "capable": 0,
       "analyzable": 2
     },
     {
@@ -162,7 +162,7 @@
     {
       "term": "!(",
       "rule": "operator-group",
-      "capable": 1,
+      "capable": 0,
       "analyzable": 1
     },
     {
@@ -217,7 +217,7 @@
       "term": "↦",
       "rule": "operator-group",
       "capable": 11,
-      "analyzable": 13
+      "analyzable": 12
     },
     {
       "term": "copia",
@@ -252,8 +252,8 @@
     {
       "term": "de",
       "rule": "keyword",
-      "capable": 2,
-      "analyzable": 2
+      "capable": 0,
+      "analyzable": 0
     },
     {
       "term": "descriptio",
@@ -342,7 +342,7 @@
     {
       "term": "ex",
       "rule": "keyword",
-      "capable": 5,
+      "capable": 2,
       "analyzable": 5
     },
     {
@@ -510,8 +510,8 @@
     {
       "term": "in",
       "rule": "keyword",
-      "capable": 1,
-      "analyzable": 1
+      "capable": 0,
+      "analyzable": 0
     },
     {
       "term": "incipiet",
@@ -546,8 +546,8 @@
     {
       "term": "itera",
       "rule": "keyword",
-      "capable": 7,
-      "analyzable": 9
+      "capable": 4,
+      "analyzable": 7
     },
     {
       "term": "iuncta",
@@ -576,8 +576,8 @@
     {
       "term": "lista",
       "rule": "keyword",
-      "capable": 3,
-      "analyzable": 3
+      "capable": 4,
+      "analyzable": 4
     },
     {
       "term": "manifest",
@@ -612,8 +612,8 @@
     {
       "term": "mori",
       "rule": "keyword",
-      "capable": 2,
-      "analyzable": 2
+      "capable": 1,
+      "analyzable": 1
     },
     {
       "term": "modulus<u16>",
@@ -858,19 +858,19 @@
     {
       "term": "?[",
       "rule": "operator-group",
-      "capable": 1,
+      "capable": 0,
       "analyzable": 1
     },
     {
       "term": "?.",
       "rule": "operator-group",
-      "capable": 2,
+      "capable": 0,
       "analyzable": 2
     },
     {
       "term": "?(",
       "rule": "operator-group",
-      "capable": 1,
+      "capable": 0,
       "analyzable": 1
     },
     {
@@ -978,8 +978,8 @@
     {
       "term": "⊘",
       "rule": "operator-group",
-      "capable": 1,
-      "analyzable": 1
+      "capable": 2,
+      "analyzable": 2
     },
     {
       "term": "solum_in",
@@ -996,8 +996,8 @@
     {
       "term": "sparge",
       "rule": "keyword",
-      "capable": 1,
-      "analyzable": 1
+      "capable": 0,
+      "analyzable": 0
     },
     {
       "term": "sponte",
@@ -1027,7 +1027,7 @@
       "term": "primus_quem",
       "rule": "concept",
       "capable": 0,
-      "analyzable": 1
+      "analyzable": 0
     },
     {
       "term": "filum",
@@ -1056,8 +1056,8 @@
     {
       "term": "summa",
       "rule": "concept",
-      "capable": 4,
-      "analyzable": 4
+      "capable": 5,
+      "analyzable": 5
     },
     {
       "term": "tacet",
@@ -1206,8 +1206,8 @@
     {
       "term": "ergo",
       "rule": "operator-group",
-      "capable": 3,
-      "analyzable": 3
+      "capable": 2,
+      "analyzable": 2
     }
   ]
 }

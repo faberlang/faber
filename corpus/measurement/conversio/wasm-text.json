@@ -5,10 +5,10 @@
   "lane": "mir",
   "generatedBy": "radix/scripta/emit-compat-json.py",
   "summary": {
-    "dedicated": 64,
+    "dedicated": 56,
     "fallback": 0,
     "rejected": 191,
-    "not-emitted": 186
+    "not-emitted": 194
   },
   "cells": [
     {
@@ -1478,7 +1478,7 @@
     {
       "src": "lista",
       "tgt": "copia",
-      "tier": "dedicated",
+      "tier": "not-emitted",
       "measured": true
     },
     {
@@ -1490,7 +1490,7 @@
     {
       "src": "lista",
       "tgt": "tensor",
-      "tier": "dedicated",
+      "tier": "not-emitted",
       "measured": true
     },
     {
@@ -1514,7 +1514,7 @@
     {
       "src": "lista",
       "tgt": "cursor",
-      "tier": "dedicated",
+      "tier": "not-emitted",
       "measured": true
     },
     {
@@ -1718,7 +1718,7 @@
     {
       "src": "copia",
       "tgt": "lista",
-      "tier": "dedicated",
+      "tier": "not-emitted",
       "measured": true
     },
     {
@@ -1952,7 +1952,7 @@
     {
       "src": "tensor",
       "tgt": "valor",
-      "tier": "dedicated",
+      "tier": "not-emitted",
       "measured": true
     },
     {
@@ -1970,7 +1970,7 @@
     {
       "src": "tensor",
       "tgt": "lista",
-      "tier": "dedicated",
+      "tier": "not-emitted",
       "measured": true
     },
     {
@@ -1994,7 +1994,7 @@
     {
       "src": "tensor",
       "tgt": "tensor",
-      "tier": "dedicated",
+      "tier": "not-emitted",
       "measured": true
     },
     {
@@ -2474,7 +2474,7 @@
     {
       "src": "cursor",
       "tgt": "lista",
-      "tier": "dedicated",
+      "tier": "not-emitted",
       "measured": true
     },
     {

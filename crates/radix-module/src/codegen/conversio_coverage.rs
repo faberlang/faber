@@ -194,7 +194,7 @@ impl ConversioTypeFamily {
             Type::Primitive(Primitive::Valor) => Some(Self::Valor),
             Type::Primitive(Primitive::Instans) | Type::SizedInstans(_) => Some(Self::Instans),
             Type::ModularWord(_) => Some(Self::Modulus),
-            Type::Array(_) => Some(Self::Lista),
+            Type::Array(_) | Type::BoundedArray { .. } => Some(Self::Lista),
             Type::Map(_, _) => Some(Self::Tabula),
             Type::Set(_) => Some(Self::Copia),
             Type::Intervallum(_) => Some(Self::Intervallum),
@@ -357,13 +357,58 @@ pub fn classify_conversio_coverage(
                 ConversioCoverage::NotEmitted
             }
         }
-        // GPU (wgsl-text) and S-expression lanes have no `Convert` handling
-        // today; semantic-accepted pairs are not emitted. Measurement
-        // re-grounds these columns; the prediction is the conservative oracle.
-        ConversioCoverageTarget::WgslText | ConversioCoverageTarget::SexpStructural | ConversioCoverageTarget::Sexp => {
-            ConversioCoverage::NotEmitted
+        // GPU (wgsl-text) lanes have no `Convert` handling today;
+        // semantic-accepted pairs are not emitted. Measurement re-grounds
+        // these columns; the prediction is the conservative oracle.
+        ConversioCoverageTarget::WgslText => ConversioCoverage::NotEmitted,
+        // S-expression lanes admit the tensor capability cluster
+        // (35a4bb122): tensor-target conversions from tensor-shaped and
+        // text-shaped sources, text formatting from scalar/text sources,
+        // and the identity vector cell. Everything else is not emitted.
+        ConversioCoverageTarget::SexpStructural | ConversioCoverageTarget::Sexp => {
+            if sexp_lowers_conversio(src, tgt) {
+                ConversioCoverage::Dedicated
+            } else {
+                ConversioCoverage::NotEmitted
+            }
         }
     }
+}
+
+/// Mirrors the mir-sexp emitter's admitted conversio surface
+/// (`radix-mir-sexp/src/capability.rs`): `X ↦ tensor` for tensor-shaped
+/// sources, scalar/text `X ↦ textus` formatting, and `vector ↦ vector`.
+fn sexp_lowers_conversio(src: ConversioTypeFamily, tgt: ConversioTypeFamily) -> bool {
+    if tgt == ConversioTypeFamily::Tensor {
+        return matches!(
+            src,
+            ConversioTypeFamily::Bivalens
+                | ConversioTypeFamily::Textus
+                | ConversioTypeFamily::Ascii
+                | ConversioTypeFamily::Octeti
+                | ConversioTypeFamily::Json
+                | ConversioTypeFamily::Modulus
+                | ConversioTypeFamily::Lista
+                | ConversioTypeFamily::Tensor
+                | ConversioTypeFamily::Vector
+                | ConversioTypeFamily::Matrix
+                | ConversioTypeFamily::Sparsa
+                | ConversioTypeFamily::Regex
+        );
+    }
+    if tgt == ConversioTypeFamily::Textus {
+        return matches!(
+            src,
+            ConversioTypeFamily::Numerus
+                | ConversioTypeFamily::Fractus
+                | ConversioTypeFamily::Bivalens
+                | ConversioTypeFamily::Textus
+                | ConversioTypeFamily::Ascii
+                | ConversioTypeFamily::Octeti
+                | ConversioTypeFamily::Regex
+        );
+    }
+    src == ConversioTypeFamily::Vector && tgt == ConversioTypeFamily::Vector
 }
 
 // ===========================================================================

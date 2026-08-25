@@ -5957,22 +5957,6 @@
     },
     {
       "src": "lista",
-      "tgt": "copia",
-      "target": "wasm-text",
-      "predicted": "not-emitted",
-      "measured": "dedicated",
-      "detail": "mir-capable"
-    },
-    {
-      "src": "lista",
-      "tgt": "copia",
-      "target": "wasm",
-      "predicted": "not-emitted",
-      "measured": "dedicated",
-      "detail": "mir-capable"
-    },
-    {
-      "src": "lista",
       "tgt": "intervallum",
       "target": "rust",
       "predicted": "fallback",
@@ -6058,22 +6042,6 @@
       "predicted": "fallback",
       "measured": "dedicated",
       "detail": "arm:dedicated"
-    },
-    {
-      "src": "lista",
-      "tgt": "tensor",
-      "target": "wasm-text",
-      "predicted": "not-emitted",
-      "measured": "dedicated",
-      "detail": "mir-capable"
-    },
-    {
-      "src": "lista",
-      "tgt": "tensor",
-      "target": "wasm",
-      "predicted": "not-emitted",
-      "measured": "dedicated",
-      "detail": "mir-capable"
     },
     {
       "src": "lista",
@@ -6247,22 +6215,6 @@
       "src": "lista",
       "tgt": "cursor",
       "target": "llvm-text",
-      "predicted": "not-emitted",
-      "measured": "dedicated",
-      "detail": "mir-capable"
-    },
-    {
-      "src": "lista",
-      "tgt": "cursor",
-      "target": "wasm-text",
-      "predicted": "not-emitted",
-      "measured": "dedicated",
-      "detail": "mir-capable"
-    },
-    {
-      "src": "lista",
-      "tgt": "cursor",
-      "target": "wasm",
       "predicted": "not-emitted",
       "measured": "dedicated",
       "detail": "mir-capable"
@@ -6842,22 +6794,6 @@
       "predicted": "fallback",
       "measured": "dedicated",
       "detail": "arm:dedicated"
-    },
-    {
-      "src": "copia",
-      "tgt": "lista",
-      "target": "wasm-text",
-      "predicted": "not-emitted",
-      "measured": "dedicated",
-      "detail": "mir-capable"
-    },
-    {
-      "src": "copia",
-      "tgt": "lista",
-      "target": "wasm",
-      "predicted": "not-emitted",
-      "measured": "dedicated",
-      "detail": "mir-capable"
     },
     {
       "src": "copia",
@@ -7629,22 +7565,6 @@
     },
     {
       "src": "tensor",
-      "tgt": "valor",
-      "target": "wasm-text",
-      "predicted": "not-emitted",
-      "measured": "dedicated",
-      "detail": "mir-capable"
-    },
-    {
-      "src": "tensor",
-      "tgt": "valor",
-      "target": "wasm",
-      "predicted": "not-emitted",
-      "measured": "dedicated",
-      "detail": "mir-capable"
-    },
-    {
-      "src": "tensor",
       "tgt": "instans",
       "target": "ts",
       "predicted": "fallback",
@@ -7674,22 +7594,6 @@
       "predicted": "fallback",
       "measured": "dedicated",
       "detail": "arm:dedicated"
-    },
-    {
-      "src": "tensor",
-      "tgt": "lista",
-      "target": "wasm-text",
-      "predicted": "not-emitted",
-      "measured": "dedicated",
-      "detail": "mir-capable"
-    },
-    {
-      "src": "tensor",
-      "tgt": "lista",
-      "target": "wasm",
-      "predicted": "not-emitted",
-      "measured": "dedicated",
-      "detail": "mir-capable"
     },
     {
       "src": "tensor",
@@ -7778,22 +7682,6 @@
       "predicted": "fallback",
       "measured": "dedicated",
       "detail": "arm:dedicated"
-    },
-    {
-      "src": "tensor",
-      "tgt": "tensor",
-      "target": "wasm-text",
-      "predicted": "not-emitted",
-      "measured": "dedicated",
-      "detail": "mir-capable"
-    },
-    {
-      "src": "tensor",
-      "tgt": "tensor",
-      "target": "wasm",
-      "predicted": "not-emitted",
-      "measured": "dedicated",
-      "detail": "mir-capable"
     },
     {
       "src": "tensor",
@@ -9261,22 +9149,6 @@
     },
     {
       "src": "cursor",
-      "tgt": "lista",
-      "target": "wasm-text",
-      "predicted": "not-emitted",
-      "measured": "dedicated",
-      "detail": "mir-capable"
-    },
-    {
-      "src": "cursor",
-      "tgt": "lista",
-      "target": "wasm",
-      "predicted": "not-emitted",
-      "measured": "dedicated",
-      "detail": "mir-capable"
-    },
-    {
-      "src": "cursor",
       "tgt": "intervallum",
       "target": "rust",
       "predicted": "fallback",
@@ -9519,6 +9391,14 @@
       "src": "cursor",
       "tgt": "cursor",
       "target": "ts",
+      "predicted": "fallback",
+      "measured": "dedicated",
+      "detail": "arm:dedicated"
+    },
+    {
+      "src": "cursor",
+      "tgt": "cursor",
+      "target": "go",
       "predicted": "fallback",
       "measured": "dedicated",
       "detail": "arm:dedicated"

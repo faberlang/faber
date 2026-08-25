@@ -6,7 +6,7 @@
   "generatedBy": "radix/scripta/emit-compat-json.py",
   "summary": {
     "capable": 6,
-    "analyzable": 310
+    "analyzable": 303
   },
   "terms": [
     {
@@ -217,7 +217,7 @@
       "term": "↦",
       "rule": "operator-group",
       "capable": 0,
-      "analyzable": 13
+      "analyzable": 12
     },
     {
       "term": "copia",
@@ -253,7 +253,7 @@
       "term": "de",
       "rule": "keyword",
       "capable": 0,
-      "analyzable": 2
+      "analyzable": 0
     },
     {
       "term": "descriptio",
@@ -511,7 +511,7 @@
       "term": "in",
       "rule": "keyword",
       "capable": 0,
-      "analyzable": 1
+      "analyzable": 0
     },
     {
       "term": "incipiet",
@@ -547,7 +547,7 @@
       "term": "itera",
       "rule": "keyword",
       "capable": 0,
-      "analyzable": 9
+      "analyzable": 7
     },
     {
       "term": "iuncta",
@@ -577,7 +577,7 @@
       "term": "lista",
       "rule": "keyword",
       "capable": 0,
-      "analyzable": 3
+      "analyzable": 4
     },
     {
       "term": "manifest",
@@ -613,7 +613,7 @@
       "term": "mori",
       "rule": "keyword",
       "capable": 0,
-      "analyzable": 2
+      "analyzable": 1
     },
     {
       "term": "modulus<u16>",
@@ -979,7 +979,7 @@
       "term": "⊘",
       "rule": "operator-group",
       "capable": 0,
-      "analyzable": 1
+      "analyzable": 2
     },
     {
       "term": "solum_in",
@@ -997,7 +997,7 @@
       "term": "sparge",
       "rule": "keyword",
       "capable": 0,
-      "analyzable": 1
+      "analyzable": 0
     },
     {
       "term": "sponte",
@@ -1027,7 +1027,7 @@
       "term": "primus_quem",
       "rule": "concept",
       "capable": 0,
-      "analyzable": 1
+      "analyzable": 0
     },
     {
       "term": "filum",
@@ -1057,7 +1057,7 @@
       "term": "summa",
       "rule": "concept",
       "capable": 0,
-      "analyzable": 4
+      "analyzable": 5
     },
     {
       "term": "tacet",
@@ -1207,7 +1207,7 @@
       "term": "ergo",
       "rule": "operator-group",
       "capable": 0,
-      "analyzable": 3
+      "analyzable": 2
     }
   ]
 }

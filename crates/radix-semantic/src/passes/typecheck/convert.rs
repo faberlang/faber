@@ -399,6 +399,9 @@ impl TypeChecker<'_> {
         if let Some((fill_elem, _bound)) =
             resolve_bounded_lista_padded_shape(source_ty, target_resolved, self.types)
         {
+            // The MIR padded-snapshot arm lowers its shape carrier as
+            // `lista<numerus>`; intern it here like the flat path does.
+            self.register_lista_to_tensor_conversio_prereqs();
             if let Some(recovery) = recovery {
                 self.note_conversio_recovery_checked(recovery, fill_elem);
             } else {
