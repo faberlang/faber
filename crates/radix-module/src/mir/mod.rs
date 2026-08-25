@@ -220,6 +220,9 @@ mod nodes_tests;
 #[path = "potentia_test.rs"]
 mod potentia_tests;
 #[cfg(test)]
+#[path = "numeric_unary_test.rs"]
+mod numeric_unary_tests;
+#[cfg(test)]
 #[path = "rank2_reduction_readiness_test.rs"]
 mod rank2_reduction_readiness_tests;
 #[cfg(test)]

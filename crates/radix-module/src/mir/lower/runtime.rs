@@ -1742,6 +1742,25 @@ impl FunctionBuilder<'_> {
             return Some(MirOperand::Constant(MirConstant::Unit));
         }
 
+        // Numeric unary family (MC2): `negativa`/`complementata` are the
+        // value twins (`SameAsReceiver`), `nega`/`complementa` the
+        // Vacuum-return in-place forms. `complement*` reach here on numerus
+        // only — fractus is rejected earlier at SEM011 admission.
+        if let Some(op) = numeric_value_unop(method_name) {
+            let operand = self.lower_expr_value(receiver)?;
+            let ty = self.expr_ty(expr)?;
+            return Some(self.assign_temp(MirValueKind::Unary { op, operand }, ty, expr.span));
+        }
+
+        if let Some(op) = numeric_imperativus_unop(method_name) {
+            let ty = self.expr_ty(receiver)?;
+            let (place, ty) = self.lower_assignment_place_with_fallback(receiver, ty)?;
+            let operand = MirOperand::Place(place.clone());
+            let value = self.assign_temp(MirValueKind::Unary { op, operand }, ty, expr.span);
+            self.assign(place, value, ty, expr.span);
+            return Some(MirOperand::Constant(MirConstant::Unit));
+        }
+
         None
     }
 
@@ -3394,6 +3413,24 @@ fn numeric_imperativus_binop(method_name: &str) -> Option<MirBinOp> {
         "alterna" => Some(MirBinOp::BitXor),
         "sinistra" => Some(MirBinOp::Shl),
         "dextra" => Some(MirBinOp::Shr),
+        _ => None,
+    }
+}
+
+/// Numeric unary value twins: return the negated/complemented receiver.
+fn numeric_value_unop(method_name: &str) -> Option<MirUnOp> {
+    match method_name {
+        "negativa" => Some(MirUnOp::Neg),
+        "complementata" => Some(MirUnOp::BitNot),
+        _ => None,
+    }
+}
+
+/// Numeric unary imperative twins: negate/complement the receiver in place.
+fn numeric_imperativus_unop(method_name: &str) -> Option<MirUnOp> {
+    match method_name {
+        "nega" => Some(MirUnOp::Neg),
+        "complementa" => Some(MirUnOp::BitNot),
         _ => None,
     }
 }
