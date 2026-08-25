@@ -2032,6 +2032,158 @@ functio main() → numerus {
 }
 
 #[test]
+fn parses_applied_generic_typed_constructor_with_size_argument() {
+    // `Gen<3> { lanes = … }` routes the applied head to the typed-constructor
+    // branch, not comparison: the `verte` target carries the kinded size
+    // argument on the existing applied `TypeExpr` form (S0-G1).
+    let result = parse_ok(
+        r#"
+genus Gen<magnitudo N> {
+    vector<f32, N> lanes
+}
+
+functio facere(vector<f32, 3> lanes) → Gen<3> {
+    redde Gen<3> { lanes = lanes }
+}
+"#,
+    );
+
+    let program = result
+        .program
+        .as_ref()
+        .expect("parser should produce a program");
+    let StmtKind::Func(func) = &program.statements[1].kind else {
+        panic!("expected function declaration");
+    };
+    let Some(body) = &func.body else {
+        panic!("expected function body");
+    };
+    let StmtKind::Redde(ret) = &body.statements[0].kind else {
+        panic!("expected return statement, got {:?}", body.statements[0].kind);
+    };
+    let ret_value = ret.value.as_deref().expect("return value");
+    let ExprKind::Verte(verte) = &ret_value.kind else {
+        panic!("expected verte constructor, got {:?}", ret_value.kind);
+    };
+    let TypeExprKind::Named(head, params) = &verte.ty.kind else {
+        panic!("expected named applied head, got {:?}", verte.ty.kind);
+    };
+    assert_eq!(symbol_name(&result, head.name), "Gen");
+    assert_eq!(params.len(), 1);
+    assert!(matches!(
+        params[0],
+        radix_syntax::GenericArgExpr::Size(_)
+    ));
+}
+
+#[test]
+fn parses_qualified_applied_generic_typed_constructor() {
+    let result = parse_ok(
+        r#"
+genus Gen<magnitudo N> {
+    vector<f32, N> lanes
+}
+
+functio facere(vector<f32, 3> lanes) → Gen<3> {
+    redde pkg.Gen<3> { lanes = lanes }
+}
+"#,
+    );
+
+    let program = result
+        .program
+        .as_ref()
+        .expect("parser should produce a program");
+    let StmtKind::Func(func) = &program.statements[1].kind else {
+        panic!("expected function declaration");
+    };
+    let Some(body) = &func.body else {
+        panic!("expected function body");
+    };
+    let StmtKind::Redde(ret) = &body.statements[0].kind else {
+        panic!("expected return statement");
+    };
+    let ret_value = ret.value.as_deref().expect("return value");
+    let ExprKind::Verte(verte) = &ret_value.kind else {
+        panic!("expected verte constructor, got {:?}", ret_value.kind);
+    };
+    let TypeExprKind::Qualified(path, params) = &verte.ty.kind else {
+        panic!("expected qualified applied head, got {:?}", verte.ty.kind);
+    };
+    assert_eq!(path.len(), 2);
+    assert_eq!(params.len(), 1);
+    assert!(matches!(
+        params[0],
+        radix_syntax::GenericArgExpr::Size(_)
+    ));
+}
+
+#[test]
+fn applied_generic_head_without_field_block_stays_comparison() {
+    // The speculative argument list must restore when no constructor field
+    // block follows, so `a < b` comparison parsing stays owned by the
+    // binary operator branch (S0-G1 ambiguity guard).
+    let result = parse_ok(
+        r#"
+functio facere(numerus a, numerus b) → boolean {
+    redde a < b
+}
+"#,
+    );
+
+    let program = result
+        .program
+        .as_ref()
+        .expect("parser should produce a program");
+    let StmtKind::Func(func) = &program.statements[0].kind else {
+        panic!("expected function declaration");
+    };
+    let Some(body) = &func.body else {
+        panic!("expected function body");
+    };
+    let StmtKind::Redde(ret) = &body.statements[0].kind else {
+        panic!("expected return statement");
+    };
+    let ret_value = ret.value.as_deref().expect("return value");
+    let ExprKind::Binary(bin) = &ret_value.kind else {
+        panic!("expected binary comparison, got {:?}", ret_value.kind);
+    };
+    assert!(matches!(bin.op, radix_syntax::BinOp::Lt));
+}
+
+#[test]
+fn applied_generic_head_without_field_block_stays_comparison_with_natural() {
+    // `flag < 3` — a natural literal argument alone must not claim the head;
+    // only `< … > { fields }` does.
+    let result = parse_ok(
+        r#"
+functio facere(numerus flag) → boolean {
+    redde flag < 3
+}
+"#,
+    );
+
+    let program = result
+        .program
+        .as_ref()
+        .expect("parser should produce a program");
+    let StmtKind::Func(func) = &program.statements[0].kind else {
+        panic!("expected function declaration");
+    };
+    let Some(body) = &func.body else {
+        panic!("expected function body");
+    };
+    let StmtKind::Redde(ret) = &body.statements[0].kind else {
+        panic!("expected return statement");
+    };
+    let ret_value = ret.value.as_deref().expect("return value");
+    let ExprKind::Binary(bin) = &ret_value.kind else {
+        panic!("expected binary comparison, got {:?}", ret_value.kind);
+    };
+    assert!(matches!(bin.op, radix_syntax::BinOp::Lt));
+}
+
+#[test]
 fn malformed_json_negative_number_reports_structured_unexpected_error() {
     let source = r#"fixum _ value ← { "x": - }"#;
     let result = parse_program(source);

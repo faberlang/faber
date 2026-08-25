@@ -166,18 +166,17 @@ functio facere() → C<numerus> {
 }
 
 #[test]
-fn generic_constructor_type_args_standalone_is_name_not_value() {
-    // Current behavior: type args on a constructor in expression position are
-    // not the construction idiom (expected-type context is). Pin the diagnostic
-    // shape; do not improve it here.
-    test_support::assert_rejects_with_issue(
+fn generic_constructor_type_args_standalone_constructs() {
+    // S0-G1: applied heads construct — `Something<numerus> { }` is the
+    // construction idiom now, not a `name_not_value` miss. The pre-S0-G1
+    // pin rejected this shape; the applied-construction landing flips it.
+    test_support::assert_accepts(
         r"genus Something<A> {
 }
 
 incipit {
     Something<numerus> { }
 }",
-        "name_not_value",
     );
 }
 
@@ -193,6 +192,105 @@ incipit {
     Something<numerus, textus> s ← Something { }
 }",
         "expected_expression",
+    );
+}
+
+// ---------------------------------------------------------------------------
+// Applied-generic nominal record construction (S0-G1) — magnitudo witnesses
+// ---------------------------------------------------------------------------
+
+#[test]
+fn applied_generic_class_construction_with_size_argument_typechecks() {
+    // `Gen<3> { lanes = … }` — the applied size argument reaches the field
+    // type before the initializer is checked (S0-G1 done_when 1).
+    test_support::assert_accepts(
+        r"genus Gen<magnitudo N> {
+    vector<f32, N> lanes
+}
+
+functio facere(vector<f32, 3> lanes) → Gen<3> {
+    redde Gen<3> { lanes = lanes }
+}",
+    );
+}
+
+#[test]
+fn bare_generic_class_construction_adopts_contextual_size_witness() {
+    // Context-instantiated `Gen { lanes = … }` under `→ Gen<3>`: the
+    // annotated return type supplies the magnitudo witness (S0-G1
+    // done_when 3) — never a silent wrong-arity acceptance.
+    test_support::assert_accepts(
+        r"genus Gen<magnitudo N> {
+    vector<f32, N> lanes
+}
+
+functio facere(vector<f32, 3> lanes) → Gen<3> {
+    redde Gen { lanes = lanes }
+}",
+    );
+}
+
+#[test]
+fn applied_generic_class_construction_rejects_wrong_width_initializer() {
+    // A wrong-width field initializer on an applied nominal keeps the
+    // structured SEM010 identity — negatives posture preserved (S0-G1
+    // done_when 2).
+    test_support::assert_rejects_with_issue(
+        r"genus Gen<magnitudo N> {
+    vector<f32, N> lanes
+}
+
+functio facere(vector<f32, 4> wide) → Gen<3> {
+    redde Gen<3> { lanes = wide }
+}",
+        "field_initializer_type_mismatch",
+    );
+}
+
+#[test]
+fn applied_generic_class_construction_rejects_kind_mismatch() {
+    // A type argument in a magnitudo slot keeps the structured SEM008
+    // identity at the applied head.
+    test_support::assert_rejects_with_issue(
+        r"genus Gen<magnitudo N> {
+    vector<f32, N> lanes
+}
+
+functio facere(vector<f32, 3> lanes) → Gen<3> {
+    redde Gen<textus> { lanes = lanes }
+}",
+        "generic_argument_kind_mismatch",
+    );
+}
+
+#[test]
+fn applied_generic_class_construction_rejects_wrong_arity() {
+    // Two arguments on a one-parameter nominal keep the structured arity
+    // identity at the applied head.
+    test_support::assert_rejects_with_issue(
+        r"genus Gen<magnitudo N> {
+    vector<f32, N> lanes
+}
+
+functio facere(vector<f32, 3> lanes) → Gen<3> {
+    redde Gen<3, 4> { lanes = lanes }
+}",
+        "generic_argument_arity_mismatch",
+    );
+}
+
+#[test]
+fn type_only_generic_class_construction_with_applied_head_typechecks() {
+    // Type-only generic nominals construct with an applied head too
+    // (S0-G1 done_when 4) — no type-argument regression.
+    test_support::assert_accepts(
+        r"genus Capsula<T> {
+    T payload
+}
+
+functio facere() → Capsula<numerus> {
+    redde Capsula<numerus> { payload = 1 }
+}",
     );
 }
 

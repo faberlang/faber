@@ -34,13 +34,15 @@ impl TypeChecker<'_> {
     /// This path is used by conversion/`verte` forms where fields are still in
     /// object-field representation. Each supplied field is checked so bad field
     /// names do not hide type errors in neighboring initializers. Generic class
-    /// construction passes the construction witnesses so field types have their
-    /// type params substituted before initializer checking (U-D1).
+    /// construction passes the applied construction arguments so field types
+    /// have their parameters substituted before initializer checking (U-D1):
+    /// `AppliedArg::Type` binds typus slots, `AppliedArg::Size` binds
+    /// magnitudo slots (S0-G1 — size witnesses must reach vector/matrix widths).
     pub fn check_struct_fields(
         &mut self,
         def_id: DefId,
         fields: &mut [HirObjectField],
-        witnesses: &[TypeId],
+        args: &[radix_types::AppliedArg],
         span: radix_lexer::Span,
     ) {
         let field_types = if let Some(info) = self.structs.get(&def_id) {
@@ -58,15 +60,24 @@ impl TypeChecker<'_> {
         };
         let field_types: FxHashMap<Symbol, StructFieldInfo> = {
             let mut vars = FxHashMap::default();
+            let mut shape_vars = FxHashMap::default();
             if let Some(params) = self.type_params_by_def.get(&def_id) {
-                for (param, witness) in params.iter().zip(witnesses.iter()) {
-                    vars.insert(*param, *witness);
+                for (param, arg) in params.iter().zip(args.iter()) {
+                    match arg {
+                        radix_types::AppliedArg::Type(witness) => {
+                            vars.insert(*param, *witness);
+                        }
+                        radix_types::AppliedArg::Size(witness) => {
+                            shape_vars.insert(*param, *witness);
+                        }
+                    }
                 }
             }
             field_types
                 .into_iter()
                 .map(|(name, mut info)| {
-                    info.ty = self.substitute_type_params(info.ty, &mut vars, None);
+                    info.ty =
+                        self.substitute_type_params(info.ty, &mut vars, Some(&mut shape_vars));
                     (name, info)
                 })
                 .collect()
@@ -316,11 +327,18 @@ impl TypeChecker<'_> {
             return self.error_type;
         };
         let witnesses = self.constructor_witnesses(def_id, &[], None, radix_lexer::Span::default());
+        let applied_args: Vec<radix_types::AppliedArg> = witnesses
+            .iter()
+            .copied()
+            .map(radix_types::AppliedArg::Type)
+            .collect();
         let field_types: FxHashMap<Symbol, StructFieldInfo> = {
             let mut vars = FxHashMap::default();
             if let Some(params) = self.type_params_by_def.get(&def_id) {
-                for (param, witness) in params.iter().zip(witnesses.iter()) {
-                    vars.insert(*param, *witness);
+                for (param, arg) in params.iter().zip(applied_args.iter()) {
+                    if let radix_types::AppliedArg::Type(witness) = arg {
+                        vars.insert(*param, *witness);
+                    }
                 }
             }
             field_types

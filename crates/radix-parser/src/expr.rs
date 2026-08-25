@@ -1851,7 +1851,24 @@ impl Parser {
             }
             path.push(self.parse_ident()?);
         }
-        if path.len() == 1
+        // Applied head (`Gen<3> { … }`, `pkg.Box<N> { … }`): the argument
+        // list parses speculatively and survives only when a constructor
+        // field block follows. Any other continuation restores, so `<`
+        // stays owned by comparison (`a < b`) and generic call
+        // (`f<T>(…)`) parsing.
+        let mut type_params = Vec::new();
+        if self.check(&TokenKind::LtAscii) {
+            let args_checkpoint = self.checkpoint();
+            match self.parse_constructor_type_args() {
+                Ok(args) if self.check(&TokenKind::LBrace) => {
+                    type_params = args;
+                }
+                _ => {
+                    self.restore(args_checkpoint);
+                }
+            }
+        }
+        if (path.len() == 1 && type_params.is_empty())
             || !self.check(&TokenKind::LBrace)
             || !self.looks_like_typed_constructor_fields()
         {
@@ -1859,11 +1876,14 @@ impl Parser {
             return Ok(None);
         }
 
-        let type_span = path
+        let mut type_span = path
             .first()
             .map(|segment| segment.span)
             .unwrap_or_default()
             .merge(path.last().map(|segment| segment.span).unwrap_or_default());
+        if !type_params.is_empty() {
+            type_span = type_span.merge(self.previous_span());
+        }
         self.advance();
         let fields = self.parse_object_fields()?;
         self.expect(&TokenKind::RBrace, "expected '}'")?;
@@ -1872,10 +1892,15 @@ impl Parser {
             kind: ExprKind::Object(ObjectExpr { fields }),
             span: type_span.merge(self.previous_span()),
         };
+        let kind = if path.len() == 1 {
+            TypeExprKind::Named(path.remove(0), type_params)
+        } else {
+            TypeExprKind::Qualified(path, type_params)
+        };
         let ty = TypeExpr {
             nullable: false,
             mode: None,
-            kind: TypeExprKind::Qualified(path, Vec::new()),
+            kind,
             span: type_span,
             iuncta_label: None,
         };
@@ -2622,6 +2647,24 @@ impl Parser {
             }
         }
 
+        self.expect(&TokenKind::GtAscii, "expected '>'")?;
+        Ok(args)
+    }
+
+    /// Parse a generic-head argument list `< arg (, arg)* >` for an applied
+    /// constructor head (`Gen<3> { … }`).
+    ///
+    /// Mirrors the generic-head production in type position: natural literals
+    /// and shape tuples are size expressions, other arguments are types.
+    fn parse_constructor_type_args(&mut self) -> Result<Vec<GenericArgExpr>, ParseError> {
+        self.expect(&TokenKind::LtAscii, "expected '<'")?;
+        let mut args = Vec::new();
+        loop {
+            args.push(self.parse_type_argument()?);
+            if !self.consume_item_separator(&TokenKind::GtAscii, "type_arguments")? {
+                break;
+            }
+        }
         self.expect(&TokenKind::GtAscii, "expected '>'")?;
         Ok(args)
     }

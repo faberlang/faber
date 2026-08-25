@@ -2143,19 +2143,14 @@ impl TypeChecker<'_> {
                 Some(target_resolved)
             }
             Type::Applied(base, args) => {
-                // The applied target carries the type args; substitute them
-                // into the field types.
+                // The applied target carries the construction arguments;
+                // substitute them into the field types. Size args bind
+                // magnitudo slots (S0-G1), so the full list flows through —
+                // filtering to type args would leave widths unsubstituted.
                 if let Type::Struct(def_id) =
                     self.types.get(self.resolve_inferred_type(base)).clone()
                 {
-                    let type_args: Vec<_> = args
-                        .iter()
-                        .filter_map(|arg| match arg {
-                            radix_types::AppliedArg::Type(id) => Some(*id),
-                            radix_types::AppliedArg::Size(_) => None,
-                        })
-                        .collect();
-                    self.check_struct_fields(def_id, entries, &type_args, span);
+                    self.check_struct_fields(def_id, entries, &args, span);
                     return Some(target_resolved);
                 }
                 None
@@ -2432,6 +2427,23 @@ impl TypeChecker<'_> {
         };
         if !self.nominal_is_generic(def_id) {
             return target_resolved;
+        }
+        // Contextual instantiation (S0-G1): a bare generic head under an
+        // enclosing applied expected type of the same nominal adopts that
+        // type's arguments — magnitudo witnesses included — instead of fresh
+        // inference variables, so `Gen { … }` under `→ Gen<3>` checks its
+        // fields against `N ↦ 3`.
+        if let Some(expected) = expected {
+            let resolved_expected = self.resolve_inferred_type(expected);
+            if let Type::Applied(expected_base, _) = self.types.get(resolved_expected) {
+                if let Type::Struct(expected_def) =
+                    self.types.get(self.resolve_inferred_type(*expected_base))
+                {
+                    if *expected_def == def_id {
+                        return resolved_expected;
+                    }
+                }
+            }
         }
         let witnesses =
             self.constructor_witnesses(def_id, &[], expected, radix_lexer::Span::default());
