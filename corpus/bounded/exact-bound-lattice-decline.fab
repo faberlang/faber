@@ -1,0 +1,28 @@
++++
+term = "lista"
+kind = "reject"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "array_literal", "additive_expr", "expression", "literal", "nota_stmt"]
+category = "collection"
+canonical = false
+summary = "Decline: unequal exact bounds on literal elementwise operands reject during typecheck."
+syntax = "[a, b] + [c]"
+related = ["lista", "+"]
+locale = "en"
++++
+
+# =============================================================================
+# Exact-bound lista lattice — documented static decline.
+# =============================================================================
+#
+# The two unannotated literals are exact witnesses of capacities 2 and 1.
+# Elementwise `+` therefore rejects this mismatch at typecheck with the
+# numeric_lista_operator_law issue. Dynamic `list<T>` operands defer their
+# equal-length check to runtime; these literal operands do not.
+#
+# EXPECTED DECLINE: SEM011:numeric_lista_operator_law
+# =============================================================================
+
+main {
+    const list<int> rejected ← [1, 2] + [3]
+    print rejected
+}
