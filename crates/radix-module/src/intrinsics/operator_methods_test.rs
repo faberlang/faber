@@ -199,6 +199,31 @@ fn potentia_receiver_codegen_applies_non_positive_base_guard() {
 
 #[cfg(feature = "hir-rust")]
 #[test]
+fn numerus_potentia_codegen_uses_integer_pow_without_float_guard() {
+    let source = r"incipit {
+    fixum numerus base ← -2
+    fixum numerus result ← base.potentia(3)
+    nota result
+}";
+    let code = compile_rust("potentia-numerus.fab", source);
+    assert!(code.contains(".pow("), "integer potentia must use Rust integer pow:\n{code}");
+    assert!(
+        code.contains(" as u32"),
+        "integer potentia exponent must use Rust pow's u32 count:\n{code}"
+    );
+    assert!(
+        !code.contains("<= 0.0"),
+        "integer potentia must not carry the FLOAT guard:\n{code}"
+    );
+    assert!(
+        !code.contains(".ln()"),
+        "integer potentia must not use the float identity:\n{code}"
+    );
+    assert!(!code.contains(" as f64"), "integer potentia must not cast through f64:\n{code}");
+}
+
+#[cfg(feature = "hir-rust")]
+#[test]
 fn emits_shift_operator_methods_as_rust_glyph_operations() {
     let source = r"
 incipit {

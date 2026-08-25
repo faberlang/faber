@@ -210,6 +210,9 @@ mod layout_tests;
 #[path = "nodes_test.rs"]
 mod nodes_tests;
 #[cfg(test)]
+#[path = "potentia_test.rs"]
+mod potentia_tests;
+#[cfg(test)]
 #[path = "rank2_reduction_readiness_test.rs"]
 mod rank2_reduction_readiness_tests;
 #[cfg(test)]

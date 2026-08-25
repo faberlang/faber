@@ -1561,15 +1561,12 @@ impl FunctionBuilder<'_> {
         }
 
         // `potentia` is a CodegenOnly registry row (no `MirCollectionOp`
-        // surface). It lowers to the exponentiation identity the Rust codegen
-        // uses (`emit_potentia_expr`): `base ≤ 0 → 0`, else
+        // surface). Fractus receivers use the exponentiation identity the Rust
+        // codegen uses (`emit_potentia_expr`): `base ≤ 0 → 0`, else
         // `(exp · ln(base)).exp()` — the "e^x via exponentiation intrinsic"
-        // identity gradus nn.fab `_exponens` documents. The identity composes
-        // existing MIR unary/binary ops and a guard branch (the runner's
-        // `MirUnOp::Log` fails on non-positive input), so no new MIR op is
-        // needed. Fractus-family receivers only: the integer identity needs a
-        // float→int truncation MIR lacks, so numerus receivers keep the prior
-        // unsupported fallthrough.
+        // identity gradus nn.fab `_exponens` documents. Numerus receivers use
+        // exact integer exponentiation below; both paths compose into ordinary
+        // MIR so the runner does not see a late provider method call.
         if method_name == "potentia" {
             return self.lower_potentia(receiver, receiver_ty, args, expr);
         }
@@ -1612,6 +1609,156 @@ impl FunctionBuilder<'_> {
         None
     }
 
+    /// Lower `potentia` by receiver family.
+    fn lower_potentia(
+        &mut self,
+        receiver: &HirExpression,
+        receiver_ty: TypeId,
+        args: &[HirCallArg],
+        expr: &HirExpression,
+    ) -> Option<MirOperand> {
+        match self.normalized_type(receiver_ty) {
+            Type::Primitive(Primitive::Numerus) | Type::SizedNumeric(Primitive::Numerus, _) => {
+                self.lower_integer_potentia(receiver, args, expr)
+            }
+            Type::Primitive(Primitive::Fractus) | Type::SizedNumeric(Primitive::Fractus, _) => {
+                self.lower_fractus_potentia(receiver, args, expr)
+            }
+            _ => None,
+        }
+    }
+
+    /// Lower integer `potentia` with exponentiation by repeated squaring.
+    ///
+    /// Shape: `accumulator = 1`; while `exponent > 0`, multiply the
+    /// accumulator for an odd exponent, halve the exponent, then square the
+    /// base only when another iteration remains. This is O(log exponent) in
+    /// multiplications, preserves negative-base signs without a float round
+    /// trip, and keeps overflow under checked integer MIR arithmetic.
+    fn lower_integer_potentia(
+        &mut self,
+        receiver: &HirExpression,
+        args: &[HirCallArg],
+        expr: &HirExpression,
+    ) -> Option<MirOperand> {
+        let ty = self.expr_ty(expr)?;
+        let [arg] = args else {
+            return None;
+        };
+        let base = self.lower_expr_value(receiver)?;
+        let exponent = self.lower_expr_value(&arg.expr)?;
+        let destination = self.push_temp(ty, expr.span);
+        let accumulator = self.next_local_id();
+        self.locals
+            .push(MirLocalDecl { id: accumulator, name: None, ty, mutable: true, span: expr.span });
+        let base_local = self.next_local_id();
+        self.locals
+            .push(MirLocalDecl { id: base_local, name: None, ty, mutable: true, span: expr.span });
+        let exponent_local = self.next_local_id();
+        self.locals
+            .push(MirLocalDecl { id: exponent_local, name: None, ty, mutable: true, span: expr.span });
+        let accumulator_place = MirPlace::local(accumulator);
+        let base_place = MirPlace::local(base_local);
+        let exponent_place = MirPlace::local(exponent_local);
+        self.assign(
+            accumulator_place.clone(),
+            MirOperand::Constant(MirConstant::Int(1)),
+            ty,
+            expr.span,
+        );
+        self.assign(base_place.clone(), base, ty, expr.span);
+        self.assign(exponent_place.clone(), exponent, ty, expr.span);
+
+        let bool_ty = MirType::semantic(self.types.primitive(Primitive::Bivalens));
+        let loop_check = self.fresh_block(expr.span);
+        let body = self.fresh_block(expr.span);
+        let multiply = self.fresh_block(expr.span);
+        let shift = self.fresh_block(expr.span);
+        let square = self.fresh_block(expr.span);
+        let done = self.fresh_block(expr.span);
+        self.terminate_current(MirTerminatorKind::Goto(loop_check), expr.span);
+
+        self.switch_to(loop_check);
+        let has_exponent = self.binary_temp(
+            MirBinOp::Gt,
+            MirOperand::Place(exponent_place.clone()),
+            MirOperand::Constant(MirConstant::Int(0)),
+            bool_ty,
+            expr.span,
+        );
+        self.terminate_current(
+            MirTerminatorKind::Branch { condition: has_exponent, then_block: body, else_block: done },
+            expr.span,
+        );
+
+        self.switch_to(body);
+        let odd_part = self.binary_temp(
+            MirBinOp::Mod,
+            MirOperand::Place(exponent_place.clone()),
+            MirOperand::Constant(MirConstant::Int(2)),
+            ty,
+            expr.span,
+        );
+        let is_odd = self.binary_temp(
+            MirBinOp::NotEq,
+            odd_part,
+            MirOperand::Constant(MirConstant::Int(0)),
+            bool_ty,
+            expr.span,
+        );
+        self.terminate_current(
+            MirTerminatorKind::Branch { condition: is_odd, then_block: multiply, else_block: shift },
+            expr.span,
+        );
+
+        self.switch_to(multiply);
+        let product = self.binary_temp(
+            MirBinOp::Mul,
+            MirOperand::Place(accumulator_place.clone()),
+            MirOperand::Place(base_place.clone()),
+            ty,
+            expr.span,
+        );
+        self.assign(accumulator_place.clone(), product, ty, expr.span);
+        self.terminate_current(MirTerminatorKind::Goto(shift), expr.span);
+
+        self.switch_to(shift);
+        let half = self.binary_temp(
+            MirBinOp::Div,
+            MirOperand::Place(exponent_place.clone()),
+            MirOperand::Constant(MirConstant::Int(2)),
+            ty,
+            expr.span,
+        );
+        self.assign(exponent_place.clone(), half, ty, expr.span);
+        let has_more = self.binary_temp(
+            MirBinOp::Gt,
+            MirOperand::Place(exponent_place.clone()),
+            MirOperand::Constant(MirConstant::Int(0)),
+            bool_ty,
+            expr.span,
+        );
+        self.terminate_current(
+            MirTerminatorKind::Branch { condition: has_more, then_block: square, else_block: loop_check },
+            expr.span,
+        );
+
+        self.switch_to(square);
+        let squared = self.binary_temp(
+            MirBinOp::Mul,
+            MirOperand::Place(base_place.clone()),
+            MirOperand::Place(base_place.clone()),
+            ty,
+            expr.span,
+        );
+        self.assign(base_place, squared, ty, expr.span);
+        self.terminate_current(MirTerminatorKind::Goto(loop_check), expr.span);
+
+        self.switch_to(done);
+        self.assign(MirPlace::temp(destination), MirOperand::Place(accumulator_place), ty, expr.span);
+        Some(MirOperand::Temp(destination))
+    }
+
     /// Lower `potentia` for a fractus-family receiver as the exponentiation
     /// identity (see the call site in [`Self::lower_numeric_operator_method`]).
     ///
@@ -1620,20 +1767,12 @@ impl FunctionBuilder<'_> {
     /// branch. The guard is mandatory: the runner's `MirUnOp::Log` rejects
     /// non-positive input, and the Rust codegen lane returns `0` for
     /// `base ≤ 0` — matching it keeps lanes aligned.
-    fn lower_potentia(
+    fn lower_fractus_potentia(
         &mut self,
         receiver: &HirExpression,
-        receiver_ty: TypeId,
         args: &[HirCallArg],
         expr: &HirExpression,
     ) -> Option<MirOperand> {
-        let fractus_family = matches!(
-            self.normalized_type(receiver_ty),
-            Type::Primitive(Primitive::Fractus) | Type::SizedNumeric(Primitive::Fractus, _)
-        );
-        if !fractus_family {
-            return None;
-        }
         let ty = self.expr_ty(expr)?;
         let base = self.lower_expr_value(receiver)?;
         let [arg] = args else {
