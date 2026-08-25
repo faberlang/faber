@@ -452,13 +452,15 @@ conversio_expr ::= '↦' type_annotation inline_recovery?
 inline_recovery ::= '⇥' unary_expr
 # formerly: call
 # [155] call_expr
-call_expr ::= primary (call_suffix | member_suffix | optional_suffix | non_null_suffix)*
+call_expr ::= primary (call_suffix | member_suffix | transpose_suffix | optional_suffix | non_null_suffix)*
 # formerly: callSuffix
 # [156] call_suffix
 call_suffix ::= call_type_args? '(' argument_list ')'
 # formerly: memberSuffix
 # [157] member_suffix
 member_suffix ::= '.' IDENTIFIER | '[' expression ']'
+# [157a] transpose_suffix
+transpose_suffix ::= 'ᵀ'
 # formerly: optionalSuffix
 # [158] optional_suffix
 optional_suffix ::= '?.' IDENTIFIER | '?[' expression ']' | '?(' argument_list ')'
@@ -808,6 +810,7 @@ NO_NEWLINE ::=
 | [`call_expr`](#call-expr) | `#call-expr` | live | call |
 | [`call_suffix`](#call-suffix) | `#call-suffix` | live | callSuffix |
 | [`member_suffix`](#member-suffix) | `#member-suffix` | live | memberSuffix |
+| [`transpose_suffix`](#transpose-suffix) | `#transpose-suffix` | live | transposeSuffix |
 | [`optional_suffix`](#optional-suffix) | `#optional-suffix` | live | optionalSuffix |
 | [`non_null_suffix`](#non-null-suffix) | `#non-null-suffix` | live | nonNullSuffix |
 | [`argument_list`](#argument-list) | `#argument-list` | live | argumentList |
@@ -1510,6 +1513,14 @@ prefer sugar. Choose per module or file.
 
 ### Operators (by precedence, lowest to highest)
 
+
+**Postfix tensor transpose (`ᵀ`, U+1D40):** `valueᵀ` is rank-2-only
+sugar for the existing `transpone` intrinsic and `Transpose` plan entry. It
+maps `[M,N]` to `[N,M]`; rank-1 is a permanent decline because there is no
+row/column distinction, while rank-3+ waits for a batched-transpose consumer.
+The precedence interaction with parse-only gradient selection is settled law,
+not an open fork: `a · bᵀ ∇ [x]` parses `(a · bᵀ) ∇ [x]`, so the transpose
+suffix is consumed before the selection suffix. `⊤` remains unspent.
 
 **Exact-output transfer (`⇇`):** `sink ⇇ payload` invokes a callable sink value — one argument, `vacuum` result — once per payload. The operator performs no formatting, adds no separators or terminator, selects no channel, and runs no conversions: the bound value owns destination and behavior, and the compiler holds no console knowledge. A chain `sink ⇇ a ⇇ b` evaluates the sink expression once, each payload once left-to-right, and invokes the sink once per payload left-to-right; the chain result is `vacuum`. `⇇` binds above assignment and below ternary, so postfix calls, conversions, and string-constructor applications finish before transfer; formatting is explicit on the right (`output ⇇ "§ §
 "(a, b)`). Combined with selective value imports it replaces compiler-owned output statements with ordinary typed values.
