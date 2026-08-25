@@ -599,9 +599,7 @@ fn probe_air_gaps(registry_gaps: &BTreeSet<String>) -> BTreeSet<String> {
     // consciously allowlisted or registry-backed.
     let mut candidates: BTreeSet<&str> = BTreeSet::new();
     candidates.extend(radix_semantic::passes::air_tensor_intrinsics::allowed_tensor_intrinsics());
-    candidates.extend(
-        radix_semantic::passes::fragment_definition::allowed_device_methods(),
-    );
+    candidates.extend(radix_semantic::passes::fragment_definition::allowed_device_methods());
     let mut gaps = BTreeSet::new();
     for name in candidates {
         // Armed := a registry Tensor row for the name whose direction-1 probe
