@@ -1040,6 +1040,18 @@ pub enum ExprKind {
     /// transferred on that single sink left-to-right; the chain is never a
     /// pipeline of return values and the whole expression is `vacuum`-shaped.
     Transfer(TransferExpr),
+    /// Capture boundary: `capta { body }`.
+    ///
+    /// Reifies the error channel into a value union (`success ∪ errata`). The
+    /// trailing expression statement of the body is the success value; there
+    /// is no early-success exit form this campaign.
+    Trap(Box<TrapExpr>),
+}
+
+#[derive(Debug)]
+pub struct TrapExpr {
+    pub body: BlockStmt,
+    pub span: Span,
 }
 
 /// Source shape for the dedicated `primus_quem` first-match expression.

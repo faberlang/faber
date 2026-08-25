@@ -2099,6 +2099,9 @@ impl TypeChecker<'_> {
         }
         let Some(error_ty) = self.current_error.map(|sink| match sink {
             ErrorSink::Function(ty) | ErrorSink::Local(ty) => ty,
+            // UT: a bare failable `↦` inside a trap accumulates its failure
+            // payload into the trap hole — same funnel.
+            ErrorSink::Trap(var) => self.trap_sink_type(var),
         }) else {
             return;
         };

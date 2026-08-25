@@ -488,6 +488,9 @@ impl TypeChecker<'_> {
                 let value_ty = self.check_expr(value);
                 if let Some(err_ty) = self.current_error.map(|sink| match sink {
                     ErrorSink::Function(ty) | ErrorSink::Local(ty) => ty,
+                    // UT: the throw payload accumulates into the trap hole —
+                    // same funnel, no channel-specific typing.
+                    ErrorSink::Trap(var) => self.trap_sink_type(var),
                 }) {
                     self.unify_assign_issue(
                         value_ty,
@@ -507,6 +510,7 @@ impl TypeChecker<'_> {
             HirExpressionKind::Handled { body, catch } => {
                 self.check_handled_block(body, catch, expected)
             }
+            HirExpressionKind::Trap(body) => self.check_trap(body, expected, expr.span),
             HirExpressionKind::Clausura(params, ret, err, body, _) => {
                 self.check_closure(params, ret.as_mut(), err.as_mut(), body, expected)
             }

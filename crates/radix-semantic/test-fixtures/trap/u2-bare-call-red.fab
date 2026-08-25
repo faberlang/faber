@@ -1,0 +1,18 @@
++++
+locale = "en"
++++
+
+# u2 — absent all three answers (⇥ declaration, fac/cape handler, trap), a
+# bare failable call in a non-⇥ function still fails SEM011.
+
+fn failable() → int ⇥ string {
+    return 42
+}
+
+fn probe() → void {
+    failable()
+}
+
+main {
+    probe()
+}

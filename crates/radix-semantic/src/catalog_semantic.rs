@@ -963,8 +963,18 @@ fn semantic_invalid_operand_types_message(args: &[DiagnosticArg]) -> Option<Stri
         "dynamic_receiver_method_type_args" => {
             Some("dynamic receiver does not accept method type arguments".to_owned())
         }
-        "failable_call_requires_handler" => {
-            Some("failable call requires a ⇥ declaring context or a local handler".to_owned())
+        "failable_call_requires_handler" => Some(
+            "failable call requires a ⇥ declaring context, a local handler, or a capta trap"
+                .to_owned(),
+        ),
+        "trap_member_type_mismatch" => {
+            Some("trap member type mismatch".to_owned())
+        }
+        "trap_union_collapsed" => {
+            let member = arg_value(args, "type")?;
+            Some(format!(
+                "capta trap union collapsed to '{member}': success and error are the same type, so the trap cannot distinguish them"
+            ))
         }
         "generic_type_arg_domain" => {
             let rejected = arg_value(args, "rejected")?;
@@ -1191,7 +1201,17 @@ fn semantic_invalid_operand_types_help(args: &[DiagnosticArg]) -> Option<String>
         | "sermo_view_payload_type_arg_count"
         | "template_application_type_args"
         | "variant_constructor_type_args" => Some("remove the explicit type argument list".to_owned()),
-        "failable_call_requires_handler" => Some("handle the call with fac/cape or declare a function ⇥".to_owned()),
+        "failable_call_requires_handler" => Some(
+            "handle the call with fac/cape, capture it with capta, or declare a function ⇥"
+                .to_owned(),
+        ),
+        "trap_member_type_mismatch" => {
+            Some("check the member type flowing into the capta trap".to_owned())
+        }
+        "trap_union_collapsed" => Some(
+            "make the success type and the error channel distinguishable, or handle the error with fac/cape instead"
+                .to_owned(),
+        ),
         "generic_type_arg_domain" => {
             Some("choose one of the allowed type arguments for this generic parameter".to_owned())
         }

@@ -1922,6 +1922,17 @@ pub(super) fn rewrite_expr(
                 diagnostics,
             );
         }
+        // UT: the capture boundary's body is an ordinary block for namespace
+        // rewriting.
+        HirExpressionKind::Trap(body) => rewrite_block(
+            unit_path,
+            body,
+            interner,
+            targets,
+            data_member_targets,
+            namespaces,
+            diagnostics,
+        ),
         HirExpressionKind::Clausura(_, _, _, body, _) => rewrite_expr(
             unit_path,
             body,

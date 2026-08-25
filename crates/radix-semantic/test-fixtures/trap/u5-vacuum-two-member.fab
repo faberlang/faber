@@ -1,0 +1,15 @@
++++
+locale = "en"
++++
+
+# u5 — `trap` over `→ void ⇥ E`: vacuum stays an explicit member (only
+# nihil is extracted), so the union is a distinguishable two members.
+
+fn nothing() → void ⇥ string {
+    return
+}
+
+main {
+    const ∪ r ← trap { nothing() }
+    print r
+}

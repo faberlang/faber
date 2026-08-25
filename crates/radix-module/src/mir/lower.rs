@@ -1215,6 +1215,29 @@ struct HandlerContext {
     error_place: MirPlace,
     error_ty: MirType,
     error_block: MirBlockId,
+    /// DFS push order of this capture boundary (shared counter with
+    /// `TrapContext`), so mixed `fac { capta { … } }` nesting routes each
+    /// alternate exit to the innermost boundary.
+    depth: usize,
+}
+
+/// Active `capta { ... }` capture boundary (UT): failable calls and `iace`
+/// inside the body lower to `TryCall` whose error block wraps the payload
+/// into the trap carrier (the union-typed destination) instead of entering a
+/// cape body or reaching `ReturnError`.
+#[derive(Debug, Clone)]
+struct TrapContext {
+    /// Union-typed destination the wrapped result is assigned into.
+    destination: MirPlace,
+    /// The trap union's `MirType` (destination payload type).
+    union_ty: MirType,
+    /// Join block both arms converge on.
+    join_block: MirBlockId,
+    /// Whether any error wrap block already targets `join_block` (keeps the
+    /// reachability decision honest when the body itself diverges).
+    error_paths: bool,
+    /// DFS push order (shared counter with `HandlerContext`).
+    depth: usize,
 }
 
 #[derive(Debug, Clone)]
@@ -1394,6 +1417,11 @@ struct FunctionBuilder<'a> {
     /// kernel's inline flow.
     filum_capture: Option<SummaFoldContext>,
     handlers: Vec<HandlerContext>,
+    /// Active `capta` trap boundaries (UT); see [`TrapContext`].
+    traps: Vec<TrapContext>,
+    /// Monotonic DFS order shared by handler and trap pushes, so
+    /// `innermost_capture` picks the lexically innermost boundary.
+    capture_depth: usize,
     materializing_consts: FxHashSet<DefId>,
     errors: Vec<MirError>,
     next_value: u32,
@@ -1436,6 +1464,8 @@ impl<'a> FunctionBuilder<'a> {
             summa_fold: None,
             filum_capture: None,
             handlers: Vec::new(),
+            traps: Vec::new(),
+            capture_depth: 0,
             materializing_consts: FxHashSet::default(),
             errors: Vec::new(),
             next_value: 0,
@@ -1453,6 +1483,21 @@ impl<'a> FunctionBuilder<'a> {
 
     fn is_device_lowering(&self) -> bool {
         self.device_role.is_some()
+    }
+
+    /// The innermost active `capta` trap when it is the innermost capture
+    /// boundary (deeper than any active `cape` handler), marking that an
+    /// error wrap block will target the trap join. `None` keeps the existing
+    /// handler / propagation routing.
+    fn take_innermost_trap(&mut self) -> Option<TrapContext> {
+        let handler_depth = self.handlers.last().map_or(0, |handler| handler.depth);
+        let trap = self.traps.last().cloned()?;
+        if trap.depth > handler_depth {
+            self.traps.last_mut().expect("trap context present").error_paths = true;
+            Some(trap)
+        } else {
+            None
+        }
     }
 
     fn add_param(&mut self, def_id: DefId, name: crate::lexer::Symbol, ty: TypeId, mode: HirParamMode, span: Span) {
@@ -2728,6 +2773,9 @@ fn unsupported_expr_kind_name(kind: &HirExpressionKind) -> &'static str {
             "gradient expressions before tensor-glyphs 2B backward-companion MIR lowering"
         }
         HirExpressionKind::Block(_) => "block expressions before nested-block MIR lowering",
+        // UT: trap lowers through `visit_trap_expr`; kept exhaustive here for
+        // any future caller.
+        HirExpressionKind::Trap(_) => "capta trap before capture-boundary MIR lowering",
         HirExpressionKind::Si { .. } => "si before control-flow MIR lowering",
         HirExpressionKind::Discerne { .. } => "discerne before switch MIR lowering",
         HirExpressionKind::Loop(_) => "loop before control-flow MIR lowering",

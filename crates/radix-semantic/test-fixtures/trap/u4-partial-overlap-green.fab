@@ -1,0 +1,15 @@
++++
+locale = "en"
++++
+
+# u4 — partial overlap: T and E share a member but the synthesized union
+# keeps >= 2 members. Legal; narrowing keeps it sound.
+
+fn partial() → int ⇥ int ∪ string {
+    return 1
+}
+
+main {
+    const ∪ r ← trap { partial() }
+    print r
+}

@@ -1,0 +1,16 @@
++++
+locale = "en"
++++
+
+# u7 — an explicit `throw` inside the body is an alternate exit toward the
+# same trap hole; at MIR it wraps into the carrier and never reaches
+# ReturnError.
+
+fn failable() → int ⇥ string {
+    throw "boom"
+}
+
+main {
+    const ∪ r ← trap { failable() }
+    print r
+}

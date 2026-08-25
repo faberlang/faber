@@ -1,0 +1,17 @@
++++
+locale = "en"
++++
+
+# u1 — the third answer: `trap` accepts a failable call and reifies the
+# channel into a value union. `const _ r` binds to the solved
+# `int ∪ string` (WARN016 teaches the union shape; `const ∪ r` is the
+# warning-free spelling).
+
+fn failable() → int ⇥ string {
+    return 42
+}
+
+main {
+    const _ r ← trap { failable() }
+    print r
+}

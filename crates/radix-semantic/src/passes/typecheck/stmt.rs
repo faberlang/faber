@@ -213,6 +213,9 @@ impl TypeChecker<'_> {
     fn check_await_alternate_channel(&mut self, alternate: TypeId, span: radix_lexer::Span) {
         let Some(error_ty) = self.current_error.map(|sink| match sink {
             ErrorSink::Function(ty) | ErrorSink::Local(ty) => ty,
+            // UT: an awaited failable's alternate exit accumulates into the
+            // trap hole — same funnel.
+            ErrorSink::Trap(var) => self.trap_sink_type(var),
         }) else {
             self.error_issue(
                 SemanticErrorKind::TypeMismatch,

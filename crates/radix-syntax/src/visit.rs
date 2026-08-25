@@ -619,6 +619,9 @@ pub fn walk_expr<V: Visitor>(visitor: &mut V, expr: &Expr) {
                 visitor.visit_expr(payload);
             }
         }
+        ExprKind::Trap(trap) => {
+            visitor.visit_block(&trap.body);
+        }
     }
 }
 

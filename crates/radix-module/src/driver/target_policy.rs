@@ -419,6 +419,8 @@ fn scan_go_expr(expr: &Expr, file: &str, diagnostics: &mut Vec<Diagnostic>) {
             PraefixumBody::Block(block) => scan_go_block(block, file, diagnostics),
             PraefixumBody::Expr(expr) => scan_go_expr(expr, file, diagnostics),
         },
+        // UT: the capture boundary's body is ordinary scanned source.
+        ExprKind::Trap(trap) => scan_go_block(&trap.body, file, diagnostics),
         ExprKind::Summa(summa) => {
             scan_go_expr(&summa.source, file, diagnostics);
             scan_go_block(&summa.body, file, diagnostics);
@@ -790,6 +792,8 @@ fn scan_rust_expr(expr: &Expr, file: &str, diagnostics: &mut Vec<Diagnostic>) {
             PraefixumBody::Block(block) => scan_rust_block(block, file, diagnostics),
             PraefixumBody::Expr(expr) => scan_rust_expr(expr, file, diagnostics),
         },
+        // UT: the capture boundary's body is ordinary scanned source.
+        ExprKind::Trap(trap) => scan_rust_block(&trap.body, file, diagnostics),
         ExprKind::Summa(summa) => {
             scan_rust_expr(&summa.source, file, diagnostics);
             scan_rust_block(&summa.body, file, diagnostics);

@@ -121,7 +121,7 @@ impl TypeChecker<'_> {
     /// U-02: union-hole variables never reach this path. `unify_with_policy`
     /// routes `Type::InferUnion` through the accumulation arms before the
     /// monomorphic bind path, so `var` here is always a monomorphic `Type::Infer`.
-    fn bind_infer_with_diagnostic(
+    pub(crate) fn bind_infer_with_diagnostic(
         &mut self,
         var: InferVar,
         ty: TypeId,
@@ -953,8 +953,30 @@ impl TypeChecker<'_> {
     ///
     /// Interning is value-based, so this is the same table entry HIR lowering
     /// produced for the source `∪` annotation.
-    fn union_hole_type_id(&mut self, var: InferVar) -> TypeId {
+    pub(crate) fn union_hole_type_id(&mut self, var: InferVar) -> TypeId {
         self.types.intern(Type::InferUnion(var))
+    }
+
+    /// Allocate a fresh `Type::InferUnion` hole for checker-synthesized union
+    /// slots (UT: the `capta` trap result).
+    ///
+    /// Same allocation space as [`Self::fresh_infer`] (checker-side counter,
+    /// disjoint from lowering's def-id-space holes), so the trap hole never
+    /// collides with a source-authored `∪` annotation hole.
+    pub(crate) fn fresh_union_hole(&mut self) -> InferVar {
+        let var = InferVar(self.next_infer);
+        self.next_infer += 1;
+        var
+    }
+
+    /// Sink type for an active `capta` trap hole (UT).
+    ///
+    /// Marks that an alternate-exit payload is flowing toward the trap (the
+    /// T ≡ E guard input) and returns the hole itself: flows into it route
+    /// through the U-02 accumulation arms, never a new unify insertion point.
+    pub(crate) fn trap_sink_type(&mut self, var: InferVar) -> TypeId {
+        self.trap_error_flow = true;
+        self.union_hole_type_id(var)
     }
 
     /// Accumulate one member type into a union hole, deduplicated via
@@ -1005,7 +1027,7 @@ impl TypeChecker<'_> {
     ///
     /// The hole itself stays open (never bound through `substitutions`), so
     /// later direct flows keep accumulating into the same slot.
-    fn accumulate_into_union_hole(
+    pub(crate) fn accumulate_into_union_hole(
         &mut self,
         var: InferVar,
         incoming: TypeId,

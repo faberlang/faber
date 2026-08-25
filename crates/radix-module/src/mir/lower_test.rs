@@ -2066,6 +2066,89 @@ fn lowers_fac_cape_iace_to_local_handler_edge() {
 }
 
 #[test]
+fn lowers_trap_failable_call_to_try_call_carrier_wrap_never_return_error() {
+    // UT: `capta` lowers the failable call through the existing try_call
+    // whose error block wraps the payload into the trap carrier (the
+    // union-typed destination) and joins. The trapped error must never
+    // reach return_error inside the trapping function (the callee's own
+    // return_error is its channel, not an escape).
+    let dump = dump_source(
+        r#"
+functio fail() → numerus ⇥ textus { iace "bad" }
+functio safe() → vacuum { fixum ∪ r ← capta { fail() } nota r }
+"#,
+    );
+
+    assert!(
+        dump.contains("function f0 -> ty#1 ⇥ ty#0"),
+        "the failable callee keeps its channel: {dump}"
+    );
+    let (_, trapping_fn) = dump
+        .split_once("function f1 -> ")
+        .expect("the trapping function is emitted");
+    let trapping_fn = trapping_fn.split_once("function f2 -> ").map_or(trapping_fn, |(f1, _)| f1);
+    assert!(
+        trapping_fn.contains("try_call def#"),
+        "the trapped call must ride the existing try_call: {trapping_fn}"
+    );
+    assert!(
+        !trapping_fn.contains("return_error"),
+        "a trapped error never reaches return_error: {trapping_fn}"
+    );
+}
+
+#[test]
+fn lowers_trap_iace_to_carrier_wrap() {
+    // An explicit `iace` inside the trap body wraps into the same carrier
+    // instead of propagating.
+    let dump = dump_source(
+        r#"functio safe() → vacuum { fixum ∪ r ← capta { iace "bad" } nota r }"#,
+    );
+
+    assert!(
+        dump.contains("goto bb"),
+        "trap lowering produced control flow: {dump}"
+    );
+    assert!(
+        !dump.contains("return_error"),
+        "a trapped iace never reaches return_error: {dump}"
+    );
+}
+
+#[test]
+fn lowers_trap_inside_fac_routes_to_innermost_boundary() {
+    // `fac { capta { fail() } } cape err { … }`: the trap is the innermost
+    // boundary, so the call wraps into the trap carrier — the outer cape
+    // handler is not entered by the trapped call.
+    let dump = dump_source(
+        r#"
+functio fail() → numerus ⇥ textus { iace "bad" }
+functio safe() → vacuum {
+    fac {
+        fixum ∪ r ← capta { fail() }
+        nota r
+    } cape err {
+        nota err
+    }
+}
+"#,
+    );
+
+    let (_, trapping_fn) = dump
+        .split_once("function f1 -> ")
+        .expect("the trapping function is emitted");
+    let trapping_fn = trapping_fn.split_once("function f2 -> ").map_or(trapping_fn, |(f1, _)| f1);
+    assert!(
+        !trapping_fn.contains("return_error"),
+        "no alternate exit escapes the nested boundaries: {trapping_fn}"
+    );
+    assert!(
+        trapping_fn.contains("try_call def#"),
+        "the trapped call rides try_call: {trapping_fn}"
+    );
+}
+
+#[test]
 fn lowers_fac_cape_failable_call_to_try_call_edge() {
     let dump = dump_source(
         r#"

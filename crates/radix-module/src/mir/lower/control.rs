@@ -85,6 +85,16 @@ impl FunctionBuilder<'_> {
     /// Lower `iace` either to the innermost active `cape` handler or to a
     /// function-level alternate return.
     pub(super) fn lower_iace(&mut self, value: &HirExpression, span: Span) -> Option<MirOperand> {
+        // UT: inside a `capta` boundary the thrown payload wraps into the trap
+        // carrier — it must never reach `ReturnError`.
+        if let Some(trap) = self.take_innermost_trap() {
+            let error_ty = self.expr_ty(value)?;
+            let operand = self.lower_transfer_expr(value)?;
+            self.assign(trap.destination, operand, error_ty, span);
+            self.terminate_current(MirTerminatorKind::Goto(trap.join_block), span);
+            return None;
+        }
+
         if let Some(handler) = self.handlers.last().cloned() {
             let error_ty = self.expr_ty(value)?;
             let value = self.lower_transfer_expr(value)?;
@@ -148,10 +158,12 @@ impl FunctionBuilder<'_> {
         let handler_binding = LocalBinding { local: handler_local, ty: error_ty };
         self.bindings.insert(catch.binding_def_id, handler_binding);
 
+        self.capture_depth += 1;
         self.handlers.push(HandlerContext {
             error_place: MirPlace::local(handler_local),
             error_ty,
             error_block: handler_id,
+            depth: self.capture_depth,
         });
         self.visit_block(body);
         self.handlers.pop();
@@ -166,6 +178,44 @@ impl FunctionBuilder<'_> {
         } else {
             self.seal_unreachable(after_id, span);
         }
+    }
+
+    /// Lower a `capta { ... }` capture boundary (UT).
+    ///
+    /// The trap result is the union-typed destination temp. The body lowers
+    /// into that destination (its trailing expression is the success member);
+    /// every failable call and `iace` inside wraps its payload into the same
+    /// destination through the existing `TryCall` error block and joins — a
+    /// trapped error never reaches `ReturnError`.
+    pub(super) fn lower_trap_expr(
+        &mut self,
+        body: &HirBlock,
+        expr: &HirExpression,
+    ) -> Option<MirOperand> {
+        let ty = self.expr_ty(expr)?;
+        let span = expr.span;
+        let destination_temp = self.push_temp(ty, span);
+        let destination = MirPlace::temp(destination_temp);
+        let join = self.fresh_block(span);
+
+        self.capture_depth += 1;
+        self.traps.push(TrapContext {
+            destination: destination.clone(),
+            union_ty: ty,
+            join_block: join,
+            error_paths: false,
+            depth: self.capture_depth,
+        });
+        self.lower_block_to_destination(body, destination.clone(), ty, span);
+        let trap = self.traps.pop().expect("trap context pushed");
+
+        let body_reaches = self.terminate_open_current(MirTerminatorKind::Goto(join), span);
+        if body_reaches || trap.error_paths {
+            self.switch_to(join);
+        } else {
+            self.seal_unreachable(join, span);
+        }
+        Some(MirOperand::Temp(destination_temp))
     }
 
     /// Lower any expression into an already-chosen destination place.
@@ -1221,10 +1271,12 @@ impl FunctionBuilder<'_> {
         self.bindings
             .insert(catch.binding_def_id, LocalBinding { local: handler_local, ty: error_ty });
 
+        self.capture_depth += 1;
         self.handlers.push(HandlerContext {
             error_place: MirPlace::local(handler_local),
             error_ty,
             error_block: handler_id,
+            depth: self.capture_depth,
         });
         let Some(condition) = self.lower_expr_value(cond) else {
             self.handlers.pop();

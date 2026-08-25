@@ -280,6 +280,18 @@ impl super::FaberCodegen {
             HirExpressionKind::Handled { body, catch } => {
                 self.write_handled_expr(body, catch, types, names, interner, surface, writer);
             }
+            // UT: the capture boundary emits as its own surface form — `capta`
+            // followed by the body block. The block's tail expression (the
+            // success value) writes as the block's final expression statement.
+            HirExpressionKind::Trap(body) => {
+                writer.write(surface.keyword(TokenKind::Trap));
+                writer.writeln(" {");
+                writer.indented(|writer| {
+                    self.write_block(body, types, names, interner, surface, writer);
+                    self.write_block_end_trivia(body, interner, writer);
+                });
+                writer.write("}");
+            }
             HirExpressionKind::Discerne {
                 scrutinees,
                 arms,

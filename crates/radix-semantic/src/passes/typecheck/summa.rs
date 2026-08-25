@@ -456,6 +456,16 @@ impl SummaBodyState {
                 self.walk_block(checker, body);
                 self.walk_cape(checker, catch);
             }
+            // UT: a trap inside a `summa` term body is an alternate-exit
+            // dataflow the fold cannot host — same rejection class as cape.
+            HirExpressionKind::Trap(body) => {
+                checker.error_issue(
+                    SemanticErrorKind::TypeMismatch,
+                    ISSUE_SUMMA_BODY_FORBIDS_CAPE,
+                    expr.span,
+                );
+                self.walk_block(checker, body);
+            }
             HirExpressionKind::Clausura(params, _, _, body, _) => {
                 effect(checker, expr.span, "dynamic_function");
                 for param in params {

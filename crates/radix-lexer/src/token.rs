@@ -150,6 +150,7 @@ pub enum TokenKind {
     // === Keywords: Error handling ===
     Adfirma,
     Cape,
+    Trap,
     Iace,
     Mori,
     Requirit,
@@ -418,6 +419,7 @@ impl TokenKind {
                 | Tacet
                 | Adfirma
                 | Cape
+                | Trap
                 | Iace
                 | Mori
                 | Requirit

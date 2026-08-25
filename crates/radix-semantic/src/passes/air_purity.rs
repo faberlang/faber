@@ -402,6 +402,14 @@ impl AirPurityChecker<'_> {
                 self.handler_regions.pop();
                 self.check_recovery(catch, self.normal_exit_type(body));
             }
+            // UT: the capture boundary locally resolves the body's alternate
+            // exits into a value union — the same ATH-2 admission shape as a
+            // local handler, with no recovery arm (the value is the recovery).
+            HirExpressionKind::Trap(body) => {
+                self.handler_regions.push(HandlerRegion::Try);
+                self.check_block(body);
+                self.handler_regions.pop();
+            }
             HirExpressionKind::Clausura(params, _, _, body, _) => {
                 // ARC-4 rewrites higher-order capture-free combines before this
                 // walker. A closure that remains here is outside that callback
@@ -660,5 +668,6 @@ fn is_control_expr_statement(expr: &HirExpression) -> bool {
             | HirExpressionKind::Discerne { .. }
             | HirExpressionKind::Block(_)
             | HirExpressionKind::Handled { .. }
+            | HirExpressionKind::Trap(_)
     )
 }

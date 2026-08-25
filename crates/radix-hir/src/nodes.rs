@@ -1183,6 +1183,13 @@ pub enum HirExpressionKind {
         catch: Box<HirCape>,
     },
 
+    /// Capture boundary (`capta { ... }`): reifies the error channel into a
+    /// value union. The block's trailing expression is the success value;
+    /// every alternate exit inside the body (failable call, `iace`) wraps
+    /// into the trap carrier instead of propagating. Not sugar over
+    /// `Handled` — do/catch is derivable as trap+match, not the reverse.
+    Trap(Box<HirBlock>),
+
     /// Closure with parameters, optional return/error types, expression body,
     /// and the `libera` capture-free marker (marker-carry only; semantic
     /// analysis owns its contract).

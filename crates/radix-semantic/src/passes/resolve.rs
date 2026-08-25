@@ -1521,6 +1521,11 @@ fn resolve_expr(
                 resolve_expr(resolver, interner, payload, errors);
             }
         }
+        // UT: the capture boundary's body is an ordinary block — binding-wins
+        // lookup applies to every subexpression inside it.
+        ExprKind::Trap(trap) => {
+            resolve_block(resolver, interner, &trap.body, errors);
+        }
     }
 }
 

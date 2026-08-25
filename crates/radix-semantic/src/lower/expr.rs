@@ -102,6 +102,7 @@ pub fn lower_expr(lowerer: &mut Lowerer, expr: &Expr) -> HirExpression {
         // vacuum-returning callable rules and payload compatibility.
         ExprKind::Transfer(transfer) => lowerer.lower_transfer(transfer),
         ExprKind::FirstMatch(first_match) => lower_first_match(lowerer, first_match),
+        ExprKind::Trap(trap) => lower_trap(lowerer, trap),
     };
 
     HirExpression {
@@ -201,7 +202,7 @@ fn lower_first_match(
     let binding_def_id = lowerer.next_def_id();
     lowerer.bind_local(first_match.binding.name, binding_def_id);
     let mut body = lowerer.lower_block(&first_match.body);
-    lift_trailing_predicate_expr(&mut body);
+    lift_trailing_expression_stmt(&mut body);
     lowerer.pop_scope();
 
     HirExpressionKind::FirstMatch {
@@ -210,6 +211,18 @@ fn lower_first_match(
         binding: (binding_def_id, first_match.binding.name),
         body,
     }
+}
+
+/// Lower the `capta { ... }` capture boundary (UT).
+///
+/// The body is an ordinary block with its own scope; its trailing expression
+/// statement is lifted into the block's tail slot as the success value. No
+/// `cape` clause attaches and there is no early-success exit (open row 1).
+fn lower_trap(lowerer: &mut Lowerer, trap: &radix_syntax::TrapExpr) -> HirExpressionKind {
+    lowerer.current_span = trap.span;
+    let mut body = lowerer.lower_block(&trap.body);
+    lift_trailing_expression_stmt(&mut body);
+    HirExpressionKind::Trap(Box::new(body))
 }
 
 /// Lower a literal
@@ -226,15 +239,16 @@ fn lower_literal(lowerer: &mut Lowerer, lit: &Literal) -> HirExpressionKind {
     }
 }
 
-/// Lift the `ubi` predicate block's trailing expression statement into the
-/// block's tail-expression slot (AFM-3).
+/// Lift a value-block's trailing expression statement into the block's
+/// tail-expression slot.
 ///
 /// Authored blocks lower with `expr: None` (block values are ordinarily
-/// `redde`-driven), but the first-match predicate is a bare trailing
-/// expression: `ubi x { x < 0.0 }`. The last expression statement of the
-/// predicate block is the predicate value; everything before it is ordinary
-/// sequential preamble.
-fn lift_trailing_predicate_expr(body: &mut radix_hir::HirBlock) {
+/// `redde`-driven), but some expression bodies are bare trailing expressions:
+/// the `ubi` predicate (`ubi x { x < 0.0 }`, AFM-3) and the `capta` trap body
+/// (its final expression is the success value, UT). The last expression
+/// statement of the block becomes the block value; everything before it is
+/// ordinary sequential preamble.
+fn lift_trailing_expression_stmt(body: &mut radix_hir::HirBlock) {
     if body.expr.is_some() {
         return;
     }

@@ -102,6 +102,9 @@ pub mod relations_test;
 #[cfg(test)]
 #[path = "union_member_refinement_test.rs"]
 mod union_member_refinement_test;
+#[cfg(test)]
+#[path = "trap_test.rs"]
+mod trap_test;
 pub mod tensor_index;
 pub mod tensor_type_directed;
 
@@ -195,6 +198,15 @@ pub(crate) enum ErrorSink {
 
     /// Local handler type introduced by `fac/cape` or handled blocks.
     Local(TypeId),
+
+    /// Capture-boundary union hole introduced by `capta { ... }` (UT).
+    ///
+    /// Every alternate exit inside the trap body accumulates into this
+    /// `Type::InferUnion` hole through the ordinary U-02 arms — no new
+    /// inference. The hole also absorbs the body's success type, so the
+    /// finalize solve produces `Success ∪ Errata` through the existing
+    /// normalization.
+    Trap(InferVar),
 }
 
 /// Mutable state for one HIR typecheck run.
@@ -341,6 +353,13 @@ pub(crate) struct TypeChecker<'a> {
 
     /// Monotonic counter for fresh inference variables within this checker.
     pub next_infer: u32,
+
+    /// Whether any alternate-exit payload flowed toward the innermost active
+    /// `capta` trap sink (UT). Restored with `current_error` by `check_trap`;
+    /// drives the T ≡ E collapse guard, which needs to distinguish "one
+    /// member because success and error collapsed" from "one member because
+    /// the body never failed" (the WARN017 degenerate solve).
+    pub trap_error_flow: bool,
 
     /// Reverse map from inference variable token to its table-local `TypeId`.
     pub infer_ids: FxHashMap<InferVar, TypeId>,
@@ -506,6 +525,7 @@ impl<'a> TypeChecker<'a> {
             allow_inferred_return: false,
             allow_intervallum_step: false,
             next_infer: 0,
+            trap_error_flow: false,
             infer_ids: FxHashMap::default(),
             substitutions: RefCell::new(FxHashMap::default()),
             canonical_cache: FxHashMap::default(),

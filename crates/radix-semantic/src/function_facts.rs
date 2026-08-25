@@ -402,6 +402,12 @@ impl HirVisitor for BodyVisitor<'_> {
                 self.with_suppressed(true, |visitor| visitor.visit_block(body));
                 self.visit_block(&catch.body);
             }
+            // UT: a `capta` trap captures every alternate exit inside its
+            // body into the trap value — the enclosing function stays
+            // non-failable.
+            HirExpressionKind::Trap(body) => {
+                self.with_suppressed(true, |visitor| visitor.visit_block(body));
+            }
             HirExpressionKind::Si {
                 cond,
                 then_block,

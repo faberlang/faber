@@ -1,0 +1,22 @@
++++
+locale = "en"
++++
+
+# u8 — the adopted two-line idiom over a trap: explicit `T ∪ E`
+# annotation, then `is` narrowing (U1R is the recovery path).
+
+fn failable(bool fail) → int ⇥ string {
+    if fail {
+        throw "boom"
+    }
+    return 42
+}
+
+main {
+    const int ∪ string r ← trap { failable(false) }
+    if r is int {
+        print r
+    } else {
+        print r.length()
+    }
+}

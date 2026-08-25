@@ -708,6 +708,16 @@ pub static KEYWORD_SPECS: &[KeywordSpec] = &[
         scope: KeywordScope::Contextual(CONTROL_FLOW),
         category: KeywordKind::ErrorHandling,
     },
+    // `trap` is the capture boundary: an expression keyword that reifies the
+    // error channel into a value union. Claimed only in expression-primary
+    // position, so the spelling stays available as an ordinary identifier
+    // everywhere else.
+    KeywordSpec {
+        text: "capta",
+        token_kind: Some(TokenKind::Trap),
+        scope: KeywordScope::Contextual(EXPRESSION_INTRODUCER),
+        category: KeywordKind::ErrorHandling,
+    },
     KeywordSpec {
         text: "iace",
         token_kind: Some(TokenKind::Iace),

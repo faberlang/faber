@@ -2345,6 +2345,63 @@ impl FunctionBuilder<'_> {
         conversion: Option<DefId>,
         span: Span,
     ) -> Option<MirOperand> {
+        // UT — the `capta` capture boundary: the failable call lowers to the
+        // existing `TryCall` whose error block wraps the payload into the
+        // trap carrier (union-typed destination) and joins. A trapped error
+        // never reaches `ReturnError`.
+        if let Some(trap) = self.take_innermost_trap() {
+            let ok_block = self.fresh_block(span);
+            let error_block = self.fresh_block(span);
+            let error_temp = self.push_temp(err_ty, span);
+            let error_place = MirPlace::temp(error_temp);
+            if self.is_vacuum(ty) {
+                self.terminate_current(
+                    MirTerminatorKind::TryCall {
+                        destination: None,
+                        callee,
+                        args: lowered_args,
+                        ok_block,
+                        error_place,
+                        error_block,
+                    },
+                    span,
+                );
+                self.switch_to(error_block);
+                self.assign(
+                    trap.destination,
+                    MirOperand::Temp(error_temp),
+                    err_ty,
+                    span,
+                );
+                self.terminate_current(MirTerminatorKind::Goto(trap.join_block), span);
+                self.switch_to(ok_block);
+                return Some(MirOperand::Constant(MirConstant::Unit));
+            }
+
+            let destination = self.push_temp(ty, span);
+            self.terminate_current(
+                MirTerminatorKind::TryCall {
+                    destination: Some(MirPlace::temp(destination)),
+                    callee,
+                    args: lowered_args,
+                    ok_block,
+                    error_place,
+                    error_block,
+                },
+                span,
+            );
+            self.switch_to(error_block);
+            self.assign(
+                trap.destination,
+                MirOperand::Temp(error_temp),
+                err_ty,
+                span,
+            );
+            self.terminate_current(MirTerminatorKind::Goto(trap.join_block), span);
+            self.switch_to(ok_block);
+            return Some(MirOperand::Temp(destination));
+        }
+
         if let Some(handler) = self.handlers.last().cloned() {
             let ok_block = self.fresh_block(span);
             if self.is_vacuum(ty) {

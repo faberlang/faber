@@ -1640,6 +1640,15 @@ impl Parser {
                 if self.check_keyword_ident(TokenKind::Clausura) {
                     return self.parse_clausura_expr();
                 }
+                // Capture boundary: `capta { ... }` claims the spelling only
+                // in expression-primary position directly followed by a
+                // block, so calls `capta(…)` and bare identifier uses keep
+                // their ordinary meaning.
+                if self.check_keyword_ident(TokenKind::Trap)
+                    && self.peek_at(1).kind == TokenKind::LBrace
+                {
+                    return self.parse_trap_expr();
+                }
                 // Expression-form `ad` is blockless — a following `{` belongs
                 // to the statement parser.
                 if self.check_keyword_ident(TokenKind::Ad) {
@@ -2774,6 +2783,27 @@ impl Parser {
         Ok(Expr {
             id,
             kind: ExprKind::Praefixum(PraefixumExpr { body }),
+            span,
+        })
+    }
+
+    /// Parse `capta { ... }`, the capture-boundary expression.
+    ///
+    /// GRAMMAR:
+    ///   trap-expr := `capta` block
+    ///
+    /// The trailing expression statement of the block is the success value;
+    /// `parse_block` owns the brace boundary. No `cape` clause, `dum` tail, or
+    /// early-success form attaches here — those belong to `fac` and open row 1.
+    fn parse_trap_expr(&mut self) -> Result<Expr, ParseError> {
+        let start = self.current_span();
+        self.expect_keyword_ident(TokenKind::Trap, "expected 'capta'")?;
+        let body = self.parse_block()?;
+        let span = start.merge(self.previous_span());
+        let id = self.next_id();
+        Ok(Expr {
+            id,
+            kind: ExprKind::Trap(Box::new(TrapExpr { body, span })),
             span,
         })
     }

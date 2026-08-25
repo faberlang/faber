@@ -1,0 +1,20 @@
++++
+locale = "en"
++++
+
+# u3 — T ≡ E collapse: success and error are the same type, so the trap
+# cannot distinguish them. Rejected fail-closed with the dedicated
+# `trap_union_collapsed` diagnostic.
+
+class Payload {
+    string message
+}
+
+fn same() → Payload ⇥ Payload {
+    return Payload { message = "x" }
+}
+
+main {
+    const ∪ r ← trap { same() }
+    print r
+}

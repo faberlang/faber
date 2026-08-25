@@ -23,6 +23,28 @@ fn generic_arg_type(arg: &radix_syntax::GenericArgExpr) -> &radix_syntax::TypeEx
 }
 
 #[test]
+fn parses_capta_trap_expression() {
+    // UT: `capta { ... }` parses in expression position; the block body is an
+    // ordinary statement block whose trailing expression is the success value.
+    let result = parse_ok(
+        "functio f() → numerus ⇥ textus { redde 1 }\nfunctio g() → vacuum { fixum ∪ r ← capta { f() } nota r }\n",
+    );
+    assert!(result.errors.is_empty(), "trap source must parse cleanly: {:?}", result.errors);
+    let program = result.program.as_ref().expect("program");
+    assert!(program.statements.len() == 2, "both functions parse: {:?}", program.statements.len());
+}
+
+#[test]
+fn capta_stays_usable_as_ordinary_identifier() {
+    // The keyword is contextual (expression-primary position only): a
+    // binding named `capta` and a call `capta()` stay ordinary identifiers.
+    let result = parse_ok(
+        "functio capta(numerus x) → numerus { redde x }\nfunctio g() → vacuum { fixum numerus capta ← capta(1) nota capta }\n",
+    );
+    assert!(result.errors.is_empty(), "capta as identifier must parse: {:?}", result.errors);
+}
+
+#[test]
 fn parses_empty_source() {
     let result = parse_ok("");
     let program = result.program.as_ref().expect("program");

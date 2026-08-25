@@ -386,6 +386,12 @@ impl FragmentDefinitionChecker<'_> {
                 self.check_block(body);
                 self.check_cape(catch);
             }
+            // UT: the capture boundary locally resolves the body's alternate
+            // exits — the effect is the same class as a local handler.
+            HirExpressionKind::Trap(body) => {
+                self.effect(expr.span, "alternate_exit");
+                self.check_block(body);
+            }
             HirExpressionKind::Clausura(params, _, _, body, _) => {
                 self.effect(expr.span, "dynamic_function");
                 for param in params {

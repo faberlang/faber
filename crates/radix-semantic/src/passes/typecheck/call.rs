@@ -1380,6 +1380,20 @@ impl TypeChecker<'_> {
                 );
                 return false;
             }
+            // UT — the third legal answer: the `capta` capture boundary. The
+            // trap hole accepts every failable call's error type by
+            // accumulation through the existing U-02 arms; no new inference,
+            // no channel-specific typing.
+            Some(ErrorSink::Trap(var)) => {
+                let hole = self.trap_sink_type(var);
+                self.unify_assign_issue(
+                    err_ty,
+                    hole,
+                    span,
+                    super::control::ISSUE_TRAP_MEMBER_TYPE_MISMATCH,
+                );
+                return false;
+            }
             Some(ErrorSink::Function(func_err_ty)) => {
                 let source_ty = self.resolve_inferred_type(err_ty);
                 let destination_ty = self.resolve_inferred_type(func_err_ty);
