@@ -1738,33 +1738,49 @@ fn resolve_generic_arg(
     errors: &mut Vec<SemanticError>,
 ) {
     match arg {
-        GenericArgExpr::Type(ty) => resolve_type_expr(resolver, interner, ty, errors),
+        GenericArgExpr::Type(ty) => match &ty.kind {
+            // A bare named argument may bind a magnitudo/index slot, so it
+            // validates leniently exactly like the `Name` shape.
+            TypeExprKind::Named(ident, nested) if nested.is_empty() => {
+                resolve_named_generic_arg_ident(resolver, interner, ident, errors);
+            }
+            _ => resolve_type_expr(resolver, interner, ty, errors),
+        },
         GenericArgExpr::Size(figura) => resolve_figura_expr(resolver, figura, errors),
         GenericArgExpr::Name(ident) => {
-            if is_builtin_type(interner.resolve(ident.name)) {
-                return;
-            }
-            let Some(def_id) = resolver.lookup(ident.name) else {
-                errors.push(undefined_type_error(ISSUE_UNKNOWN_TYPE, ident.span));
-                return;
-            };
-            let Some(symbol) = resolver.get_symbol(def_id) else {
-                errors.push(undefined_type_error(ISSUE_UNKNOWN_TYPE, ident.span));
-                return;
-            };
-            if !matches!(
-                symbol.kind,
-                SymbolKind::Struct
-                    | SymbolKind::Enum
-                    | SymbolKind::Interface
-                    | SymbolKind::TypeAlias
-                    | SymbolKind::TypeParam
-                    | SymbolKind::IndexParam
-                    | SymbolKind::Schema
-            ) {
-                errors.push(undefined_type_error(ISSUE_NAME_NOT_TYPE, ident.span));
-            }
+            resolve_named_generic_arg_ident(resolver, interner, ident, errors);
         }
+    }
+}
+
+fn resolve_named_generic_arg_ident(
+    resolver: &mut Resolver,
+    interner: &Interner,
+    ident: &radix_syntax::Ident,
+    errors: &mut Vec<SemanticError>,
+) {
+    if is_builtin_type(interner.resolve(ident.name)) {
+        return;
+    }
+    let Some(def_id) = resolver.lookup(ident.name) else {
+        errors.push(undefined_type_error(ISSUE_UNKNOWN_TYPE, ident.span));
+        return;
+    };
+    let Some(symbol) = resolver.get_symbol(def_id) else {
+        errors.push(undefined_type_error(ISSUE_UNKNOWN_TYPE, ident.span));
+        return;
+    };
+    if !matches!(
+        symbol.kind,
+        SymbolKind::Struct
+            | SymbolKind::Enum
+            | SymbolKind::Interface
+            | SymbolKind::TypeAlias
+            | SymbolKind::TypeParam
+            | SymbolKind::IndexParam
+            | SymbolKind::Schema
+    ) {
+        errors.push(undefined_type_error(ISSUE_NAME_NOT_TYPE, ident.span));
     }
 }
 
@@ -3306,7 +3322,7 @@ fn lower_bounded_primitive(
             Err(TypeLowerError::Issue(ISSUE_ASCII_FORMAT_HINT_NOT_CAPACITY))
         }
         [capacity] => {
-            let capacity = lower_generic_index_arg(capacity, resolver, types)?;
+            let capacity = lower_generic_index_arg(capacity, resolver, interner, types)?;
             Ok(match prim {
                 Primitive::Ascii => types.bounded_ascii(capacity),
                 Primitive::Textus => types.bounded_textus(capacity),
@@ -3331,7 +3347,7 @@ fn lower_lista_type(
         }
         [elem, capacity] => {
             let elem = lower_generic_type_arg(elem, resolver, interner, types)?;
-            let capacity = lower_generic_index_arg(capacity, resolver, types)?;
+            let capacity = lower_generic_index_arg(capacity, resolver, interner, types)?;
             Ok(types.bounded_array(elem, capacity))
         }
         _ => Err(TypeLowerError::CollectionArity(CollectionKind::Lista)),
@@ -3356,7 +3372,7 @@ fn lower_queue_stack_type(
         }
         [elem, capacity] => {
             let elem = lower_generic_type_arg(elem, resolver, interner, types)?;
-            let capacity = lower_generic_index_arg(capacity, resolver, types)?;
+            let capacity = lower_generic_index_arg(capacity, resolver, interner, types)?;
             Ok(match collection {
                 CollectionKind::Queue => types.bounded_queue(elem, capacity),
                 CollectionKind::Stack => types.bounded_stack(elem, capacity),
@@ -3403,6 +3419,7 @@ fn lower_generic_type_arg(
 fn lower_generic_index_arg(
     arg: &GenericArgExpr,
     resolver: &Resolver,
+    interner: &Interner,
     types: &mut TypeTable,
 ) -> Result<radix_types::IndexId, TypeLowerError> {
     match arg {
@@ -3416,22 +3433,36 @@ fn lower_generic_index_arg(
             let var = types.fresh_index_infer_var();
             Ok(types.intern_index(IndexExpr::Infer(var)))
         }
-        GenericArgExpr::Name(ident) => {
-            let kind = resolver
-                .lookup(ident.name)
-                .and_then(|def_id| resolver.get_symbol(def_id))
-                .map(|symbol| symbol.kind);
-            match kind {
-                Some(SymbolKind::IndexParam) => {
-                    Ok(types.intern_index(IndexExpr::Param(ident.name)))
-                }
-                Some(SymbolKind::TypeParam) => {
-                    Err(TypeLowerError::Issue(ISSUE_FIGURA_TYPE_PARAM_IN_INDEX))
-                }
-                _ => Err(TypeLowerError::Issue(ISSUE_BOUNDED_CAPACITY_NOT_NATURAL)),
+        GenericArgExpr::Name(ident) => lower_named_index_ident(ident, resolver, types),
+        // Bounded-capacity applications keep the explicit `Type` shape, so a
+        // bare named index argument arrives here as `Type(Named(…))`; digit
+        // spellings and index params lower exactly like the `Name` shape.
+        GenericArgExpr::Type(TypeExpr {
+            kind: TypeExprKind::Named(ident, nested),
+            ..
+        }) if nested.is_empty() => {
+            if let Some(value) = radix_types::parse_natural_capacity(interner.resolve(ident.name)) {
+                return Ok(types.intern_index(IndexExpr::Literal(value)));
             }
+            lower_named_index_ident(ident, resolver, types)
         }
         GenericArgExpr::Type(_) => Err(TypeLowerError::Issue(ISSUE_FIGURA_TYPE_PARAM_IN_INDEX)),
+    }
+}
+
+fn lower_named_index_ident(
+    ident: &radix_syntax::Ident,
+    resolver: &Resolver,
+    types: &mut TypeTable,
+) -> Result<radix_types::IndexId, TypeLowerError> {
+    let kind = resolver
+        .lookup(ident.name)
+        .and_then(|def_id| resolver.get_symbol(def_id))
+        .map(|symbol| symbol.kind);
+    match kind {
+        Some(SymbolKind::IndexParam) => Ok(types.intern_index(IndexExpr::Param(ident.name))),
+        Some(SymbolKind::TypeParam) => Err(TypeLowerError::Issue(ISSUE_FIGURA_TYPE_PARAM_IN_INDEX)),
+        _ => Err(TypeLowerError::Issue(ISSUE_BOUNDED_CAPACITY_NOT_NATURAL)),
     }
 }
 
@@ -3443,7 +3474,7 @@ fn lower_applied_arg(
 ) -> Result<AppliedArg, TypeLowerError> {
     match arg {
         GenericArgExpr::Size(_) => {
-            lower_generic_index_arg(arg, resolver, types).map(AppliedArg::Size)
+            lower_generic_index_arg(arg, resolver, interner, types).map(AppliedArg::Size)
         }
         GenericArgExpr::Type(ty) if matches!(ty.kind, TypeExprKind::Infer) => {
             lower_type_expr(ty, resolver, interner, types).map(AppliedArg::Type)
@@ -3454,7 +3485,7 @@ fn lower_applied_arg(
                 .and_then(|def_id| resolver.get_symbol(def_id))
                 .is_some_and(|symbol| symbol.kind == SymbolKind::IndexParam);
             if is_index {
-                lower_generic_index_arg(arg, resolver, types).map(AppliedArg::Size)
+                lower_generic_index_arg(arg, resolver, interner, types).map(AppliedArg::Size)
             } else {
                 lower_generic_type_arg(arg, resolver, interner, types).map(AppliedArg::Type)
             }

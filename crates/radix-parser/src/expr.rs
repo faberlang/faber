@@ -2609,12 +2609,14 @@ impl Parser {
 
     /// Parse `< typeArgument (, typeArgument)* >` after the opening `<` has been consumed.
     ///
-    /// Call-site lists use the same `typeArguments` production as named types,
-    /// including NATURAL (`linear_from_raw<2, 2, 2>(…)`).
+    /// A call-site list is unambiguously a `typeArguments` position, so every
+    /// argument keeps the explicit `Type` shape — including NATURAL
+    /// (`linear_from_raw<2, 2, 2>(…)`) — instead of the kinded split used by
+    /// generic-head applications.
     fn finish_type_args_list(&mut self) -> Result<Vec<GenericArgExpr>, ParseError> {
         let mut args = Vec::new();
         loop {
-            args.push(self.parse_type_argument()?);
+            args.push(self.parse_explicit_type_argument()?);
             if !self.consume_item_separator(&TokenKind::GtAscii, "type_arguments")? {
                 break;
             }

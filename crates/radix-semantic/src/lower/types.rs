@@ -241,32 +241,50 @@ impl Lowerer<'_> {
                 let var = self.types.fresh_index_infer_var();
                 Some(self.types.intern_index(IndexExpr::Infer(var)))
             }
-            GenericArgExpr::Name(ident) => {
-                match self.lexical_generic_param_kind(ident.name) {
-                    Some(GenericParamKind::Magnitudo) => {
-                        Some(self.types.intern_index(IndexExpr::Param(ident.name)))
-                    }
-                    Some(GenericParamKind::Typus) => {
-                        self.error("generic_type_argument_in_size_position");
-                        None
-                    }
-                    None => match self.resolver.lookup(ident.name).and_then(|def_id| {
-                        self.resolver.get_symbol(def_id).map(|symbol| symbol.kind)
-                    }) {
-                        Some(crate::SymbolKind::IndexParam) => {
-                            Some(self.types.intern_index(IndexExpr::Param(ident.name)))
-                        }
-                        _ => {
-                            self.error("generic_type_argument_in_size_position");
-                            None
-                        }
-                    },
+            GenericArgExpr::Name(ident) => self.lower_named_index_arg(ident),
+            // Bounded-capacity applications keep the explicit `Type` shape, so
+            // a bare named index argument arrives here as `Type(Named(…))`;
+            // digit spellings and index params lower exactly like `Name`.
+            GenericArgExpr::Type(TypeExpr {
+                kind: TypeExprKind::Named(ident, nested),
+                ..
+            }) if nested.is_empty() => {
+                if let Some(value) =
+                    radix_types::parse_natural_capacity(self.interner.resolve(ident.name))
+                {
+                    return Some(self.types.intern_index(IndexExpr::Literal(value)));
                 }
+                self.lower_named_index_arg(ident)
             }
             GenericArgExpr::Type(_) => {
                 self.error("generic_type_argument_in_size_position");
                 None
             }
+        }
+    }
+
+    fn lower_named_index_arg(&mut self, ident: &Ident) -> Option<IndexId> {
+        match self.lexical_generic_param_kind(ident.name) {
+            Some(GenericParamKind::Magnitudo) => {
+                Some(self.types.intern_index(IndexExpr::Param(ident.name)))
+            }
+            Some(GenericParamKind::Typus) => {
+                self.error("generic_type_argument_in_size_position");
+                None
+            }
+            None => match self
+                .resolver
+                .lookup(ident.name)
+                .and_then(|def_id| self.resolver.get_symbol(def_id).map(|symbol| symbol.kind))
+            {
+                Some(crate::SymbolKind::IndexParam) => {
+                    Some(self.types.intern_index(IndexExpr::Param(ident.name)))
+                }
+                _ => {
+                    self.error("generic_type_argument_in_size_position");
+                    None
+                }
+            },
         }
     }
 
@@ -365,7 +383,10 @@ impl Lowerer<'_> {
                     _ => AppliedArg::Type(self.lower_generic_type_arg(arg)),
                 },
                 GenericParamKind::Magnitudo => match arg {
-                    GenericArgExpr::Type(ty) if !matches!(ty.kind, TypeExprKind::Infer) => {
+                    GenericArgExpr::Type(ty)
+                        if !matches!(ty.kind, TypeExprKind::Infer)
+                            && !self.type_arg_names_an_index(&ty.kind) =>
+                    {
                         self.error("generic_argument_kind_mismatch");
                         AppliedArg::Size(self.types.intern_index(IndexExpr::Unspecified))
                     }
@@ -392,6 +413,28 @@ impl Lowerer<'_> {
                 },
             })
             .collect()
+    }
+
+    /// True when a `Type(Named(…))` argument names a compile-time index — a
+    /// NATURAL digit spelling or a declared index/magnitudo param — and so
+    /// binds a `magnitudo` slot instead of mismatching.
+    fn type_arg_names_an_index(&self, kind: &TypeExprKind) -> bool {
+        let TypeExprKind::Named(ident, nested) = kind else {
+            return false;
+        };
+        if !nested.is_empty() {
+            return false;
+        }
+        radix_types::parse_natural_capacity(self.interner.resolve(ident.name)).is_some()
+            || self
+                .resolver
+                .lookup(ident.name)
+                .and_then(|id| self.resolver.get_symbol(id))
+                .is_some_and(|symbol| symbol.kind == crate::SymbolKind::IndexParam)
+            || matches!(
+                self.lexical_generic_param_kind(ident.name),
+                Some(GenericParamKind::Magnitudo)
+            )
     }
 
     /// Resolve a named type spelling before generic application.

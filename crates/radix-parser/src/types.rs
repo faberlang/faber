@@ -25,6 +25,16 @@ use radix_syntax::{
 };
 use std::collections::HashSet;
 
+/// Heads whose arguments are capacities spelled in the type surface itself.
+///
+/// `lista`, `textus`, `ascii`, and `octeti` carry their bound in the type, so
+/// their applied arguments keep the explicit `Type` shape. Generic heads
+/// (`Box<T>`, user genera) use the kinded split instead: their parameter kinds
+/// are only known from declaration metadata.
+fn is_bounded_capacity_head(name: &str) -> bool {
+    matches!(name, "lista" | "textus" | "ascii" | "octeti")
+}
+
 // TYPE PARSING
 
 impl Parser {
@@ -239,6 +249,12 @@ impl Parser {
                             GenericArgExpr::Type(self.parse_iuncta_type_argument(&mut labels)?)
                         } else if path.len() == 1 && name_str == "ratio" {
                             GenericArgExpr::Type(self.parse_ratio_type_argument(&mut labels)?)
+                        } else if path.len() == 1 && is_bounded_capacity_head(&name_str) {
+                            // lista/textus/ascii/octeti spell their capacity in
+                            // the type surface itself, so their arguments keep
+                            // the explicit `Type` shape (NATURAL interns as a
+                            // named type) rather than the kinded split.
+                            self.parse_explicit_type_argument()?
                         } else {
                             self.parse_type_argument()?
                         };
@@ -542,13 +558,11 @@ impl Parser {
         Ok(ty)
     }
 
-    /// Parse one applied argument without erasing its source kind.
+    /// Parse one applied argument in generic-head position.
     ///
     /// Natural literals and shape tuples are compile-time size expressions.
-    /// Bare names stay unresolved until declaration metadata identifies the
-    /// corresponding generic parameter kind. Explicit `_` remains a type hole
-    /// here; a checked magnitudo slot reclassifies it as an index hole later.
-    /// Call-site `typeArguments` share this production with named types.
+    /// Explicit `_` remains a type hole here; a checked magnitudo slot
+    /// reclassifies it as an index hole later.
     pub(super) fn parse_type_argument(&mut self) -> Result<GenericArgExpr, ParseError> {
         if let TokenKind::Integer(value) = self.peek().kind {
             self.advance();
@@ -557,16 +571,31 @@ impl Parser {
         if self.check(&TokenKind::LBracket) {
             return Ok(GenericArgExpr::Size(self.parse_figura()?));
         }
-        let ty = self.parse_type()?;
-        if let TypeExprKind::Named(name, nested) = &ty.kind {
-            if nested.is_empty() {
-                return Ok(GenericArgExpr::Name(Ident {
-                    name: name.name,
-                    span: name.span,
-                }));
-            }
+        Ok(GenericArgExpr::Type(self.parse_type()?))
+    }
+
+    /// Parse one explicit type argument at a call site or bounded-container
+    /// application.
+    ///
+    /// These positions are unambiguously `typeArguments` in the grammar, so a
+    /// bare name stays a `Type` and NATURAL interns as a named type — the
+    /// kinded reclassification of generic heads must not swallow either.
+    pub(super) fn parse_explicit_type_argument(&mut self) -> Result<GenericArgExpr, ParseError> {
+        if let TokenKind::Integer(value) = self.peek().kind {
+            let span = self.current_span();
+            self.advance();
+            return Ok(GenericArgExpr::Type(TypeExpr {
+                nullable: false,
+                mode: None,
+                kind: TypeExprKind::Named(self.keyword_ident(&value.to_string(), span), Vec::new()),
+                span,
+                iuncta_label: None,
+            }));
         }
-        Ok(GenericArgExpr::Type(ty))
+        if self.check(&TokenKind::LBracket) {
+            return Ok(GenericArgExpr::Size(self.parse_figura()?));
+        }
+        Ok(GenericArgExpr::Type(self.parse_type()?))
     }
 
     /// Parse a tensor `Figura` in type position.
