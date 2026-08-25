@@ -196,6 +196,7 @@ pub struct Lexer<'a> {
     cursor: Cursor<'a>,
     locale_pack: Option<&'a dyn KeywordPack>,
     keyword_surface: crate::KeywordSurfaceMode,
+    has_latin_fallback: bool,
     interner: Interner,
     tokens: Vec<Token>,
     errors: Vec<LexError>,
@@ -214,6 +215,7 @@ impl<'a> Lexer<'a> {
             cursor: Cursor::new(source),
             locale_pack: None,
             keyword_surface: crate::KeywordSurfaceMode::RegistryDirect,
+            has_latin_fallback: false,
             interner: Interner::new(),
             tokens: Vec::new(),
             errors: Vec::new(),
@@ -230,6 +232,7 @@ impl<'a> Lexer<'a> {
     pub fn with_locale_pack(mut self, pack: &'a dyn KeywordPack) -> Self {
         self.locale_pack = Some(pack);
         self.keyword_surface = crate::KeywordSurfaceMode::from_pack_id(Some(pack.pack_id()));
+        self.has_latin_fallback = pack.has_latin_fallback();
         for spec in keyword_specs() {
             if let Some(spelling) = pack.keyword_spelling(spec.text) {
                 self.reader_keyword_surfaces
@@ -257,6 +260,7 @@ impl<'a> Lexer<'a> {
             reader_keyword_latin_keys: self.reader_keyword_latin_keys,
             reader_keyword_surfaces: self.reader_keyword_surfaces,
             reader_type_latin_keys: self.reader_type_latin_keys,
+            has_latin_fallback: self.has_latin_fallback,
             keyword_surface: self.keyword_surface,
             interner: self.interner,
         }

@@ -167,6 +167,17 @@ pub trait KeywordPack {
         None
     }
 
+    /// Whether canonical Latin type spellings are an explicit pack fallback.
+    ///
+    /// This is separate from keyword claiming: a fallback pack keeps its
+    /// declared keyword surface authoritative while allowing missing type rows
+    /// to retain their canonical Latin spelling. The parser uses this only to
+    /// suppress the wrong-locale type seal for an explicitly configured `la`
+    /// fallback.
+    fn has_latin_fallback(&self) -> bool {
+        false
+    }
+
     /// Suggested canonical spelling for near-miss identifiers.
     fn keyword_suggestion(&self, text: &str) -> Option<String>;
 }
@@ -198,6 +209,9 @@ pub struct LexResult {
 
     /// Exact source spelling → Latin type identity, for parser-owned type slots.
     pub reader_type_latin_keys: HashMap<String, String>,
+
+    /// Whether the active pack explicitly permits canonical Latin type fallback.
+    pub has_latin_fallback: bool,
 
     /// Keyword-claim surface for this run, derived from the active pack.
     pub keyword_surface: KeywordSurfaceMode,

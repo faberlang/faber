@@ -97,6 +97,7 @@ pub struct Parser {
     reader_keyword_latin_keys: HashMap<String, String>,
     reader_keyword_surfaces: HashMap<String, String>,
     reader_type_latin_keys: HashMap<String, String>,
+    has_latin_fallback: bool,
 }
 
 /// Contextual parser policy supplied by compiler frontends.
@@ -125,6 +126,7 @@ pub fn parse_with_options(lex_result: LexResult, options: ParseOptions) -> Parse
         reader_keyword_latin_keys,
         reader_keyword_surfaces,
         reader_type_latin_keys,
+        has_latin_fallback,
         keyword_surface,
         interner,
         ..
@@ -137,7 +139,7 @@ pub fn parse_with_options(lex_result: LexResult, options: ParseOptions) -> Parse
         };
     }
 
-    let mut parser = Parser::new_with_reader_identities(
+    let mut parser = Parser::new_with_reader_identities_and_fallback(
         tokens,
         interner,
         options,
@@ -145,6 +147,7 @@ pub fn parse_with_options(lex_result: LexResult, options: ParseOptions) -> Parse
         reader_keyword_surfaces,
         reader_type_latin_keys,
         keyword_surface,
+        has_latin_fallback,
     );
     parser.parse_program()
 }
@@ -186,6 +189,28 @@ impl Parser {
         reader_type_latin_keys: HashMap<String, String>,
         keyword_surface: KeywordSurfaceMode,
     ) -> Self {
+        Self::new_with_reader_identities_and_fallback(
+            tokens,
+            interner,
+            options,
+            reader_keyword_latin_keys,
+            reader_keyword_surfaces,
+            reader_type_latin_keys,
+            keyword_surface,
+            false,
+        )
+    }
+
+    fn new_with_reader_identities_and_fallback(
+        tokens: Vec<Token>,
+        interner: Interner,
+        options: ParseOptions,
+        reader_keyword_latin_keys: HashMap<String, String>,
+        reader_keyword_surfaces: HashMap<String, String>,
+        reader_type_latin_keys: HashMap<String, String>,
+        keyword_surface: KeywordSurfaceMode,
+        has_latin_fallback: bool,
+    ) -> Self {
         let non_trivia_indices: Vec<usize> = tokens
             .iter()
             .enumerate()
@@ -204,6 +229,7 @@ impl Parser {
             reader_keyword_latin_keys,
             reader_keyword_surfaces,
             reader_type_latin_keys,
+            has_latin_fallback,
         }
     }
 
@@ -670,6 +696,7 @@ impl Parser {
         let source = self.interner.resolve(ident.name);
         let Some(latin_key) = self.reader_type_latin_keys.get(source).cloned() else {
             if self.keyword_surface == KeywordSurfaceMode::PackAuthoritative
+                && !self.has_latin_fallback
                 && Self::is_canonical_type_spelling(source)
             {
                 self.errors.push(
@@ -684,11 +711,13 @@ impl Parser {
     }
 
     fn is_canonical_type_spelling(source: &str) -> bool {
-        radix_types::lookup_primitive_type_spec(source).is_some_and(|spec| spec.canonical)
-            || radix_types::lookup_collection_type_spec(source).is_some_and(|spec| spec.canonical)
-            || radix_types::lookup_tensor_family_type_spec(source)
-                .is_some_and(|spec| spec.canonical)
-            || source == "modulus"
+        radix_types::lookup_collection_type_spec(source).is_some_and(|spec| {
+            spec.canonical
+                && matches!(
+                    spec.kind,
+                    radix_types::CollectionKind::Queue | radix_types::CollectionKind::Stack
+                )
+        })
     }
 
     fn expect(&mut self, kind: &TokenKind, msg: &str) -> Result<&Token, ParseError> {

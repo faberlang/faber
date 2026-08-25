@@ -263,6 +263,17 @@ impl LocalePack {
         self.type_binding_kind(text).map(latin_type_surface)
     }
 
+    /// Whether this pack explicitly permits canonical Latin fallback.
+    ///
+    /// `inherits = "la"` is retained as a compatibility form for packs that
+    /// still use the pre-materialized schema; current packs express the same
+    /// policy with `fallback = ["la"]`.
+    #[must_use]
+    pub fn has_latin_fallback(&self) -> bool {
+        self.metadata.inherits.as_deref() == Some("la")
+            || self.metadata.fallback.iter().any(|id| id == "la")
+    }
+
     /// Return the localized surface spelling for a keyword token kind.
     ///
     /// This is the emit-direction counterpart to [`Self::keyword_token_kind`]:
@@ -2377,6 +2388,10 @@ impl radix_lexer::KeywordPack for LocalePack {
 
     fn type_latin_key(&self, text: &str) -> Option<&str> {
         LocalePack::type_latin_key(self, text)
+    }
+
+    fn has_latin_fallback(&self) -> bool {
+        LocalePack::has_latin_fallback(self)
     }
 
     fn keyword_suggestion(&self, text: &str) -> Option<String> {

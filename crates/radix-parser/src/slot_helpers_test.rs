@@ -68,6 +68,43 @@ impl KeywordPack for SlotTestPack {
     }
 }
 
+/// Minimal pack-authoritative surface for the queue/stack sealing pin. Its
+/// ordinary type rows are localized, while `queue` remains a canonical Latin
+/// type spelling supplied by the explicit `la` fallback policy.
+struct QueueFallbackPack {
+    has_latin_fallback: bool,
+}
+
+impl KeywordPack for QueueFallbackPack {
+    fn pack_id(&self) -> &'static str {
+        "queue-test"
+    }
+
+    fn keyword_token_kind(&self, _text: &str) -> Option<TokenKind> {
+        None
+    }
+
+    fn keyword_latin_key(&self, text: &str) -> Option<&str> {
+        match text {
+            "fn" => Some("functio"),
+            "return" => Some("redde"),
+            _ => None,
+        }
+    }
+
+    fn type_latin_key(&self, text: &str) -> Option<&str> {
+        (text == "int").then_some("numerus")
+    }
+
+    fn has_latin_fallback(&self) -> bool {
+        self.has_latin_fallback
+    }
+
+    fn keyword_suggestion(&self, _text: &str) -> Option<String> {
+        None
+    }
+}
+
 /// Build a parser over `source` on the plain Latin surface (no reader pack).
 fn parser_over(source: &str) -> Parser {
     let lexed = lex(source);
@@ -95,6 +132,40 @@ fn parser_over_with_pack(source: &str) -> Parser {
         reader_type_latin_keys,
         keyword_surface,
     )
+}
+
+#[test]
+fn latin_fallback_allows_queue_and_stack_but_nonfallback_seals_them() {
+    let source = "fn f(queue<int> q, stack<int> s) → stack<int> { return s }";
+
+    let fallback = parse(lex_with_locale_pack(
+        source,
+        &QueueFallbackPack {
+            has_latin_fallback: true,
+        },
+    ));
+    assert!(
+        fallback.success(),
+        "la fallback must retain canonical queue spelling: {:?}",
+        fallback.errors
+    );
+
+    let sealed = parse(lex_with_locale_pack(
+        source,
+        &QueueFallbackPack {
+            has_latin_fallback: false,
+        },
+    ));
+    assert!(
+        sealed.errors.iter().any(|error| {
+            error
+                .args
+                .iter()
+                .any(|arg| arg.name == "issue" && arg.value == "wrong_locale_type")
+        }),
+        "non-fallback pack must seal canonical queue spelling: {:?}",
+        sealed.errors
+    );
 }
 
 #[test]
