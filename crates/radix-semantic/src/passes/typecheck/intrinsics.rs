@@ -168,7 +168,9 @@ pub(super) fn check_intrinsic_method_call(
     args: &mut [HirCallArg],
     span: radix_lexer::Span,
 ) -> Option<TypeId> {
-    let receiver_resolved = checker.resolve_inferred_type(receiver_ty);
+    // S0-G2: applied aliases are value-transparent — an alias receiver
+    // dispatches on its substituted builtin carrier.
+    let receiver_resolved = checker.value_carrier_type(receiver_ty);
     let (_, payload_ty) = checker.types.peel_access_marker(receiver_resolved);
     let resolved = checker.types.get(payload_ty);
     let method_name = checker.interner.map_or_else(

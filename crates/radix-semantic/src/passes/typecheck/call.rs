@@ -475,6 +475,12 @@ impl TypeChecker<'_> {
         let resolved_receiver_ty = self.resolve_inferred_type(receiver_ty);
         let (_, intrinsic_ty) = self.types.peel_access_marker(resolved_receiver_ty);
         let resolved_receiver = self.types.get(intrinsic_ty);
+        // S0-G2: applied aliases are value-transparent for intrinsic-method
+        // dispatch — the receiver's builtin carrier owns the closed
+        // tensor/vector/matrix method surface, including its unknown-method
+        // rejection posture.
+        let receiver_carrier = self.value_carrier_type(intrinsic_ty);
+        let resolved_receiver = self.types.get(receiver_carrier);
         let receiver_is_atomic = matches!(resolved_receiver, Type::Atomic(_));
         let receiver_requires_known_method = matches!(
             resolved_receiver,

@@ -295,6 +295,11 @@ impl TypeChecker<'_> {
             return self.error_type;
         };
         let target_resolved = self.resolve_inferred_type(*target);
+        // S0-G2: `↦` dispatch is value-transparent through applied aliases —
+        // the shape arms below (vector/matrix/tensor materialization) see the
+        // substituted builtin carrier, while a successful conversion keeps
+        // returning the written target identity.
+        let target_carrier = self.value_carrier_type(target_resolved);
 
         if let Some(result_ty) = self.check_json_genus_conversio(source_ty, target_resolved, span) {
             if let Some(recovery) = recovery {
@@ -455,54 +460,54 @@ impl TypeChecker<'_> {
             return error_ty;
         }
 
-        if let Some(error_ty) = self.check_sparse_tensor_conversio(source_ty, target_resolved, span)
+        if let Some(error_ty) = self.check_sparse_tensor_conversio(source_ty, target_carrier, span)
         {
             return error_ty;
         }
 
-        if let Some(result_ty) = self.check_lista_to_matrix_conversio(source, target_resolved, span)
+        if let Some(result_ty) = self.check_lista_to_matrix_conversio(source, target_carrier, span)
         {
             if !self.types.equals(result_ty, self.error_type) {
                 if let Some(recovery) = recovery {
                     self.note_conversio_recovery_checked(recovery, target_resolved);
                 }
             }
-            return result_ty;
+            return self.conversio_written_identity(result_ty, target_carrier, target_resolved);
         }
 
         if let Some(result_ty) =
-            self.check_register_conversio(source, source_ty, target_resolved, params, span)
+            self.check_register_conversio(source, source_ty, target_carrier, params, span)
         {
             if !self.types.equals(result_ty, self.error_type) {
                 if let Some(recovery) = recovery {
                     self.note_conversio_recovery_checked(recovery, target_resolved);
                 }
             }
-            return result_ty;
+            return self.conversio_written_identity(result_ty, target_carrier, target_resolved);
         }
 
         if !matches!(source.kind, HirExpressionKind::Array(_)) {
             if let Some(result_ty) =
-                self.check_bounded_lista_to_vector_conversio(source_ty, target_resolved, span)
+                self.check_bounded_lista_to_vector_conversio(source_ty, target_carrier, span)
             {
                 if !self.types.equals(result_ty, self.error_type) {
                     if let Some(recovery) = recovery {
                         self.note_conversio_recovery_checked(recovery, target_resolved);
                     }
                 }
-                return result_ty;
+                return self.conversio_written_identity(result_ty, target_carrier, target_resolved);
             }
         }
 
         if let Some(result_ty) =
-            self.check_lista_to_vector_conversio(source, source_ty, target_resolved, span)
+            self.check_lista_to_vector_conversio(source, source_ty, target_carrier, span)
         {
             if !self.types.equals(result_ty, self.error_type) {
                 if let Some(recovery) = recovery {
                     self.note_conversio_recovery_checked(recovery, target_resolved);
                 }
             }
-            return result_ty;
+            return self.conversio_written_identity(result_ty, target_carrier, target_resolved);
         }
 
         if let Some(error_ty) =
@@ -511,7 +516,7 @@ impl TypeChecker<'_> {
             return error_ty;
         }
 
-        if let Some(error_ty) = self.check_tensor_conversio(source_ty, target_resolved, span) {
+        if let Some(error_ty) = self.check_tensor_conversio(source_ty, target_carrier, span) {
             return error_ty;
         }
 
@@ -537,6 +542,25 @@ impl TypeChecker<'_> {
             self.check_conversio_propagation_channel(source_ty, target_resolved, span);
         }
         target_resolved
+    }
+
+    /// Map a shape-arm success back to the written conversion target (S0-G2).
+    ///
+    /// The `↦` shape arms dispatch on the value carrier — an applied alias
+    /// target expands to its builtin carrier — so a success that returns the
+    /// carrier is the written annotation's own conversion succeeding; the
+    /// written identity (alias application included) is the result type.
+    fn conversio_written_identity(
+        &self,
+        result: TypeId,
+        carrier: TypeId,
+        written: TypeId,
+    ) -> TypeId {
+        if self.types.equals(result, carrier) {
+            written
+        } else {
+            result
+        }
     }
 
     /// `x ↦ intervallum` / `r1 ↦ r2`: clamp; value clamp yields bound `T`, range clamp yields `intervallum<T>`.

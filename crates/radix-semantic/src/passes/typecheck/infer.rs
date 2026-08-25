@@ -717,13 +717,32 @@ impl TypeChecker<'_> {
     /// a use `X<int>` becomes `Type::Applied(Type::Alias(def, body), [int])`.
     /// The alias's own type params are recorded in `alias_type_params` during
     /// item collection; here the args are substituted for the param names in
-    /// the body (mirroring generic call-site substitution). Non-alias applied
-    /// types (structs, enums, builtins) are returned unchanged — generic
-    /// nominal application is invariant and must not be peeled here.
+    /// the body (mirroring generic call-site substitution). An imported alias
+    /// application whose base is the imported body — a register carrier whose
+    /// width/shape expressions are placeholders (free declaration params, or
+    /// the index holes a generic signature substitution already wrote) —
+    /// expands by filling the carrier's shape slots with the applied size
+    /// args in order; see [`Self::rebuild_carrier_with_size_args`] for the
+    /// arity/type-kind guard. Other applied types (structs, enums,
+    /// interfaces) are returned unchanged — generic nominal application is
+    /// invariant and must not be peeled here.
     fn normalize_applied_alias(&mut self, ty: TypeId) -> TypeId {
         let Type::Applied(base, args) = self.types.get(ty).clone() else {
             return ty;
         };
+        let base_resolved = self.resolve_inferred_type(base);
+        // Imported alias applications carry the alias body (a register
+        // carrier with free index params) as the base — the interface route
+        // stores no `Type::Alias` wrapper — so they expand by binding the
+        // applied size args onto the base's free params (S0-G2).
+        if matches!(
+            self.types.get(base_resolved),
+            Type::Vector(_, _) | Type::Matrix(_, _) | Type::Tensor(_, _) | Type::Sparsa(_, _)
+        ) {
+            return self
+                .rebuild_carrier_with_size_args(base_resolved, &args)
+                .unwrap_or(ty);
+        }
         let Type::Alias(def, body) = self.types.get(base).clone() else {
             return ty;
         };
@@ -760,6 +779,74 @@ impl TypeChecker<'_> {
                 }
             }
             _ => substituted,
+        }
+    }
+
+    /// Value-level carrier of `ty` for operator, method, conversion, and
+    /// assignment dispatch (S0-G2 alias value transparency).
+    ///
+    /// A transparent alias is value-transparent: applied alias uses expand to
+    /// their substituted builtin carrier so glyph operands, intrinsic method
+    /// receivers, `↦` shape arms, and builtin↔alias assignment see the
+    /// register shape the alias declares. Local applications expand through
+    /// the declaration param names recorded at collection; imported
+    /// applications and generic-signature applications (whose base is the
+    /// alias body with placeholder widths) expand by shape-slot filling —
+    /// see [`Self::normalize_applied_alias`] for that guard.
+    ///
+    /// Applied *nominal* genera (`Type::Applied(Type::Struct.., ..)` and
+    /// friends) never expand here: their application is invariant, and
+    /// transparency is for aliases, not nominals.
+    pub(crate) fn value_carrier_type(&mut self, ty: TypeId) -> TypeId {
+        let resolved = self.resolve_inferred_type(ty);
+        self.normalize_applied_alias(resolved)
+    }
+
+    /// Rebuild a register carrier with the applied size args in its shape
+    /// slots (S0-G2 imported/signature alias expansion).
+    ///
+    /// The base's own width/shape expressions are placeholders at this point —
+    /// free declaration params on an imported alias body, or the fresh index
+    /// holes a generic signature substitution already wrote in — so the
+    /// applied arguments are the authoritative slot values: a vector base
+    /// takes one size arg, a matrix base two, a tensor/sparsa base one per
+    /// declared dimension. Returns `None` (stays unexpanded) when any
+    /// argument is a type or the arity does not fill the base's slots.
+    fn rebuild_carrier_with_size_args(
+        &mut self,
+        base: TypeId,
+        args: &[radix_types::AppliedArg],
+    ) -> Option<TypeId> {
+        let size_args: Vec<crate::IndexId> = args
+            .iter()
+            .map(|arg| match arg {
+                radix_types::AppliedArg::Size(index) => Some(*index),
+                radix_types::AppliedArg::Type(_) => None,
+            })
+            .collect::<Option<Vec<_>>>()?;
+        match self.types.get(base).clone() {
+            Type::Vector(element, _) if size_args.len() == 1 => {
+                Some(self.types.vector_with_width(element, size_args[0]))
+            }
+            Type::Sparsa(element, _) if size_args.len() == 1 => {
+                let shape = self
+                    .types
+                    .intern_index(radix_types::IndexExpr::Tuple(size_args));
+                Some(self.types.sparsa_with_shape(element, shape))
+            }
+            Type::Matrix(element, _) if size_args.len() == 2 => {
+                let shape = self
+                    .types
+                    .intern_index(radix_types::IndexExpr::Tuple(size_args));
+                Some(self.types.matrix_with_shape(element, shape))
+            }
+            Type::Tensor(element, _) if !size_args.is_empty() => {
+                let shape = self
+                    .types
+                    .intern_index(radix_types::IndexExpr::Tuple(size_args));
+                Some(self.types.tensor_with_shape(element, shape))
+            }
+            _ => None,
         }
     }
 

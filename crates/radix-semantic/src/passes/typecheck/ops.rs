@@ -1573,8 +1573,10 @@ impl TypeChecker<'_> {
         if self.is_error(lhs_ty) || self.is_error(rhs_ty) {
             return None;
         }
-        let lhs_resolved = self.resolve_inferred_type(lhs_ty);
-        let rhs_resolved = self.resolve_inferred_type(rhs_ty);
+        // S0-G2: glyph operands are value-transparent through applied aliases
+        // — `Vector<3> ⊗ Vector<2>` dispatches on the builtin carriers.
+        let lhs_resolved = self.value_carrier_type(lhs_ty);
+        let rhs_resolved = self.value_carrier_type(rhs_ty);
         if self.is_infer(lhs_resolved) || self.is_infer(rhs_resolved) {
             self.glyph_invalid_operand(op, GLYPH_OPERANDS_UNSUPPORTED, lhs.span);
             return None;

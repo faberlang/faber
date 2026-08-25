@@ -514,8 +514,12 @@ impl TypeChecker<'_> {
             | Type::Promissum(inner)
             | Type::Cursor(inner)
             | Type::Intervallum(inner)
-            | Type::Ref(_, inner)
-            | Type::Alias(_, inner) => self.collect_shape_params_in_type(inner, out),
+            | Type::Ref(_, inner) => self.collect_shape_params_in_type(inner, out),
+            // S0-G2: alias bodies are a foreign param scope — the alias's own
+            // declaration params are not this signature's shape params, so
+            // neither a bare alias use nor an applied alias's base contributes
+            // symbols. A function's magnitudo params reach here only through
+            // builtin shape positions and applied argument positions.
             Type::Map(key, value)
             | Type::PromissumFailable(key, value)
             | Type::AsyncCursor(key, value) => {
@@ -546,8 +550,7 @@ impl TypeChecker<'_> {
                     self.collect_shape_params_in_type(err, out);
                 }
             }
-            Type::Applied(base, args) => {
-                self.collect_shape_params_in_type(base, out);
+            Type::Applied(_base, args) => {
                 for arg in args {
                     match arg {
                         radix_types::AppliedArg::Type(id) => {

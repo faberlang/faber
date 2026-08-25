@@ -638,6 +638,10 @@ mod generic_params_test;
 mod glyph_binary_test;
 
 #[cfg(test)]
+#[path = "alias_transparency_test.rs"]
+mod alias_transparency_test;
+
+#[cfg(test)]
 #[path = "gradient_test.rs"]
 mod gradient_test;
 
