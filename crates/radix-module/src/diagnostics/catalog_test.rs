@@ -3,12 +3,12 @@
 //! codes remain stable; argument helpers preserve quoting.
 
 use super::super::catalog_semantic::{semantic_message, semantic_spec};
-use super::super::catalog_syntax::{lex_spec, parse_message, parse_spec};
+use super::super::catalog_syntax::{lex_message, lex_spec, parse_message, parse_spec};
 use super::super::locale_unknown_spec;
 use super::super::{unresolved_intrinsic_spec, unresolved_keyword_spec, unresolved_library_member_spec};
 use super::{arg_value, locale_suggestion_spec, quote_arg};
 use crate::diagnostics::DiagnosticArg;
-use crate::lexer::LexErrorKind;
+use crate::lexer::{LexErrorKind, HOMOGLYPH_ISSUE};
 use crate::parser::ParseErrorKind;
 use crate::semantic::{SemanticErrorKind, WarningKind};
 use std::collections::HashSet;
@@ -43,6 +43,30 @@ fn legacy_message_arg_is_not_a_catalog_rendering_fallback() {
 
     assert_eq!(parse_message(ParseErrorKind::Expected, &args), None);
     assert_eq!(semantic_message(SemanticErrorKind::TypeMismatch, &args), None);
+}
+
+#[test]
+fn lexer_homoglyph_catalog_rows_preserve_canonical_suggestions() {
+    let circled = vec![
+        DiagnosticArg::new("issue", HOMOGLYPH_ISSUE),
+        DiagnosticArg::new("char", "∘"),
+        DiagnosticArg::new("suggestion", "⊙"),
+    ];
+    assert_eq!(lex_spec(LexErrorKind::CharacterUnexpected).code, "LEX004");
+    assert_eq!(
+        lex_message(LexErrorKind::CharacterUnexpected, &circled),
+        Some("unexpected character: '∘'; did you mean '⊙'?".to_owned())
+    );
+
+    let norm = vec![
+        DiagnosticArg::new("issue", HOMOGLYPH_ISSUE),
+        DiagnosticArg::new("char", "‖"),
+        DiagnosticArg::new("suggestion", ".rms_norm(...)"),
+    ];
+    assert_eq!(
+        lex_message(LexErrorKind::CharacterUnexpected, &norm),
+        Some("unexpected character: '‖'; did you mean '.rms_norm(...)'?".to_owned())
+    );
 }
 
 #[test]

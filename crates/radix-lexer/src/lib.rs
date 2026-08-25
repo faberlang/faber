@@ -67,8 +67,8 @@ pub use keywords::{
     keyword_token_kind, lookup_keyword_spec, validate_keyword_groups, KeywordGroupSpec,
     KeywordGroupValidationError, KeywordKind, KeywordOwner, KeywordScope, KeywordSpec,
 };
-pub use scan::INLINE_COMMENT_ISSUE;
 pub use scan::{Interner, Lexer};
+pub use scan::{HOMOGLYPH_ISSUE, INLINE_COMMENT_ISSUE};
 pub use token::{Span, Symbol, Token, TokenKind};
 
 /// Keyword-claim surface for one lexer run.

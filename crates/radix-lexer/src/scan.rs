@@ -42,6 +42,10 @@ use unicode_normalization::UnicodeNormalization;
 /// Stable `issue` fact for inline `#` comments after code (tests + catalogs).
 pub const INLINE_COMMENT_ISSUE: &str = "inline_hash_after_code";
 
+/// Lexer issue for a rejected glyph with a canonical operator/method hint.
+/// Stable `issue` fact shared by the lexer tests and diagnostic catalog.
+pub const HOMOGLYPH_ISSUE: &str = "homoglyph_did_you_mean";
+
 /// String interner for lexer-produced symbols.
 ///
 /// The interner is part of the lexer contract, not a global table. Symbol ids
@@ -502,6 +506,17 @@ impl<'a> Lexer<'a> {
             c => {
                 if let Some(kind) = self.scan_operator(c) {
                     kind
+                } else if let Some(suggestion) = homoglyph_suggestion(c) {
+                    self.emit_error(
+                        LexErrorKind::CharacterUnexpected,
+                        start,
+                        vec![
+                            DiagnosticArg::new("issue", HOMOGLYPH_ISSUE),
+                            DiagnosticArg::new("char", c.to_string()),
+                            DiagnosticArg::new("suggestion", suggestion),
+                        ],
+                    );
+                    TokenKind::Error
                 } else {
                     self.emit_error(
                         LexErrorKind::CharacterUnexpected,
@@ -967,6 +982,18 @@ impl<'a> Lexer<'a> {
         }
 
         TokenKind::Ident(self.interner.intern_normalized(text))
+    }
+}
+
+fn homoglyph_suggestion(c: char) -> Option<&'static str> {
+    match c {
+        // `∘` is reserved for a future fusion surface; `⊙` is the live
+        // Hadamard product glyph.
+        '∘' => Some("⊙"),
+        // Norms remain method-shaped. Keep the hint independent of any
+        // reader-locale pack so lexer behavior is stable across locales.
+        '‖' | '∥' => Some(".rms_norm(...)"),
+        _ => None,
     }
 }
 

@@ -5,7 +5,7 @@
 //! literals, retired syntax, and diagnostic emission. They do not depend on
 //! parser or semantic layers.
 
-use super::{Interner, INLINE_COMMENT_ISSUE};
+use super::{Interner, HOMOGLYPH_ISSUE, INLINE_COMMENT_ISSUE};
 use crate::{
     keyword_specs, lex, lookup_keyword_spec, KeywordScope, LexErrorKind, LexResult, TokenKind,
 };
@@ -579,6 +579,77 @@ fn glyph_product_glyph_codepoints_are_distinct() {
     assert_ne!('\u{00D7}', 'x'); // not ASCII x
     assert_ne!('\u{2297}', '\u{00D7}'); // not the multiplication sign
     assert_ne!('\u{2299}', '\u{00B7}'); // not the middle dot
+}
+
+fn assert_homoglyph_did_you_mean(source: &str, lookalike: &str, suggestion: &str) {
+    let result = lex(source);
+    let error = result
+        .errors
+        .iter()
+        .find(|error| has_arg(error, "issue", HOMOGLYPH_ISSUE))
+        .unwrap_or_else(|| {
+            panic!(
+                "expected homoglyph diagnostic for {lookalike}: {:?}",
+                result.errors
+            )
+        });
+
+    assert_eq!(error.kind, LexErrorKind::CharacterUnexpected);
+    assert!(has_arg(error, "char", lookalike), "{:?}", error.args);
+    assert!(has_arg(error, "suggestion", suggestion), "{:?}", error.args);
+    assert!(result
+        .tokens
+        .iter()
+        .any(|token| token.kind == TokenKind::Error));
+    assert!(result.reader_keyword_latin_keys.is_empty());
+}
+
+#[test]
+fn circled_ring_homoglyph_suggests_hadamard_product() {
+    assert_homoglyph_did_you_mean("∘", "∘", "⊙");
+}
+
+#[test]
+fn norm_homoglyphs_suggest_method_shaped_norms() {
+    assert_homoglyph_did_you_mean("‖", "‖", ".rms_norm(...)");
+    assert_homoglyph_did_you_mean("∥", "∥", ".rms_norm(...)");
+}
+
+#[test]
+fn reserved_transpose_lookalikes_and_non_map_glyphs_get_no_u2_advice() {
+    let transpose = lex("ᵀ");
+    assert!(
+        transpose.errors.is_empty(),
+        "U3 owns ᵀ admission; U2 adds no advice"
+    );
+    assert!(transpose
+        .tokens
+        .iter()
+        .any(|token| matches!(token.kind, TokenKind::Ident(_))));
+
+    let superscript_t = lex("ᵗ");
+    assert!(
+        superscript_t.errors.is_empty(),
+        "ᵗ remains an identifier lookalike"
+    );
+    assert!(superscript_t.reader_keyword_latin_keys.is_empty());
+
+    let plain_t = lex("T");
+    assert!(plain_t.errors.is_empty(), "plain T remains an identifier");
+    assert!(plain_t.reader_keyword_latin_keys.is_empty());
+
+    for glyph in ["⊚", "⊛", "⊜", "⊝"] {
+        let result = lex(glyph);
+        assert!(
+            result.errors.iter().any(|error| {
+                error.kind == LexErrorKind::CharacterUnexpected
+                    && has_arg(error, "issue", "unexpected_character")
+                    && !error.args.iter().any(|arg| arg.name == "suggestion")
+            }),
+            "{glyph} must not receive a map-correct glyph suggestion: {:?}",
+            result.errors
+        );
+    }
 }
 
 #[test]

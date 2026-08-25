@@ -8,7 +8,7 @@
 
 use super::catalog::{arg_value, quote_arg, DiagnosticSpec};
 use radix_diagnostics::DiagnosticArg;
-use radix_lexer::LexErrorKind;
+use radix_lexer::{LexErrorKind, HOMOGLYPH_ISSUE};
 use radix_parser::ParseErrorKind;
 
 // SYNTAX KINDS
@@ -224,6 +224,13 @@ pub fn lex_message(kind: LexErrorKind, args: &[DiagnosticArg]) -> Option<String>
             "unexpected_character" => {
                 let ch = arg_value(args, "char")?;
                 Some(format!("unexpected character: {ch}"))
+            }
+            HOMOGLYPH_ISSUE => {
+                let ch = arg_value(args, "char")?;
+                let suggestion = arg_value(args, "suggestion")?;
+                Some(format!(
+                    "unexpected character: '{ch}'; did you mean '{suggestion}'?"
+                ))
             }
             _ => None,
         },
