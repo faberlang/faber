@@ -722,33 +722,42 @@ pub(crate) fn is_device_value_type(ty: TypeId, types: &TypeTable) -> bool {
     }
 }
 
+const ALLOWED_DEVICE_METHODS: &[&str] = &[
+    "addita",
+    "addita_bias",
+    "subtrahe",
+    "multiplica",
+    "divisio",
+    "nega",
+    "summa",
+    "media",
+    "matmul",
+    "transpone",
+    "forma",
+    "exponentia",
+    "logarithmus",
+    "activatio_relu",
+    "radix",
+    "gelu",
+    "silu",
+    "activatio_tanh",
+    "activatio_softmax",
+    "laminatio",
+    "summa_axis",
+    "crux_entropia",
+    "rms_norm",
+    "rope_norm",
+    "gather",
+];
+
+/// The device-fragment method admission set. Test-support surface: the
+/// radix-module bijection ratchet derives its direction-3 candidates from it.
+#[doc(hidden)]
+#[must_use]
+pub fn allowed_device_methods() -> &'static [&'static str] {
+    ALLOWED_DEVICE_METHODS
+}
+
 pub(crate) fn is_allowed_device_method(method: &str) -> bool {
-    matches!(
-        method,
-        "addita"
-            | "addita_bias"
-            | "subtrahe"
-            | "multiplica"
-            | "divisio"
-            | "nega"
-            | "summa"
-            | "media"
-            | "matmul"
-            | "transpone"
-            | "forma"
-            | "exponentia"
-            | "logarithmus"
-            | "activatio_relu"
-            | "radix"
-            | "gelu"
-            | "silu"
-            | "activatio_tanh"
-            | "activatio_softmax"
-            | "laminatio"
-            | "summa_axis"
-            | "crux_entropia"
-            | "rms_norm"
-            | "rope_norm"
-            | "gather"
-    )
+    ALLOWED_DEVICE_METHODS.contains(&method)
 }
