@@ -384,6 +384,48 @@ impl TypeChecker<'_> {
             return self.unify_join(a, b, span, "common_type_mismatch");
         }
 
+        match (
+            self.types.get(a_resolved).clone(),
+            self.types.get(b_resolved).clone(),
+        ) {
+            (Type::Array(a_inner), Type::Array(b_inner)) => {
+                let element = self.common_type(a_inner, b_inner, span);
+                return self.types.array(element);
+            }
+            (
+                Type::Array(a_inner),
+                Type::BoundedArray {
+                    element: b_inner, ..
+                },
+            )
+            | (
+                Type::BoundedArray {
+                    element: a_inner, ..
+                },
+                Type::Array(b_inner),
+            ) => {
+                let element = self.common_type(a_inner, b_inner, span);
+                return self.types.array(element);
+            }
+            (
+                Type::BoundedArray {
+                    element: a_inner,
+                    capacity: a_capacity,
+                },
+                Type::BoundedArray {
+                    element: b_inner,
+                    capacity: b_capacity,
+                },
+            ) => {
+                let element = self.common_type(a_inner, b_inner, span);
+                if self.types.index_equals(a_capacity, b_capacity) {
+                    return self.types.bounded_array(element, a_capacity);
+                }
+                return self.types.array(element);
+            }
+            _ => {}
+        }
+
         if let Type::Array(a_inner) = self.types.get(a_resolved).clone() {
             if !matches!(self.types.get(b_resolved), Type::Array(_)) {
                 return self.common_type(a_inner, b, span);
@@ -400,34 +442,55 @@ impl TypeChecker<'_> {
     }
     /// Checks an array literal and returns its list type.
     ///
-    /// Expected array context supplies the element type for empty literals and
-    /// for each non-spread item. Without that context, non-empty arrays infer a
-    /// common element type from their checked items, while an empty literal gets
-    /// a fresh inference variable instead of defaulting to `ignotum` or a target
-    /// container shape.
+    /// Expected list context supplies the element type for each non-spread item.
+    /// Dynamic `lista<T>` context preserves a dynamic carrier; bounded context
+    /// checks a literal's exact length against its capacity. Without a concrete
+    /// context, an array literal carries its exact bound and infers a common
+    /// element type from its checked items.
     pub fn check_array(
         &mut self,
         elements: &mut [HirArrayElement],
         _span: radix_lexer::Span,
         expected: Option<TypeId>,
     ) -> TypeId {
-        let expected_elem = expected.and_then(|ty| {
+        let expected_is_open =
+            expected.is_some_and(|ty| self.is_infer(self.resolve_inferred_type(ty)));
+        let expected_shape = expected.and_then(|ty| {
             let payload = self
                 .types
                 .peel_access_marker(self.resolve_inferred_type(ty))
                 .1;
             match self.types.get(payload) {
-                Type::Array(inner) => Some(*inner),
+                Type::Array(inner) => Some((*inner, None)),
+                Type::BoundedArray { element, capacity } => Some((*element, Some(*capacity))),
                 _ => None,
             }
         });
+        let expected_elem = expected_shape.map_or_else(|| self.fresh_infer(), |(elem, _)| elem);
+        let expected_capacity = expected_shape.and_then(|(_, capacity)| capacity);
+        let has_expected_element = expected_shape.is_some();
+        let literal_capacity =
+            (expected.is_none() || expected_is_open || expected_capacity.is_some())
+                && elements
+                    .iter()
+                    .all(|element| matches!(element, HirArrayElement::Expr(_)));
+        let literal_capacity = literal_capacity.then(|| {
+            self.types
+                .intern_index(IndexExpr::Literal(elements.len() as u64))
+        });
+        let result_capacity = match expected_capacity {
+            Some(capacity) if self.is_unresolved_index_hole(capacity) => Some(capacity),
+            Some(capacity) => literal_capacity.or(Some(capacity)),
+            None => literal_capacity,
+        };
 
-        if elements.is_empty() {
-            if let Some(inner) = expected_elem {
-                return self.types.array(inner);
+        if elements.is_empty() && !has_expected_element {
+            // An unannotated `[]` is still an exact zero-length witness, while
+            // `lista<T>` keeps its dynamic carrier when context supplies T.
+            if let Some(capacity) = result_capacity {
+                return self.types.bounded_array(expected_elem, capacity);
             }
-            let infer = self.fresh_infer();
-            return self.types.array(infer);
+            return self.types.array(expected_elem);
         }
 
         let mut element_ty = None;
@@ -437,14 +500,14 @@ impl TypeChecker<'_> {
                 HirArrayElement::Spread(expr) => (expr, true),
             };
             let ty = if spread {
-                if let Some(expected) = expected_elem {
-                    let expected_array = self.types.array(expected);
+                if has_expected_element {
+                    let expected_array = self.types.array(expected_elem);
                     self.check_expr_with_expected(expr, Some(expected_array))
                 } else {
                     self.check_expr(expr)
                 }
-            } else if let Some(expected) = expected_elem {
-                self.check_expr_with_expected(expr, Some(expected))
+            } else if has_expected_element {
+                self.check_expr_with_expected(expr, Some(expected_elem))
             } else {
                 self.check_expr(expr)
             };
@@ -464,7 +527,11 @@ impl TypeChecker<'_> {
             });
         }
 
-        let elem_ty = element_ty.unwrap_or_else(|| self.fresh_infer());
-        self.types.array(elem_ty)
+        let elem_ty = element_ty.unwrap_or(expected_elem);
+        if let Some(capacity) = result_capacity {
+            self.types.bounded_array(elem_ty, capacity)
+        } else {
+            self.types.array(elem_ty)
+        }
     }
 }

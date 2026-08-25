@@ -108,7 +108,10 @@ fn validate_flat_source(
     target_elem: TypeId,
     types: &TypeTable,
 ) -> Result<(), ListaToTensorError> {
-    if matches!(normalized_type(source_elem, types), Type::Array(_)) {
+    if matches!(
+        normalized_type(source_elem, types),
+        Type::Array(_) | Type::BoundedArray { .. }
+    ) {
         return Err(ListaToTensorError::NestedLista);
     }
 

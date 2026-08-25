@@ -652,6 +652,7 @@ impl TypeChecker<'_> {
         match self.types.get(resolved) {
             Type::Infer(_) => true,
             Type::Array(inner)
+            | Type::BoundedArray { element: inner, .. }
             | Type::Set(inner)
             | Type::Tensor(inner, _)
             | Type::Sparsa(inner, _)

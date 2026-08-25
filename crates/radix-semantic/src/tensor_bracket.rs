@@ -27,7 +27,7 @@ pub fn is_tensor_type(types: &TypeTable, ty: TypeId) -> bool {
 #[must_use]
 pub fn is_bracket_index_list_type(types: &TypeTable, ty: TypeId) -> bool {
     match types.get(ty) {
-        Type::Array(_) => true,
+        Type::Array(_) | Type::BoundedArray { .. } => true,
         Type::Alias(_, inner) => is_bracket_index_list_type(types, *inner),
         _ => false,
     }

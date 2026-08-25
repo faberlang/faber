@@ -168,3 +168,77 @@ fn bounded_lista_assignment_is_not_implicit_conversion() {
         "expression_type_mismatch",
     );
 }
+
+#[test]
+fn unannotated_lista_literal_carries_exact_bound() {
+    let unit = analyze_ok(
+        r"incipit {
+    fixum _ xs ← [1, 2]
+    nota xs
+}",
+    );
+    let ty = entry_local_tys(&unit)[0];
+    assert!(
+        matches!(
+            unit.types.get(ty),
+            Type::BoundedArray { capacity, .. }
+                if matches!(unit.types.get_index(*capacity), IndexExpr::Literal(2))
+        ),
+        "unannotated literal must retain exact bound 2, got {:?}",
+        unit.types.get(ty)
+    );
+}
+
+#[test]
+fn bounded_lista_hole_solves_from_literal_witness() {
+    let unit = analyze_ok(
+        r"incipit {
+    fixum lista<numerus, _> xs ← [1, 2]
+    nota xs
+}",
+    );
+    let ty = entry_local_tys(&unit)[0];
+    assert!(
+        matches!(
+            unit.types.get(ty),
+            Type::BoundedArray { capacity, .. }
+                if matches!(unit.types.get_index(*capacity), IndexExpr::Literal(2))
+        ),
+        "lista<numerus, _> literal witness must solve to 2, got {:?}",
+        unit.types.get(ty)
+    );
+}
+
+#[test]
+fn explicit_bounded_lista_literal_checks_capacity() {
+    assert_accepts("incipit { fixum lista<numerus, 2> xs ← [1, 2] }");
+    assert_rejects_with_issue(
+        "incipit { fixum lista<numerus, 3> xs ← [1, 2] }",
+        "incompatible_tensor_index",
+    );
+}
+
+#[test]
+fn unannotated_literal_pair_length_mismatch_rejects_at_typecheck() {
+    assert_rejects_with_issue(
+        "incipit { fixum _ xs ← [1, 2] + [3] }",
+        "numeric_lista_operator_law",
+    );
+}
+
+#[test]
+fn bounded_lista_hole_without_literal_witness_still_reports_sem014() {
+    crate::test_support::assert_analysis_rejects_with_issue(
+        "functio missing() → lista<numerus, _> { tacet }",
+        "bounded_capacity_unsolved",
+    );
+}
+
+#[test]
+fn bounded_lista_parameter_widening_stays_explicit() {
+    assert_rejects_with_issue(
+        r"functio consume(lista<numerus, 3> xs) → vacuum { nota xs }
+incipit { consume([1, 2]) }",
+        "argument_type_mismatch",
+    );
+}

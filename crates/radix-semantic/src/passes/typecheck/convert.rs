@@ -478,15 +478,17 @@ impl TypeChecker<'_> {
             return result_ty;
         }
 
-        if let Some(result_ty) =
-            self.check_bounded_lista_to_vector_conversio(source_ty, target_resolved, span)
-        {
-            if !self.types.equals(result_ty, self.error_type) {
-                if let Some(recovery) = recovery {
-                    self.note_conversio_recovery_checked(recovery, target_resolved);
+        if !matches!(source.kind, HirExpressionKind::Array(_)) {
+            if let Some(result_ty) =
+                self.check_bounded_lista_to_vector_conversio(source_ty, target_resolved, span)
+            {
+                if !self.types.equals(result_ty, self.error_type) {
+                    if let Some(recovery) = recovery {
+                        self.note_conversio_recovery_checked(recovery, target_resolved);
+                    }
                 }
+                return result_ty;
             }
-            return result_ty;
         }
 
         if let Some(result_ty) =
@@ -627,6 +629,7 @@ impl TypeChecker<'_> {
                 | Type::SizedNumeric(Primitive::Numerus | Primitive::Fractus, _)
                 | Type::SizedInstans(_)
                 | Type::Array(_)
+                | Type::BoundedArray { .. }
         )
     }
 
@@ -1657,12 +1660,14 @@ impl TypeChecker<'_> {
 
     fn collection_conversio_shape(&self, ty: TypeId) -> Option<CollectionConversioShape> {
         match self.types.get(ty) {
-            Type::Array(elem) => Some(CollectionConversioShape {
-                family: CollectionConversioFamily::Array,
-                elem: Some(*elem),
-                key: None,
-                value: None,
-            }),
+            Type::Array(elem) | Type::BoundedArray { element: elem, .. } => {
+                Some(CollectionConversioShape {
+                    family: CollectionConversioFamily::Array,
+                    elem: Some(*elem),
+                    key: None,
+                    value: None,
+                })
+            }
             Type::Set(elem) => Some(CollectionConversioShape {
                 family: CollectionConversioFamily::Set,
                 elem: Some(*elem),
@@ -1961,6 +1966,7 @@ impl TypeChecker<'_> {
         matches!(
             self.types.get(ty),
             Type::Array(_)
+                | Type::BoundedArray { .. }
                 | Type::Set(_)
                 | Type::Map(_, _)
                 | Type::Tensor(_, _)
@@ -2454,7 +2460,7 @@ impl TypeChecker<'_> {
                 HirArrayElement::Spread(expr) => {
                     let spread_ty = self.check_expr(expr);
                     match self.types.get(self.resolve_inferred_type(spread_ty)) {
-                        Type::Array(inner) => {
+                        Type::Array(inner) | Type::BoundedArray { element: inner, .. } => {
                             self.unify_join(
                                 *inner,
                                 elem_ty,

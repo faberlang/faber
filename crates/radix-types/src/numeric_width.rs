@@ -429,7 +429,9 @@ pub const TENSOR_INDEX_VECTOR_MSG: &str = "tensor index vector requires lista of
 #[must_use]
 pub fn is_integer_index_vector(types: &TypeTable, ty: TypeId) -> bool {
     match types.get(ty) {
-        Type::Array(elem) => is_integer_index_scalar(types, *elem),
+        Type::Array(elem) | Type::BoundedArray { element: elem, .. } => {
+            is_integer_index_scalar(types, *elem)
+        }
         Type::Alias(_, inner) => is_integer_index_vector(types, *inner),
         _ => false,
     }

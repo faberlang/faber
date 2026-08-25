@@ -557,7 +557,36 @@ impl TypeChecker<'_> {
         walk_function_mut(self, function);
     }
 
+    /// Solve a bounded-list capacity hole when its initializer is an exact
+    /// array-literal witness. Dynamic expressions and spread elements decline;
+    /// they retain the existing SEM014 behavior instead of inventing a bound.
+    fn solve_bounded_array_capacity_from_literal(&mut self, ty: TypeId, expr: &HirExpression) {
+        let resolved = self.resolve_inferred_type(ty);
+        let Type::BoundedArray { capacity, .. } = self.types.get(resolved).clone() else {
+            return;
+        };
+        if !self.is_unresolved_index_hole(capacity) {
+            return;
+        }
+        let HirExpressionKind::Array(elements) = &expr.kind else {
+            return;
+        };
+        if elements
+            .iter()
+            .any(|element| matches!(element, HirArrayElement::Spread(_)))
+        {
+            return;
+        }
+        let witness = self
+            .types
+            .intern_index(IndexExpr::Literal(elements.len() as u64));
+        self.constrain_index_equal(capacity, witness, expr.span);
+    }
+
     fn finalize_local(&mut self, local: &mut HirLocal, span: Span) {
+        if let (Some(ty), Some(init)) = (local.ty, local.init.as_ref()) {
+            self.solve_bounded_array_capacity_from_literal(ty, init);
+        }
         self.finalize_decl_type(&mut local.ty, span, "cannot_infer_variable_type");
 
         walk_local_mut(self, local);
