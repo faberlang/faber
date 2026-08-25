@@ -8,14 +8,15 @@
 use crate::file_interface::{
     FileExport, FileExportKind, FileInterface, InterfaceAliasExport, InterfaceAnnotationContract,
     InterfaceAnnotationContractField, InterfaceCallable, InterfaceEnumVariant, InterfaceGenericParam,
-    InterfaceLibraryIdentity, InterfaceMethodExport, InterfaceNominalExport, InterfaceNominalKind,
-    InterfaceNominalType, InterfaceParam, InterfaceStructExport, InterfaceStructField, InterfaceTypeSnapshot,
+    InterfaceIndexSnapshot, InterfaceLibraryIdentity, InterfaceMethodExport, InterfaceNominalExport,
+    InterfaceNominalKind, InterfaceNominalType, InterfaceParam, InterfaceStructExport, InterfaceStructField,
+    InterfaceTypeSnapshot,
 };
 use crate::semantic::passes::visibility_annotation::VisibilityTier;
 use crate::semantic::{ContractFieldType, InstansPrecision, NumericWidth, Primitive, SemanticParamMode};
 use crate::syntax::{
-    Annotation, AnnotationFieldValue, AnnotationKind, AstParamMode, ClassDecl, ClassMemberKind, ExprKind, ImportKind,
-    Literal, Program, Stmt, StmtKind, TypeExpr, TypeExprKind,
+    Annotation, AnnotationFieldValue, AnnotationKind, AstParamMode, ClassDecl, ClassMemberKind, ExprKind,
+    FiguraExpr, ImportKind, Literal, Program, Stmt, StmtKind, TypeExpr, TypeExprKind,
 };
 use rustc_hash::FxHashMap;
 use std::cell::RefCell;
@@ -1602,7 +1603,75 @@ fn interface_type_from_type_expr(
             }
             Some(InterfaceTypeSnapshot::Union(parts))
         }
+        TypeExprKind::Vector(element, figura) => Some(InterfaceTypeSnapshot::Vector(
+            Box::new(interface_type_from_type_expr(
+                element,
+                interner,
+                type_params,
+                nominal_kinds,
+                ctx,
+            )?),
+            interface_index_snapshot(figura, interner)?,
+        )),
+        TypeExprKind::Matrix(element, figura) => Some(InterfaceTypeSnapshot::Matrix(
+            Box::new(interface_type_from_type_expr(
+                element,
+                interner,
+                type_params,
+                nominal_kinds,
+                ctx,
+            )?),
+            interface_index_snapshot(figura, interner)?,
+        )),
+        TypeExprKind::Tensor(element, figura) => Some(InterfaceTypeSnapshot::Tensor(
+            Box::new(interface_type_from_type_expr(
+                element,
+                interner,
+                type_params,
+                nominal_kinds,
+                ctx,
+            )?),
+            interface_index_snapshot(figura, interner)?,
+        )),
+        TypeExprKind::Sparsa(element, figura) => Some(InterfaceTypeSnapshot::Sparsa(
+            Box::new(interface_type_from_type_expr(
+                element,
+                interner,
+                type_params,
+                nominal_kinds,
+                ctx,
+            )?),
+            interface_index_snapshot(figura, interner)?,
+        )),
+        TypeExprKind::Atomic(element) => Some(InterfaceTypeSnapshot::Atomic(Box::new(
+            interface_type_from_type_expr(element, interner, type_params, nominal_kinds, ctx)?,
+        ))),
         _ => None,
+    }
+}
+
+/// Snapshot a type-level index expression (`vector` width / `matrix` shape).
+///
+/// Mirrors the analysis-side `snapshot_interface_index`: a declared `size`
+/// parameter renders as `Param` (name identity carries through the consumer
+/// restore path), literals as `Literal`, and `[R, C]` shapes as `Tuple`.
+/// `Infer` fails the export, matching the analysis route's
+/// `IndexInferenceUnsupported` posture.
+fn interface_index_snapshot(
+    figura: &FiguraExpr,
+    interner: &crate::lexer::Interner,
+) -> Option<InterfaceIndexSnapshot> {
+    match figura {
+        FiguraExpr::Literal(value) => Some(InterfaceIndexSnapshot::Literal(*value)),
+        FiguraExpr::Var(ident) => Some(InterfaceIndexSnapshot::Param(
+            interner.resolve(ident.name).to_owned(),
+        )),
+        FiguraExpr::Tuple(dims) => dims
+            .iter()
+            .map(|dim| interface_index_snapshot(dim, interner))
+            .collect::<Option<Vec<_>>>()
+            .map(InterfaceIndexSnapshot::Tuple),
+        FiguraExpr::Infer => None,
     }
 }
 

@@ -3,8 +3,10 @@
 use super::clear_import_target_cache;
 use super::import_contract_for_file;
 use crate::driver::AnalyzeRequest;
+use crate::file_interface::{FileExportKind, InterfaceIndexSnapshot, InterfaceParam, InterfaceTypeSnapshot};
 use crate::import_resolve::library_home_test_support;
 use crate::import_resolve::resolve_namespace_import;
+use crate::semantic::{NumericWidth, Primitive, SemanticParamMode};
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -32,6 +34,212 @@ impl Drop for LibraryHomeGuard {
     fn drop(&mut self) {
         library_home_test_support::set_thread_library_home(self.previous.take());
     }
+}
+
+#[test]
+fn emit_route_imported_generic_call_size_inference() {
+    clear_import_target_cache();
+    let (_td, home) = temp_dir("gmt-emit-inference");
+    let provider = home.join("probevectors");
+    fs::create_dir_all(provider.join("src")).expect("provider src");
+    fs::write(
+        provider.join("faber.toml"),
+        r#"[package]
+name = "probevectors"
+[library]
+provider = "probevectors"
+[paths]
+source = "src"
+[build]
+kind = "lib"
+targets = ["rust"]
+"#,
+    )
+    .expect("manifest");
+    fs::write(
+        provider.join("src/vectors.fab"),
+        r#"@ public
+class Box<size N> {
+    vector<f32, N> minima
+    vector<f32, N> maxima
+}
+
+@ public
+fn add<size N>(vector<f32, N> a, vector<f32, N> b) → vector<f32, N> {
+    return a.added(b)
+}
+
+@ public
+fn dot<size N>(vector<f32, N> a, vector<f32, N> b) → f32 {
+    return a.dot(b)
+}
+
+@ public
+fn cross(vector<f32, 3> a, vector<f32, 3> b) → vector<f32, 3> {
+    return a.cross(b)
+}
+
+@ public
+fn lane(vector<f32, 3> a) → f32 {
+    const vector<f32, 3> swapped ← a.swizzle("zyx")
+    return swapped.dot(a)
+}
+
+@ public
+fn multiply(matrix<f32, [3, 2]> a, matrix<f32, [2, 3]> b) → matrix<f32, [3, 3]> {
+    return a · b
+}
+
+@ public
+fn box_minima<size N>(Box<N> b) → vector<f32, N> {
+    return b.minima
+}
+"#,
+    )
+    .expect("lib");
+
+    let app = home.join("app.fab");
+    fs::write(
+        &app,
+        r#"+++
+locale = "en"
++++
+
+import from "probevectors:vectors" gmt
+
+fn imported() → f32 {
+    const vector<f32, 3> a ← [1.0, 2.0, 3.0] ↦ vector<f32, 3>
+    const vector<f32, 3> b ← [2.0, 4.0, 6.0] ↦ vector<f32, 3>
+    const vector<f32, 3> s ← gmt.add(a, b)
+    const vector<f32, 3> x ← gmt.cross(a, b)
+    return (s.dot(b) + x.dot(a)) + gmt.lane(a)
+}
+
+fn imported_signature() → vector<f32, 4> {
+    const vector<f32, 4> a ← [1.0, 2.0, 3.0, 4.0] ↦ vector<f32, 4>
+    const vector<f32, 4> b ← [2.0, 4.0, 6.0, 8.0] ↦ vector<f32, 4>
+    return gmt.add(a, b)
+}
+
+fn imported_shapes() → matrix<f32, [3, 3]> {
+    const vector<f32, 3> s ← [1.0, 2.0, 3.0] ↦ vector<f32, 3>
+    const vector<f32, 2> narrow ← [1.0, 2.0] ↦ vector<f32, 2>
+    const matrix<f32, [3, 2]> outer ← s ⊗ narrow
+    const matrix<f32, [2, 3]> inner ← narrow ⊗ s
+    return gmt.multiply(outer, inner)
+}
+"#,
+    )
+    .expect("app");
+    let source = fs::read_to_string(&app).expect("read app");
+
+    let _guard = LibraryHomeGuard::set(&home);
+    let contract = import_contract_for_file(&app, &source, None, None);
+    let interface = contract
+        .file_interfaces
+        .get("gmt")
+        .expect("gmt interface installed");
+
+    // The emit-route snapshot must carry the size-parametric callables —
+    // vector/matrix-typed exports were previously dropped from the interface,
+    // so the consumer's `gmt.add` fell back to an Ignotum result and the
+    // `SEM010`/`SEM011` cascade fired (S0-G6).
+    for member in ["add", "dot", "cross", "lane", "multiply"] {
+        assert!(
+            interface.exports.contains_key(member),
+            "export `{member}` must survive the emit-route snapshot, got {:?}",
+            interface.exports.keys().collect::<Vec<_>>()
+        );
+    }
+    let FileExportKind::Function(add) = &interface.exports["add"].kind else {
+        panic!("add must snapshot as a function export");
+    };
+    assert_eq!(add.type_params, vec!["N".to_owned()]);
+    assert_eq!(
+        add.params,
+        vec![
+            InterfaceParam {
+                ty: InterfaceTypeSnapshot::Vector(
+                    Box::new(InterfaceTypeSnapshot::SizedNumeric(
+                        Primitive::Fractus,
+                        NumericWidth::F32,
+                    )),
+                    InterfaceIndexSnapshot::Param("N".to_owned()),
+                ),
+                mode: SemanticParamMode::Owned,
+                optional: false,
+            },
+            InterfaceParam {
+                ty: InterfaceTypeSnapshot::Vector(
+                    Box::new(InterfaceTypeSnapshot::SizedNumeric(
+                        Primitive::Fractus,
+                        NumericWidth::F32,
+                    )),
+                    InterfaceIndexSnapshot::Param("N".to_owned()),
+                ),
+                mode: SemanticParamMode::Owned,
+                optional: false,
+            },
+        ]
+    );
+    assert_eq!(
+        add.ret.as_ref(),
+        &InterfaceTypeSnapshot::Vector(
+            Box::new(InterfaceTypeSnapshot::SizedNumeric(
+                Primitive::Fractus,
+                NumericWidth::F32,
+            )),
+            InterfaceIndexSnapshot::Param("N".to_owned()),
+        )
+    );
+    // The `Box` nominal keeps its register-carrier fields instead of being
+    // silently emptied by the snapshot (the same missing vector arm).
+    let FileExportKind::Struct(strukt) = &interface.exports["Box"].kind else {
+        panic!("Box must snapshot as a struct export");
+    };
+    assert_eq!(strukt.fields.len(), 2, "Box fields must survive the snapshot");
+    assert_eq!(
+        strukt.fields[0].ty,
+        InterfaceTypeSnapshot::Vector(
+            Box::new(InterfaceTypeSnapshot::SizedNumeric(
+                Primitive::Fractus,
+                NumericWidth::F32,
+            )),
+            InterfaceIndexSnapshot::Param("N".to_owned()),
+        )
+    );
+
+    // The emit-route analysis (single-file check through the same import
+    // contract the `radix emit` driver builds) must accept the imported
+    // generic call with a concrete-size result — identical to `faber check`.
+    let result = crate::services::check_diagnostics_for_source(&app.display().to_string(), &source, false);
+    assert!(
+        result.success,
+        "emit route must accept the imported generic call, diagnostics={:?}",
+        result
+            .diagnostics
+            .iter()
+            .map(|d| (d.code, d.issue(), d.args.clone()))
+            .collect::<Vec<_>>()
+    );
+    assert!(
+        !result.diagnostics.iter().any(|d| {
+            d.is_error()
+                && matches!(
+                    d.issue(),
+                    Some("expression_type_mismatch")
+                        | Some("initializer_annotation_mismatch")
+                        | Some("return_type_mismatch")
+                        | Some("numeric_operands_required")
+                )
+        }),
+        "no SEM010/SEM011 cascade may survive the emit route: {:?}",
+        result
+            .diagnostics
+            .iter()
+            .map(|d| (d.code, d.issue()))
+            .collect::<Vec<_>>()
+    );
 }
 
 #[test]
