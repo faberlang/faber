@@ -476,7 +476,14 @@ argument ::= template_argument | 'sparge'? expression
 # [162] template_argument
 template_argument ::= 'sparge'? IDENTIFIER ':' expression
 # [163] literal
-literal ::= NUMBER | STRING | ASCII_STRING | BACKTICK_STRING | OCTETI_STRING | 'verum' | 'falsum' | 'nihil'
+# Non-finite literals are contextual floating-point values: `∞` is positive
+# infinity and `nonnumerus` is NaN. The named form is `nonnumerus` in the
+# Latin (`la`) pack and `nan` in every other shipped pack. Their width follows
+# a surrounding `f32` or `f64` context when present; bare `fractus` remains
+# unsized, and neither form has a width suffix. A leading `-` is supplied by
+# `unary_expr`, so `-∞` is unary negation of `∞`, not a separate token. A
+# `numerus` context rejects both forms (fail-closed); neither maps to an integer.
+literal ::= NUMBER | STRING | ASCII_STRING | BACKTICK_STRING | OCTETI_STRING | 'verum' | 'falsum' | 'nihil' | '∞' | 'nonnumerus'
 # [164] primary
 primary ::= IDENTIFIER | literal | 'ego' | array_literal | json_literal | typed_constructor | iuncta_expr | ad_expr | clausura_expr | praefixum_expr | scriptum_expr | lege_expr | first_match_expr | summa_expr | '(' expression ')'
 # formerly: adExpr
@@ -960,6 +967,7 @@ productions. It is not a second keyword authority.
 | Genus | `nexum` | link field |
 | Literals | `nihil` | none |
 | Declarations | `nomen` | import binding name |
+| Literals | `nonnumerus` | named NaN literal: `nonnumerus` in the Latin (`la`) pack, `nan` in every other shipped pack |
 | Boolean | `non` | not |
 | Diagnostics | `nota` | note |
 | Annotation | `nucleum` | kernel annotation |
