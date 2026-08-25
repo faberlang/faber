@@ -1596,6 +1596,7 @@ fn struct_publica_annotation_reemits() {
             methods: Vec::new(),
             extends: None,
             implements: Vec::new(),
+            is_abstract: false,
         }),
         span: span(),
     };

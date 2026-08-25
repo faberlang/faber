@@ -459,6 +459,7 @@ fn emits_member_trivia_for_struct_fields_and_methods() {
         methods: vec![method],
         extends: None,
         implements: Vec::new(),
+        is_abstract: false,
     };
     let hir = program(
         vec![HirItem {
