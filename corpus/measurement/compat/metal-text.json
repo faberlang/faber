@@ -6,7 +6,7 @@
   "generatedBy": "radix/scripta/emit-compat-json.py",
   "summary": {
     "capable": 6,
-    "analyzable": 303
+    "analyzable": 304
   },
   "terms": [
     {
@@ -997,7 +997,7 @@
       "term": "sparge",
       "rule": "keyword",
       "capable": 0,
-      "analyzable": 0
+      "analyzable": 1
     },
     {
       "term": "sponte",

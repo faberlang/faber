@@ -5,8 +5,8 @@
   "lane": "hir",
   "generatedBy": "radix/scripta/emit-compat-json.py",
   "summary": {
-    "capable": 285,
-    "analyzable": 310
+    "capable": 286,
+    "analyzable": 311
   },
   "terms": [
     {
@@ -996,8 +996,8 @@
     {
       "term": "sparge",
       "rule": "keyword",
-      "capable": 0,
-      "analyzable": 0
+      "capable": 1,
+      "analyzable": 1
     },
     {
       "term": "sponte",
