@@ -1,0 +1,42 @@
++++
+term = "⤒"
+kind = "operator-group"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "main_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "width_type_sugar", "shape_suffix", "figura", "figura_list", "array_literal", "additive_expr", "expression", "literal", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "nota_stmt"]
+category = "arithmetic"
+canonical = true
+summary = "Maximum/minimum infix arrows on scalars, lists, and tensors, including chained clamp syntax."
+syntax = "<expression> ⤒ <expression> | <expression> ⤓ <expression>"
+related = ["⤒", "⤓", "maximus", "minimus", "lista", "tensor"]
+locale = "en"
++++
+
+# =============================================================================
+# ⤒ / ⤓ — maximum, minimum, and chained clamp.
+# =============================================================================
+#
+# What this teaches:
+#   • Scalar extrema select between two numeric values.
+#   • List extrema apply elementwise; the chained form clamps each element.
+#   • Tensor extrema apply the same elementwise surface to shaped values.
+#
+# Glyph law: see docs/design/tensor-intrinsics.md (D4 amendment).
+#
+# EXPECTED OUTPUT:
+#   5
+#   17
+#   1.5
+
+main {
+    const int scalar ← 2 ⤒ 5
+    print scalar
+
+    const list<int> values ← [1, 5, 9]
+    const list<int> clamped ← values ⤒ 4 ⤓ 8
+    print clamped.sum()
+
+    const list<f32> flat ← [-1.0, 0.5, 2.0]
+    const tf32[] seed ← empty
+    const tf32[3] values_tensor ← seed.from_flat(flat, [3])
+    const tf32[3] clamped_tensor ← values_tensor ⤒ 0.0 ⤓ 1.0
+    print clamped_tensor.sum()
+}
