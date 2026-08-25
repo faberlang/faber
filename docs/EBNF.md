@@ -1588,6 +1588,12 @@ Using `vel` as conversio recovery is rejected with a migration diagnostic. `vel`
 
 ### Call and Member Access
 
+A `call_expr` may continue with the zero-argument `transpose_suffix` `ᵀ`
+(U+1D40) after its ordinary primary/member/index chain. This is postfix
+source sugar, not a method spelling: semantic analysis applies the rank-2-only
+law and lowers the admitted form through the existing `transpone`/
+`Transpose` plan entry. `a · bᵀ ∇ [x]` is settled as `(a · bᵀ) ∇ [x]`.
+
 
 ### String And Template Literals
 
