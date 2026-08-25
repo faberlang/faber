@@ -419,7 +419,7 @@ range_tail ::= ('‥' | '…' | 'ante' | 'usque') additive_expr ('per' additive_
 additive_expr ::= multiplicative_expr (('+' | '-') multiplicative_expr)*
 # formerly: multiplicative
 # [144] multiplicative_expr
-multiplicative_expr ::= vel_expr (('*' | '/' | '%' | '·' | '×' | '⊗' | '⊙') vel_expr)*
+multiplicative_expr ::= vel_expr (('*' | '/' | '%' | '·' | '×' | '⊗' | '⊙' | '⊘') vel_expr)*
 # formerly: coalesce
 # [145] vel_expr
 vel_expr ::= unary_expr ('vel' vel_rhs)*
