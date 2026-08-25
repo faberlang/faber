@@ -668,7 +668,9 @@ fn semantic_invalid_conversion_message(args: &[DiagnosticArg]) -> Option<String>
         "lista_to_vector_literal_width" => {
             Some("lista to vector conversio requires a literal vector width".to_owned())
         }
-        "matrix_materialize_unsupported" => Some("matrix materialization is not supported yet".to_owned()),
+        "matrix_materialize_unsupported" => {
+            Some("matrix materialization requires a lista source with matching element type".to_owned())
+        }
         "valor_to_regex_unsupported" => {
             Some("valor to regex conversion has no default pattern; use `valor ↦ textus ↦ regex`".to_owned())
         }

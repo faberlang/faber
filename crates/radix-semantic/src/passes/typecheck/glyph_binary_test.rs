@@ -403,6 +403,26 @@ fn glyph_transpose_scalar_is_not_a_tensor_operation() {
     );
 }
 
+// --- S0-G9: `ᵀ` on matrix carriers (rank-2 matrix glyph law) ---
+
+#[test]
+fn glyph_transpose_matrix_typechecks_and_swaps_shape() {
+    accepts(
+        r"functio transpose(matrix<f32, [2, 3]> grid) → matrix<f32, [3, 2]> {
+    redde gridᵀ
+}",
+    );
+}
+
+#[test]
+fn glyph_transpose_matrix_parametric_swaps_shape_terms() {
+    accepts(
+        r"functio transpose<magnitudo R, magnitudo C>(matrix<f32, [R, C]> grid) → matrix<f32, [C, R]> {
+    redde gridᵀ
+}",
+    );
+}
+
 #[test]
 fn glyph_dot_tensor_inner_dim_mismatch_rejects() {
     rejects_with_contract_issue(

@@ -102,3 +102,53 @@ functio apply(matrix<f32, [2, 2]> m, vector<f32, 3> v) → vector<f32, 2> {
         "argument_type_mismatch",
     );
 }
+
+#[test]
+fn matrix_applica_typechecks_parametric_shape() {
+    // S0-G9: dimension-neutral matvec — parametric [R, C] applies a
+    // vector of width C and returns a vector of width R.
+    accepts(
+        r"
+functio apply<magnitudo R, magnitudo C>(matrix<f32, [R, C]> m, vector<f32, C> v) → vector<f32, R> {
+    redde m.applica(v)
+}
+",
+    );
+}
+
+#[test]
+fn matrix_transpone_typechecks_and_swaps_literal_shape() {
+    accepts(
+        r"
+functio transpose(matrix<f32, [2, 3]> m) → matrix<f32, [3, 2]> {
+    redde m.transpone()
+}
+",
+    );
+}
+
+#[test]
+fn matrix_transpone_typechecks_and_swaps_parametric_shape() {
+    // S0-G9: dimension-neutral transpose — [R, C] → [C, R] in a generic body.
+    accepts(
+        r"
+functio transpose<magnitudo R, magnitudo C>(matrix<f32, [R, C]> m) → matrix<f32, [C, R]> {
+    redde m.transpone()
+}
+",
+    );
+}
+
+#[test]
+fn matrix_transpone_rejects_arguments() {
+    // The registry owns the zero-arity contract: an argument makes the
+    // method unresolved rather than a wrong-arity call.
+    rejects_with_issue(
+        r"
+functio transpose(matrix<f32, [2, 2]> m) → matrix<f32, [2, 2]> {
+    redde m.transpone(1)
+}
+",
+        "unknown_method",
+    );
+}

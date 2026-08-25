@@ -911,11 +911,52 @@ functio identitas() → matrix<f32, [2, 2]> {
 }
 
 #[test]
-fn matrix_conversio_materialization_rejects_non_literal_source() {
+fn matrix_conversio_materialization_accepts_runtime_lista_source() {
+    // S0-G9: a runtime `lista<T>` materializes into a literal matrix shape;
+    // the element type is the static contract, the extent is runtime.
+    test_support::assert_accepts(
+        r"
+functio cast(lista<f32> flat) → matrix<f32, [2, 2]> {
+    redde flat ↦ matrix<f32, [2, 2]>
+}
+",
+    );
+}
+
+#[test]
+fn matrix_conversio_materialization_accepts_runtime_lista_parametric_shape() {
+    // S0-G9: dimension-neutral construction — a parametric matrix shape has
+    // no statically known extent, so a runtime lista source is the shape.
+    test_support::assert_accepts(
+        r"
+functio cast<magnitudo R, magnitudo C>(lista<f32> flat) → matrix<f32, [R, C]> {
+    redde flat ↦ matrix<f32, [R, C]>
+}
+",
+    );
+}
+
+#[test]
+fn matrix_conversio_materialization_rejects_nested_lista_element_mismatch() {
+    // A nested `lista<lista<f32>>` source has row-list elements, not matrix
+    // cells; the element mismatch rejects even though the source is a lista.
     test_support::assert_rejects_with_issue(
         r"
 functio cast(lista<lista<f32>> cells) → matrix<f32, [2, 2]> {
     redde cells ↦ matrix<f32, [2, 2]>
+}
+",
+        "lista_to_tensor_element_mismatch",
+    );
+}
+
+#[test]
+fn matrix_conversio_materialization_rejects_literal_source_parametric_shape() {
+    // A literal source cannot be matched to unknown parametric dims.
+    test_support::assert_rejects_with_issue(
+        r"
+functio cast<magnitudo R, magnitudo C>() → matrix<f32, [R, C]> {
+    redde [[1.0, 2.0], [3.0, 4.0]] ↦ matrix<f32, [R, C]>
 }
 ",
         "matrix_materialize_unsupported",

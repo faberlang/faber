@@ -465,7 +465,8 @@ impl TypeChecker<'_> {
             return error_ty;
         }
 
-        if let Some(result_ty) = self.check_lista_to_matrix_conversio(source, target_carrier, span)
+        if let Some(result_ty) =
+            self.check_lista_to_matrix_conversio(source, source_ty, target_carrier, span)
         {
             if !self.types.equals(result_ty, self.error_type) {
                 if let Some(recovery) = recovery {
@@ -1558,11 +1559,15 @@ impl TypeChecker<'_> {
 
     /// Nested `lista` literal → register `matrix<T, [R, C]>` (CPU subset ≤4×4).
     ///
-    /// Non-literal sources and non-matrix targets leave this path; oversized or
-    /// ragged shapes reject with matrix materialize diagnostics.
+    /// A nested literal source validates strictly against a literal shape
+    /// (row count, per-row column count, element types). A runtime `lista<T>`
+    /// source materializes into a literal or dimension-neutral (parametric)
+    /// shape on an element-type contract: the runtime extent is the
+    /// materialization's own contract, never a static check.
     fn check_lista_to_matrix_conversio(
         &mut self,
         source: &mut HirExpression,
+        source_ty: TypeId,
         target_resolved: TypeId,
         span: radix_lexer::Span,
     ) -> Option<TypeId> {
@@ -1571,8 +1576,18 @@ impl TypeChecker<'_> {
         };
 
         let Some((rows, columns)) = crate::literal_matrix_shape(shape, self.types) else {
-            self.invalid_conversion(ISSUE_MATRIX_MATERIALIZE_UNSUPPORTED, span);
-            return Some(self.error_type);
+            // S0-G9: dimension-neutral target — a parametric shape has no
+            // statically known extent, so only a runtime lista source can
+            // materialize; a literal source cannot be matched to unknown dims.
+            if matches!(source.kind, HirExpressionKind::Array(_)) {
+                self.invalid_conversion(ISSUE_MATRIX_MATERIALIZE_UNSUPPORTED, span);
+                return Some(self.error_type);
+            }
+            return self.check_lista_source_materializes_to_matrix(
+                source_ty,
+                target_resolved,
+                span,
+            );
         };
         if rows > 4 || columns > 4 {
             self.invalid_conversion(ISSUE_MATRIX_MATERIALIZE_UNSUPPORTED, span);
@@ -1580,8 +1595,13 @@ impl TypeChecker<'_> {
         }
 
         let HirExpressionKind::Array(row_elements) = &mut source.kind else {
-            self.invalid_conversion(ISSUE_MATRIX_MATERIALIZE_UNSUPPORTED, span);
-            return Some(self.error_type);
+            // S0-G9: a runtime lista source materializes into a literal shape;
+            // the element type is the static contract, the extent is runtime.
+            return self.check_lista_source_materializes_to_matrix(
+                source_ty,
+                target_resolved,
+                span,
+            );
         };
         if row_elements.len() != usize::from(rows) {
             self.invalid_conversion(ISSUE_RECTANGULAR_LISTA_LITERAL_SHAPE, span);
@@ -1629,6 +1649,33 @@ impl TypeChecker<'_> {
                     }
                 }
             }
+        }
+        Some(target_resolved)
+    }
+
+    /// Runtime `lista<T>` → `matrix<T, [R, C]>` materialization: the element
+    /// type must match; the runtime extent (R×C cells) is the conversion's
+    /// own contract. Bounded and unbounded listas both materialize.
+    fn check_lista_source_materializes_to_matrix(
+        &mut self,
+        source_ty: TypeId,
+        target_resolved: TypeId,
+        span: radix_lexer::Span,
+    ) -> Option<TypeId> {
+        let Type::Matrix(target_elem, _) = self.types.get(target_resolved).clone() else {
+            return None;
+        };
+        let source_resolved = self.resolve_inferred_type(source_ty);
+        let source_elem = match self.types.get(source_resolved).clone() {
+            Type::Array(elem) | Type::BoundedArray { element: elem, .. } => elem,
+            _ => {
+                self.invalid_conversion(ISSUE_MATRIX_MATERIALIZE_UNSUPPORTED, span);
+                return Some(self.error_type);
+            }
+        };
+        if !self.types.equals(source_elem, target_elem) {
+            self.invalid_conversion(ISSUE_LISTA_TO_TENSOR_ELEMENT_MISMATCH, span);
+            return Some(self.error_type);
         }
         Some(target_resolved)
     }

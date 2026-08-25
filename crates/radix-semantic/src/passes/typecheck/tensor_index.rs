@@ -63,6 +63,23 @@ pub(super) fn record_shape_witness_from_init(
     }
 }
 
+/// The two raw dimension terms of a matrix shape, literal or parametric.
+///
+/// A matrix shape is always a two-dim tuple; the terms are the interned row
+/// and column index expressions as written (literals or size params).
+pub(super) fn matrix_shape_dims(
+    checker: &TypeChecker<'_>,
+    index_id: IndexId,
+) -> Option<(IndexId, IndexId)> {
+    let IndexExpr::Tuple(dims) = checker.types.get_index(index_id) else {
+        return None;
+    };
+    let [rows, columns] = dims.as_slice() else {
+        return None;
+    };
+    Some((*rows, *columns))
+}
+
 /// Tensor return type with a fresh shape hole for ops that may change rank/size.
 pub(super) fn tensor_with_fresh_shape(checker: &mut TypeChecker<'_>, elem: TypeId) -> TypeId {
     let shape = checker.fresh_index_hole();
@@ -70,19 +87,30 @@ pub(super) fn tensor_with_fresh_shape(checker: &mut TypeChecker<'_>, elem: TypeI
 }
 
 /// Return the named rank-law decline for the source-only `ᵀ` glyph, when the
-/// receiver is not an admitted rank-2 tensor. Rank-1 is a permanent decline:
-/// there is no row/column distinction. Rank 3+ is deliberately deferred until
-/// a batched-transpose consumer owns the shape and device contract.
+/// receiver is not an admitted rank-2 tensor or matrix. Rank-1 is a permanent
+/// decline: there is no row/column distinction. Rank 3+ is deliberately
+/// deferred until a batched-transpose consumer owns the shape and device
+/// contract.
 pub(super) fn glyph_transpose_rank_issue(
     checker: &mut TypeChecker<'_>,
     receiver_ty: TypeId,
 ) -> Option<&'static str> {
     let resolved = checker.resolve_inferred_type(receiver_ty);
     let (_, payload) = checker.types.peel_access_marker(resolved);
-    let Type::Tensor(_, shape) = checker.types.get(payload) else {
-        return Some(ISSUE_GLYPH_TRANSPOSE_OPERANDS_UNSUPPORTED);
+    let shape = match checker.types.get(payload) {
+        Type::Tensor(_, shape) => *shape,
+        // S0-G9: matrices admit the glyph. A matrix shape is always a
+        // two-dim tuple, so only a shape hole can decline.
+        Type::Matrix(_, shape) => {
+            let shape = checker.resolve_index(*shape);
+            return match checker.types.get_index(shape) {
+                IndexExpr::Tuple(_) => None,
+                _ => Some(ISSUE_GLYPH_TRANSPOSE_RANK_REQUIRED),
+            };
+        }
+        _ => return Some(ISSUE_GLYPH_TRANSPOSE_OPERANDS_UNSUPPORTED),
     };
-    let shape = checker.resolve_index(*shape);
+    let shape = checker.resolve_index(shape);
     match checker.types.get_index(shape) {
         IndexExpr::Literal(_) => Some(ISSUE_GLYPH_TRANSPOSE_RANK1),
         IndexExpr::Tuple(dims) => match dims.len() {

@@ -319,6 +319,24 @@ pub(super) fn check_intrinsic_method_call(
         return Some(check_matrix_applica(checker, receiver_ty, args, span));
     }
 
+    // Vector `multiplica`: elementwise multiply by a same-shape peer or by a
+    // scalar of the element type (S0-G8 scalar splat — the scalar operand
+    // broadcasts across the lanes; the result keeps the receiver shape).
+    if matches!(entry.receiver, radix_intrinsics::IntrinsicReceiver::Vector)
+        && entry.faber_name == "multiplica"
+    {
+        return Some(check_vector_multiplica(checker, receiver_ty, args, span));
+    }
+
+    // Matrix `transpone`: [R, C] → [C, R] — the result shape is swapped, so
+    // `SameAsReceiver` cannot publish it. The registry owns the zero-arity
+    // contract; this helper only swaps the shape terms.
+    if matches!(entry.receiver, radix_intrinsics::IntrinsicReceiver::Matrix)
+        && entry.faber_name == "transpone"
+    {
+        return Some(check_matrix_transpone(checker, receiver_ty));
+    }
+
     match entry.return_kind {
         IntrinsicReturnKind::MapperArray => {
             let Some(inner) = ctx.inner else {
@@ -770,6 +788,10 @@ fn resolve_return_type(
 
 /// Typecheck `matrix.applica(vector)`: peer width must equal matrix columns;
 /// result is a vector of width = matrix rows with the same element type.
+///
+/// S0-G9: literal shapes keep the exact register widths and the CPU subset
+/// bound; dimension-neutral (parametric) shapes publish their column/row
+/// terms as the peer/result widths, which unifies inside a size-generic body.
 fn check_matrix_applica(
     checker: &mut TypeChecker<'_>,
     receiver_ty: TypeId,
@@ -780,28 +802,84 @@ fn check_matrix_applica(
     let Type::Matrix(element_ty, shape) = checker.types.get(resolved).clone() else {
         return checker.error_type;
     };
-    let Some((rows, columns)) = crate::literal_matrix_shape(shape, checker.types) else {
-        checker.invalid_operand_types("matrix_applica_requires_literal_shape", span);
-        return checker.error_type;
+    let (peer_width, result_width) = match crate::literal_matrix_shape(shape, checker.types) {
+        Some((rows, columns)) => {
+            if rows > 4 || columns > 4 {
+                checker.invalid_operand_types("matrix_register_exceeds_cpu_subset", span);
+                return checker.error_type;
+            }
+            (
+                checker
+                    .types
+                    .intern_index(crate::IndexExpr::Literal(u64::from(columns))),
+                checker
+                    .types
+                    .intern_index(crate::IndexExpr::Literal(u64::from(rows))),
+            )
+        }
+        None => {
+            // Matrix shapes are always two-dim tuples; a parametric shape
+            // carries the column and row terms directly.
+            let Some((rows, columns)) = super::tensor_index::matrix_shape_dims(checker, shape)
+            else {
+                checker.invalid_operand_types("matrix_applica_requires_literal_shape", span);
+                return checker.error_type;
+            };
+            (columns, rows)
+        }
     };
-    if rows > 4 || columns > 4 {
-        checker.invalid_operand_types("matrix_register_exceeds_cpu_subset", span);
-        return checker.error_type;
-    }
     if args.len() != 1 {
         checker.wrong_arity("wrong_number_of_arguments", span);
         return checker.error_type;
     }
-    let width_id = checker
-        .types
-        .intern_index(crate::IndexExpr::Literal(u64::from(columns)));
-    let peer_ty = checker.types.vector_with_width(element_ty, width_id);
+    let peer_ty = checker.types.vector_with_width(element_ty, peer_width);
     let arg_ty = checker.check_expr_with_expected(&mut args[0].expr, Some(peer_ty));
     checker.unify_assign_issue(arg_ty, peer_ty, args[0].span, ISSUE_ARGUMENT_TYPE_MISMATCH);
-    let result_width = checker
-        .types
-        .intern_index(crate::IndexExpr::Literal(u64::from(rows)));
     checker.types.vector_with_width(element_ty, result_width)
+}
+
+/// Typecheck `matrix.transpone()`: a zero-argument method returning the
+/// receiver's shape with rows and columns swapped — `[R, C] → [C, R]`,
+/// literal or parametric. Shape holes pass through unchanged, mirroring the
+/// tensor transpose shape constraint.
+fn check_matrix_transpone(checker: &mut TypeChecker<'_>, receiver_ty: TypeId) -> TypeId {
+    let resolved = checker.resolve_inferred_type(receiver_ty);
+    let Type::Matrix(element_ty, shape) = checker.types.get(resolved).clone() else {
+        return checker.error_type;
+    };
+    let Some((rows, columns)) = super::tensor_index::matrix_shape_dims(checker, shape) else {
+        return resolved;
+    };
+    let shape = checker
+        .types
+        .intern_index(crate::IndexExpr::Tuple(vec![columns, rows]));
+    checker.types.matrix_with_shape(element_ty, shape)
+}
+
+/// Typecheck `vector.multiplica(operand)`: same-shape peer multiply, or a
+/// scalar of the element type splat-multiplied across the lanes (S0-G8).
+/// The result keeps the receiver shape at any width, parametric included.
+fn check_vector_multiplica(
+    checker: &mut TypeChecker<'_>,
+    receiver_ty: TypeId,
+    args: &mut [HirCallArg],
+    span: radix_lexer::Span,
+) -> TypeId {
+    let resolved = checker.resolve_inferred_type(receiver_ty);
+    let Type::Vector(element_ty, _) = checker.types.get(resolved).clone() else {
+        return checker.error_type;
+    };
+    if args.len() != 1 {
+        checker.wrong_arity("wrong_number_of_arguments", span);
+        return checker.error_type;
+    }
+    let arg_ty = checker.check_expr_with_expected(&mut args[0].expr, None);
+    let arg_resolved = checker.resolve_inferred_type(arg_ty);
+    if checker.types.equals(arg_resolved, element_ty) {
+        return resolved;
+    }
+    checker.unify_assign_issue(arg_ty, resolved, args[0].span, ISSUE_ARGUMENT_TYPE_MISMATCH);
+    resolved
 }
 
 /// Validate tensor method call arguments under the DEFER-064 index-vector policy.

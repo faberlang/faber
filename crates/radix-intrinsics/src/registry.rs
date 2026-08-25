@@ -824,6 +824,9 @@ pub static INTRINSICS: &[MethodIntrinsic] = &[
     ),
     // Square 2×2 / 4×4 affine inverse; singular → nihil (OptionReceiver).
     intrinsic!(Matrix, "inversa", 0, &[], OptionReceiver, CodegenOnly),
+    // Rank-2 transpose: [R, C] → [C, R]. The return type is specialized in
+    // typecheck (SameAsReceiver would keep the receiver shape).
+    intrinsic!(Matrix, "transpone", 0, &[], SameAsReceiver, CodegenOnly),
     intrinsic!(
         Vector,
         "addita",
