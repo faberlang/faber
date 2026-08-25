@@ -146,10 +146,10 @@ impl Parser {
     /// `sit`, and untyped destructuring have no concrete destination and are
     /// rejected with a structured diagnostic.
     fn parse_var_decl(&mut self) -> Result<StmtKind, ParseError> {
-        let (mutability, is_await) = if self.eat_keyword_ident(TokenKind::Fixum) {
-            (AstMutability::Immutable, false)
+        let mutability = if self.eat_keyword_ident(TokenKind::Fixum) {
+            AstMutability::Immutable
         } else if self.eat_keyword_ident(TokenKind::Varia) {
-            (AstMutability::Mutable, false)
+            AstMutability::Mutable
         } else {
             return Err(Self::expected_error("fixum or varia", self.current_span()));
         };
@@ -174,7 +174,7 @@ impl Parser {
 
         Ok(StmtKind::Var(VarDecl {
             mutability,
-            is_await,
+            is_await: false,
             ty,
             binding,
             init,
