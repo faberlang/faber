@@ -625,9 +625,15 @@ impl FunctionBuilder<'_> {
         let elem_ty = MirType::semantic(element_ty);
         let vector_ty = MirType::semantic(receiver_ty);
 
-        if matches!(method, VectorMethodKind::Longitudo | VectorMethodKind::Normalizata) {
+        if matches!(
+            method,
+            VectorMethodKind::Crea | VectorMethodKind::Longitudo | VectorMethodKind::Normalizata
+        ) {
             if !args.is_empty() {
                 return None;
+            }
+            if matches!(method, VectorMethodKind::Crea) {
+                return Some(self.lower_vector_crea(width, element_ty, vector_ty, expr));
             }
             if matches!(method, VectorMethodKind::Longitudo) {
                 return Some(self.lower_vector_longitudo(lhs, width, elem_ty, expr));
@@ -659,7 +665,7 @@ impl FunctionBuilder<'_> {
             }
             VectorMethodKind::Dot => Some(self.lower_vector_dot(lhs, rhs, width, elem_ty, expr)),
             VectorMethodKind::Swizzle => unreachable!("swizzle branch returns before vector peer lowering"),
-            VectorMethodKind::Longitudo | VectorMethodKind::Normalizata => {
+            VectorMethodKind::Longitudo | VectorMethodKind::Normalizata | VectorMethodKind::Crea => {
                 unreachable!("zero-arg vector methods handled above")
             }
         }
@@ -756,6 +762,36 @@ impl FunctionBuilder<'_> {
 
         self.switch_to(join_id);
         MirOperand::Temp(result)
+    }
+
+    /// `crea()` — the zero-vector constructor (OQ1): every lane is the
+    /// element zero at the receiver's admitted width. The receiver is the
+    /// declared shape; the result does not depend on its value.
+    fn lower_vector_crea(
+        &mut self,
+        width: u8,
+        element_ty: TypeId,
+        vector_ty: MirType,
+        expr: &HirExpression,
+    ) -> MirOperand {
+        let mut fields = Vec::with_capacity(usize::from(width));
+        for _ in 0..width {
+            let zero = self.assign_temp(
+                MirValueKind::Operand(MirOperand::Constant(numeric_zero_constant(
+                    element_ty,
+                    self.types,
+                ))),
+                MirType::semantic(element_ty),
+                expr.span,
+            );
+            fields.push(MirAggregateItem::Operand(zero));
+        }
+        self.construct_temp(
+            MirAggregateKind::Vector,
+            MirAggregateFields::Ordered(fields),
+            vector_ty,
+            expr.span,
+        )
     }
 
     fn lower_matrix_method(
@@ -3320,6 +3356,7 @@ enum VectorMethodKind {
     Swizzle,
     Longitudo,
     Normalizata,
+    Crea,
     Elementwise(MirBinOp),
 }
 
@@ -3330,6 +3367,7 @@ fn vector_method_kind(method_name: &str) -> Option<VectorMethodKind> {
         "swizzle" => Some(VectorMethodKind::Swizzle),
         "longitudo" => Some(VectorMethodKind::Longitudo),
         "normalizata" => Some(VectorMethodKind::Normalizata),
+        "crea" => Some(VectorMethodKind::Crea),
         "addita" => Some(VectorMethodKind::Elementwise(MirBinOp::Add)),
         "subtrahe" => Some(VectorMethodKind::Elementwise(MirBinOp::Sub)),
         "multiplica" => Some(VectorMethodKind::Elementwise(MirBinOp::Mul)),

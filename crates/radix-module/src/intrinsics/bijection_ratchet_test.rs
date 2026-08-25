@@ -448,13 +448,11 @@ fn probe(source: &str, session: &Session) -> ProbeOutcome {
 /// The unit-cited ratchet allowlist. Law: this set plus the permanent
 /// AIR-lane class list (`AIR_LANE_CLASSES`) EQUALS the probe-derived gap set
 /// (direction 1 ∪ direction 3). Each row cites the unit that removes it — MC2
-/// arms the numeric-unary family, MC3 arms `Vector.crea`. The 11 AIR-lane
+/// armed the numeric-unary family, MC3 armed `Vector.crea`. The 11 AIR-lane
 /// rows were dispositioned by MC4 onto `AIR_LANE_CLASSES` (ruled design
-/// surface, not worklist entries).
-const RATCHET: &[(&str, &str)] = &[
-    // MC3 — Vector.crea constructor backfill.
-    ("Vector.crea/0", "MC3"),
-];
+/// surface, not worklist entries). MC3 landed the last ratchet row — the
+/// allowlist is EMPTY: the mir-completeness implementation surface is done.
+const RATCHET: &[(&str, &str)] = &[];
 
 /// Permanent AIR-lane class list (goal mir-completeness §1 direction 3) — the
 /// 11 DOCUMENT-AS-DESIGNED rows moved off the ratchet by MC4. A design fact,

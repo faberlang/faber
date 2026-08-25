@@ -223,6 +223,9 @@ mod potentia_tests;
 #[path = "numeric_unary_test.rs"]
 mod numeric_unary_tests;
 #[cfg(test)]
+#[path = "vector_crea_test.rs"]
+mod vector_crea_tests;
+#[cfg(test)]
 #[path = "rank2_reduction_readiness_test.rs"]
 mod rank2_reduction_readiness_tests;
 #[cfg(test)]
