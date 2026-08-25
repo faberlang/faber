@@ -741,6 +741,7 @@ pub(crate) fn is_allowed_device_method(method: &str) -> bool {
             | "activatio_relu"
             | "radix"
             | "gelu"
+            | "silu"
             | "activatio_tanh"
             | "activatio_softmax"
             | "laminatio"

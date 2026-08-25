@@ -19,6 +19,7 @@ const ADMITTED_INTRINSICS: &[&str] = &[
     "activatio_relu",
     "radix",
     "gelu",
+    "silu",
     "activatio_tanh",
     "activatio_softmax",
     "laminatio",

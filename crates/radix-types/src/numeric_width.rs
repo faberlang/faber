@@ -491,7 +491,14 @@ pub fn tensor_method_requires_numeric_element(method_name: &str) -> bool {
         method_name,
         // S6-C2: `addita_bias` is the bounded bias-broadcast add over a
         // numeric element type, same element gate as the general `addita`.
-        "addita" | "addita_bias" | "subtrahe" | "multiplica" | "matmul" | "summa" | "media"
+        "addita"
+            | "addita_bias"
+            | "subtrahe"
+            | "multiplica"
+            | "matmul"
+            | "summa"
+            | "media"
+            | "silu"
     )
 }
 

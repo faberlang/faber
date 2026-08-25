@@ -298,6 +298,23 @@ functio gelu_op(tf32[2, 2] x) → tf32[2, 2] {
 }
 
 #[test]
+fn accepts_silu_tensor_method_in_air_lane() {
+    let errors = air_errors(
+        r#"
+@ radix lane "air"
+functio silu_op(tf32[2, 2] x) → tf32[2, 2] {
+    redde x.silu()
+}
+"#,
+    );
+
+    assert!(
+        errors.is_empty(),
+        "unexpected AIR errors for silu: {errors:?}"
+    );
+}
+
+#[test]
 fn accepts_activatio_tanh_tensor_method_in_air_lane() {
     let errors = air_errors(
         r#"

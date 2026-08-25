@@ -671,6 +671,9 @@ pub static INTRINSICS: &[MethodIntrinsic] = &[
         SameAsReceiver,
         collection TensorGelu
     ),
+    // GI3-1: SiLU is lowered by composition (`x / (1 + exp(-x))`) through
+    // existing tensor elementwise operations; it owns no MIR collection op.
+    intrinsic!(Tensor, "silu", 0, &[], SameAsReceiver, CodegenOnly),
     intrinsic!(
         Tensor,
         "activatio_relu",

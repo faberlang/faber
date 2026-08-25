@@ -26,6 +26,7 @@ pub(super) fn is_allowed_tensor_intrinsic(method: &str) -> bool {
             | "activatio_relu"
             | "radix"
             | "gelu"
+            | "silu"
             | "activatio_tanh"
             | "activatio_softmax"
             | "laminatio"

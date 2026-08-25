@@ -187,6 +187,12 @@ fn tensor_activatio_relu_is_registered_as_mir_tensor_relu() {
 
     let gelu = lookup_method_for_type(tensor_ty, "gelu", 0).expect("tensor gelu");
     assert_eq!(mir_collection_op(gelu), Some(MirCollectionOp::TensorGelu));
+
+    let silu = lookup_method_for_type(tensor_ty, "silu", 0).expect("tensor silu");
+    assert_eq!(silu.receiver, IntrinsicReceiver::Tensor);
+    assert_eq!(silu.return_kind, super::IntrinsicReturnKind::SameAsReceiver);
+    assert_eq!(silu.mir_kind, IntrinsicMirKind::CodegenOnly);
+    assert_eq!(mir_collection_op(silu), None, "silu must stay a composed lowering");
 }
 
 #[test]

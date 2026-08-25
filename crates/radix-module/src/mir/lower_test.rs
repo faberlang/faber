@@ -2391,6 +2391,29 @@ functio muta(tf32[2] input) → tf32[2] {
 }
 
 #[test]
+fn lowers_tensor_silu_to_gi3_composed_elementwise_ops() {
+    let source = r"
+@ nucleum
+functio silu(tf32[4] input) → tf32[4] {
+    redde input.silu()
+}
+";
+    let mut unit = analyze(source);
+    let lowered = lower_analyzed_unit(&mut unit, Default::default()).expect("MIR lowering succeeds");
+    validate_program(&lowered.program, lowered.validated.validation()).expect("the composed SiLU MIR must validate");
+    let dump = dump_program(&lowered.program);
+    assert!(dump.contains("runtime collection tensor_neg"), "missing negation: {dump}");
+    assert!(dump.contains("exp "), "missing tensor Exp unary: {dump}");
+    assert!(
+        dump.contains("runtime collection tensor_add"),
+        "missing denominator add: {dump}"
+    );
+    assert!(dump.contains("runtime collection tensor_div"), "missing SiLU division: {dump}");
+    assert!(!dump.contains("method call before runtime/provider MIR lowering"), "{dump}");
+    assert!(!dump.contains("tensor_silu"), "SiLU must not grow a dedicated MIR op: {dump}");
+}
+
+#[test]
 fn indexed_tensor_view_kernel_lowers_device_brackets_to_projections() {
     let dump = dump_source(
         r"

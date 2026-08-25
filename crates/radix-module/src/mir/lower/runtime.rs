@@ -143,6 +143,16 @@ impl FunctionBuilder<'_> {
         if let Some(lowered) = self.lower_lista_ordina(receiver, &method_name, args, expr) {
             return Some(lowered);
         }
+        if method_name == "silu" {
+            if let Some(receiver_ty) = receiver.ty {
+                let payload = self.types.get(self.method_receiver_payload_id(receiver_ty));
+                if let Some(entry) = crate::intrinsics::lookup_method_for_type(payload, &method_name, args.len()) {
+                    if matches!(entry.receiver, crate::intrinsics::IntrinsicReceiver::Tensor) {
+                        return self.lower_tensor_silu(receiver, expr);
+                    }
+                }
+            }
+        }
 
         if let Some(receiver_ty) = receiver.ty {
             let payload = self.types.get(self.method_receiver_payload_id(receiver_ty));
@@ -1498,6 +1508,36 @@ impl FunctionBuilder<'_> {
                 Some(MirPlace::temp(temp))
             }
         }
+    }
+
+    /// Lower the GI3-1 SiLU activation as existing tensor elementwise MIR.
+    ///
+    /// `silu(x) = x / (1 + exp(-x))`: TensorNeg, tensor Exp, TensorAdd, and
+    /// TensorDiv are the complete composition. Keeping this expansion here
+    /// means the registry admits the method without inventing TensorSilu.
+    fn lower_tensor_silu(&mut self, receiver: &HirExpression, expr: &HirExpression) -> Option<MirOperand> {
+        let tensor_ty = self.expr_ty(expr)?;
+        let x = self.lower_expr_value(receiver)?;
+        let negated = self.runtime_call_value(
+            MirIntrinsic::Collection(MirCollectionOp::TensorNeg),
+            vec![x.clone()],
+            tensor_ty,
+            expr.span,
+        );
+        let exponent =
+            self.assign_temp(MirValueKind::Unary { op: MirUnOp::Exp, operand: negated }, tensor_ty, expr.span);
+        let denominator = self.runtime_call_value(
+            MirIntrinsic::Collection(MirCollectionOp::TensorAdd),
+            vec![exponent, MirOperand::Constant(MirConstant::Float(1.0))],
+            tensor_ty,
+            expr.span,
+        );
+        Some(self.runtime_call_value(
+            MirIntrinsic::Collection(MirCollectionOp::TensorDiv),
+            vec![x, denominator],
+            tensor_ty,
+            expr.span,
+        ))
     }
 
     /// Lower compiler-owned numeric operator methods into ordinary MIR.
