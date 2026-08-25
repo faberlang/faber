@@ -201,6 +201,7 @@ impl Parser {
         )
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn new_with_reader_identities_and_fallback(
         tokens: Vec<Token>,
         interner: Interner,
