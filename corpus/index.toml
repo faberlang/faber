@@ -3320,7 +3320,7 @@ category = "non-null-chain"
 
 [[files]]
 path = "operatores/numeric-value-eq.fab"
-term = "≈"
+term = "≅"
 kind = "operator"
 category = "comparison"
 

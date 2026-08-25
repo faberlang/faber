@@ -1,46 +1,46 @@
 +++
-term = "≈"
+term = "≅"
 kind = "operator"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "width_type_sugar", "cast_expr", "equality", "equality_tail", "expression", "literal", "nota_stmt"]
 category = "comparison"
 canonical = true
-summary = "Numeric value equality after promotion join — not fuzzy float."
-syntax = "<expression> ≈ <expression> | <expression> ≉ <expression>"
+summary = "Numeric value equality (≅) after promotion join — exact, not fuzzy float."
+syntax = "<expression> ≅ <expression> | <expression> ≇ <expression>"
 related = ["≡", "≠", "↦", "adfirma"]
 locale = "en"
 +++
 
 # =============================================================================
-# ≈ — Numeric value equality after promotion join — not fuzzy float.
+# ≅ — Numeric value equality after promotion join — not fuzzy float.
 # =============================================================================
 #
 # What this teaches:
-#   • Value equality — `≈` promotes numeric types to a common width before comparing.
-#   • Exact comparison — Unlike `≡`, `≈` works across numeric widths (u8 vs i64), but still exact.
+#   • Value equality — `≅` promotes numeric types to a common width before comparing.
+#   • Exact comparison — Unlike `≡`, `≅` works across numeric widths (u8 vs i64), but still exact.
 #
 # Common mistakes:
-#   • Expecting ≈ to be fuzzy or approximate — it is exact value equality after promotion.
+#   • Expecting ≅ to be fuzzy or approximate — it is exact value equality after promotion.
 #
 # See also: ≡, ≠, ↦, adfirma
 # =============================================================================
 
-# operatores/numeric-value-eq — ≈ ≉
+# operatores/numeric-value-eq — ≅ ≇
 #
-# WHY: ≡ requires identical types; ≈ promotes numerics then exact-compares.
-# 42.145 ≈ 42 must stay false (no hidden tolerance).
+# WHY: ≡ requires identical types; ≅ promotes numerics then exact-compares.
+# 42.145 ≅ 42 must stay false (no hidden tolerance).
 
 main {
     const int<u8> port ← 42 ∷ int<u8>
     const int count ← 42
-    const _ same_width ← port ≈ count
+    const _ same_width ← port ≅ count
     print same_width
 
-    const _ int_float ← 1 ≈ 1.0
+    const _ int_float ← 1 ≅ 1.0
     print int_float
 
-    const _ not_fuzzy ← 42.145 ∷ float<f64> ≈ 42.0 ∷ float<f64>
+    const _ not_fuzzy ← 42.145 ∷ float<f64> ≅ 42.0 ∷ float<f64>
     print not_fuzzy
 
-    const _ differs ← 1 ≉ 2
+    const _ differs ← 1 ≇ 2
     print differs
 }

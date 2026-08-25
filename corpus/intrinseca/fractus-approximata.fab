@@ -4,23 +4,25 @@ kind = "concept"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "expression", "literal", "nota_stmt", "unary_expr", "equality", "equality_tail"]
 category = "intrinseca"
 canonical = false
-summary = "DEFER-036 tolerance compare on fractus receiver (not ≈)."
-syntax = "x.approx(aliud, toleratio)"
-related = ["fractus", "approximata", "DEFER-036"]
+summary = "Default fuzzy ≈ and explicit .approx tolerance compare on a fractus receiver."
+syntax = "<expression> ≈ <expression> | x.approx(aliud, toleratio)"
+related = ["≈", "≅", "fractus", "approximata", "DEFER-036"]
 locale = "en"
 +++
 # =============================================================================
-# fractus-approximata — DEFER-036 tolerance compare on fractus receiver (not ≈)
+# fractus-approximata — default fuzzy ≈ and explicit .approx tolerance compare (DEFER-036)
 # =============================================================================
 #
 # What this teaches:
-#   • DEFER-036 tolerance compare on fractus receiver (not ≈).
+#   • `≈` is the default fuzzy tolerance comparison.
+#   • `.approx(aliud, toleratio)` / `approximata` supplies explicit tolerance.
+#   • `≅` remains exact promoted equality.
 #   • Related keywords: fractus, approximata, DEFER-036
 #
 # Common mistakes:
-#   • Using `≡` for floating-point comparison — direct float equality is unreliable; use `.approx(aliud, toleratio)` instead.
+#   • Using `≅` when tolerance is intended — use `≈` for the default or `.approx(aliud, toleratio)` for explicit tolerance.
 #
-# See also: fractus, approximata, DEFER-036
+# See also: ≈, ≅, fractus, approximata, DEFER-036
 # =============================================================================
 
 # intrinseca/fractus-approximata — tolerance-based float compare (DEFER-036)
@@ -28,14 +30,17 @@ locale = "en"
 # EXPECTED OUTPUT:
 #   verum
 #   falsum
+#   falsum
 
 main {
     const float a ← 42.145
     const float b ← 42.0
 
     const bool near ← a.approx(b, 0.2)
-    const bool exact_promo ← a ≈ b
+    const bool fuzzy ← a ≈ b
+    const bool exact_promo ← a ≅ b
 
     print near
+    print fuzzy
     print exact_promo
 }

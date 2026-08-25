@@ -998,7 +998,7 @@ fn semantic_invalid_operand_types_message(args: &[DiagnosticArg]) -> Option<Stri
         "interval_bound_single_scalar" => Some("interval bound must be a single Unicode scalar".to_owned()),
         "numeric_operand_required" => Some("numeric operand required".to_owned()),
         "numeric_value_equality_operands_required" => {
-            Some("≈ requires numeric operands; use ≡ for exact type equality or widen with ↦".to_owned())
+            Some("≈ requires numeric operands; use ≅ for promoted exact equality or .approx for explicit tolerance".to_owned())
         }
         "boolean_operand_required" => Some("boolean operand required".to_owned()),
         "condition_must_be_bivalens" => Some("condition must be bivalens".to_owned()),
@@ -1206,7 +1206,7 @@ fn semantic_invalid_operand_types_help(args: &[DiagnosticArg]) -> Option<String>
         }
         "numeric_operand_required" => Some("use a numeric operand for this operator".to_owned()),
         "numeric_value_equality_operands_required" => Some(
-            "use numeric operands for approximate equality, or use exact equality for non-numeric values".to_owned(),
+            "use numeric operands with ≈ for fuzzy equality; use ≅ for promoted exact equality or .approx for explicit tolerance".to_owned(),
         ),
         "boolean_operand_required" => Some("use a bivalens operand for this operator".to_owned()),
         "condition_must_be_bivalens" => Some("use a bivalens expression as the condition".to_owned()),
