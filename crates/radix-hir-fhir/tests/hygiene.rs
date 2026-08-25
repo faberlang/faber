@@ -18,7 +18,12 @@ const BUDGETS: Budgets = Budgets {
     // WHY: minted at D-03 baseline; frozen, not audited here.
     unwrap: 0,
     // WHY: minted at D-03 baseline; frozen, not audited here.
-    expect: 0,
+    // Re-baselined 0→10: the MessagePack package codec (FPF-3 54654badb /
+    // FPF-5 b9d708660) encodes fixint/str/array/map headers through
+    // `try_from(...).expect("checked <= bound")` — each site converts a length
+    // whose bound is established by the enclosing match arm, so the expect is
+    // the fail-closed bound check, not a default.
+    expect: 10,
     // WHY: minted at D-03 baseline; frozen, not audited here.
     panic: 0,
     unreachable: 0,

@@ -16,11 +16,20 @@ const BUDGETS: Budgets = Budgets {
     // WHY: minted at D-03 baseline; frozen, not audited here.
     unwrap: 1,
     // WHY: minted at D-03 baseline after D03-MIR extraction; frozen, not audited here.
-    expect: 59,
+    // Re-baselined 59→69: the transformer-plan landings added fail-closed
+    // plan/probe asserts — RMSNorm gamma resource binding (1cd75e23f),
+    // interleaved rank-3 RoPE tables (a1c2b104e), and queue/stack elementwise
+    // instantiation (ef44b2751), plus one RoPE row in the abi/tests.rs probe.
+    expect: 69,
     // WHY: minted at D-03 baseline; frozen, not audited here.
     panic: 9,
     // WHY: minted at D-03 baseline; frozen, not audited here.
-    unreachable: 1,
+    // Re-baselined 1→5: SSM state-family plan selection (66b482134) added
+    // the three conv/scan fact guards in device_plan_compiler.rs, and
+    // queue/stack elementwise (ef44b2751) added the intrinsic validation
+    // arm; literal_indexed_access.rs carries the checked-index arm. All
+    // exhaustive over selections verified before dispatch.
+    unreachable: 5,
     todo: 0,
     unimplemented: 0,
     // WHY: minted at D-03 baseline; frozen, not audited here.

@@ -55,7 +55,10 @@ const BUDGETS: Budgets = Budgets {
     // feature-granularity narrowed the driver target dispatch to Rust | Go
     // (`match target above narrowed to Rust | Go`) — all shape-verified
     // fail-closed arms, same guard rationale.
-    unreachable: 11,
+    // Re-baselined 11→12: elementwise lista arithmetic lowering (1a6329505)
+    // added the runtime.rs collection-op dispatch guards — operator mapping
+    // is exhaustive over the arithmetic set checked above, same guard rationale.
+    unreachable: 12,
     todo: 0,
     unimplemented: 0,
     // WHY: deliberate Result discards in dump formatters (air/dump.rs),

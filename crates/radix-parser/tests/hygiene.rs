@@ -16,11 +16,17 @@ const BUDGETS: Budgets = Budgets {
     // WHY: minted at D-03 baseline; frozen, not audited here.
     unwrap: 0,
     // WHY: minted at D-03 baseline; frozen, not audited here.
-    expect: 93,
+    // Re-baselined 93→96: the grammar-admission landings added token-shape
+    // expects — equality ladder glyph synonyms (24647652c), minmax additive
+    // nodes (e54a7b74d), and applied-generic nominal record construction
+    // (ea8728ffb); the parser's existing fail-closed token idiom.
+    expect: 96,
     // WHY: minted at D-03 baseline; frozen, not audited here.
     panic: 0,
     // WHY: minted at D-03 baseline; frozen, not audited here.
-    unreachable: 0,
+    // Re-baselined 0→1: the conversio annotation decl arm (fcab66016)
+    // guards an exhaustive match whose shape was checked above the dispatch.
+    unreachable: 1,
     todo: 0,
     unimplemented: 0,
     // WHY: minted at D-03 baseline; frozen, not audited here. The single
