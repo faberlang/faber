@@ -2440,7 +2440,6 @@ impl<'a> FunctionBuilder<'a> {
         MirOperand::Temp(temp)
     }
 
-    // consumes args into iterators
     fn variant_payload(&mut self, variant: DefId, args: Vec<MirOperand>, span: Span) -> MirAggregateFields {
         let Some(field_names) = self.context.variant_fields.get(&variant) else {
             self.errors.push(MirError::unsupported(
