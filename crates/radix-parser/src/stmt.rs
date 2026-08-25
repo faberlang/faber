@@ -184,7 +184,17 @@ impl Parser {
             Vec::new()
         };
 
+        let mutability_span = self.current_span();
         let mutability = self.parse_mutability()?;
+        // HIR's itera node does not retain the source mutability marker, so
+        // reject this mode conflict while the parser still has that fact.
+        if matches!(mode, IteraMode::De) && matches!(mutability, AstMutability::Mutable) {
+            return Err(
+                ParseError::structured(ParseErrorKind::Expected, mutability_span)
+                    .with_arg("issue", "itera_de_requires_fixum")
+                    .with_arg("expected", "the const form `fixum`"),
+            );
+        }
         // A top-level `_` in an itera binder is the legacy unused loop
         // variable, not a destructuring wildcard. Keep it as an identifier;
         // wildcard patterns remain available inside array/object binders.

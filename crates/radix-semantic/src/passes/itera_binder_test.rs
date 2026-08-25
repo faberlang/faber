@@ -3,6 +3,52 @@
 use crate::test_support::{self, AnalyzedFixture};
 use radix_hir::{HirBlock, HirExpression, HirExpressionKind, HirItemKind, HirStatementKind};
 
+#[test]
+fn rejects_de_var_reproduction_at_binding_site() {
+    test_support::assert_rejects_with_issue(
+        r#"
+functio bad(lista<numerus> ys) → vacuum {
+    itera de ys varia y {
+        y ← y + 5
+    }
+}
+"#,
+        "itera_de_requires_fixum",
+    );
+}
+
+#[test]
+fn accepts_de_const_bindings_for_array_index_and_map_key() {
+    test_support::analyze_ok(
+        r#"
+functio arrays(lista<numerus> ys) → vacuum {
+    itera de ys fixum index {
+        nota index
+    }
+}
+
+functio maps(tabula<textus, numerus> values) → vacuum {
+    itera de values fixum key {
+        nota key
+    }
+}
+"#,
+    );
+}
+
+#[test]
+fn accepts_ex_var_element_binding() {
+    test_support::analyze_ok(
+        r#"
+functio values(lista<numerus> ys) → vacuum {
+    itera ex ys varia value {
+        value ← value + 5
+    }
+}
+"#,
+    );
+}
+
 fn function_body(unit: &AnalyzedFixture) -> &HirBlock {
     unit.hir
         .as_ref()
