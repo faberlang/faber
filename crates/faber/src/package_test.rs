@@ -5916,13 +5916,13 @@ async_main {
 #[test]
 fn library_resolver_discovers_builtin_norma_modules_without_allowlist() {
     let resolved = crate::library::default_library_resolver()
-        .resolve("norma:solum")
+        .resolve("norma:fs")
         .expect("resolve should not fail")
-        .expect("norma:solum should resolve");
+        .expect("norma:fs should resolve");
 
     assert_eq!(resolved.package, "norma");
-    assert_eq!(resolved.module_path, vec!["solum"]);
-    assert!(resolved.interface_path.ends_with("norma/src/solum.fab"));
+    assert_eq!(resolved.module_path, vec!["fs"]);
+    assert!(resolved.interface_path.ends_with("norma/src/fs.fab"));
 }
 
 #[test]

@@ -42,7 +42,7 @@ fn workspace_library_probe_finds_sibling_norma_when_home_unset() {
 
     let home = default_library_home();
     assert!(home.is_some());
-    assert!(home.unwrap().join("norma/src/solum.fab").is_file());
+    assert!(home.unwrap().join("norma/src/fs.fab").is_file());
 }
 
 #[test]
@@ -66,7 +66,7 @@ fn unset_home_records_ancestor_probe_provenance() {
 
     let resolved = resolved_library_home().expect("workspace probe");
     assert_eq!(resolved.source, LibraryHomeSource::AncestorProbe);
-    assert!(resolved.path.join("norma/src/solum.fab").is_file());
+    assert!(resolved.path.join("norma/src/fs.fab").is_file());
 }
 
 #[test]

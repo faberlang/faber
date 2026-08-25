@@ -114,7 +114,7 @@ pub(crate) fn resolved_library_home() -> Option<ResolvedLibraryHome> {
         .unwrap_or_else(|| Path::new("."));
     for candidate in workspace_root.ancestors() {
         let norma_src = candidate.join("norma/src");
-        if norma_src.is_dir() && norma_src.join("solum.fab").is_file() {
+        if norma_src.is_dir() && norma_src.join("fs.fab").is_file() {
             return Some(ResolvedLibraryHome {
                 path: candidate.to_path_buf(),
                 source: LibraryHomeSource::AncestorProbe,
