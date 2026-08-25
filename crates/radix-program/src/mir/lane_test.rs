@@ -1043,3 +1043,194 @@ fn shadowed_alias_plain_local_method_call_is_not_rewritten() {
         "h1b.gelu() must not be rewritten: the local name does not shadow an import binding"
     );
 }
+
+#[test]
+fn package_mir_return_channel_declared_conversion_applies() {
+    let dir = crate::test_support::test_temp_dir("return-channel-conversion");
+    let entry = write_return_conversion_package(dir.path(), RETURN_CONVERSION_MLP);
+    let config = Config::default().with_stdlib(dir.join("libhome"));
+
+    let mut host = BufferHost::default();
+    run_package_mir(
+        &config,
+        &entry,
+        &crate::test_support::test_mir_seams(),
+        &mut host,
+    )
+    .expect("the declared return-channel conversion must apply before ReturnError");
+    assert_eq!(host.stdout_lines, vec!["42".to_owned()]);
+}
+
+/// Fail-closed counterpart: without a declared conversion the return-channel
+/// mismatch must still be rejected — the lowering only applies an arm the
+/// source actually declares.
+#[test]
+fn package_mir_return_channel_mismatch_without_conversion_fails_closed() {
+    let dir = crate::test_support::test_temp_dir("return-channel-no-conversion");
+    let entry = write_return_conversion_package(dir.path(), RETURN_MISMATCH_MLP);
+    let config = Config::default().with_stdlib(dir.join("libhome"));
+
+    let mut host = BufferHost::default();
+    let diagnostics = run_package_mir(
+        &config,
+        &entry,
+        &crate::test_support::test_mir_seams(),
+        &mut host,
+    )
+    .expect_err("a return-channel mismatch without a declared conversion must fail closed");
+    assert!(
+        diagnostics
+            .iter()
+            .any(|diagnostic| diagnostic.issue() == Some("failable_call_conversion_absent")),
+        "expected the declared-conversion-absent diagnostic, got {:?}",
+        diagnostics
+            .iter()
+            .map(|diagnostic| {
+                (
+                    diagnostic.code.clone(),
+                    diagnostic.issue().map(|issue| issue.to_owned()),
+                    diagnostic.message.clone(),
+                )
+            })
+            .collect::<Vec<_>>()
+    );
+}
+
+/// Write the two-module library package behind the return-channel rows:
+/// `nn.fab` provides a failable namespace verb; `mlp.fab` wraps it on the
+/// return channel. `mlp_lib` selects whether the destination union declares
+/// the `@ conversion` arm. The `return nn.linear_carrier(x)` shape is exactly
+/// the one whose call-site conversion the package-MIR namespace-call rewrite
+/// drops, so the MIR lowering must recover the declared arm at the
+/// `ReturnError` terminator (gradus mlp.fab PML4 shape).
+fn write_return_conversion_package(dir: &std::path::Path, mlp_lib: &str) -> std::path::PathBuf {
+    let nn_lib = r#"+++
+locale = "en"
++++
+union NnError {
+    @ shared
+    string message
+    NnBad
+}
+
+@ public
+fn linear_carrier(int x) → int ⇥ NnError {
+    return 42
+}
+"#;
+    let src = dir.join("src");
+    let library = dir.join("libhome").join("convlib");
+    fs::create_dir_all(&src).expect("create package src");
+    fs::create_dir_all(library.join("src")).expect("create library src");
+    fs::write(
+        dir.join("faber.toml"),
+        format!(
+            r#"
+[package]
+name = "fhir-lane-return-conv"
+version = "1.0.0"
+edition = "2026"
+
+[paths]
+source = "src"
+entry = "main.fab"
+
+[build]
+target = "fmir"
+kind = "bin"
+
+[reader]
+locale = "en"
+
+[dependencies]
+convlib = "1.0.0"
+"#
+        ),
+    )
+    .expect("write faber.toml");
+    let library_display = library.display();
+    let lock = format!(
+        "[[package]]\nname = \"convlib\"\nversion = \"1.0.0\"\nsource = \"path:{library_display}\"\npackage_root = \"{library_display}\"\nkind = \"source\"\ntarget_language = \"\"\ntarget_triple = \"\"\ntarget_manifest = \"\"\ninterface_root = \"{library_display}/src\"\nartifact = \"\"\ncrate = \"\"\nrustc = \"\"\n"
+    );
+    fs::write(dir.join("faber.lock"), lock).expect("write faber.lock");
+    fs::write(library.join("src/nn.fab"), nn_lib).expect("write nn module");
+    fs::write(library.join("src/mlp.fab"), mlp_lib).expect("write mlp module");
+    let entry = src.join("main.fab");
+    let main = "import from \"convlib:mlp\" mlp\n\nmain {\n    do {\n        print mlp.wrapper(1)\n    }\n    catch err {\n        print \"err\"\n    }\n}\n";
+    fs::write(&entry, main).expect("write main.fab");
+    entry
+}
+
+const RETURN_CONVERSION_MLP: &str = r#"+++
+locale = "en"
++++
+import from "convlib:nn" nn
+
+union GradusError {
+    @ shared
+    string message
+
+    @ conversion nn.NnError err {
+        return variant GradusBad {message = err.message}
+    }
+    GradusBad
+}
+
+@ public
+fn wrapper(int x) → int ⇥ GradusError {
+    return nn.linear_carrier(x)
+}
+"#;
+
+const RETURN_MISMATCH_MLP: &str = r#"+++
+locale = "en"
++++
+import from "convlib:nn" nn
+
+union GradusError {
+    @ shared
+    string message
+    GradusBad
+}
+
+@ public
+fn wrapper(int x) → int ⇥ GradusError {
+    return nn.linear_carrier(x)
+}
+"#;
+
+#[test]
+fn probe_itera_list() {
+    let lib = r#"+++
+locale = "en"
++++
+@ private
+fn _digit(string c) → bool {
+    return c ≡ "0"
+}
+
+@ public
+fn all_digits(string s) → bool {
+    for from s const c {
+        if not _digit(c ↦ string) then return false
+    }
+    return true
+}
+"#;
+    let main = "import from \"italib:lib\" ita\n\nmain {\n    print ita.all_digits(\"12\")\n}\n";
+    let dir = crate::test_support::test_temp_dir("probe-itera-list");
+    let entry = write_library_package(dir.as_ref(), "italib", lib, main);
+    let config = Config::default().with_stdlib(dir.join("libhome"));
+
+    let mut host = BufferHost::default();
+    match run_package_mir(&config, &entry, &crate::test_support::test_mir_seams(), &mut host) {
+        Ok(()) => println!("ITERA-RESULT: ok stdout={:?}", host.stdout_lines),
+        Err(diagnostics) => println!(
+            "ITERA-RESULT: err {:?}",
+            diagnostics
+                .iter()
+                .map(|diag| (diag.code.clone(), diag.issue().map(|s| s.to_owned()), diag.message.clone()))
+                .collect::<Vec<_>>()
+        ),
+    }
+}

@@ -326,6 +326,7 @@ impl FunctionBuilder<'_> {
             enum_type_params: Arc::clone(&context.enum_type_params),
             variant_fields: Arc::clone(&context.variant_fields),
             variant_field_tys: Arc::clone(&context.variant_field_tys),
+            conversion_arms: Arc::clone(&context.conversion_arms),
             sermo_def: context.sermo_def,
             meus_def: context.meus_def,
             tuus_def: context.tuus_def,

@@ -777,10 +777,7 @@ impl FunctionBuilder<'_> {
         let mut fields = Vec::with_capacity(usize::from(width));
         for _ in 0..width {
             let zero = self.assign_temp(
-                MirValueKind::Operand(MirOperand::Constant(numeric_zero_constant(
-                    element_ty,
-                    self.types,
-                ))),
+                MirValueKind::Operand(MirOperand::Constant(numeric_zero_constant(element_ty, self.types))),
                 MirType::semantic(element_ty),
                 expr.span,
             );
@@ -2248,6 +2245,38 @@ impl FunctionBuilder<'_> {
         MirOperand::Temp(converted)
     }
 
+    /// The error conversion applied when a failable call's error propagates to
+    /// the enclosing function's alternate-exit terminator.
+    ///
+    /// A conversion recorded on the HIR call site by semantic analysis wins.
+    /// When none was recorded — the package-MIR synthetic-path rewrite of
+    /// namespace calls drops the call-site field — recover the destination
+    /// union's declared `@ conversion` arm for the call's error type, the same
+    /// arm the semantic layer would have attached. Types that already agree
+    /// need no conversion. Fails closed: a mismatch with no declared arm keeps
+    /// the raw value, and MIR validation rejects the `ReturnError`.
+    fn declared_error_conversion(
+        &self,
+        source_ty: MirType,
+        destination_ty: MirType,
+        call_site: Option<DefId>,
+    ) -> Option<DefId> {
+        if call_site.is_some()
+            || self
+                .types
+                .is_assignable(source_ty.semantic_id(), destination_ty.semantic_id())
+        {
+            return call_site;
+        }
+        let Type::Enum(destination_def) = self.types.get(destination_ty.semantic_id()) else {
+            return None;
+        };
+        self.context
+            .conversion_arms
+            .get(&(*destination_def, source_ty.semantic_id()))
+            .copied()
+    }
+
     // consumes type_args and args into MIR statements
     fn lower_definition_call(
         &mut self,
@@ -2357,6 +2386,7 @@ impl FunctionBuilder<'_> {
             ));
             return None;
         };
+        let conversion = self.declared_error_conversion(err_ty, destination_ty, conversion);
 
         let ok_block = self.fresh_block(span);
         let error_block = self.fresh_block(span);

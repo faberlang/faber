@@ -1272,6 +1272,9 @@ struct FunctionBuilderContext<'a> {
     enum_type_params: Arc<FxHashMap<DefId, Vec<Symbol>>>,
     variant_fields: Arc<FxHashMap<DefId, Vec<crate::lexer::Symbol>>>,
     variant_field_tys: Arc<FxHashMap<DefId, FxHashMap<crate::lexer::Symbol, MirType>>>,
+    /// Declared error-conversion arms keyed by `(destination enum def, source
+    /// error type)`: each `@ conversion <source> err { … }` arm on a union.
+    conversion_arms: Arc<FxHashMap<(DefId, TypeId), DefId>>,
     sermo_def: Option<DefId>,
     meus_def: Option<DefId>,
     tuus_def: Option<DefId>,
@@ -1329,6 +1332,7 @@ impl<'a> FunctionBuilderContext<'a> {
             enum_type_params: Arc::new(FxHashMap::default()),
             variant_fields: Arc::new(FxHashMap::default()),
             variant_field_tys: Arc::new(FxHashMap::default()),
+            conversion_arms: Arc::new(FxHashMap::default()),
             sermo_def: None,
             meus_def: None,
             tuus_def: None,

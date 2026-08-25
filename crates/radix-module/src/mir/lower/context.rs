@@ -70,6 +70,7 @@ struct FrozenMaps<'a> {
     enum_type_params: Arc<FxHashMap<DefId, Vec<Symbol>>>,
     variant_fields: Arc<FxHashMap<DefId, Vec<Symbol>>>,
     variant_field_tys: Arc<FxHashMap<DefId, FxHashMap<Symbol, MirType>>>,
+    conversion_arms: Arc<FxHashMap<(DefId, TypeId), DefId>>,
     top_level_consts: Arc<FxHashMap<DefId, &'a HirConst>>,
     provider_imports: Arc<FxHashMap<DefId, ProviderImport>>,
     method_targets: Arc<FxHashMap<(DefId, Symbol), MethodTarget>>,
@@ -95,6 +96,9 @@ pub(super) struct LoweringContextMaps<'a> {
     enum_type_params: FxHashMap<DefId, Vec<Symbol>>,
     variant_fields: FxHashMap<DefId, Vec<Symbol>>,
     variant_field_tys: FxHashMap<DefId, FxHashMap<Symbol, MirType>>,
+    /// Declared error-conversion arms keyed by `(destination enum def, source
+    /// error type)`: each `@ conversion <source> err { … }` arm on a union.
+    conversion_arms: FxHashMap<(DefId, TypeId), DefId>,
     sermo_def: Option<DefId>,
     meus_def: Option<DefId>,
     tuus_def: Option<DefId>,
@@ -139,6 +143,7 @@ impl<'a> LoweringContextMaps<'a> {
             enum_type_params: FxHashMap::default(),
             variant_fields: FxHashMap::default(),
             variant_field_tys: FxHashMap::default(),
+            conversion_arms: FxHashMap::default(),
             sermo_def: None,
             meus_def: None,
             tuus_def: None,
@@ -162,6 +167,7 @@ impl<'a> LoweringContextMaps<'a> {
                 enum_type_params: Arc::new(FxHashMap::default()),
                 variant_fields: Arc::new(FxHashMap::default()),
                 variant_field_tys: Arc::new(FxHashMap::default()),
+                conversion_arms: Arc::new(FxHashMap::default()),
                 top_level_consts: Arc::new(FxHashMap::default()),
                 provider_imports: Arc::new(FxHashMap::default()),
                 method_targets: Arc::new(FxHashMap::default()),
@@ -217,6 +223,7 @@ impl<'a> LoweringContextMaps<'a> {
             enum_type_params: Arc::new(core::mem::take(&mut maps.enum_type_params)),
             variant_fields: Arc::new(core::mem::take(&mut maps.variant_fields)),
             variant_field_tys: Arc::new(core::mem::take(&mut maps.variant_field_tys)),
+            conversion_arms: Arc::new(core::mem::take(&mut maps.conversion_arms)),
             top_level_consts: Arc::new(core::mem::take(&mut maps.top_level_consts)),
             provider_imports: Arc::new(core::mem::take(&mut maps.provider_imports)),
             method_targets: Arc::new(core::mem::take(&mut maps.method_targets)),
@@ -265,6 +272,7 @@ impl<'a> LoweringContextMaps<'a> {
             enum_type_params: Arc::clone(&self.frozen.enum_type_params),
             variant_fields: Arc::clone(&self.frozen.variant_fields),
             variant_field_tys: Arc::clone(&self.frozen.variant_field_tys),
+            conversion_arms: Arc::clone(&self.frozen.conversion_arms),
             sermo_def: self.sermo_def,
             meus_def: self.meus_def,
             tuus_def: self.tuus_def,
@@ -554,6 +562,10 @@ impl<'a> LoweringContextMaps<'a> {
         }
         self.enum_variants.insert(enum_def_id, variants.clone());
         self.validation.enum_variants.insert(enum_def_id, variants);
+        for arm in &enum_item.conversion_arms {
+            self.conversion_arms
+                .insert((enum_def_id, arm.source), arm.fn_def_id);
+        }
         for variant in &enum_item.variants {
             self.variant_parents.insert(variant.def_id, enum_def_id);
             self.validation
