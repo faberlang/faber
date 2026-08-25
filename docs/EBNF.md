@@ -105,7 +105,7 @@ clausura_params ::= clausura_param (',' clausura_param)*
 clausura_param ::= type_annotation IDENTIFIER
 # formerly: genusDecl
 # [034] genus_decl
-genus_decl ::= 'abstractus'? 'genus' IDENTIFIER generic_params? ('sub' IDENTIFIER)? ('implet' IDENTIFIER (',' IDENTIFIER)*)? '{' genus_member* '}'
+genus_decl ::= 'abstractus'? 'genus' IDENTIFIER generic_params? ('sub' IDENTIFIER)? ('implet' IDENTIFIER ((',' | '∩') IDENTIFIER)*)? '{' genus_member* '}'
 # formerly: genusMember
 # [035] genus_member
 genus_member ::= annotation* (field_decl | functio_method_decl)
@@ -221,7 +221,9 @@ selective_import ::= 'fixum' import_value_binding (',' import_value_binding)*
 import_value_binding ::= IDENTIFIER ('ut' IDENTIFIER)?
 # formerly: typeAnnotation
 # [074] type_annotation
-type_annotation ::= owned_type ('∪' owned_type)*
+type_annotation ::= intersection_type ('∪' intersection_type)*
+# `∩` binds tighter than `∪`: the cup tail parses at intersection level.
+intersection_type ::= owned_type ('∩' owned_type)*
 # formerly: ownedType
 # [075] owned_type
 owned_type ::= ('de' | 'in' | 'own' | 'copy')? base_type
@@ -1315,6 +1317,8 @@ into `faber.<module>.<verb>` calls. It is not a wildcard re-export and does not 
 - **Lone-`∪` rule:** a `∪` hole consumes the whole type expression — any following `∪` is a parse error (`A ∪ ∪`, `∪ B` rejected, issue `unexpected_cup_after_union_hole`). `_` keeps today's behavior and may still appear as a binary-cup member (`_ ∪ B`).
 - **Binary-cup disambiguation:** `∪` between two non-hole types remains the inline value-union operator (`A ∪ B`, nullable `T ∪ nihil`); the hole reading applies only when `∪` stands alone in a base-type position.
 - Inline union `T ∪ U` (cup) for ad-hoc value unions; `T ∪ nihil` is the canonical nullable type form (lowers to Option<T>).
+- Inline intersection `T ∩ U` (cap) is the nominal type intersection: `type Reversible = Readable ∩ Seekable` names the conjunction, and the implements clause accepts `∩` as the same separator as the comma (`class A implements Readable ∩ Seekable` ≡ the comma list). `∩` binds tighter than `∪` (`A ∩ B ∪ C` is `(A ∩ B) ∪ C`); nested intersections flatten like unions. Intersection operands are nominal-only (interfaces/structs; aliases resolve through) — primitive operands are rejected at lowering. Implements slots admit `∩` only: `∪` or a hole in an implements position is a parse error (disjunctive conformance is not a checkable contract).
+- Signature clauses stay explicit: `_` and a standalone `∪` are rejected in return (`→ _`) and error-channel (`⇥ _`) positions; both holes stay legal in local binding slots (`const _ v`, `const ∪ v`).
 - Unions are parsed as a flat member list; duplicates and `nihil`-only cases are diagnosed in semantic lowering.
 - `sponte` is a declaration marker (post-name on params/fields), never a prefix on types.
 - Qualified type paths such as `terminus.Terminus` name a type through an
