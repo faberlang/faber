@@ -4,8 +4,8 @@ kind = "method"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "width_type_sugar", "shape_suffix", "figura", "figura_list", "array_literal", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "expression", "literal", "nota_stmt"]
 category = "collection"
 canonical = false
-summary = "Tensor elementwise arithmetic with addita, subtrahe, and multiplica."
-syntax = "tensor.added(other) | tensor.subtract(other) | tensor.multiply(other)"
+summary = "Tensor elementwise arithmetic with canonical + / - operators, plus addita, subtrahe, and multiplica method twins."
+syntax = "tensor + other | tensor - other | tensor.added(other) (non-preferred) | tensor.subtract(other) (non-preferred) | tensor.multiply(other)"
 related = ["tensor", "fractus", "lista"]
 locale = "en"
 +++
@@ -15,8 +15,8 @@ locale = "en"
 # =============================================================================
 #
 # What this teaches:
-#   • Elementwise operations — `addita`, `subtrahe`, and `multiplica` apply per-element
-#   • Broadcast semantics — same-shape operations here; broadcast covered by typecheck tests
+#   • Canonical elementwise operators — `a + b` and `a - b`; `.added()`/`.subtract()` are non-preferred method twins where operators are legal
+#   • Elementwise multiplication — `multiplica` applies per-element
 #
 # Common mistakes:
 #   • mixing tensors of different shapes without explicit forma (reshape) or broadcast, or using elementwise ops on non-numeric tensors
@@ -26,11 +26,11 @@ locale = "en"
 
 
 
-# tensor elementwise arithmetic — addita, subtrahe, multiplica with broadcast
+# tensor elementwise arithmetic — canonical + / -, plus multiplica
 #
-# WHY: receiver methods lowered by radix into faber::Tensor<T> kernels. Same-shape
-# add here; broadcast (`[N] + [N,1]`) is covered by the radix typecheck tests and
-# arithmetic-reduction exempla. Result shape is a static, typecheck-time property.
+# WHY: tensor operators lower by radix into faber::Tensor<T> kernels. Same-shape
+# add and subtract here; broadcast coverage lives in the radix typecheck tests
+# and arithmetic-reduction exempla.
 #
 # EXPECTED stdout:
 #   [1.0, 4.0, 9.0, 16.0]
@@ -43,8 +43,8 @@ main {
     var tf32[2, 2] a ← seed.from_flat(flat_a, [2, 2])
     var tf32[2, 2] b ← seed.from_flat(flat_b, [2, 2])
 
-    const tf32[2, 2] sum ← a.added(b)
-    const tf32[2, 2] diff ← sum.subtract(b)
+    const tf32[2, 2] sum ← a + b
+    const tf32[2, 2] diff ← sum - b
     const tf32[2, 2] prod ← diff.multiply(a)
 
     const list<f32> out ← prod.flatten()
