@@ -49,3 +49,73 @@ incipit {
         "queue is FIFO; stack is top-first LIFO",
     );
 }
+
+#[test]
+fn queue_stack_elementwise_uses_live_window_kind_and_both_broadcast_directions() {
+    let source = r#"
+incipit {
+    varia queue<numerus> q ← vacua
+    q.appende(1)
+    q.appende(2)
+    varia queue<numerus> r ← vacua
+    r.appende(10)
+    r.appende(20)
+    fixum queue<numerus> sum ← q + r
+    fixum queue<numerus> scaled ← q * 3
+    itera ex sum fixum item {
+        nota item
+    }
+    itera ex (3 - q) fixum item {
+        nota item
+    }
+    itera ex scaled fixum item {
+        nota item
+    }
+
+    varia stack<numerus> a ← vacua
+    a.appende(2)
+    a.appende(4)
+    varia stack<numerus> b ← vacua
+    b.appende(1)
+    b.appende(3)
+    fixum stack<numerus> products ← a * b
+    itera ex products fixum item {
+        nota item
+    }
+}
+"#;
+
+    assert_eq!(
+        run(source),
+        ["11", "22", "2", "1", "3", "6", "12", "2"],
+        "queue/stack arithmetic preserves live window, kind, and operand order",
+    );
+}
+
+#[test]
+fn queue_stack_elementwise_live_length_mismatch_is_a_hard_runner_error() {
+    let source = r#"
+incipit {
+    varia queue<numerus> q ← vacua
+    q.appende(1)
+    q.appende(2)
+    varia queue<numerus> r ← vacua
+    r.appende(10)
+    fixum queue<numerus> _ ← q + r
+}
+"#;
+    let mut host = BufferHost::default();
+    let error = run_source(&session(), "queue-stack-arithmetic.fab", source, &mut host)
+        .expect_err("different live queue lengths must reject");
+    match error {
+        RunSourceError::Stepper(errors) => {
+            assert!(
+                errors
+                    .iter()
+                    .any(|error| error.issue == "runner_lista_elementwise_length_mismatch"),
+                "expected length mismatch, got {errors:?}"
+            );
+        }
+        other => panic!("expected runner length error, got {other:?}"),
+    }
+}

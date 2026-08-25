@@ -115,3 +115,99 @@ functio stack_recover(stack<textus, 2> s) → textus {
 }"#,
     );
 }
+
+#[test]
+fn queue_stack_arithmetic_accepts_all_ops_and_broadcasts_both_sides() {
+    crate::test_support::assert_accepts(
+        r#"functio queue_add(queue<numerus> a, queue<numerus> b) → queue<numerus> {
+    redde a + b
+}
+
+functio queue_sub(queue<numerus> a, numerus scalar) → queue<numerus> {
+    redde a - scalar
+}
+
+functio stack_mul(stack<numerus> a, stack<numerus> b) → stack<numerus> {
+    redde a * b
+}
+
+functio stack_div(numerus scalar, stack<numerus> b) → stack<numerus> {
+    redde scalar / b
+}"#,
+    );
+}
+
+#[test]
+fn queue_stack_arithmetic_preserves_kind_and_minimizes_bounded_capacity() {
+    let unit = crate::test_support::analyze_ok(
+        r#"functio queue_bounded(queue<numerus, 8> a, queue<numerus, 3> b) → queue<numerus, 3> {
+    redde a + b
+}
+
+functio stack_bounded(stack<numerus, 2> a, stack<numerus, 7> b) → stack<numerus, 2> {
+    redde a * b
+}"#,
+    );
+    let hir = unit.hir.as_ref().expect("HIR");
+    let bounded_queue = match &hir.items[0].kind {
+        radix_hir::HirItemKind::Function(function) => function.ret_ty.expect("queue return type"),
+        other => panic!("expected queue function, got {other:?}"),
+    };
+    let bounded_stack = match &hir.items[1].kind {
+        radix_hir::HirItemKind::Function(function) => function.ret_ty.expect("stack return type"),
+        other => panic!("expected stack function, got {other:?}"),
+    };
+    assert!(matches!(
+        unit.types.get(bounded_queue),
+        Type::BoundedQueue { capacity, .. }
+            if matches!(unit.types.get_index(*capacity), IndexExpr::Literal(3))
+    ));
+    assert!(matches!(
+        unit.types.get(bounded_stack),
+        Type::BoundedStack { capacity, .. }
+            if matches!(unit.types.get_index(*capacity), IndexExpr::Literal(2))
+    ));
+}
+
+#[test]
+fn queue_stack_arithmetic_rejects_mixed_kinds_and_non_numeric_elements() {
+    for source in [
+        "functio mixed(queue<numerus> q, stack<numerus> s) → queue<numerus> { redde q + s }",
+        "functio text_queue(queue<textus> q, queue<textus> r) → queue<textus> { redde q + r }",
+    ] {
+        crate::test_support::assert_rejects_with_issue(
+            source,
+            "numeric_queue_stack_operator_law",
+        );
+    }
+}
+
+#[test]
+fn queue_stack_arithmetic_diagnostic_is_localized_in_en_and_la() {
+    let diagnostic = radix_diagnostics::Diagnostic::error("SEM011")
+        .with_code("SEM011")
+        .with_arg("issue", "numeric_queue_stack_operator_law")
+        .with_arg("collection", "queue")
+        .with_arg("operator", "+");
+    for (locale, expected) in [
+        (
+            "en",
+            "numeric queue operator + is elementwise; scalars broadcast on either side, queues must have equal length; mixed queue/stack operands are invalid; use ↦ for explicit width conversion",
+        ),
+        (
+            "la",
+            "operator queue numerica + per elementa agit; scalaria utrimque propagantur, queue parem longitudinem requirit; operanda queue/stack mixta invalida sunt; utere ↦ ad latitudinem convertendam",
+        ),
+    ] {
+        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../stdlib/locale")
+            .join(locale)
+            .join("pack.toml");
+        let pack = crate::locale::LocalePack::from_toml_path(path).expect("locale pack");
+        let rendered = pack
+            .render_diagnostic_text(&diagnostic)
+            .expect("diagnostic template")
+            .expect("SEM011 row");
+        assert_eq!(rendered.message, expected, "locale {locale}");
+    }
+}

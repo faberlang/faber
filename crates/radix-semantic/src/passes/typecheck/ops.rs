@@ -145,6 +145,146 @@ impl TypeChecker<'_> {
         self.preferred_numeric_result_ty(lhs_resolved, rhs_resolved, lhs_shape)
     }
 
+    /// Check the C5 elementwise queue/stack arithmetic law.
+    ///
+    /// `None` means neither operand is a queue or stack, so the scalar/list
+    /// caller continues with its existing arithmetic rule. `Some` means a
+    /// queue/stack pair or scalar broadcast was handled, including a
+    /// deliberate error for mixed container kinds.
+    fn check_queue_stack_arithmetic_bin(
+        &mut self,
+        op: HirBinOp,
+        lhs: TypeId,
+        rhs: TypeId,
+        span: radix_lexer::Span,
+    ) -> Option<TypeId> {
+        let lhs_collection = self.queue_stack_arithmetic_shape(lhs);
+        let rhs_collection = self.queue_stack_arithmetic_shape(rhs);
+        if lhs_collection.is_none() && rhs_collection.is_none() {
+            return None;
+        }
+
+        let operator = lista_operator_spelling(op);
+        let law_error = |checker: &mut Self, collection: &str| {
+            checker.invalid_operand_types_with_args(
+                NUMERIC_QUEUE_STACK_OPERATOR_LAW,
+                span,
+                &[
+                    ("collection", collection.to_owned()),
+                    ("operator", operator.to_owned()),
+                ],
+            );
+            checker.error_type
+        };
+
+        let (kind, element, capacity) = match (lhs_collection, rhs_collection) {
+            (Some(lhs), Some(rhs)) => {
+                if lhs.kind != rhs.kind {
+                    return Some(law_error(self, "queue/stack"));
+                }
+                if !self.is_numeric_queue_stack_element(lhs.element)
+                    || !self.is_numeric_queue_stack_element(rhs.element)
+                {
+                    return Some(law_error(self, lhs.kind.spelling()));
+                }
+                if !self.numeric_shapes_match(lhs.element, rhs.element) {
+                    return Some(law_error(self, lhs.kind.spelling()));
+                }
+                let Some(capacity) = self.queue_stack_min_capacity(lhs.capacity, rhs.capacity)
+                else {
+                    return Some(law_error(self, lhs.kind.spelling()));
+                };
+                (lhs.kind, lhs.element, capacity)
+            }
+            (Some(lhs), None) => {
+                if !self.is_numeric_queue_stack_element(lhs.element) || !self.is_numeric_scalar(rhs)
+                {
+                    return Some(law_error(self, lhs.kind.spelling()));
+                }
+                if !self.numeric_shapes_match(lhs.element, rhs) {
+                    return Some(law_error(self, lhs.kind.spelling()));
+                }
+                (lhs.kind, lhs.element, lhs.capacity)
+            }
+            (None, Some(rhs)) => {
+                if !self.is_numeric_queue_stack_element(rhs.element) || !self.is_numeric_scalar(lhs)
+                {
+                    return Some(law_error(self, rhs.kind.spelling()));
+                }
+                if !self.numeric_shapes_match(lhs, rhs.element) {
+                    return Some(law_error(self, rhs.kind.spelling()));
+                }
+                (rhs.kind, rhs.element, rhs.capacity)
+            }
+            (None, None) => unreachable!("queue/stack arithmetic arm requires a collection"),
+        };
+
+        Some(match (kind, capacity) {
+            (QueueStackArithmeticKind::Queue, Some(capacity)) => {
+                self.types.bounded_queue(element, capacity)
+            }
+            (QueueStackArithmeticKind::Queue, None) => self.types.queue(element),
+            (QueueStackArithmeticKind::Stack, Some(capacity)) => {
+                self.types.bounded_stack(element, capacity)
+            }
+            (QueueStackArithmeticKind::Stack, None) => self.types.stack(element),
+        })
+    }
+
+    fn queue_stack_arithmetic_shape(&mut self, ty: TypeId) -> Option<QueueStackArithmeticShape> {
+        let resolved = self.resolve_inferred_type(ty);
+        match self.types.get(resolved).clone() {
+            Type::Queue(element) => Some(QueueStackArithmeticShape {
+                kind: QueueStackArithmeticKind::Queue,
+                element,
+                capacity: None,
+            }),
+            Type::BoundedQueue { element, capacity } => Some(QueueStackArithmeticShape {
+                kind: QueueStackArithmeticKind::Queue,
+                element,
+                capacity: Some(capacity),
+            }),
+            Type::Stack(element) => Some(QueueStackArithmeticShape {
+                kind: QueueStackArithmeticKind::Stack,
+                element,
+                capacity: None,
+            }),
+            Type::BoundedStack { element, capacity } => Some(QueueStackArithmeticShape {
+                kind: QueueStackArithmeticKind::Stack,
+                element,
+                capacity: Some(capacity),
+            }),
+            Type::Alias(_, target) => self.queue_stack_arithmetic_shape(target),
+            _ => None,
+        }
+    }
+
+    fn is_numeric_queue_stack_element(&self, ty: TypeId) -> bool {
+        self.numeric_shape(ty).is_some()
+    }
+
+    fn queue_stack_min_capacity(
+        &mut self,
+        lhs: Option<radix_types::IndexId>,
+        rhs: Option<radix_types::IndexId>,
+    ) -> Option<Option<radix_types::IndexId>> {
+        match (lhs, rhs) {
+            (None, None) => Some(None),
+            (Some(capacity), None) | (None, Some(capacity)) => Some(Some(capacity)),
+            (Some(lhs), Some(rhs)) if self.types.index_equals(lhs, rhs) => Some(Some(lhs)),
+            (Some(lhs), Some(rhs)) => {
+                let (radix_types::IndexExpr::Literal(lhs), radix_types::IndexExpr::Literal(rhs)) =
+                    (self.types.get_index(lhs), self.types.get_index(rhs))
+                else {
+                    return None;
+                };
+                Some(Some(self.types.intern_index(
+                    radix_types::IndexExpr::Literal((*lhs).min(*rhs)),
+                )))
+            }
+        }
+    }
+
     /// Check the A1 elementwise list arithmetic law.
     ///
     /// `None` means neither operand is a `lista`, so the scalar/tensor caller
@@ -892,6 +1032,10 @@ impl TypeChecker<'_> {
                     }
                     self.textus_type()
                 } else if let Some(result) =
+                    self.check_queue_stack_arithmetic_bin(HirBinOp::Add, lhs_ty, rhs_ty, lhs.span)
+                {
+                    result
+                } else if let Some(result) =
                     self.check_lista_arithmetic_bin(HirBinOp::Add, lhs_ty, rhs_ty, lhs.span)
                 {
                     result
@@ -905,6 +1049,10 @@ impl TypeChecker<'_> {
             HirBinOp::Sub => {
                 let (lhs_ty, rhs_ty) = self.check_arithmetic_operands(lhs, rhs, expected);
                 if let Some(result) =
+                    self.check_queue_stack_arithmetic_bin(HirBinOp::Sub, lhs_ty, rhs_ty, lhs.span)
+                {
+                    result
+                } else if let Some(result) =
                     self.check_lista_arithmetic_bin(HirBinOp::Sub, lhs_ty, rhs_ty, lhs.span)
                 {
                     result
@@ -918,7 +1066,12 @@ impl TypeChecker<'_> {
             }
             HirBinOp::Mul | HirBinOp::Div => {
                 let (lhs_ty, rhs_ty) = self.check_arithmetic_operands(lhs, rhs, expected);
-                if let Some(result) = self.check_lista_arithmetic_bin(op, lhs_ty, rhs_ty, lhs.span)
+                if let Some(result) =
+                    self.check_queue_stack_arithmetic_bin(op, lhs_ty, rhs_ty, lhs.span)
+                {
+                    result
+                } else if let Some(result) =
+                    self.check_lista_arithmetic_bin(op, lhs_ty, rhs_ty, lhs.span)
                 {
                     result
                 } else {
@@ -1652,6 +1805,7 @@ const BOOLEAN_OPERAND_REQUIRED: &str = "boolean_operand_required";
 const INTEGER_OPERAND_REQUIRED: &str = "integer_operand_required";
 const STRING_OPERANDS_REQUIRED: &str = "string_operands_required";
 const NUMERIC_LISTA_OPERATOR_LAW: &str = "numeric_lista_operator_law";
+const NUMERIC_QUEUE_STACK_OPERATOR_LAW: &str = "numeric_queue_stack_operator_law";
 const TENSOR_ARITHMETIC_NUMERIC_ELEMENT_REQUIRED: &str =
     "tensor_arithmetic_numeric_element_required";
 const MATRIX_ARITHMETIC_NUMERIC_ELEMENT_REQUIRED: &str =
@@ -1663,6 +1817,28 @@ struct NumericShape {
     prim: Primitive,
     width: NumericWidth,
     modular: bool,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum QueueStackArithmeticKind {
+    Queue,
+    Stack,
+}
+
+impl QueueStackArithmeticKind {
+    fn spelling(self) -> &'static str {
+        match self {
+            Self::Queue => "queue",
+            Self::Stack => "stack",
+        }
+    }
+}
+
+#[derive(Clone, Copy)]
+struct QueueStackArithmeticShape {
+    kind: QueueStackArithmeticKind,
+    element: TypeId,
+    capacity: Option<radix_types::IndexId>,
 }
 
 #[derive(Clone, Copy)]

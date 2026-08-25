@@ -1504,6 +1504,8 @@ fn type_matches_candidate(types: &TypeTable, id: TypeId, candidate: &Type) -> bo
         (Type::Set(a), Type::Set(b))
         | (Type::Promissum(a), Type::Promissum(b))
         | (Type::Cursor(a), Type::Cursor(b))
+        | (Type::Queue(a), Type::Queue(b))
+        | (Type::Stack(a), Type::Stack(b))
         | (Type::Intervallum(a), Type::Intervallum(b))
         | (Type::Option(a), Type::Option(b))
         | (Type::Atomic(a), Type::Atomic(b)) => types.equals(*a, *b),
@@ -1526,6 +1528,26 @@ fn type_matches_candidate(types: &TypeTable, id: TypeId, candidate: &Type) -> bo
                 capacity: a_cap,
             },
             Type::BoundedArray {
+                element: b_elem,
+                capacity: b_cap,
+            },
+        )
+        | (
+            Type::BoundedQueue {
+                element: a_elem,
+                capacity: a_cap,
+            },
+            Type::BoundedQueue {
+                element: b_elem,
+                capacity: b_cap,
+            },
+        )
+        | (
+            Type::BoundedStack {
+                element: a_elem,
+                capacity: a_cap,
+            },
+            Type::BoundedStack {
                 element: b_elem,
                 capacity: b_cap,
             },

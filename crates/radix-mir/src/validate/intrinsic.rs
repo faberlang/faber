@@ -9,6 +9,13 @@ use crate::{
 use radix_lexer::Span;
 use radix_types::{IndexExpr, Primitive, Type};
 
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum ElementwiseCollectionKind {
+    Array,
+    Queue,
+    Stack,
+}
+
 impl Validator<'_, '_> {
     pub(crate) fn validate_runtime_call(
         &mut self,
@@ -1201,45 +1208,79 @@ impl Validator<'_, '_> {
                 let Some(left_ty) = first_arg_ty else {
                     return;
                 };
-                let Some(left_element) = self.collection_element_ty(left_ty) else {
-                    self.error(span, "lista elementwise lhs is not a lista");
+                let Some(right) = call.args.get(1) else {
                     return;
                 };
-                if let Some(right) = call.args.get(1) {
-                    let Some(right_ty) = self.validate_operand(scope, right, span) else {
+                let Some(right_ty) = self.validate_operand(scope, right, span) else {
+                    return;
+                };
+                let left_kind = self.elementwise_collection_kind(left_ty);
+                let right_kind = self.elementwise_collection_kind(right_ty);
+                let (collection_kind, collection_element) = match (left_kind, right_kind) {
+                    (Some(kind), _) => {
+                        let Some(element) = self.collection_element_ty(left_ty) else {
+                            return;
+                        };
+                        (kind, element)
+                    }
+                    (None, Some(kind)) => {
+                        let Some(element) = self.collection_element_ty(right_ty) else {
+                            return;
+                        };
+                        (kind, element)
+                    }
+                    (None, None) => {
+                        self.error(span, "elementwise operands need a lista, queue, or stack");
                         return;
-                    };
-                    match self.type_kind(right_ty) {
-                        Type::Array(element) | Type::BoundedArray { element, .. } => {
-                            self.require_assignable(
-                                MirType::semantic(*element),
-                                left_element,
+                    }
+                };
+                match (left_kind, right_kind) {
+                    (Some(left_kind), Some(right_kind)) => {
+                        if left_kind != right_kind {
+                            self.error(
                                 span,
-                                "lista elementwise element types differ",
+                                "elementwise operands must preserve one collection kind",
                             );
                         }
-                        _ => self.require_assignable(
-                            right_ty,
-                            left_element,
+                        let Some(right_element) = self.collection_element_ty(right_ty) else {
+                            return;
+                        };
+                        self.require_assignable(
+                            right_element,
+                            collection_element,
                             span,
-                            "lista elementwise scalar type mismatch",
-                        ),
+                            "elementwise collection element types differ",
+                        );
                     }
+                    (Some(_), None) => self.require_assignable(
+                        right_ty,
+                        collection_element,
+                        span,
+                        "elementwise scalar type mismatch",
+                    ),
+                    (None, Some(_)) => self.require_assignable(
+                        left_ty,
+                        collection_element,
+                        span,
+                        "elementwise scalar type mismatch",
+                    ),
+                    (None, None) => unreachable!("elementwise collection kind selected above"),
                 }
-                let (Type::Array(result_element)
-                | Type::BoundedArray {
-                    element: result_element,
-                    ..
-                }) = self.type_kind(call.return_ty)
-                else {
-                    self.error(span, "lista elementwise result is not a lista");
+                let Some(result_kind) = self.elementwise_collection_kind(call.return_ty) else {
+                    self.error(span, "elementwise result is not a lista, queue, or stack");
+                    return;
+                };
+                if result_kind != collection_kind {
+                    self.error(span, "elementwise result must preserve the collection kind");
+                }
+                let Some(result_element) = self.collection_element_ty(call.return_ty) else {
                     return;
                 };
                 self.require_assignable(
-                    MirType::semantic(*result_element),
-                    left_element,
+                    result_element,
+                    collection_element,
                     span,
-                    "lista elementwise result element type mismatch",
+                    "elementwise result element type mismatch",
                 );
             }
             MirCollectionOp::TensorReshape
@@ -1994,6 +2035,18 @@ impl Validator<'_, '_> {
     ) {
         if actual != expected {
             self.error(span, format!("{label} expects {expected} MIR arguments"));
+        }
+    }
+
+    fn elementwise_collection_kind(
+        &self,
+        collection_ty: MirType,
+    ) -> Option<ElementwiseCollectionKind> {
+        match self.type_kind(collection_ty) {
+            Type::Array(_) | Type::BoundedArray { .. } => Some(ElementwiseCollectionKind::Array),
+            Type::Queue(_) | Type::BoundedQueue { .. } => Some(ElementwiseCollectionKind::Queue),
+            Type::Stack(_) | Type::BoundedStack { .. } => Some(ElementwiseCollectionKind::Stack),
+            _ => None,
         }
     }
 

@@ -273,6 +273,51 @@ fn bounded_ascii_instantiation_finds_interned() {
 }
 
 #[test]
+fn queue_stack_instantiation_finds_interned() {
+    let mut types = TypeTable::new();
+    let numerus = types.primitive(Primitive::Numerus);
+    let param = types.intern(Type::Param(Symbol(62)));
+    let mut bindings = MirGenericBindings::default();
+    bindings.insert(Symbol(62), MirType::semantic(numerus));
+
+    for interned in [types.queue(numerus), types.stack(numerus)] {
+        let generic = match types.get(interned) {
+            Type::Queue(_) => types.queue(param),
+            Type::Stack(_) => types.stack(param),
+            other => panic!("expected queue or stack, got {other:?}"),
+        };
+        let resolved = instantiate_existing_generic_type(
+            &types,
+            MirType::semantic(generic),
+            &bindings,
+            Span::default(),
+        )
+        .expect("queue/stack instantiation must find the interned type");
+        assert_eq!(resolved.semantic_id(), interned);
+    }
+
+    let capacity = types.intern_index(radix_types::IndexExpr::Literal(3));
+    for interned in [
+        types.bounded_queue(numerus, capacity),
+        types.bounded_stack(numerus, capacity),
+    ] {
+        let generic = match types.get(interned) {
+            Type::BoundedQueue { capacity, .. } => types.bounded_queue(param, *capacity),
+            Type::BoundedStack { capacity, .. } => types.bounded_stack(param, *capacity),
+            other => panic!("expected bounded queue or stack, got {other:?}"),
+        };
+        let resolved = instantiate_existing_generic_type(
+            &types,
+            MirType::semantic(generic),
+            &bindings,
+            Span::default(),
+        )
+        .expect("bounded queue/stack instantiation must find the interned type");
+        assert_eq!(resolved.semantic_id(), interned);
+    }
+}
+
+#[test]
 fn matrix_instantiation_finds_interned() {
     let mut types = TypeTable::new();
     let numerus = types.primitive(Primitive::Numerus);

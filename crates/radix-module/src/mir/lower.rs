@@ -2110,12 +2110,12 @@ impl<'a> FunctionBuilder<'a> {
         if matches!(op, HirBinOp::Add | HirBinOp::Sub) && self.is_addita_plus_operands(lhs, rhs) {
             return self.lower_glyph_product(op, lhs, rhs, expr);
         }
-        // A1's numeric-list law has a dedicated MIR collection-op seam. Dynamic
-        // list pairs reach the runner for the hard length check; literal-bounded
-        // pairs are expanded to indexed array cells and skip that check because
-        // their equal extent is already a type fact.
+        // A1/C5 numeric collection laws have a dedicated MIR collection-op
+        // seam. Dynamic pairs reach the runner for the hard live-length check;
+        // literal-bounded lista pairs may still expand to indexed MIR cells,
+        // while queue/stack capacities never stand in for their live lengths.
         if matches!(op, HirBinOp::Add | HirBinOp::Sub | HirBinOp::Mul | HirBinOp::Div)
-            && self.is_lista_arithmetic_operand(lhs, rhs)
+            && self.is_lista_or_queue_stack_arithmetic_operand(lhs, rhs)
         {
             return self.lower_lista_elementwise(op, lhs, rhs, expr);
         }
@@ -2613,11 +2613,18 @@ impl<'a> FunctionBuilder<'a> {
         )
     }
 
-    fn is_lista_arithmetic_operand(&self, lhs: &HirExpression, rhs: &HirExpression) -> bool {
-        [lhs.ty, rhs.ty]
-            .into_iter()
-            .flatten()
-            .any(|ty| matches!(self.normalized_type(ty), Type::Array(_) | Type::BoundedArray { .. }))
+    fn is_lista_or_queue_stack_arithmetic_operand(&self, lhs: &HirExpression, rhs: &HirExpression) -> bool {
+        [lhs.ty, rhs.ty].into_iter().flatten().any(|ty| {
+            matches!(
+                self.normalized_type(ty),
+                Type::Array(_)
+                    | Type::BoundedArray { .. }
+                    | Type::Queue(_)
+                    | Type::BoundedQueue { .. }
+                    | Type::Stack(_)
+                    | Type::BoundedStack { .. }
+            )
+        })
     }
 
     fn normalized_type(&self, mut ty: TypeId) -> &Type {

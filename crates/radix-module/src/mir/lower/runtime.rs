@@ -215,12 +215,13 @@ impl FunctionBuilder<'_> {
         Some(value)
     }
 
-    /// Lower A1's numeric-list arithmetic law.
+    /// Lower A1/C5 numeric collection arithmetic.
     ///
-    /// Dynamic list pairs use a dedicated collection runtime op so the runner
-    /// can enforce the hard same-length error. A pair whose two list extents
+    /// Dynamic pairs use a dedicated collection runtime op so the runner can
+    /// enforce the hard same-live-length error. A pair whose two lista extents
     /// are literal `BoundedArray` capacities is expanded into indexed MIR
-    /// cells, which is the current meaning of statically known length.
+    /// cells; queue/stack capacities always remain storage limits, never live
+    /// lengths.
     pub(super) fn lower_lista_elementwise(
         &mut self,
         op: HirBinOp,
@@ -230,9 +231,17 @@ impl FunctionBuilder<'_> {
     ) -> Option<MirOperand> {
         let lhs_shape = lhs.ty.and_then(|ty| self.lista_shape(ty));
         let rhs_shape = rhs.ty.and_then(|ty| self.lista_shape(ty));
-        if lhs_shape.is_none() && rhs_shape.is_none() {
-            self.errors
-                .push(MirError::unsupported(expr.span, "lista arithmetic without a lista operand"));
+        let queue_stack_operand = [lhs.ty, rhs.ty].into_iter().flatten().any(|ty| {
+            matches!(
+                self.normalized_type(ty),
+                Type::Queue(_) | Type::BoundedQueue { .. } | Type::Stack(_) | Type::BoundedStack { .. }
+            )
+        });
+        if lhs_shape.is_none() && rhs_shape.is_none() && !queue_stack_operand {
+            self.errors.push(MirError::unsupported(
+                expr.span,
+                "lista arithmetic without a collection operand",
+            ));
             return None;
         }
         let collection_op = match op {
@@ -245,6 +254,19 @@ impl FunctionBuilder<'_> {
         let lhs_value = self.lower_expr_value(lhs)?;
         let rhs_value = self.lower_expr_value(rhs)?;
         let result_ty = self.expr_ty(expr)?;
+
+        // Queue/stack capacities are storage limits, not live lengths. Keep
+        // every queue/stack operation on the ArrayAdd family runtime seam so
+        // Collection(Index) observes the current window and the runtime
+        // enforces same-length pairs.
+        if queue_stack_operand {
+            return Some(self.runtime_call_value(
+                MirIntrinsic::Collection(collection_op),
+                vec![lhs_value, rhs_value],
+                result_ty,
+                expr.span,
+            ));
+        }
 
         let static_capacity = match (lhs_shape, rhs_shape) {
             (Some((_, Some(lhs_capacity))), Some((_, Some(rhs_capacity)))) if lhs_capacity == rhs_capacity => {

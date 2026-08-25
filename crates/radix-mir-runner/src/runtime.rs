@@ -1869,10 +1869,10 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
         ))
     }
 
-    /// Elementwise lista op with scalar broadcast. Unlike tensor broadcast,
-    /// list/list pairs have one legal shape: equal runtime length. A mismatch
-    /// is a hard internal runner error, matching the `ponde` strict-index
-    /// family rather than a recoverable `⇥` path.
+    /// Elementwise array-backed collection op with scalar broadcast. Unlike
+    /// tensor broadcast, collection pairs have one legal shape: equal live
+    /// runtime length. A mismatch is a hard internal runner error, matching
+    /// the `ponde` strict-index family rather than a recoverable `⇥` path.
     fn array_elementwise(
         &mut self,
         args: &[MirOperand],
@@ -1887,7 +1887,12 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
         let left = self.eval_operand(left, span)?;
         let right = self.eval_operand(right, span)?;
         let element_ty = match self.types.get(return_ty.semantic_id()) {
-            Type::Array(element) | Type::BoundedArray { element, .. } => *element,
+            Type::Array(element)
+            | Type::BoundedArray { element, .. }
+            | Type::Queue(element)
+            | Type::BoundedQueue { element, .. }
+            | Type::Stack(element)
+            | Type::BoundedStack { element, .. } => *element,
             _ => {
                 return Err(RunnerError::internal(
                     span,

@@ -77,3 +77,27 @@ fn queue_pop_recover(queue<int> input) → int {
 fn stack_pop_recover(stack<int> input) → int {
   return input.remove_last() coalesce 0
 }
+
+# =============================================================================
+# C5 — numeric elementwise arithmetic, scalar broadcast, and bounded min capacity
+# =============================================================================
+
+fn queue_add(queue<int> left, queue<int> right) → queue<int> {
+  return left + right
+}
+
+fn queue_broadcast(int scalar, queue<int> values) → queue<int> {
+  return scalar * values
+}
+
+fn stack_sub(stack<int> left, stack<int> right) → stack<int> {
+  return left - right
+}
+
+fn bounded_queue_min(queue<int, 8> left, queue<int, 3> right) → queue<int, 3> {
+  return left / right
+}
+
+fn bounded_stack_min(stack<int, 5> left, stack<int, 2> right) → stack<int, 2> {
+  return left + right
+}

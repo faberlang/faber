@@ -164,8 +164,9 @@ pub enum MirAtomicOp {
 /// Built-in collection operation category.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum MirCollectionOp {
-    /// Elementwise list arithmetic. Dynamic list pairs are length-checked by
-    /// the runner; scalar peers broadcast on either side.
+    /// Elementwise numeric arithmetic for array-backed collections. Dynamic
+    /// live-window pairs are length-checked by the runner; scalar peers
+    /// broadcast on either side. Queue/stack result kind follows the MIR type.
     ArrayAdd,
     ArraySub,
     ArrayMul,
