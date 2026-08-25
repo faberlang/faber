@@ -1859,14 +1859,13 @@ impl FunctionBuilder<'_> {
     fn lower_propagated_error(
         &mut self,
         error_temp: MirTempId,
-        source_ty: MirType,
+        destination_ty: MirType,
         conversion: Option<DefId>,
         span: Span,
     ) -> MirOperand {
         let Some(arm) = conversion else {
             return MirOperand::Temp(error_temp);
         };
-        let destination_ty = self.error_ty.unwrap_or(source_ty);
         let converted = self.push_temp(destination_ty, span);
         self.append_stmt(MirStatement {
             kind: MirStatementKind::Call {
@@ -1981,13 +1980,13 @@ impl FunctionBuilder<'_> {
             return Some(MirOperand::Temp(destination));
         }
 
-        if self.error_ty.is_none() {
+        let Some(destination_ty) = self.error_ty else {
             self.errors.push(MirError::unsupported(
                 span,
                 "failable call without an active local cape handler",
             ));
             return None;
-        }
+        };
 
         let ok_block = self.fresh_block(span);
         let error_block = self.fresh_block(span);
@@ -2005,7 +2004,7 @@ impl FunctionBuilder<'_> {
                 span,
             );
             self.switch_to(error_block);
-            let propagated = self.lower_propagated_error(error_temp, err_ty, conversion, span);
+            let propagated = self.lower_propagated_error(error_temp, destination_ty, conversion, span);
             self.terminate_current(MirTerminatorKind::ReturnError(propagated), span);
             self.switch_to(ok_block);
             return Some(MirOperand::Constant(MirConstant::Unit));
@@ -2024,7 +2023,7 @@ impl FunctionBuilder<'_> {
             span,
         );
         self.switch_to(error_block);
-        let propagated = self.lower_propagated_error(error_temp, err_ty, conversion, span);
+        let propagated = self.lower_propagated_error(error_temp, destination_ty, conversion, span);
         self.terminate_current(MirTerminatorKind::ReturnError(propagated), span);
         self.switch_to(ok_block);
         Some(MirOperand::Temp(destination))

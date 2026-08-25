@@ -9,16 +9,19 @@
 //! =============
 //! - **F4**: Snapshot discipline — `ResolverSnapshot` is the wire shape for
 //!   resolver data; `Resolver` itself never derives `Serialize`.
-//! - **F5**: `ResolverSnapshot` carries only namespace exports, file
-//!   interfaces, used namespaces, and imported nominal types.
+//! - **F5**: `ResolverSnapshot` carries namespace exports, file interfaces,
+//!   used namespaces, imported nominal types, and declaration-owned conversion
+//!   arms.
 //! - **CTM E.2**: Caches and memos (`scopes`, `current_scope`, `lookup_shadow`,
 //!   `gpu_builtins`, `gpu_builtins_order`) are excluded from the wire shape
 //!   and rebuilt on load.
 //! - **CXO F4**: Insertion-order mirrors and `RefCell` caches are excluded.
 //! - **F19**: `ResolverSnapshot` struct TYPE is foundation-owned in `radix-hir`;
 //!   `Resolver::to_snapshot()` lives in `radix`.
+//! - **E3**: conversion-arm rows are preserved on the resolver snapshot so
+//!   prebuilt artifacts retain typed error-conversion lookup.
 
-use radix_lexer::Symbol;
+use radix_lexer::{Span, Symbol};
 use radix_types::{DefId, FuncSig, SemanticParamMode, TypeId, TypeTableSnapshot};
 use serde::{Deserialize, Serialize};
 
@@ -82,12 +85,23 @@ pub struct StructFieldSnapshot {
 // ResolverSnapshot
 // ---------------------------------------------------------------------------
 
+/// One declaration-owned conversion arm in a resolver snapshot. Keeping the
+/// ordered pair and synthetic function identity on the wire prevents a
+/// prebuilt artifact from silently losing law-6 lookup facts when loaded.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ConversionArmSnapshot {
+    pub destination: DefId,
+    pub source: TypeId,
+    pub fn_def_id: DefId,
+    pub span: Span,
+}
+
 /// Serializable snapshot of resolver import state for HIR artifact wire format (F4, F5, F19).
 ///
-/// Contains exactly the five fields that codegen reads from the resolver
-/// (F5, F-071). Runtime-only state — scopes, shadow map, builtins, gpu builtins,
-/// insertion-order mirrors — is excluded (CTM E.2, CXO F4) and rebuilt during
-/// loading.
+/// Contains the import-facing fields and declaration-owned conversion arms
+/// that codegen and later semantic consumers read from the resolver. Runtime-
+/// only state — scopes, shadow map, builtins, gpu builtins, insertion-order
+/// mirrors — is excluded (CTM E.2, CXO F4) and rebuilt during loading.
 ///
 /// This type is defined in `radix-hir` (foundation crate) per F19. The
 /// `Resolver::to_snapshot()` constructor lives in `radix` where it has
@@ -114,6 +128,10 @@ pub struct ResolverSnapshot {
     /// provenance for nested nominal types. This set prevents the last imported
     /// namespace from silently winning during reconstruction.
     pub ambiguous_imported_nominal_types: Vec<(NominalKind, Symbol)>,
+
+    /// Declaration-owned error conversion arms keyed by destination union.
+    /// The loader rebuilds the resolver lookup index from these rows.
+    pub conversion_arms: Vec<ConversionArmSnapshot>,
 }
 
 // ---------------------------------------------------------------------------
@@ -371,18 +389,20 @@ pub enum GpuBuiltinWire {
 /// derive from the type-position access marker; the parameter-prefix slot is
 /// retired (MU-5b). Type-position
 /// markers model the mode on the marked `Type::Ref(...)` and fn-type/closure
-/// parameter slots now carry their own modes.
+/// parameter slots now carry their own modes. Version 6 carries resolver
+/// conversion-arm rows so prebuilt artifacts preserve error-conversion lookup.
 ///
 /// Old artifacts fail closed by design: `decode.rs` has no compatibility
-/// decoder, so any schema mismatch (v1–v4) is rejected as
+/// decoder, so any schema mismatch (v1–v5) is rejected as
 /// [`HirArtifactError::UnsupportedSchemaVersion`] before the payload is
 /// interpreted — never a confusing field-layout error.
 ///
 /// v5 (EOT-3W): the unreleased `HirExpressionKind::Transfer` (EOT-3M) and
 /// `FirstMatch` (AFM-2) variants shifted serde ordinals in the directly-
-/// serde'd HIR payload — a wire break that ratchets the version rather than
-/// inventing a compatibility decoder.
-pub const SCHEMA_VERSION: u32 = 5;
+/// serde'd HIR payload. Version 6 adds resolver conversion-arm rows — both
+/// are wire breaks that ratchet the version rather than inventing a
+/// compatibility decoder.
+pub const SCHEMA_VERSION: u32 = 6;
 
 /// Serializable snapshot of one analyzed compilation unit (F1, F2, F4).
 ///

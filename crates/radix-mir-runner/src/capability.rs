@@ -159,6 +159,9 @@ fn classify_statement(
             classify_value(&value.kind, gaps, seen);
             classify_place_write(place, gaps, seen);
         }
+        // E3: a conversion arm is lowered as an ordinary call in the
+        // propagate error block, so the existing call capability row is the
+        // runner inventory entry; no conversion-specific opcode is needed.
         MirStatementKind::Call {
             destination,
             callee,

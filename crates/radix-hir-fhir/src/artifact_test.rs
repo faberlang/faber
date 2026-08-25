@@ -92,7 +92,7 @@ fn selective_import_decode_passes_referential_integrity() {
 }
 
 #[test]
-fn selective_import_field_kept_schema_v4_transfer_ratchets_to_v5() {
+fn selective_import_field_kept_schema_v4_transfer_ratchets_to_v6() {
     // Schema-version receipt (fail-closed policy): `HirImport.selective` is an
     // additive `#[serde(default)]` field, so the version stayed 4 at EOT-2W —
     // no wire break, no compatibility decoder. Consumers of the bool today:
@@ -100,9 +100,9 @@ fn selective_import_field_kept_schema_v4_transfer_ratchets_to_v5() {
     // radix-hir-rust namespace/use analysis (locals, not namespaces),
     // radix-hir-ts decl emission (value-import form), radix-hir-go
     // fail-closed, and this crate's round-trip/validate proof.
-    // EOT-3W ratchets to 5 (Transfer variant shifts serde ordinals); this pin
-    // records the v4 policy and its consumers.
-    assert_eq!(SCHEMA_VERSION, 5);
+    // EOT-3W ratchets to 5 (Transfer variant shifts serde ordinals), and E3
+    // ratchets to 6 for resolver conversion-arm rows.
+    assert_eq!(SCHEMA_VERSION, 6);
 }
 
 // ── EOT-3W transfer wire contract ────────────────────────────────────────

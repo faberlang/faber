@@ -1754,6 +1754,10 @@ pub(crate) fn runtime_regex_pattern(pattern: &str) -> String {
 mod lib_test;
 
 #[cfg(test)]
+#[path = "conversion_parity_test.rs"]
+mod conversion_parity_test;
+
+#[cfg(test)]
 #[path = "octeti_index_test.rs"]
 mod octeti_index_test;
 

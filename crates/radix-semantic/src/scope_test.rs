@@ -190,3 +190,26 @@ fn lookup_variant_bare_is_single_for_one_defining_union() {
         super::BareVariantLookup::None
     );
 }
+
+#[cfg(feature = "hir-fhir")]
+#[test]
+fn resolver_snapshot_round_trips_conversion_arms() {
+    use super::ConversionArm;
+    use radix_types::TypeId;
+
+    let mut resolver = Resolver::new();
+    resolver.register_conversion_arms(
+        DefId(700),
+        vec![ConversionArm {
+            source: TypeId(17),
+            fn_def_id: DefId(900),
+            span: Span::default(),
+        }],
+    );
+
+    let restored = Resolver::from_snapshot(resolver.to_snapshot());
+    assert_eq!(
+        restored.conversion_arm_for(DefId(700), TypeId(17)),
+        Some(DefId(900))
+    );
+}

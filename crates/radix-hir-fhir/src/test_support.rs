@@ -75,6 +75,7 @@ pub(crate) fn stub_artifact() -> HirArtifact {
             used_namespaces: Vec::new(),
             imported_nominal_types: Vec::new(),
             ambiguous_imported_nominal_types: Vec::new(),
+            conversion_arms: Vec::new(),
         },
         libraries: LibraryRegistry::default(),
         function_facts: FunctionFactTableWire {

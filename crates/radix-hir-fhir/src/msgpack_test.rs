@@ -173,7 +173,7 @@ fn unit_wire_uses_the_thirteen_named_keys_in_order() {
     assert_eq!(top_keys(&value), UNIT_KEYS);
 
     // §2 row 1: version is a uint fact.
-    assert_eq!(get(&value, &["schema_version"]), Some(&Value::Uint(5)));
+    assert_eq!(get(&value, &["schema_version"]), Some(&Value::Uint(6)));
 
     // §2 row 2: source identity map with its named keys.
     assert!(matches!(
@@ -372,7 +372,7 @@ fn genuine_floats_and_bytes_keep_their_native_types() {
 fn msgpack_decode_fails_closed_on_version_mismatch() {
     // §1.2/F3: mismatched version rejected before payload interpretation,
     // forward and backward.
-    for wrong in [4u64, 6] {
+    for wrong in [4u64, 5] {
         let bytes = encode_msgpack(&stub_artifact()).expect("encode");
         let mut value = parse(&bytes);
         if let Value::Map(entries) = &mut value {
@@ -617,7 +617,7 @@ fn package_msgpack_wire_uses_named_keys_and_nested_unit_values() {
     // modules[0] is src/aux.fab; its record carries the named module keys.
     let aux = at(&value, &[Step::Key("modules"), Step::Idx(0)]).expect("modules[0]");
     assert_eq!(top_keys(aux), MODULE_KEYS);
-    assert_eq!(get(aux, &["unit_schema_version"]), Some(&Value::Uint(5)));
+    assert_eq!(get(aux, &["unit_schema_version"]), Some(&Value::Uint(6)));
 
     // The unit is a nested named map with the 13 unit keys — not bin.
     let unit = get(aux, &["unit"]).expect("nested unit");

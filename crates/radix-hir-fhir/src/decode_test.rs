@@ -78,6 +78,7 @@ fn decode_accepts_imported_nominal_def_living_in_type_table() {
         used_namespaces: vec![Symbol(0)],
         imported_nominal_types: vec![((NominalKind::Struct, Symbol(1)), struct_ty)],
         ambiguous_imported_nominal_types: Vec::new(),
+        conversion_arms: Vec::new(),
     };
     let bytes = encode(&artifact).expect("encode artifact");
     let decoded = decode(&bytes).expect("imported nominal def in type table must load");
@@ -106,6 +107,7 @@ fn decode_rejects_nominal_def_with_no_def_site() {
         used_namespaces: Vec::new(),
         imported_nominal_types: Vec::new(),
         ambiguous_imported_nominal_types: Vec::new(),
+        conversion_arms: Vec::new(),
     };
     let bytes = encode(&artifact).expect("encode artifact");
     match decode(&bytes) {

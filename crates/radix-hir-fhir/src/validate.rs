@@ -140,6 +140,10 @@ fn collect_def_registry(artifact: &HirArtifact) -> FxHashSet<radix_types::DefId>
     for (pair, _) in artifact.libraries.reexports.keys() {
         registry.insert(*pair);
     }
+    for arm in &artifact.resolver.conversion_arms {
+        registry.insert(arm.destination);
+        registry.insert(arm.fn_def_id);
+    }
 
     // Imported-nominal def sites from the resolver snapshot. The resolver
     // allocates imported nominal types (structs, enums, interfaces) as fresh
@@ -2145,7 +2149,8 @@ pub(crate) fn validate_referential_integrity(
 
     // 6. cli_program: resolved-use-like fields only (no Symbol-bearing fields in CliProgramWire).
 
-    // 7. resolver snapshot: deep walk.
+    // 7. resolver snapshot: deep walk. E3 conversion rows are validated
+    // here rather than silently dropped at the artifact boundary.
     for (sym, _) in &artifact.resolver.namespace_exports {
         check_symbol(*sym)?;
     }
@@ -2159,6 +2164,11 @@ pub(crate) fn validate_referential_integrity(
     for ((_, sym), ty) in &artifact.resolver.imported_nominal_types {
         check_symbol(*sym)?;
         check_type(*ty)?;
+    }
+    for arm in &artifact.resolver.conversion_arms {
+        check_def(arm.destination)?;
+        check_def(arm.fn_def_id)?;
+        check_type(arm.source)?;
     }
 
     // 8. Type arena walk: validate TypeId/DefId/Symbol/IndexId

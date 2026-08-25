@@ -2,7 +2,7 @@
 //!
 //! Implements the field spec in
 //! `faber/docs/factory/fhir-package-format/spec.md` (FPF-1, faber `0a305c4`)
-//! for the unit schema v5:
+//! for the unit schema v6:
 //!
 //! - **§1.1 named fields** — every struct is a MessagePack map keyed by the
 //!   serde field names of the defining type; never a compact array.

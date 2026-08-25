@@ -3100,6 +3100,20 @@ impl Resolver {
     pub fn from_snapshot(snapshot: radix_hir_fhir::ResolverSnapshot) -> Self {
         use radix_hir_fhir::FileExportSnapshot;
 
+        let conversion_arms = snapshot
+            .conversion_arms
+            .into_iter()
+            .fold(FxHashMap::default(), |mut arms, snapshot| {
+                arms.entry(snapshot.destination)
+                    .or_insert_with(Vec::new)
+                    .push(ConversionArm {
+                        source: snapshot.source,
+                        fn_def_id: snapshot.fn_def_id,
+                        span: snapshot.span,
+                    });
+                arms
+            });
+
         // The FHIR snapshot is the codegen-facing surface and carries export
         // names without tiers; reconstruction marks every name `@ publica`.
         // The `@ interna` fail-closed tier gate is enforced during live import
@@ -3220,7 +3234,7 @@ impl Resolver {
             canonical_imported_nominal_defs: FxHashMap::default(),
             imported_enum_variants: FxHashMap::default(),
             commune_fields: FxHashMap::default(),
-            conversion_arms: FxHashMap::default(),
+            conversion_arms,
             used_namespaces,
             schemas: FxHashMap::default(),
             locale_pack_type_aliases: FxHashMap::default(),
@@ -3234,10 +3248,10 @@ impl Resolver {
     /// artifact wire format.
     ///
     /// Collects the import-facing fields codegen reads from the resolver:
-    /// namespace exports, file interfaces, used namespaces, and imported
-    /// nominal types. Runtime-only state — scopes, shadow map, builtins, GPU
-    /// builtins, insertion-order mirrors — is excluded and rebuilt during
-    /// loading.
+    /// namespace exports, file interfaces, used namespaces, imported nominal
+    /// types, and declaration-owned conversion arms. Runtime-only state —
+    /// scopes, shadow map, builtins, GPU builtins, insertion-order mirrors —
+    /// is excluded and rebuilt during loading.
     #[cfg(feature = "hir-fhir")]
     #[must_use]
     pub fn to_snapshot(&self) -> radix_hir_fhir::ResolverSnapshot {
@@ -3303,12 +3317,29 @@ impl Resolver {
             .map(|&(kind, name)| (interface_nominal_kind_to_wire(kind), name))
             .collect();
 
+        let mut conversion_arms = self
+            .conversion_arms
+            .iter()
+            .flat_map(|(&destination, arms)| {
+                arms.iter().map(move |arm| radix_hir_fhir::ConversionArmSnapshot {
+                    destination,
+                    source: arm.source,
+                    fn_def_id: arm.fn_def_id,
+                    span: arm.span,
+                })
+            })
+            .collect::<Vec<_>>();
+        conversion_arms.sort_by_key(|arm| {
+            (arm.destination.0, arm.source.0, arm.fn_def_id.0)
+        });
+
         ResolverSnapshot {
             namespace_exports,
             file_interfaces,
             used_namespaces,
             imported_nominal_types,
             ambiguous_imported_nominal_types,
+            conversion_arms,
         }
     }
 }
