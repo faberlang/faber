@@ -475,13 +475,16 @@ impl LocalePack {
         }
     }
 
-    /// Return the localized surface spelling for one canonical intrinsic name.
+    /// Return the localized (or canonical identity) surface spelling for one
+    /// intrinsic name.
     ///
-    /// A canonical with no row has no explicit surface: callers keep the
-    /// canonical spelling (identity — "missing row = canonical identity").
+    /// A canonical with no row keeps its own spelling, mirroring the Latin
+    /// identity fallback used by [`Self::type_surface`].
     #[must_use]
-    pub fn intrinsic_surface(&self, canonical: &str) -> Option<&str> {
-        self.intrinsic_surfaces.get(canonical).map(String::as_str)
+    pub fn intrinsic_surface<'a>(&'a self, canonical: &'a str) -> &'a str {
+        self.intrinsic_surfaces
+            .get(canonical)
+            .map_or(canonical, String::as_str)
     }
 
     /// Resolve one localized intrinsic surface spelling to its canonical
@@ -904,14 +907,14 @@ impl<'a> KeywordSurface<'a> {
         self.pack.type_surface(kind)
     }
 
-    /// Localized surface spelling for one canonical intrinsic method name.
+    /// Localized (or canonical identity) surface spelling for one intrinsic
+    /// method name.
     ///
-    /// `None` when the pack has no row for the canonical — callers keep the
-    /// canonical spelling (identity; the `la` pack and no-pack surfaces are
-    /// registry-direct by construction).
+    /// Packs with no row use the canonical spelling. The higher-level
+    /// no-pack surface adapter may still represent absence as `None`.
     #[must_use]
-    pub fn intrinsic_surface(&self, canonical: &str) -> Option<&'a str> {
-        self.pack.intrinsic_surface(canonical)
+    pub fn intrinsic_surface<'b>(&'b self, canonical: &'b str) -> Option<&'b str> {
+        Some(self.pack.intrinsic_surface(canonical))
     }
 }
 

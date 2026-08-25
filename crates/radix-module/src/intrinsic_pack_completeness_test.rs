@@ -3,8 +3,8 @@
 //! Proves that `stdlib/locale/en/pack.toml` maps **every** canonical
 //! intrinsic name in the compiler registry (`INTRINSICS`) to an English
 //! surface spelling, pins the four named example mappings from the delivery,
-//! and keeps the queue/stack method names explicitly owned by every installed
-//! reader pack.
+//! and proves that every installed reader pack exposes the queue/stack method
+//! names, either through a localized row or the canonical identity fallback.
 //!
 //! The en pack is the complete catalog: the registry and the pack may only
 //! drift together. A registry row added without an en row, or an en row whose
@@ -65,14 +65,15 @@ fn en_pack_intrinsic_keys_match_registry_exactly() {
 #[test]
 fn en_pack_maps_the_four_named_examples() {
     let en = owned_installed_pack("en");
-    assert_eq!(en.intrinsic_surface("continet"), Some("contains"));
-    assert_eq!(en.intrinsic_surface("longitudo"), Some("length"));
-    assert_eq!(en.intrinsic_surface("sectio"), Some("slice"));
-    assert_eq!(en.intrinsic_surface("appende"), Some("append"));
+    assert_eq!(en.intrinsic_surface("continet"), "contains");
+    assert_eq!(en.intrinsic_surface("longitudo"), "length");
+    assert_eq!(en.intrinsic_surface("sectio"), "slice");
+    assert_eq!(en.intrinsic_surface("appende"), "append");
 }
 
-/// The queue/stack method vocabulary is explicit and canonical in every
-/// installed reader pack. This is a named-method surface, not a glyph alias.
+/// The queue/stack method vocabulary is available in every installed reader
+/// pack. English uses localized rows; the other packs retain the canonical
+/// Latin spelling, either through an explicit identity row or by absence.
 #[test]
 fn queue_stack_method_rows_are_owned_by_all_installed_packs() {
     for locale in ["la", "en", "th-TH", "ar", "zh-Hans", "zh-Hant", "vi", "hi"] {
@@ -86,19 +87,15 @@ fn queue_stack_method_rows_are_owned_by_all_installed_packs() {
             let expected = if locale == "en" { english_surface } else { method };
             assert_eq!(
                 pack.intrinsic_surface(method),
-                Some(expected),
-                "{locale} must own canonical queue/stack method row {method}"
+                expected,
+                "{locale} must expose queue/stack method surface {method}"
             );
         }
     }
 
+    // la is identity-by-absence: forward projection keeps the canonical
+    // spelling while reverse lookup has no explicit pack-owned row.
     let la = owned_installed_pack("la");
-    assert_eq!(
-        la.intrinsic_canonical(IntrinsicReceiver::Queue, "appende"),
-        Some("appende")
-    );
-    assert_eq!(
-        la.intrinsic_canonical(IntrinsicReceiver::Stack, "detrahe"),
-        Some("detrahe")
-    );
+    assert_eq!(la.intrinsic_canonical(IntrinsicReceiver::Queue, "appende"), None);
+    assert_eq!(la.intrinsic_canonical(IntrinsicReceiver::Stack, "detrahe"), None);
 }

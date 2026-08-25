@@ -60,9 +60,9 @@ accipe = "get"
         pack.intrinsics["continet"],
         IntrinsicBinding { key: "continet".to_owned(), canonical: "contains".to_owned(), aliases: Vec::new() }
     );
-    assert_eq!(pack.intrinsic_surface("continet"), Some("contains"));
-    assert_eq!(pack.intrinsic_surface("appende"), Some("append"));
-    assert_eq!(pack.intrinsic_surface("accipe"), Some("get"));
+    assert_eq!(pack.intrinsic_surface("continet"), "contains");
+    assert_eq!(pack.intrinsic_surface("appende"), "append");
+    assert_eq!(pack.intrinsic_surface("accipe"), "get");
 
     // Surface → canonical, scoped by receiver family. `continet` is owned by
     // Lista/Textus/Intervallum; a family that does not own it has no mapping.
@@ -83,8 +83,8 @@ accipe = "get"
     assert_eq!(pack.intrinsic_canonical(IntrinsicReceiver::Tensor, "get"), Some("accipe"));
     assert_eq!(pack.intrinsic_canonical(IntrinsicReceiver::Copia, "get"), None);
 
-    // A canonical with no row has no explicit surface (identity by absence).
-    assert_eq!(pack.intrinsic_surface("longitudo"), None);
+    // A canonical with no row keeps its own surface (identity by absence).
+    assert_eq!(pack.intrinsic_surface("longitudo"), "longitudo");
     assert_eq!(pack.intrinsic_canonical(IntrinsicReceiver::Lista, "length"), None);
 }
 
@@ -157,7 +157,7 @@ sectio = {{ canonical = "slice", aliases = ["sliced"] }}
     .expect("alias row should validate");
 
     assert_eq!(pack.intrinsics["sectio"].aliases, vec!["sliced"]);
-    assert_eq!(pack.intrinsic_surface("sectio"), Some("slice"));
+    assert_eq!(pack.intrinsic_surface("sectio"), "slice");
     assert_eq!(pack.intrinsic_canonical(IntrinsicReceiver::Lista, "sliced"), Some("sectio"));
 
     // An alias colliding with another canonical's surface in a shared family
@@ -184,19 +184,20 @@ recide = "cut"
 fn packs_without_intrinsics_section_load_unchanged() {
     // The la pack (and every other installed pack in this wave) owns zero
     // `[intrinsics]` rows: the absent section must parse to an empty table,
-    // validate, and expose no explicit surface mappings. (The en pack now
+    // validate, and expose canonical identity surfaces without inventing
+    // explicit mappings. (The en pack now
     // owns a full intrinsic catalog — its completeness is proven by
     // `intrinsic_pack_completeness_test.rs`, L2.)
     let la = owned_installed_pack("la");
     assert!(la.intrinsics.is_empty(), "installed la pack should own no [intrinsics] rows");
     assert!(validate_locale_pack(&la).is_empty(), "installed la pack should validate");
-    assert_eq!(la.intrinsic_surface("continet"), None);
+    assert_eq!(la.intrinsic_surface("continet"), "continet");
     assert_eq!(la.intrinsic_canonical(IntrinsicReceiver::Lista, "contains"), None);
 
     // The generated Latin pack is identity-by-absence for every canonical.
     let latin = latin_locale_pack();
     assert!(latin.intrinsics.is_empty());
-    assert_eq!(latin.intrinsic_surface("longitudo"), None);
+    assert_eq!(latin.intrinsic_surface("longitudo"), "longitudo");
     assert_eq!(latin.intrinsic_canonical(IntrinsicReceiver::Lista, "length"), None);
 }
 
@@ -248,6 +249,6 @@ exemplars = ["./salve.fab"]
 
     assert_eq!(pack.intrinsics["continet"].canonical, "contains");
     assert_eq!(pack.intrinsics["sectio"].canonical, "slice");
-    assert_eq!(pack.intrinsic_surface("continet"), Some("contains"));
+    assert_eq!(pack.intrinsic_surface("continet"), "contains");
     assert_eq!(pack.intrinsic_canonical(IntrinsicReceiver::Lista, "slice"), Some("sectio"));
 }

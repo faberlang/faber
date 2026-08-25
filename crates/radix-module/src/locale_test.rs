@@ -1302,7 +1302,7 @@ fn en_pack_empty_marker_rejects_vacua_alias() {
         pack.contextual_keyword_aliases("vacua").is_empty(),
         "en marker row has no transition alias"
     );
-    assert_eq!(pack.intrinsic_surface("vacua"), Some("is_empty"));
+    assert_eq!(pack.intrinsic_surface("vacua"), "is_empty");
 
     let la = installed_pack("la");
     assert_eq!(la.keyword_latin_key("vacua"), Some("vacua"));

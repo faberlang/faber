@@ -403,7 +403,7 @@ impl TypeChecker<'_> {
             // locale mapping while every backend still receives `transpone`.
             let surface = self
                 .locale_pack
-                .and_then(|pack| pack.intrinsic_surface(super::tensor_index::TENSOR_TRANSPONE))
+                .map(|pack| pack.intrinsic_surface(super::tensor_index::TENSOR_TRANSPONE))
                 .unwrap_or(super::tensor_index::TENSOR_TRANSPONE);
             if let Some(interner) = self.interner {
                 if let Some(index) = interner.strings().iter().position(|s| s == surface) {
