@@ -351,12 +351,11 @@ impl<'a> Lexer<'a> {
             '≻' => TokenKind::Gt,
             '←' => TokenKind::Assign,
             '≡' => TokenKind::EqEq,
-            '≢' => TokenKind::BangEq,
+            '≢' | '≠' => TokenKind::BangEq,
             '≅' => TokenKind::ApproxEq,
             '≇' => TokenKind::ApproxNotEq,
             '≈' => TokenKind::FuzzyEq,
             '≉' => TokenKind::FuzzyNotEq,
-            '≠' => TokenKind::BangEq,
             '≤' => TokenKind::LtEq,
             '≥' => TokenKind::GtEq,
             '→' => TokenKind::Arrow,
@@ -1040,15 +1039,12 @@ fn homoglyph_suggestion(c: char) -> Option<&'static str> {
         // Vertical arrow neighbors outside the live ↑/↓ postfix pair. The
         // Supplemental Arrows-A set is deliberately explicit: U+2908/U+2909
         // carry a horizontal stroke and U+290A/U+290B carry three heads.
-        // Both forms are close enough to the to-bar glyphs to merit a hint.
-        '⤈' | '⤋' => Some("⤓"),
-        '⤉' | '⤊' => Some("⤒"),
-
         // Other vertical arrows with the same directional reading and a bar,
-        // dash, or double head are rejected rather than normalized. ↑ and ↓
+        // dash, or double head are rejected rather than normalized. Both
+        // forms are close enough to the to-bar glyphs to merit a hint. ↑ and ↓
         // are intentionally absent because they are already live tokens.
-        '⇣' | '⇓' | '↧' => Some("⤓"),
-        '⇡' | '⇑' | '↥' => Some("⤒"),
+        '⤈' | '⤋' | '⇣' | '⇓' | '↧' => Some("⤓"),
+        '⤉' | '⤊' | '⇡' | '⇑' | '↥' => Some("⤒"),
         _ => None,
     }
 }

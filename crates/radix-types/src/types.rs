@@ -1549,15 +1549,13 @@ impl Hash for Type {
                 e.hash(state);
                 s.hash(state);
             }
-            Self::BoundedArray { element, capacity } => {
+            Self::BoundedArray { element, capacity }
+            | Self::BoundedQueue { element, capacity }
+            | Self::BoundedStack { element, capacity } => {
                 element.hash(state);
                 capacity.hash(state);
             }
             Self::Queue(element) | Self::Stack(element) => element.hash(state),
-            Self::BoundedQueue { element, capacity } | Self::BoundedStack { element, capacity } => {
-                element.hash(state);
-                capacity.hash(state);
-            }
             Self::BoundedTextus { capacity }
             | Self::BoundedAscii { capacity }
             | Self::BoundedOcteti { capacity } => capacity.hash(state),
