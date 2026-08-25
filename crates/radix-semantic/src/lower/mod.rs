@@ -728,7 +728,7 @@ impl<'a> Lowerer<'a> {
             StmtKind::Func(decl) => self.lower_functio(stmt, decl).into_iter().collect(),
             StmtKind::Class(decl) => self.lower_gens(stmt, decl).into_iter().collect(),
             StmtKind::Enum(decl) => self.lower_ordo(stmt, decl).into_iter().collect(),
-            StmtKind::Union(decl) => self.lower_discretio(stmt, decl).into_iter().collect(),
+            StmtKind::Union(decl) => self.lower_discretio_items(stmt, decl),
             StmtKind::Interface(decl) => self.lower_implendum(stmt, decl).into_iter().collect(),
             StmtKind::TypeAlias(decl) => self.lower_typus(stmt, decl).into_iter().collect(),
             StmtKind::Schema(decl) => self.lower_schema(stmt, decl).into_iter().collect(),

@@ -470,6 +470,22 @@ fn resolve_stmt(
             for param in &decl.type_params {
                 define_generic_param(resolver, param, errors);
             }
+            for arm in &decl.arms {
+                resolve_type_expr(resolver, interner, &arm.source, errors);
+                resolver.enter_scope(ScopeKind::Function);
+                if let Some(self_ident) = &arm.self_ident {
+                    define_symbol(
+                        resolver,
+                        self_ident.name,
+                        self_ident.span,
+                        SymbolKind::Param,
+                        false,
+                        errors,
+                    );
+                }
+                resolve_block(resolver, interner, &arm.body, errors);
+                resolver.exit_scope();
+            }
             for variant in &decl.variants {
                 for field in &variant.fields {
                     resolve_type_expr(resolver, interner, &field.ty, errors);

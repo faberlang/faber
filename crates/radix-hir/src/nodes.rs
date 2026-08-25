@@ -578,7 +578,22 @@ pub struct HirEnum {
     /// coincidentally identical variant shapes.
     #[serde(default)]
     pub commune_fields: Vec<HirVariantField>,
+    /// Declaration-owned error conversions lowered to synthetic functions.
+    #[serde(default)]
+    pub conversion_arms: Vec<HirConversionArm>,
     pub variants: Vec<HirVariant>,
+}
+
+/// One destination-union error conversion declaration.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct HirConversionArm {
+    /// Source error type accepted by this destination union.
+    pub source: TypeId,
+    /// Optional whole-source binding visible to the synthetic arm function.
+    pub self_ident: Option<Symbol>,
+    /// Synthetic ordinary function that constructs the destination error.
+    pub fn_def_id: DefId,
+    pub span: Span,
 }
 
 /// Enum variant declaration.

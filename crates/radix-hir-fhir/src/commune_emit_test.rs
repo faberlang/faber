@@ -29,6 +29,7 @@ fn commune_fields_round_trip_on_union_payload() {
             ty: textus,
             span: span(),
         }],
+        conversion_arms: Vec::new(),
         variants: vec![
             HirVariant {
                 def_id: incompatible_def,

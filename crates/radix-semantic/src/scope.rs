@@ -344,6 +344,14 @@ pub struct CommuneField {
     pub span: Span,
 }
 
+/// One declaration-owned error conversion registered for later propagation.
+#[derive(Debug, Clone, Copy)]
+pub struct ConversionArm {
+    pub source: TypeId,
+    pub fn_def_id: DefId,
+    pub span: Span,
+}
+
 fn exported_member_kind(export: &FileExportKind) -> InterfaceMemberKind {
     match export {
         FileExportKind::Function(_) => InterfaceMemberKind::Function,
@@ -671,6 +679,8 @@ pub struct Resolver {
     /// rebuild imported rows from the interface; TEU3 carries the region on
     /// HIR for local emit.
     commune_fields: FxHashMap<DefId, Vec<CommuneField>>,
+    /// Declaration-owned error conversions keyed by destination union.
+    conversion_arms: FxHashMap<DefId, Vec<ConversionArm>>,
     /// Namespace bindings referenced from qualified type paths.
     used_namespaces: FxHashSet<LexSymbol>,
     /// Resolved relational schema metadata keyed by schema definition
@@ -735,6 +745,7 @@ impl Resolver {
             canonical_imported_nominal_defs: FxHashMap::default(),
             imported_enum_variants: FxHashMap::default(),
             commune_fields: FxHashMap::default(),
+            conversion_arms: FxHashMap::default(),
             used_namespaces: FxHashSet::default(),
             schemas: FxHashMap::default(),
             locale_pack_type_aliases: FxHashMap::default(),
@@ -2216,6 +2227,19 @@ impl Resolver {
             .find(|field| field.name == name)
     }
 
+    /// Record the validated conversion arms owned by a destination union.
+    pub fn register_conversion_arms(&mut self, enum_def: DefId, arms: Vec<ConversionArm>) {
+        self.conversion_arms.insert(enum_def, arms);
+    }
+
+    /// Conversion arms declared on `enum_def`, empty when none are declared.
+    #[must_use]
+    pub fn conversion_arms(&self, enum_def: DefId) -> &[ConversionArm] {
+        self.conversion_arms
+            .get(&enum_def)
+            .map_or(&[], Vec::as_slice)
+    }
+
     #[must_use]
     pub fn imported_file_enums(&self) -> Vec<(DefId, TypeId, Vec<ImportedEnumVariant>)> {
         self.file_interfaces
@@ -3183,6 +3207,7 @@ impl Resolver {
             canonical_imported_nominal_defs: FxHashMap::default(),
             imported_enum_variants: FxHashMap::default(),
             commune_fields: FxHashMap::default(),
+            conversion_arms: FxHashMap::default(),
             used_namespaces,
             schemas: FxHashMap::default(),
             locale_pack_type_aliases: FxHashMap::default(),

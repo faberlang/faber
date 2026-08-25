@@ -48,6 +48,7 @@ fn enum_program(expr: HirExpression) -> HirModule {
                 type_params: Vec::new(),
                 annotations: Vec::new(),
                 commune_fields: Vec::new(),
+                conversion_arms: Vec::new(),
                 variants: vec![
                     HirVariant {
                         def_id: DefId(2),

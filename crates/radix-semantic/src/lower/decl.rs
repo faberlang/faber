@@ -36,21 +36,22 @@
 //! payload type information for later pattern and type analysis.
 
 use super::Lowerer;
-use crate::{CommuneField, IndexExpr, NumericWidth, Primitive, Type, TypeId};
+use crate::{CommuneField, ConversionArm, IndexExpr, NumericWidth, Primitive, Type, TypeId};
 use radix_diagnostics::DiagnosticArg;
 use radix_hir::visit::{walk_expr, HirVisitor};
 use radix_hir::{
-    DefId, HirAnnotation, HirBlock, HirConst, HirEnum, HirExpression, HirExpressionKind, HirField,
-    HirFunction, HirImport, HirImportItem, HirInterface, HirInterfaceMethod, HirItem, HirItemKind,
-    HirLocal, HirMethod, HirOwnerRef, HirParam, HirParamMode, HirReceiver, HirSchema,
-    HirSchemaColumn, HirStatement, HirStatementKind, HirStruct, HirTriviaOwnerKind, HirTypeAlias,
-    HirTypeParam, HirTypeParamConstraint, HirVariant, HirVariantField,
+    DefId, HirAnnotation, HirBlock, HirConst, HirConversionArm, HirEnum, HirExpression,
+    HirExpressionKind, HirField, HirFunction, HirImport, HirImportItem, HirInterface,
+    HirInterfaceMethod, HirItem, HirItemKind, HirLocal, HirMethod, HirOwnerRef, HirParam,
+    HirParamMode, HirReceiver, HirSchema, HirSchemaColumn, HirStatement, HirStatementKind,
+    HirStruct, HirTriviaOwnerKind, HirTypeAlias, HirTypeParam, HirTypeParamConstraint, HirVariant,
+    HirVariantField,
 };
 use radix_lexer::{Span, Symbol};
 use radix_syntax::{
     AstMutability, AstParamMode, BindingPattern, CallablePosture, ClassDecl, ClassMemberKind,
     EnumDecl, FuncDecl, ImportDecl, ImportKind, InterfaceDecl, InterfaceMethod, Param, SchemaDecl,
-    Stmt, TypeAliasDecl, TypeParam, UnionDecl, VarDecl, Variant,
+    Stmt, TypeAliasDecl, TypeExprKind, TypeParam, UnionDecl, VarDecl, Variant,
 };
 
 type ModifierLocal = (DefId, Symbol, Span);
@@ -735,6 +736,7 @@ impl Lowerer<'_> {
             type_params: Vec::new(),
             annotations: self.lower_annotations(&stmt.annotations),
             commune_fields: Vec::new(),
+            conversion_arms: Vec::new(),
             variants,
         };
 
@@ -776,6 +778,25 @@ impl Lowerer<'_> {
     }
 
     pub fn lower_discretio(&mut self, stmt: &Stmt, decl: &UnionDecl) -> Option<HirItem> {
+        self.lower_discretio_parts(stmt, decl)
+            .map(|(enum_item, _)| enum_item)
+    }
+
+    pub(super) fn lower_discretio_items(&mut self, stmt: &Stmt, decl: &UnionDecl) -> Vec<HirItem> {
+        let Some((enum_item, arm_items)) = self.lower_discretio_parts(stmt, decl) else {
+            return Vec::new();
+        };
+        let mut items = Vec::with_capacity(1 + arm_items.len());
+        items.push(enum_item);
+        items.extend(arm_items);
+        items
+    }
+
+    fn lower_discretio_parts(
+        &mut self,
+        stmt: &Stmt,
+        decl: &UnionDecl,
+    ) -> Option<(HirItem, Vec<HirItem>)> {
         let def_id = self.def_id_for(decl.name.name);
 
         let type_params = self.lower_type_params(&decl.type_params);
@@ -792,6 +813,25 @@ impl Lowerer<'_> {
             .map(|variant| self.lower_variant(def_id, variant))
             .collect();
 
+        let mut conversion_arms = Vec::with_capacity(decl.arms.len());
+        let mut arm_items = Vec::with_capacity(decl.arms.len());
+        for arm in &decl.arms {
+            let (hir_arm, item) = self.lower_conversion_arm(def_id, decl.name.name, arm);
+            conversion_arms.push(hir_arm);
+            arm_items.push(item);
+        }
+        self.resolver.register_conversion_arms(
+            def_id,
+            conversion_arms
+                .iter()
+                .map(|arm| ConversionArm {
+                    source: arm.source,
+                    fn_def_id: arm.fn_def_id,
+                    span: arm.span,
+                })
+                .collect(),
+        );
+
         self.pop_type_params();
 
         let enum_item = HirEnum {
@@ -806,15 +846,98 @@ impl Lowerer<'_> {
                     span: field.span,
                 })
                 .collect(),
+            conversion_arms,
             variants,
         };
 
-        Some(HirItem {
+        Some((
+            HirItem {
+                id: self.next_hir_id(),
+                def_id,
+                kind: HirItemKind::Enum(enum_item),
+                span: stmt.span,
+            },
+            arm_items,
+        ))
+    }
+
+    fn lower_conversion_arm(
+        &mut self,
+        destination_def_id: DefId,
+        destination_name: Symbol,
+        arm: &radix_syntax::UnionArm,
+    ) -> (HirConversionArm, HirItem) {
+        let source_ty = self.lower_type(&arm.source);
+        let fn_def_id = self.next_def_id();
+        let param_def_id = self.next_def_id();
+        let param_name = arm.self_ident.as_ref().map_or_else(
+            || self.interner.intern("__conversio_source"),
+            |ident| ident.name,
+        );
+
+        self.push_scope();
+        if arm.self_ident.is_some() {
+            self.bind_local(param_name, param_def_id);
+        }
+        let body = Some(self.lower_block(&arm.body));
+        self.pop_scope();
+
+        let source_name = match &arm.source.kind {
+            TypeExprKind::Named(name, _) => self.interner.resolve(name.name).to_owned(),
+            TypeExprKind::Qualified(path, _) => path.last().map_or_else(
+                || "source".to_owned(),
+                |name| self.interner.resolve(name.name).to_owned(),
+            ),
+            _ => "source".to_owned(),
+        };
+        let function_name = self.interner.intern(&format!(
+            "conversio_{}_ex_{}",
+            self.interner.resolve(destination_name),
+            source_name
+        ));
+        let param = HirParam {
+            def_id: param_def_id,
+            name: param_name,
+            ty: source_ty,
+            mode: HirParamMode::Owned,
+            optional: false,
+            sponte: false,
+            default: None,
+            span: arm.source.span,
+        };
+        let func = HirFunction {
+            name: function_name,
+            type_params: Vec::new(),
+            params: vec![param],
+            cli_args: None,
+            ret_ty: Some(self.types.intern(Type::Enum(destination_def_id))),
+            err_ty: None,
+            body,
+            posture: CallablePosture::SyncFinite,
+            is_async: false,
+            is_generator: false,
+            is_kernel: false,
+            nucleum_fragment: false,
+            is_vertex: false,
+            is_fragment: false,
+            test: None,
+            annotations: Vec::new(),
+        };
+        let item = HirItem {
             id: self.next_hir_id(),
-            def_id,
-            kind: HirItemKind::Enum(enum_item),
-            span: stmt.span,
-        })
+            def_id: fn_def_id,
+            kind: HirItemKind::Function(Box::new(func)),
+            span: arm.span,
+        };
+        (
+            HirConversionArm {
+                source: source_ty,
+                self_ident: arm.self_ident.as_ref().map(|ident| ident.name),
+                fn_def_id,
+                span: arm.span,
+            },
+            item,
+        )
     }
 
     fn lower_commune_fields(&mut self, decl: &UnionDecl) -> Vec<CommuneField> {

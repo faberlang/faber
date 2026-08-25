@@ -473,7 +473,20 @@ pub struct UnionDecl {
     pub type_params: Vec<TypeParam>,
     /// Declaration-region fields shared by every variant.
     pub shared_fields: Vec<UnionField>,
+    /// Error-conversion arms in the pre-variant declaration region.
+    pub arms: Vec<UnionArm>,
     pub variants: Vec<Variant>,
+}
+
+#[derive(Debug)]
+pub struct UnionArm {
+    /// Source error union accepted by this destination union.
+    pub source: TypeExpr,
+    /// Optional binding for the complete source error value in the arm body.
+    pub self_ident: Option<Ident>,
+    /// Ordinary function body used to construct the destination error.
+    pub body: BlockStmt,
+    pub span: Span,
 }
 
 #[derive(Debug)]
@@ -1612,6 +1625,8 @@ pub enum AnnotationKind {
     RadixLane(RadixLaneAnnotation),
     /// `@ nucleum` / `@ nucleum fragment` — typed modifier data, not an untyped argument.
     Nucleum(NucleumAnnotation),
+    /// `@ conversio Type self_ident? { ... }` — typed union-arm payload.
+    Conversio(ConversioAnnotation),
     Cli(CliAnnotation),
     Imperium(ImperiumAnnotation),
     Optio(OptioAnnotation),
@@ -1666,6 +1681,21 @@ pub struct NucleumAnnotation {
     pub lane_values: Vec<Symbol>,
     /// Every braced lane field span, retained for dual-span diagnostics.
     pub lane_spans: Vec<Span>,
+}
+
+/// Typed payload for a union error-conversion annotation.
+///
+/// The parser keeps this as an annotation until the enclosing union member
+/// parser can classify it as an arm. That is the annotation-first latch: the
+/// `@ conversio` marker, not a braced body alone, decides the member kind.
+#[derive(Debug)]
+pub struct ConversioAnnotation {
+    /// Source error union named by the arm.
+    pub source: TypeExpr,
+    /// Optional binding for the complete source error value.
+    pub self_ident: Option<Ident>,
+    /// Ordinary statement body that constructs the destination error.
+    pub body: BlockStmt,
 }
 
 #[derive(Debug)]

@@ -1287,6 +1287,20 @@ pub static KEYWORD_SPECS: &[KeywordSpec] = &[
     // identifiers after `@`. Registered so packs can re-spell them (en: kernel,
     // …) while HIR keeps Latin family ids.
     KeywordSpec {
+        text: "conversion",
+        token_kind: Some(TokenKind::Conversio),
+        scope: KeywordScope::Alias {
+            canonical: "conversio",
+        },
+        category: KeywordKind::Annotation,
+    },
+    KeywordSpec {
+        text: "conversio",
+        token_kind: Some(TokenKind::Conversio),
+        scope: KeywordScope::Annotation,
+        category: KeywordKind::Annotation,
+    },
+    KeywordSpec {
         text: "nucleum",
         token_kind: Some(TokenKind::Nucleum),
         scope: KeywordScope::Annotation,

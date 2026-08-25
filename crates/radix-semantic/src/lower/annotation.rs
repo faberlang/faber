@@ -94,6 +94,10 @@ impl Lowerer<'_> {
             AnnotationKind::Nucleum(nucleum) => {
                 self.lower_nucleum_annotation(nucleum, annotation.span)
             }
+            // A valid union arm is moved into `HirEnum` before annotation
+            // lowering. This fallback keeps misplaced arms representable until
+            // the annotation-contract pass reports their placement error.
+            AnnotationKind::Conversio(_) => self.unit_annotation("conversio", annotation.span),
             AnnotationKind::Cli(cli) => self.lower_cli_annotation(cli, annotation.span),
             AnnotationKind::Imperium(imperium) => {
                 self.lower_imperium_annotation(imperium, annotation.span)

@@ -1128,5 +1128,9 @@ mod first_match_test;
 mod union_commune_test;
 
 #[cfg(test)]
+#[path = "union_conversio_test.rs"]
+mod union_conversio_test;
+
+#[cfg(test)]
 #[path = "non_trivia_index_test.rs"]
 mod non_trivia_index_test;

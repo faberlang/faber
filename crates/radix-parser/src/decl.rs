@@ -1121,8 +1121,9 @@ impl Parser {
     /// Parse tagged union declaration.
     ///
     /// GRAMMAR:
-    ///   union-decl := discretio ident [type-params] { union-field* variant* }
-    ///   union-field := annotation* `field_decl`
+    ///   union-decl := discretio ident [type-params] { union-member* variant* }
+    ///   union-member := annotation* `field_decl` | conversio-arm
+    ///   conversio-arm := `@ conversio` type ident? block
     ///   variant := ident [ { field* } ]
     ///   field := type ident
     fn parse_union_decl(&mut self) -> Result<StmtKind, ParseError> {
@@ -1133,17 +1134,46 @@ impl Parser {
         self.expect(&TokenKind::LBrace, "expected '{'")?;
 
         let mut shared_fields = Vec::new();
+        let mut arms = Vec::new();
         let mut variants = Vec::new();
         let mut declaration_region_started = false;
         let mut parsing_variants = false;
         while !self.check(&TokenKind::RBrace) && !self.is_at_end() {
             let leading_trivia = self.parse_leading_trivia();
 
+            if parsing_variants && self.check(&TokenKind::At) {
+                return Err(ParseError::structured(
+                    ParseErrorKind::Unexpected,
+                    self.current_span(),
+                )
+                .with_arg("issue", "union_conversio_after_variant"));
+            }
+
             if !parsing_variants {
                 let start = self.current_span();
                 if self.check(&TokenKind::At) {
                     declaration_region_started = true;
-                    let annotations = self.parse_annotations()?;
+                    let mut annotations = self.parse_annotations()?;
+                    if annotations.len() == 1
+                        && matches!(
+                            annotations.first().map(|annotation| &annotation.kind),
+                            Some(AnnotationKind::Conversio(_))
+                        )
+                    {
+                        let annotation = annotations
+                            .pop()
+                            .expect("the single conversio annotation must be present");
+                        let AnnotationKind::Conversio(conversio) = annotation.kind else {
+                            unreachable!("the conversio annotation shape was checked above");
+                        };
+                        arms.push(UnionArm {
+                            source: conversio.source,
+                            self_ident: conversio.self_ident,
+                            body: conversio.body,
+                            span: start.merge(self.previous_span()),
+                        });
+                        continue;
+                    }
                     let field = self.parse_field_decl()?;
                     shared_fields.push(UnionField {
                         leading_trivia,
@@ -1219,6 +1249,7 @@ impl Parser {
             name,
             type_params,
             shared_fields,
+            arms,
             variants,
         }))
     }
@@ -1814,8 +1845,15 @@ impl Parser {
 
             let kind = self.parse_annotation_kind()?;
             let span = start.merge(self.previous_span());
+            let is_conversio = matches!(&kind, AnnotationKind::Conversio(_));
 
             annotations.push(Annotation { kind, span });
+            if is_conversio {
+                // A typed arm owns its braced body and therefore terminates
+                // this annotation run. A following `@` begins the next union
+                // member, not another annotation stacked on the arm.
+                break;
+            }
         }
 
         self.check_nucleum_annotation_conflicts(&annotations)?;
@@ -1830,6 +1868,20 @@ impl Parser {
     /// accepting its canonical Latin form under a translated pack would make a
     /// mixed-locale file look valid while bypassing the pack surface gate.
     fn untranslated_annotation_spelling(&self, raw: &str) -> Option<String> {
+        // `conversion` is the English surface of the canonical `conversio`
+        // annotation. In registry-direct (Latin) mode the raw fallback would
+        // otherwise claim this undeclared alias before the locale gate sees it.
+        if raw == "conversion"
+            && self.reader_keyword_latin_keys.get(raw).map(String::as_str)
+                != Some("conversio")
+        {
+            return self
+                .reader_keyword_surfaces
+                .get("conversio")
+                .cloned()
+                .or_else(|| Some("conversio".to_owned()));
+        }
+
         if self.keyword_claim_key_for_text(raw).is_some() {
             return None;
         }
@@ -1891,6 +1943,14 @@ impl Parser {
             return self.parse_nucleum_annotation();
         }
 
+        // Conversion arms have a typed source, optional whole-value binding,
+        // and ordinary statement body. Keep the payload out of generic braced
+        // annotation parsing so the enclosing union can apply its pre-variant
+        // latch and classify the member before seeing the body.
+        if matches!(annotation_identity, Some(TokenKind::Conversio)) {
+            return self.parse_conversio_annotation();
+        }
+
         if self.interner.resolve(name.name) == "commune" {
             self.expect_annotation_end("unexpected token after @ commune")?;
             return Ok(AnnotationKind::Statement(AnnotationStmt {
@@ -1940,6 +2000,21 @@ impl Parser {
         }
 
         Ok(AnnotationKind::Statement(AnnotationStmt { name, args }))
+    }
+
+    fn parse_conversio_annotation(&mut self) -> Result<AnnotationKind, ParseError> {
+        let source = self.parse_type()?;
+        let self_ident = if self.check(&TokenKind::LBrace) {
+            None
+        } else {
+            Some(self.parse_ident()?)
+        };
+        let body = self.parse_block()?;
+        Ok(AnnotationKind::Conversio(ConversioAnnotation {
+            source,
+            self_ident,
+            body,
+        }))
     }
 
     fn parse_braced_annotation(&mut self, name: Ident) -> Result<AnnotationKind, ParseError> {

@@ -751,6 +751,10 @@ mod type_hole_union_warnings_test;
 mod union_commune_test;
 
 #[cfg(test)]
+#[path = "union_conversio_test.rs"]
+mod union_conversio_test;
+
+#[cfg(test)]
 #[path = "union_construction_test.rs"]
 mod union_construction_test;
 

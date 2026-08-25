@@ -665,6 +665,7 @@ fn declaration_and_annotation_lists_emit_between_only() {
         type_params: Vec::new(),
         annotations: Vec::new(),
         commune_fields: Vec::new(),
+        conversion_arms: Vec::new(),
         variants: vec![
             HirVariant {
                 def_id: DefId(30),

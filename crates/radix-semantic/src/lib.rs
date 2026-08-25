@@ -187,8 +187,8 @@ pub use resolved_use::{
     analyze_resolved_uses, ResolvedUse, ResolvedUseIndex, ResolvedUseKey, ResolvedUseKind,
 };
 pub use scope::{
-    BareVariantLookup, CommuneField, QualifiedVariantPathLookup, Resolver, Scope, ScopeId,
-    ScopeKind, Symbol, SymbolKind,
+    BareVariantLookup, CommuneField, ConversionArm, QualifiedVariantPathLookup, Resolver, Scope,
+    ScopeId, ScopeKind, Symbol, SymbolKind,
 };
 use std::collections::BTreeMap;
 pub use types::{
