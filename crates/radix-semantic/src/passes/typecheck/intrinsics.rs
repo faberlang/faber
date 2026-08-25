@@ -252,6 +252,17 @@ pub(super) fn check_intrinsic_method_call(
         );
     let ctx = IntrinsicTypeContext::from_receiver_type(checker, payload_ty);
 
+    // The extrema twins are elementwise clamp methods on numeric lists. Keep
+    // the element gate here with the method registry path so infix sugar and
+    // an explicit `.maximus(n)` / `.minimus(n)` call cannot diverge.
+    if matches!(entry.receiver, radix_intrinsics::IntrinsicReceiver::Lista)
+        && matches!(entry.faber_name, "maximus" | "minimus")
+        && !ctx.inner.is_some_and(|inner| checker.is_numeric(inner))
+    {
+        checker.invalid_operand_types(ISSUE_NUMERIC_LISTA_ELEMENTS_REQUIRED, span);
+        return Some(checker.error_type);
+    }
+
     if checker.expr_is_ref_view(receiver) && is_mutating_receiver(entry) {
         checker.error_issue(
             SemanticErrorKind::AssignToImmutableBorrow,

@@ -289,14 +289,36 @@ impl Lowerer<'_> {
         let lhs = lower_expr(self, &bin.lhs);
         let rhs = lower_expr(self, &bin.rhs);
 
+        // Infix extrema are syntax sugar for the canonical method twins. Keep
+        // the HIR shape identical to an explicit `.maximus(n)` / `.minimus(n)`
+        // call so the existing typecheck, registry lookup, and MIR lowering
+        // paths remain the sole semantic owners.
+        let twin = match bin.op {
+            radix_syntax::BinOp::Maximum => Some("maximus"),
+            radix_syntax::BinOp::Minimum => Some("minimus"),
+            _ => None,
+        };
+        if let Some(canonical) = twin {
+            let surface = self
+                .locale_pack
+                .map(|pack| pack.intrinsic_surface(canonical))
+                .unwrap_or(canonical);
+            let name = self.interner.intern(surface);
+            return HirExpressionKind::MethodCall(
+                Box::new(lhs),
+                name,
+                Vec::new(),
+                vec![HirCallArg {
+                    name: None,
+                    spread: false,
+                    span: rhs.span,
+                    expr: rhs,
+                }],
+                None,
+            );
+        }
+
         let op = match bin.op {
-            // D2 preserves the dedicated parse nodes; D3 owns their
-            // elementwise clamp admission and lowering through the live
-            // maximus/minimus twins.
-            radix_syntax::BinOp::Maximum | radix_syntax::BinOp::Minimum => {
-                self.error("minmax_infix_semantics_pending");
-                return HirExpressionKind::Error;
-            }
             radix_syntax::BinOp::Add => HirBinOp::Add,
             radix_syntax::BinOp::Sub => HirBinOp::Sub,
             radix_syntax::BinOp::Mul => HirBinOp::Mul,
@@ -329,6 +351,9 @@ impl Lowerer<'_> {
             radix_syntax::BinOp::IsNot => HirBinOp::IsNot,
             radix_syntax::BinOp::InRange => HirBinOp::InRange,
             radix_syntax::BinOp::Between => HirBinOp::Between,
+            radix_syntax::BinOp::Maximum | radix_syntax::BinOp::Minimum => {
+                unreachable!("minmax infix nodes normalize to method calls above")
+            }
         };
 
         HirExpressionKind::Binary(op, Box::new(lhs), Box::new(rhs))

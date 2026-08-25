@@ -1083,30 +1083,38 @@ impl Validator<'_, '_> {
                 let Some(receiver_ty) = first_arg_ty else {
                     return;
                 };
-                if !matches!(
-                    self.type_kind(receiver_ty),
+                let arg_ty = match self.type_kind(receiver_ty) {
                     Type::Primitive(Primitive::Numerus | Primitive::Fractus)
-                        | Type::SizedNumeric(Primitive::Numerus | Primitive::Fractus, _)
-                ) {
-                    self.error(
-                        span,
-                        "numeric comparison receiver is not numerus or fractus",
-                    );
-                    return;
-                }
-                self.require_exact(
-                    call.return_ty,
-                    receiver_ty,
-                    span,
-                    "numeric comparison result type mismatch",
-                );
-                if let Some(arg) = call.args.get(1) {
-                    if let Some(arg_ty) = self.validate_operand(scope, arg, span) {
-                        self.require_assignable(
-                            arg_ty,
-                            receiver_ty,
+                    | Type::SizedNumeric(Primitive::Numerus | Primitive::Fractus, _) => receiver_ty,
+                    Type::Array(element)
+                    | Type::BoundedArray { element, .. }
+                    | Type::Tensor(element, _) => MirType::semantic(*element),
+                    _ => {
+                        self.error(
                             span,
-                            "numeric comparison argument type mismatch",
+                            "numeric clamp receiver is not scalar, lista, or tensor",
+                        );
+                        return;
+                    }
+                };
+                if !self
+                    .context
+                    .types
+                    .is_assignable(call.return_ty.semantic_id(), receiver_ty.semantic_id())
+                    || !self
+                        .context
+                        .types
+                        .is_assignable(receiver_ty.semantic_id(), call.return_ty.semantic_id())
+                {
+                    self.error(span, "numeric clamp result type mismatch");
+                }
+                if let Some(arg) = call.args.get(1) {
+                    if let Some(actual_ty) = self.validate_operand(scope, arg, span) {
+                        self.require_assignable(
+                            actual_ty,
+                            arg_ty,
+                            span,
+                            "numeric clamp argument type mismatch",
                         );
                     }
                 }

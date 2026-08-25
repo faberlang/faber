@@ -208,6 +208,8 @@ pub static INTRINSICS: &[MethodIntrinsic] = &[
     intrinsic!(Lista, "inversa", 0, &[], ArrayInner, collection Reverse),
     intrinsic!(Lista, "inverte", 0, &[], Vacuum, collection ReverseInPlace),
     intrinsic!(Lista, "longitudo", 0, &[], Numerus, collection Length),
+    intrinsic!(Lista, "maximus", 1, &[IntrinsicParamKind::Inner], SameAsReceiver, collection Maximum),
+    intrinsic!(Lista, "minimus", 1, &[IntrinsicParamKind::Inner], SameAsReceiver, collection Minimum),
     intrinsic!(
         Lista,
         "mappata",
@@ -614,6 +616,8 @@ pub static INTRINSICS: &[MethodIntrinsic] = &[
         SameAsReceiver,
         collection TensorMatMul
     ),
+    intrinsic!(Tensor, "maximus", 1, &[IntrinsicParamKind::Inner], SameAsReceiver, collection Maximum),
+    intrinsic!(Tensor, "minimus", 1, &[IntrinsicParamKind::Inner], SameAsReceiver, collection Minimum),
     intrinsic!(Tensor, "summa", 0, &[], NumericInner, collection Sum),
     intrinsic!(Tensor, "media", 0, &[], FractusFromElement, collection TensorMean),
     intrinsic!(

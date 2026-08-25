@@ -497,6 +497,8 @@ pub fn tensor_method_requires_numeric_element(method_name: &str) -> bool {
             | "addita_bias"
             | "subtrahe"
             | "multiplica"
+            | "maximus"
+            | "minimus"
             | "matmul"
             | "summa"
             | "media"

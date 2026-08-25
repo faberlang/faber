@@ -5514,3 +5514,58 @@ fn lista_elementwise_literal_bounds_expand_without_runtime_check() {
         "literal-bounded lista arithmetic must skip the dynamic check:\n{dump}"
     );
 }
+
+#[test]
+fn minmax_infix_clamp_surfaces_route_through_method_twins() {
+    let dump = dump_source(
+        r"
+functio scalar(numerus value, numerus bound) → numerus {
+    redde value ⤒ bound
+}
+
+functio collection(lista<numerus> values, numerus bound) → lista<numerus> {
+    redde values ⤒ bound
+}
+
+functio tensor(tensor<f32, [3]> values, f32 bound) → tensor<f32, [3]> {
+    redde values ⤒ bound
+}
+
+functio chained(lista<numerus> values, numerus lower, numerus upper) → lista<numerus> {
+    redde values ⤒ lower ⤓ upper
+}
+",
+    );
+    assert_eq!(dump.matches("runtime collection maximum").count(), 4, "{dump}");
+    assert_eq!(dump.matches("runtime collection minimum").count(), 1, "{dump}");
+    assert!(!dump.contains("method call before runtime/provider MIR lowering"), "{dump}");
+}
+
+#[test]
+fn minmax_infix_clamp_runner_matches_method_twins() {
+    let source = r"
+incipit {
+    fixum numerus scalar ← 2 ⤒ 5
+    nota scalar
+
+    fixum lista<numerus> values ← [1, 5, 9]
+    fixum lista<numerus> clamped ← values ⤒ 4 ⤓ 8
+    nota clamped.summa()
+
+    fixum lista<f32> flat ← [-1.0, 0.5, 2.0]
+    fixum tf32[] seed ← vacua
+    fixum tf32[3] values_tensor ← seed.strue(flat, [3])
+    fixum tf32[3] clamped_tensor ← values_tensor ⤒ 0.0 ⤓ 1.0
+    nota clamped_tensor.summa()
+}
+";
+    let mut host = crate::mir::BufferHost::default();
+    crate::mir::run_source(
+        &Session::new(Config::default().with_target(Target::HirTypeScript)),
+        "minmax-infix-clamp.fab",
+        source,
+        &mut host,
+    )
+    .unwrap_or_else(|error| panic!("minmax infix clamp runner proof should execute: {error:?}"));
+    assert_eq!(host.stdout_lines, ["5", "17", "1.5"]);
+}

@@ -1264,8 +1264,12 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
             }
             MirCollectionOp::Absolute => self.map_numeric(args, span, return_ty, f64::abs),
             MirCollectionOp::Signum => self.map_numeric(args, span, return_ty, f64::signum),
-            MirCollectionOp::Minimum => self.map_numeric_pair(args, span, f64::min),
-            MirCollectionOp::Maximum => self.map_numeric_pair(args, span, f64::max),
+            MirCollectionOp::Minimum => {
+                self.numeric_extremum(args, span, return_ty, numeric_min, f64::min)
+            }
+            MirCollectionOp::Maximum => {
+                self.numeric_extremum(args, span, return_ty, numeric_max, f64::max)
+            }
             MirCollectionOp::Approximate => self.approximate_fractus(args, span),
             MirCollectionOp::Sum => self.sum_numeric_array(args, return_ty, span),
             MirCollectionOp::ArrayAdd => {
@@ -3354,6 +3358,28 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
         }
     }
 
+    fn numeric_extremum(
+        &mut self,
+        args: &[MirOperand],
+        span: Span,
+        return_ty: MirType,
+        op: fn(&Value, &Value, NumericWidth, Span) -> Result<Value, RunnerError>,
+        scalar_op: fn(f64, f64) -> f64,
+    ) -> Result<Value, RunnerError> {
+        let is_array = matches!(
+            self.types.get(return_ty.semantic_id()),
+            Type::Array(_) | Type::BoundedArray { .. }
+        );
+        let is_tensor = matches!(self.types.get(return_ty.semantic_id()), Type::Tensor(_, _));
+        if is_array {
+            return self.array_elementwise(args, span, "lista extremum", op, return_ty);
+        }
+        if is_tensor {
+            return self.tensor_elementwise_or_scalar(args, span, "tensor extremum", op, return_ty);
+        }
+        self.map_numeric_pair(args, span, scalar_op)
+    }
+
     fn map_numeric_pair(
         &mut self,
         args: &[MirOperand],
@@ -4281,5 +4307,39 @@ fn numeric_div(
         super::value::width_checked_div,
         super::value::uint_width_checked_div,
         |a, b| a / b,
+    )
+}
+
+fn numeric_min(
+    left: &Value,
+    right: &Value,
+    width: NumericWidth,
+    span: Span,
+) -> Result<Value, RunnerError> {
+    numeric_pair(
+        left,
+        right,
+        width,
+        span,
+        |a, b, _, _| Ok(a.min(b)),
+        |a, b, _, _| Ok(a.min(b)),
+        f64::min,
+    )
+}
+
+fn numeric_max(
+    left: &Value,
+    right: &Value,
+    width: NumericWidth,
+    span: Span,
+) -> Result<Value, RunnerError> {
+    numeric_pair(
+        left,
+        right,
+        width,
+        span,
+        |a, b, _, _| Ok(a.max(b)),
+        |a, b, _, _| Ok(a.max(b)),
+        f64::max,
     )
 }
