@@ -766,8 +766,8 @@ fn compile_package_prefers_locked_norma_interfaces_over_library_home_without_dep
     let locked_interfaces = dir.join("store").join("norma/0.1.0/interfaces");
     let library_home = dir.join("library-home");
     fs::create_dir_all(&src).expect("create src");
-    fs::create_dir_all(locked_interfaces.join("solum")).expect("create locked interfaces");
-    fs::create_dir_all(library_home.join("norma/src/solum")).expect("create fallback interfaces");
+    fs::create_dir_all(locked_interfaces.join("fs")).expect("create locked interfaces");
+    fs::create_dir_all(library_home.join("norma/src/fs")).expect("create fallback interfaces");
     fs::write(
         dir.join("faber.toml"),
         r#"
@@ -805,7 +805,7 @@ rustc = ""
     )
     .expect("write lock");
     fs::write(
-        locked_interfaces.join("solum/path.fab"),
+        locked_interfaces.join("fs/path.fab"),
         r#"
 functio locked_label() → textus {
   redde "locked"
@@ -814,7 +814,7 @@ functio locked_label() → textus {
     )
     .expect("write locked norma interface");
     fs::write(
-        library_home.join("norma/src/solum/path.fab"),
+        library_home.join("norma/src/fs/path.fab"),
         r#"
 functio fallback_label() → textus {
   redde "fallback"
@@ -826,7 +826,7 @@ functio fallback_label() → textus {
     fs::write(
         &entry,
         r#"
-import from "norma:solum/path" path
+import from "norma:fs/path" path
 
 main {
   print path.locked_label()
@@ -1029,13 +1029,13 @@ fn package_mir_artifact_manifest_declares_runtime_requirements() {
     fs::write(
         &entry,
         r#"
-import from "norma:solum" solum
+import from "norma:fs" fs
 
 @ cli "tool"
 @ operand string root
 main args args {
   var list<string> partes ← [args.root, "nested"]
-  print solum.join(partes)
+  print fs.join(partes)
 }
 "#,
     )
@@ -2087,11 +2087,11 @@ fn package_mir_callback_receives_validated_norma_program() {
     fs::write(
         &entry,
         r#"
-import from "norma:solum" solum
+import from "norma:fs" fs
 import from "norma:toml" toml
 
 main {
-  solum.write_file("/tmp/faber-package-mir-callback.txt", "salve")
+  fs.write_file("/tmp/faber-package-mir-callback.txt", "salve")
 }
 "#,
     )
@@ -2162,23 +2162,23 @@ fn assert_package_corpus_llvm_smoke(relative: &str, label: &str) {
 }
 
 #[test]
-fn package_mir_bridges_norma_solum_crea_iunge_exstat_amputa() {
+fn package_mir_bridges_norma_fs_crea_iunge_exstat_amputa() {
     let dir = test_temp_dir("package-mir-solum-create_dir-delete");
     let entry = dir.join("main.fab");
     fs::write(
         &entry,
         r#"
-import from "norma:solum" solum
+import from "norma:fs" fs
 
 @ cli "tool"
 @ operand string root
 main args args {
   var list<string> partes ← [args.root, "nested"]
-  const string nested ← solum.join(partes)
-  solum.create_dir(nested)
-  print solum.exists(nested)
-  solum.remove_tree(nested)
-  print solum.exists(nested)
+  const string nested ← fs.join(partes)
+  fs.create_dir(nested)
+  print fs.exists(nested)
+  fs.remove_tree(nested)
+  print fs.exists(nested)
 }
 "#,
     )
@@ -2194,7 +2194,7 @@ main args args {
 
     assert!(
         result.is_ok(),
-        "expected solum create_dir/join/exists/remove_tree bridge success, got {:?}",
+        "expected fs create_dir/join/exists/remove_tree bridge success, got {:?}",
         result
             .err()
             .unwrap_or_default()
@@ -2209,27 +2209,27 @@ main args args {
 }
 
 #[test]
-fn package_mir_bridges_norma_solum_tange_scribe_lege() {
+fn package_mir_bridges_norma_fs_tange_scribe_lege() {
     let dir = test_temp_dir("package-mir-solum-touch-write_file");
     let entry = dir.join("main.fab");
     fs::write(
         &entry,
         r#"
-import from "norma:solum" solum
+import from "norma:fs" fs
 
 @ cli "tool"
 @ operand string root
 main args args {
   var list<string> partes ← [args.root]
-  const string dir ← solum.join(partes)
-  solum.create_dir(dir)
+  const string dir ← fs.join(partes)
+  fs.create_dir(dir)
   partes ← [dir, "target.txt"]
-  const string target ← solum.join(partes)
-  solum.touch(target)
-  solum.write_file(target, "alpha")
-  print solum.read_file<string>(target)
-  solum.delete(target)
-  solum.remove_tree(dir)
+  const string target ← fs.join(partes)
+  fs.touch(target)
+  fs.write_file(target, "alpha")
+  print fs.read_file<string>(target)
+  fs.delete(target)
+  fs.remove_tree(dir)
 }
 "#,
     )
@@ -2245,7 +2245,7 @@ main args args {
 
     assert!(
         result.is_ok(),
-        "expected solum touch/write_file/read_file bridge success, got {:?}",
+        "expected fs touch/write_file/read_file bridge success, got {:?}",
         result
             .err()
             .unwrap_or_default()
@@ -2257,34 +2257,34 @@ main args args {
 }
 
 #[test]
-fn package_mir_bridges_norma_solum_exscribe_renomina() {
+fn package_mir_bridges_norma_fs_exscribe_renomina() {
     let dir = test_temp_dir("package-mir-solum-copy-rename");
     let entry = dir.join("main.fab");
     fs::write(
         &entry,
         r#"
-import from "norma:solum" solum
+import from "norma:fs" fs
 
 @ cli "tool"
 @ operand string root
 main args args {
   var list<string> partes ← [args.root]
-  const string dir ← solum.join(partes)
-  solum.create_dir(dir)
+  const string dir ← fs.join(partes)
+  fs.create_dir(dir)
   partes ← [dir, "source.txt"]
-  const string source ← solum.join(partes)
+  const string source ← fs.join(partes)
   partes ← [dir, "copy.txt"]
-  const string copy ← solum.join(partes)
+  const string copy ← fs.join(partes)
   partes ← [dir, "moved.txt"]
-  const string moved ← solum.join(partes)
-  solum.touch(source)
-  solum.write_file(source, "alpha")
-  solum.exscribe(source, copy)
-  solum.rename(copy, moved)
-  print solum.read_file<string>(moved)
-  solum.delete(source)
-  solum.delete(moved)
-  solum.remove_tree(dir)
+  const string moved ← fs.join(partes)
+  fs.touch(source)
+  fs.write_file(source, "alpha")
+  fs.copy(source, copy)
+  fs.rename(copy, moved)
+  print fs.read_file<string>(moved)
+  fs.delete(source)
+  fs.delete(moved)
+  fs.remove_tree(dir)
 }
 "#,
     )
@@ -2300,7 +2300,7 @@ main args args {
 
     assert!(
         result.is_ok(),
-        "expected solum copy/rename bridge success, got {:?}",
+        "expected fs copy/rename bridge success, got {:?}",
         result
             .err()
             .unwrap_or_default()
@@ -2312,28 +2312,28 @@ main args args {
 }
 
 #[test]
-fn package_mir_bridges_norma_solum_mensura_regularene_directoriumne() {
+fn package_mir_bridges_norma_fs_mensura_regularene_directoriumne() {
     let dir = test_temp_dir("package-mir-solum-byte_length");
     let entry = dir.join("main.fab");
     fs::write(
         &entry,
         r#"
-import from "norma:solum" solum
+import from "norma:fs" fs
 
 @ cli "tool"
 @ operand string root
 main args args {
   var list<string> partes ← [args.root, "nested"]
-  const string nested ← solum.join(partes)
-  solum.create_dir(nested)
+  const string nested ← fs.join(partes)
+  fs.create_dir(nested)
   partes ← [nested, "source.bin"]
-  const string source ← solum.join(partes)
-  solum.touch(source)
-  print solum.byte_length(source)
-  print solum.is_regular(source)
-  print solum.is_directory(nested)
-  solum.delete(source)
-  solum.remove_tree(nested)
+  const string source ← fs.join(partes)
+  fs.touch(source)
+  print fs.byte_length(source)
+  print fs.is_regular(source)
+  print fs.is_directory(nested)
+  fs.delete(source)
+  fs.remove_tree(nested)
 }
 "#,
     )
@@ -2349,7 +2349,7 @@ main args args {
 
     assert!(
         result.is_ok(),
-        "expected solum byte_length/is_regular/is_directory bridge success, got {:?}",
+        "expected fs byte_length/is_regular/is_directory bridge success, got {:?}",
         result
             .err()
             .unwrap_or_default()
@@ -2365,27 +2365,27 @@ main args args {
 }
 
 #[test]
-fn package_mir_bridges_norma_solum_modus_mode_verbs() {
+fn package_mir_bridges_norma_fs_modus_mode_verbs() {
     let dir = test_temp_dir("package-mir-solum-mode");
     let entry = dir.join("main.fab");
     fs::write(
         &entry,
         r#"
-import from "norma:solum" solum
+import from "norma:fs" fs
 
 @ cli "tool"
 @ operand string root
 main args args {
   var list<string> partes ← [args.root, "nested"]
-  const string nested ← solum.join(partes)
-  solum.create_dir(nested)
+  const string nested ← fs.join(partes)
+  fs.create_dir(nested)
   partes ← [nested, "target.bin"]
-  const string target ← solum.join(partes)
-  solum.touch(target)
-  solum.set_mode(target, 384)
-  print solum.mode(target)
-  solum.delete(target)
-  solum.remove_tree(nested)
+  const string target ← fs.join(partes)
+  fs.touch(target)
+  fs.set_mode(target, 384)
+  print fs.mode(target)
+  fs.delete(target)
+  fs.remove_tree(nested)
 }
 "#,
     )
@@ -2401,7 +2401,7 @@ main args args {
 
     assert!(
         result.is_ok(),
-        "expected solum mode bridge success, got {:?}",
+        "expected fs mode bridge success, got {:?}",
         result
             .err()
             .unwrap_or_default()
@@ -2413,32 +2413,32 @@ main args args {
 }
 
 #[test]
-fn package_mir_bridges_norma_solum_link_verbs() {
+fn package_mir_bridges_norma_fs_link_verbs() {
     let dir = test_temp_dir("package-mir-solum-link");
     let entry = dir.join("main.fab");
     fs::write(
         &entry,
         r#"
-import from "norma:solum" solum
+import from "norma:fs" fs
 
 @ cli "tool"
 @ operand string root
 main args args {
   var list<string> partes ← [args.root, "nested"]
-  const string nested ← solum.join(partes)
-  solum.create_dir(nested)
+  const string nested ← fs.join(partes)
+  fs.create_dir(nested)
   partes ← [nested, "source.bin"]
-  const string source ← solum.join(partes)
+  const string source ← fs.join(partes)
   partes ← [nested, "source-link"]
-  const string link ← solum.join(partes)
+  const string link ← fs.join(partes)
   const bytes payload ← |41 42|
-  solum.write_bytes(source, payload)
-  solum.create_link(source, link)
-  print solum.is_symlink(link)
-  print solum.read_link(link)
-  solum.delete(link)
-  solum.delete(source)
-  solum.remove_tree(nested)
+  fs.write_bytes(source, payload)
+  fs.create_link(source, link)
+  print fs.is_symlink(link)
+  print fs.read_link(link)
+  fs.delete(link)
+  fs.delete(source)
+  fs.remove_tree(nested)
 }
 "#,
     )
@@ -2455,7 +2455,7 @@ main args args {
 
     assert!(
         result.is_ok(),
-        "expected solum link bridge success, got {:?}",
+        "expected fs link bridge success, got {:?}",
         result
             .err()
             .unwrap_or_default()
@@ -2471,27 +2471,27 @@ main args args {
 }
 
 #[test]
-fn package_mir_bridges_norma_solum_funde_octeti() {
+fn package_mir_bridges_norma_fs_funde_octeti() {
     let dir = test_temp_dir("package-mir-solum-write_bytes");
     let entry = dir.join("main.fab");
     fs::write(
         &entry,
         r#"
-import from "norma:solum" solum
+import from "norma:fs" fs
 
 @ cli "tool"
 @ operand string root
 main args args {
   var list<string> partes ← [args.root, "dir"]
-  const string dir ← solum.join(partes)
-  solum.create_dir(dir)
+  const string dir ← fs.join(partes)
+  fs.create_dir(dir)
   partes ← [dir, "data.bin"]
-  const string target ← solum.join(partes)
+  const string target ← fs.join(partes)
   const bytes payload ← |41 42 43|
-  solum.write_bytes(target, payload)
-  print solum.byte_length(target)
-  solum.delete(target)
-  solum.remove_tree(dir)
+  fs.write_bytes(target, payload)
+  print fs.byte_length(target)
+  fs.delete(target)
+  fs.remove_tree(dir)
 }
 "#,
     )
@@ -2507,7 +2507,7 @@ main args args {
 
     assert!(
         result.is_ok(),
-        "expected solum write_bytes/octeti bridge success, got {:?}",
+        "expected fs write_bytes/octeti bridge success, got {:?}",
         result
             .err()
             .unwrap_or_default()
@@ -4244,10 +4244,10 @@ fn package_mir_linking_executes_norma_source_library_import() {
     fs::write(
         &entry,
         r#"
-import from "norma:chorda" chorda
+import from "norma:text" text
 
 main {
-  print chorda.reverse("roma")
+  print text.reverse("roma")
 }
 "#,
     )
@@ -4663,16 +4663,16 @@ fn summa(tf32[2] x) → f32 {
 }
 
 #[test]
-fn compile_package_resolves_builtin_norma_chorda_native_body() {
+fn compile_package_resolves_builtin_norma_text_native_body() {
     let dir = test_temp_dir("norma-chorda-import");
     let entry = dir.join("main.fab");
     fs::write(
         &entry,
         r#"
-import from "norma:chorda" chorda
+import from "norma:text" text
 
 main {
-  const string reversed ← chorda.reverse("roma")
+  const string reversed ← text.reverse("roma")
   print reversed
 }
 "#,
@@ -4682,7 +4682,7 @@ main {
     let result = compile_with_faber_seams(&Config::default(), &entry);
     assert!(
         result.success(),
-        "expected norma:chorda package compile success, got {:?}",
+        "expected norma:text package compile success, got {:?}",
         result
             .diagnostics
             .iter()
@@ -4695,23 +4695,23 @@ main {
 
     assert!(output.code.contains("fn reverse"));
     assert!(output.code.contains("reverse(\"roma\".to_string())"));
-    assert!(output.code.contains("pub mod chorda"));
-    assert!(output.code.contains("crate::chorda::reverse"));
-    assert!(!output.code.contains("norma::chorda::reverse"));
+    assert!(output.code.contains("pub mod text"));
+    assert!(output.code.contains("crate::text::reverse"));
+    assert!(!output.code.contains("norma::text::reverse"));
     assert!(!output.code.contains("panic!(\"unimplemented\")"));
 }
 
 #[test]
 fn compile_package_resolves_type_only_norma_file_namespace_import() {
-    let dir = test_temp_dir("norma-caelum-terminus-import");
+    let dir = test_temp_dir("norma-net-endpoint-import");
     let entry = dir.join("main.fab");
     fs::write(
         &entry,
         r#"
-import from "norma:caelum/terminus" terminus
+import from "norma:net/endpoint" endpoint
 
 main {
-  const terminus.Endpoint endpoint ← terminus.Endpoint {
+  const endpoint.Endpoint endpoint ← endpoint.Endpoint {
     host = "localhost",
     port = 8080
   }
@@ -4724,7 +4724,7 @@ main {
     let result = compile_with_faber_seams(&Config::default(), &entry);
     assert!(
         result.success(),
-        "expected norma:caelum/terminus package compile success, got {:?}",
+        "expected norma:net/endpoint package compile success, got {:?}",
         result
             .diagnostics
             .iter()
@@ -4739,11 +4739,11 @@ main {
         panic!("expected rust output");
     };
 
-    assert!(output.code.contains("pub mod caelum"));
-    assert!(output.code.contains("pub mod terminus"));
+    assert!(output.code.contains("pub mod net"));
+    assert!(output.code.contains("pub mod endpoint"));
     assert!(output.code.contains("pub struct Endpoint"));
     assert!(output.code.contains(
-        "let endpoint: crate::caelum::terminus::Endpoint = crate::caelum::terminus::Endpoint"
+        "let endpoint: crate::net::endpoint::Endpoint = crate::net::endpoint::Endpoint"
     ));
 }
 
@@ -4849,17 +4849,17 @@ main {
 }
 
 #[test]
-fn compile_package_resolves_builtin_norma_chorda_diducta_native_body() {
+fn compile_package_resolves_builtin_norma_text_diducta_native_body() {
     let dir = test_temp_dir("norma-chorda-diducta-import");
     let entry = dir.join("main.fab");
     fs::write(
         &entry,
         r#"
-import from "norma:chorda" chorda
+import from "norma:text" text
 
 main {
   do {
-    const [meta, corpus] ← chorda.split_frontmatter("+++\na = 1\n+++\nbody", "+++")
+    const [meta, corpus] ← text.split_frontmatter("+++\na = 1\n+++\nbody", "+++")
     print meta, corpus
   } catch err {
     warn err
@@ -4872,7 +4872,7 @@ main {
     let result = compile_with_faber_seams(&Config::default(), &entry);
     assert!(
         result.success(),
-        "expected norma:chorda diducta package compile success, got {:?}",
+        "expected norma:text diducta package compile success, got {:?}",
         result
             .diagnostics
             .iter()
@@ -4885,7 +4885,7 @@ main {
 
     assert!(output.code.contains("fn split_frontmatter"));
     assert!(output.code.contains("fn _delimiter_end"));
-    assert!(!output.code.contains("norma::chorda::split_frontmatter"));
+    assert!(!output.code.contains("norma::text::split_frontmatter"));
     assert!(!output.code.contains("faber::frame::sermo_open"));
 }
 
@@ -4896,12 +4896,12 @@ fn compile_package_chorda_retenta_filters_codegen() {
     fs::write(
         &entry,
         r#"
-import from "norma:chorda" chorda
+import from "norma:text" text
 
 main {
-  print chorda.keep_between("hello7!", "a", "z")
-  print chorda.keep_if("hello7!", string c ∴ c ≥ 'a' and c ≤ 'z')
-  print chorda.drop_between("hello7!", "0", "9")
+  print text.keep_between("hello7!", "a", "z")
+  print text.keep_if("hello7!", string c ∴ c ≥ 'a' and c ≤ 'z')
+  print text.drop_between("hello7!", "0", "9")
 }
 "#,
     )
@@ -4975,17 +4975,17 @@ main {
 }
 
 #[test]
-fn compile_package_resolves_builtin_norma_chorda_mixed_native_and_runtime_backed() {
+fn compile_package_resolves_builtin_norma_text_mixed_native_and_runtime_backed() {
     let dir = test_temp_dir("norma-chorda-mixed");
     let entry = dir.join("main.fab");
     fs::write(
         &entry,
         r#"
-import from "norma:chorda" chorda
+import from "norma:text" text
 
 main {
-  const bytes raw ← chorda.encode("Salve")
-  print chorda.decode(raw)
+  const bytes raw ← text.encode("Salve")
+  print text.decode(raw)
 }
 "#,
     )
@@ -4994,7 +4994,7 @@ main {
     let result = compile_with_faber_seams(&Config::default(), &entry);
     assert!(
         result.success(),
-        "expected norma:chorda mixed package compile success, got {:?}",
+        "expected norma:text mixed package compile success, got {:?}",
         result
             .diagnostics
             .iter()
@@ -5006,9 +5006,9 @@ main {
     };
 
     assert!(output.code.contains("fn reverse"));
-    assert!(output.code.contains("pub mod chorda"));
-    assert!(output.code.contains("crate::chorda::encode"));
-    assert!(output.code.contains("crate::chorda::decode"));
+    assert!(output.code.contains("pub mod text"));
+    assert!(output.code.contains("crate::text::encode"));
+    assert!(output.code.contains("crate::text::decode"));
     assert!(output.code.contains("pub(crate) fn encode"));
 }
 
@@ -5055,7 +5055,7 @@ fn compile_package_resolves_builtin_norma_toml_native_navigation_body() {
         &entry,
         r#"
 import from "norma:toml" toml
-import from "norma:valor" value
+import from "norma:value" value
 
 main {
   const value doc ← toml.parse("id = \"sample\"")
@@ -5086,8 +5086,8 @@ main {
 
     assert!(output.code.contains("fn get"));
     assert!(output.code.contains("fn require_string"));
-    assert!(!output.code.contains("norma::valor::get"));
-    assert!(!output.code.contains("norma::valor::require_string"));
+    assert!(!output.code.contains("norma::value::get"));
+    assert!(!output.code.contains("norma::value::require_string"));
 }
 
 #[test]
@@ -5098,7 +5098,7 @@ fn compile_package_resolves_builtin_norma_toml_exige_claves_native_body() {
         &entry,
         r#"
 import from "norma:toml" toml
-import from "norma:valor" value
+import from "norma:value" value
 
 main {
   const value doc ← toml.parse("id = \"sample\"")
@@ -5128,20 +5128,20 @@ main {
     };
 
     assert!(output.code.contains("fn require_strings"));
-    assert!(!output.code.contains("norma::valor::require_strings"));
+    assert!(!output.code.contains("norma::value::require_strings"));
 }
 
 #[test]
-fn compile_package_resolves_builtin_norma_solum_explora_contract() {
+fn compile_package_resolves_builtin_norma_fs_explora_contract() {
     let dir = test_temp_dir("norma-solum-explora-contract");
     let entry = dir.join("main.fab");
     fs::write(
         &entry,
         r#"
-import from "norma:solum" solum
+import from "norma:fs" fs
 
 main {
-  print "solum"
+  print "fs"
 }
 "#,
     )
@@ -5150,7 +5150,7 @@ main {
     let result = compile_with_faber_seams(&Config::default(), &entry);
     assert!(
         result.success(),
-        "expected norma:solum explora contract compile success, got {:?}",
+        "expected norma:fs explora contract compile success, got {:?}",
         result
             .diagnostics
             .iter()
@@ -5162,22 +5162,22 @@ main {
     };
 
     assert!(output.code.contains("fn glob"));
-    assert!(!output.code.contains("norma::solum::glob"));
+    assert!(!output.code.contains("norma::fs::glob"));
 }
 
 #[test]
-fn compile_package_resolves_builtin_norma_consolum_ad_wrapped_imports() {
+fn compile_package_resolves_builtin_norma_console_ad_wrapped_imports() {
     let dir = test_temp_dir("norma-consolum-ad-import");
     let entry = dir.join("main.fab");
     fs::write(
         &entry,
         r#"
-import from "norma:consolum" consolum
+import from "norma:console" console
 
 main {
-  consolum.write_partial("salve")
-  const _ tty ← consolum.stdin_is_tty()
-  consolum.write_bytes(|48 65 6c 6c 6f|)
+  console.write_partial("salve")
+  const _ tty ← console.stdin_is_tty()
+  console.write_bytes(|48 65 6c 6c 6f|)
 }
 "#,
     )
@@ -5186,7 +5186,7 @@ main {
     let result = compile_with_faber_seams(&Config::default(), &entry);
     assert!(
         result.success(),
-        "expected norma:consolum package compile success, got {:?}",
+        "expected norma:console package compile success, got {:?}",
         result
             .diagnostics
             .iter()
@@ -5201,12 +5201,12 @@ main {
     assert!(output.code.contains("consolum:audit"));
     assert!(output.code.contains("faber::frame::sermo_open"));
     assert!(output.code.contains("fn write_partial"));
-    assert!(output.code.contains("crate::consolum::write_bytes"));
+    assert!(output.code.contains("crate::console::write_bytes"));
     assert!(output.code.contains("pub(crate) fn write_bytes"));
-    assert!(!output.code.contains("norma::consolum::write_bytes"));
-    assert!(!output.code.contains("norma::consolum::write_partial"));
-    assert!(!output.code.contains("norma::consolum::stdin_is_tty"));
-    assert!(!output.code.contains("crate::norma::hal::consolum"));
+    assert!(!output.code.contains("norma::console::write_bytes"));
+    assert!(!output.code.contains("norma::console::write_partial"));
+    assert!(!output.code.contains("norma::console::stdin_is_tty"));
+    assert!(!output.code.contains("crate::norma::hal::console"));
 }
 
 #[test]
@@ -5216,7 +5216,7 @@ fn consolum_eot4_native_output_sinks_canonical() {
     fs::write(
         &entry,
         r#"
-import from "norma:consolum" const write_partial as partial_sink, write_bytes as bytes_sink, write_line as line_sink, warn_line as warning_sink, debug_line as debug_sink
+import from "norma:console" const write_partial as partial_sink, write_bytes as bytes_sink, write_line as line_sink, warn_line as warning_sink, debug_line as debug_sink
 
 main {
   partial_sink ⇇ "partial" ⇇ "chain"
@@ -5247,7 +5247,7 @@ main {
         "debug_line",
     ] {
         assert!(
-            output.code.contains(&format!("crate::consolum::{member}")),
+            output.code.contains(&format!("crate::console::{member}")),
             "expected in-crate consolum call for {member}:\n{}",
             output.code
         );
@@ -5293,11 +5293,11 @@ fn consolum_eot4_native_output_sinks_la_surface() {
     fs::write(
         &entry,
         r#"
-importa ex "norma:consolum" fixum dic ut partial_sink
-importa ex "norma:consolum" fixum funde ut bytes_sink
-importa ex "norma:consolum" fixum scribe ut line_sink
-importa ex "norma:consolum" fixum mone ut warning_sink
-importa ex "norma:consolum" fixum vide ut debug_sink
+importa ex "norma:console" fixum dic ut partial_sink
+importa ex "norma:console" fixum funde ut bytes_sink
+importa ex "norma:console" fixum scribe ut line_sink
+importa ex "norma:console" fixum mone ut warning_sink
+importa ex "norma:console" fixum vide ut debug_sink
 
 incipit {
   partial_sink ⇇ "partial" ⇇ "chain"
@@ -5327,7 +5327,7 @@ incipit {
 
     for surface in ["dic", "funde", "scribe", "mone", "vide"] {
         assert!(
-            output.code.contains(&format!("crate::consolum::{surface}")),
+            output.code.contains(&format!("crate::console::{surface}")),
             "expected la-surface member to lower to in-crate consolum call for {surface}:\n{}",
             output.code
         );
@@ -5373,7 +5373,7 @@ fn consolum_eot4_input_values_canonical() {
     fs::write(
         &entry,
         r#"
-import from "norma:consolum" const read_line as line_reader, read_bytes as bytes_reader
+import from "norma:console" const read_line as line_reader, read_bytes as bytes_reader
 
 main {
   const string line ← line_reader()
@@ -5394,12 +5394,12 @@ main {
     };
 
     assert!(
-        output.code.contains("crate::consolum::read_line"),
+        output.code.contains("crate::console::read_line"),
         "expected in-crate read_line call:\n{}",
         output.code
     );
     assert!(
-        output.code.contains("crate::consolum::read_bytes"),
+        output.code.contains("crate::console::read_bytes"),
         "expected in-crate read_bytes call:\n{}",
         output.code
     );
@@ -5408,9 +5408,9 @@ main {
     assert!(output.code.contains("consolum:lege"));
     assert!(output.code.contains("consolum:hauri"));
     assert!(output.code.contains("faber::frame::sermo_open"));
-    assert!(!output.code.contains("norma::consolum::read_line"));
-    assert!(!output.code.contains("norma::consolum::read_bytes"));
-    assert!(!output.code.contains("crate::norma::hal::consolum"));
+    assert!(!output.code.contains("norma::console::read_line"));
+    assert!(!output.code.contains("norma::console::read_bytes"));
+    assert!(!output.code.contains("crate::norma::hal::console"));
     assert!(!output.code.contains("builtin-claim"));
     assert!(!output.code.contains("builtin-claimed"));
     assert!(!output.code.contains("println!"));
@@ -5423,11 +5423,11 @@ fn consolum_eot4_input_values_la_surface() {
     fs::write(
         &entry,
         r#"
-importa ex "norma:consolum" fixum lege ut line_reader
-importa ex "norma:consolum" fixum hauri ut bytes_reader
-importa ex "norma:consolum" fixum scribe ut line_sink
-importa ex "norma:consolum" fixum funde ut bytes_sink
-importa ex "norma:solum" fixum lege ut terra_lege
+importa ex "norma:console" fixum lege ut line_reader
+importa ex "norma:console" fixum hauri ut bytes_reader
+importa ex "norma:console" fixum scribe ut line_sink
+importa ex "norma:console" fixum funde ut bytes_sink
+importa ex "norma:fs" fixum lege ut terra_lege
 
 incipit {
   line_sink ⇇ line_reader()
@@ -5456,36 +5456,36 @@ incipit {
     assert!(
         output
             .code
-            .contains("use crate::consolum::lege as line_reader"),
-        "expected la lege to resolve to the consolum member, not solum:\n{}",
+            .contains("use crate::console::lege as line_reader"),
+        "expected la lege to resolve to the console member, not fs:\n{}",
         output.code
     );
     assert!(
         output
             .code
-            .contains("use crate::consolum::hauri as bytes_reader"),
+            .contains("use crate::console::hauri as bytes_reader"),
         "expected la hauri to resolve to the consolum member:\n{}",
         output.code
     );
     assert!(
-        output.code.contains("use crate::solum::lege as terra_lege"),
-        "expected solum lege to stay module-scoped to solum:\n{}",
+        output.code.contains("use crate::fs::lege as terra_lege"),
+        "expected fs lege to stay module-scoped to fs:\n{}",
         output.code
     );
     assert!(output.code.contains("pub(crate) fn read_line"));
     assert!(output.code.contains("pub(crate) fn read_bytes"));
     assert!(
-        output.code.contains("crate::solum::lege"),
-        "expected solum lege stub to be emitted:\n{}",
+        output.code.contains("crate::fs::lege"),
+        "expected fs lege stub to be emitted:\n{}",
         output.code
     );
     assert!(output.code.contains("consolum:lege"));
     assert!(output.code.contains("consolum:hauri"));
     assert!(output.code.contains("solum:lege"));
     assert!(output.code.contains("faber::frame::sermo_open"));
-    assert!(!output.code.contains("norma::consolum::read_line"));
-    assert!(!output.code.contains("norma::consolum::read_bytes"));
-    assert!(!output.code.contains("crate::norma::hal::consolum"));
+    assert!(!output.code.contains("norma::console::read_line"));
+    assert!(!output.code.contains("norma::console::read_bytes"));
+    assert!(!output.code.contains("crate::norma::hal::console"));
     assert!(!output.code.contains("builtin-claim"));
     assert!(!output.code.contains("builtin-claimed"));
     assert!(!output.code.contains("println!"));
@@ -5498,7 +5498,7 @@ fn consolum_eot4_input_interpreted_stdin_roundtrip() {
     fs::write(
         &entry,
         r#"
-import from "norma:consolum" const read_line, read_bytes, write_line, write_bytes
+import from "norma:console" const read_line, read_bytes, write_line, write_bytes
 
 main {
   const _ line_out ← (string msg) → void ∴ write_line(msg)
@@ -5532,13 +5532,13 @@ main {
 }
 
 #[test]
-fn compile_package_resolves_builtin_norma_solum_ad_wrapped_imports() {
+fn compile_package_resolves_builtin_norma_fs_ad_wrapped_imports() {
     let dir = test_temp_dir("norma-solum-ad-import");
     let entry = dir.join("main.fab");
     fs::write(
         &entry,
         r#"
-import from "norma:solum" solum as terra
+import from "norma:fs" fs as terra
 
 async_main {
   const _ exists ← terra.exists(".")
@@ -5552,7 +5552,7 @@ async_main {
     let result = compile_with_faber_seams(&Config::default(), &entry);
     assert!(
         result.success(),
-        "expected norma:solum package compile success, got {:?}",
+        "expected norma:fs package compile success, got {:?}",
         result
             .diagnostics
             .iter()
@@ -5568,22 +5568,22 @@ async_main {
     assert!(output.code.contains("solum:funde"));
     assert!(output.code.contains("faber::frame::sermo_open"));
     assert!(output.code.contains("fn exists"));
-    assert!(output.code.contains("crate::solum::write_bytes_async"));
+    assert!(output.code.contains("crate::fs::write_bytes_async"));
     assert!(output.code.contains(".await"));
     assert!(!output.code.contains("solum:fundet"));
-    assert!(!output.code.contains("norma::solum::exists"));
-    assert!(!output.code.contains("norma::solum::parent"));
-    assert!(!output.code.contains("crate::norma::hal::solum"));
+    assert!(!output.code.contains("norma::fs::exists"));
+    assert!(!output.code.contains("norma::fs::parent"));
+    assert!(!output.code.contains("crate::norma::hal::fs"));
 }
 
 #[test]
-fn compile_package_resolves_builtin_norma_processus_ad_wrapped_imports() {
+fn compile_package_resolves_builtin_norma_process_ad_wrapped_imports() {
     let dir = test_temp_dir("norma-processus-ad-import");
     let entry = dir.join("main.fab");
     fs::write(
         &entry,
         r#"
-import from "norma:processus" processus as proc
+import from "norma:process" process as proc
 
 main {
   const _ out ← proc.exec("echo hi")
@@ -5597,7 +5597,7 @@ main {
     let result = compile_with_faber_seams(&Config::default(), &entry);
     assert!(
         result.success(),
-        "expected norma:processus package compile success, got {:?}",
+        "expected norma:process package compile success, got {:?}",
         result
             .diagnostics
             .iter()
@@ -5612,29 +5612,29 @@ main {
     assert!(output.code.contains("processus:lege"));
     assert!(output.code.contains("faber::frame::sermo_open"));
     assert!(output.code.contains("fn exec"));
-    assert!(output.code.contains("crate::processus::spawn"));
+    assert!(output.code.contains("crate::process::spawn"));
     assert!(output.code.contains("pub(crate) fn spawn"));
-    assert!(!output.code.contains("norma::processus::spawn"));
-    assert!(!output.code.contains("norma::processus::exec"));
-    assert!(!output.code.contains("norma::processus::read_env"));
-    assert!(!output.code.contains("crate::norma::hal::processus"));
+    assert!(!output.code.contains("norma::process::spawn"));
+    assert!(!output.code.contains("norma::process::exec"));
+    assert!(!output.code.contains("norma::process::read_env"));
+    assert!(!output.code.contains("crate::norma::hal::process"));
 }
 
 #[test]
-fn compile_package_resolves_builtin_norma_tempus_ad_wrapped_imports() {
+fn compile_package_resolves_builtin_norma_time_ad_wrapped_imports() {
     let dir = test_temp_dir("norma-tempus-ad-import");
     let entry = dir.join("main.fab");
     fs::write(
         &entry,
         r#"
-import from "norma:tempus" tempus
+import from "norma:time" time
 
 async_main {
-  const _ now ← tempus.now()
-  const _ mono ← tempus.monotonic()
-  const _ active ← tempus.active()
-  const _ ms ← tempus.MILLISECOND()
-  await tempus.sleep_async(0)
+  const _ now ← time.now()
+  const _ mono ← time.monotonic()
+  const _ active ← time.active()
+  const _ ms ← time.MILLISECOND()
+  await time.sleep_async(0)
 }
 "#,
     )
@@ -5643,7 +5643,7 @@ async_main {
     let result = compile_with_faber_seams(&Config::default(), &entry);
     assert!(
         result.success(),
-        "expected norma:tempus package compile success, got {:?}",
+        "expected norma:time package compile success, got {:?}",
         result
             .diagnostics
             .iter()
@@ -5659,29 +5659,29 @@ async_main {
     assert!(output.code.contains("tempus:activum"));
     assert!(output.code.contains("faber::frame::sermo_open"));
     assert!(output.code.contains("fn now"));
-    assert!(output.code.contains("crate::tempus::sleep_async(0).await"));
-    assert!(!output.code.contains("crate::tempus::sleep_async(0).expect"));
-    assert!(!output.code.contains("norma::tempus::now"));
-    assert!(!output.code.contains("norma::tempus::monotonic"));
-    assert!(!output.code.contains("norma::tempus::millisecond"));
-    assert!(!output.code.contains("crate::norma::hal::tempus"));
+    assert!(output.code.contains("crate::time::sleep_async(0).await"));
+    assert!(!output.code.contains("crate::time::sleep_async(0).expect"));
+    assert!(!output.code.contains("norma::time::now"));
+    assert!(!output.code.contains("norma::time::monotonic"));
+    assert!(!output.code.contains("norma::time::millisecond"));
+    assert!(!output.code.contains("crate::norma::hal::time"));
 }
 
 #[test]
-fn compile_package_resolves_builtin_norma_aleator_ad_wrapped_imports() {
+fn compile_package_resolves_builtin_norma_random_ad_wrapped_imports() {
     let dir = test_temp_dir("norma-aleator-ad-import");
     let entry = dir.join("main.fab");
     fs::write(
         &entry,
         r#"
-import from "norma:aleator" aleator
+import from "norma:random" random
 
 main {
-  const _ f ← aleator.random_float()
-  const _ n ← aleator.random_int(1, 6)
-  const _ id ← aleator.uuid()
-  const _ bytes ← aleator.random_bytes(8)
-  aleator.seed(42)
+  const _ f ← random.random_float()
+  const _ n ← random.random_int(1, 6)
+  const _ id ← random.uuid()
+  const _ bytes ← random.random_bytes(8)
+  random.seed(42)
 }
 "#,
     )
@@ -5690,7 +5690,7 @@ main {
     let result = compile_with_faber_seams(&Config::default(), &entry);
     assert!(
         result.success(),
-        "expected norma:aleator package compile success, got {:?}",
+        "expected norma:random package compile success, got {:?}",
         result
             .diagnostics
             .iter()
@@ -5708,10 +5708,10 @@ main {
     assert!(output.code.contains("aleator:semina"));
     assert!(output.code.contains("faber::frame::sermo_open"));
     assert!(output.code.contains("fn random_float"));
-    assert!(!output.code.contains("norma::aleator::random_float"));
-    assert!(!output.code.contains("norma::aleator::random_int"));
-    assert!(!output.code.contains("norma::aleator::uuid"));
-    assert!(!output.code.contains("crate::norma::hal::aleator"));
+    assert!(!output.code.contains("norma::random::random_float"));
+    assert!(!output.code.contains("norma::random::random_int"));
+    assert!(!output.code.contains("norma::random::uuid"));
+    assert!(!output.code.contains("crate::norma::hal::random"));
 }
 
 #[test]
@@ -5763,16 +5763,16 @@ main {
 }
 
 #[test]
-fn compile_package_rejects_removed_norma_tempus_method_calls() {
+fn compile_package_rejects_removed_norma_time_method_calls() {
     let dir = test_temp_dir("norma-tempus-removed-method");
     let entry = dir.join("main.fab");
     fs::write(
         &entry,
         r#"
-import from "norma:tempus" tempus
+import from "norma:time" time
 
 main {
-  tempus.siste(1)
+  time.siste(1)
 }
 "#,
     )
@@ -6001,7 +6001,7 @@ entry = "main.fab"
     fs::write(
         &entry,
         r#"
-import from "norma:solum/path" public * as path
+import from "norma:fs/path" public * as path
 
 main {
     const string name ← path.file_name("/usr/bin/faber")
@@ -6074,7 +6074,7 @@ main {}
         .find(|arg| arg.name == "known_modules")
         .map(|arg| arg.value.as_str())
         .expect("known_modules arg");
-    assert!(known_modules.contains("solum"));
+    assert!(known_modules.contains("fs"));
     assert!(!known_modules.contains("nope"));
 }
 
@@ -6237,7 +6237,7 @@ fn compile_package_preserves_norma_runtime_types_and_failable_calls() {
         &entry,
         r#"
 import from "norma:json" json
-import from "norma:valor" value
+import from "norma:value" value
 
 main {
     const json doc ← { "wire_name": "Ada" }
@@ -6277,7 +6277,7 @@ main {
     );
     assert!(output
         .code
-        .contains("crate::chorda::split_n(via.clone(), \".\".to_string()"));
+        .contains("crate::text::split_n(path.clone(), \".\".to_string()"));
 }
 
 #[test]
@@ -8155,13 +8155,13 @@ fn label(string nomen) → string {
 }
 
 #[test]
-fn check_package_types_norma_solum_path_namespace_call() {
+fn check_package_types_norma_fs_path_namespace_call() {
     let dir = test_temp_dir("package-file-namespace-solum-path-type");
     let entry = dir.join("main.fab");
     fs::write(
         &entry,
         r#"
-import from "norma:solum/path" path
+import from "norma:fs/path" path
 
 main {
     const string name ← path.file_name("/usr/bin/faber")
@@ -8174,7 +8174,7 @@ main {
     let diagnostics = check_with_faber_seams(&Config::default(), &entry);
     assert!(
         !diagnostics.iter().any(|diag| diag.is_error()),
-        "expected typed solum/path namespace call, got {:?}",
+        "expected typed fs/path namespace call, got {:?}",
         diagnostics
             .iter()
             .map(|diag| (diag.code, diag.issue()))
@@ -8830,6 +8830,8 @@ fn linked_library_emit_skips_entry_file_layouts_without_manifest() {
 
 #[test]
 fn emit_generated_crate_writes_cargo_toml_and_main_rs_under_target_faber() {
+    // D1 git-default: no override and no workspace probe (released-binary path).
+    super::runtime_sources::disable_path_override_probe_for_test();
     let pkg = test_temp_dir("emit-writer");
     fs::create_dir_all(pkg.join("src")).expect("src");
     fs::write(pkg.join("src/main.fab"), r#"main { print "writer test" }"#).expect("entry");
@@ -9022,10 +9024,10 @@ entry = "main.fab"
     fs::write(
         pkg.join("src/main.fab"),
         r#"
-import from "norma:tempus" tempus
+import from "norma:time" time
 
 main {
-  tempus.sleep(0)
+  time.sleep(0)
 }
 "#,
     )
@@ -9080,10 +9082,10 @@ host = "native"
     fs::write(
         pkg.join("src/main.fab"),
         r#"
-import from "norma:processus" processus
+import from "norma:process" process
 
 main {
-  const list<string> args ← processus.argv() ↦ list<string>
+  const list<string> args ← process.argv() ↦ list<string>
 }
 "#,
     )
@@ -9389,7 +9391,7 @@ main {{
         plan.provider_manifests
             .iter()
             .any(|manifest| manifest.provider == "solum"),
-        "expected solum provider manifest"
+        "expected fs provider manifest"
     );
 
     emit_generated_crate_with_runtime_plan(
@@ -9646,13 +9648,13 @@ fn write_temp_library_fixture(dir: &Path, relative_path: &str, source: &str) {
     fs::write(path, source).expect("write library fixture");
 }
 
-fn seed_temp_library_chorda(library_home: &Path) {
-    let source = repo_norma_source_file("chorda");
-    let dest = library_home.join("norma/src/chorda.fab");
+fn seed_temp_library_text(library_home: &Path) {
+    let source = repo_norma_source_file("text");
+    let dest = library_home.join("norma/src/text.fab");
     if let Some(parent) = dest.parent() {
         fs::create_dir_all(parent).expect("create norma dir");
     }
-    fs::copy(&source, &dest).expect("copy chorda.fab into temp library");
+    fs::copy(&source, &dest).expect("copy text.fab into temp library");
 }
 
 fn config_with_library_home(library_home: &Path) -> Config {
@@ -9840,14 +9842,14 @@ main {
 }
 
 #[test]
-fn transitive_import_chorda_via_fixture_library_compiles() {
+fn transitive_import_text_via_fixture_library_compiles() {
     let library_home = test_temp_dir("transitive-chorda-library_home");
-    seed_temp_library_chorda(library_home.path());
+    seed_temp_library_text(library_home.path());
     write_temp_library_fixture(
         library_home.path(),
         "transitive_fixture",
         r#"
-importa ex "norma:chorda" chorda
+importa ex "norma:text" chorda
 
 @ publica
 functio split_fields(textus row) → lista<textus> {
@@ -9881,8 +9883,8 @@ main {
     let Some(Output::Rust(output)) = result.output else {
         panic!("expected rust output");
     };
-    assert!(output.code.contains("pub mod chorda"));
-    assert!(output.code.contains("crate::chorda::split_n"));
+    assert!(output.code.contains("pub mod text"));
+    assert!(output.code.contains("crate::text::split_n"));
     assert!(output.code.contains("pub mod transitive_fixture"));
     assert!(!output.code.contains("unresolved_def"));
 }
@@ -9954,7 +9956,7 @@ fn transitive_library_conflicting_aliases_are_rejected() {
         &entry,
         r#"
 import from "norma:csv" csv
-import from "norma:chorda" chorda as ropes
+import from "norma:text" text as ropes
 
 main {
     print csv.parse("a,b").longitudo()
@@ -9967,7 +9969,7 @@ main {
     assert!(result.output.is_none());
     assert!(result.diagnostics.iter().any(|diag| {
         diagnostic_has_issue(diag, "library_conflicting_aliases")
-            && diagnostic_has_arg(diag, "module", "chorda")
+            && diagnostic_has_arg(diag, "module", "text")
             && diagnostic_has_arg(diag, "alias", "ropes")
     }));
 }
@@ -10246,7 +10248,7 @@ main {
 }
 
 #[test]
-fn transitive_csv_chorda_closure_compiles_with_mixed_provenance() {
+fn transitive_csv_text_closure_compiles_with_mixed_provenance() {
     let dir = test_temp_dir("transitive-csv-chorda");
     let entry = dir.join("main.fab");
     fs::write(
@@ -10291,7 +10293,7 @@ main {
         panic!("expected rust output");
     };
     assert!(output.code.contains("pub mod csv"));
-    assert!(output.code.contains("pub mod chorda"));
+    assert!(output.code.contains("pub mod text"));
     assert!(output.code.contains("pub(crate) fn split_n"));
     assert!(output.code.contains("pub(crate) fn join"));
 
@@ -11263,11 +11265,11 @@ entry = "main.fab"
     fs::write(
         dir.join("src/helper.fab"),
         r#"
-import from "norma:consolum" consolum
+import from "norma:console" console
 
 @ public
 fn shout(string s) → void {
-  consolum.write_line(s)
+  console.write_line(s)
 }
 "#,
     )
@@ -11275,14 +11277,14 @@ fn shout(string s) → void {
     fs::write(
         dir.join("src/main.fab"),
         r#"
-import from "norma:consolum" consolum
+import from "norma:console" console
 import from "./helper" helper
 
 @ cli "tool"
 @ operand rest string ignored
 main args args exit 0 {
   helper.shout("hi")
-  consolum.write_partial("x")
+  console.write_partial("x")
 }
 "#,
     )
@@ -11293,7 +11295,7 @@ main args args exit 0 {
     let result = result.compile_result;
     assert!(
         result.success(),
-        "dual consolum import should compile: {:?}",
+        "dual console import should compile: {:?}",
         result
             .diagnostics
             .iter()
@@ -11303,16 +11305,16 @@ main args args exit 0 {
     let Some(Output::Go(output)) = result.output else {
         panic!("expected Go");
     };
-    let decls = output.code.matches("var consolum = struct").count();
+    let decls = output.code.matches("var console = struct").count();
     assert_eq!(
         decls, 1,
-        "expected exactly one consolum shim, got {decls}:\n{}",
+        "expected exactly one console shim, got {decls}:\n{}",
         output.code
     );
     let layout = discover_build_layout(&dir).expect("layout");
     let go_layout = super::GoBuildLayout::from_package(&layout);
     super::emit_go_module(&go_layout, &output.code, &modules).expect("emit");
-    let binary = super::invoke_go_build(&go_layout).expect("go build dual consolum");
+    let binary = super::invoke_go_build(&go_layout).expect("go build dual console");
     let status = Command::new(&binary).status().expect("run");
     assert_eq!(status.code(), Some(0));
 }
@@ -11400,7 +11402,7 @@ fn g6_go4_coreutils_echo_package_go_builds() {
     };
     assert!(
         output.code.contains("var consolum") || output.code.contains("consolum ="),
-        "expected norma:consolum shim:\n{}",
+        "expected norma:console shim:\n{}",
         output.code
     );
     assert!(
@@ -11465,31 +11467,31 @@ entry = "main.fab"
     fs::write(
         dir.join("src/main.fab"),
         r#"
-import from "norma:consolum" consolum
+import from "norma:console" console
 
 @ cli "tool"
 @ operand rest string ignored
 main args args exit 0 {
-  if consolum.stdin_is_tty() {
-    consolum.write_partial("tty")
+  if console.stdin_is_tty() {
+    console.write_partial("tty")
   }
   else {
-    consolum.write_partial("notty")
+    console.write_partial("notty")
   }
-  consolum.write_line_async(":")
-  consolum.write_partial_async(consolum.read_line_async())
-  consolum.write_line("")
-  const bytes sync_bytes ← consolum.read_bytes(4)
-  consolum.write_bytes_async(sync_bytes)
-  const bytes async_bytes ← consolum.read_bytes_async(4)
-  consolum.write_bytes(async_bytes)
-  consolum.warn_line_async("warn")
-  consolum.debug_line_async("debug")
-  if consolum.stdout_is_tty() {
-    consolum.write_partial("stdout-tty")
+  console.write_line_async(":")
+  console.write_partial_async(console.read_line_async())
+  console.write_line("")
+  const bytes sync_bytes ← console.read_bytes(4)
+  console.write_bytes_async(sync_bytes)
+  const bytes async_bytes ← console.read_bytes_async(4)
+  console.write_bytes(async_bytes)
+  console.warn_line_async("warn")
+  console.debug_line_async("debug")
+  if console.stdout_is_tty() {
+    console.write_partial("stdout-tty")
   }
-  if consolum.stderr_is_tty() {
-    consolum.write_partial("stderr-tty")
+  if console.stderr_is_tty() {
+    console.write_partial("stderr-tty")
   }
 }
 "#,
@@ -11501,7 +11503,7 @@ main args args exit 0 {
     let result = result.compile_result;
     assert!(
         result.success(),
-        "consolum surface compile failed: {:?}",
+        "console surface compile failed: {:?}",
         result
             .diagnostics
             .iter()

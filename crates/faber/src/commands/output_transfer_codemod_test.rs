@@ -34,10 +34,10 @@ incipit {
         "unexpected declines: {:?}",
         report.declines
     );
-    assert_eq!(report.source.matches("norma:consolum").count(), 1);
+    assert_eq!(report.source.matches("norma:console").count(), 1);
     assert!(report
         .source
-        .contains("importa ex \"norma:consolum\" fixum dic ut output"));
+        .contains("importa ex \"norma:console\" fixum dic ut output"));
     assert!(report.source.contains("output ⇇ \"§ §\\n\"(7, \"salve\")"));
     assert!(report.source.contains("⇇"));
     assert!(!report.source.contains("nota 7, \"salve\""));

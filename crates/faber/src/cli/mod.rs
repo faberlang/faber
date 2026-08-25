@@ -482,7 +482,7 @@ pub struct ExplainArgs {
 /// Arguments for `faber repl`.
 #[derive(clap::Args, Debug)]
 pub struct ReplArgs {
-    /// Arguments available to script cells via `processus.argumenta()`
+    /// Arguments available to script cells via `process.argv()`
     #[arg(allow_hyphen_values = true, last = true)]
     pub args: Vec<String>,
 }

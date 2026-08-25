@@ -78,12 +78,12 @@ const CONST_MEMBER_CALL_MAIN: &str =
     "import from \"./util\" * as utilModule\n\nmain {\n    print utilModule.VALUE()\n}\n";
 
 const LOCAL_LOCALE_MAIN: &str = "import from \"./util\" * as utilModule\n\nfn run() → string {\n    return utilModule.greet()\n}\n\nmain {\n    print utilModule.greet()\n}\n";
-const LOCAL_LOCALE_UTIL: &str = "@ publica\nfn salutare() → string {\n    return \"salve\"\n}\n";
+const LOCAL_LOCALE_UTIL: &str = "@ public\nfn salutare() → string {\n    return \"salve\"\n}\n";
 
 // Live Triga names are source-canonical. The retired en-pack English
 // projection (`Vec3`, `make_vector`) is gone with 80b59a6c(a).
-const EXTERNAL_LIBRARY_LOCALE_MAIN: &str = "import from \"triga:math\" math\nimport from \"norma:chorda\" chorda\n\nfn run() → string {\n    const math.Vector3 origin ← math.vector3(1.0, 0.0, 0.0)\n    const string reversed ← chorda.reverse(\"abc\")\n    const string decoded ← chorda.decode(chorda.encode(\"abc\"))\n    const list<string> parts ← chorda.split_n(\"a,b\", \",\", 2)\n    print parts\n    return decoded\n}\n\nmain {\n    print run()\n}\n";
-const NORMA_LATIN_COMPATIBILITY_MAIN: &str = "importa ex \"norma:chorda\" chorda\n\nfunctio run() → textus {\n    redde chorda.retorta(\"abc\")\n}\n\nincipit {\n    nota run()\n}\n";
+const EXTERNAL_LIBRARY_LOCALE_MAIN: &str = "import from \"triga:math\" math\nimport from \"norma:text\" text\n\nfn run() → string {\n    const math.Vector3 origin ← math.vector3(1.0, 0.0, 0.0)\n    const string reversed ← text.reverse(\"abc\")\n    const string decoded ← text.decode(text.encode(\"abc\"))\n    const list<string> parts ← text.split_n(\"a,b\", \",\", 2)\n    print parts\n    return decoded\n}\n\nmain {\n    print run()\n}\n";
+const NORMA_LATIN_COMPATIBILITY_MAIN: &str = "importa ex \"norma:text\" chorda\n\nfunctio run() → textus {\n    redde chorda.retorta(\"abc\")\n}\n\nincipit {\n    nota run()\n}\n";
 
 /// Two-module package with a local import and a namespace call in the entry.
 fn write_local_package(dir: &std::path::Path) -> std::path::PathBuf {
@@ -215,6 +215,7 @@ fallback = ["la"]
 # test-local pack declares them (the test's intent is the `[[library_members]]`
 # surface row `salutare` → `greet`, not keyword gating).
 [keywords]
+publica = "public"
 importa = "import"
 ex = "from"
 privata = "private"
@@ -324,7 +325,7 @@ main {
     src.join("main.fab")
 }
 
-/// Library-import package (imports `norma:solum`). `declared` controls whether
+/// Library-import package (imports `norma:fs`). `declared` controls whether
 /// the manifest declares the dependency record the envelope must carry (a
 /// declared dependency also writes the matching `faber.lock`, as `faber
 /// install` would).
@@ -358,7 +359,7 @@ kind = "bin"
     fs::write(dir.join("faber.toml"), manifest).expect("write faber.toml");
     fs::write(
         src.join("main.fab"),
-        "import from \"norma:solum\" solum\n\nfn scinde(string s) → int {\n    const list<string> partes ← solum.read_lines(s)\n    return partes.length()\n}\n\nmain {\n    print scinde(\"a,b,c\")\n}\n",
+        "import from \"norma:fs\" fs\n\nfn scinde(string s) → int {\n    const list<string> partes ← fs.read_lines(s)\n    return partes.length()\n}\n\nmain {\n    print scinde(\"a,b,c\")\n}\n",
     )
     .expect("write main.fab");
     src.join("main.fab")
@@ -603,7 +604,7 @@ fn english_pack_resolves_real_triga_and_norma_library_surfaces() {
     assert!(
         library_items.iter().any(|item| {
             item.identity.provider == LibraryProvider::Builtin("norma".to_owned())
-                && item.identity.module_path == ["chorda".to_owned()]
+                && item.identity.module_path == ["text".to_owned()]
                 && item.exported_name == "reverse"
                 && item.kind == LibraryItemKind::Function
         }),
@@ -615,7 +616,7 @@ fn english_pack_resolves_real_triga_and_norma_library_surfaces() {
 fn latin_norma_consumer_keeps_canonical_surface_compatibility() {
     let dir = test_temp_dir("fhir-norma-latin-compatibility");
     let entry = write_external_library_locale_package(&dir, NORMA_LATIN_COMPATIBILITY_MAIN);
-    // The fixture is a Latin-identity consumer (canonical `norma:chorda`
+    // The fixture is a Latin-identity consumer (canonical `norma:text`
     // surface): compile it under the explicit la code surface — the la pack's
     // registry-direct Latin authority — mirroring the R3 conversio-assign
     // precedent (Latin sources declare la identity, they are not en-migrated).
@@ -645,7 +646,7 @@ fn latin_norma_consumer_keeps_canonical_surface_compatibility() {
     assert!(
         entry_unit.analysis.libraries.items.values().any(|item| {
             item.identity.provider == LibraryProvider::Builtin("norma".to_owned())
-                && item.identity.module_path == ["chorda".to_owned()]
+                && item.identity.module_path == ["text".to_owned()]
                 && item.exported_name == "reverse"
                 && item.kind == LibraryItemKind::Function
         }),
@@ -990,7 +991,7 @@ fn loaded_package_library_import_unit_parity() {
     assert_eq!(
         loaded.modules[0].library_imports.len(),
         1,
-        "norma:solum library import survives the envelope"
+        "norma:fs library import survives the envelope"
     );
 
     // Per-unit codegen parity (Rust + canonical Faber) with the library

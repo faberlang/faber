@@ -96,7 +96,7 @@ fn cmd_test_source_has_no_cargo_or_rust_executor() {
         "cmd_test must not emit a generated test crate"
     );
     assert!(
-        production.contains("run_proba_source") || production.contains("run_proba_on_analyzed"),
+        production.contains("run_proba_on_validated"),
         "cmd_test must drive the runner proba runner"
     );
 }

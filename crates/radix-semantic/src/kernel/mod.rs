@@ -31,10 +31,18 @@ pub fn is_kernel_glob_import_path(path: &str) -> bool {
     path == KERNEL_GLOB_IMPORT
 }
 
-/// Resolve a manifest module name (`solum`, `json`, …).
+/// Resolve a manifest module name (`solum`, `json`, …), accepting the English
+/// norma module coordinates (`fs`, `console`, `random`, `process`) the
+/// interpreted-package bridge uses after the norma English rename.
 #[must_use]
 pub fn resolve_kernel_module_name(name: &str) -> Option<KernelModule> {
-    manifest::lookup_module(name)
+    match name {
+        "fs" => Some(KernelModule::Solum),
+        "console" => Some(KernelModule::Consolum),
+        "random" => Some(KernelModule::Aleator),
+        "process" => Some(KernelModule::Processus),
+        _ => manifest::lookup_module(name),
+    }
 }
 
 /// Resolve a kernel import path to its manifest module.

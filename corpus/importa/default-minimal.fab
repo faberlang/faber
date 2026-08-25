@@ -28,8 +28,8 @@ locale = "en"
 #
 # Omitted import visibility is private by default; the retired `privata` import
 # modifier is not written here. Missing binding defaults to the final path
-# segment, so this imports norma:text as chorda.
+# segment, so this imports norma:text as text.
 
 import from "norma:text"
 
-print chorda.reverse("importa-minimal")
+print text.reverse("importa-minimal")

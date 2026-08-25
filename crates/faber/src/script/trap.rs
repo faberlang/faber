@@ -45,7 +45,7 @@ impl Host for TrapHost<'_> {
         args: &[Value],
         span: radix::module::lexer::Span,
     ) -> Result<Value, RunnerError> {
-        // processus.exit_process must hit TrapHost::exit (HostTrap) rather than the
+        // process.exit_process must hit TrapHost::exit (HostTrap) rather than the
         // inner BufferHost::exit panic, so embedders can return ExitCode.
         if matches!(module, KernelModule::Processus) && verb == "exit_process" {
             let [code] = args else {

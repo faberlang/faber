@@ -125,7 +125,7 @@ pub(crate) fn resolved_library_home() -> Option<ResolvedLibraryHome> {
     None
 }
 
-/// Identity from the provider name in an import specifier (`norma:solum`).
+/// Identity from the provider name in an import specifier (`norma:fs`).
 ///
 /// Never inspects a manifest. Passing `faber.toml` / `cista.toml` metadata
 /// here would be the U3 identity-guardrail defect.

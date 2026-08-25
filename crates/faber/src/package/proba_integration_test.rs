@@ -452,14 +452,14 @@ fn norma_src_proba_is_discovered_beside_product_sources() {
         "expected sibling norma/src at {}",
         norma_src.display()
     );
-    let mathesis_proba = norma_src.join("mathesis.proba");
+    let math_proba = norma_src.join("math.proba");
     assert!(
-        mathesis_proba.is_file(),
+        math_proba.is_file(),
         "stdlib proof fixture missing: {}",
-        mathesis_proba.display()
+        math_proba.display()
     );
     // Must live under norma product source layout, not exempla corpus.
-    let path_str = mathesis_proba.to_string_lossy();
+    let path_str = math_proba.to_string_lossy();
     assert!(
         !path_str.contains("exempla"),
         "stdlib .proba must not live under exempla: {path_str}"
@@ -468,8 +468,8 @@ fn norma_src_proba_is_discovered_beside_product_sources() {
     let files =
         radix::program::source_files::package_source_files(&norma_src, true).expect("discover");
     assert!(
-        files.iter().any(|p| p.ends_with("mathesis.proba")),
-        "include_proba=true must find mathesis.proba under norma/src"
+        files.iter().any(|p| p.ends_with("math.proba")),
+        "include_proba=true must find math.proba under norma/src"
     );
     let prod = radix::program::source_files::package_source_files(&norma_src, false).expect("prod");
     assert!(

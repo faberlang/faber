@@ -158,7 +158,7 @@ fn interpret_path(
 
 /// Process status scripta gates observe for a single-file runner result.
 ///
-/// Success yields `0`. An explicit `processus.exit_process(code)` yields that
+/// Success yields `0`. An explicit `process.exit_process(code)` yields that
 /// Unix-masked code. Frontend / MIR / runner failures yield `1`.
 pub(super) fn single_file_run_process_code(
     result: Result<ExitCode, radix::module::mir::RunSourceError>,

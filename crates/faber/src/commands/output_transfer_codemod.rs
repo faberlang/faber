@@ -67,8 +67,8 @@ impl Surface {
 
     fn header(self) -> Option<&'static str> {
         match self {
-            Self::English => Some("import from \"norma:consolum\" const write_partial as output\n"),
-            Self::Latin => Some("importa ex \"norma:consolum\" fixum dic ut output\n"),
+            Self::English => Some("import from \"norma:console\" const write_partial as output\n"),
+            Self::Latin => Some("importa ex \"norma:console\" fixum dic ut output\n"),
             Self::Unsupported => None,
         }
     }
@@ -277,11 +277,11 @@ fn rewrite_source(source: &str) -> Result<(String, usize, Vec<DeclineReason>), S
     if let Some(token) = lexed
         .tokens
         .iter()
-        .find(|token| token_text(body, token) == "\"norma:consolum\"")
+        .find(|token| token_text(body, token) == "\"norma:console\"")
     {
         declines.push(reason(
-            "existing_consolum_import",
-            "an existing consolum import was not merged by guesswork",
+            "existing_console_import",
+            "an existing console import was not merged by guesswork",
             body_offset,
             token.span.start as usize,
             token.span.end as usize,

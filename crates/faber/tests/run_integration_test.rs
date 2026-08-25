@@ -1113,10 +1113,10 @@ functio text(textus name) → textus {
 
 #[test]
 #[ignore = "builds a generated fmir-bin Rust runner with Cargo; run in periodic end-to-end coverage"]
-fn fmir_bin_norma_solum_package_reads_file_after_source_is_removed() {
+fn fmir_bin_norma_fs_package_reads_file_after_source_is_removed() {
     let package = write_basic_package(
         "fmir-bin-solum",
-        r#"import from "norma:solum" fileio
+        r#"import from "norma:fs" fileio
 
 incipit {
   nota fileio.lege<textus>("__PAYLOAD__")
@@ -1147,7 +1147,7 @@ incipit {
     let (stdout, stderr, ok) = run_executable(&entrypoint, &[]);
     assert!(
         ok,
-        "direct fmir-bin norma:solum entrypoint failed:\n{stderr}"
+        "direct fmir-bin norma:fs entrypoint failed:\n{stderr}"
     );
     assert_eq!(stdout, "solum-ok\n");
     assert_no_generated_rust(&package);
@@ -1306,16 +1306,16 @@ fn run() → void {}
 #[test]
 fn run_norma_library_import_executes_without_rust_emit() {
     // LIB-MIR: non-bridged `norma:*` source libraries link into the
-    // interpreted script path (chorda.reverse runs). The script must execute
+    // interpreted script path (text.reverse runs). The script must execute
     // without emitting Rust artifacts.
     let package = temp_dir("norma-linked");
     fs::write(
         package.join("main.fab"),
         r#"
-import from "norma:chorda" chorda
+import from "norma:text" text
 
 main {
-  print chorda.reverse("roma")
+  print text.reverse("roma")
 }
 "#,
     )
@@ -2274,7 +2274,7 @@ fn run_manifestless_single_file_uses_single_source_runner() {
 }
 
 #[test]
-fn run_norma_solum_package_reads_file_through_kernel_bridge() {
+fn run_norma_fs_package_reads_file_through_kernel_bridge() {
     // One `norma:*` import block; interpreted package execution satisfies it
     // through the runner kernel (Stage 1b host bridge). No second runner-only
     // source file, no compiled-Rust fallback.
@@ -2299,7 +2299,7 @@ entry = "main.fab"
     fs::write(
         src.join("main.fab"),
         format!(
-            r#"import from "norma:solum" fileio
+            r#"import from "norma:fs" fileio
 
 main {{
   print fileio.read_file<string>("{payload_str}")
@@ -2311,7 +2311,7 @@ main {{
 
     let (stdout, stderr, ok) = run_faber(&["run", package.to_str().expect("utf8 package path")]);
 
-    assert!(ok, "norma:solum package bridge failed:\n{stderr}");
+    assert!(ok, "norma:fs package bridge failed:\n{stderr}");
     assert_eq!(stdout, "bridge-ok\n");
     assert!(
         !stderr.contains("Compiling") && !stderr.contains("cargo"),
@@ -2321,7 +2321,7 @@ main {{
 }
 
 #[test]
-fn run_norma_solum_unsupported_verb_fails_closed() {
+fn run_norma_fs_unsupported_verb_fails_closed() {
     let package = temp_dir("norma-solum-unsupported");
     let src = package.join("src");
     fs::create_dir_all(&src).expect("create src");
@@ -2339,7 +2339,7 @@ entry = "main.fab"
     .expect("write manifest");
     fs::write(
         src.join("main.fab"),
-        r#"import from "norma:solum" fileio
+        r#"import from "norma:fs" fileio
 
 main {
   fileio.read_file_async<string>("/nonexistent")
@@ -2350,17 +2350,17 @@ main {
 
     let (stdout, stderr, ok) = run_faber(&["run", package.to_str().expect("utf8 package path")]);
 
-    assert!(!ok, "unsupported norma:solum verb should fail closed");
+    assert!(!ok, "unsupported norma:fs verb should fail closed");
     assert_eq!(stdout, "");
     assert!(
-        stderr.contains("package MIR kernel bridge does not support `norma:solum.read_file_async`"),
+        stderr.contains("package MIR kernel bridge does not support `norma:fs.read_file_async`"),
         "expected kernel bridge fail-closed diagnostic:\n{stderr}"
     );
     assert_no_generated_rust(&package);
 }
 
 #[test]
-fn run_norma_processus_argumenta_bridges_to_kernel() {
+fn run_norma_process_argumenta_bridges_to_kernel() {
     let package = temp_dir("norma-processus-bridge");
     let src = package.join("src");
     fs::create_dir_all(&src).expect("create src");
@@ -2378,10 +2378,10 @@ entry = "main.fab"
     .expect("write manifest");
     fs::write(
         src.join("main.fab"),
-        r#"import from "norma:processus" processus
+        r#"import from "norma:process" process
 
 main args args {
-  print processus.argv()[0]
+  print process.argv()[0]
 }
 "#,
     )
@@ -2394,7 +2394,7 @@ main args args {
         "first-arg",
     ]);
 
-    assert!(ok, "norma:processus bridge failed:\n{stderr}");
+    assert!(ok, "norma:process bridge failed:\n{stderr}");
     assert_eq!(stdout, "first-arg\n");
     assert_no_generated_rust(&package);
 }
@@ -2429,7 +2429,7 @@ fn run_faber_with_stdin(args: &[&str], stdin: &[u8]) -> (String, String, bool) {
 }
 
 #[test]
-fn run_norma_consolum_selective_transfer_is_byte_exact() {
+fn run_norma_console_selective_transfer_is_byte_exact() {
     // EOT-4R: interpreted lane executes the consolum contract through
     // selective imports + ⇇. Captured stdout is byte-identical to the
     // concatenated payloads (write_partial, write_bytes, read_line).
@@ -2450,7 +2450,7 @@ entry = "main.fab"
     .expect("write manifest");
     fs::write(
         src.join("main.fab"),
-        r#"import from "norma:consolum" const write_partial, write_bytes, read_line
+        r#"import from "norma:console" const write_partial, write_bytes, read_line
 
 main {
   const _ partial ← (string msg) → void ∴ write_partial(msg)
@@ -2468,7 +2468,7 @@ main {
         b"LINE\n",
     );
 
-    assert!(ok, "norma:consolum interpreted transfer failed:\n{stderr}");
+    assert!(ok, "norma:console interpreted transfer failed:\n{stderr}");
     assert_eq!(stdout, "PALINE");
     assert!(
         !stderr.contains("Compiling") && !stderr.contains("cargo"),

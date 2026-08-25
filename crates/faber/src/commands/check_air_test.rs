@@ -300,7 +300,7 @@ fn air_report_unknown_reason_trails_known_buckets() {
 /// unavailable callee body.
 #[test]
 fn air_report_does_not_invent_cross_unit_callee_blocker() {
-    let source = r#"importa ex "norma:chorda" retorta
+    let source = r#"importa ex "norma:text" retorta
 
 functio caller(numerus x) → numerus {
     redde retorta(x)

@@ -25,8 +25,8 @@ use radix_lexer::{Interner, Span};
 use radix_syntax::{
     braced_cli_nomen, braced_cli_nomen_strict, braced_imperium_nomen_strict,
     braced_operandus_view_strict, braced_optio_is_flag, braced_optio_view_strict, Annotation,
-    AnnotationKind, BracedAnnotationError, BracedView, Expr, ExprKind, FuncDecl, Ident,
-    IncipitStmt, Literal, MemberExpr, OperandusAnnotation, OptioAnnotation, Program, Stmt,
+    AnnotationKind, BracedAnnotationError, BracedView, Expr, ExprKind, FuncDecl, GenericArgExpr,
+    Ident, IncipitStmt, Literal, MemberExpr, OperandusAnnotation, OptioAnnotation, Program, Stmt,
     StmtKind, TypeExpr, TypeExprKind,
 };
 use rustc_hash::{FxHashMap, FxHashSet};
@@ -860,11 +860,23 @@ impl CliBuilder<'_> {
             TypeExprKind::Named(name, params)
                 if self.interner.resolve(name.name) == "lista" && params.len() == 1 =>
             {
-                let radix_syntax::GenericArgExpr::Type(element) = &params[0] else {
-                    self.error(span, ISSUE_UNSUPPORTED_TYPE_SHAPE);
-                    return CliType::Textus;
+                // A bare named element (`lista<numerus>`) parses as
+                // `GenericArgExpr::Name`; both element shapes lower the same.
+                let element = match &params[0] {
+                    GenericArgExpr::Type(element) => element.clone(),
+                    GenericArgExpr::Name(element) => TypeExpr {
+                        nullable: false,
+                        mode: None,
+                        kind: TypeExprKind::Named(element.clone(), Vec::new()),
+                        span: element.span,
+                        iuncta_label: None,
+                    },
+                    GenericArgExpr::Size(_) => {
+                        self.error(span, ISSUE_UNSUPPORTED_TYPE_SHAPE);
+                        return CliType::Textus;
+                    }
                 };
-                self.list_cli_type(element, span)
+                self.list_cli_type(&element, span)
             }
             _ => {
                 self.error(span, ISSUE_UNSUPPORTED_TYPE_SHAPE);
