@@ -1068,8 +1068,9 @@ fn rope_plan_facts(
     // Per-position mode is a typed fact of the kernel's table operands. The
     // current GEA2 route carries ONE frozen rank-3 `[rows, dim/2, 3]`
     // interleaved table; its component 0 is the host-owned angle and the
-    // device reads cos/sin from components 1/2. Preserve the earlier
-    // rank-1/rank-2 two-table form for existing callers.
+    // device reads cos/sin from components 1/2. Preserve the earlier forms
+    // for existing callers: the rank-1/rank-2 two-table pair and the
+    // table-free single-position route (position from the const operand).
     let x_local = crate::read_analysis::operand_local(args.first()?)?;
     let destination = rope_destination_base(function, op)?;
     // Source-level `mut` output params can be distinct from the runtime-call
@@ -1134,6 +1135,11 @@ fn rope_plan_facts(
                 _ => return None,
             }
         }
+        // Table-free single-position mode: the kernel derives the angle from
+        // the `pos` const operand, so no table params ride the signature.
+        // The dedicated per-target emitters (e.g. the NVVM GI3 probe) reject
+        // this shape with their own missing-table diagnostic.
+        [] => (false, 0),
         _ => return None,
     };
     Some((pos, dim, width, per_row, rows))
