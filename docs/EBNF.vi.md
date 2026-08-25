@@ -391,7 +391,7 @@ et_expr ::= equality (('và') equality)*
 equality ::= comparison equality_tail*
 # formerly: equalityTail
 # [135] equality_tail
-equality_tail ::= ('≡' | '≠' | '≈' | '≉' | 'là' | 'không' 'là') comparison
+equality_tail ::= ('≡' | '≢' | '≠' | '≅' | '≇' | '≈' | '≉' | 'là' | 'không' 'là') comparison
 # [136] comparison
 comparison ::= bitwise_or_expr (('≺' | '≻' | '≤' | '≥' | 'trong' | 'giữa') bitwise_or_expr)*
 # formerly: bitwiseOr

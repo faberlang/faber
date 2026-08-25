@@ -391,7 +391,7 @@ et_expr ::= equality (('且') equality)*
 equality ::= comparison equality_tail*
 # formerly: equalityTail
 # [135] equality_tail
-equality_tail ::= ('≡' | '≠' | '≈' | '≉' | '是' | '非' '是') comparison
+equality_tail ::= ('≡' | '≢' | '≠' | '≅' | '≇' | '≈' | '≉' | '是' | '非' '是') comparison
 # [136] comparison
 comparison ::= bitwise_or_expr (('≺' | '≻' | '≤' | '≥' | '内' | '间') bitwise_or_expr)*
 # formerly: bitwiseOr

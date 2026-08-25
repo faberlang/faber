@@ -391,7 +391,7 @@ et_expr ::= equality (('और') equality)*
 equality ::= comparison equality_tail*
 # formerly: equalityTail
 # [135] equality_tail
-equality_tail ::= ('≡' | '≠' | '≈' | '≉' | 'है' | 'नहीं' 'है') comparison
+equality_tail ::= ('≡' | '≢' | '≠' | '≅' | '≇' | '≈' | '≉' | 'है' | 'नहीं' 'है') comparison
 # [136] comparison
 comparison ::= bitwise_or_expr (('≺' | '≻' | '≤' | '≥' | 'भीतर' | 'बीच') bitwise_or_expr)*
 # formerly: bitwiseOr

@@ -391,7 +391,7 @@ et_expr ::= equality (('و') equality)*
 equality ::= comparison equality_tail*
 # formerly: equalityTail
 # [135] equality_tail
-equality_tail ::= ('≡' | '≠' | '≈' | '≉' | 'هو' | 'ليس' 'هو') comparison
+equality_tail ::= ('≡' | '≢' | '≠' | '≅' | '≇' | '≈' | '≉' | 'هو' | 'ليس' 'هو') comparison
 # [136] comparison
 comparison ::= bitwise_or_expr (('≺' | '≻' | '≤' | '≥' | 'ضمن' | 'بين') bitwise_or_expr)*
 # formerly: bitwiseOr

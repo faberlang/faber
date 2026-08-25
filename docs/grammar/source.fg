@@ -267,6 +267,20 @@ role = "type_ascription"
 claiming_slots = ["cast_expr", "finge_expr"]
 
 [[glyphs]]
+glyph = "≅"
+codepoint = "U+2245"
+unicode_name = "APPROXIMATELY EQUAL TO"
+role = "equality"
+claiming_slots = ["equality_tail"]
+
+[[glyphs]]
+glyph = "≇"
+codepoint = "U+2247"
+unicode_name = "NEITHER APPROXIMATELY NOR ACTUALLY EQUAL TO"
+role = "equality"
+claiming_slots = ["equality_tail"]
+
+[[glyphs]]
 glyph = "≈"
 codepoint = "U+2248"
 unicode_name = "ALMOST EQUAL TO"
@@ -291,6 +305,13 @@ claiming_slots = ["equality_tail"]
 glyph = "≡"
 codepoint = "U+2261"
 unicode_name = "IDENTICAL TO"
+role = "equality"
+claiming_slots = ["equality_tail"]
+
+[[glyphs]]
+glyph = "≢"
+codepoint = "U+2262"
+unicode_name = "NOT IDENTICAL TO"
 role = "equality"
 claiming_slots = ["equality_tail"]
 
@@ -1046,7 +1067,7 @@ aut_expr         := et_expr (('aut') et_expr)*
 et_expr        := equality (('et') equality)*
 equality   := comparison equality_tail*
 @formerly equalityTail
-equality_tail := ('≡' | '≠' | '≈' | '≉' | 'est' | 'non' 'est') comparison
+equality_tail := ('≡' | '≢' | '≠' | '≅' | '≇' | '≈' | '≉' | 'est' | 'non' 'est') comparison
 comparison := bitwise_or_expr (('≺' | '≻' | '≤' | '≥' | 'intra' | 'inter') bitwise_or_expr)*
 # Ordering operators use the canonical Unicode glyphs `≺`/`≻`/`≤`/`≥`;
 # membership uses Latin keywords `intra`/`inter` (Faber prose identity).

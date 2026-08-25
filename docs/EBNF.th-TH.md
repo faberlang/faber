@@ -391,7 +391,7 @@ et_expr ::= equality (('และ') equality)*
 equality ::= comparison equality_tail*
 # formerly: equalityTail
 # [135] equality_tail
-equality_tail ::= ('≡' | '≠' | '≈' | '≉' | 'เป็น' | 'ไม่' 'เป็น') comparison
+equality_tail ::= ('≡' | '≢' | '≠' | '≅' | '≇' | '≈' | '≉' | 'เป็น' | 'ไม่' 'เป็น') comparison
 # [136] comparison
 comparison ::= bitwise_or_expr (('≺' | '≻' | '≤' | '≥' | 'ภายใน' | 'ระหว่าง') bitwise_or_expr)*
 # formerly: bitwiseOr
