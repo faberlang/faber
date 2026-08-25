@@ -416,7 +416,7 @@ range_expr ::= additive_expr range_tail?
 range_tail ::= ('‥' | '…' | 'ante' | 'usque') additive_expr ('per' additive_expr)?
 # formerly: additive
 # [143] additive_expr
-additive_expr ::= multiplicative_expr (('+' | '-') multiplicative_expr)*
+additive_expr ::= multiplicative_expr (('+' | '-' | '⤒' | '⤓') multiplicative_expr)*
 # formerly: multiplicative
 # [144] multiplicative_expr
 multiplicative_expr ::= vel_expr (('*' | '/' | '%' | '·' | '×' | '⊗' | '⊙' | '⊘') vel_expr)*
