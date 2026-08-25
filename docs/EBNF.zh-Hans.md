@@ -1528,7 +1528,7 @@ spellings on the right perform runtime variant/type tests, while `空`,
 `真`, `假`, and ordinary value expressions use the value-test path. Radix
 currently recognizes type targets through a fixed core-type vocabulary. Extending
 that recognition to arbitrary declared types is a separate language decision.
-Use `≡` / `≠` for structural value equality and `↦` for runtime conversion.
+Use `≡` / `≠` (or `≢`) for structural value equality, `≅` / `≇` for promoted exact equality (same value after numeric widths join), `≈` / `≉` for fuzzy equality (tolerance match with Python-isclose defaults: rel_tol 1e-09, abs_tol 0.0), and `↦` for runtime conversion.
 
 Retired predicate keywords are not prefix unary syntax. Use `expr 是 真`,
 `expr 是 假`, `expr 是 空`, `expr 非 是 空`, `expr ≺ 0`, or
