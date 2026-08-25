@@ -1,12 +1,12 @@
 +++
-term = "solum lege carpe hauri"
+term = "fs lege carpe hauri"
 kind = "concept"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "importa_decl", "importa_sugar", "named_import", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "expr_stmt", "ad_expr", "ad_opener", "conversio_expr", "call_expr", "call_suffix", "call_type_args", "member_suffix", "argument_list", "argument", "array_literal", "expression", "literal", "adfirma_stmt", "equality_tail", "nota_stmt"]
 category = "ad"
 canonical = true
-summary = "solum file reads are shape-specific: lege<textus>, carpe (lista<textus>), hauri (octeti)."
-syntax = "solum.read_file<textus>(via) | call 'solum:carpe' (via) ↦ lista<textus> | call 'solum:hauri' (via) ↦ octeti"
-related = ["ad", "solum", "lege", "carpe", "hauri"]
+summary = "fs file reads are shape-specific: lege<textus>, carpe (lista<textus>), hauri (octeti)."
+syntax = "fs.read_file<textus>(via) | call 'fs:carpe' (via) ↦ lista<textus> | call 'fs:hauri' (via) ↦ octeti"
+related = ["ad", "fs", "lege", "carpe", "hauri"]
 locale = "en"
 +++
 
@@ -31,32 +31,32 @@ locale = "en"
 #
 # The provider contract (hosts/crates/solum manifest) keeps one result shape
 # per route: `solum:lege` → textus, `solum:carpe` → lista<textus>,
-# `solum:hauri` → octeti. The `norma:solum` wrappers `carpe`/`hauri` are
+# `solum:hauri` → octeti. The `norma:fs` wrappers `carpe`/`hauri` are
 # module-private this release, so this fixture reaches the line/byte routes
 # directly through the manifest-backed `ad` surface; the compiler's
-# `@ radix typus` metadata on `norma:solum.read_file<T>` still admits the broader
+# `@ radix typus` metadata on `norma:fs.read_file<T>` still admits the broader
 # targets, which the provider rejects (recorded residual). Generic
 # `solum.read_file<T>` across all three shapes is separate future provider work.
 #
 # Runtime check: files are prepared under /tmp so each read route can prove its
 # accepted result shape independently of the harness working directory.
 
-import from "norma:solum" solum
+import from "norma:fs" fs
 
 main {
-    const string textPath ← "/tmp/faber-solum-lege-generic.txt"
-    solum.write_file(textPath, "prima\nsecunda\n")
+    const string textPath ← "/tmp/faber-fs-lege-generic.txt"
+    fs.write_file(textPath, "prima\nsecunda\n")
 
-    const string body ← solum.read_file<string>(textPath)
+    const string body ← fs.read_file<string>(textPath)
     assert body ≡ "prima\nsecunda\n"
 
-    const list<string> lineae ← call 'solum:carpe' (textPath) ↦ list<string>
+    const list<string> lineae ← call 'fs:carpe' (textPath) ↦ list<string>
     assert lineae ≡ ["prima", "secunda"]
 
-    const bytes data ← call 'solum:hauri' (textPath) ↦ octeti
+    const bytes data ← call 'fs:hauri' (textPath) ↦ octeti
     assert data ≡ |70 72 69 6d 61 0a 73 65 63 75 6e 64 61 0a|
     print body
     print lineae
     print data
-    print "solum lege carpe hauri parata"
+    print "fs lege carpe hauri parata"
 }

@@ -32,7 +32,7 @@ locale = "la"
 #
 # Common mistakes:
 #   • expecting `⇇` to print — the compiler formats nothing; import a sink
-#     value (e.g. `importa ex "norma:consolum" fixum dic ut output`) and
+#     value (e.g. `importa ex "norma:console" fixum dic ut output`) and
 #     format explicitly on the right
 #   • using the chain result — a transfer chain is `vacuum`, never a payload
 #

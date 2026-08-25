@@ -5,7 +5,7 @@ grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "
 category = "package"
 canonical = false
 summary = "Minimal import sugar with private binding inferred from the path."
-syntax = "importa ex \"norma:chorda\""
+syntax = "importa ex \"norma:text\""
 aliases = ["import"]
 related = ["ex", "privata", "annotation-sugar"]
 locale = "en"
@@ -28,8 +28,8 @@ locale = "en"
 #
 # Omitted import visibility is private by default; the retired `privata` import
 # modifier is not written here. Missing binding defaults to the final path
-# segment, so this imports norma:chorda as chorda.
+# segment, so this imports norma:text as chorda.
 
-import from "norma:chorda"
+import from "norma:text"
 
 print chorda.reverse("importa-minimal")

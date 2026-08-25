@@ -10,7 +10,7 @@ aliases = ["«...»"]
 related = ["string", "textus"]
 locale = "en"
 +++
-import from "norma:consolum" const write_partial as output
+import from "norma:console" const write_partial as output
 
 # =============================================================================
 # block-string — Block textus literals with embedded quotes and newlines.

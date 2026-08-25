@@ -1,12 +1,12 @@
 +++
-term = "async solum leget"
+term = "async fs leget"
 kind = "concept"
 grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipiet_stmt", "importa_decl", "importa_sugar", "named_import", "fixum_decl", "figendum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "expr_stmt", "call_expr", "call_suffix", "call_type_args", "member_suffix", "argument_list", "argument", "expression", "literal", "adfirma_stmt", "equality_tail"]
 category = "ad"
 canonical = true
-summary = "Async solum.read_file_async<T> uses the same solum:lege route as sync solum.read_file<T>."
-syntax = "solum.read_file_async<textus>(via)"
-related = ["ad", "solum", "futura", "sermo"]
+summary = "Async fs.read_file_async<T> uses the same fs:lege route as sync fs.read_file<T>."
+syntax = "fs.read_file_async<textus>(via)"
+related = ["ad", "fs", "futura", "sermo"]
 locale = "en"
 +++
 
@@ -18,7 +18,7 @@ locale = "en"
 # What this teaches:
 #   • Async/sync proof pair — `solum.read_file_async<T>` and `solum.read_file<T>` share the
 #     same host route; the async callable posture selects the async receive path
-#   • Import syntax — `importa ex "norma:solum"` brings in standard library
+#   • Import syntax — `importa ex "norma:fs"` brings in standard library
 #     modules
 #
 # Common mistakes:
@@ -33,12 +33,12 @@ locale = "en"
 # declares the wrapper with compatibility `@ futura`; callers consume it through
 # the explicit morphology forms such as `figendum`.
 
-import from "norma:solum" solum
+import from "norma:fs" fs
 
 async_main {
-    const string textPath ← "/tmp/faber-async-solum-leget.txt"
-    solum.write_file(textPath, "async solum\n")
+    const string textPath ← "/tmp/faber-async-fs-leget.txt"
+    fs.write_file(textPath, "async fs\n")
 
-    await_const string body ← solum.read_file_async<string>(textPath)
-    assert body ≡ "async solum\n"
+    await_const string body ← fs.read_file_async<string>(textPath)
+    assert body ≡ "async fs\n"
 }

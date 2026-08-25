@@ -33,9 +33,9 @@ locale = "en"
 # EXPECTED OUTPUT:
 #   Smoke asserts exit 0 only.
 
-import from "norma:tempus" tempus
+import from "norma:time" tempus
 import from "norma:toml" toml
-import from "norma:valor" valor
+import from "norma:value" valor
 
 fn epoch_wire(instant t) → string {
     return t ↦ string
