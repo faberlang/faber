@@ -79,6 +79,13 @@ impl<H: super::super::Host + ?Sized> Runner<'_, H> {
                 span,
             )?,
             Value::Tensor(cell) => cell.borrow().data.clone(),
+            Value::Vector(cell) => self.convert_array_elements(
+                &cell.borrow(),
+                source_ty,
+                element,
+                struct_defaults,
+                span,
+            )?,
             Value::Set(cell) => cell
                 .borrow()
                 .iter()
@@ -160,7 +167,7 @@ impl<H: super::super::Host + ?Sized> Runner<'_, H> {
     ) -> Result<Vec<Value>, RunnerError> {
         let source_element = match self.types.get(source_ty) {
             Type::Array(element) => Some(*element),
-            Type::Tensor(element, _) => Some(*element),
+            Type::Tensor(element, _) | Type::Vector(element, _) => Some(*element),
             _ => None,
         };
         let Some(source_element) = source_element else {

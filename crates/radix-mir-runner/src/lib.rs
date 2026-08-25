@@ -1780,6 +1780,10 @@ mod ascii_format_pack_test;
 mod octeti_lista_test;
 
 #[cfg(test)]
+#[path = "vector_lista_test.rs"]
+mod vector_lista_test;
+
+#[cfg(test)]
 #[path = "ascii1_index_test.rs"]
 mod ascii1_index_test;
 
