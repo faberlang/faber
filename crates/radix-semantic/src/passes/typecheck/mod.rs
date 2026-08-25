@@ -602,6 +602,10 @@ mod bounded_identity_test;
 mod bounded_lista_test;
 
 #[cfg(test)]
+#[path = "lista_operator_test.rs"]
+mod lista_operator_test;
+
+#[cfg(test)]
 #[path = "convert_test.rs"]
 mod convert_test;
 

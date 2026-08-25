@@ -894,6 +894,12 @@ fn semantic_invalid_operand_types_message(args: &[DiagnosticArg]) -> Option<Stri
         "intervallum_helper_bound_unsupported" => {
             Some("intervallum helper operations currently require bare numerus bounds".to_owned())
         }
+        "numeric_lista_operator_law" => {
+            let operator = arg_value(args, "operator")?;
+            Some(format!(
+                "numeric list operator {operator} is elementwise; scalars broadcast on either side, lists must have equal length; use ↦ for explicit width conversion"
+            ))
+        }
         "numeric_operands_required" => Some("numeric operands required".to_owned()),
         "numeric_arithmetic_operands_identical" => {
             Some("numeric arithmetic operands must have identical types; use ↦ to convert explicitly".to_owned())
@@ -1112,6 +1118,10 @@ fn semantic_invalid_operand_types_help(args: &[DiagnosticArg]) -> Option<String>
         "intervallum_helper_bound_unsupported" => {
             Some("use bare numerus intervallum bounds for expansion helpers today".to_owned())
         }
+        "numeric_lista_operator_law" => Some(
+            "apply +, -, *, or / elementwise to numeric lists; use ↦ to align numeric widths"
+                .to_owned(),
+        ),
         "numeric_operands_required" => Some("use numeric operands for this operator".to_owned()),
         "modular_word_width_required" => {
             Some("write the modular word type as modulus<u8>, modulus<u16>, modulus<u32>, or modulus<u64>".to_owned())

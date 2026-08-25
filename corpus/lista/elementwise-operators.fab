@@ -1,0 +1,45 @@
++++
+term = "lista"
+kind = "existing-home"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "array_literal", "additive_expr", "multiplicative_expr", "expression", "literal", "nota_stmt"]
+category = "collection"
+canonical = false
+summary = "Elementwise +, -, *, and / on numeric lists, with scalar broadcast on either side."
+syntax = "<numeric-list> (+ | - | * | /) (<numeric-list> | <scalar>)"
+related = ["+", "-", "*", "/", "↦"]
+locale = "en"
++++
+
+# =============================================================================
+# Numeric lista operators — elementwise arithmetic and scalar broadcast.
+# =============================================================================
+#
+# What this teaches:
+#   • `+`, `-`, `*`, and `/` apply elementwise to numeric lists.
+#   • A scalar broadcasts on either side: `xs * 2` and `2 * xs` are list results.
+#   • List operands are paired by position and must have equal length.
+#   • The result is a fresh list; `*` is not Python-style list repetition.
+#
+# Common mistakes:
+#   • Mixing numeric widths — convert explicitly with `↦`.
+#   • Expecting nested lists to participate — rank-2 values belong to tensors.
+#   • Treating a list capacity bound as its current runtime length.
+#
+# See also: lista, ↦
+# =============================================================================
+
+# A1 semantic anchor. Dynamic list length checking is A2's runtime contract.
+main {
+    const list<int> xs ← [10, 20, 30]
+    const list<int> ys ← [1, 2, 3]
+
+    const list<int> sums ← xs + ys
+    const list<int> differences ← xs - ys
+    const list<int> products ← 2 * xs
+    const list<int> quotients ← xs / 10
+
+    print sums
+    print differences
+    print products
+    print quotients
+}
