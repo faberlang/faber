@@ -258,7 +258,7 @@ fn nested_norma_import_single_file_hir_rust_emits_provider() {
     fs::write(
         &app,
         r#"
-importa ex "norma:valor" valor
+importa ex "norma:value" valor
 incipit {
   nota "ok"
 }
@@ -267,11 +267,11 @@ incipit {
     .expect("app");
     let mut home = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     let home = loop {
-        if home.join("norma/src/valor.fab").is_file() {
+        if home.join("norma/src/value.fab").is_file() {
             break home;
         }
         if !home.pop() {
-            panic!("expected norma/src/valor.fab as ancestor of {}", env!("CARGO_MANIFEST_DIR"));
+            panic!("expected norma/src/value.fab as ancestor of {}", env!("CARGO_MANIFEST_DIR"));
         }
     };
     let _guard = LibraryHomeGuard::set(&home);

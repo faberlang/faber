@@ -142,7 +142,7 @@ fn vector_dot_returns_element_type() {
         r"incipit {
     fixum vf32[4] a ← [1.0, 2.0, 3.0, 4.0] ↦ vf32[4]
     fixum vf32[4] b ← [4.0, 3.0, 2.0, 1.0] ↦ vf32[4]
-    fixum f32 d ← a.dot(b)
+    fixum f32 d ← a.productum(b)
     nota d
 }",
     );

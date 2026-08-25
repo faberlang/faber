@@ -42,9 +42,20 @@ fn library_home() -> PathBuf {
 }
 
 fn norma_module_public_functions(module: &str) -> HashSet<String> {
+    // The kernel manifest speaks the manifest's short module identities
+    // (solum/processus/…); norma's English rename (norma 052ee66) moved the
+    // source files to English coordinates. Resolve the manifest identity to
+    // the live norma filename before reading the public surface.
+    let norma_coordinate = match module {
+        "solum" => "fs",
+        "processus" => "process",
+        "aleator" => "random",
+        "consolum" => "console",
+        other => other,
+    };
     let path = library_home()
         .join("norma/src")
-        .join(format!("{module}.fab"));
+        .join(format!("{norma_coordinate}.fab"));
     let source = fs::read_to_string(&path).unwrap_or_else(|err| panic!("failed to read {}: {err}", path.display()));
     extract_public_modulus_functions(&source)
 }

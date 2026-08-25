@@ -1272,9 +1272,11 @@ fn rejects_unknown_method_on_concrete_receiver() {
 #[test]
 fn rejects_unknown_tensor_method_at_typecheck() {
     // Tensor intrinsic misses must fail at check rather than infer a result
-    // that only fails later when a device target tries to lower it.
+    // that only fails later when a device target tries to lower it. `silu`
+    // joined the registered tensor surface (GEA2), so the probe rides a
+    // spelling the registry will never own.
     test_support::assert_rejects_with_issue(
-        "functio probe(tf32[2, 2] x) → tf32[2, 2] { redde x.silu() }",
+        "functio probe(tf32[2, 2] x) → tf32[2, 2] { redde x.nusquam_methodus() }",
         "unknown_method",
     );
 }
@@ -1566,11 +1568,15 @@ functio caller() → numerus ⇥ numerus {
         "expected failable call error type mismatch to be rejected"
     );
     let errors = &result.diagnostics;
+    // The declared-error-conversion law (error-conversion-declarations,
+    // archived 47ecd455b) names the rejection after the missing conversion
+    // arm and carries the error-type pair it could not convert.
     assert!(errors.iter().any(|err| err.args
-        == vec![radix_diagnostics::DiagnosticArg::new(
-            "issue",
-            "failable_call_enclosing_error_type_mismatch"
-        )]));
+        == vec![
+            radix_diagnostics::DiagnosticArg::new("issue", "failable_call_conversion_absent"),
+            radix_diagnostics::DiagnosticArg::new("source", "textus"),
+            radix_diagnostics::DiagnosticArg::new("destination", "numerus"),
+        ]));
 }
 
 #[test]
