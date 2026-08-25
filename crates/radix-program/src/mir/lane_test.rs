@@ -1199,38 +1199,3 @@ fn wrapper(int x) → int ⇥ GradusError {
 }
 "#;
 
-#[test]
-fn probe_itera_list() {
-    let lib = r#"+++
-locale = "en"
-+++
-@ private
-fn _digit(string c) → bool {
-    return c ≡ "0"
-}
-
-@ public
-fn all_digits(string s) → bool {
-    for from s const c {
-        if not _digit(c ↦ string) then return false
-    }
-    return true
-}
-"#;
-    let main = "import from \"italib:lib\" ita\n\nmain {\n    print ita.all_digits(\"12\")\n}\n";
-    let dir = crate::test_support::test_temp_dir("probe-itera-list");
-    let entry = write_library_package(dir.as_ref(), "italib", lib, main);
-    let config = Config::default().with_stdlib(dir.join("libhome"));
-
-    let mut host = BufferHost::default();
-    match run_package_mir(&config, &entry, &crate::test_support::test_mir_seams(), &mut host) {
-        Ok(()) => println!("ITERA-RESULT: ok stdout={:?}", host.stdout_lines),
-        Err(diagnostics) => println!(
-            "ITERA-RESULT: err {:?}",
-            diagnostics
-                .iter()
-                .map(|diag| (diag.code.clone(), diag.issue().map(|s| s.to_owned()), diag.message.clone()))
-                .collect::<Vec<_>>()
-        ),
-    }
-}
