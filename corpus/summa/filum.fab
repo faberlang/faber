@@ -33,8 +33,8 @@ locale = "la"
 # See also: summa, filum, nucleum, apud, tensor
 # =============================================================================
 
-@ nucleum
-functio column_dot(tf32[32] a, tf32[1] out, u32 id) → vacuum {
+@ nucleum lane "id"
+functio column_dot(tf32[32] a, tf32[1] out) → vacuum {
     fixum f32 total ← summa ex a apud [i] filum f fixum s {
         varia f32 t ← s * 1.4140625
         redde t

@@ -37,8 +37,8 @@ functio placement(tensor<f32, [32]> a) → f32 {
 }
 
 # 2. tail — K = 8 not aligned to the 32-lane width declines
-@ nucleum
-functio tail(tensor<f32, [8]> a, tf32[1] out, u32 id) → vacuum {
+@ nucleum lane "id"
+functio tail(tensor<f32, [8]> a, tf32[1] out) → vacuum {
     fixum f32 total ← summa ex a apud [i] filum f fixum s { redde s }
     out[id] ← total
 }
