@@ -61,13 +61,18 @@ functio stack_ops(stack<textus> s) → textus ∪ nihil {
 
 #[test]
 fn bounded_queue_and_stack_push_use_alternate_exit_but_pop_stays_nullable() {
-    assert_rejects_with_issue(
+    for source in [
         r"functio queue_push(queue<numerus, 2> q) → vacuum {
     varia queue<numerus, 2> values ← q
     values.appende(1)
 }",
-        "failable_call_requires_handler",
-    );
+        r##"functio stack_push(stack<textus, 2> s) → vacuum {
+    varia stack<textus, 2> values ← s
+    values.appende("top")
+}"##,
+    ] {
+        assert_rejects_with_issue(source, "failable_call_requires_handler");
+    }
     crate::test_support::assert_accepts(
         r"functio queue_pop(queue<numerus, 2> q) → numerus ∪ nihil {
     varia queue<numerus, 2> values ← q
@@ -78,5 +83,35 @@ functio stack_pop(stack<textus, 2> s) → textus ∪ nihil {
     varia stack<textus, 2> values ← s
     redde values.detrahe()
 }",
+    );
+}
+
+#[test]
+fn queue_and_stack_for_from_bind_elements_in_their_access_orders() {
+    crate::test_support::assert_accepts(
+        r#"functio queue_iter(queue<numerus> q) → vacuum {
+    itera ex q fixum item {
+        nota item
+    }
+}
+
+functio stack_iter(stack<textus, 2> s) → vacuum {
+    itera ex s fixum item {
+        nota item
+    }
+}"#,
+    );
+}
+
+#[test]
+fn queue_and_stack_empty_pop_recover_with_coalesce_without_a_handler() {
+    crate::test_support::assert_accepts(
+        r#"functio queue_recover(queue<numerus, 2> q) → numerus {
+    redde q.decapita() vel 0
+}
+
+functio stack_recover(stack<textus, 2> s) → textus {
+    redde s.detrahe() vel "empty"
+}"#,
     );
 }

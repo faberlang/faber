@@ -259,6 +259,18 @@ impl TypeChecker<'_> {
                                 self.error_type
                             }
                         },
+                        // Queue/stack expose only value iteration (`ex`). Their
+                        // access orders are distinct MIR laws: queue FIFO and
+                        // stack top-first LIFO. `de` is not an index surface for
+                        // either kind, so it remains fail-closed in MIR.
+                        Type::Queue(inner)
+                        | Type::BoundedQueue { element: inner, .. }
+                        | Type::Stack(inner)
+                        | Type::BoundedStack { element: inner, .. }
+                            if matches!(mode, radix_hir::HirIteraMode::Ex) =>
+                        {
+                            *inner
+                        }
                         Type::Map(key, value) => match mode {
                             radix_hir::HirIteraMode::Ex => *value,
                             radix_hir::HirIteraMode::De => *key,

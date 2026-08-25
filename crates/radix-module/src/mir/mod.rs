@@ -36,6 +36,10 @@ mod itera_destructure_tests;
 #[path = "bounded_itera_test.rs"]
 mod bounded_itera_test;
 
+#[cfg(test)]
+#[path = "queue_stack_test.rs"]
+mod queue_stack_test;
+
 // --- Core from radix-mir (module paths for residual code) ---
 pub use radix_mir::{
     abi, ai_workbench_stage5, artifact_completeness, boundary_abi, capability, control, device, device_semantics, dump,

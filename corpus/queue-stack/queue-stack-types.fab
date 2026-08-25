@@ -1,7 +1,7 @@
 +++
 term = "queue-stack"
 kind = "type"
-grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "typus_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "functio_decl", "param_list", "parameter", "return_clause"]
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "typus_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "functio_decl", "param_list", "parameter", "return_clause", "itera_stmt", "vel_expr", "vel_rhs"]
 category = "collection"
 canonical = false
 summary = "Queue and stack core kinds with optional capacity parameters."
@@ -49,4 +49,31 @@ fn queue_length(queue<int> input) → int {
 fn bounded_queue_push(queue<int, 2> input) → void ⇥ string {
   var queue<int, 2> q ← input
   q.append(1)
+}
+
+# =============================================================================
+# C4 access law — iteration order and nullable-pop recovery
+# =============================================================================
+
+# `for from` reads a queue in insertion order (FIFO).
+fn queue_iteration(queue<int> input) → void {
+  for from input const item {
+    print item
+  }
+}
+
+# `for from` reads a stack in removal order (top-first LIFO).
+fn stack_iteration(stack<int> input) → void {
+  for from input const item {
+    print item
+  }
+}
+
+# Empty pop is T ∪ null, so coalesce recovers a value instead of entering ⇥.
+fn queue_pop_recover(queue<int> input) → int {
+  return input.remove_first() coalesce 0
+}
+
+fn stack_pop_recover(stack<int> input) → int {
+  return input.remove_last() coalesce 0
 }

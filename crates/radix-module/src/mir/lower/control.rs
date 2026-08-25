@@ -42,6 +42,10 @@ struct RangeIteraLowering<'a> {
 #[derive(Clone)]
 enum CollectionIteraKind {
     Array(TypeId),
+    /// Queue value iteration preserves insertion order (FIFO).
+    Queue(TypeId),
+    /// Stack value iteration walks removal order (top-first LIFO).
+    Stack(TypeId),
     MapKeys(TypeId),
     MapValues(TypeId),
     Cursor(TypeId),
@@ -1509,6 +1513,12 @@ impl FunctionBuilder<'_> {
     fn borrowed_collection_itera_kind(&self, pointee: TypeId, mode: HirIteraMode) -> CollectionIteraKind {
         match self.normalized_type(pointee) {
             Type::Array(item) => CollectionIteraKind::Array(*item),
+            Type::Queue(item) | Type::BoundedQueue { element: item, .. } if matches!(mode, HirIteraMode::Ex) => {
+                CollectionIteraKind::Queue(*item)
+            }
+            Type::Stack(item) | Type::BoundedStack { element: item, .. } if matches!(mode, HirIteraMode::Ex) => {
+                CollectionIteraKind::Stack(*item)
+            }
             Type::Map(key, _) if matches!(mode, HirIteraMode::De) => CollectionIteraKind::MapKeys(*key),
             Type::Map(_, value) if matches!(mode, HirIteraMode::Ex) => CollectionIteraKind::MapValues(*value),
             _ => CollectionIteraKind::Unsupported,
@@ -1612,6 +1622,19 @@ impl FunctionBuilder<'_> {
                     }
                 }
                 Type::Array(item) => CollectionIteraKind::Array(*item),
+                // Queue and stack share the array-backed carrier but not its
+                // access order. Only `ex` admits the value iteration surface;
+                // `de`/`ab` stay unsupported rather than inventing an index law.
+                Type::Queue(item) | Type::BoundedQueue { element: item, .. }
+                    if matches!(iter.mode, HirIteraMode::Ex) =>
+                {
+                    CollectionIteraKind::Queue(*item)
+                }
+                Type::Stack(item) | Type::BoundedStack { element: item, .. }
+                    if matches!(iter.mode, HirIteraMode::Ex) =>
+                {
+                    CollectionIteraKind::Stack(*item)
+                }
                 Type::Map(key, _) if matches!(iter.mode, HirIteraMode::De) => CollectionIteraKind::MapKeys(*key),
                 Type::Map(_, value) if matches!(iter.mode, HirIteraMode::Ex) => CollectionIteraKind::MapValues(*value),
                 // Borrowed receiver (`de`/`in` param, or a field read through
@@ -1693,6 +1716,9 @@ impl FunctionBuilder<'_> {
                 };
                 (collection, binding_ty, matches!(iter.mode, HirIteraMode::De))
             }
+            CollectionIteraKind::Queue(item) | CollectionIteraKind::Stack(item) => {
+                (collection, MirType::semantic(*item), false)
+            }
             CollectionIteraKind::MapKeys(key) => {
                 let (snapshot_place, binding_ty) =
                     self.lower_map_itera_snapshot(collection, *key, MirCollectionOp::Keys, iter.iter.span)?;
@@ -1769,7 +1795,7 @@ impl FunctionBuilder<'_> {
         let condition = self.binary_temp(
             MirBinOp::Lt,
             MirOperand::Place(MirPlace::local(index)),
-            length,
+            length.clone(),
             bivalens,
             iter.span,
         );
@@ -1779,13 +1805,44 @@ impl FunctionBuilder<'_> {
         );
 
         self.switch_to(body_id);
-        let value = if array_de {
+        let stack_reverse = matches!(&collection_kind, CollectionIteraKind::Stack(_));
+        let source_index = if stack_reverse {
+            // The loop counter remains a zero-based visit count. Convert it to
+            // the source index only for stacks, so the first visit reads
+            // `length - 1` (the top) and subsequent visits walk toward zero.
+            let from_end = self.binary_temp(
+                MirBinOp::Sub,
+                length.clone(),
+                MirOperand::Place(MirPlace::local(index)),
+                numerus,
+                iter.span,
+            );
+            self.binary_temp(
+                MirBinOp::Sub,
+                from_end,
+                MirOperand::Constant(MirConstant::Int(1)),
+                numerus,
+                iter.span,
+            )
+        } else {
             MirOperand::Place(MirPlace::local(index))
+        };
+        let value = if matches!(&collection_kind, CollectionIteraKind::Queue(_) | CollectionIteraKind::Stack(_)) {
+            // Queue/stack carriers intentionally remain opaque MIR handles for
+            // method access. Read their array-backed runtime value through the
+            // collection index intrinsic rather than an index projection, whose
+            // representation contract is reserved for physical arrays.
+            self.runtime_call_value(
+                MirIntrinsic::Collection(MirCollectionOp::Index),
+                vec![MirOperand::Place(iteration_place.clone()), source_index],
+                binding_ty,
+                iter.span,
+            )
+        } else if array_de {
+            source_index
         } else {
             let mut indexed = iteration_place;
-            indexed
-                .projections
-                .push(MirProjection::Index(MirOperand::Place(MirPlace::local(index))));
+            indexed.projections.push(MirProjection::Index(source_index));
             MirOperand::Place(indexed)
         };
         self.assign(MirPlace::local(binding), value, binding_ty, iter.span);

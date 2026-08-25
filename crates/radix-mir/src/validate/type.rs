@@ -293,6 +293,23 @@ impl Validator<'_, '_> {
                 }
                 Some(MirType::semantic(inner))
             }
+            // Queue/stack iteration reads the array-backed runtime carrier
+            // through `Collection(Index)`, while the semantic types remain
+            // opaque handles for their method surfaces.
+            Type::Queue(inner)
+            | Type::BoundedQueue { element: inner, .. }
+            | Type::Stack(inner)
+            | Type::BoundedStack { element: inner, .. } => {
+                if let Some((_, index_ty)) = index {
+                    self.require_assignable(
+                        index_ty,
+                        self.primitive(Primitive::Numerus),
+                        span,
+                        "queue or stack index is not numerus",
+                    );
+                }
+                Some(MirType::semantic(inner))
+            }
             // Route B (AEU-4): bounded lista element gathers index the live
             // prefix lanes only (the lowerer emits constants below len).
             Type::BoundedArray { element, .. } => {
