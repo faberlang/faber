@@ -994,7 +994,7 @@ impl Parser {
     /// lowers to the same selectors as `loss(x) ∇ [x]`; both formatters re-emit
     /// the canonical spaced form. A non-empty selector list is required once `[` follows `∇`.
     fn parse_gradient_postfix(&mut self, start: Span, call: Expr) -> Result<Expr, ParseError> {
-        self.advance(); // consume `∇`
+        self.advance();
         let selectors = if self.check(&TokenKind::LBracket) {
             self.advance();
             if self.check(&TokenKind::RBracket) {
@@ -1742,9 +1742,8 @@ impl Parser {
             // Genus construction (`Type { ... }`) keeps Faber `=` grammar via
             // the `Ident` dispatch above.
             TokenKind::LBrace => {
-                let start = self.current_span();
                 self.advance();
-                self.parse_json_literal(start)?
+                self.parse_json_literal()?
             }
 
             TokenKind::LParen => {
@@ -2465,8 +2464,7 @@ impl Parser {
     /// Parse a JSON object literal whose opening `{` has already been consumed.
     ///
     /// Caller has advanced past `{`; this method consumes the closing `}`.
-    /// `start` is the `{` span, retained for future spanned diagnostics.
-    fn parse_json_literal(&mut self, _start: Span) -> Result<ExprKind, ParseError> {
+    fn parse_json_literal(&mut self) -> Result<ExprKind, ParseError> {
         let members = self.parse_json_object_members()?;
         Ok(ExprKind::Literal(Literal::JsonValor(JsonValue::Object(
             members,
