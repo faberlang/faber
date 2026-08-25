@@ -51,7 +51,6 @@ const SYNTHETIC_PROVIDER_DEF_ID_BASE: u32 = 0x7FFF_F000;
 /// Callable parameter metadata preserved for MIR call lowering.
 #[derive(Debug, Clone)]
 pub(super) struct CallableParamMeta<'a> {
-    pub _ty: TypeId,
     pub optional: bool,
     pub default: Option<&'a HirExpression>,
 }
@@ -72,6 +71,8 @@ struct FrozenMaps<'a> {
     variant_field_tys: Arc<FxHashMap<DefId, FxHashMap<Symbol, MirType>>>,
     conversion_arms: Arc<FxHashMap<(DefId, TypeId), DefId>>,
     top_level_consts: Arc<FxHashMap<DefId, &'a HirConst>>,
+    /// Producer-side defaults for imported class fields, keyed by importer-local type.
+    imported_struct_defaults: Arc<FxHashMap<DefId, Vec<(Symbol, HirExpression)>>>,
     provider_imports: Arc<FxHashMap<DefId, ProviderImport>>,
     method_targets: Arc<FxHashMap<(DefId, Symbol), MethodTarget>>,
     imported_method_providers: Arc<FxHashMap<(DefId, Symbol), ImportedMethodProvider>>,
@@ -169,6 +170,7 @@ impl<'a> LoweringContextMaps<'a> {
                 variant_field_tys: Arc::new(FxHashMap::default()),
                 conversion_arms: Arc::new(FxHashMap::default()),
                 top_level_consts: Arc::new(FxHashMap::default()),
+                imported_struct_defaults: Arc::new(FxHashMap::default()),
                 provider_imports: Arc::new(FxHashMap::default()),
                 method_targets: Arc::new(FxHashMap::default()),
                 imported_method_providers: Arc::new(FxHashMap::default()),
@@ -225,6 +227,7 @@ impl<'a> LoweringContextMaps<'a> {
             variant_field_tys: Arc::new(core::mem::take(&mut maps.variant_field_tys)),
             conversion_arms: Arc::new(core::mem::take(&mut maps.conversion_arms)),
             top_level_consts: Arc::new(core::mem::take(&mut maps.top_level_consts)),
+            imported_struct_defaults: Arc::new(core::mem::take(&mut maps.imported_struct_defaults)),
             provider_imports: Arc::new(core::mem::take(&mut maps.provider_imports)),
             method_targets: Arc::new(core::mem::take(&mut maps.method_targets)),
             imported_method_providers: Arc::new(core::mem::take(&mut maps.imported_method_providers)),
@@ -266,7 +269,7 @@ impl<'a> LoweringContextMaps<'a> {
             function_params,
             structs,
             struct_field_types,
-            imported_struct_defaults: Arc::new(self.imported_struct_defaults.clone()),
+            imported_struct_defaults: Arc::clone(&self.frozen.imported_struct_defaults),
             variant_parents: Arc::clone(&self.frozen.variant_parents),
             enum_variants: Arc::clone(&self.frozen.enum_variants),
             enum_type_params: Arc::clone(&self.frozen.enum_type_params),
@@ -776,7 +779,6 @@ pub(super) fn function_param_map(unit: &AnalyzedModule) -> FxHashMap<DefId, Vec<
                         .params
                         .iter()
                         .map(|param| CallableParamMeta {
-                            _ty: param.ty,
                             optional: param.optional,
                             default: param.default.as_ref(),
                         })
@@ -784,15 +786,14 @@ pub(super) fn function_param_map(unit: &AnalyzedModule) -> FxHashMap<DefId, Vec<
                 );
             }
             HirItemKind::Struct(strukt) => {
-                let Some(receiver_ty) = unit.types.find_struct(item.def_id) else {
+                if unit.types.find_struct(item.def_id).is_none() {
                     continue;
-                };
+                }
                 for method in &strukt.methods {
                     params.insert(
                         method.def_id,
-                        std::iter::once(CallableParamMeta { _ty: receiver_ty, optional: false, default: None })
+                        std::iter::once(CallableParamMeta { optional: false, default: None })
                             .chain(method.func.params.iter().map(|param| CallableParamMeta {
-                                _ty: param.ty,
                                 optional: param.optional,
                                 default: param.default.as_ref(),
                             }))
