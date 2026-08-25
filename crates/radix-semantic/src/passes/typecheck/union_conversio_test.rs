@@ -1,7 +1,7 @@
 //! E1 semantic contract for declaration-owned error-conversion arms.
 
 use super::test_support;
-use crate::{ConversionArm, Resolver, Type, TypeId};
+use crate::{ConversionArm, PassConfig, Resolver, Type, TypeId};
 use radix_hir::{DefId, HirExpressionKind, HirItemKind, HirStatementKind};
 use radix_lexer::Span;
 
@@ -82,6 +82,46 @@ fn valid_arm_lowers_to_an_enum_row_and_synthetic_function() {
         matches!(item.kind, HirItemKind::Function(_))
             && item.def_id == destination.conversion_arms[0].fn_def_id
     }));
+}
+
+#[test]
+fn la_conversio_arm_registers_with_the_installed_pack() {
+    let pack_path =
+        std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../stdlib/locale/la/pack.toml");
+    let pack = crate::locale::LocalePack::from_toml_path(&pack_path)
+        .expect("installed la pack should load");
+    // RED (F1): this row assertion fails while d2dd1c871 still declares the
+    // cross-locale `conversion` alias in the Latin pack.
+    assert!(
+        !pack.keywords.contains_key("conversion"),
+        "la must seal the English `conversion` spelling out of its pack"
+    );
+
+    let mut config = PassConfig::for_target(radix_target::Target::HirRust);
+    config.locale_pack = Some(pack);
+    let fixture = test_support::analyze_source_with_config(
+        "discretio Sourceum { Failed }\ndiscretio Destinatio { @ conversio Sourceum err { redde finge Converted {} ∷ Destinatio } Converted }",
+        config,
+    );
+    assert!(fixture.success(), "diagnostics: {:?}", fixture.diagnostics);
+    let hir = fixture.hir.as_ref().expect("typed HIR");
+    let destination = hir
+        .items
+        .iter()
+        .find_map(|item| match &item.kind {
+            HirItemKind::Enum(enum_item)
+                if fixture.interner.resolve(enum_item.name) == "Destinatio" =>
+            {
+                Some(enum_item)
+            }
+            _ => None,
+        })
+        .expect("destination enum");
+    assert_eq!(
+        destination.conversion_arms.len(),
+        1,
+        "the la `@ conversio` arm must register in typed HIR"
+    );
 }
 
 #[test]
