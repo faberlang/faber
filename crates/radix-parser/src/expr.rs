@@ -869,7 +869,7 @@ impl Parser {
                 self.reject_retired_shape_sugar_type_call_constructor(&expr)?;
                 expr = self.parse_index_postfix(start, expr)?;
             } else if self.check(&TokenKind::Transpose) {
-                expr = self.parse_transpose_postfix(start, expr)?;
+                expr = self.parse_transpose_postfix(start, expr);
             } else if self.check(&TokenKind::Nabla) {
                 expr = self.parse_gradient_postfix(start, expr)?;
             } else if self.check(&TokenKind::QuestionDot) {
@@ -953,7 +953,7 @@ impl Parser {
     /// Parse the source-only `ᵀ` suffix as a zero-argument call marker. The
     /// semantic pass rewrites the marker to the existing `transpone` intrinsic
     /// only after applying the rank-2 glyph law.
-    fn parse_transpose_postfix(&mut self, start: Span, object: Expr) -> Result<Expr, ParseError> {
+    fn parse_transpose_postfix(&mut self, start: Span, object: Expr) -> Expr {
         let glyph_span = self.current_span();
         self.advance();
         // Keep the private marker and canonical intrinsic spelling in the
@@ -973,7 +973,7 @@ impl Parser {
             }),
             span: start.merge(glyph_span),
         };
-        Ok(Expr {
+        Expr {
             id: self.next_id(),
             kind: ExprKind::Call(CallExpr {
                 callee: Box::new(callee),
@@ -981,7 +981,7 @@ impl Parser {
                 args: Vec::new(),
             }),
             span: start.merge(glyph_span),
-        })
+        }
     }
 
     /// Parse the postfix gradient suffix `∇ [places]?` bound to an already-parsed
@@ -1176,14 +1176,13 @@ impl Parser {
         // figura-law errors (missing comma after the element type) are genuine
         // diagnostics and still propagate.
         if let Some(issue) = shape_issue {
-            let malformed = match self.parse_type() {
-                Err(_) => true,
-                Ok(_) => {
-                    if !self.eat(&TokenKind::Comma) {
-                        return Err(self.expected_expression_error(issue));
-                    }
-                    self.parse_figura().is_err() || !self.eat(&TokenKind::GtAscii)
+            let malformed = if self.parse_type().is_err() {
+                true
+            } else {
+                if !self.eat(&TokenKind::Comma) {
+                    return Err(self.expected_expression_error(issue));
                 }
+                self.parse_figura().is_err() || !self.eat(&TokenKind::GtAscii)
             };
             if malformed {
                 self.restore(checkpoint);

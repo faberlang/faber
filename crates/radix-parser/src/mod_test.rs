@@ -2037,7 +2037,7 @@ fn parses_applied_generic_typed_constructor_with_size_argument() {
     // branch, not comparison: the `verte` target carries the kinded size
     // argument on the existing applied `TypeExpr` form (S0-G1).
     let result = parse_ok(
-        r#"
+        r"
 genus Gen<magnitudo N> {
     vector<f32, N> lanes
 }
@@ -2045,7 +2045,7 @@ genus Gen<magnitudo N> {
 functio facere(vector<f32, 3> lanes) → Gen<3> {
     redde Gen<3> { lanes = lanes }
 }
-"#,
+",
     );
 
     let program = result
@@ -2059,7 +2059,10 @@ functio facere(vector<f32, 3> lanes) → Gen<3> {
         panic!("expected function body");
     };
     let StmtKind::Redde(ret) = &body.statements[0].kind else {
-        panic!("expected return statement, got {:?}", body.statements[0].kind);
+        panic!(
+            "expected return statement, got {:?}",
+            body.statements[0].kind
+        );
     };
     let ret_value = ret.value.as_deref().expect("return value");
     let ExprKind::Verte(verte) = &ret_value.kind else {
@@ -2070,16 +2073,13 @@ functio facere(vector<f32, 3> lanes) → Gen<3> {
     };
     assert_eq!(symbol_name(&result, head.name), "Gen");
     assert_eq!(params.len(), 1);
-    assert!(matches!(
-        params[0],
-        radix_syntax::GenericArgExpr::Size(_)
-    ));
+    assert!(matches!(params[0], radix_syntax::GenericArgExpr::Size(_)));
 }
 
 #[test]
 fn parses_qualified_applied_generic_typed_constructor() {
     let result = parse_ok(
-        r#"
+        r"
 genus Gen<magnitudo N> {
     vector<f32, N> lanes
 }
@@ -2087,7 +2087,7 @@ genus Gen<magnitudo N> {
 functio facere(vector<f32, 3> lanes) → Gen<3> {
     redde pkg.Gen<3> { lanes = lanes }
 }
-"#,
+",
     );
 
     let program = result
@@ -2112,10 +2112,7 @@ functio facere(vector<f32, 3> lanes) → Gen<3> {
     };
     assert_eq!(path.len(), 2);
     assert_eq!(params.len(), 1);
-    assert!(matches!(
-        params[0],
-        radix_syntax::GenericArgExpr::Size(_)
-    ));
+    assert!(matches!(params[0], radix_syntax::GenericArgExpr::Size(_)));
 }
 
 #[test]
@@ -2124,11 +2121,11 @@ fn applied_generic_head_without_field_block_stays_comparison() {
     // block follows, so `a < b` comparison parsing stays owned by the
     // binary operator branch (S0-G1 ambiguity guard).
     let result = parse_ok(
-        r#"
+        r"
 functio facere(numerus a, numerus b) → boolean {
     redde a < b
 }
-"#,
+",
     );
 
     let program = result
@@ -2156,11 +2153,11 @@ fn applied_generic_head_without_field_block_stays_comparison_with_natural() {
     // `flag < 3` — a natural literal argument alone must not claim the head;
     // only `< … > { fields }` does.
     let result = parse_ok(
-        r#"
+        r"
 functio facere(numerus flag) → boolean {
     redde flag < 3
 }
-"#,
+",
     );
 
     let program = result
