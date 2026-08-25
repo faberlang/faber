@@ -8,6 +8,10 @@
 //! (`fixum f32 GELU_ALPHA ← (0.79… ∷ f32)`) transplant through the entry's
 //! top-level-const seam instead of failing with "package MIR cannot transplant
 //! const data member initializer with unsupported expression shape".
+//! (iii) Const-to-const initializers (`ELEMENTS ← N * K`) transplant by
+//! rewriting the inner `Path` to the referenced linked const's synthetic def
+//! id; a `Path` with no linked const target still fails closed (MC6,
+//! 7df48a51).
 //! The PML4 composed loop (gradus/exempla/training-loop-mlp) executes on the
 //! FMIR lane with its trajectory matching the train.proba U6 pins.
 
@@ -483,6 +487,161 @@ fn package_mir_const_data_member_verte_initializer_transplants() {
     assert!(
         (value - 0.7978845608028654).abs() < 1e-4,
         "the ascription-cast const must keep its value, got {value}"
+    );
+}
+
+// MC6 (7df48a51): const-to-const initializers (`ELEMENTS ← N * K`, the
+// gradus kernel.fab GEMV shape) transplant by rewriting the inner `Path`
+// to the referenced const's synthetic def id.
+const PATH_CONST_SIBLING_MATH: &str =
+    "const int N ← 320\n\nconst int K ← 960\n\nconst int ELEMENTS ← N * K\n";
+const PATH_CONST_SIBLING_MAIN: &str =
+    "import from \"./math\" math\n\nmain {\n    print math.ELEMENTS\n}\n";
+const PATH_CONST_LIB: &str =
+    "+++\nlocale = \"en\"\n+++\nconst int N ← 320\n\nconst int K ← 960\n\nconst int ELEMENTS ← N * K\n";
+const PATH_CONST_LIB_MAIN: &str =
+    "import from \"pathclib:lib\" vals\n\nmain {\n    print vals.ELEMENTS\n}\n";
+// The rejection boundary: a `Path` to a const that is NOT a linked data
+// member (`@ private` never reaches the export surface) fails closed.
+const PATH_CONST_PRIVATA_MATH: &str =
+    "@ private\nconst int PRIVATE_N ← 320\n\nconst int ELEMENTS ← PRIVATE_N * 3\n";
+const PATH_CONST_PRIVATA_MAIN: &str =
+    "import from \"./math\" math\n\nmain {\n    print math.ELEMENTS\n}\n";
+
+/// Write a two-unit local package (`src/<sibling>.fab` + `src/main.fab`) with
+/// the sibling imported as a namespace binding.
+fn write_sibling_namespace_package(
+    dir: &std::path::Path,
+    sibling_name: &str,
+    sibling_source: &str,
+    main_source: &str,
+) -> std::path::PathBuf {
+    let src = dir.join("src");
+    fs::create_dir_all(&src).expect("create sibling package src");
+    fs::write(
+        dir.join("faber.toml"),
+        format!(
+            r#"
+[package]
+name = "fhir-lane-{sibling_name}"
+version = "1.0.0"
+edition = "2026"
+
+[paths]
+source = "src"
+entry = "main.fab"
+
+[build]
+target = "fmir"
+kind = "bin"
+
+[reader]
+locale = "en"
+"#
+        ),
+    )
+    .expect("write faber.toml");
+    fs::write(src.join(format!("{sibling_name}.fab")), sibling_source)
+        .expect("write sibling module");
+    fs::write(src.join("main.fab"), main_source).expect("write main module");
+    src.join("main.fab")
+}
+
+#[test]
+fn package_mir_const_data_member_path_initializer_transplants_sibling() {
+    // MC6 admitted shape (sibling variant, the gradus kernel.fab scenario):
+    // `const int ELEMENTS ← N * K` references sibling consts N and K. The
+    // initializer's `Path` operands rewrite to the linked consts' synthetic
+    // def ids, so the transplant runs and `math.ELEMENTS` evaluates 320*960.
+    let dir = crate::test_support::test_temp_dir("mc6-path-sibling");
+    let entry = write_sibling_namespace_package(
+        dir.path(),
+        "math",
+        PATH_CONST_SIBLING_MATH,
+        PATH_CONST_SIBLING_MAIN,
+    );
+    let config = Config::default().with_stdlib(dir.join("libhome"));
+
+    let mut host = BufferHost::default();
+    run_package_mir(
+        &config,
+        &entry,
+        &crate::test_support::test_mir_seams(),
+        &mut host,
+    )
+    .expect("const-to-const sibling initializer must transplant");
+    assert_eq!(
+        host.stdout_lines,
+        vec!["307200".to_owned()],
+        "N * K must evaluate through the transplanted Path references"
+    );
+}
+
+#[test]
+fn package_mir_const_data_member_path_initializer_transplants_library() {
+    // MC6 admitted shape (cross-package variant): the same const-to-const
+    // initializer behind a library import rewrites through the linked
+    // library's source-path entry of the const rewrite map.
+    let dir = crate::test_support::test_temp_dir("mc6-path-library");
+    let entry = write_library_package(
+        dir.as_ref(),
+        "pathclib",
+        PATH_CONST_LIB,
+        PATH_CONST_LIB_MAIN,
+    );
+    let config = Config::default().with_stdlib(dir.join("libhome"));
+
+    let mut host = BufferHost::default();
+    run_package_mir(
+        &config,
+        &entry,
+        &crate::test_support::test_mir_seams(),
+        &mut host,
+    )
+    .expect("const-to-const library initializer must transplant");
+    assert_eq!(
+        host.stdout_lines,
+        vec!["307200".to_owned()],
+        "N * K must evaluate through the transplanted Path references"
+    );
+}
+
+#[test]
+fn package_mir_const_data_member_path_initializer_unlinked_target_fails_closed() {
+    // MC6 rejection boundary: `ELEMENTS ← PRIVATE_N * 3` references an
+    // `@ privata` const that never enters the export surface, so it is not a
+    // linked data member and has no synthetic def id. The transplant fails
+    // closed with the data-member diagnostic instead of silently carrying a
+    // dangling cross-analysis Path.
+    let dir = crate::test_support::test_temp_dir("mc6-path-privata");
+    let entry = write_sibling_namespace_package(
+        dir.path(),
+        "math",
+        PATH_CONST_PRIVATA_MATH,
+        PATH_CONST_PRIVATA_MAIN,
+    );
+    let config = Config::default().with_stdlib(dir.join("libhome"));
+
+    let mut host = BufferHost::default();
+    let diagnostics = run_package_mir(
+        &config,
+        &entry,
+        &crate::test_support::test_mir_seams(),
+        &mut host,
+    )
+    .expect_err("an unlinked Path target must fail the package MIR link");
+    assert!(
+        diagnostics.iter().any(|diagnostic| {
+            diagnostic.issue() == Some("package_mir_data_member_unsupported")
+                && diagnostic
+                    .message
+                    .contains("Path reference without a linked const data member target")
+        }),
+        "expected the fail-closed Path diagnostic, got {:?}",
+        diagnostics
+            .iter()
+            .map(|diagnostic| (diagnostic.code, diagnostic.issue(), &diagnostic.message))
+            .collect::<Vec<_>>()
     );
 }
 

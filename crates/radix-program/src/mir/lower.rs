@@ -1035,6 +1035,26 @@ fn inject_package_data_members<'a>(
     let others = others.into_iter().collect::<Vec<_>>();
     let mut diagnostics = Vec::new();
     let entry_path = entry.path.clone();
+    // Const-to-const references inside linked initializers (`ELEMENTS ← N *
+    // K`) rewrite through the linked-const entries of `links.sources`. The
+    // map keeps only synthetic ids that belong to a transplanted const data
+    // member — `links.sources` also rewrites linked functions, and a const
+    // initializer must not silently reference one of those.
+    let const_members: HashSet<DefId> = links
+        .data_members
+        .iter()
+        .map(|member| member.synthetic)
+        .collect();
+    let mut const_path_rewrites: HashMap<&PathBuf, HashMap<DefId, DefId>> = HashMap::new();
+    for ((source_path, def_id), synthetic) in &links.sources {
+        if const_members.contains(synthetic) {
+            const_path_rewrites
+                .entry(source_path)
+                .or_default()
+                .insert(*def_id, *synthetic);
+        }
+    }
+    let no_rewrites = HashMap::new();
     for member in &links.data_members {
         if member.source_path == entry_path {
             // Same-unit consts already lower through the entry's own
@@ -1092,6 +1112,9 @@ fn inject_package_data_members<'a>(
             source_types,
             source_resolver,
             &source_interface,
+            const_path_rewrites
+                .get(&member.source_path)
+                .unwrap_or(&no_rewrites),
             entry,
         ) {
             Ok(item) => item,
@@ -1122,6 +1145,7 @@ fn transplant_data_member(
     source_types: &TypeTable,
     source_resolver: &Resolver,
     source_interface: &FileInterface,
+    const_path_rewrites: &HashMap<DefId, DefId>,
     entry: &mut AnalyzedProgramNode,
 ) -> Result<HirItem, String> {
     let mut imported = HashMap::new();
@@ -1170,6 +1194,7 @@ fn transplant_data_member(
             &mut entry.analysis.types,
             &mut imported,
             Some(&nominal),
+            const_path_rewrites,
         )?,
         mutable: member.konst.mutable,
         is_await: member.konst.is_await,
@@ -1192,9 +1217,11 @@ fn remap_symbol(symbol: Symbol, source: &Interner, target: &mut Interner) -> Sym
 
 /// Transplant a const initializer expression into the entry analysis:
 /// re-intern text symbols and import every semantic type. Expression shapes
-/// that reference cross-analysis definitions (paths, calls, fields, struct
-/// literals, …) fail closed — those are the nominal/value-member surfaces U2
-/// carries, not the U1 const-value ABI.
+/// that reference cross-analysis definitions (calls, fields, struct literals,
+/// paths to non-linked definitions, …) fail closed — those are the
+/// nominal/value-member surfaces U2 carries, not the U1 const-value ABI.
+/// The one admitted cross-definition shape is a `Path` to another linked
+/// const data member, which rewrites to that member's synthetic def id.
 fn transplant_expr(
     expr: &HirExpression,
     source_interner: &Interner,
@@ -1203,6 +1230,7 @@ fn transplant_expr(
     entry_types: &mut TypeTable,
     imported: &mut HashMap<TypeId, TypeId>,
     nominal: Option<&NominalImportContext<'_>>,
+    const_path_rewrites: &HashMap<DefId, DefId>,
 ) -> Result<HirExpression, String> {
     let ty = expr.ty.map(|ty| {
         import_semantic_type_with_nominal(source_types, entry_types, ty, imported, nominal)
@@ -1222,6 +1250,7 @@ fn transplant_expr(
                 entry_types,
                 imported,
                 nominal,
+                const_path_rewrites,
             )?),
             Box::new(transplant_expr(
                 rhs,
@@ -1231,6 +1260,7 @@ fn transplant_expr(
                 entry_types,
                 imported,
                 nominal,
+                const_path_rewrites,
             )?),
         ),
         HirExpressionKind::Unary(op, inner) => HirExpressionKind::Unary(
@@ -1243,6 +1273,7 @@ fn transplant_expr(
                 entry_types,
                 imported,
                 nominal,
+                const_path_rewrites,
             )?),
         ),
         HirExpressionKind::Array(elements) => {
@@ -1258,6 +1289,7 @@ fn transplant_expr(
                             entry_types,
                             imported,
                             nominal,
+                            const_path_rewrites,
                         )?)
                     }
                     radix_module::hir::HirArrayElement::Spread(element) => {
@@ -1269,6 +1301,7 @@ fn transplant_expr(
                             entry_types,
                             imported,
                             nominal,
+                            const_path_rewrites,
                         )?)
                     }
                 });
@@ -1286,6 +1319,7 @@ fn transplant_expr(
                     entry_types,
                     imported,
                     nominal,
+                    const_path_rewrites,
                 )?);
             }
             let type_args = type_args.as_ref().map(|args| {
@@ -1314,6 +1348,7 @@ fn transplant_expr(
                     entry_types,
                     imported,
                     nominal,
+                    const_path_rewrites,
                 )?);
             }
             HirExpressionKind::Scriptum(
@@ -1332,6 +1367,7 @@ fn transplant_expr(
                     entry_types,
                     imported,
                     nominal,
+                    const_path_rewrites,
                 )?);
             }
             HirExpressionKind::Scribe(*kind, transplanted)
@@ -1354,6 +1390,7 @@ fn transplant_expr(
                 entry_types,
                 imported,
                 nominal,
+                const_path_rewrites,
             )?);
             let target = import_semantic_type_with_nominal(
                 source_types,
@@ -1390,6 +1427,7 @@ fn transplant_expr(
                                     entry_types,
                                     imported,
                                     nominal,
+                                    const_path_rewrites,
                                 )?)
                             }
                             radix_module::hir::HirObjectKey::Spread(expr) => {
@@ -1401,6 +1439,7 @@ fn transplant_expr(
                                     entry_types,
                                     imported,
                                     nominal,
+                                    const_path_rewrites,
                                 )?)
                             }
                         };
@@ -1416,6 +1455,7 @@ fn transplant_expr(
                                     entry_types,
                                     imported,
                                     nominal,
+                                    const_path_rewrites,
                                 )
                             })
                             .transpose()?;
@@ -1431,6 +1471,23 @@ fn transplant_expr(
                 entries,
             }
         }
+        // Const-to-const reference: the initializer names another linked
+        // const data member of the same source unit (e.g. `ELEMENTS ← N *
+        // K` in gradus kernel.fab). Rewriting to that member's synthetic def
+        // id materializes the reference through the entry's top-level-const
+        // seam, exactly like the entry's own rewritten member references.
+        // Paths without a linked const target — functions, non-linked
+        // definitions, anything else the source analysis resolves — fail
+        // closed below.
+        HirExpressionKind::Path(def_id) => match const_path_rewrites.get(def_id) {
+            Some(synthetic) => HirExpressionKind::Path(*synthetic),
+            None => {
+                return Err(
+                    "package MIR cannot transplant const data member initializer Path reference without a linked const data member target"
+                        .to_string(),
+                );
+            }
+        },
         _ => {
             return Err(
                 "package MIR cannot transplant const data member initializer with unsupported expression shape"
