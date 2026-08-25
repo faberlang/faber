@@ -21,7 +21,15 @@ const TENSOR_STRUE: &str = "strue";
 const TENSOR_FORMA: &str = "forma";
 const TENSOR_CREA: &str = "crea";
 const TENSOR_SECTIO: &str = "sectio";
-const TENSOR_TRANSPONE: &str = "transpone";
+pub(super) const TENSOR_TRANSPONE: &str = "transpone";
+pub(super) const GLYPH_TRANSPOSE_METHOD: &str = "__faber_glyph_transpose";
+pub(super) const ISSUE_GLYPH_TRANSPOSE_OPERANDS_UNSUPPORTED: &str =
+    "glyph_transpose_operands_unsupported";
+pub(super) const ISSUE_GLYPH_TRANSPOSE_RANK1: &str =
+    "glyph_transpose_rank1_no_row_column_distinction";
+pub(super) const ISSUE_GLYPH_TRANSPOSE_RANK3_PLUS: &str =
+    "glyph_transpose_rank3_plus_deferred_batched_consumer";
+pub(super) const ISSUE_GLYPH_TRANSPOSE_RANK_REQUIRED: &str = "glyph_transpose_static_rank_required";
 const TENSOR_ADDITA: &str = "addita";
 const TENSOR_SUBTRAHE: &str = "subtrahe";
 const TENSOR_MULTIPLICA: &str = "multiplica";
@@ -59,6 +67,33 @@ pub(super) fn record_shape_witness_from_init(
 pub(super) fn tensor_with_fresh_shape(checker: &mut TypeChecker<'_>, elem: TypeId) -> TypeId {
     let shape = checker.fresh_index_hole();
     checker.types.tensor_with_shape(elem, shape)
+}
+
+/// Return the named rank-law decline for the source-only `ᵀ` glyph, when the
+/// receiver is not an admitted rank-2 tensor. Rank-1 is a permanent decline:
+/// there is no row/column distinction. Rank 3+ is deliberately deferred until
+/// a batched-transpose consumer owns the shape and device contract.
+pub(super) fn glyph_transpose_rank_issue(
+    checker: &mut TypeChecker<'_>,
+    receiver_ty: TypeId,
+) -> Option<&'static str> {
+    let resolved = checker.resolve_inferred_type(receiver_ty);
+    let (_, payload) = checker.types.peel_access_marker(resolved);
+    let Type::Tensor(_, shape) = checker.types.get(payload) else {
+        return Some(ISSUE_GLYPH_TRANSPOSE_OPERANDS_UNSUPPORTED);
+    };
+    let shape = checker.resolve_index(*shape);
+    match checker.types.get_index(shape) {
+        IndexExpr::Literal(_) => Some(ISSUE_GLYPH_TRANSPOSE_RANK1),
+        IndexExpr::Tuple(dims) => match dims.len() {
+            2 => None,
+            0 | 1 => Some(ISSUE_GLYPH_TRANSPOSE_RANK1),
+            _ => Some(ISSUE_GLYPH_TRANSPOSE_RANK3_PLUS),
+        },
+        IndexExpr::Param(_) | IndexExpr::Infer(_) | IndexExpr::Unspecified => {
+            Some(ISSUE_GLYPH_TRANSPOSE_RANK_REQUIRED)
+        }
+    }
 }
 
 /// Whether a tensor intrinsic changes the result shape relative to the receiver.

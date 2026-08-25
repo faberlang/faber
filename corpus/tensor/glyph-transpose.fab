@@ -1,0 +1,46 @@
++++
+term = "ᵀ"
+kind = "operator-group"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "shape_suffix", "expression", "call_expr", "member_suffix", "literal", "redde_stmt"]
+category = "arithmetic"
+summary = "Postfix ᵀ transpose: rank-2 tensor [M,N] becomes [N,M]."
+syntax = "<rank-2 tensor expression>ᵀ"
+related = ["tensor", "matmul"]
+locale = "en"
++++
+
+# =============================================================================
+# ᵀ — rank-2 postfix transpose.
+# =============================================================================
+#
+# What this teaches:
+#   • `ᵀ` is postfix sugar for the existing `transpone` intrinsic and
+#     TensorTranspose plan, not a new runtime operation.
+#   • v1 admits rank-2 tensors only: `[M,N] → [N,M]`.
+#   • Rank-1 has no row/column distinction and rank-3+ waits for a batched
+#     transpose consumer; both are named semantic declines.
+#
+# Precedence is settled: `a · bᵀ ∇ [x]` parses `(a · bᵀ) ∇ [x]`; the transpose
+# suffix binds inside the selected multiplicative value, while ∇ remains
+# parse-only.
+#
+# EXPECTED stdout:
+#   [[1.0, 3.0], [2.0, 4.0]]
+#
+# See also: tensor, matmul, ᵀ
+# =============================================================================
+
+fn transpose_demo(tensor<f32, [2, 2]> input) → tensor<f32, [2, 2]> {
+    return inputᵀ
+}
+
+main {
+    const list<f32> flat ← [1.0, 2.0, 3.0, 4.0]
+    const tf32[] seed ← empty
+    var tf32[2, 2] input ← seed.from_flat(flat, [2, 2])
+    var tf32[2, 2] output ← transpose_demo(input)
+    print output.get([0, 0]) coalesce 0.0
+    print output.get([0, 1]) coalesce 0.0
+    print output.get([1, 0]) coalesce 0.0
+    print output.get([1, 1]) coalesce 0.0
+}

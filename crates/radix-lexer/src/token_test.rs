@@ -70,6 +70,7 @@ fn glyph_product_tokens_are_operators_not_keywords() {
         TokenKind::Cross,
         TokenKind::CircledTimes,
         TokenKind::CircledDot,
+        TokenKind::Transpose,
         TokenKind::Nabla,
     ] {
         assert!(
@@ -79,6 +80,21 @@ fn glyph_product_tokens_are_operators_not_keywords() {
         assert!(!kind.is_comment(), "{kind:?} must not classify as trivia");
         assert!(!kind.is_trivia(), "{kind:?} must not classify as trivia");
     }
+}
+
+#[test]
+fn transpose_lexes_as_dedicated_postfix_operator() {
+    let result = crate::lex("xᵀ");
+    assert!(
+        result.errors.is_empty(),
+        "U+1D40 must lex cleanly: {:?}",
+        result.errors
+    );
+    assert!(result
+        .tokens
+        .iter()
+        .any(|token| token.kind == TokenKind::Transpose));
+    assert!(!TokenKind::Transpose.is_keyword());
 }
 
 #[test]

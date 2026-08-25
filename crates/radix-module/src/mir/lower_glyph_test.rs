@@ -69,6 +69,20 @@ fn glyph_binop(op: HirBinOp, lhs: &HirExpression, rhs: &HirExpression, ty: TypeI
 // ===========================================================================
 
 #[test]
+fn lowers_glyph_transpose_to_tensor_transpose_collection_op() {
+    let dump = dump_source(
+        r"
+functio transpose(tensor<f32, [2, 3]> input) → tensor<f32, [3, 2]> {
+    redde inputᵀ
+}
+",
+    );
+
+    assert!(dump.contains("runtime collection tensor_transpose"), "{dump}");
+    assert!(!dump.contains("method call before runtime/provider MIR lowering"), "{dump}");
+}
+
+#[test]
 fn lowers_glyph_vector_dot_to_lane_mul_add() {
     let dump = dump_source(
         r"

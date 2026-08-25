@@ -310,6 +310,9 @@ impl<'a> Lexer<'a> {
             '⊗' => TokenKind::CircledTimes,
             '⊙' => TokenKind::CircledDot,
 
+            // Postfix tensor transpose (tensor-glyphs family).
+            'ᵀ' => TokenKind::Transpose,
+
             // Postfix gradient selection (tensor-glyphs family).
             '∇' => TokenKind::Nabla,
 
@@ -502,6 +505,9 @@ impl<'a> Lexer<'a> {
             '«' => return self.scan_guillemet_block_string(start),
             '/' => return self.scan_slash(start),
             '0'..='9' => return self.scan_number(start, c),
+            // U+1D40 is XID-compatible after NFKC, so claim it before the
+            // identifier arm can normalize it to plain `T`.
+            'ᵀ' => return self.emit_token(TokenKind::Transpose, start),
             c if is_ident_start(c) => return self.scan_identifier(start),
             c => {
                 if let Some(kind) = self.scan_operator(c) {
@@ -915,9 +921,25 @@ impl<'a> Lexer<'a> {
     /// keyword spellings still lex as identifiers; their latin keys are
     /// recorded for parser claim.
     fn scan_identifier(&mut self, start: u32) {
-        self.cursor.eat_while(is_ident_continue);
+        // U+1D40 is XID-compatible under NFKC, but it is a postfix operator
+        // rather than identifier text. Make it a lexical boundary so `xᵀ`
+        // produces `Ident("x")`, `Transpose` instead of one normalized name.
+        self.cursor.eat_while(|c| c != 'ᵀ' && is_ident_continue(c));
 
         let text = self.cursor.slice(start, self.cursor.pos());
+        if let Some(suggestion) = homoglyph_identifier_suggestion(text) {
+            self.emit_error(
+                LexErrorKind::CharacterUnexpected,
+                start,
+                vec![
+                    DiagnosticArg::new("issue", HOMOGLYPH_ISSUE),
+                    DiagnosticArg::new("char", text),
+                    DiagnosticArg::new("suggestion", suggestion),
+                ],
+            );
+            self.emit_token(TokenKind::Error, start);
+            return;
+        }
         let normalized: String = text.nfkc().collect();
         let kind = self.keyword_or_ident(&normalized, Span::new(start, self.cursor.pos()));
         self.emit_token(kind, start);
@@ -983,6 +1005,13 @@ impl<'a> Lexer<'a> {
 
         TokenKind::Ident(self.interner.intern_normalized(text))
     }
+}
+
+fn homoglyph_identifier_suggestion(text: &str) -> Option<&'static str> {
+    // U+1D57 normalizes to plain `t`, but is not the admitted modifier-capital
+    // T operator. Reject the source token with the same locale-invariant
+    // did-you-mean fact as other rejected glyphs.
+    (text == "ᵗ").then_some("ᵀ")
 }
 
 fn homoglyph_suggestion(c: char) -> Option<&'static str> {

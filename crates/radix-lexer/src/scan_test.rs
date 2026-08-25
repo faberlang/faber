@@ -616,24 +616,18 @@ fn norm_homoglyphs_suggest_method_shaped_norms() {
 }
 
 #[test]
-fn reserved_transpose_lookalikes_and_non_map_glyphs_get_no_u2_advice() {
+fn transpose_lookalikes_get_the_canonical_suffix_advice() {
     let transpose = lex("ᵀ");
-    assert!(
-        transpose.errors.is_empty(),
-        "U3 owns ᵀ admission; U2 adds no advice"
-    );
+    assert!(transpose.errors.is_empty(), "ᵀ is the admitted token");
     assert!(transpose
         .tokens
         .iter()
-        .any(|token| matches!(token.kind, TokenKind::Ident(_))));
+        .any(|token| token.kind == TokenKind::Transpose));
 
-    let superscript_t = lex("ᵗ");
-    assert!(
-        superscript_t.errors.is_empty(),
-        "ᵗ remains an identifier lookalike"
-    );
-    assert!(superscript_t.reader_keyword_latin_keys.is_empty());
+    assert_homoglyph_did_you_mean("ᵗ", "ᵗ", "ᵀ");
 
+    // Plain `T` remains a legal identifier: the language cannot reject it at
+    // lex time without breaking generic type parameters and ordinary names.
     let plain_t = lex("T");
     assert!(plain_t.errors.is_empty(), "plain T remains an identifier");
     assert!(plain_t.reader_keyword_latin_keys.is_empty());

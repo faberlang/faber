@@ -1322,8 +1322,54 @@ fn same_module_finge_construction_unchanged() {
 }
 
 // ---------------------------------------------------------------------------
-// Postfix gradient selection (`call(...) ∇` / `call(...) ∇ [places]`)
+// Postfix transpose and gradient selection
 // ---------------------------------------------------------------------------
+
+#[test]
+fn postfix_transpose_parses_as_zero_argument_method_marker() {
+    let result = parse_ok("fixum _ t ← valueᵀ");
+    let program = result.program.as_ref().expect("program");
+    let StmtKind::Var(var) = &program.statements[0].kind else {
+        panic!("expected variable declaration");
+    };
+    let ExprKind::Call(call) = &var.init.as_deref().expect("initializer").kind else {
+        panic!("expected transpose call marker");
+    };
+    let ExprKind::Member(member) = &call.callee.kind else {
+        panic!("expected transpose member marker");
+    };
+    assert_eq!(
+        result.interner.resolve(member.member.name),
+        "__faber_glyph_transpose"
+    );
+    assert!(call.args.is_empty());
+    assert!(call.type_args.is_empty());
+}
+
+#[test]
+fn transpose_binds_before_gradient_selection_after_multiplication() {
+    let result = parse_ok("fixum _ g ← a · bᵀ ∇ [x]");
+    let program = result.program.as_ref().expect("program");
+    let StmtKind::Var(var) = &program.statements[0].kind else {
+        panic!("expected variable declaration");
+    };
+    let ExprKind::Gradient(gradient) = &var.init.as_deref().expect("initializer").kind else {
+        panic!("expected gradient selection, got {:?}", var.init);
+    };
+    let ExprKind::Binary(dot) = &gradient.call.kind else {
+        panic!(
+            "selection must wrap the multiplication, got {:?}",
+            gradient.call.kind
+        );
+    };
+    assert_eq!(dot.op, BinOp::Dot);
+    assert!(matches!(dot.lhs.kind, ExprKind::Ident(_)));
+    let ExprKind::Call(transpose) = &dot.rhs.kind else {
+        panic!("transpose must stay on the dot RHS, got {:?}", dot.rhs.kind);
+    };
+    assert!(matches!(transpose.callee.kind, ExprKind::Member(_)));
+    assert_eq!(gradient.selectors.len(), 1);
+}
 
 fn gradient_expr(result: &ParseResult, statement_index: usize) -> &radix_syntax::GradientExpr {
     let program = result.program.as_ref().expect("program");

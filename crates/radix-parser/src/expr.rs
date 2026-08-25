@@ -27,6 +27,11 @@ use radix_lexer::{lookup_keyword_spec, KeywordOwner, KeywordScope, Span, Symbol,
 use radix_syntax::*;
 use std::collections::HashSet;
 
+/// Internal HIR bridge for the source-only `ᵀ` suffix. Semantic checking
+/// rewrites this marker to the canonical `transpone` intrinsic after applying
+/// the glyph's stricter rank law.
+const GLYPH_TRANSPOSE_METHOD: &str = "__faber_glyph_transpose";
+
 // EXPRESSION ENTRY POINT
 
 impl Parser {
@@ -485,10 +490,52 @@ impl Parser {
             };
             self.advance();
             let right = self.parse_coalesce_inner(allow_conversio)?;
-            left = self.binary_expr(start, left, op, right);
+            let binary = self.binary_expr(start, left, op, right);
+            left = self.reassociate_gradient_selection(binary);
         }
 
         Ok(left)
+    }
+
+    /// The settled tensor-glyph precedence law keeps a postfix transpose inside
+    /// the selected value: `a · bᵀ ∇ [x]` is `(a · bᵀ) ∇ [x]`, not
+    /// `a · (bᵀ ∇ [x])`. The ordinary gradient parser still owns the suffix;
+    /// this narrow reassociation only moves a gradient that was consumed while
+    /// parsing the right multiplicative operand.
+    fn reassociate_gradient_selection(&mut self, expr: Expr) -> Expr {
+        let Expr {
+            id,
+            kind: ExprKind::Binary(BinaryExpr { op, lhs, rhs }),
+            span,
+        } = expr
+        else {
+            return expr;
+        };
+        let ExprKind::Gradient(gradient) = rhs.kind else {
+            return Expr {
+                id,
+                kind: ExprKind::Binary(BinaryExpr { op, lhs, rhs }),
+                span,
+            };
+        };
+        let call_span = gradient.call.span;
+        let inner = Expr {
+            id,
+            kind: ExprKind::Binary(BinaryExpr {
+                op,
+                lhs,
+                rhs: gradient.call,
+            }),
+            span: span.merge(call_span),
+        };
+        Expr {
+            id: self.next_id(),
+            kind: ExprKind::Gradient(GradientExpr {
+                call: Box::new(inner),
+                selectors: gradient.selectors,
+            }),
+            span,
+        }
     }
 
     /// Local nullable elimination (`vel`). Left-associative: `a vel b vel c`.
@@ -772,6 +819,7 @@ impl Parser {
     ///   call := `(` args `)`
     ///   member := `.` ident
     ///   index := `[` expr `]`
+    ///   transpose := `ᵀ`
     ///   gradient := ∇ [ [ place (, place)* ] ]
     ///   cast := `∷` type
     ///   optional-chain := '?.' ident | '?[' expr `]` | '?(' args `)`
@@ -807,6 +855,8 @@ impl Parser {
             } else if self.check(&TokenKind::LBracket) {
                 self.reject_retired_shape_sugar_type_call_constructor(&expr)?;
                 expr = self.parse_index_postfix(start, expr)?;
+            } else if self.check(&TokenKind::Transpose) {
+                expr = self.parse_transpose_postfix(start, expr)?;
             } else if self.check(&TokenKind::Nabla) {
                 expr = self.parse_gradient_postfix(start, expr)?;
             } else if self.check(&TokenKind::QuestionDot) {
@@ -887,16 +937,49 @@ impl Parser {
         ))
     }
 
+    /// Parse the source-only `ᵀ` suffix as a zero-argument call marker. The
+    /// semantic pass rewrites the marker to the existing `transpone` intrinsic
+    /// only after applying the rank-2 glyph law.
+    fn parse_transpose_postfix(&mut self, start: Span, object: Expr) -> Result<Expr, ParseError> {
+        let glyph_span = self.current_span();
+        self.advance();
+        // Keep the private marker and canonical intrinsic spelling in the
+        // source interner so semantic checking can rewrite the HIR method name
+        // without inventing a second registry or plan entry.
+        self.interner.intern("transpone");
+        self.interner.intern("transpose");
+        let method = Ident {
+            name: self.interner.intern(GLYPH_TRANSPOSE_METHOD),
+            span: glyph_span,
+        };
+        let callee = Expr {
+            id: self.next_id(),
+            kind: ExprKind::Member(MemberExpr {
+                object: Box::new(object),
+                member: method,
+            }),
+            span: start.merge(glyph_span),
+        };
+        Ok(Expr {
+            id: self.next_id(),
+            kind: ExprKind::Call(CallExpr {
+                callee: Box::new(callee),
+                type_args: Vec::new(),
+                args: Vec::new(),
+            }),
+            span: start.merge(glyph_span),
+        })
+    }
+
     /// Parse the postfix gradient suffix `∇ [places]?` bound to an already-parsed
     /// forward expression.
     ///
     /// The gradient glyph is a structural postfix operator, never a prefix unary
     /// form. The optional selector bracket is consumed here, before the ordinary
     /// postfix loop resumes, so later postfix operations apply to the gradient
-    /// result rather than to the selector list. The grammar is
-    /// whitespace-insensitive: `loss(x) ∇[x]` parses and lowers to the same
-    /// selectors as `loss(x) ∇ [x]`; both formatters re-emit the canonical spaced
-    /// form. A non-empty selector list is required once `[` follows `∇`.
+    /// result. The grammar is whitespace-insensitive: `loss(x) ∇[x]` parses and
+    /// lowers to the same selectors as `loss(x) ∇ [x]`; both formatters re-emit
+    /// the canonical spaced form. A non-empty selector list is required once `[` follows `∇`.
     fn parse_gradient_postfix(&mut self, start: Span, call: Expr) -> Result<Expr, ParseError> {
         self.advance(); // consume `∇`
         let selectors = if self.check(&TokenKind::LBracket) {

@@ -1074,6 +1074,21 @@ fn semantic_invalid_operand_types_message(args: &[DiagnosticArg]) -> Option<Stri
         "glyph_hadamard_shapes_mismatch" => {
             Some("Hadamard product ⊙ requires operands with identical shapes".to_owned())
         }
+        "glyph_transpose_operands_unsupported" => {
+            Some("postfix transpose ᵀ requires a built-in tensor operand".to_owned())
+        }
+        "glyph_transpose_rank1_no_row_column_distinction" => {
+            Some("postfix transpose ᵀ is permanently unavailable for rank-1 tensors: there is no row/column distinction".to_owned())
+        }
+        "glyph_transpose_rank3_plus_deferred_batched_consumer" => {
+            Some("postfix transpose ᵀ is deferred for rank-3+ tensors until a batched-transpose consumer owns the contract".to_owned())
+        }
+        "glyph_transpose_static_rank_required" => {
+            Some("postfix transpose ᵀ requires a statically known rank-2 tensor in v1".to_owned())
+        }
+        "glyph_transpose_suffix_takes_no_arguments" => {
+            Some("postfix transpose ᵀ is a zero-argument suffix".to_owned())
+        }
         "gradient_expression_unsupported" => {
             Some("postfix gradient selection (`call(...) ∇ [places]`) is not lowered until the tensor-glyphs 2B autograd surface lands; no operand, selector, or result rule is active in Phase 2A".to_owned())
         }
@@ -1231,6 +1246,21 @@ fn semantic_invalid_operand_types_help(args: &[DiagnosticArg]) -> Option<String>
         }
         "glyph_hadamard_shapes_mismatch" => {
             Some("⊙ requires identical operand shapes; use ↦ to reshape before the product".to_owned())
+        }
+        "glyph_transpose_operands_unsupported" => {
+            Some("apply ᵀ to a tensor value".to_owned())
+        }
+        "glyph_transpose_rank1_no_row_column_distinction" => {
+            Some("rank-1 transpose is permanently declined because it has no row/column distinction".to_owned())
+        }
+        "glyph_transpose_rank3_plus_deferred_batched_consumer" => {
+            Some("rank-3+ transpose waits for a batched-transpose consumer; use a rank-2 tensor in v1".to_owned())
+        }
+        "glyph_transpose_static_rank_required" => {
+            Some("give ᵀ a statically known rank-2 tensor; shape-generic transpose is not admitted in v1".to_owned())
+        }
+        "glyph_transpose_suffix_takes_no_arguments" => {
+            Some("write ᵀ directly after the tensor; the suffix takes no arguments".to_owned())
         }
         "gradient_expression_unsupported" => {
             Some("gradient selection (`∇`) is parse-only in Phase 2A; the eligibility/selector rules land with tensor-glyphs 2B".to_owned())

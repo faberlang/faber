@@ -51,6 +51,10 @@ fn rejects_with_contract_issue(source: &str, issue: &str) {
     );
 }
 
+fn rejects_transpose_with_issue(source: &str, issue: &str) {
+    rejects_with_contract_issue(source, issue);
+}
+
 // --- `·` inner product (dot / matvec / matmul by rank) ---
 
 #[test]
@@ -300,6 +304,47 @@ fn glyph_dot_symbolic_transpose_chain_typechecks() {
         r"functio sdpa<magnitudo B, magnitudo D>(tensor<f32, [B, D]> qb, tensor<f32, [B, D]> kb, tensor<f32, [B, D]> vb) → tensor<f32, [B, D]> {
     redde (qb · kb.transpone() · vb)
 }",
+    );
+}
+
+// --- `ᵀ` postfix transpose (rank-2 v1 law) ---
+
+#[test]
+fn glyph_transpose_rank2_typechecks_and_swaps_shape() {
+    accepts(
+        r"functio transpose(tensor<f32, [2, 3]> grid) → tensor<f32, [3, 2]> {
+    redde gridᵀ
+}",
+    );
+}
+
+#[test]
+fn glyph_transpose_rank1_is_permanently_declined() {
+    rejects_transpose_with_issue(
+        r"functio transpose(tensor<f32, [3]> vector) → tensor<f32, [3]> {
+    redde vectorᵀ
+}",
+        "glyph_transpose_rank1_no_row_column_distinction",
+    );
+}
+
+#[test]
+fn glyph_transpose_rank3_is_deferred_to_batched_consumer() {
+    rejects_transpose_with_issue(
+        r"functio transpose(tensor<f32, [2, 3, 4]> batch) → tensor<f32, [2, 4, 3]> {
+    redde batchᵀ
+}",
+        "glyph_transpose_rank3_plus_deferred_batched_consumer",
+    );
+}
+
+#[test]
+fn glyph_transpose_scalar_is_not_a_tensor_operation() {
+    rejects_transpose_with_issue(
+        r"functio transpose(f32 value) → f32 {
+    redde valueᵀ
+}",
+        "glyph_transpose_operands_unsupported",
     );
 }
 

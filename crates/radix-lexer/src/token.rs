@@ -293,6 +293,9 @@ pub enum TokenKind {
     CircledTimes, // ⊗ U+2297 outer / Kronecker product
     CircledDot,   // ⊙ U+2299 Hadamard / elementwise product
 
+    // === Postfix tensor transpose (tensor-glyphs family) ===
+    Transpose, // ᵀ U+1D40 rank-2 postfix transpose sugar
+
     // === Postfix gradient selection (tensor-glyphs family) ===
     Nabla, // ∇ U+2207 postfix gradient operator: `call(...) ∇ [places]`
 

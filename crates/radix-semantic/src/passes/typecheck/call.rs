@@ -383,6 +383,40 @@ impl TypeChecker<'_> {
             }
         }
         let method_name = self.method_display_name(*name);
+        let method_name = if method_name == super::tensor_index::GLYPH_TRANSPOSE_METHOD {
+            if !explicit_type_args.is_empty() || !args.is_empty() {
+                self.typecheck_call_arg_exprs(args);
+                self.invalid_operand_types(
+                    "glyph_transpose_suffix_takes_no_arguments",
+                    receiver.span,
+                );
+                return self.error_type;
+            }
+            if let Some(issue) = super::tensor_index::glyph_transpose_rank_issue(self, receiver_ty)
+            {
+                self.invalid_operand_types(issue, receiver.span);
+                return self.error_type;
+            }
+            // The parser interns the canonical and English pack spellings
+            // alongside the private glyph marker. Rewriting to the active
+            // pack's surface lets the ordinary intrinsic checker perform its
+            // locale mapping while every backend still receives `transpone`.
+            let surface = self
+                .locale_pack
+                .and_then(|pack| pack.intrinsic_surface(super::tensor_index::TENSOR_TRANSPONE))
+                .unwrap_or(super::tensor_index::TENSOR_TRANSPONE);
+            if let Some(interner) = self.interner {
+                if let Some(index) = interner.strings().iter().position(|s| s == surface) {
+                    #[allow(clippy::cast_possible_truncation)]
+                    {
+                        *name = radix_lexer::Symbol(index as u32);
+                    }
+                }
+            }
+            surface.to_owned()
+        } else {
+            method_name
+        };
         if let Some(result) = self.check_directional_view_method(
             receiver_ty,
             &method_name,
