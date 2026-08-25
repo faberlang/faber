@@ -219,3 +219,59 @@ fn atomic_operator_predicate_admits_only_atomic_surface() {
         "unregistered atomic name must not pass"
     );
 }
+
+/// MC1 ratchet, catalog side: the five registry rows on the unit-cited
+/// ratchet (module-lane bijection test derives the gap set by probing the
+/// real module MIR lowerer) are `CodegenOnly` and unclassified by every MIR
+/// accessor — the catalog shape of "registry row with no owner".
+#[test]
+fn ratchet_registry_rows_are_codegen_only_and_unclassified() {
+    use super::IntrinsicMirKind;
+    for (receiver, name, arity, unit) in [
+        (IntrinsicReceiver::Numeric, "nega", 0, "MC2"),
+        (IntrinsicReceiver::Numeric, "negativa", 0, "MC2"),
+        (IntrinsicReceiver::Numeric, "complementa", 0, "MC2"),
+        (IntrinsicReceiver::Numeric, "complementata", 0, "MC2"),
+        (IntrinsicReceiver::Vector, "crea", 0, "MC3"),
+    ] {
+        let entry = lookup_method(receiver, name, arity)
+            .unwrap_or_else(|| panic!("ratchet row {name}/0 must stay in the registry until {unit} lands"));
+        assert_eq!(
+            entry.mir_kind,
+            IntrinsicMirKind::CodegenOnly,
+            "{name}/0 must stay CodegenOnly until {unit} arms it"
+        );
+        assert_eq!(mir_collection_op(entry), None, "{name}/0 has no collection op");
+        assert_eq!(mir_atomic_op(entry), None, "{name}/0 has no atomic op");
+        assert!(!mir_is_higher_order_lista(entry), "{name}/0 is not higher-order");
+    }
+}
+
+/// The eleven MC4 ratchet rows are AIR-lane method surface, NOT catalog rows:
+/// the registry cannot own them, so direction 3 (AIR/device allowlist →
+/// owner) is the only seam that can pin them. If one of these names gains a
+/// Tensor registry row, the module-lane bijection probe re-derives the gap
+/// set and this invariant forces the companion update.
+#[test]
+fn air_ratchet_rows_are_absent_from_the_tensor_catalog() {
+    for name in [
+        "maxima",
+        "minima",
+        "exponentia",
+        "logarithmus",
+        "radix",
+        "activatio_tanh",
+        "summa_axis",
+        "reducta",
+        "cumulata",
+        "mappata",
+        "filtrata",
+    ] {
+        for arity in 0..=4 {
+            assert!(
+                lookup_method(IntrinsicReceiver::Tensor, name, arity).is_none(),
+                "AIR ratchet row {name} gained a Tensor registry row — update the MC1 ratchet"
+            );
+        }
+    }
+}

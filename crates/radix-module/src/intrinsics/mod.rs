@@ -18,6 +18,10 @@ pub use radix_intrinsics::{
 #[path = "approximata_test.rs"]
 mod approximata_tests;
 
+#[cfg(all(test, feature = "mir-core"))]
+#[path = "bijection_ratchet_test.rs"]
+mod bijection_ratchet_tests;
+
 #[cfg(test)]
 #[path = "operator_methods_test.rs"]
 mod operator_methods_tests;
