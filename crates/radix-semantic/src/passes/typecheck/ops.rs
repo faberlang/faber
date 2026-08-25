@@ -1248,7 +1248,24 @@ impl TypeChecker<'_> {
                     crate::literal_matrix_shape(lhs_shape, self.types),
                     crate::literal_matrix_shape(rhs_shape, self.types),
                 ) else {
-                    self.glyph_invalid_operand(op, GLYPH_STATIC_SHAPE_REQUIRED, lhs.span);
+                    // S0-G7: glyph-static but parametric operands
+                    // (`matrix<f32, [R, K]> · matrix<f32, [K, C]>` in a
+                    // size-generic body) check symbolically instead of
+                    // demanding literal shapes: the inner dimensions must be
+                    // the same index term, and the result keeps the operand
+                    // outer dimensions.
+                    if let (Some((lhs_rows, lhs_k)), Some((rhs_k, rhs_cols))) = (
+                        self.matrix_shape_dims(lhs_shape),
+                        self.matrix_shape_dims(rhs_shape),
+                    ) {
+                        if self.types.get_index(lhs_k) == self.types.get_index(rhs_k) {
+                            let shape = self
+                                .types
+                                .intern_index(IndexExpr::Tuple(vec![lhs_rows, rhs_cols]));
+                            return self.types.matrix_with_shape(elem, shape);
+                        }
+                    }
+                    self.glyph_invalid_operand(op, GLYPH_INNER_DIM_MISMATCH, lhs.span);
                     return self.error_type;
                 };
                 if lhs_k != rhs_k {
@@ -1677,6 +1694,17 @@ impl TypeChecker<'_> {
             .types
             .intern_index(IndexExpr::Literal(u64::from(width)));
         self.types.vector_with_width(elem, width)
+    }
+
+    /// The two raw dimension terms of a matrix shape, literal or parametric.
+    fn matrix_shape_dims(&self, index_id: radix_types::IndexId) -> Option<(radix_types::IndexId, radix_types::IndexId)> {
+        let IndexExpr::Tuple(dims) = self.types.get_index(index_id) else {
+            return None;
+        };
+        let [rows, columns] = dims.as_slice() else {
+            return None;
+        };
+        Some((*rows, *columns))
     }
 
     fn glyph_matrix_type(&mut self, elem: TypeId, rows: u8, columns: u8) -> TypeId {

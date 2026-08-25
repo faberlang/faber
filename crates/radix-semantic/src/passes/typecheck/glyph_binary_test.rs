@@ -75,6 +75,39 @@ fn glyph_dot_matrix_matmul_returns_matrix() {
     );
 }
 
+// --- S0-G7: size-parametric glyph matmul (symbolic shape contract) ---
+
+#[test]
+fn glyph_dot_generic_matrix_matmul_returns_parametric_matrix() {
+    accepts(
+        r"functio multiply<magnitudo R, magnitudo K, magnitudo C>(matrix<f32, [R, K]> a, matrix<f32, [K, C]> b) → matrix<f32, [R, C]> {
+    redde a · b
+}",
+    );
+}
+
+#[test]
+fn glyph_dot_generic_matrix_matmul_inner_dim_mismatch_rejects() {
+    rejects_with_issue(
+        r"functio multiply<magnitudo R, magnitudo K, magnitudo C>(matrix<f32, [R, K]> a, matrix<f32, [C, C]> b) → matrix<f32, [R, C]> {
+    redde a · b
+}",
+        "glyph_inner_dim_mismatch",
+        "·",
+    );
+}
+
+#[test]
+fn glyph_dot_generic_vs_concrete_matrix_matmul_rejects() {
+    rejects_with_issue(
+        r"functio multiply<magnitudo R, magnitudo C>(matrix<f32, [R, 3]> a, matrix<f32, [4, C]> b) → matrix<f32, [R, C]> {
+    redde a · b
+}",
+        "glyph_inner_dim_mismatch",
+        "·",
+    );
+}
+
 #[test]
 fn glyph_dot_matvec_returns_vector() {
     accepts(
