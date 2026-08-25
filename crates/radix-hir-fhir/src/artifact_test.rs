@@ -10,6 +10,46 @@ fn hir_artifact_round_trip() {
     assert_eq!(original, deserialized);
 }
 
+/// IL-3 FHIR inventory row: this crate owns binary postcard/MessagePack
+/// artifacts, not a JSON emitter. The binary artifact path preserves an IEEE
+/// non-finite carrier; any JSON-facing boundary must reject it explicitly
+/// rather than inherit a `null`/`0` coercion.
+#[test]
+fn non_finite_float_fhir_binary_posture_is_explicit() {
+    let mut original = stub_artifact();
+    original.hir.entry = Some(radix_hir::HirBlock::simple(
+        vec![radix_hir::HirStatement {
+            id: radix_hir::HirId(1),
+            kind: radix_hir::HirStatementKind::Expr(radix_hir::HirExpression {
+                id: radix_hir::HirId(2),
+                kind: radix_hir::HirExpressionKind::Literal(radix_hir::HirLiteral::Float(
+                    f64::INFINITY,
+                )),
+                ty: None,
+                span: radix_lexer::Span::default(),
+            }),
+            span: radix_lexer::Span::default(),
+        }],
+        None,
+        radix_lexer::Span::default(),
+    ));
+
+    let bytes = postcard::to_allocvec(&original).expect("serialize non-finite binary artifact");
+    let decoded: HirArtifact = postcard::from_bytes(&bytes).expect("deserialize binary artifact");
+    let Some(radix_hir::HirBlock { statements, .. }) = decoded.hir.entry else {
+        panic!("non-finite inventory fixture must carry an entry");
+    };
+    let radix_hir::HirStatementKind::Expr(expression) = &statements[0].kind else {
+        panic!("non-finite inventory fixture must carry an expression");
+    };
+    let radix_hir::HirExpressionKind::Literal(radix_hir::HirLiteral::Float(value)) =
+        expression.kind
+    else {
+        panic!("non-finite inventory fixture must carry a float literal");
+    };
+    assert!(value.is_infinite(), "binary FHIR must preserve infinity");
+}
+
 // ── EOT-2W selective-import wire contract ────────────────────────────────
 
 /// Artifact whose HIR carries one selective import (`importa ex "…" fixum …`).

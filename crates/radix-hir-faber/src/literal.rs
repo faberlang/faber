@@ -138,7 +138,13 @@ impl super::FaberCodegen {
     ) {
         match lit {
             HirLiteral::Int(value) => writer.write(&value.to_string()),
-            HirLiteral::Float(value) => writer.write(&self.format_float_literal(*value)),
+            HirLiteral::Float(value) => {
+                if value.is_nan() {
+                    writer.write(surface.contextual_keyword("nonnumerus"));
+                } else {
+                    writer.write(&self.format_float_literal(*value));
+                }
+            }
             HirLiteral::String(sym) => self.write_textus_literal(*sym, interner, writer),
             HirLiteral::Ascii(sym) => {
                 writer.write("'");
@@ -183,6 +189,17 @@ impl super::FaberCodegen {
 
     /// Format a fractus literal so whole values keep their decimal point (`7.0`).
     pub(super) fn format_float_literal(&self, value: f64) -> String {
+        if value.is_nan() {
+            return "nonnumerus".to_owned();
+        }
+        if value.is_infinite() {
+            return if value.is_sign_negative() {
+                "-∞".to_owned()
+            } else {
+                "∞".to_owned()
+            };
+        }
+
         let rendered = value.to_string();
         if rendered.contains('.') || rendered.contains('e') || rendered.contains('E') {
             rendered
@@ -264,5 +281,76 @@ impl super::FaberCodegen {
         writer.write("\"");
         writer.write(&self.symbol_to_string(symbol, interner));
         writer.write("\"");
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::surface::{KeywordSurface, TypeBindingKind};
+    use radix_lexer::TokenKind;
+
+    struct LatinSurface;
+
+    impl KeywordSurface for LatinSurface {
+        fn keyword(&self, _kind: TokenKind) -> &str {
+            "keyword"
+        }
+
+        fn contextual_keyword(&self, key: &'static str) -> &str {
+            key
+        }
+
+        fn type_surface(&self, _kind: TypeBindingKind) -> &str {
+            "type"
+        }
+    }
+
+    struct EnglishSurface;
+
+    impl KeywordSurface for EnglishSurface {
+        fn keyword(&self, _kind: TokenKind) -> &str {
+            "keyword"
+        }
+
+        fn contextual_keyword(&self, key: &'static str) -> &str {
+            if key == "nonnumerus" {
+                "nan"
+            } else {
+                key
+            }
+        }
+
+        fn type_surface(&self, _kind: TypeBindingKind) -> &str {
+            "type"
+        }
+    }
+
+    fn render(literal: HirLiteral, surface: &impl KeywordSurface) -> String {
+        let codegen = crate::FaberCodegen::default();
+        let interner = Interner::new();
+        let mut writer = CodeWriter::new();
+        codegen.write_literal(&literal, &interner, surface, &mut writer);
+        writer.finish()
+    }
+
+    #[test]
+    fn non_finite_literals_round_trip_with_faber_spellings() {
+        assert_eq!(render(HirLiteral::Float(f64::INFINITY), &LatinSurface), "∞");
+        assert_eq!(
+            render(HirLiteral::Float(f64::NAN), &LatinSurface),
+            "nonnumerus"
+        );
+        assert_eq!(render(HirLiteral::Float(f64::NAN), &EnglishSurface), "nan");
+        assert_eq!(
+            render(HirLiteral::Float(f64::NEG_INFINITY), &LatinSurface),
+            "-∞"
+        );
+    }
+
+    #[test]
+    fn finite_float_literals_keep_decimal_convention() {
+        assert_eq!(render(HirLiteral::Float(7.0), &LatinSurface), "7.0");
+        assert_eq!(render(HirLiteral::Float(0.125), &LatinSurface), "0.125");
     }
 }
