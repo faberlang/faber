@@ -349,7 +349,7 @@ incipit {
     assert!(
         errors
             .iter()
-            .any(|error| error.message.contains("tensor accipe invalid index")),
+            .any(|error| error.issue == "runner_tensor_accipe_invalid_index"),
         "expected the named hard bounds error, got {errors:?}"
     );
 }

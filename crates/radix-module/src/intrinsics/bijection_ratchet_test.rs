@@ -435,12 +435,12 @@ fn probe(source: &str, session: &Session) -> ProbeOutcome {
     match crate::mir::lower_analyzed_unit(&mut analysis, Default::default()) {
         Ok(_) => ProbeOutcome::Lowered,
         Err(errors) => {
-            let joined = errors
+            let issues = errors.iter().map(|e| e.issue.as_str()).collect::<Vec<_>>();
+            let joined = issues.join("; ");
+            if errors
                 .iter()
-                .map(|e| e.message.clone())
-                .collect::<Vec<_>>()
-                .join("; ");
-            if joined.contains("method call") {
+                .any(|e| e.issue.contains("method_call"))
+            {
                 // Both fallthrough shapes: the dispatch-chain miss
                 // ("method call before runtime/provider MIR lowering") and the
                 // generic expression miss ("method calls before receiver-aware

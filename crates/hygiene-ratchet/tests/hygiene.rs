@@ -412,6 +412,13 @@ fn diagnostic_text_assertion_allowlisted(root: &Path, path: &Path) -> bool {
         // fallback, and localized row resolution. Followed the crate split
         // from crates/radix/src/locale_test.rs.
         || rel == "crates/radix-module/src/locale_test.rs"
+        // Renderer-contract (locale-pack surface): the queue/stack and lista
+        // operator tests render the SEM011 template through the installed en
+        // and la packs and pin the localized prose — the same pack-template
+        // contract as `crates/radix-module/src/locale_test.rs`, not a
+        // code/issue assertion surface.
+        || rel == "crates/radix-semantic/src/passes/typecheck/queue_stack_test.rs"
+        || rel == "crates/radix-semantic/src/passes/typecheck/lista_operator_test.rs"
         || rel == "crates/faber/src/diagnostic_explain_test.rs"
         || rel == "crates/faber/src/explain_test.rs"
         || rel == "crates/faber-cli/src/reference_test.rs"

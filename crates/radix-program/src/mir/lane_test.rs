@@ -631,16 +631,13 @@ fn package_mir_const_data_member_path_initializer_unlinked_target_fails_closed()
     )
     .expect_err("an unlinked Path target must fail the package MIR link");
     assert!(
-        diagnostics.iter().any(|diagnostic| {
-            diagnostic.issue() == Some("package_mir_data_member_unsupported")
-                && diagnostic
-                    .message
-                    .contains("Path reference without a linked const data member target")
-        }),
+        diagnostics
+            .iter()
+            .any(|diagnostic| diagnostic.issue() == Some("package_mir_data_member_unsupported")),
         "expected the fail-closed Path diagnostic, got {:?}",
         diagnostics
             .iter()
-            .map(|diagnostic| (diagnostic.code, diagnostic.issue(), &diagnostic.message))
+            .map(|diagnostic| (diagnostic.code, diagnostic.issue()))
             .collect::<Vec<_>>()
     );
 }
@@ -1089,7 +1086,6 @@ fn package_mir_return_channel_mismatch_without_conversion_fails_closed() {
                 (
                     diagnostic.code.clone(),
                     diagnostic.issue().map(|issue| issue.to_owned()),
-                    diagnostic.message.clone(),
                 )
             })
             .collect::<Vec<_>>()
