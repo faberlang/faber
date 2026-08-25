@@ -445,25 +445,6 @@ fn gea2_plan(entry: &str) -> WireCollectionKernelPlan {
     }
 }
 
-fn gea2_entry_counts(entry: &str) -> (Vec<u64>, u64) {
-    match entry {
-        "rmsnorm" => (vec![7680, 960], 7680),
-        "gemm_qo" => (vec![7680, 921600], 7680),
-        "gemm_kv" => (vec![7680, 307200], 2560),
-        "gemm_gate_up" => (vec![7680, 2457600], 20480),
-        "gemm_down" => (vec![20480, 2457600], 7680),
-        "rope_q" => (vec![7680, 768], 7680),
-        "rope_k" => (vec![2560, 768], 2560),
-        "transpose" => (vec![512], 512),
-        "score_gemm" => (vec![512, 512, 64], 64),
-        "causal_softmax" => (vec![64], 64),
-        "context_gemm" => (vec![64, 512], 512),
-        "swiglu" => (vec![20480, 20480], 20480),
-        "residual_add" => (vec![7680, 7680], 7680),
-        other => panic!("unknown GEA2 entry {other}"),
-    }
-}
-
 fn gea2_dispatch(entry: &str) -> WireKernelLaunchPlan {
     let (workgroup, dispatch) = match entry {
         "gemm_qo" | "gemm_down" => ([8, 8, 1], [120, 1, 1]),
@@ -496,148 +477,473 @@ fn gea2_dispatch(entry: &str) -> WireKernelLaunchPlan {
     }
 }
 
-fn gea2_block_program() -> WireDeviceProgram {
-    let mut kernels = Vec::with_capacity(GEA2_ENTRY_NAMES.len());
-    let mut semantic_values = Vec::new();
-    let mut output_buffers = Vec::new();
-    let mut next_buffer = 1_u32;
-
-    for (kernel_index, entry) in GEA2_ENTRY_NAMES.iter().enumerate() {
-        let (input_counts, output_count) = gea2_entry_counts(entry);
-        let output_id = next_buffer + u32::try_from(input_counts.len()).expect("small input count");
-        let output_role = if *entry == "residual_add" {
-            WireBufferRole::Output
-        } else {
-            WireBufferRole::InOut
-        };
-        let output_lifetime = if *entry == "residual_add" {
-            WireBufferLifetime::ObservationPoint
-        } else {
-            WireBufferLifetime::PerStep
-        };
-        let output = WireBufferIdentity {
-            id: output_id,
-            name: format!("{entry}_output"),
-            role: output_role,
-            storage: WireStorageLayout::DeviceHandle,
-            lifetime: output_lifetime,
-            semantic_value: output_id,
-        };
-        let mut resources = Vec::with_capacity(input_counts.len() + 1);
-        for (binding, element_count) in input_counts.iter().copied().enumerate() {
-            let id = next_buffer + u32::try_from(binding).expect("small binding");
-            let buffer = WireBufferIdentity {
-                id,
-                name: format!("{entry}_input_{binding}"),
-                role: WireBufferRole::Input,
-                storage: WireStorageLayout::DeviceHandle,
-                lifetime: WireBufferLifetime::PerProgram,
-                semantic_value: id,
-            };
-            semantic_values.push(WireSemanticValue {
-                id,
-                name: buffer.name.clone(),
-                origin: WireSemanticValueOrigin::Synthetic {
-                    label: format!("gea2-host-input-{id}"),
-                },
-            });
-            resources.push(WireDeviceResource {
-                buffer,
-                version: WireBufferVersion {
-                    version: 1,
-                    element_ty: "f32".to_owned(),
-                    element_count,
-                    reduced_projection: None,
-                },
-                binding: WireBinding {
-                    group: 0,
-                    binding: u32::try_from(binding).expect("small binding"),
-                },
-                access: WireResourceAccess::Read,
-                generation: 1,
-                initialization: WireInitializationPolicy::HostProvided,
-            });
-        }
-        semantic_values.push(WireSemanticValue {
-            id: output.id,
-            name: output.name.clone(),
-            origin: WireSemanticValueOrigin::Synthetic {
-                label: format!("gea2-intermediate-{}", output.id),
-            },
-        });
-        resources.push(WireDeviceResource {
-            buffer: output.clone(),
-            version: WireBufferVersion {
-                version: 1,
-                element_ty: "f32".to_owned(),
-                element_count: output_count,
-                reduced_projection: None,
-            },
-            binding: WireBinding {
-                group: 0,
-                binding: u32::try_from(input_counts.len()).expect("small binding"),
-            },
-            access: WireResourceAccess::Write,
-            generation: 1,
-            initialization: WireInitializationPolicy::KernelInitialized,
-        });
-        if *entry == "residual_add" {
-            output_buffers.push((output, output_count));
-        }
-        kernels.push(WireKernelUnit {
-            function: u32::try_from(kernel_index).expect("small kernel index"),
-            entry: (*entry).to_owned(),
-            plan: gea2_plan(entry),
-            resources,
-            launch: gea2_dispatch(entry),
-        });
-        next_buffer = output_id + 1;
+fn gea2_wire_buffer(
+    id: u32,
+    name: impl Into<String>,
+    role: WireBufferRole,
+    lifetime: WireBufferLifetime,
+) -> WireBufferIdentity {
+    WireBufferIdentity {
+        id,
+        name: name.into(),
+        role,
+        storage: WireStorageLayout::DeviceHandle,
+        lifetime,
+        semantic_value: id,
     }
+}
 
-    let mut launches = Vec::new();
-    for (kernel_index, count) in GEA2_INSTANCE_COUNTS.iter().copied().enumerate() {
-        for _ in 0..count {
-            launches.push(WireLaunchUnit {
-                id: u32::try_from(launches.len() + 1).expect("GEA2 launch count fits u32"),
-                kernel_index: u32::try_from(kernel_index).expect("small kernel index"),
-            });
-        }
-    }
-    let dependencies = launches
-        .windows(2)
-        .enumerate()
-        .map(|(index, pair)| WireDependencyEdge {
-            producer: pair[0].id,
-            consumer: pair[1].id,
-            buffer: kernels[index % kernels.len()]
-                .resources
-                .last()
-                .expect("output slot")
-                .buffer
-                .id,
+fn gea2_wire_resource(
+    buffer: &WireBufferIdentity,
+    element_count: u64,
+    binding: u32,
+    access: WireResourceAccess,
+    initialization: WireInitializationPolicy,
+) -> WireDeviceResource {
+    WireDeviceResource {
+        buffer: buffer.clone(),
+        version: WireBufferVersion {
             version: 1,
-        })
-        .collect();
-    let (final_output, final_count) = output_buffers.pop().expect("block output");
-    let final_launch = launches.last().expect("launch sequence").id;
-    let result_version = WireBufferVersion {
+            element_ty: "f32".to_owned(),
+            element_count,
+            reduced_projection: None,
+        },
+        binding: WireBinding { group: 0, binding },
+        access,
+        generation: 1,
+        initialization,
+    }
+}
+
+fn gea2_add_semantic_value(values: &mut Vec<WireSemanticValue>, buffer: &WireBufferIdentity) {
+    if values.iter().any(|value| value.id == buffer.id) {
+        return;
+    }
+    values.push(WireSemanticValue {
+        id: buffer.id,
+        name: buffer.name.clone(),
+        origin: WireSemanticValueOrigin::Synthetic {
+            label: format!("gea2-buffer-{}", buffer.id),
+        },
+    });
+}
+
+fn gea2_append_wire_kernel(
+    kernels: &mut Vec<WireKernelUnit>,
+    launches: &mut Vec<WireLaunchUnit>,
+    semantic_values: &mut Vec<WireSemanticValue>,
+    entry: &str,
+    resources: Vec<WireDeviceResource>,
+) -> u32 {
+    for resource in &resources {
+        gea2_add_semantic_value(semantic_values, &resource.buffer);
+    }
+    let kernel_index = u32::try_from(kernels.len()).expect("GEA2 kernel count fits u32");
+    let launch_id = u32::try_from(launches.len() + 1).expect("GEA2 launch count fits u32");
+    let function = GEA2_ENTRY_NAMES
+        .iter()
+        .position(|candidate| *candidate == entry)
+        .and_then(|index| u32::try_from(index).ok())
+        .expect("GEA2 entry function index fits u32");
+    kernels.push(WireKernelUnit {
+        function,
+        entry: entry.to_owned(),
+        plan: gea2_plan(entry),
+        resources,
+        launch: gea2_dispatch(entry),
+    });
+    launches.push(WireLaunchUnit {
+        id: launch_id,
+        kernel_index,
+    });
+    launch_id
+}
+
+fn gea2_wire_edge(producer: u32, consumer: u32, buffer: &WireBufferIdentity) -> WireDependencyEdge {
+    WireDependencyEdge {
+        producer,
+        consumer,
+        buffer: buffer.id,
         version: 1,
-        element_ty: "f32".to_owned(),
-        element_count: final_count,
-        reduced_projection: None,
+    }
+}
+
+fn gea2_block_program() -> WireDeviceProgram {
+    let x = gea2_wire_buffer(
+        1,
+        "activation_x",
+        WireBufferRole::Input,
+        WireBufferLifetime::PerProgram,
+    );
+    let attn_norm = gea2_wire_buffer(
+        2,
+        "attn_norm_weight",
+        WireBufferRole::Input,
+        WireBufferLifetime::PerProgram,
+    );
+    let q_weight = gea2_wire_buffer(
+        3,
+        "q_weight",
+        WireBufferRole::Input,
+        WireBufferLifetime::PerProgram,
+    );
+    let k_weight = gea2_wire_buffer(
+        4,
+        "k_weight",
+        WireBufferRole::Input,
+        WireBufferLifetime::PerProgram,
+    );
+    let v_weight = gea2_wire_buffer(
+        5,
+        "v_weight",
+        WireBufferRole::Input,
+        WireBufferLifetime::PerProgram,
+    );
+    let rope_table = gea2_wire_buffer(
+        6,
+        "rope_table",
+        WireBufferRole::Input,
+        WireBufferLifetime::PerProgram,
+    );
+    let o_weight = gea2_wire_buffer(
+        7,
+        "o_weight",
+        WireBufferRole::Input,
+        WireBufferLifetime::PerProgram,
+    );
+    let ffn_norm = gea2_wire_buffer(
+        8,
+        "ffn_norm_weight",
+        WireBufferRole::Input,
+        WireBufferLifetime::PerProgram,
+    );
+    let gate_weight = gea2_wire_buffer(
+        9,
+        "gate_weight",
+        WireBufferRole::Input,
+        WireBufferLifetime::PerProgram,
+    );
+    let up_weight = gea2_wire_buffer(
+        10,
+        "up_weight",
+        WireBufferRole::Input,
+        WireBufferLifetime::PerProgram,
+    );
+    let down_weight = gea2_wire_buffer(
+        11,
+        "down_weight",
+        WireBufferRole::Input,
+        WireBufferLifetime::PerProgram,
+    );
+    let mut next_intermediate = 100_u32;
+    let mut intermediate = |name: &str| {
+        let id = next_intermediate;
+        next_intermediate += 1;
+        gea2_wire_buffer(id, name, WireBufferRole::InOut, WireBufferLifetime::PerStep)
+    };
+    let ln1 = intermediate("ln1");
+    let q = intermediate("q");
+    let k = intermediate("k");
+    let v = intermediate("v");
+    let rope_q = intermediate("rope_q");
+    let rope_k = intermediate("rope_k");
+    let transposes: Vec<_> = (0..5)
+        .map(|head| intermediate(&format!("key_transpose_{head}")))
+        .collect();
+    let mut scores = Vec::new();
+    let mut probabilities = Vec::new();
+    let mut contexts = Vec::new();
+    for head in 0..15 {
+        scores.push(intermediate(&format!("score_{head}")));
+        probabilities.push(intermediate(&format!("probabilities_{head}")));
+        contexts.push(intermediate(&format!("context_{head}")));
+    }
+    let o_projection = intermediate("o_projection");
+    let residual1 = intermediate("residual1");
+    let ln2 = intermediate("ln2");
+    let gate = intermediate("gate");
+    let up = intermediate("up");
+    let swiglu = intermediate("swiglu");
+    let down = intermediate("down");
+    let output = gea2_wire_buffer(
+        next_intermediate,
+        "block_output",
+        WireBufferRole::Output,
+        WireBufferLifetime::ObservationPoint,
+    );
+
+    let mut kernels = Vec::new();
+    let mut launches = Vec::new();
+    let mut semantic_values = Vec::new();
+    let mut dependencies = Vec::new();
+    let host = WireInitializationPolicy::HostProvided;
+    let device = WireInitializationPolicy::KernelInitialized;
+    let read = |buffer: &WireBufferIdentity, count: u64, binding: u32, init| {
+        gea2_wire_resource(buffer, count, binding, WireResourceAccess::Read, init)
+    };
+    let write = |buffer: &WireBufferIdentity, count: u64, binding| {
+        gea2_wire_resource(buffer, count, binding, WireResourceAccess::Write, device)
     };
 
+    let launch_rmsnorm1 = gea2_append_wire_kernel(
+        &mut kernels,
+        &mut launches,
+        &mut semantic_values,
+        "rmsnorm",
+        vec![
+            read(&x, 7680, 0, host),
+            read(&attn_norm, 960, 1, host),
+            write(&ln1, 7680, 2),
+        ],
+    );
+    let launch_q = gea2_append_wire_kernel(
+        &mut kernels,
+        &mut launches,
+        &mut semantic_values,
+        "gemm_qo",
+        vec![
+            read(&ln1, 7680, 0, device),
+            read(&q_weight, 921600, 1, host),
+            write(&q, 7680, 2),
+        ],
+    );
+    dependencies.push(gea2_wire_edge(launch_rmsnorm1, launch_q, &ln1));
+    let launch_k = gea2_append_wire_kernel(
+        &mut kernels,
+        &mut launches,
+        &mut semantic_values,
+        "gemm_kv",
+        vec![
+            read(&ln1, 7680, 0, device),
+            read(&k_weight, 307200, 1, host),
+            write(&k, 2560, 2),
+        ],
+    );
+    dependencies.push(gea2_wire_edge(launch_rmsnorm1, launch_k, &ln1));
+    let launch_v = gea2_append_wire_kernel(
+        &mut kernels,
+        &mut launches,
+        &mut semantic_values,
+        "gemm_kv",
+        vec![
+            read(&ln1, 7680, 0, device),
+            read(&v_weight, 307200, 1, host),
+            write(&v, 2560, 2),
+        ],
+    );
+    dependencies.push(gea2_wire_edge(launch_rmsnorm1, launch_v, &ln1));
+    let launch_rope_q = gea2_append_wire_kernel(
+        &mut kernels,
+        &mut launches,
+        &mut semantic_values,
+        "rope_q",
+        vec![
+            read(&q, 7680, 0, device),
+            read(&rope_table, 768, 1, host),
+            write(&rope_q, 7680, 2),
+        ],
+    );
+    dependencies.push(gea2_wire_edge(launch_q, launch_rope_q, &q));
+    let launch_rope_k = gea2_append_wire_kernel(
+        &mut kernels,
+        &mut launches,
+        &mut semantic_values,
+        "rope_k",
+        vec![
+            read(&k, 2560, 0, device),
+            read(&rope_table, 768, 1, host),
+            write(&rope_k, 2560, 2),
+        ],
+    );
+    dependencies.push(gea2_wire_edge(launch_k, launch_rope_k, &k));
+
+    for transpose in &transposes {
+        let launch = gea2_append_wire_kernel(
+            &mut kernels,
+            &mut launches,
+            &mut semantic_values,
+            "transpose",
+            vec![read(&rope_k, 512, 0, device), write(transpose, 512, 1)],
+        );
+        dependencies.push(gea2_wire_edge(launch_rope_k, launch, &rope_k));
+    }
+
+    let mut context_launches = Vec::new();
+    for head in 0..15 {
+        let transpose = &transposes[head / 3];
+        let score = gea2_append_wire_kernel(
+            &mut kernels,
+            &mut launches,
+            &mut semantic_values,
+            "score_gemm",
+            vec![
+                read(&rope_q, 512, 0, device),
+                read(transpose, 512, 1, device),
+                read(&x, 64, 2, host),
+                write(&scores[head], 64, 3),
+            ],
+        );
+        dependencies.push(gea2_wire_edge(launch_rope_q, score, &rope_q));
+        let softmax = gea2_append_wire_kernel(
+            &mut kernels,
+            &mut launches,
+            &mut semantic_values,
+            "causal_softmax",
+            vec![
+                read(&scores[head], 64, 0, device),
+                write(&probabilities[head], 64, 1),
+            ],
+        );
+        dependencies.push(gea2_wire_edge(score, softmax, &scores[head]));
+        let context = gea2_append_wire_kernel(
+            &mut kernels,
+            &mut launches,
+            &mut semantic_values,
+            "context_gemm",
+            vec![
+                read(&probabilities[head], 64, 0, device),
+                read(&v, 512, 1, device),
+                write(&contexts[head], 512, 2),
+            ],
+        );
+        dependencies.push(gea2_wire_edge(softmax, context, &probabilities[head]));
+        context_launches.push(context);
+    }
+
+    let mut o_resources = contexts
+        .iter()
+        .enumerate()
+        .map(|(binding, context)| {
+            read(
+                context,
+                512,
+                u32::try_from(binding).expect("context binding fits"),
+                device,
+            )
+        })
+        .collect::<Vec<_>>();
+    o_resources.push(read(&o_weight, 921600, 15, host));
+    o_resources.push(write(&o_projection, 7680, 16));
+    let launch_o = gea2_append_wire_kernel(
+        &mut kernels,
+        &mut launches,
+        &mut semantic_values,
+        "gemm_qo",
+        o_resources,
+    );
+    dependencies.push(gea2_wire_edge(
+        *context_launches.last().expect("context launches"),
+        launch_o,
+        contexts.last().expect("context output"),
+    ));
+    let launch_residual1 = gea2_append_wire_kernel(
+        &mut kernels,
+        &mut launches,
+        &mut semantic_values,
+        "residual_add",
+        vec![
+            read(&x, 7680, 0, host),
+            read(&o_projection, 7680, 1, device),
+            write(&residual1, 7680, 2),
+        ],
+    );
+    dependencies.push(gea2_wire_edge(launch_o, launch_residual1, &o_projection));
+    let launch_rmsnorm2 = gea2_append_wire_kernel(
+        &mut kernels,
+        &mut launches,
+        &mut semantic_values,
+        "rmsnorm",
+        vec![
+            read(&residual1, 7680, 0, device),
+            read(&ffn_norm, 960, 1, host),
+            write(&ln2, 7680, 2),
+        ],
+    );
+    dependencies.push(gea2_wire_edge(
+        launch_residual1,
+        launch_rmsnorm2,
+        &residual1,
+    ));
+    let launch_gate = gea2_append_wire_kernel(
+        &mut kernels,
+        &mut launches,
+        &mut semantic_values,
+        "gemm_gate_up",
+        vec![
+            read(&ln2, 7680, 0, device),
+            read(&gate_weight, 2457600, 1, host),
+            write(&gate, 20480, 2),
+        ],
+    );
+    dependencies.push(gea2_wire_edge(launch_rmsnorm2, launch_gate, &ln2));
+    let launch_up = gea2_append_wire_kernel(
+        &mut kernels,
+        &mut launches,
+        &mut semantic_values,
+        "gemm_gate_up",
+        vec![
+            read(&ln2, 7680, 0, device),
+            read(&up_weight, 2457600, 1, host),
+            write(&up, 20480, 2),
+        ],
+    );
+    dependencies.push(gea2_wire_edge(launch_rmsnorm2, launch_up, &ln2));
+    let launch_swiglu = gea2_append_wire_kernel(
+        &mut kernels,
+        &mut launches,
+        &mut semantic_values,
+        "swiglu",
+        vec![
+            read(&gate, 20480, 0, device),
+            read(&up, 20480, 1, device),
+            write(&swiglu, 20480, 2),
+        ],
+    );
+    dependencies.push(gea2_wire_edge(launch_gate, launch_swiglu, &gate));
+    let launch_down = gea2_append_wire_kernel(
+        &mut kernels,
+        &mut launches,
+        &mut semantic_values,
+        "gemm_down",
+        vec![
+            read(&swiglu, 20480, 0, device),
+            read(&down_weight, 2457600, 1, host),
+            write(&down, 7680, 2),
+        ],
+    );
+    dependencies.push(gea2_wire_edge(launch_swiglu, launch_down, &swiglu));
+    let launch_output = gea2_append_wire_kernel(
+        &mut kernels,
+        &mut launches,
+        &mut semantic_values,
+        "residual_add",
+        vec![
+            read(&residual1, 7680, 0, device),
+            read(&down, 7680, 1, device),
+            write(&output, 7680, 2),
+        ],
+    );
+    dependencies.push(gea2_wire_edge(launch_down, launch_output, &down));
+
+    assert_eq!(kernels.len(), 64);
+    assert_eq!(launches.len(), 64);
+    assert_eq!(dependencies.len(), 63);
     WireDeviceProgram {
         kernels,
         launches,
         lifetime: WireProgramLifetime::SingleRun,
         results: vec![WireResultBuffer {
-            buffer: final_output,
-            version: result_version,
+            buffer: output,
+            version: WireBufferVersion {
+                version: 1,
+                element_ty: "f32".to_owned(),
+                element_count: 7680,
+                reduced_projection: None,
+            },
             role: WireBufferRole::Output,
-            produced_by: final_launch,
+            produced_by: launch_output,
             observation: WireObservationFact {
-                at_launch: final_launch,
+                at_launch: launch_output,
                 cadence: WireObservationCadence::PerStep,
             },
         }],
@@ -650,20 +956,35 @@ fn gea2_block_program() -> WireDeviceProgram {
 
 fn admit_gea2_block_program(program: &WireDeviceProgram) -> Result<(), String> {
     validate_wire_program(program).map_err(|error| error.to_string())?;
-    let names = program
-        .kernels
-        .iter()
-        .map(|kernel| kernel.entry.as_str())
-        .collect::<Vec<_>>();
-    if names != GEA2_ENTRY_NAMES {
-        return Err(format!("GEA2 entry table drifted: {names:?}"));
-    }
     let expected_launches: usize = GEA2_INSTANCE_COUNTS.iter().sum();
-    if program.launches.len() != expected_launches {
+    if program.kernels.len() != expected_launches || program.launches.len() != expected_launches {
         return Err(format!(
-            "GEA2 launch sequence has {} rows, expected {expected_launches}",
+            "GEA2 instance-expanded program has {} kernels and {} launches, expected {expected_launches}",
+            program.kernels.len(),
             program.launches.len()
         ));
+    }
+    for (index, launch) in program.launches.iter().enumerate() {
+        let expected_id = u32::try_from(index + 1).expect("GEA2 launch id fits u32");
+        let expected_kernel = u32::try_from(index).expect("GEA2 kernel index fits u32");
+        if launch.id != expected_id || launch.kernel_index != expected_kernel {
+            return Err(format!(
+                "launch {} is not a one-to-one instance declaration",
+                expected_id
+            ));
+        }
+    }
+    for (entry, expected) in GEA2_ENTRY_NAMES.iter().zip(GEA2_INSTANCE_COUNTS) {
+        let actual = program
+            .kernels
+            .iter()
+            .filter(|kernel| kernel.entry == *entry)
+            .count();
+        if actual != expected {
+            return Err(format!(
+                "GEA2 instance count for {entry} is {actual}, expected {expected}"
+            ));
+        }
     }
     let buffers = program
         .kernels
@@ -671,10 +992,34 @@ fn admit_gea2_block_program(program: &WireDeviceProgram) -> Result<(), String> {
         .flat_map(|kernel| kernel.resources.iter())
         .map(|resource| resource.buffer.id)
         .collect::<BTreeSet<_>>();
+    let producer_buffers = program
+        .kernels
+        .iter()
+        .flat_map(|kernel| kernel.resources.iter())
+        .filter(|resource| {
+            matches!(
+                resource.access,
+                WireResourceAccess::Write | WireResourceAccess::ReadWrite
+            )
+        })
+        .map(|resource| resource.buffer.id)
+        .collect::<BTreeSet<_>>();
     for edge in &program.dependencies {
+        if edge.producer >= edge.consumer {
+            return Err(format!(
+                "dependency edge {} → {} is non-topological",
+                edge.producer, edge.consumer
+            ));
+        }
         if !buffers.contains(&edge.buffer) {
             return Err(format!(
                 "dependency edge {} → {} names undeclared intermediate {}",
+                edge.producer, edge.consumer, edge.buffer
+            ));
+        }
+        if !producer_buffers.contains(&edge.buffer) {
+            return Err(format!(
+                "dependency edge {} → {} names buffer {} without a producer",
                 edge.producer, edge.consumer, edge.buffer
             ));
         }
@@ -686,12 +1031,38 @@ fn admit_gea2_block_program(program: &WireDeviceProgram) -> Result<(), String> {
             program.dependencies.len()
         ));
     }
+    if program.roots != vec![1] {
+        return Err(format!(
+            "GEA2 roots must be exactly [1], got {:?}",
+            program.roots
+        ));
+    }
     let result = program
         .results
         .first()
         .ok_or("block output is undeclared")?;
-    if result.version.element_ty != "f32" || result.version.element_count != 8 * 960 {
+    if result.version.element_ty != "f32"
+        || result.version.element_count != 8 * 960
+        || result.buffer.lifetime != WireBufferLifetime::ObservationPoint
+        || result.produced_by != 64
+        || result.observation.at_launch != 64
+    {
         return Err("block output must be declared as F32 [8,960]".to_owned());
+    }
+    if !program
+        .dependencies
+        .iter()
+        .any(|edge| edge.producer == 6 && edge.consumer == 7)
+        || !program
+            .dependencies
+            .iter()
+            .any(|edge| edge.producer == 12 && edge.consumer == 13)
+        || !program
+            .dependencies
+            .iter()
+            .any(|edge| edge.producer == 13 && edge.consumer == 14)
+    {
+        return Err("GEA2 per-instance attention edges are missing".to_owned());
     }
     Ok(())
 }
@@ -700,7 +1071,7 @@ fn admit_gea2_block_program(program: &WireDeviceProgram) -> Result<(), String> {
 fn gea2_block_program_admits_complete_plan() {
     let program = gea2_block_program();
     admit_gea2_block_program(&program).expect("complete GEA2 block graph admits");
-    assert_eq!(program.kernels.len(), GEA2_ENTRY_NAMES.len());
+    assert_eq!(program.kernels.len(), 64);
     assert_eq!(program.launches.len(), 64);
     assert_eq!(program.dependencies.len(), 63);
     assert_eq!(program.roots, vec![1]);
@@ -724,4 +1095,25 @@ fn gea2_block_program_rejects_missing_edges_or_undeclared_intermediates() {
         error.contains("undeclared intermediate"),
         "unexpected error: {error}"
     );
+
+    let mut non_topological = gea2_block_program();
+    non_topological.dependencies[0].consumer = non_topological.dependencies[0].producer;
+    let error =
+        admit_gea2_block_program(&non_topological).expect_err("non-topological edge fails closed");
+    assert!(
+        error.contains("itself") || error.contains("non-topological"),
+        "unexpected error: {error}"
+    );
+
+    let mut undeclared_root = gea2_block_program();
+    undeclared_root.roots = vec![99];
+    let error =
+        admit_gea2_block_program(&undeclared_root).expect_err("undeclared root fails closed");
+    assert!(error.contains("root 99"), "unexpected error: {error}");
+
+    let mut wrong_output = gea2_block_program();
+    wrong_output.results[0].version.element_count = 1;
+    let error =
+        admit_gea2_block_program(&wrong_output).expect_err("wrong declared output fails closed");
+    assert!(error.contains("F32 [8,960]"), "unexpected error: {error}");
 }
