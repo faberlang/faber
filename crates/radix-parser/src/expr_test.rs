@@ -353,6 +353,34 @@ fn hadamard_divide_binds_at_multiplicative_precedence() {
     assert_eq!(divide.op, BinOp::HadamardDiv);
 }
 
+/// Equality glyphs are parse-level synonyms; semantic re-seating belongs to a later unit.
+#[test]
+fn equality_ladder_glyphs_pin_parse_tree_equivalence() {
+    fn parsed_op(spelling: &str) -> BinOp {
+        let result = parse_ok(&format!("fixum _ value ← a {spelling} b"));
+        let program = result.program.as_ref().expect("program");
+        let StmtKind::Var(var) = &program.statements[0].kind else {
+            panic!("expected variable declaration for {spelling}");
+        };
+        let expr = var.init.as_deref().expect("initializer");
+        let ExprKind::Binary(binary) = &expr.kind else {
+            panic!(
+                "expected binary expression for {spelling}, got {:?}",
+                expr.kind
+            );
+        };
+        binary.op
+    }
+
+    assert_eq!(parsed_op("≡"), BinOp::Eq);
+    assert_eq!(parsed_op("≢"), BinOp::NotEq);
+    assert_eq!(parsed_op("≅"), BinOp::ApproxEq);
+    assert_eq!(parsed_op("≇"), BinOp::ApproxNotEq);
+    assert_eq!(parsed_op("≅"), parsed_op("≈"));
+    assert_eq!(parsed_op("≇"), parsed_op("≉"));
+    assert_eq!(parsed_op("≢"), parsed_op("≠"));
+}
+
 /// All five glyph spellings map to their pinned `BinOp` variants.
 #[test]
 fn glyph_products_map_to_pinned_binops() {

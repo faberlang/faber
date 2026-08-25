@@ -256,10 +256,12 @@ impl Parser {
                 }
             } else {
                 let op = match self.peek().kind {
-                    TokenKind::EqEq => BinOp::Eq,
-                    TokenKind::ApproxEq => BinOp::ApproxEq,
-                    TokenKind::ApproxNotEq => BinOp::ApproxNotEq,
-                    TokenKind::BangEq => BinOp::NotEq,
+                    // Equality glyph aliases normalize in the lexer; these arms pin their
+                    // parse-level carriers until the semantic re-seating unit.
+                    TokenKind::EqEq => BinOp::Eq,                 // ≡
+                    TokenKind::ApproxEq => BinOp::ApproxEq,       // ≅ / ≈
+                    TokenKind::ApproxNotEq => BinOp::ApproxNotEq, // ≇ / ≉
+                    TokenKind::BangEq => BinOp::NotEq,            // ≠ / ≢
                     _ if self.check_keyword_ident(TokenKind::Est) => BinOp::Is,
                     _ => break,
                 };

@@ -744,6 +744,25 @@ fn lexes_equality_comparison_operators() {
 }
 
 #[test]
+fn lexes_equality_ladder_synonyms_to_pinned_tokens() {
+    let result = lex("≡ ≢ ≅ ≇ ≈ ≉");
+    assert!(result.errors.is_empty(), "errors: {:?}", result.errors);
+    let kinds: Vec<TokenKind> = result.tokens.iter().map(|t| t.kind.clone()).collect();
+    assert_eq!(
+        kinds,
+        vec![
+            TokenKind::EqEq,
+            TokenKind::BangEq,
+            TokenKind::ApproxEq,
+            TokenKind::ApproxNotEq,
+            TokenKind::ApproxEq,
+            TokenKind::ApproxNotEq,
+            TokenKind::Eof,
+        ]
+    );
+}
+
+#[test]
 fn lexes_relational_operators() {
     let result = lex("< ≤ ≺ > ≥ ≻");
     assert!(result.errors.is_empty());
