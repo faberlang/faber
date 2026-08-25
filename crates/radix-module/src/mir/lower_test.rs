@@ -2874,6 +2874,7 @@ fn lowers_imported_nominal_method_to_provider_runtime_call() {
     interface.insert(FileExport {
         name: "Sample".to_owned(),
         kind: FileExportKind::Struct(InterfaceStructExport {
+            params: Vec::new(),
             name: "Sample".to_owned(),
             fields: Vec::new(),
             methods: vec![InterfaceMethodExport {
@@ -5574,4 +5575,19 @@ incipit {
     )
     .unwrap_or_else(|error| panic!("minmax infix clamp runner proof should execute: {error:?}"));
     assert_eq!(host.stdout_lines, ["5", "17", "1.5"]);
+}
+
+#[test]
+fn probe_redde_conversion_dump() {
+    let dump = dump_source(
+        r#"
+discretio NnError { Error1 }
+discretio GradusError {
+    @ conversio NnError err { redde finge Variant {} ∷ GradusError } Variant
+}
+functio linear_carrier() → numerus ⇥ NnError { iace finge Error1 {} ∷ NnError }
+functio _linear() → numerus ⇥ GradusError { redde linear_carrier() }
+"#,
+    );
+    println!("PROBE-DUMP-START\n{dump}\nPROBE-DUMP-END");
 }

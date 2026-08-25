@@ -318,11 +318,23 @@ impl Lowerer<'_> {
         def_id: crate::DefId,
         params: &[GenericArgExpr],
     ) -> Vec<AppliedArg> {
-        let Some(kinds) = self
+        let kinds = self
             .resolver
             .generic_param_kinds(def_id)
-            .map(ToOwned::to_owned)
-        else {
+            .map(ToOwned::to_owned);
+        self.lower_applied_args_directed(kinds.as_deref(), params)
+    }
+
+    /// Lower applied arguments under an ordered declaration-kind list.
+    ///
+    /// `None` keeps the undirected legacy path for callees whose declaration
+    /// kinds are unknown (builtins, identity-less legacy interfaces).
+    fn lower_applied_args_directed(
+        &mut self,
+        kinds: Option<&[GenericParamKind]>,
+        params: &[GenericArgExpr],
+    ) -> Vec<AppliedArg> {
+        let Some(kinds) = kinds else {
             return params
                 .iter()
                 .map(|arg| self.lower_applied_arg(arg))
@@ -879,10 +891,13 @@ impl Lowerer<'_> {
             if params.is_empty() {
                 return type_id;
             }
-            let args = params
-                .iter()
-                .map(|param| self.lower_applied_arg(param))
-                .collect();
+            // Imported declarations carry their ordered declaration kinds on
+            // the file interface (S0-R1); kind mismatches fail closed instead
+            // of silently accepting any argument spelling.
+            let decl_kinds = self
+                .resolver
+                .namespace_file_decl_param_kinds(namespace.name, type_name.name);
+            let args = self.lower_applied_args_directed(decl_kinds.as_deref(), params);
             return self.types.intern(Type::Applied(type_id, args));
         }
         if self

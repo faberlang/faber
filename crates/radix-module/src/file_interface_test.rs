@@ -4,8 +4,9 @@
 
 use super::{
     import_interface_type, snapshot_interface_type, FileExport, FileExportKind, FileInterface, FileInterfaceError,
-    InterfaceCallable, InterfaceIndexSnapshot, InterfaceLibraryIdentity, InterfaceNominalKind, InterfaceNominalType,
-    InterfaceParam, InterfaceStructExport, InterfaceStructField, InterfaceTypeParamConstraint, InterfaceTypeSnapshot,
+    InterfaceAliasExport, InterfaceAppliedArg, InterfaceCallable, InterfaceGenericParam, InterfaceIndexSnapshot,
+    InterfaceLibraryIdentity, InterfaceNominalKind, InterfaceNominalType, InterfaceParam, InterfaceStructExport,
+    InterfaceStructField, InterfaceTypeParamConstraint, InterfaceTypeSnapshot,
 };
 use crate::lexer::Interner;
 use crate::semantic::{
@@ -328,6 +329,7 @@ fn conflicting_kind_snapshot_fails_closed_through_canonical_key() {
     interface.insert(FileExport {
         name: "Terminus".to_owned(),
         kind: FileExportKind::Struct(InterfaceStructExport {
+            params: Vec::new(),
             name: "Terminus".to_owned(),
             fields: vec![InterfaceStructField {
                 name: "gradus".to_owned(),
@@ -403,6 +405,7 @@ fn identity_bearing_snapshot_canonical_miss_fails_closed() {
         i.insert(FileExport {
             name: "Persona".to_owned(),
             kind: FileExportKind::Struct(InterfaceStructExport {
+                params: Vec::new(),
                 name: "Persona".to_owned(),
                 fields: Vec::new(),
                 methods: Vec::new(),
@@ -458,6 +461,7 @@ fn reexported_same_module_nominal_callable_remaps_through_parent_interface() {
     interface.insert(FileExport {
         name: "data.BufferGeometry".to_owned(),
         kind: FileExportKind::Struct(InterfaceStructExport {
+            params: Vec::new(),
             name: "BufferGeometry".to_owned(),
             fields: Vec::new(),
             methods: Vec::new(),
@@ -533,6 +537,7 @@ fn strict_locale_pack_keeps_supported_struct_fields_without_field_rows() {
     interface.insert(FileExport {
         name: "BufferAttribute".to_owned(),
         kind: FileExportKind::Struct(InterfaceStructExport {
+            params: Vec::new(),
             name: "BufferAttribute".to_owned(),
             fields: vec![
                 InterfaceStructField {
@@ -603,4 +608,96 @@ exemplars = ["test.fab"]
     assert!(skipped_field
         .remap_reason
         .contains("NominalIdentityUnknown"));
+}
+
+/// S0-R1: declaration parameter kind/order rides the portable schema and the
+/// consumer resolver registers the ordered kinds for imported declarations,
+/// so `module.Type<…>` applications are kind-directed and mismatches fail
+/// closed instead of accepting any argument spelling.
+#[test]
+fn file_interface_preserves_generic_size_decl_kinds_on_import() {
+    use crate::semantic::Resolver;
+    use crate::syntax::GenericParamKind;
+
+    let mut interface = FileInterface::new();
+    interface.insert(FileExport {
+        name: "Vector".to_owned(),
+        kind: FileExportKind::TypeAlias(InterfaceAliasExport {
+            name: "Vector".to_owned(),
+            params: vec![InterfaceGenericParam { name: "N".to_owned(), kind: GenericParamKind::Magnitudo }],
+            body: InterfaceTypeSnapshot::Vector(
+                Box::new(InterfaceTypeSnapshot::SizedNumeric(Primitive::Fractus, NumericWidth::F32)),
+                InterfaceIndexSnapshot::Param("N".to_owned()),
+            ),
+        }),
+    });
+    interface.insert(FileExport {
+        name: "Box".to_owned(),
+        kind: FileExportKind::Struct(InterfaceStructExport {
+            params: vec![InterfaceGenericParam { name: "N".to_owned(), kind: GenericParamKind::Magnitudo }],
+            name: "Box".to_owned(),
+            fields: Vec::new(),
+            methods: Vec::new(),
+            annotation_contract: None,
+        }),
+    });
+
+    let mut resolver = Resolver::new();
+    let mut types = TypeTable::new();
+    let mut interner = Interner::new();
+    resolver
+        .set_file_interfaces_from_snapshots(
+            &BTreeMap::from([("math".to_owned(), interface)]),
+            &mut interner,
+            &mut types,
+        )
+        .expect("install interface");
+
+    assert_eq!(
+        resolver.namespace_file_decl_param_kinds(interner.intern("math"), interner.intern("Vector")),
+        Some(vec![GenericParamKind::Magnitudo])
+    );
+    assert_eq!(
+        resolver.namespace_file_decl_param_kinds(interner.intern("math"), interner.intern("Box")),
+        Some(vec![GenericParamKind::Magnitudo])
+    );
+    assert_eq!(
+        resolver.namespace_file_decl_param_kinds(interner.intern("math"), interner.intern("missing")),
+        None
+    );
+}
+
+/// S0-R1: a size-bearing applied snapshot round-trips through the re-exported
+/// module surface; the size argument stays a kinded index, never a type.
+#[test]
+fn file_interface_preserves_generic_size_applied_round_trip() {
+    let mut types = TypeTable::new();
+    let interner = Interner::new();
+    let elem = types.sized_numeric(Primitive::Fractus, NumericWidth::F32);
+    let width = types.intern_index(IndexExpr::Literal(3));
+    let base = types.vector_with_width(elem, width);
+    let applied = types.intern(Type::Applied(base, vec![radix_types::AppliedArg::Size(width)]));
+
+    let snapshot = snapshot_interface_type(applied, &types, &interner).expect("snapshot applied size");
+    assert_eq!(
+        snapshot,
+        InterfaceTypeSnapshot::Applied(
+            Box::new(InterfaceTypeSnapshot::Vector(
+                Box::new(InterfaceTypeSnapshot::SizedNumeric(Primitive::Fractus, NumericWidth::F32)),
+                InterfaceIndexSnapshot::Literal(3),
+            )),
+            vec![InterfaceAppliedArg::Size(InterfaceIndexSnapshot::Literal(3))],
+        )
+    );
+
+    let mut target = TypeTable::new();
+    let mut target_interner = Interner::new();
+    let imported = import_interface_type(&snapshot, &mut target, &mut target_interner).expect("import applied size");
+    let Type::Applied(_, args) = target.get(imported) else {
+        panic!("expected imported applied type");
+    };
+    assert!(matches!(
+        args.as_slice(),
+        [radix_types::AppliedArg::Size(index)] if matches!(target.get_index(*index), IndexExpr::Literal(3))
+    ));
 }

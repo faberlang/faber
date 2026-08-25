@@ -49,6 +49,7 @@ fn shape_error_interface() -> FileInterface {
     interface.insert(FileExport {
         name: "ShapeError".to_owned(),
         kind: FileExportKind::Enum(InterfaceNominalExport {
+            params: Vec::new(),
             name: "ShapeError".to_owned(),
             methods: Vec::new(),
             shared_fields: vec![message.clone()],

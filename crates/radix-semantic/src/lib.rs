@@ -890,6 +890,10 @@ mod figura_literal_test;
 mod figura_test;
 
 #[cfg(test)]
+#[path = "file_interface_test.rs"]
+mod file_interface_test;
+
+#[cfg(test)]
 #[path = "format_type_test.rs"]
 mod format_type_test;
 

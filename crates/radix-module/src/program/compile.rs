@@ -6,9 +6,10 @@
 //! with a message pointing at the `faber` CLI.
 
 use crate::file_interface::{
-    FileExport, FileExportKind, FileInterface, InterfaceAnnotationContract, InterfaceAnnotationContractField,
-    InterfaceCallable, InterfaceEnumVariant, InterfaceLibraryIdentity, InterfaceMethodExport, InterfaceNominalExport,
-    InterfaceNominalKind, InterfaceNominalType, InterfaceParam, InterfaceStructExport, InterfaceStructField,
+    FileExport, FileExportKind, FileInterface, InterfaceAliasExport, InterfaceAnnotationContract,
+    InterfaceAnnotationContractField, InterfaceCallable, InterfaceEnumVariant, InterfaceGenericParam,
+    InterfaceLibraryIdentity, InterfaceMethodExport, InterfaceNominalExport, InterfaceNominalKind,
+    InterfaceNominalType, InterfaceParam, InterfaceStructExport, InterfaceStructField,
     InterfaceTypeSnapshot,
 };
 use crate::semantic::passes::visibility_annotation::VisibilityTier;
@@ -1211,7 +1212,13 @@ fn file_export_from_stmt(
             let annotation_contract = annotation_contract_from_stmt(stmt, decl, interner);
             Some(FileExport {
                 name: name.clone(),
-                kind: FileExportKind::Struct(InterfaceStructExport { name, fields, methods, annotation_contract }),
+                kind: FileExportKind::Struct(InterfaceStructExport {
+                    name,
+                    params: interface_generic_params(&decl.type_params, interner),
+                    fields,
+                    methods,
+                    annotation_contract,
+                }),
             })
         }
         StmtKind::Enum(decl) => {
@@ -1236,6 +1243,8 @@ fn file_export_from_stmt(
                 name: name.clone(),
                 kind: FileExportKind::Enum(InterfaceNominalExport {
                     name,
+                    // AST `discretio` declarations carry no generic parameters.
+                    params: Vec::new(),
                     methods: Vec::new(),
                     variants,
                     shared_fields: Vec::new(),
@@ -1311,6 +1320,7 @@ fn file_export_from_stmt(
                 name: name.clone(),
                 kind: FileExportKind::Enum(InterfaceNominalExport {
                     name,
+                    params: interface_generic_params(&decl.type_params, interner),
                     methods: Vec::new(),
                     variants,
                     shared_fields,
@@ -1323,6 +1333,7 @@ fn file_export_from_stmt(
                 name: name.clone(),
                 kind: FileExportKind::Interface(InterfaceNominalExport {
                     name,
+                    params: interface_generic_params(&decl.type_params, interner),
                     methods: Vec::new(),
                     variants: Vec::new(),
                     shared_fields: Vec::new(),
@@ -1331,16 +1342,21 @@ fn file_export_from_stmt(
         }
         StmtKind::TypeAlias(decl) => {
             let name = interner.resolve(decl.name.name).to_owned();
+            let params = interface_generic_params(&decl.type_params, interner);
             let no_params = BTreeSet::new();
             Some(FileExport {
-                name,
-                kind: FileExportKind::TypeAlias(interface_type_from_type_expr(
-                    &decl.ty,
-                    interner,
-                    &no_params,
-                    nominal_kinds,
-                    ctx,
-                )?),
+                name: name.clone(),
+                kind: FileExportKind::TypeAlias(InterfaceAliasExport {
+                    name,
+                    params,
+                    body: interface_type_from_type_expr(
+                        &decl.ty,
+                        interner,
+                        &no_params,
+                        nominal_kinds,
+                        ctx,
+                    )?,
+                }),
             })
         }
         StmtKind::Var(var) => {
@@ -1377,6 +1393,19 @@ fn semantic_param_mode(mode: AstParamMode) -> SemanticParamMode {
         AstParamMode::In => SemanticParamMode::MutRef,
         AstParamMode::Ex => SemanticParamMode::Move,
     }
+}
+
+fn interface_generic_params(
+    params: &[crate::syntax::TypeParam],
+    interner: &crate::lexer::Interner,
+) -> Vec<InterfaceGenericParam> {
+    params
+        .iter()
+        .map(|param| InterfaceGenericParam {
+            name: interner.resolve(param.name.name).to_owned(),
+            kind: param.kind,
+        })
+        .collect()
 }
 
 fn interface_type_from_generic_arg(

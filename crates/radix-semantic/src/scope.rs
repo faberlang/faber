@@ -32,8 +32,9 @@
 use super::types::{FuncSig, Type, TypeId, TypeTable};
 use crate::file_interface::{
     import_interface_callable_with_resolver, import_interface_type_with_resolver, FileExportKind,
-    FileInterface, FileInterfaceError, InterfaceLibraryIdentity, InterfaceMemberKind,
-    InterfaceMethodExport, InterfaceNominalExport, InterfaceNominalKind, InterfaceStructExport,
+    FileInterface, FileInterfaceError, InterfaceGenericParam, InterfaceLibraryIdentity,
+    InterfaceMemberKind, InterfaceMethodExport, InterfaceNominalExport, InterfaceNominalKind,
+    InterfaceStructExport,
 };
 use crate::locale::LocalePack;
 use crate::passes::visibility_annotation::VisibilityTier;
@@ -275,6 +276,11 @@ struct ImportedFileType {
     ty: TypeId,
     def_id: Option<DefId>,
     methods: Vec<ImportedFileInterfaceMethod>,
+    /// Ordered declaration parameter kinds for the exported alias/nominal
+    /// (S0-R1). Drives kind-directed application checking on
+    /// `namespace.Type<…>` uses; empty for const exports and legacy
+    /// artifact-restored interfaces.
+    decl_param_kinds: Vec<radix_syntax::GenericParamKind>,
 }
 
 #[derive(Debug, Clone)]
@@ -984,6 +990,7 @@ impl Resolver {
                         Type::Interface,
                         Vec::new(),
                         export_identity.clone(),
+                        InterfaceGenericParam::kinds(&nominal.params),
                     ),
                     FileExportKind::TypeAlias(_)
                     | FileExportKind::Const(_)
@@ -1043,10 +1050,13 @@ impl Resolver {
                 // typechecker can resolve `module.CONST` value references
                 // without exposing type exports as value references.
                 let is_const = matches!(&export.kind, FileExportKind::Const(_));
-                let (FileExportKind::TypeAlias(snapshot) | FileExportKind::Const(snapshot)) =
-                    &export.kind
-                else {
-                    continue;
+                let (snapshot, decl_param_kinds) = match &export.kind {
+                    FileExportKind::TypeAlias(alias) => (
+                        &alias.body,
+                        crate::file_interface::InterfaceGenericParam::kinds(&alias.params),
+                    ),
+                    FileExportKind::Const(snapshot) => (snapshot, Vec::new()),
+                    _ => continue,
                 };
                 match import_interface_type_with_resolver(snapshot, types, interner, self) {
                     Ok(ty) => {
@@ -1054,6 +1064,7 @@ impl Resolver {
                             ty,
                             def_id: None,
                             methods: Vec::new(),
+                            decl_param_kinds,
                         });
                         for projected_member in projected_members {
                             let member_sym = interner.intern(&projected_member);
@@ -1225,6 +1236,7 @@ impl Resolver {
         make_type: impl FnOnce(DefId) -> Type,
         methods: Vec<ImportedFileInterfaceMethod>,
         identity: Option<InterfaceLibraryIdentity>,
+        decl_param_kinds: Vec<radix_syntax::GenericParamKind>,
     ) -> ImportedFileExport {
         let nominal_kind = match kind {
             SymbolKind::Struct => Some(InterfaceNominalKind::Struct),
@@ -1245,12 +1257,16 @@ impl Resolver {
                 ty: existing_ty,
                 def_id: Some(existing_def),
                 methods,
+                decl_param_kinds,
             });
         }
         let def_id = self.fresh_def_id();
         let ty = types.intern(make_type(def_id));
         if let Some(nominal_kind) = nominal_kind {
             self.register_imported_nominal_type(nominal_kind, identity.as_ref(), name, ty, def_id);
+        }
+        if !decl_param_kinds.is_empty() {
+            self.register_generic_param_kinds(def_id, decl_param_kinds.clone());
         }
         self.symbols.insert(
             def_id,
@@ -1267,6 +1283,7 @@ impl Resolver {
             ty,
             def_id: Some(def_id),
             methods,
+            decl_param_kinds,
         })
     }
 
@@ -1295,6 +1312,7 @@ impl Resolver {
                 ty: existing_ty,
                 def_id: Some(existing_def),
                 methods: Vec::new(),
+                decl_param_kinds: InterfaceGenericParam::kinds(&nominal.params),
             }));
         }
         let enum_def = self.fresh_def_id();
@@ -1306,6 +1324,10 @@ impl Resolver {
             ty,
             enum_def,
         );
+        let decl_param_kinds = InterfaceGenericParam::kinds(&nominal.params);
+        if !decl_param_kinds.is_empty() {
+            self.register_generic_param_kinds(enum_def, decl_param_kinds.clone());
+        }
         // Phase 1 installs the enum nominal + variant shells (names, symbols,
         // parents) only. Payload fields are remapped in phase 2 once every
         // namespace's nominal shells exist: a variant field may reference a
@@ -1354,6 +1376,7 @@ impl Resolver {
             ty,
             def_id: Some(enum_def),
             methods: Vec::new(),
+            decl_param_kinds,
         }))
     }
 
@@ -1524,6 +1547,10 @@ impl Resolver {
             name,
             ty,
             def_id,
+        );
+        self.register_generic_param_kinds(
+            def_id,
+            crate::file_interface::InterfaceGenericParam::kinds(&strukt.params),
         );
         self.symbols.insert(
             def_id,
@@ -1890,6 +1917,34 @@ impl Resolver {
         {
             ImportedFileExport::Type(ty) => Some(ty.ty),
             ImportedFileExport::Struct(strukt) => Some(strukt.ty),
+            ImportedFileExport::Function(_) => None,
+        }
+    }
+
+    /// Ordered declaration parameter kinds for an imported file namespace
+    /// type member (`module.Type`), from the interface's `{name, kind}` export
+    /// metadata (S0-R1). `None` when the member is not a type export.
+    #[must_use]
+    pub fn namespace_file_decl_param_kinds(
+        &self,
+        namespace: LexSymbol,
+        member: LexSymbol,
+    ) -> Option<Vec<radix_syntax::GenericParamKind>> {
+        if self
+            .namespace_member_rejection_issue(namespace, member)
+            .is_some()
+        {
+            return None;
+        }
+        let interface = self.file_interfaces.get(&namespace)?;
+        match interface
+            .exports
+            .get(&self.file_interface_export_key(interface, member)?)?
+        {
+            ImportedFileExport::Type(ty) => Some(ty.decl_param_kinds.clone()),
+            ImportedFileExport::Struct(strukt) => {
+                self.generic_param_kinds(strukt.def_id).map(ToOwned::to_owned)
+            }
             ImportedFileExport::Function(_) => None,
         }
     }
@@ -3149,6 +3204,10 @@ impl Resolver {
                                     ty,
                                     def_id,
                                     methods: Vec::new(),
+                                    // Artifact snapshots do not carry analysis-
+                                    // time declaration kinds; restored
+                                    // interfaces keep the undirected fallback.
+                                    decl_param_kinds: Vec::new(),
                                 })
                             }
                             FileExportSnapshot::Struct { def_id, ty, fields } => {

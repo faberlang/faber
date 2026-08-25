@@ -315,6 +315,7 @@ functio apply() → vacuum {
     interface.insert(FileExport {
         name: "Meta".to_owned(),
         kind: FileExportKind::Struct(InterfaceStructExport {
+            params: Vec::new(),
             name: "Meta".to_owned(),
             fields: vec![InterfaceStructField {
                 name: "selector".to_owned(),

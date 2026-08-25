@@ -9,14 +9,14 @@ use radix_module::diagnostics::{Diagnostic, DiagnosticPhase};
 use radix_module::driver::AnalyzedModule;
 use radix_module::file_interface::{
     snapshot_interface_callable_with_identity, snapshot_interface_type_with_identity, FileExport,
-    FileExportKind, FileInterface, FileInterfaceError, InterfaceAnnotationContract,
-    InterfaceAnnotationContractField, InterfaceEnumVariant, InterfaceLibraryIdentity,
-    InterfaceMethodExport, InterfaceNominalExport, InterfaceQualifiedIdentity,
-    InterfaceStructExport, InterfaceStructField,
+    FileExportKind, FileInterface, FileInterfaceError, InterfaceAliasExport,
+    InterfaceAnnotationContract, InterfaceAnnotationContractField, InterfaceEnumVariant,
+    InterfaceGenericParam, InterfaceLibraryIdentity, InterfaceMethodExport, InterfaceNominalExport,
+    InterfaceQualifiedIdentity, InterfaceStructExport, InterfaceStructField,
 };
 use radix_module::hir::{
     DefId, HirConst, HirEnum, HirFunction, HirInterface, HirInterfaceMethod, HirItemKind,
-    HirParamMode, HirStruct, HirTypeParamConstraint, NucleumRole,
+    HirParamMode, HirStruct, HirTypeAlias, HirTypeParam, HirTypeParamConstraint, NucleumRole,
 };
 use radix_module::semantic::{FuncSig, ParamType, SemanticParamMode, Type, TypeParamConstraint};
 use std::collections::BTreeSet;
@@ -112,16 +112,12 @@ pub fn extract_file_interface_with_identity(
                     export_identity,
                 )?)
             }
-            HirItemKind::TypeAlias(alias) => FileExportKind::TypeAlias(
-                snapshot_interface_type_with_identity(
-                    alias.ty,
-                    &analysis.types,
-                    &analysis.interner,
-                    &analysis.resolver,
-                    export_identity.map(identity_for).as_ref(),
-                )
-                .map_err(|err| interface_error(file_label, &name, err))?,
-            ),
+            HirItemKind::TypeAlias(alias) => FileExportKind::TypeAlias(snapshot_alias(
+                alias,
+                analysis,
+                file_label,
+                export_identity,
+            )?),
             HirItemKind::Struct(strukt) => FileExportKind::Struct(snapshot_struct(
                 strukt,
                 analysis,
@@ -189,6 +185,41 @@ pub fn extract_file_interface_with_identity(
     Ok(interface)
 }
 
+fn snapshot_alias(
+    alias: &HirTypeAlias,
+    analysis: &AnalyzedModule,
+    file_label: &str,
+    export_identity: Option<&ExportIdentityContext>,
+) -> Result<InterfaceAliasExport, Diagnostic> {
+    let name = analysis.interner.resolve(alias.name).to_owned();
+    Ok(InterfaceAliasExport {
+        name: name.clone(),
+        params: interface_generic_params(&alias.type_params, &analysis.interner),
+        body: snapshot_interface_type_with_identity(
+            alias.ty,
+            &analysis.types,
+            &analysis.interner,
+            &analysis.resolver,
+            export_identity.map(identity_for).as_ref(),
+        )
+        .map_err(|err| interface_error(file_label, &name, err))?,
+    })
+}
+
+/// Ordered `{name, kind}` declaration parameters for an exported type.
+fn interface_generic_params(
+    params: &[HirTypeParam],
+    interner: &radix_module::lexer::Interner,
+) -> Vec<InterfaceGenericParam> {
+    params
+        .iter()
+        .map(|param| InterfaceGenericParam {
+            name: interner.resolve(param.name).to_owned(),
+            kind: param.kind,
+        })
+        .collect()
+}
+
 fn snapshot_interface(
     interface: &HirInterface,
     analysis: &AnalyzedModule,
@@ -215,6 +246,7 @@ fn snapshot_interface(
 
     Ok(InterfaceNominalExport {
         name: analysis.interner.resolve(interface.name).to_owned(),
+        params: interface_generic_params(&interface.type_params, &analysis.interner),
         methods,
         variants: Vec::new(),
         shared_fields: Vec::new(),
@@ -288,6 +320,7 @@ fn snapshot_enum(
         .collect::<Result<Vec<_>, Diagnostic>>()?;
     Ok(InterfaceNominalExport {
         name,
+        params: interface_generic_params(&enm.type_params, &analysis.interner),
         methods: Vec::new(),
         variants,
         shared_fields,
@@ -395,6 +428,7 @@ fn snapshot_struct(
 
     Ok(InterfaceStructExport {
         name: analysis.interner.resolve(strukt.name).to_owned(),
+        params: interface_generic_params(&strukt.type_params, &analysis.interner),
         fields,
         methods,
         annotation_contract,
@@ -621,3 +655,7 @@ fn interface_error(file_label: &str, export_name: &str, err: FileInterfaceError)
 #[cfg(test)]
 #[path = "file_interface_test.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "file_interface_s0r1_test.rs"]
+mod file_interface_s0r1_test;

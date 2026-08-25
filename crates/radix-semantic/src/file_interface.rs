@@ -11,6 +11,7 @@ use crate::{
 };
 use radix_hir::{DefId, HirExpression};
 use radix_lexer::Interner;
+use radix_syntax::GenericParamKind;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 
@@ -90,11 +91,38 @@ pub struct FileExport {
 #[derive(Debug, Clone, PartialEq)]
 pub enum FileExportKind {
     Function(InterfaceCallable),
-    TypeAlias(InterfaceTypeSnapshot),
+    TypeAlias(InterfaceAliasExport),
     Struct(InterfaceStructExport),
     Enum(InterfaceNominalExport),
     Interface(InterfaceNominalExport),
     Const(InterfaceTypeSnapshot),
+}
+
+/// Type-alias export: ordered declaration parameters plus the resolved body.
+///
+/// S0-R1: declaration parameter kind/order rides the export so consumers can
+/// kind-direct applied arguments to the imported alias without guessing from
+/// identifier spelling.
+#[derive(Debug, Clone, PartialEq)]
+pub struct InterfaceAliasExport {
+    pub name: String,
+    pub params: Vec<InterfaceGenericParam>,
+    pub body: InterfaceTypeSnapshot,
+}
+
+/// One ordered generic-declaration parameter carried by a type export.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct InterfaceGenericParam {
+    pub name: String,
+    pub kind: GenericParamKind,
+}
+
+impl InterfaceGenericParam {
+    /// Ordered kind list for kind-directed application checking.
+    #[must_use]
+    pub fn kinds(params: &[Self]) -> Vec<GenericParamKind> {
+        params.iter().map(|param| param.kind).collect()
+    }
 }
 
 /// Struct declaration contract needed by importers to validate struct literals
@@ -103,6 +131,8 @@ pub enum FileExportKind {
 #[derive(Debug, Clone, PartialEq)]
 pub struct InterfaceStructExport {
     pub name: String,
+    /// Ordered generic-declaration parameters (`typus`/`magnitudo`).
+    pub params: Vec<InterfaceGenericParam>,
     pub fields: Vec<InterfaceStructField>,
     /// Public inherent methods (`genus` methods) remapped like interface methods.
     pub methods: Vec<InterfaceMethodExport>,
@@ -158,6 +188,8 @@ pub struct InterfaceStructField {
 #[derive(Debug, Clone, PartialEq)]
 pub struct InterfaceNominalExport {
     pub name: String,
+    /// Ordered generic-declaration parameters (`typus`/`magnitudo`).
+    pub params: Vec<InterfaceGenericParam>,
     pub methods: Vec<InterfaceMethodExport>,
     /// Enum variant declarations (name + optional payload fields). Carried
     /// across the import boundary so consumers can reference library enum
@@ -213,10 +245,20 @@ pub enum InterfaceTypeSnapshot {
     Ref(SemanticMutability, Box<InterfaceTypeSnapshot>),
     Func(InterfaceCallable),
     Param(String),
-    Applied(Box<InterfaceTypeSnapshot>, Vec<InterfaceTypeSnapshot>),
+    Applied(Box<InterfaceTypeSnapshot>, Vec<InterfaceAppliedArg>),
     Union(Vec<InterfaceTypeSnapshot>),
     Tuple(Vec<InterfaceTypeSnapshot>),
     Nominal(InterfaceNominalType),
+}
+
+/// Kinded applied argument in a portable applied-type snapshot.
+///
+/// S0-R1 mirror of `radix_types::AppliedArg`: a size argument serializes as an
+/// index snapshot and never becomes a fake type argument.
+#[derive(Debug, Clone, PartialEq)]
+pub enum InterfaceAppliedArg {
+    Type(InterfaceTypeSnapshot),
+    Size(InterfaceIndexSnapshot),
 }
 
 /// Snapshot of a type-level index expression.
@@ -592,10 +634,14 @@ fn snapshot_interface_type_inner(
                         interner,
                         resolver,
                         module_identity,
-                    ),
-                    radix_types::AppliedArg::Size(_) => {
-                        Err(FileInterfaceError::IndexInferenceUnsupported)
-                    }
+                    )
+                    .map(InterfaceAppliedArg::Type),
+                    radix_types::AppliedArg::Size(index) => snapshot_interface_index(
+                        *index,
+                        types,
+                        interner,
+                    )
+                    .map(InterfaceAppliedArg::Size),
                 })
                 .collect::<FileInterfaceResult<Vec<_>>>()?,
         )),
@@ -796,9 +842,20 @@ fn import_interface_type_inner(
             let base = import_interface_type_inner(base, types, interner, resolver)?;
             let args = args
                 .iter()
-                .map(|arg| {
-                    import_interface_type_inner(arg, types, interner, resolver)
-                        .map(radix_types::AppliedArg::Type)
+                .map(|arg| match arg {
+                    InterfaceAppliedArg::Type(ty) => import_interface_type_inner(
+                        ty,
+                        types,
+                        interner,
+                        resolver,
+                    )
+                    .map(radix_types::AppliedArg::Type),
+                    InterfaceAppliedArg::Size(index) => import_interface_index(
+                        index,
+                        types,
+                        interner,
+                    )
+                    .map(radix_types::AppliedArg::Size),
                 })
                 .collect::<FileInterfaceResult<Vec<_>>>()?;
             Ok(types.intern(Type::Applied(base, args)))

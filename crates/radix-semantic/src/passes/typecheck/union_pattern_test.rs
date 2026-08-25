@@ -84,6 +84,7 @@ fn token_union_interface() -> FileInterface {
     interface.insert(FileExport {
         name: "TokenKind".to_owned(),
         kind: FileExportKind::Enum(InterfaceNominalExport {
+            params: Vec::new(),
             name: "TokenKind".to_owned(),
             methods: Vec::new(),
             shared_fields: Vec::new(),
