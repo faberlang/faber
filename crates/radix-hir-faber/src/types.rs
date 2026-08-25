@@ -10,8 +10,8 @@ use crate::surface::{KeywordSurface, TypeBindingKind};
 use radix_hir::DefId;
 use radix_lexer::{Interner, Symbol};
 use radix_types::{
-    CollectionKind, Primitive, SemanticMutability, SemanticParamMode, TensorFamilyKind, Type,
-    TypeId, TypeTable,
+    CollectionKind, MarkerFamily, Primitive, SemanticMutability, SemanticParamMode,
+    TensorFamilyKind, Type, TypeId, TypeTable,
 };
 use rustc_hash::FxHashMap;
 
@@ -231,7 +231,6 @@ impl super::FaberCodegen {
                         // an imported signature carries the mode separately.
                         let type_carries_mode = matches!(types.get(p.ty), Type::Ref(..));
                         match p.mode {
-                            SemanticParamMode::Owned => ty,
                             SemanticParamMode::Ref if !type_carries_mode => {
                                 format!("{} {}", surface.keyword(radix_lexer::TokenKind::De), ty)
                             }
@@ -274,7 +273,21 @@ impl super::FaberCodegen {
 
             Type::Infer(_) => "_".to_owned(),
             Type::InferUnion(_) => "∪".to_owned(),
-            Type::MarkerHole { .. } => "numerus<_>".to_owned(),
+            Type::MarkerHole { family, .. } => {
+                let head = match family {
+                    MarkerFamily::Numerus => {
+                        surface.type_surface(TypeBindingKind::Primitive(Primitive::Numerus))
+                    }
+                    MarkerFamily::Fractus => {
+                        surface.type_surface(TypeBindingKind::Primitive(Primitive::Fractus))
+                    }
+                    MarkerFamily::Modulus => surface.contextual_keyword("modulus"),
+                    MarkerFamily::Instans => {
+                        surface.type_surface(TypeBindingKind::Primitive(Primitive::Instans))
+                    }
+                };
+                format!("{head}<_>")
+            }
             Type::Tuple(members) => {
                 let members = members
                     .iter()
@@ -288,7 +301,8 @@ impl super::FaberCodegen {
             }
             Type::Error => "<error>".to_owned(),
             Type::BoundedArray { element, capacity } => format!(
-                "lista<{}, {}>",
+                "{}<{}, {}>",
+                surface.type_surface(TypeBindingKind::Collection(CollectionKind::Lista)),
                 self.type_to_faber(*element, types, names, interner, surface),
                 crate::figura::format_figura(*capacity, types, interner)
             ),
@@ -304,24 +318,21 @@ impl super::FaberCodegen {
                 self.type_to_faber(*element, types, names, interner, surface),
                 crate::figura::format_figura(*capacity, types, interner)
             ),
-            Type::BoundedTextus { capacity } => {
-                format!(
-                    "textus<{}>",
-                    crate::figura::format_figura(*capacity, types, interner)
-                )
-            }
-            Type::BoundedAscii { capacity } => {
-                format!(
-                    "ascii<{}>",
-                    crate::figura::format_figura(*capacity, types, interner)
-                )
-            }
-            Type::BoundedOcteti { capacity } => {
-                format!(
-                    "octeti<{}>",
-                    crate::figura::format_figura(*capacity, types, interner)
-                )
-            }
+            Type::BoundedTextus { capacity } => format!(
+                "{}<{}>",
+                surface.type_surface(TypeBindingKind::Primitive(Primitive::Textus)),
+                crate::figura::format_figura(*capacity, types, interner)
+            ),
+            Type::BoundedAscii { capacity } => format!(
+                "{}<{}>",
+                surface.type_surface(TypeBindingKind::Primitive(Primitive::Ascii)),
+                crate::figura::format_figura(*capacity, types, interner)
+            ),
+            Type::BoundedOcteti { capacity } => format!(
+                "{}<{}>",
+                surface.type_surface(TypeBindingKind::Primitive(Primitive::Octeti)),
+                crate::figura::format_figura(*capacity, types, interner)
+            ),
         }
     }
 

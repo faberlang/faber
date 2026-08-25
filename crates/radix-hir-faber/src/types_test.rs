@@ -98,6 +98,9 @@ impl KeywordSurface for LatinSurface {
             TypeBindingKind::Primitive(Primitive::Nihil) => "nihil",
             TypeBindingKind::Primitive(Primitive::Vacuum) => "vacuum",
             TypeBindingKind::Primitive(Primitive::Valor) => "valor",
+            TypeBindingKind::Primitive(Primitive::Ascii) => "ascii",
+            TypeBindingKind::Primitive(Primitive::Octeti) => "octeti",
+            TypeBindingKind::Primitive(Primitive::Instans) => "instans",
             TypeBindingKind::Collection(CollectionKind::Lista) => "lista",
             TypeBindingKind::Collection(CollectionKind::Tabula) => "tabula",
             TypeBindingKind::Collection(CollectionKind::Copia) => "copia",
@@ -2263,4 +2266,85 @@ fn transfer_glyph_is_locale_invariant() {
         code.contains("⇇"),
         "localized transfer output must keep the U+21C7 glyph, got:\n{code}"
     );
+}
+
+// ── Bounded type + marker-hole surface routing ─────────────────────────
+
+/// Reader-locale surface overriding a few type rows; the rest fall back Latin.
+struct LocalizedTypeSurface;
+
+impl KeywordSurface for LocalizedTypeSurface {
+    fn keyword(&self, kind: TokenKind) -> &str {
+        LatinSurface.keyword(kind)
+    }
+
+    fn type_surface(&self, kind: TypeBindingKind) -> &str {
+        match kind {
+            TypeBindingKind::Collection(CollectionKind::Lista) => "list",
+            TypeBindingKind::Primitive(Primitive::Textus) => "text",
+            _ => LatinSurface.type_surface(kind),
+        }
+    }
+}
+
+#[test]
+fn bounded_types_print_via_the_surface() {
+    // The bounded buffer/collection heads are ordinary type identities: they
+    // must localize through the reader surface like their unbounded twins
+    // (`list<T>` / `text<N>`), not stay hardcoded Latin.
+    let codegen = FaberCodegen::default();
+    let mut types = TypeTable::new();
+    let names = FxHashMap::default();
+    let interner = Interner::new();
+    let four = types.intern_index(radix_types::IndexExpr::Literal(4));
+    let numerus = types.primitive(Primitive::Numerus);
+
+    let cases = [
+        (types.bounded_array(numerus, four), "list<numerus, 4>"),
+        (types.bounded_textus(four), "text<4>"),
+        (types.bounded_ascii(four), "ascii<4>"),
+        (types.bounded_octeti(four), "octeti<4>"),
+    ];
+    for (type_id, expected) in cases {
+        assert_eq!(
+            codegen.type_to_faber(type_id, &types, &names, &interner, &LocalizedTypeSurface),
+            expected
+        );
+    }
+
+    // Latin surface keeps the canonical spellings.
+    assert_eq!(
+        codegen.type_to_faber(types.bounded_array(numerus, four), &types, &names, &interner, &LatinSurface),
+        "lista<numerus, 4>"
+    );
+    assert_eq!(
+        codegen.type_to_faber(types.bounded_textus(four), &types, &names, &interner, &LatinSurface),
+        "textus<4>"
+    );
+}
+
+#[test]
+fn marker_hole_prints_its_family() {
+    // A marker hole's family is identity (`fractus<_>` is not `numerus<_>`);
+    // re-emission must keep the family the semantic layer interned.
+    let codegen = FaberCodegen::default();
+    let mut types = TypeTable::new();
+    let names = FxHashMap::default();
+    let interner = Interner::new();
+
+    for (family, expected) in [
+        (MarkerFamily::Numerus, "numerus<_>"),
+        (MarkerFamily::Fractus, "fractus<_>"),
+        (MarkerFamily::Modulus, "modulus<_>"),
+        (MarkerFamily::Instans, "instans<_>"),
+    ] {
+        let hole = types.intern(radix_types::Type::MarkerHole {
+            family,
+            var: radix_types::InferVar(0),
+        });
+        assert_eq!(
+            codegen.type_to_faber(hole, &types, &names, &interner, &LatinSurface),
+            expected
+        );
+    }
 }
