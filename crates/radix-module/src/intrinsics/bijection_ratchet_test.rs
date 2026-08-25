@@ -12,14 +12,16 @@
 //! internal allowlist (a design fact, not a worklist).
 //!
 //! Direction 3 (AIR/device allowlist → owner): every AIR-lane tensor method
-//! name is registry-backed with a green MIR probe, or on the ratchet. Pins the
+//! name is registry-backed with a green MIR probe, on the permanent AIR-lane
+//! class list (a design fact, not a worklist), or on the ratchet. Pins the
 //! `mappata`/`filtrata` unarmed-admission residual.
 //!
-//! The ratchet allowlist MUST equal the probe-derived gap set (set equality,
-//! both directions): a new gap turns red until consciously allowlisted with a
-//! unit citation; a stale entry after its unit lands turns red until removed.
-//! Allowlist empty == done. Never replace the probe with a test-local mirror
-//! table — that is the drift the census audit (6aa998a8) caught.
+//! The ratchet allowlist plus the permanent AIR-lane class list MUST equal the
+//! probe-derived gap set (set equality, both directions): a new gap turns red
+//! until consciously allowlisted with a unit citation; a stale entry after
+//! its unit lands turns red until removed. Allowlist empty == done. Never
+//! replace the probe with a test-local mirror table — that is the drift the
+//! census audit (6aa998a8) caught.
 
 use crate::driver::{analyze_source, AnalyzeRequest, Config, Session};
 use crate::intrinsics::{
@@ -443,10 +445,12 @@ fn probe(source: &str, session: &Session) -> ProbeOutcome {
     }
 }
 
-/// The unit-cited ratchet allowlist. Law: this set EQUALS the probe-derived
-/// gap set (direction 1 ∪ direction 3). Each row cites the unit that removes
-/// it — MC2 arms the numeric-unary family, MC3 arms `Vector.crea`, MC4 moves
-/// the AIR-lane rows onto the permanent AIR-lane class list.
+/// The unit-cited ratchet allowlist. Law: this set plus the permanent
+/// AIR-lane class list (`AIR_LANE_CLASSES`) EQUALS the probe-derived gap set
+/// (direction 1 ∪ direction 3). Each row cites the unit that removes it — MC2
+/// arms the numeric-unary family, MC3 arms `Vector.crea`. The 11 AIR-lane
+/// rows were dispositioned by MC4 onto `AIR_LANE_CLASSES` (ruled design
+/// surface, not worklist entries).
 const RATCHET: &[(&str, &str)] = &[
     // MC2 — numeric-unary backfill (registry rows, `CodegenOnly`, no arm).
     ("Numeric.nega/0", "MC2"),
@@ -455,19 +459,27 @@ const RATCHET: &[(&str, &str)] = &[
     ("Numeric.complementata/0", "MC2"),
     // MC3 — Vector.crea constructor backfill.
     ("Vector.crea/0", "MC3"),
-    // MC4 — AIR-lane method surface with no MIR method owner (deliberate,
-    // documented disposition; direction 3 rows are not registry rows).
-    ("AIR.maxima", "MC4"),
-    ("AIR.minima", "MC4"),
-    ("AIR.exponentia", "MC4"),
-    ("AIR.logarithmus", "MC4"),
-    ("AIR.radix", "MC4"),
-    ("AIR.activatio_tanh", "MC4"),
-    ("AIR.summa_axis", "MC4"),
-    ("AIR.reducta", "MC4"),
-    ("AIR.cumulata", "MC4"),
-    ("AIR.mappata", "MC4"),
-    ("AIR.filtrata", "MC4"),
+];
+
+/// Permanent AIR-lane class list (goal mir-completeness §1 direction 3) — the
+/// 11 DOCUMENT-AS-DESIGNED rows moved off the ratchet by MC4. A design fact,
+/// not a worklist (same list-kind as the permanent `MirCollectionOp`
+/// allowlist): ruled AIR-lane method surface with no MIR method owner
+/// (7fd87619 closed allowlist; 94786e02 intrinsic route). `mappata`/
+/// `filtrata` keep their unarmed-admission residual pinned here so the class
+/// cannot silently grow.
+const AIR_LANE_CLASSES: &[&str] = &[
+    "AIR.maxima",
+    "AIR.minima",
+    "AIR.exponentia",
+    "AIR.logarithmus",
+    "AIR.radix",
+    "AIR.activatio_tanh",
+    "AIR.summa_axis",
+    "AIR.reducta",
+    "AIR.cumulata",
+    "AIR.mappata",
+    "AIR.filtrata",
 ];
 
 /// Known-armed control per receiver family: if a control probe fails, the
@@ -652,21 +664,32 @@ fn bijection_ratchet_equals_probe_derived_gap_set() {
         derived.extend(probe_air_gaps(&registry_gaps));
     }
 
-    let allowlist: BTreeSet<&str> = RATCHET.iter().map(|(key, _)| *key).collect();
+    // Coverage law: every probe-derived gap is covered by exactly one of the
+    // unit-cited ratchet (a worklist entry that must shrink to empty) or the
+    // permanent AIR-lane class list (a design fact). Set equality holds both
+    // ways: a new gap turns red until consciously covered; a stale entry
+    // after its unit lands turns red until removed.
+    let ratchet: BTreeSet<&str> = RATCHET.iter().map(|(key, _)| *key).collect();
+    let air_classes: BTreeSet<&str> = AIR_LANE_CLASSES.iter().copied().collect();
+    assert!(
+        ratchet.is_disjoint(&air_classes),
+        "ratchet and AIR-lane class list must be disjoint — a row is either a worklist entry or a design fact, never both"
+    );
+    let expected: BTreeSet<&str> = ratchet.union(&air_classes).copied().collect();
     let derived_ref: BTreeSet<&str> = derived.iter().map(|s| s.as_str()).collect();
 
     let mut report = String::new();
-    if derived_ref != allowlist {
-        let mut extra: Vec<&str> = derived_ref.difference(&allowlist).copied().collect();
-        let mut missing: Vec<&str> = allowlist.difference(&derived_ref).copied().collect();
+    if derived_ref != expected {
+        let mut extra: Vec<&str> = derived_ref.difference(&expected).copied().collect();
+        let mut missing: Vec<&str> = expected.difference(&derived_ref).copied().collect();
         extra.sort_unstable();
         missing.sort_unstable();
         let _ = write!(
             report,
-            "ratchet != probe-derived gap set\n  new gaps (allowlist them with a unit citation or arm them): {extra:?}\n  stale rows (unit landed — remove from RATCHET): {missing:?}"
+            "ratchet != probe-derived gap set\n  new gaps (cite a unit in RATCHET or classify onto AIR_LANE_CLASSES): {extra:?}\n  stale rows (unit landed — remove from RATCHET or AIR_LANE_CLASSES): {missing:?}"
         );
     }
-    assert!(derived_ref == allowlist, "{report}");
+    assert!(derived_ref == expected, "{report}");
 
     // Every ratchet row carries a unit citation (the banned-pattern budget
     // shape: explicit names + citations, never a bare count).
