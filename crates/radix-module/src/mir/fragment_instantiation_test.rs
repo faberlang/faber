@@ -158,7 +158,9 @@ fn fragment_to_fragment_matching_signature_is_legal() {
 }
 
 #[test]
-fn entry_to_entry_is_nested_dispatch() {
+fn entry_to_entry_is_checked_and_legal() {
+    // DFV2-4: device code may call any concrete device function; the former
+    // `nested_dispatch` reject is now the ordinary typed instantiation check.
     let mut types = TypeTable::new();
     let ty = f32_ty(&mut types);
     let inner = function(
@@ -182,13 +184,38 @@ fn entry_to_entry_is_nested_dispatch() {
         Some(MirKernelShaderStage::Compute),
     );
     let errors = check_fns(&[outer, inner], &types);
-    let err = expect_issue(&errors, ISSUE_CONTEXT, "nested_dispatch");
-    assert_eq!(err.span, CALL_SPAN());
-    assert_eq!(err.definition_span, Some(DEF_SPAN()));
-    assert!(err
-        .args
-        .iter()
-        .any(|arg| arg.name == "caller" && arg.value == "entry"));
+    assert!(errors.is_empty(), "legal Entry→Entry must pass for composition: {errors:?}");
+}
+
+#[test]
+fn entry_to_entry_type_mismatch_is_a_type_error() {
+    // DFV2-4: the entry→entry row runs the typed check — a mismatched
+    // argument reports the instantiation TYPE issue, not a legality reject.
+    let mut types = TypeTable::new();
+    let ty = f32_ty(&mut types);
+    let text = text_ty(&types);
+    let inner = function(
+        1,
+        ENTRY_INNER,
+        vec![param(0, ty, MirParamMode::Owned)],
+        ty,
+        None,
+        Vec::new(),
+        None,
+        Some(MirKernelShaderStage::Compute),
+    );
+    let outer = function(
+        0,
+        ENTRY,
+        vec![param(0, text, MirParamMode::Owned)],
+        text,
+        Some(MirCallee::Function(MirFunctionId(1))),
+        vec![MirOperand::Place(MirPlace::local(MirLocalId(0)))],
+        Some(MirPlace::local(MirLocalId(0))),
+        Some(MirKernelShaderStage::Compute),
+    );
+    let errors = check_fns(&[outer, inner], &types);
+    expect_issue(&errors, ISSUE_TYPE, "argument");
 }
 
 #[test]
@@ -646,7 +673,9 @@ fn catalog_emits_type_and_call_site_context() {
 }
 
 #[test]
-fn lowering_rejects_entry_to_entry_nested_dispatch() {
+fn lowering_composes_entry_to_entry() {
+    // DFV2-4: a device caller may call a concrete local device entry; the
+    // call composes instead of the v1 nested-dispatch reject.
     let source = r"
 @ nucleum
 functio inner(fractus<f32> x) → fractus<f32> {
@@ -661,11 +690,12 @@ functio outer(fractus<f32> x) → fractus<f32> {
     let session = Session::new(Config::default());
     let mut analysis =
         driver::analyze_source(&session, "device.fab", source, AnalyzeRequest::default()).expect("analyze source");
-    let errors =
-        crate::mir::lower_analyzed_unit(&mut analysis, Default::default()).expect_err("Entry→Entry must be rejected");
+    let roles = crate::mir::device_roles_from_hir(&analysis.hir);
+    let lowered = crate::mir::lower_analyzed_unit(&mut analysis, Default::default()).expect("Entry→Entry must compose");
     assert!(
-        errors.iter().any(|err| err.issue == ISSUE_CONTEXT),
-        "expected nucleum_fragment_context, got {errors:?}"
+        crate::mir::fragment_composition::surviving_fragment_calls(&lowered.program.functions, &[], &roles).is_empty(),
+        "no device call may survive composition: {:#?}",
+        lowered.program.functions
     );
 }
 

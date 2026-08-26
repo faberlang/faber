@@ -419,7 +419,10 @@ functio k(fractus<f32> x) → fractus<f32> {
 }
 
 #[test]
-fn matrix_entry_to_entry_is_nested_dispatch() {
+fn matrix_entry_to_kernel_helper_composes() {
+    // DFV2-4: device code may call device code — entry or helper. The v1
+    // nested-dispatch reject is gone; the kernel-helper call composes before
+    // validation, transitively through the fragment it wraps.
     let source = r"
 @ nucleum fragment
 functio helper(fractus<f32> x) → fractus<f32> {
@@ -436,13 +439,12 @@ functio outer(fractus<f32> x) → fractus<f32> {
     redde inner(x)
 }
 ";
-    let mut analysis = analyze(source).unwrap_or_else(|errors| panic!("nested dispatch analyzes: {errors:?}"));
-    let errors = crate::mir::lower_analyzed_unit(&mut analysis, Default::default()).expect_err("Entry→Entry must fail");
-    let err = expect_lower_issue(&errors, ISSUE_CONTEXT);
+    let (analysis, lowered) = lower(source).unwrap_or_else(|errors| panic!("entry→helper must compose: {errors:?}"));
+    let roles = device_roles_from_hir(&analysis.hir);
     assert!(
-        span_in(err.span, source, "inner(x)"),
-        "nested dispatch span must be the wrapper call: {:?}",
-        err.span
+        surviving_fragment_calls(&lowered.functions, &[], &roles).is_empty(),
+        "no device call may survive kernel-helper composition: {:#?}",
+        lowered.functions
     );
 }
 

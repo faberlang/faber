@@ -9,7 +9,9 @@
 //! instantiates any shape the defining unit never called.
 
 use super::{MirError, MirGenericParam};
-use crate::file_interface::{FileExportKind, FileInterface, InterfaceDeviceContract};
+use crate::file_interface::{
+    FileExportKind, FileInterface, InterfaceDeviceContract, InterfaceDeviceRole, InterfaceDeviceVisibility,
+};
 use crate::hir::DefId;
 use crate::lexer::{Interner, Span};
 use crate::mir::generic::{
@@ -112,6 +114,11 @@ impl ImportedDeviceIndex {
     pub fn get(&self, source: DefId) -> Option<&ImportedDeviceRoute> {
         self.by_source.get(&source)
     }
+
+    /// All indexed routes with their template sources (composition input).
+    pub fn iter(&self) -> impl Iterator<Item = (&DefId, &ImportedDeviceRoute)> {
+        self.by_source.iter()
+    }
 }
 
 /// One concrete imported device instance registered for the consumer (DFV2-3
@@ -169,18 +176,25 @@ pub fn instantiate_merged_generic_calls(
     .map(|(monomorphizations, _)| monomorphizations)
 }
 
-/// Device-aware package-link instantiation (DFV2-3 imported-instance linkage).
+/// Device-aware package-link instantiation (DFV2-3 transport + DFV2-4
+/// composition).
 ///
 /// Beyond [`instantiate_merged_generic_calls`], every concrete instantiation
 /// of an indexed imported device function is registered for the consumer
-/// ([`ImportedDeviceRegistration`]), and a signature-only imported device
-/// import fails closed with the named `imported_device_body_missing` reason
-/// before composition: the role bit alone never validates the call.
+/// ([`ImportedDeviceRegistration`]), a signature-only imported device import
+/// fails closed with the named `imported_device_body_missing` reason before
+/// composition (the role bit alone never validates the call), and the merged
+/// program's device calls — including imported instance bodies calling other
+/// imported device functions — compose here, between shape finalization and
+/// the caller's `ValidatedMir` rebuild. Consumer-local device caller roles
+/// are not available at this seam; their imported calls stay untouched and
+/// fail closed downstream rather than composing blind.
 ///
 /// # Errors
 /// Returns [`MirError`] when a call site cannot bind, a template is missing,
-/// substitution fails, a shape-size scalar survives finalization, or an
-/// imported device function has no usable body channel.
+/// substitution fails, a shape-size scalar survives finalization, an
+/// imported device function has no usable body channel, or composition
+/// rejects a cycle or expansion budget.
 pub fn instantiate_merged_generic_calls_with_devices(
     program: &mut MirProgram,
     templates: &[MirFunction],
@@ -225,7 +239,52 @@ pub fn instantiate_merged_generic_calls_with_devices(
     if !state.errors.is_empty() {
         return Err(state.errors);
     }
+    // DFV2-4 merged-pipeline composition: after shapes finalize, imported
+    // device instances are device functions of this program (routes carry
+    // role + launch visibility), so their device calls compose before the
+    // caller rebuilds `ValidatedMir`. An empty index composes nothing.
+    let device_roles = imported_devices
+        .iter()
+        .map(|(source, route)| (*source, mir_role(route.contract.role)))
+        .collect::<FxHashMap<DefId, crate::mir::MirDeviceRole>>();
+    if !device_roles.is_empty() {
+        let launch_entries = imported_devices
+            .iter()
+            .filter(|(_, route)| {
+                route.contract.visibility == InterfaceDeviceVisibility::Public
+                    && mir_role(route.contract.role) == crate::mir::MirDeviceRole::Kernel
+            })
+            .map(|(source, _)| *source)
+            .collect::<FxHashSet<_>>();
+        let composition_errors = crate::mir::fragment_composition::compose(
+            &mut program.functions,
+            &state.monomorphizations,
+            &device_roles,
+            crate::mir::fragment_composition::active_budget(),
+            Some(interner),
+            &launch_entries,
+        );
+        if !composition_errors.is_empty() {
+            return Err(composition_errors
+                .into_iter()
+                .map(|error| MirError {
+                    message: error.message(),
+                    issue: error.issue.to_owned(),
+                    span: error.span,
+                    definition_span: error.definition_span,
+                })
+                .collect());
+        }
+    }
     Ok((state.monomorphizations, state.device_registrations))
+}
+
+/// Map the interface device role onto the MIR role of the same meaning.
+fn mir_role(role: InterfaceDeviceRole) -> crate::mir::MirDeviceRole {
+    match role {
+        InterfaceDeviceRole::Kernel => crate::mir::MirDeviceRole::Kernel,
+        InterfaceDeviceRole::Fragment => crate::mir::MirDeviceRole::Fragment,
+    }
 }
 
 fn next_function_id(functions: &[MirFunction]) -> MirFunctionId {
