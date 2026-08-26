@@ -1249,3 +1249,23 @@ fn cli_rejects_check_json_without_air() {
         "the rejection must name the required --air flag:\n{rendered}"
     );
 }
+
+#[test]
+fn test_timeout_flag_parses_seconds() {
+    let cli = Cli::try_parse_from(["faber", "test", "--test-timeout", "30"]).expect("parse flag");
+    let Some(crate::cli::Command::Test(args)) = cli.command else {
+        panic!("expected test subcommand");
+    };
+    assert_eq!(args.test_timeout, Some(30));
+}
+
+#[test]
+fn test_timeout_zero_is_rejected_fail_closed() {
+    let err =
+        Cli::try_parse_from(["faber", "test", "--test-timeout", "0"]).expect_err("0 rejected");
+    let rendered = err.to_string();
+    assert!(
+        rendered.contains("positive"),
+        "zero timeout must be rejected fail-closed: {rendered}"
+    );
+}

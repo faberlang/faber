@@ -24,6 +24,9 @@ struct TestRunOptions {
     exact: bool,
     list: bool,
     fail_fast: bool,
+    /// CLI `--test-timeout` wall-clock default (seconds) for cases without a
+    /// per-test `timeout` / `temporis` modifier.
+    default_timeout_secs: Option<u64>,
 }
 
 #[derive(Debug, Default)]
@@ -63,6 +66,8 @@ pub(super) fn cmd_test(args: &TestArgs) {
     if let Some(filter) = args.filter.clone() {
         filters.push(filter);
     }
+    // --test-timeout 0 is rejected fail-closed at parse time (cli parser);
+    // cmd_test never sees a zero default here.
     let options = TestRunOptions {
         filters,
         skips: args.skip.clone(),
@@ -72,6 +77,7 @@ pub(super) fn cmd_test(args: &TestArgs) {
         exact: args.exact,
         list: args.list,
         fail_fast: args.fail_fast,
+        default_timeout_secs: args.test_timeout,
     };
 
     // A named `.proba` argument is the source selection. `--include` on
@@ -267,6 +273,7 @@ fn run_source_with_options(
             None,
             false,
             include_ignored,
+            options.default_timeout_secs,
         );
         let elapsed = started.elapsed().as_millis();
         for result in &mut one.results {
@@ -612,6 +619,7 @@ fn run_package_test_unit_with_options(
                     None,
                     false,
                     include_ignored,
+                    options.default_timeout_secs,
                 );
                 let elapsed = started.elapsed().as_millis();
                 for result in &mut one.results {
@@ -716,6 +724,7 @@ fn run_package_test_unit(
                 harness_filter,
                 exact,
                 include_ignored,
+                None,
             );
             append_focus_skips(
                 &mut report,

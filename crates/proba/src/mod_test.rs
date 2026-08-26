@@ -11,6 +11,14 @@ fn session() -> Session {
 }
 
 fn run(source: &str, selection: TestSelection) -> ProbaReport {
+    run_with_timeout(source, selection, None)
+}
+
+fn run_with_timeout(
+    source: &str,
+    selection: TestSelection,
+    default_timeout_secs: Option<u64>,
+) -> ProbaReport {
     run_proba_source(
         &session(),
         "proba_test.fab",
@@ -19,6 +27,7 @@ fn run(source: &str, selection: TestSelection) -> ProbaReport {
         None,
         false,
         false,
+        default_timeout_secs,
     )
     .unwrap_or_else(|err| panic!("proba run should succeed setup: {err:?}"))
 }
@@ -94,6 +103,7 @@ probandum "suite" {
         None,
         false,
         false,
+        None,
     )
     .expect("run");
 
@@ -288,6 +298,7 @@ probandum "math" {
         Some("math/add"),
         false,
         false,
+        None,
     )
     .expect("run");
     assert_eq!(report.results.len(), 1);
@@ -317,6 +328,7 @@ proba "ok" {
         None,
         false,
         false,
+        None,
     )
 }
 
@@ -393,11 +405,12 @@ proba "broken equality" {
 }
 
 #[test]
-fn temporis_runaway_loop_exhausts_step_budget() {
-    // Without the budget this `dum verum` case hangs the runner forever.
+fn default_step_guard_stops_runaway_loop_without_modifier() {
+    // No modifier at all: the runner's default step budget must terminate a
+    // `dum verum` loop that would otherwise hang `faber test` forever.
     let report = run(
         r#"
-proba "runaway" temporis 64 {
+proba "runaway" {
     dum verum {
         tacet
     }
@@ -412,16 +425,12 @@ proba "runaway" temporis 64 {
     match &report.results[0].outcome {
         CaseOutcome::Failed { message } => {
             assert!(
-                message.contains("temporis"),
-                "budget exhaustion should name temporis: {message}"
-            );
-            assert!(
                 message.contains("step budget exhausted"),
-                "budget exhaustion should name the step budget: {message}"
+                "default guard exhaustion should name the step budget: {message}"
             );
             assert!(
-                message.contains("64"),
-                "budget exhaustion should name the limit: {message}"
+                message.contains("100000000"),
+                "default guard exhaustion should name the default limit: {message}"
             );
         }
         other => panic!("expected Failed budget exhaustion, got {other:?}"),
@@ -429,10 +438,36 @@ proba "runaway" temporis 64 {
 }
 
 #[test]
-fn temporis_sufficient_budget_still_passes() {
+fn temporis_is_wall_clock_and_trips_on_infinite_loop() {
+    // `temporis N` is now wall-clock SECONDS: an infinite loop with a small
+    // timeout fails via the deadline, not via a step budget.
     let report = run(
         r#"
-proba "bounded" temporis 10000 {
+proba "timed runaway" temporis 1 {
+    dum verum {
+        tacet
+    }
+}
+"#,
+        TestSelection::default(),
+    );
+    assert_eq!(report.failed(), 1);
+    match &report.results[0].outcome {
+        CaseOutcome::Failed { message } => {
+            assert!(
+                message.contains("wall-clock timeout"),
+                "wall-clock timeout should be named: {message}"
+            );
+        }
+        other => panic!("expected Failed wall-clock timeout, got {other:?}"),
+    }
+}
+
+#[test]
+fn temporis_sufficient_timeout_still_passes() {
+    let report = run(
+        r#"
+proba "bounded" temporis 60 {
     adfirma 1 ≡ 1
 }
 "#,
@@ -441,6 +476,82 @@ proba "bounded" temporis 10000 {
     assert_eq!(report.passed(), 1);
     assert_eq!(report.failed(), 0);
     assert!(report.success());
+}
+
+#[test]
+fn temporis_zero_is_rejected_fail_closed() {
+    let report = run(
+        r#"
+proba "zero" temporis 0 {
+    adfirma 1 ≡ 1
+}
+"#,
+        TestSelection::default(),
+    );
+    assert_eq!(report.failed(), 1);
+    match &report.results[0].outcome {
+        CaseOutcome::Failed { message } => {
+            assert!(
+                message.contains("positive wall-clock timeout"),
+                "timeout 0 must be rejected fail-closed: {message}"
+            );
+        }
+        other => panic!("expected Failed rejection, got {other:?}"),
+    }
+}
+
+#[test]
+fn cli_default_timeout_applies_without_per_test_modifier() {
+    // Precedence leg 2: --test-timeout default binds cases with no modifier.
+    let report = run_with_timeout(
+        r#"
+proba "runaway" {
+    dum verum {
+        tacet
+    }
+}
+"#,
+        TestSelection::default(),
+        Some(1),
+    );
+    assert_eq!(report.failed(), 1);
+    match &report.results[0].outcome {
+        CaseOutcome::Failed { message } => {
+            assert!(
+                message.contains("wall-clock timeout"),
+                "CLI default timeout should trip: {message}"
+            );
+        }
+        other => panic!("expected Failed wall-clock timeout, got {other:?}"),
+    }
+}
+
+#[test]
+fn per_test_timeout_wins_over_cli_default() {
+    // Precedence leg 1: per-test temporis overrides the CLI default. The
+    // per-test timeout (1s) trips long before the CLI default (60s), so a
+    // wall-clock failure here proves the per-test value was used.
+    let report = run_with_timeout(
+        r#"
+proba "per-test wins" temporis 1 {
+    dum verum {
+        tacet
+    }
+}
+"#,
+        TestSelection::default(),
+        Some(60),
+    );
+    assert_eq!(report.failed(), 1);
+    match &report.results[0].outcome {
+        CaseOutcome::Failed { message } => {
+            assert!(
+                message.contains("wall-clock timeout"),
+                "per-test timeout should win over the CLI default: {message}"
+            );
+        }
+        other => panic!("expected Failed wall-clock timeout, got {other:?}"),
+    }
 }
 
 #[test]
@@ -642,10 +753,10 @@ proba "rejected benchmark" erratur metior {
 }
 
 #[test]
-fn erratur_does_not_flip_temporis_budget_exhaustion() {
+fn erratur_does_not_flip_temporis_timeout() {
     let report = run(
         r#"
-proba "budget" erratur temporis 64 {
+proba "timeout" erratur temporis 1 {
     dum verum {
         tacet
     }
@@ -655,8 +766,13 @@ proba "budget" erratur temporis 64 {
     );
     assert_eq!(report.failed(), 1);
     match &report.results[0].outcome {
-        CaseOutcome::Failed { message } => assert!(message.contains("temporis")),
-        other => panic!("expected budget failure, got {other:?}"),
+        CaseOutcome::Failed { message } => {
+            assert!(
+                message.contains("wall-clock timeout"),
+                "wall-clock timeout must not flip under erratur: {message}"
+            );
+        }
+        other => panic!("expected timeout failure, got {other:?}"),
     }
 }
 

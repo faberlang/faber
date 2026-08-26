@@ -31,6 +31,7 @@ use radix_types::{effective_width, NumericWidth, Primitive, Type, TypeId, TypeTa
 use rustc_hash::{FxHashMap, FxHashSet};
 use std::cell::RefCell;
 use std::rc::Rc;
+use std::time::Instant;
 use value::{
     add_values, compare_values, decimal_numeric_binop, int_bitwise_binop, modular_word_bitnot,
     modular_word_bitwise_binop, modular_word_compare_values, modular_word_neg,
@@ -185,6 +186,10 @@ pub(crate) struct Runner<'a, H: Host + ?Sized> {
     /// MIR basic-block visit in `run_until_depth`.
     step_limit: Option<u64>,
     steps_taken: u64,
+    /// Cooperative wall-clock deadline for the test path. Checked every
+    /// `DEADLINE_CHECK_INTERVAL` steps in `consume_step` so the common case
+    /// pays no clock read; program execution (`*_unbounded`) leaves it `None`.
+    deadline: Option<Instant>,
     return_value: Option<Value>,
     return_error: Option<Value>,
     /// Stack of yield buffers, one per active `CursorStream` materialization.
@@ -242,6 +247,7 @@ impl<'a, H: Host + ?Sized> Runner<'a, H> {
             errors: Vec::new(),
             step_limit: None,
             steps_taken: 0,
+            deadline: None,
             return_value: None,
             return_error: None,
             generator_yields: Vec::new(),
@@ -258,6 +264,9 @@ impl<'a, H: Host + ?Sized> Runner<'a, H> {
 }
 
 /// Run the entry (`incipit`) function to completion.
+///
+/// Program execution (not a proba test): explicitly unbounded — no step
+/// budget, no wall-clock deadline. See [`run_function_unbounded`].
 ///
 /// # Errors
 ///
@@ -281,13 +290,14 @@ pub fn run_entry<H: Host + ?Sized>(
             "no entry function in MIR program",
         )]);
     };
-    run_function(validated, entry.id, host)
+    run_function_unbounded(validated, entry.id, host)
 }
 
-/// Run a specific MIR function to completion (used by proba case execution).
+/// Run a specific MIR function to completion.
 ///
-/// The function must take no parameters. Assertion failures and host aborts
-/// surface through the host's `abort` / runner error paths.
+/// Program execution: explicitly unbounded (see [`run_function_unbounded`]).
+/// The proba test path uses [`run_function_with_limits`] instead, which
+/// applies a default step budget and an optional wall-clock deadline.
 ///
 /// # Errors
 ///
@@ -297,13 +307,39 @@ pub fn run_function<H: Host + ?Sized>(
     function_id: MirFunctionId,
     host: &mut H,
 ) -> Result<(), Vec<RunnerError>> {
-    run_function_with_step_budget(validated, function_id, host, None)
+    run_function_unbounded(validated, function_id, host)
 }
+
+/// Run a specific MIR function with NO step budget and NO deadline.
+///
+/// The explicit-unbounded variant reserved for program execution
+/// (`faber run`, FMIR image runner, coverage). Test paths must not call this:
+/// they inherit [`DEFAULT_TEST_STEP_BUDGET`] through
+/// [`run_function_with_limits`] instead.
+///
+/// # Errors
+///
+/// Returns a list of runner errors if the program cannot be executed.
+pub fn run_function_unbounded<H: Host + ?Sized>(
+    validated: &ValidatedMir<'_>,
+    function_id: MirFunctionId,
+    host: &mut H,
+) -> Result<(), Vec<RunnerError>> {
+    run_function_with_explicit_limits(validated, function_id, host, None, None)
+}
+
+/// Default step budget applied to test executions when the caller passes no
+/// explicit budget (`None`). One step is one MIR basic-block visit. Generous:
+/// real tests never trip it; only unbounded work (infinite loops, runaway
+/// recursion) does. Tunable later via a max-steps-style flag.
+pub const DEFAULT_TEST_STEP_BUDGET: u64 = 100_000_000;
 
 /// Run a specific MIR function with an optional deterministic step budget.
 ///
-/// One step is one MIR basic-block visit. `None` is unlimited. Exhaustion
-/// records `interpreter step budget exhausted after N steps` and stops.
+/// One step is one MIR basic-block visit. `None` applies
+/// [`DEFAULT_TEST_STEP_BUDGET`] — test paths inherit the default guard.
+/// Exhaustion records `interpreter step budget exhausted after N steps` and
+/// stops. No wall-clock deadline is applied; use [`run_function_with_limits`].
 ///
 /// # Errors
 ///
@@ -314,6 +350,43 @@ pub fn run_function_with_step_budget<H: Host + ?Sized>(
     function_id: MirFunctionId,
     host: &mut H,
     step_budget: Option<u64>,
+) -> Result<(), Vec<RunnerError>> {
+    run_function_with_limits(validated, function_id, host, step_budget, None)
+}
+
+/// Run a specific MIR function with the test-path limits: an optional step
+/// budget (`None` applies [`DEFAULT_TEST_STEP_BUDGET`]) and an optional
+/// wall-clock deadline (checked cooperatively every
+/// [`DEADLINE_CHECK_INTERVAL`] steps).
+///
+/// # Errors
+///
+/// Returns a list of runner errors if the program cannot be executed, the
+/// step budget is exhausted, or the wall-clock deadline passes.
+pub fn run_function_with_limits<H: Host + ?Sized>(
+    validated: &ValidatedMir<'_>,
+    function_id: MirFunctionId,
+    host: &mut H,
+    step_budget: Option<u64>,
+    deadline: Option<Instant>,
+) -> Result<(), Vec<RunnerError>> {
+    run_function_with_explicit_limits(
+        validated,
+        function_id,
+        host,
+        Some(step_budget.unwrap_or(DEFAULT_TEST_STEP_BUDGET)),
+        deadline,
+    )
+}
+
+/// Shared execution core. `step_limit: None` here means truly unlimited
+/// (callers translate their own `None` into the default beforehand).
+fn run_function_with_explicit_limits<H: Host + ?Sized>(
+    validated: &ValidatedMir<'_>,
+    function_id: MirFunctionId,
+    host: &mut H,
+    step_limit: Option<u64>,
+    deadline: Option<Instant>,
 ) -> Result<(), Vec<RunnerError>> {
     let context = validated.validation();
     let program = validated.program();
@@ -336,7 +409,8 @@ pub fn run_function_with_step_budget<H: Host + ?Sized>(
         return Err(vec![RunnerError::unsupported(function.span, reason)]);
     }
     let mut runner = Runner::new(program, context, context.types, interner, host);
-    runner.step_limit = step_budget;
+    runner.step_limit = step_limit;
+    runner.deadline = deadline;
     runner.push_frame(function_id, MirBlockId(0));
     runner.run_until_depth(0);
     if runner.errors.is_empty() {
@@ -523,18 +597,36 @@ impl<H: Host + ?Sized> Runner<'_, H> {
         }
     }
 
+    /// Interval (in steps) between cooperative wall-clock deadline checks in
+    /// [`Runner::consume_step`] — amortizes the clock read over many steps.
+    const DEADLINE_CHECK_INTERVAL: u64 = 1024;
+
     /// Count one interpreter step (one MIR basic-block visit). Returns `false`
-    /// when the optional step budget is exhausted; an error is recorded.
+    /// when the step budget is exhausted or the wall-clock deadline passes; an
+    /// error is recorded. The deadline is checked every
+    /// [`DEADLINE_CHECK_INTERVAL`] steps so the common step pays no clock cost.
     fn consume_step(&mut self, span: Span) -> bool {
-        let Some(limit) = self.step_limit else {
-            return true;
-        };
-        if self.steps_taken >= limit {
-            self.errors.push(RunnerError::internal(
-                span,
-                format!("interpreter step budget exhausted after {limit} steps"),
-            ));
-            return false;
+        if self.deadline.is_some()
+            && self
+                .steps_taken
+                .is_multiple_of(Self::DEADLINE_CHECK_INTERVAL)
+        {
+            if let Some(deadline) = self.deadline {
+                if Instant::now() >= deadline {
+                    self.errors
+                        .push(RunnerError::internal(span, "wall-clock timeout exceeded"));
+                    return false;
+                }
+            }
+        }
+        if let Some(limit) = self.step_limit {
+            if self.steps_taken >= limit {
+                self.errors.push(RunnerError::internal(
+                    span,
+                    format!("interpreter step budget exhausted after {limit} steps"),
+                ));
+                return false;
+            }
         }
         self.steps_taken += 1;
         true

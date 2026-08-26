@@ -13,7 +13,7 @@ mod tests;
 use radix::hir::{DefId, HirItemKind, HirModule, HirTestMetadata, HirTestModifier};
 use radix::lexer::Interner;
 use radix::mir::{
-    lower_analyzed_unit, run_function_with_step_budget, BufferHost, MirFunctionId, RunSourceError,
+    lower_analyzed_unit, run_function_with_limits, BufferHost, MirFunctionId, RunSourceError,
     RunnerError, ValidatedMir,
 };
 use radix::module::{AnalyzedModule, Session};
@@ -21,6 +21,7 @@ use radix::program::analyze_prepared_program_name;
 use std::collections::HashMap;
 use std::panic::{catch_unwind, AssertUnwindSafe};
 use std::path::{Path, PathBuf};
+use std::time::{Duration, Instant};
 
 /// User-facing test filter requested by the package or CLI layer.
 ///
@@ -317,14 +318,20 @@ enum ExecutionPlan {
         reason: String,
     },
     Run {
-        step_budget: Option<u64>,
+        /// Resolved wall-clock timeout in seconds for this case:
+        /// per-test `temporis`/`timeout` wins, else the caller-supplied
+        /// default (CLI `--test-timeout`), else `None` (deadline-less).
+        timeout_secs: Option<u64>,
         repeats: u64,
         erratur: bool,
     },
 }
 
-fn execution_plan(modifiers: &[ProbaModifierView]) -> ExecutionPlan {
-    let mut step_budget = None;
+fn execution_plan(
+    modifiers: &[ProbaModifierView],
+    default_timeout_secs: Option<u64>,
+) -> ExecutionPlan {
+    let mut timeout_secs = default_timeout_secs;
     let mut repeats = 1_u64;
     let mut erratur = false;
     let mut solum_in = None;
@@ -336,11 +343,11 @@ fn execution_plan(modifiers: &[ProbaModifierView]) -> ExecutionPlan {
             | ProbaModifierView::Solum
             | ProbaModifierView::Tag(_) => {}
             ProbaModifierView::Temporis(n) => match u64::try_from(*n) {
-                Ok(budget) => step_budget = Some(budget),
-                Err(_) => {
+                Ok(secs) if secs > 0 => timeout_secs = Some(secs),
+                _ => {
                     return ExecutionPlan::Reject {
                         reason: format!(
-                            "faber: temporis requires a non-negative step budget, got {n}"
+                            "faber: temporis requires a positive wall-clock timeout in seconds, got {n}"
                         ),
                     };
                 }
@@ -376,7 +383,7 @@ fn execution_plan(modifiers: &[ProbaModifierView]) -> ExecutionPlan {
         }
     }
     ExecutionPlan::Run {
-        step_budget,
+        timeout_secs,
         repeats,
         erratur,
     }
@@ -448,6 +455,7 @@ pub fn run_proba_source(
     harness_filter: Option<&str>,
     exact: bool,
     include_ignored: bool,
+    default_timeout_secs: Option<u64>,
 ) -> Result<ProbaReport, RunSourceError> {
     let mut analysis =
         analyze_prepared_program_name(session, name, source).map_err(RunSourceError::Frontend)?;
@@ -458,6 +466,7 @@ pub fn run_proba_source(
         harness_filter,
         exact,
         include_ignored,
+        default_timeout_secs,
     )
 }
 
@@ -472,6 +481,7 @@ pub fn run_proba_on_analyzed(
     harness_filter: Option<&str>,
     exact: bool,
     include_ignored: bool,
+    default_timeout_secs: Option<u64>,
 ) -> Result<ProbaReport, RunSourceError> {
     run_proba_on_analyzed_with_unit_path(
         unit,
@@ -480,6 +490,7 @@ pub fn run_proba_on_analyzed(
         harness_filter,
         exact,
         include_ignored,
+        default_timeout_secs,
     )
 }
 
@@ -490,6 +501,7 @@ fn run_proba_on_analyzed_with_unit_path(
     harness_filter: Option<&str>,
     exact: bool,
     include_ignored: bool,
+    default_timeout_secs: Option<u64>,
 ) -> Result<ProbaReport, RunSourceError> {
     let cases = inventory_cases(&unit.hir, &unit.interner);
     let lowered = lower_analyzed_unit(unit, Default::default()).map_err(RunSourceError::Mir)?;
@@ -501,6 +513,7 @@ fn run_proba_on_analyzed_with_unit_path(
         harness_filter,
         exact,
         include_ignored,
+        default_timeout_secs,
     ))
 }
 
@@ -515,6 +528,7 @@ pub fn run_proba_on_validated(
     harness_filter: Option<&str>,
     exact: bool,
     include_ignored: bool,
+    default_timeout_secs: Option<u64>,
 ) -> ProbaReport {
     run_proba_on_validated_with_unit_path(
         validated,
@@ -524,6 +538,7 @@ pub fn run_proba_on_validated(
         harness_filter,
         exact,
         include_ignored,
+        default_timeout_secs,
     )
 }
 
@@ -535,6 +550,7 @@ fn run_proba_on_validated_with_unit_path(
     harness_filter: Option<&str>,
     exact: bool,
     include_ignored: bool,
+    default_timeout_secs: Option<u64>,
 ) -> ProbaReport {
     run_proba_cases(
         validated,
@@ -544,6 +560,7 @@ fn run_proba_on_validated_with_unit_path(
         harness_filter,
         exact,
         include_ignored,
+        default_timeout_secs,
         |case| mir_function_id_from_def(validated, case.def_id),
     )
 }
@@ -564,6 +581,7 @@ pub fn run_proba_on_validated_with_function_ids(
     harness_filter: Option<&str>,
     exact: bool,
     include_ignored: bool,
+    default_timeout_secs: Option<u64>,
 ) -> ProbaReport {
     let module_path = module_path.to_path_buf();
     run_proba_cases(
@@ -574,6 +592,7 @@ pub fn run_proba_on_validated_with_function_ids(
         harness_filter,
         exact,
         include_ignored,
+        default_timeout_secs,
         |case| {
             function_ids
                 .get(&(module_path.clone(), case.def_id))
@@ -590,6 +609,7 @@ fn run_proba_cases(
     harness_filter: Option<&str>,
     exact: bool,
     include_ignored: bool,
+    default_timeout_secs: Option<u64>,
     function_id_for_case: impl Fn(&ProbaCase) -> Option<MirFunctionId>,
 ) -> ProbaReport {
     let has_solum = has_solum_cases(cases);
@@ -629,7 +649,7 @@ fn run_proba_cases(
             continue;
         }
 
-        let execution = match execution_plan(&case.modifiers) {
+        let execution = match execution_plan(&case.modifiers, default_timeout_secs) {
             ExecutionPlan::Reject { reason } => {
                 CaseExecution::without_output(CaseOutcome::Failed { message: reason })
             }
@@ -637,12 +657,12 @@ fn run_proba_cases(
                 CaseExecution::without_output(CaseOutcome::Skipped { reason })
             }
             ExecutionPlan::Run {
-                step_budget,
+                timeout_secs,
                 repeats,
                 erratur,
             } => match function_id_for_case(case) {
                 Some(function_id) => {
-                    execute_case_repeated(validated, function_id, step_budget, repeats, erratur)
+                    execute_case_repeated(validated, function_id, timeout_secs, repeats, erratur)
                 }
                 None => CaseExecution::without_output(CaseOutcome::Blocked {
                     reason: format!(
@@ -677,14 +697,14 @@ fn mir_function_id_from_def(validated: &ValidatedMir<'_>, def_id: DefId) -> Opti
 fn execute_case_repeated(
     validated: &ValidatedMir<'_>,
     function_id: MirFunctionId,
-    step_budget: Option<u64>,
+    timeout_secs: Option<u64>,
     repeats: u64,
     erratur: bool,
 ) -> CaseExecution {
     execute_repeated(repeats, || {
         // Apply erratur inside each execution so a passing expected-error run
         // does not trip the repeat loop's non-Passed short-circuit.
-        execute_case(validated, function_id, step_budget, erratur)
+        execute_case(validated, function_id, timeout_secs, erratur)
     })
 }
 
@@ -702,16 +722,20 @@ fn execute_repeated(repeats: u64, mut execute: impl FnMut() -> CaseExecution) ->
 fn execute_case(
     validated: &ValidatedMir<'_>,
     function_id: MirFunctionId,
-    step_budget: Option<u64>,
+    timeout_secs: Option<u64>,
     erratur: bool,
 ) -> CaseExecution {
     let mut host = BufferHost::default();
+    // Wall-clock deadline from the resolved timeout (per-test temporis, else
+    // the CLI default). The runner's default step budget still applies as a
+    // backstop via the `None` step-budget argument.
+    let deadline = timeout_secs.map(|secs| Instant::now() + Duration::from_secs(secs));
     // Assertion failures call Host::abort which panics on BufferHost; catch as fail.
     // Silence the default panic hook so failed cases do not dump a backtrace to stderr.
     let previous_hook = std::panic::take_hook();
     std::panic::set_hook(Box::new(|_| {}));
     let trapped = catch_unwind(AssertUnwindSafe(|| {
-        run_function_with_step_budget(validated, function_id, &mut host, step_budget)
+        run_function_with_limits(validated, function_id, &mut host, None, deadline)
     }));
     std::panic::set_hook(previous_hook);
     let outcome = match trapped {
@@ -773,7 +797,11 @@ fn is_error_channel_escape(errors: &[RunnerError]) -> bool {
 
 fn case_outcome_from_runner_errors(errors: &[RunnerError]) -> CaseOutcome {
     let message = format_runner_errors(errors);
-    if is_step_budget_exhausted(&message) {
+    if is_wall_clock_timeout(&message) {
+        CaseOutcome::Failed {
+            message: "faber: test exceeded its wall-clock timeout".to_owned(),
+        }
+    } else if is_step_budget_exhausted(&message) {
         CaseOutcome::Failed {
             message: format!("temporis: {message}"),
         }
@@ -786,6 +814,10 @@ fn case_outcome_from_runner_errors(errors: &[RunnerError]) -> CaseOutcome {
 
 fn is_step_budget_exhausted(message: &str) -> bool {
     message.contains("interpreter step budget exhausted")
+}
+
+fn is_wall_clock_timeout(message: &str) -> bool {
+    message.contains("wall-clock timeout exceeded")
 }
 
 fn is_capability_gap_message(message: &str) -> bool {

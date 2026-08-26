@@ -692,6 +692,23 @@ pub struct TestArgs {
     /// Exit 0 when no cases are discovered or matched after filtering
     #[arg(long = "allow-no-tests")]
     pub allow_no_tests: bool,
+
+    /// Wall-clock timeout (seconds) applied to every test case that has no
+    /// per-test `timeout` / `temporis` modifier. 0 is rejected fail-closed.
+    #[arg(long = "test-timeout", value_name = "SECONDS", value_parser = parse_test_timeout_secs)]
+    pub test_timeout: Option<u64>,
+}
+
+/// `--test-timeout` parser: seconds, strictly positive (0 is fail-closed).
+fn parse_test_timeout_secs(value: &str) -> Result<u64, String> {
+    let parsed: u64 = value
+        .parse()
+        .map_err(|_| format!("invalid --test-timeout seconds: {value}"))?;
+    if parsed == 0 {
+        Err("--test-timeout requires a positive number of seconds".to_owned())
+    } else {
+        Ok(parsed)
+    }
 }
 
 /// Arguments for `faber model`.
