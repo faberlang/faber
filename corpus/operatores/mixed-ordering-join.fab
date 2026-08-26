@@ -1,0 +1,65 @@
++++
+term = "mixed-ordering-join"
+kind = "operator-group"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "expression", "comparison", "equality", "equality_tail", "literal", "nota_stmt"]
+category = "comparison"
+canonical = false
+summary = "Mixed numerus/fractus ordering (< >) executes at the widened float join."
+syntax = "<expression> < <expression> | <expression> > <expression>"
+related = ["≅", "comparatio", "fractus", "numerus"]
+locale = "en"
++++
+
+# =============================================================================
+# mixed-ordering-join — numerus/fractus ordering at the widened join
+# =============================================================================
+#
+# What this teaches:
+#   • `numerus < fractus` and `numerus > fractus` join both operands at the
+#     float carrier before comparing — the same promotion `+ - * /` apply.
+#   • The join is exact only below 2^53; above it the integer side loses
+#     precision, so distinct integers can compare equal at the joined width.
+#
+# Common mistakes:
+#   • Assuming mixed ordering compares exact integer values above 2^53 — the
+#     f64 join cannot represent them; the lossy joined result is by design.
+#
+# See also: ≅, comparatio, fractus, numerus
+# =============================================================================
+
+# operatores/mixed-ordering-join — numerus < fractus >
+#
+# WHY: ordering joins at the widened float carrier (fractus wins), mirroring
+# the `≅` promotion join (numeric-value-eq) and arithmetic `+ - * /`.
+#
+# ACCEPTED PRECISION BOUND: integers above 2^53 (9007199254740992) are not
+# representable in the f64 join — `9007199254740993` rounds to `2^53` when
+# widened, so it compares equal to `9007199254740992.0`. Both orderings below
+# report the LOSSY joined result (falsum) exactly as the runner executes it;
+# the bound is accepted by design (intprecision.fab precedent).
+#
+# EXPECTED OUTPUT:
+#   verum
+#   falsum
+#   falsum
+#   falsum
+
+main {
+    const numerus small ← 3
+    const fractus lata ← 3.5
+
+    const _ int_lt ← small < lata
+    print int_lt
+
+    const _ int_gt ← small > lata
+    print int_gt
+
+    const numerus above ← 9007199254740993
+    const fractus boundary ← 9007199254740992.0
+
+    const _ lossy_lt ← above < boundary
+    print lossy_lt
+
+    const _ lossy_gt ← above > boundary
+    print lossy_gt
+}
