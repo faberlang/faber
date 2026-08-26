@@ -1,0 +1,20 @@
+# N4b materialization fixture (goal flow-narrowing-and-match-patterns, §N4b):
+# an exported signature whose param solves to a union must materialize at the
+# S0-G6 file-interface seam instead of failing unrepresentable. This is the
+# post-N4a `ct-hole` shape (`fn probe(_ u)` + type-pattern match solves the
+# param to `list ∪ string`), written with the solved union explicit so the
+# seam's materialization is exercised independently of the solver.
+#
+# Validation: `cargo run -p faber -- check crates/radix-program/test-fixtures/export-probe.fab`
+
+fn probe(list<int> ∪ string u) → string {
+    match u {
+        case list<int> const xs { return "list" }
+        case string const s { return "string" }
+    }
+}
+
+main {
+    print probe([1, 2])
+    print probe("hi")
+}

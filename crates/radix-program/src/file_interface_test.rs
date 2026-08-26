@@ -244,3 +244,33 @@ fn signature_only_fragment_export_fails_closed() {
         "{err:?}"
     );
 }
+
+/// N4b: the S0-G6 seam never runs the solver — it materializes what the
+/// interface snapshot receives. A param that is still a hole at export time
+/// (no type-pattern match solved it) remains unrepresentable and fails closed
+/// with the named `interface_export_unrepresentable` issue; the solved-union
+/// shape (`Type::Union`) materializes instead (see `file_interface_s0r1_test`
+/// — the producer→consumer chain proves the round trip).
+#[test]
+fn unsolved_hole_param_export_fails_closed() {
+    let analysis = analyze("functio probe(_ u) → vacuum { tacet }\n");
+    let Err(diagnostic) =
+        extract_file_interface_with_identity(&analysis, &["probe".to_owned()], "test.fab", None)
+    else {
+        panic!("an unsolved hole param must fail closed at the seam");
+    };
+    assert!(
+        diagnostic
+            .args
+            .iter()
+            .any(|arg| { arg.name == "issue" && arg.value == "interface_export_unrepresentable" }),
+        "expected interface_export_unrepresentable, got {diagnostic:?}"
+    );
+    assert!(
+        diagnostic
+            .args
+            .iter()
+            .any(|arg| arg.name == "reason" && arg.value.contains("InferenceTypeUnsupported")),
+        "expected InferenceTypeUnsupported reason, got {diagnostic:?}"
+    );
+}

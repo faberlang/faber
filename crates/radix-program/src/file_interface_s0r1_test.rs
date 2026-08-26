@@ -1,13 +1,21 @@
 //! S0-R1: interface declaration kind/order and applied size serialization
 //! across the producer→consumer chain (semantic snapshot → program extraction
 //! → module re-export → consumer import through the facade).
+//!
+//! N4b: the S0-G6 seam extension — an exported signature whose param solves to
+//! a union (goal `flow-narrowing-and-match-patterns`, N4a semantics) arrives
+//! at the file interface as `Type::Union` and materializes as
+//! [`InterfaceTypeSnapshot::Union`] rather than failing unrepresentable. The
+//! seam never runs the solver: it materializes what the snapshot receives
+//! (the `lista<numerus> ∪ textus` shape is the `ct-hole` solve's member set).
 
 use super::*;
 use radix_module::driver::{analyze_source, AnalyzeRequest, Config, ModuleImportContract, Session};
 use radix_module::file_interface::{
     FileExportKind, InterfaceAliasExport, InterfaceGenericParam, InterfaceIndexSnapshot,
-    InterfaceTypeSnapshot,
+    InterfaceParam, InterfaceTypeSnapshot,
 };
+use radix_module::semantic::SemanticParamMode;
 use radix_module::syntax::GenericParamKind;
 use std::collections::BTreeMap;
 
@@ -204,4 +212,86 @@ functio bad() → math.Wrapper<3>
             .any(|arg| arg.name == "issue" && arg.value == "generic_argument_kind_mismatch")),
         "expected generic_argument_kind_mismatch, got {diagnostics:?}"
     );
+}
+
+// ── N4b: solved-union materialization at the S0-G6 seam ─────────────────────
+
+/// The `ct-hole` solve's member set: `fn probe(_ u)` narrowed by a type-pattern
+/// match over `lista<numerus>` and `textus` arms solves the param to
+/// `lista<numerus> ∪ textus`. The export side does not wait for the solver —
+/// it materializes the union the interface snapshot receives.
+const SOLVED_UNION_PROVIDER: &str = r#"@ publica
+functio probe(lista<numerus> ∪ textus u) → vacuum {
+    tacet
+}
+"#;
+
+fn solved_union_provider_interface() -> FileInterface {
+    let session = Session::new(
+        Config::default()
+            .with_target(radix_module::codegen::Target::HirRust)
+            .with_bodyless_functions(),
+    );
+    let analysis = analyze_source(
+        &session,
+        "provider.fab",
+        SOLVED_UNION_PROVIDER,
+        AnalyzeRequest {
+            cli_program: None,
+            contract: ModuleImportContract::default(),
+        },
+    )
+    .expect("provider analysis must succeed");
+    extract_file_interface_with_identity(&analysis, &["probe".to_owned()], "provider.fab", None)
+        .expect("extract provider interface")
+}
+
+#[test]
+fn exported_signature_materializes_solved_union_param() {
+    let interface = solved_union_provider_interface();
+    let FileExportKind::Function(callable) = &interface
+        .exports
+        .get("probe")
+        .map(|export| &export.kind)
+        .expect("probe export")
+    else {
+        panic!("expected function export");
+    };
+    assert_eq!(
+        callable.params,
+        vec![InterfaceParam {
+            ty: InterfaceTypeSnapshot::Union(vec![
+                InterfaceTypeSnapshot::Primitive(radix_module::semantic::Primitive::Textus),
+                InterfaceTypeSnapshot::Array(Box::new(InterfaceTypeSnapshot::Primitive(
+                    radix_module::semantic::Primitive::Numerus
+                ))),
+            ]),
+            mode: SemanticParamMode::Owned,
+            optional: false,
+        }],
+        "the solved union must materialize as InterfaceTypeSnapshot::Union, never fail unrepresentable"
+    );
+}
+
+#[test]
+fn solved_union_signature_round_trips_to_the_consumer() {
+    let interface = solved_union_provider_interface();
+    // A consumer calls the imported callable with each union member. The
+    // materialized union reconstructs as `Type::Union` on the consumer side,
+    // so member calls unify against the parameter (SEM010 stays silent).
+    analyze_consumer(
+        &interface,
+        r#"importa ex "math:union" math
+
+functio call_list() → vacuum {
+    fixum lista<numerus> xs ← [1, 2]
+    math.probe(xs)
+}
+
+functio call_text() → vacuum {
+    math.probe("salve")
+}
+"#,
+    )
+    .expect("union-member calls must analyze through the round trip");
 }
