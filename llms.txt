@@ -1,0 +1,51 @@
+# Faber
+
+> Faber is a statically typed compute language designed for coding agents and
+> human authors: one semantic program, rendered in the reader's locale and
+> lowered to the target you need from a single high-level intermediate
+> representation (HIR).
+
+## Identity
+
+- Language: Faber. License: MIT.
+- Compiler: Radix — closed-source while in development; ships inside the `faber` CLI.
+- Status: v1 series experimental; device GPU inference is not shipped.
+- This repository (`faberlang/faber`): language home — grammar, target support matrices, target API packages, docs.
+- Releases: https://github.com/faberlang/releases/releases
+
+## Entry points
+
+- This file — https://github.com/faberlang/faber/blob/main/llms.txt
+- Agent guide — https://faberlang.dev/agents/index.md
+- Documentation site machine index — https://faberlang.dev/llms.txt
+- Agent skills catalog — https://faberlang.dev/.well-known/agent-skills/index.json
+- Human documentation — https://faberlang.dev/en-US/
+
+## Repositories
+
+- faberlang/faber — this repository: language home, target APIs, grammar
+- faberlang/gradus — open autograd/ML library written in Faber
+- faberlang/norma — standard library source
+- faberlang/cista — package store and lock writer
+- faberlang/hosts — concrete host implementations
+- faberlang/examples — examples and application packages
+- faberlang/faberlang.dev — documentation site
+- faberlang/releases — signed release archives and checksums
+
+## Language facts
+
+- Declarations are type-first: `int a`, never `a: int`.
+- Runtime assignment uses `←`; `=` is a compile-time fact only.
+- Nullability is an explicit union: `T ∪ null`.
+- Tensor operators are glyphs: `·` matrix multiplication, `⊗` outer product, `⊙` Hadamard product.
+- Output is the line-level `print` statement, not a function call.
+- Comments are `#` on their own line.
+- English is the default authoring locale; the same program renders in Latin,
+  Arabic, Hindi, Vietnamese, Thai, Simplified Chinese, and Traditional Chinese.
+- Formal grammar: https://github.com/faberlang/faber/blob/main/docs/EBNF.md
+
+## What not to assume
+
+- No public Radix source checkout — the compiler is closed-source while in development.
+- Device GPU inference is not shipped — bounded dual-backend training on Metal and CUDA is the proven device claim.
+- The v1 surface is experimental — treat it as under active development, not stable.
