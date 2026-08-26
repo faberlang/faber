@@ -1305,6 +1305,7 @@ struct FunctionBuilderContext<'a> {
     scrinium_data_field: Option<Symbol>,
     top_level_consts: Arc<FxHashMap<DefId, &'a HirConst>>,
     provider_imports: Arc<FxHashMap<DefId, ProviderImport>>,
+    imported_type_members: Arc<FxHashMap<(DefId, Symbol), MirType>>,
     method_targets: Arc<FxHashMap<(DefId, Symbol), MethodTarget>>,
     imported_method_providers: Arc<FxHashMap<(DefId, Symbol), ImportedMethodProvider>>,
     gpu_builtins: Arc<FxHashMap<DefId, MirKernelBuiltin>>,
@@ -1363,6 +1364,7 @@ impl<'a> FunctionBuilderContext<'a> {
             scrinium_data_field: None,
             top_level_consts: Arc::new(FxHashMap::default()),
             provider_imports: Arc::new(FxHashMap::default()),
+            imported_type_members: Arc::new(FxHashMap::default()),
             method_targets: Arc::new(FxHashMap::default()),
             imported_method_providers: Arc::new(FxHashMap::default()),
             gpu_builtins: Arc::new(FxHashMap::default()),
@@ -1960,6 +1962,11 @@ impl<'a> FunctionBuilder<'a> {
 
     fn lower_path(&mut self, def_id: DefId, expr: &HirExpression) -> Option<MirOperand> {
         if let Some(place) = self.captured_bindings.get(&def_id).cloned() {
+            let storage_ty = self
+                .captured_binding_metadata
+                .get(&def_id)
+                .map(|(_, ty)| *ty);
+            let place = self.adapt_narrowed_place(place, storage_ty, expr)?;
             return Some(MirOperand::Place(place));
         }
         let Some(binding) = self.bindings.get(&def_id).copied() else {
@@ -1993,7 +2000,8 @@ impl<'a> FunctionBuilder<'a> {
             return None;
         };
 
-        Some(MirOperand::Place(MirPlace::local(binding.local)))
+        let place = self.adapt_narrowed_place(MirPlace::local(binding.local), Some(binding.ty), expr)?;
+        Some(MirOperand::Place(place))
     }
 
     fn lower_literal(&mut self, literal: &HirLiteral, ty: Option<TypeId>, span: Span) -> Option<MirOperand> {
@@ -2408,6 +2416,24 @@ impl<'a> FunctionBuilder<'a> {
         expr: &HirExpression,
     ) -> Option<MirOperand> {
         let result_ty = self.expr_ty(expr)?;
+        if let HirExpressionKind::Field(object, member) = &rhs.kind {
+            if let HirExpressionKind::Path(import_def) = &object.kind {
+                if let Some(target_ty) = self
+                    .context
+                    .imported_type_members
+                    .get(&(*import_def, *member))
+                    .copied()
+                {
+                    let operand = self.lower_expr_value(lhs)?;
+                    return Some(self.runtime_call_value(
+                        MirIntrinsic::TypeCheck(MirTypeCheckOp { positive: matches!(op, HirBinOp::Is), ty: target_ty }),
+                        vec![operand],
+                        result_ty,
+                        expr.span,
+                    ));
+                }
+            }
+        }
         if matches!(rhs.kind, HirExpressionKind::Literal(HirLiteral::Nil)) {
             let operand = self.lower_expr_value(lhs)?;
             return Some(self.lower_nil_comparison(op, operand, result_ty, expr.span));

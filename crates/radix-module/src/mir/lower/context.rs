@@ -74,6 +74,7 @@ struct FrozenMaps<'a> {
     /// Producer-side defaults for imported class fields, keyed by importer-local type.
     imported_struct_defaults: Arc<FxHashMap<DefId, Vec<(Symbol, HirExpression)>>>,
     provider_imports: Arc<FxHashMap<DefId, ProviderImport>>,
+    imported_type_members: Arc<FxHashMap<(DefId, Symbol), MirType>>,
     method_targets: Arc<FxHashMap<(DefId, Symbol), MethodTarget>>,
     imported_method_providers: Arc<FxHashMap<(DefId, Symbol), ImportedMethodProvider>>,
     gpu_builtins: Arc<FxHashMap<DefId, MirKernelBuiltin>>,
@@ -107,6 +108,7 @@ pub(super) struct LoweringContextMaps<'a> {
     scrinium_data_field: Option<Symbol>,
     top_level_consts: FxHashMap<DefId, &'a HirConst>,
     provider_imports: FxHashMap<DefId, ProviderImport>,
+    imported_type_members: FxHashMap<(DefId, Symbol), MirType>,
     imported_method_providers: FxHashMap<(DefId, Symbol), ImportedMethodProvider>,
     /// Producer-side defaults for imported class fields, keyed by importer-local type.
     imported_struct_defaults: FxHashMap<DefId, Vec<(Symbol, HirExpression)>>,
@@ -152,6 +154,7 @@ impl<'a> LoweringContextMaps<'a> {
             scrinium_data_field: None,
             top_level_consts: FxHashMap::default(),
             provider_imports: FxHashMap::default(),
+            imported_type_members: FxHashMap::default(),
             imported_method_providers: FxHashMap::default(),
             imported_struct_defaults: FxHashMap::default(),
             package_file_interface_exports: FxHashMap::default(),
@@ -172,6 +175,7 @@ impl<'a> LoweringContextMaps<'a> {
                 top_level_consts: Arc::new(FxHashMap::default()),
                 imported_struct_defaults: Arc::new(FxHashMap::default()),
                 provider_imports: Arc::new(FxHashMap::default()),
+                imported_type_members: Arc::new(FxHashMap::default()),
                 method_targets: Arc::new(FxHashMap::default()),
                 imported_method_providers: Arc::new(FxHashMap::default()),
                 gpu_builtins: Arc::new(FxHashMap::default()),
@@ -207,6 +211,7 @@ impl<'a> LoweringContextMaps<'a> {
             maps.record_library_item_identity(item);
         }
         maps.record_imported_struct_items(unit);
+        maps.record_imported_type_members(unit);
         maps.record_imported_enum_items(unit);
         for item in &unit.hir.items {
             if let HirItemKind::Constant(konst) = &item.kind {
@@ -229,6 +234,7 @@ impl<'a> LoweringContextMaps<'a> {
             top_level_consts: Arc::new(core::mem::take(&mut maps.top_level_consts)),
             imported_struct_defaults: Arc::new(core::mem::take(&mut maps.imported_struct_defaults)),
             provider_imports: Arc::new(core::mem::take(&mut maps.provider_imports)),
+            imported_type_members: Arc::new(core::mem::take(&mut maps.imported_type_members)),
             method_targets: Arc::new(core::mem::take(&mut maps.method_targets)),
             imported_method_providers: Arc::new(core::mem::take(&mut maps.imported_method_providers)),
             gpu_builtins: Arc::new(
@@ -283,6 +289,7 @@ impl<'a> LoweringContextMaps<'a> {
             scrinium_data_field: self.scrinium_data_field,
             top_level_consts: Arc::clone(&self.frozen.top_level_consts),
             provider_imports: Arc::clone(&self.frozen.provider_imports),
+            imported_type_members: Arc::clone(&self.frozen.imported_type_members),
             method_targets: Arc::clone(&self.frozen.method_targets),
             imported_method_providers: Arc::clone(&self.frozen.imported_method_providers),
             gpu_builtins: Arc::clone(&self.frozen.gpu_builtins),
@@ -508,6 +515,26 @@ impl<'a> LoweringContextMaps<'a> {
                         self.imported_method_providers
                             .insert((def_id, method.surface_name), target);
                     }
+                }
+            }
+        }
+    }
+
+    /// Record imported nominal members so a qualified type test can recover its
+    /// target even when the parser preserved `namespace.Type` as a value field.
+    fn record_imported_type_members(&mut self, unit: &AnalyzedModule) {
+        for item in &unit.hir.items {
+            let HirItemKind::Import(import) = &item.kind else {
+                continue;
+            };
+            for import_item in &import.items {
+                let namespace = import_item.alias.unwrap_or(import_item.name);
+                for export in unit.resolver.imported_file_type_exports(namespace) {
+                    let Some(ty) = unit.resolver.namespace_file_type(namespace, export.member) else {
+                        continue;
+                    };
+                    self.imported_type_members
+                        .insert((import_item.def_id, export.member), MirType::semantic(ty));
                 }
             }
         }

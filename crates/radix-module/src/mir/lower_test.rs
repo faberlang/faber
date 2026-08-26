@@ -2116,6 +2116,46 @@ fn lowers_trap_iace_to_carrier_wrap() {
 }
 
 #[test]
+fn lowers_trap_type_narrowed_member_projection() {
+    // A trap stores each successful/error payload in the union-typed local.
+    // After `adfirma` narrows the immutable local, projection lowering must
+    // materialize a member-typed temp before adding the field projection.
+    let dump = dump_source(
+        r#"
+        genus Errata { textus message }
+        functio fail() → numerus ⇥ Errata { iace Errata { message = "bad" } }
+        functio inspect() → textus {
+            fixum numerus ∪ Errata r ← capta { fail() }
+            adfirma r est Errata
+            redde r.message
+        }
+        "#,
+    );
+    assert!(dump.contains("return "), "narrowed projection should lower: {dump}");
+}
+
+#[test]
+fn runs_trap_type_narrowed_collection_member_projection() {
+    let source = r#"
+        functio make() → lista<numerus> { redde [1, 2] }
+        incipit {
+            fixum numerus ∪ lista<numerus> r ← capta { make() }
+            adfirma r est lista<numerus>
+            nota r.longitudo()
+        }
+        "#;
+    let mut host = crate::mir::BufferHost::default();
+    crate::mir::run_source(
+        &Session::new(Config::default().with_target(Target::HirTypeScript)),
+        "trap-narrowed-list.fab",
+        source,
+        &mut host,
+    )
+    .expect("narrowed trap member projection should run");
+    assert_eq!(host.stdout_lines, ["2"]);
+}
+
+#[test]
 fn lowers_trap_inside_fac_routes_to_innermost_boundary() {
     // `fac { capta { fail() } } cape err { … }`: the trap is the innermost
     // boundary, so the call wraps into the trap carrier — the outer cape

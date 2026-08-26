@@ -337,12 +337,12 @@ impl FunctionBuilder<'_> {
 
     /// Adapt a storage place to a narrowed HIR use-site type.
     ///
-    /// Null checks narrow the HIR expression inside the guarded branch, but
-    /// the backing MIR local keeps its declared nullable carrier. Projection
-    /// lowering must materialize that carrier's payload before adding a field
-    /// or index projection; otherwise validation quite correctly sees an
-    /// `Option<T>` where a collection or struct is required.
-    fn adapt_narrowed_place(
+    /// Flow checks narrow the HIR expression inside a guarded branch or after
+    /// an assertion, but the backing MIR local keeps its declared carrier.
+    /// Materialize the narrowed union member before adding a field/index
+    /// projection or passing the path to a member call; otherwise validation
+    /// quite correctly sees the original carrier instead of the member type.
+    pub(super) fn adapt_narrowed_place(
         &mut self,
         place: MirPlace,
         storage_ty: Option<MirType>,
@@ -354,6 +354,18 @@ impl FunctionBuilder<'_> {
         let Some(use_ty) = expr.ty.map(MirType::semantic) else {
             return Some(place);
         };
+        if let Type::Union(members) = self.normalized_type(storage_ty.semantic_id()) {
+            let member_match = members
+                .iter()
+                .any(|member| self.types.equals(*member, use_ty.semantic_id()));
+            if member_match {
+                return Some(self.assign_temp_place(
+                    MirValueKind::Operand(MirOperand::Place(place)),
+                    use_ty,
+                    expr.span,
+                ));
+            }
+        }
         let Some(inner_ty) = self
             .types
             .nullable_inner(storage_ty.semantic_id())
