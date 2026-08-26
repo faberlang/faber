@@ -504,8 +504,27 @@ impl TypeChecker<'_> {
         rhs_resolved
     }
 
-    /// Enforce numeric promotion join for the promoted and fuzzy equality
-    /// pairs (`≅`/`≇` and `≈`/`≉`).
+    /// Enforce the numeric-equality admission law for `≅`/`≇` and `≈`/`≉`.
+    ///
+    /// THE ≅/≈ ADMISSION LAW (contract record, E1 equality-tier-respelling)
+    /// ====================================================================
+    /// `≅`/`≇` are promoted-exact: the operand widths join through
+    /// [`Self::numeric_bin`]'s comparison-join contract (`ops.rs:44-46`), then
+    /// the lowerings compare exactly at the joined representation. `≈`/`≉`
+    /// apply the `math.isclose` default in that same joined representation
+    /// (OQ3 settled default: `2^53 ≈ 2^53+1` verdicts verum). `≡` stays
+    /// fail-closed — mixed widths are rejected by
+    /// [`Self::exact_equality_types`].
+    ///
+    /// LOSSLESS-JOIN REQUIREMENT: the join must never wrap-identify distinct
+    /// values. Named acceptance rows — the runner is the semantics of record
+    /// (`values_equal`, `crates/radix-mir-runner/src/value.rs:982-1018`; the
+    /// operator need ruling is BINDING): `−1 ∷ int<i64> ≅
+    /// 18446744073709551615 ∷ int<u64>` and the cross-width
+    /// `9007199254740993 ∷ int<i64> ≅ 9007199254740992 ∷ int<u64>` both
+    /// verdict **falsum** on every surface that can compile a mixed-width
+    /// `≅`. The int↔fractus f64 join stays accepted (lossy at 2^53 is the
+    /// operator-accepted bound, so `2^53+1 ≅ 2^52×2` verdicts verum).
     ///
     /// WHY: exact `≡` rejects cross-width numeric pairs; both relaxed levels
     /// reuse the same widening policy as arithmetic/ordering (`numeric_bin`),
