@@ -52,11 +52,11 @@ main {
     const _ numeri ← [1, 2, 3]
     var list<int> duplicati ← empty
     # predicate closure
-    const _ par ← int x → bool ∴ x % 2 ≡ 0
+    const _ paritas ← int x → bool ∴ x % 2 ≡ 0
     var list<int> pares ← empty
     for from numeri const n {
         duplicati.append(duplica(n))
-        if par(n) {
+        if paritas(n) {
             pares.append(n)
         }
     }
@@ -66,7 +66,7 @@ main {
     print pares.length()
     print pares[0]
 
-    const _ positivus ← int n → bool ∴ n > 0
-    print positivus(10)
-    print positivus(-5)
+    const _ plus ← int n → bool ∴ n > 0
+    print plus(10)
+    print plus(-5)
 }

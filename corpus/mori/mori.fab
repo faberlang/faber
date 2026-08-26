@@ -43,12 +43,12 @@ fn divide(int a, int b) → float {
     return (a ↦ float) / (b ↦ float)
 }
 
-fn accipe(list<int> res, int index) → int {
+fn accipe(list<int> numeri, int index) → int {
     # Bounds check with mori
-    if index < 0 or index ≥ res.length() {
+    if index < 0 or index ≥ numeri.length() {
         panic "index extra fines"
     }
-    return res[index]
+    return numeri[index]
 }
 
 main {
@@ -61,7 +61,7 @@ main {
     # fixum _ malum ← divide(10, 0)
 
     # Lista accessus
-    const _ nums ← [1, 2, 3]
+    const list<int> nums ← [1, 2, 3]
     const _ lectum ← accipe(nums, 1)
     # 2
     print "valor: §"(lectum)

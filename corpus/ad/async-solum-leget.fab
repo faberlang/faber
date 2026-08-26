@@ -33,12 +33,12 @@ locale = "en"
 # declares the wrapper with compatibility `@ futura`; callers consume it through
 # the explicit morphology forms such as `figendum`.
 
-import from "norma:fs" fs
+import from "norma:fs" charta
 
 async_main {
     const string textPath ← "/tmp/faber-async-fs-leget.txt"
-    fs.write_file(textPath, "async fs\n")
+    charta.write_file(textPath, "async fs\n")
 
-    await_const string body ← fs.read_file_async<string>(textPath)
+    await_const string body ← charta.read_file_async<string>(textPath)
     assert body ≡ "async fs\n"
 }

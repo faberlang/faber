@@ -46,10 +46,10 @@ main {
     const _ nomina ← ["Marcus", "Julia", "Gaius"]
     const _ vexilla ← [true, false, true]
     const _ matrix ← [[1, 2], [3, 4], [5, 6]]
-    const _ prima ← [1, 2, 3]
-    const _ secunda ← [4, 5, 6]
-    const _ coniuncta ← [spread prima, spread secunda]
-    const _ aucta ← [0, spread prima, 99]
+    const lista<int> primum ← [1, 2, 3]
+    const lista<int> secundum ← [4, 5, 6]
+    const _ coniuncta ← [spread primum, spread secundum]
+    const _ aucta ← [0, spread primum, 99]
 
     print vacuares.length()
     print numeri.length()

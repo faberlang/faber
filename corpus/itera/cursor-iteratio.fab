@@ -59,20 +59,20 @@ fn grena_futurum(int n) async_generator → int {
 async_main {
     # Direct consumption of cursor yield stream
     print "Sync cursor iteration:"
-    for from grena(3) const num {
-        print "  numerus: §"(num)
+    for from grena(3) const n {
+        print "  numerus: §"(n)
     }
 
     # Collect all results from cursor function
-    var _ effecta ← []
-    for from grena(5) const num {
-        effecta.append(num * 2)
+    var list<int> effecta ← []
+    for from grena(5) const n {
+        effecta.append(n * 2)
     }
     print "Sync collected:"
     print effecta
 
     print "Async cursor iteration:"
-    for from grena_futurum(3) const num {
-        print "  async numerus: §"(num)
+    for from grena_futurum(3) const n {
+        print "  async numerus: §"(n)
     }
 }

@@ -46,21 +46,21 @@ main {
     var tf32[4] input ← seed.create(0.0, [4])
     var tf32[4] output ← seed.create(0.0, [4])
 
-    const u32 id ← 1
-    input[id] ← 3.0
-    const f32 old ← input[id] coalesce 0.0
-    const f32 oldMethod ← input.get([id]) coalesce 0.0
-    output[id] ← old + 1.0
-    const f32 updated ← output[id] coalesce 0.0
+    const u32 index ← 1
+    input[index] ← 3.0
+    const f32 old ← input[index] coalesce 0.0
+    const f32 oldMethod ← input.get([index]) coalesce 0.0
+    output[index] ← old + 1.0
+    const f32 updated ← output[index] coalesce 0.0
 
     var tf32[2, 2] grid ← seed.create(0.0, [2, 2])
     grid[[1, 0]] ← updated
-    const f32 cell ← grid[[1, 0]] coalesce 0.0
-    const f32 cellMethod ← grid.get([1, 0]) coalesce 0.0
+    const f32 elementum ← grid[[1, 0]] coalesce 0.0
+    const f32 elementumMethod ← grid.get([1, 0]) coalesce 0.0
 
     print old
     print oldMethod
     print updated
-    print cell
-    print cellMethod
+    print elementum
+    print elementumMethod
 }

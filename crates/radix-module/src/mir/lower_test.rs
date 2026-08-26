@@ -3034,8 +3034,10 @@ functio check(textus name, numerus count) → vacuum {
 #[test]
 fn lowers_ascii_format_hole_with_materialized_conversion_target() {
     let dump = dump_source(
-        r#"
-incipit {
+        r#"+++
+locale = "en"
++++
+main {
     const _ inferred_hex ← 255 ↦ ascii<_, Hex>
     const _ inferred_bin ← 255 ↦ ascii<_, Bin>
     const _ inferred_oct ← 255 ↦ ascii<_, Oct>

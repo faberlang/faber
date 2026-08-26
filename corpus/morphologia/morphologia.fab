@@ -41,17 +41,17 @@ locale = "en"
 #   ordinata nova: [1, 2, 3, 4, 5]
 #   ordina mutat: [1, 2, 3]
 #   mappata nova: [2, 4, 6, 8, 10]
-#   res prima: [1, 2, 3, 4, 5]
+#   numeri prima: [1, 2, 3, 4, 5]
 
 main {
-    var _ res ← [1, 2, 3, 4, 5] ∷ list<int>
+    const _ numeri ← [1, 2, 3, 4, 5] ∷ list<int>
 
     # ≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡
     # FILTRA: filtr-
     # ≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡
 
     # filtrata returns a new filtered list
-    const _ pares ← res.filter(int x ∴ x % 2 ≡ 0)
+    const _ pares ← numeri.filter(int x ∴ x % 2 ≡ 0)
     print "filtrata nova: §"(pares)
 
     # ≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡
@@ -59,11 +59,11 @@ main {
     # ≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡
 
     # addita returns a new list with an added element
-    const _ aucta ← res.added(6)
+    const _ aucta ← numeri.added(6)
     print "addita nova: §"(aucta)
 
     # appende mutates in place
-    var _ mutanda ← [1, 2, 3]
+    var list<int> mutanda ← [1, 2, 3]
     mutanda.append(4)
     print "appende mutat: §"(mutanda)
 
@@ -72,11 +72,11 @@ main {
     # ≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡
 
     # inversa returns a new reversed list
-    const _ versa ← res.invert()
+    const _ versa ← numeri.invert()
     print "inversa nova: §"(versa)
 
     # inverte mutates in place
-    var _ invertenda ← [1, 2, 3]
+    var list<int> invertenda ← [1, 2, 3]
     invertenda.reverse()
     print "inverte mutat: §"(invertenda)
 
@@ -85,11 +85,11 @@ main {
     # ≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡
 
     # ordinata returns a new sorted list
-    const _ ordinata ← res.sorted()
+    const _ ordinata ← numeri.sorted()
     print "ordinata nova: §"(ordinata)
 
     # ordina mutates in place
-    var _ ordinanda ← [3, 1, 2]
+    var list<int> ordinanda ← [3, 1, 2]
     ordinanda.sort()
     print "ordina mutat: §"(ordinanda)
 
@@ -98,11 +98,11 @@ main {
     # ≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡
 
     # mappata returns a new mapped list
-    const _ duplicata ← res.map(int x ∴ x * 2)
+    const _ duplicata ← numeri.map(int x ∴ x * 2)
     print "mappata nova: §"(duplicata)
 
     # ≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡
     # Participle operations leave the original list unchanged
     # ≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡
-    print "res prima: §"(res)
+    print "numeri prima: §"(numeri)
 }

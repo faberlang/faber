@@ -44,16 +44,16 @@ main {
     const value boxedBytes ← bytes ↦ value
     print boxedBytes
 
-    const list<int> xs ← [1, 2]
-    const value boxedList ← xs ↦ value
+    const list<int> numeri ← [1, 2]
+    const value boxedList ← numeri ↦ value
     print boxedList
 
     const map<string, int> scores ← { "alpha": 10 }
     const value boxedMap ← scores ↦ value
     print boxedMap
 
-    const Punctum pt ← Punctum { x = 3, y = 4 }
-    const value boxedGenus ← pt ↦ value
+    const Punctum punctum ← Punctum { x = 3, y = 4 }
+    const value boxedGenus ← punctum ↦ value
     print boxedGenus
 
     const tensor<int, [2]> grid ← [5, 6] ↦ tensor<int, [2]>

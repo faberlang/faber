@@ -40,7 +40,7 @@ locale = "en"
 #   shape.fab stdout contract (longitudo, shape vector, accipe, scalar value).
 
 main {
-    const list<f32> flat ← [
+    const list<f32> plana ← [
         1.0,
         2.0,
         3.0,
@@ -51,7 +51,7 @@ main {
     const list<int> shape ← [2, 3]
 
     const tf32[] seed ← empty
-    var tf32[2, 3] grid ← seed.from_flat(flat, shape)
+    var tf32[2, 3] grid ← seed.from_flat(plana, shape)
     const list<int> dims ← grid.shape()
 
     const list<int> newshape ← [3, 2]
@@ -66,11 +66,11 @@ main {
 
     const tf32[1, 3] slice ← grid.slice(0, 1)
     const tf32[1, 3] owned ← slice.materialize()
-    const list<f32> flat2 ← owned.flatten()
+    const list<f32> plana2 ← owned.flatten()
 
     print grid.length()
     print dims
     print reshaped.length()
     print corner
-    print flat2.length()
+    print plana2.length()
 }

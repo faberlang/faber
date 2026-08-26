@@ -43,7 +43,7 @@ class Punctum {
     int y
 }
 
-class Forma {
+class Figura {
     string nomen
     int valor
 }
@@ -61,7 +61,7 @@ class Extra {
 }
 
 class Datum {
-    list<string> res
+    list<string> nomina
 }
 
 class Adest {
@@ -87,20 +87,20 @@ main {
 
     # --- Bracket accessus on tabula ---
 
-    const map<string, int> tab ← { "nomen": 1, "valor": 42 }
-    print tab["nomen"]
-    print tab["valor"]
+    const map<string, int> indicium ← { "nomen": 1, "valor": 42 }
+    print indicium["nomen"]
+    print indicium["valor"]
 
     # --- Chained member access ---
 
-    const _ nidum ← Extra { extra = Medium { medium = Imum { imum = "inventum" } } }
-    print nidum.extra.medium.imum
+    const _ nidus ← Extra { extra = Medium { medium = Imum { imum = "inventum" } } }
+    print nidus.extra.medium.imum
 
     # --- Mixed dot and bracket ---
 
-    const _ datum ← Datum { res = ["primus", "secundus", "tertius"] }
-    print datum.res[0]
-    print datum.res[2]
+    const _ datum ← Datum { nomina = ["primus", "secundus", "tertius"] }
+    print datum.nomina[0]
+    print datum.nomina[2]
 
     # --- Accessus optionalis ---
 

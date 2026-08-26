@@ -52,13 +52,13 @@ main {
     var tf32[4] input ← seed.create(0.0, [4])
 
     # u32 thread id flowing directly into accipe — no bare-numerus detour.
-    const u32 id ← 1
-    const f32 first ← input.get([id]) coalesce 0.0
-    input.set([id], 9.0)
-    const f32 updated ← input.get([id]) coalesce 0.0
+    const u32 index ← 1
+    const f32 first ← input.get([index]) coalesce 0.0
+    input.set([index], 9.0)
+    const f32 updated ← input.get([index]) coalesce 0.0
 
     # A bound lu32 index vector also typechecks (lista width sugar).
-    const lu32 idx ← [id]
+    const lu32 idx ← [index]
     const f32 bound ← input.get(idx) coalesce 0.0
 
     # Rank-2 grid with a lista<u32> origin index.
@@ -67,10 +67,10 @@ main {
     const u32 c ← 3
     const list<u32> origin ← [r, c]
     grid.set(origin, 7.0)
-    const f32 cell ← grid.get(origin) coalesce 0.0
+    const f32 elementum ← grid.get(origin) coalesce 0.0
 
     print first
     print updated
     print bound
-    print cell
+    print elementum
 }
