@@ -92,7 +92,7 @@ main {
     const numerus<u16> wider ← 3 ∷ numerus<u16>
     const numerus signed ← -1
     const numerus<u64> unsigned ← 18446744073709551615
-    const numerus big ← 10
+    const numerus large ← 10
 
     # --------------------------------------------------------------- floats
     const fractus<f32> single ← 2.5 ∷ fractus<f32>
@@ -123,7 +123,7 @@ main {
     print a ≇ 8
     print narrow ≅ wider
     print signed ≅ unsigned
-    print big ≅ single
+    print large ≅ single
     print above ≅ boundary
     print above ≅ below
     print single ≅ double
@@ -136,7 +136,7 @@ main {
     print a ≉ 8
     print narrow ≈ wider
     print signed ≈ unsigned
-    print big ≈ single
+    print large ≈ single
     print above ≈ boundary
     print above ≈ below
     print single ≈ double
@@ -150,8 +150,8 @@ main {
     print a < b
     print a < 8
     print narrow < wider
-    print big < single
-    print half < big
+    print large < single
+    print half < large
     print single < double
     print d32v < d64v
     print d32v < five
@@ -160,8 +160,8 @@ main {
     print a ≤ b
     print narrow ≤ wider
     print signed ≤ unsigned
-    print big ≤ single
-    print half ≤ big
+    print large ≤ single
+    print half ≤ large
     print single ≤ double
     print d32v ≤ d64v
     print d32v ≤ five
@@ -171,8 +171,8 @@ main {
     print a > 6
     print narrow > wider
     print signed > unsigned
-    print big > single
-    print big > half
+    print large > single
+    print large > half
     print single > double
     print d32v > d64v
     print d32v > five
@@ -180,8 +180,8 @@ main {
     # -------------------------------------------------------- ≥ (P1–P8)
     print a ≥ b
     print narrow ≥ wider
-    print big ≥ single
-    print half ≥ big
+    print large ≥ single
+    print half ≥ large
     print single ≥ double
     print d32v ≥ d64v
     print d32v ≥ five
