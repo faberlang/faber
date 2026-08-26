@@ -95,9 +95,6 @@ fn claim_stmt(stmt: &Stmt, claimed: &mut HashSet<u32>) {
             for field in &union_decl.shared_fields {
                 claim_trivia(&field.leading_trivia, claimed);
             }
-            for arm in &union_decl.arms {
-                claim_block(&arm.body, claimed);
-            }
             for variant in &union_decl.variants {
                 claim_trivia(&variant.leading_trivia, claimed);
             }
