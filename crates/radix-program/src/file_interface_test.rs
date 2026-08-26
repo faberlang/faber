@@ -240,7 +240,7 @@ fn signature_only_fragment_export_fails_closed() {
         err.iter().any(|diagnostic| diagnostic
             .args
             .iter()
-            .any(|arg| arg.name == "issue" && arg.value == "NUCLEUM_FRAGMENT_EFFECT")),
+            .any(|arg| arg.name == "issue" && arg.value == "nucleum_fragment_effect")),
         "{err:?}"
     );
 }
