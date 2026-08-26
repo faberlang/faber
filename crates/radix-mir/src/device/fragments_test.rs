@@ -290,3 +290,45 @@ fn definition_callee_is_a_surviving_call() {
     let device = device_from(&program, &roles());
     assert!(first_surviving_fragment_call(&program, &device).is_some());
 }
+
+/// DFV2-4: the survivor predicate covers every v2 device call — a kernel
+/// helper callee is a survivor exactly like a fragment callee. Host callers
+/// are the launch boundary and are never scanned.
+#[test]
+fn kernel_to_kernel_call_is_a_surviving_device_call() {
+    let mut types = TypeTable::new();
+    let ty = f32_ty(&mut types);
+    let mut caller = kernel_calling_fragment(ty);
+    caller.source = Some(ENTRY);
+    let mut helper = identity_function(1, FRAGMENT, ty);
+    helper.source = Some(DefId(3));
+    let program = MirProgram {
+        functions: vec![caller, helper],
+    };
+    let mut kernel_roles = roles();
+    kernel_roles.insert(DefId(3), MirDeviceRole::Kernel);
+    let device = device_from(&program, &kernel_roles);
+    let survivor = first_surviving_fragment_call(&program, &device)
+        .expect("an uncomposed kernel-helper call is a device-call survivor");
+    assert_eq!(survivor.kind, FragmentSurvivorKind::Call);
+}
+
+/// DFV2-4: a host function's call to a public kernel entry is the launch
+/// boundary — not a survivor.
+#[test]
+fn host_call_to_kernel_entry_is_not_a_survivor() {
+    let mut types = TypeTable::new();
+    let ty = f32_ty(&mut types);
+    let entry = identity_function(1, ENTRY, ty);
+    let mut host = kernel_calling_fragment(ty);
+    host.source = None;
+    host.shader_stage = None;
+    let program = MirProgram {
+        functions: vec![host, entry],
+    };
+    let device = device_from(&program, &kernel_only_roles());
+    assert!(
+        surviving_nucleum_fragments(&program, &device).is_empty(),
+        "host→entry is the launch boundary, not a composition survivor"
+    );
+}

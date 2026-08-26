@@ -1,10 +1,15 @@
-//! Nucleum-fragment MIR composition (post-monomorphization).
+//! Device-call MIR composition (post-monomorphization, DFV2-4).
 //!
-//! Every call to a `Fragment` is cloned into the caller: parameters bind to
-//! call-site values exactly once, locals/blocks/values are alpha-renamed, the
-//! cloned return path joins the caller's destination, and source spans stay
-//! with the cloned nodes. Cycles are rejected before any clone. Expansion
-//! budgets fail closed — there is no "emit a call instead" escape.
+//! Every call from device code (`@ nucleum` compute or its graphics-fragment
+//! sugar) to a concrete device function — local or imported, entry or private
+//! helper — is cloned into the caller: parameters bind to call-site values
+//! exactly once, locals/blocks/values are alpha-renamed, the cloned return
+//! path joins the caller's destination, and source spans stay with the cloned
+//! nodes. Host callers are the launch boundary, never composition inputs.
+//! Cycles are rejected before any clone. Expansion budgets fail closed —
+//! there is no "emit a call instead" escape. A composed private compute
+//! helper with no remaining reference is pruned so no standalone helper
+//! symbol survives; fragment bodies stay for the package body sidecar.
 //!
 //! Documented budget defaults (starting anchors; head-cto confirms on land):
 //! - depth 16
@@ -91,20 +96,39 @@ impl FragmentCompositionError {
     }
 }
 
-/// Compose every fragment call into its caller. Returns diagnostics; empty is success.
+/// Compose every device call into its caller. Returns diagnostics; empty is success.
+///
+/// `launch_entries` are the source defs of launchable `@ nucleum @ publica`
+/// entries: they stay program functions even when device code also calls
+/// them. Every other private compute helper that was inlined at least once
+/// and has no remaining reference is pruned after composition; fragment
+/// bodies stay (the package body sidecar attaches from this program).
 pub fn compose(
-    functions: &mut [MirFunction],
+    functions: &mut Vec<MirFunction>,
     monomorphizations: &[MirMonomorphization],
     roles: &FxHashMap<DefId, MirDeviceRole>,
     budget: ExpansionBudget,
     interner: Option<&Interner>,
+    launch_entries: &FxHashSet<DefId>,
 ) -> Vec<FragmentCompositionError> {
-    let mut pass = CompositionPass { functions, monomorphizations, roles, budget, interner, errors: Vec::new() };
+    let mut pass = CompositionPass {
+        functions,
+        monomorphizations,
+        roles,
+        budget,
+        interner,
+        launch_entries,
+        inlined: FxHashSet::default(),
+        errors: Vec::new(),
+    };
     pass.run();
     pass.errors
 }
 
-/// Fragment call sites that remain in `functions`. The mutation-test gate.
+/// Device call sites that remain in `functions`. The mutation-test gate.
+///
+/// Only device callers are scanned: a host caller's call to a device entry
+/// is the launch/partition boundary, not a composition survivor.
 #[must_use]
 pub fn surviving_fragment_calls(
     functions: &[MirFunction],
@@ -114,14 +138,17 @@ pub fn surviving_fragment_calls(
     let resolver = Resolver { functions, monomorphizations, roles };
     let mut survivors = Vec::new();
     for function in functions {
-        for site in resolver.fragment_sites(function) {
+        if !matches!(role_of(function, roles), RoleKind::Entry | RoleKind::Fragment) {
+            continue;
+        }
+        for site in resolver.device_sites(function) {
             survivors.push((function.id, site.span));
         }
     }
     survivors
 }
 
-/// Fail-closed gate: any remaining fragment call is a composition error.
+/// Fail-closed gate: any remaining device call is a composition error.
 #[must_use]
 pub fn reject_surviving_fragment_calls(
     functions: &[MirFunction],
@@ -146,11 +173,14 @@ pub fn reject_surviving_fragment_calls(
 }
 
 struct CompositionPass<'a> {
-    functions: &'a mut [MirFunction],
+    functions: &'a mut Vec<MirFunction>,
     monomorphizations: &'a [MirMonomorphization],
     roles: &'a FxHashMap<DefId, MirDeviceRole>,
     budget: ExpansionBudget,
     interner: Option<&'a Interner>,
+    launch_entries: &'a FxHashSet<DefId>,
+    /// Functions inlined at least once during this pass (prune candidates).
+    inlined: FxHashSet<MirFunctionId>,
     errors: Vec<FragmentCompositionError>,
 }
 
@@ -174,7 +204,7 @@ impl CompositionPass<'_> {
         let leftover = self
             .functions
             .iter()
-            .filter(|function| self.resolver().has_fragment_call(function))
+            .filter(|function| self.is_device_caller(function) && self.resolver().has_device_call(function))
             .map(|function| function.id)
             .collect::<Vec<_>>();
         for id in leftover {
@@ -188,6 +218,56 @@ impl CompositionPass<'_> {
             self.monomorphizations,
             self.roles,
         ));
+        if self.errors.is_empty() {
+            self.prune_composed_helpers();
+        }
+    }
+
+    /// Prune private `@ nucleum` helpers that were composed into their
+    /// callers and no longer have any call reference: a composed unit leaves
+    /// no standalone compute-helper symbol in the program. Launch entries
+    /// always stay; helpers still referenced by host code stay; fragment
+    /// bodies stay (the package body sidecar attaches from the lowered
+    /// program, and the graphics survivor scan owns their symbol proof).
+    fn prune_composed_helpers(&mut self) {
+        if self.inlined.is_empty() {
+            return;
+        }
+        let mut referenced_ids = FxHashSet::default();
+        let mut referenced_sources = FxHashSet::default();
+        for function in self.functions.iter() {
+            let resolver =
+                Resolver { functions: self.functions, monomorphizations: self.monomorphizations, roles: self.roles };
+            for site in resolver.all_callees(function) {
+                match site.callee {
+                    MirCallee::Function(id) => {
+                        referenced_ids.insert(id);
+                    }
+                    MirCallee::Definition { source, .. } => {
+                        referenced_sources.insert(source);
+                    }
+                    MirCallee::Closure(_) | MirCallee::Value(_) => {}
+                }
+            }
+        }
+        self.functions.retain(|function| {
+            if !self.inlined.contains(&function.id) {
+                return true;
+            }
+            // Only compute helpers: fragment bodies are the package body
+            // sidecar's input and stay in the lowered program.
+            if role_of(function, self.roles) != RoleKind::Entry {
+                return true;
+            }
+            let referenced = referenced_ids.contains(&function.id)
+                || function
+                    .source
+                    .is_some_and(|source| referenced_sources.contains(&source));
+            let launchable = function
+                .source
+                .is_some_and(|source| self.launch_entries.contains(&source));
+            referenced || launchable
+        });
     }
 
     fn reject_cycles(&mut self) -> bool {
@@ -207,13 +287,13 @@ impl CompositionPass<'_> {
         let resolver = self.resolver();
         let mut graph = FxHashMap::default();
         for function in self.functions.iter() {
-            if !self.is_fragment(function) {
+            if !self.is_device_caller(function) {
                 continue;
             }
             let mut edges = Vec::new();
-            for site in resolver.fragment_sites(function) {
+            for site in resolver.device_sites(function) {
                 if let Some(callee) = resolver.resolve_function(&site.callee) {
-                    if self.is_fragment(callee) && !edges.contains(&callee.id) {
+                    if self.is_device_callee(callee) && !edges.contains(&callee.id) {
                         edges.push(callee.id);
                     }
                 }
@@ -292,7 +372,7 @@ impl CompositionPass<'_> {
             let site = {
                 let resolver = self.resolver();
                 self.function(caller_id)
-                    .and_then(|function| resolver.fragment_sites(function).into_iter().next())
+                    .and_then(|function| resolver.device_sites(function).into_iter().next())
             };
             let Some(site) = site else {
                 return;
@@ -301,7 +381,7 @@ impl CompositionPass<'_> {
                 self.push_expansion("unresolved", site.span, 1, 0, &[caller_id]);
                 return;
             };
-            if !self.is_fragment(&callee) {
+            if !self.is_device_callee(&callee) {
                 return;
             }
             if let Some(fragment_lane) = lane_param(&callee) {
@@ -414,6 +494,7 @@ impl CompositionPass<'_> {
             account.nodes = account.nodes.saturating_add(cloned_nodes);
             account.instances = account.instances.saturating_add(1);
             account.sites.insert(site_key, inlines);
+            self.inlined.insert(callee.id);
             for block_id in new_blocks.cloned {
                 block_depth.insert(block_id, depth);
                 block_chain.insert(block_id, chain.clone());
@@ -607,8 +688,14 @@ impl CompositionPass<'_> {
         self.functions.iter().find(|function| function.id == id)
     }
 
-    fn is_fragment(&self, function: &MirFunction) -> bool {
-        role_of(function, self.roles) == RoleKind::Fragment
+    fn is_device_callee(&self, function: &MirFunction) -> bool {
+        matches!(role_of(function, self.roles), RoleKind::Entry | RoleKind::Fragment)
+    }
+
+    /// Whether `function` itself is device code — the only caller kind whose
+    /// calls compose. Host callers are the launch/partition boundary.
+    fn is_device_caller(&self, function: &MirFunction) -> bool {
+        self.is_device_callee(function)
     }
 
     fn is_entry(&self, function: &MirFunction) -> bool {
@@ -623,16 +710,21 @@ struct Resolver<'a> {
 }
 
 impl Resolver<'_> {
-    fn has_fragment_call(&self, function: &MirFunction) -> bool {
-        !self.fragment_sites(function).is_empty()
+    fn has_device_call(&self, function: &MirFunction) -> bool {
+        !self.device_sites(function).is_empty()
     }
 
-    fn fragment_sites(&self, function: &MirFunction) -> Vec<CallSite> {
+    /// Device call sites in one function: calls whose callee resolves to a
+    /// device function (`@ nucleum` compute or fragment sugar, entry or
+    /// helper). Collected regardless of the containing function's role; the
+    /// pass only expands device callers, so host-boundary call sites stay
+    /// untouched.
+    fn device_sites(&self, function: &MirFunction) -> Vec<CallSite> {
         let mut sites = Vec::new();
         for (block_index, block) in function.blocks.iter().enumerate() {
             for (stmt_index, stmt) in block.statements.iter().enumerate() {
                 if let MirStatementKind::Call { destination, callee, args } = &stmt.kind {
-                    if self.is_fragment_callee(callee) {
+                    if self.is_device_callee(callee) {
                         sites.push(CallSite {
                             block_index,
                             block_id: block.id,
@@ -647,7 +739,7 @@ impl Resolver<'_> {
                 }
             }
             if let MirTerminatorKind::TryCall { destination, callee, args, .. } = &block.terminator.kind {
-                if self.is_fragment_callee(callee) {
+                if self.is_device_callee(callee) {
                     sites.push(CallSite {
                         block_index,
                         block_id: block.id,
@@ -664,9 +756,43 @@ impl Resolver<'_> {
         sites
     }
 
-    fn is_fragment_callee(&self, callee: &MirCallee) -> bool {
+    /// Every call site in one function, device or not (prune reference scan).
+    fn all_callees(&self, function: &MirFunction) -> Vec<CallSite> {
+        let mut sites = Vec::new();
+        for (block_index, block) in function.blocks.iter().enumerate() {
+            for (stmt_index, stmt) in block.statements.iter().enumerate() {
+                if let MirStatementKind::Call { destination, callee, args } = &stmt.kind {
+                    sites.push(CallSite {
+                        block_index,
+                        block_id: block.id,
+                        stmt_index: Some(stmt_index),
+                        is_try_call: false,
+                        destination: destination.clone(),
+                        callee: callee.clone(),
+                        args: args.clone(),
+                        span: stmt.span,
+                    });
+                }
+            }
+            if let MirTerminatorKind::TryCall { destination, callee, args, .. } = &block.terminator.kind {
+                sites.push(CallSite {
+                    block_index,
+                    block_id: block.id,
+                    stmt_index: None,
+                    is_try_call: true,
+                    destination: destination.clone(),
+                    callee: callee.clone(),
+                    args: args.clone(),
+                    span: block.terminator.span,
+                });
+            }
+        }
+        sites
+    }
+
+    fn is_device_callee(&self, callee: &MirCallee) -> bool {
         self.resolve_function(callee)
-            .is_some_and(|function| role_of(function, self.roles) == RoleKind::Fragment)
+            .is_some_and(|function| matches!(role_of(function, self.roles), RoleKind::Entry | RoleKind::Fragment))
     }
 
     fn resolve_function(&self, callee: &MirCallee) -> Option<&MirFunction> {

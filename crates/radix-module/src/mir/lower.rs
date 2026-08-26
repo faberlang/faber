@@ -311,6 +311,14 @@ fn lower_analyzed_unit_with_options(
         // entry row. Entry gating happens on the driver's emit/dispatch path
         // via `device_entry_roles_from_hir`.
         let roles = crate::mir::device_roles_from_hir(&unit.hir);
+        // DFV2-4: launch entries are the public `@ nucleum` sources — the
+        // only device functions that stay program symbols when device code
+        // also calls them; composed private helpers are pruned.
+        let launch_entries = crate::mir::device_entry_roles_from_hir(&unit.hir, &unit.interner)
+            .into_iter()
+            .filter(|(_, role)| *role == crate::mir::MirDeviceRole::Kernel)
+            .map(|(source, _)| source)
+            .collect::<FxHashSet<_>>();
         let layouts = MirLayoutTable::from_types(&unit.types);
         let summaries =
             crate::semantic::passes::fragment_definition::check(&unit.hir, &unit.resolver, &unit.types, &unit.interner)
@@ -340,6 +348,7 @@ fn lower_analyzed_unit_with_options(
             &roles,
             super::fragment_composition::active_budget(),
             Some(&unit.interner),
+            &launch_entries,
         );
         if !composition_errors.is_empty() {
             return Err(composition_errors

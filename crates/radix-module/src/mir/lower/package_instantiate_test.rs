@@ -341,3 +341,262 @@ fn artifact_restored_signature_only_device_route_fails_closed() {
         "expected the named imported_device_body_missing reason naming the route, got {errors:?}"
     );
 }
+
+// DFV2-4 merged-pipeline composition: an imported device instance whose body
+// calls another imported device function composes here, between shape
+// finalization and the caller's ValidatedMir rebuild.
+
+const IMPORTED_INNER_SOURCE: DefId = DefId(8);
+
+fn imported_device_pair_fixture() -> (
+    TypeTable,
+    Interner,
+    MirProgram,
+    Vec<MirFunction>,
+    Vec<(DefId, Vec<MirGenericParam>)>,
+) {
+    let mut types = TypeTable::new();
+    let mut interner = Interner::new();
+    let symbol = interner.intern("T");
+    let probe = interner.intern("probe");
+    let generic = MirType::semantic(types.intern(Type::Param(symbol)));
+    let concrete = MirType::semantic(types.primitive(Primitive::Textus));
+    let imported_inner = MirFunction {
+        id: MirFunctionId(0),
+        source: Some(IMPORTED_INNER_SOURCE),
+        name: None,
+        params: vec![crate::mir::MirParam {
+            local: crate::mir::MirLocalId(0),
+            name: None,
+            ty: generic,
+            mode: crate::mir::MirParamMode::Owned,
+            span: Span::default(),
+        }],
+        locals: Vec::new(),
+        temps: Vec::new(),
+        blocks: vec![MirBlock {
+            id: crate::mir::MirBlockId(0),
+            statements: Vec::new(),
+            terminator: MirTerminator {
+                kind: MirTerminatorKind::Return(Some(MirOperand::Place(MirPlace::local(crate::mir::MirLocalId(0))))),
+                span: Span::default(),
+            },
+            span: Span::default(),
+        }],
+        return_ty: generic,
+        error_ty: None,
+        is_async: false,
+        is_generator: false,
+        shader_stage: None,
+        span: Span::default(),
+    };
+    let imported_outer = MirFunction {
+        id: MirFunctionId(0),
+        source: Some(IMPORTED_SOURCE),
+        name: None,
+        params: vec![crate::mir::MirParam {
+            local: crate::mir::MirLocalId(0),
+            name: None,
+            ty: generic,
+            mode: crate::mir::MirParamMode::Owned,
+            span: Span::default(),
+        }],
+        locals: vec![crate::mir::MirLocal {
+            id: crate::mir::MirLocalId(1),
+            name: None,
+            ty: generic,
+            mutable: false,
+            span: Span::default(),
+        }],
+        temps: Vec::new(),
+        blocks: vec![MirBlock {
+            id: crate::mir::MirBlockId(0),
+            statements: vec![MirStatement {
+                kind: MirStatementKind::Call {
+                    destination: Some(MirPlace::local(crate::mir::MirLocalId(1))),
+                    callee: MirCallee::Definition { source: IMPORTED_INNER_SOURCE, type_args: vec![generic] },
+                    args: vec![MirOperand::Constant(crate::mir::MirConstant::String(probe))],
+                },
+                span: Span::default(),
+            }],
+            terminator: MirTerminator {
+                kind: MirTerminatorKind::Return(Some(MirOperand::Place(MirPlace::local(crate::mir::MirLocalId(1))))),
+                span: Span::default(),
+            },
+            span: Span::default(),
+        }],
+        return_ty: generic,
+        error_ty: None,
+        is_async: false,
+        is_generator: false,
+        shader_stage: None,
+        span: Span::default(),
+    };
+    let caller = MirFunction {
+        id: MirFunctionId(1),
+        source: None,
+        name: None,
+        params: Vec::new(),
+        locals: Vec::new(),
+        temps: Vec::new(),
+        blocks: vec![MirBlock {
+            id: crate::mir::MirBlockId(0),
+            statements: vec![MirStatement {
+                kind: MirStatementKind::Call {
+                    destination: None,
+                    callee: MirCallee::Definition { source: IMPORTED_SOURCE, type_args: vec![concrete] },
+                    args: Vec::new(),
+                },
+                span: Span::default(),
+            }],
+            terminator: MirTerminator { kind: MirTerminatorKind::Return(None), span: Span::default() },
+            span: Span::default(),
+        }],
+        return_ty: concrete,
+        error_ty: None,
+        is_async: false,
+        is_generator: false,
+        shader_stage: None,
+        span: Span::default(),
+    };
+    let program = MirProgram { functions: vec![caller], ..MirProgram::default() };
+    let generic_params = vec![
+        (IMPORTED_SOURCE, vec![MirGenericParam { name: symbol, is_shape: false }]),
+        (IMPORTED_INNER_SOURCE, vec![MirGenericParam { name: symbol, is_shape: false }]),
+    ];
+    (types, interner, program, vec![imported_outer, imported_inner], generic_params)
+}
+
+fn imported_device_pair_index() -> ImportedDeviceIndex {
+    ImportedDeviceIndex::from_routes([
+        (
+            IMPORTED_SOURCE,
+            ImportedDeviceRoute {
+                identity: MirExternalFunctionIdentity::new("probe", vec!["src".to_owned()], "scala"),
+                contract: InterfaceDeviceContract {
+                    role: InterfaceDeviceRole::Kernel,
+                    visibility: InterfaceDeviceVisibility::Public,
+                    body: InterfaceBodyChannel::Source,
+                },
+            },
+        ),
+        (
+            IMPORTED_INNER_SOURCE,
+            ImportedDeviceRoute {
+                identity: MirExternalFunctionIdentity::new("probe", vec!["src".to_owned()], "inner"),
+                contract: InterfaceDeviceContract {
+                    role: InterfaceDeviceRole::Kernel,
+                    visibility: InterfaceDeviceVisibility::Private,
+                    body: InterfaceBodyChannel::Source,
+                },
+            },
+        ),
+    ])
+}
+
+/// DFV2-4 (a)/(d)/(h): the imported outer instance's device call to the
+/// imported inner device function composes at the merged seam; the composed
+/// private helper leaves no standalone symbol and no surviving device call.
+#[test]
+fn imported_device_call_composes_at_merged_seam() {
+    let (mut types, interner, mut program, templates, generic_params) = imported_device_pair_fixture();
+    let index = imported_device_pair_index();
+
+    let (monomorphizations, registrations) = instantiate_merged_generic_calls_with_devices(
+        &mut program,
+        &templates,
+        &generic_params,
+        &mut types,
+        &interner,
+        None,
+        &index,
+    )
+    .expect("imported device pair instantiation + composition");
+
+    assert_eq!(registrations.len(), 2, "both imported instances register for the consumer");
+    let device_roles = index
+        .iter()
+        .map(|(source, _route)| (*source, crate::mir::MirDeviceRole::Kernel))
+        .collect::<FxHashMap<_, _>>();
+    assert!(
+        crate::mir::fragment_composition::surviving_fragment_calls(
+            &program.functions,
+            &monomorphizations,
+            &device_roles
+        )
+        .is_empty(),
+        "no device call may survive merged composition: {:#?}",
+        program.functions
+    );
+    assert!(
+        program
+            .functions
+            .iter()
+            .all(|function| function.source != Some(IMPORTED_INNER_SOURCE)),
+        "the composed private imported helper must be pruned: {:#?}",
+        program.functions
+    );
+    assert!(
+        program
+            .functions
+            .iter()
+            .any(|function| function.source == Some(IMPORTED_SOURCE)),
+        "the public imported entry must stay a program symbol"
+    );
+}
+
+/// DFV2-4 (e): a concrete cycle across imported device templates reports the
+/// full chain at the merged seam.
+#[test]
+fn imported_device_cycle_is_rejected_with_full_chain() {
+    let (mut types, mut interner, mut program, mut templates, generic_params) = imported_device_pair_fixture();
+    // Rewrite the inner template's body to call back into the outer source.
+    if let Some(inner) = templates
+        .iter_mut()
+        .find(|template| template.source == Some(IMPORTED_INNER_SOURCE))
+    {
+        inner.locals.push(crate::mir::MirLocal {
+            id: crate::mir::MirLocalId(1),
+            name: None,
+            ty: inner.return_ty,
+            mutable: false,
+            span: Span::default(),
+        });
+        inner.blocks[0].statements.push(MirStatement {
+            kind: MirStatementKind::Call {
+                destination: Some(MirPlace::local(crate::mir::MirLocalId(1))),
+                callee: MirCallee::Definition { source: IMPORTED_SOURCE, type_args: Vec::new() },
+                args: vec![MirOperand::Constant(crate::mir::MirConstant::String(
+                    interner.intern("back"),
+                ))],
+            },
+            span: Span::default(),
+        });
+        inner.blocks[0].terminator = MirTerminator {
+            kind: MirTerminatorKind::Return(Some(MirOperand::Place(MirPlace::local(crate::mir::MirLocalId(1))))),
+            span: Span::default(),
+        };
+    }
+    let index = imported_device_pair_index();
+
+    let errors = instantiate_merged_generic_calls_with_devices(
+        &mut program,
+        &templates,
+        &generic_params,
+        &mut types,
+        &interner,
+        None,
+        &index,
+    )
+    .expect_err("an imported device cycle must fail closed");
+
+    let cycle = errors
+        .iter()
+        .find(|error| error.issue == "nucleum_fragment_cycle")
+        .expect("expected the named cycle issue");
+    assert!(
+        cycle.message.contains('#'),
+        "the full cycle chain must be in the diagnostic: {}",
+        cycle.message
+    );
+}

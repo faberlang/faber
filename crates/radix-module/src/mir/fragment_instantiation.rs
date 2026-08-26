@@ -1,9 +1,11 @@
 //! Per-instantiation nucleum-fragment checking after shape finalization.
 //!
 //! Every call from an `Entry` or `Fragment` is checked against the callee's
-//! specialized signature. The role call-legality matrix is enforced here so
-//! illegal cells never reach composition. Errors are call-site primary; the
-//! callee definition is a secondary span.
+//! specialized signature. Under the v2 device contract (DFV2-4) a device
+//! caller may call any concrete device function — entry or helper — so the
+//! remaining matrix rows reject only non-device callees (host callables,
+//! graphics stages) and host callers of fragments. Errors are call-site
+//! primary; the callee definition is a secondary span.
 
 use crate::diagnostics::DiagnosticArg;
 use crate::hir::DefId;
@@ -142,8 +144,12 @@ impl<'a> InstantiationChecker<'a> {
             return;
         };
         match (caller, callee_role) {
-            (RoleKind::Entry, RoleKind::Entry) => {
-                self.context(caller, "nested_dispatch", span, Some(definition_span));
+            // DFV2-4 (v2 design §1): device code may call device code —
+            // entry or helper — and the call composes. Role-based call
+            // legality is gone; the former `nested_dispatch` reject is now
+            // the ordinary typed instantiation check.
+            (RoleKind::Entry, RoleKind::Entry) | (RoleKind::Entry | RoleKind::Fragment, RoleKind::Fragment) => {
+                self.check_instantiation(caller, caller_fn, callee, callee_id, args, destination, failable, span);
             }
             (RoleKind::Fragment, RoleKind::Entry) => {
                 self.context(caller, "entry_callee", span, Some(definition_span));
@@ -156,9 +162,6 @@ impl<'a> InstantiationChecker<'a> {
             }
             (RoleKind::Entry | RoleKind::Fragment, RoleKind::Ordinary) => {
                 self.context(caller, "host_callable", span, Some(definition_span));
-            }
-            (RoleKind::Entry | RoleKind::Fragment, RoleKind::Fragment) => {
-                self.check_instantiation(caller, caller_fn, callee, callee_id, args, destination, failable, span);
             }
             _ => {}
         }
