@@ -1,0 +1,66 @@
++++
+term = "itera"
+kind = "keyword"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "functio_decl", "param_list", "parameter", "return_clause", "alternate_exit_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "itera_stmt", "cape_clause", "si_stmt", "iace_stmt", "redde_stmt", "expression", "literal", "nota_stmt"]
+category = "control-flow"
+canonical = false
+summary = "The trailing cape_clause on itera admits in the base lane: one handler wraps the whole loop and fires on the first throw."
+syntax = "for … { <body> } catch <err> { <recovery> }"
+related = ["cape", "fac", "iace", "receptio-decline"]
+locale = "en"
++++
+
+# =============================================================================
+# cape-admit — whole-loop catch on itera (base lane admit).
+# =============================================================================
+#
+# What this teaches:
+#   • `for … { } catch err { }` is legal in the base lane: the handler wraps
+#     the WHOLE loop, not each iteration
+#   • the loop runs until the first throw; the throw exits the loop and the
+#     recovery arm runs exactly once (it is never re-armed per iteration)
+#   • when nothing throws, the loop completes and the recovery arm never
+#     fires
+#
+# Common mistakes:
+#   • expecting per-iteration recovery — the handler is per-loop by the
+#     grammar; per-iteration recovery would need new syntax
+#   • reading receptio-decline.fab as a total rejection — those rows are the
+#     AIR-lane keep-out (`@ radix lane "air"`, SEM059 itera_loop); the base
+#     lane admits this shape
+#
+# See also: cape, fac, iace, receptio-decline
+# =============================================================================
+
+# whole-loop catch on itera — admit shape
+#
+# for range 0‥5 const i { … } catch err { … }
+#
+# GRAMMAR:
+#   iteraStmt :← 'itera' … (block_stmt | ergo_joint statement) cape_clause?
+#
+# EXPECTED OUTPUT:
+#   cape-admit.expected — the no-failure loop prints its quotients (10, 5,
+#   3), then the failing loop's throw at i = 0 exits the loop and the
+#   handler fires once.
+
+fn divisio(int a, int b) → int ⇥ string {
+    if b ≡ 0 then throw "per nihil"
+    return a / b
+}
+
+main {
+    # no throw: the loop runs to completion and the handler never fires
+    for range 1‥4 const i {
+        print divisio(10, i)
+    } catch err {
+        print "captum: §"(err)
+    }
+
+    # the throw at i = 0 exits the whole loop; the handler fires once
+    for range 0‥4 const i {
+        print divisio(10, i)
+    } catch err {
+        print "captum: §"(err)
+    }
+}

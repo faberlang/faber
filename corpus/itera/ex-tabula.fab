@@ -1,0 +1,59 @@
++++
+term = "itera"
+kind = "keyword"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "assignment", "place", "itera_stmt", "expression", "literal", "nota_stmt"]
+category = "iteration"
+canonical = false
+summary = "Value iteration (`itera ex`) over tabula: the binder receives each value, never the key."
+syntax = "for from <tabula> const <value> { <body> }"
+related = ["tabula", "de", "ex", "itera"]
+locale = "en"
++++
+
+# =============================================================================
+# ex-tabula — `for from <tabula>` value iteration.
+# =============================================================================
+#
+# What this teaches:
+#   • `itera ex` over a tabula yields the VALUES — the binder never receives
+#     the key
+#   • iteration order follows the map's internal order, not source/insertion
+#     order (alpha/beta/gamma here print 1, 3, 2)
+#   • value iteration cannot reach keys — `itera de` is the key surface (see
+#     itera/de.fab); the ex binder is keyless by construction
+#
+# Common mistakes:
+#   • expecting the ex binder to carry the key — ex binds values; de binds
+#     keys/indices
+#   • assuming insertion order — tabula order is the map's own; for a stable
+#     expectation, pin an order-independent aggregate
+#
+# See also: tabula, de, ex, itera
+# =============================================================================
+
+# itera ex over tabula — value iteration
+#
+# for from <tabula> const <value> { <body> }
+#
+# GRAMMAR:
+#   iteraStmt :← 'itera' 'ex' expr ('fixum' | 'varia') IDENTIFIER block
+#
+# EXPECTED OUTPUT:
+#   ex-tabula.expected — values in map order (1, 3, 2), then the
+#   order-independent sum (6).
+
+main {
+    const map<string, int> puncta ← { "alpha": 1, "beta": 2, "gamma": 3 }
+
+    # the ex binder receives each value, never the key
+    for from puncta const v {
+        print v
+    }
+
+    # order-independent aggregate — the sum is stable whatever the map order
+    var int totum ← 0
+    for from puncta const v {
+        totum ← totum + v
+    }
+    print totum
+}

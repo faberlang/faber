@@ -1,0 +1,48 @@
++++
+term = "itera"
+kind = "keyword"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "width_type_sugar", "shape_suffix", "figura", "figura_list", "array_literal", "assignment", "place", "vel_expr", "additive_expr", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "itera_stmt", "expression", "literal", "nota_stmt"]
+category = "control-flow"
+canonical = false
+summary = "Coordinate iteration over a rank-4 tensor binds four coordinates — outermost axis first."
+syntax = "for from tensor at [i, j, k, l] const cell { }"
+related = ["apud", "itera", "ex", "tensor"]
+locale = "en"
++++
+
+# =============================================================================
+# apud rank-4 — `at [i, j, k, l]` walks a 2×2×2×2 hypercube.
+# =============================================================================
+#
+# What this teaches:
+#   • any rank ≥ 1 works — arity is the only rank gate; rank 4 binds four
+#     `numerus` coordinates in one statement
+#   • first-bound coordinate is the outer axis: i outermost, then j, k, and
+#     l innermost — the print lanes run in lexicographic coordinate order
+#
+# Common mistakes:
+#   • expecting silent flattening without coordinates — the statement
+#     declares the flattening order; every axis must be named
+#
+# See also: apud, itera, ex, tensor
+# =============================================================================
+
+# Rank-4 `apud [i, j, k, l]` over a literal-shaped 2×2×2×2 tensor
+#
+# for from hypercube at [i, j, k, l] const cell { <body> }
+#
+# GRAMMAR:
+#   iteraStmt :← 'for' 'from' expr ('at' '[' ident (',' ident)* ']')? …
+#
+# EXPECTED OUTPUT:
+#   i, j, k, l, cell per line — sixteen lanes in i-outer, l-inner order.
+
+main {
+    const list<f32> flat ← [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0, 11.0, 12.0, 13.0, 14.0, 15.0, 16.0]
+    const tf32[] seed ← empty
+    const tf32[2, 2, 2, 2] hypercube ← seed.from_flat(flat, [2, 2, 2, 2])
+
+    for from hypercube at [i, j, k, l] const cell {
+        print i, j, k, l, cell
+    }
+}
