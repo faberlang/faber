@@ -928,6 +928,10 @@ fn semantic_invalid_operand_types_message(args: &[DiagnosticArg]) -> Option<Stri
             ))
         }
         "numeric_operands_required" => Some("numeric operands required".to_owned()),
+        "decimal_integer_literal_rejected" => Some(
+            "integer literals do not flow implicitly into decimal widths; write a decimal literal such as `5.0` or use explicit `↦` conversion"
+                .to_owned(),
+        ),
         "numeric_arithmetic_operands_identical" => {
             Some("numeric arithmetic operands must have identical types; use ↦ to convert explicitly".to_owned())
         }
@@ -1171,6 +1175,10 @@ fn semantic_invalid_operand_types_help(args: &[DiagnosticArg]) -> Option<String>
                 .to_owned(),
         ),
         "numeric_operands_required" => Some("use numeric operands for this operator".to_owned()),
+        "decimal_integer_literal_rejected" => Some(
+            "write a decimal literal such as `5.0`, or convert an integer explicitly with `↦`"
+                .to_owned(),
+        ),
         "modular_word_width_required" => {
             Some("write the modular word type as modulus<u8>, modulus<u16>, modulus<u32>, or modulus<u64>".to_owned())
         }

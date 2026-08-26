@@ -483,7 +483,7 @@ impl TypeChecker<'_> {
         match lit {
             HirLiteral::Int(value) => {
                 let literal_ty = self
-                    .expected_numerus_literal_type(expected)
+                    .expected_numerus_literal_type(expected, span)
                     .unwrap_or_else(|| self.numerus_type());
                 if let Type::ModularWord(width) = self.types.get(literal_ty) {
                     // Literal range follows the declared width: 0..=2^W-1.
@@ -546,12 +546,23 @@ impl TypeChecker<'_> {
         }
     }
 
-    fn expected_numerus_literal_type(&self, expected: Option<TypeId>) -> Option<TypeId> {
+    fn expected_numerus_literal_type(
+        &mut self,
+        expected: Option<TypeId>,
+        span: radix_lexer::Span,
+    ) -> Option<TypeId> {
         let expected = self.resolve_inferred_type(expected?);
         match self.types.get(expected) {
-            Type::Primitive(Primitive::Numerus)
-            | Type::SizedNumeric(Primitive::Numerus, _)
-            | Type::ModularWord(_) => Some(expected),
+            Type::Primitive(Primitive::Numerus) => Some(expected),
+            Type::SizedNumeric(Primitive::Numerus, width) if !width.is_decimal() => Some(expected),
+            Type::SizedNumeric(Primitive::Numerus, NumericWidth::D32 | NumericWidth::D64) => {
+                // Decimal carriers scale decimal literals only. An integer
+                // literal has its own numerus type and must opt into that
+                // cross-family flow with an explicit `↦` conversion.
+                self.invalid_operand_types(DECIMAL_INTEGER_LITERAL_REJECTED, span);
+                Some(self.error_type)
+            }
+            Type::ModularWord(_) => Some(expected),
             _ => None,
         }
     }
@@ -848,5 +859,6 @@ impl TypeChecker<'_> {
 
 const MODULAR_WORD_LITERAL_OUT_OF_RANGE: &str = "modular_word_literal_out_of_range";
 const NUMERUS_LITERAL_OUT_OF_RANGE: &str = "numerus_literal_out_of_range";
+const DECIMAL_INTEGER_LITERAL_REJECTED: &str = "decimal_integer_literal_rejected";
 const DECIMAL_LITERAL_UNPARSEABLE: &str = "decimal_literal_unparseable";
 const DECIMAL_LITERAL_OUT_OF_RANGE: &str = "decimal_literal_out_of_range";

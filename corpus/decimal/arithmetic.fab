@@ -30,6 +30,9 @@ locale = "en"
 #     at the d32 scale, not forty-three million
 #   • assuming decimal arithmetic degrades to float error — the scaled
 #     integer carrier keeps 4.2 + 0.1 = 4.3 exact where f64 rounds
+#   • treating integer literals as decimal literals — `a + 1`, `a / 2`, and
+#     `numerus<d32> e ← 5` reject with `decimal_integer_literal_rejected`;
+#     write `1.0`, `2.0`, or `5.0`, or use explicit `↦` conversion
 #
 # See also: numerus, d64, ↦, fractus
 # =============================================================================
