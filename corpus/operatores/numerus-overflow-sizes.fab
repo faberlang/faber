@@ -1,0 +1,43 @@
++++
+term = "numerus"
+kind = "operator-group"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "functio_decl", "param_list", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "width_type_sugar", "cast_expr", "additive_expr", "multiplicative_expr", "call_expr", "call_suffix", "argument_list", "expression", "literal", "redde_stmt", "nota_stmt"]
+category = "arithmetic"
+canonical = true
+summary = "Checked numerus arithmetic traps at sized widths instead of wrapping."
+syntax = "<numerus<i8>> + <numerus<i8>>"
+related = ["numerus", "+", "modulus<u8>"]
+locale = "en"
++++
+
+# =============================================================================
+# numerus — Checked numerus arithmetic traps at sized widths instead of wrapping.
+# =============================================================================
+#
+# What this teaches:
+#   • Sized-width overflow — `int<i8>` arithmetic traps on overflow at the
+#     declared width rather than wrapping.
+#   • Policy distinction — every numerus width follows checked semantics
+#     (operator ruling 2fb79900); only `modulus<W>` wraps mod 2^W.
+#
+# Common mistakes:
+#   • Assuming sized numerus wraps on overflow like modular word types.
+#
+# See also: +, numerus, modulus<u8>
+# =============================================================================
+
+# numerus-overflow-sizes — sized-width checked scalar arithmetic failure
+#
+# POLICY:
+#   `int<i8>` carries its declared width. Arithmetic traps on overflow at that
+#   width; it does not inherit the host's silent integer wrap. The rhs is a
+#   function call so the overflow stays a runtime fact on every target.
+
+fn uno() → int<i8> {
+    return 1
+}
+
+main {
+    var int<i8> max ← 127 ∷ int<i8>
+    print max + uno()
+}
