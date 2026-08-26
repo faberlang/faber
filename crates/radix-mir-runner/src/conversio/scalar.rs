@@ -197,7 +197,20 @@ impl<H: super::super::Host + ?Sized> Runner<'_, H> {
             },
             Value::Float(v) => Ok(Value::Int(v as i64)),
             Value::Bool(v) => Ok(Value::Int(if v { 1 } else { 0 })),
-            Value::Int(v) => Ok(Value::Int(v)),
+            Value::Int(v) => {
+                // GT-3: conversion never wraps (DEFER-116 boundary contract).
+                // A negative signed value has no unsigned carrier, so it fails
+                // closed here instead of leaving a negative carrier in an
+                // unsigned slot (which made print/≡/≅/ordering disagree).
+                if width.is_unsigned_int() && v < 0 {
+                    return self.recover_or_fail(
+                        recovery,
+                        span,
+                        "numerus to numerus conversion out of range",
+                    );
+                }
+                Ok(Value::Int(v))
+            }
             Value::UInt(v) if width.is_unsigned_int() => {
                 let (_, hi) = int_width_range(width);
                 if v as u128 <= hi as u128 {

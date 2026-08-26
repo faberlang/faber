@@ -223,3 +223,16 @@ fn decimal_overflow_is_checked_at_the_declared_carrier_width() {
     .expect_err("d32 carrier overflow");
     assert_eq!(error.message, "numerus overflow");
 }
+
+#[test]
+fn negative_signed_to_unsigned_conversion_fails_closed() {
+    let i32 = integer(NumericWidth::I32);
+    let u32 = integer(NumericWidth::U32);
+    let error = run_conversion(i32.clone(), u32.clone(), Value::Int(-2))
+        .expect_err("negative signed value has no unsigned carrier");
+    assert_eq!(error.message, "numerus to numerus conversion out of range");
+    assert_eq!(
+        run_conversion(i32, u32, Value::Int(5)).expect("non-negative converts"),
+        Value::Int(5),
+    );
+}
