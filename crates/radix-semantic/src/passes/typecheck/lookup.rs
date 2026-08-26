@@ -344,14 +344,31 @@ impl TypeChecker<'_> {
     ///
     /// `typus R = A ∪ B` and its unfolded union are the same type (BO-S-4
     /// alias transparency), so the member rule, refinement, and dead-test
-    /// warning all compare through this peel. Non-union types (and the
-    /// `Option` rewrite a nihil union lowers to) return `None`.
-    pub(crate) fn union_members_of(&self, ty: TypeId) -> Option<Vec<TypeId>> {
+    /// warning all compare through this peel. A `Type::Enum` is the closed
+    /// variant union: each variant is represented as `Type::Struct` carrying
+    /// the variant `DefId`, while payload fields remain in the checker tables.
+    /// The `Option` rewrite a nihil union lowers to still returns `None` here;
+    /// its one implicit null member is handled by the refinement seam.
+    pub(crate) fn union_members_of(&mut self, ty: TypeId) -> Option<Vec<TypeId>> {
         let mut current = self.resolve_inferred_type(ty);
         for _ in 0..8 {
-            match self.types.get(current) {
-                Type::Union(members) => return Some(members.clone()),
-                Type::Alias(_, inner) => current = self.resolve_inferred_type(*inner),
+            match self.types.get(current).clone() {
+                Type::Union(members) => return Some(members),
+                Type::Alias(_, inner) => current = self.resolve_inferred_type(inner),
+                Type::Enum(enum_def) => {
+                    let mut variants: Vec<DefId> = self
+                        .variant_parent
+                        .iter()
+                        .filter_map(|(variant, parent)| (*parent == enum_def).then_some(*variant))
+                        .collect();
+                    variants.sort_unstable_by_key(|variant| variant.0);
+                    return Some(
+                        variants
+                            .into_iter()
+                            .map(|variant| self.types.intern(Type::Struct(variant)))
+                            .collect(),
+                    );
+                }
                 _ => return None,
             }
         }

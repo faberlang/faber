@@ -317,6 +317,9 @@ impl TypeChecker<'_> {
             self.undefined_member("optional_receiver_requires_chain", span);
             return self.error_type;
         }
+        if let Some(field_ty) = self.variant_field_from_type(object_ty, name) {
+            return self.project_ref_view(object_ty, field_ty);
+        }
         if let Some(struct_def) = self.struct_def_from_type(object_ty) {
             if let Some(info) = self.structs.get(&struct_def) {
                 if let Some(field) = info.fields.get(&name).copied() {
@@ -432,9 +435,32 @@ impl TypeChecker<'_> {
         }
     }
 
+    /// Project a field carried by one enum variant represented as a nominal
+    /// `Type::Struct(variant_def)`. Variant payload metadata is collected in
+    /// parallel tables because variants are values of their parent enum at
+    /// construction sites, not standalone declarations in the struct table.
+    fn variant_field_from_type(&self, object_ty: TypeId, name: Symbol) -> Option<TypeId> {
+        let resolved = self.resolve_inferred_type(object_ty);
+        let Type::Struct(variant_def) = self.types.get(resolved) else {
+            return None;
+        };
+        let field_index = self
+            .variant_field_names
+            .get(variant_def)?
+            .iter()
+            .position(|field_name| *field_name == name)?;
+        self.variant_fields
+            .get(variant_def)?
+            .get(field_index)
+            .copied()
+    }
+
     /// One union constituent's field type for the common-member computation,
     /// or `None` when the constituent does not expose the field (U1R).
     fn union_constituent_field_type(&mut self, member: TypeId, name: Symbol) -> Option<TypeId> {
+        if let Some(field_ty) = self.variant_field_from_type(member, name) {
+            return Some(field_ty);
+        }
         if let Some(struct_def) = self.struct_def_from_type(member) {
             let field = self.structs.get(&struct_def)?.fields.get(&name).copied()?;
             return Some(self.applied_field_type(member, struct_def, field.ty));

@@ -320,3 +320,32 @@ fn primitive_union_annotation_does_not_warn() {
         .iter()
         .any(|err| !err.is_error() && test_support::issue(err) == Some("union_nominal_members")));
 }
+
+// ---------------------------------------------------------------------------
+// Closed enum variant members (N0)
+// ---------------------------------------------------------------------------
+
+const CARRIER: &str = r#"genus ErrorDetail {
+    textus body
+}
+
+discretio Carrier {
+    DetailCarrier { ErrorDetail detail },
+    TextCarrier { textus text }
+}
+
+"#;
+
+#[test]
+fn enum_variant_refinement_reaches_return_funnel() {
+    test_support::assert_accepts(&format!(
+        "{CARRIER}functio probe(Carrier r) → textus {{\n    adfirma r est DetailCarrier\n    redde r.detail.body\n}}"
+    ));
+}
+
+#[test]
+fn enum_variant_refinement_reaches_initializer_funnel() {
+    test_support::assert_accepts(&format!(
+        "{CARRIER}functio probe(Carrier r) → textus {{\n    adfirma r est DetailCarrier\n    fixum textus body ← r.detail.body\n    redde body\n}}"
+    ));
+}

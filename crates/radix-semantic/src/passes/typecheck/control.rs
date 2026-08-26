@@ -339,6 +339,18 @@ impl TypeChecker<'_> {
             let (then_refine, _) = self.condition_refinement(lhs);
             return (then_refine, None);
         }
+        // Enum variants are value paths in HIR, so `r est Variant` arrives as
+        // the same Binary(Is) shape as value equality. Promote only a known
+        // variant path to the closed variant-member predicate; literals and
+        // ordinary values retain their equality semantics.
+        if matches!(op, HirBinOp::Is | HirBinOp::IsNot) {
+            if let HirExpressionKind::Path(variant_def) = rhs.kind {
+                if self.variant_parent.contains_key(&variant_def) {
+                    let member = self.types.intern(Type::Struct(variant_def));
+                    return self.type_check_refinement(matches!(op, HirBinOp::Is), lhs, member);
+                }
+            }
+        }
         // `x non est nihil` narrows the taken branch; `x est nihil` narrows
         // the fallthrough.
         let taken_branch_narrows = match op {
