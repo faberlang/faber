@@ -2948,6 +2948,11 @@ fn unsupported_expr_kind_name(kind: &HirExpressionKind) -> &'static str {
         HirExpressionKind::IteraLockstep { .. } => {
             "lockstep itera before aligned-walk MIR lowering"
         }
+        // NR-2 transitional naming (nary-range-walk): the product declines
+        // fail-closed here until the ordered walk lowering lands with NR-3.
+        HirExpressionKind::IteraRange { .. } => {
+            "range-product itera before product MIR lowering"
+        }
         HirExpressionKind::Summa { .. } => "summa before term-fold MIR lowering",
         HirExpressionKind::Extremum { .. } => "max/min before extrema MIR lowering",
         // Unreachable from the lowering dispatcher (first-match lowers through

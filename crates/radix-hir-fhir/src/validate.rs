@@ -446,6 +446,21 @@ fn collect_expr_defs(
             }
             collect_block_defs(body, registry);
         }
+        // NR-2 traversal (nary-range-walk): the product registers its binder
+        // defs and walks ranges/body; dedicated FHIR proofs land with NR-5.
+        HirExpressionKind::IteraRange {
+            ranges,
+            bindings,
+            body,
+        } => {
+            for (binding_def_id, _) in bindings {
+                registry.insert(*binding_def_id);
+            }
+            for range in ranges {
+                collect_expr_defs(range, registry);
+            }
+            collect_block_defs(body, registry);
+        }
         HirExpressionKind::Intervallum {
             start, end, step, ..
         } => {
@@ -758,6 +773,14 @@ fn collect_hir_registry(artifact: &HirArtifact) -> FxHashSet<radix_hir::HirId> {
             HirExpressionKind::IteraLockstep { sources, body, .. } => {
                 for source in sources {
                     collect_expr(source, registry);
+                }
+                collect_block(body, registry);
+            }
+            // NR-2 traversal (nary-range-walk): walk product ranges/body;
+            // dedicated FHIR proofs land with NR-5.
+            HirExpressionKind::IteraRange { ranges, body, .. } => {
+                for range in ranges {
+                    collect_expr(range, registry);
                 }
                 collect_block(body, registry);
             }
@@ -1574,6 +1597,23 @@ pub(crate) fn validate_referential_integrity(
                 }
                 for source in sources {
                     validate_expr(source, check_symbol, check_def, check_hir, check_type)?;
+                }
+                validate_block(body, check_symbol, check_def, check_hir, check_type)?;
+            }
+            // NR-2 traversal (nary-range-walk): validate product binder
+            // defs/symbols and ranges/body; dedicated FHIR proofs land with
+            // NR-5.
+            HirExpressionKind::IteraRange {
+                ranges,
+                bindings,
+                body,
+            } => {
+                for (binding_def_id, binding_name) in bindings {
+                    check_def(*binding_def_id)?;
+                    check_symbol(*binding_name)?;
+                }
+                for range in ranges {
+                    validate_expr(range, check_symbol, check_def, check_hir, check_type)?;
                 }
                 validate_block(body, check_symbol, check_def, check_hir, check_type)?;
             }

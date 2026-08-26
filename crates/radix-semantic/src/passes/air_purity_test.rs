@@ -107,10 +107,11 @@ functio combine(fractus x, fractus y) → fractus {
     );
 
     let err = expect_air_issue(&errors, "tensor_method_receiver");
-    assert!(err
-        .args
-        .iter()
-        .any(|arg| arg.name == "method" && arg.value == "addita"));
+    assert!(
+        err.args
+            .iter()
+            .any(|arg| arg.name == "method" && arg.value == "addita")
+    );
 }
 
 #[test]
@@ -1273,4 +1274,25 @@ functio parse_or_zero(textus s, numerus fallback) → numerus {
     );
 
     assert!(errors.is_empty(), "unexpected AIR errors: {errors:?}");
+}
+
+#[test]
+fn rejects_nary_range_product_loop_fail_closed() {
+    // NR-2 (nary-range-walk): the Cartesian `itera ab` product keeps the AIR
+    // fail-closed loop policy — the same `itera_loop` reject as the
+    // single-range and lockstep forms, with ranges and body still walked for
+    // nested purity facts.
+    let itera = air_errors(
+        r#"
+@ radix lane "air"
+functio grid(numerus m, numerus n) → numerus {
+    varia numerus total ← 0
+    itera ab 0‥m, 0‥n fixum i, j {
+        total ← total + i
+    }
+    redde total
+}
+"#,
+    );
+    expect_air_issue(&itera, "itera_loop");
 }

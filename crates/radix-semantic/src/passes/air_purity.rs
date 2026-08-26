@@ -302,6 +302,16 @@ impl AirPurityChecker<'_> {
                 }
                 self.check_block(body);
             }
+            HirExpressionKind::IteraRange { ranges, body, .. } => {
+                // Same AIR fail-closed stance as the other itera loops: the
+                // product is rejected as a loop effect while its ranges and
+                // body still walk for nested purity facts.
+                self.reject(expr.span, "itera_loop");
+                for range in ranges {
+                    self.check_expr(range);
+                }
+                self.check_block(body);
+            }
             HirExpressionKind::Summa { source, body, .. } => {
                 self.reject(expr.span, "summa_expression_unsupported");
                 self.check_expr(source);

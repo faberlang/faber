@@ -101,6 +101,7 @@ pub mod lockstep;
 pub mod lookup;
 pub mod ops;
 pub mod pattern;
+pub mod range;
 #[cfg(test)]
 pub mod relations_test;
 pub mod scalar_text;

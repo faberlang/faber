@@ -10,7 +10,7 @@
 
 use crate::test_support::args_have_no_legacy_message;
 use crate::{PassConfig, SemanticError, SemanticErrorKind};
-use radix_hir::visit::{walk_expr, walk_program, walk_stmt, HirVisitor};
+use radix_hir::visit::{HirVisitor, walk_expr, walk_program, walk_stmt};
 use radix_hir::{
     HirExpression, HirExpressionKind, HirLiteral, HirModule, HirStatement, HirStatementKind,
 };
@@ -1281,10 +1281,12 @@ functio mixed(tensor<f32, [40]> x) → f32 {
         "exactly the over-budget loop declines: {:?}",
         result.diagnostics
     );
-    assert!(declined[0]
-        .args
-        .iter()
-        .any(|arg| arg.name == "causa" && arg.value == "budget"));
+    assert!(
+        declined[0]
+            .args
+            .iter()
+            .any(|arg| arg.name == "causa" && arg.value == "budget")
+    );
     let hir = result.hir.as_ref().expect("typed HIR despite the decline");
     let mut iteras = CountIteras(0);
     walk_program(&mut iteras, hir);
@@ -1633,10 +1635,12 @@ functio too_many(tensor<f32, [8]> x) → f32 {
         "exactly the over-budget loop declines: {:?}",
         result.diagnostics
     );
-    assert!(declined[0]
-        .args
-        .iter()
-        .any(|arg| arg.name == "causa" && arg.value == "budget"));
+    assert!(
+        declined[0]
+            .args
+            .iter()
+            .any(|arg| arg.name == "causa" && arg.value == "budget")
+    );
     let hir = result.hir.as_ref().expect("typed HIR despite the decline");
     let mut iteras = CountIteras(0);
     walk_program(&mut iteras, hir);
@@ -1708,4 +1712,60 @@ functio nested_lista(tensor<f32, [4]> x) → f32 {
         steps.0, 16,
         "total lanes must be the product: 4 outer x 4 inner"
     );
+}
+
+#[test]
+fn nary_range_product_never_admits_an_unroll_recipe() {
+    // NR-2 (nary-range-walk): the Cartesian `itera ab` product has no AIR
+    // unroll recipe. `classify_itera_expr` only admits the single-source
+    // `Itera`, so the product stays fail-closed: the air lane declines it
+    // as SEM059.itera_loop and nothing is erased or spliced.
+    let errors = air_errors(
+        r#"
+@ radix lane "air"
+functio grid(numerus m, numerus n) → numerus {
+    varia numerus total ← 0
+    itera ab 0‥m, 0‥n fixum i, j {
+        total ← total + i
+    }
+    redde total
+}
+"#,
+    );
+    expect_issue(&errors, "itera_loop");
+}
+
+#[test]
+fn nary_range_product_off_air_lane_is_left_in_place() {
+    // Off the air lane the product is ordinary HIR for the MIR pipeline
+    // (NR-3): the unroll pass must not touch it.
+    let result = analyze(
+        r"
+functio grid(numerus m, numerus n) → vacuum {
+    itera ab 0‥m, 0‥n fixum i, j { }
+}
+",
+    );
+    assert!(
+        result.is_ok(),
+        "non-AIR range product must keep ordinary lowering: {:?}",
+        result.diagnostics
+    );
+    let hir = result.hir.as_ref().expect("typed HIR");
+    let mut found = FindIteraRange(false);
+    walk_program(&mut found, hir);
+    assert!(
+        found.0,
+        "non-AIR-lane range product must remain untouched by the unroll pass"
+    );
+}
+
+struct FindIteraRange(bool);
+impl HirVisitor for FindIteraRange {
+    fn visit_expr(&mut self, expr: &HirExpression) {
+        if matches!(expr.kind, HirExpressionKind::IteraRange { .. }) {
+            self.0 = true;
+        }
+        walk_expr(self, expr);
+    }
 }

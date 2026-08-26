@@ -416,6 +416,21 @@ pub fn walk_expr<V: HirVisitor>(visitor: &mut V, expr: &HirExpression) {
             }
             visitor.visit_block(body);
         }
+        HirExpressionKind::IteraRange {
+            ranges,
+            bindings,
+            body,
+        } => {
+            // Ranges evaluate outside the binder scope, so they walk before
+            // the binder defs (leftmost-outermost order preserved).
+            for range in ranges {
+                visitor.visit_expr(range);
+            }
+            for (binding_def_id, binding_name) in bindings {
+                visitor.visit_def(*binding_def_id, *binding_name);
+            }
+            visitor.visit_block(body);
+        }
         HirExpressionKind::Summa {
             source,
             coordinates,
@@ -987,6 +1002,21 @@ pub fn walk_expr_mut<V: HirVisitorMut>(visitor: &mut V, expr: &mut HirExpression
             }
             for source in sources {
                 visitor.visit_expr_mut(source);
+            }
+            visitor.visit_block_mut(body);
+        }
+        HirExpressionKind::IteraRange {
+            ranges,
+            bindings,
+            body,
+        } => {
+            // Ranges evaluate outside the binder scope, so they walk before
+            // the binder defs (leftmost-outermost order preserved).
+            for range in ranges {
+                visitor.visit_expr_mut(range);
+            }
+            for (binding_def_id, binding_name) in bindings {
+                visitor.visit_def(*binding_def_id, *binding_name);
             }
             visitor.visit_block_mut(body);
         }

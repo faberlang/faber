@@ -433,6 +433,12 @@ impl super::FaberCodegen {
                 });
                 writer.write("}");
             }
+            // NR-2 transitional fail-closed arm (nary-range-walk): the
+            // localized Cartesian `ab` series emission lands with NR-6; no
+            // product HIR may reach Faber emission before that unit.
+            HirExpressionKind::IteraRange { .. } => {
+                unreachable!("range-product itera HIR is not yet emitted for the Faber target");
+            }
             HirExpressionKind::Intervallum {
                 start,
                 end,

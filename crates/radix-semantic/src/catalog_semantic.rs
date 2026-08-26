@@ -2319,6 +2319,21 @@ fn semantic_type_mismatch_message(args: &[DiagnosticArg]) -> Option<String> {
                 "lockstep for-from sources must have equal length (found {expected} and {actual}); the walk fails closed instead of truncating"
             ))
         }
+        "itera_range_source_binder_arity_mismatch" => {
+            let expected = arg_value(args, "expected").map_or_else(|| "?".to_owned(), str::to_owned);
+            let actual = arg_value(args, "actual").map_or_else(|| "?".to_owned(), str::to_owned);
+            Some(format!(
+                "for-range binds one binder per range: expected {expected} binders, found {actual}; the counts must match exactly"
+            ))
+        }
+        "itera_range_extent_binder_shadowing" => Some(
+            "a for-range binder must not shadow a name used in any range extent; rename the binder or the extent"
+                .to_owned(),
+        ),
+        "itera_range_mixed_source" => Some(
+            "for-range sources must all be range expressions; a Cartesian walk cannot mix a range with a plain value"
+                .to_owned(),
+        ),
         "libera_capture" => {
             let capture = arg_value(args, "capture")?;
             Some(format!(

@@ -30,7 +30,7 @@
 //! be literals or enum variants. Type compatibility, exhaustiveness, loop
 //! placement legality, and target-specific lowering remain downstream.
 
-use super::{pattern, HirBlock, HirExpression, HirStatement, HirStatementKind, Lowerer};
+use super::{HirBlock, HirExpression, HirStatement, HirStatementKind, Lowerer, pattern};
 use radix_hir::{HirCasuArm, HirExpressionKind, HirLiteral, HirPattern, HirScribeKind};
 use radix_lexer::Span;
 use radix_syntax::{Stmt, StmtKind};
@@ -658,12 +658,15 @@ impl Lowerer<'_> {
 
     /// Lower `itera` with a synthetic binding local for the iteration variable.
     fn lower_itera(&mut self, iter_stmt: &radix_syntax::IteraStmt) -> HirStatementKind {
-        // The lockstep series (`itera ex` with N >= 2 sources, or any binder
-        // series) lowers to its own node so the source/binder arity law owns
-        // every count mismatch; the single-source single-binder form keeps
-        // the shared itera path untouched (need: legal N=1 is
-        // byte-identical).
+        // The series forms each lower to their own node so the mode-owned
+        // arity law governs every count mismatch; the single-source
+        // single-binder form keeps the shared itera path untouched (need
+        // 400da00a: legal N=1 is byte-identical). `ab` is the Cartesian
+        // range product (never a zip) and `ex` stays the lockstep series.
         if iter_stmt.sources.len() > 1 || iter_stmt.bindings.len() > 1 {
+            if matches!(iter_stmt.mode, radix_syntax::IteraMode::Ab) {
+                return self.lower_range_product_itera(iter_stmt);
+            }
             return self.lower_lockstep_itera(iter_stmt);
         }
         let mode = match iter_stmt.mode {
@@ -815,6 +818,79 @@ impl Lowerer<'_> {
             kind: HirExpressionKind::IteraLockstep {
                 sources,
                 coordinates: coordinate_bindings,
+                bindings,
+                body,
+            },
+            ty: None,
+            span: self.current_span,
+        };
+
+        let expr = if let Some(catch) = &iter_stmt.catch {
+            let cape = self.lower_cape_clause(catch);
+            self.handled_expr(expr, cape)
+        } else {
+            expr
+        };
+
+        HirStatementKind::Expr(expr)
+    }
+
+    /// Lower the N-ary Cartesian `itera ab` range product to its node.
+    ///
+    /// Unlike the lockstep series, range sources lower OUTSIDE the binder
+    /// scope: an extent referencing an outer name keeps that outer reference,
+    /// so the extent/binder shadowing law is checkable at typecheck instead
+    /// of silently re-binding the extent to the loop binder. Binders are
+    /// names in v1 (same stance as the lockstep series). The product carries
+    /// no `apud` coordinates — coordinates require `ex` iteration, so a
+    /// product head with an `apud` clause declines through the same issue as
+    /// the single-source form.
+    fn lower_range_product_itera(
+        &mut self,
+        iter_stmt: &radix_syntax::IteraStmt,
+    ) -> HirStatementKind {
+        if let Some(coordinate) = iter_stmt.apud.first() {
+            self.error_with_args_at(
+                vec![radix_diagnostics::DiagnosticArg::new(
+                    "issue",
+                    "itera_apud_requires_ex",
+                )],
+                coordinate.span,
+            );
+            return HirStatementKind::Expr(error_expr(self, self.current_span));
+        }
+        let mut bindings = Vec::new();
+        for binding in &iter_stmt.bindings {
+            let radix_syntax::BindingPattern::Ident(ident) = binding else {
+                self.error_with_args_at(
+                    vec![radix_diagnostics::DiagnosticArg::new(
+                        "issue",
+                        "itera_binder_pattern_unsupported",
+                    )],
+                    binding_pattern_span(binding),
+                );
+                return HirStatementKind::Expr(error_expr(self, self.current_span));
+            };
+            let def_id = self.next_def_id();
+            bindings.push((def_id, ident.name));
+        }
+
+        let ranges = iter_stmt
+            .sources
+            .iter()
+            .map(|source| self.lower_expr(source))
+            .collect();
+
+        self.push_scope();
+        for (def_id, name) in &bindings {
+            self.bind_local(*name, *def_id);
+        }
+        let body = self.lower_ergo_body(&iter_stmt.body);
+        self.pop_scope();
+        let expr = HirExpression {
+            id: self.next_hir_id(),
+            kind: HirExpressionKind::IteraRange {
+                ranges,
                 bindings,
                 body,
             },

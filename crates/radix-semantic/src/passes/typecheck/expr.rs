@@ -403,6 +403,11 @@ impl TypeChecker<'_> {
                 body,
                 expr.span,
             ),
+            HirExpressionKind::IteraRange {
+                ranges,
+                bindings,
+                body,
+            } => super::range::check_range_product_expr(self, ranges, bindings, body, expr.span),
             HirExpressionKind::Summa {
                 source,
                 coordinates,

@@ -1758,6 +1758,30 @@ pub(super) fn rewrite_expr(
                 diagnostics,
             );
         }
+        // NR-2 traversal (nary-range-walk): rewrite product ranges/body like
+        // the lockstep series; dedicated package-link proofs land with NR-3.
+        HirExpressionKind::IteraRange { ranges, body, .. } => {
+            for range in ranges {
+                rewrite_expr(
+                    unit_path,
+                    range,
+                    interner,
+                    targets,
+                    data_member_targets,
+                    namespaces,
+                    diagnostics,
+                );
+            }
+            rewrite_block(
+                unit_path,
+                body,
+                interner,
+                targets,
+                data_member_targets,
+                namespaces,
+                diagnostics,
+            );
+        }
         HirExpressionKind::Summa { source, body, .. } => {
             rewrite_expr(
                 unit_path,

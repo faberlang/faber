@@ -899,6 +899,10 @@ fn classify_itera_expr(
     emitted_lanes: &mut usize,
     multiplicity: usize,
 ) -> Option<UnrollPlan> {
+    // Only the single-source `Itera` admits an unroll plan. The Cartesian
+    // `IteraRange` product (like `IteraLockstep`) has no AIR recipe: it
+    // returns `None` here and stays fail-closed — the product never
+    // unrolls, whatever its body shape.
     let HirExpressionKind::Itera(mode, coordinates, index_def, _, source, body) = &expr.kind else {
         return None;
     };
@@ -1612,6 +1616,10 @@ impl BodyDecline<'_> {
             // (multiplicative budget, fail-closed decline) instead of this
             // purity scan. Nested iteras under control flow stay rejected:
             // conditional lanes cannot chain a straight-line accumulator.
+            // The series forms (`IteraRange`, `IteraLockstep`) have no unroll
+            // recipe, so they never reach this root exemption and walk
+            // through the generic arm below like any other nested
+            // expression.
             HirExpressionKind::Itera(..) if self.at_loop_body_root && as_statement => {}
             HirExpressionKind::Itera(..) => self.reject(CAUSA_UNSUPPORTED_CONTROL),
             HirExpressionKind::Call(callee, _, args, _) => {

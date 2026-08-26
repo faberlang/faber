@@ -694,8 +694,9 @@ pub struct DumStmt {
 #[derive(Debug)]
 pub struct IteraStmt {
     pub mode: IteraMode,
-    /// Source expressions in source order. `ex` alone admits the
-    /// comma-separated lockstep series; `de` and `ab` carry exactly one.
+    /// Source expressions in source order. `ex` admits the comma-separated
+    /// lockstep series and `ab` the comma-separated range-product series;
+    /// `de` carries exactly one.
     pub sources: Vec<Expr>,
     /// Coordinate names from the optional `apud`/`at` clause, in source order.
     /// Semantic binding is intentionally deferred to the iteration lowering unit.

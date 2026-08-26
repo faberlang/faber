@@ -1084,6 +1084,24 @@ pub enum HirExpressionKind {
         body: HirBlock,
     },
 
+    /// Cartesian `itera ab` range-product walk over N >= 2 declared domains.
+    ///
+    /// N == 1 lowers through [`HirExpressionKind::Itera`] unchanged. The
+    /// ranges and binders keep source order: the first range is the
+    /// outermost walk, later ranges nest inward (leftmost-outermost). Range
+    /// expressions are lowered outside the binder scope, so an extent may
+    /// not shadow a binder name (typecheck declines it). Unlike
+    /// [`HirExpressionKind::IteraLockstep`] this is a product, never a zip:
+    /// no equal-length law applies and no `apud` clause is carried.
+    IteraRange {
+        /// Range expressions, one per binder, in source order.
+        ranges: Vec<HirExpression>,
+        /// Bindings visible in the body, one per range, in source order.
+        bindings: Vec<(DefId, Symbol)>,
+        /// Body evaluated for every element of the Cartesian product.
+        body: HirBlock,
+    },
+
     /// Contextual `summa ex` term-fold expression.
     ///
     /// This is a source-declaration node only in SFR-2. Typecheck deliberately
