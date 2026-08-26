@@ -1,6 +1,8 @@
 //! Decimal carrier math pins for codegen tiers (decimal-widths D5).
 
-use super::{carrier_in_width, decimal_scale_factor, decimal_text_to_carrier, round_half_even_quotient};
+use super::{
+    carrier_in_width, decimal_scale_factor, decimal_text_to_carrier, round_half_even_quotient,
+};
 use radix_types::NumericWidth;
 
 #[test]
@@ -40,13 +42,22 @@ fn decimal_text_to_carrier_rounds_half_even_at_the_width_scale() {
         decimal_text_to_carrier("4.2", NumericWidth::D64),
         Some(4_200_000_000)
     );
-    assert_eq!(decimal_text_to_carrier("42", NumericWidth::D32), Some(420_000_000));
+    assert_eq!(
+        decimal_text_to_carrier("42", NumericWidth::D32),
+        Some(420_000_000)
+    );
 }
 
 #[test]
 fn carrier_in_width_rejects_out_of_range_values() {
-    assert_eq!(carrier_in_width(2147483647, NumericWidth::D32), Some(2147483647));
-    assert_eq!(carrier_in_width(2147483648, NumericWidth::D32), None);
-    assert_eq!(carrier_in_width(i128::from(i64::MAX), NumericWidth::D64), Some(i64::MAX));
+    assert_eq!(
+        carrier_in_width(2_147_483_647, NumericWidth::D32),
+        Some(2_147_483_647)
+    );
+    assert_eq!(carrier_in_width(2_147_483_648, NumericWidth::D32), None);
+    assert_eq!(
+        carrier_in_width(i128::from(i64::MAX), NumericWidth::D64),
+        Some(i64::MAX)
+    );
     assert_eq!(carrier_in_width(-1, NumericWidth::I32), None);
 }

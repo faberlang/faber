@@ -179,7 +179,11 @@ fn semantic_bounds_and_rope_pairing_fail_closed() {
 
 #[test]
 fn semantic_dimensions_must_be_positive() {
-    let cases: [(&str, fn(&mut super::super::wire::WireKvCacheSemanticV2)); 5] = [
+    type SemanticCase = (
+        &'static str,
+        for<'a> fn(&'a mut super::super::wire::WireKvCacheSemanticV2),
+    );
+    let cases: [SemanticCase; 5] = [
         ("query_head_count", |semantic| semantic.query_head_count = 0),
         ("kv_head_count", |semantic| semantic.kv_head_count = 0),
         ("head_dim", |semantic| semantic.head_dim = 0),

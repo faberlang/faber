@@ -40,7 +40,7 @@ fn budget_values(device: &FmirDeviceSection) -> Vec<(u32, u64)> {
                 partition,
                 budget_bytes,
             } => (*partition, *budget_bytes),
-            other => panic!("unexpected MD3J constraint: {other:?}"),
+            WirePlacementConstraint::RequireOwner { .. } => panic!("unexpected MD3J constraint"),
         })
         .collect()
 }
@@ -82,15 +82,12 @@ fn over_budget_postcard_is_wire_legal_and_admitted_by_radix() {
 
 #[test]
 fn realcard_over_budget_postcard_is_wire_legal_and_above_a100_policy_limit() {
+    const _: () = assert!(REALCARD_DECLARED_TOTAL > (80 * 1024 * 1024 * 1024 * 9) / 10);
     let device = decode(include_bytes!(
         "fixtures/md3j/eight-rank-over-budget-realcard.postcard"
     ));
     assert_admits(&device);
     assert_eq!(REALCARD_OVER_BUDGET / 2, REALCARD_DECLARED_TOTAL);
-    assert!(
-        REALCARD_DECLARED_TOTAL > (80 * 1024 * 1024 * 1024 * 9) / 10,
-        "79 GiB ledger declaration must exceed the 80 GiB A100 OQ-2 limit"
-    );
     assert_eq!(
         budget_values(&device),
         (0..8)

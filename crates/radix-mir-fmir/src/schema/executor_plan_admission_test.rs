@@ -703,7 +703,7 @@ fn gea2_block_program() -> WireDeviceProgram {
         "gemm_qo",
         vec![
             read(&ln1, 7680, 0, device),
-            read(&q_weight, 921600, 1, host),
+            read(&q_weight, 921_600, 1, host),
             write(&q, 7680, 2),
         ],
     );
@@ -715,7 +715,7 @@ fn gea2_block_program() -> WireDeviceProgram {
         "gemm_kv",
         vec![
             read(&ln1, 7680, 0, device),
-            read(&k_weight, 307200, 1, host),
+            read(&k_weight, 307_200, 1, host),
             write(&k, 2560, 2),
         ],
     );
@@ -727,7 +727,7 @@ fn gea2_block_program() -> WireDeviceProgram {
         "gemm_kv",
         vec![
             read(&ln1, 7680, 0, device),
-            read(&v_weight, 307200, 1, host),
+            read(&v_weight, 307_200, 1, host),
             write(&v, 2560, 2),
         ],
     );
@@ -822,7 +822,7 @@ fn gea2_block_program() -> WireDeviceProgram {
             )
         })
         .collect::<Vec<_>>();
-    o_resources.push(read(&o_weight, 921600, 15, host));
+    o_resources.push(read(&o_weight, 921_600, 15, host));
     o_resources.push(write(&o_projection, 7680, 16));
     let launch_o = gea2_append_wire_kernel(
         &mut kernels,
@@ -871,7 +871,7 @@ fn gea2_block_program() -> WireDeviceProgram {
         "gemm_gate_up",
         vec![
             read(&ln2, 7680, 0, device),
-            read(&gate_weight, 2457600, 1, host),
+            read(&gate_weight, 2_457_600, 1, host),
             write(&gate, 20480, 2),
         ],
     );
@@ -883,7 +883,7 @@ fn gea2_block_program() -> WireDeviceProgram {
         "gemm_gate_up",
         vec![
             read(&ln2, 7680, 0, device),
-            read(&up_weight, 2457600, 1, host),
+            read(&up_weight, 2_457_600, 1, host),
             write(&up, 20480, 2),
         ],
     );
@@ -907,7 +907,7 @@ fn gea2_block_program() -> WireDeviceProgram {
         "gemm_down",
         vec![
             read(&swiglu, 20480, 0, device),
-            read(&down_weight, 2457600, 1, host),
+            read(&down_weight, 2_457_600, 1, host),
             write(&down, 7680, 2),
         ],
     );
@@ -969,8 +969,7 @@ fn admit_gea2_block_program(program: &WireDeviceProgram) -> Result<(), String> {
         let expected_kernel = u32::try_from(index).expect("GEA2 kernel index fits u32");
         if launch.id != expected_id || launch.kernel_index != expected_kernel {
             return Err(format!(
-                "launch {} is not a one-to-one instance declaration",
-                expected_id
+                "launch {expected_id} is not a one-to-one instance declaration"
             ));
         }
     }
@@ -1233,6 +1232,9 @@ fn gea3_wire_buffer(
     }
 }
 
+// Private fixture builder: each arg names one wire-table field under test.
+// Precedent: faber dense_full_model_run_test.rs test constructors.
+#[allow(clippy::too_many_arguments)]
 fn gea3_append_kernel(
     kernels: &mut Vec<WireKernelUnit>,
     launches: &mut Vec<WireLaunchUnit>,

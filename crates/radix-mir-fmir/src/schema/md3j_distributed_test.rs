@@ -47,7 +47,9 @@ fn budgets(device: &FmirDeviceSection) -> Vec<(u32, u64)> {
                 partition,
                 budget_bytes,
             } => (*partition, *budget_bytes),
-            other => panic!("MD3J fixture carries an unexpected constraint: {other:?}"),
+            WirePlacementConstraint::RequireOwner { .. } => {
+                panic!("MD3J fixture carries an unexpected constraint")
+            }
         })
         .collect()
 }
@@ -99,15 +101,14 @@ fn over_budget_image_is_wire_legal_and_admitted_before_hosts_policy() {
 
 #[test]
 fn realcard_over_budget_image_is_wire_legal_and_documents_the_policy_margin() {
+    const _: () = assert!(
+        REALCARD_OVER_BUDGET_DECLARED_TOTAL_BYTES > (80 * 1024 * 1024 * 1024 * 9) / 10 /* 79 GiB ledger declaration must exceed the 80 GiB A100 OQ-2 limit */
+    );
     let device = realcard_over_budget_device_section();
     assert_admits_at_wire_level(&device);
     assert_eq!(
         REALCARD_OVER_BUDGET_BYTES / 2,
         REALCARD_OVER_BUDGET_DECLARED_TOTAL_BYTES
-    );
-    assert!(
-        REALCARD_OVER_BUDGET_DECLARED_TOTAL_BYTES > (80 * 1024 * 1024 * 1024 * 9) / 10,
-        "79 GiB ledger declaration must exceed the 80 GiB A100 OQ-2 limit"
     );
     assert_eq!(
         budgets(&device),
