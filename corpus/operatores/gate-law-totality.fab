@@ -29,51 +29,48 @@ locale = "en"
 #   • Expecting `≡` to join widths — it is fail-closed; widen with `↦` first.
 #   • Expecting `+` to promote mixed widths — arithmetic requires identical
 #     operands; only ordering and value equality join.
-#   • Expecting decimal `≅`/`≈` to join at the d64 scale like ordering does —
-#     see the contested cells GT-1/GT-2 below.
+#   • Expecting decimal `≅`/`≈` to stay carrier-blind — the d64-scale join
+#     (GT-1) makes 4.2 d32 ≅ 4.2 d64 verum; decimal × fractus never compares
+#     (GT-2), on either the ordering or the equality tier.
 #
 # See also: ≅, ≈, ≡, ↦, mixed-ordering-join, numeric-value-eq, comparatio, est
 # =============================================================================
 
 # =============================================================================
 # THE TABLE — 10 operator rows × 9 carrier-pair families = 90 cells.
-# J = defined join (executed below, verdict pinned). C = contested join
-# (documented here + pinned at the SEM gate by the coverage audit; NOT
-# executed — the shared oracle cannot pin a verdict surfaces disagree on).
-# R = named SEM rejection (asserted by the coverage audit, never compiled).
+# J = defined join (executed below, verdict pinned). R = named SEM rejection
+# (asserted by the coverage audit, never compiled).
 #
 #                     ≡/≠   ≅/≇   ≈/≉    <     ≤     >     ≥    arith   ↦       est
 # P1 int identical     J     J     J     J     J     J     J     J       J        J
 # P2 int cross-width   R-eq  J     J     J     J     J     J     R-ai    J        R-eq
-# P3 signed×unsigned   R-eq  J     J    C¹     J     J    C¹    R-ai    J*       R-eq
+# P3 signed×unsigned   R-eq  J     J     J     J     J     J     R-ai    J        R-eq
 # P4 int×f32           R-eq  J     J     J     J     J     J     R-ai    J        R-eq
 # P5 int×f64           R-eq  J     J     J     J     J     J     R-ai    J        R-eq
 # P6 f32×f64           R-eq  J     J     J     J     J     J     R-ai    J        R-eq
-# P7 d32×d64           R-eq  C²    C²    J     J     J     J     R-ai  J / R-narr  R-eq
+# P7 d32×d64           R-eq  J     J     J     J     J     J     R-ai  J / R-narr  R-eq
 # P8 decimal×integer   R-eq  J     J     J     J     J     J     R-ai    J        R-eq
-# P9 decimal×fractus   R-eq  J³    J³    R-ord R-ord R-ord R-ord  R-ai    J        R-eq
+# P9 decimal×fractus   R-eq  R-eq²  R-eq²  R-ord R-ord R-ord R-ord  R-ai    J        R-eq
 #
 # R-eq    SEM010:equality_exact_types_required
 # R-ai    SEM011:numeric_arithmetic_operands_identical
 # R-ord   SEM011:mixed_decimal_fractus_ordering
+# R-eq²   SEM011:mixed_decimal_fractus_equality (GT-2 — the ≅/≈ equality tiers
+#         now mirror the ordering gate; decimal/fractus never compares)
 # R-narr  SEM016:decimal_width_narrowing_rejected (d64 → d32 only)
-# C¹      finding GT-4: generated Rust ordering casts the unsigned operand to
-#         i64 (`unsigned as i64`), wrapping u64::MAX to -1 — the runner
-#         verdicts -1 < u64::MAX = verum / -1 ≥ u64::MAX = falsum, the Rust
-#         target verdicts falsum / verum. ≤ and > coincide only by wrap.
-# C²      finding GT-1: the d32/d64 ≅ and ≈ cells are admitted, but the
-#         runner compares raw scaled carriers without the d64-scale join that
-#         ordering uses — 4.2 d32 ≅ 4.2 d64 verdicts falsum although both
-#         operands are exactly 4.2. The TS emitter also cannot typecheck the
-#         d64 ≅/≈ casts (bigint × number).
-# J³      admitted but verdict CONTESTED (finding GT-2): the decimal side is
-#         widened as a raw scaled integer into the f64 carrier — 4.2 d32 ≅
-#         4.2 f64 verdicts falsum. The ordering gate rejects the same family
-#         pair (R-ord); value equality has no equivalent rejection or scale
-#         join. The verdict is lane-agreed (runner/rust/ts all falsum).
-# J*      negative signed→unsigned ↦ is runner-carrier-inconsistent (finding
-#         GT-3): -2 i32 ↦ u32 prints -2, fails ≡/≅ against 4294967294 u32,
-#         and orders below it — neither two's complement nor an error.
+#
+# Closed findings (GT-1..GT-4, pinned by the executed rows below):
+#   GT-1  the d32/d64 ≅ and ≈ cells join at the d64 scale in MIR (conversion
+#         temps, mirroring the ordering join) — 4.2 d32 ≅ 4.2 d64 verdicts
+#         verum. Previously the runner compared raw scaled carriers.
+#   GT-3  the signed×unsigned ↦ cell joins for non-negative values; a
+#         negative value into an unsigned target fails closed at runtime
+#         (conversion never wraps — DEFER-116 boundary contract), recovered
+#         inline below. Previously the runner left a negative carrier in an
+#         unsigned slot, making print/≡/≅/ordering disagree.
+#   GT-4  the signed×unsigned < and ≥ cells now match the runner on every
+#         surface: generated Rust joins on i128 instead of `unsigned as i64`
+#         (which wrapped u64::MAX to -1 and inverted the verdicts).
 # =============================================================================
 
 # operatores/gate-law-totality — the operator × carrier truth table
@@ -81,8 +78,9 @@ locale = "en"
 # WHY: three audits found gate law not total over the operator × carrier
 # product one cell at a time (mixed int/float ordering + wrap; decimal
 # relational carrier-blind). This exemplum pins every cell so new carrier
-# families cannot mint unproven ones. Contested cells are findings (GT-1,
-# GT-2, GT-3), not patch targets — the gates were not weakened.
+# families cannot mint unproven ones. The four contested cells (GT-1..GT-4)
+# are closed here — every cell is now a defined join or a named rejection,
+# with the verdicts pinned below and in the SEM coverage audit.
 
 main {
     # ---------------------------------------------------------------- ints
@@ -128,7 +126,10 @@ main {
     print above ≅ below
     print single ≅ double
     print d32v ≅ five
-    print d32v ≅ four_two
+    print d32v ≅ d64v
+    # decimal × fractus ≅ rejects (SEM011:mixed_decimal_fractus_equality,
+    # GT-2) — the ordering gate rejects the same family pair.
+    # print d32v ≅ four_two
 
     # --------------------------------------------------- ≈ / ≉ (all joins)
     # Fuzzy equality at the joined precision (OQ3 isclose default).
@@ -141,7 +142,10 @@ main {
     print above ≈ below
     print single ≈ double
     print d32v ≈ five
-    print d32v ≈ four_two
+    print d32v ≈ d64v
+    # decimal × fractus ≈ rejects (SEM011:mixed_decimal_fractus_equality,
+    # GT-2) — the ordering gate rejects the same family pair.
+    # print d32v ≈ four_two
 
     # -------------------------------------------------------- < (P1–P8)
     # Ordering joins at the widened carrier: numerus for int pairs, f64 for
@@ -150,6 +154,7 @@ main {
     print a < b
     print a < 8
     print narrow < wider
+    print signed < unsigned
     print large < single
     print half < large
     print single < double
@@ -180,6 +185,7 @@ main {
     # -------------------------------------------------------- ≥ (P1–P8)
     print a ≥ b
     print narrow ≥ wider
+    print signed ≥ unsigned
     print large ≥ single
     print half ≥ large
     print single ≥ double
@@ -206,6 +212,10 @@ main {
     print a ↦ numerus<u8>
     print five_u ↦ numerus
     print a ↦ numerus<u64>
+    # GT-3: a negative value into an unsigned target fails closed at runtime
+    # (conversion never wraps — DEFER-116 boundary contract); the inline
+    # recovery supplies the target-typed fallback.
+    print signed ↦ numerus<u32> ⇥ (0 ∷ numerus<u32>)
     print a ↦ fractus<f32>
     print single ↦ numerus
     print a ↦ fractus

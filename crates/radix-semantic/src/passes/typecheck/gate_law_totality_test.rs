@@ -8,25 +8,29 @@
 //! a visible hole and breaks the 90-cell / 62-join / 28-reject tallies) and a
 //! live reprobe of every cell against the current gate arms.
 //!
-//! Contested cells are pinned to the gate's CURRENT admission (the gates were
-//! not weakened) and flagged here so a later ruling can flip the pin:
-//!   GT-1  ≅/≇ and ≈/≉ × d32/d64 — admitted, but the runner compares raw
-//!         scaled carriers without the d64-scale join that ordering uses.
-//!   GT-2  ≅/≇ and ≈/≉ × decimal/fractus — admitted, but the verdict is
-//!         carrier-blind (scaled integer widened into the f64 carrier), while
-//!         the ordering gate rejects the same family pair.
-//!   GT-3  signed→unsigned ↦ of a negative value is runner-carrier-
-//!         inconsistent (-2 i32 ↦ u32 prints -2, not 4294967294).
-//!   GT-4  signed×unsigned strict ordering (< / ≥) wraps in generated Rust
-//!         (`unsigned as i64` turns u64::MAX into -1): -1 < u64::MAX verdicts
-//!         falsum in Rust vs verum in the runner; ≤ / > coincide only by
-//!         wrap. The gate admits these cells — the verdicts are the finding.
+//! Closed findings (GT-1..GT-4, 2026-08-26): every contested cell is now a
+//! defined join or a named rejection, pinned by the corpus exemplum and this
+//! audit:
+//!   GT-1  ≅/≇ and ≈/≉ × d32/d64 join at the d64 scale in MIR (conversion
+//!         temps, mirroring the ordering join) — 4.2 d32 ≅ 4.2 d64 verdicts
+//!         verum on every surface.
+//!   GT-2  ≅/≇ and ≈/≉ × decimal/fractus now REJECT with
+//!         `mixed_decimal_fractus_equality`, mirroring the ordering gate
+//!         (the pair was admitted but carrier-blind before).
+//!   GT-3  negative signed→unsigned ↦ fails closed at runtime (conversion
+//!         never wraps — DEFER-116 boundary contract), so print/≡/≅/ordering
+//!         agree on the same law.
+//!   GT-4  generated Rust mixed signed/unsigned ordering emits the same
+//!         lossless i128 join as ≅ equality — `u64::MAX` no longer wraps to
+//!         -1 through `as i64`, so < / ≥ match the runner's sign-boundary
+//!         verdicts exactly.
 
 use crate::test_support;
 
 const EXACT_EQ: &str = "equality_exact_types_required";
 const ARITH_IDENTICAL: &str = "numeric_arithmetic_operands_identical";
 const DECIMAL_FRACTUS_ORDERING: &str = "mixed_decimal_fractus_ordering";
+const DECIMAL_FRACTUS_EQUALITY: &str = "mixed_decimal_fractus_equality";
 const DECIMAL_NARROWING: &str = "decimal_width_narrowing_rejected";
 
 const fn join() -> Pin {
@@ -117,9 +121,9 @@ const TABLE: [[Pin; 9]; 10] = [
         join(),
         join(),
         join(),
-        join(), // GT-1: d32/d64 admitted, runner verdict contested
+        join(), // GT-1 closed: d32/d64 join at the d64 scale in MIR
         join(),
-        join(), // GT-2: decimal/fractus admitted, verdict carrier-blind
+        reject(DECIMAL_FRACTUS_EQUALITY), // GT-2 closed: decimal/fractus rejects
     ],
     // ≈ / ≉ — fuzzy at the joined precision; same admission shape as ≅.
     [
@@ -129,17 +133,15 @@ const TABLE: [[Pin; 9]; 10] = [
         join(),
         join(),
         join(),
-        join(), // GT-1: d32/d64 admitted, runner verdict contested
+        join(), // GT-1 closed: d32/d64 join at the d64 scale in MIR
         join(),
-        join(), // GT-2: decimal/fractus admitted, verdict carrier-blind
+        reject(DECIMAL_FRACTUS_EQUALITY), // GT-2 closed: decimal/fractus rejects
     ],
     // < — ordering joins at the widened carrier; decimal/fractus rejects.
-    // P3 < is GT-4 (runner verum, generated Rust wraps to falsum); the gate
-    // admits it — only the runtime verdict is contested.
     [
         join(),
         join(),
-        join(),
+        join(), // GT-4 closed: rust emits the lossless i128 join
         join(),
         join(),
         join(),
@@ -171,12 +173,11 @@ const TABLE: [[Pin; 9]; 10] = [
         join(),
         reject(DECIMAL_FRACTUS_ORDERING),
     ],
-    // ≥ — same ordering gate; P3 ≥ is the GT-4 wrap pair (runner falsum,
-    // generated Rust verum) — gate admission pinned, verdict contested.
+    // ≥ — same ordering gate.
     [
         join(),
         join(),
-        join(),
+        join(), // GT-4 closed: rust emits the lossless i128 join
         join(),
         join(),
         join(),
@@ -198,10 +199,13 @@ const TABLE: [[Pin; 9]; 10] = [
     ],
     // ↦ — conversio is directional; every family direction admits except the
     // d64 → d32 decimal narrowing (pinned by the reverse-probe test below).
+    // GT-3 closed: the pair stays admitted; a negative value into an unsigned
+    // target fails closed at runtime (conversion never wraps), so the join
+    // verdict holds for every value that converts.
     [
         join(),
         join(),
-        join(), // GT-3: negative signed→unsigned values are runner-inconsistent
+        join(),
         join(),
         join(),
         join(),
@@ -271,12 +275,16 @@ fn probe(op: Op, family: Family) -> String {
     if op == Op::Arith {
         return format!("functio p({lhs} a, {rhs} b) → numerus {{ redde a + b }}");
     }
-    format!("functio p({lhs} a, {rhs} b) → bivalens {{ redde a {} b }}", op_glyph(op))
+    format!(
+        "functio p({lhs} a, {rhs} b) → bivalens {{ redde a {} b }}",
+        op_glyph(op)
+    )
 }
 
 /// Static completeness: the table is closed over the enumerated product, the
 /// reject pins name real issues, and the tallies match the corpus table
-/// (90 cells = 62 joins + 28 rejections).
+/// (90 cells = 60 joins + 30 rejections; GT-2 moved the two decimal/fractus
+/// equality cells from joins to named rejections).
 #[test]
 fn gate_law_table_is_total() {
     assert_eq!(TABLE.len(), OPS.len(), "one row per operator");
@@ -297,7 +305,7 @@ fn gate_law_table_is_total() {
             }
         }
     }
-    assert_eq!((joins, rejects), (62, 28));
+    assert_eq!((joins, rejects), (60, 30));
 }
 
 /// Live reprobe: every cell's probe must meet its pin against the current

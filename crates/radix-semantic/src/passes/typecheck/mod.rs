@@ -752,6 +752,10 @@ mod decimal_conversio_test;
 mod decimal_ordering_test;
 
 #[cfg(test)]
+#[path = "decimal_equality_test.rs"]
+mod decimal_equality_test;
+
+#[cfg(test)]
 #[path = "gate_law_totality_test.rs"]
 mod gate_law_totality_test;
 
