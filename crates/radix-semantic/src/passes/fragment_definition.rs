@@ -13,8 +13,8 @@ use radix_hir::{
 use radix_lexer::{Interner, Span, Symbol};
 use rustc_hash::{FxHashMap, FxHashSet};
 
-const ISSUE_EFFECT: &str = "NUCLEUM_FRAGMENT_EFFECT";
-const ISSUE_CONTEXT: &str = "NUCLEUM_FRAGMENT_CONTEXT";
+const ISSUE_EFFECT: &str = "nucleum_fragment_effect";
+const ISSUE_CONTEXT: &str = "nucleum_fragment_context";
 
 /// One visible device effect at a recorded source span.
 #[derive(Debug, Clone, PartialEq, Eq)]

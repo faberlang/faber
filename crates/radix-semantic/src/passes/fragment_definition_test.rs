@@ -9,8 +9,8 @@ use crate::test_support::args_have_no_legacy_message;
 use crate::{PassConfig, SemanticError, SemanticErrorKind};
 use radix_target::Target;
 
-const ISSUE_EFFECT: &str = "NUCLEUM_FRAGMENT_EFFECT";
-const ISSUE_CONTEXT: &str = "NUCLEUM_FRAGMENT_CONTEXT";
+const ISSUE_EFFECT: &str = "nucleum_fragment_effect";
+const ISSUE_CONTEXT: &str = "nucleum_fragment_context";
 
 fn analyze_source(source: &str) -> crate::SemanticResult {
     let lex = radix_lexer::lex(source);

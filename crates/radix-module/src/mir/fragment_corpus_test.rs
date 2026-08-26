@@ -14,9 +14,10 @@ use crate::mir::{
 };
 use crate::semantic::SemanticErrorKind;
 
-const ISSUE_CONTEXT: &str = "NUCLEUM_FRAGMENT_CONTEXT";
-const ISSUE_TYPE: &str = "NUCLEUM_FRAGMENT_TYPE";
-const ISSUE_EFFECT: &str = "NUCLEUM_FRAGMENT_EFFECT";
+// 5c7541f86 (DIE D-02-04): issue values are lowercase.
+const ISSUE_CONTEXT: &str = "nucleum_fragment_context";
+const ISSUE_TYPE: &str = "nucleum_fragment_type";
+const ISSUE_EFFECT: &str = "nucleum_fragment_effect";
 
 fn with_budget_override<R>(budget: ExpansionBudget, f: impl FnOnce() -> R) -> R {
     struct Reset(Option<ExpansionBudget>);

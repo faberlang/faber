@@ -996,11 +996,11 @@ fn semantic_invalid_operand_types_message(args: &[DiagnosticArg]) -> Option<Stri
         "gpu_builtin_device_function_required" => {
             Some("GPU builtin call is only valid inside device functions".to_owned())
         }
-        "NUCLEUM_FRAGMENT_CONTEXT" => nucleum_fragment_context_message(args),
-        "NUCLEUM_FRAGMENT_EFFECT" => nucleum_fragment_effect_message(args),
-        "NUCLEUM_FRAGMENT_TYPE" => nucleum_fragment_type_message(args),
-        "NUCLEUM_FRAGMENT_CYCLE" => nucleum_fragment_cycle_message(args),
-        "NUCLEUM_FRAGMENT_EXPANSION" => nucleum_fragment_expansion_message(args),
+        "nucleum_fragment_context" => nucleum_fragment_context_message(args),
+        "nucleum_fragment_effect" => nucleum_fragment_effect_message(args),
+        "nucleum_fragment_type" => nucleum_fragment_type_message(args),
+        "nucleum_fragment_cycle" => nucleum_fragment_cycle_message(args),
+        "nucleum_fragment_expansion" => nucleum_fragment_expansion_message(args),
         "nucleum_lane_fragment_clash" => {
             let caller = arg_value(args, "caller")?;
             let fragment = arg_value(args, "fragment")?;
@@ -1242,11 +1242,11 @@ fn semantic_invalid_operand_types_help(args: &[DiagnosticArg]) -> Option<String>
         "gpu_builtin_device_function_required" => {
             Some("call GPU builtins only inside @ nucleum or @ nucleum fragment functions".to_owned())
         }
-        "NUCLEUM_FRAGMENT_CONTEXT" => nucleum_fragment_context_help(args),
-        "NUCLEUM_FRAGMENT_EFFECT" => nucleum_fragment_effect_help(args),
-        "NUCLEUM_FRAGMENT_TYPE" => nucleum_fragment_type_help(args),
-        "NUCLEUM_FRAGMENT_CYCLE" => nucleum_fragment_cycle_help(args),
-        "NUCLEUM_FRAGMENT_EXPANSION" => nucleum_fragment_expansion_help(args),
+        "nucleum_fragment_context" => nucleum_fragment_context_help(args),
+        "nucleum_fragment_effect" => nucleum_fragment_effect_help(args),
+        "nucleum_fragment_type" => nucleum_fragment_type_help(args),
+        "nucleum_fragment_cycle" => nucleum_fragment_cycle_help(args),
+        "nucleum_fragment_expansion" => nucleum_fragment_expansion_help(args),
         "integer_operands_required" => Some("use integer operands for this operator".to_owned()),
         "instans_ordering_operands_required" => Some("compare instans values with instans values".to_owned()),
         "json_duplicate_key" => Some("remove or rename the duplicate JSON object key".to_owned()),
