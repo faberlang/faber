@@ -162,6 +162,20 @@ impl TypeChecker<'_> {
             .filter(|sym| !shape_symbols.contains(sym))
             .count();
         if type_param_count == 0 {
+            // GSF-1: a size-only callee also accepts caller-owned symbolic
+            // magnitudo witnesses (`sink<T, D>(x)` inside
+            // `forward<magnitudo T, magnitudo D>`). Non-`Param` witnesses
+            // keep the literal-surface rejection below.
+            if !sig.type_params.is_empty()
+                && self.explicit_args_are_size_witnesses(explicit_type_args)
+            {
+                if explicit_type_args.len() == sig.type_params.len() {
+                    return None;
+                }
+                self.wrong_arity("wrong_number_of_type_arguments", span);
+                self.typecheck_call_arg_exprs(args);
+                return Some(self.error_type);
+            }
             self.wrong_arity("callee_type_args_unsupported", span);
             self.typecheck_call_arg_exprs(args);
             return Some(self.error_type);
@@ -512,6 +526,30 @@ impl TypeChecker<'_> {
                 .all(|ty| self.magnitudo_literal_of(*ty).is_some())
     }
 
+    /// True when every explicit argument is a `Param`-spelled size witness —
+    /// a NATURAL literal or a caller-owned symbolic magnitudo param (GSF-1).
+    fn explicit_args_are_size_witnesses(&self, explicit_type_args: &[TypeId]) -> bool {
+        !explicit_type_args.is_empty()
+            && explicit_type_args
+                .iter()
+                .all(|ty| matches!(self.types.get(*ty), Type::Param(_)))
+    }
+
+    /// Index witness of an explicit magnitudo argument: NATURAL spellings
+    /// lower to literal indices, symbolic params forward as rigid
+    /// `IndexExpr::Param` so the caller's shape identity is preserved.
+    fn explicit_size_witness_index(&mut self, ty: TypeId) -> Option<crate::IndexId> {
+        let Type::Param(sym) = self.types.get(ty) else {
+            return None;
+        };
+        let sym = *sym;
+        let name = self.interner?.resolve(sym);
+        match radix_types::parse_natural_capacity(name) {
+            Some(value) => Some(self.types.intern_index(IndexExpr::Literal(value))),
+            None => Some(self.types.intern_index(IndexExpr::Param(sym))),
+        }
+    }
+
     fn bind_explicit_magnitudo_args(
         &mut self,
         sig: &FuncSig,
@@ -519,9 +557,8 @@ impl TypeChecker<'_> {
         shape_vars: &mut FxHashMap<Symbol, crate::IndexId>,
     ) {
         for (sym, ty) in sig.type_params.iter().zip(explicit_type_args.iter()) {
-            if let Some(value) = self.magnitudo_literal_of(*ty) {
-                let id = self.types.intern_index(IndexExpr::Literal(value));
-                shape_vars.insert(*sym, id);
+            if let Some(index) = self.explicit_size_witness_index(*ty) {
+                shape_vars.insert(*sym, index);
             }
         }
     }

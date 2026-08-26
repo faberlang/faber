@@ -1435,6 +1435,15 @@ impl Lowerer<'_> {
 }
 
 fn lower_call_generic_arg(lowerer: &mut Lowerer<'_>, arg: &GenericArgExpr) -> TypeId {
+    // GSF-1: a bare name spelling one of the caller's own size params is a
+    // forwarded magnitudo witness (`sink<T, D>(x)` inside
+    // `forward<magnitudo T, magnitudo D>`), not a type — the ordinary type
+    // path would report unknown_type_name at the symbolic argument.
+    if let Some(name) = call_arg_bare_name(arg) {
+        if call_arg_names_caller_size_param(lowerer, name) {
+            return lowerer.types.intern(crate::Type::Param(name));
+        }
+    }
     match lowerer.lower_applied_arg(arg) {
         radix_types::AppliedArg::Type(id) => id,
         radix_types::AppliedArg::Size(id) => match lowerer.types.get_index(id).clone() {
@@ -1451,6 +1460,36 @@ fn lower_call_generic_arg(lowerer: &mut Lowerer<'_>, arg: &GenericArgExpr) -> Ty
             }
         },
     }
+}
+
+/// Symbol of a bare-name call argument (`sink<T>(x)` parses the name as a
+/// nested `Type` at call sites; generic heads keep `Name`).
+fn call_arg_bare_name(arg: &GenericArgExpr) -> Option<radix_lexer::Symbol> {
+    match arg {
+        GenericArgExpr::Type(radix_syntax::TypeExpr {
+            kind: radix_syntax::TypeExprKind::Named(ident, nested),
+            ..
+        }) if nested.is_empty() => Some(ident.name),
+        GenericArgExpr::Name(ident) => Some(ident.name),
+        _ => None,
+    }
+}
+
+/// True when `name` denotes a caller-owned compile-time size — a lexical
+/// `magnitudo` param or a resolved index param. Typus params keep the type
+/// path so wrong-kind rejection stays intact.
+fn call_arg_names_caller_size_param(lowerer: &Lowerer<'_>, name: radix_lexer::Symbol) -> bool {
+    if matches!(
+        lowerer.lexical_generic_param_kind(name),
+        Some(radix_syntax::GenericParamKind::Magnitudo)
+    ) {
+        return true;
+    }
+    lowerer
+        .resolver
+        .lookup(name)
+        .and_then(|def_id| lowerer.resolver.get_symbol(def_id))
+        .is_some_and(|symbol| symbol.kind == crate::SymbolKind::IndexParam)
 }
 
 fn lower_conversio_target_type(
