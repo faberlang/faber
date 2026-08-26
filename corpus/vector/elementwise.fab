@@ -24,6 +24,7 @@ locale = "en"
 
 
 @ kernel
+@ public
 fn addita(float<f32> x) → float<f32> {
     const vf32[4] a ← [x, 2.0, 3.0, 4.0] ↦ vf32[4]
     const vf32[4] b ← [1.0, 1.0, 1.0, 1.0] ↦ vf32[4]
@@ -32,6 +33,7 @@ fn addita(float<f32> x) → float<f32> {
 }
 
 @ kernel
+@ public
 fn subtrahe(float<f32> x) → float<f32> {
     const vf32[4] a ← [x, 2.0, 3.0, 4.0] ↦ vf32[4]
     const vf32[4] b ← [1.0, 1.0, 1.0, 1.0] ↦ vf32[4]
@@ -40,6 +42,7 @@ fn subtrahe(float<f32> x) → float<f32> {
 }
 
 @ kernel
+@ public
 fn multiplica(float<f32> x) → float<f32> {
     const vf32[4] a ← [x, 2.0, 3.0, 4.0] ↦ vf32[4]
     const vf32[4] b ← [1.0, 1.0, 1.0, 1.0] ↦ vf32[4]
@@ -48,6 +51,7 @@ fn multiplica(float<f32> x) → float<f32> {
 }
 
 @ kernel
+@ public
 fn divida(float<f32> x) → float<f32> {
     const vf32[4] a ← [x, 2.0, 3.0, 4.0] ↦ vf32[4]
     const vf32[4] b ← [1.0, 1.0, 1.0, 1.0] ↦ vf32[4]

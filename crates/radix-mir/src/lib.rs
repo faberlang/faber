@@ -108,10 +108,10 @@ pub use cost_analysis::{
 };
 // Vocabulary moved down to radix-types (feature-granularity §2); re-exported
 pub use device::{
-    classify_device_safe, classify_device_safe_for_target_entry, device_roles_from_hir,
-    first_surviving_fragment_call, reject_nucleum_fragment_survivors, surviving_nucleum_fragments,
-    FragmentSurvivor, FragmentSurvivorKind, MirDeviceContext, MirDeviceRole,
-    NUCLEUM_FRAGMENT_SURVIVED,
+    classify_device_safe, classify_device_safe_for_target_entry, device_entry_roles_from_hir,
+    device_roles_from_hir, first_surviving_fragment_call, reject_nucleum_fragment_survivors,
+    surviving_nucleum_fragments, FragmentSurvivor, FragmentSurvivorKind, MirDeviceContext,
+    MirDeviceRole, NUCLEUM_FRAGMENT_SURVIVED,
 };
 pub use device_program::{
     Binding, BufferId, BufferIdentity, BufferLifetime, BufferRegistry, BufferRole, BufferVersion,

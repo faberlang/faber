@@ -26,6 +26,7 @@ locale = "en"
 # =============================================================================
 
 @ kernel lane "id"
+@ public
 fn column_dot(tf32[32] a, tf32[1] out) → void {
     const f32 total ← sum from a at [i] thread f const s {
         var f32 t ← s * 1.4140625

@@ -24,6 +24,7 @@ locale = "en"
 
 
 @ kernel
+@ public
 fn builtin_probe(float<f32> x) → float<f32> {
     const vector<u32, 3> gid ← global_invocation_id()
     return x

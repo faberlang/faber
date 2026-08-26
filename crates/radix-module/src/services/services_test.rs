@@ -569,6 +569,7 @@ fn diagnostics_check_rejects_undeclared_latin_keyword_in_grammar_position() {
 fn gpu_reflection_fixture() -> (String, serde_json::Value) {
     let source = r"
 @ nucleum
+@ publica
 functio add_one(fractus<f32> x) → fractus<f32> {
     redde x + 1.0
 }
@@ -1132,6 +1133,7 @@ fn emit_reflection_json_webgpu_dispatch_and_builtins() {
 fn gpu_builtin_emit_reflection_json_serializes_source_names_for_builtin_inputs() {
     let source = r"
 @ nucleum
+@ publica
 functio copy(tf32[4] input, tf32[4] output, u32 id) → vacuum {
     output[id] ← input[id]
 }
@@ -1166,6 +1168,7 @@ functio copy(tf32[4] input, tf32[4] output, u32 id) → vacuum {
 fn gpu_builtin_emit_reflection_json_serializes_called_builtins() {
     let source = r"
 @ nucleum
+@ publica
 functio copy(tensor<u32, [4]> input, tensor<u32, [4]> output, u32 i) → vacuum {
     output[global_invocation_x()] ← input[global_invocation_x()] + workgroup_id_y()
 }

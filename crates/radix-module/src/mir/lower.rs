@@ -303,6 +303,10 @@ fn lower_analyzed_unit_with_options(
         if !finalize_errors.is_empty() {
             return Err(finalize_errors);
         }
+        // Full (un-gated) device roles: composition checks classify every
+        // `@ nucleum` function, including private helpers that produce no
+        // entry row. Entry gating happens on the driver's emit/dispatch path
+        // via `device_entry_roles_from_hir`.
         let roles = crate::mir::device_roles_from_hir(&unit.hir);
         let layouts = MirLayoutTable::from_types(&unit.types);
         let summaries =

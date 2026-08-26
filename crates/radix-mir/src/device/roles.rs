@@ -2,7 +2,12 @@
 
 use crate::{MirFunction, MirFunctionId, MirProgram};
 use radix_hir::{DefId, HirFunction, HirItemKind, HirModule};
+use radix_lexer::Interner;
 use rustc_hash::FxHashMap;
+
+/// The `@ publica`/`@ public` annotation family: the launch-surface gate.
+const PUBLICA_FAMILY: &str = "publica";
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum MirDeviceRole {
     Kernel,
@@ -99,5 +104,60 @@ pub fn device_role_for_hir_function(func: &HirFunction) -> Option<MirDeviceRole>
         Some(MirDeviceRole::Fragment)
     } else {
         None
+    }
+}
+
+/// Whether a device function carries the launch-surface marker `@ publica`
+/// (or the reader-locale spelling `@ public`).
+///
+/// This is the v2 visibility gate: `@ nucleum @ public` functions are
+/// dispatchable entries; unmarked `@ nucleum` functions are module-internal
+/// helpers that are never given a launch ABI.
+#[must_use]
+pub fn is_public_entry(func: &HirFunction, interner: &Interner) -> bool {
+    func.annotations
+        .iter()
+        .any(|annotation| interner.resolve(annotation.family) == PUBLICA_FAMILY)
+}
+
+/// Launchability-aware device roles: only `@ nucleum @ public` functions are
+/// classified as launchable `Kernel` entries. Private `@ nucleum` functions
+/// stay helpers — they remain device functions for composition but produce no
+/// entry row. `@ nucleum fragment` keeps the graphics `Fragment` role
+/// unchanged (fragments are never launchable compute entries and the survivor
+/// scan needs the role).
+#[must_use]
+pub fn device_entry_roles_from_hir(hir: &HirModule, interner: &Interner) -> FxHashMap<DefId, MirDeviceRole> {
+    let mut roles_by_def = FxHashMap::default();
+    for item in &hir.items {
+        match &item.kind {
+            HirItemKind::Function(func) => {
+                if let Some(role) = device_entry_role_for_hir_function(func, interner) {
+                    roles_by_def.insert(item.def_id, role);
+                }
+            }
+            HirItemKind::Struct(strukt) => {
+                for method in &strukt.methods {
+                    if let Some(role) = device_entry_role_for_hir_function(&method.func, interner) {
+                        roles_by_def.insert(method.def_id, role);
+                    }
+                }
+            }
+            _ => {}
+        }
+    }
+    roles_by_def
+}
+
+#[must_use]
+fn device_entry_role_for_hir_function(func: &HirFunction, interner: &Interner) -> Option<MirDeviceRole> {
+    match device_role_for_hir_function(func) {
+        // The entry gate: a compute kernel is launchable only when public.
+        Some(MirDeviceRole::Kernel) if is_public_entry(func, interner) => Some(MirDeviceRole::Kernel),
+        // Fragments keep their role unchanged; they are never launchable
+        // compute entries and the survivor scan still needs the classification.
+        Some(MirDeviceRole::Fragment) => Some(MirDeviceRole::Fragment),
+        // Private compute kernels are helpers: no launch role.
+        Some(MirDeviceRole::Kernel) | None => None,
     }
 }

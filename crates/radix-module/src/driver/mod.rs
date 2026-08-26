@@ -664,7 +664,7 @@ fn generate_llvm_text_output(
     #[cfg(feature = "mir-llvm")]
     {
         prepare_mir_lowering_interner(analysis);
-        let device_roles = crate::mir::device_roles_from_hir(&analysis.hir);
+        let device_roles = crate::mir::device_entry_roles_from_hir(&analysis.hir, &analysis.interner);
         let mir = lower_mir_with_context_for_target(analysis, no_fuse)?;
         // DDCP3-U2 (b) mixed-path disambiguation: default `llvm-text`/`llvm-host`
         // is the CPU-module path. A package that carries device roles routes
@@ -735,7 +735,7 @@ pub fn cuda_kernel_descriptor_json(session: &Session, name: &str, source: &str) 
     // Mirror the llvm-text emit path exactly (generate_llvm_text_output) so
     // the descriptor is built from the same MIR snapshot as the emitted code.
     prepare_mir_lowering_interner(&mut analysis);
-    let device_roles = crate::mir::device_roles_from_hir(&analysis.hir);
+    let device_roles = crate::mir::device_entry_roles_from_hir(&analysis.hir, &analysis.interner);
     let mir = match lower_mir_with_context_for_target(&mut analysis, session.config.no_fuse) {
         Ok(mir) => mir,
         Err(err) => return Err(compile_codegen_error(analysis, name, source, err).diagnostics),
@@ -796,7 +796,7 @@ fn generate_metal_text_output(
     #[cfg(feature = "mir-metal")]
     {
         prepare_mir_lowering_interner(analysis);
-        let device_roles = crate::mir::device_roles_from_hir(&analysis.hir);
+        let device_roles = crate::mir::device_entry_roles_from_hir(&analysis.hir, &analysis.interner);
         let mir = lower_mir_with_context_for_target(analysis, no_fuse)?;
         let output = crate::mir::emit_metal_text_probe_with_reflection_and_device_roles(
             &device_roles,
@@ -925,7 +925,7 @@ fn generate_wgsl_text_output(
         }
 
         prepare_mir_lowering_interner(analysis);
-        let device_roles = crate::mir::device_roles_from_hir(&analysis.hir);
+        let device_roles = crate::mir::device_entry_roles_from_hir(&analysis.hir, &analysis.interner);
         let mir = lower_mir_with_context_for_target(analysis, no_fuse)?;
         let output = crate::mir::emit_wgsl_text_probe_with_reflection_and_device_roles(
             &device_roles,
@@ -3576,6 +3576,11 @@ fn retarget_cli_program_symbols(
 #[cfg(feature = "mir-core")]
 #[path = "mod_test.rs"]
 mod tests;
+
+#[cfg(test)]
+#[cfg(feature = "mir-core")]
+#[path = "device_entry_gate_test.rs"]
+mod device_entry_gate_tests;
 
 #[cfg(test)]
 #[cfg(feature = "mir-llvm")]

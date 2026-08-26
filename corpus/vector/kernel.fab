@@ -24,6 +24,7 @@ locale = "en"
 
 
 @ kernel
+@ public
 fn scala(float<f32> x) → float<f32> {
     return x + 1.0
 }

@@ -104,7 +104,8 @@ pub use radix_mir::{
     AiWorkbenchStage5Status,
 };
 pub use radix_mir::{
-    classify_device_safe, classify_device_safe_for_target_entry, device_roles_from_hir, MirDeviceContext, MirDeviceRole,
+    classify_device_safe, classify_device_safe_for_target_entry, device_entry_roles_from_hir,
+    device_roles_from_hir, MirDeviceContext, MirDeviceRole,
 };
 pub use radix_mir::{
     constant_ty, index_projection_result_ty, option_chain_base_ty, option_payload_ty, place_base_ty, MirTypeError,
