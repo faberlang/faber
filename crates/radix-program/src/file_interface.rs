@@ -645,11 +645,19 @@ fn reject_signature_only_fragment(
 }
 
 fn interface_error(file_label: &str, export_name: &str, err: FileInterfaceError) -> Diagnostic {
-    crate::package_diagnostic_error(format!(
+    // Uncoded on purpose (P2): the standing renderer contract renders prose
+    // for coded non-Codegen diagnostics only through locale-pack templates,
+    // and no pack carries a PKG001 template — a coded diagnostic here renders
+    // as an empty `error[PKG001]: <file>` body. The `issue` arg keeps the
+    // failure machine-identifiable without a code.
+    Diagnostic::error(format!(
         "public export `{export_name}` in `{file_label}` cannot be represented in a file interface: {err:?}"
     ))
     .with_phase(DiagnosticPhase::Analysis)
     .with_file(file_label.to_owned())
+    .with_arg("issue", "interface_export_unrepresentable")
+    .with_arg("export", export_name.to_owned())
+    .with_arg("reason", format!("{err:?}"))
 }
 
 #[cfg(test)]

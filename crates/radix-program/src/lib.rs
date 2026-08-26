@@ -98,3 +98,7 @@ pub(crate) fn package_diagnostic_error(
 ) -> radix_module::diagnostics::Diagnostic {
     radix_module::diagnostics::Diagnostic::error(message).with_code("PKG001")
 }
+
+#[cfg(test)]
+#[path = "bounded_param_pkg001_test.rs"]
+mod bounded_param_pkg001_test;
