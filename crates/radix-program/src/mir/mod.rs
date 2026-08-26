@@ -612,5 +612,9 @@ mod monomorphized_field_assign_link_tests;
 mod namespace_type_arg_link_tests;
 
 #[cfg(test)]
+#[path = "generic_size_forwarding_test.rs"]
+mod generic_size_forwarding_tests;
+
+#[cfg(test)]
 #[path = "const_member_lane_test.rs"]
 mod const_member_lane_tests;

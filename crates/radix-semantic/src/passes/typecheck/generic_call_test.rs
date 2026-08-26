@@ -130,6 +130,66 @@ incipit {
 }
 
 #[test]
+fn generic_call_forwards_symbolic_magnitudo_args_to_generic_callee() {
+    // GSF-1: a generic caller must pass its own magnitudo witnesses on to a
+    // generic callee (`forward<T, D>` spelling `sink<T, D>(x)`), not report
+    // SEM008 unknown_type_name at the symbolic callee argument.
+    accepts(
+        r"functio sink<magnitudo M, magnitudo N>(tensor<f32, [M, N]> x) → tensor<f32, [M, N]> {
+    redde x
+}
+
+functio forward<magnitudo T, magnitudo D>(tensor<f32, [T, D]> x) → tensor<f32, [T, D]> {
+    redde sink<T, D>(x)
+}
+
+incipit {
+    fixum tensor<f32, [3, 5]> a ← vacua
+    fixum tensor<f32, [3, 5]> b ← forward<3, 5>(a)
+    nota b.longitudo()
+}",
+    );
+}
+
+#[test]
+fn generic_call_forwards_mixed_symbolic_and_natural_magnitudo_args() {
+    // A forwarded witness may sit beside a natural literal in one list.
+    accepts(
+        r"functio sink<magnitudo M, magnitudo N>(tensor<f32, [M, N]> x) → tensor<f32, [M, N]> {
+    redde x
+}
+
+functio forward<magnitudo T>(tensor<f32, [T, 4]> x) → tensor<f32, [T, 4]> {
+    redde sink<T, 4>(x)
+}
+
+incipit {
+    fixum tensor<f32, [3, 4]> a ← vacua
+    fixum tensor<f32, [3, 4]> b ← forward<3>(a)
+    nota b.longitudo()
+}",
+    );
+}
+
+#[test]
+fn generic_call_symbolic_forwarding_rejects_typus_param_in_size_slot() {
+    // Wrong-kind stays closed: a caller typus param is a type witness, so
+    // binding it into a magnitudo slot mismatches the callee signature.
+    rejects_with_issue(
+        r"functio sink<magnitudo M, magnitudo N>(tensor<f32, [M, N]> x) → tensor<f32, [M, N]> {
+    redde x
+}
+
+functio wrong<A>(tensor<f32, [2, 4]> x) → tensor<f32, [2, 4]> {
+    redde sink<A, 4>(x)
+}
+
+incipit { tacet }",
+        "argument_type_mismatch",
+    );
+}
+
+#[test]
 fn explicit_magnitudo_natural_args_reject_wrong_arity() {
     rejects_with_issue(
         r"functio take<magnitudo M, magnitudo N>(tensor<f32, [M, N]> x) → tensor<f32, [M, N]> {

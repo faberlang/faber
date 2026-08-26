@@ -514,7 +514,14 @@ impl PackageInstantiate<'_> {
         let parent_shapes = self.instance_shape_bindings(call.function);
         let mut type_bindings = MirGenericBindings::default();
         let mut shape_bindings = MirShapeBindings::default();
-        if !self.bind_explicit_type_args(&params, &call.type_args, &mut type_bindings, &mut shape_bindings, call.span) {
+        if !self.bind_explicit_type_args(
+            &params,
+            &call.type_args,
+            &mut type_bindings,
+            &mut shape_bindings,
+            &parent_shapes,
+            call.span,
+        ) {
             return None;
         }
         // Concrete witnesses first. A Path(synthetic) namespace callee is
@@ -578,6 +585,7 @@ impl PackageInstantiate<'_> {
         explicit: &[MirType],
         type_bindings: &mut MirGenericBindings,
         shape_bindings: &mut MirShapeBindings,
+        parent_shapes: &MirShapeBindings,
         span: Span,
     ) -> bool {
         if explicit.is_empty() {
@@ -598,17 +606,14 @@ impl PackageInstantiate<'_> {
                 return false;
             }
             for (param, concrete) in shape_params.iter().zip(explicit.iter().copied()) {
-                let Some(value) = self.magnitudo_literal_of(concrete) else {
+                // Size-only generics: NATURAL typeArguments bind magnitudo
+                // params; a caller-owned symbolic `Param` resolves through
+                // the calling instance's shape bindings (GSF-1 forwarding).
+                let Some(index) = self.explicit_shape_witness(concrete, parent_shapes, span)
+                else {
                     self.errors.push(MirError::validation(
                         span,
                         "generic call type argument does not match parameter kind",
-                    ));
-                    return false;
-                };
-                let Some(index) = find_literal_index(self.types, value) else {
-                    self.errors.push(MirError::validation(
-                        span,
-                        "generic call signature has unresolved type parameter",
                     ));
                     return false;
                 };
@@ -638,6 +643,42 @@ impl PackageInstantiate<'_> {
             return None;
         };
         radix_types::parse_natural_capacity(self.interner.resolve(*sym))
+    }
+
+    /// Index witness of an explicit magnitudo argument: a NATURAL spelling
+    /// maps to its literal index; a caller-owned symbolic `Param` resolves
+    /// through the calling instance's shape bindings (GSF-1 forwarding —
+    /// package instances are concretized at creation, so the parent map is
+    /// authoritative at bind time). Anything else fails closed so wrong-kind
+    /// rejection is preserved.
+    fn explicit_shape_witness(
+        &mut self,
+        concrete: MirType,
+        parent_shapes: &MirShapeBindings,
+        span: Span,
+    ) -> Option<crate::semantic::IndexId> {
+        let Type::Param(sym) = self.types.get(concrete.semantic_id()) else {
+            return None;
+        };
+        let sym = *sym;
+        if let Some(value) = self.magnitudo_literal_of(concrete) {
+            let index = find_literal_index(self.types, value);
+            if index.is_none() {
+                self.errors.push(MirError::validation(
+                    span,
+                    "generic call signature has unresolved type parameter",
+                ));
+            }
+            return index;
+        }
+        let index = parent_shapes.get(&sym).copied();
+        if index.is_none() {
+            self.errors.push(MirError::validation(
+                span,
+                "generic call type argument does not match parameter kind",
+            ));
+        }
+        index
     }
 
     fn key_from_bindings(
@@ -796,7 +837,26 @@ impl PackageInstantiate<'_> {
             .push(ImportedDeviceRegistration { key: key.clone(), function, route });
     }
 
-    fn substitute_function(&mut self, function: &mut MirFunction, bindings: &MirGenericBindings, span: Span) -> bool {
+    fn substitute_function(
+        &mut self,
+        function: &mut MirFunction,
+        bindings: &MirGenericBindings,
+        span: Span,
+    ) -> bool {
+        // Shape params of the generic being instantiated (GSF-1): forwarded
+        // size witnesses in nested callee type args stay symbolic through
+        // typus substitution.
+        let shape_params: FxHashSet<crate::lexer::Symbol> = function
+            .source
+            .and_then(|source| self.generic_params.get(&source))
+            .map(|params| {
+                params
+                    .iter()
+                    .filter(|param| param.is_shape)
+                    .map(|param| param.name)
+                    .collect()
+            })
+            .unwrap_or_default();
         for param in &mut function.params {
             param.ty = match self.substitute_ty(param.ty, bindings, span) {
                 Some(ty) => ty,
@@ -861,14 +921,14 @@ impl PackageInstantiate<'_> {
                         };
                     }
                     MirStatementKind::Call { callee, .. } => {
-                        if !self.substitute_callee(callee, bindings, span) {
+                        if !self.substitute_callee(callee, bindings, &shape_params, span) {
                             return false;
                         }
                     }
                 }
             }
             if let MirTerminatorKind::TryCall { callee, .. } = &mut block.terminator.kind {
-                if !self.substitute_callee(callee, bindings, span) {
+                if !self.substitute_callee(callee, bindings, &shape_params, span) {
                     return false;
                 }
             }
@@ -876,11 +936,27 @@ impl PackageInstantiate<'_> {
         true
     }
 
-    fn substitute_callee(&mut self, callee: &mut MirCallee, bindings: &MirGenericBindings, span: Span) -> bool {
+    fn substitute_callee(
+        &mut self,
+        callee: &mut MirCallee,
+        bindings: &MirGenericBindings,
+        shape_params: &FxHashSet<crate::lexer::Symbol>,
+        span: Span,
+    ) -> bool {
         let MirCallee::Definition { type_args, .. } = callee else {
             return true;
         };
         for type_arg in type_args {
+            // GSF-1: a forwarded size witness stays a symbolic `Param` in
+            // callee type args — the package rewrite resolves it through the
+            // calling instance's shape bindings. Substituting it here would
+            // reject the caller-owned magnitudo symbol as an unresolved type
+            // parameter.
+            if let Type::Param(sym) = self.types.get(type_arg.semantic_id()) {
+                if shape_params.contains(sym) && !bindings.contains_key(sym) {
+                    continue;
+                }
+            }
             *type_arg = match self.substitute_ty(*type_arg, bindings, span) {
                 Some(ty) => ty,
                 None => return false,
@@ -1175,6 +1251,15 @@ fn finalize_callee(
         return true;
     };
     for type_arg in type_args {
+        // GSF-1: a forwarded size witness is a symbolic `Param` owned by the
+        // caller's shape bindings — the package rewrite resolves it against
+        // the calling instance, so finalization must leave it symbolic
+        // rather than reject it as an unresolved type parameter.
+        if let Type::Param(sym) = types.get(type_arg.semantic_id()) {
+            if shape_bindings.contains_key(sym) && !type_bindings.contains_key(sym) {
+                continue;
+            }
+        }
         *type_arg = match finalize_ty(types, *type_arg, type_bindings, shape_bindings, span, errors) {
             Some(ty) => ty,
             None => return false,

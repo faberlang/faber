@@ -448,8 +448,10 @@ impl<'lowerer, 'unit> MonomorphizationState<'lowerer, 'unit> {
             .iter()
             .filter(|param| param.kind == ParamKind::Magnitudo)
             .collect::<Vec<_>>();
-        // Size-only generics: NATURAL typeArguments bind magnitudo params.
-        // Mixed/Typus callees keep D1 (type args zip Typus; shapes from witnesses).
+        // Size-only generics: NATURAL typeArguments bind magnitudo params,
+        // and a caller-owned symbolic `Param` resolves through the calling
+        // instance's shape bindings (GSF-1 forwarding). Mixed/Typus callees
+        // keep D1 (type args zip Typus; shapes from witnesses).
         if type_params.is_empty() && !shape_params.is_empty() {
             if explicit_type_args.len() != shape_params.len() {
                 self.lowerer.errors.push(MirError::validation(
@@ -463,17 +465,10 @@ impl<'lowerer, 'unit> MonomorphizationState<'lowerer, 'unit> {
                 return None;
             }
             for (param, concrete) in shape_params.iter().zip(explicit_type_args.iter().copied()) {
-                let Some(value) = self.magnitudo_literal_of(concrete) else {
+                let Some(index) = self.explicit_shape_witness(concrete, span) else {
                     self.lowerer.errors.push(MirError::validation(
                         span,
                         "generic call type argument does not match parameter kind",
-                    ));
-                    return None;
-                };
-                let Some(index) = find_literal_index(self.types(), value) else {
-                    self.lowerer.errors.push(MirError::validation(
-                        span,
-                        "generic call signature has unresolved type parameter",
                     ));
                     return None;
                 };
@@ -514,6 +509,40 @@ impl<'lowerer, 'unit> MonomorphizationState<'lowerer, 'unit> {
         };
         let sym = *sym;
         radix_types::parse_natural_capacity(self.lowerer.unit.interner.resolve(sym))
+    }
+
+    /// Index witness of an explicit magnitudo argument: a NATURAL spelling
+    /// maps to its literal index, a caller-owned symbolic `Param` stays the
+    /// rigid param node (GSF-1 forwarding) — the key derivation resolves it
+    /// through the calling instance's shape bindings. Anything else fails
+    /// closed so wrong-kind rejection is preserved.
+    fn explicit_shape_witness(
+        &mut self,
+        concrete: MirType,
+        span: Span,
+    ) -> Option<IndexId> {
+        let Type::Param(sym) = self.types().get(concrete.semantic_id()) else {
+            return None;
+        };
+        let sym = *sym;
+        if let Some(value) = self.magnitudo_literal_of(concrete) {
+            let index = find_literal_index(self.types(), value);
+            if index.is_none() {
+                self.lowerer.errors.push(MirError::validation(
+                    span,
+                    "generic call signature has unresolved type parameter",
+                ));
+            }
+            return index;
+        }
+        let index = find_param_index(self.types(), sym);
+        if index.is_none() {
+            self.lowerer.errors.push(MirError::validation(
+                span,
+                "generic call type argument does not match parameter kind",
+            ));
+        }
+        index
     }
 
     fn ensure_instance(
@@ -559,6 +588,21 @@ impl<'lowerer, 'unit> MonomorphizationState<'lowerer, 'unit> {
     }
 
     fn substitute_function(&mut self, function: &mut MirFunction, bindings: &MirGenericBindings, span: Span) -> bool {
+        // Shape params of the generic being instantiated (GSF-1): forwarded
+        // size witnesses in nested callee type args stay symbolic through
+        // typus substitution; the key derivation resolves them through the
+        // calling instance's shape bindings.
+        let shape_params: FxHashSet<Symbol> = function
+            .source
+            .and_then(|source| self.generic_param_order.get(&source))
+            .map(|params| {
+                params
+                    .iter()
+                    .filter(|param| param.kind == ParamKind::Magnitudo)
+                    .map(|param| param.name)
+                    .collect()
+            })
+            .unwrap_or_default();
         for param in &mut function.params {
             param.ty = match self.substitute_ty(param.ty, bindings, span) {
                 Some(ty) => ty,
@@ -591,12 +635,12 @@ impl<'lowerer, 'unit> MonomorphizationState<'lowerer, 'unit> {
 
         for block in &mut function.blocks {
             for statement in &mut block.statements {
-                if !self.substitute_statement(statement, bindings, span) {
+                if !self.substitute_statement(statement, bindings, &shape_params, span) {
                     return false;
                 }
             }
             if let MirTerminatorKind::TryCall { callee, .. } = &mut block.terminator.kind {
-                if !self.substitute_callee(callee, bindings, span) {
+                if !self.substitute_callee(callee, bindings, &shape_params, span) {
                     return false;
                 }
             }
@@ -608,21 +652,39 @@ impl<'lowerer, 'unit> MonomorphizationState<'lowerer, 'unit> {
         &mut self,
         statement: &mut MirStatement,
         bindings: &MirGenericBindings,
+        shape_params: &FxHashSet<Symbol>,
         span: Span,
     ) -> bool {
         match &mut statement.kind {
             MirStatementKind::Assign { value, .. } => self.substitute_value(value, bindings, span),
-            MirStatementKind::Call { callee, .. } => self.substitute_callee(callee, bindings, span),
+            MirStatementKind::Call { callee, .. } => {
+                self.substitute_callee(callee, bindings, shape_params, span)
+            }
             MirStatementKind::RuntimeCall { call, .. } => self.substitute_runtime_call(call, bindings, span),
             MirStatementKind::Construct { aggregate, .. } => self.substitute_aggregate(aggregate, bindings, span),
         }
     }
-
-    fn substitute_callee(&mut self, callee: &mut MirCallee, bindings: &MirGenericBindings, span: Span) -> bool {
+    fn substitute_callee(
+        &mut self,
+        callee: &mut MirCallee,
+        bindings: &MirGenericBindings,
+        shape_params: &FxHashSet<Symbol>,
+        span: Span,
+    ) -> bool {
         let MirCallee::Definition { type_args, .. } = callee else {
             return true;
         };
         for type_arg in type_args {
+            // GSF-1: a forwarded size witness stays a symbolic `Param` in
+            // callee type args — it is not a typus binding and is resolved
+            // through the calling instance's shape bindings at key
+            // derivation. Substituting it here would reject the caller-owned
+            // magnitudo symbol as an unresolved type parameter.
+            if let Type::Param(sym) = self.types().get(type_arg.semantic_id()) {
+                if shape_params.contains(sym) && !bindings.contains_key(sym) {
+                    continue;
+                }
+            }
             *type_arg = match self.substitute_ty(*type_arg, bindings, span) {
                 Some(ty) => ty,
                 None => return false,
@@ -987,6 +1049,17 @@ fn find_literal_index(types: &TypeTable, value: u64) -> Option<IndexId> {
         #[expect(clippy::cast_possible_truncation, reason = "IndexId is a u32 arena index by design")]
         let id = IndexId(index as u32);
         matches!(types.get_index(id), IndexExpr::Literal(found) if *found == value).then_some(id)
+    })
+}
+
+/// Interned `IndexExpr::Param` node for a caller-owned symbolic size param.
+/// The forwarding call site's witness types reference this node, so the
+/// insert-only shape binder sees one consistent identity (GSF-1).
+fn find_param_index(types: &TypeTable, sym: radix_lexer::Symbol) -> Option<IndexId> {
+    (0..types.index_count()).find_map(|index| {
+        #[expect(clippy::cast_possible_truncation, reason = "IndexId is a u32 arena index by design")]
+        let id = IndexId(index as u32);
+        matches!(types.get_index(id), IndexExpr::Param(found) if *found == sym).then_some(id)
     })
 }
 
