@@ -4,6 +4,11 @@
 //! Probes p1–p14 (green flips + regression floor) and the declared negatives
 //! live as durable fixtures under `test-fixtures/oop-relations/`; the sources
 //! here are the inline equivalents asserted issue-by-issue.
+//!
+//! E1 (equality-tier-respelling) also pins the scalar equality relation
+//! ladder on this configured (en) surface: relaxed `≅`/`≈` admit mixed-width
+//! numeric pairs, strict `≡` stays fail-closed — see the law block on
+//! `numeric_value_equality_types`.
 
 use crate::locale::LocalePack;
 use crate::test_support::{analyze_source_with_config, AnalyzedFixture};
@@ -12,10 +17,13 @@ use radix_target::Target;
 
 fn en_config() -> PassConfig {
     let mut config = PassConfig::for_target(Target::HirRust);
-    config.locale_pack = Some(LocalePack::from_toml_path(
-        std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../stdlib/locale/en/pack.toml"),
-    )
-    .expect("load English locale pack"));
+    config.locale_pack = Some(
+        LocalePack::from_toml_path(
+            std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+                .join("../../stdlib/locale/en/pack.toml"),
+        )
+        .expect("load English locale pack"),
+    );
     config
 }
 
@@ -26,7 +34,11 @@ fn analyze_en(source: &str) -> AnalyzedFixture {
 
 fn assert_en_accepts(source: &str) {
     let result = analyze_en(source);
-    assert!(result.is_ok(), "expected green, got: {:?}", result.diagnostics);
+    assert!(
+        result.is_ok(),
+        "expected green, got: {:?}",
+        result.diagnostics
+    );
 }
 
 fn assert_en_rejects_with_issue(source: &str, expected: &str) {
@@ -499,5 +511,33 @@ main {
         !result.is_ok(),
         "bodyless method outside abstractus must not parse, got: {:?}",
         result.diagnostics
+    );
+}
+
+// EQUALITY RELATIONS — the scalar equality relation ladder on the configured
+// surface (E1 contract pin): relaxed ≅/≈ admit the mixed-width carrier pairs
+// the widening join accepts; strict ≡ rejects the same pairs fail-closed.
+
+#[test]
+fn equality_relation_relaxed_admits_mixed_width_pairs() {
+    assert_en_accepts(
+        "main {
+    assert 1 ∷ int<i64> ≅ 1 ∷ int<u64>
+    assert 1 ∷ int<i64> ≅ 1.0 ∷ float<f64>
+    assert 1 ∷ int<u64> ≅ 1.0 ∷ float<f64>
+    assert 1 ∷ int<i64> ≈ 1 ∷ int<u64>
+}
+",
+    );
+}
+
+#[test]
+fn equality_relation_strict_rejects_mixed_width_pairs() {
+    assert_en_rejects_with_issue(
+        "main {
+    assert 1 ∷ int<i64> ≡ 1 ∷ int<u64>
+}
+",
+        "equality_exact_types_required",
     );
 }
