@@ -3,6 +3,7 @@
 use super::value::*;
 use radix_lexer::Span;
 use radix_mir::MirBinOp;
+use radix_types::NumericWidth;
 
 #[test]
 fn bitwise_rejects_negative_signed_in_unsigned_context() {
@@ -48,4 +49,40 @@ fn scalar_get_ascii1_equals_textus_literal() {
     // Multi-byte / non-ASCII textus is never equal to a one-byte carrier.
     assert!(!values_equal(&ch, &Value::Str("ab".to_owned())));
     assert!(!values_equal(&ch, &Value::Str("é".to_owned())));
+}
+
+#[test]
+fn scalar_f32_addition_rounds_operands_and_result() {
+    let span = Span::default();
+    let result = add_values(
+        Value::Float(0.1),
+        Value::Float(0.2),
+        NumericWidth::F32,
+        span,
+    )
+    .expect("f32 addition");
+    assert_eq!(result, Value::Float(f64::from(0.1_f32 + 0.2_f32)));
+
+    // This distinguishes f32 arithmetic from f64 arithmetic followed by a
+    // final cast: both operands must be rounded before the operation.
+    let result = add_values(
+        Value::Float(16_777_217.0),
+        Value::Float(1.0),
+        NumericWidth::F32,
+        span,
+    )
+    .expect("f32 addition rounds operands");
+    assert_eq!(result, Value::Float(f64::from(16_777_216.0_f32)));
+}
+
+#[test]
+fn scalar_f64_addition_remains_double_width() {
+    let result = add_values(
+        Value::Float(0.1),
+        Value::Float(0.2),
+        NumericWidth::F64,
+        Span::default(),
+    )
+    .expect("f64 addition");
+    assert_eq!(result, Value::Float(0.1_f64 + 0.2_f64));
 }

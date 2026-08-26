@@ -711,9 +711,36 @@ pub fn uint_width_checked_rem(
     check_uint_width((a % b) as u128, width, span, "numerus division failed")
 }
 
+/// Round a scalar float to the runner's declared arithmetic width.
+///
+/// WHY: `Value::Float` is a single f64 carrier, but Faber scalar arithmetic
+/// still executes at the declared width. The fuzzy-value path uses this same
+/// f32-round-trip policy for every non-f64 width.
+fn round_float(value: f64, width: NumericWidth) -> f64 {
+    if matches!(width, NumericWidth::F64) {
+        value
+    } else {
+        #[expect(clippy::cast_possible_truncation)]
+        {
+            value as f32 as f64
+        }
+    }
+}
+
+fn float_binop(
+    left: f64,
+    right: f64,
+    width: NumericWidth,
+    float_op: impl FnOnce(f64, f64) -> f64,
+) -> f64 {
+    let left = round_float(left, width);
+    let right = round_float(right, width);
+    round_float(float_op(left, right), width)
+}
+
 /// Numeric binary dispatch. The integer path delegates to a width-checked op so
-/// overflow honors `numerus<W>`; the float path is width-agnostic (f32 vs f64
-/// rounding is a separate gap).
+/// overflow honors `numerus<W>`; scalar float operands and results are rounded
+/// at the declared width before and after the operation.
 pub fn numeric_binop(
     left: Value,
     right: Value,
@@ -735,11 +762,19 @@ pub fn numeric_binop(
         (Value::Int(a), Value::UInt(b)) if width.is_unsigned_int() && a >= 0 => {
             uint_op(a as u64, b, width, span).map(Value::UInt)
         }
-        (Value::Float(a), Value::Float(b)) => Ok(Value::Float(float_op(a, b))),
-        (Value::Int(a), Value::Float(b)) => Ok(Value::Float(float_op(a as f64, b))),
-        (Value::UInt(a), Value::Float(b)) => Ok(Value::Float(float_op(a as f64, b))),
-        (Value::Float(a), Value::Int(b)) => Ok(Value::Float(float_op(a, b as f64))),
-        (Value::Float(a), Value::UInt(b)) => Ok(Value::Float(float_op(a, b as f64))),
+        (Value::Float(a), Value::Float(b)) => Ok(Value::Float(float_binop(a, b, width, float_op))),
+        (Value::Int(a), Value::Float(b)) => {
+            Ok(Value::Float(float_binop(a as f64, b, width, float_op)))
+        }
+        (Value::UInt(a), Value::Float(b)) => {
+            Ok(Value::Float(float_binop(a as f64, b, width, float_op)))
+        }
+        (Value::Float(a), Value::Int(b)) => {
+            Ok(Value::Float(float_binop(a, b as f64, width, float_op)))
+        }
+        (Value::Float(a), Value::UInt(b)) => {
+            Ok(Value::Float(float_binop(a, b as f64, width, float_op)))
+        }
         _ => Err(RunnerError::internal(span, "numeric operand mismatch")),
     }
 }
