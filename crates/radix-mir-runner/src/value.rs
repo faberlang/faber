@@ -825,6 +825,21 @@ pub fn compare_values(
         (Value::Float(a), Value::Float(b)) => a
             .partial_cmp(b)
             .ok_or_else(|| RunnerError::internal(span, "float compare"))?,
+        // Mixed integer/float ordering joins at the float carrier — the same
+        // promotion `numeric_binop` applies to `+ - * /`, so `a < b` accepts
+        // exactly the operand mixes `a + b` accepts (join-cast ruling).
+        (Value::Int(a), Value::Float(b)) => (*a as f64)
+            .partial_cmp(b)
+            .ok_or_else(|| RunnerError::internal(span, "float compare"))?,
+        (Value::UInt(a), Value::Float(b)) => (*a as f64)
+            .partial_cmp(b)
+            .ok_or_else(|| RunnerError::internal(span, "float compare"))?,
+        (Value::Float(a), Value::Int(b)) => a
+            .partial_cmp(&(*b as f64))
+            .ok_or_else(|| RunnerError::internal(span, "float compare"))?,
+        (Value::Float(a), Value::UInt(b)) => a
+            .partial_cmp(&(*b as f64))
+            .ok_or_else(|| RunnerError::internal(span, "float compare"))?,
         (Value::Str(a), Value::Str(b)) => a.cmp(b),
         (Value::Ascii(a), Value::Ascii(b)) => a.cmp(b),
         (Value::Bool(a), Value::Bool(b)) => a.cmp(b),

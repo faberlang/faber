@@ -86,3 +86,85 @@ fn scalar_f64_addition_remains_double_width() {
     .expect("f64 addition");
     assert_eq!(result, Value::Float(0.1_f64 + 0.2_f64));
 }
+
+#[test]
+fn mixed_integer_float_ordering_joins_at_float_carrier() {
+    // Ordering promotes mixed integer/float operands to the float carrier,
+    // mirroring the `numeric_binop` arithmetic promotion (fractus wins) and
+    // the Rust emitter's join cast `(a as f64) < b`.
+    let span = Span::default();
+    assert_eq!(
+        compare_values(Value::Int(3), Value::Float(3.5), MirBinOp::Lt, span)
+            .expect("int < fractus joins at fractus"),
+        Value::Bool(true)
+    );
+    assert_eq!(
+        compare_values(Value::Float(3.5), Value::Int(3), MirBinOp::Gt, span)
+            .expect("fractus > int joins at fractus"),
+        Value::Bool(true)
+    );
+    assert_eq!(
+        compare_values(Value::UInt(3), Value::Float(3.5), MirBinOp::Lt, span)
+            .expect("uint < fractus joins at fractus"),
+        Value::Bool(true)
+    );
+    assert_eq!(
+        compare_values(Value::Float(3.5), Value::UInt(4), MirBinOp::Lt, span)
+            .expect("fractus < uint joins at fractus"),
+        Value::Bool(true)
+    );
+    // Negative signed operands widen to f64 before comparing.
+    assert_eq!(
+        compare_values(Value::Int(-1), Value::Float(0.5), MirBinOp::Lt, span)
+            .expect("negative int < fractus joins at fractus"),
+        Value::Bool(true)
+    );
+    // The join equality boundary: 3 <= 3.0 holds, 3 < 3.0 does not.
+    assert_eq!(
+        compare_values(Value::Int(3), Value::Float(3.0), MirBinOp::LtEq, span)
+            .expect("int <= fractus joins at fractus"),
+        Value::Bool(true)
+    );
+    assert_eq!(
+        compare_values(Value::Int(3), Value::Float(3.0), MirBinOp::Lt, span)
+            .expect("int < fractus joins at fractus"),
+        Value::Bool(false)
+    );
+    // Same-type ordering paths are untouched by the new arms.
+    assert_eq!(
+        compare_values(Value::Int(3), Value::Int(4), MirBinOp::Lt, span)
+            .expect("int < int stays exact"),
+        Value::Bool(true)
+    );
+    assert_eq!(
+        compare_values(Value::Float(3.0), Value::Float(4.0), MirBinOp::Lt, span)
+            .expect("fractus < fractus stays exact"),
+        Value::Bool(true)
+    );
+}
+
+#[test]
+fn ordering_and_arithmetic_accept_the_same_mixed_operand_mixes() {
+    // Consistency law: `a < b` and `a + b` accept the same mixed int/float
+    // and uint/float operand pairs on identical shapes.
+    let span = Span::default();
+    let pairs = [
+        (Value::Int(3), Value::Float(3.5)),
+        (Value::UInt(3), Value::Float(3.5)),
+        (Value::Float(3.5), Value::Int(3)),
+        (Value::Float(3.5), Value::UInt(3)),
+        (Value::Int(-1), Value::Float(0.5)),
+    ];
+    for (left, right) in pairs {
+        let arithmetic = add_values(left.clone(), right.clone(), NumericWidth::F64, span);
+        let ordering = compare_values(left, right, MirBinOp::Lt, span);
+        assert!(
+            arithmetic.is_ok(),
+            "arithmetic rejected a mix ordering accepts: {arithmetic:?}"
+        );
+        assert!(
+            ordering.is_ok(),
+            "ordering rejected a mix arithmetic accepts: {ordering:?}"
+        );
+    }
+}
