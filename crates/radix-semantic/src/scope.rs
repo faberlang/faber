@@ -298,6 +298,10 @@ struct ImportedFileStruct {
     ty: TypeId,
     fields: Vec<ImportedFileStructField>,
     methods: Vec<ImportedFileInterfaceMethod>,
+    /// Ordered generic-declaration parameter names, interned at import so the
+    /// MIR lowering context can register `struct_type_params` for imported
+    /// generic structs (field projection through an applied nominal).
+    type_params: Vec<LexSymbol>,
 }
 
 #[derive(Debug, Clone)]
@@ -1537,6 +1541,11 @@ impl Resolver {
                 ty: existing_ty,
                 fields: Vec::new(),
                 methods: Vec::new(),
+                type_params: strukt
+                    .params
+                    .iter()
+                    .map(|param| interner.intern(&param.name))
+                    .collect(),
             }));
         }
         let def_id = self.fresh_def_id();
@@ -1568,6 +1577,11 @@ impl Resolver {
             ty,
             fields: Vec::new(),
             methods: Vec::new(),
+            type_params: strukt
+                .params
+                .iter()
+                .map(|param| interner.intern(&param.name))
+                .collect(),
         }))
     }
 
@@ -2208,14 +2222,18 @@ impl Resolver {
         DefId,
         Vec<ImportedFileStructField>,
         Vec<ImportedFileInterfaceMethod>,
+        Vec<LexSymbol>,
     )> {
         self.file_interfaces
             .values()
             .flat_map(|interface| interface.exports.values())
             .filter_map(|export| match export {
-                ImportedFileExport::Struct(strukt) => {
-                    Some((strukt.def_id, strukt.fields.clone(), strukt.methods.clone()))
-                }
+                ImportedFileExport::Struct(strukt) => Some((
+                    strukt.def_id,
+                    strukt.fields.clone(),
+                    strukt.methods.clone(),
+                    strukt.type_params.clone(),
+                )),
                 ImportedFileExport::Function(_) | ImportedFileExport::Type(_) => None,
             })
             .collect()
@@ -2229,15 +2247,19 @@ impl Resolver {
         DefId,
         Vec<ImportedFileStructField>,
         Vec<ImportedFileInterfaceMethod>,
+        Vec<LexSymbol>,
     )> {
         self.file_interfaces
             .get(&namespace)
             .into_iter()
             .flat_map(|interface| interface.exports.values())
             .filter_map(|export| match export {
-                ImportedFileExport::Struct(strukt) => {
-                    Some((strukt.def_id, strukt.fields.clone(), strukt.methods.clone()))
-                }
+                ImportedFileExport::Struct(strukt) => Some((
+                    strukt.def_id,
+                    strukt.fields.clone(),
+                    strukt.methods.clone(),
+                    strukt.type_params.clone(),
+                )),
                 ImportedFileExport::Function(_) | ImportedFileExport::Type(_) => None,
             })
             .collect()
@@ -3226,6 +3248,10 @@ impl Resolver {
                                     ty,
                                     fields: imported_fields,
                                     methods: Vec::new(),
+                                    // Artifact snapshots do not carry
+                                    // declaration params; applied-projection
+                                    // metadata stays degraded on this route.
+                                    type_params: Vec::new(),
                                 })
                             }
                         };

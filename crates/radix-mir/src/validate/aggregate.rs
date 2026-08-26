@@ -298,9 +298,26 @@ impl Validator<'_, '_> {
                     Type::Struct(_) => {
                         self.error(span, "struct aggregate DefId does not match aggregate type");
                     }
+                    // A generic struct construction carries its applied type
+                    // (`Box<N>`); the base must still be this struct.
+                    Type::Applied(base, _) => {
+                        if !matches!(
+                            self.context.types.get(*base),
+                            Type::Struct(type_def) if type_def == def_id
+                        ) {
+                            self.error(span, "struct aggregate type is not struct");
+                        }
+                    }
                     _ => self.error(span, "struct aggregate type is not struct"),
                 }
-                self.validate_named_aggregate_fields(scope, *def_id, items, true, span);
+                self.validate_named_aggregate_fields(
+                    scope,
+                    *def_id,
+                    Some(aggregate.ty),
+                    items,
+                    true,
+                    span,
+                );
             }
             (MirAggregateKind::EnumVariant(def_id), MirAggregateFields::Named(items)) => {
                 if let Some(enum_def) = self.enum_def_from_type(aggregate.ty) {
@@ -308,7 +325,7 @@ impl Validator<'_, '_> {
                 } else {
                     self.error(span, "enum variant aggregate type is not enum");
                 }
-                self.validate_named_aggregate_fields(scope, *def_id, items, false, span);
+                self.validate_named_aggregate_fields(scope, *def_id, None, items, false, span);
             }
             (MirAggregateKind::EnumVariant(def_id), MirAggregateFields::Ordered(items)) => {
                 if let Some(enum_def) = self.enum_def_from_type(aggregate.ty) {
@@ -453,6 +470,7 @@ impl Validator<'_, '_> {
         &mut self,
         scope: &FunctionScope<'_, '_>,
         def_id: DefId,
+        aggregate_ty: Option<MirType>,
         items: &[MirNamedOperand],
         is_struct: bool,
         span: Span,
@@ -476,6 +494,20 @@ impl Validator<'_, '_> {
             let Some(expected_ty) = fields.get(&item.name).copied() else {
                 self.error(span, "named aggregate references unknown field");
                 continue;
+            };
+            // A generic construction's field types must instantiate at the
+            // aggregate's applied arguments; the raw metadata still carries
+            // the declaration's size params.
+            let expected_ty = match (aggregate_ty, is_struct) {
+                (Some(aggregate_ty), true)
+                    if matches!(self.type_kind(aggregate_ty), Type::Applied(..)) =>
+                {
+                    match self.project_field(aggregate_ty, item.name, span) {
+                        Some(ty) => ty,
+                        None => continue,
+                    }
+                }
+                _ => expected_ty,
             };
             if is_struct
                 && matches!(item.value, MirOperand::Constant(MirConstant::Nil))

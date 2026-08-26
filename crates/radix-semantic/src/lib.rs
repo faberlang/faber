@@ -750,7 +750,7 @@ fn install_imported_annotation_contracts(
 ) {
     // BO-D-4: build name → DefId once (imported structs are stable for this pass).
     let mut imported_struct_by_name = rustc_hash::FxHashMap::default();
-    for (def_id, _fields, _methods) in resolver.imported_file_structs() {
+    for (def_id, _fields, _methods, _type_params) in resolver.imported_file_structs() {
         if let Some(sym) = resolver.get_symbol(def_id) {
             let name = interner.resolve(sym.name).to_owned();
             imported_struct_by_name.entry(name).or_insert(def_id);

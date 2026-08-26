@@ -15,6 +15,7 @@ use radix_module::mir::MirFunctionSignature;
 #[derive(Clone, Default)]
 pub(super) struct RemappedValidation {
     struct_fields: HashMap<DefId, HashMap<Symbol, MirType>>,
+    struct_type_params: HashMap<DefId, Vec<Symbol>>,
     optional_struct_fields: HashMap<DefId, HashSet<Symbol>>,
     nullable_struct_fields: HashMap<DefId, HashSet<Symbol>>,
     variant_parents: HashMap<DefId, DefId>,
@@ -26,6 +27,11 @@ pub(super) struct RemappedValidation {
 impl RemappedValidation {
     fn merge(&mut self, other: &Self) {
         union_field_maps(&mut self.struct_fields, &other.struct_fields);
+        for (def, params) in &other.struct_type_params {
+            self.struct_type_params
+                .entry(*def)
+                .or_insert_with(|| params.clone());
+        }
         union_symbol_sets(
             &mut self.optional_struct_fields,
             &other.optional_struct_fields,
@@ -53,6 +59,12 @@ impl RemappedValidation {
             context
                 .struct_fields
                 .insert(*def, fields.iter().map(|(name, ty)| (*name, *ty)).collect());
+        }
+        for (def, params) in &self.struct_type_params {
+            context
+                .struct_type_params
+                .entry(*def)
+                .or_insert_with(|| params.clone());
         }
         for (def, fields) in &self.optional_struct_fields {
             context
@@ -440,6 +452,19 @@ fn collect_remapped_validation(
                 remap_metadata_type(*ty, type_rewrites),
             );
         }
+    }
+    // Generic struct params must ride the same remap: field projections
+    // through an `Applied` sibling/library struct (namespace-forwarded
+    // `ns.load<…>(…)` results) instantiate against these bindings.
+    for (def, params) in &source.struct_type_params {
+        out.struct_type_params
+            .entry(remap_nominal_def(*def))
+            .or_insert_with(|| {
+                params
+                    .iter()
+                    .map(|param| remap_metadata_symbol(*param, source_interner, entry_interner))
+                    .collect()
+            });
     }
     for (def, fields) in &source.optional_struct_fields {
         let dest = remap_nominal_def(*def);

@@ -127,7 +127,9 @@ impl CapeFailableCollector<'_> {
 /// caller can reach: the caller's file-interface resolver remaps the linked
 /// library's export signatures into the caller's type table, and the
 /// `targets` table maps (import item, verb) to the synthetic def the rewrite
-/// installed. Generic exports stay untyped (concrete instantiations only).
+/// installed. Generic exports are included: the rewrite forwards call-site
+/// type arguments onto the rewritten call, and the recovered type's error
+/// half is what keeps the try-call edge for failable generics.
 fn synthetic_namespace_function_types(
     unit_path: &Path,
     analysis: &mut radix_module::driver::AnalyzedModule,
@@ -150,9 +152,6 @@ fn synthetic_namespace_function_types(
                 continue;
             }
             for (verb, sig) in exports {
-                if !sig.type_params.is_empty() {
-                    continue;
-                }
                 let verb_name = analysis.interner.resolve(verb);
                 let Some(synthetic) = targets
                     .get(&(
@@ -192,7 +191,9 @@ fn synthetic_method_function_types(
     let mut function_types = HashMap::new();
     // Group the caller's imported struct methods by receiver nominal def.
     let mut methods_by_receiver: HashMap<DefId, Vec<_>> = HashMap::new();
-    for (def_id, _fields, struct_methods) in analysis.resolver.imported_file_structs() {
+    for (def_id, _fields, struct_methods, _type_params) in
+        analysis.resolver.imported_file_structs()
+    {
         methods_by_receiver.insert(def_id, struct_methods);
     }
     for ((receiver_def, method_name), _synthetic) in methods {
@@ -1424,13 +1425,13 @@ pub(super) fn rewrite_expr(
                 if let Some(target_def) =
                     namespace_call_target(unit_path, receiver, *method, interner, targets)
                 {
-                    if !type_args.is_empty() {
-                        diagnostics.push(
-                            "package MIR does not support type arguments on namespace calls"
-                                .to_owned(),
-                        );
-                        return;
-                    }
+                    // Forward explicit call-site type arguments onto the
+                    // rewritten direct call so the same-module generic
+                    // lowering runs. Inferred call sites carry empty
+                    // `type_args` (the semantic lowering writes HIR type
+                    // args only for spelled `<...>` arguments), so one
+                    // forward covers both forms.
+                    let call_type_args = std::mem::take(type_args);
                     let call_args = std::mem::take(args);
                     let callee = HirExpression {
                         id: receiver.id,
@@ -1438,8 +1439,12 @@ pub(super) fn rewrite_expr(
                         ty: None,
                         span: receiver.span,
                     };
-                    expr.kind =
-                        HirExpressionKind::Call(Box::new(callee), Vec::new(), call_args, None);
+                    expr.kind = HirExpressionKind::Call(
+                        Box::new(callee),
+                        call_type_args,
+                        call_args,
+                        None,
+                    );
                     return;
                 }
                 if let Some(message) =
@@ -1506,12 +1511,10 @@ pub(super) fn rewrite_expr(
             if let Some(target_def) =
                 namespace_call_target(unit_path, receiver, *method, interner, targets)
             {
-                if !type_args.is_empty() {
-                    diagnostics.push(
-                        "package MIR does not support type arguments on namespace calls".to_owned(),
-                    );
-                    return;
-                }
+                // Same forward-on-rewrite as the `Call` branch: explicit
+                // type arguments ride the rewritten direct call; inferred
+                // call sites arrive with empty `type_args`.
+                let call_type_args = std::mem::take(type_args);
                 let call_args = std::mem::take(args);
                 let callee = HirExpression {
                     id: receiver.id,
@@ -1519,7 +1522,12 @@ pub(super) fn rewrite_expr(
                     ty: None,
                     span: receiver.span,
                 };
-                expr.kind = HirExpressionKind::Call(Box::new(callee), Vec::new(), call_args, None);
+                expr.kind = HirExpressionKind::Call(
+                    Box::new(callee),
+                    call_type_args,
+                    call_args,
+                    None,
+                );
             } else if let Some(message) =
                 namespace_call_diagnostic(unit_path, receiver, *method, interner, namespaces)
             {

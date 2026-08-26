@@ -65,6 +65,19 @@ pub fn resolve_lista_to_tensor_shape(
     })
 }
 
+/// Literal dims of a tensor type, when every axis is compile-time known.
+///
+/// Runners use this to recover the authoritative shape from a substituted
+/// static type when the lowered shape operand was built before generic
+/// instantiation (the `InferOneD` fallback for parametric targets).
+#[must_use]
+pub fn literal_tensor_dims(target: TypeId, types: &TypeTable) -> Option<Vec<i64>> {
+    let Type::Tensor(_, shape_id) = normalized_type(target, types) else {
+        return None;
+    };
+    i64s_from_literal_index(*shape_id, types)
+}
+
 /// # Errors
 /// Returns an error when validation or type resolution fails. See [`ListaToTensorError`].
 pub fn validate_lista_to_tensor_source(

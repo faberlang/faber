@@ -464,7 +464,7 @@ impl<'a> LoweringContextMaps<'a> {
     }
 
     fn record_imported_struct_items(&mut self, unit: &AnalyzedModule) {
-        for (def_id, imported_fields, _) in unit.resolver.imported_file_structs() {
+        for (def_id, imported_fields, _, type_params) in unit.resolver.imported_file_structs() {
             let mut fields = FxHashMap::default();
             let mut optional_fields = FxHashSet::default();
             let mut nullable_fields = FxHashSet::default();
@@ -482,6 +482,13 @@ impl<'a> LoweringContextMaps<'a> {
                 }
             }
             self.validation.struct_fields.insert(def_id, fields);
+            // Imported generic structs must register their declaration params:
+            // field projection through an `Applied` nominal instantiates
+            // against these bindings (the own-item path in `record_struct_item`
+            // only covers structs declared in this unit).
+            self.validation
+                .struct_type_params
+                .insert(def_id, type_params);
             self.validation
                 .optional_struct_fields
                 .insert(def_id, optional_fields);
@@ -507,7 +514,9 @@ impl<'a> LoweringContextMaps<'a> {
                 let Some(provider) = self.provider_imports.get(&import_item.def_id).cloned() else {
                     continue;
                 };
-                for (def_id, _, methods) in unit.resolver.imported_file_structs_for_namespace(binding) {
+                for (def_id, _, methods, _) in
+                    unit.resolver.imported_file_structs_for_namespace(binding)
+                {
                     for method in methods {
                         let target = ImportedMethodProvider { provider: provider.clone(), canonical_name: method.name };
                         self.imported_method_providers

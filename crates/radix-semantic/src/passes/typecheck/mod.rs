@@ -574,7 +574,7 @@ impl<'a> TypeChecker<'a> {
     }
 
     pub fn collect_imported_file_structs(&mut self) {
-        for (def_id, fields, methods) in self.resolver.imported_file_structs() {
+        for (def_id, fields, methods, _type_params) in self.resolver.imported_file_structs() {
             let fields = fields
                 .into_iter()
                 .map(|field| {

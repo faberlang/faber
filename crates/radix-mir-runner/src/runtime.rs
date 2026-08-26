@@ -1325,7 +1325,7 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
             MirCollectionOp::TensorSet => self.tensor_set(args, span),
             MirCollectionOp::TensorFill => self.tensor_fill(args, span),
             MirCollectionOp::TensorCreate => self.tensor_create(args, span),
-            MirCollectionOp::TensorFromFlat => self.tensor_from_flat(args, span),
+            MirCollectionOp::TensorFromFlat => self.tensor_from_flat(args, return_ty, span),
             MirCollectionOp::TensorFlatten => self.tensor_flatten(args, span),
             MirCollectionOp::TensorMaterialize => self.tensor_materialize(args, span),
             MirCollectionOp::TensorSlice => self.tensor_slice(args, span),
@@ -1800,14 +1800,26 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
         Ok(tensor_value(vec![fill; count], shape))
     }
 
-    fn tensor_from_flat(&mut self, args: &[MirOperand], span: Span) -> Result<Value, RunnerError> {
+    fn tensor_from_flat(
+        &mut self,
+        args: &[MirOperand],
+        return_ty: MirType,
+        span: Span,
+    ) -> Result<Value, RunnerError> {
+        // A cast lowered inside a generic template builds its shape operand
+        // before instantiation, when the target dims are still size params
+        // (the `InferOneD` fallback). The substituted static return type is
+        // the shape authority (ABI source of truth): prefer its literal dims
+        // whenever they resolve, and fall back to the lowered shape operand.
+        let static_shape =
+            radix_mir::lista_tensor_conversio::literal_tensor_dims(return_ty.semantic_id(), self.types);
         let [_receiver, flat, shape, fill] = args else {
             // AEU-5 Route C: the padded form carries a trailing fill operand
             // for slots `len..N` of the bounded-lista snapshot.
             let [_receiver, flat, shape] = args else {
                 return Err(RunnerError::internal(span, "tensor from flat arity"));
             };
-            return self.tensor_from_flat_exact(flat, shape, span);
+            return self.tensor_from_flat_exact(flat, shape, static_shape, span);
         };
         let flat = self.array_arg(flat, span)?;
         let shape = self.shape_arg(
@@ -1815,6 +1827,7 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
             span,
             radix_mir::lista_tensor_conversio::LISTA_TO_TENSOR_STRUCTA_COUNT_MSG,
         )?;
+        let shape = static_shape.unwrap_or(shape);
         let count = tensor_shape_element_count(&shape)
             .ok_or_else(|| RunnerError::internal(span, ERR_ELEMENT_COUNT_OVERFLOW))?;
         // The fill is a real caller value, never a read of the carrier's
@@ -1835,6 +1848,7 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
         &mut self,
         flat: &MirOperand,
         shape: &MirOperand,
+        static_shape: Option<Vec<i64>>,
         span: Span,
     ) -> Result<Value, RunnerError> {
         let flat = self.array_arg(flat, span)?;
@@ -1843,6 +1857,7 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
             span,
             radix_mir::lista_tensor_conversio::LISTA_TO_TENSOR_STRUCTA_COUNT_MSG,
         )?;
+        let shape = static_shape.unwrap_or(shape);
         self.ensure_tensor_element_count(
             &shape,
             flat.len(),

@@ -212,7 +212,21 @@ impl FunctionBuilder<'_> {
                     return None;
                 };
                 let fields = self.lower_struct_object_fields(*def_id, entries, expr.span)?;
-                let ty = MirType::semantic(target);
+                // A generic struct written bare (`Box { … }`) carries the
+                // written raw head in `target`; the checker's contextual
+                // instantiation records the applied type (`Box<N>`) on the
+                // expression. Construct at the applied type so generic-
+                // template instantiation can specialize the temp.
+                let ty = self
+                    .expr_ty(expr)
+                    .filter(|ty| match self.types.get(ty.semantic_id()) {
+                        Type::Applied(base, _) => matches!(
+                            self.types.get(*base),
+                            Type::Struct(expr_def) if expr_def == def_id
+                        ),
+                        _ => false,
+                    })
+                    .unwrap_or(MirType::semantic(target));
                 Some(self.construct_temp(
                     MirAggregateKind::Struct(*def_id),
                     MirAggregateFields::Named(fields),
