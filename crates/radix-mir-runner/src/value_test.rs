@@ -144,6 +144,34 @@ fn mixed_integer_float_ordering_joins_at_float_carrier() {
 }
 
 #[test]
+fn scaled_decimal_join_carriers_compare_by_value() {
+    // The lowerer widens d32 to d64 and scales integer peers before this
+    // helper sees them. These are the resulting d64 carriers, not raw d32
+    // units, so comparison stays numeric rather than carrier-blind.
+    let span = Span::default();
+    assert_eq!(
+        compare_values(
+            Value::Int(4_200_000_000),
+            Value::Int(1_000_000_000),
+            MirBinOp::Gt,
+            span,
+        )
+        .expect("joined decimal carriers compare"),
+        Value::Bool(true)
+    );
+    assert_eq!(
+        compare_values(
+            Value::Int(42_000_000),
+            Value::Int(10_000_000_000),
+            MirBinOp::Gt,
+            span,
+        )
+        .expect("joined decimal/integer carriers compare"),
+        Value::Bool(false)
+    );
+}
+
+#[test]
 fn ordering_and_arithmetic_accept_the_same_mixed_operand_mixes() {
     // Consistency law: `a < b` and `a + b` accept the same mixed int/float
     // and uint/float operand pairs on identical shapes.

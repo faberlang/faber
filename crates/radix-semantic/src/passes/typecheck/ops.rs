@@ -477,6 +477,44 @@ impl TypeChecker<'_> {
         self.bool_type()
     }
 
+    /// Check numeric ordering operands and choose their lossless comparison join.
+    ///
+    /// Decimal carriers are scaled integers, so a raw comparison is meaningful
+    /// only after decimal widths join at `d64`. Decimal/integer ordering uses
+    /// the same scaled `d64` join; decimal/fractus remains fail-closed because
+    /// no exact cross-family carrier is established by the language contract.
+    fn numeric_ordering_bin(
+        &mut self,
+        lhs: TypeId,
+        rhs: TypeId,
+        span: radix_lexer::Span,
+    ) -> TypeId {
+        let lhs_resolved = self.resolve_inferred_type(lhs);
+        let rhs_resolved = self.resolve_inferred_type(rhs);
+        let lhs_shape = self.numeric_shape(lhs_resolved);
+        let rhs_shape = self.numeric_shape(rhs_resolved);
+        let decimal_lhs = lhs_shape.is_some_and(|shape| shape.width.is_decimal());
+        let decimal_rhs = rhs_shape.is_some_and(|shape| shape.width.is_decimal());
+        let fractus_lhs = lhs_shape.is_some_and(|shape| shape.prim == Primitive::Fractus);
+        let fractus_rhs = rhs_shape.is_some_and(|shape| shape.prim == Primitive::Fractus);
+
+        if (decimal_lhs && fractus_rhs) || (decimal_rhs && fractus_lhs) {
+            self.invalid_operand_types(MIXED_DECIMAL_FRACTUS_ORDERING, span);
+            return self.error_type;
+        }
+
+        let joined = self.numeric_bin(lhs, rhs, span);
+        if joined == self.error_type {
+            return joined;
+        }
+        if decimal_lhs || decimal_rhs {
+            return self
+                .types
+                .sized_numeric(Primitive::Numerus, NumericWidth::D64);
+        }
+        joined
+    }
+
     /// Allow cross-precision `instans` operands for ordering only.
     ///
     /// WHY: ordering compares at the coarser declared precision; operands need
@@ -1143,7 +1181,7 @@ impl TypeChecker<'_> {
                 } else if self.scalar_ordered_text_bin(lhs, rhs, lhs_ty, rhs_ty, lhs.span) {
                     // Single-scalar Unicode order (Seam B); not lexicographic cord compare.
                 } else {
-                    self.numeric_bin(lhs_ty, rhs_ty, lhs.span);
+                    self.numeric_ordering_bin(lhs_ty, rhs_ty, lhs.span);
                 }
                 self.bool_type()
             }
@@ -1870,6 +1908,7 @@ fn is_numeric_literal(expr: &HirExpression) -> bool {
 }
 
 const NUMERIC_OPERANDS_REQUIRED: &str = "numeric_operands_required";
+const MIXED_DECIMAL_FRACTUS_ORDERING: &str = "mixed_decimal_fractus_ordering";
 const NUMERIC_ARITHMETIC_OPERANDS_IDENTICAL: &str = "numeric_arithmetic_operands_identical";
 const MODULAR_WORD_FAMILY_MISMATCH: &str = "modular_word_family_mismatch";
 // TENSOR-GLYPHS-1B rank-rule diagnostics. Each carries `op` (the glyph

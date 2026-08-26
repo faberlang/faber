@@ -748,6 +748,10 @@ mod decimal_taxonomy_test;
 mod decimal_conversio_test;
 
 #[cfg(test)]
+#[path = "decimal_ordering_test.rs"]
+mod decimal_ordering_test;
+
+#[cfg(test)]
 #[path = "generic_call_test.rs"]
 mod generic_call_test;
 

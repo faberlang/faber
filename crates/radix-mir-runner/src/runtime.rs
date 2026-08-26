@@ -839,6 +839,55 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
         }
     }
 
+    /// Type-check a runtime value against a target, recursively for unions.
+    ///
+    /// A union target describes a set of accepted carriers; treating the union
+    /// itself as an opaque tag makes every `value is A ∪ B` check false even
+    /// when the runtime value is one of its declared members.
+    fn type_check_matches(&self, value: &Value, target: &Type) -> bool {
+        if let Type::Union(members) = target {
+            return members
+                .iter()
+                .any(|member| self.type_check_matches(value, self.types.get(*member)));
+        }
+        let nominal_match = self.nominal_type_check_matches(value, target);
+        nominal_match
+            || matches!(
+                (value, target),
+                (Value::Nil, Type::Primitive(Primitive::Nihil))
+                    | (Value::Bool(_), Type::Primitive(Primitive::Bivalens))
+                    | (
+                        Value::Int(_) | Value::UInt(_),
+                        Type::Primitive(Primitive::Numerus)
+                            | Type::SizedNumeric(Primitive::Numerus, _)
+                    )
+                    | (
+                        Value::Float(_),
+                        Type::Primitive(Primitive::Fractus)
+                            | Type::SizedNumeric(Primitive::Fractus, _)
+                    )
+                    | (
+                        Value::Str(_),
+                        Type::Primitive(Primitive::Textus | Primitive::Ascii)
+                    )
+                    | (
+                        Value::Ascii(_),
+                        Type::Primitive(Primitive::Ascii) | Type::BoundedAscii { .. }
+                    )
+                    | (Value::Octeti(_), Type::Primitive(Primitive::Octeti))
+                    | (Value::Array(_), Type::Array(_))
+                    | (Value::Map(_), Type::Map(_, _))
+                    | (Value::Set(_), Type::Set(_))
+                    | (
+                        Value::Instans(_),
+                        Type::Primitive(Primitive::Instans) | Type::SizedInstans(_)
+                    )
+                    | (Value::Regex(_), Type::Primitive(Primitive::Regex))
+                    | (Value::Unit, Type::Primitive(Primitive::Vacuum))
+                    | (_, Type::Primitive(Primitive::Valor | Primitive::Ignotum))
+            )
+    }
+
     fn eval_type_check(
         &mut self,
         op: &MirTypeCheckOp,
@@ -850,40 +899,7 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
         };
         let value = self.eval_operand(operand, span)?;
         let target = self.types.get(op.ty.semantic_id());
-        let nominal_match = self.nominal_type_check_matches(&value, target);
-        let matches = matches!(
-            (&value, &target),
-            (Value::Nil, Type::Primitive(Primitive::Nihil))
-                | (Value::Bool(_), Type::Primitive(Primitive::Bivalens))
-                | (
-                    Value::Int(_) | Value::UInt(_),
-                    Type::Primitive(Primitive::Numerus) | Type::SizedNumeric(Primitive::Numerus, _)
-                )
-                | (
-                    Value::Float(_),
-                    Type::Primitive(Primitive::Fractus) | Type::SizedNumeric(Primitive::Fractus, _)
-                )
-                | (
-                    Value::Str(_),
-                    Type::Primitive(Primitive::Textus | Primitive::Ascii)
-                )
-                | (
-                    Value::Ascii(_),
-                    Type::Primitive(Primitive::Ascii) | Type::BoundedAscii { .. }
-                )
-                | (Value::Octeti(_), Type::Primitive(Primitive::Octeti))
-                | (Value::Array(_), Type::Array(_))
-                | (Value::Map(_), Type::Map(_, _))
-                | (Value::Set(_), Type::Set(_))
-                | (
-                    Value::Instans(_),
-                    Type::Primitive(Primitive::Instans) | Type::SizedInstans(_)
-                )
-                | (Value::Regex(_), Type::Primitive(Primitive::Regex))
-                | (Value::Unit, Type::Primitive(Primitive::Vacuum))
-                | (_, Type::Primitive(Primitive::Valor | Primitive::Ignotum))
-        );
-        let matches = nominal_match || matches;
+        let matches = self.type_check_matches(&value, target);
         Ok(Value::Bool(if op.positive { matches } else { !matches }))
     }
 

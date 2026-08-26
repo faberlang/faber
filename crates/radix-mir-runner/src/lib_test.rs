@@ -4062,6 +4062,51 @@ fn runner_type_check_dispatches_nominal_struct_and_enum_tags() {
     );
 }
 
+#[test]
+fn runner_type_check_accepts_union_member_tags() {
+    use crate::host::BufferHost;
+    use crate::Value;
+    use radix_hir::DefId;
+    use radix_lexer::Interner;
+    use radix_mir::{MirType, MirTypeCheckOp, MirValidationContext};
+    use radix_types::{Primitive, Type, TypeTable};
+
+    let mut host = BufferHost::default();
+    let mut type_table = TypeTable::default();
+    let interner = Interner::new();
+    let struct_def = DefId(30);
+    let numerus = type_table.primitive(Primitive::Numerus);
+    let struct_ty = type_table.intern(Type::Struct(struct_def));
+    let union_ty = type_table.intern(Type::Union(vec![numerus, struct_ty]));
+    let bivalens = type_table.primitive(Primitive::Bivalens);
+    let context = MirValidationContext::new(&type_table);
+    let mut program = MirProgram::new();
+    program.functions.push(make_function());
+
+    let mut runner = Runner::new(&program, &context, &type_table, &interner, &mut host);
+    let fn0 = program.functions.first().unwrap();
+    runner.push_frame(fn0.id, MirBlockId(0));
+    runner.frames.last_mut().unwrap().values.insert(
+        MirValueId(0),
+        Value::Struct(struct_def, Rc::new(RefCell::new(FxHashMap::default()))),
+    );
+
+    let check = MirRuntimeCall {
+        intrinsic: MirIntrinsic::TypeCheck(MirTypeCheckOp {
+            positive: true,
+            ty: MirType::semantic(union_ty),
+        }),
+        args: vec![MirOperand::Value(MirValueId(0))],
+        return_ty: MirType::semantic(bivalens),
+    };
+    assert_eq!(
+        runner
+            .eval_runtime_call(&check, Span::default())
+            .expect("union member tag check"),
+        Value::Bool(true)
+    );
+}
+
 // ---------------------------------------------------------------------------
 // Matrix display (runner display contract: nested rows, matching the
 // compiled host route goldens)

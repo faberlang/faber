@@ -2197,16 +2197,19 @@ impl<'a> FunctionBuilder<'a> {
         {
             return self.lower_lista_elementwise(op, lhs, rhs, expr);
         }
-        let Some(op) = mir_bin_op(op) else {
+        let Some(mir_op) = mir_bin_op(op) else {
             self.errors
                 .push(MirError::unsupported(expr.span, "binary operator without a MIR primitive"));
             return None;
         };
-        let lhs = self.lower_expr_value(lhs)?;
-        let rhs = self.lower_expr_value(rhs)?;
+        let (lhs, rhs) = if matches!(op, HirBinOp::Lt | HirBinOp::Gt | HirBinOp::LtEq | HirBinOp::GtEq) {
+            self.lower_decimal_ordering_operands(lhs, rhs)?
+        } else {
+            (self.lower_expr_value(lhs)?, self.lower_expr_value(rhs)?)
+        };
         let ty = self.expr_ty(expr)?;
 
-        Some(self.assign_temp(MirValueKind::Binary { op, lhs, rhs }, ty, expr.span))
+        Some(self.assign_temp(MirValueKind::Binary { op: mir_op, lhs, rhs }, ty, expr.span))
     }
 
     fn lower_logical_short_circuit(
@@ -2706,6 +2709,100 @@ impl<'a> FunctionBuilder<'a> {
                 | (Type::Vector(_, _), Type::Vector(_, _))
                 | (Type::Matrix(_, _), Type::Matrix(_, _))
         )
+    }
+
+    /// Join decimal ordering operands at the d64 scaled carrier before the
+    /// bool-valued MIR binary op. The result type of a comparison is bivalens,
+    /// so runner normalization keyed only from that result would otherwise
+    /// miss the decimal operand widths entirely.
+    fn lower_decimal_ordering_operands(
+        &mut self,
+        lhs: &HirExpression,
+        rhs: &HirExpression,
+    ) -> Option<(MirOperand, MirOperand)> {
+        let Some((lhs_ty, rhs_ty, target_ty)) = self.decimal_ordering_join(lhs, rhs) else {
+            return Some((self.lower_expr_value(lhs)?, self.lower_expr_value(rhs)?));
+        };
+        let lhs = self.lower_ordering_operand(lhs, lhs_ty, target_ty)?;
+        let rhs = self.lower_ordering_operand(rhs, rhs_ty, target_ty)?;
+        Some((lhs, rhs))
+    }
+
+    fn decimal_ordering_join(
+        &mut self,
+        lhs: &HirExpression,
+        rhs: &HirExpression,
+    ) -> Option<(MirType, MirType, TypeId)> {
+        let lhs_ty = self.expr_ty(lhs)?;
+        let rhs_ty = self.expr_ty(rhs)?;
+        let lhs_semantic = self.types.peel_access_marker(lhs_ty.semantic_id()).1;
+        let rhs_semantic = self.types.peel_access_marker(rhs_ty.semantic_id()).1;
+        let lhs_width = match self.normalized_type(lhs_semantic) {
+            Type::SizedNumeric(Primitive::Numerus, width) if width.is_decimal() => Some(*width),
+            _ => None,
+        };
+        let rhs_width = match self.normalized_type(rhs_semantic) {
+            Type::SizedNumeric(Primitive::Numerus, width) if width.is_decimal() => Some(*width),
+            _ => None,
+        };
+        if lhs_width.is_none() && rhs_width.is_none() {
+            return None;
+        }
+        if matches!(
+            self.normalized_type(lhs_semantic),
+            Type::Primitive(Primitive::Fractus) | Type::SizedNumeric(Primitive::Fractus, _)
+        ) || matches!(
+            self.normalized_type(rhs_semantic),
+            Type::Primitive(Primitive::Fractus) | Type::SizedNumeric(Primitive::Fractus, _)
+        ) {
+            return None;
+        }
+        // The semantic ordering gate interns d64 as the lossless join. Reuse
+        // that existing TypeId because FunctionBuilder borrows the shared
+        // TypeTable immutably; the fallback keeps direct-HIR tests usable.
+        let d64 = (0..self.types.type_count()).find_map(|index| {
+            let index = u32::try_from(index).ok()?;
+            let ty = TypeId(index);
+            matches!(
+                self.normalized_type(ty),
+                Type::SizedNumeric(Primitive::Numerus, NumericWidth::D64)
+            )
+            .then_some(ty)
+        });
+        let target = d64.unwrap_or_else(|| match (lhs_width, rhs_width) {
+            (Some(NumericWidth::D64), _) => lhs_semantic,
+            (_, Some(NumericWidth::D64)) => rhs_semantic,
+            (Some(_), _) => lhs_semantic,
+            (_, Some(_)) => rhs_semantic,
+            (None, None) => lhs_semantic,
+        });
+        Some((lhs_ty, rhs_ty, target))
+    }
+
+    fn lower_ordering_operand(
+        &mut self,
+        expr: &HirExpression,
+        source_ty: MirType,
+        target_ty: TypeId,
+    ) -> Option<MirOperand> {
+        let value = self.lower_expr_value(expr)?;
+        if self.types.equals(source_ty.semantic_id(), target_ty) {
+            return Some(value);
+        }
+        let target_ty = MirType::semantic(target_ty);
+        Some(self.runtime_call_value(
+            MirIntrinsic::Convert(MirConversion {
+                flavor: MirConversionFlavor::Runtime,
+                source_ty,
+                target_ty,
+                params: Vec::new(),
+                recovery: None,
+                struct_defaults: Vec::new(),
+            }),
+            vec![value],
+            target_ty,
+            expr.span,
+        ))
     }
 
     fn is_lista_or_queue_stack_arithmetic_operand(&self, lhs: &HirExpression, rhs: &HirExpression) -> bool {

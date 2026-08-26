@@ -2259,6 +2259,10 @@ fn semantic_type_mismatch_message(args: &[DiagnosticArg]) -> Option<String> {
             "equality requires identical types; use `↦` to convert explicitly before comparing (ascii ↦ numerus for the scalar value, or compare against an ascii literal like 'a')"
                 .to_owned(),
         ),
+        "mixed_decimal_fractus_ordering" => Some(
+            "decimal and fractus ordering requires an explicit `↦` conversion to one family"
+                .to_owned(),
+        ),
         "field_initializer_type_mismatch" => Some("field initializer type mismatch".to_owned()),
         "failable_call_enclosing_error_type_mismatch" => {
             Some("failable call error type does not match enclosing ⇥".to_owned())
