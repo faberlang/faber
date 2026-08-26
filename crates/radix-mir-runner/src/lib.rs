@@ -32,11 +32,12 @@ use rustc_hash::{FxHashMap, FxHashSet};
 use std::cell::RefCell;
 use std::rc::Rc;
 use value::{
-    add_values, compare_values, int_bitwise_binop, modular_word_bitnot, modular_word_bitwise_binop,
-    modular_word_compare_values, modular_word_neg, modular_word_numeric_binop, numeric_binop,
-    uint_width_checked_div, uint_width_checked_mul, uint_width_checked_neg, uint_width_checked_rem,
-    uint_width_checked_sub, values_equal, width_checked_div, width_checked_mul, width_checked_neg,
-    width_checked_rem, width_checked_sub, GradientStorage, TensorValue,
+    add_values, compare_values, decimal_numeric_binop, int_bitwise_binop, modular_word_bitnot,
+    modular_word_bitwise_binop, modular_word_compare_values, modular_word_neg,
+    modular_word_numeric_binop, numeric_binop, uint_width_checked_div, uint_width_checked_mul,
+    uint_width_checked_neg, uint_width_checked_rem, uint_width_checked_sub, values_equal,
+    width_checked_div, width_checked_mul, width_checked_neg, width_checked_rem, width_checked_sub,
+    GradientStorage, TensorValue,
 };
 
 pub(crate) const RUNNER_UNSUPPORTED_PREFIX: &str = "faberscript unsupported";
@@ -966,6 +967,7 @@ impl<H: Host + ?Sized> Runner<'_, H> {
             }
             MirValueKind::Option(op) => self.eval_option_value(op, span)?,
         };
+        let computed = self.normalize_decimal_value(computed, value.ty.semantic_id(), span)?;
         if let Some(frame) = self.frames.last_mut() {
             frame.values.insert(value.id, computed.clone());
         }
@@ -1322,8 +1324,13 @@ impl<H: Host + ?Sized> Runner<'_, H> {
         result_ty: radix_mir::MirType,
         span: Span,
     ) -> Result<Value, RunnerError> {
-        let value = self.eval_operand(operand, span)?;
         let width = self.resolve_int_width(result_ty);
+        let value = self.eval_operand(operand, span)?;
+        let value = if width.is_decimal() {
+            self.normalize_decimal_value(value, result_ty.semantic_id(), span)?
+        } else {
+            value
+        };
         let modular = self.modular_word_width(result_ty);
         match op {
             MirUnOp::Neg => {
@@ -1542,9 +1549,17 @@ impl<H: Host + ?Sized> Runner<'_, H> {
         result_ty: radix_mir::MirType,
         span: Span,
     ) -> Result<Value, RunnerError> {
+        let width = self.resolve_int_width(result_ty);
         let left = self.eval_operand(lhs, span)?;
         let right = self.eval_operand(rhs, span)?;
-        let width = self.resolve_int_width(result_ty);
+        let (left, right) = if width.is_decimal() {
+            (
+                self.normalize_decimal_value(left, result_ty.semantic_id(), span)?,
+                self.normalize_decimal_value(right, result_ty.semantic_id(), span)?,
+            )
+        } else {
+            (left, right)
+        };
         if let Some(modular) = self.modular_word_width(result_ty) {
             return match op {
                 MirBinOp::Add | MirBinOp::Sub | MirBinOp::Mul | MirBinOp::Div | MirBinOp::Mod => {
@@ -1564,6 +1579,11 @@ impl<H: Host + ?Sized> Runner<'_, H> {
             };
         }
         match op {
+            MirBinOp::Add | MirBinOp::Sub | MirBinOp::Mul | MirBinOp::Div | MirBinOp::Mod
+                if width.is_decimal() =>
+            {
+                decimal_numeric_binop(left, right, op, width, span)
+            }
             MirBinOp::Add => add_values(left, right, width, span),
             MirBinOp::Sub => numeric_binop(
                 left,
@@ -1802,6 +1822,10 @@ mod kernel_test;
 #[cfg(test)]
 #[path = "value_test.rs"]
 mod value_test;
+
+#[cfg(test)]
+#[path = "decimal_test.rs"]
+mod decimal_test;
 
 #[cfg(test)]
 #[path = "extremum_test.rs"]

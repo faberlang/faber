@@ -6,14 +6,17 @@
 //! source `Value` shape disagrees with typed contracts (e.g. `textus ↦ bivalens`).
 
 use super::value::{
-    int_width_range, modular_word_mask, modular_word_result, MapKey, SermoValue, TensorValue, Value,
+    decimal_scale_factor, int_width_range, modular_word_mask, modular_word_result,
+    round_half_even_division, MapKey, SermoValue, TensorValue, Value,
 };
 use super::{runtime_regex_pattern, Runner, RunnerError};
 use radix_lexer::{Span, Symbol};
 use radix_mir::lista_tensor_conversio::{resolve_lista_to_tensor_shape, ListaToTensorShape};
 use radix_mir::{MirConversion, MirNamedOperand, MirOperand, MirStructFieldDefaults};
 use radix_runtime_contract::instans::{Instans, InstansPraecisio};
-use radix_types::{InstansPrecision, NumericWidth, Primitive, Type, TypeId, TypeTable};
+use radix_types::{
+    effective_width, InstansPrecision, NumericWidth, Primitive, Type, TypeId, TypeTable,
+};
 use rustc_hash::{FxHashMap, FxHashSet};
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -30,6 +33,22 @@ pub(crate) enum MissingFieldPolicy {
 }
 
 impl<H: super::Host + ?Sized> Runner<'_, H> {
+    /// Normalize a typed decimal MIR value into the scaled `Value::Int`
+    /// carrier. D1 still lowers decimal literals through the float constant
+    /// seam, so this boundary re-derives the exact decimal text before D4
+    /// arithmetic touches it.
+    pub(crate) fn normalize_decimal_value(
+        &mut self,
+        value: Value,
+        ty: TypeId,
+        span: Span,
+    ) -> Result<Value, RunnerError> {
+        let Some(width) = effective_width(self.types, ty).filter(|width| width.is_decimal()) else {
+            return Ok(value);
+        };
+        self.convert_to_numerus_from(value, ty, &[], width, None, span)
+    }
+
     pub(crate) fn eval_runtime_convert(
         &mut self,
         conversion: &MirConversion,
@@ -91,7 +110,7 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                     Type::SizedNumeric(_, width) => *width,
                     _ => NumericWidth::I64,
                 };
-                self.convert_to_numerus(value, params, width, recovery, span)
+                self.convert_to_numerus_from(value, source_ty, params, width, recovery, span)
             }
             Type::ModularWord(width) => self.convert_to_modular_word(value, *width, span),
             Type::Primitive(Primitive::Fractus) | Type::SizedNumeric(Primitive::Fractus, _) => {
@@ -99,7 +118,7 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                     Type::SizedNumeric(_, width) => *width,
                     _ => NumericWidth::F64,
                 };
-                self.convert_to_fractus(value, params, width, recovery, span)
+                self.convert_to_fractus_from(value, source_ty, params, width, recovery, span)
             }
             Type::Primitive(Primitive::Bivalens) => self.convert_to_bivalens(value, recovery, span),
             Type::Primitive(Primitive::Octeti) => self.convert_to_octeti(value, span),

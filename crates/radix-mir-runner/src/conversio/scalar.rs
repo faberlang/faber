@@ -11,8 +11,9 @@
     clippy::wildcard_imports
 )]
 // Semantic numeric conversions between host value kinds during conversio
-// lowering: fractus→numerus truncates toward zero per Faber semantics, width
-// range-checks compare in i128/u128, and numerus→fractus promotes to f64.
+// lowering: ordinary fractus→numerus keeps its truncation law, while decimal
+// carriers parse and reduce round-half-even; width range-checks compare in
+// i128/u128, and numerus→fractus promotes to f64.
 #![expect(
     clippy::cast_possible_truncation,
     clippy::cast_sign_loss,
@@ -56,6 +57,20 @@ impl<H: super::super::Host + ?Sized> Runner<'_, H> {
         recovery: Option<&MirOperand>,
         span: Span,
     ) -> Result<Value, RunnerError> {
+        if let Some(width) = decimal_source_width(self.types, source_ty) {
+            let carrier = match value {
+                Value::Int(value) => decimal_carrier_value(value, width, span)?,
+                Value::Float(value) => decimal_text_to_carrier(&value.to_string(), width)
+                    .map_err(|error| decimal_text_error(error, span))?,
+                other => {
+                    return Err(RunnerError::internal(
+                        span,
+                        format!("unsupported decimal value for textus: {other:?}"),
+                    ));
+                }
+            };
+            return Ok(Value::Str(format_decimal_carrier(carrier, width)));
+        }
         if matches!(self.types.get(source_ty), Type::Primitive(Primitive::Json)) {
             // Render the JSON document directly from concrete `Value`, mirroring
             // the prior `value_to_runtime_json_valor` -> `faber::Json::to_wire`
@@ -126,10 +141,22 @@ impl<H: super::super::Host + ?Sized> Runner<'_, H> {
         }))
     }
 
-    #[allow(clippy::only_used_in_recursion)]
+    #[allow(dead_code, clippy::only_used_in_recursion)]
     pub(crate) fn convert_to_numerus(
         &mut self,
         value: Value,
+        params: &[Symbol],
+        width: NumericWidth,
+        recovery: Option<&MirOperand>,
+        span: Span,
+    ) -> Result<Value, RunnerError> {
+        self.convert_to_numerus_from(value, TypeId(0), params, width, recovery, span)
+    }
+
+    pub(crate) fn convert_to_numerus_from(
+        &mut self,
+        value: Value,
+        source_ty: TypeId,
         params: &[Symbol],
         width: NumericWidth,
         recovery: Option<&MirOperand>,
@@ -147,6 +174,12 @@ impl<H: super::super::Host + ?Sized> Runner<'_, H> {
                 };
             }
             return self.recover_or_fail(recovery, span, "bits pair width mismatch");
+        }
+        if width.is_decimal() {
+            return self.convert_to_decimal(value, source_ty, width, recovery, span);
+        }
+        if let Some(source_width) = decimal_source_width(self.types, source_ty) {
+            return self.convert_decimal_to_integer(value, source_width, width, recovery, span);
         }
         match value {
             Value::Str(text) => match self.parse_textus_numerus(&text, params) {
@@ -186,7 +219,9 @@ impl<H: super::super::Host + ?Sized> Runner<'_, H> {
                 ),
             },
             Value::Sermo(sermo) => match materialize_sermo_value(sermo, span) {
-                Ok(value) => self.convert_to_numerus(value, params, width, recovery, span),
+                Ok(value) => {
+                    self.convert_to_numerus_from(value, source_ty, params, width, recovery, span)
+                }
                 Err(_) if recovery.is_some() => {
                     self.recover_or_fail(recovery, span, "sermo to numerus conversion failed")
                 }
@@ -200,6 +235,106 @@ impl<H: super::super::Host + ?Sized> Runner<'_, H> {
                 format!("unsupported conversio to numerus from {other:?}"),
             )),
         }
+    }
+
+    fn convert_to_decimal(
+        &mut self,
+        value: Value,
+        source_ty: TypeId,
+        target_width: NumericWidth,
+        recovery: Option<&MirOperand>,
+        span: Span,
+    ) -> Result<Value, RunnerError> {
+        let source_width = decimal_source_width(self.types, source_ty);
+        let result = match value {
+            Value::Int(value) => match source_width {
+                Some(source_width) => decimal_widen_carrier(value, source_width, target_width),
+                None => decimal_integer_to_carrier(i128::from(value), target_width),
+            },
+            Value::UInt(value) => decimal_integer_to_carrier(i128::from(value), target_width),
+            Value::Float(value) => decimal_text_to_carrier(&value.to_string(), target_width),
+            Value::Str(text) => decimal_text_to_carrier(&text, target_width),
+            Value::Sermo(sermo) => match materialize_sermo_value(sermo, span) {
+                Ok(value) => {
+                    return self.convert_to_decimal(value, source_ty, target_width, recovery, span)
+                }
+                Err(error) => return Err(error),
+            },
+            other => {
+                return Err(RunnerError::internal(
+                    span,
+                    format!("unsupported conversio to decimal from {other:?}"),
+                ));
+            }
+        };
+        match result {
+            Ok(value) => Ok(Value::Int(value)),
+            Err(DecimalTextError::Invalid) => {
+                self.recover_or_fail(recovery, span, "textus to numerus conversion failed")
+            }
+            Err(DecimalTextError::OutOfRange) => {
+                self.recover_or_fail(recovery, span, "textus to numerus conversion out of range")
+            }
+            Err(DecimalTextError::Narrowing) => {
+                Err(decimal_text_error(DecimalTextError::Narrowing, span))
+            }
+        }
+    }
+
+    fn convert_decimal_to_integer(
+        &mut self,
+        value: Value,
+        source_width: NumericWidth,
+        target_width: NumericWidth,
+        recovery: Option<&MirOperand>,
+        span: Span,
+    ) -> Result<Value, RunnerError> {
+        let raw = match value {
+            Value::Int(value) => decimal_carrier_value(value, source_width, span),
+            Value::Float(value) => decimal_text_to_carrier(&value.to_string(), source_width)
+                .map_err(|error| decimal_text_error(error, span)),
+            Value::Sermo(sermo) => match materialize_sermo_value(sermo, span) {
+                Ok(value) => {
+                    return self.convert_decimal_to_integer(
+                        value,
+                        source_width,
+                        target_width,
+                        recovery,
+                        span,
+                    )
+                }
+                Err(error) => return Err(error),
+            },
+            other => Err(RunnerError::internal(
+                span,
+                format!("unsupported decimal conversion from {other:?}"),
+            )),
+        }?;
+        let scale = decimal_scale_factor(source_width).ok_or_else(|| {
+            RunnerError::internal(span, "decimal conversion requires decimal width")
+        })?;
+        let rounded = round_half_even_division(
+            i128::from(raw),
+            scale,
+            span,
+            "decimal to numerus conversion failed",
+        )?;
+        let (lo, hi) = int_width_range(target_width);
+        if !(lo..=hi).contains(&rounded) {
+            return self.recover_or_fail(
+                recovery,
+                span,
+                "decimal to numerus conversion out of range",
+            );
+        }
+        if target_width.is_unsigned_int() {
+            return u64::try_from(rounded).map(Value::UInt).map_err(|_| {
+                RunnerError::internal(span, "decimal to numerus conversion out of range")
+            });
+        }
+        i64::try_from(rounded)
+            .map(Value::Int)
+            .map_err(|_| RunnerError::internal(span, "decimal to numerus conversion out of range"))
     }
 
     fn convert_octeti_endian_numerus(
@@ -361,6 +496,7 @@ impl<H: super::super::Host + ?Sized> Runner<'_, H> {
             })
     }
 
+    #[allow(dead_code)]
     pub(crate) fn convert_to_fractus(
         &mut self,
         value: Value,
@@ -369,6 +505,44 @@ impl<H: super::super::Host + ?Sized> Runner<'_, H> {
         recovery: Option<&MirOperand>,
         span: Span,
     ) -> Result<Value, RunnerError> {
+        self.convert_to_fractus_from(value, TypeId(0), params, width, recovery, span)
+    }
+
+    pub(crate) fn convert_to_fractus_from(
+        &mut self,
+        value: Value,
+        source_ty: TypeId,
+        params: &[Symbol],
+        width: NumericWidth,
+        recovery: Option<&MirOperand>,
+        span: Span,
+    ) -> Result<Value, RunnerError> {
+        if let Some(source_width) = decimal_source_width(self.types, source_ty) {
+            if self.has_bits_hint(params) {
+                return self.recover_or_fail(recovery, span, "bits pair width mismatch");
+            }
+            let carrier = match value {
+                Value::Int(value) => decimal_carrier_value(value, source_width, span)?,
+                Value::Float(value) => decimal_text_to_carrier(&value.to_string(), source_width)
+                    .map_err(|error| decimal_text_error(error, span))?,
+                other => {
+                    return Err(RunnerError::internal(
+                        span,
+                        format!("unsupported decimal conversion from {other:?}"),
+                    ));
+                }
+            };
+            let scale = decimal_scale_factor(source_width).ok_or_else(|| {
+                RunnerError::internal(span, "decimal conversion requires decimal width")
+            })?;
+            let value = (carrier as f64) / (scale as f64);
+            let value = if matches!(width, NumericWidth::F64) {
+                value
+            } else {
+                value as f32 as f64
+            };
+            return Ok(Value::Float(value));
+        }
         if self.has_bits_hint(params) {
             // `fractus<f16|f32|f64, Bits>` reinterprets integer bits; exact pairs
             // only, NaN payloads pass through bit-identical.
@@ -960,6 +1134,137 @@ impl<H: super::super::Host + ?Sized> Runner<'_, H> {
                 format!("unsupported conversio to instans from {other:?}"),
             )),
         }
+    }
+}
+
+#[derive(Clone, Copy)]
+enum DecimalTextError {
+    Invalid,
+    OutOfRange,
+    Narrowing,
+}
+
+fn decimal_source_width(types: &TypeTable, ty: TypeId) -> Option<NumericWidth> {
+    effective_width(types, ty).filter(|width| width.is_decimal())
+}
+
+fn decimal_text_error(error: DecimalTextError, span: Span) -> RunnerError {
+    let message = match error {
+        DecimalTextError::Invalid => "textus to numerus conversion failed",
+        DecimalTextError::OutOfRange => "textus to numerus conversion out of range",
+        DecimalTextError::Narrowing => "decimal width narrowing rejected",
+    };
+    RunnerError::internal(span, message)
+}
+
+fn decimal_carrier_value(value: i64, width: NumericWidth, span: Span) -> Result<i64, RunnerError> {
+    let (lo, hi) = int_width_range(width);
+    if (lo..=hi).contains(&i128::from(value)) {
+        Ok(value)
+    } else {
+        Err(RunnerError::internal(
+            span,
+            "decimal carrier is outside declared width",
+        ))
+    }
+}
+
+fn decimal_carrier_from_raw(value: i128, width: NumericWidth) -> Result<i64, DecimalTextError> {
+    let (lo, hi) = int_width_range(width);
+    if !(lo..=hi).contains(&value) {
+        return Err(DecimalTextError::OutOfRange);
+    }
+    i64::try_from(value).map_err(|_| DecimalTextError::OutOfRange)
+}
+
+fn decimal_integer_to_carrier(value: i128, width: NumericWidth) -> Result<i64, DecimalTextError> {
+    let scale = decimal_scale_factor(width).ok_or(DecimalTextError::OutOfRange)?;
+    let value = value
+        .checked_mul(scale)
+        .ok_or(DecimalTextError::OutOfRange)?;
+    decimal_carrier_from_raw(value, width)
+}
+
+fn decimal_widen_carrier(
+    value: i64,
+    source_width: NumericWidth,
+    target_width: NumericWidth,
+) -> Result<i64, DecimalTextError> {
+    let value = decimal_carrier_from_raw(i128::from(value), source_width)?;
+    if source_width == target_width {
+        return Ok(value);
+    }
+    if source_width == NumericWidth::D32 && target_width == NumericWidth::D64 {
+        return i128::from(value)
+            .checked_mul(100)
+            .ok_or(DecimalTextError::OutOfRange)
+            .and_then(|value| decimal_carrier_from_raw(value, target_width));
+    }
+    Err(DecimalTextError::Narrowing)
+}
+
+fn decimal_text_to_carrier(text: &str, width: NumericWidth) -> Result<i64, DecimalTextError> {
+    let (negative, digits) = match text.strip_prefix('-') {
+        Some(digits) => (true, digits),
+        None => (false, text.strip_prefix('+').unwrap_or(text)),
+    };
+    let Some((mantissa, exponent)) = radix_types::numeric_width::decimal_text_to_scaled(digits)
+    else {
+        return Err(DecimalTextError::Invalid);
+    };
+    let mantissa = if negative { -mantissa } else { mantissa };
+    let scale_digits = width.decimal_scale().ok_or(DecimalTextError::OutOfRange)?;
+    let shift = exponent
+        .checked_add(i32::try_from(scale_digits).unwrap_or(i32::MAX))
+        .ok_or(DecimalTextError::OutOfRange)?;
+    let carrier = if shift >= 0 {
+        let factor = 10_i128
+            .checked_pow(u32::try_from(shift).map_err(|_| DecimalTextError::OutOfRange)?)
+            .ok_or(DecimalTextError::OutOfRange)?;
+        mantissa
+            .checked_mul(factor)
+            .ok_or(DecimalTextError::OutOfRange)?
+    } else {
+        let Some(power) = shift
+            .checked_neg()
+            .and_then(|power| u32::try_from(power).ok())
+        else {
+            return Ok(0);
+        };
+        let Some(divisor) = 10_i128.checked_pow(power) else {
+            // The parsed mantissa fits i128, so a decimal denominator beyond
+            // i128 cannot produce a non-zero rounded carrier.
+            return Ok(0);
+        };
+        super::super::value::round_half_even_quotient(mantissa, divisor)
+            .ok_or(DecimalTextError::OutOfRange)?
+    };
+    decimal_carrier_from_raw(carrier, width)
+}
+
+fn format_decimal_carrier(value: i64, width: NumericWidth) -> String {
+    let digits = usize::try_from(width.decimal_scale().unwrap_or(0)).unwrap_or(0);
+    let factor = decimal_scale_factor(width).unwrap_or(1);
+    let value = i128::from(value);
+    let negative = value < 0;
+    let magnitude = if negative { -value } else { value };
+    let integer = magnitude / factor;
+    let remainder = magnitude % factor;
+    if remainder == 0 || digits == 0 {
+        return if negative {
+            format!("-{integer}")
+        } else {
+            integer.to_string()
+        };
+    }
+    let mut fraction = format!("{remainder:0>digits$}");
+    while fraction.ends_with('0') {
+        fraction.pop();
+    }
+    if negative {
+        format!("-{integer}.{fraction}")
+    } else {
+        format!("{integer}.{fraction}")
     }
 }
 

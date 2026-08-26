@@ -539,6 +539,120 @@ pub fn int_width_range(width: NumericWidth) -> (i128, i128) {
     }
 }
 
+/// Decimal scale as an integer factor (`d32 = 10^7`, `d64 = 10^9`).
+///
+/// The decimal runner stores the scaled integer in the ordinary `Value::Int`
+/// carrier. Keeping the factor here, next to the width bounds, makes every
+/// arithmetic path use the same representation contract.
+#[must_use]
+pub(crate) fn decimal_scale_factor(width: NumericWidth) -> Option<i128> {
+    width
+        .decimal_scale()
+        .and_then(|digits| 10_i128.checked_pow(digits))
+}
+
+/// Pure round-half-even quotient for values whose intermediate arithmetic has
+/// already been checked. Rust integer division truncates toward zero, so the
+/// remainder decides whether the quotient moves away from zero. A midpoint
+/// moves only when the truncated quotient is odd.
+#[must_use]
+pub(crate) fn round_half_even_quotient(numerator: i128, denominator: i128) -> Option<i128> {
+    if denominator == 0 {
+        return None;
+    }
+    let quotient = numerator / denominator;
+    let remainder = numerator % denominator;
+    if remainder == 0 {
+        return Some(quotient);
+    }
+
+    let remainder_abs = remainder.unsigned_abs();
+    let denominator_abs = denominator.unsigned_abs();
+    let twice_remainder = remainder_abs.checked_mul(2)?;
+    let rounds = twice_remainder > denominator_abs
+        || (twice_remainder == denominator_abs && quotient % 2 != 0);
+    if !rounds {
+        return Some(quotient);
+    }
+
+    let step = if (numerator < 0) == (denominator < 0) {
+        1
+    } else {
+        -1
+    };
+    quotient.checked_add(step)
+}
+
+/// Checked round-half-even division with the runner's standard arithmetic
+/// diagnostics. Decimal parsing uses the pure quotient helper so it can
+/// distinguish malformed text from a carrier overflow.
+pub(crate) fn round_half_even_division(
+    numerator: i128,
+    denominator: i128,
+    span: Span,
+    error: &'static str,
+) -> Result<i128, RunnerError> {
+    round_half_even_quotient(numerator, denominator)
+        .ok_or_else(|| RunnerError::internal(span, error))
+}
+
+/// Execute one decimal arithmetic operation over scaled `Value::Int` values.
+/// Addition, subtraction, and remainder stay in carrier units. Multiplication
+/// divides by the scale and division multiplies by the scale; both reductions
+/// use checked i128 intermediates and round-half-even.
+pub(crate) fn decimal_numeric_binop(
+    left: Value,
+    right: Value,
+    op: MirBinOp,
+    width: NumericWidth,
+    span: Span,
+) -> Result<Value, RunnerError> {
+    let (Value::Int(left), Value::Int(right)) = (left, right) else {
+        return Err(RunnerError::internal(
+            span,
+            "decimal operand requires scaled numerus",
+        ));
+    };
+    let scale = decimal_scale_factor(width)
+        .ok_or_else(|| RunnerError::internal(span, "decimal arithmetic requires decimal width"))?;
+    let result = match op {
+        MirBinOp::Add => (left as i128)
+            .checked_add(right as i128)
+            .ok_or_else(|| RunnerError::internal(span, "numerus overflow"))?,
+        MirBinOp::Sub => (left as i128)
+            .checked_sub(right as i128)
+            .ok_or_else(|| RunnerError::internal(span, "numerus overflow"))?,
+        MirBinOp::Mul => {
+            let product = (left as i128)
+                .checked_mul(right as i128)
+                .ok_or_else(|| RunnerError::internal(span, "numerus overflow"))?;
+            round_half_even_division(product, scale, span, "numerus overflow")?
+        }
+        MirBinOp::Div => {
+            if right == 0 {
+                return Err(RunnerError::internal(span, "numerus division failed"));
+            }
+            let numerator = (left as i128)
+                .checked_mul(scale)
+                .ok_or_else(|| RunnerError::internal(span, "numerus division failed"))?;
+            round_half_even_division(numerator, right as i128, span, "numerus division failed")?
+        }
+        MirBinOp::Mod => {
+            if right == 0 {
+                return Err(RunnerError::internal(span, "numerus division failed"));
+            }
+            (left as i128) % (right as i128)
+        }
+        _ => {
+            return Err(RunnerError::internal(
+                span,
+                "invalid decimal arithmetic operator",
+            ));
+        }
+    };
+    check_int_width(result, width, span, "numerus overflow").map(Value::Int)
+}
+
 fn check_int_width(
     result: i128,
     width: NumericWidth,
@@ -785,6 +899,9 @@ pub fn add_values(
     width: NumericWidth,
     span: Span,
 ) -> Result<Value, RunnerError> {
+    if width.is_decimal() {
+        return decimal_numeric_binop(left, right, MirBinOp::Add, width, span);
+    }
     match (left, right) {
         (Value::Str(left), Value::Str(right)) => Ok(Value::Str(format!("{left}{right}"))),
         (left, right) => numeric_binop(
