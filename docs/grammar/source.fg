@@ -1001,7 +1001,10 @@ discriminants := expression (',' expression)*
 @formerly variantCase
 casu_variant_clause  := 'casu' patterns (block_stmt | ergo_joint statement)
 patterns     := pattern ((',' | 'et') pattern)*
-pattern      := '_' | literal | (IDENTIFIER ut_pattern?)
+# A one-segment type name in a `discerne` arm is classified as a type pattern
+# by the parser's type-name lookahead; qualified paths remain variant patterns.
+pattern      := '_' | literal | type_pattern | (IDENTIFIER ut_pattern?)
+type_pattern := IDENTIFIER ut_pattern?
 @formerly patternBind
 ut_pattern  := ('ut' IDENTIFIER) | (('fixum' | 'varia') pattern_binding (',' pattern_binding)*)
 @formerly patternBinding
