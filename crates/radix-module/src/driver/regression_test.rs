@@ -133,12 +133,12 @@ fn fac_do_while_roundtrips_through_faber_codegen() {
 #[test]
 #[cfg(feature = "hir-faber")]
 fn discerne_alias_and_multi_subject_roundtrip_through_faber_codegen() {
-    let source = r#"discretio Event {
+    let source = r#"discretio Res {
   Click { numerus x numerus y },
   Quit
 }
 
-functio compare(Event left, Event right) → vacuum {
+functio compare(Res left, Res right) → vacuum {
   discerne left, right {
     casu Click ut l, Quit ut r {
       nota l.x
@@ -769,7 +769,8 @@ functio maxValue(lista<numerus> nums) → numerus {
 }
 
 incipit {
-  fixum _ numbers ← [1, 2, 3, 4, 5]
+  # 7562d0cf: annotate so the bounded literal widens explicitly.
+  fixum lista<numerus> numbers ← [1, 2, 3, 4, 5]
   nota sumArray(numbers)
   nota maxValue(numbers)
 }";
@@ -1706,7 +1707,10 @@ fn rust_output_supports_unicode_textus_index_and_range_slice() {
 #[test]
 fn rust_compile_accepts_explicit_infer_type_marker() {
     let session = test_session(Target::HirRust);
-    let source = r#"functio answer() → _ {
+    // Ruling g bans `→ _` signature holes; the return is pinned to `numerus`
+    // and the legal binding holes (`fixum _` / `varia _`) stay the test's
+    // subject.
+    let source = r#"functio answer() → numerus {
   redde 42
 }
 

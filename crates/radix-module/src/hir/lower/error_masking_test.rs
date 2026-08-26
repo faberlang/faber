@@ -53,12 +53,12 @@ fn en_locale_pack() -> crate::locale::LocalePack {
 
 /// lib.fab for Repro A — the union the consumer imports.
 const REPRO_A_LIB: &str = r"
-@ publica
+@ public
 union Kind {
     Alpha,
     Gamma { int n }
 }
-@ publica
+@ public
 fn faci_ok() → Kind {
     return variant Gamma { n = 3 } ∷ Kind
 }
@@ -98,17 +98,17 @@ fn describe(u.Kind x) → string {
 
 /// lib.fab for Repro B — the union + enum + class the consumer imports.
 const REPRO_B_LIB: &str = r"
-@ publica
+@ public
 union Kind {
     Alpha,
     Gamma { int n }
 }
-@ publica
+@ public
 enum Mark {
     Red,
     Blue
 }
-@ publica
+@ public
 class Payload {
     Mark mark
 }

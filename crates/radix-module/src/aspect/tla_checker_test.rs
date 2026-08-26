@@ -6,9 +6,6 @@
 use super::{check_tla_modules, HirAspectCheckStatus, HirAspectTlaModule, TlaAspectChecker, TlaAspectCheckerConfig};
 use std::ffi::OsString;
 use std::path::PathBuf;
-use std::sync::Mutex;
-
-static CWD_LOCK: Mutex<()> = Mutex::new(());
 
 fn temp_work_dir(name: &str) -> (tempfile::TempDir, PathBuf) {
     let dir = crate::test_support::test_temp_dir(name);
@@ -118,21 +115,43 @@ fn hir_aspect_checker_normalizes_unknown_tlc_output_as_error() {
 
 #[test]
 fn hir_aspect_checker_env_paths_are_canonicalized_before_work_dir_use() {
-    let _guard = CWD_LOCK.lock().expect("cwd lock");
+    // Hermetic: prove relative-path canonicalization without mutating the
+    // process CWD (set_current_dir flipped stdlib/locale resolution for
+    // concurrently running en-surface tests).
+    fn relative_to_cwd(target: &std::path::Path) -> PathBuf {
+        let cwd = std::env::current_dir().expect("current dir");
+        let mut cwd_iter = cwd.components();
+        let target_iter = target.components();
+        let mut common = 0usize;
+        let target_components: Vec<_> = target_iter.collect();
+        for target_component in &target_components {
+            if cwd_iter.next().as_ref() != Some(target_component) {
+                break;
+            }
+            common += 1;
+        }
+        let depth = cwd.components().count() - common;
+        let mut path = PathBuf::new();
+        for _ in 0..depth {
+            path.push("..");
+        }
+        for component in &target_components[common..] {
+            path.push(component.as_os_str());
+        }
+        path
+    }
+
     let (_td, work_dir) = temp_work_dir("canonical-env-paths");
     let bin_dir = work_dir.join("bin");
     std::fs::create_dir_all(&bin_dir).expect("temp bin dir");
     std::fs::write(work_dir.join("tla2tools.jar"), "").expect("fake jar");
     std::fs::write(bin_dir.join("java"), "").expect("fake java");
 
-    let original_dir = std::env::current_dir().expect("current dir");
-    std::env::set_current_dir(&work_dir).expect("enter temp work dir");
     let checker_work = work_dir.join("checker-work");
-    let jar = OsString::from("tla2tools.jar");
-    let java = OsString::from("bin/java");
+    let jar = relative_to_cwd(&work_dir.join("tla2tools.jar")).into_os_string();
+    let java = relative_to_cwd(&bin_dir.join("java")).into_os_string();
     let config = TlaAspectCheckerConfig::from_env_values(&checker_work, &jar, &java)
         .expect("relative env paths should canonicalize");
-    std::env::set_current_dir(original_dir).expect("restore current dir");
 
     assert!(config.tla_tools_jar.is_absolute());
     assert!(config.java_bin.is_absolute());

@@ -5,7 +5,7 @@ grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "
 category = "ad"
 canonical = true
 summary = "fs file reads are shape-specific: lege<textus>, carpe (lista<textus>), hauri (octeti)."
-syntax = "fs.read_file<textus>(via) | call 'fs:carpe' (via) ↦ lista<textus> | call 'fs:hauri' (via) ↦ octeti"
+syntax = "charta.read_file<textus>(via) | call 'fs:carpe' (via) ↦ lista<textus> | call 'fs:hauri' (via) ↦ octeti"
 related = ["ad", "fs", "lege", "carpe", "hauri"]
 locale = "en"
 +++
@@ -15,13 +15,13 @@ locale = "en"
 # =============================================================================
 #
 # What this teaches:
-#   • Shape-specific reads — `solum.read_file<textus>` reads a file as text;
+#   • Shape-specific reads — `charta.read_file<textus>` reads a file as text;
 #     `solum:carpe` reads it as a line list; `solum:hauri` reads raw bytes
 #   • Manifest-backed surface — each route declares exactly one result shape in
 #     the solum provider manifest, so the materialized target always matches
 #
 # Common mistakes:
-#   • assuming one generic `solum.read_file<T>` reads every shape — `lege` is
+#   • assuming one generic `charta.read_file<T>` reads every shape — `lege` is
 #     text-only; use `carpe` for `lista<textus>` and `hauri` for `octeti`
 #
 # See also: ad, solum, lege, carpe, hauri
@@ -34,24 +34,24 @@ locale = "en"
 # `solum:hauri` → octeti. The `norma:fs` wrappers `carpe`/`hauri` are
 # module-private this release, so this fixture reaches the line/byte routes
 # directly through the manifest-backed `ad` surface; the compiler's
-# `@ radix typus` metadata on `norma:fs.read_file<T>` still admits the broader
+# `@ radix typus` metadata on `norma:charta.read_file<T>` still admits the broader
 # targets, which the provider rejects (recorded residual). Generic
-# `solum.read_file<T>` across all three shapes is separate future provider work.
+# `charta.read_file<T>` across all three shapes is separate future provider work.
 #
 # Runtime check: files are prepared under /tmp so each read route can prove its
 # accepted result shape independently of the harness working directory.
 
-import from "norma:fs" fs
+import from "norma:fs" charta
 
 main {
     const string textPath ← "/tmp/faber-fs-lege-generic.txt"
-    fs.write_file(textPath, "prima\nsecunda\n")
+    charta.write_file(textPath, "prima\nsecunda\n")
 
-    const string body ← fs.read_file<string>(textPath)
+    const string body ← charta.read_file<string>(textPath)
     assert body ≡ "prima\nsecunda\n"
 
     const list<string> lineae ← call 'fs:carpe' (textPath) ↦ list<string>
-    assert lineae ≡ ["prima", "secunda"]
+    assert lineae ≡ (["prima", "secunda"] ↦ list<string>)
 
     const bytes data ← call 'fs:hauri' (textPath) ↦ octeti
     assert data ≡ |70 72 69 6d 61 0a 73 65 63 75 6e 64 61 0a|

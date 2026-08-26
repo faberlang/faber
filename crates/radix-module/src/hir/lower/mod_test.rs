@@ -479,7 +479,10 @@ fn nullable_union_types_lower_to_option_and_plain_unions_stay_unions() {
 fn union_hole_lowers_to_infer_union_distinct_from_infer() {
     // The standalone `∪` hole lowers to `Type::InferUnion(InferVar)`, distinct
     // from the monomorphic `_` hole (`Type::Infer`) and from explicit unions.
-    let source = r"functio f(∪ x, _ m) → ∪ { redde 1 }";
+    // Signature slots stay explicit (ruling g): `→ ∪` return holes are banned,
+    // so the return is pinned to `numerus` and only the binding holes prove
+    // the ∪-vs-_ lowering.
+    let source = r"functio f(∪ x, _ m) → numerus { redde 1 }";
 
     let (lowered, _, types) = lower_source(source);
     let hir = lowered.hir;
@@ -499,10 +502,12 @@ fn union_hole_lowers_to_infer_union_distinct_from_infer() {
         types.get(params[1].ty)
     );
 
+    // `→ ∪` is banned in signature slots (ruling g); the explicit `numerus`
+    // return is the re-pin.
     let ret_ty = ret_ty.expect("expected explicit return type");
     assert!(
-        matches!(types.get(ret_ty), Type::InferUnion(_)),
-        "`→ ∪` return type should lower to Type::InferUnion, got {:?}",
+        matches!(types.get(ret_ty), Type::Primitive(Primitive::Numerus)),
+        "`→ numerus` return type should lower to Type::Numerus, got {:?}",
         types.get(ret_ty)
     );
 }
