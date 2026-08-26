@@ -173,3 +173,92 @@ fn textus_to_decimal_arrow_accepts() {
 fn textus_to_d64_arrow_accepts() {
     test_support::assert_accepts("functio c(textus s) → numerus<d64> { redde s ↦ numerus<d64> }");
 }
+
+// --- CTR-02: channel contract for the builtin decimal rows ---
+//
+// The `textus → numerus<d32|d64>` text-parse row is failable and keeps the
+// builtin textus payload law: a bare `↦` with no inline recovery is admitted
+// only into a `⇥ textus` channel, and a non-textus channel retains the
+// `conversio_failure_channel_textus_required` diagnostic. The d32→d64
+// widening row is total and needs no channel. A builtin row (no conversion
+// function, hence no declared `⇥ E`) never admits failable-call propagation
+// through the registry seam.
+
+use super::TypeChecker;
+use crate::scope::ConversionPair;
+use crate::{FuncSig, NumericWidth, Primitive, Resolver, TypeTable};
+use radix_lexer::{Interner, Span};
+use radix_target::Target;
+
+#[test]
+fn textus_to_decimal_bare_arrow_requires_textus_channel() {
+    test_support::assert_accepts(
+        "functio c(textus s) → numerus<d32> ⇥ textus { redde s ↦ numerus<d32> }",
+    );
+    test_support::assert_accepts(
+        "functio c(textus s) → numerus<d64> ⇥ textus { redde s ↦ numerus<d64> }",
+    );
+    test_support::assert_rejects_with_issue(
+        "functio c(textus s) → numerus<d32> ⇥ numerus { redde s ↦ numerus<d32> }",
+        "conversio_failure_channel_textus_required",
+    );
+    test_support::assert_rejects_with_issue(
+        "functio c(textus s) → numerus<d64> ⇥ numerus { redde s ↦ numerus<d64> }",
+        "conversio_failure_channel_textus_required",
+    );
+}
+
+#[test]
+fn decimal_widening_bare_arrow_needs_no_recovery_in_failable_function() {
+    // d32 → d64 widening is total: a bare `↦` composes no failure channel and
+    // needs no inline recovery.
+    test_support::assert_accepts(
+        "functio c(numerus<d32> a) → numerus<d64> ⇥ textus { redde a ↦ numerus<d64> }",
+    );
+    test_support::assert_accepts(
+        "functio c(numerus<d32> a) → numerus<d64> ⇥ numerus { redde a ↦ numerus<d64> }",
+    );
+}
+
+#[test]
+fn decimal_builtin_row_carries_no_declared_channel() {
+    // A compiler-shipped builtin row has no conversion function and therefore
+    // no declared `⇥ E` channel: the registry seam must not turn it into a
+    // failable-call conversion. The `textus → numerus<d32>` text-parse row is
+    // a real builtin conversion, and the numeric widening law is bypassed by
+    // using `textus` as the thrown payload.
+    let mut types = TypeTable::new();
+    let mut resolver = Resolver::new();
+    let interner = Interner::new();
+    let textus = types.primitive(Primitive::Textus);
+    let d32 = types.sized_numeric(Primitive::Numerus, NumericWidth::D32);
+    resolver
+        .register_builtin_conversion(ConversionPair::new(textus, d32), Span::new(1, 2))
+        .expect("builtin row enrollment");
+
+    let mut checker = TypeChecker::new(&resolver, &mut types, Some(&interner), Target::HirRust);
+    checker.current_error = Some(super::ErrorSink::Function(d32));
+    let vacuum = checker.vacuum_type();
+    let sig = FuncSig {
+        type_params: Vec::new(),
+        type_param_constraints: Vec::new(),
+        params: Vec::new(),
+        ret: vacuum,
+        err: Some(textus),
+        is_async: false,
+        is_generator: false,
+    };
+    let admitted = checker.reject_failable_call(&sig, crate::test_support::test_span());
+    assert!(!admitted);
+    assert_eq!(
+        checker.pending_conversion, None,
+        "a builtin row must not select a conversion function"
+    );
+    let err = checker
+        .errors
+        .iter()
+        .find(|diag| diag.issue() == Some("failable_call_conversion_absent"))
+        .expect("SEM010-shaped absence diagnostic retained");
+    assert!(err.args.iter().any(|arg| arg.name == "source" && arg.value == "textus"));
+    assert!(err.args.iter().any(|arg| arg.name == "destination" && arg.value == "numerus<d32>"));
+}

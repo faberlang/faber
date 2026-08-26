@@ -595,6 +595,26 @@ impl TypeChecker<'_> {
             return self.error_type;
         }
 
+        // CTR-02: a registered user row is the authority for its ordered pair
+        // (direct-only lookup — no transitive composition). A row whose
+        // conversion function declares `⇥ E` makes a bare `↦` failable with
+        // that declared channel; inline recovery stays target-typed.
+        if let Some(row) = self
+            .resolver
+            .conversion_row_for(self.resolve_inferred_type(source_ty), target_resolved)
+        {
+            if let Some(fn_id) = row.fn_def_id {
+                if let Some(channel) = self.functions.get(&fn_id).and_then(|sig| sig.err) {
+                    if let Some(recovery) = recovery {
+                        self.note_conversio_recovery_checked(recovery, target_resolved);
+                    } else {
+                        self.check_registered_row_channel(channel, span);
+                    }
+                }
+                return target_resolved;
+            }
+        }
+
         // All specialized checks above handle known conversion paths; anything
         // reaching here must be between scalar-like types or identical types.
         if !self
@@ -2246,6 +2266,58 @@ impl TypeChecker<'_> {
             return;
         }
         self.invalid_conversion(ISSUE_CONVERSIO_FAILURE_CHANNEL_TEXTUS_REQUIRED, span);
+    }
+
+    /// Compose a registered row's declared `⇥ E` channel through the active
+    /// use-site channel (CTR-02).
+    ///
+    /// A bare `↦` through a registered row whose conversion function declares
+    /// `⇥ E` propagates failure with payload type `E`. The use-site channel
+    /// must accept `E`: either `E` is assignable to the sink type, the sink is
+    /// the `ignotum` escape, or the sink is an inference variable unified with
+    /// `E`. A mismatch retains the SEM010-shaped `failable_call_conversion_absent`
+    /// diagnostic with the declared channel as `source` and the use-site
+    /// channel as `destination`. Returns `false` when the mismatch was
+    /// reported.
+    pub(super) fn check_registered_row_channel(
+        &mut self,
+        channel: TypeId,
+        span: radix_lexer::Span,
+    ) -> bool {
+        let Some(error_ty) = self.current_error.map(|sink| match sink {
+            ErrorSink::Function(ty) | ErrorSink::Local(ty) => ty,
+            ErrorSink::Trap(var) => self.trap_sink_type(var),
+        }) else {
+            return true;
+        };
+        let error_ty = self.resolve_inferred_type(error_ty);
+        if self.is_infer(error_ty) {
+            self.unify_assign_issue(
+                channel,
+                error_ty,
+                span,
+                ISSUE_CONVERSIO_FAILURE_CHANNEL_TYPE_MISMATCH,
+            );
+            return true;
+        }
+        if matches!(
+            self.types.get(error_ty),
+            Type::Primitive(Primitive::Ignotum)
+        ) {
+            return true;
+        }
+        if self.types.is_assignable(self.resolve_inferred_type(channel), error_ty) {
+            return true;
+        }
+        self.invalid_operand_types_with_args(
+            super::call::ISSUE_FAILABLE_CALL_CONVERSION_ABSENT,
+            span,
+            &[
+                ("source", self.format_union_constituent_type(channel)),
+                ("destination", self.format_union_constituent_type(error_ty)),
+            ],
+        );
+        false
     }
 
     fn conversio_can_propagate_failure(&self, source_ty: TypeId, target_resolved: TypeId) -> bool {

@@ -182,3 +182,71 @@ fn u16_to_f16_without_bits_stays_integer_value_conversion() {
         "functio val(numerus<u16> dbits) → fractus<f16> { redde dbits ↦ fractus<f16> }",
     );
 }
+
+// --- CTR-02: channel contract for the builtin `Bits` rows ---
+//
+// The `Bits` bitcast is a total conversion: a bare `↦` in a failable function
+// needs no inline recovery and composes no failure channel, whatever the
+// alternate-exit payload. And a builtin row (no conversion function, hence no
+// declared `⇥ E`) never admits failable-call propagation through the registry
+// seam — the SEM010-shaped absence diagnostic is retained.
+
+use super::TypeChecker;
+use crate::scope::ConversionPair;
+use crate::{FuncSig, NumericWidth, Primitive, Resolver, TypeTable};
+use radix_lexer::{Interner, Span};
+use radix_target::Target;
+
+#[test]
+fn bits_bitcast_bare_arrow_needs_no_recovery_in_failable_function() {
+    test_support::assert_accepts(
+        "functio bits(numerus<u32> n) → fractus<f32> ⇥ textus { redde n ↦ fractus<f32, Bits> }",
+    );
+    test_support::assert_accepts(
+        "functio bits(numerus<u32> n) → fractus<f32> ⇥ numerus { redde n ↦ fractus<f32, Bits> }",
+    );
+    test_support::assert_accepts(
+        "functio bits(numerus<u64> n) → fractus<f64> ⇥ textus { redde n ↦ fractus<f64, Bits> }",
+    );
+}
+
+#[test]
+fn bits_builtin_row_carries_no_declared_channel() {
+    // A compiler-shipped builtin row has no conversion function and therefore
+    // no declared `⇥ E` channel: the registry seam must not turn it into a
+    // failable-call conversion.
+    let mut types = TypeTable::new();
+    let mut resolver = Resolver::new();
+    let interner = Interner::new();
+    let u32 = types.sized_numeric(Primitive::Numerus, NumericWidth::U32);
+    let f32 = types.sized_numeric(Primitive::Fractus, NumericWidth::F32);
+    resolver
+        .register_builtin_conversion(ConversionPair::new(u32, f32), Span::new(1, 2))
+        .expect("builtin row enrollment");
+
+    let mut checker = TypeChecker::new(&resolver, &mut types, Some(&interner), Target::HirRust);
+    checker.current_error = Some(super::ErrorSink::Function(f32));
+    let vacuum = checker.vacuum_type();
+    let sig = FuncSig {
+        type_params: Vec::new(),
+        type_param_constraints: Vec::new(),
+        params: Vec::new(),
+        ret: vacuum,
+        err: Some(u32),
+        is_async: false,
+        is_generator: false,
+    };
+    let admitted = checker.reject_failable_call(&sig, crate::test_support::test_span());
+    assert!(!admitted);
+    assert_eq!(
+        checker.pending_conversion, None,
+        "a builtin row must not select a conversion function"
+    );
+    let err = checker
+        .errors
+        .iter()
+        .find(|diag| diag.issue() == Some("failable_call_conversion_absent"))
+        .expect("SEM010-shaped absence diagnostic retained");
+    assert!(err.args.iter().any(|arg| arg.name == "source" && arg.value == "numerus<u32>"));
+    assert!(err.args.iter().any(|arg| arg.name == "destination" && arg.value == "fractus<f32>"));
+}
