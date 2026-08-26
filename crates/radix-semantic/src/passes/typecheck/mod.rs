@@ -712,6 +712,10 @@ mod ascii_format_pack_conversio_test;
 mod atomic_intrinsic_test;
 
 #[cfg(test)]
+#[path = "collection_closure_test.rs"]
+mod collection_closure_test;
+
+#[cfg(test)]
 #[path = "bounded_capacity_slot_test.rs"]
 mod bounded_capacity_slot_test;
 
