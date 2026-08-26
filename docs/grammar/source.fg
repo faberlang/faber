@@ -1006,7 +1006,8 @@ patterns     := pattern ((',' | 'et') pattern)*
 # A one-segment type name in a `discerne` arm is classified as a type pattern
 # by the parser's type-name lookahead; qualified paths remain variant patterns.
 pattern      := '_' | literal | type_pattern | (IDENTIFIER ut_pattern?)
-type_pattern := IDENTIFIER ut_pattern?
+# Type arguments carry bounded widths and hole arguments into pattern lowering.
+type_pattern := IDENTIFIER type_arguments? ut_pattern?
 @formerly patternBind
 ut_pattern  := ('ut' IDENTIFIER) | (('fixum' | 'varia') pattern_binding (',' pattern_binding)*)
 @formerly patternBinding

@@ -305,7 +305,7 @@ patterns ::= pattern ((',' | '且') pattern)*
 # [104] pattern
 pattern ::= '_' | literal | type_pattern | (IDENTIFIER ut_pattern?)
 # [105] type_pattern
-type_pattern ::= IDENTIFIER ut_pattern?
+type_pattern ::= IDENTIFIER type_arguments? ut_pattern?
 # formerly: patternBind
 # [106] ut_pattern
 ut_pattern ::= ('作为' IDENTIFIER) | (('常量' | '变量') pattern_binding (',' pattern_binding)*)
