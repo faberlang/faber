@@ -81,8 +81,7 @@ pub fn decimal_text_to_carrier(text: &str, width: NumericWidth) -> Option<i64> {
         Some(digits) => (true, digits),
         None => (false, text.strip_prefix('+').unwrap_or(text)),
     };
-    let (mantissa, exponent) =
-        radix_types::numeric_width::decimal_text_to_scaled(digits)?;
+    let (mantissa, exponent) = radix_types::numeric_width::decimal_text_to_scaled(digits)?;
     let mantissa = if negative { -mantissa } else { mantissa };
     let scale_digits = width.decimal_scale()?;
     let shift = exponent.checked_add(i32::try_from(scale_digits).ok()?)?;

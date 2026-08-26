@@ -875,9 +875,9 @@ impl FunctionBuilder<'_> {
             }
 
             let condition = if let Some(capacity) = radix_types::literal_length_guard(self.types, *ty) {
-                let capacity = i64::try_from(capacity).map_err(|_| {
-                    MirError::unsupported(arm.span, "width-pattern capacity exceeds MIR integer range")
-                }).ok()?;
+                let capacity = i64::try_from(capacity)
+                    .map_err(|_| MirError::unsupported(arm.span, "width-pattern capacity exceeds MIR integer range"))
+                    .ok()?;
                 let length_ty = MirType::semantic(self.types.primitive(Primitive::Numerus));
                 let length = self.runtime_call_value(
                     MirIntrinsic::Collection(MirCollectionOp::Length),
@@ -894,7 +894,9 @@ impl FunctionBuilder<'_> {
                     bool_ty,
                     arm.span,
                 )
-            } else if radix_types::width_pattern(self.types, *ty).is_some_and(|pattern| pattern.bound.is_some()) {
+            } else if radix_types::width_pattern(self.types, *ty).is_some_and(|pattern| {
+                pattern.bound.is_some() || matches!(pattern.family, radix_types::WidthFamily::Numerus(Some(_)))
+            }) {
                 self.errors.push(MirError::unsupported(
                     arm.span,
                     "width-pattern requires a literal runtime length guard",
@@ -931,7 +933,8 @@ impl FunctionBuilder<'_> {
                     mutable: false,
                     span: arm.span,
                 });
-                self.bindings.insert(*def_id, LocalBinding { local, ty: binding_ty });
+                self.bindings
+                    .insert(*def_id, LocalBinding { local, ty: binding_ty });
                 self.assign(
                     MirPlace::local(local),
                     MirOperand::Place(scrutinee_place.clone()),
@@ -971,14 +974,10 @@ impl FunctionBuilder<'_> {
     ) -> Option<()> {
         let binding_ty = MirType::semantic(scrutinee_ty);
         let local = self.next_local_id();
-        self.locals.push(MirLocalDecl {
-            id: local,
-            name: Some(name),
-            ty: binding_ty,
-            mutable: false,
-            span,
-        });
-        self.bindings.insert(def_id, LocalBinding { local, ty: binding_ty });
+        self.locals
+            .push(MirLocalDecl { id: local, name: Some(name), ty: binding_ty, mutable: false, span });
+        self.bindings
+            .insert(def_id, LocalBinding { local, ty: binding_ty });
         self.assign(
             MirPlace::local(local),
             MirOperand::Place(scrutinee_place.clone()),
@@ -1329,9 +1328,7 @@ impl FunctionBuilder<'_> {
                 Err(_) => Some(MirConstant::UInt(*value)),
             },
             // decimal-widths D1: text-carrying decimals lower via the f64 path.
-            HirLiteral::Float(value) | HirLiteral::FloatText { value, .. } => {
-                Some(MirConstant::Float(*value))
-            }
+            HirLiteral::Float(value) | HirLiteral::FloatText { value, .. } => Some(MirConstant::Float(*value)),
             HirLiteral::String(symbol) => Some(MirConstant::String(*symbol)),
             HirLiteral::Ascii(symbol) => Some(MirConstant::Ascii(*symbol)),
             HirLiteral::Bool(value) => Some(MirConstant::Bool(*value)),
