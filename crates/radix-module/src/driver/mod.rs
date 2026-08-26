@@ -34,28 +34,28 @@ mod shader_contract;
 mod source;
 mod target_policy;
 
-pub use file_frontmatter::{parse_file_frontmatter, FileFrontmatter};
-pub use frontmatter::{split_frontmatter, FrontmatterError, SplitFrontmatter};
+pub use file_frontmatter::{FileFrontmatter, parse_file_frontmatter};
+pub use frontmatter::{FrontmatterError, SplitFrontmatter, split_frontmatter};
 pub use session::{Config, Session, WarnPolicy};
-pub use source::{peel_raw_source, source_load_diagnostic, PeeledSource, SourceFile, SourceLoadError};
+pub use source::{PeeledSource, SourceFile, SourceLoadError, peel_raw_source, source_load_diagnostic};
 
+use crate::CompileResult;
 use crate::codegen::{self, Target};
 use crate::diagnostics::DiagnosticConvert;
-use crate::diagnostics::{locale_unknown_spec, Diagnostic, DiagnosticArg, DiagnosticPhase, Severity, Span};
-use crate::hir::visit::{walk_expr, HirVisitor};
+use crate::diagnostics::{Diagnostic, DiagnosticArg, DiagnosticPhase, Severity, Span, locale_unknown_spec};
+use crate::hir::visit::{HirVisitor, walk_expr};
 use crate::hir::{
     DefId, HirBlock, HirExpression, HirExpressionKind, HirFunction, HirItemKind, HirModule, HirModuleEnd,
     HirPresentation, HirSourceAnchorId, LibraryRegistry,
 };
 use crate::lexer;
 use crate::lexer::Interner;
-use crate::locale::{latin_locale_pack, KeywordSurface, LocalePack};
+use crate::locale::{KeywordSurface, LocalePack, latin_locale_pack};
 use crate::parser;
 use crate::semantic::{self, PassConfig, Primitive, RadixLane, RadixLaneMetadata, Resolver, Type};
 #[allow(clippy::wildcard_imports)]
 // syntax is a pure re-export barrel from radix-syntax
 use crate::syntax::*;
-use crate::CompileResult;
 use std::collections::BTreeMap;
 
 const MISSING_PARSE_PROGRAM_MESSAGE: &str = "successful parse result missing program";
@@ -1462,8 +1462,8 @@ pub fn apply_air_backward_bundle(
 /// `magnitudo` bindings without a backend-specific policy.
 #[cfg(feature = "device")]
 fn finalize_air_backward_shapes(lowered: &mut crate::mir::LoweredMirUnit<'_>) -> Result<(), SpannedCodegenError> {
-    use crate::mir::generic::MirShapeBindings;
     use crate::mir::MirMonomorphizationKey;
+    use crate::mir::generic::MirShapeBindings;
 
     const UNRESOLVED_SHAPE_SIZE_SURVIVOR: &str = "unresolved shape-size constant survives monomorphization";
 
@@ -1593,7 +1593,7 @@ fn rewrite_air_backward_calls(
     instances: &rustc_hash::FxHashMap<crate::mir::MirMonomorphizationKey, crate::mir::MirFunctionId>,
     instance_return_types: &rustc_hash::FxHashMap<crate::mir::MirMonomorphizationKey, crate::mir::MirType>,
 ) -> Result<(), SpannedCodegenError> {
-    use crate::mir::generic::{bind_generic_type_witness_with_shapes, canonical_index, MirShapeBindings};
+    use crate::mir::generic::{MirShapeBindings, bind_generic_type_witness_with_shapes, canonical_index};
     use crate::mir::{
         MirCallee, MirGenericBindings, MirMonomorphizationKey, MirOperand, MirPlaceBase, MirStatementKind,
         MirTerminatorKind,
@@ -2137,16 +2137,16 @@ fn generate_air_lane_backward_with_companion(
     no_fuse: bool,
 ) -> Result<crate::mir::device::LosslessMirCompanionEntry, codegen::CodegenError> {
     use crate::air::{
-        admit_generated_gradient_check, air_gradient_check_eligibility_witness,
-        validate_generated_backward_to_mir_from_function, validate_mir_backward_result_contract,
         AirCompanionDerivativeKind, AirCompanionErrorChannel, AirCompanionOracleRef, AirCompanionRelation,
         AirCompanionSelectedInput, AirCompanionSelectedOutput, AirGradientCheckAdmissionInputs,
+        admit_generated_gradient_check, air_gradient_check_eligibility_witness,
+        validate_generated_backward_to_mir_from_function, validate_mir_backward_result_contract,
     };
 
     let types_ref = lowered.validated.validation().types;
 
     // Run fusion pass on the companion body (unless disabled).
-    use crate::air::fusion::{fuse_companion, FusionTable};
+    use crate::air::fusion::{FusionTable, fuse_companion};
     let (fused_body, fusion_table) = if no_fuse {
         (companion.body, FusionTable::default())
     } else {
@@ -2750,6 +2750,14 @@ pub fn analyze_source(
         }
     }
 
+    // DFV2-2: orphaned-annotation admission — fail closed at check stage, with
+    // the named issue leading the diagnostic list.
+    let orphan_diagnostics = nucleum_orphan_diagnostics(&unit, name, body);
+    if !orphan_diagnostics.is_empty() {
+        unit.diagnostics.splice(0..0, orphan_diagnostics);
+        return Err(unit.diagnostics);
+    }
+
     Ok(unit)
 }
 
@@ -3216,6 +3224,91 @@ fn rust_kept_item_reaches_omit(hir: &HirModule, omit: &rustc_hash::FxHashSet<Def
     })
 }
 
+/// DFV2-2: named check-stage issue for an orphaned `@ nucleum` annotation.
+const NUCLEUM_ORPHAN_ISSUE: &str = "nucleum_orphaned_annotation";
+
+/// Canonical annotation family behind `@ nucleum` / `@ kernel`.
+const NUCLEUM_FAMILY: &str = "nucleum";
+
+/// DefIds that appear as the direct callee of a call expression anywhere in
+/// the unit — the check-stage stand-in for "a concrete instantiation exists".
+fn module_call_targets(module: &HirModule) -> rustc_hash::FxHashSet<DefId> {
+    struct CallCollector {
+        callees: rustc_hash::FxHashSet<DefId>,
+    }
+
+    impl HirVisitor for CallCollector {
+        fn visit_expr(&mut self, expr: &HirExpression) {
+            if let HirExpressionKind::Call(callee, ..) = &expr.kind {
+                if let HirExpressionKind::Path(def_id) = callee.kind {
+                    self.callees.insert(def_id);
+                }
+            }
+            walk_expr(self, expr);
+        }
+    }
+
+    let mut collector = CallCollector { callees: rustc_hash::FxHashSet::default() };
+    collector.visit_program(module);
+    collector.callees
+}
+
+/// DFV2-2 orphaned-annotation admission: an annotated `@ nucleum` function
+/// that yields zero concrete device entries in this unit — a size-generic
+/// with no same-unit call site — fails closed here, at check stage, instead
+/// of surfacing the generic zero-kernel codegen message later. Distinct from
+/// the v1 `nucleum_fragment_effect` effect diagnostics; never a warning.
+fn nucleum_orphan_diagnostics(unit: &AnalyzedModule, name: &str, source: &str) -> Vec<Diagnostic> {
+    let callees = module_call_targets(&unit.hir);
+    let mut diagnostics = Vec::new();
+    let annotated = unit.hir.items.iter().flat_map(|item| match &item.kind {
+        HirItemKind::Function(function) => vec![(item.def_id, function.as_ref(), item.span)],
+        HirItemKind::Struct(strukt) => strukt
+            .methods
+            .iter()
+            .map(|method| (method.def_id, &method.func, method.span))
+            .collect::<Vec<_>>(),
+        _ => Vec::new(),
+    });
+    for (def_id, function, definition_span) in annotated {
+        // Signature-only declarations defer to the DFV2-3 import/linkage channel.
+        if !function.is_kernel || function.body.is_none() || function.type_params.is_empty() {
+            continue;
+        }
+        if callees.contains(&def_id) {
+            continue;
+        }
+        let annotation_span = function
+            .annotations
+            .iter()
+            .find(|annotation| unit.interner.resolve(annotation.family) == NUCLEUM_FAMILY)
+            .map_or(definition_span, |annotation| annotation.span);
+        let function_name = unit.interner.resolve(function.name);
+        diagnostics.push(
+            Diagnostic::error(format!(
+                "@ nucleum function `{function_name}` yields no concrete device entry in this unit: \
+                 the annotation is orphaned (no same-unit instantiation)"
+            ))
+            .with_phase(DiagnosticPhase::Analysis)
+            .with_code("ADM001")
+            .with_args(vec![
+                DiagnosticArg::new("issue", NUCLEUM_ORPHAN_ISSUE),
+                DiagnosticArg::new("function", function_name),
+                DiagnosticArg::new("definition_start", definition_span.start.to_string()),
+                DiagnosticArg::new("definition_end", definition_span.end.to_string()),
+            ])
+            .with_file(name.to_owned())
+            .with_span(annotation_span)
+            .with_source_context(name, source, annotation_span)
+            .with_help(
+                "instantiate the generic entry from a same-unit caller with concrete size arguments, \
+                 or link it from the unit that owns a concrete instance",
+            ),
+        );
+    }
+    diagnostics
+}
+
 fn function_path_defs(function: &HirFunction) -> rustc_hash::FxHashSet<DefId> {
     struct PathCollector {
         defs: rustc_hash::FxHashSet<DefId>,
@@ -3581,6 +3674,11 @@ mod tests;
 #[cfg(feature = "mir-core")]
 #[path = "device_entry_gate_test.rs"]
 mod device_entry_gate_tests;
+
+#[cfg(test)]
+#[cfg(feature = "mir-core")]
+#[path = "device_orphan_admission_test.rs"]
+mod device_orphan_admission_tests;
 
 #[cfg(test)]
 #[cfg(feature = "mir-llvm")]
