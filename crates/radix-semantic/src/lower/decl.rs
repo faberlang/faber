@@ -809,7 +809,6 @@ impl Lowerer<'_> {
             type_params: Vec::new(),
             annotations: self.lower_annotations(&stmt.annotations),
             commune_fields: Vec::new(),
-            conversion_arms: Vec::new(),
             variants,
         };
 
@@ -896,7 +895,6 @@ impl Lowerer<'_> {
                     span: field.span,
                 })
                 .collect(),
-            conversion_arms: Vec::new(),
             variants,
         };
 
