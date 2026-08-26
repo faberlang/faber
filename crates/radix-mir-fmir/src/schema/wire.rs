@@ -572,6 +572,142 @@ pub struct WireReducedProjection {
     pub inner_stride: u64,
 }
 
+/// The named ABI successor of GEA3-WIRE-BUFFER-V1 (GEA3 delivery Amendment
+/// 3, unit GEA3-A1). V1 carries the law that one (buffer id, content
+/// version) names exactly one allocation identity and one element count;
+/// V2 keeps that allocation law and adds sub-window projection facts so a
+/// read or write slot may address a bounded window of the one allocation
+/// instead of minting a second identity. The fact's carrier today is the
+/// GEA3 program-plan envelope (`gea3-program-plan-v1` + this ABI tag); the
+/// production `WireBufferVersion` slot lands with its own unit when the
+/// FMIR image needs to carry it.
+pub const GEA3_WIRE_BUFFER_ABI_V2: &str = "gea3-wire-buffer-v2";
+
+/// The sub-window projection fact of GEA3-WIRE-BUFFER-V2 (Amendment 3): a
+/// bounded window of one producer buffer — `row_count` rows of
+/// `row_width` contiguous elements at `row_stride` producer-element pitch,
+/// starting at `element_offset`. The window is contiguous when
+/// `row_stride == row_width`; a strided window is a read-side fact only.
+/// `derived_element_count` is carried beside the geometry so the
+/// consumer's bound count and the projection can be cross-checked
+/// fail-closed (the two-truths guard,
+/// [`validate_carried_sub_window_projection`]).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct WireSubWindowProjection {
+    /// The producer buffer the window addresses. Must equal the carrying
+    /// resource's own buffer id — the buffer keeps one identity.
+    pub buffer: u32,
+    /// Element offset of the window's first row inside the producer buffer.
+    pub element_offset: u64,
+    /// Contiguous elements per window row (the consumer's addressing width).
+    pub row_width: u64,
+    /// Window rows.
+    pub row_count: u64,
+    /// Producer elements per row (the producer's row pitch; `>= row_width`).
+    pub row_stride: u64,
+    /// The carried derived element count (`row_width · row_count`).
+    pub derived_element_count: u64,
+}
+
+impl WireSubWindowProjection {
+    /// The window's covering span in producer elements:
+    /// `(row_count - 1) · row_stride + row_width`. `None` on overflow.
+    #[must_use]
+    pub fn covering_span(&self) -> Option<u64> {
+        self.row_count
+            .checked_sub(1)
+            .and_then(|rows| rows.checked_mul(self.row_stride))
+            .and_then(|span| span.checked_add(self.row_width))
+    }
+
+    /// The window addresses its rows contiguously (one flat range).
+    #[must_use]
+    pub fn is_contiguous(&self) -> bool {
+        self.row_stride == self.row_width
+    }
+
+    /// The geometry's own element count (`row_width · row_count`); `None`
+    /// on overflow.
+    #[must_use]
+    pub fn window_element_count(&self) -> Option<u64> {
+        self.row_width.checked_mul(self.row_count)
+    }
+}
+
+/// Admit one carried sub-window projection fail-closed (the GEA3-A1
+/// two-truths guard, patterned on `validate_carried_reduced_projection`):
+/// the geometry is positive, `derived_element_count` equals
+/// `row_width · row_count`, the consumer's carried `element_count` equals
+/// that derived count, the window nests inside the producer buffer's own
+/// element count, and a strided window is rejected for write access (a
+/// scattered write cannot be one binding). Errors name the broken law.
+pub fn validate_carried_sub_window_projection(
+    carrier: &str,
+    element_count: u64,
+    producer_element_count: u64,
+    write_access: bool,
+    projection: &WireSubWindowProjection,
+) -> Result<(), String> {
+    if projection.buffer == 0 {
+        return Err(format!(
+            "{carrier} carries a sub-window projection with buffer id 0; a window addresses a real producer buffer (GEA3-WIRE-BUFFER-V2)"
+        ));
+    }
+    if projection.row_width < 1 || projection.row_count < 1 {
+        return Err(format!(
+            "{carrier} carries a sub-window projection with row width {} and row count {}; a zero-extent window addresses nothing (GEA3-WIRE-BUFFER-V2)",
+            projection.row_width, projection.row_count
+        ));
+    }
+    if projection.row_stride < projection.row_width {
+        return Err(format!(
+            "{carrier} carries a sub-window projection with row stride {} below row width {}; rows cannot overlap their pitch (GEA3-WIRE-BUFFER-V2)",
+            projection.row_stride, projection.row_width
+        ));
+    }
+    if write_access && !projection.is_contiguous() {
+        return Err(format!(
+            "{carrier} carries a strided sub-window projection ({:?}) on a write slot; a scattered write is not one binding (GEA3-WIRE-BUFFER-V2)",
+            projection
+        ));
+    }
+    let Some(derived) = projection.window_element_count() else {
+        return Err(format!(
+            "{carrier} carries a sub-window projection whose row_width · row_count saturates u64 ({:?}); a saturated window cannot address a real buffer (GEA3-WIRE-BUFFER-V2)",
+            projection
+        ));
+    };
+    if projection.derived_element_count != derived {
+        return Err(format!(
+            "{carrier} carries a sub-window projection with derived element count {} but geometry {} · {} = {derived}; the carried and derived truths must agree (GEA3-WIRE-BUFFER-V2)",
+            projection.derived_element_count, projection.row_width, projection.row_count
+        ));
+    }
+    if element_count != derived {
+        return Err(format!(
+            "{carrier} binds {element_count} elements but its sub-window projection derives {derived}; the carried slot count and the projection's derived count must agree (GEA3-WIRE-BUFFER-V2)",
+        ));
+    }
+    let Some(span) = projection.covering_span() else {
+        return Err(format!(
+            "{carrier} carries a sub-window projection whose covering span saturates u64 ({:?}); a saturated span cannot address a real buffer (GEA3-WIRE-BUFFER-V2)",
+            projection
+        ));
+    };
+    match projection
+        .element_offset
+        .checked_add(span)
+        .filter(|end| *end <= producer_element_count)
+    {
+        Some(_) => Ok(()),
+        None => Err(format!(
+            "{carrier} carries a sub-window projection spanning {} of {} elements from offset {}; the window must nest inside its producer buffer (GEA3-WIRE-BUFFER-V2)",
+            span, producer_element_count, projection.element_offset
+        )),
+    }
+}
+
 /// Row-wise softmax recipe plan (wire mirror of `kernel_plan::RowSoftmaxPlan`,
 /// S6-N1 name freeze, S6-C2 wire mirror). Operates over the last (row) axis.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -1199,3 +1335,7 @@ pub struct WireSessionInput {
     /// The per-invocation input cadence of this slot.
     pub cadence: WireInputUpdateCadence,
 }
+
+#[cfg(test)]
+#[path = "wire_gea3_test.rs"]
+mod gea3_wire_tests;
