@@ -210,10 +210,14 @@ impl Value {
             }
             Value::ClosureEnvironment(id, _) => format!("closure env{}", id.0),
             Value::Array(items) => display_list(&items.borrow(), interner, span, float_width)?,
-            Value::Tensor(tensor) => display_list(&tensor.borrow().data, interner, span, float_width)?,
+            Value::Tensor(tensor) => {
+                display_list(&tensor.borrow().data, interner, span, float_width)?
+            }
             Value::Vector(lanes) => display_list(&lanes.borrow(), interner, span, float_width)?,
             Value::Matrix(matrix) => display_matrix(&matrix.borrow(), interner, span, float_width)?,
-            Value::Map(entries) => display_tabula_map(&entries.borrow(), interner, span, float_width)?,
+            Value::Map(entries) => {
+                display_tabula_map(&entries.borrow(), interner, span, float_width)?
+            }
             Value::Struct(_, fields) => display_tabula_struct(fields, interner, span, float_width)?,
             Value::Set(_) | Value::Record(_) | Value::EnumVariant(_, _) | Value::Tuple(_) => {
                 format!("{self:?}")
@@ -285,11 +289,11 @@ fn display_matrix(
             let start = row * columns;
             let end = start + columns;
             display_list(
-                    matrix.data.get(start..end).unwrap_or(&[]),
-                    interner,
-                    span,
-                    float_width,
-                )
+                matrix.data.get(start..end).unwrap_or(&[]),
+                interner,
+                span,
+                float_width,
+            )
         })
         .collect::<Result<Vec<_>, _>>()?;
     Ok(format!("[{}]", row_parts.join(", ")))
