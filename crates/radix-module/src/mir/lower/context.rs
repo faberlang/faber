@@ -22,6 +22,7 @@
 //! function calls, struct fields, and variant payloads against semantic source
 //! truth rather than trusting the MIR producer.
 
+use super::package_instantiate::ImportedDeviceRoute;
 #[allow(clippy::wildcard_imports)]
 // parent module provides shared imports for lowering context
 use super::*;
@@ -117,6 +118,12 @@ pub(super) struct LoweringContextMaps<'a> {
     /// `unit.package_import_identities` when package-aware callers supply the
     /// canonical identity facts (D-PA1); empty otherwise.
     package_file_interface_exports: FxHashMap<DefId, FxHashMap<Symbol, DefId>>,
+    /// Resolved imported-device routes keyed by import-item `DefId` (DFV2-3):
+    /// the v2 device role, launch visibility, provider-route identity, and
+    /// explicit body channel carried through the consumer link. The concrete
+    /// composition pass consumes these; a `Missing` body channel is carried,
+    /// never silently admitted.
+    imported_device_routes: FxHashMap<DefId, Vec<ImportedDeviceRoute>>,
     /// Current package product (package-aware compiles only).
     package_product: Option<String>,
     /// This file's canonical module segments (package-aware compiles only).
@@ -158,6 +165,7 @@ impl<'a> LoweringContextMaps<'a> {
             imported_method_providers: FxHashMap::default(),
             imported_struct_defaults: FxHashMap::default(),
             package_file_interface_exports: FxHashMap::default(),
+            imported_device_routes: FxHashMap::default(),
             package_product: None,
             package_module_segments: Vec::new(),
             method_targets: FxHashMap::default(),
@@ -737,6 +745,24 @@ impl<'a> LoweringContextMaps<'a> {
                 if !by_verb.is_empty() {
                     self.package_file_interface_exports
                         .insert(import_item.def_id, by_verb);
+                }
+                // DFV2-3 provider route: carry the imported-device route —
+                // role, launch visibility, body channel, provider-route
+                // identity — into the consumer link for this import item.
+                // Recorded at the import level so a shape-generic imported
+                // device function (the spike-3 shape, skipped from the
+                // concrete identity table above) keeps its device fact; the
+                // route is consumed by the concrete composition pass, never
+                // by a signature-only call.
+                if let Some(interface) =
+                    crate::program::compile::imported_device_interface_for(&package_identities.module_segments, binding)
+                {
+                    let routes =
+                        ImportedDeviceRoute::from_interface(&package_identities.product, target_segments, &interface);
+                    if !routes.is_empty() {
+                        self.imported_device_routes
+                            .insert(import_item.def_id, routes);
+                    }
                 }
             }
         }

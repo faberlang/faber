@@ -9,6 +9,7 @@
 //! instantiates any shape the defining unit never called.
 
 use super::{MirError, MirGenericParam};
+use crate::file_interface::{FileExportKind, FileInterface, InterfaceDeviceContract};
 use crate::hir::DefId;
 use crate::lexer::{Interner, Span};
 use crate::mir::generic::{
@@ -17,9 +18,9 @@ use crate::mir::generic::{
     MirShapeBindings,
 };
 use crate::mir::{
-    type_contains_param, MirCallee, MirFunction, MirFunctionId, MirGenericBindings, MirMonomorphization,
-    MirMonomorphizationKey, MirOperand, MirPlace, MirPlaceBase, MirProgram, MirProjection, MirStatementKind,
-    MirTerminatorKind, MirType,
+    type_contains_param, MirCallee, MirExternalFunctionIdentity, MirFunction, MirFunctionId, MirGenericBindings,
+    MirMonomorphization, MirMonomorphizationKey, MirOperand, MirPlace, MirPlaceBase, MirProgram, MirProjection,
+    MirStatementKind, MirTerminatorKind, MirType,
 };
 use crate::semantic::{IndexExpr, Primitive, Type, TypeTable};
 use rustc_hash::{FxHashMap, FxHashSet};
@@ -27,6 +28,108 @@ use std::collections::HashMap;
 
 const MAX_PACKAGE_MONOMORPHIZATIONS: usize = 64;
 const UNRESOLVED_SHAPE_SIZE_SURVIVOR: &str = "unresolved shape-size constant survives monomorphization";
+/// Named fail-closed reason for a signature-only imported device import
+/// (DFV2-3 (e)): the role fact alone never admits the instance.
+const IMPORTED_DEVICE_BODY_MISSING: &str = "imported_device_body_missing";
+
+/// One resolved imported-device route (DFV2-3 transport): the provider-route
+/// identity plus the v2 device contract carried from the exporting module's
+/// file interface through the consumer link.
+///
+/// Role and body travel together by construction — the contract carries the
+/// explicit body channel — so the composition unit (DFV2-4) can never observe
+/// a role fact without its body availability.
+#[derive(Debug, Clone, PartialEq)]
+pub struct ImportedDeviceRoute {
+    /// Canonical provider-route identity: product, module path, verb.
+    pub identity: MirExternalFunctionIdentity,
+    /// v2 device fact (role, launch visibility) + explicit body channel.
+    pub contract: InterfaceDeviceContract,
+}
+
+impl ImportedDeviceRoute {
+    /// Build the consumer-side routes for one imported module's file
+    /// interface: every function export that carries a device contract.
+    ///
+    /// Non-device exports are not routes. A device export with a missing
+    /// body channel stays a route (carrying [`InterfaceDeviceContract`]'s
+    /// `Missing` state) so the consumer fails closed on it instead of
+    /// silently losing the device fact.
+    #[must_use]
+    pub fn from_interface(product: &str, module_segments: &[String], interface: &FileInterface) -> Vec<Self> {
+        interface
+            .exports
+            .values()
+            .filter_map(|export| {
+                let FileExportKind::Function(callable) = &export.kind else {
+                    return None;
+                };
+                let contract = callable.device.clone()?;
+                Some(Self {
+                    identity: MirExternalFunctionIdentity::new(
+                        product.to_owned(),
+                        module_segments.to_vec(),
+                        export.name.clone(),
+                    ),
+                    contract,
+                })
+            })
+            .collect()
+    }
+
+    /// Stable display key for diagnostics: `product::module::verb`.
+    #[must_use]
+    pub fn display_key(&self) -> String {
+        format!(
+            "{}::{}::{}",
+            self.identity.product,
+            self.identity.module_path.join("::"),
+            self.identity.name
+        )
+    }
+}
+
+/// Consumer-side index of imported device functions, keyed by the merged
+/// program's template source `DefId` (DFV2-3 transport input).
+///
+/// Package linking rewrites each unit's generic-template sources to synthetic
+/// defs; the linking layer joins those defs to routes here. DFV2-3 supplies
+/// the index and the request semantics; DFV2-4 consumes the resolved routes.
+#[derive(Debug, Clone, Default)]
+pub struct ImportedDeviceIndex {
+    by_source: FxHashMap<DefId, ImportedDeviceRoute>,
+}
+
+impl ImportedDeviceIndex {
+    /// Index routes by their merged template source def.
+    #[must_use]
+    pub fn from_routes(routes: impl IntoIterator<Item = (DefId, ImportedDeviceRoute)>) -> Self {
+        Self { by_source: routes.into_iter().collect() }
+    }
+
+    /// The route registered for one imported template source, if any.
+    #[must_use]
+    pub fn get(&self, source: DefId) -> Option<&ImportedDeviceRoute> {
+        self.by_source.get(&source)
+    }
+}
+
+/// One concrete imported device instance registered for the consumer (DFV2-3
+/// transport output).
+///
+/// Design §6: a concrete instantiation of a generic `@ nucleum` function
+/// registers the instance as a device function of the compiling unit. The
+/// concrete device-call composition (DFV2-4) consumes these as its input; a
+/// `Canonical` body channel rides through unchanged.
+#[derive(Debug, Clone, PartialEq)]
+pub struct ImportedDeviceRegistration {
+    /// Concrete instantiation key (source + type/shape args).
+    pub key: MirMonomorphizationKey,
+    /// Concrete instance function in the merged program.
+    pub function: MirFunctionId,
+    /// The imported-device route the instance was admitted under.
+    pub route: ImportedDeviceRoute,
+}
 
 /// Merged struct metadata for typing projected operands during package
 /// generic instantiation (`layer.ln1` on an applied nominal needs the field
@@ -54,8 +157,41 @@ pub fn instantiate_merged_generic_calls(
     interner: &Interner,
     struct_metadata: Option<&PackageStructMetadata<'_>>,
 ) -> Result<Vec<MirMonomorphization>, Vec<MirError>> {
+    instantiate_merged_generic_calls_with_devices(
+        program,
+        templates,
+        generic_params,
+        types,
+        interner,
+        struct_metadata,
+        &ImportedDeviceIndex::from_routes([]),
+    )
+    .map(|(monomorphizations, _)| monomorphizations)
+}
+
+/// Device-aware package-link instantiation (DFV2-3 imported-instance linkage).
+///
+/// Beyond [`instantiate_merged_generic_calls`], every concrete instantiation
+/// of an indexed imported device function is registered for the consumer
+/// ([`ImportedDeviceRegistration`]), and a signature-only imported device
+/// import fails closed with the named `imported_device_body_missing` reason
+/// before composition: the role bit alone never validates the call.
+///
+/// # Errors
+/// Returns [`MirError`] when a call site cannot bind, a template is missing,
+/// substitution fails, a shape-size scalar survives finalization, or an
+/// imported device function has no usable body channel.
+pub fn instantiate_merged_generic_calls_with_devices(
+    program: &mut MirProgram,
+    templates: &[MirFunction],
+    generic_params: &[(DefId, Vec<MirGenericParam>)],
+    types: &mut TypeTable,
+    interner: &Interner,
+    struct_metadata: Option<&PackageStructMetadata<'_>>,
+    imported_devices: &ImportedDeviceIndex,
+) -> Result<(Vec<MirMonomorphization>, Vec<ImportedDeviceRegistration>), Vec<MirError>> {
     if templates.is_empty() {
-        return Ok(Vec::new());
+        return Ok((Vec::new(), Vec::new()));
     }
     let mut state = PackageInstantiate {
         types,
@@ -71,6 +207,9 @@ pub fn instantiate_merged_generic_calls(
         next_id: next_function_id(&program.functions),
         errors: Vec::new(),
         created: Vec::new(),
+        imported_devices: imported_devices.clone(),
+        device_registrations: Vec::new(),
+        registered_device_keys: FxHashSet::default(),
     };
     state.index_existing_instances(&program.functions);
     if !state.errors.is_empty() {
@@ -86,7 +225,7 @@ pub fn instantiate_merged_generic_calls(
     if !state.errors.is_empty() {
         return Err(state.errors);
     }
-    Ok(state.monomorphizations)
+    Ok((state.monomorphizations, state.device_registrations))
 }
 
 fn next_function_id(functions: &[MirFunction]) -> MirFunctionId {
@@ -108,6 +247,12 @@ struct PackageInstantiate<'a> {
     next_id: MirFunctionId,
     errors: Vec<MirError>,
     created: Vec<MirFunction>,
+    /// Imported device functions indexed by template source (DFV2-3).
+    imported_devices: ImportedDeviceIndex,
+    /// Concrete imported device instances registered for the consumer.
+    device_registrations: Vec<ImportedDeviceRegistration>,
+    /// Registration dedupe guard: one registration per monomorphization key.
+    registered_device_keys: FxHashSet<MirMonomorphizationKey>,
 }
 
 #[derive(Clone)]
@@ -524,7 +669,25 @@ impl PackageInstantiate<'_> {
         type_bindings: &MirGenericBindings,
         span: Span,
     ) -> Option<MirFunctionId> {
+        // DFV2-3 fail-closed gate: an imported device function with no usable
+        // body channel (signature-only, or an incompatible artifact) is never
+        // instantiated — the role bit alone does not validate the call.
+        if let Some(route) = self.imported_devices.get(key.source) {
+            if !route.contract.is_composable() {
+                self.errors.push(MirError {
+                    message: format!(
+                        "signature-only device import `{}` cannot be instantiated: no source body and no canonical body artifact",
+                        route.display_key()
+                    ),
+                    issue: IMPORTED_DEVICE_BODY_MISSING.to_owned(),
+                    span,
+                    definition_span: None,
+                });
+                return None;
+            }
+        }
         if let Some(existing) = self.instance_index.get(key).copied() {
+            self.register_device_instance(key, existing);
             return Some(existing);
         }
         if self.created.len() >= MAX_PACKAGE_MONOMORPHIZATIONS {
@@ -556,7 +719,22 @@ impl PackageInstantiate<'_> {
         self.monomorphizations
             .push(MirMonomorphization { key: key.clone(), function: id });
         self.created.push(instance);
+        self.register_device_instance(key, id);
         Some(id)
+    }
+
+    /// Register one concrete imported device instance for the consumer
+    /// (DFV2-3 (b)). No-op for local (non-imported) templates; one
+    /// registration per monomorphization key.
+    fn register_device_instance(&mut self, key: &MirMonomorphizationKey, function: MirFunctionId) {
+        let Some(route) = self.imported_devices.get(key.source).cloned() else {
+            return;
+        };
+        if !self.registered_device_keys.insert(key.clone()) {
+            return;
+        }
+        self.device_registrations
+            .push(ImportedDeviceRegistration { key: key.clone(), function, route });
     }
 
     fn substitute_function(&mut self, function: &mut MirFunction, bindings: &MirGenericBindings, span: Span) -> bool {

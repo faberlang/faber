@@ -3,10 +3,11 @@
 //! nominal kinds, type params, and callables resolve correctly.
 
 use super::{
-    import_interface_type, snapshot_interface_type, FileExport, FileExportKind, FileInterface, FileInterfaceError,
-    InterfaceAliasExport, InterfaceAppliedArg, InterfaceCallable, InterfaceGenericParam, InterfaceIndexSnapshot,
-    InterfaceLibraryIdentity, InterfaceNominalKind, InterfaceNominalType, InterfaceParam, InterfaceStructExport,
-    InterfaceStructField, InterfaceTypeParamConstraint, InterfaceTypeSnapshot,
+    FileExport, FileExportKind, FileInterface, FileInterfaceError, InterfaceAliasExport, InterfaceAppliedArg,
+    InterfaceBodyChannel, InterfaceCallable, InterfaceCanonicalBody, InterfaceDeviceContract, InterfaceDeviceRole,
+    InterfaceDeviceVisibility, InterfaceGenericParam, InterfaceIndexSnapshot, InterfaceLibraryIdentity,
+    InterfaceNominalKind, InterfaceNominalType, InterfaceParam, InterfaceStructExport, InterfaceStructField,
+    InterfaceTypeParamConstraint, InterfaceTypeSnapshot, import_interface_type, snapshot_interface_type,
 };
 use crate::lexer::Interner;
 use crate::semantic::{
@@ -193,6 +194,7 @@ fn callable_snapshot_can_be_constructed_without_source_type_table() {
         err: Some(Box::new(InterfaceTypeSnapshot::Primitive(Primitive::Textus))),
         is_async: false,
         is_generator: true,
+        device: None,
     };
     let snapshot = InterfaceTypeSnapshot::Func(callable);
     let mut types = TypeTable::new();
@@ -217,6 +219,7 @@ fn async_callable_import_wraps_declared_return_in_promissum() {
         err: None,
         is_async: true,
         is_generator: false,
+        device: None,
     };
     let snapshot = InterfaceTypeSnapshot::Func(callable);
     let mut types = TypeTable::new();
@@ -243,6 +246,7 @@ fn async_generator_callable_import_wraps_declared_return_in_async_cursor() {
         err: Some(Box::new(InterfaceTypeSnapshot::Primitive(Primitive::Textus))),
         is_async: true,
         is_generator: true,
+        device: None,
     };
     let snapshot = InterfaceTypeSnapshot::Func(callable);
     let mut types = TypeTable::new();
@@ -487,6 +491,7 @@ fn reexported_same_module_nominal_callable_remaps_through_parent_interface() {
             err: None,
             is_async: false,
             is_generator: false,
+            device: None,
         }),
     });
 
@@ -700,4 +705,70 @@ fn file_interface_preserves_generic_size_applied_round_trip() {
         args.as_slice(),
         [radix_types::AppliedArg::Size(index)] if matches!(target.get_index(*index), IndexExpr::Literal(3))
     ));
+}
+
+// DFV2-3 imported role + body channel: the transport types distinguish the
+// three body states and never treat a missing body as composable.
+
+/// DFV2-3 (c): the body channel explicitly distinguishes a source body, a
+/// serialized canonical artifact, and a missing/incompatible body.
+#[test]
+fn device_body_channel_distinguishes_source_canonical_and_missing() {
+    let source = InterfaceDeviceContract {
+        role: InterfaceDeviceRole::Kernel,
+        visibility: InterfaceDeviceVisibility::Public,
+        body: InterfaceBodyChannel::Source,
+    };
+    let canonical = InterfaceDeviceContract {
+        role: InterfaceDeviceRole::Kernel,
+        visibility: InterfaceDeviceVisibility::Public,
+        body: InterfaceBodyChannel::Canonical(InterfaceCanonicalBody::new(b"template".to_vec())),
+    };
+    let missing = InterfaceDeviceContract {
+        role: InterfaceDeviceRole::Kernel,
+        visibility: InterfaceDeviceVisibility::Public,
+        body: InterfaceBodyChannel::Missing,
+    };
+
+    assert_ne!(source.body, canonical.body);
+    assert_ne!(canonical.body, missing.body);
+    assert_ne!(source.body, missing.body);
+    assert!(source.is_composable(), "a source body is composable");
+    assert!(canonical.is_composable(), "a canonical artifact is composable");
+    assert!(!missing.is_composable(), "a missing body is never composable");
+}
+
+/// DFV2-3 (d): the canonical body hash is deterministic for identical bytes
+/// and distinguishes different bodies — the cache-identity input for DFV2-5.
+#[test]
+fn canonical_body_hash_is_deterministic_and_discriminating() {
+    let first = InterfaceCanonicalBody::new(b"body-a".to_vec());
+    let same = InterfaceCanonicalBody::new(b"body-a".to_vec());
+    let other = InterfaceCanonicalBody::new(b"body-b".to_vec());
+
+    assert_eq!(first.body_hash, same.body_hash);
+    assert_ne!(first.body_hash, other.body_hash);
+    assert_eq!(first.template, b"body-a".to_vec());
+}
+
+/// DFV2-3 (a): role and visibility are independent facts on the contract —
+/// a private helper keeps the Kernel role without the launch visibility.
+#[test]
+fn device_contract_keeps_role_and_visibility_independent() {
+    let helper = InterfaceDeviceContract {
+        role: InterfaceDeviceRole::Kernel,
+        visibility: InterfaceDeviceVisibility::Private,
+        body: InterfaceBodyChannel::Source,
+    };
+    let fragment = InterfaceDeviceContract {
+        role: InterfaceDeviceRole::Fragment,
+        visibility: InterfaceDeviceVisibility::Public,
+        body: InterfaceBodyChannel::Source,
+    };
+
+    assert_ne!(helper, fragment);
+    assert_eq!(helper.role, InterfaceDeviceRole::Kernel);
+    assert_eq!(helper.visibility, InterfaceDeviceVisibility::Private);
+    assert_eq!(fragment.role, InterfaceDeviceRole::Fragment);
+    assert_eq!(fragment.visibility, InterfaceDeviceVisibility::Public);
 }

@@ -2,8 +2,12 @@
 
 use super::clear_import_target_cache;
 use super::import_contract_for_file;
+use super::package_identity_facts_for_path;
 use crate::driver::AnalyzeRequest;
-use crate::file_interface::{FileExportKind, InterfaceIndexSnapshot, InterfaceParam, InterfaceTypeSnapshot};
+use crate::file_interface::{
+    FileExportKind, InterfaceBodyChannel, InterfaceDeviceRole, InterfaceDeviceVisibility, InterfaceIndexSnapshot,
+    InterfaceParam, InterfaceTypeSnapshot,
+};
 use crate::import_resolve::library_home_test_support;
 use crate::import_resolve::resolve_namespace_import;
 use crate::semantic::{NumericWidth, Primitive, SemanticParamMode};
@@ -3128,4 +3132,224 @@ import from "./lib_lista" * as p
         "consumer's own binding must win over the transitive sibling install, got {:?}",
         direct.exports.keys().collect::<Vec<_>>()
     );
+}
+
+/// DFV2-3 (a, c): an imported `@ nucleum` declaration keeps its device role,
+/// launch visibility, and explicit body channel in the consumer's file
+/// interface. The role fact never travels without the body fact.
+#[test]
+fn import_contract_carries_imported_device_role_and_body_channel() {
+    let (_td, home) = temp_dir("device-channel");
+    let provider = home.join("probe");
+    fs::create_dir_all(provider.join("src")).expect("provider src");
+    fs::write(
+        provider.join("faber.toml"),
+        r#"[package]
+name = "probe"
+[library]
+provider = "probe"
+[paths]
+source = "src"
+[build]
+kind = "lib"
+targets = ["rust"]
+"#,
+    )
+    .expect("manifest");
+    fs::write(
+        provider.join("src/probe.fab"),
+        r"
+@ nucleum
+@ publica
+functio scala(f32 x) → f32 {
+    redde x + 1.0
+}
+
+@ nucleum
+functio adiuvans(f32 x) → f32 {
+    redde x + 2.0
+}
+",
+    )
+    .expect("lib");
+
+    let app = home.join("app.fab");
+    fs::write(
+        &app,
+        r#"
+importa ex "probe:probe" probe
+"#,
+    )
+    .expect("app");
+    let source = fs::read_to_string(&app).expect("read app");
+
+    let _guard = LibraryHomeGuard::set(&home);
+    let contract = import_contract_for_file(&app, &source, None, None);
+
+    let interface = contract
+        .file_interfaces
+        .get("probe")
+        .expect("probe interface installed");
+
+    let device_contract_of = |name: &str| {
+        let export = interface
+            .exports
+            .get(name)
+            .unwrap_or_else(|| panic!("{name} export"));
+        let FileExportKind::Function(callable) = &export.kind else {
+            panic!("{name} must be a function export");
+        };
+        callable
+            .device
+            .clone()
+            .unwrap_or_else(|| panic!("{name} must carry a device contract across the import link"))
+    };
+
+    // Public `@ nucleum` with a body: launchable entry, source body available.
+    let scala = device_contract_of("scala");
+    assert_eq!(scala.role, InterfaceDeviceRole::Kernel);
+    assert_eq!(scala.visibility, InterfaceDeviceVisibility::Public);
+    assert_eq!(scala.body, InterfaceBodyChannel::Source);
+
+    // Unmarked `@ nucleum` with a body: composable helper, never a launch
+    // entry — the visibility gate rides with the role.
+    let adiuvans = device_contract_of("adiuvans");
+    assert_eq!(adiuvans.role, InterfaceDeviceRole::Kernel);
+    assert_eq!(adiuvans.visibility, InterfaceDeviceVisibility::Private);
+    assert_eq!(adiuvans.body, InterfaceBodyChannel::Source);
+    assert!(adiuvans.is_composable());
+}
+
+/// DFV2-3 (a): a plain imported function carries no device contract at all —
+/// the device fact is added for `@ nucleum` exports only, not smeared over
+/// the whole import surface.
+#[test]
+fn import_contract_leaves_non_device_exports_without_device_contract() {
+    let (_td, home) = temp_dir("device-channel-plain");
+    let provider = home.join("probe");
+    fs::create_dir_all(provider.join("src")).expect("provider src");
+    fs::write(
+        provider.join("faber.toml"),
+        r#"[package]
+name = "probe"
+[library]
+provider = "probe"
+[paths]
+source = "src"
+[build]
+kind = "lib"
+targets = ["rust"]
+"#,
+    )
+    .expect("manifest");
+    fs::write(
+        provider.join("src/probe.fab"),
+        r"
+@ publica
+functio plana(f32 x) → f32 {
+    redde x
+}
+
+@ nucleum fragment
+@ publica
+functio fragmentum(f32 x) → f32 {
+    redde x
+}
+",
+    )
+    .expect("lib");
+
+    let app = home.join("app.fab");
+    fs::write(
+        &app,
+        r#"
+importa ex "probe:probe" probe
+"#,
+    )
+    .expect("app");
+    let source = fs::read_to_string(&app).expect("read app");
+
+    let _guard = LibraryHomeGuard::set(&home);
+    let contract = import_contract_for_file(&app, &source, None, None);
+    let interface = contract
+        .file_interfaces
+        .get("probe")
+        .expect("probe interface installed");
+
+    let plana = interface.exports.get("plana").expect("plana export");
+    let FileExportKind::Function(callable) = &plana.kind else {
+        panic!("plana must be a function export");
+    };
+    assert!(callable.device.is_none(), "non-device exports carry no device contract");
+
+    // `@ nucleum fragment` keeps the composition Fragment role, distinct from
+    // the v2 compute Kernel role.
+    let fragmentum = interface
+        .exports
+        .get("fragmentum")
+        .expect("fragmentum export");
+    let FileExportKind::Function(callable) = &fragmentum.kind else {
+        panic!("fragmentum must be a function export");
+    };
+    let device = callable
+        .device
+        .as_ref()
+        .expect("fragment carries a device contract");
+    assert_eq!(device.role, InterfaceDeviceRole::Fragment);
+    assert_eq!(device.visibility, InterfaceDeviceVisibility::Public);
+    assert_eq!(device.body, InterfaceBodyChannel::Source);
+}
+
+/// DFV2-3 provider-route source: the package-identity computation records the
+/// device-bearing sibling interface for the consumer, keyed by the consumer's
+/// module segments and import binding — the data the MIR provider route
+/// carries into the consumer link.
+#[test]
+fn package_identity_facts_record_device_interface_for_the_consumer() {
+    let (_td, home) = temp_dir("device-route");
+    fs::write(
+        home.join("faber.toml"),
+        r#"[package]
+name = "probe"
+"#,
+    )
+    .expect("manifest");
+    fs::write(
+        home.join("kernels.fab"),
+        r#"
+@ kernel
+@ public
+fn scala(float<f32> x) → float<f32> {
+    return x + 1.0
+}
+"#,
+    )
+    .expect("sibling kernels");
+    let app = home.join("app.fab");
+    fs::write(
+        &app,
+        r#"
+import from "./kernels" k
+"#,
+    )
+    .expect("app");
+
+    let identities =
+        package_identity_facts_for_path(&app).expect("package identity facts for the consumer");
+    assert_eq!(identities.module_segments, vec!["app".to_owned()]);
+    assert_eq!(
+        identities.imports.get("k").map(|segments| segments.as_slice()),
+        Some(&["kernels".to_owned()][..])
+    );
+
+    let interface = super::imported_device_interface_for(&identities.module_segments, "k")
+        .expect("device-bearing sibling interface recorded for the consumer");
+    let export = interface.exports.get("scala").expect("scala export");
+    let FileExportKind::Function(callable) = &export.kind else {
+        panic!("scala must be a function export");
+    };
+    let device = callable.device.as_ref().expect("device contract recorded");
+    assert_eq!(device.role, InterfaceDeviceRole::Kernel);
+    assert_eq!(device.visibility, InterfaceDeviceVisibility::Public);
+    assert_eq!(device.body, InterfaceBodyChannel::Source);
 }

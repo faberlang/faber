@@ -7,7 +7,8 @@
 
 use crate::file_interface::{
     FileExport, FileExportKind, FileInterface, InterfaceAliasExport, InterfaceAnnotationContract,
-    InterfaceAnnotationContractField, InterfaceCallable, InterfaceEnumVariant, InterfaceGenericParam,
+    InterfaceAnnotationContractField, InterfaceBodyChannel, InterfaceCallable, InterfaceDeviceContract,
+    InterfaceDeviceRole, InterfaceDeviceVisibility, InterfaceEnumVariant, InterfaceGenericParam,
     InterfaceIndexSnapshot, InterfaceLibraryIdentity, InterfaceMethodExport, InterfaceNominalExport,
     InterfaceNominalKind, InterfaceNominalType, InterfaceParam, InterfaceStructExport, InterfaceStructField,
     InterfaceTypeSnapshot,
@@ -55,6 +56,49 @@ thread_local! {
 #[cfg(test)]
 pub(crate) fn clear_import_target_cache() {
     IMPORT_TARGET_CACHE.with(|cache| cache.borrow_mut().clear());
+    IMPORTED_DEVICE_INTERFACES.with(|cache| cache.borrow_mut().clear());
+}
+
+/// Consumer-link registry for imported device interfaces (DFV2-3).
+///
+/// Keyed by `(consumer module segments, import binding)`, this carries the
+/// body-bearing file interface of each same-package import target from the
+/// package-identity computation (this module, same session/thread) to the MIR
+/// provider-route seam (`mir::lower::context`), which holds no source path on
+/// the analyzed unit. A miss keeps the pre-transport behavior — no device
+/// admission — and never grants a role without its body channel.
+type ImportedDeviceInterfaceCache = FxHashMap<(Vec<String>, String), FileInterface>;
+
+thread_local! {
+    static IMPORTED_DEVICE_INTERFACES: RefCell<ImportedDeviceInterfaceCache> =
+        RefCell::new(FxHashMap::default());
+}
+
+/// Record one device-bearing import interface for the consumer's provider
+/// route (DFV2-3). No-op for interfaces without device exports.
+fn record_imported_device_interface(module_segments: &[String], binding: &str, interface: &FileInterface) {
+    if !interface
+        .exports
+        .values()
+        .any(|export| matches!(&export.kind, FileExportKind::Function(callable) if callable.device.is_some()))
+    {
+        return;
+    }
+    IMPORTED_DEVICE_INTERFACES.with(|cache| {
+        cache
+            .borrow_mut()
+            .insert((module_segments.to_vec(), binding.to_owned()), interface.clone());
+    });
+}
+
+/// Serve the device-bearing file interface a consumer linked under `binding`.
+pub(crate) fn imported_device_interface_for(module_segments: &[String], binding: &str) -> Option<FileInterface> {
+    IMPORTED_DEVICE_INTERFACES.with(|cache| {
+        cache
+            .borrow()
+            .get(&(module_segments.to_vec(), binding.to_owned()))
+            .cloned()
+    })
 }
 
 type ReaderPackRef<'a> = Option<&'a crate::locale::LocalePack>;
@@ -876,6 +920,14 @@ fn package_identity_facts_for_file(
         let Ok(target) = crate::import_resolve::resolve_namespace_import(&path, import_path, templates) else {
             continue;
         };
+        // DFV2-3: record the target's device-bearing interface for this
+        // consumer so the MIR provider route can carry role + body channel
+        // into the consumer link. Served through the import-target memo, so
+        // the route sees the same interface the resolver installed.
+        let pack_key = code_pack.map(|pack| pack.metadata.id.clone());
+        if let Some(linked) = cached_import_target(&path, import_path, pack_key.as_ref(), code_pack, templates) {
+            record_imported_device_interface(&module_segments, &binding, &linked.interface);
+        }
         imports.insert(binding.clone(), module_segments_relative_to(&package_root, &target));
     }
     Some(crate::driver::PackageImportIdentities { product, module_segments, imports })
@@ -1116,6 +1168,7 @@ fn file_export_from_stmt(
                 decl.posture.is_async() || annotations_include_callable_family(&stmt.annotations, interner, "futura");
             let is_generator =
                 decl.posture.is_stream() || annotations_include_callable_family(&stmt.annotations, interner, "cursor");
+            let device = device_contract_from_stmt(stmt, decl, interner);
             Some(FileExport {
                 name,
                 kind: FileExportKind::Function(InterfaceCallable {
@@ -1126,6 +1179,7 @@ fn file_export_from_stmt(
                     err,
                     is_async,
                     is_generator,
+                    device,
                 }),
             })
         }
@@ -1205,6 +1259,7 @@ fn file_export_from_stmt(
                             err,
                             is_async,
                             is_generator,
+                            device: None,
                         },
                     })
                 })
@@ -1559,6 +1614,7 @@ fn interface_type_from_type_expr(
                 err,
                 is_async: false,
                 is_generator: false,
+                device: None,
             }))
         }
         TypeExprKind::PromissumFailable(success, alternate) => {
@@ -1828,6 +1884,51 @@ fn annotations_include_callable_family(
         AnnotationKind::Braced(braced) => interner.resolve(braced.name.name) == family,
         _ => false,
     })
+}
+
+/// v2 device contract for one exported function declaration (DFV2-3).
+///
+/// The import link carries the device fact and the body channel together:
+/// `@ nucleum` (or the reader-locale `@ kernel` spelling) sets the role, the
+/// `@ publica` tier sets launch visibility, and a missing declaration body is
+/// an explicit [`InterfaceBodyChannel::Missing`] — never a silent
+/// signature-only export. Conflicting nucleum annotations yield no contract
+/// (mirroring the HIR role-exclusivity check).
+fn device_contract_from_stmt(
+    stmt: &Stmt,
+    decl: &crate::syntax::FuncDecl,
+    interner: &crate::lexer::Interner,
+) -> Option<InterfaceDeviceContract> {
+    let mut role: Option<InterfaceDeviceRole> = None;
+    for annotation in &stmt.annotations {
+        let AnnotationKind::Nucleum(nucleum) = &annotation.kind else {
+            continue;
+        };
+        let candidate = if nucleum.is_fragment {
+            InterfaceDeviceRole::Fragment
+        } else {
+            InterfaceDeviceRole::Kernel
+        };
+        if role.is_some_and(|found| found != candidate) {
+            return None;
+        }
+        role = Some(candidate);
+    }
+    let role = role?;
+    let visibility = if matches!(
+        crate::semantic::passes::visibility_annotation::statement_export_tier(stmt, interner),
+        Some(VisibilityTier::Publica)
+    ) {
+        InterfaceDeviceVisibility::Public
+    } else {
+        InterfaceDeviceVisibility::Private
+    };
+    let body = if decl.body.is_some() {
+        InterfaceBodyChannel::Source
+    } else {
+        InterfaceBodyChannel::Missing
+    };
+    Some(InterfaceDeviceContract { role, visibility, body })
 }
 
 fn annotation_contract_from_stmt(

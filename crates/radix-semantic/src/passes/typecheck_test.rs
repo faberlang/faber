@@ -2356,6 +2356,7 @@ fn eot_selective_test_interface() -> crate::file_interface::FileInterface {
         err: None,
         is_async: false,
         is_generator: false,
+        device: None,
     };
     let mut interface = crate::file_interface::FileInterface::new();
     interface.insert(FileExport {

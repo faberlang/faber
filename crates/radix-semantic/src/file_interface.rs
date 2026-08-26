@@ -280,6 +280,109 @@ pub struct InterfaceCallable {
     pub err: Option<Box<InterfaceTypeSnapshot>>,
     pub is_async: bool,
     pub is_generator: bool,
+    /// v2 device contract (`@ nucleum`) riding the callable export (DFV2-3).
+    ///
+    /// `None` for ordinary callables and for function-type snapshots; the
+    /// device fact exists only where an exporting declaration carries the
+    /// annotation. The role fact never travels without the body channel.
+    pub device: Option<InterfaceDeviceContract>,
+}
+
+/// v2 device contract for one exported `@ nucleum` callable (DFV2-3).
+///
+/// Design `device-fragments` §9: kernel-ness crosses the import boundary —
+/// an imported `@ nucleum` function is a device function of the consuming
+/// unit — and the body channel travels with it. A role fact alone never
+/// admits a device call; [`Self::body`] decides composability.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct InterfaceDeviceContract {
+    /// `@ nucleum` (compute Kernel) or `@ nucleum fragment` (composition
+    /// Fragment). Mirrors `MirDeviceRole`; graphics `@ fragment` never
+    /// appears here.
+    pub role: InterfaceDeviceRole,
+    /// Launch-surface gate: `@ publica`/`@ public` marks a launchable entry;
+    /// an unmarked device function is a module-internal helper.
+    pub visibility: InterfaceDeviceVisibility,
+    /// Explicit body availability and source for cross-unit composition.
+    pub body: InterfaceBodyChannel,
+}
+
+impl InterfaceDeviceContract {
+    /// Whether the body channel can back a concrete device composition.
+    ///
+    /// Fail-closed: only a present source body or a canonical artifact is
+    /// composable; a signature alone never is.
+    #[must_use]
+    pub fn is_composable(&self) -> bool {
+        !matches!(self.body, InterfaceBodyChannel::Missing)
+    }
+}
+
+/// Device role carried by an exported `@ nucleum` callable.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum InterfaceDeviceRole {
+    /// `@ nucleum` — device function; launchable entry when public.
+    Kernel,
+    /// `@ nucleum fragment` — composition helper, never a dispatch stage.
+    Fragment,
+}
+
+/// Launch visibility carried by an exported device callable.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum InterfaceDeviceVisibility {
+    /// `@ nucleum @ publica` — dispatch/reflection entry in the consumer.
+    Public,
+    /// Unmarked `@ nucleum` — composable helper, never a launch entry.
+    Private,
+}
+
+/// Explicit body channel for an imported device callable (DFV2-3).
+///
+/// The load-bearing `gradus owns all ML kernel source` fact: role propagation
+/// without body propagation recreates the pinned import-loss red, so the
+/// channel states are explicit. [`InterfaceBodyChannel::Missing`] is a
+/// compile-time failure at use, never a silent signature-only fallback.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum InterfaceBodyChannel {
+    /// The exporter's source body is available to this consumer (the
+    /// interface was snapshotted from the exporter's source).
+    Source,
+    /// A serialized canonical body artifact is available for cross-package
+    /// composition (durable artifact production is DFV2-5).
+    Canonical(InterfaceCanonicalBody),
+    /// No usable body: the export is signature-only (or the artifact is
+    /// incompatible). Missing and incompatible share one fail-closed state.
+    Missing,
+}
+
+/// Serialized canonical body artifact riding the body channel.
+///
+/// Opaque to the transport: `template` is the canonical body bytes and
+/// `body_hash` the deterministic digest over them (DFV2-5 owns durable
+/// production and the full artifact identity; DFV2-4 consumes the payload).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct InterfaceCanonicalBody {
+    /// Canonical serialized body template bytes.
+    pub template: Vec<u8>,
+    /// FNV-1a/64 digest over [`Self::template`], hex-encoded. Deterministic
+    /// across processes so cache identity (body hash) is stable.
+    pub body_hash: String,
+}
+
+impl InterfaceCanonicalBody {
+    /// Wrap canonical template bytes, hashing them.
+    #[must_use]
+    pub fn new(template: Vec<u8>) -> Self {
+        let mut hash: u64 = 0xcbf2_9ce4_8422_2325;
+        for byte in &template {
+            hash ^= u64::from(*byte);
+            hash = hash.wrapping_mul(0x0000_0100_0000_01b3);
+        }
+        Self {
+            template,
+            body_hash: format!("{hash:016x}"),
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -1152,6 +1255,10 @@ fn snapshot_interface_callable_inner(
             .transpose()?,
         is_async: sig.is_async,
         is_generator: sig.is_generator,
+        // A semantic `FuncSig` carries no device fact; the v2 contract is
+        // attached by the export-surface builders that know the declaration's
+        // annotations and body availability (DFV2-3).
+        device: None,
     })
 }
 

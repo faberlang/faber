@@ -3185,6 +3185,7 @@ fn lowers_imported_nominal_method_to_provider_runtime_call() {
                     err: None,
                     is_async: false,
                     is_generator: false,
+                    device: None,
                 },
             }],
             annotation_contract: None,

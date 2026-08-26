@@ -684,6 +684,7 @@ fn imports_function_export_before_struct_alphabetically() {
             err: None,
             is_async: false,
             is_generator: false,
+            device: None,
         }),
     });
     interface.insert(FileExport {
@@ -733,6 +734,7 @@ fn projects_localized_library_members_by_identity_and_rejects_unmapped_canonical
         err: None,
         is_async: false,
         is_generator: false,
+        device: None,
     };
     let mut interface = FileInterface::new().with_identity(identity.clone());
     interface.insert(FileExport {
@@ -883,6 +885,7 @@ fn skipped_locale_members_keep_structured_provenance_and_sibling_exports() {
         err: None,
         is_async: false,
         is_generator: false,
+        device: None,
     };
     let mut interface = FileInterface::new().with_identity(identity);
     interface.insert(FileExport {
@@ -1036,6 +1039,7 @@ fn identity_row_library_members_resolve_under_strict_pack() {
         err: None,
         is_async: false,
         is_generator: false,
+        device: None,
     };
     let mut interface = FileInterface::new().with_identity(identity.clone());
     interface.insert(FileExport {
