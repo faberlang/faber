@@ -752,6 +752,10 @@ mod decimal_conversio_test;
 mod decimal_ordering_test;
 
 #[cfg(test)]
+#[path = "gate_law_totality_test.rs"]
+mod gate_law_totality_test;
+
+#[cfg(test)]
 #[path = "generic_call_test.rs"]
 mod generic_call_test;
 

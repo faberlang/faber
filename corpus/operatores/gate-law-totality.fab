@@ -1,0 +1,226 @@
++++
+term = "gate-law-totality"
+kind = "operator-group"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "width_type_sugar", "cast_expr", "conversio_expr", "comparison", "equality", "equality_tail", "expression", "literal", "nota_stmt"]
+category = "comparison"
+canonical = false
+summary = "Operator × carrier truth table: every comparison/equality/arithmetic/conversio gate cell is exactly one defined join or one named SEM rejection."
+syntax = "<expression> <operator> <expression> for ≡ ≠ ≅ ≇ ≈ ≉ < ≤ > ≥ + - * / % ↦ est"
+related = ["≅", "≈", "≡", "↦", "mixed-ordering-join", "numeric-value-eq", "comparatio", "est"]
+locale = "en"
++++
+
+# =============================================================================
+# gate-law-totality — the operator × carrier truth table (SEM gate law)
+# =============================================================================
+#
+# What this teaches:
+#   • ONE pin per operator × carrier-family cell of the SEM gate law. Each
+#     cell is either a defined join (executed below, verdict pinned in the
+#     expected output) or a named SEM rejection (documented in the table,
+#     asserted by the radix-semantic coverage audit).
+#   • The gate arms: numeric_ordering_bin (< ≤ > ≥), numeric_arithmetic_bin
+#     (+ - * / %), numeric_value_equality_types (≅ ≇ ≈ ≉),
+#     exact_equality_types (≡ ≠ est), check_conversio (↦).
+#   • New carrier families (e.g. GEA4) must land a row here before their
+#     cells count as proven.
+#
+# Common mistakes:
+#   • Expecting `≡` to join widths — it is fail-closed; widen with `↦` first.
+#   • Expecting `+` to promote mixed widths — arithmetic requires identical
+#     operands; only ordering and value equality join.
+#   • Expecting decimal `≅`/`≈` to join at the d64 scale like ordering does —
+#     see the contested cells GT-1/GT-2 below.
+#
+# See also: ≅, ≈, ≡, ↦, mixed-ordering-join, numeric-value-eq, comparatio, est
+# =============================================================================
+
+# =============================================================================
+# THE TABLE — 10 operator rows × 9 carrier-pair families = 90 cells.
+# J = defined join (executed below, verdict pinned). C = contested join
+# (documented here + pinned at the SEM gate by the coverage audit; NOT
+# executed — the shared oracle cannot pin a verdict surfaces disagree on).
+# R = named SEM rejection (asserted by the coverage audit, never compiled).
+#
+#                     ≡/≠   ≅/≇   ≈/≉    <     ≤     >     ≥    arith   ↦       est
+# P1 int identical     J     J     J     J     J     J     J     J       J        J
+# P2 int cross-width   R-eq  J     J     J     J     J     J     R-ai    J        R-eq
+# P3 signed×unsigned   R-eq  J     J    C¹     J     J    C¹    R-ai    J*       R-eq
+# P4 int×f32           R-eq  J     J     J     J     J     J     R-ai    J        R-eq
+# P5 int×f64           R-eq  J     J     J     J     J     J     R-ai    J        R-eq
+# P6 f32×f64           R-eq  J     J     J     J     J     J     R-ai    J        R-eq
+# P7 d32×d64           R-eq  C²    C²    J     J     J     J     R-ai  J / R-narr  R-eq
+# P8 decimal×integer   R-eq  J     J     J     J     J     J     R-ai    J        R-eq
+# P9 decimal×fractus   R-eq  J³    J³    R-ord R-ord R-ord R-ord  R-ai    J        R-eq
+#
+# R-eq    SEM010:equality_exact_types_required
+# R-ai    SEM011:numeric_arithmetic_operands_identical
+# R-ord   SEM011:mixed_decimal_fractus_ordering
+# R-narr  SEM016:decimal_width_narrowing_rejected (d64 → d32 only)
+# C¹      finding GT-4: generated Rust ordering casts the unsigned operand to
+#         i64 (`unsigned as i64`), wrapping u64::MAX to -1 — the runner
+#         verdicts -1 < u64::MAX = verum / -1 ≥ u64::MAX = falsum, the Rust
+#         target verdicts falsum / verum. ≤ and > coincide only by wrap.
+# C²      finding GT-1: the d32/d64 ≅ and ≈ cells are admitted, but the
+#         runner compares raw scaled carriers without the d64-scale join that
+#         ordering uses — 4.2 d32 ≅ 4.2 d64 verdicts falsum although both
+#         operands are exactly 4.2. The TS emitter also cannot typecheck the
+#         d64 ≅/≈ casts (bigint × number).
+# J³      admitted but verdict CONTESTED (finding GT-2): the decimal side is
+#         widened as a raw scaled integer into the f64 carrier — 4.2 d32 ≅
+#         4.2 f64 verdicts falsum. The ordering gate rejects the same family
+#         pair (R-ord); value equality has no equivalent rejection or scale
+#         join. The verdict is lane-agreed (runner/rust/ts all falsum).
+# J*      negative signed→unsigned ↦ is runner-carrier-inconsistent (finding
+#         GT-3): -2 i32 ↦ u32 prints -2, fails ≡/≅ against 4294967294 u32,
+#         and orders below it — neither two's complement nor an error.
+# =============================================================================
+
+# operatores/gate-law-totality — the operator × carrier truth table
+#
+# WHY: three audits found gate law not total over the operator × carrier
+# product one cell at a time (mixed int/float ordering + wrap; decimal
+# relational carrier-blind). This exemplum pins every cell so new carrier
+# families cannot mint unproven ones. Contested cells are findings (GT-1,
+# GT-2, GT-3), not patch targets — the gates were not weakened.
+
+main {
+    # ---------------------------------------------------------------- ints
+    const numerus a ← 7
+    const numerus b ← 7
+    const numerus<u8> narrow ← 3 ∷ numerus<u8>
+    const numerus<u16> wider ← 3 ∷ numerus<u16>
+    const numerus signed ← -1
+    const numerus<u64> unsigned ← 18446744073709551615
+    const numerus big ← 10
+
+    # --------------------------------------------------------------- floats
+    const fractus<f32> single ← 2.5 ∷ fractus<f32>
+    const fractus double ← 2.5
+    const fractus half ← 0.5
+    const fractus four_two ← 4.2
+    const numerus<i64> above ← 9007199254740993
+    const numerus<i64> below ← 9007199254740992
+    const fractus boundary ← 9007199254740992.0
+
+    # -------------------------------------------------------------- decimals
+    const numerus<d32> d32v ← 4.2
+    const numerus<d64> d64v ← 4.2
+    const numerus five ← 5
+
+    # ----------------------------------------------------------- conversio
+    const numerus<u64> five_u ← 5
+
+    # ----------------------------------------------------- ≡ / ≠ (P1 join)
+    # P1 identical ints join exactly; every other family pair is
+    # SEM010:equality_exact_types_required.
+    print a ≡ b
+    print a ≠ 8
+
+    # --------------------------------------------------- ≅ / ≇ (all joins)
+    # Promoted-exact value equality: widths join, then compare exactly.
+    print a ≅ b
+    print a ≇ 8
+    print narrow ≅ wider
+    print signed ≅ unsigned
+    print big ≅ single
+    print above ≅ boundary
+    print above ≅ below
+    print single ≅ double
+    print d32v ≅ five
+    print d32v ≅ four_two
+
+    # --------------------------------------------------- ≈ / ≉ (all joins)
+    # Fuzzy equality at the joined precision (OQ3 isclose default).
+    print a ≈ b
+    print a ≉ 8
+    print narrow ≈ wider
+    print signed ≈ unsigned
+    print big ≈ single
+    print above ≈ boundary
+    print above ≈ below
+    print single ≈ double
+    print d32v ≈ five
+    print d32v ≈ four_two
+
+    # -------------------------------------------------------- < (P1–P8)
+    # Ordering joins at the widened carrier: numerus for int pairs, f64 for
+    # float pairs, d64 for decimal pairs (mixed-ordering-join). P9
+    # decimal×fractus is SEM011:mixed_decimal_fractus_ordering.
+    print a < b
+    print a < 8
+    print narrow < wider
+    print big < single
+    print half < big
+    print single < double
+    print d32v < d64v
+    print d32v < five
+
+    # -------------------------------------------------------- ≤ (P1–P8)
+    print a ≤ b
+    print narrow ≤ wider
+    print signed ≤ unsigned
+    print big ≤ single
+    print half ≤ big
+    print single ≤ double
+    print d32v ≤ d64v
+    print d32v ≤ five
+
+    # -------------------------------------------------------- > (P1–P8)
+    print a > b
+    print a > 6
+    print narrow > wider
+    print signed > unsigned
+    print big > single
+    print big > half
+    print single > double
+    print d32v > d64v
+    print d32v > five
+
+    # -------------------------------------------------------- ≥ (P1–P8)
+    print a ≥ b
+    print narrow ≥ wider
+    print big ≥ single
+    print half ≥ big
+    print single ≥ double
+    print d32v ≥ d64v
+    print d32v ≥ five
+    # ------------------------------------------------------- arith (P1)
+    # Arithmetic requires identical width and primitive
+    # (SEM011:numeric_arithmetic_operands_identical for every mixed pair).
+    print a + b
+    print a - b
+    print a * b
+    print a / b
+    print a % b
+    print narrow + narrow
+    print single + single
+    print four_two + four_two
+    print d32v + d32v
+    print d64v + d64v
+
+    # ------------------------------------------------------- ↦ (all joins)
+    # Conversio is directional. Every family direction admits except the
+    # decimal narrowing d64 → d32 (SEM016:decimal_width_narrowing_rejected).
+    print narrow ↦ numerus<u16>
+    print a ↦ numerus<u8>
+    print five_u ↦ numerus
+    print a ↦ numerus<u64>
+    print a ↦ fractus<f32>
+    print single ↦ numerus
+    print a ↦ fractus
+    print four_two ↦ numerus
+    print single ↦ fractus<f64>
+    print double ↦ fractus<f32>
+    print d32v ↦ numerus<d64>
+    print d32v ↦ numerus
+    print five ↦ numerus<d32>
+    print five ↦ numerus<d64>
+    print d32v ↦ fractus
+    print four_two ↦ numerus<d64>
+
+    # ----------------------------------------------------- est (P1 join)
+    # is-membership follows strict equality: identical types only
+    # (SEM010:equality_exact_types_required for every mixed pair).
+    print a is a
+}
