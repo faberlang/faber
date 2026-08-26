@@ -159,10 +159,38 @@ impl Value {
     }
 
     pub fn display(&self, interner: &Interner, span: Span) -> Result<String, RunnerError> {
+        self.display_typed(interner, span, None)
+    }
+
+    /// Width-aware display: f32-declared floats render at f32 precision
+    /// (9007e12c3 carried the declared width into arithmetic; the display
+    /// path follows), everything else renders as before.
+    pub fn display_typed(
+        &self,
+        interner: &Interner,
+        span: Span,
+        float_width: Option<NumericWidth>,
+    ) -> Result<String, RunnerError> {
         Ok(match self {
             Value::Int(v) => v.to_string(),
             Value::UInt(v) => v.to_string(),
-            Value::Float(v) => display_fractus(*v),
+            Value::Float(v) => match float_width {
+                Some(width) if width.is_float() && width != NumericWidth::F64 => {
+                    // f32 shortest repr, keeping the fractus `N.0` integral
+                    // shape (`5`, not `5.0`, is not a Faber fractus text).
+                    #[expect(clippy::cast_possible_truncation)]
+                    let narrowed = format!("{}", *v as f32);
+                    let integral = narrowed
+                        .chars()
+                        .all(|c| c.is_ascii_digit() || c == '-' || c == '+');
+                    if integral {
+                        format!("{narrowed}.0")
+                    } else {
+                        narrowed
+                    }
+                }
+                _ => display_fractus(*v),
+            },
             Value::Bool(v) => display_bivalens(*v).to_owned(),
             Value::Str(v) => display_text_payload(v).to_owned(),
             Value::Ascii(b) => {
@@ -181,12 +209,12 @@ impl Value {
                 format!("closure f{} env{}", id.0, environment.0)
             }
             Value::ClosureEnvironment(id, _) => format!("closure env{}", id.0),
-            Value::Array(items) => display_list(&items.borrow(), interner, span)?,
-            Value::Tensor(tensor) => display_list(&tensor.borrow().data, interner, span)?,
-            Value::Vector(lanes) => display_list(&lanes.borrow(), interner, span)?,
-            Value::Matrix(matrix) => display_matrix(&matrix.borrow(), interner, span)?,
-            Value::Map(entries) => display_tabula_map(&entries.borrow(), interner, span)?,
-            Value::Struct(_, fields) => display_tabula_struct(fields, interner, span)?,
+            Value::Array(items) => display_list(&items.borrow(), interner, span, float_width)?,
+            Value::Tensor(tensor) => display_list(&tensor.borrow().data, interner, span, float_width)?,
+            Value::Vector(lanes) => display_list(&lanes.borrow(), interner, span, float_width)?,
+            Value::Matrix(matrix) => display_matrix(&matrix.borrow(), interner, span, float_width)?,
+            Value::Map(entries) => display_tabula_map(&entries.borrow(), interner, span, float_width)?,
+            Value::Struct(_, fields) => display_tabula_struct(fields, interner, span, float_width)?,
             Value::Set(_) | Value::Record(_) | Value::EnumVariant(_, _) | Value::Tuple(_) => {
                 format!("{self:?}")
             }
@@ -229,10 +257,15 @@ impl Value {
     }
 }
 
-fn display_list(items: &[Value], interner: &Interner, span: Span) -> Result<String, RunnerError> {
+fn display_list(
+    items: &[Value],
+    interner: &Interner,
+    span: Span,
+    float_width: Option<NumericWidth>,
+) -> Result<String, RunnerError> {
     let parts = items
         .iter()
-        .map(|item| display_in_collection(item, interner, span))
+        .map(|item| display_in_collection(item, interner, span, float_width))
         .collect::<Result<Vec<_>, _>>()?;
     Ok(format!("[{}]", parts.join(", ")))
 }
@@ -243,6 +276,7 @@ fn display_matrix(
     matrix: &MatrixValue,
     interner: &Interner,
     span: Span,
+    float_width: Option<NumericWidth>,
 ) -> Result<String, RunnerError> {
     let rows = usize::from(matrix.rows);
     let columns = usize::from(matrix.columns);
@@ -250,7 +284,12 @@ fn display_matrix(
         .map(|row| {
             let start = row * columns;
             let end = start + columns;
-            display_list(matrix.data.get(start..end).unwrap_or(&[]), interner, span)
+            display_list(
+                    matrix.data.get(start..end).unwrap_or(&[]),
+                    interner,
+                    span,
+                    float_width,
+                )
         })
         .collect::<Result<Vec<_>, _>>()?;
     Ok(format!("[{}]", row_parts.join(", ")))
@@ -260,14 +299,15 @@ fn display_in_collection(
     value: &Value,
     interner: &Interner,
     span: Span,
+    float_width: Option<NumericWidth>,
 ) -> Result<String, RunnerError> {
     Ok(match value {
         Value::Int(v) => v.to_string(),
         Value::UInt(v) => v.to_string(),
-        Value::Array(items) => display_list(&items.borrow(), interner, span)?,
-        Value::Map(entries) => display_tabula_map(&entries.borrow(), interner, span)?,
-        Value::Struct(_, fields) => display_tabula_struct(fields, interner, span)?,
-        other => other.display(interner, span)?,
+        Value::Array(items) => display_list(&items.borrow(), interner, span, float_width)?,
+        Value::Map(entries) => display_tabula_map(&entries.borrow(), interner, span, float_width)?,
+        Value::Struct(_, fields) => display_tabula_struct(fields, interner, span, float_width)?,
+        other => other.display_typed(interner, span, float_width)?,
     })
 }
 
@@ -275,6 +315,7 @@ fn display_tabula_map(
     entries: &FxHashMap<MapKey, Value>,
     interner: &Interner,
     span: Span,
+    float_width: Option<NumericWidth>,
 ) -> Result<String, RunnerError> {
     let mut parts = Vec::new();
     for (key, value) in entries {
@@ -285,7 +326,7 @@ fn display_tabula_map(
             MapKey::Bool(v) => format!("{v}"),
             MapKey::Unit => "nihil".to_owned(),
         };
-        let val_str = display_in_collection(value, interner, span)?;
+        let val_str = display_in_collection(value, interner, span, float_width)?;
         parts.push(format!("{key_str}: {val_str}"));
     }
     Ok(format!("{{{}}}", parts.join(", ")))
@@ -295,11 +336,12 @@ fn display_tabula_struct(
     fields: &RefCell<FxHashMap<Symbol, Value>>,
     interner: &Interner,
     span: Span,
+    float_width: Option<NumericWidth>,
 ) -> Result<String, RunnerError> {
     let mut parts = Vec::new();
     for (symbol, value) in fields.borrow().iter() {
         let name = interner.resolve(*symbol);
-        let val_str = display_in_collection(value, interner, span)?;
+        let val_str = display_in_collection(value, interner, span, float_width)?;
         parts.push(format!("\"{name}\": {val_str}"));
     }
     Ok(format!("{{{}}}", parts.join(", ")))

@@ -69,7 +69,11 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                 let [arg] = call.args.as_slice() else {
                     return Err(RunnerError::internal(span, "diagnostic runtime arity"));
                 };
-                let text = self.eval_operand(arg, span)?.display(self.interner, span)?;
+                let value = self.eval_operand(arg, span)?;
+                // 9007e12c3 follow-through: floats declared at a narrower
+                // width than f64 display at that width.
+                let float_width = self.operand_float_width(arg);
+                let text = value.display_typed(self.interner, span, float_width)?;
                 self.host.scribe(*kind, &text)?;
                 Ok(Value::Unit)
             }

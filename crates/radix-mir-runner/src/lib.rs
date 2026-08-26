@@ -24,10 +24,10 @@ use radix_lexer::{Interner, Span, Symbol};
 use radix_mir::{
     MirBinOp, MirBlock, MirBlockId, MirCallee, MirConstant, MirFunction, MirFunctionId, MirLocalId,
     MirOperand, MirParamMode, MirPlace, MirPlaceBase, MirProgram, MirStatementKind, MirTempId,
-    MirTerminatorKind, MirUnOp, MirValidationContext, MirValue, MirValueId, MirValueKind,
+    MirTerminatorKind, MirType, MirUnOp, MirValidationContext, MirValue, MirValueId, MirValueKind,
     ValidatedMir,
 };
-use radix_types::{effective_width, NumericWidth, Primitive, Type, TypeTable};
+use radix_types::{effective_width, NumericWidth, Primitive, Type, TypeId, TypeTable};
 use rustc_hash::{FxHashMap, FxHashSet};
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -208,6 +208,9 @@ pub(crate) struct Runner<'a, H: Host + ?Sized> {
     /// Side-effecting `⇥` recovery calls parked in unreachable orphan blocks.
     /// Looked up by `(function, dest temp)` so conversion failure is O(1).
     recovery_calls: FxHashMap<(MirFunctionId, MirTempId), (MirCallee, Vec<MirOperand>)>,
+    /// Value-id static types per function (`MirStatementKind::Assign`), for
+    /// display-width resolution at diagnostics.
+    value_types: FxHashMap<(MirFunctionId, MirValueId), MirType>,
 }
 
 impl<'a, H: Host + ?Sized> Runner<'a, H> {
@@ -249,6 +252,7 @@ impl<'a, H: Host + ?Sized> Runner<'a, H> {
             textus_literals: RefCell::new(FxHashMap::default()),
             ascii_literals: RefCell::new(FxHashMap::default()),
             recovery_calls: index_orphan_recovery_calls(program),
+            value_types: index_value_types(program),
         }
     }
 }
@@ -983,6 +987,53 @@ impl<H: Host + ?Sized> Runner<'_, H> {
         }
     }
 
+    /// Declared float width for a diagnostic operand (scalar or numeric
+    /// collection element), used to render floats at the operand width.
+    fn operand_float_width(&self, operand: &MirOperand) -> Option<NumericWidth> {
+        let ty = match operand {
+            MirOperand::Temp(id) => {
+                let function = self.program.function_by_id(self.frames.last()?.function)?;
+                function.temps.iter().find(|t| t.id == *id).map(|t| t.ty)
+            }
+            MirOperand::Place(place) => match place.base {
+                MirPlaceBase::Temp(id) => {
+                    let function = self.program.function_by_id(self.frames.last()?.function)?;
+                    function.temps.iter().find(|t| t.id == id).map(|t| t.ty)
+                }
+                // Locals and projections may narrow away from the numeric
+                // element; only a projection-free numeric base resolves.
+                MirPlaceBase::Local(id) if place.projections.is_empty() => {
+                    let function = self.program.function_by_id(self.frames.last()?.function)?;
+                    function.locals.iter().find(|l| l.id == id).map(|l| l.ty)
+                }
+                MirPlaceBase::Local(_) => None,
+            },
+            MirOperand::Value(id) => {
+                self.value_types.get(&(self.frames.last()?.function, *id)).copied()
+            }
+            MirOperand::Constant(_) => None,
+        }?;
+        Self::element_float_width(ty.semantic_id(), self.types, 0)
+    }
+
+    fn element_float_width(ty: TypeId, types: &TypeTable, depth: u8) -> Option<NumericWidth> {
+        if depth > 8 {
+            return None;
+        }
+        match types.get(ty) {
+            Type::SizedNumeric(_, width) if width.is_float() => Some(*width),
+            Type::Vector(elem, _)
+            | Type::Matrix(elem, _)
+            | Type::Tensor(elem, _)
+            | Type::Sparsa(elem, _)
+            | Type::Array(elem)
+            | Type::BoundedArray { element: elem, .. } => {
+                Self::element_float_width(*elem, types, depth + 1)
+            }
+            _ => None,
+        }
+    }
+
     /// CTO-3 — the fallback runs ONLY on conversion failure. A side-effecting
     /// `⇥` recovery CALL is lowered by the materializer into an ORPHAN block
     /// (dead code to the main flow); at the conversion-failure recovery point
@@ -1679,6 +1730,22 @@ fn constant_equals_value(constant: &MirConstant, value: &Value, interner: &Inter
         (MirConstant::Unit, Value::Unit) => true,
         _ => false,
     }
+}
+
+/// Value-id static types from `Assign` statements, keyed per function, for
+/// display-width resolution at diagnostics.
+fn index_value_types(program: &MirProgram) -> FxHashMap<(MirFunctionId, MirValueId), MirType> {
+    let mut map = FxHashMap::default();
+    for function in &program.functions {
+        for block in &function.blocks {
+            for statement in &block.statements {
+                if let MirStatementKind::Assign { value, .. } = &statement.kind {
+                    map.insert((function.id, value.id), value.ty);
+                }
+            }
+        }
+    }
+    map
 }
 
 fn index_orphan_recovery_calls(
