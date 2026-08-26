@@ -1,0 +1,770 @@
+# corpus/variant-cells.toml — claimable variant-cell ledger (hand-maintained).
+#
+# One row per claimable variant cell across the six high-arity families
+# (itera / summa / bounded-conversio / annotations / casts / closures).
+# Enumeration sourced from the 2026-08-25 variant-level corpus census
+# (24b52ef3) and verified against live corpus state (413 .fab / 279 .expected
+# at landing, 2026-08-26). The 441-cell conversio family×family matrix
+# (examples/conversio-matrix/, measured fixtures) is intentionally NOT a
+# claimable cell space — it collapses the boundedness axis and is not corpus
+# teaching.
+#
+# Row fields:
+#   id        stable cell identifier (unique, never reused)
+#   family    itera | summa | bounded-conversio | annotations | casts | closures
+#   cell      human-readable cell descriptor
+#   status    direct       — a corpus exemplum teaches the cell (run/lane proven)
+#             unit-proven  — proven only in semantic unit tests; zero corpus
+#             bare         — no corpus exemplum anywhere (grammar admits, nothing teaches)
+#   exemplum  corpus-relative .fab path (absent for bare/unit-proven cells)
+#   expected  true when corpus/<exemplum>.expected exists (stdout pinned)
+#   decline   true for reject/decline cells (diagnostic surface, not stdout admit)
+#   required  true for NEW grammar surface: must ship exemplum + .expected or
+#             stage 1 fails (never true on the existing backlog)
+#   note      provenance / gap notes
+#
+# The stage-1 gate ./scripta/check-corpus-variant-cells enforces: direct rows
+# name a real exemplum, .expected claims match disk, required rows cannot land
+# bare, and the bare-cell ratchet below never grows.
+#
+# Ratchet: ratchet_baseline is the bare-cell count at mechanism landing. Catch-up
+# batches convert bare -> direct and lower the baseline in the same commit; new
+# surface landing bare raises the count and fails stage 1. Updated 2026-08-26.
+
+ratchet_baseline = 26
+
+# =============================================================================
+# itera (32 cells: 23 direct / 3 unit-proven / 6 bare)
+# =============================================================================
+
+[[cells]]
+id = "itera.ex.lista"
+family = "itera"
+cell = "ex × lista × ident"
+status = "direct"
+exemplum = "itera/ex.fab"
+expected = true
+
+[[cells]]
+id = "itera.ex.cursor"
+family = "itera"
+cell = "ex × cursor-return"
+status = "direct"
+exemplum = "itera/cursor-iteratio.fab"
+expected = true
+note = "capability-stream consumers also taught in ad/sermo-*"
+
+[[cells]]
+id = "itera.ex.tabula"
+family = "itera"
+cell = "ex × tabula (value iteration)"
+status = "bare"
+note = "named gap: itera ex over tabula before map value iteration MIR lowering"
+
+[[cells]]
+id = "itera.ex.bounded-lista"
+family = "itera"
+cell = "ex × bounded lista<T,N>"
+status = "direct"
+exemplum = "bounded/itera-ex-bounded-lista.fab"
+expected = false
+note = "runner NoEntryReference, rust-lane reject row; stdout unpinned"
+
+[[cells]]
+id = "itera.ex.bounded-buffers"
+family = "itera"
+cell = "ex × bounded bytes/ascii/string<N>"
+status = "bare"
+exemplum = "bounded/itera-ex-scalar-buffers.fab"
+expected = false
+note = "compile-only: declaration-only exemplum, not run-proven"
+
+[[cells]]
+id = "itera.ex.tensor-r1"
+family = "itera"
+cell = "ex × tensor rank-1"
+status = "direct"
+exemplum = "tensor/itera-ex-rank1.fab"
+expected = true
+
+[[cells]]
+id = "itera.ex.tensor-r1-apud"
+family = "itera"
+cell = "ex × tensor rank-1 + apud[1]"
+status = "direct"
+exemplum = "itera/apud-rank1.fab"
+expected = true
+
+[[cells]]
+id = "itera.ex.tensor-r2-apud"
+family = "itera"
+cell = "ex × tensor rank-2 + apud[2]"
+status = "direct"
+exemplum = "itera/apud-rank2-matrix.fab"
+expected = true
+
+[[cells]]
+id = "itera.ex.tensor-r3-apud"
+family = "itera"
+cell = "ex × tensor rank-3 + apud[3]"
+status = "direct"
+exemplum = "itera/apud-rank3.fab"
+expected = true
+
+[[cells]]
+id = "itera.ex.matrix-apud"
+family = "itera"
+cell = "ex × matrix + apud[2]"
+status = "direct"
+exemplum = "itera/apud-rank2-matrix.fab"
+expected = true
+note = "matrix row/column walk; same exemplum as rank-2 + apud"
+
+[[cells]]
+id = "itera.apud.index-causal"
+family = "itera"
+cell = "apud index-causal body use"
+status = "direct"
+exemplum = "itera/apud-index-causal.fab"
+expected = true
+
+[[cells]]
+id = "itera.ex.pattern-object"
+family = "itera"
+cell = "ex × object pattern {x,y}"
+status = "direct"
+exemplum = "itera/destructuring.fab"
+expected = true
+
+[[cells]]
+id = "itera.ex.pattern-array"
+family = "itera"
+cell = "ex × array pattern [a,b]"
+status = "direct"
+exemplum = "itera/destructuring.fab"
+expected = true
+
+[[cells]]
+id = "itera.ex.pattern-head-tail"
+family = "itera"
+cell = "ex × rest pattern [caput, rest cauda]"
+status = "direct"
+exemplum = "itera/destructuring.fab"
+expected = true
+
+[[cells]]
+id = "itera.ex.pattern-wildcard"
+family = "itera"
+cell = "ex × wildcard pattern [_, x]"
+status = "direct"
+exemplum = "itera/destructuring.fab"
+expected = true
+
+[[cells]]
+id = "itera.de"
+family = "itera"
+cell = "de × tabula keys / de × lista indices"
+status = "direct"
+exemplum = "itera/de.fab"
+expected = false
+note = "stdout deliberately unpinned (by design)"
+
+[[cells]]
+id = "itera.ab.exclusive"
+family = "itera"
+cell = "ab ‥ exclusive range"
+status = "direct"
+exemplum = "itera/intervallum.fab"
+expected = false
+
+[[cells]]
+id = "itera.ab.inclusive"
+family = "itera"
+cell = "ab … inclusive range"
+status = "direct"
+exemplum = "itera/intervallum.fab"
+expected = false
+
+[[cells]]
+id = "itera.ab.before"
+family = "itera"
+cell = "ab before (upper-bound range)"
+status = "direct"
+exemplum = "ante/ante.fab"
+expected = true
+
+[[cells]]
+id = "itera.ab.step"
+family = "itera"
+cell = "ab per step"
+status = "direct"
+exemplum = "ab/ab.fab"
+expected = true
+
+[[cells]]
+id = "itera.ab.negative-step"
+family = "itera"
+cell = "ab negative step"
+status = "direct"
+exemplum = "itera/intervallum-gradus.fab"
+expected = false
+
+[[cells]]
+id = "itera.ab.air-admit"
+family = "itera"
+cell = "ab × AIR literal-range admit"
+status = "direct"
+exemplum = "aspect/air-aspect-admit.fab"
+expected = false
+note = "lane-registered (aspect AIR rows)"
+
+[[cells]]
+id = "itera.ab.air-decline"
+family = "itera"
+cell = "ab × AIR runtime-range decline"
+status = "direct"
+exemplum = "aspect/air-aspect-decline.fab"
+expected = false
+decline = true
+note = "lane-registered reject row"
+
+[[cells]]
+id = "itera.reject.apud-arity"
+family = "itera"
+cell = "REJECT: apud arity ≠ rank"
+status = "direct"
+exemplum = "itera/apud-decline.fab"
+expected = true
+decline = true
+note = "pinned diagnostics"
+
+[[cells]]
+id = "itera.reject.lista-apud"
+family = "itera"
+cell = "REJECT: lista apud (ragged)"
+status = "direct"
+exemplum = "itera/apud-decline.fab"
+expected = true
+decline = true
+
+[[cells]]
+id = "itera.reject.apud-on-ab"
+family = "itera"
+cell = "REJECT: apud on ab (mode law)"
+status = "unit-proven"
+note = "crates/radix-semantic/src/passes/typecheck/itera_apud_test.rs"
+
+[[cells]]
+id = "itera.reject.apud-on-de"
+family = "itera"
+cell = "REJECT: apud on de (mode law)"
+status = "unit-proven"
+note = "crates/radix-semantic/src/passes/typecheck/itera_apud_test.rs"
+
+[[cells]]
+id = "itera.reject.rank2-no-apud"
+family = "itera"
+cell = "REJECT: rank ≥ 2 without apud"
+status = "unit-proven"
+note = "crates/radix-semantic/src/passes/typecheck/itera_apud_test.rs"
+
+[[cells]]
+id = "itera.varia-binder"
+family = "itera"
+cell = "binder varia (var/let loop binder)"
+status = "bare"
+note = "grammar admits (fixum | varia); only frontmatter mention in destructuring.fab"
+
+[[cells]]
+id = "itera.ergo-body"
+family = "itera"
+cell = "body ergo joint on itera"
+status = "bare"
+note = "ergo taught for si/dum in operatores/control, never on a loop"
+
+[[cells]]
+id = "itera.cape-admit"
+family = "itera"
+cell = "itera … cape err { } admit shape"
+status = "bare"
+note = "receptio-decline covers a rethrow decline; plain admit shape untaught"
+
+[[cells]]
+id = "itera.apud-rank4"
+family = "itera"
+cell = "apud rank-4+ coordinates"
+status = "bare"
+note = "grammar admits any figura rank"
+
+# =============================================================================
+# summa / maxima / minima (15 cells: 10 direct / 5 bare)
+# =============================================================================
+
+[[cells]]
+id = "summa.ex-fixum"
+family = "summa"
+cell = "sequential summa ex … apud [i] fixum s"
+status = "direct"
+exemplum = "summa/summa.fab"
+expected = true
+note = "runner runs the fold (SFR-4); rust lane fails closed at codegen by classification"
+
+[[cells]]
+id = "summa.filum"
+family = "summa"
+cell = "filum/thread distributed sum-reduce (@ nucleum la + @ kernel en)"
+status = "direct"
+exemplum = "summa/filum.fab"
+expected = false
+note = "compile-only (NoEntryReference); en spelling taught in summa/summa-en.fab"
+
+[[cells]]
+id = "summa.filum-reject"
+family = "summa"
+cell = "REJECT: filum outside @ nucleum"
+status = "direct"
+exemplum = "summa/summa-decline.fab"
+expected = true
+decline = true
+
+[[cells]]
+id = "summa.combine-refusal"
+family = "summa"
+cell = "REJECT: summa combine-refusal (PARSE001)"
+status = "direct"
+exemplum = "summa/summa-combine-refusal.fab"
+expected = true
+decline = true
+
+[[cells]]
+id = "summa.max-at-coalesce"
+family = "summa"
+cell = "max from … at [i] coalesce"
+status = "direct"
+exemplum = "summa/max-min.fab"
+expected = false
+
+[[cells]]
+id = "summa.min-at-coalesce"
+family = "summa"
+cell = "min from … at [i] coalesce"
+status = "direct"
+exemplum = "summa/max-min.fab"
+expected = false
+
+[[cells]]
+id = "summa.max-apud-absent"
+family = "summa"
+cell = "max from (row ⊙ scale) coalesce (apud-absent)"
+status = "direct"
+exemplum = "summa/max-min.fab"
+expected = false
+
+[[cells]]
+id = "summa.empty-identity"
+family = "summa"
+cell = "empty -∞ coalesce identity"
+status = "direct"
+exemplum = "summa/max-min.fab"
+expected = false
+note = "caller-stated coalesce identity; language invents no max/min identity"
+
+[[cells]]
+id = "summa.method"
+family = "summa"
+cell = ".summa() / .sum() method"
+status = "direct"
+exemplum = "summa/minmax-infix.fab"
+expected = true
+note = "method surface on lista + tensor (minmax-infix shows both)"
+
+[[cells]]
+id = "summa.minmax-infix"
+family = "summa"
+cell = "minmax-infix"
+status = "direct"
+exemplum = "summa/minmax-infix.fab"
+expected = true
+
+[[cells]]
+id = "summa.no-apud"
+family = "summa"
+cell = "summa without apud (plain fold)"
+status = "bare"
+note = "parser admits; nothing teaches"
+
+[[cells]]
+id = "summa.filum-rank2"
+family = "summa"
+cell = "filum with rank-2 apud [i,j]"
+status = "bare"
+note = "parser test proves; corpus none"
+
+[[cells]]
+id = "summa.varia-binder"
+family = "summa"
+cell = "varia binder on summa"
+status = "bare"
+note = "parser test proves; corpus none"
+
+[[cells]]
+id = "summa.en-no-thread"
+family = "summa"
+cell = "en sequential sum from WITHOUT thread"
+status = "bare"
+note = "en taught only in kernel form (summa-en.fab)"
+
+[[cells]]
+id = "summa.extrema-no-coalesce"
+family = "summa"
+cell = "maxima/minima WITHOUT coalesce tail"
+status = "bare"
+
+# =============================================================================
+# bounded-conversio (15 cells: 6 unit-proven / 9 bare)
+# =============================================================================
+# The bounded×bounded sub-space: corpus teaches only unbounded→bounded
+# (raw ↦ string<8> / bytes<8>). All 15 bounded×bounded cells are corpus-zero.
+
+[[cells]]
+id = "bconv.ascii-to-textus"
+family = "bounded-conversio"
+cell = "ascii<N> ↦ textus"
+status = "unit-proven"
+note = "crates/radix-semantic/src/passes/typecheck/bounded_string_conversio_test.rs"
+
+[[cells]]
+id = "bconv.textus-to-textus"
+family = "bounded-conversio"
+cell = "textus<N> ↦ textus"
+status = "unit-proven"
+note = "crates/radix-semantic/src/passes/typecheck/bounded_string_conversio_test.rs"
+
+[[cells]]
+id = "bconv.ascii-resize"
+family = "bounded-conversio"
+cell = "ascii<N> ↔ ascii<M> grow/shrink/identity (D7 resize)"
+status = "unit-proven"
+note = "crates/radix-semantic/src/passes/typecheck/bounded_string_conversio_test.rs"
+
+[[cells]]
+id = "bconv.ascii-overflow-decline"
+family = "bounded-conversio"
+cell = "REJECT: ascii literal over capacity"
+status = "unit-proven"
+decline = true
+note = "ascii_literal_too_long — bounded_string_conversio_test.rs"
+
+[[cells]]
+id = "bconv.textus-overflow-decline"
+family = "bounded-conversio"
+cell = "REJECT: textus literal over capacity"
+status = "unit-proven"
+decline = true
+note = "textus_literal_too_long — bounded_string_conversio_test.rs"
+
+[[cells]]
+id = "bconv.lista-to-tensor"
+family = "bounded-conversio"
+cell = "lista<T,N> ↦ tensor<T,[N]>"
+status = "unit-proven"
+note = "crates/radix-semantic/src/lista_tensor_conversio_test.rs (incl. bounded-source admits + declines)"
+
+[[cells]]
+id = "bconv.octeti-to-textus"
+family = "bounded-conversio"
+cell = "octeti<N> ↦ textus (UNSETTLED)"
+status = "bare"
+note = "neither admit nor decline documented anywhere"
+
+[[cells]]
+id = "bconv.octeti-to-octeti"
+family = "bounded-conversio"
+cell = "octeti<N> ↦ octeti<M> (UNSETTLED)"
+status = "bare"
+note = "neither admit nor decline documented anywhere"
+
+[[cells]]
+id = "bconv.octeti-to-lista"
+family = "bounded-conversio"
+cell = "octeti<N> ↦ lista<u8> (UNSETTLED)"
+status = "bare"
+note = "neither admit nor decline documented anywhere"
+
+[[cells]]
+id = "bconv.textus-to-bounded-textus"
+family = "bounded-conversio"
+cell = "textus<N> ↦ textus<M> (UNSETTLED)"
+status = "bare"
+note = "neither admit nor decline documented anywhere"
+
+[[cells]]
+id = "bconv.textus-to-ascii"
+family = "bounded-conversio"
+cell = "textus<N> ↦ ascii<M> (UNSETTLED)"
+status = "bare"
+note = "neither admit nor decline documented anywhere"
+
+[[cells]]
+id = "bconv.textus-to-octeti"
+family = "bounded-conversio"
+cell = "textus<N> ↦ octeti<N> (UNSETTLED)"
+status = "bare"
+note = "neither admit nor decline documented anywhere"
+
+[[cells]]
+id = "bconv.lista-to-bounded-textus"
+family = "bounded-conversio"
+cell = "lista<T,N> ↦ textus<M> (UNSETTLED)"
+status = "bare"
+note = "neither admit nor decline documented anywhere"
+
+[[cells]]
+id = "bconv.lista-to-bounded-lista"
+family = "bounded-conversio"
+cell = "lista<T,N> ↦ lista<T,M> (UNSETTLED)"
+status = "bare"
+note = "neither admit nor decline documented anywhere"
+
+[[cells]]
+id = "bconv.lista-to-octeti"
+family = "bounded-conversio"
+cell = "lista<T,N> ↦ octeti<M> (UNSETTLED)"
+status = "bare"
+note = "neither admit nor decline documented anywhere"
+
+# =============================================================================
+# annotations (8 cells: 6 direct / 2 bare)
+# =============================================================================
+
+[[cells]]
+id = "ann.sugar"
+family = "annotations"
+cell = "sugar @ name … (cli, publica, json, versio, optio)"
+status = "direct"
+exemplum = "publica/publica.fab"
+expected = true
+note = "sugar forms also in cli/cli.fab, json/json.fab, optio/optio.fab, meta/versio.fab (stdout unpinned there)"
+
+[[cells]]
+id = "ann.kernel-lane"
+family = "annotations"
+cell = "@ kernel lane \"id\" (en)"
+status = "direct"
+exemplum = "cuda/summa-proof.fab"
+expected = false
+note = "cuda device lane; no .expected by lane policy"
+
+[[cells]]
+id = "ann.nucleum-lane"
+family = "annotations"
+cell = "@ nucleum lane (la)"
+status = "direct"
+exemplum = "summa/filum.fab"
+expected = false
+
+[[cells]]
+id = "ann.braced"
+family = "annotations"
+cell = "braced @ name { fields } (radix-lane, futura, nondum, verte)"
+status = "direct"
+exemplum = "annotation-sugar/radix-lane-braced.fab"
+expected = true
+
+[[cells]]
+id = "ann.cli-braced"
+family = "annotations"
+cell = "braced @ cli { nomen = … }"
+status = "direct"
+exemplum = "annotation-sugar/cli-braced.fab"
+expected = false
+
+[[cells]]
+id = "ann.optio-braced"
+family = "annotations"
+cell = "braced @ optio { … }"
+status = "direct"
+exemplum = "annotation-sugar/optio-braced.fab"
+expected = false
+
+[[cells]]
+id = "ann.nucleum-fragment"
+family = "annotations"
+cell = "@ nucleum fragment modifier"
+status = "bare"
+note = "nucleum_annotation_test.rs proves the parser; zero corpus"
+
+[[cells]]
+id = "ann.nucleum-fragment-braced"
+family = "annotations"
+cell = "@ nucleum { fragment = verum } braced"
+status = "bare"
+note = "nucleum_annotation_test.rs proves the parser; zero corpus"
+
+# =============================================================================
+# casts / convert hints (11 cells: 11 direct)
+# =============================================================================
+
+[[cells]]
+id = "cast.ascribe-widths"
+family = "casts"
+cell = "∷ int/float width ascription"
+status = "direct"
+exemplum = "conversio/conversio.fab"
+expected = true
+
+[[cells]]
+id = "cast.ascribe-variant"
+family = "casts"
+cell = "∷ variant upcast (∷ Forma)"
+status = "direct"
+exemplum = "unio/unio.fab"
+expected = true
+
+[[cells]]
+id = "cast.ascribe-list"
+family = "casts"
+cell = "∷ list ascription"
+status = "direct"
+exemplum = "lista/methodi-copiae.fab"
+expected = true
+note = "also lista/methodi-accessus.fab, lista/methodi-functionales.fab"
+
+[[cells]]
+id = "cast.chain-scalar"
+family = "casts"
+cell = "chained ∷ … ↦ … scalar"
+status = "direct"
+exemplum = "conversio/conversio.fab"
+expected = true
+
+[[cells]]
+id = "cast.chain-bits"
+family = "casts"
+cell = "chained ∷ … ↦ …, Bits (finite/nan)"
+status = "direct"
+exemplum = "conversio/bits-conversio.fab"
+expected = true
+
+[[cells]]
+id = "cast.radix-forms"
+family = "casts"
+cell = "Hex/Bin/Oct radix ascription"
+status = "direct"
+exemplum = "conversio/radix.fab"
+expected = true
+
+[[cells]]
+id = "cast.endian-windows"
+family = "casts"
+cell = "Be/Le window ascription (u32/i32/f32/f64)"
+status = "direct"
+exemplum = "conversio/octeti-endian.fab"
+expected = false
+note = "census defect: EXPECTED OUTPUT comment but no .expected sibling"
+
+[[cells]]
+id = "cast.bits-fail-closed"
+family = "casts"
+cell = "Bits + fail-closed hint"
+status = "direct"
+exemplum = "conversio/bits-hint.fab"
+expected = false
+
+[[cells]]
+id = "cast.ascii-radix"
+family = "casts"
+cell = "ascii<N,radix> incl. inferred _ width"
+status = "direct"
+exemplum = "conversio/ascii-format.fab"
+expected = true
+
+[[cells]]
+id = "cast.convert-assign"
+family = "casts"
+cell = "↤ convert-assign"
+status = "direct"
+exemplum = "bounded/exact-bound-lattice.fab"
+expected = true
+note = "also operatores/modular-word*.fab"
+
+[[cells]]
+id = "cast.error-recovery"
+family = "casts"
+cell = "⇥ recovery on conversio"
+status = "direct"
+exemplum = "conversio/conversio.fab"
+expected = true
+note = "also conversio/octeti.fab, conversio/fallibilis.fab (stdout unpinned there)"
+
+# =============================================================================
+# closures (9 cells: 5 direct / 4 bare)
+# =============================================================================
+
+[[cells]]
+id = "cl.compact-single"
+family = "closures"
+cell = "compact single param ∴"
+status = "direct"
+exemplum = "clausura/clausura.fab"
+expected = true
+
+[[cells]]
+id = "cl.compact-parens"
+family = "closures"
+cell = "compact parens + → T"
+status = "direct"
+exemplum = "clausura/clausura.fab"
+expected = true
+
+[[cells]]
+id = "cl.libera"
+family = "closures"
+cell = "free/libera single + parens"
+status = "direct"
+exemplum = "libera/libera.fab"
+expected = true
+
+[[cells]]
+id = "cl.libera-module-ref"
+family = "closures"
+cell = "libera module-reference"
+status = "direct"
+exemplum = "libera/libera-module-reference.fab"
+expected = true
+
+[[cells]]
+id = "cl.libera-capture-reject"
+family = "closures"
+cell = "REJECT: libera capture"
+status = "direct"
+exemplum = "libera/libera-reject.fab"
+expected = true
+decline = true
+note = "CL-5 reject harness"
+
+[[cells]]
+id = "cl.error-channel"
+family = "closures"
+cell = "closure ⇥ E own error-channel declaration"
+status = "bare"
+note = "frontmatter mentions; body never shows"
+
+[[cells]]
+id = "cl.fac-block"
+family = "closures"
+cell = "∴ fac { } block body"
+status = "bare"
+
+[[cells]]
+id = "cl.legacy-head"
+family = "closures"
+cell = "legacy clausura(params): expr head"
+status = "bare"
+
+[[cells]]
+id = "cl.legacy-libera"
+family = "closures"
+cell = "legacy + libera (clausura numerus x libera: x * 2)"
+status = "bare"
+note = "EBNF-documented example, zero corpus"
