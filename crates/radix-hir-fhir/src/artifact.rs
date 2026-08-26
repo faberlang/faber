@@ -10,16 +10,16 @@
 //! - **F4**: Snapshot discipline — `ResolverSnapshot` is the wire shape for
 //!   resolver data; `Resolver` itself never derives `Serialize`.
 //! - **F5**: `ResolverSnapshot` carries namespace exports, file interfaces,
-//!   used namespaces, imported nominal types, and declaration-owned conversion
-//!   arms.
+//!   used namespaces, imported nominal types, and coherence-registry
+//!   conversion rows.
 //! - **CTM E.2**: Caches and memos (`scopes`, `current_scope`, `lookup_shadow`,
 //!   `gpu_builtins`, `gpu_builtins_order`) are excluded from the wire shape
 //!   and rebuilt on load.
 //! - **CXO F4**: Insertion-order mirrors and `RefCell` caches are excluded.
 //! - **F19**: `ResolverSnapshot` struct TYPE is foundation-owned in `radix-hir`;
 //!   `Resolver::to_snapshot()` lives in `radix`.
-//! - **E3**: conversion-arm rows are preserved on the resolver snapshot so
-//!   prebuilt artifacts retain typed error-conversion lookup.
+//! - **E3**: coherence-registry conversion rows are preserved on the resolver
+//!   snapshot so prebuilt artifacts retain typed error-conversion lookup.
 
 use radix_lexer::{Span, Symbol};
 use radix_types::{DefId, FuncSig, SemanticParamMode, TypeId, TypeTableSnapshot};
@@ -85,23 +85,27 @@ pub struct StructFieldSnapshot {
 // ResolverSnapshot
 // ---------------------------------------------------------------------------
 
-/// One declaration-owned conversion arm in a resolver snapshot. Keeping the
-/// ordered pair and synthetic function identity on the wire prevents a
-/// prebuilt artifact from silently losing law-6 lookup facts when loaded.
+/// One coherence-registry conversion row in a resolver snapshot. Keeping the
+/// ordered pair, builtin flag, and the owning ordinary function's `DefId` on
+/// the wire prevents a prebuilt artifact from silently losing law-6 lookup
+/// facts when loaded.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct ConversionArmSnapshot {
-    pub destination: DefId,
+pub struct ConversionRowSnapshot {
     pub source: TypeId,
-    pub fn_def_id: DefId,
+    pub destination: TypeId,
+    /// Owning ordinary function; `None` marks a compiler-shipped builtin row.
+    pub fn_def_id: Option<DefId>,
     pub span: Span,
+    pub builtin: bool,
 }
 
 /// Serializable snapshot of resolver import state for HIR artifact wire format (F4, F5, F19).
 ///
-/// Contains the import-facing fields and declaration-owned conversion arms
-/// that codegen and later semantic consumers read from the resolver. Runtime-
-/// only state — scopes, shadow map, builtins, gpu builtins, insertion-order
-/// mirrors — is excluded (CTM E.2, CXO F4) and rebuilt during loading.
+/// Contains the import-facing fields and the conversion coherence registry
+/// rows that codegen and later semantic consumers read from the resolver.
+/// Runtime-only state — scopes, shadow map, builtins, gpu builtins,
+/// insertion-order mirrors — is excluded (CTM E.2, CXO F4) and rebuilt during
+/// loading.
 ///
 /// This type is defined in `radix-hir` (foundation crate) per F19. The
 /// `Resolver::to_snapshot()` constructor lives in `radix` where it has
@@ -129,9 +133,10 @@ pub struct ResolverSnapshot {
     /// namespace from silently winning during reconstruction.
     pub ambiguous_imported_nominal_types: Vec<(NominalKind, Symbol)>,
 
-    /// Declaration-owned error conversion arms keyed by destination union.
-    /// The loader rebuilds the resolver lookup index from these rows.
-    pub conversion_arms: Vec<ConversionArmSnapshot>,
+    /// Conversion coherence registry rows keyed by the ordered pair
+    /// `(source → destination)`. The loader rebuilds the resolver's row table
+    /// from these; builtin and user rows share the one shape.
+    pub conversion_rows: Vec<ConversionRowSnapshot>,
 }
 
 // ---------------------------------------------------------------------------
@@ -389,11 +394,12 @@ pub enum GpuBuiltinWire {
 /// derive from the type-position access marker; the parameter-prefix slot is
 /// retired (MU-5b). Type-position
 /// markers model the mode on the marked `Type::Ref(...)` and fn-type/closure
-/// parameter slots now carry their own modes. Version 6 carries resolver
-/// conversion-arm rows so prebuilt artifacts preserve error-conversion lookup.
+/// parameter slots now carry their own modes. Version 6 carried resolver
+/// conversion-arm rows so prebuilt artifacts preserve error-conversion
+/// lookup.
 ///
 /// Old artifacts fail closed by design: `decode.rs` has no compatibility
-/// decoder, so any schema mismatch (v1–v5) is rejected as
+/// decoder, so any schema mismatch (v1–v6) is rejected as
 /// [`HirArtifactError::UnsupportedSchemaVersion`] before the payload is
 /// interpreted — never a confusing field-layout error.
 ///
@@ -401,8 +407,11 @@ pub enum GpuBuiltinWire {
 /// `FirstMatch` (AFM-2) variants shifted serde ordinals in the directly-
 /// serde'd HIR payload. Version 6 adds resolver conversion-arm rows — both
 /// are wire breaks that ratchet the version rather than inventing a
-/// compatibility decoder.
-pub const SCHEMA_VERSION: u32 = 6;
+/// compatibility decoder. Version 7 (CTR-05) removes the destination-owned
+/// conversion-arm rows and `HirEnum.conversion_arms` from the directly-
+/// serde'd HIR payload, replacing them with coherence-registry rows keyed by
+/// the ordered pair `(source → destination)`.
+pub const SCHEMA_VERSION: u32 = 7;
 
 /// Serializable snapshot of one analyzed compilation unit (F1, F2, F4).
 ///

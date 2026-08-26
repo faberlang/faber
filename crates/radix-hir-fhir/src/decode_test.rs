@@ -78,11 +78,106 @@ fn decode_accepts_imported_nominal_def_living_in_type_table() {
         used_namespaces: vec![Symbol(0)],
         imported_nominal_types: vec![((NominalKind::Struct, Symbol(1)), struct_ty)],
         ambiguous_imported_nominal_types: Vec::new(),
-        conversion_arms: Vec::new(),
+        conversion_rows: Vec::new(),
     };
     let bytes = encode(&artifact).expect("encode artifact");
     let decoded = decode(&bytes).expect("imported nominal def in type table must load");
     assert_eq!(decoded.resolver.file_interfaces.len(), 1);
+}
+
+#[test]
+fn decode_round_trips_registry_conversion_rows() {
+    // CTR-05: the artifact carries the coherence registry's ordered pairs
+    // and stable ordinary-function DefIds. Builtin and user rows share the
+    // one wire shape; destination-union arm rows are gone.
+    use crate::artifact::{ConversionRowSnapshot, ResolverSnapshot};
+    use radix_lexer::Span;
+    use radix_types::{DefId, Primitive, TypeTable};
+
+    let mut artifact = stub_artifact();
+    let mut types = TypeTable::new();
+    let source = types.primitive(Primitive::Numerus);
+    let destination = types.primitive(Primitive::Fractus);
+    artifact.types = types.snapshot();
+    artifact.resolver = ResolverSnapshot {
+        namespace_exports: Vec::new(),
+        file_interfaces: Vec::new(),
+        used_namespaces: Vec::new(),
+        imported_nominal_types: Vec::new(),
+        ambiguous_imported_nominal_types: Vec::new(),
+        conversion_rows: vec![
+            ConversionRowSnapshot {
+                source,
+                destination,
+                fn_def_id: Some(DefId(0)),
+                span: Span::new(3, 9),
+                builtin: false,
+            },
+            ConversionRowSnapshot {
+                source: destination,
+                destination: source,
+                fn_def_id: None,
+                span: Span::default(),
+                builtin: true,
+            },
+        ],
+    };
+
+    let bytes = encode(&artifact).expect("encode artifact");
+    let decoded = decode(&bytes).expect("registry rows must round-trip");
+    let rows = &decoded.resolver.conversion_rows;
+    assert_eq!(rows.len(), 2, "both registry rows survive the boundary");
+    let user = &rows[0];
+    assert_eq!(user.source, source);
+    assert_eq!(user.destination, destination);
+    assert_eq!(user.fn_def_id, Some(DefId(0)));
+    assert!(!user.builtin);
+    let builtin = &rows[1];
+    assert_eq!(
+        (builtin.source, builtin.destination, builtin.builtin),
+        (destination, source, true),
+        "ordered pair identity is preserved, not collapsed"
+    );
+}
+
+#[test]
+fn decode_rejects_registry_row_with_dangling_fn_def() {
+    // Negative control: a registry row naming a DefId with no definition
+    // site anywhere in the artifact must fail closed as DanglingIndex.
+    use crate::artifact::{ConversionRowSnapshot, ResolverSnapshot};
+    use radix_lexer::Span;
+    use radix_types::{DefId, Primitive, TypeTable, USER_DEF_ID_BASE};
+
+    let mut artifact = stub_artifact();
+    let mut types = TypeTable::new();
+    let source = types.primitive(Primitive::Numerus);
+    let destination = types.primitive(Primitive::Fractus);
+    artifact.types = types.snapshot();
+    let phantom = DefId(USER_DEF_ID_BASE + 12);
+    artifact.resolver = ResolverSnapshot {
+        namespace_exports: Vec::new(),
+        file_interfaces: Vec::new(),
+        used_namespaces: Vec::new(),
+        imported_nominal_types: Vec::new(),
+        ambiguous_imported_nominal_types: Vec::new(),
+        conversion_rows: vec![ConversionRowSnapshot {
+            source,
+            destination,
+            fn_def_id: Some(phantom),
+            span: Span::default(),
+            builtin: false,
+        }],
+    };
+
+    let bytes = encode(&artifact).expect("encode artifact");
+    match decode(&bytes) {
+        Err(HirArtifactError::DanglingIndex {
+            kind: "DefId",
+            index,
+            ..
+        }) => assert_eq!(index, phantom.0),
+        other => panic!("expected DanglingIndex DefId, got {other:?}"),
+    }
 }
 
 #[test]
@@ -107,7 +202,7 @@ fn decode_rejects_nominal_def_with_no_def_site() {
         used_namespaces: Vec::new(),
         imported_nominal_types: Vec::new(),
         ambiguous_imported_nominal_types: Vec::new(),
-        conversion_arms: Vec::new(),
+        conversion_rows: Vec::new(),
     };
     let bytes = encode(&artifact).expect("encode artifact");
     match decode(&bytes) {

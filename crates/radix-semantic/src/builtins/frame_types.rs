@@ -401,7 +401,6 @@ fn inject_status(
             type_params: Vec::new(),
             annotations: Vec::new(),
             commune_fields: Vec::new(),
-            conversion_arms: Vec::new(),
             variants,
         }),
         span: Span::default(),

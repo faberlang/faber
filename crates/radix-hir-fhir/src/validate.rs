@@ -123,10 +123,9 @@ fn collect_def_registry(artifact: &HirArtifact) -> FxHashSet<radix_types::DefId>
     for (pair, _) in artifact.libraries.reexports.keys() {
         registry.insert(*pair);
     }
-    for arm in &artifact.resolver.conversion_arms {
-        registry.insert(arm.destination);
-        registry.insert(arm.fn_def_id);
-    }
+    // Registry conversion rows name ordinary in-tree functions; their def
+    // sites come from the HIR walk above, so a row naming any other def
+    // fails the membership check below instead of self-blessing here.
 
     // Imported-nominal def sites from the resolver snapshot. The resolver
     // allocates imported nominal types (structs, enums, interfaces) as fresh
@@ -2222,10 +2221,12 @@ pub(crate) fn validate_referential_integrity(
         check_symbol(*sym)?;
         check_type(*ty)?;
     }
-    for arm in &artifact.resolver.conversion_arms {
-        check_def(arm.destination)?;
-        check_def(arm.fn_def_id)?;
-        check_type(arm.source)?;
+    for row in &artifact.resolver.conversion_rows {
+        if let Some(fn_def_id) = row.fn_def_id {
+            check_def(fn_def_id)?;
+        }
+        check_type(row.source)?;
+        check_type(row.destination)?;
     }
 
     // 8. Type arena walk: validate TypeId/DefId/Symbol/IndexId
