@@ -1,0 +1,3 @@
+# Reject oracle for an unsupported bounded conversio route.
+# Tokens: stable diagnostic identities (faber check output); one per line.
+SEM016:unsupported_conversio

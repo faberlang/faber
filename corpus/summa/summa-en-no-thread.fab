@@ -1,0 +1,33 @@
++++
+term = "summa"
+kind = "concept"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "main_stmt", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "shape_suffix", "redde_stmt", "fixum_decl", "expression", "summa_expr", "apud_clause", "literal", "nota_stmt", "conversio_expr"]
+category = "collection"
+summary = "Sequential English sum reduction without the distributed thread clause."
+syntax = "sum from <tensor> at [i] const s { return <term> }"
+related = ["summa", "sum", "at", "tensor"]
+locale = "en"
++++
+
+# =============================================================================
+# sum without thread — the sequential English reduction form
+# =============================================================================
+#
+# What this teaches:
+#   • `sum from` is the English surface for the sequential reduction.
+#   • Omitting `thread` selects the host-lane fold; the body returns one term
+#     for each bound element.
+#
+# Common mistakes:
+#   • adding `thread` to a host reduction — `thread` belongs to the distributed
+#     kernel form, while this cell intentionally stays sequential.
+
+fn total(tensor<float, [4]> a) → float {
+    return sum from a at [i] const s { return s }
+}
+
+main {
+    const list<float> flat ← [1.0, 2.0, 3.0, 4.0]
+    const tensor<float, [4]> a ← flat ↦ tensor<float, [4]>
+    print total(a)
+}

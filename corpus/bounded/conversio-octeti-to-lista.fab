@@ -1,0 +1,28 @@
++++
+term = "↦"
+kind = "operator-group"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "main_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "conversio_expr", "expression", "literal", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "nota_stmt"]
+category = "conversion"
+summary = "Bounded octeti<N> converts to an unbounded list<int<u8>> prefix."
+syntax = "octeti<N> ↦ list<int<u8>>"
+related = ["↦", "octeti", "lista", "u8"]
+locale = "en"
++++
+
+# =============================================================================
+# bounded octeti to lista — compile-admitted byte-list bridge
+# =============================================================================
+#
+# What this teaches:
+#   • The bounded byte carrier can be widened to the explicit u8 list bridge.
+#   • Only initialized bytes participate; the capacity is not a list length.
+#
+# Common mistakes:
+#   • using an unsized integer element type — the byte bridge requires
+#     `list<int<u8>>`.
+
+main {
+    const bytes<8> raw ← |61 62| ↦ bytes<8>
+    const list<int<u8>> out ← raw ↦ list<int<u8>>
+    print out
+}

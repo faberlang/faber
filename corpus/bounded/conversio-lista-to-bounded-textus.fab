@@ -1,0 +1,30 @@
++++
+term = "↦"
+kind = "operator-group"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "main_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "conversio_expr", "expression", "literal", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "nota_stmt"]
+category = "conversion"
+summary = "Compile-admitted bounded lista<T,N> to bounded textus<M> conversion route."
+syntax = "lista<T, N> ↦ textus<M>"
+related = ["↦", "lista", "textus"]
+locale = "en"
++++
+
+# =============================================================================
+# bounded lista to bounded textus — compile-admitted route
+# =============================================================================
+#
+# What this teaches:
+#   • A bounded list can name a bounded textus target explicitly.
+#   • The route is currently a check-level contract; the runner has no
+#     bounded textus carrier.
+#
+# Common mistakes:
+#   • treating the list capacity as the target text capacity — the target
+#     supplies its own bound.
+
+main {
+    const list<int> base ← [1, 2]
+    const list<int, 8> raw ← base ↦ list<int, 8>
+    const string<8> out ← raw ↦ string<8>
+    print out
+}

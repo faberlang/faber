@@ -1,0 +1,26 @@
++++
+term = "textus"
+kind = "reject"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "conversio_expr", "expression"]
+category = "conversion"
+summary = "Decline: bounded textus<N> cannot convert directly to ascii<M>."
+syntax = "textus<N> ↦ ascii<M>"
+related = ["↦", "textus", "ascii"]
+locale = "en"
++++
+
+# =============================================================================
+# bounded textus to ascii — unsupported conversion decline
+# =============================================================================
+#
+# What this teaches:
+#   • Unicode text and bounded ASCII have different conversion contracts.
+#   • The unsupported route fails closed with `SEM016:unsupported_conversio`.
+#
+# Common mistakes:
+#   • assuming every textus value is ASCII-safe without an explicit narrowing
+#     check.
+
+fn narrow(string<8> raw) → ascii<4> {
+    return raw ↦ ascii<4>
+}

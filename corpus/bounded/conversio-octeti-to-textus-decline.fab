@@ -1,0 +1,26 @@
++++
+term = "octeti"
+kind = "reject"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "conversio_expr", "expression"]
+category = "conversion"
+summary = "Decline: bounded octeti<N> cannot convert directly to unbounded textus."
+syntax = "octeti<N> ↦ textus"
+related = ["↦", "octeti", "textus"]
+locale = "en"
++++
+
+# =============================================================================
+# bounded octeti to textus — unsupported conversion decline
+# =============================================================================
+#
+# What this teaches:
+#   • A bounded byte carrier does not silently become textus through `↦`.
+#   • The unsupported route fails closed with `SEM016:unsupported_conversio`.
+#
+# Common mistakes:
+#   • assuming byte decoding is the same as a bounded-width copy — decoding
+#     needs an explicit octeti/textus library route, not this conversion.
+
+fn widen(bytes<8> raw) → string {
+    return raw ↦ string
+}

@@ -1,0 +1,30 @@
++++
+term = "↦"
+kind = "operator-group"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "main_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "conversio_expr", "expression", "literal", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "nota_stmt"]
+category = "conversion"
+summary = "Compile-admitted bounded lista<T,N> capacity resize route."
+syntax = "lista<T, N> ↦ lista<T, M>"
+related = ["↦", "lista", "bounded"]
+locale = "en"
++++
+
+# =============================================================================
+# bounded lista resize — compile-admitted capacity route
+# =============================================================================
+#
+# What this teaches:
+#   • A bounded list may name a different bounded-list target explicitly.
+#   • The capacity change is not implicit; it is a conversion expression.
+#   • The route is currently a check-level contract; the runner lacks the
+#     runtime bounded-array conversion carrier.
+#
+# Common mistakes:
+#   • assigning between capacities with a bare `←`.
+
+main {
+    const list<int> base ← [1, 2]
+    const list<int, 8> raw ← base ↦ list<int, 8>
+    const list<int, 4> out ← raw ↦ list<int, 4>
+    print out
+}

@@ -1,0 +1,33 @@
++++
+term = "summa"
+kind = "concept"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "shape_suffix", "redde_stmt", "incipit_stmt", "fixum_decl", "expression", "summa_expr", "apud_clause", "literal", "nota_stmt"]
+category = "collection"
+summary = "Sequential sum-reduce with a mutable varia binder: summa ex … apud [i] varia s { redde <term> }."
+syntax = "summa ex <tensor> apud [i] varia s { redde <term> }"
+related = ["summa", "apud", "varia", "tensor"]
+locale = "la"
++++
+
+# =============================================================================
+# summa varia binder — mutable element binding in a sequential reduction
+# =============================================================================
+#
+# What this teaches:
+#   • The reduction binder may be `varia`, not only `fixum`.
+#   • The body still returns exactly one scalar term with `redde`.
+#
+# Common mistakes:
+#   • reading `varia` as permission to mutate the source tensor — it only
+#     changes the local binding's mutability.
+
+functio total(tensor<f32, [4]> a) → f32 {
+    redde summa ex a apud [i] varia s { redde s }
+}
+
+incipit {
+    fixum lista<f32> flat ← [1.0, 2.0, 3.0, 4.0]
+    fixum tf32[] seed ← vacua
+    fixum tf32[4] a ← seed.strue(flat, [4])
+    nota total(a)
+}

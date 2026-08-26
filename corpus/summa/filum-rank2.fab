@@ -1,0 +1,35 @@
++++
+term = "summa"
+kind = "concept"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "annotation", "annotation_name", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "shape_suffix", "assignment", "place", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "expression", "summa_expr", "filum_clause", "apud_clause", "fixum_decl", "redde_stmt"]
+category = "collection"
+summary = "Distributed rank-2 sum-reduce kernel: summa ex … apud [i, j] filum f fixum s { redde <term> }."
+syntax = "summa ex <tensor> apud [i, j] filum f fixum s { redde <term> }"
+related = ["summa", "filum", "apud", "tensor"]
+locale = "la"
++++
+
+# =============================================================================
+# summa filum rank-2 — distributed reduction with two coordinates
+# =============================================================================
+#
+# What this teaches:
+#   • Rank-2 `apud [i, j]` binds one coordinate per tensor axis.
+#   • The distributed `filum` form accepts a 4×8 source because its 32
+#     elements fill one complete lane group.
+#   • A `fixum` term binder is valid for a pure fold.
+#
+# Common mistakes:
+#   • assuming rank-2 reductions may omit one coordinate — every axis needs a
+#     corresponding `apud` binding.
+#
+# This is a declaration-only kernel reference. Device kernels have no host
+# entry for the in-process runner; the semantic check proves this cell.
+
+@ nucleum lane "id"
+functio rank2(tensor<f32, [4, 8]> a, tf32[1] out) → vacuum {
+    fixum f32 total ← summa ex a apud [i, j] filum f fixum s {
+        redde s
+    }
+    out[id] ← total
+}

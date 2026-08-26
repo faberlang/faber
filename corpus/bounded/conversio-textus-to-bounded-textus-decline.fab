@@ -1,0 +1,26 @@
++++
+term = "textus"
+kind = "reject"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "conversio_expr", "expression"]
+category = "conversion"
+summary = "Decline: bounded textus<N> cannot resize directly to bounded textus<M>."
+syntax = "textus<N> ↦ textus<M>"
+related = ["↦", "textus"]
+locale = "en"
++++
+
+# =============================================================================
+# bounded textus resize — unsupported conversion decline
+# =============================================================================
+#
+# What this teaches:
+#   • Bounded textus capacities are not interchangeable through a direct
+#     resize conversion.
+#   • The unsupported route fails closed with `SEM016:unsupported_conversio`.
+#
+# Common mistakes:
+#   • expecting a resize to truncate Unicode scalars silently.
+
+fn resize(string<8> raw) → string<4> {
+    return raw ↦ string<4>
+}
