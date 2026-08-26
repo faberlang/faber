@@ -378,6 +378,45 @@ functio probe(_ u) → vacuum {
 }
 
 #[test]
+fn param_hole_writeback_materializes_solved_union_on_hir() {
+    // N4a writeback: finalize rewrites ret/err/expr/local but not params, so
+    // the solved union must be written back onto the HIR param slot for the
+    // exported signature to show the solve (the N4b seam reads `param.ty`).
+    let result = test_support::analyze_ok(
+        r#"
+functio probe(_ u) → vacuum {
+    discerne u {
+        casu numerus fixum i { nota i }
+        casu textus fixum s { nota s }
+    }
+}
+"#,
+    );
+    let hir = result.hir.as_ref().expect("hir");
+    let func = hir
+        .items
+        .iter()
+        .find_map(|item| match &item.kind {
+            HirItemKind::Function(func) => Some(func),
+            _ => None,
+        })
+        .expect("probe item");
+    let Type::Union(members) = result.types.get(func.params[0].ty) else {
+        panic!(
+            "param slot must hold the solved union, got {:?}",
+            result.types.get(func.params[0].ty)
+        );
+    };
+    assert_eq!(members.len(), 2, "solve must keep both pattern members");
+    assert!(members
+        .iter()
+        .any(|ty| matches!(result.types.get(*ty), Type::Primitive(Primitive::Numerus))));
+    assert!(members
+        .iter()
+        .any(|ty| matches!(result.types.get(*ty), Type::Primitive(Primitive::Textus))));
+}
+
+#[test]
 fn source_param_hole_non_type_pattern_stays_unresolved() {
     test_support::assert_analysis_rejects_with_issue(
         r#"

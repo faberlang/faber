@@ -236,6 +236,16 @@ impl TypeChecker<'_> {
         *ty = canonical;
     }
 
+    /// Finalize a parameter slot: write the solver's normalized result back
+    /// onto the HIR param's type. A solved `∪` hole materializes as its
+    /// normalized member set so exported signatures show the solve (N4a
+    /// writeback → N4b seam). Unsolved holes stay visible: the file-interface
+    /// seam fails closed on `Type::Infer*`, and body-use diagnostics already
+    /// own the unresolved case.
+    fn finalize_param_type(&mut self, param: &mut HirParam) {
+        param.ty = self.canonicalize_type(param.ty);
+    }
+
     /// Finalize an expression annotation after all surrounding constraints ran.
     fn finalize_expr_type(&mut self, ty: &mut Option<TypeId>, span: Span) {
         if let Some(current) = *ty {
@@ -553,6 +563,9 @@ impl TypeChecker<'_> {
             span,
             "cannot_infer_alternate_exit_type",
         );
+        for param in &mut function.params {
+            self.finalize_param_type(param);
+        }
 
         walk_function_mut(self, function);
     }

@@ -18,6 +18,7 @@ use radix_module::file_interface::{
 use radix_module::semantic::SemanticParamMode;
 use radix_module::syntax::GenericParamKind;
 use std::collections::BTreeMap;
+use std::path::PathBuf;
 
 const PROVIDER: &str = r#"@ publica
 typus Vector<magnitudo N> = vector<fractus<f32>, N>
@@ -294,4 +295,60 @@ functio call_text() → vacuum {
 "#,
     )
     .expect("union-member calls must analyze through the round trip");
+}
+
+/// N4b end-to-end: the export-probe fixture is the ruling-6 acceptance story —
+/// `fn probe(_ u)` with a type-pattern match. N4a's finalize writeback solves
+/// the hole to `lista<numerus> ∪ textus` on the HIR param slot, so the seam
+/// materializes the solved union instead of failing unrepresentable. The
+/// fixture is English-surface (`fn`/`match`/`case`), so the en reader pack is
+/// loaded explicitly — the radix unit harness compiles bare Latin by default.
+#[test]
+fn export_probe_fixture_materializes_solved_union_param() {
+    let pack_path =
+        PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../stdlib/locale/en/pack.toml");
+    let en_pack = radix_module::locale::LocalePack::from_toml_path(&pack_path)
+        .expect("installed en pack should load");
+    let session = Session::new(
+        Config::default()
+            .with_target(radix_module::codegen::Target::HirRust)
+            .with_locale_pack(en_pack),
+    );
+    let analysis = analyze_source(
+        &session,
+        "export-probe.fab",
+        include_str!("../test-fixtures/export-probe.fab"),
+        AnalyzeRequest::default(),
+    )
+    .expect("fixture analysis must succeed");
+    let interface = extract_file_interface_with_identity(
+        &analysis,
+        &["probe".to_owned()],
+        "export-probe.fab",
+        None,
+    )
+    .expect("extract fixture interface");
+
+    let FileExportKind::Function(callable) = &interface
+        .exports
+        .get("probe")
+        .map(|export| &export.kind)
+        .expect("probe export")
+    else {
+        panic!("expected function export");
+    };
+    assert_eq!(
+        callable.params,
+        vec![InterfaceParam {
+            ty: InterfaceTypeSnapshot::Union(vec![
+                InterfaceTypeSnapshot::Primitive(radix_module::semantic::Primitive::Textus),
+                InterfaceTypeSnapshot::Array(Box::new(InterfaceTypeSnapshot::Primitive(
+                    radix_module::semantic::Primitive::Numerus
+                ))),
+            ]),
+            mode: SemanticParamMode::Owned,
+            optional: false,
+        }],
+        "the match-solved param hole must materialize as InterfaceTypeSnapshot::Union"
+    );
 }
