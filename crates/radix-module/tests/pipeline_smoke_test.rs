@@ -56,6 +56,7 @@ incipit {
 #[cfg(any(feature = "mir-wgsl", feature = "mir-metal"))]
 const KERNEL_SOURCE: &str = r"
 @ nucleum
+@ publica
 functio add_one(fractus<f32> x) → fractus<f32> {
     redde x + 1.0
 }
