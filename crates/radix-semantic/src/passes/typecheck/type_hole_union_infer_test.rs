@@ -356,14 +356,14 @@ fn type_pattern_constraint_reuses_union_accumulation() {
 #[test]
 fn source_param_hole_match_patterns_accumulate_union() {
     test_support::assert_analysis_accepts(
-        r#"
+        r"
 functio probe(_ u) → vacuum {
     discerne u {
         casu numerus fixum i { nota i }
         casu textus fixum s { nota s }
     }
 }
-"#,
+",
     );
 }
 
@@ -373,14 +373,14 @@ fn param_hole_writeback_materializes_solved_union_on_hir() {
     // the solved union must be written back onto the HIR param slot for the
     // exported signature to show the solve (the N4b seam reads `param.ty`).
     let result = test_support::analyze_ok(
-        r#"
+        r"
 functio probe(_ u) → vacuum {
     discerne u {
         casu numerus fixum i { nota i }
         casu textus fixum s { nota s }
     }
 }
-"#,
+",
     );
     let hir = result.hir.as_ref().expect("hir");
     let func = hir

@@ -198,7 +198,7 @@ incipit {
 
 #[test]
 fn sequential_mut_param_use_stays_legal() {
-    analyze_ok(
+    let _ = analyze_ok(
         r"
 functio poke(in lista<numerus> xs) → vacuum {
     xs.appende(4)
@@ -214,7 +214,7 @@ incipit {
 
 #[test]
 fn unmarked_alias_is_not_an_exclusive_borrow() {
-    analyze_ok(
+    let _ = analyze_ok(
         r"
 incipit {
     fixum lista<numerus> a ← [1, 2, 3]

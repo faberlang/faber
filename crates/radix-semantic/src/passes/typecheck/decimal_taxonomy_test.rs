@@ -8,9 +8,7 @@ use crate::test_support;
 
 #[test]
 fn d32_widens_to_d64_at_assignment() {
-    test_support::assert_accepts(
-        "functio w(numerus<d32> a) → numerus<d64> { redde a }",
-    );
+    test_support::assert_accepts("functio w(numerus<d32> a) → numerus<d64> { redde a }");
 }
 
 #[test]

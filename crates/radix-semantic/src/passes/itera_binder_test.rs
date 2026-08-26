@@ -19,7 +19,7 @@ functio bad(lista<numerus> ys) → vacuum {
 
 #[test]
 fn accepts_de_const_bindings_for_array_index_and_map_key() {
-    test_support::analyze_ok(
+    let _ = test_support::analyze_ok(
         r"
 functio arrays(lista<numerus> ys) → vacuum {
     itera de ys fixum index {
@@ -38,7 +38,7 @@ functio maps(tabula<textus, numerus> values) → vacuum {
 
 #[test]
 fn accepts_ex_var_element_binding() {
-    test_support::analyze_ok(
+    let _ = test_support::analyze_ok(
         r"
 functio values(lista<numerus> ys) → vacuum {
     itera ex ys varia value {

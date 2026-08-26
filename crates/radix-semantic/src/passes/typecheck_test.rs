@@ -1475,7 +1475,6 @@ fn structured_cape_consumes_local_iace_without_function_alternate_exit() {
 
 #[test]
 fn gpu_builtin_call_rejects_non_device_function() {
-    let _session = ();
     let result = crate::test_support::analyze_source(
         r"functio host() → u32 { redde global_invocation_x() }",
     );
@@ -1494,7 +1493,6 @@ fn gpu_builtin_call_rejects_non_device_function() {
 
 #[test]
 fn gpu_builtin_call_typechecks_inside_device_function() {
-    let _session = ();
     let result = crate::test_support::analyze_source(
         r"
 @ nucleum fragment

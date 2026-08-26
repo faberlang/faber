@@ -8,7 +8,7 @@ use crate::test_support::{analyze_ok, assert_rejects_with_issue};
 
 #[test]
 fn copy_bind_is_independent_and_source_stays_live() {
-    analyze_ok(
+    let _ = analyze_ok(
         r"
 incipit {
     fixum lista<numerus> source ← [1, 2, 3]
@@ -22,7 +22,7 @@ incipit {
 
 #[test]
 fn copy_assignment_leaves_source_live() {
-    analyze_ok(
+    let _ = analyze_ok(
         r"
 incipit {
     fixum own lista<numerus> source ← [1, 2, 3]
@@ -36,7 +36,7 @@ incipit {
 
 #[test]
 fn copy_parameter_entry_leaves_caller_source_live() {
-    analyze_ok(
+    let _ = analyze_ok(
         r"
 functio append(copy lista<numerus> xs) → vacuum {
     xs.appende(4)
@@ -52,7 +52,7 @@ incipit {
 
 #[test]
 fn copy_bind_through_to_own_parameter_is_explicit() {
-    analyze_ok(
+    let _ = analyze_ok(
         r"
 functio take(own lista<numerus> xs) → vacuum {
     nota xs.longitudo()

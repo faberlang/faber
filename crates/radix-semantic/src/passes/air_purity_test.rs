@@ -753,8 +753,10 @@ fn ar2_dum_and_itera_variants_carry_no_catch_field() {
     // catch slot, so a per-iteration handler cannot be represented on the
     // loop node itself. This match fails to compile if either variant gains
     // (or drops) a field.
-    let _shape_pin = |kind: &radix_hir::HirExpressionKind| match kind {
+    let _ = |kind: &radix_hir::HirExpressionKind| match kind {
         radix_hir::HirExpressionKind::Dum(cond, block) => {
+            // Carrier-shape pin: the field really is Box<HirExpression>.
+            #[allow(clippy::borrowed_box)]
             let _: &Box<radix_hir::HirExpression> = cond;
             let _: &radix_hir::HirBlock = block;
         }
@@ -770,6 +772,8 @@ fn ar2_dum_and_itera_variants_carry_no_catch_field() {
             let _: &Vec<(radix_hir::DefId, radix_lexer::Symbol)> = bindings;
             let _: &radix_hir::DefId = index_def;
             let _: &radix_lexer::Symbol = index_name;
+            // Carrier-shape pin: the field really is Box<HirExpression>.
+            #[allow(clippy::borrowed_box)]
             let _: &Box<radix_hir::HirExpression> = source;
             let _: &radix_hir::HirBlock = body;
         }

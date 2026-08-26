@@ -35,16 +35,15 @@ functio loss(tf32[2, 2] x) → fractus {
     let lifted = hir
         .items
         .iter()
-        .filter_map(|item| match &item.kind {
-            HirItemKind::Function(function)
-                if fixture
-                    .interner
-                    .resolve(function.name)
-                    .starts_with("__air_closure_") =>
-            {
-                Some(item)
-            }
-            _ => None,
+        .filter(|item| {
+            matches!(
+                &item.kind,
+                HirItemKind::Function(function)
+                    if fixture
+                        .interner
+                        .resolve(function.name)
+                        .starts_with("__air_closure_")
+            )
         })
         .collect::<Vec<_>>();
     assert_eq!(lifted.len(), 1, "one synthetic combine item is expected");

@@ -5,6 +5,7 @@ use crate::test_support;
 use radix_hir::{
     HirArrayElement, HirExpression, HirExpressionKind, HirLiteral, HirObjectKey, HirStatementKind,
 };
+use std::fmt::Write;
 
 fn entry_init(unit: &test_support::AnalyzedFixture) -> &HirExpression {
     let hir = unit.hir.as_ref().expect("hir");
@@ -421,7 +422,8 @@ fn canonicalize_symbol_ids(dump: &str, unit: &test_support::AnalyzedFixture) -> 
         let end = digit_start + digit_end + close + 1;
         let symbol = radix_lexer::Symbol(id);
         canonical.push_str("Symbol(");
-        canonical.push_str(&format!("{:?}", unit.interner.resolve(symbol)));
+        write!(canonical, "{:?}", unit.interner.resolve(symbol))
+            .expect("formatting into String cannot fail");
         canonical.push(')');
         rest = &after_prefix[end..];
     }

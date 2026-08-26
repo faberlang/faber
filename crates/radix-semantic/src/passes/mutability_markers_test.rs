@@ -47,7 +47,7 @@ incipit {
 
 #[test]
 fn own_and_copy_remain_identifier_bindings() {
-    analyze_ok(
+    let _ = analyze_ok(
         r"
 incipit {
     fixum numerus own ← 1
@@ -62,7 +62,7 @@ incipit {
 #[test]
 fn mut_list_locals_still_parse() {
     // OQ-3: grammar allows mut locals. MU-4's WARN019 is non-fatal.
-    analyze_ok(
+    let _ = analyze_ok(
         r"
 incipit {
     varia in lista<numerus> xs

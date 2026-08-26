@@ -135,10 +135,10 @@ fn d64_to_d32_conversio_assign_rejects_with_teaching_issue() {
     // The `↤` conversion-directed initializer lowers through the same
     // `check_conversio` arm as `↦`.
     test_support::assert_rejects_with_issue(
-        r#"functio c(numerus<d64> a) → numerus<d32> {
+        r"functio c(numerus<d64> a) → numerus<d32> {
     fixum numerus<d32> b ↤ a
     redde b
-}"#,
+}",
         "decimal_width_narrowing_rejected",
     );
 }

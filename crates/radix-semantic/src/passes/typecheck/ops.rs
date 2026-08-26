@@ -263,6 +263,8 @@ impl TypeChecker<'_> {
         self.numeric_shape(ty).is_some()
     }
 
+    // WHY: outer Option = combinability, inner = derived capacity
+    #[allow(clippy::option_option)]
     fn queue_stack_min_capacity(
         &mut self,
         lhs: Option<radix_types::IndexId>,
@@ -567,6 +569,12 @@ impl TypeChecker<'_> {
     /// WHY: exact `≡` rejects cross-width numeric pairs; both relaxed levels
     /// reuse the same widening policy as arithmetic/ordering (`numeric_bin`),
     /// then compare at the joined type in their respective lowerings.
+    ///
+    /// GT-2: decimal × fractus equality mirrors the ordering gate
+    /// ([`Self::numeric_ordering_bin`] rejects the same family pair as
+    /// `mixed_decimal_fractus_ordering`). No exact cross-family carrier is
+    /// established by the language contract, so `≅`/`≈` reject the pair
+    /// instead of comparing a widened scaled integer against a float.
     pub fn numeric_value_equality_types(
         &mut self,
         lhs: TypeId,
@@ -584,6 +592,16 @@ impl TypeChecker<'_> {
         }
         if !self.is_numeric(lhs) || !self.is_numeric(rhs) {
             self.invalid_operand_types(NUMERIC_VALUE_EQUALITY_OPERANDS_REQUIRED, span);
+            return;
+        }
+        let lhs_shape = self.numeric_shape(lhs_resolved);
+        let rhs_shape = self.numeric_shape(rhs_resolved);
+        let decimal_lhs = lhs_shape.is_some_and(|shape| shape.width.is_decimal());
+        let decimal_rhs = rhs_shape.is_some_and(|shape| shape.width.is_decimal());
+        let fractus_lhs = lhs_shape.is_some_and(|shape| shape.prim == Primitive::Fractus);
+        let fractus_rhs = rhs_shape.is_some_and(|shape| shape.prim == Primitive::Fractus);
+        if (decimal_lhs && fractus_rhs) || (decimal_rhs && fractus_lhs) {
+            self.invalid_operand_types(MIXED_DECIMAL_FRACTUS_EQUALITY, span);
             return;
         }
         self.numeric_bin(lhs, rhs, span);
@@ -1909,6 +1927,7 @@ fn is_numeric_literal(expr: &HirExpression) -> bool {
 
 const NUMERIC_OPERANDS_REQUIRED: &str = "numeric_operands_required";
 const MIXED_DECIMAL_FRACTUS_ORDERING: &str = "mixed_decimal_fractus_ordering";
+const MIXED_DECIMAL_FRACTUS_EQUALITY: &str = "mixed_decimal_fractus_equality";
 const NUMERIC_ARITHMETIC_OPERANDS_IDENTICAL: &str = "numeric_arithmetic_operands_identical";
 const MODULAR_WORD_FAMILY_MISMATCH: &str = "modular_word_family_mismatch";
 // TENSOR-GLYPHS-1B rank-rule diagnostics. Each carries `op` (the glyph

@@ -85,7 +85,9 @@ typus Handler = (de textus, own lista<numerus>, numerus) → vacuum
     // in the type table and assert its per-param semantic modes.
     let mut func_sig = None;
     for i in 0..fixture.types.type_count() {
-        if let Type::Func(sig) = fixture.types.get(crate::TypeId(i as u32)) {
+        if let Type::Func(sig) = fixture.types.get(crate::TypeId(
+            u32::try_from(i).expect("type count fits u32"),
+        )) {
             func_sig = Some(sig.params.clone());
         }
     }
@@ -173,7 +175,9 @@ typus Handler = (in numerus) → vacuum
 ",
     );
     let signature = (0..fixture.types.type_count()).find_map(|index| {
-        match fixture.types.get(crate::TypeId(index as u32)) {
+        match fixture.types.get(crate::TypeId(
+            u32::try_from(index).expect("type count fits u32"),
+        )) {
             Type::Func(sig) if sig.params.len() == 1 => Some(sig.clone()),
             _ => None,
         }

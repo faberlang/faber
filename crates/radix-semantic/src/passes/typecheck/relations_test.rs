@@ -58,15 +58,6 @@ fn assert_en_rejects_with_issue(source: &str, expected: &str) {
     );
 }
 
-fn assert_en_rejects(source: &str) {
-    let result = analyze_en(source);
-    assert!(
-        !result.is_ok(),
-        "expected failure, got: {:?}",
-        result.diagnostics
-    );
-}
-
 #[test]
 fn p1_field_inheritance_flips_green() {
     assert_en_accepts(

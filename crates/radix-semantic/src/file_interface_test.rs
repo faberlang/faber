@@ -46,7 +46,7 @@ fn file_interface_preserves_generic_size_literal_round_trip() {
                 IndexExpr::Literal(3)
             ));
         }
-        other => panic!("expected size argument, got {other:?}"),
+        other @ AppliedArg::Type(_) => panic!("expected size argument, got {other:?}"),
     }
 }
 
@@ -87,7 +87,7 @@ fn file_interface_preserves_generic_size_param_round_trip() {
                 matches!(target_types.get_index(*index), IndexExpr::Param(sym) if target_interner.resolve(*sym) == "M")
             );
         }
-        other => panic!("expected size argument, got {other:?}"),
+        other @ AppliedArg::Type(_) => panic!("expected size argument, got {other:?}"),
     }
 }
 

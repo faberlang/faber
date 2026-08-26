@@ -126,12 +126,12 @@ impl TypeChecker<'_> {
     ) -> TypeId {
         // An explicit `∪` annotation hole (`const ∪ r ← capta { … }`) owns the
         // accumulation directly; anything else gets a fresh hole.
-        let expected_var = expected.map(|ty| self.resolve_inferred_type(ty)).and_then(|resolved| {
-            match self.types.get(resolved) {
+        let expected_var = expected
+            .map(|ty| self.resolve_inferred_type(ty))
+            .and_then(|resolved| match self.types.get(resolved) {
                 Type::InferUnion(var) => Some(*var),
                 _ => None,
-            }
-        });
+            });
         let var = expected_var.unwrap_or_else(|| self.fresh_union_hole());
 
         let prev_error = self.current_error.replace(ErrorSink::Trap(var));
@@ -141,14 +141,13 @@ impl TypeChecker<'_> {
         let error_flowed = std::mem::replace(&mut self.trap_error_flow, prev_flow);
 
         // The success member rides the same accumulation arm as the errors.
-        self.accumulate_into_union_hole(
-            var,
-            body_ty,
-            span,
-            ISSUE_TRAP_MEMBER_TYPE_MISMATCH,
-        );
+        self.accumulate_into_union_hole(var, body_ty, span, ISSUE_TRAP_MEMBER_TYPE_MISMATCH);
 
-        let collapsed = if error_flowed { self.trap_collapsed_member(var) } else { None };
+        let collapsed = if error_flowed {
+            self.trap_collapsed_member(var)
+        } else {
+            None
+        };
         if let Some(collapsed) = collapsed {
             let member = self.format_union_constituent_type(collapsed);
             self.invalid_operand_types_with_args(
@@ -192,8 +191,10 @@ impl TypeChecker<'_> {
             let borrowed = self.union_members.borrow();
             borrowed.get(&var).cloned().unwrap_or_default()
         };
-        let mut cleaned: Vec<TypeId> =
-            members.into_iter().filter(|member| *member != self.error_type).collect();
+        let mut cleaned: Vec<TypeId> = members
+            .into_iter()
+            .filter(|member| *member != self.error_type)
+            .collect();
         cleaned.sort_by_key(|id| (self.types.union_member_sort_key(*id).0, id.0));
         cleaned.dedup_by(|a, b| self.types.equals(*a, *b));
         match cleaned.as_slice() {
@@ -628,7 +629,7 @@ impl TypeChecker<'_> {
 
     /// Restore a visible state without changing lexical scope ownership.
     fn restore_flow_state(&mut self, state: &FlowState) {
-        self.binding_shadow = state.bindings.clone();
+        self.binding_shadow.clone_from(&state.bindings);
         for (&def_id, &info) in &state.bindings {
             if let Some(scope) = self
                 .scopes

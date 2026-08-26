@@ -12,7 +12,7 @@ use crate::{
 
 #[test]
 fn ref_list_read_methods_are_legal() {
-    analyze_ok(
+    let _ = analyze_ok(
         r"
 incipit {
     fixum de lista<numerus> xs ← [1, 2, 3]
@@ -37,7 +37,7 @@ incipit {
 
 #[test]
 fn unmarked_list_mutating_receiver_stays_legal() {
-    analyze_ok(
+    let _ = analyze_ok(
         r"
 incipit {
     fixum lista<numerus> xs ← vacua
@@ -62,7 +62,7 @@ incipit {
 
 #[test]
 fn unmarked_projection_assignment_stays_legal() {
-    analyze_ok(
+    let _ = analyze_ok(
         r"
 incipit {
     varia lista<numerus> xs ← [1, 2, 3]
@@ -106,7 +106,7 @@ incipit {
 
 #[test]
 fn unmarked_into_mut_param_stays_legal() {
-    analyze_ok(
+    let _ = analyze_ok(
         r"
 functio poke(in lista<numerus> xs) → vacuum {
     xs.appende(4)

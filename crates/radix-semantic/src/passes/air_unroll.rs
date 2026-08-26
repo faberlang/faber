@@ -737,14 +737,12 @@ struct Collector<'a> {
 
 impl HirVisitor for Collector<'_> {
     fn visit_local(&mut self, local: &HirLocal) {
-        if !local.mutable {
-            if let Some(init) = &local.init {
-                if let Some(length) = static_length(init, self.interner, self.facts, self.types) {
-                    self.facts.insert(local.def_id, length);
-                }
-            }
-        } else {
+        if local.mutable {
             self.facts.remove(&local.def_id);
+        } else if let Some(init) = &local.init {
+            if let Some(length) = static_length(init, self.interner, self.facts, self.types) {
+                self.facts.insert(local.def_id, length);
+            }
         }
         radix_hir::visit::walk_local(self, local);
     }
@@ -768,7 +766,7 @@ fn static_length(
         // `"abcdefgh"` is 8 UTF-8 bytes, `'alpha'` 5, `|61 62|` 2 decoded
         // bytes. The conversio capacity check above then requires len == N.
         HirExpressionKind::Literal(HirLiteral::String(sym) | HirLiteral::Ascii(sym)) => {
-            Some(interner.resolve(*sym).as_bytes().len())
+            Some(interner.resolve(*sym).len())
         }
         HirExpressionKind::Literal(HirLiteral::Octeti(sym)) => {
             radix_lexer::octeti_literal::decode_octeti_hex(interner.resolve(*sym))
@@ -834,7 +832,7 @@ fn scalar_bounded_element(ty: TypeId, types: &TypeTable) -> Option<TypeId> {
 }
 
 enum UnrollPlan {
-    Ready(ReadyUnroll),
+    Ready(Box<ReadyUnroll>),
     Decline { span: Span, causa: &'static str },
 }
 
@@ -992,7 +990,7 @@ fn classify_ab_loop(
         block_accumulators(block, body)
     };
     *emitted_lanes += lane_count.saturating_mul(multiplicity);
-    UnrollPlan::Ready(ReadyUnroll {
+    UnrollPlan::Ready(Box::new(ReadyUnroll {
         span,
         index_def,
         lanes: values,
@@ -1002,7 +1000,7 @@ fn classify_ab_loop(
         tensor_binding_ty: None,
         coordinate_defs: Vec::new(),
         lane_coordinates: Vec::new(),
-    })
+    }))
 }
 
 fn classify_ex_loop(
@@ -1078,7 +1076,7 @@ fn classify_ex_loop(
         *emitted_lanes += charge;
         #[allow(clippy::cast_possible_wrap)]
         let values = (0..lane_count).map(|lane| lane as i64).collect();
-        return UnrollPlan::Ready(ReadyUnroll {
+        return UnrollPlan::Ready(Box::new(ReadyUnroll {
             span,
             index_def,
             lanes: values,
@@ -1088,7 +1086,7 @@ fn classify_ex_loop(
             tensor_binding_ty: Some(element),
             coordinate_defs: Vec::new(),
             lane_coordinates: Vec::new(),
-        });
+        }));
     }
     let Type::Tensor(element_ty, shape) = types.get(source_ty) else {
         return UnrollPlan::Decline {
@@ -1234,7 +1232,7 @@ fn classify_ex_loop(
         let mut rest = lane;
         let mut tuple = vec![0i64; dims.len()];
         for (slot, dim) in dims.iter().enumerate().rev() {
-            tuple[slot] = (rest % dim) as i64;
+            tuple[slot] = i64::try_from(rest % dim).unwrap_or(i64::MAX);
             rest /= dim;
         }
         lane_coordinates.push(tuple);
@@ -1312,7 +1310,7 @@ fn classify_ex_tensor_ready(
     *emitted_lanes += charge;
     #[allow(clippy::cast_possible_wrap)]
     let values = (0..lane_count).map(|lane| lane as i64).collect();
-    UnrollPlan::Ready(ReadyUnroll {
+    UnrollPlan::Ready(Box::new(ReadyUnroll {
         span,
         index_def,
         lanes: values,
@@ -1322,7 +1320,7 @@ fn classify_ex_tensor_ready(
         tensor_binding_ty: Some(element_ty),
         coordinate_defs,
         lane_coordinates,
-    })
+    }))
 }
 
 // ── First-match bounded-source admission (AFM-4) ───────────────────────

@@ -32,7 +32,7 @@ fn assert_own_bind_rejects(source: &str, expected: &str) {
 
 #[test]
 fn own_fresh_literal_is_legal() {
-    analyze_ok(
+    let _ = analyze_ok(
         r"
 incipit {
     fixum own lista<numerus> xs ← [1, 2, 3]
@@ -44,7 +44,7 @@ incipit {
 
 #[test]
 fn own_transfer_without_later_use_is_legal() {
-    analyze_ok(
+    let _ = analyze_ok(
         r"
 incipit {
     fixum own lista<numerus> a ← [1, 2, 3]
@@ -89,7 +89,7 @@ incipit {
 
 #[test]
 fn unmarked_dead_into_own_is_legal() {
-    analyze_ok(
+    let _ = analyze_ok(
         r"
 incipit {
     fixum lista<numerus> a ← [1, 2, 3]
@@ -203,7 +203,7 @@ incipit {
 
 #[test]
 fn copy_source_transfers_like_own() {
-    analyze_ok(
+    let _ = analyze_ok(
         r"
 incipit {
     fixum copy lista<numerus> a ← [1, 2, 3]
@@ -230,7 +230,7 @@ incipit {
 
 #[test]
 fn unmarked_alias_on_bind_stays_legal() {
-    analyze_ok(
+    let _ = analyze_ok(
         r"
 incipit {
     fixum lista<numerus> a ← [1, 2, 3]

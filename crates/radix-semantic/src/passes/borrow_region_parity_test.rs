@@ -270,7 +270,7 @@ fn divergence_corpus_runs_through_production_path() {
     // production-path run per divergence fixture so the corpus cannot drift
     // away from the driver wiring.
     for (label, source) in divergence_corpus() {
-        analyze_source(source);
+        let _ = analyze_source(source);
         let _ = label;
     }
 }
