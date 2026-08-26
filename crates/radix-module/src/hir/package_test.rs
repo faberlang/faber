@@ -427,6 +427,8 @@ fn package_dependencies_survive_round_trip() {
     assert_eq!(loaded.dependencies[0].lock_identity, "path:/tmp/norma");
 }
 
+/// v2 device source: a private fragment helper, a public `@ nucleum` entry,
+/// and a private `@ nucleum` helper — visibility is the launch surface.
 fn nucleum_source() -> &'static str {
     r"
 @ nucleum fragment
@@ -434,9 +436,15 @@ functio helper(fractus<f32> x) → fractus<f32> {
     redde x
 }
 
+@ publica
 @ nucleum
 functio k(fractus<f32> x) → fractus<f32> {
     redde helper(x)
+}
+
+@ nucleum
+functio secret(fractus<f32> x) → fractus<f32> {
+    redde x
 }
 "
 }
@@ -454,30 +462,71 @@ fn nucleum_input<'a>(relative_path: &'a str, analysis: &'a AnalyzedModule) -> Pa
     }
 }
 
-#[test]
-fn nucleum_metadata_records_role_and_only_entry_in_dispatch() {
-    let unit = analyze("device.fab", nucleum_source());
-    let metadata = collect_nucleum_metadata(&unit, "device.fab").expect("collect nucleum metadata");
-    assert_eq!(metadata.dispatch_and_reflection_names(), vec!["k".to_owned()]);
-    assert_eq!(metadata.omitted_target_symbol_names(), vec!["helper".to_owned()]);
-    let helper = metadata
+fn nucleum_item<'a>(metadata: &'a NucleumProgramMetadata, name: &str) -> &'a NucleumItemMetadata {
+    metadata
         .items
         .iter()
-        .find(|item| item.name == "helper")
-        .expect("helper");
-    assert_eq!(helper.role, crate::hir::NucleumRole::Fragment);
-    #[cfg(feature = "mir-core")]
-    assert_eq!(NUCLEUM_FRAGMENT_ABI_VERSION, crate::mir::HOST_CALL_ABI_VERSION);
-    assert!(helper.has_hir_body);
-    let body = helper.body.as_ref().expect("fragment body artifact");
-    assert_eq!(body.compiler_version, NUCLEUM_COMPILER_VERSION);
-    assert_eq!(body.abi_version, NUCLEUM_FRAGMENT_ABI_VERSION);
-    assert!(!body.body_hash.is_empty());
-    assert!(!body.type_constraints.is_empty());
+        .find(|item| item.name == name)
+        .unwrap_or_else(|| panic!("item {name}"))
 }
 
 #[test]
-fn nucleum_package_round_trip_preserves_roles() {
+fn nucleum_metadata_filters_launch_surface_by_public_visibility() {
+    // DFV2-5: dispatch/reflection metadata admits only `@ nucleum @ publica`.
+    // A private kernel and a fragment helper stay composable but never get a
+    // launch row.
+    let unit = analyze("device.fab", nucleum_source());
+    let metadata = collect_nucleum_metadata(&unit, "device.fab").expect("collect nucleum metadata");
+    assert_eq!(metadata.dispatch_and_reflection_names(), vec!["k".to_owned()]);
+    assert_eq!(
+        metadata.omitted_target_symbol_names(),
+        vec!["helper".to_owned(), "secret".to_owned()]
+    );
+
+    let k = nucleum_item(&metadata, "k");
+    assert_eq!(k.role, crate::hir::NucleumRole::Entry);
+    assert_eq!(k.visibility, NucleumVisibility::Public);
+    assert!(k.is_launch_entry());
+
+    let secret = nucleum_item(&metadata, "secret");
+    assert_eq!(secret.role, crate::hir::NucleumRole::Entry);
+    assert_eq!(secret.visibility, NucleumVisibility::Private);
+    assert!(!secret.is_launch_entry());
+
+    let helper = nucleum_item(&metadata, "helper");
+    assert_eq!(helper.role, crate::hir::NucleumRole::Fragment);
+    assert_eq!(helper.visibility, NucleumVisibility::Private);
+    assert!(!helper.is_launch_entry());
+    assert!(helper.has_hir_body);
+}
+
+#[test]
+fn nucleum_metadata_records_device_body_identity() {
+    // DFV2-5 (b): both roles carry the artifact skeleton — constraints,
+    // effect summary slot, compiler/ABI identity. The body hash is honest
+    // build state: empty until canonical MIR attaches.
+    let unit = analyze("device.fab", nucleum_source());
+    let metadata = collect_nucleum_metadata(&unit, "device.fab").expect("collect nucleum metadata");
+    #[cfg(feature = "mir-core")]
+    assert_eq!(NUCLEUM_DEVICE_ABI_VERSION, crate::mir::HOST_CALL_ABI_VERSION);
+    for name in ["helper", "k", "secret"] {
+        let body = nucleum_item(&metadata, name)
+            .body
+            .as_ref()
+            .unwrap_or_else(|| panic!("device body artifact for {name}"));
+        assert_eq!(body.compiler_version, NUCLEUM_COMPILER_VERSION);
+        assert_eq!(body.abi_version, NUCLEUM_DEVICE_ABI_VERSION);
+        assert!(body.mir.is_empty(), "canonical bytes attach from the lowered unit");
+        assert!(
+            body.body_hash.is_empty(),
+            "the hash covers the serialized bytes, not a fingerprint"
+        );
+        assert!(!body.type_constraints.is_empty());
+    }
+}
+
+#[test]
+fn nucleum_package_round_trip_preserves_visibility_roles() {
     let unit = analyze("device.fab", nucleum_source());
     let pkg = build_package(
         PackageIdentityWire { name: "nucleum".to_owned(), version: "1.0.0".to_owned(), edition: "2026".to_owned() },
@@ -489,11 +538,16 @@ fn nucleum_package_round_trip_preserves_roles() {
     .expect("build package");
     let loaded = load_package(&encode_package_msgpack(&pkg).expect("encode")).expect("load");
     assert_eq!(loaded.nucleum.dispatch_and_reflection_names(), vec!["k".to_owned()]);
-    assert_eq!(loaded.nucleum.omitted_target_symbol_names(), vec!["helper".to_owned()]);
+    assert_eq!(
+        loaded.nucleum.omitted_target_symbol_names(),
+        vec!["helper".to_owned(), "secret".to_owned()]
+    );
+    assert_eq!(nucleum_item(&loaded.nucleum, "k").visibility, NucleumVisibility::Public);
+    assert_eq!(nucleum_item(&loaded.nucleum, "secret").visibility, NucleumVisibility::Private);
 }
 
 #[test]
-fn signature_only_fragment_import_fails_closed() {
+fn signature_only_device_import_fails_closed() {
     let session = Session::new(Config::default().with_bodyless_functions());
     let Err(err) = analyze_source(
         &session,
@@ -515,44 +569,90 @@ fn signature_only_fragment_import_fails_closed() {
         "{err:?}"
     );
 
-    let mut metadata = NucleumProgramMetadata::new();
-    metadata.items.push(NucleumItemMetadata {
-        name: "helper".to_owned(),
+    // Metadata-level gate: an importable item (fragment at any visibility,
+    // or a public device function) without any body fails closed; a private
+    // kernel helper stays module-internal and is enforced at composition.
+    let item = |name: &str, role: crate::hir::NucleumRole, visibility: NucleumVisibility| NucleumItemMetadata {
+        name: name.to_owned(),
         relative_path: "iface.fab".to_owned(),
         def_id: 1,
-        role: crate::hir::NucleumRole::Fragment,
+        role,
+        visibility,
         has_hir_body: false,
         body: None,
-        fragment_callees: Vec::new(),
-    });
+        device_callees: Vec::new(),
+    };
+    let mut metadata = NucleumProgramMetadata::new();
+    metadata.items = vec![
+        item("helper", crate::hir::NucleumRole::Fragment, NucleumVisibility::Private),
+        item("open", crate::hir::NucleumRole::Entry, NucleumVisibility::Public),
+    ];
     let err = metadata
         .require_importable_fragment_bodies()
-        .expect_err("metadata fail-closed");
-    assert!(matches!(err, NucleumPackageError::SignatureOnlyImport { name, .. } if name == "helper"));
+        .expect_err("importable signature-only items must fail");
+    assert!(matches!(&err, NucleumPackageError::SignatureOnlyImport { name, .. } if name == "helper"));
+
+    metadata.items = vec![item("open", crate::hir::NucleumRole::Entry, NucleumVisibility::Public)];
+    let err = metadata
+        .require_importable_fragment_bodies()
+        .expect_err("signature-only public entry must fail");
+    assert!(matches!(&err, NucleumPackageError::SignatureOnlyImport { name, .. } if name == "open"));
+
+    metadata.items = vec![item(
+        "secret",
+        crate::hir::NucleumRole::Entry,
+        NucleumVisibility::Private,
+    )];
+    metadata
+        .require_importable_fragment_bodies()
+        .expect("private helpers are not on the import surface");
+}
+
+/// Lower the unit and attach canonical MIR bodies to `metadata`.
+#[cfg(feature = "mir-core")]
+fn attach_bodies(metadata: &mut NucleumProgramMetadata, unit: &mut AnalyzedModule) {
+    let lowered = crate::mir::lower_analyzed_unit(unit, Default::default()).expect("lower device unit");
+    metadata.attach_canonical_mir(lowered.validated.program(), "device.fab");
 }
 
 #[test]
-fn fragment_cache_key_includes_hash_compiler_abi_caps_and_bindings() {
-    let unit = analyze("device.fab", nucleum_source());
-    let metadata = collect_nucleum_metadata(&unit, "device.fab").expect("collect");
-    let body = metadata
-        .items
-        .iter()
-        .find(|item| item.name == "helper")
-        .and_then(|item| item.body.as_ref())
+fn device_body_cache_key_tracks_hash_compiler_abi_caps_and_bindings() {
+    let mut unit = analyze("device.fab", nucleum_source());
+    let mut metadata = collect_nucleum_metadata(&unit, "device.fab").expect("collect");
+    #[cfg(feature = "mir-core")]
+    attach_bodies(&mut metadata, &mut unit);
+    let body = nucleum_item(&metadata, "helper")
+        .body
+        .as_ref()
         .expect("body");
-    let key = fragment_cache_key(body, &["metal", "wgsl"], &["f32"], &["4"]);
+    let key = device_body_cache_key(body, &["metal", "wgsl"], &["f32"], &["4"]);
     assert!(key.starts_with("sha256:"));
-    let other_caps = fragment_cache_key(body, &["llvm"], &["f32"], &["4"]);
-    let other_types = fragment_cache_key(body, &["metal", "wgsl"], &["i32"], &["4"]);
-    let other_shapes = fragment_cache_key(body, &["metal", "wgsl"], &["f32"], &["8"]);
+    let other_caps = device_body_cache_key(body, &["llvm"], &["f32"], &["4"]);
+    let other_types = device_body_cache_key(body, &["metal", "wgsl"], &["i32"], &["4"]);
+    let other_shapes = device_body_cache_key(body, &["metal", "wgsl"], &["f32"], &["8"]);
     assert_ne!(key, other_caps);
     assert_ne!(key, other_types);
     assert_ne!(key, other_shapes);
+
+    // Cache identity moves with the body hash, the compiler, and the ABI:
+    // a re-hashed body, a rebuilt compiler, and an ABI bump are three
+    // different cache subjects.
+    let mut rehashed = body.clone();
+    rehashed.body_hash = "sha256:other".to_owned();
+    assert_ne!(key, device_body_cache_key(&rehashed, &["metal", "wgsl"], &["f32"], &["4"]));
+    let mut other_compiler = body.clone();
+    other_compiler.compiler_version = "0.0.0-test".to_owned();
+    assert_ne!(
+        key,
+        device_body_cache_key(&other_compiler, &["metal", "wgsl"], &["f32"], &["4"])
+    );
+    let mut other_abi = body.clone();
+    other_abi.abi_version += 1;
+    assert_ne!(key, device_body_cache_key(&other_abi, &["metal", "wgsl"], &["f32"], &["4"]));
 }
 
 #[test]
-fn fragment_call_graph_rejects_cycle_after_import() {
+fn device_call_graph_rejects_cycle_after_import() {
     let ping = analyze(
         "ping.fab",
         r"
@@ -578,64 +678,195 @@ functio pong(fractus<f32> x) → fractus<f32> {
 }
 
 #[test]
-fn fragment_bodies_are_omitted_from_target_symbols_after_composition() {
+fn device_call_graph_rejects_kernel_cycle() {
+    // v2 composition covers entry-to-entry calls, so the package call graph
+    // must see kernel-to-kernel edges too, not only fragment edges.
+    let unit = analyze(
+        "cycle.fab",
+        r"
+@ publica
+@ nucleum
+functio k1(fractus<f32> x) → fractus<f32> {
+    redde k2(x)
+}
+
+@ publica
+@ nucleum
+functio k2(fractus<f32> x) → fractus<f32> {
+    redde k1(x)
+}
+",
+    );
+    let err = collect_nucleum_metadata(&unit, "cycle.fab").expect_err("kernel cycle");
+    match err {
+        NucleumPackageError::CyclicCallGraph { cycle } => {
+            assert!(cycle.contains("k1"), "{cycle}");
+            assert!(cycle.contains("k2"), "{cycle}");
+        }
+        other => panic!("expected cycle, got {other:?}"),
+    }
+}
+
+#[test]
+fn non_launch_device_bodies_are_omitted_from_target_symbols() {
     let unit = analyze("device.fab", nucleum_source());
     let metadata = collect_nucleum_metadata(&unit, "device.fab").expect("collect");
     let symbols = metadata.omitted_target_symbol_names();
-    assert_eq!(symbols, vec!["helper".to_owned()]);
-    assert!(!metadata
-        .dispatch_and_reflection_names()
-        .contains(&"helper".to_owned()));
+    assert_eq!(symbols, vec!["helper".to_owned(), "secret".to_owned()]);
+    for omitted in &symbols {
+        assert!(!metadata.dispatch_and_reflection_names().contains(omitted));
+    }
 }
 
 #[cfg(feature = "mir-core")]
 #[test]
-fn importable_fragment_carries_canonical_mir_artifact() {
+fn importable_device_bodies_carry_canonical_mir_artifact() {
     let mut unit = analyze("device.fab", nucleum_source());
-    let mut metadata = collect_nucleum_metadata(&unit, "device.fab").expect("collect");
-    let lowered = crate::mir::lower_analyzed_unit(&mut unit, Default::default()).expect("lower fragment unit");
-    metadata.attach_canonical_mir(lowered.validated.program(), "device.fab");
+    let mut metadata = collect_nucleum_metadata(&mut unit, "device.fab").expect("collect");
+    attach_bodies(&mut metadata, &mut unit);
     metadata
         .require_canonical_mir()
         .expect("canonical MIR attached");
-    let body = metadata
-        .items
-        .iter()
-        .find(|item| item.name == "helper")
-        .and_then(|item| item.body.as_ref())
-        .expect("body");
-    assert!(!body.mir.is_empty(), "OQ2: canonical MIR bytes required");
+    metadata
+        .verify_importable_device_bodies()
+        .expect("attached bodies verify");
+
+    // The public entry's artifact carries the actual serialized body —
+    // decodable postcard MIR for that exact definition, hashed over the
+    // bytes that travel.
+    let k = nucleum_item(&metadata, "k");
+    let body = k.body.as_ref().expect("entry body artifact");
+    assert!(!body.mir.is_empty(), "the launch entry's canonical body is required for import");
     let decoded: crate::mir::MirFunction = postcard::from_bytes(&body.mir).expect("decode MIR function");
-    assert_eq!(decoded.source, Some(crate::hir::DefId(body_def_id(&metadata, "helper"))));
+    assert_eq!(decoded.source, Some(crate::hir::DefId(k.def_id)));
+    assert_eq!(body.body_hash, format!("sha256:{}", handroll::sha256_hex(&body.mir)));
+
     let bytes = encode_nucleum_metadata(&metadata).expect("encode sidecar");
     let round = decode_nucleum_metadata(&bytes).expect("decode sidecar");
     assert_eq!(round.items.len(), metadata.items.len());
-    assert_eq!(
-        round
-            .items
-            .iter()
-            .find(|item| item.name == "helper")
-            .and_then(|item| item.body.as_ref())
-            .map(|body| &body.mir),
-        Some(&body.mir)
-    );
+    assert_eq!(round.items, metadata.items);
 }
 
-fn body_def_id(metadata: &NucleumProgramMetadata, name: &str) -> u32 {
+#[cfg(feature = "mir-core")]
+#[test]
+fn device_body_import_gate_fails_closed_on_missing_tampered_and_stale_bodies() {
+    let mut unit = analyze("device.fab", nucleum_source());
+    let mut metadata = collect_nucleum_metadata(&mut unit, "device.fab").expect("collect");
+
+    // Missing: the pre-attach artifact has no canonical bytes.
+    let err = metadata
+        .verify_importable_device_bodies()
+        .expect_err("pre-attach bodies are not importable");
+    assert!(matches!(err, NucleumPackageError::MirBodyMissing { .. }));
+    assert_eq!(err.reason(), "missing_body");
+
+    attach_bodies(&mut metadata, &mut unit);
     metadata
+        .verify_importable_device_bodies()
+        .expect("attached bodies verify");
+
+    // Tampered: bytes that no longer match the recorded hash.
+    let mut tampered = metadata.clone();
+    tampered
         .items
-        .iter()
-        .find(|item| item.name == name)
-        .expect("item")
-        .def_id
+        .iter_mut()
+        .find(|item| item.name == "k")
+        .and_then(|item| item.body.as_mut())
+        .expect("k body")
+        .mir[0] ^= 0xff;
+    let err = tampered
+        .verify_importable_device_bodies()
+        .expect_err("tampered body must fail");
+    assert!(matches!(&err, NucleumPackageError::BodyHashMismatch { name, .. } if name == "k"));
+    assert_eq!(err.reason(), "body_hash_mismatch");
+
+    // Stale: an artifact from another compiler/ABI generation.
+    let mut stale = metadata.clone();
+    {
+        let body = stale
+            .items
+            .iter_mut()
+            .find(|item| item.name == "k")
+            .and_then(|item| item.body.as_mut())
+            .expect("k body");
+        body.compiler_version = "0.0.0-old".to_owned();
+        body.abi_version -= 1;
+    }
+    let err = stale
+        .verify_importable_device_bodies()
+        .expect_err("stale body must fail");
+    assert!(matches!(&err, NucleumPackageError::IncompatibleBodyVersion { name, .. } if name == "k"));
+    assert_eq!(err.reason(), "stale_body_version");
+
+    // The transport bridge degrades every failure to the fail-closed
+    // `Missing` channel — never a signature-only callable.
+    let contract = |metadata: &NucleumProgramMetadata, name: &str| nucleum_item(metadata, name).device_contract();
+    assert!(matches!(
+        contract(&metadata, "k").body,
+        crate::file_interface::InterfaceBodyChannel::Canonical(_)
+    ));
+    assert!(matches!(
+        contract(&tampered, "k").body,
+        crate::file_interface::InterfaceBodyChannel::Missing
+    ));
+    assert!(matches!(
+        contract(&stale, "k").body,
+        crate::file_interface::InterfaceBodyChannel::Missing
+    ));
+    let pre_attach = collect_nucleum_metadata(&unit, "device.fab").expect("collect");
+    assert!(matches!(
+        contract(&pre_attach, "k").body,
+        crate::file_interface::InterfaceBodyChannel::Missing
+    ));
+}
+
+#[cfg(feature = "mir-core")]
+#[test]
+fn device_contract_bridge_carries_role_visibility_and_template() {
+    // DFV2-5 (a): the package artifact is usable by the DFV2-3/DFV2-4
+    // transport — role and launch visibility map through, and the canonical
+    // template is the serialized body bytes.
+    let mut unit = analyze("device.fab", nucleum_source());
+    let mut metadata = collect_nucleum_metadata(&mut unit, "device.fab").expect("collect");
+    attach_bodies(&mut metadata, &mut unit);
+
+    let k = nucleum_item(&metadata, "k").clone();
+    let contract = k.device_contract();
+    assert_eq!(contract.role, crate::file_interface::InterfaceDeviceRole::Kernel);
+    assert_eq!(contract.visibility, crate::file_interface::InterfaceDeviceVisibility::Public);
+    let crate::file_interface::InterfaceBodyChannel::Canonical(canonical) = &contract.body else {
+        panic!("attached public entry must carry a canonical body");
+    };
+    assert_eq!(canonical.template, k.body.as_ref().expect("body").mir);
+    assert!(!canonical.body_hash.is_empty());
+    assert!(contract.is_composable());
+
+    let secret = nucleum_item(&metadata, "secret").clone();
+    let contract = secret.device_contract();
+    assert_eq!(contract.visibility, crate::file_interface::InterfaceDeviceVisibility::Private);
 }
 
 #[test]
-fn fragment_transfer_sink_is_recorded_as_fragment_callee() {
+fn nucleum_sidecar_is_deterministic_and_rejects_foreign_bytes() {
+    // DFV2-5 (f): rebuilding the same unit yields identical sidecar bytes.
+    let unit = analyze("device.fab", nucleum_source());
+    let first = collect_nucleum_metadata(&unit, "device.fab").expect("collect");
+    let second = collect_nucleum_metadata(&unit, "device.fab").expect("collect");
+    let first_bytes = encode_nucleum_metadata(&first).expect("encode");
+    let second_bytes = encode_nucleum_metadata(&second).expect("encode");
+    assert_eq!(first_bytes, second_bytes, "sidecar bytes must be deterministic");
+
+    // A payload that is not this metadata shape fails closed on decode —
+    // pre-DFV2-5 sidecars (no visibility field) cannot load silently.
+    assert!(decode_nucleum_metadata(&[0xde, 0xad, 0xbe, 0xef]).is_err());
+}
+
+#[test]
+fn device_transfer_sink_is_recorded_as_device_callee() {
     // EOT-3W: `walk_expr_callees` covers `HirExpressionKind::Transfer` — a
-    // fragment invoked as a `⇇` sink is a called fragment (once per payload),
-    // so the post-import call graph records the edge instead of silently
-    // dropping it through the catch-all.
+    // device function invoked as a `⇇` sink is a called device callee (once
+    // per payload), so the post-import call graph records the edge instead
+    // of silently dropping it through the catch-all.
     let unit = analyze(
         "device.fab",
         r"
@@ -655,5 +886,5 @@ functio k(fractus<f32> x) → fractus<f32> {
         .iter()
         .find(|item| item.name == "k")
         .expect("k entry");
-    assert_eq!(k.fragment_callees, vec!["emit".to_owned()]);
+    assert_eq!(k.device_callees, vec!["emit".to_owned()]);
 }

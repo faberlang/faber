@@ -13,6 +13,10 @@
 //! unit's resolver snapshot).
 
 use crate::driver::AnalyzedModule;
+use crate::file_interface::{
+    InterfaceBodyChannel, InterfaceCanonicalBody, InterfaceDeviceContract, InterfaceDeviceRole,
+    InterfaceDeviceVisibility,
+};
 use crate::hir::{
     DefId, HirBlock, HirExpression, HirExpressionKind, HirFunction, HirItemKind, HirStatementKind,
     HirTypeParamConstraint, NucleumRole,
@@ -29,14 +33,16 @@ pub use radix_hir_fhir::{
     LEGACY_PACKAGE_SCHEMA_VERSION, PACKAGE_SCHEMA_VERSION,
 };
 
-/// Compiler version recorded on fragment body artifacts (radix-module crate).
+/// Compiler version recorded on device body artifacts (radix-module crate).
 pub const NUCLEUM_COMPILER_VERSION: &str = env!("CARGO_PKG_VERSION");
 
-/// ABI version recorded on fragment body artifacts and cache keys.
+/// ABI version recorded on device body artifacts and cache keys.
 ///
 /// Matches [`crate::mir::HOST_CALL_ABI_VERSION`] when `mir-core` is on; kept as
 /// a package-crate constant so FHIR-only builds can still serialize metadata.
-pub const NUCLEUM_FRAGMENT_ABI_VERSION: u32 = 8;
+/// DFV2-5 adds artifact fields without touching the body ABI this version
+/// describes — no ABI bump.
+pub const NUCLEUM_DEVICE_ABI_VERSION: u32 = 8;
 
 /// One analyzed unit input for package assembly.
 ///
@@ -86,14 +92,17 @@ pub fn build_package(
 
 /// Assemble a FHIR envelope together with nucleum program metadata.
 ///
-/// Fragment exports fail closed when they have no body. The concrete fragment
-/// call graph is required to be acyclic. Only [`NucleumRole::Entry`] items
-/// enter [`NucleumProgramMetadata::dispatch_and_reflection_names`].
+/// DFV2-5 v2 contract: every device function (`@ nucleum`, either role) gets
+/// a body artifact carrying its constraints/effect/toolchain identity, and
+/// only `@ nucleum @ publica` items enter
+/// [`NucleumProgramMetadata::dispatch_and_reflection_names`] — visibility is
+/// the launch surface, the role is not. Importable items without any body
+/// fail closed, and the concrete device call graph must be acyclic.
 ///
 /// # Errors
 ///
-/// Returns [`FhirPackageError`] when the envelope is invalid or a fragment
-/// export is signature-only / cyclic.
+/// Returns [`FhirPackageError`] when the envelope is invalid or an importable
+/// device function is signature-only / the device call graph is cyclic.
 pub fn build_package_with_nucleum(
     identity: PackageIdentityWire,
     entry_path: &str,
@@ -229,18 +238,32 @@ pub fn load_package(bytes: &[u8]) -> Result<LoadedHirPackage, FhirPackageError> 
 }
 
 // ---------------------------------------------------------------------------
-// Nucleum fragment package metadata (NF-8)
+// Nucleum device package metadata (NF-8; v2 device bodies DFV2-5)
 // ---------------------------------------------------------------------------
 
 /// Structured failure for nucleum package metadata / import checks.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum NucleumPackageError {
-    /// A `Fragment` export has no body artifact (signature-only interface).
+    /// An importable device function has no body at all (signature-only).
     SignatureOnlyImport { name: String, module: String },
-    /// Concrete fragment call graph contains a cycle after import resolution.
+    /// Concrete device call graph contains a cycle after import resolution.
     CyclicCallGraph { cycle: String },
-    /// A fragment is importable but has no canonical MIR body bytes.
+    /// A device function is importable but has no canonical MIR body bytes.
     MirBodyMissing { name: String, module: String },
+    /// The recorded body hash does not match the serialized body bytes.
+    BodyHashMismatch {
+        name: String,
+        module: String,
+        expected: String,
+        found: String,
+    },
+    /// The artifact was produced by another compiler/ABI generation.
+    IncompatibleBodyVersion {
+        name: String,
+        module: String,
+        compiler_version: String,
+        abi_version: u32,
+    },
 }
 
 impl NucleumPackageError {
@@ -248,16 +271,30 @@ impl NucleumPackageError {
         match self {
             Self::SignatureOnlyImport { name, module } => FhirPackageError::MalformedUnit {
                 module,
-                detail: format!("signature-only nucleum fragment `{name}` cannot be imported"),
+                detail: format!("signature-only nucleum device function `{name}` cannot be imported"),
             },
             Self::CyclicCallGraph { cycle } => FhirPackageError::MalformedUnit {
                 module: String::new(),
-                detail: format!("nucleum fragment call cycle: {cycle}"),
+                detail: format!("nucleum device call cycle: {cycle}"),
             },
             Self::MirBodyMissing { name, module } => FhirPackageError::MalformedUnit {
                 module,
-                detail: format!("nucleum fragment `{name}` is missing a canonical MIR body artifact"),
+                detail: format!("nucleum device function `{name}` is missing a canonical MIR body artifact"),
             },
+            Self::BodyHashMismatch { name, module, expected, found } => FhirPackageError::MalformedUnit {
+                module,
+                detail: format!("nucleum device body `{name}` hash mismatch (recorded {expected}, computed {found})"),
+            },
+            Self::IncompatibleBodyVersion { name, module, compiler_version, abi_version } => {
+                FhirPackageError::MalformedUnit {
+                    module,
+                    detail: format!(
+                        "nucleum device body `{name}` was built by compiler {compiler_version} / ABI \
+                         v{abi_version} (this compiler is {NUCLEUM_COMPILER_VERSION} / ABI \
+                         v{NUCLEUM_DEVICE_ABI_VERSION})"
+                    ),
+                }
+            }
         }
     }
 
@@ -265,7 +302,10 @@ impl NucleumPackageError {
     #[must_use]
     pub fn issue(&self) -> &'static str {
         match self {
-            Self::SignatureOnlyImport { .. } | Self::MirBodyMissing { .. } => "nucleum_fragment_effect",
+            Self::SignatureOnlyImport { .. }
+            | Self::MirBodyMissing { .. }
+            | Self::BodyHashMismatch { .. }
+            | Self::IncompatibleBodyVersion { .. } => "nucleum_fragment_effect",
             Self::CyclicCallGraph { .. } => "nucleum_fragment_cycle",
         }
     }
@@ -275,6 +315,8 @@ impl NucleumPackageError {
     pub fn reason(&self) -> &'static str {
         match self {
             Self::SignatureOnlyImport { .. } | Self::MirBodyMissing { .. } => "missing_body",
+            Self::BodyHashMismatch { .. } => "body_hash_mismatch",
+            Self::IncompatibleBodyVersion { .. } => "stale_body_version",
             Self::CyclicCallGraph { .. } => "cycle",
         }
     }
@@ -284,39 +326,99 @@ impl std::fmt::Display for NucleumPackageError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::SignatureOnlyImport { name, module } => {
-                write!(f, "signature-only nucleum fragment `{name}` in `{module}` cannot be imported")
+                write!(
+                    f,
+                    "signature-only nucleum device function `{name}` in `{module}` cannot be imported"
+                )
             }
-            Self::CyclicCallGraph { cycle } => write!(f, "nucleum fragment call cycle: {cycle}"),
+            Self::CyclicCallGraph { cycle } => write!(f, "nucleum device call cycle: {cycle}"),
             Self::MirBodyMissing { name, module } => {
-                write!(f, "nucleum fragment `{name}` in `{module}` is missing a canonical MIR body")
+                write!(
+                    f,
+                    "nucleum device function `{name}` in `{module}` is missing a canonical MIR body"
+                )
             }
+            Self::BodyHashMismatch { name, module, expected, found } => write!(
+                f,
+                "nucleum device body `{name}` in `{module}` hash mismatch (recorded {expected}, computed {found})"
+            ),
+            Self::IncompatibleBodyVersion { name, module, compiler_version, abi_version } => write!(
+                f,
+                "nucleum device body `{name}` in `{module}` was built by compiler {compiler_version} / ABI \
+                 v{abi_version} (this compiler is {NUCLEUM_COMPILER_VERSION} / ABI v{NUCLEUM_DEVICE_ABI_VERSION})"
+            ),
         }
     }
 }
 
 impl std::error::Error for NucleumPackageError {}
 
-/// One type or shape constraint on a fragment definition.
+/// Launch visibility recorded with each nucleum item (v2 DFV2-1/DFV2-5).
+///
+/// Visibility is the launch surface: `@ nucleum @ publica` is the only
+/// dispatch/reflection entry; an unmarked `@ nucleum` function is a
+/// module-internal composable helper. Mirrors the interface transport's
+/// [`InterfaceDeviceVisibility`]; kept as a package-local serde type so the
+/// postcard sidecar stays self-contained.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum NucleumVisibility {
+    /// `@ nucleum @ publica` — dispatch/reflection entry in any consumer.
+    Public,
+    /// Unmarked `@ nucleum` — composable helper, never a launch entry.
+    Private,
+}
+
+/// The `@ publica` annotation family: the v2 launch-surface gate.
+///
+/// Mirrors `radix-mir`'s `is_public_entry` (keyword and reader-locale
+/// spellings lower to the same canonical family); duplicated here because
+/// package metadata must stay constructible in FHIR-only builds without the
+/// MIR leaf.
+const PUBLICA_FAMILY: &str = "publica";
+
+/// Launch visibility of one HIR device function.
+fn nucleum_visibility(function: &HirFunction, interner: &crate::lexer::Interner) -> NucleumVisibility {
+    let public = function
+        .annotations
+        .iter()
+        .any(|annotation| interner.resolve(annotation.family) == PUBLICA_FAMILY);
+    if public {
+        NucleumVisibility::Public
+    } else {
+        NucleumVisibility::Private
+    }
+}
+
+/// One type or shape constraint on a device body artifact.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct FragmentConstraint {
+pub struct DeviceBodyConstraint {
     pub param: String,
     pub binding: String,
 }
 
-/// One visible device effect recorded on a fragment body artifact.
+/// One visible device effect recorded on a device body artifact.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct FragmentEffectRecord {
+pub struct DeviceEffectRecord {
     pub kind: String,
 }
 
-/// Canonical specialized-MIR body artifact for an importable fragment (goal OQ2).
+/// Canonical specialized-MIR body artifact for a device function (DFV2-5).
+///
+/// Carries the identity contract of design §9: canonical body bytes, the
+/// type/shape constraints the body was checked under, the device-effect
+/// summary, the producing compiler/ABI versions, and the body hash over the
+/// serialized bytes. `mir`/`body_hash` are empty until
+/// [`NucleumProgramMetadata::attach_canonical_mir`] supplies the lowered
+/// body — a pre-attach artifact is build state, never a durable import
+/// subject, and [`NucleumItemMetadata::canonical_template`] rejects it.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct FragmentBodyArtifact {
+pub struct DeviceBodyArtifact {
     /// Postcard-encoded [`crate::mir::MirFunction`] for the specialized body.
     pub mir: Vec<u8>,
-    pub type_constraints: Vec<FragmentConstraint>,
-    pub shape_constraints: Vec<FragmentConstraint>,
-    pub effect_summary: Vec<FragmentEffectRecord>,
+    pub type_constraints: Vec<DeviceBodyConstraint>,
+    pub shape_constraints: Vec<DeviceBodyConstraint>,
+    pub effect_summary: Vec<DeviceEffectRecord>,
     pub compiler_version: String,
     pub abi_version: u32,
     pub body_hash: String,
@@ -329,15 +431,100 @@ pub struct NucleumItemMetadata {
     pub relative_path: String,
     pub def_id: u32,
     pub role: NucleumRole,
+    /// Launch visibility (`@ publica` gate) — the v2 launch surface.
+    pub visibility: NucleumVisibility,
     /// HIR body present in the exporting unit.
     pub has_hir_body: bool,
-    /// Canonical MIR artifact; required for an importable `Fragment`.
-    pub body: Option<FragmentBodyArtifact>,
-    /// Direct fragment callees (names) for the post-import call graph.
-    pub fragment_callees: Vec<String>,
+    /// Canonical MIR body artifact; every device function carries one, and
+    /// importable items must have usable bytes (fail closed otherwise).
+    pub body: Option<DeviceBodyArtifact>,
+    /// Direct device callees (names) for the post-import call graph.
+    pub device_callees: Vec<String>,
 }
 
-/// Serialized program metadata for nucleum roles and fragment bodies.
+impl NucleumItemMetadata {
+    /// Whether this item is a launchable device entry (`@ nucleum @ publica`).
+    ///
+    /// The v2 dispatch/reflection gate: role `Entry` alone is not enough —
+    /// a private `@ nucleum` function is a composable helper with no launch
+    /// ABI, and a `Fragment` is never a dispatch stage.
+    #[must_use]
+    pub fn is_launch_entry(&self) -> bool {
+        self.role == NucleumRole::Entry && self.visibility == NucleumVisibility::Public
+    }
+
+    /// The canonical body template bytes, verified against the artifact's
+    /// recorded hash and toolchain identity (the DFV2-5 import gate).
+    ///
+    /// # Errors
+    ///
+    /// Returns [`NucleumPackageError::MirBodyMissing`] when the artifact or
+    /// its MIR bytes are absent, [`NucleumPackageError::BodyHashMismatch`]
+    /// when the recorded hash does not match the serialized bytes, and
+    /// [`NucleumPackageError::IncompatibleBodyVersion`] when the artifact was
+    /// produced by another compiler/ABI generation.
+    pub fn canonical_template(&self) -> Result<Vec<u8>, NucleumPackageError> {
+        let Some(body) = &self.body else {
+            return Err(NucleumPackageError::MirBodyMissing {
+                name: self.name.clone(),
+                module: self.relative_path.clone(),
+            });
+        };
+        if body.mir.is_empty() {
+            return Err(NucleumPackageError::MirBodyMissing {
+                name: self.name.clone(),
+                module: self.relative_path.clone(),
+            });
+        }
+        let computed = content_hash(&body.mir);
+        if body.body_hash != computed {
+            return Err(NucleumPackageError::BodyHashMismatch {
+                name: self.name.clone(),
+                module: self.relative_path.clone(),
+                expected: body.body_hash.clone(),
+                found: computed,
+            });
+        }
+        if body.compiler_version != NUCLEUM_COMPILER_VERSION || body.abi_version != NUCLEUM_DEVICE_ABI_VERSION {
+            return Err(NucleumPackageError::IncompatibleBodyVersion {
+                name: self.name.clone(),
+                module: self.relative_path.clone(),
+                compiler_version: body.compiler_version.clone(),
+                abi_version: body.abi_version,
+            });
+        }
+        Ok(body.mir.clone())
+    }
+
+    /// The v2 device contract for this item on the DFV2-3 import transport.
+    ///
+    /// Produces exactly what [`crate::file_interface::InterfaceCallable`]'s
+    /// `device` channel carries: role, launch visibility, and the body
+    /// channel. The body is [`InterfaceBodyChannel::Canonical`] only when the
+    /// artifact passes [`Self::canonical_template`]; any missing, malformed,
+    /// or stale body degrades to [`InterfaceBodyChannel::Missing`] — the
+    /// transport's single fail-closed state — never to a signature-only
+    /// callable.
+    #[must_use]
+    pub fn device_contract(&self) -> InterfaceDeviceContract {
+        let role = match self.role {
+            NucleumRole::Entry => InterfaceDeviceRole::Kernel,
+            NucleumRole::Fragment => InterfaceDeviceRole::Fragment,
+        };
+        let visibility = match self.visibility {
+            NucleumVisibility::Public => InterfaceDeviceVisibility::Public,
+            NucleumVisibility::Private => InterfaceDeviceVisibility::Private,
+        };
+        let body = match self.canonical_template() {
+            Ok(template) => InterfaceBodyChannel::Canonical(InterfaceCanonicalBody::new(template)),
+            Err(_) => InterfaceBodyChannel::Missing,
+        };
+        InterfaceDeviceContract { role, visibility, body }
+    }
+}
+
+/// Serialized program metadata for nucleum roles, launch visibility, and
+/// canonical device bodies.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct NucleumProgramMetadata {
     pub compiler_version: String,
@@ -351,27 +538,35 @@ impl NucleumProgramMetadata {
     pub fn new() -> Self {
         Self {
             compiler_version: NUCLEUM_COMPILER_VERSION.to_owned(),
-            abi_version: NUCLEUM_FRAGMENT_ABI_VERSION,
+            abi_version: NUCLEUM_DEVICE_ABI_VERSION,
             items: Vec::new(),
         }
     }
 
-    /// Names that enter device dispatch and reflection tables (`Entry` only).
+    /// Names that enter device dispatch and reflection tables.
+    ///
+    /// DFV2-5 visibility gate: only public `@ nucleum` entries are launch
+    /// rows. Private helpers and `Fragment` composition sugar never enter
+    /// dispatch/reflection metadata.
     #[must_use]
     pub fn dispatch_and_reflection_names(&self) -> Vec<String> {
         self.items
             .iter()
-            .filter(|item| item.role == NucleumRole::Entry)
+            .filter(|item| item.is_launch_entry())
             .map(|item| item.name.clone())
             .collect()
     }
 
-    /// Fragment names omitted from target symbol tables after composition.
+    /// Device names omitted from target symbol tables after composition.
+    ///
+    /// Everything that is not a public entry is composed into its callers
+    /// (DFV2-4) and must not survive as a standalone target symbol: private
+    /// compute helpers and every `Fragment` body.
     #[must_use]
     pub fn omitted_target_symbol_names(&self) -> Vec<String> {
         self.items
             .iter()
-            .filter(|item| item.role == NucleumRole::Fragment)
+            .filter(|item| !item.is_launch_entry())
             .map(|item| item.name.clone())
             .collect()
     }
@@ -383,15 +578,20 @@ impl NucleumProgramMetadata {
             .sort_by(|left, right| (&left.relative_path, &left.name).cmp(&(&right.relative_path, &right.name)));
     }
 
-    /// Fail closed when any `Fragment` is signature-only.
+    /// Fail closed when an importable device function is signature-only.
+    ///
+    /// Importable surface (v2): every `Fragment` (composition-only bodies,
+    /// any visibility) plus every public device function (consumer-nameable
+    /// exports). A private compute helper stays module-internal — its body
+    /// is enforced at composition, not here.
     ///
     /// # Errors
     ///
-    /// Returns [`NucleumPackageError::SignatureOnlyImport`] when a fragment has
-    /// no HIR body and no MIR artifact.
+    /// Returns [`NucleumPackageError::SignatureOnlyImport`] when an
+    /// importable item has no HIR body and no MIR artifact.
     pub fn require_importable_fragment_bodies(&self) -> Result<(), NucleumPackageError> {
         for item in &self.items {
-            if item.role != NucleumRole::Fragment {
+            if !is_importable_device_item(item) {
                 continue;
             }
             let has_mir = item.body.as_ref().is_some_and(|body| !body.mir.is_empty());
@@ -408,10 +608,15 @@ impl NucleumProgramMetadata {
 
     /// Fail closed when an importable fragment has no canonical MIR bytes.
     ///
+    /// Fragment-scoped subset (the production attach flow lowers
+    /// fragment-bearing units); the full v2 import gate over every
+    /// importable device body is
+    /// [`Self::verify_importable_device_bodies`].
+    ///
     /// # Errors
     ///
-    /// Returns [`NucleumPackageError::MirBodyMissing`] when a fragment artifact
-    /// is missing postcard MIR.
+    /// Returns [`NucleumPackageError::MirBodyMissing`] when a fragment
+    /// artifact is missing postcard MIR.
     pub fn require_canonical_mir(&self) -> Result<(), NucleumPackageError> {
         for item in &self.items {
             if item.role != NucleumRole::Fragment {
@@ -428,23 +633,51 @@ impl NucleumProgramMetadata {
         Ok(())
     }
 
-    /// Fail closed when the concrete fragment call graph has a cycle.
+    /// Import-side identity gate (DFV2-5): every importable device body must
+    /// be a complete, untampered, version-compatible canonical artifact.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`NucleumPackageError::MirBodyMissing`] for absent body bytes,
+    /// [`NucleumPackageError::BodyHashMismatch`] when the recorded hash does
+    /// not match the serialized bytes, and
+    /// [`NucleumPackageError::IncompatibleBodyVersion`] for artifacts from
+    /// another compiler/ABI generation. No failure degrades to a
+    /// signature-only import.
+    pub fn verify_importable_device_bodies(&self) -> Result<(), NucleumPackageError> {
+        for item in &self.items {
+            if !is_importable_device_item(item) {
+                continue;
+            }
+            item.canonical_template()?;
+        }
+        Ok(())
+    }
+
+    /// Fail closed when the concrete device call graph has a cycle.
     ///
     /// # Errors
     ///
     /// Returns [`NucleumPackageError::CyclicCallGraph`] with the cycle path.
     pub fn require_acyclic(&self) -> Result<(), NucleumPackageError> {
-        if let Some(cycle) = fragment_cycle(self) {
+        if let Some(cycle) = device_call_cycle(self) {
             return Err(NucleumPackageError::CyclicCallGraph { cycle });
         }
         Ok(())
     }
 
-    /// Attach postcard MIR bodies from a lowered unit (goal OQ2 canonical MIR).
+    /// Attach postcard MIR bodies from a lowered unit (canonical device MIR).
+    ///
+    /// DFV2-5: attaches for every device item of `relative_path` that is
+    /// present in the lowered program — entries, helpers, and fragments
+    /// alike — recomputing the body hash over the serialized bytes. Bodies
+    /// the lowering dropped (e.g. a private helper composed away with no
+    /// remaining reference) keep their pre-attach empty artifact and fail
+    /// the import gate rather than serializing a hollow body.
     #[cfg(feature = "mir-core")]
     pub fn attach_canonical_mir(&mut self, program: &crate::mir::MirProgram, relative_path: &str) {
         for item in &mut self.items {
-            if item.relative_path != relative_path || item.role != NucleumRole::Fragment {
+            if item.relative_path != relative_path {
                 continue;
             }
             let Some(function) = program
@@ -466,13 +699,24 @@ impl NucleumProgramMetadata {
     }
 }
 
-/// Deterministic cache key for a specialized fragment instance.
+/// Whether a nucleum item is on the cross-package import surface.
 ///
-/// Includes body hash, compiler/ABI version, target capabilities, and the
-/// concrete type/shape bindings (design §8).
+/// `Fragment` items are importable at any visibility (they exist only to be
+/// composed), and a public device function is a consumer-nameable export.
+/// Private non-fragment device functions are module-internal helpers.
+fn is_importable_device_item(item: &NucleumItemMetadata) -> bool {
+    item.role == NucleumRole::Fragment || item.visibility == NucleumVisibility::Public
+}
+
+/// Deterministic cache key for one specialized device body (design §9).
+///
+/// Identity covers the body hash, compiler/ABI version, target capabilities,
+/// and the concrete type/shape bindings. Meaningful for attached artifacts
+/// (non-empty body hash); pre-attach artifacts carry an empty hash and are
+/// build state, not cache subjects.
 #[must_use]
-pub fn fragment_cache_key(
-    artifact: &FragmentBodyArtifact,
+pub fn device_body_cache_key(
+    artifact: &DeviceBodyArtifact,
     target_capabilities: &[&str],
     type_bindings: &[&str],
     shape_bindings: &[&str],
@@ -515,8 +759,8 @@ pub fn decode_nucleum_metadata(bytes: &[u8]) -> Result<NucleumProgramMetadata, p
 ///
 /// # Errors
 ///
-/// Returns [`NucleumPackageError`] when a fragment is signature-only or the
-/// combined call graph is cyclic.
+/// Returns [`NucleumPackageError`] when an importable device function is
+/// signature-only or the combined device call graph is cyclic.
 pub fn nucleum_metadata_from_unit_inputs(
     modules: &[PackageUnitInput<'_>],
 ) -> Result<NucleumProgramMetadata, NucleumPackageError> {
@@ -533,8 +777,8 @@ pub fn nucleum_metadata_from_unit_inputs(
 ///
 /// # Errors
 ///
-/// Returns [`NucleumPackageError`] when a fragment is signature-only or the
-/// combined call graph is cyclic.
+/// Returns [`NucleumPackageError`] when an importable device function is
+/// signature-only or the combined device call graph is cyclic.
 pub fn nucleum_metadata_from_loaded_modules(
     modules: &[LoadedHirModule],
 ) -> Result<NucleumProgramMetadata, NucleumPackageError> {
@@ -549,10 +793,14 @@ pub fn nucleum_metadata_from_loaded_modules(
 
 /// Collect nucleum role/body metadata from one analyzed unit.
 ///
+/// Every device function is recorded with its launch visibility and a body
+/// artifact skeleton; dispatch/reflection filtering happens at read time
+/// ([`NucleumProgramMetadata::dispatch_and_reflection_names`]).
+///
 /// # Errors
 ///
-/// Returns [`NucleumPackageError::SignatureOnlyImport`] for a fragment without
-/// a HIR body or MIR artifact.
+/// Returns [`NucleumPackageError::SignatureOnlyImport`] for an importable
+/// device function without a HIR body or MIR artifact.
 pub fn collect_nucleum_metadata(
     analysis: &AnalyzedModule,
     relative_path: &str,
@@ -612,37 +860,40 @@ fn nucleum_item_from_function(
         return Ok(None);
     };
     let name = analysis.interner.resolve(function.name).to_owned();
+    let visibility = nucleum_visibility(function, &analysis.interner);
     let has_hir_body = function.body.is_some();
-    let body = (role == NucleumRole::Fragment).then(|| {
-        fragment_body_from_hir(
-            function,
-            analysis,
-            effects
-                .get(def_id)
-                .map(|summary| summary.effects.as_slice()),
-        )
-    });
-    let fragment_callees = function
+    // DFV2-5: every device function carries the v2 body artifact skeleton —
+    // constraints, effect summary, and toolchain identity travel with both
+    // roles; canonical bytes attach from the lowered unit.
+    let body = device_body_from_hir(
+        function,
+        analysis,
+        effects
+            .get(def_id)
+            .map(|summary| summary.effects.as_slice()),
+    );
+    let device_callees = function
         .body
         .as_ref()
-        .map(|block| collect_fragment_callees(block, index))
+        .map(|block| collect_device_callees(block, index))
         .unwrap_or_default();
     Ok(Some(NucleumItemMetadata {
         name,
         relative_path: relative_path.to_owned(),
         def_id: def_id.0,
         role,
+        visibility,
         has_hir_body,
-        body,
-        fragment_callees,
+        body: Some(body),
+        device_callees,
     }))
 }
 
-fn fragment_body_from_hir(
+fn device_body_from_hir(
     function: &HirFunction,
     analysis: &AnalyzedModule,
     effects: Option<&[crate::semantic::passes::fragment_definition::DeviceEffect]>,
-) -> FragmentBodyArtifact {
+) -> DeviceBodyArtifact {
     let mut type_constraints = Vec::new();
     let mut shape_constraints = Vec::new();
     for param in &function.type_params {
@@ -656,13 +907,13 @@ fn fragment_body_from_hir(
                 .join("|"),
         };
         if param.is_typus() {
-            type_constraints.push(FragmentConstraint { param: name, binding });
+            type_constraints.push(DeviceBodyConstraint { param: name, binding });
         } else {
-            shape_constraints.push(FragmentConstraint { param: name, binding });
+            shape_constraints.push(DeviceBodyConstraint { param: name, binding });
         }
     }
     for param in &function.params {
-        type_constraints.push(FragmentConstraint {
+        type_constraints.push(DeviceBodyConstraint {
             param: analysis.interner.resolve(param.name).to_owned(),
             binding: format_constraint_type(param.ty, analysis),
         });
@@ -670,35 +921,19 @@ fn fragment_body_from_hir(
     let effect_summary = effects
         .unwrap_or(&[])
         .iter()
-        .map(|effect| FragmentEffectRecord { kind: effect_kind_name(effect.kind).to_owned() })
+        .map(|effect| DeviceEffectRecord { kind: effect_kind_name(effect.kind).to_owned() })
         .collect::<Vec<_>>();
-    let mut fingerprint = Vec::new();
-    push_field(&mut fingerprint, "name", analysis.interner.resolve(function.name).as_bytes());
-    for constraint in &type_constraints {
-        push_field(
-            &mut fingerprint,
-            "type",
-            format!("{}={}", constraint.param, constraint.binding).as_bytes(),
-        );
-    }
-    for constraint in &shape_constraints {
-        push_field(
-            &mut fingerprint,
-            "shape",
-            format!("{}={}", constraint.param, constraint.binding).as_bytes(),
-        );
-    }
-    for effect in &effect_summary {
-        push_field(&mut fingerprint, "effect", effect.kind.as_bytes());
-    }
-    FragmentBodyArtifact {
+    DeviceBodyArtifact {
+        // Pre-attach build state: the canonical MIR bytes and their hash are
+        // supplied by `attach_canonical_mir`; the import gate rejects the
+        // empty artifact instead of trusting a definition fingerprint.
         mir: Vec::new(),
         type_constraints,
         shape_constraints,
         effect_summary,
         compiler_version: NUCLEUM_COMPILER_VERSION.to_owned(),
-        abi_version: NUCLEUM_FRAGMENT_ABI_VERSION,
-        body_hash: content_hash(&fingerprint),
+        abi_version: NUCLEUM_DEVICE_ABI_VERSION,
+        body_hash: String::new(),
     }
 }
 
@@ -753,7 +988,7 @@ fn collect_nucleum_index(analysis: &AnalyzedModule) -> NucleumIndex {
     index
 }
 
-fn collect_fragment_callees(block: &HirBlock, index: &NucleumIndex) -> Vec<String> {
+fn collect_device_callees(block: &HirBlock, index: &NucleumIndex) -> Vec<String> {
     let mut names = Vec::new();
     walk_block_callees(block, index, &mut names);
     names.sort();
@@ -794,7 +1029,9 @@ fn walk_expr_callees(expr: &HirExpression, index: &NucleumIndex, names: &mut Vec
     match &expr.kind {
         HirExpressionKind::Call(callee, _, args, _) => {
             if let HirExpressionKind::Path(def_id) = &callee.kind {
-                if index.roles.get(def_id) == Some(&NucleumRole::Fragment) {
+                // v2: every device-to-device call composes (entry or helper),
+                // so every device callee is a call-graph edge.
+                if index.roles.get(def_id).is_some() {
                     if let Some(name) = index.names.get(def_id) {
                         names.push(name.clone());
                     }
@@ -812,17 +1049,15 @@ fn walk_expr_callees(expr: &HirExpression, index: &NucleumIndex, names: &mut Vec
             }
         }
         // A transfer invokes its sink once per payload (EOT-3M/MIR contract),
-        // so a fragment sink is a called fragment callee per payload — never
+        // so a device sink is a called device callee per payload — never
         // silently dropped by the catch-all.
         HirExpressionKind::Transfer { sink, payloads } => {
-            let sink_fragment_def = match &sink.kind {
-                HirExpressionKind::Path(def_id) if index.roles.get(def_id) == Some(&NucleumRole::Fragment) => {
-                    Some(*def_id)
-                }
+            let sink_device_def = match &sink.kind {
+                HirExpressionKind::Path(def_id) if index.roles.get(def_id).is_some() => Some(*def_id),
                 _ => None,
             };
             for payload in payloads {
-                if let Some(def_id) = sink_fragment_def {
+                if let Some(def_id) = sink_device_def {
                     if let Some(name) = index.names.get(&def_id) {
                         names.push(name.clone());
                     }
@@ -866,16 +1101,14 @@ fn walk_expr_callees(expr: &HirExpression, index: &NucleumIndex, names: &mut Vec
     }
 }
 
-fn fragment_cycle(metadata: &NucleumProgramMetadata) -> Option<String> {
+/// Detect a cycle in the concrete device call graph (all device roles).
+fn device_call_cycle(metadata: &NucleumProgramMetadata) -> Option<String> {
     let mut graph: FxHashMap<&str, Vec<&str>> = FxHashMap::default();
     for item in &metadata.items {
-        if item.role != NucleumRole::Fragment {
-            continue;
-        }
         graph
             .entry(item.name.as_str())
             .or_default()
-            .extend(item.fragment_callees.iter().map(String::as_str));
+            .extend(item.device_callees.iter().map(String::as_str));
     }
     let mut visiting = rustc_hash::FxHashSet::default();
     let mut visited = rustc_hash::FxHashSet::default();
