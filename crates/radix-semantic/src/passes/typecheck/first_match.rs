@@ -23,7 +23,7 @@ pub(super) fn check_first_match_expr(
     checker: &mut TypeChecker<'_>,
     source: &mut HirExpression,
     coordinates: &[(DefId, Symbol)],
-    binding: &(DefId, Symbol),
+    binding: (DefId, Symbol),
     body: &mut HirBlock,
     span: Span,
 ) -> TypeId {
@@ -84,7 +84,7 @@ pub(super) fn check_first_match_expr(
 fn check_first_match_body(
     checker: &mut TypeChecker<'_>,
     coordinates: &[(DefId, Symbol)],
-    binding: &(DefId, Symbol),
+    binding: (DefId, Symbol),
     body: &mut HirBlock,
     elem_ty: TypeId,
 ) {

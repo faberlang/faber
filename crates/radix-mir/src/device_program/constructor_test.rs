@@ -134,6 +134,7 @@ fn tuple_construct(locals: &[u32], ty: MirType) -> (MirStatement, crate::MirTemp
 /// statements; every statement destination is typed in the locals table from
 /// its producing statement's return type (the plan/signature passes read the
 /// preserved local tables).
+#[allow(clippy::too_many_arguments)]
 fn device_function(
     id: u32,
     interner: &mut Interner,
@@ -162,8 +163,7 @@ fn device_function(
         named_locals
             .iter()
             .find(|&&(id, _, _)| id == wanted)
-            .map(|&(_, _, ty)| ty)
-            .unwrap_or(return_ty)
+            .map_or(return_ty, |&(_, _, ty)| ty)
     };
     let _ = &mut locals;
     MirFunction {
@@ -203,7 +203,7 @@ fn device_function(
     }
 }
 
-fn validated<'a>(types: &'a TypeTable, functions: Vec<MirFunction>) -> ValidatedMir<'a> {
+fn validated(types: &TypeTable, functions: Vec<MirFunction>) -> ValidatedMir<'_> {
     ValidatedMir::new(MirProgram { functions }, MirValidationContext::new(types))
         .expect("the constructor fixture validates")
 }
@@ -286,7 +286,7 @@ fn constructor_returns_program_and_semantics_from_validated_mir() {
 /// whole-function ABI synthesis fails (the matmul return-buffer
 /// element-count law) decomposes at the recipe boundary into one kernel per
 /// subchain; the transformer-recipe subchain (softmax) dispatches its
-/// signature through the P1 seam and carries the RowSoftmax plan with the
+/// signature through the P1 seam and carries the `RowSoftmax` plan with the
 /// transformer-shaped resource layout — never the generic return-buffer ABI.
 #[test]
 fn constructor_decomposes_multi_recipe_body_into_subchain_kernels() {
@@ -498,7 +498,7 @@ fn forward_function(types: &mut TypeTable, interner: &mut Interner) -> MirFuncti
     )
 }
 
-/// train_step(w, gw) = (w - gw) — the optimizer step; its tuple update
+/// `train_step(w`, gw) = (w - gw) — the optimizer step; its tuple update
 /// output aliases the parameter buffer (the in-place update, S5-U5).
 fn train_step_function(types: &mut TypeTable, interner: &mut Interner) -> MirFunction {
     let r2 = rank1_tensor_ty(types, 2);
@@ -525,9 +525,9 @@ fn train_step_function(types: &mut TypeTable, interner: &mut Interner) -> MirFun
     )
 }
 
-/// The generated backward companion: loss_backward(x, w, upstream) =
+/// The generated backward companion: `loss_backward(x`, w, upstream) =
 /// (gx, gw) — a tuple gradient return whose slots the gradient-flow link
-/// feeds into the train_step.
+/// feeds into the `train_step`.
 fn companion_function(types: &mut TypeTable, interner: &mut Interner) -> MirFunction {
     let r2 = rank1_tensor_ty(types, 2);
     let tuple_ty = MirType::semantic(types.tuple(vec![r2.semantic_id(), r2.semantic_id()]));
@@ -627,11 +627,11 @@ fn training_fixture<R>(run: impl FnOnce(&Interner, &ValidatedMir<'_>, &MirCompan
 //    device_test.rs `repeating_step_constructor_materializes_training_
 //    program`) ───────────────────────────────────────────────────────────
 
-/// The train_step kernel binds the trainable param as an InOut slot AND
+/// The `train_step` kernel binds the trainable param as an `InOut` slot AND
 /// aliases its update output slot to the same buffer (the in-place update);
-/// the param is PerProgram with HostProvided init and carries no
+/// the param is `PerProgram` with `HostProvided` init and carries no
 /// dependency edge (persistent state); the gradient input aliases the
-/// companion's gradient output buffer (the backward → train_step edge).
+/// companion's gradient output buffer (the backward → `train_step` edge).
 #[test]
 fn constructor_aliases_param_updates_and_gradients() {
     let facts = training_facts();
@@ -748,14 +748,14 @@ fn constructor_aliases_param_updates_and_gradients() {
                 .any(|edge| edge.buffer == param_id),
             "no param edge rides the dependency graph (persistent state)"
         );
-    })
+    });
 }
 
 // ── DPSC-U4a gap 4: S5A-U1 declared cadence/results + step count ────────
 
 /// The DECLARED observation cadence set: the forward's return output (the
-/// loss) is the single PerStep result; the final params are declared
-/// EndOfRun; the effective step count is the training facts' admitted count
+/// loss) is the single `PerStep` result; the final params are declared
+/// `EndOfRun`; the effective step count is the training facts' admitted count
 /// (the caller's declared value when there is no training program).
 #[test]
 fn constructor_declares_observation_cadence_and_effective_steps() {
@@ -811,5 +811,5 @@ fn constructor_declares_observation_cadence_and_effective_steps() {
         )
         .expect("the non-training program builds");
         assert_eq!(plain_steps, 7, "no training facts → the declared count");
-    })
+    });
 }

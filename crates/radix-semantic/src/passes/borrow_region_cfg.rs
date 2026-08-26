@@ -172,6 +172,9 @@ impl HirCfg {
 /// Unsupported control-flow shapes return [`CfgError`] rather than being
 /// approximated.  This makes the semantic region consumer fail closed: its
 /// caller may retain the existing checker for a shape the adapter cannot prove.
+///
+/// # Errors
+/// Returns `CfgError` when a control-flow shape is unsupported.
 pub fn build_cfg(hir: &HirModule) -> Result<HirCfg, CfgError> {
     validate_supported_shapes(hir)?;
     let mut builder = Builder {

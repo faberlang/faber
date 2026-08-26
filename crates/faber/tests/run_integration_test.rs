@@ -1145,10 +1145,7 @@ incipit {
     fs::remove_file(package.join("src/main.fab")).expect("remove source");
 
     let (stdout, stderr, ok) = run_executable(&entrypoint, &[]);
-    assert!(
-        ok,
-        "direct fmir-bin norma:fs entrypoint failed:\n{stderr}"
-    );
+    assert!(ok, "direct fmir-bin norma:fs entrypoint failed:\n{stderr}");
     assert_eq!(stdout, "solum-ok\n");
     assert_no_generated_rust(&package);
 }

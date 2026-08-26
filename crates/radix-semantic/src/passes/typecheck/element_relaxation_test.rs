@@ -4,8 +4,6 @@
 //! accepted while elementwise arithmetic on non-numeric tensor elements is
 //! rejected with a targeted diagnostic.
 
-use crate::test_support;
-
 fn compile(source: &str) -> crate::test_support::AnalyzedFixture {
     crate::test_support::analyze_source(source)
 }

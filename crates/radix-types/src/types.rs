@@ -1600,7 +1600,7 @@ impl Hash for Type {
                 var.hash(state);
             }
             Self::Union(members) | Self::Tuple(members) | Self::Intersection(members) => {
-                members.hash(state)
+                members.hash(state);
             }
             Self::Error => {}
         }
@@ -2064,8 +2064,7 @@ fn type_refs_in_bounds(ty: &Type, types_len: usize, indices_len: usize) -> bool 
         }
         Type::Record(fields) => fields.values().all(type_in_bounds),
         Type::Tuple(elems) => elems.iter().all(type_in_bounds),
-        Type::Union(members) => members.iter().all(type_in_bounds),
-        Type::Intersection(members) => members.iter().all(type_in_bounds),
+        Type::Union(members) | Type::Intersection(members) => members.iter().all(type_in_bounds),
         Type::Applied(base, args) => {
             type_in_bounds(base)
                 && args.iter().all(|arg| match arg {

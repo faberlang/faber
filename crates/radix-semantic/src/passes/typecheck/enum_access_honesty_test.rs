@@ -6,7 +6,7 @@
 
 use crate::test_support;
 
-const CARRIER: &str = r#"genus ErrorDetail {
+const CARRIER: &str = r"genus ErrorDetail {
     textus body
 }
 
@@ -15,7 +15,7 @@ discretio Carrier {
     TextCarrier { textus text }
 }
 
-"#;
+";
 
 #[test]
 fn enum_variant_payload_refines_through_return() {

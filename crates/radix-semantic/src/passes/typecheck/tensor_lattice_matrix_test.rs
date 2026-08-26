@@ -5,7 +5,6 @@
 //! disallowed conversions produce `tensor_element_mismatch`.
 
 use crate::tensor_element_lattice;
-use crate::test_support;
 
 fn compile(source: &str) -> crate::test_support::AnalyzedFixture {
     crate::test_support::analyze_source(source)

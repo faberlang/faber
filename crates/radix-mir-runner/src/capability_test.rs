@@ -1,6 +1,6 @@
 //! Tests for runner capability classification and runtime dispatch ledger.
 //!
-//! These tests prove that classify_runner_lowerability accepts or
+//! These tests prove that `classify_runner_lowerability` accepts or
 //! rejects MIR programs based on structural capability (fixtures,
 //! intrinsic support, terminator gaps) and that every runtime ABI
 //! family has an explicit dispatch status in the runner ledger.

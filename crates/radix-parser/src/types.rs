@@ -94,7 +94,6 @@ impl Parser {
 
     /// Parse one mode-prefixed, tail-free type core.
     fn parse_type_atom(&mut self, start: Span) -> Result<TypeExpr, ParseError> {
-
         // Access marker: de/in/own/copy (prefix). Nullable is no longer a prefix; use T ∪ nihil.
         let mode = if self.eat_keyword_ident(TokenKind::De) {
             Some(TypeMode::De)
@@ -323,7 +322,11 @@ impl Parser {
     ///
     /// Mirrors [`Self::parse_union_tail`]: nested intersection members are
     /// flattened so `A ∩ (B ∩ C)` and `A ∩ B ∩ C` share one AST shape.
-    fn parse_intersection_tail(&mut self, first: TypeExpr, start: Span) -> Result<TypeExpr, ParseError> {
+    fn parse_intersection_tail(
+        &mut self,
+        first: TypeExpr,
+        start: Span,
+    ) -> Result<TypeExpr, ParseError> {
         if !self.eat(&TokenKind::Cap) {
             return Ok(first);
         }

@@ -4,7 +4,6 @@
 //! each emit a targeted issue string rather than a generic type mismatch.
 
 use radix_diagnostics::DiagnosticArg;
-use radix_target::Target;
 
 fn compile(source: &str) -> crate::test_support::AnalyzedFixture {
     crate::test_support::analyze_source(source)

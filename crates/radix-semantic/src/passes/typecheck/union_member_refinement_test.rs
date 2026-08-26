@@ -292,8 +292,9 @@ fn shared_field_union_warns_only_teach() {
     assert!(result
         .iter()
         .any(|err| !err.is_error() && test_support::issue(err) == Some("union_nominal_members")));
-    assert!(!result.iter().any(|err| !err.is_error()
-        && test_support::issue(err) == Some("union_no_common_members")));
+    assert!(!result
+        .iter()
+        .any(|err| !err.is_error() && test_support::issue(err) == Some("union_no_common_members")));
 }
 
 #[test]
@@ -325,7 +326,7 @@ fn primitive_union_annotation_does_not_warn() {
 // Closed enum variant members (N0)
 // ---------------------------------------------------------------------------
 
-const CARRIER: &str = r#"genus ErrorDetail {
+const CARRIER: &str = r"genus ErrorDetail {
     textus body
 }
 
@@ -334,7 +335,7 @@ discretio Carrier {
     TextCarrier { textus text }
 }
 
-"#;
+";
 
 #[test]
 fn enum_variant_refinement_reaches_return_funnel() {

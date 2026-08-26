@@ -89,12 +89,12 @@ fn bounded_lista_literal_indices_reject_provable_oob_and_negative() {
 #[test]
 fn bounded_cord_literal_indices_reject_provable_oob_and_negative() {
     for source in [
-        r##"incipit {
+        r#"incipit {
     fixum textus raw ← "a"
     fixum textus<8> text ← raw ↦ textus<8>
     fixum _ bad ← text[8]
     nota bad
-}"##,
+}"#,
         r"incipit {
     fixum ascii<8> text ← 'a'
     fixum _ bad ← text[-1]

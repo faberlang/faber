@@ -2408,7 +2408,7 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
 
     /// Sum across a specified axis: `sum(x, axis)`.
     ///
-    /// Backward-only LayerNorm VJP helper. Result rank is input rank - 1.
+    /// Backward-only `LayerNorm` VJP helper. Result rank is input rank - 1.
     /// v1: rank-2 only with axis 0 (sum rows) or axis = last (sum columns).
     ///
     /// Args layout: `[input, axis_const]`.

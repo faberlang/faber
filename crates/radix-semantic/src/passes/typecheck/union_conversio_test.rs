@@ -144,12 +144,12 @@ fn resolver_registry_is_environment_scoped_for_cross_module_lookup() {
 #[test]
 fn failable_call_propagation_records_declared_conversion_arm() {
     let fixture = test_support::analyze_source(
-        r#"
+        r"
 discretio Sourceum { Failed }
 discretio Destinatio { @ conversio Sourceum err { redde finge Converted {} ∷ Destinatio } Converted }
 functio source() → vacuum ⇥ Sourceum {}
 functio target() → vacuum ⇥ Destinatio { redde source() }
-"#,
+",
     );
     assert!(fixture.success(), "diagnostics: {:?}", fixture.diagnostics);
     let hir = fixture.hir.as_ref().expect("typed HIR");
@@ -188,13 +188,13 @@ functio target() → vacuum ⇥ Destinatio { redde source() }
 #[test]
 fn transitive_conversion_chain_is_fail_closed_without_direct_arm() {
     let fixture = test_support::analyze_source(
-        r#"
+        r"
 discretio A { Failed }
 discretio B { @ conversio A err { redde finge FromA {} ∷ B } FromA }
 discretio C { @ conversio B err { redde finge FromB {} ∷ C } FromB }
 functio source() → vacuum ⇥ A {}
 functio target() → vacuum ⇥ C { redde source() }
-"#,
+",
     );
     let error = fixture
         .diagnostics
@@ -214,7 +214,7 @@ functio target() → vacuum ⇥ C { redde source() }
 #[test]
 fn local_handler_keeps_original_error_type_and_does_not_convert() {
     let fixture = test_support::analyze_source(
-        r#"
+        r"
 discretio Sourceum { Failed }
 discretio Destinatio { @ conversio Sourceum err { redde finge Converted {} ∷ Destinatio } Converted }
 functio source() → vacuum ⇥ Sourceum {}
@@ -222,7 +222,7 @@ functio target() → vacuum ⇥ Destinatio {
     fac { source() }
     cape err {}
 }
-"#,
+",
     );
     assert!(fixture.success(), "diagnostics: {:?}", fixture.diagnostics);
     let source_def = fixture
@@ -270,19 +270,19 @@ functio target() → vacuum ⇥ Destinatio {
 #[test]
 fn non_call_sinks_still_reject_mismatched_error_types() {
     for source in [
-        r#"
+        r"
 discretio Sourceum { Failed }
 discretio Destinatio { @ conversio Sourceum err { redde finge Converted {} ∷ Destinatio } Converted }
 functio source() → vacuum ⇥ Sourceum {}
 functio target() → vacuum ⇥ Destinatio { iace source() }
-"#,
-        r#"
+",
+        r"
 discretio Sourceum { Failed }
 discretio Destinatio { @ conversio Sourceum err { redde finge Converted {} ∷ Destinatio } Converted }
 functio source() → vacuum ⇥ Sourceum {}
 functio target() → vacuum ⇥ Destinatio { requirit falsum iace source() }
-"#,
-        r#"
+",
+        r"
 discretio Sourceum { Failed }
 discretio Destinatio { @ conversio Sourceum err { redde finge Converted {} ∷ Destinatio } Converted }
 functio source() → vacuum ⇥ Sourceum {}
@@ -290,7 +290,7 @@ functio target() → vacuum ⇥ Destinatio {
     varia Destinatio value ← finge Converted {} ∷ Destinatio
     value ↤ source()
 }
-"#,
+",
     ] {
         let fixture = test_support::analyze_source(source);
         assert!(!fixture.success(), "expected sink mismatch to reject");

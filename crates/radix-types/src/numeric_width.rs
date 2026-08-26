@@ -80,7 +80,6 @@ impl NumericWidth {
             ("bf16", Primitive::Fractus) => Ok(Self::BF16),
             ("f32", Primitive::Fractus) => Ok(Self::F32),
             ("f64", Primitive::Fractus) => Ok(Self::F64),
-            ("d32" | "d64", Primitive::Fractus) => Err(WidthError::UnrecognizedMarker),
             ("i8" | "i16" | "i32" | "i64" | "u8" | "u16" | "u32" | "u64", Primitive::Fractus) => {
                 Err(WidthError::IntOnFractus)
             }
@@ -256,7 +255,7 @@ pub fn decimal_text_to_scaled(text: &str) -> Option<(i128, i32)> {
     let mut exp10: i32 = 0;
     let mut seen_digit = false;
     let mut rest = text;
-    while let Some(digit) = rest.chars().next().filter(|c| c.is_ascii_digit()) {
+    while let Some(digit) = rest.chars().next().filter(char::is_ascii_digit) {
         mantissa = mantissa
             .checked_mul(10)?
             .checked_add(i128::from(digit as u8 - b'0'))?;
@@ -265,7 +264,7 @@ pub fn decimal_text_to_scaled(text: &str) -> Option<(i128, i32)> {
     }
     if let Some(frac) = rest.strip_prefix('.') {
         rest = frac;
-        while let Some(digit) = rest.chars().next().filter(|c| c.is_ascii_digit()) {
+        while let Some(digit) = rest.chars().next().filter(char::is_ascii_digit) {
             mantissa = mantissa
                 .checked_mul(10)?
                 .checked_add(i128::from(digit as u8 - b'0'))?;
@@ -517,7 +516,8 @@ pub const DECIMAL_INDEX_SCALAR_MSG: &str = "decimal-width numerus cannot index; 
 /// decimal-widths D2 (wildcard audit): tensor `media` reduces over a float
 /// carrier to avoid integer division; a decimal element has no defined media
 /// carrier yet (conversio rows are D3), so it fails closed here.
-pub const DECIMAL_TENSOR_MEDIA_MSG: &str = "tensor media does not accept decimal-width elements; convert to fractus<f64> first";
+pub const DECIMAL_TENSOR_MEDIA_MSG: &str =
+    "tensor media does not accept decimal-width elements; convert to fractus<f64> first";
 
 /// Whether `ty` is a `lista<integer>` usable as a tensor index vector (DEFER-064).
 ///
@@ -570,9 +570,10 @@ pub fn is_decimal_index_scalar(types: &TypeTable, ty: TypeId) -> bool {
 #[must_use]
 pub fn tensor_media_width(types: &TypeTable, elem: TypeId) -> Option<NumericWidth> {
     match types.get(elem) {
-        Type::Primitive(Primitive::Numerus) => Some(NumericWidth::F64),
         Type::SizedNumeric(Primitive::Numerus, width) if width.is_decimal() => None,
-        Type::SizedNumeric(Primitive::Numerus, _) => Some(NumericWidth::F64),
+        Type::Primitive(Primitive::Numerus) | Type::SizedNumeric(Primitive::Numerus, _) => {
+            Some(NumericWidth::F64)
+        }
         Type::Primitive(Primitive::Fractus) => Some(NumericWidth::F64),
         Type::SizedNumeric(Primitive::Fractus, width) => Some(*width),
         Type::Alias(_, inner) => tensor_media_width(types, *inner),

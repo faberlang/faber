@@ -8,7 +8,6 @@
 
 use crate::test_support::args_have_no_legacy_message;
 use crate::{SemanticError, SemanticErrorKind};
-use radix_diagnostics::DiagnosticArg;
 
 trait DefiniteAssignmentDiagnostic {
     fn has_kind_issue(&self, kind: SemanticErrorKind, issue: &str) -> bool;

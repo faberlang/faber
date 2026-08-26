@@ -106,7 +106,12 @@ impl TypeChecker<'_> {
     /// and forward calls see the same declaration table as ordinary functions.
     /// Inherited members are merged later by [`Self::resolve_struct_heritage`]
     /// so parent views are complete regardless of declaration order.
-    pub fn collect_struct(&mut self, def_id: DefId, struct_item: &HirStruct, span: radix_lexer::Span) {
+    pub fn collect_struct(
+        &mut self,
+        def_id: DefId,
+        struct_item: &HirStruct,
+        span: radix_lexer::Span,
+    ) {
         let mut fields = FxHashMap::default();
         let mut methods = FxHashMap::default();
         let mut method_spans = FxHashMap::default();
@@ -294,20 +299,14 @@ impl TypeChecker<'_> {
         let Some(def_id) = self.resolver.builtin_sermo_def_id() else {
             return;
         };
-        self.structs.insert(
-            def_id,
-            empty_struct_info(),
-        );
+        self.structs.insert(def_id, empty_struct_info());
     }
 
     fn collect_builtin_directional_view(&mut self, lookup: fn(&Resolver) -> Option<DefId>) {
         let Some(def_id) = lookup(self.resolver) else {
             return;
         };
-        self.structs.insert(
-            def_id,
-            empty_struct_info(),
-        );
+        self.structs.insert(def_id, empty_struct_info());
     }
 
     fn collect_builtin_forma(&mut self) {
@@ -495,20 +494,13 @@ impl TypeChecker<'_> {
             let mut chain: Vec<DefId> = Vec::new();
             let mut seen: FxHashSet<DefId> = FxHashSet::default();
             let mut cursor = *def_id;
-            loop {
-                let Some(parent) = self
-                    .struct_heritage
-                    .get(&cursor)
-                    .and_then(|heritage| heritage.extends)
-                else {
-                    break;
-                };
+            while let Some(parent) = self
+                .struct_heritage
+                .get(&cursor)
+                .and_then(|heritage| heritage.extends)
+            {
                 if parent == *def_id || seen.contains(&parent) {
-                    self.error_issue(
-                        SemanticErrorKind::TypeMismatch,
-                        ISSUE_HERITAGE_CYCLE,
-                        *span,
-                    );
+                    self.error_issue(SemanticErrorKind::TypeMismatch, ISSUE_HERITAGE_CYCLE, *span);
                     // Cut the walk at the closing edge; the cycle members
                     // already carry the diagnostic.
                     if let Some(heritage) = self.struct_heritage.get_mut(&cursor) {
@@ -602,7 +594,9 @@ impl TypeChecker<'_> {
             let parent_method_spans = parent_info.method_spans.clone();
             let parent_bodyless = parent_info.bodyless_methods.clone();
             for (name, field) in parent_fields {
-                if info.fields.contains_key(&name) {
+                if let std::collections::hash_map::Entry::Vacant(e) = info.fields.entry(name) {
+                    e.insert(field);
+                } else {
                     // (a): no field shadowing under `sub` — the child's own
                     // declaration is the diagnostic site.
                     let span = info
@@ -614,27 +608,21 @@ impl TypeChecker<'_> {
                         SemanticError::structured(SemanticErrorKind::DefinitionDuplicate, span)
                             .with_arg("issue", ISSUE_FIELD_REDECLARATION),
                     );
-                } else {
-                    info.fields.insert(name, field);
                 }
             }
             for (name, sig) in parent_methods {
                 if let Some(own_sig) = info.methods.get(&name).cloned() {
                     if !self.override_compatible(&own_sig, &sig) {
-                        let span = info
-                            .method_spans
-                            .get(&name)
-                            .copied()
-                            .unwrap_or_default();
+                        let span = info.method_spans.get(&name).copied().unwrap_or_default();
                         diagnostics.push(
                             SemanticError::structured(SemanticErrorKind::TypeMismatch, span)
                                 .with_arg("issue", ISSUE_OVERRIDE_SIGNATURE_INCOMPATIBLE),
                         );
                     }
                 } else {
-                    info.method_spans
-                        .entry(name)
-                        .or_insert_with(|| parent_method_spans.get(&name).copied().unwrap_or_default());
+                    info.method_spans.entry(name).or_insert_with(|| {
+                        parent_method_spans.get(&name).copied().unwrap_or_default()
+                    });
                     info.methods.insert(name, sig);
                 }
             }
@@ -642,12 +630,12 @@ impl TypeChecker<'_> {
             // this genus provides bodies for.
             let mut bodyless = info.own_bodyless.clone();
             bodyless.extend(parent_bodyless.iter().copied());
-            for name in info.own_bodied.iter() {
+            for name in &info.own_bodied {
                 bodyless.remove(name);
             }
             info.bodyless_methods = bodyless;
         } else {
-            info.bodyless_methods = info.own_bodyless.clone();
+            info.bodyless_methods.clone_from(&info.own_bodyless);
         }
 
         self.structs.insert(def_id, info);

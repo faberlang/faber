@@ -6,8 +6,6 @@
 
 use std::collections::BTreeMap;
 
-use radix_target::Target;
-
 use crate::file_interface::{
     FileExport, FileExportKind, FileInterface, InterfaceCallable, InterfaceEnumVariant,
     InterfaceNominalExport, InterfaceNominalKind, InterfaceNominalType, InterfaceParam,
@@ -177,10 +175,10 @@ functio _numel_forma(lista<numerus> forma) → numerus ⇥ TensorError {
 
     let bindings = cape_binding_tys(&unit);
     let name_of = |def_id| {
-        unit.resolver
-            .get_symbol(def_id)
-            .map(|symbol| unit.interner.resolve(symbol.name).to_owned())
-            .unwrap_or_else(|| format!("{def_id:?}"))
+        unit.resolver.get_symbol(def_id).map_or_else(
+            || format!("{def_id:?}"),
+            |symbol| unit.interner.resolve(symbol.name).to_owned(),
+        )
     };
     let show = |ty| crate::format_faber_type(ty, &unit.types, &unit.interner, &name_of);
     assert_eq!(

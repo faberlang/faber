@@ -17,6 +17,7 @@ use crate::device_program_plans::{
 use crate::MirKernelWorkgroupCount;
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
+use std::fmt::Write as _;
 
 /// Revision of the canonical graph recognition rules.
 pub const PLAN_COMPILER_REVISION: u32 = 1;
@@ -34,6 +35,9 @@ pub struct TensorShape {
 
 impl TensorShape {
     /// Construct a shape, rejecting empty or zero axes.
+    ///
+    /// # Errors
+    /// Returns a `GraphError` when `dims` is empty or contains a zero axis.
     pub fn new(dims: impl Into<Vec<u64>>) -> Result<Self, GraphError> {
         let dims = dims.into();
         if dims.is_empty() || dims.contains(&0) {
@@ -110,7 +114,7 @@ impl AttentionFacts {
     }
 }
 
-/// MoE expert-routing facts required for router and grouped-expert
+/// `MoE` expert-routing facts required for router and grouped-expert
 /// selections (PM3 `RouterPolicy` semantics carried as graph facts).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct MoEFacts {
@@ -237,23 +241,23 @@ pub enum TypedOp {
     RmsNorm,
     /// Residual addition.
     ResidualAdd,
-    /// SwiGLU gate projection or activation stage.
+    /// `SwiGLU` gate projection or activation stage.
     SwiGluGate,
-    /// SwiGLU up projection.
+    /// `SwiGLU` up projection.
     SwiGluUp,
-    /// SwiGLU activation.
+    /// `SwiGLU` activation.
     SwiGluActivation,
-    /// SwiGLU gate/up product.
+    /// `SwiGLU` gate/up product.
     SwiGluMul,
     /// Router logits projection (one logit per declared expert).
     RouterProjection,
     /// Deterministic top-k + softmax router selection (device router body).
     RouterTopK,
-    /// Grouped-expert SwiGLU gate projection.
+    /// Grouped-expert `SwiGLU` gate projection.
     ExpertGate,
-    /// Grouped-expert SwiGLU up projection.
+    /// Grouped-expert `SwiGLU` up projection.
     ExpertUp,
-    /// Grouped-expert SwiGLU activation.
+    /// Grouped-expert `SwiGLU` activation.
     ExpertActivation,
     /// Grouped-expert gate/up product.
     ExpertMul,
@@ -280,7 +284,7 @@ pub struct TypedOpNode {
     pub inputs: Vec<GraphNodeId>,
     /// Attention facts when this node belongs to an attention subgraph.
     pub attention: Option<AttentionFacts>,
-    /// MoE facts when this node belongs to a routed expert subgraph.
+    /// `MoE` facts when this node belongs to a routed expert subgraph.
     pub moe: Option<MoEFacts>,
     /// SSM state facts when this node is a conv/scan state operation.
     pub ssm: Option<SsmFacts>,
@@ -297,6 +301,9 @@ impl TypedModelGraph {
     /// Validate and construct a graph.  Node order is part of the canonical
     /// identity; callers must supply topological order, not declaration order
     /// recovered from emitted names.
+    ///
+    /// # Errors
+    /// Returns a `GraphError` when validation rejects the node list.
     pub fn new(nodes: Vec<TypedOpNode>) -> Result<Self, GraphError> {
         let graph = Self { nodes };
         graph.validate()?;
@@ -304,6 +311,9 @@ impl TypedModelGraph {
     }
 
     /// Validate ids, shapes, edge order, and attention facts.
+    ///
+    /// # Errors
+    /// Returns a `GraphError` when a node id, shape, edge order, or attention fact is invalid.
     pub fn validate(&self) -> Result<(), GraphError> {
         let mut positions = BTreeMap::new();
         for (position, node) in self.nodes.iter().enumerate() {
@@ -359,7 +369,7 @@ pub enum LibraryOperation {
     QkvProjection,
     /// Residual add followed by RMS normalization.
     ResidualRmsNorm,
-    /// SwiGLU gate/up/activation/product chain.
+    /// `SwiGLU` gate/up/activation/product chain.
     SwiGlu,
     /// Router GEMV + deterministic top-k/softmax selection feeding the
     /// grouped-dispatch ids/weights buffers (device-side router body).
@@ -510,8 +520,10 @@ impl CompiledDevicePlan {
                 })
                 .collect::<Vec<_>>()
                 .join(", ");
-            text.push_str(&format!(
-                "| {} | {} | {} | {} | {} |\n",
+            // `let _` drops the infallible fmt::Write result for String.
+            let _ = writeln!(
+                text,
+                "| {} | {} | {} | {} | {} |",
                 layer.layer,
                 layer.before_kernel_count,
                 layer.after_kernel_count,
@@ -525,7 +537,7 @@ impl CompiledDevicePlan {
                 } else {
                     &source_nodes
                 },
-            ));
+            );
         }
         text
     }
@@ -551,7 +563,7 @@ pub enum GraphError {
     InvalidShape { dims: Vec<u64> },
     /// Attention facts are incomplete or inconsistent.
     InvalidAttentionFacts(GraphNodeId),
-    /// MoE expert-routing facts are incomplete or inconsistent.
+    /// `MoE` expert-routing facts are incomplete or inconsistent.
     InvalidMoeFacts(GraphNodeId),
     /// SSM state-operation facts are incomplete or inconsistent.
     InvalidSsmFacts(GraphNodeId),
@@ -604,9 +616,12 @@ pub struct PlanCompiler;
 
 impl PlanCompiler {
     /// Compile a canonical graph to a deterministic schedule.
+    ///
+    /// # Errors
+    /// Returns a `GraphError` when graph validation or candidate admission fails.
     pub fn compile(&self, graph: &TypedModelGraph) -> Result<CompiledDevicePlan, GraphError> {
         graph.validate()?;
-        let candidates = self.find_candidates(graph)?;
+        let candidates = Self::find_candidates(graph)?;
         let mut claimed = BTreeSet::new();
         for candidate in &candidates {
             for node in &candidate.source_nodes {
@@ -665,7 +680,7 @@ impl PlanCompiler {
             for source in &candidate.source_nodes {
                 node_to_schedule.insert(*source, index);
             }
-            let bind = self.bind_for_candidate(graph, candidate)?;
+            let bind = Self::bind_for_candidate(graph, candidate)?;
             let attention_facts = candidate
                 .source_nodes
                 .iter()
@@ -679,7 +694,7 @@ impl PlanCompiler {
                 .iter()
                 .find_map(|id| graph.node(*id).and_then(|node| node.ssm));
             let seq_extent = Self::projection_step_rows(graph, candidate, attention_facts);
-            selections.push(self.selection_for_candidate(
+            selections.push(Self::selection_for_candidate(
                 candidate,
                 index,
                 bind,
@@ -740,20 +755,20 @@ impl PlanCompiler {
         })
     }
 
-    fn find_candidates(&self, graph: &TypedModelGraph) -> Result<Vec<Candidate>, GraphError> {
+    fn find_candidates(graph: &TypedModelGraph) -> Result<Vec<Candidate>, GraphError> {
         let mut candidates = Vec::new();
-        candidates.extend(self.find_qkv(graph));
-        candidates.extend(self.find_attention(graph)?);
-        candidates.extend(self.find_residual_rms(graph));
-        candidates.extend(self.find_swiglu(graph));
-        candidates.extend(self.find_moe_router(graph)?);
-        candidates.extend(self.find_grouped_experts(graph)?);
-        candidates.extend(self.find_ssm(graph)?);
+        candidates.extend(Self::find_qkv(graph));
+        candidates.extend(Self::find_attention(graph)?);
+        candidates.extend(Self::find_residual_rms(graph));
+        candidates.extend(Self::find_swiglu(graph));
+        candidates.extend(Self::find_moe_router(graph)?);
+        candidates.extend(Self::find_grouped_experts(graph)?);
+        candidates.extend(Self::find_ssm(graph)?);
         candidates.sort_by_key(|candidate| candidate.source_nodes[0]);
         Ok(candidates)
     }
 
-    fn find_qkv(&self, graph: &TypedModelGraph) -> Vec<Candidate> {
+    fn find_qkv(graph: &TypedModelGraph) -> Vec<Candidate> {
         let mut candidates = Vec::new();
         let mut seen_layers = BTreeSet::new();
         for q in graph
@@ -798,7 +813,7 @@ impl PlanCompiler {
         candidates
     }
 
-    fn find_attention(&self, graph: &TypedModelGraph) -> Result<Vec<Candidate>, GraphError> {
+    fn find_attention(graph: &TypedModelGraph) -> Result<Vec<Candidate>, GraphError> {
         let mut candidates = Vec::new();
         for context in graph
             .nodes
@@ -916,7 +931,7 @@ impl PlanCompiler {
         Ok(candidates)
     }
 
-    fn find_residual_rms(&self, graph: &TypedModelGraph) -> Vec<Candidate> {
+    fn find_residual_rms(graph: &TypedModelGraph) -> Vec<Candidate> {
         let mut candidates = Vec::new();
         for rms in graph
             .nodes
@@ -944,7 +959,7 @@ impl PlanCompiler {
         candidates
     }
 
-    fn find_swiglu(&self, graph: &TypedModelGraph) -> Vec<Candidate> {
+    fn find_swiglu(graph: &TypedModelGraph) -> Vec<Candidate> {
         let mut candidates = Vec::new();
         for mul in graph
             .nodes
@@ -989,12 +1004,12 @@ impl PlanCompiler {
         candidates
     }
 
-    /// Recognize the MoE router chain (logits projection + deterministic
+    /// Recognize the `MoE` router chain (logits projection + deterministic
     /// top-k/softmax) and lower it to one device router body row.  Fail
     /// closed on an undeclared or inconsistent expert policy (PM3
     /// `RouterPolicy` semantics): a routed layer without a declared policy
     /// is a typed rejection, never a guessed selection.
-    fn find_moe_router(&self, graph: &TypedModelGraph) -> Result<Vec<Candidate>, GraphError> {
+    fn find_moe_router(graph: &TypedModelGraph) -> Result<Vec<Candidate>, GraphError> {
         let mut candidates = Vec::new();
         for topk in graph
             .nodes
@@ -1045,9 +1060,9 @@ impl PlanCompiler {
         Ok(candidates)
     }
 
-    /// Recognize the grouped-expert SwiGLU chain and lower it to one
+    /// Recognize the grouped-expert `SwiGLU` chain and lower it to one
     /// packed grouped-expert row reading the router's device ids/weights.
-    fn find_grouped_experts(&self, graph: &TypedModelGraph) -> Result<Vec<Candidate>, GraphError> {
+    fn find_grouped_experts(graph: &TypedModelGraph) -> Result<Vec<Candidate>, GraphError> {
         let mut candidates = Vec::new();
         for mul in graph
             .nodes
@@ -1120,7 +1135,7 @@ impl PlanCompiler {
     /// shape.  The bodies currently serve only F32 state storage, so every
     /// other closed layout is a deliberate typed miss rather than a guessed
     /// conversion or a fallback to a dense kernel.
-    fn find_ssm(&self, graph: &TypedModelGraph) -> Result<Vec<Candidate>, GraphError> {
+    fn find_ssm(graph: &TypedModelGraph) -> Result<Vec<Candidate>, GraphError> {
         let mut candidates = Vec::new();
         for node in graph
             .nodes
@@ -1222,7 +1237,6 @@ impl PlanCompiler {
     }
 
     fn bind_for_candidate(
-        &self,
         graph: &TypedModelGraph,
         candidate: &Candidate,
     ) -> Result<BindDescriptor, GraphError> {
@@ -1331,7 +1345,6 @@ impl PlanCompiler {
 
     #[allow(clippy::too_many_arguments)]
     fn selection_for_candidate(
-        &self,
         candidate: &Candidate,
         index: usize,
         bind: BindDescriptor,
@@ -1362,7 +1375,7 @@ impl PlanCompiler {
                     name: name.to_owned(),
                     binding: Binding {
                         group: 0,
-                        binding: binding as u32,
+                        binding: u32::try_from(binding).unwrap_or(u32::MAX),
                     },
                     dims,
                     strides: strides.clone(),
@@ -1378,7 +1391,7 @@ impl PlanCompiler {
             for (binding, name) in logical_signature.inputs.iter().enumerate() {
                 let binding = Binding {
                     group: 0,
-                    binding: binding as u32,
+                    binding: u32::try_from(binding).unwrap_or(u32::MAX),
                 };
                 let (dims, strides) =
                     if operation == LibraryOperation::SsmConv1d && name == "kernel" {
@@ -1407,7 +1420,8 @@ impl PlanCompiler {
             for (offset, name) in logical_signature.outputs.iter().enumerate() {
                 let binding = Binding {
                     group: 0,
-                    binding: (logical_signature.inputs.len() + offset) as u32,
+                    binding: u32::try_from(logical_signature.inputs.len() + offset)
+                        .unwrap_or(u32::MAX),
                 };
                 binds.push(LibraryBind {
                     name: name.clone(),
@@ -1539,7 +1553,7 @@ impl PlanCompiler {
     }
 }
 
-/// Compile an existing DeviceProgram's ordinary kernels into the additive
+/// Compile an existing `DeviceProgram`'s ordinary kernels into the additive
 /// executor section.  This is intentionally conservative: it never invents a
 /// fusion from an entry name, and leaves that program's existing selections to
 /// [`crate::executor_plan_extension`].

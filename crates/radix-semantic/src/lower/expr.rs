@@ -315,8 +315,7 @@ impl Lowerer<'_> {
         if let Some(canonical) = twin {
             let surface = self
                 .locale_pack
-                .map(|pack| pack.intrinsic_surface(canonical))
-                .unwrap_or(canonical);
+                .map_or(canonical, |pack| pack.intrinsic_surface(canonical));
             let name = self.interner.intern(surface);
             return HirExpressionKind::MethodCall(
                 Box::new(lhs),
@@ -1189,8 +1188,14 @@ impl Lowerer<'_> {
         };
         self.pop_scope();
 
-        let ret = closure.ret.as_ref().map(|ret| self.lower_signature_type(ret));
-        let err = closure.err.as_ref().map(|err| self.lower_signature_type(err));
+        let ret = closure
+            .ret
+            .as_ref()
+            .map(|ret| self.lower_signature_type(ret));
+        let err = closure
+            .err
+            .as_ref()
+            .map(|err| self.lower_signature_type(err));
         HirExpressionKind::Clausura(params, ret, err, Box::new(body), closure.libera)
     }
 
@@ -1513,7 +1518,10 @@ fn lower_conversio_target_type(
                 lowerer.error("generic_size_argument_in_type_position");
                 return lowerer.types.intern(crate::Type::Error);
             };
-            let width_params = type_params.first().map(std::slice::from_ref).unwrap_or(&[]);
+            let width_params: &[radix_syntax::TypeExpr] = match type_params.first() {
+                Some(first) => std::slice::from_ref(first),
+                None => &[],
+            };
             let mut messages = Vec::new();
             let ty_id = crate::numeric_width::lower_sized_primitive(
                 prim,

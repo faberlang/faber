@@ -1,6 +1,5 @@
 //! Explicit type arguments at function and method call sites.
 
-use crate::test_support;
 use radix_diagnostics::DiagnosticArg;
 
 fn compile(source: &str) -> crate::test_support::AnalyzedFixture {
@@ -240,7 +239,7 @@ incipit {
 #[test]
 fn constrained_generic_call_hole_rejects_after_solve() {
     rejects_with_args(
-        r#"@ radix typus T in textus lista<textus> octeti
+        r"@ radix typus T in textus lista<textus> octeti
 functio load<T>(T value) → T {
     redde value
 }
@@ -248,7 +247,7 @@ functio load<T>(T value) → T {
 incipit {
     fixum numerus n ← load<_>(1)
     nota n
-}"#,
+}",
         &[
             DiagnosticArg::new("issue", "generic_type_arg_domain"),
             DiagnosticArg::new("rejected", "numerus"),
@@ -331,7 +330,7 @@ incipit {
 #[test]
 fn generic_applied_arg_accepts_local_size_alias() {
     accepts(
-        r#"typus Box<magnitudo N> = vector<f32, N>
+        r"typus Box<magnitudo N> = vector<f32, N>
 functio keep<magnitudo N>(Box<N> value) → Box<N> {
     redde value
 }
@@ -339,31 +338,31 @@ functio concrete(Box<3> value) → Box<3> {
     redde value
 }
 
-incipit { tacet }"#,
+incipit { tacet }",
     );
 }
 
 #[test]
 fn generic_applied_arg_accepts_ordered_type_and_size_args() {
     accepts(
-        r#"typus Box<T, magnitudo N> = vector<T, N>
+        r"typus Box<T, magnitudo N> = vector<T, N>
 functio concrete(Box<fractus, 3> value) → Box<fractus, 3> {
     redde value
 }
 
-incipit { tacet }"#,
+incipit { tacet }",
     );
 }
 
 #[test]
 fn generic_applied_arg_rejects_kind_swap() {
     rejects_with_issue(
-        r#"typus Box<magnitudo N> = vector<f32, N>
+        r"typus Box<magnitudo N> = vector<f32, N>
 functio wrong(Box<textus> value) → Box<textus> {
     redde value
 }
 
-incipit { tacet }"#,
+incipit { tacet }",
         "generic_argument_kind_mismatch",
     );
 }
@@ -371,12 +370,12 @@ incipit { tacet }"#,
 #[test]
 fn generic_applied_arg_rejects_wrong_arity() {
     rejects_with_issue(
-        r#"typus Box<magnitudo N> = vector<f32, N>
+        r"typus Box<magnitudo N> = vector<f32, N>
 functio wrong(Box<3, 4> value) → Box<3, 4> {
     redde value
 }
 
-incipit { tacet }"#,
+incipit { tacet }",
         "generic_argument_arity_mismatch",
     );
 }

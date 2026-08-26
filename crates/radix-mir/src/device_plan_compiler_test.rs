@@ -349,7 +349,7 @@ fn moe_facts() -> MoEFacts {
 }
 
 /// moe-probe exemplar class: a routed FFN block (router logits + top-k
-/// selection feeding grouped expert SwiGLU execution).
+/// selection feeding grouped expert `SwiGLU` execution).
 fn moe_nodes(facts: MoEFacts) -> Vec<TypedOpNode> {
     let mut nodes = vec![node(
         0,

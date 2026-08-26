@@ -740,7 +740,7 @@ pub struct WireBatchedAttentionPlan {
     pub hidden: u64,
     /// Packed projection layout, when present.
     pub layout: Option<WirePackedStorageLayout>,
-    /// Explicit NeoX rotate-half projection mode.
+    /// Explicit `NeoX` rotate-half projection mode.
     pub rotate_half: bool,
     /// Row-major output strides.
     pub output_strides: [u64; 4],
@@ -918,11 +918,11 @@ pub enum WireOobPaddingPolicy {
 pub enum WireReduceOp {
     Sum,
     Mean,
-    /// Maximum fold over the tensor elements (the TensorMax twin; the
+    /// Maximum fold over the tensor elements (the `TensorMax` twin; the
     /// Metal tree-reduction emitter carries it — axis-reduction stays
     /// Sum-only under the CB-W8 allow-list).
     Max,
-    /// Minimum fold over the tensor elements (the TensorMin twin).
+    /// Minimum fold over the tensor elements (the `TensorMin` twin).
     Min,
 }
 
@@ -1089,7 +1089,7 @@ impl WireKvCacheCapacityPolicy {
     }
 }
 
-/// RoPE pairing convention carried by the semantic contract.
+/// `RoPE` pairing convention carried by the semantic contract.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum WireKvCacheRopePairing {
@@ -1114,7 +1114,7 @@ impl WireKvCacheRopePairing {
 ///
 /// This is deliberately only the model/cache meaning shared by Gradus and
 /// Radix. It carries distinct K/V dtype facts, dimensions, layout and
-/// attention choices, fixed-capacity semantics, and typed RoPE facts. It does
+/// attention choices, fixed-capacity semantics, and typed `RoPE` facts. It does
 /// **not** carry a runtime cursor, buffer identity, allocation or view, or
 /// backend binding; those facts belong to KV-B's executor-plan surface.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -1142,15 +1142,15 @@ pub struct WireKvCacheSemanticV2 {
     pub context_capacity: u32,
     /// Capacity policy for the logical cache.
     pub capacity_policy: WireKvCacheCapacityPolicy,
-    /// Number of dimensions rotated by RoPE.
+    /// Number of dimensions rotated by `RoPE`.
     pub rope_dimension: u32,
-    /// RoPE frequency base (theta).
+    /// `RoPE` frequency base (theta).
     pub rope_frequency_base: f32,
-    /// RoPE position/frequency scale multiplier.
+    /// `RoPE` position/frequency scale multiplier.
     pub rope_frequency_scale: f32,
-    /// Typed RoPE pairing convention.
+    /// Typed `RoPE` pairing convention.
     pub rope_pairing: WireKvCacheRopePairing,
-    /// The semantic rule that cached K is stored after RoPE.
+    /// The semantic rule that cached K is stored after `RoPE`.
     pub k_stored_post_rope: bool,
 }
 

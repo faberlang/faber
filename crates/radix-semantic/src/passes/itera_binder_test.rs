@@ -6,13 +6,13 @@ use radix_hir::{HirBlock, HirExpression, HirExpressionKind, HirItemKind, HirStat
 #[test]
 fn rejects_de_var_reproduction_at_binding_site() {
     test_support::assert_rejects_with_issue(
-        r#"
+        r"
 functio bad(lista<numerus> ys) → vacuum {
     itera de ys varia y {
         y ← y + 5
     }
 }
-"#,
+",
         "itera_de_requires_fixum",
     );
 }
@@ -20,7 +20,7 @@ functio bad(lista<numerus> ys) → vacuum {
 #[test]
 fn accepts_de_const_bindings_for_array_index_and_map_key() {
     test_support::analyze_ok(
-        r#"
+        r"
 functio arrays(lista<numerus> ys) → vacuum {
     itera de ys fixum index {
         nota index
@@ -32,20 +32,20 @@ functio maps(tabula<textus, numerus> values) → vacuum {
         nota key
     }
 }
-"#,
+",
     );
 }
 
 #[test]
 fn accepts_ex_var_element_binding() {
     test_support::analyze_ok(
-        r#"
+        r"
 functio values(lista<numerus> ys) → vacuum {
     itera ex ys varia value {
         value ← value + 5
     }
 }
-"#,
+",
     );
 }
 

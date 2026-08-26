@@ -32,12 +32,12 @@ fn last_offset(source: &str, needle: &str) -> u32 {
 
 #[test]
 fn rejects_libera_closure_capturing_an_enclosing_local() {
-    let source = r#"
+    let source = r"
 incipit {
     fixum numerus seed ← 2
     fixum _ closure ← (numerus value) libera ∴ value + seed
 }
-"#;
+";
     let result = analyze_source(source);
     let error = find_capture_error(&result.diagnostics)
         .unwrap_or_else(|| panic!("expected libera_capture, got: {:?}", result.diagnostics));
@@ -54,12 +54,12 @@ incipit {
 #[test]
 fn rejects_libera_closure_capturing_an_enclosing_parameter() {
     let result = analyze_source(
-        r#"
+        r"
 functio take(numerus seed) → vacuum {
     fixum _ closure ← (numerus value) libera ∴ value + seed
     tacet
 }
-"#,
+",
     );
     let error = find_capture_error(&result.diagnostics)
         .unwrap_or_else(|| panic!("expected libera_capture, got: {:?}", result.diagnostics));
@@ -69,14 +69,14 @@ functio take(numerus seed) → vacuum {
 #[test]
 fn accepts_libera_closure_reference_to_module_level_function() {
     let result = analyze_source(
-        r#"
+        r"
 functio module_value() → numerus {
     redde 1
 }
 incipit {
     fixum _ closure ← (numerus value) libera ∴ value + module_value()
 }
-"#,
+",
     );
     assert!(
         result.is_ok(),
@@ -88,12 +88,12 @@ incipit {
 #[test]
 fn accepts_libera_closure_reference_to_enum_variant() {
     let result = analyze_source(
-        r#"
+        r"
 discretio Colorum { Rubrum }
 incipit {
     fixum _ closure ← (numerus value) libera ∴ Colorum.Rubrum
 }
-"#,
+",
     );
     assert!(
         result.is_ok(),
@@ -105,12 +105,12 @@ incipit {
 #[test]
 fn unmarked_capturing_closure_is_unchanged() {
     let result = analyze_source(
-        r#"
+        r"
 incipit {
     fixum numerus seed ← 2
     fixum _ closure ← (numerus value) ∴ value + seed
 }
-"#,
+",
     );
     assert!(
         result.is_ok(),
@@ -130,14 +130,14 @@ incipit {
 #[test]
 fn accepts_libera_closure_with_body_local_binding() {
     let result = analyze_source(
-        r#"
+        r"
 incipit {
     fixum _ closure ← clausura numerus value libera → numerus {
         fixum numerus doubled ← value * 2
         redde doubled
     }
 }
-"#,
+",
     );
     assert!(
         result.is_ok(),
@@ -149,12 +149,12 @@ incipit {
 #[test]
 fn rejects_libera_closure_transitively_capturing_through_nested_closure() {
     let result = analyze_source(
-        r#"
+        r"
 incipit {
     fixum numerus seed ← 2
     fixum _ closure ← (numerus value) libera ∴ (numerus inner) ∴ inner + seed
 }
-"#,
+",
     );
     let error = find_capture_error(&result.diagnostics)
         .unwrap_or_else(|| panic!("expected libera_capture, got: {:?}", result.diagnostics));
@@ -164,11 +164,11 @@ incipit {
 #[test]
 fn accepts_libera_closure_whose_nested_closure_captures_only_its_params() {
     let result = analyze_source(
-        r#"
+        r"
 incipit {
     fixum _ closure ← (numerus value) libera ∴ (numerus inner) ∴ inner + value
 }
-"#,
+",
     );
     assert!(
         result.is_ok(),

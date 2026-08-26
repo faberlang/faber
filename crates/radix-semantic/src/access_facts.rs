@@ -522,7 +522,7 @@ impl<'a> DeadSourceAnalyzer<'a> {
         then_body(self);
         let then_states = self.states.clone();
         let then_used = self.used.clone();
-        self.states = baseline_states.clone();
+        self.states.clone_from(&baseline_states);
         self.bindings = baseline_bindings.clone();
         self.used = baseline_used.clone();
         else_body(self);

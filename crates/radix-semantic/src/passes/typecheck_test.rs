@@ -1475,7 +1475,7 @@ fn structured_cape_consumes_local_iace_without_function_alternate_exit() {
 
 #[test]
 fn gpu_builtin_call_rejects_non_device_function() {
-    let session = ();
+    let _session = ();
     let result = crate::test_support::analyze_source(
         r"functio host() → u32 { redde global_invocation_x() }",
     );
@@ -1494,7 +1494,7 @@ fn gpu_builtin_call_rejects_non_device_function() {
 
 #[test]
 fn gpu_builtin_call_typechecks_inside_device_function() {
-    let session = ();
+    let _session = ();
     let result = crate::test_support::analyze_source(
         r"
 @ nucleum fragment
@@ -2066,12 +2066,12 @@ fn distinct_error_placeholders_each_report_once() {
 
 #[test]
 fn rejects_libera_closure_that_captures_an_enclosing_local() {
-    let source = r#"
+    let source = r"
 incipit {
     fixum numerus seed ← 2
     fixum _ closure ← (numerus value) libera ∴ value + seed
 }
-"#;
+";
     let parsed = radix_parser::parse(radix_lexer::lex(source));
     assert!(
         parsed.success(),
@@ -2101,14 +2101,14 @@ incipit {
 
 #[test]
 fn accepts_libera_closure_reference_to_module_level_item() {
-    let source = r#"
+    let source = r"
 functio module_value() → numerus {
     redde 1
 }
 incipit {
     fixum _ closure ← (numerus value) libera ∴ value + module_value()
 }
-"#;
+";
     let parsed = radix_parser::parse(radix_lexer::lex(source));
     assert!(
         parsed.success(),
@@ -2126,12 +2126,12 @@ incipit {
 
 #[test]
 fn unmarked_capturing_closure_behavior_is_unchanged() {
-    let source = r#"
+    let source = r"
 incipit {
     fixum numerus seed ← 2
     fixum _ closure ← (numerus value) ∴ value + seed
 }
-"#;
+";
     let unit = analyze(source);
     assert!(
         unit.is_ok(),
@@ -2241,8 +2241,8 @@ incipit { output ⇇ "salve" ⇇ "mundus" }"#,
 #[test]
 fn transfer_byte_like_payload_typechecks() {
     let result = analyze(
-        r#"functio emitte(octeti corpus) → vacuum { tacet }
-incipit { emitte ⇇ |41| }"#,
+        r"functio emitte(octeti corpus) → vacuum { tacet }
+incipit { emitte ⇇ |41| }",
     );
     assert!(
         result.is_ok(),
@@ -2302,8 +2302,8 @@ incipit { copia ⇇ "salve" }"#,
 #[test]
 fn transfer_payload_type_mismatch_reports_named_issue() {
     let result = analyze(
-        r#"functio output(textus value) → vacuum { tacet }
-incipit { output ⇇ 5 }"#,
+        r"functio output(textus value) → vacuum { tacet }
+incipit { output ⇇ 5 }",
     );
     assert!(result.is_err());
     assert!(

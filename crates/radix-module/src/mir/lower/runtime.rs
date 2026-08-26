@@ -2367,12 +2367,7 @@ impl FunctionBuilder<'_> {
                     span,
                 );
                 self.switch_to(error_block);
-                self.assign(
-                    trap.destination,
-                    MirOperand::Temp(error_temp),
-                    err_ty,
-                    span,
-                );
+                self.assign(trap.destination, MirOperand::Temp(error_temp), err_ty, span);
                 self.terminate_current(MirTerminatorKind::Goto(trap.join_block), span);
                 self.switch_to(ok_block);
                 return Some(MirOperand::Constant(MirConstant::Unit));
@@ -2391,12 +2386,7 @@ impl FunctionBuilder<'_> {
                 span,
             );
             self.switch_to(error_block);
-            self.assign(
-                trap.destination,
-                MirOperand::Temp(error_temp),
-                err_ty,
-                span,
-            );
+            self.assign(trap.destination, MirOperand::Temp(error_temp), err_ty, span);
             self.terminate_current(MirTerminatorKind::Goto(trap.join_block), span);
             self.switch_to(ok_block);
             return Some(MirOperand::Temp(destination));

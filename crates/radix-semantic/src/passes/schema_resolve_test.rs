@@ -13,9 +13,7 @@
 
 use super::{resolve, Resolver, TypeTable};
 use crate::passes::collect;
-use crate::test_support;
 use crate::test_support::args_have_no_legacy_message;
-use crate::SemanticResult;
 use crate::{Primitive, SemanticErrorKind, SymbolKind, Type};
 use radix_lexer::lex;
 use radix_parser::parse;

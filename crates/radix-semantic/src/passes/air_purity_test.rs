@@ -441,11 +441,11 @@ fn base_lane_cumulata_is_registered_on_lista_only() {
     );
 
     let errors = analyze(
-        r#"
+        r"
 functio probe(lista<fractus> xs) → lista<fractus> {
     redde xs.cumulata((fractus a, fractus b) ∴ a + b, 0.0)
 }
-"#,
+",
     );
 
     assert!(
@@ -710,11 +710,10 @@ impl radix_hir::visit::HirVisitor for Ar2Facts {
                     self.handled_wrapping_block += 1;
                 }
             }
-            radix_hir::HirExpressionKind::Si { then_catch, .. } => {
-                if then_catch.is_some() {
+            radix_hir::HirExpressionKind::Si { then_catch, .. }
+                if then_catch.is_some() => {
                     self.si_then_catch += 1;
                 }
-            }
             _ => {}
         }
         radix_hir::visit::walk_expr(self, expr);
@@ -784,7 +783,7 @@ fn ar2_si_per_arm_cape_lowers_to_then_catch_carrier() {
     // Per-arm attachment: `cape` on a `si` then-arm rides `Si.then_catch`,
     // not a wrapping `Handled`.
     let facts = ar2_facts(
-        r#"
+        r"
 functio f(bivalens bad) → numerus {
     si bad {
         redde 1
@@ -794,7 +793,7 @@ functio f(bivalens bad) → numerus {
         redde 2
     }
 }
-"#,
+",
     );
 
     assert_eq!(facts.si_then_catch, 1, "then-arm cape must ride then_catch");
@@ -844,7 +843,7 @@ fn ar2_dum_itera_cape_wrap_the_whole_loop_once() {
     // Per-loop attachment: exactly one trailing `Handled` wraps the whole
     // `dum`/`itera` expression; the loop itself carries no handler field.
     let facts = ar2_facts(
-        r#"
+        r"
 functio h(numerus n) → numerus {
     fixum numerus total ← 0
     dum n > 0 {
@@ -856,7 +855,7 @@ functio h(numerus n) → numerus {
     } cape err { redde 0 }
     redde total
 }
-"#,
+",
     );
 
     assert_eq!(facts.handled, 2, "one Handled per loop cape");

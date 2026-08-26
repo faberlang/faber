@@ -901,7 +901,8 @@ fn rejects_duplicate_iuncta_labels_at_the_duplicate_label() {
                     .any(|arg| arg.name == "issue" && arg.value == "duplicate_tuple_element_label")
         })
         .expect("duplicate label diagnostic");
-    let duplicate_label_start = source.rfind("gx").expect("duplicate label") as u32;
+    let duplicate_label_start =
+        u32::try_from(source.rfind("gx").expect("duplicate label")).expect("offset fits u32");
     assert_eq!(error.span.start, duplicate_label_start);
     assert_eq!(error.span.end, duplicate_label_start + 2);
 }
@@ -917,7 +918,7 @@ fn rejects_iuncta_label_spelling_on_call_site_type_arguments() {
     assert_eq!(error.kind, ParseErrorKind::ExpressionInvalid);
     assert_eq!(
         error.span.start,
-        source.find(':').expect("label colon") as u32
+        u32::try_from(source.find(':').expect("label colon")).expect("offset fits u32")
     );
 }
 
@@ -1121,7 +1122,8 @@ fn rejects_duplicate_ratio_labels_at_the_duplicate_label() {
                     .any(|arg| arg.name == "issue" && arg.value == "duplicate_tuple_element_label")
         })
         .expect("duplicate label diagnostic");
-    let duplicate_label_start = source.rfind("g").expect("duplicate label") as u32;
+    let duplicate_label_start =
+        u32::try_from(source.rfind('g').expect("duplicate label")).expect("offset fits u32");
     assert_eq!(error.span.start, duplicate_label_start);
     assert_eq!(error.span.end, duplicate_label_start + 1);
 }
@@ -1329,7 +1331,9 @@ fn parses_intersection_chain_and_flattens() {
     assert_eq!(members.len(), 3);
     for expected in ["A", "B", "C"] {
         assert!(
-            members.iter().any(|m| matches!(&m.kind, TypeExprKind::Named(n, _)
+            members
+                .iter()
+                .any(|m| matches!(&m.kind, TypeExprKind::Named(n, _)
                 if result.interner.resolve(n.name) == expected)),
             "missing member {expected}"
         );
@@ -1364,8 +1368,14 @@ fn implements_clause_accepts_cap_separator() {
         panic!("expected class");
     };
     assert_eq!(class.implements.len(), 2);
-    assert_eq!(result.interner.resolve(class.implements[0].name), "Readable");
-    assert_eq!(result.interner.resolve(class.implements[1].name), "Seekable");
+    assert_eq!(
+        result.interner.resolve(class.implements[0].name),
+        "Readable"
+    );
+    assert_eq!(
+        result.interner.resolve(class.implements[1].name),
+        "Seekable"
+    );
 }
 
 #[test]

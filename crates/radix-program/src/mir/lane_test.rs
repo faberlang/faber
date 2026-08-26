@@ -1194,4 +1194,3 @@ fn wrapper(int x) → int ⇥ GradusError {
     return nn.linear_carrier(x)
 }
 "#;
-

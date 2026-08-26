@@ -1,7 +1,6 @@
 //! Typecheck acceptance and rejection probes for scalar `textus`/`ascii` ordering (Seam B-lite).
 
 use radix_diagnostics::DiagnosticArg;
-use radix_target::Target;
 
 fn compile(source: &str) -> crate::test_support::AnalyzedFixture {
     crate::test_support::analyze_source(source)
@@ -229,33 +228,33 @@ fn bounded_ascii_one_literals_ge_typechecks() {
 #[test]
 fn ascii_one_params_relational_typechecks() {
     accepts(&compile(
-        r#"
+        r"
 functio after(ascii<1> left, ascii<1> right) → bivalens {
     redde left ≥ right
 }
-"#,
+",
     ));
 }
 
 #[test]
 fn bare_ascii_params_relational_typechecks() {
     accepts(&compile(
-        r#"
+        r"
 functio after(ascii left, ascii right) → bivalens {
     redde left ≥ right
 }
-"#,
+",
     ));
 }
 
 #[test]
 fn mixed_ascii_and_ascii_one_relational_typechecks() {
     accepts(&compile(
-        r#"
+        r"
 functio after(ascii left, ascii<1> right) → bivalens {
     redde left ≥ right
 }
-"#,
+",
     ));
 }
 

@@ -532,7 +532,7 @@ fn resolve_bounded_source(source: &str) -> (TypeTable, Result<(), Vec<crate::Sem
     let program = parsed.program.as_ref().expect("program");
     collect::collect(program, &mut resolver, &mut types).expect("collect");
     let resolved = resolve::resolve(program, &mut resolver, &parsed.interner, &mut types);
-    (types, resolved.map(|_| ()))
+    (types, resolved)
 }
 
 #[test]
@@ -2094,11 +2094,11 @@ incipit {
 #[test]
 fn unshadowed_lege_stays_the_builtin() {
     let result = compile_ok(
-        r#"
+        r"
 incipit {
   fixum _ input ← lege
 }
-"#,
+",
     );
     assert!(
         result.is_ok(),
@@ -2274,11 +2274,11 @@ incipit {
 #[test]
 fn resolve_does_not_record_shadowing_for_unbound_lege() {
     let (program, resolver, _) = resolve_ok(
-        r#"
+        r"
 incipit {
   fixum _ input ← lege
 }
-"#,
+",
     );
     let mut lege_nodes = Vec::new();
     walk_exprs(&program, &mut |expr| {
@@ -2319,12 +2319,12 @@ incipit {
 #[test]
 fn resolve_records_shadowing_for_vacua_in_call_position() {
     let (program, resolver, _) = resolve_ok(
-        r#"
+        r"
 functio vacua() → numerus { redde 1 }
 incipit {
   fixum _ x ← vacua()
 }
-"#,
+",
     );
     let mut vacua_callees = Vec::new();
     walk_exprs(&program, &mut |expr| {
@@ -2344,7 +2344,7 @@ incipit {
 #[test]
 fn resolve_binding_wins_in_every_marker_expression_position() {
     let (program, resolver, _) = resolve_ok(
-        r#"
+        r"
 incipit {
   fixum lista<numerus> vacua ← [1, 2, 3]
   nota vacua
@@ -2352,7 +2352,7 @@ incipit {
   nota vacua[0]
   nota vacua?.longitudo()
 }
-"#,
+",
     );
     let mut vacua_nodes = Vec::new();
     walk_exprs(&program, &mut |expr| {
@@ -2376,12 +2376,12 @@ incipit {
 #[test]
 fn initializer_self_reference_falls_back_to_marker_without_outer_binding() {
     let (program, resolver, _) = resolve_ok(
-        r#"
+        r"
 functio probe() → lista<numerus> {
   fixum lista<numerus> vacua ← vacua
   redde vacua
 }
-"#,
+",
     );
     let mut vacua_nodes = Vec::new();
     walk_exprs(&program, &mut |expr| {
@@ -2403,7 +2403,7 @@ functio probe() → lista<numerus> {
 #[test]
 fn initializer_self_reference_uses_live_outer_binding() {
     let (program, resolver, _) = resolve_ok(
-        r#"
+        r"
 functio probe() → lista<numerus> {
   fixum lista<numerus> vacua ← [1, 2, 3]
   {
@@ -2411,7 +2411,7 @@ functio probe() → lista<numerus> {
     redde vacua
   }
 }
-"#,
+",
     );
     let mut vacua_nodes = Vec::new();
     walk_exprs(&program, &mut |expr| {
@@ -2433,7 +2433,7 @@ functio probe() → lista<numerus> {
 #[test]
 fn marker_resolution_reverts_after_scope_exit() {
     let (program, resolver, _) = resolve_ok(
-        r#"
+        r"
 incipit {
   {
     fixum lista<numerus> vacua ← [1, 2, 3]
@@ -2441,7 +2441,7 @@ incipit {
   }
   nota vacua
 }
-"#,
+",
     );
     let mut vacua_nodes = Vec::new();
     walk_exprs(&program, &mut |expr| {
@@ -2467,13 +2467,13 @@ incipit {
 #[test]
 fn set_typed_marker_binding_is_a_list_argument_type_error() {
     test_support::assert_rejects_with_issue(
-        r#"
+        r"
 functio probe(lista<numerus> xs) { }
 incipit {
   fixum copia<numerus> vacua ← [1, 2] ↦ copia<numerus>
   probe(vacua)
 }
-"#,
+",
         "argument_type_mismatch",
     );
 }

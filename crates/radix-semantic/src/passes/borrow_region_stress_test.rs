@@ -17,7 +17,7 @@ fn assert_accepted(source: &str, label: &str) {
             diagnostic.kind == SemanticErrorKind::MutableBorrowConflict
                 && matches!(
                     issue(diagnostic),
-                    Some("write_while_borrowed") | Some("use_while_mutably_borrowed")
+                    Some("write_while_borrowed" | "use_while_mutably_borrowed")
                 )
         }),
         "{label} must be region-accepted; diagnostics: {:?}",
@@ -45,7 +45,7 @@ fn condition_borrow_stays_live_across_back_edge() {
     // order. This is the cyclic case where block-scope approximation and
     // true regions agree: the conflict must fire.
     assert_write_conflict(
-        r#"
+        r"
 incipit {
     varia lista<numerus> xs ← [1, 2, 3]
     varia in lista<numerus> view ← xs
@@ -53,7 +53,7 @@ incipit {
         xs.appende(4)
     }
 }
-"#,
+",
         "condition borrow live around the back edge",
     );
 }
@@ -64,7 +64,7 @@ fn condition_borrow_write_before_condition_use_conflicts() {
     // source order — the use follows the write inside the body. The region
     // is live at the write and SEM052 must fire.
     assert_write_conflict(
-        r#"
+        r"
 incipit {
     varia lista<numerus> xs ← [1, 2, 3]
     varia in lista<numerus> view ← xs
@@ -73,7 +73,7 @@ incipit {
         nota view.longitudo()
     }
 }
-"#,
+",
         "body write before the condition-established borrow's later use",
     );
 }
@@ -83,7 +83,7 @@ fn nested_loop_releases_inner_borrow_before_outer_write() {
     // Inner-loop borrow whose last use is inside the inner body; the outer
     // write runs after the inner loop exits, so the region is dead.
     assert_accepted(
-        r#"
+        r"
 incipit {
     varia lista<numerus> xs ← [1, 2, 3]
     varia numerus i ← 0
@@ -98,7 +98,7 @@ incipit {
         i ← i + 1
     }
 }
-"#,
+",
         "nested inner borrow released before outer write",
     );
 }
@@ -108,7 +108,7 @@ fn nested_loop_write_while_inner_borrow_live_conflicts() {
     // The outer write lands inside the inner loop before the borrow's last
     // use: the region is live at the write and SEM052 must fire.
     assert_write_conflict(
-        r#"
+        r"
 incipit {
     varia lista<numerus> xs ← [1, 2, 3]
     varia numerus i ← 0
@@ -123,7 +123,7 @@ incipit {
         i ← i + 1
     }
 }
-"#,
+",
         "outer write inside inner loop while borrow live",
     );
 }
@@ -133,7 +133,7 @@ fn perge_back_edge_does_not_resurrect_released_borrow() {
     // The `perge` continue edge returns to the header; the source write sits
     // before it but after the borrow's last use, so the region stays dead.
     assert_accepted(
-        r#"
+        r"
 incipit {
     varia lista<numerus> xs ← [1, 2, 3]
     varia numerus i ← 0
@@ -145,7 +145,7 @@ incipit {
         perge
     }
 }
-"#,
+",
         "perge back-edge after last use",
     );
 }
@@ -155,7 +155,7 @@ fn body_reestablish_after_release_is_not_a_self_conflict() {
     // The approximation rejected a borrow re-established later in the same
     // block against its own earlier shadow. Regions must accept it.
     assert_accepted(
-        r#"
+        r"
 incipit {
     varia lista<numerus> xs ← [1, 2, 3]
     varia in lista<numerus> first ← xs
@@ -164,7 +164,7 @@ incipit {
     nota second.longitudo()
     xs.appende(4)
 }
-"#,
+",
         "re-established borrow after earlier shadow release",
     );
 }
@@ -174,7 +174,7 @@ fn shared_condition_borrow_without_body_write_stays_clean() {
     // A shared (`de`) condition borrow with no body write: nothing conflicts,
     // and the loop still exits through the explicit `rumpe`.
     assert_accepted(
-        r#"
+        r"
 incipit {
     varia lista<numerus> xs ← [1, 2, 3]
     varia de lista<numerus> view ← xs
@@ -182,7 +182,7 @@ incipit {
         rumpe
     }
 }
-"#,
+",
         "shared condition borrow, no body write",
     );
 }
@@ -192,7 +192,7 @@ fn loop_body_borrow_live_at_later_write_conflicts() {
     // Straight-line divergence inside one loop body: the write precedes the
     // last use, so the region is live at the write.
     assert_write_conflict(
-        r#"
+        r"
 incipit {
     varia lista<numerus> xs ← [1, 2, 3]
     dum xs.longitudo() < 8 {
@@ -201,7 +201,7 @@ incipit {
         nota view.longitudo()
     }
 }
-"#,
+",
         "loop-body write before last use",
     );
 }

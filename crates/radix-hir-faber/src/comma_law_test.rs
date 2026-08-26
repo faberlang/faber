@@ -161,7 +161,7 @@ fn span() -> Span {
 fn int(interner: &Interner, value: u64) -> HirExpression {
     let _ = interner;
     HirExpression {
-        id: radix_hir::HirId(value as u32),
+        id: radix_hir::HirId(u32::try_from(value).unwrap()),
         kind: HirExpressionKind::Literal(radix_hir::HirLiteral::Int(value)),
         ty: None,
         span: span(),
@@ -877,6 +877,7 @@ fn pattern_positions_pin_between_only_and_no_trailing() {
     ];
     codegen.write_pattern(
         &HirPattern::Variant(DefId(10), patterns.clone()),
+        &TypeTable::new(),
         &names,
         &interner,
         &TestSurface,
@@ -964,7 +965,7 @@ fn canonical_reemission_is_idempotent_for_the_cs1_fixture() {
 /// bracket literal parses back as an array and fails the second compile.
 #[test]
 fn tuple_without_type_args_derives_iuncta_prefix_from_expression_type() {
-    let mut interner = Interner::new();
+    let interner = Interner::new();
     let mut types = TypeTable::new();
     let numerus = types.primitive(Primitive::Numerus);
     let one_tuple = types.intern(Type::Tuple(vec![numerus]));

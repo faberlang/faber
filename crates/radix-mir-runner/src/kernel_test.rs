@@ -1,8 +1,8 @@
 //! Integration tests for MIR runner kernel dispatch.
 //!
 //! These tests prove that Processus, JSON, Solum, Aleator, and
-//! Consolum kernel modules execute correctly through dispatch_kernel
-//! against a BufferHost. They cover subprocess management, JSON
+//! Consolum kernel modules execute correctly through `dispatch_kernel`
+//! against a `BufferHost`. They cover subprocess management, JSON
 //! round-trips, filesystem operations, random number seeding, and
 //! console output.
 

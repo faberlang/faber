@@ -19,14 +19,16 @@ use crate::test_support::{parse_ok, parse_program};
 fn first_match_head_parses_into_a_dedicated_expression() {
     // Contract row: dedicated expression-valued first-match head over a
     // statically bounded source with an owned predicate tail.
-    parse_ok("functio t(tf32[4] a) → fractus ∪ nihil { redde primus_quem(a, ubi x { x > 0.0 }) }");
+    let _ = parse_ok(
+        "functio t(tf32[4] a) → fractus ∪ nihil { redde primus_quem(a, ubi x { x > 0.0 }) }",
+    );
 }
 
 #[test]
 fn first_match_head_supports_filum_bounded_sources() {
     // Contract row: bounded-source routes include per-axis (`apud [i]`)
     // filum forms, mirroring the `summa ex … apud …` shape.
-    parse_ok(
+    let _ = parse_ok(
         "functio t(tf32[2, 2] a) → fractus ∪ nihil { redde primus_quem(a apud [i], ubi x { x > 0.0 }) }",
     );
 }
@@ -42,7 +44,7 @@ fn first_match_head_without_parens_stays_an_ordinary_identifier() {
     // identifier — here a parameter name read as a value (SFR-1 `summa`
     // disambiguation precedent). Binding-target position keeps the
     // standing registry-keyword policy shared by every contextual word.
-    parse_ok("functio t(numerus primus_quem) → numerus { redde primus_quem }");
+    let _ = parse_ok("functio t(numerus primus_quem) → numerus { redde primus_quem }");
 }
 
 #[test]
@@ -64,7 +66,7 @@ fn primus_method_receiver_stays_ordinary() {
     // `primus` is the existing Lista intrinsic method (`registry.rs` Lista
     // row). The dedicated head must not capture or retire this ordinary
     // method spelling (SFR-1 `summa` disambiguation precedent).
-    parse_ok("functio t(tf32[4] a) → fractus ∪ nihil { redde a.primus() }");
+    let _ = parse_ok("functio t(tf32[4] a) → fractus ∪ nihil { redde a.primus() }");
 }
 
 #[test]
@@ -72,5 +74,5 @@ fn nullable_union_return_type_parses_today() {
     // The `T ∪ nihil` result shape is already grammar (EBNF: `T ∪ nihil` is
     // the canonical nullable form). Pinned so the admit drivers above are
     // attributable to the head spelling, not the result type.
-    parse_ok("functio t(numerus a) → numerus ∪ nihil { redde nihil }");
+    let _ = parse_ok("functio t(numerus a) → numerus ∪ nihil { redde nihil }");
 }

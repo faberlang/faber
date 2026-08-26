@@ -66,7 +66,7 @@ const SHAPE_RETURN_ERROR_DEVICE_TERMINATOR: &str = "return_error device terminat
 /// EXEC02-PC1: name the collection op that hit the wildcard runtime-call
 /// reject (e.g. `TensorBatchedAttention`). Non-collection intrinsics keep
 /// the bare shape — their stable diagnostics (e.g. the Scribe reject in
-/// radix-module device_test) already identify the statement.
+/// radix-module `device_test`) already identify the statement.
 fn runtime_call_op_name(intrinsic: &MirIntrinsic) -> String {
     match intrinsic {
         MirIntrinsic::Collection(op) => format!("{op:?}"),

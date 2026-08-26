@@ -415,8 +415,9 @@ impl TypeChecker<'_> {
             // locale mapping while every backend still receives `transpone`.
             let surface = self
                 .locale_pack
-                .map(|pack| pack.intrinsic_surface(super::tensor_index::TENSOR_TRANSPONE))
-                .unwrap_or(super::tensor_index::TENSOR_TRANSPONE);
+                .map_or(super::tensor_index::TENSOR_TRANSPONE, |pack| {
+                    pack.intrinsic_surface(super::tensor_index::TENSOR_TRANSPONE)
+                });
             if let Some(interner) = self.interner {
                 if let Some(index) = interner.strings().iter().position(|s| s == surface) {
                     #[allow(clippy::cast_possible_truncation)]
@@ -516,7 +517,7 @@ impl TypeChecker<'_> {
 
         let resolved_receiver_ty = self.resolve_inferred_type(receiver_ty);
         let (_, intrinsic_ty) = self.types.peel_access_marker(resolved_receiver_ty);
-        let resolved_receiver = self.types.get(intrinsic_ty);
+        let _resolved_receiver = self.types.get(intrinsic_ty);
         // S0-G2: applied aliases are value-transparent for intrinsic-method
         // dispatch — the receiver's builtin carrier owns the closed
         // tensor/vector/matrix method surface, including its unknown-method
@@ -1128,10 +1129,10 @@ impl TypeChecker<'_> {
             return format!("{:?}", self.types.get(ty));
         };
         format_faber_type(ty, self.types, interner, &|def_id| {
-            self.resolver
-                .get_symbol(def_id)
-                .map(|symbol| interner.resolve(symbol.name).to_owned())
-                .unwrap_or_else(|| format!("Def{}", def_id.0))
+            self.resolver.get_symbol(def_id).map_or_else(
+                || format!("Def{}", def_id.0),
+                |symbol| interner.resolve(symbol.name).to_owned(),
+            )
         })
     }
 
@@ -1184,9 +1185,7 @@ impl TypeChecker<'_> {
             return false;
         }
         lhs.params.iter().zip(rhs.params.iter()).all(|(l, r)| {
-            l.mode == r.mode
-                && l.optional == r.optional
-                && self.member_type_equals(l.ty, r.ty)
+            l.mode == r.mode && l.optional == r.optional && self.member_type_equals(l.ty, r.ty)
         })
     }
 
@@ -1208,7 +1207,11 @@ impl TypeChecker<'_> {
     /// or more nominal members. Guardrails 3 and 4 compute over the
     /// heritage-merged member views and stay confined to all-nominal unions
     /// — a mixed or primitive union has no honest declared-member view.
-    pub fn warn_union_annotation_guardrails(&mut self, annotation_ty: TypeId, span: radix_lexer::Span) {
+    pub fn warn_union_annotation_guardrails(
+        &mut self,
+        annotation_ty: TypeId,
+        span: radix_lexer::Span,
+    ) {
         let Some(members) = self.union_members_of(annotation_ty) else {
             return;
         };
@@ -1251,7 +1254,7 @@ impl TypeChecker<'_> {
                 .map(|member| self.lookup_method_signature(member, name))
                 .collect();
             let mut agree = true;
-            let first = signatures.iter().find_map(|sig| sig.clone());
+            let first = signatures.iter().find_map(std::clone::Clone::clone);
             let Some(first) = first else {
                 continue;
             };
@@ -1316,7 +1319,12 @@ impl TypeChecker<'_> {
             return names;
         }
         if let Some(enum_def) = self.enum_def_from_type(member) {
-            names.extend(self.resolver.commune_fields(enum_def).iter().map(|f| f.name));
+            names.extend(
+                self.resolver
+                    .commune_fields(enum_def)
+                    .iter()
+                    .map(|f| f.name),
+            );
         }
         names
     }

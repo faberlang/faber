@@ -93,7 +93,7 @@ fn divergence_corpus() -> Vec<(&'static str, &'static str)> {
     vec![
         (
             "dum back-edge release-before-write",
-            r#"
+            r"
 incipit {
     varia lista<numerus> xs ← [1, 2, 3]
     dum xs.longitudo() < 5 {
@@ -102,11 +102,11 @@ incipit {
         xs.appende(4)
     }
 }
-"#,
+",
         ),
         (
             "loop rumpe release-before-write",
-            r#"
+            r"
 incipit {
     varia lista<numerus> xs ← [1, 2, 3]
     fac {
@@ -116,11 +116,11 @@ incipit {
         rumpe
     } dum verum
 }
-"#,
+",
         ),
         (
             "condition borrow with body write",
-            r#"
+            r"
 incipit {
     varia lista<numerus> xs ← [1, 2, 3]
     varia in lista<numerus> view ← xs
@@ -128,11 +128,11 @@ incipit {
         xs.appende(4)
     }
 }
-"#,
+",
         ),
         (
             "nested inner borrow released before outer write",
-            r#"
+            r"
 incipit {
     varia lista<numerus> xs ← [1, 2, 3]
     varia numerus i ← 0
@@ -147,11 +147,11 @@ incipit {
         i ← i + 1
     }
 }
-"#,
+",
         ),
         (
             "perge back-edge after last use",
-            r#"
+            r"
 incipit {
     varia lista<numerus> xs ← [1, 2, 3]
     varia numerus i ← 0
@@ -163,11 +163,11 @@ incipit {
         perge
     }
 }
-"#,
+",
         ),
         (
             "re-established borrow after earlier shadow release",
-            r#"
+            r"
 incipit {
     varia lista<numerus> xs ← [1, 2, 3]
     varia in lista<numerus> first ← xs
@@ -176,11 +176,11 @@ incipit {
     nota second.longitudo()
     xs.appende(4)
 }
-"#,
+",
         ),
         (
             "live region keeps write_while_borrowed",
-            r#"
+            r"
 incipit {
     varia lista<numerus> xs ← [1, 2, 3]
     dum xs.longitudo() < 5 {
@@ -189,7 +189,7 @@ incipit {
         nota view.longitudo()
     }
 }
-"#,
+",
         ),
     ]
 }
@@ -229,7 +229,7 @@ fn exempla_corpus_preserves_parity() {
     let mut participated = 0usize;
     let mut doc_artifacts = 0usize;
     for path in &sources {
-        let Ok(raw) = std::fs::read_to_string(&path) else {
+        let Ok(raw) = std::fs::read_to_string(path) else {
             continue;
         };
         // Corpus entries are keyword-reference documents: TOML frontmatter

@@ -285,10 +285,7 @@ impl HirVisitorMut for LiftVisitor<'_> {
                                 span: combine.expr.span,
                             };
                             let closure = std::mem::replace(&mut combine.expr, placeholder);
-                            match self.lift_callback(closure) {
-                                Ok(path) => combine.expr = path,
-                                Err(()) => {}
-                            }
+                            if let Ok(path) = self.lift_callback(closure) { combine.expr = path }
                         }
                     }
                 }
@@ -363,10 +360,10 @@ impl HirVisitor for CaptureCollector<'_> {
     }
 }
 
-fn closure_signature<'a>(
+fn closure_signature(
     ty: Option<radix_types::TypeId>,
-    types: &'a TypeTable,
-) -> Option<&'a radix_types::FuncSig> {
+    types: &TypeTable,
+) -> Option<&radix_types::FuncSig> {
     let ty = ty?;
     match types.get(ty) {
         Type::Func(signature) => Some(signature),

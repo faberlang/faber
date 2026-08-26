@@ -254,11 +254,9 @@ impl<H: super::super::Host + ?Sized> Runner<'_, H> {
             Value::UInt(value) => decimal_integer_to_carrier(i128::from(value), target_width),
             Value::Float(value) => decimal_text_to_carrier(&value.to_string(), target_width),
             Value::Str(text) => decimal_text_to_carrier(&text, target_width),
-            Value::Sermo(sermo) => match materialize_sermo_value(sermo, span) {
-                Ok(value) => {
-                    return self.convert_to_decimal(value, source_ty, target_width, recovery, span)
-                }
-                Err(error) => return Err(error),
+            Value::Sermo(sermo) => {
+                let value = materialize_sermo_value(sermo, span)?;
+                return self.convert_to_decimal(value, source_ty, target_width, recovery, span)
             },
             other => {
                 return Err(RunnerError::internal(
@@ -293,17 +291,15 @@ impl<H: super::super::Host + ?Sized> Runner<'_, H> {
             Value::Int(value) => decimal_carrier_value(value, source_width, span),
             Value::Float(value) => decimal_text_to_carrier(&value.to_string(), source_width)
                 .map_err(|error| decimal_text_error(error, span)),
-            Value::Sermo(sermo) => match materialize_sermo_value(sermo, span) {
-                Ok(value) => {
-                    return self.convert_decimal_to_integer(
-                        value,
-                        source_width,
-                        target_width,
-                        recovery,
-                        span,
-                    )
-                }
-                Err(error) => return Err(error),
+            Value::Sermo(sermo) => {
+                let value = materialize_sermo_value(sermo, span)?;
+                return self.convert_decimal_to_integer(
+                    value,
+                    source_width,
+                    target_width,
+                    recovery,
+                    span,
+                )
             },
             other => Err(RunnerError::internal(
                 span,

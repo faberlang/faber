@@ -341,7 +341,7 @@ pub struct BatchedAttentionPlan {
     pub hidden: u64,
     /// Packed weight layout for projection operations; `None` otherwise.
     pub layout: Option<crate::abi::PackedStorageLayout>,
-    /// Explicit NeoX rotate-half projection mapping, when fused into Q/K.
+    /// Explicit `NeoX` rotate-half projection mapping, when fused into Q/K.
     pub rotate_half: bool,
     /// Row-major physical strides for the logical output view.
     pub output_strides: [u64; 4],

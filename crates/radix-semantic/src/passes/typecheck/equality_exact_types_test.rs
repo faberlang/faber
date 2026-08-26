@@ -1,7 +1,6 @@
 //! Typecheck probes for exact-type equality (`≡`, `≠`, `est`, `non est`).
 
 use crate::semantic_message;
-use crate::test_support;
 use crate::SemanticErrorKind;
 
 const EXACT_EQ_ISSUE: &str = "equality_exact_types_required";
@@ -244,7 +243,7 @@ functio same(de Euler value) → bivalens {
 #[test]
 fn non_view_field_read_keeps_exact_equality_rejection() {
     let result = compile(
-        r#"
+        r"
 genus Euler {
     textus order
 }
@@ -252,7 +251,7 @@ genus Euler {
 functio same(Euler value) → bivalens {
     redde value.order ≠ 'X'
 }
-"#,
+",
     );
     assert!(
         result.diagnostics.iter().any(|diag| {

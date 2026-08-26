@@ -281,7 +281,7 @@ impl Parser {
                 TokenKind::Ident(sym) => {
                     let identity = self
                         .keyword_claim_key(sym)
-                        .and_then(|latin| lookup_keyword_spec(latin))
+                        .and_then(lookup_keyword_spec)
                         .and_then(|spec| spec.token_kind.clone());
                     matches!(
                         identity,

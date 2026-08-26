@@ -82,11 +82,8 @@ pub fn receivers_for_type(ty: &Type) -> &'static [IntrinsicReceiver] {
 #[must_use]
 pub fn receivers_for_type_id(type_id: TypeId, types: &TypeTable) -> &'static [IntrinsicReceiver] {
     let mut payload_id = type_id;
-    loop {
-        match types.get(payload_id) {
-            Type::Alias(_, inner) | Type::Ref(_, inner) => payload_id = *inner,
-            _ => break,
-        }
+    while let Type::Alias(_, inner) | Type::Ref(_, inner) = types.get(payload_id) {
+        payload_id = *inner;
     }
     receivers_for_type(types.get(payload_id))
 }

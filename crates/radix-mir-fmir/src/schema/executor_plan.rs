@@ -416,7 +416,7 @@ fn wire_source(
     match source {
         radix_mir::device_program_plans::ExecutorPlanSource::Constant { ty, bits } => {
             WireExecutorPlanSource::Constant {
-                ty: format!("{:?}", ty),
+                ty: format!("{ty:?}"),
                 bits,
             }
         }

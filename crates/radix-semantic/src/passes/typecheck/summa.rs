@@ -43,8 +43,8 @@ pub(super) fn check_summa_expr(
     checker: &mut TypeChecker<'_>,
     source: &mut HirExpression,
     coordinates: &[(DefId, Symbol)],
-    filum: Option<&(DefId, Symbol)>,
-    binding: &(DefId, Symbol),
+    filum: Option<(DefId, Symbol)>,
+    binding: (DefId, Symbol),
     body: &mut HirBlock,
     span: Span,
 ) -> TypeId {
@@ -127,7 +127,7 @@ pub(super) fn check_summa_expr(
                 .iter()
                 .map(|d| u64::try_from(*d).unwrap_or(u64::MAX))
                 .product();
-            if k % SUMMA_LANE_WIDTH != 0 {
+            if !k.is_multiple_of(SUMMA_LANE_WIDTH) {
                 checker.error_issue(
                     SemanticErrorKind::TypeMismatch,
                     ISSUE_SUMMA_TAIL_NOT_ALIGNED,
@@ -168,8 +168,8 @@ fn is_numeric_scalar(types: &TypeTable, ty: TypeId) -> bool {
 fn check_summa_body(
     checker: &mut TypeChecker<'_>,
     coordinates: &[(DefId, Symbol)],
-    filum: Option<&(DefId, Symbol)>,
-    binding: &(DefId, Symbol),
+    filum: Option<(DefId, Symbol)>,
+    binding: (DefId, Symbol),
     body: &mut HirBlock,
     term_ty: TypeId,
 ) {
@@ -179,7 +179,7 @@ fn check_summa_body(
         checker.insert_binding(*def_id, numerus);
     }
     if let Some((def_id, _)) = filum {
-        checker.insert_binding(*def_id, numerus);
+        checker.insert_binding(def_id, numerus);
     }
     checker.insert_binding(binding.0, term_ty);
 
@@ -214,18 +214,17 @@ struct SummaBodyState {
 fn check_summa_body_laws(
     checker: &mut TypeChecker<'_>,
     coordinates: &[(DefId, Symbol)],
-    filum: Option<&(DefId, Symbol)>,
-    binding: &(DefId, Symbol),
+    filum: Option<(DefId, Symbol)>,
+    binding: (DefId, Symbol),
     body: &HirBlock,
 ) {
     let mut state = SummaBodyState {
-        own_ids: FxHashSet::from_iter(
-            coordinates
-                .iter()
-                .map(|(def_id, _)| *def_id)
-                .chain(filum.map(|(def_id, _)| *def_id))
-                .chain(std::iter::once(binding.0)),
-        ),
+        own_ids: coordinates
+            .iter()
+            .map(|(def_id, _)| *def_id)
+            .chain(filum.map(|(def_id, _)| def_id))
+            .chain(std::iter::once(binding.0))
+            .collect(),
         redde_count: 0,
         valued_redde: 0,
     };

@@ -950,6 +950,7 @@ pub struct LowerRequest<'a> {
 }
 
 /// Lower resolved AST to HIR.
+#[must_use]
 pub fn lower(request: LowerRequest<'_>) -> (LoweredProgram, Vec<LowerError>) {
     let LowerRequest {
         program,

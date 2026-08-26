@@ -4742,9 +4742,9 @@ main {
     assert!(output.code.contains("pub mod net"));
     assert!(output.code.contains("pub mod endpoint"));
     assert!(output.code.contains("pub struct Endpoint"));
-    assert!(output.code.contains(
-        "let endpoint: crate::net::endpoint::Endpoint = crate::net::endpoint::Endpoint"
-    ));
+    assert!(output
+        .code
+        .contains("let endpoint: crate::net::endpoint::Endpoint = crate::net::endpoint::Endpoint"));
 }
 
 #[test]

@@ -2,7 +2,7 @@
 //!
 //! Owns the wire/schema contract for the serialized analyzed-HIR artifact:
 //! portable schema types, the unit codec (`postcard` for unit artifacts, the
-//! named-field MessagePack codec for the live `.fhirpkg` package envelope
+//! named-field `MessagePack` codec for the live `.fhirpkg` package envelope
 //! since the FPF-5 switch), schema/version checks, and fail-closed
 //! referential-integrity validation.
 //!

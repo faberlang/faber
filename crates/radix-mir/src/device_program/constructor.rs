@@ -191,7 +191,7 @@ struct ProgramBuffer {
     consumed: bool,
     readwrite: bool,
     /// A trainable parameter of a `RepeatingStep` training program (S5-U5):
-    /// `PerProgram` persistent state with HostProvided init, updated in place
+    /// `PerProgram` persistent state with `HostProvided` init, updated in place
     /// at every step. The flag is the independent fact behind the lifetime
     /// and initialization axes — never derived from the access pattern.
     param: bool,
@@ -283,6 +283,10 @@ pub struct DeviceGradientLink {
 /// Returns a typed error when folding, ABI/plan/decomposition derivation,
 /// companion lookup, buffer identity construction, launch ordering, or the
 /// shared program-plus-semantics schema rejects the result.
+///
+/// # Panics
+/// Panics on internal `expect` failures that presuppose a validated MIR
+/// (selected function ids, registered resource buffers).
 pub fn build_device_program(
     validated: &ValidatedMir<'_>,
     interner: &Interner,
@@ -581,9 +585,7 @@ pub fn build_device_program(
     // The effective declared step count (S5-U5b): the admitted training-plan
     // count when the program is a RepeatingStep training program; otherwise
     // the caller's declared value.
-    let effective_steps = training
-        .map(|facts| facts.step_count)
-        .unwrap_or(declared_steps);
+    let effective_steps = training.map_or(declared_steps, |facts| facts.step_count);
     Ok((device_program, semantics, effective_steps))
 }
 
@@ -601,14 +603,14 @@ struct KernelBuilder<'a> {
     /// (step function, param local) → update output slot for the trainable
     /// params of the training loop.
     param_updates: BTreeMap<(MirFunctionId, MirLocalId), u32>,
-    /// (step function, param position) → (companion DefId, gradient slot)
+    /// (step function, param position) → (companion `DefId`, gradient slot)
     /// for the gradient-flow links.
     gradient_links: BTreeMap<(MirFunctionId, u32), (u32, u32)>,
     /// Every selected-input gradient slot of a device-resident companion.
     companion_gradient_slots: BTreeMap<u32, BTreeSet<u32>>,
     /// The companion gradient buffers minted so far, keyed by the producing
-    /// (companion DefId, full result-tuple slot) — consulted while the
-    /// train_step kernels are built (the backward → train_step edge).
+    /// (companion `DefId`, full result-tuple slot) — consulted while the
+    /// `train_step` kernels are built (the backward → `train_step` edge).
     gradient_buffers: BTreeMap<(u32, u32), BufferId>,
     buffers: Vec<ProgramBuffer>,
     next_buffer_id: u32,
@@ -1130,7 +1132,7 @@ fn tuple_return_locals(function: &MirFunction) -> Option<Vec<MirLocalId>> {
                 crate::MirOperand::Place(place) if place.projections.is_empty() => {
                     match place.base {
                         crate::MirPlaceBase::Local(local) => Some(local),
-                        _ => None,
+                        crate::MirPlaceBase::Temp(_) => None,
                     }
                 }
                 _ => None,
@@ -1183,7 +1185,7 @@ fn merge_buffer_roles(previous: BufferRole, next: BufferRole) -> BufferRole {
 }
 
 /// Merge a slot's facts onto an existing unified buffer under one id: the
-/// role merge (a trainable-parameter slot forces InOut) and the independent
+/// role merge (a trainable-parameter slot forces `InOut`) and the independent
 /// resource-state axes (`written` / `consumed` / `readwrite` / `param`).
 /// Shared by the carried local-identity wiring (S5-U1) and the name+shape
 /// wiring — the two joins must never drift apart.
@@ -1350,7 +1352,7 @@ fn dependency_ordered_launches(
     for (index, id) in ordered.iter().enumerate() {
         position.insert(*id, index);
     }
-    let mut sorted = program.launches.to_vec();
+    let mut sorted = program.launches.clone();
     sorted.sort_by_key(|launch| position.get(&launch.id).copied().unwrap_or(usize::MAX));
     Ok(sorted)
 }
@@ -1362,7 +1364,7 @@ fn dependency_ordered_launches(
 /// - a trainable parameter is persistent device-resident state (per-program);
 /// - a buffer no kernel ever writes is host-provided persistent state
 ///   (per-program);
-/// - an in-place ReadWrite slot is persistent writable state (an accumulator
+/// - an in-place `ReadWrite` slot is persistent writable state (an accumulator
 ///   / optimizer-state buffer, per-program);
 /// - a kernel-written buffer another kernel consumes is a step-local
 ///   intermediate (per-step);
@@ -1495,8 +1497,8 @@ fn declared_result_rows(
 ///   a trainable parameter's edges are persistent-state facts — excluded;
 /// - relations: the lossless primal/companion rows from the carrier (F4);
 /// - initializations: the independent axis facts (F5) — a trainable
-///   parameter is HostProvided (copied in exactly once at session creation),
-///   never zero-filled despite its InOut access.
+///   parameter is `HostProvided` (copied in exactly once at session creation),
+///   never zero-filled despite its `InOut` access.
 fn semantic_facts(
     program: &DeviceProgram,
     buffers: &[ProgramBuffer],

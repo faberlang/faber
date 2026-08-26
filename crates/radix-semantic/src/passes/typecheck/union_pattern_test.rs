@@ -13,7 +13,6 @@
 use std::collections::BTreeMap;
 
 use crate::test_support;
-use radix_target::Target;
 
 use crate::file_interface::{
     FileExport, FileExportKind, FileInterface, InterfaceEnumVariant, InterfaceNominalExport,

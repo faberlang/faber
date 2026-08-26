@@ -133,6 +133,9 @@ impl From<CfgError> for RegionError {
 /// re-entering the binding or passing a dead-source kill.  Unsupported HIR
 /// control-flow shapes return an error instead of receiving an unsound
 /// approximation.
+///
+/// # Errors
+/// Returns `RegionError` when a control-flow or access shape is unsupported.
 pub fn analyze(
     hir: &HirModule,
     types: &TypeTable,

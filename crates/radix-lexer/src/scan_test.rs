@@ -2237,7 +2237,7 @@ fn decimal_literal_carries_exact_digit_text() {
     match &result.tokens[0].kind {
         TokenKind::FloatText { value, text } => {
             assert_eq!(result.interner.resolve(*text), "4.2");
-            assert_eq!(*value, 4.2_f64);
+            assert!((*value - 4.2_f64).abs() < f64::EPSILON);
         }
         other => panic!("expected FloatText, got {other:?}"),
     }

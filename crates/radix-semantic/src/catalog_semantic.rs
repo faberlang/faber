@@ -2270,8 +2270,8 @@ fn semantic_type_mismatch_message(args: &[DiagnosticArg]) -> Option<String> {
         "intra_requires_intervallum_range" => Some("intra requires an intervallum range".to_owned()),
         "incompatible_tensor_index" => Some(crate::INCOMPATIBLE_INDEX_MSG.to_owned()),
         "index_provably_out_of_bounds" => {
-            let index = arg_value(args, "index").map(str::to_owned).unwrap_or_else(|| "?".to_owned());
-            let bound = arg_value(args, "bound").map(str::to_owned).unwrap_or_else(|| "?".to_owned());
+            let index = arg_value(args, "index").map_or_else(|| "?".to_owned(), str::to_owned);
+            let bound = arg_value(args, "bound").map_or_else(|| "?".to_owned(), str::to_owned);
             Some(format!("index {index} is provably out of bounds for static bound {bound}"))
         }
         "invalid_cast" => Some("invalid cast".to_owned()),

@@ -6,12 +6,12 @@ use crate::{Primitive, Type};
 #[test]
 fn iuncta_element_hole_solves_from_constructor_witness() {
     let result = test_support::analyze_source(
-        r#"
+        r"
 incipit {
     fixum iuncta<f32, _> pair ← iuncta<f32, numerus> [1.0, 2]
     nota pair[1] + 0
 }
-"#,
+",
     );
     assert!(result.is_ok(), "diagnostics: {:?}", result.diagnostics);
 
@@ -35,7 +35,7 @@ incipit {
 #[test]
 fn iuncta_element_hole_solves_from_callee_return_witness() {
     let result = test_support::analyze_source(
-        r#"
+        r"
 functio make_pair() → iuncta<f32, numerus> {
     redde iuncta<f32, numerus> [1.0, 2]
 }
@@ -44,7 +44,7 @@ incipit {
     fixum iuncta<f32, _> pair ← make_pair()
     nota pair[1] + 0
 }
-"#,
+",
     );
     assert!(result.is_ok(), "diagnostics: {:?}", result.diagnostics);
 }
@@ -52,11 +52,11 @@ incipit {
 #[test]
 fn iuncta_union_type_arg_is_rejected_with_targeted_issue() {
     test_support::assert_rejects_with_issue(
-        r#"
+        r"
 incipit {
     fixum iuncta<f32, ∪> pair ← iuncta<f32, numerus> [1.0, 2]
 }
-"#,
+",
         "iuncta_union_type_arg_unsupported",
     );
 }
@@ -64,12 +64,12 @@ incipit {
 #[test]
 fn lista_union_hole_keeps_existing_warn017_behavior() {
     let diagnostics = test_support::analyze_and_get_diagnostics(
-        r#"
+        r"
 incipit {
     fixum lista<∪> values ← [1, 2]
     nota values[0]
 }
-"#,
+",
     );
     assert!(
         diagnostics.iter().all(|diagnostic| !diagnostic.is_error()),
@@ -101,12 +101,12 @@ incipit {
 #[test]
 fn iuncta_labeled_element_hole_remains_element_wise() {
     let result = test_support::analyze_source(
-        r#"
+        r"
 incipit {
     fixum iuncta<loss: _, numerus> pair ← iuncta<f32, numerus> [1.0, 2]
     nota pair[0]
 }
-"#,
+",
     );
     assert!(result.is_ok(), "diagnostics: {:?}", result.diagnostics);
 }

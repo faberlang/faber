@@ -85,7 +85,7 @@ fn statement_ids(block: &HirBlock) -> Vec<radix_hir::HirId> {
 fn dum_back_edge_releases_mutable_borrow_before_source_write() {
     // The body write is after the borrow's last use. The back-edge then
     // re-enters the condition and must not make the released loan loop-wide.
-    let source = r#"
+    let source = r"
 incipit {
     varia lista<numerus> xs ← [1, 2, 3]
     dum xs.longitudo() < 5 {
@@ -94,7 +94,7 @@ incipit {
         xs.appende(4)
     }
 }
-"#;
+";
 
     // POST-BRI-3 payoff: last-use region inference accepts this fixture
     // through the production borrow path without the old false conflict.
@@ -106,7 +106,7 @@ fn loop_rumpe_releases_mutable_borrow_before_source_write() {
     // The explicit `rumpe` supplies the loop exit while the fall-through body
     // edge returns to the next iteration. The source write follows the borrow
     // last use in the body.
-    let source = r#"
+    let source = r"
 incipit {
     varia lista<numerus> xs ← [1, 2, 3]
     fac {
@@ -116,7 +116,7 @@ incipit {
         rumpe
     } dum verum
 }
-"#;
+";
 
     // POST-BRI-3 payoff: accepted while the explicit `rumpe` exit edge stays.
     assert_region_accepted(source, "loop rumpe release-before-write");
@@ -127,7 +127,7 @@ fn cyclic_release_does_not_weaken_conflict_when_borrow_still_live() {
     // Same cyclic shape, but the source write precedes the borrow's last
     // use: the region is live at the write and SEM052 must still fire.
     let result = analyze_source(
-        r#"
+        r"
 incipit {
     varia lista<numerus> xs ← [1, 2, 3]
     dum xs.longitudo() < 5 {
@@ -136,7 +136,7 @@ incipit {
         nota view.longitudo()
     }
 }
-"#,
+",
     );
     assert!(
         result.diagnostics.iter().any(|diagnostic| {
@@ -153,7 +153,7 @@ fn production_path_consumes_the_handoff_table() {
     // The pipeline result carries the one access-fact table, and the region
     // facts the borrow path consulted were derived from that same table.
     let result = analyze_ok(
-        r#"
+        r"
 incipit {
     varia lista<numerus> xs ← [1, 2, 3]
     dum xs.longitudo() < 5 {
@@ -162,7 +162,7 @@ incipit {
         xs.appende(4)
     }
 }
-"#,
+",
     );
     let facts = result.access_facts.as_ref().expect("handoff table");
     let hir = result.hir.as_ref().expect("HIR");
@@ -172,7 +172,7 @@ incipit {
 
 #[test]
 fn dum_cfg_has_condition_body_back_edge_and_exit() {
-    let source = r#"
+    let source = r"
 incipit {
     varia lista<numerus> xs ← [1, 2, 3]
     dum xs.longitudo() < 5 {
@@ -181,7 +181,7 @@ incipit {
         xs.appende(4)
     }
 }
-"#;
+";
     let result = analyze_source(source);
     let hir = result.hir.as_ref().expect("HIR");
     let mut shapes = ControlShapes::default();
@@ -213,7 +213,7 @@ incipit {
 
 #[test]
 fn loop_cfg_has_back_edge_and_rumpe_exit() {
-    let source = r#"
+    let source = r"
 incipit {
     varia lista<numerus> xs ← [1, 2, 3]
     fac {
@@ -223,7 +223,7 @@ incipit {
         rumpe
     } dum verum
 }
-"#;
+";
     let result = analyze_source(source);
     let hir = result.hir.as_ref().expect("HIR");
     let mut shapes = ControlShapes::default();
@@ -258,7 +258,7 @@ incipit {
 #[test]
 fn region_solver_converges_on_both_cyclic_shapes() {
     let dum = analyzed_region(
-        r#"
+        r"
 incipit {
     varia lista<numerus> xs ← [1, 2, 3]
     dum xs.longitudo() < 5 {
@@ -267,10 +267,10 @@ incipit {
         xs.appende(4)
     }
 }
-"#,
+",
     );
     let loop_facts = analyzed_region(
-        r#"
+        r"
 incipit {
     varia lista<numerus> xs ← [1, 2, 3]
     fac {
@@ -280,7 +280,7 @@ incipit {
         rumpe
     } dum verum
 }
-"#,
+",
     );
 
     assert!(dum

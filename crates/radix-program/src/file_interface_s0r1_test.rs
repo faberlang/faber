@@ -3,9 +3,7 @@
 //! → module re-export → consumer import through the facade).
 
 use super::*;
-use radix_module::driver::{
-    analyze_source, AnalyzeRequest, Config, ModuleImportContract, Session,
-};
+use radix_module::driver::{analyze_source, AnalyzeRequest, Config, ModuleImportContract, Session};
 use radix_module::file_interface::{
     FileExportKind, InterfaceAliasExport, InterfaceGenericParam, InterfaceIndexSnapshot,
     InterfaceTypeSnapshot,

@@ -3245,11 +3245,11 @@ fn named_int_u32_field_program(
     (program, def_id, field)
 }
 
-fn named_int_u32_context<'a>(
-    types: &'a TypeTable,
+fn named_int_u32_context(
+    types: &TypeTable,
     def_id: DefId,
     field: Symbol,
-) -> MirValidationContext<'a> {
+) -> MirValidationContext<'_> {
     let int_u32 = types
         .find_sized_numeric(Primitive::Numerus, NumericWidth::U32)
         .expect("int<u32> interned");

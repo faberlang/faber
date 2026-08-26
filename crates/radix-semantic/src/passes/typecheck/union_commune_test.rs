@@ -14,14 +14,14 @@ use crate::file_interface::{
 use crate::test_support;
 use crate::Primitive;
 
-const SHAPE_ERROR: &str = r#"discretio ShapeError {
+const SHAPE_ERROR: &str = r"discretio ShapeError {
     @ commune
     textus message
 
     Incompatible,
     ElementMismatch { numerus expected numerus actual }
 }
-"#;
+";
 
 fn assert_checks_green(source: &str, label: &str) {
     let fixture = test_support::analyze_source(source);
@@ -172,12 +172,12 @@ incipit {
 fn construction_requires_commune_fields() {
     test_support::assert_rejects_with_issue(
         &format!(
-            r#"{SHAPE_ERROR}
+            r"{SHAPE_ERROR}
 incipit {{
     fixum ShapeError e ← finge Incompatible {{ }} ∷ ShapeError
     nota e
 }}
-"#
+"
         ),
         "wrong_number_of_arguments",
     );
@@ -186,7 +186,7 @@ incipit {{
 #[test]
 fn commune_field_on_genus_is_rejected() {
     test_support::assert_rejects_with_issue(
-        r#"genus Box {
+        r"genus Box {
     @ commune
     textus message
 }
@@ -194,7 +194,7 @@ fn commune_field_on_genus_is_rejected() {
 incipit {
     nota 1
 }
-"#,
+",
         "commune_on_non_union",
     );
 }
@@ -202,10 +202,10 @@ incipit {
 #[test]
 fn commune_annotation_on_functio_is_rejected() {
     test_support::assert_rejects_with_issue(
-        r#"@ commune
+        r"@ commune
 functio f() → vacuum {
 }
-"#,
+",
         "commune_on_non_union",
     );
 }
@@ -213,7 +213,7 @@ functio f() → vacuum {
 #[test]
 fn duplicate_commune_field_is_rejected() {
     test_support::assert_rejects_with_issue(
-        r#"discretio ShapeError {
+        r"discretio ShapeError {
     @ commune
     textus message
     @ commune
@@ -221,7 +221,7 @@ fn duplicate_commune_field_is_rejected() {
 
     Incompatible
 }
-"#,
+",
         "duplicate_commune_field",
     );
 }
@@ -229,13 +229,13 @@ fn duplicate_commune_field_is_rejected() {
 #[test]
 fn variant_redeclaring_commune_field_is_rejected() {
     test_support::assert_rejects_with_issue(
-        r#"discretio ShapeError {
+        r"discretio ShapeError {
     @ commune
     textus message
 
     Incompatible { textus message }
 }
-"#,
+",
         "union_variant_redeclares_shared_field",
     );
 }
@@ -243,14 +243,14 @@ fn variant_redeclaring_commune_field_is_rejected() {
 #[test]
 fn variant_redeclaring_unannotated_region_field_is_rejected() {
     test_support::assert_rejects_with_issue(
-        r#"discretio ShapeError {
+        r"discretio ShapeError {
     @ commune
     textus message
     numerus code
 
     Incompatible { numerus code }
 }
-"#,
+",
         "union_variant_redeclares_shared_field",
     );
 }
@@ -328,7 +328,7 @@ functio describe(shape.ShapeError e) → textus {
 #[test]
 fn publica_stacking_on_commune_field_checks_green() {
     assert_checks_green(
-        r#"discretio ShapeError {
+        r"discretio ShapeError {
     @ publica
     @ commune
     textus message
@@ -339,7 +339,7 @@ fn publica_stacking_on_commune_field_checks_green() {
 functio render(ShapeError e) → textus {
     redde e.message
 }
-"#,
+",
         "@ publica stacking on commune field",
     );
 }

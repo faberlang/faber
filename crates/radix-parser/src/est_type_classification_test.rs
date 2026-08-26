@@ -30,9 +30,7 @@ fn est_rhs_kind(result: &ParseResult) -> Option<&'static str> {
             let value = redde.value.as_deref()?;
             return match &value.kind {
                 ExprKind::TypeCheck(_) => Some("type_check"),
-                ExprKind::Binary(binary)
-                    if matches!(binary.op, BinOp::Is | BinOp::IsNot) =>
-                {
+                ExprKind::Binary(binary) if matches!(binary.op, BinOp::Is | BinOp::IsNot) => {
                     Some("value_is")
                 }
                 _ => None,
@@ -91,9 +89,7 @@ fn est_declared_implendum_ordo_typus_classify() {
 fn est_value_name_stays_value_equality() {
     // `aliud` declares no type, so the test stays `Binary(Is)` value
     // equality — the classification must not guess from casing.
-    assert_value_equality(
-        "functio f(numerus x, numerus aliud) → bivalens { redde x est aliud }",
-    );
+    assert_value_equality("functio f(numerus x, numerus aliud) → bivalens { redde x est aliud }");
 }
 
 #[test]

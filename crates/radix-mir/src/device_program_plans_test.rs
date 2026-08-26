@@ -4053,7 +4053,7 @@ fn distributed_sum_floor_is_the_tree_reduction_recipe() {
     // SFR-5 plan law: a backend with no native arm lowers the declared
     // distributed sum through the shared-memory tree floor — the floor facts
     // must equal the TreeReduction recipe's exactly, by construction.
-    let mut types = TypeTable::new();
+    let types = TypeTable::new();
     let signature = reduction_signature(1024, 32, 32);
     let validation = MirValidationContext::new(&types);
     let filum = filum_declaration(32);

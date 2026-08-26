@@ -179,6 +179,8 @@ pub fn find_bounded_ascii_one(types: &TypeTable) -> Option<TypeId> {
         })
 }
 
+/// # Errors
+/// Returns `MirTypeError` when the base type admits no index projection.
 pub fn index_projection_result_ty(
     base_ty: MirType,
     types: &TypeTable,

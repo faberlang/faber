@@ -3,8 +3,6 @@
 //! Rust lhs `MethodCall` ordering parenthesization (`out.longitudo() < n`) is
 //! asserted in `codegen/rust/tests/comparison_test.rs`.
 
-use crate::test_support;
-
 fn compile(source: &str) -> crate::test_support::AnalyzedFixture {
     crate::test_support::analyze_source(source)
 }

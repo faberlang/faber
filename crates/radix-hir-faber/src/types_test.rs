@@ -1692,6 +1692,7 @@ fn imported_variant_pattern_uses_qualified_spelling() {
         .insert(variant_def, "manifestum.Cognita".to_owned());
     codegen.write_pattern(
         &HirPattern::Variant(variant_def, Vec::new()),
+        &TypeTable::new(),
         &names,
         &interner,
         &surface,

@@ -15,7 +15,7 @@
 //! | `string < 5` (en pack) | parses (mapped spelling, malformed tail restores) |
 //! | `textus > 5` | parses (comparison) |
 //! | `textus < 5` | parses as comparison (was PARSE001) |
-//! | `ratio < 5` | parses as comparison (was ratio_type_arg_label_required) |
+//! | `ratio < 5` | parses as comparison (was `ratio_type_arg_label_required`) |
 //! | `iuncta` as declaration name | stays rejected (lexer keyword) |
 //! | `fixum ratio<g: f32> r ← ratio<g: f32> { g = 1.0 }` (la) | keeps parsing |
 //! | `fixum record<g: int> r ← record<g: int> { g = 1 }` (en pack) | constructs; head canonicalizes to `ratio` |
@@ -168,7 +168,7 @@ fn en_like_pack_mapped_spelling_less_than_parses_as_comparison() {
 
 #[test]
 fn la_ratio_declaration_and_constructor_keep_parsing() {
-    parse_ok("fixum ratio<g: f32> r ← ratio<g: f32> { g = 1.0 }");
+    let _ = parse_ok("fixum ratio<g: f32> r ← ratio<g: f32> { g = 1.0 }");
 }
 
 #[test]
@@ -249,5 +249,5 @@ fn retired_bare_type_call_is_rejected_for_mapped_spelling_under_pack() {
 fn unmapped_string_call_stays_ordinary_on_latin_surface() {
     // On the plain Latin surface `string` is unmapped: an ordinary call that
     // fails in check (SEM), never in parse.
-    parse_ok("incipit {\n    string(5)\n}");
+    let _ = parse_ok("incipit {\n    string(5)\n}");
 }

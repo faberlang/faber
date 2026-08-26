@@ -82,7 +82,7 @@ fn summa_expr_preserves_apud_filum_and_term_body() {
 
 #[test]
 fn summa_head_call_stays_ordinary() {
-    parse_ok("functio addere(numerus a, numerus b) → numerus { summa(2, 3) }");
+    let _ = parse_ok("functio addere(numerus a, numerus b) → numerus { summa(2, 3) }");
 }
 
 #[test]
@@ -94,7 +94,7 @@ fn summa_receiver_stays_ordinary_device_summa_exemplar() {
         "examples/training/device-summa/src/device_summa.fab",
         DEVICE_SUMMA_KERNEL,
     );
-    parse_ok(&source);
+    let _ = parse_ok(&source);
 }
 
 #[test]
@@ -105,13 +105,13 @@ fn summa_receiver_stays_ordinary_recollige_exemplar() {
         "examples/training/device-summa-recollige/src/device_summa_recollige.fab",
         DEVICE_SUMMA_RECOLLIGE_KERNELS,
     );
-    parse_ok(&source);
+    let _ = parse_ok(&source);
 }
 
 #[test]
 fn non_head_summa_identifiers_stay_ordinary() {
-    parse_ok("functio f() → numerus { fixum numerus summa ← 2 redde summa }");
+    let _ = parse_ok("functio f() → numerus { fixum numerus summa ← 2 redde summa }");
     // Known-good lambda spelling named `summa` (see mod_test's libera suite).
-    parse_ok("fixum _ summa ← (numerus a, numerus b) libera ∴ a + b");
-    parse_ok("functio g(numerus summa) → numerus { redde summa }");
+    let _ = parse_ok("fixum _ summa ← (numerus a, numerus b) libera ∴ a + b");
+    let _ = parse_ok("functio g(numerus summa) → numerus { redde summa }");
 }

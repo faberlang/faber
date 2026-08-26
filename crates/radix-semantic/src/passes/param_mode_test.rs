@@ -99,11 +99,11 @@ typus Handler = (de textus, own lista<numerus>, numerus) → vacuum
 #[test]
 fn retired_parameter_prefix_is_a_parse_error() {
     let result = analyze_source(
-        r#"
+        r"
 functio legacy(ex lista<numerus> values) → vacuum {
     redde
 }
-"#,
+",
     );
     assert!(
         !result.is_ok(),
@@ -115,14 +115,14 @@ functio legacy(ex lista<numerus> values) → vacuum {
 #[test]
 fn scalar_ref_and_mut_parameter_markers_are_admitted() {
     let result = analyze_ok(
-        r#"
+        r"
 functio read(de numerus value) → numerus {
     redde value
 }
 functio bump(in numerus value) → vacuum {
     value ← value + 1
 }
-"#,
+",
     );
     let functions = result
         .hir

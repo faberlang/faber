@@ -501,7 +501,7 @@ impl Lowerer<'_> {
         if let Some(ref mut body) = body {
             self.prepend_runtime_provided_locals(body, vertex_locals.into_iter().rev());
             self.prepend_runtime_provided_locals(body, fragment_locals.into_iter().rev());
-            self.prepend_runtime_provided_locals(body, lane_local.into_iter());
+            self.prepend_runtime_provided_locals(body, lane_local);
             self.prepend_runtime_provided_locals(body, inherited_lane_locals);
         }
 
@@ -613,7 +613,7 @@ impl Lowerer<'_> {
                     let mut body =
                         body.map(|body| self.prepend_modifier_locals(body, modifier_locals));
                     if let Some(ref mut body) = body {
-                        self.prepend_runtime_provided_locals(body, lane_local.into_iter());
+                        self.prepend_runtime_provided_locals(body, lane_local);
                     }
 
                     let ret_ty = method.ret.as_ref().map(|ty| self.lower_signature_type(ty));

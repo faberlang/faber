@@ -11,13 +11,13 @@
 //! compatibility decoders).
 //!
 //! FPF-5 switch (package schema v1→2): the live `.fhirpkg` wire is the
-//! MessagePack envelope ([`crate::msgpack::encode_package_msgpack`] /
+//! `MessagePack` envelope ([`crate::msgpack::encode_package_msgpack`] /
 //! [`crate::msgpack::decode_package_msgpack`], stamped
 //! [`PACKAGE_SCHEMA_VERSION`]). The postcard envelope below is the **legacy
 //! v1 codec** ([`encode_package`] / [`decode_package`]): it stays pinned to
 //! [`LEGACY_PACKAGE_SCHEMA_VERSION`] for migration reads and the equivalence
 //! proof only — the product load path never falls back to it, and v1
-//! postcard bytes handed to the MessagePack decoder fail closed with
+//! postcard bytes handed to the `MessagePack` decoder fail closed with
 //! [`FhirPackageError::LegacyPostcardPackage`].
 //!
 //! Wire discipline mirrors the unit artifact:
@@ -40,7 +40,7 @@ use serde::{Deserialize, Serialize};
 /// artifact [`SCHEMA_VERSION`]). Ratchets on breaking package-format changes;
 /// there is no compatibility decoder.
 ///
-/// FPF-5 ratchet (OQ-1): `2` is the first MessagePack envelope — the map
+/// FPF-5 ratchet (OQ-1): `2` is the first `MessagePack` envelope — the map
 /// value itself is the MessagePack-marked prefix, so retired v1 postcard
 /// bytes fail the envelope gate with
 /// [`FhirPackageError::LegacyPostcardPackage`]. No magic bytes.
@@ -48,7 +48,7 @@ pub const PACKAGE_SCHEMA_VERSION: u32 = 2;
 
 /// Schema version of the retired postcard package envelope (pre-FPF-5
 /// artifacts). The legacy postcard codec accepts exactly this version; the
-/// live MessagePack codec rejects it.
+/// live `MessagePack` codec rejects it.
 pub const LEGACY_PACKAGE_SCHEMA_VERSION: u32 = 1;
 
 /// File extension for FHIR package artifacts.
@@ -174,7 +174,7 @@ pub struct DecodedFhirPackage {
 pub enum FhirPackageError {
     /// The binary payload is not valid `postcard`-encoded data.
     Malformed(postcard::Error),
-    /// The payload is not a valid MessagePack package value (the live wire
+    /// The payload is not a valid `MessagePack` package value (the live wire
     /// since the FPF-5 switch).
     MalformedMsgpack(String),
     /// The payload ends before a complete package could be consumed.
@@ -183,12 +183,12 @@ pub enum FhirPackageError {
     /// does not support (clean break — no v0 decoder).
     UnsupportedPackageSchemaVersion { found: u32, expected: u32 },
     /// The payload is a retired postcard-encoded envelope (FPF-5 ratchet:
-    /// schema v1 postcard → v2 MessagePack). Named legacy rejection: no
+    /// schema v1 postcard → v2 `MessagePack`). Named legacy rejection: no
     /// fallback decode, no dual writer. Rebuild the package.
     LegacyPostcardPackage {
         /// Legacy package schema version carried by the payload.
         found: u32,
-        /// The live MessagePack package schema version.
+        /// The live `MessagePack` package schema version.
         expected: u32,
     },
     /// An embedded unit declares a schema version this loader rejects.
@@ -279,7 +279,7 @@ impl std::error::Error for FhirPackageError {
 }
 
 impl From<crate::msgpack::MsgpackError> for FhirPackageError {
-    /// Maps a MessagePack package-codec failure onto the loader-facing
+    /// Maps a `MessagePack` package-codec failure onto the loader-facing
     /// package error surface (the FPF-5 load path).
     fn from(error: crate::msgpack::MsgpackError) -> Self {
         match error {
@@ -325,7 +325,7 @@ pub fn encode_package(pkg: &FhirPackage) -> Result<Vec<u8>, postcard::Error> {
 /// Deserialize and validate a FHIR package from `postcard` bytes (**legacy
 /// v1 codec**, FPF-5): accepts only [`LEGACY_PACKAGE_SCHEMA_VERSION`]
 /// envelopes — the wire format of pre-FPF-5 artifacts. The live wire is the
-/// MessagePack codec ([`crate::msgpack::decode_package_msgpack`]).
+/// `MessagePack` codec ([`crate::msgpack::decode_package_msgpack`]).
 ///
 /// Gates, in order (fail closed):
 /// 1. package schema-version prefix (first wire field);
@@ -418,7 +418,7 @@ pub fn decode_package(bytes: &[u8]) -> Result<DecodedFhirPackage, FhirPackageErr
 // ---------------------------------------------------------------------------
 
 /// Module table checks: canonical sorted order, uniqueness, entry presence,
-/// and entry-flag consistency. Shared with the FPF-3 MessagePack package
+/// and entry-flag consistency. Shared with the FPF-3 `MessagePack` package
 /// codec ([`crate::msgpack::decode_package_msgpack`]).
 pub(crate) fn validate_module_table(
     pkg: &FhirPackage,

@@ -32,8 +32,12 @@ fn trap_binds_inference_hole_to_solved_union() {
     };
     let members = union_members(&result, local_ty);
     assert_eq!(members.len(), 2, "trap result must be a two-member union");
-    assert!(members.iter().any(|ty| is_primitive(&result, *ty, Primitive::Numerus)));
-    assert!(members.iter().any(|ty| is_primitive(&result, *ty, Primitive::Textus)));
+    assert!(members
+        .iter()
+        .any(|ty| is_primitive(&result, *ty, Primitive::Numerus)));
+    assert!(members
+        .iter()
+        .any(|ty| is_primitive(&result, *ty, Primitive::Textus)));
 }
 
 #[test]
@@ -59,9 +63,17 @@ fn trap_of_vacuum_success_is_distinguishable_two_member_union() {
     ));
     let tys = entry_local_tys(&result);
     let members = union_members(&result, tys[0]);
-    assert_eq!(members.len(), 2, "vacuum success must stay an explicit member");
-    assert!(members.iter().any(|ty| is_primitive(&result, *ty, Primitive::Vacuum)));
-    assert!(members.iter().any(|ty| is_primitive(&result, *ty, Primitive::Textus)));
+    assert_eq!(
+        members.len(),
+        2,
+        "vacuum success must stay an explicit member"
+    );
+    assert!(members
+        .iter()
+        .any(|ty| is_primitive(&result, *ty, Primitive::Vacuum)));
+    assert!(members
+        .iter()
+        .any(|ty| is_primitive(&result, *ty, Primitive::Textus)));
 }
 
 #[test]
@@ -171,16 +183,15 @@ fn trap_of_infallible_body_solves_degenerately_with_warn017() {
         "incipit {\n    fixum ∪ r ← capta { f() }\n    nota r\n}\n",
     ));
     assert!(
-        result
-            .diagnostics
-            .iter()
-            .any(|diag| !diag.is_error() && test_support::issue(diag) == Some("union_hole_solved_monomorphically")),
+        result.diagnostics.iter().any(|diag| !diag.is_error()
+            && test_support::issue(diag) == Some("union_hole_solved_monomorphically")),
         "expected WARN017 for the degenerate trap solve, got: {:?}",
         result.diagnostics
     );
     assert!(
-        !result.diagnostics.iter().any(|diag| diag.is_error()
-            && test_support::issue(diag) == Some("trap_union_collapsed")),
+        !result.diagnostics.iter().any(
+            |diag| diag.is_error() && test_support::issue(diag) == Some("trap_union_collapsed")
+        ),
         "no error flow means no T ≡ E collapse: {:?}",
         result.diagnostics
     );
@@ -192,7 +203,7 @@ fn trap_of_infallible_body_solves_degenerately_with_warn017() {
 
 fn union_members(result: &test_support::AnalyzedFixture, ty: crate::TypeId) -> Vec<crate::TypeId> {
     match result.types.get(ty) {
-        Type::Union(members) => members.to_vec(),
+        Type::Union(members) => members.clone(),
         other => panic!("expected a union type, got {other:?}"),
     }
 }

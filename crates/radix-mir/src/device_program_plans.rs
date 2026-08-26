@@ -579,9 +579,9 @@ pub enum BindLayout {
     RowMajor,
     /// A non-contiguous view described by the carried strides.
     Strided,
-    /// RoPE consecutive-pair layout.
+    /// `RoPE` consecutive-pair layout.
     RopeConsecutivePair { rotated_width: u64 },
-    /// RoPE rotate-half layout.
+    /// `RoPE` rotate-half layout.
     RopeRotateHalf { rotated_width: u64 },
 }
 
@@ -759,6 +759,9 @@ pub struct ExecutorPlanExtension {
 impl ExecutorPlanExtension {
     /// Validate the section against the program kernel count before a consumer
     /// interprets any library selection.
+    ///
+    /// # Errors
+    /// Returns a `String` detail when the section disagrees with the kernel count.
     pub fn validate_for_kernel_count(&self, kernel_count: usize) -> Result<(), String> {
         if self.abi_version != EXECUTOR_PLAN_BIND_ABI_VERSION {
             return Err(format!(
@@ -777,22 +780,19 @@ impl ExecutorPlanExtension {
         for (position, selection) in self.selections.iter().enumerate() {
             if selection.kernel_index != position || !seen.insert(selection.kernel_index) {
                 return Err(format!(
-                    "executor-plan kernel indices are not the ordered unique range at position {}",
-                    position
+                    "executor-plan kernel indices are not the ordered unique range at position {position}"
                 ));
             }
             if !selection.bind.is_well_formed() {
                 return Err(format!(
-                    "executor-plan selection {} has an invalid bind descriptor",
-                    position
+                    "executor-plan selection {position} has an invalid bind descriptor"
                 ));
             }
             if selection.logical_signature.operation.is_empty()
                 || selection.provenance.pass.is_empty()
             {
                 return Err(format!(
-                    "executor-plan selection {} has incomplete signature/provenance",
-                    position
+                    "executor-plan selection {position} has incomplete signature/provenance"
                 ));
             }
         }
@@ -851,6 +851,9 @@ pub struct VerificationPlanShape {
 
 impl VerificationPlanShape {
     /// Validate the static shape facts before they enter a plan identity.
+    ///
+    /// # Errors
+    /// Returns `VerificationAdmissionError` when a shape fact is inadmissible.
     pub fn validate(&self) -> Result<(), VerificationAdmissionError> {
         if self.model_shape.is_empty() || self.model_shape.contains(&0) {
             return Err(VerificationAdmissionError::InvalidPlanShape {
@@ -1035,12 +1038,18 @@ impl std::error::Error for VerificationAdmissionError {}
 impl VerificationBlockAdmission {
     /// Validate and admit the invocation facts without inferring `k` from any
     /// sequence or candidate vector.
+    ///
+    /// # Errors
+    /// Returns `VerificationAdmissionError` when the invocation facts are inconsistent.
     pub fn admit(self) -> Result<Self, VerificationAdmissionError> {
         self.validate()?;
         Ok(self)
     }
 
     /// Validate this invocation record.
+    ///
+    /// # Errors
+    /// Returns `VerificationAdmissionError` when an invocation fact is inadmissible.
     pub fn validate(&self) -> Result<(), VerificationAdmissionError> {
         admit_executor_plan_verification_version(self.abi_version)?;
         self.plan.validate()?;
@@ -1085,6 +1094,9 @@ impl VerificationBlockAdmission {
 
     /// Admit a result against this invocation's generation, transaction, row
     /// shape, layout, and accepted-length contract.
+    ///
+    /// # Errors
+    /// Returns `VerificationAdmissionError` when the result violates the admitted contract.
     pub fn admit_result(
         &self,
         result: VerificationBlockResult,
@@ -1097,6 +1109,9 @@ impl VerificationBlockAdmission {
 
 impl VerificationBlockResult {
     /// Validate this result against its admitted verification block.
+    ///
+    /// # Errors
+    /// Returns `VerificationAdmissionError` when the result does not match its admission.
     pub fn validate_against(
         &self,
         admission: &VerificationBlockAdmission,
@@ -1152,6 +1167,9 @@ impl VerificationBlockResult {
 }
 
 /// Admit a verification section version before interpreting its records.
+///
+/// # Errors
+/// Returns `VerificationAdmissionError` when the version is unsupported.
 pub fn admit_executor_plan_verification_version(
     version: u16,
 ) -> Result<(), VerificationAdmissionError> {
@@ -1469,6 +1487,9 @@ impl std::error::Error for ExecutorPlanV2Error {}
 impl ExecutorPlanV2Facts {
     /// Validate dynamic facts against the typed device program before any
     /// executor-plan selection is projected.
+    ///
+    /// # Errors
+    /// Returns `ExecutorPlanV2Error` when a dynamic fact contradicts the program.
     pub fn validate_for_program(&self, program: &DeviceProgram) -> Result<(), ExecutorPlanV2Error> {
         let mut allocations = std::collections::BTreeMap::new();
         for allocation in &self.allocations {
@@ -1718,6 +1739,9 @@ fn view_required_span(view: &ViewFact, dtype_width: u64) -> Option<u64> {
 impl ExecutorPlanExtensionV2 {
     /// Validate version, ordered selections, and binding ownership before a
     /// consumer interprets any v2 field.
+    ///
+    /// # Errors
+    /// Returns a `String` detail when a v2 field disagrees with the kernel count.
     pub fn validate_for_kernel_count(&self, kernel_count: usize) -> Result<(), String> {
         if self.abi_version != EXECUTOR_PLAN_RUNTIME_BIND_ABI_VERSION {
             return Err(format!(
@@ -1735,8 +1759,7 @@ impl ExecutorPlanExtensionV2 {
         for (position, selection) in self.selections.iter().enumerate() {
             if selection.kernel_index != position || !selection.bind.is_well_formed() {
                 return Err(format!(
-                    "executor-plan v2 selection {} is not an ordered well-formed selection",
-                    position
+                    "executor-plan v2 selection {position} is not an ordered well-formed selection"
                 ));
             }
         }
@@ -1762,6 +1785,10 @@ impl ExecutorPlanExtensionV2 {
 /// Produce a v2 executor plan after validating every allocation, view, and
 /// launch binding against the typed program. The v1 [`executor_plan_extension`]
 /// producer remains the static compatibility path and is not changed.
+///
+/// # Errors
+/// Returns `ExecutorPlanV2Error` when any allocation, view, or launch binding
+/// fails validation against the typed program.
 pub fn executor_plan_extension_v2<B: Borrow<ExecutorPlanV2Facts>>(
     program: &DeviceProgram,
     facts: B,
@@ -1783,6 +1810,9 @@ pub fn executor_plan_extension_v2<B: Borrow<ExecutorPlanV2Facts>>(
 }
 
 /// Descriptive alias for callers at the runtime-binding seam.
+///
+/// # Errors
+/// Returns `ExecutorPlanV2Error` when the v2 producer rejects the program.
 pub fn executor_plan_extension_with_runtime_bindings<B: Borrow<ExecutorPlanV2Facts>>(
     program: &DeviceProgram,
     facts: B,
@@ -1929,7 +1959,7 @@ pub fn executor_plan_extension(program: &DeviceProgram) -> ExecutorPlanExtension
                     backend_requirements: packed_backend_requirements_for_kernel(kernel),
                     provenance: PlanProvenance {
                         pass: "device-program-plan".to_owned(),
-                        revision: EXECUTOR_PLAN_BIND_ABI_VERSION as u32,
+                        revision: u32::from(EXECUTOR_PLAN_BIND_ABI_VERSION),
                         source_nodes: vec![kernel.function.0],
                     },
                     bind,
@@ -2032,7 +2062,7 @@ fn logical_signature_for_kernel(kernel: &KernelUnit, recipe: RecipeKind) -> Logi
         .map(|(index, _)| format!("output{index}"))
         .collect();
     LogicalSignature {
-        operation: format!("{:?}", recipe),
+        operation: format!("{recipe:?}"),
         inputs,
         outputs,
     }
@@ -3093,7 +3123,7 @@ fn transformer_operand_local(function: &MirFunction, op: MirCollectionOp) -> Opt
         .find_map(crate::read_analysis::operand_local)
 }
 
-/// The RMSNorm affine gamma peer is the fourth runtime-call argument after
+/// The `RMSNorm` affine gamma peer is the fourth runtime-call argument after
 /// the tensor operand and its two const plan facts. It is data, not a plan
 /// field, so the source/signature seam binds its local as a read resource.
 fn rms_norm_gamma_local(function: &MirFunction) -> Option<MirLocalId> {
@@ -3202,7 +3232,7 @@ pub fn subchain_signature_for_emission_with_source(
 ///
 /// The transformer recipes bind exactly one recipe operand (the tensor the
 /// recipe reads). Const operands (axis / epsilon) remain plan facts, never
-/// buffers. RMSNorm's mandatory gamma peer is a typed extra read resource;
+/// buffers. `RMSNorm`'s mandatory gamma peer is a typed extra read resource;
 /// other affine peers remain data-flow inputs when their recipe admits them.
 ///
 /// # Errors

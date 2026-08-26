@@ -6,12 +6,12 @@ use crate::{NumericWidth, Primitive, Type};
 #[test]
 fn ratio_element_hole_solves_from_constructor_witness() {
     let result = test_support::analyze_source(
-        r#"
+        r"
 incipit {
     fixum ratio<g: _, w: numerus> r ← ratio<g: f32, w: numerus> { g = 1.0, w = 2 }
     nota r.g + 0.0
 }
-"#,
+",
     );
     assert!(result.is_ok(), "diagnostics: {:?}", result.diagnostics);
 
@@ -42,7 +42,7 @@ incipit {
 #[test]
 fn ratio_element_hole_solves_from_callee_return_witness() {
     let result = test_support::analyze_source(
-        r#"
+        r"
 functio make_ratio() → ratio<g: f32> {
     redde ratio<g: f32> { g = 1.0 }
 }
@@ -51,7 +51,7 @@ incipit {
     fixum ratio<g: _> r ← make_ratio()
     nota r.g + 0.0
 }
-"#,
+",
     );
     assert!(result.is_ok(), "diagnostics: {:?}", result.diagnostics);
 }
@@ -59,11 +59,11 @@ incipit {
 #[test]
 fn ratio_union_hole_is_rejected_with_targeted_issue() {
     test_support::assert_rejects_with_issue(
-        r#"
+        r"
 incipit {
     fixum ratio<g: ∪> r ← ratio<g: f32> { g = 1.0 }
 }
-"#,
+",
         "ratio_union_type_arg_unsupported",
     );
 }
@@ -71,12 +71,12 @@ incipit {
 #[test]
 fn lista_union_hole_keeps_existing_warn017_behavior() {
     let diagnostics = test_support::analyze_and_get_diagnostics(
-        r#"
+        r"
 incipit {
     fixum lista<∪> values ← [1, 2]
     nota values[0]
 }
-"#,
+",
     );
     assert!(
         diagnostics.iter().all(|diagnostic| !diagnostic.is_error()),

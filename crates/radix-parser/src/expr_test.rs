@@ -700,7 +700,7 @@ functio main() → numerus {
 #[test]
 fn parses_ratio_construction_as_verte_with_labeled_type() {
     let result =
-        parse_ok(r#"incipit { fixum _ point ← ratio<g: f32, w: f32> { g = 1.0, w = 2.0 } }"#);
+        parse_ok(r"incipit { fixum _ point ← ratio<g: f32, w: f32> { g = 1.0, w = 2.0 } }");
     let program = result.program.as_ref().expect("program");
     let StmtKind::Incipit(incipit) = &program.statements[0].kind else {
         panic!("expected incipit");
@@ -756,7 +756,7 @@ fn rejects_unlabeled_ratio_constructor_type_argument() {
     // lookahead), so the specific `ratio_type_arg_label_required` issue is
     // gone — the unlabeled form must still fail at parse time.
     let result =
-        parse_program(r#"incipit { fixum _ point ← ratio<f32, w: numerus> { g = 1.0, w = 2 } }"#);
+        parse_program(r"incipit { fixum _ point ← ratio<f32, w: numerus> { g = 1.0, w = 2 } }");
     assert!(
         !result.success(),
         "unlabeled ratio constructor type argument must stay rejected, got {:?}",
@@ -767,7 +767,7 @@ fn rejects_unlabeled_ratio_constructor_type_argument() {
 #[test]
 fn rejects_trailing_comma_in_ratio_constructor_type_arguments() {
     assert_parse_error_issue(
-        r#"incipit { fixum _ point ← ratio<g: f32,> { g = 1.0 } }"#,
+        r"incipit { fixum _ point ← ratio<g: f32,> { g = 1.0 } }",
         "item_list_trailing_comma",
     );
 }
@@ -775,7 +775,7 @@ fn rejects_trailing_comma_in_ratio_constructor_type_arguments() {
 #[test]
 fn rejects_trailing_comma_in_ratio_constructor_fields() {
     assert_parse_error_issue(
-        r#"incipit { fixum _ point ← ratio<g: f32> { g = 1.0, } }"#,
+        r"incipit { fixum _ point ← ratio<g: f32> { g = 1.0, } }",
         "item_list_trailing_comma",
     );
 }
@@ -1641,7 +1641,7 @@ fn template_call_carries_labeled_actual_on_string_literal_callee() {
 
 #[test]
 fn template_call_carries_labeled_actual_on_forma_literal_callee() {
-    let result = parse_ok(r#"fixum _ out ← `… §{id}`(id: 1)"#);
+    let result = parse_ok(r"fixum _ out ← `… §{id}`(id: 1)");
     let program = result.program.as_ref().expect("program");
     let StmtKind::Var(var) = &program.statements[0].kind else {
         panic!("expected variable declaration");

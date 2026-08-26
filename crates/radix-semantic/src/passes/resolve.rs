@@ -982,10 +982,11 @@ fn resolve_pattern(
     match pattern {
         Pattern::Wildcard(_) => {}
         Pattern::Literal(_, _) => {}
-        Pattern::Type(_ident, bind) => {
-            // The type atom is classified before resolution. Only its optional
-            // value binding enters the arm scope; the type name itself is not a
-            // local and therefore must not be shadowed into one.
+        Pattern::Type(_ty, bind) => {
+            // The type pattern is classified before resolution. Only its
+            // optional value binding enters the arm scope; the type name and
+            // its width/shape arguments are not locals and therefore must not
+            // be shadowed into one.
             resolve_pattern_bind(resolver, bind.as_ref(), errors);
         }
         Pattern::Ident(ident, bind) => {
@@ -1836,7 +1837,7 @@ fn generic_arg_span(arg: &GenericArgExpr) -> radix_lexer::Span {
         GenericArgExpr::Size(FiguraExpr::Var(ident)) => ident.span,
         GenericArgExpr::Size(FiguraExpr::Tuple(dims)) => dims
             .first()
-            .map(|dim| generic_figura_span(dim))
+            .map(generic_figura_span)
             .unwrap_or_default(),
         GenericArgExpr::Name(ident) => ident.span,
     }

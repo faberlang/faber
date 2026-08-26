@@ -1655,11 +1655,11 @@ fn v_projection_function(
                             MirOperand::Place(MirPlace::local(MirLocalId(1))),
                             MirOperand::Constant(MirConstant::Int(6)), // Q5_0
                             MirOperand::Constant(MirConstant::Int(2)), // KIND_V
-                            MirOperand::Constant(MirConstant::Int(kv_heads as i64)),
-                            MirOperand::Constant(MirConstant::Int(q_per_kv as i64)),
-                            MirOperand::Constant(MirConstant::Int(seq_const as i64)),
-                            MirOperand::Constant(MirConstant::Int(head_dim as i64)),
-                            MirOperand::Constant(MirConstant::Int(hidden as i64)),
+                            MirOperand::Constant(MirConstant::Int(i64::try_from(kv_heads).unwrap())),
+                            MirOperand::Constant(MirConstant::Int(i64::try_from(q_per_kv).unwrap())),
+                            MirOperand::Constant(MirConstant::Int(i64::try_from(seq_const).unwrap())),
+                            MirOperand::Constant(MirConstant::Int(i64::try_from(head_dim).unwrap())),
+                            MirOperand::Constant(MirConstant::Int(i64::try_from(hidden).unwrap())),
                         ],
                         return_ty: output,
                     },

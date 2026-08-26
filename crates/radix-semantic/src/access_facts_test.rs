@@ -55,11 +55,11 @@ fn typed_local_rows(source: &str) -> (radix_hir::HirModule, crate::TypeTable, Ve
 #[test]
 fn fresh_array_initializer_is_recorded_at_expression_and_binding_sites() {
     let (hir, locals) = local_rows(
-        r#"
+        r"
 incipit {
     fixum lista<numerus> fresh ← [1, 2, 3]
 }
-"#,
+",
     );
     let local = &locals[0];
     let init = local.init.as_ref().expect("fresh local initializer");
@@ -74,7 +74,7 @@ incipit {
 #[test]
 fn aliases_and_calls_remain_conservatively_unknown() {
     let (hir, locals) = local_rows(
-        r#"
+        r"
 functio make() → lista<numerus> {
     redde [4, 5, 6]
 }
@@ -83,7 +83,7 @@ incipit {
     fixum lista<numerus> alias ← fresh
     fixum lista<numerus> called ← make()
 }
-"#,
+",
     );
     let facts = analyze_access_facts(&hir);
 
@@ -103,12 +103,12 @@ incipit {
 #[test]
 fn own_transfer_records_dead_source_identity_and_spans() {
     let (hir, types, locals) = typed_local_rows(
-        r#"
+        r"
 incipit {
     fixum own lista<numerus> source ← [1, 2, 3]
     fixum own lista<numerus> destination ← source
 }
-"#,
+",
     );
     let source = &locals[0];
     let destination = &locals[1];
@@ -131,12 +131,12 @@ incipit {
 #[test]
 fn provably_dead_unmarked_source_records_transfer_death() {
     let (hir, types, locals) = typed_local_rows(
-        r#"
+        r"
 incipit {
     fixum lista<numerus> source ← [1, 2, 3]
     fixum own lista<numerus> destination ← source
 }
-"#,
+",
     );
     let source = &locals[0];
     let facts = analyze_access_facts_with_types(&hir, &types);
@@ -149,13 +149,13 @@ incipit {
 #[test]
 fn explicit_copy_keeps_the_exclusive_source_live() {
     let (hir, types, locals) = typed_local_rows(
-        r#"
+        r"
 incipit {
     fixum own lista<numerus> source ← [1, 2, 3]
     fixum copy lista<numerus> copied ← source
     nota source.longitudo()
 }
-"#,
+",
     );
     let source = &locals[0];
     let facts = analyze_access_facts_with_types(&hir, &types);
@@ -168,11 +168,11 @@ incipit {
 #[test]
 fn scope_exit_records_an_unused_exclusive_source() {
     let (hir, types, locals) = typed_local_rows(
-        r#"
+        r"
 incipit {
     fixum own lista<numerus> scoped ← [1, 2, 3]
 }
-"#,
+",
     );
     let source = &locals[0];
     let facts = analyze_access_facts_with_types(&hir, &types);
@@ -188,7 +188,7 @@ incipit {
 #[test]
 fn unknown_branch_does_not_widen_path_local_death() {
     let (hir, types, locals) = typed_local_rows(
-        r#"
+        r"
 functio incertum() → bivalens {
     redde verum
 }
@@ -198,7 +198,7 @@ incipit {
         fixum own lista<numerus> destination ← source
     }
 }
-"#,
+",
     );
     let source = &locals[0];
     let facts = analyze_access_facts_with_types(&hir, &types);

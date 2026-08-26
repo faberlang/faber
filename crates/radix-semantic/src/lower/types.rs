@@ -149,10 +149,7 @@ impl Lowerer<'_> {
                     })
                     .collect();
                 let ret = self.lower_signature_type(&func.ret);
-                let err = func
-                    .err
-                    .as_ref()
-                    .map(|err| self.lower_signature_type(err));
+                let err = func.err.as_ref().map(|err| self.lower_signature_type(err));
                 self.types.function(FuncSig {
                     type_params: Vec::new(),
                     type_param_constraints: Vec::new(),

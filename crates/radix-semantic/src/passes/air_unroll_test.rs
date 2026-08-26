@@ -345,11 +345,11 @@ functio generic_grid<magnitudo M, magnitudo N>(tensor<f32, [M, N]> x) → f32 {
 #[test]
 fn apud_on_non_air_lane_loop_is_left_in_place() {
     let result = analyze(
-        r#"
+        r"
 functio host_grid(tensor<f32, [2, 3]> x) → vacuum {
     itera ex x apud [i, j] fixum cell { }
 }
-"#,
+",
     );
     assert!(
         result.is_ok(),
@@ -383,10 +383,10 @@ fn coordinate_lane_tuples(hir: &HirModule, rank: usize) -> Vec<Vec<u64>> {
     let mut found = CollectCoordLets(Vec::new());
     walk_program(&mut found, hir);
     assert!(
-        found.0.len() % rank == 0,
+        found.0.len().is_multiple_of(rank),
         "coordinate constants must chunk evenly by rank"
     );
-    found.0.chunks(rank).map(|chunk| chunk.to_vec()).collect()
+    found.0.chunks(rank).map(<[u64]>::to_vec).collect()
 }
 
 #[test]
@@ -622,7 +622,7 @@ functio runtime_n(numerus n, tensor<f32, [4]> x) → f32 {
 #[test]
 fn non_air_lane_range_loop_is_left_in_place() {
     let result = analyze(
-        r#"
+        r"
 functio host_loop() → numerus {
     varia numerus total ← 0
     itera ab 0‥4 fixum i {
@@ -630,7 +630,7 @@ functio host_loop() → numerus {
     }
     redde total
 }
-"#,
+",
     );
     assert!(
         result.is_ok(),
@@ -1649,13 +1649,13 @@ functio too_many(tensor<f32, [8]> x) → f32 {
 #[test]
 fn nested_non_air_loop_stays_in_place() {
     let result = analyze(
-        r#"
+        r"
 functio host_nested(tensor<f32, [2, 3]> x) → vacuum {
     itera ex x apud [i, j] fixum cell {
         itera ab 0‥2 fixum k { }
     }
 }
-"#,
+",
     );
     assert!(
         result.is_ok(),

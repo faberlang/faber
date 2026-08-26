@@ -2086,7 +2086,9 @@ functio safe() → vacuum { fixum ∪ r ← capta { fail() } nota r }
     let (_, trapping_fn) = dump
         .split_once("function f1 -> ")
         .expect("the trapping function is emitted");
-    let trapping_fn = trapping_fn.split_once("function f2 -> ").map_or(trapping_fn, |(f1, _)| f1);
+    let trapping_fn = trapping_fn
+        .split_once("function f2 -> ")
+        .map_or(trapping_fn, |(f1, _)| f1);
     assert!(
         trapping_fn.contains("try_call def#"),
         "the trapped call must ride the existing try_call: {trapping_fn}"
@@ -2101,14 +2103,9 @@ functio safe() → vacuum { fixum ∪ r ← capta { fail() } nota r }
 fn lowers_trap_iace_to_carrier_wrap() {
     // An explicit `iace` inside the trap body wraps into the same carrier
     // instead of propagating.
-    let dump = dump_source(
-        r#"functio safe() → vacuum { fixum ∪ r ← capta { iace "bad" } nota r }"#,
-    );
+    let dump = dump_source(r#"functio safe() → vacuum { fixum ∪ r ← capta { iace "bad" } nota r }"#);
 
-    assert!(
-        dump.contains("goto bb"),
-        "trap lowering produced control flow: {dump}"
-    );
+    assert!(dump.contains("goto bb"), "trap lowering produced control flow: {dump}");
     assert!(
         !dump.contains("return_error"),
         "a trapped iace never reaches return_error: {dump}"
@@ -2177,7 +2174,9 @@ functio safe() → vacuum {
     let (_, trapping_fn) = dump
         .split_once("function f1 -> ")
         .expect("the trapping function is emitted");
-    let trapping_fn = trapping_fn.split_once("function f2 -> ").map_or(trapping_fn, |(f1, _)| f1);
+    let trapping_fn = trapping_fn
+        .split_once("function f2 -> ")
+        .map_or(trapping_fn, |(f1, _)| f1);
     assert!(
         !trapping_fn.contains("return_error"),
         "no alternate exit escapes the nested boundaries: {trapping_fn}"

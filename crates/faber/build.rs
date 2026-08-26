@@ -1,4 +1,4 @@
-//! Compress `stdlib/locale/<id>/pack.toml` into OUT_DIR gzip artifacts.
+//! Compress `stdlib/locale/<id>/pack.toml` into `OUT_DIR` gzip artifacts.
 //!
 //! The eight reader packs are the authoring source of truth. The `faber`
 //! binary embeds the compressed bytes and decompresses only the selected

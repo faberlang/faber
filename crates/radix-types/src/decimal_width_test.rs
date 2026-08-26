@@ -32,9 +32,18 @@ fn d_markers_parse_on_numerus_only() {
 
 #[test]
 fn decimal_lattice_grows_d32_to_d64_only() {
-    assert!(NumericWidth::is_widening_assignable(NumericWidth::D32, NumericWidth::D64));
-    assert!(NumericWidth::is_widening_assignable(NumericWidth::D32, NumericWidth::D32));
-    assert!(!NumericWidth::is_widening_assignable(NumericWidth::D64, NumericWidth::D32));
+    assert!(NumericWidth::is_widening_assignable(
+        NumericWidth::D32,
+        NumericWidth::D64
+    ));
+    assert!(NumericWidth::is_widening_assignable(
+        NumericWidth::D32,
+        NumericWidth::D32
+    ));
+    assert!(!NumericWidth::is_widening_assignable(
+        NumericWidth::D64,
+        NumericWidth::D32
+    ));
     // decimals never cross into the integer or fractus lattices
     for other in [
         NumericWidth::I64,
@@ -42,10 +51,22 @@ fn decimal_lattice_grows_d32_to_d64_only() {
         NumericWidth::F32,
         NumericWidth::F64,
     ] {
-        assert!(!NumericWidth::is_widening_assignable(NumericWidth::D32, other));
-        assert!(!NumericWidth::is_widening_assignable(other, NumericWidth::D32));
-        assert!(!NumericWidth::is_widening_assignable(NumericWidth::D64, other));
-        assert!(!NumericWidth::is_widening_assignable(other, NumericWidth::D64));
+        assert!(!NumericWidth::is_widening_assignable(
+            NumericWidth::D32,
+            other
+        ));
+        assert!(!NumericWidth::is_widening_assignable(
+            other,
+            NumericWidth::D32
+        ));
+        assert!(!NumericWidth::is_widening_assignable(
+            NumericWidth::D64,
+            other
+        ));
+        assert!(!NumericWidth::is_widening_assignable(
+            other,
+            NumericWidth::D64
+        ));
     }
     assert!(!NumericWidth::D32.is_float());
     assert!(!NumericWidth::D32.is_signed_int());
@@ -93,14 +114,8 @@ fn tensor_media_width_rejects_decimal_elements() {
     let i32 = types.sized_numeric(Primitive::Numerus, NumericWidth::I32);
     let f32 = types.sized_numeric(Primitive::Fractus, NumericWidth::F32);
     assert_eq!(tensor_media_width(&types, d32), None);
-    assert_eq!(
-        tensor_media_width(&types, i32),
-        Some(NumericWidth::F64)
-    );
-    assert_eq!(
-        tensor_media_width(&types, f32),
-        Some(NumericWidth::F32)
-    );
+    assert_eq!(tensor_media_width(&types, i32), Some(NumericWidth::F64));
+    assert_eq!(tensor_media_width(&types, f32), Some(NumericWidth::F32));
 }
 
 // --- D3 conversio matrix (explicit `↦` arms) ---

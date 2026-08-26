@@ -206,11 +206,9 @@ fn endian_read_width_bytes(ty: &Type) -> Option<usize> {
 
 fn static_integer_magnitude(source: &HirExpression) -> Option<i128> {
     match &source.kind {
-        HirExpressionKind::Literal(HirLiteral::Int(value)) => i128::try_from(*value).ok(),
+        HirExpressionKind::Literal(HirLiteral::Int(value)) => Some(i128::from(*value)),
         HirExpressionKind::Unary(radix_hir::HirUnOp::Neg, inner) => match &inner.kind {
-            HirExpressionKind::Literal(HirLiteral::Int(value)) => {
-                i128::try_from(*value).ok().map(|value| -value)
-            }
+            HirExpressionKind::Literal(HirLiteral::Int(value)) => Some(-i128::from(*value)),
             _ => None,
         },
         _ => None,
@@ -1155,22 +1153,26 @@ impl TypeChecker<'_> {
     /// decimal-widths D2 (wildcard audit): named reject for conversio slot-2
     /// hints aimed at a decimal numerus target — `textus ↦ numerus<d32, Hex>`,
     /// `octeti ↦ numerus<d32, Be>`, and every other hint spelling.
-    fn decimal_target_hint_issue(&self, target_resolved: TypeId, params: &[Symbol]) -> Option<&'static str> {
+    fn decimal_target_hint_issue(
+        &self,
+        target_resolved: TypeId,
+        params: &[Symbol],
+    ) -> Option<&'static str> {
         if !matches!(
             self.types.get(target_resolved),
             Type::SizedNumeric(Primitive::Numerus, width) if width.is_decimal()
         ) {
             return None;
         }
-        let Some(interner) = self.interner else {
-            return None;
-        };
-        params.iter().find_map(|param| match interner.resolve(*param) {
-            "Hex" | "Bin" | "Oct" => Some(ISSUE_DECIMAL_RADIX_HINT_REJECTED),
-            "Be" | "Le" => Some(ISSUE_DECIMAL_ENDIAN_HINT_REJECTED),
-            "Bits" => Some(ISSUE_DECIMAL_BITS_HINT_REJECTED),
-            _ => None,
-        })
+        let interner = self.interner?;
+        params
+            .iter()
+            .find_map(|param| match interner.resolve(*param) {
+                "Hex" | "Bin" | "Oct" => Some(ISSUE_DECIMAL_RADIX_HINT_REJECTED),
+                "Be" | "Le" => Some(ISSUE_DECIMAL_ENDIAN_HINT_REJECTED),
+                "Bits" => Some(ISSUE_DECIMAL_BITS_HINT_REJECTED),
+                _ => None,
+            })
     }
 
     /// `Bits` is an exact-width IEEE bitcast: `u16↔bf16`, `u16↔f16`,
@@ -1203,25 +1205,19 @@ impl TypeChecker<'_> {
             (source, target),
             (
                 Type::SizedNumeric(Primitive::Numerus, NumericWidth::U16),
-                Type::SizedNumeric(Primitive::Fractus, NumericWidth::BF16)
+                Type::SizedNumeric(Primitive::Fractus, NumericWidth::BF16 | NumericWidth::F16)
             ) | (
                 Type::SizedNumeric(Primitive::Numerus, NumericWidth::U32),
                 Type::SizedNumeric(Primitive::Fractus, NumericWidth::F32)
             ) | (
-                Type::SizedNumeric(Primitive::Numerus, NumericWidth::U16),
-                Type::SizedNumeric(Primitive::Fractus, NumericWidth::F16)
-            ) | (
                 Type::SizedNumeric(Primitive::Numerus, NumericWidth::U64),
                 Type::SizedNumeric(Primitive::Fractus, NumericWidth::F64)
             ) | (
-                Type::SizedNumeric(Primitive::Fractus, NumericWidth::BF16),
+                Type::SizedNumeric(Primitive::Fractus, NumericWidth::BF16 | NumericWidth::F16),
                 Type::SizedNumeric(Primitive::Numerus, NumericWidth::U16)
             ) | (
                 Type::SizedNumeric(Primitive::Fractus, NumericWidth::F32),
                 Type::SizedNumeric(Primitive::Numerus, NumericWidth::U32)
-            ) | (
-                Type::SizedNumeric(Primitive::Fractus, NumericWidth::F16),
-                Type::SizedNumeric(Primitive::Numerus, NumericWidth::U16)
             ) | (
                 Type::SizedNumeric(Primitive::Fractus, NumericWidth::F64),
                 Type::SizedNumeric(Primitive::Numerus, NumericWidth::U64)
@@ -1737,12 +1733,14 @@ impl TypeChecker<'_> {
             return None;
         };
         let source_resolved = self.resolve_inferred_type(source_ty);
-        let source_elem = match self.types.get(source_resolved).clone() {
-            Type::Array(elem) | Type::BoundedArray { element: elem, .. } => elem,
-            _ => {
-                self.invalid_conversion(ISSUE_MATRIX_MATERIALIZE_UNSUPPORTED, span);
-                return Some(self.error_type);
-            }
+        let (Type::Array(source_elem)
+        | Type::BoundedArray {
+            element: source_elem,
+            ..
+        }) = self.types.get(source_resolved).clone()
+        else {
+            self.invalid_conversion(ISSUE_MATRIX_MATERIALIZE_UNSUPPORTED, span);
+            return Some(self.error_type);
         };
         if !self.types.equals(source_elem, target_elem) {
             self.invalid_conversion(ISSUE_LISTA_TO_TENSOR_ELEMENT_MISMATCH, span);
@@ -2236,7 +2234,10 @@ impl TypeChecker<'_> {
             | (PrimitiveConversioFamily::Octeti, PrimitiveConversioFamily::Textus) => true,
             _ => matches!(
                 (self.types.get(source), self.types.get(target)),
-                (Type::Array(_), Type::Tensor(_, _)) | (Type::Array(_), Type::BoundedArray { .. })
+                (
+                    Type::Array(_),
+                    Type::Tensor(_, _) | Type::BoundedArray { .. }
+                )
             ),
         }
     }

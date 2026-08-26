@@ -52,9 +52,9 @@ pub use numeric_width::{
     lista_sugar_width_marker, lower_modular_word, lower_sized_primitive,
     lower_standalone_width_type, matrix_sugar_width_marker, sparsa_sugar_width_marker,
     standalone_width_type, tensor_element_conversio_allowed, tensor_media_width,
-    tensor_method_requires_numeric_element, tensor_sugar_width_marker,
-    vector_sugar_width_marker, NumericWidth, WidthError, DECIMAL_INDEX_SCALAR_MSG,
-    DECIMAL_TENSOR_MEDIA_MSG, TENSOR_ELEMENT_NUMERIC_MSG, TENSOR_INDEX_VECTOR_MSG,
+    tensor_method_requires_numeric_element, tensor_sugar_width_marker, vector_sugar_width_marker,
+    NumericWidth, WidthError, DECIMAL_INDEX_SCALAR_MSG, DECIMAL_TENSOR_MEDIA_MSG,
+    TENSOR_ELEMENT_NUMERIC_MSG, TENSOR_INDEX_VECTOR_MSG,
 };
 pub use schema::{SchemaColumnDef, SchemaDef};
 pub use schema_subset::{

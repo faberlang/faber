@@ -740,7 +740,7 @@ fn packed_rank2_matmul_operands(
 ///
 /// The dispatch domain pads the logical output columns by this multiplier;
 /// the concrete thread geometry is a per-lane recipe fact (Metal states it
-/// in `radix-mir-metal` quantized_matmul emit). The ELP-02 lane admission
+/// in `radix-mir-metal` `quantized_matmul` emit). The ELP-02 lane admission
 /// map is the handoff for owning it per lane.
 ///
 /// This is also the decode (M=1) body's outputs-per-workgroup fact: one
@@ -837,8 +837,7 @@ fn batched_attention_contract(
     };
     if output_dims != expected {
         return Err(MirAbiError::new(format!(
-            "batched attention {:?} output dims {:?} do not match {:?}",
-            kind, output_dims, expected
+            "batched attention {kind:?} output dims {output_dims:?} do not match {expected:?}"
         )));
     }
     let layout = if is_projection {
@@ -851,6 +850,7 @@ fn batched_attention_contract(
         None
     };
     let scale_bits = if matches!(kind, crate::kernel_plan::BatchedAttentionKind::Scores) {
+        #[allow(clippy::cast_possible_truncation)] // WGSL scale carrier is f32
         let value = const_f64(args, kind_index - 1, "attention scale")? as f32;
         if !value.is_finite() || value == 0.0 {
             return Err(MirAbiError::new(

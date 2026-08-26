@@ -1526,9 +1526,7 @@ fn transplant_literal(
         ),
         HirLiteral::Int(value) => HirLiteral::Int(*value),
         // decimal-widths D1: text does not cross the MIR boundary (f64 path).
-        HirLiteral::Float(value) | HirLiteral::FloatText { value, .. } => {
-            HirLiteral::Float(*value)
-        }
+        HirLiteral::Float(value) | HirLiteral::FloatText { value, .. } => HirLiteral::Float(*value),
         HirLiteral::JsonValor(value) => HirLiteral::JsonValor(value.clone()),
         HirLiteral::Bool(value) => HirLiteral::Bool(*value),
         HirLiteral::Nil => HirLiteral::Nil,

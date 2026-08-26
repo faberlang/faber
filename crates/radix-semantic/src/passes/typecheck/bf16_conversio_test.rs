@@ -34,12 +34,12 @@ fn f16_and_bf16_value_conversions_are_admitted_through_f32() {
 #[test]
 fn bf16_literal_and_print_forms_keep_the_whole_marker() {
     test_support::assert_accepts(
-        r#"
+        r"
 incipit {
     fixum fractus<bf16> value ← 1.0
     nota value
 }
-"#,
+",
     );
     test_support::assert_accepts("functio keep(bf16 x) → bf16 { redde x }");
 }
@@ -47,12 +47,12 @@ incipit {
 #[test]
 fn bf16_does_not_silently_widen_to_f32() {
     test_support::assert_rejects_with_issue(
-        r#"
+        r"
 incipit {
     fixum fractus<bf16> value ← 1.0
     fixum fractus<f32> widened ← value
 }
-"#,
+",
         "initializer_annotation_mismatch",
     );
 }

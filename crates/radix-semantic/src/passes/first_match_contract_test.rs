@@ -42,7 +42,7 @@ fn analyze(source: &str) -> Vec<SemanticError> {
 fn base_errors(source: &str) -> Vec<SemanticError> {
     analyze(source)
         .into_iter()
-        .filter(|err| err.is_error())
+        .filter(super::super::error::SemanticError::is_error)
         .collect()
 }
 
@@ -66,11 +66,11 @@ fn first_match_total_evaluation_observes_post_match_predicate_error() {
     // observable) — dataflow first-live selection, no early exit.
     // RED today: typecheck declines the head (AFM-2 admits the parse only).
     let errors = base_errors(
-        r#"
+        r"
 functio t(tf32[4] a) → fractus ∪ nihil {
     redde primus_quem(a, ubi x { (x ↦ u8) > 0 })
 }
-"#,
+",
     );
     assert!(errors.is_empty(), "unexpected diagnostics: {errors:?}");
 }
@@ -80,11 +80,11 @@ fn first_match_no_match_yields_nihil() {
     // Contract row: no live match → `nihil`, never an error.
     // RED today: typecheck declines the head (AFM-2 admits the parse only).
     let errors = base_errors(
-        r#"
+        r"
 functio t(tf32[4] a) → fractus ∪ nihil {
     redde primus_quem(a, ubi x { x < 0.0 })
 }
-"#,
+",
     );
     assert!(errors.is_empty(), "unexpected diagnostics: {errors:?}");
 }
@@ -94,11 +94,11 @@ fn first_match_empty_source_yields_nihil() {
     // Contract row: empty (statically zero-length) source → `nihil`.
     // RED today: typecheck declines the head (AFM-2 admits the parse only).
     let errors = base_errors(
-        r#"
+        r"
 functio t(tf32[0] a) → fractus ∪ nihil {
     redde primus_quem(a, ubi x { x > 0.0 })
 }
-"#,
+",
     );
     assert!(errors.is_empty(), "unexpected diagnostics: {errors:?}");
 }
@@ -110,11 +110,11 @@ fn first_match_predicate_error_propagates_never_becomes_nihil() {
     // no-match/empty, not predicate failure.
     // RED today: typecheck declines the head (AFM-2 admits the parse only).
     let errors = base_errors(
-        r#"
+        r"
 functio t(tf32[4] a) → fractus ∪ nihil {
     redde primus_quem(a, ubi x { (x ↦ u8) > 100 })
 }
-"#,
+",
     );
     assert!(errors.is_empty(), "unexpected diagnostics: {errors:?}");
 }

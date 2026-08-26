@@ -12,10 +12,13 @@ use radix_target::Target;
 
 fn en_config() -> PassConfig {
     let mut config = PassConfig::for_target(Target::HirRust);
-    config.locale_pack = Some(LocalePack::from_toml_path(
-        std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../stdlib/locale/en/pack.toml"),
-    )
-    .expect("load English locale pack"));
+    config.locale_pack = Some(
+        LocalePack::from_toml_path(
+            std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+                .join("../../stdlib/locale/en/pack.toml"),
+        )
+        .expect("load English locale pack"),
+    );
     config
 }
 
@@ -161,7 +164,10 @@ class Doc implements _ {
 
 #[test]
 fn r2_primitive_intersection_is_rejected_in_alias() {
-    assert_en_rejects_with_issue("type Bad = numerus ∩ fractus", "intersection_primitive_operand");
+    assert_en_rejects_with_issue(
+        "type Bad = numerus ∩ fractus",
+        "intersection_primitive_operand",
+    );
 }
 
 #[test]

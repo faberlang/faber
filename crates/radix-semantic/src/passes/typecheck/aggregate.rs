@@ -62,7 +62,11 @@ impl TypeChecker<'_> {
         // (c): an abstract genus is a contract, not a constructor; concrete
         // genera extending it are the constructible shapes.
         if is_abstract {
-            self.error_issue(SemanticErrorKind::TypeMismatch, ISSUE_ABSTRACT_CONSTRUCTION, span);
+            self.error_issue(
+                SemanticErrorKind::TypeMismatch,
+                ISSUE_ABSTRACT_CONSTRUCTION,
+                span,
+            );
         }
         let field_types: FxHashMap<Symbol, StructFieldInfo> = {
             let mut vars = FxHashMap::default();

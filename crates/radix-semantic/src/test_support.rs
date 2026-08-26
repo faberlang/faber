@@ -64,17 +64,20 @@ impl std::ops::DerefMut for AnalyzedFixture {
 }
 
 /// Parse source and run the semantic pipeline for `target`.
+#[must_use]
 pub fn analyze_source_for_target(source: &str, target: Target) -> AnalyzedFixture {
     analyze_source_with_config(source, PassConfig::for_target(target))
 }
 
 /// Parse source and run the semantic pipeline with the historical Rust-shaped
 /// pass config (borrow analysis on). No backend is invoked.
+#[must_use]
 pub fn analyze_source(source: &str) -> AnalyzedFixture {
     analyze_source_for_target(source, Target::HirRust)
 }
 
 /// Parse source and run analysis with an explicit [`PassConfig`].
+#[must_use]
 pub fn analyze_source_with_config(source: &str, config: PassConfig) -> AnalyzedFixture {
     let mut parsed = if let Some(pack) = config.locale_pack.as_ref() {
         parse(radix_lexer::lex_with_locale_pack(
@@ -114,6 +117,7 @@ pub fn analyze_source_with_config(source: &str, config: PassConfig) -> AnalyzedF
 }
 
 /// Analyze with caller-supplied namespace exports and file interfaces.
+#[must_use]
 pub fn analyze_source_with_import_contract(
     source: &str,
     namespace_exports: BTreeMap<String, BTreeMap<String, VisibilityTier>>,
@@ -126,6 +130,7 @@ pub fn analyze_source_with_import_contract(
 }
 
 /// Analyze and assert no error diagnostics.
+#[must_use]
 pub fn analyze_ok(source: &str) -> AnalyzedFixture {
     let result = analyze_source(source);
     assert!(result.is_ok(), "diagnostics: {:?}", result.diagnostics);
@@ -147,6 +152,7 @@ pub fn entry_local_tys(result: &AnalyzedFixture) -> Vec<TypeId> {
 }
 
 /// Named `issue` argument on a semantic diagnostic, if present.
+#[must_use]
 pub fn issue(err: &SemanticError) -> Option<&str> {
     err.args
         .iter()
@@ -155,21 +161,25 @@ pub fn issue(err: &SemanticError) -> Option<&str> {
 }
 
 /// Whether `args` omit legacy prose attachments.
+#[must_use]
 pub fn args_have_no_legacy_message(args: &[DiagnosticArg]) -> bool {
     !args.iter().any(|arg| arg.name == "legacy_message")
 }
 
 /// Check that a [`SemanticError`] uses structured args and carries `issue`.
+#[must_use]
 pub fn semantic_error_has_issue(err: &SemanticError, expected: &str) -> bool {
     args_have_no_legacy_message(&err.args) && issue(err) == Some(expected)
 }
 
 /// Default zero-width span for hand-built fixtures.
+#[must_use]
 pub fn test_span() -> Span {
     Span::default()
 }
 
 /// Byte span covering `start..end` in hand-built fixtures.
+#[must_use]
 pub fn test_span_between(start: u32, end: u32) -> Span {
     Span::new(start, end)
 }
@@ -264,21 +274,25 @@ pub fn assert_analysis_rejects_with_issue(source: &str, expected: &str) {
 }
 
 /// Diagnostics from analysis (errors and warnings).
+#[must_use]
 pub fn analyze_and_get_diagnostics(source: &str) -> Vec<SemanticError> {
     analyze_source(source).diagnostics.clone().clone()
 }
 
 /// Historical compile-path alias: analysis only, no backend.
+#[must_use]
 pub fn compile_and_get_result(source: &str) -> AnalyzedFixture {
     analyze_source(source)
 }
 
 /// Historical compile-path alias: analysis diagnostics only.
+#[must_use]
 pub fn compile_and_get_diagnostics(source: &str) -> Vec<SemanticError> {
     analyze_and_get_diagnostics(source)
 }
 
 /// Historical compile-path alias for a specific target.
+#[must_use]
 pub fn compile_for_target_and_get_result(source: &str, target: Target) -> AnalyzedFixture {
     analyze_source_for_target(source, target)
 }

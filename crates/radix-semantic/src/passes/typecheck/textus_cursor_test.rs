@@ -133,9 +133,9 @@ fn en_pack() -> LocalePack {
 
 #[test]
 fn en_string_cursor_accepts_as_iterator_ascii_one() {
-    let source = r#"fn walk(string s) → iterator<ascii<1>> {
+    let source = r"fn walk(string s) → iterator<ascii<1>> {
     return s.cursor()
-}"#;
+}";
     let mut config = crate::PassConfig::for_target(Target::HirRust);
     config.locale_pack = Some(en_pack());
     let result = crate::test_support::analyze_source_with_config(source, config);

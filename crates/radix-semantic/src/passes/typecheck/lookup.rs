@@ -572,9 +572,7 @@ impl TypeChecker<'_> {
         if !width.is_decimal() {
             return None;
         }
-        let Some(interner) = self.interner else {
-            return None;
-        };
+        let interner = self.interner?;
         let digits = interner.resolve(text);
         let Some((mantissa, exp10)) = radix_types::numeric_width::decimal_text_to_scaled(digits)
         else {
@@ -588,7 +586,7 @@ impl TypeChecker<'_> {
         // The scaled carrier holds mantissa × 10^(exp10 + scale); a negative
         // shift means digits beyond the width's scale (precision loss) and a
         // positive shift that overflows i128 exceeds the carrier domain.
-        let scale = width.decimal_scale()? as i32;
+        let scale = i32::try_from(width.decimal_scale()?).ok()?;
         let Some(shift) = exp10.checked_add(scale) else {
             return Some(self.decimal_literal_out_of_range(span));
         };

@@ -64,7 +64,7 @@ fn first_fragment_def(report: &FragmentDefinitionReport) -> radix_hir::DefId {
 #[test]
 fn accepts_scalar_ops_structured_control_and_locals() {
     let report = check_source(
-        r#"
+        r"
 @ nucleum fragment
 functio helper(numerus x) → numerus {
     fixum numerus doubled ← x * 2
@@ -74,7 +74,7 @@ functio helper(numerus x) → numerus {
         redde 0
     }
 }
-"#,
+",
     );
     assert!(
         report.errors.is_empty(),
@@ -87,12 +87,12 @@ functio helper(numerus x) → numerus {
 #[test]
 fn accepts_tensor_ops_supported_in_device_mir() {
     let report = check_source(
-        r#"
+        r"
 @ nucleum fragment
 functio combine(tf32[2, 2] x, tf32[2, 2] y) → tf32[2, 2] {
     redde x.addita(y).multiplica(y)
 }
-"#,
+",
     );
     assert!(
         report.errors.is_empty(),
@@ -116,13 +116,13 @@ functio combine(tf32[2, 2] x, tf32[2, 2] y) → tf32[2, 2] {
 #[test]
 fn accepts_explicit_argument_writes() {
     let report = check_source(
-        r#"
+        r"
 @ nucleum fragment
 functio scale(in numerus value) → numerus {
     value ← value * 2
     redde value
 }
-"#,
+",
     );
     assert!(
         report.errors.is_empty(),
@@ -147,12 +147,12 @@ functio scale(in numerus value) → numerus {
 #[test]
 fn accepts_approved_device_intrinsic() {
     let report = check_source(
-        r#"
+        r"
 @ nucleum fragment
 functio helper() → u32 {
     redde workgroup_size_y()
 }
-"#,
+",
     );
     assert!(
         report.errors.is_empty(),
@@ -176,7 +176,7 @@ functio helper() → u32 {
 #[test]
 fn accepts_call_to_another_fragment() {
     let report = check_source(
-        r#"
+        r"
 @ nucleum fragment
 functio inner(numerus x) → numerus {
     redde x + 1
@@ -186,7 +186,7 @@ functio inner(numerus x) → numerus {
 functio outer(numerus x) → numerus {
     redde inner(x)
 }
-"#,
+",
     );
     assert!(
         report.errors.is_empty(),
@@ -208,13 +208,13 @@ functio outer(numerus x) → numerus {
 #[test]
 fn does_not_check_entry_bodies() {
     let report = check_source(
-        r#"
+        r"
 @ nucleum
 functio k(numerus x) → numerus {
     scribe x
     redde x
 }
-"#,
+",
     );
     assert!(
         report.errors.is_empty(),
@@ -227,12 +227,12 @@ functio k(numerus x) → numerus {
 #[test]
 fn rejects_alternate_exit_posture() {
     let report = check_source(
-        r#"
+        r"
 @ nucleum fragment
 functio helper(numerus x) → numerus ⇥ textus {
     redde x
 }
-"#,
+",
     );
     expect_issue(&report.errors, ISSUE_EFFECT, "alternate_exit");
 }
@@ -240,12 +240,12 @@ functio helper(numerus x) → numerus ⇥ textus {
 #[test]
 fn rejects_async_posture() {
     let report = check_source(
-        r#"
+        r"
 @ nucleum fragment
 functio helper(numerus x) fiet → numerus {
     redde x
 }
-"#,
+",
     );
     expect_issue(&report.errors, ISSUE_EFFECT, "async_posture");
 }
@@ -253,12 +253,12 @@ functio helper(numerus x) fiet → numerus {
 #[test]
 fn rejects_generator_posture() {
     let report = check_source(
-        r#"
+        r"
 @ nucleum fragment
 functio helper(numerus x) fiunt → numerus {
     redde x
 }
-"#,
+",
     );
     expect_issue(&report.errors, ISSUE_EFFECT, "generator_posture");
 }
@@ -266,13 +266,13 @@ functio helper(numerus x) fiunt → numerus {
 #[test]
 fn analyze_registers_definition_effect() {
     let result = analyze_source(
-        r#"
+        r"
 @ nucleum fragment
 functio helper(numerus x) → numerus {
     scribe x
     redde x
 }
-"#,
+",
     );
     expect_issue(&result.diagnostics, ISSUE_EFFECT, "host_io");
 }
@@ -280,13 +280,13 @@ functio helper(numerus x) → numerus {
 #[test]
 fn rejects_host_io() {
     let report = check_source(
-        r#"
+        r"
 @ nucleum fragment
 functio helper(numerus x) → numerus {
     scribe x
     redde x
 }
-"#,
+",
     );
     expect_issue(&report.errors, ISSUE_EFFECT, "host_io");
 }
@@ -307,7 +307,7 @@ functio helper() → vacuum {
 #[test]
 fn rejects_host_function_call_at_definition_site() {
     let report = check_source(
-        r#"
+        r"
 functio host_add(numerus x) → numerus {
     redde x + 1
 }
@@ -316,7 +316,7 @@ functio host_add(numerus x) → numerus {
 functio helper(numerus x) → numerus {
     redde host_add(x)
 }
-"#,
+",
     );
     let err = expect_issue(&report.errors, ISSUE_CONTEXT, "host_callable");
     assert!(
@@ -331,7 +331,7 @@ functio helper(numerus x) → numerus {
 #[test]
 fn rejects_entry_callee_at_definition_site() {
     let report = check_source(
-        r#"
+        r"
 @ nucleum
 functio k(numerus x) → numerus {
     redde x
@@ -341,7 +341,7 @@ functio k(numerus x) → numerus {
 functio helper(numerus x) → numerus {
     redde k(x)
 }
-"#,
+",
     );
     expect_issue(&report.errors, ISSUE_CONTEXT, "entry_callee");
 }
@@ -349,7 +349,7 @@ functio helper(numerus x) → numerus {
 #[test]
 fn rejects_dynamic_function_value() {
     let report = check_source(
-        r#"
+        r"
 functio host_add(numerus x) → numerus {
     redde x + 1
 }
@@ -359,7 +359,7 @@ functio helper() → vacuum {
     fixum _ f ← host_add
     redde
 }
-"#,
+",
     );
     expect_issue(&report.errors, ISSUE_EFFECT, "dynamic_function");
 }

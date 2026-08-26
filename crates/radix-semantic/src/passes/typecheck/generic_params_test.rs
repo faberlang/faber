@@ -1,7 +1,5 @@
 //! DEFER-059 ratchet: generic params stay rigid in bodies; call sites instantiate.
 
-use crate::test_support;
-
 fn compile(source: &str) -> crate::test_support::AnalyzedFixture {
     crate::test_support::analyze_source(source)
 }
