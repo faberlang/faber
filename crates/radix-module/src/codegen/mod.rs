@@ -286,12 +286,23 @@ pub fn generate_from_analyzed_with_options(
         Target::HirTypeScript => {
             #[cfg(feature = "hir-ts")]
             {
-                let mut gen = ts::TsCodegen::new(&analysis.hir, &analysis.interner);
+                // Library-mode TypeScript must use the module entry path so
+                // provider files carry named exports and their namespace
+                // aggregate. Clone the analyzed interner only to intern the
+                // output module name; HIR symbol ids remain stable.
+                let mut module_interner = analysis.interner.clone();
+                let gen = if output_mode == OutputMode::Library {
+                    let namespace = module_interner.intern(module_name.unwrap_or("FaberModule"));
+                    ts::TsCodegen::new_module(&analysis.hir, &module_interner, namespace)
+                } else {
+                    ts::TsCodegen::new(&analysis.hir, &module_interner)
+                };
+                let mut gen = gen;
                 gen.set_failable_facts(&ts_failable_facts(&analysis.function_facts));
                 gen.set_library_registry(&analysis.libraries);
                 gen.set_gpu_builtins(&ts_gpu_builtins(&analysis.gpu_builtins));
                 register_cross_file_defids(&mut gen, &analysis.hir, &analysis.resolver);
-                let output = gen.generate(&analysis.hir, &analysis.types, &analysis.interner)?;
+                let output = gen.generate(&analysis.hir, &analysis.types, &module_interner)?;
                 Ok(crate::Output::TypeScript(crate::TypeScriptOutput { code: output.code }))
             }
             #[cfg(not(feature = "hir-ts"))]
