@@ -30,9 +30,9 @@
 # Ratchet: ratchet_baseline is the bare-cell count at mechanism landing. Catch-up
 # batches convert bare -> direct and lower the baseline in the same commit; new
 # surface landing bare raises the count and fails stage 1. Updated 2026-08-26
-# (batch 2: 24 -> 18; batch 3: 18 -> 13).
+# (batch 2: 24 -> 18; batch 3: 18 -> 13; batch 4: 13 -> 0).
 
-ratchet_baseline = 13
+ratchet_baseline = 0
 
 # =============================================================================
 # itera (32 cells: 29 direct / 3 unit-proven / 0 bare)
@@ -311,7 +311,7 @@ expected = true
 note = "batch 3: rank-4 coordinate iteration; .expected pinned from runner stdout"
 
 # =============================================================================
-# summa / maxima / minima (15 cells: 11 direct / 4 bare)
+# summa / maxima / minima (15 cells: 15 direct / 0 bare)
 # =============================================================================
 
 [[cells]]
@@ -416,38 +416,47 @@ note = "batch 1 (bc40c951): rank-1 fold with no coordinate binder; rust lane fai
 id = "summa.filum-rank2"
 family = "summa"
 cell = "filum with rank-2 apud [i,j]"
-status = "bare"
-note = "parser test proves; corpus none"
+status = "direct"
+exemplum = "summa/filum-rank2.fab"
+expected = false
+note = "batch 4: check-proven declaration-only kernel; runner has no entry function"
 
 [[cells]]
 id = "summa.varia-binder"
 family = "summa"
 cell = "varia binder on summa"
-status = "bare"
-note = "parser test proves; corpus none"
+status = "direct"
+exemplum = "summa/varia-binder.fab"
+expected = true
+note = "batch 4: mutable reduction binder; .expected pinned from runner stdout"
 
 [[cells]]
 id = "summa.en-no-thread"
 family = "summa"
 cell = "en sequential sum from WITHOUT thread"
-status = "bare"
-note = "en taught only in kernel form (summa-en.fab)"
+status = "direct"
+exemplum = "summa/summa-en-no-thread.fab"
+expected = true
+note = "batch 4: English host-lane reduction without thread; .expected pinned from runner stdout"
 
 [[cells]]
 id = "summa.extrema-no-coalesce"
 family = "summa"
 cell = "maxima/minima WITHOUT coalesce tail"
-status = "bare"
+status = "direct"
+exemplum = "summa/extrema-no-coalesce.fab"
+expected = true
+note = "batch 4: non-empty max/min reductions without coalesce; .expected pinned from runner stdout"
 
 # =============================================================================
-# bounded-conversio (15 cells: 6 direct / 9 bare)
+# bounded-conversio (15 cells: 15 direct / 0 bare)
 # =============================================================================
-# The bounded×bounded sub-space: corpus teaches only unbounded→bounded
-# (raw ↦ string<8> / bytes<8>). Batch 1 (bc40c951) taught the six
-# semantic-test-proven directions; the nine formerly-UNSETTLED directions
-# were probed at faber check (2026-08-25) — determinations recorded in the
-# row notes (5 reject SEM016:unsupported_conversio, 4 check-admit with
-# runner UnsupportedMir carriers).
+# Existing bounded-conversio teaching began with unbounded→bounded
+# (raw ↦ string<8> / bytes<8>). Batch 1 (bc40c951) taught six
+# semantic-test-proven directions; batch 4 adds the nine bounded-origin
+# directions: five frontend declines and four check-admitted routes whose
+# runner carriers remain UnsupportedMir. The row notes retain each measured
+# classification and reason.
 
 [[cells]]
 id = "bconv.ascii-to-textus"
@@ -509,64 +518,87 @@ note = "batch 1 (bc40c951): runner-proven (list<f32,8> ↦ tf32[8]; shape/sum/la
 id = "bconv.octeti-to-textus"
 family = "bounded-conversio"
 cell = "octeti<N> ↦ textus"
-status = "bare"
-note = "probe 2026-08-25 (bc40c951): REJECT SEM016:unsupported_conversio"
+status = "direct"
+exemplum = "bounded/conversio-octeti-to-textus-decline.fab"
+expected = true
+decline = true
+note = "batch 4: frontend decline pinned as SEM016:unsupported_conversio"
 
 [[cells]]
 id = "bconv.octeti-to-octeti"
 family = "bounded-conversio"
 cell = "octeti<N> ↦ octeti<M>"
-status = "bare"
-note = "probe 2026-08-25 (bc40c951): REJECT SEM016:unsupported_conversio (direct literal ↦ over-capacity also declines)"
+status = "direct"
+exemplum = "bounded/conversio-octeti-to-octeti-decline.fab"
+expected = true
+decline = true
+note = "batch 4: frontend decline pinned as SEM016:unsupported_conversio"
 
 [[cells]]
 id = "bconv.octeti-to-lista"
 family = "bounded-conversio"
 cell = "octeti<N> ↦ lista<u8>"
-status = "bare"
-note = "probe 2026-08-25 (bc40c951): ADMIT at check; runner lacks bounded octeti carrier (UnsupportedMir)"
+status = "direct"
+exemplum = "bounded/conversio-octeti-to-lista.fab"
+expected = false
+note = "batch 4: check-admitted u8 list bridge; runner lacks bounded octeti carrier (UnsupportedMir)"
 
 [[cells]]
 id = "bconv.textus-to-bounded-textus"
 family = "bounded-conversio"
 cell = "textus<N> ↦ textus<M>"
-status = "bare"
-note = "probe 2026-08-25 (bc40c951): REJECT SEM016:unsupported_conversio"
+status = "direct"
+exemplum = "bounded/conversio-textus-to-bounded-textus-decline.fab"
+expected = true
+decline = true
+note = "batch 4: frontend decline pinned as SEM016:unsupported_conversio"
 
 [[cells]]
 id = "bconv.textus-to-ascii"
 family = "bounded-conversio"
 cell = "textus<N> ↦ ascii<M>"
-status = "bare"
-note = "probe 2026-08-25 (bc40c951): REJECT SEM016:unsupported_conversio"
+status = "direct"
+exemplum = "bounded/conversio-textus-to-ascii-decline.fab"
+expected = true
+decline = true
+note = "batch 4: frontend decline pinned as SEM016:unsupported_conversio"
 
 [[cells]]
 id = "bconv.textus-to-octeti"
 family = "bounded-conversio"
 cell = "textus<N> ↦ octeti<N>"
-status = "bare"
-note = "probe 2026-08-25 (bc40c951): REJECT SEM016:unsupported_conversio"
+status = "direct"
+exemplum = "bounded/conversio-textus-to-octeti-decline.fab"
+expected = true
+decline = true
+note = "batch 4: frontend decline pinned as SEM016:unsupported_conversio"
 
 [[cells]]
 id = "bconv.lista-to-bounded-textus"
 family = "bounded-conversio"
 cell = "lista<T,N> ↦ textus<M>"
-status = "bare"
-note = "probe 2026-08-25 (bc40c951): ADMIT at check; runner lacks bounded textus carrier (UnsupportedMir)"
+status = "direct"
+exemplum = "bounded/conversio-lista-to-bounded-textus.fab"
+expected = false
+note = "batch 4: check-admitted route; runner lacks bounded textus carrier (UnsupportedMir)"
 
 [[cells]]
 id = "bconv.lista-to-bounded-lista"
 family = "bounded-conversio"
 cell = "lista<T,N> ↦ lista<T,M>"
-status = "bare"
-note = "probe 2026-08-25 (bc40c951): ADMIT at check (shrink + grow); runner lacks runtime conversio to BoundedArray (UnsupportedMir)"
+status = "direct"
+exemplum = "bounded/conversio-lista-to-bounded-lista.fab"
+expected = false
+note = "batch 4: check-admitted shrink route; runner lacks runtime BoundedArray conversio (UnsupportedMir)"
 
 [[cells]]
 id = "bconv.lista-to-octeti"
 family = "bounded-conversio"
 cell = "lista<T,N> ↦ octeti<M>"
-status = "bare"
-note = "probe 2026-08-25 (bc40c951): ADMIT at check; runner lacks bounded octeti carrier (UnsupportedMir)"
+status = "direct"
+exemplum = "bounded/conversio-lista-to-octeti.fab"
+expected = false
+note = "batch 4: check-admitted u8 byte bridge; runner lacks bounded octeti carrier (UnsupportedMir)"
 
 # =============================================================================
 # annotations (8 cells: 8 direct / 0 bare)
