@@ -1811,8 +1811,10 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
         // (the `InferOneD` fallback). The substituted static return type is
         // the shape authority (ABI source of truth): prefer its literal dims
         // whenever they resolve, and fall back to the lowered shape operand.
-        let static_shape =
-            radix_mir::lista_tensor_conversio::literal_tensor_dims(return_ty.semantic_id(), self.types);
+        let static_shape = radix_mir::lista_tensor_conversio::literal_tensor_dims(
+            return_ty.semantic_id(),
+            self.types,
+        );
         let [_receiver, flat, shape, fill] = args else {
             // AEU-5 Route C: the padded form carries a trailing fill operand
             // for slots `len..N` of the bounded-lista snapshot.

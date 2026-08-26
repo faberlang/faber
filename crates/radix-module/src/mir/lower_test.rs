@@ -5966,8 +5966,7 @@ fn copia_mappata_fails_closed_before_set_mir_lowering() {
     redde s.mappata(numerus n ∴ n * 2)
 }",
     );
-    let errors = dump_analyzed_unit(&mut unit)
-        .expect_err("copia mappata must fail closed before set MIR lowering");
+    let errors = dump_analyzed_unit(&mut unit).expect_err("copia mappata must fail closed before set MIR lowering");
     assert!(
         errors
             .iter()

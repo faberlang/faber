@@ -1394,7 +1394,10 @@ fn failable_call_propagation_composes_declared_row_channel() {
     h.enroll_user(textus, numerus, row_fn);
     let row_sig = h.conversion_fn_sig(Some(numerus));
     let call_sig = h.total_sig();
-    let call_sig = FuncSig { err: Some(textus), ..call_sig };
+    let call_sig = FuncSig {
+        err: Some(textus),
+        ..call_sig
+    };
 
     let mut checker = h.checker();
     checker.functions.insert(row_fn, row_sig);
@@ -1441,8 +1444,14 @@ fn failable_call_propagation_rejects_declared_channel_mismatch() {
         .iter()
         .find(|diag| diag.issue() == Some("failable_call_conversion_absent"))
         .expect("SEM010-shaped conversion-absent diagnostic");
-    assert!(err.args.iter().any(|arg| arg.name == "source" && arg.value == "bivalens"));
-    assert!(err.args.iter().any(|arg| arg.name == "destination" && arg.value == "numerus"));
+    assert!(err
+        .args
+        .iter()
+        .any(|arg| arg.name == "source" && arg.value == "bivalens"));
+    assert!(err
+        .args
+        .iter()
+        .any(|arg| arg.name == "destination" && arg.value == "numerus"));
 }
 
 #[test]
@@ -1470,8 +1479,14 @@ fn failable_call_propagation_requires_direct_row_only() {
         .iter()
         .find(|diag| diag.issue() == Some("failable_call_conversion_absent"))
         .expect("SEM010-shaped conversion-absent diagnostic");
-    assert!(err.args.iter().any(|arg| arg.name == "source" && arg.value == "textus"));
-    assert!(err.args.iter().any(|arg| arg.name == "destination" && arg.value == "fractus"));
+    assert!(err
+        .args
+        .iter()
+        .any(|arg| arg.name == "source" && arg.value == "textus"));
+    assert!(err
+        .args
+        .iter()
+        .any(|arg| arg.name == "destination" && arg.value == "fractus"));
 }
 
 #[test]
@@ -1528,7 +1543,10 @@ fn local_handler_mismatch_keeps_handler_issue_not_registry_seam() {
     let admitted = checker.reject_failable_call(&call_sig, crate::test_support::test_span());
     assert!(!admitted);
     assert_eq!(checker.pending_conversion, None);
-    assert!(has_issue(&checker, "failable_call_handler_error_type_mismatch"));
+    assert!(has_issue(
+        &checker,
+        "failable_call_handler_error_type_mismatch"
+    ));
     assert!(
         !has_issue(&checker, "failable_call_conversion_absent"),
         "the local sink must not consult the failable-call seam"
@@ -1603,8 +1621,14 @@ fn bare_arrow_through_registered_row_composes_declared_channel() {
         .iter()
         .find(|diag| diag.issue() == Some("failable_call_conversion_absent"))
         .expect("SEM010-shaped conversion-absent diagnostic");
-    assert!(err.args.iter().any(|arg| arg.name == "source" && arg.value == "bivalens"));
-    assert!(err.args.iter().any(|arg| arg.name == "destination" && arg.value == "numerus"));
+    assert!(err
+        .args
+        .iter()
+        .any(|arg| arg.name == "source" && arg.value == "bivalens"));
+    assert!(err
+        .args
+        .iter()
+        .any(|arg| arg.name == "destination" && arg.value == "numerus"));
 }
 
 #[test]
@@ -1771,6 +1795,12 @@ fn conversio_assign_channel_mismatch_keeps_sem010_shape() {
         .iter()
         .find(|diag| diag.issue() == Some("failable_call_conversion_absent"))
         .expect("SEM010-shaped conversion-absent diagnostic");
-    assert!(err.args.iter().any(|arg| arg.name == "source" && arg.value == "bivalens"));
-    assert!(err.args.iter().any(|arg| arg.name == "destination" && arg.value == "numerus"));
+    assert!(err
+        .args
+        .iter()
+        .any(|arg| arg.name == "source" && arg.value == "bivalens"));
+    assert!(err
+        .args
+        .iter()
+        .any(|arg| arg.name == "destination" && arg.value == "numerus"));
 }

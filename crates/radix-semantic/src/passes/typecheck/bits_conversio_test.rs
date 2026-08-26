@@ -247,6 +247,12 @@ fn bits_builtin_row_carries_no_declared_channel() {
         .iter()
         .find(|diag| diag.issue() == Some("failable_call_conversion_absent"))
         .expect("SEM010-shaped absence diagnostic retained");
-    assert!(err.args.iter().any(|arg| arg.name == "source" && arg.value == "numerus<u32>"));
-    assert!(err.args.iter().any(|arg| arg.name == "destination" && arg.value == "fractus<f32>"));
+    assert!(err
+        .args
+        .iter()
+        .any(|arg| arg.name == "source" && arg.value == "numerus<u32>"));
+    assert!(err
+        .args
+        .iter()
+        .any(|arg| arg.name == "destination" && arg.value == "fractus<f32>"));
 }

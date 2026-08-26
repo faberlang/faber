@@ -3,11 +3,11 @@
 //! nominal kinds, type params, and callables resolve correctly.
 
 use super::{
-    FileExport, FileExportKind, FileInterface, FileInterfaceError, InterfaceAliasExport, InterfaceAppliedArg,
-    InterfaceBodyChannel, InterfaceCallable, InterfaceCanonicalBody, InterfaceDeviceContract, InterfaceDeviceRole,
-    InterfaceDeviceVisibility, InterfaceGenericParam, InterfaceIndexSnapshot, InterfaceLibraryIdentity,
-    InterfaceNominalKind, InterfaceNominalType, InterfaceParam, InterfaceStructExport, InterfaceStructField,
-    InterfaceTypeParamConstraint, InterfaceTypeSnapshot, import_interface_type, snapshot_interface_type,
+    import_interface_type, snapshot_interface_type, FileExport, FileExportKind, FileInterface, FileInterfaceError,
+    InterfaceAliasExport, InterfaceAppliedArg, InterfaceBodyChannel, InterfaceCallable, InterfaceCanonicalBody,
+    InterfaceDeviceContract, InterfaceDeviceRole, InterfaceDeviceVisibility, InterfaceGenericParam,
+    InterfaceIndexSnapshot, InterfaceLibraryIdentity, InterfaceNominalKind, InterfaceNominalType, InterfaceParam,
+    InterfaceStructExport, InterfaceStructField, InterfaceTypeParamConstraint, InterfaceTypeSnapshot,
 };
 use crate::lexer::Interner;
 use crate::semantic::{

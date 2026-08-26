@@ -113,7 +113,10 @@ fn bad(set<int> s) → list<int> {
     let mut config = crate::PassConfig::for_target(Target::HirRust);
     config.locale_pack = Some(en_pack());
     let result = crate::test_support::analyze_source_with_config(source, config);
-    assert!(!result.is_ok(), "set filter result must be a set, not a list");
+    assert!(
+        !result.is_ok(),
+        "set filter result must be a set, not a list"
+    );
 }
 
 // ── F2-SET-MAP: set image closure (set<U> result) ───────────────────────

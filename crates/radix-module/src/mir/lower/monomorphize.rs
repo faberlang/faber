@@ -516,11 +516,7 @@ impl<'lowerer, 'unit> MonomorphizationState<'lowerer, 'unit> {
     /// rigid param node (GSF-1 forwarding) — the key derivation resolves it
     /// through the calling instance's shape bindings. Anything else fails
     /// closed so wrong-kind rejection is preserved.
-    fn explicit_shape_witness(
-        &mut self,
-        concrete: MirType,
-        span: Span,
-    ) -> Option<IndexId> {
+    fn explicit_shape_witness(&mut self, concrete: MirType, span: Span) -> Option<IndexId> {
         let Type::Param(sym) = self.types().get(concrete.semantic_id()) else {
             return None;
         };
@@ -657,9 +653,7 @@ impl<'lowerer, 'unit> MonomorphizationState<'lowerer, 'unit> {
     ) -> bool {
         match &mut statement.kind {
             MirStatementKind::Assign { value, .. } => self.substitute_value(value, bindings, span),
-            MirStatementKind::Call { callee, .. } => {
-                self.substitute_callee(callee, bindings, shape_params, span)
-            }
+            MirStatementKind::Call { callee, .. } => self.substitute_callee(callee, bindings, shape_params, span),
             MirStatementKind::RuntimeCall { call, .. } => self.substitute_runtime_call(call, bindings, span),
             MirStatementKind::Construct { aggregate, .. } => self.substitute_aggregate(aggregate, bindings, span),
         }

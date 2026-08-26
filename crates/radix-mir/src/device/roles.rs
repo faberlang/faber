@@ -127,7 +127,10 @@ pub fn is_public_entry(func: &HirFunction, interner: &Interner) -> bool {
 /// unchanged (fragments are never launchable compute entries and the survivor
 /// scan needs the role).
 #[must_use]
-pub fn device_entry_roles_from_hir(hir: &HirModule, interner: &Interner) -> FxHashMap<DefId, MirDeviceRole> {
+pub fn device_entry_roles_from_hir(
+    hir: &HirModule,
+    interner: &Interner,
+) -> FxHashMap<DefId, MirDeviceRole> {
     let mut roles_by_def = FxHashMap::default();
     for item in &hir.items {
         match &item.kind {
@@ -150,10 +153,15 @@ pub fn device_entry_roles_from_hir(hir: &HirModule, interner: &Interner) -> FxHa
 }
 
 #[must_use]
-fn device_entry_role_for_hir_function(func: &HirFunction, interner: &Interner) -> Option<MirDeviceRole> {
+fn device_entry_role_for_hir_function(
+    func: &HirFunction,
+    interner: &Interner,
+) -> Option<MirDeviceRole> {
     match device_role_for_hir_function(func) {
         // The entry gate: a compute kernel is launchable only when public.
-        Some(MirDeviceRole::Kernel) if is_public_entry(func, interner) => Some(MirDeviceRole::Kernel),
+        Some(MirDeviceRole::Kernel) if is_public_entry(func, interner) => {
+            Some(MirDeviceRole::Kernel)
+        }
         // Fragments keep their role unchanged; they are never launchable
         // compute entries and the survivor scan still needs the classification.
         Some(MirDeviceRole::Fragment) => Some(MirDeviceRole::Fragment),

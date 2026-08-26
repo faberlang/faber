@@ -3334,11 +3334,13 @@ import from "./kernels" k
     )
     .expect("app");
 
-    let identities =
-        package_identity_facts_for_path(&app).expect("package identity facts for the consumer");
+    let identities = package_identity_facts_for_path(&app).expect("package identity facts for the consumer");
     assert_eq!(identities.module_segments, vec!["app".to_owned()]);
     assert_eq!(
-        identities.imports.get("k").map(|segments| segments.as_slice()),
+        identities
+            .imports
+            .get("k")
+            .map(|segments| segments.as_slice()),
         Some(&["kernels".to_owned()][..])
     );
 

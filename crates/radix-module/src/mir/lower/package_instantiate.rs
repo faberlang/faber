@@ -609,8 +609,7 @@ impl PackageInstantiate<'_> {
                 // Size-only generics: NATURAL typeArguments bind magnitudo
                 // params; a caller-owned symbolic `Param` resolves through
                 // the calling instance's shape bindings (GSF-1 forwarding).
-                let Some(index) = self.explicit_shape_witness(concrete, parent_shapes, span)
-                else {
+                let Some(index) = self.explicit_shape_witness(concrete, parent_shapes, span) else {
                     self.errors.push(MirError::validation(
                         span,
                         "generic call type argument does not match parameter kind",
@@ -837,12 +836,7 @@ impl PackageInstantiate<'_> {
             .push(ImportedDeviceRegistration { key: key.clone(), function, route });
     }
 
-    fn substitute_function(
-        &mut self,
-        function: &mut MirFunction,
-        bindings: &MirGenericBindings,
-        span: Span,
-    ) -> bool {
+    fn substitute_function(&mut self, function: &mut MirFunction, bindings: &MirGenericBindings, span: Span) -> bool {
         // Shape params of the generic being instantiated (GSF-1): forwarded
         // size witnesses in nested callee type args stay symbolic through
         // typus substitution.

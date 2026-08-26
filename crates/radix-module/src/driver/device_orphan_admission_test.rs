@@ -9,7 +9,7 @@
 use super::compile;
 use crate::codegen::Target;
 use crate::diagnostics::DiagnosticArg;
-use crate::driver::{AnalyzeRequest, ModuleCompileRequest, analyze_source};
+use crate::driver::{analyze_source, AnalyzeRequest, ModuleCompileRequest};
 use crate::test_support::test_session;
 
 /// The spike's uninstantiated generic shape: annotated, public, never called.

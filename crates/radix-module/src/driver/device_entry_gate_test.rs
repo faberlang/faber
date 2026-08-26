@@ -49,9 +49,7 @@ fn def_id_for_function(analysis: &crate::driver::AnalyzedModule, name: &str) -> 
         .items
         .iter()
         .find_map(|item| match &item.kind {
-            radix_hir::HirItemKind::Function(func) if analysis.interner.resolve(func.name) == name => {
-                Some(item.def_id)
-            }
+            radix_hir::HirItemKind::Function(func) if analysis.interner.resolve(func.name) == name => Some(item.def_id),
             _ => None,
         })
         .unwrap_or_else(|| panic!("no function named {name} in analyzed unit"))
@@ -93,12 +91,7 @@ fn nvvm_emit_produces_exactly_one_entry_row_for_the_pair() {
             .with_dev_stdlib()
             .with_nvvm_device_module(),
     );
-    let result = compile(
-        &session,
-        "entry-pair.fab",
-        PUBLIC_PRIVATE_PAIR,
-        ModuleCompileRequest::default(),
-    );
+    let result = compile(&session, "entry-pair.fab", PUBLIC_PRIVATE_PAIR, ModuleCompileRequest::default());
     assert!(result.success(), "compile failed: {:?}", result.diagnostics);
     let Some(crate::Output::LlvmText(output)) = result.output else {
         panic!("expected llvm-text output");
