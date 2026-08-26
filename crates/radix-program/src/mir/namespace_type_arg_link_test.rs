@@ -44,6 +44,26 @@ main {
 }
 "#;
 
+const TYPEARG_FORWARD_MAIN: &str = r#"import from "./util" * as utilModule
+
+fn forward<size N>(tensor<f32, [N]> x) → tensor<f32, [N]> {
+    return utilModule.id<N>(x)
+}
+
+fn run() → f32 {
+    const tensor<f32, [3]> a ← [1.5, 2.5, 3.5] ↦ tensor<f32, [3]>
+    const tensor<f32, [5]> b ← [1.0, 2.0, 3.0, 4.0, 5.0] ↦ tensor<f32, [5]>
+    const tensor<f32, [3]> ra ← forward<3>(a)
+    const tensor<f32, [5]> rb ← forward<5>(b)
+    const tensor<f32, [3]> rc ← ra ↦ tensor<f32, [3]>
+    return rc[1]
+}
+
+main {
+    print run()
+}
+"#;
+
 fn write_typearg_package(dir: &std::path::Path, main_source: &str) -> std::path::PathBuf {
     let src = dir.join("src");
     fs::create_dir_all(&src).expect("create package src");
@@ -107,6 +127,27 @@ fn first_param_shape(lowered: &LoweredMirUnit<'_>, function_name: &str) -> Optio
         .next()
 }
 
+fn named_param_shapes(lowered: &LoweredMirUnit<'_>, function_name: &str) -> Vec<Vec<i64>> {
+    let types = lowered.validated.validation().types;
+    lowered
+        .program
+        .functions
+        .iter()
+        .filter(|function| {
+            function
+                .name
+                .is_some_and(|name| lowered.interner.resolve(name) == function_name)
+        })
+        .filter_map(|function| {
+            let param = function.params.first()?;
+            match types.get(param.ty.semantic_id()) {
+                Type::Tensor(_, shape) => literal_dims(types, *shape),
+                _ => None,
+            }
+        })
+        .collect()
+}
+
 #[test]
 fn package_mir_links_explicit_type_arg_namespace_call() {
     let dir = crate::test_support::test_temp_dir("ns-typearg-explicit");
@@ -159,5 +200,45 @@ fn package_mir_links_inferred_type_arg_namespace_call() {
             "inferred type-arg namespace call must link, got {:?}",
             errors
         )
+    });
+}
+
+#[test]
+fn package_mir_links_generic_caller_forwarding_type_args_to_namespace_callee() {
+    // GSF-3: the generic caller spells the callee sizes with its own symbols
+    // (`utilModule.id<N>`). The namespace rewrite plus package monomorphization
+    // must instantiate the imported `id` at EVERY forwarded concrete size, not
+    // merely keep the caller's own static signature consistent.
+    let dir = crate::test_support::test_temp_dir("ns-typearg-forward");
+    let entry = write_typearg_package(dir.as_ref(), TYPEARG_FORWARD_MAIN);
+    let config = Config::default();
+
+    with_interpreted_lowered_package_mir(
+        &config,
+        &entry,
+        &crate::test_support::test_mir_seams(),
+        |lowered| {
+            let id_shapes = named_param_shapes(lowered, "id");
+            for size in [3i64, 5] {
+                assert!(
+                    id_shapes.iter().any(|shape| shape == &vec![size]),
+                    "imported `utilModule.id` forwarded from `forward<{size}>` must \
+                     instantiate at the concrete [{size}] signature, got {id_shapes:?}"
+                );
+            }
+            let forward_shapes = named_param_shapes(lowered, "forward");
+            for size in [3i64, 5] {
+                assert!(
+                    forward_shapes.iter().any(|shape| shape == &vec![size]),
+                    "`forward<{size}>` must instantiate at [{size}], got {forward_shapes:?}"
+                );
+            }
+        },
+    )
+    .unwrap_or_else(|errors| {
+        panic!(
+            "generic namespace forwarding package must link and run, got {:?}",
+            errors
+        );
     });
 }
