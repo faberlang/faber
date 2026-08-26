@@ -51,7 +51,6 @@ fn emit_shape_error() -> String {
                     ty: textus,
                     span: span(),
                 }],
-                conversion_arms: Vec::new(),
                 variants: vec![
                     HirVariant {
                         def_id: incompatible_def,

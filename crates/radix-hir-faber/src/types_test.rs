@@ -1534,7 +1534,6 @@ fn union_last_variant_has_no_trailing_comma() {
         type_params: Vec::new(),
         annotations: Vec::new(),
         commune_fields: Vec::new(),
-        conversion_arms: Vec::new(),
         variants: vec![
             HirVariant {
                 def_id: DefId(1),
@@ -1641,7 +1640,6 @@ fn enum_publica_annotation_reemits() {
             type_params: Vec::new(),
             annotations: vec![HirAnnotation::with_fields(publica, Vec::new(), span())],
             commune_fields: Vec::new(),
-            conversion_arms: Vec::new(),
             variants: vec![HirVariant {
                 def_id: DefId(1),
                 name: interner.intern("F32"),
@@ -1719,7 +1717,6 @@ fn call_to_local_variant_reemits_finge_construction() {
         type_params: Vec::new(),
         annotations: Vec::new(),
         commune_fields: Vec::new(),
-        conversion_arms: Vec::new(),
         variants: vec![HirVariant {
             def_id: variant_def,
             name: interner.intern("F32"),
@@ -1815,7 +1812,6 @@ fn finge_with_named_fields_reemits_braced_fields() {
         type_params: Vec::new(),
         annotations: Vec::new(),
         commune_fields: Vec::new(),
-        conversion_arms: Vec::new(),
         variants: vec![HirVariant {
             def_id: variant_def,
             name: interner.intern("FormaInvalida"),
