@@ -616,5 +616,9 @@ mod namespace_type_arg_link_tests;
 mod generic_size_forwarding_tests;
 
 #[cfg(test)]
+#[path = "generic_pin_link_test.rs"]
+mod generic_pin_link_tests;
+
+#[cfg(test)]
 #[path = "const_member_lane_test.rs"]
 mod const_member_lane_tests;
