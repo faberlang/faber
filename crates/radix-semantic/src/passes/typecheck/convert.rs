@@ -61,6 +61,13 @@ const ISSUE_ASCII_PACK_WIDTH_OVERFLOW: &str = "ascii_pack_width_overflow";
 const ISSUE_ASCII_PACK_NEGATIVE_SOURCE: &str = "ascii_pack_negative_source";
 const ISSUE_OCTETI_TO_FRACTUS_UNSPECIFIED: &str = "octeti_to_fractus_unspecified";
 const ISSUE_BITS_PAIR_WIDTH_MISMATCH: &str = "bits_pair_width_mismatch";
+// decimal-widths D2 (wildcard audit): the conversio slot-2 hints are
+// integer-family machinery. Radix text parse (Hex/Bin/Oct), endian unpack
+// (Be/Le), and the IEEE bitcast (Bits) all reject decimal targets/sources
+// with named teaching issues instead of a generic mismatch.
+const ISSUE_DECIMAL_RADIX_HINT_REJECTED: &str = "decimal_radix_hint_rejected";
+const ISSUE_DECIMAL_ENDIAN_HINT_REJECTED: &str = "decimal_endianness_hint_rejected";
+const ISSUE_DECIMAL_BITS_HINT_REJECTED: &str = "decimal_bits_hint_rejected";
 const ISSUE_BITS_HINT_CONFLICT: &str = "conversio_bits_format_hint_conflict";
 const ISSUE_OCTETI_TO_BIVALENS_UNSUPPORTED: &str = "octeti_to_bivalens_unsupported";
 const ISSUE_PROMISSUM_TARGET_BOUNDARY: &str = "promissum_target_boundary";
@@ -295,6 +302,13 @@ impl TypeChecker<'_> {
             return self.error_type;
         };
         let target_resolved = self.resolve_inferred_type(*target);
+        // decimal-widths D2 (wildcard audit): any conversio slot-2 hint aimed
+        // at a decimal numerus target rejects here — radix text parse, endian
+        // unpack, and the Bits bitcast are integer/IEEE-family only.
+        if let Some(issue) = self.decimal_target_hint_issue(target_resolved, params) {
+            self.invalid_conversion(issue, span);
+            return self.error_type;
+        }
         // S0-G2: `↦` dispatch is value-transparent through applied aliases —
         // the shape arms below (vector/matrix/tensor materialization) see the
         // substituted builtin carrier, while a successful conversion keeps
@@ -1118,6 +1132,27 @@ impl TypeChecker<'_> {
             .any(|param| matches!(interner.resolve(*param), "Be" | "Le"))
     }
 
+    /// decimal-widths D2 (wildcard audit): named reject for conversio slot-2
+    /// hints aimed at a decimal numerus target — `textus ↦ numerus<d32, Hex>`,
+    /// `octeti ↦ numerus<d32, Be>`, and every other hint spelling.
+    fn decimal_target_hint_issue(&self, target_resolved: TypeId, params: &[Symbol]) -> Option<&'static str> {
+        if !matches!(
+            self.types.get(target_resolved),
+            Type::SizedNumeric(Primitive::Numerus, width) if width.is_decimal()
+        ) {
+            return None;
+        }
+        let Some(interner) = self.interner else {
+            return None;
+        };
+        params.iter().find_map(|param| match interner.resolve(*param) {
+            "Hex" | "Bin" | "Oct" => Some(ISSUE_DECIMAL_RADIX_HINT_REJECTED),
+            "Be" | "Le" => Some(ISSUE_DECIMAL_ENDIAN_HINT_REJECTED),
+            "Bits" => Some(ISSUE_DECIMAL_BITS_HINT_REJECTED),
+            _ => None,
+        })
+    }
+
     /// `Bits` is an exact-width IEEE bitcast: `u16↔bf16`, `u16↔f16`,
     /// `u32↔f32`, and `u64↔f64` only. `bf16` is the top half of an f32
     /// value, not an f16 representation, so `bf16↔f16` remains an ordinary
@@ -1137,6 +1172,13 @@ impl TypeChecker<'_> {
         }
         let source = self.types.get(self.resolve_inferred_type(source_ty));
         let target = self.types.get(target_resolved);
+        // decimal-widths D2 (wildcard audit): a decimal carrier never bitcasts
+        // — the scaled-integer representation is not an IEEE bit pattern.
+        if matches!(source, Type::SizedNumeric(Primitive::Numerus, w) if w.is_decimal())
+            || matches!(target, Type::SizedNumeric(Primitive::Numerus, w) if w.is_decimal())
+        {
+            return Some(ISSUE_DECIMAL_BITS_HINT_REJECTED);
+        }
         let exact_pair = matches!(
             (source, target),
             (
@@ -1206,6 +1248,15 @@ impl TypeChecker<'_> {
                         self.invalid_conversion(ISSUE_UNSUPPORTED_CONVERSIO, span);
                         return Some(self.error_type);
                     }
+                }
+                // decimal-widths D2 (wildcard audit): `n ↦ ascii<N, Hex>` is
+                // integer digit packing; a scaled decimal has no radix digits.
+                if matches!(
+                    self.types.get(self.resolve_inferred_type(source_ty)),
+                    Type::SizedNumeric(Primitive::Numerus, width) if width.is_decimal()
+                ) {
+                    self.invalid_conversion(ISSUE_DECIMAL_RADIX_HINT_REJECTED, span);
+                    return Some(self.error_type);
                 }
 
                 // AP-2: a hole is a const-folding witness, not a runtime

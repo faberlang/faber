@@ -30,6 +30,7 @@ const ISSUE_TENSOR_ARITHMETIC_NUMERIC_ELEMENT_REQUIRED: &str =
 const ISSUE_MATRIX_ARITHMETIC_NUMERIC_ELEMENT_REQUIRED: &str =
     "matrix_arithmetic_numeric_element_required";
 const ISSUE_TENSOR_INDEX_VECTOR_INTEGER_ELEMENTS: &str = "tensor_index_vector_integer_elements";
+const ISSUE_TENSOR_MEDIA_DECIMAL: &str = "tensor_media_decimal_rejected";
 const ISSUE_IMPERATIVUS_OPERATOR_METHOD_REQUIRES_VARIA_RECEIVER: &str =
     "imperativus_operator_method_requires_varia_receiver";
 pub(super) const ISSUE_ATOMIC_METHOD_REQUIRES_ATOMIC_RECEIVER: &str =
@@ -728,6 +729,15 @@ fn resolve_return_type(
             };
             if let Some(width) = crate::numeric_width::tensor_media_width(checker.types, inner) {
                 checker.types.sized_numeric(Primitive::Fractus, width)
+            } else if matches!(
+                checker.types.get(checker.resolve_inferred_type(inner)),
+                Type::SizedNumeric(Primitive::Numerus, width) if width.is_decimal()
+            ) {
+                // decimal-widths D2 (wildcard audit): decimal elements are the
+                // named tensor-media reject — teaching issue, not the generic
+                // numeric-element one.
+                checker.invalid_operand_types(ISSUE_TENSOR_MEDIA_DECIMAL, span);
+                checker.error_type
             } else {
                 checker
                     .invalid_operand_types(ISSUE_TENSOR_ARITHMETIC_NUMERIC_ELEMENT_REQUIRED, span);

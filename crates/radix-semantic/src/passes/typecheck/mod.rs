@@ -722,6 +722,10 @@ mod equality_exact_types_test;
 mod decimal_width_literal_test;
 
 #[cfg(test)]
+#[path = "decimal_taxonomy_test.rs"]
+mod decimal_taxonomy_test;
+
+#[cfg(test)]
 #[path = "generic_call_test.rs"]
 mod generic_call_test;
 

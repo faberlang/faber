@@ -509,6 +509,16 @@ pub const TENSOR_ELEMENT_NUMERIC_MSG: &str = "tensor arithmetic requires numeric
 /// global signed↔unsigned lattice.
 pub const TENSOR_INDEX_VECTOR_MSG: &str = "tensor index vector requires lista of integer elements";
 
+/// decimal-widths D2 (wildcard audit): decimal widths are value scalars, not
+/// positions. A `numerus<d32|d64>` index would scale-address storage — the
+/// bracket index boundary is integer-only.
+pub const DECIMAL_INDEX_SCALAR_MSG: &str = "decimal-width numerus cannot index; decimal widths are scaled values, not positions — use an integer width such as numerus<i32>";
+
+/// decimal-widths D2 (wildcard audit): tensor `media` reduces over a float
+/// carrier to avoid integer division; a decimal element has no defined media
+/// carrier yet (conversio rows are D3), so it fails closed here.
+pub const DECIMAL_TENSOR_MEDIA_MSG: &str = "tensor media does not accept decimal-width elements; convert to fractus<f64> first";
+
 /// Whether `ty` is a `lista<integer>` usable as a tensor index vector (DEFER-064).
 ///
 /// Accepts integer widths that fit in `i64` (`numerus`, `numerus<u32>`, …);
@@ -526,12 +536,27 @@ pub fn is_integer_index_vector(types: &TypeTable, ty: TypeId) -> bool {
 }
 
 /// Whether `ty` is a single integer value that fits the tensor index boundary.
+///
+/// decimal-widths D2: decimal markers reject — a scaled value is not a
+/// position (audit class: index scalars, wrong-to-inherit).
 #[must_use]
 pub fn is_integer_index_scalar(types: &TypeTable, ty: TypeId) -> bool {
     match types.get(ty) {
         Type::Primitive(Primitive::Numerus) => true,
-        Type::SizedNumeric(Primitive::Numerus, width) => *width != NumericWidth::U64,
+        Type::SizedNumeric(Primitive::Numerus, width) => {
+            *width != NumericWidth::U64 && !width.is_decimal()
+        }
         Type::Alias(_, inner) => is_integer_index_scalar(types, *inner),
+        _ => false,
+    }
+}
+
+/// Whether `ty` is a decimal-width numerus scalar (index-audit reject probe).
+#[must_use]
+pub fn is_decimal_index_scalar(types: &TypeTable, ty: TypeId) -> bool {
+    match types.get(ty) {
+        Type::SizedNumeric(Primitive::Numerus, width) => width.is_decimal(),
+        Type::Alias(_, inner) => is_decimal_index_scalar(types, *inner),
         _ => false,
     }
 }
@@ -540,12 +565,14 @@ pub fn is_integer_index_scalar(types: &TypeTable, ty: TypeId) -> bool {
 ///
 /// `numerus` family reduces to `fractus<f64>` to avoid integer division;
 /// `fractus` family keeps its own width so `tf32` media stays `f32`.
+/// decimal-widths D2: decimal elements reject — there is no float media
+/// carrier for a scaled integer yet (audit class: tensor media).
 #[must_use]
 pub fn tensor_media_width(types: &TypeTable, elem: TypeId) -> Option<NumericWidth> {
     match types.get(elem) {
-        Type::Primitive(Primitive::Numerus) | Type::SizedNumeric(Primitive::Numerus, _) => {
-            Some(NumericWidth::F64)
-        }
+        Type::Primitive(Primitive::Numerus) => Some(NumericWidth::F64),
+        Type::SizedNumeric(Primitive::Numerus, width) if width.is_decimal() => None,
+        Type::SizedNumeric(Primitive::Numerus, _) => Some(NumericWidth::F64),
         Type::Primitive(Primitive::Fractus) => Some(NumericWidth::F64),
         Type::SizedNumeric(Primitive::Fractus, width) => Some(*width),
         Type::Alias(_, inner) => tensor_media_width(types, *inner),

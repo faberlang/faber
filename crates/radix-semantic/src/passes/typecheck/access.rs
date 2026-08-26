@@ -29,6 +29,7 @@ const ISSUE_MAP_INDEX_TYPE_MISMATCH: &str = "map_index_type_mismatch";
 const ISSUE_TENSOR_INDEX_VECTOR_INTEGER_ELEMENTS: &str = "tensor_index_vector_integer_elements";
 const ISSUE_TENSOR_SCALAR_INDEX_RANK: &str = "tensor_scalar_index_rank";
 const ISSUE_TENSOR_BRACKET_INDEX_INTEGER_OR_LISTA: &str = "tensor_bracket_index_integer_or_lista";
+const ISSUE_TENSOR_BRACKET_INDEX_DECIMAL: &str = "tensor_bracket_index_decimal_rejected";
 const ISSUE_INVALID_ASSIGNMENT_TARGET: &str = "invalid_assignment_target";
 
 impl TypeChecker<'_> {
@@ -250,7 +251,11 @@ impl TypeChecker<'_> {
         index_span: radix_lexer::Span,
     ) -> TypeId {
         let resolved_idx = self.resolve_inferred_type(idx_ty);
-        if crate::tensor_bracket::is_bracket_index_list_type(self.types, resolved_idx) {
+        // decimal-widths D2 (wildcard audit): decimal index scalars reject
+        // with their own teaching issue, not the generic integer-or-lista one.
+        if crate::numeric_width::is_decimal_index_scalar(self.types, resolved_idx) {
+            self.invalid_operand_types(ISSUE_TENSOR_BRACKET_INDEX_DECIMAL, index_span);
+        } else if crate::tensor_bracket::is_bracket_index_list_type(self.types, resolved_idx) {
             if !crate::numeric_width::is_integer_index_vector(self.types, resolved_idx) {
                 self.invalid_operand_types(ISSUE_TENSOR_INDEX_VECTOR_INTEGER_ELEMENTS, index_span);
             }
@@ -431,12 +436,7 @@ impl TypeChecker<'_> {
     /// or `None` when the constituent does not expose the field (U1R).
     fn union_constituent_field_type(&mut self, member: TypeId, name: Symbol) -> Option<TypeId> {
         if let Some(struct_def) = self.struct_def_from_type(member) {
-            let field = self
-                .structs
-                .get(&struct_def)?
-                .fields
-                .get(&name)
-                .copied()?;
+            let field = self.structs.get(&struct_def)?.fields.get(&name).copied()?;
             return Some(self.applied_field_type(member, struct_def, field.ty));
         }
         if let Some(enum_def) = self.enum_def_from_type(member) {

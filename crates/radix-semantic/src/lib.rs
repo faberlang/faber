@@ -173,7 +173,10 @@ pub use matrix_shape::{
     literal_matrix_shape, lower_matrix_shape_expr, MATRIX_INCOMPLETE_MSG,
     MATRIX_MISSING_FIGURA_MSG, MATRIX_SHAPE_TWO_DIM_MSG,
 };
-pub use numeric_width::{NumericWidth, TENSOR_ELEMENT_NUMERIC_MSG, TENSOR_INDEX_VECTOR_MSG};
+pub use numeric_width::{
+    NumericWidth, DECIMAL_INDEX_SCALAR_MSG, DECIMAL_TENSOR_MEDIA_MSG, TENSOR_ELEMENT_NUMERIC_MSG,
+    TENSOR_INDEX_VECTOR_MSG,
+};
 use passes::companion_predeclare::CompanionPredeclarations;
 pub use qualified_identity::{
     build_qualified_identities, QualifiedDeclKind, QualifiedIdentity, QualifiedIdentityTable,

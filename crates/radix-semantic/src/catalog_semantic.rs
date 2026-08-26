@@ -383,9 +383,9 @@ pub fn semantic_help(kind: SemanticErrorKind, args: &[DiagnosticArg]) -> Option<
         SemanticErrorKind::Warning(WarningKind::UnboundedTextusIndex) => {
             Some("convert to textus<N> for O(1) indexing or iterate scalars".to_owned())
         }
-        SemanticErrorKind::Warning(WarningKind::TypeTestMemberAbsent) => Some(
-            "narrow with a member the union declares, or fix the tested type".to_owned(),
-        ),
+        SemanticErrorKind::Warning(WarningKind::TypeTestMemberAbsent) => {
+            Some("narrow with a member the union declares, or fix the tested type".to_owned())
+        }
         SemanticErrorKind::Warning(
             WarningKind::UnionOfNominalMembers
             | WarningKind::UnionNoCommonMembers
@@ -1050,6 +1050,17 @@ fn semantic_invalid_operand_types_message(args: &[DiagnosticArg]) -> Option<Stri
             Some(crate::tensor_bracket::TENSOR_BRACKET_INDEX_MSG.to_owned())
         }
         "tensor_arithmetic_numeric_element_required" => Some(crate::TENSOR_ELEMENT_NUMERIC_MSG.to_owned()),
+        "tensor_bracket_index_decimal_rejected" => Some(crate::DECIMAL_INDEX_SCALAR_MSG.to_owned()),
+        "tensor_media_decimal_rejected" => Some(crate::DECIMAL_TENSOR_MEDIA_MSG.to_owned()),
+        "decimal_radix_hint_rejected" => Some(
+            "decimal widths reject Hex/Bin/Oct radix hints; radix text parse is integer-family — convert through an integer width first".to_owned(),
+        ),
+        "decimal_endianness_hint_rejected" => Some(
+            "decimal widths reject Be/Le endianness hints; octeti unpack is integer/IEEE-family — decimal byte layouts are D5 surface".to_owned(),
+        ),
+        "decimal_bits_hint_rejected" => Some(
+            "decimal widths reject the Bits bitcast; a scaled-integer carrier is not an IEEE bit pattern".to_owned(),
+        ),
         "matrix_arithmetic_numeric_element_required" => {
             Some("matrix arithmetic requires numeric element types".to_owned())
         }
@@ -1606,9 +1617,10 @@ fn semantic_duplicate_definition_message(args: &[DiagnosticArg]) -> Option<Strin
     match arg_value(args, "issue")? {
         "duplicate_definition" => Some("duplicate definition".to_owned()),
         "duplicate_commune_field" => Some("duplicate commune field".to_owned()),
-        "field_redeclaration" => {
-            Some("child genus redeclares an inherited field; fields cannot shadow under extends".to_owned())
-        }
+        "field_redeclaration" => Some(
+            "child genus redeclares an inherited field; fields cannot shadow under extends"
+                .to_owned(),
+        ),
         "union_variant_redeclares_shared_field" => {
             Some("variant redeclares a commune field".to_owned())
         }
@@ -1640,9 +1652,10 @@ fn semantic_duplicate_definition_help(args: &[DiagnosticArg]) -> Option<String> 
         "duplicate_commune_field" => {
             Some("declare each commune field once in the union region".to_owned())
         }
-        "field_redeclaration" => {
-            Some("remove the redeclared field; inherited fields are already part of the child genus".to_owned())
-        }
+        "field_redeclaration" => Some(
+            "remove the redeclared field; inherited fields are already part of the child genus"
+                .to_owned(),
+        ),
         "union_variant_redeclares_shared_field" => {
             Some("omit the commune field from the variant payload".to_owned())
         }
@@ -1740,9 +1753,10 @@ fn semantic_undefined_member_help(args: &[DiagnosticArg]) -> Option<String> {
         }
         "unknown_variant_field" => Some("check the variant field name".to_owned()),
         "unknown_union_field" => Some("check the union's `@ commune` field name".to_owned()),
-        "union_member_not_common" => {
-            Some("narrow the receiver (`est M` branch, `discerne`) to recover per-member access".to_owned())
-        }
+        "union_member_not_common" => Some(
+            "narrow the receiver (`est M` branch, `discerne`) to recover per-member access"
+                .to_owned(),
+        ),
         _ => None,
     }
 }
@@ -3031,7 +3045,9 @@ fn semantic_type_test_member_absent_message(args: &[DiagnosticArg]) -> Option<St
         "type_test_member_absent" => {
             let ty = arg_value(args, "type")?;
             let union = arg_value(args, "union")?;
-            Some(format!("type test `{ty}` is dead: not a member of `{union}`"))
+            Some(format!(
+                "type test `{ty}` is dead: not a member of `{union}`"
+            ))
         }
         _ => None,
     }
@@ -3047,7 +3063,9 @@ fn semantic_union_guardrail_message(args: &[DiagnosticArg]) -> Option<String> {
         }
         "union_no_common_members" => {
             let union = arg_value(args, "union")?;
-            Some(format!("union `{union}` shares no members; it is store-only until narrowed"))
+            Some(format!(
+                "union `{union}` shares no members; it is store-only until narrowed"
+            ))
         }
         "union_method_signature_shadowed" => {
             let method = arg_value(args, "method")?;

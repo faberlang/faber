@@ -68,3 +68,37 @@ fn decimal_text_to_scaled_is_exact() {
     assert_eq!(decimal_text_to_scaled("abc"), None);
     assert_eq!(decimal_text_to_scaled("1e"), None);
 }
+
+// --- D2 wildcard audit gates (index scalars / tensor media) ---
+
+#[test]
+fn decimal_widths_reject_as_index_scalars() {
+    use crate::{is_decimal_index_scalar, is_integer_index_scalar, TypeTable};
+    let mut types = TypeTable::new();
+    let d32 = types.sized_numeric(Primitive::Numerus, NumericWidth::D32);
+    let d64 = types.sized_numeric(Primitive::Numerus, NumericWidth::D64);
+    let i32 = types.sized_numeric(Primitive::Numerus, NumericWidth::I32);
+    assert!(!is_integer_index_scalar(&types, d32));
+    assert!(!is_integer_index_scalar(&types, d64));
+    assert!(is_integer_index_scalar(&types, i32));
+    assert!(is_decimal_index_scalar(&types, d32));
+    assert!(!is_decimal_index_scalar(&types, i32));
+}
+
+#[test]
+fn tensor_media_width_rejects_decimal_elements() {
+    use crate::{tensor_media_width, TypeTable};
+    let mut types = TypeTable::new();
+    let d32 = types.sized_numeric(Primitive::Numerus, NumericWidth::D32);
+    let i32 = types.sized_numeric(Primitive::Numerus, NumericWidth::I32);
+    let f32 = types.sized_numeric(Primitive::Fractus, NumericWidth::F32);
+    assert_eq!(tensor_media_width(&types, d32), None);
+    assert_eq!(
+        tensor_media_width(&types, i32),
+        Some(NumericWidth::F64)
+    );
+    assert_eq!(
+        tensor_media_width(&types, f32),
+        Some(NumericWidth::F32)
+    );
+}
