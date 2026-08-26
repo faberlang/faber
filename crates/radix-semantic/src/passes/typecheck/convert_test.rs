@@ -1218,3 +1218,41 @@ fn conversio_assign_routes_through_live_tuus_cursor_escape_no_bypass() {
         "live_tuus_cursor_copy",
     );
 }
+
+#[test]
+fn conversion_registry_duplicate_conflict_reports_dual_spans() {
+    use crate::scope::{ConversionPair, ConversionRowConflict};
+    use radix_lexer::Span;
+    use radix_types::TypeId;
+
+    let error = super::convert::conversion_registry_conflict_error(
+        ConversionPair::new(TypeId(3), TypeId(9)),
+        ConversionRowConflict::Duplicate {
+            first_span: Span::new(4, 8),
+            second_span: Span::new(40, 44),
+        },
+    );
+    assert_eq!(error.issue(), Some("conversio_registry_duplicate_pair"));
+    assert_eq!(error.span, Span::new(4, 44));
+    assert!(error.args.iter().any(|arg| arg.name == "first_span"));
+    assert!(error.args.iter().any(|arg| arg.name == "second_span"));
+}
+
+#[test]
+fn conversion_registry_builtin_shadow_conflict_reports_dual_spans() {
+    use crate::scope::{ConversionPair, ConversionRowConflict};
+    use radix_lexer::Span;
+    use radix_types::TypeId;
+
+    let error = super::convert::conversion_registry_conflict_error(
+        ConversionPair::new(TypeId(3), TypeId(9)),
+        ConversionRowConflict::BuiltinShadow {
+            builtin_span: Span::new(0, 0),
+            user_span: Span::new(50, 54),
+        },
+    );
+    assert_eq!(error.issue(), Some("conversio_registry_builtin_shadow"));
+    assert_eq!(error.span, Span::new(0, 54));
+    assert!(error.args.iter().any(|arg| arg.name == "first_span"));
+    assert!(error.args.iter().any(|arg| arg.name == "second_span"));
+}

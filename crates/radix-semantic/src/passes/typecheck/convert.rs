@@ -138,6 +138,8 @@ const ISSUE_OBJECT_SPREAD_REQUIRES_TABULA: &str = "object_spread_requires_tabula
 const ISSUE_OBJECT_FIELD_REQUIRES_VALUE: &str = "object_field_requires_value";
 const ISSUE_JSON_GENUS_CONVERSION_REQUIRES_JSON: &str =
     "json_genus_conversion_requires_json_annotation";
+const ISSUE_CONVERSION_REGISTRY_DUPLICATE_PAIR: &str = "conversio_registry_duplicate_pair";
+const ISSUE_CONVERSION_REGISTRY_BUILTIN_SHADOW: &str = "conversio_registry_builtin_shadow";
 
 /// Byte cap for literal regex patterns.
 ///
@@ -266,7 +268,59 @@ fn rectangular_lista_literal_issue(error: RectangularListaLiteralError) -> &'sta
     }
 }
 
+/// Build the dual-span structured diagnostic for one coherence-registry
+/// enrollment conflict, mirroring the union duplicate-arm check: the error
+/// span merges both declarations and both source spans ride along as
+/// `first_span` / `second_span` args.
+pub(super) fn conversion_registry_conflict_error(
+    pair: crate::scope::ConversionPair,
+    conflict: crate::scope::ConversionRowConflict,
+) -> SemanticError {
+    let (issue, first_span, second_span) = match conflict {
+        crate::scope::ConversionRowConflict::Duplicate {
+            first_span,
+            second_span,
+        } => (
+            ISSUE_CONVERSION_REGISTRY_DUPLICATE_PAIR,
+            first_span,
+            second_span,
+        ),
+        crate::scope::ConversionRowConflict::BuiltinShadow {
+            builtin_span,
+            user_span,
+        } => (
+            ISSUE_CONVERSION_REGISTRY_BUILTIN_SHADOW,
+            builtin_span,
+            user_span,
+        ),
+    };
+    let dual_span = first_span.merge(second_span);
+    SemanticError::structured(SemanticErrorKind::DefinitionDuplicate, dual_span)
+        .with_arg("issue", issue)
+        .with_arg("source", pair.source.0.to_string())
+        .with_arg("destination", pair.destination.0.to_string())
+        .with_arg(
+            "first_span",
+            format!("{}..{}", first_span.start, first_span.end),
+        )
+        .with_arg(
+            "second_span",
+            format!("{}..{}", second_span.start, second_span.end),
+        )
+}
+
 impl TypeChecker<'_> {
+    /// Report one coherence-registry enrollment conflict as a dual-span
+    /// structured diagnostic.
+    pub fn report_conversion_registry_conflict(
+        &mut self,
+        pair: crate::scope::ConversionPair,
+        conflict: crate::scope::ConversionRowConflict,
+    ) {
+        self.errors
+            .push(conversion_registry_conflict_error(pair, conflict));
+    }
+
     pub fn check_deref(&mut self, expr: &mut HirExpression, span: radix_lexer::Span) -> TypeId {
         let expr_ty = self.check_expr(expr);
         if let Type::Ref(_, inner) = self.types.get(self.resolve_inferred_type(expr_ty)) {

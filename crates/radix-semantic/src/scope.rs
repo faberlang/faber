@@ -358,6 +358,60 @@ pub struct ConversionArm {
     pub span: Span,
 }
 
+/// Ordered concrete conversion-pair identity: exactly `(source → destination)`.
+///
+/// `(A, B)` and `(B, A)` are distinct rows. Generic helpers cannot key rows;
+/// both ends must be concrete `TypeId`s by the time a row is enrolled.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct ConversionPair {
+    pub source: TypeId,
+    pub destination: TypeId,
+}
+
+impl ConversionPair {
+    #[must_use]
+    pub fn new(source: TypeId, destination: TypeId) -> Self {
+        Self {
+            source,
+            destination,
+        }
+    }
+}
+
+/// One row of the conversion coherence registry.
+///
+/// Builtin and user rows share this shape and the same ordered-pair identity.
+/// A builtin row carries no user `fn_def_id` and enrolls in the global scope,
+/// so it is visible from every scope and can never be shadowed.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ConversionRow {
+    pub pair: ConversionPair,
+    /// Owning callable; `None` marks a compiler-shipped builtin row.
+    pub fn_def_id: Option<DefId>,
+    /// Declaration span; builtin rows seeded without a source location use
+    /// [`Span::default`].
+    pub span: Span,
+    /// Scope the row was enrolled in.
+    pub scope: ScopeId,
+    /// Whether the row is compiler-shipped. Builtin rows reject user rows for
+    /// the same pair at enrollment time (non-shadowing).
+    pub builtin: bool,
+}
+
+/// Why a conversion row could not be enrolled.
+///
+/// Both variants carry the two source spans of the conflicting rows so
+/// diagnostics can report both declarations, mirroring the union duplicate-arm
+/// check's `first_span` / `second_span` shape.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ConversionRowConflict {
+    /// The ordered pair is already enrolled in the same scope.
+    Duplicate { first_span: Span, second_span: Span },
+    /// The ordered pair is owned by a compiler-shipped builtin row; a user row
+    /// may not shadow it in any scope.
+    BuiltinShadow { builtin_span: Span, user_span: Span },
+}
+
 fn exported_member_kind(export: &FileExportKind) -> InterfaceMemberKind {
     match export {
         FileExportKind::Function(_) => InterfaceMemberKind::Function,
@@ -687,6 +741,10 @@ pub struct Resolver {
     commune_fields: FxHashMap<DefId, Vec<CommuneField>>,
     /// Declaration-owned error conversions keyed by destination union.
     conversion_arms: FxHashMap<DefId, Vec<ConversionArm>>,
+    /// Conversion coherence registry keyed by the ordered concrete pair
+    /// `(source → destination)`. Builtin and (future) user rows share this one
+    /// table; there is no second compatibility table.
+    conversion_rows: FxHashMap<ConversionPair, Vec<ConversionRow>>,
     /// Namespace bindings referenced from qualified type paths.
     used_namespaces: FxHashSet<LexSymbol>,
     /// Resolved relational schema metadata keyed by schema definition
@@ -752,6 +810,7 @@ impl Resolver {
             imported_enum_variants: FxHashMap::default(),
             commune_fields: FxHashMap::default(),
             conversion_arms: FxHashMap::default(),
+            conversion_rows: FxHashMap::default(),
             used_namespaces: FxHashSet::default(),
             schemas: FxHashMap::default(),
             locale_pack_type_aliases: FxHashMap::default(),
@@ -2306,6 +2365,94 @@ impl Resolver {
             .iter()
             .find(|arm| arm.source == source)
             .map(|arm| arm.fn_def_id)
+    }
+
+    /// Enroll one compiler-shipped builtin row in the coherence registry.
+    ///
+    /// Builtin rows occupy the global scope, are visible from every scope, and
+    /// reject any later user row for the same ordered pair. Registering the
+    /// same builtin pair twice is a duplicate conflict carrying both spans.
+    pub fn register_builtin_conversion(
+        &mut self,
+        pair: ConversionPair,
+        span: Span,
+    ) -> Result<(), ConversionRowConflict> {
+        let rows = self.conversion_rows.entry(pair).or_default();
+        if let Some(previous) = rows.iter().find(|row| row.builtin) {
+            return Err(ConversionRowConflict::Duplicate {
+                first_span: previous.span,
+                second_span: span,
+            });
+        }
+        rows.push(ConversionRow {
+            pair,
+            fn_def_id: None,
+            span,
+            scope: ScopeId(0),
+            builtin: true,
+        });
+        Ok(())
+    }
+
+    /// Enroll one user row in the coherence registry, in the current scope.
+    ///
+    /// Fails closed when the pair is already enrolled in the same scope
+    /// (duplicate, both spans) or owned by a builtin row in any scope
+    /// (non-shadowing, builtin + user spans). At most one row per pair per
+    /// scope.
+    pub fn register_user_conversion(
+        &mut self,
+        pair: ConversionPair,
+        fn_def_id: DefId,
+        span: Span,
+    ) -> Result<(), ConversionRowConflict> {
+        let scope = self.current_scope;
+        let rows = self.conversion_rows.entry(pair).or_default();
+        if let Some(builtin) = rows.iter().find(|row| row.builtin) {
+            return Err(ConversionRowConflict::BuiltinShadow {
+                builtin_span: builtin.span,
+                user_span: span,
+            });
+        }
+        if let Some(previous) = rows.iter().find(|row| row.scope == scope) {
+            return Err(ConversionRowConflict::Duplicate {
+                first_span: previous.span,
+                second_span: span,
+            });
+        }
+        rows.push(ConversionRow {
+            pair,
+            fn_def_id: Some(fn_def_id),
+            span,
+            scope,
+            builtin: false,
+        });
+        Ok(())
+    }
+
+    /// Direct, scope-aware row lookup for one ordered pair.
+    ///
+    /// Walks the current scope chain toward global and returns the first row
+    /// enrolled in a visible scope. Lookup is direct only — no transitive
+    /// composition; a miss is a miss.
+    #[must_use]
+    pub fn conversion_row_for(&self, source: TypeId, destination: TypeId) -> Option<ConversionRow> {
+        let pair = ConversionPair::new(source, destination);
+        let rows = self.conversion_rows.get(&pair)?;
+        let mut scope = Some(self.current_scope);
+        while let Some(scope_id) = scope {
+            if let Some(row) = rows.iter().find(|row| row.scope == scope_id) {
+                return Some(*row);
+            }
+            scope = self.scopes[scope_id.0 as usize].parent;
+        }
+        None
+    }
+
+    /// All enrolled rows for one ordered pair, builtin and user alike.
+    #[must_use]
+    pub fn conversion_rows_for(&self, pair: ConversionPair) -> &[ConversionRow] {
+        self.conversion_rows.get(&pair).map_or(&[], Vec::as_slice)
     }
 
     #[must_use]
