@@ -40,7 +40,7 @@ const ISSUE_DYNAMIC_CALLEE_TYPE_ARGS: &str = "dynamic_callee_type_args";
 const ISSUE_DYNAMIC_RECEIVER_METHOD_TYPE_ARGS: &str = "dynamic_receiver_method_type_args";
 const ISSUE_FAILABLE_CALL_ENCLOSING_ERROR_TYPE_MISMATCH: &str =
     "failable_call_enclosing_error_type_mismatch";
-const ISSUE_FAILABLE_CALL_CONVERSION_ABSENT: &str = "failable_call_conversion_absent";
+pub(crate) const ISSUE_FAILABLE_CALL_CONVERSION_ABSENT: &str = "failable_call_conversion_absent";
 const ISSUE_FAILABLE_CALL_HANDLER_ERROR_TYPE_MISMATCH: &str =
     "failable_call_handler_error_type_mismatch";
 const ISSUE_FAILABLE_CALL_REQUIRES_HANDLER: &str = "failable_call_requires_handler";
@@ -1411,6 +1411,24 @@ impl TypeChecker<'_> {
                 let source_ty = self.resolve_inferred_type(err_ty);
                 let destination_ty = self.resolve_inferred_type(func_err_ty);
                 if !self.types.is_assignable(source_ty, destination_ty) {
+                    // CTR-02: registered rows are the authority for their
+                    // ordered pair (direct lookup only). A row whose
+                    // conversion function declares `⇥ E` composes that
+                    // declared channel through the destination channel.
+                    if let Some(row) = self.resolver.conversion_row_for(source_ty, destination_ty)
+                    {
+                        if let Some(fn_id) = row.fn_def_id {
+                            if let Some(channel) =
+                                self.functions.get(&fn_id).and_then(|sig| sig.err)
+                            {
+                                if !self.check_registered_row_channel(channel, span) {
+                                    return false;
+                                }
+                            }
+                            self.pending_conversion = Some(fn_id);
+                            return false;
+                        }
+                    }
                     if let Some(arm) = self.lookup_conversion_arm(source_ty, destination_ty) {
                         self.pending_conversion = Some(arm);
                         return false;

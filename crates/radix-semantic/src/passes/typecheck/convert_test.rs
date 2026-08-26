@@ -1218,3 +1218,559 @@ fn conversio_assign_routes_through_live_tuus_cursor_escape_no_bypass() {
         "live_tuus_cursor_copy",
     );
 }
+
+#[test]
+fn conversion_registry_duplicate_conflict_reports_dual_spans() {
+    use crate::scope::{ConversionPair, ConversionRowConflict};
+    use radix_lexer::Span;
+    use radix_types::TypeId;
+
+    let error = super::convert::conversion_registry_conflict_error(
+        ConversionPair::new(TypeId(3), TypeId(9)),
+        ConversionRowConflict::Duplicate {
+            first_span: Span::new(4, 8),
+            second_span: Span::new(40, 44),
+        },
+    );
+    assert_eq!(error.issue(), Some("conversio_registry_duplicate_pair"));
+    assert_eq!(error.span, Span::new(4, 44));
+    assert!(error.args.iter().any(|arg| arg.name == "first_span"));
+    assert!(error.args.iter().any(|arg| arg.name == "second_span"));
+}
+
+#[test]
+fn conversion_registry_builtin_shadow_conflict_reports_dual_spans() {
+    use crate::scope::{ConversionPair, ConversionRowConflict};
+    use radix_lexer::Span;
+    use radix_types::TypeId;
+
+    let error = super::convert::conversion_registry_conflict_error(
+        ConversionPair::new(TypeId(3), TypeId(9)),
+        ConversionRowConflict::BuiltinShadow {
+            builtin_span: Span::new(0, 0),
+            user_span: Span::new(50, 54),
+        },
+    );
+    assert_eq!(error.issue(), Some("conversio_registry_builtin_shadow"));
+    assert_eq!(error.span, Span::new(0, 54));
+    assert!(error.args.iter().any(|arg| arg.name == "first_span"));
+    assert!(error.args.iter().any(|arg| arg.name == "second_span"));
+}
+
+// =============================================================================
+// CTR-02: registered-row failure-channel composition
+// =============================================================================
+//
+// The full `analyze_source` pipeline builds its own resolver with no enrolled
+// rows (standalone-function enrollment lands with CTR-04), so the
+// registry-backed contract below is proven by driving `TypeChecker` directly
+// against a hand-seeded coherence registry. Under test (delivery CTR-02):
+//
+// - a row whose conversion function declares `⇥ E` composes that declared
+//   channel through the function/use-site channel for explicit `↦` and
+//   failable-call propagation;
+// - inline `⇥` recovery stays target-typed, never channel-typed;
+// - lookup is direct only: rows `A → B` and `B → C` never admit `A → C`;
+// - local `fac/cape`, `iace` (hence `requirit`, which lowers to
+//   `si non (cond) { iace err }`), and `↤` never consult the failable-call
+//   seam, and a channel mismatch retains the SEM010-shaped
+//   `failable_call_conversion_absent` diagnostic.
+
+use super::TypeChecker;
+use crate::scope::ConversionPair;
+use crate::{FuncSig, ParamType, Primitive, Resolver, SemanticParamMode, TypeId, TypeTable};
+use radix_hir::{DefId, HirConversioTarget, HirExpression, HirExpressionKind, HirId, HirLiteral};
+use radix_lexer::{Interner, Span, Symbol};
+use radix_target::Target;
+
+/// Direct-checker harness with a hand-seeded coherence registry.
+struct RowHarness {
+    resolver: Resolver,
+    types: TypeTable,
+    interner: Interner,
+}
+
+impl RowHarness {
+    fn new() -> Self {
+        Self {
+            resolver: Resolver::new(),
+            types: TypeTable::new(),
+            interner: Interner::new(),
+        }
+    }
+
+    fn enroll_user(&mut self, source: TypeId, destination: TypeId, fn_id: DefId) {
+        self.resolver
+            .register_user_conversion(
+                ConversionPair::new(source, destination),
+                fn_id,
+                Span::new(1, 2),
+            )
+            .expect("unique row enrollment");
+    }
+
+    fn checker(&mut self) -> TypeChecker<'_> {
+        TypeChecker::new(
+            &self.resolver,
+            &mut self.types,
+            Some(&self.interner),
+            Target::HirRust,
+        )
+    }
+
+    fn total_sig(&mut self) -> FuncSig {
+        FuncSig {
+            type_params: Vec::new(),
+            type_param_constraints: Vec::new(),
+            params: Vec::new(),
+            ret: self.types.primitive(Primitive::Vacuum),
+            err: None,
+            is_async: false,
+            is_generator: false,
+        }
+    }
+
+    fn conversion_fn_sig(&mut self, err: Option<TypeId>) -> FuncSig {
+        FuncSig {
+            type_params: Vec::new(),
+            type_param_constraints: Vec::new(),
+            params: vec![ParamType {
+                ty: self.types.primitive(Primitive::Vacuum),
+                mode: SemanticParamMode::Owned,
+                optional: false,
+            }],
+            ret: self.types.primitive(Primitive::Vacuum),
+            err,
+            is_async: false,
+            is_generator: false,
+        }
+    }
+}
+
+fn textus_literal_expr(id: u32) -> HirExpression {
+    HirExpression {
+        id: HirId(id),
+        kind: HirExpressionKind::Literal(HirLiteral::String(Symbol(7))),
+        ty: None,
+        span: crate::test_support::test_span(),
+    }
+}
+
+fn int_literal_expr(id: u32, value: u64) -> HirExpression {
+    HirExpression {
+        id: HirId(id),
+        kind: HirExpressionKind::Literal(HirLiteral::Int(value)),
+        ty: None,
+        span: crate::test_support::test_span(),
+    }
+}
+
+fn bool_literal_expr(id: u32, value: bool) -> HirExpression {
+    HirExpression {
+        id: HirId(id),
+        kind: HirExpressionKind::Literal(HirLiteral::Bool(value)),
+        ty: None,
+        span: crate::test_support::test_span(),
+    }
+}
+
+fn has_issue(checker: &TypeChecker<'_>, issue: &str) -> bool {
+    checker
+        .errors
+        .iter()
+        .any(|diag| diag.is_error() && diag.issue() == Some(issue))
+}
+
+#[test]
+fn failable_call_propagation_composes_declared_row_channel() {
+    // A failable call throwing `textus` into a `⇥ numerus` function is
+    // admitted by the direct row `textus → numerus` whose conversion function
+    // declares `⇥ numerus` — the declared channel is assignable to the
+    // use-site channel, and the row `DefId` is recorded as the conversion.
+    let mut h = RowHarness::new();
+    let textus = h.types.primitive(Primitive::Textus);
+    let numerus = h.types.primitive(Primitive::Numerus);
+    let row_fn = DefId(2100);
+    h.enroll_user(textus, numerus, row_fn);
+    let row_sig = h.conversion_fn_sig(Some(numerus));
+    let call_sig = h.total_sig();
+    let call_sig = FuncSig { err: Some(textus), ..call_sig };
+
+    let mut checker = h.checker();
+    checker.functions.insert(row_fn, row_sig);
+    checker.current_error = Some(super::ErrorSink::Function(numerus));
+
+    let admitted = checker.reject_failable_call(&call_sig, crate::test_support::test_span());
+    assert!(!admitted, "registered row admits the failable call");
+    assert_eq!(checker.pending_conversion, Some(row_fn));
+    assert!(
+        checker.errors.is_empty(),
+        "no diagnostics expected: {:?}",
+        checker.errors
+    );
+}
+
+#[test]
+fn failable_call_propagation_rejects_declared_channel_mismatch() {
+    // The row's declared `⇥ bivalens` is not assignable to the use-site
+    // `⇥ numerus` channel: the mismatch retains the SEM010-shaped
+    // `failable_call_conversion_absent` diagnostic with the declared channel
+    // as `source` and the use-site channel as `destination`.
+    let mut h = RowHarness::new();
+    let textus = h.types.primitive(Primitive::Textus);
+    let numerus = h.types.primitive(Primitive::Numerus);
+    let bivalens = h.types.primitive(Primitive::Bivalens);
+    let row_fn = DefId(2101);
+    h.enroll_user(textus, numerus, row_fn);
+    let row_sig = h.conversion_fn_sig(Some(bivalens));
+    let mut call_sig = h.total_sig();
+    call_sig.err = Some(textus);
+
+    let mut checker = h.checker();
+    checker.functions.insert(row_fn, row_sig);
+    checker.current_error = Some(super::ErrorSink::Function(numerus));
+
+    let admitted = checker.reject_failable_call(&call_sig, crate::test_support::test_span());
+    assert!(!admitted);
+    assert_eq!(
+        checker.pending_conversion, None,
+        "a channel mismatch must not select the row"
+    );
+    let err = checker
+        .errors
+        .iter()
+        .find(|diag| diag.issue() == Some("failable_call_conversion_absent"))
+        .expect("SEM010-shaped conversion-absent diagnostic");
+    assert!(err.args.iter().any(|arg| arg.name == "source" && arg.value == "bivalens"));
+    assert!(err.args.iter().any(|arg| arg.name == "destination" && arg.value == "numerus"));
+}
+
+#[test]
+fn failable_call_propagation_requires_direct_row_only() {
+    // Rows `textus → numerus` and `numerus → fractus` exist, but the call
+    // throws `textus` into a `⇥ fractus` channel: direct-only lookup means
+    // `textus → fractus` is a miss and the SEM010-shaped diagnostic fires.
+    let mut h = RowHarness::new();
+    let textus = h.types.primitive(Primitive::Textus);
+    let numerus = h.types.primitive(Primitive::Numerus);
+    let fractus = h.types.primitive(Primitive::Fractus);
+    h.enroll_user(textus, numerus, DefId(2102));
+    h.enroll_user(numerus, fractus, DefId(2103));
+    let mut call_sig = h.total_sig();
+    call_sig.err = Some(textus);
+
+    let mut checker = h.checker();
+    checker.current_error = Some(super::ErrorSink::Function(fractus));
+
+    let admitted = checker.reject_failable_call(&call_sig, crate::test_support::test_span());
+    assert!(!admitted);
+    assert_eq!(checker.pending_conversion, None);
+    let err = checker
+        .errors
+        .iter()
+        .find(|diag| diag.issue() == Some("failable_call_conversion_absent"))
+        .expect("SEM010-shaped conversion-absent diagnostic");
+    assert!(err.args.iter().any(|arg| arg.name == "source" && arg.value == "textus"));
+    assert!(err.args.iter().any(|arg| arg.name == "destination" && arg.value == "fractus"));
+}
+
+#[test]
+fn local_handler_keeps_original_error_with_registered_row_present() {
+    // A `fac/cape` local handler typed as the source error admits the call
+    // directly; the registered row for `textus → numerus` with a declared
+    // channel is never consulted.
+    let mut h = RowHarness::new();
+    let textus = h.types.primitive(Primitive::Textus);
+    let numerus = h.types.primitive(Primitive::Numerus);
+    let bivalens = h.types.primitive(Primitive::Bivalens);
+    let row_fn = DefId(2104);
+    h.enroll_user(textus, numerus, row_fn);
+    let row_sig = h.conversion_fn_sig(Some(bivalens));
+    let mut call_sig = h.total_sig();
+    call_sig.err = Some(textus);
+
+    let mut checker = h.checker();
+    checker.functions.insert(row_fn, row_sig);
+    checker.current_error = Some(super::ErrorSink::Local(textus));
+
+    let admitted = checker.reject_failable_call(&call_sig, crate::test_support::test_span());
+    assert!(!admitted, "local handler admits the call");
+    assert_eq!(
+        checker.pending_conversion, None,
+        "the local handler must not select the registry row"
+    );
+    assert!(
+        checker.errors.is_empty(),
+        "original-error handler type needs no conversion: {:?}",
+        checker.errors
+    );
+}
+
+#[test]
+fn local_handler_mismatch_keeps_handler_issue_not_registry_seam() {
+    // A mismatched local handler reports the handler issue; the registered
+    // row for `textus → numerus` does not turn the mismatch into a
+    // failable-call conversion lookup.
+    let mut h = RowHarness::new();
+    let textus = h.types.primitive(Primitive::Textus);
+    let numerus = h.types.primitive(Primitive::Numerus);
+    let bivalens = h.types.primitive(Primitive::Bivalens);
+    let row_fn = DefId(2105);
+    h.enroll_user(textus, numerus, row_fn);
+    let row_sig = h.conversion_fn_sig(Some(bivalens));
+    let mut call_sig = h.total_sig();
+    call_sig.err = Some(textus);
+
+    let mut checker = h.checker();
+    checker.functions.insert(row_fn, row_sig);
+    checker.current_error = Some(super::ErrorSink::Local(numerus));
+
+    let admitted = checker.reject_failable_call(&call_sig, crate::test_support::test_span());
+    assert!(!admitted);
+    assert_eq!(checker.pending_conversion, None);
+    assert!(has_issue(&checker, "failable_call_handler_error_type_mismatch"));
+    assert!(
+        !has_issue(&checker, "failable_call_conversion_absent"),
+        "the local sink must not consult the failable-call seam"
+    );
+}
+
+#[test]
+fn iace_throw_never_consults_registry_seam() {
+    // `iace` (and `requirit`, which lowers to `si non (cond) { iace err }`)
+    // throws the payload straight into the channel: with a registered row
+    // `textus → numerus` present, throwing a `textus` value into a
+    // `⇥ numerus` channel still reports `iace_value_type_mismatch`, never
+    // `failable_call_conversion_absent`.
+    let mut h = RowHarness::new();
+    let textus = h.types.primitive(Primitive::Textus);
+    let numerus = h.types.primitive(Primitive::Numerus);
+    let bivalens = h.types.primitive(Primitive::Bivalens);
+    let row_fn = DefId(2106);
+    h.enroll_user(textus, numerus, row_fn);
+    let row_sig = h.conversion_fn_sig(Some(bivalens));
+
+    let mut checker = h.checker();
+    checker.functions.insert(row_fn, row_sig);
+    checker.current_error = Some(super::ErrorSink::Function(numerus));
+
+    let mut thrown = textus_literal_expr(1);
+    let mut throw_expr = HirExpression {
+        id: HirId(2),
+        kind: HirExpressionKind::Throw(Box::new(thrown)),
+        ty: None,
+        span: crate::test_support::test_span(),
+    };
+    let result = checker.check_expr(&mut throw_expr);
+    assert_eq!(result, checker.vacuum_type());
+    assert!(has_issue(&checker, "iace_value_type_mismatch"));
+    assert!(
+        !has_issue(&checker, "failable_call_conversion_absent"),
+        "iace must not use the failable-call seam: {:?}",
+        checker.errors
+    );
+}
+
+#[test]
+fn bare_arrow_through_registered_row_composes_declared_channel() {
+    // A bare `textus ↦ numerus` through the row admits the pair and composes
+    // the row's declared `⇥ bivalens` against the use-site `⇥ numerus`
+    // channel: the mismatch retains the SEM010 shape.
+    let mut h = RowHarness::new();
+    let textus = h.types.primitive(Primitive::Textus);
+    let numerus = h.types.primitive(Primitive::Numerus);
+    let bivalens = h.types.primitive(Primitive::Bivalens);
+    let row_fn = DefId(2107);
+    h.enroll_user(textus, numerus, row_fn);
+    let row_sig = h.conversion_fn_sig(Some(bivalens));
+
+    let mut checker = h.checker();
+    checker.functions.insert(row_fn, row_sig);
+    checker.current_error = Some(super::ErrorSink::Function(numerus));
+
+    let mut source = textus_literal_expr(1);
+    let mut target = HirConversioTarget::Type(numerus);
+    let result = checker.check_conversio(
+        &mut source,
+        &mut target,
+        &[],
+        None,
+        crate::test_support::test_span(),
+    );
+    assert_eq!(result, numerus);
+    let err = checker
+        .errors
+        .iter()
+        .find(|diag| diag.issue() == Some("failable_call_conversion_absent"))
+        .expect("SEM010-shaped conversion-absent diagnostic");
+    assert!(err.args.iter().any(|arg| arg.name == "source" && arg.value == "bivalens"));
+    assert!(err.args.iter().any(|arg| arg.name == "destination" && arg.value == "numerus"));
+}
+
+#[test]
+fn bare_arrow_through_registered_row_accepts_assignable_declared_channel() {
+    // The same bare conversion is admitted without diagnostics when the
+    // declared channel (`⇥ numerus`) is assignable to the use-site channel.
+    let mut h = RowHarness::new();
+    let textus = h.types.primitive(Primitive::Textus);
+    let numerus = h.types.primitive(Primitive::Numerus);
+    let row_fn = DefId(2108);
+    h.enroll_user(textus, numerus, row_fn);
+    let row_sig = h.conversion_fn_sig(Some(numerus));
+
+    let mut checker = h.checker();
+    checker.functions.insert(row_fn, row_sig);
+    checker.current_error = Some(super::ErrorSink::Function(numerus));
+
+    let mut source = textus_literal_expr(1);
+    let mut target = HirConversioTarget::Type(numerus);
+    let result = checker.check_conversio(
+        &mut source,
+        &mut target,
+        &[],
+        None,
+        crate::test_support::test_span(),
+    );
+    assert_eq!(result, numerus);
+    assert!(
+        checker.errors.is_empty(),
+        "declared channel assignable to the use-site channel: {:?}",
+        checker.errors
+    );
+}
+
+#[test]
+fn inline_recovery_stays_target_typed() {
+    // Inline `⇥` recovery is typed against the conversion target, not the
+    // row's declared channel: a `numerus` recovery is accepted even though
+    // the row declares `⇥ bivalens`, and a `bivalens` recovery rejects with
+    // `conversio_recovery_type_mismatch`.
+    let mut h = RowHarness::new();
+    let textus = h.types.primitive(Primitive::Textus);
+    let numerus = h.types.primitive(Primitive::Numerus);
+    let bivalens = h.types.primitive(Primitive::Bivalens);
+    let row_fn = DefId(2109);
+    h.enroll_user(textus, numerus, row_fn);
+    let row_sig = h.conversion_fn_sig(Some(bivalens));
+
+    let mut checker = h.checker();
+    checker.functions.insert(row_fn, row_sig);
+    checker.current_error = Some(super::ErrorSink::Function(numerus));
+
+    // Target-typed recovery: `⇥ 0` (numerus) admits, despite the declared channel.
+    let mut source = textus_literal_expr(1);
+    let mut target = HirConversioTarget::Type(numerus);
+    let mut recovery = int_literal_expr(2, 0);
+    let result = checker.check_conversio(
+        &mut source,
+        &mut target,
+        &[],
+        Some(&mut recovery),
+        crate::test_support::test_span(),
+    );
+    assert_eq!(result, numerus);
+    assert!(
+        checker.errors.is_empty(),
+        "target-typed recovery: {:?}",
+        checker.errors
+    );
+
+    // Channel-typed recovery would be the wrong seam: `⇥ verum` (bivalens) is
+    // rejected against the numerus target.
+    let mut source = textus_literal_expr(3);
+    let mut target = HirConversioTarget::Type(numerus);
+    let mut recovery = bool_literal_expr(4, true);
+    checker.check_conversio(
+        &mut source,
+        &mut target,
+        &[],
+        Some(&mut recovery),
+        crate::test_support::test_span(),
+    );
+    assert!(has_issue(&checker, "conversio_recovery_type_mismatch"));
+    assert!(
+        !has_issue(&checker, "failable_call_conversion_absent"),
+        "recovery stays on the conversion seam: {:?}",
+        checker.errors
+    );
+}
+
+#[test]
+fn conversio_assign_composes_declared_channel_through_conversion_seam() {
+    // `↤` routes through `check_conversio` (the conversion seam): a
+    // `numerus` local receiving a `textus` value is admitted by the direct
+    // row whose declared channel matches the use-site channel.
+    let mut h = RowHarness::new();
+    let textus = h.types.primitive(Primitive::Textus);
+    let numerus = h.types.primitive(Primitive::Numerus);
+    let row_fn = DefId(2110);
+    h.enroll_user(textus, numerus, row_fn);
+    let row_sig = h.conversion_fn_sig(Some(numerus));
+
+    let mut checker = h.checker();
+    checker.functions.insert(row_fn, row_sig);
+    checker.current_error = Some(super::ErrorSink::Function(numerus));
+    checker.push_scope();
+    checker.insert_binding(DefId(500), numerus);
+
+    let mut target = HirExpression {
+        id: HirId(1),
+        kind: HirExpressionKind::Path(DefId(500)),
+        ty: None,
+        span: crate::test_support::test_span(),
+    };
+    let mut source = textus_literal_expr(2);
+    let result = checker.check_conversio_assign(
+        &mut target,
+        &mut source,
+        None,
+        crate::test_support::test_span(),
+    );
+    assert_eq!(result, numerus);
+    assert!(
+        checker.errors.is_empty(),
+        "↤ admits through the conversion seam: {:?}",
+        checker.errors
+    );
+}
+
+#[test]
+fn conversio_assign_channel_mismatch_keeps_sem010_shape() {
+    // A `↤` whose row declares `⇥ bivalens` against a `⇥ numerus` use-site
+    // channel reports the SEM010-shaped mismatch — the conversion seam, not a
+    // different failable-call diagnostic.
+    let mut h = RowHarness::new();
+    let textus = h.types.primitive(Primitive::Textus);
+    let numerus = h.types.primitive(Primitive::Numerus);
+    let bivalens = h.types.primitive(Primitive::Bivalens);
+    let row_fn = DefId(2111);
+    h.enroll_user(textus, numerus, row_fn);
+    let row_sig = h.conversion_fn_sig(Some(bivalens));
+
+    let mut checker = h.checker();
+    checker.functions.insert(row_fn, row_sig);
+    checker.current_error = Some(super::ErrorSink::Function(numerus));
+    checker.push_scope();
+    checker.insert_binding(DefId(501), numerus);
+
+    let mut target = HirExpression {
+        id: HirId(1),
+        kind: HirExpressionKind::Path(DefId(501)),
+        ty: None,
+        span: crate::test_support::test_span(),
+    };
+    let mut source = textus_literal_expr(2);
+    checker.check_conversio_assign(
+        &mut target,
+        &mut source,
+        None,
+        crate::test_support::test_span(),
+    );
+    let err = checker
+        .errors
+        .iter()
+        .find(|diag| diag.issue() == Some("failable_call_conversion_absent"))
+        .expect("SEM010-shaped conversion-absent diagnostic");
+    assert!(err.args.iter().any(|arg| arg.name == "source" && arg.value == "bivalens"));
+    assert!(err.args.iter().any(|arg| arg.name == "destination" && arg.value == "numerus"));
+}
