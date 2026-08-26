@@ -208,7 +208,6 @@ impl FunctionBuilder<'_> {
         self.capture_depth += 1;
         self.traps.push(TrapContext {
             destination: destination.clone(),
-            union_ty: ty,
             join_block: join,
             error_paths: false,
             depth: self.capture_depth,
@@ -961,7 +960,7 @@ impl FunctionBuilder<'_> {
         }
         destination
             .map(MirOperand::Place)
-            .or_else(|| Some(MirOperand::Constant(MirConstant::Unit)))
+            .or(Some(MirOperand::Constant(MirConstant::Unit)))
     }
 
     fn bind_type_test_family(

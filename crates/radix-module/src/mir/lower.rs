@@ -1229,8 +1229,6 @@ struct HandlerContext {
 struct TrapContext {
     /// Union-typed destination the wrapped result is assigned into.
     destination: MirPlace,
-    /// The trap union's `MirType` (destination payload type).
-    union_ty: MirType,
     /// Join block both arms converge on.
     join_block: MirBlockId,
     /// Whether any error wrap block already targets `join_block` (keeps the
@@ -2769,7 +2767,7 @@ impl<'a> FunctionBuilder<'a> {
             )
             .then_some(ty)
         });
-        let target = d64.unwrap_or_else(|| match (lhs_width, rhs_width) {
+        let target = d64.unwrap_or(match (lhs_width, rhs_width) {
             (Some(NumericWidth::D64), _) => lhs_semantic,
             (_, Some(NumericWidth::D64)) => rhs_semantic,
             (Some(_), _) => lhs_semantic,
