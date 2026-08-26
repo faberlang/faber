@@ -688,10 +688,7 @@ fn execute_case_repeated(
     })
 }
 
-fn execute_repeated(
-    repeats: u64,
-    mut execute: impl FnMut() -> CaseExecution,
-) -> CaseExecution {
+fn execute_repeated(repeats: u64, mut execute: impl FnMut() -> CaseExecution) -> CaseExecution {
     let mut last = CaseExecution::without_output(CaseOutcome::Passed);
     for _ in 0..repeats {
         last = execute();
@@ -750,10 +747,7 @@ fn captured_stdout(host: &BufferHost) -> Vec<String> {
 /// expected error-channel escape for `erratur`.
 const ISSUE_UNCAUGHT_ALTERNATE_RETURN: &str = "runner_uncaught_alternate_return_from_call";
 
-fn outcome_from_run_result(
-    result: Result<(), Vec<RunnerError>>,
-    erratur: bool,
-) -> CaseOutcome {
+fn outcome_from_run_result(result: Result<(), Vec<RunnerError>>, erratur: bool) -> CaseOutcome {
     match result {
         // Strict-xfail: an erratur case that completes cleanly is a suite
         // failure, not a silently accepted pass.

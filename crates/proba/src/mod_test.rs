@@ -616,7 +616,10 @@ proba "rejected flaky" erratur fragilis 1 {
         TestSelection::default(),
     );
     assert_eq!(report.failed(), 1);
-    assert!(matches!(report.results[0].outcome, CaseOutcome::Failed { .. }));
+    assert!(matches!(
+        report.results[0].outcome,
+        CaseOutcome::Failed { .. }
+    ));
     assert!(!report.success());
 }
 
@@ -631,7 +634,10 @@ proba "rejected benchmark" erratur metior {
         TestSelection::default(),
     );
     assert_eq!(report.failed(), 1);
-    assert!(matches!(report.results[0].outcome, CaseOutcome::Failed { .. }));
+    assert!(matches!(
+        report.results[0].outcome,
+        CaseOutcome::Failed { .. }
+    ));
     assert!(!report.success());
 }
 
@@ -665,7 +671,10 @@ proba "assertion" erratur {
         TestSelection::default(),
     );
     assert_eq!(report.failed(), 1);
-    assert!(matches!(report.results[0].outcome, CaseOutcome::Failed { .. }));
+    assert!(matches!(
+        report.results[0].outcome,
+        CaseOutcome::Failed { .. }
+    ));
     assert!(!report.success());
 }
 
