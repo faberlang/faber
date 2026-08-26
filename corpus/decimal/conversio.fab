@@ -1,0 +1,71 @@
++++
+term = "d64"
+kind = "operator-group"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "width_type_sugar", "expression", "conversio_expr", "cast_expr", "literal", "nota_stmt"]
+category = "conversion"
+canonical = false
+summary = "The decimal conversio rows: decimal↔integer (round-half-even), fractus↔decimal (string round-trip), and the d32→d64 widening."
+syntax = "a ↦ numerus<d64>"
+related = ["↦", "numerus", "d32", "fractus"]
+locale = "en"
++++
+
+# =============================================================================
+# d64 — the decimal conversio rows
+# =============================================================================
+#
+# What this teaches:
+#   • decimal → integer — `a ↦ numerus<i64>` rounds half-even; it never
+#     truncates. 4.2 → 4, 2.5 → 2, 3.5 → 4.
+#   • integer → decimal — `n ↦ numerus<d32>` scales the integer to the
+#     carrier: 5 → 50000000 (5 × 10⁷ at the d32 scale).
+#   • fractus → decimal — `g ↦ numerus<d32>` uses the string round-trip,
+#     so 1.5 → 15000000 exactly.
+#   • decimal → fractus — `a ↦ fractus` is a defined rounding; 4.2 keeps
+#     its value through the float carrier.
+#   • d32 → d64 — the ONLY widening row in the decimal family; the reverse
+#     (d64 → d32) is a narrowing with no `↦` arm and rejects
+#     (SEM016:decimal_width_narrowing_rejected, see narrowing-decline.fab).
+#
+# Common mistakes:
+#   • writing d64 → d32 without expecting the SEM016 narrowing reject
+#   • expecting bare `≡` across decimal widths — cross-width equality needs
+#     the explicit `↦` side (SEM010 exact-types law)
+#
+# See also: ↦, numerus, d32, fractus
+# =============================================================================
+
+# decimal — the conversio rows at the runner
+#
+# WHY: pins the D3 conversio matrix end-to-end. The printed values are the
+# actual runner carriers (d32 scale 10⁷, d64 scale 10⁹).
+#
+# EXPECTED OUTPUT:
+#   decimal-conversio.expected — one raw value per print, in order.
+
+main {
+    const numerus<d32> a ← 4.2
+
+    const numerus<i64> i ← a ↦ numerus<i64>
+    print i
+
+    const numerus<i64> n ← 5
+    const numerus<d32> d ← n ↦ numerus<d32>
+    print d
+
+    const fractus f ← a ↦ fractus
+    print f
+
+    const fractus g ← 1.5
+    const numerus<d32> h ← g ↦ numerus<d32>
+    print h
+
+    const numerus<d64> w ← a ↦ numerus<d64>
+    print w
+
+    const numerus<d32> p ← 2.5
+    print p ↦ numerus<i64>
+
+    const numerus<d32> r ← 3.5
+    print r ↦ numerus<i64>
+}

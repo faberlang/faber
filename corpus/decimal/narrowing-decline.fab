@@ -1,0 +1,38 @@
++++
+term = "d32"
+kind = "reject"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "width_type_sugar", "conversio_expr", "expression"]
+category = "conversion"
+canonical = false
+summary = "Decline: d64 → d32 is a decimal-width narrowing with no ↦ row and rejects with SEM016:decimal_width_narrowing_rejected."
+syntax = "numerus<d64> ↦ numerus<d32>"
+related = ["↦", "numerus", "d32", "d64"]
+locale = "en"
++++
+
+# =============================================================================
+# d32 — the decimal-width narrowing decline
+# =============================================================================
+#
+# What this teaches:
+#   • The decimal conversio matrix admits exactly ONE widening — d32 → d64.
+#     The reverse direction is a narrowing with no `↦` arm.
+#   • The narrowing fails closed with the teaching diagnostic
+#     `SEM016:decimal_width_narrowing_rejected` — the decimal width never
+#     silently loses precision, symmetric with the tensor element law.
+#
+# Common mistakes:
+#   • writing `d64 ↦ d32` and expecting a runtime rounding step — the
+#     narrowing is a type error, not a lossy conversion
+#
+# See also: ↦, numerus, d32, d64
+# =============================================================================
+
+# decimal — d64 → d32 narrowing reject
+#
+# WHY: the reverse of the widening row must reject at check time; there is
+# no runtime path that narrows a decimal width.
+
+fn narrow(numerus<d64> x) → numerus<d32> {
+    return x ↦ numerus<d32>
+}

@@ -791,6 +791,71 @@ expected = true
 required = true
 note = "N2 ruling 4; bounded patterns must precede the unbounded family catch-all"
 
+# decimal-width cells (decimal-widths goal D1-D4 surface; landed 2026-08-26).
+# All six rows are required (new grammar surface): markers D32/D64, annotated
+# decimal literals, scaled-carrier arithmetic, and the D3 conversio rows.
+
+[[cells]]
+id = "cast.decimal-literal"
+family = "casts"
+cell = "annotated decimal literal numerus<d32>/<d64> ← 4.2 (exact digit text)"
+status = "direct"
+exemplum = "decimal/arithmetic.fab"
+expected = true
+required = true
+note = "D1 FloatText carrier: 4.2 = 42×10⁻¹ survives to typing; bare 4.2 stays fractus"
+
+[[cells]]
+id = "cast.decimal-arithmetic"
+family = "casts"
+cell = "decimal arithmetic at the scaled carrier (round-half-even; 4.2+0.1=4.3 exact)"
+status = "direct"
+exemplum = "decimal/arithmetic.fab"
+expected = true
+required = true
+note = "D4 runner: Value::Int carriers d32=10⁷ / d64=10⁹, checked i128, round-half-even; .expected pins raw scaled carriers"
+
+[[cells]]
+id = "cast.decimal-integer-conversio"
+family = "casts"
+cell = "decimal ↔ integer via ↦ (round-half-even both ways)"
+status = "direct"
+exemplum = "decimal/conversio.fab"
+expected = true
+required = true
+note = "D3 row: 4.2 ↦ i64 = 4; 5 ↦ d32 = 5×10⁷; 2.5 ↦ i64 = 2, 3.5 ↦ i64 = 4; never truncates"
+
+[[cells]]
+id = "cast.decimal-fractus-conversio"
+family = "casts"
+cell = "fractus ↔ decimal via ↦ (string round-trip / defined rounding)"
+status = "direct"
+exemplum = "decimal/conversio.fab"
+expected = true
+required = true
+note = "D3 row: 4.2 ↦ fractus = 4.2; 1.5 ↦ d32 = 1.5×10⁷ exact"
+
+[[cells]]
+id = "cast.decimal-widen-d32-d64"
+family = "casts"
+cell = "d32 → d64 widening-only (admit)"
+status = "direct"
+exemplum = "decimal/conversio.fab"
+expected = true
+required = true
+note = "D3 row: the only widening in the decimal family; 4.2 ↦ d64 = 42×10⁸ at scale 10⁹"
+
+[[cells]]
+id = "cast.decimal-narrow-d64-d32"
+family = "casts"
+cell = "REJECT: d64 → d32 narrowing (SEM016 decimal_width_narrowing_rejected)"
+status = "direct"
+exemplum = "decimal/narrowing-decline.fab"
+expected = true
+required = true
+decline = true
+note = "D3 row: narrowing has no ↦ arm; fails closed with a teaching diagnostic"
+
 # =============================================================================
 # closures (9 cells: 9 direct / 0 bare)
 # =============================================================================
