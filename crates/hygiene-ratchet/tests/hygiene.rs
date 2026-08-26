@@ -419,6 +419,12 @@ fn diagnostic_text_assertion_allowlisted(root: &Path, path: &Path) -> bool {
         // code/issue assertion surface.
         || rel == "crates/radix-semantic/src/passes/typecheck/queue_stack_test.rs"
         || rel == "crates/radix-semantic/src/passes/typecheck/lista_operator_test.rs"
+        // Renderer-contract (PKG001 empty-message regression): the bounded-param
+        // test pins that the interface_export_unrepresentable locale template
+        // resolves to non-empty prose that renders into default `faber check`
+        // output — a message-rendering contract, not a code/issue surface
+        // (the machine identity is asserted via issue() in the same test).
+        || rel == "crates/radix-program/src/bounded_param_pkg001_test.rs"
         || rel == "crates/faber/src/diagnostic_explain_test.rs"
         || rel == "crates/faber/src/explain_test.rs"
         || rel == "crates/faber-cli/src/reference_test.rs"

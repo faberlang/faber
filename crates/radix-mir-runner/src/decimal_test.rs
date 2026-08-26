@@ -206,8 +206,8 @@ fn decimal_conversio_matrix_rounds_and_widens() {
     assert_eq!(
         narrowing
             .expect_err("d64 to d32 must remain rejected")
-            .message,
-        "decimal width narrowing rejected"
+            .issue,
+        "runner_decimal_width_narrowing_rejected"
     );
 }
 
@@ -221,7 +221,7 @@ fn decimal_overflow_is_checked_at_the_declared_carrier_width() {
         Span::default(),
     )
     .expect_err("d32 carrier overflow");
-    assert_eq!(error.message, "numerus overflow");
+    assert_eq!(error.issue, "runner_numerus_overflow");
 }
 
 #[test]
@@ -230,7 +230,9 @@ fn negative_signed_to_unsigned_conversion_fails_closed() {
     let u32 = integer(NumericWidth::U32);
     let error = run_conversion(i32.clone(), u32.clone(), Value::Int(-2))
         .expect_err("negative signed value has no unsigned carrier");
-    assert_eq!(error.message, "numerus to numerus conversion out of range");
+    assert_eq!(
+        error.issue, "runner_numerus_to_numerus_conversion_out_of_range",
+    );
     assert_eq!(
         run_conversion(i32, u32, Value::Int(5)).expect("non-negative converts"),
         Value::Int(5),
