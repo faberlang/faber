@@ -30,12 +30,12 @@
 # Ratchet: ratchet_baseline is the bare-cell count at mechanism landing. Catch-up
 # batches convert bare -> direct and lower the baseline in the same commit; new
 # surface landing bare raises the count and fails stage 1. Updated 2026-08-26
-# (batch 2: 24 -> 18).
+# (batch 2: 24 -> 18; batch 3: 18 -> 13).
 
-ratchet_baseline = 18
+ratchet_baseline = 13
 
 # =============================================================================
-# itera (32 cells: 24 direct / 3 unit-proven / 5 bare)
+# itera (32 cells: 29 direct / 3 unit-proven / 0 bare)
 # =============================================================================
 
 [[cells]]
@@ -59,8 +59,10 @@ note = "capability-stream consumers also taught in ad/sermo-*"
 id = "itera.ex.tabula"
 family = "itera"
 cell = "ex × tabula (value iteration)"
-status = "bare"
-note = "named gap: itera ex over tabula before map value iteration MIR lowering"
+status = "direct"
+exemplum = "itera/ex-tabula.fab"
+expected = true
+note = "batch 3: value iteration over tabula; .expected pinned from runner stdout (map order + order-independent sum)"
 
 [[cells]]
 id = "itera.ex.bounded-lista"
@@ -75,10 +77,10 @@ note = "runner NoEntryReference, rust-lane reject row; stdout unpinned"
 id = "itera.ex.bounded-buffers"
 family = "itera"
 cell = "ex × bounded bytes/ascii/string<N>"
-status = "bare"
+status = "direct"
 exemplum = "bounded/itera-ex-scalar-buffers.fab"
 expected = false
-note = "compile-only: declaration-only exemplum, not run-proven"
+note = "compile-only: declaration-only driver (NoEntryReference); ascii<N> carrier runner-proven, bytes/string carriers stay compile-only (runner overlay declines bounded carriers)"
 
 [[cells]]
 id = "itera.ex.tensor-r1"
@@ -285,22 +287,28 @@ note = "batch 1 (bc40c951): mutable loop binder taught; each element binds a fre
 id = "itera.ergo-body"
 family = "itera"
 cell = "body ergo joint on itera"
-status = "bare"
-note = "ergo taught for si/dum in operatores/control, never on a loop"
+status = "direct"
+exemplum = "itera/ergo-body.fab"
+expected = true
+note = "batch 3: ergo (then) joint as a one-statement loop body; .expected pinned from runner stdout"
 
 [[cells]]
 id = "itera.cape-admit"
 family = "itera"
 cell = "itera … cape err { } admit shape"
-status = "bare"
-note = "receptio-decline covers a rethrow decline; plain admit shape untaught"
+status = "direct"
+exemplum = "itera/cape-admit.fab"
+expected = true
+note = "batch 3: base-lane whole-loop cape admit (receptio-decline keeps the AIR keep-out rows); .expected pinned from runner stdout"
 
 [[cells]]
 id = "itera.apud-rank4"
 family = "itera"
 cell = "apud rank-4+ coordinates"
-status = "bare"
-note = "grammar admits any figura rank"
+status = "direct"
+exemplum = "itera/apud-rank4.fab"
+expected = true
+note = "batch 3: rank-4 coordinate iteration; .expected pinned from runner stdout"
 
 # =============================================================================
 # summa / maxima / minima (15 cells: 11 direct / 4 bare)
