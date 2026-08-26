@@ -50,6 +50,18 @@ struct RangeIteraLowering<'a> {
     span: Span,
 }
 
+/// One already-materialized axis of the Cartesian range product (NR-3):
+/// the binder local plus its loop-invariant start/bound/step locals and
+/// range kind. The axis CFG itself is built by
+/// [`FunctionBuilder::lower_range_product_level`].
+struct RangeProductAxis {
+    index: MirLocalId,
+    start: MirLocalId,
+    bound: MirLocalId,
+    step: MirLocalId,
+    kind: HirRangeKind,
+}
+
 #[derive(Clone)]
 enum CollectionIteraKind {
     Array(TypeId),
@@ -1773,6 +1785,263 @@ impl FunctionBuilder<'_> {
         self.terminate_current(MirTerminatorKind::Goto(cond_id), range.span);
 
         self.switch_to(after_id);
+        Some(())
+    }
+
+    /// Lower the Cartesian `itera ab` range product (NR-3, nary-range-walk).
+    ///
+    /// One ordered Cartesian construct, never a zip: every range's bounds
+    /// are evaluated in source order before the walk starts (the extents
+    /// live outside the binder scope, so no extent can observe a binder),
+    /// then one range CFG per axis nests first-range-outermost and later
+    /// ranges inward. Each axis keeps the single-range walk's sign-split
+    /// admission and inclusive/exclusive/step behavior; no equal-length
+    /// guard, shared index, or truncation is installed. `perge` continues
+    /// the innermost axis; `rumpe` exits the innermost axis into the
+    /// enclosing axis's increment — hand-nested loop reading.
+    pub(super) fn lower_itera_range_expr(
+        &mut self,
+        ranges: &[HirExpression],
+        bindings: &[(DefId, Symbol)],
+        body: &HirBlock,
+        expr: &HirExpression,
+    ) -> Option<MirOperand> {
+        let ty = self.expr_ty(expr)?;
+        if !self.is_vacuum(ty) {
+            self.errors
+                .push(MirError::unsupported(expr.span, "itera expression with non-vacuum result"));
+            return None;
+        }
+        if ranges.len() != bindings.len() || ranges.is_empty() {
+            self.errors.push(MirError::unsupported(
+                expr.span,
+                "itera range product with unequal range and binder counts",
+            ));
+            return None;
+        }
+        let numerus = MirType::semantic(self.types.primitive(Primitive::Numerus));
+        let bivalens = MirType::semantic(self.types.primitive(Primitive::Bivalens));
+        let span = expr.span;
+
+        // Only `Intervallum` members reach MIR (the mixed-source law declines
+        // earlier at check); anything else is a fail-closed decline, never a
+        // guessed walk.
+        let mut members = Vec::with_capacity(ranges.len());
+        for range in ranges {
+            let HirExpressionKind::Intervallum { start, end, step, kind } = &range.kind else {
+                self.errors.push(MirError::unsupported(
+                    range.span,
+                    "itera range product member before range MIR lowering",
+                ));
+                return None;
+            };
+            members.push((start, end, step.as_deref(), *kind));
+        }
+
+        // Pre-allocate each axis's extent-entry block plus the nest entry
+        // (the outermost axis's per-pass entry) so every extent chain can
+        // name its exit before the nest is filled.
+        let axis_count = members.len();
+        let nest_entry = self.fresh_block(span);
+        let mut extent_entries = Vec::with_capacity(axis_count);
+        for _ in 0..axis_count {
+            extent_entries.push(self.fresh_block(span));
+        }
+
+        let mut axes = Vec::with_capacity(axis_count);
+        for (position, ((start, end, step, kind), (binding, name))) in members.iter().zip(bindings).enumerate() {
+            let index = self.next_local_id();
+            self.locals
+                .push(MirLocalDecl { id: index, name: Some(*name), ty: numerus, mutable: true, span });
+            self.bindings
+                .insert(*binding, LocalBinding { local: index, ty: numerus });
+            // The extent values are loop-invariant (no extent can reference
+            // a binder), so each pass re-assigns the index from `start`
+            // instead of re-evaluating the extent expressions.
+            let start_local = self.next_local_id();
+            self.locals
+                .push(MirLocalDecl { id: start_local, name: None, ty: numerus, mutable: false, span });
+            let bound = self.next_local_id();
+            self.locals
+                .push(MirLocalDecl { id: bound, name: None, ty: numerus, mutable: false, span });
+            let step_local = self.next_local_id();
+            self.locals
+                .push(MirLocalDecl { id: step_local, name: None, ty: numerus, mutable: false, span });
+
+            if position > 0 {
+                self.switch_to(extent_entries[position]);
+            }
+            self.lower_expr_to_destination(start, MirPlace::local(start_local), numerus)?;
+            self.lower_expr_to_destination(end, MirPlace::local(bound), numerus)?;
+            if !self.current_is_open() {
+                return None;
+            }
+            let exit = if position + 1 < axis_count {
+                extent_entries[position + 1]
+            } else {
+                nest_entry
+            };
+            match step {
+                Some(step) => {
+                    self.lower_expr_to_destination(step, MirPlace::local(step_local), numerus)?;
+                    self.terminate_open_current(MirTerminatorKind::Goto(exit), span);
+                }
+                None => self.lower_default_range_step(start_local, bound, step_local, exit, bivalens, span),
+            }
+            axes.push(RangeProductAxis { index, start: start_local, bound, step: step_local, kind: *kind });
+        }
+
+        let after_id = self.fresh_block(span);
+        self.lower_range_product_level(&axes, body, 0, nest_entry, after_id, span)?;
+        self.switch_to(after_id);
+        Some(MirOperand::Constant(MirConstant::Unit))
+    }
+
+    /// Build one axis's range CFG and nest inward (NR-3).
+    ///
+    /// Mirrors the single-range walk's condition blocks: each pass re-assigns
+    /// the axis index from its loop-invariant start, the step sign splits
+    /// positive/negative admissions, an inclusive axis compares with
+    /// `<=`/`>=`, and a failing axis exits into `continuation` (the
+    /// enclosing axis's increment; the outermost exit joins `after`).
+    fn lower_range_product_level(
+        &mut self,
+        axes: &[RangeProductAxis],
+        body: &HirBlock,
+        level: usize,
+        entry: MirBlockId,
+        continuation: MirBlockId,
+        span: Span,
+    ) -> Option<()> {
+        let axis = &axes[level];
+        let innermost = level + 1 == axes.len();
+        let numerus = MirType::semantic(self.types.primitive(Primitive::Numerus));
+        let bivalens = MirType::semantic(self.types.primitive(Primitive::Bivalens));
+
+        let cond_id = self.fresh_block(span);
+        let positive_check_id = self.fresh_block(span);
+        let negative_or_zero_id = self.fresh_block(span);
+        let negative_check_id = self.fresh_block(span);
+        let then_target = if innermost {
+            self.fresh_block(body.span)
+        } else {
+            self.fresh_block(span)
+        };
+        let increment_id = self.fresh_block(span);
+        let loop_after_id = self.fresh_block(span);
+
+        self.switch_to(entry);
+        self.assign(
+            MirPlace::local(axis.index),
+            MirOperand::Place(MirPlace::local(axis.start)),
+            numerus,
+            span,
+        );
+        self.terminate_current(MirTerminatorKind::Goto(cond_id), span);
+
+        self.switch_to(cond_id);
+        let step_is_positive = self.binary_temp(
+            MirBinOp::Gt,
+            MirOperand::Place(MirPlace::local(axis.step)),
+            MirOperand::Constant(MirConstant::Int(0)),
+            bivalens,
+            span,
+        );
+        self.terminate_current(
+            MirTerminatorKind::Branch {
+                condition: step_is_positive,
+                then_block: positive_check_id,
+                else_block: negative_or_zero_id,
+            },
+            span,
+        );
+
+        self.switch_to(positive_check_id);
+        let positive_op = match axis.kind {
+            HirRangeKind::Exclusive => MirBinOp::Lt,
+            HirRangeKind::Inclusive => MirBinOp::LtEq,
+        };
+        let positive_continues = self.binary_temp(
+            positive_op,
+            MirOperand::Place(MirPlace::local(axis.index)),
+            MirOperand::Place(MirPlace::local(axis.bound)),
+            bivalens,
+            span,
+        );
+        self.terminate_current(
+            MirTerminatorKind::Branch {
+                condition: positive_continues,
+                then_block: then_target,
+                else_block: loop_after_id,
+            },
+            span,
+        );
+
+        self.switch_to(negative_or_zero_id);
+        let step_is_negative = self.binary_temp(
+            MirBinOp::Lt,
+            MirOperand::Place(MirPlace::local(axis.step)),
+            MirOperand::Constant(MirConstant::Int(0)),
+            bivalens,
+            span,
+        );
+        self.terminate_current(
+            MirTerminatorKind::Branch {
+                condition: step_is_negative,
+                then_block: negative_check_id,
+                else_block: loop_after_id,
+            },
+            span,
+        );
+
+        self.switch_to(negative_check_id);
+        let negative_op = match axis.kind {
+            HirRangeKind::Exclusive => MirBinOp::Gt,
+            HirRangeKind::Inclusive => MirBinOp::GtEq,
+        };
+        let negative_continues = self.binary_temp(
+            negative_op,
+            MirOperand::Place(MirPlace::local(axis.index)),
+            MirOperand::Place(MirPlace::local(axis.bound)),
+            bivalens,
+            span,
+        );
+        self.terminate_current(
+            MirTerminatorKind::Branch {
+                condition: negative_continues,
+                then_block: then_target,
+                else_block: loop_after_id,
+            },
+            span,
+        );
+
+        if innermost {
+            self.breakables.push(BreakableContext {
+                perge_target: Some(increment_id),
+                rumpe_target: loop_after_id,
+                rumpe_used: false,
+            });
+            self.switch_to(then_target);
+            self.visit_block(body);
+            self.breakables.pop();
+            self.terminate_open_current(MirTerminatorKind::Goto(increment_id), span);
+        } else {
+            self.lower_range_product_level(axes, body, level + 1, then_target, increment_id, span)?;
+        }
+
+        self.switch_to(increment_id);
+        let next = self.binary_temp(
+            MirBinOp::Add,
+            MirOperand::Place(MirPlace::local(axis.index)),
+            MirOperand::Place(MirPlace::local(axis.step)),
+            numerus,
+            span,
+        );
+        self.assign(MirPlace::local(axis.index), next, numerus, span);
+        self.terminate_current(MirTerminatorKind::Goto(cond_id), span);
+
+        self.switch_to(loop_after_id);
+        self.terminate_open_current(MirTerminatorKind::Goto(continuation), span);
         Some(())
     }
 

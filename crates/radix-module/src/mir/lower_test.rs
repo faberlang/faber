@@ -1722,6 +1722,91 @@ fn lockstep_itera_runs_aligned_walks_with_shared_coordinate() {
 }
 
 #[test]
+fn range_product_two_axes_walk_row_major_leftmost_outermost() {
+    // NR-3: the range product is one ordered Cartesian construct — the first
+    // range is the outer axis, so (i, j) visits row-major leftmost-outermost.
+    let mut host = crate::mir::BufferHost::default();
+    crate::mir::run_source(
+        &Session::new(Config::default().with_target(Target::HirTypeScript)),
+        "range-product-n2.fab",
+        r"incipit {
+  itera ab 0‥2, 0‥3 fixum i, j {
+    nota i * 10 + j
+  }
+}",
+        &mut host,
+    )
+    .unwrap_or_else(|error| panic!("range product must run: {error:?}"));
+    assert_eq!(host.stdout_lines, ["0", "1", "2", "10", "11", "12"]);
+}
+
+#[test]
+fn range_product_three_axes_preserve_every_binder() {
+    // NR-3: all N binders stay live in the single shared body — the encoded
+    // row proves i, j, and p each contribute their axis digit.
+    let mut host = crate::mir::BufferHost::default();
+    crate::mir::run_source(
+        &Session::new(Config::default().with_target(Target::HirTypeScript)),
+        "range-product-n3.fab",
+        r"incipit {
+  itera ab 0‥2, 0‥2, 0‥2 fixum i, j, p {
+    nota i * 100 + j * 10 + p
+  }
+}",
+        &mut host,
+    )
+    .unwrap_or_else(|error| panic!("three-axis range product must run: {error:?}"));
+    assert_eq!(host.stdout_lines, ["0", "1", "10", "11", "100", "101", "110", "111"]);
+}
+
+#[test]
+fn range_product_keeps_per_axis_step_and_inclusive_bounds() {
+    // NR-3: each axis retains the single-range semantics — axis 0 is an
+    // exclusive stepped walk (0, 2), axis 1 is inclusive (0, 1, 2).
+    let mut host = crate::mir::BufferHost::default();
+    crate::mir::run_source(
+        &Session::new(Config::default().with_target(Target::HirTypeScript)),
+        "range-product-semantics.fab",
+        r"incipit {
+  itera ab 0‥4 per 2, 0…2 fixum i, j {
+    nota i * 10 + j
+  }
+}",
+        &mut host,
+    )
+    .unwrap_or_else(|error| panic!("mixed-bounds range product must run: {error:?}"));
+    assert_eq!(host.stdout_lines, ["0", "1", "2", "20", "21", "22"]);
+}
+
+#[test]
+fn range_product_lowers_as_ordered_nest_without_zip_guard() {
+    // NR-3 keep-class: the product lowers through per-axis range CFG only —
+    // no lockstep walk, no list length read, no equal-length admission.
+    let dump = dump_source(
+        r"functio grid(numerus m, numerus n) → vacuum {
+  itera ab 0‥m, 0‥n fixum i, j {
+    nota i
+    nota j
+  }
+}",
+    );
+    assert!(
+        !dump.contains("range-product itera"),
+        "the product must lower instead of declining: {dump}"
+    );
+    assert!(!dump.contains("lockstep"), "a range product is never a zip: {dump}");
+    assert!(
+        !dump.contains("runtime collection length"),
+        "no list length read feeds a range product: {dump}"
+    );
+    assert!(!dump.contains("panic"), "no equal-length guard guards a range product: {dump}");
+    assert!(
+        dump.matches("branch ").count() >= 6,
+        "two axes need their own sign-split condition CFG: {dump}"
+    );
+}
+
+#[test]
 fn borrowed_receiver_itera_ex_lowers_by_pointee_with_by_value_identical_dump() {
     // MRL-2 flip of MRL-1's decline pins: a borrowed receiver (`de` param,
     // or a field read through one) classifies by pointee and lowers through
