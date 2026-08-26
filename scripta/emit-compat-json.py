@@ -304,7 +304,7 @@ def parse_section(text: str, marker: str) -> list[str]:
     rows = []
     for line in lines[start + 1:]:
         stripped = line.strip()
-        if not stripped or stripped in ("ROWS", "MEASURED", "DISAGREEMENTS"):
+        if not stripped or stripped in ("ROWS", "MEASURED", "DISAGREEMENTS", "DECIMAL ROWS"):
             break
         rows.append(line)
     return rows
@@ -339,6 +339,67 @@ def parse_disagreements(text: str) -> list[dict]:
             }
         )
     return rows
+
+
+# Decimal conversio rows (decimal-widths goal D6). Width-refined cells in the
+# same stable order as the harness `DECIMAL_CELLS` table.
+DECIMAL_CELL_IDS = [
+    "d32-d64",
+    "d64-d32",
+    "d32-i64",
+    "i64-d32",
+    "d32-u32",
+    "u32-d32",
+    "fractus-d32",
+    "d32-fractus",
+    "textus-d32",
+    "d32-textus",
+]
+
+
+def parse_decimal_rows(text: str) -> dict[tuple[str, str], str]:
+    rows: dict[tuple[str, str], str] = {}
+    for line in parse_section(text, "DECIMAL ROWS"):
+        parts = line.split("\t")
+        if len(parts) != 4:
+            continue
+        cell_id, target, verdict, _detail = parts
+        rows[(cell_id, target)] = verdict
+    return rows
+
+
+def emit_conversio_decimal(out_root: Path) -> None:
+    text = run_or_read("CONVERSIO_MATRIX_LOG", CARGO_CONVERSIO)
+    rows = parse_decimal_rows(text)
+
+    for target in CONV_HIR_TARGETS + CONV_MIR_TARGETS:
+        lane = "hir" if target in CONV_HIR_TARGETS else "mir"
+        summary = {"dedicated": 0, "fallback": 0, "rejected": 0, "not-emitted": 0}
+        cells = []
+        for cell_id in DECIMAL_CELL_IDS:
+            src, tgt = cell_id.split("-", 1)
+            verdict = rows.get((cell_id, target), "not-emitted")
+            summary[verdict] = summary.get(verdict, 0) + 1
+            cells.append(
+                {
+                    "src": src,
+                    "tgt": tgt,
+                    "tier": verdict,
+                    "measured": True,
+                }
+            )
+        write_json(
+            out_root / "conversio-decimal" / f"{target}.json",
+            {
+                "schemaVersion": 1,
+                "artifact": "faber-conversio-decimal-measurement",
+                "target": target,
+                "lane": lane,
+                "generatedBy": "radix/scripta/emit-compat-json.py",
+                "summary": summary,
+                "cells": cells,
+            },
+        )
 
 
 def emit_conversio(out_root: Path) -> None:
@@ -390,6 +451,7 @@ def main() -> int:
     out_root = Path(os.environ.get("COMPAT_OUT", DEFAULT_OUT))
     emit_compat(out_root)
     emit_conversio(out_root)
+    emit_conversio_decimal(out_root)
     print(f"measurement JSON written under {out_root}", file=sys.stderr)
     return 0
 

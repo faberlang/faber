@@ -1,0 +1,75 @@
+{
+  "schemaVersion": 1,
+  "artifact": "faber-conversio-decimal-measurement",
+  "target": "wgsl-text",
+  "lane": "mir",
+  "generatedBy": "radix/scripta/emit-compat-json.py",
+  "summary": {
+    "dedicated": 0,
+    "fallback": 0,
+    "rejected": 1,
+    "not-emitted": 9
+  },
+  "cells": [
+    {
+      "src": "d32",
+      "tgt": "d64",
+      "tier": "not-emitted",
+      "measured": true
+    },
+    {
+      "src": "d64",
+      "tgt": "d32",
+      "tier": "rejected",
+      "measured": true
+    },
+    {
+      "src": "d32",
+      "tgt": "i64",
+      "tier": "not-emitted",
+      "measured": true
+    },
+    {
+      "src": "i64",
+      "tgt": "d32",
+      "tier": "not-emitted",
+      "measured": true
+    },
+    {
+      "src": "d32",
+      "tgt": "u32",
+      "tier": "not-emitted",
+      "measured": true
+    },
+    {
+      "src": "u32",
+      "tgt": "d32",
+      "tier": "not-emitted",
+      "measured": true
+    },
+    {
+      "src": "fractus",
+      "tgt": "d32",
+      "tier": "not-emitted",
+      "measured": true
+    },
+    {
+      "src": "d32",
+      "tgt": "fractus",
+      "tier": "not-emitted",
+      "measured": true
+    },
+    {
+      "src": "textus",
+      "tgt": "d32",
+      "tier": "not-emitted",
+      "measured": true
+    },
+    {
+      "src": "d32",
+      "tgt": "textus",
+      "tier": "not-emitted",
+      "measured": true
+    }
+  ]
+}

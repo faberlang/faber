@@ -1,0 +1,75 @@
+{
+  "schemaVersion": 1,
+  "artifact": "faber-conversio-decimal-measurement",
+  "target": "go",
+  "lane": "hir",
+  "generatedBy": "radix/scripta/emit-compat-json.py",
+  "summary": {
+    "dedicated": 9,
+    "fallback": 0,
+    "rejected": 1,
+    "not-emitted": 0
+  },
+  "cells": [
+    {
+      "src": "d32",
+      "tgt": "d64",
+      "tier": "dedicated",
+      "measured": true
+    },
+    {
+      "src": "d64",
+      "tgt": "d32",
+      "tier": "rejected",
+      "measured": true
+    },
+    {
+      "src": "d32",
+      "tgt": "i64",
+      "tier": "dedicated",
+      "measured": true
+    },
+    {
+      "src": "i64",
+      "tgt": "d32",
+      "tier": "dedicated",
+      "measured": true
+    },
+    {
+      "src": "d32",
+      "tgt": "u32",
+      "tier": "dedicated",
+      "measured": true
+    },
+    {
+      "src": "u32",
+      "tgt": "d32",
+      "tier": "dedicated",
+      "measured": true
+    },
+    {
+      "src": "fractus",
+      "tgt": "d32",
+      "tier": "dedicated",
+      "measured": true
+    },
+    {
+      "src": "d32",
+      "tgt": "fractus",
+      "tier": "dedicated",
+      "measured": true
+    },
+    {
+      "src": "textus",
+      "tgt": "d32",
+      "tier": "dedicated",
+      "measured": true
+    },
+    {
+      "src": "d32",
+      "tgt": "textus",
+      "tier": "dedicated",
+      "measured": true
+    }
+  ]
+}
