@@ -73,6 +73,42 @@ functio maior(numerus<d32> a, numerus n) → bivalens {
 }
 
 #[test]
+fn lowers_decimal_equality_through_a_common_scaled_carrier() {
+    let dump = dump_source(
+        r#"
+functio aequalis(numerus<d32> a, numerus<d64> b) → bivalens {
+    redde a ≅ b
+}
+"#,
+    );
+    assert_eq!(
+        dump.matches("runtime convert runtime").count(),
+        1,
+        "d32 must widen once to the d64 comparison carrier:\n{dump}"
+    );
+    assert!(
+        dump.contains(" =="),
+        "comparison must remain a primitive MIR equality op:\n{dump}"
+    );
+}
+
+#[test]
+fn lowers_decimal_fuzzy_equality_through_the_d64_scaled_carrier() {
+    let dump = dump_source(
+        r#"
+functio aequalis(numerus<d32> a, numerus<d64> b) → bivalens {
+    redde a ≈ b
+}
+"#,
+    );
+    assert_eq!(
+        dump.matches("runtime convert runtime").count(),
+        1,
+        "fuzzy equality must widen d32 to the d64 carrier:\n{dump}"
+    );
+}
+
+#[test]
 fn queue_and_stack_methods_lower_to_core_collection_walkers() {
     let queue = dump_source(
         r#"incipit {

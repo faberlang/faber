@@ -2170,8 +2170,10 @@ impl<'a> FunctionBuilder<'a> {
             return self.lower_glyph_product(op, lhs, rhs, expr);
         }
         if matches!(op, HirBinOp::FuzzyEq | HirBinOp::FuzzyNotEq) {
-            let lhs = self.lower_expr_value(lhs)?;
-            let rhs = self.lower_expr_value(rhs)?;
+            // GT-1: fuzzy equality joins decimal operands at the d64 scale
+            // like every other comparison tier; raw scaled carriers would
+            // compare 4.2 d32 as 42000000 against 4200000000 d64.
+            let (lhs, rhs) = self.lower_decimal_join_operands(lhs, rhs)?;
             let ty = self.expr_ty(expr)?;
             return Some(self.runtime_call_value(
                 MirIntrinsic::Collection(MirCollectionOp::Approximate),
@@ -2200,8 +2202,23 @@ impl<'a> FunctionBuilder<'a> {
                 .push(MirError::unsupported(expr.span, "binary operator without a MIR primitive"));
             return None;
         };
-        let (lhs, rhs) = if matches!(op, HirBinOp::Lt | HirBinOp::Gt | HirBinOp::LtEq | HirBinOp::GtEq) {
-            self.lower_decimal_ordering_operands(lhs, rhs)?
+        // GT-1: the decimal d64-scale join is the shared comparison join —
+        // ordering (mixed-ordering-join) and the ≅/≈ value-equality tiers both
+        // widen decimal operands at the d64 carrier before the bool op.
+        let (lhs, rhs) = if matches!(
+            op,
+            HirBinOp::Lt
+                | HirBinOp::Gt
+                | HirBinOp::LtEq
+                | HirBinOp::GtEq
+                | HirBinOp::Eq
+                | HirBinOp::NotEq
+                | HirBinOp::StrictEq
+                | HirBinOp::StrictNotEq
+                | HirBinOp::ApproxEq
+                | HirBinOp::ApproxNotEq
+        ) {
+            self.lower_decimal_join_operands(lhs, rhs)?
         } else {
             (self.lower_expr_value(lhs)?, self.lower_expr_value(rhs)?)
         };
@@ -2709,28 +2726,25 @@ impl<'a> FunctionBuilder<'a> {
         )
     }
 
-    /// Join decimal ordering operands at the d64 scaled carrier before the
-    /// bool-valued MIR binary op. The result type of a comparison is bivalens,
-    /// so runner normalization keyed only from that result would otherwise
-    /// miss the decimal operand widths entirely.
-    fn lower_decimal_ordering_operands(
+    /// Join decimal comparison operands at the d64 scaled carrier before the
+    /// bool-valued MIR binary op. Shared by ordering and the ≅/≈ equality
+    /// tiers (GT-1). The result type of a comparison is bivalens, so runner
+    /// normalization keyed only from that result would otherwise miss the
+    /// decimal operand widths entirely.
+    fn lower_decimal_join_operands(
         &mut self,
         lhs: &HirExpression,
         rhs: &HirExpression,
     ) -> Option<(MirOperand, MirOperand)> {
-        let Some((lhs_ty, rhs_ty, target_ty)) = self.decimal_ordering_join(lhs, rhs) else {
+        let Some((lhs_ty, rhs_ty, target_ty)) = self.decimal_join_target(lhs, rhs) else {
             return Some((self.lower_expr_value(lhs)?, self.lower_expr_value(rhs)?));
         };
-        let lhs = self.lower_ordering_operand(lhs, lhs_ty, target_ty)?;
-        let rhs = self.lower_ordering_operand(rhs, rhs_ty, target_ty)?;
+        let lhs = self.lower_join_operand(lhs, lhs_ty, target_ty)?;
+        let rhs = self.lower_join_operand(rhs, rhs_ty, target_ty)?;
         Some((lhs, rhs))
     }
 
-    fn decimal_ordering_join(
-        &mut self,
-        lhs: &HirExpression,
-        rhs: &HirExpression,
-    ) -> Option<(MirType, MirType, TypeId)> {
+    fn decimal_join_target(&mut self, lhs: &HirExpression, rhs: &HirExpression) -> Option<(MirType, MirType, TypeId)> {
         let lhs_ty = self.expr_ty(lhs)?;
         let rhs_ty = self.expr_ty(rhs)?;
         let lhs_semantic = self.types.peel_access_marker(lhs_ty.semantic_id()).1;
@@ -2777,7 +2791,7 @@ impl<'a> FunctionBuilder<'a> {
         Some((lhs_ty, rhs_ty, target))
     }
 
-    fn lower_ordering_operand(
+    fn lower_join_operand(
         &mut self,
         expr: &HirExpression,
         source_ty: MirType,
