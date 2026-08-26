@@ -27,6 +27,9 @@ mod comma_law_test;
 mod commune_emit_test;
 
 #[cfg(test)]
+mod intervallum_spacing_test;
+
+#[cfg(test)]
 mod trivia_test;
 
 pub use module::{emit, empty_presentation, FaberCodegen, FaberOutput};

@@ -58,6 +58,21 @@ const NON_NULL_CHAIN: PostfixChainPrefixes = PostfixChainPrefixes {
     call_open: "!(",
 };
 
+/// Bare integer literal for the range-spacing law: an
+/// `Int(u64)` literal, or unary minus over one. Negative literals lower as
+/// `Unary(Neg, Int)` (see `HirLiteral::Int`), and the `Unary` arm emits
+/// `unop` + operand with no inner spacing, so `-1` is one operand.
+fn is_bare_int_literal(expr: &HirExpression) -> bool {
+    match &expr.kind {
+        HirExpressionKind::Literal(radix_hir::HirLiteral::Int(_)) => true,
+        HirExpressionKind::Unary(radix_hir::HirUnOp::Neg, operand) => matches!(
+            operand.kind,
+            HirExpressionKind::Literal(radix_hir::HirLiteral::Int(_))
+        ),
+        _ => false,
+    }
+}
+
 #[derive(Clone, Copy)]
 enum PostfixChainTail<'a> {
     Member(Symbol),
@@ -383,10 +398,20 @@ impl super::FaberCodegen {
                 kind,
             } => {
                 self.write_expr(start, types, names, interner, surface, writer);
-                writer.write(match kind {
+                // Need (operator-locked): range glyphs are tight iff
+                // both endpoints are bare integer literals; every other infix
+                // spacing rule pads both sides.
+                let glyph = match kind {
                     radix_hir::HirRangeKind::Exclusive => "‥",
                     radix_hir::HirRangeKind::Inclusive => "…",
-                });
+                };
+                if is_bare_int_literal(start) && is_bare_int_literal(end) {
+                    writer.write(glyph);
+                } else {
+                    writer.write(" ");
+                    writer.write(glyph);
+                    writer.write(" ");
+                }
                 self.write_expr(end, types, names, interner, surface, writer);
                 if let Some(step) = step {
                     writer.write(" ");
