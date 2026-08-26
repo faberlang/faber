@@ -2605,6 +2605,7 @@ impl KeywordPack for EnGuardPack {
             "true" => Some("verum"),
             "for" => Some("itera"),
             "from" => Some("ex"),
+            "range" => Some("ab"),
             "at" => Some("apud"),
             "const" => Some("fixum"),
             _ => None,
@@ -2652,6 +2653,23 @@ fn parses_itera_apud_clause_on_en_at_surface() {
         .map(|ident| symbol_name(&result, ident.name))
         .collect::<Vec<_>>();
     assert_eq!(coordinates, ["i", "j"]);
+}
+
+#[test]
+fn parses_en_for_range_series_at_surface() {
+    // The documented English spelling of the NR-1 `ab` range series parses
+    // through the same source/binder series shape (`en` pack: range = ab).
+    let result = parse_ok_en("for range 0‥m, 0‥n, 0‥k const i, j, p { }");
+    let program = result.program.as_ref().expect("program");
+    let StmtKind::Itera(iter_stmt) = &program.statements[0].kind else {
+        panic!("expected itera statement");
+    };
+    assert_eq!(
+        std::mem::discriminant(&iter_stmt.mode),
+        std::mem::discriminant(&IteraMode::Ab)
+    );
+    assert_eq!(iter_stmt.sources.len(), 3);
+    assert_eq!(iter_stmt.bindings.len(), 3);
 }
 
 #[test]

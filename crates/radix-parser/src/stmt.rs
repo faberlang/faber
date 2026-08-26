@@ -156,14 +156,15 @@ impl Parser {
     /// Parse an `itera` loop and its ownership mode.
     ///
     /// GRAMMAR:
-    ///   itera-stmt := `itera` (`ex` expr (`,` expr)* | (`de`|`ab`) expr) [apud-clause] (`fixum`|`varia`) itera-binding if-body [`cape` ident block]
+    ///   itera-stmt := `itera` ((`ex`|`ab`) expr (`,` expr)* | `de` expr) [apud-clause] (`fixum`|`varia`) itera-binding if-body [`cape` ident block]
     ///   apud-clause := `apud` `[` IDENTIFIER (`,` IDENTIFIER)* `]`
     ///   itera-binding := array-pattern | object-pattern | IDENTIFIER (`,` IDENTIFIER)*
     ///
     /// The parser records the source preposition mode; later phases validate
-    /// the semantic source shape for that mode. Only `ex` admits the
-    /// comma-separated lockstep source series; source/binder arity is a
-    /// semantic law, not a parse decision.
+    /// the semantic source shape for that mode. `ex` and `ab` admit the
+    /// comma-separated source series (`ex` lockstep zip, `ab` Cartesian range
+    /// product); `de` stays unary. Source/binder arity and range membership
+    /// are semantic laws, not parse decisions.
     pub(super) fn parse_itera_stmt(&mut self) -> Result<StmtKind, ParseError> {
         self.expect_keyword_ident(TokenKind::Itera, "expected 'itera'")?;
 
@@ -180,7 +181,7 @@ impl Parser {
         };
 
         let mut sources = vec![self.parse_expression()?];
-        if matches!(mode, IteraMode::Ex) {
+        if matches!(mode, IteraMode::Ex | IteraMode::Ab) {
             while self.eat(&TokenKind::Comma) {
                 sources.push(self.parse_expression()?);
             }
