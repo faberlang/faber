@@ -65,7 +65,8 @@ impl Parser {
     /// Parse one pattern atom plus its optional binding suffix.
     ///
     /// GRAMMAR:
-    ///   pattern := `_` | literal | type-name [`bind`] | ident [`bind`] | path bind
+    ///   pattern := `_` | literal | type-pattern [`bind`] | ident [`bind`] | path bind
+    ///   type-pattern := type-name [type-arguments]
     ///   bind := `ut` ident | (`fixum`|`varia`) binding-list
     ///   binding-list := ident [`ut` ident] (',' ident [`ut` ident])*
     ///
@@ -84,13 +85,15 @@ impl Parser {
 
         // Type-name lookahead mirrors `est` classification. `nihil` is a
         // deliberate exception to the ordinary literal table: in a `discerne`
-        // arm it denotes the null member of the scrutinee union.
+        // arm it denotes the null member of the scrutinee union. Parse the
+        // complete type expression so bounded families (`lista<T, N>`) and
+        // tensor figures remain available to lowering.
         if (self.check_keyword_ident(TokenKind::Nihil) || self.peek_starts_type_name())
             && !matches!(self.peek_at(1).kind, TokenKind::Dot)
         {
-            let ident = self.parse_ident()?;
+            let ty = self.parse_type()?;
             let bind = self.parse_pattern_bind()?;
-            return Ok(Pattern::Type(ident, bind));
+            return Ok(Pattern::Type(ty, bind));
         }
 
         if let TokenKind::Ident(_) = self.peek().kind {

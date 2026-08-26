@@ -743,6 +743,10 @@ impl Parser {
                 | "octeti"
                 | "ascii"
                 | "vacuum"
+                | "tensor"
+                | "sparsa"
+                | "vector"
+                | "matrix"
         )
     }
 

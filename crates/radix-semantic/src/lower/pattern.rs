@@ -24,6 +24,7 @@
 //! phases can still report useful errors in the rest of the arm.
 
 use super::Lowerer;
+use crate::{IndexExpr, Type};
 use radix_hir::{HirLiteral, HirPattern};
 use radix_lexer::Span;
 use radix_syntax::{
@@ -43,7 +44,7 @@ pub fn lower_pattern(lowerer: &mut Lowerer, pattern: &Pattern) -> HirPattern {
             HirPattern::Wildcard
         }
         Pattern::Ident(ident, bind) => lower_ident_pattern(lowerer, ident, bind.as_ref()),
-        Pattern::Type(ident, bind) => lower_type_pattern(lowerer, ident, bind.as_ref()),
+        Pattern::Type(ty, bind) => lower_type_pattern(lowerer, ty, bind.as_ref()),
         Pattern::Literal(lit, span) => lower_literal(lowerer, lit, *span),
         Pattern::Path(path) => lower_path_pattern(lowerer, path),
     }
@@ -51,21 +52,20 @@ pub fn lower_pattern(lowerer: &mut Lowerer, pattern: &Pattern) -> HirPattern {
 
 fn lower_type_pattern(
     lowerer: &mut Lowerer,
-    ident: &radix_syntax::Ident,
+    ty_expr: &TypeExpr,
     bind: Option<&PatternBind>,
 ) -> HirPattern {
-    lowerer.current_span = ident.span;
-    let ty_expr = TypeExpr {
-        nullable: false,
-        mode: None,
-        kind: TypeExprKind::Named(ident.clone(), Vec::new()),
-        span: ident.span,
-        iuncta_label: None,
-    };
-    let ty = lowerer.lower_type(&ty_expr);
-    let candidate = match lowerer.resolver.lookup_variant_bare(ident.name) {
-        crate::BareVariantLookup::Single(def_id) => Some(def_id),
-        crate::BareVariantLookup::Ambiguous { .. } | crate::BareVariantLookup::None => None,
+    lowerer.current_span = ty_expr.span;
+    let lowered_ty = lowerer.lower_type(ty_expr);
+    let ty = normalize_pattern_width_hole(lowerer, lowered_ty);
+    let candidate = match &ty_expr.kind {
+        TypeExprKind::Named(ident, params) if params.is_empty() => {
+            match lowerer.resolver.lookup_variant_bare(ident.name) {
+                crate::BareVariantLookup::Single(def_id) => Some(def_id),
+                crate::BareVariantLookup::Ambiguous { .. } | crate::BareVariantLookup::None => None,
+            }
+        }
+        _ => None,
     };
     let binding = match bind {
         None => None,
@@ -102,6 +102,30 @@ fn lower_type_pattern(
         ty,
         candidate,
         binding,
+    }
+}
+
+/// A capacity hole in a pattern means "any member of this family", not an
+/// unresolved type that must be solved by a value witness. Lowering it to the
+/// unbounded family keeps the pattern checkable and prevents finalization from
+/// reporting an unrelated unsolved-capacity error.
+fn normalize_pattern_width_hole(lowerer: &mut Lowerer, ty: crate::TypeId) -> crate::TypeId {
+    let width_hole =
+        |capacity: crate::IndexId| matches!(lowerer.types.get_index(capacity), IndexExpr::Infer(_));
+    match lowerer.types.get(ty).clone() {
+        Type::BoundedArray { element, capacity } if width_hole(capacity) => {
+            lowerer.types.array(element)
+        }
+        Type::BoundedTextus { capacity } if width_hole(capacity) => {
+            lowerer.types.primitive(crate::Primitive::Textus)
+        }
+        Type::BoundedAscii { capacity } if width_hole(capacity) => {
+            lowerer.types.primitive(crate::Primitive::Ascii)
+        }
+        Type::BoundedOcteti { capacity } if width_hole(capacity) => {
+            lowerer.types.primitive(crate::Primitive::Octeti)
+        }
+        _ => ty,
     }
 }
 

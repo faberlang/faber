@@ -180,6 +180,10 @@ fn check_match(
 
     let mut covered = FxHashSet::default();
     let mut covered_members = Vec::new();
+    // Width patterns form an ordered specificity lattice. A later bounded
+    // pattern is unreachable after a covering bound or family catch-all, while
+    // a family pattern remains reachable after a narrower bounded arm.
+    let mut covered_width_patterns = Vec::new();
     let mut has_catchall = false;
     let mut catchall_span = None;
     let mut explicit_null_arm = false;
@@ -215,7 +219,26 @@ fn check_match(
                 if is_guarded {
                     continue;
                 }
-                if covered_members
+                if covered_width_patterns
+                    .iter()
+                    .copied()
+                    .any(|covered| radix_types::width_pattern_covers(types, covered, member))
+                {
+                    errors.push(
+                        SemanticError::structured(SemanticErrorKind::UnreachablePattern, arm.span)
+                            .with_arg("issue", "after_width_pattern"),
+                    );
+                    continue;
+                }
+                if let Some(width) = radix_types::width_pattern(types, member) {
+                    if width.bound.is_some() {
+                        covered_width_patterns.push(member);
+                    } else {
+                        // The unbounded family is the least-specific pattern,
+                        // but it covers every member of that family from here.
+                        covered_width_patterns.push(member);
+                    }
+                } else if covered_members
                     .iter()
                     .copied()
                     .any(|covered| types.equals(covered, member))
@@ -277,6 +300,10 @@ fn check_match(
                     .iter()
                     .copied()
                     .any(|covered| types.equals(covered, *member))
+                    && !covered_width_patterns
+                        .iter()
+                        .copied()
+                        .any(|covered| radix_types::width_pattern_covers(types, covered, *member))
             });
             if missing {
                 errors.push(
@@ -373,19 +400,26 @@ pub fn discerne_definitely_covered(
     let Some(scrutinee_ty) = scrutinees[0].ty else {
         return false;
     };
+    let covered: Vec<TypeId> = arms
+        .iter()
+        .filter(|arm| arm.guard.is_none())
+        .flat_map(|arm| arm.patterns.iter())
+        .filter_map(pattern_type_id)
+        .collect();
     if let Some(expected) = union_members_from_type(scrutinee_ty, types) {
-        let covered: Vec<TypeId> = arms
-            .iter()
-            .filter(|arm| arm.guard.is_none())
-            .flat_map(|arm| arm.patterns.iter())
-            .filter_map(pattern_type_id)
-            .collect();
         return expected.iter().all(|member| {
-            covered
-                .iter()
-                .copied()
-                .any(|candidate| types.equals(candidate, *member))
+            covered.iter().copied().any(|candidate| {
+                types.equals(candidate, *member)
+                    || radix_types::width_pattern_covers(types, candidate, *member)
+            })
         });
+    }
+    if covered
+        .iter()
+        .copied()
+        .any(|candidate| radix_types::width_pattern_covers(types, candidate, scrutinee_ty))
+    {
+        return true;
     }
 
     let Some(enum_def) = enum_def_from_type(scrutinee_ty, types) else {

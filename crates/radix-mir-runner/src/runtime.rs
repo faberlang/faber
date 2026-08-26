@@ -827,6 +827,18 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
     /// its corresponding valor-carried type. Inner type parameters are erased
     /// at boxing time and never checked (mirrors the archived `est`
     /// variant-check surface).
+    fn nominal_type_check_matches(&self, value: &Value, target: &Type) -> bool {
+        match (value, target) {
+            (Value::Struct(def, _), Type::Struct(target)) => def == target,
+            (Value::EnumVariant(def, _), Type::Enum(target)) => self
+                .context
+                .variant_parents
+                .get(def)
+                .is_some_and(|parent| parent == target),
+            _ => false,
+        }
+    }
+
     fn eval_type_check(
         &mut self,
         op: &MirTypeCheckOp,
@@ -838,6 +850,7 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
         };
         let value = self.eval_operand(operand, span)?;
         let target = self.types.get(op.ty.semantic_id());
+        let nominal_match = self.nominal_type_check_matches(&value, target);
         let matches = matches!(
             (&value, &target),
             (Value::Nil, Type::Primitive(Primitive::Nihil))
@@ -870,6 +883,7 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                 | (Value::Unit, Type::Primitive(Primitive::Vacuum))
                 | (_, Type::Primitive(Primitive::Valor | Primitive::Ignotum))
         );
+        let matches = nominal_match || matches;
         Ok(Value::Bool(if op.positive { matches } else { !matches }))
     }
 

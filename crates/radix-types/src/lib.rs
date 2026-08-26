@@ -17,6 +17,11 @@ mod schema;
 mod schema_subset;
 mod types;
 pub mod vocabulary;
+pub mod width_pattern;
+pub use width_pattern::{
+    is_family_catchall, literal_length_guard, width_pattern, width_pattern_applies,
+    width_pattern_covers, WidthFamily, WidthPattern,
+};
 
 pub use def_id::DefId;
 pub use filtrum::{
@@ -72,6 +77,10 @@ pub use types::{
 #[cfg(test)]
 #[path = "lattice_property_test.rs"]
 mod lattice_property_tests;
+
+#[cfg(test)]
+#[path = "width_pattern_test.rs"]
+mod width_pattern_tests;
 
 #[cfg(test)]
 #[path = "schema_subset_test.rs"]

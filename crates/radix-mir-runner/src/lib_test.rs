@@ -3999,6 +3999,70 @@ fn runner_type_check_dispatches_on_runtime_variant_tag() {
     );
 }
 
+#[test]
+fn runner_type_check_dispatches_nominal_struct_and_enum_tags() {
+    use crate::host::BufferHost;
+    use crate::Value;
+    use radix_hir::DefId;
+    use radix_lexer::Interner;
+    use radix_mir::MirType;
+    use radix_mir::MirTypeCheckOp;
+    use radix_mir::MirValidationContext;
+    use radix_types::{Primitive, Type, TypeTable};
+
+    let mut host = BufferHost::default();
+    let mut type_table = TypeTable::default();
+    let interner = Interner::new();
+    let struct_def = DefId(10);
+    let enum_def = DefId(20);
+    let variant_def = DefId(21);
+    let bivalens = type_table.primitive(Primitive::Bivalens);
+    let struct_ty = type_table.intern(Type::Struct(struct_def));
+    let enum_ty = type_table.intern(Type::Enum(enum_def));
+    let mut context = MirValidationContext::new(&type_table);
+    context.enum_variants.insert(enum_def, vec![variant_def]);
+    context.variant_parents.insert(variant_def, enum_def);
+    context.rebuild_variant_positions();
+    let mut program = MirProgram::new();
+    program.functions.push(make_function());
+
+    let mut runner = Runner::new(&program, &context, &type_table, &interner, &mut host);
+    let fn0 = program.functions.first().unwrap();
+    runner.push_frame(fn0.id, MirBlockId(0));
+    runner.frames.last_mut().unwrap().values.extend([
+        (
+            MirValueId(2),
+            Value::Struct(struct_def, Rc::new(RefCell::new(FxHashMap::default()))),
+        ),
+        (
+            MirValueId(3),
+            Value::EnumVariant(variant_def, Rc::new(RefCell::new(FxHashMap::default()))),
+        ),
+    ]);
+
+    let type_check = |ty: TypeId, slot: u32| MirRuntimeCall {
+        intrinsic: MirIntrinsic::TypeCheck(MirTypeCheckOp {
+            positive: true,
+            ty: MirType::semantic(ty),
+        }),
+        args: vec![MirOperand::Value(MirValueId(slot))],
+        return_ty: MirType::semantic(bivalens),
+    };
+
+    assert_eq!(
+        runner
+            .eval_runtime_call(&type_check(struct_ty, 2), Span::default())
+            .expect("struct tag check"),
+        Value::Bool(true)
+    );
+    assert_eq!(
+        runner
+            .eval_runtime_call(&type_check(enum_ty, 3), Span::default())
+            .expect("enum variant tag check"),
+        Value::Bool(true)
+    );
+}
+
 // ---------------------------------------------------------------------------
 // Matrix display (runner display contract: nested rows, matching the
 // compiled host route goldens)

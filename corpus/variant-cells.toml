@@ -781,6 +781,16 @@ expected = true
 required = true
 note = "N1 ruling 2+3; type-pattern predicate shares the est member rule"
 
+[[cells]]
+id = "cast.discerne-width-pattern"
+family = "casts"
+cell = "discerne bounded width pattern + family catch-all"
+status = "direct"
+exemplum = "discerne/width-patterns.fab"
+expected = true
+required = true
+note = "N2 ruling 4; bounded patterns must precede the unbounded family catch-all"
+
 # =============================================================================
 # closures (9 cells: 9 direct / 0 bare)
 # =============================================================================

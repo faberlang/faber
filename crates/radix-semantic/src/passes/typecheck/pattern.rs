@@ -84,12 +84,15 @@ impl TypeChecker<'_> {
             }
             HirPattern::TypeTest { ty, binding, .. } => {
                 let target = self.resolve_inferred_type(*ty);
-                if !self.constrain_type_pattern(
+                let constrained = self.constrain_type_pattern(
                     expected,
                     target,
                     span,
                     ISSUE_PATTERN_TYPE_MISMATCH,
-                ) {
+                );
+                let width_applies =
+                    radix_types::width_pattern_applies(&self.types, expected, target);
+                if !constrained && !width_applies {
                     if let Some(members) = self.union_members_of(expected) {
                         let is_member = members
                             .iter()
@@ -111,7 +114,12 @@ impl TypeChecker<'_> {
                     }
                 }
                 if let Some((def_id, _name)) = binding {
-                    self.insert_binding(*def_id, target);
+                    // A width guard narrows the runtime value without changing
+                    // its carrier type. Keep the expected carrier in the arm.
+                    self.insert_binding(
+                        *def_id,
+                        if width_applies { expected } else { target },
+                    );
                 }
             }
             HirPattern::Alias(def_id, _name, pattern) => {

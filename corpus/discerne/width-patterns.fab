@@ -1,0 +1,24 @@
++++
+term = "discerne width patterns"
+kind = "feature"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "functio_decl", "param_list", "parameter", "return_clause", "discerne_stmt", "discriminants", "casu_variant_clause", "patterns", "pattern", "type_pattern", "type_arguments", "type_argument", "redde_stmt", "expression", "literal", "incipit_stmt"]
+category = "control-flow"
+canonical = true
+summary = "Discerne orders bounded collection patterns before their unbounded family catch-all."
+syntax = "discerne <list<T>> { case list<T, N> ... case list<T> ... }"
+related = ["discerne", "casu", "lista"]
+locale = "en"
++++
+
+# A bounded arm is more specific than the unbounded family arm.
+fn classify(list<int> values) → string {
+    match values {
+        case list<int, 4> { return "short" }
+        case list<int> { return "family" }
+    }
+}
+
+main {
+    const list<int> values ← [1, 2]
+    print classify(values)
+}

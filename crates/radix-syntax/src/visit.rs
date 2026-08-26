@@ -783,8 +783,14 @@ fn walk_pattern<V: Visitor>(visitor: &mut V, pattern: &Pattern) {
     };
     match pattern {
         Pattern::Wildcard(_) | Pattern::Literal(_, _) => {}
-        Pattern::Ident(ident, bind) | Pattern::Type(ident, bind) => {
+        Pattern::Ident(ident, bind) => {
             visitor.visit_ident(ident);
+            if let Some(bind) = bind {
+                walk_pattern_bind(visitor, bind);
+            }
+        }
+        Pattern::Type(ty, bind) => {
+            visitor.visit_type_expr(ty);
             if let Some(bind) = bind {
                 walk_pattern_bind(visitor, bind);
             }
