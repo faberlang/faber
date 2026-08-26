@@ -853,7 +853,7 @@ clausura_params := clausura_param (',' clausura_param)*
 clausura_param  := type_annotation IDENTIFIER
 
 @formerly genusDecl
-genus_decl    := 'abstractus'? 'genus' IDENTIFIER generic_params? ('sub' IDENTIFIER)? ('implet' IDENTIFIER (',' IDENTIFIER)*)? '{' genus_member* '}'
+genus_decl    := 'abstractus'? 'genus' IDENTIFIER generic_params? ('sub' IDENTIFIER)? ('implet' IDENTIFIER ((',' | '∩') IDENTIFIER)*)? '{' genus_member* '}'
 @formerly genusMember
 genus_member  := annotation* (field_decl | functio_method_decl)
 @formerly fieldDecl
@@ -942,7 +942,9 @@ selective_import := 'fixum' import_value_binding (',' import_value_binding)*
 import_value_binding := IDENTIFIER ('ut' IDENTIFIER)?
 
 @formerly typeAnnotation
-type_annotation := owned_type ('∪' owned_type)*
+type_annotation := intersection_type ('∪' intersection_type)*
+# `∩` binds tighter than `∪`: the cup tail parses at intersection level.
+intersection_type := owned_type ('∩' owned_type)*
 @formerly ownedType
 owned_type      := ('de' | 'in' | 'own' | 'copy')? base_type
 @formerly baseType
