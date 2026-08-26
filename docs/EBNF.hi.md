@@ -280,352 +280,354 @@ else_arm ::= (block_stmt | ergo_joint statement) cape_clause?
 dum_stmt ::= 'जबतक' expression (block_stmt | ergo_joint statement) cape_clause?
 # formerly: iteraStmt
 # [095] itera_stmt
-itera_stmt ::= 'दोहराओ' (('सेवन' | 'से') expression | 'सीमा' expression) apud_clause? ('स्थिर' | 'चर') (array_pattern | object_pattern | IDENTIFIER) (block_stmt | ergo_joint statement) cape_clause?
-# [096] apud_clause
+itera_stmt ::= 'दोहराओ' ('सेवन' expression (',' expression)* | 'से' expression | 'सीमा' expression) apud_clause? ('स्थिर' | 'चर') itera_binding (block_stmt | ergo_joint statement) cape_clause?
+# [096] itera_binding
+itera_binding ::= array_pattern | object_pattern | IDENTIFIER (',' IDENTIFIER)*
+# [097] apud_clause
 apud_clause ::= 'पर' '[' IDENTIFIER (',' IDENTIFIER)* ']'
 # formerly: eligeStmt
-# [097] elige_stmt
+# [098] elige_stmt
 elige_stmt ::= 'चुनो' expression '{' casu_elige_clause* ceterum_clause? '}' cape_clause?
 # formerly: eligeCase
-# [098] casu_elige_clause
+# [099] casu_elige_clause
 casu_elige_clause ::= 'स्थिति' expression (block_stmt | ergo_joint statement)
 # formerly: defaultCase
-# [099] ceterum_clause
+# [100] ceterum_clause
 ceterum_clause ::= 'अन्यतम' (block_stmt | ergo_joint statement)
 # formerly: discerneStmt
-# [100] discerne_stmt
+# [101] discerne_stmt
 discerne_stmt ::= 'मिलाओ' 'सब'? discriminants '{' casu_variant_clause* ceterum_clause? '}'
-# [101] discriminants
+# [102] discriminants
 discriminants ::= expression (',' expression)*
 # formerly: variantCase
-# [102] casu_variant_clause
+# [103] casu_variant_clause
 casu_variant_clause ::= 'स्थिति' patterns (block_stmt | ergo_joint statement)
-# [103] patterns
+# [104] patterns
 patterns ::= pattern ((',' | 'और') pattern)*
-# [104] pattern
+# [105] pattern
 pattern ::= '_' | literal | type_pattern | (IDENTIFIER ut_pattern?)
-# [105] type_pattern
+# [106] type_pattern
 type_pattern ::= IDENTIFIER type_arguments? ut_pattern?
 # formerly: patternBind
-# [106] ut_pattern
+# [107] ut_pattern
 ut_pattern ::= ('रूपमें' IDENTIFIER) | (('स्थिर' | 'चर') pattern_binding (',' pattern_binding)*)
 # formerly: patternBinding
-# [107] pattern_binding
+# [108] pattern_binding
 pattern_binding ::= IDENTIFIER ('रूपमें' IDENTIFIER)?
 # formerly: guardStmt
-# [108] custodi_stmt
+# [109] custodi_stmt
 custodi_stmt ::= 'रक्षक' '{' si_guard_clause+ '}'
 # formerly: guardClause
-# [109] si_guard_clause
+# [110] si_guard_clause
 si_guard_clause ::= 'यदि' expression (block_stmt | ergo_joint statement)
 # formerly: curaStmt
-# [110] cura_stmt
+# [111] cura_stmt
 cura_stmt ::= 'देखभाल' STRING ('स्थिर' | 'चर') type_annotation IDENTIFIER block_stmt cape_clause?
 # formerly: extractStmt
-# [111] ex_stmt
+# [112] ex_stmt
 ex_stmt ::= 'सेवन' expression ('स्थिर' | 'चर') extract_fields
 # formerly: extractFields
-# [112] extract_fields
+# [113] extract_fields
 extract_fields ::= extract_field (',' extract_field)* (',' ceteri_field)? | ceteri_field
 # formerly: extractField
-# [113] extract_field
+# [114] extract_field
 extract_field ::= IDENTIFIER ('रूपमें' IDENTIFIER)?
 # formerly: restField
-# [114] ceteri_field
+# [115] ceteri_field
 ceteri_field ::= 'बाकी' IDENTIFIER
 # formerly: returnStmt
-# [115] redde_stmt
+# [116] redde_stmt
 redde_stmt ::= 'लौटाओ' expression?
 # formerly: returnAwaitStmt
-# [116] reddet_stmt
+# [117] reddet_stmt
 reddet_stmt ::= 'रुको_लौटाओ' expression
 # formerly: awaitDiscardStmt
-# [117] tacebit_stmt
+# [118] tacebit_stmt
 tacebit_stmt ::= 'रुको' expression
 # formerly: yieldStmt
-# [118] cede_stmt
+# [119] cede_stmt
 cede_stmt ::= 'आगेबढ़ो' expression
 # formerly: breakStmt
-# [119] rumpe_stmt
+# [120] rumpe_stmt
 rumpe_stmt ::= 'तोड़ो'
 # formerly: continueStmt
-# [120] perge_stmt
+# [121] perge_stmt
 perge_stmt ::= 'जारी'
 # formerly: noopStmt
-# [121] tacet_stmt
+# [122] tacet_stmt
 tacet_stmt ::= 'मौन'
 # formerly: throwStmt
-# [122] iace_stmt
+# [123] iace_stmt
 iace_stmt ::= iace_expr | iace_guarded_expr
 # formerly: bareThrow
-# [123] iace_expr
+# [124] iace_expr
 iace_expr ::= ('इधरफेंको' | 'मरोजाओ') expression
 # formerly: guardedThrowSugar
-# [124] iace_guarded_expr
+# [125] iace_guarded_expr
 iace_guarded_expr ::= ('इधरफेंको' | 'मरोजाओ') expression NO_NEWLINE 'यदि' expression
 # formerly: catchClause
-# [125] cape_clause
+# [126] cape_clause
 cape_clause ::= 'पकड़ो' IDENTIFIER block_stmt
 # formerly: assertStmt
-# [126] adfirma_stmt
+# [127] adfirma_stmt
 adfirma_stmt ::= 'पुष्टि' expression ('मरोजाओ' expression)?
 # formerly: requiritStmt
-# [127] requirit_stmt
+# [128] requirit_stmt
 requirit_stmt ::= 'आवश्यक' expression 'इधरफेंको' expression
-# [128] expression
+# [129] expression
 expression ::= assignment
-# [129] transfer
+# [130] transfer
 transfer ::= ternary ('⇇' ternary)*
-# [130] assignment
+# [131] assignment
 assignment ::= transfer ('←' assignment | '↤' assignment inline_recovery?)?
 # formerly: incDecStmt
-# [131] inc_dec_stmt
+# [132] inc_dec_stmt
 inc_dec_stmt ::= place ('↑' | '↓')
-# [132] place
+# [133] place
 place ::= call_expr
-# [133] ternary
+# [134] ternary
 ternary ::= aut_expr (('?' expression ':' | 'ऐसा' expression 'अन्यथा') ternary)?
 # formerly: or
-# [134] aut_expr
+# [135] aut_expr
 aut_expr ::= et_expr (('या') et_expr)*
 # formerly: and
-# [135] et_expr
+# [136] et_expr
 et_expr ::= equality (('और') equality)*
-# [136] equality
+# [137] equality
 equality ::= comparison equality_tail*
 # formerly: equalityTail
-# [137] equality_tail
+# [138] equality_tail
 equality_tail ::= ('≡' | '≢' | '≠' | '≅' | '≇' | '≈' | '≉' | 'है' | 'नहीं' 'है') comparison
-# [138] comparison
+# [139] comparison
 comparison ::= bitwise_or_expr (('≺' | '≻' | '≤' | '≥' | 'भीतर' | 'बीच') bitwise_or_expr)*
 # formerly: bitwiseOr
-# [139] bitwise_or_expr
+# [140] bitwise_or_expr
 bitwise_or_expr ::= bitwise_xor_expr ('∨' bitwise_xor_expr)*
 # formerly: bitwiseXor
-# [140] bitwise_xor_expr
+# [141] bitwise_xor_expr
 bitwise_xor_expr ::= bitwise_and_expr ('⊻' bitwise_and_expr)*
 # formerly: bitwiseAnd
-# [141] bitwise_and_expr
+# [142] bitwise_and_expr
 bitwise_and_expr ::= shift_expr ('∧' shift_expr)*
 # formerly: shift
-# [142] shift_expr
+# [143] shift_expr
 shift_expr ::= range_expr (('⇐' | '⇒') range_expr)*
 # formerly: range
-# [143] range_expr
+# [144] range_expr
 range_expr ::= additive_expr range_tail?
 # formerly: rangeTail
-# [144] range_tail
+# [145] range_tail
 range_tail ::= ('‥' | '…' | 'पहले' | 'तक') additive_expr ('प्रति' additive_expr)?
 # formerly: additive
-# [145] additive_expr
+# [146] additive_expr
 additive_expr ::= multiplicative_expr (('+' | '-') multiplicative_expr)*
 # formerly: multiplicative
-# [146] multiplicative_expr
+# [147] multiplicative_expr
 multiplicative_expr ::= vel_expr (('*' | '/' | '%' | '·' | '×' | '⊗' | '⊙') vel_expr)*
 # formerly: coalesce
-# [147] vel_expr
+# [148] vel_expr
 vel_expr ::= unary_expr ('डिफ़ॉल्ट' vel_rhs)*
 # formerly: velRhs
-# [148] vel_rhs
+# [149] vel_rhs
 vel_rhs ::= unary_expr vel_range_tail?
 # formerly: velRangeTail
-# [149] vel_range_tail
+# [150] vel_range_tail
 vel_range_tail ::= ('‥' | '…' | 'पहले' | 'तक') unary_expr ('प्रति' unary_expr)?
 # formerly: unary
-# [150] unary_expr
+# [151] unary_expr
 unary_expr ::= ('-' | '¬' | 'नहीं') unary_expr | finge_expr | cast_expr
 # formerly: gradientExpr
-# [151] gradient_expr
+# [152] gradient_expr
 gradient_expr ::= call_expr ('∇' gradient_selection?)?
 # formerly: gradientSelection
-# [152] gradient_selection
+# [153] gradient_selection
 gradient_selection ::= '[' gradient_place (',' gradient_place)* ']'
 # formerly: gradientPlace
-# [153] gradient_place
+# [154] gradient_place
 gradient_place ::= expression
 # formerly: cast
-# [154] cast_expr
+# [155] cast_expr
 cast_expr ::= gradient_expr ('∷' type_annotation | conversio_expr)*
 # formerly: conversio
-# [155] conversio_expr
+# [156] conversio_expr
 conversio_expr ::= '↦' type_annotation inline_recovery?
 # formerly: inlineRecovery
-# [156] inline_recovery
+# [157] inline_recovery
 inline_recovery ::= '⇥' unary_expr
 # formerly: call
-# [157] call_expr
+# [158] call_expr
 call_expr ::= primary (call_suffix | member_suffix | optional_suffix | non_null_suffix)*
 # formerly: callSuffix
-# [158] call_suffix
+# [159] call_suffix
 call_suffix ::= call_type_args? '(' argument_list ')'
 # formerly: memberSuffix
-# [159] member_suffix
+# [160] member_suffix
 member_suffix ::= '.' IDENTIFIER | '[' expression ']'
 # formerly: optionalSuffix
-# [160] optional_suffix
+# [161] optional_suffix
 optional_suffix ::= '?.' IDENTIFIER | '?[' expression ']' | '?(' argument_list ')'
 # formerly: nonNullSuffix
-# [161] non_null_suffix
+# [162] non_null_suffix
 non_null_suffix ::= '!.' IDENTIFIER | '![' expression ']' | '!(' argument_list ')'
 # formerly: argumentList
-# [162] argument_list
+# [163] argument_list
 argument_list ::= (argument (',' argument)*)?
-# [163] argument
+# [164] argument
 argument ::= template_argument | 'फैलाओ'? expression
 # formerly: templateArgument
-# [164] template_argument
+# [165] template_argument
 template_argument ::= 'फैलाओ'? IDENTIFIER ':' expression
-# [165] literal
+# [166] literal
 literal ::= NUMBER | STRING | ASCII_STRING | BACKTICK_STRING | OCTETI_STRING | 'सत्य' | 'असत्य' | 'शून्य'
-# [166] primary
+# [167] primary
 primary ::= IDENTIFIER | literal | 'मैं' | array_literal | json_literal | typed_constructor | iuncta_expr | ad_expr | clausura_expr | praefixum_expr | scriptum_expr | lege_expr | first_match_expr | summa_expr | '(' expression ')'
 # formerly: adExpr
-# [167] ad_expr
+# [168] ad_expr
 ad_expr ::= 'सेवा' ASCII_STRING ad_opener?
 # formerly: adOpener
-# [168] ad_opener
+# [169] ad_opener
 ad_opener ::= '(' expression ')'
 # formerly: arrayLiteral
-# [169] array_literal
+# [170] array_literal
 array_literal ::= '[' argument_list? ']'
 # formerly: iunctaExpr
-# [170] iuncta_expr
+# [171] iuncta_expr
 iuncta_expr ::= 'टपल' type_arguments '[' argument_list? ']'
 # formerly: jsonLiteral
-# [171] json_literal
+# [172] json_literal
 json_literal ::= '{' (json_member (',' json_member)*)? '}'
 # formerly: jsonMember
-# [172] json_member
+# [173] json_member
 json_member ::= STRING ':' json_value
 # formerly: typedConstructor
-# [173] typed_constructor
+# [174] typed_constructor
 typed_constructor ::= type_annotation '{' field_list? '}'
 # formerly: fieldList
-# [174] field_list
+# [175] field_list
 field_list ::= field_init (',' field_init)*
 # formerly: fieldInit
-# [175] field_init
+# [176] field_init
 field_init ::= ('फैलाओ' expression) | (field_key '=' expression) | IDENTIFIER
 # formerly: fieldKey
-# [176] field_key
+# [177] field_key
 field_key ::= IDENTIFIER | STRING | '[' expression ']'
 # formerly: jsonValue
-# [177] json_value
+# [178] json_value
 json_value ::= json_object | json_array | json_string | json_number | 'true' | 'false' | 'null'
 # formerly: jsonObject
-# [178] json_object
+# [179] json_object
 json_object ::= '{' (json_member (',' json_member)*)? '}'
 # formerly: jsonArray
-# [179] json_array
+# [180] json_array
 json_array ::= '[' (json_value (',' json_value)*)? ']'
 # formerly: jsonString
-# [180] json_string
+# [181] json_string
 json_string ::= STRING
 # formerly: jsonNumber
-# [181] json_number
+# [182] json_number
 json_number ::= NUMBER
 # formerly: fingeExpr
-# [182] finge_expr
+# [183] finge_expr
 finge_expr ::= 'गढ़ो' qualified_ident ('{' field_list '}')? ('∷' type_annotation)?
 # formerly: qualifiedIdent
-# [183] qualified_ident
+# [184] qualified_ident
 qualified_ident ::= IDENTIFIER ('.' IDENTIFIER)*
 # formerly: praefixumExpr
-# [184] praefixum_expr
+# [185] praefixum_expr
 praefixum_expr ::= 'उपसर्ग' (block_stmt | '(' expression ')')
 # formerly: scriptumExpr
-# [185] scriptum_expr
+# [186] scriptum_expr
 scriptum_expr ::= 'लिखित' '(' STRING (',' expression)* ')'
 # formerly: legeExpr
-# [186] lege_expr
+# [187] lege_expr
 lege_expr ::= 'पढ़ो' 'पंक्ति'?
-# [187] first_match_expr
+# [188] first_match_expr
 first_match_expr ::= 'प्रथम_मेल' '(' expression apud_clause? ',' 'जहाँ' IDENTIFIER block_stmt ')'
-# [188] summa_expr
+# [189] summa_expr
 summa_expr ::= 'योग' 'सेवन' expression apud_clause? filum_clause? ('स्थिर' | 'चर') IDENTIFIER block_stmt
-# [189] filum_clause
+# [190] filum_clause
 filum_clause ::= 'धागा' IDENTIFIER
 # formerly: objectPattern
-# [190] object_pattern
+# [191] object_pattern
 object_pattern ::= '{' pattern_property (',' pattern_property)* '}'
 # formerly: patternProperty
-# [191] pattern_property
+# [192] pattern_property
 pattern_property ::= 'बाकी'? IDENTIFIER ('रूपमें' IDENTIFIER)?
 # formerly: arrayPattern
-# [192] array_pattern
+# [193] array_pattern
 array_pattern ::= '[' array_pattern_element (',' array_pattern_element)* ']'
 # formerly: arrayPatternElement
-# [193] array_pattern_element
+# [194] array_pattern_element
 array_pattern_element ::= '_' | 'बाकी'? IDENTIFIER
 # formerly: outputStmt
-# [194] nota_stmt
+# [195] nota_stmt
 nota_stmt ::= ('दिखाओ' | 'देखो' | 'चेताओ' | 'लिखो') expression (',' expression)*
 # formerly: entryHeader
-# [195] entry_header
+# [196] entry_header
 entry_header ::= ('तर्क' IDENTIFIER)? ('निर्गम' expression)?
 # formerly: incipitStmt
-# [196] incipit_stmt
+# [197] incipit_stmt
 incipit_stmt ::= 'आरंभ' entry_header block_stmt
 # formerly: incipietStmt
-# [197] incipiet_stmt
+# [198] incipiet_stmt
 incipiet_stmt ::= 'आरंभasync' entry_header block_stmt
 # formerly: probandumDecl
-# [198] probandum_decl
+# [199] probandum_decl
 probandum_decl ::= 'परीक्षणसमूह' STRING proba_modifier* '{' probandum_body '}'
 # formerly: probandumBody
-# [199] probandum_body
+# [200] probandum_body
 probandum_body ::= (praepara_block | probandum_decl | proba_stmt)*
 # formerly: probaStmt
-# [200] proba_stmt
+# [201] proba_stmt
 proba_stmt ::= 'परीक्षण' STRING proba_modifier* block_stmt
 # formerly: probaModifier
-# [201] proba_modifier
+# [202] proba_modifier
 proba_modifier ::= 'छोड़ो' STRING | 'लंबित' STRING | 'केवल' | 'टैग' STRING | 'समय' NUMBER | 'मापो' | 'पुनरावृत्ति' NUMBER | 'नाज़ुक' NUMBER | 'केवलमें' STRING
 # formerly: praeparaBlock
-# [202] praepara_block
+# [203] praepara_block
 praepara_block ::= ('पूर्वतैयार' | 'पूर्वतैयारasync' | 'पश्चतैयार' | 'पश्चतैयारasync') 'सब'? block_stmt
 # formerly: facBlockStmt
-# [203] fac_stmt
+# [204] fac_stmt
 fac_stmt ::= 'करो' block_stmt cape_clause? ('जबतक' expression)?
-# [204] IDENTIFIER
+# [205] IDENTIFIER
 IDENTIFIER ::=
-# [205] NUMBER
+# [206] NUMBER
 NUMBER ::=
-# [206] NATURAL
+# [207] NATURAL
 NATURAL ::=
-# [207] STRING
+# [208] STRING
 STRING ::=
-# [208] ASCII_STRING
+# [209] ASCII_STRING
 ASCII_STRING ::=
-# [209] BACKTICK_STRING
+# [210] BACKTICK_STRING
 BACKTICK_STRING ::=
-# [210] OCTETI_STRING
+# [211] OCTETI_STRING
 OCTETI_STRING ::=
-# [211] NEWLINE
+# [212] NEWLINE
 NEWLINE ::=
-# [212] WIDTH_MARKER
+# [213] WIDTH_MARKER
 WIDTH_MARKER ::=
-# [213] LISTA_WIDTH_SUGAR
+# [214] LISTA_WIDTH_SUGAR
 LISTA_WIDTH_SUGAR ::=
-# [214] TENSOR_WIDTH_SUGAR
+# [215] TENSOR_WIDTH_SUGAR
 TENSOR_WIDTH_SUGAR ::=
-# [215] SPARSA_WIDTH_SUGAR
+# [216] SPARSA_WIDTH_SUGAR
 SPARSA_WIDTH_SUGAR ::=
-# [216] VECTOR_WIDTH_SUGAR
+# [217] VECTOR_WIDTH_SUGAR
 VECTOR_WIDTH_SUGAR ::=
-# [217] MATRIX_WIDTH_SUGAR
+# [218] MATRIX_WIDTH_SUGAR
 MATRIX_WIDTH_SUGAR ::=
-# [218] FRONTMATTER_DELIMITER
+# [219] FRONTMATTER_DELIMITER
 FRONTMATTER_DELIMITER ::=
-# [219] TOML_LINES
+# [220] TOML_LINES
 TOML_LINES ::=
-# [220] ANNOTATION_NAME
+# [221] ANNOTATION_NAME
 ANNOTATION_NAME ::=
-# [221] ANNOTATION_FIELD_NAME
+# [222] ANNOTATION_FIELD_NAME
 ANNOTATION_FIELD_NAME ::=
-# [222] NON_NEWLINE_TOKEN
+# [223] NON_NEWLINE_TOKEN
 NON_NEWLINE_TOKEN ::=
-# [223] NO_NEWLINE
+# [224] NO_NEWLINE
 NO_NEWLINE ::=
 ```
 
@@ -748,6 +750,7 @@ NO_NEWLINE ::=
 | [`else_arm`](#else-arm) | `#else-arm` | live | elseArm |
 | [`dum_stmt`](#dum-stmt) | `#जबतक-stmt` | live | whileStmt |
 | [`itera_stmt`](#itera-stmt) | `#दोहराओ-stmt` | live | iteraStmt |
+| [`itera_binding`](#itera-binding) | `#दोहराओ-binding` | live | — |
 | [`apud_clause`](#apud-clause) | `#पर-clause` | live | — |
 | [`elige_stmt`](#elige-stmt) | `#चुनो-stmt` | live | eligeStmt |
 | [`casu_elige_clause`](#casu-elige-clause) | `#स्थिति-चुनो-clause` | live | eligeCase |

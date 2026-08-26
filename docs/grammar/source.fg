@@ -986,8 +986,11 @@ else_arm    := (block_stmt | ergo_joint statement) cape_clause?
 dum_stmt  := 'dum' expression (block_stmt | ergo_joint statement) cape_clause?
 @formerly iteraStmt
 # A top-level `_` in the itera binder parses as the legacy unused loop-variable
-# identifier, not a destructuring wildcard.
-itera_stmt  := 'itera' (('ex' | 'de') expression | 'ab' expression) apud_clause? ('fixum' | 'varia') (array_pattern | object_pattern | IDENTIFIER) (block_stmt | ergo_joint statement) cape_clause?
+# identifier, not a destructuring wildcard. Only `ex` admits the comma-separated
+# lockstep source series (N sources, N name binders); `de` and `ab` stay
+# single-source. Patterns bind only the single-source form.
+itera_stmt  := 'itera' ('ex' expression (',' expression)* | 'de' expression | 'ab' expression) apud_clause? ('fixum' | 'varia') itera_binding (block_stmt | ergo_joint statement) cape_clause?
+itera_binding := array_pattern | object_pattern | IDENTIFIER (',' IDENTIFIER)*
 apud_clause := 'apud' '[' IDENTIFIER (',' IDENTIFIER)* ']'
 
 @formerly eligeStmt
