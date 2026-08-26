@@ -214,20 +214,14 @@ fn signature_only_imported_device_fails_closed_with_named_reason() {
     )
     .expect_err("signature-only device import must fail closed");
 
+    // Issue-code identity only: MirError carries the route as rendered prose,
+    // and non-renderer tests must not assert message text (hygiene:
+    // `non_renderer_tests_do_not_assert_diagnostic_text`).
     assert!(
         errors
             .iter()
             .any(|error| error.issue == "imported_device_body_missing"),
         "expected the named imported_device_body_missing reason, got {errors:?}"
-    );
-    let named = errors
-        .iter()
-        .find(|error| error.issue == "imported_device_body_missing")
-        .expect("named reason");
-    assert!(
-        named.message.contains("probe::src::scala"),
-        "the named reason must name the provider-route identity: {}",
-        named.message
     );
     // The unresolved call was not rewritten to a valid target.
     let caller = &program.functions[0];
@@ -337,8 +331,8 @@ fn artifact_restored_signature_only_device_route_fails_closed() {
     assert!(
         errors
             .iter()
-            .any(|error| error.issue == "imported_device_body_missing" && error.message.contains("probe::src::scala")),
-        "expected the named imported_device_body_missing reason naming the route, got {errors:?}"
+            .any(|error| error.issue == "imported_device_body_missing"),
+        "expected the named imported_device_body_missing reason, got {errors:?}"
     );
 }
 
@@ -590,13 +584,14 @@ fn imported_device_cycle_is_rejected_with_full_chain() {
     )
     .expect_err("an imported device cycle must fail closed");
 
-    let cycle = errors
-        .iter()
-        .find(|error| error.issue == "nucleum_fragment_cycle")
-        .expect("expected the named cycle issue");
+    // Issue-code identity only: the structured chain/cycle args are asserted
+    // in fragment_composition_test.rs, where FragmentCompositionError.args
+    // are visible; the MirError seam does not carry them (hygiene:
+    // `non_renderer_tests_do_not_assert_diagnostic_text`).
     assert!(
-        cycle.message.contains('#'),
-        "the full cycle chain must be in the diagnostic: {}",
-        cycle.message
+        errors
+            .iter()
+            .any(|error| error.issue == "nucleum_fragment_cycle"),
+        "expected the named cycle issue at the merged seam, got {errors:?}"
     );
 }
