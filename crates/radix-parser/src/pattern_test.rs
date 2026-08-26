@@ -69,14 +69,14 @@ fn parses_type_pattern_atoms_and_null_member() {
 #[test]
 fn parses_width_hole_and_tensor_figure_patterns() {
     let result = parse_ok(
-        r#"
+        r"
 incipit {
     discerne value {
         casu lista<numerus, _> ergo tacet
         casu tensor<f32, [2, 4]> ergo tacet
     }
 }
-"#,
+",
     );
     let program = result.program.as_ref().expect("program");
     let StmtKind::Incipit(stmt) = &program.statements[0].kind else {

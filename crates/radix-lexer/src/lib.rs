@@ -55,10 +55,6 @@ mod ascii_literal_tests;
 #[path = "octeti_literal_test.rs"]
 mod octeti_literal_tests;
 
-#[cfg(test)]
-#[path = "textus_literal_test.rs"]
-mod textus_literal_tests;
-
 use std::collections::HashMap;
 
 pub use cursor::Cursor;
