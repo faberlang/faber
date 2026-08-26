@@ -114,11 +114,11 @@ mod trap_test;
 #[path = "type_pattern_test.rs"]
 mod type_pattern_test;
 #[cfg(test)]
-#[path = "width_pattern_test.rs"]
-mod width_pattern_test;
-#[cfg(test)]
 #[path = "union_member_refinement_test.rs"]
 mod union_member_refinement_test;
+#[cfg(test)]
+#[path = "width_pattern_test.rs"]
+mod width_pattern_test;
 
 // Lane-gated: compiles through the full driver to the Rust target; a
 // core-only build excludes the module.

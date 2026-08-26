@@ -340,18 +340,8 @@ fn type_pattern_constraint_reuses_union_accumulation() {
     let textus = checker.types.primitive(Primitive::Textus);
     let source_hole = checker.fresh_infer();
 
-    assert!(checker.constrain_type_pattern(
-        source_hole,
-        numerus,
-        span,
-        "pattern_type_mismatch",
-    ));
-    assert!(checker.constrain_type_pattern(
-        source_hole,
-        textus,
-        span,
-        "pattern_type_mismatch",
-    ));
+    assert!(checker.constrain_type_pattern(source_hole, numerus, span, "pattern_type_mismatch",));
+    assert!(checker.constrain_type_pattern(source_hole, textus, span, "pattern_type_mismatch",));
 
     let union_hole = checker.resolve_inferred_type(source_hole);
     let union_var = checker

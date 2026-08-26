@@ -1064,7 +1064,6 @@ fn discerne_definitely_covered_imported_enum_via_derived_variants() {
 // hand-built HIR stand-in).
 // ---------------------------------------------------------------------------
 
-
 fn union_probe_diagnostics(source: &str) -> Vec<crate::SemanticError> {
     crate::test_support::analyze_source(source)
         .diagnostics

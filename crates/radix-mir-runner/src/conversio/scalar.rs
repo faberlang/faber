@@ -256,8 +256,8 @@ impl<H: super::super::Host + ?Sized> Runner<'_, H> {
             Value::Str(text) => decimal_text_to_carrier(&text, target_width),
             Value::Sermo(sermo) => {
                 let value = materialize_sermo_value(sermo, span)?;
-                return self.convert_to_decimal(value, source_ty, target_width, recovery, span)
-            },
+                return self.convert_to_decimal(value, source_ty, target_width, recovery, span);
+            }
             other => {
                 return Err(RunnerError::internal(
                     span,
@@ -299,8 +299,8 @@ impl<H: super::super::Host + ?Sized> Runner<'_, H> {
                     target_width,
                     recovery,
                     span,
-                )
-            },
+                );
+            }
             other => Err(RunnerError::internal(
                 span,
                 format!("unsupported decimal conversion from {other:?}"),

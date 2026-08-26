@@ -285,7 +285,9 @@ impl HirVisitorMut for LiftVisitor<'_> {
                                 span: combine.expr.span,
                             };
                             let closure = std::mem::replace(&mut combine.expr, placeholder);
-                            if let Ok(path) = self.lift_callback(closure) { combine.expr = path }
+                            if let Ok(path) = self.lift_callback(closure) {
+                                combine.expr = path
+                            }
                         }
                     }
                 }

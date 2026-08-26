@@ -48,7 +48,10 @@ fn render(literal: &HirLiteral, surface: &impl KeywordSurface) -> String {
 
 #[test]
 fn non_finite_literals_round_trip_with_faber_spellings() {
-    assert_eq!(render(&HirLiteral::Float(f64::INFINITY), &LatinSurface), "∞");
+    assert_eq!(
+        render(&HirLiteral::Float(f64::INFINITY), &LatinSurface),
+        "∞"
+    );
     assert_eq!(
         render(&HirLiteral::Float(f64::NAN), &LatinSurface),
         "nonnumerus"

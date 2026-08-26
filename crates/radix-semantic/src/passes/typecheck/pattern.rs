@@ -116,10 +116,7 @@ impl TypeChecker<'_> {
                 if let Some((def_id, _name)) = binding {
                     // A width guard narrows the runtime value without changing
                     // its carrier type. Keep the expected carrier in the arm.
-                    self.insert_binding(
-                        *def_id,
-                        if width_applies { expected } else { target },
-                    );
+                    self.insert_binding(*def_id, if width_applies { expected } else { target });
                 }
             }
             HirPattern::Alias(def_id, _name, pattern) => {

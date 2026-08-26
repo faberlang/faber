@@ -710,10 +710,9 @@ impl radix_hir::visit::HirVisitor for Ar2Facts {
                     self.handled_wrapping_block += 1;
                 }
             }
-            radix_hir::HirExpressionKind::Si { then_catch, .. }
-                if then_catch.is_some() => {
-                    self.si_then_catch += 1;
-                }
+            radix_hir::HirExpressionKind::Si { then_catch, .. } if then_catch.is_some() => {
+                self.si_then_catch += 1;
+            }
             _ => {}
         }
         radix_hir::visit::walk_expr(self, expr);

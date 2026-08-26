@@ -1835,10 +1835,9 @@ fn generic_arg_span(arg: &GenericArgExpr) -> radix_lexer::Span {
             radix_lexer::Span::default()
         }
         GenericArgExpr::Size(FiguraExpr::Var(ident)) => ident.span,
-        GenericArgExpr::Size(FiguraExpr::Tuple(dims)) => dims
-            .first()
-            .map(generic_figura_span)
-            .unwrap_or_default(),
+        GenericArgExpr::Size(FiguraExpr::Tuple(dims)) => {
+            dims.first().map(generic_figura_span).unwrap_or_default()
+        }
         GenericArgExpr::Name(ident) => ident.span,
     }
 }
