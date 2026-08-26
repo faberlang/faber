@@ -433,11 +433,41 @@ impl super::FaberCodegen {
                 });
                 writer.write("}");
             }
-            // NR-2 transitional fail-closed arm (nary-range-walk): the
-            // localized Cartesian `ab` series emission lands with NR-6; no
-            // product HIR may reach Faber emission before that unit.
-            HirExpressionKind::IteraRange { .. } => {
-                unreachable!("range-product itera HIR is not yet emitted for the Faber target");
+            // NR-6 (nary-range-walk): the Cartesian range product emits as the
+            // source-declared `ab` series — extents once in source order
+            // (first range outermost), binders in the same order, no `apud`
+            // clause (a product never zips). Locale spellings ride the same
+            // keyword/contextual-keyword surface as the lockstep arm.
+            HirExpressionKind::IteraRange {
+                ranges,
+                bindings,
+                body,
+            } => {
+                writer.write(surface.keyword(TokenKind::Itera));
+                writer.write(" ");
+                writer.write(surface.contextual_keyword("ab"));
+                writer.write(" ");
+                for (index, range) in ranges.iter().enumerate() {
+                    if index > 0 {
+                        writer.write(", ");
+                    }
+                    self.write_expr(range, types, names, interner, surface, writer);
+                }
+                writer.write(" ");
+                writer.write(surface.contextual_keyword("fixum"));
+                writer.write(" ");
+                for (index, (_, binding_name)) in bindings.iter().enumerate() {
+                    if index > 0 {
+                        writer.write(", ");
+                    }
+                    writer.write(&self.symbol_to_string(*binding_name, interner));
+                }
+                writer.writeln(" {");
+                writer.indented(|writer| {
+                    self.write_block(body, types, names, interner, surface, writer);
+                    self.write_block_end_trivia(body, interner, writer);
+                });
+                writer.write("}");
             }
             HirExpressionKind::Intervallum {
                 start,
