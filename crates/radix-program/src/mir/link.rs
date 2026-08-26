@@ -191,8 +191,7 @@ fn synthetic_method_function_types(
     let mut function_types = HashMap::new();
     // Group the caller's imported struct methods by receiver nominal def.
     let mut methods_by_receiver: HashMap<DefId, Vec<_>> = HashMap::new();
-    for (def_id, _fields, struct_methods, _type_params) in
-        analysis.resolver.imported_file_structs()
+    for (def_id, _fields, struct_methods, _type_params) in analysis.resolver.imported_file_structs()
     {
         methods_by_receiver.insert(def_id, struct_methods);
     }
@@ -1439,12 +1438,8 @@ pub(super) fn rewrite_expr(
                         ty: None,
                         span: receiver.span,
                     };
-                    expr.kind = HirExpressionKind::Call(
-                        Box::new(callee),
-                        call_type_args,
-                        call_args,
-                        None,
-                    );
+                    expr.kind =
+                        HirExpressionKind::Call(Box::new(callee), call_type_args, call_args, None);
                     return;
                 }
                 if let Some(message) =
@@ -1522,12 +1517,8 @@ pub(super) fn rewrite_expr(
                     ty: None,
                     span: receiver.span,
                 };
-                expr.kind = HirExpressionKind::Call(
-                    Box::new(callee),
-                    call_type_args,
-                    call_args,
-                    None,
-                );
+                expr.kind =
+                    HirExpressionKind::Call(Box::new(callee), call_type_args, call_args, None);
             } else if let Some(message) =
                 namespace_call_diagnostic(unit_path, receiver, *method, interner, namespaces)
             {

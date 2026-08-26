@@ -637,6 +637,37 @@ pub(super) fn lower_package_units<'a>(
         library_cache,
     )?;
     let entry_path = entry.path.clone();
+    // The same rewrite also fires inside SIBLING units: a reader unit's
+    // function body referencing another unit's exported const
+    // (`k between keys.KEYS`) was rewritten to `Path(synthetic)`, but the
+    // synthetic const item only exists in the entry analysis — the reader
+    // then lowers "path that does not resolve to a local value". Transplant
+    // the linked members into every sibling reader before it lowers, so the
+    // rewritten path materializes through that unit's own top-level-const
+    // seam (same data-member ABI as the entry).
+    let sibling_reader_paths: HashSet<&PathBuf> = links
+        .data_member_targets
+        .keys()
+        .map(|(caller_path, _, _)| caller_path)
+        .filter(|caller_path| **caller_path != entry_path)
+        .collect();
+    let sibling_reader_ids: Vec<ModuleId> = others
+        .iter()
+        .filter(|(_, unit)| sibling_reader_paths.contains(&unit.path))
+        .map(|(id, _)| id.clone())
+        .collect();
+    for id in sibling_reader_ids {
+        let (_, mut reader) = others.remove_entry(&id).expect("reader id from map");
+        let injection = inject_package_data_members(
+            &mut reader,
+            others.values(),
+            links,
+            library_resolver,
+            library_cache,
+        );
+        others.insert(id, reader);
+        injection?;
+    }
     let mut pending = Vec::new();
     let mut extra_validation = RemappedValidation::default();
     let mut shared_nominals: HashMap<(InterfaceNominalKind, String), TypeId> = HashMap::new();
@@ -1041,17 +1072,19 @@ pub(super) fn lower_package_units<'a>(
     Ok(merged)
 }
 
-/// Transplant linked const data members into the entry analysis before the
-/// entry unit lowers (S1 data-member ABI).
+/// Transplant linked const data members into a target unit's analysis before
+/// that unit lowers (S1 data-member ABI). The target is the entry unit or a
+/// sibling unit whose function bodies read another unit's const through the
+/// namespace member rewrite.
 ///
-/// Each linked const is re-interned into the entry interner and its type is
-/// imported into the entry type table, then injected as a synthetic
+/// Each linked const is re-interned into the target interner and its type is
+/// imported into the target type table, then injected as a synthetic
 /// `HirItemKind::Constant` item under the member's synthetic def id. The
-/// entry lowering context then records it in `top_level_consts`, so rewritten
+/// target lowering context then records it in `top_level_consts`, so rewritten
 /// `Path(synthetic_def)` member references materialize through the existing
 /// top-level-const seam.
 fn inject_package_data_members<'a>(
-    entry: &mut AnalyzedProgramNode,
+    target: &mut AnalyzedProgramNode,
     others: impl IntoIterator<Item = &'a AnalyzedProgramNode>,
     links: &PackageMirLinks,
     library_resolver: &LibraryResolver,
@@ -1059,7 +1092,7 @@ fn inject_package_data_members<'a>(
 ) -> Result<(), Vec<Diagnostic>> {
     let others = others.into_iter().collect::<Vec<_>>();
     let mut diagnostics = Vec::new();
-    let entry_path = entry.path.clone();
+    let target_path = target.path.clone();
     // Const-to-const references inside linked initializers (`ELEMENTS ← N *
     // K`) rewrite through the linked-const entries of `links.sources`. The
     // map keeps only synthetic ids that belong to a transplanted const data
@@ -1081,14 +1114,14 @@ fn inject_package_data_members<'a>(
     }
     let no_rewrites = HashMap::new();
     for member in &links.data_members {
-        if member.source_path == entry_path {
-            // Same-unit consts already lower through the entry's own
+        if member.source_path == target_path {
+            // Same-unit consts already lower through the target's own
             // top-level-const seam; the linker never registers those.
             continue;
         }
         // The source analysis is borrowed from the sibling nodes (disjoint
-        // from `entry`) or the library cache; only the interner needs cloning
-        // (the entry borrow must not conflict with the package-unit borrow).
+        // from `target`) or the library cache; only the interner needs cloning
+        // (the target borrow must not conflict with the package-unit borrow).
         let source = others
             .iter()
             .copied()
@@ -1122,7 +1155,7 @@ fn inject_package_data_members<'a>(
         let Some((source_interner, source_types, source_resolver, source_interface)) = source
         else {
             diagnostics.push(mir_issue_diag(
-                &entry_path,
+                &target_path,
                 "package_mir_data_member_unsupported",
                 format!(
                     "package MIR could not find const data member source unit `{}`",
@@ -1140,19 +1173,19 @@ fn inject_package_data_members<'a>(
             const_path_rewrites
                 .get(&member.source_path)
                 .unwrap_or(&no_rewrites),
-            entry,
+            target,
         ) {
             Ok(item) => item,
             Err(message) => {
                 diagnostics.push(mir_issue_diag(
-                    &entry_path,
+                    &target_path,
                     "package_mir_data_member_unsupported",
                     message,
                 ));
                 continue;
             }
         };
-        entry.analysis.hir.items.push(item);
+        target.analysis.hir.items.push(item);
     }
     if diagnostics.is_empty() {
         Ok(())
@@ -1162,8 +1195,8 @@ fn inject_package_data_members<'a>(
 }
 
 /// Build the synthetic `HirItemKind::Constant` item for one linked const,
-/// re-interning the const name + initializer symbols into the entry interner
-/// and importing the const (and initializer) types into the entry type table.
+/// re-interning the const name + initializer symbols into the target interner
+/// and importing the const (and initializer) types into the target type table.
 fn transplant_data_member(
     member: &DataMemberLink,
     source_interner: &Interner,
@@ -1171,12 +1204,12 @@ fn transplant_data_member(
     source_resolver: &Resolver,
     source_interface: &FileInterface,
     const_path_rewrites: &HashMap<DefId, DefId>,
-    entry: &mut AnalyzedProgramNode,
+    target: &mut AnalyzedProgramNode,
 ) -> Result<HirItem, String> {
     let mut imported = HashMap::new();
     let source_exports = exported_nominal_names(source_interface);
     // S1 U2 nominal identity: build the canonical nominal remap so const
-    // types/initializers referencing library nominals unify with the entry's
+    // types/initializers referencing library nominals unify with the target's
     // semantic types (the linked source module's identity is the key).
     let nominal_map = build_nominal_remap(
         source_types,
@@ -1184,7 +1217,7 @@ fn transplant_data_member(
         source_resolver,
         source_interface.identity.as_ref(),
         &source_exports,
-        &entry.analysis,
+        &target.analysis,
         &HashMap::new(),
     )?;
     let empty_def_remap = HashMap::new();
@@ -1200,12 +1233,12 @@ fn transplant_data_member(
         name: remap_symbol(
             member.konst.name,
             source_interner,
-            &mut entry.analysis.interner,
+            &mut target.analysis.interner,
         ),
         ty: member.konst.ty.map(|ty| {
             import_semantic_type_with_nominal(
                 source_types,
-                &mut entry.analysis.types,
+                &mut target.analysis.types,
                 ty,
                 &mut imported,
                 Some(&nominal),
@@ -1215,8 +1248,8 @@ fn transplant_data_member(
             &member.konst.value,
             source_interner,
             source_types,
-            &mut entry.analysis.interner,
-            &mut entry.analysis.types,
+            &mut target.analysis.interner,
+            &mut target.analysis.types,
             &mut imported,
             Some(&nominal),
             const_path_rewrites,
@@ -1226,7 +1259,7 @@ fn transplant_data_member(
     };
     Ok(HirItem {
         // The synthetic def id doubles as a unique item/expression id; no
-        // entry HIR id range collides with the package-MIR synthetic range.
+        // unit-local HIR id range collides with the package-MIR synthetic range.
         id: HirId(member.synthetic.0),
         def_id: member.synthetic,
         kind: HirItemKind::Constant(konst),
@@ -1494,6 +1527,75 @@ fn transplant_expr(
                 source,
                 target,
                 entries,
+            }
+        }
+        // Runtime conversion (`↦ target`): module-level collection consts
+        // convert their literal at initialization (`[…] ↦ set<string>` in
+        // gradus gguf.fab). The source expression, the conversion target
+        // (type or clamp range), the codegen hint symbols, and the optional
+        // inline recovery all travel; cross-analysis definitions inside them
+        // still fail closed through the recursive transplant below.
+        HirExpressionKind::Conversio {
+            source,
+            target,
+            params,
+            recovery,
+        } => {
+            let source = Box::new(transplant_expr(
+                source,
+                source_interner,
+                source_types,
+                entry_interner,
+                entry_types,
+                imported,
+                nominal,
+                const_path_rewrites,
+            )?);
+            let target = match target {
+                radix_module::hir::HirConversioTarget::Type(ty) => {
+                    radix_module::hir::HirConversioTarget::Type(import_semantic_type_with_nominal(
+                        source_types,
+                        entry_types,
+                        *ty,
+                        imported,
+                        nominal,
+                    ))
+                }
+                radix_module::hir::HirConversioTarget::Intervallum(range) => {
+                    radix_module::hir::HirConversioTarget::Intervallum(Box::new(transplant_expr(
+                        range,
+                        source_interner,
+                        source_types,
+                        entry_interner,
+                        entry_types,
+                        imported,
+                        nominal,
+                        const_path_rewrites,
+                    )?))
+                }
+            };
+            let params = params
+                .iter()
+                .map(|param| remap_symbol(*param, source_interner, entry_interner))
+                .collect();
+            let recovery = match recovery {
+                Some(recovery) => Some(Box::new(transplant_expr(
+                    recovery,
+                    source_interner,
+                    source_types,
+                    entry_interner,
+                    entry_types,
+                    imported,
+                    nominal,
+                    const_path_rewrites,
+                )?)),
+                None => None,
+            };
+            HirExpressionKind::Conversio {
+                source,
+                target,
+                params,
+                recovery,
             }
         }
         // Const-to-const reference: the initializer names another linked

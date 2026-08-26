@@ -44,10 +44,7 @@ main {
 }
 "#;
 
-fn write_typearg_package(
-    dir: &std::path::Path,
-    main_source: &str,
-) -> std::path::PathBuf {
+fn write_typearg_package(dir: &std::path::Path, main_source: &str) -> std::path::PathBuf {
     let src = dir.join("src");
     fs::create_dir_all(&src).expect("create package src");
     fs::write(
@@ -89,10 +86,7 @@ fn literal_dims(
     }
 }
 
-fn first_param_shape(
-    lowered: &LoweredMirUnit<'_>,
-    function_name: &str,
-) -> Option<Vec<i64>> {
+fn first_param_shape(lowered: &LoweredMirUnit<'_>, function_name: &str) -> Option<Vec<i64>> {
     let types = lowered.validated.validation().types;
     lowered
         .program
@@ -167,4 +161,3 @@ fn package_mir_links_inferred_type_arg_namespace_call() {
         )
     });
 }
-
