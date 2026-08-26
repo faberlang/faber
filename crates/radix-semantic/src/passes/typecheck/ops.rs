@@ -1838,7 +1838,9 @@ impl TypeChecker<'_> {
 
 fn is_numeric_literal(expr: &HirExpression) -> bool {
     match &expr.kind {
-        HirExpressionKind::Literal(HirLiteral::Int(_) | HirLiteral::Float(_)) => true,
+        HirExpressionKind::Literal(
+            HirLiteral::Int(_) | HirLiteral::Float(_) | HirLiteral::FloatText { .. },
+        ) => true,
         // A negated literal (`-1.0`) is still a literal for propagation purposes.
         HirExpressionKind::Unary(radix_hir::HirUnOp::Neg, inner) => is_numeric_literal(inner),
         _ => false,
@@ -1927,7 +1929,9 @@ fn lista_operator_spelling(op: HirBinOp) -> &'static str {
 fn numeric_literal_family(expr: &HirExpression) -> Option<Primitive> {
     match &expr.kind {
         HirExpressionKind::Literal(HirLiteral::Int(_)) => Some(Primitive::Numerus),
-        HirExpressionKind::Literal(HirLiteral::Float(_)) => Some(Primitive::Fractus),
+        HirExpressionKind::Literal(HirLiteral::Float(_) | HirLiteral::FloatText { .. }) => {
+            Some(Primitive::Fractus)
+        }
         // A negated literal (`-1.0`) inherits the inner literal's family so
         // that peer-type propagation in arithmetic recognizes it.
         HirExpressionKind::Unary(radix_hir::HirUnOp::Neg, inner) => numeric_literal_family(inner),

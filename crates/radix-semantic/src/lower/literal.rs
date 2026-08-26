@@ -11,6 +11,10 @@ pub(crate) fn literal_to_hir(lit: &Literal) -> Result<HirLiteral, &'static str> 
     match lit {
         Literal::Int(value) => Ok(HirLiteral::Int(*value)),
         Literal::Float(value) => Ok(HirLiteral::Float(*value)),
+        Literal::FloatText { value, text } => Ok(HirLiteral::FloatText {
+            value: *value,
+            text: *text,
+        }),
         Literal::String(value) => Ok(HirLiteral::String(*value)),
         Literal::Ascii(value) => Ok(HirLiteral::Ascii(*value)),
         Literal::Octeti(value) => Ok(HirLiteral::Octeti(*value)),

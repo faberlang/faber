@@ -2364,7 +2364,9 @@ fn is_comparison(expr: &HirExpression) -> bool {
 
 fn is_nonzero_literal(expr: &HirExpression) -> bool {
     match &expr.kind {
-        HirExpressionKind::Literal(HirLiteral::Float(value)) => *value != 0.0,
+        HirExpressionKind::Literal(
+            HirLiteral::Float(value) | HirLiteral::FloatText { value, .. },
+        ) => *value != 0.0,
         HirExpressionKind::Literal(HirLiteral::Int(value)) => *value != 0,
         HirExpressionKind::Unary(HirUnOp::Neg, inner) => is_nonzero_literal(inner),
         _ => false,

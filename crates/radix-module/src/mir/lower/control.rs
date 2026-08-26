@@ -187,11 +187,7 @@ impl FunctionBuilder<'_> {
     /// every failable call and `iace` inside wraps its payload into the same
     /// destination through the existing `TryCall` error block and joins — a
     /// trapped error never reaches `ReturnError`.
-    pub(super) fn lower_trap_expr(
-        &mut self,
-        body: &HirBlock,
-        expr: &HirExpression,
-    ) -> Option<MirOperand> {
+    pub(super) fn lower_trap_expr(&mut self, body: &HirBlock, expr: &HirExpression) -> Option<MirOperand> {
         let ty = self.expr_ty(expr)?;
         let span = expr.span;
         let destination_temp = self.push_temp(ty, span);
@@ -1113,7 +1109,10 @@ impl FunctionBuilder<'_> {
                 // the upper half of u64; carry them exactly as `UInt`.
                 Err(_) => Some(MirConstant::UInt(*value)),
             },
-            HirLiteral::Float(value) => Some(MirConstant::Float(*value)),
+            // decimal-widths D1: text-carrying decimals lower via the f64 path.
+            HirLiteral::Float(value) | HirLiteral::FloatText { value, .. } => {
+                Some(MirConstant::Float(*value))
+            }
             HirLiteral::String(symbol) => Some(MirConstant::String(*symbol)),
             HirLiteral::Ascii(symbol) => Some(MirConstant::Ascii(*symbol)),
             HirLiteral::Bool(value) => Some(MirConstant::Bool(*value)),

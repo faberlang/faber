@@ -984,7 +984,13 @@ fn int_layout(width: NumericWidth) -> LayoutResolution {
         NumericWidth::U16 => MirScalarLayout::U16,
         NumericWidth::U32 => MirScalarLayout::U32,
         NumericWidth::U64 => MirScalarLayout::U64,
-        NumericWidth::F16 | NumericWidth::BF16 | NumericWidth::F32 | NumericWidth::F64 => {
+        NumericWidth::F16
+        | NumericWidth::BF16
+        | NumericWidth::F32
+        | NumericWidth::F64
+        // decimal-widths D1: decimals have no integer layout arm until D4/D5.
+        | NumericWidth::D32
+        | NumericWidth::D64 => {
             return LayoutResolution::MissingFact(format!(
                 "modulus<{}> has no named layout arm",
                 width.faber_marker()

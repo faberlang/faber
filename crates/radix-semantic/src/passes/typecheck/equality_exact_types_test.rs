@@ -81,6 +81,19 @@ incipit {
 "#,
             expect: EqualityExpect::RejectsIssue(EXACT_EQ_ISSUE),
         },
+        // decimal-widths D1: d32/d64 join the exact-types equality law —
+        // cross-width decimal equality discriminates (SEM010 pin).
+        EqualityCase {
+            name: "sized_numerus_d32_d64_eq_rejects",
+            source: r#"
+incipit {
+    fixum numerus<d32> a ← 4.2
+    fixum numerus<d64> b ← 4.2
+    si a ≡ b { nota "bad" }
+}
+"#,
+            expect: EqualityExpect::RejectsIssue(EXACT_EQ_ISSUE),
+        },
         EqualityCase {
             name: "octeti_lista_eq_rejects",
             source: r#"

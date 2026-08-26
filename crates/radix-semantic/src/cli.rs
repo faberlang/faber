@@ -932,7 +932,9 @@ impl CliBuilder<'_> {
                 // back to the unsupported-expression channel instead of wrapping.
                 Err(_) => CliDefault::Expr(format!("{:?}", expr.kind)),
             },
-            ExprKind::Literal(Literal::Float(value)) => CliDefault::Float(*value),
+            ExprKind::Literal(Literal::Float(value) | Literal::FloatText { value, .. }) => {
+                CliDefault::Float(*value)
+            }
             ExprKind::Literal(Literal::Bool(value)) => CliDefault::Bool(*value),
             ExprKind::Literal(Literal::Nil) => CliDefault::Nil,
             other => CliDefault::Expr(format!("{other:?}")),

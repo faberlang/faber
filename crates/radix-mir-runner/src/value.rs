@@ -532,6 +532,10 @@ pub fn int_width_range(width: NumericWidth) -> (i128, i128) {
         NumericWidth::F16 | NumericWidth::BF16 | NumericWidth::F32 | NumericWidth::F64 => {
             (i64::MIN as i128, i64::MAX as i128)
         }
+        // decimal-widths D1: scaled-integer carriers fit their integer domain
+        // (d32 = i32×10⁻⁷, d64 = i64×10⁻⁹); D4 owns runner arithmetic.
+        NumericWidth::D32 => (i32::MIN as i128, i32::MAX as i128),
+        NumericWidth::D64 => (i64::MIN as i128, i64::MAX as i128),
     }
 }
 

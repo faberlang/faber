@@ -2225,3 +2225,32 @@ fn eot_transfer_ascii_alias_does_not_produce_transfer_token() {
         "ASCII <== must never produce the Transfer token"
     );
 }
+
+// ---------------------------------------------------------------------------
+// decimal-widths D1: decimal literals preserve exact digit text (R0 fix)
+// ---------------------------------------------------------------------------
+
+#[test]
+fn decimal_literal_carries_exact_digit_text() {
+    let result = lex("4.2");
+    assert!(result.errors.is_empty());
+    match &result.tokens[0].kind {
+        TokenKind::FloatText { value, text } => {
+            assert_eq!(result.interner.resolve(*text), "4.2");
+            assert_eq!(*value, 4.2_f64);
+        }
+        other => panic!("expected FloatText, got {other:?}"),
+    }
+}
+
+#[test]
+fn decimal_literal_with_exponent_carries_text() {
+    let result = lex("1e-3");
+    assert!(result.errors.is_empty());
+    match &result.tokens[0].kind {
+        TokenKind::FloatText { text, .. } => {
+            assert_eq!(result.interner.resolve(*text), "1e-3");
+        }
+        other => panic!("expected FloatText, got {other:?}"),
+    }
+}

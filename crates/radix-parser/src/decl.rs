@@ -2601,6 +2601,7 @@ impl Parser {
                 | TokenKind::String(_)
                 | TokenKind::Integer(_)
                 | TokenKind::Float(_)
+                | TokenKind::FloatText { .. }
                 | TokenKind::Comma
                 | TokenKind::Ceteri
                 | TokenKind::De

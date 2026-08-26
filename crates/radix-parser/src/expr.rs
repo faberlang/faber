@@ -663,6 +663,7 @@ impl Parser {
                 | TokenKind::Underscore(_)
                 | TokenKind::Integer(_)
                 | TokenKind::Float(_)
+                | TokenKind::FloatText { .. }
                 | TokenKind::String(_)
                 | TokenKind::AsciiString(_)
                 | TokenKind::BacktickString(_)
@@ -1314,7 +1315,7 @@ impl Parser {
     fn conversio_target_starts_inline_range(&self) -> bool {
         matches!(
             self.peek().kind,
-            TokenKind::Integer(_) | TokenKind::Float(_)
+            TokenKind::Integer(_) | TokenKind::Float(_) | TokenKind::FloatText { .. }
         )
     }
 
@@ -1601,6 +1602,10 @@ impl Parser {
             TokenKind::Float(n) => {
                 self.advance();
                 ExprKind::Literal(Literal::Float(n))
+            }
+            TokenKind::FloatText { value, text } => {
+                self.advance();
+                ExprKind::Literal(Literal::FloatText { value, text })
             }
             TokenKind::String(s) => {
                 self.advance();
@@ -2542,6 +2547,11 @@ impl Parser {
                 self.advance();
                 Ok(JsonValue::Fractus(n))
             }
+            TokenKind::FloatText { value, .. } => {
+                let n = *value;
+                self.advance();
+                Ok(JsonValue::Fractus(n))
+            }
             TokenKind::Minus => self.parse_json_negative_number(),
             TokenKind::Ident(sym) => {
                 let sym = *sym;
@@ -2605,6 +2615,11 @@ impl Parser {
                 let n = *n;
                 self.advance();
                 Ok(JsonValue::Fractus(-n))
+            }
+            TokenKind::FloatText { value, .. } => {
+                let n = -*value;
+                self.advance();
+                Ok(JsonValue::Fractus(n))
             }
             _ => Err(self.json_unexpected_error("expected_json_number_after_minus")),
         }

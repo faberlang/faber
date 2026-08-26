@@ -23,6 +23,10 @@ pub enum NumericWidth {
     BF16,
     F32,
     F64,
+    /// Decimal-encoded numerus width (scaled integer, d32 = i32×10⁻⁷).
+    D32,
+    /// Decimal-encoded numerus width (scaled integer, d64 = i64×10⁻⁹).
+    D64,
 }
 
 /// Family mismatch or unknown width marker for a primitive family.
@@ -67,11 +71,16 @@ impl NumericWidth {
             ("u16", Primitive::Numerus) => Ok(Self::U16),
             ("u32", Primitive::Numerus) => Ok(Self::U32),
             ("u64", Primitive::Numerus) => Ok(Self::U64),
+            // decimal-widths D1: d-markers are valid only on numerus (the
+            // surgical FloatOnNumerus relaxation — f-markers still reject).
+            ("d32", Primitive::Numerus) => Ok(Self::D32),
+            ("d64", Primitive::Numerus) => Ok(Self::D64),
             ("f16" | "f32" | "f64" | "bf16", Primitive::Numerus) => Err(WidthError::FloatOnNumerus),
             ("f16", Primitive::Fractus) => Ok(Self::F16),
             ("bf16", Primitive::Fractus) => Ok(Self::BF16),
             ("f32", Primitive::Fractus) => Ok(Self::F32),
             ("f64", Primitive::Fractus) => Ok(Self::F64),
+            ("d32" | "d64", Primitive::Fractus) => Err(WidthError::UnrecognizedMarker),
             ("i8" | "i16" | "i32" | "i64" | "u8" | "u16" | "u32" | "u64", Primitive::Fractus) => {
                 Err(WidthError::IntOnFractus)
             }
@@ -122,6 +131,8 @@ impl NumericWidth {
             Self::BF16 => "bf16",
             Self::F32 => "f32",
             Self::F64 => "f64",
+            Self::D32 => "d32",
+            Self::D64 => "d64",
         }
     }
 
@@ -160,6 +171,32 @@ impl NumericWidth {
         }
     }
 
+    /// Decimal-width lattice rank; `d32 → d64` is the only decimal widening.
+    fn decimal_rank(self) -> Option<u8> {
+        match self {
+            Self::D32 => Some(0),
+            Self::D64 => Some(1),
+            _ => None,
+        }
+    }
+
+    /// Decimal-digit scale exponent of the scaled-integer carrier.
+    ///
+    /// d32 = i32×10⁻⁷, d64 = i64×10⁻⁹ (CTO ruling, decimal-widths D0).
+    #[must_use]
+    pub fn decimal_scale(self) -> Option<u32> {
+        match self {
+            Self::D32 => Some(7),
+            Self::D64 => Some(9),
+            _ => None,
+        }
+    }
+
+    #[must_use]
+    pub fn is_decimal(self) -> bool {
+        matches!(self, Self::D32 | Self::D64)
+    }
+
     /// Whether `from` may flow into `to` along the v1 widening lattice.
     #[must_use]
     pub fn is_widening_assignable(from: Self, to: Self) -> bool {
@@ -173,6 +210,11 @@ impl NumericWidth {
             return a <= b;
         }
         if let (Some(a), Some(b)) = (from.float_rank(), to.float_rank()) {
+            return a <= b;
+        }
+        // decimal-widths D1: d32 → d64 is the only decimal widening; decimals
+        // never widen into or out of the integer/fractus lattices.
+        if let (Some(a), Some(b)) = (from.decimal_rank(), to.decimal_rank()) {
             return a <= b;
         }
         // Signed integer chain may widen into fractus<f64>.
@@ -200,6 +242,52 @@ impl WidthError {
             }
             (WidthError::UnrecognizedMarker, _) => "unknown width marker for this family",
         }
+    }
+}
+
+/// Parse decimal digit text into an exact scaled representation:
+/// `(mantissa, exp10)` with `value == mantissa × 10^exp10` (decimal-widths D1).
+///
+/// Accepts the lexer's cleaned decimal spelling (`4.2`, `1e-3`, `42`); returns
+/// `None` for malformed text or mantissa overflow of the i128 carrier.
+#[must_use]
+pub fn decimal_text_to_scaled(text: &str) -> Option<(i128, i32)> {
+    let mut mantissa: i128 = 0;
+    let mut exp10: i32 = 0;
+    let mut seen_digit = false;
+    let mut rest = text;
+    while let Some(digit) = rest.chars().next().filter(|c| c.is_ascii_digit()) {
+        mantissa = mantissa
+            .checked_mul(10)?
+            .checked_add(i128::from(digit as u8 - b'0'))?;
+        seen_digit = true;
+        rest = &rest[1..];
+    }
+    if let Some(frac) = rest.strip_prefix('.') {
+        rest = frac;
+        while let Some(digit) = rest.chars().next().filter(|c| c.is_ascii_digit()) {
+            mantissa = mantissa
+                .checked_mul(10)?
+                .checked_add(i128::from(digit as u8 - b'0'))?;
+            exp10 -= 1;
+            seen_digit = true;
+            rest = &rest[1..];
+        }
+    }
+    if let Some(exp) = rest.strip_prefix(['e', 'E']) {
+        let (sign, exp) = match exp.strip_prefix('-') {
+            Some(e) => (-1i32, e),
+            None => (1i32, exp.strip_prefix('+').unwrap_or(exp)),
+        };
+        let e: i32 = exp.parse().ok()?;
+        exp10 = exp10.checked_add(sign.checked_mul(e)?)?;
+    } else if !rest.is_empty() {
+        return None;
+    }
+    if seen_digit {
+        Some((mantissa, exp10))
+    } else {
+        None
     }
 }
 
@@ -581,3 +669,6 @@ impl NumericWidth {
 #[cfg(test)]
 #[path = "numeric_width_test.rs"]
 mod tests;
+
+#[path = "decimal_width_test.rs"]
+mod decimal_width_test;

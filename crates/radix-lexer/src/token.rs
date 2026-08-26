@@ -85,6 +85,13 @@ pub enum TokenKind {
     /// enum values, CLI, annotations) convert with explicit checked bounds.
     Integer(u64),
     Float(f64),
+    /// Decimal literal preserving exact digit text (decimal-widths D1, R0 fix).
+    /// `value` is the f64 re-derivation used by the fractus path — identical to
+    /// the old `Float(f64)` collapse. `text` is the cleaned decimal spelling.
+    FloatText {
+        value: f64,
+        text: Symbol,
+    },
     String(Symbol),
     /// Single-quoted `'...'` payload interned without delimiters.
     AsciiString(Symbol),

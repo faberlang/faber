@@ -661,6 +661,7 @@ impl Parser {
                 | TokenKind::Underscore(_)
                 | TokenKind::Integer(_)
                 | TokenKind::Float(_)
+                | TokenKind::FloatText { .. }
                 | TokenKind::String(_)
                 | TokenKind::AsciiString(_)
                 | TokenKind::BacktickString(_)

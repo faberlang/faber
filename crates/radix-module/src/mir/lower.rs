@@ -1493,7 +1493,10 @@ impl<'a> FunctionBuilder<'a> {
         let handler_depth = self.handlers.last().map_or(0, |handler| handler.depth);
         let trap = self.traps.last().cloned()?;
         if trap.depth > handler_depth {
-            self.traps.last_mut().expect("trap context present").error_paths = true;
+            self.traps
+                .last_mut()
+                .expect("trap context present")
+                .error_paths = true;
             Some(trap)
         } else {
             None
@@ -2015,7 +2018,8 @@ impl<'a> FunctionBuilder<'a> {
                 ));
                 None
             }
-            HirLiteral::Float(value) => {
+            // decimal-widths D1: text-carrying decimals lower via the f64 path.
+            HirLiteral::Float(value) | HirLiteral::FloatText { value, .. } => {
                 let operand = MirOperand::Constant(MirConstant::Float(*value));
                 match self.sized_fractus_literal_ty(ty) {
                     Some(ty) => Some(self.assign_temp(MirValueKind::Operand(operand), ty, span)),

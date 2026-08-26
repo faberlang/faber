@@ -1392,6 +1392,13 @@ pub enum HirLiteral {
     /// unsigned carriers land.
     Int(u64),
     Float(f64),
+    /// Decimal literal carrying exact digit text (decimal-widths D1, R0 fix).
+    /// `value` re-derives f64 exactly as the `Float` path always did; `text`
+    /// preserves the decimal spelling for scaled-integer decimal widths.
+    FloatText {
+        value: f64,
+        text: Symbol,
+    },
     String(Symbol),
     Ascii(Symbol),
     Octeti(Symbol),

@@ -200,6 +200,11 @@ impl Parser {
                 self.advance();
                 Some(Pattern::Literal(Literal::Float(n), span))
             }
+            TokenKind::FloatText { value, text } => {
+                let span = self.peek().span;
+                self.advance();
+                Some(Pattern::Literal(Literal::FloatText { value, text }, span))
+            }
             TokenKind::String(sym) => {
                 let span = self.peek().span;
                 self.advance();

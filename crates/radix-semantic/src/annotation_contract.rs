@@ -1166,7 +1166,9 @@ fn payload_value(
                     Err(_) => Err(ISSUE_INVALID_PAYLOAD),
                 }
             }
-            ExprKind::Literal(Literal::Float(n)) if schema.ty == ContractFieldType::Fractus => {
+            ExprKind::Literal(Literal::Float(n) | Literal::FloatText { value: n, .. })
+                if schema.ty == ContractFieldType::Fractus =>
+            {
                 Ok(ContractPayloadValue::Float(*n))
             }
             ExprKind::Literal(Literal::Bool(b)) if schema.ty == ContractFieldType::Bivalens => {

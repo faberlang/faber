@@ -490,6 +490,17 @@ impl TypeChecker<'_> {
             HirLiteral::Float(_) => self
                 .expected_fractus_literal_type(expected)
                 .unwrap_or_else(|| self.fractus_type()),
+            // decimal-widths D1: annotated decimals carry exact digit text to
+            // typing; `numerus<d32>`/`numerus<d64>` accept the literal at the
+            // declared width while every other expectation keeps fractus law.
+            HirLiteral::FloatText { text, .. } => {
+                if let Some(ty) = self.expected_decimal_literal_type(expected, *text, span) {
+                    ty
+                } else {
+                    self.expected_fractus_literal_type(expected)
+                        .unwrap_or_else(|| self.fractus_type())
+                }
+            }
             HirLiteral::String(_) => self.textus_type(),
             HirLiteral::Ascii(sym) => self.check_ascii_literal(*sym, span, expected),
             HirLiteral::Octeti(sym) => self.check_octeti_literal(*sym, span),
@@ -518,6 +529,69 @@ impl TypeChecker<'_> {
             | Type::ModularWord(_) => Some(expected),
             _ => None,
         }
+    }
+
+    /// Annotated decimal literal meeting a `numerus<d32>` / `numerus<d64>`
+    /// expectation (decimal-widths D1). Returns the expected type when the
+    /// digit text scales exactly into the width's carrier.
+    fn expected_decimal_literal_type(
+        &mut self,
+        expected: Option<TypeId>,
+        text: radix_lexer::Symbol,
+        span: radix_lexer::Span,
+    ) -> Option<TypeId> {
+        let expected = self.resolve_inferred_type(expected?);
+        let Type::SizedNumeric(Primitive::Numerus, width) = self.types.get(expected) else {
+            return None;
+        };
+        if !width.is_decimal() {
+            return None;
+        }
+        let Some(interner) = self.interner else {
+            return None;
+        };
+        let digits = interner.resolve(text);
+        let Some((mantissa, exp10)) = radix_types::numeric_width::decimal_text_to_scaled(digits)
+        else {
+            self.error_issue(
+                SemanticErrorKind::TypeMismatch,
+                DECIMAL_LITERAL_UNPARSEABLE,
+                span,
+            );
+            return Some(self.error_type);
+        };
+        // The scaled carrier holds mantissa × 10^(exp10 + scale); a negative
+        // shift means digits beyond the width's scale (precision loss) and a
+        // positive shift that overflows i128 exceeds the carrier domain.
+        let scale = width.decimal_scale()? as i32;
+        let Some(shift) = exp10.checked_add(scale) else {
+            return Some(self.decimal_literal_out_of_range(span));
+        };
+        if shift < 0 {
+            return Some(self.decimal_literal_out_of_range(span));
+        }
+        let factor = i128::from(10u32).checked_pow(shift.cast_unsigned());
+        let carrier_max: i128 = match width {
+            NumericWidth::D32 => i128::from(i32::MAX),
+            NumericWidth::D64 => i128::from(i64::MAX),
+            _ => unreachable!("decimal width checked above"),
+        };
+        if factor
+            .and_then(|f| mantissa.checked_mul(f))
+            .is_none_or(|carrier| carrier > carrier_max)
+        {
+            return Some(self.decimal_literal_out_of_range(span));
+        }
+        Some(expected)
+    }
+
+    fn decimal_literal_out_of_range(&mut self, span: radix_lexer::Span) -> TypeId {
+        self.error_issue(
+            SemanticErrorKind::TypeMismatch,
+            DECIMAL_LITERAL_OUT_OF_RANGE,
+            span,
+        );
+        self.error_type
     }
 
     /// Whether an integer literal magnitude exceeds the domain of its resolved
@@ -751,3 +825,5 @@ impl TypeChecker<'_> {
 
 const MODULAR_WORD_LITERAL_OUT_OF_RANGE: &str = "modular_word_literal_out_of_range";
 const NUMERUS_LITERAL_OUT_OF_RANGE: &str = "numerus_literal_out_of_range";
+const DECIMAL_LITERAL_UNPARSEABLE: &str = "decimal_literal_unparseable";
+const DECIMAL_LITERAL_OUT_OF_RANGE: &str = "decimal_literal_out_of_range";

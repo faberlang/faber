@@ -158,7 +158,10 @@ impl super::FaberCodegen {
                 self.write_textus_literal(*sym, interner, writer);
             }
             TokenKind::Integer(value) => writer.write(&value.to_string()),
-            TokenKind::Float(value) => writer.write(&value.to_string()),
+            // decimal-widths D1: emit paths stay byte-identical (f64 spelling).
+            TokenKind::Float(value) | TokenKind::FloatText { value, .. } => {
+                writer.write(&value.to_string())
+            }
             TokenKind::Ident(sym) | TokenKind::Underscore(sym) => {
                 let spelling = interner.resolve(*sym);
                 // Tokenless keyword values (e.g. `verum` since Batch C) still

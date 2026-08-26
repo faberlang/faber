@@ -907,7 +907,12 @@ impl<'a> Lexer<'a> {
                     self.emit_issue_error(LexErrorKind::NumberInvalid, start, "float_underflow");
                     self.emit_token(TokenKind::Error, start);
                 }
-                Ok(n) => self.emit_token(TokenKind::Float(n), start),
+                Ok(n) => {
+                    // decimal-widths D1: carry the digit text alongside the f64
+                    // re-derivation so decimal widths never lose exactness (R0).
+                    let text = self.interner.intern_raw(&clean);
+                    self.emit_token(TokenKind::FloatText { value: n, text }, start);
+                }
                 Err(_) => {
                     self.emit_issue_error(
                         LexErrorKind::NumberInvalid,

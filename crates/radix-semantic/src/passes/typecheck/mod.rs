@@ -94,19 +94,19 @@ pub mod json_genus;
 pub mod lookup;
 pub mod ops;
 pub mod pattern;
+#[cfg(test)]
+pub mod relations_test;
 pub mod scalar_text;
 pub mod stmt;
 pub mod summa;
-#[cfg(test)]
-pub mod relations_test;
-#[cfg(test)]
-#[path = "union_member_refinement_test.rs"]
-mod union_member_refinement_test;
+pub mod tensor_index;
+pub mod tensor_type_directed;
 #[cfg(test)]
 #[path = "trap_test.rs"]
 mod trap_test;
-pub mod tensor_index;
-pub mod tensor_type_directed;
+#[cfg(test)]
+#[path = "union_member_refinement_test.rs"]
+mod union_member_refinement_test;
 
 // Lane-gated: compiles through the full driver to the Rust target; a
 // core-only build excludes the module.
@@ -716,6 +716,10 @@ mod element_relaxation_test;
 #[cfg(test)]
 #[path = "equality_exact_types_test.rs"]
 mod equality_exact_types_test;
+
+#[cfg(test)]
+#[path = "decimal_width_literal_test.rs"]
+mod decimal_width_literal_test;
 
 #[cfg(test)]
 #[path = "generic_call_test.rs"]

@@ -402,7 +402,8 @@ fn token_to_source(token: &Token, interner: &Interner) -> String {
         }
         TokenKind::Ident(sym) | TokenKind::Underscore(sym) => interner.resolve(*sym).to_owned(),
         TokenKind::Integer(value) => value.to_string(),
-        TokenKind::Float(value) => value.to_string(),
+        // decimal-widths D1: emit paths stay byte-identical (f64 spelling).
+        TokenKind::Float(value) | TokenKind::FloatText { value, .. } => value.to_string(),
         TokenKind::Verum => "verum".to_owned(),
         TokenKind::Falsum => "falsum".to_owned(),
         TokenKind::Nihil => "nihil".to_owned(),
