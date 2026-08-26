@@ -739,6 +739,11 @@ pub(super) fn lower_package_units<'a>(
             &lowered.interner,
             &mut entry.analysis.interner,
         );
+        remap_closure_environment_symbols(
+            &mut lowered.closure_environments,
+            &lowered.interner,
+            &mut entry.analysis.interner,
+        );
         remap_templates_text_symbols(&mut lowered, &mut entry.analysis.interner);
         // Sibling struct/union literals constructed in the source analysis
         // carry the source `DefId` in aggregate kinds and interned types; the
@@ -803,6 +808,11 @@ pub(super) fn lower_package_units<'a>(
             rewrite_lowered_type_ids(&mut lowered, &dispatch_rewrites);
         }
         rewrite_program_sources(&mut lowered.program, &unit_path, &source_rewrites);
+        rewrite_closure_environment_sources(
+            &mut lowered.closure_environments,
+            &unit_path,
+            &source_rewrites,
+        );
         rewrite_generic_identity(&mut lowered, &unit_path, &source_rewrites);
         ensure_unique_definition_sources(&lowered.program, &unit_path)?;
         let validation = collect_remapped_validation(
@@ -938,6 +948,11 @@ pub(super) fn lower_package_units<'a>(
                     &lowered.interner,
                     &mut entry.analysis.interner,
                 );
+                remap_closure_environment_symbols(
+                    &mut lowered.closure_environments,
+                    &lowered.interner,
+                    &mut entry.analysis.interner,
+                );
                 remap_templates_text_symbols(&mut lowered, &mut entry.analysis.interner);
                 let mut nominal_def_remap =
                     build_nominal_def_remap(&nominal_map, &entry.analysis.types);
@@ -995,6 +1010,11 @@ pub(super) fn lower_package_units<'a>(
                     &mut next_synthetic,
                 );
                 rewrite_program_sources(&mut lowered.program, &library.path, &source_rewrites);
+                rewrite_closure_environment_sources(
+                    &mut lowered.closure_environments,
+                    &library.path,
+                    &source_rewrites,
+                );
                 rewrite_generic_identity(&mut lowered, &library.path, &source_rewrites);
                 if let Err(errors) =
                     ensure_unique_definition_sources(&lowered.program, &library.path)
@@ -2326,6 +2346,24 @@ fn next_function_id(program: &MirProgram, path: &Path) -> Result<u32, Vec<Diagno
         })
 }
 
+/// Closure-environment capture names are lowering-interner symbols like
+/// function/param/local names (`remap_program_text_symbols`); the merged
+/// program resolves names through the entry interner, so the environment
+/// metadata must ride the same remap or the construct-vs-metadata match
+/// compares symbols from unrelated interners.
+fn remap_closure_environment_symbols(
+    environments: &mut [MirClosureEnvironment],
+    source: &Interner,
+    target: &mut Interner,
+) {
+    for environment in environments {
+        for capture in &mut environment.captures {
+            capture.name = remap_optional_symbol(Some(capture.name), source, target)
+                .expect("capture name is always present");
+        }
+    }
+}
+
 fn ensure_shift_fits(
     program: &MirProgram,
     closure_environments: &[MirClosureEnvironment],
@@ -2601,6 +2639,25 @@ pub(super) fn shift_runtime_call_ids(call: &mut MirRuntimeCall, offset: u32) {
 }
 
 pub(super) fn shift_aggregate_ids(aggregate: &mut MirAggregate, offset: u32) {
+    match &mut aggregate.kind {
+        // The merged environment registry is re-keyed by the same offset
+        // (`shift_program_ids`); a shifted unit's `construct closure_env`
+        // kind id must follow it or the construct names a pre-merge key.
+        MirAggregateKind::ClosureEnvironment(id) => shift_environment_id(id, offset),
+        // Struct/variant DefIds are nominal identities riding the nominal
+        // remap, never the function/env merge offset.
+        MirAggregateKind::Struct(_) | MirAggregateKind::EnumVariant(_) => {}
+        MirAggregateKind::Tuple
+        | MirAggregateKind::Array
+        | MirAggregateKind::Record
+        | MirAggregateKind::Map
+        | MirAggregateKind::Set
+        | MirAggregateKind::Tensor
+        | MirAggregateKind::SparseTensor
+        | MirAggregateKind::Interval { .. }
+        | MirAggregateKind::Vector
+        | MirAggregateKind::Matrix => {}
+    }
     match &mut aggregate.fields {
         MirAggregateFields::Ordered(items) => {
             for item in items {
