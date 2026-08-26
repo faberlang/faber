@@ -29,6 +29,7 @@ use radix_mir::MirClosureEnvironmentId;
 use radix_mir::{MirBinOp, MirFunctionId};
 use radix_runtime_contract::display::{display_bivalens, display_fractus, display_text_payload};
 use radix_runtime_contract::instans::Instans;
+use radix_runtime_contract::{D32_SCALE, D64_SCALE};
 use radix_types::NumericWidth;
 use rustc_hash::{FxHashMap, FxHashSet};
 use std::cell::RefCell;
@@ -546,9 +547,11 @@ pub fn int_width_range(width: NumericWidth) -> (i128, i128) {
 /// arithmetic path use the same representation contract.
 #[must_use]
 pub(crate) fn decimal_scale_factor(width: NumericWidth) -> Option<i128> {
-    width
-        .decimal_scale()
-        .and_then(|digits| 10_i128.checked_pow(digits))
+    match width {
+        NumericWidth::D32 => Some(i128::from(D32_SCALE)),
+        NumericWidth::D64 => Some(i128::from(D64_SCALE)),
+        _ => None,
+    }
 }
 
 /// Pure round-half-even quotient for values whose intermediate arithmetic has
