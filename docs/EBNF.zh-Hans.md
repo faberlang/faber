@@ -1386,6 +1386,15 @@ Literals must be in `0..=2^W-1` (for `modulus<u64>` up to
 `18446744073709551615`). Shift counts are themselves modular: `x ⇐ W` is a
 full wrap. Cross-width modular arithmetic is rejected.
 
+Conversion is the deliberate complement to the checked arithmetic policy:
+`fractus ↦ numerus<W>` saturates at the target width — NaN converts to `0`,
+and an out-of-range value clamps to the width's bounds (the cross-tier Rust
+`as` status quo). The `∷` ascription surface follows the same saturation when
+it crosses numeric families. Integer `numerus<W>` arithmetic errors on
+overflow while float→integer conversion clamps; `modulus<W>` stays the only
+wrapping family (FORK-2, operator mail 2fb79900). Runner cast-path alignment
+is tracked as want 34821b73.
+
 ### Generic Collections
 
 | Faber          | Meaning  |
