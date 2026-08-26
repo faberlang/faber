@@ -1,0 +1,43 @@
++++
+term = "itera"
+kind = "keyword"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "itera_stmt", "itera_binding", "range_expr", "range_tail", "expression", "literal", "nota_stmt"]
+category = "control-flow"
+canonical = true
+summary = "Cartesian walk of two ranges with two binders."
+syntax = "for range <a>‥<b>, <c>‥<d> const <i>, <j> { }"
+related = ["ex", "de", "apud"]
+locale = "en"
++++
+
+# =============================================================================
+# range product N=2 — one walk over two declared numeric domains.
+# =============================================================================
+#
+# What this teaches:
+#   • `for range` with a comma-separated range series walks the Cartesian
+#     product of the declared domains — every (i, j) pair, exactly once
+#   • the binder series names one binder per range, in the same order
+#   • order is structural: the leftmost range is the outermost walk, so the
+#     output is row-major — each outer value carries the complete inner walk
+#
+# Common mistakes:
+#   • expecting a zip — aligned walks are the separate `for from` series;
+#     ranges of unequal visit counts are multiplied, never truncated
+#   • writing nested `for range` loops with a hand-made counter to visit a
+#     grid — the product series is the flat spelling of that nesting
+#
+# See also: ex, apud
+# =============================================================================
+
+main {
+    for range 0‥2, 0‥2 const i, j {
+        print i
+        print j
+    }
+
+    for range 3‥5, 1‥3 const first, second {
+        print first
+        print second
+    }
+}

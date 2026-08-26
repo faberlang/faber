@@ -1,0 +1,5 @@
+# Reject oracle for the Cartesian range-product declines.
+# Tokens: stable diagnostic identities (faber check output); one per line.
+SEM010:itera_range_source_binder_arity_mismatch
+SEM010:itera_range_extent_binder_shadowing
+SEM010:itera_range_mixed_source
