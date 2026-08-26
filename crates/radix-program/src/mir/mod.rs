@@ -618,3 +618,7 @@ mod generic_size_forwarding_tests;
 #[cfg(test)]
 #[path = "const_member_lane_test.rs"]
 mod const_member_lane_tests;
+
+#[cfg(test)]
+#[path = "closure_env_link_test.rs"]
+mod closure_env_link_tests;

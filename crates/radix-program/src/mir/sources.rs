@@ -57,6 +57,29 @@ pub(super) fn rewrite_program_sources(
     }
 }
 
+/// Rewrite the unit's closure-environment capture sources under the same map
+/// as [`rewrite_program_sources`]. The closure body's
+/// `MirProjection::ClosureCapture { source }` and the environment row's
+/// `captures[].source` name the same definition; rewriting only the body
+/// desyncs body and metadata ("closure capture projection is missing
+/// metadata").
+pub(super) fn rewrite_closure_environment_sources(
+    environments: &mut [MirClosureEnvironment],
+    unit_path: &Path,
+    source_rewrites: &SourceRewrites,
+) {
+    if source_rewrites.is_empty() {
+        return;
+    }
+    for environment in environments {
+        for capture in &mut environment.captures {
+            if let Some(rewritten) = rewritten_source(unit_path, capture.source, source_rewrites) {
+                capture.source = rewritten;
+            }
+        }
+    }
+}
+
 pub(super) fn rewritten_source(
     unit_path: &Path,
     source: DefId,
