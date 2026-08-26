@@ -5,8 +5,8 @@
   "lane": "mir",
   "generatedBy": "radix/scripta/emit-compat-json.py",
   "summary": {
-    "capable": 256,
-    "analyzable": 304
+    "capable": 260,
+    "analyzable": 308
   },
   "terms": [
     {
@@ -546,8 +546,8 @@
     {
       "term": "itera",
       "rule": "keyword",
-      "capable": 7,
-      "analyzable": 7
+      "capable": 8,
+      "analyzable": 8
     },
     {
       "term": "iuncta",
@@ -576,8 +576,8 @@
     {
       "term": "lista",
       "rule": "keyword",
-      "capable": 4,
-      "analyzable": 4
+      "capable": 5,
+      "analyzable": 5
     },
     {
       "term": "manifest",
@@ -612,8 +612,8 @@
     {
       "term": "mori",
       "rule": "keyword",
-      "capable": 1,
-      "analyzable": 1
+      "capable": 2,
+      "analyzable": 2
     },
     {
       "term": "modulus<u16>",
@@ -1044,8 +1044,8 @@
     {
       "term": "Bits",
       "rule": "conversio",
-      "capable": 0,
-      "analyzable": 0
+      "capable": 1,
+      "analyzable": 1
     },
     {
       "term": "⇇",

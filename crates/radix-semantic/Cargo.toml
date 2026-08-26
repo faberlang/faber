@@ -1,6 +1,6 @@
 [package]
 name = "radix-semantic"
-version = "0.83.0"
+version = "0.84.0"
 edition = "2021"
 description = "Semantic analysis for Faber: collection, resolution, HIR lowering, typecheck, post-typecheck analyses, and coupled source contracts"
 license = "MIT"
