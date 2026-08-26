@@ -77,6 +77,9 @@ use std::cell::RefCell;
 pub mod access;
 pub mod aggregate;
 pub mod call;
+#[cfg(test)]
+#[path = "cfa_join_test.rs"]
+mod cfa_join_test;
 pub mod collect;
 pub mod control;
 pub mod convert;
@@ -415,6 +418,11 @@ pub(crate) struct TypeChecker<'a> {
     /// (U1R). `adfirma r est M` registers a narrowed binding here for the
     /// rest of its block; block exit restores every override in reverse.
     pub(crate) assert_refinements: Vec<Vec<(DefId, Option<BindingInfo>)>>,
+
+    /// Declared binding state remembered when a cross-statement fact first
+    /// narrows a binding. Assignment invalidation restores this state instead
+    /// of treating the narrowed type as the binding's new declaration.
+    pub(crate) flow_bases: FxHashMap<DefId, BindingInfo>,
 }
 
 /// Typecheck resolved HIR and attach table-local types to declarations and expressions.
@@ -544,6 +552,7 @@ impl<'a> TypeChecker<'a> {
             mark_chorda_scalar_closure_param: false,
             locale_pack: None,
             assert_refinements: Vec::new(),
+            flow_bases: FxHashMap::default(),
         }
     }
 

@@ -20,21 +20,37 @@
 //!   arm bodies.
 //! - Null-check branches carry a temporary flow refinement: `x non est nihil`
 //!   records `x : T` in the taken branch and `x est nihil` records it in the
-//!   else branch (nn-u1). The override is restored immediately after the
-//!   branch block — a narrowed type must never escape its branch scope.
+//!   else branch (nn-u1). Branch edges are joined after checking: a fact
+//!   persists only when every normal edge carries the same selected member;
+//!   diverging edges contribute nothing.
 //!   Compound conditions are conservative (nn-u2): `x non est nihil et …`
 //!   narrows the taken branch only (the conjunction requires the left
 //!   null-check conjunct), while `or` and non-`and` shapes never narrow.
 //! - U1R generalizes the seam to nominal member tests: `r est M` narrows the
 //!   taken branch to `M` and the fallthrough to the union minus `M` (`non est
 //!   M` mirrors), on immutable bindings only (varia refinement is open row 2).
-//!   `adfirma <cond>` narrows the REST of its block through an override frame
+//!   `adfirma <cond>` narrows the rest of its block through an override frame
 //!   restored at block exit — a failed assert aborts, so control never
 //!   continues past it with the un-narrowed type.
+//! - N3 drops all recorded facts when a binding is assigned. Loop bodies drop
+//!   facts for bindings they touch before entry; untouched immutable facts may
+//!   enter as loop-invariant knowledge.
 
 #[allow(clippy::wildcard_imports)]
 // parent module provides shared imports for typechecking
 use super::*;
+use radix_hir::visit::{walk_expr, walk_stmt, HirVisitor};
+
+/// A snapshot of the visible binding state at one control-flow edge.
+///
+/// The map is deliberately keyed by bindings, not types as an algebraic
+/// lattice. Assignment markers are kept separately so a branch that writes a
+/// binding cannot accidentally rejoin with a stale fact from another edge.
+#[derive(Clone, Default)]
+struct FlowState {
+    bindings: FxHashMap<DefId, BindingInfo>,
+    invalidated: FxHashSet<DefId>,
+}
 
 /// `(then_refinement, else_refinement)` pair for condition narrowing
 /// (nn-u1 null checks, U1R nominal `est M` tests): each side is an optional
@@ -278,26 +294,59 @@ impl TypeChecker<'_> {
         else_block: Option<&mut HirBlock>,
         expected: Option<TypeId>,
     ) -> TypeId {
-        let then_ty = if let Some(catch) = then_catch {
+        // The condition is checked once against the incoming facts. Both edge
+        // refinements must be computed before either branch can mutate the
+        // visible binding map.
+        let incoming = self.snapshot_flow_state();
+        self.remember_flow_bases(&incoming);
+        let (then_refine, else_refine) = {
+            self.check_condition(cond);
+            self.condition_refinement(cond)
+        };
+
+        let (then_ty, then_state) = if let Some(catch) = then_catch {
             let err_ty = self.fresh_infer();
             let prev_error = self.current_error;
             self.current_error = Some(ErrorSink::Local(err_ty));
-            self.check_condition(cond);
-            let (then_refine, _) = self.condition_refinement(cond);
-            let then_ty = self.check_block_with_refinement(then_block, expected, then_refine);
+            let result = self.check_block_with_refinement(then_block, expected, then_refine);
             self.current_error = prev_error;
             self.check_cape(catch, err_ty);
-            then_ty
+            result
         } else {
-            self.check_condition(cond);
-            let (then_refine, _) = self.condition_refinement(cond);
             self.check_block_with_refinement(then_block, expected, then_refine)
         };
-        let (_, else_refine) = self.condition_refinement(cond);
-        let else_ty = match else_block {
-            Some(block) => self.check_block_with_refinement(block, expected, else_refine),
-            None => self.vacuum_type(),
+        let then_diverges = self.block_diverges(then_block);
+
+        // Restore the incoming edge before checking the fallthrough. A missing
+        // else is still a real normal edge: it carries the incoming facts plus
+        // any refinement proven by the negated condition.
+        self.restore_flow_state(&incoming);
+        let (else_ty, else_state, else_diverges) = match else_block {
+            Some(block) => {
+                let (ty, state) = self.check_block_with_refinement(block, expected, else_refine);
+                (ty, state, self.block_diverges(block))
+            }
+            None => {
+                let state = self.state_with_refinement(else_refine);
+                (self.vacuum_type(), state, false)
+            }
         };
+
+        // Apply the ruled join to the statement's continuation. Diverging
+        // edges contribute nothing; normal edges retain a fact only when every
+        // surviving edge carries the same selected member.
+        self.restore_flow_state(&incoming);
+        if !(then_diverges && else_diverges) {
+            let normal_states: Vec<&FlowState> = [
+                (!then_diverges).then_some(&then_state),
+                (!else_diverges).then_some(&else_state),
+            ]
+            .into_iter()
+            .flatten()
+            .collect();
+            let joined = self.join_flow_states(&incoming, &normal_states);
+            self.apply_flow_state(&incoming, &joined);
+        }
 
         // U-04: under a `∪`-hole expectation the branch join is an
         // accumulation, not a monomorphic `common_type` join. Each branch
@@ -519,26 +568,264 @@ impl TypeChecker<'_> {
 
     /// Check a branch block under an optional flow refinement.
     ///
-    /// The refinement is a temporary binding override that lives exactly for
-    /// the duration of the block check and is restored immediately after —
-    /// a narrowed type must never escape its branch scope. `BindingInfo` is
-    /// `Copy`, so the exact original entry is put back (mutable and
-    /// scalar-text flags included).
+    /// Branches need one extra observation point: nested control forms may
+    /// establish a fact in the branch's own scope, and the ruled outer join
+    /// must see it before that scope is discarded. The ordinary block checker
+    /// remains the owner of normal block entry/exit; this helper mirrors its
+    /// small traversal so it can snapshot the edge immediately before cleanup.
     fn check_block_with_refinement(
         &mut self,
         block: &mut HirBlock,
         expected: Option<TypeId>,
         refine: Option<(DefId, TypeId)>,
-    ) -> TypeId {
+    ) -> (TypeId, FlowState) {
         let (refined_def, saved) = match refine {
             Some((def_id, ty)) => (Some(def_id), self.override_binding(def_id, ty)),
             None => (None, None),
         };
-        let ty = self.check_block(block, expected);
+
+        self.push_scope();
+        self.push_assert_refinement_frame();
+        for stmt in &mut block.statements {
+            self.check_stmt(stmt);
+        }
+        let ty = if let Some(expr) = &mut block.expr {
+            self.check_expr_with_expected(expr, expected)
+        } else {
+            self.vacuum_type()
+        };
+        let mut state = self.snapshot_flow_state();
+        state.invalidated.extend(assignment_targets_in_block(block));
+        self.pop_assert_refinement_frame();
+        self.pop_scope();
+
         if let (Some(def_id), Some(original)) = (refined_def, saved) {
             self.restore_binding(def_id, original);
         }
-        ty
+        (ty, state)
+    }
+
+    /// Check a loop body after applying the loop-entry policy.
+    ///
+    /// Facts for bindings assigned anywhere in the body are dropped before the
+    /// first iteration. Facts for untouched immutable bindings remain available
+    /// because they are loop-invariant under this first-cut policy.
+    pub fn check_loop_block(&mut self, block: &mut HirBlock) {
+        let touched = assignment_targets_in_block(block);
+        for def_id in touched {
+            self.invalidate_flow_fact(def_id);
+        }
+        self.check_block(block, None);
+    }
+
+    /// Snapshot the currently visible binding state for one control-flow edge.
+    fn snapshot_flow_state(&self) -> FlowState {
+        FlowState {
+            bindings: self.binding_shadow.clone(),
+            invalidated: FxHashSet::default(),
+        }
+    }
+
+    /// Restore a visible state without changing lexical scope ownership.
+    fn restore_flow_state(&mut self, state: &FlowState) {
+        self.binding_shadow = state.bindings.clone();
+        for (&def_id, &info) in &state.bindings {
+            if let Some(scope) = self
+                .scopes
+                .iter_mut()
+                .rev()
+                .find(|scope| scope.contains_key(&def_id))
+            {
+                scope.insert(def_id, info);
+            }
+        }
+    }
+
+    /// Remember the declared type behind a future persistent fact.
+    fn remember_flow_bases(&mut self, state: &FlowState) {
+        for (&def_id, &info) in &state.bindings {
+            if self.flow_bases.contains_key(&def_id) {
+                continue;
+            }
+            let saved = self
+                .assert_refinements
+                .iter()
+                .rev()
+                .flat_map(|frame| frame.iter().rev())
+                .find_map(|(saved_def, saved)| (*saved_def == def_id).then_some(*saved).flatten());
+            self.flow_bases.insert(def_id, saved.unwrap_or(info));
+        }
+    }
+
+    /// Apply a joined state only where it differs from the incoming state.
+    fn apply_flow_state(&mut self, incoming: &FlowState, joined: &FlowState) {
+        for (&def_id, &info) in &joined.bindings {
+            let Some(before) = incoming.bindings.get(&def_id) else {
+                continue;
+            };
+            if !self.member_type_equals(before.ty, info.ty) {
+                self.set_current_binding(def_id, info);
+            }
+        }
+    }
+
+    /// The ruled join: intersect selected members across normal edges. A
+    /// singleton intersection is represented by that existing member type;
+    /// when a multi-member intersection would require constructing a new
+    /// type-level meet, the conservative incoming fact is retained.
+    fn join_flow_states(&mut self, incoming: &FlowState, states: &[&FlowState]) -> FlowState {
+        let Some(first) = states.first() else {
+            return incoming.clone();
+        };
+        if states.len() == 1 {
+            let mut joined = (*first).clone();
+            for def_id in &first.invalidated {
+                if let Some(base) = self.flow_bases.get(def_id).copied() {
+                    joined.bindings.insert(*def_id, base);
+                }
+            }
+            return joined;
+        }
+        let mut joined = incoming.clone();
+        for (&def_id, &before) in &incoming.bindings {
+            let Some(candidate) = first.bindings.get(&def_id).copied() else {
+                continue;
+            };
+            if states
+                .iter()
+                .any(|state| state.invalidated.contains(&def_id))
+            {
+                if let Some(base) = self.flow_bases.get(&def_id).copied() {
+                    joined.bindings.insert(def_id, base);
+                } else {
+                    joined.bindings.insert(def_id, before);
+                }
+                continue;
+            }
+            let Some(before_state) = incoming.bindings.get(&def_id) else {
+                continue;
+            };
+            let changed_edges = states.iter().all(|state| {
+                state
+                    .bindings
+                    .get(&def_id)
+                    .is_some_and(|info| !self.member_type_equals(before_state.ty, info.ty))
+            });
+            if !changed_edges {
+                continue;
+            }
+            let mut common = self.flow_members(candidate.ty);
+            for state in &states[1..] {
+                let Some(other) = state.bindings.get(&def_id) else {
+                    common.clear();
+                    break;
+                };
+                let members = self.flow_members(other.ty);
+                common.retain(|member| {
+                    members
+                        .iter()
+                        .copied()
+                        .any(|other| self.member_type_equals(*member, other))
+                });
+            }
+            match common.as_slice() {
+                [member] => {
+                    let mut refined = candidate;
+                    refined.ty = *member;
+                    joined.bindings.insert(def_id, refined);
+                }
+                _ if states[1..].iter().all(|state| {
+                    state
+                        .bindings
+                        .get(&def_id)
+                        .is_some_and(|other| self.member_type_equals(candidate.ty, other.ty))
+                }) =>
+                {
+                    joined.bindings.insert(def_id, candidate);
+                }
+                _ => {}
+            }
+        }
+        joined
+    }
+
+    /// Return the existing member set represented by a flow type. The join
+    /// never creates an intersection type; a singleton result can select an
+    /// existing member, while wider disagreements conservatively drop.
+    fn flow_members(&mut self, ty: TypeId) -> Vec<TypeId> {
+        let resolved = self.resolve_inferred_type(ty);
+        self.union_members_of(resolved)
+            .unwrap_or_else(|| vec![resolved])
+    }
+
+    /// Return an edge snapshot with one condition refinement applied.
+    fn state_with_refinement(&mut self, refine: Option<(DefId, TypeId)>) -> FlowState {
+        let Some((def_id, ty)) = refine else {
+            return self.snapshot_flow_state();
+        };
+        let saved = self.override_binding(def_id, ty);
+        let state = self.snapshot_flow_state();
+        if let Some(original) = saved {
+            self.restore_binding(def_id, original);
+        }
+        state
+    }
+
+    /// Restore the declared binding state and remove all active assert facts
+    /// for a binding whose cell has been assigned.
+    pub(crate) fn invalidate_flow_fact(&mut self, def_id: DefId) {
+        let Some(current) = self.lookup_binding(def_id) else {
+            return;
+        };
+        let original = self
+            .flow_bases
+            .get(&def_id)
+            .copied()
+            .or_else(|| {
+                self.assert_refinements
+                    .iter()
+                    .rev()
+                    .flat_map(|frame| frame.iter().rev())
+                    .find_map(|(saved_def, saved)| {
+                        (*saved_def == def_id).then_some(*saved).flatten()
+                    })
+            })
+            .unwrap_or(current);
+        for scope in &mut self.scopes {
+            if scope.contains_key(&def_id) {
+                scope.insert(def_id, original);
+            }
+        }
+        self.binding_shadow.insert(def_id, original);
+        for frame in &mut self.assert_refinements {
+            frame.retain(|(saved_def, _)| *saved_def != def_id);
+        }
+    }
+
+    /// Drop facts before checking an assignment, so its target is typed from
+    /// the declared cell rather than from a stale pre-assignment refinement.
+    pub(crate) fn invalidate_assignment_target(&mut self, target: &HirExpression) {
+        if let HirExpressionKind::Path(def_id) = target.kind {
+            self.invalidate_flow_fact(def_id);
+        }
+    }
+
+    /// Drop any assignment facts produced by nested expression forms after the
+    /// expression has been checked. Direct assignment checks invalidate before
+    /// their target is typed; this post-pass covers assignments nested in a
+    /// larger statement expression and inc/dec targets.
+    pub(crate) fn invalidate_assignments_in_expr(&mut self, expr: &HirExpression) {
+        for def_id in assignment_targets_in_expr(expr) {
+            self.invalidate_flow_fact(def_id);
+        }
+    }
+
+    /// Install a joined fact in the scope containing the current statement.
+    fn set_current_binding(&mut self, def_id: DefId, info: BindingInfo) {
+        if let Some(scope) = self.scopes.last_mut() {
+            scope.insert(def_id, info);
+        }
+        self.binding_shadow.insert(def_id, info);
     }
 
     /// Temporarily record a narrowed type for a visible binding.
@@ -608,6 +895,94 @@ impl TypeChecker<'_> {
         let saved = self.override_binding(def_id, ty);
         if let Some(frame) = self.assert_refinements.last_mut() {
             frame.push((def_id, saved));
+        }
+    }
+
+    /// Whether a checked block has no normal continuation.
+    fn block_diverges(&self, block: &HirBlock) -> bool {
+        if let Some(expr) = &block.expr {
+            return self.expression_diverges(expr);
+        }
+        block
+            .statements
+            .last()
+            .is_some_and(|stmt| self.statement_diverges(stmt))
+    }
+
+    fn statement_diverges(&self, stmt: &HirStatement) -> bool {
+        match &stmt.kind {
+            HirStatementKind::Redde(_) => true,
+            HirStatementKind::Expr(expr) => self.expression_diverges(expr),
+            _ => false,
+        }
+    }
+
+    fn expression_diverges(&self, expr: &HirExpression) -> bool {
+        match &expr.kind {
+            HirExpressionKind::Throw(_)
+            | HirExpressionKind::Panic(_)
+            | HirExpressionKind::Transfer { .. } => true,
+            HirExpressionKind::Block(block) | HirExpressionKind::Loop(block) => {
+                self.block_diverges(block)
+            }
+            HirExpressionKind::Si {
+                then_block,
+                else_block: Some(else_block),
+                ..
+            } => self.block_diverges(then_block) && self.block_diverges(else_block),
+            HirExpressionKind::Discerne { arms, .. } => {
+                !arms.is_empty() && arms.iter().all(|arm| self.expression_diverges(&arm.body))
+            }
+            HirExpressionKind::Handled { body, catch } => {
+                self.block_diverges(body) && self.block_diverges(&catch.body)
+            }
+            _ => false,
+        }
+    }
+}
+
+/// Collect bindings assigned by a loop body before its first iteration.
+fn assignment_targets_in_block(block: &HirBlock) -> FxHashSet<DefId> {
+    let mut collector = AssignmentTargetCollector::default();
+    collector.visit_block(block);
+    collector.targets
+}
+
+fn assignment_targets_in_expr(expr: &HirExpression) -> FxHashSet<DefId> {
+    let mut collector = AssignmentTargetCollector::default();
+    collector.visit_expr(expr);
+    collector.targets
+}
+
+#[derive(Default)]
+struct AssignmentTargetCollector {
+    targets: FxHashSet<DefId>,
+}
+
+impl HirVisitor for AssignmentTargetCollector {
+    fn visit_stmt(&mut self, stmt: &HirStatement) {
+        if let HirStatementKind::IncDec(inc_dec) = &stmt.kind {
+            self.collect_target(&inc_dec.target);
+        }
+        walk_stmt(self, stmt);
+    }
+
+    fn visit_expr(&mut self, expr: &HirExpression) {
+        match &expr.kind {
+            HirExpressionKind::Assign(target, _)
+            | HirExpressionKind::ConversioAssign { target, .. } => {
+                self.collect_target(target);
+            }
+            _ => {}
+        }
+        walk_expr(self, expr);
+    }
+}
+
+impl AssignmentTargetCollector {
+    fn collect_target(&mut self, target: &HirExpression) {
+        if let HirExpressionKind::Path(def_id) = target.kind {
+            self.targets.insert(def_id);
         }
     }
 }

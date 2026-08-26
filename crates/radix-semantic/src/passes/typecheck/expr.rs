@@ -170,12 +170,12 @@ impl TypeChecker<'_> {
                 scrutinees, arms, ..
             } => self.check_match(scrutinees, arms, expected),
             HirExpressionKind::Loop(block) => {
-                self.check_block(block, None);
+                self.check_loop_block(block);
                 self.vacuum_type()
             }
             HirExpressionKind::Dum(cond, block) => {
                 self.check_condition(cond);
-                self.check_block(block, None);
+                self.check_loop_block(block);
                 self.vacuum_type()
             }
             HirExpressionKind::Itera(mode, coordinate_bindings, binding, _, iter, block) => {
@@ -377,7 +377,7 @@ impl TypeChecker<'_> {
                     self.insert_binding(*def_id, numerus);
                 }
                 self.insert_binding(*binding, elem_ty);
-                self.check_block(block, None);
+                self.check_loop_block(block);
                 self.pop_scope();
                 self.vacuum_type()
             }

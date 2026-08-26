@@ -141,12 +141,12 @@ fn si_non_est_mirrors() {
 }
 
 #[test]
-fn si_refinement_does_not_leak_past_branch() {
-    // Scope hygiene: after the `si`, `r` is the full union again, so a
-    // non-common member access in the fallthrough still rejects.
+fn si_refinement_does_not_leak_past_normal_join() {
+    // Both edges continue, so a branch-only refinement must not escape the
+    // `si`; the incoming union remains the only sound continuation type.
     test_support::assert_rejects_with_issue(
         &errata_bonum(
-            "functio f(Errata ∪ Bonum r) → textus {\n    si r est Errata { redde r.nuntius }\n    redde r.nuntius\n}",
+            "functio f(Errata ∪ Bonum r) → textus {\n    si r est Errata { nota r.nuntius }\n    redde r.nuntius\n}",
         ),
         "union_member_not_common",
     );

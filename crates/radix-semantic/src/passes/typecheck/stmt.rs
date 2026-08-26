@@ -129,6 +129,9 @@ impl TypeChecker<'_> {
             }
             (None, None) => self.fresh_infer(),
         };
+        if let Some(init) = local.init.as_ref() {
+            self.invalidate_assignments_in_expr(init);
+        }
 
         if local.ty.is_none() {
             local.ty = Some(inferred);
@@ -160,6 +163,7 @@ impl TypeChecker<'_> {
             let awaited =
                 self.await_success_type(future_ty, init.span, ISSUE_AWAIT_BIND_REQUIRES_PROMISSUM);
             super::tensor_index::record_shape_witness_from_init(self, local.def_id, init);
+            self.invalidate_assignments_in_expr(init);
             awaited
         } else {
             self.error_type
@@ -247,6 +251,7 @@ impl TypeChecker<'_> {
                 // for the rest of the block (failure aborts before control
                 // continues), so register the override after checking it.
                 self.apply_assert_refinement(expr);
+                self.invalidate_assignments_in_expr(expr);
                 if self.is_infer(self.resolve_inferred_type(expr_ty)) {
                     let vacuum = self.vacuum_type();
                     self.unify_assign_issue(
@@ -260,7 +265,8 @@ impl TypeChecker<'_> {
             HirStatementKind::Redde(value) => self.check_return(value.as_mut(), stmt.span),
             HirStatementKind::Rumpe | HirStatementKind::Perge | HirStatementKind::Tacet => {}
             HirStatementKind::IncDec(inc_dec) => {
-                self.check_inc_dec(inc_dec.op, &mut inc_dec.target, stmt.span)
+                self.check_inc_dec(inc_dec.op, &mut inc_dec.target, stmt.span);
+                self.invalidate_assignments_in_expr(&inc_dec.target);
             }
             HirStatementKind::Custodi(custodi) => {
                 for clause in &mut custodi.clauses {
