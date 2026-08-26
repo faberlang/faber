@@ -6129,7 +6129,7 @@
       "target": "rust",
       "predicted": "dedicated",
       "measured": "rejected",
-      "detail": "frontend:matrix_materialize_unsupported"
+      "detail": "frontend:lista_to_tensor_element_mismatch"
     },
     {
       "src": "lista",
@@ -6137,7 +6137,7 @@
       "target": "ts",
       "predicted": "dedicated",
       "measured": "rejected",
-      "detail": "frontend:matrix_materialize_unsupported"
+      "detail": "frontend:lista_to_tensor_element_mismatch"
     },
     {
       "src": "lista",
@@ -6145,7 +6145,7 @@
       "target": "go",
       "predicted": "not-emitted",
       "measured": "rejected",
-      "detail": "frontend:matrix_materialize_unsupported"
+      "detail": "frontend:lista_to_tensor_element_mismatch"
     },
     {
       "src": "lista",
@@ -6153,7 +6153,7 @@
       "target": "faber",
       "predicted": "dedicated",
       "measured": "rejected",
-      "detail": "frontend:matrix_materialize_unsupported"
+      "detail": "frontend:lista_to_tensor_element_mismatch"
     },
     {
       "src": "lista",
@@ -6161,7 +6161,7 @@
       "target": "llvm-text",
       "predicted": "not-emitted",
       "measured": "rejected",
-      "detail": "frontend:matrix_materialize_unsupported"
+      "detail": "frontend:lista_to_tensor_element_mismatch"
     },
     {
       "src": "lista",
@@ -6169,7 +6169,7 @@
       "target": "wasm-text",
       "predicted": "not-emitted",
       "measured": "rejected",
-      "detail": "frontend:matrix_materialize_unsupported"
+      "detail": "frontend:lista_to_tensor_element_mismatch"
     },
     {
       "src": "lista",
@@ -6177,7 +6177,7 @@
       "target": "wasm",
       "predicted": "not-emitted",
       "measured": "rejected",
-      "detail": "frontend:matrix_materialize_unsupported"
+      "detail": "frontend:lista_to_tensor_element_mismatch"
     },
     {
       "src": "lista",
@@ -6185,7 +6185,7 @@
       "target": "wgsl-text",
       "predicted": "not-emitted",
       "measured": "rejected",
-      "detail": "frontend:matrix_materialize_unsupported"
+      "detail": "frontend:lista_to_tensor_element_mismatch"
     },
     {
       "src": "lista",
@@ -6193,7 +6193,7 @@
       "target": "sexp-struct",
       "predicted": "not-emitted",
       "measured": "rejected",
-      "detail": "frontend:matrix_materialize_unsupported"
+      "detail": "frontend:lista_to_tensor_element_mismatch"
     },
     {
       "src": "lista",
@@ -6201,7 +6201,7 @@
       "target": "sexp",
       "predicted": "not-emitted",
       "measured": "rejected",
-      "detail": "frontend:matrix_materialize_unsupported"
+      "detail": "frontend:lista_to_tensor_element_mismatch"
     },
     {
       "src": "lista",

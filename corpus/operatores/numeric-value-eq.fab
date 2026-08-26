@@ -17,9 +17,11 @@ locale = "en"
 # What this teaches:
 #   • Value equality — `≅` promotes numeric types to a common width before comparing.
 #   • Exact comparison — Unlike `≡`, `≅` works across numeric widths (u8 vs i64), but still exact.
+#   • Lossless joins — signed negatives do not wrap into unsigned values, while an int↔float join records its precision boundary.
 #
 # Common mistakes:
 #   • Expecting ≅ to be fuzzy or approximate — it is exact value equality after promotion.
+#   • Treating −1 as the unsigned maximum — the sign-boundary comparison is falsum, not a wrapped match.
 #
 # See also: ≡, ≠, ↦, adfirma
 # =============================================================================
@@ -43,4 +45,23 @@ main {
 
     const _ differs ← 1 ≇ 2
     print differs
+
+    # Sign-boundary pin: a negative signed value never wraps to u64::MAX.
+    const int<i64> signed_negative ← -1
+    const int<u64> unsigned_max ← 18446744073709551615
+    const _ sign_equal ← signed_negative ≅ unsigned_max
+    const _ sign_different ← signed_negative ≇ unsigned_max
+    print sign_equal
+    print sign_different
+
+    # Cross-width pin: the 2^53+1 integer remains distinct from 2^53.
+    const int<i64> above_precision ← 9007199254740993
+    const int<u64> below_precision ← 9007199254740992
+    const _ cross_width ← above_precision ≅ below_precision
+    print cross_width
+
+    # Honesty pin: the int↔float join is lossy and therefore compares equal.
+    const float<f64> float_boundary ← 9007199254740992.0
+    const _ int_float_honesty ← above_precision ≅ float_boundary
+    print int_float_honesty
 }
