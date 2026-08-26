@@ -35,7 +35,8 @@ locale = "en"
 #   forRangeStmt :← 'itera' 'ab' rangeExpr 'per' expr ('fixum' | 'varia') ident block
 #
 # EXPECTED OUTPUT:
-#   none — stdout not pinned for this exemplum.
+#   intervallum-gradus.expected — positive-step, inclusive, and negative-step
+#   range values pinned from runner stdout.
 
 main {
     # Step by 2 (exclusive: 0, 2, 4, 6, 8)

@@ -1,0 +1,60 @@
++++
+term = "clausura"
+kind = "keyword"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "clausura_expr", "compact_clausura_expr", "clausura_signature", "clausura_param", "clausura_params", "clausura_joint", "return_clause", "alternate_exit_clause", "fac_block", "fac_stmt", "cape_clause", "si_stmt", "iace_stmt", "iace_expr", "expression", "additive_expr", "multiplicative_expr", "comparison", "equality", "call_expr", "call_suffix", "argument_list", "argument", "literal", "nota_stmt"]
+category = "function"
+canonical = false
+summary = "A closure may declare its own error channel: (params) → T ⇥ E ∴ …; the call site must handle the channel."
+syntax = "(<params>) → <type> ⇥ <error-type> ∴ <body>"
+aliases = ["error-channel closure"]
+related = ["clausura", "⇥", "fac", "cape", "iace"]
+locale = "en"
++++
+
+# =============================================================================
+# clausura — closure with its own error channel
+# =============================================================================
+#
+# What this teaches:
+#   • Own channel — `⇥ string` after the return clause gives the closure its
+#     own recoverable error channel; the body throws into it with `throw`
+#   • Block bodies need the return clause — a `do { }` body with `return`
+#     requires `→ int`; the single-expression `∴` form can infer instead
+#   • Fail-closed call sites — invoking a failable closure outside a
+#     `do { } catch { }` handler is rejected (failable_call_requires_handler)
+#
+# Common mistakes:
+#   • calling the closure without a handler — the channel is part of the
+#     closure type, so every call must be recoverable
+#   • `throw` in expression position — `∴ throw …` is not an expression;
+#     throw is a statement inside the `do { }` body
+#
+# See also: clausura, ⇥, fac, cape, iace
+# =============================================================================
+
+# clausura — error-channel declaration and both exit paths
+#
+# GRAMMAR:
+#   closureExpr :← params '→' type '⇥' errorType '∴' do-block
+#
+# EXPECTED OUTPUT:
+#   error-channel.expected — the thrown payload and the happy-path value.
+
+main {
+    const _ guard ← (int x) → int ⇥ string ∴ do {
+        if x > 3 {
+            throw "too big"
+        }
+        return x + 1
+    }
+    do {
+        print guard(5)
+    } catch err {
+        print "caught: §"(err)
+    }
+    do {
+        print guard(2)
+    } catch err {
+        print "caught: §"(err)
+    }
+}

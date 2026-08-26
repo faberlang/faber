@@ -36,10 +36,10 @@ locale = "en"
 # EXPECTED OUTPUT:
 #   3735928559
 #   4022250974
-#   1
-#   1
-#   1
-#   1
+#   1.0
+#   1.0
+#   1.0
+#   1.0
 #
 # BACKEND:
 #   HIR-direct Rust emits from_be_bytes / from_le_bytes. MIR-stepper agrees.

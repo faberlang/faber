@@ -36,7 +36,8 @@ locale = "en"
 #   forRangeStmt :← 'itera' 'ab' rangeExpr ('fixum' | 'varia') ident block
 #
 # EXPECTED OUTPUT:
-#   none — stdout not pinned for this exemplum.
+#   intervallum.expected — exclusive, ante-exclusive, inclusive, non-zero,
+#   and descending range values pinned from runner stdout.
 
 main {
     # Basic range (exclusive: 0, 1, 2, 3, 4)

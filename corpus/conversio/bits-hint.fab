@@ -36,19 +36,19 @@ locale = "la"
 # =============================================================================
 
 functio in_f16(numerus<u16> n) → f16 {
-    redde n ↦ f16<Bits>
+    redde n ↦ fractus<f16, Bits>
 }
 
 functio ex_bf16(bf16 x) → numerus<u16> {
-    redde x ↦ numerus<u16><Bits>
+    redde x ↦ numerus<u16, Bits>
 }
 
 functio in_f32(numerus<u32> n) → f32 {
-    redde n ↦ f32<Bits>
+    redde n ↦ fractus<f32, Bits>
 }
 
 functio ex_f64(f64 x) → numerus<u64> {
-    redde x ↦ numerus<u64><Bits>
+    redde x ↦ numerus<u64, Bits>
 }
 
 incipit {

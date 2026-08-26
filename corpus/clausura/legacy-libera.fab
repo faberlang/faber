@@ -1,0 +1,49 @@
++++
+term = "libera"
+kind = "keyword"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "clausura_expr", "clausura_legacy_expr", "clausura_param", "clausura_params", "closure_modifier", "clausura_joint", "return_clause", "expression", "additive_expr", "multiplicative_expr", "call_expr", "call_suffix", "argument_list", "argument", "literal", "nota_stmt"]
+category = "function"
+canonical = false
+summary = "The free (libera) capture-free modifier also composes with the legacy lambda head."
+syntax = "lambda <type> <name> free: <expression>"
+aliases = ["legacy libera"]
+related = ["libera", "clausura", "∴"]
+locale = "en"
++++
+
+# =============================================================================
+# libera — capture-free modifier on the legacy lambda head
+# =============================================================================
+#
+# What this teaches:
+#   • Legacy composition — `free` sits after the legacy parameter list and
+#     before the colon, exactly as it sits before the `∴` in the compact
+#     form: `lambda int x free: x * 2`
+#   • Same contract — the marked closure may not reference any enclosing
+#     local or parameter (CL-5 reject surface, see libera-reject.fab)
+#   • The la reader spelling — `clausura numerus x libera: x * 2` is the la
+#     twin of the same head
+#
+# Common mistakes:
+#   • placing `free` after the colon — the modifier belongs to the
+#     signature, not the body
+#   • capturing an enclosing binding in a free-marked legacy closure — the
+#     reject rule is identical to the compact form
+#
+# See also: libera, clausura, ∴
+# =============================================================================
+
+# libera — legacy lambda head with the free modifier
+#
+# GRAMMAR:
+#   closureExpr :← 'lambda' params 'free' ':' expr
+#
+# EXPECTED OUTPUT:
+#   legacy-libera.expected — the doubled and summed values.
+
+main {
+    const _ f ← lambda int x free: x * 2
+    print f(5)
+    const _ g ← lambda int x, int y free: x + y
+    print g(2, 3)
+}

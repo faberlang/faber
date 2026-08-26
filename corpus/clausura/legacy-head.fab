@@ -1,0 +1,47 @@
++++
+term = "clausura"
+kind = "keyword"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "clausura_expr", "clausura_legacy_expr", "clausura_param", "clausura_params", "clausura_joint", "return_clause", "expression", "additive_expr", "multiplicative_expr", "call_expr", "call_suffix", "argument_list", "argument", "literal", "nota_stmt"]
+category = "function"
+canonical = false
+summary = "Legacy lambda head — lambda <type> <name>[, …]: <expr>; the compact ∴ syntax is preferred for new code."
+syntax = "lambda <type> <name>[, <type> <name>…]: <expression>"
+aliases = ["legacy clausura head"]
+related = ["clausura", "∴"]
+locale = "en"
++++
+
+# =============================================================================
+# clausura — legacy lambda head
+# =============================================================================
+#
+# What this teaches:
+#   • Legacy head — `lambda int x: x * 2` opens the closure with the
+#     `lambda` keyword and a colon before the body expression
+#   • Bare parameter list — legacy params are comma-separated and
+#     parenthesized forms (`lambda (int x)`) are not part of this head
+#   • The la reader spelling — `clausura numerus x: x * 2` is the la twin
+#     of the same head
+#
+# Common mistakes:
+#   • reaching for the legacy head in new code — the compact `∴` form is
+#     preferred; the legacy head is kept for reading older sources
+#   • parenthesizing legacy params — only the compact signature takes `( )`
+#
+# See also: clausura, ∴
+# =============================================================================
+
+# clausura — legacy lambda head, single and multi-param
+#
+# GRAMMAR:
+#   closureExpr :← 'lambda' params ':' expr
+#
+# EXPECTED OUTPUT:
+#   legacy-head.expected — the doubled and summed values.
+
+main {
+    const _ a ← lambda int x: x * 2
+    print a(5)
+    const _ b ← lambda int x, int y: x + y
+    print b(2, 3)
+}

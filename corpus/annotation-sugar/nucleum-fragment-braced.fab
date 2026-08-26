@@ -1,0 +1,45 @@
++++
+term = "nucleum"
+kind = "annotation"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "annotation", "nucleum_annotation", "nucleum_braced", "nucleum_field_list", "nucleum_field", "functio_decl", "param_list", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "redde_stmt", "incipit_stmt", "fixum_decl", "call_expr", "call_suffix", "argument_list", "argument", "expression", "literal", "nota_stmt"]
+category = "lane"
+canonical = false
+summary = "Braced @ nucleum { fragment = verum } record sets the fragment modifier on the nucleum annotation."
+syntax = "@ nucleum { fragment = verum }"
+related = ["nucleum", "annotation-sugar"]
+locale = "la"
++++
+
+# =============================================================================
+# nucleum — braced @ nucleum { fragment = verum } modifier record
+# =============================================================================
+#
+# What this teaches:
+#   • Braced modifier record — `@ nucleum { fragment = verum }` writes the
+#     fragment modifier as a key-value field; `fragment = falsum` is the
+#     explicit non-fragment form
+#   • The field value is a bivalent literal — `verum` / `falsum`, never a
+#     general expression
+#   • Same role as the sugar form — both spellings produce the
+#     NucleumRole::Fragment marker; the la reader pair is `@ kernel { fragment = true }` in en
+#
+# Common mistakes:
+#   • mixing `verum` with the en surface — the bivalent literal follows the
+#     active reader pack
+#   • writing an expression value (`fragment = 1`) — the field admits only
+#     the two bivalent literals
+#
+# See also: nucleum, annotation-sugar
+# =============================================================================
+
+@ nucleum { fragment = verum }
+functio umbra() → vacuum {
+}
+
+functio identitas(numerus x) → numerus {
+    redde x
+}
+
+incipit {
+    nota identitas(5)
+}

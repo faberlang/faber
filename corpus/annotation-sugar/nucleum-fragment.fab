@@ -1,0 +1,46 @@
++++
+term = "nucleum"
+kind = "annotation"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "annotation", "nucleum_annotation", "nucleum_sugar", "nucleum_modifier", "functio_decl", "param_list", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "redde_stmt", "incipit_stmt", "fixum_decl", "call_expr", "call_suffix", "argument_list", "argument", "expression", "literal", "nota_stmt"]
+category = "lane"
+canonical = true
+summary = "Sugar @ nucleum fragment modifier marks a fragment-shader entry on the nucleum surface."
+syntax = "@ nucleum fragment"
+related = ["nucleum", "annotation-sugar"]
+locale = "la"
++++
+
+# =============================================================================
+# nucleum — sugar @ nucleum fragment modifier
+# =============================================================================
+#
+# What this teaches:
+#   • Sugar modifier — `@ nucleum fragment` on a function declaration marks
+#     it as the fragment-shader entry (NucleumRole::Fragment); the parser
+#     reads `fragment` as structured modifier data on the nucleum annotation,
+#     never as an untyped name/argument pair
+#   • The la reader spelling — `nucleum` is the la surface of the kernel
+#     annotation identity; the en twin is `@ kernel fragment`
+#   • A marked fragment function is a systems/shaders entry, not a host
+#     entry — the plain `incipit` driver below proves the module still
+#     checks and runs on the host lane
+#
+# Common mistakes:
+#   • writing `@ fragment` alone — the bare fragment name stays the graphics
+#     statement annotation, not the nucleum modifier
+#   • expecting the marked function to be called from a host `incipit`
+#
+# See also: nucleum, annotation-sugar
+# =============================================================================
+
+@ nucleum fragment
+functio umbra() → vacuum {
+}
+
+functio identitas(numerus x) → numerus {
+    redde x
+}
+
+incipit {
+    nota identitas(5)
+}

@@ -1,0 +1,50 @@
++++
+term = "clausura"
+kind = "keyword"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "clausura_expr", "compact_clausura_expr", "clausura_signature", "clausura_param", "clausura_params", "clausura_joint", "return_clause", "fac_block", "expression", "additive_expr", "multiplicative_expr", "call_expr", "call_suffix", "argument_list", "argument", "literal", "nota_stmt"]
+category = "function"
+canonical = false
+summary = "A compact closure body may be a fac (do) block with statements: (params) → T ∴ do { … }."
+syntax = "(<params>) → <type> ∴ do { <statements> }"
+aliases = ["fac-block closure", "block-body closure"]
+related = ["clausura", "fac", "∴"]
+locale = "en"
++++
+
+# =============================================================================
+# clausura — fac-block closure body
+# =============================================================================
+#
+# What this teaches:
+#   • Block body — after the `∴` joint the closure body may be a `do { }`
+#     block instead of a single expression; statements (local bindings,
+#     guards, `return`) live inside the block
+#   • Return clause required for blocks — a block body that `return`s needs
+#     `→ int`; the single-expression form may infer its type instead
+#   • The la reader spelling — `fac { }` is the la surface of the same
+#     block body (`do` in en)
+#
+# Common mistakes:
+#   • using a block body without `→ <type>` — the block cannot infer a
+#     return type from bare `return`
+#   • confusing `∴` (closure body joint) with `ergo` (single-statement
+#     body joint for si/dum/casu) — they are not interchangeable
+#
+# See also: clausura, fac, ∴
+# =============================================================================
+
+# clausura — fac-block body with a local binding
+#
+# GRAMMAR:
+#   closureExpr :← params '→' type '∴' fac-block
+#
+# EXPECTED OUTPUT:
+#   fac-block.expected — the doubled, shifted value.
+
+main {
+    const _ f ← (int x) → int ∴ do {
+        const int y ← x + 1
+        return y * 2
+    }
+    print f(5)
+}
