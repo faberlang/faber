@@ -103,6 +103,8 @@ pub enum IntrinsicReturnKind {
     /// `TensorGet`/`TensorSlice`).
     GatherShape,
     MapperArray,
+    /// `set<U>` where `U` is the mapper return type (`copia.mappata`).
+    MapperSet,
     ReducerInfer,
     /// `lista` of prefix results for a serial higher-order scan.
     ReducerArray,
@@ -275,6 +277,14 @@ pub static INTRINSICS: &[MethodIntrinsic] = &[
     intrinsic!(Copia, "habet", 1, &[IntrinsicParamKind::Inner], Bool, collection Contains),
     intrinsic!(Copia, "intersectio", 1, &[IntrinsicParamKind::SetInner], SetInner, collection Intersection),
     intrinsic!(Copia, "longitudo", 0, &[], Numerus, collection Length),
+    intrinsic!(
+        Copia,
+        "mappata",
+        1,
+        &[IntrinsicParamKind::Mapper],
+        MapperSet,
+        HigherOrderMap
+    ),
     intrinsic!(Copia, "subcopia", 1, &[IntrinsicParamKind::SetInner], Bool, collection IsSubset),
     intrinsic!(Copia, "supercopia", 1, &[IntrinsicParamKind::SetInner], Bool, collection IsSuperset),
     intrinsic!(Copia, "symmetrica", 1, &[IntrinsicParamKind::SetInner], SetInner, collection SymmetricDifference),

@@ -339,7 +339,7 @@ pub(super) fn check_intrinsic_method_call(
     }
 
     match entry.return_kind {
-        IntrinsicReturnKind::MapperArray => {
+        IntrinsicReturnKind::MapperArray | IntrinsicReturnKind::MapperSet => {
             let Some(inner) = ctx.inner else {
                 return Some(checker.error_type);
             };
@@ -372,7 +372,14 @@ pub(super) fn check_intrinsic_method_call(
             };
             checker.check_call_args(&sig, args, span);
             let ret = checker.resolve_inferred_type(mapped);
-            Some(checker.types.array(ret))
+            // F2-SET-MAP admissibility gate: `types.set` IS the existing
+            // set-element admissibility relation (total over element types —
+            // the same constructor every other set-construction site rides).
+            // `set<U>` publishes only through it; no coercion, no new rule.
+            match entry.return_kind {
+                IntrinsicReturnKind::MapperSet => Some(checker.types.set(ret)),
+                _ => Some(checker.types.array(ret)),
+            }
         }
         IntrinsicReturnKind::ReducerInfer | IntrinsicReturnKind::ReducerArray => {
             let Some(inner) = ctx.inner else {
@@ -791,6 +798,7 @@ fn resolve_return_type(
             super::tensor_index::tensor_with_fresh_shape(checker, inner)
         }
         IntrinsicReturnKind::MapperArray
+        | IntrinsicReturnKind::MapperSet
         | IntrinsicReturnKind::ReducerInfer
         | IntrinsicReturnKind::ReducerArray => checker.error_type,
     }
