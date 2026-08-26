@@ -528,6 +528,8 @@ impl TypeChecker<'_> {
             resolved_receiver,
             Type::Tensor(_, _) | Type::Vector(_, _) | Type::Matrix(_, _)
         );
+        let tensor_higher_order_method = matches!(resolved_receiver, Type::Tensor(_, _))
+            && super::super::air_closure_lift::is_higher_order_method(&method_name);
         if super::intrinsics::receiver_supports_intrinsics(resolved_receiver) {
             if self.reject_explicit_type_args_on_dynamic_callee(
                 explicit_type_args,
@@ -562,13 +564,16 @@ impl TypeChecker<'_> {
                 );
                 return self.error_type;
             }
-            if receiver_requires_known_method {
+            if receiver_requires_known_method && !tensor_higher_order_method {
                 // Tensor, vector, and matrix methods are closed compiler-owned
                 // surfaces. A registry miss must not manufacture an inferred
                 // result that survives check and fails only during lowering.
                 self.undefined_member("unknown_method", receiver.span);
                 return self.error_type;
             }
+            // ARC-3 higher-order Tensor methods are consumed by the AIR passes;
+            // their callback/result typing belongs to that lane rather than the
+            // neutral receiver registry. Preserve the pre-AIR inference path.
             return self.fresh_infer();
         }
 
