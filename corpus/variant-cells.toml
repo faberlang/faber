@@ -31,7 +31,7 @@
 # batches convert bare -> direct and lower the baseline in the same commit; new
 # surface landing bare raises the count and fails stage 1. Updated 2026-08-26.
 
-ratchet_baseline = 26
+ratchet_baseline = 24
 
 # =============================================================================
 # itera (32 cells: 23 direct / 3 unit-proven / 6 bare)
@@ -272,8 +272,10 @@ note = "crates/radix-semantic/src/passes/typecheck/itera_apud_test.rs"
 id = "itera.varia-binder"
 family = "itera"
 cell = "binder varia (var/let loop binder)"
-status = "bare"
-note = "grammar admits (fixum | varia); only frontmatter mention in destructuring.fab"
+status = "direct"
+exemplum = "itera/varia-binder.fab"
+expected = true
+note = "batch 1 (bc40c951): mutable loop binder taught; each element binds a fresh mutable slot"
 
 [[cells]]
 id = "itera.ergo-body"
@@ -390,8 +392,10 @@ expected = true
 id = "summa.no-apud"
 family = "summa"
 cell = "summa without apud (plain fold)"
-status = "bare"
-note = "parser admits; nothing teaches"
+status = "direct"
+exemplum = "summa/no-apud.fab"
+expected = true
+note = "batch 1 (bc40c951): rank-1 fold with no coordinate binder; rust lane fails closed by classification"
 
 [[cells]]
 id = "summa.filum-rank2"
@@ -421,117 +425,133 @@ cell = "maxima/minima WITHOUT coalesce tail"
 status = "bare"
 
 # =============================================================================
-# bounded-conversio (15 cells: 6 unit-proven / 9 bare)
+# bounded-conversio (15 cells: 6 direct / 9 bare)
 # =============================================================================
 # The bounded×bounded sub-space: corpus teaches only unbounded→bounded
-# (raw ↦ string<8> / bytes<8>). All 15 bounded×bounded cells are corpus-zero.
+# (raw ↦ string<8> / bytes<8>). Batch 1 (bc40c951) taught the six
+# semantic-test-proven directions; the nine formerly-UNSETTLED directions
+# were probed at faber check (2026-08-25) — determinations recorded in the
+# row notes (5 reject SEM016:unsupported_conversio, 4 check-admit with
+# runner UnsupportedMir carriers).
 
 [[cells]]
 id = "bconv.ascii-to-textus"
 family = "bounded-conversio"
 cell = "ascii<N> ↦ textus"
-status = "unit-proven"
-note = "crates/radix-semantic/src/passes/typecheck/bounded_string_conversio_test.rs"
+status = "direct"
+exemplum = "bounded/conversio-ascii-textus.fab"
+expected = true
+note = "batch 1 (bc40c951): runner-proven widen (ascii<8> ↦ string prints ab)"
 
 [[cells]]
 id = "bconv.textus-to-textus"
 family = "bounded-conversio"
 cell = "textus<N> ↦ textus"
-status = "unit-proven"
-note = "crates/radix-semantic/src/passes/typecheck/bounded_string_conversio_test.rs"
+status = "direct"
+exemplum = "bounded/conversio-textus-to-textus.fab"
+expected = false
+note = "batch 1 (bc40c951): check-admitted; runner lacks bounded textus carrier (UnsupportedMir)"
 
 [[cells]]
 id = "bconv.ascii-resize"
 family = "bounded-conversio"
 cell = "ascii<N> ↔ ascii<M> grow/shrink/identity (D7 resize)"
-status = "unit-proven"
-note = "crates/radix-semantic/src/passes/typecheck/bounded_string_conversio_test.rs"
+status = "direct"
+exemplum = "bounded/conversio-ascii-resize.fab"
+expected = false
+note = "batch 1 (bc40c951): check-admitted; runner lacks runtime conversio to BoundedAscii (UnsupportedMir)"
 
 [[cells]]
 id = "bconv.ascii-overflow-decline"
 family = "bounded-conversio"
 cell = "REJECT: ascii literal over capacity"
-status = "unit-proven"
+status = "direct"
+exemplum = "bounded/conversio-ascii-overflow-decline.fab"
+expected = true
 decline = true
-note = "ascii_literal_too_long — bounded_string_conversio_test.rs"
+note = "ascii_literal_too_long pinned; batch 1 (bc40c951)"
 
 [[cells]]
 id = "bconv.textus-overflow-decline"
 family = "bounded-conversio"
 cell = "REJECT: textus literal over capacity"
-status = "unit-proven"
+status = "direct"
+exemplum = "bounded/conversio-textus-overflow-decline.fab"
+expected = true
 decline = true
-note = "textus_literal_too_long — bounded_string_conversio_test.rs"
+note = "textus_literal_too_long pinned; batch 1 (bc40c951)"
 
 [[cells]]
 id = "bconv.lista-to-tensor"
 family = "bounded-conversio"
 cell = "lista<T,N> ↦ tensor<T,[N]>"
-status = "unit-proven"
-note = "crates/radix-semantic/src/lista_tensor_conversio_test.rs (incl. bounded-source admits + declines)"
+status = "direct"
+exemplum = "bounded/conversio-lista-to-tensor.fab"
+expected = true
+note = "batch 1 (bc40c951): runner-proven (list<f32,8> ↦ tf32[8]; shape/sum/lanes pinned)"
 
 [[cells]]
 id = "bconv.octeti-to-textus"
 family = "bounded-conversio"
-cell = "octeti<N> ↦ textus (UNSETTLED)"
+cell = "octeti<N> ↦ textus"
 status = "bare"
-note = "neither admit nor decline documented anywhere"
+note = "probe 2026-08-25 (bc40c951): REJECT SEM016:unsupported_conversio"
 
 [[cells]]
 id = "bconv.octeti-to-octeti"
 family = "bounded-conversio"
-cell = "octeti<N> ↦ octeti<M> (UNSETTLED)"
+cell = "octeti<N> ↦ octeti<M>"
 status = "bare"
-note = "neither admit nor decline documented anywhere"
+note = "probe 2026-08-25 (bc40c951): REJECT SEM016:unsupported_conversio (direct literal ↦ over-capacity also declines)"
 
 [[cells]]
 id = "bconv.octeti-to-lista"
 family = "bounded-conversio"
-cell = "octeti<N> ↦ lista<u8> (UNSETTLED)"
+cell = "octeti<N> ↦ lista<u8>"
 status = "bare"
-note = "neither admit nor decline documented anywhere"
+note = "probe 2026-08-25 (bc40c951): ADMIT at check; runner lacks bounded octeti carrier (UnsupportedMir)"
 
 [[cells]]
 id = "bconv.textus-to-bounded-textus"
 family = "bounded-conversio"
-cell = "textus<N> ↦ textus<M> (UNSETTLED)"
+cell = "textus<N> ↦ textus<M>"
 status = "bare"
-note = "neither admit nor decline documented anywhere"
+note = "probe 2026-08-25 (bc40c951): REJECT SEM016:unsupported_conversio"
 
 [[cells]]
 id = "bconv.textus-to-ascii"
 family = "bounded-conversio"
-cell = "textus<N> ↦ ascii<M> (UNSETTLED)"
+cell = "textus<N> ↦ ascii<M>"
 status = "bare"
-note = "neither admit nor decline documented anywhere"
+note = "probe 2026-08-25 (bc40c951): REJECT SEM016:unsupported_conversio"
 
 [[cells]]
 id = "bconv.textus-to-octeti"
 family = "bounded-conversio"
-cell = "textus<N> ↦ octeti<N> (UNSETTLED)"
+cell = "textus<N> ↦ octeti<N>"
 status = "bare"
-note = "neither admit nor decline documented anywhere"
+note = "probe 2026-08-25 (bc40c951): REJECT SEM016:unsupported_conversio"
 
 [[cells]]
 id = "bconv.lista-to-bounded-textus"
 family = "bounded-conversio"
-cell = "lista<T,N> ↦ textus<M> (UNSETTLED)"
+cell = "lista<T,N> ↦ textus<M>"
 status = "bare"
-note = "neither admit nor decline documented anywhere"
+note = "probe 2026-08-25 (bc40c951): ADMIT at check; runner lacks bounded textus carrier (UnsupportedMir)"
 
 [[cells]]
 id = "bconv.lista-to-bounded-lista"
 family = "bounded-conversio"
-cell = "lista<T,N> ↦ lista<T,M> (UNSETTLED)"
+cell = "lista<T,N> ↦ lista<T,M>"
 status = "bare"
-note = "neither admit nor decline documented anywhere"
+note = "probe 2026-08-25 (bc40c951): ADMIT at check (shrink + grow); runner lacks runtime conversio to BoundedArray (UnsupportedMir)"
 
 [[cells]]
 id = "bconv.lista-to-octeti"
 family = "bounded-conversio"
-cell = "lista<T,N> ↦ octeti<M> (UNSETTLED)"
+cell = "lista<T,N> ↦ octeti<M>"
 status = "bare"
-note = "neither admit nor decline documented anywhere"
+note = "probe 2026-08-25 (bc40c951): ADMIT at check; runner lacks bounded octeti carrier (UnsupportedMir)"
 
 # =============================================================================
 # annotations (8 cells: 6 direct / 2 bare)
