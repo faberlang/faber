@@ -446,8 +446,9 @@ fn collect_expr_defs(
             }
             collect_block_defs(body, registry);
         }
-        // NR-2 traversal (nary-range-walk): the product registers its binder
-        // defs and walks ranges/body; dedicated FHIR proofs land with NR-5.
+        // NR-5 (nary-range-walk): the product registers its binder defs —
+        // they are definition sites, so in-body binder paths resolve — then
+        // walks ranges and body.
         HirExpressionKind::IteraRange {
             ranges,
             bindings,
@@ -776,8 +777,8 @@ fn collect_hir_registry(artifact: &HirArtifact) -> FxHashSet<radix_hir::HirId> {
                 }
                 collect_block(body, registry);
             }
-            // NR-2 traversal (nary-range-walk): walk product ranges/body;
-            // dedicated FHIR proofs land with NR-5.
+            // NR-5 (nary-range-walk): collect the product's range and body
+            // HirIds into the membership registry.
             HirExpressionKind::IteraRange { ranges, body, .. } => {
                 for range in ranges {
                     collect_expr(range, registry);
@@ -1600,9 +1601,9 @@ pub(crate) fn validate_referential_integrity(
                 }
                 validate_block(body, check_symbol, check_def, check_hir, check_type)?;
             }
-            // NR-2 traversal (nary-range-walk): validate product binder
-            // defs/symbols and ranges/body; dedicated FHIR proofs land with
-            // NR-5.
+            // NR-5 (nary-range-walk): validate product binder defs/symbols
+            // and ranges/body; dangling binder indices fail closed through
+            // the shared DanglingIndex path.
             HirExpressionKind::IteraRange {
                 ranges,
                 bindings,
