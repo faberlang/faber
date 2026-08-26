@@ -950,6 +950,46 @@ pub(super) struct NominalImportContext<'a> {
     pub source_names: &'a HashMap<DefId, (InterfaceNominalKind, String)>,
     /// Previously interned sibling/library nominals keyed by (kind, name).
     pub shared_nominals: &'a HashMap<(InterfaceNominalKind, String), TypeId>,
+    /// Source param symbol → merged-interner symbol. Param symbols are
+    /// interner-local; without the by-name re-intern a generic size literal
+    /// (`Param("2")`) lands as the merged interner's unrelated symbol and
+    /// forwarded type args on merged generic calls garble.
+    pub param_symbols: &'a HashMap<Symbol, Symbol>,
+}
+
+/// Pre-intern every `Type::Param` and `IndexExpr::Param` symbol of a source
+/// type table into the merged interner. Generated identity tokens outside
+/// the source string table stay as-is (same guard as
+/// [`remap_optional_symbol`]).
+pub(super) fn intern_param_symbols(
+    source_types: &TypeTable,
+    source_interner: &Interner,
+    target_interner: &mut Interner,
+) -> HashMap<Symbol, Symbol> {
+    let mut map = HashMap::new();
+    let mut intern_by_name = |symbol: Symbol| -> Symbol {
+        if symbol.0 as usize >= source_interner.strings().len() {
+            return symbol;
+        }
+        target_interner.intern(source_interner.resolve(symbol))
+    };
+    for index in 0..source_types.type_count() {
+        if let Type::Param(symbol) = source_types.get(TypeId(index as u32)) {
+            let remapped = intern_by_name(*symbol);
+            map.insert(*symbol, remapped);
+        }
+    }
+    // Shape dims (`tensor<f32, [D, Q]>`) are index params, a separate symbol
+    // population from type params; remap both by name.
+    for index in 0..source_types.index_count() {
+        if let IndexExpr::Param(symbol) =
+            source_types.get_index(radix_module::semantic::IndexId(index as u32))
+        {
+            let remapped = intern_by_name(*symbol);
+            map.insert(*symbol, remapped);
+        }
+    }
+    map
 }
 
 /// Build the canonical nominal remap for one source unit (sibling or linked
@@ -1239,31 +1279,31 @@ pub(super) fn import_semantic_type_with_nominal(
         Type::BoundedArray { element, capacity } => {
             let element =
                 import_semantic_type_with_nominal(source, target, element, imported, nominal);
-            let capacity = import_index_expr(source, target, capacity);
+            let capacity = import_index_expr_with_nominal(source, target, capacity, nominal);
             target.bounded_array(element, capacity)
         }
         Type::BoundedQueue { element, capacity } => {
             let element =
                 import_semantic_type_with_nominal(source, target, element, imported, nominal);
-            let capacity = import_index_expr(source, target, capacity);
+            let capacity = import_index_expr_with_nominal(source, target, capacity, nominal);
             target.bounded_queue(element, capacity)
         }
         Type::BoundedStack { element, capacity } => {
             let element =
                 import_semantic_type_with_nominal(source, target, element, imported, nominal);
-            let capacity = import_index_expr(source, target, capacity);
+            let capacity = import_index_expr_with_nominal(source, target, capacity, nominal);
             target.bounded_stack(element, capacity)
         }
         Type::BoundedTextus { capacity } => {
-            let capacity = import_index_expr(source, target, capacity);
+            let capacity = import_index_expr_with_nominal(source, target, capacity, nominal);
             target.bounded_textus(capacity)
         }
         Type::BoundedAscii { capacity } => {
-            let capacity = import_index_expr(source, target, capacity);
+            let capacity = import_index_expr_with_nominal(source, target, capacity, nominal);
             target.bounded_ascii(capacity)
         }
         Type::BoundedOcteti { capacity } => {
-            let capacity = import_index_expr(source, target, capacity);
+            let capacity = import_index_expr_with_nominal(source, target, capacity, nominal);
             target.bounded_octeti(capacity)
         }
         Type::Map(key, value) => {
@@ -1320,22 +1360,22 @@ pub(super) fn import_semantic_type_with_nominal(
         }
         Type::Tensor(inner, shape) => {
             let inner = import_semantic_type_with_nominal(source, target, inner, imported, nominal);
-            let shape = import_index_expr(source, target, shape);
+            let shape = import_index_expr_with_nominal(source, target, shape, nominal);
             target.tensor_with_shape(inner, shape)
         }
         Type::Vector(inner, width) => {
             let inner = import_semantic_type_with_nominal(source, target, inner, imported, nominal);
-            let width = import_index_expr(source, target, width);
+            let width = import_index_expr_with_nominal(source, target, width, nominal);
             target.vector_with_width(inner, width)
         }
         Type::Matrix(inner, shape) => {
             let inner = import_semantic_type_with_nominal(source, target, inner, imported, nominal);
-            let shape = import_index_expr(source, target, shape);
+            let shape = import_index_expr_with_nominal(source, target, shape, nominal);
             target.matrix_with_shape(inner, shape)
         }
         Type::Sparsa(inner, shape) => {
             let inner = import_semantic_type_with_nominal(source, target, inner, imported, nominal);
-            let shape = import_index_expr(source, target, shape);
+            let shape = import_index_expr_with_nominal(source, target, shape, nominal);
             target.sparsa_with_shape(inner, shape)
         }
         Type::Atomic(inner) => {
@@ -1382,9 +1422,9 @@ pub(super) fn import_semantic_type_with_nominal(
                     radix_types::AppliedArg::Type(id) => radix_types::AppliedArg::Type(
                         import_semantic_type_with_nominal(source, target, id, imported, nominal),
                     ),
-                    radix_types::AppliedArg::Size(id) => {
-                        radix_types::AppliedArg::Size(import_index_expr(source, target, id))
-                    }
+                    radix_types::AppliedArg::Size(id) => radix_types::AppliedArg::Size(
+                        import_index_expr_with_nominal(source, target, id, nominal),
+                    ),
                 })
                 .collect();
             target.intern(Type::Applied(base, args))
@@ -1433,11 +1473,19 @@ pub(super) fn import_semantic_type_with_nominal(
                 }
             })
         }
-        other @ (Type::Param(_)
-        | Type::Infer(_)
-        | Type::InferUnion(_)
-        | Type::MarkerHole { .. }
-        | Type::Error) => target.intern(other),
+        // Param symbols are interner-local: a generic size literal interned
+        // as `Param("2")` in the source unit would land as the merged
+        // interner's unrelated symbol 2 without a by-name re-intern, garbling
+        // forwarded type args on merged generic calls.
+        Type::Param(symbol) => {
+            let remapped = nominal
+                .and_then(|ctx| ctx.param_symbols.get(&symbol).copied())
+                .unwrap_or(symbol);
+            target.intern(Type::Param(remapped))
+        }
+        other @ (Type::Infer(_) | Type::InferUnion(_) | Type::MarkerHole { .. } | Type::Error) => {
+            target.intern(other)
+        }
     };
     imported.insert(ty, imported_ty);
     imported_ty
@@ -1470,13 +1518,33 @@ pub(super) fn import_index_expr(
     target: &mut TypeTable,
     index: radix_module::semantic::IndexId,
 ) -> radix_module::semantic::IndexId {
+    import_index_expr_with_nominal(source, target, index, None)
+}
+
+/// Index-param symbols are interner-local exactly like [`Type::Param`]
+/// symbols: a shape `tensor<f32, [D, Q]>` imported with the source unit's
+/// raw symbol ids aliases unrelated merged strings (garbage dims after
+/// instantiation). Re-intern `Param` dims by name through the import
+/// context's precomputed map.
+pub(super) fn import_index_expr_with_nominal(
+    source: &TypeTable,
+    target: &mut TypeTable,
+    index: radix_module::semantic::IndexId,
+    nominal: Option<&NominalImportContext<'_>>,
+) -> radix_module::semantic::IndexId {
     match source.get_index(index).clone() {
         IndexExpr::Tuple(items) => {
             let items = items
                 .into_iter()
-                .map(|item| import_index_expr(source, target, item))
+                .map(|item| import_index_expr_with_nominal(source, target, item, nominal))
                 .collect();
             target.intern_index(IndexExpr::Tuple(items))
+        }
+        IndexExpr::Param(symbol) => {
+            let remapped = nominal
+                .and_then(|ctx| ctx.param_symbols.get(&symbol).copied())
+                .unwrap_or(symbol);
+            target.intern_index(IndexExpr::Param(remapped))
         }
         other => target.intern_index(other),
     }

@@ -574,7 +574,14 @@ impl<'a> TypeChecker<'a> {
     }
 
     pub fn collect_imported_file_structs(&mut self) {
-        for (def_id, fields, methods, _type_params) in self.resolver.imported_file_structs() {
+        for (def_id, fields, methods, type_params) in self.resolver.imported_file_structs() {
+            // Imported generic structs substitute construction size args into
+            // field types exactly like local ones (S0-G1); without this entry
+            // `check_struct_fields` leaves `tensor<f32, [D]>` rigid and every
+            // same-shape initializer fires SEM010.
+            if !type_params.is_empty() {
+                self.type_params_by_def.insert(def_id, type_params);
+            }
             let fields = fields
                 .into_iter()
                 .map(|field| {

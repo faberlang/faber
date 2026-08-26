@@ -18,14 +18,23 @@ use crate::mir::generic::{
 };
 use crate::mir::{
     type_contains_param, MirCallee, MirFunction, MirFunctionId, MirGenericBindings, MirMonomorphization,
-    MirMonomorphizationKey, MirOperand, MirPlace, MirPlaceBase, MirProgram, MirStatementKind, MirTerminatorKind,
-    MirType,
+    MirMonomorphizationKey, MirOperand, MirPlace, MirPlaceBase, MirProgram, MirProjection, MirStatementKind,
+    MirTerminatorKind, MirType,
 };
 use crate::semantic::{IndexExpr, Primitive, Type, TypeTable};
 use rustc_hash::{FxHashMap, FxHashSet};
+use std::collections::HashMap;
 
 const MAX_PACKAGE_MONOMORPHIZATIONS: usize = 64;
 const UNRESOLVED_SHAPE_SIZE_SURVIVOR: &str = "unresolved shape-size constant survives monomorphization";
+
+/// Merged struct metadata for typing projected operands during package
+/// generic instantiation (`layer.ln1` on an applied nominal needs the field
+/// type substituted by the applied size args, not the container type).
+pub struct PackageStructMetadata<'a> {
+    pub struct_fields: &'a HashMap<DefId, HashMap<crate::lexer::Symbol, MirType>>,
+    pub struct_type_params: &'a HashMap<DefId, Vec<crate::lexer::Symbol>>,
+}
 
 /// Instantiate remaining generic `Definition` callees in a merged package
 /// program, distinguishing instances by [`MirMonomorphizationKey`] shape args.
@@ -43,6 +52,7 @@ pub fn instantiate_merged_generic_calls(
     generic_params: &[(DefId, Vec<MirGenericParam>)],
     types: &mut TypeTable,
     interner: &Interner,
+    struct_metadata: Option<&PackageStructMetadata<'_>>,
 ) -> Result<Vec<MirMonomorphization>, Vec<MirError>> {
     if templates.is_empty() {
         return Ok(Vec::new());
@@ -50,6 +60,7 @@ pub fn instantiate_merged_generic_calls(
     let mut state = PackageInstantiate {
         types,
         interner,
+        struct_metadata,
         templates: templates
             .iter()
             .filter_map(|template| template.source.map(|source| (source, template.clone())))
@@ -89,6 +100,7 @@ fn next_function_id(functions: &[MirFunction]) -> MirFunctionId {
 struct PackageInstantiate<'a> {
     types: &'a mut TypeTable,
     interner: &'a Interner,
+    struct_metadata: Option<&'a PackageStructMetadata<'a>>,
     templates: FxHashMap<DefId, MirFunction>,
     generic_params: FxHashMap<DefId, Vec<MirGenericParam>>,
     instance_index: FxHashMap<MirMonomorphizationKey, MirFunctionId>,
@@ -590,6 +602,20 @@ impl PackageInstantiate<'_> {
                             Some(ty) => ty,
                             None => return false,
                         };
+                        // Conversions carry their own source/target payload
+                        // types; leaving them pre-substitution fails the
+                        // validator against the substituted operand (same
+                        // rule as the unit monomorphizer).
+                        if let crate::mir::MirIntrinsic::Convert(conversion) = &mut call.intrinsic {
+                            conversion.source_ty = match self.substitute_ty(conversion.source_ty, bindings, span) {
+                                Some(ty) => ty,
+                                None => return false,
+                            };
+                            conversion.target_ty = match self.substitute_ty(conversion.target_ty, bindings, span) {
+                                Some(ty) => ty,
+                                None => return false,
+                            };
+                        }
                     }
                     MirStatementKind::Construct { aggregate, .. } => {
                         aggregate.ty = match self.substitute_ty(aggregate.ty, bindings, span) {
@@ -664,7 +690,7 @@ impl PackageInstantiate<'_> {
     }
 
     fn place_ty(&mut self, place: &MirPlace, scope: &FunctionTypeScope, span: Span) -> Option<MirType> {
-        match place.base {
+        let mut ty = match place.base {
             MirPlaceBase::Local(id) => scope.locals.get(&id).copied(),
             MirPlaceBase::Temp(id) => scope.temps.get(&id).copied(),
         }
@@ -672,7 +698,66 @@ impl PackageInstantiate<'_> {
             self.errors
                 .push(MirError::validation(span, "undefined place in generic call"));
             None
-        })
+        })?;
+        for projection in &place.projections {
+            ty = self.projection_ty(ty, projection, span)?;
+        }
+        Some(ty)
+    }
+
+    /// Field projections resolve through merged struct metadata (an applied
+    /// nominal substitutes its size args into the field type). Other
+    /// projection kinds carry no recoverable type in this pass; the caller
+    /// skips witness binding from them.
+    fn projection_ty(&mut self, base_ty: MirType, projection: &MirProjection, span: Span) -> Option<MirType> {
+        match projection {
+            MirProjection::Field(field) => self.field_projection_ty(base_ty, *field, span),
+            _ => None,
+        }
+    }
+
+    fn field_projection_ty(&mut self, base_ty: MirType, field: crate::lexer::Symbol, span: Span) -> Option<MirType> {
+        let metadata = self.struct_metadata?;
+        match self.types.get(base_ty.semantic_id()) {
+            Type::Struct(def_id) => metadata
+                .struct_fields
+                .get(def_id)
+                .and_then(|fields| fields.get(&field))
+                .copied(),
+            Type::Applied(base, args) => {
+                let Type::Struct(def_id) = self.types.get(*base) else {
+                    return None;
+                };
+                let field_ty = metadata
+                    .struct_fields
+                    .get(def_id)
+                    .and_then(|fields| fields.get(&field))
+                    .copied()?;
+                let Some(params) = metadata.struct_type_params.get(def_id) else {
+                    return Some(field_ty);
+                };
+                let mut type_bindings = MirGenericBindings::default();
+                let mut shape_bindings = MirShapeBindings::default();
+                for (param, arg) in params.iter().zip(args.iter()) {
+                    match arg {
+                        radix_types::AppliedArg::Type(witness) => {
+                            type_bindings.insert(*param, MirType::semantic(*witness));
+                        }
+                        radix_types::AppliedArg::Size(index) => {
+                            shape_bindings.insert(*param, *index);
+                        }
+                    }
+                }
+                instantiate_generic_type_with_shapes(self.types, field_ty, &type_bindings, &shape_bindings, span)
+                    .map_err(|error| {
+                        self.errors
+                            .push(MirError::validation(error.span, error.message));
+                    })
+                    .ok()
+            }
+            Type::Alias(_, target) => self.field_projection_ty(MirType::semantic(*target), field, span),
+            _ => None,
+        }
     }
 
     fn constant_ty(&self, constant: &crate::mir::MirConstant, _span: Span) -> Option<MirType> {
@@ -800,6 +885,23 @@ fn finalize_function(
                             Some(ty) => ty,
                             None => return false,
                         };
+                    // Conversions carry their own source/target payload
+                    // types; finalize them with the same shape bindings as
+                    // the operands (unit `finalize_statement_shapes` parity).
+                    if let crate::mir::MirIntrinsic::Convert(conversion) = &mut call.intrinsic {
+                        conversion.source_ty =
+                            match finalize_ty(types, conversion.source_ty, type_bindings, shape_bindings, span, errors)
+                            {
+                                Some(ty) => ty,
+                                None => return false,
+                            };
+                        conversion.target_ty =
+                            match finalize_ty(types, conversion.target_ty, type_bindings, shape_bindings, span, errors)
+                            {
+                                Some(ty) => ty,
+                                None => return false,
+                            };
+                    }
                 }
                 MirStatementKind::Construct { aggregate, .. } => {
                     aggregate.ty = match finalize_ty(types, aggregate.ty, type_bindings, shape_bindings, span, errors) {

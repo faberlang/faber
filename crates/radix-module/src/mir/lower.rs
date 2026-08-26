@@ -79,7 +79,7 @@ mod stmt;
 use context::{function_param_map, struct_field_map, LoweringContextMaps};
 use expr::HirExpressionLoweringVisitor;
 use item::ItemLoweringPass;
-pub use package_instantiate::instantiate_merged_generic_calls;
+pub use package_instantiate::{instantiate_merged_generic_calls, PackageStructMetadata};
 
 /// Developer-facing MIR lowering diagnostic.
 ///

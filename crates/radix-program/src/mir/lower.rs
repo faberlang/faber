@@ -25,6 +25,16 @@ pub(super) struct RemappedValidation {
 }
 
 impl RemappedValidation {
+    /// Merged struct metadata for the package generic instantiator: field
+    /// types and generic param names let it type projected call arguments
+    /// (`layer.ln1` on an applied nominal) while binding witnesses.
+    pub(super) fn struct_metadata(&self) -> radix_module::mir::PackageStructMetadata<'_> {
+        radix_module::mir::PackageStructMetadata {
+            struct_fields: &self.struct_fields,
+            struct_type_params: &self.struct_type_params,
+        }
+    }
+
     fn merge(&mut self, other: &Self) {
         union_field_maps(&mut self.struct_fields, &other.struct_fields);
         for (def, params) in &other.struct_type_params {
@@ -755,11 +765,17 @@ pub(super) fn lower_package_units<'a>(
         let mut def_remap = nominal_def_remap.clone();
         def_remap.extend(variant_remap.iter().map(|(key, dest)| (*key, *dest)));
         let source_to_entry_types = {
+            let param_symbols = super::intern_param_symbols(
+                lowered.validated.validation().types,
+                &lowered.interner,
+                &mut entry.analysis.interner,
+            );
             let nominal = NominalImportContext {
                 nominal_map: &nominal_map,
                 def_remap: &def_remap,
                 source_names: &source_names,
                 shared_nominals: &shared_nominals,
+                param_symbols: &param_symbols,
             };
             import_lowered_semantic_types(
                 lowered.validated.validation().types,
@@ -944,11 +960,17 @@ pub(super) fn lower_package_units<'a>(
                 let mut def_remap = nominal_def_remap.clone();
                 def_remap.extend(variant_remap.iter().map(|(key, dest)| (*key, *dest)));
                 let source_to_entry_types = {
+                    let param_symbols = super::intern_param_symbols(
+                        lowered.validated.validation().types,
+                        &lowered.interner,
+                        &mut entry.analysis.interner,
+                    );
                     let nominal = NominalImportContext {
                         nominal_map: &nominal_map,
                         def_remap: &def_remap,
                         source_names: &source_names,
                         shared_nominals: &shared_nominals,
+                        param_symbols: &param_symbols,
                     };
                     import_lowered_semantic_types(
                         lowered.validated.validation().types,
@@ -1223,11 +1245,14 @@ fn transplant_data_member(
     let empty_def_remap = HashMap::new();
     let empty_source_names = HashMap::new();
     let empty_shared_nominals = HashMap::new();
+    let param_symbols =
+        super::intern_param_symbols(source_types, source_interner, &mut target.analysis.interner);
     let nominal = NominalImportContext {
         nominal_map: &nominal_map,
         def_remap: &empty_def_remap,
         source_names: &empty_source_names,
         shared_nominals: &empty_shared_nominals,
+        param_symbols: &param_symbols,
     };
     let konst = HirConst {
         name: remap_symbol(
@@ -1742,6 +1767,15 @@ fn remap_templates_text_symbols(lowered: &mut LoweredMirUnit<'_>, target: &mut I
     for template in &mut lowered.generic_templates {
         remap_function_text_symbols(template, &source, target);
     }
+    // Generic param names must land in the merged interner too: template
+    // shape params re-intern by name on type import, so shape-binding keys
+    // (param names) and template shape symbols have to agree on one table.
+    for (_, params) in &mut lowered.generic_params {
+        for param in params {
+            param.name =
+                remap_optional_symbol(Some(param.name), &source, target).unwrap_or(param.name);
+        }
+    }
 }
 
 fn rewrite_generic_identity(
@@ -1789,6 +1823,9 @@ fn instantiate_package_generics(
         &generic_params,
         &mut types,
         &merged.interner,
+        extra_validation
+            .map(|validation| validation.struct_metadata())
+            .as_ref(),
     )
     .map_err(|errors| {
         errors
@@ -1839,6 +1876,15 @@ fn rewrite_function_type_ids(function: &mut MirFunction, rewrites: &[(TypeId, Ty
         for statement in &mut block.statements {
             rewrite_statement_type_id(statement, rewrites);
         }
+        if let MirTerminatorKind::TryCall { callee, .. } = &mut block.terminator.kind {
+            // Failable generic callees carry the same imported-unit type
+            // args as direct calls; rewrite them on the try edge too.
+            if let MirCallee::Definition { type_args, .. } = callee {
+                for type_arg in type_args {
+                    rewrite_type_id(type_arg, rewrites);
+                }
+            }
+        }
     }
 }
 
@@ -1854,7 +1900,17 @@ pub(super) fn rewrite_statement_type_id(
 ) {
     match &mut statement.kind {
         MirStatementKind::Assign { value, .. } => rewrite_value_type_id(value, rewrites),
-        MirStatementKind::Call { .. } => {}
+        MirStatementKind::Call { callee, .. } => {
+            // A generic callee's explicit type args are semantic types from
+            // the imported unit's table; unrewritten ids alias unrelated
+            // entry types after the merge (size literals become arbitrary
+            // shapes and monomorphization rejects the kind).
+            if let MirCallee::Definition { type_args, .. } = callee {
+                for type_arg in type_args {
+                    rewrite_type_id(type_arg, rewrites);
+                }
+            }
+        }
         MirStatementKind::RuntimeCall { call, .. } => {
             rewrite_type_id(&mut call.return_ty, rewrites);
             if let MirIntrinsic::Convert(conversion) = &mut call.intrinsic {

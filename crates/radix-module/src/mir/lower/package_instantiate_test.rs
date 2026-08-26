@@ -38,6 +38,7 @@ fn substitute_function_rewrites_generic_call_type_args() {
     let mut state = PackageInstantiate {
         types: &mut types,
         interner: &interner,
+        struct_metadata: None,
         templates: FxHashMap::default(),
         generic_params: FxHashMap::default(),
         instance_index: FxHashMap::default(),

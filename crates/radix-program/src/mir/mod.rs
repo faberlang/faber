@@ -605,6 +605,9 @@ mod mixed_shape_link_tests;
 mod method_call_mir_tests;
 
 #[cfg(test)]
+#[path = "monomorphized_field_assign_link_test.rs"]
+mod monomorphized_field_assign_link_tests;
+#[cfg(test)]
 #[path = "namespace_type_arg_link_test.rs"]
 mod namespace_type_arg_link_tests;
 

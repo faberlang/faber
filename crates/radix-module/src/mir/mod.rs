@@ -66,7 +66,7 @@ pub use llvm_text::{
 pub use lower::prepare_mir_lowering_interner;
 pub use lower::{
     dump_analyzed_unit, instantiate_merged_generic_calls, lower_analyzed_unit, LoweredMirUnit, MirError,
-    MirGenericParam, MirLoweringOptions, MirRuntimeRecordField, MirRuntimeRecordValue,
+    MirGenericParam, MirLoweringOptions, MirRuntimeRecordField, MirRuntimeRecordValue, PackageStructMetadata,
 };
 #[cfg(feature = "mir-metal")]
 pub use metal_text::{
@@ -165,8 +165,9 @@ pub use radix_mir::{
 };
 #[cfg(feature = "runner")]
 pub use runner::{
-    classify_runner_lowerability, run_analyzed, run_entry, run_function, run_function_with_limits, run_function_with_step_budget, run_source,
-    runner_dispatch_status, BufferHost, Host, RunSourceError, RunnerDispatchStatus, RunnerError, StdioHost, Value,
+    classify_runner_lowerability, run_analyzed, run_entry, run_function, run_function_with_limits,
+    run_function_with_step_budget, run_source, runner_dispatch_status, BufferHost, Host, RunSourceError,
+    RunnerDispatchStatus, RunnerError, StdioHost, Value,
 };
 #[cfg(feature = "mir-sexp")]
 pub use sexp_text::{classify_sexp_lowerability, emit_sexp_text, MirSexpTextProbeError};
