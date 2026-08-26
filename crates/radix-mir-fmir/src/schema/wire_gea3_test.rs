@@ -90,13 +90,7 @@ fn degenerate_geometry_fails_closed() {
     let error = admit(&overlap, 76 * 64, 76 * 32, false).unwrap_err();
     assert!(error.contains("pitch"), "{error}");
     // Saturating geometry.
-    let saturated = window(
-        0,
-        u64::MAX,
-        2,
-        u64::MAX,
-        u64::MAX,
-    );
+    let saturated = window(0, u64::MAX, 2, u64::MAX, u64::MAX);
     assert!(admit(&saturated, u64::MAX, u64::MAX, false).is_err());
 }
 

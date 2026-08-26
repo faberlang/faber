@@ -1008,9 +1008,10 @@ impl<H: Host + ?Sized> Runner<'_, H> {
                 }
                 MirPlaceBase::Local(_) => None,
             },
-            MirOperand::Value(id) => {
-                self.value_types.get(&(self.frames.last()?.function, *id)).copied()
-            }
+            MirOperand::Value(id) => self
+                .value_types
+                .get(&(self.frames.last()?.function, *id))
+                .copied(),
             MirOperand::Constant(_) => None,
         }?;
         Self::element_float_width(ty.semantic_id(), self.types, 0)

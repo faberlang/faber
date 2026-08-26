@@ -231,7 +231,8 @@ fn negative_signed_to_unsigned_conversion_fails_closed() {
     let error = run_conversion(i32.clone(), u32.clone(), Value::Int(-2))
         .expect_err("negative signed value has no unsigned carrier");
     assert_eq!(
-        error.issue, "runner_numerus_to_numerus_conversion_out_of_range",
+        error.issue,
+        "runner_numerus_to_numerus_conversion_out_of_range",
     );
     assert_eq!(
         run_conversion(i32, u32, Value::Int(5)).expect("non-negative converts"),
