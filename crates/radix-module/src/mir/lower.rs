@@ -53,7 +53,7 @@ use crate::mir::{
     MirSwitchCase, MirTemp, MirTempId, MirTerminator, MirTerminatorKind, MirType, MirTypeCheckOp, MirUnOp,
     MirValidationContext, MirValue, MirValueId, MirValueKind, ValidatedMir,
 };
-use crate::semantic::{IndexExpr, NumericWidth, Primitive, Type, TypeId, TypeTable};
+use crate::semantic::{ConversionPair, IndexExpr, NumericWidth, Primitive, Type, TypeId, TypeTable};
 use radix_types::{MirCollectionOp, MirKernelBuiltin};
 use rustc_hash::{FxHashMap, FxHashSet};
 use std::sync::Arc;
@@ -1315,9 +1315,11 @@ struct FunctionBuilderContext<'a> {
     enum_type_params: Arc<FxHashMap<DefId, Vec<Symbol>>>,
     variant_fields: Arc<FxHashMap<DefId, Vec<crate::lexer::Symbol>>>,
     variant_field_tys: Arc<FxHashMap<DefId, FxHashMap<crate::lexer::Symbol, MirType>>>,
-    /// Declared error-conversion arms keyed by `(destination enum def, source
-    /// error type)`: each `@ conversion <source> err { … }` arm on a union.
-    conversion_arms: Arc<FxHashMap<(DefId, TypeId), DefId>>,
+    /// Registry conversion rows keyed by ordered pair `(source →
+    /// destination)`: the coherence registry's user rows (CTR-06). The
+    /// failable-call recovery path uses these to re-select the registered
+    /// function when a package rewrite dropped the call-site conversion.
+    conversion_rows: Arc<FxHashMap<ConversionPair, DefId>>,
     sermo_def: Option<DefId>,
     meus_def: Option<DefId>,
     tuus_def: Option<DefId>,
@@ -1377,7 +1379,7 @@ impl<'a> FunctionBuilderContext<'a> {
             enum_type_params: Arc::new(FxHashMap::default()),
             variant_fields: Arc::new(FxHashMap::default()),
             variant_field_tys: Arc::new(FxHashMap::default()),
-            conversion_arms: Arc::new(FxHashMap::default()),
+            conversion_rows: Arc::new(FxHashMap::default()),
             sermo_def: None,
             meus_def: None,
             tuus_def: None,

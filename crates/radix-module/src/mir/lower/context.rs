@@ -70,7 +70,7 @@ struct FrozenMaps<'a> {
     enum_type_params: Arc<FxHashMap<DefId, Vec<Symbol>>>,
     variant_fields: Arc<FxHashMap<DefId, Vec<Symbol>>>,
     variant_field_tys: Arc<FxHashMap<DefId, FxHashMap<Symbol, MirType>>>,
-    conversion_arms: Arc<FxHashMap<(DefId, TypeId), DefId>>,
+    conversion_rows: Arc<FxHashMap<ConversionPair, DefId>>,
     top_level_consts: Arc<FxHashMap<DefId, &'a HirConst>>,
     /// Producer-side defaults for imported class fields, keyed by importer-local type.
     imported_struct_defaults: Arc<FxHashMap<DefId, Vec<(Symbol, HirExpression)>>>,
@@ -99,9 +99,10 @@ pub(super) struct LoweringContextMaps<'a> {
     enum_type_params: FxHashMap<DefId, Vec<Symbol>>,
     variant_fields: FxHashMap<DefId, Vec<Symbol>>,
     variant_field_tys: FxHashMap<DefId, FxHashMap<Symbol, MirType>>,
-    /// Declared error-conversion arms keyed by `(destination enum def, source
-    /// error type)`: each `@ conversion <source> err { … }` arm on a union.
-    conversion_arms: FxHashMap<(DefId, TypeId), DefId>,
+    /// Coherence-registry conversion rows keyed by ordered pair
+    /// `(source → destination)` (CTR-06). Populated from the analyzed
+    /// unit's resolver — the one semantic registry — not from HIR shape.
+    conversion_rows: FxHashMap<ConversionPair, DefId>,
     sermo_def: Option<DefId>,
     meus_def: Option<DefId>,
     tuus_def: Option<DefId>,
@@ -153,7 +154,7 @@ impl<'a> LoweringContextMaps<'a> {
             enum_type_params: FxHashMap::default(),
             variant_fields: FxHashMap::default(),
             variant_field_tys: FxHashMap::default(),
-            conversion_arms: FxHashMap::default(),
+            conversion_rows: FxHashMap::default(),
             sermo_def: None,
             meus_def: None,
             tuus_def: None,
@@ -179,7 +180,7 @@ impl<'a> LoweringContextMaps<'a> {
                 enum_type_params: Arc::new(FxHashMap::default()),
                 variant_fields: Arc::new(FxHashMap::default()),
                 variant_field_tys: Arc::new(FxHashMap::default()),
-                conversion_arms: Arc::new(FxHashMap::default()),
+                conversion_rows: Arc::new(FxHashMap::default()),
                 top_level_consts: Arc::new(FxHashMap::default()),
                 imported_struct_defaults: Arc::new(FxHashMap::default()),
                 provider_imports: Arc::new(FxHashMap::default()),
@@ -215,6 +216,7 @@ impl<'a> LoweringContextMaps<'a> {
         };
         maps.record_package_import_identities(unit);
         maps.visit_program(&unit.hir);
+        maps.record_conversion_rows(unit);
         for item in unit.libraries.items.values() {
             maps.record_library_item_identity(item);
         }
@@ -238,7 +240,7 @@ impl<'a> LoweringContextMaps<'a> {
             enum_type_params: Arc::new(core::mem::take(&mut maps.enum_type_params)),
             variant_fields: Arc::new(core::mem::take(&mut maps.variant_fields)),
             variant_field_tys: Arc::new(core::mem::take(&mut maps.variant_field_tys)),
-            conversion_arms: Arc::new(core::mem::take(&mut maps.conversion_arms)),
+            conversion_rows: Arc::new(core::mem::take(&mut maps.conversion_rows)),
             top_level_consts: Arc::new(core::mem::take(&mut maps.top_level_consts)),
             imported_struct_defaults: Arc::new(core::mem::take(&mut maps.imported_struct_defaults)),
             provider_imports: Arc::new(core::mem::take(&mut maps.provider_imports)),
@@ -290,7 +292,7 @@ impl<'a> LoweringContextMaps<'a> {
             enum_type_params: Arc::clone(&self.frozen.enum_type_params),
             variant_fields: Arc::clone(&self.frozen.variant_fields),
             variant_field_tys: Arc::clone(&self.frozen.variant_field_tys),
-            conversion_arms: Arc::clone(&self.frozen.conversion_arms),
+            conversion_rows: Arc::clone(&self.frozen.conversion_rows),
             sermo_def: self.sermo_def,
             meus_def: self.meus_def,
             tuus_def: self.tuus_def,
@@ -581,6 +583,20 @@ impl<'a> LoweringContextMaps<'a> {
         }
     }
 
+    /// Collect the coherence registry's user rows into the pair → function
+    /// table used by failable-call error recovery (CTR-06). The resolver's
+    /// registry is the one authority — the destination enum no longer owns
+    /// conversion shape. Builtin rows carry no callable and are skipped;
+    /// first enrollment wins a pair, matching the registry's
+    /// duplicate-rejecting insertion order.
+    fn record_conversion_rows(&mut self, unit: &AnalyzedModule) {
+        for row in unit.resolver.conversion_rows() {
+            if let Some(fn_def_id) = row.fn_def_id {
+                self.conversion_rows.entry(row.pair).or_insert(fn_def_id);
+            }
+        }
+    }
+
     fn record_enum_item(&mut self, enum_item: &HirEnum, enum_def_id: DefId) {
         self.enum_type_params.insert(
             enum_def_id,
@@ -608,10 +624,6 @@ impl<'a> LoweringContextMaps<'a> {
         }
         self.enum_variants.insert(enum_def_id, variants.clone());
         self.validation.enum_variants.insert(enum_def_id, variants);
-        for arm in &enum_item.conversion_arms {
-            self.conversion_arms
-                .insert((enum_def_id, arm.source), arm.fn_def_id);
-        }
         for variant in &enum_item.variants {
             self.variant_parents.insert(variant.def_id, enum_def_id);
             self.validation

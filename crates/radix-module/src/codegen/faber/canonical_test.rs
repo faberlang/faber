@@ -1088,7 +1088,6 @@ fn discerne_patterns_preserve_bindings_aliases_variants_and_guards() {
             type_params: Vec::new(),
             annotations: Vec::new(),
             commune_fields: Vec::new(),
-            conversion_arms: Vec::new(),
             variants: vec![HirVariant {
                 def_id: DefId(2),
                 name: click,

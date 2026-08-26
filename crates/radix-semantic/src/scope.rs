@@ -354,17 +354,6 @@ pub struct CommuneField {
     pub span: Span,
 }
 
-/// Retired destination-owned conversion-arm shape (CTR-05): no longer
-/// stored, looked up, or serialized — the coherence registry's
-/// [`ConversionRow`] is the one authority. Kept only because the crate root
-/// re-exports it.
-#[derive(Debug, Clone, Copy)]
-pub struct ConversionArm {
-    pub source: TypeId,
-    pub fn_def_id: DefId,
-    pub span: Span,
-}
-
 /// Ordered concrete conversion-pair identity: exactly `(source → destination)`.
 ///
 /// `(A, B)` and `(B, A)` are distinct rows. Generic helpers cannot key rows;
@@ -2454,6 +2443,17 @@ impl Resolver {
     #[must_use]
     pub fn conversion_rows_for(&self, pair: ConversionPair) -> &[ConversionRow] {
         self.conversion_rows.get(&pair).map_or(&[], Vec::as_slice)
+    }
+
+    /// Every enrolled row, builtin and user alike, in enrollment order.
+    ///
+    /// Whole-registry consumers (MIR lowering's direct-only conversion
+    /// recovery) flatten scope visibility deliberately: production analysis
+    /// enrolls all rows in the global scope, so the flat walk and
+    /// [`Self::conversion_row_for`] agree on the live unit.
+    #[must_use]
+    pub fn conversion_rows(&self) -> impl Iterator<Item = ConversionRow> + '_ {
+        self.conversion_rows.values().flatten().copied()
     }
 
     /// Record a nominal type definition as imported (foreign to this unit).
