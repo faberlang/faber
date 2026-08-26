@@ -1117,3 +1117,492 @@ fn gea2_block_program_rejects_missing_edges_or_undeclared_intermediates() {
         admit_gea2_block_program(&wrong_output).expect_err("wrong declared output fails closed");
     assert!(error.contains("F32 [8,960]"), "unexpected error: {error}");
 }
+
+// ---------------------------------------------------------------------------
+// GEA3-U4 full-model program admission
+// ---------------------------------------------------------------------------
+
+const GEA3_LAYER_COUNT: usize = 32;
+const GEA3_BLOCK_LAUNCHES: usize = 64;
+const GEA3_HISTORY_CAPACITY: u64 = 76;
+const GEA3_KV_WIDTH: u64 = 320;
+const GEA3_VOCAB: u64 = 49_152;
+const GEA3_PREFILL_ROWS: u64 = 36;
+
+fn gea3_block_entries(prefill: bool) -> Vec<&'static str> {
+    let (
+        rmsnorm,
+        projection,
+        kv,
+        rope_q,
+        rope_k,
+        transpose,
+        score,
+        softmax,
+        context,
+        gate_up,
+        down,
+        swiglu,
+        residual,
+    ) = if prefill {
+        (
+            "prefill_rmsnorm",
+            "prefill_gemm_qo",
+            "prefill_gemm_kv",
+            "prefill_rope_q",
+            "prefill_rope_k",
+            "prefill_key_transpose",
+            "prefill_score_gemm",
+            "prefill_causal_softmax",
+            "prefill_context_gemm",
+            "prefill_gemm_gate_up",
+            "prefill_gemm_down",
+            "prefill_swiglu",
+            "prefill_residual_add",
+        )
+    } else {
+        (
+            "decode_rmsnorm",
+            "decode_gemv_qo",
+            "decode_gemv_kv",
+            "decode_rope_q",
+            "decode_rope_k",
+            "decode_key_transpose",
+            "decode_score_gemm",
+            "decode_masked_softmax",
+            "decode_context_gemm",
+            "decode_gemv_gate_up",
+            "decode_gemv_down",
+            "decode_swiglu",
+            "decode_residual_add",
+        )
+    };
+    let mut entries = vec![rmsnorm, projection, kv, kv, rope_q, rope_k];
+    entries.extend(std::iter::repeat_n(transpose, 5));
+    entries.extend(std::iter::repeat_n(score, 15));
+    entries.extend(std::iter::repeat_n(softmax, 15));
+    entries.extend(std::iter::repeat_n(context, 15));
+    entries.extend([
+        projection, residual, rmsnorm, gate_up, gate_up, swiglu, down, residual,
+    ]);
+    assert_eq!(entries.len(), GEA3_BLOCK_LAUNCHES);
+    entries
+}
+
+fn gea3_wire_plan(entry: &str) -> WireCollectionKernelPlan {
+    if entry.ends_with("rmsnorm") {
+        WireCollectionKernelPlan::RmsNormalization(WireRmsNormalizationPlan {
+            axis: 1,
+            epsilon_bits: (1.0e-5_f32).to_bits(),
+            width: 960,
+        })
+    } else {
+        WireCollectionKernelPlan::Elementwise
+    }
+}
+
+fn gea3_wire_launch(element_count: u64) -> WireKernelLaunchPlan {
+    WireKernelLaunchPlan {
+        workgroup: WireWorkgroupSize { x: 1, y: 1, z: 1 },
+        dispatch_size: WireDispatchSize {
+            x: element_count,
+            y: 1,
+            z: 1,
+        },
+        workgroup_count: WireWorkgroupCount {
+            x: element_count,
+            y: 1,
+            z: 1,
+        },
+    }
+}
+
+fn gea3_wire_buffer(
+    id: u32,
+    name: impl Into<String>,
+    role: WireBufferRole,
+    lifetime: WireBufferLifetime,
+) -> WireBufferIdentity {
+    WireBufferIdentity {
+        id,
+        name: name.into(),
+        role,
+        storage: WireStorageLayout::DeviceHandle,
+        lifetime,
+        semantic_value: id,
+    }
+}
+
+fn gea3_append_kernel(
+    kernels: &mut Vec<WireKernelUnit>,
+    launches: &mut Vec<WireLaunchUnit>,
+    semantic_values: &mut Vec<WireSemanticValue>,
+    entry: &str,
+    input: &WireBufferIdentity,
+    output: &WireBufferIdentity,
+    extras: Vec<WireDeviceResource>,
+    output_count: u64,
+) -> u32 {
+    let input_initialization = if input.id == 1 {
+        WireInitializationPolicy::HostProvided
+    } else {
+        WireInitializationPolicy::KernelInitialized
+    };
+    let mut resources = vec![gea2_wire_resource(
+        input,
+        960,
+        0,
+        WireResourceAccess::Read,
+        input_initialization,
+    )];
+    resources.extend(extras);
+    resources.push(gea2_wire_resource(
+        output,
+        output_count,
+        u32::try_from(resources.len()).expect("GEA3 resource binding fits u32"),
+        WireResourceAccess::Write,
+        WireInitializationPolicy::KernelInitialized,
+    ));
+    for resource in &resources {
+        gea2_add_semantic_value(semantic_values, &resource.buffer);
+    }
+    let kernel_index = u32::try_from(kernels.len()).expect("GEA3 kernel index fits u32");
+    let launch_id = u32::try_from(launches.len() + 1).expect("GEA3 launch id fits u32");
+    kernels.push(WireKernelUnit {
+        function: kernel_index,
+        entry: entry.to_owned(),
+        plan: gea3_wire_plan(entry),
+        resources,
+        launch: gea3_wire_launch(output_count),
+    });
+    launches.push(WireLaunchUnit {
+        id: launch_id,
+        kernel_index,
+    });
+    launch_id
+}
+
+fn gea3_full_model_program(prefill: bool) -> WireDeviceProgram {
+    let expected_launches = GEA3_LAYER_COUNT * GEA3_BLOCK_LAUNCHES + 3;
+    let result_count = if prefill {
+        GEA3_PREFILL_ROWS * GEA3_VOCAB
+    } else {
+        GEA3_VOCAB
+    };
+    let mut next_buffer = 1_u32;
+    let input = gea3_wire_buffer(
+        next_buffer,
+        "token_ids",
+        WireBufferRole::Input,
+        WireBufferLifetime::PerProgram,
+    );
+    next_buffer += 1;
+    let mut prior = input.clone();
+    let mut kernels = Vec::new();
+    let mut launches = Vec::new();
+    let mut semantic_values = Vec::new();
+    gea2_add_semantic_value(&mut semantic_values, &input);
+    let mut dependencies = Vec::new();
+
+    for index in 0..expected_launches {
+        let layer = index
+            .checked_sub(1)
+            .map(|offset| offset / GEA3_BLOCK_LAUNCHES);
+        let ordinal = index
+            .checked_sub(1)
+            .map(|offset| offset % GEA3_BLOCK_LAUNCHES);
+        let entry = if index == 0 {
+            "embedding_gather"
+        } else if index == expected_launches - 2 {
+            "head_rmsnorm"
+        } else if index == expected_launches - 1 {
+            "lm_head_gemv"
+        } else {
+            gea3_block_entries(prefill)[ordinal.expect("GEA3 block ordinal")]
+        };
+        let is_result = index == expected_launches - 1;
+        let output_count = if is_result { result_count } else { 960 };
+        let output = gea3_wire_buffer(
+            next_buffer,
+            format!("layer_{layer:?}_{index:04}_{entry}_output"),
+            if is_result {
+                WireBufferRole::Output
+            } else {
+                WireBufferRole::InOut
+            },
+            if is_result {
+                WireBufferLifetime::ObservationPoint
+            } else {
+                WireBufferLifetime::PerStep
+            },
+        );
+        next_buffer += 1;
+        let mut extras = Vec::new();
+        if index == 0 {
+            let weight = gea3_wire_buffer(
+                next_buffer,
+                "token_embd.weight",
+                WireBufferRole::Input,
+                WireBufferLifetime::PerProgram,
+            );
+            next_buffer += 1;
+            extras.push(gea2_wire_resource(
+                &weight,
+                960,
+                1,
+                WireResourceAccess::Read,
+                WireInitializationPolicy::HostProvided,
+            ));
+        }
+        if let Some(layer) = layer.filter(|_| ordinal == Some(0)) {
+            for weight in [
+                "attn_norm",
+                "attn_q",
+                "attn_k",
+                "attn_v",
+                "attn_output",
+                "ffn_norm",
+                "ffn_gate",
+                "ffn_up",
+                "ffn_down",
+            ] {
+                let identity = gea3_wire_buffer(
+                    next_buffer,
+                    format!("blk.{layer:02}.{weight}.weight"),
+                    WireBufferRole::Input,
+                    WireBufferLifetime::PerProgram,
+                );
+                next_buffer += 1;
+                extras.push(gea2_wire_resource(
+                    &identity,
+                    960,
+                    u32::try_from(extras.len() + 1).expect("GEA3 weight binding fits u32"),
+                    WireResourceAccess::Read,
+                    WireInitializationPolicy::HostProvided,
+                ));
+            }
+            for cache in ["kv_k", "kv_v"] {
+                let identity = gea3_wire_buffer(
+                    next_buffer,
+                    format!("blk.{layer:02}.{cache}"),
+                    WireBufferRole::InOut,
+                    WireBufferLifetime::PerProgram,
+                );
+                next_buffer += 1;
+                extras.push(gea2_wire_resource(
+                    &identity,
+                    GEA3_HISTORY_CAPACITY * GEA3_KV_WIDTH,
+                    u32::try_from(extras.len() + 1).expect("GEA3 cache binding fits u32"),
+                    WireResourceAccess::ReadWrite,
+                    WireInitializationPolicy::ZeroFill,
+                ));
+            }
+        }
+        let launch = gea3_append_kernel(
+            &mut kernels,
+            &mut launches,
+            &mut semantic_values,
+            entry,
+            &prior,
+            &output,
+            extras,
+            output_count,
+        );
+        if index > 0 {
+            dependencies.push(gea2_wire_edge(launch - 1, launch, &prior));
+        }
+        prior = output;
+    }
+
+    let final_launch = u32::try_from(expected_launches).expect("GEA3 final launch fits u32");
+    WireDeviceProgram {
+        kernels,
+        launches,
+        lifetime: WireProgramLifetime::SingleRun,
+        results: vec![WireResultBuffer {
+            buffer: prior,
+            version: WireBufferVersion {
+                version: 1,
+                element_ty: "f32".to_owned(),
+                element_count: result_count,
+                reduced_projection: None,
+            },
+            role: WireBufferRole::Output,
+            produced_by: final_launch,
+            observation: WireObservationFact {
+                at_launch: final_launch,
+                cadence: WireObservationCadence::PerStep,
+            },
+        }],
+        semantic_values,
+        roots: vec![1],
+        dependencies,
+        relations: Vec::new(),
+    }
+}
+
+fn admit_gea3_full_model_program(program: &WireDeviceProgram, prefill: bool) -> Result<(), String> {
+    let expected = GEA3_LAYER_COUNT * GEA3_BLOCK_LAUNCHES + 3;
+    if program.kernels.len() != expected || program.launches.len() != expected {
+        return Err("GEA3 program launch count drifted".to_owned());
+    }
+    if program.dependencies.len() != expected - 1 {
+        return Err("missing dependency edge".to_owned());
+    }
+    let buffers = program
+        .kernels
+        .iter()
+        .flat_map(|kernel| kernel.resources.iter())
+        .map(|resource| resource.buffer.id)
+        .collect::<BTreeSet<_>>();
+    for edge in &program.dependencies {
+        if edge.producer >= edge.consumer {
+            return Err("dependency cycle".to_owned());
+        }
+        if !buffers.contains(&edge.buffer) {
+            return Err(format!("undeclared intermediate {}", edge.buffer));
+        }
+    }
+    for resource in program
+        .kernels
+        .iter()
+        .flat_map(|kernel| kernel.resources.iter())
+    {
+        if resource.version.element_ty != "f32" || resource.version.element_count == 0 {
+            return Err("dtype/shape/range drift".to_owned());
+        }
+    }
+    if program.roots != vec![1] {
+        return Err("undeclared root".to_owned());
+    }
+    if let WireCollectionKernelPlan::RmsNormalization(plan) = &program.kernels[1].plan {
+        if plan.axis != 1 || plan.width != 960 {
+            return Err("wrong kernel geometry".to_owned());
+        }
+    } else {
+        return Err("missing RMSNorm geometry".to_owned());
+    }
+    validate_wire_program(program).map_err(|error| error.to_string())?;
+    if program.kernels[0].entry != "embedding_gather"
+        || program.kernels[expected - 2].entry != "head_rmsnorm"
+        || program.kernels[expected - 1].entry != "lm_head_gemv"
+    {
+        return Err("GEA3 head route is incomplete".to_owned());
+    }
+    let expected_count = if prefill {
+        GEA3_PREFILL_ROWS * GEA3_VOCAB
+    } else {
+        GEA3_VOCAB
+    };
+    let result = program
+        .results
+        .first()
+        .ok_or("logits output is undeclared")?;
+    if result.version.element_ty != "f32" || result.version.element_count != expected_count {
+        return Err("wrong logits geometry".to_owned());
+    }
+    for layer in 0..GEA3_LAYER_COUNT {
+        for weight in [
+            "attn_norm",
+            "attn_q",
+            "attn_k",
+            "attn_v",
+            "attn_output",
+            "ffn_norm",
+            "ffn_gate",
+            "ffn_up",
+            "ffn_down",
+        ] {
+            let name = format!("blk.{layer:02}.{weight}.weight");
+            if !program
+                .kernels
+                .iter()
+                .flat_map(|kernel| kernel.resources.iter())
+                .any(|resource| resource.buffer.name == name)
+            {
+                return Err(format!("missing per-layer weight {name}"));
+            }
+        }
+        for cache in ["kv_k", "kv_v"] {
+            let name = format!("blk.{layer:02}.{cache}");
+            let resource = program
+                .kernels
+                .iter()
+                .flat_map(|kernel| kernel.resources.iter())
+                .find(|resource| resource.buffer.name == name)
+                .ok_or_else(|| format!("missing per-layer KV buffer {name}"))?;
+            if resource.version.element_count != GEA3_HISTORY_CAPACITY * GEA3_KV_WIDTH
+                || resource.version.element_ty != "f32"
+            {
+                return Err(format!("wrong KV geometry {name}"));
+            }
+        }
+    }
+    Ok(())
+}
+
+#[test]
+fn gea3_full_model_program_admits_complete_plan() {
+    for prefill in [false, true] {
+        let program = gea3_full_model_program(prefill);
+        admit_gea3_full_model_program(&program, prefill)
+            .expect("complete GEA3 two-program graph admits");
+        assert_eq!(
+            program.kernels.len(),
+            GEA3_LAYER_COUNT * GEA3_BLOCK_LAUNCHES + 3
+        );
+        assert_eq!(program.dependencies.len(), program.kernels.len() - 1);
+        assert_eq!(program.roots, vec![1]);
+    }
+}
+
+#[test]
+fn gea3_program_rejects_missing_edges_or_undeclared_facts() {
+    let complete = gea3_full_model_program(false);
+    admit_gea3_full_model_program(&complete, false).expect("complete GEA3 graph admits");
+
+    let mut missing_edge = complete.clone();
+    missing_edge.dependencies.pop();
+    let error =
+        admit_gea3_full_model_program(&missing_edge, false).expect_err("missing edge fails closed");
+    assert!(
+        error.contains("missing dependency"),
+        "unexpected error: {error}"
+    );
+
+    let mut undeclared = complete.clone();
+    undeclared.dependencies[0].buffer = u32::MAX;
+    let error = admit_gea3_full_model_program(&undeclared, false)
+        .expect_err("undeclared intermediate fails closed");
+    assert!(
+        error.contains("buffer") || error.contains("declared"),
+        "unexpected error: {error}"
+    );
+
+    let mut cycle = complete.clone();
+    cycle.dependencies[0].consumer = cycle.dependencies[0].producer;
+    let error = admit_gea3_full_model_program(&cycle, false).expect_err("cycle fails closed");
+    assert!(error.contains("cycle") || error.contains("itself") || error.contains("producer"));
+
+    let mut undeclared_root = complete.clone();
+    undeclared_root.roots = vec![u32::MAX];
+    let error = admit_gea3_full_model_program(&undeclared_root, false)
+        .expect_err("undeclared root fails closed");
+    assert!(error.contains("root") || error.contains("launch"));
+
+    let mut wrong_dtype = complete.clone();
+    wrong_dtype.kernels[1].resources[0].version.element_ty = "bf16".to_owned();
+    assert!(admit_gea3_full_model_program(&wrong_dtype, false).is_err());
+
+    let mut wrong_shape = complete.clone();
+    wrong_shape.kernels[1].resources[0].version.element_count = 0;
+    assert!(admit_gea3_full_model_program(&wrong_shape, false).is_err());
+
+    let mut wrong_geometry = complete;
+    let WireCollectionKernelPlan::RmsNormalization(plan) = &mut wrong_geometry.kernels[1].plan
+    else {
+        panic!("GEA3 block RMSNorm plan is missing");
+    };
+    plan.axis = 0;
+    assert!(admit_gea3_full_model_program(&wrong_geometry, false).is_err());
+}
