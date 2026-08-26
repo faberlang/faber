@@ -79,13 +79,10 @@ fn uninstantiated_generic_annotation_fails_check_with_named_orphan_issue() {
         first.is_error(),
         "orphan admission must be an error, never a warning: {first:?}"
     );
+    // The orphan issue being first is itself the ordering proof: the generic
+    // zero-kernel codegen diagnostic carries a different issue identity
+    // (hygiene: `non_renderer_tests_do_not_assert_diagnostic_text`).
     assert_eq!(arg_value(&first.args, "issue"), Some(ORPHAN_ISSUE), "{first:?}");
-    assert!(
-        !first
-            .message
-            .contains("requires at least one @ nucleum function"),
-        "the generic zero-kernel codegen message must not be first: {first:?}"
-    );
 }
 
 #[test]
