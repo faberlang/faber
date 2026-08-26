@@ -1,0 +1,40 @@
++++
+term = "itera"
+kind = "keyword"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "itera_stmt", "itera_binding", "range_expr", "range_tail", "expression", "literal", "nota_stmt"]
+category = "control-flow"
+canonical = true
+summary = "Cartesian walk of three ranges with three binders."
+syntax = "for range <a>‥<b>, <c>‥<d>, <e>‥<f> const <i>, <j>, <k> { }"
+related = ["ex", "de", "apud"]
+locale = "en"
++++
+
+# =============================================================================
+# range product N=3 — one walk over three declared numeric domains.
+# =============================================================================
+#
+# What this teaches:
+#   • the range series takes any N — three domains multiply into every
+#     (i, j, k) triple with three binders, all alive at once
+#   • nesting stays leftmost-outermost: i is outermost, k is innermost, and
+#     each outer pair carries the complete innermost walk
+#
+# Common mistakes:
+#   • nesting product walks for three axes — the series is flat: one clause,
+#     N ranges, N binders
+#   • reading the binders as a tuple to destructure — each binder is one
+#     plain name scoped to the body
+#
+# See also: ex, apud
+# =============================================================================
+
+main {
+    for range 1‥3, 2‥4, 0‥2 const i, j, k {
+        print i * 100 + j * 10 + k
+    }
+
+    for range 5‥7, 1‥3, 0‥2 const first, second, third {
+        print first * 100 + second * 10 + third
+    }
+}

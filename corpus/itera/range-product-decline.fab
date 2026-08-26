@@ -1,0 +1,58 @@
++++
+term = "itera"
+kind = "reject"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "itera_stmt", "itera_binding", "range_expr", "range_tail", "expression", "literal", "nota_stmt"]
+category = "control-flow"
+canonical = false
+summary = "Range product declines: source/binder arity, extent/binder shadowing, and a mixed range/plain series fail closed."
+syntax = "for range <a>‥<b>, <c>‥<d> const <i>, <j> { }"
+related = ["ex", "itera", "apud"]
+locale = "en"
++++
+
+# =============================================================================
+# range product decline — arity, shadowing, and mixed-source laws.
+# =============================================================================
+#
+# Decline rows (reject reason in each comment):
+#   1. arity — 2 ranges carry 1 binder: SEM010
+#      itera_range_source_binder_arity_mismatch (one binder per range;
+#      never a partial bind, never a silent first-range-only walk)
+#   2. shadowing — a binder spelling that also names an extent reference:
+#      SEM010 itera_range_extent_binder_shadowing (ranges lower outside the
+#      binder scope, so the shared spelling would name two different
+#      bindings)
+#   3. mixed source — `0‥m, n` joins a range with a plain value: SEM010
+#      itera_range_mixed_source (every member must be a range expression;
+#      the product is never a zip fallback and never borrows the
+#      single-range `ab` issue)
+#
+# Common mistakes:
+#   • expecting the walk to bind what it can and skip the rest — every
+#     product law here declines the whole statement
+#
+# See also: ex, apud
+# =============================================================================
+
+# range product reject cases — expected compile failure
+#
+# WHY: documents the source/binder arity law, the extent/binder shadowing
+# law, and the every-member-is-a-range law for the Cartesian series.
+
+fn counts(numerus m, numerus n) → void {
+    for range 0‥m, 0‥n const i {
+        print i
+    }
+}
+
+fn shadows(numerus k) → void {
+    for range 0‥k, 1‥2 const k, j {
+        print k
+    }
+}
+
+fn mixes(numerus m, numerus n) → void {
+    for range 0‥m, n const i, j {
+        print i
+    }
+}
