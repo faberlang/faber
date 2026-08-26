@@ -102,3 +102,38 @@ fn tensor_media_width_rejects_decimal_elements() {
         Some(NumericWidth::F32)
     );
 }
+
+// --- D3 conversio matrix (explicit `↦` arms) ---
+
+#[test]
+fn decimal_conversio_admits_widening_arm_only() {
+    // The conversio matrix within the decimal family is exactly the widening
+    // arm: d32→d64 (identity included). The reverse d64→d32 is a narrowing
+    // with no `↦` row — decimals never narrow through conversio, unlike
+    // integer widths where explicit narrowing is an established law.
+    assert!(!NumericWidth::is_decimal_narrowing_conversio(
+        NumericWidth::D32,
+        NumericWidth::D64
+    ));
+    assert!(!NumericWidth::is_decimal_narrowing_conversio(
+        NumericWidth::D32,
+        NumericWidth::D32
+    ));
+    assert!(NumericWidth::is_decimal_narrowing_conversio(
+        NumericWidth::D64,
+        NumericWidth::D32
+    ));
+    assert!(!NumericWidth::is_decimal_narrowing_conversio(
+        NumericWidth::D64,
+        NumericWidth::D64
+    ));
+    // Non-decimal pairs never trip the decimal narrowing arm.
+    assert!(!NumericWidth::is_decimal_narrowing_conversio(
+        NumericWidth::I64,
+        NumericWidth::I32
+    ));
+    assert!(!NumericWidth::is_decimal_narrowing_conversio(
+        NumericWidth::F64,
+        NumericWidth::F32
+    ));
+}

@@ -94,6 +94,49 @@ incipit {
 "#,
             expect: EqualityExpect::RejectsIssue(EXACT_EQ_ISSUE),
         },
+        // decimal-widths D3: within-width decimal equality is exact and
+        // accepted; the explicit-↦ law re-enables cross-width equality.
+        EqualityCase {
+            name: "sized_numerus_d32_within_width_eq_accepts",
+            source: r#"
+incipit {
+    fixum numerus<d32> a ← 4.2
+    si a ≡ a { nota "ok" }
+}
+"#,
+            expect: EqualityExpect::Accepts,
+        },
+        EqualityCase {
+            name: "sized_numerus_d32_d64_explicit_arrow_eq_accepts",
+            source: r#"
+incipit {
+    fixum numerus<d32> a ← 4.2
+    fixum numerus<d64> b ← 4.2
+    si a ↦ numerus<d64> ≡ b { nota "ok" }
+}
+"#,
+            expect: EqualityExpect::Accepts,
+        },
+        EqualityCase {
+            name: "decimal_integer_cross_family_eq_rejects",
+            source: r#"
+incipit {
+    fixum numerus<d32> a ← 4.2
+    si a ≡ 1 { nota "bad" }
+}
+"#,
+            expect: EqualityExpect::RejectsIssue(EXACT_EQ_ISSUE),
+        },
+        EqualityCase {
+            name: "decimal_fractus_cross_family_eq_rejects",
+            source: r#"
+incipit {
+    fixum numerus<d32> a ← 4.2
+    si a ≡ 4.2 { nota "bad" }
+}
+"#,
+            expect: EqualityExpect::RejectsIssue(EXACT_EQ_ISSUE),
+        },
         EqualityCase {
             name: "octeti_lista_eq_rejects",
             source: r#"

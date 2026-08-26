@@ -726,6 +726,10 @@ mod decimal_width_literal_test;
 mod decimal_taxonomy_test;
 
 #[cfg(test)]
+#[path = "decimal_conversio_test.rs"]
+mod decimal_conversio_test;
+
+#[cfg(test)]
 #[path = "generic_call_test.rs"]
 mod generic_call_test;
 

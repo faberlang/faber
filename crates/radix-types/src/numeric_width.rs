@@ -691,11 +691,21 @@ impl NumericWidth {
         }
         false
     }
+
+    /// decimal-widths D3: the decimal conversio matrix admits exactly the
+    /// widening arm (`d32 → d64`, identity included); the reverse (`d64 → d32`)
+    /// is a narrowing with no `↦` arm — decimals never narrow through
+    /// conversio, unlike integer widths where explicit narrowing is a row.
+    #[must_use]
+    pub fn is_decimal_narrowing_conversio(from: Self, to: Self) -> bool {
+        from.is_decimal() && to.is_decimal() && !Self::is_widening_assignable(from, to)
+    }
 }
 
 #[cfg(test)]
 #[path = "numeric_width_test.rs"]
 mod tests;
 
+#[cfg(test)]
 #[path = "decimal_width_test.rs"]
 mod decimal_width_test;

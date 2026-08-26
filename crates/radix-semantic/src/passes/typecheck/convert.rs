@@ -68,6 +68,9 @@ const ISSUE_BITS_PAIR_WIDTH_MISMATCH: &str = "bits_pair_width_mismatch";
 const ISSUE_DECIMAL_RADIX_HINT_REJECTED: &str = "decimal_radix_hint_rejected";
 const ISSUE_DECIMAL_ENDIAN_HINT_REJECTED: &str = "decimal_endianness_hint_rejected";
 const ISSUE_DECIMAL_BITS_HINT_REJECTED: &str = "decimal_bits_hint_rejected";
+// decimal-widths D3: the decimal conversio matrix admits exactly the d32→d64
+// widening arm; the reverse (d64→d32) is a narrowing with no `↦` row.
+const ISSUE_DECIMAL_NARROWING_REJECTED: &str = "decimal_width_narrowing_rejected";
 const ISSUE_BITS_HINT_CONFLICT: &str = "conversio_bits_format_hint_conflict";
 const ISSUE_OCTETI_TO_BIVALENS_UNSUPPORTED: &str = "octeti_to_bivalens_unsupported";
 const ISSUE_PROMISSUM_TARGET_BOUNDARY: &str = "promissum_target_boundary";
@@ -1045,6 +1048,23 @@ impl TypeChecker<'_> {
         params: &[Symbol],
         span: radix_lexer::Span,
     ) -> Option<TypeId> {
+        // decimal-widths D3: within the decimal family, `↦` admits only the
+        // d32→d64 widening arm. The reverse (d64→d32) is a narrowing with no
+        // conversio row — decimals never narrow through `↦`, unlike integer
+        // widths where explicit narrowing is an established law.
+        if let (PrimitiveConversioFamily::Numerus, PrimitiveConversioFamily::Numerus) = (
+            self.primitive_conversio_family(source_ty),
+            self.primitive_conversio_family(target_resolved),
+        ) {
+            let from = crate::numeric_width::effective_width(self.types, source_ty);
+            let to = crate::numeric_width::effective_width(self.types, target_resolved);
+            if let (Some(from), Some(to)) = (from, to) {
+                if NumericWidth::is_decimal_narrowing_conversio(from, to) {
+                    self.invalid_conversion(ISSUE_DECIMAL_NARROWING_REJECTED, span);
+                    return Some(self.error_type);
+                }
+            }
+        }
         let issue = match (
             self.primitive_conversio_family(source_ty),
             self.primitive_conversio_family(target_resolved),

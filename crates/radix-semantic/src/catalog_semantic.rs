@@ -733,6 +733,11 @@ fn semantic_invalid_conversion_message(args: &[DiagnosticArg]) -> Option<String>
         "conversio_bits_format_hint_conflict" => Some(
             "the Bits reinterpretation hint never combines with Hex/Bin/Oct format hints in one conversio; use one interpretation per `↦`".to_owned(),
         ),
+        // decimal-widths D3: the decimal conversio matrix admits exactly the
+        // d32→d64 widening arm; the reverse has no `↦` row.
+        "decimal_width_narrowing_rejected" => Some(
+            "decimal width narrowing has no conversio arm — d32→d64 is the only decimal width flow; convert through fractus (defined rounding) or an integer width instead".to_owned(),
+        ),
         "octeti_to_bivalens_unsupported" => {
             Some("conversion from octeti to bivalens has no default meaning; decode to textus or compare bytes explicitly".to_owned())
         }
