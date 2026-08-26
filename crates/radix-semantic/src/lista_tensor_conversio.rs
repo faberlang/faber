@@ -7,7 +7,7 @@
 
 use radix_hir::{HirArrayElement, HirExpression, HirExpressionKind};
 
-use super::{i64s_from_literal_index, Primitive, Type, TypeId, TypeTable};
+use super::{i64s_from_literal_index, IndexExpr, IndexId, Primitive, Type, TypeId, TypeTable};
 
 /// Outcome-ladder label when `structa` rejects a flat buffer against the target `Figura`.
 pub const LISTA_TO_TENSOR_STRUCTA_COUNT_MSG: &str =
@@ -16,6 +16,13 @@ pub const LISTA_TO_TENSOR_STRUCTA_COUNT_MSG: &str =
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ListaToTensorShape {
     Literal(Vec<i64>),
+    /// Declared shape whose every dim is a literal or a `magnitudo` param
+    /// (`[T, D]`, `[3, D]`): the rank is known now, the concrete dims only
+    /// after generic instantiation.
+    Symbolic {
+        shape: IndexId,
+        rank: usize,
+    },
     InferOneD,
 }
 
@@ -60,8 +67,33 @@ pub fn resolve_lista_to_tensor_shape(
     };
     Some(match i64s_from_literal_index(*shape_id, types) {
         Some(dims) => ListaToTensorShape::Literal(dims),
-        None => ListaToTensorShape::InferOneD,
+        None => match symbolic_shape_rank(*shape_id, types) {
+            Some(rank) => ListaToTensorShape::Symbolic {
+                shape: *shape_id,
+                rank,
+            },
+            None => ListaToTensorShape::InferOneD,
+        },
     })
+}
+
+/// Rank of a shape index whose every dim is declared — a literal or a
+/// `magnitudo` param (`[T, D]`, `[3, D]`). Inference holes and unspecified
+/// shapes declare no rank; they stay one-dimensional inferences.
+fn symbolic_shape_rank(shape: IndexId, types: &TypeTable) -> Option<usize> {
+    match types.get_index(shape) {
+        IndexExpr::Literal(_) | IndexExpr::Param(_) => Some(1),
+        IndexExpr::Tuple(dims) => dims
+            .iter()
+            .all(|dim| {
+                matches!(
+                    types.get_index(*dim),
+                    IndexExpr::Literal(_) | IndexExpr::Param(_)
+                )
+            })
+            .then_some(dims.len()),
+        IndexExpr::Infer(_) | IndexExpr::Unspecified => None,
+    }
 }
 
 /// Validate that a source type is a valid list representation of a tensor.

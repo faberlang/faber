@@ -963,6 +963,58 @@ functio cast<magnitudo R, magnitudo C>() → matrix<f32, [R, C]> {
     );
 }
 
+// ---- GSF-2: declared symbolic tensor-target pins ----
+
+#[test]
+fn symbolic_rank_two_lista_to_tensor_pin_typechecks() {
+    // A declared `[T, D]` target is a known-shape pin, not an inference: the
+    // generic gathers its result through `↦` at its own symbolic sizes.
+    test_support::assert_accepts(
+        r"
+functio college<magnitudo V, magnitudo D, magnitudo T>(tensor<f32, [V, D]> mensa, lista<numerus> indices) → tensor<f32, [T, D]> {
+    redde (mensa ↦ lista<f32>) ↦ tensor<f32, [T, D]>
+}
+",
+    );
+}
+
+#[test]
+fn symbolic_rank_one_lista_to_tensor_pin_typechecks() {
+    test_support::assert_accepts(
+        r"
+functio columna<magnitudo N>(lista<f32> plana) → tensor<f32, [N]> {
+    redde plana ↦ tensor<f32, [N]>
+}
+",
+    );
+}
+
+#[test]
+fn symbolic_lista_to_tensor_pin_rejects_element_mismatch() {
+    test_support::assert_rejects_with_issue(
+        r"
+functio college<magnitudo T, magnitudo D>(lista<numerus> plana) → tensor<f32, [T, D]> {
+    redde plana ↦ tensor<f32, [T, D]>
+}
+",
+        "lista_to_tensor_element_mismatch",
+    );
+}
+
+#[test]
+fn literal_lista_to_symbolic_tensor_target_rejects() {
+    // A rectangular literal cannot prove a parametric shape; the pin stays
+    // reserved for flat sources whose count the runtime checks.
+    test_support::assert_rejects_with_issue(
+        r"
+functio college<magnitudo T, magnitudo D>() → tensor<f32, [T, D]> {
+    redde [[1.0, 2.0], [3.0, 4.0]] ↦ tensor<f32, [T, D]>
+}
+",
+        "rectangular_lista_literal_target",
+    );
+}
+
 // ---- `sermo ↦ T` materialization conversio ----
 
 #[test]

@@ -3233,6 +3233,33 @@ impl FunctionBuilder<'_> {
                 .into_iter()
                 .map(|dim| MirAggregateItem::Operand(MirOperand::Constant(MirConstant::Int(dim))))
                 .collect(),
+            // GSF-2: a declared symbolic target (`[T, D]`) carries one
+            // shape-size scalar per axis. Finalization substitutes each to
+            // its concrete `fractus` value; the numerus conversion keeps the
+            // `lista<numerus>` shape operand type-correct through validation
+            // and runner execution — the flat length is never the shape.
+            ListaToTensorShape::Symbolic { shape, rank } => (0..rank)
+                .map(|axis| {
+                    let axis = i64::try_from(axis).ok()?;
+                    let scalar =
+                        MirOperand::Constant(MirConstant::ShapeSize { shape, axis: Some(axis) });
+                    let numerus = self.types.primitive(Primitive::Numerus);
+                    let dim = self.runtime_call_value(
+                        MirIntrinsic::Convert(MirConversion {
+                            flavor: MirConversionFlavor::Runtime,
+                            source_ty: MirType::semantic(self.types.primitive(Primitive::Fractus)),
+                            target_ty: MirType::semantic(numerus),
+                            params: Vec::new(),
+                            recovery: None,
+                            struct_defaults: Vec::new(),
+                        }),
+                        vec![scalar],
+                        MirType::semantic(numerus),
+                        span,
+                    );
+                    Some(MirAggregateItem::Operand(dim))
+                })
+                .collect::<Option<Vec<_>>>()?,
             ListaToTensorShape::InferOneD => {
                 let len = self.runtime_call_value(
                     MirIntrinsic::Collection(MirCollectionOp::Length),

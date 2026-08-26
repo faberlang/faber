@@ -78,6 +78,14 @@ pub fn literal_tensor_dims(target: TypeId, types: &TypeTable) -> Option<Vec<i64>
     i64s_from_literal_index(*shape_id, types)
 }
 
+// GSF-2 divergence from the radix-semantic policy copy: the semantic
+// resolver additionally carries declared symbolic targets (`[T, D]`, every
+// dim a literal or `magnitudo` param) as a symbolic shape that lowering
+// bakes into the `TensorFromFlat` shape operand. This runner copy keeps the
+// two-arm ladder because runner resolution happens on post-finalization
+// (concrete) types — a symbolic target reaching here has no executable
+// shape, so the one-dimensional flat-length fallback stays its answer.
+
 /// # Errors
 /// Returns an error when validation or type resolution fails. See [`ListaToTensorError`].
 pub fn validate_lista_to_tensor_source(
