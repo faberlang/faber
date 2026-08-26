@@ -151,13 +151,12 @@ fn scalar_mut_param_propagates_through_runner_frames() {
             .expect("caller value"),
         Value::Int(6)
     );
-    let error = match runner.invoke_call(
+    let Err(error) = runner.invoke_call(
         &MirCallee::Function(MirFunctionId(1)),
         &[MirOperand::Constant(MirConstant::Int(3))],
         span,
-    ) {
-        Err(error) => error,
-        Ok(_) => panic!("in parameter must reject a non-place argument"),
+    ) else {
+        panic!("in parameter must reject a non-place argument");
     };
     assert_eq!(
         error.issue,

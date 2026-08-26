@@ -140,6 +140,10 @@ pub fn admit_executor_plan_v2(
 /// A4V/A5R can call this at the package boundary after the outer carrier has
 /// been ratcheted. The outer check runs before the payload check and before
 /// any selection, allocation, or view field is interpreted.
+///
+/// # Errors
+/// Returns `ExecutorPlanAdmissionError::UnsupportedSectionVersion` when the
+/// section version is not v2, or whatever `admit_executor_plan_v2` reports.
 pub fn admit_executor_plan_section_v2_with_version(
     section_version: u32,
     payload: &WireExecutorPlanV2,
@@ -155,6 +159,9 @@ pub fn admit_executor_plan_section_v2_with_version(
 }
 
 /// Alias named for callers that refer to the package carrier as a section.
+///
+/// # Errors
+/// Delegates to `admit_executor_plan_section_v2_with_version`.
 pub fn admit_executor_plan_section_v2(
     payload: &WireExecutorPlanV2,
     kernel_count: usize,
@@ -171,6 +178,10 @@ pub fn admit_executor_plan_section_v2(
 /// Version 1 remains valid only for the static selection carrier. Runtime
 /// facts belong on the v2 payload; this carrier has no field that could hold
 /// them, so a v1 section cannot smuggle a cursor through admission.
+///
+/// # Errors
+/// Returns `ExecutorPlanAdmissionError::UnsupportedSectionVersion` when the
+/// legacy carrier version does not match, or the payload fails v1 admission.
 pub fn admit_legacy_static_executor_plan_section(
     section: &super::device::FmirExecutorPlanSection,
 ) -> Result<(), ExecutorPlanAdmissionError> {

@@ -392,6 +392,11 @@ fn admit_executor_plan_section(
     Ok(())
 }
 
+/// Admits the device section against the artifact compatibility table.
+///
+/// # Errors
+/// Returns `FmirImageError` when the nested device-program version mismatches,
+/// the program fails wire validation, or the executor-plan section is invalid.
 pub fn admit_device_section_with_compat(
     device: &FmirDeviceSection,
     table: &ArtifactCompatibilityTable,

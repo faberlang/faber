@@ -100,6 +100,7 @@ fn octeti_endian_short_window_fails() {
 }
 
 #[test]
+#[allow(clippy::cast_possible_truncation, clippy::cast_precision_loss)]
 fn octeti_endian_le_f32_preserves_bits() {
     let result =
         eval_float_bytes(vec![0x00, 0x00, 0x80, 0x3f], "Le", NumericWidth::F32).expect("le f32");
@@ -110,6 +111,7 @@ fn octeti_endian_le_f32_preserves_bits() {
 }
 
 #[test]
+#[allow(clippy::cast_possible_truncation, clippy::cast_precision_loss)]
 fn octeti_endian_le_f32_preserves_noncanonical_bits() {
     let result =
         eval_float_bytes(vec![0xde, 0xad, 0xbe, 0xef], "Le", NumericWidth::F32).expect("le f32");

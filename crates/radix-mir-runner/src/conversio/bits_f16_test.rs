@@ -97,6 +97,7 @@ fn f16_nan_payload_survives_width_agnostic_float_carrier() {
 }
 
 #[test]
+#[allow(clippy::cast_possible_truncation, clippy::cast_precision_loss)]
 fn f16_bits_folded_chain_equals_direct_exact_widen() {
     // Folded: u16 -> fractus<f16,Bits> -> fractus<f32>; the f16 value widened
     // exactly to f32 (and f64 in between) must equal the direct exact widen.

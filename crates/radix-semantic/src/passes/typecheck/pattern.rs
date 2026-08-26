@@ -91,7 +91,7 @@ impl TypeChecker<'_> {
                     ISSUE_PATTERN_TYPE_MISMATCH,
                 );
                 let width_applies =
-                    radix_types::width_pattern_applies(&self.types, expected, target);
+                    radix_types::width_pattern_applies(self.types, expected, target);
                 if !constrained && !width_applies {
                     if let Some(members) = self.union_members_of(expected) {
                         let is_member = members

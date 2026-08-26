@@ -2852,8 +2852,10 @@ fn semantic_exhaustiveness_message(
             let keyword = quote_arg(args, "keyword")?;
             Some(format!("{keyword} requires a single enum scrutinee"))
         }
-        (SemanticErrorKind::UnreachablePattern, "after_catchall")
-        | (SemanticErrorKind::UnreachablePattern, "after_width_pattern") => {
+        (
+            SemanticErrorKind::UnreachablePattern,
+            "after_catchall" | "after_width_pattern",
+        ) => {
             Some("unreachable pattern".to_owned())
         }
         _ => None,

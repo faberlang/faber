@@ -14,7 +14,9 @@ use std::rc::Rc;
 
 fn call(op: MirCollectionOp, args: usize) -> MirRuntimeCall {
     let operands = (0..args)
-        .map(|index| MirOperand::Value(MirValueId(index as u32)))
+        .map(|index| {
+            MirOperand::Value(MirValueId(u32::try_from(index).expect("arg count fits u32")))
+        })
         .collect();
     MirRuntimeCall {
         intrinsic: MirIntrinsic::Collection(op),
