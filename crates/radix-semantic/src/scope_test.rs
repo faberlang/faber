@@ -193,24 +193,37 @@ fn lookup_variant_bare_is_single_for_one_defining_union() {
 
 #[cfg(feature = "hir-fhir")]
 #[test]
-fn resolver_snapshot_round_trips_conversion_arms() {
-    use super::ConversionArm;
+fn resolver_snapshot_round_trips_conversion_rows() {
+    use crate::scope::ConversionPair;
     use radix_types::TypeId;
 
     let mut resolver = Resolver::new();
-    resolver.register_conversion_arms(
-        DefId(700),
-        vec![ConversionArm {
-            source: TypeId(17),
-            fn_def_id: DefId(900),
-            span: Span::default(),
-        }],
-    );
+    let pair = ConversionPair::new(TypeId(17), TypeId(23));
+    resolver
+        .register_builtin_conversion(pair, Span::default())
+        .expect("builtin row enrolls");
+    let user_pair = ConversionPair::new(TypeId(31), TypeId(23));
+    let user_fn = DefId(900);
+    resolver
+        .register_user_conversion(user_pair, user_fn, Span::new(4, 8))
+        .expect("user row enrolls");
 
     let restored = Resolver::from_snapshot(resolver.to_snapshot());
-    assert_eq!(
-        restored.conversion_arm_for(DefId(700), TypeId(17)),
-        Some(DefId(900))
+    let restored_user = restored
+        .conversion_row_for(TypeId(31), TypeId(23))
+        .expect("user row survives the snapshot boundary");
+    assert_eq!(restored_user.fn_def_id, Some(DefId(900)));
+    assert!(!restored_user.builtin);
+
+    let restored_builtin = restored
+        .conversion_row_for(TypeId(17), TypeId(23))
+        .expect("builtin row survives the snapshot boundary");
+    assert!(restored_builtin.builtin);
+    assert_eq!(restored_builtin.fn_def_id, None);
+
+    assert!(
+        restored.conversion_row_for(TypeId(23), TypeId(17)).is_none(),
+        "ordered pair identity is preserved, not reversed"
     );
 }
 

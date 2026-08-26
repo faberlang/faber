@@ -2250,11 +2250,12 @@ impl FunctionBuilder<'_> {
     ///
     /// A conversion recorded on the HIR call site by semantic analysis wins.
     /// When none was recorded — the package-MIR synthetic-path rewrite of
-    /// namespace calls drops the call-site field — recover the destination
-    /// union's declared `@ conversion` arm for the call's error type, the same
-    /// arm the semantic layer would have attached. Types that already agree
-    /// need no conversion. Fails closed: a mismatch with no declared arm keeps
-    /// the raw value, and MIR validation rejects the `ReturnError`.
+    /// namespace calls drops the call-site field — recover the coherence
+    /// registry's enrolled row for the call's exact ordered pair, the same
+    /// function the semantic layer would have attached. Types that already
+    /// agree need no conversion. Lookup is direct only: no transitive
+    /// composition, and a pair with no enrolled row fails closed — the raw
+    /// value is kept and MIR validation rejects the `ReturnError`.
     fn declared_error_conversion(
         &self,
         source_ty: MirType,
@@ -2268,12 +2269,12 @@ impl FunctionBuilder<'_> {
         {
             return call_site;
         }
-        let Type::Enum(destination_def) = self.types.get(destination_ty.semantic_id()) else {
-            return None;
-        };
         self.context
-            .conversion_arms
-            .get(&(*destination_def, source_ty.semantic_id()))
+            .conversion_rows
+            .get(&ConversionPair::new(
+                source_ty.semantic_id(),
+                destination_ty.semantic_id(),
+            ))
             .copied()
     }
 

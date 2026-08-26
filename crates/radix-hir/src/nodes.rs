@@ -283,16 +283,23 @@ pub enum HirAnnotationValue {
     Nihil,
 }
 
-/// Nucleus surface role. Replaces the former `is_kernel` boolean for `@ nucleum`.
+/// Nucleus device classification for `@ nucleum` items.
 ///
-/// `Entry` is the only dispatch/reflection/`DeviceProgram` role. `Fragment` is
-/// device code composed into an entry — never a standalone dispatch stage.
-/// Graphics `@ fragment` remains [`HirFunction::is_fragment`] and is not this type.
+/// Classification only, not a launch authority: since the DFV2-4 device-call
+/// composition contract, launchability is decided by visibility (`@ nucleum
+/// @ publica` is an entry; an unmarked `@ nucleum` is a module-internal
+/// helper), and composition keys on device callers calling device callees
+/// rather than on this role. `Fragment` survives as the never-launchable
+/// composition-sugar marker the survivor scan proves standalone symbols
+/// against. Graphics `@ fragment` remains [`HirFunction::is_fragment`] and is
+/// not this type.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum NucleumRole {
-    /// `@ nucleum` — device-entry ABI, dispatch metadata, reflection identity.
+    /// `@ nucleum` — device item; dispatch/reflection/`DeviceProgram`
+    /// eligibility is additionally gated by visibility at the consumer.
     Entry,
-    /// `@ nucleum fragment` — composition helper, never a dispatch entry.
+    /// `@ nucleum fragment` — composition sugar, never a standalone dispatch
+    /// stage.
     Fragment,
 }
 
@@ -330,11 +337,13 @@ pub struct HirFunction {
     /// Generator callable (`fiunt`/`fient` / `cursor`).
     pub is_generator: bool,
 
-    /// Device kernel entry (`@ nucleum`), shared by every device lane. The
-    /// Entry half of [`NucleumRole`].
+    /// Device classification (`@ nucleum`), shared by every device lane; the
+    /// [`NucleumRole::Entry`] half. Launch eligibility is the visibility
+    /// gate, not this bit.
     pub is_kernel: bool,
 
-    /// `@ nucleum fragment` composition helper. Mutually exclusive with
+    /// `@ nucleum fragment` composition sugar; the never-launchable
+    /// [`NucleumRole::Fragment`] half. Mutually exclusive with
     /// [`Self::is_kernel`] and with graphics stage flags.
     pub nucleum_fragment: bool,
 
@@ -350,7 +359,9 @@ pub struct HirFunction {
 }
 
 impl HirFunction {
-    /// Exclusive nucleus role, or `None` when unset or when both bits are set.
+    /// Exclusive nucleus classification, or `None` when unset or when both
+    /// bits are set. Device classification only — never consult this as a
+    /// launch or composition authority.
     #[must_use]
     pub fn nucleum_role(&self) -> Option<NucleumRole> {
         match (self.is_kernel, self.nucleum_fragment) {
@@ -589,22 +600,7 @@ pub struct HirEnum {
     /// coincidentally identical variant shapes.
     #[serde(default)]
     pub commune_fields: Vec<HirVariantField>,
-    /// Declaration-owned error conversions lowered to synthetic functions.
-    #[serde(default)]
-    pub conversion_arms: Vec<HirConversionArm>,
     pub variants: Vec<HirVariant>,
-}
-
-/// One destination-union error conversion declaration.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct HirConversionArm {
-    /// Source error type accepted by this destination union.
-    pub source: TypeId,
-    /// Optional whole-source binding visible to the synthetic arm function.
-    pub self_ident: Option<Symbol>,
-    /// Synthetic ordinary function that constructs the destination error.
-    pub fn_def_id: DefId,
-    pub span: Span,
 }
 
 /// Enum variant declaration.

@@ -354,14 +354,6 @@ pub struct CommuneField {
     pub span: Span,
 }
 
-/// One declaration-owned error conversion registered for later propagation.
-#[derive(Debug, Clone, Copy)]
-pub struct ConversionArm {
-    pub source: TypeId,
-    pub fn_def_id: DefId,
-    pub span: Span,
-}
-
 /// Ordered concrete conversion-pair identity: exactly `(source → destination)`.
 ///
 /// `(A, B)` and `(B, A)` are distinct rows. Generic helpers cannot key rows;
@@ -743,10 +735,8 @@ pub struct Resolver {
     /// rebuild imported rows from the interface; TEU3 carries the region on
     /// HIR for local emit.
     commune_fields: FxHashMap<DefId, Vec<CommuneField>>,
-    /// Declaration-owned error conversions keyed by destination union.
-    conversion_arms: FxHashMap<DefId, Vec<ConversionArm>>,
     /// Conversion coherence registry keyed by the ordered concrete pair
-    /// `(source → destination)`. Builtin and (future) user rows share this one
+    /// `(source → destination)`. Builtin and user rows share this one
     /// table; there is no second compatibility table.
     conversion_rows: FxHashMap<ConversionPair, Vec<ConversionRow>>,
     /// DefIds of nominal types installed from imported file interfaces.
@@ -816,7 +806,6 @@ impl Resolver {
             canonical_imported_nominal_defs: FxHashMap::default(),
             imported_enum_variants: FxHashMap::default(),
             commune_fields: FxHashMap::default(),
-            conversion_arms: FxHashMap::default(),
             conversion_rows: FxHashMap::default(),
             imported_type_def_ids: FxHashSet::default(),
             used_namespaces: FxHashSet::default(),
@@ -2368,32 +2357,6 @@ impl Resolver {
             .find(|field| field.name == name)
     }
 
-    /// Record the validated conversion arms owned by a destination union.
-    pub fn register_conversion_arms(&mut self, enum_def: DefId, arms: Vec<ConversionArm>) {
-        self.conversion_arms.insert(enum_def, arms);
-    }
-
-    /// Conversion arms declared on `enum_def`, empty when none are declared.
-    #[must_use]
-    pub fn conversion_arms(&self, enum_def: DefId) -> &[ConversionArm] {
-        self.conversion_arms
-            .get(&enum_def)
-            .map_or(&[], Vec::as_slice)
-    }
-
-    /// Find the declaration-owned arm for one ordered destination/source pair.
-    ///
-    /// The resolver is the semantic environment shared by the analyzed module
-    /// graph. Keeping lookup on this existing registry makes the pair global to
-    /// that environment without introducing a second pass-owned registry.
-    #[must_use]
-    pub fn conversion_arm_for(&self, destination: DefId, source: TypeId) -> Option<DefId> {
-        self.conversion_arms(destination)
-            .iter()
-            .find(|arm| arm.source == source)
-            .map(|arm| arm.fn_def_id)
-    }
-
     /// Enroll one compiler-shipped builtin row in the coherence registry.
     ///
     /// Builtin rows occupy the global scope, are visible from every scope, and
@@ -2480,6 +2443,17 @@ impl Resolver {
     #[must_use]
     pub fn conversion_rows_for(&self, pair: ConversionPair) -> &[ConversionRow] {
         self.conversion_rows.get(&pair).map_or(&[], Vec::as_slice)
+    }
+
+    /// Every enrolled row, builtin and user alike, in enrollment order.
+    ///
+    /// Whole-registry consumers (MIR lowering's direct-only conversion
+    /// recovery) flatten scope visibility deliberately: production analysis
+    /// enrolls all rows in the global scope, so the flat walk and
+    /// [`Self::conversion_row_for`] agree on the live unit.
+    #[must_use]
+    pub fn conversion_rows(&self) -> impl Iterator<Item = ConversionRow> + '_ {
+        self.conversion_rows.values().flatten().copied()
     }
 
     /// Record a nominal type definition as imported (foreign to this unit).
@@ -3362,17 +3336,21 @@ impl Resolver {
     pub fn from_snapshot(snapshot: radix_hir_fhir::ResolverSnapshot) -> Self {
         use radix_hir_fhir::FileExportSnapshot;
 
-        let conversion_arms = snapshot.conversion_arms.into_iter().fold(
+        let conversion_rows = snapshot.conversion_rows.into_iter().fold(
             FxHashMap::default(),
-            |mut arms, snapshot| {
-                arms.entry(snapshot.destination)
+            |mut rows, snapshot| {
+                rows.entry(ConversionPair::new(snapshot.source, snapshot.destination))
                     .or_insert_with(Vec::new)
-                    .push(ConversionArm {
-                        source: snapshot.source,
+                    .push(ConversionRow {
+                        pair: ConversionPair::new(snapshot.source, snapshot.destination),
                         fn_def_id: snapshot.fn_def_id,
                         span: snapshot.span,
+                        // Snapshots carry no scope walk-state; every restored
+                        // row is visible from the reconstructed global scope.
+                        scope: ScopeId(0),
+                        builtin: snapshot.builtin,
                     });
-                arms
+                rows
             },
         );
 
@@ -3504,8 +3482,7 @@ impl Resolver {
             canonical_imported_nominal_defs: FxHashMap::default(),
             imported_enum_variants: FxHashMap::default(),
             commune_fields: FxHashMap::default(),
-            conversion_arms,
-            conversion_rows: FxHashMap::default(),
+            conversion_rows,
             imported_type_def_ids: FxHashSet::default(),
             used_namespaces,
             schemas: FxHashMap::default(),
@@ -3521,8 +3498,8 @@ impl Resolver {
     ///
     /// Collects the import-facing fields codegen reads from the resolver:
     /// namespace exports, file interfaces, used namespaces, imported nominal
-    /// types, and declaration-owned conversion arms. Runtime-only state —
-    /// scopes, shadow map, builtins, GPU builtins, insertion-order mirrors —
+    /// types, and the conversion coherence registry rows. Runtime-only state
+    /// — scopes, shadow map, builtins, GPU builtins, insertion-order mirrors —
     /// is excluded and rebuilt during loading.
     #[cfg(feature = "hir-fhir")]
     #[must_use]
@@ -3589,20 +3566,27 @@ impl Resolver {
             .map(|&(kind, name)| (interface_nominal_kind_to_wire(kind), name))
             .collect();
 
-        let mut conversion_arms = self
-            .conversion_arms
-            .iter()
-            .flat_map(|(&destination, arms)| {
-                arms.iter()
-                    .map(move |arm| radix_hir_fhir::ConversionArmSnapshot {
-                        destination,
-                        source: arm.source,
-                        fn_def_id: arm.fn_def_id,
-                        span: arm.span,
-                    })
+        let mut conversion_rows = self
+            .conversion_rows
+            .values()
+            .flat_map(|rows| {
+                rows.iter().map(|row| radix_hir_fhir::ConversionRowSnapshot {
+                    source: row.pair.source,
+                    destination: row.pair.destination,
+                    fn_def_id: row.fn_def_id,
+                    span: row.span,
+                    builtin: row.builtin,
+                })
             })
             .collect::<Vec<_>>();
-        conversion_arms.sort_by_key(|arm| (arm.destination.0, arm.source.0, arm.fn_def_id.0));
+        conversion_rows.sort_by_key(|row| {
+            (
+                row.destination.0,
+                row.source.0,
+                row.builtin,
+                row.fn_def_id.map_or(0, |def_id| def_id.0),
+            )
+        });
 
         ResolverSnapshot {
             namespace_exports,
@@ -3610,7 +3594,7 @@ impl Resolver {
             used_namespaces,
             imported_nominal_types,
             ambiguous_imported_nominal_types,
-            conversion_arms,
+            conversion_rows,
         }
     }
 }

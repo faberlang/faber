@@ -115,7 +115,7 @@ fn minimal_test_artifact() -> HirArtifact {
             used_namespaces: Vec::new(),
             imported_nominal_types: Vec::new(),
             ambiguous_imported_nominal_types: Vec::new(),
-            conversion_arms: Vec::new(),
+            conversion_rows: Vec::new(),
         },
         libraries: LibraryRegistry::default(),
         function_facts: FunctionFactTableWire { entries: Vec::new(), entry: None },
