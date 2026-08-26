@@ -5954,3 +5954,25 @@ incipit {
     .unwrap_or_else(|error| panic!("minmax infix clamp runner proof should execute: {error:?}"));
     assert_eq!(host.stdout_lines, ["5", "17", "1.5"]);
 }
+
+#[test]
+fn copia_mappata_fails_closed_before_set_mir_lowering() {
+    // F2-SET-MAP: the registry row admits `copia<T>.mappata` at typecheck, but
+    // the MIR collection-transform phase only owns array receivers. A set
+    // receiver must fail closed with an unsupported-MIR issue, never silently
+    // lower through the lista array transform.
+    let mut unit = analyze(
+        r"functio doubled(copia<numerus> s) → copia<numerus> {
+    redde s.mappata(numerus n ∴ n * 2)
+}",
+    );
+    let errors = dump_analyzed_unit(&mut unit)
+        .expect_err("copia mappata must fail closed before set MIR lowering");
+    assert!(
+        errors
+            .iter()
+            .any(|err| err.issue.starts_with("unsupported_mir_lowering")),
+        "expected an unsupported-MIR issue, got: {:?}",
+        errors.iter().map(|err| &err.issue).collect::<Vec<_>>()
+    );
+}
