@@ -1,0 +1,35 @@
++++
+term = "textus"
+kind = "reject"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "conversio_expr", "expression", "literal", "nota_stmt"]
+category = "conversion"
+canonical = false
+summary = "Decline: a textus literal longer than the target capacity rejects with textus_literal_too_long."
+syntax = "\"<text>\" ↦ textus<N>"
+related = ["↦", "textus"]
+locale = "en"
++++
+
+# =============================================================================
+# textus overflow decline — literal over capacity fails closed
+# =============================================================================
+#
+# Decline row (reject reason in the comment):
+#   1. over capacity — `"abcdef" ↦ string<4>` asks a 6-scalar literal to fit
+#      a capacity of 4: SEM011 textus_literal_too_long
+#
+# Common mistakes:
+#   • expecting silent truncation — the D7 overflow rule fails closed at
+#     check for literals whose scalar count exceeds the target capacity
+#
+# See also: ↦, textus
+# =============================================================================
+
+# textus literal over capacity — expected compile failure
+#
+# WHY: pins the fail-closed overflow token in conversio-textus-overflow-decline.expected.
+
+main {
+    const string<4> t ← "abcdef" ↦ string<4>
+    print t
+}

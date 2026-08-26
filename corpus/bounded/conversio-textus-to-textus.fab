@@ -1,0 +1,43 @@
++++
+term = "↦"
+kind = "operator-group"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "conversio_expr", "expression", "literal", "nota_stmt"]
+category = "conversion"
+canonical = false
+summary = "Bounded textus<N> widens to unbounded textus: string<8> ↦ string."
+syntax = "textus<N> ↦ textus"
+related = ["↦", "textus"]
+locale = "en"
++++
+
+# =============================================================================
+# ↦ — bounded textus<N> widens to unbounded textus
+# =============================================================================
+#
+# What this teaches:
+#   • Width release — a bounded `string<8>` converts to the unbounded
+#     `string` surface with `↦`; the widened value is an ordinary textus
+#   • The bounded value itself is conversion-built — `raw ↦ string<8>` is
+#     the only way into the capacity from a runtime string
+#
+# Common mistakes:
+#   • writing `string u ← t` without `↦` — bounded-to-unbounded widening is
+#     conversion-only, never implicit
+#
+# See also: ↦, textus
+# =============================================================================
+
+# conversio — textus<N> ↦ textus
+#
+# GRAMMAR:
+#   convertExpr :← expr '↦' 'string'
+#
+# NOTE: check-admitted; the runner does not yet carry bounded textus values
+# (UnsupportedMir), so stdout stays unpinned.
+
+main {
+    const string raw ← "abcd"
+    const string<8> t ← raw ↦ string<8>
+    const string u ← t ↦ string
+    print u
+}

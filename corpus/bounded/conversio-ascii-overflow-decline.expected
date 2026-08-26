@@ -1,0 +1,3 @@
+# Reject oracle for the ascii literal over-capacity conversio.
+# Tokens: stable diagnostic identities (faber check output); one per line.
+SEM011:ascii_literal_too_long

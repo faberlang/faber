@@ -1,0 +1,50 @@
++++
+term = "↦"
+kind = "operator-group"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "shape_suffix", "width_type_sugar", "array_literal", "conversio_expr", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "expression", "literal", "nota_stmt"]
+category = "conversion"
+canonical = false
+summary = "Bounded numeric lista<T, N> converts to a shaped tensor: list<f32, 8> ↦ tf32[8]."
+syntax = "list<T, N> ↦ tf32[N]"
+related = ["↦", "lista", "tensor"]
+locale = "en"
++++
+
+# =============================================================================
+# ↦ — bounded numeric lista<T, N> converts to a shaped tensor
+# =============================================================================
+#
+# What this teaches:
+#   • Capacity-to-shape — a bounded `list<f32, 8>` with numeric elements
+#     converts to the literal-shaped `tf32[8]` tensor; the target witnesses
+#     both element type and shape
+#   • The converted value is a real shaped tensor — element access, `shape()`,
+#     and reductions (`sum`) all work on it
+#   • Non-numeric elements decline at check (the conversion is numeric-only)
+#
+# Common mistakes:
+#   • converting a bounded lista of textus — the tensor conversion admits
+#     numeric elements only
+#   • treating capacity as runtime length — the tensor carries the shape,
+#     while the lista keeps its own runtime length
+#
+# See also: ↦, lista, tensor
+# =============================================================================
+
+# conversio — list<f32, 8> ↦ tf32[8]
+#
+# GRAMMAR:
+#   convertExpr :← expr '↦' shape-suffixed tensor type
+#
+# EXPECTED OUTPUT:
+#   conversio-lista-to-tensor.expected — shape, folded sum, and lane values.
+
+main {
+    const list<f32, 8> flat ← [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0]
+    const tf32[8] line ← flat ↦ tf32[8]
+    const list<int> dims ← line.shape()
+    print dims
+    print line.sum()
+    print line[0]
+    print line[7]
+}

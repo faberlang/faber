@@ -1,0 +1,49 @@
++++
+term = "↦"
+kind = "operator-group"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "conversio_expr", "expression", "literal", "nota_stmt"]
+category = "conversion"
+canonical = false
+summary = "ascii<N> ↔ ascii<M> D7 resize: grow, shrink, and identity copies with ↦."
+syntax = "ascii<N> ↦ ascii<M>"
+related = ["↦", "ascii"]
+locale = "en"
++++
+
+# =============================================================================
+# ↦ — ascii<N> ↔ ascii<M> resize (grow / shrink / identity)
+# =============================================================================
+#
+# What this teaches:
+#   • D7 resize — a bounded ascii converts to another capacity with `↦`;
+#     the initialized prefix is copied and overflow fails closed
+#   • All three directions are the same rule — grow (`ascii<4> ↦ ascii<8>`),
+#     shrink (`ascii<8> ↦ ascii<4>`), and identity (`ascii<8> ↦ ascii<8>`)
+#     are each one explicit conversion
+#
+# Common mistakes:
+#   • expecting a bare `←` to resize — capacity changes are conversion-only
+#   • reading shrink as truncating the string — the copy keeps the prefix
+#     that fits and fails closed when the source is longer than the target
+#
+# See also: ↦, ascii
+# =============================================================================
+
+# conversio — ascii<N> ↔ ascii<M> D7 resize
+#
+# GRAMMAR:
+#   convertExpr :← expr '↦' 'ascii' '<' capacity '>'
+#
+# NOTE: check-admitted; the runner does not yet carry the bounded ascii
+# runtime conversio (UnsupportedMir), so stdout stays unpinned.
+
+main {
+    const ascii<4> a ← 'ab'
+    const ascii<8> grown ← a ↦ ascii<8>
+    const ascii<8> b ← 'abcdef'
+    const ascii<4> shrunk ← b ↦ ascii<4>
+    const ascii<8> same ← a ↦ ascii<8>
+    print grown
+    print shrunk
+    print same
+}
