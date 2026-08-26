@@ -209,7 +209,7 @@ fn index_covers(types: &TypeTable, pattern: IndexId, value: IndexId) -> bool {
     match (types.get_index(pattern), types.get_index(value)) {
         (IndexExpr::Literal(pattern), IndexExpr::Literal(value)) => pattern >= value,
         (IndexExpr::Param(pattern), IndexExpr::Param(value)) => pattern == value,
-        (IndexExpr::Infer(_), _) | (IndexExpr::Unspecified, _) => true,
+        (IndexExpr::Infer(_) | IndexExpr::Unspecified, _) => true,
         _ => types.index_equals(pattern, value),
     }
 }
