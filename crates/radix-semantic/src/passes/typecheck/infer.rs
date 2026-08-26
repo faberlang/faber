@@ -1015,6 +1015,41 @@ impl TypeChecker<'_> {
         true
     }
 
+    /// Contribute a type-pattern member to an open inference hole.
+    ///
+    /// Type-patterns are a producer of constraints rather than a use-site
+    /// assignment. When the expected type is a monomorphic source hole, route
+    /// it through a fresh `InferUnion` hole and bind the source variable to
+    /// that hole. Existing union accumulation and finalization then remain the
+    /// only solver and normalization paths. A concrete expected type returns
+    /// `false` so the caller keeps its ordinary pattern-membership check.
+    pub(crate) fn constrain_type_pattern(
+        &mut self,
+        expected: TypeId,
+        member: TypeId,
+        span: radix_lexer::Span,
+        issue: &'static str,
+    ) -> bool {
+        let expected = self.resolve_inferred_type(expected);
+        let union_var = if let Some(var) = self.infer_union_var_of(expected) {
+            var
+        } else if let Some(source_var) = self.infer_var_of(expected) {
+            let union_var = self.fresh_union_hole();
+            let union_hole = self.union_hole_type_id(union_var);
+            let before = self.errors.len();
+            self.bind_infer_with_diagnostic(source_var, union_hole, span, issue);
+            if self.errors.len() != before {
+                return true;
+            }
+            union_var
+        } else {
+            return false;
+        };
+
+        self.accumulate_into_union_hole(union_var, member, span, issue);
+        true
+    }
+
     /// Merge a resolved incoming type into a `∪` hole and return the hole.
     ///
     /// U-02 accumulation semantics (per binding / per type node):

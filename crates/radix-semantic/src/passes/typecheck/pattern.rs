@@ -84,24 +84,31 @@ impl TypeChecker<'_> {
             }
             HirPattern::TypeTest { ty, binding, .. } => {
                 let target = self.resolve_inferred_type(*ty);
-                if let Some(members) = self.union_members_of(expected) {
-                    let is_member = members
-                        .iter()
-                        .copied()
-                        .any(|member| self.member_type_equals(member, target));
-                    if !is_member {
+                if !self.constrain_type_pattern(
+                    expected,
+                    target,
+                    span,
+                    ISSUE_PATTERN_TYPE_MISMATCH,
+                ) {
+                    if let Some(members) = self.union_members_of(expected) {
+                        let is_member = members
+                            .iter()
+                            .copied()
+                            .any(|member| self.member_type_equals(member, target));
+                        if !is_member {
+                            self.error_issue(
+                                SemanticErrorKind::TypeMismatch,
+                                ISSUE_PATTERN_TYPE_MISMATCH,
+                                span,
+                            );
+                        }
+                    } else if !self.member_type_equals(expected, target) {
                         self.error_issue(
                             SemanticErrorKind::TypeMismatch,
                             ISSUE_PATTERN_TYPE_MISMATCH,
                             span,
                         );
                     }
-                } else if !self.member_type_equals(expected, target) {
-                    self.error_issue(
-                        SemanticErrorKind::TypeMismatch,
-                        ISSUE_PATTERN_TYPE_MISMATCH,
-                        span,
-                    );
                 }
                 if let Some((def_id, _name)) = binding {
                     self.insert_binding(*def_id, target);

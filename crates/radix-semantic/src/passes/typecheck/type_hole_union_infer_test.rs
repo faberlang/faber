@@ -329,3 +329,64 @@ incipit {
 ",
     );
 }
+
+#[test]
+fn type_pattern_constraint_reuses_union_accumulation() {
+    let mut types = TypeTable::new();
+    let resolver = Resolver::new();
+    let mut checker = TypeChecker::new(&resolver, &mut types, None, Target::HirRust);
+    let span = radix_lexer::Span::default();
+    let numerus = checker.numerus_type();
+    let textus = checker.types.primitive(Primitive::Textus);
+    let source_hole = checker.fresh_infer();
+
+    assert!(checker.constrain_type_pattern(
+        source_hole,
+        numerus,
+        span,
+        "pattern_type_mismatch",
+    ));
+    assert!(checker.constrain_type_pattern(
+        source_hole,
+        textus,
+        span,
+        "pattern_type_mismatch",
+    ));
+
+    let union_hole = checker.resolve_inferred_type(source_hole);
+    let union_var = checker
+        .infer_union_var_of(union_hole)
+        .expect("pattern constraint must promote to InferUnion");
+    let members = members_of(&checker, union_var);
+    assert_eq!(members.len(), 2);
+    assert!(members.contains(&numerus) && members.contains(&textus));
+    assert!(checker.errors.is_empty());
+}
+
+#[test]
+fn source_param_hole_match_patterns_accumulate_union() {
+    test_support::assert_analysis_accepts(
+        r#"
+functio probe(_ u) → vacuum {
+    discerne u {
+        casu numerus fixum i { nota i }
+        casu textus fixum s { nota s }
+    }
+}
+"#,
+    );
+}
+
+#[test]
+fn source_param_hole_non_type_pattern_stays_unresolved() {
+    test_support::assert_analysis_rejects_with_issue(
+        r#"
+functio probe(_ u) → vacuum {
+    discerne u {
+        casu _ { nota "any" }
+    }
+}
+"#,
+        "cannot_infer_expression_type",
+    );
+}
