@@ -280,7 +280,7 @@ else_arm ::= (block_stmt | ergo_joint statement) cape_clause?
 dum_stmt ::= 'जबतक' expression (block_stmt | ergo_joint statement) cape_clause?
 # formerly: iteraStmt
 # [095] itera_stmt
-itera_stmt ::= 'दोहराओ' ('सेवन' expression (',' expression)* | 'से' expression | 'सीमा' expression) apud_clause? ('स्थिर' | 'चर') itera_binding (block_stmt | ergo_joint statement) cape_clause?
+itera_stmt ::= 'दोहराओ' ('सेवन' expression (',' expression)* | 'से' expression | 'सीमा' expression (',' expression)*) apud_clause? ('स्थिर' | 'चर') itera_binding (block_stmt | ergo_joint statement) cape_clause?
 # [096] itera_binding
 itera_binding ::= array_pattern | object_pattern | IDENTIFIER (',' IDENTIFIER)*
 # [097] apud_clause

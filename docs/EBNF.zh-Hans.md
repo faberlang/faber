@@ -280,7 +280,7 @@ else_arm ::= (block_stmt | ergo_joint statement) cape_clause?
 dum_stmt ::= '当' expression (block_stmt | ergo_joint statement) cape_clause?
 # formerly: iteraStmt
 # [095] itera_stmt
-itera_stmt ::= '遍历' ('取自' expression (',' expression)* | '借自' expression | '范围' expression) apud_clause? ('常量' | '变量') itera_binding (block_stmt | ergo_joint statement) cape_clause?
+itera_stmt ::= '遍历' ('取自' expression (',' expression)* | '借自' expression | '范围' expression (',' expression)*) apud_clause? ('常量' | '变量') itera_binding (block_stmt | ergo_joint statement) cape_clause?
 # [096] itera_binding
 itera_binding ::= array_pattern | object_pattern | IDENTIFIER (',' IDENTIFIER)*
 # [097] apud_clause

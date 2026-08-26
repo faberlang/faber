@@ -280,7 +280,7 @@ else_arm ::= (block_stmt | ergo_joint statement) cape_clause?
 dum_stmt ::= 'trong_khi' expression (block_stmt | ergo_joint statement) cape_clause?
 # formerly: iteraStmt
 # [095] itera_stmt
-itera_stmt ::= 'lặp' ('từ' expression (',' expression)* | 'ra' expression | 'khoảng' expression) apud_clause? ('hằng' | 'biến') itera_binding (block_stmt | ergo_joint statement) cape_clause?
+itera_stmt ::= 'lặp' ('từ' expression (',' expression)* | 'ra' expression | 'khoảng' expression (',' expression)*) apud_clause? ('hằng' | 'biến') itera_binding (block_stmt | ergo_joint statement) cape_clause?
 # [096] itera_binding
 itera_binding ::= array_pattern | object_pattern | IDENTIFIER (',' IDENTIFIER)*
 # [097] apud_clause
