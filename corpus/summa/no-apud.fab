@@ -1,0 +1,42 @@
++++
+term = "summa"
+kind = "concept"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "shape_suffix", "redde_stmt", "incipit_stmt", "fixum_decl", "expression", "summa_expr", "literal", "nota_stmt"]
+category = "collection"
+canonical = false
+summary = "Sequential sum-reduce without coordinates: summa ex <tensor> fixum s { redde <term> } folds a rank-1 source with no apud clause."
+syntax = "summa ex <source> fixum <binder> { redde <term> }"
+related = ["summa", "apud", "tensor"]
+locale = "la"
++++
+
+# =============================================================================
+# summa no-apud — the plain rank-1 fold without coordinate binding
+# =============================================================================
+#
+# What this teaches:
+#   • Omitting `apud` — a rank-1 tensor folds with no coordinate binder at
+#     all; the term body sees only the element
+#   • Sibling of the canonical `summa ex … apud [i] fixum s` form — the
+#     apud clause is optional on rank-1 sources
+#   • Rank law — a rank ≥ 2 source without apud declines with the shared
+#     arity rule (itera_apud_arity_mismatch), so no-apud implies rank 1
+#
+# Common mistakes:
+#   • writing `summa ex` over a lista — the fold requires a shaped
+#     tensor/matrix iterable; listas stay with the `.summa()` method
+#   • expecting the no-apud fold to bind an index — there is no index to bind
+#
+# See also: summa, apud, tensor
+# =============================================================================
+
+functio total(tensor<f32, [8]> a) → f32 {
+    redde summa ex a fixum s { redde s }
+}
+
+incipit {
+    fixum lista<f32> flat ← [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0]
+    fixum tf32[] seed ← vacua
+    fixum tf32[8] a ← seed.strue(flat, [8])
+    nota total(a)
+}
