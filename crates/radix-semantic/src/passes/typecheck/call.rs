@@ -1117,11 +1117,35 @@ impl TypeChecker<'_> {
         self.error_type
     }
 
-    fn lookup_conversion_arm(&self, source: TypeId, destination: TypeId) -> Option<DefId> {
-        let Type::Enum(destination_def) = self.types.get(destination) else {
-            return None;
-        };
-        self.resolver.conversion_arm_for(*destination_def, source)
+    fn conversion_absent_diagnostic(
+        &mut self,
+        source_ty: TypeId,
+        destination_ty: TypeId,
+        span: radix_lexer::Span,
+    ) {
+        let mut args = vec![
+            (
+                "source",
+                self.format_conversion_type_for_diagnostic(source_ty),
+            ),
+            (
+                "destination",
+                self.format_conversion_type_for_diagnostic(destination_ty),
+            ),
+        ];
+        // CTR-04: names are the ambiguity escape — when the pair names a
+        // helper enrolled in a non-visible scope, suggest it explicitly.
+        if let Some(name) = self
+            .resolver
+            .conversion_name_suggestion(source_ty, destination_ty)
+            .and_then(|name| {
+                self.interner
+                    .map(|interner| interner.resolve(name).to_owned())
+            })
+        {
+            args.push(("suggestion", name));
+        }
+        self.invalid_operand_types_with_args(ISSUE_FAILABLE_CALL_CONVERSION_ABSENT, span, &args);
     }
 
     pub(crate) fn format_union_constituent_type(&self, ty: TypeId) -> String {
@@ -1415,8 +1439,7 @@ impl TypeChecker<'_> {
                     // ordered pair (direct lookup only). A row whose
                     // conversion function declares `⇥ E` composes that
                     // declared channel through the destination channel.
-                    if let Some(row) = self.resolver.conversion_row_for(source_ty, destination_ty)
-                    {
+                    if let Some(row) = self.resolver.conversion_row_for(source_ty, destination_ty) {
                         if let Some(fn_id) = row.fn_def_id {
                             if let Some(channel) =
                                 self.functions.get(&fn_id).and_then(|sig| sig.err)
@@ -1429,24 +1452,7 @@ impl TypeChecker<'_> {
                             return false;
                         }
                     }
-                    if let Some(arm) = self.lookup_conversion_arm(source_ty, destination_ty) {
-                        self.pending_conversion = Some(arm);
-                        return false;
-                    }
-                    self.invalid_operand_types_with_args(
-                        ISSUE_FAILABLE_CALL_CONVERSION_ABSENT,
-                        span,
-                        &[
-                            (
-                                "source",
-                                self.format_conversion_type_for_diagnostic(source_ty),
-                            ),
-                            (
-                                "destination",
-                                self.format_conversion_type_for_diagnostic(destination_ty),
-                            ),
-                        ],
-                    );
+                    self.conversion_absent_diagnostic(source_ty, destination_ty, span);
                     return false;
                 }
                 self.unify_assign_issue(

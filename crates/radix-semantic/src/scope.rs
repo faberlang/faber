@@ -749,6 +749,9 @@ pub struct Resolver {
     /// `(source → destination)`. Builtin and (future) user rows share this one
     /// table; there is no second compatibility table.
     conversion_rows: FxHashMap<ConversionPair, Vec<ConversionRow>>,
+    /// DefIds of nominal types installed from imported file interfaces.
+    /// Runtime-only ownership surface for orphan-style conversion rules.
+    imported_type_def_ids: FxHashSet<DefId>,
     /// Namespace bindings referenced from qualified type paths.
     used_namespaces: FxHashSet<LexSymbol>,
     /// Resolved relational schema metadata keyed by schema definition
@@ -815,6 +818,7 @@ impl Resolver {
             commune_fields: FxHashMap::default(),
             conversion_arms: FxHashMap::default(),
             conversion_rows: FxHashMap::default(),
+            imported_type_def_ids: FxHashSet::default(),
             used_namespaces: FxHashSet::default(),
             schemas: FxHashMap::default(),
             locale_pack_type_aliases: FxHashMap::default(),
@@ -2243,6 +2247,7 @@ impl Resolver {
         ty: TypeId,
         def_id: DefId,
     ) {
+        self.note_imported_type_def(def_id);
         // Legacy name-keyed table (snapshot-serialized resolution surface).
         // Preserves the historical collision guard: same short name from two
         // different modules marks the name-keyed entry ambiguous.
@@ -2475,6 +2480,39 @@ impl Resolver {
     #[must_use]
     pub fn conversion_rows_for(&self, pair: ConversionPair) -> &[ConversionRow] {
         self.conversion_rows.get(&pair).map_or(&[], Vec::as_slice)
+    }
+
+    /// Record a nominal type definition as imported (foreign to this unit).
+    pub(crate) fn note_imported_type_def(&mut self, def_id: DefId) {
+        self.imported_type_def_ids.insert(def_id);
+    }
+
+    /// Whether a nominal type definition arrived from an imported file
+    /// interface (foreign to this compilation unit).
+    #[must_use]
+    pub fn type_def_is_foreign(&self, def_id: DefId) -> bool {
+        self.imported_type_def_ids.contains(&def_id)
+    }
+
+    /// Named-helper suggestion for a pair with no visible row.
+    ///
+    /// Direct lookup is the only selection mechanism, but a pair enrolled in a
+    /// non-visible scope still names a callable the author can select
+    /// explicitly. Returns the function's declared name symbol when such a
+    /// row exists; the caller renders it through its interner.
+    #[must_use]
+    pub fn conversion_name_suggestion(
+        &self,
+        source: TypeId,
+        destination: TypeId,
+    ) -> Option<LexSymbol> {
+        let pair = ConversionPair::new(source, destination);
+        self.conversion_rows
+            .get(&pair)?
+            .iter()
+            .find_map(|row| row.fn_def_id)
+            .and_then(|def_id| self.symbols.get(&def_id))
+            .map(|symbol| symbol.name)
     }
 
     #[must_use]
@@ -3467,6 +3505,8 @@ impl Resolver {
             imported_enum_variants: FxHashMap::default(),
             commune_fields: FxHashMap::default(),
             conversion_arms,
+            conversion_rows: FxHashMap::default(),
+            imported_type_def_ids: FxHashSet::default(),
             used_namespaces,
             schemas: FxHashMap::default(),
             locale_pack_type_aliases: FxHashMap::default(),

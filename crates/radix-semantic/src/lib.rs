@@ -190,8 +190,9 @@ pub use resolved_use::{
     analyze_resolved_uses, ResolvedUse, ResolvedUseIndex, ResolvedUseKey, ResolvedUseKind,
 };
 pub use scope::{
-    BareVariantLookup, CommuneField, ConversionArm, QualifiedVariantPathLookup, Resolver, Scope,
-    ScopeId, ScopeKind, Symbol, SymbolKind,
+    BareVariantLookup, CommuneField, ConversionArm, ConversionPair, ConversionRow,
+    ConversionRowConflict, QualifiedVariantPathLookup, Resolver, Scope, ScopeId, ScopeKind, Symbol,
+    SymbolKind,
 };
 use std::collections::BTreeMap;
 pub use types::{
@@ -391,6 +392,9 @@ pub fn analyze_with_cli(
     let mut resolver = Resolver::new();
     let mut radix_lanes = RadixLaneMetadata::default();
 
+    // Analysis setup: builtin genera plus the compiler-shipped conversion
+    // rows (CTR-04) seed before user declaration collection so enrollment can
+    // never shadow them.
     crate::builtins::register(&mut resolver, &mut types, interner);
     crate::builtins::register_frame_types_if_needed(program, &mut resolver, &mut types, interner);
     if let Some(pack) = config.locale_pack.as_ref() {

@@ -52,7 +52,7 @@ pub struct LoweredProgram {
 }
 
 pub mod annotation;
-mod decl;
+pub(crate) mod decl;
 mod expr;
 mod literal;
 mod pattern;

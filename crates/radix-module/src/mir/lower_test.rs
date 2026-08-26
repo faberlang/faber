@@ -733,14 +733,17 @@ fn lowers_declared_error_conversion_before_return_error() {
     let dump = dump_source(
         r#"
 discretio Sourceum { Failed }
-discretio Destinatio { @ conversio Sourceum err { redde finge Converted {} ∷ Destinatio } Converted }
+discretio Destinatio { Converted }
+@ conversio functio ex_source(Sourceum err) → Destinatio { redde finge Converted {} ∷ Destinatio }
 functio fail() → vacuum ⇥ Sourceum { iace finge Failed {} ∷ Sourceum }
 functio caller() → vacuum ⇥ Destinatio { fail() }
 "#,
     );
+    // The enrolled row's ordinary function is the conversion call; it must
+    // run before the propagated ReturnError.
     let call = dump
-        .find("call def#1000000(%0)")
-        .expect("synthetic conversion arm call");
+        .find("call def#")
+        .expect("enrolled conversion function call");
     let return_error = dump[call..]
         .find("return_error %1")
         .map(|offset| call + offset)

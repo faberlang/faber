@@ -42,9 +42,6 @@ const ISSUE_COMMUNE_ON_NON_UNION: &str = "commune_on_non_union";
 const ISSUE_DUPLICATE_COMMUNE_FIELD: &str = "duplicate_commune_field";
 const ISSUE_VARIANT_REDECLARES_COMMUNE: &str = "union_variant_redeclares_shared_field";
 const ISSUE_CONVERSIO_MISPLACED: &str = "union_conversio_misplaced";
-const ISSUE_CONVERSIO_SELF_PAIR: &str = "union_conversio_self_pair";
-const ISSUE_CONVERSIO_GENERIC_UNION: &str = "union_conversio_generic_union";
-const ISSUE_CONVERSIO_DUPLICATE_PAIR: &str = "union_conversio_duplicate_pair";
 const FAMILY_COMMUNE: &str = "commune";
 
 /// Where a contract may be attached in v1.
@@ -234,7 +231,6 @@ pub fn collect_local_contracts(
         reject_misplaced_commune(stmt, interner, &mut errors);
         reject_misplaced_conversio(stmt, interner, &mut errors);
         reject_commune_field_uniqueness(stmt, &mut errors);
-        validate_union_conversio_arms(stmt, resolver, interner, &mut errors);
     }
 
     if errors.is_empty() {
@@ -618,12 +614,18 @@ fn reject_misplaced_commune(stmt: &Stmt, interner: &Interner, errors: &mut Vec<S
 }
 
 fn annotation_is_conversio(annotation: &Annotation) -> bool {
-    matches!(&annotation.kind, AnnotationKind::Conversio(_))
+    matches!(&annotation.kind, AnnotationKind::Conversio)
 }
 
-fn reject_conversio_on_list(annotations: &[Annotation], errors: &mut Vec<SemanticError>) {
+/// `@ conversio` is legal only on a standalone function declaration prefix
+/// (the parser enforces the prefix shape); every other placement fails closed.
+fn reject_conversio_on_list(
+    annotations: &[Annotation],
+    function_site: bool,
+    errors: &mut Vec<SemanticError>,
+) {
     for annotation in annotations {
-        if annotation_is_conversio(annotation) {
+        if annotation_is_conversio(annotation) && !function_site {
             errors.push(
                 invalid_annotation(annotation.span, ISSUE_CONVERSIO_MISPLACED)
                     .with_arg("annotation", "@ conversio"),
@@ -633,103 +635,24 @@ fn reject_conversio_on_list(annotations: &[Annotation], errors: &mut Vec<Semanti
 }
 
 fn reject_misplaced_conversio(stmt: &Stmt, _interner: &Interner, errors: &mut Vec<SemanticError>) {
-    reject_conversio_on_list(&stmt.annotations, errors);
+    let on_function = matches!(stmt.kind, StmtKind::Func(_));
+    reject_conversio_on_list(&stmt.annotations, on_function, errors);
     match &stmt.kind {
-        StmtKind::Func(func) => reject_conversio_on_list(&func.annotations, errors),
+        StmtKind::Func(func) => reject_conversio_on_list(&func.annotations, true, errors),
         StmtKind::Class(class) => {
             for member in &class.members {
-                reject_conversio_on_list(&member.annotations, errors);
+                reject_conversio_on_list(&member.annotations, false, errors);
                 if let ClassMemberKind::Method(method) = &member.kind {
-                    reject_conversio_on_list(&method.annotations, errors);
+                    reject_conversio_on_list(&method.annotations, false, errors);
                 }
             }
         }
         StmtKind::Interface(iface) => {
             for method in &iface.methods {
-                reject_conversio_on_list(&method.annotations, errors);
+                reject_conversio_on_list(&method.annotations, false, errors);
             }
         }
         _ => {}
-    }
-}
-
-fn conversio_source_head(source: &TypeExpr) -> Option<Symbol> {
-    match &source.kind {
-        TypeExprKind::Named(name, _) => Some(name.name),
-        TypeExprKind::Qualified(path, _) => path.last().map(|name| name.name),
-        _ => None,
-    }
-}
-
-fn validate_union_conversio_arms(
-    stmt: &Stmt,
-    resolver: &Resolver,
-    interner: &Interner,
-    errors: &mut Vec<SemanticError>,
-) {
-    let StmtKind::Union(union) = &stmt.kind else {
-        return;
-    };
-
-    if union.arms.is_empty() {
-        return;
-    }
-
-    let destination = resolver.lookup_type(union.name.name);
-    if !union.type_params.is_empty() {
-        for arm in &union.arms {
-            errors.push(
-                invalid_annotation(arm.span, ISSUE_CONVERSIO_GENERIC_UNION)
-                    .with_arg("union", interner.resolve(union.name.name)),
-            );
-        }
-    }
-
-    let mut seen: FxHashMap<DefId, Span> = FxHashMap::default();
-    for arm in &union.arms {
-        let Some(source_name) = conversio_source_head(&arm.source) else {
-            continue;
-        };
-        let source = resolver.lookup_type(source_name);
-
-        if let (Some(destination), Some(source)) = (destination, source) {
-            if destination == source {
-                errors.push(
-                    invalid_annotation(arm.span, ISSUE_CONVERSIO_SELF_PAIR)
-                        .with_arg("union", interner.resolve(union.name.name))
-                        .with_arg("source", interner.resolve(source_name)),
-                );
-            }
-
-            if resolver
-                .generic_param_kinds(source)
-                .is_some_and(|params| !params.is_empty())
-                || matches!(&arm.source.kind, TypeExprKind::Named(_, args) if !args.is_empty())
-            {
-                errors.push(
-                    invalid_annotation(arm.span, ISSUE_CONVERSIO_GENERIC_UNION)
-                        .with_arg("union", interner.resolve(union.name.name))
-                        .with_arg("source", interner.resolve(source_name)),
-                );
-            }
-
-            if let Some(previous_span) = seen.insert(source, arm.span) {
-                let dual_span = previous_span.merge(arm.span);
-                errors.push(
-                    invalid_annotation(dual_span, ISSUE_CONVERSIO_DUPLICATE_PAIR)
-                        .with_arg("destination", interner.resolve(union.name.name))
-                        .with_arg("source", interner.resolve(source_name))
-                        .with_arg(
-                            "first_span",
-                            format!("{}..{}", previous_span.start, previous_span.end),
-                        )
-                        .with_arg(
-                            "second_span",
-                            format!("{}..{}", arm.span.start, arm.span.end),
-                        ),
-                );
-            }
-        }
     }
 }
 

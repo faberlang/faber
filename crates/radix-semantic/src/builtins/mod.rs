@@ -7,7 +7,7 @@ pub mod forma;
 pub mod frame_types;
 pub mod gpu;
 
-use crate::{Resolver, TypeTable};
+use crate::{ConversionPair, Primitive, Resolver, TypeTable};
 use radix_hir::{DefId, HirItem};
 use radix_lexer::Interner;
 
@@ -16,6 +16,28 @@ pub fn register(resolver: &mut Resolver, types: &mut TypeTable, interner: &mut I
     forma::register(resolver, types, interner);
     gpu::register(resolver, types, interner);
     register_vertex_shader_locals(resolver, types, interner);
+    register_builtin_conversion_rows(resolver, types);
+}
+
+/// Seed compiler-shipped conversion rows in the coherence registry (CTR-04).
+///
+/// The pairs are the builtin `textus ↔ octeti` re-presentations the typecheck
+/// conversio checks already admit; seeding them as builtin rows makes the one
+/// registry the authority for their identity, so a user `@ conversio` row for
+/// the same ordered pair fails closed as a builtin shadow at enrollment.
+fn register_builtin_conversion_rows(resolver: &mut Resolver, types: &mut TypeTable) {
+    let textus = types.primitive(Primitive::Textus);
+    let octeti = types.primitive(Primitive::Octeti);
+    for (source, destination) in [(textus, octeti), (octeti, textus)] {
+        let result = resolver.register_builtin_conversion(
+            ConversionPair::new(source, destination),
+            radix_lexer::Span::default(),
+        );
+        debug_assert!(
+            result.is_ok(),
+            "builtin conversion rows must seed exactly once per analysis"
+        );
+    }
 }
 
 /// Register implicit `@vertex` shader input/output identifiers so the

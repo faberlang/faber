@@ -272,7 +272,7 @@ fn rectangular_lista_literal_issue(error: RectangularListaLiteralError) -> &'sta
 /// enrollment conflict, mirroring the union duplicate-arm check: the error
 /// span merges both declarations and both source spans ride along as
 /// `first_span` / `second_span` args.
-pub(super) fn conversion_registry_conflict_error(
+pub(crate) fn conversion_registry_conflict_error(
     pair: crate::scope::ConversionPair,
     conflict: crate::scope::ConversionRowConflict,
 ) -> SemanticError {
@@ -310,17 +310,6 @@ pub(super) fn conversion_registry_conflict_error(
 }
 
 impl TypeChecker<'_> {
-    /// Report one coherence-registry enrollment conflict as a dual-span
-    /// structured diagnostic.
-    pub fn report_conversion_registry_conflict(
-        &mut self,
-        pair: crate::scope::ConversionPair,
-        conflict: crate::scope::ConversionRowConflict,
-    ) {
-        self.errors
-            .push(conversion_registry_conflict_error(pair, conflict));
-    }
-
     pub fn check_deref(&mut self, expr: &mut HirExpression, span: radix_lexer::Span) -> TypeId {
         let expr_ty = self.check_expr(expr);
         if let Type::Ref(_, inner) = self.types.get(self.resolve_inferred_type(expr_ty)) {
@@ -2306,7 +2295,10 @@ impl TypeChecker<'_> {
         ) {
             return true;
         }
-        if self.types.is_assignable(self.resolve_inferred_type(channel), error_ty) {
+        if self
+            .types
+            .is_assignable(self.resolve_inferred_type(channel), error_ty)
+        {
             return true;
         }
         self.invalid_operand_types_with_args(

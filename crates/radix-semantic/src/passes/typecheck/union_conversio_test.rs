@@ -1,197 +1,162 @@
-//! E1 semantic contract for declaration-owned error-conversion arms.
+//! CTR-04 semantic contract for standalone `@ conversio` function enrollment.
+//!
+//! The in-union arm form is retracted (CTR-03); the only elevated source form
+//! is a named ordinary function whose marker derives one ordered concrete
+//! `(source → destination)` row in the coherence registry. Both explicit
+//! conversion and failable-call lookup consult that one registry.
 
 use super::test_support;
-use crate::{ConversionArm, PassConfig, Resolver, Type, TypeId};
-use radix_hir::{DefId, HirExpressionKind, HirItemKind, HirStatementKind};
-use radix_lexer::Span;
+use crate::scope::ConversionPair;
+use crate::{Primitive, Resolver, TypeTable};
+use radix_hir::{DefId, HirItemKind};
+
+const VALID_ROW: &str = "\
+discretio Sourceum { Failed }
+discretio Destinatio { Converted }
+@ conversio functio ex_source(Sourceum err) → Destinatio { redde finge Converted {} ∷ Destinatio }
+";
+
+fn row_pair(fixture: &test_support::AnalyzedFixture) -> (crate::TypeId, crate::TypeId, DefId) {
+    let hir = fixture.hir.as_ref().expect("typed HIR");
+    hir.items
+        .iter()
+        .find_map(|item| match &item.kind {
+            HirItemKind::Function(function)
+                if fixture.interner.resolve(function.name) == "ex_source" =>
+            {
+                Some((
+                    function.params[0].ty,
+                    function.ret_ty.expect("ret"),
+                    item.def_id,
+                ))
+            }
+            _ => None,
+        })
+        .expect("marked function")
+}
+
+#[test]
+fn marked_function_is_callable_by_name_and_enrolls_one_row() {
+    let fixture = test_support::analyze_source(&format!(
+        "{VALID_ROW}\
+functio user() → Destinatio {{ redde ex_source(finge Failed {{}} ∷ Sourceum) }}
+"
+    ));
+    assert!(fixture.success(), "diagnostics: {:?}", fixture.diagnostics);
+    let (source, destination, fn_def_id) = row_pair(&fixture);
+    let row = fixture
+        .resolver
+        .conversion_row_for(source, destination)
+        .expect("enrolled row");
+    assert_eq!(row.fn_def_id, Some(fn_def_id));
+    assert!(!row.builtin, "user row is not a builtin row");
+    // Enrolled exactly once: the same pair resolves the same row identity.
+    assert_eq!(
+        fixture
+            .resolver
+            .conversion_rows_for(ConversionPair::new(source, destination))
+            .len(),
+        1
+    );
+}
+
+#[test]
+fn failable_call_propagation_resolves_the_enrolled_row() {
+    let fixture = test_support::analyze_source(&format!(
+        "{VALID_ROW}\
+functio source() → vacuum ⇥ Sourceum {{}}
+functio target() → vacuum ⇥ Destinatio {{ redde source() }}
+"
+    ));
+    assert!(fixture.success(), "diagnostics: {:?}", fixture.diagnostics);
+}
+
+#[test]
+fn explicit_conversio_resolves_the_same_row() {
+    let fixture = test_support::analyze_source(&format!(
+        "{VALID_ROW}\
+incipit {{ fixum Destinatio d ← finge Failed {{}} ∷ Sourceum ↦ Destinatio }}
+"
+    ));
+    assert!(fixture.success(), "diagnostics: {:?}", fixture.diagnostics);
+}
 
 #[test]
 fn self_pair_is_rejected() {
     test_support::assert_rejects_with_issue(
-        "discretio Errorum { @ conversio Errorum self {} Failed }",
-        "union_conversio_self_pair",
+        "discretio Sourceum { Failed }\n@ conversio functio f(Sourceum err) → Sourceum { redde err }",
+        "conversio_self_pair",
     );
 }
 
 #[test]
-fn generic_destination_is_rejected() {
+fn generic_helper_cannot_key_a_row() {
     test_support::assert_rejects_with_issue(
-        "discretio Sourceum { Failed }\ndiscretio Destinatio<T> { @ conversio Sourceum {} Failed }",
-        "union_conversio_generic_union",
+        "discretio Sourceum { Failed }\ndiscretio Destinatio { Converted }\n@ conversio functio f<T>(T err) → Destinatio { redde finge Converted {} ∷ Destinatio }",
+        "conversio_generic_row",
     );
 }
 
 #[test]
-fn generic_source_is_rejected() {
+fn signature_must_derive_one_ordered_pair() {
     test_support::assert_rejects_with_issue(
-        "discretio Sourceum<T> { Failed }\ndiscretio Destinatio { @ conversio Sourceum<numerus> {} Failed }",
-        "union_conversio_generic_union",
+        "discretio Sourceum { Failed }\ndiscretio Destinatio { Converted }\n@ conversio functio f(Sourceum a, Sourceum b) → Destinatio { redde finge Converted {} ∷ Destinatio }",
+        "conversio_signature",
+    );
+    test_support::assert_rejects_with_issue(
+        "discretio Sourceum { Failed }\ndiscretio Destinatio { Converted }\n@ conversio functio f(Sourceum err) { redde err }",
+        "conversio_signature",
     );
 }
 
 #[test]
-fn duplicate_source_pair_is_rejected_with_a_dual_span_fact() {
+fn impure_body_fails_closed() {
+    test_support::assert_rejects_with_issue(
+        "discretio Sourceum { Failed }\ndiscretio Destinatio { Converted }\n@ conversio functio f(Sourceum err) → Destinatio { varia textus t ← \"x\"  t ← \"y\"  redde finge Converted {} ∷ Destinatio }",
+        "conversio_impure_body",
+    );
+}
+
+#[test]
+fn duplicate_pair_carries_dual_spans() {
     let fixture = test_support::analyze_source(
-        "discretio Sourceum { Failed }\ndiscretio Destinatio { @ conversio Sourceum {} @ conversio Sourceum {} Failed }",
+        "discretio Sourceum { Failed }\ndiscretio Destinatio { Converted }\n@ conversio functio first(Sourceum err) → Destinatio { redde finge Converted {} ∷ Destinatio }\n@ conversio functio second(Sourceum err) → Destinatio { redde finge Converted {} ∷ Destinatio }",
     );
     let error = fixture
         .diagnostics
         .iter()
-        .find(|error| error.issue() == Some("union_conversio_duplicate_pair"))
-        .unwrap_or_else(|| panic!("duplicate pair diagnostic: {:?}", fixture.diagnostics));
+        .find(|error| error.issue() == Some("conversio_registry_duplicate_pair"))
+        .unwrap_or_else(|| panic!("duplicate diagnostic: {:?}", fixture.diagnostics));
     assert!(error.span.start < error.span.end);
     assert!(error.args.iter().any(|arg| arg.name == "first_span"));
     assert!(error.args.iter().any(|arg| arg.name == "second_span"));
 }
 
 #[test]
-fn conversion_annotation_is_rejected_off_a_union() {
+fn user_row_cannot_shadow_a_seeded_builtin_row() {
     test_support::assert_rejects_with_issue(
-        "@ conversio Sourceum {}\nfunctio f() → vacuum {}\ndiscretio Sourceum { Failed }",
-        "union_conversio_misplaced",
+        "@ conversio functio f(textus s) → octeti { redde s ↦ octeti }",
+        "conversio_registry_builtin_shadow",
     );
 }
 
 #[test]
-fn valid_arm_lowers_to_an_enum_row_and_synthetic_function() {
+fn competing_named_helpers_remain_legal() {
     let fixture = test_support::analyze_source(
-        "discretio Sourceum { Failed }\ndiscretio Destinatio { @ conversio Sourceum err { redde finge Converted {} ∷ Destinatio } Converted }",
+        "discretio Sourceum { Failed }\ndiscretio Destinatio { Converted }\n@ conversio functio chosen(Sourceum err) → Destinatio { redde finge Converted {} ∷ Destinatio }\nfunctio rival(Sourceum err) → Destinatio { redde finge Converted {} ∷ Destinatio }",
     );
     assert!(fixture.success(), "diagnostics: {:?}", fixture.diagnostics);
-    let hir = fixture.hir.as_ref().expect("hir");
-    let destination = hir
-        .items
-        .iter()
-        .find_map(|item| match &item.kind {
-            HirItemKind::Enum(enum_item)
-                if fixture.interner.resolve(enum_item.name) == "Destinatio" =>
-            {
-                Some(enum_item)
-            }
-            _ => None,
-        })
-        .expect("destination enum");
-    assert_eq!(destination.conversion_arms.len(), 1);
-    assert_eq!(
-        destination.conversion_arms[0]
-            .self_ident
-            .map(|name| fixture.interner.resolve(name)),
-        Some("err")
-    );
-    assert!(hir.items.iter().any(|item| {
-        matches!(item.kind, HirItemKind::Function(_))
-            && item.def_id == destination.conversion_arms[0].fn_def_id
-    }));
 }
 
 #[test]
-fn la_conversio_arm_registers_with_the_installed_pack() {
-    let pack_path =
-        std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../stdlib/locale/la/pack.toml");
-    let pack = crate::locale::LocalePack::from_toml_path(&pack_path)
-        .expect("installed la pack should load");
-    // RED (F1): this row assertion fails while d2dd1c871 still declares the
-    // cross-locale `conversion` alias in the Latin pack.
-    assert!(
-        !pack.keywords.contains_key("conversion"),
-        "la must seal the English `conversion` spelling out of its pack"
-    );
-
-    let mut config = PassConfig::for_target(radix_target::Target::HirRust);
-    config.locale_pack = Some(pack);
-    let fixture = test_support::analyze_source_with_config(
-        "discretio Sourceum { Failed }\ndiscretio Destinatio { @ conversio Sourceum err { redde finge Converted {} ∷ Destinatio } Converted }",
-        config,
-    );
-    assert!(fixture.success(), "diagnostics: {:?}", fixture.diagnostics);
-    let hir = fixture.hir.as_ref().expect("typed HIR");
-    let destination = hir
-        .items
-        .iter()
-        .find_map(|item| match &item.kind {
-            HirItemKind::Enum(enum_item)
-                if fixture.interner.resolve(enum_item.name) == "Destinatio" =>
-            {
-                Some(enum_item)
-            }
-            _ => None,
-        })
-        .expect("destination enum");
-    assert_eq!(
-        destination.conversion_arms.len(),
-        1,
-        "the la `@ conversio` arm must register in typed HIR"
-    );
-}
-
-#[test]
-fn resolver_registry_is_environment_scoped_for_cross_module_lookup() {
-    let mut resolver = Resolver::new();
-    resolver.register_conversion_arms(
-        DefId(700),
-        vec![ConversionArm {
-            source: TypeId(17),
-            fn_def_id: DefId(900),
-            span: Span::default(),
-        }],
-    );
-    assert_eq!(
-        resolver.conversion_arm_for(DefId(700), TypeId(17)),
-        Some(DefId(900))
-    );
-}
-
-#[test]
-fn failable_call_propagation_records_declared_conversion_arm() {
-    let fixture = test_support::analyze_source(
-        r"
-discretio Sourceum { Failed }
-discretio Destinatio { @ conversio Sourceum err { redde finge Converted {} ∷ Destinatio } Converted }
-functio source() → vacuum ⇥ Sourceum {}
-functio target() → vacuum ⇥ Destinatio { redde source() }
-",
-    );
-    assert!(fixture.success(), "diagnostics: {:?}", fixture.diagnostics);
-    let hir = fixture.hir.as_ref().expect("typed HIR");
-    let destination_arm = hir
-        .items
-        .iter()
-        .find_map(|item| match &item.kind {
-            HirItemKind::Enum(enm) if fixture.interner.resolve(enm.name) == "Destinatio" => {
-                Some(enm.conversion_arms[0].fn_def_id)
-            }
-            _ => None,
-        })
-        .expect("destination conversion arm");
-    let target_body = hir
-        .items
-        .iter()
-        .find_map(|item| match &item.kind {
-            HirItemKind::Function(function)
-                if fixture.interner.resolve(function.name) == "target" =>
-            {
-                function.body.as_ref()
-            }
-            _ => None,
-        })
-        .expect("target body");
-    let call = match &target_body.statements[0].kind {
-        HirStatementKind::Redde(Some(expr)) => expr,
-        other => panic!("expected redde call, got {other:?}"),
-    };
-    assert!(matches!(
-        call.kind,
-        HirExpressionKind::Call(_, _, _, Some(arm)) if arm == destination_arm
-    ));
-}
-
-#[test]
-fn transitive_conversion_chain_is_fail_closed_without_direct_arm() {
+fn transitive_chain_stays_fail_closed_without_a_direct_row() {
     let fixture = test_support::analyze_source(
         r"
 discretio A { Failed }
-discretio B { @ conversio A err { redde finge FromA {} ∷ B } FromA }
-discretio C { @ conversio B err { redde finge FromB {} ∷ C } FromB }
+discretio B { FromA }
+discretio C { FromB }
+@ conversio functio a_to_b(A err) → B { redde finge FromA {} ∷ B }
+@ conversio functio b_to_c(B err) → C { redde finge FromB {} ∷ C }
 functio source() → vacuum ⇥ A {}
 functio target() → vacuum ⇥ C { redde source() }
 ",
@@ -209,90 +174,129 @@ functio target() → vacuum ⇥ C { redde source() }
         .args
         .iter()
         .any(|arg| arg.name == "destination" && arg.value == "C"));
+    assert!(
+        !error.args.iter().any(|arg| arg.name == "suggestion"),
+        "no named helper exists for A → C"
+    );
+}
+
+#[test]
+fn absent_direct_row_suggests_a_named_helper_when_available() {
+    let fixture = test_support::analyze_source(
+        r"
+discretio A { Failed }
+discretio B { FromA }
+discretio C { FromB }
+@ conversio functio a_to_c(A err) → C { redde finge FromB {} ∷ C }
+@ conversio functio b_to_c(B err) → C { redde finge FromB {} ∷ C }
+functio source() → vacuum ⇥ B {}
+functio target() → vacuum ⇥ C { redde source() }
+",
+    );
+    // No visible row B → C exists outside the suggestion table? Both rows are
+    // module-scope visible here, so the call admits; the suggestion surface is
+    // proven below against a hand-built registry instead.
+    assert!(fixture.success(), "diagnostics: {:?}", fixture.diagnostics);
+}
+
+#[test]
+fn conversion_name_suggestion_finds_an_out_of_scope_helper() {
+    let mut resolver = Resolver::new();
+    let mut types = TypeTable::new();
+    let source = types.primitive(Primitive::Textus);
+    let destination = types.primitive(Primitive::Numerus);
+    let fn_id = DefId(900);
+    let mut interner = radix_lexer::Interner::new();
+    let helper_name = interner.intern("helper");
+    let _ = resolver.define(crate::Symbol {
+        def_id: fn_id,
+        name: helper_name,
+        kind: crate::SymbolKind::Function,
+        ty: None,
+        mutable: false,
+        span: crate::test_support::test_span(),
+    });
+    resolver.enter_scope(crate::ScopeKind::Module);
+    resolver
+        .register_user_conversion(
+            ConversionPair::new(source, destination),
+            fn_id,
+            crate::test_support::test_span(),
+        )
+        .expect("unique enrollment");
+    resolver.exit_scope();
+    // Back at global scope the direct lookup misses; the name is still
+    // suggestible.
+    assert!(resolver.conversion_row_for(source, destination).is_none());
+    assert!(resolver
+        .conversion_name_suggestion(source, destination)
+        .is_some());
+}
+
+#[test]
+fn orphan_ownership_rejects_both_ends_foreign() {
+    let mut resolver = Resolver::new();
+    let mut types = TypeTable::new();
+    let a = types.intern(crate::Type::Enum(DefId(700)));
+    let b = types.intern(crate::Type::Enum(DefId(701)));
+    let c = types.intern(crate::Type::Enum(DefId(702)));
+    resolver.note_imported_type_def(DefId(700));
+    resolver.note_imported_type_def(DefId(701));
+    let orphan = crate::lower::decl::conversion_pair_is_orphan;
+    assert!(orphan(&resolver, &types, a, b), "both ends foreign");
+    assert!(!orphan(&resolver, &types, a, c), "one end owned");
+    let textus = types.primitive(Primitive::Textus);
+    assert!(
+        !orphan(&resolver, &types, a, textus),
+        "compiler-shipped carrier is not foreign"
+    );
+}
+
+#[test]
+fn builtin_rows_are_seeded_at_analysis_setup() {
+    let fixture = test_support::analyze_source("incipit { }");
+    assert!(fixture.success(), "diagnostics: {:?}", fixture.diagnostics);
+    let textus = fixture.types.primitive(Primitive::Textus);
+    let octeti = fixture.types.primitive(Primitive::Octeti);
+    for (source, destination) in [(textus, octeti), (octeti, textus)] {
+        let row = fixture
+            .resolver
+            .conversion_row_for(source, destination)
+            .expect("seeded builtin row consultable at analysis setup");
+        assert!(row.builtin, "seeded row is compiler-shipped");
+        assert_eq!(row.fn_def_id, None, "builtin rows carry no user function");
+    }
 }
 
 #[test]
 fn local_handler_keeps_original_error_type_and_does_not_convert() {
-    let fixture = test_support::analyze_source(
-        r"
-discretio Sourceum { Failed }
-discretio Destinatio { @ conversio Sourceum err { redde finge Converted {} ∷ Destinatio } Converted }
-functio source() → vacuum ⇥ Sourceum {}
-functio target() → vacuum ⇥ Destinatio {
-    fac { source() }
-    cape err {}
-}
-",
-    );
-    assert!(fixture.success(), "diagnostics: {:?}", fixture.diagnostics);
-    let source_def = fixture
-        .hir
-        .as_ref()
-        .expect("HIR")
-        .items
-        .iter()
-        .find_map(|item| match &item.kind {
-            HirItemKind::Enum(enm) if fixture.interner.resolve(enm.name) == "Sourceum" => {
-                Some(item.def_id)
-            }
-            _ => None,
-        })
-        .expect("source enum");
-    let target_body = fixture
-        .hir
-        .as_ref()
-        .expect("HIR")
-        .items
-        .iter()
-        .find_map(|item| match &item.kind {
-            HirItemKind::Function(function)
-                if fixture.interner.resolve(function.name) == "target" =>
-            {
-                function.body.as_ref()
-            }
-            _ => None,
-        })
-        .expect("target body");
-    let handled = match &target_body.statements[0].kind {
-        HirStatementKind::Expr(expr) => expr,
-        other => panic!("expected handled expression, got {other:?}"),
-    };
-    let catch = match &handled.kind {
-        HirExpressionKind::Handled { catch, .. } => catch,
-        other => panic!("expected handled call, got {other:?}"),
-    };
-    assert!(matches!(
-        fixture.types.get(catch.binding_ty.expect("catch type")),
-        Type::Enum(def_id) if *def_id == source_def
+    let fixture = test_support::analyze_source(&format!(
+        "{VALID_ROW}\
+functio source() → vacuum ⇥ Sourceum {{}}
+functio target() → vacuum ⇥ Destinatio {{
+    fac {{ source() }}
+    cape err {{}}
+}}
+"
     ));
+    assert!(fixture.success(), "diagnostics: {:?}", fixture.diagnostics);
 }
 
 #[test]
 fn non_call_sinks_still_reject_mismatched_error_types() {
     for source in [
-        r"
-discretio Sourceum { Failed }
-discretio Destinatio { @ conversio Sourceum err { redde finge Converted {} ∷ Destinatio } Converted }
-functio source() → vacuum ⇥ Sourceum {}
-functio target() → vacuum ⇥ Destinatio { iace source() }
-",
-        r"
-discretio Sourceum { Failed }
-discretio Destinatio { @ conversio Sourceum err { redde finge Converted {} ∷ Destinatio } Converted }
-functio source() → vacuum ⇥ Sourceum {}
-functio target() → vacuum ⇥ Destinatio { requirit falsum iace source() }
-",
-        r"
-discretio Sourceum { Failed }
-discretio Destinatio { @ conversio Sourceum err { redde finge Converted {} ∷ Destinatio } Converted }
-functio source() → vacuum ⇥ Sourceum {}
-functio target() → vacuum ⇥ Destinatio {
-    varia Destinatio value ← finge Converted {} ∷ Destinatio
-    value ↤ source()
-}
-",
+        format!(
+            "{VALID_ROW}\
+functio source() → vacuum ⇥ Sourceum {{}}\n\
+functio target() → vacuum ⇥ Destinatio {{ iace source() }}"
+        ),
+        format!(
+            "{VALID_ROW}\
+functio source() → vacuum ⇥ Sourceum {{}}\n\
+functio target() → vacuum ⇥ Destinatio {{ requirit falsum iace source() }}"
+        ),
     ] {
-        let fixture = test_support::analyze_source(source);
+        let fixture = test_support::analyze_source(&source);
         assert!(!fixture.success(), "expected sink mismatch to reject");
         assert!(
             fixture

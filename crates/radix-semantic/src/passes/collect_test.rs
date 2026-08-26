@@ -222,7 +222,6 @@ fn collects_union_variants() {
         name: union_name,
         type_params: Vec::new(),
         shared_fields: Vec::new(),
-        arms: Vec::new(),
         variants: vec![ok, error],
     }))]);
 
@@ -260,7 +259,6 @@ fn cross_union_variant_names_do_not_collide() {
         name: ident(&mut interner, "A"),
         type_params: Vec::new(),
         shared_fields: Vec::new(),
-        arms: Vec::new(),
         variants: vec![Variant {
             leading_trivia: Vec::new(),
             name: ident(&mut interner, "X"),
@@ -272,7 +270,6 @@ fn cross_union_variant_names_do_not_collide() {
         name: ident(&mut interner, "B"),
         type_params: Vec::new(),
         shared_fields: Vec::new(),
-        arms: Vec::new(),
         variants: vec![Variant {
             leading_trivia: Vec::new(),
             name: ident(&mut interner, "X"),
@@ -326,7 +323,6 @@ fn same_union_duplicate_variant_still_fails() {
         name: ident(&mut interner, "A"),
         type_params: Vec::new(),
         shared_fields: Vec::new(),
-        arms: Vec::new(),
         variants: vec![
             Variant {
                 leading_trivia: Vec::new(),
