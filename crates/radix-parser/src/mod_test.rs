@@ -29,9 +29,17 @@ fn parses_capta_trap_expression() {
     let result = parse_ok(
         "functio f() → numerus ⇥ textus { redde 1 }\nfunctio g() → vacuum { fixum ∪ r ← capta { f() } nota r }\n",
     );
-    assert!(result.errors.is_empty(), "trap source must parse cleanly: {:?}", result.errors);
+    assert!(
+        result.errors.is_empty(),
+        "trap source must parse cleanly: {:?}",
+        result.errors
+    );
     let program = result.program.as_ref().expect("program");
-    assert!(program.statements.len() == 2, "both functions parse: {:?}", program.statements.len());
+    assert!(
+        program.statements.len() == 2,
+        "both functions parse: {:?}",
+        program.statements.len()
+    );
 }
 
 #[test]
@@ -41,7 +49,11 @@ fn capta_stays_usable_as_ordinary_identifier() {
     let result = parse_ok(
         "functio capta(numerus x) → numerus { redde x }\nfunctio g() → vacuum { fixum numerus capta ← capta(1) nota capta }\n",
     );
-    assert!(result.errors.is_empty(), "capta as identifier must parse: {:?}", result.errors);
+    assert!(
+        result.errors.is_empty(),
+        "capta as identifier must parse: {:?}",
+        result.errors
+    );
 }
 
 #[test]
@@ -2440,7 +2452,13 @@ fn parses_itera_pattern_binder_all_modes() {
         let StmtKind::Itera(iter_stmt) = &program.statements[0].kind else {
             panic!("expected itera statement for {source}");
         };
-        assert!(matches!(iter_stmt.mode, mode), "mode mismatch for {source}");
+        // IteraMode has no PartialEq; discriminant equality is exact for this
+        // fieldless enum and constrains the mode (unlike matches!(mode, mode)).
+        assert_eq!(
+            std::mem::discriminant(&iter_stmt.mode),
+            std::mem::discriminant(&mode),
+            "mode mismatch for {source}"
+        );
         assert!(
             matches!(iter_stmt.binding, BindingPattern::Array { .. }),
             "expected array binder for {source}"
@@ -5103,7 +5121,7 @@ fn eot_transfer_inside_assignment_value() {
 #[test]
 fn eot_transfer_missing_payload_rejected() {
     assert_parse_error_matches(
-        r#"output ⇇"#,
+        r"output ⇇",
         ParseExpectation::Issue("transfer_payload_expected"),
     );
     assert_parse_error_matches(
