@@ -25,6 +25,7 @@
 //!   from the returned source string.
 
 pub mod conversio_arm;
+pub mod decimal;
 pub mod hygiene;
 pub mod names;
 pub mod text_literal;
