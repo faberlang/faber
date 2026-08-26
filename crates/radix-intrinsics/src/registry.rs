@@ -264,6 +264,14 @@ pub static INTRINSICS: &[MethodIntrinsic] = &[
     intrinsic!(Copia, "adde", 1, &[IntrinsicParamKind::Inner], Vacuum, collection Append),
     intrinsic!(Copia, "dele", 1, &[IntrinsicParamKind::Inner], Bool, collection Delete),
     intrinsic!(Copia, "differentia", 1, &[IntrinsicParamKind::SetInner], SetInner, collection Difference),
+    intrinsic!(
+        Copia,
+        "filtrata",
+        1,
+        &[IntrinsicParamKind::Predicate],
+        SetInner,
+        HigherOrderFiltrata
+    ),
     intrinsic!(Copia, "habet", 1, &[IntrinsicParamKind::Inner], Bool, collection Contains),
     intrinsic!(Copia, "intersectio", 1, &[IntrinsicParamKind::SetInner], SetInner, collection Intersection),
     intrinsic!(Copia, "longitudo", 0, &[], Numerus, collection Length),
