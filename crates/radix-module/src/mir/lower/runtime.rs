@@ -2271,10 +2271,7 @@ impl FunctionBuilder<'_> {
         }
         self.context
             .conversion_rows
-            .get(&ConversionPair::new(
-                source_ty.semantic_id(),
-                destination_ty.semantic_id(),
-            ))
+            .get(&ConversionPair::new(source_ty.semantic_id(), destination_ty.semantic_id()))
             .copied()
     }
 
@@ -3241,8 +3238,7 @@ impl FunctionBuilder<'_> {
             ListaToTensorShape::Symbolic { shape, rank } => (0..rank)
                 .map(|axis| {
                     let axis = i64::try_from(axis).ok()?;
-                    let scalar =
-                        MirOperand::Constant(MirConstant::ShapeSize { shape, axis: Some(axis) });
+                    let scalar = MirOperand::Constant(MirConstant::ShapeSize { shape, axis: Some(axis) });
                     let numerus = self.types.primitive(Primitive::Numerus);
                     let dim = self.runtime_call_value(
                         MirIntrinsic::Convert(MirConversion {

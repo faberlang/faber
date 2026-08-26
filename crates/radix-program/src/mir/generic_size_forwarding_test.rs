@@ -81,12 +81,14 @@ fn named_function_shapes<'a>(
                 .is_some_and(|name| lowered.interner.resolve(name) == function_name)
         })
         .map(|function| {
-            let param_shape = function.params.first().and_then(|param| {
-                match types.get(param.ty.semantic_id()) {
-                    Type::Tensor(_, shape) => literal_dims(types, *shape),
-                    _ => None,
-                }
-            });
+            let param_shape =
+                function
+                    .params
+                    .first()
+                    .and_then(|param| match types.get(param.ty.semantic_id()) {
+                        Type::Tensor(_, shape) => literal_dims(types, *shape),
+                        _ => None,
+                    });
             let return_shape = match types.get(function.return_ty.semantic_id()) {
                 Type::Tensor(_, shape) => literal_dims(types, *shape),
                 _ => None,

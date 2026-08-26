@@ -408,9 +408,9 @@ pub enum GpuBuiltinWire {
 /// serde'd HIR payload. Version 6 adds resolver conversion-arm rows — both
 /// are wire breaks that ratchet the version rather than inventing a
 /// compatibility decoder. Version 7 (CTR-05) removes the destination-owned
-/// conversion-arm rows and `HirEnum.conversion_arms` from the directly-
-/// serde'd HIR payload, replacing them with coherence-registry rows keyed by
-/// the ordered pair `(source → destination)`.
+/// conversion-arm rows and the enum's retired conversion-arm payload from
+/// the directly-serde'd HIR payload, replacing them with coherence-registry
+/// rows keyed by the ordered pair `(source → destination)`.
 pub const SCHEMA_VERSION: u32 = 7;
 
 /// Serializable snapshot of one analyzed compilation unit (F1, F2, F4).

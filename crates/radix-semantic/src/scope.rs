@@ -3570,13 +3570,14 @@ impl Resolver {
             .conversion_rows
             .values()
             .flat_map(|rows| {
-                rows.iter().map(|row| radix_hir_fhir::ConversionRowSnapshot {
-                    source: row.pair.source,
-                    destination: row.pair.destination,
-                    fn_def_id: row.fn_def_id,
-                    span: row.span,
-                    builtin: row.builtin,
-                })
+                rows.iter()
+                    .map(|row| radix_hir_fhir::ConversionRowSnapshot {
+                        source: row.pair.source,
+                        destination: row.pair.destination,
+                        fn_def_id: row.fn_def_id,
+                        span: row.span,
+                        builtin: row.builtin,
+                    })
             })
             .collect::<Vec<_>>();
         conversion_rows.sort_by_key(|row| {

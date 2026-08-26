@@ -201,10 +201,7 @@ fn run_closure_env_package_tests(package_root: &Path, stdlib_home: &Path) -> Vec
     .unwrap_or_else(|diagnostics| {
         panic!(
             "closure-env package must lower on the test-link lane: {:?}",
-            diagnostics
-                .iter()
-                .map(|diag| (diag.code, diag.message.clone()))
-                .collect::<Vec<_>>()
+            diagnostics.iter().map(|diag| diag.code).collect::<Vec<_>>()
         )
     })
 }
