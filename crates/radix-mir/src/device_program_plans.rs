@@ -3079,13 +3079,20 @@ fn gather_ids_element_ty(
     ids_ty: MirType,
     validation: &MirValidationContext<'_>,
 ) -> Result<MirType, PlanMappingError> {
-    let Type::Array(element) = validation.types.get(ids_ty.semantic_id()) else {
-        return Err(PlanMappingError::mapping(
-            "row-gather ids operand must be a lista<numerus>",
-        ));
+    // CCI-1: literal ids may be unbounded `lista<numerus>` or, post-7562d0cf,
+    // a bounded `lista<numerus, N>` inferred from the literal — a literal with
+    // a known bound is still a provable literal ids vector.
+    let element = match validation.types.get(ids_ty.semantic_id()) {
+        Type::Array(element) => *element,
+        Type::BoundedArray { element, .. } => *element,
+        _ => {
+            return Err(PlanMappingError::mapping(
+                "row-gather ids operand must be a lista<numerus>",
+            ));
+        }
     };
     let (Type::Primitive(Primitive::Numerus) | Type::SizedNumeric(Primitive::Numerus, _)) =
-        validation.types.get(*element)
+        validation.types.get(element)
     else {
         return Err(PlanMappingError::mapping(
             "row-gather ids operand must be a lista<numerus>",

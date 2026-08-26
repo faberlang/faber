@@ -1446,7 +1446,12 @@ impl Validator<'_, '_> {
                     .get(1)
                     .and_then(|arg| self.validate_operand(scope, arg, span))
                 {
-                    if !matches!(self.type_kind(ids_ty), Type::Array(_)) {
+                    // CCI-1: bounded `lista<numerus,N>` literals are legal ids
+                    // post-7562d0cf (exact list literal bounds).
+                    if !matches!(
+                        self.type_kind(ids_ty),
+                        Type::Array(_) | Type::BoundedArray { .. }
+                    ) {
                         self.error(span, "tensor gather ids is not a lista");
                     }
                 }
