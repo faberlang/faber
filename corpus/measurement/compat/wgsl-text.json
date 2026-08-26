@@ -6,7 +6,7 @@
   "generatedBy": "radix/scripta/emit-compat-json.py",
   "summary": {
     "capable": 6,
-    "analyzable": 328
+    "analyzable": 331
   },
   "terms": [
     {
@@ -547,7 +547,7 @@
       "term": "itera",
       "rule": "keyword",
       "capable": 0,
-      "analyzable": 13
+      "analyzable": 15
     },
     {
       "term": "iuncta",
@@ -673,7 +673,7 @@
       "term": "numerus",
       "rule": "keyword",
       "capable": 0,
-      "analyzable": 3
+      "analyzable": 4
     },
     {
       "term": "non est",

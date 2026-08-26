@@ -97,8 +97,8 @@ fn selective_import_field_kept_schema_v4_wire_breaks_ratchet_version() {
     // fail-closed, and this crate's round-trip/validate proof.
     // EOT-3W ratchets to 5 (Transfer variant shifts serde ordinals), E3
     // ratchets to 6 for resolver conversion-arm rows, and CTR-05 ratchets to
-    // 7 (registry rows replace destination-owned arm rows; `HirEnum
-    // .conversion_arms` leaves the serde'd HIR payload).
+    // 7 (registry rows replace destination-owned arm rows; the enum's
+    // retired conversion-arm payload leaves the serde'd HIR payload).
     assert_eq!(SCHEMA_VERSION, 7);
 }
 

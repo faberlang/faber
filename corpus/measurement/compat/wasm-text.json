@@ -5,8 +5,8 @@
   "lane": "mir",
   "generatedBy": "radix/scripta/emit-compat-json.py",
   "summary": {
-    "capable": 242,
-    "analyzable": 328
+    "capable": 245,
+    "analyzable": 331
   },
   "terms": [
     {
@@ -546,8 +546,8 @@
     {
       "term": "itera",
       "rule": "keyword",
-      "capable": 4,
-      "analyzable": 13
+      "capable": 6,
+      "analyzable": 15
     },
     {
       "term": "iuncta",
@@ -672,8 +672,8 @@
     {
       "term": "numerus",
       "rule": "keyword",
-      "capable": 3,
-      "analyzable": 3
+      "capable": 4,
+      "analyzable": 4
     },
     {
       "term": "non est",

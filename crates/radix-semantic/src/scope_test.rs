@@ -222,7 +222,9 @@ fn resolver_snapshot_round_trips_conversion_rows() {
     assert_eq!(restored_builtin.fn_def_id, None);
 
     assert!(
-        restored.conversion_row_for(TypeId(23), TypeId(17)).is_none(),
+        restored
+            .conversion_row_for(TypeId(23), TypeId(17))
+            .is_none(),
         "ordered pair identity is preserved, not reversed"
     );
 }

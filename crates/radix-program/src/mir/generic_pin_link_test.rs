@@ -263,8 +263,8 @@ fn package_mir_symbolic_pin_wrong_count_fails_closed() {
     assert!(
         errors
             .iter()
-            .any(|diagnostic| diagnostic.message.contains("element count")),
-        "the wrong-count failure must name the element-count contract, got {:?}",
+            .any(|diagnostic| diagnostic.code == Some("PKG001")),
+        "the wrong-count failure must carry the structured PKG001 identity, got {:?}",
         errors
     );
 }
