@@ -28,6 +28,17 @@ use super::*;
 use crate::hir::visit::HirVisitor;
 use radix_types::i64s_from_literal_index;
 
+fn arm_body_returns(arm: &HirCasuArm) -> bool {
+    matches!(
+        &arm.body.kind,
+        HirExpressionKind::Block(block)
+            if block
+                .statements
+                .iter()
+                .any(|statement| matches!(statement.kind, HirStatementKind::Redde(_)))
+    )
+}
+
 struct RangeIteraLowering<'a> {
     binding: DefId,
     name: Symbol,
@@ -689,6 +700,20 @@ impl FunctionBuilder<'_> {
         arms: &[HirCasuArm],
         expr: &HirExpression,
     ) -> Option<MirOperand> {
+        if arms
+            .iter()
+            .flat_map(|arm| arm.patterns.iter())
+            .any(|pattern| matches!(pattern, HirPattern::TypeTest { .. }))
+        {
+            let [scrutinee] = scrutinees else {
+                self.errors.push(MirError::unsupported(
+                    expr.span,
+                    "multi-subject type-test discerne before MIR lowering",
+                ));
+                return None;
+            };
+            return self.lower_type_test_discerne_expr(scrutinee, arms, expr);
+        }
         let ty = self.expr_ty(expr)?;
         if !self.is_vacuum(ty) {
             self.errors.push(MirError::unsupported(
@@ -788,6 +813,128 @@ impl FunctionBuilder<'_> {
             self.seal_unreachable(join_id, expr.span);
         }
         Some(MirOperand::Constant(MirConstant::Unit))
+    }
+
+    fn lower_type_test_discerne_expr(
+        &mut self,
+        scrutinee: &HirExpression,
+        arms: &[HirCasuArm],
+        expr: &HirExpression,
+    ) -> Option<MirOperand> {
+        let scrutinee_ty = scrutinee.ty?;
+        let value = self.lower_expr_value(scrutinee)?;
+        let scrutinee_place =
+            self.materialize_operand_place(value.clone(), MirType::semantic(scrutinee_ty), scrutinee.span);
+        let result_ty = expr.ty?;
+        let all_arms_return = arms.iter().all(arm_body_returns);
+        let destination = if all_arms_return || self.is_vacuum(MirType::semantic(result_ty)) {
+            None
+        } else {
+            Some(MirPlace::temp(self.push_temp(MirType::semantic(result_ty), expr.span)))
+        };
+        let join_id = self.fresh_block(expr.span);
+        let bool_ty = MirType::semantic(self.types.primitive(Primitive::Bivalens));
+        let mut reaches_join = false;
+        let mut has_default = false;
+
+        for arm in arms {
+            let [pattern] = arm.patterns.as_slice() else {
+                self.errors.push(MirError::unsupported(
+                    arm.span,
+                    "multi-pattern type-test discerne arm before MIR lowering",
+                ));
+                return None;
+            };
+            if arm.guard.is_some() {
+                self.errors
+                    .push(MirError::unsupported(arm.span, "guarded type-test discerne arm"));
+                return None;
+            }
+            let HirPattern::TypeTest { ty, binding, .. } = pattern else {
+                if matches!(pattern, HirPattern::Wildcard | HirPattern::Binding(_, _)) {
+                    has_default = true;
+                    self.lower_type_test_arm_body(arm, destination.clone(), result_ty, &scrutinee_place, scrutinee_ty)?;
+                    reaches_join |= self.terminate_open_current(MirTerminatorKind::Goto(join_id), arm.span);
+                    break;
+                }
+                self.errors
+                    .push(MirError::unsupported(arm.span, "non-type-test pattern in type-test discerne"));
+                return None;
+            };
+
+            let condition = self.runtime_call_value(
+                MirIntrinsic::TypeCheck(MirTypeCheckOp { positive: true, ty: MirType::semantic(*ty) }),
+                vec![value.clone()],
+                bool_ty,
+                arm.span,
+            );
+            let then_id = self.fresh_block(arm.span);
+            let else_id = self.fresh_block(arm.span);
+            self.terminate_current(
+                MirTerminatorKind::Branch { condition, then_block: then_id, else_block: else_id },
+                arm.span,
+            );
+
+            self.switch_to(then_id);
+            if let Some((def_id, name)) = binding {
+                let local = self.next_local_id();
+                self.locals.push(MirLocalDecl {
+                    id: local,
+                    name: Some(*name),
+                    ty: MirType::semantic(*ty),
+                    mutable: false,
+                    span: arm.span,
+                });
+                self.bindings
+                    .insert(*def_id, LocalBinding { local, ty: MirType::semantic(*ty) });
+                self.assign(
+                    MirPlace::local(local),
+                    MirOperand::Place(scrutinee_place.clone()),
+                    MirType::semantic(*ty),
+                    arm.span,
+                );
+            }
+            self.lower_type_test_arm_body(arm, destination.clone(), result_ty, &scrutinee_place, scrutinee_ty)?;
+            reaches_join |= self.terminate_open_current(MirTerminatorKind::Goto(join_id), arm.span);
+            self.switch_to(else_id);
+        }
+
+        if !has_default {
+            // Semantic exhaustiveness owns the missing-member diagnostic. Keep
+            // the MIR CFG total for the runner by routing the statically
+            // unreachable fallthrough to the join rather than emitting a
+            // runner-unsupported `Unreachable` terminator.
+            reaches_join |= self.terminate_open_current(MirTerminatorKind::Goto(join_id), expr.span);
+        }
+        if reaches_join {
+            self.switch_to(join_id);
+        } else {
+            self.seal_unreachable(join_id, expr.span);
+        }
+        destination
+            .map(MirOperand::Place)
+            .or_else(|| Some(MirOperand::Constant(MirConstant::Unit)))
+    }
+
+    fn lower_type_test_arm_body(
+        &mut self,
+        arm: &HirCasuArm,
+        destination: Option<MirPlace>,
+        result_ty: TypeId,
+        _scrutinee_place: &MirPlace,
+        _scrutinee_ty: TypeId,
+    ) -> Option<()> {
+        if let Some(destination) = destination {
+            let HirExpressionKind::Block(block) = &arm.body.kind else {
+                self.errors
+                    .push(MirError::unsupported(arm.span, "type-test value arm is not a block"));
+                return None;
+            };
+            self.lower_block_to_destination(block, destination, MirType::semantic(result_ty), arm.span)?;
+        } else {
+            self.lower_expr_value(&arm.body)?;
+        }
+        Some(())
     }
 
     fn lower_unit_variant_discerne(

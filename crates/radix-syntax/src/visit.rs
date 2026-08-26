@@ -695,12 +695,8 @@ pub fn walk_type_expr<V: Visitor>(visitor: &mut V, ty: &TypeExpr) {
             }
             visitor.visit_type_expr(&func.ret);
         }
-        TypeExprKind::Union(members) => {
-            for m in members {
-                visitor.visit_type_expr(m);
-            }
-        }
-        TypeExprKind::Intersection(members) => {
+        // Union and Intersection share one walk: both are flat member lists.
+        TypeExprKind::Union(members) | TypeExprKind::Intersection(members) => {
             for m in members {
                 visitor.visit_type_expr(m);
             }
@@ -787,7 +783,7 @@ fn walk_pattern<V: Visitor>(visitor: &mut V, pattern: &Pattern) {
     };
     match pattern {
         Pattern::Wildcard(_) | Pattern::Literal(_, _) => {}
-        Pattern::Ident(ident, bind) => {
+        Pattern::Ident(ident, bind) | Pattern::Type(ident, bind) => {
             visitor.visit_ident(ident);
             if let Some(bind) = bind {
                 walk_pattern_bind(visitor, bind);

@@ -982,6 +982,12 @@ fn resolve_pattern(
     match pattern {
         Pattern::Wildcard(_) => {}
         Pattern::Literal(_, _) => {}
+        Pattern::Type(_ident, bind) => {
+            // The type atom is classified before resolution. Only its optional
+            // value binding enters the arm scope; the type name itself is not a
+            // local and therefore must not be shadowed into one.
+            resolve_pattern_bind(resolver, bind.as_ref(), errors);
+        }
         Pattern::Ident(ident, bind) => {
             // A bare name that two or more unions define is an ambiguous
             // variant pattern; report it and never bind it silently. The

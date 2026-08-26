@@ -26,7 +26,9 @@
 use super::Lowerer;
 use radix_hir::{HirLiteral, HirPattern};
 use radix_lexer::Span;
-use radix_syntax::{AstMutability, Literal, PathPattern, Pattern, PatternBind};
+use radix_syntax::{
+    AstMutability, Literal, PathPattern, Pattern, PatternBind, TypeExpr, TypeExprKind,
+};
 
 /// Lower a parser pattern into HIR while establishing any new bindings.
 ///
@@ -41,8 +43,65 @@ pub fn lower_pattern(lowerer: &mut Lowerer, pattern: &Pattern) -> HirPattern {
             HirPattern::Wildcard
         }
         Pattern::Ident(ident, bind) => lower_ident_pattern(lowerer, ident, bind.as_ref()),
+        Pattern::Type(ident, bind) => lower_type_pattern(lowerer, ident, bind.as_ref()),
         Pattern::Literal(lit, span) => lower_literal(lowerer, lit, *span),
         Pattern::Path(path) => lower_path_pattern(lowerer, path),
+    }
+}
+
+fn lower_type_pattern(
+    lowerer: &mut Lowerer,
+    ident: &radix_syntax::Ident,
+    bind: Option<&PatternBind>,
+) -> HirPattern {
+    lowerer.current_span = ident.span;
+    let ty_expr = TypeExpr {
+        nullable: false,
+        mode: None,
+        kind: TypeExprKind::Named(ident.clone(), Vec::new()),
+        span: ident.span,
+        iuncta_label: None,
+    };
+    let ty = lowerer.lower_type(&ty_expr);
+    let candidate = match lowerer.resolver.lookup_variant_bare(ident.name) {
+        crate::BareVariantLookup::Single(def_id) => Some(def_id),
+        crate::BareVariantLookup::Ambiguous { .. } | crate::BareVariantLookup::None => None,
+    };
+    let binding = match bind {
+        None => None,
+        Some(PatternBind::Alias(alias)) => {
+            let def_id = lowerer.next_def_id();
+            lowerer.bind_local(alias.name, def_id);
+            Some((def_id, alias.name))
+        }
+        Some(PatternBind::Bindings {
+            mutability,
+            bindings,
+        }) => {
+            if *mutability == AstMutability::Mutable {
+                lowerer.error("mutable_pattern_binding");
+            }
+            let Some(field) = bindings.first() else {
+                lowerer.error("type_pattern_binding_required");
+                return HirPattern::TypeTest {
+                    ty,
+                    candidate,
+                    binding: None,
+                };
+            };
+            if bindings.len() > 1 {
+                lowerer.error("type_pattern_binding_arity");
+            }
+            let name = field.alias.as_ref().unwrap_or(&field.name);
+            let def_id = lowerer.next_def_id();
+            lowerer.bind_local(name.name, def_id);
+            Some((def_id, name.name))
+        }
+    };
+    HirPattern::TypeTest {
+        ty,
+        candidate,
+        binding,
     }
 }
 

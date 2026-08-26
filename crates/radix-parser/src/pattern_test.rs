@@ -46,6 +46,23 @@ discerne event {
 }
 
 #[test]
+fn parses_type_pattern_atoms_and_null_member() {
+    let result = parse_ok(
+        "genus Formal { textus greeting }\nfunctio f(Formal ∪ nihil u) → vacuum {\n    discerne u {\n        casu Formal fixum f { tacet }\n        casu nihil { tacet }\n    }\n}",
+    );
+    let program = result.program.as_ref().expect("program");
+    let StmtKind::Func(func) = &program.statements[1].kind else {
+        panic!("expected function");
+    };
+    let body = func.body.as_ref().expect("body");
+    let StmtKind::Discerne(stmt) = &body.statements[0].kind else {
+        panic!("expected discerne statement");
+    };
+    assert!(matches!(stmt.arms[0].patterns[0], Pattern::Type(_, _)));
+    assert!(matches!(stmt.arms[1].patterns[0], Pattern::Type(_, None)));
+}
+
+#[test]
 fn parses_ascii_and_octeti_literal_patterns() {
     let result = parse_ok(
         r"

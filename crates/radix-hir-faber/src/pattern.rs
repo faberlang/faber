@@ -42,7 +42,7 @@ impl super::FaberCodegen {
         for arm in arms {
             writer.write(surface.contextual_keyword("casu"));
             writer.write(" ");
-            self.write_pattern_list(&arm.patterns, names, interner, surface, writer);
+            self.write_pattern_list(&arm.patterns, types, names, interner, surface, writer);
             if let Some(guard) = &arm.guard {
                 writer.write(" ");
                 writer.write(surface.contextual_keyword("si"));
@@ -68,6 +68,7 @@ impl super::FaberCodegen {
     pub(super) fn write_pattern(
         &self,
         pattern: &HirPattern,
+        types: &TypeTable,
         names: &FxHashMap<DefId, Symbol>,
         interner: &Interner,
         surface: &impl KeywordSurface,
@@ -80,7 +81,7 @@ impl super::FaberCodegen {
                 writer.write(&self.symbol_to_string(name, interner));
             }
             HirPattern::Alias(def_id, name, pattern) => {
-                self.write_pattern(pattern, names, interner, surface, writer);
+                self.write_pattern(pattern, types, names, interner, surface, writer);
                 let name = Self::resolved_binding_symbol(*def_id, *name, names);
                 writer.write(" ");
                 writer.write(surface.keyword(TokenKind::Ut));
@@ -93,7 +94,25 @@ impl super::FaberCodegen {
                     writer.write(" ");
                     writer.write(surface.contextual_keyword("fixum"));
                     writer.write(" ");
-                    self.write_pattern_list(patterns, names, interner, surface, writer);
+                    self.write_pattern_list(patterns, types, names, interner, surface, writer);
+                }
+            }
+            HirPattern::TypeTest {
+                ty,
+                binding,
+                candidate,
+            } => {
+                if let Some(candidate) = candidate {
+                    writer.write(&self.name_for_def_imported(*candidate, names, interner));
+                } else {
+                    writer.write(&self.type_to_faber(*ty, types, names, interner, surface));
+                }
+                if let Some((def_id, name)) = binding {
+                    writer.write(" ");
+                    writer.write(surface.contextual_keyword("fixum"));
+                    writer.write(" ");
+                    let name = Self::resolved_binding_symbol(*def_id, *name, names);
+                    writer.write(&self.symbol_to_string(name, interner));
                 }
             }
             HirPattern::Literal(lit) => {
@@ -105,6 +124,7 @@ impl super::FaberCodegen {
     fn write_pattern_list(
         &self,
         patterns: &[HirPattern],
+        types: &TypeTable,
         names: &FxHashMap<DefId, Symbol>,
         interner: &Interner,
         surface: &impl KeywordSurface,
@@ -114,7 +134,7 @@ impl super::FaberCodegen {
             if idx > 0 {
                 writer.write(", ");
             }
-            self.write_pattern(pattern, names, interner, surface, writer);
+            self.write_pattern(pattern, types, names, interner, surface, writer);
         }
     }
 

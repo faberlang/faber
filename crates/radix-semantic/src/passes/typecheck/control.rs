@@ -207,8 +207,25 @@ impl TypeChecker<'_> {
 
         for arm in arms {
             self.push_scope();
-            for (pattern, scrutinee_ty) in arm.patterns.iter().zip(scrutinee_tys.iter().copied()) {
+            let mut refinements = Vec::new();
+            for (index, (pattern, scrutinee_ty)) in arm
+                .patterns
+                .iter_mut()
+                .zip(scrutinee_tys.iter().copied())
+                .enumerate()
+            {
+                let narrowed =
+                    super::pattern::resolve_type_test_target(self, pattern, scrutinee_ty);
                 self.check_pattern(pattern, scrutinee_ty, arm.span);
+                if let (Some(narrowed), Some(HirExpressionKind::Path(def_id))) = (
+                    narrowed,
+                    scrutinees.get(index).map(|scrutinee| &scrutinee.kind),
+                ) {
+                    refinements.push((*def_id, narrowed));
+                }
+            }
+            for (def_id, narrowed) in refinements {
+                self.override_binding(def_id, narrowed);
             }
             if let Some(guard) = &mut arm.guard {
                 self.check_condition(guard);

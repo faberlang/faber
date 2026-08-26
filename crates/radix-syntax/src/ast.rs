@@ -770,6 +770,11 @@ pub struct CasuArm {
 pub enum Pattern {
     Wildcard(Span),
     Ident(Ident, Option<PatternBind>),
+    /// A single type-name atom classified by the parser's type-name lookahead.
+    ///
+    /// Keeping this distinction in syntax prevents later phases from guessing
+    /// whether a name was intended as a new binding or a type predicate.
+    Type(Ident, Option<PatternBind>),
     Literal(Literal, Span),
     Path(PathPattern),
 }

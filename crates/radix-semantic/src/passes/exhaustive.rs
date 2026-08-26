@@ -176,8 +176,10 @@ fn check_match(
 
     let enum_def = enum_def_from_type(scrutinee_ty, types);
     let expected_variants = enum_def.and_then(|def_id| enum_variants.get(&def_id));
+    let expected_members = union_members_from_type(scrutinee_ty, types);
 
     let mut covered = FxHashSet::default();
+    let mut covered_members = Vec::new();
     let mut has_catchall = false;
     let mut catchall_span = None;
     let mut explicit_null_arm = false;
@@ -209,6 +211,25 @@ fn check_match(
                             .with_arg("issue", "duplicate_variant"),
                     );
                 }
+            } else if let Some(member) = pattern_type_id(pattern) {
+                if is_guarded {
+                    continue;
+                }
+                if covered_members
+                    .iter()
+                    .copied()
+                    .any(|covered| types.equals(covered, member))
+                {
+                    errors.push(
+                        SemanticError::structured(SemanticErrorKind::PatternDuplicate, arm.span)
+                            .with_arg("issue", "duplicate_type_pattern"),
+                    );
+                } else {
+                    covered_members.push(member);
+                }
+                if type_is_nil(member, types) {
+                    explicit_null_arm = true;
+                }
             } else if is_null_literal_pattern(pattern) {
                 explicit_null_arm = true;
             } else if is_catchall_pattern(pattern) && !is_guarded {
@@ -238,13 +259,10 @@ fn check_match(
         }
     }
 
-    if let Some(expected) = expected_variants {
-        if !has_catchall {
-            let missing: Vec<_> = expected
-                .iter()
-                .filter(|def_id| !covered.contains(def_id))
-                .collect();
-            if !missing.is_empty() {
+    if !has_catchall {
+        if let Some(expected) = expected_variants {
+            let missing = expected.iter().any(|def_id| !covered.contains(def_id));
+            if missing {
                 errors.push(
                     SemanticError::structured(
                         SemanticErrorKind::NonExhaustiveMatch,
@@ -253,8 +271,56 @@ fn check_match(
                     .with_arg("issue", "missing_variants"),
                 );
             }
+        } else if let Some(expected) = expected_members {
+            let missing = expected.iter().any(|member| {
+                !covered_members
+                    .iter()
+                    .copied()
+                    .any(|covered| types.equals(covered, *member))
+            });
+            if missing {
+                errors.push(
+                    SemanticError::structured(
+                        SemanticErrorKind::NonExhaustiveMatch,
+                        scrutinees[0].span,
+                    )
+                    .with_arg("issue", "missing_union_members"),
+                );
+            }
         }
     }
+}
+
+fn union_members_from_type(ty: TypeId, types: &TypeTable) -> Option<Vec<TypeId>> {
+    match types.get(ty) {
+        Type::Union(members) => Some(members.clone()),
+        Type::Option(inner) => {
+            let mut members =
+                union_members_from_type(*inner, types).unwrap_or_else(|| vec![*inner]);
+            members.push(types.primitive(Primitive::Nihil));
+            Some(members)
+        }
+        Type::Alias(_, inner) | Type::Ref(_, inner) | Type::Applied(inner, _) => {
+            union_members_from_type(*inner, types)
+        }
+        _ => None,
+    }
+}
+
+fn pattern_type_id(pattern: &HirPattern) -> Option<TypeId> {
+    match pattern {
+        HirPattern::TypeTest {
+            ty,
+            candidate: None,
+            ..
+        } => Some(*ty),
+        HirPattern::Alias(_, _, inner) => pattern_type_id(inner),
+        _ => None,
+    }
+}
+
+fn type_is_nil(ty: TypeId, types: &TypeTable) -> bool {
+    matches!(types.get(ty), Type::Primitive(Primitive::Nihil))
 }
 
 pub fn enum_def_from_type(ty: TypeId, types: &TypeTable) -> Option<DefId> {
@@ -307,6 +373,21 @@ pub fn discerne_definitely_covered(
     let Some(scrutinee_ty) = scrutinees[0].ty else {
         return false;
     };
+    if let Some(expected) = union_members_from_type(scrutinee_ty, types) {
+        let covered: Vec<TypeId> = arms
+            .iter()
+            .filter(|arm| arm.guard.is_none())
+            .flat_map(|arm| arm.patterns.iter())
+            .filter_map(pattern_type_id)
+            .collect();
+        return expected.iter().all(|member| {
+            covered
+                .iter()
+                .copied()
+                .any(|candidate| types.equals(candidate, *member))
+        });
+    }
+
     let Some(enum_def) = enum_def_from_type(scrutinee_ty, types) else {
         return false;
     };
@@ -366,6 +447,10 @@ fn imported_enum_arms_all_variant(arms: &[radix_hir::HirCasuArm]) -> bool {
 pub fn pattern_variant_id(pattern: &HirPattern) -> Option<DefId> {
     match pattern {
         HirPattern::Variant(def_id, _) => Some(*def_id),
+        HirPattern::TypeTest {
+            candidate: Some(def_id),
+            ..
+        } => Some(*def_id),
         HirPattern::Alias(_, _, inner) => pattern_variant_id(inner),
         _ => None,
     }
@@ -378,7 +463,7 @@ fn is_catchall_pattern(pattern: &HirPattern) -> bool {
     match pattern {
         HirPattern::Wildcard | HirPattern::Binding(_, _) => true,
         HirPattern::Alias(_, _, inner) => is_catchall_pattern(inner),
-        HirPattern::Variant(_, _) | HirPattern::Literal(_) => false,
+        HirPattern::Variant(_, _) | HirPattern::TypeTest { .. } | HirPattern::Literal(_) => false,
     }
 }
 

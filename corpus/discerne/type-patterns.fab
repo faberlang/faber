@@ -1,0 +1,35 @@
++++
+term = "discerne type patterns"
+kind = "feature"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "genus_decl", "genus_member", "field_decl", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "functio_decl", "param_list", "parameter", "return_clause", "discerne_stmt", "discriminants", "casu_variant_clause", "patterns", "pattern", "type_pattern", "ut_pattern", "pattern_binding", "redde_stmt", "expression", "literal", "nota_stmt", "incipit_stmt"]
+category = "control-flow"
+canonical = true
+summary = "Discerne cases can test nominal type members and bind the narrowed value."
+syntax = "discerne <union> { casu <type> fixum <name> { ... } }"
+related = ["discerne", "casu", "discretio", "est"]
+locale = "en"
++++
+
+# Type-pattern cases use the same member predicate as `est` and bind the
+# narrowed value for the arm body.
+class Formal {
+    string greeting
+}
+
+class Casual {
+    string greeting
+}
+
+fn classify(Formal ∪ Casual u) → string {
+    match u {
+        case Formal const f { return f.greeting }
+        case Casual const c { return c.greeting }
+    }
+}
+
+main {
+    const Formal f ← Formal { greeting = "formal" }
+    const Casual c ← Casual { greeting = "casual" }
+    print classify(f)
+    print classify(c)
+}

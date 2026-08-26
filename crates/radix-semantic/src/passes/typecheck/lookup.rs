@@ -355,6 +355,14 @@ impl TypeChecker<'_> {
             match self.types.get(current).clone() {
                 Type::Union(members) => return Some(members),
                 Type::Alias(_, inner) => current = self.resolve_inferred_type(inner),
+                Type::Option(inner) => {
+                    let mut members = match self.union_members_of(inner) {
+                        Some(members) => members,
+                        None => vec![inner],
+                    };
+                    members.push(self.types.primitive(Primitive::Nihil));
+                    return Some(members);
+                }
                 Type::Enum(enum_def) => {
                     let mut variants: Vec<DefId> = self
                         .variant_parent

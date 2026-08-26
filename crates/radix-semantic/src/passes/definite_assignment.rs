@@ -318,6 +318,12 @@ impl<'a> DefiniteAssignmentChecker<'a> {
                     self.assign_pattern_binding(pattern);
                 }
             }
+            HirPattern::TypeTest { binding, .. } => {
+                if let Some((def_id, _)) = binding {
+                    self.track_binding(*def_id);
+                    self.mark_assigned(*def_id);
+                }
+            }
             HirPattern::Wildcard | HirPattern::Literal(_) => {}
         }
     }

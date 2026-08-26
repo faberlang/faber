@@ -771,6 +771,16 @@ exemplum = "conversio/conversio.fab"
 expected = true
 note = "also conversio/octeti.fab, conversio/fallibilis.fab (stdout unpinned there)"
 
+[[cells]]
+id = "cast.discerne-type-pattern"
+family = "casts"
+cell = "discerne nominal type pattern + narrowed binding"
+status = "direct"
+exemplum = "discerne/type-patterns.fab"
+expected = true
+required = true
+note = "N1 ruling 2+3; type-pattern predicate shares the est member rule"
+
 # =============================================================================
 # closures (9 cells: 9 direct / 0 bare)
 # =============================================================================

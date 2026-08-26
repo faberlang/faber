@@ -65,7 +65,7 @@ impl Parser {
     /// Parse one pattern atom plus its optional binding suffix.
     ///
     /// GRAMMAR:
-    ///   pattern := `_` | literal | ident [`bind`] | path bind
+    ///   pattern := `_` | literal | type-name [`bind`] | ident [`bind`] | path bind
     ///   bind := `ut` ident | (`fixum`|`varia`) binding-list
     ///   binding-list := ident [`ut` ident] (',' ident [`ut` ident])*
     ///
@@ -80,6 +80,17 @@ impl Parser {
 
         if let Some(literal) = self.try_parse_pattern_literal() {
             return Ok(literal);
+        }
+
+        // Type-name lookahead mirrors `est` classification. `nihil` is a
+        // deliberate exception to the ordinary literal table: in a `discerne`
+        // arm it denotes the null member of the scrutinee union.
+        if (self.check_keyword_ident(TokenKind::Nihil) || self.peek_starts_type_name())
+            && !matches!(self.peek_at(1).kind, TokenKind::Dot)
+        {
+            let ident = self.parse_ident()?;
+            let bind = self.parse_pattern_bind()?;
+            return Ok(Pattern::Type(ident, bind));
         }
 
         if let TokenKind::Ident(_) = self.peek().kind {
@@ -220,15 +231,14 @@ impl Parser {
                 self.advance();
                 Some(Pattern::Literal(Literal::Octeti(sym), span))
             }
-            // verum/falsum/nihil are claimed by spelling so `casu verum` stays a
-            // literal pattern instead of falling through to a name binding.
+            // verum/falsum are claimed by spelling so boolean literals stay
+            // literal patterns instead of falling through to name bindings.
+            // `nihil` is classified as a type-pattern atom above.
             TokenKind::Ident(_) => {
                 let literal = if self.check_keyword_ident(TokenKind::Verum) {
                     Some(Literal::Bool(true))
                 } else if self.check_keyword_ident(TokenKind::Falsum) {
                     Some(Literal::Bool(false))
-                } else if self.check_keyword_ident(TokenKind::Nihil) {
-                    Some(Literal::Nil)
                 } else {
                     None
                 };

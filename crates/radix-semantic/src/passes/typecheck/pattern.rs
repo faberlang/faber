@@ -23,6 +23,47 @@ use super::*;
 const ISSUE_PATTERN_TYPE_MISMATCH: &str = "pattern_type_mismatch";
 const ISSUE_VARIANT_PATTERN_SCRUTINEE_MISMATCH: &str = "variant_pattern_scrutinee_mismatch";
 
+/// Select the effective member for a type-test pattern.
+///
+/// The parser preserves a same-spelled variant candidate. The scrutinee owns
+/// the final decision: a candidate that is a member of this scrutinee wins;
+/// otherwise the ordinary named type remains the predicate target.
+pub fn resolve_type_test_target(
+    checker: &mut TypeChecker<'_>,
+    pattern: &mut HirPattern,
+    expected: TypeId,
+) -> Option<TypeId> {
+    let HirPattern::TypeTest {
+        ty,
+        candidate,
+        binding: _,
+    } = pattern
+    else {
+        return None;
+    };
+
+    let named_ty = checker.resolve_inferred_type(*ty);
+    let Some(candidate_def) = *candidate else {
+        return Some(named_ty);
+    };
+    let candidate_ty = checker.types.intern(Type::Struct(candidate_def));
+    let candidate_is_member = checker.union_members_of(expected).is_some_and(|members| {
+        members
+            .iter()
+            .copied()
+            .any(|member| checker.member_type_equals(member, candidate_ty))
+    });
+    if candidate_is_member {
+        *ty = candidate_ty;
+        return Some(candidate_ty);
+    }
+
+    // The named type wins when the candidate belongs to another union. Clear
+    // the candidate so every emitter sees one settled HIR representation.
+    *candidate = None;
+    Some(named_ty)
+}
+
 impl TypeChecker<'_> {
     /// Check a pattern against an expected scrutinee or field type.
     ///
@@ -40,6 +81,31 @@ impl TypeChecker<'_> {
             HirPattern::Wildcard => {}
             HirPattern::Binding(def_id, _name) => {
                 self.insert_binding(*def_id, expected);
+            }
+            HirPattern::TypeTest { ty, binding, .. } => {
+                let target = self.resolve_inferred_type(*ty);
+                if let Some(members) = self.union_members_of(expected) {
+                    let is_member = members
+                        .iter()
+                        .copied()
+                        .any(|member| self.member_type_equals(member, target));
+                    if !is_member {
+                        self.error_issue(
+                            SemanticErrorKind::TypeMismatch,
+                            ISSUE_PATTERN_TYPE_MISMATCH,
+                            span,
+                        );
+                    }
+                } else if !self.member_type_equals(expected, target) {
+                    self.error_issue(
+                        SemanticErrorKind::TypeMismatch,
+                        ISSUE_PATTERN_TYPE_MISMATCH,
+                        span,
+                    );
+                }
+                if let Some((def_id, _name)) = binding {
+                    self.insert_binding(*def_id, target);
+                }
             }
             HirPattern::Alias(def_id, _name, pattern) => {
                 self.insert_binding(*def_id, expected);

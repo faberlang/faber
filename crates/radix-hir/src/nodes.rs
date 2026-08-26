@@ -1522,6 +1522,15 @@ pub enum HirPattern {
     /// Resolved enum/variant pattern with nested subpatterns.
     Variant(DefId, Vec<HirPattern>),
 
+    /// A type predicate pattern. `candidate` preserves a same-spelled variant
+    /// so semantic checking can apply the scrutinee-directed discrimination
+    /// rule before emission; `binding` names the narrowed value, if any.
+    TypeTest {
+        ty: TypeId,
+        candidate: Option<DefId>,
+        binding: Option<(DefId, Symbol)>,
+    },
+
     /// Literal pattern.
     Literal(HirLiteral),
 }

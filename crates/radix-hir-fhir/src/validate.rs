@@ -560,6 +560,11 @@ fn collect_pattern_defs(pat: &radix_hir::HirPattern, registry: &mut FxHashSet<ra
         | radix_hir::HirPattern::Variant(def_id, _) => {
             registry.insert(*def_id);
         }
+        radix_hir::HirPattern::TypeTest { binding, .. } => {
+            if let Some((def_id, _)) = binding {
+                registry.insert(*def_id);
+            }
+        }
         radix_hir::HirPattern::Literal(_) | radix_hir::HirPattern::Wildcard => {}
     }
     if let radix_hir::HirPattern::Alias(_, _, ref inner) = pat {
@@ -1735,6 +1740,12 @@ pub(crate) fn validate_referential_integrity(
                 radix_hir::HirLiteral::Regex(s, None) => check_symbol(*s)?,
                 _ => {}
             },
+            radix_hir::HirPattern::TypeTest { binding, .. } => {
+                if let Some((def_id, sym)) = binding {
+                    check_def(*def_id)?;
+                    check_symbol(*sym)?;
+                }
+            }
             radix_hir::HirPattern::Wildcard => {}
         }
         Ok(())

@@ -1,0 +1,93 @@
+//! N1 type-pattern grammar, arm narrowing, and scrutinee-directed selection.
+
+use crate::test_support;
+
+#[test]
+fn class_member_type_patterns_narrow_arm_bindings() {
+    test_support::assert_accepts(
+        r#"genus Formal {
+    textus greeting
+}
+
+genus Casual {
+    textus greeting
+}
+
+functio probe(Formal ∪ Casual u) → textus {
+    discerne u {
+        casu Formal fixum f { redde f.greeting }
+        casu Casual fixum c { redde c.greeting }
+    }
+}"#,
+    );
+}
+
+#[test]
+fn type_pattern_narrows_the_scrutinee_binding_inside_an_arm() {
+    test_support::assert_accepts(
+        r#"genus Formal { textus greeting }
+genus Casual { textus greeting }
+functio probe(Formal ∪ Casual u) → textus {
+    discerne u {
+        casu Formal { redde u.greeting }
+        casu Casual { redde u.greeting }
+    }
+}"#,
+    );
+}
+
+#[test]
+fn primitive_and_nil_type_patterns_cover_nullable_union() {
+    test_support::assert_accepts(
+        r#"functio probe(numerus ∪ textus ∪ nihil u) → vacuum {
+    discerne u {
+        casu numerus fixum i { nota i }
+        casu textus fixum s { nota s }
+        casu nihil { nota "nihil" }
+    }
+}"#,
+    );
+}
+
+#[test]
+fn type_pattern_exhaustiveness_reports_missing_union_member() {
+    test_support::assert_rejects_with_issue(
+        r#"genus Formal { textus greeting }
+genus Casual { textus greeting }
+genus Other { textus greeting }
+functio probe(Formal ∪ Casual ∪ Other u) → textus {
+    discerne u {
+        casu Formal fixum f { redde f.greeting }
+        casu Casual fixum c { redde c.greeting }
+    }
+}"#,
+        "missing_union_members",
+    );
+}
+
+#[test]
+fn type_pattern_catchall_closes_union_coverage() {
+    test_support::assert_accepts(
+        r#"genus Formal { textus greeting }
+genus Casual { textus greeting }
+functio probe(Formal ∪ Casual u) → textus {
+    discerne u {
+        casu Formal fixum f { redde f.greeting }
+        casu _ { redde "other" }
+    }
+}"#,
+    );
+}
+
+#[test]
+fn type_pattern_rejects_member_not_in_scrutinee_union() {
+    test_support::assert_rejects_with_issue(
+        r#"genus Formal { textus greeting }
+functio probe(textus u) → vacuum {
+    discerne u {
+        casu Formal fixum f { nota f }
+    }
+}"#,
+        "pattern_type_mismatch",
+    );
+}
