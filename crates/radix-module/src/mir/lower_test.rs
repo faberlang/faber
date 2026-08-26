@@ -1807,6 +1807,67 @@ fn range_product_lowers_as_ordered_nest_without_zip_guard() {
 }
 
 #[test]
+fn range_product_rumpe_exits_innermost_axis_and_perge_continues_it() {
+    // NR-4R decision test — Mind ruling 2026-08-26 on head-CTO finding 4
+    // (65c2edff): for the N-ary range PRODUCT, `rumpe`/`perge` bind the
+    // INNERMOST axis — the hand-nested-loop reading matching the
+    // leftmost-outermost row-major contract; outer axes continue after a
+    // break. `for from` (zip) keeps whole-construct exit. NR-3's MIR routes
+    // `rumpe_target` at the innermost level (control.rs pushes the breakable
+    // context only there); this pins that routing as the contract.
+    //
+    // Discrimination: if `rumpe` bound the whole product, the first break
+    // would end the walk and rows "10"/"11" could never print — the second
+    // row's presence proves the outer axis advanced through its increment
+    // after the break. If `perge` bound an outer axis, the inner axis would
+    // restart from its start instead of skipping one inner value, so "0"
+    // would print again where "2" appears.
+    let mut host = crate::mir::BufferHost::default();
+    crate::mir::run_source(
+        &Session::new(Config::default().with_target(Target::HirTypeScript)),
+        "range-product-rumpe.fab",
+        r"incipit {
+  itera ab 0‥2, 0‥3 fixum i, j {
+    si j ≡ 2 {
+      rumpe
+    }
+    nota i * 10 + j
+  }
+}",
+        &mut host,
+    )
+    .unwrap_or_else(|error| panic!("rumpe range product must run: {error:?}"));
+    assert_eq!(
+        host.stdout_lines,
+        ["0", "1", "10", "11"],
+        "rumpe exits only the innermost axis; the outer axis continues: {:?}",
+        host.stdout_lines
+    );
+
+    let mut host = crate::mir::BufferHost::default();
+    crate::mir::run_source(
+        &Session::new(Config::default().with_target(Target::HirTypeScript)),
+        "range-product-perge.fab",
+        r"incipit {
+  itera ab 0‥2, 0‥3 fixum i, j {
+    si j ≡ 1 {
+      perge
+    }
+    nota i * 10 + j
+  }
+}",
+        &mut host,
+    )
+    .unwrap_or_else(|error| panic!("perge range product must run: {error:?}"));
+    assert_eq!(
+        host.stdout_lines,
+        ["0", "2", "10", "12"],
+        "perge continues the innermost axis only, skipping one inner value per row: {:?}",
+        host.stdout_lines
+    );
+}
+
+#[test]
 fn borrowed_receiver_itera_ex_lowers_by_pointee_with_by_value_identical_dump() {
     // MRL-2 flip of MRL-1's decline pins: a borrowed receiver (`de` param,
     // or a field read through one) classifies by pointee and lowers through
