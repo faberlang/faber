@@ -125,7 +125,9 @@ fn scan_go_stmt(stmt: &Stmt, file: &str, diagnostics: &mut Vec<Diagnostic>) {
             }
         }
         StmtKind::Itera(iter_stmt) => {
-            scan_go_expr(&iter_stmt.iterable, file, diagnostics);
+            for source in &iter_stmt.sources {
+                scan_go_expr(source, file, diagnostics);
+            }
             scan_go_if_body(&iter_stmt.body, file, diagnostics);
             if let Some(catch) = &iter_stmt.catch {
                 scan_go_block(&catch.body, file, diagnostics);
@@ -504,7 +506,9 @@ fn scan_rust_stmt(stmt: &Stmt, file: &str, diagnostics: &mut Vec<Diagnostic>) {
             }
         }
         StmtKind::Itera(iter_stmt) => {
-            scan_rust_expr(&iter_stmt.iterable, file, diagnostics);
+            for source in &iter_stmt.sources {
+                scan_rust_expr(source, file, diagnostics);
+            }
             scan_rust_if_body(&iter_stmt.body, file, diagnostics);
             if let Some(catch) = &iter_stmt.catch {
                 scan_rust_block(&catch.body, file, diagnostics);

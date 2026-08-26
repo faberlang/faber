@@ -1,0 +1,58 @@
++++
+term = "itera"
+kind = "reject"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "array_literal", "itera_stmt", "itera_binding", "apud_clause", "expression", "literal", "nota_stmt"]
+category = "control-flow"
+canonical = false
+summary = "Lockstep declines: source/binder arity, at-coordinate cardinality, and statically known unequal lengths fail closed."
+syntax = "for from <a>, <b> const <x> { }"
+related = ["ex", "itera", "apud"]
+locale = "en"
++++
+
+# =============================================================================
+# lockstep decline — arity, at-cardinality, and static length laws.
+# =============================================================================
+#
+# Decline rows (reject reason in each comment):
+#   1. arity — 2 sources carry 1 binder: SEM010
+#      itera_lockstep_source_binder_arity_mismatch (one binder per source;
+#      never a partial bind, same family as the apud arity rule)
+#   2. at-cardinality — `at [i, j]` on a list zip: SEM010
+#      itera_lockstep_at_coordinate_cardinality (the shared coordinate does
+#      not grow with N; one clause names the one index)
+#   3. static lengths — two inline literals of unequal element count are
+#      exact witnesses: SEM010 itera_lockstep_length_mismatch (dynamic
+#      list<T> lengths defer to the MIR walk guard, which aborts before the
+#      first body visit — pinned in radix-module lower_test, not in this
+#      checker oracle)
+#
+# Common mistakes:
+#   • expecting a partial bind or silent truncation — every count/length law
+#     here declines the whole statement
+#
+# See also: ex, apud
+# =============================================================================
+
+# lockstep reject cases — expected compile failure
+#
+# WHY: documents the source/binder arity law, the one-shared-coordinate law,
+# and the fail-closed equal-length admission for the lockstep series.
+
+fn arity(lista<numerus> ks, lista<numerus> vs) → void {
+    for from ks, vs const k {
+        print k
+    }
+}
+
+fn cardinality(lista<numerus> ks, lista<numerus> vs) → void {
+    for from ks, vs at [i, j] const k, v {
+        print k
+    }
+}
+
+fn lengths() → void {
+    for from [1, 2, 3], [4, 5] const k, v {
+        print k
+    }
+}

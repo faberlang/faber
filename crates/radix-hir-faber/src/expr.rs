@@ -391,6 +391,48 @@ impl super::FaberCodegen {
                 });
                 writer.write("}");
             }
+            HirExpressionKind::IteraLockstep {
+                sources,
+                coordinates,
+                bindings,
+                body,
+            } => {
+                // Lockstep series: `itera ex s1, s2 [apud [i]] fixum b1, b2`.
+                // One shared coordinate at most; the series binder names keep
+                // their comma separation so the emit reparses byte-for-byte.
+                writer.write(surface.keyword(TokenKind::Itera));
+                writer.write(" ");
+                writer.write(surface.keyword(TokenKind::Ex));
+                writer.write(" ");
+                for (index, source) in sources.iter().enumerate() {
+                    if index > 0 {
+                        writer.write(", ");
+                    }
+                    self.write_expr(source, types, names, interner, surface, writer);
+                }
+                if let Some((_, coordinate_name)) = coordinates.first() {
+                    writer.write(" ");
+                    writer.write(surface.keyword(TokenKind::Apud));
+                    writer.write(" [");
+                    writer.write(&self.symbol_to_string(*coordinate_name, interner));
+                    writer.write("]");
+                }
+                writer.write(" ");
+                writer.write(surface.contextual_keyword("fixum"));
+                writer.write(" ");
+                for (index, (_, binding_name)) in bindings.iter().enumerate() {
+                    if index > 0 {
+                        writer.write(", ");
+                    }
+                    writer.write(&self.symbol_to_string(*binding_name, interner));
+                }
+                writer.writeln(" {");
+                writer.indented(|writer| {
+                    self.write_block(body, types, names, interner, surface, writer);
+                    self.write_block_end_trivia(body, interner, writer);
+                });
+                writer.write("}");
+            }
             HirExpressionKind::Intervallum {
                 start,
                 end,

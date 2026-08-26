@@ -494,7 +494,9 @@ fn resolve_stmt(
             }
         }
         StmtKind::Itera(stmt) => {
-            resolve_expr(resolver, interner, &stmt.iterable, errors);
+            for source in &stmt.sources {
+                resolve_expr(resolver, interner, source, errors);
+            }
             resolver.enter_scope(ScopeKind::Loop);
             for ident in &stmt.apud {
                 define_symbol(
@@ -506,12 +508,14 @@ fn resolve_stmt(
                     errors,
                 );
             }
-            define_binding_pattern(
-                resolver,
-                &stmt.binding,
-                stmt.mutability == radix_syntax::AstMutability::Mutable,
-                errors,
-            );
+            for binding in &stmt.bindings {
+                define_binding_pattern(
+                    resolver,
+                    binding,
+                    stmt.mutability == radix_syntax::AstMutability::Mutable,
+                    errors,
+                );
+            }
             resolve_if_body(resolver, interner, &stmt.body, errors);
             resolver.exit_scope();
             if let Some(catch) = &stmt.catch {

@@ -277,6 +277,7 @@ impl<'a> LoweringContextMaps<'a> {
             diagnostic_format_templates: diagnostics.format_templates,
             diagnostic_separator: diagnostics.separator,
             diagnostic_nihil: diagnostics.nihil,
+            diagnostic_lockstep_length_mismatch: diagnostics.lockstep_length_mismatch,
             function_errors: Arc::clone(&self.frozen.function_errors),
             function_async: Arc::clone(&self.frozen.function_async),
             function_generator: Arc::clone(&self.frozen.function_generator),
@@ -522,9 +523,7 @@ impl<'a> LoweringContextMaps<'a> {
                 let Some(provider) = self.provider_imports.get(&import_item.def_id).cloned() else {
                     continue;
                 };
-                for (def_id, _, methods, _) in
-                    unit.resolver.imported_file_structs_for_namespace(binding)
-                {
+                for (def_id, _, methods, _) in unit.resolver.imported_file_structs_for_namespace(binding) {
                     for method in methods {
                         let target = ImportedMethodProvider { provider: provider.clone(), canonical_name: method.name };
                         self.imported_method_providers

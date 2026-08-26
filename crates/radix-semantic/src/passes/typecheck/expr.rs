@@ -38,6 +38,15 @@ const ISSUE_ITERA_APUD_REQUIRES_EX: &str = "itera_apud_requires_ex";
 pub(super) const ISSUE_ITERA_APUD_ARITY_MISMATCH: &str = "itera_apud_arity_mismatch";
 pub(super) const ISSUE_ITERA_APUD_REQUIRES_SHAPED_ITERABLE: &str =
     "itera_apud_requires_shaped_iterable";
+/// Lockstep `itera ex` N-ary series laws. All are the same
+/// fail-closed SEM family as the `apud` arity rule above.
+pub(super) const ISSUE_ITERA_LOCKSTEP_SOURCE_BINDER_ARITY_MISMATCH: &str =
+    "itera_lockstep_source_binder_arity_mismatch";
+pub(super) const ISSUE_ITERA_LOCKSTEP_AT_COORDINATE_CARDINALITY: &str =
+    "itera_lockstep_at_coordinate_cardinality";
+pub(super) const ISSUE_ITERA_LOCKSTEP_SOURCE_REQUIRES_LISTA: &str =
+    "itera_lockstep_source_requires_lista";
+pub(super) const ISSUE_ITERA_LOCKSTEP_LENGTH_MISMATCH: &str = "itera_lockstep_length_mismatch";
 const ISSUE_CEDE_REQUIRES_PROMISSUM: &str = "cede_requires_promissum";
 const ISSUE_CEDE_REQUIRES_GENERATOR: &str = "cede_requires_generator";
 const ISSUE_REDDET_REQUIRES_ASYNC_FUNCTION: &str = "reddet_requires_async_function";
@@ -381,6 +390,19 @@ impl TypeChecker<'_> {
                 self.pop_scope();
                 self.vacuum_type()
             }
+            HirExpressionKind::IteraLockstep {
+                sources,
+                coordinates,
+                bindings,
+                body,
+            } => super::lockstep::check_lockstep_expr(
+                self,
+                sources,
+                coordinates,
+                bindings,
+                body,
+                expr.span,
+            ),
             HirExpressionKind::Summa {
                 source,
                 coordinates,

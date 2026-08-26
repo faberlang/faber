@@ -1643,6 +1643,85 @@ fn lowers_array_itera_ex_and_de_to_index_loops() {
 }
 
 #[test]
+fn lowers_lockstep_itera_to_one_aligned_index_walk() {
+    // Need: N sources lower to ONE aligned index walk — the shared
+    // length comes from the first source, each further source is guarded
+    // equal before the loop, and every binder reads its own projection.
+    let dump = dump_source(
+        r"functio summaVecta(lista<numerus> ks, lista<numerus> vs) → numerus {
+  varia numerus total ← 0
+  itera ex ks, vs fixum k, v {
+    total ← total + k + v
+  }
+  redde total
+}",
+    );
+
+    let length_calls = dump.matches("runtime collection length").count();
+    assert_eq!(length_calls, 2, "one length read per source: {dump}");
+    assert!(
+        dump.contains("_3 = _4[_2]: ty#1") || dump.matches("[_").count() >= 2,
+        "each binder reads its own projection: {dump}"
+    );
+    assert!(
+        dump.contains("panic"),
+        "the equal-length admission panics fail-closed before the walk: {dump}"
+    );
+    assert!(!dump.contains("itera collection before iterator MIR lowering"));
+    assert!(!dump.contains("lockstep"));
+}
+
+#[test]
+fn lockstep_itera_unequal_lengths_abort_fail_closed() {
+    // The walk never truncates to the shorter source: the runtime admission
+    // aborts before the first body visit (no partial output).
+    let mut host = crate::mir::BufferHost::default();
+    let failed = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        crate::mir::run_source(
+            &Session::new(Config::default().with_target(Target::HirTypeScript)),
+            "lockstep-mismatch.fab",
+            r"incipit {
+  varia lista<numerus> ks ← [1, 2, 3]
+  varia lista<numerus> vs ← [10, 20]
+  itera ex ks, vs fixum k, v {
+    nota k + v
+  }
+}",
+            &mut host,
+        )
+    }));
+    assert!(failed.is_err(), "unequal lockstep lengths must abort");
+    assert_eq!(
+        host.last_abort.as_deref(),
+        Some("itera lockstep sources must have equal length")
+    );
+    assert!(host.stdout_lines.is_empty(), "no partial rows before the abort");
+}
+
+#[test]
+fn lockstep_itera_runs_aligned_walks_with_shared_coordinate() {
+    let mut host = crate::mir::BufferHost::default();
+    crate::mir::run_source(
+        &Session::new(Config::default().with_target(Target::HirTypeScript)),
+        "lockstep-run.fab",
+        r#"incipit {
+  varia lista<numerus> ks ← [1, 2, 3]
+  varia lista<numerus> vs ← [10, 20, 30]
+  varia lista<textus> ts ← ["a", "b", "c"]
+  itera ex ks, vs fixum k, v {
+    nota k + v
+  }
+  itera ex ks, vs, ts apud [i] fixum k, v, t {
+    nota t
+  }
+}"#,
+        &mut host,
+    )
+    .unwrap_or_else(|error| panic!("lockstep walks must run: {error:?}"));
+    assert_eq!(host.stdout_lines, ["11", "22", "33", "a", "b", "c"]);
+}
+
+#[test]
 fn borrowed_receiver_itera_ex_lowers_by_pointee_with_by_value_identical_dump() {
     // MRL-2 flip of MRL-1's decline pins: a borrowed receiver (`de` param,
     // or a field read through one) classifies by pointee and lowers through

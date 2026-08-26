@@ -658,6 +658,14 @@ impl Lowerer<'_> {
 
     /// Lower `itera` with a synthetic binding local for the iteration variable.
     fn lower_itera(&mut self, iter_stmt: &radix_syntax::IteraStmt) -> HirStatementKind {
+        // The lockstep series (`itera ex` with N >= 2 sources, or any binder
+        // series) lowers to its own node so the source/binder arity law owns
+        // every count mismatch; the single-source single-binder form keeps
+        // the shared itera path untouched (need: legal N=1 is
+        // byte-identical).
+        if iter_stmt.sources.len() > 1 || iter_stmt.bindings.len() > 1 {
+            return self.lower_lockstep_itera(iter_stmt);
+        }
         let mode = match iter_stmt.mode {
             radix_syntax::IteraMode::Ex => radix_hir::HirIteraMode::Ex,
             radix_syntax::IteraMode::De => radix_hir::HirIteraMode::De,
@@ -665,13 +673,17 @@ impl Lowerer<'_> {
         };
 
         let binding = self.next_def_id();
-        let iter = self.lower_expr(&iter_stmt.iterable);
-        let binding_span = binding_pattern_span(&iter_stmt.binding);
-        let binding_name = match &iter_stmt.binding {
+        let iter = self.lower_expr(&iter_stmt.sources[0]);
+        let first_binding = iter_stmt
+            .bindings
+            .first()
+            .expect("parser produces at least one itera binder");
+        let binding_span = binding_pattern_span(first_binding);
+        let binding_name = match first_binding {
             radix_syntax::BindingPattern::Ident(ident) => ident.name,
             radix_syntax::BindingPattern::Array { .. }
             | radix_syntax::BindingPattern::Object { .. } => {
-                self.fresh_itera_binding_name(&iter_stmt.binding)
+                self.fresh_itera_binding_name(first_binding)
             }
             // The normalized loop grammar has no top-level wildcard binder.
             // Keep the parser's broader shared-pattern recovery fail-closed.
@@ -706,21 +718,18 @@ impl Lowerer<'_> {
             })
             .collect();
         self.bind_local(binding_name, binding);
-        if matches!(
-            iter_stmt.binding,
-            radix_syntax::BindingPattern::Object { .. }
-        ) {
-            self.record_itera_element_labels(&iter_stmt.iterable, binding);
+        if matches!(first_binding, radix_syntax::BindingPattern::Object { .. }) {
+            self.record_itera_element_labels(&iter_stmt.sources[0], binding);
         }
-        let pattern_locals = match &iter_stmt.binding {
+        let pattern_locals = match first_binding {
             radix_syntax::BindingPattern::Array { .. } => self.lower_array_destructure_pattern(
-                &iter_stmt.binding,
+                first_binding,
                 &binding_expr,
                 iter_stmt.mutability,
                 false,
             ),
             radix_syntax::BindingPattern::Object { .. } => self.lower_object_destructure_pattern(
-                &iter_stmt.binding,
+                first_binding,
                 &binding_expr,
                 iter_stmt.mutability,
                 false,
@@ -743,6 +752,72 @@ impl Lowerer<'_> {
                 Box::new(iter),
                 body,
             ),
+            ty: None,
+            span: self.current_span,
+        };
+
+        let expr = if let Some(catch) = &iter_stmt.catch {
+            let cape = self.lower_cape_clause(catch);
+            self.handled_expr(expr, cape)
+        } else {
+            expr
+        };
+
+        HirStatementKind::Expr(expr)
+    }
+
+    /// Lower the N-ary lockstep `itera ex` series to its dedicated node.
+    ///
+    /// Binders are names in v1: a pattern or wildcard binder
+    /// on the series declines here because the node carries name bindings
+    /// only. Source/binder count equality and the shared `apud` cardinality
+    /// are typecheck laws over the node — same family as the single-source
+    /// `apud` arity rule.
+    fn lower_lockstep_itera(&mut self, iter_stmt: &radix_syntax::IteraStmt) -> HirStatementKind {
+        let mut bindings = Vec::new();
+        for binding in &iter_stmt.bindings {
+            let radix_syntax::BindingPattern::Ident(ident) = binding else {
+                self.error_with_args_at(
+                    vec![radix_diagnostics::DiagnosticArg::new(
+                        "issue",
+                        "itera_lockstep_binder_pattern_unsupported",
+                    )],
+                    binding_pattern_span(binding),
+                );
+                return HirStatementKind::Expr(error_expr(self, self.current_span));
+            };
+            let def_id = self.next_def_id();
+            bindings.push((def_id, ident.name));
+        }
+
+        self.push_scope();
+        let coordinate_bindings = iter_stmt
+            .apud
+            .iter()
+            .map(|ident| {
+                let def_id = self.next_def_id();
+                self.bind_local(ident.name, def_id);
+                (def_id, ident.name)
+            })
+            .collect();
+        for (def_id, name) in &bindings {
+            self.bind_local(*name, *def_id);
+        }
+        let sources = iter_stmt
+            .sources
+            .iter()
+            .map(|source| self.lower_expr(source))
+            .collect();
+        let body = self.lower_ergo_body(&iter_stmt.body);
+        self.pop_scope();
+        let expr = HirExpression {
+            id: self.next_hir_id(),
+            kind: HirExpressionKind::IteraLockstep {
+                sources,
+                coordinates: coordinate_bindings,
+                bindings,
+                body,
+            },
             ty: None,
             span: self.current_span,
         };

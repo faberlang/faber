@@ -694,12 +694,16 @@ pub struct DumStmt {
 #[derive(Debug)]
 pub struct IteraStmt {
     pub mode: IteraMode,
-    pub iterable: Box<Expr>,
+    /// Source expressions in source order. `ex` alone admits the
+    /// comma-separated lockstep series; `de` and `ab` carry exactly one.
+    pub sources: Vec<Expr>,
     /// Coordinate names from the optional `apud`/`at` clause, in source order.
     /// Semantic binding is intentionally deferred to the iteration lowering unit.
     pub apud: Vec<Ident>,
     pub mutability: AstMutability,
-    pub binding: BindingPattern,
+    /// Binder patterns in source order, one per source (enforced in semantic:
+    /// patterns bind only the single-source form; the series binds names).
+    pub bindings: Vec<BindingPattern>,
     pub body: IfBody,
     pub catch: Option<CapeClause>,
 }

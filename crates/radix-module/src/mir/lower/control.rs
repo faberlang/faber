@@ -2157,6 +2157,198 @@ impl FunctionBuilder<'_> {
         Some(())
     }
 
+    /// Lower the N-ary lockstep `itera ex` walk.
+    ///
+    /// One aligned index walk: every source lowers to a place, the shared
+    /// length comes from the first source, and each further source's length
+    /// must equal it before the loop runs — the admission fails closed (a
+    /// panic terminator, mirroring `mori`) and the walk never truncates to
+    /// the minimum. Statically known mismatches already failed at check.
+    /// The optional `apud [i]` coordinate names the shared index local.
+    pub(super) fn lower_itera_lockstep_expr(
+        &mut self,
+        sources: &[HirExpression],
+        coordinates: &[(DefId, Symbol)],
+        bindings: &[(DefId, Symbol)],
+        body: &HirBlock,
+        expr: &HirExpression,
+    ) -> Option<MirOperand> {
+        let ty = self.expr_ty(expr)?;
+        if !self.is_vacuum(ty) {
+            self.errors
+                .push(MirError::unsupported(expr.span, "itera expression with non-vacuum result"));
+            return None;
+        }
+        let numerus = MirType::semantic(self.types.primitive(Primitive::Numerus));
+        let bivalens = MirType::semantic(self.types.primitive(Primitive::Bivalens));
+
+        // Materialize each source place with its element type; a non-lista
+        // source is impossible after typecheck, so decline fail-closed rather
+        // than inventing an element row here.
+        let mut collections = Vec::with_capacity(sources.len());
+        for source in sources {
+            let Some(source_ty) = source.ty else {
+                self.errors
+                    .push(MirError::missing_type(source.span, "itera lockstep collection source"));
+                return None;
+            };
+            let semantic = match self.normalized_type(source_ty) {
+                Type::Ref(_, inner) => *inner,
+                _ => source_ty,
+            };
+            let element = match self.types.get(semantic) {
+                Type::Array(inner) | Type::BoundedArray { element: inner, .. } => *inner,
+                _ => {
+                    self.errors.push(MirError::unsupported(
+                        source.span,
+                        "itera lockstep source before lista MIR lowering",
+                    ));
+                    return None;
+                }
+            };
+            let collection = self.lower_expr_value(source)?;
+            let collection_ty = MirType::semantic(semantic);
+            let place = self.materialize_operand_place(collection, collection_ty, source.span);
+            collections.push((place, MirType::semantic(element)));
+        }
+
+        // Fail-closed equal-length admission: guard every further source
+        // against the first length before any loop block exists.
+        let first_length = self.runtime_call_value(
+            MirIntrinsic::Collection(MirCollectionOp::Length),
+            vec![MirOperand::Place(collections[0].0.clone())],
+            numerus,
+            expr.span,
+        );
+        if !self.current_is_open() {
+            return None;
+        }
+        let mismatch_message =
+            MirOperand::Constant(MirConstant::String(self.context.diagnostic_lockstep_length_mismatch));
+        for (place, _) in &collections[1..] {
+            let length = self.runtime_call_value(
+                MirIntrinsic::Collection(MirCollectionOp::Length),
+                vec![MirOperand::Place(place.clone())],
+                numerus,
+                expr.span,
+            );
+            let equal = self.binary_temp(MirBinOp::Eq, first_length.clone(), length, bivalens, expr.span);
+            let ok_id = self.fresh_block(expr.span);
+            let mismatch_id = self.fresh_block(expr.span);
+            self.terminate_current(
+                MirTerminatorKind::Branch { condition: equal, then_block: ok_id, else_block: mismatch_id },
+                expr.span,
+            );
+            self.switch_to(mismatch_id);
+            let numquam = MirType::semantic(self.types.primitive(Primitive::Numquam));
+            self.append_stmt(MirStatement {
+                kind: MirStatementKind::RuntimeCall {
+                    destination: None,
+                    call: MirRuntimeCall {
+                        intrinsic: MirIntrinsic::Panic,
+                        args: vec![mismatch_message.clone()],
+                        return_ty: numquam,
+                    },
+                },
+                span: expr.span,
+            });
+            self.terminate_current(MirTerminatorKind::Unreachable, expr.span);
+            self.switch_to(ok_id);
+        }
+
+        // The shared index local doubles as the `apud [i]` coordinate when
+        // one is present; without a clause it stays a synthetic counter.
+        let index = self.next_local_id();
+        let coordinate_name = coordinates.first().map(|(_, name)| *name);
+        self.locals.push(MirLocalDecl {
+            id: index,
+            name: coordinate_name,
+            ty: numerus,
+            mutable: true,
+            span: expr.span,
+        });
+        if let Some((coordinate_def, _)) = coordinates.first() {
+            self.bindings
+                .insert(*coordinate_def, LocalBinding { local: index, ty: numerus });
+        }
+        self.assign(
+            MirPlace::local(index),
+            MirOperand::Constant(MirConstant::Int(0)),
+            numerus,
+            expr.span,
+        );
+
+        let mut binder_locals = Vec::with_capacity(bindings.len());
+        for ((binding_def, binding_name), (_, element_ty)) in bindings.iter().zip(collections.iter()) {
+            let binding = self.next_local_id();
+            self.locals.push(MirLocalDecl {
+                id: binding,
+                name: Some(*binding_name),
+                ty: *element_ty,
+                mutable: true,
+                span: expr.span,
+            });
+            self.bindings
+                .insert(*binding_def, LocalBinding { local: binding, ty: *element_ty });
+            binder_locals.push((binding, *element_ty));
+        }
+
+        let cond_id = self.fresh_block(expr.span);
+        let body_id = self.fresh_block(body.span);
+        let increment_id = self.fresh_block(expr.span);
+        let after_id = self.fresh_block(expr.span);
+        self.terminate_current(MirTerminatorKind::Goto(cond_id), expr.span);
+
+        self.switch_to(cond_id);
+        let condition = self.binary_temp(
+            MirBinOp::Lt,
+            MirOperand::Place(MirPlace::local(index)),
+            first_length,
+            bivalens,
+            expr.span,
+        );
+        self.terminate_current(
+            MirTerminatorKind::Branch { condition, then_block: body_id, else_block: after_id },
+            expr.span,
+        );
+
+        self.switch_to(body_id);
+        for ((place, _), (binder_local, binder_ty)) in collections.iter().zip(binder_locals.iter()) {
+            let mut indexed = place.clone();
+            indexed
+                .projections
+                .push(MirProjection::Index(MirOperand::Place(MirPlace::local(index))));
+            self.assign(
+                MirPlace::local(*binder_local),
+                MirOperand::Place(indexed),
+                *binder_ty,
+                expr.span,
+            );
+        }
+        self.breakables.push(BreakableContext {
+            perge_target: Some(increment_id),
+            rumpe_target: after_id,
+            rumpe_used: false,
+        });
+        self.visit_block(body);
+        self.breakables.pop();
+        self.terminate_open_current(MirTerminatorKind::Goto(increment_id), expr.span);
+
+        self.switch_to(increment_id);
+        let next = self.binary_temp(
+            MirBinOp::Add,
+            MirOperand::Place(MirPlace::local(index)),
+            MirOperand::Constant(MirConstant::Int(1)),
+            numerus,
+            expr.span,
+        );
+        self.assign(MirPlace::local(index), next, numerus, expr.span);
+        self.terminate_current(MirTerminatorKind::Goto(cond_id), expr.span);
+
+        self.switch_to(after_id);
+        Some(MirOperand::Constant(MirConstant::Unit))
+    }
+
     /// Lower one shaped `apud` loop as rank-N nested CFG loops.
     ///
     /// Tensor element reads use the runtime `TensorGet` ABI with the current

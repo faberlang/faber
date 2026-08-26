@@ -270,6 +270,9 @@ fn lower_analyzed_unit_with_options(
         ],
         separator: unit.interner.intern(" "),
         nihil: unit.interner.intern("nihil"),
+        lockstep_length_mismatch: unit
+            .interner
+            .intern("itera lockstep sources must have equal length"),
     };
     let mut lowerer = MirLowerer {
         unit,
@@ -703,6 +706,9 @@ struct DiagnosticSymbols {
     /// The rendered `nihil` textus used by the scribe grouping when an option
     /// argument's payload is absent (`display_option` semantics).
     nihil: Symbol,
+    /// Lockstep `itera ex` runtime admission message: the
+    /// fail-closed equal-length guard's panic textus.
+    lockstep_length_mismatch: Symbol,
 }
 
 struct MirLowerer<'a> {
@@ -1277,6 +1283,9 @@ struct FunctionBuilderContext<'a> {
     diagnostic_format_templates: [Symbol; 3],
     diagnostic_separator: Symbol,
     diagnostic_nihil: Symbol,
+    /// Lockstep `itera ex` runtime admission message: the
+    /// fail-closed equal-length guard's panic textus.
+    diagnostic_lockstep_length_mismatch: Symbol,
     function_errors: Arc<FxHashMap<DefId, MirType>>,
     function_async: Arc<FxHashMap<DefId, bool>>,
     function_generator: Arc<FxHashMap<DefId, bool>>,
@@ -1346,6 +1355,7 @@ impl<'a> FunctionBuilderContext<'a> {
             diagnostic_format_templates: [Symbol(0); 3],
             diagnostic_separator: Symbol(0),
             diagnostic_nihil: Symbol(0),
+            diagnostic_lockstep_length_mismatch: Symbol(0),
             function_errors: Arc::new(FxHashMap::default()),
             function_async: Arc::new(FxHashMap::default()),
             function_generator: Arc::new(FxHashMap::default()),
@@ -2924,6 +2934,9 @@ fn unsupported_expr_kind_name(kind: &HirExpressionKind) -> &'static str {
         HirExpressionKind::Loop(_) => "loop before control-flow MIR lowering",
         HirExpressionKind::Dum(_, _) => "dum before control-flow MIR lowering",
         HirExpressionKind::Itera(_, _, _, _, _, _) => "itera before iterator MIR lowering",
+        HirExpressionKind::IteraLockstep { .. } => {
+            "lockstep itera before aligned-walk MIR lowering"
+        }
         HirExpressionKind::Summa { .. } => "summa before term-fold MIR lowering",
         HirExpressionKind::Extremum { .. } => "max/min before extrema MIR lowering",
         // Unreachable from the lowering dispatcher (first-match lowers through

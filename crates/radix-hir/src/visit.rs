@@ -399,6 +399,23 @@ pub fn walk_expr<V: HirVisitor>(visitor: &mut V, expr: &HirExpression) {
             visitor.visit_expr(iter);
             visitor.visit_block(block);
         }
+        HirExpressionKind::IteraLockstep {
+            sources,
+            coordinates,
+            bindings,
+            body,
+        } => {
+            for (coordinate_def_id, coordinate_name) in coordinates {
+                visitor.visit_def(*coordinate_def_id, *coordinate_name);
+            }
+            for (binding_def_id, binding_name) in bindings {
+                visitor.visit_def(*binding_def_id, *binding_name);
+            }
+            for source in sources {
+                visitor.visit_expr(source);
+            }
+            visitor.visit_block(body);
+        }
         HirExpressionKind::Summa {
             source,
             coordinates,
@@ -955,6 +972,23 @@ pub fn walk_expr_mut<V: HirVisitorMut>(visitor: &mut V, expr: &mut HirExpression
             visitor.visit_def(*def_id, *name);
             visitor.visit_expr_mut(iter);
             visitor.visit_block_mut(block);
+        }
+        HirExpressionKind::IteraLockstep {
+            sources,
+            coordinates,
+            bindings,
+            body,
+        } => {
+            for (coordinate_def_id, coordinate_name) in coordinates {
+                visitor.visit_def(*coordinate_def_id, *coordinate_name);
+            }
+            for (binding_def_id, binding_name) in bindings {
+                visitor.visit_def(*binding_def_id, *binding_name);
+            }
+            for source in sources {
+                visitor.visit_expr_mut(source);
+            }
+            visitor.visit_block_mut(body);
         }
         HirExpressionKind::Summa {
             source,

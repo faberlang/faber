@@ -1,0 +1,5 @@
+# Reject oracle for the lockstep for-from series declines.
+# Tokens: stable diagnostic identities (faber check output); one per line.
+SEM010:itera_lockstep_source_binder_arity_mismatch
+SEM010:itera_lockstep_at_coordinate_cardinality
+SEM010:itera_lockstep_length_mismatch

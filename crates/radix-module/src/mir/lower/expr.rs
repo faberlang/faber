@@ -85,6 +85,9 @@ pub(super) trait HirExpressionLoweringVisitor {
             HirExpressionKind::Itera(mode, coordinates, binding, name, iter, block) => {
                 self.visit_itera_expr(*mode, coordinates, *binding, *name, iter, block, expr)
             }
+            HirExpressionKind::IteraLockstep { sources, coordinates, bindings, body } => {
+                self.visit_itera_lockstep_expr(sources, coordinates, bindings, body, expr)
+            }
             HirExpressionKind::Summa { source, coordinates, filum, binding, body } => {
                 self.visit_summa_expr(source, coordinates, filum.as_ref(), binding, body, expr)
             }
@@ -261,6 +264,14 @@ pub(super) trait HirExpressionLoweringVisitor {
         name: Symbol,
         iter: &HirExpression,
         block: &HirBlock,
+        expr: &HirExpression,
+    ) -> Option<MirOperand>;
+    fn visit_itera_lockstep_expr(
+        &mut self,
+        sources: &[HirExpression],
+        coordinates: &[(DefId, Symbol)],
+        bindings: &[(DefId, Symbol)],
+        body: &HirBlock,
         expr: &HirExpression,
     ) -> Option<MirOperand>;
     fn visit_summa_expr(
@@ -572,6 +583,17 @@ impl HirExpressionLoweringVisitor for FunctionBuilder<'_> {
         expr: &HirExpression,
     ) -> Option<MirOperand> {
         self.lower_itera_expr(mode, coordinates, binding, name, iter, block, expr)
+    }
+
+    fn visit_itera_lockstep_expr(
+        &mut self,
+        sources: &[HirExpression],
+        coordinates: &[(DefId, Symbol)],
+        bindings: &[(DefId, Symbol)],
+        body: &HirBlock,
+        expr: &HirExpression,
+    ) -> Option<MirOperand> {
+        self.lower_itera_lockstep_expr(sources, coordinates, bindings, body, expr)
     }
 
     fn visit_handled_expr(&mut self, body: &HirBlock, catch: &HirCape, expr: &HirExpression) -> Option<MirOperand> {

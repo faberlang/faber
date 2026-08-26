@@ -97,6 +97,7 @@ pub mod intervallum;
 pub mod intrinsics;
 pub mod item;
 pub mod json_genus;
+pub mod lockstep;
 pub mod lookup;
 pub mod ops;
 pub mod pattern;

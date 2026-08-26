@@ -295,6 +295,13 @@ impl AirPurityChecker<'_> {
                 self.check_expr(source);
                 self.check_block(block);
             }
+            HirExpressionKind::IteraLockstep { sources, body, .. } => {
+                self.reject(expr.span, "itera_loop");
+                for source in sources {
+                    self.check_expr(source);
+                }
+                self.check_block(body);
+            }
             HirExpressionKind::Summa { source, body, .. } => {
                 self.reject(expr.span, "summa_expression_unsupported");
                 self.check_expr(source);

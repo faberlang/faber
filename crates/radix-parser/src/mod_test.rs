@@ -798,7 +798,10 @@ fn parses_itera_loop_apud_clause_and_preserves_coordinate_order() {
             .map(|ident| symbol_name(&result, ident.name))
             .collect::<Vec<_>>();
         assert_eq!(coordinates, expected);
-        assert!(matches!(&iter_stmt.binding, BindingPattern::Ident(_)));
+        assert!(matches!(
+            &iter_stmt.bindings[..],
+            [BindingPattern::Ident(_)]
+        ));
     }
 }
 
@@ -2406,7 +2409,7 @@ fn parses_itera_array_pattern_binder() {
     assert!(matches!(iter_stmt.mode, IteraMode::Ex));
     let BindingPattern::Array {
         elements, is_rest, ..
-    } = &iter_stmt.binding
+    } = &iter_stmt.bindings[0]
     else {
         panic!("expected array binding pattern binder");
     };
@@ -2429,7 +2432,7 @@ fn parses_itera_object_pattern_binder() {
     };
     let BindingPattern::Object {
         fields, is_rest, ..
-    } = &iter_stmt.binding
+    } = &iter_stmt.bindings[0]
     else {
         panic!("expected object binding pattern binder");
     };
@@ -2460,7 +2463,7 @@ fn parses_itera_pattern_binder_all_modes() {
             "mode mismatch for {source}"
         );
         assert!(
-            matches!(iter_stmt.binding, BindingPattern::Array { .. }),
+            matches!(iter_stmt.bindings[0], BindingPattern::Array { .. }),
             "expected array binder for {source}"
         );
     }
@@ -2479,7 +2482,7 @@ fn parses_itera_pattern_binder_element_forms() {
     assert!(matches!(iter_stmt.mutability, AstMutability::Mutable));
     let BindingPattern::Array {
         elements, is_rest, ..
-    } = &iter_stmt.binding
+    } = &iter_stmt.bindings[0]
     else {
         panic!("expected array binding pattern binder");
     };
@@ -2499,7 +2502,7 @@ fn parses_itera_object_pattern_alias() {
     let StmtKind::Itera(iter_stmt) = &program.statements[0].kind else {
         panic!("expected itera statement");
     };
-    let BindingPattern::Object { fields, .. } = &iter_stmt.binding else {
+    let BindingPattern::Object { fields, .. } = &iter_stmt.bindings[0] else {
         panic!("expected object binding pattern binder");
     };
     assert_eq!(fields.len(), 1);

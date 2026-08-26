@@ -2297,6 +2297,28 @@ fn semantic_type_mismatch_message(args: &[DiagnosticArg]) -> Option<String> {
         "itera_apud_requires_shaped_iterable" => {
             Some("apud requires a tensor or matrix iterable with a static rank".to_owned())
         }
+        "itera_lockstep_source_binder_arity_mismatch" => {
+            let expected = arg_value(args, "expected").map_or_else(|| "?".to_owned(), str::to_owned);
+            let actual = arg_value(args, "actual").map_or_else(|| "?".to_owned(), str::to_owned);
+            Some(format!(
+                "lockstep for-from binds one binder per source: expected {expected} binders, found {actual}; the counts must match exactly"
+            ))
+        }
+        "itera_lockstep_at_coordinate_cardinality" => Some(
+            "the lockstep for-from apud clause is one shared coordinate (`apud [i]`); it does not grow with the source count"
+                .to_owned(),
+        ),
+        "itera_lockstep_source_requires_lista" => Some(
+            "lockstep for-from sources must be lists; other collection surfaces stay single-source"
+                .to_owned(),
+        ),
+        "itera_lockstep_length_mismatch" => {
+            let expected = arg_value(args, "expected").map_or_else(|| "?".to_owned(), str::to_owned);
+            let actual = arg_value(args, "actual").map_or_else(|| "?".to_owned(), str::to_owned);
+            Some(format!(
+                "lockstep for-from sources must have equal length (found {expected} and {actual}); the walk fails closed instead of truncating"
+            ))
+        }
         "libera_capture" => {
             let capture = arg_value(args, "capture")?;
             Some(format!(

@@ -363,6 +363,12 @@ impl SummaBodyState {
                 self.walk_expr(checker, source);
                 self.walk_block(checker, block);
             }
+            HirExpressionKind::IteraLockstep { sources, body, .. } => {
+                for source in sources {
+                    self.walk_expr(checker, source);
+                }
+                self.walk_block(checker, body);
+            }
             // Nested summa nodes are admitted/declined by their own admission
             // check under the ordinary expression path; the fragment subset
             // treats the nested node as an unapproved effect, so the outer

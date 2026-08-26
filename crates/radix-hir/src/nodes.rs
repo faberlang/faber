@@ -1069,6 +1069,25 @@ pub enum HirExpressionKind {
         HirBlock,
     ),
 
+    /// Lockstep `itera ex` walk over N >= 2 aligned collections.
+    ///
+    /// N == 1 lowers through [`HirExpressionKind::Itera`] unchanged; this node
+    /// exists only for the comma-separated source series with its matching
+    /// name-binder series. Length equality is a fail-closed law: statically
+    /// known lengths are compared at typecheck, dynamic lengths are guarded at
+    /// the MIR walk admission — the walk never truncates to the minimum.
+    IteraLockstep {
+        /// Aligned source expressions, one per binder.
+        sources: Vec<HirExpression>,
+        /// Coordinate binding from the optional shared `apud [i]` clause
+        /// (at most one; the count law is enforced at typecheck).
+        coordinates: Vec<(DefId, Symbol)>,
+        /// Element bindings visible in the body, one per source.
+        bindings: Vec<(DefId, Symbol)>,
+        /// Body evaluated for each aligned element tuple.
+        body: HirBlock,
+    },
+
     /// Contextual `summa ex` term-fold expression.
     ///
     /// This is a source-declaration node only in SFR-2. Typecheck deliberately

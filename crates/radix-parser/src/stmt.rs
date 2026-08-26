@@ -156,12 +156,14 @@ impl Parser {
     /// Parse an `itera` loop and its ownership mode.
     ///
     /// GRAMMAR:
-    ///   itera-stmt := `itera` mode expr [apud-clause] (`fixum`|`varia`) binding-pattern if-body [`cape` ident block]
-    ///   mode := `ex` | `de` | `ab`
+    ///   itera-stmt := `itera` (`ex` expr (`,` expr)* | (`de`|`ab`) expr) [apud-clause] (`fixum`|`varia`) itera-binding if-body [`cape` ident block]
     ///   apud-clause := `apud` `[` IDENTIFIER (`,` IDENTIFIER)* `]`
+    ///   itera-binding := array-pattern | object-pattern | IDENTIFIER (`,` IDENTIFIER)*
     ///
     /// The parser records the source preposition mode; later phases validate
-    /// the semantic source shape for that mode.
+    /// the semantic source shape for that mode. Only `ex` admits the
+    /// comma-separated lockstep source series; source/binder arity is a
+    /// semantic law, not a parse decision.
     pub(super) fn parse_itera_stmt(&mut self) -> Result<StmtKind, ParseError> {
         self.expect_keyword_ident(TokenKind::Itera, "expected 'itera'")?;
 
@@ -177,7 +179,12 @@ impl Parser {
                 .with_arg("expected", "'ex', 'de', or 'ab'"));
         };
 
-        let iterable = Box::new(self.parse_expression()?);
+        let mut sources = vec![self.parse_expression()?];
+        if matches!(mode, IteraMode::Ex) {
+            while self.eat(&TokenKind::Comma) {
+                sources.push(self.parse_expression()?);
+            }
+        }
         let apud = if self.eat_keyword_ident(TokenKind::Apud) {
             self.parse_apud_clause()?
         } else {
@@ -195,6 +202,10 @@ impl Parser {
                     .with_arg("expected", "the const form `fixum`"),
             );
         }
+        // A name binder may continue through commas (`itera_binding`'s
+        // IDENTIFIER series); pattern binders and the legacy `_` loop
+        // variable close the head. The token decides before parsing.
+        let binder_is_name = matches!(self.peek().kind, TokenKind::Ident(_));
         // A top-level `_` in an itera binder is the legacy unused loop
         // variable, not a destructuring wildcard. Keep it as an identifier;
         // wildcard patterns remain available inside array/object binders.
@@ -203,15 +214,21 @@ impl Parser {
         } else {
             self.parse_binding_pattern()?
         };
+        let mut bindings = vec![binding];
+        if binder_is_name {
+            while self.eat(&TokenKind::Comma) {
+                bindings.push(BindingPattern::Ident(self.parse_ident()?));
+            }
+        }
         let body = self.parse_ergo_body()?;
         let catch = self.try_parse_cape_stmt()?;
 
         Ok(StmtKind::Itera(IteraStmt {
             mode,
-            iterable,
+            sources,
             apud,
             mutability,
-            binding,
+            bindings,
             body,
             catch,
         }))

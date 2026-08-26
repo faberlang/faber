@@ -430,6 +430,23 @@ fn collect_expr_defs(
             collect_expr_defs(iterable, registry);
             collect_block_defs(body, registry);
         }
+        HirExpressionKind::IteraLockstep {
+            sources,
+            coordinates,
+            bindings,
+            body,
+        } => {
+            for (coordinate_def_id, _) in coordinates {
+                registry.insert(*coordinate_def_id);
+            }
+            for (binding_def_id, _) in bindings {
+                registry.insert(*binding_def_id);
+            }
+            for source in sources {
+                collect_expr_defs(source, registry);
+            }
+            collect_block_defs(body, registry);
+        }
         HirExpressionKind::Intervallum {
             start, end, step, ..
         } => {
@@ -737,6 +754,12 @@ fn collect_hir_registry(artifact: &HirArtifact) -> FxHashSet<radix_hir::HirId> {
             }
             HirExpressionKind::Itera(_, _, _, _, iterable, body) => {
                 collect_expr(iterable, registry);
+                collect_block(body, registry);
+            }
+            HirExpressionKind::IteraLockstep { sources, body, .. } => {
+                for source in sources {
+                    collect_expr(source, registry);
+                }
                 collect_block(body, registry);
             }
             HirExpressionKind::Assign(lhs, rhs) => {
@@ -1534,6 +1557,25 @@ pub(crate) fn validate_referential_integrity(
                 check_def(*def_id)?;
                 check_symbol(*sym)?;
                 validate_expr(iterable, check_symbol, check_def, check_hir, check_type)?;
+                validate_block(body, check_symbol, check_def, check_hir, check_type)?;
+            }
+            HirExpressionKind::IteraLockstep {
+                sources,
+                coordinates,
+                bindings,
+                body,
+            } => {
+                for (coordinate_def_id, coordinate_name) in coordinates {
+                    check_def(*coordinate_def_id)?;
+                    check_symbol(*coordinate_name)?;
+                }
+                for (binding_def_id, binding_name) in bindings {
+                    check_def(*binding_def_id)?;
+                    check_symbol(*binding_name)?;
+                }
+                for source in sources {
+                    validate_expr(source, check_symbol, check_def, check_hir, check_type)?;
+                }
                 validate_block(body, check_symbol, check_def, check_hir, check_type)?;
             }
             HirExpressionKind::Intervallum {

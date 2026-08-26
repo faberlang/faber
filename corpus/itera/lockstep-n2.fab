@@ -1,0 +1,48 @@
++++
+term = "itera"
+kind = "keyword"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "array_literal", "itera_stmt", "itera_binding", "expression", "literal", "nota_stmt"]
+category = "control-flow"
+canonical = true
+summary = "Lockstep walk of two lists with two binders."
+syntax = "for from <lista>, <lista> const <left>, <right> { }"
+related = ["ex", "de", "apud"]
+locale = "en"
++++
+
+# =============================================================================
+# lockstep N=2 — one walk over two aligned lists.
+# =============================================================================
+#
+# What this teaches:
+#   • `for from` with a comma-separated source series walks N collections in
+#     lockstep — one iteration per aligned index, no hand-written counter
+#   • the binder series names one binder per source, in the same order
+#   • equal lengths are a law: statically known lengths must already match at
+#     check; dynamic lengths are guarded before the walk (fail-closed, never
+#     truncated to the shorter list)
+#
+# Common mistakes:
+#   • writing `xs[i]` with `for range` to keep two lists aligned — the
+#     lockstep series exists exactly for that index-free shape
+#   • expecting silent truncation on unequal lists — the walk fails closed
+#
+# See also: ex, apud
+# =============================================================================
+
+main {
+    const list<string> labels ← ["one", "two", "three"]
+    const list<int> values ← [1, 2, 3]
+
+    for from labels, values const label, value {
+        print label
+        print value
+    }
+
+    const list<int> left ← [10, 20, 30]
+    const list<int> right ← [1, 2, 3]
+
+    for from left, right const a, b {
+        print a - b
+    }
+}
