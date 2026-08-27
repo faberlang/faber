@@ -69,6 +69,10 @@ pub use needs::{collect_go_needs, GoNeeds};
 pub use needs::{collect_rust_needs, RustNeeds};
 /// Shared indentation-aware source writer (lives in `radix-codegen-shared`).
 pub use radix_codegen_shared::{CodeWriter, Codegen, CodegenError};
+#[cfg(feature = "hir-rust")]
+pub use radix_hir_rust::representation_plan;
+#[cfg(feature = "hir-rust")]
+pub use rust::build_representation_plan;
 
 /// Conversio (`↦`) emit-arm detection probe — measurement path only, inert in
 /// production. The exempla conversio matrix harness uses it to measure the
