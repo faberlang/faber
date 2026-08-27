@@ -79,10 +79,7 @@ impl FunctionBuilder<'_> {
                 .push(MirError::missing_type(receiver.span, "collection reduce receiver"));
             return None;
         };
-        if !matches!(
-            self.normalized_type(receiver_ty),
-            Type::Array(_) | Type::BoundedArray { .. }
-        ) {
+        if !matches!(self.normalized_type(receiver_ty), Type::Array(_) | Type::BoundedArray { .. }) {
             self.errors.push(MirError::unsupported(
                 receiver.span,
                 "collection reduce before array MIR lowering",
@@ -112,10 +109,7 @@ impl FunctionBuilder<'_> {
                 .push(MirError::missing_type(receiver.span, "collection cumulata receiver"));
             return None;
         };
-        if !matches!(
-            self.normalized_type(receiver_ty),
-            Type::Array(_) | Type::BoundedArray { .. }
-        ) {
+        if !matches!(self.normalized_type(receiver_ty), Type::Array(_) | Type::BoundedArray { .. }) {
             self.errors.push(MirError::unsupported(
                 receiver.span,
                 "collection cumulata before array MIR lowering",
@@ -675,9 +669,7 @@ impl FunctionBuilder<'_> {
 
     fn collection_element_ty(&self, ty: TypeId) -> Option<MirType> {
         match self.normalized_type(ty) {
-            Type::Array(item) | Type::BoundedArray { element: item, .. } => {
-                Some(MirType::semantic(*item))
-            }
+            Type::Array(item) | Type::BoundedArray { element: item, .. } => Some(MirType::semantic(*item)),
             _ => None,
         }
     }

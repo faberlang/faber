@@ -10,7 +10,7 @@
 
 use crate::test_support::args_have_no_legacy_message;
 use crate::{PassConfig, SemanticError, SemanticErrorKind};
-use radix_hir::visit::{HirVisitor, walk_expr, walk_program, walk_stmt};
+use radix_hir::visit::{walk_expr, walk_program, walk_stmt, HirVisitor};
 use radix_hir::{
     HirExpression, HirExpressionKind, HirLiteral, HirModule, HirStatement, HirStatementKind,
 };
@@ -1281,12 +1281,10 @@ functio mixed(tensor<f32, [40]> x) → f32 {
         "exactly the over-budget loop declines: {:?}",
         result.diagnostics
     );
-    assert!(
-        declined[0]
-            .args
-            .iter()
-            .any(|arg| arg.name == "causa" && arg.value == "budget")
-    );
+    assert!(declined[0]
+        .args
+        .iter()
+        .any(|arg| arg.name == "causa" && arg.value == "budget"));
     let hir = result.hir.as_ref().expect("typed HIR despite the decline");
     let mut iteras = CountIteras(0);
     walk_program(&mut iteras, hir);
@@ -1635,12 +1633,10 @@ functio too_many(tensor<f32, [8]> x) → f32 {
         "exactly the over-budget loop declines: {:?}",
         result.diagnostics
     );
-    assert!(
-        declined[0]
-            .args
-            .iter()
-            .any(|arg| arg.name == "causa" && arg.value == "budget")
-    );
+    assert!(declined[0]
+        .args
+        .iter()
+        .any(|arg| arg.name == "causa" && arg.value == "budget"));
     let hir = result.hir.as_ref().expect("typed HIR despite the decline");
     let mut iteras = CountIteras(0);
     walk_program(&mut iteras, hir);

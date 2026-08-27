@@ -30,7 +30,7 @@
 //! be literals or enum variants. Type compatibility, exhaustiveness, loop
 //! placement legality, and target-specific lowering remain downstream.
 
-use super::{HirBlock, HirExpression, HirStatement, HirStatementKind, Lowerer, pattern};
+use super::{pattern, HirBlock, HirExpression, HirStatement, HirStatementKind, Lowerer};
 use radix_hir::{HirCasuArm, HirExpressionKind, HirLiteral, HirPattern, HirScribeKind};
 use radix_lexer::Span;
 use radix_syntax::{Stmt, StmtKind};
