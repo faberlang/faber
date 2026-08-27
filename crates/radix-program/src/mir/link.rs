@@ -269,6 +269,14 @@ pub(super) fn local_namespace_call_targets(
         .map(|unit| (unit.path.clone(), unit))
         .collect::<BTreeMap<_, _>>();
     let mut links = PackageMirLinkAccumulator::default();
+    // Sibling-route product identity: the package root directory name, the
+    // same derivation the package-identity computation applies.
+    let sibling_product = package
+        .spec
+        .package_root
+        .file_name()
+        .map(|name| name.to_string_lossy().into_owned())
+        .unwrap_or_default();
 
     for unit in package.nodes.values() {
         for item in &unit.analysis.hir.items {
@@ -356,6 +364,7 @@ pub(super) fn local_namespace_call_targets(
                             import_item.def_id,
                             sibling,
                             &exports,
+                            &sibling_product,
                         );
                     }
                 }
@@ -387,6 +396,7 @@ pub(super) fn local_namespace_call_targets(
                                 import_item.def_id,
                                 sibling,
                                 &exports,
+                                &sibling_product,
                             );
                         }
                         continue;
@@ -475,10 +485,16 @@ fn link_sibling_import_item(
     import_def_id: DefId,
     sibling: &AnalyzedProgramNode,
     exports: &BTreeSet<String>,
+    product: &str,
 ) {
     links
         .namespaces
         .insert((caller_path.to_path_buf(), import_def_id), exports.clone());
+    // SGR-U0: a sibling device export is an imported-device route for every
+    // consumer unit of the package. The body is package-owned source, so the
+    // route is composable by construction; without the route the consumer's
+    // generic instantiation registers no device entry (the spike-3 gap) and
+    // the target seam sees a zero-kernel package.
     for function in exported_top_level_functions(sibling, exports) {
         let synthetic = *links
             .source_rewrites
@@ -488,6 +504,29 @@ fn link_sibling_import_item(
                 links.next_synthetic += 1;
                 def_id
             });
+        if let Some(contract) = sibling
+            .file_interface
+            .exports
+            .get(&function.name)
+            .and_then(|export| match &export.kind {
+                radix_module::file_interface::FileExportKind::Function(callable) => {
+                    callable.device.clone()
+                }
+                _ => None,
+            })
+        {
+            links.imported_device_routes.push((
+                synthetic,
+                radix_module::mir::ImportedDeviceRoute {
+                    identity: radix_module::mir::MirExternalFunctionIdentity::new(
+                        product.to_owned(),
+                        sibling.module_segments.clone(),
+                        function.name.clone(),
+                    ),
+                    contract,
+                },
+            ));
+        }
         links.targets.insert(
             (caller_path.to_path_buf(), import_def_id, function.name),
             synthetic,

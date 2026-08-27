@@ -238,6 +238,102 @@ fn signature_only_imported_device_fails_closed_with_named_reason() {
     );
 }
 
+/// SGR-U0: an imported device instantiation whose size bindings cannot be
+/// resolved from the use site fails closed with the stable classified issue
+/// `imported_device_bindings_unresolved` — never a silent provider fallback.
+#[test]
+fn unresolved_imported_device_bindings_fail_closed_with_named_reason() {
+    let mut types = TypeTable::new();
+    let mut interner = Interner::new();
+    let size_symbol = interner.intern("M");
+    let concrete = MirType::semantic(types.primitive(Primitive::Textus));
+    // Template admits no bindable witness for its declared shape param, so
+    // the call site resolves no binding for `M`.
+    let template = MirFunction {
+        id: MirFunctionId(0),
+        source: Some(IMPORTED_SOURCE),
+        name: None,
+        params: Vec::new(),
+        locals: Vec::new(),
+        temps: Vec::new(),
+        blocks: vec![MirBlock {
+            id: crate::mir::MirBlockId(0),
+            statements: Vec::new(),
+            terminator: MirTerminator { kind: MirTerminatorKind::Return(None), span: Span::default() },
+            span: Span::default(),
+        }],
+        return_ty: concrete,
+        error_ty: None,
+        is_async: false,
+        is_generator: false,
+        shader_stage: None,
+        span: Span::default(),
+    };
+    let caller = MirFunction {
+        id: MirFunctionId(1),
+        source: None,
+        name: None,
+        params: Vec::new(),
+        locals: Vec::new(),
+        temps: Vec::new(),
+        blocks: vec![MirBlock {
+            id: crate::mir::MirBlockId(0),
+            statements: vec![MirStatement {
+                kind: MirStatementKind::Call {
+                    destination: None,
+                    callee: MirCallee::Definition { source: IMPORTED_SOURCE, type_args: Vec::new() },
+                    args: Vec::new(),
+                },
+                span: Span::default(),
+            }],
+            terminator: MirTerminator { kind: MirTerminatorKind::Return(None), span: Span::default() },
+            span: Span::default(),
+        }],
+        return_ty: concrete,
+        error_ty: None,
+        is_async: false,
+        is_generator: false,
+        shader_stage: None,
+        span: Span::default(),
+    };
+    let mut program = MirProgram { functions: vec![caller], ..MirProgram::default() };
+    let generic_params = vec![(
+        IMPORTED_SOURCE,
+        vec![MirGenericParam { name: size_symbol, is_shape: true }],
+    )];
+    let index = imported_device_index(imported_device_route(InterfaceBodyChannel::Source));
+
+    let errors = instantiate_merged_generic_calls_with_devices(
+        &mut program,
+        &[template],
+        &generic_params,
+        &mut types,
+        &interner,
+        None,
+        &index,
+        &std::collections::HashMap::new(),
+        &std::collections::HashSet::new(),
+    )
+    .expect_err("unresolved imported device bindings must fail closed");
+
+    assert!(
+        errors
+            .iter()
+            .any(|error| error.issue == "imported_device_bindings_unresolved"),
+        "expected the named imported_device_bindings_unresolved reason, got {errors:?}"
+    );
+    // No registration and no valid target: the call site keeps its
+    // unresolved Definition callee.
+    let caller = &program.functions[0];
+    let MirStatementKind::Call { callee, .. } = &caller.blocks[0].statements[0].kind else {
+        panic!("expected call statement");
+    };
+    assert!(
+        matches!(callee, MirCallee::Definition { source, .. } if *source == IMPORTED_SOURCE),
+        "an unresolved binding must not make the device call valid"
+    );
+}
+
 /// DFV2-3 (d): a serialized canonical-body fixture reaches the consumer's
 /// composition input unchanged — same template bytes, same body hash.
 #[test]

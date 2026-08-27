@@ -411,11 +411,21 @@ fn sibling_import_composes_consumer_local_kernel_caller() {
         &entry,
         &crate::test_support::test_mir_seams(),
         |lowered| {
-            // No library join: the sibling's kernel is not an imported-device
-            // route; its composition facts are consumer-local only.
-            assert!(
-                lowered.imported_device_registrations.is_empty(),
-                "a sibling export is not a library route"
+            // SGR-U0 superseded the "no library join ⇒ no registration"
+            // boundary: a sibling device export is an imported-device route
+            // for every consumer unit of the package (package-owned body,
+            // composable by construction), so its generic instantiation
+            // registers here too — through the source-rewrite join, not the
+            // library interface path.
+            assert_eq!(
+                lowered.imported_device_registrations.len(),
+                1,
+                "the sibling's public kernel registers exactly one imported instance: {:?}",
+                lowered.imported_device_registrations
+            );
+            assert_eq!(
+                lowered.imported_device_registrations[0].route.identity.name, "add",
+                "the registered sibling route names the exported verb"
             );
 
             // The sibling's instantiated public kernel stays a launch symbol:
@@ -459,7 +469,7 @@ fn sibling_import_composes_consumer_local_kernel_caller() {
                 &imported_entry_facts(lowered),
                 lowered.validated.program(),
             )
-            .expect("the consumer-local role map must merge with zero facts");
+            .expect("the consumer-local role map must merge with the sibling registration facts");
             let mut device = radix_module::mir::MirDeviceContext::from_hir_roles(merged);
             device.attach_program(lowered.validated.program());
             assert_eq!(
