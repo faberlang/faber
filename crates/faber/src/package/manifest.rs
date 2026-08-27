@@ -73,6 +73,10 @@ pub struct FaberManifest {
     /// Explicit additions to the native host provider selection.
     #[serde(default)]
     pub dispatch: ManifestDispatch,
+
+    /// Check-command settings (`[check]`): the complexity warning budget.
+    #[serde(default)]
+    pub check: ManifestCheck,
 }
 
 /// `[device]` metadata for package runner backend selection (N1.1), the
@@ -173,6 +177,20 @@ pub struct ManifestDispatch {
     pub providers: Vec<String>,
 }
 
+/// `[check]` settings for the package check command (product view only).
+///
+/// The `radix-program` compiler projection tolerates `[check]` as an
+/// unknown product table; only this view declares and validates its shape.
+/// Layering: CLI `--complexity-budget` beats `complexity-budget` here,
+/// which beats the driver's baked default.
+#[derive(Debug, Default, Deserialize)]
+#[serde(default, deny_unknown_fields, rename_all = "kebab-case")]
+pub struct ManifestCheck {
+    /// Cyclomatic-complexity warning budget for `faber check`; `None`
+    /// leaves the baked driver default in place.
+    pub complexity_budget: Option<u32>,
+}
+
 macro_rules! product_path_default {
     ($name:ident, $value:literal) => {
         fn $name() -> String {
@@ -207,6 +225,26 @@ pub(crate) fn manifest_build_target_for_input(
         Some(target) => manifest_build_target(Some(target), &layout.manifest_path).map(Some),
         None => Ok(None),
     }
+}
+
+/// Resolve the manifest `[check] complexity-budget` for an input path.
+///
+/// `None` when no package layout is discoverable, no manifest exists, the
+/// key is unset, or the product-view parse fails — the caller then applies
+/// the baked default, and the strict product-view validation seam reports
+/// the parse failure (fail closed there, not here). CLI
+/// `--complexity-budget` beats this value.
+pub(crate) fn manifest_check_complexity_budget(input: &Path) -> Option<u32> {
+    let Ok(layout) = super::discover_build_layout(input) else {
+        return None;
+    };
+    if !layout.manifest_path.exists() {
+        return None;
+    }
+    read_manifest(&layout.manifest_path)
+        .ok()?
+        .check
+        .complexity_budget
 }
 
 /// Map a manifest `[device] backend` value to a backend selection request
