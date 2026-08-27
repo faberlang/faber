@@ -30,7 +30,9 @@ fn template_function(id: MirFunctionId, source: DefId) -> MirFunction {
 }
 
 fn program_of(functions: &[MirFunction]) -> MirProgram {
-    MirProgram { functions: functions.to_vec() }
+    MirProgram {
+        functions: functions.to_vec(),
+    }
 }
 
 fn kernel_fact(source: DefId, function: MirFunctionId) -> MirImportedEntryFact {
@@ -147,8 +149,9 @@ fn local_role_disagreement_fails_closed() {
     let source = DefId(2_000_000_106);
     let program = program_of(&[template_function(MirFunctionId(0), source)]);
     let local = FxHashMap::from_iter([(source, MirDeviceRole::Fragment)]);
-    let error = merge_imported_entry_roles(local, &[kernel_fact(source, MirFunctionId(0))], &program)
-        .expect_err("role disagreement must fail closed");
+    let error =
+        merge_imported_entry_roles(local, &[kernel_fact(source, MirFunctionId(0))], &program)
+            .expect_err("role disagreement must fail closed");
     assert_eq!(error.issue(), IMPORTED_DEVICE_ENTRY_ROLE_CONFLICT);
 }
 

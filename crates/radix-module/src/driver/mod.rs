@@ -654,6 +654,7 @@ fn generate_wasm_text_output(
 /// target-admission fact. The launch decision comes from the registration's
 /// carried v2 contract alone (role, visibility, body channel) — never from
 /// symbol spelling, emitted text, or a fallback carrier.
+#[cfg(feature = "mir-core")]
 fn imported_target_entry_fact(
     registration: &crate::mir::ImportedDeviceRegistration,
 ) -> radix_mir::device::MirImportedEntryFact {
@@ -680,13 +681,12 @@ fn imported_target_entry_fact(
 /// unresolvable registration fails closed before any emitter runs. With no
 /// registrations (the single-unit route) the local map passes through
 /// unchanged.
+#[cfg(feature = "mir-core")]
 fn merged_target_entry_roles(
     local: rustc_hash::FxHashMap<crate::hir::DefId, crate::mir::MirDeviceRole>,
     lowered: &crate::mir::LoweredMirUnit<'_>,
-) -> Result<
-    rustc_hash::FxHashMap<crate::hir::DefId, crate::mir::MirDeviceRole>,
-    radix_mir::device::MirImportedEntryError,
-> {
+) -> Result<rustc_hash::FxHashMap<crate::hir::DefId, crate::mir::MirDeviceRole>, radix_mir::device::MirImportedEntryError>
+{
     if lowered.imported_device_registrations.is_empty() {
         return Ok(local);
     }
@@ -700,12 +700,9 @@ fn merged_target_entry_roles(
 
 /// Spanned carrier for a KPC-EMIT merge failure (the `issue` diagnostic arg
 /// keeps the machine-readable identity, e.g. `imported_device_instance_unresolved`).
+#[cfg(feature = "mir-core")]
 fn imported_entry_error_spanned(error: radix_mir::device::MirImportedEntryError) -> SpannedCodegenError {
-    SpannedCodegenError {
-        message: error.message(),
-        args: vec![DiagnosticArg::new("issue", error.issue())],
-        span: None,
-    }
+    SpannedCodegenError { message: error.message(), args: vec![DiagnosticArg::new("issue", error.issue())], span: None }
 }
 
 #[cfg_attr(not(feature = "mir-llvm"), allow(unused_variables))]
@@ -727,8 +724,7 @@ fn generate_llvm_text_output(
         // KPC-EMIT target-role handoff: the merged map (local entries plus
         // concrete imported registrations) is what the text paths consume, so
         // an import-only device package no longer reports the zero-entry red.
-        let device_roles =
-            merged_target_entry_roles(local_device_roles, &mir).map_err(imported_entry_error_spanned)?;
+        let device_roles = merged_target_entry_roles(local_device_roles, &mir).map_err(imported_entry_error_spanned)?;
         // DDCP3-U2 (b) mixed-path disambiguation: default `llvm-text`/`llvm-host`
         // is the CPU-module path. A package that carries device roles routes
         // through the HOST-PARTITION lane (direct declarations/calls, no device
@@ -806,8 +802,7 @@ pub fn cuda_kernel_descriptor_json(session: &Session, name: &str, source: &str) 
     // KPC-EMIT: same merged target-role handoff as the text paths — the
     // descriptor's entry set is derived from the same merged map.
     let device_roles = merged_target_entry_roles(local_device_roles, &mir).map_err(|error| {
-        vec![codegen_diagnostic(name, "CUDA_DESCRIPTOR_BUILD", error.message())
-            .with_arg("issue", error.issue())]
+        vec![codegen_diagnostic(name, "CUDA_DESCRIPTOR_BUILD", error.message()).with_arg("issue", error.issue())]
     })?;
 
     let mut device = crate::mir::MirDeviceContext::from_hir_roles(device_roles);
@@ -870,8 +865,7 @@ fn generate_metal_text_output(
         // KPC-EMIT target-role handoff: concrete imported registrations join
         // the local entry map before the probe — the spike-3 zero-entry red
         // is the omission this merge removes.
-        let device_roles =
-            merged_target_entry_roles(local_device_roles, &mir).map_err(imported_entry_error_spanned)?;
+        let device_roles = merged_target_entry_roles(local_device_roles, &mir).map_err(imported_entry_error_spanned)?;
         let output = crate::mir::emit_metal_text_probe_with_reflection_and_device_roles(
             &device_roles,
             &mir.validated,
@@ -1002,8 +996,7 @@ fn generate_wgsl_text_output(
         let local_device_roles = crate::mir::device_entry_roles_from_hir(&analysis.hir, &analysis.interner);
         let mir = lower_mir_with_context_for_target(analysis, no_fuse)?;
         // KPC-EMIT target-role handoff: same merged entry map as Metal/LLVM.
-        let device_roles =
-            merged_target_entry_roles(local_device_roles, &mir).map_err(imported_entry_error_spanned)?;
+        let device_roles = merged_target_entry_roles(local_device_roles, &mir).map_err(imported_entry_error_spanned)?;
         let output = crate::mir::emit_wgsl_text_probe_with_reflection_and_device_roles(
             &device_roles,
             &mir.validated,
