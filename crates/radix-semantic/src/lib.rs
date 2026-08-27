@@ -38,6 +38,7 @@ pub mod access_facts;
 pub mod analyzed_application;
 pub mod annotation_contract;
 pub mod broadcast_reduction;
+pub mod capability;
 pub mod def_id_closure;
 pub mod error;
 pub mod figura;
@@ -146,6 +147,20 @@ pub use annotation_contract::{
     ResolvedContractApplication, ResolvedContractField,
 };
 pub use broadcast_reduction::compute_cotangent_reduction_axes;
+pub use capability::{
+    CapabilityAnswer, CapabilityFamily, CapabilityKind, CapabilityQueries, CapabilityQuery,
+    CapabilityReason, CapturePosture, CaptureRequirement, EffectPosture, ExportVisibility,
+    FailClosedCapabilityQueries, FunctionCapabilityAnswer, FunctionCapabilityKind,
+    FunctionCapabilityProof, FunctionCapabilityQueries, FunctionCapabilitySummary, FunctionProof,
+    FunctionSummary, IndexCapabilityAnswer, IndexCapabilityKind, IndexCapabilityProof,
+    IndexCapabilityQueries, IndexCapabilitySummary, IndexProof, IndexSummary, Liveness,
+    ParameterAccess, ParameterAccessPosture, PlaceCapabilityAnswer, PlaceCapabilityKind,
+    PlaceCapabilityProof, PlaceCapabilityQueries, PlaceCapabilitySummary, PlaceProof,
+    RecursionOutcome, RegionRelationship, RequiredRegionRelationships, ReturnedBorrowProvenance,
+    SolvedIndexedIdentity, TypeCapabilityAnswer, TypeCapabilityKind, TypeCapabilityProof,
+    TypeCapabilityQueries, TypeCapabilitySummary, TypeProof, TypeSummary,
+    CAPABILITY_VOCABULARY_VERSION,
+};
 pub use def_id_closure::{
     check_def_id_closure, def_id_closure_gaps, emit_def_table_name, missing_emit_def_diagnostic,
     resolved_reference_defs, DEF_ID_CLOSURE_CODE, DEF_ID_CLOSURE_ISSUE,
@@ -892,6 +907,10 @@ fn register_locale_pack_type_spellings(
 #[cfg(test)]
 #[path = "access_facts_test.rs"]
 mod access_facts_test;
+
+#[cfg(test)]
+#[path = "capability_test.rs"]
+mod capability_test;
 
 #[cfg(test)]
 #[path = "analyzed_application_test.rs"]
