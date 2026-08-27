@@ -675,3 +675,7 @@ mod const_member_lane_tests;
 #[cfg(test)]
 #[path = "closure_env_link_test.rs"]
 mod closure_env_link_tests;
+
+#[cfg(test)]
+#[path = "device_matrix_test.rs"]
+mod device_matrix_tests;
