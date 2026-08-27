@@ -3355,3 +3355,129 @@ import from "./kernels" k
     assert_eq!(device.visibility, InterfaceDeviceVisibility::Public);
     assert_eq!(device.body, InterfaceBodyChannel::Source);
 }
+
+/// KPC-WIRE done_when (i), advisory D2: an imported library that resolves and
+/// reads but does not parse is a named import-site fact, never a silently
+/// missing namespace surface. This is the pinned-gradus defect shape — the
+/// consumer's namespace stops silently matching (no exports, no declarations,
+/// no interface) and the compile fails closed instead of falling through the
+/// ignotum route.
+#[test]
+fn import_contract_failcloses_on_unparsable_library() {
+    clear_import_target_cache();
+    let (_td, home) = temp_dir("import-site-failure");
+    let provider = home.join("probe");
+    fs::create_dir_all(provider.join("src")).expect("provider src");
+    fs::write(
+        provider.join("faber.toml"),
+        r#"[package]
+name = "probe"
+[library]
+provider = "probe"
+[paths]
+source = "src"
+[build]
+kind = "lib"
+targets = ["rust"]
+"#,
+    )
+    .expect("manifest");
+    // Library content that cannot parse under any reader pack: the function
+    // body never closes.
+    fs::write(
+        provider.join("src/probe.fab"),
+        "functio scala(f32 x) → f32 {\n    redde x + 1.0\n",
+    )
+    .expect("broken lib");
+
+    let app = home.join("app.fab");
+    fs::write(&app, "importa ex \"probe:probe\" probe\n").expect("app");
+    let source = fs::read_to_string(&app).expect("read app");
+
+    let _guard = LibraryHomeGuard::set(&home);
+    let contract = import_contract_for_file(&app, &source, None, None);
+
+    assert_eq!(
+        contract.import_site_failures.len(),
+        1,
+        "one named import-site fact per parse-failed library"
+    );
+    let failure = &contract.import_site_failures[0];
+    assert_eq!(failure.binding, "probe");
+    assert_eq!(failure.import_path, "probe:probe");
+    assert!(
+        failure.target_path.ends_with("probe.fab"),
+        "fact names the resolved target, got {}",
+        failure.target_path.display()
+    );
+    // The interfaceless namespace stops silently matching: no surface is
+    // installed for the binding.
+    assert!(!contract.namespace_exports.contains_key("probe"));
+    assert!(!contract.namespace_declarations.contains_key("probe"));
+    assert!(!contract.file_interfaces.contains_key("probe"));
+
+    // The session memo deduplicates the failure: a second contract build for
+    // the same target reports the same single fact, not a second one.
+    let again = import_contract_for_file(&app, &source, None, None);
+    assert_eq!(again.import_site_failures.len(), 1);
+}
+
+/// KPC-WIRE done_when (i), triaged against the KPC-SEM rubric: the gate fires
+/// on parse failure with library content, never on surfaceless-by-design
+/// namespaces. A provider namespace that resolves to no target stays silently
+/// surfaceless — the 11 bare-driver/kernel-manifest regressions must hold.
+#[test]
+fn import_site_gate_ignores_surfaceless_namespaces() {
+    clear_import_target_cache();
+    let (_td, home) = temp_dir("import-site-surfaceless");
+    let app = home.join("app.fab");
+    fs::write(&app, "importa ex \"faber:processus\" processus\n").expect("app");
+    let source = fs::read_to_string(&app).expect("read app");
+
+    let _guard = LibraryHomeGuard::set(&home);
+    let contract = import_contract_for_file(&app, &source, None, None);
+
+    assert!(
+        contract.import_site_failures.is_empty(),
+        "surfaceless namespace must not trip the fail-closed gate: {:?}",
+        contract.import_site_failures
+    );
+    assert!(!contract.file_interfaces.contains_key("processus"));
+}
+
+/// KPC-WIRE done_when (i): the parse-failed library stops the program compile
+/// with the named import-site diagnostic on the driver-side `Diagnostic`
+/// channel (advisory D3 — no interface-type change).
+#[test]
+fn prepare_program_module_fails_closed_on_unparsable_library() {
+    clear_import_target_cache();
+    let (_td, home) = temp_dir("import-site-prepare");
+    fs::write(
+        home.join("math.fab"),
+        "functio addere(f32 a, f32 b) → f32 {\n    redde a + b\n",
+    )
+    .expect("broken lib");
+    let app = home.join("app.fab");
+    fs::write(&app, "importa ex \"./math\" math\n").expect("app");
+    let source = fs::read_to_string(&app).expect("read app");
+
+    let session = crate::driver::Session::new(crate::driver::Config::default());
+    let diagnostic = match crate::program::compile::prepare_program_module(&app, &source, &session) {
+        Ok(prepared) => panic!(
+            "parse-failed library must fail the program compile closed, got contract bindings {:?}",
+            prepared.contract.file_interfaces.keys().collect::<Vec<_>>()
+        ),
+        Err(diagnostic) => *diagnostic,
+    };
+    assert_eq!(diagnostic.code, Some("IMP001"));
+    assert!(matches!(
+        diagnostic.phase,
+        crate::diagnostics::DiagnosticPhase::Parse
+    ));
+    assert_eq!(diagnostic.issue(), Some("imported_library_parse_failure"));
+    assert!(
+        diagnostic.message.contains("math"),
+        "diagnostic names the import site: {}",
+        diagnostic.message
+    );
+}

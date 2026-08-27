@@ -79,7 +79,10 @@ mod stmt;
 use context::{function_param_map, struct_field_map, LoweringContextMaps};
 use expr::HirExpressionLoweringVisitor;
 use item::ItemLoweringPass;
-pub use package_instantiate::{instantiate_merged_generic_calls, PackageStructMetadata};
+pub use package_instantiate::{
+    instantiate_merged_generic_calls, instantiate_merged_generic_calls_with_devices, ImportedDeviceIndex,
+    ImportedDeviceRegistration, ImportedDeviceRoute, PackageStructMetadata,
+};
 
 /// Developer-facing MIR lowering diagnostic.
 ///
@@ -189,6 +192,20 @@ pub struct LoweredMirUnit<'a> {
     /// instead of being discarded after validation. The faber device-program
     /// constructor consumes it to lower generated companions into kernels.
     pub companions: radix_mir::device::MirCompanionMap,
+    /// Imported-device routes transferred from this unit's lowering context
+    /// (KPC-WIRE done_when (c)), keyed by import-item `DefId`: the v2 device
+    /// role, launch visibility, provider-route identity, and explicit body
+    /// channel collected at the import items. Package linking joins each
+    /// route to the merged synthetic template `DefId` and instantiates
+    /// against the resulting index; the single-unit path leaves the map
+    /// untouched.
+    pub imported_device_routes: FxHashMap<DefId, Vec<ImportedDeviceRoute>>,
+    /// Concrete imported-device instances registered for this unit by
+    /// package-link instantiation (KPC-WIRE done_when (d)): one entry per
+    /// [`MirMonomorphizationKey`], each proving the instance was admitted
+    /// under its route's role + body channel rather than a role bit alone.
+    /// Empty until package linking runs the device-aware instantiation.
+    pub imported_device_registrations: Vec<ImportedDeviceRegistration>,
 }
 
 impl std::fmt::Debug for LoweredMirUnit<'_> {
@@ -201,6 +218,7 @@ impl std::fmt::Debug for LoweredMirUnit<'_> {
             .field("generic_templates", &self.generic_templates)
             .field("generic_params", &self.generic_params)
             .field("companions", &self.companions)
+            .field("imported_device_registrations", &self.imported_device_registrations)
             .finish_non_exhaustive()
     }
 }
@@ -361,7 +379,11 @@ fn lower_analyzed_unit_with_options(
                 })
                 .collect());
         }
-        let mut validation = LoweringContextMaps::collect(unit).validation;
+        let mut maps = LoweringContextMaps::collect(unit);
+        // KPC-WIRE done_when (c): the module-owned route map is transferred
+        // exactly once instead of being dropped with the rest of the walk.
+        let imported_device_routes = maps.take_imported_device_routes();
+        let mut validation = maps.validation;
         align_function_signatures_with_mir_params(&mut validation, &program.functions);
         validation.layouts = MirLayoutTable::from_types(&unit.types);
         validation.closure_environments = closure_environments
@@ -383,6 +405,8 @@ fn lower_analyzed_unit_with_options(
             generic_params,
             validated,
             companions: radix_mir::device::MirCompanionMap::default(),
+            imported_device_routes,
+            imported_device_registrations: Vec::new(),
         })
     } else {
         Err(lowering_errors)

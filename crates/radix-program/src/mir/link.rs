@@ -221,6 +221,10 @@ struct PackageMirLinkAccumulator {
     diagnostics: Vec<Diagnostic>,
     libraries: Vec<LibraryLinkTarget>,
     method_targets: MethodCallTargets,
+    /// Imported-device routes joined to their synthetic template source
+    /// `DefId` (KPC-WIRE): one entry per device-bearing library function,
+    /// carried to package lowering for the device-aware instantiation index.
+    imported_device_routes: Vec<(DefId, radix_module::mir::ImportedDeviceRoute)>,
 }
 
 impl Default for PackageMirLinkAccumulator {
@@ -235,6 +239,7 @@ impl Default for PackageMirLinkAccumulator {
             diagnostics: Vec::new(),
             libraries: Vec::new(),
             method_targets: HashMap::new(),
+            imported_device_routes: Vec::new(),
         }
     }
 }
@@ -460,6 +465,7 @@ pub(super) fn local_namespace_call_targets(
         next_synthetic: links.next_synthetic,
         libraries: links.libraries,
         method_targets: links.method_targets,
+        imported_device_routes: links.imported_device_routes,
     })
 }
 
@@ -609,6 +615,12 @@ fn link_library_import_site(
             .insert((site.caller_path.clone(), item.def_id), exports.clone());
         // Allocate every function source, not only public call targets. Private
         // functions can be reached from an exported function in the same module.
+        // Route→synthetic join (KPC-WIRE done_when (c)): every device-bearing
+        // function of the linked library becomes an imported-device route
+        // keyed by the synthetic template source the package rewrite will
+        // give that function's generic template. Joining here — where both
+        // the interface (role + body channel) and the allocated synthetic
+        // live — is caller-independent, so one route serves every consumer.
         for function in &functions {
             let synthetic = *links
                 .source_rewrites
@@ -618,6 +630,24 @@ fn link_library_import_site(
                     links.next_synthetic += 1;
                     def_id
                 });
+            if let Some(contract) = interface.exports.get(&function.name).and_then(|export| {
+                match &export.kind {
+                    radix_module::file_interface::FileExportKind::Function(callable) => callable.device.clone(),
+                    _ => None,
+                }
+            }) {
+                links.imported_device_routes.push((
+                    synthetic,
+                    radix_module::mir::ImportedDeviceRoute {
+                        identity: radix_module::mir::MirExternalFunctionIdentity::new(
+                            module.package.clone(),
+                            module.module_path.clone(),
+                            function.name.clone(),
+                        ),
+                        contract,
+                    },
+                ));
+            }
             if exports.contains(&function.name) {
                 links.targets.insert(
                     (site.caller_path.clone(), item.def_id, function.name.clone()),

@@ -137,6 +137,15 @@ pub(super) struct LoweringContextMaps<'a> {
 }
 
 impl<'a> LoweringContextMaps<'a> {
+    /// Transfer the collected imported-device route map (KPC-WIRE done_when
+    /// (c)): the consumer link's provider routes, handed to the lowered-unit
+    /// carrier exactly once so package linking can join them to rewritten
+    /// synthetic template sources. The map is left empty — a second read
+    /// yields nothing, so a route is never admitted twice.
+    pub(super) fn take_imported_device_routes(&mut self) -> FxHashMap<DefId, Vec<ImportedDeviceRoute>> {
+        std::mem::take(&mut self.imported_device_routes)
+    }
+
     /// Collect MIR lowering and validation maps from an analyzed unit.
     ///
     /// This walk intentionally follows HIR item structure instead of MIR output:

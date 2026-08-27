@@ -39,7 +39,33 @@ struct CachedImportTarget {
     target_path: PathBuf,
 }
 
-type ImportTargetCache = FxHashMap<(Option<String>, PathBuf), CachedImportTarget>;
+/// Memoized outcome for one import target (KPC-WIRE, advisory D2).
+///
+/// `Parsed` serves the cached surface. `Unparsable` records a target that
+/// resolved and read but produced no parseable program: the failure is
+/// memoized with the surface so a repeated import of the same physical file
+/// reports the same named import-site failure once per session instead of
+/// silently matching no namespace (advisory D5 — the thread-local memo both
+/// scopes and deduplicates the failure).
+#[derive(Clone)]
+enum CachedImportTargetEntry {
+    Parsed(CachedImportTarget),
+    Unparsable(PathBuf),
+}
+
+/// Lookup result for one import target.
+///
+/// `Unresolved` keeps the pre-existing silent skip for absent, disallowed, or
+/// unreadable targets — surfaceless-by-design namespaces (kernel manifests,
+/// bare-driver empty contracts) live here and must not trip the fail-closed
+/// gate.
+enum ImportTargetLookup {
+    Parsed(CachedImportTarget),
+    Unparsable(PathBuf),
+    Unresolved,
+}
+
+type ImportTargetCache = FxHashMap<(Option<String>, PathBuf), CachedImportTargetEntry>;
 
 thread_local! {
     /// Session-scoped memo for import-target exports and interfaces.
@@ -359,6 +385,40 @@ pub(crate) struct ImportContract {
     /// Package roots of resolved `provider:module` imports. Used to load
     /// library-owned `locale/<consumer-locale>/pack.toml` fragments.
     pub(crate) library_package_roots: BTreeSet<PathBuf>,
+    /// Fail-closed import-site facts (KPC-WIRE, advisory D2): imported
+    /// libraries that resolved and read but did not parse. The binding's
+    /// namespace surface stays uninstalled — it stops silently matching — and
+    /// the driver surfaces each fact as a named import-site `Diagnostic`.
+    pub(crate) import_site_failures: Vec<ImportSiteFailure>,
+}
+
+/// One parse-failed import target, recorded at the consumer's import site.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct ImportSiteFailure {
+    /// Import binding the consumer declared (`import from … math`).
+    pub(crate) binding: String,
+    /// Import path spelling as written by the consumer.
+    pub(crate) import_path: String,
+    /// Resolved target path that failed to parse.
+    pub(crate) target_path: PathBuf,
+}
+
+/// Named import-site diagnostic for a parse-failed imported library (KPC-WIRE
+/// done_when (i), advisory D2/D3): rides the driver-side [`Diagnostic`]
+/// channel only — never a `FileInterfaceError` or an interface-type change.
+fn import_site_parse_failure_diagnostic(consumer: &Path, failure: &ImportSiteFailure) -> crate::Diagnostic {
+    crate::Diagnostic::error(format!(
+        "imported library `{}` from `{}` did not parse: {}",
+        failure.binding,
+        failure.import_path,
+        failure.target_path.display()
+    ))
+    .with_phase(crate::diagnostics::DiagnosticPhase::Parse)
+    .with_code("IMP001")
+    .with_arg("issue", "imported_library_parse_failure")
+    .with_arg("binding", failure.binding.as_str())
+    .with_arg("import_path", failure.import_path.as_str())
+    .with_file(consumer.display().to_string())
 }
 
 impl ImportContract {
@@ -429,6 +489,13 @@ pub fn prepare_program_module(
         })?;
     }
     let import = import_contract_for_file(path, source, pack.as_ref(), templates);
+    // Fail-closed import-site propagation (KPC-WIRE done_when (i), advisory
+    // D2): a parse-failed imported library stops the compile with its named
+    // diagnostic instead of degrading to an interfaceless namespace. The
+    // first failure names the site; the contract carries every fact.
+    if let Some(failure) = import.import_site_failures.first() {
+        return Err(Box::new(import_site_parse_failure_diagnostic(path, failure)));
+    }
     let mut config = session.config.clone();
     if let Some(pack) = pack {
         config = config.with_locale_pack(pack).with_locale_pack_explicit();
@@ -508,44 +575,76 @@ pub fn analyze_prepared_program_name(
 /// and no parse on the hit path. On a miss the target is resolved, looked up
 /// under the raw and canonical path keys, and read+parsed once, with both
 /// keys inserted on success.
+///
+/// A target that resolved and read but did not parse returns
+/// [`ImportTargetLookup::Unparsable`] (KPC-WIRE, advisory D2): the parse
+/// failure is a named import-site fact for the consumer, never a silent
+/// `None`. Targets that never resolve, are disallowed, or cannot be read stay
+/// [`ImportTargetLookup::Unresolved`] — that is the surfaceless-by-design
+/// surface the fail-closed gate must not fire on.
 fn cached_import_target(
     from_file: &Path,
     import_path: &str,
     pack_key: Option<&String>,
     code_pack: ReaderPackRef<'_>,
     templates: Option<&BTreeMap<String, String>>,
-) -> Option<CachedImportTarget> {
+) -> ImportTargetLookup {
+    fn serve(entry: Option<CachedImportTargetEntry>) -> Option<ImportTargetLookup> {
+        entry.map(|entry| match entry {
+            CachedImportTargetEntry::Parsed(target) => ImportTargetLookup::Parsed(target),
+            CachedImportTargetEntry::Unparsable(target_path) => {
+                ImportTargetLookup::Unparsable(target_path)
+            }
+        })
+    }
+
     if import_path.starts_with("./") {
         // Fast path: derive the would-be resolved target without touching the
         // filesystem, so a session-cached target is served after deletion.
-        let candidate = from_file.parent()?.join(import_path);
+        let Some(parent) = from_file.parent() else {
+            return ImportTargetLookup::Unresolved;
+        };
+        let candidate = parent.join(import_path);
         let probe_key = (pack_key.cloned(), candidate.with_extension("fab"));
-        let cached = IMPORT_TARGET_CACHE.with(|cache| cache.borrow().get(&probe_key).cloned());
-        if cached.is_some() {
-            return cached;
+        if let Some(lookup) = serve(IMPORT_TARGET_CACHE.with(|cache| cache.borrow().get(&probe_key).cloned())) {
+            return lookup;
         }
     }
     let Ok(target_path) = resolve_namespace_import(from_file, import_path, templates) else {
-        return None;
+        return ImportTargetLookup::Unresolved;
     };
     let raw_key = (pack_key.cloned(), target_path.clone());
-    let cached = IMPORT_TARGET_CACHE.with(|cache| cache.borrow().get(&raw_key).cloned());
-    if cached.is_some() {
-        return cached;
+    if let Some(lookup) = serve(IMPORT_TARGET_CACHE.with(|cache| cache.borrow().get(&raw_key).cloned())) {
+        return lookup;
     }
     let canonical_key = std::fs::canonicalize(&target_path)
         .ok()
         .map(|canonical| (pack_key.cloned(), canonical));
     if let Some(key) = &canonical_key {
-        let cached = IMPORT_TARGET_CACHE.with(|cache| cache.borrow().get(key).cloned());
-        if cached.is_some() {
-            return cached;
+        if let Some(lookup) = serve(IMPORT_TARGET_CACHE.with(|cache| cache.borrow().get(key).cloned())) {
+            return lookup;
         }
     }
-    let target_source = std::fs::read_to_string(&target_path).ok()?;
+    let Ok(target_source) = std::fs::read_to_string(&target_path) else {
+        return ImportTargetLookup::Unresolved;
+    };
     let target_pack = import_target_locale_pack(&target_path, &target_source, code_pack);
-    let (target_program, target_interner) =
-        parse_program_for_namespace_exports(&target_path.display().to_string(), &target_source, target_pack.as_ref())?;
+    let Some((target_program, target_interner)) =
+        parse_program_for_namespace_exports(&target_path.display().to_string(), &target_source, target_pack.as_ref())
+    else {
+        // Fail-closed parse-failure propagation (KPC-WIRE, advisory D2): the
+        // library has content but no parseable program. Memoize the failure
+        // under both path keys so a repeated import reports once.
+        IMPORT_TARGET_CACHE.with(|cache| {
+            let mut cache = cache.borrow_mut();
+            let entry = CachedImportTargetEntry::Unparsable(target_path.clone());
+            cache.insert(raw_key, entry.clone());
+            if let Some(key) = canonical_key {
+                cache.insert(key, entry);
+            }
+        });
+        return ImportTargetLookup::Unparsable(target_path);
+    };
     let exports = sorted_export_surface(&target_program, &target_interner);
     let declarations = sorted_declaration_surface(&target_program, &target_interner);
     let module_identity = import_target_identity(import_path, None);
@@ -553,12 +652,13 @@ fn cached_import_target(
     let cached = CachedImportTarget { exports, declarations, interface, target_path };
     IMPORT_TARGET_CACHE.with(|cache| {
         let mut cache = cache.borrow_mut();
-        cache.insert(raw_key, cached.clone());
+        let entry = CachedImportTargetEntry::Parsed(cached.clone());
+        cache.insert(raw_key, entry.clone());
         if let Some(key) = canonical_key {
-            cache.insert(key, cached.clone());
+            cache.insert(key, entry);
         }
     });
-    Some(cached)
+    ImportTargetLookup::Parsed(cached)
 }
 
 /// Build namespace export names and typed file interfaces for a source file's imports.
@@ -582,6 +682,11 @@ pub(crate) fn import_contract_for_file(
     let Some((program, interner)) =
         parse_program_for_namespace_exports(&path.display().to_string(), source, resolved_pack.as_ref())
     else {
+        // The consumer itself did not parse. The authoritative diagnostics
+        // come from the real compile pass over this source (which lexes and
+        // parses it again and reports there); there is no import AST here to
+        // name an import site, and an extra unnamed fact would only duplicate
+        // that report.
         return ImportContract::default();
     };
 
@@ -601,10 +706,24 @@ pub(crate) fn import_contract_for_file(
         if !import_contract_path_allowed(import_path, templates) {
             continue;
         }
-        let Some(target) =
-            cached_import_target(path, import_path, pack_key.as_ref(), resolved_pack.as_ref(), templates)
-        else {
-            continue;
+        let target =
+            cached_import_target(path, import_path, pack_key.as_ref(), resolved_pack.as_ref(), templates);
+        let target = match target {
+            ImportTargetLookup::Parsed(target) => target,
+            ImportTargetLookup::Unparsable(target_path) => {
+                // Fail-closed propagation (KPC-WIRE done_when (i)): record the
+                // named import-site fact and leave the binding's surface
+                // uninstalled, so an interfaceless namespace stops silently
+                // matching. The gate fires only on parse failure with library
+                // content — never on surfaceless-by-design namespaces.
+                contract.import_site_failures.push(ImportSiteFailure {
+                    binding: binding.clone(),
+                    import_path: import_path.to_owned(),
+                    target_path,
+                });
+                continue;
+            }
+            ImportTargetLookup::Unresolved => continue,
         };
         contract
             .namespace_exports
@@ -692,7 +811,13 @@ fn collect_transitive_relative_interfaces(
         let Some(binding) = import_binding(&interner, &decl.kind) else {
             continue;
         };
-        let Some(target) = cached_import_target(from_file, import_path, pack_key, pack_ref, templates) else {
+        // An unparsable transitive target contributes no interface here; the
+        // module that directly imports it reports the named import-site
+        // failure through its own contract walk.
+        let Some(target) = (match cached_import_target(from_file, import_path, pack_key, pack_ref, templates) {
+            ImportTargetLookup::Parsed(target) => Some(target),
+            ImportTargetLookup::Unparsable(_) | ImportTargetLookup::Unresolved => None,
+        }) else {
             continue;
         };
         if !visited.insert(target.target_path.clone()) {
@@ -923,9 +1048,13 @@ fn package_identity_facts_for_file(
         // DFV2-3: record the target's device-bearing interface for this
         // consumer so the MIR provider route can carry role + body channel
         // into the consumer link. Served through the import-target memo, so
-        // the route sees the same interface the resolver installed.
+        // the route sees the same interface the resolver installed. An
+        // unparsable target records no route — its contract walk already
+        // failed closed with the named import-site diagnostic.
         let pack_key = code_pack.map(|pack| pack.metadata.id.clone());
-        if let Some(linked) = cached_import_target(&path, import_path, pack_key.as_ref(), code_pack, templates) {
+        if let ImportTargetLookup::Parsed(linked) =
+            cached_import_target(&path, import_path, pack_key.as_ref(), code_pack, templates)
+        {
             record_imported_device_interface(&module_segments, &binding, &linked.interface);
         }
         imports.insert(binding.clone(), module_segments_relative_to(&package_root, &target));

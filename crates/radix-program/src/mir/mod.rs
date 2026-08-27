@@ -413,6 +413,11 @@ struct PackageMirLinks {
     /// Library genus-method call targets keyed by caller unit path
     /// (FMIR e2e-hardening CTO-1).
     method_targets: MethodCallTargets,
+    /// Imported-device routes joined to synthetic template source `DefId`s
+    /// (KPC-WIRE): each device-bearing linked-library function carries its
+    /// provider identity + v2 device contract, ready for the device-aware
+    /// package instantiation index.
+    imported_device_routes: Vec<(DefId, radix_module::mir::ImportedDeviceRoute)>,
 }
 
 /// One linked const data member. The linker allocates a synthetic def id in
@@ -599,6 +604,10 @@ mod receiver_method_lane_tests;
 #[cfg(test)]
 #[path = "mixed_shape_link_test.rs"]
 mod mixed_shape_link_tests;
+
+#[cfg(test)]
+#[path = "generic_device_link_test.rs"]
+mod generic_device_link_tests;
 
 #[cfg(test)]
 #[path = "method_call_mir_test.rs"]

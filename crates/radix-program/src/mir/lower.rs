@@ -681,6 +681,10 @@ pub(super) fn lower_package_units<'a>(
     let mut pending = Vec::new();
     let mut extra_validation = RemappedValidation::default();
     let mut shared_nominals: HashMap<(InterfaceNominalKind, String), TypeId> = HashMap::new();
+    // Imported-device routes joined to synthetic template sources (KPC-WIRE):
+    // seeded from the linker's library join, extended by each lowered unit's
+    // module-owned route map.
+    let mut imported_device_routes = links.imported_device_routes.clone();
     // Mutable copy of the link sources: the library-lowering pass extends it
     // with synthetic ids for auto-generated sub-companion sources.
     let mut source_rewrites = links.sources.clone();
@@ -734,6 +738,16 @@ pub(super) fn lower_package_units<'a>(
             &unit.analysis.resolver,
         );
         let mut lowered = lower_unit(unit, &cli_plan.entry_records, no_fuse)?;
+        // KPC-WIRE (c): this unit's module-owned route map was transferred
+        // into the lowered unit instead of being dropped; join it to the
+        // linker's synthetic template sources for this caller now, while the
+        // unit path is in hand.
+        imported_device_routes.extend(joined_imported_device_routes(
+            &lowered.imported_device_routes,
+            links,
+            &unit_path,
+        ));
+        lowered.imported_device_routes.clear();
         remap_program_text_symbols(
             &mut lowered.program,
             &lowered.interner,
@@ -1059,6 +1073,14 @@ pub(super) fn lower_package_units<'a>(
 
     let mut merged = lower_unit(entry, &cli_plan.entry_records, no_fuse)?;
     ensure_unique_definition_sources(&merged.program, &entry_path)?;
+    // KPC-WIRE (c): the entry's module-owned route map joins the same way as
+    // the siblings'; the transferred map is consumed exactly once.
+    imported_device_routes.extend(joined_imported_device_routes(
+        &merged.imported_device_routes,
+        links,
+        &entry_path,
+    ));
+    merged.imported_device_routes.clear();
     let mut dispatch_function = selected_cli_dispatch_function(
         cli_plan,
         &entry_path,
@@ -1098,6 +1120,7 @@ pub(super) fn lower_package_units<'a>(
         generic_params,
         &entry_path,
         Some(&extra_validation),
+        radix_module::mir::ImportedDeviceIndex::from_routes(imported_device_routes),
     )?;
     rebuild_merged_validated(&mut merged, &entry_path, Some(&extra_validation))?;
 
@@ -1807,6 +1830,33 @@ fn rewrite_generic_identity(
     rewrite_generic_param_sources(&mut lowered.generic_params, unit_path, source_rewrites);
 }
 
+/// Join one unit's transferred imported-device route map to the merged
+/// synthetic template `DefId`s (KPC-WIRE done_when (c)).
+///
+/// The module-side map is keyed by import-item `DefId`; the linker's call
+/// table keys the same import item plus verb to the synthetic source the
+/// package rewrite gives that function's generic template. A route with no
+/// linked target joins nothing — it never silently admits an instance.
+fn joined_imported_device_routes<'routes>(
+    unit_routes: impl IntoIterator<Item = (&'routes DefId, &'routes Vec<radix_module::mir::ImportedDeviceRoute>)>,
+    links: &PackageMirLinks,
+    caller_path: &Path,
+) -> Vec<(DefId, radix_module::mir::ImportedDeviceRoute)> {
+    let mut joined = Vec::new();
+    for (import_def_id, routes) in unit_routes {
+        for route in routes {
+            let Some(synthetic) = links
+                .calls
+                .get(&(caller_path.to_path_buf(), *import_def_id, route.identity.name.clone()))
+            else {
+                continue;
+            };
+            joined.push((*synthetic, route.clone()));
+        }
+    }
+    joined
+}
+
 fn shift_templates(templates: &mut [MirFunction], offset: u32) {
     if offset == 0 {
         return;
@@ -1828,6 +1878,7 @@ fn instantiate_package_generics(
     generic_params: Vec<(DefId, Vec<radix_module::mir::MirGenericParam>)>,
     diagnostic_path: &Path,
     extra_validation: Option<&RemappedValidation>,
+    imported_devices: radix_module::mir::ImportedDeviceIndex,
 ) -> Result<(), Vec<Diagnostic>> {
     if templates.is_empty() {
         merged.generic_templates = templates;
@@ -1837,7 +1888,11 @@ fn instantiate_package_generics(
     let mut types =
         radix_types::TypeTable::from_snapshot(merged.validated.validation().types.snapshot())
             .map_err(|message| vec![mir_lowering_diag(diagnostic_path, message)])?;
-    let extra = radix_module::mir::instantiate_merged_generic_calls(
+    // KPC-WIRE done_when (b): the production package path invokes the
+    // device-aware helper with the joined imported-device index — never the
+    // empty-index wrapper — so imported generic device calls register their
+    // concrete instances and signature-only routes fail closed.
+    let (extra, registrations) = radix_module::mir::instantiate_merged_generic_calls_with_devices(
         &mut merged.program,
         &templates,
         &generic_params,
@@ -1846,14 +1901,26 @@ fn instantiate_package_generics(
         extra_validation
             .map(|validation| validation.struct_metadata())
             .as_ref(),
+        &imported_devices,
     )
     .map_err(|errors| {
         errors
             .into_iter()
-            .map(|error| mir_lowering_diag(diagnostic_path, error.message))
+            .map(|error| {
+                // Preserve the named fail-closed issue (KPC-WIRE done_when
+                // (e)): `imported_device_body_missing` and its siblings are
+                // machine-readable identities, not message prose.
+                let diagnostic = mir_lowering_diag(diagnostic_path, error.message);
+                if error.issue.is_empty() {
+                    diagnostic
+                } else {
+                    diagnostic.with_arg("issue", error.issue)
+                }
+            })
             .collect::<Vec<_>>()
     })?;
     merged.monomorphizations.extend(extra);
+    merged.imported_device_registrations = registrations;
     merged.generic_templates = templates;
     merged.generic_params = generic_params;
     let types: &'static radix_types::TypeTable = Box::leak(Box::new(types));

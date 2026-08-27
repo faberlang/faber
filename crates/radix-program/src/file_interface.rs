@@ -10,7 +10,8 @@ use radix_module::driver::AnalyzedModule;
 use radix_module::file_interface::{
     snapshot_interface_callable_with_identity, snapshot_interface_type_with_identity, FileExport,
     FileExportKind, FileInterface, FileInterfaceError, InterfaceAliasExport,
-    InterfaceAnnotationContract, InterfaceAnnotationContractField, InterfaceEnumVariant,
+    InterfaceAnnotationContract, InterfaceAnnotationContractField, InterfaceBodyChannel,
+    InterfaceDeviceContract, InterfaceDeviceRole, InterfaceDeviceVisibility, InterfaceEnumVariant,
     InterfaceGenericParam, InterfaceLibraryIdentity, InterfaceMethodExport, InterfaceNominalExport,
     InterfaceQualifiedIdentity, InterfaceStructExport, InterfaceStructField,
 };
@@ -562,14 +563,54 @@ fn snapshot_function(
         is_async: func.is_async,
         is_generator: func.is_generator,
     };
-    snapshot_interface_callable_with_identity(
+    let mut callable = snapshot_interface_callable_with_identity(
         &sig,
         &analysis.types,
         &analysis.interner,
         &analysis.resolver,
         export_identity.map(identity_for).as_ref(),
     )
-    .map_err(|err| interface_error(file_label, name, err))
+    .map_err(|err| interface_error(file_label, name, err))?;
+    // Library-cache parity (KPC-WIRE): the module-side import link attaches
+    // the v2 device contract at its export-surface builder; this snapshot is
+    // the library/package interface source, and without the same fact an
+    // exported `@ kernel`/`@ nucleum` declaration arrives at the package seam
+    // with `device: None` and its role can never cross the import boundary.
+    if let Some(contract) = device_contract_from_hir(func, &analysis.interner) {
+        callable.device = Some(contract);
+    }
+    Ok(callable)
+}
+
+/// v2 device contract for one exported HIR function declaration, mirroring
+/// the module-side `device_contract_from_stmt` convention (DFV2-3): the
+/// nucleum role bit sets the role, an explicit `@ publica`/`@ public`
+/// annotation sets launch visibility (an unmarked device function is a
+/// module-internal helper), and a missing body is an explicit
+/// [`InterfaceBodyChannel::Missing`] — never a silent signature-only export.
+fn device_contract_from_hir(
+    func: &HirFunction,
+    interner: &radix_module::lexer::Interner,
+) -> Option<InterfaceDeviceContract> {
+    let role = match func.nucleum_role()? {
+        NucleumRole::Entry => InterfaceDeviceRole::Kernel,
+        NucleumRole::Fragment => InterfaceDeviceRole::Fragment,
+    };
+    let visibility = if func
+        .annotations
+        .iter()
+        .any(|annotation| interner.resolve(annotation.family) == "publica")
+    {
+        InterfaceDeviceVisibility::Public
+    } else {
+        InterfaceDeviceVisibility::Private
+    };
+    let body = if func.body.is_some() {
+        InterfaceBodyChannel::Source
+    } else {
+        InterfaceBodyChannel::Missing
+    };
+    Some(InterfaceDeviceContract { role, visibility, body })
 }
 
 fn snapshot_const(

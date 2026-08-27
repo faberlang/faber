@@ -1,6 +1,9 @@
 use super::*;
 use radix_module::driver::{analyze_source, AnalyzeRequest, Config, ModuleImportContract, Session};
-use radix_module::file_interface::{FileExportKind, InterfaceStructField, InterfaceTypeSnapshot};
+use radix_module::file_interface::{
+    FileExportKind, InterfaceBodyChannel, InterfaceDeviceRole, InterfaceDeviceVisibility,
+    InterfaceStructField, InterfaceTypeSnapshot,
+};
 use radix_module::semantic::Primitive;
 use std::collections::BTreeMap;
 
@@ -280,8 +283,8 @@ fn unsolved_hole_param_export_fails_closed() {
 /// witnesses — materializes as an `InterfaceCallable` through the package
 /// export extraction path. The same-unit concrete caller keeps the DFV2-2
 /// orphan admission silent so the extraction result is proven on both
-/// partial and integrated trees; the device contract stays unpopulated
-/// (KPC-WIRE owns `InterfaceDeviceContract` parity, not this unit).
+/// partial and integrated trees; KPC-WIRE lands the library-cache device
+/// parity this proof waited on, so the twin now carries its v2 contract.
 #[test]
 fn typed_kernel_twin_export_materializes_as_interface_callable() {
     let analysis = analyze(
@@ -312,8 +315,14 @@ fn typed_kernel_twin_export_materializes_as_interface_callable() {
     );
     assert_eq!(callable.params[0].ty, expected);
     assert_eq!(*callable.ret, expected);
-    assert!(
-        callable.device.is_none(),
-        "PKG-REP fixes signature representability only; device parity is KPC-WIRE's"
-    );
+    // KPC-WIRE library-cache parity: the twin keeps its v2 device contract
+    // through the package export extraction path — public Kernel with a
+    // source body channel.
+    let device = callable
+        .device
+        .as_ref()
+        .expect("typed kernel twin must retain its InterfaceDeviceContract");
+    assert_eq!(device.role, InterfaceDeviceRole::Kernel);
+    assert_eq!(device.visibility, InterfaceDeviceVisibility::Public);
+    assert_eq!(device.body, InterfaceBodyChannel::Source);
 }
