@@ -15,8 +15,8 @@ use super::compile;
 use crate::codegen::Target;
 use crate::diagnostics::DiagnosticArg;
 use crate::driver::{
-    AnalyzeRequest, ModuleCompileRequest, PackageKernelTemplateAdmissions, analyze_source,
-    analyze_source_with_kernel_template_admissions,
+    analyze_source, analyze_source_with_kernel_template_admissions, AnalyzeRequest, ModuleCompileRequest,
+    PackageKernelTemplateAdmissions,
 };
 use crate::hir::HirItemKind;
 use crate::semantic::passes::visibility_annotation::VisibilityTier;

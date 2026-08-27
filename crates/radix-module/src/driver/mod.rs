@@ -34,28 +34,28 @@ mod shader_contract;
 mod source;
 mod target_policy;
 
-pub use file_frontmatter::{FileFrontmatter, parse_file_frontmatter};
-pub use frontmatter::{FrontmatterError, SplitFrontmatter, split_frontmatter};
+pub use file_frontmatter::{parse_file_frontmatter, FileFrontmatter};
+pub use frontmatter::{split_frontmatter, FrontmatterError, SplitFrontmatter};
 pub use session::{Config, Session, WarnPolicy};
-pub use source::{PeeledSource, SourceFile, SourceLoadError, peel_raw_source, source_load_diagnostic};
+pub use source::{peel_raw_source, source_load_diagnostic, PeeledSource, SourceFile, SourceLoadError};
 
-use crate::CompileResult;
 use crate::codegen::{self, Target};
 use crate::diagnostics::DiagnosticConvert;
-use crate::diagnostics::{Diagnostic, DiagnosticArg, DiagnosticPhase, Severity, Span, locale_unknown_spec};
-use crate::hir::visit::{HirVisitor, walk_expr};
+use crate::diagnostics::{locale_unknown_spec, Diagnostic, DiagnosticArg, DiagnosticPhase, Severity, Span};
+use crate::hir::visit::{walk_expr, HirVisitor};
 use crate::hir::{
     DefId, HirBlock, HirExpression, HirExpressionKind, HirFunction, HirItemKind, HirModule, HirModuleEnd,
     HirPresentation, HirSourceAnchorId, LibraryRegistry,
 };
 use crate::lexer;
 use crate::lexer::Interner;
-use crate::locale::{KeywordSurface, LocalePack, latin_locale_pack};
+use crate::locale::{latin_locale_pack, KeywordSurface, LocalePack};
 use crate::parser;
 use crate::semantic::{self, PassConfig, Primitive, RadixLane, RadixLaneMetadata, Resolver, Type};
 #[allow(clippy::wildcard_imports)]
 // syntax is a pure re-export barrel from radix-syntax
 use crate::syntax::*;
+use crate::CompileResult;
 use std::collections::BTreeMap;
 
 const MISSING_PARSE_PROGRAM_MESSAGE: &str = "successful parse result missing program";
@@ -1462,8 +1462,8 @@ pub fn apply_air_backward_bundle(
 /// `magnitudo` bindings without a backend-specific policy.
 #[cfg(feature = "device")]
 fn finalize_air_backward_shapes(lowered: &mut crate::mir::LoweredMirUnit<'_>) -> Result<(), SpannedCodegenError> {
-    use crate::mir::MirMonomorphizationKey;
     use crate::mir::generic::MirShapeBindings;
+    use crate::mir::MirMonomorphizationKey;
 
     const UNRESOLVED_SHAPE_SIZE_SURVIVOR: &str = "unresolved shape-size constant survives monomorphization";
 
@@ -1593,7 +1593,7 @@ fn rewrite_air_backward_calls(
     instances: &rustc_hash::FxHashMap<crate::mir::MirMonomorphizationKey, crate::mir::MirFunctionId>,
     instance_return_types: &rustc_hash::FxHashMap<crate::mir::MirMonomorphizationKey, crate::mir::MirType>,
 ) -> Result<(), SpannedCodegenError> {
-    use crate::mir::generic::{MirShapeBindings, bind_generic_type_witness_with_shapes, canonical_index};
+    use crate::mir::generic::{bind_generic_type_witness_with_shapes, canonical_index, MirShapeBindings};
     use crate::mir::{
         MirCallee, MirGenericBindings, MirMonomorphizationKey, MirOperand, MirPlaceBase, MirStatementKind,
         MirTerminatorKind,
@@ -2137,16 +2137,16 @@ fn generate_air_lane_backward_with_companion(
     no_fuse: bool,
 ) -> Result<crate::mir::device::LosslessMirCompanionEntry, codegen::CodegenError> {
     use crate::air::{
-        AirCompanionDerivativeKind, AirCompanionErrorChannel, AirCompanionOracleRef, AirCompanionRelation,
-        AirCompanionSelectedInput, AirCompanionSelectedOutput, AirGradientCheckAdmissionInputs,
         admit_generated_gradient_check, air_gradient_check_eligibility_witness,
         validate_generated_backward_to_mir_from_function, validate_mir_backward_result_contract,
+        AirCompanionDerivativeKind, AirCompanionErrorChannel, AirCompanionOracleRef, AirCompanionRelation,
+        AirCompanionSelectedInput, AirCompanionSelectedOutput, AirGradientCheckAdmissionInputs,
     };
 
     let types_ref = lowered.validated.validation().types;
 
     // Run fusion pass on the companion body (unless disabled).
-    use crate::air::fusion::{FusionTable, fuse_companion};
+    use crate::air::fusion::{fuse_companion, FusionTable};
     let (fused_body, fusion_table) = if no_fuse {
         (companion.body, FusionTable::default())
     } else {

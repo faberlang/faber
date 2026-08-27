@@ -353,8 +353,7 @@ fn convert_round_trip_retains_named_conversion_fn_en_la_en() {
     // Canonicalize under the package's own en surface first, so every later
     // state is an emitter product and text/diagnostics compare exactly.
     run_convert_in_place(&binary, &source_dir, "en");
-    let canonical_en =
-        fs::read_to_string(source_dir.join("main.fab")).expect("read canonical en");
+    let canonical_en = fs::read_to_string(source_dir.join("main.fab")).expect("read canonical en");
     assert!(
         canonical_en.contains("@ conversion\nfn from_source_error(SourceError err) → DestError {"),
         "canonical en emit must keep the named conversion fn with its marker:\n{canonical_en}"

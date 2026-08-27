@@ -3452,11 +3452,7 @@ fn import_site_gate_ignores_surfaceless_namespaces() {
 fn prepare_program_module_fails_closed_on_unparsable_library() {
     clear_import_target_cache();
     let (_td, home) = temp_dir("import-site-prepare");
-    fs::write(
-        home.join("math.fab"),
-        "functio addere(f32 a, f32 b) → f32 {\n    redde a + b\n",
-    )
-    .expect("broken lib");
+    fs::write(home.join("math.fab"), "functio addere(f32 a, f32 b) → f32 {\n    redde a + b\n").expect("broken lib");
     let app = home.join("app.fab");
     fs::write(&app, "importa ex \"./math\" math\n").expect("app");
     let source = fs::read_to_string(&app).expect("read app");
@@ -3470,14 +3466,14 @@ fn prepare_program_module_fails_closed_on_unparsable_library() {
         Err(diagnostic) => *diagnostic,
     };
     assert_eq!(diagnostic.code, Some("IMP001"));
-    assert!(matches!(
-        diagnostic.phase,
-        crate::diagnostics::DiagnosticPhase::Parse
-    ));
+    assert!(matches!(diagnostic.phase, crate::diagnostics::DiagnosticPhase::Parse));
     assert_eq!(diagnostic.issue(), Some("imported_library_parse_failure"));
     assert!(
-        diagnostic.message.contains("math"),
-        "diagnostic names the import site: {}",
-        diagnostic.message
+        diagnostic
+            .args
+            .iter()
+            .any(|arg| arg.name == "binding" && arg.value == "math"),
+        "diagnostic names the import site binding: {:?}",
+        diagnostic.args
     );
 }

@@ -630,12 +630,17 @@ fn link_library_import_site(
                     links.next_synthetic += 1;
                     def_id
                 });
-            if let Some(contract) = interface.exports.get(&function.name).and_then(|export| {
-                match &export.kind {
-                    radix_module::file_interface::FileExportKind::Function(callable) => callable.device.clone(),
-                    _ => None,
-                }
-            }) {
+            if let Some(contract) =
+                interface
+                    .exports
+                    .get(&function.name)
+                    .and_then(|export| match &export.kind {
+                        radix_module::file_interface::FileExportKind::Function(callable) => {
+                            callable.device.clone()
+                        }
+                        _ => None,
+                    })
+            {
                 links.imported_device_routes.push((
                     synthetic,
                     radix_module::mir::ImportedDeviceRoute {
