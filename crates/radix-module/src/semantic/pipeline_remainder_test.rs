@@ -16,8 +16,25 @@ fn lege_corpus_still_checks() {
 
 #[test]
 fn th_th_example_still_checks_with_locale002_advisories() {
-    let path =
-        std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../examples/reader-locale/th-TH/src/main.fab");
+    // Probe ancestors for the examples repo so lane packets under
+    // `worktrees/<lane>/` (which lack a sibling `examples/`) still resolve.
+    let example = ["reader-locale/th-TH/src/main.fab"]
+        .into_iter()
+        .map(std::path::Path::new)
+        .find_map(|rel| std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .parent()
+            .and_then(std::path::Path::parent)
+            .and_then(std::path::Path::parent)
+            .and_then(|root| root.ancestors().find(|dir| {
+                !dir
+                    .components()
+                    .any(|c| c.as_os_str() == std::ffi::OsStr::new("worktrees"))
+                    && dir.join("examples").join(rel).is_file()
+            })));
+    let Some(examples_root) = example else {
+        panic!("examples repo (reader-locale/th-TH) not found near this checkout");
+    };
+    let path = examples_root.join("examples").join("reader-locale/th-TH/src/main.fab");
     let source = std::fs::read_to_string(&path).expect("th-TH example");
     let pack_path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../stdlib/locale/th-TH/pack.toml");
     let pack = crate::locale::LocalePack::from_toml_path(&pack_path).expect("installed th-TH pack should load");

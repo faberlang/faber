@@ -5,8 +5,8 @@
   "lane": "mir",
   "generatedBy": "radix/scripta/emit-compat-json.py",
   "summary": {
-    "capable": 307,
-    "analyzable": 334
+    "capable": 309,
+    "analyzable": 336
   },
   "terms": [
     {
@@ -540,8 +540,8 @@
     {
       "term": "instans",
       "rule": "keyword",
-      "capable": 2,
-      "analyzable": 2
+      "capable": 3,
+      "analyzable": 3
     },
     {
       "term": "itera",
@@ -1056,8 +1056,8 @@
     {
       "term": "summa",
       "rule": "concept",
-      "capable": 9,
-      "analyzable": 10
+      "capable": 10,
+      "analyzable": 11
     },
     {
       "term": "tacet",
