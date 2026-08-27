@@ -141,7 +141,7 @@ fn discerne_alias_and_multi_subject_roundtrip_through_faber_codegen() {
 functio compare(Res left, Res right) → vacuum {
   discerne left, right {
     casu Click ut l, Quit ut r {
-      nota l.x
+      nota l
       nota r
     }
     ceterum {
