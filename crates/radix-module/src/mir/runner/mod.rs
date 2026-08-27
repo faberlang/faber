@@ -9,6 +9,10 @@ pub use radix_mir_runner::{
     runner_dispatch_status, BufferHost, Host, RunnerDispatchStatus, RunnerError, StdioHost, Value,
 };
 
+#[cfg(test)]
+#[path = "kernel_ban_test.rs"]
+mod kernel_ban_tests;
+
 use crate::diagnostics::Diagnostic;
 use crate::driver::{AnalyzedModule, Session};
 use crate::mir::lower_analyzed_unit;

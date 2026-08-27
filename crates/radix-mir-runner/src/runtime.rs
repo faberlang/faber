@@ -260,6 +260,7 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
         span: Span,
     ) -> Result<Value, RunnerError> {
         let func_id = self.resolve_definition(stream.callee, span)?;
+        self.refuse_kernel_execution(func_id, span)?;
         let param_locals = self
             .function_by_id(func_id, span)?
             .params

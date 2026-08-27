@@ -22,10 +22,10 @@ pub use value::{MapKey, Value};
 use radix_hir::DefId;
 use radix_lexer::{Interner, Span, Symbol};
 use radix_mir::{
-    MirBinOp, MirBlock, MirBlockId, MirCallee, MirConstant, MirFunction, MirFunctionId, MirLocalId,
-    MirOperand, MirParamMode, MirPlace, MirPlaceBase, MirProgram, MirStatementKind, MirTempId,
-    MirTerminatorKind, MirType, MirUnOp, MirValidationContext, MirValue, MirValueId, MirValueKind,
-    ValidatedMir,
+    MirBinOp, MirBlock, MirBlockId, MirCallee, MirConstant, MirFunction, MirFunctionId,
+    MirKernelShaderStage, MirLocalId, MirOperand, MirParamMode, MirPlace, MirPlaceBase, MirProgram,
+    MirStatementKind, MirTempId, MirTerminatorKind, MirType, MirUnOp, MirValidationContext,
+    MirValue, MirValueId, MirValueKind, ValidatedMir,
 };
 use radix_types::{effective_width, NumericWidth, Primitive, Type, TypeId, TypeTable};
 use rustc_hash::{FxHashMap, FxHashSet};
@@ -48,6 +48,11 @@ pub(crate) const RUNNER_CODE_UNSUPPORTED: &str = "runner_unsupported";
 
 /// Stable diagnostic code for internal runner failures (D-02-07).
 pub(crate) const RUNNER_CODE_INTERNAL: &str = "runner_internal";
+
+/// Stable diagnostic identity for refusing execution of a device-annotated
+/// function. The runner's execution policy keys on MIR shader-stage metadata,
+/// not on source names or rendered diagnostic text.
+pub const RUNNER_KERNEL_REFUSED_ISSUE: &str = "runner_kernel_refused";
 
 /// Issue stem for the unsupported family; identity comes from the structured
 /// code + feature arg, never from parsing the prose message.
@@ -122,6 +127,14 @@ impl RunnerError {
         self.message.ends_with(" conversion failed")
             || self.message.ends_with(" conversion out of range")
     }
+}
+
+fn kernel_refused(span: Span) -> RunnerError {
+    RunnerError::internal_with_issue(
+        span,
+        "runner refuses execution of @ kernel function",
+        RUNNER_KERNEL_REFUSED_ISSUE,
+    )
 }
 
 fn runner_issue(message: &str) -> String {
@@ -402,6 +415,11 @@ fn run_function_with_explicit_limits<H: Host + ?Sized>(
             format!("no MIR function with id {}", function_id.0),
         )]);
     }
+    if let Some(function) = program.function_by_id(function_id) {
+        if function.shader_stage == Some(MirKernelShaderStage::Compute) {
+            return Err(vec![kernel_refused(function.span)]);
+        }
+    }
     if let Some((function, reason)) = program.functions.iter().find_map(|function| {
         function_unsupported_bounded_carrier(function, context.types)
             .map(|reason| (function, reason))
@@ -586,6 +604,21 @@ impl<H: Host + ?Sized> Runner<'_, H> {
         self.program
             .function_by_id(id)
             .ok_or_else(|| RunnerError::internal(span, format!("missing function f{}", id.0)))
+    }
+
+    /// Refuse execution of a function carrying the device `@ kernel`
+    /// annotation. The annotation survives HIR→MIR as the compute shader
+    /// stage; no source-name or prose matching belongs in this policy gate.
+    fn refuse_kernel_execution(
+        &self,
+        function_id: MirFunctionId,
+        span: Span,
+    ) -> Result<(), RunnerError> {
+        let function = self.function_by_id(function_id, span)?;
+        if function.shader_stage == Some(MirKernelShaderStage::Compute) {
+            return Err(kernel_refused(span));
+        }
+        Ok(())
     }
 
     fn set_active_block(&mut self, block: MirBlockId, span: Span) {
@@ -948,6 +981,7 @@ impl<H: Host + ?Sized> Runner<'_, H> {
             },
             _ => (self.resolve_callee(callee, span)?, None),
         };
+        self.refuse_kernel_execution(func_id, span)?;
         // BO-M-3/052: avoid cloning the entire MirFunction; collect param locals only.
         let param_modes = self
             .function_by_id(func_id, span)?

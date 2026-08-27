@@ -4692,3 +4692,49 @@ fn explicit_unbounded_variant_does_not_stop_on_default_guard() {
     let result = run_function_unbounded(&validated, MirFunctionId(0), &mut host);
     panic!("unbounded variant must never return from an infinite loop: {result:?}");
 }
+
+#[test]
+fn direct_kernel_function_run_refuses_with_stable_identity() {
+    let mut interner = Interner::new();
+    let marked = interner.intern("marked");
+    let types = radix_types::TypeTable::new();
+    let mut context = MirValidationContext::new(&types);
+    context.interner = Some(&interner);
+    let vacuum = MirType::semantic(types.primitive(radix_types::Primitive::Vacuum));
+    let function = MirFunction {
+        id: MirFunctionId(0),
+        source: None,
+        name: Some(marked),
+        params: vec![],
+        locals: vec![],
+        temps: vec![],
+        blocks: vec![MirBlock {
+            id: MirBlockId(0),
+            statements: vec![],
+            terminator: MirTerminator {
+                kind: MirTerminatorKind::Return(None),
+                span: Span::default(),
+            },
+            span: Span::default(),
+        }],
+        return_ty: vacuum,
+        error_ty: None,
+        is_async: false,
+        is_generator: false,
+        shader_stage: Some(radix_mir::MirKernelShaderStage::Compute),
+        span: Span::default(),
+    };
+    let validated = ValidatedMir::new(
+        MirProgram {
+            functions: vec![function],
+        },
+        context,
+    )
+    .expect("kernel refusal fixture validates");
+    let mut host = BufferHost::default();
+
+    let errors = run_function(&validated, MirFunctionId(0), &mut host)
+        .expect_err("the runner must refuse direct kernel execution");
+    assert_eq!(errors.len(), 1);
+    assert_eq!(errors[0].issue, RUNNER_KERNEL_REFUSED_ISSUE);
+}
