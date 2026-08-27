@@ -550,8 +550,15 @@ impl TypeChecker<'_> {
                 self.check_expr(expr)
             };
             let ty = if spread {
+                // Exact-bound literals intern as `BoundedArray`; spreading
+                // one extracts its element just like an unbounded lista
+                // (mirrors `check_verte_array_target`).
                 if let Type::Array(inner) = self.types.get(self.resolve_inferred_type(ty)) {
                     *inner
+                } else if let Type::BoundedArray { element, .. } =
+                    self.types.get(self.resolve_inferred_type(ty))
+                {
+                    *element
                 } else {
                     self.invalid_operand_types(ISSUE_ARRAY_SPREAD_REQUIRES_LISTA, expr.span);
                     self.error_type

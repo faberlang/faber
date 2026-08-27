@@ -785,12 +785,31 @@ impl Validator<'_, '_> {
             }
             MirCollectionOp::Reverse | MirCollectionOp::Sort => {
                 if let Some(collection_ty) = first_arg_ty {
-                    self.require_assignable(
-                        call.return_ty,
-                        collection_ty,
-                        span,
-                        "collection reverse/sort result type mismatch",
-                    );
+                    // Reverse/sort preserve the element type; the receiver's
+                    // exact-bounds literal shape (BoundedArray) does not carry
+                    // onto the ArrayInner result. Compare element types and
+                    // fall back to the whole-type check for non-collections.
+                    match (
+                        self.collection_element_ty(call.return_ty),
+                        self.collection_element_ty(collection_ty),
+                    ) {
+                        (Some(result_elem), Some(receiver_elem)) => {
+                            self.require_assignable(
+                                result_elem,
+                                receiver_elem,
+                                span,
+                                "collection reverse/sort result type mismatch",
+                            );
+                        }
+                        _ => {
+                            self.require_assignable(
+                                call.return_ty,
+                                collection_ty,
+                                span,
+                                "collection reverse/sort result type mismatch",
+                            );
+                        }
+                    }
                 }
             }
             MirCollectionOp::Take | MirCollectionOp::TakeLast | MirCollectionOp::DropFirst => {

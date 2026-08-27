@@ -2490,7 +2490,10 @@ impl TypeChecker<'_> {
         recovery: &mut HirExpression,
         target_resolved: TypeId,
     ) {
-        let recovery_ty = self.check_expr(recovery);
+        // Check under the target as expected type so literal operands erase
+        // their exact bounds exactly like a declared-type initializer
+        // (`fixum lista<numerus> x ← [0]`).
+        let recovery_ty = self.check_expr_with_expected(recovery, Some(target_resolved));
         self.unify_assign_issue(
             recovery_ty,
             target_resolved,
