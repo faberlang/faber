@@ -171,7 +171,8 @@ fn manifest_check_without_section_parses_in_both_views() {
     let path = write_bare_manifest(&root, None);
     let product = faber_cli::package::read_manifest(&path).expect("product view parses");
     assert!(
-        product.check.complexity_budget.is_none() && product.check.kernel_complexity_budget.is_none(),
+        product.check.complexity_budget.is_none()
+            && product.check.kernel_complexity_budget.is_none(),
         "absent [check] must deserialize to the default section"
     );
     radix::program::manifest::read_manifest(&path)
@@ -203,8 +204,16 @@ fn manifest_check_unknown_key_fails_closed() {
     // validation seam, naming the offending key.
     let package = manifest_check_package("unknown-key", Some(bad_section));
     let (_, stderr, code) = run_faber_check(&["check"], &package);
-    assert_ne!(code, Some(0), "unknown [check] key must fail closed:\n{stderr}");
-    assert_eq!(code, Some(1), "fatal manifest diagnostic exits 1:\n{stderr}");
+    assert_ne!(
+        code,
+        Some(0),
+        "unknown [check] key must fail closed:\n{stderr}"
+    );
+    assert_eq!(
+        code,
+        Some(1),
+        "fatal manifest diagnostic exits 1:\n{stderr}"
+    );
     assert!(
         stderr.contains("bogus-budget"),
         "the offending key must be named:\n{stderr}"

@@ -3559,11 +3559,19 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
         want_max: bool,
     ) -> Result<Value, RunnerError> {
         let [receiver] = args else {
-            return Err(RunnerError::internal(span, "collection argmax/argmin arity"));
+            return Err(RunnerError::internal(
+                span,
+                "collection argmax/argmin arity",
+            ));
         };
         let values = match self.eval_operand(receiver, span)? {
             Value::Array(cell) => cell.borrow().clone(),
-            _ => return Err(RunnerError::internal(span, "argmax/argmin receiver type mismatch")),
+            _ => {
+                return Err(RunnerError::internal(
+                    span,
+                    "argmax/argmin receiver type mismatch",
+                ))
+            }
         };
         let mut winner: Option<usize> = None;
         for (index, value) in values.iter().enumerate() {

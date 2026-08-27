@@ -882,11 +882,14 @@ impl Validator<'_, '_> {
                 }
                 match self.type_kind(call.return_ty) {
                     Type::Option(index)
-                        if self.context.types.equals(
-                            *index,
-                            self.context.types.primitive(Primitive::Numerus),
-                        ) => {}
-                    _ => self.error(span, "collection argmax/argmin result is not numerus ∪ nihil"),
+                        if self
+                            .context
+                            .types
+                            .equals(*index, self.context.types.primitive(Primitive::Numerus)) => {}
+                    _ => self.error(
+                        span,
+                        "collection argmax/argmin result is not numerus ∪ nihil",
+                    ),
                 }
             }
             MirCollectionOp::TensorSumAxis => {

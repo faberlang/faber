@@ -4,8 +4,8 @@
 //! tie/NaN/empty execution laws are pinned by the owning runner tests
 //! (`radix-mir-runner/src/arg_extremum_test.rs`).
 
-use crate::Type;
 use crate::test_support::{analyze_ok, assert_accepts, assert_rejects_with_issue, entry_local_tys};
+use crate::Type;
 
 #[test]
 fn argmaxima_resolves_on_numeric_lista_as_numerus_option() {

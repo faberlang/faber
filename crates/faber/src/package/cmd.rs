@@ -759,10 +759,9 @@ pub fn cmd_check_package(
             // beats its manifest `[check]` key, which beats the baked
             // default; the two budgets never borrow each other's layers.
             let check = super::manifest::manifest_check_section(&input_path);
-            let budget =
-                complexity_budget.or_else(|| check.as_ref()?.complexity_budget);
-            let kernel_budget = kernel_complexity_budget
-                .or_else(|| check.as_ref()?.kernel_complexity_budget);
+            let budget = complexity_budget.or_else(|| check.as_ref()?.complexity_budget);
+            let kernel_budget =
+                kernel_complexity_budget.or_else(|| check.as_ref()?.kernel_complexity_budget);
             let config = match budget {
                 Some(budget) => config.with_complexity_budget(budget),
                 None => config,

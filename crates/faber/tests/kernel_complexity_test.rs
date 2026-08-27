@@ -128,7 +128,11 @@ fn warn_count(stderr: &str) -> usize {
 fn kernel_complexity_baked_default_warns_on_score_3_exit_0() {
     let package = kernel_complexity_package("default", None);
     let (_, stderr, code) = run_faber_check(&["check"], &package);
-    assert_eq!(code, Some(0), "advisory kernel budget must exit 0:\n{stderr}");
+    assert_eq!(
+        code,
+        Some(0),
+        "advisory kernel budget must exit 0:\n{stderr}"
+    );
     // Baked kernel default 2: densa (3) warns, quieta (2) stays silent.
     // Regular default 12: brancha (13) also warns, hosta (5) silent. The
     // kernel tier alone is isolated by the differential tests below.
@@ -142,7 +146,11 @@ fn kernel_complexity_score_2_kernel_stays_silent_at_default() {
     let package = kernel_complexity_package("tight", None);
     let (_, stderr, code) =
         run_faber_check(&["check", "--kernel-complexity-budget", "1"], &package);
-    assert_eq!(code, Some(0), "advisory kernel budget must exit 0:\n{stderr}");
+    assert_eq!(
+        code,
+        Some(0),
+        "advisory kernel budget must exit 0:\n{stderr}"
+    );
     // Kernel budget 1: densa (3) + quieta (2) warn; brancha (13) still
     // warns under the untouched regular default 12; hosta (5) silent.
     assert_eq!(warn_count(&stderr), 3, "stderr:\n{stderr}");
@@ -164,7 +172,11 @@ fn kernel_complexity_manifest_key_applies_without_cli_flag() {
     let package =
         kernel_complexity_package("manifest", Some("[check]\nkernel-complexity-budget = 1\n"));
     let (_, stderr, code) = run_faber_check(&["check"], &package);
-    assert_eq!(code, Some(0), "advisory kernel budget must exit 0:\n{stderr}");
+    assert_eq!(
+        code,
+        Some(0),
+        "advisory kernel budget must exit 0:\n{stderr}"
+    );
     // Manifest kernel budget 1: densa (3) + quieta (2) + brancha (13).
     assert_eq!(warn_count(&stderr), 3, "stderr:\n{stderr}");
 }
@@ -186,8 +198,7 @@ fn kernel_complexity_layering_is_independent_of_the_regular_budget() {
     let package = kernel_complexity_package("independent", None);
 
     // Loosening the REGULAR budget must not loosen the kernel tier.
-    let (_, stderr, code) =
-        run_faber_check(&["check", "--complexity-budget", "13"], &package);
+    let (_, stderr, code) = run_faber_check(&["check", "--complexity-budget", "13"], &package);
     assert_eq!(code, Some(0), "warn-only complexity must exit 0:\n{stderr}");
     // densa (3 > kernel 2) still warns; brancha (13) is now at the regular
     // budget and goes silent — proving the regular flag moved only brancha.
@@ -217,7 +228,11 @@ fn kernel_complexity_deny_warn027_promotes_both_budgets_together() {
     // WARN027, asserted here so it can never silently diverge.
     let package = kernel_complexity_package("deny", None);
     let (_, stderr, code) = run_faber_check(&["check", "--deny", "WARN027"], &package);
-    assert_ne!(code, Some(0), "promoted warnings must fail the check:\n{stderr}");
+    assert_ne!(
+        code,
+        Some(0),
+        "promoted warnings must fail the check:\n{stderr}"
+    );
     assert_eq!(code, Some(1), "fatal promoted warnings exit 1:\n{stderr}");
     assert!(
         warn_count(&stderr) >= 2,
