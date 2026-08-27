@@ -3,9 +3,9 @@
 //! Identity assertions target the rendered label
 //! `WARN027:complexity_budget_exceeded` (catalog code + issue), never
 //! free-form prose. Warn-count differentials prove the budget value reached
-//! the pass: `branchy` scores 11 and `steady` scores 10 (base 1 plus one
+//! the pass: `branchy` scores 13 and `steady` scores 12 (base 1 plus one
 //! decision point per standalone `si`), so the pair pins the baked default
-//! (10) and both override directions.
+//! (12) and both override directions.
 
 use std::fs;
 use std::path::Path;
@@ -17,8 +17,8 @@ use temp::TempDir;
 
 const WARN_LABEL: &str = "WARN027:complexity_budget_exceeded";
 
-/// `branchy` = 10 standalone `si` branches (score 11, over the baked default
-/// 10); `steady` = 9 branches (score 10, exactly at it). Identifiers avoid
+/// `branchy` = 12 standalone `si` branches (score 13, over the baked default
+/// 12); `steady` = 11 branches (score 12, exactly at it). Identifiers avoid
 /// pack keyword near-misses so LOCALE002 suggestions stay out of the counts.
 const MAIN_FAB: &str = r#"+++
 locale = "en"
@@ -36,6 +36,8 @@ fn branchy(int seed) → int {
     if seed ≡ 8 { n ← 8 }
     if seed ≡ 9 { n ← 9 }
     if seed ≡ 10 { n ← 10 }
+    if seed ≡ 11 { n ← 11 }
+    if seed ≡ 12 { n ← 12 }
     return n
 }
 
@@ -50,6 +52,8 @@ fn steady(int seed) → int {
     if seed ≡ 7 { n ← 7 }
     if seed ≡ 8 { n ← 8 }
     if seed ≡ 9 { n ← 9 }
+    if seed ≡ 10 { n ← 10 }
+    if seed ≡ 11 { n ← 11 }
     return n
 }
 
@@ -110,7 +114,7 @@ fn check_complexity_budget_baked_default_applies_without_flag() {
     let package = budget_fixture_package("default");
     let (_, stderr, code) = run_faber_check(&["check"], &package);
     assert_eq!(code, Some(0), "warn-only complexity must exit 0:\n{stderr}");
-    // Baked default 10: branchy (11) warns, steady (10) stays silent.
+    // Baked default 12: branchy (13) warns, steady (12) stays silent.
     assert_eq!(warn_count(&stderr), 1, "stderr:\n{stderr}");
 }
 
@@ -119,16 +123,16 @@ fn check_complexity_budget_warns_at_budget_n() {
     let package = budget_fixture_package("warn");
     let (_, stderr, code) = run_faber_check(&["check", "--complexity-budget", "5"], &package);
     assert_eq!(code, Some(0), "warn-only complexity must exit 0:\n{stderr}");
-    // Budget 5: both branchy (11) and steady (10) exceed it.
+    // Budget 5: both branchy (13) and steady (12) exceed it.
     assert_eq!(warn_count(&stderr), 2, "stderr:\n{stderr}");
 }
 
 #[test]
 fn check_complexity_budget_silent_at_higher_budget() {
     let package = budget_fixture_package("silent");
-    let (_, stderr, code) = run_faber_check(&["check", "--complexity-budget", "11"], &package);
+    let (_, stderr, code) = run_faber_check(&["check", "--complexity-budget", "13"], &package);
     assert_eq!(code, Some(0), "check must stay green:\n{stderr}");
-    // Budget 11: branchy (11) is at the budget, steady (10) under it.
+    // Budget 13: branchy (13) is at the budget, steady (12) under it.
     assert_eq!(warn_count(&stderr), 0, "stderr:\n{stderr}");
 }
 
