@@ -897,6 +897,43 @@ fn validate_rejects_matmul_workgroup_not_matching_tile() {
     );
 }
 
+/// PGC-B2 T=1 one-row exception: an M=1 plan may carry workgroup
+/// `(tile, 1)` (the decode GEMV launch shape); every other multi-row
+/// workgroup drift (including a one-row workgroup on an M>1 plan, and a
+/// shrunk x lane) still rejects.
+#[test]
+fn validate_admits_matmul_one_row_workgroup_only_for_t1() {
+    let mut plan = matmul_plan();
+    plan.m = 1;
+    plan.workgroup_y = 1;
+    assert!(
+        CollectionKernelPlan::TiledMatMul(plan.clone()).validate().is_ok(),
+        "an M=1 plan admits the one-row workgroup (tile, 1)"
+    );
+    let mut multi_row = matmul_plan();
+    multi_row.workgroup_y = 1;
+    assert_eq!(
+        matmul_plan_validation_error(&multi_row),
+        PlanValidationError::MatMulWorkgroupMismatch {
+            workgroup_x: MATMUL_TILE,
+            workgroup_y: 1,
+            tile: MATMUL_TILE,
+        }
+    );
+    let mut one_row_x = matmul_plan();
+    one_row_x.m = 1;
+    one_row_x.workgroup_y = 1;
+    one_row_x.workgroup_x = MATMUL_TILE - 1;
+    assert_eq!(
+        matmul_plan_validation_error(&one_row_x),
+        PlanValidationError::MatMulWorkgroupMismatch {
+            workgroup_x: MATMUL_TILE - 1,
+            workgroup_y: 1,
+            tile: MATMUL_TILE,
+        }
+    );
+}
+
 #[test]
 fn validate_rejects_matmul_shared_memory_slot_mismatch() {
     let mut plan = matmul_plan();
