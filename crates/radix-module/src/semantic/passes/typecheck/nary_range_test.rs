@@ -3,10 +3,10 @@
 //!
 //! The semantic laws are proven in the `radix-semantic` leaf; these probes
 //! run the same statements through the full module driver so the product is
-//! checked exactly as user packages meet it — parse, lower, typecheck — and
-//! the Rust target stays fail-closed on the product until NR-4 lands.
+//! checked exactly as user packages meet it — parse, lower, typecheck — and,
+//! since NR-4 (e55457166), the Rust target emits the product.
 
-use super::test_support::{assert_analysis_accepts, assert_analysis_rejects_with_issue, compile_and_get_diagnostics};
+use super::test_support::{assert_accepts, assert_analysis_accepts, assert_analysis_rejects_with_issue};
 
 #[test]
 fn n2_range_product_typechecks_through_the_driver() {
@@ -120,11 +120,13 @@ functio zip(lista<numerus> xs, lista<numerus> ys) → vacuum {
 }
 
 #[test]
-fn rust_target_stays_fail_closed_on_the_range_product() {
-    // NR-2 transitional red window: typecheck admits the product, the Rust
-    // target declines it by name until the ordered nested-loop emission
-    // lands with NR-4. No guessed product code may be emitted meanwhile.
-    let diagnostics = compile_and_get_diagnostics(
+fn rust_target_emits_the_range_product_through_the_driver() {
+    // NR-4 settled contract: the Rust target emits the Cartesian product as
+    // ordered nested range loops (extent/walk shape byte-pinned in the
+    // `radix-hir-rust` leaf). Through the driver that is a clean compile —
+    // codegen output present, no error diagnostics. The malformed-product
+    // laws above keep failing closed at typecheck.
+    assert_accepts(
         r"
 functio grid(numerus m, numerus n) → vacuum {
     itera ab 0‥m, 0‥n fixum i, j {
@@ -132,14 +134,6 @@ functio grid(numerus m, numerus n) → vacuum {
     }
 }
 ",
-    );
-    assert!(
-        !diagnostics.is_empty(),
-        "Rust target must decline the range product until NR-4 lands"
-    );
-    assert!(
-        diagnostics.iter().any(|diag| diag.is_error()),
-        "expected a hard decline, got: {diagnostics:?}"
     );
 }
 
