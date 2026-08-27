@@ -1233,6 +1233,10 @@ mod nucleum_annotation_test;
 mod annotation_locale_test;
 
 #[cfg(test)]
+#[path = "annotation_line_test.rs"]
+mod annotation_line_test;
+
+#[cfg(test)]
 #[path = "comma_law_test.rs"]
 mod comma_law_test;
 

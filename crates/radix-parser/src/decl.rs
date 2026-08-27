@@ -1839,11 +1839,77 @@ impl Parser {
             let kind = self.parse_annotation_kind()?;
             let span = start.merge(self.previous_span());
 
+            self.require_newline_after_bare_annotation(&kind)?;
             annotations.push(Annotation { kind, span });
         }
 
         self.check_nucleum_annotation_conflicts(&annotations)?;
         Ok(annotations)
+    }
+
+    /// GRAMMAR: [043]/[045] end a bare `annotation_sugar` at NEWLINE, so per
+    /// [004] the annotated declaration must start on the next physical line —
+    /// in same-line text the only derivation swallows the declaration head
+    /// into the `NON_NEWLINE_TOKEN*` payload.
+    fn require_newline_after_bare_annotation(
+        &mut self,
+        kind: &AnnotationKind,
+    ) -> Result<(), ParseError> {
+        if !self.annotation_is_bare_sugar(kind)
+            || self.is_at_end()
+            || self.raw_newline_before_next_word()
+        {
+            return Ok(());
+        }
+        Err(self
+            .invalid_annotation_error("unexpected_annotation_token")
+            .with_arg("context", self.bare_annotation_context(kind)))
+    }
+
+    /// Whether the annotation is sugar with no payload and no braced body, so
+    /// its production names NEWLINE as the terminator. Payload sugar ([043]
+    /// `NON_NEWLINE_TOKEN*`, preserved for statement annotations whose block
+    /// opens on the annotation's own line) and braced forms ([040], ending at
+    /// `}`) do not.
+    fn annotation_is_bare_sugar(&self, kind: &AnnotationKind) -> bool {
+        match kind {
+            AnnotationKind::Statement(stmt) => stmt.args.is_empty(),
+            AnnotationKind::Braced(_)
+            | AnnotationKind::Cli(_)
+            | AnnotationKind::Imperium(_)
+            | AnnotationKind::Optio(_)
+            | AnnotationKind::Operandus(_)
+            | AnnotationKind::RadixTypusDomain(_)
+            | AnnotationKind::RadixLane(_) => false,
+            // Braced `@ nucleum { … }` shares the sugar variant; a lane-less
+            // nucleum is bare only when the form did not end at `}`.
+            AnnotationKind::Nucleum(nucleum) => {
+                nucleum.lane.is_none()
+                    && !matches!(
+                        self.tokens.get(self.pos - 1).map(|t| &t.kind),
+                        Some(TokenKind::RBrace)
+                    )
+            }
+            // Markers (`@ publica`, `@ conversio`, …) carry no payload.
+            _ => true,
+        }
+    }
+
+    /// Canonical `@ name` context for the annotation-line diagnostic, using
+    /// the same latin family identity the AST keeps. Only bare-sugar kinds
+    /// reach this helper.
+    fn bare_annotation_context(&self, kind: &AnnotationKind) -> String {
+        let name = match kind {
+            AnnotationKind::Statement(stmt) => self.interner.resolve(stmt.name.name),
+            AnnotationKind::Nucleum(_) => "nucleum",
+            AnnotationKind::Publica => "publica",
+            AnnotationKind::Protecta => "protecta",
+            AnnotationKind::Privata => "privata",
+            AnnotationKind::Interna => "interna",
+            AnnotationKind::Conversio => "conversio",
+            _ => "annotation",
+        };
+        format!("@ {name}")
     }
 
     /// Return the active pack's spelling when `raw` is a registered annotation

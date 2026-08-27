@@ -191,8 +191,8 @@ fn functio_missing_close_paren_expected() {
 }
 
 #[test]
-fn same_line_futura_stops_before_functio_declaration() {
-    let result = parse_ok("@ futura functio f() → vacuum { }");
+fn futura_annotation_precedes_functio_declaration_on_next_line() {
+    let result = parse_ok("@ futura\nfunctio f() → vacuum { }");
     let program = result.program.as_ref().expect("program");
     assert_eq!(program.statements.len(), 1);
 
@@ -233,19 +233,16 @@ fn publica_annotation_stops_before_type_alias_declaration() {
 }
 
 #[test]
-fn publica_annotation_attaches_inline_before_type_alias() {
-    let result = parse_ok("@ publica typus Nomen = string\n");
-    let program = result.program.as_ref().expect("program");
-    assert_eq!(program.statements.len(), 1);
-    let StmtKind::TypeAlias(alias) = &program.statements[0].kind else {
-        panic!("expected type alias declaration");
-    };
-    assert_eq!(symbol_name(&result, alias.name.name), "Nomen");
-    assert_eq!(program.statements[0].annotations.len(), 1);
-    assert!(matches!(
-        program.statements[0].annotations[0].kind,
-        AnnotationKind::Publica
-    ));
+fn publica_annotation_rejects_same_line_type_alias() {
+    // A bare annotation is NEWLINE-terminated ([043]); the alias declaration
+    // it annotates must start on the next physical line, not share it.
+    assert_parse_error_matches(
+        "@ publica typus Nomen = string\n",
+        ParseExpectation::Args(&[
+            ("issue", "unexpected_annotation_token"),
+            ("context", "@ publica"),
+        ]),
+    );
 }
 
 #[test]
