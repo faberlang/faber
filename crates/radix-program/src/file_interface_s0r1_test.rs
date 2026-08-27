@@ -352,3 +352,123 @@ fn export_probe_fixture_materializes_solved_union_param() {
         "the match-solved param hole must materialize as InterfaceTypeSnapshot::Union"
     );
 }
+
+// ── PKG-REP: typed kernel-twin round trip ───────────────────
+
+/// The gradus kernel-twin declaration shape: an exported size-generic whose
+/// tensor shape witnesses are the declared `magnitudo` parameters. The
+/// same-unit concrete caller keeps orphan admission silent so the round trip
+/// proves the interface, not the admission family (PKG-ADM owns that).
+const TWIN_PROVIDER: &str = r#"@ publica
+functio gemma<magnitudo M, magnitudo K>(
+    tensor<f32, [M, K]> x
+) → tensor<f32, [M, K]> {
+    redde x
+}
+
+functio appellans(tensor<f32, [4, 8]> x) → tensor<f32, [4, 8]> {
+    redde gemma(x)
+}
+"#;
+
+fn twin_provider_interface() -> FileInterface {
+    let session = Session::new(
+        Config::default()
+            .with_target(radix_module::codegen::Target::HirRust)
+            .with_bodyless_functions(),
+    );
+    let analysis = analyze_source(
+        &session,
+        "provider.fab",
+        TWIN_PROVIDER,
+        AnalyzeRequest::default(),
+    )
+    .expect("provider analysis must succeed");
+    let identity = crate::file_interface::ExportIdentityContext {
+        provider: "gradus".to_owned(),
+        package: Some("gradus".to_owned()),
+        module_path: vec!["nn".to_owned()],
+    };
+    extract_file_interface_with_identity(
+        &analysis,
+        &["gemma".to_owned()],
+        "provider.fab",
+        Some(&identity),
+    )
+    .expect("twin provider interface must extract")
+}
+
+/// Producer identity and export name survive the interface, and the twin's
+/// ordered size parameters arrive as `InterfaceCallable::type_params` with
+/// symbolic `Param` shape witnesses (PKG-REP done_when (b)).
+#[test]
+fn twin_export_preserves_producer_identity_and_export_name() {
+    let interface = twin_provider_interface();
+    assert_eq!(
+        interface
+            .identity
+            .as_ref()
+            .expect("producer identity must ride the interface")
+            .display_key(),
+        "gradus::gradus::nn"
+    );
+    let Some(FileExportKind::Function(callable)) =
+        interface.exports.get("gemma").map(|export| &export.kind)
+    else {
+        panic!("expected gemma export, got {:?}", interface.exports);
+    };
+    assert_eq!(callable.type_params, vec!["M".to_owned(), "K".to_owned()]);
+    assert!(matches!(
+        callable.params[0].ty,
+        InterfaceTypeSnapshot::Tensor(
+            _,
+            radix_module::file_interface::InterfaceIndexSnapshot::Tuple(ref dims)
+        ) if dims.len() == 2
+            && matches!(
+                dims[0],
+                radix_module::file_interface::InterfaceIndexSnapshot::Param(_)
+            )
+    ));
+}
+
+/// The consumer round trip through the full import contract (export surface
+/// + interface, as the production per-unit `AnalyzeRequest` carries them): a
+/// concrete-shaped call through the imported twin analyzes without
+/// diagnostics — the portable signature carries the symbolic witnesses, and
+/// the call binds `[4, 8]` against `[M, K]`.
+#[test]
+fn twin_signature_consumer_round_trip_binds_concrete_shapes() {
+    let interface = twin_provider_interface();
+    let session = Session::new(
+        Config::default()
+            .with_target(radix_module::codegen::Target::HirRust)
+            .with_bodyless_functions(),
+    );
+    let contract = ModuleImportContract {
+        namespace_exports: BTreeMap::from([(
+            "nn".to_owned(),
+            BTreeMap::from([(
+                "gemma".to_owned(),
+                radix_module::semantic::passes::visibility_annotation::VisibilityTier::Publica,
+            )]),
+        )]),
+        file_interfaces: BTreeMap::from([("nn".to_owned(), interface)]),
+        namespace_seams: BTreeMap::from([("nn".to_owned(), false)]),
+        namespace_declarations: BTreeMap::new(),
+    };
+    analyze_source(
+        &session,
+        "consumer.fab",
+        r#"importa ex "gradus:nn" nn
+
+functio consume(tensor<f32, [4, 8]> x) → tensor<f32, [4, 8]> {
+    redde nn.gemma(x)
+}
+"#,
+        AnalyzeRequest {
+            cli_program: None,
+            contract,
+        },
+    )
+    .expect("imported twin call must analyze through the round trip");
+}

@@ -274,3 +274,46 @@ fn unsolved_hole_param_export_fails_closed() {
         "expected InferenceTypeUnsupported reason, got {diagnostic:?}"
     );
 }
+
+/// PKG-REP: an exported typed kernel twin — `@ nucleum`
+/// `@ publica` with ordered `magnitudo` parameters and symbolic tensor-shape
+/// witnesses — materializes as an `InterfaceCallable` through the package
+/// export extraction path. The same-unit concrete caller keeps the DFV2-2
+/// orphan admission silent so the extraction result is proven on both
+/// partial and integrated trees; the device contract stays unpopulated
+/// (KPC-WIRE owns `InterfaceDeviceContract` parity, not this unit).
+#[test]
+fn typed_kernel_twin_export_materializes_as_interface_callable() {
+    let analysis = analyze(
+        "@ publica\n@ nucleum\nfunctio gemma<magnitudo M, magnitudo K>(\n    tensor<f32, [M, K]> x\n) → tensor<f32, [M, K]> {\n    redde x\n}\n\nfunctio appellans(tensor<f32, [4, 8]> x) → tensor<f32, [4, 8]> {\n    redde gemma(x)\n}\n",
+    );
+    let interface =
+        extract_file_interface_with_identity(&analysis, &["gemma".to_owned()], "test.fab", None)
+            .expect("typed kernel twin export must be representable");
+
+    let Some(FileExportKind::Function(callable)) =
+        interface.exports.get("gemma").map(|export| &export.kind)
+    else {
+        panic!(
+            "expected gemma function export, got {:?}",
+            interface.exports
+        );
+    };
+    assert_eq!(callable.type_params, vec!["M".to_owned(), "K".to_owned()]);
+    let expected = InterfaceTypeSnapshot::Tensor(
+        Box::new(InterfaceTypeSnapshot::SizedNumeric(
+            Primitive::Fractus,
+            radix_module::semantic::NumericWidth::F32,
+        )),
+        radix_module::file_interface::InterfaceIndexSnapshot::Tuple(vec![
+            radix_module::file_interface::InterfaceIndexSnapshot::Param("M".to_owned()),
+            radix_module::file_interface::InterfaceIndexSnapshot::Param("K".to_owned()),
+        ]),
+    );
+    assert_eq!(callable.params[0].ty, expected);
+    assert_eq!(*callable.ret, expected);
+    assert!(
+        callable.device.is_none(),
+        "PKG-REP fixes signature representability only; device parity is KPC-WIRE's"
+    );
+}
