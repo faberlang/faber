@@ -287,6 +287,9 @@ pub struct PassConfig {
     pub locale_pack: Option<LocalePack>,
     /// Import path templates (`§name` → path mapping) from `[paths.templates]`.
     pub import_path_templates: Option<BTreeMap<String, String>>,
+    /// Per-function cyclomatic-complexity warning budget; `None` uses the
+    /// baked default ([`passes::complexity::DEFAULT_COMPLEXITY_BUDGET`]).
+    pub complexity_budget: Option<u32>,
 }
 
 impl PassConfig {
@@ -309,6 +312,7 @@ impl PassConfig {
             file_interfaces: BTreeMap::new(),
             locale_pack: None,
             import_path_templates: None,
+            complexity_budget: None,
         }
     }
 
@@ -661,6 +665,17 @@ pub fn analyze_with_cli(
             &types,
             interner,
             config.locale_pack.as_ref(),
+        ));
+
+        // Complexity is a structural per-function budget analysis with its own
+        // option; warn-only, same gate as lint.
+        let complexity_budget = config
+            .complexity_budget
+            .unwrap_or(passes::complexity::DEFAULT_COMPLEXITY_BUDGET);
+        diagnostics.extend(passes::complexity::complexity(
+            &hir,
+            interner,
+            complexity_budget,
         ));
     }
 

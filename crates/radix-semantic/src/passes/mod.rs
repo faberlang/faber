@@ -52,6 +52,7 @@ pub mod borrow_region_cfg;
 pub mod collect;
 pub mod companion_predeclare;
 pub mod companion_signature;
+pub mod complexity;
 pub mod definite_assignment;
 pub mod exhaustive;
 pub mod fragment_definition;
@@ -115,6 +116,10 @@ mod companion_predeclare_test;
 #[cfg(test)]
 #[path = "companion_signature_test.rs"]
 mod companion_signature_test;
+
+#[cfg(test)]
+#[path = "complexity_test.rs"]
+mod complexity_test;
 
 #[cfg(test)]
 #[path = "definite_assignment_test.rs"]
