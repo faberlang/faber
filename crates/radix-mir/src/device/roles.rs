@@ -199,7 +199,10 @@ pub enum MirImportedEntryError {
     /// The registration's concrete instance is absent from the merged
     /// program (or keyed to a different template source) — an unresolved
     /// instance, never a silent admission.
-    InstanceUnresolved { source: DefId, function: MirFunctionId },
+    InstanceUnresolved {
+        source: DefId,
+        function: MirFunctionId,
+    },
     /// The local declaration table and the imported contract disagree on
     /// the role for one source; the carrier is inconsistent, not ambiguous.
     RoleConflict {
