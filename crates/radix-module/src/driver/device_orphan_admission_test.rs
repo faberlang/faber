@@ -5,12 +5,23 @@
 //! check stage with the named `nucleum_orphaned_annotation` issue at the
 //! annotation span, carrying the definition span as the secondary span. The
 //! old generic zero-kernel codegen message must not be the first diagnostic.
+//!
+//! PKG-ADM (`device-fragments-v2` package seam): package analysis widens that
+//! boundary with an explicit admission fact for an exported `@ publica`
+//! size-generic kernel template. The admission is demand-only and
+//! diagnostic-only; every other shape stays fail-closed.
 
 use super::compile;
 use crate::codegen::Target;
 use crate::diagnostics::DiagnosticArg;
-use crate::driver::{analyze_source, AnalyzeRequest, ModuleCompileRequest};
+use crate::driver::{
+    AnalyzeRequest, ModuleCompileRequest, PackageKernelTemplateAdmissions, analyze_source,
+    analyze_source_with_kernel_template_admissions,
+};
+use crate::hir::HirItemKind;
+use crate::semantic::passes::visibility_annotation::VisibilityTier;
 use crate::test_support::test_session;
+use std::collections::BTreeMap;
 
 /// The spike's uninstantiated generic shape: annotated, public, never called.
 const ORPHAN_GENERIC: &str = r#"+++
@@ -148,4 +159,126 @@ fn orphan_is_not_reported_as_the_generic_zero_kernel_codegen_message_first() {
     assert!(!result.success(), "orphan must fail closed");
     let first = result.diagnostics.first().expect("at least one diagnostic");
     assert_eq!(arg_value(&first.args, "issue"), Some(ORPHAN_ISSUE), "{first:?}");
+}
+
+/// A `@ kernel` generic method on a class, sharing its name with a top-level
+/// export — the collision shape the admission's top-level guard must not
+/// silently forgive.
+const METHOD_COLLISION: &str = r#"+++
+locale = "en"
++++
+
+@ kernel
+@ public
+fn kadd<size M, size N>(tensor<f32, [M, N]> a, tensor<f32, [M, N]> b) → tensor<f32, [M, N]> {
+    return a + b
+}
+
+class Repo {
+    @ kernel
+    fn kadd<size M, size N>(tensor<f32, [M, N]> a) → tensor<f32, [M, N]> {
+        return a
+    }
+}
+"#;
+
+/// PKG-ADM: the publica-tier export surface package analysis threads in for
+/// the unit being analyzed.
+fn package_admissions(entries: &[(&str, VisibilityTier)]) -> PackageKernelTemplateAdmissions {
+    PackageKernelTemplateAdmissions::from_export_surface(
+        &entries
+            .iter()
+            .map(|(name, tier)| ((*name).to_owned(), *tier))
+            .collect::<BTreeMap<String, VisibilityTier>>(),
+    )
+}
+
+fn orphan_issue_count(diagnostics: &[crate::diagnostics::Diagnostic]) -> usize {
+    diagnostics
+        .iter()
+        .filter(|diag| arg_value(&diag.args, "issue") == Some(ORPHAN_ISSUE))
+        .count()
+}
+
+/// The green half of PKG-ADM: an exported `@ publica` size-generic template
+/// with no same-unit caller is demand-admitted, and the admission is
+/// diagnostic-only — no synthesized caller, instantiation twin, or entry.
+#[test]
+fn publica_template_admission_suppresses_orphan_without_side_effects() {
+    let result = analyze_source_with_kernel_template_admissions(
+        &test_session(Target::MirWgsl),
+        "pkg-template.fab",
+        ORPHAN_GENERIC,
+        AnalyzeRequest::default(),
+        &package_admissions(&[("kadd", VisibilityTier::Publica)]),
+    );
+    let Ok(unit) = result else {
+        panic!("exported publica size-generic template is demand-admissible");
+    };
+    assert_eq!(orphan_issue_count(&unit.diagnostics), 0, "{:?}", unit.diagnostics);
+    // Demand admission only: the HIR keeps exactly the declared template.
+    assert!(unit.hir.entry.is_none(), "admission mints no launch entry");
+    assert_eq!(unit.hir.items.len(), 1, "admission synthesizes no items");
+    let HirItemKind::Function(function) = &unit.hir.items[0].kind else {
+        panic!("declared template is the only item");
+    };
+    assert!(function.is_kernel);
+    assert_eq!(function.type_params.len(), 2, "no monomorphization twin is recorded");
+}
+
+/// Tier discipline: `@ interna` exports stay fail-closed — the admission is
+/// the publica package API fact, not a name match.
+#[test]
+fn interna_tier_export_is_not_admitted() {
+    let result = analyze_source_with_kernel_template_admissions(
+        &test_session(Target::MirWgsl),
+        "pkg-template-interna.fab",
+        ORPHAN_GENERIC,
+        AnalyzeRequest::default(),
+        &package_admissions(&[("kadd", VisibilityTier::Interna)]),
+    );
+    let Err(diagnostics) = result else {
+        panic!("@ interna exports must stay fail-closed");
+    };
+    assert_eq!(orphan_issue_count(&diagnostics), 1, "{diagnostics:?}");
+}
+
+/// Name-collision guard: struct methods are never package exports, so a
+/// method sharing an exported name must keep its orphan diagnostic while the
+/// same-named top-level template is admitted.
+#[test]
+fn method_sharing_an_exported_name_stays_orphan() {
+    let standalone = analyze_source(
+        &test_session(Target::MirWgsl),
+        "method-collision.fab",
+        METHOD_COLLISION,
+        AnalyzeRequest::default(),
+    );
+    assert_eq!(
+        orphan_issue_count(&collected_diagnostics(standalone)),
+        2,
+        "both the template and the method are orphans without package facts"
+    );
+
+    let admitted = analyze_source_with_kernel_template_admissions(
+        &test_session(Target::MirWgsl),
+        "method-collision.fab",
+        METHOD_COLLISION,
+        AnalyzeRequest::default(),
+        &package_admissions(&[("kadd", VisibilityTier::Publica)]),
+    );
+    let Err(diagnostics) = admitted else {
+        panic!("the kernel method keeps its orphan diagnostic under admission");
+    };
+    assert_eq!(orphan_issue_count(&diagnostics), 1, "{diagnostics:?}");
+}
+
+/// Result-shape helper: both arms carry the same diagnostic slice type.
+fn collected_diagnostics(
+    result: Result<crate::driver::AnalyzedModule, Vec<crate::diagnostics::Diagnostic>>,
+) -> Vec<crate::diagnostics::Diagnostic> {
+    match result {
+        Ok(unit) => unit.diagnostics,
+        Err(diagnostics) => diagnostics,
+    }
 }

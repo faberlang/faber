@@ -3,7 +3,9 @@
 //! This is the production analysis spine for a package source graph: load
 //! package files, resolve imports/libraries, extract cross-unit file
 //! interfaces, and analyze every unit through the radix driver
-//! (`analyze_source` with an [`AnalyzeRequest`] → [`AnalyzedModule`]).
+//! (`analyze_source_with_kernel_template_admissions` with an
+//! [`AnalyzeRequest`] and the unit's package kernel-template admissions →
+//! [`AnalyzedModule`]).
 //! The production [`AnalyzedProgram`] contract is radix-program-owned; Faber's
 //! package consumers use it directly.
 //!
@@ -24,23 +26,24 @@ pub const PACKAGE_TEST_ANALYSIS_BUDGET: Duration = Duration::from_secs(30);
 
 use radix_module::diagnostics::Diagnostic;
 use radix_module::driver::{
-    analyze_source, AnalyzeRequest, AnalyzedModule, Config, ModuleImportContract, Session,
+    AnalyzeRequest, AnalyzedModule, Config, ModuleImportContract, PackageKernelTemplateAdmissions,
+    Session, analyze_source_with_kernel_template_admissions,
 };
 use radix_module::lexer::Interner;
 use radix_module::semantic::passes::visibility_annotation::VisibilityTier;
 use radix_module::syntax::{ImportDecl, ImportKind, StmtKind};
 
-use crate::discovery::{discover_build_layout, discover_package, PackageSpec};
+use crate::discovery::{PackageSpec, discover_build_layout, discover_package};
 use crate::frontmatter::manifest_path_for_spec;
 use crate::import_graph::{
-    build_mount_plan, detect_import_cycles, import_unsupported_diagnostic, library_import_binding,
-    library_import_kind_diagnostic, resolve_import, ImportResolution,
+    ImportResolution, build_mount_plan, detect_import_cycles, import_unsupported_diagnostic,
+    library_import_binding, library_import_kind_diagnostic, resolve_import,
 };
 use crate::library::{
-    analysis_source_for_file, attach_library_provenance_with_links, expand_library_imports,
-    library_cached_file_interface, library_interface_declaration_surface,
-    library_interface_export_surface, library_interface_has_module, program_declaration_surface,
-    program_export_surface, LibraryInterfaceCache, LibraryResolver, LocaleLoader,
+    LibraryInterfaceCache, LibraryResolver, LocaleLoader, analysis_source_for_file,
+    attach_library_provenance_with_links, expand_library_imports, library_cached_file_interface,
+    library_interface_declaration_surface, library_interface_export_surface,
+    library_interface_has_module, program_declaration_surface, program_export_surface,
 };
 use crate::manifest::read_manifest;
 use crate::modules::module_segments_for_file;
@@ -543,7 +546,16 @@ fn analyze_package_spec_with_deadline(
                 continue;
             }
         };
-        let mut analysis = match analyze_source(
+        // PKG-ADM: the file's own package export surface is the admission
+        // fact for exported size-generic kernel templates — registered here,
+        // before the per-unit orphan check, so a package API with no
+        // same-unit caller is not mistaken for an orphan. A missing surface
+        // stays fail-closed (empty admissions).
+        let kernel_template_admissions = export_surfaces_by_path
+            .get(&file.path)
+            .map(PackageKernelTemplateAdmissions::from_export_surface)
+            .unwrap_or_default();
+        let mut analysis = match analyze_source_with_kernel_template_admissions(
             &session,
             &file.path.display().to_string(),
             &analysis_source,
@@ -556,6 +568,7 @@ fn analyze_package_spec_with_deadline(
                     namespace_declarations,
                 },
             },
+            &kernel_template_admissions,
         ) {
             Ok(analysis) => analysis,
             Err(file_diagnostics) => {
@@ -880,11 +893,13 @@ pub fn load_package_with_locale_pack(
     } else {
         // Single-file entry: allow an explicit `.proba` path on the test path only.
         if is_proba_source_path(&spec.entry) && !include_proba {
-            return Err(vec![crate::package_diagnostic_error(
-                ".proba files are test sources; use `faber test` to load them",
-            )
-            .with_file(spec.entry.display().to_string())
-            .with_arg("issue", "proba_source_build_forbidden")]);
+            return Err(vec![
+                crate::package_diagnostic_error(
+                    ".proba files are test sources; use `faber test` to load them",
+                )
+                .with_file(spec.entry.display().to_string())
+                .with_arg("issue", "proba_source_build_forbidden"),
+            ]);
         }
         // Product graph starts at the entry file. For `faber test`, also walk
         // `source_root` for `*.proba` so colocated test files are not orphaned
