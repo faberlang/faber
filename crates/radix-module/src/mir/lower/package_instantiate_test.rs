@@ -297,10 +297,7 @@ fn unresolved_imported_device_bindings_fail_closed_with_named_reason() {
         span: Span::default(),
     };
     let mut program = MirProgram { functions: vec![caller], ..MirProgram::default() };
-    let generic_params = vec![(
-        IMPORTED_SOURCE,
-        vec![MirGenericParam { name: size_symbol, is_shape: true }],
-    )];
+    let generic_params = vec![(IMPORTED_SOURCE, vec![MirGenericParam { name: size_symbol, is_shape: true }])];
     let index = imported_device_index(imported_device_route(InterfaceBodyChannel::Source));
 
     let errors = instantiate_merged_generic_calls_with_devices(
