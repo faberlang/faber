@@ -5,8 +5,8 @@
   "lane": "hir",
   "generatedBy": "radix/scripta/emit-compat-json.py",
   "summary": {
-    "capable": 337,
-    "analyzable": 341
+    "capable": 338,
+    "analyzable": 342
   },
   "terms": [
     {
@@ -1056,8 +1056,8 @@
     {
       "term": "summa",
       "rule": "concept",
-      "capable": 10,
-      "analyzable": 10
+      "capable": 11,
+      "analyzable": 11
     },
     {
       "term": "tacet",
