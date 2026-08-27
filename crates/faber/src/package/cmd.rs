@@ -723,7 +723,10 @@ pub fn should_treat_as_package_from_args(input: &[String]) -> bool {
 /// The permissive mode intentionally downgrades only unresolved/import-driven
 /// semantic errors; manifest, I/O, parse, and package-policy errors remain
 /// fatal because they prevent reliable package graph construction.
-pub fn cmd_check_package(command: radix::services::CheckCommand) {
+///
+/// `complexity_budget` is the `--complexity-budget` CLI override; `None`
+/// leaves the driver's baked-in default in place.
+pub fn cmd_check_package(command: radix::services::CheckCommand, complexity_budget: Option<u32>) {
     if command.input.is_empty() || command.input[0] == "-" {
         eprintln!("error: package checking requires a path input");
         std::process::exit(1);
@@ -741,13 +744,17 @@ pub fn cmd_check_package(command: radix::services::CheckCommand) {
         command.locale.as_deref(),
         command.diagnostics_locale.as_deref(),
     ) {
-        Ok((config, pack)) => (
-            config.with_warn_policy(radix::module::driver::WarnPolicy {
+        Ok((config, pack)) => {
+            let config = config.with_warn_policy(radix::module::driver::WarnPolicy {
                 deny_all_warnings: command.deny_warnings,
                 deny_codes: command.deny_codes,
-            }),
-            pack,
-        ),
+            });
+            let config = match complexity_budget {
+                Some(budget) => config.with_complexity_budget(budget),
+                None => config,
+            };
+            (config, pack)
+        }
         Err(diag) => {
             let diag = super::attach_path_diagnostic_context(diag);
             fail_with_diagnostic(&diag)

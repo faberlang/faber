@@ -411,6 +411,15 @@ pub struct CheckArgs {
     #[arg(long = "deny", value_name = "CODE")]
     pub deny: Vec<String>,
 
+    /// Per-function cyclomatic complexity budget for this check (>= 1);
+    /// overrides the baked-in default for this run
+    #[arg(
+        long = "complexity-budget",
+        value_name = "N",
+        value_parser = clap::value_parser!(u32).range(1..)
+    )]
+    pub complexity_budget: Option<u32>,
+
     /// Print an advisory AIR-lane compatibility report (report-only); rows
     /// carry the census tier labels ADMISSIBLE-KERNEL, ADMISSIBLE-ONE-AWAY,
     /// WOULD-REJECT, and NOT-A-TARGET
