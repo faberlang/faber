@@ -208,3 +208,26 @@ functio _numel_forma(lista<numerus> forma) → numerus ⇥ TensorError {
         );
     }
 }
+
+/// KPC-SEM boundary control: a local that shadows an import name owns the
+/// Path DefId, so with no namespace surface installed at all the receiver is
+/// typed as the local value — the bare `lista<numerus>` method surface, not a
+/// namespace member route. Namespace-call repairs must key on installed
+/// surfaces, never on the binding name alone.
+#[test]
+fn shadowed_namespace_name_without_surface_types_as_local_value() {
+    let unit = crate::test_support::analyze_source_with_import_contract(
+        r#"importa ex "./nulla" nulla
+
+functio _probe(lista<numerus> nulla) → numerus {
+    redde nulla.longitudo()
+}"#,
+        BTreeMap::new(),
+        BTreeMap::new(),
+    );
+    assert!(
+        unit.is_ok(),
+        "a shadowing parameter keeps value typing without any import surface: {:?}",
+        unit.diagnostics
+    );
+}

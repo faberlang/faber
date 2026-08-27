@@ -768,3 +768,298 @@ incipit {
 }",
     );
 }
+
+// ---------------------------------------------------------------------------
+// KPC-SEM — imported namespace generic calls (spike1 shape).
+//
+// `gradus:math`'s `add<size M, size N>` exports through a file interface whose
+// callable carries the DFV2-3 device contract (`@ kernel @ publica`). The
+// consumer's `math.add(a, b)` must resolve to that canonical imported `FuncSig`
+// and solve concrete type/shape witnesses from the arguments and the expected
+// result — never fall through the dynamic/`ignotum` route.
+
+use std::collections::BTreeMap;
+
+use crate::file_interface::{
+    FileExport, FileExportKind, InterfaceBodyChannel, InterfaceCallable, InterfaceDeviceContract,
+    InterfaceDeviceRole, InterfaceDeviceVisibility, InterfaceIndexSnapshot, InterfaceParam,
+    InterfaceTypeSnapshot,
+};
+use crate::passes::visibility_annotation::VisibilityTier;
+
+fn math_namespace_interface() -> crate::file_interface::FileInterface {
+    let f32_elem = Box::new(InterfaceTypeSnapshot::SizedNumeric(
+        crate::Primitive::Fractus,
+        radix_types::NumericWidth::F32,
+    ));
+    let shape_mn = InterfaceIndexSnapshot::Tuple(vec![
+        InterfaceIndexSnapshot::Param("M".to_owned()),
+        InterfaceIndexSnapshot::Param("N".to_owned()),
+    ]);
+    let tensor_mn = InterfaceTypeSnapshot::Tensor(f32_elem.clone(), shape_mn.clone());
+    let mut interface = crate::file_interface::FileInterface::new();
+    interface.insert(FileExport {
+        name: "add".to_owned(),
+        kind: FileExportKind::Function(InterfaceCallable {
+            type_params: vec!["M".to_owned(), "N".to_owned()],
+            type_param_constraints: Vec::new(),
+            params: vec![
+                InterfaceParam {
+                    ty: tensor_mn.clone(),
+                    mode: crate::SemanticParamMode::Owned,
+                    optional: false,
+                },
+                InterfaceParam {
+                    ty: tensor_mn.clone(),
+                    mode: crate::SemanticParamMode::Owned,
+                    optional: false,
+                },
+            ],
+            ret: Box::new(tensor_mn),
+            err: None,
+            is_async: false,
+            is_generator: false,
+            // DFV2-3: an exported `@ kernel @ publica` declaration carries its
+            // device contract on the callable. Typing must survive the fact.
+            device: Some(InterfaceDeviceContract {
+                role: InterfaceDeviceRole::Kernel,
+                visibility: InterfaceDeviceVisibility::Public,
+                body: InterfaceBodyChannel::Source,
+            }),
+        }),
+    });
+    interface
+}
+
+fn analyze_math_consumer(source: &str) -> crate::test_support::AnalyzedFixture {
+    crate::test_support::analyze_source_with_import_contract(
+        source,
+        BTreeMap::from([(
+            "math".to_owned(),
+            BTreeMap::from([("add".to_owned(), VisibilityTier::Publica)]),
+        )]),
+        BTreeMap::from([("math".to_owned(), math_namespace_interface())]),
+    )
+}
+
+#[test]
+fn imported_namespace_generic_call_types_concrete_result() {
+    // spike1 shape: concrete tensor params and expected result around the
+    // imported size-generic `math.add`. Must typecheck the concrete
+    // `tensor<f32, [4, 8]>` result instead of SEM010/IGNOTUM.
+    let mut unit = analyze_math_consumer(
+        r#"importa ex "./math" math
+
+functio _probe(tensor<f32, [4, 8]> a, tensor<f32, [4, 8]> b) → tensor<f32, [4, 8]> {
+    redde math.add(a, b)
+}"#,
+    );
+    assert!(
+        unit.is_ok(),
+        "imported generic wrapper should analyze green: {:?}",
+        unit.diagnostics
+    );
+
+    // The resolved canonical signature is the imported one, not a method on
+    // the receiver value or an ignotum escape.
+    let math = unit.interner.intern("math");
+    let add = unit.interner.intern("add");
+    let sig = unit
+        .resolver
+        .namespace_file_function_canonical(math, add)
+        .expect("canonical imported add signature");
+    assert_eq!(sig.type_params.len(), 2, "add stays size-generic");
+
+    // The call's recorded type is the concrete solved result.
+    struct CallTypeCollector {
+        tys: Vec<Option<crate::TypeId>>,
+    }
+    impl radix_hir::visit::HirVisitor for CallTypeCollector {
+        fn visit_expr(&mut self, expr: &radix_hir::HirExpression) {
+            if matches!(
+                expr.kind,
+                radix_hir::HirExpressionKind::MethodCall(..)
+                    | radix_hir::HirExpressionKind::Call(..)
+            ) {
+                self.tys.push(expr.ty);
+            }
+            radix_hir::visit::walk_expr(self, expr);
+        }
+    }
+    let mut collector = CallTypeCollector { tys: Vec::new() };
+    radix_hir::visit::walk_program(&mut collector, unit.hir.as_ref().expect("hir"));
+    let call_ty = collector
+        .tys
+        .last()
+        .copied()
+        .flatten()
+        .expect("math.add call type recorded");
+    let name_of = |def_id| {
+        unit.resolver.get_symbol(def_id).map_or_else(
+            || format!("{def_id:?}"),
+            |symbol| unit.interner.resolve(symbol.name).to_owned(),
+        )
+    };
+    let shown = crate::format_faber_type(call_ty, &unit.types, &unit.interner, &name_of);
+    assert_eq!(
+        shown, "tensor<fractus<f32>, [4, 8]>",
+        "imported generic call must solve the concrete result shape"
+    );
+    assert!(
+        !matches!(
+            unit.types.get(call_ty),
+            crate::Type::Primitive(crate::Primitive::Ignotum)
+        ),
+        "imported generic call must not fall through the ignotum route"
+    );
+}
+
+#[test]
+fn imported_namespace_generic_call_host_expected_control() {
+    // Control E shape: the same imported call inside a host entry with a
+    // concrete annotation — proves the repair is not device-context-only.
+    let mut unit = analyze_math_consumer(
+        r#"importa ex "./math" math
+
+incipit {
+    fixum tensor<f32, [4, 8]> a ← vacua
+    fixum tensor<f32, [4, 8]> b ← vacua
+    fixum tensor<f32, [4, 8]> r ← math.add(a, b)
+    nota r
+}"#,
+    );
+    assert!(
+        unit.is_ok(),
+        "host-context imported generic call should analyze green: {:?}",
+        unit.diagnostics
+    );
+    let tys = crate::test_support::entry_local_tys(&unit);
+    assert_eq!(tys.len(), 3, "a, b, r locals");
+    let name_of = |def_id| {
+        unit.resolver.get_symbol(def_id).map_or_else(
+            || format!("{def_id:?}"),
+            |symbol| unit.interner.resolve(symbol.name).to_owned(),
+        )
+    };
+    let shown = crate::format_faber_type(tys[2], &unit.types, &unit.interner, &name_of);
+    assert_eq!(shown, "tensor<fractus<f32>, [4, 8]>");
+}
+
+#[test]
+fn imported_namespace_generic_call_binds_explicit_magnitudo_args() {
+    // Control F repaired: explicit size witnesses on the imported generic
+    // callee instantiate instead of tripping the dynamic-receiver rejection
+    // the ignotum route produced.
+    let mut unit = analyze_math_consumer(
+        r#"importa ex "./math" math
+
+functio _probe(tensor<f32, [4, 8]> a, tensor<f32, [4, 8]> b) → tensor<f32, [4, 8]> {
+    redde math.add<4, 8>(a, b)
+}"#,
+    );
+    assert!(
+        unit.is_ok(),
+        "explicit magnitudo witnesses on the imported generic call should analyze green: {:?}",
+        unit.diagnostics
+    );
+}
+
+#[test]
+fn imported_namespace_generic_call_rejects_incompatible_shape() {
+    // Genuinely incompatible witnesses stay fail-closed with the existing
+    // argument mismatch diagnostic.
+    let unit = analyze_math_consumer(
+        r#"importa ex "./math" math
+
+functio _bad(tensor<f32, [4, 8]> a, tensor<f32, [2, 2]> b) → tensor<f32, [4, 8]> {
+    redde math.add(a, b)
+}"#,
+    );
+    assert!(
+        !unit.is_ok(),
+        "mismatched shape witness must fail: {:?}",
+        unit.diagnostics
+    );
+    assert!(
+        unit.diagnostics.iter().any(|diag| diag
+            .args
+            .iter()
+            .any(|arg| arg.name == "issue" && arg.value == "argument_type_mismatch")),
+        "expected argument_type_mismatch, got: {:?}",
+        unit.diagnostics
+    );
+}
+
+#[test]
+fn imported_namespace_unknown_member_stays_fail_closed() {
+    // An unresolved namespace callee keeps its existing diagnostic; the
+    // generic repair must not make unknown exports permissive.
+    let unit = analyze_math_consumer(
+        r#"importa ex "./math" math
+
+functio _probe(tensor<f32, [4, 8]> a, tensor<f32, [4, 8]> b) → tensor<f32, [4, 8]> {
+    redde math.sub(a, b)
+}"#,
+    );
+    assert!(
+        !unit.is_ok(),
+        "unknown namespace member must fail: {:?}",
+        unit.diagnostics
+    );
+    assert!(
+        unit.diagnostics.iter().any(|diag| diag
+            .args
+            .iter()
+            .any(|arg| arg.name == "issue" && arg.value == "namespace_missing_export")),
+        "expected namespace_missing_export, got: {:?}",
+        unit.diagnostics
+    );
+}
+
+#[test]
+fn namespace_call_without_import_surface_keeps_bare_driver_leniency() {
+    // KPC-SEM boundary control: with no import contract at all (bare driver
+    // mode, `AnalyzeRequest::default()`), an import binding has no surface and
+    // its member calls keep the pinned permissive typing — the empty-contract
+    // leniency `module_analysis_does_not_derive_contracts_from_path_name`
+    // pins. The fail-closed repair for a resolvable-but-unusable import is
+    // driver-owned (the import graph must propagate the target failure), not a
+    // semantic guess from an absent contract. This test pins that the generic
+    // repair does not turn contract absence into hard errors.
+    let mut unit = crate::test_support::analyze_source_with_import_contract(
+        r#"importa ex "./math" math
+
+functio _probe(tensor<f32, [4, 8]> a, tensor<f32, [4, 8]> b) → tensor<f32, [4, 8]> {
+    fixum ignotum r ← math.add(a, b)
+    redde a
+}"#,
+        BTreeMap::new(),
+        BTreeMap::new(),
+    );
+    assert!(
+        unit.is_ok(),
+        "contract absence must stay permissive (bare-driver leniency): {:?}",
+        unit.diagnostics
+    );
+}
+
+#[test]
+fn ignotum_value_receiver_method_keeps_dynamic_route() {
+    // Ordinary unknown callees stay on their existing diagnostics: an
+    // ignotum-typed VALUE receiver (not an import namespace) keeps the
+    // documented escape, including its explicit-type-args rejection.
+    rejects_with_args(
+        r#"functio box(ignotum v) → ignotum {
+    redde v
+}
+
+incipit {
+    fixum ignotum receiver ← box(1)
+    receiver.meth<textus>()
+}"#,
+        &[DiagnosticArg::new(
+            "issue",
+            "dynamic_receiver_method_type_args",
+        )],
+    );
+}
