@@ -71,10 +71,13 @@ fn nucleum_fragment_sugar_is_not_untyped_argument() {
 }
 
 #[test]
-fn parses_same_line_nucleum_fragment_sugar_before_functio() {
-    assert_eq!(
-        first_annotation_kind("@ nucleum fragment functio h() → vacuum { }\n"),
-        AnnotationKindSnapshot::Nucleum { fragment: true }
+fn rejects_same_line_nucleum_fragment_sugar_before_functio() {
+    assert_parse_error_matches(
+        "@ nucleum fragment functio h() → vacuum { }\n",
+        ParseExpectation::Args(&[
+            ("issue", "unexpected_annotation_token"),
+            ("context", "@ nucleum"),
+        ]),
     );
 }
 

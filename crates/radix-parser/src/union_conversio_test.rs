@@ -82,7 +82,7 @@ fn parse_la(source: &str) -> ParseResult {
 
 #[test]
 fn standalone_conversio_marker_parses_in_latin_and_english_surfaces() {
-    let result = parse_la("@ conversio functio f(Source err) → Dest { redde finge From(err) }");
+    let result = parse_la("@ conversio\nfunctio f(Source err) → Dest { redde finge From(err) }");
     assert!(result.success(), "parse errors: {:?}", result.errors);
     let program = result.program.as_ref().expect("program");
     let StmtKind::Func(func) = &program.statements[0].kind else {
@@ -94,7 +94,7 @@ fn standalone_conversio_marker_parses_in_latin_and_english_surfaces() {
         [annotation] if matches!(annotation.kind, AnnotationKind::Conversio)
     ));
 
-    let english = parse_en("@ conversion functio f(Source err) → Dest { redde finge From(err) }");
+    let english = parse_en("@ conversion\nfunctio f(Source err) → Dest { redde finge From(err) }");
     assert!(english.success(), "parse errors: {:?}", english.errors);
     let StmtKind::Func(func) = &english.program.as_ref().unwrap().statements[0].kind else {
         panic!("expected function declaration");
@@ -111,7 +111,7 @@ fn standalone_conversio_marker_parses_in_latin_and_english_surfaces() {
 #[test]
 fn conversio_marker_stacks_with_a_preceding_annotation() {
     let result = parse(lex(
-        "@ kernel @ conversio functio f(Source err) → Dest { redde finge From(err) }",
+        "@ kernel\n@ conversio\nfunctio f(Source err) → Dest { redde finge From(err) }",
     ));
     assert!(result.success(), "parse errors: {:?}", result.errors);
     let program = result.program.as_ref().expect("program");
