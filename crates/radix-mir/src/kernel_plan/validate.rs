@@ -407,7 +407,10 @@ pub(super) fn validate_ssm_scan_plan(plan: &SsmScanPlan) -> Result<(), PlanValid
 /// Workgroup coupling (L12 / PRP-004 U2): tile-local addressing derives from
 /// workgroup-local ids, so the shared-memory tile is only correct when the
 /// workgroup equals the tile grid on both axes — the pre-fix `id % 8` aliased
-/// shared slots for any other workgroup size. A zero tile is degenerate (no
+/// shared slots for any other workgroup size. The one admitted exception is
+/// the PGC-B2 T=1 one-row launch (see the check below): an M=1 plan may
+/// carry workgroup `(tile, 1)` because its body never addresses a y tile.
+/// A zero tile is degenerate (no
 /// dispatch arithmetic could tile it) and is rejected here, before any
 /// `div_ceil` runs.
 fn validate_matmul_workgroup(plan: &MatMulPlan) -> Result<(), PlanValidationError> {
@@ -420,11 +423,18 @@ fn validate_matmul_workgroup(plan: &MatMulPlan) -> Result<(), PlanValidationErro
         });
     }
     if plan.workgroup_x != plan.tile || plan.workgroup_y != plan.tile {
-        return Err(PlanValidationError::MatMulWorkgroupMismatch {
-            workgroup_x: plan.workgroup_x,
-            workgroup_y: plan.workgroup_y,
-            tile: plan.tile,
-        });
+        // PGC-B2 T=1 one-row exception: an M=1 plan (the decode GEMV /
+        // lm-head shapes) may carry workgroup (tile, 1). The one-row body
+        // loads shared_a's single row and the shared_b tile with x lanes
+        // only (`local_id.y` is always 0), so the tile-local addressing the
+        // coupling law protects stays exact on the x axis and unused on y.
+        if !(plan.m == 1 && plan.workgroup_x == plan.tile && plan.workgroup_y == 1) {
+            return Err(PlanValidationError::MatMulWorkgroupMismatch {
+                workgroup_x: plan.workgroup_x,
+                workgroup_y: plan.workgroup_y,
+                tile: plan.tile,
+            });
+        }
     }
     Ok(())
 }
