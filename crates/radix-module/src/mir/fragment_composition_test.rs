@@ -1006,7 +1006,10 @@ fn in_place_splice_leaves_no_dead_block_ids() {
     assert_eq!(composed.blocks.len(), 1, "no continue or cloned block ids: {composed:#?}");
     let mut ids: Vec<_> = composed.blocks.iter().map(|block| block.id).collect();
     ids.sort_by_key(|id| id.0);
-    let unique = ids.iter().copied().collect::<std::collections::BTreeSet<_>>();
+    let unique = ids
+        .iter()
+        .copied()
+        .collect::<std::collections::BTreeSet<_>>();
     assert_eq!(unique.len(), ids.len(), "block ids must stay unique: {ids:?}");
     assert!(
         ids.iter().all(|id| id.0 == 0),
@@ -1130,7 +1133,8 @@ fn multi_block_callee_keeps_goto_join_and_fails_device_safe() {
         panic!("a composed multi-block caller must stay fail-closed, got {verdict:?}");
     };
     assert!(
-        gaps.iter().any(|gap| gap.shape() == "device multi-block control flow"),
+        gaps.iter()
+            .any(|gap| gap.shape() == "device multi-block control flow"),
         "expected SHAPE_DEVICE_MULTI_BLOCK_CFG, got {gaps:?}"
     );
 }

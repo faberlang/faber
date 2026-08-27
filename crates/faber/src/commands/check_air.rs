@@ -28,14 +28,6 @@ pub enum AirVerdict {
 }
 
 impl AirVerdict {
-    pub(crate) fn label(self) -> &'static str {
-        match self {
-            Self::Admissible => "ADMISSIBLE",
-            Self::WouldReject => "WOULD-REJECT",
-            Self::NotATarget => "NOT-A-TARGET",
-        }
-    }
-
     /// Census tier label for one row: the verdict plus the row's annotation
     /// state split the admissible tier into kernel entry vs one annotation
     /// away; the other verdicts are annotation-independent.
