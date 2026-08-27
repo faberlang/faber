@@ -13,7 +13,8 @@ use radix_hir::{DefId, HirItemKind};
 const VALID_ROW: &str = "\
 discretio Sourceum { Failed }
 discretio Destinatio { Converted }
-@ conversio functio ex_source(Sourceum err) → Destinatio { redde finge Converted {} ∷ Destinatio }
+@ conversio
+functio ex_source(Sourceum err) → Destinatio { redde finge Converted {} ∷ Destinatio }
 ";
 
 fn row_pair(fixture: &test_support::AnalyzedFixture) -> (crate::TypeId, crate::TypeId, DefId) {
@@ -84,7 +85,7 @@ incipit {{ fixum Destinatio d ← finge Failed {{}} ∷ Sourceum ↦ Destinatio 
 #[test]
 fn self_pair_is_rejected() {
     test_support::assert_rejects_with_issue(
-        "discretio Sourceum { Failed }\n@ conversio functio f(Sourceum err) → Sourceum { redde err }",
+        "discretio Sourceum { Failed }\n@ conversio\nfunctio f(Sourceum err) → Sourceum { redde err }",
         "conversio_self_pair",
     );
 }
@@ -92,7 +93,7 @@ fn self_pair_is_rejected() {
 #[test]
 fn generic_helper_cannot_key_a_row() {
     test_support::assert_rejects_with_issue(
-        "discretio Sourceum { Failed }\ndiscretio Destinatio { Converted }\n@ conversio functio f<T>(T err) → Destinatio { redde finge Converted {} ∷ Destinatio }",
+        "discretio Sourceum { Failed }\ndiscretio Destinatio { Converted }\n@ conversio\nfunctio f<T>(T err) → Destinatio { redde finge Converted {} ∷ Destinatio }",
         "conversio_generic_row",
     );
 }
@@ -100,11 +101,11 @@ fn generic_helper_cannot_key_a_row() {
 #[test]
 fn signature_must_derive_one_ordered_pair() {
     test_support::assert_rejects_with_issue(
-        "discretio Sourceum { Failed }\ndiscretio Destinatio { Converted }\n@ conversio functio f(Sourceum a, Sourceum b) → Destinatio { redde finge Converted {} ∷ Destinatio }",
+        "discretio Sourceum { Failed }\ndiscretio Destinatio { Converted }\n@ conversio\nfunctio f(Sourceum a, Sourceum b) → Destinatio { redde finge Converted {} ∷ Destinatio }",
         "conversio_signature",
     );
     test_support::assert_rejects_with_issue(
-        "discretio Sourceum { Failed }\ndiscretio Destinatio { Converted }\n@ conversio functio f(Sourceum err) { redde err }",
+        "discretio Sourceum { Failed }\ndiscretio Destinatio { Converted }\n@ conversio\nfunctio f(Sourceum err) { redde err }",
         "conversio_signature",
     );
 }
@@ -112,7 +113,7 @@ fn signature_must_derive_one_ordered_pair() {
 #[test]
 fn impure_body_fails_closed() {
     test_support::assert_rejects_with_issue(
-        "discretio Sourceum { Failed }\ndiscretio Destinatio { Converted }\n@ conversio functio f(Sourceum err) → Destinatio { varia textus t ← \"x\"  t ← \"y\"  redde finge Converted {} ∷ Destinatio }",
+        "discretio Sourceum { Failed }\ndiscretio Destinatio { Converted }\n@ conversio\nfunctio f(Sourceum err) → Destinatio { varia textus t ← \"x\"  t ← \"y\"  redde finge Converted {} ∷ Destinatio }",
         "conversio_impure_body",
     );
 }
@@ -120,7 +121,7 @@ fn impure_body_fails_closed() {
 #[test]
 fn duplicate_pair_carries_dual_spans() {
     let fixture = test_support::analyze_source(
-        "discretio Sourceum { Failed }\ndiscretio Destinatio { Converted }\n@ conversio functio first(Sourceum err) → Destinatio { redde finge Converted {} ∷ Destinatio }\n@ conversio functio second(Sourceum err) → Destinatio { redde finge Converted {} ∷ Destinatio }",
+        "discretio Sourceum { Failed }\ndiscretio Destinatio { Converted }\n@ conversio\nfunctio first(Sourceum err) → Destinatio { redde finge Converted {} ∷ Destinatio }\n@ conversio\nfunctio second(Sourceum err) → Destinatio { redde finge Converted {} ∷ Destinatio }",
     );
     let error = fixture
         .diagnostics
@@ -135,7 +136,7 @@ fn duplicate_pair_carries_dual_spans() {
 #[test]
 fn user_row_cannot_shadow_a_seeded_builtin_row() {
     test_support::assert_rejects_with_issue(
-        "@ conversio functio f(textus s) → octeti { redde s ↦ octeti }",
+        "@ conversio\nfunctio f(textus s) → octeti { redde s ↦ octeti }",
         "conversio_registry_builtin_shadow",
     );
 }
@@ -143,7 +144,7 @@ fn user_row_cannot_shadow_a_seeded_builtin_row() {
 #[test]
 fn competing_named_helpers_remain_legal() {
     let fixture = test_support::analyze_source(
-        "discretio Sourceum { Failed }\ndiscretio Destinatio { Converted }\n@ conversio functio chosen(Sourceum err) → Destinatio { redde finge Converted {} ∷ Destinatio }\nfunctio rival(Sourceum err) → Destinatio { redde finge Converted {} ∷ Destinatio }",
+        "discretio Sourceum { Failed }\ndiscretio Destinatio { Converted }\n@ conversio\nfunctio chosen(Sourceum err) → Destinatio { redde finge Converted {} ∷ Destinatio }\nfunctio rival(Sourceum err) → Destinatio { redde finge Converted {} ∷ Destinatio }",
     );
     assert!(fixture.success(), "diagnostics: {:?}", fixture.diagnostics);
 }
@@ -155,8 +156,10 @@ fn transitive_chain_stays_fail_closed_without_a_direct_row() {
 discretio A { Failed }
 discretio B { FromA }
 discretio C { FromB }
-@ conversio functio a_to_b(A err) → B { redde finge FromA {} ∷ B }
-@ conversio functio b_to_c(B err) → C { redde finge FromB {} ∷ C }
+@ conversio
+functio a_to_b(A err) → B { redde finge FromA {} ∷ B }
+@ conversio
+functio b_to_c(B err) → C { redde finge FromB {} ∷ C }
 functio source() → vacuum ⇥ A {}
 functio target() → vacuum ⇥ C { redde source() }
 ",
@@ -187,8 +190,10 @@ fn absent_direct_row_suggests_a_named_helper_when_available() {
 discretio A { Failed }
 discretio B { FromA }
 discretio C { FromB }
-@ conversio functio a_to_c(A err) → C { redde finge FromB {} ∷ C }
-@ conversio functio b_to_c(B err) → C { redde finge FromB {} ∷ C }
+@ conversio
+functio a_to_c(A err) → C { redde finge FromB {} ∷ C }
+@ conversio
+functio b_to_c(B err) → C { redde finge FromB {} ∷ C }
 functio source() → vacuum ⇥ B {}
 functio target() → vacuum ⇥ C { redde source() }
 ",

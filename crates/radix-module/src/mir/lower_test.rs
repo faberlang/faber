@@ -734,7 +734,8 @@ fn lowers_declared_error_conversion_before_return_error() {
         r#"
 discretio Sourceum { Failed }
 discretio Destinatio { Converted }
-@ conversio functio ex_source(Sourceum err) → Destinatio { redde finge Converted {} ∷ Destinatio }
+@ conversio
+functio ex_source(Sourceum err) → Destinatio { redde finge Converted {} ∷ Destinatio }
 functio fail() → vacuum ⇥ Sourceum { iace finge Failed {} ∷ Sourceum }
 functio caller() → vacuum ⇥ Destinatio { fail() }
 "#,
