@@ -1097,10 +1097,16 @@ fn check_library_long_help_states_v1_library_home_rule() {
     assert!(help.contains("scripta/check-source"));
 }
 
-/// ALA-3 fixture: one function per row kind — ADMISSIBLE (unroll note),
-/// WOULD-REJECT own-body, WOULD-REJECT via callee closure, NOT-A-TARGET.
-/// Latin surface: file mode uses the canonical Latin reader.
-const ALL_FOUR_VERDICTS: &str = r#"functio computus_gyrum() → fractus {
+/// ALA-3 fixture: every verdict kind — annotated ADMISSIBLE (kernel entry),
+/// unannotated ADMISSIBLE (unroll note), WOULD-REJECT own-body, WOULD-REJECT
+/// via callee closure, NOT-A-TARGET. Latin surface: file mode uses the
+/// canonical Latin reader.
+const ALL_FOUR_VERDICTS: &str = r#"@ radix lane "air"
+functio computus_purus(numerus x) → numerus {
+    redde x + 1
+}
+
+functio computus_gyrum() → fractus {
     fixum fractus total ← 0.0
     itera ab 0‥10 per 2 fixum i {
         total ← total + 1.0
@@ -1148,8 +1154,9 @@ fn json_row<'a>(rows: &'a [serde_json::Value], name: &str) -> &'a serde_json::Va
 }
 
 /// ALA-3 pin: `check --air --json` emits one machine-readable object per row
-/// (schema_version 1, all four row kinds, byte spans, via-callee attribution,
-/// annotated flag, note), and keeps plain-check exit parity.
+/// (schema_version 2, all four verdict labels including both admissible
+/// census tiers, byte spans, via-callee attribution, annotated flag, note),
+/// and keeps plain-check exit parity.
 #[test]
 fn check_air_json_machine_rows_are_versioned_and_complete() {
     let output = run_faber_stdin(&["check", "--air", "--json", "-"], ALL_FOUR_VERDICTS);
@@ -1160,24 +1167,42 @@ fn check_air_json_machine_rows_are_versioned_and_complete() {
         .map(serde_json::from_str::<serde_json::Value>)
         .collect::<Result<Vec<_>, _>>()
         .unwrap_or_else(|err| panic!("each stdout line must be one JSON object:\n{stdout}\n{err}"));
-    assert_eq!(rows.len(), 4, "one row per top-level function:\n{stdout}");
+    assert_eq!(rows.len(), 5, "one row per top-level function:\n{stdout}");
 
     for row in &rows {
         assert_eq!(
-            row["schema_version"], 1,
+            row["schema_version"], 2,
             "rows are versioned from day one:\n{row}"
         );
-        assert!(
-            row.get("name").is_some()
-                && row.get("verdict").is_some()
-                && row.get("annotated").is_some()
-                && row.get("reasons").is_some(),
-            "every row carries the full key set:\n{row}"
+        let mut keys = row
+            .as_object()
+            .expect("every row is a JSON object")
+            .keys()
+            .map(|key| key.as_str())
+            .collect::<Vec<_>>();
+        keys.sort_unstable();
+        assert_eq!(
+            keys,
+            [
+                "annotated",
+                "name",
+                "note",
+                "reasons",
+                "schema_version",
+                "verdict"
+            ],
+            "the v2 key set is unchanged from v1:\n{row}"
         );
     }
 
+    let kernel = json_row(&rows, "computus_purus");
+    assert_eq!(kernel["verdict"], "ADMISSIBLE-KERNEL");
+    assert_eq!(kernel["annotated"], true);
+    assert_eq!(kernel["reasons"], serde_json::json!([]));
+    assert_eq!(kernel["note"], serde_json::Value::Null);
+
     let admissible = json_row(&rows, "computus_gyrum");
-    assert_eq!(admissible["verdict"], "ADMISSIBLE");
+    assert_eq!(admissible["verdict"], "ADMISSIBLE-ONE-AWAY");
     assert_eq!(admissible["annotated"], false);
     assert_eq!(admissible["reasons"], serde_json::json!([]));
     assert_eq!(

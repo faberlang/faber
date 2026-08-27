@@ -79,18 +79,20 @@ fn exit_runner_feature_unavailable(command: &str) -> ! {
     std::process::exit(1);
 }
 
-/// `faber check --air --json` machine rows (schema version 1).
+/// `faber check --air --json` machine rows (schema version 2).
 ///
 /// One JSON object per report row, one row per line. The contract is
 /// versioned from day one (`schema_version`): the near-miss contract is meant
-/// for LLM/tooling consumption and must not churn silently. The whole report
-/// is computed first; rows are emitted as complete lines, not streamed.
+/// for LLM/tooling consumption and must not churn silently. Version 2 splits
+/// the admissible verdict into the census tier labels; the key set is
+/// otherwise unchanged from version 1. The whole report is computed first;
+/// rows are emitted as complete lines, not streamed.
 mod air_json {
     use super::check_air::AirRow;
     use serde::Serialize;
 
     /// Schema version of the advisory AIR `--json` rows.
-    pub(super) const AIR_SCHEMA_VERSION: u32 = 1;
+    pub(super) const AIR_SCHEMA_VERSION: u32 = 2;
 
     #[derive(Serialize)]
     pub(super) struct AirRowJson {
@@ -124,7 +126,7 @@ mod air_json {
             let view = AirRowJson {
                 schema_version: AIR_SCHEMA_VERSION,
                 name: row.name.clone(),
-                verdict: row.verdict.label().to_owned(),
+                verdict: row.verdict.census_label(row.annotated).to_owned(),
                 annotated: row.annotated,
                 reasons: row
                     .reasons
