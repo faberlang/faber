@@ -390,3 +390,124 @@ test "decode" {
     assert_eq!(proba_names, vec!["cache.proba".to_owned()]);
     let _ = fs::remove_dir_all(&dir);
 }
+
+/// PKG-ADM green half: package analysis registers the unit's own publica
+/// export surface as kernel-template admission before the per-unit orphan
+/// check, so a package library module exporting a size-generic
+/// `@ kernel @ public` template with no same-unit caller analyzes clean —
+/// the package API is not mistaken for an orphan.
+#[test]
+fn analyze_package_admits_exported_generic_kernel_template() {
+    let dir = temp_root("pkg-adm-admit");
+    fs::write(
+        dir.join("faber.toml"),
+        r#"
+[package]
+name = "pkgadmadmit"
+version = "0.1.0"
+
+[library]
+provider = "pkgadmadmit"
+
+[paths]
+source = "src"
+
+[build]
+kind = "lib"
+targets = ["fhir"]
+"#,
+    )
+    .expect("write manifest");
+    fs::create_dir_all(dir.join("src")).expect("mkdir src");
+    fs::write(
+        dir.join("src/math.fab"),
+        r#"
+@ kernel
+@ public
+fn add<size M, size N>(tensor<f32, [M, N]> a, tensor<f32, [M, N]> b) → tensor<f32, [M, N]> {
+  return a + b
+}
+"#,
+    )
+    .expect("write math");
+
+    let program = analyze_package(
+        &Config::default().with_target(radix_module::Target::MirWgsl),
+        &dir,
+        &test_seams(),
+    )
+    .expect("exported generic kernel template is demand-admitted");
+
+    assert!(
+        !program
+            .diagnostics
+            .iter()
+            .any(|diag| diag.issue() == Some("nucleum_orphaned_annotation")),
+        "no ADM001 for the exported template: {:?}",
+        program.diagnostics
+    );
+    let math_unit = program
+        .nodes
+        .values()
+        .find(|unit| unit.path.ends_with("math.fab"))
+        .expect("math unit analyzed");
+    assert_eq!(math_unit.export_names, vec!["add".to_owned()]);
+    assert!(math_unit.analysis.hir.entry.is_none());
+    let _ = fs::remove_dir_all(&dir);
+}
+
+/// PKG-ADM converse: admission is the package export fact, not a blanket
+/// public-annotation exemption — a `@ private` (module-private) size-generic
+/// kernel with no same-unit caller is absent from the export surface and
+/// stays an ADM001 orphan through package analysis.
+#[test]
+fn analyze_package_keeps_unexported_generic_kernel_orphaned() {
+    let dir = temp_root("pkg-adm-orphan");
+    fs::write(
+        dir.join("faber.toml"),
+        r#"
+[package]
+name = "pkgadmorphan"
+version = "0.1.0"
+
+[library]
+provider = "pkgadmorphan"
+
+[paths]
+source = "src"
+
+[build]
+kind = "lib"
+targets = ["fhir"]
+"#,
+    )
+    .expect("write manifest");
+    fs::create_dir_all(dir.join("src")).expect("mkdir src");
+    fs::write(
+        dir.join("src/math.fab"),
+        r#"
+@ kernel
+@ private
+fn add<size M, size N>(tensor<f32, [M, N]> a, tensor<f32, [M, N]> b) → tensor<f32, [M, N]> {
+  return a + b
+}
+"#,
+    )
+    .expect("write math");
+
+    let diagnostics = match analyze_package(
+        &Config::default().with_target(radix_module::Target::MirWgsl),
+        &dir,
+        &test_seams(),
+    ) {
+        Err(diagnostics) => diagnostics,
+        Ok(_) => panic!("unexported generic kernel stays an orphan"),
+    };
+    assert!(
+        diagnostics
+            .iter()
+            .any(|diag| diag.issue() == Some("nucleum_orphaned_annotation")),
+        "ADM001 must survive for the unexported template: {diagnostics:?}"
+    );
+    let _ = fs::remove_dir_all(&dir);
+}
