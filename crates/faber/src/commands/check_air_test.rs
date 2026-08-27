@@ -1,6 +1,7 @@
 //! End-to-end proofs for `faber check --air` (ALA-1): three verdicts, unroll
 //! note, advisory-only exit parity, annotated diagnostics byte-identity, and
-//! unchanged default `check` output.
+//! unchanged default `check` output. ACL-1 adds the census tier split
+//! (ADMISSIBLE-KERNEL / ADMISSIBLE-ONE-AWAY by annotation state).
 
 use std::process::Command;
 
@@ -30,6 +31,12 @@ functio gradus_passus(numerus x) → numerus {
     varia numerus total ← x
     total ← total + 1
     redde total
+}
+"#;
+
+const ANNOTATED_PURE: &str = r#"@ radix lane "air"
+functio computus_purus(numerus x) → numerus {
+    redde x + 1
 }
 "#;
 
@@ -169,6 +176,51 @@ fn air_report_marks_annotated_functions() {
         row.contains("WOULD-REJECT") && row.contains("annotated"),
         "annotated fn must render with the annotated marker:\n{stdout}"
     );
+}
+
+/// ACL-1 census-tier split: the same pure numeric shape renders
+/// ADMISSIBLE-KERNEL when annotated and ADMISSIBLE-ONE-AWAY when not (the
+/// unannotated pure fixture is `computus_gyrum` in MIXED_SOURCE).
+#[test]
+fn air_report_splits_admissible_by_annotation() {
+    let output = run_faber_stdin(ANNOTATED_PURE, true);
+    let stdout = String::from_utf8_lossy(&output.stdout);
+
+    let row = report_row(&stdout, "computus_purus")
+        .unwrap_or_else(|| panic!("annotated pure fn must have a report row:\n{stdout}"));
+    assert!(
+        row.contains("ADMISSIBLE-KERNEL"),
+        "annotated pure fn must be ADMISSIBLE-KERNEL:\n{stdout}"
+    );
+
+    let output = run_faber_stdin(MIXED_SOURCE, true);
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let row = report_row(&stdout, "computus_gyrum")
+        .unwrap_or_else(|| panic!("pure numeric fn must have a report row:\n{stdout}"));
+    assert!(
+        row.contains("ADMISSIBLE-ONE-AWAY"),
+        "unannotated pure fn must be ADMISSIBLE-ONE-AWAY:\n{stdout}"
+    );
+}
+
+/// The census-label derivation covers the four tier labels from
+/// (verdict, annotated); `AirVerdict` itself stays three variants.
+#[test]
+fn census_label_maps_verdict_and_annotation_to_four_tiers() {
+    use super::check_air::AirVerdict;
+
+    assert_eq!(
+        AirVerdict::Admissible.census_label(true),
+        "ADMISSIBLE-KERNEL"
+    );
+    assert_eq!(
+        AirVerdict::Admissible.census_label(false),
+        "ADMISSIBLE-ONE-AWAY"
+    );
+    assert_eq!(AirVerdict::WouldReject.census_label(true), "WOULD-REJECT");
+    assert_eq!(AirVerdict::WouldReject.census_label(false), "WOULD-REJECT");
+    assert_eq!(AirVerdict::NotATarget.census_label(true), "NOT-A-TARGET");
+    assert_eq!(AirVerdict::NotATarget.census_label(false), "NOT-A-TARGET");
 }
 
 /// (d) annotated fn plain-check diagnostics are byte-identical with and

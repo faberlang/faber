@@ -411,7 +411,9 @@ pub struct CheckArgs {
     #[arg(long = "deny", value_name = "CODE")]
     pub deny: Vec<String>,
 
-    /// Print an advisory AIR-lane compatibility report (report-only)
+    /// Print an advisory AIR-lane compatibility report (report-only); rows
+    /// carry the census tier labels ADMISSIBLE-KERNEL, ADMISSIBLE-ONE-AWAY,
+    /// WOULD-REJECT, and NOT-A-TARGET
     #[arg(long)]
     pub air: bool,
 

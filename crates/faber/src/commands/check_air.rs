@@ -35,6 +35,18 @@ impl AirVerdict {
             Self::NotATarget => "NOT-A-TARGET",
         }
     }
+
+    /// Census tier label for one row: the verdict plus the row's annotation
+    /// state split the admissible tier into kernel entry vs one annotation
+    /// away; the other verdicts are annotation-independent.
+    pub(crate) fn census_label(self, annotated: bool) -> &'static str {
+        match (self, annotated) {
+            (Self::Admissible, true) => "ADMISSIBLE-KERNEL",
+            (Self::Admissible, false) => "ADMISSIBLE-ONE-AWAY",
+            (Self::WouldReject, _) => "WOULD-REJECT",
+            (Self::NotATarget, _) => "NOT-A-TARGET",
+        }
+    }
 }
 
 /// One rejection reason with its rule id, source location, and attribution.
@@ -382,7 +394,12 @@ pub fn render_report(out: &mut dyn std::io::Write, rows: &[AirRow]) -> std::io::
     writeln!(out, "{AIR_REPORT_HEADER}")?;
     let width = rows.iter().map(|row| row.name.len()).max().unwrap_or(0);
     for row in rows {
-        write!(out, "{:<width$}  {:<13}", row.name, row.verdict.label())?;
+        write!(
+            out,
+            "{:<width$}  {:<20}",
+            row.name,
+            row.verdict.census_label(row.annotated)
+        )?;
         if row.annotated {
             write!(out, "annotated ")?;
         }
