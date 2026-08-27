@@ -958,3 +958,220 @@ functio k(fractus<f32> x) → fractus<f32> {
         lowered.program.functions
     );
 }
+
+// --- CDC-3: single-block splice shape at the composition home ---
+
+/// done_when (a) shape: a single-block callee splices in place — the caller
+/// keeps exactly its one block, keeps its original Return terminator, and
+/// the splice leaves no Goto and no continue block.
+#[test]
+fn single_block_callee_splices_in_place() {
+    let mut types = TypeTable::new();
+    let ty = f32_ty(&mut types);
+    let helper = identity_fragment(1, FRAGMENT, ty);
+    let entry = entry_calling(1, 1, ty, Vec::new(), Vec::new());
+    let mut functions = vec![entry, helper];
+    assert!(compose_fns(&mut functions).is_empty());
+    let composed = &functions[0];
+    assert_eq!(
+        composed.blocks.len(),
+        1,
+        "a single-block callee must splice without adding blocks: {composed:#?}"
+    );
+    assert!(
+        matches!(composed.blocks[0].terminator.kind, MirTerminatorKind::Return(_)),
+        "the caller's original terminator must survive the splice: {composed:#?}"
+    );
+    assert!(
+        composed
+            .blocks
+            .iter()
+            .all(|block| !matches!(block.terminator.kind, MirTerminatorKind::Goto(_))),
+        "no synthetic Goto may remain: {composed:#?}"
+    );
+}
+
+/// done_when (b): the in-place splice leaves no orphan or dead block ids —
+/// the composed entry owns exactly one block id and the pruned helper's ids
+/// left the program with it.
+#[test]
+fn in_place_splice_leaves_no_dead_block_ids() {
+    let mut types = TypeTable::new();
+    let ty = f32_ty(&mut types);
+    let helper = identity_fragment(1, KERNEL_HELPER, ty);
+    let entry = kernel_calling_helper(1, ty);
+    let mut functions = vec![entry, helper];
+    assert!(compose_fns(&mut functions).is_empty());
+    let composed = &functions[0];
+    assert_eq!(composed.blocks.len(), 1, "no continue or cloned block ids: {composed:#?}");
+    let mut ids: Vec<_> = composed.blocks.iter().map(|block| block.id).collect();
+    ids.sort_by_key(|id| id.0);
+    let unique = ids.iter().copied().collect::<std::collections::BTreeSet<_>>();
+    assert_eq!(unique.len(), ids.len(), "block ids must stay unique: {ids:?}");
+    assert!(
+        ids.iter().all(|id| id.0 == 0),
+        "the in-place splice must not allocate block ids: {ids:?}"
+    );
+}
+
+/// done_when (c): a transitive single-block chain (caller → callee →
+/// callee) composes hop by hop and stays single-block.
+#[test]
+fn transitive_single_block_chain_stays_single_block() {
+    let mut types = TypeTable::new();
+    let ty = f32_ty(&mut types);
+    let inner = identity_fragment(2, FRAGMENT_INNER, ty);
+    let outer = function(
+        1,
+        FRAGMENT,
+        vec![param(0, ty)],
+        ty,
+        vec![MirLocal { id: MirLocalId(1), name: None, ty, mutable: false, span: test_span() }],
+        vec![MirBlock {
+            id: MirBlockId(0),
+            statements: vec![call_stmt(
+                Some(MirPlace::local(MirLocalId(1))),
+                MirFunctionId(2),
+                vec![MirOperand::Place(MirPlace::local(MirLocalId(0)))],
+            )],
+            terminator: MirTerminator {
+                kind: MirTerminatorKind::Return(Some(MirOperand::Place(MirPlace::local(MirLocalId(1))))),
+                span: test_span(),
+            },
+            span: test_span(),
+        }],
+        None,
+    );
+    let entry = entry_calling(1, 1, ty, Vec::new(), Vec::new());
+    let mut functions = vec![entry, outer, inner];
+    let errors = compose_fns(&mut functions);
+    assert!(errors.is_empty(), "{errors:?}");
+    let composed = &functions[0];
+    assert_eq!(
+        composed.blocks.len(),
+        1,
+        "every single-block hop must splice in place: {composed:#?}"
+    );
+    assert!(
+        matches!(composed.blocks[0].terminator.kind, MirTerminatorKind::Return(_)),
+        "the caller's original terminator must survive both hops: {composed:#?}"
+    );
+}
+
+/// done_when (e): a multi-block (structured) callee keeps today's Goto-join
+/// splice and the composed caller still fails the shared device-safe gate
+/// with `SHAPE_DEVICE_MULTI_BLOCK_CFG` — asserted, not assumed.
+#[test]
+fn multi_block_callee_keeps_goto_join_and_fails_device_safe() {
+    let mut types = TypeTable::new();
+    let ty = f32_ty(&mut types);
+    let add = |local: u32| MirStatement {
+        kind: MirStatementKind::Assign {
+            place: MirPlace::local(MirLocalId(local)),
+            value: MirValue {
+                id: MirValueId(0),
+                kind: MirValueKind::Binary {
+                    op: MirBinOp::Add,
+                    lhs: MirOperand::Place(MirPlace::local(MirLocalId(0))),
+                    rhs: MirOperand::Place(MirPlace::local(MirLocalId(0))),
+                },
+                ty,
+                span: DEF_SPAN(),
+            },
+        },
+        span: DEF_SPAN(),
+    };
+    let helper = function(
+        1,
+        FRAGMENT,
+        vec![param(0, ty)],
+        ty,
+        vec![MirLocal { id: MirLocalId(1), name: None, ty, mutable: false, span: DEF_SPAN() }],
+        vec![
+            MirBlock {
+                id: MirBlockId(0),
+                statements: vec![add(1)],
+                terminator: MirTerminator { kind: MirTerminatorKind::Goto(MirBlockId(1)), span: DEF_SPAN() },
+                span: DEF_SPAN(),
+            },
+            MirBlock {
+                id: MirBlockId(1),
+                statements: Vec::new(),
+                terminator: MirTerminator {
+                    kind: MirTerminatorKind::Return(Some(MirOperand::Place(MirPlace::local(MirLocalId(1))))),
+                    span: DEF_SPAN(),
+                },
+                span: DEF_SPAN(),
+            },
+        ],
+        None,
+    );
+    let entry = entry_calling(1, 1, ty, Vec::new(), Vec::new());
+    let mut functions = vec![entry, helper];
+    assert!(compose_fns(&mut functions).is_empty(), "multi-block splice must keep composing");
+    let composed = &functions[0];
+    assert!(
+        composed.blocks.len() > 1,
+        "a multi-block callee must keep the Goto-join splice: {composed:#?}"
+    );
+    assert!(
+        matches!(composed.blocks[0].terminator.kind, MirTerminatorKind::Goto(_)),
+        "the Goto-join splice keeps its entry Goto: {composed:#?}"
+    );
+
+    // The composed caller stays fail-closed at the shared device-safe gate.
+    let program = crate::mir::MirProgram { functions: functions.clone() };
+    let mut context = crate::mir::MirDeviceContext::from_hir_roles(roles());
+    context.attach_program(&program);
+    let validated = crate::mir::ValidatedMir::new(program, crate::mir::MirValidationContext::new(&types))
+        .expect("composed test MIR must validate");
+    let verdict = crate::mir::classify_device_safe(&validated, &context);
+    let radix_types::Lowerability::Rejected(gaps) = verdict else {
+        panic!("a composed multi-block caller must stay fail-closed, got {verdict:?}");
+    };
+    assert!(
+        gaps.iter().any(|gap| gap.shape() == "device multi-block control flow"),
+        "expected SHAPE_DEVICE_MULTI_BLOCK_CFG, got {gaps:?}"
+    );
+}
+
+/// done_when (f): the single-unit route (no package registrations) composes
+/// to the same single-block shape.
+#[test]
+fn single_unit_route_composes_single_block() {
+    let source = r"
+@ nucleum fragment
+functio helper(fractus<f32> x) → fractus<f32> {
+    redde x
+}
+
+@ nucleum
+functio k(fractus<f32> x) → fractus<f32> {
+    redde helper(x)
+}
+";
+    let session = Session::new(Config::default());
+    let mut analysis =
+        driver::analyze_source(&session, "device.fab", source, AnalyzeRequest::default()).expect("analyze source");
+    let roles = crate::mir::device_roles_from_hir(&analysis.hir);
+    let lowered = crate::mir::lower_analyzed_unit(&mut analysis, Default::default()).expect("composition must succeed");
+    let kernel = lowered
+        .program
+        .functions
+        .iter()
+        .find(|function| {
+            function
+                .source
+                .is_some_and(|source| roles.get(&source) == Some(&MirDeviceRole::Kernel))
+        })
+        .expect("the entry kernel must survive composition");
+    assert_eq!(
+        kernel.blocks.len(),
+        1,
+        "the single-unit route must compose single-block: {kernel:#?}"
+    );
+    assert!(
+        matches!(kernel.blocks[0].terminator.kind, MirTerminatorKind::Return(_)),
+        "the kernel's original Return terminator must survive: {kernel:#?}"
+    );
+}

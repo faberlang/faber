@@ -499,8 +499,20 @@ impl CompositionPass<'_> {
                 block_depth.insert(block_id, depth);
                 block_chain.insert(block_id, chain.clone());
             }
-            block_depth.insert(new_blocks.continue_id, depth.saturating_sub(1));
-            block_chain.insert(new_blocks.continue_id, chain[..chain.len() - 1].to_vec());
+            match new_blocks.continue_id {
+                Some(continue_id) => {
+                    block_depth.insert(continue_id, depth.saturating_sub(1));
+                    block_chain.insert(continue_id, chain[..chain.len() - 1].to_vec());
+                }
+                // No-new-blocks splice: the caller block now carries the
+                // callee's depth/chain so nested call sites keep counting —
+                // conservative for later tail sites in the same block, never
+                // lower than the Goto-join splice's accounting.
+                None => {
+                    block_depth.insert(site.block_id, depth);
+                    block_chain.insert(site.block_id, chain);
+                }
+            }
         }
     }
 
@@ -614,24 +626,11 @@ impl CompositionPass<'_> {
                 .temps
                 .push(MirTemp { id: new_temp, ty: temp.ty, span: temp.span });
         }
-        for block in &callee.blocks {
-            alpha.blocks.insert(block.id, ids.next_block());
-        }
-        let continue_id = ids.next_block();
-        let cloned_entry = *alpha.blocks.get(&callee.blocks[0].id)?;
         let dest_ty = site
             .destination
             .as_ref()
             .and_then(|place| place_ty(caller, place))
             .unwrap_or(callee.return_ty);
-        let mut cloned = Vec::new();
-        let mut cloned_ids = Vec::new();
-        for block in &callee.blocks {
-            let mapped =
-                remap_and_connect(block, &mut alpha, &mut ids, site.destination.as_ref(), continue_id, dest_ty);
-            cloned_ids.push(mapped.id);
-            cloned.push(mapped);
-        }
         let block = &mut caller.blocks[site.block_index];
         if stmt_index >= block.statements.len() {
             return None;
@@ -642,6 +641,52 @@ impl CompositionPass<'_> {
             return None;
         }
         tail.remove(0);
+        // CDC-3: a single-block Return-terminated callee splices directly
+        // into the caller block — arg binds, remapped statements, result
+        // assign, then the caller's own tail and original terminator. No
+        // entry Goto, no continue block, no fresh block ids, so the composed
+        // caller keeps the single-block shape the device-safe gate admits.
+        if callee.blocks.len() == 1 && matches!(callee.blocks[0].terminator.kind, MirTerminatorKind::Return(_)) {
+            let callee_block = &callee.blocks[0];
+            let mut spliced: Vec<_> = callee_block
+                .statements
+                .iter()
+                .map(|stmt| remap_stmt(stmt, &mut alpha, &mut ids))
+                .collect();
+            if let (Some(dest), MirTerminatorKind::Return(Some(operand))) =
+                (site.destination.as_ref(), &callee_block.terminator.kind)
+            {
+                spliced.push(MirStatement {
+                    kind: MirStatementKind::Assign {
+                        place: dest.clone(),
+                        value: MirValue {
+                            id: ids.next_value(),
+                            kind: MirValueKind::Operand(alpha.operand(operand, &mut ids)),
+                            ty: dest_ty,
+                            span: callee_block.terminator.span,
+                        },
+                    },
+                    span: callee_block.terminator.span,
+                });
+            }
+            block.statements.extend(binds);
+            block.statements.extend(spliced);
+            block.statements.extend(tail);
+            return Some(InlineBlocks { cloned: Vec::new(), continue_id: None });
+        }
+        for block in &callee.blocks {
+            alpha.blocks.insert(block.id, ids.next_block());
+        }
+        let continue_id = ids.next_block();
+        let cloned_entry = *alpha.blocks.get(&callee.blocks[0].id)?;
+        let mut cloned = Vec::new();
+        let mut cloned_ids = Vec::new();
+        for block in &callee.blocks {
+            let mapped =
+                remap_and_connect(block, &mut alpha, &mut ids, site.destination.as_ref(), continue_id, dest_ty);
+            cloned_ids.push(mapped.id);
+            cloned.push(mapped);
+        }
         let old_term = std::mem::replace(
             &mut block.terminator,
             MirTerminator { kind: MirTerminatorKind::Goto(cloned_entry), span: site.span },
@@ -651,7 +696,7 @@ impl CompositionPass<'_> {
             .blocks
             .push(MirBlock { id: continue_id, statements: tail, terminator: old_term, span: site.span });
         caller.blocks.extend(cloned);
-        Some(InlineBlocks { cloned: cloned_ids, continue_id })
+        Some(InlineBlocks { cloned: cloned_ids, continue_id: Some(continue_id) })
     }
 
     fn push_expansion(&mut self, reason: &'static str, span: Span, observed: u32, limit: u32, chain: &[MirFunctionId]) {
@@ -830,8 +875,12 @@ struct CallSite {
 }
 
 struct InlineBlocks {
+    /// Fresh block ids the splice added (cloned callee blocks).
     cloned: Vec<MirBlockId>,
-    continue_id: MirBlockId,
+    /// The block control continues in after a Goto-join splice; `None` when
+    /// the splice added no blocks (the caller's own block continues in
+    /// place).
+    continue_id: Option<MirBlockId>,
 }
 
 struct Account {
