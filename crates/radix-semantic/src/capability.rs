@@ -193,6 +193,66 @@ impl FunctionCapabilityQueries for FailClosedCapabilityQueries {
     }
 }
 
+/// One durable last-use fact: the borrow binding and its final use site.
+///
+/// `site` is the last use's HIR identity, not a CFG location — the CFG is an
+/// incidental [`RegionFacts`] structure and is never serialized (SCR-04
+/// persistence law).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct LastUseFact {
+    /// Borrow binding the region engine attributed the region to.
+    pub borrower: DefId,
+    /// HIR identity of the region's last use.
+    pub site: HirId,
+}
+
+/// Durable codegen-facing reduction of one function's flow-sensitive borrow
+/// regions (SCR-04). Carries only stable signature/provenance facts; the
+/// full CFG and `RegionFacts` layout stay behind the analysis boundary.
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct FunctionProvenanceSummary {
+    /// Existing function or method definition identity.
+    pub function: DefId,
+    /// F-CAP-04: returned-borrow provenance.
+    pub returned_borrow: ReturnedBorrowProvenance,
+    /// F-CAP-05: required region relationships in deterministic order.
+    pub required_regions: Vec<RegionRelationship>,
+    /// P-CAP-08 durable portion: last use per borrow binding.
+    pub last_uses: Vec<LastUseFact>,
+}
+
+/// Durable provenance summaries for every function and method of one
+/// analyzed snapshot.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct FunctionProvenanceTable {
+    rows: Vec<FunctionProvenanceSummary>,
+}
+
+impl FunctionProvenanceTable {
+    /// Wrap pre-reduced rows, assumed already keyed by distinct functions.
+    #[must_use]
+    pub fn from_rows(rows: Vec<FunctionProvenanceSummary>) -> Self {
+        Self { rows }
+    }
+
+    /// The summary for one function, when present.
+    #[must_use]
+    pub fn get(&self, function: DefId) -> Option<&FunctionProvenanceSummary> {
+        self.rows.iter().find(|row| row.function == function)
+    }
+
+    /// Iterate every row in construction order.
+    pub fn iter(&self) -> impl Iterator<Item = &FunctionProvenanceSummary> {
+        self.rows.iter()
+    }
+
+    /// Whether the table carries no rows.
+    #[must_use]
+    pub fn is_empty(&self) -> bool {
+        self.rows.is_empty()
+    }
+}
+
 /// Keep the proof and summary types reachable from the semantic capability
 /// namespace without adding semantic derivation to this unit.
 pub type TypeProof = TypeCapabilityProof;
@@ -252,6 +312,7 @@ pub struct DerivedCapabilityQueries<'a> {
     access_facts: &'a AccessFactTable,
     function_facts: &'a FunctionFactTable,
     regions: Option<&'a RegionFacts>,
+    provenance: Option<&'a FunctionProvenanceTable>,
     visibility: FxHashMap<DefId, VisibilityTier>,
     memo: RefCell<QueryMemo<'a>>,
 }
@@ -288,6 +349,7 @@ impl<'a> DerivedCapabilityQueries<'a> {
             access_facts,
             function_facts,
             regions: None,
+            provenance: None,
             visibility: FxHashMap::default(),
             memo: RefCell::new(QueryMemo::default()),
         }
@@ -305,6 +367,7 @@ impl<'a> DerivedCapabilityQueries<'a> {
             app.access_facts(),
             app.function_facts(),
         )
+        .with_provenance(app.provenance())
     }
 
     /// Attach region facts produced from the same snapshot's access facts.
@@ -325,6 +388,16 @@ impl<'a> DerivedCapabilityQueries<'a> {
         tiers: impl IntoIterator<Item = (DefId, VisibilityTier)>,
     ) -> Self {
         self.visibility = tiers.into_iter().collect();
+        self
+    }
+
+    /// Attach the durable provenance summaries from the same snapshot.
+    ///
+    /// F-CAP-04 and F-CAP-05 answer from this table; without it they fail
+    /// closed with [`CapabilityReason::MissingFact`].
+    #[must_use]
+    pub fn with_provenance(mut self, provenance: &'a FunctionProvenanceTable) -> Self {
+        self.provenance = Some(provenance);
         self
     }
 
@@ -1065,8 +1138,25 @@ impl<'a> DerivedCapabilityQueries<'a> {
         if kind == FunctionCapabilityKind::ReturnedBorrowProvenance
             || kind == FunctionCapabilityKind::RequiredRegionRelationships
         {
-            // Durable region/provenance summaries are SCR-04's rows.
-            return CapabilityAnswer::Rejected(CapabilityReason::MissingFact);
+            // SCR-04: the durable provenance summary is the sole authority
+            // for the region rows; live region facts are never re-derived
+            // here and a missing table stays MissingFact.
+            let Some(table) = self.provenance else {
+                return CapabilityAnswer::Rejected(CapabilityReason::MissingFact);
+            };
+            let Some(row) = table.get(def_id) else {
+                return CapabilityAnswer::Rejected(CapabilityReason::MissingFact);
+            };
+            return match kind {
+                FunctionCapabilityKind::ReturnedBorrowProvenance => {
+                    CapabilityAnswer::Proven(Proof::ReturnedBorrow(row.returned_borrow))
+                }
+                _ => {
+                    CapabilityAnswer::Proven(Proof::RequiredRegions(RequiredRegionRelationships {
+                        relationships: row.required_regions.clone(),
+                    }))
+                }
+            };
         }
         let Some(fact) = self.function_facts.get(def_id) else {
             return CapabilityAnswer::Rejected(CapabilityReason::MissingFact);

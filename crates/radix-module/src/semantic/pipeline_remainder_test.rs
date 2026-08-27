@@ -60,6 +60,11 @@ incipit {
     let _ = unit.qualified_identities;
     let view = unit.application_view();
     assert_eq!(view.stamp, unit.analysis_stamp);
+
+    // SCR-04: durable provenance rides the driver fields and the borrowed
+    // application view with the same stamp; F-CAP-04/05 answer from it.
+    assert!(!unit.provenance.is_empty(), "every function carries a row");
+    assert_eq!(view.provenance, &unit.provenance);
 }
 
 #[test]

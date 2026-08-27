@@ -41,8 +41,8 @@ use serde::ser::{
 use serde::{Deserialize, Deserializer, Serialize};
 
 use crate::artifact::{
-    CliProgramWire, FunctionFactTableWire, FunctionFactWire, GpuBuiltinWire, HirArtifact,
-    ResolvedUseWire, ResolverSnapshot, SourceIdentity, SCHEMA_VERSION,
+    CliProgramWire, FunctionFactTableWire, FunctionFactWire, FunctionProvenanceTableWire,
+    GpuBuiltinWire, HirArtifact, ResolvedUseWire, ResolverSnapshot, SourceIdentity, SCHEMA_VERSION,
 };
 use crate::decode::{decode as decode_unit_bytes, encode as encode_unit_bytes};
 use crate::error::HirArtifactError;
@@ -1241,6 +1241,7 @@ struct HirArtifactDto {
     resolved_uses: Vec<ResolvedUseWire>,
     analysis_stamp: u64,
     gpu_builtins: Vec<GpuBuiltinEntryDto>,
+    capability_provenance: FunctionProvenanceTableWire,
 }
 
 impl From<&HirArtifact> for HirArtifactDto {
@@ -1277,6 +1278,7 @@ impl From<&HirArtifact> for HirArtifactDto {
                     builtin: *builtin,
                 })
                 .collect(),
+            capability_provenance: artifact.capability_provenance.clone(),
         }
     }
 }
@@ -1309,6 +1311,7 @@ impl From<HirArtifactDto> for HirArtifact {
                 .into_iter()
                 .map(|entry| (entry.def_id, entry.builtin))
                 .collect(),
+            capability_provenance: dto.capability_provenance,
         }
     }
 }

@@ -6,7 +6,8 @@
 #![cfg(test)]
 
 use crate::artifact::{
-    FunctionFactTableWire, HirArtifact, ResolverSnapshot, SourceIdentity, SCHEMA_VERSION,
+    FunctionFactTableWire, FunctionProvenanceTableWire, HirArtifact, ResolverSnapshot,
+    SourceIdentity, SCHEMA_VERSION,
 };
 use radix_hir::{
     HirFunction, HirId, HirItem, HirItemKind, HirModule, HirModuleEnd, HirPresentation,
@@ -85,6 +86,7 @@ pub(crate) fn stub_artifact() -> HirArtifact {
         resolved_uses: Vec::new(),
         analysis_stamp: 42,
         gpu_builtins: Vec::new(),
+        capability_provenance: FunctionProvenanceTableWire::default(),
     }
 }
 

@@ -737,7 +737,7 @@ incipit { }
 }
 
 #[test]
-fn region_and_provenance_rows_stay_open_for_scr_04() {
+fn region_and_provenance_rows_fail_closed_without_a_durable_summary() {
     let (queries, hir, _types) = source_queries(
         r"
 functio f() → numerus {
@@ -757,6 +757,63 @@ incipit { }
             Some(CapabilityReason::MissingFact)
         );
     }
+}
+
+#[test]
+fn durable_provenance_answers_the_region_rows_through_the_application() {
+    // SCR-04: the region rows answer from the durable summary carried by
+    // AnalyzedApplication — never by re-running region inference.
+    let lex = radix_lexer::lex(
+        r"
+functio eadem(de lista<numerus> xs) → de lista<numerus> {
+    redde xs
+}
+incipit { }
+",
+    );
+    let mut parsed = radix_parser::parse(lex);
+    assert!(parsed.success(), "parse: {:?}", parsed.errors);
+    let program = parsed.program.take().expect("program");
+    let result = crate::analyze(&program, &crate::PassConfig::base(), &mut parsed.interner);
+    assert!(result.is_ok(), "analyze: {:?}", result.diagnostics);
+    let parts = crate::AnalyzedApplicationParts {
+        hir: result.hir.expect("hir"),
+        types: result.types,
+        resolver: result.resolver,
+        annotation_contracts: result.annotation_contracts,
+        libraries: radix_hir::LibraryRegistry::default(),
+        radix_lanes: result.radix_lanes,
+        gpu_builtins: result.gpu_builtins,
+        access_facts: result.access_facts.expect("access facts"),
+        region_facts: None,
+        semantic_diagnostics: result.diagnostics,
+    };
+    let app = crate::AnalyzedApplication::build(parts, &parsed.interner).expect("build");
+    let def = app
+        .hir()
+        .items
+        .iter()
+        .find(|item| matches!(item.kind, radix_hir::HirItemKind::Function(_)))
+        .expect("function item")
+        .def_id;
+    let param = match &app.hir().items[0].kind {
+        radix_hir::HirItemKind::Function(function) => function.params[0].def_id,
+        _ => panic!("function item"),
+    };
+
+    let queries = DerivedCapabilityQueries::from_application(&app);
+    assert!(matches!(
+        queries.function_capability(def, FunctionCapabilityKind::ReturnedBorrowProvenance),
+        CapabilityAnswer::Proven(FunctionCapabilityProof::ReturnedBorrow(
+            super::ReturnedBorrowProvenance::Parameter(p)
+        )) if p == param
+    ));
+    assert!(matches!(
+        queries.function_capability(def, FunctionCapabilityKind::RequiredRegionRelationships),
+        CapabilityAnswer::Proven(FunctionCapabilityProof::RequiredRegions(
+            super::RequiredRegionRelationships { relationships }
+        )) if relationships.is_empty()
+    ));
 }
 
 #[test]

@@ -46,6 +46,9 @@ pub enum AnalyzedApplicationError {
     StampMismatch { expected: u64, found: u64 },
     /// Required fact family is absent from the snapshot.
     AbsentRequiredFacts { family: &'static str },
+    /// A borrow-returning function's provenance summary could not be tied to
+    /// the region engine's facts (SCR-04).
+    IncoherentProvenance { def_id: radix_hir::DefId },
     /// `parts.semantic_diagnostics` contains one or more hard (fatal) entries.
     HardSemanticErrors { count: usize },
 }
@@ -65,6 +68,9 @@ impl std::fmt::Display for AnalyzedApplicationError {
             }
             Self::AbsentRequiredFacts { family } => {
                 write!(f, "analyzed application missing required facts: {family}")
+            }
+            Self::IncoherentProvenance { def_id } => {
+                write!(f, "incoherent borrow provenance for DefId({})", def_id.0)
             }
             Self::HardSemanticErrors { count } => {
                 write!(
@@ -89,6 +95,13 @@ pub struct AnalyzedApplicationParts {
     pub radix_lanes: RadixLaneMetadata,
     pub gpu_builtins: Vec<(radix_hir::DefId, radix_types::MirKernelBuiltin)>,
     pub access_facts: AccessFactTable,
+    /// Optional caller-supplied region facts from the same analysis run.
+    ///
+    /// When `None`, `build` runs the region engine itself exactly once over
+    /// the snapshot's own HIR/types/access facts. Supplying facts from a
+    /// different run is a snapshot-coherence violation and fails closed at
+    /// the reduction boundary.
+    pub region_facts: Option<crate::passes::borrow_region::RegionFacts>,
     pub semantic_diagnostics: Vec<SemanticError>,
 }
 
@@ -110,6 +123,7 @@ pub struct AnalyzedApplication {
     function_facts: FunctionFactTable,
     resolved_uses: ResolvedUseIndex,
     qualified_identities: QualifiedIdentityTable,
+    provenance: crate::capability::FunctionProvenanceTable,
     semantic_diagnostics: Vec<SemanticError>,
 }
 
@@ -165,6 +179,32 @@ impl AnalyzedApplication {
             });
         }
 
+        // SCR-04: reduce flow-sensitive regions to durable provenance
+        // summaries over this snapshot's own facts. Region facts supplied by
+        // the caller replace the engine run; both paths share the one
+        // reduction and its fail-closed law.
+        let regions = match parts.region_facts {
+            Some(facts) => Some(facts),
+            None => {
+                crate::passes::borrow_region::analyze(&parts.hir, &parts.types, &access_facts).ok()
+            }
+        };
+        let provenance = match crate::passes::borrow_region::reduce(
+            &parts.hir,
+            &parts.types,
+            regions.as_ref(),
+        ) {
+            Ok(table) => table,
+            Err(crate::passes::borrow_region::ProvenanceError::Unavailable { .. }) => {
+                return Err(AnalyzedApplicationError::AbsentRequiredFacts {
+                    family: "borrow_provenance",
+                });
+            }
+            Err(crate::passes::borrow_region::ProvenanceError::Incoherent { function }) => {
+                return Err(AnalyzedApplicationError::IncoherentProvenance { def_id: function });
+            }
+        };
+
         Ok(Self {
             stamp: AnalysisStamp::next(),
             hir: parts.hir,
@@ -178,6 +218,7 @@ impl AnalyzedApplication {
             function_facts,
             resolved_uses,
             qualified_identities,
+            provenance,
             semantic_diagnostics: parts.semantic_diagnostics,
         })
     }
@@ -243,6 +284,11 @@ impl AnalyzedApplication {
     }
 
     #[must_use]
+    pub fn provenance(&self) -> &crate::capability::FunctionProvenanceTable {
+        &self.provenance
+    }
+
+    #[must_use]
     pub fn semantic_diagnostics(&self) -> &[SemanticError] {
         &self.semantic_diagnostics
     }
@@ -279,6 +325,7 @@ impl AnalyzedApplication {
             function_facts: self.function_facts,
             resolved_uses: self.resolved_uses,
             qualified_identities: self.qualified_identities,
+            provenance: self.provenance,
             semantic_diagnostics: self.semantic_diagnostics,
         }
     }
@@ -298,6 +345,7 @@ pub struct AnalyzedApplicationDriverFields {
     pub function_facts: FunctionFactTable,
     pub resolved_uses: ResolvedUseIndex,
     pub qualified_identities: QualifiedIdentityTable,
+    pub provenance: crate::capability::FunctionProvenanceTable,
     pub semantic_diagnostics: Vec<SemanticError>,
 }
 

@@ -7,8 +7,9 @@
 use crate::driver::AnalyzedModule;
 use radix_hir_fhir::{
     CaptureFactWire, CaptureModeWire, CliCommandWire, CliDefaultWire, CliExitWire, CliModeWire, CliOperandWire,
-    CliOptionWire, CliProgramWire, CliTypeWire, FunctionFactTableWire, FunctionFactWire, GpuBuiltinWire, HirArtifact,
-    ResolvedUseKeyWire, ResolvedUseKindWire, ResolvedUseWire, SourceIdentity, SCHEMA_VERSION,
+    CliOptionWire, CliProgramWire, CliTypeWire, FunctionFactTableWire, FunctionFactWire, FunctionProvenanceTableWire,
+    FunctionProvenanceWire, GpuBuiltinWire, HirArtifact, LastUseWire, RegionRelationshipWire, ResolvedUseKeyWire,
+    ResolvedUseKindWire, ResolvedUseWire, ReturnedBorrowWire, SourceIdentity, SCHEMA_VERSION,
 };
 
 // ── Entry point ───────────────────────────────────────────────────────────
@@ -47,6 +48,39 @@ pub fn from_analyzed(unit: &AnalyzedModule, content_hash: &str, relative_path: &
             .gpu_builtins
             .iter()
             .map(|(def_id, builtin)| (*def_id, gpu_builtin_to_wire(*builtin)))
+            .collect(),
+        capability_provenance: provenance_table_to_wire(&unit.provenance),
+    }
+}
+
+// ── Capability provenance wire conversions (SCR-04) ───────────────────────
+
+fn returned_borrow_to_wire(p: crate::semantic::ReturnedBorrowProvenance) -> ReturnedBorrowWire {
+    match p {
+        crate::semantic::ReturnedBorrowProvenance::None => ReturnedBorrowWire::None,
+        crate::semantic::ReturnedBorrowProvenance::Parameter(def_id) => ReturnedBorrowWire::Parameter(def_id),
+        crate::semantic::ReturnedBorrowProvenance::Definition(def_id) => ReturnedBorrowWire::Definition(def_id),
+    }
+}
+
+fn provenance_table_to_wire(table: &crate::semantic::FunctionProvenanceTable) -> FunctionProvenanceTableWire {
+    FunctionProvenanceTableWire {
+        functions: table
+            .iter()
+            .map(|row| FunctionProvenanceWire {
+                function: row.function,
+                returned_borrow: returned_borrow_to_wire(row.returned_borrow),
+                required_regions: row
+                    .required_regions
+                    .iter()
+                    .map(|rel| RegionRelationshipWire { from: rel.from, to: rel.to })
+                    .collect(),
+                last_uses: row
+                    .last_uses
+                    .iter()
+                    .map(|fact| LastUseWire { borrower: fact.borrower, site: fact.site })
+                    .collect(),
+            })
             .collect(),
     }
 }

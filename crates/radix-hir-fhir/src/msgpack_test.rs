@@ -40,7 +40,7 @@ fn get<'a>(value: &'a Value, path: &[&str]) -> Option<&'a Value> {
 }
 
 /// The 13 spec §2 named top-level keys, in declaration order.
-const UNIT_KEYS: [&str; 13] = [
+const UNIT_KEYS: [&str; 14] = [
     "schema_version",
     "source_identity",
     "hir",
@@ -54,6 +54,7 @@ const UNIT_KEYS: [&str; 13] = [
     "resolved_uses",
     "analysis_stamp",
     "gpu_builtins",
+    "capability_provenance",
 ];
 
 fn top_keys(value: &Value) -> Vec<&str> {
@@ -166,14 +167,14 @@ fn transfer_msgpack_decode_passes_referential_integrity() {
 // ── Wire-shape pins (spec.md §1/§2 binding rules) ────────────────────────
 
 #[test]
-fn unit_wire_uses_the_thirteen_named_keys_in_order() {
+fn unit_wire_uses_the_named_keys_in_order() {
     // §1.1/§1.2: named fields, not compact arrays; schema_version first.
     let bytes = encode_msgpack(&stub_artifact()).expect("encode");
     let value = parse(&bytes);
     assert_eq!(top_keys(&value), UNIT_KEYS);
 
     // §2 row 1: version is a uint fact.
-    assert_eq!(get(&value, &["schema_version"]), Some(&Value::Uint(7)));
+    assert_eq!(get(&value, &["schema_version"]), Some(&Value::Uint(8)));
 
     // §2 row 2: source identity map with its named keys.
     assert!(matches!(
@@ -617,7 +618,7 @@ fn package_msgpack_wire_uses_named_keys_and_nested_unit_values() {
     // modules[0] is src/aux.fab; its record carries the named module keys.
     let aux = at(&value, &[Step::Key("modules"), Step::Idx(0)]).expect("modules[0]");
     assert_eq!(top_keys(aux), MODULE_KEYS);
-    assert_eq!(get(aux, &["unit_schema_version"]), Some(&Value::Uint(7)));
+    assert_eq!(get(aux, &["unit_schema_version"]), Some(&Value::Uint(8)));
 
     // The unit is a nested named map with the 13 unit keys — not bin.
     let unit = get(aux, &["unit"]).expect("nested unit");

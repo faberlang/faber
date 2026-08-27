@@ -2521,6 +2521,10 @@ pub struct AnalyzedModule {
     /// Portable qualified identities for imported declarations.
     pub qualified_identities: semantic::QualifiedIdentityTable,
 
+    /// Durable borrow-provenance and last-use summaries (SCR-04) carried
+    /// from the analyzed application; the durable F-CAP-04/05 authority.
+    pub provenance: semantic::FunctionProvenanceTable,
+
     /// Package-local import identity facts for user-code cross-module calls
     /// (see [`PackageImportIdentities`]). `None` for plain single-file
     /// compiles.
@@ -2560,6 +2564,7 @@ impl AnalyzedModule {
         function_facts: semantic::FunctionFactTable,
         resolved_uses: semantic::ResolvedUseIndex,
         qualified_identities: semantic::QualifiedIdentityTable,
+        provenance: semantic::FunctionProvenanceTable,
         radix_lanes: RadixLaneMetadata,
         gpu_builtins: Vec<(crate::hir::DefId, radix_types::MirKernelBuiltin)>,
         #[cfg(feature = "mir-core")] graphics_source: GraphicsSourceFacts,
@@ -2578,6 +2583,7 @@ impl AnalyzedModule {
             function_facts,
             resolved_uses,
             qualified_identities,
+            provenance,
             radix_lanes,
             gpu_builtins,
             #[cfg(feature = "mir-core")]
@@ -2605,6 +2611,7 @@ impl AnalyzedModule {
         function_facts: semantic::FunctionFactTable,
         resolved_uses: semantic::ResolvedUseIndex,
         qualified_identities: semantic::QualifiedIdentityTable,
+        provenance: semantic::FunctionProvenanceTable,
         radix_lanes: RadixLaneMetadata,
         gpu_builtins: Vec<(crate::hir::DefId, radix_types::MirKernelBuiltin)>,
         #[cfg(feature = "mir-core")] graphics_source: GraphicsSourceFacts,
@@ -2623,6 +2630,7 @@ impl AnalyzedModule {
             function_facts,
             resolved_uses,
             qualified_identities,
+            provenance,
             package_import_identities: None,
             radix_lanes,
             gpu_builtins,
@@ -2645,6 +2653,7 @@ impl AnalyzedModule {
             function_facts: &self.function_facts,
             resolved_uses: &self.resolved_uses,
             qualified_identities: &self.qualified_identities,
+            provenance: &self.provenance,
             radix_lanes: &self.radix_lanes,
             gpu_builtins: &self.gpu_builtins,
             cli_program: self.cli_program.as_ref(),
@@ -2710,6 +2719,7 @@ pub struct AnalyzedModuleApplicationView<'a> {
     pub function_facts: &'a semantic::FunctionFactTable,
     pub resolved_uses: &'a semantic::ResolvedUseIndex,
     pub qualified_identities: &'a semantic::QualifiedIdentityTable,
+    pub provenance: &'a semantic::FunctionProvenanceTable,
     pub radix_lanes: &'a RadixLaneMetadata,
     pub gpu_builtins: &'a [(crate::hir::DefId, radix_types::MirKernelBuiltin)],
     pub cli_program: Option<&'a crate::cli::CliProgram>,
@@ -3524,6 +3534,7 @@ fn analyzed_unit_from_semantic(
         radix_lanes: semantic_result.radix_lanes,
         gpu_builtins: semantic_result.gpu_builtins,
         access_facts,
+        region_facts: None,
         semantic_diagnostics: semantic_result.diagnostics,
     };
 
@@ -3554,6 +3565,7 @@ fn analyzed_unit_from_semantic(
         function_facts: fields.function_facts,
         resolved_uses: fields.resolved_uses,
         qualified_identities: fields.qualified_identities,
+        provenance: fields.provenance,
         package_import_identities: None,
         radix_lanes: fields.radix_lanes,
         gpu_builtins: fields.gpu_builtins,

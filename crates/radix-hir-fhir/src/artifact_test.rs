@@ -98,8 +98,9 @@ fn selective_import_field_kept_schema_v4_wire_breaks_ratchet_version() {
     // EOT-3W ratchets to 5 (Transfer variant shifts serde ordinals), E3
     // ratchets to 6 for resolver conversion-arm rows, and CTR-05 ratchets to
     // 7 (registry rows replace destination-owned arm rows; the enum's
-    // retired conversion-arm payload leaves the serde'd HIR payload).
-    assert_eq!(SCHEMA_VERSION, 7);
+    // retired conversion-arm payload leaves the serde'd HIR payload), and
+    // SCR-04 ratchets to 8 (capability-provenance summaries join the wire).
+    assert_eq!(SCHEMA_VERSION, 8);
 }
 
 // ── EOT-3W transfer wire contract ────────────────────────────────────────
@@ -156,4 +157,33 @@ fn transfer_decode_passes_referential_integrity() {
         ),
         "transfer must survive the full decode/validate path"
     );
+}
+
+// ── SCR-04 capability provenance round trips ─────────────────────────────
+
+#[test]
+fn capability_provenance_round_trips_through_postcard() {
+    use crate::artifact::{
+        FunctionProvenanceTableWire, FunctionProvenanceWire, LastUseWire, RegionRelationshipWire,
+        ReturnedBorrowWire,
+    };
+
+    let mut original = stub_artifact();
+    original.capability_provenance = FunctionProvenanceTableWire {
+        functions: vec![FunctionProvenanceWire {
+            function: DefId(0),
+            returned_borrow: ReturnedBorrowWire::Parameter(DefId(0)),
+            required_regions: vec![RegionRelationshipWire {
+                from: DefId(0),
+                to: DefId(0),
+            }],
+            last_uses: vec![LastUseWire {
+                borrower: DefId(0),
+                site: radix_hir::HirId(0),
+            }],
+        }],
+    };
+    let bytes = postcard::to_allocvec(&original).expect("serialize provenance-carrying artifact");
+    let deserialized: HirArtifact = postcard::from_bytes(&bytes).expect("deserialize");
+    assert_eq!(original, deserialized);
 }

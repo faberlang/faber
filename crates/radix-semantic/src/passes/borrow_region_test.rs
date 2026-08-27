@@ -296,3 +296,163 @@ incipit {
     assert!(dum.fact_reads() > 0);
     assert!(loop_facts.fact_reads() > 0);
 }
+
+// ── SCR-04 durable provenance reduction ─────────────────────────────────────
+
+fn reduced(
+    source: &str,
+) -> (
+    borrow_region::RegionFacts,
+    crate::capability::FunctionProvenanceTable,
+    radix_hir::HirModule,
+) {
+    let result = analyze_source(source);
+    let hir = result
+        .hir
+        .as_ref()
+        .unwrap_or_else(|| panic!("analysis must succeed: {:?}", result.diagnostics))
+        .clone();
+    let access_facts = result.access_facts.as_ref().expect("access facts");
+    let regions = borrow_region::analyze(&hir, &result.types, access_facts).expect("regions");
+    let table =
+        borrow_region::reduce(&hir, &result.types, Some(&regions)).expect("coherent reduction");
+    (regions, table, hir)
+}
+
+fn first_function_def(hir: &radix_hir::HirModule) -> radix_hir::DefId {
+    hir.items
+        .iter()
+        .find(|item| matches!(item.kind, radix_hir::HirItemKind::Function(_)))
+        .expect("function item")
+        .def_id
+}
+
+#[test]
+fn plain_function_reduces_to_settled_no_borrow_summary() {
+    let (_regions, table, hir) = reduced(
+        r"
+functio plain(numerus n) → numerus {
+    redde n
+}
+incipit { }
+",
+    );
+    let row = table.get(first_function_def(&hir)).expect("row");
+    assert_eq!(
+        row.returned_borrow,
+        radix_types::ReturnedBorrowProvenance::None
+    );
+    assert!(row.required_regions.is_empty());
+    assert!(row.last_uses.is_empty());
+}
+
+#[test]
+fn borrow_local_last_use_summary_matches_live_regions() {
+    let source = r"
+functio utitur() → numerus {
+    varia lista<numerus> xs ← [1, 2, 3]
+    varia in lista<numerus> view ← xs
+    redde view.longitudo()
+}
+incipit { }
+";
+    let (regions, table, hir) = reduced(source);
+    let row = table.get(first_function_def(&hir)).expect("row");
+
+    // Sanity (SCR-04 card): the persisted summary must agree with the live
+    // RegionFacts it was reduced from — one last-use fact per body region,
+    // keyed by the same borrower, ending at the same last-use site.
+    let live: Vec<(radix_hir::DefId, radix_hir::HirId)> = regions
+        .regions()
+        .iter()
+        .filter_map(|region| {
+            region
+                .last_use()
+                .and_then(|location| location.hir_id)
+                .map(|site| (region.borrower, site))
+        })
+        .collect();
+    let persisted: Vec<(radix_hir::DefId, radix_hir::HirId)> = row
+        .last_uses
+        .iter()
+        .map(|fact| (fact.borrower, fact.site))
+        .collect();
+    assert_eq!(persisted, live);
+    assert!(
+        !persisted.is_empty(),
+        "body borrow must carry a last-use fact"
+    );
+}
+
+#[test]
+fn borrow_returning_parameter_carries_parameter_provenance() {
+    let (_regions, table, hir) = reduced(
+        r"
+functio eadem(de lista<numerus> xs) → de lista<numerus> {
+    redde xs
+}
+incipit { }
+",
+    );
+    let row = table.get(first_function_def(&hir)).expect("row");
+    let param = match &hir.items[0].kind {
+        radix_hir::HirItemKind::Function(function) => function.params[0].def_id,
+        _ => panic!("function item"),
+    };
+    assert_eq!(
+        row.returned_borrow,
+        radix_types::ReturnedBorrowProvenance::Parameter(param)
+    );
+    assert!(row.required_regions.is_empty());
+}
+
+#[test]
+fn absent_regions_fail_closed_for_borrow_returning_function() {
+    let result = analyze_source(
+        r"
+functio mutator(lista<numerus> xs) → in lista<numerus> {
+    varia in lista<numerus> view ← xs
+    redde view
+}
+incipit { }
+",
+    );
+    let hir = result.hir.as_ref().expect("typed HIR");
+    let error = borrow_region::reduce(hir, &result.types, None).expect_err("fail closed");
+    assert!(matches!(
+        error,
+        borrow_region::ProvenanceError::Unavailable { .. }
+    ));
+}
+
+#[test]
+fn foreign_region_facts_are_incoherent_for_borrow_returning_function() {
+    let borrowing = analyze_source(
+        r"
+functio mutator(lista<numerus> xs) → in lista<numerus> {
+    varia in lista<numerus> view ← xs
+    redde view
+}
+incipit { }
+",
+    );
+    let other = analyze_source(
+        r"
+functio alia(numerus n) → numerus {
+    redde n
+}
+incipit { }
+",
+    );
+    let other_hir = other.hir.as_ref().expect("typed HIR");
+    let other_facts = other.access_facts.as_ref().expect("access facts");
+    let foreign = borrow_region::analyze(other_hir, &other.types, other_facts).expect("regions");
+
+    let borrowing_hir = borrowing.hir.as_ref().expect("typed HIR");
+    let error = borrow_region::reduce(borrowing_hir, &borrowing.types, Some(&foreign))
+        .expect_err("cross-run facts must not satisfy a different snapshot");
+    assert!(matches!(
+        error,
+        borrow_region::ProvenanceError::Incoherent { .. }
+    ));
+}

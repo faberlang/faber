@@ -309,6 +309,7 @@ fn analyzed_application_carries_access_facts() {
         radix_lanes: result.radix_lanes,
         gpu_builtins: result.gpu_builtins,
         access_facts,
+        region_facts: None,
         semantic_diagnostics: result.diagnostics,
     };
     let app = AnalyzedApplication::build(parts, &parsed.interner).expect("application");
