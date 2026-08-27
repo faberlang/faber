@@ -521,8 +521,9 @@ use std::hash::{Hash, Hasher};
 
 use radix_module::diagnostics::Diagnostic;
 use radix_module::driver::{
-    analyze_source, peel_raw_source, source_load_diagnostic, AnalyzeRequest, AnalyzedModule,
-    Config, ModuleImportContract, Session,
+    analyze_source_with_kernel_template_admissions, peel_raw_source, source_load_diagnostic,
+    AnalyzeRequest, AnalyzedModule, Config, ModuleImportContract, PackageKernelTemplateAdmissions,
+    Session,
 };
 use radix_module::file_interface::FileInterface;
 use radix_module::hir::{
@@ -1233,7 +1234,21 @@ fn analyze_cached_library_interface_body(
             library_interface_declaration_surface(dependency, library_resolver, library_cache)?,
         );
     }
-    let mut analysis = match analyze_source(
+    // PKG-ADM (library seam): a library unit's own export surface is its
+    // kernel-template admission fact, mirroring the package path
+    // (analyze.rs): an exported `@ publica` size-generic `@ kernel` template
+    // is demand-admissible because consumers instantiate it from their own
+    // units. Without this, every linked-library kernel API with no same-unit
+    // caller orphans (ADM001) the moment a consumer analyzes the library.
+    // `@ interna`/`@ privata` and unexported templates stay fail-closed.
+    let kernel_template_admissions = {
+        let cached = load_cached_library_interface(&import.module, library_cache)?;
+        PackageKernelTemplateAdmissions::from_export_surface(&program_export_surface(
+            &cached.program,
+            &cached.interner,
+        ))
+    };
+    let mut analysis = match analyze_source_with_kernel_template_admissions(
         &session,
         &import.module.interface_path.display().to_string(),
         &analysis_source,
@@ -1246,6 +1261,7 @@ fn analyze_cached_library_interface_body(
                 namespace_declarations,
             },
         },
+        &kernel_template_admissions,
     ) {
         Ok(analysis) => analysis,
         Err(diagnostics) => {

@@ -1092,6 +1092,57 @@ fn package_mir_return_channel_mismatch_without_conversion_fails_closed() {
     );
 }
 
+/// PKG-ADM library-seam converse: the library interface analysis path admits
+/// only publica-tier exports (the unit's own export surface), never a
+/// blanket kernel-annotation exemption — a `@ private` size-generic
+/// `@ kernel` template in an imported library with no same-unit caller
+/// stays an ADM001 orphan in the consumer's analysis.
+#[test]
+fn package_mir_library_kernel_template_admission_stays_fail_closed_for_unexported_templates() {
+    let library = r#"+++
+locale = "en"
++++
+@ kernel
+@ private
+fn hidden<size M, size N>(tensor<f32, [M, N]> a, tensor<f32, [M, N]> b) → tensor<f32, [M, N]> {
+    return a + b
+}
+
+@ public
+fn touch(int x) → int {
+    return x
+}
+"#;
+    let main = "import from \"orphanlib:lib\" orb\n\nmain {\n    print orb.touch(1)\n}\n";
+    let dir = crate::test_support::test_temp_dir("library-kernel-admission");
+    let entry = write_library_package(dir.path(), "orphanlib", library, main);
+    let config = Config::default().with_stdlib(dir.join("libhome"));
+
+    let mut host = BufferHost::default();
+    let diagnostics = run_package_mir(
+        &config,
+        &entry,
+        &crate::test_support::test_mir_seams(),
+        &mut host,
+    )
+    .expect_err("an unexported library kernel template must stay an ADM001 orphan");
+    let orphan = diagnostics
+        .iter()
+        .find(|diagnostic| diagnostic.issue() == Some("nucleum_orphaned_annotation"))
+        .expect("the ADM001 orphan diagnostic must name the library module");
+    assert!(
+        orphan.file.ends_with("orphanlib/src/lib.fab"),
+        "the orphan must be reported on the library unit, got {}",
+        orphan.file
+    );
+    assert!(
+        !diagnostics
+            .iter()
+            .any(|diagnostic| diagnostic.issue() == Some("imported_library_parse_failure")),
+        "the fail-closed orphan is an admission fact, not an import-site parse failure"
+    );
+}
+
 /// Write the two-module library package behind the return-channel rows:
 /// `nn.fab` provides a failable namespace verb; `mlp.fab` wraps it on the
 /// return channel. `mlp_lib` selects whether the destination union declares
@@ -1157,6 +1208,12 @@ convlib = "1.0.0"
     entry
 }
 
+// Respelled onto the schema-7 named standalone `@ conversion fn` form: the
+// old typed union-arm payload (`@ conversion nn.NnError err { … }` inside the
+// union) is retracted grammar (PARSE018), so the declared arm is enrolled
+// from the conversion fn's signature instead. The declaration still names
+// the same cross-package pair (nn.NnError → GradusError) the return-channel
+// lowering must recover at the `ReturnError` terminator.
 const RETURN_CONVERSION_MLP: &str = r#"+++
 locale = "en"
 +++
@@ -1165,11 +1222,13 @@ import from "convlib:nn" nn
 union GradusError {
     @ shared
     string message
-
-    @ conversion nn.NnError err {
-        return variant GradusBad {message = err.message}
-    }
     GradusBad
+}
+
+@ conversion fn from_nn_error(nn.NnError err) → GradusError {
+    match err {
+        case nn.NnError.NnBad const message { return variant GradusBad {message = message} }
+    }
 }
 
 @ public
