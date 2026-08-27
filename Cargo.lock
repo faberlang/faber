@@ -804,6 +804,7 @@ dependencies = [
 name = "radix-semantic"
 version = "0.84.0"
 dependencies = [
+ "radix",
  "radix-diagnostics",
  "radix-hir",
  "radix-hir-fhir",
