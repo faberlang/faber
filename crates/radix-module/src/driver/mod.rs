@@ -3234,6 +3234,7 @@ fn analyze_semantic_program(input: SemanticAnalysisInput<'_>) -> Result<semantic
     pass_config.script_kernel_mode = PassConfig::for_target(session.config.target).script_kernel_mode;
     pass_config.import_path_templates = session.config.import_path_templates.clone();
     pass_config.complexity_budget = session.config.complexity_budget;
+    pass_config.kernel_complexity_budget = session.config.kernel_complexity_budget;
     let semantic_result = semantic::analyze_with_cli(program, &pass_config, interner, cli_program);
 
     for err in &semantic_result.diagnostics {

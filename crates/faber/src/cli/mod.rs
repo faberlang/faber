@@ -420,6 +420,16 @@ pub struct CheckArgs {
     )]
     pub complexity_budget: Option<u32>,
 
+    /// Per-function cyclomatic complexity budget for `@ kernel` functions in
+    /// this check (>= 1); advisory-only (never gates kernel admission);
+    /// overrides the baked-in kernel default for this run
+    #[arg(
+        long = "kernel-complexity-budget",
+        value_name = "N",
+        value_parser = clap::value_parser!(u32).range(1..)
+    )]
+    pub kernel_complexity_budget: Option<u32>,
+
     /// Print an advisory AIR-lane compatibility report (report-only); rows
     /// carry the census tier labels ADMISSIBLE-KERNEL, ADMISSIBLE-ONE-AWAY,
     /// WOULD-REJECT, and NOT-A-TARGET

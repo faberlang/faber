@@ -27,6 +27,14 @@ const ISSUE_COMPLEXITY_BUDGET_EXCEEDED: &str = "complexity_budget_exceeded";
 /// 4.4% of the 2393 scored functions.
 pub const DEFAULT_COMPLEXITY_BUDGET: u32 = 12;
 
+/// Baked complexity budget for `@ nucleum` kernel entries
+/// ([`HirFunction::is_kernel`]), fixed by the CC-U4 census kernel subset:
+/// `docs/factory/complexity-diagnostics/census-report.md` recommends 2 —
+/// all 84 measured kernel functions score ≤ 2 (six at 2), so the budget
+/// fires on nothing today and trips any future kernel scoring 3+.
+/// Advisory-only: it warns, it never gates kernel admission.
+pub const DEFAULT_KERNEL_COMPLEXITY_BUDGET: u32 = 2;
+
 /// Cyclomatic score of one declared function, or `None` when it has no body
 /// (bodyless interface methods are skipped, not scored).
 #[must_use]
@@ -92,27 +100,43 @@ impl HirVisitor for DecisionPointCounter {
     }
 }
 
-/// Warn once per declared function whose score exceeds `budget`.
+/// Warn once per declared function whose score exceeds its applicable
+/// budget: `budget` for ordinary functions, `kernel_budget` for
+/// `@ nucleum` kernel entries ([`HirFunction::is_kernel`]). The kernel
+/// budget is advisory-only (warn, never admission); its findings carry a
+/// `kernel` named arg and report the kernel budget in `budget`.
 ///
 /// Scores top-level functions and struct methods (both carry a
 /// [`HirFunction`]); bodyless interface methods and compiler-synthesized
 /// items (def ids ≥ 1_000_000, e.g. lifted AIR closures) are skipped.
 #[must_use]
-pub fn complexity(hir: &HirModule, interner: &Interner, budget: u32) -> Vec<SemanticError> {
+pub fn complexity(
+    hir: &HirModule,
+    interner: &Interner,
+    budget: u32,
+    kernel_budget: u32,
+) -> Vec<SemanticError> {
     let mut findings = Vec::new();
     let mut consider = |func: &HirFunction, span: Span| {
         if let Some(score) = function_complexity(func) {
-            if score > budget {
-                findings.push(
-                    SemanticError::structured(
-                        SemanticErrorKind::Warning(WarningKind::ComplexityBudgetExceeded),
-                        span,
-                    )
-                    .with_arg("issue", ISSUE_COMPLEXITY_BUDGET_EXCEEDED)
-                    .with_arg("function", interner.resolve(func.name))
-                    .with_arg("score", score.to_string())
-                    .with_arg("budget", budget.to_string()),
-                );
+            let applicable = if func.is_kernel {
+                kernel_budget
+            } else {
+                budget
+            };
+            if score > applicable {
+                let mut finding = SemanticError::structured(
+                    SemanticErrorKind::Warning(WarningKind::ComplexityBudgetExceeded),
+                    span,
+                )
+                .with_arg("issue", ISSUE_COMPLEXITY_BUDGET_EXCEEDED)
+                .with_arg("function", interner.resolve(func.name))
+                .with_arg("score", score.to_string())
+                .with_arg("budget", applicable.to_string());
+                if func.is_kernel {
+                    finding = finding.with_arg("kernel", "true");
+                }
+                findings.push(finding);
             }
         }
     };

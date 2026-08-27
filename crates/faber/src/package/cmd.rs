@@ -724,10 +724,15 @@ pub fn should_treat_as_package_from_args(input: &[String]) -> bool {
 /// semantic errors; manifest, I/O, parse, and package-policy errors remain
 /// fatal because they prevent reliable package graph construction.
 ///
-/// `complexity_budget` is the `--complexity-budget` CLI override; `None`
-/// falls back to the manifest `[check] complexity-budget` key, then the
-/// driver's baked-in default.
-pub fn cmd_check_package(command: radix::services::CheckCommand, complexity_budget: Option<u32>) {
+/// `complexity_budget` is the `--complexity-budget` CLI override and
+/// `kernel_complexity_budget` the `--kernel-complexity-budget` one (the
+/// advisory kernel-entry budget). Each falls back independently to its
+/// manifest `[check]` key, then to the driver's baked-in default.
+pub fn cmd_check_package(
+    command: radix::services::CheckCommand,
+    complexity_budget: Option<u32>,
+    kernel_complexity_budget: Option<u32>,
+) {
     if command.input.is_empty() || command.input[0] == "-" {
         eprintln!("error: package checking requires a path input");
         std::process::exit(1);
@@ -750,12 +755,20 @@ pub fn cmd_check_package(command: radix::services::CheckCommand, complexity_budg
                 deny_all_warnings: command.deny_warnings,
                 deny_codes: command.deny_codes,
             });
-            // CC-U3 layering: CLI `--complexity-budget` beats the manifest
-            // `[check] complexity-budget` key; both beat the baked default.
-            let budget = complexity_budget
-                .or_else(|| super::manifest::manifest_check_complexity_budget(&input_path));
+            // CC-U3/CC-U6 layering, one budget at a time: each CLI flag
+            // beats its manifest `[check]` key, which beats the baked
+            // default; the two budgets never borrow each other's layers.
+            let check = super::manifest::manifest_check_section(&input_path);
+            let budget =
+                complexity_budget.or_else(|| check.as_ref()?.complexity_budget);
+            let kernel_budget = kernel_complexity_budget
+                .or_else(|| check.as_ref()?.kernel_complexity_budget);
             let config = match budget {
                 Some(budget) => config.with_complexity_budget(budget),
+                None => config,
+            };
+            let config = match kernel_budget {
+                Some(budget) => config.with_kernel_complexity_budget(budget),
                 None => config,
             };
             (config, pack)

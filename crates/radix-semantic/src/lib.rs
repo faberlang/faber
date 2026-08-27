@@ -290,6 +290,11 @@ pub struct PassConfig {
     /// Per-function cyclomatic-complexity warning budget; `None` uses the
     /// baked default ([`passes::complexity::DEFAULT_COMPLEXITY_BUDGET`]).
     pub complexity_budget: Option<u32>,
+    /// Advisory per-function complexity budget for `@ nucleum` kernel
+    /// entries; `None` uses the baked kernel default
+    /// ([`passes::complexity::DEFAULT_KERNEL_COMPLEXITY_BUDGET`]). Warns
+    /// only — it never gates kernel admission.
+    pub kernel_complexity_budget: Option<u32>,
 }
 
 impl PassConfig {
@@ -313,6 +318,7 @@ impl PassConfig {
             locale_pack: None,
             import_path_templates: None,
             complexity_budget: None,
+            kernel_complexity_budget: None,
         }
     }
 
@@ -668,14 +674,19 @@ pub fn analyze_with_cli(
         ));
 
         // Complexity is a structural per-function budget analysis with its own
-        // option; warn-only, same gate as lint.
+        // options; warn-only, same gate as lint. Kernel entries measure
+        // against their own advisory budget (never admission).
         let complexity_budget = config
             .complexity_budget
             .unwrap_or(passes::complexity::DEFAULT_COMPLEXITY_BUDGET);
+        let kernel_complexity_budget = config
+            .kernel_complexity_budget
+            .unwrap_or(passes::complexity::DEFAULT_KERNEL_COMPLEXITY_BUDGET);
         diagnostics.extend(passes::complexity::complexity(
             &hir,
             interner,
             complexity_budget,
+            kernel_complexity_budget,
         ));
     }
 

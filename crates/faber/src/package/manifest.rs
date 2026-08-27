@@ -181,14 +181,19 @@ pub struct ManifestDispatch {
 ///
 /// The `radix-program` compiler projection tolerates `[check]` as an
 /// unknown product table; only this view declares and validates its shape.
-/// Layering: CLI `--complexity-budget` beats `complexity-budget` here,
-/// which beats the driver's baked default.
+/// Layering per key: CLI `--complexity-budget` / `--kernel-complexity-budget`
+/// beats the same-named key here, which beats the driver's baked default.
 #[derive(Debug, Default, Deserialize)]
 #[serde(default, deny_unknown_fields, rename_all = "kebab-case")]
 pub struct ManifestCheck {
     /// Cyclomatic-complexity warning budget for `faber check`; `None`
     /// leaves the baked driver default in place.
     pub complexity_budget: Option<u32>,
+
+    /// Advisory kernel-entry complexity warning budget for `faber check`
+    /// (`@ nucleum` functions); `None` leaves the baked kernel default in
+    /// place. Warns only; never gates kernel admission.
+    pub kernel_complexity_budget: Option<u32>,
 }
 
 macro_rules! product_path_default {
@@ -227,14 +232,15 @@ pub(crate) fn manifest_build_target_for_input(
     }
 }
 
-/// Resolve the manifest `[check] complexity-budget` for an input path.
+/// Resolve the manifest `[check]` section for an input path.
 ///
-/// `None` when no package layout is discoverable, no manifest exists, the
-/// key is unset, or the product-view parse fails — the caller then applies
-/// the baked default, and the strict product-view validation seam reports
-/// the parse failure (fail closed there, not here). CLI
-/// `--complexity-budget` beats this value.
-pub(crate) fn manifest_check_complexity_budget(input: &Path) -> Option<u32> {
+/// `None` when no package layout is discoverable, no manifest exists, or
+/// the product-view parse fails — the caller then applies the baked
+/// defaults, and the strict product-view validation seam reports the parse
+/// failure (fail closed there, not here). Per-budget layering is resolved
+/// by the caller: CLI flag beats the section key, which beats the baked
+/// default.
+pub(crate) fn manifest_check_section(input: &Path) -> Option<ManifestCheck> {
     let Ok(layout) = super::discover_build_layout(input) else {
         return None;
     };
@@ -242,9 +248,8 @@ pub(crate) fn manifest_check_complexity_budget(input: &Path) -> Option<u32> {
         return None;
     }
     read_manifest(&layout.manifest_path)
-        .ok()?
-        .check
-        .complexity_budget
+        .ok()
+        .map(|manifest| manifest.check)
 }
 
 /// Map a manifest `[device] backend` value to a backend selection request

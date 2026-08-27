@@ -7,7 +7,9 @@
 //! assert diagnostic identity — kind, `issue`, named args — never rendered
 //! text.
 
-use super::complexity::{complexity, function_complexity, DEFAULT_COMPLEXITY_BUDGET};
+use super::complexity::{
+    complexity, function_complexity, DEFAULT_COMPLEXITY_BUDGET, DEFAULT_KERNEL_COMPLEXITY_BUDGET,
+};
 use super::{SemanticErrorKind, WarningKind};
 use crate::catalog_semantic::semantic_spec;
 use crate::test_support::{args_have_no_legacy_message, test_span};
@@ -91,9 +93,20 @@ fn score(exprs: Vec<HirExpression>) -> u32 {
 }
 
 fn module_with_function(name: &str, body: HirBlock) -> (HirModule, Interner) {
+    module_with_function_selected(name, body, false)
+}
+
+/// [`module_with_function`] with the kernel classification pinned
+/// (`HirFunction.is_kernel`) so kernel-budget selection is under test.
+fn module_with_function_selected(
+    name: &str,
+    body: HirBlock,
+    is_kernel: bool,
+) -> (HirModule, Interner) {
     let mut interner = Interner::new();
     let mut func = function(body);
     func.name = interner.intern(name);
+    func.is_kernel = is_kernel;
     let module = HirModule {
         items: vec![HirItem {
             id: HirId(0),
@@ -608,7 +621,13 @@ fn bodyless_functions_are_skipped() {
 
     let (module, interner) = (empty_module(), Interner::new());
     assert!(
-        complexity(&module, &interner, DEFAULT_COMPLEXITY_BUDGET).is_empty(),
+        complexity(
+            &module,
+            &interner,
+            DEFAULT_COMPLEXITY_BUDGET,
+            DEFAULT_KERNEL_COMPLEXITY_BUDGET
+        )
+        .is_empty(),
         "no declared function, no finding"
     );
 }
@@ -631,7 +650,12 @@ fn over_budget_function_warns_with_identity() {
         )),
     ]);
     let (module, interner) = module_with_function("solve", body);
-    let findings = complexity(&module, &interner, 2);
+    let findings = complexity(
+        &module,
+        &interner,
+        2,
+        DEFAULT_KERNEL_COMPLEXITY_BUDGET,
+    );
     assert_eq!(findings.len(), 1, "exactly one finding");
 
     let finding = find_complexity_warning(&findings);
@@ -653,7 +677,13 @@ fn at_baked_default_score_does_not_warn() {
     // Boundary at the census-derived baked default: 11 branches score 12 —
     // exactly the budget.
     let (module, interner) = module_with_function("edge", block(si_branches(11)));
-    assert!(complexity(&module, &interner, DEFAULT_COMPLEXITY_BUDGET).is_empty());
+    assert!(complexity(
+        &module,
+        &interner,
+        DEFAULT_COMPLEXITY_BUDGET,
+        DEFAULT_KERNEL_COMPLEXITY_BUDGET
+    )
+    .is_empty());
     assert_eq!(score(si_branches(11)), DEFAULT_COMPLEXITY_BUDGET);
 }
 
@@ -661,7 +691,12 @@ fn at_baked_default_score_does_not_warn() {
 fn one_over_baked_default_warns() {
     // 12 branches score 13: the first score that warns at the baked default.
     let (module, interner) = module_with_function("over", block(si_branches(12)));
-    let findings = complexity(&module, &interner, DEFAULT_COMPLEXITY_BUDGET);
+    let findings = complexity(
+        &module,
+        &interner,
+        DEFAULT_COMPLEXITY_BUDGET,
+        DEFAULT_KERNEL_COMPLEXITY_BUDGET,
+    );
     assert_eq!(findings.len(), 1, "exactly one finding");
     let finding = find_complexity_warning(&findings);
     assert_eq!(arg(finding, "score"), "13");
@@ -678,4 +713,113 @@ fn complexity_warning_takes_catalog_code_warn027() {
         DEFAULT_COMPLEXITY_BUDGET, 12,
         "census-derived baked default (pooled p95 = 11)"
     );
+}
+
+// ── Kernel advisory budget (CC-U6) ───────────────────────────────────────────
+
+/// Kernel boundary fixture: score 2 = base + one `si` (the census kernel
+/// max), score 3 = base + two `si` (the first future kernel that trips).
+fn kernel_body(si_count: usize) -> HirBlock {
+    block(si_branches(si_count))
+}
+
+#[test]
+fn kernel_score_two_is_silent_at_baked_kernel_default() {
+    assert_eq!(
+        function_complexity(&function(kernel_body(1))),
+        Some(2),
+        "fixture sanity: one si scores 2 (the census kernel max)"
+    );
+    let (module, interner) = module_with_function_selected("still", kernel_body(1), true);
+    assert!(complexity(
+        &module,
+        &interner,
+        DEFAULT_COMPLEXITY_BUDGET,
+        DEFAULT_KERNEL_COMPLEXITY_BUDGET
+    )
+    .is_empty());
+}
+
+#[test]
+fn kernel_score_three_warns_with_kernel_arg() {
+    assert_eq!(
+        function_complexity(&function(kernel_body(2))),
+        Some(3),
+        "fixture sanity: two sis score 3 (the first tripping score)"
+    );
+    let (module, interner) = module_with_function_selected("dense", kernel_body(2), true);
+    let findings = complexity(
+        &module,
+        &interner,
+        DEFAULT_COMPLEXITY_BUDGET,
+        DEFAULT_KERNEL_COMPLEXITY_BUDGET,
+    );
+    assert_eq!(findings.len(), 1, "exactly one finding");
+
+    let finding = find_complexity_warning(&findings);
+    assert!(!finding.is_error(), "advisory: warn-only, never admission");
+    assert_eq!(finding.issue(), Some("complexity_budget_exceeded"));
+    assert_eq!(arg(finding, "function"), "dense");
+    assert_eq!(arg(finding, "score"), "3");
+    assert_eq!(
+        arg(finding, "budget"),
+        "2",
+        "the kernel budget is the applicable one"
+    );
+    assert_eq!(arg(finding, "kernel"), "true", "kernel arg marks the tier");
+    assert_eq!(
+        finding.args.len(),
+        5,
+        "kernel identity args: issue, function, score, budget, kernel"
+    );
+}
+
+#[test]
+fn non_kernel_finding_has_no_kernel_arg() {
+    // The same score-3 body as a non-kernel function at budget 2 warns
+    // without the kernel arg — the arg is tier evidence, not a constant.
+    let (module, interner) = module_with_function("plain", kernel_body(2));
+    let findings = complexity(&module, &interner, 2, DEFAULT_KERNEL_COMPLEXITY_BUDGET);
+    assert_eq!(findings.len(), 1);
+    let finding = find_complexity_warning(&findings);
+    assert_eq!(arg(finding, "budget"), "2");
+    assert!(
+        finding.args.iter().all(|arg| arg.name != "kernel"),
+        "non-kernel findings never carry the kernel arg"
+    );
+}
+
+#[test]
+fn kernel_budget_selection_is_independent_of_the_regular_budget() {
+    // Kernel function: measured only by the kernel budget. The regular
+    // budget neither silences nor tightens it.
+    let (kernel_module, interner) = module_with_function_selected("k", kernel_body(2), true);
+    assert!(
+        complexity(&kernel_module, &interner, 2, 12).is_empty(),
+        "kernel score 3 under kernel budget 12: silent — the regular budget 2 must not leak in"
+    );
+    assert_eq!(
+        complexity(&kernel_module, &interner, 12, 2).len(),
+        1,
+        "kernel score 3 over kernel budget 2: warns — the regular budget 12 must not loosen it"
+    );
+
+    // Non-kernel function: measured only by the regular budget.
+    let (module, interner) = module_with_function("host", kernel_body(2));
+    assert!(
+        complexity(&module, &interner, 12, 2).is_empty(),
+        "non-kernel score 3 under regular budget 12: silent — the kernel budget 2 must not leak in"
+    );
+    assert_eq!(
+        complexity(&module, &interner, 2, 12).len(),
+        1,
+        "non-kernel score 3 over regular budget 2: warns — the kernel budget must not silence it"
+    );
+}
+
+#[test]
+fn kernel_budget_constant_is_census_recommendation() {
+    // Census kernel subset (84 kernel fns, max 2, six at 2): the budget is
+    // a future tripwire firing on nothing measured today.
+    assert_eq!(DEFAULT_KERNEL_COMPLEXITY_BUDGET, 2);
 }

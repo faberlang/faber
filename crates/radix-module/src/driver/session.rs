@@ -120,6 +120,11 @@ pub struct Config {
     /// Per-function cyclomatic-complexity warning budget. `None` uses the
     /// baked semantic default; warn-only, never fails compilation alone.
     pub complexity_budget: Option<u32>,
+
+    /// Advisory per-function complexity budget for `@ nucleum` kernel
+    /// entries. `None` uses the baked kernel default; warn-only, and never
+    /// gates kernel admission (kernel-purity owns that).
+    pub kernel_complexity_budget: Option<u32>,
 }
 
 impl Default for Config {
@@ -142,6 +147,7 @@ impl Default for Config {
             emit_nvvm_device_module: false,
             import_path_templates: None,
             complexity_budget: None,
+            kernel_complexity_budget: None,
         }
     }
 }
@@ -212,6 +218,13 @@ impl Config {
     #[must_use]
     pub fn with_complexity_budget(mut self, budget: u32) -> Self {
         self.complexity_budget = Some(budget);
+        self
+    }
+
+    /// Set the advisory kernel-entry complexity warning budget.
+    #[must_use]
+    pub fn with_kernel_complexity_budget(mut self, budget: u32) -> Self {
+        self.kernel_complexity_budget = Some(budget);
         self
     }
 

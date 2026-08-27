@@ -301,6 +301,7 @@ fn dispatch(command: Command) {
                         diagnostics_locale: args.diagnostics_locale,
                     },
                     args.complexity_budget,
+                    args.kernel_complexity_budget,
                 );
             } else {
                 cmd_check_file(
