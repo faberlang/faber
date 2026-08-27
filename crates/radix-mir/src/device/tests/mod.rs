@@ -9,6 +9,7 @@ use radix_types::{IndexExpr, NumericWidth, Primitive, Type, TypeTable};
 use rustc_hash::FxHashMap;
 
 mod companion;
+mod entry_roles;
 mod fold_artifact;
 mod i64_axis_const;
 mod i64_const_copy;

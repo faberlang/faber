@@ -108,6 +108,9 @@ pub use radix_mir::{
     classify_device_safe, classify_device_safe_for_target_entry, device_entry_roles_from_hir, device_roles_from_hir,
     MirDeviceContext, MirDeviceRole,
 };
+// KPC-EMIT: the imported-entry merge surface re-exported from the device
+// module (the crate-root list above predates it; `device` is public).
+pub use radix_mir::device::{merge_imported_entry_roles, MirImportedEntryError, MirImportedEntryFact};
 pub use radix_mir::{
     constant_ty, index_projection_result_ty, option_chain_base_ty, option_payload_ty, place_base_ty, MirTypeError,
     MirTypeLookup,

@@ -169,3 +169,127 @@ fn device_entry_role_for_hir_function(
         Some(MirDeviceRole::Kernel) | None => None,
     }
 }
+
+/// One concrete imported device instance's target-admission facts (KPC-EMIT).
+///
+/// Built from package lowering's `ImportedDeviceRegistration` rows and the
+/// carried `InterfaceDeviceContract` — never re-derived from HIR, function
+/// names, emitted text, or a second ambient cache (KPC metadata-carrier
+/// decision). The builder decides launchability from the contract alone:
+/// a public, composable Kernel route; everything else stays composable
+/// without a launch row.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct MirImportedEntryFact {
+    /// Merged synthetic template source the instance was instantiated from
+    /// (`MirMonomorphizationKey::source`).
+    pub source: DefId,
+    /// Concrete instance function in the merged program.
+    pub function: MirFunctionId,
+    /// v2 device role carried by the route's contract.
+    pub role: MirDeviceRole,
+    /// Contract launch admission: public Kernel route with a usable body.
+    pub launchable: bool,
+}
+
+/// Fail-closed merge outcomes for [`merge_imported_entry_roles`] (KPC-EMIT
+/// done_when (c)/(e)): a fact that cannot be proven against the merged
+/// program never reaches an emitter.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum MirImportedEntryError {
+    /// The registration's concrete instance is absent from the merged
+    /// program (or keyed to a different template source) — an unresolved
+    /// instance, never a silent admission.
+    InstanceUnresolved { source: DefId, function: MirFunctionId },
+    /// The local declaration table and the imported contract disagree on
+    /// the role for one source; the carrier is inconsistent, not ambiguous.
+    RoleConflict {
+        source: DefId,
+        local: MirDeviceRole,
+        imported: MirDeviceRole,
+    },
+}
+
+/// Stable machine-readable identities for [`MirImportedEntryError`] (the
+/// driver `issue` diagnostic arg), matching the `imported_device_*` family
+/// (`imported_device_body_missing`, KPC-WIRE).
+pub const IMPORTED_DEVICE_INSTANCE_UNRESOLVED: &str = "imported_device_instance_unresolved";
+/// Stable identity for a local/imported role disagreement on one source.
+pub const IMPORTED_DEVICE_ENTRY_ROLE_CONFLICT: &str = "imported_device_entry_role_conflict";
+
+impl MirImportedEntryError {
+    /// Stable machine-readable identity for the driver's `issue` arg.
+    #[must_use]
+    pub fn issue(&self) -> &'static str {
+        match self {
+            Self::InstanceUnresolved { .. } => IMPORTED_DEVICE_INSTANCE_UNRESOLVED,
+            Self::RoleConflict { .. } => IMPORTED_DEVICE_ENTRY_ROLE_CONFLICT,
+        }
+    }
+
+    /// Human-facing message naming the failed fact.
+    #[must_use]
+    pub fn message(&self) -> String {
+        match self {
+            Self::InstanceUnresolved { source, function } => format!(
+                "imported device registration f{} (def#{}) has no concrete instance in the merged program",
+                function.0, source.0
+            ),
+            Self::RoleConflict { source, local, imported } => format!(
+                "imported device registration def#{} conflicts with the local {:?} role (imported {:?})",
+                source.0, local, imported
+            ),
+        }
+    }
+}
+
+/// Merge imported concrete entry facts into the local entry-role map
+/// (KPC-EMIT target-role handoff).
+///
+/// Only launchable Kernel facts admit their template source as a `Kernel`
+/// entry — one `DefId` per route, so every concrete instance of a public
+/// Kernel template attaches through `MirDeviceContext::attach_program`.
+/// Private imported helpers and Fragment-role registrations produce no
+/// launch row (composition availability is decided earlier, from the full
+/// role map, and is unchanged here). Local entries — public, private, and
+/// graphics fragments — pass through untouched.
+///
+/// # Errors
+///
+/// Fails closed with [`MirImportedEntryError`] when a launchable fact's
+/// concrete instance is not present in `program` (unresolved instance) or a
+/// local role already disagrees for the same source.
+pub fn merge_imported_entry_roles(
+    mut roles_by_def: FxHashMap<DefId, MirDeviceRole>,
+    facts: &[MirImportedEntryFact],
+    program: &MirProgram,
+) -> Result<FxHashMap<DefId, MirDeviceRole>, MirImportedEntryError> {
+    for fact in facts {
+        // The launch gate is double-checked here (role + contract admission):
+        // a Fragment or private helper fact registers no launch row even if
+        // a caller mislabels one as launchable.
+        if !fact.launchable || fact.role != MirDeviceRole::Kernel {
+            continue;
+        }
+        if !program
+            .functions
+            .iter()
+            .any(|function| function.id == fact.function && function.source == Some(fact.source))
+        {
+            return Err(MirImportedEntryError::InstanceUnresolved {
+                source: fact.source,
+                function: fact.function,
+            });
+        }
+        if let Some(local) = roles_by_def.get(&fact.source) {
+            if *local != MirDeviceRole::Kernel {
+                return Err(MirImportedEntryError::RoleConflict {
+                    source: fact.source,
+                    local: *local,
+                    imported: fact.role,
+                });
+            }
+        }
+        roles_by_def.insert(fact.source, MirDeviceRole::Kernel);
+    }
+    Ok(roles_by_def)
+}

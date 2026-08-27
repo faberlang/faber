@@ -559,6 +559,46 @@ pub use driver::with_linked_test_package_mir;
 #[allow(unused_imports)] // external backend harnesses consume the public package-MIR callback.
 pub use driver::with_lowered_package_mir;
 pub use lower::canonicalize_direct_definition_callees;
+
+/// Imported target-entry facts from package lowering (KPC-EMIT,
+/// `device-fragments-v2`): the concrete `ImportedDeviceRegistration` rows on
+/// a package-lowered [`LoweredMirUnit`] translated to target-admission facts.
+///
+/// This is the package-path exposure of the registration carrier — the same
+/// translation the radix-module driver performs for its text-target handoff.
+/// Consumers merge these facts with a local entry-role map through
+/// [`radix_module::mir::merge_imported_entry_roles`]: a public, composable
+/// Kernel route admits its concrete instances as launch entries; private
+/// helpers and Fragment roles stay composition-only. Role and launch facts
+/// come from the registration's carried v2 contract, never from symbol
+/// spelling, emitted text, or a second ambient cache.
+#[must_use]
+pub fn imported_entry_facts(
+    lowered: &LoweredMirUnit<'_>,
+) -> Vec<radix_module::mir::MirImportedEntryFact> {
+    lowered
+        .imported_device_registrations
+        .iter()
+        .map(|registration| {
+            use radix_module::file_interface::{InterfaceDeviceRole, InterfaceDeviceVisibility};
+            use radix_module::mir::{MirDeviceRole, MirImportedEntryFact};
+            let contract = &registration.route.contract;
+            let role = match contract.role {
+                InterfaceDeviceRole::Kernel => MirDeviceRole::Kernel,
+                InterfaceDeviceRole::Fragment => MirDeviceRole::Fragment,
+            };
+            MirImportedEntryFact {
+                source: registration.key.source,
+                function: registration.function,
+                role,
+                launchable: contract.role == InterfaceDeviceRole::Kernel
+                    && contract.visibility == InterfaceDeviceVisibility::Public
+                    && contract.is_composable(),
+            }
+        })
+        .collect()
+}
+
 /// Generated fmir-bin runner crates consume this public API through faber's
 /// re-export (`faber_cli::package::run_fmir_image_bytes_with_stdio`).
 pub use routes::run_fmir_image_bytes_with_stdio;
