@@ -610,7 +610,11 @@ fn device_contract_from_hir(
     } else {
         InterfaceBodyChannel::Missing
     };
-    Some(InterfaceDeviceContract { role, visibility, body })
+    Some(InterfaceDeviceContract {
+        role,
+        visibility,
+        body,
+    })
 }
 
 fn snapshot_const(

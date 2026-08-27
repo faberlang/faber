@@ -592,9 +592,7 @@ fn cached_import_target(
     fn serve(entry: Option<CachedImportTargetEntry>) -> Option<ImportTargetLookup> {
         entry.map(|entry| match entry {
             CachedImportTargetEntry::Parsed(target) => ImportTargetLookup::Parsed(target),
-            CachedImportTargetEntry::Unparsable(target_path) => {
-                ImportTargetLookup::Unparsable(target_path)
-            }
+            CachedImportTargetEntry::Unparsable(target_path) => ImportTargetLookup::Unparsable(target_path),
         })
     }
 
@@ -706,8 +704,7 @@ pub(crate) fn import_contract_for_file(
         if !import_contract_path_allowed(import_path, templates) {
             continue;
         }
-        let target =
-            cached_import_target(path, import_path, pack_key.as_ref(), resolved_pack.as_ref(), templates);
+        let target = cached_import_target(path, import_path, pack_key.as_ref(), resolved_pack.as_ref(), templates);
         let target = match target {
             ImportTargetLookup::Parsed(target) => target,
             ImportTargetLookup::Unparsable(target_path) => {

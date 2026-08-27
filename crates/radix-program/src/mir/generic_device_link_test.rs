@@ -88,11 +88,7 @@ optlib = "1.0.0"
         "[[package]]\nname = \"optlib\"\nversion = \"1.0.0\"\nsource = \"path:{library_display}\"\npackage_root = \"{library_display}\"\nkind = \"source\"\ntarget_language = \"\"\ntarget_triple = \"\"\ntarget_manifest = \"\"\ninterface_root = \"{library_display}/src\"\nartifact = \"\"\ncrate = \"\"\nrustc = \"\"\n"
     );
     fs::write(dir.join("faber.lock"), lock).expect("write faber.lock");
-    fs::write(
-        library.join("src/devicemath.fab"),
-        DEVICE_MATH_LIB,
-    )
-    .expect("write library module");
+    fs::write(library.join("src/devicemath.fab"), DEVICE_MATH_LIB).expect("write library module");
     fs::write(src.join("main.fab"), DEVICE_MAIN).expect("write main.fab");
     src.join("main.fab")
 }
@@ -145,7 +141,10 @@ fn package_mir_registers_imported_device_instances() {
             // Public `@ kernel` route: provider identity joined at the link.
             let kadd = registration_of("kadd");
             assert_eq!(kadd.route.identity.product, "optlib");
-            assert_eq!(kadd.route.identity.module_path, vec!["devicemath".to_owned()]);
+            assert_eq!(
+                kadd.route.identity.module_path,
+                vec!["devicemath".to_owned()]
+            );
             assert_eq!(
                 kadd.route.contract.role,
                 radix_module::file_interface::InterfaceDeviceRole::Kernel
@@ -159,7 +158,11 @@ fn package_mir_registers_imported_device_instances() {
                 .iter()
                 .filter_map(|index| literal_shape(types, *index))
                 .collect::<Vec<_>>();
-            assert_eq!(shapes, vec![2, 2], "kadd instance must bind [2, 2], got {shapes:?}");
+            assert_eq!(
+                shapes,
+                vec![2, 2],
+                "kadd instance must bind [2, 2], got {shapes:?}"
+            );
 
             // The registered instance exists in the merged program and is
             // keyed by the same source as the merged synthetic template.
@@ -224,9 +227,7 @@ fn package_mir_imported_device_registrations_deduplicate_by_key() {
                 .filter(|registration| registration.route.identity.name == "kadd")
                 .map(|registration| registration.key.clone())
                 .collect::<Vec<_>>();
-            kadd_keys.sort_by(|left, right| {
-                format!("{left:?}").cmp(&format!("{right:?}"))
-            });
+            kadd_keys.sort_by(|left, right| format!("{left:?}").cmp(&format!("{right:?}")));
             kadd_keys.dedup();
             let raw_count = lowered
                 .imported_device_registrations
@@ -325,7 +326,9 @@ optlib = "1.0.0"
     )
     .expect_err("signature-only route must fail the package link");
     assert!(
-        errors.iter().any(|error| error.issue() == Some("imported_device_body_missing")),
+        errors
+            .iter()
+            .any(|error| error.issue() == Some("imported_device_body_missing")),
         "named fail-closed issue `imported_device_body_missing` required, got {:?}",
         errors
             .iter()

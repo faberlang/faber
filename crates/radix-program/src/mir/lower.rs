@@ -1838,17 +1838,23 @@ fn rewrite_generic_identity(
 /// package rewrite gives that function's generic template. A route with no
 /// linked target joins nothing — it never silently admits an instance.
 fn joined_imported_device_routes<'routes>(
-    unit_routes: impl IntoIterator<Item = (&'routes DefId, &'routes Vec<radix_module::mir::ImportedDeviceRoute>)>,
+    unit_routes: impl IntoIterator<
+        Item = (
+            &'routes DefId,
+            &'routes Vec<radix_module::mir::ImportedDeviceRoute>,
+        ),
+    >,
     links: &PackageMirLinks,
     caller_path: &Path,
 ) -> Vec<(DefId, radix_module::mir::ImportedDeviceRoute)> {
     let mut joined = Vec::new();
     for (import_def_id, routes) in unit_routes {
         for route in routes {
-            let Some(synthetic) = links
-                .calls
-                .get(&(caller_path.to_path_buf(), *import_def_id, route.identity.name.clone()))
-            else {
+            let Some(synthetic) = links.calls.get(&(
+                caller_path.to_path_buf(),
+                *import_def_id,
+                route.identity.name.clone(),
+            )) else {
                 continue;
             };
             joined.push((*synthetic, route.clone()));
