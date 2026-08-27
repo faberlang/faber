@@ -1988,8 +1988,13 @@ mod value_test;
 mod decimal_test;
 
 #[cfg(test)]
+#[cfg(test)]
 #[path = "extremum_test.rs"]
 mod extremum_test;
+
+#[cfg(test)]
+#[path = "arg_extremum_test.rs"]
+mod arg_extremum_test;
 
 #[cfg(test)]
 #[path = "queue_stack_test.rs"]

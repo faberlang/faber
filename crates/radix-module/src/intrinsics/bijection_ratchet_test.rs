@@ -473,6 +473,12 @@ const RATCHET: &[(&str, &str)] = &[];
 const AIR_LANE_CLASSES: &[&str] = &[
     "AIR.maxima",
     "AIR.minima",
+    // LSR-W0-SEMANTIC: identity-table twin rows with a Lista (host) registry
+    // owner but no Tensor row and no AirTensorOp mapping — the device method
+    // family adopts them mechanically in a later wave; kernel-lane calls
+    // fail closed in AIR lowering today.
+    "AIR.argmaxima",
+    "AIR.argminima",
     "AIR.exponentia",
     "AIR.logarithmus",
     "AIR.radix",
@@ -715,6 +721,10 @@ fn every_mir_collection_op_variant_is_reachable_or_permanently_allowed() {
         MirCollectionOp::Maximum,
         MirCollectionOp::Approximate,
         MirCollectionOp::Sum,
+        // LSR-W0-SEMANTIC: the lista method twins — reachable through the
+        // method registry probe surface (`.argmax()` / `.argmin()`).
+        MirCollectionOp::ArgMax,
+        MirCollectionOp::ArgMin,
         MirCollectionOp::TensorSumAxis,
         MirCollectionOp::Round,
         MirCollectionOp::Floor,

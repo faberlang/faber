@@ -89,6 +89,10 @@ pub enum IntrinsicReturnKind {
     SameAsReceiver,
     /// `receiver ∪ nihil` for fallible interval algebra (`inter`, `union`).
     OptionReceiver,
+    /// `numerus ∪ nihil` — the argmax/argmin index-or-nihil shape (LSR-W0):
+    /// the winning index, or `nihil` for an empty source (never a −1
+    /// sentinel). Requires an ordered numeric element.
+    OptionNumerus,
     NumerusFromFractus,
     /// `fractus<f64>` for `numerus` elements, else the matching `fractus<W>` width.
     /// Used by tensor `media` to dodge the integer-division trap.
@@ -189,6 +193,13 @@ pub static INTRINSICS: &[MethodIntrinsic] = &[
     intrinsic!(Lista, "accipe", 1, &[IntrinsicParamKind::NumerusIndex], OptionInner, collection Index),
     intrinsic!(Lista, "addita", 1, &[IntrinsicParamKind::Inner], ArrayInner, collection AppendImmutable),
     intrinsic!(Lista, "appende", 1, &[IntrinsicParamKind::Inner], Vacuum, collection Append),
+    // LSR-W0-SEMANTIC: the argmax/argmin method twins beside the reduction
+    // family. First-index tie law (also the parallel-combine law), empty →
+    // nihil composing with `vel`/`coalesce`, NaN law pinned to `max from`'s
+    // implemented `f64::max` fold — stated once in the `ArgMax`/`ArgMin`
+    // `MirCollectionOp` docs and pinned by the owning-crate contract tests.
+    intrinsic!(Lista, "argmaxima", 0, &[], OptionNumerus, collection ArgMax),
+    intrinsic!(Lista, "argminima", 0, &[], OptionNumerus, collection ArgMin),
     intrinsic!(Lista, "continet", 1, &[IntrinsicParamKind::Inner], Bool, collection Contains),
     intrinsic!(
         Lista,

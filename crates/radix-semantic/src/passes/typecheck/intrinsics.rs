@@ -665,6 +665,22 @@ fn resolve_return_type(
             };
             checker.types.option(inner)
         }
+        IntrinsicReturnKind::OptionNumerus => {
+            // LSR-W0: the argmax/argmin index-or-nihil shape. The index is
+            // `numerus`; the element must be ordered numeric (the scan
+            // compares values), and the empty source yields `nihil` —
+            // composing with `vel`/`coalesce` through the nullable plumbing,
+            // never a −1 sentinel.
+            let Some(inner) = ctx.inner else {
+                return checker.error_type;
+            };
+            if !checker.is_numeric(inner) {
+                checker.invalid_operand_types(ISSUE_NUMERIC_LISTA_ELEMENTS_REQUIRED, span);
+                return checker.error_type;
+            }
+            let numerus = checker.numerus_type();
+            checker.types.option(numerus)
+        }
         IntrinsicReturnKind::OptionValue => {
             let Some(value) = ctx.value else {
                 return checker.error_type;

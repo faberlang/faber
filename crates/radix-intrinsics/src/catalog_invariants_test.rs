@@ -264,9 +264,10 @@ fn ratchet_registry_rows_are_codegen_only_and_unclassified() {
     }
 }
 
-/// The eleven MC4 ratchet rows are AIR-lane method surface, NOT catalog rows:
-/// the registry cannot own them, so direction 3 (AIR/device allowlist →
-/// owner) is the only seam that can pin them. If one of these names gains a
+/// The MC4 ratchet rows (eleven at MC4; the LSR-W0 twins joined) are AIR-lane
+/// method surface, NOT catalog rows: the registry cannot own them on the
+/// Tensor receiver, so direction 3 (AIR/device allowlist → owner) is the only
+/// seam that can pin them. If one of these names gains a
 /// Tensor registry row, the module-lane bijection probe re-derives the gap
 /// set and this invariant forces the companion update.
 #[test]
@@ -274,6 +275,10 @@ fn air_ratchet_rows_are_absent_from_the_tensor_catalog() {
     for name in [
         "maxima",
         "minima",
+        // LSR-W0: twins own Lista rows only; the Tensor receiver stays
+        // without a row until the device lane admits them.
+        "argmaxima",
+        "argminima",
         "exponentia",
         "logarithmus",
         "radix",
