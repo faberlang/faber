@@ -8,6 +8,7 @@
 //!
 //! This crate must not depend on HIR nodes, semantic passes, parser, or codegen.
 
+mod capability;
 mod def_id;
 mod filtrum;
 mod index;
@@ -23,6 +24,16 @@ pub use width_pattern::{
     width_pattern_covers, WidthFamily, WidthPattern,
 };
 
+pub use capability::{
+    CapabilityAnswer, CapabilityFamily, CapabilityKind, CapabilityReason, CapturePosture,
+    CaptureRequirement, EffectPosture, ExportVisibility, FunctionCapabilityAnswer,
+    FunctionCapabilityKind, FunctionCapabilityProof, FunctionCapabilitySummary,
+    IndexCapabilityAnswer, IndexCapabilityKind, IndexCapabilityProof, IndexCapabilitySummary,
+    Liveness, ParameterAccess, ParameterAccessPosture, PlaceCapabilityAnswer, PlaceCapabilityKind,
+    PlaceCapabilityProof, RecursionOutcome, RegionRelationship, RequiredRegionRelationships,
+    ReturnedBorrowProvenance, SolvedIndexedIdentity, TypeCapabilityAnswer, TypeCapabilityKind,
+    TypeCapabilityProof, TypeCapabilitySummary, CAPABILITY_VOCABULARY_VERSION,
+};
 pub use def_id::DefId;
 pub use filtrum::{
     CapabilityRequirement, ColumnRef, ComparisonOp, FiltrumPlan, OrderRow, Predicate,
@@ -73,6 +84,10 @@ pub use types::{
     SemanticMutability, SemanticParamMode, TensorFamilyKind, TensorFamilyTypeSpec, Type, TypeId,
     TypeParamConstraint, TypeTable, TypeTableSnapshot, ATOMIC_ELEMENT_MSG, INTERVALLUM_BOUND_MSG,
 };
+
+#[cfg(test)]
+#[path = "capability_test.rs"]
+mod capability_test;
 
 #[cfg(test)]
 #[path = "lattice_property_test.rs"]
