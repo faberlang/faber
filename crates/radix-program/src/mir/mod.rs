@@ -650,6 +650,10 @@ mod mixed_shape_link_tests;
 mod generic_device_link_tests;
 
 #[cfg(test)]
+#[path = "consumer_device_composition_test.rs"]
+mod consumer_device_composition_tests;
+
+#[cfg(test)]
 #[path = "method_call_mir_test.rs"]
 mod method_call_mir_tests;
 

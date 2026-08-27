@@ -685,6 +685,14 @@ pub(super) fn lower_package_units<'a>(
     // seeded from the linker's library join, extended by each lowered unit's
     // module-owned route map.
     let mut imported_device_routes = links.imported_device_routes.clone();
+    // CDC-1: the consumer units' own device roles (full role map, private
+    // helpers included) and public Kernel launch-entry sources, keyed by the
+    // merged program's source DefIds. Collected at each unit's `lower_unit`
+    // site while its analysis is freely borrowable; consumed by the
+    // package-seam composition as the leaf-tail union with the routes.
+    let mut consumer_device_roles: HashMap<DefId, radix_module::mir::MirDeviceRole> =
+        HashMap::default();
+    let mut consumer_launch_entries: HashSet<DefId> = HashSet::default();
     // Mutable copy of the link sources: the library-lowering pass extends it
     // with synthetic ids for auto-generated sub-companion sources.
     let mut source_rewrites = links.sources.clone();
@@ -736,6 +744,18 @@ pub(super) fn lower_package_units<'a>(
             &unit.analysis.types,
             &unit.analysis.interner,
             &unit.analysis.resolver,
+        );
+        // CDC-1: collect this sibling unit's own device facts before
+        // lowering takes the mutable analysis borrow. Keys remap through the
+        // same `source_rewrites` map `rewrite_program_sources` applies to
+        // this unit's lowered program, so they join the merged program's
+        // synthetic template sources.
+        collect_consumer_device_facts(
+            &unit.analysis,
+            &unit_path,
+            Some(&source_rewrites),
+            &mut consumer_device_roles,
+            &mut consumer_launch_entries,
         );
         let mut lowered = lower_unit(unit, &cli_plan.entry_records, no_fuse)?;
         // KPC-WIRE (c): this unit's module-owned route map was transferred
@@ -1071,6 +1091,16 @@ pub(super) fn lower_package_units<'a>(
         unreachable!("entry id selected from program nodes");
     };
 
+    // CDC-1: the entry unit's own device facts join the consumer-local
+    // collection the same way (identity-keyed: the merged program never
+    // source-rewrites the entry's own definitions).
+    collect_consumer_device_facts(
+        &entry.analysis,
+        &entry_path,
+        None,
+        &mut consumer_device_roles,
+        &mut consumer_launch_entries,
+    );
     let mut merged = lower_unit(entry, &cli_plan.entry_records, no_fuse)?;
     ensure_unique_definition_sources(&merged.program, &entry_path)?;
     // KPC-WIRE (c): the entry's module-owned route map joins the same way as
@@ -1121,6 +1151,8 @@ pub(super) fn lower_package_units<'a>(
         &entry_path,
         Some(&extra_validation),
         radix_module::mir::ImportedDeviceIndex::from_routes(imported_device_routes),
+        consumer_device_roles,
+        consumer_launch_entries,
     )?;
     rebuild_merged_validated(&mut merged, &entry_path, Some(&extra_validation))?;
 
@@ -1830,6 +1862,41 @@ fn rewrite_generic_identity(
     rewrite_generic_param_sources(&mut lowered.generic_params, unit_path, source_rewrites);
 }
 
+/// Collect one package unit's own device facts for the package-seam
+/// composition (CDC-1): the full device-role map (`@ nucleum` entries and
+/// private helpers alike — the same derivation the single-unit compose
+/// consumes) plus the public Kernel launch-entry sources. Keys are remapped
+/// through the same `source_rewrites` map `rewrite_program_sources` applies
+/// to that unit's lowered program; sibling units pass the map, the entry
+/// unit passes `None` (its definitions are identity-keyed in the merged
+/// program). One DefId should never join two facts; if a rewrite collision
+/// ever produced one, the last write is inert because the merged program's
+/// own `ensure_unique_definition_sources` guard rejects the underlying
+/// duplicate-source collision first.
+fn collect_consumer_device_facts(
+    analysis: &radix_module::driver::AnalyzedModule,
+    unit_path: &Path,
+    source_rewrites: Option<&SourceRewrites>,
+    device_roles: &mut HashMap<DefId, radix_module::mir::MirDeviceRole>,
+    launch_entries: &mut HashSet<DefId>,
+) {
+    let remap = |def: DefId| -> DefId {
+        source_rewrites
+            .and_then(|rewrites| rewrites.get(&(unit_path.to_path_buf(), def)).copied())
+            .unwrap_or(def)
+    };
+    for (def, role) in radix_module::mir::device_roles_from_hir(&analysis.hir) {
+        device_roles.insert(remap(def), role);
+    }
+    for (def, role) in
+        radix_module::mir::device_entry_roles_from_hir(&analysis.hir, &analysis.interner)
+    {
+        if role == radix_module::mir::MirDeviceRole::Kernel {
+            launch_entries.insert(remap(def));
+        }
+    }
+}
+
 /// Join one unit's transferred imported-device route map to the merged
 /// synthetic template `DefId`s (KPC-WIRE done_when (c)).
 ///
@@ -1878,6 +1945,7 @@ fn shift_templates(templates: &mut [MirFunction], offset: u32) {
     }
 }
 
+#[allow(clippy::type_complexity)]
 fn instantiate_package_generics(
     merged: &mut LoweredMirUnit<'_>,
     templates: Vec<MirFunction>,
@@ -1885,6 +1953,8 @@ fn instantiate_package_generics(
     diagnostic_path: &Path,
     extra_validation: Option<&RemappedValidation>,
     imported_devices: radix_module::mir::ImportedDeviceIndex,
+    consumer_device_roles: HashMap<DefId, radix_module::mir::MirDeviceRole>,
+    consumer_launch_entries: HashSet<DefId>,
 ) -> Result<(), Vec<Diagnostic>> {
     if templates.is_empty() {
         merged.generic_templates = templates;
@@ -1897,7 +1967,9 @@ fn instantiate_package_generics(
     // KPC-WIRE done_when (b): the production package path invokes the
     // device-aware helper with the joined imported-device index — never the
     // empty-index wrapper — so imported generic device calls register their
-    // concrete instances and signature-only routes fail closed.
+    // concrete instances and signature-only routes fail closed. CDC-1: the
+    // consumer units' own device roles and launch entries ride the same call
+    // as the leaf-tail union (no second composition pass, no dual authority).
     let (extra, registrations) = radix_module::mir::instantiate_merged_generic_calls_with_devices(
         &mut merged.program,
         &templates,
@@ -1908,6 +1980,8 @@ fn instantiate_package_generics(
             .map(|validation| validation.struct_metadata())
             .as_ref(),
         &imported_devices,
+        &consumer_device_roles,
+        &consumer_launch_entries,
     )
     .map_err(|errors| {
         errors

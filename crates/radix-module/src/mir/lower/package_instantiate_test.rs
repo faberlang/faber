@@ -173,6 +173,8 @@ fn imported_device_instantiation_registers_the_device_function() {
         &interner,
         None,
         &index,
+        &std::collections::HashMap::new(),
+        &std::collections::HashSet::new(),
     )
     .expect("imported device instantiation");
 
@@ -211,6 +213,8 @@ fn signature_only_imported_device_fails_closed_with_named_reason() {
         &interner,
         None,
         &index,
+        &std::collections::HashMap::new(),
+        &std::collections::HashSet::new(),
     )
     .expect_err("signature-only device import must fail closed");
 
@@ -253,6 +257,8 @@ fn canonical_body_fixture_reaches_composition_input_unchanged() {
         &interner,
         None,
         &index,
+        &std::collections::HashMap::new(),
+        &std::collections::HashSet::new(),
     )
     .expect("imported device instantiation with a canonical body");
 
@@ -325,6 +331,8 @@ fn artifact_restored_signature_only_device_route_fails_closed() {
         &interner,
         None,
         &index,
+        &std::collections::HashMap::new(),
+        &std::collections::HashSet::new(),
     )
     .expect_err("a signature-only device route must fail closed");
 
@@ -504,6 +512,8 @@ fn imported_device_call_composes_at_merged_seam() {
         &interner,
         None,
         &index,
+        &std::collections::HashMap::new(),
+        &std::collections::HashSet::new(),
     )
     .expect("imported device pair instantiation + composition");
 
@@ -581,6 +591,8 @@ fn imported_device_cycle_is_rejected_with_full_chain() {
         &interner,
         None,
         &index,
+        &std::collections::HashMap::new(),
+        &std::collections::HashSet::new(),
     )
     .expect_err("an imported device cycle must fail closed");
 
@@ -593,5 +605,354 @@ fn imported_device_cycle_is_rejected_with_full_chain() {
             .iter()
             .any(|error| error.issue == "nucleum_fragment_cycle"),
         "expected the named cycle issue at the merged seam, got {errors:?}"
+    );
+}
+
+// CDC-1: the consumer units' own device roles and launch entries join the
+// package-seam composition as the leaf-tail union.
+
+const LOCAL_CALLER_SOURCE: DefId = DefId(11);
+const LOCAL_TEMPLATE_SOURCE: DefId = DefId(12);
+
+/// A consumer-local public Kernel caller calling a local generic Kernel
+/// helper template — the consumer-local-only shape (no imported routes).
+fn consumer_local_fixture() -> (
+    TypeTable,
+    Interner,
+    MirProgram,
+    Vec<MirFunction>,
+    Vec<(DefId, Vec<MirGenericParam>)>,
+) {
+    let (types, interner, program, templates, mut generic_params) = imported_device_fixture();
+    // Re-key the fixture onto consumer-local sources and give the caller the
+    // public-Kernel declaration identity composition keys on.
+    let mut templates = templates;
+    templates[0].source = Some(LOCAL_TEMPLATE_SOURCE);
+    let mut program = program;
+    let MirStatementKind::Call { callee, .. } = &mut program.functions[0].blocks[0].statements[0].kind else {
+        panic!("expected call statement");
+    };
+    let MirCallee::Definition { source, .. } = callee else {
+        panic!("expected definition callee");
+    };
+    *source = LOCAL_TEMPLATE_SOURCE;
+    program.functions[0].source = Some(LOCAL_CALLER_SOURCE);
+    let generic_params = vec![(LOCAL_TEMPLATE_SOURCE, generic_params.remove(0).1)];
+    (types, interner, program, templates, generic_params)
+}
+
+fn consumer_local_roles() -> FxHashMap<DefId, crate::mir::MirDeviceRole> {
+    let mut roles = FxHashMap::default();
+    roles.insert(LOCAL_CALLER_SOURCE, crate::mir::MirDeviceRole::Kernel);
+    roles.insert(LOCAL_TEMPLATE_SOURCE, crate::mir::MirDeviceRole::Kernel);
+    roles
+}
+
+/// CDC-1 (g) + design-ruling point 4: consumer-local-only inputs reach the
+/// one existing composition pass (the union keys the gate), a consumer-local
+/// caller's local call composes, and the composed private helper is pruned.
+#[test]
+fn consumer_local_only_package_composes_at_the_union_gate() {
+    let (mut types, interner, mut program, templates, generic_params) = consumer_local_fixture();
+
+    let (monomorphizations, registrations) = instantiate_merged_generic_calls_with_devices(
+        &mut program,
+        &templates,
+        &generic_params,
+        &mut types,
+        &interner,
+        None,
+        &ImportedDeviceIndex::from_routes([]),
+        &{
+            let mut roles = std::collections::HashMap::new();
+            for (def, role) in consumer_local_roles() {
+                roles.insert(def, role);
+            }
+            roles
+        },
+        &std::iter::once(LOCAL_CALLER_SOURCE).collect(),
+    )
+    .expect("consumer-local-only composition");
+
+    assert!(registrations.is_empty(), "no imported routes means no registrations");
+    assert!(
+        crate::mir::fragment_composition::surviving_fragment_calls(
+            &program.functions,
+            &monomorphizations,
+            &consumer_local_roles()
+        )
+        .is_empty(),
+        "the consumer-local caller's device call must compose: {:#?}",
+        program.functions
+    );
+    assert!(
+        program
+            .functions
+            .iter()
+            .all(|function| function.source != Some(LOCAL_TEMPLATE_SOURCE)),
+        "the composed private local helper must be pruned: {:#?}",
+        program.functions
+    );
+    assert!(
+        program
+            .functions
+            .iter()
+            .any(|function| function.source == Some(LOCAL_CALLER_SOURCE)),
+        "the consumer-local launch entry must stay a program symbol"
+    );
+}
+
+/// CDC-1 (d): a callee that is also a consumer-local launch entry survives
+/// composition — the launch-entry union prevents pruning a public Kernel
+/// instance its caller composed into.
+#[test]
+fn consumer_local_launch_entry_union_prevents_pruning() {
+    let (mut types, interner, mut program, templates, generic_params) = consumer_local_fixture();
+
+    let (_monomorphizations, _registrations) = instantiate_merged_generic_calls_with_devices(
+        &mut program,
+        &templates,
+        &generic_params,
+        &mut types,
+        &interner,
+        None,
+        &ImportedDeviceIndex::from_routes([]),
+        &{
+            let mut roles = std::collections::HashMap::new();
+            for (def, role) in consumer_local_roles() {
+                roles.insert(def, role);
+            }
+            roles
+        },
+        &[LOCAL_CALLER_SOURCE, LOCAL_TEMPLATE_SOURCE]
+            .into_iter()
+            .collect(),
+    )
+    .expect("consumer-local composition with a launchable callee");
+
+    assert!(
+        program
+            .functions
+            .iter()
+            .any(|function| function.source == Some(LOCAL_TEMPLATE_SOURCE)),
+        "the public Kernel callee stays a program symbol after its caller composed: {:#?}",
+        program.functions
+    );
+}
+
+/// CDC-1 fail-closed union: a consumer-local role contradicting an imported
+/// route contract on one source never silently overrides — the named
+/// identity fires before composition.
+#[test]
+fn consumer_local_role_conflict_fails_closed() {
+    let (mut types, interner, mut program, templates, generic_params) = imported_device_fixture();
+    let index = imported_device_index(imported_device_route(InterfaceBodyChannel::Source));
+
+    let errors = instantiate_merged_generic_calls_with_devices(
+        &mut program,
+        &templates,
+        &generic_params,
+        &mut types,
+        &interner,
+        None,
+        &index,
+        &[(IMPORTED_SOURCE, crate::mir::MirDeviceRole::Fragment)]
+            .into_iter()
+            .collect(),
+        &std::collections::HashSet::new(),
+    )
+    .expect_err("a contradictory role union must fail closed");
+
+    assert!(
+        errors
+            .iter()
+            .any(|error| error.issue == "consumer_device_role_conflict"),
+        "expected the named consumer_device_role_conflict reason, got {errors:?}"
+    );
+}
+
+/// CDC-1 (e) budget clause: a consumer-local caller expanding a device chain
+/// deeper than the documented depth budget fails closed with the same named
+/// identity imported-instance callers hit — `nucleum_fragment_expansion`.
+/// (Source-level imported chains are blocked by the pre-existing template
+/// merge collapse; the observed/limit args are pinned in
+/// `fragment_composition_test.rs`, which sees `FragmentCompositionError`.)
+#[test]
+fn consumer_local_caller_hits_expansion_budget_identity() {
+    // A chain of generic device templates t0..t17 (depth > the documented
+    // budget of 16): t_i calls t_{i-1}; the consumer-local Kernel caller
+    // calls t17. Same shapes as the proven imported-pair fixture, chained.
+    const CHAIN_DEPTH: usize = 18;
+    let mut types = TypeTable::new();
+    let mut interner = Interner::new();
+    let symbol = interner.intern("T");
+    let probe = interner.intern("probe");
+    let generic = MirType::semantic(types.intern(Type::Param(symbol)));
+    let concrete = MirType::semantic(types.primitive(Primitive::Textus));
+    let chain_sources: Vec<DefId> = (0..CHAIN_DEPTH)
+        .map(|index| DefId(100 + index as u32))
+        .collect();
+    let caller_source = DefId(99);
+    let mut templates = Vec::new();
+    let mut generic_params = Vec::new();
+    for (index, source) in chain_sources.iter().enumerate() {
+        let mut template = MirFunction {
+            id: MirFunctionId(index as u32),
+            source: Some(*source),
+            name: None,
+            params: vec![crate::mir::MirParam {
+                local: crate::mir::MirLocalId(0),
+                name: None,
+                ty: generic,
+                mode: crate::mir::MirParamMode::Owned,
+                span: Span::default(),
+            }],
+            locals: Vec::new(),
+            temps: Vec::new(),
+            blocks: Vec::new(),
+            return_ty: generic,
+            error_ty: None,
+            is_async: false,
+            is_generator: false,
+            shader_stage: None,
+            span: Span::default(),
+        };
+        if index == 0 {
+            template.blocks = vec![MirBlock {
+                id: crate::mir::MirBlockId(0),
+                statements: Vec::new(),
+                terminator: MirTerminator {
+                    kind: MirTerminatorKind::Return(Some(MirOperand::Place(MirPlace::local(crate::mir::MirLocalId(
+                        0,
+                    ))))),
+                    span: Span::default(),
+                },
+                span: Span::default(),
+            }];
+        } else {
+            template.locals.push(crate::mir::MirLocal {
+                id: crate::mir::MirLocalId(1),
+                name: None,
+                ty: generic,
+                mutable: false,
+                span: Span::default(),
+            });
+            template.blocks = vec![MirBlock {
+                id: crate::mir::MirBlockId(0),
+                statements: vec![MirStatement {
+                    kind: MirStatementKind::Call {
+                        destination: Some(MirPlace::local(crate::mir::MirLocalId(1))),
+                        callee: MirCallee::Definition { source: chain_sources[index - 1], type_args: vec![generic] },
+                        args: vec![MirOperand::Constant(crate::mir::MirConstant::String(probe))],
+                    },
+                    span: Span::default(),
+                }],
+                terminator: MirTerminator {
+                    kind: MirTerminatorKind::Return(Some(MirOperand::Place(MirPlace::local(crate::mir::MirLocalId(
+                        1,
+                    ))))),
+                    span: Span::default(),
+                },
+                span: Span::default(),
+            }];
+        }
+        templates.push(template);
+        generic_params.push((*source, vec![MirGenericParam { name: symbol, is_shape: false }]));
+    }
+    let caller = MirFunction {
+        id: MirFunctionId(90),
+        source: Some(caller_source),
+        name: None,
+        params: Vec::new(),
+        locals: vec![crate::mir::MirLocal {
+            id: crate::mir::MirLocalId(1),
+            name: None,
+            ty: concrete,
+            mutable: false,
+            span: Span::default(),
+        }],
+        temps: Vec::new(),
+        blocks: vec![MirBlock {
+            id: crate::mir::MirBlockId(0),
+            statements: vec![MirStatement {
+                kind: MirStatementKind::Call {
+                    destination: Some(MirPlace::local(crate::mir::MirLocalId(1))),
+                    callee: MirCallee::Definition { source: chain_sources[CHAIN_DEPTH - 1], type_args: vec![concrete] },
+                    args: vec![MirOperand::Constant(crate::mir::MirConstant::String(probe))],
+                },
+                span: Span::default(),
+            }],
+            terminator: MirTerminator {
+                kind: MirTerminatorKind::Return(Some(MirOperand::Place(MirPlace::local(crate::mir::MirLocalId(1))))),
+                span: Span::default(),
+            },
+            span: Span::default(),
+        }],
+        return_ty: concrete,
+        error_ty: None,
+        is_async: false,
+        is_generator: false,
+        shader_stage: None,
+        span: Span::default(),
+    };
+    let mut program = MirProgram { functions: vec![caller], ..MirProgram::default() };
+
+    let consumer_roles = std::iter::once((caller_source, crate::mir::MirDeviceRole::Kernel))
+        .chain(
+            chain_sources
+                .iter()
+                .map(|source| (*source, crate::mir::MirDeviceRole::Kernel)),
+        )
+        .collect::<std::collections::HashMap<_, _>>();
+
+    let errors = instantiate_merged_generic_calls_with_devices(
+        &mut program,
+        &templates,
+        &generic_params,
+        &mut types,
+        &interner,
+        None,
+        &ImportedDeviceIndex::from_routes([]),
+        &consumer_roles,
+        &std::iter::once(caller_source).collect(),
+    )
+    .expect_err("a consumer-local depth overflow must fail closed at the seam");
+
+    assert!(
+        errors
+            .iter()
+            .any(|error| error.issue == "nucleum_fragment_expansion"),
+        "expected the named nucleum_fragment_expansion identity, got {errors:?}"
+    );
+}
+
+/// CDC-1 (e): with consumer-local roles present at the seam, a signature-only
+/// imported route still fails closed with the same named identity an
+/// imported-instance caller hits — the union never widens admission.
+#[test]
+fn consumer_local_roles_do_not_widen_signature_only_admission() {
+    let (mut types, interner, mut program, templates, generic_params) = imported_device_fixture();
+    let index = imported_device_index(imported_device_route(InterfaceBodyChannel::Missing));
+
+    let errors = instantiate_merged_generic_calls_with_devices(
+        &mut program,
+        &templates,
+        &generic_params,
+        &mut types,
+        &interner,
+        None,
+        &index,
+        &[(LOCAL_CALLER_SOURCE, crate::mir::MirDeviceRole::Kernel)]
+            .into_iter()
+            .collect(),
+        &std::iter::once(LOCAL_CALLER_SOURCE).collect(),
+    )
+    .expect_err("a signature-only device route must still fail closed");
+
+    assert!(
+        errors
+            .iter()
+            .any(|error| error.issue == "imported_device_body_missing"),
+        "expected the named imported_device_body_missing reason, got {errors:?}"
     );
 }

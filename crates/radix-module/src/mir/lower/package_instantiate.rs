@@ -33,6 +33,12 @@ const UNRESOLVED_SHAPE_SIZE_SURVIVOR: &str = "unresolved shape-size constant sur
 /// Named fail-closed reason for a signature-only imported device import
 /// (DFV2-3 (e)): the role fact alone never admits the instance.
 const IMPORTED_DEVICE_BODY_MISSING: &str = "imported_device_body_missing";
+/// Named fail-closed reason for a consumer-local role disagreeing with an
+/// imported route's contract on one merged source (CDC-1): the composition
+/// role map is one authority, so a contradictory join is a wiring defect,
+/// never a silent override (same defect class as
+/// `imported_device_entry_role_conflict`, at the composition seam).
+const CONSUMER_DEVICE_ROLE_CONFLICT: &str = "consumer_device_role_conflict";
 
 /// One resolved imported-device route (DFV2-3 transport): the provider-route
 /// identity plus the v2 device contract carried from the exporting module's
@@ -172,29 +178,36 @@ pub fn instantiate_merged_generic_calls(
         interner,
         struct_metadata,
         &ImportedDeviceIndex::from_routes([]),
+        &HashMap::new(),
+        &std::collections::HashSet::new(),
     )
     .map(|(monomorphizations, _)| monomorphizations)
 }
 
 /// Device-aware package-link instantiation (DFV2-3 transport + DFV2-4
-/// composition).
+/// composition, CDC-1 consumer-local union).
 ///
 /// Beyond [`instantiate_merged_generic_calls`], every concrete instantiation
 /// of an indexed imported device function is registered for the consumer
 /// ([`ImportedDeviceRegistration`]), a signature-only imported device import
 /// fails closed with the named `imported_device_body_missing` reason before
 /// composition (the role bit alone never validates the call), and the merged
-/// program's device calls — including imported instance bodies calling other
-/// imported device functions — compose here, between shape finalization and
-/// the caller's `ValidatedMir` rebuild. Consumer-local device caller roles
-/// are not available at this seam; their imported calls stay untouched and
-/// fail closed downstream rather than composing blind.
+/// program's device calls — imported instance bodies calling other imported
+/// device functions and consumer-local device callers calling imported
+/// instances — compose here, between shape finalization and the caller's
+/// `ValidatedMir` rebuild. The composition's role and launch-entry inputs are
+/// the merged union of the imported routes and the consumer units' own device
+/// roles and public Kernel launch sources (CDC-1, leaf-tail union design
+/// ruling 2026-08-27), so consumer-local-only packages reach compose; a
+/// consumer-local role that disagrees with a route contract on one source
+/// fails closed with `consumer_device_role_conflict`.
 ///
 /// # Errors
 /// Returns [`MirError`] when a call site cannot bind, a template is missing,
 /// substitution fails, a shape-size scalar survives finalization, an
-/// imported device function has no usable body channel, or composition
-/// rejects a cycle or expansion budget.
+/// imported device function has no usable body channel, the role union is
+/// contradictory, or composition rejects a cycle or expansion budget.
+#[allow(clippy::type_complexity)]
 pub fn instantiate_merged_generic_calls_with_devices(
     program: &mut MirProgram,
     templates: &[MirFunction],
@@ -203,6 +216,8 @@ pub fn instantiate_merged_generic_calls_with_devices(
     interner: &Interner,
     struct_metadata: Option<&PackageStructMetadata<'_>>,
     imported_devices: &ImportedDeviceIndex,
+    consumer_roles: &HashMap<DefId, crate::mir::MirDeviceRole>,
+    consumer_launch_entries: &std::collections::HashSet<DefId>,
 ) -> Result<(Vec<MirMonomorphization>, Vec<ImportedDeviceRegistration>), Vec<MirError>> {
     if templates.is_empty() {
         return Ok((Vec::new(), Vec::new()));
@@ -242,20 +257,45 @@ pub fn instantiate_merged_generic_calls_with_devices(
     // DFV2-4 merged-pipeline composition: after shapes finalize, imported
     // device instances are device functions of this program (routes carry
     // role + launch visibility), so their device calls compose before the
-    // caller rebuilds `ValidatedMir`. An empty index composes nothing.
-    let device_roles = imported_devices
+    // caller rebuilds `ValidatedMir`. CDC-1: the consumer units' own device
+    // roles and public Kernel launch sources join the same inputs — the
+    // leaf-tail union — so a consumer-local device caller's imported-instance
+    // call composes in this one pass, and consumer-local-only packages
+    // (no imported routes) reach compose. Empty union composes nothing.
+    let mut device_roles = consumer_roles
         .iter()
-        .map(|(source, route)| (*source, mir_role(route.contract.role)))
+        .map(|(def, role)| (*def, *role))
         .collect::<FxHashMap<DefId, crate::mir::MirDeviceRole>>();
+    for (source, route) in imported_devices.iter() {
+        let role = mir_role(route.contract.role);
+        if let Some(consumer) = device_roles.insert(*source, role) {
+            if consumer != role {
+                return Err(vec![MirError {
+                    message: format!(
+                        "consumer-local device role for def#{} conflicts with the imported route ({consumer:?} vs {role:?})",
+                        source.0
+                    ),
+                    issue: CONSUMER_DEVICE_ROLE_CONFLICT.to_owned(),
+                    span: Span::default(),
+                    definition_span: None,
+                }]);
+            }
+        }
+    }
     if !device_roles.is_empty() {
-        let launch_entries = imported_devices
+        let mut launch_entries = consumer_launch_entries
             .iter()
-            .filter(|(_, route)| {
-                route.contract.visibility == InterfaceDeviceVisibility::Public
-                    && mir_role(route.contract.role) == crate::mir::MirDeviceRole::Kernel
-            })
-            .map(|(source, _)| *source)
-            .collect::<FxHashSet<_>>();
+            .copied()
+            .collect::<FxHashSet<DefId>>();
+        launch_entries.extend(
+            imported_devices
+                .iter()
+                .filter(|(_, route)| {
+                    route.contract.visibility == InterfaceDeviceVisibility::Public
+                        && mir_role(route.contract.role) == crate::mir::MirDeviceRole::Kernel
+                })
+                .map(|(source, _)| *source),
+        );
         let composition_errors = crate::mir::fragment_composition::compose(
             &mut program.functions,
             &state.monomorphizations,
