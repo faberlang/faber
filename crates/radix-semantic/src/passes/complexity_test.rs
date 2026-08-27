@@ -126,6 +126,20 @@ fn find_complexity_warning(findings: &[SemanticError]) -> &SemanticError {
         .expect("complexity budget warning present")
 }
 
+/// `count` standalone `si` branches: base 1 + one decision point per branch.
+fn si_branches(count: usize) -> Vec<HirExpression> {
+    (0..count)
+        .map(|_| {
+            expr(HirExpressionKind::Si {
+                cond: boxed(HirExpressionKind::Literal(HirLiteral::Bool(true))),
+                then_block: block(vec![]),
+                then_catch: None,
+                else_block: None,
+            })
+        })
+        .collect()
+}
+
 fn arg<'a>(finding: &'a SemanticError, name: &str) -> &'a str {
     finding
         .args
@@ -635,23 +649,23 @@ fn over_budget_function_warns_with_identity() {
 }
 
 #[test]
-fn at_budget_score_does_not_warn() {
-    // Score 3 at budget 3: not over budget.
-    let body = block(vec![
-        expr(HirExpressionKind::Si {
-            cond: boxed(HirExpressionKind::Literal(HirLiteral::Bool(true))),
-            then_block: block(vec![]),
-            then_catch: None,
-            else_block: None,
-        }),
-        expr(HirExpressionKind::Dum(
-            boxed(HirExpressionKind::Literal(HirLiteral::Bool(false))),
-            block(vec![]),
-        )),
-    ]);
-    let (module, interner) = module_with_function("edge", body);
-    assert!(complexity(&module, &interner, 3).is_empty());
-    assert_eq!(complexity(&module, &interner, 2).len(), 1);
+fn at_baked_default_score_does_not_warn() {
+    // Boundary at the census-derived baked default: 11 branches score 12 —
+    // exactly the budget.
+    let (module, interner) = module_with_function("edge", block(si_branches(11)));
+    assert!(complexity(&module, &interner, DEFAULT_COMPLEXITY_BUDGET).is_empty());
+    assert_eq!(score(si_branches(11)), DEFAULT_COMPLEXITY_BUDGET);
+}
+
+#[test]
+fn one_over_baked_default_warns() {
+    // 12 branches score 13: the first score that warns at the baked default.
+    let (module, interner) = module_with_function("over", block(si_branches(12)));
+    let findings = complexity(&module, &interner, DEFAULT_COMPLEXITY_BUDGET);
+    assert_eq!(findings.len(), 1, "exactly one finding");
+    let finding = find_complexity_warning(&findings);
+    assert_eq!(arg(finding, "score"), "13");
+    assert_eq!(arg(finding, "budget"), "12");
 }
 
 #[test]
@@ -660,5 +674,8 @@ fn complexity_warning_takes_catalog_code_warn027() {
         semantic_spec(SemanticErrorKind::Warning(WarningKind::ComplexityBudgetExceeded)).code,
         "WARN027"
     );
-    assert_eq!(DEFAULT_COMPLEXITY_BUDGET, 10, "provisional baked default");
+    assert_eq!(
+        DEFAULT_COMPLEXITY_BUDGET, 12,
+        "census-derived baked default (pooled p95 = 11)"
+    );
 }

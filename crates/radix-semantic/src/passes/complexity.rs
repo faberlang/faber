@@ -21,9 +21,11 @@ use radix_lexer::{Interner, Span};
 
 const ISSUE_COMPLEXITY_BUDGET_EXCEEDED: &str = "complexity_budget_exceeded";
 
-/// Baked per-function complexity budget. Provisional (order of 10 per the
-/// operator need); the CC-U4 census fixes the final value in CC-U5.
-pub const DEFAULT_COMPLEXITY_BUDGET: u32 = 10;
+/// Baked per-function complexity budget, fixed by the CC-U4 census (CC-U5):
+/// `docs/factory/complexity-diagnostics/census-report.md` recommends 12 —
+/// the nearest candidate to the measured pooled p95 = 11, firing on the top
+/// 4.4% of the 2393 scored functions.
+pub const DEFAULT_COMPLEXITY_BUDGET: u32 = 12;
 
 /// Cyclomatic score of one declared function, or `None` when it has no body
 /// (bodyless interface methods are skipped, not scored).
