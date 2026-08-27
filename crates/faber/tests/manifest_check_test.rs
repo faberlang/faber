@@ -3,12 +3,12 @@
 //!
 //! Layering under test: CLI `--complexity-budget` beats the manifest
 //! `[check] complexity-budget` key, which beats the driver's baked default
-//! (10). Identity assertions target the rendered label
+//! (12). Identity assertions target the rendered label
 //! `WARN027:complexity_budget_exceeded` (catalog code + issue), never
-//! free-form prose. Warn-count differentials prove which budget reached the
-//! pass: `fiver` scores 5 (4 standalone `si`), `steady` scores 10, `branchy`
-//! scores 11 — so the counts pin budget 4 (3 warns), the default 10
-//! (1 warn), and the override (1 warn at CLI 10 where the manifest's 4
+//! free-form prose. Warn-count differentials prove which budget reached
+//! the pass: `fiver` scores 5 (4 standalone `si`), `steady` scores 12,
+//! `branchy` scores 13 — so the counts pin budget 4 (3 warns), the default
+//! 12 (1 warn), and the override (1 warn at CLI 12 where the manifest's 4
 //! alone would give 3).
 
 use std::fs;
@@ -45,6 +45,8 @@ fn steady(int seed) → int {
     if seed ≡ 7 { n ← 7 }
     if seed ≡ 8 { n ← 8 }
     if seed ≡ 9 { n ← 9 }
+    if seed ≡ 10 { n ← 10 }
+    if seed ≡ 11 { n ← 11 }
     return n
 }
 
@@ -60,6 +62,8 @@ fn branchy(int seed) → int {
     if seed ≡ 8 { n ← 8 }
     if seed ≡ 9 { n ← 9 }
     if seed ≡ 10 { n ← 10 }
+    if seed ≡ 11 { n ← 11 }
+    if seed ≡ 12 { n ← 12 }
     return n
 }
 
@@ -136,7 +140,7 @@ fn manifest_check_budget_warns_without_cli_flag() {
     let package = manifest_check_package("warn", Some("[check]\ncomplexity-budget = 4\n"));
     let (_, stderr, code) = run_faber_check(&["check"], &package);
     assert_eq!(code, Some(0), "warn-only complexity must exit 0:\n{stderr}");
-    // Manifest budget 4: fiver (5), steady (10), and branchy (11) all
+    // Manifest budget 4: fiver (5), steady (12), and branchy (13) all
     // exceed it — including the score-5 function the layering pins.
     assert_eq!(warn_count(&stderr), 3, "stderr:\n{stderr}");
 }
@@ -144,9 +148,9 @@ fn manifest_check_budget_warns_without_cli_flag() {
 #[test]
 fn manifest_check_cli_flag_beats_manifest_key() {
     let package = manifest_check_package("override", Some("[check]\ncomplexity-budget = 4\n"));
-    let (_, stderr, code) = run_faber_check(&["check", "--complexity-budget", "10"], &package);
+    let (_, stderr, code) = run_faber_check(&["check", "--complexity-budget", "12"], &package);
     assert_eq!(code, Some(0), "warn-only complexity must exit 0:\n{stderr}");
-    // CLI 10 wins over the manifest's 4: only branchy (11) warns. Had the
+    // CLI 12 wins over the manifest's 4: only branchy (13) warns. Had the
     // manifest key won, all three functions would warn (3).
     assert_eq!(warn_count(&stderr), 1, "stderr:\n{stderr}");
 }
@@ -156,7 +160,7 @@ fn manifest_check_absent_key_absent_flag_baked_default() {
     let package = manifest_check_package("default", None);
     let (_, stderr, code) = run_faber_check(&["check"], &package);
     assert_eq!(code, Some(0), "warn-only complexity must exit 0:\n{stderr}");
-    // Baked default 10: branchy (11) warns, steady (10) and fiver (5) stay
+    // Baked default 12: branchy (13) warns, steady (12) and fiver (5) stay
     // silent.
     assert_eq!(warn_count(&stderr), 1, "stderr:\n{stderr}");
 }
@@ -167,7 +171,7 @@ fn manifest_check_without_section_parses_in_both_views() {
     let path = write_bare_manifest(&root, None);
     let product = faber_cli::package::read_manifest(&path).expect("product view parses");
     assert!(
-        product.check.complexity_budget.is_none(),
+        product.check.complexity_budget.is_none() && product.check.kernel_complexity_budget.is_none(),
         "absent [check] must deserialize to the default section"
     );
     radix::program::manifest::read_manifest(&path)
