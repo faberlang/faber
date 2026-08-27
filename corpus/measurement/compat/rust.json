@@ -5,8 +5,8 @@
   "lane": "hir",
   "generatedBy": "radix/scripta/emit-compat-json.py",
   "summary": {
-    "capable": 334,
-    "analyzable": 338
+    "capable": 337,
+    "analyzable": 341
   },
   "terms": [
     {
@@ -546,8 +546,8 @@
     {
       "term": "itera",
       "rule": "keyword",
-      "capable": 15,
-      "analyzable": 15
+      "capable": 18,
+      "analyzable": 18
     },
     {
       "term": "iuncta",

@@ -5,8 +5,8 @@
   "lane": "mir",
   "generatedBy": "radix/scripta/emit-compat-json.py",
   "summary": {
-    "capable": 283,
-    "analyzable": 308
+    "capable": 307,
+    "analyzable": 334
   },
   "terms": [
     {
@@ -204,8 +204,8 @@
     {
       "term": "clausura",
       "rule": "keyword",
-      "capable": 1,
-      "analyzable": 1
+      "capable": 4,
+      "analyzable": 4
     },
     {
       "term": "cli",
@@ -216,8 +216,8 @@
     {
       "term": "↦",
       "rule": "operator-group",
-      "capable": 11,
-      "analyzable": 12
+      "capable": 19,
+      "analyzable": 20
     },
     {
       "term": "copia",
@@ -540,14 +540,14 @@
     {
       "term": "instans",
       "rule": "keyword",
-      "capable": 3,
-      "analyzable": 3
+      "capable": 2,
+      "analyzable": 2
     },
     {
       "term": "itera",
       "rule": "keyword",
-      "capable": 5,
-      "analyzable": 8
+      "capable": 14,
+      "analyzable": 18
     },
     {
       "term": "iuncta",
@@ -576,8 +576,8 @@
     {
       "term": "lista",
       "rule": "keyword",
-      "capable": 4,
-      "analyzable": 5
+      "capable": 5,
+      "analyzable": 6
     },
     {
       "term": "manifest",
@@ -672,8 +672,8 @@
     {
       "term": "numerus",
       "rule": "keyword",
-      "capable": 3,
-      "analyzable": 3
+      "capable": 4,
+      "analyzable": 4
     },
     {
       "term": "non est",
@@ -1014,8 +1014,8 @@
     {
       "term": "sub",
       "rule": "keyword",
-      "capable": 1,
-      "analyzable": 1
+      "capable": 0,
+      "analyzable": 0
     },
     {
       "term": "selective_import",
@@ -1056,8 +1056,8 @@
     {
       "term": "summa",
       "rule": "concept",
-      "capable": 5,
-      "analyzable": 5
+      "capable": 9,
+      "analyzable": 10
     },
     {
       "term": "tacet",
