@@ -11,7 +11,8 @@
 //!
 //! INVARIANTS
 //! ==========
-//! - Only array receivers are supported in this phase.
+//! - Only lista receivers are supported in this phase (exact-bound
+//!   `BoundedArray` literals included — the loop reads length at runtime).
 //! - Filter/map callbacks are single-parameter closures with non-failable
 //!   signatures; reduce callbacks are two-parameter closures.
 //! - Loop blocks are created before any terminator seals the current block.
@@ -78,7 +79,10 @@ impl FunctionBuilder<'_> {
                 .push(MirError::missing_type(receiver.span, "collection reduce receiver"));
             return None;
         };
-        if !matches!(self.normalized_type(receiver_ty), Type::Array(_)) {
+        if !matches!(
+            self.normalized_type(receiver_ty),
+            Type::Array(_) | Type::BoundedArray { .. }
+        ) {
             self.errors.push(MirError::unsupported(
                 receiver.span,
                 "collection reduce before array MIR lowering",
@@ -108,7 +112,10 @@ impl FunctionBuilder<'_> {
                 .push(MirError::missing_type(receiver.span, "collection cumulata receiver"));
             return None;
         };
-        if !matches!(self.normalized_type(receiver_ty), Type::Array(_)) {
+        if !matches!(
+            self.normalized_type(receiver_ty),
+            Type::Array(_) | Type::BoundedArray { .. }
+        ) {
             self.errors.push(MirError::unsupported(
                 receiver.span,
                 "collection cumulata before array MIR lowering",
@@ -140,7 +147,7 @@ impl FunctionBuilder<'_> {
             return None;
         };
         let normalized = self.normalized_type(receiver_ty);
-        if let Type::Array(_) = normalized {
+        if matches!(normalized, Type::Array(_) | Type::BoundedArray { .. }) {
         } else {
             self.errors.push(MirError::unsupported(
                 receiver.span,
@@ -668,7 +675,9 @@ impl FunctionBuilder<'_> {
 
     fn collection_element_ty(&self, ty: TypeId) -> Option<MirType> {
         match self.normalized_type(ty) {
-            Type::Array(item) => Some(MirType::semantic(*item)),
+            Type::Array(item) | Type::BoundedArray { element: item, .. } => {
+                Some(MirType::semantic(*item))
+            }
             _ => None,
         }
     }
