@@ -122,6 +122,7 @@ fn minimal_test_artifact() -> HirArtifact {
         resolved_uses: Vec::new(),
         analysis_stamp: 1,
         gpu_builtins: Vec::new(),
+        capability_provenance: radix_hir_fhir::FunctionProvenanceTableWire::default(),
     }
 }
 
@@ -1064,6 +1065,7 @@ fn build_artifact_from_unit(unit: &AnalyzedModule) -> HirArtifact {
             .iter()
             .map(|(def_id, builtin)| (*def_id, gpu_builtin_to_wire(*builtin)))
             .collect(),
+        capability_provenance: crate::hir::serialize::from_analyzed(unit, "x", "x").capability_provenance,
     }
 }
 
@@ -1172,4 +1174,48 @@ fn eot_artifact_legacy_empty_surface_roundtrips_unchanged() {
     let loaded = load_fhir(&bytes).expect("legacy artifact baseline must load");
     assert_eq!(loaded.hir.items.len(), artifact.hir.items.len());
     assert!(loaded.hir.entry.is_none());
+}
+
+// ── SCR-04 capability provenance survives the FHIR boundary ──────────────
+
+#[test]
+fn capability_provenance_survives_serialize_and_load() {
+    use crate::driver::{analyze_source, AnalyzeRequest, Session};
+    use crate::hir::serialize::from_analyzed;
+
+    let session = Session::new(crate::driver::Config::default());
+    let unit = analyze_source(
+        &session,
+        "prov.fab",
+        r"
+functio utitur() → numerus {
+    varia lista<numerus> xs ← [1, 2, 3]
+    varia in lista<numerus> view ← xs
+    redde view.longitudo()
+}
+incipit { }
+",
+        AnalyzeRequest::default(),
+    )
+    .expect("analyze");
+
+    let function_def = unit
+        .hir
+        .items
+        .iter()
+        .find(|item| matches!(item.kind, radix_hir::HirItemKind::Function(_)))
+        .expect("function item")
+        .def_id;
+    let original_row = unit.provenance.get(function_def).expect("row").clone();
+    assert!(!original_row.last_uses.is_empty(), "body borrow carries a last-use fact");
+
+    // The wire carries only the reduced summary; the region CFG is absent.
+    let artifact = from_analyzed(&unit, "deadbeef", "prov.fab");
+    assert_eq!(artifact.capability_provenance.functions.len(), 1);
+    let bytes = serialize_artifact(&artifact);
+    let loaded = load_fhir(&bytes).expect("load");
+
+    let loaded_row = loaded.provenance.get(function_def).expect("loaded row");
+    assert_eq!(loaded_row, &original_row);
+    assert_eq!(loaded.analysis_stamp, unit.analysis_stamp);
 }

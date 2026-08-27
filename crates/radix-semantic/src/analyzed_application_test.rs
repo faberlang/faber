@@ -36,6 +36,7 @@ fn analyze_parts(source: &str) -> (AnalyzedApplicationParts, Interner) {
         radix_lanes: result.radix_lanes,
         gpu_builtins: result.gpu_builtins,
         access_facts: result.access_facts.expect("access facts"),
+        region_facts: None,
         semantic_diagnostics: result.diagnostics,
     };
     (parts, parsed.interner)
@@ -298,4 +299,107 @@ incipit {
         ),
         "build() with a hard error must reject"
     );
+}
+
+// ── SCR-04 durable provenance ───────────────────────────────────────────────
+
+#[test]
+fn build_carries_durable_provenance_into_driver_fields() {
+    let source = r"
+functio utitur() → numerus {
+    varia lista<numerus> xs ← [1, 2, 3]
+    varia in lista<numerus> view ← xs
+    redde view.longitudo()
+}
+incipit { }
+";
+    let (parts, interner) = analyze_parts(source);
+    let app = AnalyzedApplication::build(parts, &interner).expect("build");
+    let function_def = app
+        .hir()
+        .items
+        .iter()
+        .find(|item| matches!(item.kind, radix_hir::HirItemKind::Function(_)))
+        .expect("function item")
+        .def_id;
+    let row = app
+        .provenance()
+        .get(function_def)
+        .expect("provenance row")
+        .clone();
+    assert_eq!(row.function, function_def);
+    assert!(
+        !row.last_uses.is_empty(),
+        "body borrow carries a last-use fact"
+    );
+
+    // Signature provenance and last-use facts survive the driver handoff.
+    let fields = app.into_driver_fields();
+    assert_eq!(fields.provenance.get(function_def), Some(&row));
+}
+
+#[test]
+fn build_fails_closed_on_incoherent_provenance() {
+    // Regions from a different snapshot must not satisfy a borrow-returning
+    // function: build fails closed instead of freezing cross-run facts.
+    let (borrowing, interner) = analyze_parts(
+        r"
+functio mutator() → in lista<numerus> {
+    varia lista<numerus> xs ← [1, 2, 3]
+    varia in lista<numerus> view ← xs
+    redde view
+}
+incipit { }
+",
+    );
+    let (other, _other_interner) = analyze_parts(
+        r"
+functio alia(numerus n) → numerus {
+    redde n
+}
+incipit { }
+",
+    );
+    let other_regions =
+        crate::passes::borrow_region::analyze(&other.hir, &other.types, &other.access_facts).ok();
+
+    let result = AnalyzedApplication::build(
+        AnalyzedApplicationParts {
+            region_facts: other_regions,
+            ..borrowing
+        },
+        &interner,
+    );
+    let outcome = result.err();
+    assert!(
+        matches!(
+            outcome,
+            Some(AnalyzedApplicationError::IncoherentProvenance { .. })
+        ),
+        "foreign region facts must fail closed, got {outcome:?}"
+    );
+}
+
+#[test]
+fn unavailable_region_facts_are_an_absent_required_summary() {
+    // The reducer's Unavailable path (no region facts for a borrow-returning
+    // function) is what build maps to AbsentRequiredFacts; a build with no
+    // engine failure cannot fixture it end-to-end, so prove the mapping at
+    // the reduction boundary it composes from.
+    let (parts, _interner) = analyze_parts(
+        r"
+functio mutator() → in lista<numerus> {
+    varia lista<numerus> xs ← [1, 2, 3]
+    varia in lista<numerus> view ← xs
+    redde view
+}
+incipit { }
+",
+    );
+    let error = crate::passes::borrow_region::reduce(&parts.hir, &parts.types, None)
+        .expect_err("absent regions are not an empty summary");
+    assert!(matches!(
+        error,
+        crate::passes::borrow_region::ProvenanceError::Unavailable { .. }
+    ));
 }

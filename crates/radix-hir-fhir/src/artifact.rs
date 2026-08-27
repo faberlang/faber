@@ -379,6 +379,53 @@ pub enum GpuBuiltinWire {
 }
 
 // ---------------------------------------------------------------------------
+// Capability provenance wire DTOs (SCR-04)
+// ---------------------------------------------------------------------------
+//
+// `FunctionProvenanceTable` lives in crate `radix` (semantic/capability).
+// radix-hir owns the wire DTOs so HirArtifact can carry the durable
+// borrow-provenance summaries without a reverse dependency. The DTO carries
+// only stable signature/provenance facts; the CFG and `RegionFacts` layout
+// are deliberately absent (SCR-04 persistence law).
+
+/// Wire returned-borrow provenance (mirrors `radix_types::ReturnedBorrowProvenance`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum ReturnedBorrowWire {
+    None,
+    Parameter(DefId),
+    Definition(DefId),
+}
+
+/// Wire required region relationship (mirrors `radix_types::RegionRelationship`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct RegionRelationshipWire {
+    pub from: DefId,
+    pub to: DefId,
+}
+
+/// Wire last-use fact (mirrors `radix::semantic::capability::LastUseFact`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct LastUseWire {
+    pub borrower: DefId,
+    pub site: radix_hir::HirId,
+}
+
+/// Wire provenance summary for one function boundary.
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct FunctionProvenanceWire {
+    pub function: DefId,
+    pub returned_borrow: ReturnedBorrowWire,
+    pub required_regions: Vec<RegionRelationshipWire>,
+    pub last_uses: Vec<LastUseWire>,
+}
+
+/// Wire provenance table (mirrors `radix::semantic::capability::FunctionProvenanceTable`).
+#[derive(Debug, Clone, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct FunctionProvenanceTableWire {
+    pub functions: Vec<FunctionProvenanceWire>,
+}
+
+// ---------------------------------------------------------------------------
 // HirArtifact
 // ---------------------------------------------------------------------------
 
@@ -410,8 +457,11 @@ pub enum GpuBuiltinWire {
 /// compatibility decoder. Version 7 (CTR-05) removes the destination-owned
 /// conversion-arm rows and the enum's retired conversion-arm payload from
 /// the directly-serde'd HIR payload, replacing them with coherence-registry
-/// rows keyed by the ordered pair `(source → destination)`.
-pub const SCHEMA_VERSION: u32 = 7;
+/// rows keyed by the ordered pair `(source → destination)`. Version 8
+/// (SCR-04) adds the durable capability-provenance summaries
+/// (`FunctionProvenanceTableWire`); older artifacts fail closed at the
+/// schema gate as usual.
+pub const SCHEMA_VERSION: u32 = 8;
 
 /// Serializable snapshot of one analyzed compilation unit (F1, F2, F4).
 ///
@@ -475,6 +525,10 @@ pub struct HirArtifact {
 
     /// GPU kernel builtin assignments keyed by declaring `DefId` (`F13`, `F20`: wire DTO).
     pub gpu_builtins: Vec<(DefId, GpuBuiltinWire)>,
+
+    /// Durable borrow-provenance and last-use summaries for every function
+    /// boundary (SCR-04: wire DTO; F-CAP-04/05 authority on the wire).
+    pub capability_provenance: FunctionProvenanceTableWire,
 }
 
 // ---------------------------------------------------------------------------

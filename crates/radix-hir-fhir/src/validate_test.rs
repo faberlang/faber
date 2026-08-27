@@ -276,3 +276,30 @@ fn itera_range_dangling_binder_symbol_fails_closed() {
         "dangling binder symbol must surface as a Symbol DanglingIndex: {err:?}"
     );
 }
+
+// ── SCR-04 capability provenance validation ──────────────────────────────
+
+#[test]
+fn dangling_provenance_identity_fails_closed() {
+    let mut artifact = stub_artifact();
+    artifact.capability_provenance = crate::artifact::FunctionProvenanceTableWire {
+        functions: vec![crate::artifact::FunctionProvenanceWire {
+            function: DefId(0),
+            returned_borrow: crate::artifact::ReturnedBorrowWire::None,
+            required_regions: Vec::new(),
+            last_uses: vec![crate::artifact::LastUseWire {
+                borrower: DefId(0),
+                site: radix_hir::HirId(9_999),
+            }],
+        }],
+    };
+    let err = crate::decode(&postcard::to_allocvec(&artifact).expect("encode"))
+        .expect_err("dangling last-use HirId must fail closed");
+    assert!(
+        matches!(
+            err,
+            crate::error::HirArtifactError::DanglingIndex { kind: "HirId", .. }
+        ),
+        "dangling last-use site must surface as a HirId DanglingIndex: {err:?}"
+    );
+}

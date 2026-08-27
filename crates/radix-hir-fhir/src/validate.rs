@@ -2306,6 +2306,26 @@ pub(crate) fn validate_referential_integrity(
         &check_def,
     )?;
 
+    // 10. Capability provenance (SCR-04, schema v8): every identity key —
+    //     function rows, provenance/relationship DefIds, and last-use
+    //     borrower/site pairs — must resolve against the HIR arenas.
+    for row in &artifact.capability_provenance.functions {
+        check_def(row.function)?;
+        match row.returned_borrow {
+            crate::artifact::ReturnedBorrowWire::None => {}
+            crate::artifact::ReturnedBorrowWire::Parameter(def_id)
+            | crate::artifact::ReturnedBorrowWire::Definition(def_id) => check_def(def_id)?,
+        }
+        for relationship in &row.required_regions {
+            check_def(relationship.from)?;
+            check_def(relationship.to)?;
+        }
+        for last_use in &row.last_uses {
+            check_def(last_use.borrower)?;
+            check_hir(last_use.site)?;
+        }
+    }
+
     Ok(())
 }
 

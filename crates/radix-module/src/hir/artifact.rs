@@ -10,8 +10,9 @@
 use crate::driver::AnalyzedModule;
 use crate::driver::GraphicsSourceFacts;
 use crate::semantic::{
-    AnnotationContractMetadata, CaptureFact, CaptureMode, FunctionFact, FunctionFactTable, QualifiedIdentityTable,
-    RadixLaneMetadata, ResolvedUse, ResolvedUseIndex, ResolvedUseKey, ResolvedUseKind, Resolver,
+    AnnotationContractMetadata, CaptureFact, CaptureMode, FunctionFact, FunctionFactTable, FunctionProvenanceTable,
+    QualifiedIdentityTable, RadixLaneMetadata, ResolvedUse, ResolvedUseIndex, ResolvedUseKey, ResolvedUseKind,
+    Resolver,
 };
 use radix_hir_fhir::{
     CaptureFactWire, CaptureModeWire, CliProgramWire, FunctionFactTableWire, FunctionFactWire, GpuBuiltinWire,
@@ -112,6 +113,35 @@ fn map_function_fact_table(wire: FunctionFactTableWire) -> FunctionFactTable {
             .collect(),
         wire.entry.map(map_function_fact),
     )
+}
+
+/// Map a wire provenance table to the live type (SCR-04).
+fn map_provenance_table(wire: radix_hir_fhir::FunctionProvenanceTableWire) -> FunctionProvenanceTable {
+    use radix_hir_fhir::{FunctionProvenanceWire, LastUseWire, RegionRelationshipWire, ReturnedBorrowWire};
+    use radix_types::{RegionRelationship, ReturnedBorrowProvenance};
+
+    fn map_row(row: FunctionProvenanceWire) -> crate::semantic::FunctionProvenanceSummary {
+        crate::semantic::FunctionProvenanceSummary {
+            function: row.function,
+            returned_borrow: match row.returned_borrow {
+                ReturnedBorrowWire::None => ReturnedBorrowProvenance::None,
+                ReturnedBorrowWire::Parameter(def_id) => ReturnedBorrowProvenance::Parameter(def_id),
+                ReturnedBorrowWire::Definition(def_id) => ReturnedBorrowProvenance::Definition(def_id),
+            },
+            required_regions: row
+                .required_regions
+                .into_iter()
+                .map(|rel: RegionRelationshipWire| RegionRelationship { from: rel.from, to: rel.to })
+                .collect(),
+            last_uses: row
+                .last_uses
+                .into_iter()
+                .map(|fact: LastUseWire| crate::semantic::LastUseFact { borrower: fact.borrower, site: fact.site })
+                .collect(),
+        }
+    }
+
+    FunctionProvenanceTable::from_rows(wire.functions.into_iter().map(map_row).collect())
 }
 
 /// Map a wire CLI program to the live `CliProgram` (F18).
@@ -303,6 +333,9 @@ pub(crate) fn reconstruct_unit(artifact: radix_hir_fhir::HirArtifact) -> Result<
         .map(|(def_id, builtin)| (def_id, map_gpu_builtin(builtin)))
         .collect();
 
+    // Capability provenance: map wire → live (SCR-04).
+    let provenance = map_provenance_table(artifact.capability_provenance);
+
     let analysis_stamp = crate::semantic::AnalysisStamp::from_persisted(artifact.analysis_stamp);
 
     Ok(AnalyzedModule::from_loaded_with_presentation(
@@ -318,6 +351,7 @@ pub(crate) fn reconstruct_unit(artifact: radix_hir_fhir::HirArtifact) -> Result<
         function_facts,
         resolved_uses,
         QualifiedIdentityTable::default(),
+        provenance,
         RadixLaneMetadata::default(),
         gpu_builtins,
         GraphicsSourceFacts::default(),
