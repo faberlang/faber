@@ -386,6 +386,36 @@ fn cli_parses_fmir_bin_target_for_build() {
 }
 
 #[test]
+fn cli_parses_complexity_budget_on_check() {
+    let check = Cli::try_parse_from(["faber", "check", "--complexity-budget", "7", "main.fab"])
+        .expect("parse check complexity budget");
+    let Some(crate::cli::Command::Check(args)) = check.command else {
+        panic!("expected check subcommand");
+    };
+    assert_eq!(args.complexity_budget, Some(7));
+}
+
+#[test]
+fn cli_complexity_budget_absent_defaults_to_none_on_check() {
+    let check = Cli::try_parse_from(["faber", "check", "main.fab"]).expect("parse check");
+    let Some(crate::cli::Command::Check(args)) = check.command else {
+        panic!("expected check subcommand");
+    };
+    assert_eq!(args.complexity_budget, None);
+}
+
+#[test]
+fn cli_complexity_budget_rejects_zero_and_non_numeric() {
+    let zero = Cli::try_parse_from(["faber", "check", "--complexity-budget", "0", "main.fab"]);
+    assert!(zero.is_err(), "budget 0 must fail clap validation (>= 1)");
+    let text = Cli::try_parse_from(["faber", "check", "--complexity-budget", "abc", "main.fab"]);
+    assert!(
+        text.is_err(),
+        "non-numeric budget must fail clap u32 parsing"
+    );
+}
+
+#[test]
 fn cli_parses_locale_on_check() {
     let check = Cli::try_parse_from(["faber", "check", "--locale", "zh-Hans", "main.fab"])
         .expect("parse check reader locale");

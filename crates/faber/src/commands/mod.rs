@@ -288,17 +288,20 @@ fn dispatch(command: Command) {
                     args.json,
                 );
             } else if package_shaped {
-                package::cmd_check_package(CheckCommand {
-                    input: args.input,
-                    package: args.package,
-                    permissive: args.permissive,
-                    deny_warnings: args.deny_warnings,
-                    deny_codes: args.deny,
-                    diagnostic_mode: diagnostic_mode(args.diagnostics),
-                    diagnostics_locale_pack: None,
-                    locale: args.locale,
-                    diagnostics_locale: args.diagnostics_locale,
-                });
+                package::cmd_check_package(
+                    CheckCommand {
+                        input: args.input,
+                        package: args.package,
+                        permissive: args.permissive,
+                        deny_warnings: args.deny_warnings,
+                        deny_codes: args.deny,
+                        diagnostic_mode: diagnostic_mode(args.diagnostics),
+                        diagnostics_locale_pack: None,
+                        locale: args.locale,
+                        diagnostics_locale: args.diagnostics_locale,
+                    },
+                    args.complexity_budget,
+                );
             } else {
                 cmd_check_file(
                     CheckCommand {
