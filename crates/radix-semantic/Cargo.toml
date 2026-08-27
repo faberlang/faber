@@ -47,6 +47,12 @@ unicode-normalization = "0.1"
 unicode-ident = "1"
 serde = { version = "1.0.228", features = ["derive"] }
 
+[dev-dependencies]
+# CC-U4 census harness (tests/complexity_census.rs): in-process analysis
+# entries (driver single-unit + radix-program library cache). Dev-only edge,
+# so the leaf keeps its normal dependency direction.
+radix = { path = "../radix" }
+
 [features]
 hir-fhir = ["dep:radix-hir-fhir"]
 
