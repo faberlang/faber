@@ -423,12 +423,17 @@ fn validate_matmul_workgroup(plan: &MatMulPlan) -> Result<(), PlanValidationErro
         });
     }
     if plan.workgroup_x != plan.tile || plan.workgroup_y != plan.tile {
-        // PGC-B2 T=1 one-row exception: an M=1 plan (the decode GEMV /
-        // lm-head shapes) may carry workgroup (tile, 1). The one-row body
-        // loads shared_a's single row and the shared_b tile with x lanes
-        // only (`local_id.y` is always 0), so the tile-local addressing the
-        // coupling law protects stays exact on the x axis and unused on y.
-        if !(plan.m == 1 && plan.workgroup_x == plan.tile && plan.workgroup_y == 1) {
+        // PGC-B2 T=1 one-row exception (B2-RETUNE width sweep): an M=1
+        // plan (the decode GEMV / lm-head shapes) may carry workgroup
+        // `(w, 1)` with `w` a tile multiple up to 64 — the one-row body
+        // streams each output column independently (no shared tiles, no
+        // barriers), so any admitted lane count is correct and the width
+        // is an occupancy knob, not an addressing fact.
+        let one_row = plan.m == 1
+            && plan.workgroup_y == 1
+            && plan.workgroup_x.is_multiple_of(plan.tile)
+            && plan.workgroup_x <= 64;
+        if !one_row {
             return Err(PlanValidationError::MatMulWorkgroupMismatch {
                 workgroup_x: plan.workgroup_x,
                 workgroup_y: plan.workgroup_y,
