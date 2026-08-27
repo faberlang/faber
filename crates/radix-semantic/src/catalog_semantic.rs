@@ -77,6 +77,7 @@ pub(crate) const WARNING_KINDS: &[WarningKind] = &[
     WarningKind::UnionOfNominalMembers,
     WarningKind::UnionNoCommonMembers,
     WarningKind::UnionMethodSignatureShadowed,
+    WarningKind::ComplexityBudgetExceeded,
 ];
 
 // STABLE CODES
@@ -352,6 +353,9 @@ pub fn semantic_message(kind: SemanticErrorKind, args: &[DiagnosticArg]) -> Opti
             | WarningKind::UnionNoCommonMembers
             | WarningKind::UnionMethodSignatureShadowed,
         ) => semantic_union_guardrail_message(args),
+        SemanticErrorKind::Warning(WarningKind::ComplexityBudgetExceeded) => {
+            semantic_complexity_budget_exceeded_message(args)
+        }
     }
 }
 
@@ -3034,6 +3038,10 @@ fn warning_spec(kind: WarningKind) -> DiagnosticSpec {
                 "align the constituent signatures or rename one method to keep it common",
             ),
         },
+        WarningKind::ComplexityBudgetExceeded => DiagnosticSpec {
+            code: "WARN027",
+            help: Some("split the function or raise the complexity budget for this check"),
+        },
     }
 }
 
@@ -3149,6 +3157,20 @@ fn semantic_union_guardrail_help(args: &[DiagnosticArg]) -> Option<String> {
         "union_method_signature_shadowed" => Some(
             "align the constituent signatures or rename one method to keep it common".to_owned(),
         ),
+        _ => None,
+    }
+}
+
+fn semantic_complexity_budget_exceeded_message(args: &[DiagnosticArg]) -> Option<String> {
+    match arg_value(args, "issue")? {
+        "complexity_budget_exceeded" => {
+            let function = arg_value(args, "function")?;
+            let score = arg_value(args, "score")?;
+            let budget = arg_value(args, "budget")?;
+            Some(format!(
+                "function `{function}` has cyclomatic complexity {score}, over the budget {budget}"
+            ))
+        }
         _ => None,
     }
 }

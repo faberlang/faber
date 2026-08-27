@@ -251,6 +251,9 @@ pub enum WarningKind {
     /// A same-name method with incompatible signatures across `∪`
     /// constituents silently leaves the common set (U1R guardrail 4).
     UnionMethodSignatureShadowed,
+    /// A declared function's cyclomatic complexity exceeded the applicable
+    /// budget. Warn-only; promotion is the caller's deny policy.
+    ComplexityBudgetExceeded,
 }
 
 /// Semantic diagnostic categories used by passes and command policy.

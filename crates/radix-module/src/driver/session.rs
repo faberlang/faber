@@ -116,6 +116,10 @@ pub struct Config {
     /// relative paths as authored; the map keys are template names). When `None`,
     /// `§` forms are rejected by the import-path pass.
     pub import_path_templates: Option<std::collections::BTreeMap<String, String>>,
+
+    /// Per-function cyclomatic-complexity warning budget. `None` uses the
+    /// baked semantic default; warn-only, never fails compilation alone.
+    pub complexity_budget: Option<u32>,
 }
 
 impl Default for Config {
@@ -137,6 +141,7 @@ impl Default for Config {
             no_fuse: false,
             emit_nvvm_device_module: false,
             import_path_templates: None,
+            complexity_budget: None,
         }
     }
 }
@@ -200,6 +205,13 @@ impl Config {
     #[must_use]
     pub fn with_import_path_templates(mut self, templates: std::collections::BTreeMap<String, String>) -> Self {
         self.import_path_templates = Some(templates);
+        self
+    }
+
+    /// Set the per-function cyclomatic-complexity warning budget.
+    #[must_use]
+    pub fn with_complexity_budget(mut self, budget: u32) -> Self {
+        self.complexity_budget = Some(budget);
         self
     }
 
