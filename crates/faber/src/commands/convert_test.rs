@@ -327,3 +327,199 @@ fn convert_check_passes_on_braced_futura_exempla() {
         "locale check must pass on braced futura exempla: {stderr}"
     );
 }
+
+/// CTR-11 closeout regression (conversio-fn-enrollment acceptance 7): a named
+/// standalone `@ conversion` function survives a real English → Latin →
+/// English `faber convert` round trip on a package — name, body, and
+/// annotation identity retained, both emitted locales re-checked with the
+/// same diagnostics set, and no synthetic `conversio_<dest>_ex_<src>` output.
+/// This is the user-visible proof for the bug class that motivated the goal:
+/// the old emitter dropped the union arm and emitted a synthetic function
+/// that did not re-check. A conversion fn that silently drops in either
+/// direction fails twice here — the marker/name/body assertions fail on the
+/// emitted text, and the re-check loses the registry row so the `↦` and `⇥`
+/// use-sites stop checking (`failable_call_conversion_absent`).
+#[test]
+fn convert_round_trip_retains_named_conversion_fn_en_la_en() {
+    let root = tempfile::tempdir().expect("create round-trip fixture root");
+    let package = root.path().join("ctr11roundtrip");
+    let source_dir = package.join("src");
+    fs::create_dir_all(&source_dir).expect("create package source dir");
+    write_round_trip_manifest(&package, "en");
+    fs::write(source_dir.join("main.fab"), ROUND_TRIP_EN_SOURCE).expect("write en source");
+
+    let binary = faber_binary();
+
+    // Canonicalize under the package's own en surface first, so every later
+    // state is an emitter product and text/diagnostics compare exactly.
+    run_convert_in_place(&binary, &source_dir, "en");
+    let canonical_en =
+        fs::read_to_string(source_dir.join("main.fab")).expect("read canonical en");
+    assert!(
+        canonical_en.contains("@ conversion\nfn from_source_error(SourceError err) → DestError {"),
+        "canonical en emit must keep the named conversion fn with its marker:\n{canonical_en}"
+    );
+    assert!(
+        canonical_en.contains("return variant Wrapped {payload = detail}"),
+        "canonical en emit must keep the conversion body:\n{canonical_en}"
+    );
+    assert!(
+        canonical_en.contains("return err ↦ DestError"),
+        "canonical en emit must keep the explicit-conversion use-site:\n{canonical_en}"
+    );
+    assert!(
+        !canonical_en.contains("conversio_"),
+        "no synthetic conversio_<dest>_ex_<src> name may appear:\n{canonical_en}"
+    );
+    let en_diagnostics = run_round_trip_check(&binary, &package);
+
+    // English → Latin: the marker, name, body, and both registry consumers
+    // must re-emit on the Latin surface and re-check with the same
+    // diagnostics set.
+    run_convert_in_place(&binary, &source_dir, "la");
+    write_round_trip_manifest(&package, "la");
+    let la_source = fs::read_to_string(source_dir.join("main.fab")).expect("read la source");
+    assert!(
+        la_source.contains("@ conversio\nfunctio from_source_error(SourceError err) → DestError {"),
+        "la emit must keep the named conversion fn with its marker:\n{la_source}"
+    );
+    assert!(
+        la_source.contains("redde finge Wrapped {payload = detail}"),
+        "la emit must keep the conversion body:\n{la_source}"
+    );
+    assert!(
+        la_source.contains("functio propagate() → vacuum ⇥ DestError {"),
+        "la emit must keep the failable-call propagation use-site:\n{la_source}"
+    );
+    assert!(
+        la_source.contains("redde err ↦ DestError"),
+        "la emit must keep the explicit-conversion use-site:\n{la_source}"
+    );
+    assert!(
+        !la_source.contains("conversio_"),
+        "no synthetic conversio_<dest>_ex_<src> name may appear:\n{la_source}"
+    );
+    assert!(
+        !code_only(&la_source).contains("@ conversion"),
+        "the en marker spelling must not survive the la emit:\n{la_source}"
+    );
+    let la_diagnostics = run_round_trip_check(&binary, &package);
+    assert_eq!(
+        en_diagnostics, la_diagnostics,
+        "en and la outputs must carry the same diagnostics set"
+    );
+
+    // Latin → English: the round trip must land back on the canonical en
+    // emit byte for byte — full name/body/annotation identity — and re-check
+    // with the same diagnostics set.
+    run_convert_in_place(&binary, &source_dir, "en");
+    write_round_trip_manifest(&package, "en");
+    let round_trip_en =
+        fs::read_to_string(source_dir.join("main.fab")).expect("read round-trip en");
+    assert_eq!(
+        round_trip_en, canonical_en,
+        "en → la → en must return the canonical en source exactly"
+    );
+    let round_trip_diagnostics = run_round_trip_check(&binary, &package);
+    assert_eq!(
+        en_diagnostics, round_trip_diagnostics,
+        "the round-tripped en output must carry the same diagnostics set"
+    );
+}
+
+/// EN fixture: one owned error-union pair, the named standalone conversion
+/// fn enrolled for `SourceError → DestError`, and both registry consumers
+/// (`↦` explicit conversion, `⇥` failable-call propagation) at use-sites.
+const ROUND_TRIP_EN_SOURCE: &str = r#"+++
+locale = "en"
++++
+
+union SourceError {
+    Malformed {
+        string detail
+    }
+}
+
+union DestError {
+    Wrapped {
+        string payload
+    }
+}
+
+@ conversion fn from_source_error(SourceError err) → DestError {
+    match err {
+        case SourceError.Malformed const detail { return variant Wrapped {payload = detail} }
+        case _ { return variant Wrapped {payload = "unmatched"} }
+    }
+}
+
+fn fail_source() → void ⇥ SourceError {
+    throw variant Malformed {detail = "ctr11 round trip"}
+}
+
+fn propagate() → void ⇥ DestError {
+    fail_source()
+}
+
+fn explicit_convert(SourceError err) → DestError {
+    return err ↦ DestError
+}
+
+main {
+}
+"#;
+
+fn write_round_trip_manifest(package: &std::path::Path, locale: &str) {
+    fs::write(
+        package.join("faber.toml"),
+        format!(
+            "[package]\nname = \"ctr11-roundtrip\"\nversion = \"0.1.0\"\nedition = \"2026\"\n\n\
+             [paths]\nsource = \"src\"\nentry = \"main.fab\"\n\n\
+             [locale]\nlocale = \"{locale}\"\n"
+        ),
+    )
+    .expect("write round-trip manifest");
+}
+
+fn run_convert_in_place(binary: &std::path::Path, source_dir: &std::path::Path, to: &str) {
+    let output = Command::new(binary)
+        .args([
+            "convert",
+            source_dir.to_str().expect("utf8 source dir"),
+            "--to",
+            to,
+        ])
+        .output()
+        .expect("run faber convert in place");
+    assert!(
+        output.status.success(),
+        "faber convert --to {to} must succeed: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+}
+
+/// Check the package and return its diagnostics header lines
+/// (`warning[CODE:issue]: path:line`). Header lines only: the source-context
+/// lines below each header restate the flagged line in the active locale's
+/// spellings, so they differ between en and la by design; the codes, issues,
+/// and locations are the semantic diagnostics set.
+fn run_round_trip_check(binary: &std::path::Path, package: &std::path::Path) -> Vec<String> {
+    let output = Command::new(binary)
+        .args(["check", package.to_str().expect("utf8 package")])
+        .output()
+        .expect("run faber check");
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        output.status.success(),
+        "round-trip package must re-check cleanly:\n{stderr}"
+    );
+    assert!(
+        stderr.contains("ok:"),
+        "successful check must report the ok verdict:\n{stderr}"
+    );
+    stderr
+        .lines()
+        .filter(|line| line.starts_with("warning[") || line.starts_with("error["))
+        .map(str::to_owned)
+        .collect()
+}
