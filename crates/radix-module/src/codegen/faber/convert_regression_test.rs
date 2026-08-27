@@ -254,7 +254,8 @@ locale = "la"
         r#"+++
 locale = "la"
 +++
-@ publica functio muta(numerus p) → numerus {
+@ publica
+functio muta(numerus p) → numerus {
     redde p + 1
 }
 "#,

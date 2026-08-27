@@ -1225,7 +1225,8 @@ union GradusError {
     GradusBad
 }
 
-@ conversion fn from_nn_error(nn.NnError err) → GradusError {
+@ conversion
+fn from_nn_error(nn.NnError err) → GradusError {
     match err {
         case nn.NnError.NnBad const message { return variant GradusBad {message = message} }
     }

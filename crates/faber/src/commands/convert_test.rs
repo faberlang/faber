@@ -445,7 +445,8 @@ union DestError {
     }
 }
 
-@ conversion fn from_source_error(SourceError err) → DestError {
+@ conversion
+fn from_source_error(SourceError err) → DestError {
     match err {
         case SourceError.Malformed const detail { return variant Wrapped {payload = detail} }
         case _ { return variant Wrapped {payload = "unmatched"} }
