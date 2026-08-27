@@ -15,10 +15,10 @@ use crate::catalog_semantic::semantic_spec;
 use crate::test_support::{args_have_no_legacy_message, test_span};
 use crate::SemanticError;
 use radix_hir::{
-    DefId, HirBinOp, HirBlock, HirCape, HirCasuArm, HirConversioTarget, HirCustodi, HirCustodiClause,
-    HirExpression, HirExpressionKind, HirExtremumOp, HirFunction, HirId, HirIteraMode, HirItem,
-    HirItemKind, HirLiteral, HirModule, HirNonNullKind, HirOptionalChainKind, HirPattern,
-    HirStatement, HirStatementKind,
+    DefId, HirBinOp, HirBlock, HirCape, HirCasuArm, HirConversioTarget, HirCustodi,
+    HirCustodiClause, HirExpression, HirExpressionKind, HirExtremumOp, HirFunction, HirId, HirItem,
+    HirItemKind, HirIteraMode, HirLiteral, HirModule, HirNonNullKind, HirOptionalChainKind,
+    HirPattern, HirStatement, HirStatementKind,
 };
 use radix_lexer::{Interner, Symbol};
 use radix_syntax::CallablePosture;
@@ -279,7 +279,11 @@ fn row_short_circuit_connectives_count_one_each() {
     assert_eq!(
         score(vec![expr(HirExpressionKind::Binary(
             HirBinOp::Or,
-            boxed(HirExpressionKind::Binary(HirBinOp::And, operand(), operand())),
+            boxed(HirExpressionKind::Binary(
+                HirBinOp::And,
+                operand(),
+                operand()
+            )),
             operand(),
         ))]),
         3,
@@ -329,9 +333,7 @@ fn row_error_channel_catches_count() {
 #[test]
 fn row_trap_capture_boundary_counts() {
     assert_eq!(
-        score(vec![expr(HirExpressionKind::Trap(Box::new(block(
-            vec![]
-        ))))]),
+        score(vec![expr(HirExpressionKind::Trap(Box::new(block(vec![]))))]),
         2,
         "capta {{ }}"
     );
@@ -538,7 +540,7 @@ fn row_everything_else_does_not_count() {
                 boxed(HirExpressionKind::Path(DefId(1))),
                 Vec::new(),
                 Vec::new(),
-                None
+                None,
             )),
             selected_arguments: Vec::new(),
         }),
@@ -550,41 +552,44 @@ fn row_everything_else_does_not_count() {
         expr(HirExpressionKind::Scriptum(Symbol(2), vec![lit()])),
         expr(HirExpressionKind::ReadLine(true)),
         // aggregates and plain structure
-        expr(HirExpressionKind::Array(vec![radix_hir::HirArrayElement::Expr(
-            lit()
-        )])),
+        expr(HirExpressionKind::Array(vec![
+            radix_hir::HirArrayElement::Expr(lit()),
+        ])),
         expr(HirExpressionKind::Tuple(vec![lit(), lit()], None)),
-        expr(HirExpressionKind::Field(boxed(HirExpressionKind::Path(DefId(1))), Symbol(2))),
+        expr(HirExpressionKind::Field(
+            boxed(HirExpressionKind::Path(DefId(1))),
+            Symbol(2),
+        )),
         expr(HirExpressionKind::Index(
             boxed(HirExpressionKind::Path(DefId(1))),
             boxed(HirExpressionKind::Literal(HirLiteral::Int(0))),
         )),
         // markers, assertions, panics
-        expr(HirExpressionKind::Praefixum(boxed(HirExpressionKind::Literal(
-            HirLiteral::Int(1)
-        )))),
+        expr(HirExpressionKind::Praefixum(boxed(
+            HirExpressionKind::Literal(HirLiteral::Int(1)),
+        ))),
         expr(HirExpressionKind::Adfirma(
             boxed(HirExpressionKind::Literal(HirLiteral::Bool(true))),
             None,
         )),
         expr(HirExpressionKind::Panic(boxed(HirExpressionKind::Literal(
-            HirLiteral::Int(1)
+            HirLiteral::Int(1),
         )))),
         expr(HirExpressionKind::Throw(boxed(HirExpressionKind::Literal(
-            HirLiteral::Int(1)
+            HirLiteral::Int(1),
         )))),
         // async/generator carriers
         expr(HirExpressionKind::Cede(boxed(HirExpressionKind::Literal(
-            HirLiteral::Int(1)
+            HirLiteral::Int(1),
         )))),
-        expr(HirExpressionKind::Reddet(boxed(HirExpressionKind::Literal(
-            HirLiteral::Int(1)
-        )))),
-        expr(HirExpressionKind::Tacebit(boxed(HirExpressionKind::Literal(
-            HirLiteral::Int(1)
-        )))),
+        expr(HirExpressionKind::Reddet(boxed(
+            HirExpressionKind::Literal(HirLiteral::Int(1)),
+        ))),
+        expr(HirExpressionKind::Tacebit(boxed(
+            HirExpressionKind::Literal(HirLiteral::Int(1)),
+        ))),
         expr(HirExpressionKind::Yield(boxed(HirExpressionKind::Literal(
-            HirLiteral::Int(1)
+            HirLiteral::Int(1),
         )))),
     ]);
     assert_eq!(plain, 1, "no listed zero-row node is a decision point");
@@ -650,12 +655,7 @@ fn over_budget_function_warns_with_identity() {
         )),
     ]);
     let (module, interner) = module_with_function("solve", body);
-    let findings = complexity(
-        &module,
-        &interner,
-        2,
-        DEFAULT_KERNEL_COMPLEXITY_BUDGET,
-    );
+    let findings = complexity(&module, &interner, 2, DEFAULT_KERNEL_COMPLEXITY_BUDGET);
     assert_eq!(findings.len(), 1, "exactly one finding");
 
     let finding = find_complexity_warning(&findings);
@@ -706,7 +706,10 @@ fn one_over_baked_default_warns() {
 #[test]
 fn complexity_warning_takes_catalog_code_warn027() {
     assert_eq!(
-        semantic_spec(SemanticErrorKind::Warning(WarningKind::ComplexityBudgetExceeded)).code,
+        semantic_spec(SemanticErrorKind::Warning(
+            WarningKind::ComplexityBudgetExceeded
+        ))
+        .code,
         "WARN027"
     );
     assert_eq!(

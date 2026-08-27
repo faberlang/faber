@@ -68,11 +68,9 @@ impl HirVisitor for DecisionPointCounter {
             | HirExpressionKind::Itera(..)
             | HirExpressionKind::IteraLockstep { .. }
             | HirExpressionKind::IteraRange { .. } => self.0 += 1,
-            HirExpressionKind::Binary(
-                HirBinOp::And | HirBinOp::Or | HirBinOp::Coalesce,
-                _,
-                _,
-            ) => self.0 += 1,
+            HirExpressionKind::Binary(HirBinOp::And | HirBinOp::Or | HirBinOp::Coalesce, _, _) => {
+                self.0 += 1
+            }
             HirExpressionKind::Handled { .. } => self.0 += 1,
             HirExpressionKind::Trap(_) => self.0 += 1,
             // Body-carrying folds/selections: +1 each.
