@@ -3469,8 +3469,11 @@ fn prepare_program_module_fails_closed_on_unparsable_library() {
     assert!(matches!(diagnostic.phase, crate::diagnostics::DiagnosticPhase::Parse));
     assert_eq!(diagnostic.issue(), Some("imported_library_parse_failure"));
     assert!(
-        diagnostic.message.contains("math"),
-        "diagnostic names the import site: {}",
-        diagnostic.message
+        diagnostic
+            .args
+            .iter()
+            .any(|arg| arg.name == "binding" && arg.value == "math"),
+        "diagnostic names the import site binding: {:?}",
+        diagnostic.args
     );
 }

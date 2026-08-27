@@ -332,7 +332,7 @@ optlib = "1.0.0"
         "named fail-closed issue `imported_device_body_missing` required, got {:?}",
         errors
             .iter()
-            .map(|error| (error.code, error.message.clone()))
+            .map(|error| (error.code, error.issue()))
             .collect::<Vec<_>>()
     );
 }
