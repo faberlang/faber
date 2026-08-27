@@ -1,0 +1,125 @@
++++
+term = "summa"
+kind = "concept"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "incipit_stmt", "fixum_decl", "redde_stmt", "expression", "array_literal", "vel_expr", "vel_rhs", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "literal", "nota_stmt"]
+category = "collection"
+summary = "argmax/argmin method twins over lists: first-index ties, nihil on empty composing with coalesce, and the NaN-loses-to-numbers law."
+syntax = "<lista>.argmax() | <lista>.argmin()"
+related = ["summa", "maxima", "minima", "nihil", "coalesce"]
+locale = "en"
++++
+
+# =============================================================================
+# argmax / argmin — best-index method twins (LSR-W0 contract).
+# =============================================================================
+#
+# What this teaches (wave-0-delivery §3, stated once, test-pinned):
+#   • First-index tie law — among equal winners the least index wins. The
+#     same law is the parallel-combine law: partials pair as
+#     (value desc, index asc), so sequential scan and tree-combine agree.
+#   • Empty source → nihil — the twins return `int ∪ null`, never a −1
+#     sentinel; a caller that needs an int composes `coalesce` (`vel`) at
+#     the call site.
+#   • NaN law — aligned with `max from`'s implemented fold: NaN never wins
+#     while a number participates; an all-NaN source keeps index 0.
+#   • argmin mirrors argmax exactly (least value, first index).
+#
+# EBNF determination (LSR-W0-CORPUS): no new production — the twins ride
+# the existing method-call surface (member_suffix + call_suffix); there is
+# no argmax/argmin row in faber/docs/EBNF.md by design.
+#
+# Common mistakes:
+#   • hand-rolling a best-index scan instead of calling the twin
+#   • testing the result for −1 — the empty answer is nihil, compose
+#     `coalesce` instead
+#   • assuming NaN wins a comparison — it never does while a number
+#     participates
+#
+# See also: summa, maxima, minima, nihil, coalesce
+# =============================================================================
+
+# Contract 1 — first-index ties. [3, 1, 3, 2, 3]: three equal maxima, the
+# least index (0) wins; the mirror scan on minima keeps index 1.
+fn tie_max(list<int> xs) → int {
+    const int winner ← xs.argmax() coalesce 0
+    return winner
+}
+
+fn tie_min(list<int> xs) → int {
+    const int winner ← xs.argmin() coalesce 0
+    return winner
+}
+
+# Contract 3 — NaN loses to numbers (the `max from` fold law). [nan, 3.0,
+# 1.0, 3.0]: NaN never wins, and the first 3.0 keeps the tie at index 1.
+fn nan_max(list<f64> xs) → int {
+    const int winner ← xs.argmax() coalesce 0
+    return winner
+}
+
+# The min mirror: [1.0, nan, 0.5, 0.5] — least value 0.5, first index wins.
+fn nan_min(list<f64> xs) → int {
+    const int winner ← xs.argmin() coalesce 0
+    return winner
+}
+
+# Contract 3, all-NaN — index 0 is kept (carrying NaN); the mirror agrees.
+fn all_nan_argmax(list<f64> xs) → int {
+    const int winner ← xs.argmax() coalesce 0
+    return winner
+}
+
+# Contract 2 — empty → nihil, no sentinel. The raw twin keeps the nullable
+# shape so the caller sees nihil and composes the default at the call site.
+fn raw_argmax(list<f64> xs) → int ∪ null {
+    const int ∪ null winner ← xs.argmax()
+    return winner
+}
+
+fn empty_or(list<f64> xs, int fallback) → int {
+    const int winner ← xs.argmin() coalesce fallback
+    return winner
+}
+
+# EXPECTED OUTPUT:
+#   0
+#   1
+#   1
+#   1
+#   2
+#   2
+#   0
+#   0
+#   nihil
+#   0
+#   7
+
+main {
+    # Contract 1 — first-index ties on both twins.
+    const list<int> ties ← [3, 1, 3, 2, 3]
+    print tie_max(ties)
+    print tie_min(ties)
+
+    const list<int> min_ties ← [4, 2, 5, 2, 9]
+    print tie_min(min_ties)
+
+    # Contract 3 — NaN loses to numbers on both twins.
+    const list<f64> with_nan ← [nan, 3.0, 1.0, 3.0]
+    print nan_max(with_nan)
+    print nan_min(with_nan)
+
+    const list<f64> min_nan ← [1.0, nan, 0.5, 0.5]
+    print nan_min(min_nan)
+
+    # Contract 3 — all-NaN keeps index 0; argmin mirrors argmax.
+    const list<f64> all_nan ← [nan, nan]
+    print all_nan_argmax(all_nan)
+    print nan_min(all_nan)
+
+    # Contract 2 — empty → nihil (never −1); coalesce composes the default.
+    const list<f64> vacua ← empty
+    print raw_argmax(vacua)
+    print empty_or(vacua, 0)
+    const int fallback ← 7
+    print vacua.argmax() coalesce fallback
+}

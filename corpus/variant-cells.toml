@@ -311,7 +311,7 @@ expected = true
 note = "batch 3: rank-4 coordinate iteration; .expected pinned from runner stdout"
 
 # =============================================================================
-# summa / maxima / minima (15 cells: 15 direct / 0 bare)
+# summa / maxima / minima (16 cells: 16 direct / 0 bare)
 # =============================================================================
 
 [[cells]]
@@ -394,6 +394,15 @@ status = "direct"
 exemplum = "summa/minmax-infix.fab"
 expected = true
 note = "method surface on lista + tensor (minmax-infix shows both)"
+
+[[cells]]
+id = "summa.argmax-argmin-method"
+family = "summa"
+cell = ".argmax() / .argmin() method"
+status = "direct"
+exemplum = "summa/argmax-argmin.fab"
+expected = true
+note = "LSR-W0-CORPUS: method twins on lista; first-index ties (also the parallel-combine law), empty → nihil composing with coalesce (vel), NaN loses to numbers / all-NaN keeps index 0; EBNF no-row — the method-call surface exists, no new production"
 
 [[cells]]
 id = "summa.minmax-infix"
