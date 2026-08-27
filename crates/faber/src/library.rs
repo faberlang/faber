@@ -113,6 +113,14 @@ pub(crate) fn resolved_library_home() -> Option<ResolvedLibraryHome> {
         .parent()
         .unwrap_or_else(|| Path::new("."));
     for candidate in workspace_root.ancestors() {
+        // Skip lane worktrees (`worktrees/<lane>/…`): a stale sibling checkout
+        // there would shadow the container stdlib for packet-local runs.
+        if candidate
+            .components()
+            .any(|c| c.as_os_str() == std::ffi::OsStr::new("worktrees"))
+        {
+            continue;
+        }
         let norma_src = candidate.join("norma/src");
         if norma_src.is_dir() && norma_src.join("fs.fab").is_file() {
             return Some(ResolvedLibraryHome {

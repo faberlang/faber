@@ -33,6 +33,14 @@ fn library_home() -> PathBuf {
     }
 
     for candidate in workspace_root().ancestors() {
+        // Skip lane worktrees (`worktrees/<lane>/…`): a stale sibling checkout
+        // there would shadow the container stdlib for packet-local runs.
+        if candidate
+            .components()
+            .any(|c| c.as_os_str() == std::ffi::OsStr::new("worktrees"))
+        {
+            continue;
+        }
         if candidate.join("norma/src").exists() {
             return candidate.to_path_buf();
         }
