@@ -21,6 +21,13 @@ const ALLOWED_TENSOR_INTRINSICS: &[&str] = &[
     "media",
     "maxima",
     "minima",
+    // LSR-W0-SEMANTIC: the argmax/argmin twin identities, registered beside
+    // `maxima`/`minima` for the device method family's mechanical adoption.
+    // W0 admits the identities only — no `AirTensorOp` mapping yet (the
+    // unarmed-admission class of `mappata`/`filtrata`: a kernel-lane call
+    // fails closed in AIR lowering today).
+    "argmaxima",
+    "argminima",
     "matmul",
     "transpone",
     "forma",

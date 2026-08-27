@@ -209,6 +209,19 @@ pub enum MirCollectionOp {
     Maximum,
     Approximate,
     Sum,
+    /// First-index argmax over an array-backed collection (LSR-W0-SEMANTIC):
+    /// the index of the maximal element, `nihil` when the source is empty —
+    /// never a −1 sentinel. One tie law serves host scan and device
+    /// tree-combine: among equal values the least index wins, so partials
+    /// combine as `(value desc, index asc)` pairs. NaN law is pinned to
+    /// `TensorMax`'s implemented fold (`f64::max`, maxNum semantics): a NaN
+    /// element never wins while any number participates; an all-NaN source
+    /// yields index 0 carrying NaN, matching `max from`'s NaN result.
+    ArgMax,
+    /// First-index argmin — the exact mirror of [`Self::ArgMax`]: least
+    /// value, least index, `nihil` on empty, NaN law pinned to `TensorMin`'s
+    /// `f64::min` fold.
+    ArgMin,
     /// Sum across a specific axis: `sum(x, axis)`. The axis is a trailing
     /// const operand (`MirConstant::Int`) in the `MirRuntimeCall::args` list.
     /// Result rank is input rank - 1.

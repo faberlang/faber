@@ -490,6 +490,8 @@ impl Validator<'_, '_> {
             | MirCollectionOp::Ceiling
             | MirCollectionOp::Truncate
             | MirCollectionOp::Sum
+            | MirCollectionOp::ArgMax
+            | MirCollectionOp::ArgMin
             | MirCollectionOp::TensorShape
             | MirCollectionOp::TensorFlatten
             | MirCollectionOp::TensorMaterialize
@@ -858,6 +860,34 @@ impl Validator<'_, '_> {
                     span,
                     "collection sum result type mismatch",
                 );
+            }
+            MirCollectionOp::ArgMax | MirCollectionOp::ArgMin => {
+                // LSR-W0: the receiver is an array-backed collection of
+                // ordered numeric elements; the result is the winning index
+                // as `numerus ∪ nihil` — nihil exactly when the source is
+                // empty, never a −1 sentinel.
+                let Some(collection_ty) = first_arg_ty else {
+                    return;
+                };
+                let inner = match self.type_kind(collection_ty) {
+                    Type::Array(inner) | Type::BoundedArray { element: inner, .. } => *inner,
+                    _ => {
+                        self.error(span, "collection argmax/argmin receiver is not a lista");
+                        return;
+                    }
+                };
+                if !self.is_numeric_type(MirType::semantic(inner)) {
+                    self.error(span, "collection argmax/argmin element is not numeric");
+                    return;
+                }
+                match self.type_kind(call.return_ty) {
+                    Type::Option(index)
+                        if self.context.types.equals(
+                            *index,
+                            self.context.types.primitive(Primitive::Numerus),
+                        ) => {}
+                    _ => self.error(span, "collection argmax/argmin result is not numerus ∪ nihil"),
+                }
             }
             MirCollectionOp::TensorSumAxis => {
                 let Some(receiver_ty) = first_arg_ty else {

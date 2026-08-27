@@ -1306,6 +1306,8 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
             }
             MirCollectionOp::Approximate => self.approximate_fractus(args, span),
             MirCollectionOp::Sum => self.sum_numeric_array(args, return_ty, span),
+            MirCollectionOp::ArgMax => self.arg_extremum_index(args, span, true),
+            MirCollectionOp::ArgMin => self.arg_extremum_index(args, span, false),
             MirCollectionOp::ArrayAdd => {
                 self.array_elementwise(args, span, "lista add", numeric_add, return_ty)
             }
@@ -3540,6 +3542,46 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
         }
     }
 
+    /// LSR-W0 argmax/argmin scan over an array-backed collection.
+    ///
+    /// One law serves host scan and device tree-combine: among equal values
+    /// the least index wins, so partials combine as `(value desc, index
+    /// asc)` pairs — the sequential scan and any tree-combine of partials
+    /// produce the identical winner. The NaN law is pinned to the
+    /// `TensorMax`/`TensorMin` folds (`f64::max`/`f64::min`, maxNum
+    /// semantics): a NaN element never wins while any number participates,
+    /// and an all-NaN source yields index 0 carrying NaN. An empty source
+    /// yields `nihil`; there is no −1 sentinel path anywhere.
+    fn arg_extremum_index(
+        &mut self,
+        args: &[MirOperand],
+        span: Span,
+        want_max: bool,
+    ) -> Result<Value, RunnerError> {
+        let [receiver] = args else {
+            return Err(RunnerError::internal(span, "collection argmax/argmin arity"));
+        };
+        let values = match self.eval_operand(receiver, span)? {
+            Value::Array(cell) => cell.borrow().clone(),
+            _ => return Err(RunnerError::internal(span, "argmax/argmin receiver type mismatch")),
+        };
+        let mut winner: Option<usize> = None;
+        for (index, value) in values.iter().enumerate() {
+            match winner {
+                None => winner = Some(index),
+                Some(best) => {
+                    if arg_extremum_replaces(&values[best], value, want_max, span)? {
+                        winner = Some(index);
+                    }
+                }
+            }
+        }
+        Ok(match winner {
+            Some(index) => Value::Int(index as i64),
+            None => Value::Nil,
+        })
+    }
+
     fn approximate_fractus(
         &mut self,
         args: &[MirOperand],
@@ -4323,6 +4365,35 @@ fn numeric_as_f64(value: &Value, span: Span) -> Result<f64, RunnerError> {
             "tensor numeric element type mismatch",
         )),
     }
+}
+
+/// Whether `candidate` replaces the incumbent arg-extremum winner: strict
+/// improvement only (the least index keeps ties — the stated-once law that
+/// is also the parallel-combine order). NaN law pinned to the `f64::max` /
+/// `f64::min` folds: NaN loses to every number and never replaces one;
+/// NaN-vs-NaN keeps the incumbent, so an all-NaN source keeps index 0.
+fn arg_extremum_replaces(
+    incumbent: &Value,
+    candidate: &Value,
+    want_max: bool,
+    span: Span,
+) -> Result<bool, RunnerError> {
+    // Integer pairs compare exactly — never through an f64 round-trip.
+    if let (Value::Int(best), Value::Int(value)) = (incumbent, candidate) {
+        return Ok(if want_max { value > best } else { value < best });
+    }
+    if let (Value::UInt(best), Value::UInt(value)) = (incumbent, candidate) {
+        return Ok(if want_max { value > best } else { value < best });
+    }
+    let best = numeric_as_f64(incumbent, span)?;
+    let value = numeric_as_f64(candidate, span)?;
+    if best.is_nan() {
+        return Ok(!value.is_nan());
+    }
+    if value.is_nan() {
+        return Ok(false);
+    }
+    Ok(if want_max { value > best } else { value < best })
 }
 
 /// Numeric pair dispatch with width-checked integer arithmetic and zero-div guard.

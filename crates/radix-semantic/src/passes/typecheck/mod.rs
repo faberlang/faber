@@ -805,8 +805,13 @@ mod infer_test;
 mod itera_apud_test;
 
 #[cfg(test)]
+#[cfg(test)]
 #[path = "summa_test.rs"]
 mod summa_test;
+
+#[cfg(test)]
+#[path = "argmaxima_test.rs"]
+mod argmaxima_test;
 
 #[cfg(test)]
 #[path = "extremum_test.rs"]

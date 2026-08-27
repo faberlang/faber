@@ -11,6 +11,8 @@ const ADMITTED_INTRINSICS: &[&str] = &[
     "media",
     "maxima",
     "minima",
+    "argmaxima",
+    "argminima",
     "matmul",
     "transpone",
     "forma",
