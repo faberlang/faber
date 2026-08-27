@@ -33,6 +33,11 @@ const UNRESOLVED_SHAPE_SIZE_SURVIVOR: &str = "unresolved shape-size constant sur
 /// Named fail-closed reason for a signature-only imported device import
 /// (DFV2-3 (e)): the role fact alone never admits the instance.
 const IMPORTED_DEVICE_BODY_MISSING: &str = "imported_device_body_missing";
+/// Named fail-closed reason for an imported device instantiation whose size
+/// bindings cannot be resolved from the use site (SGR-U0): a device entry
+/// admits only concrete instances, so an unbound shape parameter is a
+/// classified rejection, never a silent provider fallback.
+const IMPORTED_DEVICE_BINDINGS_UNRESOLVED: &str = "imported_device_bindings_unresolved";
 /// Named fail-closed reason for a consumer-local role disagreeing with an
 /// imported route's contract on one merged source (CDC-1): the composition
 /// role map is one authority, so a contradictory join is a wiring defect,
@@ -729,33 +734,40 @@ impl PackageInstantiate<'_> {
         parent_shapes: &MirShapeBindings,
         span: Span,
     ) -> Option<MirMonomorphizationKey> {
+        // SGR-U0 fail-closed classification: an imported device route whose
+        // bindings do not resolve carries the stable issue identity, not the
+        // generic unresolved-parameter prose alone.
+        let issue = if self.imported_devices.get(source).is_some() {
+            IMPORTED_DEVICE_BINDINGS_UNRESOLVED.to_owned()
+        } else {
+            String::new()
+        };
+        let unresolved = |state: &mut Self| {
+            state.errors.push(MirError {
+                message: "generic call signature has unresolved type parameter".to_owned(),
+                issue: issue.clone(),
+                span,
+                definition_span: None,
+            });
+        };
         let mut type_args = Vec::new();
         let mut shape_args = Vec::new();
         for param in params {
             if param.is_shape {
                 let Some(bound) = shape_bindings.get(&param.name).copied() else {
-                    self.errors.push(MirError::validation(
-                        span,
-                        "generic call signature has unresolved type parameter",
-                    ));
+                    unresolved(self);
                     return None;
                 };
                 let Some(concrete) =
                     super::monomorphize::resolve_parent_shape_binding(self.types, bound, parent_shapes)
                 else {
-                    self.errors.push(MirError::validation(
-                        span,
-                        "generic call signature has unresolved type parameter",
-                    ));
+                    unresolved(self);
                     return None;
                 };
                 shape_args.push(canonical_index(self.types, concrete));
             } else {
                 let Some(bound) = type_bindings.get(&param.name).copied() else {
-                    self.errors.push(MirError::validation(
-                        span,
-                        "generic call signature has unresolved type parameter",
-                    ));
+                    unresolved(self);
                     return None;
                 };
                 type_args.push(bound);

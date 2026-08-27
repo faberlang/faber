@@ -646,6 +646,9 @@ mod receiver_method_lane_tests;
 mod mixed_shape_link_tests;
 
 #[cfg(test)]
+#[path = "sibling_generic_device_entry_test.rs"]
+mod sibling_generic_device_entry_tests;
+
 #[path = "generic_device_link_test.rs"]
 mod generic_device_link_tests;
 
