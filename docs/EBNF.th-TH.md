@@ -90,7 +90,7 @@ compact_clausura_expr ::= clausura_signature clausura_joint (expression | fac_bl
 # [028] clausura_signature
 clausura_signature ::= (clausura_param | '(' clausura_params? ')') closure_modifier? return_clause? alternate_exit_clause?
 # [029] closure_modifier
-closure_modifier ::= 'อิสระ'
+closure_modifier ::= 'อิสระ' | 'เคอร์เนล'
 # formerly: closureFacBlock
 # [030] fac_block
 fac_block ::= 'ทำ' block_stmt cape_clause?
@@ -970,7 +970,7 @@ productions. It is not a second keyword authority.
 | Declarations | `ชื่อ` | import binding name |
 | Boolean | `ไม่` | not |
 | Diagnostics | `บันทึก` | note |
-| Annotation | `เคอร์เนล` | kernel annotation |
+| Annotation | `เคอร์เนล` | kernel annotation; kernel closure modifier |
 | JSON | `null` | JSON null |
 | Testing | `ละเว้น` | skip |
 | Params | `ทั้งหมด` | all / glob |
@@ -1147,6 +1147,15 @@ Entries are trivia-delimited.
 ```fab
 sit summa ← (numerus a, numerus b) libera ∴ a + b
 clausura numerus x libera: x * 2
+```
+
+`เคอร์เนล` is the second spelling of the `closure_modifier`; the English reader spelling is `kernel`. The alternative is locale-sealed and singular: at most one modifier may occupy the slot, each reader pack admits only its declared spelling, and stacked spellings such as `free kernel` are rejected as a duplicate modifier. A `kernel` closure requires everything `free` requires — no reference to an enclosing function's local or parameter, while its own parameters, body locals, and module-level items stay legal — plus the device-safe subset used by kernel functions: typed tensors and scalars, glyphs, structured control, and calls to other device functions. Host allocation, I/O, bags, dynamic calls, `⇥` clauses, `โยน` throws, and `จับ` recovery are rejected in the kernel contract; `คืน` returns only the closure's own `→` result. Declaration annotations `@ เคอร์เนล` (`@ kernel` in the English reader) are unchanged: they remain the role marker for named functions, and the closure modifier is their expression-form twin.
+
+The body joint keeps the existing closure law: `∴` followed by one expression, or `∴ ทำ { ... }` (`do` in the English reader); bare `{ ... }` is not a closure body. A kernel closure is usable only as a local immutable binding in its enclosing function and only called there, or invoked immediately in the same expression; it is not a first-class value and cannot escape into a field, list element, return value, or ordinary-function argument. The compiler lowers it to a private synthetic kernel with a stable identity: one launch when its host caller invokes it, direct composition with no surviving device-to-device runtime call when a kernel caller invokes it, and never a public launch entry or ABI row. The modifier does not request fusion; two local kernel closures remain two launches unless a later cross-launch pass fuses them.
+
+```fab
+fixum _ duplica ← (tensor<f32, [8]> x) nucleum ∴ x + x
+fixum _ dup ← duplica(xs)
 ```
 
 - Return syntax: `→` declares the normal success type. A bodyful function with no `→` is effect-only (`vacuum`) and must not contain `คืน`. A statement-bodied closure (`ทำ { ... }` or legacy block body) must also spell `→ T` before it can use `คืน`; expression-bodied closures may infer their result from the expression.
