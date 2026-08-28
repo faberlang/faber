@@ -147,6 +147,14 @@ const EXPECTED: &[(&str, Variant, Classification)] = &[
         Variant::Bare,
         Classification::FailClosed,
     ),
+    // Emitted-output revalidation (fmt-revalidation-gate): re-analyzes the
+    // emitted single unit through the same standalone pipeline as the
+    // format compile above.
+    (
+        "crates/radix-module/src/codegen/faber/compile.rs",
+        Variant::Bare,
+        Classification::FailClosed,
+    ),
     // Provider-module analysis for codegen (one module source).
     (
         "crates/radix-module/src/codegen/mod.rs",
