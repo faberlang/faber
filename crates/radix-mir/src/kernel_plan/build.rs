@@ -645,6 +645,7 @@ impl CollectionKernelPlan {
             CollectionKernelPlan::SsmConv1d(plan) => validate_ssm_conv1d_plan(plan),
             CollectionKernelPlan::SsmScan(plan) => validate_ssm_scan_plan(plan),
             CollectionKernelPlan::DistributedSum(plan) => validate_distributed_sum_plan(plan),
+            CollectionKernelPlan::ComposedMatMul(plan) => plan.validate(),
         }
     }
 }

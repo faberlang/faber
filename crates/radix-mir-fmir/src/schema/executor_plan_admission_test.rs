@@ -7,15 +7,240 @@ use crate::schema::validate::validate_wire_program;
 use crate::schema::wire::{
     WireBarrierPhase, WireBarrierPoint, WireBinding, WireBufferIdentity, WireBufferLifetime,
     WireBufferRole, WireBufferVersion, WireCausalMaskedSoftmaxPlan, WireCollectionKernelPlan,
-    WireDependencyEdge, WireDeviceProgram, WireDeviceResource, WireDispatchSize,
-    WireInitializationPolicy, WireKernelLaunchPlan, WireKernelUnit, WireLaunchUnit,
-    WireMatMulLayout, WireMatMulPlan, WireMatMulSharedMemory, WireObservationCadence,
-    WireObservationFact, WireOobPaddingPolicy, WireProgramLifetime, WireResourceAccess,
-    WireResultBuffer, WireRmsNormalizationPlan, WireRopePlan, WireSemanticValue,
-    WireSemanticValueOrigin, WireSharedMemoryLayout, WireStorageLayout, WireTransposePlan,
-    WireWorkgroupCount, WireWorkgroupSize,
+    WireComposedMatMulEdge, WireComposedMatMulHandoff, WireComposedMatMulPlan,
+    WireComposedMatMulShape, WireComposedMatMulStage, WireComposedMatMulStageKind,
+    WireComposedMatMulStageOutput, WireDependencyEdge, WireDeviceProgram, WireDeviceResource,
+    WireDispatchSize, WireInitializationPolicy, WireKernelLaunchPlan, WireKernelUnit,
+    WireLaunchUnit, WireMatMulLayout, WireMatMulPlan, WireMatMulSharedMemory,
+    WireObservationCadence, WireObservationFact, WireOobPaddingPolicy, WireProgramLifetime,
+    WireResourceAccess, WireResultBuffer, WireRmsNormalizationPlan, WireRopePlan,
+    WireSemanticValue, WireSemanticValueOrigin, WireSharedMemoryLayout, WireStorageLayout,
+    WireTransposePlan, WireWorkgroupCount, WireWorkgroupSize,
 };
 use std::collections::BTreeSet;
+
+fn composed_matmul_wire_program() -> WireDeviceProgram {
+    let input = |id: u32, name: &str| WireBufferIdentity {
+        id,
+        name: name.to_owned(),
+        role: WireBufferRole::Input,
+        storage: WireStorageLayout::DeviceHandle,
+        lifetime: WireBufferLifetime::PerProgram,
+        semantic_value: id,
+    };
+    let scratch = |id: u32, name: &str| WireBufferIdentity {
+        id,
+        name: name.to_owned(),
+        role: WireBufferRole::InOut,
+        storage: WireStorageLayout::DeviceHandle,
+        lifetime: WireBufferLifetime::PerStep,
+        semantic_value: id,
+    };
+    let output = WireBufferIdentity {
+        id: 6,
+        name: "down".to_owned(),
+        role: WireBufferRole::Output,
+        storage: WireStorageLayout::DeviceHandle,
+        lifetime: WireBufferLifetime::ObservationPoint,
+        semantic_value: 6,
+    };
+    let version = |count| WireBufferVersion {
+        version: 1,
+        element_ty: "f32".to_owned(),
+        element_count: count,
+        reduced_projection: None,
+    };
+    let resource = |buffer, binding, access, initialization| WireDeviceResource {
+        buffer,
+        version: version(4),
+        binding: WireBinding { group: 0, binding },
+        access,
+        generation: 1,
+        initialization,
+    };
+    let output = output;
+    let stage_plan = |local, kind, access| WireComposedMatMulStage {
+        kind,
+        shape: (!matches!(kind, WireComposedMatMulStageKind::SwiGlu)).then_some(
+            WireComposedMatMulShape {
+                m: 1,
+                k: 1,
+                n: 4,
+                left_layout: WireMatMulLayout::F32,
+                right_layout: WireMatMulLayout::F32,
+            },
+        ),
+        output: WireComposedMatMulStageOutput {
+            source_local: local,
+            element_ty: WireMatMulLayout::F32,
+            element_count: 4,
+            access,
+        },
+    };
+    WireDeviceProgram {
+        kernels: vec![WireKernelUnit {
+            function: 0,
+            entry: "composed".to_owned(),
+            plan: WireCollectionKernelPlan::ComposedMatMul(WireComposedMatMulPlan {
+                stages: vec![
+                    stage_plan(
+                        10,
+                        WireComposedMatMulStageKind::Gate,
+                        WireResourceAccess::ReadWrite,
+                    ),
+                    stage_plan(
+                        11,
+                        WireComposedMatMulStageKind::Up,
+                        WireResourceAccess::ReadWrite,
+                    ),
+                    stage_plan(
+                        12,
+                        WireComposedMatMulStageKind::SwiGlu,
+                        WireResourceAccess::ReadWrite,
+                    ),
+                    stage_plan(
+                        13,
+                        WireComposedMatMulStageKind::Down,
+                        WireResourceAccess::Write,
+                    ),
+                ],
+                edges: vec![
+                    WireComposedMatMulEdge {
+                        producer: 0,
+                        consumer: 1,
+                        source_local: 10,
+                        element_ty: WireMatMulLayout::F32,
+                        element_count: 4,
+                    },
+                    WireComposedMatMulEdge {
+                        producer: 1,
+                        consumer: 2,
+                        source_local: 11,
+                        element_ty: WireMatMulLayout::F32,
+                        element_count: 4,
+                    },
+                    WireComposedMatMulEdge {
+                        producer: 2,
+                        consumer: 3,
+                        source_local: 12,
+                        element_ty: WireMatMulLayout::F32,
+                        element_count: 4,
+                    },
+                ],
+                handoff: WireComposedMatMulHandoff::WorkgroupBarrier,
+            }),
+            resources: vec![
+                resource(
+                    input(1, "x"),
+                    0,
+                    WireResourceAccess::Read,
+                    WireInitializationPolicy::HostProvided,
+                ),
+                resource(
+                    scratch(2, "gate"),
+                    1,
+                    WireResourceAccess::ReadWrite,
+                    WireInitializationPolicy::ZeroFill,
+                ),
+                resource(
+                    scratch(3, "up"),
+                    2,
+                    WireResourceAccess::ReadWrite,
+                    WireInitializationPolicy::ZeroFill,
+                ),
+                resource(
+                    scratch(4, "swiglu"),
+                    3,
+                    WireResourceAccess::ReadWrite,
+                    WireInitializationPolicy::ZeroFill,
+                ),
+                resource(
+                    output.clone(),
+                    4,
+                    WireResourceAccess::Write,
+                    WireInitializationPolicy::KernelInitialized,
+                ),
+            ],
+            launch: WireKernelLaunchPlan {
+                workgroup: WireWorkgroupSize { x: 8, y: 8, z: 1 },
+                dispatch_size: WireDispatchSize { x: 1, y: 1, z: 1 },
+                workgroup_count: WireWorkgroupCount { x: 1, y: 1, z: 1 },
+            },
+        }],
+        launches: vec![WireLaunchUnit {
+            id: 1,
+            kernel_index: 0,
+        }],
+        lifetime: WireProgramLifetime::SingleRun,
+        results: vec![WireResultBuffer {
+            buffer: output,
+            version: version(4),
+            role: WireBufferRole::Output,
+            produced_by: 1,
+            observation: WireObservationFact {
+                at_launch: 1,
+                cadence: WireObservationCadence::PerStep,
+            },
+        }],
+        semantic_values: (1..=6)
+            .map(|id| WireSemanticValue {
+                id,
+                name: format!("value_{id}"),
+                origin: match id {
+                    1 => WireSemanticValueOrigin::HostInput,
+                    2 => WireSemanticValueOrigin::MirLocal {
+                        function: 0,
+                        local: 10,
+                    },
+                    3 => WireSemanticValueOrigin::MirLocal {
+                        function: 0,
+                        local: 11,
+                    },
+                    4 => WireSemanticValueOrigin::MirLocal {
+                        function: 0,
+                        local: 12,
+                    },
+                    6 => WireSemanticValueOrigin::MirLocal {
+                        function: 0,
+                        local: 13,
+                    },
+                    _ => WireSemanticValueOrigin::Synthetic {
+                        label: format!("stage_{id}"),
+                    },
+                },
+            })
+            .collect(),
+        roots: vec![1],
+        dependencies: Vec::new(),
+        relations: Vec::new(),
+    }
+}
+
+#[test]
+fn composed_matmul_wire_plan_round_trips_and_admits() {
+    let original = composed_matmul_wire_program();
+    validate_wire_program(&original).expect("the complete composed plan admits");
+    let bytes = postcard::to_allocvec(&original).expect("composed wire program serializes");
+    let decoded: WireDeviceProgram =
+        postcard::from_bytes(&bytes).expect("composed wire program deserializes");
+    assert_eq!(
+        decoded, original,
+        "all staged facts must survive the wire round trip"
+    );
+    validate_wire_program(&decoded).expect("the round-tripped composed plan admits");
+
+    let mut malformed = decoded;
+    let WireCollectionKernelPlan::ComposedMatMul(plan) = &mut malformed.kernels[0].plan else {
+        panic!("fixture carries a composed plan");
+    };
+    plan.edges[0].source_local = 99;
+    let error = validate_wire_program(&malformed)
+        .expect_err("a stage edge with the wrong local must fail admission");
+    assert!(
+        error.to_string().contains("disagrees with its producer"),
+        "the malformed edge diagnostic must identify the typed producer mismatch: {error}"
+    );
+}
 
 fn payload() -> WireExecutorPlanV2 {
     WireExecutorPlanV2 {

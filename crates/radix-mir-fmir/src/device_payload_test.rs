@@ -2964,7 +2964,7 @@ fn gi3_inference_recipe_plans_round_trip_on_the_wire() {
 /// semantic facts, no version bump.
 #[test]
 fn r_pack_packed_kernel_plans_round_trip_on_the_wire() {
-    assert_eq!(WIRE_DEVICE_PROGRAM_VERSION, 8);
+    assert_eq!(WIRE_DEVICE_PROGRAM_VERSION, 9);
     let plans = [
         WireCollectionKernelPlan::QuantizedMatMul(WireQuantizedMatMulPlan {
             m: 8,

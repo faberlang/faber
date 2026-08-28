@@ -101,9 +101,9 @@ pub const PACKAGE_MIR_ARTIFACT_VERSION: u32 = 7;
 
 /// The accepted artifact ABI/schema version of the `DeviceArtifact` packet
 /// (DDCP3-U0 (c) / CTO9-6 c): the **exact-match** admission set for an
-/// artifact's declared `abi_version`. Rides the coordinated boundary with
-/// `HOST_CALL_ABI_VERSION == DEVICE_RUN_PLAN_VERSION` (both 8) — the
-/// versioned typed-boundary the artifact is produced against. A deliberate
+/// artifact's declared `abi_version`. Rides the coordinated artifact
+/// boundary; the nested device-program wire has its own exact-match ratchet
+/// and may advance independently. A deliberate
 /// future minor-compatibility lane is an explicit decision, never a silent
 /// addition; a packet whose `abi_version` is not this value fails admission
 /// with [`UnsupportedArtifactAbiVersion`](crate::error::FmirImageError::ArtifactAbiVersionMismatch).
@@ -138,19 +138,21 @@ pub const ARTIFACT_ABI_VERSION: u32 = 8;
 /// bump records them retroactively), and every `AxisReduction` plan +
 /// reduced buffer version carries the producer-defined **reduced-resource
 /// projection** (`axis_extent` + `inner_stride`) so consumers never
-/// reconstruct the reduced-buffer mapping from element count).
+/// reconstruct the reduced-buffer mapping from element count), and `8 → 9`
+/// by GEA3-A2f: the composed gate/up/SwiGLU/down plan and its typed staged
+/// producer facts are carried and admitted as a distinct wire variant).
 /// Admitted independently of the outer image version:
 /// [`admit_device_section`] rejects a mismatched nested version before any
 /// field-level interpretation, with a focused diagnostic
 /// ([`UnsupportedDeviceProgramVersion`](crate::error::FmirImageError::DeviceProgramVersionMismatch)).
-pub const WIRE_DEVICE_PROGRAM_VERSION: u32 = 8;
+pub const WIRE_DEVICE_PROGRAM_VERSION: u32 = 9;
 
 /// The version ratchet of the optional distributed execution section
 /// (MD2-W1 A7). The section carries its OWN nested version, admitted
 /// fail-closed **before field interpretation** (the `admit_device_section`
 /// pattern, FC4) — independently of the nested device-program wire version
 /// and the outer image version. The first distributed-section shape is v1;
-/// the nested `WIRE_DEVICE_PROGRAM_VERSION = 8` and the outer
+/// the nested `WIRE_DEVICE_PROGRAM_VERSION = 9` and the outer
 /// `PACKAGE_MIR_ARTIFACT_VERSION = 7` stay untouched (FC1).
 pub const WIRE_DISTRIBUTED_SECTION_VERSION: u32 = 1;
 

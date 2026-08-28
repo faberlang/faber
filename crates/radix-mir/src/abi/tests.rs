@@ -1,4 +1,8 @@
 use super::*;
+use crate::kernel_plan::{
+    ComposedMatMulEdge, ComposedMatMulHandoff, ComposedMatMulPlan, ComposedMatMulStage,
+    ComposedMatMulStageKind, ComposedMatMulStageOutput, MatMulShapes,
+};
 use crate::{
     MirBlock, MirBlockId, MirCollectionOp, MirConstant, MirFunction, MirFunctionId, MirIntrinsic,
     MirLayoutKind, MirLocal, MirLocalId, MirOperand, MirParam, MirParamMode, MirPlace,
@@ -241,6 +245,178 @@ fn validation_with_device_tensor_layouts(types: &TypeTable) -> MirValidationCont
         );
     }
     validation
+}
+
+fn composed_stage_plan() -> ComposedMatMulPlan {
+    let output = |local, access| ComposedMatMulStageOutput {
+        source_local: MirLocalId(local),
+        element_ty: MirScalarLayout::F32,
+        element_count: 4,
+        access,
+    };
+    let shape = || MatMulShapes {
+        m: 1,
+        k: 4,
+        n: 4,
+        left_layout: MirScalarLayout::F32,
+        right_layout: MirScalarLayout::F32,
+    };
+    ComposedMatMulPlan {
+        stages: vec![
+            ComposedMatMulStage {
+                kind: ComposedMatMulStageKind::Gate,
+                shape: Some(shape()),
+                output: output(4, MirKernelResourceAccess::ReadWrite),
+            },
+            ComposedMatMulStage {
+                kind: ComposedMatMulStageKind::Up,
+                shape: Some(shape()),
+                output: output(5, MirKernelResourceAccess::ReadWrite),
+            },
+            ComposedMatMulStage {
+                kind: ComposedMatMulStageKind::SwiGlu,
+                shape: None,
+                output: output(MirLocalId(6).0, MirKernelResourceAccess::ReadWrite),
+            },
+            ComposedMatMulStage {
+                kind: ComposedMatMulStageKind::Down,
+                shape: Some(shape()),
+                output: output(MirLocalId(7).0, MirKernelResourceAccess::Write),
+            },
+        ],
+        edges: vec![
+            ComposedMatMulEdge {
+                producer: 0,
+                consumer: 1,
+                source_local: MirLocalId(4),
+                element_ty: MirScalarLayout::F32,
+                element_count: 4,
+            },
+            ComposedMatMulEdge {
+                producer: 1,
+                consumer: 2,
+                source_local: MirLocalId(5),
+                element_ty: MirScalarLayout::F32,
+                element_count: 4,
+            },
+            ComposedMatMulEdge {
+                producer: 2,
+                consumer: 3,
+                source_local: MirLocalId(6),
+                element_ty: MirScalarLayout::F32,
+                element_count: 4,
+            },
+        ],
+        handoff: ComposedMatMulHandoff::WorkgroupBarrier,
+    }
+}
+
+fn composed_stage_function(tensor_ty: MirType) -> MirFunction {
+    let params = (0..4)
+        .map(|local| MirParam {
+            local: MirLocalId(local),
+            name: None,
+            ty: tensor_ty,
+            mode: MirParamMode::Owned,
+            span: Span::default(),
+        })
+        .collect();
+    MirFunction {
+        id: MirFunctionId(11),
+        source: Some(DefId(13)),
+        name: None,
+        params,
+        locals: (4..8)
+            .map(|local| MirLocal {
+                id: MirLocalId(local),
+                name: None,
+                ty: tensor_ty,
+                mutable: false,
+                span: Span::default(),
+            })
+            .collect(),
+        temps: Vec::new(),
+        blocks: vec![MirBlock {
+            id: MirBlockId(0),
+            statements: Vec::new(),
+            terminator: MirTerminator {
+                kind: MirTerminatorKind::Return(Some(MirOperand::Place(MirPlace::local(
+                    MirLocalId(7),
+                )))),
+                span: Span::default(),
+            },
+            span: Span::default(),
+        }],
+        return_ty: tensor_ty,
+        error_ty: None,
+        is_async: false,
+        is_generator: false,
+        shader_stage: None,
+        span: Span::default(),
+    }
+}
+
+#[test]
+fn kernel_signature_declares_composed_stage_outputs() {
+    let mut types = TypeTable::new();
+    let f32 = types.sized_numeric(Primitive::Fractus, NumericWidth::F32);
+    let dim_m = types.intern_index(IndexExpr::Literal(1));
+    let dim_n = types.intern_index(IndexExpr::Literal(4));
+    let shape = types.intern_index(IndexExpr::Tuple(vec![dim_m, dim_n]));
+    let tensor_ty = MirType::semantic(types.tensor_with_shape(f32, shape));
+    let validation = validation_with_device_tensor_layouts(&types);
+    let function = composed_stage_function(tensor_ty);
+    let mut signature = MirKernelSignature::storage_buffer_kernel(&function, &validation)
+        .expect("the ordinary tensor ABI should synthesize first");
+    signature
+        .append_composed_stage_outputs(&function, &validation, &composed_stage_plan())
+        .expect("typed composed stage outputs should append");
+
+    assert_eq!(signature.output.role, MirKernelResourceRole::Output);
+    assert_eq!(signature.output.access, MirKernelResourceAccess::Write);
+    assert_eq!(signature.output.source_local, Some(MirLocalId(7)));
+    assert_eq!(signature.output.element_ty, MirType::semantic(f32));
+    assert_eq!(signature.output.element_count, 4);
+    assert_eq!(
+        signature
+            .extra_outputs
+            .iter()
+            .map(|resource| (
+                resource.source_local,
+                resource.element_ty,
+                resource.element_count,
+                resource.role,
+                resource.access,
+                resource.binding,
+            ))
+            .collect::<Vec<_>>(),
+        vec![
+            (
+                Some(MirLocalId(4)),
+                MirType::semantic(f32),
+                4,
+                MirKernelResourceRole::Output,
+                MirKernelResourceAccess::ReadWrite,
+                5,
+            ),
+            (
+                Some(MirLocalId(5)),
+                MirType::semantic(f32),
+                4,
+                MirKernelResourceRole::Output,
+                MirKernelResourceAccess::ReadWrite,
+                6,
+            ),
+            (
+                Some(MirLocalId(6)),
+                MirType::semantic(f32),
+                4,
+                MirKernelResourceRole::Output,
+                MirKernelResourceAccess::ReadWrite,
+                7,
+            ),
+        ]
+    );
 }
 
 /// Two-param tensor kernel: `functio addita(tf32[4] a, tf32[4] b) -> tf32[4]`.

@@ -18,6 +18,7 @@ use crate::abi::{
 };
 use crate::device::MirCompanionMap;
 use crate::device_program_plans::{
+    composed_matmul_plan_for_function, composed_matmul_signature_for_emission,
     is_transformer_recipe_op, kernel_plan_for_function,
     subchain_signature_for_emission_with_source,
     transformer_subchain_signature_for_emission_with_source,
@@ -672,13 +673,60 @@ impl<'a> KernelBuilder<'a> {
         let return_tuple_locals = tuple_return_locals(function).unwrap_or_default();
 
         // Whole-function path: a single-recipe or elementwise-only body
-        // carries ONE kernel from its full ABI signature.
-        let whole_signature =
-            MirKernelSignature::storage_buffer_kernel_with_interner_for_target_entry(
+        // carries ONE kernel from its full ABI signature. A recognized
+        // composed body is an atomic one-kernel contract: if its typed ABI or
+        // plan cannot be synthesized, fail closed instead of falling through
+        // to the ordinary one-recipe decomposition path.
+        let composed_plan =
+            composed_matmul_plan_for_function(function, self.validation).map_err(|error| {
+                DeviceProgramBuildError::KernelPlan {
+                    function: function.id,
+                    detail: error.message,
+                }
+            })?;
+        let whole_signature = match composed_plan.as_ref() {
+            Some(plan) => composed_matmul_signature_for_emission(
                 function,
                 self.validation,
                 self.interner,
+                plan,
+            )
+            .map_err(|error| DeviceProgramBuildError::KernelAbi {
+                function: function.id,
+                detail: error.message,
+            }),
+            None => MirKernelSignature::storage_buffer_kernel_with_interner_for_target_entry(
+                function,
+                self.validation,
+                self.interner,
+            )
+            .map_err(|error| DeviceProgramBuildError::KernelAbi {
+                function: function.id,
+                detail: error.message,
+            }),
+        };
+        if let Some(_) = composed_plan {
+            let signature = whole_signature?;
+            let plan = kernel_plan_for_function(function, &signature, self.validation)
+                .map_err(|error| DeviceProgramBuildError::KernelPlan {
+                    function: function.id,
+                    detail: error.message,
+                })?
+                .ok_or_else(|| DeviceProgramBuildError::KernelPlan {
+                    function: function.id,
+                    detail: "composed matmul body did not resolve a carried plan".to_owned(),
+                })?;
+            return self.emit_subchain(
+                function,
+                function,
+                &signature,
+                plan,
+                base_entry,
+                None,
+                &return_tuple_locals,
+                &mut BTreeMap::new(),
             );
+        }
         if let Ok(signature) = &whole_signature {
             if let Ok(Some(plan)) = kernel_plan_for_function(function, signature, self.validation) {
                 return self.emit_subchain(
@@ -723,10 +771,7 @@ impl<'a> KernelBuilder<'a> {
                     &return_tuple_locals,
                     &mut BTreeMap::new(),
                 ),
-                Err(error) => Err(DeviceProgramBuildError::KernelAbi {
-                    function: function.id,
-                    detail: error.message,
-                }),
+                Err(error) => Err(error),
             };
         }
         let mut subchain_types = TypeTable::from_snapshot(self.validation.types.snapshot())

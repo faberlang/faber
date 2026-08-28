@@ -7,8 +7,10 @@ use crate::device_program::{
 };
 use crate::device_semantics::{
     LosslessMirCompanionEntry, MirCompanionSelectedInput, MirCompanionSelectedOutput,
+    SemanticValueOrigin,
 };
 use crate::kernel_plan::CollectionKernelPlan;
+use crate::layout::MirTensorStorageLayout;
 use crate::{
     MirAggregate, MirAggregateFields, MirAggregateItem, MirAggregateKind, MirBlock, MirBlockId,
     MirCollectionOp, MirFunction, MirFunctionId, MirIntrinsic, MirKernelShaderStage, MirLocal,
@@ -276,6 +278,112 @@ fn constructor_returns_program_and_semantics_from_validated_mir() {
     device_program
         .validate_with_semantics(&semantics)
         .expect("constructor output passes the shared semantic gate");
+}
+
+#[test]
+fn device_program_composed_stages_are_inout_and_unobserved() {
+    let mut types = TypeTable::new();
+    let mut interner = Interner::new();
+    let r2 = rank2_tensor_ty(&mut types, [4, 4]);
+    let function = device_function(
+        1,
+        &mut interner,
+        "composed_mlp",
+        &[
+            (0, "x", r2),
+            (1, "gate_weight", r2),
+            (2, "up_weight", r2),
+            (3, "down_weight", r2),
+            (4, "gate", r2),
+            (5, "up", r2),
+            (6, "swiglu", r2),
+            (7, "down", r2),
+        ],
+        &[0, 1, 2, 3],
+        vec![
+            collection_statement(MirCollectionOp::TensorMatMul, &[0, 1], 4, r2),
+            collection_statement(MirCollectionOp::TensorMatMul, &[0, 2], 5, r2),
+            collection_statement(MirCollectionOp::TensorMul, &[4, 5], 6, r2),
+            collection_statement(MirCollectionOp::TensorMatMul, &[6, 3], 7, r2),
+        ],
+        Some(MirOperand::Place(MirPlace::local(MirLocalId(7)))),
+        Vec::new(),
+        r2,
+        true,
+    );
+    let validated = validated(&types, vec![function]);
+    let (program, semantics, _) = build_device_program(
+        &validated,
+        &interner,
+        &MirCompanionMap::default(),
+        None,
+        DeviceProgramLifetime::SingleRun,
+        0,
+    )
+    .expect("the composed body should materialize as one device kernel");
+
+    assert_eq!(program.kernels.len(), 1);
+    assert_eq!(program.launches.len(), 1);
+    assert!(matches!(
+        program.kernels[0].plan,
+        CollectionKernelPlan::ComposedMatMul(_)
+    ));
+    let stage_resources: Vec<_> = program.kernels[0]
+        .resources
+        .iter()
+        .filter(|resource| resource.access == MirKernelResourceAccess::ReadWrite)
+        .collect();
+    assert_eq!(stage_resources.len(), 3);
+    assert_eq!(
+        stage_resources
+            .iter()
+            .map(|resource| resource.binding.binding)
+            .collect::<Vec<_>>(),
+        vec![5, 6, 7]
+    );
+    assert!(stage_resources
+        .iter()
+        .all(|resource| resource.buffer.role == BufferRole::InOut));
+    assert!(stage_resources
+        .iter()
+        .all(|resource| resource.buffer.storage == MirTensorStorageLayout::DeviceHandle));
+    assert!(stage_resources
+        .iter()
+        .all(|resource| resource.version.version == 1));
+    assert_eq!(
+        stage_resources
+            .iter()
+            .map(|resource| resource.buffer.id)
+            .collect::<BTreeSet<_>>()
+            .len(),
+        3,
+        "Gate, Up, and SwiGLU need distinct scratch identities"
+    );
+    for (resource, local) in stage_resources.iter().zip([4, 5, 6]) {
+        let value = semantics
+            .values
+            .iter()
+            .find(|value| value.id.0 == resource.buffer.id.0)
+            .expect("every stage buffer has a semantic value");
+        assert_eq!(
+            value.origin,
+            SemanticValueOrigin::MirLocal {
+                function: MirFunctionId(1),
+                local,
+            }
+        );
+    }
+    assert_eq!(program.results.len(), 1, "only Down is host-observed");
+    assert_eq!(program.results[0].buffer.role, BufferRole::Output);
+    assert!(stage_resources.iter().all(|resource| {
+        !program
+            .results
+            .iter()
+            .any(|result| result.buffer.id == resource.buffer.id)
+    }));
+    program
+        .validate_with_semantics(&semantics)
+        .expect("composed stage materialization passes semantic validation");
 }
 
 // ── DPSC-U4a gap 1: the decomposition fallback (oracle: faber

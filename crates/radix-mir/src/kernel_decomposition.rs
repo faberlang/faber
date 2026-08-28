@@ -172,6 +172,45 @@ pub fn decompose_kernel_function_with_limit(
     }
     let block = &function.blocks[0];
 
+    // The admitted gate/up/SwiGLU/down region is one carried recipe, not a
+    // sequence of ordinary recipe subchains. Keep this atomic even when a
+    // caller enters the decomposition API directly; the device-program
+    // constructor takes the same whole-function route before reaching this
+    // fallback. The stage-local producer/consumer edges remain in the
+    // composed plan rather than being reconstructed as cross-kernel edges.
+    if let Some(plan) =
+        crate::device_program_plans::composed_matmul_plan_for_function(function, validation)?
+    {
+        let input_count = function
+            .params
+            .iter()
+            .filter(|param| !crate::abi::is_vacuum(param.ty, validation))
+            .count();
+        let buffer_count = input_count.saturating_add(plan.stages.len());
+        if !limit.admits(buffer_count) {
+            return Err(PlanMappingError::mapping(format!(
+                "composed matmul storage-buffer count {buffer_count} exceeds the {}-buffer binding maximum; the staged body cannot be split",
+                limit.max_storage_buffers
+            )));
+        }
+        let statements = (0..block.statements.len()).collect();
+        let produced = block
+            .statements
+            .iter()
+            .rev()
+            .find_map(crate::read_analysis::statement_destination);
+        return Ok(KernelDecomposition {
+            subchains: vec![KernelSubchain {
+                statements,
+                plan: CollectionKernelPlan::ComposedMatMul(plan.clone()),
+                elementwise_plan: None,
+                consumes: Vec::new(),
+                produced,
+                outputs: vec![plan.stages[3].output.source_local],
+            }],
+        });
+    }
+
     // Slice the statement stream at recipe boundaries. `current` holds the
     // source statement indices of the open subchain; `current_has_recipe`
     // tracks whether the open subchain already adopted a recipe (a second
