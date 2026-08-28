@@ -270,6 +270,46 @@ fn lean_checker_axiom_parse_output_empty() {
     assert!(audit.dependencies.is_empty());
 }
 
+// ---------------------------------------------------------------------------
+// APA P2-1 (want, ruling 6a0fafde option (b)): empty #print-axioms
+// output — the silent unresolved wrapper import — must never classify Allowed.
+// ---------------------------------------------------------------------------
+
+#[test]
+fn lean_checker_axiom_empty_print_output_never_classifies_allowed() {
+    // An unresolved wrapper import can present as EMPTY output (lean exits
+    // quietly without printing anything). No parsed decl lines and no
+    // explicit error means the audit has zero evidence: it must be
+    // unresolved, never a silent Allowed.
+    let audit = parse_axiom_output("");
+    assert!(audit.dependencies.is_empty());
+    assert!(audit.unresolved_import, "empty audit output must be unresolved_import");
+    assert_ne!(LeanAspectChecker::classify_axioms(&audit), AxiomVerdict::Allowed);
+
+    let result = combined_verdict(proven_result(), &LeanAspectChecker::classify_axioms(&audit), &SorryVerdict::Clean);
+    assert_eq!(result.status, HirAspectCheckStatus::Failed);
+    assert!(result.evidence.0.contains("unresolved"));
+}
+
+#[test]
+fn lean_checker_axiom_garbage_output_without_resolution_is_unresolved() {
+    // Output with neither parsed decl lines nor explicit error evidence is
+    // not proof that the wrapper import resolved.
+    let audit = parse_axiom_output("some random garbage\nnot axiom output\n");
+    assert!(audit.unresolved_import);
+    assert_ne!(LeanAspectChecker::classify_axioms(&audit), AxiomVerdict::Allowed);
+}
+
+#[test]
+fn lean_checker_axiom_explicit_no_axioms_line_is_resolved() {
+    // A real "does not depend on any axioms" line proves the import
+    // resolved — that stays a trustworthy (allowed) audit.
+    let output = "'simpleThm' does not depend on any axioms\n";
+    let audit = parse_axiom_output(output);
+    assert!(!audit.unresolved_import);
+    assert_eq!(LeanAspectChecker::classify_axioms(&audit), AxiomVerdict::Allowed);
+}
+
 #[test]
 fn lean_checker_axiom_parse_output_malformed_is_empty() {
     let audit = parse_axiom_output("some random garbage\nnot axiom output\n");

@@ -814,9 +814,12 @@ pub fn combined_verdict(
 #[must_use]
 pub fn parse_axiom_output(output: &str) -> AxiomAudit {
     let mut dependencies = Vec::new();
-    // Fail-closed (operator ruling 6a0fafde option (b)): explicit Lean
-    // errors — an unresolved wrapper import above all — mean the audit ran
-    // without trustworthy evidence and must never classify as Allowed.
+    // Fail-closed (operator ruling 6a0fafde option (b), APA P2-1): the
+    // audit is trustworthy only when the wrapper import demonstrably
+    // resolved — at least one parsed `'decl'` audit line — or when an
+    // explicit error says it did not. Empty or unparsable output (the
+    // silent unresolved import) must never classify as Allowed.
+    let mut resolved_decl_line = false;
     let unresolved_import = is_unresolved_import_evidence(output);
 
     for line in output.lines() {
@@ -828,6 +831,7 @@ pub fn parse_axiom_output(output: &str) -> AxiomAudit {
         let Some((decl, suffix)) = rest.split_once('\'') else {
             continue;
         };
+        resolved_decl_line = true;
 
         if let Some(axiom_part) = suffix.strip_prefix(" depends on axioms: [") {
             let axiom_part = axiom_part.trim_end_matches(']');
@@ -841,7 +845,7 @@ pub fn parse_axiom_output(output: &str) -> AxiomAudit {
         // "does not depend on any axioms" → nothing to record
     }
 
-    AxiomAudit { dependencies, unresolved_import }
+    AxiomAudit { dependencies, unresolved_import: unresolved_import || !resolved_decl_line }
 }
 
 /// Whether `#print axioms` output carries explicit error evidence (unresolved
