@@ -105,6 +105,61 @@ fn runtime_extent_resource(binding: u32, extent_ty: TypeId) -> MirKernelResource
 /// PRODUCTION INVARIANT: the GPU builtin registry interns `numerus<u32>`
 /// for every kernel program, so real kernels always carry the extent; only
 /// hand-built unit tables may lack it (`abi_test` pins the fallback).
+/// PGC-R1: the storage element count of a row-gather ids input — the
+/// kernel param typed exactly `Array(numerus<u32>)` that is the function's
+/// `TensorGather` ids operand (`args[1]` of the gather statement). The
+/// count is the gather's output row count `T`, resolved from the
+/// statement's return-type dims (`[T, D]`) — the same typed fact
+/// `gather_recipe_facts` (kernel_plan/build.rs) admits, so the ids buffer
+/// count and the GatherPlan's `id_count` cannot disagree. `None` — the
+/// input keeps the ordinary device-view law — when the param is not the
+/// typed gather ids operand of a well-shaped gather statement.
+fn gather_ids_param_count(
+    function: &MirFunction,
+    param: &MirParam,
+    validation: &MirValidationContext<'_>,
+) -> Option<u64> {
+    let is_ids_layout = matches!(
+        validation.types.get(param.ty.semantic_id()),
+        Type::Array(element)
+            if matches!(
+                validation.types.get(*element),
+                Type::SizedNumeric(Primitive::Numerus, NumericWidth::U32)
+            )
+    );
+    if !is_ids_layout {
+        return None;
+    }
+    for block in &function.blocks {
+        for statement in &block.statements {
+            if crate::collection_ops::statement_collection_op(statement)
+                != Some(crate::MirCollectionOp::TensorGather)
+            {
+                continue;
+            }
+            let crate::MirStatementKind::RuntimeCall {
+                call: crate::MirRuntimeCall { args, return_ty, .. },
+                ..
+            } = &statement.kind
+            else {
+                continue;
+            };
+            let Some(crate::MirOperand::Place(place)) = args.get(1) else {
+                return None;
+            };
+            if place.base != crate::MirPlaceBase::Local(param.local) {
+                return None;
+            }
+            let dims = crate::tensor_type::tensor_literal_dims(*return_ty, validation).ok()?;
+            if dims.len() != 2 || dims[0] == 0 {
+                return None;
+            }
+            return Some(dims[0]);
+        }
+    }
+    None
+}
+
 fn maybe_append_runtime_extent(
     function: &MirFunction,
     signature: &mut MirKernelSignature,
@@ -948,6 +1003,36 @@ impl MirKernelSignature {
         let output_element_count = device_view_element_count(output.ty, validation)?;
         let mut input_resources = Vec::new();
         for (binding, input) in inputs.iter().enumerate() {
+            // PGC-R1: a row-gather ids input — a kernel input param typed
+            // exactly `Array(numerus<u32>)` that is this function's
+            // `TensorGather` ids operand (the gather signature's first
+            // extra input at the u32 kernel-index layout, gi3-contract.md
+            // §1.2). It binds as a read-only storage buffer whose element
+            // count is the gather's output row count `T` — the same typed
+            // fact the GatherPlan admission cross-checks. Every other input
+            // keeps the device-view law unchanged.
+            if let Some(count) = gather_ids_param_count(function, input, validation) {
+                let element_ty = MirType::semantic(
+                    validation
+                        .types
+                        .find_sized_numeric(Primitive::Numerus, NumericWidth::U32)
+                        .ok_or_else(|| MirAbiError::new("gather ids requires numerus<u32>"))?,
+                );
+                input_resources.push(MirKernelResource {
+                    group: DEFAULT_KERNEL_RESOURCE_GROUP,
+                    binding: u32::try_from(binding)
+                        .map_err(|_| MirAbiError::new(ERR_KERNEL_RESOURCE_BINDING_OVERFLOW))?,
+                    kind: MirKernelResourceKind::StorageBuffer,
+                    role: MirKernelResourceRole::Input,
+                    access: MirKernelResourceAccess::Read,
+                    element_ty,
+                    element_count: count,
+                    source_local: Some(input.local),
+                    source_name: param_source_name(input, context.interner),
+                    reduced_projection: None,
+                });
+                continue;
+            }
             let input_element_ty = device_view_element_type(
                 input.ty,
                 validation,
