@@ -1,0 +1,24 @@
++++
+term = "nucleum"
+kind = "keyword"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "closure_modifier", "compact_clausura_expr", "clausura_signature", "clausura_param", "clausura_params", "clausura_joint", "fac_block", "cape_clause", "call_expr", "call_suffix", "argument_list", "argument", "array_literal", "typed_constructor", "field_list", "field_init", "field_key", "expression", "additive_expr", "multiplicative_expr", "literal", "nota_stmt", "genus_decl", "genus_member", "field_decl"]
+category = "function"
+summary = "A kernel closure may use the existing do block body after the closure joint."
+syntax = "(int value) kernel → int ∴ do { ... }"
+related = ["nucleum", "clausura", "libera"]
+locale = "en"
++++
+# =============================================================================
+# nucleum — kernel closure with a do/fac body
+# =============================================================================
+# `do` is the English reader spelling of the existing block body law. Kernel
+# status belongs to the closure signature, not to `do`.
+# =============================================================================
+
+main {
+    const _ twice ← (int value) kernel → int ∴ do {
+        const int shifted ← value + 1
+        return shifted * 2
+    }
+    const int result ← twice(5)
+}
