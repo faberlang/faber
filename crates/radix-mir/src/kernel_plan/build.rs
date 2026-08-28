@@ -103,6 +103,18 @@ impl CollectionKernelPlan {
         matmul_shapes: Option<MatMulShapes>,
     ) -> Option<CollectionKernelPlan> {
         match *contract {
+            // PGC-R5 (verdict 91fe3d59): the row-reduction family. The
+            // contract owns only launch geometry (one workgroup per row),
+            // never plan facts: both ops are transformer recipe ops, so
+            // every live resolution path (the whole-function scan, the
+            // subchain seam, the emitters' cross-check) resolves the frozen
+            // RmsNormalization/CausalMaskedSoftmax plans through
+            // `from_transformer_op` with the SAME signature (element
+            // counts are the generic 1D facts). This arm exists only to
+            // keep the contract match exhaustive; a caller that reaches it
+            // has routed a row-reduction op through the contract plan pass
+            // and fails closed (None) instead of guessing plan facts.
+            CollectionOpContract::RowReduction { .. } => None,
             CollectionOpContract::Reduction {
                 length,
                 workgroup_x,
@@ -1265,7 +1277,25 @@ fn transformer_operand_dims(
     operand: &MirOperand,
     validation: &MirValidationContext<'_>,
 ) -> Option<Vec<u64>> {
-    let ty = crate::local_ty::operand_local_ty(function, operand)?;
+    // PGC-R5: the additive-idiom softmax reads an elementwise TEMP
+    // (`(x + mask)` — the GEA2-U5e surface); its type lives in the temps
+    // table, which the local-only `operand_local_ty` cannot read (the same
+    // temp-aware lookup the ABI contract resolver applies).
+    let ty = crate::local_ty::operand_local_ty(function, operand).or_else(|| {
+        let temp = match operand {
+            MirOperand::Temp(temp) => Some(*temp),
+            MirOperand::Place(place) => match place.base {
+                MirPlaceBase::Temp(temp) => Some(temp),
+                MirPlaceBase::Local(_) => None,
+            },
+            _ => None,
+        }?;
+        function
+            .temps
+            .iter()
+            .find(|entry| entry.id == temp)
+            .map(|entry| entry.ty)
+    })?;
     crate::tensor_type::tensor_literal_dims(ty, validation).ok()
 }
 

@@ -18,8 +18,7 @@ use crate::abi::{
     DEFAULT_STORAGE_BUFFER_LIMIT,
 };
 use crate::device_program::{
-    Binding, BufferRole, DeviceProgram, DeviceProgramError, DeviceResource, KernelLaunchPlan,
-    KernelUnit,
+    Binding, BufferRole, DeviceProgram, DeviceProgramError, DeviceResource, KernelUnit,
 };
 use crate::kernel_plan::{
     BatchedAttentionKind, CollectionKernelPlan, MatMulShapes, SharedMemoryLayout,
@@ -230,8 +229,18 @@ pub fn kernel_plan_for_function_with_limit(
     // are resolved once from the body's matmul statement scan.
     let contract = collection_op_contract(function, validation)?;
     let matmul_shapes = kernel_matmul_shapes(function, validation)?;
+    let stability_max_dead = crate::abi::stability_max_is_dead(function);
     let mut recipe: Option<CollectionKernelPlan> = None;
     for op in ops {
+        // PGC-R5: a DEAD stability-max reduction is not a recipe — the
+        // same dead skip the contract resolver applies (the `_stability_max`
+        // idiom of the causal-softmax entries; the emitters' dead skips are
+        // the precedent).
+        if stability_max_dead
+            && matches!(op, MirCollectionOp::TensorMax | MirCollectionOp::TensorMin)
+        {
+            continue;
+        }
         if is_transformer_recipe_op(op) {
             // S6-P1: the transformer recipes have no `CollectionOpContract`
             // variant; the plan pass resolves them from the function's typed
@@ -2281,7 +2290,7 @@ pub fn per_output_domains(kernel: &KernelUnit) -> Vec<PerOutputDomain> {
 /// own domain exceeds the dispatched lanes.
 pub fn validate_per_output_domains(program: &DeviceProgram) -> Result<(), DeviceProgramError> {
     for (kernel_index, kernel) in program.kernels.iter().enumerate() {
-        let dispatched = dispatched_lanes(&kernel.launch);
+        let dispatched = dispatched_lanes(kernel);
         for domain in per_output_domains(kernel) {
             if domain.element_count > dispatched {
                 return Err(DeviceProgramError::OutputExtentUnderfilled {
@@ -2297,15 +2306,58 @@ pub fn validate_per_output_domains(program: &DeviceProgram) -> Result<(), Device
     Ok(())
 }
 
-/// The total lanes the shared dispatch launches: workgroup count ×
-/// workgroup size across all three axes.
-fn dispatched_lanes(launch: &KernelLaunchPlan) -> u64 {
-    launch.workgroup_count.x
+/// The output coverage of the shared dispatch: workgroup count ×
+/// workgroup size across all three axes — one lane per element for the
+/// per-element launches. The PGC-R5 row-reduction family is the one
+/// collective 1D exception: one `ROW_REDUCTION_WORKGROUP_X`-lane workgroup
+/// owns one FULL row (the `RowReduction` contract's law), so the write
+/// coverage is workgroups × row width, not lanes — the per-thread
+/// under-coverage oracle does not apply (a workgroup writes a whole row,
+/// not one element; the tiled-matmul over-cover class is the precedent).
+/// Keyed on the contract-minted launch shape for the three row-reduction
+/// plans; an under-rowed launch still under-fills and fails closed.
+fn dispatched_lanes(kernel: &KernelUnit) -> u64 {
+    let launch = &kernel.launch;
+    let lanes = launch.workgroup_count.x
         * u64::from(launch.workgroup.x)
         * launch.workgroup_count.y
         * u64::from(launch.workgroup.y)
         * launch.workgroup_count.z
-        * u64::from(launch.workgroup.z)
+        * u64::from(launch.workgroup.z);
+    if launch.workgroup.y == 1
+        && launch.workgroup.z == 1
+        && launch.workgroup.x == crate::kernel_plan::ROW_REDUCTION_WORKGROUP_X
+    {
+        let workgroups = launch.workgroup_count.x;
+        match &kernel.plan {
+            CollectionKernelPlan::RmsNormalization(plan) => {
+                return workgroups.saturating_mul(plan.width);
+            }
+            CollectionKernelPlan::CausalMaskedSoftmax(plan) => {
+                return workgroups.saturating_mul(plan.cols);
+            }
+            // The additive-mask softmax idiom (a `RowSoftmax` plan under
+            // the row launch): the row width is the output extent
+            // partitioned by the row workgroups — coverage is the row
+            // partition itself (an indivisible extent keeps the lane law
+            // and fails closed).
+            CollectionKernelPlan::RowSoftmax(_) => {
+                if let Some(output) = kernel.resources.iter().rev().find(|resource| {
+                    matches!(
+                        resource.access,
+                        MirKernelResourceAccess::Write | MirKernelResourceAccess::ReadWrite
+                    )
+                }) {
+                    let extent = output.version.element_count;
+                    if workgroups > 0 && extent % workgroups == 0 {
+                        return extent;
+                    }
+                }
+            }
+            _ => {}
+        }
+    }
+    lanes
 }
 
 /// The recipe's shared-memory footprint in bytes (the host sizes the
@@ -2789,6 +2841,56 @@ pub fn contract_shape_signature(
             signature.dispatch_size = MirKernelDispatchSize {
                 x: dispatch_x,
                 y: dispatch_y,
+                z: 1,
+            };
+        }
+        // PGC-R5 (verdict 91fe3d59): the row-reduction family. Resources
+        // are the SAME facts the transformer seam builds (input at the
+        // flattened dims, RMSNorm's gamma as the typed extra input with the
+        // output at binding 2, output at the flattened dims); only the
+        // launch geometry is the row-reduction contract (one workgroup per
+        // row). A mixed subchain (additional consumed outputs) keeps the
+        // generic 1D dispatch — a rows grid would under-cover the extra
+        // output writes (the R6 P1 union-dispatch law).
+        CollectionOpContract::RowReduction { rows, width } => {
+            let op = if is_recipe_op_scan(function, MirCollectionOp::TensorRmsNorm) {
+                MirCollectionOp::TensorRmsNorm
+            } else {
+                MirCollectionOp::TensorCausalMaskedSoftmax
+            };
+            let operand_ty = recipe_operand_ty(function, op)?;
+            let element_ty = tensor_element_ty(operand_ty, validation)?;
+            let extent = rows.saturating_mul(width);
+            signature.input = storage_input(0, element_ty, extent);
+            signature.output = storage_output(1, element_ty, extent);
+            signature.output.source_local = recipe_destination_local_for(function, op);
+            if op == MirCollectionOp::TensorRmsNorm {
+                let gamma_local = rms_norm_gamma_local(function).ok_or_else(|| {
+                    PlanMappingError::mapping(
+                        "TensorRmsNorm gamma peer has no local in the subchain body",
+                    )
+                })?;
+                let gamma_ty = function_local_ty(function, gamma_local)?;
+                let (gamma_element_ty, gamma_count) =
+                    data_flow_element_ty_and_count(gamma_ty, validation)?;
+                signature.extra_inputs.push(storage_input_with_local(
+                    1,
+                    gamma_element_ty,
+                    gamma_count,
+                    gamma_local,
+                ));
+                signature.output.binding = 2;
+            }
+            let lanes = u64::from(crate::kernel_plan::ROW_REDUCTION_WORKGROUP_X);
+            signature.workgroup = MirWorkgroupSize {
+                x: crate::kernel_plan::ROW_REDUCTION_WORKGROUP_X,
+                y: 1,
+                z: 1,
+            };
+            // 1D dispatch law: threads (rows workgroups × lanes).
+            signature.dispatch_size = MirKernelDispatchSize {
+                x: rows.saturating_mul(lanes),
+                y: 1,
                 z: 1,
             };
         }
@@ -3324,6 +3426,40 @@ pub fn transformer_subchain_signature_for_emission_with_source(
     // by its own extent, so the union dispatch never overruns the smaller
     // recipe buffer (R6 P1, mirroring the elementwise multi-output union).
     apply_transformer_union_dispatch(&mut signature);
+    // PGC-R5 (verdict 91fe3d59): the row-reduction family hands its two
+    // ops to the contract geometry — one workgroup per row — whenever the
+    // admission predicate resolves and the subchain has no additional
+    // consumed outputs (a mixed subchain keeps the union 1D dispatch; the
+    // emitter's per-element body covers the tail writes).
+    if matches!(
+        op,
+        MirCollectionOp::TensorRmsNorm | MirCollectionOp::TensorCausalMaskedSoftmax
+    ) && signature.extra_outputs.is_empty()
+    {
+        let admission = if op == MirCollectionOp::TensorRmsNorm {
+            crate::kernel_plan::rmsnorm_row_reduction_admission
+        } else {
+            crate::kernel_plan::causal_softmax_row_reduction_admission
+        };
+        if let Some((dims, _)) =
+            crate::kernel_plan::transformer_recipe_shape(function, validation, op)
+        {
+            if dims.len() == 2 && admission(dims[0], dims[1]).is_some() {
+                let lanes = u64::from(crate::kernel_plan::ROW_REDUCTION_WORKGROUP_X);
+                signature.workgroup = MirWorkgroupSize {
+                    x: crate::kernel_plan::ROW_REDUCTION_WORKGROUP_X,
+                    y: 1,
+                    z: 1,
+                };
+                // 1D dispatch law: threads (rows workgroups × lanes).
+                signature.dispatch_size = MirKernelDispatchSize {
+                    x: dims[0].saturating_mul(lanes),
+                    y: 1,
+                    z: 1,
+                };
+            }
+        }
+    }
     Ok(signature)
 }
 
@@ -3643,8 +3779,18 @@ pub fn resolve_subchain_plan(
     validation: &MirValidationContext<'_>,
 ) -> Result<CollectionKernelPlan, PlanMappingError> {
     let ops = crate::collection_ops::collection_ops_with_read_context(function, read_context);
+    let stability_max_dead = crate::abi::stability_max_is_dead(function);
     let mut recipe_op: Option<MirCollectionOp> = None;
     for op in ops {
+        // PGC-R5: a DEAD stability-max reduction is not a recipe — the
+        // same dead skip the contract resolver applies (a subchain whose
+        // only recipe is a dead stability max keeps the elementwise lane;
+        // the emitters' dead skips are the precedent).
+        if stability_max_dead
+            && matches!(op, MirCollectionOp::TensorMax | MirCollectionOp::TensorMin)
+        {
+            continue;
+        }
         if is_recipe_op(op) {
             if let Some(existing) = recipe_op {
                 if existing != op {

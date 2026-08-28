@@ -2297,3 +2297,42 @@ fn simdgroup_admission_refuses_non_class_shapes() {
         "the vocab-scale lm_head twin must keep the frozen scalar emission"
     );
 }
+
+/// PGC-R5: the row-reduction admission facts. The pinned family —
+/// `prefill_rmsnorm`/`head_rmsnorm` at `[·, 960]` (a full simdgroup of
+/// strided columns, float4-aligned width) and `prefill_causal_softmax` at
+/// `[36, 36]` — admits the one-workgroup-per-row launch; the decode T=1
+/// masked softmax (B1/B2-landed extents and body) refuses, and shapes
+/// without a full lane count or without float4 alignment keep the frozen
+/// per-element 1D contract.
+#[test]
+fn row_reduction_admission_covers_pinned_family_and_refuses_others() {
+    use crate::{causal_softmax_row_reduction_admission, rmsnorm_row_reduction_admission};
+
+    let prefill = rmsnorm_row_reduction_admission(36, 960).expect("prefill_rmsnorm admits");
+    assert_eq!(prefill.rows, 36);
+    assert_eq!(prefill.width, 960);
+    assert_eq!(prefill.workgroup_x, ROW_REDUCTION_WORKGROUP_X);
+    // head_rmsnorm is T=1 — the recipe is row-wise at any row count (the
+    // decode rmsnorm twin shares the MIR shape and the family).
+    let head = rmsnorm_row_reduction_admission(1, 960).expect("head_rmsnorm admits");
+    assert_eq!(head.rows, 1);
+
+    let softmax = causal_softmax_row_reduction_admission(36, 36).expect("prefill softmax admits");
+    assert_eq!(softmax.rows, 36);
+    assert_eq!(softmax.width, 36);
+
+    // The decode T=1 masked softmax keeps the frozen per-element body.
+    assert!(
+        causal_softmax_row_reduction_admission(1, 76).is_none(),
+        "decode_masked_softmax must keep the generic 1D contract"
+    );
+    // Below a full lane count: no row reduction.
+    assert!(rmsnorm_row_reduction_admission(4, 8).is_none());
+    assert!(causal_softmax_row_reduction_admission(9, 9).is_none());
+    // float4-unaligned width: no vectorized scale pass, no admission.
+    assert!(rmsnorm_row_reduction_admission(2, 34).is_none());
+    // Zero extents fail closed.
+    assert!(rmsnorm_row_reduction_admission(0, 960).is_none());
+    assert!(rmsnorm_row_reduction_admission(36, 0).is_none());
+}

@@ -1,6 +1,7 @@
 use crate::{
-    MirCollectionOp, MirConstant, MirFunction, MirIntrinsic, MirOperand, MirParam, MirParamMode,
-    MirPlaceBase, MirRuntimeCall, MirStatementKind, MirValidationContext,
+    MirCollectionOp, MirConstant, MirFunction, MirIntrinsic, MirLocalId, MirOperand, MirParam,
+    MirParamMode, MirPlace, MirPlaceBase, MirRuntimeCall, MirStatement, MirStatementKind,
+    MirTempId, MirType, MirValidationContext, MirValueKind,
 };
 use radix_lexer::Interner;
 use radix_types::NumericWidth;
@@ -157,6 +158,23 @@ pub enum CollectionOpContract {
         scale_bits: u32,
         /// Flat output element count.
         output_elements: u64,
+    },
+    /// PGC-R5 row-reduction contract (`TensorRmsNorm` /
+    /// `TensorCausalMaskedSoftmax`, head-cto verdict `91fe3d59`): one
+    /// workgroup per row — `ROW_REDUCTION_WORKGROUP_X` lanes tree-reduce
+    /// the row statistic in threadgroup memory, then a vectorized scale
+    /// pass writes the row. Buffer counts and element counts are
+    /// UNCHANGED from the generic 1D contract; only the launch geometry
+    /// differs (`workgroup (32,1,1)`, `dispatch (rows,1,1)`). Resolution
+    /// is admission-gated
+    /// ([`crate::kernel_plan::rmsnorm_row_reduction_admission`] /
+    /// [`crate::kernel_plan::causal_softmax_row_reduction_admission`]):
+    /// non-admitted shapes keep the generic 1D contract byte-for-byte.
+    RowReduction {
+        /// Row count (one workgroup per row; the dispatch extent).
+        rows: u64,
+        /// Row width (the reduction extent the lanes stride over).
+        width: u64,
     },
     /// SSM conv1d (R-PACK-01A). 1D elementwise-style dispatch over
     /// `length · channels`.
@@ -394,6 +412,30 @@ pub(crate) fn apply_collection_op_contract(
                 z: 1,
             };
         }
+        CollectionOpContract::RowReduction { rows, .. } => {
+            // PGC-R5: one workgroup per row. Only the launch geometry
+            // changes — buffer bindings and element counts stay the
+            // generic-1D facts. Gated on the single-output shape: a kernel
+            // with additional outputs or accumulation buffers keeps the 1D
+            // contract (a rows grid would under-cover the extra writes).
+            if signature.extra_outputs.is_empty() && signature.accumulation_buffers.is_empty() {
+                let lanes = u64::from(crate::kernel_plan::ROW_REDUCTION_WORKGROUP_X);
+                signature.workgroup = MirWorkgroupSize {
+                    x: crate::kernel_plan::ROW_REDUCTION_WORKGROUP_X,
+                    y: 1,
+                    z: 1,
+                };
+                // The 1D dispatch law counts THREADS (the reduction
+                // contract's law): rows workgroups × 32 lanes, so the
+                // derived `ceil(dispatch / workgroup)` grid is exactly the
+                // row count.
+                signature.dispatch_size = MirKernelDispatchSize {
+                    x: rows.saturating_mul(lanes),
+                    y: 1,
+                    z: 1,
+                };
+            }
+        }
         CollectionOpContract::Transpose { m, n } => {
             // Elementwise-style 1D contract: one thread per output element
             // of the rank-2 remap (S5-U1).
@@ -542,6 +584,22 @@ pub fn collection_op_contract(
                 | MirCollectionOp::TensorMean
                 | MirCollectionOp::TensorMax
                 | MirCollectionOp::TensorMin => {
+                    // PGC-R5: skip the DEAD stability-max idiom — a
+                    // `TensorMax`/`TensorMin` whose temp destination only
+                    // copies into scalar locals nothing ever reads (the
+                    // `_stability_max` coalesce const of the causal-softmax
+                    // idiom is the standing example). Narrow by
+                    // construction: Sum/Mean reductions and any
+                    // tensor-typed copy stay live (a later subchain may
+                    // read them — the S3-A5 cross-subchain blind spot),
+                    // and the emitters' dead skips are the precedent.
+                    if matches!(op, MirCollectionOp::TensorMax | MirCollectionOp::TensorMin)
+                        && destination
+                            .as_ref()
+                            .is_some_and(|dest| reduction_destination_is_dead(function, dest))
+                    {
+                        continue;
+                    }
                     let Some(operand_ty) = args
                         .first()
                         .and_then(|arg| crate::local_ty::operand_local_ty(function, arg))
@@ -661,11 +719,307 @@ pub fn collection_op_contract(
                 MirCollectionOp::TensorSsmScan => {
                     return Ok(Some(ssm_scan_contract(function, args, validation)?));
                 }
+                // PGC-R5 (verdict 91fe3d59): the row-reduction family.
+                // Admission-gated — a non-admitted shape keeps scanning
+                // (no contract) and lands on the generic 1D contract with
+                // its frozen per-element emission.
+                MirCollectionOp::TensorRmsNorm => {
+                    if let Some(contract) = row_reduction_contract(
+                        function,
+                        validation,
+                        op,
+                        crate::kernel_plan::rmsnorm_row_reduction_admission,
+                    )? {
+                        return Ok(Some(contract));
+                    }
+                }
+                // PGC-R5 additive-idiom twin: the causal softmax entries
+                // lower as a plain `TensorSoftmax` over an `(x + mask)`
+                // elementwise temp (the GEA2-U5e surface — the mask carries
+                // the causality as data). Under the established mask data
+                // contract (0 at/below the diagonal, -inf above) the causal
+                // row reduction is the exact same output class, so the
+                // multi-row idiom resolves the same RowReduction contract.
+                // A plain softmax (operand is a direct tensor input) never
+                // matches and keeps the generic 1D contract.
+                MirCollectionOp::TensorSoftmax => {
+                    if args.first().is_some_and(|operand| {
+                        softmax_operand_is_additive_mask_temp(function, operand)
+                    }) {
+                        if let Some(contract) = row_reduction_contract(
+                            function,
+                            validation,
+                            op,
+                            crate::kernel_plan::causal_softmax_row_reduction_admission,
+                        )? {
+                            return Ok(Some(contract));
+                        }
+                    }
+                }
+                MirCollectionOp::TensorCausalMaskedSoftmax => {
+                    if let Some(contract) = row_reduction_contract(
+                        function,
+                        validation,
+                        op,
+                        crate::kernel_plan::causal_softmax_row_reduction_admission,
+                    )? {
+                        return Ok(Some(contract));
+                    }
+                }
                 _ => {}
             }
         }
     }
     Ok(None)
+}
+
+/// PGC-R5: resolve the `RowReduction` contract for a row-reduction-family
+/// op from the recipe's typed shape facts (the same
+/// [`crate::kernel_plan::transformer_recipe_shape`] scan the plan pass
+/// uses), under the op's own admission predicate. `Ok(None)` when the
+/// shape is not admitted or the recipe facts do not resolve — the caller
+/// keeps scanning and the kernel keeps the generic 1D contract.
+fn row_reduction_contract(
+    function: &MirFunction,
+    validation: &MirValidationContext<'_>,
+    op: MirCollectionOp,
+    admission: fn(u64, u64) -> Option<crate::kernel_plan::RowReductionFacts>,
+) -> Result<Option<CollectionOpContract>, MirAbiError> {
+    // PGC-R5: the additive-idiom softmax reads an elementwise TEMP
+    // (`(x + mask)`), whose type lives in the temps table — the shared
+    // `transformer_recipe_shape` resolves local operands only, so the dims
+    // come from the temp-aware lookup here (the emitters'
+    // `transformer_operand_dims` precedent).
+    let dims = match crate::kernel_plan::transformer_recipe_shape(function, validation, op) {
+        Some((dims, _)) => dims,
+        None if op == MirCollectionOp::TensorSoftmax => {
+            let Some(args) = function_temp_operand_args(function) else {
+                return Ok(None);
+            };
+            let Some(ty) = temp_operand_ty(function, &args[0]) else {
+                return Ok(None);
+            };
+            match crate::tensor_type::tensor_literal_dims(ty, validation) {
+                Ok(dims) => dims,
+                Err(_) => return Ok(None),
+            }
+        }
+        None => return Ok(None),
+    };
+    if dims.len() != 2 {
+        return Ok(None);
+    }
+    let (rows, width) = (dims[0], dims[1]);
+    if admission(rows, width).is_none() {
+        return Ok(None);
+    }
+    Ok(Some(CollectionOpContract::RowReduction { rows, width }))
+}
+
+/// PGC-R5: the `TensorSoftmax` statement's args (the additive-idiom twin's
+/// operand scan — same shape as the plan pass's `transformer_statement_args`).
+fn function_temp_operand_args(function: &MirFunction) -> Option<&[MirOperand]> {
+    for block in &function.blocks {
+        for statement in &block.statements {
+            if crate::collection_ops::statement_collection_op(statement)
+                != Some(MirCollectionOp::TensorSoftmax)
+            {
+                continue;
+            }
+            let MirStatementKind::RuntimeCall {
+                call: MirRuntimeCall { args, .. },
+                ..
+            } = &statement.kind
+            else {
+                continue;
+            };
+            return Some(args);
+        }
+    }
+    None
+}
+
+/// PGC-R5: the type of a temp-referencing operand (the temps table lookup
+/// the local-only `operand_local_ty` cannot do).
+fn temp_operand_ty(function: &MirFunction, operand: &MirOperand) -> Option<MirType> {
+    let temp = match operand {
+        MirOperand::Temp(temp) => *temp,
+        MirOperand::Place(place) => match place.base {
+            MirPlaceBase::Temp(temp) => temp,
+            MirPlaceBase::Local(local) => {
+                return crate::local_ty::local_ty(function, local);
+            }
+        },
+        _ => return None,
+    };
+    function
+        .temps
+        .iter()
+        .find(|entry| entry.id == temp)
+        .map(|entry| entry.ty)
+}
+
+/// PGC-R5: whether a `TensorMax`/`TensorMin` destination is dead — the
+/// `_stability_max` idiom whose result never reaches the kernel's
+/// dataflow. A LOCAL destination is dead when the shared read analysis
+/// (the S3-A5 authority) never reads it and it is not a param; a TEMP
+/// destination is dead only when every reader is a pure copy into a local
+/// that is itself dead by the same rule. The call site additionally gates
+/// the skip to `TensorMax`/`TensorMin`, so live reductions and Sum/Mean
+/// consumers can never be skipped.
+fn reduction_destination_is_dead(function: &MirFunction, destination: &MirPlace) -> bool {
+    let read_locals = crate::read_analysis::function_read_locals(function);
+    let local_is_dead = |local: &MirLocalId| {
+        !function.params.iter().any(|param| param.local == *local) && !read_locals.contains(local)
+    };
+    match destination.base {
+        MirPlaceBase::Local(local) => local_is_dead(&local),
+        MirPlaceBase::Temp(temp) => {
+            // Every reader of the temp must be a pure copy into a dead
+            // local; any other reader keeps the reduction live.
+            let mut saw_reader = false;
+            let mut all_dead_copies = true;
+            for block in &function.blocks {
+                for statement in &block.statements {
+                    let MirStatementKind::Assign { place, value, .. } = &statement.kind else {
+                        continue;
+                    };
+                    let reads_temp = matches!(
+                        &value.kind,
+                        MirValueKind::Operand(source)
+                            if matches!(
+                                (source, &place.base),
+                                (MirOperand::Temp(read), _)
+                                    if read == &temp
+                            ) || matches!(
+                                (source, &place.base),
+                                (MirOperand::Place(source_place), _)
+                                    if matches!(source_place.base, MirPlaceBase::Temp(read) if read == temp)
+                            )
+                    );
+                    if !reads_temp {
+                        continue;
+                    }
+                    saw_reader = true;
+                    // A pure copy: the whole value is exactly the temp read.
+                    let is_pure_copy = matches!(&value.kind, MirValueKind::Operand(_));
+                    match (is_pure_copy, &place.base) {
+                        (true, MirPlaceBase::Local(local)) => {
+                            all_dead_copies &= local_is_dead(local);
+                        }
+                        _ => all_dead_copies = false,
+                    }
+                }
+            }
+            saw_reader && all_dead_copies
+        }
+    }
+}
+
+/// PGC-R5: whether EVERY `TensorMax`/`TensorMin` statement in the function
+/// body is the DEAD stability-max idiom (a destination that never reaches
+/// the kernel's dataflow — the `_stability_max` coalesce const of the
+/// causal-softmax idiom is the standing example). The contract resolver
+/// skips these statements when scanning for a dispatch contract; published
+/// so the plan and subchain scans apply the SAME skip (a dead reduction is
+/// not a recipe — the emitters' dead skips are the precedent). A body with
+/// no such statement, or with any live one, yields `false`.
+#[must_use]
+pub fn stability_max_is_dead(function: &MirFunction) -> bool {
+    let mut saw_stability = false;
+    for block in &function.blocks {
+        for statement in &block.statements {
+            if !matches!(
+                crate::collection_ops::statement_collection_op(statement),
+                Some(MirCollectionOp::TensorMax | MirCollectionOp::TensorMin)
+            ) {
+                continue;
+            }
+            let destination = statement_destination(statement);
+            let dead = destination
+                .as_ref()
+                .is_some_and(|dest| reduction_destination_is_dead(function, dest));
+            if !dead {
+                return false;
+            }
+            saw_stability = true;
+        }
+    }
+    saw_stability
+}
+
+/// The runtime-call destination of a collection statement, when present.
+fn statement_destination(statement: &MirStatement) -> Option<&MirPlace> {
+    match &statement.kind {
+        MirStatementKind::RuntimeCall { destination, .. } => destination.as_ref(),
+        _ => None,
+    }
+}
+
+/// PGC-R5: whether a softmax operand is the additive-mask idiom — a temp
+/// bound to `lhs + rhs` over two place operands (the GEA2-U5e causal
+/// surface: the softmax runs over `(scores + causal_mask)` and the mask
+/// carries the causality as data). Structural, name-free, shared by the
+/// ABI contract resolver and the Metal emitter so the two can never
+/// disagree (A3).
+#[must_use]
+pub fn softmax_operand_is_additive_mask_temp(function: &MirFunction, operand: &MirOperand) -> bool {
+    /// The softmax operand's binding identity — a temp or a local.
+    enum DestinationBase {
+        Temp(MirTempId),
+        Local(MirLocalId),
+    }
+    impl DestinationBase {
+        fn matches(&self, base: &MirPlaceBase) -> bool {
+            matches!(
+                (self, base),
+                (Self::Temp(temp), MirPlaceBase::Temp(dest)) if temp == dest
+            ) || matches!(
+                (self, base),
+                (Self::Local(local), MirPlaceBase::Local(dest)) if local == dest
+            )
+        }
+    }
+    let temp = match operand {
+        MirOperand::Place(place) => match place.base {
+            MirPlaceBase::Temp(temp) => DestinationBase::Temp(temp),
+            MirPlaceBase::Local(local) => DestinationBase::Local(local),
+        },
+        MirOperand::Temp(temp) => DestinationBase::Temp(*temp),
+        _ => return false,
+    };
+    let place_bases_are_locals = |operand: &MirOperand| {
+        matches!(
+            operand,
+            MirOperand::Place(addend)
+                if matches!(addend.base, MirPlaceBase::Local(_))
+                    && addend.projections.is_empty()
+        )
+    };
+    // The elementwise add lowers as a `TensorAdd` collection runtime call
+    // whose destination is the temp (the S3-A5 tensor-expr model).
+    function.blocks.iter().any(|block| {
+        block
+            .statements
+            .iter()
+            .any(|statement| match &statement.kind {
+                MirStatementKind::RuntimeCall {
+                    destination: Some(destination),
+                    call:
+                        MirRuntimeCall {
+                            intrinsic: MirIntrinsic::Collection(MirCollectionOp::TensorAdd),
+                            args,
+                            ..
+                        },
+                } => {
+                    temp.matches(&destination.base)
+                        && args.len() == 2
+                        && place_bases_are_locals(&args[0])
+                        && place_bases_are_locals(&args[1])
+                }
+                _ => false,
+            })
+    })
 }
 
 fn packed_layout_from_operand(operand: &MirOperand) -> Result<PackedStorageLayout, MirAbiError> {
