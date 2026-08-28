@@ -87,6 +87,30 @@ functio loss(tf32[2, 2] x) → fractus {
 }
 
 #[test]
+fn nucleum_callback_is_rejected_before_air_lifting() {
+    let errors = air_errors(
+        r#"
+@ radix lane "air"
+functio loss(tf32[2, 2] x) → fractus {
+    redde x.reducta((fractus a, fractus b) nucleum ∴ a + b, 0.0)
+}
+"#,
+    );
+    let error = errors
+        .iter()
+        .find(|error| error.issue() == Some("nucleum_closure_escape"))
+        .expect("kernel callback must be rejected before lifting");
+    assert!(
+        error
+            .args
+            .iter()
+            .any(|arg| arg.name == "context" && arg.value == "higher_order_argument"),
+        "kernel escape context must be structured: {:?}",
+        error.args
+    );
+}
+
+#[test]
 fn libera_marker_skips_capture_detection_when_present() {
     let errors = air_errors(
         r#"

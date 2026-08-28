@@ -17,7 +17,9 @@ use radix_hir::{
     HirTypeParamConstraint, HirVariant, HirVariantField,
 };
 use radix_lexer::{Interner, Span, TokenKind};
-use radix_syntax::{CallablePosture, GenericParamKind, JsonMember, JsonValue, Visibility};
+use radix_syntax::{
+    CallablePosture, ClosureModifier, GenericParamKind, JsonMember, JsonValue, Visibility,
+};
 use radix_types::{
     FuncSig, IndexExpr, NumericWidth, ParamType, Primitive, SemanticParamMode, Type, TypeTable,
 };
@@ -184,6 +186,51 @@ fn render_expr(
         &mut writer,
     );
     writer.finish()
+}
+
+#[test]
+fn closure_modifier_is_preserved_by_faber_reemission() {
+    let mut interner = Interner::new();
+    let name = interner.intern("value");
+    let types = TypeTable::new();
+    let param = HirParam {
+        def_id: DefId(1),
+        name,
+        ty: types.primitive(Primitive::Numerus),
+        mode: HirParamMode::Owned,
+        optional: false,
+        sponte: false,
+        default: None,
+        span: span(),
+    };
+    let codegen = FaberCodegen::default();
+
+    for (modifier, spelling) in [
+        (ClosureModifier::Libera, "libera"),
+        (ClosureModifier::Nucleum, "nucleum"),
+    ] {
+        let closure = HirExpression {
+            id: radix_hir::HirId(30),
+            kind: HirExpressionKind::Clausura(
+                vec![param.clone()],
+                None,
+                None,
+                Box::new(HirExpression {
+                    id: radix_hir::HirId(31),
+                    kind: radix_hir::HirExpressionKind::Literal(radix_hir::HirLiteral::Int(1)),
+                    ty: Some(types.primitive(Primitive::Numerus)),
+                    span: span(),
+                }),
+                modifier,
+            ),
+            ty: None,
+            span: span(),
+        };
+        assert_eq!(
+            render_expr(&codegen, &closure, &types, &interner),
+            format!("numerus value {spelling} ∴ 1")
+        );
+    }
 }
 
 fn call_arg(expr: HirExpression) -> HirCallArg {
@@ -411,7 +458,7 @@ fn expression_item_lists_emit_between_only() {
             Some(types.primitive(Primitive::Numerus)),
             None,
             Box::new(int(&interner, 0)),
-            false,
+            ClosureModifier::None,
         ),
         ty: None,
         span: span(),
@@ -436,7 +483,7 @@ fn expression_item_lists_emit_between_only() {
             None,
             None,
             Box::new(int(&interner, 0)),
-            false,
+            ClosureModifier::None,
         ),
         ty: None,
         span: span(),

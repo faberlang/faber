@@ -2147,13 +2147,18 @@ incipit {
 }
 
 #[test]
-fn libera_marker_survives_lowering_into_hir() {
-    struct LiberaProbe(usize);
-    impl radix_hir::visit::HirVisitor for LiberaProbe {
+fn closure_modifiers_survive_lowering_into_hir() {
+    struct ModifierProbe {
+        libera_count: usize,
+        nucleum_count: usize,
+    }
+    impl radix_hir::visit::HirVisitor for ModifierProbe {
         fn visit_expr(&mut self, expr: &radix_hir::HirExpression) {
-            if let radix_hir::HirExpressionKind::Clausura(_, _, _, _, libera) = &expr.kind {
-                if *libera {
-                    self.0 += 1;
+            if let radix_hir::HirExpressionKind::Clausura(_, _, _, _, modifier) = &expr.kind {
+                match modifier {
+                    radix_syntax::ClosureModifier::Libera => self.libera_count += 1,
+                    radix_syntax::ClosureModifier::Nucleum => self.nucleum_count += 1,
+                    radix_syntax::ClosureModifier::None => {}
                 }
             }
             radix_hir::visit::walk_expr(self, expr);
@@ -2161,22 +2166,39 @@ fn libera_marker_survives_lowering_into_hir() {
     }
 
     let marked = analyze("incipit {\n    fixum _ c ← (numerus value) libera ∴ value\n}\n");
-    let mut marked_probe = LiberaProbe(0);
+    let mut marked_probe = ModifierProbe {
+        libera_count: 0,
+        nucleum_count: 0,
+    };
     radix_hir::visit::walk_program(&mut marked_probe, marked.result.hir.as_ref().expect("hir"));
     assert_eq!(
-        marked_probe.0, 1,
-        "marked closure must carry the HIR marker"
+        marked_probe.libera_count, 1,
+        "marked closure must carry the HIR modifier"
     );
+    assert_eq!(marked_probe.nucleum_count, 0);
+
+    let kernel = analyze("incipit {\n    fixum _ c ← (numerus value) nucleum ∴ value\n}\n");
+    let mut kernel_probe = ModifierProbe {
+        libera_count: 0,
+        nucleum_count: 0,
+    };
+    radix_hir::visit::walk_program(&mut kernel_probe, kernel.result.hir.as_ref().expect("hir"));
+    assert_eq!(kernel_probe.libera_count, 0);
+    assert_eq!(kernel_probe.nucleum_count, 1);
 
     let unmarked = analyze("incipit {\n    fixum _ c ← (numerus value) ∴ value\n}\n");
-    let mut unmarked_probe = LiberaProbe(0);
+    let mut unmarked_probe = ModifierProbe {
+        libera_count: 0,
+        nucleum_count: 0,
+    };
     radix_hir::visit::walk_program(
         &mut unmarked_probe,
         unmarked.result.hir.as_ref().expect("hir"),
     );
     assert_eq!(
-        unmarked_probe.0, 0,
-        "unmarked closure must default the marker to absent"
+        unmarked_probe.libera_count + unmarked_probe.nucleum_count,
+        0,
+        "unmarked closure must default the modifier to absent"
     );
 }
 

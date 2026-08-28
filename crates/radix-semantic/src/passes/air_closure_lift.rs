@@ -20,7 +20,7 @@ use radix_hir::{
     HirModule, HirParam,
 };
 use radix_lexer::{Interner, Span, Symbol};
-use radix_syntax::CallablePosture;
+use radix_syntax::{CallablePosture, ClosureModifier};
 use rustc_hash::{FxHashMap, FxHashSet};
 
 /// Higher-order tensor methods whose first argument is a combine/callback.
@@ -163,7 +163,8 @@ impl<'a> LiftVisitor<'a> {
     fn lift_callback(&mut self, closure: HirExpression) -> Result<HirExpression, ()> {
         let HirExpression {
             id,
-            kind: HirExpressionKind::Clausura(params, explicit_ret, explicit_err, mut body, libera),
+            kind:
+                HirExpressionKind::Clausura(params, explicit_ret, explicit_err, mut body, modifier),
             ty: closure_ty,
             span,
         } = closure
@@ -171,7 +172,12 @@ impl<'a> LiftVisitor<'a> {
             return Err(());
         };
 
-        let captures = if libera {
+        if modifier == ClosureModifier::Nucleum {
+            self.errors.push(self.nucleum_escape_error(span));
+            return Err(());
+        }
+
+        let captures = if modifier == ClosureModifier::Libera {
             Vec::new()
         } else {
             collect_captures(&body, &params, &self.module_defs)
@@ -231,6 +237,12 @@ impl<'a> LiftVisitor<'a> {
             ty: closure_ty,
             span,
         })
+    }
+
+    fn nucleum_escape_error(&self, closure_span: Span) -> SemanticError {
+        SemanticError::structured(SemanticErrorKind::AirPurityViolation, closure_span)
+            .with_arg("issue", "nucleum_closure_escape")
+            .with_arg("context", "higher_order_argument")
     }
 
     fn capture_error(&self, closure_span: Span, captures: &[CaptureUse]) -> SemanticError {

@@ -1205,7 +1205,7 @@ impl Lowerer<'_> {
             .err
             .as_ref()
             .map(|err| self.lower_signature_type(err));
-        HirExpressionKind::Clausura(params, ret, err, Box::new(body), closure.libera)
+        HirExpressionKind::Clausura(params, ret, err, Box::new(body), closure.modifier)
     }
 
     fn lower_intervallum(&mut self, range: &radix_syntax::IntervallumExpr) -> HirExpressionKind {

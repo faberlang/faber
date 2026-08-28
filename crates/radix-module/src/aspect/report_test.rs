@@ -490,7 +490,7 @@ fn additive_closure(id: u32, span: Span) -> HirExpression {
                 ty: None,
                 span,
             }),
-            true,
+            crate::syntax::ClosureModifier::Libera,
         ),
         ty: None,
         span,

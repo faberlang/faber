@@ -181,8 +181,8 @@ impl HirVisitor for LiberaChecker<'_> {
 
     fn visit_expr(&mut self, expr: &HirExpression) {
         match &expr.kind {
-            HirExpressionKind::Clausura(params, _, _, body, libera) => {
-                if *libera {
+            HirExpressionKind::Clausura(params, _, _, body, modifier) => {
+                if *modifier == radix_syntax::ClosureModifier::Libera {
                     self.check_libera_closure(params, body);
                 }
                 for param in params {
