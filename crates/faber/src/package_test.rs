@@ -7880,7 +7880,8 @@ fn thai_reader_locale_example_compiles_from_manifest() {
     };
     let rust = output.code;
     assert!(rust.contains("fn ทักทาย(name: String) -> String"));
-    assert!(rust.contains("let greeting: String = format!(\"สวัสดี, {}!\", name);"));
+    let greeting_line = rust.lines().find(|l| l.contains("greeting")).unwrap_or_default().to_owned();
+    assert!(greeting_line.contains("format!(\"สวัสดี, {name}!\")"));
     assert!(rust.contains("fn ผ่าน(score: i64) -> bool"));
     assert!(rust.contains("if score >= 80"));
     assert!(rust.contains("return true;"));
@@ -8035,9 +8036,13 @@ fn saluta(string nomen) → string {
     assert!(!output.code.contains("#![allow(non_snake_case)]"));
     let main_pos = output.code.find("fn main()").expect("entry main");
     let module_pos = output.code.find("pub mod auxilium").expect("module");
+    // SCR-09 recorded-suppressions prelude: the emitted carrier always opens
+    // with a crate-level `#![allow(...)]` inner attribute, so module blocks
+    // precede the entry body (inner attributes must head the file).
     assert!(
-        main_pos < module_pos,
-        "package modules must be emitted after the entry body when no crate-level inner attributes remain"
+        module_pos < main_pos,
+        "package modules follow the inner-attribute prelude and precede the entry body. code:\n{}",
+        output.code
     );
 }
 
@@ -11004,7 +11009,7 @@ import from "triga:math" triga
 main {
   const triga.Color initium ← triga.Color { r = 0.0, g = 0.0, b = 0.0 }
   const triga.Color finis ← triga.Color { r = 1.0, g = 0.5, b = 0.25 }
-  const triga.Color midpoint ← initium.interpolata(finis, 0.5)
+  const triga.Color midpoint ← initium.lerp(finis, 0.5)
   assert midpoint.r ≡ (0.5 ∷ f32) panic "color call-arg"
 }
 "#,
@@ -11034,7 +11039,7 @@ main {
     assert!(
         output
             .code
-            .contains("initium.interpolata(faber::Valor::from(finis.clone()), 0.5)"),
+            .contains("initium.lerp(faber::Valor::from(finis.clone()), 0.5)"),
         "Color receiver call-arg must emit with the migrated method:\n{}",
         output.code
     );

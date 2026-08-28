@@ -51,6 +51,15 @@ fn workspace_root() -> PathBuf {
 fn faberlang_home() -> PathBuf {
     let workspace = workspace_root();
     for candidate in workspace.ancestors() {
+        // Lane packets carry a subset of the container siblings; a stale
+        // `worktrees/faber` lane must never satisfy this probe (same skip
+        // law as radix-module paths and runtime_sources).
+        if candidate
+            .components()
+            .any(|c| c.as_os_str() == std::ffi::OsStr::new("worktrees"))
+        {
+            continue;
+        }
         if candidate.join("faber/runtime/rust/Cargo.toml").exists() {
             return candidate.to_path_buf();
         }
