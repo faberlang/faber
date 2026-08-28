@@ -6,14 +6,14 @@
 //! here so target emitters never grow their own generic policies.
 
 use crate::{
-    MirAggregate, MirAggregateFields, MirAggregateItem, MirCallee, MirClosureValue, MirConstant,
-    MirFunction, MirIntrinsic, MirOperand, MirOptionChainLink, MirOptionOp, MirPlace,
-    MirProjection, MirRuntimeCall, MirStatement, MirStatementKind, MirTerminator,
-    MirTerminatorKind, MirType, MirValue, MirValueKind,
+    MirAggregate, MirAggregateFields, MirAggregateItem, MirCallee, MirClosureValue,
+    MirCollectionOp, MirConstant, MirFunction, MirIntrinsic, MirOperand, MirOptionChainLink,
+    MirOptionOp, MirPlace, MirProjection, MirRuntimeCall, MirStatement, MirStatementKind,
+    MirTerminator, MirTerminatorKind, MirType, MirValue, MirValueKind,
 };
 use radix_lexer::{Span, Symbol};
 use radix_types::{
-    i64s_from_literal_index, FuncSig, IndexExpr, IndexId, ParamType, Type, TypeId, TypeTable,
+    FuncSig, IndexExpr, IndexId, ParamType, Type, TypeId, TypeTable, i64s_from_literal_index,
 };
 use rustc_hash::{FxHashMap, FxHashSet, FxHasher};
 use std::hash::{Hash, Hasher};
@@ -1842,6 +1842,129 @@ pub fn substitute_shape_size_constants(
         }
         _ => true,
     })
+}
+
+/// Repair `ShapeSize` operands in a `TensorFromFlat` shape aggregate after a
+/// package merge. `ShapeSize` carries an `IndexId`, while package type-table
+/// import remaps the surrounding tensor type; a source-local index can
+/// therefore point at an unrelated symbolic node in the merged table. The
+/// tensor result's shape is the authoritative shape for each axis of the
+/// shape aggregate produced by `lista ↦ tensor`, and it is already finalized
+/// from the instance key at this point.
+///
+/// Terms outside this producer remain untouched and are still handled by
+/// [`substitute_shape_size_constants`]. Returning `false` preserves the
+/// caller's fail-closed survivor net when the result shape itself is not
+/// concrete or an axis cannot be folded.
+#[must_use]
+pub fn substitute_tensor_from_flat_shape_size_constants(
+    types: &mut TypeTable,
+    function: &mut MirFunction,
+    shape_bindings: &MirShapeBindings,
+) -> bool {
+    let mut all_folded = true;
+    for block in &mut function.blocks {
+        let shape_targets = block
+            .statements
+            .iter()
+            .filter_map(|statement| {
+                let MirStatementKind::RuntimeCall { call, .. } = &statement.kind else {
+                    return None;
+                };
+                let MirIntrinsic::Collection(MirCollectionOp::TensorFromFlat) = &call.intrinsic
+                else {
+                    return None;
+                };
+                let MirOperand::Temp(shape_temp) = call.args.get(2)? else {
+                    return None;
+                };
+                let shape = tensor_shape(types, call.return_ty)?;
+                Some((*shape_temp, shape))
+            })
+            .collect::<Vec<_>>();
+
+        for (shape_temp, target_shape) in shape_targets {
+            let Some(construct_index) = block.statements.iter().position(|statement| {
+                let MirStatementKind::Construct { destination, .. } = &statement.kind else {
+                    return false;
+                };
+                matches!(&destination.base, crate::MirPlaceBase::Temp(temp) if *temp == shape_temp)
+            }) else {
+                all_folded = false;
+                continue;
+            };
+            let dimension_temps = {
+                let MirStatementKind::Construct { aggregate, .. } =
+                    &block.statements[construct_index].kind
+                else {
+                    unreachable!("construct index selected from a Construct statement");
+                };
+                let MirAggregateFields::Ordered(items) = &aggregate.fields else {
+                    all_folded = false;
+                    continue;
+                };
+                items
+                    .iter()
+                    .map(|item| match item {
+                        MirAggregateItem::Operand(MirOperand::Temp(temp)) => Some(*temp),
+                        _ => None,
+                    })
+                    .collect::<Vec<_>>()
+            };
+            for dimension_temp in dimension_temps {
+                let Some(dimension_temp) = dimension_temp else {
+                    all_folded = false;
+                    continue;
+                };
+                let Some(runtime_index) = block.statements.iter().position(|statement| {
+                    let MirStatementKind::RuntimeCall { destination, .. } = &statement.kind else {
+                        return false;
+                    };
+                    matches!(
+                        destination.as_ref().map(|place| &place.base),
+                        Some(crate::MirPlaceBase::Temp(temp)) if *temp == dimension_temp
+                    )
+                }) else {
+                    all_folded = false;
+                    continue;
+                };
+                let MirStatementKind::RuntimeCall { call, .. } =
+                    &mut block.statements[runtime_index].kind
+                else {
+                    unreachable!("runtime index selected from a RuntimeCall statement");
+                };
+                let Some(MirOperand::Constant(MirConstant::ShapeSize { axis, .. })) =
+                    call.args.first_mut()
+                else {
+                    all_folded = false;
+                    continue;
+                };
+                let Some(folded) =
+                    fold_shape_size_constant(types, target_shape, *axis, shape_bindings)
+                else {
+                    all_folded = false;
+                    continue;
+                };
+                call.args[0] = MirOperand::Constant(folded);
+            }
+        }
+    }
+    all_folded
+}
+
+fn tensor_shape(types: &TypeTable, ty: MirType) -> Option<IndexId> {
+    let mut current = ty.semantic_id();
+    let mut seen = FxHashSet::default();
+    loop {
+        if !seen.insert(current) {
+            return None;
+        }
+        match types.get(current) {
+            Type::Tensor(_, shape) => return Some(*shape),
+            Type::Alias(_, target) => current = *target,
+            _ => return None,
+        }
+    }
 }
 
 /// Whether a function body still contains a `MirConstant::ShapeSize` term in
