@@ -11,7 +11,7 @@
 //! visible instead of silently borrowing an unrelated spelling.
 
 use radix_hir::visit::HirVisitor;
-use radix_hir::{DefId, HirModule};
+use radix_hir::{DefId, HirItemKind, HirModule};
 use radix_lexer::{Interner, Symbol};
 use rustc_hash::FxHashMap;
 
@@ -73,6 +73,89 @@ impl super::FaberCodegen {
         };
         collector.visit_program(hir);
         collector.names
+    }
+
+    /// Union-qualified spellings (`Union.VARIANT`) for local variants whose
+    /// bare name cannot re-resolve: the same variant name declared in two
+    /// local unions. (A local/imported collision cannot reach here — the
+    /// authored bare spelling would already fail check.)
+    pub(super) fn ambiguous_local_variant_spellings(
+        &self,
+        hir: &HirModule,
+        interner: &Interner,
+    ) -> FxHashMap<DefId, String> {
+        let mut counts: rustc_hash::FxHashMap<Symbol, usize> = rustc_hash::FxHashMap::default();
+        for item in &hir.items {
+            if let HirItemKind::Enum(enm) = &item.kind {
+                for variant in &enm.variants {
+                    *counts.entry(variant.name).or_default() += 1;
+                }
+            }
+        }
+
+        let mut qualified = FxHashMap::default();
+        for item in &hir.items {
+            let HirItemKind::Enum(enm) = &item.kind else {
+                continue;
+            };
+            let union_name = self.symbol_to_string(enm.name, interner);
+            for variant in &enm.variants {
+                if counts.get(&variant.name).is_some_and(|n| *n > 1) {
+                    let variant_name = self.symbol_to_string(variant.name, interner);
+                    qualified.insert(variant.def_id, format!("{union_name}.{variant_name}"));
+                }
+            }
+        }
+        qualified
+    }
+
+    /// Imported variant def ids that must take the three-part pattern spelling
+    /// (`ns.Union.VARIANT`): the bare variant name is declared by two imported
+    /// namespaces, or collides with a local union variant. Every other
+    /// imported variant keeps the authored two-part `ns.VARIANT` form.
+    pub(super) fn imported_variants_needing_union_path(
+        &self,
+        hir: &HirModule,
+        interner: &Interner,
+    ) -> rustc_hash::FxHashSet<DefId> {
+        // spelling "ns.Union.VARIANT" → (namespace, variant name) pairs.
+        let mut namespaces_by_variant: rustc_hash::FxHashMap<&str, rustc_hash::FxHashSet<&str>> =
+            rustc_hash::FxHashMap::default();
+        let mut defs_by_spelling: Vec<(DefId, &str, &str)> = Vec::new();
+        for (def_id, spelling) in &self.imported_pattern_spellings {
+            let parts: Vec<&str> = spelling.split('.').collect();
+            if parts.len() < 3 {
+                continue;
+            }
+            let namespace = parts[0];
+            let variant = parts[parts.len() - 1];
+            namespaces_by_variant
+                .entry(variant)
+                .or_default()
+                .insert(namespace);
+            defs_by_spelling.push((*def_id, namespace, variant));
+        }
+        let local_variant_names: rustc_hash::FxHashSet<&str> = hir
+            .items
+            .iter()
+            .filter_map(|item| match &item.kind {
+                HirItemKind::Enum(enm) => Some(&enm.variants),
+                _ => None,
+            })
+            .flatten()
+            .map(|variant| interner.resolve(variant.name))
+            .collect();
+
+        defs_by_spelling
+            .into_iter()
+            .filter(|(_, _, variant)| {
+                namespaces_by_variant
+                    .get(variant)
+                    .is_some_and(|namespaces| namespaces.len() > 1)
+                    || local_variant_names.contains(variant)
+            })
+            .map(|(def_id, _, _)| def_id)
+            .collect()
     }
 }
 

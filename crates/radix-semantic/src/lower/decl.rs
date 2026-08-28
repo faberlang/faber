@@ -49,8 +49,8 @@ use radix_hir::{
 use radix_lexer::{Span, Symbol};
 use radix_syntax::{
     AstMutability, AstParamMode, BindingPattern, CallablePosture, ClassDecl, ClassMemberKind,
-    EnumDecl, FuncDecl, ImportDecl, ImportKind, InterfaceDecl, InterfaceMethod, Param, SchemaDecl,
-    Stmt, TypeAliasDecl, TypeParam, UnionDecl, VarDecl, Variant,
+    EnumDecl, EnumValue, FuncDecl, ImportDecl, ImportKind, InterfaceDecl, InterfaceMethod, Param,
+    SchemaDecl, Stmt, TypeAliasDecl, TypeParam, UnionDecl, VarDecl, Variant,
 };
 
 type ModifierLocal = (DefId, Symbol, Span);
@@ -804,6 +804,24 @@ impl Lowerer<'_> {
     /// Plain `ordo` variants carry names and `DefId`s; payload fields belong to `discretio`.
     pub fn lower_ordo(&mut self, stmt: &Stmt, decl: &EnumDecl) -> Option<HirItem> {
         let def_id = self.def_id_for(decl.name.name);
+
+        // Surface fidelity: authored `ordo` members carry discriminants the
+        // union-shaped HIR drops; keep them on the presentation sidecar so
+        // emission restores the authored enumeration vocabulary and values.
+        let members = decl
+            .members
+            .iter()
+            .map(|member| radix_hir::HirOrdoMember {
+                def_id: self.variant_def_for(def_id, member.name.name),
+                value: member.value.as_ref().map(|value| match value {
+                    EnumValue::Integer(int) => radix_hir::HirOrdoValue::Integer(*int),
+                    EnumValue::String(text) => radix_hir::HirOrdoValue::String(*text),
+                }),
+            })
+            .collect();
+        self.presentation
+            .ordo_enums
+            .push(radix_hir::HirOrdoEnum { def_id, members });
 
         let variants = decl
             .members

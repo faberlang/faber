@@ -62,6 +62,9 @@ fn presentation_json_exposes_owners_attachments_and_ends() {
         entry_start_anchor: Some(radix_hir::HirSourceAnchorId(2)),
         entry_explicit: false,
         guard_si_ids: Vec::new(),
+        elige_expr_ids: Vec::new(),
+        discard_binding_stmts: Vec::new(),
+        ordo_enums: Vec::new(),
     };
 
     let json = presentation_json(&presentation, &interner);
@@ -125,6 +128,9 @@ fn presentation_json_emits_null_semantic_refs_and_null_entry_anchor() {
         entry_start_anchor: None,
         entry_explicit: false,
         guard_si_ids: Vec::new(),
+        elige_expr_ids: Vec::new(),
+        discard_binding_stmts: Vec::new(),
+        ordo_enums: Vec::new(),
     };
 
     let json = presentation_json(&presentation, &interner);
@@ -152,6 +158,9 @@ fn presentation_json_escapes_comment_payloads() {
         entry_start_anchor: None,
         entry_explicit: false,
         guard_si_ids: Vec::new(),
+        elige_expr_ids: Vec::new(),
+        discard_binding_stmts: Vec::new(),
+        ordo_enums: Vec::new(),
     };
 
     let json = presentation_json(&presentation, &interner);

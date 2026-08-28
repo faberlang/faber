@@ -478,6 +478,26 @@ impl super::FaberCodegen {
                 self.write_local_stmt(local, types, names, interner, surface, writer);
             }
             HirStatementKind::Expr(expr) => {
+                // Authored discard binding (`fixum T _ ← expr`): lowering drops
+                // the declaration, so the presentation facts restore it.
+                if let Some(discard) = self.discard_bindings.get(&expr.id) {
+                    let keyword = match (discard.is_await, discard.mutable) {
+                        (true, false) => surface.contextual_keyword("figendum"),
+                        (true, true) => surface.contextual_keyword("variandum"),
+                        (false, false) => surface.contextual_keyword("fixum"),
+                        (false, true) => surface.contextual_keyword("varia"),
+                    };
+                    writer.write(keyword);
+                    writer.write(" ");
+                    if let Some(ty) = discard.ty {
+                        writer.write(&self.type_to_faber(ty, types, names, interner, surface));
+                        writer.write(" ");
+                    }
+                    writer.write("_ ← ");
+                    self.write_expr(expr, types, names, interner, surface, writer);
+                    writer.newline();
+                    return;
+                }
                 self.write_expr(expr, types, names, interner, surface, writer);
                 writer.newline();
             }

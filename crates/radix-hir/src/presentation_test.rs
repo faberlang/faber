@@ -75,6 +75,9 @@ fn sample_presentation() -> HirPresentation {
         entry_start_anchor: Some(HirSourceAnchorId(1)),
         entry_explicit: false,
         guard_si_ids: Vec::new(),
+        elige_expr_ids: Vec::new(),
+        discard_binding_stmts: Vec::new(),
+        ordo_enums: Vec::new(),
     }
 }
 

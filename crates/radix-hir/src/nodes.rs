@@ -1732,6 +1732,63 @@ pub struct HirPresentation {
     /// structurally identical authored conditionals stay braced.
     #[serde(default)]
     pub guard_si_ids: Vec<HirId>,
+
+    /// Ids of `Discerne` expressions lowered from `elige` (en `switch`)
+    /// statements. Emission re-sugars exactly these back to the `elige`
+    /// vocabulary with a `ceterum` default arm; authored `discerne`
+    /// statements keep the `discerne`/`casu _` spelling.
+    #[serde(default)]
+    pub elige_expr_ids: Vec<HirId>,
+
+    /// Initializer-expression ids of wildcard-bound declarations
+    /// (`fixum T _ ← expr`), which lower to bare expression statements.
+    /// Emission restores the authored discard binding for exactly these.
+    #[serde(default)]
+    pub discard_binding_stmts: Vec<HirDiscardBinding>,
+
+    /// Authored `ordo` enumerations, keyed by the enum's def id. Emission
+    /// re-sugars exactly these with the `ordo` vocabulary and member
+    /// discriminants; authored `discretio` unions are unaffected.
+    #[serde(default)]
+    pub ordo_enums: Vec<HirOrdoEnum>,
+}
+
+/// Authored facts for one `ordo` enumeration member.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct HirOrdoMember {
+    pub def_id: DefId,
+
+    /// Authored discriminant, when the member spelled one.
+    pub value: Option<HirOrdoValue>,
+}
+
+/// An `ordo` member discriminant literal (`= 3`, `= "text"`).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum HirOrdoValue {
+    Integer(i64),
+    String(Symbol),
+}
+
+/// Authored `ordo` enumeration shape carried for emission fidelity.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct HirOrdoEnum {
+    pub def_id: DefId,
+    pub members: Vec<HirOrdoMember>,
+}
+
+/// Authored facts for one wildcard-bound declaration (`fixum T _ ← expr`).
+///
+/// Keyed by the initializer expression id; the lowered statement keeps no
+/// `HirLocal`, so these facts ride the presentation sidecar.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct HirDiscardBinding {
+    pub expr_id: HirId,
+
+    /// Authored annotation type, when the declaration spelled one.
+    pub ty: Option<TypeId>,
+
+    pub mutable: bool,
+    pub is_await: bool,
 }
 
 /// Structural end of one authored executable block.

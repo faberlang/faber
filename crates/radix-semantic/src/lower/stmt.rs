@@ -594,6 +594,20 @@ impl Lowerer<'_> {
                     Some(expr) => self.lower_expr(expr),
                     None => error_expr(self, *span),
                 };
+                // Surface fidelity: a wildcard-bound declaration is a discard
+                // binding (`fixum T _ ← expr`), not a bare effect call. The
+                // lowered statement keeps no `HirLocal`, so the authored
+                // declaration facts ride the presentation sidecar keyed by
+                // the initializer expression id.
+                let ty = decl.ty.as_ref().map(|ty| self.lower_type(ty));
+                self.presentation
+                    .discard_binding_stmts
+                    .push(radix_hir::HirDiscardBinding {
+                        expr_id: init.id,
+                        ty,
+                        mutable: decl.mutability == radix_syntax::AstMutability::Mutable,
+                        is_await: decl.is_await,
+                    });
                 HirStatementKind::Expr(init)
             }
             radix_syntax::BindingPattern::Array { span, .. } => {
@@ -1240,6 +1254,11 @@ impl Lowerer<'_> {
             span: self.current_span,
         };
 
+        // Surface fidelity: authored `elige` re-sugars with the `elige`
+        // vocabulary (`switch`/`default` under `en`), never `discerne`/`casu _`.
+        // Record the `Discerne` node's own id: a trailing `cape` wraps the
+        // expression in a fresh node, but emission matches the inner id.
+        self.presentation.elige_expr_ids.push(expr.id);
         let expr = if let Some(catch) = &elige_stmt.catch {
             let cape = self.lower_cape_clause(catch);
             self.handled_expr(expr, cape)
