@@ -1,0 +1,270 @@
+//! Binding and sinks for `faber run` diagnostic statistics.
+//!
+//! The runner owns observations; this module owns the stable product schema and
+//! the two CLI output contracts.  The artifact is diagnostic-only and is never
+//! used as a benchmark input.
+
+use radix_mir_runner::{FunctionStats, IntrinsicStats, RunnerStats};
+use serde::{Deserialize, Serialize};
+use std::fs;
+use std::io::{self, Write};
+use std::path::{Path, PathBuf};
+use std::time::{SystemTime, UNIX_EPOCH};
+
+pub(crate) const STATS_MARKER: &str = "--- faber-run-stats ---";
+const FORMAT_VERSION: u32 = 1;
+const ROUTE: &str = "scena";
+const CLOCK: &str = "monotonic-ns";
+const DURATION_METHOD: &str = "reservoir";
+const DURATION_SIZE: u32 = 256;
+const SELF_TIME: &str = "child-subtracted via call stack";
+const NOTE: &str = "diagnostic only — never a bench-gate input";
+
+/// The binding's `format_version: 1` runner artifact.
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct RunStatsArtifact {
+    pub(crate) kind: String,
+    pub(crate) format_version: u32,
+    pub(crate) generated_at: String,
+    pub(crate) faber: FaberMetadata,
+    pub(crate) package: PackageMetadata,
+    pub(crate) route: String,
+    pub(crate) run: RunMetadata,
+    pub(crate) meter: MeterMetadata,
+    pub(crate) functions: Vec<FunctionMetadata>,
+    pub(crate) intrinsics: Vec<IntrinsicMetadata>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct FaberMetadata {
+    pub(crate) version: String,
+    pub(crate) commit: Option<String>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct PackageMetadata {
+    pub(crate) name: String,
+    pub(crate) entry: String,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct RunMetadata {
+    pub(crate) wall_ms: u64,
+    pub(crate) exit: i32,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct MeterMetadata {
+    pub(crate) clock: String,
+    pub(crate) durations: DurationMetadata,
+    pub(crate) self_time: String,
+    pub(crate) note: String,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct DurationMetadata {
+    pub(crate) method: String,
+    pub(crate) size: u32,
+    pub(crate) exact: bool,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct FunctionMetadata {
+    pub(crate) module: String,
+    pub(crate) name: String,
+    pub(crate) calls: u64,
+    pub(crate) total_ns: u64,
+    pub(crate) self_ns: u64,
+    pub(crate) p50_ns: u64,
+    pub(crate) p95_ns: u64,
+    pub(crate) max_ns: u64,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct IntrinsicMetadata {
+    pub(crate) name: String,
+    pub(crate) calls: u64,
+    pub(crate) total_ns: u64,
+    pub(crate) self_ns: u64,
+    pub(crate) p95_ns: u64,
+}
+
+impl RunStatsArtifact {
+    pub(crate) fn new(
+        package: PackageMetadata,
+        stats: RunnerStats,
+        wall_ms: u64,
+        exit: i32,
+    ) -> Self {
+        Self::with_generated_at(package, stats, wall_ms, exit, generated_at())
+    }
+
+    pub(crate) fn with_generated_at(
+        package: PackageMetadata,
+        stats: RunnerStats,
+        wall_ms: u64,
+        exit: i32,
+        generated_at: String,
+    ) -> Self {
+        let mut functions = stats
+            .functions
+            .into_iter()
+            .map(FunctionMetadata::from)
+            .collect::<Vec<_>>();
+        functions.sort_by(|left, right| {
+            left.module
+                .cmp(&right.module)
+                .then_with(|| left.name.cmp(&right.name))
+        });
+
+        let mut intrinsics = stats
+            .intrinsics
+            .into_iter()
+            .map(IntrinsicMetadata::from)
+            .collect::<Vec<_>>();
+        intrinsics.sort_by(|left, right| left.name.cmp(&right.name));
+
+        Self {
+            kind: "faber-run-stats".to_owned(),
+            format_version: FORMAT_VERSION,
+            generated_at,
+            faber: FaberMetadata {
+                version: env!("CARGO_PKG_VERSION").to_owned(),
+                commit: None,
+            },
+            package,
+            route: ROUTE.to_owned(),
+            run: RunMetadata { wall_ms, exit },
+            meter: MeterMetadata {
+                clock: CLOCK.to_owned(),
+                durations: DurationMetadata {
+                    method: DURATION_METHOD.to_owned(),
+                    size: DURATION_SIZE,
+                    exact: false,
+                },
+                self_time: SELF_TIME.to_owned(),
+                note: NOTE.to_owned(),
+            },
+            functions,
+            intrinsics,
+        }
+    }
+}
+
+impl From<FunctionStats> for FunctionMetadata {
+    fn from(stats: FunctionStats) -> Self {
+        Self {
+            module: stats.module,
+            name: stats.name,
+            calls: stats.calls,
+            total_ns: stats.total_ns,
+            self_ns: stats.self_ns,
+            p50_ns: stats.p50_ns,
+            p95_ns: stats.p95_ns,
+            max_ns: stats.max_ns,
+        }
+    }
+}
+
+impl From<IntrinsicStats> for IntrinsicMetadata {
+    fn from(stats: IntrinsicStats) -> Self {
+        Self {
+            name: stats.name,
+            calls: stats.calls,
+            total_ns: stats.total_ns,
+            self_ns: stats.self_ns,
+            p95_ns: stats.p95_ns,
+        }
+    }
+}
+
+/// Resolve the package identity used in the artifact header.
+pub(crate) fn package_metadata(
+    input: &Path,
+) -> Result<PackageMetadata, Box<radix::module::diagnostics::Diagnostic>> {
+    let spec = crate::package::discover_package(input)?;
+    let name = if spec.manifest_backed {
+        let manifest = crate::package::read_manifest(&spec.package_root.join("faber.toml"))?;
+        manifest.package.name
+    } else {
+        spec.package_root
+            .file_name()
+            .and_then(|name| name.to_str())
+            .unwrap_or("package")
+            .to_owned()
+    };
+    let entry = spec
+        .entry
+        .strip_prefix(&spec.package_root)
+        .unwrap_or(&spec.entry)
+        .to_string_lossy()
+        .replace('\\', "/");
+    Ok(PackageMetadata { name, entry })
+}
+
+/// Serialize exactly one compact schema object.
+pub(crate) fn encode(artifact: &RunStatsArtifact) -> io::Result<String> {
+    serde_json::to_string(artifact)
+        .map_err(|error| io::Error::new(io::ErrorKind::InvalidData, error))
+}
+
+/// Emit the requested file artifact and/or framed stdout artifact.
+///
+/// The file is written first so a file-only failure cannot leave a misleading
+/// stdout marker behind.  No function in this module is called on the
+/// unstatsed route, preserving that route's stdout bytes exactly.
+pub(crate) fn emit(
+    artifact: &RunStatsArtifact,
+    stdout: bool,
+    stats_file: Option<&PathBuf>,
+) -> io::Result<()> {
+    let json = encode(artifact)?;
+    if let Some(path) = stats_file {
+        fs::write(path, json.as_bytes())?;
+    }
+    if stdout {
+        let mut output = io::stdout().lock();
+        write!(output, "{STATS_MARKER}\n{json}\n")?;
+        output.flush()?;
+    }
+    Ok(())
+}
+
+fn generated_at() -> String {
+    let Ok(elapsed) = SystemTime::now().duration_since(UNIX_EPOCH) else {
+        return "unknown-time".to_owned();
+    };
+    let seconds = i64::try_from(elapsed.as_secs()).unwrap_or(i64::MAX);
+    let days = seconds.div_euclid(86_400);
+    let day_seconds = seconds.rem_euclid(86_400);
+    let (year, month, day) = civil_date(days);
+    let hour = day_seconds / 3_600;
+    let minute = day_seconds / 60 % 60;
+    let second = day_seconds % 60;
+    format!("{year:04}-{month:02}-{day:02}T{hour:02}:{minute:02}:{second:02}Z")
+}
+
+// Inverse of the proleptic Gregorian day-number calculation, with 1970-01-01
+// as day zero.  Keeping this local avoids adding a timestamp dependency for a
+// diagnostic metadata field.
+fn civil_date(days_since_unix_epoch: i64) -> (i64, i64, i64) {
+    let z = days_since_unix_epoch + 719_468;
+    let era = (if z >= 0 { z } else { z - 146_096 }).div_euclid(146_097);
+    let doe = z - era * 146_097;
+    let yoe = (doe - doe / 1_460 + doe / 36_524 - doe / 146_096).div_euclid(365);
+    let year = yoe + era * 400;
+    let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
+    let month_part = (5 * doy + 2).div_euclid(153);
+    let day = doy - (153 * month_part + 2).div_euclid(5) + 1;
+    let month = month_part + if month_part < 10 { 3 } else { -9 };
+    let year = year + if month <= 2 { 1 } else { 0 };
+    (year, month, day)
+}

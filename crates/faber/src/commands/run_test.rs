@@ -22,6 +22,8 @@ fn run_args(path: PathBuf, backend: Option<BackendSelection>) -> RunArgs {
         locale: None,
         diagnostics_locale: None,
         backend,
+        stats: false,
+        stats_file: None,
         deny_warnings: false,
         deny: Vec::new(),
         args: Vec::new(),

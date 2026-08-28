@@ -281,7 +281,40 @@ fn cli_run_defaults_to_current_directory() {
     };
     assert_eq!(args.path, std::path::PathBuf::from("."));
     assert!(!args.deny_warnings);
+    assert!(!args.stats);
+    assert!(args.stats_file.is_none());
     assert!(args.args.is_empty());
+}
+
+#[test]
+fn cli_parses_run_stats_sinks_and_rejects_profile_name() {
+    let stats = Cli::try_parse_from(["faber", "run", "--stats", "pkg"]).expect("parse --stats");
+    let Some(crate::cli::Command::Run(args)) = stats.command else {
+        panic!("expected run command");
+    };
+    assert!(args.stats);
+    assert!(args.stats_file.is_none());
+    assert_eq!(args.path, std::path::PathBuf::from("pkg"));
+
+    let stats_file = Cli::try_parse_from(["faber", "run", "--stats-file", "out.json", "pkg"])
+        .expect("parse --stats-file");
+    let Some(crate::cli::Command::Run(args)) = stats_file.command else {
+        panic!("expected run command");
+    };
+    assert!(!args.stats);
+    assert_eq!(args.stats_file, Some(std::path::PathBuf::from("out.json")));
+
+    let both = Cli::try_parse_from(["faber", "run", "--stats", "--stats-file", "out.json", "pkg"])
+        .expect("parse both stats sinks");
+    let Some(crate::cli::Command::Run(args)) = both.command else {
+        panic!("expected run command");
+    };
+    assert!(args.stats);
+    assert_eq!(args.stats_file, Some(std::path::PathBuf::from("out.json")));
+
+    let error = Cli::try_parse_from(["faber", "run", "--profile", "debug", "pkg"])
+        .expect_err("--profile is not a run stats spelling");
+    assert!(error.to_string().contains("--profile"));
 }
 
 #[test]

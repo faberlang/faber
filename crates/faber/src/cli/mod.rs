@@ -540,6 +540,14 @@ pub struct RunArgs {
     #[arg(long = "backend", value_enum, value_name = "BACKEND")]
     pub backend: Option<BackendSelection>,
 
+    /// Emit diagnostic runner statistics after a package run.
+    #[arg(long)]
+    pub stats: bool,
+
+    /// Write diagnostic runner statistics to a JSON file.
+    #[arg(long = "stats-file", value_name = "PATH")]
+    pub stats_file: Option<PathBuf>,
+
     /// Promote all warning diagnostics to errors
     #[arg(long)]
     pub deny_warnings: bool,

@@ -39,6 +39,11 @@ mod model;
 mod output_transfer_codemod;
 #[cfg(feature = "runner")]
 mod run;
+#[cfg(feature = "runner")]
+mod run_stats;
+#[cfg(all(feature = "runner", test))]
+#[path = "run_stats_test.rs"]
+mod run_stats_test;
 pub(crate) mod self_update;
 #[cfg(test)]
 #[path = "self_update_test.rs"]
