@@ -312,6 +312,7 @@ pub fn generate_from_analyzed_with_options(
                 // aggregate. Clone the analyzed interner only to intern the
                 // output module name; HIR symbol ids remain stable.
                 let mut module_interner = analysis.interner.clone();
+                let ts_surface = ts::TsKeywordSurfaceBridge(*surface);
                 let gen = if output_mode == OutputMode::Library {
                     let namespace = module_interner.intern(module_name.unwrap_or("FaberModule"));
                     ts::TsCodegen::new_module(&analysis.hir, &module_interner, namespace)
@@ -322,6 +323,7 @@ pub fn generate_from_analyzed_with_options(
                 gen.set_failable_facts(&ts_failable_facts(&analysis.function_facts));
                 gen.set_library_registry(&analysis.libraries);
                 gen.set_gpu_builtins(&ts_gpu_builtins(&analysis.gpu_builtins));
+                gen.set_intrinsic_surface(&ts_surface);
                 register_cross_file_defids(&mut gen, &analysis.hir, &analysis.resolver);
                 let output = gen.generate(&analysis.hir, &analysis.types, &module_interner)?;
                 Ok(crate::Output::TypeScript(crate::TypeScriptOutput { code: output.code }))
