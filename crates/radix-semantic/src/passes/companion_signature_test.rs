@@ -269,11 +269,19 @@ fn generic_companion_implicit_call_substitutes_tuple_return_shapes() {
     // Without tuple-return substitution the baseline reds here are exactly
     // incompatible_tensor_index + argument_type_mismatch at the consumer.
     assert!(
-        !has_issue(errors, SemanticErrorKind::TypeMismatch, "incompatible_tensor_index"),
+        !has_issue(
+            errors,
+            SemanticErrorKind::TypeMismatch,
+            "incompatible_tensor_index"
+        ),
         "consumer must see concrete [2, 2] shapes; errors: {errors:?}"
     );
     assert!(
-        !has_issue(errors, SemanticErrorKind::TypeMismatch, "argument_type_mismatch"),
+        !has_issue(
+            errors,
+            SemanticErrorKind::TypeMismatch,
+            "argument_type_mismatch"
+        ),
         "consumer call must typecheck against substituted shapes; errors: {errors:?}"
     );
 }
@@ -323,7 +331,11 @@ fn generic_companion_result_tuple_annotation_unifies_shapes() {
     // Baseline P3 reds are incompatible_tensor_index + the annotation
     // mismatch; both must be absent once the tuple return substitutes.
     assert!(
-        !has_issue(errors, SemanticErrorKind::TypeMismatch, "incompatible_tensor_index"),
+        !has_issue(
+            errors,
+            SemanticErrorKind::TypeMismatch,
+            "incompatible_tensor_index"
+        ),
         "annotated tuple members must unify at concrete shapes; errors: {errors:?}"
     );
     assert!(
@@ -352,7 +364,11 @@ fn generic_companion_variable_to_variable_consumer_stays_green() {
         "generic consumer binding companion shapes to its own size vars should typecheck; errors: {errors:?}"
     );
     assert!(
-        !has_issue(errors, SemanticErrorKind::TypeMismatch, "incompatible_tensor_index"),
+        !has_issue(
+            errors,
+            SemanticErrorKind::TypeMismatch,
+            "incompatible_tensor_index"
+        ),
         "variable-to-variable tuple annotation must unify; errors: {errors:?}"
     );
     assert!(
@@ -401,7 +417,11 @@ incipit {
         "concrete-primal companion call + consumer should stay fully green; errors: {errors:?}"
     );
     assert!(
-        !has_issue(errors, SemanticErrorKind::TypeMismatch, "incompatible_tensor_index"),
+        !has_issue(
+            errors,
+            SemanticErrorKind::TypeMismatch,
+            "incompatible_tensor_index"
+        ),
         "frozen form must not produce shape/index facts; errors: {errors:?}"
     );
     assert!(

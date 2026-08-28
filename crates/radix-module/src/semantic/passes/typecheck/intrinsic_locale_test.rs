@@ -454,7 +454,8 @@ const TWIN_EN_SOURCE: &str = "fn sonda() → bool {\n    const list<int> xs ← 
 
 /// The canonical Latin twin spelling under the en pack: not a declared en
 /// surface, so the pack-authoritative lookup must reject the call.
-const TWIN_EN_CANONICAL_MISS: &str = "fn sonda() → bool {\n    const list<int> xs ← empty\n    return xs.omnia(int d ∴ d ≥ 0)\n}\n";
+const TWIN_EN_CANONICAL_MISS: &str =
+    "fn sonda() → bool {\n    const list<int> xs ← empty\n    return xs.omnia(int d ∴ d ≥ 0)\n}\n";
 
 /// la source (canonical Latin keywords): the twins resolve registry-direct.
 const TWIN_LA_SOURCE: &str = "functio sonda() → bivalens {\n    fixum lista<numerus> xs ← vacua\n    redde xs.omnia(numerus d ∴ d ≥ 0)\n}\n\nfunctio aliud() → bivalens {\n    fixum lista<numerus> ys ← vacua\n    redde ys.quilibet(numerus d ∴ d < 0)\n}\n";
@@ -486,8 +487,7 @@ fn en_twin_surfaces_resolve_to_canonical_omnia_and_quilibet() {
         Some("quilibet"),
         "the en reverse cache must map `any` → `quilibet` for Lista"
     );
-    let unit =
-        analyze(TWIN_EN_SOURCE, Some(pack)).expect("en `all`/`any` on a Lista must typecheck with the en pack");
+    let unit = analyze(TWIN_EN_SOURCE, Some(pack)).expect("en `all`/`any` on a Lista must typecheck with the en pack");
     assert_eq!(
         method_call_spellings(&unit.hir, &unit.interner),
         vec!["omnia".to_owned(), "quilibet".to_owned()],
@@ -554,7 +554,8 @@ fn la_pack_resolves_twins_registry_direct_without_rows() {
         "la must have no reverse-cache row for `quilibet` (identity-by-absence)"
     );
     assert_eq!(
-        la.intrinsic_surface("omnia"), "omnia",
+        la.intrinsic_surface("omnia"),
+        "omnia",
         "the forward display fallback keeps the canonical spelling with no row — surface output alone is not evidence"
     );
     let unit = analyze(TWIN_LA_SOURCE, Some(la))
