@@ -224,6 +224,73 @@ incipit {
     );
 }
 
+const GENERIC_TWO_TENSOR_PRIMAL: &str = r#"
+@ radix lane "air"
+@ radix backward "loss_backward"
+functio simple_loss<magnitudo R, magnitudo C>(
+    tensor<f32, [R, C]> x, tensor<f32, [R, C]> w
+) → f32 {
+    fixum tensor<f32, [R, C]> product ← x.multiplica(w)
+    redde product.media()
+}
+"#;
+
+fn generic_companion_probe_source(call: &str, declarations: &str) -> String {
+    format!(
+        "{GENERIC_TWO_TENSOR_PRIMAL}\nfunctio nil() → vacuum {{\n    tacet\n}}\n\n{declarations}\n\nincipit {{\n    fixum tensor<f32, [2, 2]> x ← vacua\n    fixum tensor<f32, [2, 2]> w ← vacua\n    fixum f32 upstream ← 1.0\n    {call}\n}}"
+    )
+}
+
+/// P1: an implicit companion call must substitute both tensor members of its
+/// generated tuple return before a concrete downstream consumer sees them.
+#[test]
+fn generic_companion_implicit_call_substitutes_tuple_return_shapes() {
+    let source = generic_companion_probe_source(
+        "fixum [gx, gw] ← loss_backward(x, w, nil(), upstream)\n    fixum f32 consumed ← consume(x, gw)\n    nota consumed",
+        r#"functio consume(tensor<f32, [2, 2]> gx, tensor<f32, [2, 2]> gw) → f32 {
+    redde 1.0
+}"#,
+    );
+    let result = analyze_result(&source);
+    assert!(
+        result.is_ok(),
+        "implicit generic companion call should substitute tuple-return shapes; errors: {:?}",
+        result.diagnostics
+    );
+}
+
+/// P2: explicit shape arguments use the propagated companion type-parameter
+/// list, while still binding the shape symbols positionally.
+#[test]
+fn generic_companion_explicit_shape_args_bind_both_dimensions() {
+    let source = generic_companion_probe_source(
+        "fixum _ grads ← loss_backward<2, 2>(x, w, nil(), upstream)",
+        "",
+    );
+    let result = analyze_result(&source);
+    assert!(
+        result.is_ok(),
+        "explicit generic companion shape args should bind both dimensions; errors: {:?}",
+        result.diagnostics
+    );
+}
+
+/// P3: a concrete tuple result annotation must unify through the generated
+/// companion return rather than leaving its tensor shapes symbolic.
+#[test]
+fn generic_companion_result_tuple_annotation_unifies_shapes() {
+    let source = generic_companion_probe_source(
+        "fixum iuncta<tensor<f32, [2, 2]>, tensor<f32, [2, 2]>> grads ← loss_backward(x, w, nil(), upstream)",
+        "",
+    );
+    let result = analyze_result(&source);
+    assert!(
+        result.is_ok(),
+        "concrete result tuple annotation should unify through generic companion; errors: {:?}",
+        result.diagnostics
+    );
+}
+
 #[test]
 fn unknown_name_still_sem001() {
     let source = r#"

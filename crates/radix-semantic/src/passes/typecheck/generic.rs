@@ -449,6 +449,15 @@ impl TypeChecker<'_> {
                     .collect();
                 self.types.intern(Type::Union(types))
             }
+            Type::Tuple(elements) => {
+                let elements = elements
+                    .iter()
+                    .map(|element| {
+                        self.substitute_type_params(*element, vars, shape_vars.as_deref_mut())
+                    })
+                    .collect();
+                self.types.intern(Type::Tuple(elements))
+            }
             Type::Alias(def, inner) => {
                 let inner = self.substitute_type_params(inner, vars, shape_vars);
                 self.types.intern(Type::Alias(def, inner))
