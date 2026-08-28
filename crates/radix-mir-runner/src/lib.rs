@@ -11,12 +11,14 @@ mod conversio;
 mod host;
 pub mod kernel;
 mod runtime;
+pub mod stats;
 mod textus_literal;
 pub mod value;
 
 pub use capability::{classify_runner_lowerability, runner_dispatch_status, RunnerDispatchStatus};
 
 pub use host::{BufferHost, Host, StdioHost};
+pub use stats::{FunctionStats, IntrinsicStats, RunnerStats};
 pub use value::{MapKey, Value};
 
 use radix_hir::DefId;
@@ -187,6 +189,18 @@ enum StatementOutcome {
     FrameReturned,
 }
 
+/// Result of a run that was admitted and started with statistics enabled.
+///
+/// Validation and route failures happen before a runner starts and are
+/// returned as the outer `Err`, while runtime failures are retained alongside
+/// the completed statistics snapshot so callers can emit diagnostics and the
+/// artifact together.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RunnerRunOutcome {
+    pub result: Result<(), Vec<RunnerError>>,
+    pub stats: RunnerStats,
+}
+
 pub(crate) struct Runner<'a, H: Host + ?Sized> {
     program: &'a MirProgram,
     context: &'a MirValidationContext<'a>,
@@ -194,6 +208,9 @@ pub(crate) struct Runner<'a, H: Host + ?Sized> {
     interner: &'a Interner,
     host: &'a mut H,
     frames: Vec<Frame>,
+    /// Optional diagnostic meter. `None` is the unmetered fast path: no
+    /// statistics clock reads, active-stack work, or row lookups occur.
+    stats: Option<stats::StatsCollector>,
     errors: Vec<RunnerError>,
     /// Remaining-capacity counter: `None` means unlimited. One unit is one
     /// MIR basic-block visit in `run_until_depth`.
@@ -257,6 +274,7 @@ impl<'a, H: Host + ?Sized> Runner<'a, H> {
             interner,
             host,
             frames: Vec::new(),
+            stats: None,
             errors: Vec::new(),
             step_limit: None,
             steps_taken: 0,
@@ -304,6 +322,97 @@ pub fn run_entry<H: Host + ?Sized>(
         )]);
     };
     run_function_unbounded(validated, entry.id, host)
+}
+
+/// Run the explicit entry function with the diagnostic meter armed.
+///
+/// The outer error is reserved for failures before execution starts.  Once the
+/// entry frame is pushed, runtime errors are returned in
+/// [`RunnerRunOutcome::result`] together with the collected snapshot.
+///
+/// # Errors
+///
+/// Returns pre-execution runner errors when the validation context has no
+/// interner or the MIR has no explicit entry function.
+pub fn run_entry_with_stats<H: Host + ?Sized>(
+    validated: &ValidatedMir<'_>,
+    host: &mut H,
+) -> Result<RunnerRunOutcome, Vec<RunnerError>> {
+    let context = validated.validation();
+    let program = validated.program();
+    let interner = context.interner.ok_or_else(|| {
+        vec![RunnerError::internal(
+            Span::default(),
+            "runner requires interner context",
+        )]
+    })?;
+    let names = radix_mir::names::MirNames::new(program, context.types, interner);
+    let Some(entry) = names.explicit_entry_function() else {
+        return Err(vec![RunnerError::internal(
+            Span::default(),
+            "no entry function in MIR program",
+        )]);
+    };
+    run_function_with_stats(validated, entry.id, host)
+}
+
+/// Run a specific MIR function with the diagnostic meter armed.
+///
+/// The outer error is reserved for failures before execution starts.  Once the
+/// function frame is pushed, runtime errors are returned in
+/// [`RunnerRunOutcome::result`] together with the collected snapshot.
+///
+/// # Errors
+///
+/// Returns pre-execution runner errors when the validation context is missing
+/// an interner, the function id is unknown, or the MIR is refused before start.
+pub fn run_function_with_stats<H: Host + ?Sized>(
+    validated: &ValidatedMir<'_>,
+    function_id: MirFunctionId,
+    host: &mut H,
+) -> Result<RunnerRunOutcome, Vec<RunnerError>> {
+    run_function_with_explicit_limits_and_stats(validated, function_id, host, None, None, true)
+}
+
+/// Run a specific MIR function with the diagnostic meter armed and explicit
+/// interpreter limits.  This is the stats-capable counterpart to
+/// [`run_function_with_limits`].
+///
+/// # Errors
+///
+/// Returns pre-execution runner errors when the validation context is missing
+/// an interner, the function id is unknown, or the MIR is refused before start.
+pub fn run_function_with_stats_and_limits<H: Host + ?Sized>(
+    validated: &ValidatedMir<'_>,
+    function_id: MirFunctionId,
+    host: &mut H,
+    step_budget: Option<u64>,
+    deadline: Option<Instant>,
+) -> Result<RunnerRunOutcome, Vec<RunnerError>> {
+    run_function_with_explicit_limits_and_stats(
+        validated,
+        function_id,
+        host,
+        Some(step_budget.unwrap_or(DEFAULT_TEST_STEP_BUDGET)),
+        deadline,
+        true,
+    )
+}
+
+/// Run a specific MIR function with the diagnostic meter armed and a step
+/// budget.  `None` applies [`DEFAULT_TEST_STEP_BUDGET`].
+///
+/// # Errors
+///
+/// Returns pre-execution runner errors when the validation context is missing
+/// an interner, the function id is unknown, or the MIR is refused before start.
+pub fn run_function_with_stats_and_step_budget<H: Host + ?Sized>(
+    validated: &ValidatedMir<'_>,
+    function_id: MirFunctionId,
+    host: &mut H,
+    step_budget: Option<u64>,
+) -> Result<RunnerRunOutcome, Vec<RunnerError>> {
+    run_function_with_stats_and_limits(validated, function_id, host, step_budget, None)
 }
 
 /// Run a specific MIR function to completion.
@@ -401,6 +510,25 @@ fn run_function_with_explicit_limits<H: Host + ?Sized>(
     step_limit: Option<u64>,
     deadline: Option<Instant>,
 ) -> Result<(), Vec<RunnerError>> {
+    let outcome = run_function_with_explicit_limits_and_stats(
+        validated,
+        function_id,
+        host,
+        step_limit,
+        deadline,
+        false,
+    )?;
+    outcome.result
+}
+
+fn run_function_with_explicit_limits_and_stats<H: Host + ?Sized>(
+    validated: &ValidatedMir<'_>,
+    function_id: MirFunctionId,
+    host: &mut H,
+    step_limit: Option<u64>,
+    deadline: Option<Instant>,
+    collect_stats: bool,
+) -> Result<RunnerRunOutcome, Vec<RunnerError>> {
     let context = validated.validation();
     let program = validated.program();
     let interner = context.interner.ok_or_else(|| {
@@ -429,13 +557,19 @@ fn run_function_with_explicit_limits<H: Host + ?Sized>(
     let mut runner = Runner::new(program, context, context.types, interner, host);
     runner.step_limit = step_limit;
     runner.deadline = deadline;
+    if collect_stats {
+        runner.stats = Some(stats::StatsCollector::new(program, context, interner));
+    }
     runner.push_frame(function_id, MirBlockId(0));
     runner.run_until_depth(0);
-    if runner.errors.is_empty() {
+    runner.close_all_frames();
+    let result = if runner.errors.is_empty() {
         Ok(())
     } else {
-        Err(runner.errors)
-    }
+        Err(std::mem::take(&mut runner.errors))
+    };
+    let stats = runner.take_stats().unwrap_or_default();
+    Ok(RunnerRunOutcome { result, stats })
 }
 
 fn function_unsupported_bounded_carrier(
@@ -597,6 +731,27 @@ impl<H: Host + ?Sized> Runner<'_, H> {
             block: entry_block,
             is_generator: false,
         });
+        if let Some(stats) = self.stats.as_mut() {
+            stats.enter_function(function_id);
+        }
+    }
+
+    fn pop_frame(&mut self) -> Option<Frame> {
+        let frame = self.frames.pop();
+        if let Some(frame) = frame.as_ref() {
+            if let Some(stats) = self.stats.as_mut() {
+                stats.leave_function(frame.function);
+            }
+        }
+        frame
+    }
+
+    fn close_all_frames(&mut self) {
+        while self.pop_frame().is_some() {}
+    }
+
+    fn take_stats(&mut self) -> Option<RunnerStats> {
+        self.stats.take().map(stats::StatsCollector::finish)
     }
 
     fn function_by_id(&self, id: MirFunctionId, span: Span) -> Result<&MirFunction, RunnerError> {
@@ -669,7 +824,7 @@ impl<H: Host + ?Sized> Runner<'_, H> {
     /// the error list and stops; the frame drop keeps the depth guard exact.
     fn fail(&mut self, error: RunnerError) {
         self.errors.push(error);
-        self.frames.pop();
+        self.pop_frame();
     }
 
     fn run_until_depth(&mut self, min_depth: usize) {
@@ -725,7 +880,7 @@ impl<H: Host + ?Sized> Runner<'_, H> {
                     };
                     self.return_error = None;
                     self.return_value = Some(value);
-                    self.frames.pop();
+                    self.pop_frame();
                 }
                 MirTerminatorKind::ReturnError(operand) => {
                     let value = match self.eval_operand(&operand, terminator.span) {
@@ -737,7 +892,7 @@ impl<H: Host + ?Sized> Runner<'_, H> {
                     };
                     self.return_value = None;
                     self.return_error = Some(value);
-                    self.frames.pop();
+                    self.pop_frame();
                 }
                 MirTerminatorKind::TryCall {
                     destination,
@@ -847,23 +1002,44 @@ impl<H: Host + ?Sized> Runner<'_, H> {
                 Ok(StatementOutcome::Continue)
             }
             MirStatementKind::RuntimeCall { destination, call } => {
+                // Keep this boundary around both production dispatch paths:
+                // `Convert` is handled directly here, while every other
+                // intrinsic goes through `eval_runtime_call`.  In particular,
+                // do not instrument only that method's unreachable Convert
+                // arm; conversion recovery must still be counted.
+                let intrinsic_name = self
+                    .stats
+                    .as_ref()
+                    .map(|_| stats::intrinsic_name(&call.intrinsic));
+                let intrinsic_started = self
+                    .stats
+                    .as_ref()
+                    .map(|_| stats::StatsCollector::begin_intrinsic());
                 let result = match &call.intrinsic {
                     radix_mir::MirIntrinsic::Convert(conversion) => {
                         match self.eval_convert(conversion, &call.args, statement.span) {
-                            Ok(value) => value,
+                            Ok(value) => Ok(Some(value)),
                             Err(error) if error.is_conversion_failure() => {
-                                return self.propagate_conversion_failure(error);
+                                self.propagate_conversion_failure(error).map(|_| None)
                             }
-                            Err(error) => return Err(error),
+                            Err(error) => Err(error),
                         }
                     }
                     _ => match self.eval_runtime_call(call, statement.span) {
-                        Ok(value) => value,
+                        Ok(value) => Ok(Some(value)),
                         Err(error) if error.issue == "runner_collection_push_capacity" => {
-                            return self.propagate_conversion_failure(error);
+                            self.propagate_conversion_failure(error).map(|_| None)
                         }
-                        Err(error) => return Err(error),
+                        Err(error) => Err(error),
                     },
+                };
+                if let (Some(name), Some(started)) = (intrinsic_name, intrinsic_started) {
+                    if let Some(stats) = self.stats.as_mut() {
+                        stats.record_intrinsic(name, started);
+                    }
+                }
+                let Some(result) = result? else {
+                    return Ok(StatementOutcome::FrameReturned);
                 };
                 if let Some(destination) = destination {
                     self.write_place(destination, result, statement.span)?;
@@ -920,7 +1096,7 @@ impl<H: Host + ?Sized> Runner<'_, H> {
 
         self.return_value = None;
         self.return_error = Some(Value::Str(error.message));
-        self.frames.pop();
+        self.pop_frame();
         Ok(StatementOutcome::FrameReturned)
     }
 
@@ -1042,12 +1218,12 @@ impl<H: Host + ?Sized> Runner<'_, H> {
         self.run_until_depth(depth);
         if let Some(error) = self.errors.pop() {
             while self.frames.len() > depth {
-                self.frames.pop();
+                self.pop_frame();
             }
             return Err(error);
         }
         while self.frames.len() > depth {
-            self.frames.pop();
+            self.pop_frame();
         }
         if let Some(error_value) = self.return_error.take() {
             return Ok(CallOutcome::Err(error_value));
@@ -2033,3 +2209,7 @@ mod arg_extremum_test;
 #[cfg(test)]
 #[path = "queue_stack_test.rs"]
 mod queue_stack_test;
+
+#[cfg(test)]
+#[path = "stats_test.rs"]
+mod stats_test;
