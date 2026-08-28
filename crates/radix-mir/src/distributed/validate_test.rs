@@ -1088,6 +1088,9 @@ fn collection_kernel_plan_carries_no_communication_variant() {
             // SFR-5: the declared distributed sum is an in-kernel recipe —
             // no communication variant.
             CollectionKernelPlan::DistributedSum(_) => true,
+            // GEA3-A2f: the staged body is likewise one in-kernel recipe,
+            // not a communication-graph variant.
+            CollectionKernelPlan::ComposedMatMul(_) => true,
         }
     }
 

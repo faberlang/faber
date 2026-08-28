@@ -8,11 +8,13 @@
 use super::device::{FmirSessionSection, FmirSessionSectionV2};
 use super::distributed::FmirDistributedExecutionSection;
 use super::wire::{
-    WireBroadcastDeclaration, WireBufferIdentity, WireBufferLifetime, WireCollectionKernelPlan,
-    WireDeviceProgram, WireInitializationPolicy, WireInputUpdateCadence, WireInvocationMode,
+    WireBroadcastDeclaration, WireBufferIdentity, WireBufferLifetime, WireBufferRole,
+    WireCollectionKernelPlan, WireComposedMatMulStageKind, WireDeviceProgram,
+    WireInitializationPolicy, WireInputUpdateCadence, WireInvocationMode,
     WireKvCacheCapacityPolicy, WireKvCacheDtype, WireKvCacheRopePairing, WireKvCacheSemanticV2,
-    WireObservationCadence, WireProgramLifetime, WireReduceOp, WireReducedProjection,
-    WireResourceAccess, WireSessionInput, WireSessionObservationCadence,
+    WireMatMulLayout, WireObservationCadence, WireProgramLifetime, WireReduceOp,
+    WireReducedProjection, WireResourceAccess, WireSemanticValueOrigin, WireSessionInput,
+    WireSessionObservationCadence, WireStorageLayout,
 };
 use super::SHA256_IDENTITY_PREFIX;
 
@@ -33,6 +35,7 @@ pub(crate) fn validate_wire_program(
     validate_wire_axes(wire, &launches)?;
     validate_wire_step_count(wire)?;
     validate_wire_broadcast_facts(wire)?;
+    validate_wire_composed_matmul_plans(wire)?;
     validate_wire_reduced_projections(wire)?;
     Ok(())
 }
@@ -69,6 +72,155 @@ fn validate_wire_broadcast_facts(
             return Err(wire_invalid(format!(
                 "kernel '{}' carries a rank-extension broadcast fact whose result shape {:?} does not equal the higher-rank operand shape {:?} (S6-C2 A7)",
                 kernel.entry, fact.result_shape, *higher
+            )));
+        }
+    }
+    Ok(())
+}
+
+/// Validate the composed gate/up/SwiGLU/down plan and its typed stage
+/// resources before FMIR admission. The wire carries all facts explicitly;
+/// this function never reconstructs them from names, counts, or emitted text.
+fn validate_wire_composed_matmul_plans(
+    wire: &WireDeviceProgram,
+) -> Result<(), crate::error::FmirImageError> {
+    for kernel in &wire.kernels {
+        let WireCollectionKernelPlan::ComposedMatMul(plan) = &kernel.plan else {
+            continue;
+        };
+        if plan.stages.len() != 4 || plan.edges.len() != 3 {
+            return Err(wire_invalid(format!(
+                "kernel '{}' carries an incomplete composed matmul plan ({} stages, {} edges)",
+                kernel.entry,
+                plan.stages.len(),
+                plan.edges.len()
+            )));
+        }
+        let expected = [
+            WireComposedMatMulStageKind::Gate,
+            WireComposedMatMulStageKind::Up,
+            WireComposedMatMulStageKind::SwiGlu,
+            WireComposedMatMulStageKind::Down,
+        ];
+        let mut locals = std::collections::BTreeSet::new();
+        let mut used_resources = std::collections::BTreeSet::new();
+        for (index, (stage, expected_kind)) in plan.stages.iter().zip(expected).enumerate() {
+            let expected_access = if index == 3 {
+                WireResourceAccess::Write
+            } else {
+                WireResourceAccess::ReadWrite
+            };
+            if stage.kind != expected_kind
+                || stage.output.element_count == 0
+                || stage.output.element_ty != WireMatMulLayout::F32
+                || stage.output.access != expected_access
+                || !locals.insert(stage.output.source_local)
+            {
+                return Err(wire_invalid(format!(
+                    "kernel '{}' carries invalid composed matmul stage {index}",
+                    kernel.entry
+                )));
+            }
+            match index {
+                0 | 1 | 3 => {
+                    let Some(shape) = stage.shape else {
+                        return Err(wire_invalid(format!(
+                            "kernel '{}' composed matmul stage {index} has no shape",
+                            kernel.entry
+                        )));
+                    };
+                    let Some(output_extent) = shape.m.checked_mul(shape.n) else {
+                        return Err(wire_invalid(format!(
+                            "kernel '{}' composed matmul stage {index} shape overflows its output extent",
+                            kernel.entry
+                        )));
+                    };
+                    if shape.m == 0
+                        || shape.k == 0
+                        || shape.n == 0
+                        || shape.left_layout != WireMatMulLayout::F32
+                        || shape.right_layout != WireMatMulLayout::F32
+                        || output_extent != stage.output.element_count
+                    {
+                        return Err(wire_invalid(format!(
+                            "kernel '{}' composed matmul stage {index} has invalid shape",
+                            kernel.entry
+                        )));
+                    }
+                }
+                2 => {
+                    if stage.shape.is_some()
+                        || stage.output.element_count != plan.stages[0].output.element_count
+                        || stage.output.element_count != plan.stages[1].output.element_count
+                    {
+                        return Err(wire_invalid(format!(
+                            "kernel '{}' composed SwiGLU stage has mismatched extent",
+                            kernel.entry
+                        )));
+                    }
+                }
+                _ => unreachable!("validated composed stage count"),
+            }
+            let expected_role = if index == 3 {
+                WireBufferRole::Output
+            } else {
+                WireBufferRole::InOut
+            };
+            let resource = kernel.resources.iter().find(|resource| {
+                resource.buffer.role == expected_role
+                    && resource.buffer.storage == WireStorageLayout::DeviceHandle
+                    && resource.version.element_count == stage.output.element_count
+                    && resource.version.element_ty == "f32"
+                    && resource.access == stage.output.access
+                    && wire.semantic_values.iter().any(|value| {
+                        value.id == resource.buffer.semantic_value
+                            && matches!(
+                                value.origin,
+                                WireSemanticValueOrigin::MirLocal { function, local }
+                                    if function == kernel.function
+                                        && local == stage.output.source_local
+                            )
+                    })
+                    && !used_resources.contains(&resource.buffer.id)
+            });
+            let Some(resource) = resource else {
+                return Err(wire_invalid(format!(
+                    "kernel '{}' composed stage {index} has no matching typed stage resource",
+                    kernel.entry
+                )));
+            };
+            used_resources.insert(resource.buffer.id);
+        }
+        for (index, edge) in plan.edges.iter().enumerate() {
+            let producer = usize::from(edge.producer);
+            let consumer = usize::from(edge.consumer);
+            if producer != index || consumer != index + 1 || consumer >= plan.stages.len() {
+                return Err(wire_invalid(format!(
+                    "kernel '{}' composed edge {index} is not adjacent",
+                    kernel.entry
+                )));
+            }
+            let output = &plan.stages[producer].output;
+            if edge.source_local != output.source_local
+                || edge.element_ty != output.element_ty
+                || edge.element_count != output.element_count
+            {
+                return Err(wire_invalid(format!(
+                    "kernel '{}' composed edge {index} disagrees with its producer",
+                    kernel.entry
+                )));
+            }
+        }
+        if !matches!(
+            plan.handoff,
+            super::wire::WireComposedMatMulHandoff::WorkgroupBarrier
+        ) || kernel.launch.dispatch_size.x != 1
+            || kernel.launch.dispatch_size.y != 1
+            || kernel.launch.dispatch_size.z != 1
+        {
+            return Err(wire_invalid(format!(
+                "kernel '{}' carries an unsupported composed matmul synchronization handoff",
+                kernel.entry
             )));
         }
     }

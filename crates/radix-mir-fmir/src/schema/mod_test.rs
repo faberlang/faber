@@ -22,7 +22,7 @@ fn device_program_wire_version_is_8_after_the_gi3_projection_break() {
     // it currently does NOT coincide numerically with
     // `PACKAGE_MIR_ARTIFACT_VERSION`; the two are admitted by separate
     // gates.
-    assert_eq!(WIRE_DEVICE_PROGRAM_VERSION, 8);
+    assert_eq!(WIRE_DEVICE_PROGRAM_VERSION, 9);
 }
 
 #[test]
@@ -33,7 +33,7 @@ fn distributed_section_versions_leave_the_accepted_wire_untouched() {
     // section's own version are admitted by separate gates; none of the
     // frozen version constants changes with the distributed section.
     assert_eq!(WIRE_DISTRIBUTED_SECTION_VERSION, 1);
-    assert_eq!(WIRE_DEVICE_PROGRAM_VERSION, 8);
+    assert_eq!(WIRE_DEVICE_PROGRAM_VERSION, 9);
     assert_eq!(PACKAGE_MIR_ARTIFACT_VERSION, 7);
 }
 

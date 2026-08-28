@@ -1,8 +1,9 @@
 use super::plan::{
-    AxisReductionPlan, BarrierPhase, BarrierPoint, CausalMaskedSoftmaxPlan, DistributedSumPlan,
-    GatherPlan, GroupedMatMulPlan, MatMulPlan, QuantizedMatMulPlan, ReduceOp, ReductionPlan,
-    RmsNormalizationPlan, RopePlan, SharedMemoryLayout, SsmConv1dPlan, SsmScanPlan, TransposePlan,
-    MATMUL_SHARED_A_BUFFER_NAME, MATMUL_SHARED_B_BUFFER_NAME, WORKGROUP_SHARED_MEMORY_LIMIT_BYTES,
+    AxisReductionPlan, BarrierPhase, BarrierPoint, CausalMaskedSoftmaxPlan, ComposedMatMulPlan,
+    DistributedSumPlan, GatherPlan, GroupedMatMulPlan, MatMulPlan, QuantizedMatMulPlan, ReduceOp,
+    ReductionPlan, RmsNormalizationPlan, RopePlan, SharedMemoryLayout, SsmConv1dPlan, SsmScanPlan,
+    TransposePlan, MATMUL_SHARED_A_BUFFER_NAME, MATMUL_SHARED_B_BUFFER_NAME,
+    WORKGROUP_SHARED_MEMORY_LIMIT_BYTES,
 };
 use std::fmt;
 
@@ -181,6 +182,96 @@ pub(super) fn validate_matmul_plan(plan: &MatMulPlan) -> Result<(), PlanValidati
     validate_matmul_shared_memory(plan)?;
     validate_matmul_barrier_coverage(plan)?;
     validate_matmul_oob_padding_coverage(plan)?;
+    Ok(())
+}
+
+/// Validate the closed gate/up/SwiGLU/down stage contract. This is kept
+/// target-neutral; backend emission separately proves that its resource map
+/// and synchronization implementation agree with these facts.
+pub(super) fn validate_composed_matmul_plan(
+    plan: &ComposedMatMulPlan,
+) -> Result<(), PlanValidationError> {
+    use super::plan::ComposedMatMulStageKind;
+    if plan.stages.len() != 4 || plan.edges.len() != 3 {
+        return Err(PlanValidationError::ComposedMatMulStageCount {
+            stages: plan.stages.len(),
+            edges: plan.edges.len(),
+        });
+    }
+    let expected = [
+        ComposedMatMulStageKind::Gate,
+        ComposedMatMulStageKind::Up,
+        ComposedMatMulStageKind::SwiGlu,
+        ComposedMatMulStageKind::Down,
+    ];
+    let mut locals = std::collections::BTreeSet::new();
+    for (index, (stage, expected_kind)) in plan.stages.iter().zip(expected).enumerate() {
+        if stage.kind != expected_kind {
+            return Err(PlanValidationError::ComposedMatMulStageOrder { index });
+        }
+        let output = &stage.output;
+        let expected_access = if index == 3 {
+            crate::MirKernelResourceAccess::Write
+        } else {
+            crate::MirKernelResourceAccess::ReadWrite
+        };
+        if output.element_count == 0
+            || output.element_ty != crate::MirScalarLayout::F32
+            || output.access != expected_access
+            || !locals.insert(output.source_local)
+        {
+            return Err(PlanValidationError::ComposedMatMulStageOutputInvalid { index });
+        }
+        match stage.kind {
+            ComposedMatMulStageKind::Gate
+            | ComposedMatMulStageKind::Up
+            | ComposedMatMulStageKind::Down => {
+                let Some(shape) = stage.shape else {
+                    return Err(PlanValidationError::ComposedMatMulShapeMissing { index });
+                };
+                let Some(output_extent) = shape.m.checked_mul(shape.n) else {
+                    return Err(PlanValidationError::ComposedMatMulShapeInvalid { index });
+                };
+                if shape.m == 0
+                    || shape.k == 0
+                    || shape.n == 0
+                    || shape.left_layout != crate::MirScalarLayout::F32
+                    || shape.right_layout != crate::MirScalarLayout::F32
+                    || output_extent != output.element_count
+                {
+                    return Err(PlanValidationError::ComposedMatMulShapeInvalid { index });
+                }
+            }
+            ComposedMatMulStageKind::SwiGlu => {
+                if stage.shape.is_some() {
+                    return Err(PlanValidationError::ComposedMatMulShapeUnexpected { index });
+                }
+                let gate = &plan.stages[0].output;
+                let up = &plan.stages[1].output;
+                if output.element_count != gate.element_count
+                    || output.element_count != up.element_count
+                    || output.element_ty != gate.element_ty
+                    || output.element_ty != up.element_ty
+                {
+                    return Err(PlanValidationError::ComposedMatMulStageExtentMismatch { index });
+                }
+            }
+        }
+    }
+    for (index, edge) in plan.edges.iter().enumerate() {
+        let producer = usize::from(edge.producer);
+        let consumer = usize::from(edge.consumer);
+        if producer != index || consumer != index + 1 || consumer >= plan.stages.len() {
+            return Err(PlanValidationError::ComposedMatMulEdgeOrder { index });
+        }
+        let output = &plan.stages[producer].output;
+        if edge.source_local != output.source_local
+            || edge.element_ty != output.element_ty
+            || edge.element_count != output.element_count
+        {
+            return Err(PlanValidationError::ComposedMatMulEdgeIdentity { index });
+        }
+    }
     Ok(())
 }
 
@@ -693,6 +784,27 @@ pub enum PlanValidationError {
     DistributedSumLaneWidthMismatch { lane_width: u32, workgroup_x: u32 },
     /// The filum source length `K` must be positive (SFR-5).
     DistributedSumZeroLength,
+    /// A composed body must carry exactly four stages and three edges.
+    ComposedMatMulStageCount { stages: usize, edges: usize },
+    /// A composed body has a stage in the wrong fixed position.
+    ComposedMatMulStageOrder { index: usize },
+    /// A composed stage output is not a unique writable F32 resource.
+    ComposedMatMulStageOutputInvalid { index: usize },
+    /// A matmul stage is missing its typed shape.
+    ComposedMatMulShapeMissing { index: usize },
+    /// A matmul stage shape does not match its typed output.
+    ComposedMatMulShapeInvalid { index: usize },
+    /// The pointwise stage unexpectedly carries matmul geometry.
+    ComposedMatMulShapeUnexpected { index: usize },
+    /// The pointwise stage does not match both projection extents.
+    ComposedMatMulStageExtentMismatch { index: usize },
+    /// A producer/consumer edge is not adjacent in the fixed stage order.
+    ComposedMatMulEdgeOrder { index: usize },
+    /// A producer/consumer edge disagrees with the typed stage output.
+    ComposedMatMulEdgeIdentity { index: usize },
+    /// The selected composed-stage synchronization cannot publish a global
+    /// producer write to the consumer dispatch.
+    ComposedMatMulUnsupportedHandoff,
 }
 
 impl fmt::Display for PlanValidationError {
@@ -853,6 +965,46 @@ impl fmt::Display for PlanValidationError {
             Self::DistributedSumZeroLength => write!(
                 f,
                 "distributed sum requires a positive source length"
+            ),
+            Self::ComposedMatMulStageCount { stages, edges } => write!(
+                f,
+                "composed matmul requires four stages and three edges, got {stages} stages and {edges} edges"
+            ),
+            Self::ComposedMatMulStageOrder { index } => write!(
+                f,
+                "composed matmul stage {index} is not in gate/up/swiglu/down order"
+            ),
+            Self::ComposedMatMulStageOutputInvalid { index } => write!(
+                f,
+                "composed matmul stage {index} has a non-unique writable F32 output"
+            ),
+            Self::ComposedMatMulShapeMissing { index } => write!(
+                f,
+                "composed matmul stage {index} is missing typed matmul shape facts"
+            ),
+            Self::ComposedMatMulShapeInvalid { index } => write!(
+                f,
+                "composed matmul stage {index} has invalid shape or output extent"
+            ),
+            Self::ComposedMatMulShapeUnexpected { index } => write!(
+                f,
+                "composed matmul SwiGLU stage {index} unexpectedly carries matmul shape facts"
+            ),
+            Self::ComposedMatMulStageExtentMismatch { index } => write!(
+                f,
+                "composed matmul SwiGLU stage {index} does not match gate/up extents"
+            ),
+            Self::ComposedMatMulEdgeOrder { index } => write!(
+                f,
+                "composed matmul edge {index} is not an adjacent producer/consumer handoff"
+            ),
+            Self::ComposedMatMulEdgeIdentity { index } => write!(
+                f,
+                "composed matmul edge {index} disagrees with its typed producer output"
+            ),
+            Self::ComposedMatMulUnsupportedHandoff => write!(
+                f,
+                "composed matmul stage handoff requires a legal single-workgroup synchronization path"
             ),
         }
     }

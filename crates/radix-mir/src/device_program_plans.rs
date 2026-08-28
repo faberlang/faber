@@ -218,6 +218,13 @@ pub fn kernel_plan_for_function_with_limit(
         }
         return Ok(Some(plan));
     }
+    // The composed MLP body is a single target-neutral recipe even though it
+    // contains three matmul calls and one pointwise consumer. Resolve it
+    // before the ordinary one-recipe scan, which would correctly reject the
+    // mixed body as multiple conflicting recipes.
+    if let Some(plan) = composed_matmul_plan_for_function(function, validation)? {
+        return Ok(Some(CollectionKernelPlan::ComposedMatMul(plan)));
+    }
     // Scan ALL statements: the kernel body's plan is decided by its complete
     // collection-op set, never by the first matching statement (N3.2).
     let ops = crate::collection_ops::collection_ops_for_function(function);
@@ -520,6 +527,8 @@ pub enum RecipeKind {
     SsmConv1d,
     /// SSM linear-recurrence scan recipe (R-PACK-01A).
     SsmScan,
+    /// Target-neutral staged multi-matmul recipe.
+    ComposedMatMul,
 }
 
 impl RecipeKind {
@@ -546,6 +555,9 @@ impl RecipeKind {
             // tree-reduction launch semantics here; native arms (SFR-6/7)
             // match the plan variant before consulting this tag.
             CollectionKernelPlan::DistributedSum(_) => Self::TreeReduction,
+            // Composed staged producers have no generic library entry; the
+            // Metal lane owns their explicit stage map and synchronization.
+            CollectionKernelPlan::ComposedMatMul(_) => Self::ComposedMatMul,
         }
     }
 }
@@ -2032,6 +2044,14 @@ fn bind_dimensions(plan: &CollectionKernelPlan, output_extent: u64) -> (Vec<u64>
         }
         CollectionKernelPlan::Transpose(plan) => (vec![plan.m, plan.n], BindLayout::RowMajor),
         CollectionKernelPlan::TreeReduction(plan) => (vec![plan.length], BindLayout::Flat),
+        CollectionKernelPlan::ComposedMatMul(plan) => {
+            let output = plan
+                .stages
+                .get(3)
+                .map(|stage| stage.output.element_count)
+                .unwrap_or(output_extent);
+            (vec![output.max(1)], BindLayout::Flat)
+        }
         CollectionKernelPlan::Elementwise
         | CollectionKernelPlan::AxisReduction(_)
         | CollectionKernelPlan::RowSoftmax(_)
@@ -2396,6 +2416,7 @@ fn plan_shared_memory_bytes(plan: &CollectionKernelPlan) -> u64 {
             shared_memory_layout_bytes(&plan.shared_memory.shared_a)
                 + shared_memory_layout_bytes(&plan.shared_memory.shared_b)
         }
+        CollectionKernelPlan::ComposedMatMul(_) => 0,
     }
 }
 
@@ -3839,6 +3860,245 @@ pub fn resolve_subchain_plan(
         None
     };
     plan_for_collection_op(&signature, &contract, recipe_op, shapes)
+}
+
+/// Resolve the exact four-stage gate/up/SwiGLU/down body into its carried
+/// target-neutral plan. A body is composed only when it has three ordered
+/// matmuls and a live binary pointwise consumer between the second and third;
+/// all other bodies continue through the ordinary recipe/decomposition path.
+///
+/// This resolver deliberately uses typed destinations, shapes, and element
+/// layouts. It never treats a name, buffer count, or emitted text as stage
+/// provenance.
+pub fn composed_matmul_plan_for_function(
+    function: &MirFunction,
+    validation: &MirValidationContext<'_>,
+) -> Result<Option<crate::kernel_plan::ComposedMatMulPlan>, PlanMappingError> {
+    use crate::kernel_plan::{
+        ComposedMatMulEdge, ComposedMatMulHandoff, ComposedMatMulStage, ComposedMatMulStageKind,
+        ComposedMatMulStageOutput,
+    };
+    if function.blocks.len() != 1 {
+        return Ok(None);
+    }
+    let mut matmuls = Vec::new();
+    let mut pointwise = Vec::new();
+    for block in &function.blocks {
+        for (statement_index, statement) in block.statements.iter().enumerate() {
+            let MirStatementKind::RuntimeCall {
+                destination, call, ..
+            } = &statement.kind
+            else {
+                continue;
+            };
+            let MirIntrinsic::Collection(op) = call.intrinsic else {
+                continue;
+            };
+            match op {
+                MirCollectionOp::TensorMatMul => {
+                    matmuls.push((statement_index, call, destination.as_ref()))
+                }
+                MirCollectionOp::TensorMul => {
+                    pointwise.push((statement_index, call, destination.as_ref()))
+                }
+                _ => {}
+            }
+        }
+    }
+    if matmuls.len() != 3 {
+        return Ok(None);
+    }
+    let destinations = matmuls
+        .iter()
+        .map(|(_, _, destination)| {
+            destination
+                .and_then(|place| match place.base {
+                    MirPlaceBase::Local(local) if place.projections.is_empty() => Some(local),
+                    _ => None,
+                })
+                .ok_or_else(|| {
+                    PlanMappingError::mapping(
+                        "composed matmul stage destination must be an unprojected local",
+                    )
+                })
+        })
+        .collect::<Result<Vec<_>, _>>()?;
+    if destinations.windows(2).any(|pair| pair[0] == pair[1]) {
+        return Ok(None);
+    }
+    if pointwise.len() != 1 {
+        return Ok(None);
+    }
+    let Some((swiglu_statement_index, _swiglu_call, swiglu_destination)) =
+        pointwise.into_iter().find(|(_, call, _)| {
+            call.args.len() == 2
+                && call.args.iter().all(|arg| {
+                    crate::read_analysis::operand_local(arg)
+                        .is_some_and(|local| destinations[..2].contains(&local))
+                })
+        })
+    else {
+        return Ok(None);
+    };
+    if !(matmuls[1].0 < swiglu_statement_index && swiglu_statement_index < matmuls[2].0) {
+        return Err(PlanMappingError::mapping(
+            "composed matmul SwiGLU consumer must occur between the up and down producers",
+        ));
+    }
+    let Some(swiglu_local) = swiglu_destination.and_then(|place| match place.base {
+        MirPlaceBase::Local(local) if place.projections.is_empty() => Some(local),
+        _ => None,
+    }) else {
+        return Err(PlanMappingError::mapping(
+            "composed SwiGLU destination must be an unprojected local",
+        ));
+    };
+    if !matmuls[2]
+        .1
+        .args
+        .iter()
+        .any(|arg| crate::read_analysis::operand_local(arg) == Some(swiglu_local))
+    {
+        return Ok(None);
+    }
+
+    let stage_specs = [
+        (ComposedMatMulStageKind::Gate, destinations[0], Some(0usize)),
+        (ComposedMatMulStageKind::Up, destinations[1], Some(1usize)),
+        (ComposedMatMulStageKind::SwiGlu, swiglu_local, None),
+        (ComposedMatMulStageKind::Down, destinations[2], Some(2usize)),
+    ];
+    let mut stages = Vec::with_capacity(stage_specs.len());
+    for (kind, local, matmul_index) in stage_specs {
+        let local_ty = crate::local_ty::local_ty(function, local)
+            .ok_or_else(|| PlanMappingError::mapping("composed matmul stage local has no type"))?;
+        let element_ty = tensor_element_ty(local_ty, validation)?;
+        let layout = validation
+            .layouts
+            .layout_for_type(element_ty)
+            .map_err(|error| PlanMappingError::mapping(error.message))?;
+        let crate::MirLayoutKind::Scalar(element_ty) = layout.kind else {
+            return Err(PlanMappingError::mapping(
+                "composed matmul stage output must have a scalar element layout",
+            ));
+        };
+        let element_count = crate::tensor_type::tensor_literal_dims(local_ty, validation)
+            .map_err(PlanMappingError::mapping)?
+            .into_iter()
+            .fold(1u64, u64::saturating_mul);
+        let shape = matmul_index
+            .map(|index| matmul_shapes_for_call(function, matmuls[index].1, validation))
+            .transpose()?;
+        stages.push(ComposedMatMulStage {
+            kind,
+            shape,
+            output: ComposedMatMulStageOutput {
+                source_local: local,
+                element_ty,
+                element_count,
+                access: if kind == ComposedMatMulStageKind::Down {
+                    crate::MirKernelResourceAccess::Write
+                } else {
+                    crate::MirKernelResourceAccess::ReadWrite
+                },
+            },
+        });
+    }
+    let edges = (0..3)
+        .map(|index| {
+            let output = &stages[index].output;
+            ComposedMatMulEdge {
+                producer: u8::try_from(index).unwrap_or(u8::MAX),
+                consumer: u8::try_from(index + 1).unwrap_or(u8::MAX),
+                source_local: output.source_local,
+                element_ty: output.element_ty,
+                element_count: output.element_count,
+            }
+        })
+        .collect();
+    let plan = crate::kernel_plan::ComposedMatMulPlan {
+        stages,
+        edges,
+        handoff: ComposedMatMulHandoff::WorkgroupBarrier,
+    };
+    plan.validate()
+        .map_err(|error| PlanMappingError::mapping(error.to_string()))?;
+    Ok(Some(plan))
+}
+
+/// Build the composed body's ABI from the ordinary carrier signature, then
+/// append the typed Gate/Up/SwiGLU scratch outputs. This keeps the ABI's
+/// existing positional binding law while making computed intermediates
+/// explicit `ReadWrite` resources.
+pub fn composed_matmul_signature_for_emission(
+    function: &MirFunction,
+    validation: &MirValidationContext<'_>,
+    interner: &radix_lexer::Interner,
+    plan: &crate::kernel_plan::ComposedMatMulPlan,
+) -> Result<MirKernelSignature, PlanMappingError> {
+    let mut signature = MirKernelSignature::storage_buffer_kernel_with_interner_for_target_entry(
+        function, validation, interner,
+    )
+    .map_err(|error| PlanMappingError::mapping(error.message))?;
+    signature
+        .append_composed_stage_outputs(function, validation, plan)
+        .map_err(|error| PlanMappingError::mapping(error.message))?;
+    plan.validate_for_dispatch(signature.dispatch_size, signature.workgroup)
+        .map_err(|error| PlanMappingError::mapping(error.to_string()))?;
+    Ok(signature)
+}
+
+/// Resolve one matmul call's rank-2 × rank-1/rank-2 typed geometry.
+fn matmul_shapes_for_call(
+    function: &MirFunction,
+    call: &MirRuntimeCall,
+    validation: &MirValidationContext<'_>,
+) -> Result<MatMulShapes, PlanMappingError> {
+    if call.args.len() != 2 {
+        return Err(PlanMappingError::mapping(
+            "matmul requires exactly two tensor operands",
+        ));
+    }
+    let left_ty = crate::local_ty::operand_local_ty(function, &call.args[0])
+        .ok_or_else(|| PlanMappingError::mapping("matmul left operand has no local type"))?;
+    let right_ty = crate::local_ty::operand_local_ty(function, &call.args[1])
+        .ok_or_else(|| PlanMappingError::mapping("matmul right operand has no local type"))?;
+    let left_dims = crate::tensor_type::tensor_literal_dims(left_ty, validation)
+        .map_err(PlanMappingError::mapping)?;
+    let right_dims = crate::tensor_type::tensor_literal_dims(right_ty, validation)
+        .map_err(PlanMappingError::mapping)?;
+    if left_dims.len() != 2 || !(1..=2).contains(&right_dims.len()) {
+        return Err(PlanMappingError::mapping(
+            "matmul requires a rank-2 left tensor and rank-1 or rank-2 right tensor",
+        ));
+    }
+    if left_dims[1] != right_dims[0] {
+        return Err(PlanMappingError::mapping(
+            "matmul inner dimensions must match",
+        ));
+    }
+    let left_layout = validation
+        .layouts
+        .layout_for_type(left_ty)
+        .map_err(|error| PlanMappingError::mapping(error.message))?;
+    let right_layout = validation
+        .layouts
+        .layout_for_type(right_ty)
+        .map_err(|error| PlanMappingError::mapping(error.message))?;
+    let (MirLayoutKind::DeviceView(left_view), MirLayoutKind::DeviceView(right_view)) =
+        (&left_layout.kind, &right_layout.kind)
+    else {
+        return Err(PlanMappingError::mapping(
+            "matmul operands require device-view layouts",
+        ));
+    };
+    Ok(MatMulShapes {
+        m: left_dims[0],
+        k: left_dims[1],
+        n: right_dims.get(1).copied().unwrap_or(1),
+        left_layout: left_view.element,
+        right_layout: right_view.element,
+    })
 }
 
 /// Matmul operand shapes `(M, K, N)` resolved from the `TensorMatMul`

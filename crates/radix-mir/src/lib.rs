@@ -120,14 +120,14 @@ pub use device_program::{
     RegistryVersion, ResultBuffer,
 };
 pub use device_program_plans::{
-    carried_plan_agrees, executor_plan_extension, kernel_plan_for_function, launch_descriptors,
-    plan_for_collection_op, subchain_signature_for_emission, BackendRequirement, BindDescriptor,
-    BindLayout, ExecutorPlanExtension, KernelLaunchDescriptor, LaunchBufferSlot, LibraryBind,
-    LibrarySelection, LogicalSignature, OffsetBinding, PlanMappingError, PlanProvenance,
-    RecipeKind, UniformBinding, UniformType, WorkspaceBinding, DECODE_GEMV_SELECTION_ENABLED,
-    DECODE_GEMV_UNIFORM, PACKED_BLOCK_BYTES_UNIFORM, PACKED_BLOCK_ELEMENTS_UNIFORM,
-    PACKED_BYTES_UNIFORM, PACKED_LAYOUT_GGML_TYPE_ID_UNIFORM, QUANTIZED_GEMM_ENTRY,
-    QUANTIZED_GEMV_ENTRY,
+    carried_plan_agrees, composed_matmul_plan_for_function, composed_matmul_signature_for_emission,
+    executor_plan_extension, kernel_plan_for_function, launch_descriptors, plan_for_collection_op,
+    subchain_signature_for_emission, BackendRequirement, BindDescriptor, BindLayout,
+    ExecutorPlanExtension, KernelLaunchDescriptor, LaunchBufferSlot, LibraryBind, LibrarySelection,
+    LogicalSignature, OffsetBinding, PlanMappingError, PlanProvenance, RecipeKind, UniformBinding,
+    UniformType, WorkspaceBinding, DECODE_GEMV_SELECTION_ENABLED, DECODE_GEMV_UNIFORM,
+    PACKED_BLOCK_BYTES_UNIFORM, PACKED_BLOCK_ELEMENTS_UNIFORM, PACKED_BYTES_UNIFORM,
+    PACKED_LAYOUT_GGML_TYPE_ID_UNIFORM, QUANTIZED_GEMM_ENTRY, QUANTIZED_GEMV_ENTRY,
 };
 pub use dump::dump_program;
 pub use elementwise_plan::{
@@ -154,12 +154,14 @@ pub use kernel_decomposition::{
 pub use kernel_plan::{
     admit_quantized_gather, admit_quantized_matmul, causal_softmax_row_reduction_admission,
     rmsnorm_row_reduction_admission, simdgroup_matmul_admission, BarrierPhase, BarrierPoint,
-    CollectionKernelPlan, GroupedMatMulPlan, MatMulPlan, OobPaddingPolicy, PackedAdmissionError,
-    PackedDequantError, PackedDequantKind, PackedDequantResolution, PlanValidationError,
-    QuantizedGatherPlan, QuantizedMatMulPlan, ReduceOp, ReductionPlan, RowReductionFacts,
-    SharedMemoryLayout, SimdgroupMatMulFacts, SsmConv1dPlan, SsmScanPlan, TransposePlan,
-    ROW_REDUCTION_WORKGROUP_X, SIMDGROUP_MATMUL_MAX_N, SIMDGROUP_MATMUL_PARTIAL_SLOTS,
-    SIMDGROUP_MATMUL_STAGING_SLOTS, TRANSPOSE_WORKGROUP_X,
+    CollectionKernelPlan, ComposedMatMulEdge, ComposedMatMulHandoff, ComposedMatMulPlan,
+    ComposedMatMulStage, ComposedMatMulStageKind, ComposedMatMulStageOutput, GroupedMatMulPlan,
+    MatMulPlan, MatMulShapes, OobPaddingPolicy, PackedAdmissionError, PackedDequantError,
+    PackedDequantKind, PackedDequantResolution, PlanValidationError, QuantizedGatherPlan,
+    QuantizedMatMulPlan, ReduceOp, ReductionPlan, RowReductionFacts, SharedMemoryLayout,
+    SimdgroupMatMulFacts, SsmConv1dPlan, SsmScanPlan, TransposePlan, ROW_REDUCTION_WORKGROUP_X,
+    SIMDGROUP_MATMUL_MAX_N, SIMDGROUP_MATMUL_PARTIAL_SLOTS, SIMDGROUP_MATMUL_STAGING_SLOTS,
+    TRANSPOSE_WORKGROUP_X,
 };
 pub use layout::{
     MirAggregateCarrier, MirAggregateFamily, MirAggregateLayout, MirAtomicLayout,

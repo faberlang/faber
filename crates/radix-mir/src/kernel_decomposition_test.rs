@@ -1,5 +1,6 @@
 use super::*;
 use crate::elementwise_plan::{ElementwiseExpr, ElementwiseOp};
+use crate::kernel_plan::ComposedMatMulStageKind;
 use crate::validate::ValidatedMir;
 use crate::{
     MirBinOp, MirBlock, MirBlockId, MirCallee, MirConstant, MirFunctionId, MirLocal, MirLocalId,
@@ -209,6 +210,23 @@ fn mlp_loss_function(types: &mut TypeTable) -> MirFunction {
         ],
         Some(5),
         scalar,
+    )
+}
+
+/// The exact admitted staged MLP body: `gate = x @ wg; up = x @ wu;
+/// swiglu = gate * up; down = swiglu @ wd`.
+fn composed_mlp_function(types: &mut TypeTable) -> MirFunction {
+    let r2 = rank2_tensor_ty(types, [4, 4]);
+    device_function(
+        &[(0, r2), (1, r2), (2, r2), (3, r2)],
+        vec![
+            collection_statement(MirCollectionOp::TensorMatMul, &[0, 1], 4, r2),
+            collection_statement(MirCollectionOp::TensorMatMul, &[0, 2], 5, r2),
+            collection_statement(MirCollectionOp::TensorMul, &[4, 5], 6, r2),
+            collection_statement(MirCollectionOp::TensorMatMul, &[6, 3], 7, r2),
+        ],
+        Some(7),
+        r2,
     )
 }
 
@@ -507,6 +525,45 @@ fn mlp_loss_gelu_function(types: &mut TypeTable) -> MirFunction {
         span: test_span(),
     });
     function
+}
+
+// -----------------------------------------------------------------------
+// Composed staged MLP remains one kernel unit.
+// -----------------------------------------------------------------------
+
+#[test]
+fn mlp_composed_body_stays_one_kernel_unit() {
+    let mut types = TypeTable::new();
+    let function = composed_mlp_function(&mut types);
+    let validation = MirValidationContext::new(&types);
+    let decomposition =
+        decompose_kernel_function(&function, &validation).expect("composed MLP stays atomic");
+
+    assert_eq!(decomposition.subchains.len(), 1);
+    let subchain = &decomposition.subchains[0];
+    let CollectionKernelPlan::ComposedMatMul(plan) = &subchain.plan else {
+        panic!(
+            "the composed body must carry ComposedMatMul, got {:?}",
+            subchain.plan
+        );
+    };
+    assert_eq!(subchain.statements, vec![0, 1, 2, 3]);
+    assert!(subchain.consumes.is_empty());
+    assert_eq!(subchain.produced, Some(MirLocalId(7)));
+    assert_eq!(subchain.outputs, vec![MirLocalId(7)]);
+    assert_eq!(plan.edges.len(), 3);
+    assert_eq!(
+        plan.stages
+            .iter()
+            .map(|stage| stage.kind)
+            .collect::<Vec<_>>(),
+        vec![
+            ComposedMatMulStageKind::Gate,
+            ComposedMatMulStageKind::Up,
+            ComposedMatMulStageKind::SwiGlu,
+            ComposedMatMulStageKind::Down,
+        ]
+    );
 }
 
 // -----------------------------------------------------------------------
