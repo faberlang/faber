@@ -1462,7 +1462,7 @@ incipit {
     let output = super::rust_output(result);
     assert!(output
         .code
-        .contains("let mut name: String = \"Marcus\".to_string();"));
+        .contains("let name: String = \"Marcus\".to_string();"));
     assert!(output.code.contains("return \"yes\".to_string();"));
     assert!(output
         .code
