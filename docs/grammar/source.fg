@@ -617,6 +617,7 @@ tree_sitter_missing = ["·", "×", "∇", "≺", "≻", "⊗", "⊙"]
 # | Error | `iacit` | throws marker |
 # | Error | `mori` | panic |
 # | Error | `requirit` | require |
+# | Error | `reice` | reject |
 # | Async | `cede` | yield |
 # | Async | `fient` | async stream posture |
 # | Async | `fiet` | async finite posture |
@@ -792,7 +793,7 @@ statement_core := importa_decl | binding_decl | functio_decl | genus_decl | impl
                | elige_stmt | discerne_stmt | custodi_stmt | cura_stmt | fac_stmt
                | redde_stmt | reddet_stmt | tacebit_stmt | cede_stmt
                | rumpe_stmt | perge_stmt | tacet_stmt | iace_stmt
-               | adfirma_stmt | requirit_stmt | nota_stmt | incipit_stmt | incipiet_stmt
+               | adfirma_stmt | requirit_stmt | reice_stmt | nota_stmt | incipit_stmt | incipiet_stmt
                | ex_stmt | probandum_decl | proba_stmt | block_stmt
                | inc_dec_stmt | expr_stmt
 @formerly bindingDecl
@@ -1060,6 +1061,8 @@ cape_clause       := 'cape' IDENTIFIER block_stmt
 adfirma_stmt        := 'adfirma' expression ('mori' expression)?
 @formerly requiritStmt
 requirit_stmt      := 'requirit' expression 'iace' expression
+@formerly reiceStmt
+reice_stmt         := 'reice' expression 'iace' expression
 
 expression := assignment
 # Exact-output transfer (EOT-3): sink ⇇ payload chains bind above assignment
