@@ -547,8 +547,8 @@ pub fn simdgroup_matmul_admission(plan: &MatMulPlan) -> Option<SimdgroupMatMulFa
         || plan.workgroup_y != MATMUL_TILE
         || plan.m <= 1
         || plan.k == 0
-        || plan.k % tile != 0
-        || plan.m % tile == 0
+        || !plan.k.is_multiple_of(tile)
+        || plan.m.is_multiple_of(tile)
         || plan.left_layout != MirScalarLayout::F32
         || plan.right_layout != MirScalarLayout::F32
         || plan.n > SIMDGROUP_MATMUL_MAX_N

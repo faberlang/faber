@@ -157,8 +157,8 @@ pub use kernel_plan::{
     PackedAdmissionError, PackedDequantError, PackedDequantKind, PackedDequantResolution,
     PlanValidationError, QuantizedGatherPlan, QuantizedMatMulPlan, ReduceOp, ReductionPlan,
     SharedMemoryLayout, SimdgroupMatMulFacts, SsmConv1dPlan, SsmScanPlan, TransposePlan,
-    TRANSPOSE_WORKGROUP_X, SIMDGROUP_MATMUL_MAX_N, SIMDGROUP_MATMUL_PARTIAL_SLOTS,
-    SIMDGROUP_MATMUL_STAGING_SLOTS,
+    SIMDGROUP_MATMUL_MAX_N, SIMDGROUP_MATMUL_PARTIAL_SLOTS, SIMDGROUP_MATMUL_STAGING_SLOTS,
+    TRANSPOSE_WORKGROUP_X,
 };
 pub use layout::{
     MirAggregateCarrier, MirAggregateFamily, MirAggregateLayout, MirAtomicLayout,
