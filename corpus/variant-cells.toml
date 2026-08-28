@@ -866,7 +866,7 @@ decline = true
 note = "D3 row: narrowing has no ↦ arm; fails closed with a teaching diagnostic"
 
 # =============================================================================
-# closures (9 cells: 9 direct / 0 bare)
+# closures (10 cells: 10 direct / 0 bare)
 # =============================================================================
 
 [[cells]]
@@ -946,3 +946,12 @@ status = "direct"
 exemplum = "clausura/legacy-libera.fab"
 expected = true
 note = "batch 2: runner-pinned; legacy head + free modifier (en lambda int x free)"
+
+[[cells]]
+id = "cl.lista-predicate-twins"
+family = "closures"
+cell = "lista predicate twins: empty identities + decisive element + reject guard"
+status = "direct"
+exemplum = "lista/methodi-praedicata.fab"
+expected = true
+note = "LPT-3 (docs/factory/list-predicate-twins): pinned all/any identities and reject guard; EBNF no-row"

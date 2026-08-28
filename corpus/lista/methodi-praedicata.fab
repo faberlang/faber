@@ -1,0 +1,53 @@
++++
+term = "omnia"
+kind = "concept"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "hole_type", "qualified_type", "type_arguments", "type_argument", "array_literal", "argument_list", "argument", "compact_clausura_expr", "clausura_signature", "clausura_joint", "clausura_params", "clausura_param", "comparison", "equality", "equality_tail", "call_expr", "call_suffix", "member_suffix", "fac_stmt", "cape_clause", "iace_stmt", "iace_expr", "expression", "literal", "nota_stmt"]
+category = "collection"
+summary = "List predicate twins: all and any, empty-list identities, decisive elements, and a reject guard."
+syntax = "<lista>.all(<predicate>) | <lista>.any(<predicate>)"
+related = ["omnia", "quilibet", "filtrata", "requirit", "reice"]
+locale = "en"
++++
+# =============================================================================
+# omnia / quilibet — list predicate method twins.
+# =============================================================================
+#
+# What this teaches:
+#   • `all` is true for an empty list; `any` is false for an empty list.
+#   • A decisive element determines each fold: one negative makes `all` false
+#     and makes `any` true.
+#   • `reject <condition> throw <error>` is a guard-shaped use of `any` for
+#     rejecting a list that contains a negative dimension.
+#
+# Common mistakes:
+#   • Treating an empty `all` as false or an empty `any` as true.
+#   • Replacing a predicate twin with a hand-written loop when the list method
+#     already expresses the contract.
+#   • Reading `reject` as `require`: reject throws when its condition is true.
+#
+# EBNF determination (LPT-3): no new row — the method-call surface already
+# exists and EBNF enumerates no intrinsic method names.
+#
+# See also: lista, filtrata, requirit, reice
+# =============================================================================
+
+main {
+    # Empty-list identities: all → true, any → false.
+    const list<int> empty_values ← empty
+    print empty_values.all(int d ∴ d ≥ 0)
+    print empty_values.any(int d ∴ d < 0)
+
+    # Decisive element: -1 makes all non-negative false and any-negative true.
+    const list<int> mixed ← [2, -1, 4]
+    print mixed.all(int d ∴ d ≥ 0)
+    print mixed.any(int d ∴ d < 0)
+
+    # Guard-shaped reject: the true `any` result throws into this catch.
+    do {
+        reject mixed.any(int d ∴ d < 0) throw "negative dimension"
+        print "accepted"
+    }
+    catch err {
+        print "caught: §"(err)
+    }
+}
