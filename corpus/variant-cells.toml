@@ -866,7 +866,7 @@ decline = true
 note = "D3 row: narrowing has no ↦ arm; fails closed with a teaching diagnostic"
 
 # =============================================================================
-# closures (10 cells: 10 direct / 0 bare)
+# closures (31 cells: 31 direct / 0 bare)
 # =============================================================================
 
 [[cells]]
@@ -955,3 +955,234 @@ status = "direct"
 exemplum = "lista/methodi-praedicata.fab"
 expected = true
 note = "LPT-3 (docs/factory/list-predicate-twins): pinned all/any identities and reject guard; EBNF no-row"
+
+# =============================================================================
+# KCM-07 kernel/nucleum closure cells (21 new direct / 21 pinned)
+# =============================================================================
+
+[[cells]]
+id = "cl.nucleum-compact-local"
+family = "closures"
+cell = "kernel compact local const _ closure + same-function call (en)"
+status = "direct"
+exemplum = "kernel-closure/accepted/compact-local.fab"
+expected = true
+required = true
+note = "KCM-07 teaching form; empty stdout pin because the runner refuses compute-stage execution"
+
+[[cells]]
+id = "cl.nucleum-fac"
+family = "closures"
+cell = "kernel compact closure with do/fac body (en)"
+status = "direct"
+exemplum = "kernel-closure/accepted/fac-body.fab"
+expected = true
+required = true
+note = "KCM-07 body-joint proof; empty stdout pin because the runner refuses compute-stage execution"
+
+[[cells]]
+id = "cl.nucleum-device-leaf"
+family = "closures"
+cell = "kernel closure calls an existing named device leaf"
+status = "direct"
+exemplum = "kernel-closure/accepted/device-leaf.fab"
+expected = true
+required = true
+note = "KCM-07 composition proof; declaration-only with empty stdout pin"
+
+[[cells]]
+id = "cl.nucleum-iife"
+family = "closures"
+cell = "same-expression kernel closure IIFE"
+status = "direct"
+exemplum = "kernel-closure/accepted/iife.fab"
+expected = true
+required = true
+note = "KCM-07 unconditional IIFE proof; empty stdout pin because the runner refuses compute-stage execution"
+
+[[cells]]
+id = "cl.nucleum-stack-free-kernel"
+family = "closures"
+cell = "REJECT: free then kernel modifier stacking"
+status = "direct"
+exemplum = "kernel-closure/stack-free-kernel.fab"
+expected = true
+required = true
+decline = true
+note = "KCM-07 parser reject; PARSE019"
+
+[[cells]]
+id = "cl.nucleum-stack-kernel-free"
+family = "closures"
+cell = "REJECT: kernel then free modifier stacking"
+status = "direct"
+exemplum = "kernel-closure/stack-kernel-free.fab"
+expected = true
+required = true
+decline = true
+note = "KCM-07 parser reject; PARSE019"
+
+[[cells]]
+id = "cl.nucleum-bare-body"
+family = "closures"
+cell = "REJECT: bare compact brace body"
+status = "direct"
+exemplum = "kernel-closure/bare-body.fab"
+expected = true
+required = true
+decline = true
+note = "KCM-07 parser reject; closure_block_body"
+
+[[cells]]
+id = "cl.nucleum-capture"
+family = "closures"
+cell = "REJECT: enclosing value capture"
+status = "direct"
+exemplum = "kernel-closure/capture.fab"
+expected = true
+required = true
+decline = true
+note = "KCM-07 semantic reject; nucleum_closure_capture"
+
+[[cells]]
+id = "cl.nucleum-error-channel"
+family = "closures"
+cell = "REJECT: kernel closure ⇥ error channel"
+status = "direct"
+exemplum = "kernel-closure/error-channel.fab"
+expected = true
+required = true
+decline = true
+note = "KCM-07 semantic reject; nucleum_closure_effect"
+
+[[cells]]
+id = "cl.nucleum-throw"
+family = "closures"
+cell = "REJECT: throw in kernel closure body"
+status = "direct"
+exemplum = "kernel-closure/throw.fab"
+expected = true
+required = true
+decline = true
+note = "KCM-07 semantic reject; nucleum_closure_effect"
+
+[[cells]]
+id = "cl.nucleum-require"
+family = "closures"
+cell = "REJECT: require guard in kernel closure body"
+status = "direct"
+exemplum = "kernel-closure/require.fab"
+expected = true
+required = true
+decline = true
+note = "KCM-07 semantic reject; nucleum_closure_effect"
+
+[[cells]]
+id = "cl.nucleum-reject"
+family = "closures"
+cell = "REJECT: reject guard in kernel closure body"
+status = "direct"
+exemplum = "kernel-closure/reject.fab"
+expected = true
+required = true
+decline = true
+note = "KCM-07 semantic reject; nucleum_closure_effect"
+
+[[cells]]
+id = "cl.nucleum-cape"
+family = "closures"
+cell = "REJECT: cape/catch recovery in kernel closure body"
+status = "direct"
+exemplum = "kernel-closure/cape.fab"
+expected = true
+required = true
+decline = true
+note = "KCM-07 semantic reject; nucleum_closure_effect"
+
+[[cells]]
+id = "cl.nucleum-host-effect"
+family = "closures"
+cell = "REJECT: host output in kernel closure body"
+status = "direct"
+exemplum = "kernel-closure/host-effect.fab"
+expected = true
+required = true
+decline = true
+note = "KCM-07 semantic reject; nucleum_closure_effect"
+
+[[cells]]
+id = "cl.nucleum-bag-result"
+family = "closures"
+cell = "REJECT: list/bag append-built result from kernel closure"
+status = "direct"
+exemplum = "kernel-closure/bag-result.fab"
+expected = true
+required = true
+decline = true
+note = "KCM-07 semantic reject; nucleum_closure_type"
+
+[[cells]]
+id = "cl.nucleum-dynamic-value"
+family = "closures"
+cell = "REJECT: dynamic nested closure value"
+status = "direct"
+exemplum = "kernel-closure/dynamic-value.fab"
+expected = true
+required = true
+decline = true
+note = "KCM-07 semantic reject; nucleum_closure_effect"
+
+[[cells]]
+id = "cl.nucleum-source-callback"
+family = "closures"
+cell = "REJECT: source callback capture"
+status = "direct"
+exemplum = "kernel-closure/source-callback.fab"
+expected = true
+required = true
+decline = true
+note = "KCM-07 semantic reject; nucleum_closure_capture"
+
+[[cells]]
+id = "cl.nucleum-field-escape"
+family = "closures"
+cell = "REJECT: field escape"
+status = "direct"
+exemplum = "kernel-closure/field-escape.fab"
+expected = true
+required = true
+decline = true
+note = "KCM-07 semantic reject; nucleum_closure_escape context=field"
+
+[[cells]]
+id = "cl.nucleum-list-escape"
+family = "closures"
+cell = "REJECT: list escape"
+status = "direct"
+exemplum = "kernel-closure/list-escape.fab"
+expected = true
+required = true
+decline = true
+note = "KCM-07 semantic reject; nucleum_closure_escape context=list"
+
+[[cells]]
+id = "cl.nucleum-return-escape"
+family = "closures"
+cell = "REJECT: return escape"
+status = "direct"
+exemplum = "kernel-closure/return-escape.fab"
+expected = true
+required = true
+decline = true
+note = "KCM-07 semantic reject; nucleum_closure_escape context=return"
+
+[[cells]]
+id = "cl.nucleum-argument-escape"
+family = "closures"
+cell = "REJECT: ordinary-function argument escape"
+status = "direct"
+exemplum = "kernel-closure/argument-escape.fab"
+expected = true
+required = true
+decline = true
+note = "KCM-07 semantic reject; nucleum_closure_escape context=ordinary_argument"

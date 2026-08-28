@@ -1,0 +1,20 @@
++++
+term = "nucleum"
+kind = "keyword"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "closure_modifier", "compact_clausura_expr", "clausura_signature", "clausura_param", "clausura_params", "clausura_joint", "fac_block", "cape_clause", "call_expr", "call_suffix", "argument_list", "argument", "array_literal", "typed_constructor", "field_list", "field_init", "field_key", "expression", "additive_expr", "multiplicative_expr", "literal", "nota_stmt", "genus_decl", "genus_member", "field_decl"]
+category = "function"
+summary = "A kernel closure may be invoked immediately in the same expression."
+syntax = "((int value) kernel → int ∴ value * 3)(2)"
+related = ["nucleum", "clausura", "libera"]
+locale = "en"
++++
+# =============================================================================
+# nucleum — same-expression kernel-closure IIFE
+# =============================================================================
+# This is a legal same-expression use, distinct from the local-const teaching
+# form. It is intentionally retained as a required corpus proof.
+# =============================================================================
+
+main {
+    const int result ← ((int value) kernel → int ∴ value * 3)(2)
+}
