@@ -27,6 +27,31 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
 pub struct MirFunctionId(pub u32);
 
+/// Parent-relative identity for a synthetic kernel closure.
+///
+/// The identity is independent of the source-less MIR function's position in
+/// the final program vector, so later composition can retain the closure's
+/// origin without inferring it from a name or shader stage.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct MirSyntheticFunctionIdentity {
+    pub parent: MirFunctionId,
+    pub ordinal: u32,
+}
+
+/// Origin fact carried by explicit device-function metadata.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum MirFunctionOrigin {
+    Source,
+    SyntheticKernelClosure,
+}
+
+/// Visibility fact for a lowered device function.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum MirFunctionVisibility {
+    Public,
+    Private,
+}
+
 /// Stable identifier for a basic block within one MIR function.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
 pub struct MirBlockId(pub u32);
@@ -220,7 +245,8 @@ pub struct MirFunction {
     /// Source stream posture, including legacy `@ cursor`.
     pub is_generator: bool,
     /// Shader stage assigned from `@ kernel`/`@ vertex`/`@ fragment` during
-    /// HIR→MIR lowering. `None` for non-shader functions and synthetic helpers.
+    /// HIR→MIR lowering. Ordinary synthetic helpers stay `None`; synthetic
+    /// kernel closures carry `Compute` explicitly for the device boundary.
     pub shader_stage: Option<MirKernelShaderStage>,
     pub span: Span,
 }

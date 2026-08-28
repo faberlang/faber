@@ -45,15 +45,16 @@ use crate::mir::{
     dump_program, instantiate_existing_generic_type, type_contains_param, MirAggregate, MirAggregateFields,
     MirAggregateItem, MirAggregateKind, MirBinOp, MirBlock, MirBlockId, MirCallee, MirClosureCallee, MirClosureCapture,
     MirClosureEnvironment, MirClosureEnvironmentId, MirClosureValue, MirConstant, MirConversion, MirConversionFlavor,
-    MirDeviceRole, MirDiagnosticKind, MirFilumCoordinate, MirFilumSumOp, MirFunction, MirFunctionId,
-    MirGenericBindings, MirIntrinsic, MirKernelShaderStage, MirKeyValueOperand, MirLayoutTable,
+    MirDeviceRole, MirDiagnosticKind, MirFilumCoordinate, MirFilumSumOp, MirFunction, MirFunctionId, MirFunctionOrigin,
+    MirFunctionVisibility, MirGenericBindings, MirIntrinsic, MirKernelShaderStage, MirKeyValueOperand, MirLayoutTable,
     MirLocal as MirLocalDecl, MirLocalId, MirMonomorphization, MirNamedOperand, MirOperand, MirOptionChainLink,
     MirOptionOp, MirOptionUnwrapMode, MirParam, MirParamMode, MirPlace, MirPlaceBase, MirProgram, MirProjection,
     MirProvider, MirProviderKind, MirRuntimeCall, MirStatement, MirStatementKind, MirStructFieldDefaults,
-    MirSwitchCase, MirTemp, MirTempId, MirTerminator, MirTerminatorKind, MirType, MirTypeCheckOp, MirUnOp,
-    MirValidationContext, MirValue, MirValueId, MirValueKind, ValidatedMir,
+    MirSwitchCase, MirSyntheticFunctionIdentity, MirTemp, MirTempId, MirTerminator, MirTerminatorKind, MirType,
+    MirTypeCheckOp, MirUnOp, MirValidationContext, MirValue, MirValueId, MirValueKind, ValidatedMir,
 };
 use crate::semantic::{ConversionPair, IndexExpr, NumericWidth, Primitive, Type, TypeId, TypeTable};
+use radix_mir::device::{MirDeviceFunctionMetadata, MirDeviceFunctionMetadataMap};
 use radix_types::{MirCollectionOp, MirKernelBuiltin};
 use rustc_hash::{FxHashMap, FxHashSet};
 use std::sync::Arc;
@@ -175,6 +176,10 @@ pub struct LoweredMirUnit<'a> {
     pub interner: Interner,
     pub monomorphizations: Vec<MirMonomorphization>,
     pub closure_environments: Vec<MirClosureEnvironment>,
+    /// Explicit role/origin facts for source-less synthetic device functions.
+    /// Consumers must use this carrier rather than infer private status from
+    /// the missing source definition or compute stage.
+    pub device_function_metadata: MirDeviceFunctionMetadataMap,
     /// Generic source bodies removed from [`Self::program`] after unit
     /// monomorphization. Package linking keeps them so a later unit can
     /// instantiate a shape the defining unit never called.
@@ -215,6 +220,7 @@ impl std::fmt::Debug for LoweredMirUnit<'_> {
             .field("program", &self.program)
             .field("monomorphizations", &self.monomorphizations)
             .field("closure_environments", &self.closure_environments)
+            .field("device_function_metadata", &self.device_function_metadata)
             .field("generic_templates", &self.generic_templates)
             .field("generic_params", &self.generic_params)
             .field("companions", &self.companions)
@@ -300,6 +306,7 @@ fn lower_analyzed_unit_with_options(
         errors: Vec::new(),
         functions: Vec::new(),
         closure_environments: Vec::new(),
+        device_function_metadata: MirDeviceFunctionMetadataMap::default(),
     };
     lowerer.lower();
 
@@ -313,6 +320,7 @@ fn lower_analyzed_unit_with_options(
         }
         let functions = std::mem::take(&mut lowerer.functions);
         let closure_environments = std::mem::take(&mut lowerer.closure_environments);
+        let device_function_metadata = std::mem::take(&mut lowerer.device_function_metadata);
         let interner = lowerer.unit.interner.clone();
         drop(lowerer);
         let mut program = MirProgram { functions };
@@ -401,6 +409,7 @@ fn lower_analyzed_unit_with_options(
             interner,
             monomorphizations,
             closure_environments,
+            device_function_metadata,
             generic_templates,
             generic_params,
             validated,
@@ -752,6 +761,7 @@ struct MirLowerer<'a> {
     errors: Vec<MirError>,
     functions: Vec<MirFunction>,
     closure_environments: Vec<MirClosureEnvironment>,
+    device_function_metadata: MirDeviceFunctionMetadataMap,
 }
 
 /// MIR locals, CFG, and side-effect functions produced by one callable lowering pass.
@@ -763,6 +773,7 @@ struct CallableLoweringParts {
     errors: Vec<MirError>,
     synthetics: Vec<MirFunction>,
     closure_environments: Vec<MirClosureEnvironment>,
+    device_function_metadata: MirDeviceFunctionMetadataMap,
 }
 
 struct CallableLoweringConfig<'input> {
@@ -908,18 +919,28 @@ impl<'a> MirLowerer<'a> {
             reason = "MirFunctionId is u32 by design; lowered function count is bounded by u32::MAX"
         )]
         let parent_function_id = MirFunctionId(self.functions.len() as u32);
-        let CallableLoweringParts { params, locals, temps, blocks, errors, synthetics, closure_environments } = self
-            .lower_callable_body(
-                body_ctx,
-                CallableLoweringConfig {
-                    error_ty,
-                    parent_function_id,
-                    device_role: device_role_for_function(function),
-                    target,
-                },
-            );
+        let CallableLoweringParts {
+            params,
+            locals,
+            temps,
+            blocks,
+            errors,
+            synthetics,
+            closure_environments,
+            device_function_metadata,
+        } = self.lower_callable_body(
+            body_ctx,
+            CallableLoweringConfig {
+                error_ty,
+                parent_function_id,
+                device_role: device_role_for_function(function),
+                target,
+            },
+        );
         self.errors.extend(errors);
         self.closure_environments.extend(closure_environments);
+        self.device_function_metadata
+            .extend(device_function_metadata);
 
         let shader_stage = self.compute_shader_stage(function, span);
         self.push_function_with_synthetics(
@@ -1021,6 +1042,7 @@ impl<'a> MirLowerer<'a> {
         };
         let synthetics = builder.take_synthetic_functions();
         let closure_environments = builder.take_closure_environments();
+        let device_function_metadata = builder.take_device_function_metadata();
         CallableLoweringParts {
             params: builder.params,
             locals: builder.locals,
@@ -1029,6 +1051,7 @@ impl<'a> MirLowerer<'a> {
             errors: builder.errors,
             synthetics,
             closure_environments,
+            device_function_metadata,
         }
     }
 
@@ -1052,7 +1075,7 @@ impl<'a> MirLowerer<'a> {
             reason = "MirFunctionId is u32 by design; lowered function count is bounded by u32::MAX"
         )]
         let parent_function_id = MirFunctionId(self.functions.len() as u32);
-        let (locals, temps, blocks, errors, synthetics, closure_environments) = {
+        let (locals, temps, blocks, errors, synthetics, closure_environments, device_function_metadata) = {
             let mut builder =
                 FunctionBuilder::for_function(&self.unit.types, None, context, parent_function_id, None, None);
             let entry_block = builder.fresh_block(entry.span);
@@ -1076,6 +1099,7 @@ impl<'a> MirLowerer<'a> {
             let blocks = builder.finish_blocks();
             let synthetics = builder.take_synthetic_functions();
             let closure_environments = builder.take_closure_environments();
+            let device_function_metadata = builder.take_device_function_metadata();
             (
                 builder.locals,
                 builder.temps,
@@ -1083,10 +1107,13 @@ impl<'a> MirLowerer<'a> {
                 builder.errors,
                 synthetics,
                 closure_environments,
+                device_function_metadata,
             )
         };
         self.errors.extend(errors);
         self.closure_environments.extend(closure_environments);
+        self.device_function_metadata
+            .extend(device_function_metadata);
 
         self.push_function_with_synthetics(
             MirFunction {
@@ -1476,8 +1503,12 @@ struct FunctionBuilder<'a> {
     next_value: u32,
     synthetic_functions: Vec<MirFunction>,
     closure_environments: Vec<MirClosureEnvironment>,
+    device_function_metadata: MirDeviceFunctionMetadataMap,
+    next_kernel_closure_ordinal: u32,
     closure_temp_callees: FxHashMap<MirTempId, MirClosureCallee>,
     closure_local_callees: FxHashMap<MirLocalId, MirClosureCallee>,
+    kernel_temp_callees: FxHashMap<MirTempId, MirFunctionId>,
+    kernel_local_callees: FxHashMap<MirLocalId, MirFunctionId>,
     captured_bindings: FxHashMap<DefId, MirPlace>,
     captured_binding_metadata: FxHashMap<DefId, (Symbol, MirType)>,
     parent_function_id: MirFunctionId,
@@ -1520,8 +1551,12 @@ impl<'a> FunctionBuilder<'a> {
             next_value: 0,
             synthetic_functions: Vec::new(),
             closure_environments: Vec::new(),
+            device_function_metadata: MirDeviceFunctionMetadataMap::default(),
+            next_kernel_closure_ordinal: 0,
             closure_temp_callees: FxHashMap::default(),
             closure_local_callees: FxHashMap::default(),
+            kernel_temp_callees: FxHashMap::default(),
+            kernel_local_callees: FxHashMap::default(),
             captured_bindings: FxHashMap::default(),
             captured_binding_metadata: FxHashMap::default(),
             parent_function_id,
@@ -2557,9 +2592,14 @@ impl<'a> FunctionBuilder<'a> {
         let MirPlaceBase::Local(local) = destination.base else {
             return;
         };
-        if let Some(closure) = self.closure_callee_for_operand(value) {
+        if let Some(function) = self.kernel_callee_for_operand(value) {
+            self.kernel_local_callees.insert(local, function);
+            self.closure_local_callees.remove(&local);
+        } else if let Some(closure) = self.closure_callee_for_operand(value) {
+            self.kernel_local_callees.remove(&local);
             self.closure_local_callees.insert(local, closure);
         } else {
+            self.kernel_local_callees.remove(&local);
             self.closure_local_callees.remove(&local);
         }
     }

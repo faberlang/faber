@@ -5,7 +5,10 @@
 
 use super::context::MirValidationContext;
 use super::error::{MirFunctionSignature, MirParamSignature, MirValidationError};
-use crate::device::{reject_nucleum_fragment_survivors, MirDeviceContext, MirDeviceRole};
+use crate::device::{
+    reject_nucleum_fragment_survivors, MirDeviceContext, MirDeviceFunctionMetadataMap,
+    MirDeviceRole,
+};
 use crate::visit::MirVisitor;
 use crate::{
     MirBlock, MirBlockId, MirFunction, MirFunctionId, MirGenericBindings, MirLocal, MirLocalId,
@@ -85,11 +88,30 @@ impl<'a> ValidatedMir<'a> {
     /// when a fragment call or standalone fragment symbol remains.
     pub fn with_device_roles(
         program: MirProgram,
-        mut context: MirValidationContext<'a>,
+        context: MirValidationContext<'a>,
         roles: &FxHashMap<DefId, MirDeviceRole>,
     ) -> Result<Self, Vec<MirValidationError>> {
+        Self::with_device_roles_and_metadata(
+            program,
+            context,
+            roles,
+            &MirDeviceFunctionMetadataMap::default(),
+        )
+    }
+
+    /// Build a validated-MIR token with explicit source-less device metadata.
+    ///
+    /// The metadata is kept alongside the validation operation so role-aware
+    /// checks classify synthetic private kernels without inferring from
+    /// `source`, generated names, or shader stage.
+    pub fn with_device_roles_and_metadata(
+        program: MirProgram,
+        mut context: MirValidationContext<'a>,
+        roles: &FxHashMap<DefId, MirDeviceRole>,
+        metadata: &MirDeviceFunctionMetadataMap,
+    ) -> Result<Self, Vec<MirValidationError>> {
         context.rebuild_variant_positions();
-        validate_program_with_device_roles(&program, &context, roles)?;
+        validate_program_with_device_roles_and_metadata(&program, &context, roles, metadata)?;
         Ok(Self {
             program,
             validation: context,
@@ -146,12 +168,34 @@ pub fn validate_program_with_device_roles(
     context: &MirValidationContext<'_>,
     roles: &FxHashMap<DefId, MirDeviceRole>,
 ) -> Result<(), Vec<MirValidationError>> {
+    validate_program_with_device_roles_and_metadata(
+        program,
+        context,
+        roles,
+        &MirDeviceFunctionMetadataMap::default(),
+    )
+}
+
+/// Validate MIR with HIR roles plus explicit source-less device metadata.
+///
+/// The separate metadata map keeps existing hand-built MIR fixtures source
+/// compatible while making synthetic kernel role facts visible at validation.
+#[expect(
+    clippy::implicit_hasher,
+    reason = "FxHashMap is the crate-wide map type for device roles"
+)]
+pub fn validate_program_with_device_roles_and_metadata(
+    program: &MirProgram,
+    context: &MirValidationContext<'_>,
+    roles: &FxHashMap<DefId, MirDeviceRole>,
+    metadata: &MirDeviceFunctionMetadataMap,
+) -> Result<(), Vec<MirValidationError>> {
     let mut errors = match validate_program(program, context) {
         Ok(()) => Vec::new(),
         Err(errors) => errors,
     };
-    let mut device = MirDeviceContext::from_hir_roles(roles.clone());
-    device.attach_program(program);
+    let mut device = MirDeviceContext::from_hir_roles_with_metadata(roles.clone(), metadata);
+    device.attach_program_with_metadata(program, metadata);
     errors.extend(reject_nucleum_fragment_survivors(program, &device));
     if errors.is_empty() {
         Ok(())

@@ -3928,6 +3928,82 @@ fn lowers_nested_collection_higher_order_synthetic_closures() {
 }
 
 #[test]
+fn lowers_kernel_closure_to_private_direct_kernel() {
+    let source = r"
+incipit {
+    fixum _ kernel ← (numerus value) nucleum → numerus ∴ value * 2
+    fixum numerus result ← kernel(21)
+}
+";
+    let mut unit = analyze(source);
+    let lowered = lower_analyzed_unit(&mut unit, Default::default()).expect("MIR lowering succeeds");
+    let synthetic = lowered
+        .program
+        .functions
+        .iter()
+        .find(|function| function.source.is_none() && function.shader_stage == Some(MirKernelShaderStage::Compute))
+        .expect("kernel closure synthetic function");
+
+    assert!(
+        lowered.closure_environments.is_empty(),
+        "kernel closure must not create an environment"
+    );
+    let calls = lowered
+        .program
+        .functions
+        .iter()
+        .flat_map(|function| &function.blocks)
+        .flat_map(|block| &block.statements)
+        .filter_map(|statement| match &statement.kind {
+            MirStatementKind::Call { callee, .. } => Some(callee),
+            _ => None,
+        })
+        .collect::<Vec<_>>();
+    assert!(
+        calls
+            .iter()
+            .any(|callee| matches!(callee, MirCallee::Function(id) if *id == synthetic.id)),
+        "kernel closure call must be direct: {calls:?}"
+    );
+    assert!(calls
+        .iter()
+        .all(|callee| !matches!(callee, MirCallee::Closure(_) | MirCallee::Value(_))));
+
+    let metadata = lowered
+        .device_function_metadata
+        .get(&synthetic.id)
+        .expect("synthetic kernel metadata");
+    assert_eq!(metadata.identity.parent, MirFunctionId(0));
+    assert_eq!(metadata.identity.ordinal, 0);
+    assert_eq!(metadata.role, MirDeviceRole::Kernel);
+    assert_eq!(metadata.shader_stage, MirKernelShaderStage::Compute);
+    assert_eq!(metadata.visibility, MirFunctionVisibility::Private);
+    assert_eq!(metadata.origin, MirFunctionOrigin::SyntheticKernelClosure);
+}
+
+#[test]
+fn lowers_kernel_closure_iife_to_private_direct_kernel() {
+    let mut unit = analyze(
+        r"
+incipit {
+    fixum numerus result ← ((numerus value) nucleum → numerus ∴ value * 2)(21)
+}
+",
+    );
+    let lowered = lower_analyzed_unit(&mut unit, Default::default()).expect("MIR lowering succeeds");
+    let synthetic = lowered
+        .program
+        .functions
+        .iter()
+        .find(|function| function.source.is_none() && function.shader_stage == Some(MirKernelShaderStage::Compute))
+        .expect("IIFE kernel closure synthetic function");
+    assert!(lowered.closure_environments.is_empty());
+    assert!(lowered.program.functions.iter().flat_map(|function| &function.blocks).flat_map(|block| &block.statements).any(
+        |statement| matches!(&statement.kind, MirStatementKind::Call { callee: MirCallee::Function(id), .. } if *id == synthetic.id)
+    ));
+}
+
+#[test]
 fn lowers_mappata_callback_to_result_element_type() {
     let dump = dump_source(
         r#"functio labels(lista<numerus> xs) → lista<textus> {

@@ -10,6 +10,7 @@ use crate::lexer::Symbol;
 use crate::mir::dump_program;
 use crate::semantic::{Primitive, TypeTable};
 use crate::test_support::test_span;
+use radix_mir::device::MirDeviceFunctionMetadata;
 
 #[test]
 fn mir_type_wraps_semantic_type_and_reserves_layout_slot() {
@@ -22,6 +23,45 @@ fn mir_type_wraps_semantic_type_and_reserves_layout_slot() {
     assert_eq!(plain.layout_id(), None);
     assert_eq!(laid_out.semantic_id(), text);
     assert_eq!(laid_out.layout_id(), Some(MirLayoutId(7)));
+}
+
+#[test]
+fn synthetic_device_metadata_attaches_to_source_less_functions() {
+    let types = TypeTable::new();
+    let vacuum = MirType::semantic(types.primitive(Primitive::Vacuum));
+    let function = MirFunction {
+        id: MirFunctionId(7),
+        source: None,
+        name: None,
+        params: Vec::new(),
+        locals: Vec::new(),
+        temps: Vec::new(),
+        blocks: Vec::new(),
+        return_ty: vacuum,
+        error_ty: None,
+        is_async: false,
+        is_generator: false,
+        shader_stage: Some(MirKernelShaderStage::Compute),
+        span: test_span(),
+    };
+    let program = MirProgram { functions: vec![function.clone()] };
+    let metadata = [(
+        function.id,
+        MirDeviceFunctionMetadata {
+            identity: MirSyntheticFunctionIdentity { parent: MirFunctionId(2), ordinal: 0 },
+            role: MirDeviceRole::Kernel,
+            shader_stage: MirKernelShaderStage::Compute,
+            visibility: MirFunctionVisibility::Private,
+            origin: MirFunctionOrigin::SyntheticKernelClosure,
+        },
+    )]
+    .into_iter()
+    .collect();
+    let mut device = MirDeviceContext::from_hir_roles_with_metadata(Default::default(), &metadata);
+    device.attach_program(&program);
+
+    assert_eq!(device.role_for_function(&function), Some(MirDeviceRole::Kernel));
+    assert_eq!(device.metadata_for_function(&function), metadata.get(&function.id).copied());
 }
 
 #[test]

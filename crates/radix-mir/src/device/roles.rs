@@ -1,9 +1,27 @@
 //! Shared MIR device roles and the per-function role context carried from HIR.
 
-use crate::{MirFunction, MirFunctionId, MirProgram};
+use crate::{
+    MirFunction, MirFunctionId, MirFunctionOrigin, MirFunctionVisibility, MirKernelShaderStage,
+    MirProgram, MirSyntheticFunctionIdentity,
+};
 use radix_hir::{DefId, HirFunction, HirItemKind, HirModule};
 use radix_lexer::Interner;
 use rustc_hash::FxHashMap;
+
+/// Explicit device facts for a source-less or synthetic function.
+///
+/// Consumers must use this carrier instead of inferring private status from a
+/// missing source definition, a generated name, or the compute stage alone.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct MirDeviceFunctionMetadata {
+    pub identity: MirSyntheticFunctionIdentity,
+    pub role: MirDeviceRole,
+    pub shader_stage: MirKernelShaderStage,
+    pub visibility: MirFunctionVisibility,
+    pub origin: MirFunctionOrigin,
+}
+
+pub type MirDeviceFunctionMetadataMap = FxHashMap<MirFunctionId, MirDeviceFunctionMetadata>;
 
 /// The `@ publica`/`@ public` annotation family: the launch-surface gate.
 const PUBLICA_FAMILY: &str = "publica";
@@ -19,6 +37,7 @@ pub enum MirDeviceRole {
 pub struct MirDeviceContext {
     pub(super) by_function_id: FxHashMap<MirFunctionId, MirDeviceRole>,
     pub(super) by_def_id: FxHashMap<DefId, MirDeviceRole>,
+    pub(super) by_function_metadata: MirDeviceFunctionMetadataMap,
 }
 
 impl MirDeviceContext {
@@ -30,6 +49,17 @@ impl MirDeviceContext {
         }
     }
 
+    /// Build a role context with explicit facts for source-less functions.
+    #[must_use]
+    pub fn from_hir_roles_with_metadata(
+        roles_by_def: FxHashMap<DefId, MirDeviceRole>,
+        metadata: &MirDeviceFunctionMetadataMap,
+    ) -> Self {
+        let mut context = Self::from_hir_roles(roles_by_def);
+        context.by_function_metadata.clone_from(metadata);
+        context
+    }
+
     pub fn attach_program(&mut self, program: &MirProgram) {
         for function in &program.functions {
             if let Some(def_id) = function.source {
@@ -37,7 +67,27 @@ impl MirDeviceContext {
                     self.by_function_id.insert(function.id, role);
                 }
             }
+            if let Some(metadata) = self.by_function_metadata.get(&function.id).copied() {
+                self.by_function_id.insert(function.id, metadata.role);
+            }
         }
+    }
+
+    /// Attach explicit synthetic-function facts after source-based roles.
+    ///
+    /// A metadata row is accepted only for a function present in the program;
+    /// an absent row cannot silently create a device role for a missing body.
+    pub fn attach_program_with_metadata(
+        &mut self,
+        program: &MirProgram,
+        metadata: &MirDeviceFunctionMetadataMap,
+    ) {
+        for function in &program.functions {
+            if let Some(facts) = metadata.get(&function.id).copied() {
+                self.by_function_metadata.insert(function.id, facts);
+            }
+        }
+        self.attach_program(program);
     }
 
     #[must_use]
@@ -45,7 +95,20 @@ impl MirDeviceContext {
         self.by_function_id
             .get(&function.id)
             .copied()
+            .or_else(|| {
+                self.by_function_metadata
+                    .get(&function.id)
+                    .map(|metadata| metadata.role)
+            })
             .or_else(|| function.source.and_then(|def_id| self.role_for_def(def_id)))
+    }
+
+    #[must_use]
+    pub fn metadata_for_function(
+        &self,
+        function: &MirFunction,
+    ) -> Option<MirDeviceFunctionMetadata> {
+        self.by_function_metadata.get(&function.id).copied()
     }
 
     #[must_use]
@@ -55,7 +118,9 @@ impl MirDeviceContext {
 
     #[must_use]
     pub fn has_roles(&self) -> bool {
-        !self.by_function_id.is_empty() || !self.by_def_id.is_empty()
+        !self.by_function_id.is_empty()
+            || !self.by_def_id.is_empty()
+            || !self.by_function_metadata.is_empty()
     }
 }
 
