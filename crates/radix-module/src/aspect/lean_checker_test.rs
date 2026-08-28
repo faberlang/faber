@@ -286,7 +286,11 @@ fn lean_checker_axiom_empty_print_output_never_classifies_allowed() {
     assert!(audit.unresolved_import, "empty audit output must be unresolved_import");
     assert_ne!(LeanAspectChecker::classify_axioms(&audit), AxiomVerdict::Allowed);
 
-    let result = combined_verdict(proven_result(), &LeanAspectChecker::classify_axioms(&audit), &SorryVerdict::Clean);
+    let result = combined_verdict(
+        proven_result(),
+        &LeanAspectChecker::classify_axioms(&audit),
+        &SorryVerdict::Clean,
+    );
     assert_eq!(result.status, HirAspectCheckStatus::Failed);
     assert!(result.evidence.0.contains("unresolved"));
 }
