@@ -4,7 +4,7 @@
 //! rendering. The parent catalog owns reader-locale fallback diagnostics and
 //! shared argument helpers.
 
-use super::catalog::{DiagnosticSpec, arg_value, quote_arg};
+use super::catalog::{arg_value, quote_arg, DiagnosticSpec};
 use crate::{SemanticErrorKind, WarningKind};
 use radix_diagnostics::DiagnosticArg;
 

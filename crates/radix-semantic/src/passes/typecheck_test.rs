@@ -15,12 +15,12 @@ use radix_target::Target;
 
 use radix_hir::{DefId, HirItemKind, HirModule, HirStatementKind};
 
-use super::typecheck::{TypeChecker, typecheck};
-use crate::SemanticErrorKind;
+use super::typecheck::{typecheck, TypeChecker};
 use crate::file_interface::{FileExport, FileExportKind, FileInterface, InterfaceStructExport};
 use crate::passes::visibility_annotation::VisibilityTier;
 use crate::test_support::args_have_no_legacy_message;
 use crate::test_support::test_span;
+use crate::SemanticErrorKind;
 use crate::{Primitive, Resolver, Type, TypeTable};
 use radix_hir::{HirCallArg, HirExpression, HirExpressionKind, HirLiteral, HirPattern};
 use radix_lexer::Span;
@@ -644,11 +644,9 @@ fn condition_type_mismatch_does_not_emit_follow_on_condition_error() {
     // si with a numerus condition → TypeMismatch, but NOT condition_must_be_bivalens
     let diags = compile_and_diagnostics("incipit { si 1 { } }");
     assert!(diags.iter().any(crate::SemanticError::is_error));
-    assert!(
-        !diags
-            .iter()
-            .any(|d| d.issue() == Some("condition_must_be_bivalens"))
-    );
+    assert!(!diags
+        .iter()
+        .any(|d| d.issue() == Some("condition_must_be_bivalens")));
 }
 
 #[test]
