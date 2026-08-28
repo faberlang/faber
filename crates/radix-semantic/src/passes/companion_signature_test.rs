@@ -24,6 +24,13 @@ fn analyze_errors(source: &str) -> Vec<SemanticError> {
     result.diagnostics
 }
 
+/// Structured-fact matcher: error kind plus machine `issue` argument.
+fn has_issue(errors: &[SemanticError], kind: SemanticErrorKind, issue: &str) -> bool {
+    errors
+        .iter()
+        .any(|e| e.kind == kind && e.args.iter().any(|a| a.name == "issue" && a.value == issue))
+}
+
 /// Simple primal with two tensor params to produce a 4-param companion.
 const TWO_TENSOR_PRIMAL: &str = r#"
 @ radix lane "air"
@@ -252,10 +259,22 @@ fn generic_companion_implicit_call_substitutes_tuple_return_shapes() {
 }"#,
     );
     let result = analyze_result(&source);
+    let errors = &result.diagnostics;
     assert!(
         result.is_ok(),
         "implicit generic companion call should substitute tuple-return shapes; errors: {:?}",
         result.diagnostics
+    );
+    // Variable-to-concrete proof: `gw` reaches the concrete [2, 2] consumer.
+    // Without tuple-return substitution the baseline reds here are exactly
+    // incompatible_tensor_index + argument_type_mismatch at the consumer.
+    assert!(
+        !has_issue(errors, SemanticErrorKind::TypeMismatch, "incompatible_tensor_index"),
+        "consumer must see concrete [2, 2] shapes; errors: {errors:?}"
+    );
+    assert!(
+        !has_issue(errors, SemanticErrorKind::TypeMismatch, "argument_type_mismatch"),
+        "consumer call must typecheck against substituted shapes; errors: {errors:?}"
     );
 }
 
@@ -268,10 +287,21 @@ fn generic_companion_explicit_shape_args_bind_both_dimensions() {
         "",
     );
     let result = analyze_result(&source);
+    let errors = &result.diagnostics;
     assert!(
         result.is_ok(),
         "explicit generic companion shape args should bind both dimensions; errors: {:?}",
         result.diagnostics
+    );
+    // The explicit list is counted against the propagated 2-param list, so the
+    // baseline P2 red (wrong_number_of_type_arguments) must be absent.
+    assert!(
+        !has_issue(
+            errors,
+            SemanticErrorKind::ArityMismatch,
+            "wrong_number_of_type_arguments"
+        ),
+        "explicit <2, 2> must be accepted against the real type-param count; errors: {errors:?}"
     );
 }
 
@@ -284,11 +314,126 @@ fn generic_companion_result_tuple_annotation_unifies_shapes() {
         "",
     );
     let result = analyze_result(&source);
+    let errors = &result.diagnostics;
     assert!(
         result.is_ok(),
         "concrete result tuple annotation should unify through generic companion; errors: {:?}",
         result.diagnostics
     );
+    // Baseline P3 reds are incompatible_tensor_index + the annotation
+    // mismatch; both must be absent once the tuple return substitutes.
+    assert!(
+        !has_issue(errors, SemanticErrorKind::TypeMismatch, "incompatible_tensor_index"),
+        "annotated tuple members must unify at concrete shapes; errors: {errors:?}"
+    );
+    assert!(
+        !has_issue(
+            errors,
+            SemanticErrorKind::TypeMismatch,
+            "initializer_annotation_mismatch"
+        ),
+        "initializer must match the concrete tuple annotation; errors: {errors:?}"
+    );
+}
+
+/// Row (d): the `gradients_simple_loss` variable-to-variable precedent (gradus
+/// `src/gradient.fab:242-247`). A generic consumer annotates the companion
+/// tuple in its own size vars, so the companion's symbolic members substitute
+/// variable-to-variable instead of to concrete dimensions.
+#[test]
+fn generic_companion_variable_to_variable_consumer_stays_green() {
+    let source = format!(
+        "{GENERIC_TWO_TENSOR_PRIMAL}\nfunctio nil() → vacuum {{\n    tacet\n}}\n\nfunctio grad_wrap<magnitudo M, magnitudo N>(tensor<f32, [M, N]> x, tensor<f32, [M, N]> w, f32 upstream) → f32 {{\n    fixum iuncta<tensor<f32, [M, N]>, tensor<f32, [M, N]>> grads ← loss_backward(x, w, nil(), upstream)\n    fixum _ gw ← grads[1]\n    redde upstream + gw.media()\n}}\n\nincipit {{\n    fixum tensor<f32, [2, 2]> x ← vacua\n    fixum tensor<f32, [2, 2]> w ← vacua\n    fixum f32 upstream ← 1.0\n    fixum f32 packed ← grad_wrap(x, w, upstream)\n    nota packed\n}}"
+    );
+    let result = analyze_result(&source);
+    let errors = &result.diagnostics;
+    assert!(
+        result.is_ok(),
+        "generic consumer binding companion shapes to its own size vars should typecheck; errors: {errors:?}"
+    );
+    assert!(
+        !has_issue(errors, SemanticErrorKind::TypeMismatch, "incompatible_tensor_index"),
+        "variable-to-variable tuple annotation must unify; errors: {errors:?}"
+    );
+    assert!(
+        !has_issue(
+            errors,
+            SemanticErrorKind::TypeMismatch,
+            "initializer_annotation_mismatch"
+        ),
+        "variable-to-variable tuple annotation must match its initializer; errors: {errors:?}"
+    );
+}
+
+/// Row (e): frozen-form regression. A concrete-primal companion keeps its
+/// pre-existing behavior: implicit call + concrete downstream consumer, fully
+/// green with no shape facts in play.
+#[test]
+fn concrete_primal_companion_frozen_form_regression() {
+    let source = r#"
+@ radix lane "air"
+@ radix backward "loss2_backward"
+functio concrete_loss(tensor<f32, [2, 2]> x, tensor<f32, [2, 2]> w) → f32 {
+    fixum tensor<f32, [2, 2]> product ← x.multiplica(w)
+    redde product.media()
+}
+
+functio nil() → vacuum {
+    tacet
+}
+
+functio consume(tensor<f32, [2, 2]> gx, tensor<f32, [2, 2]> gw) → f32 {
+    redde 1.0
+}
+
+incipit {
+    fixum tensor<f32, [2, 2]> x ← vacua
+    fixum tensor<f32, [2, 2]> w ← vacua
+    fixum f32 upstream ← 1.0
+    fixum [gx, gw] ← loss2_backward(x, w, nil(), upstream)
+    fixum f32 consumed ← consume(gx, gw)
+    nota consumed
+}"#;
+    let result = analyze_result(&source);
+    let errors = &result.diagnostics;
+    assert!(
+        result.is_ok(),
+        "concrete-primal companion call + consumer should stay fully green; errors: {errors:?}"
+    );
+    assert!(
+        !has_issue(errors, SemanticErrorKind::TypeMismatch, "incompatible_tensor_index"),
+        "frozen form must not produce shape/index facts; errors: {errors:?}"
+    );
+    assert!(
+        !has_issue(
+            errors,
+            SemanticErrorKind::ArityMismatch,
+            "wrong_number_of_type_arguments"
+        ),
+        "frozen form must not produce type-argument facts; errors: {errors:?}"
+    );
+}
+
+/// Row (f): explicit type args at the wrong arity still reject with
+/// wrong_number_of_type_arguments — now counted against the real propagated
+/// companion type-param list (2), per CTP-1.
+#[test]
+fn generic_companion_wrong_arity_type_args_still_rejected() {
+    for call in [
+        "fixum _ grads ← loss_backward<2>(x, w, nil(), upstream)",
+        "fixum _ grads ← loss_backward<2, 2, 4>(x, w, nil(), upstream)",
+    ] {
+        let source = generic_companion_probe_source(call, "");
+        let errors = analyze_errors(&source);
+        assert!(
+            has_issue(
+                &errors,
+                SemanticErrorKind::ArityMismatch,
+                "wrong_number_of_type_arguments"
+            ),
+            "wrong-arity explicit type args must reject with wrong_number_of_type_arguments; call: {call}; errors: {errors:?}"
+        );
+    }
 }
 
 #[test]
