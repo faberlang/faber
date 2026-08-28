@@ -339,6 +339,88 @@ fn known_method_on_concrete_receiver_still_resolves() {
 }
 
 #[test]
+fn callable_struct_field_is_invocable_as_member_call() {
+    // A function-valued field must be callable through the member-call syntax
+    // that lowering uses for every `receiver.member(args)` expression.
+    test_support::assert_accepts(
+        r#"
+discretio Nuntius { Electus { textus identitas } }
+genus Eventum { textus nomen }
+genus Ligatio { (Eventum) → Nuntius nuntius }
+functio selectum(textus identitas) → Nuntius {
+    redde finge Electus { identitas = identitas } ∷ Nuntius
+}
+functio fac() → Ligatio {
+    redde Ligatio {
+        nuntius = (Eventum eventum) → Nuntius ∴ selectum(eventum.nomen)
+    }
+}
+functio usus() → Nuntius {
+    fixum Ligatio ligatio ← fac()
+    redde ligatio.nuntius(Eventum { nomen = "x" })
+}
+"#,
+    );
+}
+
+#[test]
+fn non_callable_struct_field_member_call_remains_unknown_method() {
+    test_support::assert_rejects_with_issue(
+        r#"
+genus Ligatio { textus nuntius }
+functio usus(Ligatio ligatio) → textus {
+    redde ligatio.nuntius("x")
+}
+"#,
+        "unknown_method",
+    );
+}
+
+#[test]
+fn callable_struct_field_member_call_checks_argument_count() {
+    test_support::assert_rejects_with_issue(
+        r#"
+genus Eventum { textus nomen }
+genus Ligatio { (Eventum) → textus nuntius }
+functio usus(Ligatio ligatio) → textus {
+    redde ligatio.nuntius()
+}
+"#,
+        "wrong_number_of_arguments",
+    );
+}
+
+#[test]
+fn callable_struct_field_member_call_checks_argument_types() {
+    test_support::assert_rejects_with_issue(
+        r#"
+genus Eventum { textus nomen }
+genus Ligatio { (Eventum) → textus nuntius }
+functio usus(Ligatio ligatio) → textus {
+    redde ligatio.nuntius("x")
+}
+"#,
+        "argument_type_mismatch",
+    );
+}
+
+#[test]
+fn explicit_method_wins_over_same_named_callable_struct_field() {
+    test_support::assert_accepts(
+        r#"
+genus Eventum { textus nomen }
+genus Ligatio {
+    (Eventum) → textus nuntius
+    functio nuntius() → textus { redde "method" }
+}
+functio usus(Ligatio ligatio) → textus {
+    redde ligatio.nuntius()
+}
+"#,
+    );
+}
+
+#[test]
 fn ignotum_receiver_method_call_still_infers() {
     // Dynamic/Ignotum receivers keep inferring unknown methods.
     test_support::assert_accepts("functio probe(ignotum s) → ignotum { redde s.from_flat(3) }");

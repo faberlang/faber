@@ -340,6 +340,19 @@ impl TypeChecker<'_> {
         None
     }
 
+    /// Look up a nominal field without emitting an access diagnostic.
+    ///
+    /// Method-call checking uses this probe only after declared method lookup
+    /// misses, so a callable field can act as the callee while an explicit
+    /// method with the same name keeps precedence. Applied generic receivers
+    /// project their type parameters before the call checker inspects the
+    /// resulting field type.
+    pub fn lookup_field_type(&mut self, receiver_ty: TypeId, name: Symbol) -> Option<TypeId> {
+        let struct_def = self.struct_def_from_type(receiver_ty)?;
+        let field = self.structs.get(&struct_def)?.fields.get(&name).copied()?;
+        Some(self.applied_field_type(receiver_ty, struct_def, field.ty))
+    }
+
     /// Members of a union type after alias transparency (U1R).
     ///
     /// `typus R = A ∪ B` and its unfolded union are the same type (BO-S-4
