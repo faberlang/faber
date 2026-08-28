@@ -184,6 +184,19 @@ pub struct ElementwisePlan {
     pub provenance: Vec<SourceSpanFact>,
     /// Chain-wide numerical policy (no reassociation).
     pub numerical_policy: NumericalPolicy,
+    /// Every local the composed chain writes (the plan's intermediate
+    /// producers plus the output), in ascending local-id order — the
+    /// consumer's statement-coverage fact (PGC-R6 / OF-3).
+    pub composed_locals: Vec<MirLocalId>,
+}
+
+impl ElementwisePlan {
+    /// Whether `local` is written by this plan (an intermediate producer
+    /// or the composed output) — the emit-side coverage check.
+    #[must_use]
+    pub fn covers_local(&self, local: MirLocalId) -> bool {
+        local == self.output.local || self.composed_locals.contains(&local)
+    }
 }
 
 /// Typed reason a function is not a phase-one elementwise plan.
@@ -397,6 +410,9 @@ pub fn plan_elementwise(
                 })
         })
         .collect();
+    let mut composed_locals: Vec<MirLocalId> = builder.producers.keys().copied().collect();
+    composed_locals.sort_unstable();
+    composed_locals.dedup();
     Ok(ElementwisePlan {
         inputs: builder.inputs,
         output: ElementwiseOutput {
@@ -408,7 +424,28 @@ pub fn plan_elementwise(
         expression,
         provenance,
         numerical_policy: NumericalPolicy::SOURCE_ORDER,
+        composed_locals,
     })
+}
+
+/// Human-readable plan-or-barrier summary for one device function
+/// (design §12: fusion facts must be discoverable without parsing target
+/// text). `"elementwise plan: …"` for a legal chain, `"elementwise
+/// barrier: <typed reason>"` otherwise.
+#[must_use]
+pub fn elementwise_plan_summary(
+    function: &MirFunction,
+    validation: &MirValidationContext<'_>,
+) -> String {
+    match plan_elementwise(function, validation) {
+        Ok(plan) => format!(
+            "elementwise plan: {} ops, {} inputs, output local {}",
+            plan.provenance.len(),
+            plan.inputs.len(),
+            plan.output.local.0
+        ),
+        Err(error) => format!("elementwise barrier: {error}"),
+    }
 }
 
 /// Shared `kernel_plan/` classification: recipe, closed elementwise set, or

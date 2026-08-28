@@ -542,3 +542,58 @@ fn unary_relu_gelu_assign_is_effect_barrier() {
         }
     }
 }
+
+// PGC-R6 (OF-3 consumer surface): coverage facts and the plan summary.
+
+#[test]
+fn composed_locals_cover_chain_and_exclude_params() {
+    let mut types = TypeTable::new();
+    let ty = rank1_tensor_ty(&mut types, 4);
+    // b = add(a, a); c = mul(b, a); d = add(c, a)
+    let function = device_function(
+        &[(0, ty)],
+        vec![
+            collection_statement(MirCollectionOp::TensorAdd, &[0, 0], 1, ty),
+            collection_statement(MirCollectionOp::TensorMul, &[1, 0], 2, ty),
+            collection_statement(MirCollectionOp::TensorAdd, &[2, 0], 3, ty),
+        ],
+        Some(3),
+        ty,
+    );
+    let plan = plan_of(&function, &types);
+    assert!(plan.covers_local(MirLocalId(1)));
+    assert!(plan.covers_local(MirLocalId(2)));
+    assert!(plan.covers_local(MirLocalId(3)));
+    assert!(!plan.covers_local(MirLocalId(0)), "a param is not composed");
+}
+
+#[test]
+fn plan_summary_reports_plan_or_barrier_reason() {
+    use super::elementwise_plan_summary;
+    let mut types = TypeTable::new();
+    let ty = rank1_tensor_ty(&mut types, 4);
+    let planned = device_function(
+        &[(0, ty)],
+        vec![collection_statement(MirCollectionOp::TensorAdd, &[0, 0], 1, ty)],
+        Some(1),
+        ty,
+    );
+    let validation = MirValidationContext::new(&types);
+    assert_eq!(
+        elementwise_plan_summary(&planned, &validation),
+        "elementwise plan: 1 ops, 1 inputs, output local 1"
+    );
+    // A recipe op is a NAMED barrier in the summary — discoverable without
+    // parsing target text (design §12).
+    let recipe = device_function(
+        &[(0, ty)],
+        vec![collection_statement(MirCollectionOp::TensorMean, &[0], 1, ty)],
+        Some(1),
+        ty,
+    );
+    let barrier = elementwise_plan_summary(&recipe, &validation);
+    assert!(
+        barrier.starts_with("elementwise barrier: recipe op"),
+        "summary must name the barrier: {barrier}"
+    );
+}

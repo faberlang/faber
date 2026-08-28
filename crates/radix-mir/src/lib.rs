@@ -131,9 +131,9 @@ pub use device_program_plans::{
 };
 pub use dump::dump_program;
 pub use elementwise_plan::{
-    plan_elementwise, ConcreteTensorShape, ElementwiseBarrierError, ElementwiseExpr,
-    ElementwiseInput, ElementwiseOp, ElementwiseOutput, ElementwisePlan, IndexMapping,
-    NumericalPolicy, ReassociationPolicy, SourceSpanFact,
+    elementwise_plan_summary, plan_elementwise, ConcreteTensorShape, ElementwiseBarrierError,
+    ElementwiseExpr, ElementwiseInput, ElementwiseOp, ElementwiseOutput, ElementwisePlan,
+    IndexMapping, NumericalPolicy, ReassociationPolicy, SourceSpanFact,
 };
 pub use generic::{
     bind_generic_type_witness, fold_shape_size_constant, function_contains_shape_size,
