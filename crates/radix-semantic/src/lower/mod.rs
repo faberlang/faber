@@ -214,6 +214,7 @@ impl<'a> Lowerer<'a> {
                     span: Span::default(),
                 },
                 entry_start_anchor: None,
+                entry_explicit: false,
             },
             next_def_id: 1_000_000,
             errors: Vec::new(),
@@ -290,6 +291,7 @@ impl<'a> Lowerer<'a> {
                 {
                     self.presentation.entry_start_anchor = Some(anchor);
                 }
+                self.presentation.entry_explicit = true;
                 entry_annotations = self.lower_annotations(&stmt.annotations);
                 entry_args_name = entry_stmt.args.as_ref().map(|ident| ident.name);
                 entry_is_async = entry_stmt.is_async;
@@ -316,6 +318,8 @@ impl<'a> Lowerer<'a> {
                                 mutable: false,
                                 is_await: false,
                                 runtime_provided: true,
+                                annotation_authored: true,
+                                annotation_union_hole: false,
                             }),
                             span,
                         },

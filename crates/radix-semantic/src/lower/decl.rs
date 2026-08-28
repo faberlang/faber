@@ -230,7 +230,9 @@ impl Lowerer<'_> {
                         init: None,
                         mutable: true,
                         is_await: false,
+                        annotation_authored: true,
                         runtime_provided: true,
+                        annotation_union_hole: false,
                     }),
                     span,
                 },
@@ -378,7 +380,9 @@ impl Lowerer<'_> {
                         init: None,
                         mutable,
                         is_await: false,
+                        annotation_authored: true,
                         runtime_provided: true,
+                        annotation_union_hole: false,
                     }),
                     span,
                 },
@@ -400,6 +404,13 @@ impl Lowerer<'_> {
         };
 
         let def_id = self.def_id_for(name);
+        // Spelled annotations re-emit as written; `_` holes stay holes.
+        let annotation_authored = decl.ty.as_ref().is_some_and(|ty| {
+            !matches!(
+                ty.kind,
+                radix_syntax::TypeExprKind::Infer | radix_syntax::TypeExprKind::UnionHole
+            )
+        });
         let ty = decl.ty.as_ref().map(|ty| self.lower_type(ty));
         let value = if let Some(init) = &decl.init {
             self.lower_expr(init)
@@ -417,6 +428,7 @@ impl Lowerer<'_> {
                 value,
                 mutable: decl.mutability == AstMutability::Mutable,
                 is_await: decl.is_await,
+                annotation_authored,
             }),
             span: stmt.span,
         };

@@ -754,6 +754,7 @@ pub(crate) fn empty_presentation() -> HirPresentation {
             span: radix_lexer::Span::default(),
         },
         entry_start_anchor: None,
+        entry_explicit: false,
     }
 }
 

@@ -151,3 +151,19 @@ impl super::FaberCodegen {
         }
     }
 }
+
+/// Whether a same-precedence left operand regroups under a left-associative
+/// re-parse without changing meaning. Associative operators are safe; the rest
+/// keep the equal-precedence parenthesis policy.
+pub(super) fn binop_left_associative(op: HirBinOp) -> bool {
+    matches!(
+        op,
+        HirBinOp::Add
+            | HirBinOp::Mul
+            | HirBinOp::And
+            | HirBinOp::Or
+            | HirBinOp::BitAnd
+            | HirBinOp::BitOr
+            | HirBinOp::BitXor
+    )
+}

@@ -1729,6 +1729,8 @@ fn emit_unrolled_lanes(
                     mutable: false,
                     is_await: false,
                     runtime_provided: false,
+                    annotation_authored: true,
+                    annotation_union_hole: false,
                 };
                 out.push(HirStatement {
                     id: ids.next_hir(),
@@ -1788,6 +1790,8 @@ fn emit_unrolled_lanes(
                 mutable: false,
                 is_await: false,
                 runtime_provided: false,
+                annotation_authored: true,
+                annotation_union_hole: false,
             };
             out.push(HirStatement {
                 id: ids.next_hir(),
@@ -1896,6 +1900,8 @@ fn ssa_local(
             mutable: false,
             is_await: false,
             runtime_provided: false,
+            annotation_authored: true,
+            annotation_union_hole: false,
         }),
         span,
     }

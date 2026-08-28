@@ -88,7 +88,14 @@ impl super::FaberCodegen {
                 writer.write(surface.contextual_keyword("fixum"));
                 writer.write(" ");
                 if let Some(ty) = c.ty {
-                    writer.write(&self.type_to_faber(ty, types, names, interner, surface));
+                    if c.annotation_authored {
+                        writer.write(&self.type_to_faber(ty, types, names, interner, surface));
+                    } else {
+                        // `_` hole: keep the hole instead of materializing the
+                        // inferred type (materialized bounded-lista
+                        // annotations narrow later spread legality).
+                        writer.write("_");
+                    }
                     writer.write(" ");
                 }
                 writer.write(&self.symbol_to_string(c.name, interner));
@@ -200,6 +207,14 @@ impl super::FaberCodegen {
         writer.write("(");
         self.write_param_list(&func.params, types, names, interner, surface, writer);
         writer.write(")");
+        if let Some(cli_args) = &func.cli_args {
+            // `functio f() argumenta args` sugar: the CLI bundle param is not
+            // part of `params`, so its binding re-emits in the postfix slot.
+            writer.write(" ");
+            writer.write(surface.keyword(TokenKind::Argumenta));
+            writer.write(" ");
+            writer.write(&self.symbol_to_string(cli_args.name, interner));
+        }
         if !has_legacy_posture_annotation(&func.annotations, interner) {
             self.write_callable_posture(func.posture, surface, writer);
         }
@@ -479,7 +494,7 @@ impl super::FaberCodegen {
         writer.indented(|writer| {
             for method in &i.methods {
                 for availability in &method.availability {
-                    self.write_availability(availability, interner, writer);
+                    self.write_availability(availability, interner, surface, writer);
                 }
                 writer.write(surface.contextual_keyword("functio"));
                 writer.write(" ");
@@ -507,11 +522,17 @@ impl super::FaberCodegen {
         &self,
         availability: &HirAvailability,
         interner: &Interner,
+        surface: &impl KeywordSurface,
         writer: &mut CodeWriter,
     ) {
         match availability {
             HirAvailability::Nondum { target, reason } => {
-                writer.write("@ nondum { ");
+                writer.write("@ ");
+                // Surface-projected spelling: the availability family is a
+                // contextual keyword (`unstable` under `en`, `nondum` under
+                // `la`); a hardcoded Latin spelling fails PARSE018 on re-parse.
+                writer.write(surface.contextual_keyword("nondum"));
+                writer.write(" { ");
                 if let Some(target) = target {
                     writer.write("target = ");
                     writer.write(&self.symbol_to_string(*target, interner));

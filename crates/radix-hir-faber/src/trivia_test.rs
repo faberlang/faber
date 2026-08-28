@@ -133,6 +133,7 @@ fn empty_presentation() -> HirPresentation {
             span: span(),
         },
         entry_start_anchor: None,
+        entry_explicit: false,
     }
 }
 
@@ -269,6 +270,7 @@ fn emits_statement_trivia_before_each_statement() {
             span: span(),
         },
         entry_start_anchor: None,
+        entry_explicit: false,
     };
 
     let code = render(&hir, &presentation, &interner);
@@ -309,6 +311,7 @@ fn emits_block_end_trivia_before_closing_brace() {
             span: span(),
         },
         entry_start_anchor: None,
+        entry_explicit: false,
     };
 
     let code = render(&hir, &presentation, &interner);
@@ -344,6 +347,7 @@ fn emits_program_end_trivia_before_eof() {
             span: span(),
         },
         entry_start_anchor: None,
+        entry_explicit: false,
     };
 
     let code = render(&hir, &presentation, &interner);
@@ -380,6 +384,7 @@ fn emits_item_trivia_before_item() {
             span: span(),
         },
         entry_start_anchor: None,
+        entry_explicit: false,
     };
 
     let code = render(&hir, &presentation, &interner);
@@ -403,6 +408,7 @@ fn emits_entry_trivia_before_incipit_keyword() {
             span: span(),
         },
         entry_start_anchor: Some(anchor(1)),
+        entry_explicit: false,
     };
 
     let code = render(&hir, &presentation, &interner);
@@ -493,6 +499,7 @@ fn emits_member_trivia_for_struct_fields_and_methods() {
             span: span(),
         },
         entry_start_anchor: None,
+        entry_explicit: false,
     };
 
     let code = emit(
@@ -551,6 +558,7 @@ fn emits_trivia_before_annotation_sequence() {
             span: span(),
         },
         entry_start_anchor: None,
+        entry_explicit: false,
     };
 
     let code = render(&hir, &presentation, &interner);
@@ -616,6 +624,7 @@ fn comment_bearing_branch_stays_braced_not_ergo() {
             span: span(),
         },
         entry_start_anchor: None,
+        entry_explicit: false,
     };
 
     let code = render(&hir, &presentation, &interner);
@@ -714,6 +723,7 @@ fn comment_bearing_branch_prevents_sic_secus_compaction() {
             span: span(),
         },
         entry_start_anchor: None,
+        entry_explicit: false,
     };
 
     let code = render(&hir, &presentation, &interner);
@@ -824,6 +834,7 @@ fn boundary_newline_normalization_does_not_manufacture_blank_lines() {
             span: span(),
         },
         entry_start_anchor: None,
+        entry_explicit: false,
     };
 
     let code = render(&hir, &presentation, &interner);
@@ -874,6 +885,7 @@ fn file_start_trivia_keeps_no_leading_blank_lines() {
             span: span(),
         },
         entry_start_anchor: None,
+        entry_explicit: false,
     };
 
     let code = render(&hir, &presentation, &interner);
@@ -921,6 +933,7 @@ fn explicit_tacet_prints_implicit_ends_do_not() {
             span: span(),
         },
         entry_start_anchor: None,
+        entry_explicit: false,
     };
 
     let code = render(&hir, &presentation, &interner);
@@ -974,6 +987,7 @@ fn rendering_is_deterministic() {
             span: span(),
         },
         entry_start_anchor: None,
+        entry_explicit: false,
     };
 
     let first = render(&hir, &presentation, &interner);

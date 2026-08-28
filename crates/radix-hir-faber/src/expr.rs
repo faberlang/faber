@@ -29,7 +29,7 @@
 //! (`panic`). Leftover Secus is PARSE001 `adfirma_else_rejected` (`7805f8e1a`);
 //! hardcoded `secus` (`e0fbae339`) is not a valid particle.
 
-use crate::surface::KeywordSurface;
+use crate::surface::{KeywordSurface, TypeBindingKind};
 use radix_codegen_shared::CodeWriter;
 use radix_hir::{
     DefId, HirArrayElement, HirBlock, HirCallArg, HirCape, HirConversioTarget, HirExpression,
@@ -38,6 +38,8 @@ use radix_hir::{
 use radix_lexer::{Interner, Symbol, TokenKind};
 use radix_types::{Primitive, Type, TypeId, TypeTable};
 use rustc_hash::FxHashMap;
+
+use crate::ops::binop_left_associative;
 
 #[derive(Clone, Copy)]
 struct PostfixChainPrefixes {
@@ -139,7 +141,15 @@ impl super::FaberCodegen {
             HirExpressionKind::ReadLine(_) => writer.write(surface.contextual_keyword("lege")),
             HirExpressionKind::Binary(op, lhs, rhs) => {
                 let op_prec = self.binop_precedence(*op);
-                self.write_expr_prec(lhs, op_prec, types, names, interner, surface, writer);
+                // Left operands of associative operators re-parse identically
+                // without parens (`a + b + c`); the parenthesized form after a
+                // statement-head callee (`scribe (a + b) + c`) is call syntax.
+                let lhs_prec = if binop_left_associative(*op) {
+                    op_prec.saturating_sub(1)
+                } else {
+                    op_prec
+                };
+                self.write_expr_prec(lhs, lhs_prec, types, names, interner, surface, writer);
                 writer.write(" ");
                 writer.write(&self.binop_to_faber(*op, surface));
                 writer.write(" ");
@@ -367,7 +377,7 @@ impl super::FaberCodegen {
                 });
                 writer.write("}");
             }
-            HirExpressionKind::Itera(mode, _, _binding, binding_name, iter, block) => {
+            HirExpressionKind::Itera(mode, coordinates, _binding, binding_name, iter, block) => {
                 writer.write(surface.keyword(TokenKind::Itera));
                 writer.write(" ");
                 writer.write(match mode {
@@ -380,6 +390,21 @@ impl super::FaberCodegen {
                 });
                 writer.write(" ");
                 self.write_expr(iter, types, names, interner, surface, writer);
+                // Coordinate clause from the shared `apud` production; the
+                // bindings are loop-visible, so dropping them breaks bodies
+                // that reference the coordinate.
+                if !coordinates.is_empty() {
+                    writer.write(" ");
+                    writer.write(surface.keyword(TokenKind::Apud));
+                    writer.write(" [");
+                    for (index, (_, name)) in coordinates.iter().enumerate() {
+                        if index > 0 {
+                            writer.write(", ");
+                        }
+                        writer.write(&self.symbol_to_string(*name, interner));
+                    }
+                    writer.write("]");
+                }
                 writer.write(" ");
                 writer.write(surface.contextual_keyword("fixum"));
                 writer.write(" ");
@@ -767,21 +792,42 @@ impl super::FaberCodegen {
                 writer.write(" ↦ ");
                 match target {
                     HirConversioTarget::Type(ty) => {
-                        writer.write(&self.type_to_faber(*ty, types, names, interner, surface));
+                        let mut target_str =
+                            self.type_to_faber(*ty, types, names, interner, surface);
+                        if !params.is_empty() {
+                            // Conversio markers (`Be` / `Le` / `Bits`) are extra
+                            // generic arguments on the target type
+                            // (`int<u32, Be>`); a trailing `<Be>` append is not
+                            // the source form and fails to re-parse.
+                            let markers = params
+                                .iter()
+                                .map(|param| self.symbol_to_string(*param, interner))
+                                .collect::<Vec<_>>()
+                                .join(", ");
+                            if target_str.ends_with('>') {
+                                target_str.truncate(target_str.len() - 1);
+                                target_str.push_str(", ");
+                            } else {
+                                // Bare width marker target: the marker rides a
+                                // generic argument, so re-wrap the width in
+                                // the float-family head (`float<f32, Be>`).
+                                target_str = format!(
+                                    "{}<{}",
+                                    surface.type_surface(TypeBindingKind::Primitive(
+                                        Primitive::Fractus
+                                    )),
+                                    target_str
+                                );
+                                target_str.push_str(", ");
+                            }
+                            target_str.push_str(&markers);
+                            target_str.push('>');
+                        }
+                        writer.write(&target_str);
                     }
                     HirConversioTarget::Intervallum(operand) => {
                         self.write_expr_prec(operand, 10, types, names, interner, surface, writer);
                     }
-                }
-                if !params.is_empty() {
-                    writer.write("<");
-                    for (idx, param) in params.iter().enumerate() {
-                        if idx > 0 {
-                            writer.write(", ");
-                        }
-                        writer.write(&self.symbol_to_string(*param, interner));
-                    }
-                    writer.write(">");
                 }
                 if let Some(recovery) = recovery {
                     writer.write(" ⇥ ");
@@ -818,13 +864,16 @@ impl super::FaberCodegen {
             }
             HirExpressionKind::TypeCheck { positive, expr, ty } => {
                 // Precedence matches `HirBinOp::Is` (4) — both spell `est`
-                // and bind at the same relational level.
+                // and bind at the same relational level. Negation is the
+                // infix `<expr> non est <ty>` spelling; a prefix `non`
+                // re-parses as `(non expr) est ty` and fails the boolean
+                // operand gate.
+                self.write_expr_prec(expr, 4, types, names, interner, surface, writer);
+                writer.write(" ");
                 if !*positive {
                     writer.write(surface.contextual_keyword("non"));
                     writer.write(" ");
                 }
-                self.write_expr_prec(expr, 4, types, names, interner, surface, writer);
-                writer.write(" ");
                 writer.write(surface.contextual_keyword("est"));
                 writer.write(" ");
                 writer.write(&self.type_to_faber(*ty, types, names, interner, surface));
@@ -832,15 +881,91 @@ impl super::FaberCodegen {
             HirExpressionKind::Praefixum(inner) => {
                 self.write_expr(inner, types, names, interner, surface, writer);
             }
-            HirExpressionKind::Summa { .. } => {
-                // SFR-2 is source-shaped only; keep re-emission fail-closed
-                // until the reduction lowering units provide a valid surface.
-                writer.write(surface.contextual_keyword("nihil"));
+            HirExpressionKind::Summa {
+                source,
+                coordinates,
+                filum,
+                binding,
+                body,
+            } => {
+                // `summa ex src apud [i] filum f fixum s { … }` — the SFR-2
+                // source shape; every clause head is surface-projected.
+                writer.write(surface.contextual_keyword("summa"));
+                writer.write(" ");
+                writer.write(surface.keyword(TokenKind::Ex));
+                writer.write(" ");
+                // Reduction operand precedence: binary children (`row ⊙
+                // scale`) must stay grouped or the tail clauses capture the
+                // loose operand on re-parse.
+                self.write_expr_prec(source, 10, types, names, interner, surface, writer);
+                if !coordinates.is_empty() {
+                    writer.write(" ");
+                    writer.write(surface.keyword(TokenKind::Apud));
+                    writer.write(" [");
+                    for (index, (_, name)) in coordinates.iter().enumerate() {
+                        if index > 0 {
+                            writer.write(", ");
+                        }
+                        writer.write(&self.symbol_to_string(*name, interner));
+                    }
+                    writer.write("]");
+                }
+                if let Some((_, lane)) = filum {
+                    writer.write(" ");
+                    writer.write(surface.contextual_keyword("filum"));
+                    writer.write(" ");
+                    writer.write(&self.symbol_to_string(*lane, interner));
+                }
+                writer.write(" ");
+                writer.write(surface.contextual_keyword("fixum"));
+                writer.write(" ");
+                writer.write(&self.symbol_to_string(binding.1, interner));
+                writer.writeln(" {");
+                writer.indented(|writer| {
+                    self.write_block(body, types, names, interner, surface, writer);
+                    self.write_block_end_trivia(body, interner, writer);
+                });
+                writer.write("}");
             }
-            HirExpressionKind::Extremum { .. } => {
-                // M2 preserves the typed source shape; M3 owns target
-                // lowering and valid max/min re-emission.
-                writer.write(surface.contextual_keyword("nihil"));
+            HirExpressionKind::Extremum {
+                op,
+                source,
+                coordinates,
+                coalesce,
+            } => {
+                writer.write(surface.contextual_keyword(match op {
+                    radix_hir::HirExtremumOp::Max => "maxima",
+                    radix_hir::HirExtremumOp::Min => "minima",
+                }));
+                writer.write(" ");
+                writer.write(surface.keyword(TokenKind::Ex));
+                writer.write(" ");
+                // With a `vel` identity tail the source must bind tighter
+                // than the infix `vel` operator; primary-level precedence
+                // parenthesizes any operator source (`(row ⊙ scale) vel …`).
+                if coalesce.is_some() {
+                    self.write_expr_prec(source, 12, types, names, interner, surface, writer);
+                } else {
+                    self.write_expr_prec(source, 10, types, names, interner, surface, writer);
+                }
+                if !coordinates.is_empty() {
+                    writer.write(" ");
+                    writer.write(surface.keyword(TokenKind::Apud));
+                    writer.write(" [");
+                    for (index, (_, name)) in coordinates.iter().enumerate() {
+                        if index > 0 {
+                            writer.write(", ");
+                        }
+                        writer.write(&self.symbol_to_string(*name, interner));
+                    }
+                    writer.write("]");
+                }
+                if let Some(identity) = coalesce {
+                    writer.write(" ");
+                    writer.write(surface.contextual_keyword("vel"));
+                    writer.write(" ");
+                    self.write_expr(identity, types, names, interner, surface, writer);
+                }
             }
             HirExpressionKind::FirstMatch { .. } => {
                 // AFM-2 is source-shaped only; keep re-emission fail-closed
@@ -1336,6 +1461,14 @@ impl super::FaberCodegen {
                     return matches!(
                         ty,
                         Type::Array(_)
+                            | Type::BoundedArray { .. }
+                            | Type::Queue(_)
+                            | Type::BoundedQueue { .. }
+                            | Type::Stack(_)
+                            | Type::BoundedStack { .. }
+                            | Type::BoundedTextus { .. }
+                            | Type::BoundedAscii { .. }
+                            | Type::BoundedOcteti { .. }
                             | Type::Map(_, _)
                             | Type::Set(_)
                             | Type::Tensor(_, _)

@@ -17,7 +17,9 @@
 
 use radix_hir::{HirFunction, HirId, HirItem, HirItemKind, HirModule, LibraryRegistry};
 use radix_hir_fhir::HirArtifactError;
-use radix_hir_fhir::{FunctionFactTableWire, FunctionProvenanceTableWire, ResolverSnapshot, SourceIdentity, SCHEMA_VERSION};
+use radix_hir_fhir::{
+    FunctionFactTableWire, FunctionProvenanceTableWire, ResolverSnapshot, SourceIdentity, SCHEMA_VERSION,
+};
 use radix_lexer::Symbol;
 use radix_module::hir::artifact::load_fhir;
 use radix_types::{DefId, TypeId, TypeTable};
@@ -75,6 +77,7 @@ fn minimal_test_artifact() -> radix_hir_fhir::HirArtifact {
                 span: radix_lexer::Span::default(),
             },
             entry_start_anchor: None,
+            entry_explicit: false,
         },
         cli_program: None,
         types: types.snapshot(),
@@ -256,6 +259,7 @@ fn hir_artifact_adversarial_dangling_attachment_anchor() {
             span: radix_lexer::Span::default(),
         },
         entry_start_anchor: None,
+        entry_explicit: false,
     };
     let bytes = serialize_artifact(&artifact);
     let result = load_fhir(&bytes);
@@ -294,6 +298,7 @@ fn hir_artifact_adversarial_duplicate_owner_anchor() {
             span: radix_lexer::Span::default(),
         },
         entry_start_anchor: None,
+        entry_explicit: false,
     };
     let bytes = serialize_artifact(&artifact);
     let result = load_fhir(&bytes);
@@ -327,6 +332,7 @@ fn hir_artifact_adversarial_duplicate_attachment_owner() {
             span: radix_lexer::Span::default(),
         },
         entry_start_anchor: None,
+        entry_explicit: false,
     };
     let bytes = serialize_artifact(&artifact);
     let result = load_fhir(&bytes);
@@ -360,6 +366,7 @@ fn hir_artifact_adversarial_dangling_comment_symbol() {
             span: radix_lexer::Span::default(),
         },
         entry_start_anchor: None,
+        entry_explicit: false,
     };
     let bytes = serialize_artifact(&artifact);
     let result = load_fhir(&bytes);
@@ -407,6 +414,7 @@ fn hir_artifact_adversarial_duplicate_block_end_anchor() {
             span: radix_lexer::Span::default(),
         },
         entry_start_anchor: None,
+        entry_explicit: false,
     };
     let bytes = serialize_artifact(&artifact);
     let result = load_fhir(&bytes);
@@ -436,6 +444,7 @@ fn hir_artifact_adversarial_program_end_collides_with_block_end() {
             span: radix_lexer::Span::default(),
         },
         entry_start_anchor: None,
+        entry_explicit: false,
     };
     let bytes = serialize_artifact(&artifact);
     let result = load_fhir(&bytes);
@@ -469,6 +478,7 @@ fn hir_artifact_adversarial_end_anchor_reused_as_owner() {
             span: radix_lexer::Span::default(),
         },
         entry_start_anchor: None,
+        entry_explicit: false,
     };
     let bytes = serialize_artifact(&artifact);
     let result = load_fhir(&bytes);
@@ -499,6 +509,7 @@ fn hir_artifact_adversarial_block_end_owner_without_end() {
             span: radix_lexer::Span::default(),
         },
         entry_start_anchor: None,
+        entry_explicit: false,
     };
     let bytes = serialize_artifact(&artifact);
     let result = load_fhir(&bytes);
@@ -529,6 +540,7 @@ fn hir_artifact_adversarial_program_end_owner_mismatch() {
             span: radix_lexer::Span::default(),
         },
         entry_start_anchor: None,
+        entry_explicit: false,
     };
     let bytes = serialize_artifact(&artifact);
     let result = load_fhir(&bytes);

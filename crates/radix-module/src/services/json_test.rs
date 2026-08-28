@@ -60,6 +60,7 @@ fn presentation_json_exposes_owners_attachments_and_ends() {
         block_ends: vec![radix_hir::HirBlockEnd { id: radix_hir::HirSourceAnchorId(3), span: span(30, 31) }],
         program_end: radix_hir::HirModuleEnd { id: radix_hir::HirSourceAnchorId(4), span: span(60, 60) },
         entry_start_anchor: Some(radix_hir::HirSourceAnchorId(2)),
+        entry_explicit: false,
     };
 
     let json = presentation_json(&presentation, &interner);
@@ -121,6 +122,7 @@ fn presentation_json_emits_null_semantic_refs_and_null_entry_anchor() {
         block_ends: Vec::new(),
         program_end: radix_hir::HirModuleEnd { id: radix_hir::HirSourceAnchorId(1), span: span(11, 11) },
         entry_start_anchor: None,
+        entry_explicit: false,
     };
 
     let json = presentation_json(&presentation, &interner);
@@ -146,6 +148,7 @@ fn presentation_json_escapes_comment_payloads() {
         block_ends: Vec::new(),
         program_end: radix_hir::HirModuleEnd { id: radix_hir::HirSourceAnchorId(1), span: span(0, 0) },
         entry_start_anchor: None,
+        entry_explicit: false,
     };
 
     let json = presentation_json(&presentation, &interner);

@@ -1356,6 +1356,7 @@ fn transplant_data_member(
         )?,
         mutable: member.konst.mutable,
         is_await: member.konst.is_await,
+        annotation_authored: true,
     };
     Ok(HirItem {
         // The synthetic def id doubles as a unique item/expression id; no

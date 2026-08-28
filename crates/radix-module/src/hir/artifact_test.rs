@@ -137,6 +137,7 @@ fn empty_presentation() -> radix_hir::HirPresentation {
             span: radix_lexer::Span::default(),
         },
         entry_start_anchor: None,
+        entry_explicit: false,
     }
 }
 
@@ -501,6 +502,8 @@ fn user_range_def_id_loads_ok() {
                         mutable: false,
                         is_await: false,
                         runtime_provided: false,
+                        annotation_authored: true,
+                        annotation_union_hole: false,
                         init: Some(radix_hir::HirExpression {
                             id: radix_hir::HirId(1),
                             kind: radix_hir::HirExpressionKind::Path(radix_types::DefId(
@@ -626,6 +629,8 @@ fn serialize_load_roundtrip_ok() {
                         mutable: false,
                         is_await: false,
                         runtime_provided: false,
+                        annotation_authored: true,
+                        annotation_union_hole: false,
                         init: None,
                     }),
                 }],
@@ -803,6 +808,7 @@ fn presentation_dangling_attachment_anchor() {
         block_ends: Vec::new(),
         program_end: empty_presentation().program_end,
         entry_start_anchor: None,
+        entry_explicit: false,
     };
     let bytes = serialize_artifact(&artifact);
     let result = load_fhir(&bytes);
@@ -827,6 +833,7 @@ fn presentation_dangling_entry_anchor() {
         block_ends: Vec::new(),
         program_end: empty_presentation().program_end,
         entry_start_anchor: Some(HirSourceAnchorId(4)),
+        entry_explicit: false,
     };
     let bytes = serialize_artifact(&artifact);
     let result = load_fhir(&bytes);
@@ -853,6 +860,7 @@ fn presentation_duplicate_owner_anchor() {
         block_ends: Vec::new(),
         program_end: empty_presentation().program_end,
         entry_start_anchor: None,
+        entry_explicit: false,
     };
     let bytes = serialize_artifact(&artifact);
     let result = load_fhir(&bytes);
@@ -879,6 +887,7 @@ fn presentation_duplicate_attachment_owner() {
         block_ends: Vec::new(),
         program_end: empty_presentation().program_end,
         entry_start_anchor: None,
+        entry_explicit: false,
     };
     let bytes = serialize_artifact(&artifact);
     let result = load_fhir(&bytes);
@@ -908,6 +917,7 @@ fn presentation_dangling_comment_symbol() {
         block_ends: Vec::new(),
         program_end: empty_presentation().program_end,
         entry_start_anchor: None,
+        entry_explicit: false,
     };
     let bytes = serialize_artifact(&artifact);
     let result = load_fhir(&bytes);
@@ -937,6 +947,7 @@ fn presentation_dangling_def_backref() {
         block_ends: Vec::new(),
         program_end: empty_presentation().program_end,
         entry_start_anchor: None,
+        entry_explicit: false,
     };
     let bytes = serialize_artifact(&artifact);
     let result = load_fhir(&bytes);
