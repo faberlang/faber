@@ -1,13 +1,13 @@
-//! Higher-order collection method lowering (`filtrata`, `mappata`, `reducta`,
-//! `cumulata`).
+//! Higher-order collection method lowering (`omnia`, `quilibet`, `filtrata`,
+//! `mappata`, `reducta`, `cumulata`).
 //!
 //! Collection transforms lower into explicit MIR loops over array receivers.
 //! Each callback is emitted as a synthetic closure function, then invoked once
-//! per element through the shared callable lowering path. Filtered results
-//! append only when the predicate returns true; mapped results append the
-//! callback return value directly; reduced results update an accumulator;
-//! cumulated results append the accumulator after every fold step (serial
-//! prefix scan).
+//! per element through the shared callable lowering path. Predicate folds
+//! settle on the first decisive result; filtered results append only when the
+//! predicate returns true; mapped results append the callback return value
+//! directly; reduced results update an accumulator; cumulated results append
+//! the accumulator after every fold step (serial prefix scan).
 //!
 //! INVARIANTS
 //! ==========
@@ -31,6 +31,36 @@ impl FunctionBuilder<'_> {
         let bivalens = MirType::semantic(self.types.primitive(Primitive::Bivalens));
         let predicate = self.lower_closure_function(closure, bivalens)?;
         self.lower_collection_transform(receiver, predicate, TransformKind::Filter, expr)
+    }
+
+    /// `omnia` — left-to-right universal predicate fold over a `lista`.
+    ///
+    /// The initial accumulator is true, so an empty source satisfies the
+    /// vacuous-truth law. A false predicate result settles the fold early.
+    pub(super) fn lower_omnia(
+        &mut self,
+        receiver: &HirExpression,
+        closure: &HirExpression,
+        expr: &HirExpression,
+    ) -> Option<MirOperand> {
+        let bivalens = MirType::semantic(self.types.primitive(Primitive::Bivalens));
+        let predicate = self.lower_closure_function(closure, bivalens)?;
+        self.lower_collection_predicate(receiver, predicate, TransformKind::All, expr)
+    }
+
+    /// `quilibet` — left-to-right existential predicate fold over a `lista`.
+    ///
+    /// The initial accumulator is false, so an empty source fails the fold.
+    /// A true predicate result settles the fold early.
+    pub(super) fn lower_quilibet(
+        &mut self,
+        receiver: &HirExpression,
+        closure: &HirExpression,
+        expr: &HirExpression,
+    ) -> Option<MirOperand> {
+        let bivalens = MirType::semantic(self.types.primitive(Primitive::Bivalens));
+        let predicate = self.lower_closure_function(closure, bivalens)?;
+        self.lower_collection_predicate(receiver, predicate, TransformKind::Any, expr)
     }
 
     pub(super) fn lower_mappata(
@@ -128,6 +158,129 @@ impl FunctionBuilder<'_> {
         self.lower_collection_cumulata(receiver, receiver_ty, reducer, initial, result_ty, accumulator_ty, expr)
     }
 
+    fn lower_collection_predicate(
+        &mut self,
+        receiver: &HirExpression,
+        callback: MirCallee,
+        kind: TransformKind,
+        expr: &HirExpression,
+    ) -> Option<MirOperand> {
+        let Some(receiver_ty) = receiver.ty else {
+            self.errors
+                .push(MirError::missing_type(receiver.span, "collection predicate receiver"));
+            return None;
+        };
+        if !matches!(self.normalized_type(receiver_ty), Type::Array(_) | Type::BoundedArray { .. }) {
+            self.errors.push(MirError::unsupported(
+                receiver.span,
+                "collection predicate before array MIR lowering",
+            ));
+            return None;
+        }
+        let result_ty = self.expr_ty(expr)?;
+        let collection_ty = MirType::semantic(receiver_ty);
+        let numerus = MirType::semantic(self.types.primitive(Primitive::Numerus));
+        let bivalens = MirType::semantic(self.types.primitive(Primitive::Bivalens));
+
+        let collection = self.lower_expr_value(receiver)?;
+        let collection = self.materialize_operand_place(collection, collection_ty, receiver.span);
+
+        let result = self.next_local_id();
+        self.locals
+            .push(MirLocalDecl { id: result, name: None, ty: result_ty, mutable: true, span: expr.span });
+        self.assign(
+            MirPlace::local(result),
+            MirOperand::Constant(MirConstant::Bool(matches!(kind, TransformKind::All))),
+            result_ty,
+            expr.span,
+        );
+
+        let index = self.next_local_id();
+        self.locals
+            .push(MirLocalDecl { id: index, name: None, ty: numerus, mutable: true, span: expr.span });
+        self.assign(
+            MirPlace::local(index),
+            MirOperand::Constant(MirConstant::Int(0)),
+            numerus,
+            expr.span,
+        );
+
+        let length = self.runtime_call_value(
+            MirIntrinsic::Collection(MirCollectionOp::Length),
+            vec![MirOperand::Place(collection.clone())],
+            numerus,
+            expr.span,
+        );
+        if !self.current_is_open() {
+            return None;
+        }
+
+        let cond_id = self.fresh_block(expr.span);
+        let body_id = self.fresh_block(expr.span);
+        let decisive_id = self.fresh_block(expr.span);
+        let increment_id = self.fresh_block(expr.span);
+        let after_id = self.fresh_block(expr.span);
+        self.terminate_current(MirTerminatorKind::Goto(cond_id), expr.span);
+
+        self.switch_to(cond_id);
+        let continues = self.binary_temp(
+            MirBinOp::Lt,
+            MirOperand::Place(MirPlace::local(index)),
+            length,
+            bivalens,
+            expr.span,
+        );
+        self.terminate_current(
+            MirTerminatorKind::Branch { condition: continues, then_block: body_id, else_block: after_id },
+            expr.span,
+        );
+
+        self.switch_to(body_id);
+        let mut item_place = collection;
+        item_place
+            .projections
+            .push(MirProjection::Index(MirOperand::Place(MirPlace::local(index))));
+        let predicate = self.call_callback_callee(callback, vec![MirOperand::Place(item_place)], bivalens, expr.span);
+        if !self.current_is_open() {
+            return None;
+        }
+
+        let (then_block, else_block) = match kind {
+            TransformKind::All => (increment_id, decisive_id),
+            TransformKind::Any => (decisive_id, increment_id),
+            TransformKind::Filter | TransformKind::Map => {
+                return None;
+            }
+        };
+        self.terminate_current(
+            MirTerminatorKind::Branch { condition: predicate, then_block, else_block },
+            expr.span,
+        );
+
+        self.switch_to(decisive_id);
+        self.assign(
+            MirPlace::local(result),
+            MirOperand::Constant(MirConstant::Bool(matches!(kind, TransformKind::Any))),
+            result_ty,
+            expr.span,
+        );
+        self.terminate_current(MirTerminatorKind::Goto(after_id), expr.span);
+
+        self.switch_to(increment_id);
+        let next = self.binary_temp(
+            MirBinOp::Add,
+            MirOperand::Place(MirPlace::local(index)),
+            MirOperand::Constant(MirConstant::Int(1)),
+            numerus,
+            expr.span,
+        );
+        self.assign(MirPlace::local(index), next, numerus, expr.span);
+        self.terminate_current(MirTerminatorKind::Goto(cond_id), expr.span);
+
+        self.switch_to(after_id);
+        Some(MirOperand::Place(MirPlace::local(result)))
+    }
+
     fn lower_collection_transform(
         &mut self,
         receiver: &HirExpression,
@@ -223,6 +376,9 @@ impl FunctionBuilder<'_> {
         let callback_return = match kind {
             TransformKind::Filter => bivalens,
             TransformKind::Map => result_element_ty,
+            TransformKind::All | TransformKind::Any => {
+                unreachable!("predicate folds use lower_collection_predicate")
+            }
         };
         let mapped = self.call_callback_callee(callback, vec![item.clone()], callback_return, expr.span);
         if !self.current_is_open() {
@@ -252,6 +408,9 @@ impl FunctionBuilder<'_> {
                     vacuum,
                     expr.span,
                 );
+            }
+            TransformKind::All | TransformKind::Any => {
+                unreachable!("predicate folds use lower_collection_predicate")
             }
         }
         if !self.current_is_open() {
@@ -685,6 +844,8 @@ impl FunctionBuilder<'_> {
 
 #[derive(Debug, Clone, Copy)]
 enum TransformKind {
+    All,
+    Any,
     Filter,
     Map,
 }

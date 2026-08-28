@@ -54,6 +54,35 @@ fn cumulata_is_a_lista_scan_row() {
 }
 
 #[test]
+fn predicate_twins_are_boolean_lista_higher_order_rows() {
+    for (name, kind) in [
+        ("omnia", IntrinsicMirKind::HigherOrderAll),
+        ("quilibet", IntrinsicMirKind::HigherOrderAny),
+    ] {
+        let entry = lookup_method(IntrinsicReceiver::Lista, name, 1)
+            .unwrap_or_else(|| panic!("lista {name} predicate row"));
+        assert_eq!(entry.params, &[IntrinsicParamKind::Predicate]);
+        assert_eq!(entry.return_kind, IntrinsicReturnKind::Bool);
+        assert_eq!(entry.mir_kind, kind);
+        assert!(mir_is_higher_order_lista(entry));
+        assert_eq!(mir_collection_op(entry), None);
+        assert_eq!(mir_atomic_op(entry), None);
+    }
+
+    let mut types = radix_types::TypeTable::new();
+    let element = types.intern(Type::Primitive(Primitive::Numerus));
+    let lista = Type::Array(element);
+    assert_eq!(
+        lookup_method_for_type(&lista, "omnia", 1).map(|row| row.faber_name),
+        Some("omnia")
+    );
+    assert_eq!(
+        lookup_method_for_type(&lista, "quilibet", 1).map(|row| row.faber_name),
+        Some("quilibet")
+    );
+}
+
+#[test]
 fn receivers_for_type_maps_semantic_families() {
     let mut types = radix_types::TypeTable::new();
     let element = types.intern(Type::Primitive(Primitive::Numerus));

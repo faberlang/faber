@@ -148,6 +148,18 @@ fn numerus_receiver_uses_numeric_rows_only() {
 
 #[test]
 fn lista_higher_order_methods_are_classified_for_mir() {
+    let omnia = lookup_method(IntrinsicReceiver::Lista, "omnia", 1).expect("omnia");
+    assert_eq!(omnia.params, &[crate::intrinsics::IntrinsicParamKind::Predicate]);
+    assert_eq!(omnia.return_kind, crate::intrinsics::IntrinsicReturnKind::Bool);
+    assert!(matches!(omnia.mir_kind, IntrinsicMirKind::HigherOrderAll));
+    assert!(crate::intrinsics::mir_is_higher_order_lista(omnia));
+
+    let quilibet = lookup_method(IntrinsicReceiver::Lista, "quilibet", 1).expect("quilibet");
+    assert_eq!(quilibet.params, &[crate::intrinsics::IntrinsicParamKind::Predicate]);
+    assert_eq!(quilibet.return_kind, crate::intrinsics::IntrinsicReturnKind::Bool);
+    assert!(matches!(quilibet.mir_kind, IntrinsicMirKind::HigherOrderAny));
+    assert!(crate::intrinsics::mir_is_higher_order_lista(quilibet));
+
     let filtrata = lookup_method(IntrinsicReceiver::Lista, "filtrata", 1).expect("filtrata");
     assert!(matches!(filtrata.mir_kind, IntrinsicMirKind::HigherOrderFiltrata));
 
