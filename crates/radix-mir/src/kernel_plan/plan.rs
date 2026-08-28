@@ -495,6 +495,73 @@ pub struct MatMulSharedMemory {
     pub shared_b: SharedMemoryLayout,
 }
 
+/// PGC-R4 simdgroup fast-path staging facts (Metal override of the
+/// `TiledMatMul` recipe). The fast path double-buffers its two operand
+/// staging tiles so a partial output band needs only ONE barrier per K
+/// slice (the scalar body's post-load + post-inner-product pair is gone),
+/// and combines the two simdgroups' K-parity partial accumulators through
+/// one `SIMDGROUP_PARTIAL_SLOTS` threadgroup buffer at kernel end.
+pub const SIMDGROUP_MATMUL_STAGING_SLOTS: u32 = 128;
+
+/// PGC-R4 wave bound: the fast path admits projection-class output
+/// widths only. The vocab-scale `prefill_lm_head_gemv` twin carries a
+/// frozen scalar-emission pin (the terminal-row narrowing family is
+/// PGC-R2/C2 territory, not this recipe wave), so its 49,152-column
+/// launch keeps the canonical body until a follow-up card owns it.
+pub const SIMDGROUP_MATMUL_MAX_N: u64 = 8192;
+
+/// PGC-R4: the K-parity partial-accumulator combine buffer slots (two
+/// simdgroups × 64 elements).
+pub const SIMDGROUP_MATMUL_PARTIAL_SLOTS: u32 = 128;
+
+/// PGC-R4: the simdgroup fast-path admission facts for a validated
+/// `TiledMatMul` plan. This is NOT a new `CollectionKernelPlan` variant —
+/// the module law ("a backend either lowers a recipe to target syntax or
+/// overrides the whole body with a target fast path") makes the
+/// simdgroup-matrix body a backend-local override of the SAME recipe: the
+/// dispatch geometry, signature, and wire plan facts stay byte-identical.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct SimdgroupMatMulFacts {
+    /// `ceil(k / tile)` K slices the two simdgroups split by parity.
+    pub k_tiles: u64,
+    /// Staging slots per operand tile pair (double-buffered `tile × tile`).
+    pub staging_slots: u32,
+    /// Partial-accumulator combine buffer slots.
+    pub partial_slots: u32,
+}
+
+/// PGC-R4: admit the Metal simdgroup-matrix fast path for a tiled-matmul
+/// plan. Plan-level gates: the multi-row law (`m > 1` with the canonical
+/// `(tile, tile)` workgroup), `k` a tile multiple (the direct device
+/// `simdgroup_load` path admits no K tail), f32 operands, and `m` NOT a
+/// tile multiple — the recipe exists for the padded-FMA partial-band class
+/// (the prefill `M = 36` family); tile-multiple shapes have no padding
+/// class and keep the frozen canonical scalar body. Backend-local
+/// declarations (strided/chunked/gathered operand windows, launch output
+/// windows) are checked at the emitter and fall back to the scalar body.
+#[must_use]
+pub fn simdgroup_matmul_admission(plan: &MatMulPlan) -> Option<SimdgroupMatMulFacts> {
+    let tile = u64::from(plan.tile);
+    if plan.tile != MATMUL_TILE
+        || plan.workgroup_x != MATMUL_TILE
+        || plan.workgroup_y != MATMUL_TILE
+        || plan.m <= 1
+        || plan.k == 0
+        || plan.k % tile != 0
+        || plan.m % tile == 0
+        || plan.left_layout != MirScalarLayout::F32
+        || plan.right_layout != MirScalarLayout::F32
+        || plan.n > SIMDGROUP_MATMUL_MAX_N
+    {
+        return None;
+    }
+    Some(SimdgroupMatMulFacts {
+        k_tiles: plan.k / tile,
+        staging_slots: SIMDGROUP_MATMUL_STAGING_SLOTS,
+        partial_slots: SIMDGROUP_MATMUL_PARTIAL_SLOTS,
+    })
+}
+
 /// Tree-reduction recipe (WGSL `radix-mir-wgsl/src/lib.rs:1470-1555`).
 ///
 /// Algorithmic invariants carried from the reference body:
