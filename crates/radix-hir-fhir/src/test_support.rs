@@ -57,6 +57,7 @@ pub(crate) fn stub_artifact() -> HirArtifact {
             span: Span::default(),
         },
         entry_start_anchor: None,
+        entry_explicit: false,
     };
     let types = TypeTable::new();
     HirArtifact {

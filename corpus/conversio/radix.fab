@@ -40,9 +40,9 @@ locale = "en"
 #   HIR-direct Rust and MIR-stepper routes must agree for radix parsing.
 
 main {
-    const int<i32> hex ← "ff" ↦ int<i32><Hex>
-    const int<i32> bin ← "1010" ↦ int<i32><Bin>
-    const int<i32> oct ← "755" ↦ int<i32><Oct>
+    const int<i32> hex ← "ff" ↦ int<i32, Hex>
+    const int<i32> bin ← "1010" ↦ int<i32, Bin>
+    const int<i32> oct ← "755" ↦ int<i32, Oct>
     print hex
     print bin
     print oct

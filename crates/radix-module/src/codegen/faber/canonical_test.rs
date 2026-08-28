@@ -259,6 +259,8 @@ fn renders_unresolved_infer_as_marker() {
                     mutable: false,
                     is_await: false,
                     runtime_provided: false,
+                    annotation_authored: true,
+                    annotation_union_hole: false,
                 }),
                 span: span(),
             }],
@@ -297,6 +299,8 @@ fn renders_option_types_as_nullable_union() {
                     mutable: false,
                     is_await: false,
                     runtime_provided: false,
+                    annotation_authored: true,
+                    annotation_union_hole: false,
                 }),
                 span: span(),
             }],
@@ -762,6 +766,8 @@ fn emits_canonical_operator_spellings_and_precedence() {
                         mutable: true,
                         is_await: false,
                         runtime_provided: false,
+                        annotation_authored: true,
+                        annotation_union_hole: false,
                     }),
                     span: span(),
                 },
@@ -846,6 +852,8 @@ fn emits_shared_argument_spelling_for_optional_and_non_null_calls() {
                         mutable: false,
                         is_await: false,
                         runtime_provided: false,
+                        annotation_authored: true,
+                        annotation_union_hole: false,
                     }),
                     span: span(),
                 },
@@ -893,6 +901,8 @@ fn emits_local_and_control_statement_forms() {
                         mutable: true,
                         is_await: false,
                         runtime_provided: false,
+                        annotation_authored: true,
+                        annotation_union_hole: false,
                     }),
                     span: span(),
                 },
@@ -1557,8 +1567,8 @@ fn stream() async_generator → int {
         "reddet must localize without an extra return:\n{output}"
     );
     assert!(
-        output.contains("await_const int value ← fetch()"),
-        "figendum must localize and retain type identity:\n{output}"
+        output.contains("await_const _ value ← fetch()"),
+        "figendum must localize and preserve the authored hole:\n{output}"
     );
     assert!(output.contains("await fetch()"), "tacebit must localize:\n{output}");
     assert!(output.contains("yield value"), "cede yield must localize:\n{output}");

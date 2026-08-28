@@ -9,7 +9,6 @@ syntax = "@ nucleum fragment"
 related = ["nucleum", "annotation-sugar"]
 locale = "la"
 +++
-
 # =============================================================================
 # nucleum — sugar @ nucleum fragment modifier
 # =============================================================================
@@ -33,7 +32,7 @@ locale = "la"
 # See also: nucleum, annotation-sugar
 # =============================================================================
 
-@ nucleum fragment
+@ nucleum { fragment = verum }
 functio umbra() → vacuum {
 }
 

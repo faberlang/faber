@@ -52,7 +52,7 @@ fn leU32(bytes buf, int off) → int {
     const int b1 ← byteAt(buf, off + 1)
     const int b2 ← byteAt(buf, off + 2)
     const int b3 ← byteAt(buf, off + 3)
-    return ((b3 * 16777216 + b2 * 65536) + b1 * 256) + b0
+    return b3 * 16777216 + b2 * 65536 + b1 * 256 + b0
 }
 
 fn powerTwo(int n) → float {
@@ -86,10 +86,10 @@ fn f32le(bytes buf, int off) → f32 {
     const float fracRatio ← (frac ↦ float) / 8388608.0
     if exp ≡ 0 {
         if frac ≡ 0 then return signFactor * 0.0 ↦ f32
-        return (signFactor * powerTwo(-126)) * fracRatio ↦ f32
+        return signFactor * powerTwo(-126) * fracRatio ↦ f32
     }
     const float power ← powerTwo(exp - 127)
-    return (signFactor * power) * (1.0 + fracRatio) ↦ f32
+    return signFactor * power * (1.0 + fracRatio) ↦ f32
 }
 
 fn decodeFlat(bytes buf, int off, int count) → list<f32> {

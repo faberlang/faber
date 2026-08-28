@@ -9,7 +9,6 @@ syntax = "@ nondum [target] [reason]"
 related = ["implendum", "@"]
 locale = "en"
 +++
-
 # =============================================================================
 # nondum — Marks an interface method as planned but unavailable for a target.
 # =============================================================================
@@ -36,7 +35,7 @@ locale = "en"
 #   Calls to @ nondum methods fail semantic check (SEM017); do not invoke here.
 
 interface tempus {
-    @ unstable rs "timer handles are not implemented yet"
+    @ unstable { target = rs, ratio = "timer handles are not implemented yet" }
     fn siste(int handle) → void
 }
 

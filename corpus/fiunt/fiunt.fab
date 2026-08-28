@@ -13,7 +13,6 @@ related = ["cursor", "cede", "fient"]
 # declares `la` — not `en`, whose pack owns English surfaces.
 locale = "la"
 +++
-
 # =============================================================================
 # fiunt — Synchronous stream callable posture
 # =============================================================================
@@ -35,7 +34,8 @@ locale = "la"
 # EXPECTED OUTPUT:
 #   [1, 2]
 
-```fab
+``
+`fab
 functio stream() fiunt → numerus {
     cede 1
     cede 2
@@ -44,4 +44,5 @@ functio stream() fiunt → numerus {
 incipit {
     nota stream()
 }
-```
+`
+``

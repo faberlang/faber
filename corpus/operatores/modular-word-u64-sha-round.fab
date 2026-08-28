@@ -41,11 +41,11 @@ main {
     const uint<u64> h ← 6620516959814648809
     const uint<u64> w ← 7017280452245743616
     const uint<u64> k ← 4794697086780616226
-    const uint<u64> sigma1 ← (dextra(e, 14 ∷ uint<u64>) ⊻ dextra(e, 18 ∷ uint<u64>)) ⊻ dextra(e, 41 ∷ uint<u64>)
+    const uint<u64> sigma1 ← dextra(e, 14 ∷ uint<u64>) ⊻ dextra(e, 18 ∷ uint<u64>) ⊻ dextra(e, 41 ∷ uint<u64>)
     const uint<u64> choose ← e ∧ f ⊻ ¬e ∧ g
-    const uint<u64> temp1 ← (((h + sigma1) + choose) + k) + w
-    const uint<u64> sigma0 ← (dextra(a, 28 ∷ uint<u64>) ⊻ dextra(a, 34 ∷ uint<u64>)) ⊻ dextra(a, 39 ∷ uint<u64>)
-    const uint<u64> majority ← (a ∧ b ⊻ a ∧ c) ⊻ b ∧ c
+    const uint<u64> temp1 ← h + sigma1 + choose + k + w
+    const uint<u64> sigma0 ← dextra(a, 28 ∷ uint<u64>) ⊻ dextra(a, 34 ∷ uint<u64>) ⊻ dextra(a, 39 ∷ uint<u64>)
+    const uint<u64> majority ← a ∧ b ⊻ a ∧ c ⊻ b ∧ c
     const uint<u64> temp2 ← sigma0 + majority
     print temp1 + temp2
     print d + temp1

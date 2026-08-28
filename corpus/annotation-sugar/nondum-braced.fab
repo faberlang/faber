@@ -9,7 +9,6 @@ syntax = "@ nondum { target = rs, ratio = \"…\" }"
 related = ["nondum", "annotation-sugar"]
 locale = "en"
 +++
-
 # =============================================================================
 # nondum — Braced canonical @ nondum availability record.
 # =============================================================================
@@ -27,8 +26,8 @@ locale = "en"
 # =============================================================================
 
 interface tempus {
-  @ unstable { target = rs, ratio = "timer handles are not implemented" }
-  fn siste(int handle) → void
+    @ unstable { target = rs, ratio = "timer handles are not implemented" }
+    fn siste(int handle) → void
 }
 
 main {

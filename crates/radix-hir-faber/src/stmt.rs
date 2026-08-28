@@ -509,7 +509,25 @@ impl super::FaberCodegen {
         };
         writer.write(keyword);
         writer.write(" ");
-        if let Some(ty) = local.ty {
+        if local.annotation_authored {
+            if let Some(ty) = local.ty {
+                writer.write(&self.type_to_faber(ty, types, names, interner, surface));
+                writer.write(" ");
+            }
+        } else if local.init.is_some() {
+            // Inference hole / synthesized binding: keep the hole spelling
+            // instead of materializing the inferred type (a materialized
+            // bounded-lista annotation narrows later spread legality, and a
+            // solved union hole must keep accepting new flow members).
+            writer.write(if local.annotation_union_hole {
+                "∪"
+            } else {
+                "_"
+            });
+            writer.write(" ");
+        } else if let Some(ty) = local.ty {
+            // Hole-shaped declaration without initializer (`let label` later
+            // assigned): materialize so the bare binding still type-checks.
             writer.write(&self.type_to_faber(ty, types, names, interner, surface));
             writer.write(" ");
         }

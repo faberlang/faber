@@ -97,6 +97,9 @@ pub fn empty_presentation() -> HirPresentation {
             span: Span::default(),
         },
         entry_start_anchor: None,
+        // Bridge callers (hand-built HIR, loose artifacts) have no surface
+        // facts; the canonical default keeps the explicit `incipit` wrapper.
+        entry_explicit: true,
     }
 }
 
@@ -177,23 +180,36 @@ impl FaberCodegen {
         );
 
         if let Some(entry) = &hir.entry {
-            writer.write(if hir.entry_is_async {
-                surface.keyword(TokenKind::Incipiet)
+            // Fidelity: an implicit entry (top-level statements with no
+            // `incipit` keyword) re-emits in place. Wrapping it in an explicit
+            // block changes the source form and can outlaw top-level-only
+            // statements (template strings are TLA-only inside blocks).
+            let explicit_entry = presentation.entry_explicit
+                || presentation.entry_start_anchor.is_some()
+                || hir.entry_is_async
+                || hir.entry_args_name.is_some()
+                || !hir.entry_annotations.is_empty();
+            if explicit_entry {
+                writer.write(if hir.entry_is_async {
+                    surface.keyword(TokenKind::Incipiet)
+                } else {
+                    surface.keyword(TokenKind::Incipit)
+                });
+                if let Some(args) = hir.entry_args_name {
+                    writer.write(" ");
+                    writer.write(surface.keyword(TokenKind::Argumenta));
+                    writer.write(" ");
+                    writer.write(&self.symbol_to_string(args, interner));
+                }
+                writer.writeln(" {");
+                writer.indented(|writer| {
+                    self.write_block(entry, types, &names, interner, surface, writer);
+                    self.write_block_end_trivia(entry, interner, writer);
+                });
+                writer.writeln("}");
             } else {
-                surface.keyword(TokenKind::Incipit)
-            });
-            if let Some(args) = hir.entry_args_name {
-                writer.write(" ");
-                writer.write(surface.keyword(TokenKind::Argumenta));
-                writer.write(" ");
-                writer.write(&self.symbol_to_string(args, interner));
+                self.write_block(entry, types, &names, interner, surface, &mut writer);
             }
-            writer.writeln(" {");
-            writer.indented(|writer| {
-                self.write_block(entry, types, &names, interner, surface, writer);
-                self.write_block_end_trivia(entry, interner, writer);
-            });
-            writer.writeln("}");
         }
 
         self.write_program_end_trivia(

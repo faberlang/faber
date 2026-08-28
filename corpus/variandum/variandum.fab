@@ -13,7 +13,6 @@ related = ["figendum", "tacebit", "fiet", "promissum"]
 # declares `la` — not `en`, whose pack owns English surfaces.
 locale = "la"
 +++
-
 # =============================================================================
 # variandum — Await-bind mutable
 # =============================================================================
@@ -24,7 +23,8 @@ locale = "la"
 # See also: figendum, tacebit, fiet, promissum
 # =============================================================================
 
-```fab
+``
+`fab
 functio responde() fiet → numerus {
     redde 3
 }
@@ -34,4 +34,5 @@ incipiet {
     responsum ← responsum + 1
     nota responsum
 }
-```
+`
+``

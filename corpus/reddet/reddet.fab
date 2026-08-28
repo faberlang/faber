@@ -13,7 +13,6 @@ related = ["figendum", "tacebit", "fiet", "redde"]
 # declares `la` — not `en`, whose pack owns English surfaces.
 locale = "la"
 +++
-
 # =============================================================================
 # reddet — Await-return
 # =============================================================================
@@ -24,7 +23,8 @@ locale = "la"
 # See also: figendum, tacebit, fiet, redde
 # =============================================================================
 
-```fab
+``
+`fab
 functio inner() fiet → numerus {
     redde 9
 }
@@ -37,4 +37,5 @@ incipiet {
     figendum numerus v ← outer()
     nota v
 }
-```
+`
+``

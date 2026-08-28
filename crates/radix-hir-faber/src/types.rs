@@ -172,6 +172,10 @@ impl super::FaberCodegen {
                     surface.type_surface(TypeBindingKind::Primitive(Primitive::Numerus)),
                     width.faber_marker()
                 ),
+                // Bare width marker (`f32`): valid in every locale and every
+                // type position; the wrapped `fractus<f32>` / `float<f32>`
+                // spelling is reserved for conversio targets that carry
+                // marker arguments (see the Conversio emit arm).
                 Primitive::Fractus => width.faber_marker().to_owned(),
                 _ => surface
                     .type_surface(TypeBindingKind::Primitive(Primitive::Ignotum))

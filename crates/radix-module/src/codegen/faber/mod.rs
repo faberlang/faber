@@ -59,3 +59,7 @@ impl LeafKeywordSurface for LocaleKeywordBridge<'_> {
         locale::KeywordSurface::type_surface(&self.0, pack_kind)
     }
 }
+
+#[cfg(test)]
+#[path = "reemit_fidelity_test.rs"]
+mod reemit_fidelity_test;

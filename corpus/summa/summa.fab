@@ -9,7 +9,6 @@ syntax = "summa ex <source> apud [coords] fixum <binder> { redde <term> }"
 related = ["tensor", "filum"]
 locale = "la"
 +++
-
 # =============================================================================
 # summa — one-expression sequential sum-reduce over a tensor
 # =============================================================================
@@ -32,7 +31,9 @@ locale = "la"
 # =============================================================================
 
 functio identity(tensor<f32, [8]> a) → f32 {
-    redde summa ex a apud [i] fixum s { redde s }
+    redde summa ex a apud [i] fixum s {
+        redde s
+    }
 }
 
 functio shifted(tensor<f32, [8]> a) → f32 {
@@ -45,13 +46,11 @@ functio shifted(tensor<f32, [8]> a) → f32 {
 
 incipit {
     fixum lista<f32> flat ← [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0]
-    fixum tf32[] seed ← vacua
-    fixum tf32[8] a ← seed.strue(flat, [8])
-
+    fixum tensor<f32, []> seed ← vacua
+    fixum tensor<f32, [8]> a ← seed.strue(flat, [8])
     fixum f32 per_summam ← a.summa()
     fixum f32 plicatum ← identity(a)
     fixum f32 summam_totam ← shifted(a)
-
     nota per_summam
     nota plicatum
     nota summam_totam

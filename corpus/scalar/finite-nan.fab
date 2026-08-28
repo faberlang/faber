@@ -9,7 +9,6 @@ syntax = "x ↦ int<u32, Bits> field reads: (bits ⇒ 23) ∧ 255 and bits ∧ 8
 related = ["↦", "fractus", "functio"]
 locale = "en"
 +++
-
 # =============================================================================
 # ↦ — finite()/NaN detection through the Bits field-read gate.
 # =============================================================================
@@ -57,20 +56,20 @@ locale = "en"
 # finite() — field-read gate, the dtype.fab-compatible NaN check.
 # A value is finite iff its exponent field is not all-ones (0xFF); the
 # fraction field (≠ 0) is what separates NaN from ±Inf inside that class.
-fn finite(float<f32> x) → bool {
+fn finite(f32 x) → bool {
     const _ bits ← x ↦ int<u32, Bits>
-    const _ exponent ← (bits ⇒ 23) ∧ (255 ∷ int<u32>)
+    const _ exponent ← bits ⇒ 23 ∧ 255 ∷ int<u32>
     const _ omnino ← 255 ∷ int<u32>
     return exponent ≠ omnino
 }
 
 # nan() — the same field gate narrowed to NaN only (exponent 0xFF, fraction ≠ 0).
-fn nan(float<f32> x) → bool {
+fn nan(f32 x) → bool {
     const _ bits ← x ↦ int<u32, Bits>
-    const _ exponent ← (bits ⇒ 23) ∧ (255 ∷ int<u32>)
-    const _ fraction ← bits ∧ (8388607 ∷ int<u32>)
-    const _ omnino ← exponent ≡ (255 ∷ int<u32>)
-    const _ non_nihil ← fraction ≠ (0 ∷ int<u32>)
+    const _ exponent ← bits ⇒ 23 ∧ 255 ∷ int<u32>
+    const _ fraction ← bits ∧ 8388607 ∷ int<u32>
+    const _ omnino ← exponent ≡ 255 ∷ int<u32>
+    const _ non_nihil ← fraction ≠ 0 ∷ int<u32>
     return omnino and non_nihil
 }
 
@@ -83,7 +82,6 @@ main {
 
     # 0x7F800000 — +Inf.
     const _ infinitas ← 2139095040 ∷ int<u32> ↦ float<f32, Bits>
-
     print finite(one_and_half)
     print finite(quiet_nan)
     print finite(infinitas)
@@ -94,5 +92,5 @@ main {
     # touches non-canonical spellings — see the header note).
     const _ back ← quiet_nan ↦ int<u32, Bits>
     print back
-    print back ≡ (2143289344 ∷ int<u32>)
+    print back ≡ 2143289344 ∷ int<u32>
 }

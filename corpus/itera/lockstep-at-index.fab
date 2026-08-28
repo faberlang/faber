@@ -37,7 +37,7 @@ main {
     const list<int> keys ← [1, 2]
     const list<int> payloads ← [10, 20]
     for from bases, keys, payloads at [slot] const base, key, payload {
-        const int total ← ((slot + base) + key) + payload
+        const int total ← slot + base + key + payload
         print total
     }
 }

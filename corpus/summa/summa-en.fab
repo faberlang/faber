@@ -8,7 +8,6 @@ syntax = "sum from <tf32[32]> at [i] thread f const s { return <term> }"
 related = ["summa", "filum", "tensor"]
 locale = "en"
 +++
-
 # =============================================================================
 # sum thread — distributed sum-reduce admit inside @ kernel
 # =============================================================================
@@ -25,9 +24,9 @@ locale = "en"
 # See also: sum, thread, kernel, at, tensor
 # =============================================================================
 
-@ kernel lane "id"
-@ public
-fn column_dot(tf32[32] a, tf32[1] out) → void {
+@ kernel { lane = "id" }
+@ public { }
+fn column_dot(tensor<f32, [32]> a, tensor<f32, [1]> out) → void {
     const f32 total ← sum from a at [i] thread f const s {
         var f32 t ← s * 1.4140625
         return t

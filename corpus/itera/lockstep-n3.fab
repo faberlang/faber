@@ -30,7 +30,7 @@ main {
     const list<int> keys ← [1, 2, 3]
     const list<int> payloads ← [10, 20, 30]
     for from bases, keys, payloads const base, key, payload {
-        const int total ← (base + key) + payload
+        const int total ← base + key + payload
         print total
     }
     const list<int> rows ← [1, 2]

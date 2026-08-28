@@ -43,13 +43,13 @@ locale = "en"
 #   HIR-direct Rust and MIR-stepper routes must agree for ascii format pack.
 
 main {
-    const ascii<2> hex ← 255 ↦ ascii<2><Hex>
-    const ascii<8> padded ← 37 ↦ ascii<8><Hex>
-    const ascii<8> bin ← 255 ↦ ascii<8><Bin>
-    const ascii<3> oct ← 255 ↦ ascii<3><Oct>
-    const ascii<2> inferred_hex ← 255 ↦ ascii<_><Hex>
-    const ascii<8> inferred_bin ← 255 ↦ ascii<_><Bin>
-    const ascii<3> inferred_oct ← 255 ↦ ascii<_><Oct>
+    const ascii<2> hex ← 255 ↦ ascii<2, Hex>
+    const ascii<8> padded ← 37 ↦ ascii<8, Hex>
+    const ascii<8> bin ← 255 ↦ ascii<8, Bin>
+    const ascii<3> oct ← 255 ↦ ascii<3, Oct>
+    const ascii<2> inferred_hex ← 255 ↦ ascii<_, Hex>
+    const ascii<8> inferred_bin ← 255 ↦ ascii<_, Bin>
+    const ascii<3> inferred_oct ← 255 ↦ ascii<_, Oct>
     print hex
     print padded
     print bin

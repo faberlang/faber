@@ -13,7 +13,6 @@ related = ["fiunt", "fiet", "cede"]
 # declares `la` — not `en`, whose pack owns English surfaces.
 locale = "la"
 +++
-
 # =============================================================================
 # fient — Asynchronous stream callable posture
 # =============================================================================
@@ -35,7 +34,8 @@ locale = "la"
 # BACKEND:
 #   Product path is Rust async-cursor; other backends may fail closed.
 
-```fab
+``
+`fab
 functio stream() fient → numerus {
     cede 1
     cede 2
@@ -44,4 +44,5 @@ functio stream() fient → numerus {
 incipiet {
     nota stream()
 }
-```
+`
+``

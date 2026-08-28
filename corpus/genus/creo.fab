@@ -63,7 +63,7 @@ class Circulus {
 
     fn creo() → void {
         self.diameter ← self.radius * 2
-        self.area ← (3.14159 * (self.radius ↦ float)) * (self.radius ↦ float)
+        self.area ← 3.14159 * (self.radius ↦ float) * (self.radius ↦ float)
     }
 }
 

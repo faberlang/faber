@@ -41,11 +41,11 @@ main {
     const uint<u32> h ← 1541459225
     const uint<u32> w ← 1633837952
     const uint<u32> k ← 1116352408
-    const uint<u32> sigma1 ← (dextra(e, 6 ∷ uint<u32>) ⊻ dextra(e, 11 ∷ uint<u32>)) ⊻ dextra(e, 25 ∷ uint<u32>)
+    const uint<u32> sigma1 ← dextra(e, 6 ∷ uint<u32>) ⊻ dextra(e, 11 ∷ uint<u32>) ⊻ dextra(e, 25 ∷ uint<u32>)
     const uint<u32> choose ← e ∧ f ⊻ ¬e ∧ g
-    const uint<u32> temp1 ← (((h + sigma1) + choose) + k) + w
-    const uint<u32> sigma0 ← (dextra(a, 2 ∷ uint<u32>) ⊻ dextra(a, 13 ∷ uint<u32>)) ⊻ dextra(a, 22 ∷ uint<u32>)
-    const uint<u32> majority ← (a ∧ b ⊻ a ∧ c) ⊻ b ∧ c
+    const uint<u32> temp1 ← h + sigma1 + choose + k + w
+    const uint<u32> sigma0 ← dextra(a, 2 ∷ uint<u32>) ⊻ dextra(a, 13 ∷ uint<u32>) ⊻ dextra(a, 22 ∷ uint<u32>)
+    const uint<u32> majority ← a ∧ b ⊻ a ∧ c ⊻ b ∧ c
     const uint<u32> temp2 ← sigma0 + majority
     print temp1 + temp2
     print d + temp1

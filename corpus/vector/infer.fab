@@ -9,7 +9,6 @@ syntax = "vector<elem, _>"
 related = ["vector", "generic", "magnitudo"]
 locale = "en"
 +++
-
 # =============================================================================
 # vector — Vector width inference placeholder for generic vector return syntax.
 # =============================================================================

@@ -73,6 +73,7 @@ fn sample_presentation() -> HirPresentation {
             span: make_span(90),
         },
         entry_start_anchor: Some(HirSourceAnchorId(1)),
+        entry_explicit: false,
     }
 }
 

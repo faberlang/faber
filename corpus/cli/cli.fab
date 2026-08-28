@@ -9,7 +9,22 @@ syntax = "@ cli <name>"
 related = ["imperium", "imperia", "optio", "operandus", "argumenta", "descriptio", "ubique", "versio", "alias"]
 locale = "en"
 +++
+@ command { name = "greet" }
+@ alias "g"
+@ description "Greet by name"
+@ operand { type = string, binding = nomen, description = "Name to greet" }
+fn greet() args args → void {
+    if args.verbose {
+        print "verbose"
+    }
+    print "Salve, §!"(args.nomen)
+}
 
+@ command { name = "version" }
+@ alias "v"
+fn version() → void {
+    print "exemplum v0.1.0"
+}
 # =============================================================================
 # cli — CLI root with options, operands, subcommands, and module mounts.
 # =============================================================================
@@ -45,26 +60,9 @@ locale = "en"
 #   Rust runtime whitelist (missing operand 'nomen'); Go compile whitelist.
 #   Cross-ref optio/, operandus/, descriptio/, ubique/, argumenta/ keyword dirs.
 
-@ cli "exemplum"
+@ cli { name = "exemplum" }
 @ versio "0.1.0"
 @ description "Faber CLI framework smoke exemplum"
-@ option verbose short "v" long "verbose" type bool global description "Enable verbose output"
+@ option { binding = verbose, short = "v", long = "verbose", type = bool, description = "Enable verbose output", global = true }
 main args args {
-}
-
-@ command "greet"
-@ alias "g"
-@ description "Greet by name"
-@ operand string nomen description "Name to greet"
-fn greet() args args → void {
-    if args.verbose {
-        print "verbose"
-    }
-    print "Salve, §!"(args.nomen)
-}
-
-@ command "version"
-@ alias "v"
-fn version() → void {
-    print "exemplum v0.1.0"
 }

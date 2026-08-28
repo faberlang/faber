@@ -9,7 +9,6 @@ syntax = "textus<N>"
 related = ["longitudo", "appende", "accipe", "sectio", "vacua", "ascii"]
 locale = "en"
 +++
-
 # =============================================================================
 # textus<N> — bounded Unicode buffer (BB-8R)
 # =============================================================================
@@ -38,5 +37,7 @@ main {
     print n
     print vacant
     print a.slice(0, 1)
-    if a ≡ b { print 1 }
+    if a ≡ b {
+        print 1
+    }
 }
