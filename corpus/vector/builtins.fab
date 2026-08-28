@@ -6,6 +6,7 @@ category = "gpu"
 summary = "global_invocation_id returns vector<u32, 3>"
 locale = "en"
 +++
+
 # =============================================================================
 # vector — global_invocation_id returns vector<u32, 3>.
 # =============================================================================
@@ -22,9 +23,9 @@ locale = "en"
 
 
 
-@ kernel { }
-@ public { }
-fn builtin_probe(f32 x) → f32 {
-    const vector<int<u32>, 3> gid ← def_5()
+@ kernel
+@ public
+fn builtin_probe(float<f32> x) → float<f32> {
+    const vector<u32, 3> gid ← global_invocation_id()
     return x
 }
