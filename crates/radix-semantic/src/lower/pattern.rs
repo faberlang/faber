@@ -286,6 +286,12 @@ fn lower_path_pattern(lowerer: &mut Lowerer, path: &PathPattern) -> HirPattern {
             .unwrap_or_else(|| lowerer.next_def_id())
     };
 
+    if path.segments.len() >= 2 {
+        let symbols: Vec<radix_lexer::Symbol> =
+            path.segments.iter().map(|ident| ident.name).collect();
+        lowerer.record_variant_path(def_id, &symbols);
+    }
+
     match path.bind.as_ref() {
         None => HirPattern::Variant(def_id, Vec::new()),
         Some(PatternBind::Alias(alias)) => {

@@ -103,15 +103,14 @@ impl super::FaberCodegen {
                 writer.write(&self.symbol_to_string(name, interner));
             }
             HirPattern::Variant(def_id, patterns) => {
-                // Pattern position takes a union-qualified spelling only when
-                // the shorter form cannot re-resolve: two local unions (or a
-                // local and imported union) sharing a variant name (SEM001 on
-                // re-check), or one variant name under two imported
-                // namespaces. Authored spellings otherwise survive verbatim.
+                // Keep an authored qualified path when lowering erased its
+                // segments. If no path fact exists, qualify only when the
+                // shorter form cannot re-resolve.
                 let spelling = self
-                    .qualified_local_variants
+                    .authored_variant_spellings
                     .get(def_id)
                     .cloned()
+                    .or_else(|| self.qualified_local_variants.get(def_id).cloned())
                     .or_else(|| {
                         self.imported_variant_union_path_ids
                             .contains(def_id)

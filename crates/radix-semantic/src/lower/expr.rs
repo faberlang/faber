@@ -722,6 +722,10 @@ impl Lowerer<'_> {
                                     member.member.name,
                                 )
                             {
+                                self.record_variant_path(
+                                    variant_def,
+                                    &[base.name, obj.member.name, member.member.name],
+                                );
                                 return HirExpressionKind::Path(variant_def);
                             }
                             // The penultimate segment names a type export. A
@@ -1102,6 +1106,11 @@ impl Lowerer<'_> {
             self.error("unknown_finge_variant");
             return HirExpressionKind::Error;
         };
+        if finge.variant.len() >= 2 {
+            let path: Vec<radix_lexer::Symbol> =
+                finge.variant.iter().map(|ident| ident.name).collect();
+            self.record_variant_path(variant_def_id, &path);
+        }
 
         let callee = HirExpression {
             id: self.next_hir_id(),

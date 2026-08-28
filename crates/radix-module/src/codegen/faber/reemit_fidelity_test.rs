@@ -6,7 +6,11 @@
 //! idempotence (re-emitting the emitted source is byte-identical).
 
 use super::compile::{compile_canonical, compile_canonical_str};
-use crate::driver::{Config, Session};
+use crate::driver::{analyze_source, AnalyzeRequest, Config, ModuleImportContract, Session};
+use crate::file_interface::{FileExport, FileExportKind, FileInterface, InterfaceEnumVariant, InterfaceNominalExport};
+use crate::semantic::passes::visibility_annotation::VisibilityTier;
+use crate::Target;
+use std::collections::BTreeMap;
 
 fn emit_once(source: &str) -> String {
     let result = compile_canonical_str("fidelity.fab", source);
@@ -28,6 +32,99 @@ fn assert_idempotent(source: &str) -> String {
     let second = emit_once(&first);
     assert_eq!(first, second, "re-emission must be idempotent");
     first
+}
+
+fn imported_token_interface() -> FileInterface {
+    let mut interface = FileInterface::new();
+    interface.insert(FileExport {
+        name: "TokenKind".to_owned(),
+        kind: FileExportKind::Enum(InterfaceNominalExport {
+            params: Vec::new(),
+            name: "TokenKind".to_owned(),
+            methods: Vec::new(),
+            shared_fields: Vec::new(),
+            variants: vec![InterfaceEnumVariant { name: "Palabra".to_owned(), fields: Vec::new() }],
+        }),
+    });
+    interface
+}
+
+fn emit_imported_variant_case(source: &str, locale: &str) -> String {
+    let pack = if locale == "en" {
+        let mut pack_path = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        pack_path.push("../../stdlib/locale/en/pack.toml");
+        crate::locale::LocalePack::from_toml_path(&pack_path).expect("installed en pack loads")
+    } else {
+        crate::locale::latin_locale_pack()
+    };
+    let session = Session::new(
+        Config::default()
+            .with_target(Target::HirFaber)
+            .with_locale_pack(pack.clone()),
+    );
+    let contract = ModuleImportContract {
+        namespace_exports: BTreeMap::from([(
+            "token".to_owned(),
+            BTreeMap::from([("TokenKind".to_owned(), VisibilityTier::Publica)]),
+        )]),
+        file_interfaces: BTreeMap::from([("token".to_owned(), imported_token_interface())]),
+        ..ModuleImportContract::default()
+    };
+    let analysis = analyze_source(
+        &session,
+        "alias-case.fab",
+        source,
+        AnalyzeRequest { cli_program: None, contract },
+    )
+    .unwrap_or_else(|diagnostics| {
+        panic!(
+            "imported variant analysis failed: {:?}",
+            diagnostics
+                .iter()
+                .map(|diag| (diag.code, diag.issue()))
+                .collect::<Vec<_>>()
+        )
+    });
+    let surface = crate::locale::KeywordSurface::new(&pack);
+    let output =
+        super::super::generate_from_analyzed(Target::HirFaber, &analysis, &surface).expect("imported variant emission");
+    let crate::Output::Faber(output) = output else {
+        panic!("expected Faber output");
+    };
+    output.code
+}
+
+#[test]
+fn imported_alias_qualified_variant_path_round_trips_in_each_locale() {
+    let latin = "importa ex \"./token\" token\n\nfunctio classify(token.TokenKind value) → textus {\n    elige value {\n        casu token.TokenKind.Palabra {\n            redde \"palabra\"\n        }\n        ceterum {\n            redde \"other\"\n        }\n    }\n}\n";
+    let latin_first = emit_imported_variant_case(latin, "la");
+    let latin_second = emit_imported_variant_case(&latin_first, "la");
+    assert_eq!(latin_first, latin_second, "Latin re-emission must be idempotent");
+    assert!(
+        latin_first.contains("casu token.TokenKind.Palabra"),
+        "Latin alias-qualified variant path must survive:\n{latin_first}"
+    );
+    let latin_short = latin.replace("token.TokenKind.Palabra", "token.Palabra");
+    let latin_short_output = emit_imported_variant_case(&latin_short, "la");
+    assert!(
+        latin_short_output.contains("casu token.Palabra"),
+        "Latin two-part alias path must not be widened:\n{latin_short_output}"
+    );
+
+    let english = "import from \"./token\" token\n\nfn classify(token.TokenKind value) → string {\n    switch value {\n        case token.TokenKind.Palabra {\n            return \"palabra\"\n        }\n        default {\n            return \"other\"\n        }\n    }\n}\n";
+    let english_first = emit_imported_variant_case(english, "en");
+    let english_second = emit_imported_variant_case(&english_first, "en");
+    assert_eq!(english_first, english_second, "English re-emission must be idempotent");
+    assert!(
+        english_first.contains("case token.TokenKind.Palabra"),
+        "English alias-qualified variant path must survive:\n{english_first}"
+    );
+    let english_short = english.replace("token.TokenKind.Palabra", "token.Palabra");
+    let english_short_output = emit_imported_variant_case(&english_short, "en");
+    assert!(
+        english_short_output.contains("case token.Palabra"),
+        "English two-part alias path must not be widened:\n{english_short_output}"
+    );
 }
 
 #[test]

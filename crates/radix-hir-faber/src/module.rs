@@ -38,6 +38,10 @@ pub struct FaberCodegen {
     /// `DefId` → union-qualified spelling (`base.Kind.VARIANT`) for imported
     /// union variants in `casu` pattern arms.
     pub(crate) imported_pattern_spellings: FxHashMap<DefId, String>,
+    /// Authored qualified variant spellings captured before lowering erased
+    /// their path segments. These facts preserve whether a source reference
+    /// used the two-part or three-part form.
+    pub(crate) authored_variant_spellings: FxHashMap<DefId, String>,
     /// Def ids of this unit's struct/enum items: a `Path` to one of these in
     /// value position is a `ego` (self) reference and must re-emit as the
     /// self keyword, not the type name.
@@ -131,6 +135,7 @@ pub fn empty_presentation() -> HirPresentation {
         elige_expr_ids: Vec::new(),
         discard_binding_stmts: Vec::new(),
         ordo_enums: Vec::new(),
+        variant_paths: Vec::new(),
     }
 }
 
@@ -167,6 +172,19 @@ impl FaberCodegen {
             .ordo_enums
             .iter()
             .map(|ordo| (ordo.def_id, ordo.members.clone()))
+            .collect();
+        self.authored_variant_spellings = presentation
+            .variant_paths
+            .iter()
+            .map(|path| {
+                let spelling = path
+                    .path
+                    .iter()
+                    .map(|segment| interner.resolve(*segment))
+                    .collect::<Vec<_>>()
+                    .join(".");
+                (path.def_id, spelling)
+            })
             .collect();
 
         let mut writer = CodeWriter::new();

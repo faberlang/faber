@@ -1290,6 +1290,7 @@ impl Lowerer<'_> {
                     if segments.len() >= 3 {
                         match self.resolver.qualified_variant_path(&segments) {
                             crate::QualifiedVariantPathLookup::Variant(def_id) => {
+                                self.record_variant_path(def_id, &segments);
                                 return HirPattern::Variant(def_id, Vec::new());
                             }
                             crate::QualifiedVariantPathLookup::UnknownVariant
@@ -1298,6 +1299,15 @@ impl Lowerer<'_> {
                                 self.error("unknown_variant");
                                 return HirPattern::Wildcard;
                             }
+                        }
+                    }
+                    if segments.len() == 2 {
+                        if let Some((def_id, _)) = self
+                            .resolver
+                            .namespace_file_variant(segments[0], segments[1])
+                        {
+                            self.record_variant_path(def_id, &segments);
+                            return HirPattern::Variant(def_id, Vec::new());
                         }
                     }
                 }
@@ -1314,6 +1324,9 @@ impl Lowerer<'_> {
                             if let Some(variant_def) =
                                 self.resolver.variant_child(base_def, member.member.name)
                             {
+                                if let Some(segments) = member_segments(member) {
+                                    self.record_variant_path(variant_def, &segments);
+                                }
                                 return HirPattern::Variant(variant_def, Vec::new());
                             }
                             self.current_span = span;

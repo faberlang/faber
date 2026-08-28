@@ -69,7 +69,7 @@ use radix_hir::{
     HirBlock, HirBlockEnd, HirExpression, HirId, HirItem, HirModule, HirModuleEnd, HirOwnerRef,
     HirParamMode, HirPresentation, HirSourceAnchorId, HirStatement, HirStatementKind,
     HirTestMetadata, HirTestModifier, HirTrivia, HirTriviaAttachment, HirTriviaOwner,
-    HirTriviaOwnerKind,
+    HirTriviaOwnerKind, HirVariantPath,
 };
 use radix_lexer::{Interner, Span, Symbol};
 use radix_syntax::{
@@ -219,6 +219,7 @@ impl<'a> Lowerer<'a> {
                 elige_expr_ids: Vec::new(),
                 discard_binding_stmts: Vec::new(),
                 ordo_enums: Vec::new(),
+                variant_paths: Vec::new(),
             },
             next_def_id: 1_000_000,
             errors: Vec::new(),
@@ -233,6 +234,29 @@ impl<'a> Lowerer<'a> {
             annotation_contracts,
             list_element_labels: FxHashMap::default(),
         }
+    }
+
+    /// Preserve a qualified variant spelling that would otherwise disappear
+    /// when lowering the reference to its resolved `DefId`.
+    pub(super) fn record_variant_path(&mut self, def_id: radix_hir::DefId, path: &[Symbol]) {
+        if path.len() < 2 {
+            return;
+        }
+        let Some(namespace_def) = self.lookup_name(path[0]) else {
+            return;
+        };
+        if !matches!(
+            self.resolver
+                .get_symbol(namespace_def)
+                .map(|symbol| symbol.kind),
+            Some(crate::SymbolKind::Module)
+        ) {
+            return;
+        }
+        self.presentation.variant_paths.push(HirVariantPath {
+            def_id,
+            path: path.to_vec(),
+        });
     }
 
     /// Enter a lexical scope of generic-parameter names for signature lowering.

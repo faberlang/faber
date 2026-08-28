@@ -133,10 +133,10 @@ impl super::FaberCodegen {
                     // come from `ego` (self): a bare type name is not a value.
                     // Print the localized self keyword instead of the type name.
                     writer.write(surface.keyword(TokenKind::Ego));
-                } else if let Some(spelling) = self.imported_pattern_spellings.get(def_id) {
-                    // An imported variant in value position is the three-part
-                    // path (`dequant.GgmlKind.F32`); the two-part def spelling
-                    // can collide with another namespace export (SEM010).
+                } else if let Some(spelling) = self.authored_variant_spellings.get(def_id) {
+                    // Lowering keeps only the resolved variant `DefId`; use the
+                    // captured source path when value emission must preserve
+                    // its authored qualification.
                     writer.write(spelling);
                 } else {
                     writer.write(&self.name_for_def_imported(*def_id, names, interner));
@@ -1421,11 +1421,11 @@ impl super::FaberCodegen {
         surface: &impl KeywordSurface,
         writer: &mut CodeWriter,
     ) {
-        // An imported fieldless variant is authored as the three-part value
-        // path (`dequant.GgmlKind.F32`), not a `finge`: the two-part call
-        // spelling is not the value form and can collide with another export.
+        // An imported fieldless variant is authored as a qualified value path,
+        // not a `finge` construction. Keep its exact source path when the HIR
+        // has collapsed the path to the variant `DefId`.
         if fields.is_empty() {
-            if let Some(spelling) = self.imported_pattern_spellings.get(&variant_def) {
+            if let Some(spelling) = self.authored_variant_spellings.get(&variant_def) {
                 writer.write(spelling);
                 return;
             }
@@ -1437,9 +1437,10 @@ impl super::FaberCodegen {
         // two-part spelling exactly where the source needed it.
         writer.write(
             &self
-                .qualified_local_variants
+                .authored_variant_spellings
                 .get(&variant_def)
                 .cloned()
+                .or_else(|| self.qualified_local_variants.get(&variant_def).cloned())
                 .unwrap_or_else(|| self.name_for_def_imported(variant_def, names, interner)),
         );
         if !fields.is_empty() {
