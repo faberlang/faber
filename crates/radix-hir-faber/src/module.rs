@@ -35,6 +35,9 @@ pub struct FaberCodegen {
     /// `DefId` → qualified source spelling for imported nominals in
     /// struct-literal construction expressions.
     pub(crate) imported_def_spellings: FxHashMap<DefId, String>,
+    /// `DefId` → union-qualified spelling (`base.Kind.VARIANT`) for imported
+    /// union variants in `casu` pattern arms.
+    pub(crate) imported_pattern_spellings: FxHashMap<DefId, String>,
     /// Def ids of this unit's struct/enum items: a `Path` to one of these in
     /// value position is a `ego` (self) reference and must re-emit as the
     /// self keyword, not the type name.
@@ -44,6 +47,9 @@ pub struct FaberCodegen {
     /// call shape, and must re-emit with the `finge` keyword (a bare
     /// `<variant>()` call is not re-parseable source).
     pub(crate) variant_def_ids: FxHashSet<DefId>,
+    /// Ids of `Si` expressions lowered from `requirit`/`reice` guards; only
+    /// these re-sugar to the guard statement form on emission.
+    pub(crate) guard_si_ids: FxHashSet<radix_hir::HirId>,
 }
 
 /// Emit canonical Faber source from analyzed HIR and its presentation.
@@ -64,6 +70,7 @@ pub struct FaberCodegen {
 /// `FxHashMap` parameters are intentional (mirrors `TypeTable` / interner maps);
 /// do not generalize over `BuildHasher` for call-site simplicity.
 #[allow(clippy::implicit_hasher)]
+#[allow(clippy::too_many_arguments)]
 pub fn emit(
     hir: &HirModule,
     presentation: &HirPresentation,
@@ -72,10 +79,12 @@ pub fn emit(
     surface: &impl KeywordSurface,
     imported_type_spellings: &FxHashMap<TypeId, String>,
     imported_def_spellings: &FxHashMap<DefId, String>,
+    imported_pattern_spellings: &FxHashMap<DefId, String>,
 ) -> Result<FaberOutput, CodegenError> {
     let mut codegen = FaberCodegen {
         imported_type_spellings: imported_type_spellings.clone(),
         imported_def_spellings: imported_def_spellings.clone(),
+        imported_pattern_spellings: imported_pattern_spellings.clone(),
         ..Default::default()
     };
     codegen.generate(hir, presentation, types, interner, surface)
@@ -100,6 +109,7 @@ pub fn empty_presentation() -> HirPresentation {
         // Bridge callers (hand-built HIR, loose artifacts) have no surface
         // facts; the canonical default keeps the explicit `incipit` wrapper.
         entry_explicit: true,
+        guard_si_ids: Vec::new(),
     }
 }
 
@@ -125,6 +135,7 @@ impl FaberCodegen {
         radix_codegen_shared::reject_hir_errors(hir)?;
         reject_unsupported_legacy_hir(hir)?;
         self.trivia = TriviaIndex::from_presentation(presentation);
+        self.guard_si_ids = presentation.guard_si_ids.iter().copied().collect();
 
         let mut writer = CodeWriter::new();
         let names = self.collect_names(hir);
@@ -323,12 +334,14 @@ fn is_compiler_injected_item(item: &HirItem) -> bool {
 
 /// Whether `generate_item` will re-emit an annotation sequence for this item.
 ///
-/// Only functions write annotations today; structs/enums/interfaces do not.
-/// The item trivia then drops its trailing annotation-line terminator (see
-/// `trivia::without_following_annotation`).
+/// Functions, structs, and enums write their annotation sequences (see
+/// `decl.rs`); the item trivia then drops its trailing annotation-line
+/// terminator (see `trivia::without_following_annotation`).
 fn item_has_rendered_annotations(item: &HirItem) -> bool {
     match &item.kind {
         HirItemKind::Function(func) => !func.annotations.is_empty(),
+        HirItemKind::Struct(s) => !s.annotations.is_empty(),
+        HirItemKind::Enum(e) => !e.annotations.is_empty(),
         _ => false,
     }
 }

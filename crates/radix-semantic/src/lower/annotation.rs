@@ -138,6 +138,7 @@ impl Lowerer<'_> {
             family: resolved.family,
             fields,
             raw_args: Vec::new(),
+            brace_authored: true,
             contract_id: Some(resolved.contract_id),
             span,
         }
@@ -155,6 +156,7 @@ impl Lowerer<'_> {
                     span,
                 }],
                 raw_args: Vec::new(),
+                brace_authored: true,
                 contract_id: None,
                 span,
             };
@@ -169,6 +171,7 @@ impl Lowerer<'_> {
                     span,
                 }],
                 raw_args: Vec::new(),
+                brace_authored: true,
                 contract_id: None,
                 span,
             };
@@ -218,7 +221,8 @@ impl Lowerer<'_> {
                 | "interna"
         ) && braced.fields.is_empty()
         {
-            return self.unit_annotation(&family_owned, span);
+            // Authored empty braced record (`@ futura { }`) — keep the braces.
+            return HirAnnotation::with_fields(braced.name.name, Vec::new(), span);
         }
 
         HirAnnotation {
@@ -229,6 +233,7 @@ impl Lowerer<'_> {
                 .filter_map(|field| self.lower_braced_field(field))
                 .collect(),
             raw_args: Vec::new(),
+            brace_authored: true,
             contract_id: None,
             span,
         }
@@ -357,7 +362,12 @@ impl Lowerer<'_> {
     }
 
     fn unit_annotation(&mut self, family: &str, span: Span) -> HirAnnotation {
-        HirAnnotation::with_fields(self.intern_field_name(family), Vec::new(), span)
+        let mut annotation =
+            HirAnnotation::with_fields(self.intern_field_name(family), Vec::new(), span);
+        // Bare marker (`@ futura`); braced empty records route through the
+        // braced-annotation path with the authored flag set.
+        annotation.brace_authored = false;
+        annotation
     }
 
     fn lower_statement_annotation(&mut self, stmt: &AnnotationStmt, span: Span) -> HirAnnotation {
@@ -387,13 +397,16 @@ impl Lowerer<'_> {
             "futura" | "cursor" | "nucleum" | "vertex" | "fragment" | "solum" | "omitte" | "metior"
         ) && stmt.args.is_empty()
         {
-            return HirAnnotation::with_fields(family, Vec::new(), span);
+            let mut annotation = HirAnnotation::with_fields(family, Vec::new(), span);
+            annotation.brace_authored = false;
+            return annotation;
         }
 
         HirAnnotation {
             family,
             fields: Vec::new(),
             raw_args: stmt.args.clone(),
+            brace_authored: true,
             contract_id: None,
             span,
         }
@@ -438,6 +451,7 @@ impl Lowerer<'_> {
                 span,
             }],
             raw_args: Vec::new(),
+            brace_authored: true,
             contract_id: None,
             span,
         }
@@ -514,7 +528,11 @@ impl Lowerer<'_> {
                 span: nucleum.lane_spans.first().copied().unwrap_or(span),
             });
         }
-        HirAnnotation::with_fields(family, fields, span)
+        // Authored brace shape: `@ nucleum { … }` keeps braces; the sugar
+        // markers (`@ kernel`, `@ kernel fragment`) stay bare.
+        let mut annotation = HirAnnotation::with_fields(family, fields, span);
+        annotation.brace_authored = nucleum.braced;
+        annotation
     }
 
     fn lower_cli_annotation(&mut self, cli: &CliAnnotation, span: Span) -> HirAnnotation {
@@ -526,6 +544,7 @@ impl Lowerer<'_> {
                 span,
             }],
             raw_args: Vec::new(),
+            brace_authored: true,
             contract_id: None,
             span,
         }
@@ -544,6 +563,7 @@ impl Lowerer<'_> {
                 span,
             }],
             raw_args: Vec::new(),
+            brace_authored: true,
             contract_id: None,
             span,
         }

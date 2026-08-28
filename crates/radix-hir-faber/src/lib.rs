@@ -26,6 +26,8 @@ mod comma_law_test;
 #[cfg(test)]
 mod commune_emit_test;
 
+// Mirrors the lint-fix-1 cfg-gate landing on main: ungated test modules fail
+// stage-2 clippy (unused/dead) in non-test builds.
 #[cfg(test)]
 mod instance_spacing_test;
 #[cfg(test)]

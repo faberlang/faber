@@ -260,6 +260,7 @@ fn emit_empty_hir_program_succeeds() {
         &LatinSurface,
         &FxHashMap::default(),
         &FxHashMap::default(),
+        &FxHashMap::default(),
     )
     .expect("empty HIR must emit");
     assert!(
@@ -408,6 +409,7 @@ fn vacua_emit_routes_through_contextual_keyword() {
         &ProbeSurface,
         &FxHashMap::default(),
         &FxHashMap::default(),
+        &FxHashMap::default(),
     )
     .expect("vacua program must emit");
     assert!(
@@ -466,6 +468,7 @@ fn vacua_emit_uses_canonical_when_surface_spelling_is_bound() {
         &types,
         &interner,
         &ProbeSurface,
+        &FxHashMap::default(),
         &FxHashMap::default(),
         &FxHashMap::default(),
     )

@@ -352,6 +352,7 @@ pub fn generate_from_analyzed_with_options(
                 &faber::LocaleKeywordBridge(*surface),
                 &imported_spellings.by_type,
                 &by_def,
+                &imported_spellings.by_def_pattern,
             )?;
             Ok(crate::Output::Faber(crate::FaberOutput { code: output.code }))
         }
@@ -711,6 +712,7 @@ pub fn generate_with_options(
                 types,
                 interner,
                 &faber::LocaleKeywordBridge(surface),
+                &rustc_hash::FxHashMap::default(),
                 &rustc_hash::FxHashMap::default(),
                 &rustc_hash::FxHashMap::default(),
             )?;

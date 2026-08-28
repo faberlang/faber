@@ -2276,6 +2276,7 @@ impl Parser {
             lane,
             lane_values,
             lane_spans,
+            braced: false,
         }))
     }
 
@@ -2324,6 +2325,7 @@ impl Parser {
             lane,
             lane_values,
             lane_spans,
+            braced: true,
         }))
     }
 

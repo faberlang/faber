@@ -226,6 +226,53 @@ impl super::FaberCodegen {
         }
     }
 
+    /// Re-sugar a guard-desugared conditional back to `requirit`/`reice`.
+    ///
+    /// Requires the then-block to be exactly one `iace` statement with no tail
+    /// and no authored trivia (compact guards have no comment slot). The
+    /// negated condition marks `requirit`; the plain condition marks `reice`.
+    /// Returns `false` when the shape is not a guard, leaving the caller to
+    /// emit the ordinary conditional.
+    #[allow(clippy::too_many_arguments)]
+    pub(super) fn write_guard_stmt(
+        &self,
+        cond: &HirExpression,
+        then_block: &HirBlock,
+        types: &TypeTable,
+        names: &FxHashMap<DefId, Symbol>,
+        interner: &Interner,
+        surface: &impl KeywordSurface,
+        writer: &mut CodeWriter,
+    ) -> bool {
+        if then_block.expr.is_some() || then_block.statements.len() != 1 {
+            return false;
+        }
+        if self.trivia.block_has_trivia(then_block) {
+            return false;
+        }
+        let HirStatementKind::Expr(expr) = &then_block.statements[0].kind else {
+            return false;
+        };
+        let HirExpressionKind::Throw(error) = &expr.kind else {
+            return false;
+        };
+
+        if let HirExpressionKind::Unary(radix_hir::HirUnOp::Not, inner) = &cond.kind {
+            writer.write(surface.keyword(TokenKind::Requirit));
+            writer.write(" ");
+            self.write_expr(inner, types, names, interner, surface, writer);
+        } else {
+            writer.write(surface.keyword(TokenKind::Reice));
+            writer.write(" ");
+            self.write_expr(cond, types, names, interner, surface, writer);
+        }
+        writer.write(" ");
+        writer.write(surface.keyword(TokenKind::Iace));
+        writer.write(" ");
+        self.write_expr(error, types, names, interner, surface, writer);
+        true
+    }
+
     /// Try to write a conditional expression as compact `sic ... secus ...`.
     ///
     /// Returns `false` when either branch needs block syntax. Callers then fall

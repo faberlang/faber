@@ -44,11 +44,14 @@ impl super::FaberCodegen {
         writer.write(&self.annotation_surface_spelling(annotation.family, interner, surface));
 
         if annotation.fields.is_empty() && annotation.raw_args.is_empty() {
-            // `@ conversio` is a bare marker: its parser production accepts no
-            // braced record, so the empty braced sugar legal for flag families
-            // (`@ futura { }`) must not apply — the braced form fails PARSE018
-            // on re-parse and breaks the locale round trip.
-            if self.symbol_to_string(annotation.family, interner) != "conversio" {
+            // Only an authored empty braced record re-emits braces; a bare
+            // marker (`@ public`) stays bare. `@ conversio` is always bare:
+            // its parser production accepts no braced record, so the braced
+            // form fails PARSE018 on re-parse and breaks the locale round
+            // trip.
+            if annotation.brace_authored
+                && self.symbol_to_string(annotation.family, interner) != "conversio"
+            {
                 writer.write(" { }");
             }
             return;

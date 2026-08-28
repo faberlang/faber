@@ -233,6 +233,13 @@ pub struct HirAnnotation {
     /// Token payload for unpromoted `AnnotationKind::Statement` families.
     pub raw_args: Vec<Token>,
 
+    /// Whether the source authored the braced record form (`@ futura { }`)
+    /// as opposed to the bare marker (`@ futura`). Empty-body re-emission
+    /// keeps the authored shape; the serde default preserves braced output
+    /// for artifacts serialized before the flag existed.
+    #[serde(default = "annotation_brace_authored_default")]
+    pub brace_authored: bool,
+
     /// Resolved annotation-contract definition when this application named a contract.
     ///
     /// Compiler-owned families leave this `None`. Target/framework consumers should
@@ -249,10 +256,15 @@ impl HirAnnotation {
             family,
             fields,
             raw_args: Vec::new(),
+            brace_authored: true,
             contract_id: None,
             span,
         }
     }
+}
+
+fn annotation_brace_authored_default() -> bool {
+    true
 }
 
 /// One named field in a normalized annotation record.
@@ -1714,6 +1726,12 @@ pub struct HirPresentation {
     /// explicit entry re-emits the `incipit` wrapper.
     #[serde(default)]
     pub entry_explicit: bool,
+
+    /// Ids of `Si` expressions lowered from `requirit`/`reice` guard
+    /// statements. Emission re-sugars exactly these back to guard form;
+    /// structurally identical authored conditionals stay braced.
+    #[serde(default)]
+    pub guard_si_ids: Vec<HirId>,
 }
 
 /// Structural end of one authored executable block.

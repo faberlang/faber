@@ -3591,6 +3591,7 @@ fn empty_presentation() -> HirPresentation {
         program_end: HirModuleEnd { id: HirSourceAnchorId(0), span: crate::lexer::Span::default() },
         entry_start_anchor: None,
         entry_explicit: false,
+        guard_si_ids: Vec::new(),
     }
 }
 

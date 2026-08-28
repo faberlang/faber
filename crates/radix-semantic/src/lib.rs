@@ -755,6 +755,7 @@ pub(crate) fn empty_presentation() -> HirPresentation {
         },
         entry_start_anchor: None,
         entry_explicit: false,
+        guard_si_ids: Vec::new(),
     }
 }
 

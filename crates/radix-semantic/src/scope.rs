@@ -241,6 +241,11 @@ pub struct ImportedSpellings {
     pub by_type: FxHashMap<TypeId, String>,
     /// `DefId` → `base.Vector3` for nominal construction expressions.
     pub by_def: FxHashMap<DefId, String>,
+    /// `DefId` → `base.Kind.VARIANT` for `casu` pattern arms. Pattern
+    /// position accepts (and ambiguity requires) the union-qualified
+    /// three-part spelling; expression/call position does not, so it cannot
+    /// ride `by_def`.
+    pub by_def_pattern: FxHashMap<DefId, String>,
 }
 
 /// One imported file namespace after its portable interface has been remapped
@@ -2040,6 +2045,7 @@ impl Resolver {
     pub fn imported_spellings(&self, interner: &radix_lexer::Interner) -> ImportedSpellings {
         let mut by_type = FxHashMap::default();
         let mut by_def = FxHashMap::default();
+        let mut by_def_pattern = FxHashMap::default();
         for (namespace, interface) in &self.file_interfaces {
             let namespace = interner.resolve(*namespace);
             for (member, export) in &interface.exports {
@@ -2054,7 +2060,10 @@ impl Resolver {
                         // Union/enum variants are first-class path values and
                         // pattern arms (`module.VARIANT`); give the emitter
                         // their qualified spelling so convert re-emits them
-                        // instead of the `def_N` fallback.
+                        // instead of the `def_N` fallback. Two-part only:
+                        // the three-part `module.Union.VARIANT` spelling is
+                        // not accepted in expression/call position, so it
+                        // cannot ride this shared map.
                         if let Some(enum_def) = export.def_id {
                             if let Some(variants) = self.imported_enum_variants.get(&enum_def) {
                                 for variant in variants {
@@ -2062,6 +2071,10 @@ impl Resolver {
                                     by_def.insert(
                                         variant.def_id,
                                         format!("{namespace}.{variant_name}"),
+                                    );
+                                    by_def_pattern.insert(
+                                        variant.def_id,
+                                        format!("{namespace}.{member}.{variant_name}"),
                                     );
                                 }
                             }
@@ -2075,7 +2088,11 @@ impl Resolver {
                 }
             }
         }
-        ImportedSpellings { by_type, by_def }
+        ImportedSpellings {
+            by_type,
+            by_def,
+            by_def_pattern,
+        }
     }
 
     /// Return source spellings for compiler-generated backward companion

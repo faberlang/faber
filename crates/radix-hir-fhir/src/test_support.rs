@@ -58,6 +58,7 @@ pub(crate) fn stub_artifact() -> HirArtifact {
         },
         entry_start_anchor: None,
         entry_explicit: false,
+        guard_si_ids: Vec::new(),
     };
     let types = TypeTable::new();
     HirArtifact {

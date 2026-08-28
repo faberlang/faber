@@ -1259,6 +1259,17 @@ pub static KEYWORD_SPECS: &[KeywordSpec] = &[
         scope: KeywordScope::Annotation,
         category: KeywordKind::Annotation,
     },
+    // Shared-field union annotation. Tokenless (lexes as an identifier): the
+    // parser claims both locale spellings as raw annotation names and
+    // normalizes them to the `commune` family; the registry row exists so
+    // reader packs can carry the localized emit surface (en: `shared`)
+    // and re-emission projects it back through `contextual_keyword`.
+    KeywordSpec {
+        text: "commune",
+        token_kind: None,
+        scope: KeywordScope::Contextual(ANNOTATION_NAME),
+        category: KeywordKind::Annotation,
+    },
     KeywordSpec {
         text: "cursor",
         token_kind: Some(TokenKind::Cursor),

@@ -138,6 +138,7 @@ fn empty_presentation() -> radix_hir::HirPresentation {
         },
         entry_start_anchor: None,
         entry_explicit: false,
+        guard_si_ids: Vec::new(),
     }
 }
 
@@ -809,6 +810,7 @@ fn presentation_dangling_attachment_anchor() {
         program_end: empty_presentation().program_end,
         entry_start_anchor: None,
         entry_explicit: false,
+        guard_si_ids: Vec::new(),
     };
     let bytes = serialize_artifact(&artifact);
     let result = load_fhir(&bytes);
@@ -834,6 +836,7 @@ fn presentation_dangling_entry_anchor() {
         program_end: empty_presentation().program_end,
         entry_start_anchor: Some(HirSourceAnchorId(4)),
         entry_explicit: false,
+        guard_si_ids: Vec::new(),
     };
     let bytes = serialize_artifact(&artifact);
     let result = load_fhir(&bytes);
@@ -861,6 +864,7 @@ fn presentation_duplicate_owner_anchor() {
         program_end: empty_presentation().program_end,
         entry_start_anchor: None,
         entry_explicit: false,
+        guard_si_ids: Vec::new(),
     };
     let bytes = serialize_artifact(&artifact);
     let result = load_fhir(&bytes);
@@ -888,6 +892,7 @@ fn presentation_duplicate_attachment_owner() {
         program_end: empty_presentation().program_end,
         entry_start_anchor: None,
         entry_explicit: false,
+        guard_si_ids: Vec::new(),
     };
     let bytes = serialize_artifact(&artifact);
     let result = load_fhir(&bytes);
@@ -918,6 +923,7 @@ fn presentation_dangling_comment_symbol() {
         program_end: empty_presentation().program_end,
         entry_start_anchor: None,
         entry_explicit: false,
+        guard_si_ids: Vec::new(),
     };
     let bytes = serialize_artifact(&artifact);
     let result = load_fhir(&bytes);
@@ -948,6 +954,7 @@ fn presentation_dangling_def_backref() {
         program_end: empty_presentation().program_end,
         entry_start_anchor: None,
         entry_explicit: false,
+        guard_si_ids: Vec::new(),
     };
     let bytes = serialize_artifact(&artifact);
     let result = load_fhir(&bytes);

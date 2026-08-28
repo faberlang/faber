@@ -106,6 +106,7 @@ pub fn compile_canonical(session: &Session, name: &str, source: &str) -> FormatC
         &super::LocaleKeywordBridge(surface),
         &imported_spellings.by_type,
         &by_def,
+        &imported_spellings.by_def_pattern,
     ) {
         Ok(output) => {
             FormatCompileResult { output: Some(FaberOutput { code: output.code }), diagnostics: analysis.diagnostics }
@@ -147,6 +148,7 @@ pub fn emit_from_analyzed(
         types,
         interner,
         &super::LocaleKeywordBridge(surface),
+        &rustc_hash::FxHashMap::default(),
         &rustc_hash::FxHashMap::default(),
         &rustc_hash::FxHashMap::default(),
     )?;

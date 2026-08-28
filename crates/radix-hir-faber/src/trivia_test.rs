@@ -134,6 +134,7 @@ fn empty_presentation() -> HirPresentation {
         },
         entry_start_anchor: None,
         entry_explicit: false,
+        guard_si_ids: Vec::new(),
     }
 }
 
@@ -221,6 +222,7 @@ fn render(hir: &HirModule, presentation: &HirPresentation, interner: &Interner) 
         &TestSurface,
         &FxHashMap::default(),
         &FxHashMap::default(),
+        &FxHashMap::default(),
     )
     .expect("emit should succeed")
     .code
@@ -271,6 +273,7 @@ fn emits_statement_trivia_before_each_statement() {
         },
         entry_start_anchor: None,
         entry_explicit: false,
+        guard_si_ids: Vec::new(),
     };
 
     let code = render(&hir, &presentation, &interner);
@@ -312,6 +315,7 @@ fn emits_block_end_trivia_before_closing_brace() {
         },
         entry_start_anchor: None,
         entry_explicit: false,
+        guard_si_ids: Vec::new(),
     };
 
     let code = render(&hir, &presentation, &interner);
@@ -348,6 +352,7 @@ fn emits_program_end_trivia_before_eof() {
         },
         entry_start_anchor: None,
         entry_explicit: false,
+        guard_si_ids: Vec::new(),
     };
 
     let code = render(&hir, &presentation, &interner);
@@ -385,6 +390,7 @@ fn emits_item_trivia_before_item() {
         },
         entry_start_anchor: None,
         entry_explicit: false,
+        guard_si_ids: Vec::new(),
     };
 
     let code = render(&hir, &presentation, &interner);
@@ -409,6 +415,7 @@ fn emits_entry_trivia_before_incipit_keyword() {
         },
         entry_start_anchor: Some(anchor(1)),
         entry_explicit: false,
+        guard_si_ids: Vec::new(),
     };
 
     let code = render(&hir, &presentation, &interner);
@@ -500,6 +507,7 @@ fn emits_member_trivia_for_struct_fields_and_methods() {
         },
         entry_start_anchor: None,
         entry_explicit: false,
+        guard_si_ids: Vec::new(),
     };
 
     let code = emit(
@@ -508,6 +516,7 @@ fn emits_member_trivia_for_struct_fields_and_methods() {
         &types,
         &interner,
         &TestSurface,
+        &FxHashMap::default(),
         &FxHashMap::default(),
         &FxHashMap::default(),
     )
@@ -559,6 +568,7 @@ fn emits_trivia_before_annotation_sequence() {
         },
         entry_start_anchor: None,
         entry_explicit: false,
+        guard_si_ids: Vec::new(),
     };
 
     let code = render(&hir, &presentation, &interner);
@@ -625,6 +635,7 @@ fn comment_bearing_branch_stays_braced_not_ergo() {
         },
         entry_start_anchor: None,
         entry_explicit: false,
+        guard_si_ids: Vec::new(),
     };
 
     let code = render(&hir, &presentation, &interner);
@@ -724,6 +735,7 @@ fn comment_bearing_branch_prevents_sic_secus_compaction() {
         },
         entry_start_anchor: None,
         entry_explicit: false,
+        guard_si_ids: Vec::new(),
     };
 
     let code = render(&hir, &presentation, &interner);
@@ -835,6 +847,7 @@ fn boundary_newline_normalization_does_not_manufacture_blank_lines() {
         },
         entry_start_anchor: None,
         entry_explicit: false,
+        guard_si_ids: Vec::new(),
     };
 
     let code = render(&hir, &presentation, &interner);
@@ -886,6 +899,7 @@ fn file_start_trivia_keeps_no_leading_blank_lines() {
         },
         entry_start_anchor: None,
         entry_explicit: false,
+        guard_si_ids: Vec::new(),
     };
 
     let code = render(&hir, &presentation, &interner);
@@ -934,6 +948,7 @@ fn explicit_tacet_prints_implicit_ends_do_not() {
         },
         entry_start_anchor: None,
         entry_explicit: false,
+        guard_si_ids: Vec::new(),
     };
 
     let code = render(&hir, &presentation, &interner);
@@ -988,6 +1003,7 @@ fn rendering_is_deterministic() {
         },
         entry_start_anchor: None,
         entry_explicit: false,
+        guard_si_ids: Vec::new(),
     };
 
     let first = render(&hir, &presentation, &interner);
