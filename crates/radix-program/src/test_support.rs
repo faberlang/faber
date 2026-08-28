@@ -178,6 +178,7 @@ fn test_device_section_builder(
 fn test_host_route(
     _image: &crate::mir::FmirPackageImage,
     _selection: DeviceSelection,
+    _stats_requested: bool,
 ) -> Result<Option<()>, Vec<Diagnostic>> {
     Ok(None)
 }

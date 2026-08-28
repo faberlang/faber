@@ -87,8 +87,14 @@ pub type DeviceSectionBuilder = fn(
 /// loaded image runs on the CPU/FMIR runner or a device route, and executes
 /// the device route when selected. `Ok(None)` runs the CPU route with the
 /// caller's host; `Ok(Some(()))` means the device route already executed.
-pub type HostRoutePolicy =
-    fn(image: &FmirPackageImage, selection: DeviceSelection) -> Result<Option<()>, Vec<Diagnostic>>;
+/// The explicit `stats_requested` fact (RSM route transport) reaches the
+/// policy before the device decision so the owner can refuse stats+device
+/// requests fail-closed; non-stats callers pass `false`.
+pub type HostRoutePolicy = fn(
+    image: &FmirPackageImage,
+    selection: DeviceSelection,
+    stats_requested: bool,
+) -> Result<Option<()>, Vec<Diagnostic>>;
 
 /// Generated fmir-bin runner crate writer (faber's `bin_runner.rs`): writes
 /// the runner crate and invokes `cargo build`. Toolchain invocation is faber
@@ -146,13 +152,14 @@ use radix_module::hir::{
 };
 use radix_module::lexer::{Interner, Symbol};
 use radix_module::mir::{
-    lower_analyzed_unit, run_entry, validate_program, Host, LoweredMirUnit, MirAggregate,
-    MirAggregateFields, MirAggregateItem, MirAggregateKind, MirBlock, MirBlockId, MirCallee,
-    MirClosureCallee, MirClosureEnvironment, MirClosureEnvironmentId, MirClosureValue, MirConstant,
-    MirDiagnosticKind, MirFunction, MirFunctionId, MirIntrinsic, MirNamedOperand, MirOperand,
-    MirOptionChainLink, MirOptionOp, MirPlace, MirProgram, MirProjection, MirProviderKind,
-    MirRuntimeCall, MirRuntimeRecordField, MirRuntimeRecordValue, MirStatement, MirStatementKind,
-    MirSwitchCase, MirTerminator, MirTerminatorKind, MirType, MirValue, MirValueKind, RunnerError,
+    lower_analyzed_unit, run_entry, run_entry_with_stats, validate_program, Host, LoweredMirUnit,
+    MirAggregate, MirAggregateFields, MirAggregateItem, MirAggregateKind, MirBlock, MirBlockId,
+    MirCallee, MirClosureCallee, MirClosureEnvironment, MirClosureEnvironmentId, MirClosureValue,
+    MirConstant, MirDiagnosticKind, MirFunction, MirFunctionId, MirIntrinsic, MirNamedOperand,
+    MirOperand, MirOptionChainLink, MirOptionOp, MirPlace, MirProgram, MirProjection,
+    MirProviderKind, MirRuntimeCall, MirRuntimeRecordField, MirRuntimeRecordValue, MirStatement,
+    MirStatementKind, MirSwitchCase, MirTerminator, MirTerminatorKind, MirType, MirValue,
+    MirValueKind, RunnerError, RunnerStats,
 };
 use radix_module::semantic::{
     IndexExpr, Primitive, Resolver, SymbolKind, Type, TypeId, TypeTable, TypeTableSnapshot,
@@ -615,7 +622,7 @@ pub use routes::{
 #[allow(unused_imports)]
 pub use routes::{
     build_package_mir_artifact, run_package_mir, run_package_mir_artifact,
-    run_package_mir_with_selection,
+    run_package_mir_with_selection, run_package_mir_with_selection_and_stats, PackageRunStats,
 };
 
 #[cfg(feature = "mir-fmir")]
@@ -682,6 +689,10 @@ mod const_member_lane_tests;
 #[cfg(test)]
 #[path = "closure_env_link_test.rs"]
 mod closure_env_link_tests;
+
+#[cfg(test)]
+#[path = "stats_route_test.rs"]
+mod stats_route_tests;
 
 #[cfg(test)]
 #[path = "device_matrix_test.rs"]
