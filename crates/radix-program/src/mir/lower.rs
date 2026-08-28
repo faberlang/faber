@@ -2,7 +2,7 @@
 
 use super::*;
 use radix_module::file_interface::FileInterface;
-use radix_module::mir::MirFunctionSignature;
+use radix_module::mir::{MirDeviceFunctionMetadataMap, MirFunctionSignature};
 
 /// Struct/enum/function validation metadata remapped from a sibling or
 /// library unit into the entry's DefId / TypeId / Symbol space.
@@ -1073,6 +1073,7 @@ pub(super) fn lower_package_units<'a>(
                     environments: lowered.closure_environments,
                     templates: lowered.generic_templates,
                     generic_params: lowered.generic_params,
+                    device_function_metadata: lowered.device_function_metadata,
                 });
                 Ok(())
             },
@@ -1123,6 +1124,15 @@ pub(super) fn lower_package_units<'a>(
     let mut generic_params = std::mem::take(&mut merged.generic_params);
     for mut unit in pending {
         let offset = append_shifted_program(&mut merged, &mut unit.lowered, &entry_path)?;
+        // KCM-05: synthetic kernel closures ride the explicit metadata
+        // carrier; the merge shifts keys and parent identities with the
+        // program so the rows stay valid in the merged id space.
+        merge_shifted_device_function_metadata(
+            &mut merged.device_function_metadata,
+            &unit.lowered.device_function_metadata,
+            offset,
+            &entry_path,
+        )?;
         shift_templates(&mut unit.lowered.generic_templates, offset);
         generic_templates.append(&mut unit.lowered.generic_templates);
         generic_params.append(&mut unit.lowered.generic_params);
@@ -1137,6 +1147,12 @@ pub(super) fn lower_package_units<'a>(
             &mut merged.closure_environments,
             &mut library.program,
             &mut library.environments,
+            &entry_path,
+        )?;
+        merge_shifted_device_function_metadata(
+            &mut merged.device_function_metadata,
+            &library.device_function_metadata,
+            offset,
             &entry_path,
         )?;
         shift_templates(&mut library.templates, offset);
@@ -2445,6 +2461,39 @@ pub(super) fn lower_unit<'a>(
     Ok(lowered)
 }
 
+/// Merge one appended unit's synthetic-kernel metadata into the merged map,
+/// shifting keys and parent identities by the unit's id offset (KCM-05).
+///
+/// A row whose key or parent id would overflow the merged id space fails
+/// closed with the shared function-id overflow diagnostic — a shifted row
+/// that cannot be represented never silently joins the merged program.
+///
+/// # Errors
+///
+/// Returns the function-id overflow diagnostic when a shifted key or parent
+/// id exceeds `u32::MAX`.
+fn merge_shifted_device_function_metadata(
+    merged: &mut MirDeviceFunctionMetadataMap,
+    incoming: &MirDeviceFunctionMetadataMap,
+    offset: u32,
+    path: &Path,
+) -> Result<(), Vec<Diagnostic>> {
+    if offset == 0 {
+        merged.extend(incoming.iter().map(|(key, row)| (*key, *row)));
+        return Ok(());
+    }
+    let shift = |id: MirFunctionId| -> Result<MirFunctionId, Vec<Diagnostic>> {
+        checked_shifted_function_id(id, offset, path)
+    };
+    for (key, row) in incoming {
+        let key = shift(*key)?;
+        let mut row = *row;
+        row.identity.parent = shift(row.identity.parent)?;
+        merged.insert(key, row);
+    }
+    Ok(())
+}
+
 pub(super) fn append_shifted_program(
     merged: &mut LoweredMirUnit<'_>,
     lowered: &mut LoweredMirUnit<'_>,
@@ -2935,6 +2984,9 @@ struct LibraryMirParts {
     environments: Vec<MirClosureEnvironment>,
     templates: Vec<MirFunction>,
     generic_params: Vec<(DefId, Vec<radix_module::mir::MirGenericParam>)>,
+    /// Synthetic-kernel metadata carried from the lowered unit; merged with
+    /// the same id shift as the program (KCM-05).
+    device_function_metadata: MirDeviceFunctionMetadataMap,
 }
 
 fn prune_unreachable_library_functions(
@@ -3426,5 +3478,73 @@ fn scan_option_chain_references(link: &MirOptionChainLink, scan: &mut MirReferen
                 scan_operand_references(arg, scan);
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod metadata_merge_tests {
+    use super::*;
+    use radix_module::mir::{
+        MirDeviceFunctionMetadata, MirDeviceRole, MirFunctionOrigin, MirFunctionVisibility,
+        MirKernelShaderStage, MirSyntheticFunctionIdentity,
+    };
+
+    fn synthetic_row(parent: u32, ordinal: u32) -> MirDeviceFunctionMetadata {
+        MirDeviceFunctionMetadata {
+            identity: MirSyntheticFunctionIdentity {
+                parent: MirFunctionId(parent),
+                ordinal,
+            },
+            role: MirDeviceRole::Kernel,
+            shader_stage: MirKernelShaderStage::Compute,
+            visibility: MirFunctionVisibility::Private,
+            origin: MirFunctionOrigin::SyntheticKernelClosure,
+        }
+    }
+
+    #[test]
+    fn metadata_rows_shift_keys_and_parents_with_the_program() {
+        let mut incoming = MirDeviceFunctionMetadataMap::default();
+        incoming.insert(MirFunctionId(1), synthetic_row(0, 2));
+        let mut merged = MirDeviceFunctionMetadataMap::default();
+        merge_shifted_device_function_metadata(&mut merged, &incoming, 10, Path::new("shift.fab"))
+            .expect("shifted metadata merge");
+        assert_eq!(merged.len(), 1);
+        let row = merged.get(&MirFunctionId(11)).expect("shifted row key");
+        assert_eq!(row.identity.parent, MirFunctionId(10));
+        assert_eq!(row.identity.ordinal, 2);
+        assert_eq!(row.origin, MirFunctionOrigin::SyntheticKernelClosure);
+    }
+
+    #[test]
+    fn zero_offset_metadata_merge_keeps_ids_verbatim() {
+        let mut incoming = MirDeviceFunctionMetadataMap::default();
+        incoming.insert(MirFunctionId(4), synthetic_row(3, 0));
+        let mut merged = MirDeviceFunctionMetadataMap::default();
+        merge_shifted_device_function_metadata(&mut merged, &incoming, 0, Path::new("same.fab"))
+            .expect("verbatim metadata merge");
+        assert!(merged.contains_key(&MirFunctionId(4)));
+        assert_eq!(
+            merged.get(&MirFunctionId(4)).expect("row").identity.parent,
+            MirFunctionId(3)
+        );
+    }
+
+    #[test]
+    fn overflowing_metadata_shift_fails_closed() {
+        let mut incoming = MirDeviceFunctionMetadataMap::default();
+        incoming.insert(MirFunctionId(u32::MAX), synthetic_row(0, 0));
+        let mut merged = MirDeviceFunctionMetadataMap::default();
+        let result = merge_shifted_device_function_metadata(
+            &mut merged,
+            &incoming,
+            1,
+            Path::new("over.fab"),
+        );
+        assert!(
+            result.is_err(),
+            "an unrepresentable shifted row never joins"
+        );
+        assert!(merged.is_empty(), "a failed merge inserts no partial rows");
     }
 }

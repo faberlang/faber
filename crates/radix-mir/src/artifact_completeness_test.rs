@@ -58,7 +58,7 @@ fn vertical_program(types: &mut TypeTable, interner: &mut Interner) -> MirProgra
         functions: vec![
             MirFunction {
                 id: MirFunctionId(1),
-                source: None,
+                source: Some(radix_hir::DefId(1)),
                 name: Some(interner.intern("scale_kernel")),
                 params: vec![param(10, f32_ty)],
                 locals: vec![local(10, f32_ty)],

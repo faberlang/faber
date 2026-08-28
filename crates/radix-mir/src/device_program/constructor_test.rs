@@ -1,6 +1,7 @@
 use super::build_device_program;
 use crate::abi::MirKernelResourceAccess;
 use crate::device::MirCompanionMap;
+use crate::device::{MirDeviceFunctionMetadata, MirDeviceFunctionMetadataMap};
 use crate::device_program::{
     BufferLifetime, BufferRole, DeviceGradientLink, DeviceProgramLifetime, DeviceTrainableParam,
     DeviceTrainingFacts, ObservationCadence,
@@ -11,10 +12,11 @@ use crate::device_semantics::{
 use crate::kernel_plan::CollectionKernelPlan;
 use crate::{
     MirAggregate, MirAggregateFields, MirAggregateItem, MirAggregateKind, MirBlock, MirBlockId,
-    MirCollectionOp, MirFunction, MirFunctionId, MirIntrinsic, MirKernelShaderStage, MirLocal,
-    MirLocalId, MirOperand, MirParam, MirParamMode, MirPlace, MirProgram, MirRuntimeCall,
-    MirStatement, MirStatementKind, MirTerminator, MirTerminatorKind, MirType,
-    MirValidationContext, ValidatedMir,
+    MirCollectionOp, MirFunction, MirFunctionId, MirFunctionOrigin, MirFunctionVisibility,
+    MirIntrinsic, MirKernelShaderStage, MirLocal, MirLocalId, MirOperand, MirParam, MirParamMode,
+    MirPlace, MirProgram, MirRuntimeCall, MirStatement, MirStatementKind,
+    MirSyntheticFunctionIdentity, MirTerminator, MirTerminatorKind, MirType, MirValidationContext,
+    ValidatedMir,
 };
 use radix_hir::DefId;
 use radix_lexer::{Interner, Span};
@@ -203,6 +205,32 @@ fn device_function(
     }
 }
 
+/// Explicit carrier rows for the fixture's compute-stage functions: under
+/// the KCM-05 explicit-facts admission law a fixture declares its device
+/// kernels through the carrier (public rows — the named-entry analog) instead
+/// of relying on the compute stage alone.
+fn fixture_metadata(functions: &[MirFunction]) -> MirDeviceFunctionMetadataMap {
+    functions
+        .iter()
+        .filter(|function| function.shader_stage == Some(MirKernelShaderStage::Compute))
+        .map(|function| {
+            (
+                function.id,
+                MirDeviceFunctionMetadata {
+                    identity: MirSyntheticFunctionIdentity {
+                        parent: MirFunctionId(0),
+                        ordinal: 0,
+                    },
+                    role: crate::MirDeviceRole::Kernel,
+                    shader_stage: MirKernelShaderStage::Compute,
+                    visibility: MirFunctionVisibility::Public,
+                    origin: MirFunctionOrigin::Source,
+                },
+            )
+        })
+        .collect()
+}
+
 fn validated(types: &TypeTable, functions: Vec<MirFunction>) -> ValidatedMir<'_> {
     ValidatedMir::new(MirProgram { functions }, MirValidationContext::new(types))
         .expect("the constructor fixture validates")
@@ -263,6 +291,7 @@ fn constructor_returns_program_and_semantics_from_validated_mir() {
         None,
         DeviceProgramLifetime::SingleRun,
         0,
+        &fixture_metadata(&validated.program().functions),
     )
     .expect("the constructor derives the device program");
 
@@ -319,6 +348,7 @@ fn constructor_decomposes_multi_recipe_body_into_subchain_kernels() {
         None,
         DeviceProgramLifetime::SingleRun,
         0,
+        &fixture_metadata(&validated.program().functions),
     )
     .expect("the multi-recipe body decomposes instead of failing closed");
 
@@ -432,6 +462,7 @@ fn constructor_launch_sequence_follows_dependencies_not_declaration_order() {
         None,
         DeviceProgramLifetime::SingleRun,
         0,
+        &fixture_metadata(&validated.program().functions),
     )
     .expect("the reversed chain builds");
 
@@ -644,6 +675,7 @@ fn constructor_aliases_param_updates_and_gradients() {
             Some(&facts),
             DeviceProgramLifetime::RepeatingStep,
             100,
+            &fixture_metadata(&validated.program().functions),
         )
         .expect("the training program builds");
 
@@ -769,6 +801,7 @@ fn constructor_declares_observation_cadence_and_effective_steps() {
             Some(&facts),
             DeviceProgramLifetime::RepeatingStep,
             100,
+            &fixture_metadata(&validated.program().functions),
         )
         .expect("the training program builds");
 
@@ -808,6 +841,7 @@ fn constructor_declares_observation_cadence_and_effective_steps() {
             None,
             DeviceProgramLifetime::SingleRun,
             7,
+            &fixture_metadata(&validated.program().functions),
         )
         .expect("the non-training program builds");
         assert_eq!(plain_steps, 7, "no training facts → the declared count");

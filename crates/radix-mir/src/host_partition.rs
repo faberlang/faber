@@ -69,6 +69,7 @@
 use crate::boundary_abi::{
     derive_boundary_calls, validate_boundary_abi, BoundaryAbiError, BoundaryCall,
 };
+use crate::device::MirDeviceFunctionMetadataMap;
 use crate::device_program::LaunchId;
 use crate::device_program::{
     build_device_program, DeviceProgram, DeviceProgramBuildError, DeviceProgramError,
@@ -216,6 +217,10 @@ impl HostPartition {
 /// side is every other function. A package with no compute kernels yields an
 /// empty partition (`has_device() == false`) — no device payload.
 ///
+/// Source-less synthetic kernel closures are invisible to this entry point:
+/// callers that lower kernel closures pass their explicit metadata carrier
+/// through [`derive_host_partition_with_metadata`].
+///
 /// The typed [`DeviceProgram`] is composed from the shared ABI synthesis, the
 /// shared plan pass, and the shared schema — never from emitted text:
 ///
@@ -245,6 +250,27 @@ pub fn derive_host_partition(
     validated: &ValidatedMir<'_>,
     interner: &Interner,
 ) -> Result<HostPartition, HostPartitionError> {
+    derive_host_partition_with_metadata(
+        validated,
+        interner,
+        &MirDeviceFunctionMetadataMap::default(),
+    )
+}
+
+/// [`derive_host_partition`] with the explicit metadata carrier for
+/// source-less synthetic kernel closures (KCM-05): the constructor's
+/// selection consumes the carrier facts, so a host-launched private closure
+/// derives its one launch region while composed or uncalled synthetic
+/// helpers never become launch rows.
+///
+/// # Errors
+///
+/// Same contract as [`derive_host_partition`].
+pub fn derive_host_partition_with_metadata(
+    validated: &ValidatedMir<'_>,
+    interner: &Interner,
+    device_function_metadata: &MirDeviceFunctionMetadataMap,
+) -> Result<HostPartition, HostPartitionError> {
     let (device_program, _semantics, _steps) = build_device_program(
         validated,
         interner,
@@ -252,6 +278,7 @@ pub fn derive_host_partition(
         None,
         DeviceProgramLifetime::SingleRun,
         0,
+        device_function_metadata,
     )
     .map_err(HostPartitionError::from)?;
     let program = validated.program();
