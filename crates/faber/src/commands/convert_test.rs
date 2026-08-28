@@ -359,7 +359,7 @@ fn convert_round_trip_retains_named_conversion_fn_en_la_en() {
         "canonical en emit must keep the named conversion fn with its marker:\n{canonical_en}"
     );
     assert!(
-        canonical_en.contains("return variant Wrapped {payload = detail}"),
+        canonical_en.contains("return variant Wrapped { payload = detail }"),
         "canonical en emit must keep the conversion body:\n{canonical_en}"
     );
     assert!(
@@ -383,7 +383,7 @@ fn convert_round_trip_retains_named_conversion_fn_en_la_en() {
         "la emit must keep the named conversion fn with its marker:\n{la_source}"
     );
     assert!(
-        la_source.contains("redde finge Wrapped {payload = detail}"),
+        la_source.contains("redde finge Wrapped { payload = detail }"),
         "la emit must keep the conversion body:\n{la_source}"
     );
     assert!(
