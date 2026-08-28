@@ -423,6 +423,42 @@ functio apply(matrix<f32, [2, 2]> m, vector<f32, 2> v) → vector<f32, 2> {
 }
 
 #[test]
+fn lowers_matrix_transpone_to_cell_permutation() {
+    let dump = dump_source(
+        r"
+functio swap(matrix<f32, [2, 2]> m) → matrix<f32, [2, 2]> {
+    redde m.transpone()
+}
+",
+    );
+
+    assert!(dump.contains("construct matrix"), "{dump}");
+    assert!(dump.contains("_0.cell0_1"), "{dump}");
+    assert!(dump.contains("_0.cell1_0"), "{dump}");
+    assert!(!dump.contains("*"), "transpose is a pure permutation, no arithmetic\n{dump}");
+    assert!(!dump.contains("matrix method before MIR lowering"), "{dump}");
+}
+
+#[test]
+fn lowers_matrix_transpone_non_square_swaps_shape() {
+    let dump = dump_source(
+        r"
+functio swap(matrix<f32, [2, 3]> m) → matrix<f32, [3, 2]> {
+    redde m.transpone()
+}
+",
+    );
+
+    // Result [3, 2]: row-major fields visit receiver cells column-major.
+    assert!(dump.contains("construct matrix"), "{dump}");
+    assert!(
+        dump.contains("[_0.cell0_0, _0.cell1_0, _0.cell0_1, _0.cell1_1, _0.cell0_2, _0.cell1_2]"),
+        "transpose [2,3]→[3,2] must permute receiver cells column-major\n{dump}"
+    );
+    assert!(!dump.contains("matrix method before MIR lowering"), "{dump}");
+}
+
+#[test]
 fn lowers_vector_longitudo_to_sqrt_of_dot() {
     // R-W3-lane (wave3 residual C-1): assert the full sum-of-squares structure.
     // The prior `contains(".lane0")` OR-fallback was near-vacuous for any vector dump.

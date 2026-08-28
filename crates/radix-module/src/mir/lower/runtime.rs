@@ -829,6 +829,13 @@ impl FunctionBuilder<'_> {
             let result_ty = self.expr_ty(expr)?;
             return Some(self.lower_matrix_inversa(lhs, rows, columns, elem_ty, matrix_ty, result_ty, expr));
         }
+        if method_name == "transpone" {
+            if !args.is_empty() {
+                return None;
+            }
+            let result_ty = self.expr_ty(expr)?;
+            return Some(self.lower_matrix_transpone(lhs, rows, columns, result_ty, expr));
+        }
 
         let [arg] = args else {
             return None;
@@ -1004,6 +1011,30 @@ impl FunctionBuilder<'_> {
             MirAggregateKind::Vector,
             MirAggregateFields::Ordered(fields),
             vector_ty,
+            expr.span,
+        )
+    }
+
+    /// Matrix transpose: `[R, C] → [C, R]`. Result cell `(c, r)` reads
+    /// receiver cell `(r, c)` — a pure operand permutation, no arithmetic.
+    fn lower_matrix_transpone(
+        &mut self,
+        matrix: MirPlace,
+        rows: u8,
+        columns: u8,
+        result_ty: MirType,
+        expr: &HirExpression,
+    ) -> MirOperand {
+        let mut fields = Vec::with_capacity(usize::from(rows) * usize::from(columns));
+        for column in 0..columns {
+            for row in 0..rows {
+                fields.push(MirAggregateItem::Operand(matrix_cell_operand(&matrix, row, column)));
+            }
+        }
+        self.construct_temp(
+            MirAggregateKind::Matrix,
+            MirAggregateFields::Ordered(fields),
+            result_ty,
             expr.span,
         )
     }
