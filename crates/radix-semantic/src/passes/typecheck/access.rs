@@ -508,7 +508,7 @@ impl TypeChecker<'_> {
     /// S0-G8: `Type::Applied` size arguments bind magnitudo slots exactly as
     /// construction does (S0-G1) — `Box<3>` fields surface with width 3.
     /// Non-applied receivers keep the declared field type unchanged.
-    fn applied_field_type(
+    pub(super) fn applied_field_type(
         &mut self,
         object_ty: TypeId,
         struct_def: DefId,

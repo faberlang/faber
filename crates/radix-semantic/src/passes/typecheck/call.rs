@@ -485,6 +485,21 @@ impl TypeChecker<'_> {
             return ret;
         }
 
+        // A member callee normally names a method, but lowering preserves the
+        // same MethodCall shape for a function-valued struct field. Probe the
+        // field only after method lookup so an explicit method always wins.
+        if let Some(field_ty) = self.lookup_field_type(receiver_ty, *name) {
+            if let Some(sig) = self.signature_from_type(field_ty) {
+                return self.check_instantiated_call(
+                    &sig,
+                    explicit_type_args,
+                    args,
+                    receiver.span,
+                    expected,
+                );
+            }
+        }
+
         // U1R common-member rule: a `∪` receiver calls a method only when
         // every constituent declares it with one agreeing signature — a real
         // signature, not the permissive sink this path used to fall through
