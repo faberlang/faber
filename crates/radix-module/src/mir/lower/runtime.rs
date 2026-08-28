@@ -160,6 +160,12 @@ impl FunctionBuilder<'_> {
                 if crate::intrinsics::mir_is_higher_order_lista(entry) {
                     let closure = &args[0].expr;
                     return match entry.mir_kind {
+                        crate::intrinsics::IntrinsicMirKind::HigherOrderAll => {
+                            self.lower_omnia(receiver, closure, expr)
+                        }
+                        crate::intrinsics::IntrinsicMirKind::HigherOrderAny => {
+                            self.lower_quilibet(receiver, closure, expr)
+                        }
                         crate::intrinsics::IntrinsicMirKind::HigherOrderFiltrata => {
                             self.lower_filtrata(receiver, closure, expr)
                         }
