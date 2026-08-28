@@ -459,9 +459,20 @@ fn probe(source: &str, session: &Session) -> ProbeOutcome {
 /// (direction 1 ∪ direction 3). Each row cites the unit that removes it — MC2
 /// armed the numeric-unary family, MC3 armed `Vector.crea`. The 11 AIR-lane
 /// rows were dispositioned by MC4 onto `AIR_LANE_CLASSES` (ruled design
-/// surface, not worklist entries). MC3 landed the last ratchet row — the
-/// allowlist is EMPTY: the mir-completeness implementation surface is done.
-const RATCHET: &[(&str, &str)] = &[];
+/// surface, not worklist entries). MC3 emptied the ratchet; S0-G9
+/// (a7d731ec0) re-grew it by one with a semantic-only Matrix `transpone`
+/// admission whose MIR lowering unit is still owed.
+const RATCHET: &[(&str, &str)] = &[
+    // S0-G9 (a7d731ec0) admitted the Matrix `transpone` registry row
+    // semantic-only (typecheck publishes the swapped shape); the MIR lowerer
+    // has no dispatch for it yet (unlike `inversa`/`applica`, which own
+    // dedicated lower_matrix_* units). Real gap, not corpus drift — needs an
+    // MIR lowering unit before this row comes off the ratchet.
+    (
+        "Matrix.transpone/0",
+        "S0-G9 a7d731ec0: Matrix transpone registry row admitted semantic-only; MIR lowerer dispatch missing",
+    ),
+];
 
 /// Permanent AIR-lane class list (goal mir-completeness §1 direction 3) — the
 /// 11 DOCUMENT-AS-DESIGNED rows moved off the ratchet by MC4. A design fact,

@@ -6,7 +6,7 @@
   "generatedBy": "radix/scripta/emit-compat-json.py",
   "summary": {
     "capable": 6,
-    "analyzable": 336
+    "analyzable": 337
   },
   "terms": [
     {
@@ -899,6 +899,12 @@
     },
     {
       "term": "requirit",
+      "rule": "keyword",
+      "capable": 0,
+      "analyzable": 1
+    },
+    {
+      "term": "reice",
       "rule": "keyword",
       "capable": 0,
       "analyzable": 1
