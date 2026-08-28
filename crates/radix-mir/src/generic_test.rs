@@ -625,9 +625,10 @@ fn canonical_index_collapses_structurally_equal_shapes() {
 // ── Phase-4 producer fact: shape-size scalar substitution ────────────────
 
 use crate::{
-    MirAggregateKind, MirBlock, MirBlockId, MirCallee, MirFunctionId, MirLocalId, MirPlace,
-    MirPlaceBase, MirProjection, MirRuntimeCall, MirStatement, MirStatementKind, MirSwitchCase,
-    MirTerminator, MirTerminatorKind, MirValue, MirValueId, MirValueKind,
+    MirAggregateKind, MirBlock, MirBlockId, MirCallee, MirConversion, MirConversionFlavor,
+    MirFunctionId, MirLocalId, MirPlace, MirPlaceBase, MirProjection, MirRuntimeCall, MirStatement,
+    MirStatementKind, MirSwitchCase, MirTempId, MirTerminator, MirTerminatorKind, MirValue,
+    MirValueId, MirValueKind,
 };
 
 fn shape_test_function(blocks: Vec<MirBlock>) -> MirFunction {
@@ -811,6 +812,126 @@ fn substitute_shape_size_rewrites_every_operand_position() {
     // 1.0 (rhs) + 16.0 (product) + 8.0 + 2.0 (axes) + 2.0 (negative axis)
     // + 16.0 (aggregate) + 16.0 (index projection) + 16.0 (switch case).
     assert_all_floats(&mut function, &[1.0, 16.0, 8.0, 2.0, 2.0, 16.0, 16.0, 16.0]);
+}
+
+#[test]
+fn tensor_from_flat_shape_size_uses_finalized_result_shape() {
+    let mut types = TypeTable::new();
+    let element = f32_ty(&mut types);
+    let numerus = types.primitive(Primitive::Numerus);
+    let four = types.intern_index(IndexExpr::Literal(4));
+    let eight = types.intern_index(IndexExpr::Literal(8));
+    let target_shape = types.intern_index(IndexExpr::Tuple(vec![four, eight]));
+    let stale_shape = types.intern_index(IndexExpr::Param(Symbol(999)));
+    let tensor_ty = MirType::semantic(types.tensor_with_shape(element, target_shape));
+    let numerus_ty = MirType::semantic(numerus);
+
+    let mut function = shape_test_function(vec![MirBlock {
+        id: MirBlockId(0),
+        statements: vec![
+            MirStatement {
+                kind: MirStatementKind::Construct {
+                    destination: MirPlace {
+                        base: MirPlaceBase::Temp(MirTempId(0)),
+                        projections: Vec::new(),
+                    },
+                    aggregate: crate::MirAggregate {
+                        kind: MirAggregateKind::Array,
+                        ty: numerus_ty,
+                        fields: crate::MirAggregateFields::Ordered(vec![
+                            crate::MirAggregateItem::Operand(MirOperand::Temp(MirTempId(1))),
+                            crate::MirAggregateItem::Operand(MirOperand::Temp(MirTempId(2))),
+                        ]),
+                    },
+                },
+                span: Span::default(),
+            },
+            MirStatement {
+                kind: MirStatementKind::RuntimeCall {
+                    destination: Some(MirPlace {
+                        base: MirPlaceBase::Temp(MirTempId(1)),
+                        projections: Vec::new(),
+                    }),
+                    call: MirRuntimeCall {
+                        intrinsic: MirIntrinsic::Convert(MirConversion {
+                            flavor: MirConversionFlavor::Runtime,
+                            source_ty: MirType::semantic(types.primitive(Primitive::Fractus)),
+                            target_ty: numerus_ty,
+                            params: Vec::new(),
+                            recovery: None,
+                            struct_defaults: Vec::new(),
+                        }),
+                        args: vec![shape_size(stale_shape, Some(0))],
+                        return_ty: numerus_ty,
+                    },
+                },
+                span: Span::default(),
+            },
+            MirStatement {
+                kind: MirStatementKind::RuntimeCall {
+                    destination: Some(MirPlace {
+                        base: MirPlaceBase::Temp(MirTempId(2)),
+                        projections: Vec::new(),
+                    }),
+                    call: MirRuntimeCall {
+                        intrinsic: MirIntrinsic::Convert(MirConversion {
+                            flavor: MirConversionFlavor::Runtime,
+                            source_ty: MirType::semantic(types.primitive(Primitive::Fractus)),
+                            target_ty: numerus_ty,
+                            params: Vec::new(),
+                            recovery: None,
+                            struct_defaults: Vec::new(),
+                        }),
+                        args: vec![shape_size(stale_shape, Some(1))],
+                        return_ty: numerus_ty,
+                    },
+                },
+                span: Span::default(),
+            },
+            MirStatement {
+                kind: MirStatementKind::RuntimeCall {
+                    destination: None,
+                    call: MirRuntimeCall {
+                        intrinsic: MirIntrinsic::Collection(MirCollectionOp::TensorFromFlat),
+                        args: vec![
+                            MirOperand::Constant(MirConstant::Unit),
+                            MirOperand::Constant(MirConstant::Unit),
+                            MirOperand::Temp(MirTempId(0)),
+                        ],
+                        return_ty: tensor_ty,
+                    },
+                },
+                span: Span::default(),
+            },
+        ],
+        terminator: MirTerminator {
+            kind: MirTerminatorKind::Return(None),
+            span: Span::default(),
+        },
+        span: Span::default(),
+    }]);
+    function.return_ty = tensor_ty;
+
+    assert!(
+        substitute_tensor_from_flat_shape_size_constants(
+            &mut types,
+            &mut function,
+            &MirShapeBindings::default(),
+        ),
+        "a finalized TensorFromFlat result supplies the concrete shape"
+    );
+    assert!(!function_contains_shape_size(&mut function));
+    let constants = collect_constants(&mut function);
+    assert!(
+        constants
+            .iter()
+            .filter_map(|constant| match constant {
+                MirConstant::Float(value) => Some(*value),
+                _ => None,
+            })
+            .eq([4.0, 8.0]),
+        "both shape axes must fold from the result shape, got {constants:?}"
+    );
 }
 
 #[test]

@@ -2,9 +2,10 @@ use super::*;
 use crate::{
     MirAggregate, MirAggregateFields, MirAggregateItem, MirAggregateKind, MirBinOp, MirBlock,
     MirBlockId, MirCallee, MirCollectionOp, MirConstant, MirFunction, MirFunctionId, MirGradientOp,
-    MirIntrinsic, MirLocal, MirLocalId, MirNamedOperand, MirOperand, MirPlace, MirPlaceBase,
-    MirProgram, MirProjection, MirRuntimeCall, MirStatement, MirStatementKind, MirSwitchCase,
-    MirTerminator, MirTerminatorKind, MirType, MirUnOp, MirValue, MirValueId, MirValueKind,
+    MirIntrinsic, MirLocal, MirLocalId, MirNamedOperand, MirOperand, MirParam, MirParamMode,
+    MirPlace, MirPlaceBase, MirProgram, MirProjection, MirRuntimeCall, MirStatement,
+    MirStatementKind, MirSwitchCase, MirTerminator, MirTerminatorKind, MirType, MirUnOp, MirValue,
+    MirValueId, MirValueKind,
 };
 use radix_hir::DefId;
 use radix_lexer::{Span, Symbol};
@@ -3354,4 +3355,225 @@ fn bounded_octeti_local_validates_as_leaf_carrier() {
     };
     let errors = validate(&program, &types);
     assert!(errors.is_empty(), "expected no errors, got: {errors:?}");
+}
+
+// -----------------------------------------------------------------------
+// MMG-D1 — surface 4, first boundary: run-depth shape witness red
+// -----------------------------------------------------------------------
+
+/// Build the smallest direct-MIR call that matches the CTP-3 run-depth red:
+/// six concrete `[4, 4]` tensors are passed to a generic `[N, N]` signature,
+/// and the concrete destination is checked against the same symbolic return.
+fn mlp_shape_mismatch_program(types: &mut TypeTable) -> MirProgram {
+    let element = types.sized_numeric(Primitive::Fractus, NumericWidth::F32);
+    let n = types.intern_index(IndexExpr::Param(Symbol(900)));
+    let symbolic_shape = types.intern_index(IndexExpr::Tuple(vec![n, n]));
+    let expected = MirType::semantic(types.tensor_with_shape(element, symbolic_shape));
+    let four = types.intern_index(IndexExpr::Literal(4));
+    let actual_shape = types.intern_index(IndexExpr::Tuple(vec![four, four]));
+    let actual = MirType::semantic(types.tensor_with_shape(element, actual_shape));
+    let vacuum = MirType::semantic(types.primitive(Primitive::Vacuum));
+
+    let callee = MirFunction {
+        id: MirFunctionId(1),
+        source: None,
+        name: None,
+        params: (0..6)
+            .map(|index| MirParam {
+                local: MirLocalId(index),
+                name: None,
+                ty: expected,
+                mode: MirParamMode::Owned,
+                span: Span::default(),
+            })
+            .collect(),
+        locals: Vec::new(),
+        temps: Vec::new(),
+        blocks: vec![MirBlock {
+            id: MirBlockId(0),
+            statements: Vec::new(),
+            terminator: MirTerminator {
+                kind: MirTerminatorKind::Unreachable,
+                span: Span::default(),
+            },
+            span: Span::default(),
+        }],
+        return_ty: expected,
+        error_ty: None,
+        is_async: false,
+        is_generator: false,
+        shader_stage: None,
+        span: Span::default(),
+    };
+
+    let caller = MirFunction {
+        id: MirFunctionId(0),
+        source: None,
+        name: None,
+        params: Vec::new(),
+        locals: (0..7)
+            .map(|index| MirLocal {
+                id: MirLocalId(index),
+                name: None,
+                ty: actual,
+                mutable: false,
+                span: Span::default(),
+            })
+            .collect(),
+        temps: Vec::new(),
+        blocks: vec![MirBlock {
+            id: MirBlockId(0),
+            statements: vec![MirStatement {
+                kind: MirStatementKind::Call {
+                    destination: Some(MirPlace {
+                        base: MirPlaceBase::Local(MirLocalId(6)),
+                        projections: Vec::new(),
+                    }),
+                    callee: MirCallee::Function(MirFunctionId(1)),
+                    args: (0..6)
+                        .map(|index| {
+                            MirOperand::Place(MirPlace {
+                                base: MirPlaceBase::Local(MirLocalId(index)),
+                                projections: Vec::new(),
+                            })
+                        })
+                        .collect(),
+                },
+                span: Span::default(),
+            }],
+            terminator: MirTerminator {
+                kind: MirTerminatorKind::Return(None),
+                span: Span::default(),
+            },
+            span: Span::default(),
+        }],
+        return_ty: vacuum,
+        error_ty: None,
+        is_async: false,
+        is_generator: false,
+        shader_stage: None,
+        span: Span::default(),
+    };
+
+    MirProgram {
+        functions: vec![caller, callee],
+    }
+}
+
+fn mlp_shape_try_call_program(types: &mut TypeTable) -> MirProgram {
+    let mut program = mlp_shape_mismatch_program(types);
+    let statement = program.functions[0].blocks[0]
+        .statements
+        .pop()
+        .expect("shape fixture has a call statement");
+    let MirStatementKind::Call {
+        destination,
+        callee,
+        args,
+    } = statement.kind
+    else {
+        panic!("shape fixture statement is not a call");
+    };
+    let vacuum = MirType::semantic(types.primitive(Primitive::Vacuum));
+    program.functions[1].error_ty = Some(vacuum);
+    program.functions[0].locals.push(MirLocal {
+        id: MirLocalId(7),
+        ty: vacuum,
+        name: None,
+        mutable: false,
+        span: Span::default(),
+    });
+    program.functions[0].blocks[0].terminator.kind = MirTerminatorKind::TryCall {
+        destination,
+        callee,
+        args,
+        ok_block: MirBlockId(1),
+        error_place: MirPlace {
+            base: MirPlaceBase::Local(MirLocalId(7)),
+            projections: Vec::new(),
+        },
+        error_block: MirBlockId(2),
+    };
+    for id in [MirBlockId(1), MirBlockId(2)] {
+        program.functions[0].blocks.push(MirBlock {
+            id,
+            statements: Vec::new(),
+            terminator: MirTerminator {
+                kind: MirTerminatorKind::Return(None),
+                span: Span::default(),
+            },
+            span: Span::default(),
+        });
+    }
+    program
+}
+
+#[test]
+fn mlp_shape_witness_binds_through_ordinary_call_args_and_destination() {
+    let mut types = TypeTable::new();
+    let program = mlp_shape_mismatch_program(&mut types);
+    let table_size = (types.type_count(), types.index_count());
+    let messages = validate(&program, &types);
+    assert!(
+        messages.is_empty(),
+        "expected shape witness binding, got: {messages:?}"
+    );
+    assert_eq!(
+        (types.type_count(), types.index_count()),
+        table_size,
+        "validation must not intern shape types or indices"
+    );
+}
+
+#[test]
+fn mlp_shape_witness_binds_through_try_call_args_and_destination() {
+    let mut types = TypeTable::new();
+    let messages = validate(&mlp_shape_try_call_program(&mut types), &types);
+    assert!(
+        messages.is_empty(),
+        "expected shape witness binding, got: {messages:?}"
+    );
+}
+
+#[test]
+fn mlp_shape_wrong_shape_call_preserves_argument_mismatch() {
+    let mut types = TypeTable::new();
+    let mut program = mlp_shape_mismatch_program(&mut types);
+    let element = types.sized_numeric(Primitive::Fractus, NumericWidth::F32);
+    let eight = types.intern_index(IndexExpr::Literal(8));
+    let wrong_shape = types.intern_index(IndexExpr::Tuple(vec![eight, eight]));
+    let wrong = MirType::semantic(types.tensor_with_shape(element, wrong_shape));
+    program.functions[1]
+        .params
+        .iter_mut()
+        .for_each(|param| param.ty = wrong);
+    program.functions[1].return_ty = wrong;
+
+    let messages = validate(&program, &types);
+    let expected = (0..6)
+        .map(|index| {
+            format!(
+                "call argument type mismatch (arg {index}: expected tensor<fractus<f32>, [8, 8]>, got tensor<fractus<f32>, [4, 4]>)"
+            )
+        })
+        .chain(std::iter::once("destination type mismatch".to_owned()))
+        .collect::<Vec<_>>();
+    assert_eq!(messages, expected);
+}
+
+#[test]
+fn mlp_shape_destination_mismatch_preserves_structured_issue() {
+    let mut types = TypeTable::new();
+    let mut program = mlp_shape_mismatch_program(&mut types);
+    let element = types.sized_numeric(Primitive::Fractus, NumericWidth::F32);
+    let eight = types.intern_index(IndexExpr::Literal(8));
+    let wrong_shape = types.intern_index(IndexExpr::Tuple(vec![eight, eight]));
+    program.functions[0].locals[6].ty =
+        MirType::semantic(types.tensor_with_shape(element, wrong_shape));
+
+    let messages = validate(&program, &types);
+    assert_eq!(
+        messages,
+        vec!["destination type mismatch", "destination type mismatch"]
+    );
 }
