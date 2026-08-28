@@ -159,25 +159,11 @@ pub fn compose_with_metadata(
     pass.errors
 }
 
-/// Device call sites that remain in `functions`. The mutation-test gate.
+/// Device call sites that remain in `functions`, using the explicit
+/// synthetic-kernel metadata carrier.
 ///
 /// Only device callers are scanned: a host caller's call to a device entry
 /// is the launch/partition boundary, not a composition survivor.
-#[must_use]
-pub fn surviving_fragment_calls(
-    functions: &[MirFunction],
-    monomorphizations: &[MirMonomorphization],
-    roles: &FxHashMap<DefId, MirDeviceRole>,
-) -> Vec<(MirFunctionId, Span)> {
-    surviving_fragment_calls_with_metadata(
-        functions,
-        monomorphizations,
-        roles,
-        &MirDeviceFunctionMetadataMap::default(),
-    )
-}
-
-/// [`surviving_fragment_calls`] with the synthetic-kernel metadata carrier.
 #[must_use]
 pub fn surviving_fragment_calls_with_metadata(
     functions: &[MirFunction],
@@ -202,21 +188,6 @@ pub fn surviving_fragment_calls_with_metadata(
 }
 
 /// Fail-closed gate: any remaining device call is a composition error.
-#[must_use]
-pub fn reject_surviving_fragment_calls(
-    functions: &[MirFunction],
-    monomorphizations: &[MirMonomorphization],
-    roles: &FxHashMap<DefId, MirDeviceRole>,
-) -> Vec<FragmentCompositionError> {
-    reject_surviving_fragment_calls_with_metadata(
-        functions,
-        monomorphizations,
-        roles,
-        &MirDeviceFunctionMetadataMap::default(),
-    )
-}
-
-/// [`reject_surviving_fragment_calls`] with the synthetic-kernel metadata carrier.
 #[must_use]
 pub fn reject_surviving_fragment_calls_with_metadata(
     functions: &[MirFunction],

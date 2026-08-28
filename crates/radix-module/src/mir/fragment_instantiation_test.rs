@@ -727,7 +727,13 @@ functio outer(fractus<f32> x) → fractus<f32> {
     let roles = crate::mir::device_roles_from_hir(&analysis.hir);
     let lowered = crate::mir::lower_analyzed_unit(&mut analysis, Default::default()).expect("Entry→Entry must compose");
     assert!(
-        crate::mir::fragment_composition::surviving_fragment_calls(&lowered.program.functions, &[], &roles).is_empty(),
+        crate::mir::fragment_composition::surviving_fragment_calls_with_metadata(
+            &lowered.program.functions,
+            &[],
+            &roles,
+            &crate::mir::MirDeviceFunctionMetadataMap::default(),
+        )
+        .is_empty(),
         "no device call may survive composition: {:#?}",
         lowered.program.functions
     );
@@ -753,7 +759,13 @@ functio k(fractus<f32> x) → fractus<f32> {
     let lowered =
         crate::mir::lower_analyzed_unit(&mut analysis, Default::default()).expect("legal Entry→Fragment must compose");
     assert!(
-        crate::mir::fragment_composition::surviving_fragment_calls(&lowered.program.functions, &[], &roles).is_empty(),
+        crate::mir::fragment_composition::surviving_fragment_calls_with_metadata(
+            &lowered.program.functions,
+            &[],
+            &roles,
+            &crate::mir::MirDeviceFunctionMetadataMap::default(),
+        )
+        .is_empty(),
         "staging-gate rejection narrowed to composition success"
     );
 }

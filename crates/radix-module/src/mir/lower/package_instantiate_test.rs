@@ -616,10 +616,11 @@ fn imported_device_call_composes_at_merged_seam() {
         .map(|(source, _route)| (*source, crate::mir::MirDeviceRole::Kernel))
         .collect::<FxHashMap<_, _>>();
     assert!(
-        crate::mir::fragment_composition::surviving_fragment_calls(
+        crate::mir::fragment_composition::surviving_fragment_calls_with_metadata(
             &program.functions,
             &monomorphizations,
-            &device_roles
+            &device_roles,
+            &crate::mir::MirDeviceFunctionMetadataMap::default(),
         )
         .is_empty(),
         "no device call may survive merged composition: {:#?}",
@@ -769,10 +770,11 @@ fn consumer_local_only_package_composes_at_the_union_gate() {
 
     assert!(registrations.is_empty(), "no imported routes means no registrations");
     assert!(
-        crate::mir::fragment_composition::surviving_fragment_calls(
+        crate::mir::fragment_composition::surviving_fragment_calls_with_metadata(
             &program.functions,
             &monomorphizations,
-            &consumer_local_roles()
+            &consumer_local_roles(),
+            &crate::mir::MirDeviceFunctionMetadataMap::default(),
         )
         .is_empty(),
         "the consumer-local caller's device call must compose: {:#?}",

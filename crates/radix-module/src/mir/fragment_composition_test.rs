@@ -1,8 +1,8 @@
 //! Coverage for nucleum-fragment MIR composition.
 
 use super::{
-    compose, compose_with_metadata, reject_surviving_fragment_calls, reject_surviving_fragment_calls_with_metadata,
-    surviving_fragment_calls, surviving_fragment_calls_with_metadata, ExpansionBudget, ISSUE_CYCLE, ISSUE_EXPANSION,
+    compose, compose_with_metadata, reject_surviving_fragment_calls_with_metadata,
+    surviving_fragment_calls_with_metadata, ExpansionBudget, ISSUE_CYCLE, ISSUE_EXPANSION,
 };
 use crate::diagnostics::{semantic_message, DiagnosticArg};
 use crate::driver::{self, AnalyzeRequest, Config, Session};
@@ -163,7 +163,7 @@ fn compose_fns(functions: &mut Vec<MirFunction>) -> Vec<super::FragmentCompositi
 }
 
 fn fragment_call_count(functions: &[MirFunction]) -> usize {
-    surviving_fragment_calls(functions, &[], &roles()).len()
+    surviving_fragment_calls_with_metadata(functions, &[], &roles(), &MirDeviceFunctionMetadataMap::default()).len()
 }
 
 #[test]
@@ -178,7 +178,12 @@ fn mutation_surviving_call_fires_the_gate() {
         1,
         "uncomposed MIR must retain the fragment call"
     );
-    let errors = reject_surviving_fragment_calls(&functions, &[], &roles());
+    let errors = reject_surviving_fragment_calls_with_metadata(
+        &functions,
+        &[],
+        &roles(),
+        &MirDeviceFunctionMetadataMap::default(),
+    );
     assert!(
         errors
             .iter()
@@ -603,7 +608,13 @@ functio k(fractus<f32> x) → fractus<f32> {
     let roles = crate::mir::device_roles_from_hir(&analysis.hir);
     let lowered = crate::mir::lower_analyzed_unit(&mut analysis, Default::default()).expect("composition must succeed");
     assert!(
-        surviving_fragment_calls(&lowered.program.functions, &[], &roles).is_empty(),
+        surviving_fragment_calls_with_metadata(
+            &lowered.program.functions,
+            &[],
+            &roles,
+            &MirDeviceFunctionMetadataMap::default(),
+        )
+        .is_empty(),
         "no fragment call may survive lowering: {:#?}",
         lowered.program.functions
     );
@@ -940,7 +951,13 @@ functio k(fractus<f32> x) → fractus<f32> {
     let lowered =
         crate::mir::lower_analyzed_unit(&mut analysis, Default::default()).expect("kernel helper must compose");
     assert!(
-        surviving_fragment_calls(&lowered.program.functions, &[], &roles).is_empty(),
+        surviving_fragment_calls_with_metadata(
+            &lowered.program.functions,
+            &[],
+            &roles,
+            &MirDeviceFunctionMetadataMap::default(),
+        )
+        .is_empty(),
         "no device call may survive lowering: {:#?}",
         lowered.program.functions
     );

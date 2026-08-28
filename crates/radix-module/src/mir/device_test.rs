@@ -2320,7 +2320,13 @@ functio k(fractus<f32> x) → fractus<f32> {
     let lowered =
         crate::mir::lower_analyzed_unit(&mut analysis, Default::default()).expect("legal fragment call must compose");
     assert!(
-        crate::mir::fragment_composition::surviving_fragment_calls(&lowered.program.functions, &[], &roles).is_empty(),
+        crate::mir::fragment_composition::surviving_fragment_calls_with_metadata(
+            &lowered.program.functions,
+            &[],
+            &roles,
+            &crate::mir::MirDeviceFunctionMetadataMap::default(),
+        )
+        .is_empty(),
         "no fragment call may survive composition"
     );
 }

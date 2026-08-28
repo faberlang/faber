@@ -4,7 +4,7 @@
 //! Fragments have no standalone runtime identity, so no fixture here emits a
 //! fragment alone.
 
-use super::{surviving_fragment_calls, ExpansionBudget, ISSUE_CYCLE, ISSUE_EXPANSION};
+use super::{surviving_fragment_calls_with_metadata, ExpansionBudget, ISSUE_CYCLE, ISSUE_EXPANSION};
 use crate::diagnostics::Diagnostic;
 use crate::driver::{self, AnalyzeRequest, Config, Session};
 use crate::lexer::Span;
@@ -126,7 +126,13 @@ fn assert_composed(source: &str) {
     let (analysis, lowered) = lower(source).unwrap_or_else(|errors| panic!("legal wrapper must compose: {errors:?}"));
     let roles = device_roles_from_hir(&analysis.hir);
     assert!(
-        surviving_fragment_calls(&lowered.functions, &[], &roles).is_empty(),
+        surviving_fragment_calls_with_metadata(
+            &lowered.functions,
+            &[],
+            &roles,
+            &crate::mir::MirDeviceFunctionMetadataMap::default(),
+        )
+        .is_empty(),
         "no fragment call may survive the wrapper route: {:#?}",
         lowered.functions
     );
@@ -186,7 +192,13 @@ functio k() → u32 {
             .any(|param| param.mode == MirParamMode::Lane),
         "fragment lane propagation must add the entry ABI position parameter: {entry:#?}"
     );
-    assert!(surviving_fragment_calls(&lowered.functions, &[], &device_roles_from_hir(&analysis.hir)).is_empty());
+    assert!(surviving_fragment_calls_with_metadata(
+        &lowered.functions,
+        &[],
+        &device_roles_from_hir(&analysis.hir),
+        &crate::mir::MirDeviceFunctionMetadataMap::default(),
+    )
+    .is_empty());
 }
 
 #[test]
@@ -226,7 +238,13 @@ functio k() → u32 {
         1,
         "fragment lane storage must resolve to the caller's one position local: {entry:#?}"
     );
-    assert!(surviving_fragment_calls(&lowered.functions, &[], &device_roles_from_hir(&analysis.hir)).is_empty());
+    assert!(surviving_fragment_calls_with_metadata(
+        &lowered.functions,
+        &[],
+        &device_roles_from_hir(&analysis.hir),
+        &crate::mir::MirDeviceFunctionMetadataMap::default(),
+    )
+    .is_empty());
 }
 
 #[test]
@@ -253,7 +271,13 @@ functio k() → u32 {
         .params
         .iter()
         .all(|param| param.mode != MirParamMode::LaneInherited));
-    assert!(surviving_fragment_calls(&lowered.functions, &[], &device_roles_from_hir(&analysis.hir)).is_empty());
+    assert!(surviving_fragment_calls_with_metadata(
+        &lowered.functions,
+        &[],
+        &device_roles_from_hir(&analysis.hir),
+        &crate::mir::MirDeviceFunctionMetadataMap::default(),
+    )
+    .is_empty());
 }
 
 #[test]
@@ -442,7 +466,13 @@ functio outer(fractus<f32> x) → fractus<f32> {
     let (analysis, lowered) = lower(source).unwrap_or_else(|errors| panic!("entry→helper must compose: {errors:?}"));
     let roles = device_roles_from_hir(&analysis.hir);
     assert!(
-        surviving_fragment_calls(&lowered.functions, &[], &roles).is_empty(),
+        surviving_fragment_calls_with_metadata(
+            &lowered.functions,
+            &[],
+            &roles,
+            &crate::mir::MirDeviceFunctionMetadataMap::default(),
+        )
+        .is_empty(),
         "no device call may survive kernel-helper composition: {:#?}",
         lowered.functions
     );
@@ -582,7 +612,13 @@ functio k(fractus<f32> x) → fractus<f32> {
     let (analysis, lowered) =
         lower(source).unwrap_or_else(|errors| panic!("eval-once fixture must compose: {errors:?}"));
     let roles = device_roles_from_hir(&analysis.hir);
-    assert!(surviving_fragment_calls(&lowered.functions, &[], &roles).is_empty());
+    assert!(surviving_fragment_calls_with_metadata(
+        &lowered.functions,
+        &[],
+        &roles,
+        &crate::mir::MirDeviceFunctionMetadataMap::default(),
+    )
+    .is_empty());
     let entry = kernel_function(&lowered.functions, &analysis);
     let bind_locals: Vec<_> = entry
         .blocks
