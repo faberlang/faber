@@ -247,7 +247,7 @@ pub fn generate_from_analyzed_with_options(
             {
                 reject_rust_unsupported_types(&analysis.types)?;
 
-                let namespace_info = rust::build_file_import_namespaces(
+                let mut namespace_info = rust::build_file_import_namespaces(
                     &analysis.hir,
                     &analysis.interner,
                     &rust::ResolverImportsBridge(&analysis.resolver),
@@ -257,6 +257,24 @@ pub fn generate_from_analyzed_with_options(
                 let function_facts = rust::rust_function_facts(&analysis.function_facts);
                 let used_imports = rust::used_import_defs(&analysis.resolved_uses);
 
+                // Provider-emitted signatures decide importer call-site
+                // unwrapping: an `ad`-verb provider function emits `Result`
+                // even without a declared `⇥` channel, so widen the imported
+                // namespace effects for those members.
+                for ((def_id, member), effects) in namespace_info.function_effects.iter_mut() {
+                    let Some(modules) = namespace_info.modules.get(def_id) else {
+                        continue;
+                    };
+                    if let Some(failable_exports) = provider_modules
+                        .iter()
+                        .find(|(name, _, _)| modules.iter().any(|segment| segment == name))
+                        .map(|(_, _, failable_exports)| failable_exports)
+                    {
+                        if failable_exports.contains(member) {
+                            effects.is_failable = true;
+                        }
+                    }
+                }
                 let mut gen = rust::RustCodegen::new_with_types(&analysis.hir, &analysis.interner, &analysis.types);
                 gen.set_gpu_builtins(&gpu_builtins);
                 gen.set_function_facts(&function_facts);
@@ -266,7 +284,7 @@ pub fn generate_from_analyzed_with_options(
 
                 if !provider_modules.is_empty() {
                     let mut module_block = String::new();
-                    for (module_name, module_code) in &provider_modules {
+                    for (module_name, module_code, _failable) in &provider_modules {
                         module_block.push_str("pub mod ");
                         module_block.push_str(module_name);
                         module_block.push_str(" {\n");
@@ -476,17 +494,28 @@ fn generate_haskell_from_analyzed(_analysis: &crate::driver::AnalyzedModule) -> 
 
 /// Analyze and emit each distinct file-namespace provider binding as a module.
 #[cfg(feature = "hir-rust")]
-fn emit_provider_modules(analysis: &crate::driver::AnalyzedModule) -> Result<Vec<(String, String)>, CodegenError> {
-    use crate::hir::HirItemKind;
-    use crate::import_resolve::resolve_namespace_import;
+fn emit_provider_modules(
+    analysis: &crate::driver::AnalyzedModule,
+) -> Result<Vec<(String, String, std::collections::BTreeSet<String>)>, CodegenError> {
     use std::collections::BTreeMap;
     use std::path::Path;
 
-    // Provider imports resolve via FABER_LIBRARY_HOME; relative imports need a
-    // base path which single-file emit does not currently thread — relative
-    // modules are already inlined by package mode in `faber`.
-    let from_file = Path::new(".");
     let mut modules = BTreeMap::new();
+    collect_provider_modules(analysis, Path::new("."), &mut modules)?;
+    Ok(modules
+        .into_iter()
+        .map(|(name, (code, failable))| (name, code, failable))
+        .collect())
+}
+
+#[cfg(feature = "hir-rust")]
+fn collect_provider_modules(
+    analysis: &crate::driver::AnalyzedModule,
+    from_file: &std::path::Path,
+    modules: &mut std::collections::BTreeMap<String, (String, std::collections::BTreeSet<String>)>,
+) -> Result<(), CodegenError> {
+    use crate::hir::HirItemKind;
+    use crate::import_resolve::resolve_namespace_import;
 
     for item in &analysis.hir.items {
         let HirItemKind::Import(import) = &item.kind else {
@@ -575,12 +604,46 @@ fn emit_provider_modules(analysis: &crate::driver::AnalyzedModule) -> Result<Vec
                     ],
                 });
             }
-            let module_out = rust::generate_module(&unit.hir, &unit.types, &unit.interner)?;
-            modules.insert(module_name, module_out.code);
+            // Recurse first so nested namespace imports (norma:value →
+            // norma:text) emit their own sibling modules; the provider's own
+            // namespace calls then target `crate::<module>::…` paths that
+            // exist. The `contains_key` guard above is the cycle brake.
+            let nested_from = provider_path
+                .parent()
+                .map(std::path::Path::to_path_buf)
+                .unwrap_or_else(|| std::path::Path::new(".").to_path_buf());
+            collect_provider_modules(&unit, &nested_from, modules)?;
+            let namespace_info = rust::build_file_import_namespaces(
+                &unit.hir,
+                &unit.interner,
+                &rust::ResolverImportsBridge(&unit.resolver),
+            );
+            let module_out = radix_hir_rust::generate_with_library_registry_test_selection_and_imports(
+                radix_hir_rust::ModuleGenerationRequest {
+                    hir: &unit.hir,
+                    types: &unit.types,
+                    interner: &unit.interner,
+                    libraries: &radix_hir::LibraryRegistry::default(),
+                    test_selection: None,
+                    function_facts: None,
+                    module_mode: true,
+                    cli_program: None,
+                    imported_function_params: None,
+                    imported_namespace_info: Some(namespace_info),
+                    gpu_builtins: &[],
+                    field_name_policy: Default::default(),
+                    native_host_bootstrap: false,
+                },
+            )?;
+            // The provider's emitted signatures (not its Faber declarations)
+            // decide importer call-site unwrapping: `ad`-verb functions emit
+            // `Result` even without a declared `⇥` channel.
+            let failable_exports = radix_hir_rust::provider_failable_export_names(&unit.hir, &unit.interner);
+            modules.insert(module_name, (module_out.code, failable_exports));
         }
     }
 
-    Ok(modules.into_iter().collect())
+    Ok(())
 }
 
 /// Loose `HIR`+types entry used by unit tests and transitional callers.
