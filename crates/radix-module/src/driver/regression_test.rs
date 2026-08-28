@@ -1515,7 +1515,7 @@ fn rust_output_uses_debug_format_for_collection_scribe() {
 
     assert!(result.success());
     let output = super::rust_output(result);
-    assert!(output.code.contains("println!(\"{:?}\", names);"));
+    assert!(output.code.contains("println!(\"{names:?}\");"));
 }
 
 #[test]
@@ -1638,7 +1638,7 @@ fn rust_output_uses_format_macro_for_scriptum() {
 
     assert!(result.success());
     let output = super::rust_output(result);
-    assert!(output.code.contains("format!(\"valor: {}\""));
+    assert!(output.code.contains("println!(\"valor: {value}\");"));
 }
 
 #[test]
@@ -1653,7 +1653,9 @@ fn rust_output_uses_zero_based_numbered_scriptum_placeholders() {
 
     assert!(result.success());
     let output = super::rust_output(result);
-    assert!(output.code.contains("format!(\"ordo: {1}, {0}\""));
+    assert!(output
+        .code
+        .contains("println!(\"ordo: {second}, {first}\");"));
 }
 
 #[test]
@@ -1667,7 +1669,7 @@ fn rust_output_uses_string_literal_format_application() {
 
     assert!(result.success());
     let output = super::rust_output(result);
-    assert!(output.code.contains("format!(\"valor: {}\""));
+    assert!(output.code.contains("println!(\"valor: {value}\");"));
 }
 
 #[test]
@@ -1682,7 +1684,9 @@ fn rust_output_uses_numbered_string_literal_format_application() {
 
     assert!(result.success());
     let output = super::rust_output(result);
-    assert!(output.code.contains("format!(\"ordo: {1}, {0}\""));
+    assert!(output
+        .code
+        .contains("println!(\"ordo: {second}, {first}\");"));
 }
 
 #[test]
