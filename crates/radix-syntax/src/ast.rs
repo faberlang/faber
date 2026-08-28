@@ -135,6 +135,8 @@ pub enum StmtKind {
     Adfirma(AdfirmaStmt),
     /// `requirit` recoverable guard (en surface `require`).
     Require(RequireStmt),
+    /// `reice` recoverable reject guard (en surface `reject`).
+    Reject(RejectStmt),
     /// `nota` / `vide` / `mone` / `scribe` diagnostics.
     Scribe(ScribeStmt),
     /// `incipit` / `incipiet` entry point.
@@ -881,6 +883,17 @@ pub struct AdfirmaStmt {
 /// enters the enclosing function's `⇥ E` channel, unlike `adfirma` (fatal).
 #[derive(Debug)]
 pub struct RequireStmt {
+    pub cond: Box<Expr>,
+    pub error: Box<Expr>,
+}
+
+/// `reice <cond> iace <err>` — recoverable reject guard statement (en surface
+/// `reject <cond> throw <err>`); the boolean opposite of `requirit`.
+///
+/// Desugars to `si (cond) { iace err }` at lowering; the thrown value enters
+/// the enclosing function's `⇥ E` channel, same as `requirit`.
+#[derive(Debug)]
+pub struct RejectStmt {
     pub cond: Box<Expr>,
     pub error: Box<Expr>,
 }

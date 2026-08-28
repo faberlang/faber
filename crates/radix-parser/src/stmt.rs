@@ -642,6 +642,32 @@ impl Parser {
         Ok(StmtKind::Require(RequireStmt { cond, error }))
     }
 
+    /// Parse `reice` / `reject`.
+    ///
+    /// GRAMMAR:
+    ///   reice-stmt := `reice` expr 'iace' expr
+    ///
+    /// The boolean opposite of `requirit`: fail when the condition holds.
+    /// Same `iace` particle and mandatory error payload as `requirit`.
+    /// Lowering desugars the node to `si (cond) { iace err }`.
+    pub(super) fn parse_reject_stmt(&mut self) -> Result<StmtKind, ParseError> {
+        self.expect_keyword_ident(TokenKind::Reice, "expected 'reice'")?;
+
+        let cond = Box::new(self.parse_expression()?);
+
+        if self.check_keyword_ident(TokenKind::Secus) {
+            return Err(self.expected_statement_error("reice_else_rejected"));
+        }
+
+        if !self.eat_keyword_ident(TokenKind::Iace) {
+            return Err(self.expected_statement_error("reice_iace"));
+        }
+
+        let error = Box::new(self.parse_expression()?);
+
+        Ok(StmtKind::Reject(RejectStmt { cond, error }))
+    }
+
     // I/O AND DEBUGGING
 
     /// Parse `scribe` / `vide` / `mone` / `nota`.

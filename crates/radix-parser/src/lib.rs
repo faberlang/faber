@@ -1036,6 +1036,7 @@ impl Parser {
                         | TokenKind::Cede
                         | TokenKind::Adfirma
                         | TokenKind::Requirit
+                        | TokenKind::Reice
                         | TokenKind::Scribe
                         | TokenKind::Incipiet
                         | TokenKind::Incipit

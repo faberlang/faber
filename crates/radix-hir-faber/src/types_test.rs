@@ -50,6 +50,7 @@ impl KeywordSurface for LatinSurface {
             TokenKind::Nota => "nota",
             TokenKind::Adfirma => "adfirma",
             TokenKind::Requirit => "requirit",
+            TokenKind::Reice => "reice",
             TokenKind::Mori => "mori",
             TokenKind::Iace => "iace",
             TokenKind::Finge => "finge",

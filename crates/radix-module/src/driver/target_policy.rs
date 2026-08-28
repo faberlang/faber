@@ -193,6 +193,10 @@ fn scan_go_stmt(stmt: &Stmt, file: &str, diagnostics: &mut Vec<Diagnostic>) {
             scan_go_expr(&stmt.cond, file, diagnostics);
             scan_go_expr(&stmt.error, file, diagnostics);
         }
+        StmtKind::Reject(stmt) => {
+            scan_go_expr(&stmt.cond, file, diagnostics);
+            scan_go_expr(&stmt.error, file, diagnostics);
+        }
         StmtKind::Scribe(stmt) => {
             for arg in &stmt.args {
                 scan_go_expr(arg, file, diagnostics);
@@ -569,6 +573,10 @@ fn scan_rust_stmt(stmt: &Stmt, file: &str, diagnostics: &mut Vec<Diagnostic>) {
             }
         }
         StmtKind::Require(stmt) => {
+            scan_rust_expr(&stmt.cond, file, diagnostics);
+            scan_rust_expr(&stmt.error, file, diagnostics);
+        }
+        StmtKind::Reject(stmt) => {
             scan_rust_expr(&stmt.cond, file, diagnostics);
             scan_rust_expr(&stmt.error, file, diagnostics);
         }

@@ -2596,6 +2596,7 @@ impl KeywordPack for EnGuardPack {
         match text {
             "assert" => Some("adfirma"),
             "require" => Some("requirit"),
+            "reject" => Some("reice"),
             "throw" => Some("iace"),
             "panic" => Some("mori"),
             "else" => Some("secus"),
@@ -2731,6 +2732,43 @@ fn parses_requirit_statement() {
         en_program.statements[0].kind,
         StmtKind::Require(_)
     ));
+}
+
+#[test]
+fn parses_reice_statement() {
+    let result = parse_ok("reice verum iace \"bad\"");
+    let program = result.program.as_ref().expect("program");
+    assert_eq!(program.statements.len(), 1);
+    let StmtKind::Reject(reject_stmt) = &program.statements[0].kind else {
+        panic!("expected reice statement");
+    };
+    assert!(
+        matches!(reject_stmt.cond.kind, ExprKind::Literal(Literal::Bool(true))),
+        "cond should be the boolean literal verum"
+    );
+    assert!(matches!(reject_stmt.error.kind, ExprKind::Literal(_)));
+
+    let en = parse_ok_en("reject true throw \"bad\"");
+    let en_program = en.program.as_ref().expect("program");
+    assert_eq!(en_program.statements.len(), 1);
+    assert!(matches!(en_program.statements[0].kind, StmtKind::Reject(_)));
+}
+
+#[test]
+fn rejects_reice_without_secus_payload() {
+    assert_parse_error_matches(
+        "reice verum",
+        ParseExpectation::Args(&[("issue", "reice_iace")]),
+    );
+}
+
+#[test]
+fn rejects_reice_else() {
+    assert_parse_error_matches(
+        "reice verum secus \"bad\"",
+        ParseExpectation::Args(&[("issue", "reice_else_rejected")]),
+    );
+    assert_en_parse_error_issue("reject true else \"bad\"", "reice_else_rejected");
 }
 
 #[test]

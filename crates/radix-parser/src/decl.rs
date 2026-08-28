@@ -72,6 +72,7 @@ impl Parser {
                 Some(TokenKind::Cede) => self.parse_cede_stmt()?,
                 Some(TokenKind::Adfirma) => self.parse_adfirma_stmt()?,
                 Some(TokenKind::Requirit) => self.parse_require_stmt()?,
+                Some(TokenKind::Reice) => self.parse_reject_stmt()?,
                 // Scribe-family keywords claim statement-initial position only
                 // when not immediately followed by `(`. `nota 5` is the output
                 // statement; `nota (5)` falls through as a user call.

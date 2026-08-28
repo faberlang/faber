@@ -736,6 +736,12 @@ pub static KEYWORD_SPECS: &[KeywordSpec] = &[
         scope: KeywordScope::Contextual(CONTROL_FLOW),
         category: KeywordKind::ErrorHandling,
     },
+    KeywordSpec {
+        text: "reice",
+        token_kind: Some(TokenKind::Reice),
+        scope: KeywordScope::Contextual(CONTROL_FLOW),
+        category: KeywordKind::ErrorHandling,
+    },
     // === Keywords: Async ===
     KeywordSpec {
         text: "cede",
