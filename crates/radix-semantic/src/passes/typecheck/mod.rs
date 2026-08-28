@@ -814,6 +814,10 @@ mod summa_test;
 mod argmaxima_test;
 
 #[cfg(test)]
+#[path = "predicate_twins_test.rs"]
+mod predicate_twins_test;
+
+#[cfg(test)]
 #[path = "extremum_test.rs"]
 mod extremum_test;
 

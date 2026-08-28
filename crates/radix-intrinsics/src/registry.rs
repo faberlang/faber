@@ -122,6 +122,8 @@ pub enum IntrinsicReturnKind {
 pub enum IntrinsicMirKind {
     Collection(MirCollectionOp),
     Atomic(MirAtomicOp),
+    HigherOrderAll,
+    HigherOrderAny,
     HigherOrderFiltrata,
     HigherOrderMap,
     HigherOrderReduce,
@@ -232,10 +234,26 @@ pub static INTRINSICS: &[MethodIntrinsic] = &[
         HigherOrderMap
     ),
     intrinsic!(Lista, "omissa", 1, &[IntrinsicParamKind::NumerusIndex], ArrayInner, collection DropFirst),
+    intrinsic!(
+        Lista,
+        "omnia",
+        1,
+        &[IntrinsicParamKind::Predicate],
+        Bool,
+        HigherOrderAll
+    ),
     intrinsic!(Lista, "ordina", 0, &[], Vacuum, CodegenOnly),
     intrinsic!(Lista, "ordinata", 0, &[], ArrayInner, collection Sort),
     intrinsic!(Lista, "prima", 1, &[IntrinsicParamKind::NumerusIndex], ArrayInner, collection Take),
     intrinsic!(Lista, "primus", 0, &[], OptionInner, collection First),
+    intrinsic!(
+        Lista,
+        "quilibet",
+        1,
+        &[IntrinsicParamKind::Predicate],
+        Bool,
+        HigherOrderAny
+    ),
     intrinsic!(
         Lista,
         "reducta",

@@ -208,7 +208,9 @@ pub fn mir_collection_op(entry: &MethodIntrinsic) -> Option<MirCollectionOp> {
     match entry.mir_kind {
         IntrinsicMirKind::Collection(op) => Some(op),
         IntrinsicMirKind::Atomic(_) => None,
-        IntrinsicMirKind::HigherOrderFiltrata
+        IntrinsicMirKind::HigherOrderAll
+        | IntrinsicMirKind::HigherOrderAny
+        | IntrinsicMirKind::HigherOrderFiltrata
         | IntrinsicMirKind::HigherOrderMap
         | IntrinsicMirKind::HigherOrderReduce
         | IntrinsicMirKind::HigherOrderCumulata
@@ -222,6 +224,8 @@ pub fn mir_atomic_op(entry: &MethodIntrinsic) -> Option<MirAtomicOp> {
     match entry.mir_kind {
         IntrinsicMirKind::Atomic(op) => Some(op),
         IntrinsicMirKind::Collection(_)
+        | IntrinsicMirKind::HigherOrderAll
+        | IntrinsicMirKind::HigherOrderAny
         | IntrinsicMirKind::HigherOrderFiltrata
         | IntrinsicMirKind::HigherOrderMap
         | IntrinsicMirKind::HigherOrderReduce
@@ -235,7 +239,9 @@ pub fn mir_atomic_op(entry: &MethodIntrinsic) -> Option<MirAtomicOp> {
 pub fn mir_is_higher_order_lista(entry: &MethodIntrinsic) -> bool {
     matches!(
         entry.mir_kind,
-        IntrinsicMirKind::HigherOrderFiltrata
+        IntrinsicMirKind::HigherOrderAll
+            | IntrinsicMirKind::HigherOrderAny
+            | IntrinsicMirKind::HigherOrderFiltrata
             | IntrinsicMirKind::HigherOrderMap
             | IntrinsicMirKind::HigherOrderReduce
             | IntrinsicMirKind::HigherOrderCumulata
