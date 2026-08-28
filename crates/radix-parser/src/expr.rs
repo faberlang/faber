@@ -2027,14 +2027,14 @@ impl Parser {
             if self.check(&TokenKind::Arrow)
                 || self.check(&TokenKind::Colon)
                 || self.check(&TokenKind::LBrace)
-                || self.check_libera_marker()
+                || self.check_closure_modifier() != ClosureModifier::None
             {
                 break;
             }
 
             params.push(self.parse_clausura_param()?);
 
-            if self.check_libera_marker() {
+            if self.check_closure_modifier() != ClosureModifier::None {
                 break;
             }
             if !self.consume_item_separator_before(
@@ -2045,7 +2045,8 @@ impl Parser {
             }
         }
 
-        let libera = self.eat_libera_marker();
+        let modifier = self.eat_closure_modifier();
+        self.reject_duplicate_closure_modifier()?;
         let (ret, err) = self.parse_optional_clausura_signature()?;
 
         let body = if self.eat(&TokenKind::Colon) {
@@ -2062,7 +2063,7 @@ impl Parser {
             id,
             kind: ExprKind::Clausura(Box::new(ClausuraExpr {
                 params,
-                libera,
+                modifier,
                 ret,
                 err,
                 body,
@@ -2090,7 +2091,9 @@ impl Parser {
             Err(err)
                 if matches!(
                     err.kind,
-                    ParseErrorKind::ErgoWrongContext | ParseErrorKind::ThereforeWrongContext
+                    ParseErrorKind::ErgoWrongContext
+                        | ParseErrorKind::ThereforeWrongContext
+                        | ParseErrorKind::ModifierDuplicate
                 ) || self.tokens[saved_pos..self.pos]
                     .iter()
                     .any(|token| token.kind == TokenKind::Therefore) =>
@@ -2171,7 +2174,8 @@ impl Parser {
             vec![self.parse_clausura_param()?]
         };
 
-        let libera = self.eat_libera_marker();
+        let modifier = self.eat_closure_modifier();
+        self.reject_duplicate_closure_modifier()?;
         let (ret, err) = self.parse_optional_clausura_signature()?;
         if self.check_keyword_ident(TokenKind::Ergo) {
             return Err(ParseError::structured(
@@ -2191,7 +2195,7 @@ impl Parser {
             id,
             kind: ExprKind::Clausura(Box::new(ClausuraExpr {
                 params,
-                libera,
+                modifier,
                 ret,
                 err,
                 body,

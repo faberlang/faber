@@ -357,7 +357,7 @@ const CHOICE_GROUP: &[&str] = &["elige", "casu", "ceterum"];
 const PATTERN_CHOICE_GROUP: &[&str] = &["discerne", "casu", "ceterum"];
 const TRY_RECOVERY_GROUP: &[&str] = &["cape"];
 const LOOP_GROUP: &[&str] = &["dum", "fac", "itera", "apud", "perge", "rumpe"];
-const CLOSURE_GROUP: &[&str] = &["clausura", "libera"];
+const CLOSURE_GROUP: &[&str] = &["clausura", "libera", "nucleum"];
 const RELATIONAL_VIEW_GROUP: &[&str] = &["schema", "columna"];
 
 /// Complete keyword-group declarations for static Latin source-surface data.
@@ -1341,6 +1341,8 @@ pub static KEYWORD_SPECS: &[KeywordSpec] = &[
         scope: KeywordScope::Annotation,
         category: KeywordKind::Annotation,
     },
+    // `nucleum` is also claimed contextually in the closure signature slot;
+    // its annotation identity remains the canonical registry token.
     KeywordSpec {
         text: "nucleum",
         token_kind: Some(TokenKind::Nucleum),

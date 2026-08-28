@@ -346,7 +346,16 @@ fn keyword_groups_are_static_and_complete_for_latin_surface() {
         .iter()
         .find(|group| group.id == "closure")
         .expect("closure group");
-    assert_eq!(closure.members, &["clausura", "libera"]);
+    assert_eq!(closure.members, &["clausura", "libera", "nucleum"]);
+}
+
+#[test]
+fn nucleum_is_a_closure_modifier_and_annotation_identity() {
+    let spec = lookup_keyword_spec("nucleum").expect("nucleum must be registered");
+    assert_eq!(spec.token_kind, Some(TokenKind::Nucleum));
+    assert_eq!(spec.category, KeywordKind::Annotation);
+    assert_eq!(keyword_token_kind("nucleum"), Some(TokenKind::Nucleum));
+    assert!(TokenKind::Nucleum.is_keyword());
 }
 
 #[test]

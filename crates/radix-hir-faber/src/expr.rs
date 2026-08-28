@@ -731,7 +731,7 @@ impl super::FaberCodegen {
                 writer.write(" ");
                 self.write_expr(value, types, names, interner, surface, writer);
             }
-            HirExpressionKind::Clausura(params, ret, err, body, _) => {
+            HirExpressionKind::Clausura(params, ret, err, body, modifier) => {
                 let parenthesized = params.len() != 1;
                 if parenthesized {
                     writer.write("(");
@@ -753,6 +753,10 @@ impl super::FaberCodegen {
                 }
                 if parenthesized {
                     writer.write(")");
+                }
+                if *modifier != radix_syntax::ClosureModifier::None {
+                    writer.write(" ");
+                    writer.write(surface.contextual_keyword(modifier.spelling()));
                 }
                 if let Some(ret) = ret {
                     writer.write(" → ");

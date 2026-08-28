@@ -1260,14 +1260,14 @@ pub enum HirExpressionKind {
     Trap(Box<HirBlock>),
 
     /// Closure with parameters, optional return/error types, expression body,
-    /// and the `libera` capture-free marker (marker-carry only; semantic
-    /// analysis owns its contract).
+    /// and one signature modifier (marker-carry only; semantic analysis owns
+    /// each modifier's contract).
     Clausura(
         Vec<HirParam>,
         Option<TypeId>,
         Option<TypeId>,
         Box<HirExpression>,
-        bool,
+        radix_syntax::ClosureModifier,
     ),
 
     /// Legacy serialized/imported context-dependent `cede` carrier. New source

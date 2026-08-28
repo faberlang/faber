@@ -21,7 +21,7 @@ use radix_hir::{
     HirPattern, HirStatement, HirStatementKind,
 };
 use radix_lexer::{Interner, Symbol};
-use radix_syntax::CallablePosture;
+use radix_syntax::{CallablePosture, ClosureModifier};
 
 // ── Fixture helpers ──────────────────────────────────────────────────────────
 
@@ -609,7 +609,7 @@ fn closures_fold_into_the_parent_score() {
             then_catch: None,
             else_block: None,
         }),
-        false,
+        ClosureModifier::None,
     ));
     assert_eq!(
         score(vec![closure]),

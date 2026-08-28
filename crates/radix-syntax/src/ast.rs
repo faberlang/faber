@@ -226,6 +226,35 @@ impl CallablePosture {
     }
 }
 
+/// Closure signature modifier carried from parsing through HIR.
+///
+/// The modifier occupies one slot after closure parameters. Keeping the
+/// alternatives in one value makes stacking impossible to represent in the
+/// syntax tree and preserves the locale-independent `libera`/`nucleum`
+/// identities for later phases.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+pub enum ClosureModifier {
+    /// No closure modifier was authored.
+    #[default]
+    None,
+    /// Capture-free closure (`free` / `libera`).
+    Libera,
+    /// Private device closure (`kernel` / `nucleum`).
+    Nucleum,
+}
+
+impl ClosureModifier {
+    /// Canonical Latin identity used in structured parser facts.
+    #[must_use]
+    pub const fn spelling(self) -> &'static str {
+        match self {
+            Self::None => "none",
+            Self::Libera => "libera",
+            Self::Nucleum => "nucleum",
+        }
+    }
+}
+
 #[derive(Debug)]
 pub struct FuncDecl {
     pub name: Ident,
@@ -1382,10 +1411,9 @@ pub struct FingeFieldInit {
 #[derive(Debug)]
 pub struct ClausuraExpr {
     pub params: Vec<ClausuraParam>,
-    /// `libera` capture-free marker claimed after params, before return/
-    /// alternate-exit clauses. Marker-carry only; borrow semantics live in
-    /// semantic analysis.
-    pub libera: bool,
+    /// One closure modifier claimed after params, before return/alternate-exit
+    /// clauses. Semantic analysis owns the modifier contracts.
+    pub modifier: ClosureModifier,
     pub ret: Option<TypeExpr>,
     pub err: Option<TypeExpr>,
     pub body: ClausuraBody,
