@@ -155,16 +155,15 @@ pub(crate) fn revalidate_emitted_output(
             .with_locale_pack_explicit(),
     );
     let expected = variant_path_spelling_multiset(&input.presentation, &input.interner);
-    let prepared = prepare_program_module_for_name(name, emitted, &revalidation_session)
-        .map_err(|diagnostic| {
-            Box::new(revalidation_failure(
-                name,
-                "variant_path_spelling_reanalysis_failed",
-                format!("preparing emitted output failed: {}", diagnostic.message),
-                expected.len(),
-                None,
-            ))
-        })?;
+    let prepared = prepare_program_module_for_name(name, emitted, &revalidation_session).map_err(|diagnostic| {
+        Box::new(revalidation_failure(
+            name,
+            "variant_path_spelling_reanalysis_failed",
+            format!("preparing emitted output failed: {}", diagnostic.message),
+            expected.len(),
+            None,
+        ))
+    })?;
     let reanalysis = analyze_source(
         &prepared.session,
         name,
