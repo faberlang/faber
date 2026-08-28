@@ -348,6 +348,7 @@ fn device_program_composed_stages_are_inout_and_unobserved() {
         None,
         DeviceProgramLifetime::SingleRun,
         0,
+        &fixture_metadata(&validated.program().functions),
     )
     .expect("the composed body should materialize as one device kernel");
 
