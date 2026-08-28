@@ -572,19 +572,39 @@ impl CompositionPass<'_> {
         let mut ids = IdGen::from_function(caller);
         let mut alpha = Alpha::default();
         let mut binds = Vec::new();
+        // GEA3-A2b: an `in` (MutRef) parameter carries mutating ownership, so
+        // its binding may not terminate at a fresh immutable clone — the
+        // callee's writes must reach the caller's actual place. A bare caller
+        // local aliases in place (the runner's MutRef place-alias contract);
+        // any other place, e.g. an indexed `buf[i]`, binds a fresh *mutable*
+        // local that writes back to the caller place once the callee body
+        // finishes.
+        let mut mut_writebacks: Vec<(MirPlace, MirLocalId, MirType)> = Vec::new();
         for (param, arg) in callee
             .params
             .iter()
             .filter(|param| !is_lane_param(param))
             .zip(site.args.iter())
         {
+            let mut mut_target = None;
+            if param.mode == MirParamMode::MutRef {
+                if let MirOperand::Place(place) = arg {
+                    if place.projections.is_empty() {
+                        if let MirPlaceBase::Local(caller_local) = place.base {
+                            alpha.locals.insert(param.local, caller_local);
+                            continue;
+                        }
+                    }
+                    mut_target = Some((place.clone(), param.ty));
+                }
+            }
             let new_local = ids.next_local();
             alpha.locals.insert(param.local, new_local);
             caller.locals.push(MirLocal {
                 id: new_local,
                 name: param.name,
                 ty: param.ty,
-                mutable: false,
+                mutable: mut_target.is_some(),
                 span: param.span,
             });
             binds.push(MirStatement {
@@ -599,6 +619,9 @@ impl CompositionPass<'_> {
                 },
                 span: site.span,
             });
+            if let Some((place, ty)) = mut_target {
+                mut_writebacks.push((place, new_local, ty));
+            }
         }
         if let Some(fragment_lane) = lane_param(callee) {
             if let Some(caller_lane_local) = caller_lane_local {
@@ -653,6 +676,13 @@ impl CompositionPass<'_> {
                 .iter()
                 .map(|stmt| remap_stmt(stmt, &mut alpha, &mut ids))
                 .collect();
+            // GEA3-A2b: publish mut-output clones after the callee body and
+            // before the result assign, so a destination overlapping a mut
+            // place keeps call semantics (param writes precede the
+            // return-value assign).
+            for (place, local, ty) in &mut_writebacks {
+                spliced.push(writeback_stmt(place, *local, *ty, callee_block.terminator.span, &mut ids));
+            }
             if let (Some(dest), MirTerminatorKind::Return(Some(operand))) =
                 (site.destination.as_ref(), &callee_block.terminator.kind)
             {
@@ -682,8 +712,15 @@ impl CompositionPass<'_> {
         let mut cloned = Vec::new();
         let mut cloned_ids = Vec::new();
         for block in &callee.blocks {
-            let mapped =
-                remap_and_connect(block, &mut alpha, &mut ids, site.destination.as_ref(), continue_id, dest_ty);
+            let mapped = remap_and_connect(
+                block,
+                &mut alpha,
+                &mut ids,
+                site.destination.as_ref(),
+                continue_id,
+                dest_ty,
+                &mut_writebacks,
+            );
             cloned_ids.push(mapped.id);
             cloned.push(mapped);
         }
@@ -1306,15 +1343,39 @@ fn remap_terminator(terminator: &MirTerminator, alpha: &mut Alpha, ids: &mut IdG
     }
 }
 
+fn writeback_stmt(place: &MirPlace, local: MirLocalId, ty: MirType, span: Span, ids: &mut IdGen) -> MirStatement {
+    MirStatement {
+        kind: MirStatementKind::Assign {
+            place: place.clone(),
+            value: MirValue {
+                id: ids.next_value(),
+                kind: MirValueKind::Operand(MirOperand::Place(MirPlace::local(local))),
+                ty,
+                span,
+            },
+        },
+        span,
+    }
+}
+
 fn rewrite_return_into(
     block: &mut MirBlock,
     destination: Option<&MirPlace>,
     continue_id: MirBlockId,
     dest_ty: MirType,
     ids: &mut IdGen,
+    mut_writebacks: &[(MirPlace, MirLocalId, MirType)],
 ) {
     match &block.terminator.kind {
         MirTerminatorKind::Return(operand) => {
+            // GEA3-A2b: publish mut-output clones at the return edge, before
+            // the result assign, so param writes precede the return-value
+            // assign exactly as the uncomposed call ordered them.
+            for (place, local, ty) in mut_writebacks {
+                block
+                    .statements
+                    .push(writeback_stmt(place, *local, *ty, block.terminator.span, ids));
+            }
             if let (Some(dest), Some(operand)) = (destination, operand.clone()) {
                 block.statements.push(MirStatement {
                     kind: MirStatementKind::Assign {
@@ -1346,9 +1407,10 @@ fn remap_and_connect(
     destination: Option<&MirPlace>,
     continue_id: MirBlockId,
     dest_ty: MirType,
+    mut_writebacks: &[(MirPlace, MirLocalId, MirType)],
 ) -> MirBlock {
     let mut mapped = remap_block(block, alpha, ids);
-    rewrite_return_into(&mut mapped, destination, continue_id, dest_ty, ids);
+    rewrite_return_into(&mut mapped, destination, continue_id, dest_ty, ids, mut_writebacks);
     mapped
 }
 

@@ -1179,3 +1179,334 @@ functio k(fractus<f32> x) → fractus<f32> {
         "the kernel's original Return terminator must survive: {kernel:#?}"
     );
 }
+
+// --- GEA3-A2b: composed mut-output caller-place preservation ---
+
+use crate::mir::test_support::{indexed_local_place, rank1_tf32_type, u32_type};
+
+/// A single-block callee whose `in` (MutRef) output argument is an indexed
+/// caller place: the composed MIR must contain a write reaching that caller
+/// place — the write may not terminate at a fresh `mutable: false` clone
+/// local (the probe defect: `buf[idx]` composed parents emitted no output
+/// write at all).
+#[test]
+fn mut_output_composition_reaches_caller_place() {
+    let mut types = TypeTable::new();
+    let (tensor_ty, elem_ty) = rank1_tf32_type(&mut types);
+    let index_ty = u32_type(&mut types);
+    let mut_param = |local: u32| MirParam { mode: MirParamMode::MutRef, ..param(local, elem_ty) };
+    let helper = function(
+        1,
+        FRAGMENT,
+        vec![param(0, elem_ty), mut_param(1)],
+        elem_ty,
+        vec![
+            MirLocal { id: MirLocalId(0), name: None, ty: elem_ty, mutable: false, span: DEF_SPAN() },
+            MirLocal { id: MirLocalId(1), name: None, ty: elem_ty, mutable: true, span: DEF_SPAN() },
+        ],
+        vec![MirBlock {
+            id: MirBlockId(0),
+            statements: vec![MirStatement {
+                kind: MirStatementKind::Assign {
+                    place: MirPlace::local(MirLocalId(1)),
+                    value: MirValue {
+                        id: MirValueId(0),
+                        kind: MirValueKind::Binary {
+                            op: MirBinOp::Add,
+                            lhs: MirOperand::Place(MirPlace::local(MirLocalId(0))),
+                            rhs: MirOperand::Place(MirPlace::local(MirLocalId(1))),
+                        },
+                        ty: elem_ty,
+                        span: DEF_SPAN(),
+                    },
+                },
+                span: DEF_SPAN(),
+            }],
+            terminator: MirTerminator { kind: MirTerminatorKind::Return(None), span: DEF_SPAN() },
+            span: DEF_SPAN(),
+        }],
+        None,
+    );
+    let output_place = indexed_local_place(MirLocalId(1), MirLocalId(2));
+    let entry = function(
+        0,
+        ENTRY,
+        vec![param(0, tensor_ty)],
+        elem_ty,
+        vec![
+            MirLocal { id: MirLocalId(1), name: None, ty: tensor_ty, mutable: true, span: test_span() },
+            MirLocal { id: MirLocalId(2), name: None, ty: index_ty, mutable: false, span: test_span() },
+            MirLocal { id: MirLocalId(3), name: None, ty: elem_ty, mutable: false, span: test_span() },
+        ],
+        vec![MirBlock {
+            id: MirBlockId(0),
+            statements: vec![call_stmt(
+                None,
+                MirFunctionId(1),
+                vec![
+                    MirOperand::Place(MirPlace::local(MirLocalId(3))),
+                    MirOperand::Place(output_place.clone()),
+                ],
+            )],
+            terminator: MirTerminator { kind: MirTerminatorKind::Return(None), span: test_span() },
+            span: test_span(),
+        }],
+        Some(MirKernelShaderStage::Compute),
+    );
+    let mut functions = vec![entry, helper];
+    assert!(
+        compose_fns(&mut functions).is_empty(),
+        "legal mut-output composition must compose"
+    );
+    let composed = &functions[0];
+    assert_eq!(
+        composed.blocks.len(),
+        1,
+        "the mut-output splice must stay single-block: {composed:#?}"
+    );
+    let statements = &composed.blocks[0].statements;
+    let writeback_at = statements
+        .iter()
+        .position(|stmt| matches!(&stmt.kind, MirStatementKind::Assign { place, .. } if *place == output_place))
+        .unwrap_or_else(|| panic!("a mut-output write must reach the caller place: {composed:#?}"));
+    // The intermediate clone that carries the callee's mutation must be a
+    // declared mutable local — never the fresh immutable binding of the
+    // probe defect.
+    let clone_local = statements
+        .iter()
+        .find_map(|stmt| match &stmt.kind {
+            MirStatementKind::Assign {
+                place,
+                value: MirValue { kind: MirValueKind::Operand(MirOperand::Place(src)), .. },
+            } if *src == output_place => match place.base {
+                crate::mir::MirPlaceBase::Local(id) => Some(id),
+                _ => None,
+            },
+            _ => None,
+        })
+        .unwrap_or_else(|| panic!("the mut-output clone bind must exist: {composed:#?}"));
+    assert!(
+        composed
+            .locals
+            .iter()
+            .any(|local| local.id == clone_local && local.mutable),
+        "the mut-output clone local must be declared mutable: {composed:#?}"
+    );
+    // Call semantics: the callee body's write precedes the caller-place
+    // publish, which precedes the caller's own tail.
+    let body_write_at = statements
+        .iter()
+        .position(|stmt| {
+            matches!(&stmt.kind, MirStatementKind::Assign {
+            place: MirPlace { base: crate::mir::MirPlaceBase::Local(id), projections }, ..
+        } if *id == clone_local && projections.is_empty() && stmt.span == DEF_SPAN())
+        })
+        .unwrap_or_else(|| panic!("the callee body write must splice before the writeback: {composed:#?}"));
+    assert!(
+        body_write_at < writeback_at,
+        "callee body write must precede the caller-place writeback: {composed:#?}"
+    );
+}
+
+/// A bare caller local passed as an `in` (MutRef) argument aliases in place:
+/// the callee's writes splice directly onto the caller's own local — no
+/// fresh clone binding for the mut parameter at all.
+#[test]
+fn mut_output_aliases_bare_caller_local_in_place() {
+    let mut types = TypeTable::new();
+    let (_, elem_ty) = rank1_tf32_type(&mut types);
+    let helper = function(
+        1,
+        FRAGMENT,
+        vec![
+            param(0, elem_ty),
+            MirParam { mode: MirParamMode::MutRef, ..param(1, elem_ty) },
+        ],
+        elem_ty,
+        vec![
+            MirLocal { id: MirLocalId(0), name: None, ty: elem_ty, mutable: false, span: DEF_SPAN() },
+            MirLocal { id: MirLocalId(1), name: None, ty: elem_ty, mutable: true, span: DEF_SPAN() },
+        ],
+        vec![MirBlock {
+            id: MirBlockId(0),
+            statements: vec![MirStatement {
+                kind: MirStatementKind::Assign {
+                    place: MirPlace::local(MirLocalId(1)),
+                    value: MirValue {
+                        id: MirValueId(0),
+                        kind: MirValueKind::Binary {
+                            op: MirBinOp::Add,
+                            lhs: MirOperand::Place(MirPlace::local(MirLocalId(0))),
+                            rhs: MirOperand::Place(MirPlace::local(MirLocalId(1))),
+                        },
+                        ty: elem_ty,
+                        span: DEF_SPAN(),
+                    },
+                },
+                span: DEF_SPAN(),
+            }],
+            terminator: MirTerminator { kind: MirTerminatorKind::Return(None), span: DEF_SPAN() },
+            span: DEF_SPAN(),
+        }],
+        None,
+    );
+    let entry = function(
+        0,
+        ENTRY,
+        vec![param(0, elem_ty)],
+        elem_ty,
+        vec![MirLocal { id: MirLocalId(1), name: None, ty: elem_ty, mutable: true, span: test_span() }],
+        vec![MirBlock {
+            id: MirBlockId(0),
+            statements: vec![call_stmt(
+                None,
+                MirFunctionId(1),
+                vec![
+                    MirOperand::Place(MirPlace::local(MirLocalId(0))),
+                    MirOperand::Place(MirPlace::local(MirLocalId(1))),
+                ],
+            )],
+            terminator: MirTerminator { kind: MirTerminatorKind::Return(None), span: test_span() },
+            span: test_span(),
+        }],
+        Some(MirKernelShaderStage::Compute),
+    );
+    let mut functions = vec![entry, helper];
+    assert!(
+        compose_fns(&mut functions).is_empty(),
+        "legal mut-output composition must compose"
+    );
+    let composed = &functions[0];
+    let reaches_caller_local = composed.blocks.iter().any(|block| {
+        block.statements.iter().any(|stmt| {
+            matches!(
+                &stmt.kind,
+                MirStatementKind::Assign { place: MirPlace { base: crate::mir::MirPlaceBase::Local(id), projections }, .. }
+                    if *id == MirLocalId(1) && projections.is_empty()
+            )
+        })
+    });
+    assert!(
+        reaches_caller_local,
+        "the aliased mut-output write must land on the caller's local: {composed:#?}"
+    );
+    assert_eq!(
+        composed.locals.len(),
+        2,
+        "only the immutable input clone may be added — the mut parameter aliases without a fresh local: {composed:#?}"
+    );
+    assert!(
+        composed
+            .locals
+            .iter()
+            .filter(|local| local.id != MirLocalId(1))
+            .all(|local| !local.mutable),
+        "the one fresh local is the immutable input clone: {composed:#?}"
+    );
+}
+
+/// A multi-block (Goto-join) callee with an `in` (MutRef) indexed output
+/// still publishes the mutation: the writeback lands in the cloned return
+/// block, before control joins the caller's continue block.
+#[test]
+fn multi_block_mut_output_writes_back_on_return_join() {
+    let mut types = TypeTable::new();
+    let (tensor_ty, elem_ty) = rank1_tf32_type(&mut types);
+    let index_ty = u32_type(&mut types);
+    let write = |local: u32| MirStatement {
+        kind: MirStatementKind::Assign {
+            place: MirPlace::local(MirLocalId(local)),
+            value: MirValue {
+                id: MirValueId(0),
+                kind: MirValueKind::Binary {
+                    op: MirBinOp::Add,
+                    lhs: MirOperand::Place(MirPlace::local(MirLocalId(0))),
+                    rhs: MirOperand::Place(MirPlace::local(MirLocalId(local))),
+                },
+                ty: elem_ty,
+                span: DEF_SPAN(),
+            },
+        },
+        span: DEF_SPAN(),
+    };
+    let helper = function(
+        1,
+        FRAGMENT,
+        vec![
+            param(0, elem_ty),
+            MirParam { mode: MirParamMode::MutRef, ..param(1, elem_ty) },
+        ],
+        elem_ty,
+        vec![
+            MirLocal { id: MirLocalId(0), name: None, ty: elem_ty, mutable: false, span: DEF_SPAN() },
+            MirLocal { id: MirLocalId(1), name: None, ty: elem_ty, mutable: true, span: DEF_SPAN() },
+        ],
+        vec![
+            MirBlock {
+                id: MirBlockId(0),
+                statements: vec![write(1)],
+                terminator: MirTerminator { kind: MirTerminatorKind::Goto(MirBlockId(1)), span: DEF_SPAN() },
+                span: DEF_SPAN(),
+            },
+            MirBlock {
+                id: MirBlockId(1),
+                statements: Vec::new(),
+                terminator: MirTerminator { kind: MirTerminatorKind::Return(None), span: DEF_SPAN() },
+                span: DEF_SPAN(),
+            },
+        ],
+        None,
+    );
+    let output_place = indexed_local_place(MirLocalId(1), MirLocalId(2));
+    let entry = function(
+        0,
+        ENTRY,
+        vec![param(0, tensor_ty)],
+        elem_ty,
+        vec![
+            MirLocal { id: MirLocalId(1), name: None, ty: tensor_ty, mutable: true, span: test_span() },
+            MirLocal { id: MirLocalId(2), name: None, ty: index_ty, mutable: false, span: test_span() },
+            MirLocal { id: MirLocalId(3), name: None, ty: elem_ty, mutable: false, span: test_span() },
+        ],
+        vec![MirBlock {
+            id: MirBlockId(0),
+            statements: vec![call_stmt(
+                None,
+                MirFunctionId(1),
+                vec![
+                    MirOperand::Place(MirPlace::local(MirLocalId(3))),
+                    MirOperand::Place(output_place.clone()),
+                ],
+            )],
+            terminator: MirTerminator { kind: MirTerminatorKind::Return(None), span: test_span() },
+            span: test_span(),
+        }],
+        Some(MirKernelShaderStage::Compute),
+    );
+    let mut functions = vec![entry, helper];
+    assert!(
+        compose_fns(&mut functions).is_empty(),
+        "multi-block mut-output composition must compose"
+    );
+    let composed = &functions[0];
+    assert!(
+        composed.blocks.len() > 1,
+        "a multi-block callee keeps the Goto-join splice: {composed:#?}"
+    );
+    assert!(
+        composed.blocks.iter().any(|block| {
+            block
+                .statements
+                .iter()
+                .any(|stmt| matches!(&stmt.kind, MirStatementKind::Assign { place, .. } if *place == output_place))
+        }),
+        "the mut-output writeback must reach the caller place on the return join: {composed:#?}"
+    );
+    assert!(
+        composed
+            .blocks
+            .iter()
+            .any(|block| matches!(block.terminator.kind, MirTerminatorKind::Return(_))),
+        "the caller's original Return terminator must survive the join: {composed:#?}"
+    );
+}
