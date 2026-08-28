@@ -4,7 +4,7 @@
 //! rendering. The parent catalog owns reader-locale fallback diagnostics and
 //! shared argument helpers.
 
-use super::catalog::{arg_value, quote_arg, DiagnosticSpec};
+use super::catalog::{DiagnosticSpec, arg_value, quote_arg};
 use crate::{SemanticErrorKind, WarningKind};
 use radix_diagnostics::DiagnosticArg;
 
@@ -1975,6 +1975,43 @@ fn semantic_lowering_error_message(args: &[DiagnosticArg]) -> Option<String> {
             Some("nested object destructuring is not lowered yet".to_owned())
         }
         "numerus_width_params" => Some("numerus accepts at most one width marker".to_owned()),
+        "nucleum_closure_effect" => {
+            let reason = arg_value(args, "reason")?;
+            match reason {
+                "alternate_exit" => Some(
+                    "kernel closures have no error channel; remove the explicit or inline ⇥ exit"
+                        .to_owned(),
+                ),
+                "throw" => Some(
+                    "kernel closures reject throw/require/reject guards; use ordinary control flow"
+                        .to_owned(),
+                ),
+                "cape" => Some(
+                    "kernel closures reject cape recovery; the region must be error-free"
+                        .to_owned(),
+                ),
+                "recovery" => Some(
+                    "kernel closures reject error/recovery operations; the region must be error-free"
+                        .to_owned(),
+                ),
+                "dynamic_value" => Some(
+                    "kernel closures reject nested closure values; device regions admit no dynamic function values"
+                        .to_owned(),
+                ),
+                _ => {
+                    let operation = arg_value(args, "operation")?;
+                    Some(format!(
+                        "kernel closure body rejects host/device-unsafe operation '{operation}'"
+                    ))
+                }
+            }
+        }
+        "nucleum_closure_escape" => {
+            let context = arg_value(args, "context")?;
+            Some(format!(
+                "kernel closure escapes as a {context} value; it may only initialize an immutable local or be called in the same expression"
+            ))
+        }
         "object_destructuring_initializer" => {
             Some("object destructuring requires initializer".to_owned())
         }
@@ -2342,6 +2379,19 @@ fn semantic_type_mismatch_message(args: &[DiagnosticArg]) -> Option<String> {
             let capture = arg_value(args, "capture")?;
             Some(format!(
                 "libera closure captures '{capture}' from an enclosing scope; a libera closure must not capture enclosing locals or parameters"
+            ))
+        }
+        "nucleum_closure_capture" => {
+            let capture = arg_value(args, "capture")?;
+            Some(format!(
+                "kernel closure captures '{capture}' from an enclosing scope; a kernel closure is a private device region and must not capture enclosing locals or parameters"
+            ))
+        }
+        "nucleum_closure_type" => {
+            let ty = arg_value(args, "type")?;
+            let position = arg_value(args, "position")?;
+            Some(format!(
+                "kernel closure {position} type '{ty}' is outside the device-safe subset; kernel closures admit scalars and tensor-family types"
             ))
         }
         "json_map_key_must_be_textus" => Some("JSON map key must be textus".to_owned()),
@@ -3034,9 +3084,7 @@ fn warning_spec(kind: WarningKind) -> DiagnosticSpec {
         },
         WarningKind::UnionMethodSignatureShadowed => DiagnosticSpec {
             code: "WARN026",
-            help: Some(
-                "align the constituent signatures or rename one method to keep it common",
-            ),
+            help: Some("align the constituent signatures or rename one method to keep it common"),
         },
         WarningKind::ComplexityBudgetExceeded => DiagnosticSpec {
             code: "WARN027",
