@@ -25,6 +25,9 @@ use std::fs;
 use std::io;
 use std::path::Path;
 use std::process::ExitCode;
+use std::time::Instant;
+
+use super::run_stats::{self, RunStatsArtifact};
 
 pub(super) fn cmd_run(args: RunArgs) {
     crate::commands::validate_deny_codes(&args.deny);
@@ -57,6 +60,8 @@ pub(super) fn cmd_run(args: RunArgs) {
         args.locale.as_deref(),
         args.diagnostics_locale.as_deref(),
         selection,
+        args.stats,
+        args.stats_file.as_ref(),
     );
 }
 
@@ -69,7 +74,10 @@ fn interpret_path(
     locale: Option<&str>,
     diagnostics_locale: Option<&str>,
     selection: DeviceSelection,
+    stats: bool,
+    stats_file: Option<&std::path::PathBuf>,
 ) {
+    let stats_requested = stats || stats_file.is_some();
     if super::archive::is_zip_archive(path) {
         let archive = match super::archive::extract_package_archive(path) {
             Ok(archive) => archive,
@@ -87,7 +95,54 @@ fn interpret_path(
                 }
             };
         let mut host = StdioHost::with_argumenta(program_args.to_vec());
-        if let Err(mut diagnostics) = radix::program::mir::run_package_mir_with_selection(
+        if stats_requested {
+            let metadata = match run_stats::package_metadata(archive.package_input()) {
+                Ok(metadata) => metadata,
+                Err(diagnostic) => {
+                    eprint_archive_diagnostics(std::slice::from_ref(diagnostic.as_ref()));
+                    drop(archive);
+                    std::process::exit(1);
+                }
+            };
+            let started = Instant::now();
+            match radix::program::mir::run_package_mir_with_selection_and_stats(
+                &config,
+                archive.package_input(),
+                selection,
+                stats_requested,
+                &package::mir::faber_mir_seams(),
+                &mut host,
+            ) {
+                Err(mut diagnostics) => {
+                    archive.remap_diagnostics(&mut diagnostics);
+                    eprint_archive_diagnostics(&diagnostics);
+                    eprint_device_run_note(&diagnostics);
+                    drop(archive);
+                    std::process::exit(1);
+                }
+                Ok(outcome) => {
+                    let exit = i32::from(outcome.result.is_err());
+                    let artifact = RunStatsArtifact::new(
+                        metadata,
+                        outcome.stats,
+                        elapsed_wall_ms(started),
+                        exit,
+                    );
+                    if let Err(error) = run_stats::emit(&artifact, stats, stats_file) {
+                        eprintln!("error: could not write run statistics: {error}");
+                        drop(archive);
+                        std::process::exit(1);
+                    }
+                    if let Err(mut diagnostics) = outcome.result {
+                        archive.remap_diagnostics(&mut diagnostics);
+                        eprint_archive_diagnostics(&diagnostics);
+                        eprint_device_run_note(&diagnostics);
+                        drop(archive);
+                        std::process::exit(1);
+                    }
+                }
+            }
+        } else if let Err(mut diagnostics) = radix::program::mir::run_package_mir_with_selection(
             &config,
             archive.package_input(),
             selection,
@@ -112,7 +167,48 @@ fn interpret_path(
             }
         };
         let mut host = StdioHost::with_argumenta(program_args.to_vec());
-        if let Err(diagnostics) = radix::program::mir::run_package_mir_with_selection(
+        if stats_requested {
+            let metadata = match run_stats::package_metadata(path) {
+                Ok(metadata) => metadata,
+                Err(diagnostic) => {
+                    super::eprint_compile_diagnostics(std::slice::from_ref(diagnostic.as_ref()));
+                    std::process::exit(1);
+                }
+            };
+            let started = Instant::now();
+            match radix::program::mir::run_package_mir_with_selection_and_stats(
+                &config,
+                path,
+                selection,
+                stats_requested,
+                &package::mir::faber_mir_seams(),
+                &mut host,
+            ) {
+                Err(diagnostics) => {
+                    super::eprint_compile_diagnostics(&diagnostics);
+                    eprint_device_run_note(&diagnostics);
+                    std::process::exit(1);
+                }
+                Ok(outcome) => {
+                    let exit = i32::from(outcome.result.is_err());
+                    let artifact = RunStatsArtifact::new(
+                        metadata,
+                        outcome.stats,
+                        elapsed_wall_ms(started),
+                        exit,
+                    );
+                    if let Err(error) = run_stats::emit(&artifact, stats, stats_file) {
+                        eprintln!("error: could not write run statistics: {error}");
+                        std::process::exit(1);
+                    }
+                    if let Err(diagnostics) = outcome.result {
+                        super::eprint_compile_diagnostics(&diagnostics);
+                        eprint_device_run_note(&diagnostics);
+                        std::process::exit(1);
+                    }
+                }
+            }
+        } else if let Err(diagnostics) = radix::program::mir::run_package_mir_with_selection(
             &config,
             path,
             selection,
@@ -127,8 +223,17 @@ fn interpret_path(
     }
 
     // Single-source runner. A lone `.fab` file carries no package `[device]`
-    // section, so an explicit backend request can never be served here
-    // (N1.1 fail closed: "package has no device program").
+    // section, and v1 stats are a package-route contract. Refuse before
+    // reading or executing the source so a requested artifact is never
+    // silently omitted.
+    if stats_requested {
+        eprintln!(
+            "error: run statistics require a package input; stats are not supported for a single `.fab` file"
+        );
+        std::process::exit(1);
+    }
+    // An explicit backend request can never be served here (N1.1 fail closed:
+    // "package has no device program").
     if selection != DeviceSelection::Auto {
         eprintln!(
             "error: explicit backend selection `{}` cannot be served: a single `.fab` file carries no package device program; device execution requires a package with a `[device]` section",
@@ -177,6 +282,10 @@ fn exit_interpreted(result: Result<ExitCode, radix::module::mir::RunSourceError>
     if code != 0 {
         std::process::exit(code);
     }
+}
+
+fn elapsed_wall_ms(started: Instant) -> u64 {
+    u64::try_from(started.elapsed().as_millis()).unwrap_or(u64::MAX)
 }
 
 /// Reader config for interpreted packages: CLI `--locale` / `--diagnostics-locale`
