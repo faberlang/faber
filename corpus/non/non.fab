@@ -10,7 +10,24 @@ aliases = ["!"]
 related = ["verum", "falsum"]
 locale = "en"
 +++
+test "non negates falsum" {
+    const bool flag ← false
+    const bool negated ← not flag
+    assert negated
+}
 
+test "non negates verum" {
+    const bool flag ← true
+    const bool negated ← not flag
+    assert negated ≡ false
+}
+
+test "non applied twice returns the original" {
+    const bool flag ← false
+    const bool negated ← not flag
+    const bool bis ← not negated
+    assert bis ≡ false
+}
 # =============================================================================
 # non — Negates a boolean expression.
 # =============================================================================
@@ -34,26 +51,7 @@ locale = "en"
 #
 
 main {
-    const _ flag ← false
-    const _ negated ← not flag
+    const bool flag ← false
+    const bool negated ← not flag
     print negated
-}
-
-test "non negates falsum" {
-    const _ flag ← false
-    const _ negated ← not flag
-    assert negated
-}
-
-test "non negates verum" {
-    const _ flag ← true
-    const _ negated ← not flag
-    assert negated ≡ false
-}
-
-test "non applied twice returns the original" {
-    const _ flag ← false
-    const _ negated ← not flag
-    const _ bis ← not negated
-    assert bis ≡ false
 }

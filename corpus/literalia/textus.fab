@@ -10,7 +10,6 @@ aliases = ["\"...\""]
 related = ["block-string", "§", "textus"]
 locale = "en"
 +++
-
 # =============================================================================
 # string — Short quoted textus string literals and template application.
 # =============================================================================
@@ -35,10 +34,9 @@ locale = "en"
 #   Salve, Salve, Mundus!
 
 main {
-    const _ greeting ← "Salve"
+    const string greeting ← "Salve"
     print greeting
-
-    const _ nomen ← "Mundus"
-    const _ message ← "Salve, §!"(nomen)
+    const string nomen ← "Mundus"
+    const string message ← "Salve, §!"(nomen)
     print message
 }

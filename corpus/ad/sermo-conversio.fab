@@ -9,7 +9,6 @@ syntax = "ad 'runtime:echo' (payload) ↦ textus"
 related = ["conversio"]
 locale = "en"
 +++
-
 # =============================================================================
 # ad — ad opens a sermo endpoint and materializes the stream with an explicit
 # conversio target.

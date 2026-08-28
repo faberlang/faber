@@ -8,7 +8,6 @@ summary = "innermost dum wins over enclosing fac for rumpe"
 related = ["fac", "dum"]
 locale = "en"
 +++
-
 # =============================================================================
 # rumpe — innermost dum wins over enclosing fac for rumpe
 # =============================================================================
@@ -29,9 +28,11 @@ locale = "en"
 main {
     var int x ← 0
     do {
-        while x < 3 {
+        while x ≺ 3 {
             x ← x + 1
-            if x ≡ 2 then break
+            if x ≡ 2 {
+                break
+            }
         }
         print x
     }

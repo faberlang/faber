@@ -10,7 +10,6 @@ aliases = ["json", "object"]
 related = ["genus", "∷", "ignotum", "tabula"]
 locale = "en"
 +++
-
 # =============================================================================
 # valor — JSON-shaped dynamic value literal for open object-shaped data.
 # =============================================================================
@@ -49,14 +48,13 @@ locale = "en"
 main {
     # --- Empty and simple records ---
 
-    const _ void ← {}
+    const json void ← {}
     print void
-
-    const _ punctum ← { "x": 10, "y": 20 }
+    const json punctum ← { "x": 10, "y": 20 }
     print punctum
 
     # Text keys and constant values
-    const _ forma ← { "clavis": 42 }
+    const json forma ← { "clavis": 42 }
     print forma
 
     # NOTE: JSON valor literals accept only constant values (strings, numbers,
@@ -65,6 +63,6 @@ main {
 
     # --- Nested valor ---
 
-    const _ nidum ← { "extra": { "medium": 1 } }
+    const json nidum ← { "extra": { "medium": 1 } }
     print nidum
 }

@@ -10,7 +10,6 @@ aliases = ["'...'"]
 related = ["textus", "string"]
 locale = "en"
 +++
-
 # =============================================================================
 # ascii — Single-quoted ASCII machine-text literals.
 # =============================================================================
@@ -30,6 +29,6 @@ locale = "en"
 #   pg:query
 
 main {
-    const _ route ← 'pg:query'
+    const ascii route ← 'pg:query'
     print route
 }

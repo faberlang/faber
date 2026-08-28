@@ -9,7 +9,6 @@ syntax = "tensor<textus, [N]>"
 related = ["tensor", "textus"]
 locale = "en"
 +++
-
 # =============================================================================
 # tensor — tensor<textus, [N]> as a universal container with non-numeric elements.
 # =============================================================================

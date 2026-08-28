@@ -9,7 +9,6 @@ syntax = "<expression>!.<name> | <expression>![<expression>] | <expression>!(<ar
 related = ["!.", "![", "!("]
 locale = "en"
 +++
-
 # =============================================================================
 # !. — Asserted member, index, and call access on known-present values.
 # =============================================================================
@@ -44,7 +43,6 @@ main {
     const Persona ∪ null p ← Persona { nomen = "Marcus", urbs = "Roma" }
     print p!.nomen
     print p!.urbs
-
-    const _ litterae ← ["a", "b", "c"]
+    const list<string, 3> litterae ← ["a", "b", "c"]
     print litterae![0]
 }

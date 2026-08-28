@@ -10,7 +10,6 @@ aliases = ["match"]
 related = ["discretio", "casu"]
 locale = "en"
 +++
-
 # =============================================================================
 # discerne — Starts an exhaustive pattern match over a value or values.
 # =============================================================================
@@ -49,22 +48,33 @@ union Condicio {
 }
 
 union Nuntius {
-    Pulsus { int x int y },
-    Clavis { string clavis },
+    Pulsus {
+        int x
+        int y
+    },
+    Clavis {
+        string clavis
+    },
     Finis
 }
 
 # Simple casu matching on unit variants (no payload)
 fn nomina(Condicio s) → string {
     match s {
-        case Agens { return "agens" }
-        case Iners { return "iners" }
-        case Pendens { return "pendens" }
+        case Agens {
+            return "agens"
+        }
+        case Iners {
+            return "iners"
+        }
+        case Pendens {
+            return "pendens"
+        }
     }
 }
 
 # casu with fixum bindings destructures variant fields
-fn tracta(Nuntius e) → null {
+fn tracta(Nuntius e) → null_ty {
     match e {
         case Pulsus const x, y {
             print "pulsus: § §"(x, y)

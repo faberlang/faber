@@ -10,7 +10,19 @@ aliases = ["and"]
 related = ["aut", "non"]
 locale = "en"
 +++
+test "and requires both operands" {
+    assert (true and true) ≡ true
+    assert (false and true) ≡ false
+    assert (true and false) ≡ false
+    assert (false and false) ≡ false
+}
 
+test "and mirrors the incipit smoke" {
+    const bool paratus ← true
+    const bool licet ← true
+    const bool currit ← paratus and licet
+    assert currit ≡ true
+}
 # =============================================================================
 # et — Combines boolean expressions with logical and.
 # =============================================================================
@@ -38,25 +50,10 @@ locale = "en"
 
 main {
     # left operand: verum
-    const _ paratus ← true
+    const bool paratus ← true
     # right operand: verum
-    const _ licet ← true
+    const bool licet ← true
     # verum et verum → verum
-    const _ currit ← paratus and licet
-
+    const bool currit ← paratus and licet
     print currit
-}
-
-test "and requires both operands" {
-    assert (true and true) ≡ true
-    assert (false and true) ≡ false
-    assert (true and false) ≡ false
-    assert (false and false) ≡ false
-}
-
-test "and mirrors the incipit smoke" {
-    const _ paratus ← true
-    const _ licet ← true
-    const _ currit ← paratus and licet
-    assert currit ≡ true
 }

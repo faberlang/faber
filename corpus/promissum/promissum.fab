@@ -10,7 +10,6 @@ aliases = ["promise"]
 related = ["fiet", "futura", "figendum", "tacebit"]
 locale = "en"
 +++
-
 # =============================================================================
 # promissum — Promise-like result type associated with async finite functions.
 # =============================================================================

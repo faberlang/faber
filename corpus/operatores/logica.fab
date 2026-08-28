@@ -9,7 +9,6 @@ syntax = "<expression> ∨ <expression> | <expression> non est <expression>"
 related = ["∧", "⊻", "¬", "et", "aut", "vel", "non est", "est"]
 locale = "en"
 +++
-
 # =============================================================================
 # ∨ — Bitwise or and est-negation operators.
 # =============================================================================
@@ -37,19 +36,17 @@ locale = "en"
 #   Negated est parses as `expr non est target`.
 
 main {
-    const _ vexilla ← 0b1010
-    const _ persona ← 0b1100
-    const _ velata ← vexilla ∨ persona
+    const int vexilla ← 10
+    const int persona ← 12
+    const int velata ← vexilla ∨ persona
     # 14 (0b1110)
     print velata
-
     const string ∪ null praesens ← "salve"
     const string ∪ null absens ← null
-    const _ habetValorem ← praesens not is null
+    const bool habetValorem ← praesens not is null
     # verum
     print habetValorem
-
-    const _ caretValorem ← absens not is null
+    const bool caretValorem ← absens not is null
     # falsum
     print caretValorem
 }

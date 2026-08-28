@@ -10,7 +10,6 @@ aliases = ["then"]
 related = ["si", "secus"]
 locale = "en"
 +++
-
 # =============================================================================
 # sic — Starts the true branch of a one-line ternary conditional expression.
 # =============================================================================
@@ -40,8 +39,8 @@ locale = "en"
 #
 
 main {
-    const _ a ← 3
-    const _ b ← 9
-    const _ max ← a > b yields a else b
+    const int a ← 3
+    const int b ← 9
+    const int max ← a ≻ b yields a else b
     print max
 }

@@ -9,8 +9,6 @@ syntax = "<expression> aut <expression>"
 related = ["et", "vel", "binarius"]
 locale = "en"
 +++
-
-
 # =============================================================================
 # aut — Short-circuit logical or on bivalent operands.
 # =============================================================================
@@ -39,11 +37,10 @@ locale = "en"
 
 main {
     # left operand: falsum
-    const _ invitatus ← false
+    const bool invitatus ← false
     # right operand: verum
-    const _ membrum ← true
+    const bool membrum ← true
     # falsum aut verum → verum
-    const _ intrat ← invitatus or membrum
-
+    const bool intrat ← invitatus or membrum
     print intrat
 }

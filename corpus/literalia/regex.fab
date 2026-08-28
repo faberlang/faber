@@ -9,7 +9,6 @@ syntax = "<textus> ↦ regex"
 related = ["lege", "conversio", "scriptum"]
 locale = "en"
 +++
-
 # =============================================================================
 # regex — Compile textus patterns to regex via ↦ regex.
 # =============================================================================
@@ -39,14 +38,13 @@ locale = "en"
 #   Cross-ref scriptum/scriptum.fab for § template application.
 
 main {
-    const _ digits ← "\d+" ↦ regex
+    const regex digits ← "\d+" ↦ regex
     print digits
-
-    const _ word ← "(?i)\w+" ↦ regex
+    const regex word ← "(?i)\w+" ↦ regex
     print word
 
     # Template application → textus, then conversio to regex (dynamic path segments)
-    const _ tenant ← "acme"
-    const _ homePath ← "/home/§/.*"(tenant) ↦ regex
+    const string tenant ← "acme"
+    const regex homePath ← "/home/§/.*"(tenant) ↦ regex
     print homePath
 }

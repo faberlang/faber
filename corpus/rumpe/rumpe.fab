@@ -10,7 +10,6 @@ aliases = ["break"]
 related = ["perge", "dum"]
 locale = "en"
 +++
-
 # =============================================================================
 # rumpe — Breaks out of the innermost loop.
 # =============================================================================
@@ -39,9 +38,8 @@ locale = "en"
 
 main {
     # Break when reaching 5
-    var _ i ← 0
-
-    while i < 10 {
+    var int i ← 0
+    while i ≺ 10 {
         if i ≡ 5 {
             break
         }
@@ -50,19 +48,16 @@ main {
     }
 
     # Break in nested loop
-    var _ exterior ← 0
-
-    while exterior < 3 {
-        var _ interior ← 0
-
-        while interior < 10 {
+    var int exterior ← 0
+    while exterior ≺ 3 {
+        var int interior ← 0
+        while interior ≺ 10 {
             if interior ≡ 2 {
                 break
             }
             print "exterior←§, interior←§"(exterior, interior)
             interior ← interior + 1
         }
-
         exterior ← exterior + 1
     }
 }

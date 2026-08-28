@@ -42,6 +42,6 @@ class Color {
 }
 
 main {
-    const _ color ← Color {}
+    const Color color ← Color {}
     print color.nomen
 }

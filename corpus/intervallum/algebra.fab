@@ -37,13 +37,12 @@ main {
     const intervallum<int> early ← 0‥5
     const intervallum<int> late ← 5‥10
     const intervallum<int> workday ← early.union(late) coalesce 0‥0
-    const _ overlap_span ← overlap.length()
-    const _ workday_span ← workday.length()
+    const int overlap_span ← overlap.length()
+    const int workday_span ← workday.length()
     assert overlap_span ≡ 2
     assert workday_span ≡ 10
-
     const intervallum<int> gap_left ← 0‥3
     const intervallum<int> gap_right ← 6‥9
-    const _ no_union ← gap_left.union(gap_right)
+    const intervallum<int> ∪ null no_union ← gap_left.union(gap_right)
     assert no_union is null
 }

@@ -10,7 +10,6 @@ aliases = ["faber.toml", "package manifest"]
 related = ["targets", "cli", "incipit", "proba"]
 locale = "en"
 +++
-
 # =============================================================================
 # manifest — faber.toml package metadata for build, run, and test.
 # =============================================================================

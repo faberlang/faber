@@ -9,7 +9,6 @@ syntax = "dum <condition> <block>"
 related = ["dum", "functio"]
 locale = "en"
 +++
-
 # =============================================================================
 # dum — While loops inside function bodies.
 # =============================================================================
@@ -38,30 +37,25 @@ locale = "en"
 fn factorial(int n) → int {
     var int value ← 1
     var int currens ← n
-
-    while currens > 1 {
+    while currens ≻ 1 {
         value ← value * currens
         currens ← currens - 1
     }
-
     return value
 }
 
 # Doubles until vis exceeds n (first power of two strictly greater than n)
 fn potentia(int n) → int {
     var int vis ← 1
-
     while vis ≤ n {
         vis ← vis * 2
     }
-
     return vis
 }
 
 main {
     print "5! ←", factorial(5)
     print "10! ←", factorial(10)
-
     print "potentia post 100: §"(potentia(100))
     print "potentia post 1000: §"(potentia(1000))
 }

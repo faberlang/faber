@@ -61,13 +61,9 @@ fn media(float a, float b) → float {
 
 main {
     print quadratum(7)
-
     print adde(100, 200)
-
     print narra("Julius", 30)
-
     print nega(true)
     print nega(false)
-
     print media(3.0, 7.0)
 }

@@ -9,7 +9,6 @@ syntax = "cura \"arena\" fixum _ <alloc> { … }"
 related = ["cura", "arena"]
 locale = "en"
 +++
-
 # =============================================================================
 # cura — Nested allocator scopes with inner and outer arena bindings.
 # =============================================================================
@@ -38,9 +37,11 @@ locale = "en"
 #   "outer" then "inner" lines.
 
 main {
-    with "arena" const _ outer {
+    {
+        const any outer
         print "outer"
-        with "arena" const _ inner {
+        {
+            const any inner
             print "inner"
         }
     }

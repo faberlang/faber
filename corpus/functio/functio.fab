@@ -36,12 +36,12 @@ locale = "en"
 #   functio.expected — four diagnostics (greetings, name, integer).
 
 # Function with no parameters, no return
-fn saluta() {
+fn saluta() → void {
     print "Salve, Mundus!"
 }
 
 # Function with parameter, no explicit return type
-fn dic(string verbum) {
+fn dic(string verbum) → void {
     print verbum
 }
 
@@ -57,11 +57,8 @@ fn duplica(int n) → int {
 
 main {
     saluta()
-
     dic("Bonum diem!")
-
-    const _ rex ← nomen()
+    const string rex ← nomen()
     print rex
-
     print duplica(21)
 }

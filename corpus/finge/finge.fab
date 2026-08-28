@@ -42,14 +42,23 @@ union Condicio {
 }
 
 union Nuntius {
-    Pulsus { int x int y },
-    Clavis { string clavis },
+    Pulsus {
+        int x
+        int y
+    },
+    Clavis {
+        string clavis
+    },
     Finis
 }
 
 union Responsum {
-    Bonum { string nuntius },
-    Malum { string causa }
+    Bonum {
+        string nuntius
+    },
+    Malum {
+        string causa
+    }
 }
 
 main {
@@ -68,6 +77,5 @@ main {
 
     const Responsum r1 ← variant Bonum { nuntius = "opus perfectum" } ∷ Responsum
     const Responsum r2 ← variant Malum { causa = "opus fractum" } ∷ Responsum
-
     print "finge expressiones paratae"
 }

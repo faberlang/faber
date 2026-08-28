@@ -56,23 +56,9 @@ fn scale(bool compact, int base) → int {
     return base * factor
 }
 
-main {
-    const _ nomen ← "Marcus"
-    const _ salve ← "Salve, §!"(nomen)
-
-    print salve
-
-    const int pending
-    pending ← 7
-    print pending
-
-    print scale(true, 3)
-    print scale(false, 3)
-}
-
 test "fixum immediate init" {
-    const _ nomen ← "Marcus"
-    const _ salve ← "Salve, §!"(nomen)
+    const string nomen ← "Marcus"
+    const string salve ← "Salve, §!"(nomen)
     assert nomen ≡ "Marcus"
     assert salve ≡ "Salve, Marcus!"
 }
@@ -86,4 +72,15 @@ test "fixum deferred init writes once" {
 test "fixum factor selected per branch" {
     assert scale(true, 3) ≡ 30
     assert scale(false, 3) ≡ 300
+}
+
+main {
+    const string nomen ← "Marcus"
+    const string salve ← "Salve, §!"(nomen)
+    print salve
+    const int pending
+    pending ← 7
+    print pending
+    print scale(true, 3)
+    print scale(false, 3)
 }

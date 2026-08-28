@@ -9,7 +9,6 @@ syntax = "<numerus<i8>> + <numerus<i8>>"
 related = ["numerus", "+", "modulus<u8>"]
 locale = "en"
 +++
-
 # =============================================================================
 # numerus — Checked numerus arithmetic traps at sized widths instead of wrapping.
 # =============================================================================

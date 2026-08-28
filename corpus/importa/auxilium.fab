@@ -41,7 +41,7 @@ locale = "en"
 #
 # BACKEND: importa/importa.fab whitelisted when compiled alone (no sibling link).
 
-@ public
+@ public { }
 fn saluta(string nomen) → string {
     return "Salve, §!"(nomen)
 }

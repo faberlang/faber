@@ -39,11 +39,9 @@ locale = "en"
 
 main {
     const float value ← -3.75
-
-    const _ absolutus ← value.abs()
-    const _ signum ← value.sign()
-    const _ minor ← value.minimum(2.5)
-    const _ maior ← value.maximum(2.5)
-
+    const float absolutus ← value.abs()
+    const float signum ← value.sign()
+    const float minor ← value.minimum(2.5)
+    const float maior ← value.maximum(2.5)
     print absolutus, signum, minor, maior
 }

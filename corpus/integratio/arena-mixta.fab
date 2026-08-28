@@ -50,26 +50,22 @@ class Nauta {
 }
 
 fn classificata(int n) → string {
-    return n ≥ 10 yields "veteranus" else (n ≥ 5 yields "peritus" else "novus")
+    return n ≥ 10 yields "veteranus" else n ≥ 5 yields "peritus" else "novus"
 }
 
 main {
-    const _ nautae ← [Nauta { nomen = "Aelia", navis = "Fortuna", gradus = 12 }, Nauta { nomen = "Brutus", gradus = 3 }, Nauta { nomen = "Claudia", navis = "Aurora", gradus = 7 }]
-
-    const _ titulus ← Nauta n → string ∴ do {
-        const _ navis ← n?.navis coalesce "nulla navis"
+    const list<Nauta, 3> nautae ← [Nauta { nomen = "Aelia", navis = "Fortuna", gradus = 12 }, Nauta { nomen = "Brutus", gradus = 3 }, Nauta { nomen = "Claudia", navis = "Aurora", gradus = 7 }]
+    const (Nauta) → string titulus ← Nauta n → string ∴ do {
+        const string navis ← n?.navis coalesce "nulla navis"
         return "§ :: § :: §"(n.nomen, navis, classificata(n.gradus))
     }
-
     for from nautae const n {
         print titulus(n)
     }
-
     var list<int> gradus ← empty
     for range 0…6 step 2 const i {
         gradus.append(i * 3)
     }
-
-    const _ magni ← gradus.filter(int g ∴ g ≥ 6).map(int g ∴ g + 1)
+    const list<int> magni ← gradus.filter(int g ∴ g ≥ 6).map(int g ∴ g + 1)
     print magni
 }

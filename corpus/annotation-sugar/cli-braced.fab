@@ -9,7 +9,6 @@ syntax = "@ cli { nomen = \"NAME\" }"
 related = ["cli", "optio", "annotation-sugar"]
 locale = "en"
 +++
-
 # =============================================================================
 # cli — Braced canonical @ cli program marker.
 # =============================================================================
@@ -31,12 +30,7 @@ locale = "en"
 # TARGET: annotation-sugar stage 2
 # PAIR: sugar `@ cli "NAME"` (see optio/optio.fab)
 
-@ cli { nomen = "annotation-sugar-smoke" }
-@ option {
-    binding = verbose,
-    brevis = "v",
-    longum = "verbose",
-    typus = bool,
-    descriptio = "Verbose mode"
+@ cli { name = "annotation-sugar-smoke" }
+@ option { binding = verbose, short = "v", long = "verbose", type = bool, description = "Verbose mode" }
+main args args {
 }
-main args args { }

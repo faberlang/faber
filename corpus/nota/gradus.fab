@@ -9,8 +9,6 @@ syntax = "nota <expr> | vide <expr> | mone <expr>"
 related = ["nota", "vide", "mone", "scribe"]
 locale = "en"
 +++
-
-
 # =============================================================================
 # nota — Diagnostic output severities: nota, vide, and mone.
 # =============================================================================
@@ -38,8 +36,8 @@ locale = "en"
 #   none — output mixes diagnostic channels; no .expected sidecar.
 
 main {
-    const _ condicio ← "currit"
-    const _ quantitas ← 42
+    const string condicio ← "currit"
+    const int quantitas ← 42
 
     # Neutral diagnostic note
     print "opus initum"

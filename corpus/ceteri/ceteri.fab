@@ -10,8 +10,6 @@ aliases = ["rest"]
 related = ["functio", "operandus", "ex"]
 locale = "en"
 +++
-
-
 # =============================================================================
 # ceteri — Collects remaining parameters, operands, or extracted fields.
 # =============================================================================
@@ -38,13 +36,11 @@ locale = "en"
 # EXPECTED OUTPUT:
 #   none
 
-fn summa(rest list<int> numeri) → int {
-    var _ total ← 0
-
+fn summa(list<int> numeri) → int {
+    var int total ← 0
     for from numeri const n {
         total ← total + n
     }
-
     return total
 }
 

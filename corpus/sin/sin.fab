@@ -10,7 +10,6 @@ aliases = ["else if"]
 related = ["si", "secus"]
 locale = "en"
 +++
-
 # =============================================================================
 # sin — Adds an else-if branch after a previous si branch.
 # =============================================================================
@@ -39,7 +38,7 @@ locale = "en"
 #
 
 main {
-    const _ score ← 85
+    const int score ← 85
     if score ≥ 90 {
         print "excellent"
     }

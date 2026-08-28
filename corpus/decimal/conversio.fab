@@ -9,7 +9,6 @@ syntax = "a ↦ numerus<d64>"
 related = ["↦", "numerus", "d32", "fractus"]
 locale = "en"
 +++
-
 # =============================================================================
 # d64 — the decimal conversio rows
 # =============================================================================
@@ -44,28 +43,21 @@ locale = "en"
 #   decimal-conversio.expected — one raw value per print, in order.
 
 main {
-    const numerus<d32> a ← 4.2
-
-    const numerus<i64> i ← a ↦ numerus<i64>
+    const int<d32> a ← 4.2
+    const int<i64> i ← a ↦ int<i64>
     print i
-
-    const numerus<i64> n ← 5
-    const numerus<d32> d ← n ↦ numerus<d32>
+    const int<i64> n ← 5
+    const int<d32> d ← n ↦ int<d32>
     print d
-
-    const fractus f ← a ↦ fractus
+    const float f ← a ↦ float
     print f
-
-    const fractus g ← 1.5
-    const numerus<d32> h ← g ↦ numerus<d32>
+    const float g ← 1.5
+    const int<d32> h ← g ↦ int<d32>
     print h
-
-    const numerus<d64> w ← a ↦ numerus<d64>
+    const int<d64> w ← a ↦ int<d64>
     print w
-
-    const numerus<d32> p ← 2.5
-    print p ↦ numerus<i64>
-
-    const numerus<d32> r ← 3.5
-    print r ↦ numerus<i64>
+    const int<d32> p ← 2.5
+    print p ↦ int<i64>
+    const int<d32> r ← 3.5
+    print r ↦ int<i64>
 }

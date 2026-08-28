@@ -10,7 +10,6 @@ aliases = ["guard"]
 related = ["si", "redde"]
 locale = "en"
 +++
-
 # =============================================================================
 # custodi — Groups early-exit guard checks before the main body of a function.
 # =============================================================================
@@ -42,16 +41,15 @@ fn divide(int a, int b) → int {
             return 0
         }
     }
-
     return a / b
 }
 
 fn tracta(int x) → int {
     guard {
-        if x < 0 {
+        if x ≺ 0 {
             return -1
         }
-        if x > 100 {
+        if x ≻ 100 {
             return -1
         }
     }
@@ -62,14 +60,13 @@ fn tracta(int x) → int {
 
 fn stringe(int value, int minimum, int maximum) → int {
     guard {
-        if minimum > value {
+        if minimum ≻ value {
             return minimum
         }
-        if maximum < value {
+        if maximum ≺ value {
             return maximum
         }
     }
-
     return value
 }
 
@@ -82,7 +79,6 @@ main {
     print tracta(50)
     print tracta(-10)
     print tracta(150)
-
     print stringe(5, 0, 10)
     print stringe(-5, 0, 10)
     print stringe(15, 0, 10)

@@ -10,7 +10,6 @@ aliases = ["iterate"]
 related = ["ex", "de", "ab"]
 locale = "en"
 +++
-
 # =============================================================================
 # itera — Starts a for-each iteration statement.
 # =============================================================================
@@ -46,7 +45,7 @@ main {
     }
 
     # Explicit exclusive with ante (same as ‥)
-    for range 0 before 5 const i {
+    for range 0‥5 const i {
         print i
     }
 

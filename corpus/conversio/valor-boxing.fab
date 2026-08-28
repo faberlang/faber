@@ -9,7 +9,6 @@ syntax = "<typed-expression> ↦ valor"
 related = ["↦", "valor", "octeti", "lista", "tabula", "genus", "tensor"]
 locale = "en"
 +++
-
 # =============================================================================
 # valor — T ↦ valor boxing for scalar, byte, collection, genus, and tensor carriers.
 # =============================================================================
@@ -39,23 +38,18 @@ main {
     const int n ← 42
     const value scalar ← n ↦ value
     print scalar
-
     const bytes bytes ← |de ad|
     const value boxedBytes ← bytes ↦ value
     print boxedBytes
-
     const list<int> numeri ← [1, 2]
     const value boxedList ← numeri ↦ value
     print boxedList
-
     const map<string, int> scores ← { "alpha": 10 }
     const value boxedMap ← scores ↦ value
     print boxedMap
-
     const Punctum punctum ← Punctum { x = 3, y = 4 }
     const value boxedGenus ← punctum ↦ value
     print boxedGenus
-
     const tensor<int, [2]> grid ← [5, 6] ↦ tensor<int, [2]>
     const value boxedTensor ← grid ↦ value
     print boxedTensor

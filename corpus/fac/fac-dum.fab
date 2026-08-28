@@ -38,11 +38,10 @@ main {
     do {
         counter ← counter + 1
         print "Iteration §"(counter)
-    } while counter < 3
-
+    } while counter ≺ 3
     var int attempts ← 0
     do {
         attempts ← attempts + 1
         print "Attempt §"(attempts)
-    } while attempts < 2
+    } while attempts ≺ 2
 }

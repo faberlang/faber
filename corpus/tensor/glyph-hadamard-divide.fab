@@ -9,7 +9,6 @@ syntax = "<expression> ⊘ <expression>"
 related = ["tensor", "arithmetic"]
 locale = "en"
 +++
-
 # =============================================================================
 # ⊘ — glyph Hadamard divide (identical-shape elementwise division).
 # =============================================================================
@@ -37,9 +36,9 @@ fn hadamard_divide(tensor<f32, [2, 2]> numerator, tensor<f32, [2, 2]> denominato
 main {
     const list<f32> flat_numerator ← [2.0, 4.0, 9.0, 16.0]
     const list<f32> flat_denominator ← [1.0, 2.0, 3.0, 4.0]
-    const tf32[] seed ← empty
-    var tf32[2, 2] numerator ← seed.from_flat(flat_numerator, [2, 2])
-    var tf32[2, 2] denominator ← seed.from_flat(flat_denominator, [2, 2])
-    const tf32[2, 2] result ← hadamard_divide(numerator, denominator)
+    const tensor<f32, []> seed ← empty
+    var tensor<f32, [2, 2]> numerator ← seed.from_flat(flat_numerator, [2, 2])
+    var tensor<f32, [2, 2]> denominator ← seed.from_flat(flat_denominator, [2, 2])
+    const tensor<f32, [2, 2]> result ← hadamard_divide(numerator, denominator)
     print result.flatten()
 }

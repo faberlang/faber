@@ -9,7 +9,6 @@ syntax = "for range <a>‥<b> step <s>, <c>‥<d> const <i>, <j> { }"
 related = ["ex", "de", "apud"]
 locale = "en"
 +++
-
 # =============================================================================
 # range product semantics — the sign/offset/step matrix, end to end.
 # =============================================================================

@@ -9,7 +9,6 @@ syntax = "<expression> ⤒ <expression> | <expression> ⤓ <expression>"
 related = ["⤒", "⤓", "maximus", "minimus", "lista", "tensor"]
 locale = "en"
 +++
-
 # =============================================================================
 # ⤒ / ⤓ — maximum, minimum, and chained clamp.
 # =============================================================================
@@ -27,16 +26,14 @@ locale = "en"
 #   1.5
 
 main {
-    const int scalar ← 2 ⤒ 5
+    const int scalar ← 2.maximum(5)
     print scalar
-
     const list<int> values ← [1, 5, 9]
-    const list<int> clamped ← values ⤒ 4 ⤓ 8
+    const list<int> clamped ← values.maximum(4).minimum(8)
     print clamped.sum()
-
     const list<f32> flat ← [-1.0, 0.5, 2.0]
-    const tf32[] seed ← empty
-    const tf32[3] values_tensor ← seed.from_flat(flat, [3])
-    const tf32[3] clamped_tensor ← values_tensor ⤒ 0.0 ⤓ 1.0
+    const tensor<f32, []> seed ← empty
+    const tensor<f32, [3]> values_tensor ← seed.from_flat(flat, [3])
+    const tensor<f32, [3]> clamped_tensor ← values_tensor.maximum(0.0).minimum(1.0)
     print clamped_tensor.sum()
 }

@@ -9,7 +9,6 @@ syntax = "modulus<u64>"
 related = ["numerus", "¬", "⇐", "⇒"]
 locale = "en"
 +++
-
 # =============================================================================
 # modulus<u64> — Unsigned 64-bit modular-word arithmetic and bit-pattern edges.
 # =============================================================================
@@ -36,7 +35,6 @@ main {
     const uint<u64> one ← 1
     var uint<u64> zero ← 0
     const int<u64> converted ↤ one
-
     print max + one
     print zero - one
     print max * 2
@@ -44,19 +42,17 @@ main {
     print ¬zero
     print one ⇐ 64
     print max ⇒ 64
-    print max > zero
+    print max ≻ zero
 
     # Carrier-mix equality: conversions and arithmetic results compare by
     # value against literals (review regression).
     const uint<u64> uno ↤ 1
     print one ≡ uno
     print one ≡ one + 0
-
     max ↑
     zero ↓
     print max
     print zero
-
     const uint<u64> methodSum ← max.added(one)
     const uint<u64> methodShift ← max.shifted_left(64)
     var uint<u64> methodAcc ← 0
@@ -66,10 +62,8 @@ main {
     print methodSum
     print methodShift
     print methodAcc
-
     const list<uint<u64>> words ← [one, max]
-    print words.get(1) coalesce (0 ∷ uint<u64>)
-
+    print words.get(1) coalesce 0 ∷ uint<u64>
     var list<uint<u64>> sorted ← [18446744073709551615, 3, 10, 2]
     sorted.sort()
     print sorted

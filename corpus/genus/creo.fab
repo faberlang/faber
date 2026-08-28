@@ -42,12 +42,11 @@ locale = "en"
 class Terminus {
     int valor = 0
 
-    fn creo() {
-        if self.valor < 0 {
+    fn creo() → void {
+        if self.valor ≺ 0 {
             self.valor ← 0
         }
-
-        if self.valor > 100 {
+        if self.valor ≻ 100 {
             self.valor ← 100
         }
     }
@@ -62,34 +61,25 @@ class Circulus {
     int diameter = 0
     float area = 0
 
-    fn creo() {
+    fn creo() → void {
         self.diameter ← self.radius * 2
-        self.area ← 3.14159 * (self.radius ↦ float) * (self.radius ↦ float)
+        self.area ← (3.14159 * (self.radius ↦ float)) * (self.radius ↦ float)
     }
 }
 
 main {
     # --- Validation in creo ---
 
-    const _ rectus ← Terminus {
-        valor = 50
-    }
-
+    const Terminus rectus ← Terminus { valor = 50 }
     print rectus.accipe()
 
     # creo clamps to 100
-    const _ coactus ← Terminus {
-        valor = 200
-    }
-
+    const Terminus coactus ← Terminus { valor = 200 }
     print coactus.accipe()
 
     # --- Derived initialization in creo ---
 
-    const _ c ← Circulus {
-        radius = 5
-    }
-
+    const Circulus c ← Circulus { radius = 5 }
     print c.radius
     print c.diameter
     print c.area

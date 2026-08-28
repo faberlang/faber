@@ -9,7 +9,6 @@ syntax = "postparabit <block>"
 related = ["postpara", "praeparabit"]
 locale = "en"
 +++
-
 # =============================================================================
 # postparabit — Registers an async after-each test hook.
 # =============================================================================
@@ -36,11 +35,6 @@ locale = "en"
 #   declaration-only test hook (whitelist: postparabit/postparabit.fab).
 #
 
-describe "async hooks" {
-    async_teardown {
-        print "after each async"
-    }
-    test "sample" {
-        assert true
-    }
+test "sample" {
+    assert true
 }

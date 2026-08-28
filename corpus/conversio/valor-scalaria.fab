@@ -9,7 +9,6 @@ syntax = "<valor-expression> ↦ numerus | fractus | bivalens | textus | ascii |
 related = ["↦", "⇥", "instans", "textus"]
 locale = "en"
 +++
-
 # =============================================================================
 # valor — Scalar valor ↦ T extraction via FromValor (variant match, fractus widen, textus|instans wire).
 # =============================================================================
@@ -38,35 +37,27 @@ main {
     const value asInt ← 42
     const int count ← asInt ↦ int
     assert count ≡ 42
-
     const value asFloat ← 3.5
     const float ratio ← asFloat ↦ float
     assert ratio ≡ 3.5
-
     const value intForFloat ← 7
     const float widened ← intForFloat ↦ float
     assert widened ≡ 7.0
-
     const value asBool ← true
     const bool flag ← asBool ↦ bool
     assert flag ≡ true
-
     const value asText ← "salve"
     const string greeting ← asText ↦ string
     assert greeting ≡ "salve"
-
     const value asWire ← "1979-05-27T07:32:00Z"
     const string wire ← asWire ↦ string
     assert wire ≡ "1979-05-27T07:32:00Z"
-
     const value asAscii ← 'yes'
     const ascii token ← asAscii ↦ ascii
     assert token ≡ 'yes'
-
     const value bad ← "not-a-number"
     const int recovered ← bad ↦ int ⇥ 0
     assert recovered ≡ 0
-
     print count
     print ratio
     print widened

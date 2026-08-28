@@ -34,8 +34,8 @@ locale = "en"
 #   none — stdout not pinned for this exemplum.
 
 main {
-    const _ condicio ← "agens"
-    const _ aetas ← 21
+    const string condicio ← "agens"
+    const int aetas ← 21
 
     # Basic inter with textus lista
     if condicio between ["pendens", "agens", "pausa"] {
@@ -46,6 +46,5 @@ main {
     if aetas between [18, 21, 65] {
         print "aetas insignis"
     }
-
     print "exempla inter"
 }

@@ -9,7 +9,6 @@ syntax = "@ descriptio <string>"
 related = ["versio"]
 locale = "en"
 +++
-
 # =============================================================================
 # descriptio — Attaches a description string to CLI metadata.
 # =============================================================================
@@ -36,7 +35,7 @@ locale = "en"
 #   declaration-only CLI metadata (whitelist: descriptio/descriptio.fab).
 #
 
-@ cli "descriptio-smoke"
+@ cli { name = "descriptio-smoke" }
 @ description "Short CLI description"
 main args args {
 }

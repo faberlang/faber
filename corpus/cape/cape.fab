@@ -10,7 +10,6 @@ aliases = ["catch"]
 related = ["fac", "iace", "⇥"]
 locale = "en"
 +++
-
 # =============================================================================
 # cape — Starts a catch block.
 # =============================================================================
@@ -43,7 +42,7 @@ main {
     var int attempt ← 0
     do {
         attempt ← attempt + 1
-        if attempt > 1 {
+        if attempt ≻ 1 {
             throw "simulated failure"
         }
         print "attempt §"(attempt)

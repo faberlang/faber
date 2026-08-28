@@ -10,7 +10,6 @@ aliases = ["return"]
 related = ["vacuum", "functio"]
 locale = "en"
 +++
-
 # =============================================================================
 # redde — Function returning an integer literal via redde 42.
 # =============================================================================

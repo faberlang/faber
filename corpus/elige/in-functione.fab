@@ -9,7 +9,6 @@ syntax = "elige <expression> { casu … redde … }"
 related = ["elige", "redde", "functio"]
 locale = "en"
 +++
-
 # =============================================================================
 # elige — Early returns from elige inside functions.
 # =============================================================================
@@ -39,7 +38,7 @@ locale = "en"
 #   Greetings and status strings for known and unknown inputs.
 
 fn saluta(string lingua) → string {
-    switch lingua {
+    match lingua {
         case "latina" {
             return "Salve"
         }
@@ -59,7 +58,7 @@ fn saluta(string lingua) → string {
 }
 
 fn nuntius(int codex) → string {
-    switch codex {
+    match codex {
         case 1 {
             return "paratum"
         }
@@ -82,7 +81,6 @@ main {
     print saluta("latina")
     print saluta("etrusca")
     print saluta("ignota")
-
     print nuntius(1)
     print nuntius(4)
     print nuntius(9)

@@ -10,7 +10,6 @@ aliases = ["iterate"]
 related = ["ex", "de", "ab"]
 locale = "en"
 +++
-
 # =============================================================================
 # itera — Starts a for-each iteration statement.
 # =============================================================================
@@ -42,9 +41,8 @@ locale = "en"
 
 main {
     # Nested lista iteration — 3 × 3 combinations
-    const _ rows ← [1, 2, 3]
-    const _ cols ← ["A", "B", "C"]
-
+    const list<int, 3> rows ← [1, 2, 3]
+    const list<string, 3> cols ← ["A", "B", "C"]
     for from rows const row {
         for from cols const col {
             print row, col

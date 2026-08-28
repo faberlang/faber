@@ -9,7 +9,6 @@ syntax = "<lista>.sum()"
 related = ["prima", "ultima", "lista"]
 locale = "en"
 +++
-
 # =============================================================================
 # summa — Returns the sum of numeric list elements.
 # =============================================================================
@@ -44,13 +43,11 @@ locale = "en"
 # (whitelist: lista/methodi-functionales.fab).
 
 main {
-    const _ res ← [1, 2, 3, 4, 5] ∷ list<int>
-
-    const _ pares ← res.filter(int x ∴ x % 2 ≡ 0)
-    const _ duplicata ← res.map(int x ∴ x * 2)
-    const _ summa ← res.reduce((int collectus, int x) ∴ collectus + x, 0)
-    const _ cumulata ← res.cumulate((int collectus, int x) ∴ collectus + x, 0)
-
+    const list<int> res ← [1, 2, 3, 4, 5] ∷ list<int>
+    const list<int> pares ← res.filter(int x ∴ x % 2 ≡ 0)
+    const list<int> duplicata ← res.map(int x ∴ x * 2)
+    const int summa ← res.reduce((int collectus, int x) ∴ collectus + x, 0)
+    const list<int> cumulata ← res.cumulate((int collectus, int x) ∴ collectus + x, 0)
     print pares
     print duplicata
     print summa

@@ -9,7 +9,6 @@ syntax = "de <expression>"
 related = ["ex", "in"]
 locale = "en"
 +++
-
 # =============================================================================
 # de — Introduces borrowed iteration or borrowed parameters.
 # =============================================================================
@@ -42,7 +41,7 @@ main {
     for ref persona const clavis {
         print clavis
     }
-    const _ numeri ← [10, 20, 30]
+    const list<int, 3> numeri ← [10, 20, 30]
     for ref numeri const index {
         print index
     }

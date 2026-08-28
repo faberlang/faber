@@ -9,7 +9,6 @@ syntax = "<textus> ↦ numerus<W, Radix>"
 related = ["↦", "numerus", "textus"]
 locale = "en"
 +++
-
 # =============================================================================
 # ↦ — Radix-parameterized integer parsing from textus.
 # =============================================================================
@@ -41,10 +40,9 @@ locale = "en"
 #   HIR-direct Rust and MIR-stepper routes must agree for radix parsing.
 
 main {
-    const _ hex ← "ff" ↦ int<i32, Hex>
-    const _ bin ← "1010" ↦ int<i32, Bin>
-    const _ oct ← "755" ↦ int<i32, Oct>
-
+    const int<i32> hex ← "ff" ↦ int<i32><Hex>
+    const int<i32> bin ← "1010" ↦ int<i32><Bin>
+    const int<i32> oct ← "755" ↦ int<i32><Oct>
     print hex
     print bin
     print oct

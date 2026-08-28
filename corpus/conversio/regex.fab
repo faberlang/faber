@@ -9,7 +9,6 @@ syntax = "<textus-or-ascii> ↦ regex"
 related = ["↦", "regex", "textus", "ascii"]
 locale = "en"
 +++
-
 # =============================================================================
 # regex — Regex carrier construction from textus and ascii.
 # =============================================================================
@@ -35,11 +34,9 @@ main {
     const string digitsWire ← "\d+"
     const regex digits ← digitsWire ↦ regex
     print digits
-
     const ascii wordWire ← '(?i)[a-z]+'
     const regex word ← wordWire ↦ regex
     print word
-
     const string brokenWire ← "\d["
     const regex broken ← brokenWire ↦ regex
     print broken

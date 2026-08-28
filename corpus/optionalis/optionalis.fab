@@ -9,8 +9,6 @@ syntax = "<expression>?.<name> | <expression>?[<expression>]"
 related = ["?.", "sponte", "vel"]
 locale = "en"
 +++
-
-
 # =============================================================================
 # ?. — Optional chaining for nested voluntary field access.
 # =============================================================================
@@ -49,33 +47,27 @@ class Civis {
 main {
     # --- Civis with full locus ---
 
-    const _ aelia ← Civis {
-        nomen = "Aelia",
-        locus = Locus { urbs = "Roma", regio = "Italia" }
-    }
-
-    const _ urbs ← aelia?.locus?.urbs
+    const Civis aelia ← Civis { nomen = "Aelia", locus = Locus { urbs = "Roma", regio = "Italia" } }
+    const string ∪ null urbs ← aelia?.locus?.urbs
     # "Roma"
     print urbs
-
-    const _ regio ← aelia?.locus?.regio
+    const string ∪ null regio ← aelia?.locus?.regio
     # "Italia"
     print regio
 
     # --- Civis with no locus (chain short-circuits to nihil) ---
 
-    const _ brutus ← Civis { nomen = "Brutus" }
-    const _ urbs2 ← brutus?.locus?.urbs
+    const Civis brutus ← Civis { nomen = "Brutus" }
+    const string ∪ null urbs2 ← brutus?.locus?.urbs
     # nihil
     print urbs2
-
-    const _ regio2 ← brutus?.locus?.regio
+    const string ∪ null regio2 ← brutus?.locus?.regio
     # nihil
     print regio2
 
     # --- Accessus optionalis on lista ---
 
-    const _ litterae ← ["a", "b", "c"]
+    const list<string, 3> litterae ← ["a", "b", "c"]
     # "a"
     print litterae?[0]
     # nihil (out of range)
@@ -83,7 +75,7 @@ main {
 
     # --- Combining with vel for defaults ---
 
-    const _ defecta ← brutus?.locus?.urbs coalesce "ignota"
+    const string defecta ← brutus?.locus?.urbs coalesce "ignota"
     # "ignota"
     print defecta
 }

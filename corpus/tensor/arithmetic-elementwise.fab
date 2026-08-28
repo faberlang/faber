@@ -9,7 +9,6 @@ syntax = "tensor + other | tensor - other | tensor.added(other) (non-preferred) 
 related = ["tensor", "fractus", "lista"]
 locale = "en"
 +++
-
 # =============================================================================
 # tensor — Tensor elementwise arithmetic with addita, subtrahe, and multiplica.
 # =============================================================================
@@ -38,15 +37,12 @@ locale = "en"
 main {
     const list<f32> flat_a ← [1.0, 2.0, 3.0, 4.0]
     const list<f32> flat_b ← [10.0, 20.0, 30.0, 40.0]
-    const tf32[] seed ← empty
-
-    var tf32[2, 2] a ← seed.from_flat(flat_a, [2, 2])
-    var tf32[2, 2] b ← seed.from_flat(flat_b, [2, 2])
-
-    const tf32[2, 2] sum ← a + b
-    const tf32[2, 2] diff ← sum - b
-    const tf32[2, 2] prod ← diff.multiply(a)
-
+    const tensor<f32, []> seed ← empty
+    var tensor<f32, [2, 2]> a ← seed.from_flat(flat_a, [2, 2])
+    var tensor<f32, [2, 2]> b ← seed.from_flat(flat_b, [2, 2])
+    const tensor<f32, [2, 2]> sum ← a + b
+    const tensor<f32, [2, 2]> diff ← sum - b
+    const tensor<f32, [2, 2]> prod ← diff.multiply(a)
     const list<f32> out ← prod.flatten()
     print out
 }

@@ -8,7 +8,6 @@ syntax = "lista<int<u8>, N> ↦ octeti<M>"
 related = ["↦", "lista", "octeti", "u8"]
 locale = "en"
 +++
-
 # =============================================================================
 # bounded lista to octeti — compile-admitted byte carrier route
 # =============================================================================

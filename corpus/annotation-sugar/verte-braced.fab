@@ -9,7 +9,6 @@ syntax = "@ verte { target = rs, methodus = \"…\" }"
 related = ["verte", "annotation-sugar"]
 locale = "en"
 +++
-
 # =============================================================================
 # verte — Braced canonical @ verte rename mapping.
 # =============================================================================

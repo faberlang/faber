@@ -9,7 +9,6 @@ syntax = "de <expression>"
 related = ["ex", "in"]
 locale = "en"
 +++
-
 # =============================================================================
 # de — Introduces borrowed iteration or borrowed parameters.
 # =============================================================================
@@ -38,7 +37,6 @@ locale = "en"
 main {
     # Iterate over tabula keys
     const map<string, string> persona ← { "nomen": "Marcus", "urbs": "Roma" }
-
     for ref persona const clavis {
         print clavis
     }
@@ -49,8 +47,7 @@ main {
     }
 
     # Iterate over lista indices
-    const _ numeri ← [10, 20, 30]
-
+    const list<int, 3> numeri ← [10, 20, 30]
     for ref numeri const index {
         print "index: § valor: §"(index, numeri[index])
     }

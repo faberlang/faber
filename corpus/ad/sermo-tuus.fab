@@ -8,7 +8,6 @@ summary = "typed inbound sermo stream view"
 related = ["ad", "sermo", "scrinium", "cursor"]
 locale = "en"
 +++
-
 # =============================================================================
 # tuus — typed inbound sermo stream view.
 # =============================================================================
@@ -28,8 +27,7 @@ locale = "en"
 # sermo.tuus<T>() — typed inbound frame stream
 
 main {
-    const _ s ← call 'runtime:echo' ("salve")
-
+    const sermo s ← call 'runtime:echo' ("salve")
     for from s.tuus<string>().cursor() const frame {
         assert frame.data ≡ "salve"
     }

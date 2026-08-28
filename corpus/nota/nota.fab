@@ -9,8 +9,6 @@ syntax = "scribe <expression>"
 related = ["vide", "mone"]
 locale = "en"
 +++
-
-
 # =============================================================================
 # scribe — Writes a value to standard output.
 # =============================================================================
@@ -43,17 +41,17 @@ main {
     print "Salve, Munde!"
 
     # Variable output
-    const _ nomen ← "Marcus"
+    const string nomen ← "Marcus"
     print nomen
 
     # Multiple arguments
-    const _ aetas ← 30
+    const int aetas ← 30
     print "nomen: §"(nomen)
     print "aetas: §"(aetas)
 
     # Expressions
-    const _ x ← 10
-    const _ y ← 20
+    const int x ← 10
+    const int y ← 20
     print "summa: §"(x + y)
 
     # Multiple values in one statement

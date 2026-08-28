@@ -53,11 +53,9 @@ async_main {
     print "incipiet initium"
 
     # Await fiet functions with figendum
-    await_const _ datum ← accipe()
+    await_const string datum ← accipe()
     print "acceptum: §"(datum)
-
-    await_const _ longitudo ← metire(datum)
+    await_const int longitudo ← metire(datum)
     print "longitudo: §"(longitudo)
-
     print "opus perfectum"
 }

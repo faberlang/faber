@@ -9,7 +9,6 @@ syntax = "tensor<T, F> ↦ sparsa<T, F> | sparsa<T, F> ↦ tensor<T, F>"
 related = ["sparsa", "tensor", "↦"]
 locale = "en"
 +++
-
 # =============================================================================
 # sparsa — Same-shape tensor ↔ sparsa representation conversio.
 # =============================================================================
@@ -33,9 +32,8 @@ locale = "en"
 #   Sparse stored count and dense round-trip rank.
 
 main {
-    const tf32[2, 2] dense ← [[1.0, 0.0], [0.0, 2.0]] ↦ tf32[2, 2]
-    const sf32[2, 2] sparse ← dense ↦ sf32[2, 2]
-    const tf32[2, 2] roundtrip ← sparse ↦ tf32[2, 2]
-
+    const tensor<f32, [2, 2]> dense ← [[1.0, 0.0], [0.0, 2.0]] ↦ tensor<f32, [2, 2]>
+    const sparsa<f32, [2, 2]> sparse ← dense ↦ sparsa<f32, [2, 2]>
+    const tensor<f32, [2, 2]> roundtrip ← sparse ↦ tensor<f32, [2, 2]>
     print sparse.nonzero_count(), roundtrip.length()
 }

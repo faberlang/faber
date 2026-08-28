@@ -9,7 +9,6 @@ syntax = "-<expr> | non <expr> | <expr> > 0 | <expr> est nihil"
 related = ["non", "est", "non est"]
 locale = "en"
 +++
-
 # =============================================================================
 # unarius — Unary negation, logical not, sign comparisons, and optional presence tests.
 # =============================================================================
@@ -40,28 +39,28 @@ locale = "en"
 
 main {
     # Numeric negation
-    const _ x ← 5
-    const _ neg ← -x
+    const int x ← 5
+    const int neg ← -x
     # -5
     print neg
 
     # Logical negation
-    const _ flag ← true
-    const _ non_signum ← not flag
+    const bool flag ← true
+    const bool non_signum ← not flag
     # falsum
     print non_signum
 
     # Positive/negative checks
-    const _ a ← 10
-    const _ b ← -3
+    const int a ← 10
+    const int b ← -3
     # verum
-    print a > 0
+    print a ≻ 0
     # falsum
-    print a < 0
+    print a ≺ 0
     # falsum
-    print b > 0
+    print b ≻ 0
     # verum
-    print b < 0
+    print b ≺ 0
 
     # Null checks
     const string ∪ null forsitan ← null
@@ -69,7 +68,6 @@ main {
     print forsitan is null
     # falsum
     print forsitan not is null
-
     const string ∪ null adest ← "salve"
     # falsum
     print adest is null

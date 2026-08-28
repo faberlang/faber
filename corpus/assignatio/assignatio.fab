@@ -10,8 +10,6 @@ aliases = ["assignment", "assign"]
 related = ["=", "fixum", "varia", "↑", "↓"]
 locale = "en"
 +++
-
-
 # =============================================================================
 # ← — Assigns a value to a binding, field, or assignable expression.
 # =============================================================================
@@ -47,27 +45,21 @@ locale = "en"
 
 main {
     var int x ← 10
-
     x ← 20
     # 20
     print x
-
     x ← x + 5
     # 25
     print x
-
     x ← x - 10
     # 15
     print x
-
     x ← x * 2
     # 30
     print x
-
     x ← x / 3
     # 10
     print x
-
     var string s ← "salve"
     s ← s + " munde"
     # salve munde

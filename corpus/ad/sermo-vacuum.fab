@@ -9,7 +9,6 @@ syntax = "ad 'runtime:echo' (payload) ↦ vacuum"
 related = ["ad", "sermo", "vacuum"]
 locale = "en"
 +++
-
 # =============================================================================
 # ad — ad sermo materialization can drain a stream as vacuum.
 # =============================================================================
@@ -32,6 +31,6 @@ locale = "en"
 # means "drain to terminal and ignore payloads."
 
 main {
-    const _ v ← call 'runtime:echo' ("salve") ↦ void
+    const void v ← call 'runtime:echo' ("salve") ↦ void
     assert true
 }

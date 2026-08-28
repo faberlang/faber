@@ -10,7 +10,6 @@ aliases = ["if"]
 related = ["sin", "secus", "ergo"]
 locale = "en"
 +++
-
 # =============================================================================
 # si — Starts a conditional branch that runs when its condition is true.
 # =============================================================================
@@ -41,10 +40,9 @@ locale = "en"
 
 main {
     # logged in
-    const _ intravit ← true
+    const bool intravit ← true
     # has permission
-    const _ licet ← true
-
+    const bool licet ← true
     if intravit {
         # Inner branch: permission check after login succeeds
         if licet {

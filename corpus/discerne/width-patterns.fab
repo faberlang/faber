@@ -9,12 +9,15 @@ syntax = "discerne <list<T>> { case list<T, N> ... case list<T> ... }"
 related = ["discerne", "casu", "lista"]
 locale = "en"
 +++
-
 # A bounded arm is more specific than the unbounded family arm.
 fn classify(list<int> values) → string {
     match values {
-        case list<int, 4> { return "short" }
-        case list<int> { return "family" }
+        case list<int, 4> {
+            return "short"
+        }
+        case list<int> {
+            return "family"
+        }
     }
 }
 

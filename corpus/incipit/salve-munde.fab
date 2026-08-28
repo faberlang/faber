@@ -9,31 +9,33 @@ syntax = "nota <textus-literal>"
 related = ["incipit", "nota"]
 locale = "en"
 +++
-# =============================================================================
-# incipit — Canonical hello-world smoke with module-scope nota output
-# =============================================================================
-#
-# What this teaches:
-#   • Canonical hello-world smoke with module-scope nota output.
-#   • Related keywords: incipit, nota
-#
-# Common mistakes:
-#   • Writing `incipit { }` when only module-scope output is needed — `nota` at module scope works without an explicit incipit block.
-#
-# See also: incipit, nota
-# =============================================================================
+main {
+    # =============================================================================
+    # incipit — Canonical hello-world smoke with module-scope nota output
+    # =============================================================================
+    #
+    # What this teaches:
+    #   • Canonical hello-world smoke with module-scope nota output.
+    #   • Related keywords: incipit, nota
+    #
+    # Common mistakes:
+    #   • Writing `incipit { }` when only module-scope output is needed — `nota` at module scope works without an explicit incipit block.
+    #
+    # See also: incipit, nota
+    # =============================================================================
 
-# incipit — canonical hello-world entry point
-#
-# nota <textus literal>           — module scope, no incipit block required
-#
-# GRAMMAR:
-#   moduleStmt :← notaStmt
-#
-# EXPECTED OUTPUT:
-#   salve-munde.expected — one greeting line via nota.
-#
-# BACKEND:
-#   Roundtrip harness gives this file special-case handling (canonical smoke).
+    # incipit — canonical hello-world entry point
+    #
+    # nota <textus literal>           — module scope, no incipit block required
+    #
+    # GRAMMAR:
+    #   moduleStmt :← notaStmt
+    #
+    # EXPECTED OUTPUT:
+    #   salve-munde.expected — one greeting line via nota.
+    #
+    # BACKEND:
+    #   Roundtrip harness gives this file special-case handling (canonical smoke).
 
-print "Salve, Munde!"
+    print "Salve, Munde!"
+}

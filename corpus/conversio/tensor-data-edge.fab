@@ -9,7 +9,6 @@ syntax = "<lista<f32>> ↦ tensor<f32, [2, 8]> ⇥ <recovery-tensor>"
 related = ["↦", "⇥", "octeti", "lista", "tensor"]
 locale = "en"
 +++
-
 # =============================================================================
 # ↦ — GGUF/safetensors-style tensor data-edge conversio.
 # =============================================================================
@@ -45,7 +44,7 @@ locale = "en"
 # (no bit-reinterpret primitive — same seam as gradus dequant `_f32le`).
 
 fn byteAt(bytes buf, int off) → int {
-    return (buf.get(off) coalesce (0 ∷ int<u8>)) ↦ int
+    return buf.get(off) coalesce 0 ∷ int<u8> ↦ int
 }
 
 fn leU32(bytes buf, int off) → int {
@@ -60,14 +59,14 @@ fn powerTwo(int n) → float {
     var float result ← 1.0
     if n ≥ 0 {
         var int i ← 0
-        while i < n {
+        while i ≺ n {
             result ← result * 2.0
             i ← i + 1
         }
     }
     else {
         var int i ← n
-        while i < 0 {
+        while i ≺ 0 {
             result ← result / 2.0
             i ← i + 1
         }
@@ -96,7 +95,7 @@ fn f32le(bytes buf, int off) → f32 {
 fn decodeFlat(bytes buf, int off, int count) → list<f32> {
     var list<f32> out ← empty
     var int i ← 0
-    while i < count {
+    while i ≺ count {
         out.append(f32le(buf, off + i * 4))
         i ← i + 1
     }
@@ -106,20 +105,14 @@ fn decodeFlat(bytes buf, int off, int count) → list<f32> {
 main {
     # 8-byte LE dim header + 16 × f32le 1.0
     const bytes fixture ← |02 00 00 00 08 00 00 00 00 00 80 3f 00 00 80 3f 00 00 80 3f 00 00 80 3f 00 00 80 3f 00 00 80 3f 00 00 80 3f 00 00 80 3f 00 00 80 3f 00 00 80 3f 00 00 80 3f 00 00 80 3f 00 00 80 3f 00 00 80 3f 00 00 80 3f 00 00 80 3f|
-
     const int dim0 ← leU32(fixture, 0)
     const int dim1 ← leU32(fixture, 4)
     const list<f32> flat ← decodeFlat(fixture, 8, dim0 * dim1)
     const tensor<f32, [2, 8]> grid ← flat ↦ tensor<f32, [2, 8]>
-
     print dim0
     print dim1
     print grid.flatten().length()
-
-    const list<f32> zeros16 ← [
-        0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-        0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0
-    ]
+    const list<f32> zeros16 ← [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
     const list<f32> short ← [1.0, 2.0, 3.0]
     const tensor<f32, [2, 8]> zeros ← zeros16 ↦ tensor<f32, [2, 8]>
     const tensor<f32, [2, 8]> recovered ← short ↦ tensor<f32, [2, 8]> ⇥ zeros
