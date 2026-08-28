@@ -28,6 +28,7 @@
 use crate::diagnostics::Diagnostic;
 use crate::driver::{analyze_source, AnalyzeRequest, Config, Session};
 use crate::hir::{HirExpression, HirExpressionKind, HirModule, HirStatementKind};
+use crate::intrinsics::IntrinsicReceiver;
 use crate::mir::lower_analyzed_unit;
 use crate::mir::{MirCollectionOp, MirIntrinsic, MirProgram, MirStatementKind};
 use std::path::PathBuf;
@@ -433,6 +434,135 @@ fn en_surface_mutating_imperative_scheme_sort_sorted() {
         method_call_spellings(&sorted.hir, &sorted.interner),
         vec!["ordinata".to_owned()],
         "en `sorted` (participle, value-returning) must rewrite to canonical `ordinata`"
+    );
+}
+
+// ---------------------------------------------------------------------------
+// LPT — lista `omnia`/`quilibet` reader-pack surface (all eight packs).
+//
+// Row ownership: LPT-1 owns the en rows (`all`/`any`); the six translated
+// packs (ar, hi, th-TH, vi, zh-Hans, zh-Hant) own the explicit identity rows
+// `omnia`/`quilibet`; la owns no row and proves the twins through
+// registry-direct lookup. The reverse cache is explicit-row-only, so
+// ownership is asserted with `intrinsic_canonical`; `intrinsic_surface`
+// falls back to the canonical spelling and cannot distinguish a row from
+// its absence.
+// ---------------------------------------------------------------------------
+
+/// Real `Lista` source calls under the en pack: `xs.all(...)` / `ys.any(...)`.
+const TWIN_EN_SOURCE: &str = "fn sonda() → bool {\n    const list<int> xs ← empty\n    return xs.all(int d ∴ d ≥ 0)\n}\n\nfn aliud() → bool {\n    const list<int> ys ← empty\n    return ys.any(int d ∴ d < 0)\n}\n";
+
+/// The canonical Latin twin spelling under the en pack: not a declared en
+/// surface, so the pack-authoritative lookup must reject the call.
+const TWIN_EN_CANONICAL_MISS: &str = "fn sonda() → bool {\n    const list<int> xs ← empty\n    return xs.omnia(int d ∴ d ≥ 0)\n}\n";
+
+/// la source (canonical Latin keywords): the twins resolve registry-direct.
+const TWIN_LA_SOURCE: &str = "functio sonda() → bivalens {\n    fixum lista<numerus> xs ← vacua\n    redde xs.omnia(numerus d ∴ d ≥ 0)\n}\n\nfunctio aliud() → bivalens {\n    fixum lista<numerus> ys ← vacua\n    redde ys.quilibet(numerus d ∴ d < 0)\n}\n";
+
+/// (locale, real localized source) for the six translated packs. Each source
+/// is composed from that pack's own `[keywords]`/`[types]` rows; the twin
+/// surfaces are the explicit identity rows the pack owns.
+const TWIN_TRANSLATED_SOURCES: &[(&str, &str)] = &[
+    ("ar", "دالة sonda() → منطقي {\n    ثابت قائمة<عدد> xs ← فارغ\n    أعد xs.omnia(عدد d ∴ d ≥ 0)\n}\n\nدالة aliud() → منطقي {\n    ثابت قائمة<عدد> ys ← فارغ\n    أعد ys.quilibet(عدد d ∴ d < 0)\n}\n"),
+    ("hi", "फलन sonda() → तार्किक {\n    स्थिर सूची<संख्या> xs ← खाली\n    लौटाओ xs.omnia(संख्या d ∴ d ≥ 0)\n}\n\nफलन aliud() → तार्किक {\n    स्थिर सूची<संख्या> ys ← खाली\n    लौटाओ ys.quilibet(संख्या d ∴ d < 0)\n}\n"),
+    ("th-TH", "ฟังก์ชัน sonda() → ตรรกะ {\n    คงที่ รายการ<จำนวน> xs ← เซตว่าง\n    คืน xs.omnia(จำนวน d ∴ d ≥ 0)\n}\n\nฟังก์ชัน aliud() → ตรรกะ {\n    คงที่ รายการ<จำนวน> ys ← เซตว่าง\n    คืน ys.quilibet(จำนวน d ∴ d < 0)\n}\n"),
+    ("vi", "hàm sonda() → logic {\n    hằng danh_sách<số> xs ← tập_rỗng\n    trả xs.omnia(số d ∴ d ≥ 0)\n}\n\nhàm aliud() → logic {\n    hằng danh_sách<số> ys ← tập_rỗng\n    trả ys.quilibet(số d ∴ d < 0)\n}\n"),
+    ("zh-Hans", "函数 sonda() → 布尔 {\n    常量 列表<整数> xs ← 空集\n    返回 xs.omnia(整数 d ∴ d ≥ 0)\n}\n\n函数 aliud() → 布尔 {\n    常量 列表<整数> ys ← 空集\n    返回 ys.quilibet(整数 d ∴ d < 0)\n}\n"),
+    ("zh-Hant", "函式 sonda() → 布林 {\n    定值 列表<整數> xs ← 空集\n    傳回 xs.omnia(整數 d ∴ d ≥ 0)\n}\n\n函式 aliud() → 布林 {\n    定值 列表<整數> ys ← 空集\n    傳回 ys.quilibet(整數 d ∴ d < 0)\n}\n"),
+];
+
+/// done-when: the en surfaces `all`/`any` resolve both twins on a real Lista
+/// call to the canonical registry spellings.
+#[test]
+fn en_twin_surfaces_resolve_to_canonical_omnia_and_quilibet() {
+    let pack = en_pack();
+    assert_eq!(
+        pack.intrinsic_canonical(IntrinsicReceiver::Lista, "all"),
+        Some("omnia"),
+        "the en reverse cache must map `all` → `omnia` for Lista"
+    );
+    assert_eq!(
+        pack.intrinsic_canonical(IntrinsicReceiver::Lista, "any"),
+        Some("quilibet"),
+        "the en reverse cache must map `any` → `quilibet` for Lista"
+    );
+    let unit =
+        analyze(TWIN_EN_SOURCE, Some(pack)).expect("en `all`/`any` on a Lista must typecheck with the en pack");
+    assert_eq!(
+        method_call_spellings(&unit.hir, &unit.interner),
+        vec!["omnia".to_owned(), "quilibet".to_owned()],
+        "the en surfaces `all`/`any` must rewrite to canonical `omnia`/`quilibet` on the HIR"
+    );
+}
+
+/// done-when: each translated pack owns the explicit identity rows — proven on
+/// the reverse cache (`intrinsic_canonical`), not on the fallback-prone
+/// `intrinsic_surface` output — and both twins resolve on a real localized
+/// Lista call while keeping the canonical HIR spelling.
+#[test]
+fn translated_pack_identity_rows_resolve_both_twins_on_lista() {
+    for (locale, source) in TWIN_TRANSLATED_SOURCES.iter() {
+        let pack = pack(locale);
+        assert_eq!(
+            pack.intrinsic_canonical(IntrinsicReceiver::Lista, "omnia"),
+            Some("omnia"),
+            "{locale}: `omnia` must be an explicit row in the reverse cache"
+        );
+        assert_eq!(
+            pack.intrinsic_canonical(IntrinsicReceiver::Lista, "quilibet"),
+            Some("quilibet"),
+            "{locale}: `quilibet` must be an explicit row in the reverse cache"
+        );
+        let unit = analyze(source, Some(pack)).unwrap_or_else(|diagnostics| {
+            panic!("{locale}: identity `omnia`/`quilibet` calls must typecheck: {diagnostics:?}")
+        });
+        assert_eq!(
+            method_call_spellings(&unit.hir, &unit.interner),
+            vec!["omnia".to_owned(), "quilibet".to_owned()],
+            "{locale}: the identity surfaces must keep the canonical HIR spelling"
+        );
+    }
+}
+
+/// done-when (pack-authoritative): the canonical Latin `omnia` spelling is not
+/// a declared en surface — the same miss law the other rows already prove.
+#[test]
+fn twin_canonical_latin_spelling_is_miss_under_en() {
+    let result = analyze(TWIN_EN_CANONICAL_MISS, Some(en_pack()));
+    let diagnostics = result.unwrap_err_or_diagnostics();
+    assert!(
+        !diagnostics.is_empty(),
+        "canonical Latin `omnia` must be a compile error under the en pack"
+    );
+}
+
+/// done-when: la owns no intrinsics row; the twins resolve through
+/// registry-direct lookup while the reverse cache stays empty — and
+/// `intrinsic_surface` still reports the canonical spelling, which is exactly
+/// why surface output alone is not evidence of a row.
+#[test]
+fn la_pack_resolves_twins_registry_direct_without_rows() {
+    let la = la_pack();
+    assert_eq!(
+        la.intrinsic_canonical(IntrinsicReceiver::Lista, "omnia"),
+        None,
+        "la must have no reverse-cache row for `omnia` (identity-by-absence)"
+    );
+    assert_eq!(
+        la.intrinsic_canonical(IntrinsicReceiver::Lista, "quilibet"),
+        None,
+        "la must have no reverse-cache row for `quilibet` (identity-by-absence)"
+    );
+    assert_eq!(
+        la.intrinsic_surface("omnia"), "omnia",
+        "the forward display fallback keeps the canonical spelling with no row — surface output alone is not evidence"
+    );
+    let unit = analyze(TWIN_LA_SOURCE, Some(la))
+        .expect("la canonical `omnia`/`quilibet` must typecheck through registry-direct lookup");
+    assert_eq!(
+        method_call_spellings(&unit.hir, &unit.interner),
+        vec!["omnia".to_owned(), "quilibet".to_owned()],
+        "la must keep the canonical spellings unchanged on the HIR"
     );
 }
 
