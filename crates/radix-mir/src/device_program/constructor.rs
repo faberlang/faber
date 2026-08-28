@@ -771,7 +771,7 @@ impl<'a> KernelBuilder<'a> {
                 detail: error.message,
             }),
         };
-        if let Some(_) = composed_plan {
+        if composed_plan.is_some() {
             let signature = whole_signature?;
             let plan = kernel_plan_for_function(function, &signature, self.validation)
                 .map_err(|error| DeviceProgramBuildError::KernelPlan {
