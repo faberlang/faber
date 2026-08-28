@@ -1239,7 +1239,6 @@ mod tests {
             }],
             brace_authored: true,
             raw_args: Vec::new(),
-            brace_authored: true,
             contract_id: None,
             span: Span::default(),
         }
