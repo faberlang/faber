@@ -5,8 +5,8 @@
   "lane": "mir",
   "generatedBy": "radix/scripta/emit-compat-json.py",
   "summary": {
-    "capable": 309,
-    "analyzable": 336
+    "capable": 310,
+    "analyzable": 337
   },
   "terms": [
     {
@@ -899,6 +899,12 @@
     },
     {
       "term": "requirit",
+      "rule": "keyword",
+      "capable": 1,
+      "analyzable": 1
+    },
+    {
+      "term": "reice",
       "rule": "keyword",
       "capable": 1,
       "analyzable": 1
