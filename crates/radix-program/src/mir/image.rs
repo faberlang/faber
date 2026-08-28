@@ -266,6 +266,64 @@ pub(super) fn run_fmir_package_image<H: Host + ?Sized>(
     Ok(())
 }
 
+/// [`run_fmir_package_image`] with the opt-in diagnostic meter armed (RSM
+/// CPU/FMIR stats outcome): pre-execution failures (runtime-requirement
+/// check, type metadata, CLI binding, validation) remain the outer `Err`
+/// without a summary; once the entry frame is pushed, runtime diagnostics
+/// are retained in [`PackageRunStats::result`] beside the collected summary.
+/// The declared exit code applies only to a successful started run, matching
+/// the unmetered route.
+pub(super) fn run_fmir_package_image_with_stats<H: Host + ?Sized>(
+    mut image: FmirPackageImage,
+    host: &mut H,
+) -> Result<PackageRunStats, Vec<Diagnostic>> {
+    check_fmir_runtime_requirements(&image)?;
+    let types = TypeTable::from_snapshot(image.types).map_err(|error| {
+        vec![mir_issue_diag(
+            &image.diagnostic_path,
+            "fmir_image_type_metadata_invalid",
+            format!(
+                "could not load {} type metadata: {error}",
+                image.format.label()
+            ),
+        )
+        .with_arg("format", image.format.label())]
+    })?;
+    let mut interner = radix_module::lexer::Interner::from_strings(image.interner);
+    bind_fmir_text_runtime_cli(
+        &mut image.program,
+        image.cli.as_ref(),
+        &image.entry_function,
+        &mut interner,
+        host,
+        &image.diagnostic_path,
+    )?;
+    let mut validation = radix_module::mir::MirValidationContext::new(&types);
+    validation.interner = Some(&interner);
+    apply_validation_metadata(&mut validation, &image.validation);
+    let validated = radix_module::mir::ValidatedMir::new(image.program.clone(), validation)
+        .map_err(|errors| {
+            errors
+                .into_iter()
+                .map(|error| mir_diag(&image.diagnostic_path, error.message))
+                .collect::<Vec<_>>()
+        })?;
+    let outcome = run_entry_with_stats(&validated, host)
+        .map_err(|errors| runner_diagnostics(&image.diagnostic_path, errors))?;
+    let result = outcome
+        .result
+        .map_err(|errors| runner_diagnostics(&image.diagnostic_path, errors));
+    if result.is_ok() {
+        if let Some(code) = image.exit_code {
+            host.exit(code);
+        }
+    }
+    Ok(PackageRunStats {
+        stats: outcome.stats,
+        result,
+    })
+}
+
 impl FmirPackageImageFormat {
     pub(super) fn label(self) -> &'static str {
         match self {

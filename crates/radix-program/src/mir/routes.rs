@@ -2,6 +2,17 @@
 
 use super::*;
 
+/// The started package run's diagnostic-statistics outcome (RSM route
+/// transport): the meter summary plus the started run's status. Compile/load
+/// failures happen before a runner starts and remain the route's `Err`
+/// (diagnostics without a summary); runtime diagnostics are retained here so
+/// the caller receives the artifact and the failure together.
+#[derive(Debug)]
+pub struct PackageRunStats {
+    pub stats: RunnerStats,
+    pub result: Result<(), Vec<Diagnostic>>,
+}
+
 pub fn run_package_mir<H: Host + ?Sized>(
     config: &Config,
     input: &Path,
@@ -52,6 +63,42 @@ pub fn run_package_mir_with_selection<H: Host + ?Sized>(
             seams,
         )?;
         run_loaded_fmir_image_route_with_selection(image, selection, seams, host)
+    })
+}
+
+/// [`run_package_mir_with_selection`] with the opt-in diagnostic meter (RSM
+/// route transport): `stats_requested` is the explicit CLI-originated fact —
+/// carried through the host-route seam ahead of the device decision and
+/// arming the CPU/FMIR leg's collector. `false` reproduces the unmetered
+/// route; the single-source route is intentionally out of scope (refused by
+/// the faber CLI layer, RSM-3).
+pub fn run_package_mir_with_selection_and_stats<H: Host + ?Sized>(
+    config: &Config,
+    input: &Path,
+    selection: DeviceSelection,
+    stats_requested: bool,
+    seams: &MirSeams,
+    host: &mut H,
+) -> Result<PackageRunStats, Vec<Diagnostic>> {
+    let argumenta = host
+        .argumenta()
+        .map_err(|e| vec![mir_diag(input, e.message)])?
+        .to_vec();
+    with_prepared_package_mir(config, input, &argumenta, seams, |prepared, lowered| {
+        let image = fmir_package_image_from_lowered(
+            prepared,
+            lowered,
+            prepared.entry_path.clone(),
+            FmirPackageImageFormat::Source,
+            seams,
+        )?;
+        run_loaded_fmir_image_route_with_selection_and_stats(
+            image,
+            selection,
+            stats_requested,
+            seams,
+            host,
+        )
     })
 }
 
@@ -340,11 +387,32 @@ pub(super) fn run_loaded_fmir_image_route_with_selection<H: Host + ?Sized>(
     // device-bearing image through the composite host's device route, and
     // fails closed on unsupported requests. `Ok(Some(()))` means the device
     // route already executed; `Ok(None)` runs the CPU/FMIR runner with the
-    // caller's host.
-    if (seams.host_route)(&image, selection)?.is_some() {
+    // caller's host. Non-stats callers carry the explicit `false`.
+    if (seams.host_route)(&image, selection, false)?.is_some() {
         return Ok(());
     }
     run_fmir_package_image(image, host)
+}
+
+/// [`run_loaded_fmir_image_route_with_selection`] with the opt-in diagnostic
+/// meter (RSM route transport): the explicit `stats_requested` fact reaches
+/// the seam ahead of the device decision; a device route executes with the
+/// composite host and records no interpreter rows (the stats+device refusal
+/// is the faber seam owner's decision, RSM-4).
+pub(super) fn run_loaded_fmir_image_route_with_selection_and_stats<H: Host + ?Sized>(
+    image: FmirPackageImage,
+    selection: DeviceSelection,
+    stats_requested: bool,
+    seams: &MirSeams,
+    host: &mut H,
+) -> Result<PackageRunStats, Vec<Diagnostic>> {
+    if (seams.host_route)(&image, selection, stats_requested)?.is_some() {
+        return Ok(PackageRunStats {
+            stats: RunnerStats::default(),
+            result: Ok(()),
+        });
+    }
+    run_fmir_package_image_with_stats(image, host)
 }
 
 pub fn run_fmir_image_path<H: Host + ?Sized>(
@@ -435,8 +503,8 @@ pub fn run_fmir_image_bytes_with_stdio(
     // device-bearing image through the composite host's device route, and
     // fails closed on unsupported requests. `Ok(Some(()))` means the device
     // route already executed; `Ok(None)` runs the CPU/FMIR runner with the
-    // stdio host.
-    if (seams.host_route)(&loaded, selection)?.is_some() {
+    // stdio host. The generated-runner stdio route never requests stats.
+    if (seams.host_route)(&loaded, selection, false)?.is_some() {
         return Ok(());
     }
     let mut host = radix_module::mir::StdioHost::with_argumenta(argumenta);

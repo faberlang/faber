@@ -215,10 +215,14 @@ fn device_section_builder(
 /// loaded image runs on the CPU/FMIR runner or a device route, and execute
 /// the device route when selected. `Ok(None)` runs the CPU route with the
 /// caller's host; `Ok(Some(()))` means the device route already executed.
+/// `stats_requested` is the explicit CLI-originated fact transported by the
+/// radix-program route (RSM-2); the stats+device fail-closed refusal before
+/// `execute_device_route` is this seam owner's follow-up (RSM-4).
 #[cfg(feature = "runner")]
 fn host_route(
     image: &radix::program::mir::FmirPackageImage,
     selection: DeviceSelection,
+    _stats_requested: bool,
 ) -> Result<Option<()>, Vec<Diagnostic>> {
     // DDPP1-U2 (C2 feature isolation): the device route is compiled only under
     // `device-runtime`; without it an explicit backend request or a
