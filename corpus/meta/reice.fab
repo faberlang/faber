@@ -1,0 +1,71 @@
++++
+term = "reice"
+kind = "keyword"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "discretio_decl", "variant", "variant_fields", "functio_decl", "param_list", "parameter", "return_clause", "alternate_exit_clause", "iace_expr", "finge_expr", "qualified_ident", "field_list", "field_init", "field_key", "redde_stmt", "incipit_stmt", "cape_clause", "adfirma_stmt", "comparison", "equality", "equality_tail", "expression", "literal"]
+category = "errors"
+canonical = true
+summary = "Reject a condition or throw a recoverable error."
+syntax = "reice <expression> iace <expression>"
+aliases = ["reject"]
+related = ["requirit", "adfirma", "iace", "cape", "⇥"]
+locale = "en"
++++
+
+
+# =============================================================================
+# reice — Reject a condition or throw a recoverable error.
+# =============================================================================
+#
+# What this teaches:
+#   • Reject guard — `reject <condition> throw <error>` throws into the
+#     function's ⇥ channel when the condition is true (en surface of `reice`)
+#   • Boolean opposite of `require` — `require not (p) throw e` becomes
+#     `reject p throw e`; no hand-rolled negation
+#   • Typed payload — the true-path expression is a `variant`, the same shape
+#     used at constructor guard ladders
+#
+# Common mistakes:
+#   • Using `reject` in a function without `⇥ E` — SEM010 `iace_requires_alternate_exit`, same as `throw`
+#   • Reading `reject` as `require` — it fails when the condition HOLDS
+#
+# See also: requirit, adfirma, iace, cape, ⇥
+# =============================================================================
+
+# reice — recoverable reject statement
+#
+# reject <condition> throw <error>
+#
+# GRAMMAR:
+#   reiceStmt :← 'reice' expr 'iace' expr
+#
+# EXPECTED OUTPUT:
+#   empty — success-path main only (reice.expected)
+
+union GuardError {
+    Invalid { string causa }
+}
+
+fn guarded(int value) → int ⇥ GuardError {
+    reject value < 0 throw variant Invalid { causa = "value must not be negative" }
+    return value
+}
+
+main {
+    do {
+        const int ok ← guarded(1)
+        assert ok ≡ 1
+    }
+    catch err {
+        assert false panic "success path must not throw"
+    }
+}
+
+test "true path is recoverable" {
+    do {
+        const int dropped ← guarded(-1)
+        assert false panic "true path must throw"
+    }
+    catch err {
+        # recovered — reject entered ⇥ and catch intercepted it
+    }
+}

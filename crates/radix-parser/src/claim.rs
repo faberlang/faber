@@ -119,6 +119,7 @@ fn claim_stmt(stmt: &Stmt, claimed: &mut HashSet<u32>) {
         | StmtKind::Tacet(_)
         | StmtKind::Adfirma(_)
         | StmtKind::Require(_)
+        | StmtKind::Reject(_)
         | StmtKind::Scribe(_)
         | StmtKind::Reddet(_)
         | StmtKind::Tacebit(_) => {}

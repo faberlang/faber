@@ -143,6 +143,7 @@ pub fn lower_stmt(lowerer: &mut Lowerer, stmt: &Stmt) -> HirStatement {
         }
         StmtKind::Adfirma(adfirma_stmt) => lowerer.lower_adfirma(adfirma_stmt),
         StmtKind::Require(require_stmt) => lowerer.lower_require(require_stmt),
+    StmtKind::Reject(reject_stmt) => lowerer.lower_reject(reject_stmt),
         StmtKind::Scribe(scribe_stmt) => lowerer.lower_scribe(scribe_stmt),
         StmtKind::Incipit(incipit_stmt) => lowerer.lower_incipit_stmt(incipit_stmt),
         StmtKind::Cura(cura_stmt) => lowerer.lower_cura(cura_stmt),
@@ -981,6 +982,35 @@ impl Lowerer<'_> {
             id: self.next_hir_id(),
             kind: HirExpressionKind::Si {
                 cond: Box::new(negated),
+                then_block,
+                then_catch: None,
+                else_block: None,
+            },
+            ty: None,
+            span: self.current_span,
+        })
+    }
+
+    /// Lower `reice` as the reject-guard desugar `si (cond) { iace err }` — the
+    /// boolean opposite of `requirit`: it fails when the condition holds.
+    fn lower_reject(&mut self, stmt: &radix_syntax::RejectStmt) -> HirStatementKind {
+        let cond = self.lower_expr(&stmt.cond);
+        let error = self.lower_expr(&stmt.error);
+        let throw_stmt = HirStatement {
+            id: self.next_hir_id(),
+            kind: HirStatementKind::Expr(HirExpression {
+                id: self.next_hir_id(),
+                kind: HirExpressionKind::Throw(Box::new(error)),
+                ty: None,
+                span: self.current_span,
+            }),
+            span: self.current_span,
+        };
+        let then_block = HirBlock::simple(vec![throw_stmt], None, self.current_span);
+        HirStatementKind::Expr(HirExpression {
+            id: self.next_hir_id(),
+            kind: HirExpressionKind::Si {
+                cond: Box::new(cond),
                 then_block,
                 then_catch: None,
                 else_block: None,

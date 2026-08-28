@@ -161,6 +161,7 @@ pub enum TokenKind {
     Iace,
     Mori,
     Requirit,
+    Reice,
     // === Keywords: Async ===
     Cede,
     Clausura,
@@ -430,6 +431,7 @@ impl TokenKind {
                 | Iace
                 | Mori
                 | Requirit
+                | Reice
                 | Cede
                 | Clausura
                 | Cursor

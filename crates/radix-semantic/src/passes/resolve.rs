@@ -604,6 +604,10 @@ fn resolve_stmt(
             resolve_expr(resolver, interner, &stmt.cond, errors);
             resolve_expr(resolver, interner, &stmt.error, errors);
         }
+        StmtKind::Reject(stmt) => {
+            resolve_expr(resolver, interner, &stmt.cond, errors);
+            resolve_expr(resolver, interner, &stmt.error, errors);
+        }
         StmtKind::Scribe(stmt) => {
             for arg in &stmt.args {
                 resolve_expr(resolver, interner, arg, errors);

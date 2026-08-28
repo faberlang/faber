@@ -1552,6 +1552,33 @@ fn lexes_requirit_statement_keyword() {
 }
 
 #[test]
+fn lexes_reice_statement_keyword() {
+    // `reice` is the reject statement keyword (error-handling identity), the
+    // boolean opposite of `requirit`. It lexes as an identifier whose latin
+    // key the parser claims as `TokenKind::Reice`.
+    let result = lex("reice verum iace \"bad\"");
+    assert!(result.errors.is_empty());
+    let kinds: Vec<TokenKind> = result.tokens.iter().map(|t| t.kind.clone()).collect();
+    assert!(matches!(kinds[0], TokenKind::Ident(_)));
+    assert!(matches!(kinds[1], TokenKind::Ident(_)));
+    assert!(matches!(kinds[2], TokenKind::Ident(_)));
+    assert!(matches!(kinds[3], TokenKind::String(_)));
+    assert!(matches!(kinds[4], TokenKind::Eof));
+    assert_eq!(
+        result.reader_keyword_latin_keys.get("reice"),
+        Some(&"reice".to_owned()),
+        "reice must record its latin identity for parser claims"
+    );
+    let spec = lookup_keyword_spec("reice").expect("reice should be registered");
+    assert_eq!(spec.token_kind, Some(TokenKind::Reice));
+    assert_eq!(
+        spec.category,
+        crate::KeywordKind::ErrorHandling,
+        "reice belongs to the error-handling category"
+    );
+}
+
+#[test]
 fn lexes_proba_block_braces() {
     let result = lex("{}");
     assert!(result.errors.is_empty());

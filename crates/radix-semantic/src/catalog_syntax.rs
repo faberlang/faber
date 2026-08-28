@@ -479,6 +479,10 @@ fn expected_message(args: &[DiagnosticArg]) -> Option<String> {
             "requirit_else_rejected" => {
                 return Some("'secus' is not the particle on requirit".to_owned())
             }
+            "reice_iace" => return Some("expected 'iace' after the reice condition".to_owned()),
+            "reice_else_rejected" => {
+                return Some("'secus' is not the particle on reice".to_owned())
+            }
             "adfirma_else_rejected" => {
                 return Some("'secus' is not the particle on adfirma".to_owned())
             }
@@ -561,6 +565,10 @@ fn expected_help(args: &[DiagnosticArg]) -> Option<String> {
             "secus_si_else_if" => return Some("replace secus si with sin".to_owned()),
             "requirit_iace" => return Some("write requirit cond iace err".to_owned()),
             "requirit_else_rejected" => {
+                return Some("use 'iace' for the recoverable payload".to_owned())
+            }
+            "reice_iace" => return Some("write reice cond iace err".to_owned()),
+            "reice_else_rejected" => {
                 return Some("use 'iace' for the recoverable payload".to_owned())
             }
             "adfirma_else_rejected" => {
