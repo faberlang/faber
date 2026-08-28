@@ -152,13 +152,14 @@ pub use kernel_decomposition::{
     KernelSubchain,
 };
 pub use kernel_plan::{
-    admit_quantized_gather, admit_quantized_matmul, simdgroup_matmul_admission, BarrierPhase,
-    BarrierPoint, CollectionKernelPlan, GroupedMatMulPlan, MatMulPlan, OobPaddingPolicy,
-    PackedAdmissionError, PackedDequantError, PackedDequantKind, PackedDequantResolution,
-    PlanValidationError, QuantizedGatherPlan, QuantizedMatMulPlan, ReduceOp, ReductionPlan,
+    admit_quantized_gather, admit_quantized_matmul, causal_softmax_row_reduction_admission,
+    rmsnorm_row_reduction_admission, simdgroup_matmul_admission, BarrierPhase, BarrierPoint,
+    CollectionKernelPlan, GroupedMatMulPlan, MatMulPlan, OobPaddingPolicy, PackedAdmissionError,
+    PackedDequantError, PackedDequantKind, PackedDequantResolution, PlanValidationError,
+    QuantizedGatherPlan, QuantizedMatMulPlan, ReduceOp, ReductionPlan, RowReductionFacts,
     SharedMemoryLayout, SimdgroupMatMulFacts, SsmConv1dPlan, SsmScanPlan, TransposePlan,
-    SIMDGROUP_MATMUL_MAX_N, SIMDGROUP_MATMUL_PARTIAL_SLOTS, SIMDGROUP_MATMUL_STAGING_SLOTS,
-    TRANSPOSE_WORKGROUP_X,
+    ROW_REDUCTION_WORKGROUP_X, SIMDGROUP_MATMUL_MAX_N, SIMDGROUP_MATMUL_PARTIAL_SLOTS,
+    SIMDGROUP_MATMUL_STAGING_SLOTS, TRANSPOSE_WORKGROUP_X,
 };
 pub use layout::{
     MirAggregateCarrier, MirAggregateFamily, MirAggregateLayout, MirAtomicLayout,

@@ -238,6 +238,62 @@ pub struct RopePlan {
     pub rotate_half: bool,
 }
 
+/// PGC-R5 row-reduction launch lane width: one simdgroup (32 lanes) per
+/// row under the `RowReduction` contract. The tree reduction over the
+/// workgroup's lanes and the `float4` scale pass both key off this width.
+pub const ROW_REDUCTION_WORKGROUP_X: u32 = 32;
+
+/// PGC-R5 row-reduction admission facts for the `RowReduction` contract
+/// (`TensorRmsNorm` / `TensorCausalMaskedSoftmax`): one workgroup per row,
+/// 32 lanes, tree-reduced in threadgroup memory. Shared by the ABI
+/// contract resolver (`abi/contract.rs`) and the Metal emitter arms so the
+/// resolved geometry and the emitted body can never disagree (A3).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct RowReductionFacts {
+    /// Row count (the dispatch extent — one workgroup per row).
+    pub rows: u64,
+    /// Row width (the reduction extent each lane strides over).
+    pub width: u64,
+    /// Lanes per row workgroup (`ROW_REDUCTION_WORKGROUP_X`).
+    pub workgroup_x: u32,
+}
+
+/// PGC-R5: admit the row-reduction contract for an RMSNorm-shaped operand
+/// `[rows, width]`. Admission requires a full simdgroup's worth of strided
+/// columns (`width >= 32`) and a `float4`-aligned width for the vectorized
+/// scale pass; any other shape keeps the generic per-element 1D contract
+/// and its frozen emission. Unlike the causal-softmax twin this admits
+/// single-row shapes (`head_rmsnorm` is T=1) — the recipe is row-wise at
+/// any row count and the decode twin (`decode_rmsnorm`, the same MIR
+/// shape) rides the same family, declared Class B in the R5 receipt.
+#[must_use]
+pub fn rmsnorm_row_reduction_admission(rows: u64, width: u64) -> Option<RowReductionFacts> {
+    row_reduction_admission(rows, width)
+}
+
+/// PGC-R5: admit the row-reduction contract for a causal masked-softmax
+/// operand `[rows, cols]`. Multi-row only: the decode T=1 masked softmax
+/// (`decode_masked_softmax`, B1/B2-landed extents and body) keeps the
+/// generic per-element 1D contract byte-for-byte.
+#[must_use]
+pub fn causal_softmax_row_reduction_admission(rows: u64, cols: u64) -> Option<RowReductionFacts> {
+    if rows <= 1 {
+        return None;
+    }
+    row_reduction_admission(rows, cols)
+}
+
+fn row_reduction_admission(rows: u64, width: u64) -> Option<RowReductionFacts> {
+    if rows == 0 || width < u64::from(ROW_REDUCTION_WORKGROUP_X) || width % 4 != 0 {
+        return None;
+    }
+    Some(RowReductionFacts {
+        rows,
+        width,
+        workgroup_x: ROW_REDUCTION_WORKGROUP_X,
+    })
+}
+
 /// Causal masked-row softmax recipe plan (GI3-1: name frozen in this unit,
 /// S6-N1 precedent). Row `i` of the causal score matrix masks columns
 /// `j > i` (zero probability above the diagonal; the diagonal is included)
