@@ -10,7 +10,6 @@ aliases = ["silent noop"]
 related = ["ergo", "redde"]
 locale = "en"
 +++
-
 # =============================================================================
 # tacet — Marks an explicit no-op statement.
 # =============================================================================
@@ -54,7 +53,8 @@ main {
     maybeNota(false)
 
     # condition false, so tacet never runs
-    if false then pass
-
+    if false {
+        pass
+    }
     print "finis"
 }

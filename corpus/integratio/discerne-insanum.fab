@@ -36,8 +36,13 @@ locale = "en"
 #   none — deterministic variant strings; no .expected sidecar.
 
 union Mandatum {
-    Moveo { string locus int passus },
-    Loquere { string verba },
+    Moveo {
+        string locus
+        int passus
+    },
+    Loquere {
+        string verba
+    },
     Tace
 }
 
@@ -59,7 +64,6 @@ main {
     const Mandatum a ← variant Moveo { locus = "forum", passus = 8 }
     const Mandatum b ← variant Loquere { verba = "salve" }
     const Mandatum c ← variant Tace
-
     print narra(a)
     print narra(b)
     print narra(c)

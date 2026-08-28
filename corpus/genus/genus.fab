@@ -52,19 +52,12 @@ class Persona {
 
 main {
     # Instantiate with all required fields
-    const _ p ← Punctum {
-        x = 10,
-        y = 20
-    }
-
+    const Punctum p ← Punctum { x = 10, y = 20 }
     print p.x
     print p.y
 
     # Instantiate with required + optional defaults
-    const _ marcus ← Persona {
-        nomen = "Marcus"
-    }
-
+    const Persona marcus ← Persona { nomen = "Marcus" }
     print marcus.nomen
     # 0 from default
     print marcus.aetas
@@ -72,12 +65,7 @@ main {
     print marcus.activus
 
     # Override defaults explicitly
-    const _ julia ← Persona {
-        nomen = "Julia",
-        aetas = 25,
-        activus = false
-    }
-
+    const Persona julia ← Persona { nomen = "Julia", aetas = 25, activus = false }
     print julia.nomen
     print julia.aetas
     print julia.activus

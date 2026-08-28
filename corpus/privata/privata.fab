@@ -10,7 +10,6 @@ aliases = ["private"]
 related = ["publica", "importa"]
 locale = "en"
 +++
-
 # =============================================================================
 # privata — Marks a declaration as module-private (the default tier).
 # =============================================================================
@@ -39,7 +38,7 @@ locale = "en"
 # EXPECTED OUTPUT:
 #   privata
 
-@ private
+@ private { }
 fn privatum() → string {
     return "privata"
 }

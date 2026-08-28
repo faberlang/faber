@@ -9,7 +9,6 @@ syntax = "nihil [<expression>]"
 related = ["∪", "sponte"]
 locale = "en"
 +++
-
 # =============================================================================
 # nihil — Represents the null value and can prefix a null check.
 # =============================================================================
@@ -33,6 +32,6 @@ locale = "en"
 #
 
 main {
-    const _ nothing ← null
+    const null_ty nothing ← null
     print nothing
 }

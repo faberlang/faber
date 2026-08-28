@@ -43,7 +43,7 @@ fn par(int n) → bool {
 }
 
 main {
-    const _ n ← 42
+    const int n ← 42
     if par(n) {
         print "par §"(n)
     }

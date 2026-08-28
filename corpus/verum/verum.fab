@@ -9,7 +9,15 @@ syntax = "verum [<expression>]"
 related = ["falsum", "nihil"]
 locale = "en"
 +++
+test "verum is the true literal" {
+    const bool active ← true
+    assert active
+    assert active ≡ true
+}
 
+test "verum stands alone as a truthy condition" {
+    assert true
+}
 # =============================================================================
 # verum — Represents the true boolean value and can prefix a truthiness check.
 # =============================================================================
@@ -36,16 +44,6 @@ locale = "en"
 #
 
 main {
-    const _ active ← true
+    const bool active ← true
     print active
-}
-
-test "verum is the true literal" {
-    const _ active ← true
-    assert active
-    assert active ≡ true
-}
-
-test "verum stands alone as a truthy condition" {
-    assert true
 }

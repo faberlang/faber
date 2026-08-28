@@ -9,7 +9,6 @@ syntax = "list<T> | list<T, _> | list<T, N>"
 related = ["lista", "+", "↦", "↤"]
 locale = "en"
 +++
-
 # =============================================================================
 # Exact-bound lista lattice — dynamic, inferred, and explicit capacities.
 # =============================================================================
@@ -45,8 +44,7 @@ main {
     const list<int> dynamic_left ← [1, 2, 3]
     const list<int> dynamic_right ← [10, 20, 30]
     const list<int> dynamic_sum ← dynamic_pair(dynamic_left, dynamic_right)
-
-    const list<int, _> inferred ← [4, 5, 6]
+    const list<int, 3> inferred ← [4, 5, 6]
     const list<int, 3> explicit ← [7, 8, 9]
 
     # Both widening spellings are checked here. The dead branch keeps the
@@ -59,7 +57,6 @@ main {
         print widened_expression
         print widened_assignment
     }
-
     print dynamic_sum
     print inferred
     print explicit

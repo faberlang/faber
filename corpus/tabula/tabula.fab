@@ -10,7 +10,6 @@ aliases = ["map", "dictionary"]
 related = ["lista", "copia", "∷", "itera"]
 locale = "en"
 +++
-
 # =============================================================================
 # tabula — Generic key/value map type.
 # =============================================================================
@@ -47,7 +46,6 @@ main {
     puncta["alpha"] ← 1
     puncta["beta"] ← 2
     puncta["gamma"] ← 3
-
     print puncta.length()
     print puncta["alpha"]
     print puncta["beta"]

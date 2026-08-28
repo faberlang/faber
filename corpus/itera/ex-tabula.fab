@@ -9,7 +9,6 @@ syntax = "for from <tabula> const <value> { <body> }"
 related = ["tabula", "de", "ex", "itera"]
 locale = "en"
 +++
-
 # =============================================================================
 # ex-tabula — `for from <tabula>` value iteration.
 # =============================================================================

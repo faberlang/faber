@@ -9,7 +9,6 @@ syntax = "numerus<W> | fractus<W>"
 related = ["numerus", "fractus", "instans"]
 locale = "en"
 +++
-
 # =============================================================================
 # numerus — Sized numerus and fractus width annotations in type position.
 # =============================================================================
@@ -35,8 +34,7 @@ main {
     const int<i32> narrow ← 7 ∷ int<i32>
     const int<u64> wide ← 255 ∷ int<u64>
     const int<i64> signed ← narrow
-    const float<f32> single ← 1.5 ∷ float<f32>
-
+    const f32 single ← 1.5 ∷ f32
     print narrow
     print wide
     print signed

@@ -9,7 +9,6 @@ syntax = "mori <expression> si <condition>"
 related = ["iace", "ergo", "si"]
 locale = "en"
 +++
-
 # =============================================================================
 # mori — Conditional fatal abort with si guard.
 # =============================================================================
@@ -44,17 +43,20 @@ locale = "en"
 
 fn clamp(int x, int min, int max) → int {
     # Guard: abort if min > max — invariant violation
-    panic "range inverted" if min > max
+    if min ≻ max {
+        panic "range inverted"
+    }
 
     # Guard: abort if value out of range
-    panic "value out of range" if x < min or x > max
-
+    if x ≺ min or x ≻ max {
+        panic "value out of range"
+    }
     return x
 }
 
 fn accessus(list<int> res, int index) → int {
     # Unconditional mori — unchanged form
-    if index < 0 or index ≥ res.length() {
+    if index ≺ 0 or index ≥ res.length() {
         panic "index out of bounds"
     }
     return res[index]
@@ -69,7 +71,6 @@ main {
     const list<int> xs ← [1, 2, 3]
     const int y ← accessus(xs, 1)
     print "positive"
-
     const list<int> ys ← [42]
     const int z ← accessus(ys, 0)
     print "not empty"

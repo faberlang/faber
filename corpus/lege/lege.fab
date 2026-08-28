@@ -9,7 +9,6 @@ syntax = "lege [lineam]"
 related = ["lineam", "scribe"]
 locale = "en"
 +++
-
 # =============================================================================
 # lege — Reads input from the active input stream.
 # =============================================================================
@@ -40,9 +39,8 @@ locale = "en"
 # (whitelist: lege/lege.fab).
 
 main {
-    const _ pattern ← "(?g)\d+" ↦ regex
+    const regex pattern ← "(?g)\d+" ↦ regex
     print pattern
-
-    const _ input ← read
+    const string ∪ null input ← read
     print input
 }

@@ -9,7 +9,6 @@ syntax = "for from <lista>, <lista> const <left>, <right> { }"
 related = ["ex", "de", "apud"]
 locale = "en"
 +++
-
 # =============================================================================
 # lockstep N=2 — one walk over two aligned lists.
 # =============================================================================
@@ -33,15 +32,12 @@ locale = "en"
 main {
     const list<string> labels ← ["one", "two", "three"]
     const list<int> values ← [1, 2, 3]
-
     for from labels, values const label, value {
         print label
         print value
     }
-
     const list<int> left ← [10, 20, 30]
     const list<int> right ← [1, 2, 3]
-
     for from left, right const a, b {
         print a - b
     }

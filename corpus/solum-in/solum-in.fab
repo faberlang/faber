@@ -8,7 +8,6 @@ summary = "Restricts a test to a named environment or target."
 syntax = "solum_in <string> <string>"
 locale = "en"
 +++
-
 # =============================================================================
 # solum_in — Restricts a test to a named environment or target.
 # =============================================================================

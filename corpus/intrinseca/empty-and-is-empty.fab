@@ -26,7 +26,7 @@ locale = "en"
 
 main {
     var list<int> xs ← empty
-    const _ vacant ← xs.is_empty()
+    const bool vacant ← xs.is_empty()
     xs.append(1)
     print vacant, xs.is_empty(), xs.length()
 }

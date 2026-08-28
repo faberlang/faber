@@ -9,7 +9,6 @@ syntax = "<condition> sic <then-expr> secus <else-expr>"
 related = ["sic", "secus", "si"]
 locale = "en"
 +++
-
 # =============================================================================
 # sic — Ternary conditional expressions with sic and secus.
 # =============================================================================
@@ -38,33 +37,30 @@ locale = "en"
 #   ternarius.expected — nested and flat ternary results.
 
 main {
-    const _ aetas ← 25
+    const int aetas ← 25
 
     # Latin ternary
-    const _ gradusaetatis ← aetas ≥ 18 yields "adultus" else "minor"
+    const string gradusaetatis ← aetas ≥ 18 yields "adultus" else "minor"
     # "adultus"
     print gradusaetatis
 
     # Latin nested (reads more clearly)
-    const _ puncta ← 85
-    const _ gradus ←
-        puncta ≥ 90 yields "A" else
-        puncta ≥ 80 yields "B" else
-        puncta ≥ 70 yields "C" else "F"
+    const int puncta ← 85
+    const string gradus ← puncta ≥ 90 yields "A" else puncta ≥ 80 yields "B" else puncta ≥ 70 yields "C" else "F"
     # "B"
     print gradus
 
     # In expressions
-    const _ maximum ← aetas > 30 yields aetas else 30
+    const int maximum ← aetas ≻ 30 yields aetas else 30
     print "maximum: §"(maximum)
 
     # With nullish values
-    var _ forsitan ← null ∷ string ∪ null
-    const _ solutum ← forsitan not is null yields forsitan else "defectum"
+    var string ∪ null forsitan ← null ∷ string ∪ null
+    const string solutum ← forsitan not is null yields forsitan else "defectum"
     # "defectum"
     print solutum
 
     # Prefer sic/secus for clarity
-    const _ licentia ← aetas ≥ 21 yields "licet bibere" else "bibere non licet"
+    const string licentia ← aetas ≥ 21 yields "licet bibere" else "bibere non licet"
     print licentia
 }

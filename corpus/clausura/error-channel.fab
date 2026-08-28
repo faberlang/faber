@@ -10,7 +10,6 @@ aliases = ["error-channel closure"]
 related = ["clausura", "⇥", "fac", "cape", "iace"]
 locale = "en"
 +++
-
 # =============================================================================
 # clausura — closure with its own error channel
 # =============================================================================
@@ -41,20 +40,22 @@ locale = "en"
 #   error-channel.expected — the thrown payload and the happy-path value.
 
 main {
-    const _ guard ← (int x) → int ⇥ string ∴ do {
-        if x > 3 {
+    const (int) → int ⇥ string guard ← int x → int ⇥ string ∴ do {
+        if x ≻ 3 {
             throw "too big"
         }
         return x + 1
     }
     do {
         print guard(5)
-    } catch err {
+    }
+    catch err {
         print "caught: §"(err)
     }
     do {
         print guard(2)
-    } catch err {
+    }
+    catch err {
         print "caught: §"(err)
     }
 }

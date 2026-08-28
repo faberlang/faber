@@ -1902,7 +1902,7 @@ fn finge_with_named_fields_reemits_braced_fields() {
 
     let code = generate_faber(&program, &types, &interner);
     assert!(
-        code.contains("iace finge FormaInvalida {causa = def_9}"),
+        code.contains("iace finge FormaInvalida { causa = def_9 }"),
         "named finge fields must re-emit in the braced form:\n{code}"
     );
 }

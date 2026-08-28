@@ -9,7 +9,6 @@ syntax = "<name>(<args>) | <expr>.<method>(<args>) | <name>(sparge <lista>)"
 related = ["functio", "sparge", "genus"]
 locale = "en"
 +++
-
 # =============================================================================
 # vocatio — Function, method, chained, and sparge spread call expressions.
 # =============================================================================
@@ -41,7 +40,7 @@ locale = "en"
 # EXPECTED OUTPUT:
 #   Salve, arithmetic results, chained builder output, spread-arg sum.
 
-fn saluta() {
+fn saluta() → void {
     print "Salve!"
 }
 
@@ -76,30 +75,30 @@ main {
     saluta()
 
     # Call with arguments
-    const _ summa ← adde(10, 20)
+    const int summa ← adde(10, 20)
     # 30
     print summa
 
     # Multiple arguments
-    const _ productum ← multiplica(5, 6)
+    const int productum ← multiplica(5, 6)
     # 30
     print productum
 
     # Method call on objectum
-    var _ computator ← Computator {}
+    var Computator computator ← Computator {}
     computator.pone(10)
     # 10
     print computator.accipe()
 
     # Chained method calls
-    var _ alter ← Computator {}
-    const _ value ← alter.pone(5).duplica().duplica().accipe()
+    var Computator alter ← Computator {}
+    const int value ← alter.pone(5).duplica().duplica().accipe()
     # 20
     print value
 
     # Call with sparge
     const list<int> numeri ← [3, 7]
-    const _ sparsa ← adde(spread numeri)
+    const int sparsa ← adde(spread numeri)
     # 10
     print sparsa
 }

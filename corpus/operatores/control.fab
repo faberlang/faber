@@ -10,7 +10,6 @@ aliases = ["ergo", "therefore"]
 related = ["si", "redde", "clausura", "ergo"]
 locale = "en"
 +++
-
 # =============================================================================
 # ergo — Compact consequent after si/dum heads via ergo, with ∴ reserved for closure bodies.
 # =============================================================================
@@ -37,8 +36,8 @@ locale = "en"
 #   Cross-ref si/ergo-redde.fab for ergo-redde guard-return spelling.
 
 fn clamp(int x) → int {
-    if x < 0 then return 0
-    if x > 100 then return 100
+    if x ≺ 0 then return 0
+    if x ≻ 100 then return 100
     return x
 }
 

@@ -9,7 +9,6 @@ syntax = "itera ab <literal range> fixum <ident>; return <path>"
 related = ["itera", "ab", "air-aspect-decline"]
 locale = "en"
 +++
-
 # =============================================================================
 # air-aspect-admit — admitted AIR proof-aspect shapes.
 # =============================================================================
@@ -33,8 +32,9 @@ locale = "en"
 # =============================================================================
 
 # Admitted Line 1 shape: literal range gives concrete lanes (route ab, 4 lanes).
-fn unroll_admit() → vacuum {
-    for range 0‥4 const i { }
+fn unroll_admit() → void {
+    for range 0‥4 const i {
+    }
 }
 
 # Admitted Line 3 shape: immutable let chain + returned path — inside the

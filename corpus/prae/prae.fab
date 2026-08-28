@@ -10,7 +10,6 @@ aliases = ["type parameters", "magnitudo"]
 related = ["typus", "functio"]
 locale = "en"
 +++
-
 # =============================================================================
 # generics — Angle-bracket generic parameters on functions and declarations.
 # =============================================================================

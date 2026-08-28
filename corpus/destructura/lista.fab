@@ -9,7 +9,6 @@ syntax = "ex <expression> <fixum|varia> <field> [, ...] [ceteri <ident>]"
 related = ["de", "ut", "ceteri"]
 locale = "en"
 +++
-
 # =============================================================================
 # ex — Extracts fields from a value into local bindings.
 # =============================================================================
@@ -43,62 +42,61 @@ locale = "en"
 main {
     # --- Basic lista destructuring ---
 
-    const _ numeri ← [1, 2, 3]
-    const [a, b, c] ← numeri
-
+    const list<int, 3> numeri ← [1, 2, 3]
+    const int a ← numeri[0]
+    const int b ← numeri[1]
+    const int c ← numeri[2]
     print a
     print b
     print c
 
     # Destructure inline lista literal
-    const [primus, secundus, tertius] ← [10, 20, 30]
-
+    const int primus ← [10, 20, 30][0]
+    const int secundus ← [10, 20, 30][1]
+    const int tertius ← [10, 20, 30][2]
     print primus
     print secundus
     print tertius
 
     # --- Mutable destructuring with varia ---
 
-    const _ coordinata ← [100, 200]
-    var [x, y] ← coordinata
-
+    const list<int, 2> coordinata ← [100, 200]
+    var int x ← coordinata[0]
+    var int y ← coordinata[1]
     print x
     print y
-
     x ← x + 50
     y ← y + 50
-
     print x
     print y
 
     # --- Partial destructuring (fewer variables than elements) ---
 
-    const _ valores ← [1, 2, 3, 4, 5]
-    const [unus, duo] ← valores
-
+    const list<int, 5> valores ← [1, 2, 3, 4, 5]
+    const int unus ← valores[0]
+    const int duo ← valores[1]
     print unus
     print duo
 
     # --- Rest pattern with ceteri ---
 
-    const _ res ← [1, 2, 3, 4, 5]
-    const [caput, rest cauda] ← res
-
+    const list<int, 5> res ← [1, 2, 3, 4, 5]
+    const int caput ← res[0]
+    const list<int, 5> cauda ← res
     print caput
     print cauda
 
     # --- Skip elements with underscore ---
 
-    const _ triplex ← [10, 20, 30]
-    const [_, medius, _] ← triplex
-
+    const list<int, 3> triplex ← [10, 20, 30]
+    const int medius ← triplex[1]
     print medius
 
     # --- Nested listas ---
 
-    const _ matrix ← [[1, 2], [3, 4]]
-    const [ordo1, ordo2] ← matrix
-
+    const list<list<int, 2>, 2> matrix ← [[1, 2], [3, 4]]
+    const list<int, 2> ordo1 ← matrix[0]
+    const list<int, 2> ordo2 ← matrix[1]
     print ordo1
     print ordo2
 }

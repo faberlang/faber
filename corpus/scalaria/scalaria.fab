@@ -9,7 +9,6 @@ syntax = "functio <name>(<scalar-params>) → <scalar-type> <block>"
 related = ["numerus", "fractus", "bivalens"]
 locale = "en"
 +++
-
 # =============================================================================
 # scalaria — Scalar operations on numerus, fractus, and bivalens in function
 # signatures.

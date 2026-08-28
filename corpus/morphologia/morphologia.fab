@@ -9,7 +9,6 @@ syntax = "<collection>.<verb-a|verb-ata|verb-e|verb-ita>(<args>)"
 related = ["lista", "appende", "filtrata"]
 locale = "en"
 +++
-
 # =============================================================================
 # morphologia — Verb-form dispatch on collection methodi (imperative vs participle endings).
 # =============================================================================
@@ -44,14 +43,14 @@ locale = "en"
 #   numeri prima: [1, 2, 3, 4, 5]
 
 main {
-    const _ numeri ← [1, 2, 3, 4, 5] ∷ list<int>
+    const list<int> numeri ← [1, 2, 3, 4, 5] ∷ list<int>
 
     # ≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡
     # FILTRA: filtr-
     # ≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡
 
     # filtrata returns a new filtered list
-    const _ pares ← numeri.filter(int x ∴ x % 2 ≡ 0)
+    const list<int> pares ← numeri.filter(int x ∴ x % 2 ≡ 0)
     print "filtrata nova: §"(pares)
 
     # ≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡
@@ -59,7 +58,7 @@ main {
     # ≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡
 
     # addita returns a new list with an added element
-    const _ aucta ← numeri.added(6)
+    const list<int> aucta ← numeri.added(6)
     print "addita nova: §"(aucta)
 
     # appende mutates in place
@@ -72,7 +71,7 @@ main {
     # ≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡
 
     # inversa returns a new reversed list
-    const _ versa ← numeri.invert()
+    const list<int> versa ← numeri.invert()
     print "inversa nova: §"(versa)
 
     # inverte mutates in place
@@ -85,7 +84,7 @@ main {
     # ≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡
 
     # ordinata returns a new sorted list
-    const _ ordinata ← numeri.sorted()
+    const list<int> ordinata ← numeri.sorted()
     print "ordinata nova: §"(ordinata)
 
     # ordina mutates in place
@@ -98,7 +97,7 @@ main {
     # ≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡
 
     # mappata returns a new mapped list
-    const _ duplicata ← numeri.map(int x ∴ x * 2)
+    const list<int> duplicata ← numeri.map(int x ∴ x * 2)
     print "mappata nova: §"(duplicata)
 
     # ≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡≡

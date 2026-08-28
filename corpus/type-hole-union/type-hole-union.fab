@@ -10,7 +10,6 @@ aliases = []
 related = ["unio", "nihil"]
 locale = "en"
 +++
-
 # =============================================================================
 # type-hole-union — two type holes (`_` vs `∪`) and the nullable exception
 # =============================================================================
@@ -40,48 +39,58 @@ locale = "en"
 # =============================================================================
 
 # `_` infers exactly one inhabitant type from the initializer.
-fn member_count(list<int ∪ string> xs) → int {
+fn member_count(list<string ∪ int> xs) → int {
     match xs {
-        case _ { return 1 }
+        case _ {
+            return 1
+        }
     }
 }
 
 # `∪` accumulates a member per direct flow; `match` arms name the members.
-fn consume(int ∪ string value) → int {
+fn consume(string ∪ int value) → int {
     match value {
-        case 7 { return 1 }
-        case "x" { return 2 }
-        default { return 0 }
+        case 7 {
+            return 1
+        }
+        case "x" {
+            return 2
+        }
+        case _ {
+            return 0
+        }
     }
 }
 
 # `T ∪ null` is one optional inhabitant, so a `null` arm is the null case.
 fn maybe_len(string ∪ null value) → int {
     match value {
-        case null { return 0 }
-        default { return 1 }
+        case null_ty {
+            return 0
+        }
+        case _ {
+            return 1
+        }
     }
 }
 
 test "the two hole kinds infer cleanly without shape warnings" {
     # `_`: exactly one inhabitant type.
-    const _ count ← 3
+    const int count ← 3
 
     # `∪`: every direct flow adds a member — solves to `int ∪ string`.
-    var ∪ mixed ← 1
+    var string ∪ int mixed ← 1
     mixed ← "salve"
 
     # `list<∪>`: heterogeneous elements solve to `list<int ∪ string>`.
-    const list<∪> nodes ← [1, "two", 3]
+    const list<string ∪ int> nodes ← [1, "two", 3]
 
     # `T ∪ null`: one optional inhabitant — `_` over it stays quiet.
     const string ∪ null opt ← "text"
-    const _ maybe ← opt
-
-    const _ m ← member_count(nodes)
-    const _ n ← consume(mixed)
-    const _ o ← maybe_len(maybe)
-
+    const string ∪ null maybe ← opt
+    const int m ← member_count(nodes)
+    const int n ← consume(mixed)
+    const int o ← maybe_len(maybe)
     assert count ≡ 3
     assert m ≡ 1
     assert n ≡ 0
@@ -92,28 +101,25 @@ test "the two hole kinds infer cleanly without shape warnings" {
 # so the script harness has an exact stdout oracle (`type-hole-union.expected`).
 main {
     # `_`: exactly one inhabitant type.
-    const _ count ← 3
+    const int count ← 3
 
     # `∪`: every direct flow adds a member — solves to `int ∪ string`.
-    var ∪ mixed ← 1
+    var string ∪ int mixed ← 1
     mixed ← "salve"
 
     # `list<∪>`: heterogeneous elements solve to `list<int ∪ string>`.
-    const list<∪> nodes ← [1, "two", 3]
+    const list<string ∪ int> nodes ← [1, "two", 3]
 
     # `T ∪ null`: one optional inhabitant — `_` over it stays quiet.
     const string ∪ null opt ← "text"
-    const _ maybe ← opt
-
-    const _ m ← member_count(nodes)
-    const _ n ← consume(mixed)
-    const _ o ← maybe_len(maybe)
-
+    const string ∪ null maybe ← opt
+    const int m ← member_count(nodes)
+    const int n ← consume(mixed)
+    const int o ← maybe_len(maybe)
     assert count ≡ 3
     assert m ≡ 1
     assert n ≡ 0
     assert o ≡ 1
-
     print count
     print m
     print n

@@ -9,7 +9,6 @@ syntax = "ad 'runtime:echo' (payload) ↦ numerus ⇥ fallback"
 related = ["ad", "conversio", "sermo"]
 locale = "en"
 +++
-
 # =============================================================================
 # ad — ad sermo materialization can recover from a failed typed extraction with
 # a fallback.

@@ -295,7 +295,7 @@ fn expression_item_lists_emit_between_only() {
     };
     assert_eq!(
         render_expr(&codegen, &typed_object, &types, &interner),
-        "def_10 {a = 1, b = 2, c = 3}"
+        "def_10 { a = 1, b = 2, c = 3 }"
     );
 
     let json = HirExpression {
@@ -520,7 +520,7 @@ fn expression_item_lists_emit_between_only() {
     };
     assert_eq!(
         render_expr(&codegen, &finge, &types, &interner),
-        "finge def_30 {x = 1, y = 2}"
+        "finge def_30 { x = 1, y = 2 }"
     );
 
     let discerne = HirExpression {
@@ -539,13 +539,13 @@ fn expression_item_lists_emit_between_only() {
     for output in [
         "0 ∇ [1, 2, 3]",
         "[1, 2, 3]",
-        "def_10 {a = 1, b = 2, c = 3}",
+        "def_10 { a = 1, b = 2, c = 3 }",
         "{ \"a\": 1, \"b\": 2 }",
         "def_20(1, 2)",
         "[1, 2, 3]",
         "nota 1, 2, 3",
         "scriptum(\"message\", 1, 2)",
-        "finge def_30 {x = 1, y = 2}",
+        "finge def_30 { x = 1, y = 2 }",
     ] {
         assert_no_trailing_separator(output);
     }

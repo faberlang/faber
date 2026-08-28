@@ -10,7 +10,6 @@ aliases = ["fac-block closure", "block-body closure"]
 related = ["clausura", "fac", "∴"]
 locale = "en"
 +++
-
 # =============================================================================
 # clausura — fac-block closure body
 # =============================================================================
@@ -42,7 +41,7 @@ locale = "en"
 #   fac-block.expected — the doubled, shifted value.
 
 main {
-    const _ f ← (int x) → int ∴ do {
+    const (int) → int f ← int x → int ∴ do {
         const int y ← x + 1
         return y * 2
     }

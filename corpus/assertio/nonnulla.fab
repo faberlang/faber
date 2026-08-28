@@ -9,8 +9,6 @@ syntax = "<expression>!.<name> | <expression>![<expression>] | <expression>!(<ar
 related = ["!."]
 locale = "en"
 +++
-
-
 # =============================================================================
 # !. — Non-null assertion before member, index, or call access.
 # =============================================================================
@@ -54,7 +52,7 @@ main {
     print p!.urbs
 
     # !. on lista index — asserts element exists
-    const _ litterae ← ["a", "b", "c"]
+    const list<string, 3> litterae ← ["a", "b", "c"]
     print litterae![0]
     print litterae![2]
 }

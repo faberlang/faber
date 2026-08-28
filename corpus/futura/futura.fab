@@ -41,13 +41,13 @@ locale = "en"
 # BACKEND:
 #   Rust async runtime not linked in exempla harness (whitelist: futura/futura.fab).
 
-@ future
+@ future { }
 fn responde() → int {
     return 42
 }
 
 async_main {
     # figendum awaits the promissum and binds the resolved value
-    await_const _ responsum ← responde()
+    await_const int responsum ← responde()
     print responsum
 }

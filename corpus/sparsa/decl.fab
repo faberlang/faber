@@ -9,7 +9,6 @@ syntax = "sparsa<T, Figura> | sparsa<T, []>"
 related = ["sparsa", "tensor", "vacua"]
 locale = "en"
 +++
-
 # =============================================================================
 # sparsa — sparsa<T, Figura> declaration shell with all-zero vacua.
 # =============================================================================
@@ -36,13 +35,12 @@ locale = "en"
 # EXPECTED OUTPUT:
 #   Rank and stored non-zero count after round-trip identity call.
 
-fn identity(sparsa<float<f32>, [2, 3]> value) → sparsa<float<f32>, [2, 3]> {
+fn identity(sparsa<f32, [2, 3]> value) → sparsa<f32, [2, 3]> {
     return value
 }
 
 main {
-    const sparsa<float<f32>, [2, 3]> empty ← empty
-    const sparsa<float<f32>, [2, 3]> roundtrip ← identity(empty)
-
+    const sparsa<f32, [2, 3]> empty ← empty
+    const sparsa<f32, [2, 3]> roundtrip ← identity(empty)
     print roundtrip.length(), roundtrip.nonzero_count()
 }

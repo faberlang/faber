@@ -10,7 +10,6 @@ aliases = ["optional", "voluntary"]
 related = ["vel", "nihil", "∪", "functio", "genus"]
 locale = "en"
 +++
-
 # =============================================================================
 # sponte — Marks a named declaration slot (parameter or genus field) as voluntary — the caller or provider may omit the value.
 # =============================================================================

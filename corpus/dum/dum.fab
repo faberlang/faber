@@ -10,7 +10,21 @@ aliases = ["while"]
 related = ["si", "ergo", "fac"]
 locale = "en"
 +++
+test "dum counts up to its condition" {
+    var int computus ← 0
+    while computus ≺ 5 {
+        computus ← computus + 1
+    }
+    assert computus ≡ 5
+}
 
+test "dum counts down to zero" {
+    var int reliquum ← 3
+    while reliquum ≻ 0 {
+        reliquum ← reliquum - 1
+    }
+    assert reliquum ≡ 0
+}
 # =============================================================================
 # dum — Repeats a block while a condition remains true.
 # =============================================================================
@@ -39,35 +53,16 @@ locale = "en"
 main {
     # Ascending counter: varia so the loop variable can mutate
     var int computus ← 0
-
-    while computus < 5 {
+    while computus ≺ 5 {
         print computus
         computus ← computus + 1
     }
 
     # Descending loop: condition becomes falsum at 0
     var int reliquum ← 3
-
-    while reliquum > 0 {
+    while reliquum ≻ 0 {
         print "reliquum: §"(reliquum)
         reliquum ← reliquum - 1
     }
-
     print "perfectum!"
-}
-
-test "dum counts up to its condition" {
-    var int computus ← 0
-    while computus < 5 {
-        computus ← computus + 1
-    }
-    assert computus ≡ 5
-}
-
-test "dum counts down to zero" {
-    var int reliquum ← 3
-    while reliquum > 0 {
-        reliquum ← reliquum - 1
-    }
-    assert reliquum ≡ 0
 }

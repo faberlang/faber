@@ -9,7 +9,6 @@ syntax = "tensor.get(indices) | tensor.set(indices, value)"
 related = ["tensor", "accipe", "ponde", "lista"]
 locale = "en"
 +++
-
 # =============================================================================
 # tensor — Tensor method policy for static literal rejection and checked reads.
 # =============================================================================
@@ -40,16 +39,13 @@ locale = "en"
 #   8.0
 
 main {
-    const tf32[] seed ← empty
-    var tf32[3] input ← seed.from_flat([1.0, 2.0, 3.0], [3])
-
+    const tensor<f32, []> seed ← empty
+    var tensor<f32, [3]> input ← seed.from_flat([1.0, 2.0, 3.0], [3])
     const f32 in_bounds ← input.get([1]) coalesce 0.0
     const int dynamic_index ← 1
     const f32 dynamic_in_bounds ← input.get([dynamic_index]) coalesce 0.0
-
     input.set([2], 8.0)
     const f32 updated ← input.get([2]) coalesce 0.0
-
     print in_bounds
     print dynamic_in_bounds
     print updated

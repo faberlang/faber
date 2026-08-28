@@ -9,7 +9,6 @@ syntax = "<octeti> ↦ list<int<u8>>"
 related = ["↦", "octeti", "lista", "numerus"]
 locale = "en"
 +++
-
 # =============================================================================
 # ↦ — Boundary bridge from octeti to lista<numerus<u8>>.
 # =============================================================================
@@ -43,7 +42,6 @@ main {
     const bytes raw ← |de ad be ef|
     const list<int<u8>> asList ← raw ↦ list<int<u8>>
     const bytes back ← asList ↦ bytes
-
     print asList.length()
     print back.length()
 }

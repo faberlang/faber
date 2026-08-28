@@ -9,7 +9,6 @@ syntax = "cura \"<allocator-kind>\" fixum _ <alloc> <block>"
 related = ["arena"]
 locale = "en"
 +++
-
 # =============================================================================
 # cura — Starts an allocator scope.
 # =============================================================================
@@ -39,7 +38,8 @@ locale = "en"
 #   "in arena".
 
 main {
-    with "arena" const _ alloc {
+    {
+        const any alloc
         print "in arena"
     }
 }

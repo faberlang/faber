@@ -9,6 +9,16 @@ syntax = "falsum [<expression>]"
 related = ["verum", "nihil"]
 locale = "en"
 +++
+test "falsum is the false literal" {
+    const bool inactive ← false
+    assert inactive ≡ false
+    assert not inactive
+}
+
+test "falsum contrasts with verum" {
+    assert false ≠ true
+    assert false ≡ false
+}
 # =============================================================================
 # falsum — Represents the false boolean value and can prefix a falsity check
 # =============================================================================
@@ -33,17 +43,6 @@ locale = "en"
 #
 
 main {
-    const _ inactive ← false
+    const bool inactive ← false
     print inactive
-}
-
-test "falsum is the false literal" {
-    const _ inactive ← false
-    assert inactive ≡ false
-    assert not inactive
-}
-
-test "falsum contrasts with verum" {
-    assert false ≠ true
-    assert false ≡ false
 }

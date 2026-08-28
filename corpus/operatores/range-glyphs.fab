@@ -9,7 +9,6 @@ syntax = "<expression> ‥ <expression> | <expression> … <expression>"
 related = ["‥", "…", "ante", "usque", "intra"]
 locale = "en"
 +++
-
 # =============================================================================
 # ‥ — Half-open and inclusive range endpoints in itera ab and intra.
 # =============================================================================
@@ -42,7 +41,6 @@ main {
     }
     # 5 iterations
     print exclusivus
-
     var int inclusivus ← 0
     for range 0…5 const _ {
         inclusivus ↑

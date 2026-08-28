@@ -10,7 +10,6 @@ aliases = ["switch", "choose"]
 related = ["casu", "ceterum"]
 locale = "en"
 +++
-
 # =============================================================================
 # elige — Starts a value-based branch statement.
 # =============================================================================
@@ -41,9 +40,8 @@ locale = "en"
 
 main {
     # Text matching
-    const _ condicio ← "agens"
-
-    switch condicio {
+    const string condicio ← "agens"
+    match condicio {
         case "pendens" {
             print "exspectat..."
         }
@@ -56,9 +54,8 @@ main {
     }
 
     # Numerus matching
-    const _ codex ← 200
-
-    switch codex {
+    const int codex ← 200
+    match codex {
         case 200 {
             print "Recte"
         }
@@ -71,9 +68,8 @@ main {
     }
 
     # Multiple statements per case
-    const _ modus ← "opera"
-
-    switch modus {
+    const string modus ← "opera"
+    match modus {
         case "labor" {
             print "modus laboris"
             print "verba multa"

@@ -42,7 +42,10 @@ locale = "en"
 #   and `?` at the apply call site (FF-1 / D10).
 
 union LookupError {
-    Missing { string key int layer }
+    Missing {
+        string key
+        int layer
+    }
 }
 
 # Named thrower — live throw, not a bool-struct. Passed as the callback value.
@@ -57,7 +60,7 @@ fn apply((string, int) → tensor<f32, [1]> ⇥ LookupError lookup, string name,
 
 main {
     do {
-        const _ t ← apply(lookup_throw, "missing", 0)
+        const tensor<f32, [1]> t ← apply(lookup_throw, "missing", 0)
     }
     catch err {
         warn "threw"

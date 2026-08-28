@@ -10,7 +10,6 @@ aliases = ["array", "list"]
 related = ["tabula", "copia", "∷", "itera"]
 locale = "en"
 +++
-
 # =============================================================================
 # lista — Generic ordered collection type.
 # =============================================================================
@@ -41,14 +40,12 @@ locale = "en"
 # (whitelist: lista/methodi-mutatio.fab).
 
 main {
-    var _ res ← [3, 1, 2] ∷ list<int>
-
+    var list<int> res ← [3, 1, 2] ∷ list<int>
     res.append(4)
-    const _ primusremotus ← res.remove_first()
-    const _ ultimusremotus ← res.remove_last()
+    const int ∪ null primusremotus ← res.remove_first()
+    const int ∪ null ultimusremotus ← res.remove_last()
     res.reverse()
     res.sort()
-
     print res
     print primusremotus
     print ultimusremotus

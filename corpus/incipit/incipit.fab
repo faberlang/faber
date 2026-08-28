@@ -10,6 +10,9 @@ aliases = ["main", "entry"]
 related = ["functio", "importa"]
 locale = "en"
 +++
+test "do nothing deliberately" {
+    pass
+}
 # =============================================================================
 # incipit — Declares the synchronous program entry point
 # =============================================================================
@@ -40,8 +43,4 @@ locale = "en"
 
 main {
     print "ingressus"
-}
-
-test "do nothing deliberately" {
-    pass
 }

@@ -47,20 +47,14 @@ fn factorial(int n) → int {
 
 # Fibonacci: fib(n) ← fib(n-1) + fib(n-2)
 fn fibonacci(int n) → int {
-    if n ≤ 0 {
-        return 0
-    }
-    if n ≡ 1 {
-        return 1
-    }
+    if n ≤ 0 then return 0
+    if n ≡ 1 then return 1
     return fibonacci(n - 1) + fibonacci(n - 2)
 }
 
 # Sum from 1 to n
 fn summatio(int n) → int {
-    if n ≤ 0 {
-        return 0
-    }
+    if n ≤ 0 then return 0
     return n + summatio(n - 1)
 }
 

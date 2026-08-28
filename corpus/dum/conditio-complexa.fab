@@ -9,7 +9,6 @@ syntax = "dum <condition> <block>"
 related = ["dum", "et", "aut"]
 locale = "en"
 +++
-
 # =============================================================================
 # dum — While loops with compound et/aut conditions.
 # =============================================================================
@@ -40,11 +39,9 @@ main {
     # et: loop stops when currit becomes falsum (after 3 iterations)
     var bool currit ← true
     var int conatus ← 0
-
-    while currit and conatus < 5 {
+    while currit and conatus ≺ 5 {
         print "conatus: §"(conatus)
         conatus ← conatus + 1
-
         if conatus ≥ 3 {
             # breaks the et condition on next check
             currit ← false
@@ -54,8 +51,7 @@ main {
     # aut: continues while at least one counter is positive
     var int a ← 5
     var int b ← 3
-
-    while a > 0 or b > 0 {
+    while a ≻ 0 or b ≻ 0 {
         print "a: § b: §"(a, b)
         a ← a - 1
         b ← b - 1

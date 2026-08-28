@@ -37,11 +37,9 @@ locale = "en"
 
 main {
     const float value ← -3.75
-
-    const _ rotundus ← value.round()
-    const _ basis ← value.floor()
-    const _ culmen ← value.ceiling()
-    const _ truncatus ← value.truncate()
-
+    const int rotundus ← value.round()
+    const int basis ← value.floor()
+    const int culmen ← value.ceiling()
+    const int truncatus ← value.truncate()
     print rotundus, basis, culmen, truncatus
 }

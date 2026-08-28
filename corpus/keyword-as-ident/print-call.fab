@@ -9,7 +9,6 @@ syntax = "fn print(string print) { print print }; print(\"print\")"
 related = ["nota", "functio"]
 locale = "en"
 +++
-
 # =============================================================================
 # keyword-as-ident — user call `print(...)`
 # =============================================================================
@@ -40,7 +39,9 @@ locale = "en"
 # EXPECTED OUTPUT:
 #   print-call.expected — print
 
-fn print(string print) { print print }
+fn print(string print) → void {
+    print print
+}
 
 main {
     print("print")

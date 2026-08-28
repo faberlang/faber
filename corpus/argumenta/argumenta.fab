@@ -9,7 +9,6 @@ syntax = "incipit argumenta <name> <block> | functio <name>() argumenta <name> <
 related = ["incipit", "cli", "imperium", "optio", "operandus"]
 locale = "en"
 +++
-
 # =============================================================================
 # argumenta — Binds command-line arguments for an entry point.
 # =============================================================================
@@ -38,7 +37,7 @@ locale = "en"
 #   declaration-only CLI entry (whitelist: argumenta/argumenta.fab).
 #
 
-@ cli "argumenta-smoke"
+@ cli { name = "argumenta-smoke" }
 @ description "argumenta exemplum"
 main args args {
 }

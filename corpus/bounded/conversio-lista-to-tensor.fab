@@ -9,7 +9,6 @@ syntax = "list<T, N> ↦ tf32[N]"
 related = ["↦", "lista", "tensor"]
 locale = "en"
 +++
-
 # =============================================================================
 # ↦ — bounded numeric lista<T, N> converts to a shaped tensor
 # =============================================================================
@@ -41,7 +40,7 @@ locale = "en"
 
 main {
     const list<f32, 8> flat ← [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0]
-    const tf32[8] line ← flat ↦ tf32[8]
+    const tensor<f32, [8]> line ← flat ↦ tensor<f32, [8]>
     const list<int> dims ← line.shape()
     print dims
     print line.sum()

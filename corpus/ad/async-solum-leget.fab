@@ -9,7 +9,6 @@ syntax = "fs.read_file_async<textus>(via)"
 related = ["ad", "fs", "futura", "sermo"]
 locale = "en"
 +++
-
 # =============================================================================
 # async solum leget — async solum.read_file_async<T> uses the same solum:lege route as
 # sync solum.read_file<T>.
@@ -38,7 +37,6 @@ import from "norma:fs" charta
 async_main {
     const string textPath ← "/tmp/faber-async-fs-leget.txt"
     charta.write_file(textPath, "async fs\n")
-
     await_const string body ← charta.read_file_async<string>(textPath)
     assert body ≡ "async fs\n"
 }

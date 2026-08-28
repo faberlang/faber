@@ -9,7 +9,6 @@ syntax = "temporis <number>"
 related = ["metior", "repete"]
 locale = "en"
 +++
-
 # =============================================================================
 # temporis — Sets a wall-clock timeout in seconds for a test modifier.
 # =============================================================================

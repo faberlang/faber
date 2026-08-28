@@ -9,7 +9,6 @@ syntax = "ubique"
 related = ["optio", "operandus"]
 locale = "en"
 +++
-
 # =============================================================================
 # ubique — Marks an option or operand as global.
 # =============================================================================
@@ -38,7 +37,7 @@ locale = "en"
 #   declaration-only CLI metadata (whitelist: ubique/ubique.fab).
 #
 
-@ cli "ubique-smoke"
-@ option verbose short "v" long "verbose" type bool global description "Global verbose flag"
+@ cli { name = "ubique-smoke" }
+@ option { binding = verbose, short = "v", long = "verbose", type = bool, description = "Global verbose flag", global = true }
 main args args {
 }

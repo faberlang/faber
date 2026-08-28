@@ -551,7 +551,11 @@ impl super::FaberCodegen {
                     .cloned()
                     .unwrap_or_else(|| self.name_for_def(*def_id, names, interner));
                 writer.write(&name);
-                writer.write(" {");
+                if !fields.is_empty() {
+                    writer.write(" { ");
+                } else {
+                    writer.write(" {");
+                }
                 for (idx, (name, value)) in fields.iter().enumerate() {
                     if idx > 0 {
                         writer.write(", ");
@@ -559,6 +563,9 @@ impl super::FaberCodegen {
                     writer.write(&self.symbol_to_string(*name, interner));
                     writer.write(" = ");
                     self.write_expr(value, types, names, interner, surface, writer);
+                }
+                if !fields.is_empty() {
+                    writer.write(" ");
                 }
                 writer.write("}");
             }
@@ -906,11 +913,17 @@ impl super::FaberCodegen {
                         .unwrap_or_else(|| self.name_for_def(*def_id, names, interner));
                     writer.write(&name);
                     writer.write(" {");
+                    if !entries.is_empty() {
+                        writer.write(" ");
+                    }
                     for (idx, field) in entries.iter().enumerate() {
                         if idx > 0 {
                             writer.write(", ");
                         }
                         self.write_genus_field(field, types, names, interner, surface, writer);
+                    }
+                    if !entries.is_empty() {
+                        writer.write(" ");
                     }
                     writer.write("}");
                     return;
@@ -1252,7 +1265,7 @@ impl super::FaberCodegen {
         writer.write(" ");
         writer.write(&self.name_for_def_imported(variant_def, names, interner));
         if !fields.is_empty() {
-            writer.write(" {");
+            writer.write(" { ");
             for (idx, field) in fields.iter().enumerate() {
                 if idx > 0 {
                     writer.write(", ");
@@ -1263,7 +1276,7 @@ impl super::FaberCodegen {
                 }
                 self.write_expr(&field.expr, types, names, interner, surface, writer);
             }
-            writer.write("}");
+            writer.write(" }");
         }
     }
 

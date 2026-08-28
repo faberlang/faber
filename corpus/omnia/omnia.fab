@@ -9,8 +9,6 @@ syntax = "omnia"
 related = ["praepara", "postpara"]
 locale = "en"
 +++
-
-
 # =============================================================================
 # omnia — Marks a test hook as applying to every case.
 # =============================================================================
@@ -43,12 +41,16 @@ union Condicio {
 fn narra(Condicio condicio) → string {
     # every variant must have a casu
     match all condicio {
-        case Activa { return "activa" }
-        case Quietus { return "quietus" }
+        case Activa {
+            return "activa"
+        }
+        case Quietus {
+            return "quietus"
+        }
     }
 }
 
 main {
-    const _ condicio ← variant Activa
+    const Condicio condicio ← variant Activa
     print narra(condicio)
 }

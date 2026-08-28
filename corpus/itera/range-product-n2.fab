@@ -9,7 +9,6 @@ syntax = "for range <a>‥<b>, <c>‥<d> const <i>, <j> { }"
 related = ["ex", "de", "apud"]
 locale = "en"
 +++
-
 # =============================================================================
 # range product N=2 — one walk over two declared numeric domains.
 # =============================================================================
@@ -35,7 +34,6 @@ main {
         print i
         print j
     }
-
     for range 3‥5, 1‥3 const first, second {
         print first
         print second

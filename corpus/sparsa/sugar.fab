@@ -9,7 +9,6 @@ syntax = "sf32[2, 3] | si64[N] | su32[4]"
 related = ["tensor", "numeric type sugar"]
 locale = "en"
 +++
-
 # =============================================================================
 # sparsa — Sparse tensor width sugar mirrors dense tensor sugar with an s prefix.
 # =============================================================================
@@ -27,13 +26,11 @@ locale = "en"
 # STYLE: sparse tensor sugar (sf32, si64[N]) — see docs/design/numeric-type-sugar.md
 
 main {
-    var sf32[2, 3] grid ← empty
+    var sparsa<f32, [2, 3]> grid ← empty
     grid.set([0, 1], 4.0)
-
-    const _ value ← grid.get([0, 1])
-    const _ absent ← grid.get([1, 2])
-    const _ count ← grid.nonzero_count()
-
-    const tf32[2, 3] dense ← grid.densify()
+    const f32 value ← grid.get([0, 1])
+    const f32 absent ← grid.get([1, 2])
+    const int count ← grid.nonzero_count()
+    const tensor<f32, [2, 3]> dense ← grid.densify()
     print value, absent, count, dense.length()
 }

@@ -48,6 +48,6 @@ class Civis implements Nominatum {
 }
 
 main {
-    const _ civis ← Civis { nomen = "Aurelia" }
+    const Civis civis ← Civis { nomen = "Aurelia" }
     print civis.plenum()
 }

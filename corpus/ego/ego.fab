@@ -10,7 +10,6 @@ aliases = ["self", "this"]
 related = ["generis", "nexum"]
 locale = "en"
 +++
-
 # =============================================================================
 # ego — Refers to the current instance inside a method.
 # =============================================================================
@@ -45,6 +44,6 @@ class Capsa {
 }
 
 main {
-    const _ capsa ← Capsa { titulus = "prima" }
+    const Capsa capsa ← Capsa { titulus = "prima" }
     print capsa.narra()
 }

@@ -9,7 +9,6 @@ syntax = "modulus<u8>"
 related = ["numerus", "¬", "⇐", "⇒"]
 locale = "en"
 +++
-
 # =============================================================================
 # modulus<u8> — Unsigned 8-bit modular-word arithmetic and bit-pattern edges.
 # =============================================================================
@@ -36,7 +35,6 @@ main {
     const uint<u8> one ← 1
     var uint<u8> zero ← 0
     const int<u8> converted ↤ one
-
     print max + one
     print zero - one
     print max * 2
@@ -44,13 +42,11 @@ main {
     print ¬zero
     print one ⇐ 8
     print max ⇒ 8
-    print max > zero
-
+    print max ≻ zero
     max ↑
     zero ↓
     print max
     print zero
-
     const uint<u8> methodSum ← max.added(one)
     const uint<u8> methodShift ← max.shifted_left(8)
     var uint<u8> methodAcc ← 0
@@ -60,7 +56,6 @@ main {
     print methodSum
     print methodShift
     print methodAcc
-
     const list<uint<u8>> words ← [one, max]
-    print words.get(1) coalesce (0 ∷ uint<u8>)
+    print words.get(1) coalesce 0 ∷ uint<u8>
 }

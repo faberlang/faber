@@ -9,7 +9,6 @@ syntax = "<expression> ↦ instans | instans<ms> | instans<us> | instans<ns>"
 related = ["↦", "⇥", "textus"]
 locale = "en"
 +++
-
 # =============================================================================
 # instans — Conversio arms for instans precision family and textus datetime provenance.
 # =============================================================================
@@ -40,25 +39,20 @@ locale = "en"
 main {
     const string utc ← "1979-05-27T07:32:00.123456Z"
     const string offset ← "1979-05-27T16:32:00+0900"
-
     const instant seconds ← utc ↦ instant
     const instant<ms> millis ← seconds ↦ instant<ms>
     const instant<us> micros ← utc ↦ instant<us>
     const instant<ns> nanos ← utc ↦ instant<ns>
     const instant normalized ← offset ↦ instant
-
-    assert millis ↦ string ≡ "1979-05-27T07:32:00.000Z"
-    assert micros ↦ string ≡ "1979-05-27T07:32:00.123456Z"
+    assert (millis ↦ string) ≡ "1979-05-27T07:32:00.000Z"
+    assert (micros ↦ string) ≡ "1979-05-27T07:32:00.123456Z"
     assert normalized ≡ seconds panic "offset ingest lands on same UTC instant"
-
     const instant<ns> fine ← nanos
     const instant narrowed ← fine ↦ instant
-    assert narrowed ↦ string ≡ "1979-05-27T07:32:00Z"
-
+    assert (narrowed ↦ string) ≡ "1979-05-27T07:32:00Z"
     const string bad ← "not-a-datetime"
     const instant recovered ← bad ↦ instant ⇥ seconds
     assert recovered ≡ seconds
-
     print seconds ↦ string
     print millis ↦ string
     print micros ↦ string

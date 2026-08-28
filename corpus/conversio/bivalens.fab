@@ -9,7 +9,6 @@ syntax = "<expression> ↦ bivalens"
 related = ["↦", "bivalens"]
 locale = "en"
 +++
-
 # =============================================================================
 # ↦ — Truthiness conversion to bivalens.
 # =============================================================================
@@ -43,16 +42,14 @@ locale = "en"
 #   HIR-direct Rust and MIR-stepper routes must agree for truthiness.
 
 main {
-    const _ b1 ← 0 ↦ bool
-    const _ b2 ← 42 ↦ bool
+    const bool b1 ← 0 ↦ bool
+    const bool b2 ← 42 ↦ bool
     print b1
     print b2
-
-    const _ b3 ← "" ↦ bool
-    const _ b4 ← "salve" ↦ bool
+    const bool b3 ← "" ↦ bool
+    const bool b4 ← "salve" ↦ bool
     print b3
     print b4
-
-    const _ habet ← ("123" ↦ int ⇥ 0) ↦ bool
+    const bool habet ← ("123" ↦ int ⇥ 0) ↦ bool
     print habet
 }

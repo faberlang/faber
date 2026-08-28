@@ -32,8 +32,8 @@ locale = "en"
 
 main {
     # --- value clamp (half-open interior vs inclusive endpoint) ---
-    const _ half ← 15 ↦ 0‥10
-    const _ closed ← 15 ↦ 0…10
+    const int half ← 15 ↦ 0‥10
+    const int closed ← 15 ↦ 0…10
     assert half ≡ 9
     assert closed ≡ 10
 
@@ -56,6 +56,6 @@ main {
 
     # --- stored containment via continet (intra desugars to the same surface) ---
     const intervallum<int> fines ← 0‥10
-    const _ inside ← fines.contains(5)
+    const bool inside ← fines.contains(5)
     assert inside
 }

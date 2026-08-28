@@ -39,10 +39,9 @@ locale = "en"
 
 main {
     const int value ← -7
-    const _ absolutus ← value.abs()
-    const _ signum ← value.sign()
-    const _ minor ← value.minimum(3)
-    const _ maior ← value.maximum(3)
-
+    const int absolutus ← value.abs()
+    const int signum ← value.sign()
+    const int minor ← value.minimum(3)
+    const int maior ← value.maximum(3)
     print absolutus, signum, minor, maior
 }

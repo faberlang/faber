@@ -9,7 +9,6 @@ syntax = "const string print ← \"print\"; print print"
 related = ["nota", "fixum"]
 locale = "en"
 +++
-
 # =============================================================================
 # keyword-as-ident — binding named `print`
 # =============================================================================

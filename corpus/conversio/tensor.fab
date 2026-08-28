@@ -9,7 +9,6 @@ syntax = "<tensor> ↦ <tensor-type> | <lista> ↦ tensor | tensor ↦ lista"
 related = ["↦", "tensor", "lista"]
 locale = "en"
 +++
-
 # =============================================================================
 # ↦ — Tensor bridges and element-width conversio.
 # =============================================================================
@@ -48,30 +47,24 @@ main {
     const tensor<int, [4]> grid ← xs ↦ tensor<int, [4]>
     const list<int> flat ← grid ↦ list<int>
     print flat.length()
-
     const tensor<float, [4]> floats ← grid ↦ tensor<float, [4]>
     const tensor<int, [4]> ints ← floats ↦ tensor<int, [4]>
     print ints.length()
-
     const tensor<int<i32>, []> narrow ← empty
     const tensor<int<i64>, []> wide ← narrow ↦ tensor<int<i64>, []>
     const tensor<int<i32>, []> narrowed ← wide ↦ tensor<int<i32>, []>
     print narrowed.length()
-
     const tensor<int<u8>, []> bytes ← empty
     const tensor<int<u16>, []> words ← bytes ↦ tensor<int<u16>, []>
     const tensor<int<u8>, []> shrunk ← words ↦ tensor<int<u8>, []>
     print shrunk.length()
-
-    const tensor<float<f32>, []> half ← empty
+    const tensor<f32, []> half ← empty
     const tensor<float, []> full ← half ↦ tensor<float, []>
-    const tensor<float<f32>, []> single ← full ↦ tensor<float<f32>, []>
+    const tensor<f32, []> single ← full ↦ tensor<f32, []>
     print single.length()
-
     const tensor<float, []> fromFloat ← empty
     const tensor<int<i32>, []> fromFractus ← fromFloat ↦ tensor<int<i32>, []>
     print fromFractus.length()
-
     const tensor<int<i32>, []> signed ← empty
     const tensor<float, []> promoted ← signed ↦ tensor<float, []>
     print promoted.length()

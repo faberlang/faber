@@ -26,6 +26,7 @@ mod comma_law_test;
 #[cfg(test)]
 mod commune_emit_test;
 
+mod instance_spacing_test;
 #[cfg(test)]
 mod intervallum_spacing_test;
 
