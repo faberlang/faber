@@ -2229,3 +2229,71 @@ fn packed_dequant_q5k_accepts_full_superblock() {
         .expect("Q5_K body landed in R-PACK-02F");
     assert_eq!(values.len(), 256);
 }
+
+// ── PGC-R4 simdgroup fast-path admission (plan facts) ─────────────────
+
+/// The prefill `M = 36` family: multi-row f32, `k` a tile multiple, `m` a
+/// partial band — the padded-FMA class the fast path exists for.
+#[test]
+fn simdgroup_admission_covers_the_prefill_partial_band_class() {
+    let mut plan = matmul_plan();
+    plan.m = 36;
+    plan.k = 960;
+    plan.n = 2560;
+    let facts = simdgroup_matmul_admission(&plan).expect("prefill gate_up admits");
+    assert_eq!(facts.k_tiles, 120);
+    assert_eq!(facts.staging_slots, SIMDGROUP_MATMUL_STAGING_SLOTS);
+    assert_eq!(facts.partial_slots, SIMDGROUP_MATMUL_PARTIAL_SLOTS);
+    assert_eq!(facts.staging_slots, 128);
+    assert_eq!(facts.partial_slots, 128);
+    // Same admission for the other prefill shapes.
+    plan.n = 320;
+    assert!(simdgroup_matmul_admission(&plan).is_some());
+    plan.k = 2560;
+    plan.n = 960;
+    assert!(simdgroup_matmul_admission(&plan).is_some());
+}
+
+/// The fast path refuses every shape outside its class: K tails (the
+/// direct device `simdgroup_load` admits no K tail), tile-multiple `m`
+/// (no padding class; keeps the frozen canonical scalar body), one-row
+/// launches, non-f32 layouts, and workgroup drift.
+#[test]
+fn simdgroup_admission_refuses_non_class_shapes() {
+    // Fixture: m=17 (partial band) but k=12 — a K tail refuses.
+    let plan = matmul_plan();
+    assert!(
+        simdgroup_matmul_admission(&plan).is_none(),
+        "k=12 carries a K tail and must keep the scalar body"
+    );
+    let mut tile_multiple_m = matmul_plan();
+    tile_multiple_m.m = 16;
+    tile_multiple_m.k = 960;
+    assert!(
+        simdgroup_matmul_admission(&tile_multiple_m).is_none(),
+        "tile-multiple m has no padded-FMA class"
+    );
+    let mut one_row = tile_multiple_m.clone();
+    one_row.m = 1;
+    one_row.workgroup_y = 1;
+    assert!(simdgroup_matmul_admission(&one_row).is_none());
+    let mut bf16 = tile_multiple_m.clone();
+    bf16.m = 36;
+    bf16.right_layout = crate::MirScalarLayout::Bf16;
+    assert!(simdgroup_matmul_admission(&bf16).is_none());
+    let mut drifted = matmul_plan();
+    drifted.m = 36;
+    drifted.k = 960;
+    drifted.workgroup_x = MATMUL_TILE - 1;
+    assert!(simdgroup_matmul_admission(&drifted).is_none());
+    // Vocab-scale output widths are outside the projection-class wave
+    // (the frozen `prefill_lm_head_gemv` emission stays scalar).
+    let mut vocab = matmul_plan();
+    vocab.m = 36;
+    vocab.k = 960;
+    vocab.n = 49_152;
+    assert!(
+        simdgroup_matmul_admission(&vocab).is_none(),
+        "the vocab-scale lm_head twin must keep the frozen scalar emission"
+    );
+}
