@@ -143,7 +143,7 @@ pub fn lower_stmt(lowerer: &mut Lowerer, stmt: &Stmt) -> HirStatement {
         }
         StmtKind::Adfirma(adfirma_stmt) => lowerer.lower_adfirma(adfirma_stmt),
         StmtKind::Require(require_stmt) => lowerer.lower_require(require_stmt),
-    StmtKind::Reject(reject_stmt) => lowerer.lower_reject(reject_stmt),
+        StmtKind::Reject(reject_stmt) => lowerer.lower_reject(reject_stmt),
         StmtKind::Scribe(scribe_stmt) => lowerer.lower_scribe(scribe_stmt),
         StmtKind::Incipit(incipit_stmt) => lowerer.lower_incipit_stmt(incipit_stmt),
         StmtKind::Cura(cura_stmt) => lowerer.lower_cura(cura_stmt),

@@ -2743,7 +2743,10 @@ fn parses_reice_statement() {
         panic!("expected reice statement");
     };
     assert!(
-        matches!(reject_stmt.cond.kind, ExprKind::Literal(Literal::Bool(true))),
+        matches!(
+            reject_stmt.cond.kind,
+            ExprKind::Literal(Literal::Bool(true))
+        ),
         "cond should be the boolean literal verum"
     );
     assert!(matches!(reject_stmt.error.kind, ExprKind::Literal(_)));
