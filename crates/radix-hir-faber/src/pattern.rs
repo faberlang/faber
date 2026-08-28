@@ -89,7 +89,15 @@ impl super::FaberCodegen {
                 writer.write(&self.symbol_to_string(name, interner));
             }
             HirPattern::Variant(def_id, patterns) => {
-                writer.write(&self.name_for_def_imported(*def_id, names, interner));
+                // Pattern position takes the union-qualified spelling when
+                // known: the two-part form is ambiguous when two imported
+                // unions share a variant name (SEM001 on re-check).
+                let spelling = self
+                    .imported_pattern_spellings
+                    .get(def_id)
+                    .cloned()
+                    .unwrap_or_else(|| self.name_for_def_imported(*def_id, names, interner));
+                writer.write(&spelling);
                 if !patterns.is_empty() {
                     writer.write(" ");
                     writer.write(surface.contextual_keyword("fixum"));

@@ -215,6 +215,7 @@ impl<'a> Lowerer<'a> {
                 },
                 entry_start_anchor: None,
                 entry_explicit: false,
+                guard_si_ids: Vec::new(),
             },
             next_def_id: 1_000_000,
             errors: Vec::new(),

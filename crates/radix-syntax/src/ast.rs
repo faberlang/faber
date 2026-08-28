@@ -1723,6 +1723,9 @@ pub struct NucleumAnnotation {
     pub lane_values: Vec<Symbol>,
     /// Every braced lane field span, retained for dual-span diagnostics.
     pub lane_spans: Vec<Span>,
+    /// True when the braced record form (`@ nucleum { … }`) was authored;
+    /// re-emission keeps the authored brace shape.
+    pub braced: bool,
 }
 
 #[derive(Debug)]

@@ -1005,8 +1005,10 @@ impl Lowerer<'_> {
             span: self.current_span,
         };
         let then_block = HirBlock::simple(vec![throw_stmt], None, self.current_span);
+        let guard_id = self.next_hir_id();
+        self.presentation.guard_si_ids.push(guard_id);
         HirStatementKind::Expr(HirExpression {
-            id: self.next_hir_id(),
+            id: guard_id,
             kind: HirExpressionKind::Si {
                 cond: Box::new(negated),
                 then_block,
@@ -1034,8 +1036,10 @@ impl Lowerer<'_> {
             span: self.current_span,
         };
         let then_block = HirBlock::simple(vec![throw_stmt], None, self.current_span);
+        let guard_id = self.next_hir_id();
+        self.presentation.guard_si_ids.push(guard_id);
         HirStatementKind::Expr(HirExpression {
-            id: self.next_hir_id(),
+            id: guard_id,
             kind: HirExpressionKind::Si {
                 cond: Box::new(cond),
                 then_block,

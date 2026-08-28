@@ -61,6 +61,7 @@ fn presentation_json_exposes_owners_attachments_and_ends() {
         program_end: radix_hir::HirModuleEnd { id: radix_hir::HirSourceAnchorId(4), span: span(60, 60) },
         entry_start_anchor: Some(radix_hir::HirSourceAnchorId(2)),
         entry_explicit: false,
+        guard_si_ids: Vec::new(),
     };
 
     let json = presentation_json(&presentation, &interner);
@@ -123,6 +124,7 @@ fn presentation_json_emits_null_semantic_refs_and_null_entry_anchor() {
         program_end: radix_hir::HirModuleEnd { id: radix_hir::HirSourceAnchorId(1), span: span(11, 11) },
         entry_start_anchor: None,
         entry_explicit: false,
+        guard_si_ids: Vec::new(),
     };
 
     let json = presentation_json(&presentation, &interner);
@@ -149,6 +151,7 @@ fn presentation_json_escapes_comment_payloads() {
         program_end: radix_hir::HirModuleEnd { id: radix_hir::HirSourceAnchorId(1), span: span(0, 0) },
         entry_start_anchor: None,
         entry_explicit: false,
+        guard_si_ids: Vec::new(),
     };
 
     let json = presentation_json(&presentation, &interner);

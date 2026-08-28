@@ -75,6 +75,7 @@ fn emit_rejects_legacy_context_dependent_cede_hir() {
         &TestSurface,
         &FxHashMap::default(),
         &FxHashMap::default(),
+        &FxHashMap::default(),
     )
     .expect_err("legacy Cede HIR must fail closed before Faber emission");
 

@@ -78,6 +78,7 @@ fn minimal_test_artifact() -> radix_hir_fhir::HirArtifact {
             },
             entry_start_anchor: None,
             entry_explicit: false,
+            guard_si_ids: Vec::new(),
         },
         cli_program: None,
         types: types.snapshot(),
@@ -260,6 +261,7 @@ fn hir_artifact_adversarial_dangling_attachment_anchor() {
         },
         entry_start_anchor: None,
         entry_explicit: false,
+        guard_si_ids: Vec::new(),
     };
     let bytes = serialize_artifact(&artifact);
     let result = load_fhir(&bytes);
@@ -299,6 +301,7 @@ fn hir_artifact_adversarial_duplicate_owner_anchor() {
         },
         entry_start_anchor: None,
         entry_explicit: false,
+        guard_si_ids: Vec::new(),
     };
     let bytes = serialize_artifact(&artifact);
     let result = load_fhir(&bytes);
@@ -333,6 +336,7 @@ fn hir_artifact_adversarial_duplicate_attachment_owner() {
         },
         entry_start_anchor: None,
         entry_explicit: false,
+        guard_si_ids: Vec::new(),
     };
     let bytes = serialize_artifact(&artifact);
     let result = load_fhir(&bytes);
@@ -367,6 +371,7 @@ fn hir_artifact_adversarial_dangling_comment_symbol() {
         },
         entry_start_anchor: None,
         entry_explicit: false,
+        guard_si_ids: Vec::new(),
     };
     let bytes = serialize_artifact(&artifact);
     let result = load_fhir(&bytes);
@@ -415,6 +420,7 @@ fn hir_artifact_adversarial_duplicate_block_end_anchor() {
         },
         entry_start_anchor: None,
         entry_explicit: false,
+        guard_si_ids: Vec::new(),
     };
     let bytes = serialize_artifact(&artifact);
     let result = load_fhir(&bytes);
@@ -445,6 +451,7 @@ fn hir_artifact_adversarial_program_end_collides_with_block_end() {
         },
         entry_start_anchor: None,
         entry_explicit: false,
+        guard_si_ids: Vec::new(),
     };
     let bytes = serialize_artifact(&artifact);
     let result = load_fhir(&bytes);
@@ -479,6 +486,7 @@ fn hir_artifact_adversarial_end_anchor_reused_as_owner() {
         },
         entry_start_anchor: None,
         entry_explicit: false,
+        guard_si_ids: Vec::new(),
     };
     let bytes = serialize_artifact(&artifact);
     let result = load_fhir(&bytes);
@@ -510,6 +518,7 @@ fn hir_artifact_adversarial_block_end_owner_without_end() {
         },
         entry_start_anchor: None,
         entry_explicit: false,
+        guard_si_ids: Vec::new(),
     };
     let bytes = serialize_artifact(&artifact);
     let result = load_fhir(&bytes);
@@ -541,6 +550,7 @@ fn hir_artifact_adversarial_program_end_owner_mismatch() {
         },
         entry_start_anchor: None,
         entry_explicit: false,
+        guard_si_ids: Vec::new(),
     };
     let bytes = serialize_artifact(&artifact);
     let result = load_fhir(&bytes);

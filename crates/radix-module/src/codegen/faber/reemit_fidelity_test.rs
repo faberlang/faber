@@ -170,3 +170,85 @@ fn nondum_availability_projects_through_en_pack() {
     let code = result.output.expect("emit").code;
     assert!(code.contains("@ unstable {"), "nondum must surface-project under en:\n{code}");
 }
+
+#[test]
+fn bare_annotation_markers_stay_bare() {
+    // Authored brace shape is carried: `@ futura` (bare) must not gain the
+    // empty braced record, while `@ futura { }` keeps its braces.
+    let bare = assert_idempotent("@ futura\nfunctio f() → vacuum { }\n");
+    assert!(!bare.contains("@ futura { }"), "bare marker must stay bare:\n{bare}");
+    let braced = assert_idempotent("@ futura { }\nfunctio f() → vacuum { }\n");
+    assert!(braced.contains("@ futura { }"), "authored braces must survive:\n{braced}");
+    let kernel = assert_idempotent("@ nucleum\n@ publica\nfunctio k() → vacuum { }\n");
+    assert!(kernel.contains("@ nucleum\n"), "bare nucleum marker must stay bare:\n{kernel}");
+}
+
+#[test]
+fn commune_annotation_round_trips_each_locale_spelling() {
+    // la fixture: `@ commune` stays `@ commune`.
+    let la = assert_idempotent("discretio E {\n    @ commune\n    textus nuntius\n\n    Malum\n}\n");
+    assert!(la.contains("@ commune"), "la commune must stay commune:\n{la}");
+    assert!(!la.contains("@ commune { }"), "commune is a bare marker:\n{la}");
+
+    // en fixture: `@ shared` stays `@ shared` — a Latin word in an en file is
+    // illegal surface (sealed locales).
+    let mut pack_path = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    pack_path.push("../../stdlib/locale/en/pack.toml");
+    let pack = crate::locale::LocalePack::from_toml_path(&pack_path).expect("installed en pack loads");
+    let session = Session::new(Config::default().with_locale_pack(pack));
+    let result = compile_canonical(
+        &session,
+        "commune-en.fab",
+        "union E {\n    @ shared\n    string message\n\n    Bad\n}\n",
+    );
+    assert!(
+        result.success(),
+        "{:?}",
+        result
+            .diagnostics
+            .iter()
+            .map(|diag| (diag.code, diag.issue()))
+            .collect::<Vec<_>>()
+    );
+    let code = result.output.expect("emit").code;
+    assert!(code.contains("@ shared"), "en commune must project to shared:\n{code}");
+    assert!(!code.contains("@ commune"), "Latin spelling is illegal en surface:\n{code}");
+}
+
+#[test]
+fn require_throw_guards_re_sugar() {
+    // `requirit <cond> iace variant …` re-emits in guard form, not as the
+    // desugared `si non (…) { iace … }`.
+    let code = assert_idempotent(
+        "discretio Err {\n    Malum {\n        textus nuntius\n    }\n}\n\nfunctio probe(numerus x) → numerus ⇥ Err {\n    requirit x ≥ 1 iace finge Malum { nuntius = \"parvum\" }\n    redde x\n}\n",
+    );
+    assert!(code.contains("requirit x ≥ 1 iace"), "require guard must re-sugar:\n{code}");
+    assert!(!code.contains("si non"), "desugared conditional must not surface:\n{code}");
+}
+
+#[test]
+fn authored_negated_conditional_stays_braced() {
+    // A structurally identical authored `si non … { iace … }` must NOT be
+    // re-sugared into a guard — only lowered guards carry the marker.
+    let code = assert_idempotent(
+        "discretio Err {\n    Malum {\n        textus nuntius\n    }\n}\n\nfunctio probe(numerus x) → numerus ⇥ Err {\n    si non (x ≥ 1) {\n        iace finge Malum { nuntius = \"parvum\" }\n    }\n    redde x\n}\n",
+    );
+    assert!(
+        code.contains("si non (x ≥ 1)"),
+        "authored negated conditional must stay braced:\n{code}"
+    );
+    assert!(!code.contains("requirit"), "authored si must not become a guard:\n{code}");
+}
+
+#[test]
+fn require_comparison_direction_is_preserved() {
+    // The guard condition re-emits with its authored operator; no
+    // canonicalization to a negated opposite direction.
+    let code = assert_idempotent(
+        "discretio Err {\n    Malum {\n        textus nuntius\n    }\n}\n\nfunctio probe(numerus x) → numerus ⇥ Err {\n    requirit x ≺ 10 iace finge Malum { nuntius = \"nimium\" }\n    redde x\n}\n",
+    );
+    assert!(
+        code.contains("requirit x ≺ 10 iace"),
+        "authored comparison direction must survive:\n{code}"
+    );
+}

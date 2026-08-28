@@ -257,6 +257,19 @@ impl super::FaberCodegen {
                 then_catch: None,
                 else_block,
             } => {
+                // Guard statements (`requirit`/`reice`) lower to this exact
+                // shape; the presentation id set marks which `Si` nodes came
+                // from a guard so authored look-alikes stay braced.
+                if else_block.is_none()
+                    && self.guard_si_ids.contains(&expr.id)
+                    && self
+                        .write_guard_stmt(cond, then_block, types, names, interner, surface, writer)
+                {
+                    if needs_parens {
+                        writer.write(")");
+                    }
+                    return;
+                }
                 if self.write_sic_secus_chain(
                     cond,
                     then_block,
