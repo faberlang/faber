@@ -10,7 +10,6 @@ aliases = ["let", "mutable"]
 related = ["fixum", "←", "↑"]
 locale = "en"
 +++
-
 # =============================================================================
 # varia — Declares a mutable binding.
 # =============================================================================
@@ -44,10 +43,8 @@ main {
 
     var _ computus ← 0
     print computus
-
     computus ← 1
     print computus
-
     computus ← computus + 10
     print computus
 
@@ -57,9 +54,9 @@ main {
     print salutatio
 
     # sit compresses repeated fixum _ when chaining inferred locals
-    let x ← 10
-    let y ← 20
-    let summa ← x + y
+    const _ x ← 10
+    const _ y ← 20
+    const _ summa ← x + y
     print summa
 
     # --- Reassign only varia bindings ---

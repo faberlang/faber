@@ -9,7 +9,6 @@ syntax = "if <condition> <block> catch <name> <block> else <block>"
 related = ["cape", "si", "secus", "iace", "fac"]
 locale = "en"
 +++
-
 # =============================================================================
 # cape — arm-attached catch on an if/else chain
 # =============================================================================
@@ -39,15 +38,13 @@ locale = "en"
 #
 
 fn classify(int x) → string {
-    if x > 0 {
+    if x ≻ 0 {
         throw "positive"
     }
     catch e {
         return "err: §"(e)
     }
-    else {
-        return "zero"
-    }
+    else then return "zero"
 }
 
 main {

@@ -9,7 +9,6 @@ syntax = "<textus> ↦ numerus<W, Radix>"
 related = ["↦", "numerus", "textus"]
 locale = "en"
 +++
-
 # =============================================================================
 # ↦ — Radix-parameterized integer parsing from textus.
 # =============================================================================
@@ -44,7 +43,6 @@ main {
     const _ hex ← "ff" ↦ int<i32, Hex>
     const _ bin ← "1010" ↦ int<i32, Bin>
     const _ oct ← "755" ↦ int<i32, Oct>
-
     print hex
     print bin
     print oct

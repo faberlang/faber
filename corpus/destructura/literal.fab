@@ -10,7 +10,6 @@ aliases = ["json", "object"]
 related = ["genus", "∷", "ignotum", "tabula"]
 locale = "en"
 +++
-
 # =============================================================================
 # valor — JSON-shaped dynamic value literal for open object-shaped data.
 # =============================================================================
@@ -51,7 +50,6 @@ main {
 
     const _ void ← {}
     print void
-
     const _ punctum ← { "x": 10, "y": 20 }
     print punctum
 

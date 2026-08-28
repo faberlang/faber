@@ -9,7 +9,6 @@ syntax = "modulus<u16>"
 related = ["numerus", "¬", "⇐", "⇒"]
 locale = "en"
 +++
-
 # =============================================================================
 # modulus<u16> — Unsigned 16-bit modular-word arithmetic and bit-pattern edges.
 # =============================================================================
@@ -36,7 +35,6 @@ main {
     const uint<u16> one ← 1
     var uint<u16> zero ← 0
     const int<u16> converted ↤ one
-
     print max + one
     print zero - one
     print max * 2
@@ -44,13 +42,11 @@ main {
     print ¬zero
     print one ⇐ 16
     print max ⇒ 16
-    print max > zero
-
+    print max ≻ zero
     max ↑
     zero ↓
     print max
     print zero
-
     const uint<u16> methodSum ← max.added(one)
     const uint<u16> methodShift ← max.shifted_left(16)
     var uint<u16> methodAcc ← 0
@@ -60,7 +56,6 @@ main {
     print methodSum
     print methodShift
     print methodAcc
-
     const list<uint<u16>> words ← [one, max]
-    print words.get(1) coalesce (0 ∷ uint<u16>)
+    print words.get(1) coalesce 0 ∷ uint<u16>
 }

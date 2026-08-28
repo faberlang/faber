@@ -37,11 +37,9 @@ locale = "en"
 
 main {
     const _ nuntius ← " Ave Roma "
-
     const _ longitudo ← nuntius.length()
     const _ habetroma ← nuntius.contains("Roma")
     const _ initiumest ← nuntius.starts_with(" Ave")
     const _ finisest ← nuntius.ends_with(" ")
-
     print longitudo, habetroma, initiumest, finisest
 }

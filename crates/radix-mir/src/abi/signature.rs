@@ -138,7 +138,10 @@ fn gather_ids_param_count(
                 continue;
             }
             let crate::MirStatementKind::RuntimeCall {
-                call: crate::MirRuntimeCall { args, return_ty, .. },
+                call:
+                    crate::MirRuntimeCall {
+                        args, return_ty, ..
+                    },
                 ..
             } = &statement.kind
             else {

@@ -40,6 +40,6 @@ fn keep_matrix(matrix<f32, [2, 2]> m) → matrix<f32, [2, 2]> {
     return m
 }
 
-fn add_matrix(mf32[2, 2] left, mf32[2, 2] right) → mf32[2, 2] {
+fn add_matrix(matrix<f32, [2, 2]> left, matrix<f32, [2, 2]> right) → matrix<f32, [2, 2]> {
     return left.added(right)
 }

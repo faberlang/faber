@@ -10,7 +10,6 @@ aliases = ["union", "sum type"]
 related = ["ordo", "discerne", "finge"]
 locale = "en"
 +++
-
 # =============================================================================
 # discretio — Declares a tagged union with variant payloads.
 # =============================================================================
@@ -42,23 +41,44 @@ locale = "en"
 
 # Discretio with payload variants
 union Exitus {
-    Bonum { string nuntius },
-    Malum { string causa }
+    Bonum {
+        string nuntius
+    },
+    Malum {
+        string causa
+    }
 }
 
 # Discretio with mixed unit and payload variants
 # (Finis is a unit variant — no payload fields)
 union Actum {
-    Pulsus { int x int y },
-    Clavis { string clavis },
+    Pulsus {
+        int x
+        int y
+    },
+    Clavis {
+        string clavis
+    },
     Finis
 }
 
 # Discretio with many fields per variant
 union Figura {
-    Rectum { int x int y int latitudo int altitudo },
-    Circulus { int cx int cy int radius },
-    Punctum { int x int y }
+    Rectum {
+        int x
+        int y
+        int latitudo
+        int altitudo
+    },
+    Circulus {
+        int cx
+        int cy
+        int radius
+    },
+    Punctum {
+        int x
+        int y
+    }
 }
 
 main {

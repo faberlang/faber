@@ -10,8 +10,6 @@ aliases = ["enum"]
 related = ["discretio"]
 locale = "en"
 +++
-
-
 # =============================================================================
 # ordo — Declares an enumeration.
 # =============================================================================
@@ -39,37 +37,45 @@ locale = "en"
 #   rubrum
 #   actum
 
-enum Color { rubrum, viridis, caeruleum }
+union Color {
+    rubrum,
+    viridis,
+    caeruleum
+}
 
-enum Condicio { pendens = 0, actum = 1, finitum = 2 }
+union Condicio {
+    pendens,
+    actum,
+    finitum
+}
 
 main {
     # Using ordo values
-    const _ color ← Color.rubrum
-    const _ condicio ← Condicio.actum
+    const _ color ← rubrum
+    const _ condicio ← actum
 
     # Select by ordo
-    switch color {
-        case Color.rubrum {
+    match color {
+        case rubrum {
             print "rubrum"
         }
-        case Color.viridis {
+        case viridis {
             print "viridis"
         }
-        case Color.caeruleum {
+        case caeruleum {
             print "caeruleum"
         }
     }
 
     # Select by ordo with numeric values
-    switch condicio {
-        case Condicio.pendens {
+    match condicio {
+        case pendens {
             print "pendens"
         }
-        case Condicio.actum {
+        case actum {
             print "actum"
         }
-        case Condicio.finitum {
+        case finitum {
             print "finitum"
         }
     }

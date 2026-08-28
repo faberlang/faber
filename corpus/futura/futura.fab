@@ -41,7 +41,7 @@ locale = "en"
 # BACKEND:
 #   Rust async runtime not linked in exempla harness (whitelist: futura/futura.fab).
 
-@ future
+@ future { }
 fn responde() → int {
     return 42
 }

@@ -10,7 +10,6 @@ aliases = ["shared"]
 related = ["discretio", "discerne", "finge"]
 locale = "en"
 +++
-
 # =============================================================================
 # commune — Declares shared fields once on a tagged union.
 # =============================================================================
@@ -34,7 +33,7 @@ locale = "en"
 #   tagged unions) and MIR lowering/stepper. Tail backends are TEU4.
 
 union ShapeError {
-    @ shared
+    @ commune
     string message
 
     Incompatible,
@@ -46,8 +45,12 @@ union ShapeError {
 
 fn describe(ShapeError e) → string {
     match e {
-        case Incompatible const message { return message }
-        case ElementMismatch const message, expected, actual { return message }
+        case Incompatible const message {
+            return message
+        }
+        case ElementMismatch const message, expected, actual {
+            return message
+        }
     }
 }
 
@@ -56,8 +59,8 @@ fn render(ShapeError e) → string {
 }
 
 main {
-    const ShapeError a ← variant Incompatible { message = "incompatible" }
-    const ShapeError b ← variant ElementMismatch { message = "mismatch", expected = 1, actual = 2 }
+    const ShapeError a ← variant Incompatible {message = "incompatible"}
+    const ShapeError b ← variant ElementMismatch {message = "mismatch", expected = 1, actual = 2}
     print describe(a)
     print describe(b)
     print render(a)

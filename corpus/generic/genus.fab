@@ -37,8 +37,12 @@ locale = "en"
 # BACKEND: Generic `discerne` enum lowering gap on Rust (whitelist: generic/genus.fab).
 
 union Resultatus<T> {
-    Ok { T value },
-    Err { string nuntius }
+    Ok {
+        T value
+    },
+    Err {
+        string nuntius
+    }
 }
 
 interface Reponens<T> {
@@ -47,8 +51,12 @@ interface Reponens<T> {
 
 fn describe(Resultatus<int> r) → string {
     match r {
-        case Ok const value { return "ok: §"(value) }
-        case Err const nuntius { return "err: §"(nuntius) }
+        case Ok const value {
+            return "ok: §"(value)
+        }
+        case Err const nuntius {
+            return "err: §"(nuntius)
+        }
     }
 }
 

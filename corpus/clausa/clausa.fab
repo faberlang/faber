@@ -10,7 +10,6 @@ aliases = ["lambda", "closure"]
 related = ["∴", "functio", "numerus"]
 locale = "en"
 +++
-
 # =============================================================================
 # clausa — Closure and lambda expressions with inferred or annotated types.
 # =============================================================================
@@ -48,7 +47,6 @@ main {
     # Multi-parameter typed closure
     const _ adde ← (int a, int b) → int ∴ a + b
     print adde(3, 4)
-
     const _ numeri ← [1, 2, 3]
     var list<int> duplicati ← empty
     # predicate closure
@@ -65,8 +63,7 @@ main {
     print duplicati[2]
     print pares.length()
     print pares[0]
-
-    const _ plus ← int n → bool ∴ n > 0
+    const _ plus ← int n → bool ∴ n ≻ 0
     print plus(10)
     print plus(-5)
 }

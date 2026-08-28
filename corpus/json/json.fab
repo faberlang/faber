@@ -6,7 +6,6 @@ category = "type"
 canonical = true
 locale = "en"
 +++
-
 # =============================================================================
 # json — JSON serialization and deserialization
 # =============================================================================
@@ -19,14 +18,13 @@ locale = "en"
 # Common mistakes:
 #   • Applying @ json to a non-genus declaration — @ json is only supported on genus declarations and their fields.
 #
-# See also: 
+# See also:
 # =============================================================================
 
 import from "norma:json" json
 
-@ json
+@ json { }
 class Payload {
-    @ json { nomen = "wire_name" }
     string name
 }
 
@@ -34,16 +32,13 @@ main {
     const json literal ← { "wire_name": "Ada", "items": [1, { "ok": true }] }
     const value broad ← literal ↦ value
     const json narrowed ← broad ↦ json
-
     const Payload payload ← narrowed ↦ Payload
     const json encoded ← payload ↦ json
     const string wire ← json.stringify(encoded)
     const json ∪ null tentativa ← json.try_parse(wire)
-
     print payload.name
     print wire
     print tentativa
-
     do {
         const json reparsed ← json.parse(wire)
         const Payload roundtrip ← reparsed ↦ Payload

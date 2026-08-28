@@ -10,7 +10,6 @@ aliases = ["target compatibility", "backends"]
 related = ["manifest", "cli", "∷", "↦"]
 locale = "en"
 +++
-
 # =============================================================================
 # targets — Compilation backends listed by faber targets or radix targets.
 # =============================================================================

@@ -42,14 +42,23 @@ union Condicio {
 }
 
 union Nuntius {
-    Pulsus { int x int y },
-    Clavis { string clavis },
+    Pulsus {
+        int x
+        int y
+    },
+    Clavis {
+        string clavis
+    },
     Finis
 }
 
 union Responsum {
-    Bonum { string nuntius },
-    Malum { string causa }
+    Bonum {
+        string nuntius
+    },
+    Malum {
+        string causa
+    }
 }
 
 main {
@@ -60,14 +69,13 @@ main {
 
     # --- Payload variants with explicit type ---
 
-    const Nuntius e1 ← variant Pulsus { x = 100, y = 200 } ∷ Nuntius
-    const Nuntius e2 ← variant Clavis { clavis = "intro" } ∷ Nuntius
+    const Nuntius e1 ← variant Pulsus {x = 100, y = 200} ∷ Nuntius
+    const Nuntius e2 ← variant Clavis {clavis = "intro"} ∷ Nuntius
     const Nuntius e3 ← variant Finis ∷ Nuntius
 
     # --- Responsum variants ---
 
-    const Responsum r1 ← variant Bonum { nuntius = "opus perfectum" } ∷ Responsum
-    const Responsum r2 ← variant Malum { causa = "opus fractum" } ∷ Responsum
-
+    const Responsum r1 ← variant Bonum {nuntius = "opus perfectum"} ∷ Responsum
+    const Responsum r2 ← variant Malum {causa = "opus fractum"} ∷ Responsum
     print "finge expressiones paratae"
 }

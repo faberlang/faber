@@ -9,7 +9,6 @@ syntax = "valor ↦ instans | instans<ms> [⇥ fallback]"
 related = ["↦", "⇥", "valor"]
 locale = "en"
 +++
-
 # =============================================================================
 # instans — Valor datetime carriers to instans through runtime extraction.
 # =============================================================================
@@ -39,7 +38,6 @@ main {
     const instant normalized ← offset ↦ instant
     const value bad ← "not-a-datetime"
     const instant recovered ← bad ↦ instant ⇥ seconds
-
     print seconds ↦ string
     print millis ↦ string
     print normalized ↦ string

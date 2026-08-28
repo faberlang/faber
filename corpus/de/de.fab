@@ -9,7 +9,6 @@ syntax = "de <expression>"
 related = ["ex", "in"]
 locale = "en"
 +++
-
 # =============================================================================
 # de — Introduces borrowed iteration or borrowed parameters.
 # =============================================================================

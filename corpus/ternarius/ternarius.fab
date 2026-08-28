@@ -9,7 +9,6 @@ syntax = "<condition> sic <then-expr> secus <else-expr>"
 related = ["sic", "secus", "si"]
 locale = "en"
 +++
-
 # =============================================================================
 # sic — Ternary conditional expressions with sic and secus.
 # =============================================================================
@@ -47,15 +46,12 @@ main {
 
     # Latin nested (reads more clearly)
     const _ puncta ← 85
-    const _ gradus ←
-        puncta ≥ 90 yields "A" else
-        puncta ≥ 80 yields "B" else
-        puncta ≥ 70 yields "C" else "F"
+    const _ gradus ← puncta ≥ 90 yields "A" else puncta ≥ 80 yields "B" else puncta ≥ 70 yields "C" else "F"
     # "B"
     print gradus
 
     # In expressions
-    const _ maximum ← aetas > 30 yields aetas else 30
+    const _ maximum ← aetas ≻ 30 yields aetas else 30
     print "maximum: §"(maximum)
 
     # With nullish values

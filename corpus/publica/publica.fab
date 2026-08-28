@@ -10,7 +10,6 @@ aliases = ["public"]
 related = ["privata", "importa"]
 locale = "en"
 +++
-
 # =============================================================================
 # publica — Marks an import as re-exported from the current module.
 # =============================================================================
@@ -39,7 +38,7 @@ locale = "en"
 # EXPECTED OUTPUT:
 #   publica
 
-@ public
+@ public { }
 fn publicum() → string {
     return "publica"
 }

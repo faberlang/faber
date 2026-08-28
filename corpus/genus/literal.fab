@@ -45,12 +45,12 @@ class Persona {
 
 main {
     # All required fields supplied
-    const _ p1 ← Punctum { x = 10, y = 20 }
+    const _ p1 ← Punctum {x = 10, y = 20}
     print p1.x
     print p1.y
 
     # Omitted field picks up genus default
-    const _ persona ← Persona { nomen = "Marcus" }
+    const _ persona ← Persona {nomen = "Marcus"}
     print persona.nomen
     print persona.aetas
 }

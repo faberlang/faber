@@ -8,7 +8,6 @@ summary = "live outbound and inbound sermo directional views"
 related = ["ad", "sermo", "tuus", "scrinium", "cursor", "accipe"]
 locale = "en"
 +++
-
 # =============================================================================
 # meus — live outbound and inbound sermo directional views.
 # =============================================================================
@@ -34,22 +33,18 @@ locale = "en"
 
 main {
     const sermo s ← call 'runtime:echo' ("salve")
-
     const meus<string> m ← s.meus<string>()
     m.da("ping")
     const status outbound ← m.fini()
-
     const tuus<string> t ← s.tuus<string>()
     for from t.cursor() const frame {
         assert frame.data ≡ "salve"
     }
     const status inbound ← t.fini()
-
     const sermo s2 ← call 'runtime:echo' ("salve")
     const tuus<string> t2 ← s2.tuus<string>()
     const scrinium<string> ∪ null got ← t2.accipe()
     const status accipe_done ← t2.fini()
-
     print outbound
     print inbound
     print got

@@ -8,7 +8,6 @@ syntax = "lista<T, N> ↦ lista<T, M>"
 related = ["↦", "lista", "bounded"]
 locale = "en"
 +++
-
 # =============================================================================
 # bounded lista resize — compile-admitted capacity route
 # =============================================================================

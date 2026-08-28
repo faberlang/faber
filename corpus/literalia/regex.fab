@@ -9,7 +9,6 @@ syntax = "<textus> ↦ regex"
 related = ["lege", "conversio", "scriptum"]
 locale = "en"
 +++
-
 # =============================================================================
 # regex — Compile textus patterns to regex via ↦ regex.
 # =============================================================================
@@ -41,7 +40,6 @@ locale = "en"
 main {
     const _ digits ← "\d+" ↦ regex
     print digits
-
     const _ word ← "(?i)\w+" ↦ regex
     print word
 

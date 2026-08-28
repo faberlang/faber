@@ -9,7 +9,6 @@ syntax = "tensor.sum() | tensor.mean()"
 related = ["tensor", "fractus", "lista"]
 locale = "en"
 +++
-
 # =============================================================================
 # tensor — Tensor reduction methods for summa and media.
 # =============================================================================
@@ -38,20 +37,11 @@ locale = "en"
 #   3.5
 
 main {
-    const list<f32> flat ← [
-        1.0,
-        2.0,
-        3.0,
-        4.0,
-        5.0,
-        6.0
-    ]
-    const tf32[] seed ← empty
-    var tf32[2, 3] grid ← seed.from_flat(flat, [2, 3])
-
+    const list<f32> flat ← [1.0, 2.0, 3.0, 4.0, 5.0, 6.0]
+    const tensor<f32, []> seed ← empty
+    var tensor<f32, [2, 3]> grid ← seed.from_flat(flat, [2, 3])
     const f32 total ← grid.sum()
     const f32 mean ← grid.mean()
-
     print total
     print mean
 }

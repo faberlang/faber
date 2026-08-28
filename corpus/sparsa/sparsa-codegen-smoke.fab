@@ -9,7 +9,6 @@ syntax = "sparsa<T, Figura>.length() | sparsa<T, Figura>.nonzero_count()"
 related = ["sparsa", "tensor", "vacua"]
 locale = "en"
 +++
-
 # =============================================================================
 # sparsa — Sparse tensor codegen smoke for longitudo and nonnihil calls.
 # =============================================================================
@@ -25,8 +24,8 @@ locale = "en"
 # =============================================================================
 
 main {
-  const sparsa<float, [2, 3]> s ← empty
-  const _ len ← s.length()
-  const _ count ← s.nonzero_count()
-  print len, count
+    const sparsa<float, [2, 3]> s ← empty
+    const _ len ← s.length()
+    const _ count ← s.nonzero_count()
+    print len, count
 }

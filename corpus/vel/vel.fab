@@ -10,7 +10,28 @@ aliases = ["nullish coalescing"]
 related = ["nihil"]
 locale = "en"
 +++
+test "vel supplies a fallback for nihil" {
+    const string ∪ null nomen ← null
+    const _ ostensum ← nomen coalesce "ignotus"
+    assert ostensum ≡ "ignotus"
+}
 
+test "vel preserves non-nihil values" {
+    const _ nihilum ← 0
+    const _ vacuus ← ""
+    const _ falsus2 ← false
+    assert nihilum coalesce 999 ≡ 0
+    assert vacuus coalesce "defectum" ≡ ""
+    assert falsus2 coalesce true ≡ false
+}
+
+test "vel chains to the first non-nihil value" {
+    const string ∪ null a ← null
+    const string ∪ null b ← null
+    const string ∪ null c ← "inventum"
+    const _ primum ← ((a coalesce b) coalesce c) coalesce "nihil"
+    assert primum ≡ "inventum"
+}
 # =============================================================================
 # vel — Provides a default when the left side is null.
 # =============================================================================
@@ -41,20 +62,20 @@ locale = "en"
 main {
     # Basic nihil coalescing
     const string ∪ null nomen ← null
-    let ostensum ← nomen coalesce "ignotus"
+    const _ ostensum ← nomen coalesce "ignotus"
     # "ignotus"
     print ostensum
 
     # With present value
     const string ∪ null adest ← "Marcus"
-    let ostensum2 ← adest coalesce "ignotus"
+    const _ ostensum2 ← adest coalesce "ignotus"
     # "Marcus"
     print ostensum2
 
     # Difference from logical aut: vel only checks nihil
-    let nihilum ← 0
-    let vacuus ← ""
-    let falsus2 ← false
+    const _ nihilum ← 0
+    const _ vacuus ← ""
+    const _ falsus2 ← false
 
     # vel preserves non-nihil values
     # 0
@@ -63,38 +84,14 @@ main {
     print vacuus coalesce "defectum"
     # falsum
     print falsus2 coalesce true
-
-    let alter ← nomen coalesce "defectum"
+    const _ alter ← nomen coalesce "defectum"
     print alter
 
     # Chaining
     const string ∪ null a ← null
     const string ∪ null b ← null
     const string ∪ null c ← "inventum"
-    let primum ← a coalesce b coalesce c coalesce "nihil"
+    const _ primum ← ((a coalesce b) coalesce c) coalesce "nihil"
     # "inventum"
     print primum
-}
-
-test "vel supplies a fallback for nihil" {
-    const string ∪ null nomen ← null
-    let ostensum ← nomen coalesce "ignotus"
-    assert ostensum ≡ "ignotus"
-}
-
-test "vel preserves non-nihil values" {
-    let nihilum ← 0
-    let vacuus ← ""
-    let falsus2 ← false
-    assert (nihilum coalesce 999) ≡ 0
-    assert (vacuus coalesce "defectum") ≡ ""
-    assert (falsus2 coalesce true) ≡ false
-}
-
-test "vel chains to the first non-nihil value" {
-    const string ∪ null a ← null
-    const string ∪ null b ← null
-    const string ∪ null c ← "inventum"
-    let primum ← a coalesce b coalesce c coalesce "nihil"
-    assert primum ≡ "inventum"
 }

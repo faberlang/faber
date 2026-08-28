@@ -38,13 +38,13 @@ fn ping() → void {
     print "primitiva smoke"
 }
 
-fn describe(unknown value) → string {
-    if value is null { return "nihil est" }
+fn describe(any value) → string {
+    if value is null then return "nihil est"
     return "aliud est"
 }
 
 fn describe_boolean(bool value) → string {
-    if value is true { return "verum est" }
+    if value is true then return "verum est"
     return "aliud est"
 }
 

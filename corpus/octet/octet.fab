@@ -9,7 +9,6 @@ syntax = "octet"
 related = ["octeti", "numerus", "lista"]
 locale = "en"
 +++
-
 # =============================================================================
 # octet — octet is the byte scalar, a builtin spelling for numerus<u8>, the element type of octeti.
 # =============================================================================
@@ -33,21 +32,19 @@ fn describe(bytes buf) → int {
     return buf.length()
 }
 
-fn firstByte(bytes buf) → octet {
-    const octet b ← buf.get(0) coalesce (0 ∷ octet)
+fn firstByte(bytes buf) → int<u8> {
+    const int<u8> b ← buf.get(0) coalesce 0 ∷ int<u8>
     return b
 }
 
 main {
     var bytes sig ← |de ad be ef|
-    const octet b ← 0x80 ∷ octet
+    const int<u8> b ← 128 ∷ int<u8>
     sig.append(b)
     print describe(sig)
-
-    const octet first ← firstByte(sig)
+    const int<u8> first ← firstByte(sig)
     print first
-
     const int<u8> raw ← b
-    const octet back ← raw
+    const int<u8> back ← raw
     print back
 }

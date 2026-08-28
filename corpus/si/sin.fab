@@ -10,7 +10,6 @@ aliases = ["else if"]
 related = ["si", "secus"]
 locale = "en"
 +++
-
 # =============================================================================
 # sin — Adds an else-if branch after a previous si branch.
 # =============================================================================
@@ -42,18 +41,17 @@ locale = "en"
 
 main {
     const _ hour ← 14
-
-    if hour < 6 {
+    if hour ≺ 6 {
         print "Late night"
     }
-    elif hour < 12 {
+    elif hour ≺ 12 {
         print "Morning"
     }
-    elif hour < 18 {
+    elif hour ≺ 18 {
         # 14 ≥ 12 and 14 < 18
         print "Afternoon"
     }
-    elif hour < 22 {
+    elif hour ≺ 22 {
         print "Evening"
     }
     else {

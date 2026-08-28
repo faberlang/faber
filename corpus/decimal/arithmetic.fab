@@ -9,7 +9,6 @@ syntax = "numerus<d32> a ← 4.2"
 related = ["numerus", "d64", "↦", "fractus"]
 locale = "en"
 +++
-
 # =============================================================================
 # numerus<d32> — decimal arithmetic at the scaled carrier
 # =============================================================================
@@ -46,19 +45,16 @@ locale = "en"
 #   decimal-arithmetic.expected — raw d32/d64 carriers, one per print.
 
 main {
-    const numerus<d32> a ← 4.2
-    const numerus<d32> b ← 0.1
-
+    const int<d32> a ← 4.2
+    const int<d32> b ← 0.1
     print a
     print b
     print a + b
     print a - b
     print a * b
     print a / b
-
-    const numerus<d64> x ← 4.2
-    const numerus<d64> y ← 0.1
-
+    const int<d64> x ← 4.2
+    const int<d64> y ← 0.1
     print x + y
     print x * y
 }

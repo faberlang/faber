@@ -10,7 +10,6 @@ aliases = ["return"]
 related = ["→", "⇥", "ergo", "iace", "tacet"]
 locale = "en"
 +++
-
 # =============================================================================
 # redde — Returns a value from a function.
 # =============================================================================
@@ -55,7 +54,7 @@ fn tace() → void {
 }
 
 fn porta(int x) → int {
-    if x < 0 {
+    if x ≺ 0 {
         # early return on negative input
         return 0
     }

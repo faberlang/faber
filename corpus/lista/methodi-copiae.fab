@@ -10,7 +10,6 @@ aliases = ["array", "list"]
 related = ["tabula", "copia", "∷", "itera"]
 locale = "en"
 +++
-
 # =============================================================================
 # lista — Generic ordered collection type.
 # =============================================================================
@@ -48,7 +47,6 @@ locale = "en"
 
 main {
     const _ res ← [1, 2, 3, 4, 5] ∷ list<int>
-
     const _ addita ← res.added(6)
     const _ sectio ← res.slice(1, 4)
     const _ primaduo ← res.take(2)
@@ -56,7 +54,6 @@ main {
     const _ omissaduo ← res.drop(2)
     const _ inversa ← res.invert()
     const _ ordinata ← [3, 1, 2].sorted()
-
     print addita
     print sectio
     print primaduo

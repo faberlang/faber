@@ -10,7 +10,6 @@ aliases = ["panic"]
 related = ["iace", "ergo"]
 locale = "en"
 +++
-
 # =============================================================================
 # mori — Raises a fatal error or panic.
 # =============================================================================
@@ -45,7 +44,7 @@ fn divide(int a, int b) → float {
 
 fn accipe(list<int> numeri, int index) → int {
     # Bounds check with mori
-    if index < 0 or index ≥ numeri.length() {
+    if index ≺ 0 or index ≥ numeri.length() {
         panic "index extra fines"
     }
     return numeri[index]

@@ -10,7 +10,6 @@ aliases = ["map", "dictionary"]
 related = ["lista", "copia", "∷", "itera"]
 locale = "en"
 +++
-
 # =============================================================================
 # tabula — Generic key/value map type.
 # =============================================================================
@@ -47,7 +46,6 @@ main {
     var map<string, int> puncta ← empty
     puncta.put("aelia", 95)
     puncta.put("balbus", 87)
-
     const _ aelia ← puncta.get("aelia")
     const _ absens ← puncta.get("carus")
     const _ carus ← puncta.get("carus") coalesce 0
@@ -55,6 +53,5 @@ main {
     const _ remotus ← puncta.delete("balbus")
     const _ longitudo ← puncta.length()
     const _ vacuaest ← puncta.is_empty()
-
     print aelia, absens, carus, habetbalbum, remotus, longitudo, vacuaest
 }

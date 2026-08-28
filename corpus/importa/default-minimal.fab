@@ -30,6 +30,6 @@ locale = "en"
 # modifier is not written here. Missing binding defaults to the final path
 # segment, so this imports norma:text as text.
 
-import from "norma:text"
+import from "norma:text" text
 
 print text.reverse("importa-minimal")

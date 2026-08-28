@@ -10,7 +10,10 @@ aliases = ["or"]
 related = ["et", "vel", "⊻"]
 locale = "en"
 +++
-
+fn carum() → bool {
+    print "hoc non videatur"
+    return true
+}
 
 # =============================================================================
 # aut — Combines boolean expressions with logical or.
@@ -50,17 +53,13 @@ main {
     # Arithmetica: + - * / %
     const _ summa ← 10 + 5
     print summa
-
     const _ differentia ← 10 - 5
     print differentia
-
-    let productum ← 10 * 5
+    const _ productum ← 10 * 5
     print productum
-
-    let quotiens ← 10 / 5
+    const _ quotiens ← 10 / 5
     print quotiens
-
-    let reliquum ← 10 % 3
+    const _ reliquum ← 10 % 3
     print reliquum
 
     # Assignatio explicita (compound glyphs removed)
@@ -72,79 +71,60 @@ main {
     print index
 
     # Comparationes
-    let aequalis ← 10 ≡ 10
+    const _ aequalis ← 10 ≡ 10
     print aequalis
-
-    let diversus ← 10 ≠ 5
+    const _ diversus ← 10 ≠ 5
     print diversus
-
-    let minor ← 5 < 10
+    const _ minor ← 5 ≺ 10
     print minor
-
-    let maior ← 10 > 5
+    const _ maior ← 10 ≻ 5
     print maior
-
-    let medius ← 0 < 5 and 5 < 10
+    const _ medius ← 0 ≺ 5 and 5 ≺ 10
     print medius
 
     # Logica
-    let ambo ← true and true
+    const _ ambo ← true and true
     print ambo
-
-    let alterutrum ← false or true
+    const _ alterutrum ← false or true
     print alterutrum
-
-    let neutrum ← false and false
+    const _ neutrum ← false and false
     print neutrum
-
-    let short ← false and carum()
+    const _ short ← false and carum()
     print short
 
     # vel
     const string ∪ null nomen ← null
-    let solutum ← nomen coalesce "defectum"
+    const _ solutum ← nomen coalesce "defectum"
     print solutum
-
     const string ∪ null primum ← null
     const string ∪ null secundum ← null
     const string tertium ← "inventum"
-    let inventum ← primum coalesce secundum coalesce tertium
+    const _ inventum ← (primum coalesce secundum) coalesce tertium
     print inventum
 
     # sic/secus — ternary conditional (sic = "thus", secus = "otherwise")
-    let aetas ← 25
-    let condicio ← aetas ≥ 18 yields "adultus" else "minor"
+    const _ aetas ← 25
+    const _ condicio ← aetas ≥ 18 yields "adultus" else "minor"
     print condicio
-
-    let puncta ← 85
-    let gradus ← puncta ≥ 90 yields "A" else puncta ≥ 80 yields "B" else puncta ≥ 70 yields "C" else "F"
+    const _ puncta ← 85
+    const _ gradus ← puncta ≥ 90 yields "A" else puncta ≥ 80 yields "B" else puncta ≥ 70 yields "C" else "F"
     print gradus
 
     # Bit per bit
-    let vexilla ← 0b1010
-    let persona ← 0b1100
-
-    let coniuncta ← vexilla ∧ persona
+    const _ vexilla ← 10
+    const _ persona ← 12
+    const _ coniuncta ← vexilla ∧ persona
     print coniuncta
-
-    let velata ← vexilla ∨ persona
+    const _ velata ← vexilla ∨ persona
     print velata
-
-    let diversa ← vexilla ⊻ persona
+    const _ diversa ← vexilla ⊻ persona
     print diversa
 
     # Motus bit
-    let sinistra ← 1 ⇐ 4
+    const _ sinistra ← 1 ⇐ 4
     print sinistra
-
-    let dextra ← 16 ⇒ 2
+    const _ dextra ← 16 ⇒ 2
     print dextra
-
-    let persona_vacua ← (vexilla ∧ persona) ≡ 0
+    const _ persona_vacua ← vexilla ∧ persona ≡ 0
     print persona_vacua
-}
-
-fn carum() → bool {
-    print "hoc non videatur"
-    return true
 }

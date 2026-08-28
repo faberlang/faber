@@ -9,7 +9,6 @@ syntax = "elige <expression> { casu … ceterum { … } }"
 related = ["elige", "casu", "ceterum"]
 locale = "en"
 +++
-
 # =============================================================================
 # elige — Value branch with a default ceterum clause.
 # =============================================================================
@@ -41,23 +40,21 @@ locale = "en"
 main {
     # ceterum handles unmatched cases
     const _ dies ← "mercurii"
-
-    switch dies {
+    match dies {
         case "lunae" {
             print "initium hebdomadis"
         }
         case "veneris" {
             print "finis hebdomadis"
         }
-        default {
+        case _ {
             print "medium hebdomadis"
         }
     }
 
     # ceterum with unknown input
     const _ command ← "ignotum"
-
-    switch command {
+    match command {
         case "incipe" {
             print "incipit..."
         }
@@ -67,15 +64,14 @@ main {
         case "redintegra" {
             print "reincipit..."
         }
-        default {
+        case _ {
             print "imperium ignotum"
         }
     }
 
     # Multiple statements in ceterum
     const _ gradus ← 99
-
-    switch gradus {
+    match gradus {
         case 1 {
             print "rudis"
         }
@@ -85,7 +81,7 @@ main {
         case 3 {
             print "provectus"
         }
-        default {
+        case _ {
             print "gradus proprius"
             print "gradus: §"(gradus)
         }

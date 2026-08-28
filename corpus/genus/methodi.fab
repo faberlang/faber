@@ -56,7 +56,7 @@ class Forma {
 class Numerator {
     int numerus = 0
 
-    fn auge() {
+    fn auge() → void {
         # mutate instance state via ego
         self.numerus ← self.numerus + 1
     }
@@ -69,11 +69,7 @@ class Numerator {
 main {
     # --- Methods that return values ---
 
-    const _ forma ← Forma {
-        latitudo = 10,
-        altitudo = 5
-    }
-
+    const _ forma ← Forma {latitudo = 10, altitudo = 5}
     print forma.area()
     print forma.ambitus()
     print forma.aequilatera()
@@ -81,12 +77,9 @@ main {
     # --- Methods that modify state (varia instance binding) ---
 
     var _ numerator ← Numerator {}
-
     print numerator.accipe()
-
     numerator.auge()
     print numerator.accipe()
-
     numerator.auge()
     numerator.auge()
     print numerator.accipe()

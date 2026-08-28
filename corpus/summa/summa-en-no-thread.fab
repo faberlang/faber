@@ -8,7 +8,6 @@ syntax = "sum from <tensor> at [i] const s { return <term> }"
 related = ["summa", "sum", "at", "tensor"]
 locale = "en"
 +++
-
 # =============================================================================
 # sum without thread — the sequential English reduction form
 # =============================================================================
@@ -23,7 +22,9 @@ locale = "en"
 #     kernel form, while this cell intentionally stays sequential.
 
 fn total(tensor<float, [4]> a) → float {
-    return sum from a at [i] const s { return s }
+    return sum from a at [i] const s {
+        return s
+    }
 }
 
 main {

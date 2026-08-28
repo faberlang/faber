@@ -41,7 +41,6 @@ main {
     const _ workday_span ← workday.length()
     assert overlap_span ≡ 2
     assert workday_span ≡ 10
-
     const intervallum<int> gap_left ← 0‥3
     const intervallum<int> gap_right ← 6‥9
     const _ no_union ← gap_left.union(gap_right)

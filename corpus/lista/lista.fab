@@ -10,7 +10,6 @@ aliases = ["array", "list"]
 related = ["tabula", "copia", "∷", "itera"]
 locale = "en"
 +++
-
 # =============================================================================
 # lista — Generic ordered collection type.
 # =============================================================================
@@ -46,11 +45,10 @@ main {
     const _ nomina ← ["Marcus", "Julia", "Gaius"]
     const _ vexilla ← [true, false, true]
     const _ matrix ← [[1, 2], [3, 4], [5, 6]]
-    const lista<int> primum ← [1, 2, 3]
-    const lista<int> secundum ← [4, 5, 6]
+    const list<int> primum ← [1, 2, 3]
+    const list<int> secundum ← [4, 5, 6]
     const _ coniuncta ← [spread primum, spread secundum]
     const _ aucta ← [0, spread primum, 99]
-
     print vacuares.length()
     print numeri.length()
     print numeri[0]

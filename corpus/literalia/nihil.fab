@@ -9,7 +9,6 @@ syntax = "nihil"
 related = ["∪", "sponte", "nihil"]
 locale = "en"
 +++
-
 # =============================================================================
 # nihil — Null literal and nullable union bindings.
 # =============================================================================
@@ -44,9 +43,7 @@ fn maybe() → int ∪ null {
 main {
     const int ∪ null absent ← null
     print absent
-
     const _ nihilne ← absent is null
     print nihilne
-
     print maybe() not is null
 }

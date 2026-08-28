@@ -9,7 +9,6 @@ syntax = "<octeti>[lo‥hi] ↦ int|float<W, Be|Le>"
 related = ["↦", "octeti", "int", "float"]
 locale = "en"
 +++
-
 # =============================================================================
 # ↦ — Endian integer unpack from an octeti window.
 # =============================================================================
@@ -51,7 +50,6 @@ main {
     const _ f32_le ← |00 00 80 3f|[0‥4] ↦ float<f32, Le>
     const _ f64_be ← |3f f0 00 00 00 00 00 00|[0‥8] ↦ float<f64, Be>
     const _ f64_le ← |00 00 00 00 00 00 f0 3f|[0‥8] ↦ float<f64, Le>
-
     print be
     print le
     print f32_be

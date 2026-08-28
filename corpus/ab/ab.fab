@@ -9,7 +9,6 @@ syntax = "itera ab <range> <binding>"
 related = ["itera", "ex", "de", "per", "ab pipeline"]
 locale = "en"
 +++
-
 # =============================================================================
 # ab — Selects numeric range iteration in an itera loop.
 # =============================================================================

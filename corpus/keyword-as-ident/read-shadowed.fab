@@ -9,7 +9,6 @@ syntax = "const string read ← \"data\"; print read"
 related = ["lege", "nota"]
 locale = "en"
 +++
-
 # =============================================================================
 # keyword-as-ident — shadowed `read` binding
 # =============================================================================

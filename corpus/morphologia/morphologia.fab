@@ -9,7 +9,6 @@ syntax = "<collection>.<verb-a|verb-ata|verb-e|verb-ita>(<args>)"
 related = ["lista", "appende", "filtrata"]
 locale = "en"
 +++
-
 # =============================================================================
 # morphologia — Verb-form dispatch on collection methodi (imperative vs participle endings).
 # =============================================================================

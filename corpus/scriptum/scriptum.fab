@@ -9,7 +9,6 @@ syntax = "\"<template>\"(<args>...)"
 related = ["lege", "lineam"]
 locale = "en"
 +++
-
 # =============================================================================
 # scriptum — Creates a formatted string with `§` placeholders.
 # =============================================================================

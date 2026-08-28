@@ -10,7 +10,6 @@ aliases = ["never"]
 related = ["mori", "exitus"]
 locale = "en"
 +++
-
 # =============================================================================
 # numquam — Primitive never type for code paths that do not return normally.
 # =============================================================================

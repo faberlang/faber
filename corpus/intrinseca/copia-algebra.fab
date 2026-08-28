@@ -44,19 +44,16 @@ main {
     primi.add(1)
     primi.add(2)
     primi.add(3)
-
     var set<int> pares ← empty
     pares.add(2)
     pares.add(4)
     pares.add(6)
-
     const _ omnes ← primi.union(pares)
     const _ communia ← primi.intersection(pares)
     const _ reliqua ← primi.difference(pares)
     const _ disiuncta ← primi.symmetric_difference(pares)
     const _ subcopiaest ← communia.is_subset(omnes)
     const _ supercopiaest ← omnes.is_superset(communia)
-
     print omnes, communia, reliqua, disiuncta
     print subcopiaest, supercopiaest
 }

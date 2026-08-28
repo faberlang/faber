@@ -40,19 +40,15 @@ main {
     var map<string, int> map ← empty
     map["primus"] ← 42
     map["secundus"] ← 99
-
     var list<string> res ← empty
     res.append("alpha")
     res.append("beta")
-
     var set<int> visi ← empty
     visi.add(1)
     visi.add(2)
-
     const map<string, int> puncta ← { "aelia": 95, "balbus": 87 }
     const _ numeri ← [1, 2, 3] ∷ list<int>
     const _ claves ← ["primus", "secundus"] ∷ list<string>
-
     print map["primus"], res.length(), visi.has(2)
     print puncta["aelia"], numeri.first(), claves.last()
 

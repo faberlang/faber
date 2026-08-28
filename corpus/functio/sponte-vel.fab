@@ -37,9 +37,7 @@ locale = "en"
 #   codex length and metire results, civis summary strings
 
 fn saluta(string nomen, string titulus optional) → string {
-    if titulus is null {
-        return "Salve, §!"(nomen)
-    }
+    if titulus is null then return "Salve, §!"(nomen)
     return "Salve, § §!"(titulus, nomen)
 }
 
@@ -61,20 +59,16 @@ fn civis(string nomen, int aetas optional coalesce 0, bool activus optional coal
 
 main {
     print saluta("Marcus")
-
     print saluta("Marcus", "Dominus")
 
     # both sponte params use vel defaults
     print pagina()
-
     print pagina(2, 25)
 
     # quantitas defaults to 10
     print pagina(5)
-
     print metire("codex")
     print metire("codex", 5)
-
     print civis("Julia")
     print civis("Julia", 25)
     print civis("Julia", 25, false)

@@ -9,7 +9,6 @@ syntax = "<expression> ↦ <type> | functio … → T ⇥ E | fac { … } cape e
 related = ["↦", "⇥", "fac", "cape", "iace"]
 locale = "en"
 +++
-
 # =============================================================================
 # conversio-fallibilis — Three recovery postures for fallible conversio: inline ⇥, ⇥ propagation, and fac/cape.
 # =============================================================================
@@ -69,15 +68,11 @@ fn tutumDirect(value v) → instant {
 main {
     const value good ← "1979-05-27T07:32:00Z"
     const value bad ← "not-a-datetime"
-
     assert inlineRecovery(good) ≡ (good ↦ instant)
     assert inlineRecovery(bad) ≡ epochZero()
-
     assert tutum(good) ≡ (good ↦ instant)
     assert tutum(bad) ≡ epochZero()
-
     assert tutumDirect(good) ≡ (good ↦ instant)
     assert tutumDirect(bad) ≡ epochZero()
-
     print inlineRecovery(good), tutum(good), tutumDirect(good)
 }

@@ -574,7 +574,12 @@ fn plan_summary_reports_plan_or_barrier_reason() {
     let ty = rank1_tensor_ty(&mut types, 4);
     let planned = device_function(
         &[(0, ty)],
-        vec![collection_statement(MirCollectionOp::TensorAdd, &[0, 0], 1, ty)],
+        vec![collection_statement(
+            MirCollectionOp::TensorAdd,
+            &[0, 0],
+            1,
+            ty,
+        )],
         Some(1),
         ty,
     );
@@ -587,7 +592,12 @@ fn plan_summary_reports_plan_or_barrier_reason() {
     // parsing target text (design §12).
     let recipe = device_function(
         &[(0, ty)],
-        vec![collection_statement(MirCollectionOp::TensorMean, &[0], 1, ty)],
+        vec![collection_statement(
+            MirCollectionOp::TensorMean,
+            &[0],
+            1,
+            ty,
+        )],
         Some(1),
         ty,
     );

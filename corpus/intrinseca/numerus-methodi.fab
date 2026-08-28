@@ -43,6 +43,5 @@ main {
     const _ signum ← value.sign()
     const _ minor ← value.minimum(3)
     const _ maior ← value.maximum(3)
-
     print absolutus, signum, minor, maior
 }

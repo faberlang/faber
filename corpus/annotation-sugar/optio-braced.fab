@@ -9,7 +9,6 @@ syntax = "@ optio { binding = NAME, brevis = \"x\", longum = \"name\", typus = T
 related = ["optio", "cli", "annotation-sugar"]
 locale = "en"
 +++
-
 # =============================================================================
 # optio — Braced canonical @ optio CLI option record.
 # =============================================================================
@@ -31,13 +30,7 @@ locale = "en"
 # TARGET: annotation-sugar stage 2
 # PAIR: sugar `@ optio NAME brevis \"x\" ...` (see optio/optio.fab)
 
-@ cli { nomen = "optio-braced-smoke" }
-@ option {
-    binding = verbose,
-    brevis = "v",
-    longum = "verbose",
-    typus = bool,
-    descriptio = "Verbose mode",
-    ubique = true
+@ cli { name = "optio-braced-smoke" }
+@ option { binding = verbose, short = "v", long = "verbose", type = bool, description = "Verbose mode", global = true }
+main args args {
 }
-main args args { }

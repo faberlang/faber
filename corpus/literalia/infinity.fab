@@ -9,7 +9,6 @@ syntax = "∞ | -∞ | nan"
 related = ["fractus", "numerus", "nan"]
 locale = "en"
 +++
-
 # =============================================================================
 # infinity — Non-finite floating-point literals.
 # =============================================================================
@@ -38,7 +37,6 @@ main {
     const f32 narrow ← ∞
     const f64 negative ← -∞
     const f32 quiet ← nan
-
     print positive
     print narrow
     print negative

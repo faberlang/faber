@@ -9,7 +9,6 @@ syntax = "@ nucleum { fragment = verum }"
 related = ["nucleum", "annotation-sugar"]
 locale = "la"
 +++
-
 # =============================================================================
 # nucleum — braced @ nucleum { fragment = verum } modifier record
 # =============================================================================

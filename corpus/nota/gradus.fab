@@ -9,8 +9,6 @@ syntax = "nota <expr> | vide <expr> | mone <expr>"
 related = ["nota", "vide", "mone", "scribe"]
 locale = "en"
 +++
-
-
 # =============================================================================
 # nota — Diagnostic output severities: nota, vide, and mone.
 # =============================================================================

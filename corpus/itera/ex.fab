@@ -9,7 +9,6 @@ syntax = "ex <expression> <fixum|varia> <field> [, ...] [ceteri <ident>]"
 related = ["de", "ut", "ceteri"]
 locale = "en"
 +++
-
 # =============================================================================
 # ex — Extracts fields from a value into local bindings.
 # =============================================================================
@@ -37,21 +36,18 @@ locale = "en"
 main {
     # Iterate over number lista
     const _ numeri ← [1, 2, 3, 4, 5]
-
     for from numeri const n {
         print n
     }
 
     # Iterate over textus lista
     const _ nomina ← ["Marcus", "Julia", "Claudia"]
-
     for from nomina const nomen {
         print nomen
     }
 
     # Transform values
     const _ valores ← [10, 20, 30]
-
     for from valores const v {
         const _ duplex ← v * 2
         print duplex

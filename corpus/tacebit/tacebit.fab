@@ -13,7 +13,6 @@ related = ["figendum", "reddet", "fiet", "promissum"]
 # declares `la` — not `en`, whose pack owns English surfaces.
 locale = "la"
 +++
-
 # =============================================================================
 # tacebit — Await-discard
 # =============================================================================
@@ -28,7 +27,8 @@ locale = "la"
 # GRAMMAR:
 #   awaitDiscard :← 'tacebit' expr
 
-```fab
+``
+`fab
 functio responde() fiet → numerus {
     redde 1
 }
@@ -37,4 +37,5 @@ incipiet {
     tacebit responde()
     nota "done"
 }
-```
+`
+``

@@ -9,7 +9,6 @@ syntax = "<expression> ↦ bivalens"
 related = ["↦", "bivalens"]
 locale = "en"
 +++
-
 # =============================================================================
 # ↦ — Truthiness conversion to bivalens.
 # =============================================================================
@@ -47,12 +46,10 @@ main {
     const _ b2 ← 42 ↦ bool
     print b1
     print b2
-
     const _ b3 ← "" ↦ bool
     const _ b4 ← "salve" ↦ bool
     print b3
     print b4
-
     const _ habet ← ("123" ↦ int ⇥ 0) ↦ bool
     print habet
 }

@@ -9,7 +9,6 @@ syntax = "<expression>?.<name> | <expression>?[<expression>] | <expression>?(<ar
 related = ["?.", "?[", "?(", "vel", "sponte"]
 locale = "en"
 +++
-
 # =============================================================================
 # ?. — Null-safe member, index, and call access.
 # =============================================================================
@@ -47,18 +46,12 @@ class Civis {
 }
 
 main {
-    const _ aelia ← Civis {
-        nomen = "Aelia",
-        locus = Locus { urbs = "Roma", regio = "Italia" }
-    }
-
+    const _ aelia ← Civis {nomen = "Aelia", locus = Locus {urbs = "Roma", regio = "Italia"}}
     print aelia?.locus?.urbs
     print aelia?.locus?.regio
-
-    const _ brutus ← Civis { nomen = "Brutus" }
+    const _ brutus ← Civis {nomen = "Brutus"}
     print brutus?.locus?.urbs
     print brutus?.locus?.regio
-
     const _ litterae ← ["a", "b", "c"]
     print litterae?[0]
     print litterae?[10]

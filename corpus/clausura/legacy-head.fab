@@ -10,7 +10,6 @@ aliases = ["legacy clausura head"]
 related = ["clausura", "∴"]
 locale = "en"
 +++
-
 # =============================================================================
 # clausura — legacy lambda head
 # =============================================================================
@@ -40,8 +39,8 @@ locale = "en"
 #   legacy-head.expected — the doubled and summed values.
 
 main {
-    const _ a ← lambda int x: x * 2
+    const _ a ← int x ∴ x * 2
     print a(5)
-    const _ b ← lambda int x, int y: x + y
+    const _ b ← (int x, int y) ∴ x + y
     print b(2, 3)
 }

@@ -13,8 +13,6 @@ related = ["←", "↦", "⇥", "fixum", "varia"]
 # `la` (la identity surface) — not `en`, whose pack owns English surfaces.
 locale = "la"
 +++
-
-
 # =============================================================================
 # ↤ — Conversion-directed assignment (U+21A4).
 # =============================================================================
@@ -56,7 +54,7 @@ incipit {
     # feeds the outer conversion into a. Both links store 42.
     varia numerus a ← 0
     varia numerus b ← 0
-    a ↤ b ↤ "42"
+    a ↤ (b ↤ "42")
     nota a
     nota b
 }

@@ -9,7 +9,6 @@ syntax = "@ cursor"
 related = ["fiunt", "fient", "cede"]
 locale = "en"
 +++
-
 # =============================================================================
 # cursor — Compatibility annotation for stream/generator posture.
 # =============================================================================
@@ -40,7 +39,7 @@ locale = "en"
 #   Cross-ref: futura/futura.fab, itera/cursor-iteratio.fab; Go whitelist: cursor/cursor.fab.
 #
 
-@ cursor
+@ cursor { }
 fn stream() → int {
     yield 1
     yield 2

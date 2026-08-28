@@ -9,7 +9,6 @@ syntax = "`template`(args)"
 related = ["scriptum", "textus"]
 locale = "en"
 +++
-
 # =============================================================================
 # forma — Captured backtick templates for bound payloads.
 # =============================================================================
@@ -36,19 +35,15 @@ locale = "en"
 main {
     const string tenantId ← "tenant-42"
     const string plan ← "pro"
-
     const _ q ← `
         select id, email, plan
         from accounts
         where tenant_id = §
           and plan = §
     `(tenantId, plan)
-
     print q.template
-
     const _ indexed ← `where tenant_id = §0 or parent_tenant_id = §0`(tenantId, tenantId)
     print indexed.template
-
     const _ bare ← `select 1`
     print bare.template
 }

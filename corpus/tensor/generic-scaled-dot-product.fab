@@ -37,10 +37,7 @@ locale = "la"
 # static body. Same shape as the unit-2A pin
 # `generic_scaled_dot_product_method_body_typechecks`.
 
-functio scaled_dot_product<magnitudo B, magnitudo D>(
-    tensor<f32, [B, D]> qb, tensor<f32, [B, D]> kb, tensor<f32, [B, D]> vb,
-    tensor<f32, [B, B]> scale
-) → tensor<f32, [B, D]> {
+functio scaled_dot_product<magnitudo B, magnitudo D>(tensor<f32, [B, D]> qb, tensor<f32, [B, D]> kb, tensor<f32, [B, D]> vb, tensor<f32, [B, B]> scale) → tensor<f32, [B, D]> {
     fixum tensor<f32, [D, B]> kt ← kb.transpone()
     fixum tensor<f32, [B, B]> scores ← qb.matmul(kt)
     fixum tensor<f32, [B, B]> scaled ← scores.multiplica(scale)

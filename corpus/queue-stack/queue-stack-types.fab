@@ -9,7 +9,6 @@ syntax = "queue<T[, N]> / stack<T[, N]>"
 related = ["queue", "stack"]
 locale = "en"
 +++
-
 # =============================================================================
 # queue<T[, N]> / stack<T[, N]> — C1 declaration surface
 # =============================================================================
@@ -19,36 +18,40 @@ locale = "en"
 # =============================================================================
 
 type IntQueue = queue<int>
+
 type BoundedIntQueue = queue<int, 8>
+
 type TextStack = stack<string>
+
 type BoundedTextStack = stack<string, 8>
 
-fn accepts(queue<int> q, queue<int, 8> bounded_q, stack<string> s, stack<string, 8> bounded_s) → void {}
+fn accepts(queue<int> q, queue<int, 8> bounded_q, stack<string> s, stack<string, 8> bounded_s) → void {
+}
 
 # =============================================================================
 # C2 receiver methods — FIFO/LIFO walkers and the settled asymmetry
 # =============================================================================
 
 fn queue_walk(queue<int> input) → int ∪ null {
-  var queue<int> q ← input
-  q.append(1)
-  return q.remove_first()
+    var queue<int> q ← input
+    q.append(1)
+    return q.remove_first()
 }
 
 fn stack_walk(stack<string> input) → string ∪ null {
-  var stack<string> s ← input
-  s.append("top")
-  return s.remove_last()
+    var stack<string> s ← input
+    s.append("top")
+    return s.remove_last()
 }
 
 fn queue_length(queue<int> input) → int {
-  return input.length()
+    return input.length()
 }
 
 # Bounded push remains a recoverable alternate exit; empty pop is nullable.
 fn bounded_queue_push(queue<int, 2> input) → void ⇥ string {
-  var queue<int, 2> q ← input
-  q.append(1)
+    var queue<int, 2> q ← input
+    q.append(1)
 }
 
 # =============================================================================
@@ -57,25 +60,25 @@ fn bounded_queue_push(queue<int, 2> input) → void ⇥ string {
 
 # `for from` reads a queue in insertion order (FIFO).
 fn queue_iteration(queue<int> input) → void {
-  for from input const item {
-    print item
-  }
+    for from input const item {
+        print item
+    }
 }
 
 # `for from` reads a stack in removal order (top-first LIFO).
 fn stack_iteration(stack<int> input) → void {
-  for from input const item {
-    print item
-  }
+    for from input const item {
+        print item
+    }
 }
 
 # Empty pop is T ∪ null, so coalesce recovers a value instead of entering ⇥.
 fn queue_pop_recover(queue<int> input) → int {
-  return input.remove_first() coalesce 0
+    return input.remove_first() coalesce 0
 }
 
 fn stack_pop_recover(stack<int> input) → int {
-  return input.remove_last() coalesce 0
+    return input.remove_last() coalesce 0
 }
 
 # =============================================================================
@@ -83,21 +86,21 @@ fn stack_pop_recover(stack<int> input) → int {
 # =============================================================================
 
 fn queue_add(queue<int> left, queue<int> right) → queue<int> {
-  return left + right
+    return left + right
 }
 
 fn queue_broadcast(int scalar, queue<int> values) → queue<int> {
-  return scalar * values
+    return scalar * values
 }
 
 fn stack_sub(stack<int> left, stack<int> right) → stack<int> {
-  return left - right
+    return left - right
 }
 
 fn bounded_queue_min(queue<int, 8> left, queue<int, 3> right) → queue<int, 3> {
-  return left / right
+    return left / right
 }
 
 fn bounded_stack_min(stack<int, 5> left, stack<int, 2> right) → stack<int, 2> {
-  return left + right
+    return left + right
 }

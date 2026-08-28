@@ -9,7 +9,6 @@ syntax = "for from bytes<N> | ascii<N> | string<N> const x { }"
 related = ["bytes", "ascii", "string", "ex", "itera", "longitudo"]
 locale = "en"
 +++
-
 # =============================================================================
 # itera-ex-scalar-buffers — Route B runtime-len scalar buffer iteration.
 # =============================================================================
@@ -37,19 +36,19 @@ locale = "en"
 # runs in the runner, while the bytes<N>/string<N> carriers stay compile-only
 # (the runner overlay declines the bounded octeti/textus carriers).
 
-fn visit_bytes(bytes<8> xs) → vacuum {
+fn visit_bytes(bytes<8> xs) → void {
     for from xs const b {
         print b
     }
 }
 
-fn visit_ascii(ascii<8> xs) → vacuum {
+fn visit_ascii(ascii<8> xs) → void {
     for from xs const l {
         print l
     }
 }
 
-fn visit_string(string<8> xs) → vacuum {
+fn visit_string(string<8> xs) → void {
     for from xs const c {
         print c
     }

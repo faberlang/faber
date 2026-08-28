@@ -9,7 +9,6 @@ syntax = "<valor> ↦ lista<T> ↦ tensor<T, [N]> ↦ lista<T> ↦ valor"
 related = ["↦", "valor", "lista", "tensor"]
 locale = "en"
 +++
-
 # =============================================================================
 # valor — Compose valor ↔ tensor roundtrip via lista bridges (no dedicated valor↔tensor arms).
 # =============================================================================
@@ -34,14 +33,11 @@ main {
     const value arr ← [1, 2, 3, 4]
     const list<int> xs ← arr ↦ list<int>
     assert xs.length() ≡ 4
-
     const tensor<int, [4]> grid ← xs ↦ tensor<int, [4]>
     const list<int> flat ← grid ↦ list<int>
     assert flat.length() ≡ 4
-
     const value roundtrip ← flat ↦ value
     print roundtrip
-
     const value obj ← { "alpha": 10, "beta": 20 } ↦ value
     const map<string, int> scores ← obj ↦ map<string, int>
     print scores.get("alpha") coalesce 0

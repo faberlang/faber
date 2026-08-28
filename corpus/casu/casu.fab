@@ -10,7 +10,6 @@ aliases = ["case"]
 related = ["elige", "discerne"]
 locale = "en"
 +++
-
 # =============================================================================
 # casu — Introduces a branch inside an elige or discerne statement.
 # =============================================================================
@@ -41,11 +40,11 @@ locale = "en"
 
 main {
     const _ code ← 200
-    switch code {
+    match code {
         case 200 {
             print "ok"
         }
-        default {
+        case _ {
             print "other"
         }
     }

@@ -10,8 +10,6 @@ aliases = ["continue"]
 related = ["rumpe", "dum"]
 locale = "en"
 +++
-
-
 # =============================================================================
 # perge — Continues with the next loop iteration.
 # =============================================================================
@@ -39,33 +37,25 @@ locale = "en"
 main {
     # Skip even numbers
     var _ i ← 0
-
-    while i < 10 {
+    while i ≺ 10 {
         i ← i + 1
-
         if i % 2 ≡ 0 {
             continue
         }
-
         print i
     }
 
     # Continue in nested loop
     var _ exterior ← 0
-
-    while exterior < 3 {
+    while exterior ≺ 3 {
         var _ interior ← 0
-
-        while interior < 5 {
+        while interior ≺ 5 {
             interior ← interior + 1
-
             if interior ≡ 3 {
                 continue
             }
-
             print "exterior←§, interior←§"(exterior, interior)
         }
-
         exterior ← exterior + 1
     }
 }

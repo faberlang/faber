@@ -9,7 +9,6 @@ syntax = "itera ex tensor<T, [N]> fixum x { }"
 related = ["tensor", "ex", "itera"]
 locale = "en"
 +++
-
 # =============================================================================
 # itera-ex-rank1 — Value iteration over rank-1 literal-shaped tensors.
 # =============================================================================
@@ -37,14 +36,12 @@ locale = "en"
 
 main {
     const list<f32> flat ← [1.0, 2.0, 3.0, 4.0]
-    const tf32[] seed ← empty
-    var tf32[4] t ← seed.from_flat(flat, [4])
-
+    const tensor<f32, []> seed ← empty
+    var tensor<f32, [4]> t ← seed.from_flat(flat, [4])
     var f32 total ← 0.0
     for from t const x {
         print x
         total ← total + x
     }
-
     print total
 }

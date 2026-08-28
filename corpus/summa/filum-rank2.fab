@@ -8,7 +8,6 @@ syntax = "summa ex <tensor> apud [i, j] filum f fixum s { redde <term> }"
 related = ["summa", "filum", "apud", "tensor"]
 locale = "la"
 +++
-
 # =============================================================================
 # summa filum rank-2 — distributed reduction with two coordinates
 # =============================================================================
@@ -26,9 +25,9 @@ locale = "la"
 # This is a declaration-only kernel reference. Device kernels have no host
 # entry for the in-process runner; the semantic check proves this cell.
 
-@ nucleum lane "id"
-@ publica
-functio rank2(tensor<f32, [4, 8]> a, tf32[1] out) → vacuum {
+@ nucleum { lane = "id" }
+@ publica { }
+functio rank2(tensor<f32, [4, 8]> a, tensor<f32, [1]> out) → vacuum {
     fixum f32 total ← summa ex a apud [i, j] filum f fixum s {
         redde s
     }

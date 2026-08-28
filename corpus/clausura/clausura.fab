@@ -10,7 +10,6 @@ aliases = []
 related = ["∴", "functio", "fac", "cape", "cede"]
 locale = "en"
 +++
-
 # =============================================================================
 # clausura — Declares or explains an inline closure expression; compact ∴
 # syntax is preferred for new code.

@@ -10,7 +10,6 @@ aliases = ["else", "otherwise"]
 related = ["si", "sin"]
 locale = "en"
 +++
-
 # =============================================================================
 # secus — Runs the fallback branch when preceding conditional branches do not
 # match.
@@ -41,7 +40,7 @@ locale = "en"
 
 main {
     const _ hour ← 23
-    if hour < 12 {
+    if hour ≺ 12 {
         print "morning"
     }
     else {

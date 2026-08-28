@@ -9,7 +9,6 @@ syntax = "<expression> <operator> <expression> for ≡ ≠ ≅ ≇ ≈ ≉ < ≤
 related = ["≅", "≈", "≡", "↦", "mixed-ordering-join", "numeric-value-eq", "comparatio", "est"]
 locale = "en"
 +++
-
 # =============================================================================
 # gate-law-totality — the operator × carrier truth table (SEM gate law)
 # =============================================================================
@@ -84,30 +83,30 @@ locale = "en"
 
 main {
     # ---------------------------------------------------------------- ints
-    const numerus a ← 7
-    const numerus b ← 7
-    const numerus<u8> narrow ← 3 ∷ numerus<u8>
-    const numerus<u16> wider ← 3 ∷ numerus<u16>
-    const numerus signed ← -1
-    const numerus<u64> unsigned ← 18446744073709551615
-    const numerus large ← 10
+    const int a ← 7
+    const int b ← 7
+    const int<u8> narrow ← 3 ∷ int<u8>
+    const int<u16> wider ← 3 ∷ int<u16>
+    const int signed ← -1
+    const int<u64> unsigned ← 18446744073709551615
+    const int large ← 10
 
     # --------------------------------------------------------------- floats
-    const fractus<f32> single ← 2.5 ∷ fractus<f32>
-    const fractus double ← 2.5
-    const fractus half ← 0.5
-    const fractus four_two ← 4.2
-    const numerus<i64> above ← 9007199254740993
-    const numerus<i64> below ← 9007199254740992
-    const fractus boundary ← 9007199254740992.0
+    const f32 single ← 2.5 ∷ f32
+    const float double ← 2.5
+    const float half ← 0.5
+    const float four_two ← 4.2
+    const int<i64> above ← 9007199254740993
+    const int<i64> below ← 9007199254740992
+    const float boundary ← 9007199254740992.0
 
     # -------------------------------------------------------------- decimals
-    const numerus<d32> d32v ← 4.2
-    const numerus<d64> d64v ← 4.2
-    const numerus five ← 5
+    const int<d32> d32v ← 4.2
+    const int<d64> d64v ← 4.2
+    const int five ← 5
 
     # ----------------------------------------------------------- conversio
-    const numerus<u64> five_u ← 5
+    const int<u64> five_u ← 5
 
     # ----------------------------------------------------- ≡ / ≠ (P1 join)
     # P1 identical ints join exactly; every other family pair is
@@ -151,15 +150,15 @@ main {
     # Ordering joins at the widened carrier: numerus for int pairs, f64 for
     # float pairs, d64 for decimal pairs (mixed-ordering-join). P9
     # decimal×fractus is SEM011:mixed_decimal_fractus_ordering.
-    print a < b
-    print a < 8
-    print narrow < wider
-    print signed < unsigned
-    print large < single
-    print half < large
-    print single < double
-    print d32v < d64v
-    print d32v < five
+    print a ≺ b
+    print a ≺ 8
+    print narrow ≺ wider
+    print signed ≺ unsigned
+    print large ≺ single
+    print half ≺ large
+    print single ≺ double
+    print d32v ≺ d64v
+    print d32v ≺ five
 
     # -------------------------------------------------------- ≤ (P1–P8)
     print a ≤ b
@@ -172,15 +171,15 @@ main {
     print d32v ≤ five
 
     # -------------------------------------------------------- > (P1–P8)
-    print a > b
-    print a > 6
-    print narrow > wider
-    print signed > unsigned
-    print large > single
-    print large > half
-    print single > double
-    print d32v > d64v
-    print d32v > five
+    print a ≻ b
+    print a ≻ 6
+    print narrow ≻ wider
+    print signed ≻ unsigned
+    print large ≻ single
+    print large ≻ half
+    print single ≻ double
+    print d32v ≻ d64v
+    print d32v ≻ five
 
     # -------------------------------------------------------- ≥ (P1–P8)
     print a ≥ b
@@ -208,26 +207,26 @@ main {
     # ------------------------------------------------------- ↦ (all joins)
     # Conversio is directional. Every family direction admits except the
     # decimal narrowing d64 → d32 (SEM016:decimal_width_narrowing_rejected).
-    print narrow ↦ numerus<u16>
-    print a ↦ numerus<u8>
-    print five_u ↦ numerus
-    print a ↦ numerus<u64>
+    print narrow ↦ int<u16>
+    print a ↦ int<u8>
+    print five_u ↦ int
+    print a ↦ int<u64>
     # GT-3: a negative value into an unsigned target fails closed at runtime
     # (conversion never wraps — DEFER-116 boundary contract); the inline
     # recovery supplies the target-typed fallback.
-    print signed ↦ numerus<u32> ⇥ (0 ∷ numerus<u32>)
-    print a ↦ fractus<f32>
-    print single ↦ numerus
-    print a ↦ fractus
-    print four_two ↦ numerus
-    print single ↦ fractus<f64>
-    print double ↦ fractus<f32>
-    print d32v ↦ numerus<d64>
-    print d32v ↦ numerus
-    print five ↦ numerus<d32>
-    print five ↦ numerus<d64>
-    print d32v ↦ fractus
-    print four_two ↦ numerus<d64>
+    print signed ↦ int<u32> ⇥ 0 ∷ int<u32>
+    print a ↦ f32
+    print single ↦ int
+    print a ↦ float
+    print four_two ↦ int
+    print single ↦ f64
+    print double ↦ f32
+    print d32v ↦ int<d64>
+    print d32v ↦ int
+    print five ↦ int<d32>
+    print five ↦ int<d64>
+    print d32v ↦ float
+    print four_two ↦ int<d64>
 
     # ----------------------------------------------------- est (P1 join)
     # is-membership follows strict equality: identical types only

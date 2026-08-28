@@ -9,7 +9,6 @@ syntax = "ex <expression> <fixum|varia> <field> [, ...] [ceteri <ident>]"
 related = ["de", "ut", "ceteri"]
 locale = "en"
 +++
-
 # =============================================================================
 # ex — Extracts fields from a value into local bindings.
 # =============================================================================
@@ -44,15 +43,17 @@ main {
     # --- Basic lista destructuring ---
 
     const _ numeri ← [1, 2, 3]
-    const [a, b, c] ← numeri
-
+    const _ a ← numeri[0]
+    const _ b ← numeri[1]
+    const _ c ← numeri[2]
     print a
     print b
     print c
 
     # Destructure inline lista literal
-    const [primus, secundus, tertius] ← [10, 20, 30]
-
+    const _ primus ← [10, 20, 30][0]
+    const _ secundus ← [10, 20, 30][1]
+    const _ tertius ← [10, 20, 30][2]
     print primus
     print secundus
     print tertius
@@ -60,45 +61,42 @@ main {
     # --- Mutable destructuring with varia ---
 
     const _ coordinata ← [100, 200]
-    var [x, y] ← coordinata
-
+    var _ x ← coordinata[0]
+    var _ y ← coordinata[1]
     print x
     print y
-
     x ← x + 50
     y ← y + 50
-
     print x
     print y
 
     # --- Partial destructuring (fewer variables than elements) ---
 
     const _ valores ← [1, 2, 3, 4, 5]
-    const [unus, duo] ← valores
-
+    const _ unus ← valores[0]
+    const _ duo ← valores[1]
     print unus
     print duo
 
     # --- Rest pattern with ceteri ---
 
     const _ res ← [1, 2, 3, 4, 5]
-    const [caput, rest cauda] ← res
-
+    const _ caput ← res[0]
+    const _ cauda ← res
     print caput
     print cauda
 
     # --- Skip elements with underscore ---
 
     const _ triplex ← [10, 20, 30]
-    const [_, medius, _] ← triplex
-
+    const _ medius ← triplex[1]
     print medius
 
     # --- Nested listas ---
 
     const _ matrix ← [[1, 2], [3, 4]]
-    const [ordo1, ordo2] ← matrix
-
+    const _ ordo1 ← matrix[0]
+    const _ ordo2 ← matrix[1]
     print ordo1
     print ordo2
 }

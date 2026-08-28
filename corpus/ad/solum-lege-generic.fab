@@ -9,7 +9,6 @@ syntax = "charta.read_file<textus>(via) | call 'fs:carpe' (via) ↦ lista<textus
 related = ["ad", "fs", "lege", "carpe", "hauri"]
 locale = "en"
 +++
-
 # =============================================================================
 # solum lege carpe hauri — solum file reads are shape-specific routes.
 # =============================================================================
@@ -46,14 +45,11 @@ import from "norma:fs" charta
 main {
     const string textPath ← "/tmp/faber-fs-lege-generic.txt"
     charta.write_file(textPath, "prima\nsecunda\n")
-
     const string body ← charta.read_file<string>(textPath)
     assert body ≡ "prima\nsecunda\n"
-
     const list<string> lineae ← call 'fs:carpe' (textPath) ↦ list<string>
     assert lineae ≡ (["prima", "secunda"] ↦ list<string>)
-
-    const bytes data ← call 'fs:hauri' (textPath) ↦ octeti
+    const bytes data ← call 'fs:hauri' (textPath) ↦ bytes
     assert data ≡ |70 72 69 6d 61 0a 73 65 63 75 6e 64 61 0a|
     print body
     print lineae

@@ -9,7 +9,6 @@ syntax = "discerne <union> { casu <type> fixum <name> { ... } }"
 related = ["discerne", "casu", "discretio", "est"]
 locale = "en"
 +++
-
 # Type-pattern cases use the same member predicate as `est` and bind the
 # narrowed value for the arm body.
 class Formal {
@@ -22,14 +21,18 @@ class Casual {
 
 fn classify(Formal ∪ Casual u) → string {
     match u {
-        case Formal const f { return f.greeting }
-        case Casual const c { return c.greeting }
+        case Formal const f {
+            return f.greeting
+        }
+        case Casual const c {
+            return c.greeting
+        }
     }
 }
 
 main {
-    const Formal f ← Formal { greeting = "formal" }
-    const Casual c ← Casual { greeting = "casual" }
+    const Formal f ← Formal {greeting = "formal"}
+    const Casual c ← Casual {greeting = "casual"}
     print classify(f)
     print classify(c)
 }

@@ -9,7 +9,6 @@ syntax = "\"<template>\"(<args>...)"
 related = ["textus", "scribe"]
 locale = "en"
 +++
-
 # =============================================================================
 # § — String-template substitution holes inside quoted literals.
 # =============================================================================

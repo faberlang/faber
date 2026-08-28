@@ -10,7 +10,33 @@ aliases = ["if"]
 related = ["sin", "secus", "ergo"]
 locale = "en"
 +++
+test "si runs its body on a verum condition" {
+    const _ x ← 10
+    var bool maior ← false
+    if x ≻ 5 {
+        maior ← true
+    }
+    assert maior
+}
 
+test "si skips its body on a falsum condition" {
+    const _ x ← 10
+    var bool maior ← false
+    if x ≻ 20 {
+        maior ← true
+    }
+    assert not maior
+}
+
+test "si block body runs every statement" {
+    const _ aetas ← 25
+    var int gradus ← 0
+    if aetas ≥ 18 {
+        gradus ← gradus + 1
+        gradus ← gradus + 1
+    }
+    assert gradus ≡ 2
+}
 # =============================================================================
 # si — Starts a conditional branch that runs when its condition is true.
 # =============================================================================
@@ -40,49 +66,18 @@ locale = "en"
 main {
     # Simple truthy branch — only the first condition matches
     const _ x ← 10
-
-    if x > 5 {
+    if x ≻ 5 {
         print "x maior quam 5"
     }
-
-    if x > 20 {
+    if x ≻ 20 {
         # skipped: 10 ≯ 20
         print "x maior quam 20"
     }
 
     # Block body: multiple statements run together when condition holds
     const _ aetas ← 25
-
     if aetas ≥ 18 {
         print "Adult"
         print "Can vote"
     }
-}
-
-test "si runs its body on a verum condition" {
-    const _ x ← 10
-    var bool maior ← false
-    if x > 5 {
-        maior ← true
-    }
-    assert maior
-}
-
-test "si skips its body on a falsum condition" {
-    const _ x ← 10
-    var bool maior ← false
-    if x > 20 {
-        maior ← true
-    }
-    assert not maior
-}
-
-test "si block body runs every statement" {
-    const _ aetas ← 25
-    var int gradus ← 0
-    if aetas ≥ 18 {
-        gradus ← gradus + 1
-        gradus ← gradus + 1
-    }
-    assert gradus ≡ 2
 }

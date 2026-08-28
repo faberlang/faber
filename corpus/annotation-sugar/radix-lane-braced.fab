@@ -9,7 +9,6 @@ syntax = "@ radix { lane = \"hir-direct\" }"
 related = ["radix", "annotation-sugar"]
 locale = "en"
 +++
-
 # =============================================================================
 # radix-lane — Braced canonical @ radix lane routing record for the Rust
 # HIR-direct lane.

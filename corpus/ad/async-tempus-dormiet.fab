@@ -9,7 +9,6 @@ syntax = "tempus.sleep(ms) | tacebit tempus.sleep_async(ms)"
 related = ["ad", "tempus", "futura", "sermo"]
 locale = "en"
 +++
-
 # =============================================================================
 # async tempus dormiet — async tempus.sleep_async and sync tempus.sleep share
 # the tempus:dormiet route.

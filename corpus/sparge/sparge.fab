@@ -10,7 +10,6 @@ aliases = ["..."]
 related = ["lista"]
 locale = "en"
 +++
-
 # =============================================================================
 # sparge — Spreads an array or collection literal into its surrounding expression.
 # =============================================================================
@@ -40,7 +39,6 @@ main {
     const list<int> media ← [2, 3]
     # → [1, 2, 3, 4]
     const _ numeri ← [1, spread media, 4]
-
     for from numeri const n {
         print n
     }

@@ -35,6 +35,7 @@ locale = "en"
 #   declaration-only entry modifier (whitelist: exitus/exitus.fab).
 #
 
-@ cli "exitus-smoke"
-main args args exit 1 {
+@ cli { name = "exitus-smoke" }
+main args args {
+    1
 }

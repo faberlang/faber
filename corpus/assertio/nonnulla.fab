@@ -9,8 +9,6 @@ syntax = "<expression>!.<name> | <expression>![<expression>] | <expression>!(<ar
 related = ["!."]
 locale = "en"
 +++
-
-
 # =============================================================================
 # !. — Non-null assertion before member, index, or call access.
 # =============================================================================
@@ -49,7 +47,7 @@ class Persona {
 
 main {
     # Optional genus value — !. asserts it is not nihil before field access
-    const Persona ∪ null p ← Persona { nomen = "Marcus", urbs = "Roma" }
+    const Persona ∪ null p ← Persona {nomen = "Marcus", urbs = "Roma"}
     print p!.nomen
     print p!.urbs
 

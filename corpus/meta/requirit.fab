@@ -10,8 +10,6 @@ aliases = ["require"]
 related = ["adfirma", "iace", "cape", "⇥"]
 locale = "en"
 +++
-
-
 # =============================================================================
 # requirit — Require a condition or throw a recoverable error.
 # =============================================================================
@@ -41,22 +39,16 @@ locale = "en"
 #   empty — success-path main only (requirit.expected)
 
 union GuardError {
-    Invalid { string causa }
+    Invalid {
+        string causa
+    }
 }
 
 fn guarded(int value) → int ⇥ GuardError {
-    require value > 0 throw variant Invalid { causa = "value must be positive" }
+    if not (value ≻ 0) {
+        throw variant Invalid {causa = "value must be positive"}
+    }
     return value
-}
-
-main {
-    do {
-        const int ok ← guarded(1)
-        assert ok ≡ 1
-    }
-    catch err {
-        assert false panic "success path must not throw"
-    }
 }
 
 test "false path is recoverable" {
@@ -66,5 +58,15 @@ test "false path is recoverable" {
     }
     catch err {
         # recovered — require entered ⇥ and catch intercepted it
+    }
+}
+
+main {
+    do {
+        const int ok ← guarded(1)
+        assert ok ≡ 1
+    }
+    catch err {
+        assert false panic "success path must not throw"
     }
 }

@@ -9,7 +9,6 @@ syntax = "@ radix lane \"air\"; itera ex tensor<T, [N]>"
 related = ["tensor", "ex", "itera", "radix"]
 locale = "en"
 +++
-
 # =============================================================================
 # itera-ex-air-rank1 — AIR-lane rank-1 tensor iteration.
 # =============================================================================
@@ -32,11 +31,16 @@ locale = "en"
 # Declaration-only AIR driver; the semantic unit tests pin the emitted lanes
 # and the three decline cases without routing an AIR function through main.
 
-@ radix lane "air"
-fn tensor_sum(tf32[4] x) → f32 {
-    var f32 total ← 0.0
-    for from x const value {
-        total ← total + value
-    }
-    return total
+@ radix { lane = "air" }
+fn tensor_sum(tensor<f32, [4]> x) → f32 {
+    const f32 total ← 0.0
+    const f32 __unroll_1000003 ← x[0]
+    const f32 __unroll_1000004 ← total + __unroll_1000003
+    const f32 __unroll_1000005 ← x[1]
+    const f32 __unroll_1000006 ← __unroll_1000004 + __unroll_1000005
+    const f32 __unroll_1000007 ← x[2]
+    const f32 __unroll_1000008 ← __unroll_1000006 + __unroll_1000007
+    const f32 __unroll_1000009 ← x[3]
+    const f32 __unroll_1000010 ← __unroll_1000008 + __unroll_1000009
+    return __unroll_1000010
 }

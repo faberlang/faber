@@ -8,7 +8,6 @@ summary = "Points to the coreutils application exempla workspace."
 related = ["cli", "argumenta", "operandus", "exitus"]
 locale = "en"
 +++
-
 # =============================================================================
 # applications — Points to the coreutils application exempla workspace.
 # =============================================================================

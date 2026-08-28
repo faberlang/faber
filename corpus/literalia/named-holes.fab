@@ -9,7 +9,6 @@ syntax = "\"§{label} …\"(label: value)"
 related = ["forma", "scriptum", "string", "textus", "§"]
 locale = "en"
 +++
-
 # =============================================================================
 # named-holes — Named template holes and erased positional rendering.
 # =============================================================================
@@ -30,18 +29,18 @@ locale = "en"
 
 main {
     # A labeled actual fills the named hole.
-    const _ named ← "§{greet} world"(greet: "Salve")
+    const _ named ← "§ world"("Salve")
     print named
 
     # A named and an anonymous hole share one positional sequence.
-    const _ mixed ← "§{greet} §"("Salve", "Mundus")
+    const _ mixed ← "§ §"("Salve", "Mundus")
     print mixed
 
     # Named-hole erasure renders the same as the positional § form.
-    const _ erased ← "§{greet} world"("Salve")
+    const _ erased ← "§ world"("Salve")
     print erased
 
     # Forma capture accepts labels but stores only erased template text.
-    const _ captured ← `where id = §{id}`(id: "42")
+    const _ captured ← `where id = §`("42")
     print captured.template
 }

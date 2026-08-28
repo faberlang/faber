@@ -9,7 +9,6 @@ syntax = "<expr>.<field> | <expr>[<index>] | <expr>?.<field>"
 related = ["?.", "lista", "tabula", "genus"]
 locale = "en"
 +++
-
 # =============================================================================
 # membrum — Dot, bracket, chained, and optional member access expressions.
 # =============================================================================
@@ -75,7 +74,7 @@ class Forsitan {
 main {
     # --- Dot accessus ---
 
-    const _ punctum ← Punctum { x = 10, y = 20 }
+    const _ punctum ← Punctum {x = 10, y = 20}
     print punctum.x
     print punctum.y
 
@@ -93,18 +92,18 @@ main {
 
     # --- Chained member access ---
 
-    const _ nidus ← Extra { extra = Medium { medium = Imum { imum = "inventum" } } }
+    const _ nidus ← Extra {extra = Medium {medium = Imum {imum = "inventum"}}}
     print nidus.extra.medium.imum
 
     # --- Mixed dot and bracket ---
 
-    const _ datum ← Datum { nomina = ["primus", "secundus", "tertius"] }
+    const _ datum ← Datum {nomina = ["primus", "secundus", "tertius"]}
     print datum.nomina[0]
     print datum.nomina[2]
 
     # --- Accessus optionalis ---
 
-    const _ forsitan ← Forsitan { adest = Adest { valor = 100 } }
+    const _ forsitan ← Forsitan {adest = Adest {valor = 100}}
     print forsitan?.adest?.valor
 
     # Accessus optionalis on nihil binding

@@ -9,7 +9,6 @@ syntax = "sparsa.get(indices) | sparsa.set(indices, value)"
 related = ["sparsa", "accipe", "ponde"]
 locale = "en"
 +++
-
 # =============================================================================
 # sparsa — Sparse tensor accipe/ponde access and zero-removal semantics.
 # =============================================================================
@@ -32,15 +31,12 @@ locale = "en"
 #   removal.
 
 main {
-    var sparsa<float<f32>, [2, 3]> grid ← empty
-
+    var sparsa<f32, [2, 3]> grid ← empty
     grid.set([0, 1], 4.0)
     grid.set([1, 2], 9.0)
     grid.set([1, 2], 0.0)
-
     const f32 stored ← grid.get([0, 1])
     const f32 absent ← grid.get([1, 2])
     const int count ← grid.nonzero_count()
-
     print stored, absent, count
 }

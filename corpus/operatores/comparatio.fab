@@ -9,7 +9,16 @@ syntax = "<expression> ≡ <expression> | <expression> ≠ <expression> | <expre
 related = ["≠", "≤", "≥", "est", "adfirma"]
 locale = "en"
 +++
+test "equal and not-equal comparisons" {
+    assert 10 ≡ 10
+    assert 10 ≠ 5
+}
 
+test "ordering and chained interval" {
+    assert 5 ≤ 10
+    assert 10 ≥ 5
+    assert 0 ≺ 5 and 5 ≺ 10
+}
 # =============================================================================
 # ≡ — Equality and ordering comparisons returning bivalens.
 # =============================================================================
@@ -38,27 +47,12 @@ locale = "en"
 main {
     const _ aequalis ← 10 ≡ 10
     print aequalis
-
     const _ diversus ← 10 ≠ 5
     print diversus
-
     const _ nonMaior ← 5 ≤ 10
     print nonMaior
-
     const _ nonMinor ← 10 ≥ 5
     print nonMinor
-
-    const _ intervallum ← 0 < 5 and 5 < 10
+    const _ intervallum ← 0 ≺ 5 and 5 ≺ 10
     print intervallum
-}
-
-test "equal and not-equal comparisons" {
-    assert 10 ≡ 10
-    assert 10 ≠ 5
-}
-
-test "ordering and chained interval" {
-    assert 5 ≤ 10
-    assert 10 ≥ 5
-    assert 0 < 5 and 5 < 10
 }

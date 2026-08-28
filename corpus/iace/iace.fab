@@ -61,7 +61,7 @@ main {
     # Conditional iace inside fac — validation guard
     const _ value ← -5
     do {
-        if value < 0 {
+        if value ≺ 0 {
             throw "Value must be non-negative"
         }
         print "Value is valid"

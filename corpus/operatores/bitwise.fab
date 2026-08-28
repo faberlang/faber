@@ -9,7 +9,6 @@ syntax = "<expression> ∧ <expression> | <expression> ⊻ <expression> | ¬ <ex
 related = ["∨", "⊻", "¬", "⇐", "⇒"]
 locale = "en"
 +++
-
 # =============================================================================
 # ∧ — Bitwise and, or, xor, not, and shifts on numerus operands.
 # =============================================================================
@@ -37,21 +36,17 @@ locale = "en"
 #   Unary ¬ documented in syntax; Rust emits `~` (whitelist if reintroduced in body).
 
 main {
-    const _ vexilla ← 0b1010
-    const _ persona ← 0b1100
-
+    const _ vexilla ← 10
+    const _ persona ← 12
     const _ coniuncta ← vexilla ∧ persona
     # 8 (0b1000)
     print coniuncta
-
     const _ diversa ← vexilla ⊻ persona
     # 6 (0b0110)
     print diversa
-
     const _ sinistra ← 1 ⇐ 4
     # 16
     print sinistra
-
     const _ dextra ← 16 ⇒ 2
     # 4
     print dextra

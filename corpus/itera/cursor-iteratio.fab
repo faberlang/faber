@@ -10,7 +10,6 @@ aliases = ["iterate"]
 related = ["ex", "de", "ab"]
 locale = "en"
 +++
-
 # =============================================================================
 # itera — Starts a for-each iteration statement.
 # =============================================================================
@@ -44,14 +43,14 @@ locale = "en"
 
 # Multi-value sync stream function that yields values via cede
 fn grena(int n) generator → int {
-    for range 0‥n const i {
+    for range 0 ‥ n const i {
         yield i
     }
 }
 
 # Multi-value async stream function that yields values via cede
 fn grena_futurum(int n) async_generator → int {
-    for range 0‥n const i {
+    for range 0 ‥ n const i {
         yield i
     }
 }
@@ -70,7 +69,6 @@ async_main {
     }
     print "Sync collected:"
     print effecta
-
     print "Async cursor iteration:"
     for from grena_futurum(3) const n {
         print "  async numerus: §"(n)

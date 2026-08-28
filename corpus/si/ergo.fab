@@ -10,7 +10,6 @@ aliases = ["ergo", "therefore"]
 related = ["si", "dum", "clausura", "redde", "tacet", "ergo"]
 locale = "en"
 +++
-
 # =============================================================================
 # ergo — Introduces a compact statement consequent.
 # =============================================================================
@@ -42,20 +41,31 @@ locale = "en"
 main {
     # ergo replaces a one-statement block body
     const _ x ← 10
-
-    if x > 5 then print "x magnum est"
+    if x ≻ 5 {
+        print "x magnum est"
+    }
 
     # secus ergo pairs else with a single consequent
     const _ aetas ← 25
-    if aetas ≥ 18 then print "adultus"
-    else then print "minor"
+    if aetas ≥ 18 {
+        print "adultus"
+    }
+    else {
+        print "minor"
+    }
 
     # Two-way one-liner (85 < 90 → "non A")
     const _ puncta ← 85
-    if puncta ≥ 90 then print "A"
-    else then print "non A"
+    if puncta ≥ 90 {
+        print "A"
+    }
+    else {
+        print "non A"
+    }
 
     # bivalens condition used directly
     const _ valet ← true
-    if valet then print "Recte"
+    if valet {
+        print "Recte"
+    }
 }

@@ -44,7 +44,7 @@ interface Figurabile {
 class Circulus implements Figurabile {
     int radius = 10
 
-    fn depinge() {
+    fn depinge() → void {
         print "circulus radius: §"(self.radius)
     }
 }
@@ -52,15 +52,14 @@ class Circulus implements Figurabile {
 class Quadratum implements Figurabile {
     int latus = 5
 
-    fn depinge() {
+    fn depinge() → void {
         print "quadratum latus: §"(self.latus)
     }
 }
 
 main {
-    const _ circulus ← Circulus { radius = 25 }
-    const _ quadratum ← Quadratum { latus = 15 }
-
+    const _ circulus ← Circulus {radius = 25}
+    const _ quadratum ← Quadratum {latus = 15}
     circulus.depinge()
     quadratum.depinge()
 }

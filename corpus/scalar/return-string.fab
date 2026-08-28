@@ -10,7 +10,6 @@ aliases = ["return"]
 related = ["textus", "functio"]
 locale = "en"
 +++
-
 # =============================================================================
 # redde — Function returning a string literal via redde "textus".
 # =============================================================================

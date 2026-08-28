@@ -9,7 +9,6 @@ syntax = "<expression> ↦ octeti | <expression> ↦ textus | <expression> ↦ a
 related = ["↦", "octeti", "textus", "chorda"]
 locale = "en"
 +++
-
 # =============================================================================
 # ↦ — Text and byte conversio between textus, ascii, and octeti.
 # =============================================================================

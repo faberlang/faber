@@ -9,7 +9,6 @@ syntax = "itera ab <runtime range>; return <a + b>"
 related = ["radix-lane", "itera", "ab", "air-aspect-admit"]
 locale = "en"
 +++
-
 # =============================================================================
 # air-aspect-decline — declined AIR proof-aspect shapes.
 # =============================================================================
@@ -31,7 +30,8 @@ locale = "en"
 # lanes exist and no unroll obligation is recorded.
 fn deambulatio(int n) → int {
     const int summa ← 0
-    for range n‥4 const i { }
+    for range n ‥ 4 const i {
+    }
     return summa
 }
 

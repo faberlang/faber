@@ -9,7 +9,6 @@ syntax = "<expression> ↦ <numeric-or-bivalens-type>"
 related = ["↦", "numerus", "fractus", "bivalens"]
 locale = "en"
 +++
-
 # =============================================================================
 # ↦ — Scalar numeric and bivalens primitive conversio.
 # =============================================================================
@@ -41,20 +40,16 @@ main {
     const float pi ← 3.7
     const int truncated ← pi ↦ int
     print truncated
-
     const bool fromFractus ← pi ↦ bool
     print fromFractus
-
     const int count ← 42
     const bool fromNumerus ← count ↦ bool
     print fromNumerus
-
     const bool flag ← true
     const int asInt ← flag ↦ int
     const float asFloat ← flag ↦ float
     print asInt
     print asFloat
-
     const ascii token ← 'yes'
     const bool fromAscii ← token ↦ bool
     print fromAscii

@@ -9,7 +9,6 @@ syntax = "[[...], [...]] ↦ <tensor-type-with-literal-Figura>"
 related = ["↦", "lista", "tensor", "Figura"]
 locale = "en"
 +++
-
 # =============================================================================
 # ↦ — Rectangular nested lista literal to tensor conversio.
 # =============================================================================
@@ -31,14 +30,9 @@ locale = "en"
 # shape, so the compiler flattens row-major and lowers through structa.
 
 main {
-    const tf32[3, 3] grid ← [
-        [0.0, 0.0, 0.0],
-        [1.0, 2.0, 0.0],
-        [0.0, 0.0, 0.0]
-    ] ↦ tf32[3, 3]
+    const tensor<f32, [3, 3]> grid ← [[0.0, 0.0, 0.0], [1.0, 2.0, 0.0], [0.0, 0.0, 0.0]] ↦ tensor<f32, [3, 3]>
     const list<int> dims ← grid.shape()
     const list<f32> flat ← grid.flatten()
-
     print dims
     print grid.length()
     print flat.length()

@@ -9,7 +9,6 @@ syntax = "nihil [<expression>]"
 related = ["∪", "sponte"]
 locale = "en"
 +++
-
 # =============================================================================
 # nihil — Represents the null value and can prefix a null check.
 # =============================================================================

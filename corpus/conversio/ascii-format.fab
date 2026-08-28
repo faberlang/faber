@@ -9,7 +9,6 @@ syntax = "<numerus> ↦ ascii<N, Hex|Bin|Oct>"
 related = ["↦", "ascii", "numerus"]
 locale = "en"
 +++
-
 # =============================================================================
 # ↦ — Fixed-width ascii format pack from numerus.
 # =============================================================================
@@ -51,7 +50,6 @@ main {
     const _ inferred_hex ← 255 ↦ ascii<_, Hex>
     const _ inferred_bin ← 255 ↦ ascii<_, Bin>
     const _ inferred_oct ← 255 ↦ ascii<_, Oct>
-
     print hex
     print padded
     print bin

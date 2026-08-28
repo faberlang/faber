@@ -46,6 +46,5 @@ main {
     if aetas between [18, 21, 65] {
         print "aetas insignis"
     }
-
     print "exempla inter"
 }

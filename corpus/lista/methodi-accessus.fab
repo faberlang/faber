@@ -9,7 +9,6 @@ syntax = "metior"
 related = ["temporis", "prima", "ultima"]
 locale = "en"
 +++
-
 # =============================================================================
 # metior — Marks a test for metered or measured execution.
 # =============================================================================
@@ -41,14 +40,12 @@ locale = "en"
 
 main {
     const _ res ← [1, 2, 3, 4, 5] ∷ list<int>
-
     const _ primus ← res.first()
     const _ ultimus ← res.last()
     const _ tertius ← res.get(2)
     const _ longitudo ← res.length()
     const _ vacuaest ← res.is_empty()
     const _ habettres ← res.contains(3)
-
     print primus, ultimus, tertius
     print longitudo, vacuaest, habettres
 }

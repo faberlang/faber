@@ -9,7 +9,6 @@ syntax = "<expression> est <expression>"
 related = ["non est"]
 locale = "en"
 +++
-
 # =============================================================================
 # est — Tests whether a value is or matches a type-like target.
 # =============================================================================
@@ -42,14 +41,14 @@ locale = "en"
 # EXPECTED OUTPUT:
 #   est.expected
 
-fn explora(unknown x) → string {
-    if x is null { return "nihil est" }
+fn explora(any x) → string {
+    if x is null then return "nihil est"
     return "aliud est"
 }
 
 fn explora_bivalens(bool x) → string {
-    if x is true { return "verum est" }
-    if x is false { return "falsum est" }
+    if x is true then return "verum est"
+    if x is false then return "falsum est"
     return "aliud est"
 }
 
@@ -75,7 +74,7 @@ main {
     print defectum_debet
 
     # Parenthesized for clarity
-    const _ utraque_nihil ← (forsitan is null) and (nomen is null)
+    const _ utraque_nihil ← forsitan is null and nomen is null
     print utraque_nihil
 
     # Dynamic ignotum dispatch for nihil and exact boolean checks on bivalens
@@ -95,13 +94,11 @@ main {
     const value notae ← ["a", "b"] ↦ value
     const value active ← true ↦ value
     const value proportio ← 1.5 ↦ value
-
     assert name is string
     assert quantitas is int
     assert notae is list<value>
     assert active is bool
     assert proportio is float
-
     assert quantitas not is string
     assert name not is int
 }
