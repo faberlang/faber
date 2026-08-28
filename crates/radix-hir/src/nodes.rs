@@ -1751,6 +1751,21 @@ pub struct HirPresentation {
     /// discriminants; authored `discretio` unions are unaffected.
     #[serde(default)]
     pub ordo_enums: Vec<HirOrdoEnum>,
+
+    /// Authored qualified variant paths (`module.Union.VARIANT`) carried
+    /// through lowering when the HIR retains only the resolved variant id.
+    /// The source path is presentation data: semantic identity remains the
+    /// `DefId`, while Faber re-emission uses this spelling to avoid silently
+    /// shortening an authored path.
+    #[serde(default)]
+    pub variant_paths: Vec<HirVariantPath>,
+}
+
+/// Authored source path for one resolved enum or union variant.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct HirVariantPath {
+    pub def_id: DefId,
+    pub path: Vec<Symbol>,
 }
 
 /// Authored facts for one `ordo` enumeration member.
