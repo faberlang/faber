@@ -114,7 +114,7 @@ pub fn compile_canonical(session: &Session, name: &str, source: &str) -> FormatC
                 Ok(()) => FormatCompileResult { output: Some(output), diagnostics: analysis.diagnostics },
                 Err(diagnostic) => {
                     let mut diagnostics = analysis.diagnostics;
-                    diagnostics.push(diagnostic);
+                    diagnostics.push(*diagnostic);
                     FormatCompileResult { output: None, diagnostics }
                 }
             }
@@ -146,7 +146,7 @@ pub(crate) fn revalidate_emitted_output(
     emitted: &str,
     input: &AnalyzedModule,
     emit_pack: &LocalePack,
-) -> Result<(), Diagnostic> {
+) -> Result<(), Box<Diagnostic>> {
     let revalidation_session = Session::new(
         session
             .config
@@ -155,15 +155,16 @@ pub(crate) fn revalidate_emitted_output(
             .with_locale_pack_explicit(),
     );
     let expected = variant_path_spelling_multiset(&input.presentation, &input.interner);
-    let prepared = prepare_program_module_for_name(name, emitted, &revalidation_session).map_err(|diagnostic| {
-        revalidation_failure(
-            name,
-            "variant_path_spelling_reanalysis_failed",
-            format!("preparing emitted output failed: {}", diagnostic.message),
-            expected.len(),
-            None,
-        )
-    })?;
+    let prepared = prepare_program_module_for_name(name, emitted, &revalidation_session)
+        .map_err(|diagnostic| {
+            Box::new(revalidation_failure(
+                name,
+                "variant_path_spelling_reanalysis_failed",
+                format!("preparing emitted output failed: {}", diagnostic.message),
+                expected.len(),
+                None,
+            ))
+        })?;
     let reanalysis = analyze_source(
         &prepared.session,
         name,
@@ -172,34 +173,34 @@ pub(crate) fn revalidate_emitted_output(
     );
     let reanalysis = match reanalysis {
         Ok(reanalysis) if reanalysis.diagnostics.iter().any(Diagnostic::is_error) => {
-            return Err(revalidation_failure(
+            return Err(Box::new(revalidation_failure(
                 name,
                 "variant_path_spelling_reanalysis_failed",
                 diagnostics_summary(&reanalysis.diagnostics),
                 expected.len(),
                 None,
-            ));
+            )));
         }
         Ok(reanalysis) => reanalysis,
         Err(diagnostics) => {
-            return Err(revalidation_failure(
+            return Err(Box::new(revalidation_failure(
                 name,
                 "variant_path_spelling_reanalysis_failed",
                 diagnostics_summary(&diagnostics),
                 expected.len(),
                 None,
-            ));
+            )));
         }
     };
     let actual = variant_path_spelling_multiset(&reanalysis.presentation, &reanalysis.interner);
     if actual != expected {
-        return Err(revalidation_failure(
+        return Err(Box::new(revalidation_failure(
             name,
             "variant_path_spelling_multiset_diverged",
             "emitted variant-path spellings differ from the input",
             expected.len(),
             Some(actual.len()),
-        ));
+        )));
     }
     Ok(())
 }
