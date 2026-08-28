@@ -538,9 +538,14 @@ impl TypeChecker<'_> {
                 self.check_handled_block(body, catch, expected)
             }
             HirExpressionKind::Trap(body) => self.check_trap(body, expected, expr.span),
-            HirExpressionKind::Clausura(params, ret, err, body, _) => {
-                self.check_closure(params, ret.as_mut(), err.as_mut(), body, expected)
-            }
+            HirExpressionKind::Clausura(params, ret, err, body, modifier) => self.check_closure(
+                params,
+                ret.as_mut(),
+                err.as_mut(),
+                body,
+                expected,
+                *modifier,
+            ),
             HirExpressionKind::Cede(inner) => {
                 self.check_expr(inner);
                 self.error_issue(

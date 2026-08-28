@@ -19,6 +19,7 @@
 #[allow(clippy::wildcard_imports)]
 // parent module provides shared imports for typechecking
 use super::*;
+use radix_syntax::ClosureModifier;
 
 const ISSUE_ARRAY_SPREAD_REQUIRES_LISTA: &str = "array_spread_requires_lista";
 const ISSUE_ABSTRACT_CONSTRUCTION: &str = "abstract_construction";
@@ -28,6 +29,8 @@ const ISSUE_FIELD_INITIALIZER_TYPE_MISMATCH: &str = "field_initializer_type_mism
 const ISSUE_STRUCT_COMPUTED_KEY_FORBIDDEN: &str = "struct_computed_key_forbidden";
 const ISSUE_STRUCT_SPREAD_FORBIDDEN: &str = "struct_spread_forbidden";
 const ISSUE_UNKNOWN_STRUCT: &str = "unknown_struct";
+const ISSUE_NUCLEUM_CLOSURE_EFFECT: &str = "nucleum_closure_effect";
+const ISSUE_NUCLEUM_CLOSURE_TYPE: &str = "nucleum_closure_type";
 
 impl TypeChecker<'_> {
     /// Validates object-field syntax against a known struct definition.
@@ -141,6 +144,12 @@ impl TypeChecker<'_> {
     /// enable `redde` when the closure spells its own `→` return channel, and
     /// only enable escaping `iace` when the closure spells its own `⇥` channel.
     /// Contextual expected types do not create implicit statement exit channels.
+    ///
+    /// A `nucleum` closure is checked under its device contract before the
+    /// ordinary closure machinery: an explicit `⇥` channel is an alternate
+    /// exit, and the signature (parameters and explicit return) must stay in
+    /// the device-safe scalar/tensor subset. Ordinary closure behavior is
+    /// unchanged for `libera` and unmarked closures.
     #[allow(clippy::ptr_arg)]
     pub fn check_closure(
         &mut self,
@@ -149,8 +158,27 @@ impl TypeChecker<'_> {
         err: Option<&mut TypeId>,
         body: &mut HirExpression,
         expected: Option<TypeId>,
+        modifier: ClosureModifier,
     ) -> TypeId {
         let expected_sig = expected.and_then(|ty| self.signature_from_type(ty));
+        let kernel = matches!(modifier, ClosureModifier::Nucleum);
+
+        if kernel {
+            if err.is_some() {
+                self.errors.push(
+                    SemanticError::structured(SemanticErrorKind::LoweringError, body.span)
+                        .with_arg("issue", ISSUE_NUCLEUM_CLOSURE_EFFECT)
+                        .with_arg("reason", "alternate_exit")
+                        .with_arg("operation", "error_channel"),
+                );
+            }
+            for param in params.iter() {
+                self.check_kernel_closure_signature_type(param.ty, param.span, "parameter");
+            }
+            if let Some(ret_ty) = ret.as_ref() {
+                self.check_kernel_closure_signature_type(**ret_ty, body.span, "return");
+            }
+        }
 
         self.push_scope();
         for (idx, param) in params.iter().enumerate() {
@@ -171,7 +199,14 @@ impl TypeChecker<'_> {
         self.mark_chorda_scalar_closure_param = false;
 
         let explicit_ret = ret.as_ref().map(|ty| **ty);
-        let explicit_err = err.as_ref().map(|ty| **ty);
+        // A kernel closure has no error channel: an explicit one is rejected
+        // above and must not configure closure-local error state or the
+        // synthesized signature.
+        let explicit_err = if kernel {
+            None
+        } else {
+            err.as_ref().map(|ty| **ty)
+        };
         let expected_ret = explicit_ret.or_else(|| expected_sig.as_ref().map(|sig| sig.ret));
 
         let prev_return = self.current_return;
@@ -256,6 +291,90 @@ impl TypeChecker<'_> {
             is_generator: false,
         };
         self.types.function(sig)
+    }
+
+    /// Device-safe admission for one `nucleum` closure signature type.
+    ///
+    /// Mirrors the scalar/tensor subset the target-neutral device-safe
+    /// classifier admits (`radix-mir` `device::safe`): booleans, vacuity,
+    /// numerics in any width, modular words, atomics, the tensor/vector/matrix
+    /// families, and unresolved holes that defer to later resolution. Host
+    /// value families (text, collections, cursors, functions, unions, …)
+    /// reject with the offending type as a structured fact. The MIR classifier
+    /// remains the final lowerability authority; this is the signature gate.
+    fn check_kernel_closure_signature_type(
+        &mut self,
+        ty: TypeId,
+        span: radix_lexer::Span,
+        position: &'static str,
+    ) {
+        if self.kernel_closure_admits_type(ty) {
+            return;
+        }
+        let offending = self.kernel_closure_type_name(ty);
+        self.errors.push(
+            SemanticError::structured(SemanticErrorKind::TypeMismatch, span)
+                .with_arg("issue", ISSUE_NUCLEUM_CLOSURE_TYPE)
+                .with_arg("reason", "device_unsafe_type")
+                .with_arg("type", offending)
+                .with_arg("position", position),
+        );
+    }
+
+    fn kernel_closure_admits_type(&self, ty: TypeId) -> bool {
+        // Follow alias chains with a depth guard; an alias cycle fails closed.
+        let mut current = self.resolve_inferred_type(ty);
+        for _ in 0..16 {
+            match self.types.get(current) {
+                Type::Alias(_, inner) => current = *inner,
+                Type::Primitive(Primitive::Bivalens | Primitive::Vacuum | Primitive::Numquam)
+                | Type::Primitive(Primitive::Numerus | Primitive::Fractus)
+                | Type::SizedNumeric(..)
+                | Type::ModularWord(_)
+                | Type::Atomic(_)
+                | Type::Tensor(..)
+                | Type::Vector(..)
+                | Type::Matrix(..)
+                | Type::Param(_)
+                | Type::Infer(_)
+                | Type::InferUnion(_)
+                | Type::MarkerHole { .. }
+                | Type::Error => return true,
+                _ => return false,
+            }
+        }
+        false
+    }
+
+    /// Coarse display name for a rejected kernel signature type. A rendering
+    /// aid, never the identity: the `issue`/`reason` facts carry the contract.
+    fn kernel_closure_type_name(&self, ty: TypeId) -> String {
+        match self.types.get(self.resolve_inferred_type(ty)) {
+            Type::Primitive(primitive) => format!("{primitive:?}").to_lowercase(),
+            Type::SizedNumeric(primitive, _) => format!("{primitive:?}").to_lowercase(),
+            Type::Array(_) => "lista".to_owned(),
+            Type::BoundedArray { .. } => "bounded lista".to_owned(),
+            Type::Tuple(_) => "iuncta".to_owned(),
+            Type::Map(..) => "tabula".to_owned(),
+            Type::Record(_) => "record".to_owned(),
+            Type::Set(_) => "set".to_owned(),
+            Type::Struct(_) | Type::Enum(_) | Type::Interface(_) => "genus".to_owned(),
+            Type::Union(_) => "union".to_owned(),
+            Type::Intersection(_) => "intersection".to_owned(),
+            Type::Option(_) => "option".to_owned(),
+            Type::Func(_) => "function".to_owned(),
+            Type::Cursor(_) | Type::AsyncCursor(..) => "cursor".to_owned(),
+            Type::Queue(_) | Type::BoundedQueue { .. } => "queue".to_owned(),
+            Type::Stack(_) | Type::BoundedStack { .. } => "stack".to_owned(),
+            Type::Sparsa(..) => "sparsa".to_owned(),
+            Type::Intervallum(_) => "intervallum".to_owned(),
+            Type::Promissum(_) | Type::PromissumFailable(..) => "promissum".to_owned(),
+            Type::Ref(..) => "reference".to_owned(),
+            Type::Applied(..) => "applied type".to_owned(),
+            Type::ModularWord(_) => "modulus".to_owned(),
+            Type::SizedInstans(_) => "instans".to_owned(),
+            _ => "unresolved type".to_owned(),
+        }
     }
 
     /// Builds a typed `Type::Tuple` from a positional aggregate expression.

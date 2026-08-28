@@ -15,12 +15,12 @@ use radix_target::Target;
 
 use radix_hir::{DefId, HirItemKind, HirModule, HirStatementKind};
 
-use super::typecheck::{typecheck, TypeChecker};
+use super::typecheck::{TypeChecker, typecheck};
+use crate::SemanticErrorKind;
 use crate::file_interface::{FileExport, FileExportKind, FileInterface, InterfaceStructExport};
 use crate::passes::visibility_annotation::VisibilityTier;
 use crate::test_support::args_have_no_legacy_message;
 use crate::test_support::test_span;
-use crate::SemanticErrorKind;
 use crate::{Primitive, Resolver, Type, TypeTable};
 use radix_hir::{HirCallArg, HirExpression, HirExpressionKind, HirLiteral, HirPattern};
 use radix_lexer::Span;
@@ -644,9 +644,11 @@ fn condition_type_mismatch_does_not_emit_follow_on_condition_error() {
     // si with a numerus condition → TypeMismatch, but NOT condition_must_be_bivalens
     let diags = compile_and_diagnostics("incipit { si 1 { } }");
     assert!(diags.iter().any(crate::SemanticError::is_error));
-    assert!(!diags
-        .iter()
-        .any(|d| d.issue() == Some("condition_must_be_bivalens")));
+    assert!(
+        !diags
+            .iter()
+            .any(|d| d.issue() == Some("condition_must_be_bivalens"))
+    );
 }
 
 #[test]
@@ -1603,10 +1605,11 @@ incipit {
         "summa should require numeric lista elements"
     );
     let errors = &result.diagnostics;
-    assert!(errors.iter().any(|err| err
-        .args
-        .iter()
-        .any(|arg| arg.name == "issue" && arg.value == "numeric_lista_elements_required")));
+    assert!(errors.iter().any(|err| {
+        err.args
+            .iter()
+            .any(|arg| arg.name == "issue" && arg.value == "numeric_lista_elements_required")
+    }));
 }
 
 #[test]
@@ -2199,6 +2202,170 @@ fn closure_modifiers_survive_lowering_into_hir() {
         unmarked_probe.libera_count + unmarked_probe.nucleum_count,
         0,
         "unmarked closure must default the modifier to absent"
+    );
+}
+
+// =============================================================================
+// KCM-03 — nucleum kernel-closure typecheck contract
+// =============================================================================
+
+fn kernel_closure_error<'a>(
+    unit: &'a crate::test_support::AnalyzedFixture,
+    wanted: &str,
+) -> Option<&'a crate::SemanticError> {
+    unit.diagnostics
+        .iter()
+        .filter(|error| error.is_error())
+        .find(|error| crate::test_support::issue(error) == Some(wanted))
+}
+
+fn kernel_closure_arg<'a>(error: &'a crate::SemanticError, name: &str) -> Option<&'a str> {
+    error
+        .args
+        .iter()
+        .find(|arg| arg.name == name)
+        .map(|arg| arg.value.as_str())
+}
+
+#[test]
+fn typechecks_legal_kernel_closure_scalar_signature() {
+    let source = r"
+incipit {
+    fixum _ kernel ← (fractus<f32> a, fractus<f32> b) nucleum → fractus<f32> ∴ a + b
+}
+";
+    let unit = analyze(source);
+    assert!(
+        unit.is_ok(),
+        "a typed scalar kernel closure typechecks under the device subset: {:?}",
+        unit.diagnostics
+    );
+}
+
+#[test]
+fn typechecks_legal_kernel_closure_tensor_signature() {
+    let source = r"
+functio shaped(tensor<f32, [8]> input) → vacuum {
+    fixum _ kernel ← (tensor<f32, [8]> value) nucleum → tensor<f32, [8]> ∴ value
+    tacet
+}
+";
+    let unit = analyze(source);
+    assert!(
+        unit.is_ok(),
+        "a typed tensor kernel closure typechecks under the device subset: {:?}",
+        unit.diagnostics
+    );
+}
+
+#[test]
+fn typechecks_kernel_closure_same_expression_iife() {
+    let source = r"
+incipit {
+    fixum numerus result ← ((numerus value) nucleum → numerus ∴ value * 2)(21)
+}
+";
+    let unit = analyze(source);
+    assert!(
+        unit.is_ok(),
+        "the same-expression IIFE typechecks like the local-const form: {:?}",
+        unit.diagnostics
+    );
+}
+
+#[test]
+fn rejects_kernel_closure_signature_error_channel() {
+    let source = r"
+functio take(numerus seed) → vacuum {
+    fixum _ kernel ← (numerus value) nucleum → numerus ⇥ textus ∴ value
+    tacet
+}
+";
+    let unit = analyze(source);
+    let error = kernel_closure_error(&unit, "nucleum_closure_effect").unwrap_or_else(|| {
+        panic!(
+            "expected nucleum_closure_effect, got: {:?}",
+            unit.diagnostics
+        )
+    });
+    assert_eq!(kernel_closure_arg(error, "reason"), Some("alternate_exit"));
+    assert_eq!(
+        kernel_closure_arg(error, "operation"),
+        Some("error_channel")
+    );
+}
+
+#[test]
+fn rejects_kernel_closure_host_type_parameter() {
+    let source = r"
+functio take() → vacuum {
+    fixum _ kernel ← (textus label) nucleum ∴ label
+    tacet
+}
+";
+    let unit = analyze(source);
+    let error = kernel_closure_error(&unit, "nucleum_closure_type")
+        .unwrap_or_else(|| panic!("expected nucleum_closure_type, got: {:?}", unit.diagnostics));
+    assert_eq!(kernel_closure_arg(error, "type"), Some("textus"));
+    assert_eq!(kernel_closure_arg(error, "position"), Some("parameter"));
+    assert_eq!(
+        kernel_closure_arg(error, "reason"),
+        Some("device_unsafe_type")
+    );
+}
+
+#[test]
+fn rejects_kernel_closure_host_return_type() {
+    let source = r#"
+functio take() → vacuum {
+    fixum _ kernel ← (numerus value) nucleum → textus ∴ "computed"
+    tacet
+}
+"#;
+    let unit = analyze(source);
+    let error = kernel_closure_error(&unit, "nucleum_closure_type")
+        .unwrap_or_else(|| panic!("expected nucleum_closure_type, got: {:?}", unit.diagnostics));
+    assert_eq!(kernel_closure_arg(error, "type"), Some("textus"));
+    assert_eq!(kernel_closure_arg(error, "position"), Some("return"));
+}
+
+#[test]
+fn kernel_closure_signature_admits_sized_numerics_and_boolean() {
+    let source = r"
+functio take() → vacuum {
+    fixum _ kernel ← (numerus<u32> value, bivalens flag) nucleum → numerus<u64> ∴ value
+    tacet
+}
+";
+    let unit = analyze(source);
+    assert!(
+        unit.is_ok(),
+        "sized numerics and booleans are inside the device subset: {:?}",
+        unit.diagnostics
+    );
+}
+
+#[test]
+fn ordinary_closure_error_channel_behavior_is_unchanged() {
+    let source = r#"
+functio guard(numerus value) → numerus ⇥ textus {
+    redde value
+}
+functio take() → vacuum {
+    fixum _ plain ← clausura numerus value → numerus ⇥ textus {
+        si value ≻ 3 {
+            iace "too big"
+        }
+        redde value
+    }
+    tacet
+}
+"#;
+    let unit = analyze(source);
+    assert!(
+        unit.is_ok(),
+        "an unmarked closure keeps its explicit ⇥ channel: {:?}",
+        unit.diagnostics
     );
 }
 
