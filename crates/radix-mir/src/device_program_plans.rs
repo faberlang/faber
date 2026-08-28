@@ -27,7 +27,8 @@ use crate::layout::MirTensorStorageLayout;
 use crate::{
     MirCollectionOp, MirConstant, MirFunction, MirIntrinsic, MirKernelDispatchSize,
     MirKernelWorkgroupCount, MirLayoutKind, MirLocalId, MirOperand, MirPlaceBase, MirRuntimeCall,
-    MirStatementKind, MirType, MirUnOp, MirValidationContext, MirWorkgroupSize,
+    MirStatementKind, MirTempId, MirTerminatorKind, MirType, MirUnOp, MirValidationContext,
+    MirValueKind, MirWorkgroupSize,
 };
 use radix_types::{NumericWidth, Primitive, Type, TypeId};
 use rustc_hash::FxHashMap;
@@ -3910,12 +3911,8 @@ pub fn composed_matmul_plan_for_function(
     }
     let destinations = matmuls
         .iter()
-        .map(|(_, _, destination)| {
-            destination
-                .and_then(|place| match place.base {
-                    MirPlaceBase::Local(local) if place.projections.is_empty() => Some(local),
-                    _ => None,
-                })
+        .map(|(statement_index, call, destination)| {
+            composed_matmul_stage_destination(function, *statement_index, call, *destination)
                 .ok_or_else(|| {
                     PlanMappingError::mapping(
                         "composed matmul stage destination must be an unprojected local",
@@ -4024,6 +4021,118 @@ pub fn composed_matmul_plan_for_function(
     plan.validate()
         .map_err(|error| PlanMappingError::mapping(error.to_string()))?;
     Ok(Some(plan))
+}
+
+/// Resolve a composed matmul's typed stage destination. Direct unprojected
+/// locals remain the primary path; source-shaped calls may instead write a
+/// result temp and immediately forward it to an unprojected local.
+fn composed_matmul_stage_destination(
+    function: &MirFunction,
+    statement_index: usize,
+    call: &MirRuntimeCall,
+    destination: Option<&crate::MirPlace>,
+) -> Option<MirLocalId> {
+    if let Some(local) = destination.and_then(|place| match place.base {
+        MirPlaceBase::Local(local) if place.projections.is_empty() => Some(local),
+        _ => None,
+    }) {
+        return Some(local);
+    }
+
+    let place = destination?;
+    let MirPlaceBase::Temp(temp) = place.base else {
+        return None;
+    };
+    if !place.projections.is_empty() {
+        return None;
+    }
+    let next = function
+        .blocks
+        .first()?
+        .statements
+        .get(statement_index + 1)?;
+    let MirStatementKind::Assign {
+        place: forwarded_place,
+        value,
+    } = &next.kind
+    else {
+        return None;
+    };
+    let MirPlaceBase::Local(local) = forwarded_place.base else {
+        return None;
+    };
+    if !forwarded_place.projections.is_empty() {
+        return None;
+    }
+    let MirValueKind::Operand(MirOperand::Temp(forwarded_temp)) = &value.kind else {
+        return None;
+    };
+    if *forwarded_temp != temp {
+        return None;
+    }
+
+    let temp_ty = function
+        .temps
+        .iter()
+        .find(|entry| entry.id == temp)
+        .map(|entry| entry.ty)?;
+    let local_ty = crate::local_ty::local_ty(function, local)?;
+    if temp_ty.semantic_id() != call.return_ty.semantic_id()
+        || value.ty.semantic_id() != call.return_ty.semantic_id()
+        || local_ty.semantic_id() != call.return_ty.semantic_id()
+    {
+        return None;
+    }
+    if crate::read_analysis::temp_forward_local(function, temp) != Some(local)
+        || crate::read_analysis::temp_directly_read(function, temp)
+        || !composed_matmul_temp_has_only_producer(function, temp, statement_index)
+    {
+        return None;
+    }
+    Some(local)
+}
+
+/// A source result temp has one producer: the collection call whose immediate
+/// typed handoff is being resolved. Any other temp write makes provenance
+/// ambiguous and keeps the composed resolver fail closed.
+fn composed_matmul_temp_has_only_producer(
+    function: &MirFunction,
+    temp: MirTempId,
+    producer_index: usize,
+) -> bool {
+    let mut producer_count = 0;
+    let block = match function.blocks.first() {
+        Some(block) => block,
+        None => return false,
+    };
+    for (statement_index, statement) in block.statements.iter().enumerate() {
+        let destination = match &statement.kind {
+            MirStatementKind::Assign { place, .. }
+            | MirStatementKind::Construct {
+                destination: place, ..
+            } => Some(place),
+            MirStatementKind::RuntimeCall { destination, .. }
+            | MirStatementKind::Call { destination, .. } => destination.as_ref(),
+        };
+        let Some(destination) = destination else {
+            continue;
+        };
+        if !matches!(&destination.base, MirPlaceBase::Temp(candidate) if *candidate == temp) {
+            continue;
+        }
+        if statement_index != producer_index || !destination.projections.is_empty() {
+            return false;
+        }
+        producer_count += 1;
+    }
+    if let MirTerminatorKind::TryCall { destination, .. } = &block.terminator.kind {
+        if destination.as_ref().is_some_and(
+            |place| matches!(&place.base, MirPlaceBase::Temp(candidate) if candidate == &temp),
+        ) {
+            return false;
+        }
+    }
+    producer_count == 1
 }
 
 /// Build the composed body's ABI from the ordinary carrier signature, then
