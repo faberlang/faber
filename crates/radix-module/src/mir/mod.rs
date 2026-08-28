@@ -175,9 +175,8 @@ pub use radix_mir::{
 #[cfg(feature = "runner")]
 pub use runner::{
     classify_runner_lowerability, run_analyzed, run_entry, run_entry_with_stats, run_function,
-    run_function_with_limits, run_function_with_step_budget, run_source, runner_dispatch_status,
-    BufferHost, Host, RunSourceError, RunnerDispatchStatus, RunnerError, RunnerRunOutcome,
-    RunnerStats, StdioHost, Value,
+    run_function_with_limits, run_function_with_step_budget, run_source, runner_dispatch_status, BufferHost, Host,
+    RunSourceError, RunnerDispatchStatus, RunnerError, RunnerRunOutcome, RunnerStats, StdioHost, Value,
 };
 #[cfg(feature = "mir-sexp")]
 pub use sexp_text::{classify_sexp_lowerability, emit_sexp_text, MirSexpTextProbeError};
