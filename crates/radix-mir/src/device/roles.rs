@@ -8,7 +8,7 @@ use radix_hir::{DefId, HirFunction, HirItemKind, HirModule};
 use radix_lexer::Interner;
 use rustc_hash::FxHashMap;
 
-/// Explicit device facts for a source-less or synthetic function.
+/// Explicit device facts for a source-derived or source-less function.
 ///
 /// Consumers must use this carrier instead of inferring private status from a
 /// missing source definition, a generated name, or the compute stage alone.
@@ -19,6 +19,18 @@ pub struct MirDeviceFunctionMetadata {
     pub shader_stage: MirKernelShaderStage,
     pub visibility: MirFunctionVisibility,
     pub origin: MirFunctionOrigin,
+}
+
+impl MirDeviceFunctionMetadata {
+    /// The explicit launchability fact shared by HIR entry-role selection and
+    /// MIR consumers: only a public `Kernel` role receives a launch row.
+    #[must_use]
+    pub fn entry_role(&self) -> Option<MirDeviceRole> {
+        device_entry_role_for_visibility(
+            self.role,
+            self.visibility == MirFunctionVisibility::Public,
+        )
+    }
 }
 
 pub type MirDeviceFunctionMetadataMap = FxHashMap<MirFunctionId, MirDeviceFunctionMetadata>;
@@ -49,7 +61,8 @@ impl MirDeviceContext {
         }
     }
 
-    /// Build a role context with explicit facts for source-less functions.
+    /// Build a role context with explicit facts for source-derived and
+    /// source-less functions.
     #[must_use]
     pub fn from_hir_roles_with_metadata(
         roles_by_def: FxHashMap<DefId, MirDeviceRole>,
@@ -73,7 +86,7 @@ impl MirDeviceContext {
         }
     }
 
-    /// Attach explicit synthetic-function facts after source-based roles.
+    /// Attach explicit function facts after source-based roles.
     ///
     /// A metadata row is accepted only for a function present in the program;
     /// an absent row cannot silently create a device role for a missing body.
@@ -218,21 +231,25 @@ pub fn device_entry_roles_from_hir(
 }
 
 #[must_use]
+fn device_entry_role_for_visibility(role: MirDeviceRole, public: bool) -> Option<MirDeviceRole> {
+    match (role, public) {
+        // The entry gate: a compute kernel is launchable only when public.
+        (MirDeviceRole::Kernel, true) => Some(MirDeviceRole::Kernel),
+        // Fragments keep their role unchanged; they are never launchable
+        // compute entries and the survivor scan still needs the role.
+        (MirDeviceRole::Fragment, _) => Some(MirDeviceRole::Fragment),
+        // Private compute kernels are helpers: no launch role.
+        (MirDeviceRole::Kernel, false) => None,
+    }
+}
+
+#[must_use]
 fn device_entry_role_for_hir_function(
     func: &HirFunction,
     interner: &Interner,
 ) -> Option<MirDeviceRole> {
-    match device_role_for_hir_function(func) {
-        // The entry gate: a compute kernel is launchable only when public.
-        Some(MirDeviceRole::Kernel) if is_public_entry(func, interner) => {
-            Some(MirDeviceRole::Kernel)
-        }
-        // Fragments keep their role unchanged; they are never launchable
-        // compute entries and the survivor scan still needs the classification.
-        Some(MirDeviceRole::Fragment) => Some(MirDeviceRole::Fragment),
-        // Private compute kernels are helpers: no launch role.
-        Some(MirDeviceRole::Kernel) | None => None,
-    }
+    device_role_for_hir_function(func)
+        .and_then(|role| device_entry_role_for_visibility(role, is_public_entry(func, interner)))
 }
 
 /// One concrete imported device instance's target-admission facts (KPC-EMIT).

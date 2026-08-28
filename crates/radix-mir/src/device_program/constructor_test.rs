@@ -236,6 +236,85 @@ fn validated(types: &TypeTable, functions: Vec<MirFunction>) -> ValidatedMir<'_>
         .expect("the constructor fixture validates")
 }
 
+/// The constructor's launch rows follow the same explicit visibility gate
+/// as HIR entry-role selection: a public named entry is materialized, while an
+/// unmarked named helper stays available only to composition and never reaches
+/// the program's kernel, launch, or ABI rows.
+#[test]
+fn constructor_excludes_private_named_helpers_from_device_program() {
+    let mut types = TypeTable::new();
+    let mut interner = Interner::new();
+    let scalar = f32(&mut types);
+    let mut public = device_function(
+        1,
+        &mut interner,
+        "public_entry",
+        &[(0, "value", scalar)],
+        &[0],
+        Vec::new(),
+        Some(MirOperand::Place(MirPlace::local(MirLocalId(0)))),
+        Vec::new(),
+        scalar,
+        true,
+    );
+    public.source = Some(DefId(1));
+    let mut private = device_function(
+        2,
+        &mut interner,
+        "private_helper",
+        &[(0, "value", scalar)],
+        &[0],
+        Vec::new(),
+        Some(MirOperand::Place(MirPlace::local(MirLocalId(0)))),
+        Vec::new(),
+        scalar,
+        true,
+    );
+    private.source = Some(DefId(2));
+    let validated = validated(&types, vec![public, private]);
+    let mut metadata = fixture_metadata(&validated.program().functions);
+    metadata
+        .get_mut(&MirFunctionId(2))
+        .expect("private named helper has a source metadata row")
+        .visibility = MirFunctionVisibility::Private;
+
+    let (program, _semantics, _steps) = build_device_program(
+        &validated,
+        &interner,
+        &MirCompanionMap::default(),
+        None,
+        DeviceProgramLifetime::SingleRun,
+        0,
+        &metadata,
+    )
+    .expect("public named entry materializes");
+
+    assert_eq!(
+        program.kernels.len(),
+        1,
+        "only the public entry has a kernel row"
+    );
+    assert_eq!(program.kernels[0].function, MirFunctionId(1));
+    assert_eq!(program.kernels[0].entry, "public_entry");
+    assert_eq!(
+        program.launches.len(),
+        1,
+        "only the public entry is launched"
+    );
+    assert_eq!(
+        program.results.len(),
+        1,
+        "only the public entry has ABI results"
+    );
+    assert!(
+        program
+            .kernels
+            .iter()
+            .all(|kernel| kernel.function != MirFunctionId(2)),
+        "private named helper must be absent from kernel/ABI rows"
+    );
+}
+
 #[test]
 fn constructor_returns_program_and_semantics_from_validated_mir() {
     let mut types = TypeTable::new();

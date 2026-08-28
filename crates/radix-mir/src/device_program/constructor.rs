@@ -32,8 +32,8 @@ use crate::kernel_plan::CollectionKernelPlan;
 use crate::layout::MirTensorStorageLayout;
 use crate::static_shape_fold::{fold_validated_device_program, ShapeFoldError};
 use crate::{
-    MirCallee, MirConstant, MirFunction, MirFunctionId, MirFunctionVisibility, MirLocalId,
-    MirOperand, MirStatementKind, MirType, ValidatedMir,
+    MirCallee, MirConstant, MirFunction, MirFunctionId, MirFunctionOrigin, MirFunctionVisibility,
+    MirLocalId, MirOperand, MirStatementKind, MirType, ValidatedMir,
 };
 use radix_hir::DefId;
 use radix_lexer::Interner;
@@ -273,24 +273,27 @@ fn direct_callee_function_id(callee: &MirCallee) -> Option<MirFunctionId> {
 
 /// Explicit-facts admission for one compute-stage candidate (KCM-05).
 ///
-/// Named functions admit through their source identity; source-less
-/// synthetic kernel closures admit only through their metadata carrier —
-/// public rows unconditionally, private rows only when a host caller still
-/// launches them; a source-less function with no carrier row never admits
-/// (fail-closed: an unclassifiable device body cannot become a launch).
+/// Every entry uses the metadata carrier's launchability fact. Named source
+/// functions are `Source` rows in that carrier, so an unmarked/private named
+/// helper cannot reach ABI synthesis merely because it has a source identity.
+/// The only private exception is a synthetic kernel closure with a remaining
+/// host call edge: that physical host boundary is its launch fact. A function
+/// with no carrier row never admits (fail-closed: an unclassifiable device
+/// body cannot become a launch).
 fn admits_device_entry(
     function: &MirFunction,
     metadata: &MirDeviceFunctionMetadataMap,
     host_launched: &BTreeSet<MirFunctionId>,
 ) -> bool {
-    if function.source.is_some() {
-        return true;
+    let Some(row) = metadata.get(&function.id) else {
+        return false;
+    };
+    if row.origin == MirFunctionOrigin::SyntheticKernelClosure
+        && row.visibility == MirFunctionVisibility::Private
+    {
+        return host_launched.contains(&function.id);
     }
-    match metadata.get(&function.id).map(|row| row.visibility) {
-        Some(MirFunctionVisibility::Public) => true,
-        Some(MirFunctionVisibility::Private) => host_launched.contains(&function.id),
-        None => false,
-    }
+    row.entry_role() == Some(crate::MirDeviceRole::Kernel)
 }
 
 /// Build the one target-neutral [`DeviceProgram`], its carried semantics, and
@@ -307,12 +310,12 @@ fn admits_device_entry(
 /// to the complete selected device set before any ABI or plan derivation.
 ///
 /// Selection is explicit-facts admission (KCM-05), never the compute stage
-/// alone: a named function is admitted through its source identity; a
-/// source-less synthetic kernel closure is admitted only through its
+/// alone: named functions are admitted only by their carried public `Source`
+/// row; a source-less synthetic kernel closure is admitted only through its
 /// metadata carrier — public rows unconditionally, private rows only when a
-/// host caller still launches them (the one region/launch law); a
-/// source-less compute-stage function with no carrier row is never admitted
-/// (fail-closed — an unclassifiable device body cannot become a launch).
+/// host caller still launches them (the one region/launch law); any compute
+/// function with no carrier row is never admitted (fail-closed — an
+/// unclassifiable device body cannot become a launch).
 ///
 /// **DPSC-U4a (the faber superset):** a multi-recipe body whose whole-function
 /// ABI/plan synthesis fails decomposes at recipe boundaries into subchain
