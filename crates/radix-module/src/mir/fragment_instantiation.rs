@@ -292,7 +292,7 @@ impl<'a> InstantiationChecker<'a> {
                 continue;
             };
             if let Some((expected, got)) = self.tensor_shape_pair(param.ty, actual) {
-                if expected != got {
+                if !self.types.index_equals(expected, got) {
                     return Some((format!("{expected:?}"), format!("{got:?}")));
                 }
             }
@@ -438,7 +438,10 @@ impl<'a> InstantiationChecker<'a> {
     }
 
     fn types_fit(&self, expected: MirType, actual: MirType) -> bool {
-        resolve_ty(self.types, expected.semantic_id()) == resolve_ty(self.types, actual.semantic_id())
+        self.types.equals(
+            resolve_ty(self.types, expected.semantic_id()),
+            resolve_ty(self.types, actual.semantic_id()),
+        )
     }
 
     fn tensor_shape_pair(

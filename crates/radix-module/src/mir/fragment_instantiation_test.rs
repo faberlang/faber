@@ -363,6 +363,40 @@ fn tensor_shape_mismatch_emits_type() {
 }
 
 #[test]
+fn same_shape_with_distinct_index_ids_is_accepted() {
+    let mut types = TypeTable::new();
+    let element = types.sized_numeric(crate::semantic::Primitive::Fractus, crate::semantic::NumericWidth::F32);
+    let shape = types.intern_index(crate::semantic::IndexExpr::Literal(4));
+    let same_shape = types.intern_index(crate::semantic::IndexExpr::Literal(4));
+    assert_ne!(shape, same_shape);
+    let expected = MirType::semantic(types.tensor_with_shape(element, shape));
+    let actual = MirType::semantic(types.tensor_with_shape(element, same_shape));
+    let helper = function(
+        1,
+        FRAGMENT,
+        vec![param(0, expected, MirParamMode::Owned)],
+        expected,
+        None,
+        Vec::new(),
+        None,
+        None,
+    );
+    let entry = function(
+        0,
+        ENTRY,
+        vec![param(0, actual, MirParamMode::Owned)],
+        actual,
+        Some(MirCallee::Function(MirFunctionId(1))),
+        vec![MirOperand::Place(MirPlace::local(MirLocalId(0)))],
+        Some(MirPlace::local(MirLocalId(0))),
+        Some(MirKernelShaderStage::Compute),
+    );
+
+    let errors = check_fns(&[entry, helper], &types);
+    assert!(errors.is_empty(), "equal tensor shapes should instantiate: {errors:?}");
+}
+
+#[test]
 fn argument_type_mismatch_emits_type() {
     let mut types = TypeTable::new();
     let f32 = f32_ty(&mut types);
