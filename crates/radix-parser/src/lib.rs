@@ -45,7 +45,7 @@ use radix_lexer::{
     keyword_allowed_as_ident, keyword_spelling_for_token, lookup_keyword_spec, Interner,
     KeywordOwner, KeywordScope, KeywordSurfaceMode, LexResult, Span, Symbol, Token, TokenKind,
 };
-use radix_syntax::{CommentLine, Ident, Newline, NodeId, Program, Trivia};
+use radix_syntax::{ClosureModifier, CommentLine, Ident, Newline, NodeId, Program, Trivia};
 use std::collections::{HashMap, HashSet};
 
 /// Result of the parsing phase for one compilation unit.
@@ -511,25 +511,44 @@ impl Parser {
         )
     }
 
-    /// Check whether the current word is the `libera` capture-free closure
-    /// modifier, by locale-independent keyword identity (tokenless keyword;
-    /// pack spellings resolve to the latin key).
-    fn check_libera_marker(&self) -> bool {
+    /// Return the closure modifier claimed at the current signature slot.
+    ///
+    /// Both spellings are resolved through the active reader surface before
+    /// their locale-independent Latin identity is matched. In particular,
+    /// `kernel` claims `nucleum` only when the English pack declares it; an
+    /// undeclared Latin spelling cannot bypass pack-authoritative parsing.
+    fn check_closure_modifier(&self) -> ClosureModifier {
         let TokenKind::Ident(sym) = self.peek().kind else {
-            return false;
+            return ClosureModifier::None;
         };
-        matches!(self.keyword_claim_key(sym), Some("libera"))
+        match self.keyword_claim_key(sym) {
+            Some("libera") => ClosureModifier::Libera,
+            Some("nucleum") => ClosureModifier::Nucleum,
+            _ => ClosureModifier::None,
+        }
     }
 
-    /// Consume the `libera` modifier when present in the closure signature
-    /// slot. Returns whether the marker was claimed.
-    fn eat_libera_marker(&mut self) -> bool {
-        if self.check_libera_marker() {
+    /// Consume one closure modifier from the signature slot.
+    fn eat_closure_modifier(&mut self) -> ClosureModifier {
+        let modifier = self.check_closure_modifier();
+        if modifier != ClosureModifier::None {
             self.advance();
-            true
-        } else {
-            false
         }
+        modifier
+    }
+
+    /// Reject a second closure modifier instead of allowing two independent
+    /// flags or falling through to a less-specific body diagnostic.
+    fn reject_duplicate_closure_modifier(&self) -> Result<(), ParseError> {
+        let duplicate = self.check_closure_modifier();
+        if duplicate == ClosureModifier::None {
+            return Ok(());
+        }
+        Err(
+            ParseError::structured(ParseErrorKind::ModifierDuplicate, self.current_span())
+                .with_arg("modifier", "closure")
+                .with_arg("duplicate", duplicate.spelling()),
+        )
     }
 
     /// Same as [`Self::check_keyword_ident`] but on the raw token stream —

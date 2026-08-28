@@ -5,6 +5,7 @@ use radix_hir::{
     HirParamMode, HirRangeKind, HirStatement, HirStatementKind,
 };
 use radix_lexer::{Span, Symbol};
+use radix_syntax::ClosureModifier;
 use radix_types::{DefId, Type, TypeTable, USER_DEF_ID_BASE};
 
 fn lit(id: u32, value: u64) -> HirExpression {
@@ -70,7 +71,7 @@ fn decode_accepts_def_sites_inside_parameter_default() {
             None,
             None,
             Box::new(lit(2, 0)),
-            false,
+            ClosureModifier::None,
         ),
         ty: None,
         span: Span::default(),
