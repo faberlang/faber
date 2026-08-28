@@ -895,6 +895,7 @@ fn pattern_positions_pin_between_only_and_no_trailing() {
     let mut writer = CodeWriter::new();
     codegen.write_match_arms(
         &[arm],
+        false,
         &TypeTable::new(),
         &names,
         &interner,

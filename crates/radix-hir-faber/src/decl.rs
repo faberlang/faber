@@ -47,7 +47,7 @@ impl super::FaberCodegen {
                 self.generate_struct(s, types, names, interner, surface, writer);
             }
             HirItemKind::Enum(e) => {
-                self.generate_enum(e, types, names, interner, surface, writer);
+                self.generate_enum(item.def_id, e, types, names, interner, surface, writer);
             }
             HirItemKind::Interface(i) => {
                 self.generate_interface(i, types, names, interner, surface, writer);
@@ -410,8 +410,10 @@ impl super::FaberCodegen {
         }
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub(super) fn generate_enum(
         &self,
+        def_id: DefId,
         e: &HirEnum,
         types: &TypeTable,
         names: &FxHashMap<DefId, Symbol>,
@@ -419,11 +421,19 @@ impl super::FaberCodegen {
         surface: &impl KeywordSurface,
         writer: &mut CodeWriter,
     ) {
+        // Authored `ordo` enumerations lower into the union-shaped HIR; the
+        // presentation facts mark which items re-sugar with the `ordo`
+        // vocabulary and their member discriminants.
+        let ordo_members = self.ordo_enums.get(&def_id);
         // Enum variants are normalized to the block form that remains valid
         // for both plain variants and variants carrying named fields.
         self.write_hir_annotations(&e.annotations, types, names, interner, surface, writer);
 
-        writer.write(surface.contextual_keyword("discretio"));
+        writer.write(if ordo_members.is_some() {
+            surface.keyword(TokenKind::Ordo)
+        } else {
+            surface.contextual_keyword("discretio")
+        });
         writer.write(" ");
         writer.write(&self.symbol_to_string(e.name, interner));
 
@@ -446,6 +456,20 @@ impl super::FaberCodegen {
             for (idx, variant) in e.variants.iter().enumerate() {
                 self.write_member_trivia(variant.def_id, false, interner, writer);
                 writer.write(&self.symbol_to_string(variant.name, interner));
+                if let Some(value) = ordo_members
+                    .and_then(|members| members.iter().find(|m| m.def_id == variant.def_id))
+                    .and_then(|member| member.value.as_ref())
+                {
+                    writer.write(" = ");
+                    match value {
+                        radix_hir::HirOrdoValue::Integer(int) => {
+                            writer.write(&int.to_string());
+                        }
+                        radix_hir::HirOrdoValue::String(text) => {
+                            self.write_textus_literal(*text, interner, writer);
+                        }
+                    }
+                }
                 if !variant.fields.is_empty() {
                     writer.writeln(" {");
                     writer.indented(|writer| {

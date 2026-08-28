@@ -47,9 +47,27 @@ pub struct FaberCodegen {
     /// call shape, and must re-emit with the `finge` keyword (a bare
     /// `<variant>()` call is not re-parseable source).
     pub(crate) variant_def_ids: FxHashSet<DefId>,
+    /// Local variant def ids whose bare name is ambiguous (the same variant
+    /// name in two local unions), mapped to the union-qualified
+    /// `Union.VARIANT` spelling. Bare re-emit of these fails re-check with
+    /// SEM001/SEM008; the two-part local form re-parses.
+    pub(crate) qualified_local_variants: FxHashMap<DefId, String>,
+    /// Imported variant def ids that need the three-part `ns.Union.VARIANT`
+    /// pattern spelling; all other imported variants keep the authored
+    /// two-part `ns.VARIANT` form.
+    pub(crate) imported_variant_union_path_ids: FxHashSet<DefId>,
     /// Ids of `Si` expressions lowered from `requirit`/`reice` guards; only
     /// these re-sugar to the guard statement form on emission.
     pub(crate) guard_si_ids: FxHashSet<radix_hir::HirId>,
+    /// Ids of `Discerne` expressions lowered from `elige` statements; only
+    /// these re-emit with the `elige` vocabulary and a `ceterum` default arm.
+    pub(crate) elige_expr_ids: FxHashSet<radix_hir::HirId>,
+    /// Initializer-expression ids of authored discard bindings (`fixum T _ ← e`)
+    /// with their declaration facts, for re-emitting the binding.
+    pub(crate) discard_bindings: FxHashMap<radix_hir::HirId, radix_hir::HirDiscardBinding>,
+    /// Authored `ordo` enumerations by enum def id: emission re-sugars these
+    /// with the `ordo` vocabulary and member discriminants.
+    pub(crate) ordo_enums: FxHashMap<DefId, Vec<radix_hir::HirOrdoMember>>,
 }
 
 /// Emit canonical Faber source from analyzed HIR and its presentation.
@@ -110,6 +128,9 @@ pub fn empty_presentation() -> HirPresentation {
         // facts; the canonical default keeps the explicit `incipit` wrapper.
         entry_explicit: true,
         guard_si_ids: Vec::new(),
+        elige_expr_ids: Vec::new(),
+        discard_binding_stmts: Vec::new(),
+        ordo_enums: Vec::new(),
     }
 }
 
@@ -136,6 +157,17 @@ impl FaberCodegen {
         reject_unsupported_legacy_hir(hir)?;
         self.trivia = TriviaIndex::from_presentation(presentation);
         self.guard_si_ids = presentation.guard_si_ids.iter().copied().collect();
+        self.elige_expr_ids = presentation.elige_expr_ids.iter().copied().collect();
+        self.discard_bindings = presentation
+            .discard_binding_stmts
+            .iter()
+            .map(|binding| (binding.expr_id, binding.clone()))
+            .collect();
+        self.ordo_enums = presentation
+            .ordo_enums
+            .iter()
+            .map(|ordo| (ordo.def_id, ordo.members.clone()))
+            .collect();
 
         let mut writer = CodeWriter::new();
         let names = self.collect_names(hir);
@@ -157,6 +189,15 @@ impl FaberCodegen {
             .flatten()
             .map(|variant| variant.def_id)
             .collect();
+        // Imported union variants ride the pattern-spelling contract (its keys
+        // are exactly the imported variant def ids). Without them a guard
+        // `iace` payload targeting an imported variant re-emits as a bare
+        // positional call — not re-parseable, not check-green source.
+        self.variant_def_ids
+            .extend(self.imported_pattern_spellings.keys().copied());
+        self.qualified_local_variants = self.ambiguous_local_variant_spellings(hir, interner);
+        self.imported_variant_union_path_ids =
+            self.imported_variants_needing_union_path(hir, interner);
 
         let mut rendered_any_item = false;
         for (idx, item) in hir.items.iter().enumerate() {

@@ -133,6 +133,11 @@ impl super::FaberCodegen {
                     // come from `ego` (self): a bare type name is not a value.
                     // Print the localized self keyword instead of the type name.
                     writer.write(surface.keyword(TokenKind::Ego));
+                } else if let Some(spelling) = self.imported_pattern_spellings.get(def_id) {
+                    // An imported variant in value position is the three-part
+                    // path (`dequant.GgmlKind.F32`); the two-part def spelling
+                    // can collide with another namespace export (SEM010).
+                    writer.write(spelling);
                 } else {
                     writer.write(&self.name_for_def_imported(*def_id, names, interner));
                 }
@@ -335,7 +340,16 @@ impl super::FaberCodegen {
                 arms,
                 exhaustive,
             } => {
-                writer.write(surface.contextual_keyword("discerne"));
+                // Authored `elige` (en `switch`) lowers to this shape; the
+                // presentation id set marks which `Discerne` nodes came from
+                // one so authored vocabulary re-emits instead of `discerne`.
+                let authored_elige =
+                    !*exhaustive && scrutinees.len() == 1 && self.elige_expr_ids.contains(&expr.id);
+                writer.write(if authored_elige {
+                    surface.contextual_keyword("elige")
+                } else {
+                    surface.contextual_keyword("discerne")
+                });
                 if *exhaustive {
                     writer.write(" ");
                     writer.write(surface.contextual_keyword("omnia"));
@@ -349,7 +363,15 @@ impl super::FaberCodegen {
                 }
                 writer.writeln(" {");
                 writer.indented(|writer| {
-                    self.write_match_arms(arms, types, names, interner, surface, writer);
+                    self.write_match_arms(
+                        arms,
+                        authored_elige,
+                        types,
+                        names,
+                        interner,
+                        surface,
+                        writer,
+                    );
                 });
                 writer.write("}");
             }
@@ -1399,9 +1421,27 @@ impl super::FaberCodegen {
         surface: &impl KeywordSurface,
         writer: &mut CodeWriter,
     ) {
+        // An imported fieldless variant is authored as the three-part value
+        // path (`dequant.GgmlKind.F32`), not a `finge`: the two-part call
+        // spelling is not the value form and can collide with another export.
+        if fields.is_empty() {
+            if let Some(spelling) = self.imported_pattern_spellings.get(&variant_def) {
+                writer.write(spelling);
+                return;
+            }
+        }
         writer.write(surface.keyword(TokenKind::Finge));
         writer.write(" ");
-        writer.write(&self.name_for_def_imported(variant_def, names, interner));
+        // Bare local names that two local unions share (or that collide with
+        // an imported variant) re-parse ambiguously; use the union-qualified
+        // two-part spelling exactly where the source needed it.
+        writer.write(
+            &self
+                .qualified_local_variants
+                .get(&variant_def)
+                .cloned()
+                .unwrap_or_else(|| self.name_for_def_imported(variant_def, names, interner)),
+        );
         if !fields.is_empty() {
             writer.write(" { ");
             for (idx, field) in fields.iter().enumerate() {

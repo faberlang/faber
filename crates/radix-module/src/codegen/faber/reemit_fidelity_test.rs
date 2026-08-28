@@ -252,3 +252,127 @@ fn require_comparison_direction_is_preserved() {
         "authored comparison direction must survive:\n{code}"
     );
 }
+
+#[test]
+fn ambiguous_local_variant_guard_qualifies_with_union() {
+    // Two local unions sharing a variant name: the bare guard payload would
+    // re-parse ambiguously (SEM001/SEM008 on gradus qwen35moe.fab), so the
+    // union-qualified two-part spelling re-emits exactly where authored.
+    let code = assert_idempotent(
+        "discretio Err {\n    Malum {\n        textus nuntius\n    }\n}\n\ndiscretio AliudErr {\n    Malum {\n        textus nuntius\n    }\n}\n\nfunctio probe(numerus x) → numerus ⇥ Err {\n    requirit x ≥ 1 iace finge Err.Malum { nuntius = \"parvum\" }\n    redde x\n}\n",
+    );
+    assert!(
+        code.contains("iace finge Err.Malum { nuntius = \"parvum\" }"),
+        "ambiguous variant must keep the union-qualified spelling:\n{code}"
+    );
+}
+
+#[test]
+fn authored_elige_vocabulary_round_trips() {
+    // la fixture: authored `elige … casu … ceterum` keeps its vocabulary;
+    // a bare wildcard arm never replaces the authored default.
+    let la = assert_idempotent(
+        "discretio Modus {\n    Parvum,\n    Magnum\n}\n\nfunctio nomen(Modus m) → textus {\n    elige m {\n        casu Parvum {\n            redde \"parvum\"\n        }\n        ceterum {\n            redde \"magnum\"\n        }\n    }\n}\n",
+    );
+    assert!(la.contains("elige m {"), "la elige head must survive:\n{la}");
+    assert!(la.contains("ceterum {"), "la ceterum default must survive:\n{la}");
+    assert!(!la.contains("casu _"), "wildcard arm must not replace ceterum:\n{la}");
+
+    // en fixture: `switch`/`default` surface spellings project through the
+    // en pack and round-trip as authored.
+    let mut pack_path = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    pack_path.push("../../stdlib/locale/en/pack.toml");
+    let pack = crate::locale::LocalePack::from_toml_path(&pack_path).expect("installed en pack loads");
+    let session = Session::new(Config::default().with_locale_pack(pack));
+    let result = compile_canonical(
+        &session,
+        "switch-en.fab",
+        "union Mode {\n    Small,\n    Big\n}\n\nfn name(Mode m) → string {\n    switch m {\n        case Small {\n            return \"small\"\n        }\n        default {\n            return \"big\"\n        }\n    }\n}\n",
+    );
+    assert!(
+        result.success(),
+        "{:?}",
+        result
+            .diagnostics
+            .iter()
+            .map(|diag| (diag.code, diag.issue()))
+            .collect::<Vec<_>>()
+    );
+    let code = result.output.expect("emit").code;
+    assert!(code.contains("switch m {"), "en switch head must survive:\n{code}");
+    assert!(code.contains("default {"), "en default arm must survive:\n{code}");
+    assert!(!code.contains("match m {"), "switch must not canonicalize to match:\n{code}");
+    assert!(!code.contains("case _"), "default must not become case _:\n{code}");
+}
+
+#[test]
+fn authored_discerne_wildcard_arm_stays_casu() {
+    // The mirror contract: an authored `discerne` with a wildcard arm keeps
+    // `casu _`; only authored `elige` re-sugars a trailing wildcard to the
+    // default spelling.
+    let code = assert_idempotent(
+        "discretio Modus {\n    Parvum,\n    Magnum\n}\n\nfunctio nomen(Modus m) → textus {\n    discerne m {\n        casu Parvum {\n            redde \"parvum\"\n        }\n        casu _ {\n            redde \"magnum\"\n        }\n    }\n}\n",
+    );
+    assert!(code.contains("casu _ {"), "authored wildcard arm must stay casu _:\n{code}");
+    assert!(!code.contains("ceterum"), "discernere must not gain a default:\n{code}");
+}
+
+#[test]
+fn discard_binding_round_trips() {
+    // la fixture: `fixum T _ ← expr` is a discard binding, not a bare effect
+    // call; the arrow count must survive (gradus generation.fab elision).
+    let la = assert_idempotent("functio vacua() → numerus {\n    fixum numerus _ ← 6 * 7\n    redde 1\n}\n");
+    assert!(la.contains("fixum numerus _ ← 6 * 7"), "la discard binding must survive:\n{la}");
+
+    // en fixture: `const T _ ← expr` keeps the authored declaration form.
+    let mut pack_path = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    pack_path.push("../../stdlib/locale/en/pack.toml");
+    let pack = crate::locale::LocalePack::from_toml_path(&pack_path).expect("installed en pack loads");
+    let session = Session::new(Config::default().with_locale_pack(pack));
+    let result = compile_canonical(
+        &session,
+        "discard-en.fab",
+        "fn probe() → int {\n    const int _ ← 6 * 7\n    return 1\n}\n",
+    );
+    assert!(
+        result.success(),
+        "{:?}",
+        result
+            .diagnostics
+            .iter()
+            .map(|diag| (diag.code, diag.issue()))
+            .collect::<Vec<_>>()
+    );
+    let code = result.output.expect("emit").code;
+    assert!(code.contains("const int _ ← 6 * 7"), "en discard binding must survive:\n{code}");
+}
+
+#[test]
+fn ordo_enum_round_trips_discriminants() {
+    // la note: the la-surface `ordo` declaration does not register in this
+    // build (pre-existing SEM001 on the declaration alone), so the fixture is
+    // en-only — the surface keyword and discriminant emission are shared.
+    // en fixture: `enum` surface spelling with discriminants round-trips.
+    let mut pack_path = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    pack_path.push("../../stdlib/locale/en/pack.toml");
+    let pack = crate::locale::LocalePack::from_toml_path(&pack_path).expect("installed en pack loads");
+    let session = Session::new(Config::default().with_locale_pack(pack));
+    let result = compile_canonical(
+        &session,
+        "ordo-en.fab",
+        "enum Level {\n    One = 1,\n    Two = 2\n}\n\nmain {\n    const Level level ← One\n    print level\n}\n",
+    );
+    assert!(
+        result.success(),
+        "{:?}",
+        result
+            .diagnostics
+            .iter()
+            .map(|diag| (diag.code, diag.issue()))
+            .collect::<Vec<_>>()
+    );
+    let code = result.output.expect("emit").code;
+    assert!(code.contains("enum Level {"), "en enum head must survive:\n{code}");
+    assert!(code.contains("One = 1,"), "en discriminant must survive:\n{code}");
+    assert!(!code.contains("union Level"), "enum must not become union:\n{code}");
+}

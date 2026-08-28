@@ -30,24 +30,38 @@ impl super::FaberCodegen {
     /// function preserves that distinction only as far as the grammar requires:
     /// every arm is braced, and non-block bodies are emitted as one expression
     /// statement inside the arm.
+    #[allow(clippy::too_many_arguments)]
     pub(super) fn write_match_arms(
         &self,
         arms: &[HirCasuArm],
+        authored_elige: bool,
         types: &TypeTable,
         names: &FxHashMap<DefId, Symbol>,
         interner: &Interner,
         surface: &impl KeywordSurface,
         writer: &mut CodeWriter,
     ) {
-        for arm in arms {
-            writer.write(surface.contextual_keyword("casu"));
-            writer.write(" ");
-            self.write_pattern_list(&arm.patterns, types, names, interner, surface, writer);
-            if let Some(guard) = &arm.guard {
+        for (idx, arm) in arms.iter().enumerate() {
+            // An authored `elige` default (`ceterum`) lowers to a trailing
+            // bare wildcard arm; re-emit the authored default spelling
+            // instead of `casu _`.
+            let elige_default = authored_elige
+                && idx + 1 == arms.len()
+                && arm.guard.is_none()
+                && arm.patterns.len() == 1
+                && matches!(arm.patterns[0], HirPattern::Wildcard);
+            if elige_default {
+                writer.write(surface.contextual_keyword("ceterum"));
+            } else {
+                writer.write(surface.contextual_keyword("casu"));
                 writer.write(" ");
-                writer.write(surface.contextual_keyword("si"));
-                writer.write(" ");
-                self.write_expr(guard, types, names, interner, surface, writer);
+                self.write_pattern_list(&arm.patterns, types, names, interner, surface, writer);
+                if let Some(guard) = &arm.guard {
+                    writer.write(" ");
+                    writer.write(surface.contextual_keyword("si"));
+                    writer.write(" ");
+                    self.write_expr(guard, types, names, interner, surface, writer);
+                }
             }
             writer.writeln(" {");
             writer.indented(|writer| {
@@ -89,13 +103,26 @@ impl super::FaberCodegen {
                 writer.write(&self.symbol_to_string(name, interner));
             }
             HirPattern::Variant(def_id, patterns) => {
-                // Pattern position takes the union-qualified spelling when
-                // known: the two-part form is ambiguous when two imported
-                // unions share a variant name (SEM001 on re-check).
+                // Pattern position takes a union-qualified spelling only when
+                // the shorter form cannot re-resolve: two local unions (or a
+                // local and imported union) sharing a variant name (SEM001 on
+                // re-check), or one variant name under two imported
+                // namespaces. Authored spellings otherwise survive verbatim.
                 let spelling = self
-                    .imported_pattern_spellings
+                    .qualified_local_variants
                     .get(def_id)
                     .cloned()
+                    .or_else(|| {
+                        self.imported_variant_union_path_ids
+                            .contains(def_id)
+                            .then(|| {
+                                self.imported_pattern_spellings
+                                    .get(def_id)
+                                    .cloned()
+                                    .unwrap_or_default()
+                            })
+                            .filter(|spelling| !spelling.is_empty())
+                    })
                     .unwrap_or_else(|| self.name_for_def_imported(*def_id, names, interner));
                 writer.write(&spelling);
                 if !patterns.is_empty() {
