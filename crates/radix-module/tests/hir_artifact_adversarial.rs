@@ -17,7 +17,7 @@
 
 use radix_hir::{HirFunction, HirId, HirItem, HirItemKind, HirModule, LibraryRegistry};
 use radix_hir_fhir::HirArtifactError;
-use radix_hir_fhir::{FunctionFactTableWire, ResolverSnapshot, SourceIdentity, SCHEMA_VERSION};
+use radix_hir_fhir::{FunctionFactTableWire, FunctionProvenanceTableWire, ResolverSnapshot, SourceIdentity, SCHEMA_VERSION};
 use radix_lexer::Symbol;
 use radix_module::hir::artifact::load_fhir;
 use radix_types::{DefId, TypeId, TypeTable};
@@ -92,6 +92,7 @@ fn minimal_test_artifact() -> radix_hir_fhir::HirArtifact {
         resolved_uses: Vec::new(),
         analysis_stamp: 1,
         gpu_builtins: Vec::new(),
+        capability_provenance: FunctionProvenanceTableWire::default(),
     }
 }
 
