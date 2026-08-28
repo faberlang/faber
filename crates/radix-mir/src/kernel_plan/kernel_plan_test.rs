@@ -907,7 +907,9 @@ fn validate_admits_matmul_one_row_workgroup_only_for_t1() {
     plan.m = 1;
     plan.workgroup_y = 1;
     assert!(
-        CollectionKernelPlan::TiledMatMul(plan.clone()).validate().is_ok(),
+        CollectionKernelPlan::TiledMatMul(plan.clone())
+            .validate()
+            .is_ok(),
         "an M=1 plan admits the one-row workgroup (tile, 1)"
     );
     let mut multi_row = matmul_plan();
