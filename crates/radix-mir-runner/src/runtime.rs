@@ -296,12 +296,12 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
         let yields = self.generator_yields.pop().unwrap_or_default();
         if let Some(error) = self.errors.pop() {
             while self.frames.len() > depth {
-                self.frames.pop();
+                self.pop_frame();
             }
             return Err(error);
         }
         while self.frames.len() > depth {
-            self.frames.pop();
+            self.pop_frame();
         }
         self.return_value = None;
         self.return_error = None;
