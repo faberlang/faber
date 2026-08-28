@@ -3,6 +3,7 @@
 use super::{
     DuplicateFunctionFinder, FunctionScope, FunctionShape, GenericTypeBindings, Validator,
 };
+use crate::generic::MirShapeBindings;
 use crate::visit::terminator_successors;
 use crate::{
     MirBlock, MirBlockId, MirCallee, MirFunction, MirFunctionId, MirStatement, MirStatementKind,
@@ -117,19 +118,22 @@ impl Validator<'_, '_> {
                     }
                 }
                 let mut generic_bindings = GenericTypeBindings::default();
+                let mut shape_bindings = MirShapeBindings::default();
                 self.validate_call_args(
                     scope,
                     sig.as_ref(),
                     args,
                     stmt.span,
                     &mut generic_bindings,
+                    &mut shape_bindings,
                 );
-                self.validate_optional_destination(
+                self.validate_optional_destination_with_shapes(
                     scope,
                     destination.as_ref(),
                     sig.as_ref().map(|sig| sig.return_ty),
                     stmt.span,
                     &mut generic_bindings,
+                    &mut shape_bindings,
                 );
             }
             MirStatementKind::RuntimeCall { destination, call } => {
@@ -211,19 +215,22 @@ impl Validator<'_, '_> {
             } => {
                 let sig = self.validate_callee(scope, callee, terminator.span);
                 let mut generic_bindings = GenericTypeBindings::default();
+                let mut shape_bindings = MirShapeBindings::default();
                 self.validate_call_args(
                     scope,
                     sig.as_ref(),
                     args,
                     terminator.span,
                     &mut generic_bindings,
+                    &mut shape_bindings,
                 );
-                self.validate_optional_destination(
+                self.validate_optional_destination_with_shapes(
                     scope,
                     destination.as_ref(),
                     sig.as_ref().map(|sig| sig.return_ty),
                     terminator.span,
                     &mut generic_bindings,
+                    &mut shape_bindings,
                 );
                 let error_place_ty = self.validate_place(scope, error_place, terminator.span);
                 // The failable contract is enforced whenever the callee
@@ -250,12 +257,14 @@ impl Validator<'_, '_> {
                             error_ty,
                             place_ty,
                             &mut generic_bindings,
+                            &mut shape_bindings,
                             terminator.span,
                             "try_call error place type mismatch",
                         );
                         if let Some(error_ty) = self.instantiate_generic_type(
                             error_ty,
                             &generic_bindings,
+                            &shape_bindings,
                             terminator.span,
                         ) {
                             self.require_assignable(

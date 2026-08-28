@@ -4,6 +4,7 @@ use super::{
     signature_from_func_sig, signature_from_function, FunctionScope, GenericTypeBindings,
     MirFunctionSignature, Validator,
 };
+use crate::generic::MirShapeBindings;
 use crate::{
     MirBinOp, MirCallee, MirClosureCallee, MirConstant, MirOperand, MirOptionChainLink,
     MirOptionOp, MirPlace, MirPlaceBase, MirProjection, MirType, MirUnOp, MirValue, MirValueKind,
@@ -294,7 +295,15 @@ impl Validator<'_, '_> {
             MirOptionChainLink::Call { callee, args } => {
                 let sig = self.validate_callee(scope, callee, span);
                 let mut generic_bindings = GenericTypeBindings::default();
-                self.validate_call_args(scope, sig.as_ref(), args, span, &mut generic_bindings);
+                let mut shape_bindings = MirShapeBindings::default();
+                self.validate_call_args(
+                    scope,
+                    sig.as_ref(),
+                    args,
+                    span,
+                    &mut generic_bindings,
+                    &mut shape_bindings,
+                );
             }
         }
     }
@@ -398,6 +407,7 @@ impl Validator<'_, '_> {
         args: &[MirOperand],
         span: Span,
         generic_bindings: &mut GenericTypeBindings,
+        shape_bindings: &mut MirShapeBindings,
     ) {
         let Some(sig) = sig else {
             for arg in args {
@@ -432,12 +442,16 @@ impl Validator<'_, '_> {
                     expected.ty,
                     arg_ty,
                     generic_bindings,
+                    shape_bindings,
                     span,
                     call_argument_mismatch(self.context.types, index, expected.ty, arg_ty),
                 );
-                if let Some(expected_ty) =
-                    self.instantiate_generic_type(expected.ty, generic_bindings, span)
-                {
+                if let Some(expected_ty) = self.instantiate_generic_type(
+                    expected.ty,
+                    generic_bindings,
+                    shape_bindings,
+                    span,
+                ) {
                     self.require_assignable(
                         arg_ty,
                         expected_ty,
@@ -454,11 +468,17 @@ impl Validator<'_, '_> {
         expected: MirType,
         actual: MirType,
         generic_bindings: &mut GenericTypeBindings,
+        shape_bindings: &mut MirShapeBindings,
         span: Span,
         message: impl Into<String>,
     ) {
-        if crate::bind_generic_type_witness(self.context.types, expected, actual, generic_bindings)
-        {
+        if crate::generic::bind_generic_type_witness_with_shapes(
+            self.context.types,
+            expected,
+            actual,
+            generic_bindings,
+            shape_bindings,
+        ) {
             return;
         }
         self.error(span, message);
@@ -468,12 +488,14 @@ impl Validator<'_, '_> {
         &mut self,
         ty: MirType,
         generic_bindings: &GenericTypeBindings,
+        shape_bindings: &MirShapeBindings,
         span: Span,
     ) -> Option<MirType> {
-        match crate::instantiate_existing_generic_type(
+        match crate::generic::instantiate_existing_generic_type_with_shapes(
             self.context.types,
             ty,
             generic_bindings,
+            shape_bindings,
             span,
         ) {
             Ok(ty) => Some(ty),

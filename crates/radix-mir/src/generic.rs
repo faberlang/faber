@@ -13,7 +13,7 @@ use crate::{
 };
 use radix_lexer::{Span, Symbol};
 use radix_types::{
-    FuncSig, IndexExpr, IndexId, ParamType, Type, TypeId, TypeTable, i64s_from_literal_index,
+    i64s_from_literal_index, FuncSig, IndexExpr, IndexId, ParamType, Type, TypeId, TypeTable,
 };
 use rustc_hash::{FxHashMap, FxHashSet, FxHasher};
 use std::hash::{Hash, Hasher};
@@ -566,9 +566,40 @@ pub fn instantiate_existing_generic_type(
     generic_bindings: &MirGenericBindings,
     span: Span,
 ) -> Result<MirType, MirGenericError> {
+    instantiate_existing_generic_type_with_shapes(
+        types,
+        ty,
+        generic_bindings,
+        &MirShapeBindings::default(),
+        span,
+    )
+}
+
+/// Instantiate a generic type with read-only shape-param substitution.
+///
+/// Unlike [`instantiate_generic_type_with_shapes`], this validation helper
+/// never interns a type or index. It only returns an already-existing semantic
+/// type, which keeps validation a read-only walk over the caller's table.
+///
+/// # Errors
+/// Returns [`MirGenericError`] when the substituted type is not already
+/// represented in `types`.
+pub fn instantiate_existing_generic_type_with_shapes(
+    types: &TypeTable,
+    ty: MirType,
+    generic_bindings: &MirGenericBindings,
+    shape_bindings: &MirShapeBindings,
+    span: Span,
+) -> Result<MirType, MirGenericError> {
     let index = ExistingTypeIndex::build(types);
-    let instantiated =
-        instantiate_existing_type_id(types, ty.semantic_id(), generic_bindings, span, &index)?;
+    let instantiated = instantiate_existing_type_id_with_shapes(
+        types,
+        ty.semantic_id(),
+        generic_bindings,
+        shape_bindings,
+        span,
+        &index,
+    )?;
     Ok(MirType::semantic(instantiated))
 }
 
@@ -654,10 +685,11 @@ fn type_fingerprint(ty: &Type) -> u64 {
     hasher.finish()
 }
 
-fn instantiate_existing_type_id(
+fn instantiate_existing_type_id_with_shapes(
     types: &TypeTable,
     ty: TypeId,
     generic_bindings: &MirGenericBindings,
+    shape_bindings: &MirShapeBindings,
     span: Span,
     index: &ExistingTypeIndex,
 ) -> Result<TypeId, MirGenericError> {
@@ -672,21 +704,43 @@ fn instantiate_existing_type_id(
             types,
             inner,
             generic_bindings,
+            shape_bindings,
             span,
             index,
             Type::Array,
         ),
         Type::Map(key, value) => {
-            let key = instantiate_existing_type_id(types, key, generic_bindings, span, index)?;
-            let value = instantiate_existing_type_id(types, value, generic_bindings, span, index)?;
+            let key = instantiate_existing_type_id_with_shapes(
+                types,
+                key,
+                generic_bindings,
+                shape_bindings,
+                span,
+                index,
+            )?;
+            let value = instantiate_existing_type_id_with_shapes(
+                types,
+                value,
+                generic_bindings,
+                shape_bindings,
+                span,
+                index,
+            )?;
             find_existing_type(types, &Type::Map(key, value), span, index)
         }
         Type::Record(fields) => {
             let fields = fields
                 .iter()
                 .map(|(name, field_ty)| {
-                    instantiate_existing_type_id(types, *field_ty, generic_bindings, span, index)
-                        .map(|field_ty| (*name, field_ty))
+                    instantiate_existing_type_id_with_shapes(
+                        types,
+                        *field_ty,
+                        generic_bindings,
+                        shape_bindings,
+                        span,
+                        index,
+                    )
+                    .map(|field_ty| (*name, field_ty))
                 })
                 .collect::<Result<FxHashMap<_, _>, _>>()?;
             find_existing_type(types, &Type::Record(fields), span, index)
@@ -695,27 +749,53 @@ fn instantiate_existing_type_id(
             let elements = elements
                 .iter()
                 .map(|element| {
-                    instantiate_existing_type_id(types, *element, generic_bindings, span, index)
+                    instantiate_existing_type_id_with_shapes(
+                        types,
+                        *element,
+                        generic_bindings,
+                        shape_bindings,
+                        span,
+                        index,
+                    )
                 })
                 .collect::<Result<Vec<_>, _>>()?;
             find_existing_type(types, &Type::Tuple(elements), span, index)
         }
-        Type::Set(inner) => {
-            instantiate_existing_unary_type(types, inner, generic_bindings, span, index, Type::Set)
-        }
+        Type::Set(inner) => instantiate_existing_unary_type(
+            types,
+            inner,
+            generic_bindings,
+            shape_bindings,
+            span,
+            index,
+            Type::Set,
+        ),
         Type::Promissum(inner) => instantiate_existing_unary_type(
             types,
             inner,
             generic_bindings,
+            shape_bindings,
             span,
             index,
             Type::Promissum,
         ),
         Type::PromissumFailable(success, alternate) => {
-            let success =
-                instantiate_existing_type_id(types, success, generic_bindings, span, index)?;
-            let alternate =
-                instantiate_existing_type_id(types, alternate, generic_bindings, span, index)?;
+            let success = instantiate_existing_type_id_with_shapes(
+                types,
+                success,
+                generic_bindings,
+                shape_bindings,
+                span,
+                index,
+            )?;
+            let alternate = instantiate_existing_type_id_with_shapes(
+                types,
+                alternate,
+                generic_bindings,
+                shape_bindings,
+                span,
+                index,
+            )?;
             find_existing_type(
                 types,
                 &Type::PromissumFailable(success, alternate),
@@ -727,6 +807,7 @@ fn instantiate_existing_type_id(
             types,
             inner,
             generic_bindings,
+            shape_bindings,
             span,
             index,
             Type::Cursor,
@@ -735,6 +816,7 @@ fn instantiate_existing_type_id(
             types,
             inner,
             generic_bindings,
+            shape_bindings,
             span,
             index,
             Type::Queue,
@@ -743,20 +825,35 @@ fn instantiate_existing_type_id(
             types,
             inner,
             generic_bindings,
+            shape_bindings,
             span,
             index,
             Type::Stack,
         ),
         Type::AsyncCursor(item, alternate) => {
-            let item = instantiate_existing_type_id(types, item, generic_bindings, span, index)?;
-            let alternate =
-                instantiate_existing_type_id(types, alternate, generic_bindings, span, index)?;
+            let item = instantiate_existing_type_id_with_shapes(
+                types,
+                item,
+                generic_bindings,
+                shape_bindings,
+                span,
+                index,
+            )?;
+            let alternate = instantiate_existing_type_id_with_shapes(
+                types,
+                alternate,
+                generic_bindings,
+                shape_bindings,
+                span,
+                index,
+            )?;
             find_existing_type(types, &Type::AsyncCursor(item, alternate), span, index)
         }
         Type::Intervallum(inner) => instantiate_existing_unary_type(
             types,
             inner,
             generic_bindings,
+            shape_bindings,
             span,
             index,
             Type::Intervallum,
@@ -765,12 +862,20 @@ fn instantiate_existing_type_id(
             types,
             inner,
             generic_bindings,
+            shape_bindings,
             span,
             index,
             Type::Option,
         ),
         Type::Ref(mode, inner) => {
-            let inner = instantiate_existing_type_id(types, inner, generic_bindings, span, index)?;
+            let inner = instantiate_existing_type_id_with_shapes(
+                types,
+                inner,
+                generic_bindings,
+                shape_bindings,
+                span,
+                index,
+            )?;
             find_existing_type(types, &Type::Ref(mode, inner), span, index)
         }
         Type::Tensor(inner, shape) => instantiate_existing_indexed_type(
@@ -778,6 +883,7 @@ fn instantiate_existing_type_id(
             inner,
             shape,
             generic_bindings,
+            shape_bindings,
             span,
             index,
             Type::Tensor,
@@ -787,6 +893,7 @@ fn instantiate_existing_type_id(
             inner,
             width,
             generic_bindings,
+            shape_bindings,
             span,
             index,
             Type::Vector,
@@ -796,6 +903,7 @@ fn instantiate_existing_type_id(
             inner,
             shape,
             generic_bindings,
+            shape_bindings,
             span,
             index,
             Type::Matrix,
@@ -805,6 +913,7 @@ fn instantiate_existing_type_id(
             inner,
             shape,
             generic_bindings,
+            shape_bindings,
             span,
             index,
             Type::Sparsa,
@@ -814,6 +923,7 @@ fn instantiate_existing_type_id(
             element,
             capacity,
             generic_bindings,
+            shape_bindings,
             span,
             index,
             |element, capacity| Type::BoundedArray { element, capacity },
@@ -823,6 +933,7 @@ fn instantiate_existing_type_id(
             element,
             capacity,
             generic_bindings,
+            shape_bindings,
             span,
             index,
             |element, capacity| Type::BoundedQueue { element, capacity },
@@ -832,41 +943,68 @@ fn instantiate_existing_type_id(
             element,
             capacity,
             generic_bindings,
+            shape_bindings,
             span,
             index,
             |element, capacity| Type::BoundedStack { element, capacity },
         ),
         Type::BoundedTextus { capacity } => {
+            let capacity = substitute_existing_index_params(types, capacity, shape_bindings, span)?;
             find_existing_type(types, &Type::BoundedTextus { capacity }, span, index)
         }
         Type::BoundedAscii { capacity } => {
+            let capacity = substitute_existing_index_params(types, capacity, shape_bindings, span)?;
             find_existing_type(types, &Type::BoundedAscii { capacity }, span, index)
         }
         Type::BoundedOcteti { capacity } => {
+            let capacity = substitute_existing_index_params(types, capacity, shape_bindings, span)?;
             find_existing_type(types, &Type::BoundedOcteti { capacity }, span, index)
         }
         Type::Atomic(inner) => instantiate_existing_unary_type(
             types,
             inner,
             generic_bindings,
+            shape_bindings,
             span,
             index,
             Type::Atomic,
         ),
         Type::Alias(def_id, inner) => {
-            let inner = instantiate_existing_type_id(types, inner, generic_bindings, span, index)?;
+            let inner = instantiate_existing_type_id_with_shapes(
+                types,
+                inner,
+                generic_bindings,
+                shape_bindings,
+                span,
+                index,
+            )?;
             find_existing_type(types, &Type::Alias(def_id, inner), span, index)
         }
         Type::Applied(base, args) => {
-            let base = instantiate_existing_type_id(types, base, generic_bindings, span, index)?;
+            let base = instantiate_existing_type_id_with_shapes(
+                types,
+                base,
+                generic_bindings,
+                shape_bindings,
+                span,
+                index,
+            )?;
             let args = args
                 .iter()
                 .map(|arg| match arg {
-                    radix_types::AppliedArg::Type(id) => {
-                        instantiate_existing_type_id(types, *id, generic_bindings, span, index)
-                            .map(radix_types::AppliedArg::Type)
+                    radix_types::AppliedArg::Type(id) => instantiate_existing_type_id_with_shapes(
+                        types,
+                        *id,
+                        generic_bindings,
+                        shape_bindings,
+                        span,
+                        index,
+                    )
+                    .map(radix_types::AppliedArg::Type),
+                    radix_types::AppliedArg::Size(id) => {
+                        substitute_existing_index_params(types, *id, shape_bindings, span)
+                            .map(radix_types::AppliedArg::Size)
                     }
-                    radix_types::AppliedArg::Size(id) => Ok(radix_types::AppliedArg::Size(*id)),
                 })
                 .collect::<Result<Vec<_>, _>>()?;
             find_existing_type(types, &Type::Applied(base, args), span, index)
@@ -875,7 +1013,14 @@ fn instantiate_existing_type_id(
             let members = members
                 .iter()
                 .map(|member| {
-                    instantiate_existing_type_id(types, *member, generic_bindings, span, index)
+                    instantiate_existing_type_id_with_shapes(
+                        types,
+                        *member,
+                        generic_bindings,
+                        shape_bindings,
+                        span,
+                        index,
+                    )
                 })
                 .collect::<Result<Vec<_>, _>>()?;
             find_existing_type(types, &Type::Union(members), span, index)
@@ -884,7 +1029,14 @@ fn instantiate_existing_type_id(
             let members = members
                 .iter()
                 .map(|member| {
-                    instantiate_existing_type_id(types, *member, generic_bindings, span, index)
+                    instantiate_existing_type_id_with_shapes(
+                        types,
+                        *member,
+                        generic_bindings,
+                        shape_bindings,
+                        span,
+                        index,
+                    )
                 })
                 .collect::<Result<Vec<_>, _>>()?;
             find_existing_type(types, &Type::Intersection(members), span, index)
@@ -897,19 +1049,40 @@ fn instantiate_existing_type_id(
                     .params
                     .iter()
                     .map(|param| {
-                        instantiate_existing_type_id(types, param.ty, generic_bindings, span, index)
-                            .map(|ty| ParamType {
-                                ty,
-                                mode: param.mode,
-                                optional: param.optional,
-                            })
+                        instantiate_existing_type_id_with_shapes(
+                            types,
+                            param.ty,
+                            generic_bindings,
+                            shape_bindings,
+                            span,
+                            index,
+                        )
+                        .map(|ty| ParamType {
+                            ty,
+                            mode: param.mode,
+                            optional: param.optional,
+                        })
                     })
                     .collect::<Result<Vec<_>, _>>()?,
-                ret: instantiate_existing_type_id(types, sig.ret, generic_bindings, span, index)?,
+                ret: instantiate_existing_type_id_with_shapes(
+                    types,
+                    sig.ret,
+                    generic_bindings,
+                    shape_bindings,
+                    span,
+                    index,
+                )?,
                 err: sig
                     .err
                     .map(|err| {
-                        instantiate_existing_type_id(types, err, generic_bindings, span, index)
+                        instantiate_existing_type_id_with_shapes(
+                            types,
+                            err,
+                            generic_bindings,
+                            shape_bindings,
+                            span,
+                            index,
+                        )
                     })
                     .transpose()?,
                 is_async: sig.is_async,
@@ -935,11 +1108,19 @@ fn instantiate_existing_unary_type(
     types: &TypeTable,
     inner: TypeId,
     generic_bindings: &MirGenericBindings,
+    shape_bindings: &MirShapeBindings,
     span: Span,
     index: &ExistingTypeIndex,
     build: impl FnOnce(TypeId) -> Type,
 ) -> Result<TypeId, MirGenericError> {
-    let inner = instantiate_existing_type_id(types, inner, generic_bindings, span, index)?;
+    let inner = instantiate_existing_type_id_with_shapes(
+        types,
+        inner,
+        generic_bindings,
+        shape_bindings,
+        span,
+        index,
+    )?;
     find_existing_type(types, &build(inner), span, index)
 }
 
@@ -948,12 +1129,21 @@ fn instantiate_existing_indexed_type(
     inner: TypeId,
     index_id: IndexId,
     generic_bindings: &MirGenericBindings,
+    shape_bindings: &MirShapeBindings,
     span: Span,
     index: &ExistingTypeIndex,
     build: impl FnOnce(TypeId, IndexId) -> Type,
 ) -> Result<TypeId, MirGenericError> {
-    let inner = instantiate_existing_type_id(types, inner, generic_bindings, span, index)?;
-    find_existing_type(types, &build(inner, index_id), span, index)
+    let inner = instantiate_existing_type_id_with_shapes(
+        types,
+        inner,
+        generic_bindings,
+        shape_bindings,
+        span,
+        index,
+    )?;
+    let shape = substitute_existing_index_params(types, index_id, shape_bindings, span)?;
+    find_existing_type(types, &build(inner, shape), span, index)
 }
 
 fn find_existing_type(
@@ -973,6 +1163,65 @@ fn find_existing_type(
 // ---------------------------------------------------------------------------
 // Shape-param substitution (4A)
 // ---------------------------------------------------------------------------
+
+/// Replace bound shape params in one index term without interning.
+///
+/// A changed tuple must already exist in the caller's type table. In
+/// validation that is guaranteed by the concrete operand or destination type;
+/// refusing to synthesize a new index keeps this helper read-only.
+fn substitute_existing_index_params(
+    types: &TypeTable,
+    index_id: IndexId,
+    shape_bindings: &MirShapeBindings,
+    span: Span,
+) -> Result<IndexId, MirGenericError> {
+    match types.get_index(index_id).clone() {
+        IndexExpr::Param(sym) => Ok(shape_bindings.get(&sym).copied().unwrap_or(index_id)),
+        IndexExpr::Tuple(dims) => {
+            let substituted = dims
+                .iter()
+                .map(|dim| substitute_existing_index_params(types, *dim, shape_bindings, span))
+                .collect::<Result<Vec<_>, _>>()?;
+            if substituted.iter().zip(dims.iter()).all(|(a, b)| a == b) {
+                return Ok(index_id);
+            }
+            find_existing_index(types, &IndexExpr::Tuple(substituted), span)
+        }
+        IndexExpr::Literal(_) | IndexExpr::Infer(_) | IndexExpr::Unspecified => Ok(index_id),
+    }
+}
+
+fn find_existing_index(
+    types: &TypeTable,
+    candidate: &IndexExpr,
+    span: Span,
+) -> Result<IndexId, MirGenericError> {
+    (0..types.index_count())
+        .map(index_id_at)
+        .find(|id| index_expr_matches(types, *id, candidate))
+        .ok_or_else(|| {
+            MirGenericError::new(
+                span,
+                "instantiated generic type is missing semantic metadata",
+            )
+        })
+}
+
+fn index_expr_matches(types: &TypeTable, id: IndexId, candidate: &IndexExpr) -> bool {
+    match (types.get_index(id), candidate) {
+        (IndexExpr::Literal(a), IndexExpr::Literal(b)) => a == b,
+        (IndexExpr::Param(a), IndexExpr::Param(b)) => a == b,
+        (IndexExpr::Tuple(a), IndexExpr::Tuple(b)) => {
+            a.len() == b.len()
+                && a.iter()
+                    .zip(b.iter())
+                    .all(|(a, b)| types.index_equals(*a, *b))
+        }
+        (IndexExpr::Infer(a), IndexExpr::Infer(b)) => a == b,
+        (IndexExpr::Unspecified, IndexExpr::Unspecified) => true,
+        _ => false,
+    }
+}
 
 /// Replace bound `IndexExpr::Param` nodes inside one index term.
 ///

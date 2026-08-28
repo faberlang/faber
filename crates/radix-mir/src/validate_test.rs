@@ -3460,17 +3460,120 @@ fn mlp_shape_mismatch_program(types: &mut TypeTable) -> MirProgram {
     }
 }
 
+fn mlp_shape_try_call_program(types: &mut TypeTable) -> MirProgram {
+    let mut program = mlp_shape_mismatch_program(types);
+    let statement = program.functions[0].blocks[0]
+        .statements
+        .pop()
+        .expect("shape fixture has a call statement");
+    let MirStatementKind::Call {
+        destination,
+        callee,
+        args,
+    } = statement.kind
+    else {
+        panic!("shape fixture statement is not a call");
+    };
+    let vacuum = MirType::semantic(types.primitive(Primitive::Vacuum));
+    program.functions[1].error_ty = Some(vacuum);
+    program.functions[0].locals.push(MirLocal {
+        id: MirLocalId(7),
+        ty: vacuum,
+        name: None,
+        mutable: false,
+        span: Span::default(),
+    });
+    program.functions[0].blocks[0].terminator.kind = MirTerminatorKind::TryCall {
+        destination,
+        callee,
+        args,
+        ok_block: MirBlockId(1),
+        error_place: MirPlace {
+            base: MirPlaceBase::Local(MirLocalId(7)),
+            projections: Vec::new(),
+        },
+        error_block: MirBlockId(2),
+    };
+    for id in [MirBlockId(1), MirBlockId(2)] {
+        program.functions[0].blocks.push(MirBlock {
+            id,
+            statements: Vec::new(),
+            terminator: MirTerminator {
+                kind: MirTerminatorKind::Return(None),
+                span: Span::default(),
+            },
+            span: Span::default(),
+        });
+    }
+    program
+}
+
 #[test]
-fn mlp_shape_mismatch_red_records_all_argument_and_destination_diagnostics() {
+fn mlp_shape_witness_binds_through_ordinary_call_args_and_destination() {
     let mut types = TypeTable::new();
-    let messages = validate(&mlp_shape_mismatch_program(&mut types), &types);
+    let program = mlp_shape_mismatch_program(&mut types);
+    let table_size = (types.type_count(), types.index_count());
+    let messages = validate(&program, &types);
+    assert!(
+        messages.is_empty(),
+        "expected shape witness binding, got: {messages:?}"
+    );
+    assert_eq!(
+        (types.type_count(), types.index_count()),
+        table_size,
+        "validation must not intern shape types or indices"
+    );
+}
+
+#[test]
+fn mlp_shape_witness_binds_through_try_call_args_and_destination() {
+    let mut types = TypeTable::new();
+    let messages = validate(&mlp_shape_try_call_program(&mut types), &types);
+    assert!(
+        messages.is_empty(),
+        "expected shape witness binding, got: {messages:?}"
+    );
+}
+
+#[test]
+fn mlp_shape_wrong_shape_call_preserves_argument_mismatch() {
+    let mut types = TypeTable::new();
+    let mut program = mlp_shape_mismatch_program(&mut types);
+    let element = types.sized_numeric(Primitive::Fractus, NumericWidth::F32);
+    let eight = types.intern_index(IndexExpr::Literal(8));
+    let wrong_shape = types.intern_index(IndexExpr::Tuple(vec![eight, eight]));
+    let wrong = MirType::semantic(types.tensor_with_shape(element, wrong_shape));
+    program.functions[1]
+        .params
+        .iter_mut()
+        .for_each(|param| param.ty = wrong);
+    program.functions[1].return_ty = wrong;
+
+    let messages = validate(&program, &types);
     let expected = (0..6)
         .map(|index| {
             format!(
-                "call argument type mismatch (arg {index}: expected tensor<fractus<f32>, [N, N]>, got tensor<fractus<f32>, [4, 4]>)"
+                "call argument type mismatch (arg {index}: expected tensor<fractus<f32>, [8, 8]>, got tensor<fractus<f32>, [4, 4]>)"
             )
         })
         .chain(std::iter::once("destination type mismatch".to_owned()))
         .collect::<Vec<_>>();
     assert_eq!(messages, expected);
+}
+
+#[test]
+fn mlp_shape_destination_mismatch_preserves_structured_issue() {
+    let mut types = TypeTable::new();
+    let mut program = mlp_shape_mismatch_program(&mut types);
+    let element = types.sized_numeric(Primitive::Fractus, NumericWidth::F32);
+    let eight = types.intern_index(IndexExpr::Literal(8));
+    let wrong_shape = types.intern_index(IndexExpr::Tuple(vec![eight, eight]));
+    program.functions[0].locals[6].ty =
+        MirType::semantic(types.tensor_with_shape(element, wrong_shape));
+
+    let messages = validate(&program, &types);
+    assert_eq!(
+        messages,
+        vec!["destination type mismatch", "destination type mismatch"]
+    );
 }
