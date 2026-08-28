@@ -284,7 +284,7 @@ pub fn causal_softmax_row_reduction_admission(rows: u64, cols: u64) -> Option<Ro
 }
 
 fn row_reduction_admission(rows: u64, width: u64) -> Option<RowReductionFacts> {
-    if rows == 0 || width < u64::from(ROW_REDUCTION_WORKGROUP_X) || width % 4 != 0 {
+    if rows == 0 || width < u64::from(ROW_REDUCTION_WORKGROUP_X) || !width.is_multiple_of(4) {
         return None;
     }
     Some(RowReductionFacts {
