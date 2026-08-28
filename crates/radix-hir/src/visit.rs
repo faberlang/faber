@@ -1237,6 +1237,7 @@ mod tests {
                 })),
                 span: Span::default(),
             }],
+            brace_authored: true,
             raw_args: Vec::new(),
             contract_id: None,
             span: Span::default(),
