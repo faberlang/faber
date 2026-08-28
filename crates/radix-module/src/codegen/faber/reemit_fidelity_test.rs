@@ -8,9 +8,13 @@
 use super::compile::{compile_canonical, compile_canonical_str};
 use crate::driver::{analyze_source, AnalyzeRequest, Config, ModuleImportContract, Session};
 use crate::file_interface::{FileExport, FileExportKind, FileInterface, InterfaceEnumVariant, InterfaceNominalExport};
+use crate::import_resolve::library_home_test_support;
+use crate::program::compile::prepare_program_module_for_name;
 use crate::semantic::passes::visibility_annotation::VisibilityTier;
 use crate::Target;
 use std::collections::BTreeMap;
+use std::fs;
+use std::path::{Path, PathBuf};
 
 fn emit_once(source: &str) -> String {
     let result = compile_canonical_str("fidelity.fab", source);
@@ -47,6 +51,23 @@ fn imported_token_interface() -> FileInterface {
         }),
     });
     interface
+}
+
+struct LibraryHomeGuard {
+    previous: Option<PathBuf>,
+}
+
+impl LibraryHomeGuard {
+    fn set(home: &Path) -> Self {
+        let previous = library_home_test_support::set_thread_library_home(Some(home.to_path_buf()));
+        Self { previous }
+    }
+}
+
+impl Drop for LibraryHomeGuard {
+    fn drop(&mut self) {
+        library_home_test_support::set_thread_library_home(self.previous.take());
+    }
 }
 
 fn emit_imported_variant_case(source: &str, locale: &str) -> String {
@@ -124,6 +145,122 @@ fn imported_alias_qualified_variant_path_round_trips_in_each_locale() {
     assert!(
         english_short_output.contains("case token.Palabra"),
         "English two-part alias path must not be widened:\n{english_short_output}"
+    );
+}
+
+#[test]
+fn canonical_revalidation_rejects_shortened_imported_variant_path() {
+    let td = crate::test_support::test_temp_dir("canonical-revalidation-variant-path");
+    let home = td.path().join("library-home");
+    let provider_dir = home.join("canonicalrevalidation");
+    let source_dir = provider_dir.join("src");
+    fs::create_dir_all(&source_dir).expect("create provider source directory");
+    fs::write(
+        provider_dir.join("faber.toml"),
+        r#"[package]
+name = "canonicalrevalidation"
+version = "0.1.0"
+edition = "2026"
+
+[library]
+provider = "canonicalrevalidation"
+
+[paths]
+source = "src"
+
+[build]
+kind = "lib"
+targets = ["fmir"]
+
+[locale]
+locale = "la"
+"#,
+    )
+    .expect("write provider manifest");
+    let provider_path = source_dir.join("token.fab");
+    let consumer_path = td.path().join("consumer.fab");
+    fs::write(&provider_path, "@ publica\ndiscretio TokenKind {\n    Palabra\n}\n")
+        .expect("write imported variant provider");
+    let source = "importa ex \"canonicalrevalidation:token\" token\n\nfunctio classify(token.TokenKind value) → textus {\n    elige value {\n        casu token.TokenKind.Palabra {\n            redde \"palabra\"\n        }\n        ceterum {\n            redde \"other\"\n        }\n    }\n}\n";
+    fs::write(&consumer_path, source).expect("write imported variant consumer");
+
+    let _library_home = LibraryHomeGuard::set(&home);
+    let latin = crate::locale::latin_locale_pack();
+    let session = Session::new(Config::default().with_locale_pack(latin.clone()));
+    let name = consumer_path.display().to_string();
+    let prepared = prepare_program_module_for_name(&name, source, &session).expect("prepare imported variant source");
+    let analysis = analyze_source(
+        &prepared.session,
+        &name,
+        source,
+        AnalyzeRequest { cli_program: None, contract: prepared.contract },
+    )
+    .expect("analyze imported variant source");
+    let result = compile_canonical(&session, &name, source);
+    assert!(
+        result.success(),
+        "faithful imported variant output must pass the gate: {:?}",
+        result.diagnostics
+    );
+    let output = result.output.expect("faithful output").code;
+    assert!(
+        output.contains("token.TokenKind.Palabra"),
+        "expected qualified output:\n{output}"
+    );
+
+    let shortened = output.replace("token.TokenKind.Palabra", "token.Palabra");
+    let diagnostic = super::compile::revalidate_emitted_output(&session, &name, &shortened, &analysis, &latin)
+        .expect_err("shortened imported variant path must fail re-validation");
+    assert_eq!(diagnostic.code, Some("CODEGEN006"));
+    assert_eq!(diagnostic.issue(), Some("variant_path_spelling_multiset_diverged"));
+    assert_eq!(
+        diagnostic
+            .args
+            .iter()
+            .find(|arg| arg.name == "expected_count")
+            .map(|arg| arg.value.as_str()),
+        Some("1")
+    );
+    assert_eq!(
+        diagnostic
+            .args
+            .iter()
+            .find(|arg| arg.name == "actual_count")
+            .map(|arg| arg.value.as_str()),
+        Some("1")
+    );
+}
+
+#[test]
+fn canonical_revalidation_rejects_analysis_errors() {
+    let latin = crate::locale::latin_locale_pack();
+    let session = Session::new(Config::default().with_locale_pack(latin.clone()));
+    let source = "functio noop() → vacuum { }\n";
+    let prepared = prepare_program_module_for_name("revalidation.fab", source, &session).expect("prepare valid source");
+    let analysis = analyze_source(
+        &prepared.session,
+        "revalidation.fab",
+        source,
+        AnalyzeRequest { cli_program: None, contract: prepared.contract },
+    )
+    .expect("analyze valid source");
+    let diagnostic = super::compile::revalidate_emitted_output(
+        &session,
+        "revalidation.fab",
+        "functio noop( → vacuum { }\n",
+        &analysis,
+        &latin,
+    )
+    .expect_err("invalid emitted source must fail re-validation");
+    assert_eq!(diagnostic.code, Some("CODEGEN006"));
+    assert_eq!(diagnostic.issue(), Some("variant_path_spelling_reanalysis_failed"));
+    assert_eq!(
+        diagnostic
+            .args
+            .iter()
+            .find(|arg| arg.name == "expected_count")
+            .map(|arg| arg.value.as_str()),
+        Some("0")
     );
 }
 

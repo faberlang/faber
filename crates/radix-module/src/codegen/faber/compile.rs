@@ -10,8 +10,8 @@
 //! produces Faber output. Does not own emit internals.
 
 use crate::codegen::CodegenError;
-use crate::driver::{analyze_source, AnalyzeRequest, Config, Session};
-use crate::locale::{latin_locale_pack, KeywordSurface};
+use crate::driver::{analyze_source, AnalyzeRequest, AnalyzedModule, Config, Session};
+use crate::locale::{latin_locale_pack, KeywordSurface, LocalePack};
 use crate::program::compile::prepare_program_module_for_name;
 use crate::{Diagnostic, FaberOutput};
 
@@ -109,7 +109,15 @@ pub fn compile_canonical(session: &Session, name: &str, source: &str) -> FormatC
         &imported_spellings.by_def_pattern,
     ) {
         Ok(output) => {
-            FormatCompileResult { output: Some(FaberOutput { code: output.code }), diagnostics: analysis.diagnostics }
+            let output = FaberOutput { code: output.code };
+            match revalidate_emitted_output(&session, name, &output.code, &analysis, &emit_pack) {
+                Ok(()) => FormatCompileResult { output: Some(output), diagnostics: analysis.diagnostics },
+                Err(diagnostic) => {
+                    let mut diagnostics = analysis.diagnostics;
+                    diagnostics.push(diagnostic);
+                    FormatCompileResult { output: None, diagnostics }
+                }
+            }
         }
         Err(err) => {
             analysis
@@ -118,6 +126,134 @@ pub fn compile_canonical(session: &Session, name: &str, source: &str) -> FormatC
             FormatCompileResult { output: None, diagnostics: analysis.diagnostics }
         }
     }
+}
+
+/// Re-analyze emitted Faber and compare the source facts that the emitter must
+/// preserve. The emitted body is prepared again so path-shaped names rebuild
+/// their import contract instead of reusing the input analysis.
+///
+/// The incoming reader pack is made explicit for this pass. The first analysis
+/// may have selected a source frontmatter pack, while the output is written in
+/// the caller-selected pack captured by `emit_pack`.
+///
+/// # Errors
+///
+/// Returns `CODEGEN006` when the emitted body cannot be analyzed or when its
+/// authored variant-path spelling multiset differs from the input analysis.
+pub(crate) fn revalidate_emitted_output(
+    session: &Session,
+    name: &str,
+    emitted: &str,
+    input: &AnalyzedModule,
+    emit_pack: &LocalePack,
+) -> Result<(), Diagnostic> {
+    let revalidation_session = Session::new(
+        session
+            .config
+            .clone()
+            .with_locale_pack(emit_pack.clone())
+            .with_locale_pack_explicit(),
+    );
+    let expected = variant_path_spelling_multiset(&input.presentation, &input.interner);
+    let prepared = prepare_program_module_for_name(name, emitted, &revalidation_session).map_err(|diagnostic| {
+        revalidation_failure(
+            name,
+            "variant_path_spelling_reanalysis_failed",
+            format!("preparing emitted output failed: {}", diagnostic.message),
+            expected.len(),
+            None,
+        )
+    })?;
+    let reanalysis = analyze_source(
+        &prepared.session,
+        name,
+        emitted,
+        AnalyzeRequest { cli_program: None, contract: prepared.contract },
+    );
+    let reanalysis = match reanalysis {
+        Ok(reanalysis) if reanalysis.diagnostics.iter().any(Diagnostic::is_error) => {
+            return Err(revalidation_failure(
+                name,
+                "variant_path_spelling_reanalysis_failed",
+                diagnostics_summary(&reanalysis.diagnostics),
+                expected.len(),
+                None,
+            ));
+        }
+        Ok(reanalysis) => reanalysis,
+        Err(diagnostics) => {
+            return Err(revalidation_failure(
+                name,
+                "variant_path_spelling_reanalysis_failed",
+                diagnostics_summary(&diagnostics),
+                expected.len(),
+                None,
+            ));
+        }
+    };
+    let actual = variant_path_spelling_multiset(&reanalysis.presentation, &reanalysis.interner);
+    if actual != expected {
+        return Err(revalidation_failure(
+            name,
+            "variant_path_spelling_multiset_diverged",
+            "emitted variant-path spellings differ from the input",
+            expected.len(),
+            Some(actual.len()),
+        ));
+    }
+    Ok(())
+}
+
+/// Return the authored variant paths as a sorted spelling multiset.
+///
+/// The `DefId` is deliberately omitted: each analysis allocates identities in
+/// its own namespace, while the authored spelling is the stable comparison
+/// fact for this gate. Sorting preserves duplicate references as a multiset.
+pub(crate) fn variant_path_spelling_multiset(
+    presentation: &crate::hir::HirPresentation,
+    interner: &crate::lexer::Interner,
+) -> Vec<String> {
+    let mut paths = presentation
+        .variant_paths
+        .iter()
+        .map(|variant| {
+            variant
+                .path
+                .iter()
+                .map(|segment| interner.resolve(*segment))
+                .collect::<Vec<_>>()
+                .join(".")
+        })
+        .collect::<Vec<_>>();
+    paths.sort_unstable();
+    paths
+}
+
+fn revalidation_failure(
+    name: &str,
+    issue: &str,
+    detail: impl Into<String>,
+    expected_count: usize,
+    actual_count: Option<usize>,
+) -> Diagnostic {
+    let mut diagnostic = Diagnostic::error(format!("canonical Faber output failed re-validation: {}", detail.into()))
+        .with_phase(crate::diagnostics::DiagnosticPhase::Codegen)
+        .with_code("CODEGEN006")
+        .with_file(name.to_owned())
+        .with_arg("issue", issue)
+        .with_arg("expected_count", expected_count.to_string());
+    if let Some(actual_count) = actual_count {
+        diagnostic = diagnostic.with_arg("actual_count", actual_count.to_string());
+    }
+    diagnostic
+}
+
+fn diagnostics_summary(diagnostics: &[Diagnostic]) -> String {
+    diagnostics
+        .iter()
+        .map(|diagnostic| diagnostic.message.as_str())
+        .collect::<Vec<_>>()
+        .join("; ")
 }
 
 /// Convenience wrapper with a default Faber-format session config.
