@@ -34,7 +34,7 @@
 use crate::tensor_type_directed::is_tensor_type;
 use crate::{
     FuncSig, ParamType, Primitive, RadixLaneMetadata, Resolver, SemanticParamMode, Type, TypeId,
-    TypeTable,
+    TypeParamConstraint, TypeTable,
 };
 use radix_hir::{DefId, HirItemKind};
 use radix_lexer::Interner;
@@ -122,8 +122,17 @@ pub fn attach_signatures(
         });
 
         let sig = FuncSig {
-            type_params: Vec::new(),
-            type_param_constraints: Vec::new(),
+            type_params: primal.type_params.iter().map(|param| param.name).collect(),
+            type_param_constraints: primal
+                .type_params
+                .iter()
+                .map(|param| match &param.constraint {
+                    radix_hir::HirTypeParamConstraint::Any => TypeParamConstraint::Any,
+                    radix_hir::HirTypeParamConstraint::OneOf(allowed) => {
+                        TypeParamConstraint::OneOf(allowed.clone())
+                    }
+                })
+                .collect(),
             params: sig_params,
             ret: gradient_tuple_ty,
             err: None,
