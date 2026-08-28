@@ -110,7 +110,11 @@ pub use radix_mir::{
 };
 // KPC-EMIT: the imported-entry merge surface re-exported from the device
 // module (the crate-root list above predates it; `device` is public).
-pub use radix_mir::device::{merge_imported_entry_roles, MirImportedEntryError, MirImportedEntryFact};
+// KCM-05: the synthetic-kernel metadata carrier rides the same device module.
+pub use radix_mir::device::{
+    merge_imported_entry_roles, MirDeviceFunctionMetadata, MirDeviceFunctionMetadataMap, MirImportedEntryError,
+    MirImportedEntryFact,
+};
 pub use radix_mir::{
     constant_ty, index_projection_result_ty, option_chain_base_ty, option_payload_ty, place_base_ty, MirTypeError,
     MirTypeLookup,

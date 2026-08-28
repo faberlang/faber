@@ -20,15 +20,18 @@
 
 use super::*;
 use crate::boundary_abi::HOST_CALL_ABI_VERSION;
+use crate::device::{MirDeviceFunctionMetadata, MirDeviceFunctionMetadataMap};
 use crate::device_program::{Binding, BufferLifetime, BufferRole, ObservationCadence};
 use crate::device_semantics::DeviceEffectFact;
 use crate::layout::MirTensorStorageLayout;
 use crate::{
-    MirBlock, MirBlockId, MirCallee, MirFunction, MirFunctionId, MirKernelShaderStage, MirLocal,
-    MirLocalId, MirOperand, MirParam, MirParamMode, MirPlace, MirProgram, MirStatement,
-    MirStatementKind, MirTerminator, MirTerminatorKind, MirType, MirValidationContext,
+    MirBlock, MirBlockId, MirCallee, MirFunction, MirFunctionId, MirFunctionOrigin,
+    MirFunctionVisibility, MirKernelShaderStage, MirLocal, MirLocalId, MirOperand, MirParam,
+    MirParamMode, MirPlace, MirProgram, MirStatement, MirStatementKind,
+    MirSyntheticFunctionIdentity, MirTerminator, MirTerminatorKind, MirType, MirValidationContext,
     ValidatedMir,
 };
+use radix_hir::DefId;
 use radix_lexer::{Interner, Span};
 use radix_types::{IndexExpr, NumericWidth, Primitive, TypeTable};
 
@@ -93,6 +96,32 @@ fn kernel_unit(id: u32, name: &str, ty: MirType, interner: &mut Interner) -> Mir
     }
 }
 
+/// Explicit Private carrier rows for a fixture's compute-stage functions:
+/// the KCM-05 explicit-facts selection admits them through the host-launch
+/// fact instead of the compute stage alone.
+fn fixture_metadata(program: &MirProgram) -> MirDeviceFunctionMetadataMap {
+    program
+        .functions
+        .iter()
+        .filter(|function| function.shader_stage == Some(MirKernelShaderStage::Compute))
+        .map(|function| {
+            (
+                function.id,
+                MirDeviceFunctionMetadata {
+                    identity: MirSyntheticFunctionIdentity {
+                        parent: MirFunctionId(0),
+                        ordinal: 0,
+                    },
+                    role: crate::MirDeviceRole::Kernel,
+                    shader_stage: MirKernelShaderStage::Compute,
+                    visibility: MirFunctionVisibility::Private,
+                    origin: MirFunctionOrigin::SyntheticKernelClosure,
+                },
+            )
+        })
+        .collect()
+}
+
 /// The NGAB0-U11 shape at the MIR level: one Compute kernel f1
 /// `scale_kernel` (one f32 parameter, f32 return — the return-buffer kernel
 /// ABI) and one host function f2 `run_scale` whose single call statement
@@ -105,7 +134,7 @@ fn u11_program(types: &mut TypeTable, interner: &mut Interner) -> MirProgram {
         functions: vec![
             MirFunction {
                 id: MirFunctionId(1),
-                source: None,
+                source: Some(DefId(1)),
                 name: Some(interner.intern("scale_kernel")),
                 params: vec![param(10, f32_ty)],
                 locals: vec![local(10, f32_ty)],
@@ -170,7 +199,12 @@ fn derive_u11(types: &mut TypeTable, interner: &mut Interner) -> HostPartition {
     let program = u11_program(types, interner);
     let context = MirValidationContext::new(types);
     let validated = ValidatedMir::new(program, context).expect("the U11 MIR fixture validates");
-    derive_host_partition(&validated, interner).expect("the U11 partition derives")
+    derive_host_partition_with_metadata(
+        &validated,
+        interner,
+        &fixture_metadata(validated.program()),
+    )
+    .expect("the U11 partition derives")
 }
 
 /// Resource identity + mutation rules survive: the derived [`DeviceProgram`]
@@ -463,8 +497,12 @@ fn vector_arg_shape_survives_derive() {
     };
     let context = MirValidationContext::new(&types);
     let validated = ValidatedMir::new(program, context).expect("the vector fixture MIR validates");
-    let partition =
-        derive_host_partition(&validated, &interner).expect("the vector partition derives");
+    let partition = derive_host_partition_with_metadata(
+        &validated,
+        &interner,
+        &fixture_metadata(validated.program()),
+    )
+    .expect("the vector partition derives");
 
     // One boundary call; the gate accepted the exact 4-element crossing.
     assert_eq!(partition.boundary_calls.len(), 1);
@@ -546,8 +584,12 @@ fn two_kernel_composition_derives_one_region() {
     };
     let context = MirValidationContext::new(&types);
     let validated = ValidatedMir::new(program, context).expect("the two-kernel MIR validates");
-    let partition =
-        derive_host_partition(&validated, &interner).expect("the two-kernel partition derives");
+    let partition = derive_host_partition_with_metadata(
+        &validated,
+        &interner,
+        &fixture_metadata(validated.program()),
+    )
+    .expect("the two-kernel partition derives");
 
     // The batch rides ONE boundary call → ONE prepared region, in invocation
     // order — never per-kernel ABI rows (NGAB0-R1 granularity).
@@ -772,4 +814,161 @@ fn partition_record_cpu_host_ad_positive_fixture_stays_valid() {
     assert_eq!(record.membership.len(), 2);
     assert_eq!(record.regions.len(), 1);
     assert_eq!(record.callsites.len(), 1);
+}
+
+// ── KCM-05: synthetic kernel closures ride the explicit metadata carrier ──
+
+/// A source-less synthetic kernel closure with the scale-kernel body shape:
+/// one f32 param returned as-is (the return-buffer kernel ABI).
+fn private_synthetic_closure(id: u32, ty: MirType) -> MirFunction {
+    MirFunction {
+        id: MirFunctionId(id),
+        source: None,
+        name: None,
+        params: vec![param(id * 10, ty)],
+        locals: vec![local(id * 10, ty)],
+        temps: Vec::new(),
+        blocks: vec![MirBlock {
+            id: MirBlockId(0),
+            statements: Vec::new(),
+            terminator: MirTerminator {
+                kind: MirTerminatorKind::Return(Some(MirOperand::Place(MirPlace::local(
+                    MirLocalId(id * 10),
+                )))),
+                span: Span::default(),
+            },
+            span: Span::default(),
+        }],
+        return_ty: ty,
+        error_ty: None,
+        is_async: false,
+        is_generator: false,
+        shader_stage: Some(MirKernelShaderStage::Compute),
+        span: Span::default(),
+    }
+}
+
+fn synthetic_row(function_id: u32) -> (MirFunctionId, MirDeviceFunctionMetadata) {
+    (
+        MirFunctionId(function_id),
+        MirDeviceFunctionMetadata {
+            identity: MirSyntheticFunctionIdentity {
+                parent: MirFunctionId(0),
+                ordinal: 0,
+            },
+            role: crate::MirDeviceRole::Kernel,
+            shader_stage: MirKernelShaderStage::Compute,
+            visibility: MirFunctionVisibility::Private,
+            origin: MirFunctionOrigin::SyntheticKernelClosure,
+        },
+    )
+}
+
+/// A source-less compute-stage function with no carrier row never derives a
+/// device payload: fail-closed selection — the compute stage alone is never
+/// an entry fact.
+#[test]
+fn derive_host_partition_without_carrier_yields_no_device_for_source_less_compute() {
+    let mut types = TypeTable::new();
+    let mut interner = Interner::new();
+    let f32_ty = f32(&mut types);
+    let program = MirProgram {
+        functions: vec![private_synthetic_closure(1, f32_ty)],
+    };
+    let context = MirValidationContext::new(&types);
+    let validated = ValidatedMir::new(program, context).expect("the closure fixture validates");
+    let partition =
+        derive_host_partition(&validated, &interner).expect("the empty partition derives");
+    assert!(
+        !partition.has_device(),
+        "an uncarried source-less compute function is never a launch"
+    );
+}
+
+/// An uncalled private synthetic closure has no launch fact: it stays out of
+/// the device program.
+#[test]
+fn uncalled_private_synthetic_closure_never_becomes_a_launch_row() {
+    let mut types = TypeTable::new();
+    let mut interner = Interner::new();
+    let f32_ty = f32(&mut types);
+    let program = MirProgram {
+        functions: vec![private_synthetic_closure(1, f32_ty)],
+    };
+    let context = MirValidationContext::new(&types);
+    let validated = ValidatedMir::new(program, context).expect("the closure fixture validates");
+    let mut metadata = MirDeviceFunctionMetadataMap::default();
+    metadata.extend([synthetic_row(1)]);
+    let partition = derive_host_partition_with_metadata(&validated, &interner, &metadata)
+        .expect("the empty partition derives");
+    assert!(
+        !partition.has_device(),
+        "a private closure with no host launch fact is not a launch row"
+    );
+}
+
+/// A host-launched private synthetic closure derives its one region: the
+/// host call is the launch boundary, the closure is device-side, and the
+/// host stays host.
+#[test]
+fn host_launched_private_synthetic_closure_derives_one_region() {
+    let mut types = TypeTable::new();
+    let mut interner = Interner::new();
+    let f32_ty = f32(&mut types);
+    let host = MirFunction {
+        id: MirFunctionId(2),
+        source: None,
+        name: Some(interner.intern("run_closure")),
+        params: vec![param(20, f32_ty)],
+        locals: vec![local(20, f32_ty), local(30, f32_ty)],
+        temps: Vec::new(),
+        blocks: vec![MirBlock {
+            id: MirBlockId(0),
+            statements: vec![MirStatement {
+                kind: MirStatementKind::Call {
+                    destination: Some(MirPlace::local(MirLocalId(30))),
+                    callee: MirCallee::Function(MirFunctionId(1)),
+                    args: vec![MirOperand::Place(MirPlace::local(MirLocalId(20)))],
+                },
+                span: Span::default(),
+            }],
+            terminator: MirTerminator {
+                kind: MirTerminatorKind::Return(Some(MirOperand::Place(MirPlace::local(
+                    MirLocalId(30),
+                )))),
+                span: Span::default(),
+            },
+            span: Span::default(),
+        }],
+        return_ty: f32_ty,
+        error_ty: None,
+        is_async: false,
+        is_generator: false,
+        shader_stage: None,
+        span: Span::default(),
+    };
+    let program = MirProgram {
+        functions: vec![private_synthetic_closure(1, f32_ty), host],
+    };
+    let context = MirValidationContext::new(&types);
+    let validated =
+        ValidatedMir::new(program, context).expect("the closure+host fixture validates");
+    let mut metadata = MirDeviceFunctionMetadataMap::default();
+    metadata.extend([synthetic_row(1)]);
+    let partition = derive_host_partition_with_metadata(&validated, &interner, &metadata)
+        .expect("the closure partition derives");
+    assert_eq!(partition.device_kernels, vec![MirFunctionId(1)]);
+    assert_eq!(partition.host_functions, vec![MirFunctionId(2)]);
+    assert_eq!(
+        partition.boundary_calls.len(),
+        1,
+        "one host call → one region"
+    );
+    assert_eq!(partition.boundary_calls[0].host, MirFunctionId(2));
+    assert_eq!(
+        partition.boundary_calls[0].region.kernels,
+        vec![MirFunctionId(1)]
+    );
+    assert_eq!(partition.device_program.kernels.len(), 1);
+    assert_eq!(partition.device_program.launches.len(), 1);
 }

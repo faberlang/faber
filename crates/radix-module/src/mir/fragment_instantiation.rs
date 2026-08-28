@@ -19,6 +19,7 @@ use crate::semantic::{
     passes::fragment_definition::{DeviceEffectKind, FragmentEffectTable},
     Primitive, Type, TypeId, TypeTable,
 };
+use radix_mir::device::MirDeviceFunctionMetadataMap;
 use rustc_hash::FxHashMap;
 
 pub const ISSUE_CONTEXT: &str = "nucleum_fragment_context";
@@ -60,6 +61,11 @@ impl FragmentInstantiationError {
 enum RoleKind {
     Entry,
     Fragment,
+    /// A source-less synthetic kernel closure: device-side for call checking
+    /// (kernel callers and fragments compose it; host callers launch it),
+    /// never a launch entry. Classified only through the explicit metadata
+    /// carrier — never from `source: None`, a name, or the compute stage.
+    SyntheticKernel,
     Graphics,
     Ordinary,
 }
@@ -69,6 +75,7 @@ impl RoleKind {
         match self {
             Self::Entry => "entry",
             Self::Fragment => "fragment",
+            Self::SyntheticKernel => "synthetic",
             Self::Graphics | Self::Ordinary => "host",
         }
     }
@@ -84,8 +91,40 @@ pub fn check(
     roles: &FxHashMap<DefId, MirDeviceRole>,
     summaries: Option<&FragmentEffectTable>,
 ) -> Vec<FragmentInstantiationError> {
-    let mut checker =
-        InstantiationChecker { functions, monomorphizations, layouts, types, roles, summaries, errors: Vec::new() };
+    check_with_metadata(
+        functions,
+        monomorphizations,
+        layouts,
+        types,
+        roles,
+        summaries,
+        &MirDeviceFunctionMetadataMap::default(),
+    )
+}
+
+/// [`check`] with the explicit metadata carrier for source-less synthetic
+/// kernel closures (KCM-05). Programs lowered without kernel closures pass
+/// no rows and classify exactly as before.
+#[must_use]
+pub fn check_with_metadata(
+    functions: &[MirFunction],
+    monomorphizations: &[MirMonomorphization],
+    layouts: &MirLayoutTable,
+    types: &TypeTable,
+    roles: &FxHashMap<DefId, MirDeviceRole>,
+    summaries: Option<&FragmentEffectTable>,
+    metadata: &MirDeviceFunctionMetadataMap,
+) -> Vec<FragmentInstantiationError> {
+    let mut checker = InstantiationChecker {
+        functions,
+        monomorphizations,
+        layouts,
+        types,
+        roles,
+        metadata,
+        summaries,
+        errors: Vec::new(),
+    };
     checker.check_program();
     checker.errors
 }
@@ -96,6 +135,7 @@ struct InstantiationChecker<'a> {
     layouts: &'a MirLayoutTable,
     types: &'a TypeTable,
     roles: &'a FxHashMap<DefId, MirDeviceRole>,
+    metadata: &'a MirDeviceFunctionMetadataMap,
     summaries: Option<&'a FragmentEffectTable>,
     errors: Vec<FragmentInstantiationError>,
 }
@@ -136,7 +176,7 @@ impl<'a> InstantiationChecker<'a> {
         span: Span,
     ) {
         let Some((callee_id, callee_role, definition_span)) = self.resolve_callee(callee) else {
-            if matches!(caller, RoleKind::Entry | RoleKind::Fragment)
+            if matches!(caller, RoleKind::Entry | RoleKind::Fragment | RoleKind::SyntheticKernel)
                 && matches!(callee, MirCallee::Closure(_) | MirCallee::Value(_))
             {
                 self.context(caller, "host_callable", span, None);
@@ -148,19 +188,30 @@ impl<'a> InstantiationChecker<'a> {
             // entry or helper — and the call composes. Role-based call
             // legality is gone; the former `nested_dispatch` reject is now
             // the ordinary typed instantiation check.
-            (RoleKind::Entry, RoleKind::Entry) | (RoleKind::Entry | RoleKind::Fragment, RoleKind::Fragment) => {
+            // KCM-05: a synthetic kernel closure is device-side for its
+            // callers — a kernel caller or fragment composes it, it composes
+            // entries/helpers itself, and a host caller's direct call is the
+            // launch boundary (unmatched, so legal).
+            (RoleKind::Entry, RoleKind::Entry) => {
+                self.check_instantiation(caller, caller_fn, callee, callee_id, args, destination, failable, span);
+            }
+            (RoleKind::Entry | RoleKind::Fragment | RoleKind::SyntheticKernel, RoleKind::Fragment) => {
                 self.check_instantiation(caller, caller_fn, callee, callee_id, args, destination, failable, span);
             }
             (RoleKind::Fragment, RoleKind::Entry) => {
                 self.context(caller, "entry_callee", span, Some(definition_span));
             }
-            (RoleKind::Entry | RoleKind::Fragment, RoleKind::Graphics) => {
+            (RoleKind::Entry | RoleKind::Fragment, RoleKind::SyntheticKernel)
+            | (RoleKind::SyntheticKernel, RoleKind::Entry | RoleKind::SyntheticKernel) => {
+                self.check_instantiation(caller, caller_fn, callee, callee_id, args, destination, failable, span);
+            }
+            (RoleKind::Entry | RoleKind::Fragment | RoleKind::SyntheticKernel, RoleKind::Graphics) => {
                 self.context(caller, "graphics_stage", span, Some(definition_span));
             }
             (RoleKind::Ordinary | RoleKind::Graphics, RoleKind::Fragment) => {
                 self.context(caller, "host_callable", span, Some(definition_span));
             }
-            (RoleKind::Entry | RoleKind::Fragment, RoleKind::Ordinary) => {
+            (RoleKind::Entry | RoleKind::Fragment | RoleKind::SyntheticKernel, RoleKind::Ordinary) => {
                 self.context(caller, "host_callable", span, Some(definition_span));
             }
             _ => {}
@@ -394,10 +445,16 @@ impl<'a> InstantiationChecker<'a> {
                 None => {}
             }
         }
+        // The explicit metadata carrier classifies source-less synthetic
+        // kernel closures; without it a source-less compute-stage function
+        // has no proven device identity and is never admitted as an entry
+        // (fail-closed selection — KCM-05).
+        if self.metadata.contains_key(&function.id) {
+            return RoleKind::SyntheticKernel;
+        }
         match function.shader_stage {
             Some(MirKernelShaderStage::Fragment | MirKernelShaderStage::Vertex) => RoleKind::Graphics,
-            Some(MirKernelShaderStage::Compute) => RoleKind::Entry,
-            None => RoleKind::Ordinary,
+            Some(MirKernelShaderStage::Compute) | None => RoleKind::Ordinary,
         }
     }
 

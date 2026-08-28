@@ -757,3 +757,171 @@ functio k(fractus<f32> x) → fractus<f32> {
         "staging-gate rejection narrowed to composition success"
     );
 }
+
+// ---------------------------------------------------------------------------
+// KCM-05: synthetic kernel closures classify through the metadata carrier.
+// ---------------------------------------------------------------------------
+
+use super::check_with_metadata;
+use crate::mir::{
+    MirDeviceFunctionMetadata, MirDeviceFunctionMetadataMap, MirFunctionOrigin, MirFunctionVisibility,
+    MirSyntheticFunctionIdentity,
+};
+
+fn synthetic_closure(
+    id: u32,
+    ty: MirType,
+    callee: Option<MirCallee>,
+    args: Vec<MirOperand>,
+    dest: Option<MirPlace>,
+) -> MirFunction {
+    let statements = if let Some(callee) = callee {
+        vec![MirStatement { kind: MirStatementKind::Call { destination: dest, callee, args }, span: CALL_SPAN() }]
+    } else {
+        Vec::new()
+    };
+    MirFunction {
+        id: MirFunctionId(id),
+        source: None,
+        name: None,
+        params: vec![param(0, ty, MirParamMode::Owned)],
+        locals: Vec::new(),
+        temps: Vec::new(),
+        blocks: vec![MirBlock {
+            id: MirBlockId(0),
+            statements,
+            terminator: MirTerminator { kind: MirTerminatorKind::Return(None), span: test_span() },
+            span: DEF_SPAN(),
+        }],
+        return_ty: ty,
+        error_ty: None,
+        is_async: false,
+        is_generator: false,
+        shader_stage: Some(MirKernelShaderStage::Compute),
+        span: DEF_SPAN(),
+    }
+}
+
+fn synthetic_metadata(function_id: u32) -> MirDeviceFunctionMetadataMap {
+    let mut metadata = MirDeviceFunctionMetadataMap::default();
+    metadata.insert(
+        MirFunctionId(function_id),
+        MirDeviceFunctionMetadata {
+            identity: MirSyntheticFunctionIdentity { parent: MirFunctionId(0), ordinal: 0 },
+            role: MirDeviceRole::Kernel,
+            shader_stage: MirKernelShaderStage::Compute,
+            visibility: MirFunctionVisibility::Private,
+            origin: MirFunctionOrigin::SyntheticKernelClosure,
+        },
+    );
+    metadata
+}
+
+fn check_fns_with_metadata(
+    functions: &[MirFunction],
+    types: &TypeTable,
+    metadata: &MirDeviceFunctionMetadataMap,
+) -> Vec<FragmentInstantiationError> {
+    check_with_metadata(
+        functions,
+        &[],
+        &MirLayoutTable::from_types(types),
+        types,
+        &roles(),
+        None,
+        metadata,
+    )
+}
+
+/// A kernel caller's direct call to a synthetic kernel closure is a legal
+/// device call — it composes downstream.
+#[test]
+fn kernel_caller_to_synthetic_closure_is_a_legal_device_call() {
+    let mut types = TypeTable::new();
+    let ty = f32_ty(&mut types);
+    let closure = synthetic_closure(2, ty, None, Vec::new(), None);
+    let entry = function(
+        0,
+        ENTRY,
+        vec![param(0, ty, MirParamMode::Owned)],
+        ty,
+        Some(MirCallee::Function(MirFunctionId(2))),
+        vec![MirOperand::Place(MirPlace::local(MirLocalId(0)))],
+        Some(MirPlace::local(MirLocalId(0))),
+        Some(MirKernelShaderStage::Compute),
+    );
+    let metadata = synthetic_metadata(2);
+    let errors = check_fns_with_metadata(&[entry, closure], &types, &metadata);
+    assert!(errors.is_empty(), "Entry→synthetic closure must pass: {errors:?}");
+}
+
+/// A host caller's direct call to a synthetic kernel closure is the launch
+/// boundary, not a host-callable violation.
+#[test]
+fn host_call_to_synthetic_closure_is_a_legal_launch_boundary() {
+    let mut types = TypeTable::new();
+    let ty = f32_ty(&mut types);
+    let closure = synthetic_closure(2, ty, None, Vec::new(), None);
+    let host = function(
+        1,
+        HOST,
+        vec![param(0, ty, MirParamMode::Owned)],
+        ty,
+        Some(MirCallee::Function(MirFunctionId(2))),
+        vec![MirOperand::Place(MirPlace::local(MirLocalId(0)))],
+        Some(MirPlace::local(MirLocalId(0))),
+        None,
+    );
+    let metadata = synthetic_metadata(2);
+    let errors = check_fns_with_metadata(&[host, closure], &types, &metadata);
+    assert!(errors.is_empty(), "host→synthetic closure must pass: {errors:?}");
+}
+
+/// A synthetic kernel closure calling a named kernel entry is device→device.
+#[test]
+fn synthetic_closure_to_kernel_entry_is_a_legal_device_call() {
+    let mut types = TypeTable::new();
+    let ty = f32_ty(&mut types);
+    let entry = function(
+        1,
+        ENTRY,
+        vec![param(0, ty, MirParamMode::Owned)],
+        ty,
+        None,
+        Vec::new(),
+        None,
+        Some(MirKernelShaderStage::Compute),
+    );
+    let closure = synthetic_closure(
+        2,
+        ty,
+        Some(MirCallee::Function(MirFunctionId(1))),
+        vec![MirOperand::Place(MirPlace::local(MirLocalId(0)))],
+        Some(MirPlace::local(MirLocalId(0))),
+    );
+    let metadata = synthetic_metadata(2);
+    let errors = check_fns_with_metadata(&[closure, entry], &types, &metadata);
+    assert!(errors.is_empty(), "synthetic→Entry must pass: {errors:?}");
+}
+
+/// Without the carrier a source-less compute-stage function has no proven
+/// device identity: a kernel caller's call rejects host-callable (fail-closed
+/// selection — never an entry without explicit facts).
+#[test]
+fn kernel_caller_to_uncarried_compute_rejects_host_callable() {
+    let mut types = TypeTable::new();
+    let ty = f32_ty(&mut types);
+    let uncarried = synthetic_closure(2, ty, None, Vec::new(), None);
+    let entry = function(
+        0,
+        ENTRY,
+        vec![param(0, ty, MirParamMode::Owned)],
+        ty,
+        Some(MirCallee::Function(MirFunctionId(2))),
+        vec![MirOperand::Place(MirPlace::local(MirLocalId(0)))],
+        Some(MirPlace::local(MirLocalId(0))),
+        Some(MirKernelShaderStage::Compute),
+    );
+    let errors = check_fns_with_metadata(&[entry, uncarried], &types, &MirDeviceFunctionMetadataMap::default());
+    expect_issue(&errors, ISSUE_CONTEXT, "host_callable");
+}

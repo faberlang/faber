@@ -27,6 +27,7 @@ use crate::mir::{
     MirProjection, MirRuntimeCall, MirStatement, MirStatementKind, MirTemp, MirTempId, MirTerminator,
     MirTerminatorKind, MirType, MirValue, MirValueId, MirValueKind,
 };
+use radix_mir::device::MirDeviceFunctionMetadataMap;
 use rustc_hash::{FxHashMap, FxHashSet};
 use std::cell::Cell;
 
@@ -103,6 +104,10 @@ impl FragmentCompositionError {
 /// them. Every other private compute helper that was inlined at least once
 /// and has no remaining reference is pruned after composition; fragment
 /// bodies stay (the package body sidecar attaches from this program).
+///
+/// Source-less synthetic kernel closures are invisible to this entry point:
+/// callers that lower kernel closures pass their explicit metadata carrier
+/// through [`compose_with_metadata`].
 pub fn compose(
     functions: &mut Vec<MirFunction>,
     monomorphizations: &[MirMonomorphization],
@@ -111,10 +116,39 @@ pub fn compose(
     interner: Option<&Interner>,
     launch_entries: &FxHashSet<DefId>,
 ) -> Vec<FragmentCompositionError> {
+    compose_with_metadata(
+        functions,
+        monomorphizations,
+        roles,
+        &MirDeviceFunctionMetadataMap::default(),
+        budget,
+        interner,
+        launch_entries,
+    )
+}
+
+/// Compose every device call into its caller with the explicit metadata
+/// carrier for source-less synthetic kernel closures (KCM-05).
+///
+/// The carrier classifies a synthetic closure as device-side for
+/// composition — a kernel caller's direct call composes, and a composed
+/// closure with no remaining reference is pruned — without ever making it a
+/// launch entry (`launch_entries` stays `DefId`-keyed and synthetic
+/// functions carry no source).
+pub fn compose_with_metadata(
+    functions: &mut Vec<MirFunction>,
+    monomorphizations: &[MirMonomorphization],
+    roles: &FxHashMap<DefId, MirDeviceRole>,
+    metadata: &MirDeviceFunctionMetadataMap,
+    budget: ExpansionBudget,
+    interner: Option<&Interner>,
+    launch_entries: &FxHashSet<DefId>,
+) -> Vec<FragmentCompositionError> {
     let mut pass = CompositionPass {
         functions,
         monomorphizations,
         roles,
+        metadata,
         budget,
         interner,
         launch_entries,
@@ -135,10 +169,29 @@ pub fn surviving_fragment_calls(
     monomorphizations: &[MirMonomorphization],
     roles: &FxHashMap<DefId, MirDeviceRole>,
 ) -> Vec<(MirFunctionId, Span)> {
-    let resolver = Resolver { functions, monomorphizations, roles };
+    surviving_fragment_calls_with_metadata(
+        functions,
+        monomorphizations,
+        roles,
+        &MirDeviceFunctionMetadataMap::default(),
+    )
+}
+
+/// [`surviving_fragment_calls`] with the synthetic-kernel metadata carrier.
+#[must_use]
+pub fn surviving_fragment_calls_with_metadata(
+    functions: &[MirFunction],
+    monomorphizations: &[MirMonomorphization],
+    roles: &FxHashMap<DefId, MirDeviceRole>,
+    metadata: &MirDeviceFunctionMetadataMap,
+) -> Vec<(MirFunctionId, Span)> {
+    let resolver = Resolver { functions, monomorphizations, roles, metadata };
     let mut survivors = Vec::new();
     for function in functions {
-        if !matches!(role_of(function, roles), RoleKind::Entry | RoleKind::Fragment) {
+        if !matches!(
+            role_of(function, roles, metadata),
+            RoleKind::Entry | RoleKind::Fragment | RoleKind::SyntheticKernel
+        ) {
             continue;
         }
         for site in resolver.device_sites(function) {
@@ -155,7 +208,23 @@ pub fn reject_surviving_fragment_calls(
     monomorphizations: &[MirMonomorphization],
     roles: &FxHashMap<DefId, MirDeviceRole>,
 ) -> Vec<FragmentCompositionError> {
-    surviving_fragment_calls(functions, monomorphizations, roles)
+    reject_surviving_fragment_calls_with_metadata(
+        functions,
+        monomorphizations,
+        roles,
+        &MirDeviceFunctionMetadataMap::default(),
+    )
+}
+
+/// [`reject_surviving_fragment_calls`] with the synthetic-kernel metadata carrier.
+#[must_use]
+pub fn reject_surviving_fragment_calls_with_metadata(
+    functions: &[MirFunction],
+    monomorphizations: &[MirMonomorphization],
+    roles: &FxHashMap<DefId, MirDeviceRole>,
+    metadata: &MirDeviceFunctionMetadataMap,
+) -> Vec<FragmentCompositionError> {
+    surviving_fragment_calls_with_metadata(functions, monomorphizations, roles, metadata)
         .into_iter()
         .map(|(_, span)| {
             error(
@@ -176,6 +245,7 @@ struct CompositionPass<'a> {
     functions: &'a mut Vec<MirFunction>,
     monomorphizations: &'a [MirMonomorphization],
     roles: &'a FxHashMap<DefId, MirDeviceRole>,
+    metadata: &'a MirDeviceFunctionMetadataMap,
     budget: ExpansionBudget,
     interner: Option<&'a Interner>,
     launch_entries: &'a FxHashSet<DefId>,
@@ -213,11 +283,13 @@ impl CompositionPass<'_> {
                 return;
             }
         }
-        self.errors.extend(reject_surviving_fragment_calls(
-            self.functions,
-            self.monomorphizations,
-            self.roles,
-        ));
+        self.errors
+            .extend(reject_surviving_fragment_calls_with_metadata(
+                self.functions,
+                self.monomorphizations,
+                self.roles,
+                self.metadata,
+            ));
         if self.errors.is_empty() {
             self.prune_composed_helpers();
         }
@@ -229,6 +301,9 @@ impl CompositionPass<'_> {
     /// always stay; helpers still referenced by host code stay; fragment
     /// bodies stay (the package body sidecar attaches from the lowered
     /// program, and the graphics survivor scan owns their symbol proof).
+    /// Composed synthetic kernel closures prune under the same law — they
+    /// are private device helpers by carrier fact and can never be launch
+    /// entries (`launch_entries` is `DefId`-keyed).
     fn prune_composed_helpers(&mut self) {
         if self.inlined.is_empty() {
             return;
@@ -236,8 +311,12 @@ impl CompositionPass<'_> {
         let mut referenced_ids = FxHashSet::default();
         let mut referenced_sources = FxHashSet::default();
         for function in self.functions.iter() {
-            let resolver =
-                Resolver { functions: self.functions, monomorphizations: self.monomorphizations, roles: self.roles };
+            let resolver = Resolver {
+                functions: self.functions,
+                monomorphizations: self.monomorphizations,
+                roles: self.roles,
+                metadata: self.metadata,
+            };
             for site in resolver.all_callees(function) {
                 match site.callee {
                     MirCallee::Function(id) => {
@@ -254,9 +333,13 @@ impl CompositionPass<'_> {
             if !self.inlined.contains(&function.id) {
                 return true;
             }
-            // Only compute helpers: fragment bodies are the package body
-            // sidecar's input and stay in the lowered program.
-            if role_of(function, self.roles) != RoleKind::Entry {
+            // Only device helpers prune: fragment bodies are the package body
+            // sidecar's input and stay in the lowered program; synthetic
+            // kernel closures prune like the private compute helpers they are.
+            if !matches!(
+                role_of(function, self.roles, self.metadata),
+                RoleKind::Entry | RoleKind::SyntheticKernel
+            ) {
                 return true;
             }
             let referenced = referenced_ids.contains(&function.id)
@@ -763,7 +846,12 @@ impl CompositionPass<'_> {
     }
 
     fn resolver(&self) -> Resolver<'_> {
-        Resolver { functions: self.functions, monomorphizations: self.monomorphizations, roles: self.roles }
+        Resolver {
+            functions: self.functions,
+            monomorphizations: self.monomorphizations,
+            roles: self.roles,
+            metadata: self.metadata,
+        }
     }
 
     fn function(&self, id: MirFunctionId) -> Option<&MirFunction> {
@@ -771,7 +859,10 @@ impl CompositionPass<'_> {
     }
 
     fn is_device_callee(&self, function: &MirFunction) -> bool {
-        matches!(role_of(function, self.roles), RoleKind::Entry | RoleKind::Fragment)
+        matches!(
+            role_of(function, self.roles, self.metadata),
+            RoleKind::Entry | RoleKind::Fragment | RoleKind::SyntheticKernel
+        )
     }
 
     /// Whether `function` itself is device code — the only caller kind whose
@@ -780,8 +871,13 @@ impl CompositionPass<'_> {
         self.is_device_callee(function)
     }
 
+    /// Expansion roots: launch entries plus synthetic kernel closures (their
+    /// own device calls compose inside the region body).
     fn is_entry(&self, function: &MirFunction) -> bool {
-        role_of(function, self.roles) == RoleKind::Entry
+        matches!(
+            role_of(function, self.roles, self.metadata),
+            RoleKind::Entry | RoleKind::SyntheticKernel
+        )
     }
 }
 
@@ -789,6 +885,7 @@ struct Resolver<'a> {
     functions: &'a [MirFunction],
     monomorphizations: &'a [MirMonomorphization],
     roles: &'a FxHashMap<DefId, MirDeviceRole>,
+    metadata: &'a MirDeviceFunctionMetadataMap,
 }
 
 impl Resolver<'_> {
@@ -873,8 +970,12 @@ impl Resolver<'_> {
     }
 
     fn is_device_callee(&self, callee: &MirCallee) -> bool {
-        self.resolve_function(callee)
-            .is_some_and(|function| matches!(role_of(function, self.roles), RoleKind::Entry | RoleKind::Fragment))
+        self.resolve_function(callee).is_some_and(|function| {
+            matches!(
+                role_of(function, self.roles, self.metadata),
+                RoleKind::Entry | RoleKind::Fragment | RoleKind::SyntheticKernel
+            )
+        })
     }
 
     fn resolve_function(&self, callee: &MirCallee) -> Option<&MirFunction> {
@@ -936,16 +1037,29 @@ impl Account {
 enum RoleKind {
     Entry,
     Fragment,
+    /// A source-less synthetic kernel closure: device-side for composition
+    /// (its direct call composes into kernel callers, and it composes its
+    /// own device calls), never a launch entry. Classified only through the
+    /// explicit metadata carrier — never from `source: None`, a name, or the
+    /// compute stage.
+    SyntheticKernel,
     Other,
 }
 
-fn role_of(function: &MirFunction, roles: &FxHashMap<DefId, MirDeviceRole>) -> RoleKind {
+fn role_of(
+    function: &MirFunction,
+    roles: &FxHashMap<DefId, MirDeviceRole>,
+    metadata: &MirDeviceFunctionMetadataMap,
+) -> RoleKind {
     if let Some(source) = function.source {
         match roles.get(&source) {
             Some(MirDeviceRole::Kernel) => return RoleKind::Entry,
             Some(MirDeviceRole::Fragment) => return RoleKind::Fragment,
             None => {}
         }
+    }
+    if metadata.contains_key(&function.id) {
+        return RoleKind::SyntheticKernel;
     }
     RoleKind::Other
 }

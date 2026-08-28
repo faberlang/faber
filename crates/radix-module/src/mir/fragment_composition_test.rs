@@ -1,16 +1,18 @@
 //! Coverage for nucleum-fragment MIR composition.
 
 use super::{
-    compose, reject_surviving_fragment_calls, surviving_fragment_calls, ExpansionBudget, ISSUE_CYCLE, ISSUE_EXPANSION,
+    compose, compose_with_metadata, reject_surviving_fragment_calls, reject_surviving_fragment_calls_with_metadata,
+    surviving_fragment_calls, surviving_fragment_calls_with_metadata, ExpansionBudget, ISSUE_CYCLE, ISSUE_EXPANSION,
 };
 use crate::diagnostics::{semantic_message, DiagnosticArg};
 use crate::driver::{self, AnalyzeRequest, Config, Session};
 use crate::hir::DefId;
 use crate::lexer::Span;
 use crate::mir::{
-    MirBinOp, MirBlock, MirBlockId, MirCallee, MirDeviceRole, MirFunction, MirFunctionId, MirKernelShaderStage,
-    MirLocal, MirLocalId, MirOperand, MirParam, MirParamMode, MirPlace, MirStatement, MirStatementKind, MirTerminator,
-    MirTerminatorKind, MirType, MirValue, MirValueId, MirValueKind,
+    MirBinOp, MirBlock, MirBlockId, MirCallee, MirDeviceFunctionMetadata, MirDeviceFunctionMetadataMap, MirDeviceRole,
+    MirFunction, MirFunctionId, MirFunctionOrigin, MirFunctionVisibility, MirKernelShaderStage, MirLocal, MirLocalId,
+    MirOperand, MirParam, MirParamMode, MirPlace, MirStatement, MirStatementKind, MirSyntheticFunctionIdentity,
+    MirTerminator, MirTerminatorKind, MirType, MirValue, MirValueId, MirValueKind,
 };
 use crate::semantic::{SemanticErrorKind, TypeTable};
 use crate::test_support::{test_span, test_span_between};
@@ -1508,5 +1510,185 @@ fn multi_block_mut_output_writes_back_on_return_join() {
             .iter()
             .any(|block| matches!(block.terminator.kind, MirTerminatorKind::Return(_))),
         "the caller's original Return terminator must survive the join: {composed:#?}"
+    );
+}
+
+// ---------------------------------------------------------------------------
+// KCM-05: synthetic kernel closures ride the explicit metadata carrier.
+// ---------------------------------------------------------------------------
+
+/// A source-less synthetic kernel closure body: identity over its one param.
+fn synthetic_kernel_closure(id: u32, ty: MirType) -> MirFunction {
+    let mut block = empty_block(0, Some(MirOperand::Place(MirPlace::local(MirLocalId(0)))));
+    block.span = DEF_SPAN();
+    block.terminator.span = DEF_SPAN();
+    MirFunction {
+        id: MirFunctionId(id),
+        source: None,
+        name: None,
+        params: vec![param(0, ty)],
+        locals: Vec::new(),
+        temps: Vec::new(),
+        blocks: vec![block],
+        return_ty: ty,
+        error_ty: None,
+        is_async: false,
+        is_generator: false,
+        shader_stage: Some(MirKernelShaderStage::Compute),
+        span: DEF_SPAN(),
+    }
+}
+
+fn synthetic_row(function_id: u32, parent: u32, ordinal: u32) -> (MirFunctionId, MirDeviceFunctionMetadata) {
+    (
+        MirFunctionId(function_id),
+        MirDeviceFunctionMetadata {
+            identity: MirSyntheticFunctionIdentity { parent: MirFunctionId(parent), ordinal },
+            role: MirDeviceRole::Kernel,
+            shader_stage: MirKernelShaderStage::Compute,
+            visibility: MirFunctionVisibility::Private,
+            origin: MirFunctionOrigin::SyntheticKernelClosure,
+        },
+    )
+}
+
+fn synthetic_metadata(rows: &[(MirFunctionId, MirDeviceFunctionMetadata)]) -> MirDeviceFunctionMetadataMap {
+    rows.iter().copied().collect()
+}
+
+fn call_count_to(functions: &[MirFunction], callee: MirFunctionId) -> usize {
+    functions
+        .iter()
+        .flat_map(|function| &function.blocks)
+        .flat_map(|block| &block.statements)
+        .filter(|statement| {
+            matches!(
+                &statement.kind,
+                MirStatementKind::Call { callee: MirCallee::Function(id), .. } if *id == callee
+            )
+        })
+        .count()
+}
+
+/// A kernel caller's direct call to a synthetic kernel closure composes: no
+/// device call survives, and the composed private closure is pruned — no
+/// standalone helper symbol survives.
+#[test]
+fn kernel_caller_composes_synthetic_kernel_closure() {
+    let mut types = TypeTable::new();
+    let ty = f32_ty(&mut types);
+    let closure = synthetic_kernel_closure(2, ty);
+    let entry = kernel_calling_helper(2, ty);
+    let mut functions = vec![entry, closure];
+    let metadata = synthetic_metadata(&[synthetic_row(2, 0, 0)]);
+    let errors = compose_with_metadata(
+        &mut functions,
+        &[],
+        &roles(),
+        &metadata,
+        ExpansionBudget::DOCUMENTED_DEFAULTS,
+        None,
+        &launch_entries(),
+    );
+    assert!(errors.is_empty(), "{errors:?}");
+    assert_eq!(fragment_call_count(&functions), 0, "no device call may survive");
+    assert_eq!(
+        call_count_to(&functions, MirFunctionId(2)),
+        0,
+        "the direct closure call composes"
+    );
+    assert!(
+        functions
+            .iter()
+            .all(|function| function.id != MirFunctionId(2)),
+        "the composed private closure must be pruned: {:#?}",
+        functions
+    );
+}
+
+/// A host caller's direct call to a synthetic kernel closure is the launch
+/// boundary: it composes nothing, and the still-referenced closure stays.
+#[test]
+fn host_call_to_synthetic_closure_is_the_launch_boundary() {
+    let mut types = TypeTable::new();
+    let ty = f32_ty(&mut types);
+    let closure = synthetic_kernel_closure(2, ty);
+    let host = function(
+        1,
+        HOST,
+        vec![param(0, ty)],
+        ty,
+        vec![MirLocal { id: MirLocalId(1), name: None, ty, mutable: false, span: test_span() }],
+        vec![MirBlock {
+            id: MirBlockId(0),
+            statements: vec![call_stmt(
+                Some(MirPlace::local(MirLocalId(1))),
+                MirFunctionId(2),
+                vec![MirOperand::Place(MirPlace::local(MirLocalId(0)))],
+            )],
+            terminator: MirTerminator {
+                kind: MirTerminatorKind::Return(Some(MirOperand::Place(MirPlace::local(MirLocalId(1))))),
+                span: test_span(),
+            },
+            span: test_span(),
+        }],
+        None,
+    );
+    let mut functions = vec![host, closure];
+    let metadata = synthetic_metadata(&[synthetic_row(2, 1, 0)]);
+    let errors = compose_with_metadata(
+        &mut functions,
+        &[],
+        &roles(),
+        &metadata,
+        ExpansionBudget::DOCUMENTED_DEFAULTS,
+        None,
+        &launch_entries(),
+    );
+    assert!(errors.is_empty(), "{errors:?}");
+    assert_eq!(call_count_to(&functions, MirFunctionId(2)), 1, "the host boundary call stays");
+    assert!(
+        functions
+            .iter()
+            .any(|function| function.id == MirFunctionId(2)),
+        "a host-referenced closure is not pruned"
+    );
+    let survivors = surviving_fragment_calls_with_metadata(&functions, &[], &roles(), &metadata);
+    assert!(
+        survivors.is_empty(),
+        "the launch boundary is not a composition survivor: {survivors:?}"
+    );
+}
+
+/// Without the carrier a source-less compute-stage function has no proven
+/// device identity: the kernel caller's call is not a device site, so
+/// composition leaves it for the fail-closed survivor gates downstream.
+#[test]
+fn uncarrid_synthetic_compute_is_not_a_device_callee() {
+    let mut types = TypeTable::new();
+    let ty = f32_ty(&mut types);
+    let uncarried = synthetic_kernel_closure(2, ty);
+    let entry = kernel_calling_helper(2, ty);
+    let mut functions = vec![entry, uncarried];
+    let errors = compose_with_metadata(
+        &mut functions,
+        &[],
+        &roles(),
+        &MirDeviceFunctionMetadataMap::default(),
+        ExpansionBudget::DOCUMENTED_DEFAULTS,
+        None,
+        &launch_entries(),
+    );
+    assert!(errors.is_empty(), "{errors:?}");
+    assert_eq!(
+        call_count_to(&functions, MirFunctionId(2)),
+        1,
+        "an uncarried call never composes"
+    );
+    assert!(
+        functions
+            .iter()
+            .any(|function| function.id == MirFunctionId(2)),
+        "an uncarried function is never pruned as a composed helper"
     );
 }

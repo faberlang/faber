@@ -735,6 +735,7 @@ fn generate_llvm_text_output(
         let code = if emit_nvvm_device_module || device_roles.is_empty() {
             crate::mir::emit_llvm_text_probe(crate::mir::LlvmEmitRequest {
                 device_roles: Some(device_roles.clone()),
+                device_function_metadata: Some(mir.device_function_metadata.clone()),
                 ..crate::mir::LlvmEmitRequest::new(&mir.validated, &mir.interner)
             })
             .map_err(llvm_text_codegen_error)?
@@ -751,6 +752,7 @@ fn generate_llvm_text_output(
             // available to that seam at this route.
             crate::mir::emit_llvm_text_probe(crate::mir::LlvmEmitRequest {
                 device_roles: Some(device_roles.clone()),
+                device_function_metadata: Some(mir.device_function_metadata.clone()),
                 host_partition: true,
                 host_partition_legality: crate::mir::device_semantics::DeviceLegalityFacts::default(),
                 ..crate::mir::LlvmEmitRequest::new(&mir.validated, &mir.interner)
@@ -866,8 +868,9 @@ fn generate_metal_text_output(
         // the local entry map before the probe — the spike-3 zero-entry red
         // is the omission this merge removes.
         let device_roles = merged_target_entry_roles(local_device_roles, &mir).map_err(imported_entry_error_spanned)?;
-        let output = crate::mir::emit_metal_text_probe_with_reflection_and_device_roles(
+        let output = radix_mir_metal::emit_metal_text_probe_with_reflection_and_function_metadata(
             &device_roles,
+            &mir.device_function_metadata,
             &mir.validated,
             &mir.interner,
         )
@@ -997,8 +1000,9 @@ fn generate_wgsl_text_output(
         let mir = lower_mir_with_context_for_target(analysis, no_fuse)?;
         // KPC-EMIT target-role handoff: same merged entry map as Metal/LLVM.
         let device_roles = merged_target_entry_roles(local_device_roles, &mir).map_err(imported_entry_error_spanned)?;
-        let output = crate::mir::emit_wgsl_text_probe_with_reflection_and_device_roles(
+        let output = radix_mir_wgsl::emit_wgsl_text_probe_with_reflection_and_function_metadata(
             &device_roles,
+            &mir.device_function_metadata,
             &mir.validated,
             &mir.interner,
         )

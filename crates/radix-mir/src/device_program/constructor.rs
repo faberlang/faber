@@ -16,7 +16,7 @@ use crate::abi::{
     collection_op_contract, MirKernelResource, MirKernelResourceAccess, MirKernelResourceKind,
     MirKernelResourceRole, MirKernelSignature,
 };
-use crate::device::MirCompanionMap;
+use crate::device::{MirCompanionMap, MirDeviceFunctionMetadataMap};
 use crate::device_program_plans::{
     is_transformer_recipe_op, kernel_plan_for_function,
     subchain_signature_for_emission_with_source,
@@ -31,7 +31,10 @@ use crate::kernel_decomposition::decompose_kernel_function;
 use crate::kernel_plan::CollectionKernelPlan;
 use crate::layout::MirTensorStorageLayout;
 use crate::static_shape_fold::{fold_validated_device_program, ShapeFoldError};
-use crate::{MirFunction, MirFunctionId, MirLocalId, MirStatementKind, MirType, ValidatedMir};
+use crate::{
+    MirCallee, MirConstant, MirFunction, MirFunctionId, MirFunctionVisibility, MirLocalId,
+    MirOperand, MirStatementKind, MirType, ValidatedMir,
+};
 use radix_hir::DefId;
 use radix_lexer::Interner;
 use radix_types::TypeTable;
@@ -256,6 +259,40 @@ pub struct DeviceGradientLink {
     pub gradient_slot: u32,
 }
 
+/// The direct function a call edge names, when it names one: a `Function`
+/// callee carries the id; a function-constant `Value` callee is the same
+/// physical edge. Used by the host-launch scan, never by entry admission
+/// policy itself.
+fn direct_callee_function_id(callee: &MirCallee) -> Option<MirFunctionId> {
+    match callee {
+        MirCallee::Function(id) => Some(*id),
+        MirCallee::Value(MirOperand::Constant(MirConstant::Function(id))) => Some(*id),
+        MirCallee::Value(_) | MirCallee::Closure(_) | MirCallee::Definition { .. } => None,
+    }
+}
+
+/// Explicit-facts admission for one compute-stage candidate (KCM-05).
+///
+/// Named functions admit through their source identity; source-less
+/// synthetic kernel closures admit only through their metadata carrier —
+/// public rows unconditionally, private rows only when a host caller still
+/// launches them; a source-less function with no carrier row never admits
+/// (fail-closed: an unclassifiable device body cannot become a launch).
+fn admits_device_entry(
+    function: &MirFunction,
+    metadata: &MirDeviceFunctionMetadataMap,
+    host_launched: &BTreeSet<MirFunctionId>,
+) -> bool {
+    if function.source.is_some() {
+        return true;
+    }
+    match metadata.get(&function.id).map(|row| row.visibility) {
+        Some(MirFunctionVisibility::Public) => true,
+        Some(MirFunctionVisibility::Private) => host_launched.contains(&function.id),
+        None => false,
+    }
+}
+
 /// Build the one target-neutral [`DeviceProgram`], its carried semantics, and
 /// the effective declared step count.
 ///
@@ -268,6 +305,14 @@ pub struct DeviceGradientLink {
 /// `declared_steps` is the caller's declared count, returned unchanged when
 /// there is no training program. The shared static-shape fold is applied once
 /// to the complete selected device set before any ABI or plan derivation.
+///
+/// Selection is explicit-facts admission (KCM-05), never the compute stage
+/// alone: a named function is admitted through its source identity; a
+/// source-less synthetic kernel closure is admitted only through its
+/// metadata carrier — public rows unconditionally, private rows only when a
+/// host caller still launches them (the one region/launch law); a
+/// source-less compute-stage function with no carrier row is never admitted
+/// (fail-closed — an unclassifiable device body cannot become a launch).
 ///
 /// **DPSC-U4a (the faber superset):** a multi-recipe body whose whole-function
 /// ABI/plan synthesis fails decomposes at recipe boundaries into subchain
@@ -294,12 +339,33 @@ pub fn build_device_program(
     training: Option<&DeviceTrainingFacts>,
     lifetime: DeviceProgramLifetime,
     declared_steps: u32,
+    device_function_metadata: &MirDeviceFunctionMetadataMap,
 ) -> Result<(DeviceProgram, DeviceSemantics, u32), DeviceProgramBuildError> {
     let program = validated.program();
+    // Host-launched synthetic closures: the physical launch fact is a
+    // remaining direct call edge from a host-side (non-device-stage) caller.
+    // Device-caller references belong to composition, not to a launch row.
+    let host_launched: BTreeSet<MirFunctionId> = program
+        .functions
+        .iter()
+        .filter(|caller| caller.shader_stage.is_none())
+        .flat_map(|caller| {
+            caller.blocks.iter().flat_map(|block| {
+                block
+                    .statements
+                    .iter()
+                    .filter_map(|statement| match &statement.kind {
+                        MirStatementKind::Call { callee, .. } => direct_callee_function_id(callee),
+                        _ => None,
+                    })
+            })
+        })
+        .collect();
     let mut selected_ids: BTreeSet<MirFunctionId> = program
         .functions
         .iter()
         .filter(|function| function.shader_stage == Some(crate::MirKernelShaderStage::Compute))
+        .filter(|function| admits_device_entry(function, device_function_metadata, &host_launched))
         .map(|function| function.id)
         .collect();
 
