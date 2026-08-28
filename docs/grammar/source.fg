@@ -677,7 +677,7 @@ tree_sitter_missing = ["·", "×", "∇", "≺", "≻", "⊗", "⊙"]
 # | Builtin | `lineam` | line |
 # | Builtin | `scriptum` | write |
 # | Annotation | `fragment` | nucleum fragment |
-# | Annotation | `nucleum` | kernel annotation |
+# | Annotation | `nucleum` | kernel annotation; kernel closure modifier |
 # | Testing | `fragilis` | flaky |
 # | Testing | `futurum` | future |
 # | Testing | `metior` | benchmark |
@@ -843,7 +843,7 @@ clausura_expr   := compact_clausura_expr | clausura_legacy_expr
 compact_clausura_expr := clausura_signature clausura_joint (expression | fac_block)
 @formerly clausuraSignature
 clausura_signature := (clausura_param | '(' clausura_params? ')') closure_modifier? return_clause? alternate_exit_clause?
-closure_modifier := 'libera'
+closure_modifier := 'libera' | 'nucleum'
 @formerly closureFacBlock
 fac_block := 'fac' block_stmt cape_clause?
 @formerly legacyClausuraExpr
