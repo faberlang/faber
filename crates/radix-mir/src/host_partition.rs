@@ -467,7 +467,36 @@ pub fn derive_partition_record(
     module: &str,
     legality: &DeviceLegalityFacts,
 ) -> Result<PartitionRecord, HostPartitionError> {
-    let partition = derive_host_partition(validated, interner)?;
+    derive_partition_record_with_metadata(
+        validated,
+        interner,
+        module,
+        legality,
+        &MirDeviceFunctionMetadataMap::default(),
+    )
+}
+
+/// Derive a partition record from the explicit source/synthetic function
+/// metadata carrier used by the device-program constructor.
+///
+/// The metadata-aware entry point is required for lowered programs whose
+/// launchability is carried by KCM facts rather than inferred from the
+/// compute-stage marker. The legacy [`derive_partition_record`] wrapper keeps
+/// the fail-closed empty-carrier behavior for callers that have no carrier.
+///
+/// # Errors
+///
+/// Returns a [`HostPartitionError`] when the base partition cannot be
+/// derived or the legality record fails the named-rule gate.
+pub fn derive_partition_record_with_metadata(
+    validated: &ValidatedMir<'_>,
+    interner: &Interner,
+    module: &str,
+    legality: &DeviceLegalityFacts,
+    device_function_metadata: &MirDeviceFunctionMetadataMap,
+) -> Result<PartitionRecord, HostPartitionError> {
+    let partition =
+        derive_host_partition_with_metadata(validated, interner, device_function_metadata)?;
 
     // Effect boundaries explicit (gate bullet 2): the legality gate runs over
     // the program's launch universe. A hostile fact on any device launch

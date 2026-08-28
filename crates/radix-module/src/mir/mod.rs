@@ -96,8 +96,9 @@ pub use radix_mir::dump_program;
 // callsite mapping + explicit effect boundaries) — the compiler artifact
 // proving DDCP3 gate bullets 1 + 2. Re-export hunks serialized after U2's.
 pub use radix_mir::host_partition::{
-    derive_host_partition, derive_partition_record, CallsiteId, CallsiteRecord, EffectBoundaryRecord, HostPartition,
-    HostPartitionError, PartitionMember, PartitionRecord, PartitionRole, RegionRecord,
+    derive_host_partition, derive_partition_record, derive_partition_record_with_metadata, CallsiteId, CallsiteRecord,
+    EffectBoundaryRecord, HostPartition, HostPartitionError, PartitionMember, PartitionRecord, PartitionRole,
+    RegionRecord,
 };
 pub use radix_mir::nodes::*;
 pub use radix_mir::{

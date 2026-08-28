@@ -13,13 +13,17 @@
 
 use super::*;
 use crate::boundary_abi::{derive_host_device_calls, MemberKernel, RegionArgumentLayout};
+use crate::device::{MirDeviceFunctionMetadata, MirDeviceFunctionMetadataMap};
 use crate::device_program::LaunchId;
 use crate::device_semantics::DeviceLegalityFacts;
-use crate::host_partition::{derive_host_partition, derive_partition_record, PartitionRecord};
+use crate::host_partition::{
+    derive_host_partition_with_metadata, derive_partition_record_with_metadata, PartitionRecord,
+};
 use crate::{
-    MirBlock, MirBlockId, MirCallee, MirFunction, MirFunctionId, MirKernelShaderStage, MirLocal,
-    MirLocalId, MirOperand, MirParam, MirParamMode, MirPlace, MirProgram, MirStatement,
-    MirStatementKind, MirTerminator, MirTerminatorKind, MirType, MirValidationContext,
+    MirBlock, MirBlockId, MirCallee, MirDeviceRole, MirFunction, MirFunctionId, MirFunctionOrigin,
+    MirFunctionVisibility, MirKernelShaderStage, MirLocal, MirLocalId, MirOperand, MirParam,
+    MirParamMode, MirPlace, MirProgram, MirStatement, MirStatementKind,
+    MirSyntheticFunctionIdentity, MirTerminator, MirTerminatorKind, MirType, MirValidationContext,
     ValidatedMir,
 };
 use radix_lexer::{Interner, Span};
@@ -47,6 +51,33 @@ fn param(local_id: u32, ty: MirType) -> MirParam {
         mode: MirParamMode::Owned,
         span: Span::default(),
     }
+}
+
+/// Explicit source-entry facts for this named-kernel fixture. The KCM
+/// admission contract no longer infers launchability from the compute-stage
+/// marker alone, so the fixture carries the same public Source row as the
+/// product lowering path.
+fn fixture_metadata(program: &MirProgram) -> MirDeviceFunctionMetadataMap {
+    program
+        .functions
+        .iter()
+        .filter(|function| function.shader_stage == Some(MirKernelShaderStage::Compute))
+        .map(|function| {
+            (
+                function.id,
+                MirDeviceFunctionMetadata {
+                    identity: MirSyntheticFunctionIdentity {
+                        parent: MirFunctionId(0),
+                        ordinal: 0,
+                    },
+                    role: MirDeviceRole::Kernel,
+                    shader_stage: MirKernelShaderStage::Compute,
+                    visibility: MirFunctionVisibility::Public,
+                    origin: MirFunctionOrigin::Source,
+                },
+            )
+        })
+        .collect()
 }
 
 /// The minimal one-region vertical fixture (NGAB0-U11 shape): one Compute
@@ -127,13 +158,15 @@ fn derive_vertical(
     let program = vertical_program(types, interner);
     let context = MirValidationContext::new(types);
     let validated = ValidatedMir::new(program, context).expect("the vertical fixture validates");
-    let partition = derive_host_partition(&validated, interner)
+    let metadata = fixture_metadata(validated.program());
+    let partition = derive_host_partition_with_metadata(&validated, interner, &metadata)
         .expect("the vertical partition derives (boundary-ABI gate green)");
-    let record = derive_partition_record(
+    let record = derive_partition_record_with_metadata(
         &validated,
         interner,
         "fixture-u11",
         &DeviceLegalityFacts::default(),
+        &metadata,
     )
     .expect("the vertical partition record derives (legality gate green)");
     (partition, record)

@@ -838,8 +838,14 @@ pub fn partition_record_json(session: &Session, name: &str, source: &str) -> Res
         Err(err) => return Err(compile_codegen_error(analysis, name, source, err).diagnostics),
     };
     let legality = crate::mir::device_semantics::DeviceLegalityFacts::default();
-    let record = crate::mir::derive_partition_record(&mir.validated, &mir.interner, name, &legality)
-        .map_err(|error| vec![codegen_diagnostic(name, "PARTITION_RECORD", error.to_string())])?;
+    let record = crate::mir::derive_partition_record_with_metadata(
+        &mir.validated,
+        &mir.interner,
+        name,
+        &legality,
+        &mir.device_function_metadata,
+    )
+    .map_err(|error| vec![codegen_diagnostic(name, "PARTITION_RECORD", error.to_string())])?;
     serde_json::to_string_pretty(&record).map_err(|error| {
         vec![codegen_diagnostic(
             name,

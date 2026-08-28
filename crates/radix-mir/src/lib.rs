@@ -141,7 +141,8 @@ pub use generic::{
     type_contains_param, MirGenericBindings,
 };
 pub use host_partition::{
-    derive_host_partition, kernel_entry_name, HostPartition, HostPartitionError,
+    derive_host_partition, derive_partition_record_with_metadata, kernel_entry_name, HostPartition,
+    HostPartitionError,
 };
 pub use inference_blocker_matrix::{
     inference_blocker_rows, inference_non_claims, InferenceBlockerKind, InferenceBlockerRow,

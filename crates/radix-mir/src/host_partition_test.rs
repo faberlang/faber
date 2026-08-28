@@ -234,8 +234,12 @@ fn resource_identity_and_mutation_rules_survive_to_device_program() {
         )
         .expect("the U11 kernel's ABI synthesizes");
 
-    let partition =
-        derive_host_partition(&validated, &interner).expect("the U11 partition derives");
+    let partition = derive_host_partition_with_metadata(
+        &validated,
+        &interner,
+        &fixture_metadata(validated.program()),
+    )
+    .expect("the U11 partition derives");
     let derived = &partition.device_program.kernels[0];
 
     // Every storage-buffer resource of the semantic signature survives, in
@@ -632,11 +636,12 @@ fn derive_u11_record(types: &mut TypeTable, interner: &mut Interner) -> Partitio
     let program = u11_program(types, interner);
     let context = MirValidationContext::new(types);
     let validated = ValidatedMir::new(program, context).expect("the U11 MIR fixture validates");
-    derive_partition_record(
+    derive_partition_record_with_metadata(
         &validated,
         interner,
         "fixture-u11",
         &DeviceLegalityFacts::default(),
+        &fixture_metadata(validated.program()),
     )
     .expect("the U11 partition record derives")
 }
@@ -790,7 +795,13 @@ fn partition_record_effect_boundary_negative_fails_closed() {
         kind: DeviceEffectBoundaryKind::Ad,
     });
     assert!(matches!(
-        derive_partition_record(&validated, &interner, "fixture-u11", &legality),
+        derive_partition_record_with_metadata(
+            &validated,
+            &interner,
+            "fixture-u11",
+            &legality,
+            &fixture_metadata(validated.program()),
+        ),
         Err(HostPartitionError::Program(
             DeviceProgramError::DeviceFunctionHostileEffect {
                 launch: LaunchId(1),
