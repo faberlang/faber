@@ -265,19 +265,18 @@ pub fn generate_from_analyzed_with_options(
                 let mut output = gen.generate(&analysis.hir, &analysis.types, &analysis.interner)?;
 
                 if !provider_modules.is_empty() {
-                    let mut assembled = String::new();
+                    let mut module_block = String::new();
                     for (module_name, module_code) in &provider_modules {
-                        assembled.push_str("pub mod ");
-                        assembled.push_str(module_name);
-                        assembled.push_str(" {\n");
-                        assembled.push_str(module_code);
+                        module_block.push_str("pub mod ");
+                        module_block.push_str(module_name);
+                        module_block.push_str(" {\n");
+                        module_block.push_str(module_code);
                         if !module_code.ends_with('\n') {
-                            assembled.push('\n');
+                            module_block.push('\n');
                         }
-                        assembled.push_str("}\n\n");
+                        module_block.push_str("}\n\n");
                     }
-                    assembled.push_str(&output.code);
-                    output.code = assembled;
+                    output.code = insert_modules_after_leading_crate_attributes(&output.code, &module_block);
                 }
 
                 Ok(crate::Output::Rust(crate::RustOutput { code: output.code }))
@@ -908,4 +907,32 @@ fn reject_rust_unsupported_types(types: &TypeTable) -> Result<(), CodegenError> 
         }
     }
     Ok(())
+}
+
+/// Splice provider `modules` into entry code after its leading crate
+/// attributes (comments/blank lines/`#![...]`), mirroring the package crate
+/// assembler in `radix-program`. Prepending before the attributes would strand
+/// the entry's inner-attribute preamble mid-file, where Rust rejects it.
+fn insert_modules_after_leading_crate_attributes(entry: &str, modules: &str) -> String {
+    let mut insert_at = 0usize;
+    let mut scanned = 0usize;
+    for line in entry.lines() {
+        let trimmed = line.trim();
+        scanned += line.len() + 1;
+        if trimmed.is_empty() || trimmed.starts_with("//") {
+            insert_at = scanned;
+            continue;
+        }
+        if trimmed.starts_with("#![") {
+            insert_at = scanned;
+            continue;
+        }
+        break;
+    }
+    let insert_at = insert_at.min(entry.len());
+    let mut assembled = String::with_capacity(entry.len() + modules.len());
+    assembled.push_str(&entry[..insert_at]);
+    assembled.push_str(modules);
+    assembled.push_str(&entry[insert_at..]);
+    assembled
 }

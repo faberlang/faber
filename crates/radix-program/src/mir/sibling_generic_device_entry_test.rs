@@ -105,7 +105,10 @@ fn sibling_generic_kernel_registers_with_ordered_use_site_bindings() {
 
             // Provider identity: the package product + the sibling module.
             assert!(!registration.route.identity.product.is_empty());
-            assert_eq!(registration.route.identity.module_path, vec!["nn".to_owned()]);
+            assert_eq!(
+                registration.route.identity.module_path,
+                vec!["nn".to_owned()]
+            );
             assert_eq!(
                 registration.route.contract.role,
                 radix_module::file_interface::InterfaceDeviceRole::Kernel
@@ -125,7 +128,11 @@ fn sibling_generic_kernel_registers_with_ordered_use_site_bindings() {
                 .iter()
                 .filter_map(|index| literal_shape(types, *index))
                 .collect::<Vec<_>>();
-            assert_eq!(shapes, vec![2, 2, 2], "linear must bind [M, K, N] = [2, 2, 2]");
+            assert_eq!(
+                shapes,
+                vec![2, 2, 2],
+                "linear must bind [M, K, N] = [2, 2, 2]"
+            );
 
             // The concrete instance exists in the merged program and joins
             // the merged synthetic template source.
@@ -156,5 +163,7 @@ fn sibling_generic_kernel_registers_with_ordered_use_site_bindings() {
             );
         },
     )
-    .unwrap_or_else(|errors| panic!("sibling generic device package must lower green, got {errors:?}"));
+    .unwrap_or_else(|errors| {
+        panic!("sibling generic device package must lower green, got {errors:?}")
+    });
 }

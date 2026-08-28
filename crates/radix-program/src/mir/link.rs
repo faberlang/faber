@@ -504,16 +504,17 @@ fn link_sibling_import_item(
                 links.next_synthetic += 1;
                 def_id
             });
-        if let Some(contract) = sibling
-            .file_interface
-            .exports
-            .get(&function.name)
-            .and_then(|export| match &export.kind {
-                radix_module::file_interface::FileExportKind::Function(callable) => {
-                    callable.device.clone()
-                }
-                _ => None,
-            })
+        if let Some(contract) =
+            sibling
+                .file_interface
+                .exports
+                .get(&function.name)
+                .and_then(|export| match &export.kind {
+                    radix_module::file_interface::FileExportKind::Function(callable) => {
+                        callable.device.clone()
+                    }
+                    _ => None,
+                })
         {
             links.imported_device_routes.push((
                 synthetic,
