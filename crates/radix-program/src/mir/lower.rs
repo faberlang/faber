@@ -1987,35 +1987,37 @@ fn instantiate_package_generics(
     // concrete instances and signature-only routes fail closed. CDC-1: the
     // consumer units' own device roles and launch entries ride the same call
     // as the leaf-tail union (no second composition pass, no dual authority).
-    let (extra, registrations) = radix_module::mir::instantiate_merged_generic_calls_with_devices(
-        &mut merged.program,
-        &templates,
-        &generic_params,
-        &mut types,
-        &merged.interner,
-        extra_validation
-            .map(|validation| validation.struct_metadata())
-            .as_ref(),
-        &imported_devices,
-        &consumer_device_roles,
-        &consumer_launch_entries,
-    )
-    .map_err(|errors| {
-        errors
-            .into_iter()
-            .map(|error| {
-                // Preserve the named fail-closed issue (KPC-WIRE done_when
-                // (e)): `imported_device_body_missing` and its siblings are
-                // machine-readable identities, not message prose.
-                let diagnostic = mir_lowering_diag(diagnostic_path, error.message);
-                if error.issue.is_empty() {
-                    diagnostic
-                } else {
-                    diagnostic.with_arg("issue", error.issue)
-                }
-            })
-            .collect::<Vec<_>>()
-    })?;
+    let (extra, registrations) =
+        radix_module::mir::instantiate_merged_generic_calls_with_devices_and_metadata(
+            &mut merged.program,
+            &templates,
+            &generic_params,
+            &mut types,
+            &merged.interner,
+            extra_validation
+                .map(|validation| validation.struct_metadata())
+                .as_ref(),
+            &mut merged.device_function_metadata,
+            &imported_devices,
+            &consumer_device_roles,
+            &consumer_launch_entries,
+        )
+        .map_err(|errors| {
+            errors
+                .into_iter()
+                .map(|error| {
+                    // Preserve the named fail-closed issue (KPC-WIRE done_when
+                    // (e)): `imported_device_body_missing` and its siblings are
+                    // machine-readable identities, not message prose.
+                    let diagnostic = mir_lowering_diag(diagnostic_path, error.message);
+                    if error.issue.is_empty() {
+                        diagnostic
+                    } else {
+                        diagnostic.with_arg("issue", error.issue)
+                    }
+                })
+                .collect::<Vec<_>>()
+        })?;
     merged.monomorphizations.extend(extra);
     merged.imported_device_registrations = registrations;
     merged.generic_templates = templates;

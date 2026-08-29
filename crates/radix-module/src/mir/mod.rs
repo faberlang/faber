@@ -66,8 +66,9 @@ pub use llvm_text::{
 pub use lower::prepare_mir_lowering_interner;
 pub use lower::{
     dump_analyzed_unit, instantiate_merged_generic_calls, instantiate_merged_generic_calls_with_devices,
-    lower_analyzed_unit, ImportedDeviceIndex, ImportedDeviceRegistration, ImportedDeviceRoute, LoweredMirUnit,
-    MirError, MirGenericParam, MirLoweringOptions, MirRuntimeRecordField, MirRuntimeRecordValue, PackageStructMetadata,
+    instantiate_merged_generic_calls_with_devices_and_metadata, lower_analyzed_unit, ImportedDeviceIndex,
+    ImportedDeviceRegistration, ImportedDeviceRoute, LoweredMirUnit, MirError, MirGenericParam, MirLoweringOptions,
+    MirRuntimeRecordField, MirRuntimeRecordValue, PackageStructMetadata,
 };
 #[cfg(feature = "mir-metal")]
 pub use metal_text::{

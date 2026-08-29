@@ -233,6 +233,23 @@ fn imported_twin_instance_records_key_route_registration_and_visibility() {
                     .any(|function| function.id == twin_add.function),
                 "the registered instance must exist in the merged program"
             );
+            let metadata = lowered
+                .device_function_metadata
+                .get(&twin_add.function)
+                .expect("the registered public instance must carry source metadata");
+            assert_eq!(metadata.role, radix_module::mir::MirDeviceRole::Kernel);
+            assert_eq!(
+                metadata.shader_stage,
+                radix_module::mir::MirKernelShaderStage::Compute
+            );
+            assert_eq!(
+                metadata.visibility,
+                radix_module::mir::MirFunctionVisibility::Public
+            );
+            assert_eq!(
+                metadata.origin,
+                radix_module::mir::MirFunctionOrigin::Source
+            );
             assert!(
                 lowered
                     .generic_templates
