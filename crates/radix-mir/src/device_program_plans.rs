@@ -27,8 +27,8 @@ use crate::layout::MirTensorStorageLayout;
 use crate::{
     MirCollectionOp, MirConstant, MirFunction, MirIntrinsic, MirKernelDispatchSize,
     MirKernelWorkgroupCount, MirLayoutKind, MirLocalId, MirOperand, MirPlaceBase, MirRuntimeCall,
-    MirStatementKind, MirTempId, MirTerminatorKind, MirType, MirUnOp, MirValidationContext,
-    MirValueKind, MirWorkgroupSize,
+    MirStatement, MirStatementKind, MirTempId, MirTerminatorKind, MirType, MirUnOp,
+    MirValidationContext, MirValue, MirValueKind, MirWorkgroupSize,
 };
 use radix_types::{NumericWidth, Primitive, Type, TypeId};
 use rustc_hash::FxHashMap;
@@ -3912,12 +3912,18 @@ pub fn composed_matmul_plan_for_function(
     let destinations = matmuls
         .iter()
         .map(|(statement_index, call, destination)| {
-            composed_matmul_stage_destination(function, *statement_index, call, *destination)
-                .ok_or_else(|| {
-                    PlanMappingError::mapping(
-                        "composed matmul stage destination must be an unprojected local",
-                    )
-                })
+            composed_matmul_stage_destination(
+                function,
+                validation,
+                *statement_index,
+                call,
+                *destination,
+            )
+            .ok_or_else(|| {
+                PlanMappingError::mapping(
+                    "composed matmul stage destination must be an unprojected local",
+                )
+            })
         })
         .collect::<Result<Vec<_>, _>>()?;
     if destinations.windows(2).any(|pair| pair[0] == pair[1]) {
@@ -3926,13 +3932,16 @@ pub fn composed_matmul_plan_for_function(
     if pointwise.len() != 1 {
         return Ok(None);
     }
-    let Some((swiglu_statement_index, _swiglu_call, swiglu_destination)) =
-        pointwise.into_iter().find(|(_, call, _)| {
-            call.args.len() == 2
-                && call.args.iter().all(|arg| {
-                    crate::read_analysis::operand_local(arg)
-                        .is_some_and(|local| destinations[..2].contains(&local))
-                })
+    let Some((swiglu_statement_index, swiglu_call, swiglu_destination)) =
+        pointwise.into_iter().find(|(statement_index, call, _)| {
+            composed_matmul_swiglu_operands(
+                function,
+                *statement_index,
+                call,
+                destinations[0],
+                destinations[1],
+                validation,
+            )
         })
     else {
         return Ok(None);
@@ -3942,10 +3951,13 @@ pub fn composed_matmul_plan_for_function(
             "composed matmul SwiGLU consumer must occur between the up and down producers",
         ));
     }
-    let Some(swiglu_local) = swiglu_destination.and_then(|place| match place.base {
-        MirPlaceBase::Local(local) if place.projections.is_empty() => Some(local),
-        _ => None,
-    }) else {
+    let Some(swiglu_local) = composed_matmul_stage_destination(
+        function,
+        validation,
+        swiglu_statement_index,
+        swiglu_call,
+        swiglu_destination,
+    ) else {
         return Err(PlanMappingError::mapping(
             "composed SwiGLU destination must be an unprojected local",
         ));
@@ -4023,11 +4035,366 @@ pub fn composed_matmul_plan_for_function(
     Ok(Some(plan))
 }
 
+/// Match the pointwise SwiGLU consumer against the Gate and Up producers.
+///
+/// The direct test fixture uses the already-materialized Gate local. Faber's
+/// source lowering expands `silu()` before the `TensorMul`, so the real body
+/// reaches that consumer through the bounded `neg → exp → add → div` chain.
+/// Both forms retain plain local operands and the same typed stage values.
+fn composed_matmul_swiglu_operands(
+    function: &MirFunction,
+    consumer_index: usize,
+    call: &MirRuntimeCall,
+    gate_local: MirLocalId,
+    up_local: MirLocalId,
+    validation: &MirValidationContext<'_>,
+) -> bool {
+    let [first, second] = call.args.as_slice() else {
+        return false;
+    };
+    let (Some(first_local), Some(second_local)) = (
+        composed_matmul_plain_local(first),
+        composed_matmul_plain_local(second),
+    ) else {
+        return false;
+    };
+    let Some(gate_ty) = crate::local_ty::local_ty(function, gate_local) else {
+        return false;
+    };
+    let Some(up_ty) = crate::local_ty::local_ty(function, up_local) else {
+        return false;
+    };
+    if !validation
+        .types
+        .equals(gate_ty.semantic_id(), up_ty.semantic_id())
+        || !validation
+            .types
+            .equals(gate_ty.semantic_id(), call.return_ty.semantic_id())
+    {
+        return false;
+    }
+
+    if (first_local == gate_local && second_local == up_local)
+        || (first_local == up_local && second_local == gate_local)
+    {
+        return true;
+    }
+    let activation_local = if first_local == up_local {
+        second_local
+    } else if second_local == up_local {
+        first_local
+    } else {
+        return false;
+    };
+    if activation_local == gate_local || activation_local == up_local {
+        return false;
+    }
+    let Some(activation_ty) = crate::local_ty::local_ty(function, activation_local) else {
+        return false;
+    };
+    if !validation
+        .types
+        .equals(activation_ty.semantic_id(), gate_ty.semantic_id())
+    {
+        return false;
+    }
+    composed_matmul_silu_activation_reaches_gate(
+        function,
+        consumer_index,
+        activation_local,
+        gate_local,
+    )
+}
+
+/// Prove the source-lowered `silu(gate)` local used by the SwiGLU consumer.
+/// Each producer has one immediately following consumer, and every temporary
+/// in the chain has exactly one producer and one reader. This is deliberately
+/// a bounded shape match, not a general data-flow or name-based inference.
+fn composed_matmul_silu_activation_reaches_gate(
+    function: &MirFunction,
+    consumer_index: usize,
+    activation_local: MirLocalId,
+    gate_local: MirLocalId,
+) -> bool {
+    let Some(block) = function.blocks.first() else {
+        return false;
+    };
+    let Some(activation_assign_index) = consumer_index.checked_sub(1) else {
+        return false;
+    };
+    let Some(activation_assign) = block.statements.get(activation_assign_index) else {
+        return false;
+    };
+    let Some(activation_temp) =
+        composed_matmul_forward_temp_at(activation_assign, activation_local)
+    else {
+        return false;
+    };
+    let Some(div_index) = activation_assign_index.checked_sub(1) else {
+        return false;
+    };
+    let Some(div_statement) = block.statements.get(div_index) else {
+        return false;
+    };
+    let Some(div_call) = composed_matmul_runtime_call_writing_temp(
+        div_statement,
+        MirCollectionOp::TensorDiv,
+        activation_temp,
+    ) else {
+        return false;
+    };
+    let [gate_operand, denominator_operand] = div_call.args.as_slice() else {
+        return false;
+    };
+    if composed_matmul_plain_local(gate_operand) != Some(gate_local) {
+        return false;
+    }
+    let Some(denominator_temp) = composed_matmul_plain_temp(denominator_operand) else {
+        return false;
+    };
+
+    let Some(add_index) = div_index.checked_sub(1) else {
+        return false;
+    };
+    let Some(add_statement) = block.statements.get(add_index) else {
+        return false;
+    };
+    let Some(add_call) = composed_matmul_runtime_call_writing_temp(
+        add_statement,
+        MirCollectionOp::TensorAdd,
+        denominator_temp,
+    ) else {
+        return false;
+    };
+    let [exp_operand, one_operand] = add_call.args.as_slice() else {
+        return false;
+    };
+    let Some(exp_temp) = composed_matmul_plain_temp(exp_operand) else {
+        return false;
+    };
+    if !matches!(one_operand, MirOperand::Constant(MirConstant::Float(value)) if *value == 1.0) {
+        return false;
+    }
+
+    let Some(exp_index) = add_index.checked_sub(1) else {
+        return false;
+    };
+    let Some(exp_statement) = block.statements.get(exp_index) else {
+        return false;
+    };
+    let Some(neg_temp) = composed_matmul_exp_assignment(exp_statement, exp_temp) else {
+        return false;
+    };
+    let Some(neg_index) = exp_index.checked_sub(1) else {
+        return false;
+    };
+    let Some(neg_statement) = block.statements.get(neg_index) else {
+        return false;
+    };
+    let Some(neg_call) = composed_matmul_runtime_call_writing_temp(
+        neg_statement,
+        MirCollectionOp::TensorNeg,
+        neg_temp,
+    ) else {
+        return false;
+    };
+    let [neg_operand] = neg_call.args.as_slice() else {
+        return false;
+    };
+    if composed_matmul_plain_local(neg_operand) != Some(gate_local) {
+        return false;
+    }
+
+    [
+        (neg_temp, neg_index, exp_index),
+        (exp_temp, exp_index, add_index),
+        (denominator_temp, add_index, div_index),
+        (activation_temp, div_index, activation_assign_index),
+    ]
+    .into_iter()
+    .all(|(temp, producer_index, consumer_index)| {
+        composed_matmul_temp_has_only_producer(function, temp, producer_index)
+            && composed_matmul_temp_has_only_consumer(function, temp, consumer_index)
+    })
+}
+
+fn composed_matmul_plain_local(operand: &MirOperand) -> Option<MirLocalId> {
+    let MirOperand::Place(place) = operand else {
+        return None;
+    };
+    match place.base {
+        MirPlaceBase::Local(local) if place.projections.is_empty() => Some(local),
+        _ => None,
+    }
+}
+
+fn composed_matmul_plain_temp(operand: &MirOperand) -> Option<MirTempId> {
+    match operand {
+        MirOperand::Temp(temp) => Some(*temp),
+        MirOperand::Place(place)
+            if place.projections.is_empty() && matches!(place.base, MirPlaceBase::Temp(_)) =>
+        {
+            match place.base {
+                MirPlaceBase::Temp(temp) => Some(temp),
+                MirPlaceBase::Local(_) => None,
+            }
+        }
+        MirOperand::Place(_) | MirOperand::Constant(_) | MirOperand::Value(_) => None,
+    }
+}
+
+fn composed_matmul_forward_temp_at(
+    statement: &MirStatement,
+    local: MirLocalId,
+) -> Option<MirTempId> {
+    let MirStatementKind::Assign { place, value } = &statement.kind else {
+        return None;
+    };
+    if !matches!(place.base, MirPlaceBase::Local(candidate) if candidate == local)
+        || !place.projections.is_empty()
+    {
+        return None;
+    }
+    match &value.kind {
+        MirValueKind::Operand(operand) => composed_matmul_plain_temp(operand),
+        MirValueKind::Unary { .. }
+        | MirValueKind::Binary { .. }
+        | MirValueKind::Option(_)
+        | MirValueKind::Closure(_) => None,
+    }
+}
+
+fn composed_matmul_runtime_call_writing_temp(
+    statement: &MirStatement,
+    operation: MirCollectionOp,
+    temp: MirTempId,
+) -> Option<&MirRuntimeCall> {
+    let MirStatementKind::RuntimeCall {
+        destination: Some(destination),
+        call,
+        ..
+    } = &statement.kind
+    else {
+        return None;
+    };
+    if !matches!(destination.base, MirPlaceBase::Temp(candidate) if candidate == temp)
+        || !destination.projections.is_empty()
+    {
+        return None;
+    }
+    matches!(call.intrinsic, MirIntrinsic::Collection(candidate) if candidate == operation)
+        .then_some(call)
+}
+
+fn composed_matmul_exp_assignment(
+    statement: &MirStatement,
+    exp_temp: MirTempId,
+) -> Option<MirTempId> {
+    let MirStatementKind::Assign { place, value } = &statement.kind else {
+        return None;
+    };
+    if !matches!(place.base, MirPlaceBase::Temp(_)) || !place.projections.is_empty() {
+        return None;
+    }
+    let MirPlaceBase::Temp(result_temp) = place.base else {
+        return None;
+    };
+    if result_temp != exp_temp {
+        return None;
+    }
+    let MirValueKind::Unary {
+        op: MirUnOp::Exp,
+        operand: MirOperand::Temp(neg_temp),
+    } = &value.kind
+    else {
+        return None;
+    };
+    Some(*neg_temp)
+}
+
+/// A chain temporary must have exactly the expected reader. In particular,
+/// a second direct read cannot be hidden behind the local-forwarding shape.
+fn composed_matmul_temp_has_only_consumer(
+    function: &MirFunction,
+    temp: MirTempId,
+    consumer_index: usize,
+) -> bool {
+    let mut reads = 0;
+    let Some(block) = function.blocks.first() else {
+        return false;
+    };
+    for (statement_index, statement) in block.statements.iter().enumerate() {
+        if composed_matmul_statement_reads_temp(statement, temp) {
+            if statement_index != consumer_index {
+                return false;
+            }
+            reads += 1;
+        }
+    }
+    if composed_matmul_terminator_reads_temp(&block.terminator.kind, temp) {
+        return false;
+    }
+    reads == 1
+}
+
+fn composed_matmul_statement_reads_temp(statement: &MirStatement, temp: MirTempId) -> bool {
+    match &statement.kind {
+        MirStatementKind::Assign { value, .. } => composed_matmul_value_reads_temp(value, temp),
+        MirStatementKind::RuntimeCall { call, .. } => call
+            .args
+            .iter()
+            .any(|operand| composed_matmul_operand_reads_temp(operand, temp)),
+        // These forms are not part of the admitted source shape. Treating
+        // them as reads is the conservative choice for a chain temp.
+        MirStatementKind::Construct { .. } | MirStatementKind::Call { .. } => true,
+    }
+}
+
+fn composed_matmul_value_reads_temp(value: &MirValue, temp: MirTempId) -> bool {
+    match &value.kind {
+        MirValueKind::Operand(operand) | MirValueKind::Unary { operand, .. } => {
+            composed_matmul_operand_reads_temp(operand, temp)
+        }
+        MirValueKind::Binary { lhs, rhs, .. } => {
+            composed_matmul_operand_reads_temp(lhs, temp)
+                || composed_matmul_operand_reads_temp(rhs, temp)
+        }
+        MirValueKind::Option(_) | MirValueKind::Closure(_) => true,
+    }
+}
+
+fn composed_matmul_operand_reads_temp(operand: &MirOperand, temp: MirTempId) -> bool {
+    match operand {
+        MirOperand::Temp(candidate) => *candidate == temp,
+        MirOperand::Place(place) => {
+            matches!(place.base, MirPlaceBase::Temp(candidate) if candidate == temp)
+        }
+        MirOperand::Constant(_) | MirOperand::Value(_) => false,
+    }
+}
+
+fn composed_matmul_terminator_reads_temp(terminator: &MirTerminatorKind, temp: MirTempId) -> bool {
+    match terminator {
+        MirTerminatorKind::Return(Some(operand)) | MirTerminatorKind::ReturnError(operand) => {
+            composed_matmul_operand_reads_temp(operand, temp)
+        }
+        MirTerminatorKind::Branch { condition, .. }
+        | MirTerminatorKind::Switch {
+            value: condition, ..
+        } => composed_matmul_operand_reads_temp(condition, temp),
+        MirTerminatorKind::TryCall { .. } => true,
+        MirTerminatorKind::Return(None)
+        | MirTerminatorKind::Goto(_)
+        | MirTerminatorKind::Unreachable => false,
+    }
+}
+
 /// Resolve a composed matmul's typed stage destination. Direct unprojected
 /// locals remain the primary path; source-shaped calls may instead write a
 /// result temp and immediately forward it to an unprojected local.
 fn composed_matmul_stage_destination(
     function: &MirFunction,
+    validation: &MirValidationContext<'_>,
     statement_index: usize,
     call: &MirRuntimeCall,
     destination: Option<&crate::MirPlace>,
@@ -4077,9 +4444,15 @@ fn composed_matmul_stage_destination(
         .find(|entry| entry.id == temp)
         .map(|entry| entry.ty)?;
     let local_ty = crate::local_ty::local_ty(function, local)?;
-    if temp_ty.semantic_id() != call.return_ty.semantic_id()
-        || value.ty.semantic_id() != call.return_ty.semantic_id()
-        || local_ty.semantic_id() != call.return_ty.semantic_id()
+    if !validation
+        .types
+        .equals(temp_ty.semantic_id(), call.return_ty.semantic_id())
+        || !validation
+            .types
+            .equals(value.ty.semantic_id(), call.return_ty.semantic_id())
+        || !validation
+            .types
+            .equals(local_ty.semantic_id(), call.return_ty.semantic_id())
     {
         return None;
     }
@@ -4152,9 +4525,45 @@ pub fn composed_matmul_signature_for_emission(
     signature
         .append_composed_stage_outputs(function, validation, plan)
         .map_err(|error| PlanMappingError::mapping(error.message))?;
-    plan.validate_for_dispatch(signature.dispatch_size, signature.workgroup)
+    // The composed handoff remains the target-neutral one-workgroup barrier
+    // contract. A tiled launch can still use this signature when its consumer
+    // serializes the admitted tile grid through one active workgroup; keep the
+    // actual launch dimensions in the signature for the host while validating
+    // the effective handoff dispatch at one workgroup.
+    let effective_dispatch = if composed_matmul_serialized_dispatch_admitted(&signature, plan) {
+        MirKernelDispatchSize { x: 1, y: 1, z: 1 }
+    } else {
+        signature.dispatch_size
+    };
+    plan.validate_for_dispatch(effective_dispatch, signature.workgroup)
         .map_err(|error| PlanMappingError::mapping(error.to_string()))?;
     Ok(signature)
+}
+
+/// Whether a composed signature's ordinary tile-grid launch can be consumed
+/// through the plan's existing single-workgroup barrier contract. This is
+/// based only on typed signature/plan geometry; it does not inspect source
+/// names or add a backend-specific plan mode.
+fn composed_matmul_serialized_dispatch_admitted(
+    signature: &MirKernelSignature,
+    plan: &crate::kernel_plan::ComposedMatMulPlan,
+) -> bool {
+    let Some(first_shape) = plan.stages.first().and_then(|stage| stage.shape) else {
+        return false;
+    };
+    let tile = u64::from(crate::kernel_plan::MATMUL_TILE);
+    let legal_workgroup_y = if first_shape.m == 1 {
+        signature.workgroup.y == 1 || signature.workgroup.y == crate::kernel_plan::MATMUL_TILE
+    } else {
+        signature.workgroup.y == crate::kernel_plan::MATMUL_TILE
+    };
+    signature.dispatch_size != MirKernelDispatchSize { x: 1, y: 1, z: 1 }
+        && signature.workgroup.x == crate::kernel_plan::MATMUL_TILE
+        && legal_workgroup_y
+        && signature.workgroup.z == 1
+        && signature.dispatch_size.z == 1
+        && signature.dispatch_size.x == first_shape.n.div_ceil(tile)
+        && signature.dispatch_size.y == first_shape.m.div_ceil(tile)
 }
 
 /// Resolve one matmul call's rank-2 × rank-1/rank-2 typed geometry.

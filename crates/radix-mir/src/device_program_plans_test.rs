@@ -569,6 +569,319 @@ fn composed_mlp_assign_then_use_function(types: &mut TypeTable) -> MirFunction {
     }
 }
 
+/// The exact direct-op parent shape emitted by the Faber lowering. The
+/// collection calls write result-specific temps, while the following typed
+/// assignments forward those results into the declared stage locals. The
+/// result temps use an equivalent alias type, which mirrors the real
+/// lowering's distinct call-result and declared-local type ids.
+fn composed_mlp_real_lowered_function(types: &mut TypeTable) -> MirFunction {
+    let input = rank2_tensor_ty(types, [2, 4]);
+    let gate_weights = rank2_tensor_ty(types, [4, 3]);
+    let up_weights = rank2_tensor_ty(types, [4, 3]);
+    let down_weights = rank2_tensor_ty(types, [3, 5]);
+    let gate = rank2_tensor_ty(types, [2, 3]);
+    let up = rank2_tensor_ty(types, [2, 3]);
+    let activated = rank2_tensor_ty(types, [2, 3]);
+    let fused = rank2_tensor_ty(types, [2, 3]);
+    let down = rank2_tensor_ty(types, [2, 5]);
+    let alias = |name: u32, ty: MirType, types: &mut TypeTable| {
+        MirType::semantic(types.intern(Type::Alias(radix_hir::DefId(name), ty.semantic_id())))
+    };
+    let gate_result = alias(100, gate, types);
+    let up_result = alias(101, up, types);
+    let activated_result = alias(102, activated, types);
+    let fused_result = alias(103, fused, types);
+    let down_result = alias(104, down, types);
+    let span = test_span();
+    let matmul = |left: MirLocalId,
+                  right: MirLocalId,
+                  destination: MirTempId,
+                  return_ty: MirType| MirStatement {
+        kind: MirStatementKind::RuntimeCall {
+            destination: Some(MirPlace::temp(destination)),
+            call: MirRuntimeCall {
+                intrinsic: MirIntrinsic::Collection(MirCollectionOp::TensorMatMul),
+                args: vec![
+                    MirOperand::Place(MirPlace::local(left)),
+                    MirOperand::Place(MirPlace::local(right)),
+                ],
+                return_ty,
+            },
+        },
+        span,
+    };
+    let forward = |local: MirLocalId, temp: MirTempId, ty: MirType, id: u32| MirStatement {
+        kind: MirStatementKind::Assign {
+            place: MirPlace::local(local),
+            value: MirValue {
+                id: MirValueId(id),
+                kind: MirValueKind::Operand(MirOperand::Temp(temp)),
+                ty,
+                span,
+            },
+        },
+        span,
+    };
+    let runtime = |op: MirCollectionOp,
+                   destination: MirTempId,
+                   args: Vec<MirOperand>,
+                   return_ty: MirType| MirStatement {
+        kind: MirStatementKind::RuntimeCall {
+            destination: Some(MirPlace::temp(destination)),
+            call: MirRuntimeCall {
+                intrinsic: MirIntrinsic::Collection(op),
+                args,
+                return_ty,
+            },
+        },
+        span,
+    };
+    MirFunction {
+        id: MirFunctionId(0),
+        source: None,
+        name: None,
+        params: vec![
+            MirParam {
+                local: MirLocalId(0),
+                name: None,
+                ty: input,
+                mode: MirParamMode::Owned,
+                span,
+            },
+            MirParam {
+                local: MirLocalId(1),
+                name: None,
+                ty: gate_weights,
+                mode: MirParamMode::Owned,
+                span,
+            },
+            MirParam {
+                local: MirLocalId(2),
+                name: None,
+                ty: up_weights,
+                mode: MirParamMode::Owned,
+                span,
+            },
+            MirParam {
+                local: MirLocalId(3),
+                name: None,
+                ty: down_weights,
+                mode: MirParamMode::Owned,
+                span,
+            },
+            MirParam {
+                local: MirLocalId(4),
+                name: None,
+                ty: down,
+                mode: MirParamMode::MutRef,
+                span,
+            },
+            MirParam {
+                local: MirLocalId(5),
+                name: None,
+                ty: f32_ty(types),
+                mode: MirParamMode::Owned,
+                span,
+            },
+        ],
+        locals: vec![
+            MirLocal {
+                id: MirLocalId(6),
+                name: None,
+                ty: gate,
+                mutable: true,
+                span,
+            },
+            MirLocal {
+                id: MirLocalId(7),
+                name: None,
+                ty: up,
+                mutable: false,
+                span,
+            },
+            MirLocal {
+                id: MirLocalId(8),
+                name: None,
+                ty: activated,
+                mutable: false,
+                span,
+            },
+            MirLocal {
+                id: MirLocalId(9),
+                name: None,
+                ty: fused,
+                mutable: false,
+                span,
+            },
+        ],
+        temps: vec![
+            MirTemp {
+                id: MirTempId(0),
+                ty: gate_result,
+                span,
+            },
+            MirTemp {
+                id: MirTempId(1),
+                ty: up_result,
+                span,
+            },
+            MirTemp {
+                id: MirTempId(2),
+                ty: activated,
+                span,
+            },
+            MirTemp {
+                id: MirTempId(3),
+                ty: activated,
+                span,
+            },
+            MirTemp {
+                id: MirTempId(4),
+                ty: activated,
+                span,
+            },
+            MirTemp {
+                id: MirTempId(5),
+                ty: activated_result,
+                span,
+            },
+            MirTemp {
+                id: MirTempId(6),
+                ty: fused_result,
+                span,
+            },
+            MirTemp {
+                id: MirTempId(7),
+                ty: down_result,
+                span,
+            },
+        ],
+        blocks: vec![MirBlock {
+            id: MirBlockId(0),
+            statements: vec![
+                matmul(MirLocalId(0), MirLocalId(1), MirTempId(0), gate_result),
+                forward(MirLocalId(6), MirTempId(0), gate, 0),
+                matmul(MirLocalId(0), MirLocalId(2), MirTempId(1), up_result),
+                forward(MirLocalId(7), MirTempId(1), up, 1),
+                runtime(
+                    MirCollectionOp::TensorNeg,
+                    MirTempId(2),
+                    vec![MirOperand::Place(MirPlace::local(MirLocalId(6)))],
+                    activated,
+                ),
+                MirStatement {
+                    kind: MirStatementKind::Assign {
+                        place: MirPlace::temp(MirTempId(3)),
+                        value: MirValue {
+                            id: MirValueId(2),
+                            kind: MirValueKind::Unary {
+                                op: MirUnOp::Exp,
+                                operand: MirOperand::Temp(MirTempId(2)),
+                            },
+                            ty: activated,
+                            span,
+                        },
+                    },
+                    span,
+                },
+                runtime(
+                    MirCollectionOp::TensorAdd,
+                    MirTempId(4),
+                    vec![
+                        MirOperand::Temp(MirTempId(3)),
+                        MirOperand::Constant(MirConstant::Float(1.0)),
+                    ],
+                    activated,
+                ),
+                runtime(
+                    MirCollectionOp::TensorDiv,
+                    MirTempId(5),
+                    vec![
+                        MirOperand::Place(MirPlace::local(MirLocalId(6))),
+                        MirOperand::Temp(MirTempId(4)),
+                    ],
+                    activated_result,
+                ),
+                forward(MirLocalId(8), MirTempId(5), activated, 3),
+                runtime(
+                    MirCollectionOp::TensorMul,
+                    MirTempId(6),
+                    vec![
+                        MirOperand::Place(MirPlace::local(MirLocalId(8))),
+                        MirOperand::Place(MirPlace::local(MirLocalId(7))),
+                    ],
+                    fused_result,
+                ),
+                forward(MirLocalId(9), MirTempId(6), fused, 4),
+                matmul(MirLocalId(9), MirLocalId(3), MirTempId(7), down_result),
+                forward(MirLocalId(4), MirTempId(7), down, 5),
+            ],
+            terminator: MirTerminator {
+                kind: MirTerminatorKind::Return(None),
+                span,
+            },
+            span,
+        }],
+        return_ty: MirType::semantic(types.primitive(Primitive::Vacuum)),
+        error_ty: None,
+        is_async: false,
+        is_generator: false,
+        shader_stage: None,
+        span,
+    }
+}
+
+#[test]
+fn composed_mlp_plan_accepts_real_lowered_assign_then_use_stage_destinations() {
+    let mut types = TypeTable::new();
+    let function = composed_mlp_real_lowered_function(&mut types);
+    let validation = MirValidationContext::new(&types);
+    let plan = composed_matmul_plan_for_function(&function, &validation)
+        .expect("real lowered composed MLP facts resolve")
+        .expect("real lowered composed MLP derives a plan");
+
+    assert_eq!(
+        plan.stages
+            .iter()
+            .map(|stage| stage.output.source_local)
+            .collect::<Vec<_>>(),
+        vec![MirLocalId(6), MirLocalId(7), MirLocalId(9), MirLocalId(4)]
+    );
+    assert_eq!(
+        plan.edges
+            .iter()
+            .map(|edge| (edge.producer, edge.consumer, edge.source_local))
+            .collect::<Vec<_>>(),
+        vec![
+            (0, 1, MirLocalId(6)),
+            (1, 2, MirLocalId(7)),
+            (2, 3, MirLocalId(9)),
+        ]
+    );
+    assert_eq!(plan.stages[3].output.access, MirKernelResourceAccess::Write);
+    assert!(plan.stages[..3]
+        .iter()
+        .all(|stage| stage.output.access == MirKernelResourceAccess::ReadWrite));
+}
+
+#[test]
+fn composed_mlp_plan_rejects_real_swiglu_without_gate_provenance() {
+    let mut types = TypeTable::new();
+    let mut function = composed_mlp_real_lowered_function(&mut types);
+    let MirStatementKind::RuntimeCall { call, .. } = &mut function.blocks[0].statements[4].kind
+    else {
+        panic!("the first silu operation must be a runtime call");
+    };
+    call.args[0] = MirOperand::Place(MirPlace::local(MirLocalId(7)));
+    let validation = MirValidationContext::new(&types);
+    assert!(
+        composed_matmul_plan_for_function(&function, &validation)
+            .expect("invalid SwiGLU provenance remains a typed result")
+            .is_none(),
+        "a pointwise consumer whose activation no longer reaches Gate must not compose"
+    );
+}
+
 fn elementwise_function(types: &mut TypeTable) -> MirFunction {
     let tensor = tensor_ty(types, 4);
     MirFunction {
@@ -1374,6 +1687,27 @@ fn composed_mlp_plan_rejects_non_immediate_or_ambiguous_stage_handoff() {
             panic!("the first stage must be a runtime call");
         };
         *destination = None;
+    });
+
+    assert_composed_mlp_destination_rejected("read result temp", |function| {
+        let ty = function.params[0].ty;
+        function.blocks[0].statements.insert(
+            1,
+            MirStatement {
+                kind: MirStatementKind::RuntimeCall {
+                    destination: None,
+                    call: MirRuntimeCall {
+                        intrinsic: MirIntrinsic::Collection(MirCollectionOp::TensorMul),
+                        args: vec![
+                            MirOperand::Temp(MirTempId(0)),
+                            MirOperand::Place(MirPlace::local(MirLocalId(4))),
+                        ],
+                        return_ty: ty,
+                    },
+                },
+                span: test_span(),
+            },
+        );
     });
 
     assert_composed_mlp_destination_rejected("ambiguous handoff", |function| {
