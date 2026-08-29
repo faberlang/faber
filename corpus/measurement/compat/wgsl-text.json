@@ -6,7 +6,7 @@
   "generatedBy": "radix/scripta/emit-compat-json.py",
   "summary": {
     "capable": 6,
-    "analyzable": 337
+    "analyzable": 338
   },
   "terms": [
     {
@@ -697,7 +697,7 @@
       "term": "omnia",
       "rule": "keyword",
       "capable": 0,
-      "analyzable": 1
+      "analyzable": 2
     },
     {
       "term": "operandus",
