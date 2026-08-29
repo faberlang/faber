@@ -1124,6 +1124,7 @@ fn instantiate_existing_unary_type(
     find_existing_type(types, &build(inner), span, index)
 }
 
+#[allow(clippy::too_many_arguments)]
 fn instantiate_existing_indexed_type(
     types: &TypeTable,
     inner: TypeId,
