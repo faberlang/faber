@@ -726,6 +726,14 @@ pub struct TestArgs {
     /// per-test `timeout` / `temporis` modifier. 0 is rejected fail-closed.
     #[arg(long = "test-timeout", value_name = "SECONDS", value_parser = parse_test_timeout_secs)]
     pub test_timeout: Option<u64>,
+
+    /// Emit diagnostic runner statistics after the test report.
+    #[arg(long)]
+    pub stats: bool,
+
+    /// Write diagnostic runner statistics to a JSON file.
+    #[arg(long = "stats-file", value_name = "PATH")]
+    pub stats_file: Option<PathBuf>,
 }
 
 /// `--test-timeout` parser: seconds, strictly positive (0 is fail-closed).

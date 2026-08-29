@@ -28,6 +28,7 @@ fn run_with_timeout(
         false,
         false,
         default_timeout_secs,
+        false,
     )
     .unwrap_or_else(|err| panic!("proba run should succeed setup: {err:?}"))
 }
@@ -68,6 +69,46 @@ proba "one equals one" {
     assert!(report.success());
     assert_eq!(report.results[0].name, "one equals one");
     assert!(matches!(report.results[0].outcome, CaseOutcome::Passed));
+    assert!(report.results[0].stats.is_none());
+}
+
+#[test]
+fn collect_stats_records_meter_rows_for_executed_cases_only() {
+    let report = run_proba_source(
+        &session(),
+        "proba_stats.fab",
+        r#"
+proba "one equals one" {
+    adfirma 1 ≡ 1
+}
+proba "parked" omitte "later" {
+    adfirma 1 ≡ 2
+}
+"#,
+        &TestSelection::default(),
+        None,
+        false,
+        false,
+        None,
+        true,
+    )
+    .unwrap_or_else(|err| panic!("proba stats run should succeed setup: {err:?}"));
+    let executed = report
+        .results
+        .iter()
+        .find(|result| result.name == "one equals one")
+        .expect("executed case");
+    let stats = executed.stats.as_ref().expect("meter snapshot");
+    assert!(
+        !stats.functions.is_empty(),
+        "executed case should observe at least one function row: {stats:?}"
+    );
+    let skipped = report
+        .results
+        .iter()
+        .find(|result| result.name == "parked")
+        .expect("skipped case");
+    assert!(skipped.stats.is_none());
 }
 
 #[test]
@@ -104,6 +145,7 @@ probandum "suite" {
         false,
         false,
         None,
+        false,
     )
     .expect("run");
 
@@ -299,6 +341,7 @@ probandum "math" {
         false,
         false,
         None,
+        false,
     )
     .expect("run");
     assert_eq!(report.results.len(), 1);
@@ -329,6 +372,7 @@ proba "ok" {
         false,
         false,
         None,
+        false,
     )
 }
 

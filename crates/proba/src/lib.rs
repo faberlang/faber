@@ -13,8 +13,8 @@ mod tests;
 use radix::hir::{DefId, HirItemKind, HirModule, HirTestMetadata, HirTestModifier};
 use radix::lexer::Interner;
 use radix::mir::{
-    lower_analyzed_unit, run_function_with_limits, BufferHost, MirFunctionId, RunSourceError,
-    RunnerError, ValidatedMir,
+    lower_analyzed_unit, run_function_with_limits, run_function_with_stats_and_limits, BufferHost,
+    MirFunctionId, RunSourceError, RunnerError, RunnerStats, ValidatedMir,
 };
 use radix::module::{AnalyzedModule, Session};
 use radix::program::analyze_prepared_program_name;
@@ -101,6 +101,9 @@ pub struct CaseResult {
     pub stdout: Vec<String>,
     /// Lines written to stderr while the case ran.
     pub stderr: Vec<String>,
+    /// Interpreter meter snapshot when the caller armed diagnostic stats.
+    /// Absent when the case was not executed or stats were not requested.
+    pub stats: Option<RunnerStats>,
 }
 
 #[derive(Debug)]
@@ -108,6 +111,7 @@ struct CaseExecution {
     outcome: CaseOutcome,
     stdout: Vec<String>,
     stderr: Vec<String>,
+    stats: Option<RunnerStats>,
 }
 
 impl CaseExecution {
@@ -116,11 +120,31 @@ impl CaseExecution {
             outcome,
             stdout: Vec::new(),
             stderr: Vec::new(),
+            stats: None,
         }
     }
 }
 
 impl CaseResult {
+    /// Report row with no captured output and no meter snapshot.
+    #[must_use]
+    pub fn reported(
+        unit_path: PathBuf,
+        name: String,
+        suite_path: String,
+        outcome: CaseOutcome,
+    ) -> Self {
+        Self {
+            unit_path,
+            name,
+            suite_path,
+            outcome,
+            stdout: Vec::new(),
+            stderr: Vec::new(),
+            stats: None,
+        }
+    }
+
     /// Display path used in reports: `suite/name` or just `name`.
     #[must_use]
     pub fn display_path(&self) -> String {
@@ -456,6 +480,7 @@ pub fn run_proba_source(
     exact: bool,
     include_ignored: bool,
     default_timeout_secs: Option<u64>,
+    collect_stats: bool,
 ) -> Result<ProbaReport, RunSourceError> {
     let mut analysis =
         analyze_prepared_program_name(session, name, source).map_err(RunSourceError::Frontend)?;
@@ -467,6 +492,7 @@ pub fn run_proba_source(
         exact,
         include_ignored,
         default_timeout_secs,
+        collect_stats,
     )
 }
 
@@ -482,6 +508,7 @@ pub fn run_proba_on_analyzed(
     exact: bool,
     include_ignored: bool,
     default_timeout_secs: Option<u64>,
+    collect_stats: bool,
 ) -> Result<ProbaReport, RunSourceError> {
     run_proba_on_analyzed_with_unit_path(
         unit,
@@ -491,6 +518,7 @@ pub fn run_proba_on_analyzed(
         exact,
         include_ignored,
         default_timeout_secs,
+        collect_stats,
     )
 }
 
@@ -502,6 +530,7 @@ fn run_proba_on_analyzed_with_unit_path(
     exact: bool,
     include_ignored: bool,
     default_timeout_secs: Option<u64>,
+    collect_stats: bool,
 ) -> Result<ProbaReport, RunSourceError> {
     let cases = inventory_cases(&unit.hir, &unit.interner);
     let lowered = lower_analyzed_unit(unit, Default::default()).map_err(RunSourceError::Mir)?;
@@ -514,6 +543,7 @@ fn run_proba_on_analyzed_with_unit_path(
         exact,
         include_ignored,
         default_timeout_secs,
+        collect_stats,
     ))
 }
 
@@ -529,6 +559,7 @@ pub fn run_proba_on_validated(
     exact: bool,
     include_ignored: bool,
     default_timeout_secs: Option<u64>,
+    collect_stats: bool,
 ) -> ProbaReport {
     run_proba_on_validated_with_unit_path(
         validated,
@@ -539,6 +570,7 @@ pub fn run_proba_on_validated(
         exact,
         include_ignored,
         default_timeout_secs,
+        collect_stats,
     )
 }
 
@@ -551,6 +583,7 @@ fn run_proba_on_validated_with_unit_path(
     exact: bool,
     include_ignored: bool,
     default_timeout_secs: Option<u64>,
+    collect_stats: bool,
 ) -> ProbaReport {
     run_proba_cases(
         validated,
@@ -561,6 +594,7 @@ fn run_proba_on_validated_with_unit_path(
         exact,
         include_ignored,
         default_timeout_secs,
+        collect_stats,
         |case| mir_function_id_from_def(validated, case.def_id),
     )
 }
@@ -582,6 +616,7 @@ pub fn run_proba_on_validated_with_function_ids(
     exact: bool,
     include_ignored: bool,
     default_timeout_secs: Option<u64>,
+    collect_stats: bool,
 ) -> ProbaReport {
     let module_path = module_path.to_path_buf();
     run_proba_cases(
@@ -593,6 +628,7 @@ pub fn run_proba_on_validated_with_function_ids(
         exact,
         include_ignored,
         default_timeout_secs,
+        collect_stats,
         |case| {
             function_ids
                 .get(&(module_path.clone(), case.def_id))
@@ -610,6 +646,7 @@ fn run_proba_cases(
     exact: bool,
     include_ignored: bool,
     default_timeout_secs: Option<u64>,
+    collect_stats: bool,
     function_id_for_case: impl Fn(&ProbaCase) -> Option<MirFunctionId>,
 ) -> ProbaReport {
     let has_solum = has_solum_cases(cases);
@@ -625,27 +662,23 @@ fn run_proba_cases(
             // unless include_ignored is set — matching language-level selection,
             // not Cargo's “ignored suite”.
             if include_ignored {
-                results.push(CaseResult {
-                    unit_path: unit_path.to_path_buf(),
-                    name: case.name.clone(),
-                    suite_path: case.suite_path.clone(),
-                    outcome: CaseOutcome::Skipped { reason },
-                    stdout: Vec::new(),
-                    stderr: Vec::new(),
-                });
+                results.push(CaseResult::reported(
+                    unit_path.to_path_buf(),
+                    case.name.clone(),
+                    case.suite_path.clone(),
+                    CaseOutcome::Skipped { reason },
+                ));
             }
             continue;
         }
 
         if let Some(reason) = source_skip_reason(case) {
-            results.push(CaseResult {
-                unit_path: unit_path.to_path_buf(),
-                name: case.name.clone(),
-                suite_path: case.suite_path.clone(),
-                outcome: CaseOutcome::Skipped { reason },
-                stdout: Vec::new(),
-                stderr: Vec::new(),
-            });
+            results.push(CaseResult::reported(
+                unit_path.to_path_buf(),
+                case.name.clone(),
+                case.suite_path.clone(),
+                CaseOutcome::Skipped { reason },
+            ));
             continue;
         }
 
@@ -661,9 +694,14 @@ fn run_proba_cases(
                 repeats,
                 erratur,
             } => match function_id_for_case(case) {
-                Some(function_id) => {
-                    execute_case_repeated(validated, function_id, timeout_secs, repeats, erratur)
-                }
+                Some(function_id) => execute_case_repeated(
+                    validated,
+                    function_id,
+                    timeout_secs,
+                    repeats,
+                    erratur,
+                    collect_stats,
+                ),
                 None => CaseExecution::without_output(CaseOutcome::Blocked {
                     reason: format!(
                         "proba case {:?} has no lowered MIR function (def #{})",
@@ -679,6 +717,7 @@ fn run_proba_cases(
             outcome: execution.outcome,
             stdout: execution.stdout,
             stderr: execution.stderr,
+            stats: execution.stats,
         });
     }
 
@@ -700,11 +739,12 @@ fn execute_case_repeated(
     timeout_secs: Option<u64>,
     repeats: u64,
     erratur: bool,
+    collect_stats: bool,
 ) -> CaseExecution {
     execute_repeated(repeats, || {
         // Apply erratur inside each execution so a passing expected-error run
         // does not trip the repeat loop's non-Passed short-circuit.
-        execute_case(validated, function_id, timeout_secs, erratur)
+        execute_case(validated, function_id, timeout_secs, erratur, collect_stats)
     })
 }
 
@@ -724,6 +764,7 @@ fn execute_case(
     function_id: MirFunctionId,
     timeout_secs: Option<u64>,
     erratur: bool,
+    collect_stats: bool,
 ) -> CaseExecution {
     let mut host = BufferHost::default();
     // Wall-clock deadline from the resolved timeout (per-test temporis, else
@@ -735,26 +776,48 @@ fn execute_case(
     let previous_hook = std::panic::take_hook();
     std::panic::set_hook(Box::new(|_| {}));
     let trapped = catch_unwind(AssertUnwindSafe(|| {
-        run_function_with_limits(validated, function_id, &mut host, None, deadline)
+        if collect_stats {
+            match run_function_with_stats_and_limits(
+                validated,
+                function_id,
+                &mut host,
+                None,
+                deadline,
+            ) {
+                Ok(outcome) => (outcome.result, Some(outcome.stats)),
+                Err(errors) => (Err(errors), None),
+            }
+        } else {
+            (
+                run_function_with_limits(validated, function_id, &mut host, None, deadline),
+                None,
+            )
+        }
     }));
     std::panic::set_hook(previous_hook);
-    let outcome = match trapped {
-        Ok(run_result) => outcome_from_run_result(run_result, erratur),
+    let (run_result, stats) = match trapped {
+        Ok(pair) => pair,
         Err(payload) => {
-            if let Some(reason) = host.last_abort.clone() {
+            let outcome = if let Some(reason) = host.last_abort.clone() {
                 CaseOutcome::Failed { message: reason }
             } else {
                 let message = abort_message_from_payload(payload.as_ref())
                     .unwrap_or_else(|| "proba case aborted".to_owned());
                 CaseOutcome::Failed { message }
-            }
+            };
+            return CaseExecution {
+                outcome,
+                stdout: captured_stdout(&host),
+                stderr: host.stderr_lines,
+                stats: None,
+            };
         }
     };
-    let stdout = captured_stdout(&host);
     CaseExecution {
-        outcome,
-        stdout,
+        outcome: outcome_from_run_result(run_result, erratur),
+        stdout: captured_stdout(&host),
         stderr: host.stderr_lines,
+        stats,
     }
 }
 

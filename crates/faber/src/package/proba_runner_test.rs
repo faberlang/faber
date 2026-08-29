@@ -134,6 +134,7 @@ test "skip" skip "later" {
         false,
         false,
         None,
+        false,
     )
     .expect("run");
     assert_eq!(report.passed(), 1);
@@ -275,6 +276,7 @@ test "identity holds" {
             false,
             false,
             None,
+            false,
         )
         .expect("run unit");
         if !report.results.is_empty() {
@@ -349,6 +351,7 @@ test "double" {
                         false,
                         false,
                         None,
+                        false,
                     )
                     .results,
                 );
@@ -384,6 +387,7 @@ probandum "suite_b" {
         false,
         false,
         None,
+        false,
     )
     .expect("run");
     assert_eq!(by_name.results.len(), 1);
@@ -402,6 +406,7 @@ probandum "suite_b" {
         false,
         false,
         None,
+        false,
     )
     .expect("run");
     assert_eq!(by_suite.results.len(), 1);
@@ -515,6 +520,7 @@ test "math ok" {
             false,
             false,
             None,
+            false,
         )
         .expect("run unit");
         passed += report.passed();
@@ -644,6 +650,7 @@ fn linked_package_report(package: radix::program::analyze::AnalyzedProgram) -> p
                         false,
                         false,
                         None,
+                        false,
                     )
                     .results,
                 );
@@ -759,6 +766,7 @@ fn no_package_single_file_route_cannot_resolve_in_package_import() {
         false,
         false,
         None,
+        false,
     );
     match result {
         Ok(report) => {

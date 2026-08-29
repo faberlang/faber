@@ -1,5 +1,7 @@
 //! `faber test` — interpret proba cases on the MIR runner (not a Cargo harness).
 
+use super::run_stats;
+use super::test_stats::{self, TestStatsArtifact};
 use crate::cli::{TestArgs, TestOutputFormat};
 use crate::input_shape::locale_without_package_error;
 use crate::package;
@@ -27,6 +29,8 @@ struct TestRunOptions {
     /// CLI `--test-timeout` wall-clock default (seconds) for cases without a
     /// per-test `timeout` / `temporis` modifier.
     default_timeout_secs: Option<u64>,
+    /// Arm the interpreter diagnostic meter for each executed case.
+    collect_stats: bool,
 }
 
 #[derive(Debug, Default)]
@@ -78,6 +82,7 @@ pub(super) fn cmd_test(args: &TestArgs) {
         list: args.list,
         fail_fast: args.fail_fast,
         default_timeout_secs: args.test_timeout,
+        collect_stats: args.stats || args.stats_file.is_some(),
     };
 
     // A named `.proba` argument is the source selection. `--include` on
@@ -96,6 +101,14 @@ pub(super) fn cmd_test(args: &TestArgs) {
             "error: --ignored is not supported on the MIR runner; use omitte/futurum cases with default run (they skip) or --include-ignored to list them"
         );
         std::process::exit(2);
+    }
+
+    let stats_requested = args.stats || args.stats_file.is_some();
+    if stats_requested && args.list {
+        eprintln!(
+            "error: test statistics require executing cases; --list does not run the interpreter"
+        );
+        std::process::exit(1);
     }
 
     let warn_policy = radix::module::driver::WarnPolicy {
@@ -126,6 +139,7 @@ pub(super) fn cmd_test(args: &TestArgs) {
         }
     };
 
+    let started = Instant::now();
     let (report, unmatched_include, metadata) =
         match package::test_input_route(&input_path, args.no_package) {
             package::TestInputRoute::SingleFile => {
@@ -158,6 +172,7 @@ pub(super) fn cmd_test(args: &TestArgs) {
         if code == 0 {
             eprintln!("warning: {detail}");
             print_report(&report, args.nocapture, args.format, &metadata, args.list);
+            emit_test_stats_if_requested(args, &input_path, &report, &metadata, started, code);
         } else {
             eprintln!("error: {detail}");
         }
@@ -165,10 +180,53 @@ pub(super) fn cmd_test(args: &TestArgs) {
     }
 
     print_report(&report, args.nocapture, args.format, &metadata, args.list);
-    if report.success() {
-        std::process::exit(0);
+    let code = i32::from(!report.success());
+    emit_test_stats_if_requested(args, &input_path, &report, &metadata, started, code);
+    std::process::exit(code);
+}
+
+fn emit_test_stats_if_requested(
+    args: &TestArgs,
+    input: &Path,
+    report: &ProbaReport,
+    metadata: &RunMetadata,
+    started: Instant,
+    exit: i32,
+) {
+    if !args.stats && args.stats_file.is_none() {
+        return;
     }
-    std::process::exit(1);
+    let package = match run_stats::package_metadata(input) {
+        Ok(package) => package,
+        Err(_) => run_stats::PackageMetadata {
+            name: input
+                .file_stem()
+                .and_then(|name| name.to_str())
+                .unwrap_or("package")
+                .to_owned(),
+            entry: input
+                .file_name()
+                .and_then(|name| name.to_str())
+                .unwrap_or("test")
+                .to_owned(),
+        },
+    };
+    let artifact = TestStatsArtifact::new(
+        package,
+        report,
+        &metadata.durations_ms,
+        elapsed_wall_ms(started),
+        exit,
+        result_key,
+    );
+    if let Err(error) = test_stats::emit(&artifact, args.stats, args.stats_file.as_ref()) {
+        eprintln!("error: could not write test statistics: {error}");
+        std::process::exit(1);
+    }
+}
+
+fn elapsed_wall_ms(started: Instant) -> u64 {
+    u64::try_from(started.elapsed().as_millis()).unwrap_or(u64::MAX)
 }
 
 /// Zero selected cases after discovery/filtering. `--include` that matched no
@@ -274,6 +332,7 @@ fn run_source_with_options(
             false,
             include_ignored,
             options.default_timeout_secs,
+            options.collect_stats,
         );
         let elapsed = started.elapsed().as_millis();
         for result in &mut one.results {
@@ -330,6 +389,7 @@ fn append_focus_skips(
             outcome: CaseOutcome::Skipped { reason },
             stdout: Vec::new(),
             stderr: Vec::new(),
+            stats: None,
         });
     }
 }
@@ -620,6 +680,7 @@ fn run_package_test_unit_with_options(
                     false,
                     include_ignored,
                     options.default_timeout_secs,
+                    options.collect_stats,
                 );
                 let elapsed = started.elapsed().as_millis();
                 for result in &mut one.results {
@@ -725,6 +786,7 @@ fn run_package_test_unit(
                 exact,
                 include_ignored,
                 None,
+                false,
             );
             append_focus_skips(
                 &mut report,
@@ -768,6 +830,7 @@ fn blocked_unit_report_with_options(
                 },
                 stdout: Vec::new(),
                 stderr: Vec::new(),
+                stats: None,
             });
             continue;
         }
@@ -780,6 +843,7 @@ fn blocked_unit_report_with_options(
             },
             stdout: Vec::new(),
             stderr: Vec::new(),
+            stats: None,
         });
     }
     report
@@ -812,6 +876,7 @@ fn blocked_unit_report(
                     },
                     stdout: Vec::new(),
                     stderr: Vec::new(),
+                    stats: None,
                 });
             }
             continue;
@@ -826,6 +891,7 @@ fn blocked_unit_report(
                 },
                 stdout: Vec::new(),
                 stderr: Vec::new(),
+                stats: None,
             });
             continue;
         }
@@ -838,6 +904,7 @@ fn blocked_unit_report(
             },
             stdout: Vec::new(),
             stderr: Vec::new(),
+            stats: None,
         });
     }
     report
@@ -930,6 +997,7 @@ fn list_report(unit_path: &Path, cases: &[ProbaCase]) -> ProbaReport {
                 },
                 stdout: Vec::new(),
                 stderr: Vec::new(),
+                stats: None,
             })
             .collect(),
     }

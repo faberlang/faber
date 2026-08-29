@@ -226,19 +226,28 @@ pub(crate) fn emit(
     stdout: bool,
     stats_file: Option<&PathBuf>,
 ) -> io::Result<()> {
-    let json = encode(artifact)?;
+    emit_framed(STATS_MARKER, &encode(artifact)?, stdout, stats_file)
+}
+
+/// Shared file-then-stdout framing used by `faber run` and `faber test`.
+pub(crate) fn emit_framed(
+    marker: &str,
+    json: &str,
+    stdout: bool,
+    stats_file: Option<&PathBuf>,
+) -> io::Result<()> {
     if let Some(path) = stats_file {
         fs::write(path, json.as_bytes())?;
     }
     if stdout {
         let mut output = io::stdout().lock();
-        write!(output, "{STATS_MARKER}\n{json}\n")?;
+        write!(output, "{marker}\n{json}\n")?;
         output.flush()?;
     }
     Ok(())
 }
 
-fn generated_at() -> String {
+pub(crate) fn generated_at() -> String {
     let Ok(elapsed) = SystemTime::now().duration_since(UNIX_EPOCH) else {
         return "unknown-time".to_owned();
     };

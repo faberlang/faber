@@ -40,6 +40,7 @@ proba "pass case" {
         false,
         false,
         None,
+        false,
     )
     .expect("run");
     assert!(report.success(), "{report:?}");
@@ -70,6 +71,7 @@ proba "the broken one" {
         false,
         false,
         None,
+        false,
     )
     .expect("run");
     assert!(!report.success());

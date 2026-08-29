@@ -6,8 +6,8 @@
 
 pub use radix_mir_runner::{
     classify_runner_lowerability, run_entry, run_entry_with_stats, run_function, run_function_with_limits,
-    run_function_with_step_budget, runner_dispatch_status, BufferHost, Host, RunnerDispatchStatus, RunnerError,
-    RunnerRunOutcome, RunnerStats, StdioHost, Value,
+    run_function_with_stats_and_limits, run_function_with_step_budget, runner_dispatch_status, BufferHost, Host,
+    RunnerDispatchStatus, RunnerError, RunnerRunOutcome, RunnerStats, StdioHost, Value,
 };
 
 #[cfg(test)]

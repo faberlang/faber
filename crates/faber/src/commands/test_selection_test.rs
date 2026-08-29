@@ -113,6 +113,7 @@ fn blocked_result(unit: &str, name: &str, suite: &str, reason: &str) -> CaseResu
         },
         stdout: Vec::new(),
         stderr: Vec::new(),
+        stats: None,
     }
 }
 
@@ -217,6 +218,7 @@ fn fail_fast_stops_on_failed_or_blocked_outcomes() {
         },
         stdout: Vec::new(),
         stderr: Vec::new(),
+        stats: None,
     };
     let blocked = CaseResult {
         outcome: CaseOutcome::Blocked {

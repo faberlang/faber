@@ -51,6 +51,11 @@ mod self_update_test;
 pub(crate) mod targets;
 #[cfg(feature = "runner")]
 mod test;
+#[cfg(feature = "runner")]
+mod test_stats;
+#[cfg(all(feature = "runner", test))]
+#[path = "test_stats_test.rs"]
+mod test_stats_test;
 
 use crate::cli::Command;
 use crate::input_shape::{locale_without_package_error, verify_input_is_package_shaped};

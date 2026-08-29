@@ -1357,3 +1357,17 @@ fn test_timeout_zero_is_rejected_fail_closed() {
         "zero timeout must be rejected fail-closed: {rendered}"
     );
 }
+
+#[test]
+fn test_stats_flags_parse() {
+    let cli = Cli::try_parse_from(["faber", "test", "--stats", "--stats-file", "out.json"])
+        .expect("parse stats flags");
+    let Some(crate::cli::Command::Test(args)) = cli.command else {
+        panic!("expected test subcommand");
+    };
+    assert!(args.stats);
+    assert_eq!(
+        args.stats_file.as_deref(),
+        Some(std::path::Path::new("out.json"))
+    );
+}
