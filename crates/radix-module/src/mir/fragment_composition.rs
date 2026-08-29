@@ -97,38 +97,15 @@ impl FragmentCompositionError {
     }
 }
 
-/// Compose every device call into its caller. Returns diagnostics; empty is success.
+/// Compose every device call into its caller with the explicit metadata
+/// carrier for source-less synthetic kernel closures (KCM-05). Returns
+/// diagnostics; empty is success.
 ///
 /// `launch_entries` are the source defs of launchable `@ nucleum @ publica`
 /// entries: they stay program functions even when device code also calls
 /// them. Every other private compute helper that was inlined at least once
 /// and has no remaining reference is pruned after composition; fragment
 /// bodies stay (the package body sidecar attaches from this program).
-///
-/// Source-less synthetic kernel closures are invisible to this entry point:
-/// callers that lower kernel closures pass their explicit metadata carrier
-/// through [`compose_with_metadata`].
-pub fn compose(
-    functions: &mut Vec<MirFunction>,
-    monomorphizations: &[MirMonomorphization],
-    roles: &FxHashMap<DefId, MirDeviceRole>,
-    budget: ExpansionBudget,
-    interner: Option<&Interner>,
-    launch_entries: &FxHashSet<DefId>,
-) -> Vec<FragmentCompositionError> {
-    compose_with_metadata(
-        functions,
-        monomorphizations,
-        roles,
-        &MirDeviceFunctionMetadataMap::default(),
-        budget,
-        interner,
-        launch_entries,
-    )
-}
-
-/// Compose every device call into its caller with the explicit metadata
-/// carrier for source-less synthetic kernel closures (KCM-05).
 ///
 /// The carrier classifies a synthetic closure as device-side for
 /// composition — a kernel caller's direct call composes, and a composed

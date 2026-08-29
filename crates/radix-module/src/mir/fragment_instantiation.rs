@@ -81,28 +81,8 @@ impl RoleKind {
     }
 }
 
-/// Check every nucleum-relevant call against the specialized signature and matrix.
-#[must_use]
-pub fn check(
-    functions: &[MirFunction],
-    monomorphizations: &[MirMonomorphization],
-    layouts: &MirLayoutTable,
-    types: &TypeTable,
-    roles: &FxHashMap<DefId, MirDeviceRole>,
-    summaries: Option<&FragmentEffectTable>,
-) -> Vec<FragmentInstantiationError> {
-    check_with_metadata(
-        functions,
-        monomorphizations,
-        layouts,
-        types,
-        roles,
-        summaries,
-        &MirDeviceFunctionMetadataMap::default(),
-    )
-}
-
-/// [`check`] with the explicit metadata carrier for source-less synthetic
+/// Check every nucleum-relevant call against the specialized signature and
+/// matrix, with the explicit metadata carrier for source-less synthetic
 /// kernel closures (KCM-05). Programs lowered without kernel closures pass
 /// no rows and classify exactly as before.
 #[must_use]
