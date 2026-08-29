@@ -260,6 +260,50 @@ fn generic_backward_primal_generates_symbolic_companion_through_driver() {
     );
 }
 
+#[test]
+fn generated_companion_is_carried_as_a_shape_generic_package_template() {
+    let session = test_session(Target::MirLlvm);
+    let mut analysis = analyze_source(
+        &session,
+        "generic_backward_package_template.fab",
+        GENERIC_SIMPLE_LOSS_SOURCE,
+        AnalyzeRequest::default(),
+    )
+    .expect("symbolic generic backward primal should analyze cleanly");
+    let bundle = expect_codegen_ok(
+        prepare_air_backward_bundle(&mut analysis),
+        "backward bundle preparation should succeed",
+    )
+    .expect("an AIR lane with backward annotations must produce a bundle");
+    let companion_source = bundle
+        .snapshots
+        .first()
+        .expect("the generic primal has one backward snapshot")
+        .companion_def_id;
+    let mut lowered =
+        lower_analyzed_unit(&mut analysis, Default::default()).expect("generic primal should lower to MIR");
+
+    expect_codegen_ok(
+        apply_air_backward_bundle(&mut lowered, bundle, false),
+        "generic companion must install without a symbolic-shape error",
+    );
+
+    let template = lowered
+        .generic_templates
+        .iter()
+        .find(|template| template.source == Some(companion_source))
+        .expect("package linking needs the generated companion as a template");
+    let params = lowered
+        .generic_params
+        .iter()
+        .find(|(source, _)| *source == companion_source)
+        .map(|(_, params)| params)
+        .expect("package linking needs generated companion shape parameters");
+    assert_eq!(params.len(), 2, "the companion template carries both shape parameters");
+    assert!(params.iter().all(|param| param.is_shape));
+    assert!(crate::mir::generic::function_contains_shape_size(&mut template.clone()));
+}
+
 // ── Test 2: generic wrapper calls the generic companion (OQ4 pin) ──
 
 #[test]

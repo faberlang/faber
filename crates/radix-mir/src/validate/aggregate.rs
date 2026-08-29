@@ -1,6 +1,7 @@
 //! Aggregate shape and closure-value checks.
 
 use super::{FunctionScope, GenericTypeBindings, Validator};
+use crate::generic::MirShapeBindings;
 use crate::{
     MirAggregate, MirAggregateFields, MirAggregateItem, MirAggregateKind, MirClosureEnvironmentId,
     MirClosureValue, MirConstant, MirNamedOperand, MirOperand, MirPlace, MirType,
@@ -558,6 +559,26 @@ impl Validator<'_, '_> {
         span: Span,
         generic_bindings: &mut GenericTypeBindings,
     ) {
+        let mut shape_bindings = MirShapeBindings::default();
+        self.validate_optional_destination_with_shapes(
+            scope,
+            destination,
+            expected_ty,
+            span,
+            generic_bindings,
+            &mut shape_bindings,
+        );
+    }
+
+    pub(crate) fn validate_optional_destination_with_shapes(
+        &mut self,
+        scope: &FunctionScope<'_, '_>,
+        destination: Option<&MirPlace>,
+        expected_ty: Option<MirType>,
+        span: Span,
+        generic_bindings: &mut GenericTypeBindings,
+        shape_bindings: &mut MirShapeBindings,
+    ) {
         match (destination, expected_ty) {
             (Some(destination), Some(expected_ty)) => {
                 if let Some(destination_ty) = self.validate_place(scope, destination, span) {
@@ -565,12 +586,16 @@ impl Validator<'_, '_> {
                         expected_ty,
                         destination_ty,
                         generic_bindings,
+                        shape_bindings,
                         span,
                         "destination type mismatch",
                     );
-                    if let Some(expected_ty) =
-                        self.instantiate_generic_type(expected_ty, generic_bindings, span)
-                    {
+                    if let Some(expected_ty) = self.instantiate_generic_type(
+                        expected_ty,
+                        generic_bindings,
+                        shape_bindings,
+                        span,
+                    ) {
                         self.require_assignable(
                             expected_ty,
                             destination_ty,

@@ -9,13 +9,14 @@
 // parent module provides shared imports for lowering
 use super::*;
 use crate::mir::generic::{
-    bind_generic_type_witness_with_shapes, canonical_index, function_contains_shape_size,
-    instantiate_generic_type_with_shapes, substitute_shape_size_constants, MirShapeBindings,
+    MirShapeBindings, bind_generic_type_witness_with_shapes, canonical_index, function_contains_shape_size,
+    instantiate_generic_type_with_shapes, substitute_shape_size_constants,
+    substitute_tensor_from_flat_shape_size_constants,
 };
 use crate::mir::ty::index_projection_result_ty;
 use crate::mir::{
-    instantiate_existing_generic_type, type_contains_param, MirGenericBindings, MirMonomorphization,
-    MirMonomorphizationKey, MirPlaceBase,
+    MirGenericBindings, MirMonomorphization, MirMonomorphizationKey, MirPlaceBase, instantiate_existing_generic_type,
+    type_contains_param,
 };
 use crate::semantic::IndexId;
 
@@ -1206,8 +1207,11 @@ fn finalize_function_shapes(
     }
     // Phase-4 producer fact: rewrite every shape-size operand/constant in the
     // body from this instance's shape bindings to the concrete `Float` it
-    // denotes. Terms that cannot fold stay untouched and are rejected by the
-    // post-finalize survivor net (one stable diagnostic).
+    // denotes. Package-imported TensorFromFlat producers also repair their
+    // source-local shape index against the finalized result type before the
+    // general walk. Terms that cannot fold stay untouched and are rejected by
+    // the post-finalize survivor net (one stable diagnostic).
+    let _ = substitute_tensor_from_flat_shape_size_constants(&mut unit.types, function, shape_bindings);
     let _ = substitute_shape_size_constants(&mut unit.types, function, shape_bindings);
     true
 }

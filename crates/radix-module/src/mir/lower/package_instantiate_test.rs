@@ -1051,3 +1051,184 @@ fn consumer_local_roles_do_not_widen_signature_only_admission() {
         "expected the named imported_device_body_missing reason, got {errors:?}"
     );
 }
+
+/// MMG-F1 risk proof: two concrete shapes using one generic template must
+/// produce two instances, while structurally duplicate index nodes for one
+/// shape must reuse the canonical key and instance. Bindings are insert-only;
+/// a later call must never overwrite the first shape or silently merge [8, 8]
+/// into [2, 2].
+#[test]
+fn two_shape_instances_keep_canonical_keys_and_do_not_merge() {
+    const SOURCE: DefId = DefId(77);
+    let mut types = TypeTable::new();
+    let interner = Interner::new();
+    let element = types.primitive(Primitive::Fractus);
+    let shape_param_a = types.intern_index(IndexExpr::Param(crate::lexer::Symbol(501)));
+    let shape_param_b = types.intern_index(IndexExpr::Param(crate::lexer::Symbol(502)));
+    let template_shape = types.intern_index(IndexExpr::Tuple(vec![shape_param_a, shape_param_b]));
+    let stale_param_a = types.intern_index(IndexExpr::Param(crate::lexer::Symbol(601)));
+    let stale_param_b = types.intern_index(IndexExpr::Param(crate::lexer::Symbol(602)));
+    let stale_shape = types.intern_index(IndexExpr::Tuple(vec![stale_param_a, stale_param_b]));
+    let template_tensor = MirType::semantic(types.tensor_with_shape(element, template_shape));
+    let vacuum = MirType::semantic(types.primitive(Primitive::Vacuum));
+    let template = MirFunction {
+        id: MirFunctionId(0),
+        source: Some(SOURCE),
+        name: None,
+        params: vec![crate::mir::MirParam {
+            local: crate::mir::MirLocalId(0),
+            name: None,
+            ty: template_tensor,
+            mode: crate::mir::MirParamMode::Owned,
+            span: Span::default(),
+        }],
+        locals: vec![crate::mir::MirLocal {
+            id: crate::mir::MirLocalId(1),
+            name: None,
+            ty: MirType::semantic(element),
+            mutable: false,
+            span: Span::default(),
+        }],
+        temps: Vec::new(),
+        blocks: vec![MirBlock {
+            id: crate::mir::MirBlockId(0),
+            statements: vec![
+                MirStatement {
+                    kind: MirStatementKind::RuntimeCall {
+                        destination: None,
+                        call: crate::mir::MirRuntimeCall {
+                            intrinsic: crate::mir::MirIntrinsic::Collection(crate::mir::MirCollectionOp::TensorMean),
+                            args: vec![MirOperand::Place(MirPlace::local(crate::mir::MirLocalId(0)))],
+                            return_ty: MirType::semantic(element),
+                        },
+                    },
+                    span: Span::default(),
+                },
+                MirStatement {
+                    kind: MirStatementKind::Assign {
+                        place: MirPlace::local(crate::mir::MirLocalId(1)),
+                        value: crate::mir::MirValue {
+                            id: crate::mir::MirValueId(0),
+                            kind: crate::mir::MirValueKind::Operand(MirOperand::Constant(
+                                crate::mir::MirConstant::ShapeSize { shape: stale_shape, axis: None },
+                            )),
+                            ty: MirType::semantic(element),
+                            span: Span::default(),
+                        },
+                    },
+                    span: Span::default(),
+                },
+            ],
+            terminator: MirTerminator { kind: MirTerminatorKind::Return(None), span: Span::default() },
+            span: Span::default(),
+        }],
+        return_ty: template_tensor,
+        error_ty: None,
+        is_async: false,
+        is_generator: false,
+        shader_stage: None,
+        span: Span::default(),
+    };
+
+    let make_shape = |row: u64, column: u64, types: &mut TypeTable| {
+        let row = types.intern_index(IndexExpr::Literal(row));
+        let column = types.intern_index(IndexExpr::Literal(column));
+        types.intern_index(IndexExpr::Tuple(vec![row, column]))
+    };
+    let shape_2x2_a = make_shape(2, 2, &mut types);
+    let shape_2x2_b = make_shape(2, 2, &mut types);
+    assert_ne!(shape_2x2_a, shape_2x2_b, "fixture must use duplicate raw index identities");
+    let shape_8x8 = make_shape(8, 8, &mut types);
+    let tensor_2x2_a = MirType::semantic(types.tensor_with_shape(element, shape_2x2_a));
+    let tensor_2x2_b = MirType::semantic(types.tensor_with_shape(element, shape_2x2_b));
+    let tensor_8x8 = MirType::semantic(types.tensor_with_shape(element, shape_8x8));
+
+    let make_caller = |id: u32, tensor: MirType| MirFunction {
+        id: MirFunctionId(id),
+        source: None,
+        name: None,
+        params: Vec::new(),
+        locals: vec![crate::mir::MirLocal {
+            id: crate::mir::MirLocalId(0),
+            name: None,
+            ty: tensor,
+            mutable: false,
+            span: Span::default(),
+        }],
+        temps: Vec::new(),
+        blocks: vec![MirBlock {
+            id: crate::mir::MirBlockId(0),
+            statements: vec![MirStatement {
+                kind: MirStatementKind::Call {
+                    destination: None,
+                    callee: MirCallee::Definition { source: SOURCE, type_args: Vec::new() },
+                    args: vec![MirOperand::Place(MirPlace::local(crate::mir::MirLocalId(0)))],
+                },
+                span: Span::default(),
+            }],
+            terminator: MirTerminator { kind: MirTerminatorKind::Return(None), span: Span::default() },
+            span: Span::default(),
+        }],
+        return_ty: vacuum,
+        error_ty: None,
+        is_async: false,
+        is_generator: false,
+        shader_stage: None,
+        span: Span::default(),
+    };
+    let mut program = MirProgram {
+        functions: vec![
+            make_caller(1, tensor_2x2_a),
+            make_caller(2, tensor_2x2_b),
+            make_caller(3, tensor_8x8),
+        ],
+        ..MirProgram::default()
+    };
+    let generic_params = vec![(
+        SOURCE,
+        vec![
+            MirGenericParam { name: crate::lexer::Symbol(501), is_shape: true },
+            MirGenericParam { name: crate::lexer::Symbol(502), is_shape: true },
+        ],
+    )];
+
+    let monomorphizations =
+        instantiate_merged_generic_calls(&mut program, &[template], &generic_params, &mut types, &interner, None)
+            .expect("distinct concrete shape instances must link");
+
+    assert_eq!(monomorphizations.len(), 2, "duplicate [2, 2] key must reuse one instance");
+    assert_eq!(
+        monomorphizations
+            .iter()
+            .filter(|entry| entry.key.shape_args == monomorphizations[0].key.shape_args)
+            .count(),
+        1,
+        "the instance index must contain one canonical key per concrete shape"
+    );
+    assert_ne!(
+        monomorphizations[0].key.shape_args, monomorphizations[1].key.shape_args,
+        "same-template [2, 2] and [8, 8] keys must stay distinct"
+    );
+    let target = |function: &MirFunction| {
+        let MirStatementKind::Call { callee, .. } = &function.blocks[0].statements[0].kind else {
+            panic!("expected generic call statement");
+        };
+        let MirCallee::Function(target) = callee else {
+            panic!("generic call must be rewritten to an instance");
+        };
+        *target
+    };
+    assert_eq!(target(&program.functions[0]), target(&program.functions[1]));
+    assert_ne!(target(&program.functions[0]), target(&program.functions[2]));
+    for monomorphization in &monomorphizations {
+        let instance = program
+            .functions
+            .iter()
+            .find(|function| function.id == monomorphization.function)
+            .expect("each canonical shape key has an instance");
+        assert!(
+            !function_contains_shape_size(&mut instance.clone()),
+            "package finalization must fold every generated-companion ShapeSize"
+        );
+    }
+}

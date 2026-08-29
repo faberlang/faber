@@ -266,3 +266,91 @@ functio add_tensors<magnitudo B, magnitudo D>(tensor<f32, [B, D]> a, tensor<f32,
         "invalid_mir_unresolved_shape_size_constant_survives_monomorphization"
     );
 }
+
+// ── MMG-D1: package-link survivor population ──────────────────────────────
+
+/// Exercise the same fail-closed survivor net used by package linking. The
+/// package-link inputs themselves live in the Gradus consumers, so their
+/// verbatim package reds are recorded in `docs/factory/mir-monomorphization-gap/diagnosis.md`.
+fn assert_unbound_shape_size_survivor(surface: &str, source_text: &str, function_name: &str, shape_names: &[&str]) {
+    let mut unit = analyzed_unit(source_text);
+    let source = generic_def_id(&unit, function_name);
+    let shape_dims = shape_names
+        .iter()
+        .map(|name| {
+            unit.types
+                .intern_index(IndexExpr::Param(unit.interner.intern(name)))
+        })
+        .collect::<Vec<_>>();
+    let symbolic_shape = unit.types.intern_index(IndexExpr::Tuple(shape_dims));
+    let mut functions = vec![shape_size_instance(symbolic_shape, source)];
+    let errors = finalize_monomorphized_shapes(
+        &mut unit,
+        &mut functions,
+        &[MirMonomorphization {
+            key: MirMonomorphizationKey {
+                source,
+                type_args: Vec::new(),
+                // The package-link red is the empty per-instance map case.
+                shape_args: Vec::new(),
+            },
+            function: MirFunctionId(0),
+        }],
+    );
+
+    assert_eq!(errors.len(), 1, "{surface} must produce one survivor error: {errors:?}");
+    assert_eq!(
+        errors[0].message, "invalid MIR: unresolved shape-size constant survives monomorphization",
+        "{surface} survivor diagnostic changed: {errors:?}"
+    );
+    assert_eq!(
+        errors[0].issue, "invalid_mir_unresolved_shape_size_constant_survives_monomorphization",
+        "{surface} survivor issue changed: {errors:?}"
+    );
+    assert!(
+        crate::mir::generic::function_contains_shape_size(&mut functions[0]),
+        "{surface} must retain the unresolved ShapeSize terms for the survivor net"
+    );
+}
+
+#[test]
+fn dense_ref01_survivor_population_is_fail_closed() {
+    assert_unbound_shape_size_survivor(
+        "dense REF-01",
+        r#"
+functio pin<magnitudo A, magnitudo B>(tensor<f32, [A, B]> t) → tensor<f32, [A, B]> {
+    redde t
+}
+"#,
+        "pin",
+        &["A", "B"],
+    );
+}
+
+#[test]
+fn gather_twin_survivor_population_is_fail_closed() {
+    assert_unbound_shape_size_survivor(
+        "gather twin",
+        r#"
+functio gather<magnitudo T, magnitudo V, magnitudo D>(tensor<f32, [T, D]> table) → tensor<f32, [T, D]> {
+    redde table
+}
+"#,
+        "gather",
+        &["T", "D"],
+    );
+}
+
+#[test]
+fn krs_oracle_survivor_population_is_fail_closed() {
+    assert_unbound_shape_size_survivor(
+        "KRS oracle",
+        r#"
+functio dense_qkv<magnitudo T, magnitudo D, magnitudo Q, magnitudo K>(tensor<f32, [T, Q]> q) → tensor<f32, [T, Q]> {
+    redde q
+}
+"#,
+        "dense_qkv",
+        &["T", "Q"],
+    );
+}
