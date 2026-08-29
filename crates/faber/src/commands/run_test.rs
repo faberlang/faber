@@ -3,7 +3,7 @@ use crate::cli::{BackendSelection, RunArgs};
 use radix::module::mir::RunSourceError;
 use radix::program::mir::DeviceSelection;
 use std::path::{Path, PathBuf};
-use std::process::ExitCode;
+use std::process::{Command, ExitCode};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 fn temp_dir(label: &str) -> PathBuf {
@@ -22,6 +22,8 @@ fn run_args(path: PathBuf, backend: Option<BackendSelection>) -> RunArgs {
         locale: None,
         diagnostics_locale: None,
         backend,
+        stats: false,
+        stats_file: None,
         deny_warnings: false,
         deny: Vec::new(),
         args: Vec::new(),
@@ -212,6 +214,161 @@ fn route_selection_invalid_manifest_with_cli_flag_is_ignored() {
     let args = run_args(dir.clone(), Some(BackendSelection::Auto));
     let selection = resolve_route_selection(&args, &dir).expect("CLI flag wins");
     assert_eq!(selection, DeviceSelection::Auto);
+}
+
+// ── RSM-4: fail-closed stats + device-route refusal (CLI hook) ───────────
+
+#[test]
+fn route_selection_refuses_stats_with_explicit_device_backend() {
+    let dir = temp_dir("stats-backend-refused");
+    std::fs::write(dir.join("main.fab"), "incipit {\n}\n").expect("write entry");
+    write_manifest(&dir, Some("metal"));
+
+    let mut args = run_args(dir.clone(), Some(BackendSelection::Metal));
+    args.stats = true;
+    let err = resolve_route_selection(&args, &dir)
+        .expect_err("stats + explicit device backend must refuse during route resolution");
+    assert_eq!(err.issue(), Some("run_stats_device_route_unsupported"));
+    assert!(
+        err.message.contains("run statistics") && err.message.contains("metal"),
+        "diagnostic must name the stats/device incompatibility: {}",
+        err.message
+    );
+
+    // The file-sink spelling refuses with the same identity.
+    let mut file_args = run_args(dir.clone(), Some(BackendSelection::Cuda));
+    file_args.stats_file = Some(dir.join("refused.json"));
+    let err = resolve_route_selection(&file_args, &dir)
+        .expect_err("stats-file + explicit device backend must refuse identically");
+    assert_eq!(err.issue(), Some("run_stats_device_route_unsupported"));
+}
+
+#[test]
+fn route_selection_allows_stats_with_auto_or_absent_backend() {
+    let dir = temp_dir("stats-auto-allowed");
+    std::fs::write(dir.join("main.fab"), "incipit {\n}\n").expect("write entry");
+    write_manifest(&dir, None);
+
+    let mut auto_args = run_args(dir.clone(), Some(BackendSelection::Auto));
+    auto_args.stats = true;
+    assert_eq!(
+        resolve_route_selection(&auto_args, &dir).expect("auto stays on the CPU route"),
+        DeviceSelection::Auto
+    );
+
+    let mut manifest_args = run_args(dir.clone(), None);
+    manifest_args.stats = true;
+    assert_eq!(
+        resolve_route_selection(&manifest_args, &dir).expect("absent backend resolves"),
+        DeviceSelection::Auto
+    );
+}
+
+/// Drive the cargo-built `faber` binary (never PATH) for the process-level
+/// refusal proofs: nonzero exit, naming diagnostic, and no stats artifact.
+fn run_faber_binary(package: &Path, flags: &[&str]) -> std::process::Output {
+    Command::new(crate::commands::format_test::faber_binary())
+        .arg("run")
+        .args(flags)
+        .arg(package)
+        .output()
+        .expect("run faber binary")
+}
+
+fn assert_no_stats_artifact(output: &std::process::Output, stats_file: &Path) {
+    assert!(
+        !output
+            .stdout
+            .windows(crate::commands::run_stats::STATS_MARKER.len())
+            .any(|window| window == crate::commands::run_stats::STATS_MARKER.as_bytes()),
+        "refusal must emit no stdout stats"
+    );
+    assert!(
+        !stats_file.exists(),
+        "refusal must emit no stats file: {}",
+        stats_file.display()
+    );
+}
+
+fn assert_refusal_names_stats_device_incompatibility(stderr: &str) {
+    assert!(
+        stderr.contains("run statistics") && stderr.contains("device route"),
+        "refusal diagnostic must name the stats/device incompatibility: {stderr}"
+    );
+}
+
+#[test]
+fn route_stats_cli_backend_refusal_exits_nonzero_without_artifact() {
+    let dir = temp_dir("stats-cli-backend-metal-cli-refused");
+    std::fs::write(dir.join("main.fab"), "main { print 1 }\n").expect("write entry");
+
+    let stats_file = dir.join("refused.json");
+    let file_arg = stats_file.to_str().expect("UTF-8 stats path");
+    let output = run_faber_binary(
+        &dir,
+        &["--stats", "--stats-file", file_arg, "--backend", "metal"],
+    );
+    assert!(
+        !output.status.success(),
+        "stats + explicit device backend must exit nonzero: {:?}",
+        output.status
+    );
+    assert_refusal_names_stats_device_incompatibility(&String::from_utf8_lossy(&output.stderr));
+    assert_no_stats_artifact(&output, &stats_file);
+}
+
+#[test]
+fn route_stats_manifest_backend_refusal_exits_nonzero_without_artifact() {
+    // No CLI `--backend`: the manifest-declared selection reaches the seam,
+    // which refuses before any device callback/launch (the seam is observed
+    // refusing, not the device failing).
+    let dir = temp_dir("stats-manifest-metal-seam-refused");
+    std::fs::create_dir_all(dir.join("src")).expect("create src");
+    std::fs::write(dir.join("src/main.fab"), "main { print 1 }\n").expect("write entry");
+    std::fs::write(
+        dir.join("faber.toml"),
+        r#"[package]
+name = "stats-manifest-metal"
+version = "0.1.0"
+edition = "2026"
+
+[paths]
+source = "src"
+entry = "main.fab"
+
+[build]
+kind = "bin"
+
+[device]
+backend = "metal"
+"#,
+    )
+    .expect("write manifest");
+
+    let stats_file = dir.join("refused.json");
+    let file_arg = stats_file.to_str().expect("UTF-8 stats path");
+    let output = run_faber_binary(&dir, &["--stats", "--stats-file", file_arg]);
+    assert!(
+        !output.status.success(),
+        "manifest-declared device selection + stats must exit nonzero: {:?}",
+        output.status
+    );
+    assert_refusal_names_stats_device_incompatibility(&String::from_utf8_lossy(&output.stderr));
+    assert_no_stats_artifact(&output, &stats_file);
+
+    // No-stats callers keep the existing device/backend semantics (here: the
+    // fail-closed device refusal of a build without `device-runtime`), and
+    // the refusal identity is the device one, not the stats one.
+    let unstatsed = run_faber_binary(&dir, &[]);
+    assert!(
+        !unstatsed.status.success(),
+        "the no-stats device route keeps its existing fail-closed refusal"
+    );
+    let unstatsed_stderr = String::from_utf8_lossy(&unstatsed.stderr);
+    assert!(
+        !unstatsed_stderr.contains("run statistics"),
+        "the no-stats refusal must not be the stats refusal: {unstatsed_stderr}"
+    );
 }
 
 // ── run dispatch: the package-MIR runner with a selection ────────────────
