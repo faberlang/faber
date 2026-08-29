@@ -353,13 +353,28 @@ pub(super) fn is_single_fab_file(path: &Path) -> bool {
 /// Resolve the effective backend selection for `faber run` (N1.1): CLI
 /// `--backend` > manifest `[device] backend` > default `auto`. An invalid
 /// manifest value fails closed with a structured diagnostic (never silently
-/// ignored).
+/// ignored). An explicit device backend combined with a stats request
+/// refuses here, during route resolution (RSM-4): the device route never
+/// runs the interpreter the meter measures.
 fn resolve_route_selection(
     args: &RunArgs,
     input_path: &Path,
 ) -> Result<DeviceSelection, Box<Diagnostic>> {
+    let stats_requested = args.stats || args.stats_file.is_some();
     if let Some(backend) = args.backend {
-        return Ok(backend.selection());
+        let selection = backend.selection();
+        if stats_requested && selection != DeviceSelection::Auto {
+            return Err(Box::new(
+                crate::package_diagnostic_error(format!(
+                    "run statistics (`--stats`/`--stats-file`) require the interpreted CPU route; `--backend {}` executes a device route that never runs the interpreter, so the stats request is refused",
+                    selection.spelling()
+                ))
+                .with_file(input_path.display().to_string())
+                .with_arg("issue", "run_stats_device_route_unsupported")
+                .with_arg("backend", selection.spelling().to_owned()),
+            ));
+        }
+        return Ok(selection);
     }
     let Ok(layout) = package::discover_build_layout(input_path) else {
         return Ok(DeviceSelection::Auto);

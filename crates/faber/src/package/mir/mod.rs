@@ -216,14 +216,23 @@ fn device_section_builder(
 /// the device route when selected. `Ok(None)` runs the CPU route with the
 /// caller's host; `Ok(Some(()))` means the device route already executed.
 /// `stats_requested` is the explicit CLI-originated fact transported by the
-/// radix-program route (RSM-2); the stats+device fail-closed refusal before
-/// `execute_device_route` is this seam owner's follow-up (RSM-4).
+/// radix-program route (RSM-2); a stats request on a route that will not run
+/// the interpreter — a device-bearing image (device route) or an explicit
+/// backend selection — refuses here before any device callback/launch
+/// (RSM-4, fail closed; never silently empty numbers).
 #[cfg(feature = "runner")]
 fn host_route(
     image: &radix::program::mir::FmirPackageImage,
     selection: DeviceSelection,
-    _stats_requested: bool,
+    stats_requested: bool,
 ) -> Result<Option<()>, Vec<Diagnostic>> {
+    if stats_requested && (image.device.is_some() || selection != DeviceSelection::Auto) {
+        return Err(vec![mir_issue_diag(
+            &image.diagnostic_path,
+            "run_stats_device_route_unsupported",
+            "run statistics (`--stats`/`--stats-file`) require the interpreted CPU route; this image executes a device route through the host driver that never runs the interpreter, so the stats request is refused",
+        )]);
+    }
     // DDPP1-U2 (C2 feature isolation): the device route is compiled only under
     // `device-runtime`; without it an explicit backend request or a
     // device-bearing image fails closed (never silently runs CPU).
