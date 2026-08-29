@@ -3982,6 +3982,73 @@ incipit {
 }
 
 #[test]
+fn production_named_public_kernel_metadata_reaches_device_program_selection() {
+    let mut unit = analyze(
+        r#"
+@ nucleum
+@ publica
+functio publica_entry(fractus<f32> value) → fractus<f32> {
+    redde value
+}
+
+@ nucleum
+functio privata_helper(fractus<f32> value) → fractus<f32> {
+    redde value
+}
+"#,
+    );
+    let lowered = lower_analyzed_unit(&mut unit, Default::default()).expect("MIR lowering succeeds");
+    let (program, _semantics, _steps) = radix_mir::device_program::build_device_program(
+        &lowered.validated,
+        &lowered.interner,
+        &radix_mir::device::MirCompanionMap::default(),
+        None,
+        radix_mir::device_program::DeviceProgramLifetime::SingleRun,
+        0,
+        &lowered.device_function_metadata,
+    )
+    .expect("device-program admission succeeds");
+
+    assert_eq!(program.kernels.len(), 1, "only the public named kernel is admitted");
+    let admitted = &program.kernels[0];
+    assert_eq!(
+        admitted.entry, "publica_entry",
+        "the public named kernel must be the selected entry"
+    );
+}
+
+#[test]
+fn production_kernel_closure_composes_named_device_leaf() {
+    let mut unit = analyze(
+        r#"
+@ nucleum
+functio device_leaf(numerus value) → numerus {
+    redde value + 1
+}
+
+@ nucleum
+functio caller(numerus input) → numerus {
+    fixum _ region ← (numerus value) nucleum → numerus ∴ device_leaf(value)
+    redde region(input)
+}
+"#,
+    );
+    let roles = crate::mir::device_roles_from_hir(&unit.hir);
+    let lowered =
+        lower_analyzed_unit(&mut unit, Default::default()).expect("a kernel closure may call a named device leaf");
+    let survivors = super::super::fragment_composition::surviving_fragment_calls_with_metadata(
+        &lowered.program.functions,
+        &lowered.monomorphizations,
+        &roles,
+        &lowered.device_function_metadata,
+    );
+    assert!(
+        survivors.is_empty(),
+        "device calls must compose through the production metadata path: {survivors:?}"
+    );
+}
+
+#[test]
 fn lowers_kernel_closure_iife_to_private_direct_kernel() {
     let mut unit = analyze(
         r"

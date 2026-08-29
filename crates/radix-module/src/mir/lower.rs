@@ -54,7 +54,7 @@ use crate::mir::{
     MirTypeCheckOp, MirUnOp, MirValidationContext, MirValue, MirValueId, MirValueKind, ValidatedMir,
 };
 use crate::semantic::{ConversionPair, IndexExpr, NumericWidth, Primitive, Type, TypeId, TypeTable};
-use radix_mir::device::{MirDeviceFunctionMetadata, MirDeviceFunctionMetadataMap};
+use radix_mir::device::{is_public_entry, MirDeviceFunctionMetadata, MirDeviceFunctionMetadataMap};
 use radix_types::{MirCollectionOp, MirKernelBuiltin};
 use rustc_hash::{FxHashMap, FxHashSet};
 use std::sync::Arc;
@@ -81,8 +81,9 @@ use context::{function_param_map, struct_field_map, LoweringContextMaps};
 use expr::HirExpressionLoweringVisitor;
 use item::ItemLoweringPass;
 pub use package_instantiate::{
-    instantiate_merged_generic_calls, instantiate_merged_generic_calls_with_devices, ImportedDeviceIndex,
-    ImportedDeviceRegistration, ImportedDeviceRoute, PackageStructMetadata,
+    instantiate_merged_generic_calls, instantiate_merged_generic_calls_with_devices,
+    instantiate_merged_generic_calls_with_devices_and_metadata, ImportedDeviceIndex, ImportedDeviceRegistration,
+    ImportedDeviceRoute, PackageStructMetadata,
 };
 
 /// Developer-facing MIR lowering diagnostic.
@@ -176,9 +177,9 @@ pub struct LoweredMirUnit<'a> {
     pub interner: Interner,
     pub monomorphizations: Vec<MirMonomorphization>,
     pub closure_environments: Vec<MirClosureEnvironment>,
-    /// Explicit role/origin facts for source-less synthetic device functions.
-    /// Consumers must use this carrier rather than infer private status from
-    /// the missing source definition or compute stage.
+    /// Explicit role/origin/visibility facts for source-derived and source-less
+    /// device functions. Consumers must use this carrier rather than infer
+    /// private status from a missing source definition or compute stage alone.
     pub device_function_metadata: MirDeviceFunctionMetadataMap,
     /// Generic source bodies removed from [`Self::program`] after unit
     /// monomorphization. Package linking keeps them so a later unit can
@@ -349,13 +350,14 @@ fn lower_analyzed_unit_with_options(
         let summaries =
             crate::semantic::passes::fragment_definition::check(&unit.hir, &unit.resolver, &unit.types, &unit.interner)
                 .summaries;
-        let instantiation_errors = super::fragment_instantiation::check(
+        let instantiation_errors = super::fragment_instantiation::check_with_metadata(
             &program.functions,
             &monomorphizations,
             &layouts,
             &unit.types,
             &roles,
             Some(&summaries),
+            &device_function_metadata,
         );
         if !instantiation_errors.is_empty() {
             return Err(instantiation_errors
@@ -368,10 +370,11 @@ fn lower_analyzed_unit_with_options(
                 })
                 .collect());
         }
-        let composition_errors = super::fragment_composition::compose(
+        let composition_errors = super::fragment_composition::compose_with_metadata(
             &mut program.functions,
             &monomorphizations,
             &roles,
+            &device_function_metadata,
             super::fragment_composition::active_budget(),
             Some(&unit.interner),
             &launch_entries,
@@ -943,6 +946,27 @@ impl<'a> MirLowerer<'a> {
             .extend(device_function_metadata);
 
         let shader_stage = self.compute_shader_stage(function, span);
+        // KCM-05: named device functions carry the same explicit role,
+        // stage, and visibility facts as source-less kernel closures. The
+        // device-program constructor is fail-closed when this row is absent,
+        // so populate it at the source-function lowering boundary rather than
+        // making package consumers reconstruct HIR visibility later.
+        if let (Some(role), Some(shader_stage)) = (device_role_for_function(function), shader_stage) {
+            self.device_function_metadata.insert(
+                parent_function_id,
+                MirDeviceFunctionMetadata {
+                    identity: MirSyntheticFunctionIdentity { parent: parent_function_id, ordinal: 0 },
+                    role,
+                    shader_stage,
+                    visibility: if is_public_entry(function, &self.unit.interner) {
+                        MirFunctionVisibility::Public
+                    } else {
+                        MirFunctionVisibility::Private
+                    },
+                    origin: MirFunctionOrigin::Source,
+                },
+            );
+        }
         self.push_function_with_synthetics(
             MirFunction {
                 id: parent_function_id,

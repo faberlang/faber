@@ -11,9 +11,9 @@ use crate::diagnostics::DiagnosticArg;
 use crate::hir::DefId;
 use crate::lexer::Span;
 use crate::mir::{
-    type_contains_param, MirCallee, MirDeviceRole, MirFunction, MirFunctionId, MirKernelShaderStage, MirLayoutTable,
-    MirMonomorphization, MirOperand, MirParamMode, MirPlace, MirPlaceBase, MirStatementKind, MirTerminatorKind,
-    MirType,
+    type_contains_param, MirCallee, MirDeviceRole, MirFunction, MirFunctionId, MirFunctionOrigin, MirKernelShaderStage,
+    MirLayoutTable, MirMonomorphization, MirOperand, MirParamMode, MirPlace, MirPlaceBase, MirStatementKind,
+    MirTerminatorKind, MirType,
 };
 use crate::semantic::{
     passes::fragment_definition::{DeviceEffectKind, FragmentEffectTable},
@@ -449,7 +449,11 @@ impl<'a> InstantiationChecker<'a> {
         // kernel closures; without it a source-less compute-stage function
         // has no proven device identity and is never admitted as an entry
         // (fail-closed selection — KCM-05).
-        if self.metadata.contains_key(&function.id) {
+        if self
+            .metadata
+            .get(&function.id)
+            .is_some_and(|metadata| metadata.origin == MirFunctionOrigin::SyntheticKernelClosure)
+        {
             return RoleKind::SyntheticKernel;
         }
         match function.shader_stage {

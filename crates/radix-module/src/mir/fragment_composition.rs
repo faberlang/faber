@@ -22,10 +22,10 @@ use crate::hir::DefId;
 use crate::lexer::{Interner, Span};
 use crate::mir::{
     MirAggregate, MirAggregateFields, MirAggregateItem, MirBlock, MirBlockId, MirCallee, MirConversion, MirDeviceRole,
-    MirFunction, MirFunctionId, MirIntrinsic, MirKeyValueOperand, MirLocal, MirLocalId, MirMonomorphization,
-    MirNamedOperand, MirOperand, MirOptionChainLink, MirOptionOp, MirParam, MirParamMode, MirPlace, MirPlaceBase,
-    MirProjection, MirRuntimeCall, MirStatement, MirStatementKind, MirTemp, MirTempId, MirTerminator,
-    MirTerminatorKind, MirType, MirValue, MirValueId, MirValueKind,
+    MirFunction, MirFunctionId, MirFunctionOrigin, MirIntrinsic, MirKeyValueOperand, MirLocal, MirLocalId,
+    MirMonomorphization, MirNamedOperand, MirOperand, MirOptionChainLink, MirOptionOp, MirParam, MirParamMode,
+    MirPlace, MirPlaceBase, MirProjection, MirRuntimeCall, MirStatement, MirStatementKind, MirTemp, MirTempId,
+    MirTerminator, MirTerminatorKind, MirType, MirValue, MirValueId, MirValueKind,
 };
 use radix_mir::device::MirDeviceFunctionMetadataMap;
 use rustc_hash::{FxHashMap, FxHashSet};
@@ -1029,7 +1029,10 @@ fn role_of(
             None => {}
         }
     }
-    if metadata.contains_key(&function.id) {
+    if metadata
+        .get(&function.id)
+        .is_some_and(|metadata| metadata.origin == MirFunctionOrigin::SyntheticKernelClosure)
+    {
         return RoleKind::SyntheticKernel;
     }
     RoleKind::Other

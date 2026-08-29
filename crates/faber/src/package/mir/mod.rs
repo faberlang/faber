@@ -85,12 +85,14 @@ fn device_section_builder(
         let declared_steps = prepared
             .device_steps
             .unwrap_or(super::device::DEFAULT_TRAINING_STEPS);
-        let Some((program, semantics, step_count)) = super::device::device_program_for_lowered(
-            &lowered.validated,
-            &lowered.interner,
-            &lowered.companions,
-            declared_steps,
-        )?
+        let Some((program, semantics, step_count)) =
+            super::device::device_program_for_lowered_with_metadata(
+                &lowered.validated,
+                &lowered.interner,
+                &lowered.companions,
+                declared_steps,
+                &lowered.device_function_metadata,
+            )?
         else {
             // The selected entry lowers to no compute kernel: no device
             // payload. An explicit GPU request fails closed at run time

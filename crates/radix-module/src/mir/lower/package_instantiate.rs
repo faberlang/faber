@@ -20,9 +20,9 @@ use crate::mir::generic::{
     MirShapeBindings,
 };
 use crate::mir::{
-    type_contains_param, MirCallee, MirExternalFunctionIdentity, MirFunction, MirFunctionId, MirGenericBindings,
-    MirMonomorphization, MirMonomorphizationKey, MirOperand, MirPlace, MirPlaceBase, MirProgram, MirProjection,
-    MirStatementKind, MirTerminatorKind, MirType,
+    type_contains_param, MirCallee, MirDeviceFunctionMetadataMap, MirExternalFunctionIdentity, MirFunction,
+    MirFunctionId, MirGenericBindings, MirMonomorphization, MirMonomorphizationKey, MirOperand, MirPlace, MirPlaceBase,
+    MirProgram, MirProjection, MirStatementKind, MirTerminatorKind, MirType,
 };
 use crate::semantic::{IndexExpr, Primitive, Type, TypeTable};
 use rustc_hash::{FxHashMap, FxHashSet};
@@ -224,6 +224,38 @@ pub fn instantiate_merged_generic_calls_with_devices(
     consumer_roles: &HashMap<DefId, crate::mir::MirDeviceRole>,
     consumer_launch_entries: &std::collections::HashSet<DefId>,
 ) -> Result<(Vec<MirMonomorphization>, Vec<ImportedDeviceRegistration>), Vec<MirError>> {
+    let mut device_function_metadata = MirDeviceFunctionMetadataMap::default();
+    instantiate_merged_generic_calls_with_devices_and_metadata(
+        program,
+        templates,
+        generic_params,
+        types,
+        interner,
+        struct_metadata,
+        &mut device_function_metadata,
+        imported_devices,
+        consumer_roles,
+        consumer_launch_entries,
+    )
+}
+
+/// Device-aware package-link instantiation with the lowered function metadata
+/// carrier. Production package linking uses this entry point so source-derived
+/// visibility and source-less synthetic closure identity survive the generic
+/// instantiation/composition boundary.
+#[allow(clippy::type_complexity)]
+pub fn instantiate_merged_generic_calls_with_devices_and_metadata(
+    program: &mut MirProgram,
+    templates: &[MirFunction],
+    generic_params: &[(DefId, Vec<MirGenericParam>)],
+    types: &mut TypeTable,
+    interner: &Interner,
+    struct_metadata: Option<&PackageStructMetadata<'_>>,
+    device_function_metadata: &mut MirDeviceFunctionMetadataMap,
+    imported_devices: &ImportedDeviceIndex,
+    consumer_roles: &HashMap<DefId, crate::mir::MirDeviceRole>,
+    consumer_launch_entries: &std::collections::HashSet<DefId>,
+) -> Result<(Vec<MirMonomorphization>, Vec<ImportedDeviceRegistration>), Vec<MirError>> {
     if templates.is_empty() {
         return Ok((Vec::new(), Vec::new()));
     }
@@ -259,6 +291,32 @@ pub fn instantiate_merged_generic_calls_with_devices(
     if !state.errors.is_empty() {
         return Err(state.errors);
     }
+    // A generic device template's source row must follow every concrete
+    // instance id. Without this copy, the fail-closed constructor would omit
+    // an imported public kernel even though its route carried public
+    // visibility. Synthetic closure rows remain keyed by their own lowered
+    // function ids and are not inferred here.
+    let template_metadata: FxHashMap<DefId, _> = templates
+        .iter()
+        .filter_map(|template| {
+            let source = template.source?;
+            let metadata = device_function_metadata.get(&template.id).copied()?;
+            Some((source, metadata))
+        })
+        .collect();
+    let created_metadata = program
+        .functions
+        .iter()
+        .filter(|function| created_ids.contains(&function.id))
+        .filter_map(|function| {
+            let source = function.source?;
+            let mut metadata = *template_metadata.get(&source)?;
+            metadata.identity.parent = function.id;
+            Some((function.id, metadata))
+        })
+        .collect::<Vec<_>>();
+    device_function_metadata.extend(created_metadata);
+
     // DFV2-4 merged-pipeline composition: after shapes finalize, imported
     // device instances are device functions of this program (routes carry
     // role + launch visibility), so their device calls compose before the
@@ -301,10 +359,11 @@ pub fn instantiate_merged_generic_calls_with_devices(
                 })
                 .map(|(source, _)| *source),
         );
-        let composition_errors = crate::mir::fragment_composition::compose(
+        let composition_errors = crate::mir::fragment_composition::compose_with_metadata(
             &mut program.functions,
             &state.monomorphizations,
             &device_roles,
+            device_function_metadata,
             crate::mir::fragment_composition::active_budget(),
             Some(interner),
             &launch_entries,

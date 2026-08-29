@@ -725,6 +725,17 @@ fn generate_llvm_text_output(
         // concrete imported registrations) is what the text paths consume, so
         // an import-only device package no longer reports the zero-entry red.
         let device_roles = merged_target_entry_roles(local_device_roles, &mir).map_err(imported_entry_error_spanned)?;
+        // Source metadata is the package constructor's explicit admission
+        // carrier. LLVM's direct device-module route already receives the
+        // launch-filtered `device_roles`; pass only source-less closure rows
+        // here so a private named helper cannot be promoted back into an LLVM
+        // kernel annotation merely because it is a device-composition fact.
+        let llvm_metadata = mir
+            .device_function_metadata
+            .iter()
+            .filter(|(_, metadata)| metadata.origin == crate::mir::MirFunctionOrigin::SyntheticKernelClosure)
+            .map(|(function, metadata)| (*function, *metadata))
+            .collect::<crate::mir::MirDeviceFunctionMetadataMap>();
         // DDCP3-U2 (b) mixed-path disambiguation: default `llvm-text`/`llvm-host`
         // is the CPU-module path. A package that carries device roles routes
         // through the HOST-PARTITION lane (direct declarations/calls, no device
@@ -735,7 +746,7 @@ fn generate_llvm_text_output(
         let code = if emit_nvvm_device_module || device_roles.is_empty() {
             crate::mir::emit_llvm_text_probe(crate::mir::LlvmEmitRequest {
                 device_roles: Some(device_roles.clone()),
-                device_function_metadata: Some(mir.device_function_metadata.clone()),
+                device_function_metadata: Some(llvm_metadata.clone()),
                 ..crate::mir::LlvmEmitRequest::new(&mir.validated, &mir.interner)
             })
             .map_err(llvm_text_codegen_error)?
@@ -752,7 +763,7 @@ fn generate_llvm_text_output(
             // available to that seam at this route.
             crate::mir::emit_llvm_text_probe(crate::mir::LlvmEmitRequest {
                 device_roles: Some(device_roles.clone()),
-                device_function_metadata: Some(mir.device_function_metadata.clone()),
+                device_function_metadata: Some(llvm_metadata),
                 host_partition: true,
                 host_partition_legality: crate::mir::device_semantics::DeviceLegalityFacts::default(),
                 ..crate::mir::LlvmEmitRequest::new(&mir.validated, &mir.interner)
