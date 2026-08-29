@@ -73,3 +73,11 @@ website/dist/
 
 # Local cargo config (shared target dir, machine-specific)
 /.cargo/
+
+# Raw device-capture process transcripts. llama-cli comparator.stdout
+# can be hundreds of MB; paired-run.json and markdown receipts are the
+# committed record. Fixtures under scripta/testdata/ are not matched.
+docs/**/comparator.stdout
+docs/**/comparator.stderr
+docs/**/faber.stdout
+docs/**/faber.stderr
