@@ -40,6 +40,35 @@ const STATS_FIXTURE: &str = r#"
 }
 "#;
 
+/// Named-consumer fixture (en package surface): a hot loop function, one
+/// runtime textus→int convert-assign, and a `@ cursor` generator call, so the
+/// metered artifact carries discovery targets for every row family the meter
+/// emits on the CPU route.
+const CONSUMER_FIXTURE: &str = r#"
+@ cursor { }
+fn digits() → int {
+    yield 7
+}
+
+fn bump(int n) → int {
+    return n + 1
+}
+
+main {
+    var int total ← 0
+    var int i ← 0
+    while i < 12 {
+        total ← bump(total)
+        i ← i + 1
+    }
+    var textus raw ← "41"
+    var int parsed ↤ raw
+    total ← bump(parsed)
+    print "total=", total
+    print digits()
+}
+"#;
+
 fn fixture_artifact() -> RunStatsArtifact {
     serde_json::from_str(STATS_FIXTURE).expect("binding fixture must deserialize")
 }
@@ -351,16 +380,16 @@ fn pre_execution_and_single_source_failures_emit_no_artifact() {
     let source_dir = tempfile::tempdir().expect("create single-source directory");
     let source = source_dir.path().join("single.fab");
     fs::write(&source, "main { print 1 }\n").expect("write single source");
-    for flags in [
-        vec!["--stats"],
-        vec![
-            "--stats-file",
-            source_dir
-                .path()
-                .join("single.json")
-                .to_str()
-                .expect("UTF-8 single stats path"),
-        ],
+    let refused_file = source_dir.path().join("single.json");
+    for (flags, artifact_path) in [
+        (vec!["--stats"], None),
+        (
+            vec![
+                "--stats-file",
+                refused_file.to_str().expect("UTF-8 single stats path"),
+            ],
+            Some(refused_file.as_path()),
+        ),
     ] {
         let output = run_faber(&source, &flags);
         assert!(!output.status.success(), "single-source stats must refuse");
@@ -376,5 +405,141 @@ fn pre_execution_and_single_source_failures_emit_no_artifact() {
             .stdout
             .windows(run_stats::STATS_MARKER.len())
             .any(|window| window == run_stats::STATS_MARKER.as_bytes()));
+        assert!(
+            artifact_path.map_or(true, |path| !path.exists()),
+            "single-source refusal must emit no artifact"
+        );
     }
+}
+
+#[test]
+fn named_consumer_proof_discovers_hot_function_conversion_and_cursor_rows() {
+    let (_dir, package) = write_package("consumer", CONSUMER_FIXTURE);
+    let plain = run_faber(&package, &[]);
+    assert!(plain.status.success(), "plain run failed: {:?}", plain);
+
+    let stats = run_faber(&package, &["--stats"]);
+    assert!(stats.status.success(), "stats run failed: {:?}", stats);
+    let (prefix, artifact) = framed_artifact(&stats.stdout);
+    assert_eq!(
+        prefix, plain.stdout,
+        "consumer framing must preserve program output"
+    );
+
+    // Binding posture on the real artifact: approximate reservoir, verbatim
+    // diagnostic-only note, deterministic function ordering.
+    assert!(!artifact.meter.durations.exact);
+    assert_eq!(
+        artifact.meter.note,
+        "diagnostic only — never a bench-gate input"
+    );
+    assert!(artifact.functions.windows(2).all(|pair| {
+        (pair[0].module.as_str(), pair[0].name.as_str())
+            < (pair[1].module.as_str(), pair[1].name.as_str())
+    }));
+
+    // Discovery: the hot loop function (12 iterations + one convert-fed
+    // call), the cursor generator (one row per invocation), and the entry
+    // frame.
+    let bump = artifact
+        .functions
+        .iter()
+        .find(|row| row.name == "bump")
+        .expect("hot function row");
+    assert_eq!(bump.calls, 13);
+    let digits = artifact
+        .functions
+        .iter()
+        .find(|row| row.name == "digits")
+        .expect("cursor generator row");
+    assert_eq!(digits.calls, 1, "one function row per generator invocation");
+    let entry = artifact
+        .functions
+        .iter()
+        .find(|row| row.name == "incipit")
+        .expect("entry frame row");
+    assert_eq!(entry.calls, 1);
+    assert!(
+        artifact.functions.iter().all(|row| row.self_ns <= row.total_ns),
+        "self time is child-subtracted, never exceeding total"
+    );
+
+    // Discovery: conversion and cursor intrinsic rows; intrinsic rows are
+    // higher-order leaves, so self_ns equals total_ns.
+    let convert = artifact
+        .intrinsics
+        .iter()
+        .find(|row| row.name == "convert")
+        .expect("conversion row from the runtime textus→int convert-assign");
+    assert_eq!(convert.calls, 1);
+    let cursor = artifact
+        .intrinsics
+        .iter()
+        .find(|row| row.name == "cursor_stream")
+        .expect("cursor stream row from the generator call");
+    assert_eq!(cursor.calls, 1);
+    assert!(
+        artifact
+            .intrinsics
+            .iter()
+            .any(|row| row.name == "cede"),
+        "generator yield row"
+    );
+    assert!(
+        artifact
+            .intrinsics
+            .iter()
+            .all(|row| row.self_ns == row.total_ns),
+        "intrinsic rows carry the leaf self-time approximation"
+    );
+}
+
+#[test]
+fn device_refusal_is_observed_before_launch_with_no_artifact() {
+    // Device-bearing fixture (manifest-declared selection): the seam receives
+    // the stats request and refuses before any device callback/launch.
+    let (dir, package) = write_package("device-refusal", "main { print 1 }\n");
+    fs::write(
+        dir.path().join("faber.toml"),
+        r#"[package]
+name = "stats-fixture"
+version = "0.1.0"
+edition = "2026"
+
+[paths]
+source = "src"
+entry = "main.fab"
+
+[build]
+kind = "bin"
+
+[device]
+backend = "metal"
+"#,
+    )
+    .expect("write device manifest");
+
+    let output_dir = tempfile::tempdir().expect("create stats output directory");
+    let stats_file = output_dir.path().join("refused.json");
+    let stats_arg = stats_file.to_str().expect("UTF-8 stats path");
+    let output = run_faber(&package, &["--stats", "--stats-file", stats_arg]);
+    assert!(
+        !output.status.success(),
+        "device route + stats request must refuse: {:?}",
+        output.status
+    );
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        stderr.contains("run statistics") && stderr.contains("device route"),
+        "refusal must name the stats/device incompatibility: {stderr}"
+    );
+    assert!(!output
+        .stdout
+        .windows(run_stats::STATS_MARKER.len())
+        .any(|window| window == run_stats::STATS_MARKER.as_bytes()));
+    assert!(
+        !stats_file.exists(),
+        "refusal must emit no artifact: {}",
+        stats_file.display()
+    );
 }
