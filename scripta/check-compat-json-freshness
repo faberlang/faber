@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
 # Freshness gate for radix/corpus/measurement/*.json (compat + conversio).
 #
-# Regenerates the measurement JSON to a temp root and fails if it differs from
-# the committed files. Wired into ./scripta/check-measurement-gates (stage 4a)
-# so a stale measurement fails ./scripta/test before later stages run.
+# Regenerates the measurement JSON to a temp root and classifies it against
+# the committed files. Additive measurement growth is recorded and passes;
+# capability regressions fail. Wired into ./scripta/check-measurement-gates
+# (stage 4a) so a regressed measurement fails before later stages run.
 #
 # Cache envs (skip cargo):
 #   EBNF_MATRIX_HIR_LOG / EBNF_MATRIX_MIR_LOG / CONVERSIO_MATRIX_LOG
@@ -36,10 +37,8 @@ if ! COMPAT_OUT="$tmp" ./scripta/emit-compat-json.py >"$emit_log" 2>&1; then
   exit 1
 fi
 
-if ! diff -rq -x README.md corpus/measurement "$tmp" >/dev/null; then
-  echo "error: corpus/measurement JSON is stale; regenerate with:" >&2
-  echo "  ./scripta/emit-compat-json.py" >&2
-  diff -rq -x README.md corpus/measurement "$tmp" | head -20 >&2 || true
+if ! python3 ./scripta/compare-compat-json.py corpus/measurement "$tmp"; then
+  echo "error: corpus/measurement contains a regressive capability delta" >&2
   exit 1
 fi
 

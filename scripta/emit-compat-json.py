@@ -25,8 +25,10 @@ Env:
   CONVERSIO_MATRIX_FIXTURES  fixture tree root (default ../examples/conversio-matrix)
 
 The freshness gate (scripta/check-compat-json-freshness, wired into
-check-measurement-gates / stage 4a) regenerates to a temp root and fails on a
-stale committed measurement. Commit regenerated JSON as part of a release.
+check-measurement-gates / stage 4a) regenerates to a temp root and runs the
+class-aware diff. Additive measurement deltas are recorded and pass; capability
+regressions fail. Commit regenerated JSON when the measured baseline is meant
+to move.
 """
 
 from __future__ import annotations
