@@ -4525,9 +4525,45 @@ pub fn composed_matmul_signature_for_emission(
     signature
         .append_composed_stage_outputs(function, validation, plan)
         .map_err(|error| PlanMappingError::mapping(error.message))?;
-    plan.validate_for_dispatch(signature.dispatch_size, signature.workgroup)
+    // The composed handoff remains the target-neutral one-workgroup barrier
+    // contract. A tiled launch can still use this signature when its consumer
+    // serializes the admitted tile grid through one active workgroup; keep the
+    // actual launch dimensions in the signature for the host while validating
+    // the effective handoff dispatch at one workgroup.
+    let effective_dispatch = if composed_matmul_serialized_dispatch_admitted(&signature, plan) {
+        MirKernelDispatchSize { x: 1, y: 1, z: 1 }
+    } else {
+        signature.dispatch_size
+    };
+    plan.validate_for_dispatch(effective_dispatch, signature.workgroup)
         .map_err(|error| PlanMappingError::mapping(error.to_string()))?;
     Ok(signature)
+}
+
+/// Whether a composed signature's ordinary tile-grid launch can be consumed
+/// through the plan's existing single-workgroup barrier contract. This is
+/// based only on typed signature/plan geometry; it does not inspect source
+/// names or add a backend-specific plan mode.
+fn composed_matmul_serialized_dispatch_admitted(
+    signature: &MirKernelSignature,
+    plan: &crate::kernel_plan::ComposedMatMulPlan,
+) -> bool {
+    let Some(first_shape) = plan.stages.first().and_then(|stage| stage.shape) else {
+        return false;
+    };
+    let tile = u64::from(crate::kernel_plan::MATMUL_TILE);
+    let legal_workgroup_y = if first_shape.m == 1 {
+        signature.workgroup.y == 1 || signature.workgroup.y == crate::kernel_plan::MATMUL_TILE
+    } else {
+        signature.workgroup.y == crate::kernel_plan::MATMUL_TILE
+    };
+    signature.dispatch_size != MirKernelDispatchSize { x: 1, y: 1, z: 1 }
+        && signature.workgroup.x == crate::kernel_plan::MATMUL_TILE
+        && legal_workgroup_y
+        && signature.workgroup.z == 1
+        && signature.dispatch_size.z == 1
+        && signature.dispatch_size.x == first_shape.n.div_ceil(tile)
+        && signature.dispatch_size.y == first_shape.m.div_ceil(tile)
 }
 
 /// Resolve one matmul call's rank-2 × rank-1/rank-2 typed geometry.
