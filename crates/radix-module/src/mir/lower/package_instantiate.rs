@@ -15,14 +15,14 @@ use crate::file_interface::{
 use crate::hir::DefId;
 use crate::lexer::{Interner, Span};
 use crate::mir::generic::{
-    MirShapeBindings, bind_generic_type_witness_with_shapes, canonical_index, function_contains_shape_size,
+    bind_generic_type_witness_with_shapes, canonical_index, function_contains_shape_size,
     instantiate_existing_generic_type, instantiate_generic_type_with_shapes, substitute_shape_size_constants,
-    substitute_tensor_from_flat_shape_size_constants,
+    substitute_tensor_from_flat_shape_size_constants, MirShapeBindings,
 };
 use crate::mir::{
-    MirCallee, MirExternalFunctionIdentity, MirFunction, MirFunctionId, MirGenericBindings, MirMonomorphization,
-    MirMonomorphizationKey, MirOperand, MirPlace, MirPlaceBase, MirProgram, MirProjection, MirStatementKind,
-    MirTerminatorKind, MirType, type_contains_param,
+    type_contains_param, MirCallee, MirExternalFunctionIdentity, MirFunction, MirFunctionId, MirGenericBindings,
+    MirMonomorphization, MirMonomorphizationKey, MirOperand, MirPlace, MirPlaceBase, MirProgram, MirProjection,
+    MirStatementKind, MirTerminatorKind, MirType,
 };
 use crate::semantic::{IndexExpr, Primitive, Type, TypeTable};
 use rustc_hash::{FxHashMap, FxHashSet};
@@ -1193,6 +1193,94 @@ fn rewrite_call_callee(function: &mut MirFunction, call: &PendingCall, target: M
     }
 }
 
+/// Repair AIR-generated `ShapeSize` indices that cross a package type-table
+/// merge. Ordinary type ids are remapped at the package seam, but a
+/// `ShapeSize` carries an `IndexId` directly and therefore cannot be repaired
+/// by the type-id rewrite. The reverse-AD mean producer emits the divisor as
+/// the statement immediately after its `TensorMean`; that call's tensor
+/// operand has the authoritative, already-finalized result shape.
+fn repair_mean_shape_size_constants(types: &TypeTable, function: &mut MirFunction) {
+    let snapshot = function.clone();
+    for block in &mut function.blocks {
+        for index in 1..block.statements.len() {
+            let Some(mean_shape) = (|| {
+                let MirStatementKind::RuntimeCall { call, .. } = &block.statements[index - 1].kind else {
+                    return None;
+                };
+                if !matches!(
+                    call.intrinsic,
+                    crate::mir::MirIntrinsic::Collection(crate::mir::MirCollectionOp::TensorMean)
+                ) {
+                    return None;
+                }
+                tensor_shape_for_operand(types, &snapshot, call.args.first()?)
+            })() else {
+                continue;
+            };
+            if block.statements[index].span != block.statements[index - 1].span {
+                continue;
+            }
+            let MirStatementKind::Assign { value, .. } = &mut block.statements[index].kind else {
+                continue;
+            };
+            let crate::mir::MirValueKind::Operand(MirOperand::Constant(crate::mir::MirConstant::ShapeSize {
+                shape,
+                ..
+            })) = &mut value.kind
+            else {
+                continue;
+            };
+            *shape = mean_shape;
+        }
+    }
+}
+
+fn tensor_shape_for_operand(
+    types: &TypeTable,
+    function: &MirFunction,
+    operand: &MirOperand,
+) -> Option<crate::semantic::IndexId> {
+    let ty = match operand {
+        MirOperand::Place(place) if place.projections.is_empty() => match place.base {
+            MirPlaceBase::Local(id) => function
+                .params
+                .iter()
+                .find(|param| param.local == id)
+                .map(|param| param.ty)
+                .or_else(|| {
+                    function
+                        .locals
+                        .iter()
+                        .find(|local| local.id == id)
+                        .map(|local| local.ty)
+                }),
+            MirPlaceBase::Temp(id) => function
+                .temps
+                .iter()
+                .find(|temp| temp.id == id)
+                .map(|temp| temp.ty),
+        },
+        MirOperand::Temp(id) => function
+            .temps
+            .iter()
+            .find(|temp| temp.id == *id)
+            .map(|temp| temp.ty),
+        MirOperand::Value(_) | MirOperand::Constant(_) | MirOperand::Place(_) => None,
+    }?;
+    let mut current = ty.semantic_id();
+    let mut seen = FxHashSet::default();
+    loop {
+        if !seen.insert(current) {
+            return None;
+        }
+        match types.get(current) {
+            Type::Tensor(_, shape) => return Some(*shape),
+            Type::Alias(_, target) => current = *target,
+            _ => return None,
+        }
+    }
+}
+
 fn finalize_function(
     types: &mut TypeTable,
     function: &mut MirFunction,
@@ -1281,6 +1369,7 @@ fn finalize_function(
             }
         }
     }
+    repair_mean_shape_size_constants(types, function);
     let _ = substitute_tensor_from_flat_shape_size_constants(types, function, shape_bindings);
     let _ = substitute_shape_size_constants(types, function, shape_bindings);
     true

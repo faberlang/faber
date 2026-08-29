@@ -1563,6 +1563,7 @@ fn finalize_air_backward_shapes(lowered: &mut crate::mir::LoweredMirUnit<'_>) ->
         })
         .cloned()
         .collect::<Vec<_>>();
+    carry_air_backward_templates(lowered, &companion_templates);
     if companion_templates.is_empty() {
         return reject_shape_size_survivors(&mut lowered.program.functions, UNRESOLVED_SHAPE_SIZE_SURVIVOR);
     }
@@ -1806,6 +1807,45 @@ fn rewrite_air_backward_calls(
         }
     }
     Ok(())
+}
+
+#[cfg(feature = "device")]
+fn carry_air_backward_templates(lowered: &mut crate::mir::LoweredMirUnit<'_>, templates: &[crate::mir::MirFunction]) {
+    // AIR companions are generated after ordinary unit monomorphization, so
+    // the lowerer cannot place them in `generic_templates` itself. Package
+    // linking sees only that sidecar when it must instantiate a companion for
+    // a caller in another unit. Carry the generated body and its shape-key
+    // declaration into the same sidecar before the package merge. The body
+    // stays in `program` for the standalone route; package instantiation uses
+    // this copy as the template and its canonical key discipline.
+    let carried = {
+        let types = lowered.validated.validation().types;
+        templates
+            .iter()
+            .filter_map(|template| {
+                let source = template.source?;
+                let symbols = companion_shape_symbols(types, template);
+                (!symbols.is_empty()).then_some((source, template.clone(), symbols))
+            })
+            .collect::<Vec<_>>()
+    };
+    for (source, template, symbols) in carried {
+        if lowered
+            .generic_params
+            .iter()
+            .any(|(existing, _)| *existing == source)
+        {
+            continue;
+        }
+        lowered.generic_templates.push(template);
+        lowered.generic_params.push((
+            source,
+            symbols
+                .into_iter()
+                .map(|name| crate::mir::MirGenericParam { name, is_shape: true })
+                .collect(),
+        ));
+    }
 }
 
 #[cfg(feature = "device")]

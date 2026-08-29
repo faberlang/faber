@@ -1066,6 +1066,9 @@ fn two_shape_instances_keep_canonical_keys_and_do_not_merge() {
     let shape_param_a = types.intern_index(IndexExpr::Param(crate::lexer::Symbol(501)));
     let shape_param_b = types.intern_index(IndexExpr::Param(crate::lexer::Symbol(502)));
     let template_shape = types.intern_index(IndexExpr::Tuple(vec![shape_param_a, shape_param_b]));
+    let stale_param_a = types.intern_index(IndexExpr::Param(crate::lexer::Symbol(601)));
+    let stale_param_b = types.intern_index(IndexExpr::Param(crate::lexer::Symbol(602)));
+    let stale_shape = types.intern_index(IndexExpr::Tuple(vec![stale_param_a, stale_param_b]));
     let template_tensor = MirType::semantic(types.tensor_with_shape(element, template_shape));
     let vacuum = MirType::semantic(types.primitive(Primitive::Vacuum));
     let template = MirFunction {
@@ -1079,11 +1082,43 @@ fn two_shape_instances_keep_canonical_keys_and_do_not_merge() {
             mode: crate::mir::MirParamMode::Owned,
             span: Span::default(),
         }],
-        locals: Vec::new(),
+        locals: vec![crate::mir::MirLocal {
+            id: crate::mir::MirLocalId(1),
+            name: None,
+            ty: MirType::semantic(element),
+            mutable: false,
+            span: Span::default(),
+        }],
         temps: Vec::new(),
         blocks: vec![MirBlock {
             id: crate::mir::MirBlockId(0),
-            statements: Vec::new(),
+            statements: vec![
+                MirStatement {
+                    kind: MirStatementKind::RuntimeCall {
+                        destination: None,
+                        call: crate::mir::MirRuntimeCall {
+                            intrinsic: crate::mir::MirIntrinsic::Collection(crate::mir::MirCollectionOp::TensorMean),
+                            args: vec![MirOperand::Place(MirPlace::local(crate::mir::MirLocalId(0)))],
+                            return_ty: MirType::semantic(element),
+                        },
+                    },
+                    span: Span::default(),
+                },
+                MirStatement {
+                    kind: MirStatementKind::Assign {
+                        place: MirPlace::local(crate::mir::MirLocalId(1)),
+                        value: crate::mir::MirValue {
+                            id: crate::mir::MirValueId(0),
+                            kind: crate::mir::MirValueKind::Operand(MirOperand::Constant(
+                                crate::mir::MirConstant::ShapeSize { shape: stale_shape, axis: None },
+                            )),
+                            ty: MirType::semantic(element),
+                            span: Span::default(),
+                        },
+                    },
+                    span: Span::default(),
+                },
+            ],
             terminator: MirTerminator { kind: MirTerminatorKind::Return(None), span: Span::default() },
             span: Span::default(),
         }],
@@ -1185,4 +1220,15 @@ fn two_shape_instances_keep_canonical_keys_and_do_not_merge() {
     };
     assert_eq!(target(&program.functions[0]), target(&program.functions[1]));
     assert_ne!(target(&program.functions[0]), target(&program.functions[2]));
+    for monomorphization in &monomorphizations {
+        let instance = program
+            .functions
+            .iter()
+            .find(|function| function.id == monomorphization.function)
+            .expect("each canonical shape key has an instance");
+        assert!(
+            !function_contains_shape_size(&mut instance.clone()),
+            "package finalization must fold every generated-companion ShapeSize"
+        );
+    }
 }
