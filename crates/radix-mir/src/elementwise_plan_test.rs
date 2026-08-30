@@ -7,8 +7,9 @@ use super::{
 use crate::{
     MirBlock, MirBlockId, MirCollectionOp, MirConstant, MirFunction, MirFunctionId, MirIntrinsic,
     MirLocal, MirLocalId, MirOperand, MirParam, MirParamMode, MirPlace, MirPlaceBase,
-    MirProjection, MirRuntimeCall, MirStatement, MirStatementKind, MirTerminator,
-    MirTerminatorKind, MirType, MirUnOp, MirValidationContext, MirValue, MirValueId, MirValueKind,
+    MirProjection, MirRuntimeCall, MirStatement, MirStatementKind, MirTemp, MirTempId,
+    MirTerminator, MirTerminatorKind, MirType, MirUnOp, MirValidationContext, MirValue, MirValueId,
+    MirValueKind,
 };
 use radix_lexer::Span;
 use radix_types::{IndexExpr, NumericWidth, Primitive, Type, TypeTable};
@@ -413,8 +414,8 @@ fn multi_consumer_intermediate_is_barrier() {
         r1,
     );
     match barrier_of(&function, &types) {
-        ElementwiseBarrierError::MultiConsumer { local, .. } => {
-            assert_eq!(local, MirLocalId(3));
+        ElementwiseBarrierError::MultiConsumer { slot, .. } => {
+            assert_eq!(slot, MirPlaceBase::Local(MirLocalId(3)));
         }
         other => panic!("expected MultiConsumer, got {other:?}"),
     }
@@ -507,18 +508,24 @@ fn unsupported_collection_op_is_barrier() {
     }
 }
 
-/// Unary Relu/Gelu assign (`MirValueKind::Unary`) — the collection-op / unary
-/// duality at `device_program_plans.rs` (`is_elementwise_collection_op` vs
-/// `is_admitted_tensor_unary`).
-///
-/// `plan_elementwise` classifies only collection runtime calls. A live tensor
-/// unary assign is therefore an [`ElementwiseBarrierError::Effect`], even though
-/// Relu/Gelu are admitted as both a collection op and a tensor unary.
+/// Unary Relu/Gelu assign (`MirValueKind::Unary`) — the collection-op /
+/// unary duality at `device_program_plans.rs` (`is_elementwise_collection_op`
+/// vs `is_admitted_tensor_unary`). 1A-bis F3: the tensor-unary spelling of
+/// an admitted op plans as the SAME named elementwise op as its collection
+/// spelling.
 #[test]
-fn unary_relu_gelu_assign_is_effect_barrier() {
-    for (unop, collection) in [
-        (MirUnOp::Relu, MirCollectionOp::TensorRelu),
-        (MirUnOp::Gelu, MirCollectionOp::TensorGelu),
+fn unary_relu_gelu_assign_yields_typed_unary_plan() {
+    for (unop, collection, named) in [
+        (
+            MirUnOp::Relu,
+            MirCollectionOp::TensorRelu,
+            ElementwiseOp::Relu,
+        ),
+        (
+            MirUnOp::Gelu,
+            MirCollectionOp::TensorGelu,
+            ElementwiseOp::Gelu,
+        ),
     ] {
         assert!(
             crate::device_program_plans::is_admitted_tensor_unary(unop),
@@ -536,10 +543,307 @@ fn unary_relu_gelu_assign_is_effect_barrier() {
             Some(1),
             r1,
         );
-        match barrier_of(&function, &types) {
-            ElementwiseBarrierError::Effect { .. } => {}
-            other => panic!("expected Effect barrier for unary {unop:?}, got {other:?}"),
+        let plan = plan_of(&function, &types);
+        let operand = assert_unary(&plan.expression, named);
+        assert!(
+            matches!(*operand, ElementwiseExpr::Input { slot: 0, .. }),
+            "the unary reads the param as its input"
+        );
+    }
+}
+
+// -----------------------------------------------------------------------
+// 1A-bis: lowering-shaped slot fixtures — temp destinations, tensor
+// unary assigns, typed pure forwards, and their fail-closed controls.
+// -----------------------------------------------------------------------
+
+fn local_operand(local: u32) -> MirOperand {
+    MirOperand::Place(MirPlace::local(MirLocalId(local)))
+}
+
+fn temp_operand(temp: u32) -> MirOperand {
+    MirOperand::Temp(MirTempId(temp))
+}
+
+fn collection_call_operands(
+    op: MirCollectionOp,
+    args: &[MirOperand],
+    destination: MirPlace,
+    ty: MirType,
+) -> MirStatement {
+    MirStatement {
+        kind: MirStatementKind::RuntimeCall {
+            destination: Some(destination),
+            call: MirRuntimeCall {
+                intrinsic: MirIntrinsic::Collection(op),
+                args: args.to_vec(),
+                return_ty: ty,
+            },
+        },
+        span: test_span(),
+    }
+}
+
+fn temp_forward_statement(dest_local: u32, temp: u32, ty: MirType) -> MirStatement {
+    MirStatement {
+        kind: MirStatementKind::Assign {
+            place: MirPlace::local(MirLocalId(dest_local)),
+            value: MirValue {
+                id: MirValueId(dest_local),
+                kind: MirValueKind::Operand(temp_operand(temp)),
+                ty,
+                span: test_span(),
+            },
+        },
+        span: test_span(),
+    }
+}
+
+/// A device function with explicit local and temp slot tables — the
+/// 1A-bis temp/forward fixtures need temps the plain `device_function`
+/// cannot declare.
+fn slot_function(
+    params: &[(u32, MirType)],
+    locals: &[(u32, MirType)],
+    temps: &[(u32, MirType)],
+    statements: Vec<MirStatement>,
+    return_local: u32,
+) -> MirFunction {
+    let span = test_span();
+    let return_ty = locals
+        .iter()
+        .find(|(id, _)| *id == return_local)
+        .map(|(_, ty)| *ty)
+        .expect("return local has a declared type");
+    MirFunction {
+        id: MirFunctionId(0),
+        source: None,
+        name: None,
+        params: params
+            .iter()
+            .map(|&(id, ty)| MirParam {
+                local: MirLocalId(id),
+                name: None,
+                ty,
+                mode: MirParamMode::Owned,
+                span,
+            })
+            .collect(),
+        locals: locals
+            .iter()
+            .map(|&(id, ty)| MirLocal {
+                id: MirLocalId(id),
+                name: None,
+                ty,
+                mutable: false,
+                span,
+            })
+            .collect(),
+        temps: temps
+            .iter()
+            .map(|&(id, ty)| MirTemp {
+                id: MirTempId(id),
+                ty,
+                span,
+            })
+            .collect(),
+        blocks: vec![MirBlock {
+            id: MirBlockId(0),
+            statements,
+            terminator: MirTerminator {
+                kind: MirTerminatorKind::Return(Some(local_operand(return_local))),
+                span,
+            },
+            span,
+        }],
+        return_ty,
+        error_ty: None,
+        is_async: false,
+        is_generator: false,
+        shader_stage: None,
+        span,
+    }
+}
+
+/// A collection op writing a TEMP destination and consumed as a TEMP
+/// operand — the real lowering's shape, which keyed-over-locals planning
+/// rejected as `UnresolvedShape` (1A-bis F1).
+#[test]
+fn temp_destination_collection_plans_through_temp_consumer() {
+    let mut types = TypeTable::new();
+    let r1 = rank1_tensor_ty(&mut types, 4);
+    // t0 = add(a, a); b = mul(t0, a)
+    let function = slot_function(
+        &[(0, r1)],
+        &[(1, r1)],
+        &[(0, r1)],
+        vec![
+            collection_call_operands(
+                MirCollectionOp::TensorAdd,
+                &[local_operand(0), local_operand(0)],
+                MirPlace::temp(MirTempId(0)),
+                r1,
+            ),
+            collection_call_operands(
+                MirCollectionOp::TensorMul,
+                &[temp_operand(0), local_operand(0)],
+                MirPlace::local(MirLocalId(1)),
+                r1,
+            ),
+        ],
+        1,
+    );
+    let plan = plan_of(&function, &types);
+    let (lhs, rhs) = assert_binary(&plan.expression, ElementwiseOp::Mul);
+    let (add_lhs, add_rhs) = assert_binary(lhs, ElementwiseOp::Add);
+    assert!(matches!(*add_lhs, ElementwiseExpr::Input { slot: 0, .. }));
+    assert!(matches!(*add_rhs, ElementwiseExpr::Input { slot: 0, .. }));
+    assert!(matches!(*rhs, ElementwiseExpr::Input { slot: 0, .. }));
+    assert_eq!(plan.output.local, MirLocalId(1));
+    assert_eq!(plan.composed_temps, vec![MirTempId(0)]);
+    assert!(plan.covers_slot(&MirPlaceBase::Temp(MirTempId(0))));
+}
+
+/// The admitted `MirUnOp::Exp` tensor unary is a typed unary producer —
+/// the exact node the real SiLU expansion carries (1A-bis F3).
+#[test]
+fn admitted_tensor_exp_assign_yields_plan() {
+    let mut types = TypeTable::new();
+    let r1 = rank1_tensor_ty(&mut types, 4);
+    let function = device_function(
+        &[(0, r1)],
+        vec![unary_assign_statement(MirUnOp::Exp, 0, 1, r1)],
+        Some(1),
+        r1,
+    );
+    let plan = plan_of(&function, &types);
+    let operand = assert_unary(&plan.expression, ElementwiseOp::Exp);
+    assert!(matches!(*operand, ElementwiseExpr::Input { slot: 0, .. }));
+    assert_eq!(plan.provenance.len(), 1);
+}
+
+/// A typed temp-to-local forward is an ALIAS: it contributes no expression
+/// node and no provenance op, and its destination local joins the composed
+/// coverage (1A-bis F4/F7).
+#[test]
+fn typed_temp_to_local_forward_is_alias() {
+    let mut types = TypeTable::new();
+    let r1 = rank1_tensor_ty(&mut types, 4);
+    // t0 = add(a, a); b <- t0; return b
+    let function = slot_function(
+        &[(0, r1)],
+        &[(1, r1)],
+        &[(0, r1)],
+        vec![
+            collection_call_operands(
+                MirCollectionOp::TensorAdd,
+                &[local_operand(0), local_operand(0)],
+                MirPlace::temp(MirTempId(0)),
+                r1,
+            ),
+            temp_forward_statement(1, 0, r1),
+        ],
+        1,
+    );
+    let plan = plan_of(&function, &types);
+    let (lhs, rhs) = assert_binary(&plan.expression, ElementwiseOp::Add);
+    assert!(matches!(*lhs, ElementwiseExpr::Input { slot: 0, .. }));
+    assert!(matches!(*rhs, ElementwiseExpr::Input { slot: 0, .. }));
+    assert_eq!(plan.output.local, MirLocalId(1));
+    assert_eq!(
+        plan.provenance.len(),
+        1,
+        "the forward contributes no provenance operation"
+    );
+    assert_eq!(plan.composed_locals, vec![MirLocalId(1)]);
+    assert_eq!(plan.composed_temps, vec![MirTempId(0)]);
+    assert!(plan.covers_slot(&MirPlaceBase::Local(MirLocalId(1))));
+    assert!(plan.covers_slot(&MirPlaceBase::Temp(MirTempId(0))));
+}
+
+/// A temp producer read by BOTH a pure forward and a second direct
+/// consumer stays a typed barrier over slots (1A-bis F6).
+#[test]
+fn temp_forward_with_second_consumer_is_multi_consumer_barrier() {
+    let mut types = TypeTable::new();
+    let r1 = rank1_tensor_ty(&mut types, 4);
+    // t0 = add(a, a); m = mul(t0, a); b <- t0  — t0 feeds two consumers.
+    let function = slot_function(
+        &[(0, r1)],
+        &[(1, r1), (2, r1)],
+        &[(0, r1)],
+        vec![
+            collection_call_operands(
+                MirCollectionOp::TensorAdd,
+                &[local_operand(0), local_operand(0)],
+                MirPlace::temp(MirTempId(0)),
+                r1,
+            ),
+            collection_call_operands(
+                MirCollectionOp::TensorMul,
+                &[temp_operand(0), local_operand(0)],
+                MirPlace::local(MirLocalId(1)),
+                r1,
+            ),
+            temp_forward_statement(2, 0, r1),
+        ],
+        2,
+    );
+    match barrier_of(&function, &types) {
+        ElementwiseBarrierError::MultiConsumer { slot, .. } => {
+            assert_eq!(slot, MirPlaceBase::Temp(MirTempId(0)));
         }
+        other => panic!("expected MultiConsumer, got {other:?}"),
+    }
+}
+
+/// A forward whose value, source slot, and destination slot types are not
+/// semantically equal is not a provable alias — fail-closed (1A-bis F4).
+#[test]
+fn type_mismatched_forward_is_effect_barrier() {
+    let mut types = TypeTable::new();
+    let r4 = rank1_tensor_ty(&mut types, 4);
+    let r8 = rank1_tensor_ty(&mut types, 8);
+    // t0 = add(a4, a4); b8 <- t0  — the forward claims an 8-wide type.
+    let function = slot_function(
+        &[(0, r4)],
+        &[(1, r8)],
+        &[(0, r4)],
+        vec![
+            collection_call_operands(
+                MirCollectionOp::TensorAdd,
+                &[local_operand(0), local_operand(0)],
+                MirPlace::temp(MirTempId(0)),
+                r4,
+            ),
+            temp_forward_statement(1, 0, r8),
+        ],
+        1,
+    );
+    match barrier_of(&function, &types) {
+        ElementwiseBarrierError::Effect { .. } => {}
+        other => panic!("expected Effect for the type-mismatched forward, got {other:?}"),
+    }
+}
+
+/// A tensor unary outside the admitted set (`Log`) remains a typed
+/// barrier (1A-bis F3: fail-closed, never a silent fallback).
+#[test]
+fn unsupported_tensor_unary_log_is_effect_barrier() {
+    let mut types = TypeTable::new();
+    let r1 = rank1_tensor_ty(&mut types, 4);
+    assert!(!crate::device_program_plans::is_admitted_tensor_unary(
+        MirUnOp::Log
+    ));
+    let function = device_function(
+        &[(0, r1)],
+        vec![unary_assign_statement(MirUnOp::Log, 0, 1, r1)],
+        Some(1),
+        r1,
+    );
+    match barrier_of(&function, &types) {
+        ElementwiseBarrierError::Effect { .. } => {}
+        other => panic!("expected Effect for the unsupported unary, got {other:?}"),
     }
 }
 

@@ -1563,11 +1563,31 @@ fn real_lowered_mlp_body_decomposes_into_fork_join_subchains() {
     );
 }
 
+fn expect_binary<'a>(
+    expr: &'a ElementwiseExpr,
+    op: ElementwiseOp,
+) -> (&'a ElementwiseExpr, &'a ElementwiseExpr) {
+    match expr {
+        ElementwiseExpr::Binary {
+            op: found,
+            lhs,
+            rhs,
+            ..
+        } if *found == op => (lhs, rhs),
+        other => panic!("expected Binary({op:?}), got {other:?}"),
+    }
+}
+
+fn expect_unary<'a>(expr: &'a ElementwiseExpr, op: ElementwiseOp) -> &'a ElementwiseExpr {
+    match expr {
+        ElementwiseExpr::Unary {
+            op: found, operand, ..
+        } if *found == op => operand,
+        other => panic!("expected Unary({op:?}), got {other:?}"),
+    }
+}
+
 #[test]
-#[ignore = "1A-bis (expression-plan coverage): ElementwisePlan rejects the \
-expanded SiLU chain's temp-forward destinations (ElementwiseBarrierError::Effect \
-on a forwarded local read by a later statement). The join child's partition is \
-proven above; its typed expression plan lands with 1A-bis."]
 fn real_lowered_mlp_join_child_carries_typed_expression_plan() {
     let mut types = TypeTable::new();
     let function =
@@ -1575,11 +1595,98 @@ fn real_lowered_mlp_join_child_carries_typed_expression_plan() {
     let validation = MirValidationContext::new(&types);
     let decomposition = decompose_kernel_function(&function, &validation)
         .expect("the real lowered body decomposes by the dataflow rule");
+
+    // Unit-1A topology is unchanged by 1A-bis (F10): the same four-child
+    // partition, the join as child 2, both roots consumed.
+    let slices: Vec<Vec<usize>> = decomposition
+        .subchains
+        .iter()
+        .map(|subchain| subchain.statements.clone())
+        .collect();
+    assert_eq!(
+        slices,
+        vec![
+            vec![0, 1],
+            vec![2, 3],
+            vec![4, 5, 6, 7, 8, 9, 10],
+            vec![11, 12]
+        ],
+        "the fork/join partition must be unchanged, got {slices:?}"
+    );
     let join = &decomposition.subchains[2];
     assert_eq!(join.plan, CollectionKernelPlan::Elementwise);
+    assert_eq!(join.consumes, vec![0, 1], "the join consumes both roots");
+
+    let plan = join
+        .elementwise_plan
+        .as_ref()
+        .expect("the join child must carry the typed SiLU+multiply expression plan");
+
+    // Inputs in first-use order: gate, then up (F8).
+    assert_eq!(plan.inputs.len(), 2);
+    assert_eq!(plan.inputs[0].local, MirLocalId(6), "gate is read first");
+    assert_eq!(plan.inputs[1].local, MirLocalId(7), "up is read second");
+
+    // Output: fused, shape [2, 3] (F8).
+    assert_eq!(plan.output.local, MirLocalId(9));
+    assert_eq!(plan.output.shape, vec![2, 3]);
+
+    // The exact lowered body tree, in MIR operand order — Exp is an
+    // explicit operation node, never a collapsed SiLU (F8):
+    // Mul(Div(gate, Add(Exp(Neg(gate)), 1.0)), up).
+    let (mul_lhs, mul_rhs) = expect_binary(&plan.expression, ElementwiseOp::Mul);
     assert!(
-        join.elementwise_plan.is_some(),
-        "the join child must carry the typed SiLU+multiply expression plan"
+        matches!(mul_rhs, ElementwiseExpr::Input { slot: 1, .. }),
+        "the Mul rhs is the up input"
+    );
+    let (div_lhs, div_rhs) = expect_binary(mul_lhs, ElementwiseOp::Div);
+    assert!(
+        matches!(div_lhs, ElementwiseExpr::Input { slot: 0, .. }),
+        "the Div lhs is the gate input"
+    );
+    let (add_lhs, add_rhs) = expect_binary(div_rhs, ElementwiseOp::Add);
+    let exp_operand = expect_unary(add_lhs, ElementwiseOp::Exp);
+    let neg_operand = expect_unary(exp_operand, ElementwiseOp::Neg);
+    assert!(
+        matches!(neg_operand, ElementwiseExpr::Input { slot: 0, .. }),
+        "Neg reads the gate input"
+    );
+    assert!(
+        matches!(add_rhs, ElementwiseExpr::Scalar(MirConstant::Float(value)) if *value == 1.0),
+        "the Add rhs is the embedded 1.0 scalar, got {add_rhs:?}"
+    );
+
+    // Provenance operations in source order (F8).
+    let ops: Vec<Option<ElementwiseOp>> = plan.provenance.iter().map(|fact| fact.op).collect();
+    assert_eq!(
+        ops,
+        vec![
+            Some(ElementwiseOp::Neg),
+            Some(ElementwiseOp::Exp),
+            Some(ElementwiseOp::Add),
+            Some(ElementwiseOp::Div),
+            Some(ElementwiseOp::Mul),
+        ],
+        "provenance must follow the source statement order"
+    );
+
+    // Complete coverage facts (F7): both local forwards and all five temp
+    // producers belong to the expression — Unit 3 never reconstructs this.
+    assert_eq!(
+        plan.composed_locals,
+        vec![MirLocalId(8), MirLocalId(9)],
+        "activated and fused are the composed locals"
+    );
+    assert_eq!(
+        plan.composed_temps,
+        vec![
+            crate::MirTempId(2),
+            crate::MirTempId(3),
+            crate::MirTempId(4),
+            crate::MirTempId(5),
+            crate::MirTempId(6),
+        ],
+        "the five SiLU/join temps are the composed temps"
     );
 }
 

@@ -7,12 +7,14 @@
 //! and never treats [`crate::kernel_plan::CollectionKernelPlan::Elementwise`]
 //! as a silent fallback.
 
-use crate::device_program_plans::{is_elementwise_collection_op, is_recipe_op};
+use crate::device_program_plans::{
+    is_admitted_tensor_unary, is_elementwise_collection_op, is_recipe_op,
+};
 use crate::tensor_type::tensor_literal_dims;
 use crate::{
     collection_ops::statement_collection_op, MirCollectionOp, MirConstant, MirFunction,
-    MirLayoutKind, MirLocalId, MirOperand, MirPlace, MirStatement, MirStatementKind, MirType,
-    MirValidationContext,
+    MirLayoutKind, MirLocalId, MirOperand, MirPlaceBase, MirStatement, MirStatementKind, MirTempId,
+    MirType, MirUnOp, MirValidationContext, MirValueKind,
 };
 use radix_lexer::Span;
 use radix_types::Type;
@@ -108,8 +110,11 @@ pub struct SourceSpanFact {
 
 /// Closed set of elementwise operations the plan may compose.
 ///
-/// Membership is decided by [`is_elementwise_collection_op`]; this enum only
-/// names an already-classified op.
+/// Collection-op membership is decided by [`is_elementwise_collection_op`];
+/// `Relu`/`Gelu` name both their collection and tensor-unary spellings, and
+/// `Tanh`/`Exp`/`Sqrt`/`F16Round` name the admitted tensor unaries
+/// ([`is_admitted_tensor_unary`]) that have no collection spelling. The enum
+/// only names an already-classified op; it never re-derives admission.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ElementwiseOp {
     /// [`MirCollectionOp::TensorAdd`].
@@ -124,10 +129,18 @@ pub enum ElementwiseOp {
     Neg,
     /// [`MirCollectionOp::TensorFill`].
     Fill,
-    /// [`MirCollectionOp::TensorRelu`].
+    /// [`MirCollectionOp::TensorRelu`] or the admitted `MirUnOp::Relu`.
     Relu,
-    /// [`MirCollectionOp::TensorGelu`].
+    /// [`MirCollectionOp::TensorGelu`] or the admitted `MirUnOp::Gelu`.
     Gelu,
+    /// The admitted `MirUnOp::Tanh` assignment.
+    Tanh,
+    /// The admitted `MirUnOp::Exp` assignment.
+    Exp,
+    /// The admitted `MirUnOp::Sqrt` assignment.
+    Sqrt,
+    /// The admitted `MirUnOp::F16Round` assignment.
+    F16Round,
 }
 
 /// Target-neutral per-element expression. Nodes carry provenance and the
@@ -186,8 +199,14 @@ pub struct ElementwisePlan {
     pub numerical_policy: NumericalPolicy,
     /// Every local the composed chain writes (the plan's intermediate
     /// producers plus the output), in ascending local-id order — the
-    /// consumer's statement-coverage fact (PGC-R6 / OF-3).
+    /// consumer's statement-coverage fact (PGC-R6 / OF-3). Pure-forward
+    /// alias destinations belong here too (1A-bis F7).
     pub composed_locals: Vec<MirLocalId>,
+    /// Every temp the composed chain writes (the plan's temp producers plus
+    /// temp alias destinations), in ascending temp-id order — the temp half
+    /// of the coverage fact, so Unit 3 never reconstructs it from Metal MIR
+    /// (1A-bis F7).
+    pub composed_temps: Vec<MirTempId>,
 }
 
 impl ElementwisePlan {
@@ -197,10 +216,22 @@ impl ElementwisePlan {
     pub fn covers_local(&self, local: MirLocalId) -> bool {
         local == self.output.local || self.composed_locals.contains(&local)
     }
+
+    /// Whether an unprojected place base slot is written by this plan —
+    /// the place/base coverage accessor over locals and temps (1A-bis F7).
+    #[must_use]
+    pub fn covers_slot(&self, base: &MirPlaceBase) -> bool {
+        match base {
+            MirPlaceBase::Local(local) => self.covers_local(*local),
+            MirPlaceBase::Temp(temp) => self.composed_temps.contains(temp),
+        }
+    }
 }
 
 /// Typed reason a function is not a phase-one elementwise plan.
-#[derive(Debug, Clone, PartialEq, Eq)]
+// `PartialEq` only: `MultiConsumer` names its slot with `MirPlaceBase`,
+// which carries no `Eq` (matches! is the consumer-side pattern anyway).
+#[derive(Debug, Clone, PartialEq)]
 pub enum ElementwiseBarrierError {
     /// Recipe-bearing collection op (`is_recipe_op`); never elementwise.
     Recipe {
@@ -218,8 +249,8 @@ pub enum ElementwiseBarrierError {
     },
     /// An intermediate is read by more than one live consumer.
     MultiConsumer {
-        /// The shared intermediate.
-        local: MirLocalId,
+        /// The shared intermediate slot (local or temp).
+        slot: MirPlaceBase,
         /// Span of a consumer or the producer.
         span: Span,
     },
@@ -259,8 +290,8 @@ impl fmt::Display for ElementwiseBarrierError {
             Self::UnsupportedOp { op, .. } => {
                 write!(f, "collection op {op:?} is not an elementwise candidate")
             }
-            Self::MultiConsumer { local, .. } => {
-                write!(f, "intermediate {local:?} has multiple live consumers")
+            Self::MultiConsumer { slot, .. } => {
+                write!(f, "intermediate slot {slot:?} has multiple live consumers")
             }
             Self::ProjectedDestination { .. } => {
                 write!(f, "destination place carries an unsupported projection")
@@ -312,59 +343,132 @@ pub fn plan_elementwise(
         });
     }
     let block = &function.blocks[0];
-    let consumer_counts = consumer_counts(function);
-    let mut producers = FxHashMap::default();
+    let consumer_counts = slot_consumer_counts(function);
+    let mut producers: FxHashMap<PlanValue, Producer> = FxHashMap::default();
+    let mut forwards: FxHashMap<PlanValue, PureForward> = FxHashMap::default();
     for (index, statement) in block.statements.iter().enumerate() {
-        let dest_place = statement_destination_place(statement);
+        let dest_place = crate::read_analysis::statement_destination_place(statement);
         if dest_place.is_some_and(|place| !place.projections.is_empty()) {
             return Err(ElementwiseBarrierError::ProjectedDestination {
                 span: statement.span,
             });
         }
-        let Some(op) = statement_collection_op(statement) else {
-            if let Some(local) = crate::read_analysis::statement_destination(statement) {
-                if consumer_counts.get(&local).copied().unwrap_or(0) > 0 {
+        let dest_slot = dest_place
+            .and_then(crate::read_analysis::place_slot_base)
+            .map(PlanValue::from);
+        match statement_role(statement) {
+            StatementRole::Collection(op) => {
+                if !dest_slot
+                    .is_some_and(|slot| destination_slot_is_live(function, slot, &consumer_counts))
+                {
+                    continue;
+                }
+                let classified = classify_collection_op(op, statement.span)?;
+                let Some(slot) = dest_slot else {
+                    return Err(ElementwiseBarrierError::UnresolvedShape {
+                        span: statement.span,
+                    });
+                };
+                enforce_single_consumer(slot, &consumer_counts, statement.span)?;
+                let MirStatementKind::RuntimeCall { call, .. } = &statement.kind else {
+                    return Err(ElementwiseBarrierError::Effect {
+                        span: statement.span,
+                    });
+                };
+                producers.insert(
+                    slot,
+                    Producer {
+                        index,
+                        op: classified,
+                        args: call.args.clone(),
+                        span: statement.span,
+                    },
+                );
+            }
+            StatementRole::TensorUnary(un_op) => {
+                let Some(slot) = dest_slot else {
+                    return Err(ElementwiseBarrierError::UnresolvedShape {
+                        span: statement.span,
+                    });
+                };
+                if !destination_slot_is_live(function, slot, &consumer_counts) {
+                    continue;
+                }
+                // The admission authority already spoke; this names the op
+                // (1A-bis F3). A divergence between admission and naming
+                // stays fail-closed.
+                let Some(classified) = named_tensor_unary(un_op) else {
+                    return Err(ElementwiseBarrierError::Effect {
+                        span: statement.span,
+                    });
+                };
+                enforce_single_consumer(slot, &consumer_counts, statement.span)?;
+                let MirStatementKind::Assign { value, .. } = &statement.kind else {
+                    return Err(ElementwiseBarrierError::Effect {
+                        span: statement.span,
+                    });
+                };
+                let MirValueKind::Unary { operand, .. } = &value.kind else {
+                    return Err(ElementwiseBarrierError::Effect {
+                        span: statement.span,
+                    });
+                };
+                producers.insert(
+                    slot,
+                    Producer {
+                        index,
+                        op: classified,
+                        args: vec![operand.clone()],
+                        span: statement.span,
+                    },
+                );
+            }
+            StatementRole::PureForward(source_base) => {
+                let Some(slot) = dest_slot else {
+                    return Err(ElementwiseBarrierError::UnresolvedShape {
+                        span: statement.span,
+                    });
+                };
+                if !destination_slot_is_live(function, slot, &consumer_counts) {
+                    continue;
+                }
+                let MirStatementKind::Assign { value, .. } = &statement.kind else {
+                    return Err(ElementwiseBarrierError::Effect {
+                        span: statement.span,
+                    });
+                };
+                // A pure forward is an alias only when its value, source
+                // slot, and destination slot types are all present and
+                // semantically equal (1A-bis F4); anything else fails closed.
+                if !forward_types_equal(
+                    function,
+                    validation,
+                    value.ty,
+                    PlanValue::from(source_base.clone()),
+                    slot,
+                ) {
                     return Err(ElementwiseBarrierError::Effect {
                         span: statement.span,
                     });
                 }
+                enforce_single_consumer(slot, &consumer_counts, statement.span)?;
+                forwards.insert(
+                    slot,
+                    PureForward {
+                        source: PlanValue::from(source_base),
+                    },
+                );
             }
-            continue;
-        };
-        let dest = crate::read_analysis::statement_destination(statement);
-        if dest.is_some_and(|local| {
-            !crate::read_analysis::place_is_read(function, &MirPlace::local(local))
-        }) {
-            continue;
+            StatementRole::Other => {
+                if let Some(slot) = dest_slot {
+                    if consumer_counts.get(&slot).copied().unwrap_or(0) > 0 {
+                        return Err(ElementwiseBarrierError::Effect {
+                            span: statement.span,
+                        });
+                    }
+                }
+            }
         }
-        let classified = classify_collection_op(op, statement.span)?;
-        let Some(local) = dest else {
-            return Err(ElementwiseBarrierError::UnresolvedShape {
-                span: statement.span,
-            });
-        };
-        let count = consumer_counts.get(&local).copied().unwrap_or(0);
-        if count > 1 {
-            return Err(ElementwiseBarrierError::MultiConsumer {
-                local,
-                span: statement.span,
-            });
-        }
-        let MirStatementKind::RuntimeCall { call, .. } = &statement.kind else {
-            return Err(ElementwiseBarrierError::Effect {
-                span: statement.span,
-            });
-        };
-        producers.insert(
-            local,
-            Producer {
-                index,
-                op: classified,
-                args: call.args.clone(),
-                dest_ty: call.return_ty,
-                span: statement.span,
-            },
-        );
     }
     let output_local = crate::read_analysis::terminator_return_local(&block.terminator.kind)
         .or_else(|| {
@@ -377,24 +481,45 @@ pub fn plan_elementwise(
         .ok_or(ElementwiseBarrierError::NoCandidate {
             span: function.span,
         })?;
-    let Some(output_producer) = producers.get(&output_local) else {
+    // The expression root stays ABI-local (1A-bis F5): plan from the
+    // returned local, following pure forwards to their producer. A
+    // dangling temp is never invented as an input here — an unresolved
+    // root is a typed barrier.
+    let mut root = PlanValue::Local(output_local);
+    let mut walked = FxHashSet::default();
+    while let Some(forward) = forwards.get(&root) {
+        if !walked.insert(root) {
+            return Err(ElementwiseBarrierError::UnresolvedShape {
+                span: function.span,
+            });
+        }
+        root = forward.source;
+    }
+    let Some(_) = producers.get(&root) else {
         return Err(ElementwiseBarrierError::NoCandidate {
             span: function.span,
         });
     };
-    let output_ty = output_producer.dest_ty;
+    // The plan output type is the destination local's declared type — the
+    // producer's return type can be an alias spelling of it.
+    let output_ty = crate::local_ty::local_ty(function, output_local).ok_or(
+        ElementwiseBarrierError::UnresolvedShape {
+            span: function.span,
+        },
+    )?;
     let result_shape = concrete_shape(output_ty, validation, function.span)?;
     let mut builder = PlanBuilder {
         function,
         validation,
         producers,
+        forwards,
         result_shape: result_shape.dims.clone(),
         inputs: Vec::new(),
         input_slots: FxHashMap::default(),
         used: FxHashSet::default(),
         visiting: FxHashSet::default(),
     };
-    let expression = builder.expr_for_local(output_local, function.span)?;
+    let expression = builder.expr_for_slot(root, function.span)?;
     let mut used: Vec<usize> = builder.used.into_iter().collect();
     used.sort_unstable();
     let provenance = used
@@ -410,9 +535,28 @@ pub fn plan_elementwise(
                 })
         })
         .collect();
-    let mut composed_locals: Vec<MirLocalId> = builder.producers.keys().copied().collect();
+    let mut composed_locals: Vec<MirLocalId> = builder
+        .producers
+        .keys()
+        .chain(builder.forwards.keys())
+        .filter_map(|value| match value {
+            PlanValue::Local(local) => Some(*local),
+            PlanValue::Temp(_) => None,
+        })
+        .collect();
     composed_locals.sort_unstable();
     composed_locals.dedup();
+    let mut composed_temps: Vec<MirTempId> = builder
+        .producers
+        .keys()
+        .chain(builder.forwards.keys())
+        .filter_map(|value| match value {
+            PlanValue::Temp(temp) => Some(*temp),
+            PlanValue::Local(_) => None,
+        })
+        .collect();
+    composed_temps.sort_unstable();
+    composed_temps.dedup();
     Ok(ElementwisePlan {
         inputs: builder.inputs,
         output: ElementwiseOutput {
@@ -425,6 +569,7 @@ pub fn plan_elementwise(
         provenance,
         numerical_policy: NumericalPolicy::SOURCE_ORDER,
         composed_locals,
+        composed_temps,
     })
 }
 
@@ -479,30 +624,174 @@ fn named_elementwise_op(op: MirCollectionOp) -> Option<ElementwiseOp> {
     }
 }
 
-fn statement_destination_place(statement: &MirStatement) -> Option<&MirPlace> {
-    match &statement.kind {
-        MirStatementKind::Assign { place, .. }
-        | MirStatementKind::Construct {
-            destination: place, ..
-        } => Some(place),
-        MirStatementKind::RuntimeCall { destination, .. }
-        | MirStatementKind::Call { destination, .. } => destination.as_ref(),
+/// One planner value space over local and temp slots (1A-bis F1): every
+/// producer, alias, consumer-count, recursion, cycle, and coverage fact is
+/// keyed by this. `ElementwiseInput`/`ElementwiseOutput` stay local-based
+/// ABI facts.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+enum PlanValue {
+    Local(MirLocalId),
+    Temp(MirTempId),
+}
+
+impl From<MirPlaceBase> for PlanValue {
+    fn from(base: MirPlaceBase) -> Self {
+        match base {
+            MirPlaceBase::Local(local) => Self::Local(local),
+            MirPlaceBase::Temp(temp) => Self::Temp(temp),
+        }
     }
 }
 
-fn consumer_counts(function: &MirFunction) -> FxHashMap<MirLocalId, usize> {
+impl From<PlanValue> for MirPlaceBase {
+    fn from(value: PlanValue) -> Self {
+        match value {
+            PlanValue::Local(local) => Self::Local(local),
+            PlanValue::Temp(temp) => Self::Temp(temp),
+        }
+    }
+}
+
+/// A proven pure slot-to-slot forward (`dest ← source`): an alias that
+/// contributes no expression node and no provenance operation (1A-bis F4).
+struct PureForward {
+    source: PlanValue,
+}
+
+/// The planner role of one statement (1A-bis F3/F4): a collection runtime
+/// call, an admitted tensor unary assignment, a pure slot-to-slot copy
+/// candidate, or anything else.
+enum StatementRole {
+    Collection(MirCollectionOp),
+    TensorUnary(MirUnOp),
+    PureForward(MirPlaceBase),
+    Other,
+}
+
+fn statement_role(statement: &MirStatement) -> StatementRole {
+    if let Some(op) = statement_collection_op(statement) {
+        return StatementRole::Collection(op);
+    }
+    let MirStatementKind::Assign { value, .. } = &statement.kind else {
+        return StatementRole::Other;
+    };
+    match &value.kind {
+        MirValueKind::Unary { op, .. } if is_admitted_tensor_unary(*op) => {
+            StatementRole::TensorUnary(*op)
+        }
+        MirValueKind::Operand(operand) => match operand {
+            MirOperand::Temp(temp) => StatementRole::PureForward(MirPlaceBase::Temp(*temp)),
+            MirOperand::Place(place) => match crate::read_analysis::place_slot_base(place) {
+                Some(base) => StatementRole::PureForward(base),
+                None => StatementRole::Other,
+            },
+            _ => StatementRole::Other,
+        },
+        _ => StatementRole::Other,
+    }
+}
+
+/// Name an admitted tensor unary in the target-neutral op set.
+fn named_tensor_unary(op: MirUnOp) -> Option<ElementwiseOp> {
+    match op {
+        MirUnOp::Tanh => Some(ElementwiseOp::Tanh),
+        MirUnOp::Relu => Some(ElementwiseOp::Relu),
+        MirUnOp::Gelu => Some(ElementwiseOp::Gelu),
+        MirUnOp::Exp => Some(ElementwiseOp::Exp),
+        MirUnOp::Sqrt => Some(ElementwiseOp::Sqrt),
+        MirUnOp::F16Round => Some(ElementwiseOp::F16Round),
+        _ => None,
+    }
+}
+
+/// Consumer counts over the planner's slot space (locals AND temps,
+/// including terminator reads and pure forwards — 1A-bis F6).
+fn slot_consumer_counts(function: &MirFunction) -> FxHashMap<PlanValue, usize> {
     let mut counts = FxHashMap::default();
     for block in &function.blocks {
         for statement in &block.statements {
-            for local in crate::read_analysis::statement_read_locals(statement) {
-                *counts.entry(local).or_insert(0) += 1;
+            for base in crate::read_analysis::statement_read_slots(statement) {
+                *counts.entry(PlanValue::from(base)).or_insert(0) += 1;
             }
         }
-        for local in crate::read_analysis::terminator_read_locals(&block.terminator.kind) {
-            *counts.entry(local).or_insert(0) += 1;
+        for base in crate::read_analysis::terminator_read_slots(&block.terminator.kind) {
+            *counts.entry(PlanValue::from(base)).or_insert(0) += 1;
         }
     }
     counts
+}
+
+/// Whether a destination slot is live: a local destination that is a
+/// function param is a side-effect write (the `place_is_read` rule);
+/// otherwise the slot needs at least one read.
+fn destination_slot_is_live(
+    function: &MirFunction,
+    slot: PlanValue,
+    consumer_counts: &FxHashMap<PlanValue, usize>,
+) -> bool {
+    let is_read = consumer_counts.get(&slot).copied().unwrap_or(0) > 0;
+    match slot {
+        PlanValue::Local(local) => {
+            is_read || function.params.iter().any(|param| param.local == local)
+        }
+        PlanValue::Temp(_) => is_read,
+    }
+}
+
+/// The single-consumer law over slots (1A-bis F6): a produced slot read by
+/// a forward AND another statement cannot fuse. Re-reading an external
+/// input is legal; the law only binds slots the plan writes, which is why
+/// this check runs per producer/alias destination.
+fn enforce_single_consumer(
+    slot: PlanValue,
+    consumer_counts: &FxHashMap<PlanValue, usize>,
+    span: Span,
+) -> Result<(), ElementwiseBarrierError> {
+    if consumer_counts.get(&slot).copied().unwrap_or(0) > 1 {
+        return Err(ElementwiseBarrierError::MultiConsumer {
+            slot: MirPlaceBase::from(slot),
+            span,
+        });
+    }
+    Ok(())
+}
+
+/// The MIR type of a planner slot (params first for locals; the temps
+/// table for temps).
+fn slot_ty(function: &MirFunction, value: PlanValue) -> Option<MirType> {
+    match value {
+        PlanValue::Local(local) => crate::local_ty::local_ty(function, local),
+        PlanValue::Temp(temp) => function
+            .temps
+            .iter()
+            .find(|candidate| candidate.id == temp)
+            .map(|candidate| candidate.ty),
+    }
+}
+
+/// Whether a pure forward's value, source slot, and destination slot types
+/// are all present and semantically equal under `TypeTable::equals` (the
+/// alias proof; aliases peel, so a `fused_result` temp forwards into a
+/// `fused` local — 1A-bis F4).
+fn forward_types_equal(
+    function: &MirFunction,
+    validation: &MirValidationContext<'_>,
+    value_ty: MirType,
+    source: PlanValue,
+    dest: PlanValue,
+) -> bool {
+    let (Some(source_ty), Some(dest_ty)) = (slot_ty(function, source), slot_ty(function, dest))
+    else {
+        return false;
+    };
+    let (value_id, source_id, dest_id) = (
+        value_ty.semantic_id(),
+        source_ty.semantic_id(),
+        dest_ty.semantic_id(),
+    );
+    validation.types.equals(value_id, source_id)
+        && validation.types.equals(source_id, dest_id)
+        && validation.types.equals(value_id, dest_id)
 }
 
 fn concrete_shape(
@@ -562,44 +851,56 @@ struct Producer {
     index: usize,
     op: ElementwiseOp,
     args: Vec<MirOperand>,
-    dest_ty: MirType,
     span: Span,
 }
 
 struct PlanBuilder<'a, 'b> {
     function: &'a MirFunction,
     validation: &'a MirValidationContext<'b>,
-    producers: FxHashMap<MirLocalId, Producer>,
+    producers: FxHashMap<PlanValue, Producer>,
+    forwards: FxHashMap<PlanValue, PureForward>,
     result_shape: Vec<u64>,
     inputs: Vec<ElementwiseInput>,
     input_slots: FxHashMap<MirLocalId, usize>,
     used: FxHashSet<usize>,
-    visiting: FxHashSet<MirLocalId>,
+    visiting: FxHashSet<PlanValue>,
 }
 
 impl PlanBuilder<'_, '_> {
-    fn expr_for_local(
+    /// The expression for one planner slot: its producer's op, a pure
+    /// forward's source (the alias contributes no node), an external read
+    /// for an unresolved LOCAL, or a typed barrier for a dangling temp
+    /// (1A-bis F5: temps are never invented as external inputs).
+    fn expr_for_slot(
         &mut self,
-        local: MirLocalId,
+        value: PlanValue,
         span: Span,
     ) -> Result<ElementwiseExpr, ElementwiseBarrierError> {
-        if !self.visiting.insert(local) {
+        if !self.visiting.insert(value) {
             return Err(ElementwiseBarrierError::UnresolvedShape { span });
         }
-        let expr = if self.producers.contains_key(&local) {
-            self.expr_for_producer(local)?
+        let expr = if self.producers.contains_key(&value) {
+            self.expr_for_producer(value)?
+        } else if let Some(forward) = self.forwards.get(&value) {
+            let source = forward.source;
+            self.expr_for_slot(source, span)?
         } else {
-            self.intern_input(local, span)?
+            match value {
+                PlanValue::Local(local) => self.intern_input(local, span)?,
+                PlanValue::Temp(_) => {
+                    return Err(ElementwiseBarrierError::UnresolvedShape { span });
+                }
+            }
         };
-        self.visiting.remove(&local);
+        self.visiting.remove(&value);
         Ok(expr)
     }
 
     fn expr_for_producer(
         &mut self,
-        local: MirLocalId,
+        value: PlanValue,
     ) -> Result<ElementwiseExpr, ElementwiseBarrierError> {
-        let Some(producer) = self.producers.get(&local) else {
+        let Some(producer) = self.producers.get(&value) else {
             return Err(ElementwiseBarrierError::NoCandidate {
                 span: self.function.span,
             });
@@ -637,6 +938,10 @@ impl PlanBuilder<'_, '_> {
                 })
             }
             ElementwiseOp::Neg
+            | ElementwiseOp::Tanh
+            | ElementwiseOp::Exp
+            | ElementwiseOp::Sqrt
+            | ElementwiseOp::F16Round
             | ElementwiseOp::Relu
             | ElementwiseOp::Gelu
             | ElementwiseOp::Fill => {
@@ -670,14 +975,10 @@ impl PlanBuilder<'_, '_> {
                 if !place.projections.is_empty() {
                     return Err(ElementwiseBarrierError::ProjectedDestination { span });
                 }
-                let Some(local) = crate::read_analysis::place_local_base(place) else {
-                    return Err(ElementwiseBarrierError::UnresolvedShape { span });
-                };
-                self.expr_for_local(local, span)
+                self.expr_for_slot(PlanValue::from(place.base.clone()), span)
             }
-            MirOperand::Temp(_) | MirOperand::Value(_) => {
-                Err(ElementwiseBarrierError::UnresolvedShape { span })
-            }
+            MirOperand::Temp(temp) => self.expr_for_slot(PlanValue::Temp(*temp), span),
+            MirOperand::Value(_) => Err(ElementwiseBarrierError::UnresolvedShape { span }),
         }
     }
 
