@@ -612,10 +612,10 @@ impl super::FaberCodegen {
                     .cloned()
                     .unwrap_or_else(|| self.name_for_def(*def_id, names, interner));
                 writer.write(&name);
-                if !fields.is_empty() {
-                    writer.write(" { ");
-                } else {
+                if fields.is_empty() {
                     writer.write(" {");
+                } else {
+                    writer.write(" { ");
                 }
                 for (idx, (name, value)) in fields.iter().enumerate() {
                     if idx > 0 {
@@ -655,7 +655,7 @@ impl super::FaberCodegen {
                         }
                         let site = HirTypeSite {
                             owner: HirOwnerRef::Hir(expr.id),
-                            slot: HirTypeSlot::TupleTypeArgument(idx as u32),
+                            slot: HirTypeSlot::TupleTypeArgument(u32::try_from(idx).expect("tuple argument count exceeds u32::MAX")),
                         };
                         let rendered = self
                             .type_to_faber_at(&site, *ty, types, names, interner, surface)
@@ -750,7 +750,7 @@ impl super::FaberCodegen {
                     }
                     let site = HirTypeSite {
                         owner: HirOwnerRef::Def(param.def_id),
-                        slot: HirTypeSlot::ClosureParameter(idx as u32),
+                        slot: HirTypeSlot::ClosureParameter(u32::try_from(idx).expect("closure parameter count exceeds u32::MAX")),
                     };
                     let rendered = self
                         .type_to_faber_at(&site, param.ty, types, names, interner, surface)

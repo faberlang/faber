@@ -16,6 +16,7 @@ use radix_types::TypeTable;
 use rustc_hash::FxHashMap;
 
 impl super::FaberCodegen {
+    #[allow(clippy::too_many_arguments)]
     pub(super) fn write_hir_annotations(
         &self,
         annotations: &[HirAnnotation],
@@ -30,7 +31,7 @@ impl super::FaberCodegen {
             self.write_hir_annotation(
                 annotation,
                 owner,
-                annotation_ordinal as u32,
+                u32::try_from(annotation_ordinal).expect("annotation count exceeds u32::MAX"),
                 types,
                 names,
                 interner,

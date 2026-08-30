@@ -703,7 +703,7 @@ impl super::FaberCodegen {
             }
             self.write_param(
                 param,
-                HirTypeSlot::Parameter(idx as u32),
+                HirTypeSlot::Parameter(u32::try_from(idx).expect("parameter count exceeds u32::MAX")),
                 types,
                 names,
                 interner,
@@ -727,30 +727,32 @@ impl super::FaberCodegen {
     ) {
         if let Some(ret) = ret_ty {
             writer.write(" → ");
-            let rendered = owner
-                .map(|owner| {
+            let rendered = owner.map_or_else(
+                || self.type_to_faber(ret, types, names, interner, surface),
+                |owner| {
                     let site = HirTypeSite {
                         owner: HirOwnerRef::Def(owner),
                         slot: HirTypeSlot::Return,
                     };
                     self.type_to_faber_at(&site, ret, types, names, interner, surface)
                         .unwrap_or_else(|error| self.record_type_emission_error(error))
-                })
-                .unwrap_or_else(|| self.type_to_faber(ret, types, names, interner, surface));
+                },
+            );
             writer.write(&rendered);
         }
         if let Some(err) = err_ty {
             writer.write(" ⇥ ");
-            let rendered = owner
-                .map(|owner| {
+            let rendered = owner.map_or_else(
+                || self.type_to_faber(err, types, names, interner, surface),
+                |owner| {
                     let site = HirTypeSite {
                         owner: HirOwnerRef::Def(owner),
                         slot: HirTypeSlot::Error,
                     };
                     self.type_to_faber_at(&site, err, types, names, interner, surface)
                         .unwrap_or_else(|error| self.record_type_emission_error(error))
-                })
-                .unwrap_or_else(|| self.type_to_faber(err, types, names, interner, surface));
+                },
+            );
             writer.write(&rendered);
         }
     }
