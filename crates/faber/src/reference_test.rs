@@ -155,7 +155,7 @@ fn dev_fallback_loads_repo_exempla_index() {
 
     let pack = ReferencePack::load().expect("dev fallback loads repo exempla");
     // 201 since b07cc8c3e (LSR-W2 reice/reject keyword + meta/reice.fab exemplum).
-        assert_eq!(pack.term_count(), 201);
+    assert_eq!(pack.term_count(), 201);
     assert_eq!(pack.metadata().registry_terms, 201);
     assert_eq!(pack.layout(), ReferenceLayout::Repo);
     assert!(pack.term("functio").is_some());
@@ -171,7 +171,7 @@ fn load_from_repo_root_lists_canonical_terms() {
     let root = repo_exempla_root();
     let pack = ReferencePack::load_from(&root).expect("load repo exempla");
     // 201 since b07cc8c3e (LSR-W2 reice/reject keyword + meta/reice.fab exemplum).
-        assert_eq!(pack.term_count(), 201);
+    assert_eq!(pack.term_count(), 201);
     assert_eq!(pack.legacy_redirects().len(), 14);
     assert!(pack.resolve_exempla_path("functio/functio.fab").is_file());
 }

@@ -460,7 +460,10 @@ fn named_consumer_proof_discovers_hot_function_conversion_and_cursor_rows() {
         .expect("entry frame row");
     assert_eq!(entry.calls, 1);
     assert!(
-        artifact.functions.iter().all(|row| row.self_ns <= row.total_ns),
+        artifact
+            .functions
+            .iter()
+            .all(|row| row.self_ns <= row.total_ns),
         "self time is child-subtracted, never exceeding total"
     );
 
@@ -479,10 +482,7 @@ fn named_consumer_proof_discovers_hot_function_conversion_and_cursor_rows() {
         .expect("cursor stream row from the generator call");
     assert_eq!(cursor.calls, 1);
     assert!(
-        artifact
-            .intrinsics
-            .iter()
-            .any(|row| row.name == "cede"),
+        artifact.intrinsics.iter().any(|row| row.name == "cede"),
         "generator yield row"
     );
     assert!(

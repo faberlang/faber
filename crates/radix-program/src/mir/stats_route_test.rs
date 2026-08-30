@@ -38,8 +38,10 @@ kind = "bin"
 }
 
 // Default-locale fixtures (the run_test.rs BufferHost temp-package shape).
-const STATS_MAIN: &str = "fn dupla(int x) → int {\n    return x * 2\n}\n\nmain {\n    print dupla(21)\n}\n";
-const RUNTIME_ERROR_MAIN: &str = "main {\n    print \"before\"\n    const list<int> base ← [1, 2]\n    print base[5]\n}\n";
+const STATS_MAIN: &str =
+    "fn dupla(int x) → int {\n    return x * 2\n}\n\nmain {\n    print dupla(21)\n}\n";
+const RUNTIME_ERROR_MAIN: &str =
+    "main {\n    print \"before\"\n    const list<int> base ← [1, 2]\n    print base[5]\n}\n";
 const COMPILE_ERROR_MAIN: &str = "main {\n    print numquam\n}\n";
 
 // ── seam spies ──────────────────────────────────────────────────────────────
@@ -114,11 +116,7 @@ fn stats_package_run_returns_per_function_rows_and_preserves_output() {
         outcome.stats.functions
     );
     assert!(
-        outcome
-            .stats
-            .functions
-            .iter()
-            .all(|row| row.calls == 1),
+        outcome.stats.functions.iter().all(|row| row.calls == 1),
         "each function must record exactly one call: {:?}",
         outcome.stats.functions
     );
@@ -202,7 +200,10 @@ fn seam_spy_proves_stats_requested_reaches_policy_and_callers_pass_explicit_fals
         &mut host,
     )
     .expect("the spy seam keeps the CPU route");
-    assert!(SPY_SEEN.load(Ordering::SeqCst), "the policy must be consulted");
+    assert!(
+        SPY_SEEN.load(Ordering::SeqCst),
+        "the policy must be consulted"
+    );
     assert!(
         SPY_STATS_REQUESTED.load(Ordering::SeqCst),
         "stats_requested = true must reach HostRoutePolicy before the device decision"
@@ -216,7 +217,10 @@ fn seam_spy_proves_stats_requested_reaches_policy_and_callers_pass_explicit_fals
     let mut host = BufferHost::default();
     run_package_mir_with_selection(&config, &entry, DeviceSelection::Auto, &seams, &mut host)
         .expect("the unstatsed route behavior is unchanged");
-    assert!(SPY_SEEN.load(Ordering::SeqCst), "the policy must be consulted");
+    assert!(
+        SPY_SEEN.load(Ordering::SeqCst),
+        "the policy must be consulted"
+    );
     assert!(
         !SPY_STATS_REQUESTED.load(Ordering::SeqCst),
         "non-stats callers must pass the explicit false"

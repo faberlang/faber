@@ -7880,7 +7880,11 @@ fn thai_reader_locale_example_compiles_from_manifest() {
     };
     let rust = output.code;
     assert!(rust.contains("fn ทักทาย(name: String) -> String"));
-    let greeting_line = rust.lines().find(|l| l.contains("greeting")).unwrap_or_default().to_owned();
+    let greeting_line = rust
+        .lines()
+        .find(|l| l.contains("greeting"))
+        .unwrap_or_default()
+        .to_owned();
     assert!(greeting_line.contains("format!(\"สวัสดี, {name}!\")"));
     assert!(rust.contains("fn ผ่าน(score: i64) -> bool"));
     assert!(rust.contains("if score >= 80"));
