@@ -1164,9 +1164,17 @@ impl Lowerer<'_> {
     fn lower_clausura(&mut self, closure: &radix_syntax::ClausuraExpr) -> HirExpressionKind {
         let mut params = Vec::new();
         self.push_scope();
-        for param in &closure.params {
+        for (ordinal, param) in closure.params.iter().enumerate() {
             let def_id = self.next_def_id();
-            let ty = self.lower_parameter_type(&param.ty);
+            let ty = self.lower_authored_type(
+                radix_hir::HirTypeSite {
+                    owner: radix_hir::HirOwnerRef::Def(def_id),
+                    slot: radix_hir::HirTypeSlot::ClosureParameter(ordinal as u32),
+                },
+                &param.ty,
+                true,
+                false,
+            );
             let mode = match param.ty.mode {
                 Some(type_mode) => super::type_mode_hir_param_mode(type_mode),
                 None => radix_hir::HirParamMode::Owned,
