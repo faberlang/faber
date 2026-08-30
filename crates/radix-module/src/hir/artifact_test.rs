@@ -143,6 +143,7 @@ fn empty_presentation() -> radix_hir::HirPresentation {
         discard_binding_stmts: Vec::new(),
         ordo_enums: Vec::new(),
         variant_paths: Vec::new(),
+        authored_types: Vec::new(),
     }
 }
 
@@ -819,6 +820,7 @@ fn presentation_dangling_attachment_anchor() {
         discard_binding_stmts: Vec::new(),
         ordo_enums: Vec::new(),
         variant_paths: Vec::new(),
+        authored_types: Vec::new(),
     };
     let bytes = serialize_artifact(&artifact);
     let result = load_fhir(&bytes);
@@ -849,6 +851,7 @@ fn presentation_dangling_entry_anchor() {
         discard_binding_stmts: Vec::new(),
         ordo_enums: Vec::new(),
         variant_paths: Vec::new(),
+        authored_types: Vec::new(),
     };
     let bytes = serialize_artifact(&artifact);
     let result = load_fhir(&bytes);
@@ -881,6 +884,7 @@ fn presentation_duplicate_owner_anchor() {
         discard_binding_stmts: Vec::new(),
         ordo_enums: Vec::new(),
         variant_paths: Vec::new(),
+        authored_types: Vec::new(),
     };
     let bytes = serialize_artifact(&artifact);
     let result = load_fhir(&bytes);
@@ -913,6 +917,7 @@ fn presentation_duplicate_attachment_owner() {
         discard_binding_stmts: Vec::new(),
         ordo_enums: Vec::new(),
         variant_paths: Vec::new(),
+        authored_types: Vec::new(),
     };
     let bytes = serialize_artifact(&artifact);
     let result = load_fhir(&bytes);
@@ -948,6 +953,7 @@ fn presentation_dangling_comment_symbol() {
         discard_binding_stmts: Vec::new(),
         ordo_enums: Vec::new(),
         variant_paths: Vec::new(),
+        authored_types: Vec::new(),
     };
     let bytes = serialize_artifact(&artifact);
     let result = load_fhir(&bytes);
@@ -983,6 +989,7 @@ fn presentation_dangling_def_backref() {
         discard_binding_stmts: Vec::new(),
         ordo_enums: Vec::new(),
         variant_paths: Vec::new(),
+        authored_types: Vec::new(),
     };
     let bytes = serialize_artifact(&artifact);
     let result = load_fhir(&bytes);

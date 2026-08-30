@@ -79,6 +79,7 @@ fn sample_presentation() -> HirPresentation {
         discard_binding_stmts: Vec::new(),
         ordo_enums: Vec::new(),
         variant_paths: Vec::new(),
+        authored_types: Vec::new(),
     }
 }
 
@@ -305,4 +306,158 @@ fn postcard_round_trip_preserves_presentation_data() {
     );
     assert_eq!(restored.block_ends[0].id, HirSourceAnchorId(2));
     assert_eq!(restored.entry_start_anchor, Some(HirSourceAnchorId(1)));
+}
+
+// --- authored type forms (ATF-2) ---
+
+use crate::nodes::{
+    HirAuthoredTypeUse, HirTypeForm, HirTypeFormArg, HirTypeFormHead, HirTypeSite, HirTypeSlot,
+};
+use radix_types::{IndexId, TypeId};
+use radix_syntax::TypeFormLevel;
+
+/// A LONG-level semantic form witnessing `ty` with no children.
+fn semantic_form(ty: TypeId, level: TypeFormLevel) -> HirTypeForm {
+    HirTypeForm {
+        ty,
+        head: HirTypeFormHead::Semantic(level),
+        args: Vec::new(),
+    }
+}
+
+#[test]
+fn same_type_id_keeps_independent_forms_at_distinct_sites() {
+    // `map<list<u32>, lu32>`: both branches witness the same array-of-u32
+    // semantic type but must keep their authored long/short distinction.
+    let shared_ty = TypeId(7);
+    let long_site = HirAuthoredTypeUse {
+        site: HirTypeSite {
+            owner: HirOwnerRef::Hir(HirId(1)),
+            slot: HirTypeSlot::Declared,
+        },
+        form: HirTypeForm {
+            ty: TypeId(8),
+            head: HirTypeFormHead::Semantic(TypeFormLevel::LONG),
+            args: vec![HirTypeFormArg::Type(Box::new(semantic_form(
+                shared_ty,
+                TypeFormLevel::LONG,
+            )))],
+        },
+    };
+    let short_site = HirAuthoredTypeUse {
+        site: HirTypeSite {
+            owner: HirOwnerRef::Hir(HirId(2)),
+            slot: HirTypeSlot::Declared,
+        },
+        form: HirTypeForm {
+            ty: TypeId(8),
+            head: HirTypeFormHead::Semantic(TypeFormLevel::LONG),
+            args: vec![HirTypeFormArg::Type(Box::new(semantic_form(
+                shared_ty,
+                TypeFormLevel::SHORT,
+            )))],
+        },
+    };
+    let mut presentation = sample_presentation();
+    presentation.authored_types = vec![long_site, short_site];
+
+    // Each site retrieves its own form despite the shared inner TypeId.
+    let first = presentation
+        .authored_type_at(&HirTypeSite {
+            owner: HirOwnerRef::Hir(HirId(1)),
+            slot: HirTypeSlot::Declared,
+        })
+        .expect("first site recorded");
+    let second = presentation
+        .authored_type_at(&HirTypeSite {
+            owner: HirOwnerRef::Hir(HirId(2)),
+            slot: HirTypeSlot::Declared,
+        })
+        .expect("second site recorded");
+    let HirTypeFormArg::Type(first_child) = &first.args[0] else {
+        panic!("expected type child");
+    };
+    let HirTypeFormArg::Type(second_child) = &second.args[0] else {
+        panic!("expected type child");
+    };
+    assert_eq!(first_child.head, HirTypeFormHead::Semantic(TypeFormLevel::LONG));
+    assert_eq!(
+        second_child.head,
+        HirTypeFormHead::Semantic(TypeFormLevel::SHORT)
+    );
+}
+
+#[test]
+fn authored_type_sites_index_uniquely_by_owner_and_slot() {
+    let use_a = HirAuthoredTypeUse {
+        site: HirTypeSite {
+            owner: HirOwnerRef::Def(DefId(3)),
+            slot: HirTypeSlot::Parameter(0),
+        },
+        form: semantic_form(TypeId(1), TypeFormLevel::LONG),
+    };
+    // Same owner, different slot: a distinct site.
+    let use_b = HirAuthoredTypeUse {
+        site: HirTypeSite {
+            owner: HirOwnerRef::Def(DefId(3)),
+            slot: HirTypeSlot::Return,
+        },
+        form: semantic_form(TypeId(1), TypeFormLevel::SHORT),
+    };
+    // Same slot shape, different owner: a distinct site.
+    let use_c = HirAuthoredTypeUse {
+        site: HirTypeSite {
+            owner: HirOwnerRef::Def(DefId(4)),
+            slot: HirTypeSlot::Return,
+        },
+        form: semantic_form(TypeId(1), TypeFormLevel::SHORT),
+    };
+    let mut presentation = sample_presentation();
+    presentation.authored_types = vec![use_a, use_b.clone(), use_c];
+
+    let index: std::collections::BTreeMap<(String, String), &HirTypeForm> = presentation
+        .authored_types
+        .iter()
+        .map(|use_| {
+            let owner = match &use_.site.owner {
+                HirOwnerRef::Def(def) => format!("def:{def:?}"),
+                HirOwnerRef::Hir(id) => format!("hir:{}", id.0),
+            };
+            let slot = match &use_.site.slot {
+                HirTypeSlot::Parameter(ordinal) => format!("param:{ordinal}"),
+                HirTypeSlot::Return => "return".to_string(),
+                other => format!("{other:?}"),
+            };
+            ((owner, slot), &use_.form)
+        })
+        .collect();
+    assert_eq!(index.len(), 3, "owner x slot pairs are unique site keys");
+    assert!(index.contains_key(&("def:DefId(3)".to_string(), "param:0".to_string())));
+    assert_eq!(presentation.authored_types[1], use_b);
+}
+
+#[test]
+fn postcard_round_trip_preserves_authored_type_forms() {
+    let mut original = sample_presentation();
+    original.authored_types = vec![HirAuthoredTypeUse {
+        site: HirTypeSite {
+            owner: HirOwnerRef::Hir(HirId(9)),
+            slot: HirTypeSlot::AliasBody,
+        },
+        form: HirTypeForm {
+            ty: TypeId(42),
+            head: HirTypeFormHead::Named {
+                def_id: DefId(5),
+                path: vec![Symbol(31), Symbol(32)],
+            },
+            args: vec![
+                HirTypeFormArg::Name(Symbol(33)),
+                HirTypeFormArg::Size(IndexId(3)),
+            ],
+        },
+    }];
+
+    let bytes = postcard::to_allocvec(&original).expect("serialize presentation");
+    let restored: HirPresentation = postcard::from_bytes(&bytes).expect("deserialize presentation");
+    assert_eq!(restored, original, "authored type forms round-trip exactly");
 }

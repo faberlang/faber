@@ -63,6 +63,7 @@ pub(crate) fn stub_artifact() -> HirArtifact {
         discard_binding_stmts: Vec::new(),
         ordo_enums: Vec::new(),
         variant_paths: Vec::new(),
+        authored_types: Vec::new(),
     };
     let types = TypeTable::new();
     HirArtifact {

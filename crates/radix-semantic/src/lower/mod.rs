@@ -220,6 +220,7 @@ impl<'a> Lowerer<'a> {
                 discard_binding_stmts: Vec::new(),
                 ordo_enums: Vec::new(),
                 variant_paths: Vec::new(),
+                authored_types: Vec::new(),
             },
             next_def_id: 1_000_000,
             errors: Vec::new(),

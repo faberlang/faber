@@ -27,8 +27,10 @@
 //!   target-specific lowering belong in later phases.
 
 use radix_lexer::{Span, Symbol, Token};
-use radix_syntax::{CallablePosture, GenericParamKind, JsonValue, Visibility};
-use radix_types::TypeId;
+use radix_syntax::{
+    CallablePosture, GenericParamKind, JsonValue, TypeFormLevel, Visibility,
+};
+use radix_types::{IndexId, TypeId};
 use rustc_hash::{FxHashMap, FxHashSet};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
@@ -1673,7 +1675,7 @@ pub enum HirTriviaOwnerKind {
 /// Items and statements use [`HirOwnerRef::Hir`]; members use
 /// [`HirOwnerRef::Def`]. This keeps the semantic tree trivia-blind — no new
 /// fields on `HirItem`, `HirStatement`, `HirMethod`, or `HirField`.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum HirOwnerRef {
     /// An annotatable HIR node: `HirItem.id` or `HirStatement.id`.
     Hir(HirId),
@@ -1759,6 +1761,130 @@ pub struct HirPresentation {
     /// shortening an authored path.
     #[serde(default)]
     pub variant_paths: Vec<HirVariantPath>,
+
+    /// Authored type occurrences, one record per authored root type position.
+    /// Each record carries the full recursive form tree for that site; nested
+    /// nodes are children of the root form, not separate entries. Two sites
+    /// with the same semantic `TypeId` keep independent forms. Missing
+    /// records mean synthesized/hand-built HIR and emit canonically; present
+    /// records are validated fail-closed at emission and in FHIR.
+    #[serde(default)]
+    pub authored_types: Vec<HirAuthoredTypeUse>,
+}
+
+/// Authored type-form facts for one source type position.
+///
+/// `site` keys the occurrence by stable semantic owner plus closed type slot;
+/// `form` is the recursive authored tree whose witnesses resolve into the
+/// canonical type tables.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct HirAuthoredTypeUse {
+    pub site: HirTypeSite,
+    pub form: HirTypeForm,
+}
+
+impl HirPresentation {
+    /// Authored form recorded at `site`, if any. Linear by design: authored
+    /// type sites are sparse relative to expressions, and the Faber emitter
+    /// builds its own map when it needs repeated lookups.
+    #[must_use]
+    pub fn authored_type_at(&self, site: &HirTypeSite) -> Option<&HirTypeForm> {
+        self.authored_types
+            .iter()
+            .find(|use_| &use_.site == site)
+            .map(|use_| &use_.form)
+    }
+}
+
+/// Stable identity of one authored type occurrence.
+///
+/// Never keyed by `TypeId` (distinct occurrences share interned types),
+/// spans (diagnostics data, not identity), traversal order, or rendered
+/// strings (locale conversion changes built-in spellings).
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct HirTypeSite {
+    pub owner: HirOwnerRef,
+    pub slot: HirTypeSlot,
+}
+
+/// Closed set of type positions within an owner. The set is derived from the
+/// source-site census; new authored positions gain named variants here and
+/// nowhere else.
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum HirTypeSlot {
+    /// Declared type of a local/const binding inside a function body.
+    Declared,
+    /// Body type of a `typus` alias declaration.
+    AliasBody,
+    /// Declared parameter type; the payload is the parameter ordinal.
+    Parameter(u32),
+    Return,
+    /// Alternate-exit (`⇥`) type.
+    Error,
+    /// Named aggregate or union-variant field; payload is the field ordinal.
+    Field(u32),
+    /// Type-valued annotation field.
+    AnnotationField { annotation: u32, field: u32 },
+    /// Clausura parameter; payload is the parameter ordinal.
+    ClosureParameter(u32),
+    /// Explicit `iuncta` construction type argument.
+    TupleTypeArgument(u32),
+    /// Explicit ascription target (`∷`).
+    AscriptionTarget,
+    /// Explicit conversion (`↦`) target type.
+    ConversionTarget,
+    /// Runtime type check / type-test target.
+    TypeCheckTarget,
+    /// Typed pattern position.
+    PatternType,
+    /// Type spelling of a wildcard/discard binding.
+    DiscardBinding,
+}
+
+/// One semantic-level authored type node.
+///
+/// Not a second type system: no inference, unification, assignability,
+/// layout, or alias expansion happens here. `ty` is the finalized semantic
+/// witness for this node in the canonical tables; `head` and `args` record
+/// how the author spelled that fact at this occurrence.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct HirTypeForm {
+    /// Finalized semantic type witnessed by this authored node.
+    pub ty: TypeId,
+    pub head: HirTypeFormHead,
+    pub args: Vec<HirTypeFormArg>,
+}
+
+/// How one authored type node was spelled.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum HirTypeFormHead {
+    /// A built-in semantic constructor written directly. The level supplies
+    /// the presentation (long head vs bare-width/prefixed compression); the
+    /// witness `ty` supplies the constructor and width.
+    Semantic(TypeFormLevel),
+    /// A user-defined alias or nominal path written by its authored spelling.
+    /// The source argument list is intentionally independent of the canonical
+    /// expansion's child list (a generic alias may take one source argument
+    /// and expand to several canonical children); validation proves the
+    /// instantiation equivalent to the site's canonical type.
+    Named {
+        def_id: DefId,
+        path: Vec<Symbol>,
+    },
+    /// Authored `_` inference hole.
+    Infer,
+    /// Authored standalone `∪` hole.
+    UnionHole,
+}
+
+/// One authored child of a type-form node.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum HirTypeFormArg {
+    Type(Box<HirTypeForm>),
+    /// Tensor-family figura argument resolved to its canonical index.
+    Size(IndexId),
+    /// Authored generic name argument (e.g. `lista<numerus>`).
+    Name(Symbol),
 }
 
 /// Authored source path for one resolved enum or union variant.

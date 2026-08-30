@@ -3657,6 +3657,7 @@ fn empty_presentation() -> HirPresentation {
         discard_binding_stmts: Vec::new(),
         ordo_enums: Vec::new(),
         variant_paths: Vec::new(),
+        authored_types: Vec::new(),
     }
 }
 
