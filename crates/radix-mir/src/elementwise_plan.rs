@@ -254,6 +254,16 @@ pub enum ElementwiseBarrierError {
         /// Span of a consumer or the producer.
         span: Span,
     },
+    /// A slot is written by more than one statement in the block — an SSA
+    /// ambiguity: resolution would be order-dependent (reads between the
+    /// writes see different versions), so it fails closed instead of
+    /// resolving by map precedence.
+    Redefinition {
+        /// The redefined slot.
+        slot: MirPlaceBase,
+        /// Span of the second definition.
+        span: Span,
+    },
     /// Destination place carries a projection (alias/index/field).
     ProjectedDestination {
         /// Statement span.
@@ -292,6 +302,9 @@ impl fmt::Display for ElementwiseBarrierError {
             }
             Self::MultiConsumer { slot, .. } => {
                 write!(f, "intermediate slot {slot:?} has multiple live consumers")
+            }
+            Self::Redefinition { slot, .. } => {
+                write!(f, "slot {slot:?} is written more than once in the block")
             }
             Self::ProjectedDestination { .. } => {
                 write!(f, "destination place carries an unsupported projection")
@@ -370,6 +383,7 @@ pub fn plan_elementwise(
                     });
                 };
                 enforce_single_consumer(slot, &consumer_counts, statement.span)?;
+                enforce_single_definition(slot, &producers, &forwards, statement.span)?;
                 let MirStatementKind::RuntimeCall { call, .. } = &statement.kind else {
                     return Err(ElementwiseBarrierError::Effect {
                         span: statement.span,
@@ -403,6 +417,7 @@ pub fn plan_elementwise(
                     });
                 };
                 enforce_single_consumer(slot, &consumer_counts, statement.span)?;
+                enforce_single_definition(slot, &producers, &forwards, statement.span)?;
                 let MirStatementKind::Assign { value, .. } = &statement.kind else {
                     return Err(ElementwiseBarrierError::Effect {
                         span: statement.span,
@@ -452,6 +467,7 @@ pub fn plan_elementwise(
                     });
                 }
                 enforce_single_consumer(slot, &consumer_counts, statement.span)?;
+                enforce_single_definition(slot, &producers, &forwards, statement.span)?;
                 forwards.insert(
                     slot,
                     PureForward {
@@ -749,6 +765,27 @@ fn enforce_single_consumer(
 ) -> Result<(), ElementwiseBarrierError> {
     if consumer_counts.get(&slot).copied().unwrap_or(0) > 1 {
         return Err(ElementwiseBarrierError::MultiConsumer {
+            slot: MirPlaceBase::from(slot),
+            span,
+        });
+    }
+    Ok(())
+}
+
+/// The single-definition (SSA) invariant over the planner's slot space: a
+/// slot written twice makes expression resolution order-dependent (reads
+/// between the writes see different versions), so a second definition
+/// fails closed instead of resolving by map precedence (review P1).
+/// Dead definitions never reach this check — a skipped write has no reads
+/// anywhere, so it cannot interleave with the live one.
+fn enforce_single_definition(
+    slot: PlanValue,
+    producers: &FxHashMap<PlanValue, Producer>,
+    forwards: &FxHashMap<PlanValue, PureForward>,
+    span: Span,
+) -> Result<(), ElementwiseBarrierError> {
+    if producers.contains_key(&slot) || forwards.contains_key(&slot) {
+        return Err(ElementwiseBarrierError::Redefinition {
             slot: MirPlaceBase::from(slot),
             span,
         });

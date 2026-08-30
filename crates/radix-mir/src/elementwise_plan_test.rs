@@ -847,6 +847,100 @@ fn unsupported_tensor_unary_log_is_effect_barrier() {
     }
 }
 
+fn local_forward_statement(dest_local: u32, source_local: u32, ty: MirType) -> MirStatement {
+    MirStatement {
+        kind: MirStatementKind::Assign {
+            place: MirPlace::local(MirLocalId(dest_local)),
+            value: MirValue {
+                id: MirValueId(dest_local),
+                kind: MirValueKind::Operand(local_operand(source_local)),
+                ty,
+                span: test_span(),
+            },
+        },
+        span: test_span(),
+    }
+}
+
+/// Review P1 (single-definition invariant): a slot written by a producer
+/// and then redefined by a typed forward must fail closed. With the
+/// two-map representation this silently resolved to the STALE producer —
+/// expression resolution prefers producers — accepting a wrong plan
+/// (`Mul(Add(x, x), x)` for a body that computes `Mul(a3, x)`).
+#[test]
+fn producer_then_forward_redefinition_is_barrier() {
+    let mut types = TypeTable::new();
+    let r1 = rank1_tensor_ty(&mut types, 4);
+    // l1 = add(a0, a0); l1 <- a3; l2 = mul(l1, a0); return l2
+    let function = device_function(
+        &[(0, r1), (3, r1)],
+        vec![
+            collection_statement(MirCollectionOp::TensorAdd, &[0, 0], 1, r1),
+            local_forward_statement(1, 3, r1),
+            collection_statement(MirCollectionOp::TensorMul, &[1, 0], 2, r1),
+        ],
+        Some(2),
+        r1,
+    );
+    match barrier_of(&function, &types) {
+        ElementwiseBarrierError::Redefinition { slot, .. } => {
+            assert_eq!(slot, MirPlaceBase::Local(MirLocalId(1)));
+        }
+        other => panic!("expected Redefinition for the rewritten slot, got {other:?}"),
+    }
+}
+
+/// The mirrored order — a typed forward followed by a producer rewriting
+/// the same slot — is equally ambiguous (count-based liveness cannot see
+/// write order), so it fails closed too.
+#[test]
+fn forward_then_producer_redefinition_is_barrier() {
+    let mut types = TypeTable::new();
+    let r1 = rank1_tensor_ty(&mut types, 4);
+    // l1 <- a3; l1 = add(a0, a0); l2 = mul(l1, a0); return l2
+    let function = device_function(
+        &[(0, r1), (3, r1)],
+        vec![
+            local_forward_statement(1, 3, r1),
+            collection_statement(MirCollectionOp::TensorAdd, &[0, 0], 1, r1),
+            collection_statement(MirCollectionOp::TensorMul, &[1, 0], 2, r1),
+        ],
+        Some(2),
+        r1,
+    );
+    match barrier_of(&function, &types) {
+        ElementwiseBarrierError::Redefinition { slot, .. } => {
+            assert_eq!(slot, MirPlaceBase::Local(MirLocalId(1)));
+        }
+        other => panic!("expected Redefinition for the rewritten slot, got {other:?}"),
+    }
+}
+
+/// The output local itself being redefined is the sharpest case: the plan
+/// would compose the FIRST definition while the program returns the
+/// second value.
+#[test]
+fn output_local_redefinition_is_barrier() {
+    let mut types = TypeTable::new();
+    let r1 = rank1_tensor_ty(&mut types, 4);
+    // l1 = add(a0, a0); l1 <- a3; return l1
+    let function = device_function(
+        &[(0, r1), (3, r1)],
+        vec![
+            collection_statement(MirCollectionOp::TensorAdd, &[0, 0], 1, r1),
+            local_forward_statement(1, 3, r1),
+        ],
+        Some(1),
+        r1,
+    );
+    match barrier_of(&function, &types) {
+        ElementwiseBarrierError::Redefinition { slot, .. } => {
+            assert_eq!(slot, MirPlaceBase::Local(MirLocalId(1)));
+        }
+        other => panic!("expected Redefinition for the rewritten output, got {other:?}"),
+    }
+}
+
 // PGC-R6 (OF-3 consumer surface): coverage facts and the plan summary.
 
 #[test]
