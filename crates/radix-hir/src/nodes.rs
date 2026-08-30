@@ -27,9 +27,7 @@
 //!   target-specific lowering belong in later phases.
 
 use radix_lexer::{Span, Symbol, Token};
-use radix_syntax::{
-    CallablePosture, GenericParamKind, JsonValue, TypeFormLevel, Visibility,
-};
+use radix_syntax::{CallablePosture, GenericParamKind, JsonValue, TypeFormLevel, Visibility};
 use radix_types::{IndexId, TypeId};
 use rustc_hash::{FxHashMap, FxHashSet};
 use serde::{Deserialize, Serialize};
@@ -1824,7 +1822,10 @@ pub enum HirTypeSlot {
     /// Named aggregate or union-variant field; payload is the field ordinal.
     Field(u32),
     /// Type-valued annotation field.
-    AnnotationField { annotation: u32, field: u32 },
+    AnnotationField {
+        annotation: u32,
+        field: u32,
+    },
     /// Clausura parameter; payload is the parameter ordinal.
     ClosureParameter(u32),
     /// Explicit `iuncta` construction type argument.
@@ -1867,10 +1868,7 @@ pub enum HirTypeFormHead {
     /// expansion's child list (a generic alias may take one source argument
     /// and expand to several canonical children); validation proves the
     /// instantiation equivalent to the site's canonical type.
-    Named {
-        def_id: DefId,
-        path: Vec<Symbol>,
-    },
+    Named { def_id: DefId, path: Vec<Symbol> },
     /// Authored `_` inference hole.
     Infer,
     /// Authored standalone `∪` hole.

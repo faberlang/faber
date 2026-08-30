@@ -1,4 +1,5 @@
 use super::{walk_expr, walk_stmt, walk_type_expr, Visitor, MAX_VISIT_DEPTH};
+use crate::TypeFormLevel;
 use crate::{AstMutability, ExField, PathPattern};
 use crate::{
     BinOp, BinaryExpr, BlockStmt, CasuArm, DiscerneStmt, Expr, ExprKind, FuncDecl, Ident, IfBody,
@@ -7,7 +8,6 @@ use crate::{
 };
 use crate::{PraeparaBlock, PraeparaKind};
 use radix_lexer::{Span, Symbol};
-use crate::TypeFormLevel;
 
 /// Visitor that records depth-limit hits instead of panicking.
 struct DepthProbe {

@@ -33,8 +33,8 @@ use crate::{Primitive, TypeId};
 use radix_diagnostics::DiagnosticArg;
 use radix_hir::{
     HirArrayElement, HirBinOp, HirCallArg, HirConversioTarget, HirExpression, HirExpressionKind,
-    HirExtremumOp, HirId, HirLiteral, HirNonNullKind, HirObjectField, HirObjectKey, HirOptionalChainKind,
-    HirUnOp,
+    HirExtremumOp, HirId, HirLiteral, HirNonNullKind, HirObjectField, HirObjectKey,
+    HirOptionalChainKind, HirUnOp,
 };
 use radix_syntax::{
     BinaryExpr, Expr, ExprKind, GenericArgExpr, Literal, TypeExpr, TypeExprKind, UnaryExpr,
@@ -979,7 +979,11 @@ impl Lowerer<'_> {
     ///
     /// Type arguments from the source syntax are lowered and preserved so
     /// typecheck can use them when no contextual expected tuple is available.
-    fn lower_iuncta(&mut self, iuncta: &radix_syntax::IunctaExpr, owner: HirId) -> HirExpressionKind {
+    fn lower_iuncta(
+        &mut self,
+        iuncta: &radix_syntax::IunctaExpr,
+        owner: HirId,
+    ) -> HirExpressionKind {
         let mut elements = Vec::new();
         for expr in &iuncta.elements {
             elements.push(lower_expr(self, expr));
@@ -1188,7 +1192,11 @@ impl Lowerer<'_> {
     /// before the enclosing expression continues. Return and alternate-exit type
     /// annotations remain optional HIR metadata for typecheck to reconcile with
     /// the body.
-    fn lower_clausura(&mut self, closure: &radix_syntax::ClausuraExpr, owner: HirId) -> HirExpressionKind {
+    fn lower_clausura(
+        &mut self,
+        closure: &radix_syntax::ClausuraExpr,
+        owner: HirId,
+    ) -> HirExpressionKind {
         let mut params = Vec::new();
         self.push_scope();
         for (ordinal, param) in closure.params.iter().enumerate() {
@@ -1232,34 +1240,28 @@ impl Lowerer<'_> {
         };
         self.pop_scope();
 
-        let ret = closure
-            .ret
-            .as_ref()
-            .map(|ret| {
-                self.lower_authored_type(
-                    radix_hir::HirTypeSite {
-                        owner: radix_hir::HirOwnerRef::Hir(owner),
-                        slot: radix_hir::HirTypeSlot::Return,
-                    },
-                    ret,
-                    false,
-                    true,
-                )
-            });
-        let err = closure
-            .err
-            .as_ref()
-            .map(|err| {
-                self.lower_authored_type(
-                    radix_hir::HirTypeSite {
-                        owner: radix_hir::HirOwnerRef::Hir(owner),
-                        slot: radix_hir::HirTypeSlot::Error,
-                    },
-                    err,
-                    false,
-                    true,
-                )
-            });
+        let ret = closure.ret.as_ref().map(|ret| {
+            self.lower_authored_type(
+                radix_hir::HirTypeSite {
+                    owner: radix_hir::HirOwnerRef::Hir(owner),
+                    slot: radix_hir::HirTypeSlot::Return,
+                },
+                ret,
+                false,
+                true,
+            )
+        });
+        let err = closure.err.as_ref().map(|err| {
+            self.lower_authored_type(
+                radix_hir::HirTypeSite {
+                    owner: radix_hir::HirOwnerRef::Hir(owner),
+                    slot: radix_hir::HirTypeSlot::Error,
+                },
+                err,
+                false,
+                true,
+            )
+        });
         HirExpressionKind::Clausura(params, ret, err, Box::new(body), closure.modifier)
     }
 
@@ -1327,7 +1329,11 @@ impl Lowerer<'_> {
     /// Lower `expr est <type>` / `expr non est <type>` into a `TypeCheck` HIR node.
     /// The target type is resolved here; typecheck and codegen decide whether
     /// it maps to a Valor variant tag check.
-    fn lower_type_check(&mut self, tc: &radix_syntax::TypeCheckExpr, owner: HirId) -> HirExpressionKind {
+    fn lower_type_check(
+        &mut self,
+        tc: &radix_syntax::TypeCheckExpr,
+        owner: HirId,
+    ) -> HirExpressionKind {
         let expr = lower_expr(self, &tc.expr);
         let ty = self.lower_authored_type(
             radix_hir::HirTypeSite {

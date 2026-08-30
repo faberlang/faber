@@ -68,7 +68,12 @@ fn first_declared_form<'a>(
 }
 
 fn single_type_child(form: &HirTypeForm) -> &HirTypeForm {
-    assert_eq!(form.args.len(), 1, "expected one child, got {:?}", form.args);
+    assert_eq!(
+        form.args.len(),
+        1,
+        "expected one child, got {:?}",
+        form.args
+    );
     let HirTypeFormArg::Type(child) = &form.args[0] else {
         panic!("expected a type child, got {:?}", form.args);
     };
@@ -87,7 +92,10 @@ fn declared_forms_match_authored_spelling_and_canonical_witness() {
     // Long root stays LONG; its bare-width element is SHORT over the same
     // sized-numeric witness the fused spelling records.
     let (long_form, long_ty) = first_declared_form(&fixture, "long_form");
-    assert_eq!(long_form.head, HirTypeFormHead::Semantic(TypeFormLevel::LONG));
+    assert_eq!(
+        long_form.head,
+        HirTypeFormHead::Semantic(TypeFormLevel::LONG)
+    );
     let long_child = single_type_child(long_form);
     assert_eq!(
         long_child.head,
@@ -152,7 +160,10 @@ fn alias_uses_carry_named_heads_and_alias_bodies_stay_semantic() {
         .iter()
         .find(|authored| authored.site.slot == HirTypeSlot::AliasBody)
         .expect("alias body recorded");
-    assert_eq!(body.form.head, HirTypeFormHead::Semantic(TypeFormLevel::LONG));
+    assert_eq!(
+        body.form.head,
+        HirTypeFormHead::Semantic(TypeFormLevel::LONG)
+    );
     assert!(matches!(
         fixture.result.types.get(body.form.ty),
         Type::ModularWord(NumericWidth::U32)

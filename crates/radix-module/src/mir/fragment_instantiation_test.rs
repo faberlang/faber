@@ -6,9 +6,10 @@ use crate::driver::{self, AnalyzeRequest, Config, Session};
 use crate::hir::DefId;
 use crate::lexer::Span;
 use crate::mir::{
-    MirBlock, MirBlockId, MirCallee, MirDeviceFunctionMetadataMap, MirDeviceRole, MirFunction, MirFunctionId, MirKernelShaderStage, MirLayoutTable,
-    MirLocal, MirLocalId, MirMonomorphization, MirMonomorphizationKey, MirOperand, MirParam, MirParamMode, MirPlace,
-    MirStatement, MirStatementKind, MirTerminator, MirTerminatorKind, MirType,
+    MirBlock, MirBlockId, MirCallee, MirDeviceFunctionMetadataMap, MirDeviceRole, MirFunction, MirFunctionId,
+    MirKernelShaderStage, MirLayoutTable, MirLocal, MirLocalId, MirMonomorphization, MirMonomorphizationKey,
+    MirOperand, MirParam, MirParamMode, MirPlace, MirStatement, MirStatementKind, MirTerminator, MirTerminatorKind,
+    MirType,
 };
 use crate::semantic::{SemanticErrorKind, TypeTable};
 use crate::test_support::{test_span, test_span_between};
@@ -795,9 +796,7 @@ functio k(fractus<f32> x) → fractus<f32> {
 // KCM-05: synthetic kernel closures classify through the metadata carrier.
 // ---------------------------------------------------------------------------
 
-use crate::mir::{
-    MirDeviceFunctionMetadata, MirFunctionOrigin, MirFunctionVisibility, MirSyntheticFunctionIdentity,
-};
+use crate::mir::{MirDeviceFunctionMetadata, MirFunctionOrigin, MirFunctionVisibility, MirSyntheticFunctionIdentity};
 
 fn synthetic_closure(
     id: u32,

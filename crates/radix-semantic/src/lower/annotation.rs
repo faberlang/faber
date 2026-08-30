@@ -13,13 +13,12 @@ use radix_hir::{
 };
 use radix_lexer::{Interner, Span, Symbol};
 use radix_syntax::{
-    TypeExpr,
     braced_cli_nomen, braced_imperium_nomen, braced_nondum_view, braced_operandus_view,
     braced_optio_view, braced_radix_lane_view, braced_radix_typus_view, braced_verte_view,
     nondum_from_stmt, radix_lane_from_stmt, verte_from_stmt, Annotation, AnnotationField,
     AnnotationFieldValue, AnnotationKind, AnnotationStmt, BracedAnnotation, CliAnnotation,
     ImperiumAnnotation, NucleumAnnotation, OperandusAnnotation, OptioAnnotation,
-    RadixTypusDomainAnnotation,
+    RadixTypusDomainAnnotation, TypeExpr,
 };
 
 fn lower_contract_payload(value: &ContractPayloadValue) -> HirAnnotationValue {
@@ -88,7 +87,10 @@ impl Lowerer<'_> {
             (Some(owner), Some(annotation)) => self.lower_authored_type(
                 radix_hir::HirTypeSite {
                     owner,
-                    slot: radix_hir::HirTypeSlot::AnnotationField { annotation, field: field_ordinal },
+                    slot: radix_hir::HirTypeSlot::AnnotationField {
+                        annotation,
+                        field: field_ordinal,
+                    },
                 },
                 ty,
                 false,
@@ -378,7 +380,9 @@ impl Lowerer<'_> {
             AnnotationFieldValue::Expr(expr) => {
                 HirAnnotationValue::Expr(Box::new(self.lower_expr(expr)))
             }
-            AnnotationFieldValue::Type(ty) => HirAnnotationValue::Type(self.lower_annotation_type(ty)),
+            AnnotationFieldValue::Type(ty) => {
+                HirAnnotationValue::Type(self.lower_annotation_type(ty))
+            }
         };
         Some(HirAnnotationField {
             name,

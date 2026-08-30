@@ -2,12 +2,12 @@
 //! parse-time `Span` value.
 
 use super::Spanned;
+use crate::TypeFormLevel;
 use crate::{
     Annotation, AnnotationKind, Expr, ExprKind, Ident, Literal, Program, Stmt, StmtKind, TypeExpr,
     TypeExprKind,
 };
 use radix_lexer::{Span, Symbol};
-use crate::TypeFormLevel;
 
 #[test]
 fn spanned_impls_return_direct_parse_spans() {

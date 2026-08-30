@@ -1440,12 +1440,18 @@ fn type_form_levels_capture_sugar_roots_and_width_children() {
     // Long tensor keeps L0; bare-width element SHORT.
     let long_tensor = binding_annotation("fixum tensor<f32, [2, 2]> t ← vacua");
     assert_eq!(long_tensor.form, TypeFormLevel::LONG);
-    assert_eq!(first_tensor_element(&long_tensor).form, TypeFormLevel::SHORT);
+    assert_eq!(
+        first_tensor_element(&long_tensor).form,
+        TypeFormLevel::SHORT
+    );
 
     // Fused tensor sugar: root SHORT, element SHORT.
     let fused_tensor = binding_annotation("fixum tf32[2, 2] t ← vacua");
     assert_eq!(fused_tensor.form, TypeFormLevel::SHORT);
-    assert_eq!(first_tensor_element(&fused_tensor).form, TypeFormLevel::SHORT);
+    assert_eq!(
+        first_tensor_element(&fused_tensor).form,
+        TypeFormLevel::SHORT
+    );
 
     // Bare width marker is itself SHORT.
     let bare_width = binding_annotation("fixum u32 x ← 1");

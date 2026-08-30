@@ -313,8 +313,8 @@ fn postcard_round_trip_preserves_presentation_data() {
 use crate::nodes::{
     HirAuthoredTypeUse, HirTypeForm, HirTypeFormArg, HirTypeFormHead, HirTypeSite, HirTypeSlot,
 };
-use radix_types::{IndexId, TypeId};
 use radix_syntax::TypeFormLevel;
+use radix_types::{IndexId, TypeId};
 
 /// A LONG-level semantic form witnessing `ty` with no children.
 fn semantic_form(ty: TypeId, level: TypeFormLevel) -> HirTypeForm {
@@ -380,7 +380,10 @@ fn same_type_id_keeps_independent_forms_at_distinct_sites() {
     let HirTypeFormArg::Type(second_child) = &second.args[0] else {
         panic!("expected type child");
     };
-    assert_eq!(first_child.head, HirTypeFormHead::Semantic(TypeFormLevel::LONG));
+    assert_eq!(
+        first_child.head,
+        HirTypeFormHead::Semantic(TypeFormLevel::LONG)
+    );
     assert_eq!(
         second_child.head,
         HirTypeFormHead::Semantic(TypeFormLevel::SHORT)
