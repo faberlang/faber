@@ -1569,6 +1569,29 @@ pub enum GenericArgExpr {
     Name(Ident),
 }
 
+/// Authored compression level of one type-expr node.
+///
+/// Transient syntax fact captured during parsing and consumed by semantic
+/// lowering to build authored-form presentation records. Level meaning is
+/// interpreted per semantic constructor: `LONG` is the ordinary explicit head;
+/// `SHORT` is the bare width (`u32`) or width-prefixed (`lu32`, `tf32[2, 2]`)
+/// form where the constructor supports one. Compression never propagates: a
+/// parent and each child carry their own level.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct TypeFormLevel(pub u8);
+
+impl TypeFormLevel {
+    /// Ordinary explicit head (`lista<numerus<u32>>`, `tensor<f32, [2, 2]>`).
+    pub const LONG: Self = Self(0);
+    /// Bare-width or width-prefixed compression (`u32`, `lu32`, `tf32[2, 2]`).
+    pub const SHORT: Self = Self(1);
+
+    #[must_use]
+    pub fn is_short(self) -> bool {
+        self.0 != 0
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct TypeExpr {
     /// Legacy `si` nullability marker.
@@ -1583,6 +1606,9 @@ pub struct TypeExpr {
 
     pub kind: TypeExprKind,
     pub span: Span,
+
+    /// Authored compression level of this node. See [`TypeFormLevel`].
+    pub form: TypeFormLevel,
 
     /// Optional contextual aggregate label at this type-argument position.
     ///

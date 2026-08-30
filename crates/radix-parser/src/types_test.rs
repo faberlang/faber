@@ -1391,3 +1391,86 @@ fn implements_clause_rejects_hole() {
     let result = parse(lex("genus Doc implet _ {}"));
     assert!(!result.errors.is_empty(), "implements hole must not parse");
 }
+
+// --- authored type-form levels (ATF-1) ---
+
+use radix_syntax::{TypeExpr, TypeFormLevel};
+
+fn binding_annotation(source: &str) -> TypeExpr {
+    let result = parse_ok(source);
+    let program = result
+        .program
+        .as_ref()
+        .expect("parser should produce a program");
+    let StmtKind::Var(decl) = &program.statements[0].kind else {
+        panic!("expected var binding, got {:?}", program.statements[0].kind);
+    };
+    decl.ty.clone().expect("binding should carry an annotation")
+}
+
+fn first_type_arg(expr: &TypeExpr) -> TypeExpr {
+    let TypeExprKind::Named(_, args) = &expr.kind else {
+        panic!("expected named type, got {:?}", expr.kind);
+    };
+    let GenericArgExpr::Type(child) = &args[0] else {
+        panic!("expected type argument, got {:?}", args[0]);
+    };
+    child.clone()
+}
+
+fn first_tensor_element(expr: &TypeExpr) -> TypeExpr {
+    let TypeExprKind::Tensor(elem, _) = &expr.kind else {
+        panic!("expected tensor type, got {:?}", expr.kind);
+    };
+    (**elem).clone()
+}
+
+#[test]
+fn type_form_levels_capture_sugar_roots_and_width_children() {
+    // Long root keeps L0; its bare-width element is authored SHORT.
+    let long_list = binding_annotation("fixum lista<u32> xs ← vacua");
+    assert_eq!(long_list.form, TypeFormLevel::LONG);
+    assert_eq!(first_type_arg(&long_list).form, TypeFormLevel::SHORT);
+
+    // Fused lista sugar: root SHORT, bare-width element SHORT.
+    let fused_list = binding_annotation("fixum lu32 xs ← vacua");
+    assert_eq!(fused_list.form, TypeFormLevel::SHORT);
+    assert_eq!(first_type_arg(&fused_list).form, TypeFormLevel::SHORT);
+
+    // Long tensor keeps L0; bare-width element SHORT.
+    let long_tensor = binding_annotation("fixum tensor<f32, [2, 2]> t ← vacua");
+    assert_eq!(long_tensor.form, TypeFormLevel::LONG);
+    assert_eq!(first_tensor_element(&long_tensor).form, TypeFormLevel::SHORT);
+
+    // Fused tensor sugar: root SHORT, element SHORT.
+    let fused_tensor = binding_annotation("fixum tf32[2, 2] t ← vacua");
+    assert_eq!(fused_tensor.form, TypeFormLevel::SHORT);
+    assert_eq!(first_tensor_element(&fused_tensor).form, TypeFormLevel::SHORT);
+
+    // Bare width marker is itself SHORT.
+    let bare_width = binding_annotation("fixum u32 x ← 1");
+    assert_eq!(bare_width.form, TypeFormLevel::SHORT);
+
+    // Long scalar head over a width marker: root LONG, width argument SHORT.
+    let long_scalar = binding_annotation("fixum numerus<u32> x ← 1");
+    assert_eq!(long_scalar.form, TypeFormLevel::LONG);
+    assert_eq!(first_type_arg(&long_scalar).form, TypeFormLevel::SHORT);
+}
+
+#[test]
+fn type_form_levels_stay_independent_under_nesting() {
+    // `lista<lista<u32>>`: both collection roots LONG, inner bare width SHORT.
+    let nested = binding_annotation("fixum lista<lista<u32>> xs ← vacua");
+    assert_eq!(nested.form, TypeFormLevel::LONG);
+    let mid = first_type_arg(&nested);
+    assert_eq!(mid.form, TypeFormLevel::LONG);
+    assert_eq!(first_type_arg(&mid).form, TypeFormLevel::SHORT);
+
+    // Fused sugar does not propagate SHORT to ancestors: `lista<lu32>` keeps
+    // the outer root LONG with a SHORT fused-list child.
+    let fused_child = binding_annotation("fixum lista<lu32> xs ← vacua");
+    assert_eq!(fused_child.form, TypeFormLevel::LONG);
+    let child = first_type_arg(&fused_child);
+    assert_eq!(child.form, TypeFormLevel::SHORT);
+    assert_eq!(first_type_arg(&child).form, TypeFormLevel::SHORT);
+}

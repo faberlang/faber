@@ -21,7 +21,8 @@
 use super::{ParseError, ParseErrorKind, Parser};
 use radix_lexer::{KeywordOwner, Span, Symbol, TokenKind};
 use radix_syntax::{
-    FiguraExpr, FuncTypeExpr, GenericArgExpr, Ident, TypeExpr, TypeExprKind, TypeMode,
+    FiguraExpr, FuncTypeExpr, GenericArgExpr, Ident, TypeExpr, TypeExprKind, TypeFormLevel,
+    TypeMode,
 };
 use std::collections::HashSet;
 
@@ -115,6 +116,7 @@ impl Parser {
                 mode,
                 kind: TypeExprKind::Func(func),
                 span,
+                form: TypeFormLevel::LONG,
                 iuncta_label: None,
             };
             return self.parse_union_tail(core, start);
@@ -122,6 +124,10 @@ impl Parser {
 
         // Standalone `∪` is a union hole. A second cup is a parse error; the
         // hole consumes the whole type expression.
+        // Authored compression capture: sugar roots and bare width markers
+        // carry SHORT; every other spelling is LONG. Child levels come from
+        // each branch's own parse (width children are always bare widths).
+        let mut form = TypeFormLevel::LONG;
         let kind = if matches!(self.peek().kind, TokenKind::Underscore(_)) {
             self.advance();
             TypeExprKind::Infer
@@ -177,22 +183,27 @@ impl Parser {
             let kind = if let Some(width) =
                 radix_types::numeric_width::lista_sugar_width_marker(&name_str)
             {
+                form = TypeFormLevel::SHORT;
                 self.parse_lista_width_sugar(name, width)?
             } else if let Some(width) =
                 radix_types::numeric_width::tensor_sugar_width_marker(&name_str)
             {
+                form = TypeFormLevel::SHORT;
                 self.parse_tensor_width_sugar(name, width)?
             } else if let Some(width) =
                 radix_types::numeric_width::vector_sugar_width_marker(&name_str)
             {
+                form = TypeFormLevel::SHORT;
                 self.parse_vector_width_sugar(name, width)?
             } else if let Some(width) =
                 radix_types::numeric_width::matrix_sugar_width_marker(&name_str)
             {
+                form = TypeFormLevel::SHORT;
                 self.parse_matrix_width_sugar(name, width)?
             } else if let Some(width) =
                 radix_types::numeric_width::sparsa_sugar_width_marker(&name_str)
             {
+                form = TypeFormLevel::SHORT;
                 self.parse_sparsa_width_sugar(name, width)?
             } else if self.eat(&TokenKind::LtAscii) {
                 if name_str == "atomic" {
@@ -295,6 +306,9 @@ impl Parser {
                 }
             } else {
                 if path.len() == 1 {
+                    if radix_types::numeric_width::standalone_width_type(&name_str).is_some() {
+                        form = TypeFormLevel::SHORT;
+                    }
                     TypeExprKind::Named(name, Vec::new())
                 } else {
                     TypeExprKind::Qualified(path, Vec::new())
@@ -313,6 +327,7 @@ impl Parser {
             mode,
             kind,
             span,
+            form,
             iuncta_label: None,
         };
         Ok(core)
@@ -349,6 +364,7 @@ impl Parser {
             mode: None,
             kind: TypeExprKind::Intersection(members),
             span,
+            form: TypeFormLevel::LONG,
             iuncta_label: None,
         })
     }
@@ -390,6 +406,7 @@ impl Parser {
             mode: None, // modes belong on members or parenthesized forms (future)
             kind: TypeExprKind::Union(members),
             span,
+            form: TypeFormLevel::LONG,
             iuncta_label: None,
         })
     }
@@ -527,6 +544,8 @@ impl Parser {
             mode: None,
             kind: TypeExprKind::Named(self.keyword_ident(width, span), Vec::new()),
             span,
+            // The element of any width sugar is authored as a bare width.
+            form: TypeFormLevel::SHORT,
             iuncta_label: None,
         }
     }
@@ -640,6 +659,7 @@ impl Parser {
                 mode: None,
                 kind: TypeExprKind::Named(self.keyword_ident(&value.to_string(), span), Vec::new()),
                 span,
+                form: TypeFormLevel::LONG,
                 iuncta_label: None,
             }));
         }
@@ -692,6 +712,7 @@ fn flatten_union_member(member: TypeExpr, members: &mut Vec<TypeExpr>) {
         mode,
         kind,
         span,
+        form,
         iuncta_label,
     } = member;
     match kind {
@@ -705,6 +726,7 @@ fn flatten_union_member(member: TypeExpr, members: &mut Vec<TypeExpr>) {
             mode,
             kind,
             span,
+            form,
             iuncta_label,
         }),
     }
@@ -721,6 +743,7 @@ fn flatten_intersection_member(member: TypeExpr, members: &mut Vec<TypeExpr>) {
         mode,
         kind,
         span,
+        form,
         iuncta_label,
     } = member;
     match kind {
@@ -734,6 +757,7 @@ fn flatten_intersection_member(member: TypeExpr, members: &mut Vec<TypeExpr>) {
             mode,
             kind,
             span,
+            form,
             iuncta_label,
         }),
     }

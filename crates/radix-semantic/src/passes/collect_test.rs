@@ -366,6 +366,7 @@ fn collects_function_definitions() {
             mode: None,
             kind: TypeExprKind::Named(ident(&mut interner, "vacuum"), Vec::new()),
             span: Span::default(),
+            form: radix_syntax::TypeFormLevel::LONG,
             iuncta_label: None,
         }),
         err: None,

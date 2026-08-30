@@ -869,6 +869,7 @@ impl CliBuilder<'_> {
                         mode: None,
                         kind: TypeExprKind::Named(element.clone(), Vec::new()),
                         span: element.span,
+                        form: radix_syntax::TypeFormLevel::LONG,
                         iuncta_label: None,
                     },
                     GenericArgExpr::Size(_) => {

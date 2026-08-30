@@ -3418,6 +3418,7 @@ fn generic_type_expr(arg: &GenericArgExpr) -> Option<TypeExpr> {
             mode: None,
             kind: TypeExprKind::Named(name.clone(), Vec::new()),
             span: name.span,
+            form: radix_syntax::TypeFormLevel::LONG,
             iuncta_label: None,
         }),
         GenericArgExpr::Size(_) => None,

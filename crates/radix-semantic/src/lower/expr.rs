@@ -1610,6 +1610,7 @@ fn lower_conversio_target_type(
                     Vec::new(),
                 ),
                 span: ty.span,
+                form: radix_syntax::TypeFormLevel::LONG,
                 iuncta_label: None,
             };
             lowerer.lower_type(&bare)
@@ -1652,6 +1653,7 @@ fn generic_type_expr(arg: &GenericArgExpr) -> Option<TypeExpr> {
             mode: None,
             kind: TypeExprKind::Named(name.clone(), Vec::new()),
             span: name.span,
+            form: radix_syntax::TypeFormLevel::LONG,
             iuncta_label: None,
         }),
         GenericArgExpr::Size(_) => None,

@@ -344,6 +344,7 @@ impl Parser {
             mode: None,
             kind: TypeExprKind::Infer,
             span: start,
+            form: TypeFormLevel::LONG,
             iuncta_label: None,
         });
 
@@ -2136,6 +2137,7 @@ impl Parser {
             mode: None,
             kind: TypeExprKind::Named(name, Vec::new()),
             span,
+            form: TypeFormLevel::LONG,
             iuncta_label: None,
         })
     }

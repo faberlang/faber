@@ -7,6 +7,7 @@ use crate::{
     TypeExprKind,
 };
 use radix_lexer::{Span, Symbol};
+use crate::TypeFormLevel;
 
 #[test]
 fn spanned_impls_return_direct_parse_spans() {
@@ -59,6 +60,7 @@ fn ty() -> TypeExpr {
         mode: None,
         kind: TypeExprKind::Infer,
         span: Span::new(5, 10),
+        form: TypeFormLevel::LONG,
         iuncta_label: None,
     }
 }

@@ -1733,6 +1733,7 @@ impl Parser {
                         mode: None,
                         kind: TypeExprKind::Named(ident, Vec::new()),
                         span: type_span,
+                        form: TypeFormLevel::LONG,
                         iuncta_label: None,
                     };
                     ExprKind::Verte(VerteExpr {
@@ -1839,6 +1840,7 @@ impl Parser {
             mode: None,
             kind: TypeExprKind::Named(name, type_args),
             span: type_span,
+            form: TypeFormLevel::LONG,
             iuncta_label: None,
         };
         Ok(ExprKind::Verte(VerteExpr {
@@ -1914,6 +1916,7 @@ impl Parser {
             mode: None,
             kind,
             span: type_span,
+            form: TypeFormLevel::LONG,
             iuncta_label: None,
         };
         Ok(Some(ExprKind::Verte(VerteExpr {

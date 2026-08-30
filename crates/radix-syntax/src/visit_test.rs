@@ -7,6 +7,7 @@ use crate::{
 };
 use crate::{PraeparaBlock, PraeparaKind};
 use radix_lexer::{Span, Symbol};
+use crate::TypeFormLevel;
 
 /// Visitor that records depth-limit hits instead of panicking.
 struct DepthProbe {
@@ -81,6 +82,7 @@ fn infer_type() -> TypeExpr {
         mode: None,
         kind: TypeExprKind::Infer,
         span: Span::new(0, 1),
+        form: TypeFormLevel::LONG,
         iuncta_label: None,
     }
 }
@@ -94,6 +96,7 @@ fn deep_atomic_chain(depth: usize) -> TypeExpr {
             mode: None,
             kind: TypeExprKind::Atomic(Box::new(ty)),
             span: Span::new(0, 1),
+            form: TypeFormLevel::LONG,
             iuncta_label: None,
         };
     }

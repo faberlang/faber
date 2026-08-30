@@ -1597,6 +1597,7 @@ fn interface_type_from_generic_arg(
                 mode: None,
                 kind: TypeExprKind::Named(name.clone(), Vec::new()),
                 span: name.span,
+                form: radix_syntax::TypeFormLevel::LONG,
                 iuncta_label: None,
             };
             interface_type_from_type_expr(&ty, interner, type_params, nominal_kinds, ctx)

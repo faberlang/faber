@@ -108,6 +108,7 @@ fn named_type(name: radix_syntax::Ident) -> TypeExpr {
         mode: None,
         kind: TypeExprKind::Named(name, Vec::new()),
         span: Span::default(),
+        form: radix_syntax::TypeFormLevel::LONG,
         iuncta_label: None,
     }
 }
@@ -118,6 +119,7 @@ fn named_type_with_params(name: radix_syntax::Ident, params: Vec<TypeExpr>) -> T
         mode: None,
         kind: TypeExprKind::Named(name, params.into_iter().map(GenericArgExpr::Type).collect()),
         span: Span::default(),
+        form: radix_syntax::TypeFormLevel::LONG,
         iuncta_label: None,
     }
 }
