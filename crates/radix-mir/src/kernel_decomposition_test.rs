@@ -527,63 +527,82 @@ fn mlp_loss_gelu_function(types: &mut TypeTable) -> MirFunction {
 }
 
 // -----------------------------------------------------------------------
-// The staged MLP body decomposes into ordinary recipe subchains — the
-// composed atomic bypass is retired from the decomposition contract.
+// The staged MLP body decomposes into fork/join subchains — Gate and Up
+// are independent roots, the activation join is its own elementwise child,
+// and no edge exists that the MIR dataflow does not carry.
 // -----------------------------------------------------------------------
 
 #[test]
-fn composed_mlp_body_decomposes_into_three_ordinary_subchains() {
+fn composed_mlp_body_decomposes_into_fork_join_subchains() {
     let mut types = TypeTable::new();
     let function = composed_mlp_function(&mut types);
     let validation = MirValidationContext::new(&types);
     let decomposition = decompose_kernel_function(&function, &validation)
-        .expect("composed MLP body decomposes by the ordinary rule");
+        .expect("composed MLP body decomposes by the dataflow rule");
 
     assert_eq!(
         decomposition.subchains.len(),
-        3,
-        "the gate/up+mul/down body must split into three subchain kernels, got {:?}",
+        4,
+        "gate/up + join + down must split into four subchain kernels, got {:?}",
         decomposition.subchains
     );
 
-    // Child 0: the gate matmul.
+    // Child 0: the gate matmul — an independent root.
     let gate = &decomposition.subchains[0];
-    assert!(
-        matches!(gate.plan, CollectionKernelPlan::TiledMatMul(_)),
-        "subchain 0 must carry the tiled-matmul plan, got {:?}",
-        gate.plan
-    );
+    assert!(matches!(gate.plan, CollectionKernelPlan::TiledMatMul(_)));
     assert_eq!(gate.statements, vec![0]);
-    assert!(gate.consumes.is_empty());
+    assert!(gate.consumes.is_empty(), "gate must be a root");
     assert_eq!(gate.produced, Some(MirLocalId(4)));
     assert_eq!(gate.outputs, vec![MirLocalId(4)]);
 
-    // Child 1: the up matmul with the elementwise mul tail folded in.
+    // Child 1: the up matmul — an independent root. The false Gate → Up
+    // dependency the old source-order fold manufactured must stay absent.
     let up = &decomposition.subchains[1];
+    assert!(matches!(up.plan, CollectionKernelPlan::TiledMatMul(_)));
+    assert_eq!(up.statements, vec![1]);
     assert!(
-        matches!(up.plan, CollectionKernelPlan::TiledMatMul(_)),
-        "subchain 1 must carry the tiled-matmul plan, got {:?}",
-        up.plan
+        up.consumes.is_empty(),
+        "up must not consume gate (no Gate → Up edge), got {:?}",
+        up.consumes
     );
-    assert_eq!(up.statements, vec![1, 2]);
-    assert_eq!(up.consumes, vec![0]);
-    assert_eq!(up.produced, Some(MirLocalId(6)));
-    // D-2a keeps the recipe result (5) as the primary contract output even
-    // though only the mul destination (6) is read across children — the
-    // buffer-materialization decision for that residue is Unit 2's.
-    assert_eq!(up.outputs, vec![MirLocalId(5), MirLocalId(6)]);
+    assert_eq!(up.produced, Some(MirLocalId(5)));
+    assert_eq!(up.outputs, vec![MirLocalId(5)]);
 
-    // Child 2: the down matmul, consuming the fused activation.
-    let down = &decomposition.subchains[2];
-    assert!(
-        matches!(down.plan, CollectionKernelPlan::TiledMatMul(_)),
-        "subchain 2 must carry the tiled-matmul plan, got {:?}",
-        down.plan
+    // Child 2: the activation join — an elementwise-only child consuming
+    // BOTH producer lineages.
+    let join = &decomposition.subchains[2];
+    assert!(matches!(join.plan, CollectionKernelPlan::Elementwise));
+    assert_eq!(join.statements, vec![2]);
+    assert_eq!(
+        join.consumes,
+        vec![0, 1],
+        "the join must consume both roots, got {:?}",
+        join.consumes
     );
+    assert!(
+        join.elementwise_plan.is_some(),
+        "the join child must carry a typed elementwise expression plan"
+    );
+    assert_eq!(join.produced, Some(MirLocalId(6)));
+    assert_eq!(join.outputs, vec![MirLocalId(6)]);
+
+    // Child 3: the down matmul, consuming only the joined activation.
+    let down = &decomposition.subchains[3];
+    assert!(matches!(down.plan, CollectionKernelPlan::TiledMatMul(_)));
     assert_eq!(down.statements, vec![3]);
-    assert_eq!(down.consumes, vec![1]);
+    assert_eq!(down.consumes, vec![2]);
     assert_eq!(down.produced, Some(MirLocalId(7)));
     assert_eq!(down.outputs, vec![MirLocalId(7)]);
+
+    // The root set is exactly {gate, up}.
+    let roots: Vec<usize> = decomposition
+        .subchains
+        .iter()
+        .enumerate()
+        .filter(|(_, subchain)| subchain.consumes.is_empty())
+        .map(|(index, _)| index)
+        .collect();
+    assert_eq!(roots, vec![0, 1]);
 }
 
 /// The recognizer near-miss (non-MLP by statement kinds): the SwiGLU-shaped
@@ -615,23 +634,25 @@ fn recognizer_vetoed_body_decomposes_by_the_ordinary_rule() {
 
     assert_eq!(
         decomposition.subchains.len(),
-        3,
-        "three live recipe ops must split into three subchain kernels, got {:?}",
+        4,
+        "three live recipe ops plus a two-lineage join must split into four \
+         subchain kernels, got {:?}",
         decomposition.subchains
     );
     assert_eq!(decomposition.subchains[0].statements, vec![0]);
     assert_eq!(decomposition.subchains[1].statements, vec![1]);
-    // The down matmul and the trailing mul share the last subchain (the mul
-    // is an elementwise op folding into the open recipe slice).
-    let last = &decomposition.subchains[2];
-    assert_eq!(last.statements, vec![2, 3]);
-    assert!(
-        matches!(last.plan, CollectionKernelPlan::TiledMatMul(_)),
-        "the last subchain must carry the tiled-matmul plan, got {:?}",
-        last.plan
+    // The third matmul is its own subchain; the trailing mul reads BOTH
+    // earlier matmul results, so it is its own elementwise join child.
+    assert_eq!(decomposition.subchains[2].statements, vec![2]);
+    let join = &decomposition.subchains[3];
+    assert_eq!(join.statements, vec![3]);
+    assert!(matches!(join.plan, CollectionKernelPlan::Elementwise));
+    assert_eq!(
+        join.consumes,
+        vec![0, 1],
+        "the join must consume both earlier lineages, got {:?}",
+        join.consumes
     );
-    // The trailing subchain reads both earlier matmul results.
-    assert_eq!(last.consumes, vec![0, 1]);
 }
 
 // -----------------------------------------------------------------------
@@ -1379,17 +1400,22 @@ fn oversized_elementwise_body_splits_within_the_buffer_budget() {
 
 #[test]
 fn divergent_data_flow_consumes_multiple_prior_subchains() {
-    // s = sum(x); m = mean(x); t = s + m: the two recipe results feed one
-    // elementwise combine, so the second subchain consumes BOTH prior
-    // subchains' produced locals (the explicit data-flow edges model the
-    // non-linear graph).
+    // s = sum(x); m = mean(x); t = s + m: Sum and Mean are independent
+    // roots, and the combine is its own elementwise join child consuming
+    // BOTH prior subchains (the explicit data-flow edges model the
+    // non-linear graph without serializing the roots).
     let mut types = TypeTable::new();
     let function = sum_mean_function(&mut types);
     let validation = MirValidationContext::new(&types);
     let decomposition =
         decompose_kernel_function(&function, &validation).expect("sum+mean body decomposes");
 
-    assert_eq!(decomposition.subchains.len(), 2);
+    assert_eq!(
+        decomposition.subchains.len(),
+        3,
+        "sum/mean + join must split into three subchain kernels, got {:?}",
+        decomposition.subchains
+    );
     let CollectionKernelPlan::TreeReduction(sum_plan) = &decomposition.subchains[0].plan else {
         panic!(
             "subchain 0 must be the sum reduction, got {:?}",
@@ -1397,6 +1423,10 @@ fn divergent_data_flow_consumes_multiple_prior_subchains() {
         );
     };
     assert_eq!(sum_plan.op, crate::kernel_plan::ReduceOp::Sum);
+    assert!(
+        decomposition.subchains[0].consumes.is_empty(),
+        "sum must be a root"
+    );
     let CollectionKernelPlan::TreeReduction(mean_plan) = &decomposition.subchains[1].plan else {
         panic!(
             "subchain 1 must be the mean reduction, got {:?}",
@@ -1404,8 +1434,387 @@ fn divergent_data_flow_consumes_multiple_prior_subchains() {
         );
     };
     assert_eq!(mean_plan.op, crate::kernel_plan::ReduceOp::Mean);
-    assert_eq!(decomposition.subchains[1].consumes, vec![0]);
-    assert_eq!(decomposition.subchains[1].statements, vec![1, 2]);
+    assert!(
+        decomposition.subchains[1].consumes.is_empty(),
+        "mean must not consume sum (no Sum → Mean edge), got {:?}",
+        decomposition.subchains[1].consumes
+    );
+    let join = &decomposition.subchains[2];
+    assert!(matches!(join.plan, CollectionKernelPlan::Elementwise));
+    assert_eq!(join.statements, vec![2]);
+    assert_eq!(
+        join.consumes,
+        vec![0, 1],
+        "the combine must consume both roots, got {:?}",
+        join.consumes
+    );
+}
+
+// -----------------------------------------------------------------------
+// The real Faber-lowered MLP body: fork/join over temps, forwards, and
+// the expanded SiLU chain, ending in a MutRef output forward.
+// -----------------------------------------------------------------------
+
+#[test]
+fn real_lowered_mlp_body_decomposes_into_fork_join_subchains() {
+    let mut types = TypeTable::new();
+    let function =
+        crate::device_program_plans::tests::composed_mlp_real_lowered_function(&mut types);
+    let validation = MirValidationContext::new(&types);
+
+    // Drift check: the fixture must stay shape-faithful to the Faber
+    // lowering — temp-destination matmuls + typed forwards, the expanded
+    // SiLU, the separate multiply, the MutRef output forward, and the
+    // vacuum return. A lowering change must break this fixture loudly
+    // instead of silently re-baselining the oracle.
+    let block = &function.blocks[0];
+    let ops: Vec<Option<MirCollectionOp>> = block
+        .statements
+        .iter()
+        .map(|statement| crate::collection_ops::statement_collection_op(statement))
+        .collect();
+    let expected_ops = [
+        Some(MirCollectionOp::TensorMatMul),
+        None, // gate result forward
+        Some(MirCollectionOp::TensorMatMul),
+        None,                             // up result forward
+        Some(MirCollectionOp::TensorNeg), // silu: -gate
+        None,                             // exp (unary assign)
+        Some(MirCollectionOp::TensorAdd), // +1
+        Some(MirCollectionOp::TensorDiv), // gate / (1 + exp(-gate))
+        None,                             // activated forward
+        Some(MirCollectionOp::TensorMul), // fused = activated * up
+        None,                             // fused forward
+        Some(MirCollectionOp::TensorMatMul),
+        None, // MutRef output forward
+    ];
+    assert_eq!(
+        ops.len(),
+        expected_ops.len(),
+        "the real-lowered statement shape drifted: {ops:?}"
+    );
+    for (index, (op, expected)) in ops.iter().zip(expected_ops.iter()).enumerate() {
+        assert_eq!(
+            op, expected,
+            "statement {index} drifted from the real lowered shape"
+        );
+    }
+    // The mutable output parameter rides the last statement's forward.
+    assert!(function
+        .params
+        .iter()
+        .any(|param| { param.local == MirLocalId(4) && param.mode == MirParamMode::MutRef }));
+
+    let decomposition = decompose_kernel_function(&function, &validation)
+        .expect("the real lowered body decomposes by the dataflow rule");
+
+    let slices: Vec<Vec<usize>> = decomposition
+        .subchains
+        .iter()
+        .map(|subchain| subchain.statements.clone())
+        .collect();
+    assert_eq!(
+        slices,
+        vec![
+            vec![0, 1],
+            vec![2, 3],
+            vec![4, 5, 6, 7, 8, 9, 10],
+            vec![11, 12],
+        ],
+        "the fork/join partition must match the dataflow, got {slices:?}"
+    );
+    assert!(matches!(
+        decomposition.subchains[0].plan,
+        CollectionKernelPlan::TiledMatMul(_)
+    ));
+    assert!(matches!(
+        decomposition.subchains[1].plan,
+        CollectionKernelPlan::TiledMatMul(_)
+    ));
+    assert!(matches!(
+        decomposition.subchains[2].plan,
+        CollectionKernelPlan::Elementwise
+    ));
+    assert!(matches!(
+        decomposition.subchains[3].plan,
+        CollectionKernelPlan::TiledMatMul(_)
+    ));
+    assert!(
+        decomposition.subchains[0].consumes.is_empty(),
+        "gate is a root"
+    );
+    assert!(
+        decomposition.subchains[1].consumes.is_empty(),
+        "up must not consume gate (no Gate → Up edge), got {:?}",
+        decomposition.subchains[1].consumes
+    );
+    assert_eq!(
+        decomposition.subchains[2].consumes,
+        vec![0, 1],
+        "the join consumes both roots, got {:?}",
+        decomposition.subchains[2].consumes
+    );
+    assert_eq!(decomposition.subchains[3].consumes, vec![2]);
+    // The MutRef output forward rides the down child's slice.
+    assert_eq!(
+        crate::read_analysis::statement_destination(&block.statements[12]),
+        Some(MirLocalId(4)),
+        "the down child must carry the mutable output forward"
+    );
+}
+
+#[test]
+#[ignore = "1A-bis (expression-plan coverage): ElementwisePlan rejects the \
+expanded SiLU chain's temp-forward destinations (ElementwiseBarrierError::Effect \
+on a forwarded local read by a later statement). The join child's partition is \
+proven above; its typed expression plan lands with 1A-bis."]
+fn real_lowered_mlp_join_child_carries_typed_expression_plan() {
+    let mut types = TypeTable::new();
+    let function =
+        crate::device_program_plans::tests::composed_mlp_real_lowered_function(&mut types);
+    let validation = MirValidationContext::new(&types);
+    let decomposition = decompose_kernel_function(&function, &validation)
+        .expect("the real lowered body decomposes by the dataflow rule");
+    let join = &decomposition.subchains[2];
+    assert_eq!(join.plan, CollectionKernelPlan::Elementwise);
+    assert!(
+        join.elementwise_plan.is_some(),
+        "the join child must carry the typed SiLU+multiply expression plan"
+    );
+}
+
+// -----------------------------------------------------------------------
+// Generic topology controls: the rule is derived from reads, writes, and
+// lineage — never from operation names, root counts, or join arity.
+// -----------------------------------------------------------------------
+
+#[test]
+fn three_independent_roots_fan_in_through_chained_joins() {
+    // sum(x) ∥ mean(x) ∥ max(x) → add → mul: more than two independently
+    // ready roots, and the binary joins chain into ONE join child whose
+    // lineage is the union of all three roots (arbitrary-arity fan-in via
+    // the run union — never a root serialized behind a sibling).
+    let mut types = TypeTable::new();
+    let r1 = rank1_tensor_ty(&mut types, 16);
+    let function = device_function(
+        &[(0, r1)],
+        vec![
+            collection_statement(MirCollectionOp::Sum, &[0], 2, r1),
+            collection_statement(MirCollectionOp::TensorMean, &[0], 3, r1),
+            collection_statement(MirCollectionOp::TensorMax, &[0], 4, r1),
+            collection_statement(MirCollectionOp::TensorAdd, &[2, 3], 5, r1),
+            collection_statement(MirCollectionOp::TensorMul, &[5, 4], 6, r1),
+        ],
+        Some(6),
+        r1,
+    );
+    let validation = MirValidationContext::new(&types);
+    let decomposition =
+        decompose_kernel_function(&function, &validation).expect("the three-root body decomposes");
+
+    assert_eq!(
+        decomposition.subchains.len(),
+        4,
+        "three roots plus one union join child, got {:?}",
+        decomposition.subchains
+    );
+    let roots: Vec<usize> = decomposition
+        .subchains
+        .iter()
+        .enumerate()
+        .filter(|(_, subchain)| subchain.consumes.is_empty())
+        .map(|(index, _)| index)
+        .collect();
+    assert_eq!(roots, vec![0, 1, 2], "the three recipes must all be roots");
+    let join = &decomposition.subchains[3];
+    assert!(matches!(join.plan, CollectionKernelPlan::Elementwise));
+    assert_eq!(join.statements, vec![3, 4]);
+    assert_eq!(
+        join.consumes,
+        vec![0, 1, 2],
+        "the join child consumes all three roots, got {:?}",
+        join.consumes
+    );
+}
+
+#[test]
+fn fan_out_feeds_two_consumers_without_invented_edges() {
+    // matmul(x, w) → h; softmax(h) → s; mean(h) → m; add(s, m) → t: h fans
+    // out to TWO child kernels; the consumers join, and neither carries an
+    // edge the dataflow does not justify.
+    let mut types = TypeTable::new();
+    let r2 = rank2_tensor_ty(&mut types, [4, 4]);
+    let scalar = f32_ty(&mut types);
+    let function = device_function(
+        &[(0, r2), (1, r2)],
+        vec![
+            collection_statement(MirCollectionOp::TensorMatMul, &[0, 1], 2, r2),
+            collection_statement(MirCollectionOp::TensorSoftmax, &[2], 3, r2),
+            collection_statement(MirCollectionOp::TensorMean, &[2], 4, scalar),
+            collection_statement(MirCollectionOp::TensorAdd, &[3, 4], 5, scalar),
+        ],
+        Some(5),
+        scalar,
+    );
+    let validation = MirValidationContext::new(&types);
+    let decomposition =
+        decompose_kernel_function(&function, &validation).expect("the fan-out body decomposes");
+
+    assert_eq!(
+        decomposition.subchains.len(),
+        4,
+        "mm ∥ softmax ∥ mean → join must be four children, got {:#?}",
+        decomposition.subchains
+    );
+    assert!(
+        decomposition.subchains[0].consumes.is_empty(),
+        "h's producer is the root"
+    );
+    assert_eq!(
+        decomposition.subchains[1].consumes,
+        vec![0],
+        "the softmax child consumes h"
+    );
+    assert_eq!(
+        decomposition.subchains[2].consumes,
+        vec![0],
+        "the mean child consumes the same h buffer"
+    );
+    assert!(
+        !decomposition.subchains[1].consumes.contains(&2)
+            && !decomposition.subchains[2].consumes.contains(&1),
+        "fan-out: the two consumers must not depend on each other"
+    );
+    assert_eq!(
+        decomposition.subchains[3].consumes,
+        vec![1, 2],
+        "the join consumes both consumers of h"
+    );
+}
+
+#[test]
+fn topology_control_uses_four_plan_kinds_without_position_logic() {
+    // softmax(x) ∥ layernorm(x) → mul join → sum: four different plan kinds
+    // in one fork/join graph; dependency discovery never inspects which kind
+    // sits at which graph position.
+    let mut types = TypeTable::new();
+    let r2 = rank2_tensor_ty(&mut types, [4, 4]);
+    let scalar = f32_ty(&mut types);
+    let function = device_function(
+        &[(0, r2)],
+        vec![
+            collection_statement(MirCollectionOp::TensorSoftmax, &[0], 2, r2),
+            collection_statement_operands(
+                MirCollectionOp::TensorLayerNorm,
+                vec![
+                    MirOperand::Place(MirPlace::local(MirLocalId(0))),
+                    MirOperand::Constant(MirConstant::Int(1)),
+                    MirOperand::Constant(MirConstant::Float(1e-5)),
+                ],
+                3,
+                r2,
+            ),
+            collection_statement(MirCollectionOp::TensorMul, &[2, 3], 4, r2),
+            collection_statement(MirCollectionOp::Sum, &[4], 5, scalar),
+        ],
+        Some(5),
+        scalar,
+    );
+    let validation = MirValidationContext::new(&types);
+    let decomposition =
+        decompose_kernel_function(&function, &validation).expect("the four-kind body decomposes");
+
+    assert_eq!(decomposition.subchains.len(), 4);
+    assert!(matches!(
+        decomposition.subchains[0].plan,
+        CollectionKernelPlan::RowSoftmax(_)
+    ));
+    assert!(matches!(
+        decomposition.subchains[1].plan,
+        CollectionKernelPlan::LayerNormalization(_)
+    ));
+    assert!(matches!(
+        decomposition.subchains[2].plan,
+        CollectionKernelPlan::Elementwise
+    ));
+    assert!(matches!(
+        decomposition.subchains[3].plan,
+        CollectionKernelPlan::TreeReduction(_)
+    ));
+    assert!(decomposition.subchains[0].consumes.is_empty());
+    assert!(decomposition.subchains[1].consumes.is_empty());
+    assert_eq!(decomposition.subchains[2].consumes, vec![0, 1]);
+    assert_eq!(decomposition.subchains[3].consumes, vec![2]);
+}
+
+// -----------------------------------------------------------------------
+// Property cross-check: every carried consumes edge is justified by a
+// read of the producing subchain's written locals, and every read of an
+// earlier subchain's local produces an edge — on every fixture.
+// -----------------------------------------------------------------------
+
+fn assert_consumes_match_reads(
+    name: &str,
+    types: &mut TypeTable,
+    function: &MirFunction,
+    decomposition: &KernelDecomposition,
+) {
+    decomposition.intern_output_tuple_types(function, types);
+    let block = &function.blocks[0];
+    let written: Vec<std::collections::BTreeSet<MirLocalId>> = decomposition
+        .subchains
+        .iter()
+        .map(|subchain| {
+            subchain
+                .statements
+                .iter()
+                .filter_map(|&index| {
+                    crate::read_analysis::statement_destination(&block.statements[index])
+                })
+                .collect()
+        })
+        .collect();
+    for (index, subchain) in decomposition.subchains.iter().enumerate() {
+        let synthetic = decomposition.subchain_function(function, index, types);
+        let inputs: BTreeSet<MirLocalId> =
+            synthetic.params.iter().map(|param| param.local).collect();
+        let expected: Vec<usize> = (0..index)
+            .filter(|&prior| written[prior].iter().any(|local| inputs.contains(local)))
+            .collect();
+        assert_eq!(
+            subchain.consumes, expected,
+            "{name}: subchain {index} carries an edge no read justifies or misses one"
+        );
+    }
+}
+
+#[test]
+fn every_emitted_edge_is_justified_by_a_read_across_fixtures() {
+    type Fixture = fn(&mut TypeTable) -> MirFunction;
+    let fixtures: &[(&str, Fixture)] = &[
+        ("composed_mlp", composed_mlp_function),
+        ("swiglu_after_down", swiglu_after_down_function),
+        ("sum_mean", sum_mean_function),
+        ("mlp_loss", mlp_loss_function),
+        ("mlp_loss_gelu", mlp_loss_gelu_function),
+        ("matmul_vjp", matmul_vjp_function),
+        (
+            "gradient_companion_tuple",
+            gradient_companion_tuple_function,
+        ),
+        (
+            "real_lowered_mlp",
+            crate::device_program_plans::tests::composed_mlp_real_lowered_function,
+        ),
+    ];
+    let mut types = TypeTable::new();
+    for (name, build) in fixtures {
+        let function = build(&mut types);
+        let validation = MirValidationContext::new(&types);
+        let decomposition = decompose_kernel_function(&function, &validation)
+            .unwrap_or_else(|error| panic!("{name}: decomposes, got {error:?}"));
+        assert_consumes_match_reads(name, &mut types, &function, &decomposition);
+    }
 }
 
 // -----------------------------------------------------------------------

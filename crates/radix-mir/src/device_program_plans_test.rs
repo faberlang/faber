@@ -574,7 +574,7 @@ fn composed_mlp_assign_then_use_function(types: &mut TypeTable) -> MirFunction {
 /// assignments forward those results into the declared stage locals. The
 /// result temps use an equivalent alias type, which mirrors the real
 /// lowering's distinct call-result and declared-local type ids.
-fn composed_mlp_real_lowered_function(types: &mut TypeTable) -> MirFunction {
+pub(crate) fn composed_mlp_real_lowered_function(types: &mut TypeTable) -> MirFunction {
     let input = rank2_tensor_ty(types, [2, 4]);
     let gate_weights = rank2_tensor_ty(types, [4, 3]);
     let up_weights = rank2_tensor_ty(types, [4, 3]);

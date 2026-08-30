@@ -68,7 +68,7 @@ use crate::{
 use crate::{MirCollectionOp, MirIntrinsic, MirRuntimeCall};
 use radix_types::{Type, TypeId, TypeTable};
 use rustc_hash::FxHashSet;
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 
 /// One decomposed kernel subchain: a contiguous statement slice of the
 /// source function carrying exactly one recipe (or an elementwise-only
@@ -172,17 +172,189 @@ pub fn decompose_kernel_function_with_limit(
     }
     let block = &function.blocks[0];
 
-    // Slice the statement stream at recipe boundaries. `current` holds the
-    // source statement indices of the open subchain; `current_has_recipe`
-    // tracks whether the open subchain already adopted a recipe (a second
-    // live recipe op closes it and starts a new slice).
+    // Slice the statement stream at recipe boundaries AND along producer
+    // lineages. `current` holds the source statement indices of the open
+    // subchain; `current_has_recipe` tracks whether it adopted a recipe;
+    // `current_lineage` tracks the closed subchains whose written locals the
+    // open slice reads. Source adjacency is not a dependency: an elementwise
+    // statement folds into the open slice only when it introduces no NEW
+    // lineage — an elementwise join of an independent producer lineage
+    // becomes its own elementwise subchain (fork/join truth, so the plan
+    // never manufactures an edge between independent roots). A recipe
+    // arriving at a lineage-carrying slice starts a new subchain instead of
+    // adopting the completed join; the lineage-free elementwise prefix
+    // still folds into the recipe it feeds (S3-B1). The returned tuple
+    // assembly folds by ABI contract (D-6), not by adjacency.
     let mut slices: Vec<Vec<usize>> = Vec::new();
     let mut current: Vec<usize> = Vec::new();
     let mut current_has_recipe = false;
-    for (index, statement) in block.statements.iter().enumerate() {
+    let mut current_lineage: BTreeSet<usize> = BTreeSet::new();
+    let mut current_writes: BTreeSet<MirLocalId> = BTreeSet::new();
+    let mut current_temp_defs: BTreeSet<MirTempId> = BTreeSet::new();
+    let mut lineage_of_local: BTreeMap<MirLocalId, usize> = BTreeMap::new();
+    let mut lineage_of_temp: BTreeMap<MirTempId, usize> = BTreeMap::new();
+
+    // The returned place base: the tuple-return assembly is the ABI's
+    // output boundary, not a schedulable join.
+    let returned_base: Option<MirPlaceBase> = match &block.terminator.kind {
+        MirTerminatorKind::Return(Some(MirOperand::Place(place))) => Some(place.base.clone()),
+        MirTerminatorKind::Return(Some(MirOperand::Temp(temp))) => Some(MirPlaceBase::Temp(*temp)),
+        _ => None,
+    };
+    let is_return_assembly = |statement: &MirStatement| -> bool {
+        matches!(
+            statement.kind,
+            MirStatementKind::Construct {
+                aggregate: MirAggregate {
+                    kind: MirAggregateKind::Tuple,
+                    ..
+                },
+                ..
+            }
+        ) && matches!(
+            statement.kind,
+            MirStatementKind::Construct { ref destination, .. }
+            if Some(&destination.base) == returned_base.as_ref()
+        )
+    };
+
+    // The closed lineages a statement's reads resolve to (params and the
+    // open slice's own writes contribute nothing; temps resolve to the
+    // slice containing their definition).
+    fn cross_reads(
+        statement: &MirStatement,
+        current_writes: &BTreeSet<MirLocalId>,
+        current_temp_defs: &BTreeSet<MirTempId>,
+        lineage_of_local: &BTreeMap<MirLocalId, usize>,
+        lineage_of_temp: &BTreeMap<MirTempId, usize>,
+    ) -> BTreeSet<usize> {
+        let mut cross = BTreeSet::new();
+        if std::env::var("FABER_1A_DEBUG").is_ok() {
+            eprintln!(
+                "cross_reads: stmt locals={:?} refs={:?} cur_writes={:?} cur_tdefs={:?}",
+                crate::read_analysis::statement_read_locals(statement),
+                {
+                    let (_, r) = statement_temp_sets(statement);
+                    r
+                },
+                current_writes,
+                current_temp_defs
+            );
+        }
+        for local in crate::read_analysis::statement_read_locals(statement) {
+            if current_writes.contains(&local) {
+                continue;
+            }
+            if let Some(lineage) = lineage_of_local.get(&local) {
+                cross.insert(*lineage);
+            }
+        }
+        let (_, referenced) = statement_temp_sets(statement);
+        for temp in referenced {
+            if current_temp_defs.contains(&temp) {
+                continue;
+            }
+            if let Some(lineage) = lineage_of_temp.get(&temp) {
+                cross.insert(*lineage);
+            }
+        }
+        cross
+    }
+
+    // Close the open slice: its writes and temp definitions take the
+    // closed slice's lineage for the rest of the walk.
+    fn close_current(
+        slices: &mut Vec<Vec<usize>>,
+        current: &mut Vec<usize>,
+        current_writes: &mut BTreeSet<MirLocalId>,
+        current_temp_defs: &mut BTreeSet<MirTempId>,
+        current_lineage: &mut BTreeSet<usize>,
+        current_has_recipe: &mut bool,
+        lineage_of_local: &mut BTreeMap<MirLocalId, usize>,
+        lineage_of_temp: &mut BTreeMap<MirTempId, usize>,
+    ) {
+        let closed = slices.len();
+        for local in current_writes.iter() {
+            lineage_of_local.insert(*local, closed);
+        }
+        for temp in current_temp_defs.iter() {
+            lineage_of_temp.insert(*temp, closed);
+        }
+        slices.push(std::mem::take(current));
+        current_lineage.clear();
+        current_writes.clear();
+        current_temp_defs.clear();
+        *current_has_recipe = false;
+    }
+
+    // Record one statement's writes into the open slice's sets.
+    fn record_writes(
+        statement: &MirStatement,
+        current_writes: &mut BTreeSet<MirLocalId>,
+        current_temp_defs: &mut BTreeSet<MirTempId>,
+    ) {
+        if let Some(local) = crate::read_analysis::statement_destination(statement) {
+            current_writes.insert(local);
+        }
+        let (defined, _) = statement_temp_sets(statement);
+        current_temp_defs.extend(defined);
+    }
+
+    // Walk the statement stream. An elementwise statement (value math or
+    // an elementwise collection op) folds into the open slice only when its
+    // cross-reads stay within the slice's lineage; the first statement that
+    // reads a NEW producer lineage closes the open slice and starts an
+    // elementwise JOIN slice whose lineage is the union of everything it
+    // reads — later elementwise statements accumulate into that join (a
+    // fan-in of any arity is one join child). A recipe closes a join slice
+    // and opens a fresh recipe slice; the lineage-free elementwise prefix
+    // still folds into the recipe it feeds (S3-B1). Source adjacency never
+    // manufactures an edge between independent roots.
+    let mut index = 0usize;
+    while index < block.statements.len() {
+        let statement = &block.statements[index];
         let Some(op) = crate::collection_ops::statement_collection_op(statement) else {
-            // Elementwise value math (Assign / Construct / Call).
+            // D-6: the returned tuple assembly folds into the open slice
+            // by ABI contract — it is the output boundary, not a join.
+            if is_return_assembly(statement) {
+                current.push(index);
+                record_writes(statement, &mut current_writes, &mut current_temp_defs);
+                index += 1;
+                continue;
+            }
+            let cross = cross_reads(
+                statement,
+                &current_writes,
+                &current_temp_defs,
+                &lineage_of_local,
+                &lineage_of_temp,
+            );
+            if cross.is_subset(&current_lineage) {
+                // Plain fold into the open slice.
+            } else if !current_lineage.is_empty() && !current_has_recipe {
+                // An open JOIN slice absorbs a further producer lineage —
+                // fan-in of any arity is one join child.
+                current_lineage.extend(&cross);
+            } else {
+                // Close the open slice and start a join with this lineage.
+                if !current.is_empty() {
+                    close_current(
+                        &mut slices,
+                        &mut current,
+                        &mut current_writes,
+                        &mut current_temp_defs,
+                        &mut current_lineage,
+                        &mut current_has_recipe,
+                        &mut lineage_of_local,
+                        &mut lineage_of_temp,
+                    );
+                }
+                current_has_recipe = false;
+                current_lineage = cross;
+            }
             current.push(index);
+            record_writes(statement, &mut current_writes, &mut current_temp_defs);
+            index += 1;
             continue;
         };
         if is_recipe_op(op) {
@@ -190,17 +362,61 @@ pub fn decompose_kernel_function_with_limit(
             // part of the kernel semantics, and it must not force a recipe
             // boundary or a contract the live plan does not carry.
             if statement_destination_is_dead(function, statement) {
+                index += 1;
                 continue;
             }
-            if current_has_recipe {
-                slices.push(std::mem::take(&mut current));
+            if current_has_recipe || !current_lineage.is_empty() {
+                close_current(
+                    &mut slices,
+                    &mut current,
+                    &mut current_writes,
+                    &mut current_temp_defs,
+                    &mut current_lineage,
+                    &mut current_has_recipe,
+                    &mut lineage_of_local,
+                    &mut lineage_of_temp,
+                );
             }
             current_has_recipe = true;
             current.push(index);
+            record_writes(statement, &mut current_writes, &mut current_temp_defs);
+            index += 1;
             continue;
         }
         if is_elementwise_collection_op(op) {
+            let cross = cross_reads(
+                statement,
+                &current_writes,
+                &current_temp_defs,
+                &lineage_of_local,
+                &lineage_of_temp,
+            );
+            if cross.is_subset(&current_lineage) {
+                // Plain fold into the open slice.
+            } else if !current_lineage.is_empty() && !current_has_recipe {
+                // An open JOIN slice absorbs a further producer lineage —
+                // fan-in of any arity is one join child.
+                current_lineage.extend(&cross);
+            } else {
+                // Close the open slice and start a join with this lineage.
+                if !current.is_empty() {
+                    close_current(
+                        &mut slices,
+                        &mut current,
+                        &mut current_writes,
+                        &mut current_temp_defs,
+                        &mut current_lineage,
+                        &mut current_has_recipe,
+                        &mut lineage_of_local,
+                        &mut lineage_of_temp,
+                    );
+                }
+                current_has_recipe = false;
+                current_lineage = cross;
+            }
             current.push(index);
+            record_writes(statement, &mut current_writes, &mut current_temp_defs);
+            index += 1;
             continue;
         }
         return Err(PlanMappingError::mapping(format!(
@@ -209,7 +425,16 @@ pub fn decompose_kernel_function_with_limit(
         )));
     }
     if !current.is_empty() {
-        slices.push(current);
+        close_current(
+            &mut slices,
+            &mut current,
+            &mut current_writes,
+            &mut current_temp_defs,
+            &mut current_lineage,
+            &mut current_has_recipe,
+            &mut lineage_of_local,
+            &mut lineage_of_temp,
+        );
     }
 
     // The per-kernel storage-buffer budget: a whole body whose emission
@@ -232,7 +457,8 @@ pub fn decompose_kernel_function_with_limit(
     let mut recipe_results: Vec<Option<MirLocalId>> = Vec::new();
     for (position, indices) in slices.iter().enumerate() {
         let is_last = position + 1 == slices.len();
-        let synthetic = build_subchain_function(function, indices, &[], is_last, validation.types);
+        let mut synthetic =
+            build_subchain_function(function, indices, &[], is_last, false, validation.types);
         // The S3-A5 dead filter resolves reads against the SOURCE function
         // (the subchain's produced local is consumed by a later subchain,
         // invisible inside the slice itself).
@@ -243,9 +469,22 @@ pub fn decompose_kernel_function_with_limit(
         // OF-1 expression plan. Recipe classification stays
         // `resolve_subchain_plan` / `kernel_plan/` — this never re-derives
         // it, and a typed `ElementwiseBarrierError` leaves the collection plan
-        // as payload-less `Elementwise` (existing gates stay closed).
+        // as payload-less `Elementwise` (existing gates stay closed). The
+        // elementwise planning synthetic is rebuilt with the join child's
+        // product-return (Unit 1A) so the planner's liveness sees the
+        // cross-kernel read.
         let elementwise_plan = match &plan {
-            CollectionKernelPlan::Elementwise => plan_elementwise(&synthetic, validation).ok(),
+            CollectionKernelPlan::Elementwise => {
+                synthetic = build_subchain_function(
+                    function,
+                    indices,
+                    &[],
+                    is_last,
+                    true,
+                    validation.types,
+                );
+                plan_elementwise(&synthetic, validation).ok()
+            }
             _ => None,
         };
         let produced = indices.iter().rev().find_map(|&index| {
@@ -873,11 +1112,16 @@ impl KernelDecomposition {
         types: &TypeTable,
     ) -> MirFunction {
         let is_last = index + 1 == self.subchains.len();
+        let plan_is_elementwise = matches!(
+            self.subchains[index].plan,
+            CollectionKernelPlan::Elementwise
+        );
         build_subchain_function(
             source,
             &self.subchains[index].statements,
             &self.subchains[index].outputs,
             is_last,
+            plan_is_elementwise,
             types,
         )
     }
@@ -1251,7 +1495,11 @@ fn needs_synthetic_tuple_return(
 /// reduction shape); an intermediate subchain returns nothing when its
 /// output set is the single recipe result, and a TUPLE of its output set
 /// (`[primary, extra_outputs...]` in `outputs` order) when it carries
-/// additional consumed outputs (D-2b-1).
+/// additional consumed outputs (D-2b-1). An ELEMENTWISE join child (Unit 1A
+/// fork/join) instead returns its last destination local: its product is the
+/// cross-kernel output, and the return makes the elementwise planner's
+/// liveness see that read while the full-ABI synthesis binds the join's
+/// output buffer.
 ///
 /// # Panics
 /// Panics when an intermediate subchain carries additional outputs but the
@@ -1261,6 +1509,7 @@ fn build_subchain_function(
     indices: &[usize],
     outputs: &[MirLocalId],
     is_last: bool,
+    plan_is_elementwise: bool,
     types: &TypeTable,
 ) -> MirFunction {
     let block = &source.blocks[0];
@@ -1360,6 +1609,34 @@ fn build_subchain_function(
         // survives the slice.
         terminator = block.terminator.clone();
         return_ty = source.return_ty;
+    } else if plan_is_elementwise {
+        // Unit 1A fork/join: an elementwise join child's product is its
+        // cross-kernel output. The synthetic returns the slice's last
+        // destination so the elementwise planner's liveness sees the
+        // cross-kernel read (the D-2a output set exposes exactly this
+        // local) and the full-ABI synthesis binds the join's output
+        // buffer.
+        let last_local = indices.iter().rev().find_map(|&index| {
+            crate::read_analysis::statement_destination(&block.statements[index])
+        });
+        match last_local {
+            Some(local) => {
+                terminator = MirTerminator {
+                    kind: MirTerminatorKind::Return(Some(MirOperand::Place(MirPlace::local(
+                        local,
+                    )))),
+                    span,
+                };
+                return_ty = source_local_ty(source, local);
+            }
+            None => {
+                terminator = MirTerminator {
+                    kind: MirTerminatorKind::Return(None),
+                    span,
+                };
+                return_ty = source.return_ty;
+            }
+        }
     } else {
         terminator = MirTerminator {
             kind: MirTerminatorKind::Return(None),

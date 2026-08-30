@@ -4681,4 +4681,4 @@ fn kernel_matmul_shapes(
 
 #[cfg(test)]
 #[path = "device_program_plans_test.rs"]
-mod tests;
+pub(crate) mod tests;

@@ -316,10 +316,15 @@ pub struct KernelUnit {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct LaunchId(pub u32);
 
-/// One entry in the ordered launch sequence.
+/// One entry in the deterministic launch enumeration.
 ///
-/// `launches` is the program's execution order — the generalized form of the
-/// WGSL chain descriptor's `chain`. A kernel may be launched multiple times
+/// `launches` is a stable topological enumeration over the carried dependency
+/// edges, not the dependency graph itself — the generalized form of the
+/// WGSL chain descriptor's `chain`. Adjacency in the vector imposes no
+/// semantic order between launches: only the carried producer-consumer edges
+/// ([`BufferRegistry`] data-flow pairs, [`DeviceSemantics`] dependencies)
+/// decide what must wait for what, and independent launches may execute in
+/// any order or concurrently. A kernel may be launched multiple times
 /// (a repeated per-step launch or a re-launch after a shape change); the
 /// launch plan is the launched kernel's [`KernelUnit`]`::launch`, so the host
 /// needs no per-launch override for the S1-1 contract.
@@ -435,7 +440,8 @@ pub enum DeviceProgramLifetime {
 ///
 /// - `kernels`: the ordered kernel declarations (function id, entry, plan,
 ///   typed resource list, launch plan).
-/// - `launches`: the ordered execution sequence over the kernels.
+/// - `launches`: the deterministic launch enumeration over the kernels (a
+///   stable topological order; the dependency graph is carried separately).
 /// - `lifetime`: the program execution-lifetime regime.
 /// - `results`: the explicit multi-output result buffers.
 ///
@@ -448,7 +454,8 @@ pub enum DeviceProgramLifetime {
 pub struct DeviceProgram {
     /// Ordered kernel declarations.
     pub kernels: Vec<KernelUnit>,
-    /// Ordered launch sequence.
+    /// Deterministic launch enumeration (stable topological order, not the
+    /// dependency graph).
     pub launches: Vec<LaunchUnit>,
     /// Program execution-lifetime regime.
     pub lifetime: DeviceProgramLifetime,
