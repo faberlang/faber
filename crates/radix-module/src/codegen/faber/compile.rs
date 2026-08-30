@@ -14,6 +14,14 @@ use crate::driver::{analyze_source, AnalyzeRequest, AnalyzedModule, Config, Sess
 use crate::locale::{latin_locale_pack, KeywordSurface, LocalePack};
 use crate::program::compile::prepare_program_module_for_name;
 use crate::{Diagnostic, FaberOutput};
+use radix_hir::visit::{walk_block, walk_expr, walk_function, HirVisitor};
+use radix_hir::{
+    HirExpression, HirExpressionKind, HirItem, HirItemKind, HirOwnerRef, HirTypeForm, HirTypeFormArg, HirTypeFormHead,
+    HirTypeSlot,
+};
+use radix_types::{AppliedArg, Type, TypeId};
+use rustc_hash::FxHashMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 /// Output and diagnostics from one canonical Faber format invocation.
 #[derive(Debug)]
@@ -138,8 +146,8 @@ pub fn compile_canonical(session: &Session, name: &str, source: &str) -> FormatC
 ///
 /// # Errors
 ///
-/// Returns `CODEGEN006` when the emitted body cannot be analyzed or when its
-/// authored variant-path spelling multiset differs from the input analysis.
+/// Returns `CODEGEN006` when the emitted body cannot be analyzed or when an
+/// authored source fact differs from the input analysis.
 pub(crate) fn revalidate_emitted_output(
     session: &Session,
     name: &str,
@@ -154,13 +162,14 @@ pub(crate) fn revalidate_emitted_output(
             .with_locale_pack(emit_pack.clone())
             .with_locale_pack_explicit(),
     );
-    let expected = variant_path_spelling_multiset(&input.presentation, &input.interner);
+    let expected_variants = variant_path_spelling_multiset(&input.presentation, &input.interner);
+    let expected_types = authored_type_form_fingerprint(input);
     let prepared = prepare_program_module_for_name(name, emitted, &revalidation_session).map_err(|diagnostic| {
         Box::new(revalidation_failure(
             name,
             "variant_path_spelling_reanalysis_failed",
             format!("preparing emitted output failed: {}", diagnostic.message),
-            expected.len(),
+            expected_variants.len(),
             None,
         ))
     })?;
@@ -176,7 +185,7 @@ pub(crate) fn revalidate_emitted_output(
                 name,
                 "variant_path_spelling_reanalysis_failed",
                 diagnostics_summary(&reanalysis.diagnostics),
-                expected.len(),
+                expected_variants.len(),
                 None,
             )));
         }
@@ -186,22 +195,540 @@ pub(crate) fn revalidate_emitted_output(
                 name,
                 "variant_path_spelling_reanalysis_failed",
                 diagnostics_summary(&diagnostics),
-                expected.len(),
+                expected_variants.len(),
                 None,
             )));
         }
     };
-    let actual = variant_path_spelling_multiset(&reanalysis.presentation, &reanalysis.interner);
-    if actual != expected {
+    let actual_variants = variant_path_spelling_multiset(&reanalysis.presentation, &reanalysis.interner);
+    if actual_variants != expected_variants {
         return Err(Box::new(revalidation_failure(
             name,
             "variant_path_spelling_multiset_diverged",
             "emitted variant-path spellings differ from the input",
-            expected.len(),
-            Some(actual.len()),
+            expected_variants.len(),
+            Some(actual_variants.len()),
+        )));
+    }
+
+    let actual_types = authored_type_form_fingerprint(&reanalysis);
+    // Re-emission may materialize an inferred signature that had no authored
+    // source site. Compare every input key and ignore only such extra keys;
+    // dropping or changing an expected occurrence still fails closed.
+    let keyed_diverged = expected_types
+        .keyed
+        .iter()
+        .any(|(key, expected)| actual_types.keyed.get(key) != Some(expected));
+    if keyed_diverged || actual_types.unkeyed != expected_types.unkeyed {
+        let issue = if keyed_diverged {
+            "authored_type_form_map_diverged"
+        } else {
+            "authored_type_form_count_diverged"
+        };
+        return Err(Box::new(revalidation_failure(
+            name,
+            issue,
+            "emitted authored type forms differ from the input",
+            expected_types.total(),
+            Some(actual_types.total()),
         )));
     }
     Ok(())
+}
+
+/// Occurrence-aware authored type facts used by output revalidation.
+///
+/// Named and local `Def` owners use structural keys. `Hir` owners identify
+/// expression occurrences only by slot, so those sites are checked by count
+/// per slot rather than by a false cross-analysis HIR id.
+#[derive(Debug, Default, PartialEq, Eq)]
+struct AuthoredTypeFormFingerprint {
+    keyed: BTreeMap<String, String>,
+    unkeyed: BTreeMap<String, usize>,
+}
+
+impl AuthoredTypeFormFingerprint {
+    fn total(&self) -> usize {
+        self.keyed.len() + self.unkeyed.values().sum::<usize>()
+    }
+}
+
+fn authored_type_form_fingerprint(analysis: &AnalyzedModule) -> AuthoredTypeFormFingerprint {
+    let owners = StructuralOwnerIndex::build(&analysis.hir, &analysis.interner);
+    let mut fingerprint = AuthoredTypeFormFingerprint::default();
+    for authored in &analysis.presentation.authored_types {
+        // Field emission remains canonical until its owner path is migrated.
+        if matches!(&authored.site.slot, HirTypeSlot::Field(_)) {
+            continue;
+        }
+        let slot = type_slot_key(&authored.site.slot);
+        let signature = type_form_signature(analysis, &authored.form);
+        match &authored.site.owner {
+            HirOwnerRef::Def(def_id) => {
+                if let Some(owner) = owners.owners.get(def_id) {
+                    fingerprint
+                        .keyed
+                        .insert(format!("{owner}/{slot}"), signature);
+                } else {
+                    // An unknown Def owner is not structurally nameable. Keep
+                    // it conservative and compare its slot count instead of
+                    // comparing an analysis-local DefId.
+                    *fingerprint
+                        .unkeyed
+                        .entry(format!("unresolved-def/{slot}"))
+                        .or_default() += 1;
+                }
+            }
+            HirOwnerRef::Hir(_) => {
+                // HIR ids are analysis-local. Expression-owned sites are
+                // therefore count-only per slot, as required by §10.
+                *fingerprint.unkeyed.entry(slot).or_default() += 1;
+            }
+        }
+    }
+    fingerprint
+}
+
+#[derive(Debug, Clone)]
+enum StructuralOwner {
+    Named(String),
+    Local {
+        function: String,
+        name: String,
+        ordinal: usize,
+    },
+}
+
+impl std::fmt::Display for StructuralOwner {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Named(path) => write!(formatter, "named:{path}"),
+            Self::Local { function, name, ordinal } => write!(formatter, "local:{function}:{name}:{ordinal}"),
+        }
+    }
+}
+
+#[derive(Debug)]
+struct FunctionOwnerFrame {
+    path: String,
+    occurrences: BTreeMap<String, usize>,
+    closures: usize,
+}
+
+struct StructuralOwnerIndex<'a> {
+    interner: &'a crate::lexer::Interner,
+    owners: FxHashMap<crate::hir::DefId, StructuralOwner>,
+    functions: Vec<FunctionOwnerFrame>,
+}
+
+impl<'a> StructuralOwnerIndex<'a> {
+    fn build(hir: &crate::hir::HirModule, interner: &'a crate::lexer::Interner) -> Self {
+        let mut index = Self { interner, owners: FxHashMap::default(), functions: Vec::new() };
+        index.visit_program(hir);
+        index
+    }
+
+    fn visit_function_in_context(&mut self, path: String, function: &crate::hir::HirFunction) {
+        self.functions
+            .push(FunctionOwnerFrame { path, occurrences: BTreeMap::new(), closures: 0 });
+        walk_function(self, function);
+        self.functions.pop();
+    }
+
+    fn current_function_path(&self) -> String {
+        self.functions
+            .last()
+            .map(|frame| frame.path.clone())
+            .unwrap_or_else(|| "<module>".to_owned())
+    }
+
+    fn visit_struct_method(&mut self, parent: &str, method: &crate::hir::HirMethod) {
+        let path = format!("{parent}.{}", self.interner.resolve(method.func.name));
+        self.owners
+            .insert(method.def_id, StructuralOwner::Named(path.clone()));
+        self.visit_function_in_context(path, &method.func);
+    }
+}
+
+impl HirVisitor for StructuralOwnerIndex<'_> {
+    fn visit_program(&mut self, program: &crate::hir::HirModule) {
+        for item in &program.items {
+            self.visit_item(item);
+        }
+        for annotation in &program.entry_annotations {
+            self.visit_annotation(annotation);
+        }
+        if let Some(entry) = &program.entry {
+            self.functions.push(FunctionOwnerFrame {
+                path: "<entry>".to_owned(),
+                occurrences: BTreeMap::new(),
+                closures: 0,
+            });
+            walk_block(self, entry);
+            self.functions.pop();
+        }
+    }
+
+    fn visit_item(&mut self, item: &HirItem) {
+        match &item.kind {
+            HirItemKind::Function(function) => {
+                let path = self.interner.resolve(function.name).to_owned();
+                self.owners
+                    .insert(item.def_id, StructuralOwner::Named(path.clone()));
+                self.visit_function_in_context(path, function);
+            }
+            HirItemKind::Struct(strukt) => {
+                let parent = self.interner.resolve(strukt.name).to_owned();
+                self.owners
+                    .insert(item.def_id, StructuralOwner::Named(parent.clone()));
+                for annotation in &strukt.annotations {
+                    self.visit_annotation(annotation);
+                }
+                for field in &strukt.fields {
+                    self.visit_field(field);
+                }
+                for method in &strukt.methods {
+                    self.visit_struct_method(&parent, method);
+                }
+            }
+            HirItemKind::Enum(enumeration) => {
+                let path = self.interner.resolve(enumeration.name).to_owned();
+                self.owners
+                    .insert(item.def_id, StructuralOwner::Named(path));
+                for annotation in &enumeration.annotations {
+                    self.visit_annotation(annotation);
+                }
+            }
+            HirItemKind::Interface(interface) => {
+                let parent = self.interner.resolve(interface.name).to_owned();
+                self.owners
+                    .insert(item.def_id, StructuralOwner::Named(parent.clone()));
+                for method in &interface.methods {
+                    let path = format!("{parent}.{}", self.interner.resolve(method.name));
+                    self.functions
+                        .push(FunctionOwnerFrame { path, occurrences: BTreeMap::new(), closures: 0 });
+                    for param in &method.params {
+                        self.visit_param(param);
+                    }
+                    self.functions.pop();
+                }
+            }
+            HirItemKind::TypeAlias(alias) => {
+                let path = self.interner.resolve(alias.name).to_owned();
+                self.owners
+                    .insert(item.def_id, StructuralOwner::Named(path));
+            }
+            HirItemKind::Schema(schema) => {
+                let path = self.interner.resolve(schema.name).to_owned();
+                self.owners
+                    .insert(item.def_id, StructuralOwner::Named(path));
+            }
+            HirItemKind::Constant(constant) => {
+                let path = self.interner.resolve(constant.name).to_owned();
+                self.owners
+                    .insert(item.def_id, StructuralOwner::Named(path));
+                self.visit_expr(&constant.value);
+            }
+            HirItemKind::Import(import) => {
+                for imported in &import.items {
+                    self.owners.insert(
+                        imported.def_id,
+                        StructuralOwner::Named(
+                            self.interner
+                                .resolve(imported.alias.unwrap_or(imported.name))
+                                .to_owned(),
+                        ),
+                    );
+                }
+            }
+        }
+    }
+
+    fn visit_function(&mut self, function: &crate::hir::HirFunction) {
+        walk_function(self, function);
+    }
+
+    fn visit_expr(&mut self, expr: &HirExpression) {
+        if let HirExpressionKind::Clausura(..) = &expr.kind {
+            let parent = self.current_function_path();
+            let ordinal = self.functions.last_mut().map_or(0, |frame| {
+                let ordinal = frame.closures;
+                frame.closures += 1;
+                ordinal
+            });
+            let path = format!("{parent}::<closure:{ordinal}>");
+            self.functions
+                .push(FunctionOwnerFrame { path, occurrences: BTreeMap::new(), closures: 0 });
+            walk_expr(self, expr);
+            self.functions.pop();
+        } else {
+            walk_expr(self, expr);
+        }
+    }
+
+    fn visit_def(&mut self, def_id: crate::hir::DefId, name: crate::lexer::Symbol) {
+        let name = self.interner.resolve(name).to_owned();
+        let Some(frame) = self.functions.last_mut() else {
+            return;
+        };
+        let ordinal = *frame.occurrences.entry(name.clone()).or_default();
+        *frame
+            .occurrences
+            .get_mut(&name)
+            .expect("occurrence inserted") += 1;
+        self.owners
+            .insert(def_id, StructuralOwner::Local { function: frame.path.clone(), name, ordinal });
+    }
+
+    fn visit_type_param(&mut self, _type_param: &crate::hir::HirTypeParam) {}
+}
+
+fn type_slot_key(slot: &HirTypeSlot) -> String {
+    match slot {
+        HirTypeSlot::Declared => "declared".to_owned(),
+        HirTypeSlot::AliasBody => "alias-body".to_owned(),
+        HirTypeSlot::Parameter(ordinal) => format!("parameter:{ordinal}"),
+        HirTypeSlot::Return => "return".to_owned(),
+        HirTypeSlot::Error => "error".to_owned(),
+        HirTypeSlot::Field(ordinal) => format!("field:{ordinal}"),
+        HirTypeSlot::AnnotationField { annotation, field } => format!("annotation-field:{annotation}:{field}"),
+        HirTypeSlot::ClosureParameter(ordinal) => format!("closure-parameter:{ordinal}"),
+        HirTypeSlot::TupleTypeArgument(ordinal) => format!("tuple-type-argument:{ordinal}"),
+        HirTypeSlot::AscriptionTarget => "ascription-target".to_owned(),
+        HirTypeSlot::ConversionTarget => "conversion-target".to_owned(),
+        HirTypeSlot::TypeCheckTarget => "type-check-target".to_owned(),
+        HirTypeSlot::PatternType => "pattern-type".to_owned(),
+        HirTypeSlot::DiscardBinding => "discard-binding".to_owned(),
+    }
+}
+
+fn type_form_signature(analysis: &AnalyzedModule, form: &HirTypeForm) -> String {
+    let head = match &form.head {
+        HirTypeFormHead::Semantic(level) => format!(
+            "semantic(level={},shape={})",
+            level.0,
+            canonical_type_shape(analysis, form.ty, &mut BTreeSet::new())
+        ),
+        HirTypeFormHead::Named { path, .. } => format!(
+            "named(path={},shape={})",
+            path.iter()
+                .map(|symbol| analysis.interner.resolve(*symbol))
+                .collect::<Vec<_>>()
+                .join("."),
+            canonical_type_shape(analysis, form.ty, &mut BTreeSet::new())
+        ),
+        HirTypeFormHead::Infer => {
+            format!("infer(shape={})", canonical_type_shape(analysis, form.ty, &mut BTreeSet::new()))
+        }
+        HirTypeFormHead::UnionHole => format!(
+            "union-hole(shape={})",
+            canonical_type_shape(analysis, form.ty, &mut BTreeSet::new())
+        ),
+    };
+    let args = form
+        .args
+        .iter()
+        .map(|arg| match arg {
+            HirTypeFormArg::Type(child) => format!("type({})", type_form_signature(analysis, child)),
+            HirTypeFormArg::Size(index) => format!(
+                "size({})",
+                radix_hir_faber::figura::format_figura(*index, &analysis.types, &analysis.interner)
+            ),
+            HirTypeFormArg::Name(symbol) => {
+                format!("name({})", analysis.interner.resolve(*symbol))
+            }
+        })
+        .collect::<Vec<_>>()
+        .join(",");
+    format!("{head}[{args}]")
+}
+
+fn canonical_type_shape(analysis: &AnalyzedModule, type_id: TypeId, active: &mut BTreeSet<u32>) -> String {
+    if !active.insert(type_id.0) {
+        return "<recursive>".to_owned();
+    }
+    let shape = match analysis.types.get(type_id) {
+        Type::Primitive(primitive) => format!("primitive:{primitive:?}"),
+        Type::Array(element) => format!("array<{}>", canonical_type_shape(analysis, *element, active)),
+        Type::BoundedArray { element, capacity } => format!(
+            "bounded-array<{},{}>",
+            canonical_type_shape(analysis, *element, active),
+            radix_hir_faber::figura::format_figura(*capacity, &analysis.types, &analysis.interner)
+        ),
+        Type::Queue(element) => format!("queue<{}>", canonical_type_shape(analysis, *element, active)),
+        Type::BoundedQueue { element, capacity } => format!(
+            "bounded-queue<{},{}>",
+            canonical_type_shape(analysis, *element, active),
+            radix_hir_faber::figura::format_figura(*capacity, &analysis.types, &analysis.interner)
+        ),
+        Type::Stack(element) => format!("stack<{}>", canonical_type_shape(analysis, *element, active)),
+        Type::BoundedStack { element, capacity } => format!(
+            "bounded-stack<{},{}>",
+            canonical_type_shape(analysis, *element, active),
+            radix_hir_faber::figura::format_figura(*capacity, &analysis.types, &analysis.interner)
+        ),
+        Type::BoundedTextus { capacity } => format!(
+            "bounded-textus<{}>",
+            radix_hir_faber::figura::format_figura(*capacity, &analysis.types, &analysis.interner)
+        ),
+        Type::BoundedAscii { capacity } => format!(
+            "bounded-ascii<{}>",
+            radix_hir_faber::figura::format_figura(*capacity, &analysis.types, &analysis.interner)
+        ),
+        Type::BoundedOcteti { capacity } => format!(
+            "bounded-octeti<{}>",
+            radix_hir_faber::figura::format_figura(*capacity, &analysis.types, &analysis.interner)
+        ),
+        Type::Map(key, value) => format!(
+            "map<{},{}>",
+            canonical_type_shape(analysis, *key, active),
+            canonical_type_shape(analysis, *value, active)
+        ),
+        Type::Record(fields) => {
+            let mut fields = fields
+                .iter()
+                .map(|(name, ty)| {
+                    format!(
+                        "{}:{}",
+                        analysis.interner.resolve(*name),
+                        canonical_type_shape(analysis, *ty, active)
+                    )
+                })
+                .collect::<Vec<_>>();
+            fields.sort_unstable();
+            format!("record{{{}}}", fields.join(","))
+        }
+        Type::Set(element) => format!("set<{}>", canonical_type_shape(analysis, *element, active)),
+        Type::Promissum(element) => format!("promissum<{}>", canonical_type_shape(analysis, *element, active)),
+        Type::PromissumFailable(success, alternate) => format!(
+            "promissum-failable<{},{}>",
+            canonical_type_shape(analysis, *success, active),
+            canonical_type_shape(analysis, *alternate, active)
+        ),
+        Type::Cursor(element) => format!("cursor<{}>", canonical_type_shape(analysis, *element, active)),
+        Type::AsyncCursor(item, alternate) => format!(
+            "async-cursor<{},{}>",
+            canonical_type_shape(analysis, *item, active),
+            canonical_type_shape(analysis, *alternate, active)
+        ),
+        Type::Tensor(element, shape) => format!(
+            "tensor<{},{}>",
+            canonical_type_shape(analysis, *element, active),
+            radix_hir_faber::figura::format_figura(*shape, &analysis.types, &analysis.interner)
+        ),
+        Type::Vector(element, width) => format!(
+            "vector<{},{}>",
+            canonical_type_shape(analysis, *element, active),
+            radix_hir_faber::figura::format_figura(*width, &analysis.types, &analysis.interner)
+        ),
+        Type::Matrix(element, shape) => format!(
+            "matrix<{},{}>",
+            canonical_type_shape(analysis, *element, active),
+            radix_hir_faber::figura::format_figura(*shape, &analysis.types, &analysis.interner)
+        ),
+        Type::Sparsa(element, shape) => format!(
+            "sparsa<{},{}>",
+            canonical_type_shape(analysis, *element, active),
+            radix_hir_faber::figura::format_figura(*shape, &analysis.types, &analysis.interner)
+        ),
+        Type::Atomic(element) => format!("atomic<{}>", canonical_type_shape(analysis, *element, active)),
+        Type::Intervallum(bound) => format!("intervallum<{}>", canonical_type_shape(analysis, *bound, active)),
+        Type::SizedNumeric(primitive, width) => format!("sized-numeric:{primitive:?}:{}", width.faber_marker()),
+        Type::ModularWord(width) => format!("modular-word:{}", width.faber_marker()),
+        Type::SizedInstans(precision) => format!("sized-instans:{precision:?}"),
+        Type::Option(inner) => format!("option<{}>", canonical_type_shape(analysis, *inner, active)),
+        Type::Ref(mutability, inner) => {
+            format!("ref:{mutability:?}<{}>", canonical_type_shape(analysis, *inner, active))
+        }
+        Type::Struct(def_id) => format!("struct:{}", declaration_name(analysis, *def_id)),
+        Type::Enum(def_id) => format!("enum:{}", declaration_name(analysis, *def_id)),
+        Type::Interface(def_id) => format!("interface:{}", declaration_name(analysis, *def_id)),
+        Type::Alias(def_id, resolved) => format!(
+            "alias:{}={}",
+            declaration_name(analysis, *def_id),
+            canonical_type_shape(analysis, *resolved, active)
+        ),
+        Type::Func(signature) => {
+            let params = signature
+                .params
+                .iter()
+                .map(|param| format!("{:?}:{}", param.mode, canonical_type_shape(analysis, param.ty, active)))
+                .collect::<Vec<_>>()
+                .join(",");
+            let error = signature
+                .err
+                .map(|error| canonical_type_shape(analysis, error, active))
+                .unwrap_or_default();
+            format!(
+                "func<{};{};{};{};{}>",
+                params,
+                canonical_type_shape(analysis, signature.ret, active),
+                error,
+                signature.is_async,
+                signature.is_generator
+            )
+        }
+        Type::Param(symbol) => format!("param:{}", analysis.interner.resolve(*symbol)),
+        Type::Applied(base, args) => {
+            let args = args
+                .iter()
+                .map(|arg| match arg {
+                    AppliedArg::Type(ty) => canonical_type_shape(analysis, *ty, active),
+                    AppliedArg::Size(index) => {
+                        radix_hir_faber::figura::format_figura(*index, &analysis.types, &analysis.interner)
+                    }
+                })
+                .collect::<Vec<_>>()
+                .join(",");
+            format!("applied<{};{}>", canonical_type_shape(analysis, *base, active), args)
+        }
+        Type::Infer(_) => "infer".to_owned(),
+        Type::InferUnion(_) => "infer-union".to_owned(),
+        Type::MarkerHole { family, .. } => format!("marker-hole:{family:?}"),
+        Type::Union(members) => {
+            let mut members = members
+                .iter()
+                .map(|member| canonical_type_shape(analysis, *member, active))
+                .collect::<Vec<_>>();
+            members.sort_unstable();
+            format!("union<{}>", members.join(","))
+        }
+        Type::Intersection(members) => {
+            let mut members = members
+                .iter()
+                .map(|member| canonical_type_shape(analysis, *member, active))
+                .collect::<Vec<_>>();
+            members.sort_unstable();
+            format!("intersection<{}>", members.join(","))
+        }
+        Type::Tuple(members) => format!(
+            "tuple<{}>",
+            members
+                .iter()
+                .map(|member| canonical_type_shape(analysis, *member, active))
+                .collect::<Vec<_>>()
+                .join(",")
+        ),
+        Type::Error => "error".to_owned(),
+    };
+    active.remove(&type_id.0);
+    shape
+}
+
+fn declaration_name(analysis: &AnalyzedModule, def_id: crate::hir::DefId) -> String {
+    analysis
+        .resolver
+        .get_symbol(def_id)
+        .map(|symbol| analysis.interner.resolve(symbol.name).to_owned())
+        .or_else(|| {
+            analysis
+                .resolver
+                .imported_spellings(&analysis.interner)
+                .by_def
+                .get(&def_id)
+                .cloned()
+        })
+        .unwrap_or_else(|| "<external>".to_owned())
 }
 
 /// Return the authored variant paths as a sorted spelling multiset.

@@ -110,7 +110,14 @@ fn render_at(
     surface: &impl KeywordSurface,
 ) -> String {
     codegen
-        .type_to_faber_at(site, type_id, types, &FxHashMap::default(), interner, surface)
+        .type_to_faber_at(
+            site,
+            type_id,
+            types,
+            &FxHashMap::default(),
+            interner,
+            surface,
+        )
         .expect("form must render")
 }
 
@@ -155,7 +162,14 @@ fn missing_presentation_falls_back_to_canonical() {
         )
     );
     assert_eq!(
-        render_at(&codegen, &site, fx.f32_ty, &fx.types, &fx.interner, &LaSurface),
+        render_at(
+            &codegen,
+            &site,
+            fx.f32_ty,
+            &fx.types,
+            &fx.interner,
+            &LaSurface
+        ),
         "f32"
     );
 }
@@ -167,10 +181,7 @@ fn scalar_long_and_short_stay_distinct_over_one_type_id() {
         declared_site(1),
         semantic_form(TypeFormLevel::LONG, fx.u32_ty, Vec::new()),
     )]);
-    let short = codegen_with_forms(vec![(
-        declared_site(2),
-        short_width(fx.u32_ty),
-    )]);
+    let short = codegen_with_forms(vec![(declared_site(2), short_width(fx.u32_ty))]);
 
     assert_eq!(
         render_at(
@@ -290,11 +301,25 @@ fn tensor_two_way_keeps_long_and_short_roots() {
     )]);
 
     assert_eq!(
-        render_at(&long, &declared_site(1), tensor, &fx.types, &fx.interner, &LaSurface),
+        render_at(
+            &long,
+            &declared_site(1),
+            tensor,
+            &fx.types,
+            &fx.interner,
+            &LaSurface
+        ),
         "tensor<f32, [2, 3]>"
     );
     assert_eq!(
-        render_at(&short, &declared_site(2), tensor, &fx.types, &fx.interner, &LaSurface),
+        render_at(
+            &short,
+            &declared_site(2),
+            tensor,
+            &fx.types,
+            &fx.interner,
+            &LaSurface
+        ),
         "tf32[2, 3]"
     );
 }
@@ -478,11 +503,25 @@ fn deep_nesting_changes_only_the_inner_node() {
     )]);
 
     assert_eq!(
-        render_at(&long, &declared_site(2), outer_list, &fx.types, &fx.interner, &LaSurface),
+        render_at(
+            &long,
+            &declared_site(2),
+            outer_list,
+            &fx.types,
+            &fx.interner,
+            &LaSurface
+        ),
         "lista<lista<lista<tensor<f32, [2, 2]>>>>"
     );
     assert_eq!(
-        render_at(&short, &declared_site(3), outer_list, &fx.types, &fx.interner, &LaSurface),
+        render_at(
+            &short,
+            &declared_site(3),
+            outer_list,
+            &fx.types,
+            &fx.interner,
+            &LaSurface
+        ),
         "lista<lista<lista<tf32[2, 2]>>>"
     );
 }
@@ -513,7 +552,14 @@ fn shared_type_id_branches_keep_independent_forms() {
         ),
     )]);
     assert_eq!(
-        render_at(&codegen, &declared_site(1), map, &fx.types, &fx.interner, &LaSurface),
+        render_at(
+            &codegen,
+            &declared_site(1),
+            map,
+            &fx.types,
+            &fx.interner,
+            &LaSurface
+        ),
         "tabula<lista<u32>, lu32>"
     );
 }
@@ -535,7 +581,14 @@ fn named_heads_render_authored_paths_and_args() {
     };
     let codegen = codegen_with_forms(vec![(declared_site(1), form)]);
     assert_eq!(
-        render_at(&codegen, &declared_site(1), alias_ty, &fx.types, &fx.interner, &LaSurface),
+        render_at(
+            &codegen,
+            &declared_site(1),
+            alias_ty,
+            &fx.types,
+            &fx.interner,
+            &LaSurface
+        ),
         "module.Word<u32>"
     );
 }
@@ -602,37 +655,93 @@ fn locale_projection_changes_vocabulary_and_preserves_levels() {
 
     // en: built-in vocabulary projects; compression levels survive.
     assert_eq!(
-        render_at(&codegen, &declared_site(1), fx.lista_u32, &fx.types, &fx.interner, &EnSurface),
+        render_at(
+            &codegen,
+            &declared_site(1),
+            fx.lista_u32,
+            &fx.types,
+            &fx.interner,
+            &EnSurface
+        ),
         "list<int<u32>>"
     );
     assert_eq!(
-        render_at(&codegen, &declared_site(2), fx.lista_u32, &fx.types, &fx.interner, &EnSurface),
+        render_at(
+            &codegen,
+            &declared_site(2),
+            fx.lista_u32,
+            &fx.types,
+            &fx.interner,
+            &EnSurface
+        ),
         "lu32"
     );
     assert_eq!(
-        render_at(&codegen, &declared_site(3), fx.u32_ty, &fx.types, &fx.interner, &EnSurface),
+        render_at(
+            &codegen,
+            &declared_site(3),
+            fx.u32_ty,
+            &fx.types,
+            &fx.interner,
+            &EnSurface
+        ),
         "int<u32>"
     );
     assert_eq!(
-        render_at(&codegen, &declared_site(4), fx.u32_ty, &fx.types, &fx.interner, &EnSurface),
+        render_at(
+            &codegen,
+            &declared_site(4),
+            fx.u32_ty,
+            &fx.types,
+            &fx.interner,
+            &EnSurface
+        ),
         "u32"
     );
 
     // la: same forms, canonical vocabulary.
     assert_eq!(
-        render_at(&codegen, &declared_site(1), fx.lista_u32, &fx.types, &fx.interner, &LaSurface),
+        render_at(
+            &codegen,
+            &declared_site(1),
+            fx.lista_u32,
+            &fx.types,
+            &fx.interner,
+            &LaSurface
+        ),
         "lista<numerus<u32>>"
     );
     assert_eq!(
-        render_at(&codegen, &declared_site(2), fx.lista_u32, &fx.types, &fx.interner, &LaSurface),
+        render_at(
+            &codegen,
+            &declared_site(2),
+            fx.lista_u32,
+            &fx.types,
+            &fx.interner,
+            &LaSurface
+        ),
         "lu32"
     );
     assert_eq!(
-        render_at(&codegen, &declared_site(3), fx.u32_ty, &fx.types, &fx.interner, &LaSurface),
+        render_at(
+            &codegen,
+            &declared_site(3),
+            fx.u32_ty,
+            &fx.types,
+            &fx.interner,
+            &LaSurface
+        ),
         "numerus<u32>"
     );
     assert_eq!(
-        render_at(&codegen, &declared_site(4), fx.u32_ty, &fx.types, &fx.interner, &LaSurface),
+        render_at(
+            &codegen,
+            &declared_site(4),
+            fx.u32_ty,
+            &fx.types,
+            &fx.interner,
+            &LaSurface
+        ),
         "u32"
     );
 }
@@ -648,7 +757,14 @@ fn registry_renders_special_and_sized_heads() {
         semantic_form(TypeFormLevel::LONG, octeti, Vec::new()),
     )]);
     assert_eq!(
-        render_at(&octeti_codegen, &declared_site(1), octeti, &fx.types, &fx.interner, &LaSurface),
+        render_at(
+            &octeti_codegen,
+            &declared_site(1),
+            octeti,
+            &fx.types,
+            &fx.interner,
+            &LaSurface
+        ),
         "octeti"
     );
 
@@ -659,7 +775,14 @@ fn registry_renders_special_and_sized_heads() {
         semantic_form(TypeFormLevel::LONG, word, Vec::new()),
     )]);
     assert_eq!(
-        render_at(&word_codegen, &declared_site(2), word, &fx.types, &fx.interner, &LaSurface),
+        render_at(
+            &word_codegen,
+            &declared_site(2),
+            word,
+            &fx.types,
+            &fx.interner,
+            &LaSurface
+        ),
         "modulus<u32>"
     );
 
@@ -670,7 +793,14 @@ fn registry_renders_special_and_sized_heads() {
         semantic_form(TypeFormLevel::LONG, fx.f32_ty, Vec::new()),
     )]);
     assert_eq!(
-        render_at(&fractus_long, &declared_site(3), fx.f32_ty, &fx.types, &fx.interner, &LaSurface),
+        render_at(
+            &fractus_long,
+            &declared_site(3),
+            fx.f32_ty,
+            &fx.types,
+            &fx.interner,
+            &LaSurface
+        ),
         "fractus<f32>"
     );
 }
@@ -699,11 +829,25 @@ fn hole_heads_render_the_authored_hole() {
         ),
     ]);
     assert_eq!(
-        render_at(&codegen, &declared_site(1), infer_ty, &fx.types, &fx.interner, &LaSurface),
+        render_at(
+            &codegen,
+            &declared_site(1),
+            infer_ty,
+            &fx.types,
+            &fx.interner,
+            &LaSurface
+        ),
         "_"
     );
     assert_eq!(
-        render_at(&codegen, &declared_site(2), union_ty, &fx.types, &fx.interner, &LaSurface),
+        render_at(
+            &codegen,
+            &declared_site(2),
+            union_ty,
+            &fx.types,
+            &fx.interner,
+            &LaSurface
+        ),
         "∪"
     );
 }
@@ -859,12 +1003,10 @@ fn generate_builds_the_type_site_index_from_presentation() {
     let site = declared_site(7);
     let form = short_width(fx.u32_ty);
     let mut presentation = empty_presentation();
-    presentation
-        .authored_types
-        .push(HirAuthoredTypeUse {
-            site: site.clone(),
-            form,
-        });
+    presentation.authored_types.push(HirAuthoredTypeUse {
+        site: site.clone(),
+        form,
+    });
 
     let hir = HirModule {
         items: Vec::new(),
@@ -879,7 +1021,10 @@ fn generate_builds_the_type_site_index_from_presentation() {
         .expect("empty program must emit");
     assert_eq!(
         codegen.authored_type_forms.get(&site),
-        presentation.authored_types.first().map(|authored| &authored.form),
+        presentation
+            .authored_types
+            .first()
+            .map(|authored| &authored.form),
         "generate must index authored forms by site"
     );
 

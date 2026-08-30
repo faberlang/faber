@@ -12,6 +12,7 @@ use radix_hir::{
 use radix_lexer::{Interner, Span, TokenKind};
 use radix_types::{TypeId, TypeTable};
 use rustc_hash::{FxHashMap, FxHashSet};
+use std::cell::RefCell;
 
 /// Canonical Faber output from HIR re-emission.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -77,6 +78,8 @@ pub struct FaberCodegen {
     /// exactly these authored long/short/named shapes; sites absent from the
     /// map keep the canonical fallback spelling.
     pub(crate) authored_type_forms: FxHashMap<HirTypeSite, HirTypeForm>,
+    /// First malformed authored type form observed during emission.
+    type_emission_error: RefCell<Option<CodegenError>>,
 }
 
 /// Emit canonical Faber source from analyzed HIR and its presentation.
@@ -166,6 +169,7 @@ impl FaberCodegen {
     ) -> Result<FaberOutput, CodegenError> {
         radix_codegen_shared::reject_hir_errors(hir)?;
         reject_unsupported_legacy_hir(hir)?;
+        *self.type_emission_error.borrow_mut() = None;
         self.trivia = TriviaIndex::from_presentation(presentation);
         self.guard_si_ids = presentation.guard_si_ids.iter().copied().collect();
         self.elige_expr_ids = presentation.elige_expr_ids.iter().copied().collect();
@@ -257,6 +261,7 @@ impl FaberCodegen {
             &names,
             interner,
             surface,
+            None,
             &mut writer,
         );
 
@@ -299,9 +304,22 @@ impl FaberCodegen {
             &mut writer,
         );
 
+        if let Some(error) = self.type_emission_error.borrow_mut().take() {
+            return Err(error);
+        }
         Ok(FaberOutput {
             code: writer.finish(),
         })
+    }
+
+    /// Keep emission running long enough to collect the first malformed-form
+    /// error, then make `generate` return it instead of emitting bad source.
+    pub(super) fn record_type_emission_error(&self, error: CodegenError) -> String {
+        let mut recorded = self.type_emission_error.borrow_mut();
+        if recorded.is_none() {
+            *recorded = Some(error);
+        }
+        "<error>".to_owned()
     }
 
     /// Emit item leading trivia before the item (and before its annotations).

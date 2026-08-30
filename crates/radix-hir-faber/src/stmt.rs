@@ -21,8 +21,8 @@
 use crate::surface::KeywordSurface;
 use radix_codegen_shared::CodeWriter;
 use radix_hir::{
-    DefId, HirBlock, HirCape, HirExpression, HirExpressionKind, HirLocal, HirStatement,
-    HirStatementKind,
+    DefId, HirBlock, HirCape, HirExpression, HirExpressionKind, HirLocal, HirOwnerRef,
+    HirStatement, HirStatementKind, HirTypeSite, HirTypeSlot,
 };
 use radix_lexer::{Interner, Symbol, TokenKind};
 use radix_types::TypeTable;
@@ -490,7 +490,14 @@ impl super::FaberCodegen {
                     writer.write(keyword);
                     writer.write(" ");
                     if let Some(ty) = discard.ty {
-                        writer.write(&self.type_to_faber(ty, types, names, interner, surface));
+                        let site = HirTypeSite {
+                            owner: HirOwnerRef::Hir(expr.id),
+                            slot: HirTypeSlot::DiscardBinding,
+                        };
+                        let rendered = self
+                            .type_to_faber_at(&site, ty, types, names, interner, surface)
+                            .unwrap_or_else(|error| self.record_type_emission_error(error));
+                        writer.write(&rendered);
                         writer.write(" ");
                     }
                     writer.write("_ ← ");
@@ -576,21 +583,36 @@ impl super::FaberCodegen {
         };
         writer.write(keyword);
         writer.write(" ");
+        let site = HirTypeSite {
+            owner: HirOwnerRef::Def(local.def_id),
+            slot: HirTypeSlot::Declared,
+        };
         if local.annotation_authored {
             if let Some(ty) = local.ty {
-                writer.write(&self.type_to_faber(ty, types, names, interner, surface));
+                let rendered = self
+                    .type_to_faber_at(&site, ty, types, names, interner, surface)
+                    .unwrap_or_else(|error| self.record_type_emission_error(error));
+                writer.write(&rendered);
                 writer.write(" ");
             }
         } else if local.init.is_some() {
-            // Inference hole / synthesized binding: keep the hole spelling
-            // instead of materializing the inferred type (a materialized
-            // bounded-lista annotation narrows later spread legality, and a
-            // solved union hole must keep accepting new flow members).
-            writer.write(if local.annotation_union_hole {
-                "∪"
+            // Inference holes keep their authored spelling when the sidecar
+            // has a site; synthesized locals retain the legacy fallback.
+            if let Some(ty) = local
+                .ty
+                .filter(|_| self.authored_type_forms.contains_key(&site))
+            {
+                let rendered = self
+                    .type_to_faber_at(&site, ty, types, names, interner, surface)
+                    .unwrap_or_else(|error| self.record_type_emission_error(error));
+                writer.write(&rendered);
             } else {
-                "_"
-            });
+                writer.write(if local.annotation_union_hole {
+                    "∪"
+                } else {
+                    "_"
+                });
+            }
             writer.write(" ");
         } else if let Some(ty) = local.ty {
             // Hole-shaped declaration without initializer (`let label` later

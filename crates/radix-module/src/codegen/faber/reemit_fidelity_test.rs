@@ -232,6 +232,33 @@ locale = "la"
 }
 
 #[test]
+fn canonical_revalidation_rejects_swapped_same_typed_sites() {
+    let source = "functio swap() → numerus {\n    fixum lista<numerus<u32>> first ← vacua\n    fixum lista<u32> second ← vacua\n    redde 0\n}\n";
+    let latin = crate::locale::latin_locale_pack();
+    let session = Session::new(Config::default().with_locale_pack(latin.clone()));
+    let prepared =
+        prepare_program_module_for_name("swapped-sites.fab", source, &session).expect("prepare swapped-site source");
+    let analysis = analyze_source(
+        &prepared.session,
+        "swapped-sites.fab",
+        source,
+        AnalyzeRequest { cli_program: None, contract: prepared.contract },
+    )
+    .expect("analyze swapped-site source");
+    let output = compile_canonical(&session, "swapped-sites.fab", source);
+    assert!(output.success(), "faithful source must pass: {:?}", output.diagnostics);
+    let emitted = output.output.expect("faithful output").code;
+    let swapped = emitted
+        .replace("lista<numerus<u32>> first", "lista<u32> first")
+        .replace("lista<u32> second", "lista<numerus<u32>> second");
+    let diagnostic =
+        super::compile::revalidate_emitted_output(&session, "swapped-sites.fab", &swapped, &analysis, &latin)
+            .expect_err("swapping same-typed authored forms must fail the occurrence-aware gate");
+    assert_eq!(diagnostic.code, Some("CODEGEN006"));
+    assert_eq!(diagnostic.issue(), Some("authored_type_form_map_diverged"));
+}
+
+#[test]
 fn canonical_revalidation_rejects_analysis_errors() {
     let latin = crate::locale::latin_locale_pack();
     let session = Session::new(Config::default().with_locale_pack(latin.clone()));

@@ -228,6 +228,137 @@ fn run_faber_convert_stdin(to: &str, source: &str) -> (String, String, bool) {
     (stdout, stderr, success)
 }
 
+const AUTHORED_TYPE_FORMS_SOURCE: &str = r#"+++
+locale = "en"
++++
+type Word = uint<u32>
+
+fn forms() → int {
+    const int scalar_long ← 1
+    const u32 scalar_short ← 2
+    const list<int<u32>> list_long ← empty
+    const list<u32> list_middle ← empty
+    const lu32 list_short ← empty
+    const tensor<float, [2, 3]> tensor_long ← empty
+    const tf32[2, 3] tensor_short ← empty
+    const Word alias_use ← 3
+    const list<list<list<tensor<float, [2, 2]>>>> nested_long ← empty
+    const list<list<list<tf32[2, 2]>>> nested_short ← empty
+    return 0
+}
+"#;
+
+#[test]
+fn convert_preserves_authored_type_forms_en_to_la() {
+    let fixture = std::env::temp_dir().join("faber-convert-authored-type-forms.fab");
+    fs::write(&fixture, AUTHORED_TYPE_FORMS_SOURCE).expect("write authored-type fixture");
+    let output = run_faber_convert_stdout_with_args(&[
+        "convert",
+        "--to",
+        "la",
+        "--stdout",
+        fixture.to_str().expect("utf8 fixture path"),
+    ]);
+    fs::write(&fixture, &output).expect("rewrite target-locale fixture");
+    let second = run_faber_convert_stdout_with_args(&[
+        "convert",
+        "--to",
+        "la",
+        "--stdout",
+        fixture.to_str().expect("utf8 fixture path"),
+    ]);
+    let _ = fs::remove_file(&fixture);
+    assert_eq!(
+        second, output,
+        "authored type conversion must be idempotent"
+    );
+
+    assert!(
+        output.contains("fixum numerus scalar_long"),
+        "scalar L0 must stay long:\n{output}"
+    );
+    assert!(
+        output.contains("fixum u32 scalar_short"),
+        "scalar L1 must stay short:\n{output}"
+    );
+    assert!(
+        output.contains("fixum lista<numerus<u32>> list_long"),
+        "list L0/L0 must stay long:\n{output}"
+    );
+    assert!(
+        output.contains("fixum lista<u32> list_middle"),
+        "list L0/L1 must stay mixed:\n{output}"
+    );
+    assert!(
+        output.contains("fixum lu32 list_short"),
+        "list L1/L1 must stay fused:\n{output}"
+    );
+    assert!(
+        output.contains("fixum tensor<fractus, [2, 3]> tensor_long"),
+        "tensor L0 must stay long:\n{output}"
+    );
+    assert!(
+        output.contains("fixum tf32[2, 3] tensor_short"),
+        "tensor L1 must stay fused:\n{output}"
+    );
+    assert!(
+        output.contains("typus Word = modulus<u32>"),
+        "alias body must stay authored:\n{output}"
+    );
+    assert!(
+        output.contains("fixum Word alias_use"),
+        "alias use must not expand:\n{output}"
+    );
+    assert!(
+        output.contains("fixum lista<lista<lista<tensor<fractus, [2, 2]>>>> nested_long"),
+        "nested long form must stay long:\n{output}"
+    );
+    assert!(
+        output.contains("fixum lista<lista<lista<tf32[2, 2]>>> nested_short"),
+        "only the nested tensor node may stay fused:\n{output}"
+    );
+}
+
+#[test]
+fn convert_preserves_three_way_list_forms_en_to_la() {
+    let fixture = std::env::temp_dir().join("faber-convert-three-way-list-forms.fab");
+    fs::write(
+        &fixture,
+        r#"+++
+locale = "en"
++++
+fn lists() → int {
+    const list<int<u32>> long_form ← empty
+    const list<u32> child_short ← empty
+    const lu32 root_short ← empty
+    return 0
+}
+"#,
+    )
+    .expect("write three-way list fixture");
+    let output = run_faber_convert_stdout_with_args(&[
+        "convert",
+        "--to",
+        "la",
+        "--stdout",
+        fixture.to_str().expect("utf8 fixture path"),
+    ]);
+    let _ = fs::remove_file(&fixture);
+
+    assert!(
+        output.contains("lista<numerus<u32>> long_form"),
+        "long list form changed:\n{output}"
+    );
+    assert!(
+        output.contains("lista<u32> child_short"),
+        "child-short list form changed:\n{output}"
+    );
+    assert!(
+        output.contains("lu32 root_short"),
+        "root-short list form changed:\n{output}"
+    );
+}
+
 #[test]
 fn convert_preserves_template_application_sugar() {
     // Reader-locale packs re-render the same semantic program with different
@@ -268,8 +399,8 @@ fn convert_preserves_template_application_sugar() {
 
 #[test]
 fn convert_localizes() {
-    // A bare --locale=<X> selects the HIR-backed re-emit path with the
-    // localized surface (author mode when --locale is absent).
+    // `convert --to <X>` selects the HIR-backed re-emit path with the
+    // localized surface.
     let root = radix::module::paths::faberlang_home()
         .expect("faberlang container root")
         .join("examples/reader-locale/th-TH");

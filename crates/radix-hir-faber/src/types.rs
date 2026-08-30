@@ -356,8 +356,6 @@ impl super::FaberCodegen {
     /// `type_id`, carries a level illegal for its constructor, or has the
     /// wrong child arity/kind fails closed with [`CodegenError`] — it is
     /// never guessed around or silently re-spelled.
-    // Dead until ATF-7 migrates the emission call sites to this boundary.
-    #[allow(dead_code)]
     #[allow(clippy::too_many_arguments)]
     pub(super) fn type_to_faber_at(
         &self,
@@ -500,7 +498,8 @@ impl super::FaberCodegen {
             }
             Type::Array(_) => Ok(format!("l{}", self.fused_width_marker(form, types)?)),
             Type::Tensor(_, shape) => match form.args.as_slice() {
-                [HirTypeFormArg::Type(child), HirTypeFormArg::Size(index)] if *index == *shape => {
+                [HirTypeFormArg::Type(child), HirTypeFormArg::Size(index)]
+                    if self.same_figura(*index, *shape, types, interner) => {
                     let marker = self.fused_child_marker(child, types)?;
                     Ok(fused_with_figura(
                         "t",
@@ -658,19 +657,18 @@ impl super::FaberCodegen {
                 self.single_type_form_child(form, types, names, interner, surface)?
             )),
             Type::PromissumFailable(_, _) => {
-                let members = self.exact_type_form_children(
-                    form, 2, types, names, interner, surface,
-                )?;
+                let members =
+                    self.exact_type_form_children(form, 2, types, names, interner, surface)?;
                 Ok(format!(
                     "{}<{} ⇥ {}>",
                     surface.type_surface(TypeBindingKind::Collection(CollectionKind::Promissum)),
-                    members[0], members[1]
+                    members[0],
+                    members[1]
                 ))
             }
             Type::AsyncCursor(_, _) => {
-                let members = self.exact_type_form_children(
-                    form, 2, types, names, interner, surface,
-                )?;
+                let members =
+                    self.exact_type_form_children(form, 2, types, names, interner, surface)?;
                 // Canonical arm keeps this spelling outside the keyword
                 // surface; mirror it exactly.
                 Ok(format!("async cursor<{} ⇥ {}>", members[0], members[1]))
@@ -696,14 +694,8 @@ impl super::FaberCodegen {
                 Ok(self.type_to_faber(form.ty, types, names, interner, surface))
             }
             Type::Tensor(_, shape) => {
-                let elem = self.tensor_element_child(
-                    form,
-                    *shape,
-                    types,
-                    names,
-                    interner,
-                    surface,
-                )?;
+                let elem =
+                    self.tensor_element_child(form, *shape, types, names, interner, surface)?;
                 Ok(self.figura_tensor_head(
                     TensorFamilyKind::Tensor,
                     &elem,
@@ -928,7 +920,9 @@ impl super::FaberCodegen {
         surface: &impl KeywordSurface,
     ) -> Result<String, CodegenError> {
         match form.args.as_slice() {
-            [HirTypeFormArg::Type(child), HirTypeFormArg::Size(index)] if *index == shape => {
+            [HirTypeFormArg::Type(child), HirTypeFormArg::Size(index)]
+                if self.same_figura(*index, shape, types, interner) =>
+            {
                 self.type_form_to_faber(child, types, names, interner, surface)
             }
             _ => Err(malformed_type_form(
@@ -971,6 +965,17 @@ impl super::FaberCodegen {
                 "fused short root child must be a sized numeric width".to_owned(),
             )),
         }
+    }
+
+    fn same_figura(
+        &self,
+        left: IndexId,
+        right: IndexId,
+        types: &TypeTable,
+        interner: &Interner,
+    ) -> bool {
+        crate::figura::format_figura(left, types, interner)
+            == crate::figura::format_figura(right, types, interner)
     }
 
     fn figura_tensor_head(
@@ -1145,9 +1150,6 @@ fn sorted_record_fields(
 /// Fused short spelling: the figura string is already bracketed by
 /// `format_figura` (`[2, 3]`); an inference hole (authored without brackets)
 /// emits the bare fused token.
-// Dead until ATF-7 migrates the emission call sites (only `type_to_faber_at`
-// reaches this).
-#[allow(dead_code)]
 fn fused_with_figura(prefix: &str, marker: &str, figura: &str) -> String {
     if figura == "_" {
         format!("{prefix}{marker}")
@@ -1157,9 +1159,6 @@ fn fused_with_figura(prefix: &str, marker: &str, figura: &str) -> String {
 }
 
 /// Fail-closed error for a present-but-malformed authored type form.
-// Dead until ATF-7 migrates the emission call sites (only `type_to_faber_at`
-// reaches this).
-#[allow(dead_code)]
 fn malformed_type_form(message: String) -> CodegenError {
     CodegenError {
         message,

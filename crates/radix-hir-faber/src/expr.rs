@@ -34,6 +34,7 @@ use radix_codegen_shared::CodeWriter;
 use radix_hir::{
     DefId, HirArrayElement, HirBlock, HirCallArg, HirCape, HirConversioTarget, HirExpression,
     HirExpressionKind, HirNonNullKind, HirObjectField, HirObjectKey, HirOptionalChainKind,
+    HirOwnerRef, HirTypeSite, HirTypeSlot,
 };
 use radix_lexer::{Interner, Symbol, TokenKind};
 use radix_types::{Primitive, Type, TypeId, TypeTable};
@@ -652,7 +653,14 @@ impl super::FaberCodegen {
                         if idx > 0 {
                             writer.write(", ");
                         }
-                        writer.write(&self.type_to_faber(*ty, types, names, interner, surface));
+                        let site = HirTypeSite {
+                            owner: HirOwnerRef::Hir(expr.id),
+                            slot: HirTypeSlot::TupleTypeArgument(idx as u32),
+                        };
+                        let rendered = self
+                            .type_to_faber_at(&site, *ty, types, names, interner, surface)
+                            .unwrap_or_else(|error| self.record_type_emission_error(error));
+                        writer.write(&rendered);
                     }
                     writer.write("> ");
                 }
@@ -740,7 +748,14 @@ impl super::FaberCodegen {
                     if idx > 0 {
                         writer.write(", ");
                     }
-                    writer.write(&self.type_to_faber(param.ty, types, names, interner, surface));
+                    let site = HirTypeSite {
+                        owner: HirOwnerRef::Def(param.def_id),
+                        slot: HirTypeSlot::ClosureParameter(idx as u32),
+                    };
+                    let rendered = self
+                        .type_to_faber_at(&site, param.ty, types, names, interner, surface)
+                        .unwrap_or_else(|error| self.record_type_emission_error(error));
+                    writer.write(&rendered);
                     writer.write(" ");
                     writer.write(&self.symbol_to_string(param.name, interner));
                     self.write_sponte_marker(param.sponte, surface, writer);
@@ -760,11 +775,25 @@ impl super::FaberCodegen {
                 }
                 if let Some(ret) = ret {
                     writer.write(" → ");
-                    writer.write(&self.type_to_faber(*ret, types, names, interner, surface));
+                    let site = HirTypeSite {
+                        owner: HirOwnerRef::Hir(expr.id),
+                        slot: HirTypeSlot::Return,
+                    };
+                    let rendered = self
+                        .type_to_faber_at(&site, *ret, types, names, interner, surface)
+                        .unwrap_or_else(|error| self.record_type_emission_error(error));
+                    writer.write(&rendered);
                 }
                 if let Some(err) = err {
                     writer.write(" ⇥ ");
-                    writer.write(&self.type_to_faber(*err, types, names, interner, surface));
+                    let site = HirTypeSite {
+                        owner: HirOwnerRef::Hir(expr.id),
+                        slot: HirTypeSlot::Error,
+                    };
+                    let rendered = self
+                        .type_to_faber_at(&site, *err, types, names, interner, surface)
+                        .unwrap_or_else(|error| self.record_type_emission_error(error));
+                    writer.write(&rendered);
                 }
                 writer.write(" ∴ ");
                 if matches!(body.kind, HirExpressionKind::Block(_)) {
@@ -797,6 +826,7 @@ impl super::FaberCodegen {
                 entries,
             } => {
                 self.write_verte_expr(
+                    expr.id,
                     source,
                     *target,
                     entries.as_deref(),
@@ -838,8 +868,13 @@ impl super::FaberCodegen {
                 writer.write(" ↦ ");
                 match target {
                     HirConversioTarget::Type(ty) => {
-                        let mut target_str =
-                            self.type_to_faber(*ty, types, names, interner, surface);
+                        let site = HirTypeSite {
+                            owner: HirOwnerRef::Hir(expr.id),
+                            slot: HirTypeSlot::ConversionTarget,
+                        };
+                        let mut target_str = self
+                            .type_to_faber_at(&site, *ty, types, names, interner, surface)
+                            .unwrap_or_else(|error| self.record_type_emission_error(error));
                         if !params.is_empty() {
                             // Conversio markers (`Be` / `Le` / `Bits`) are extra
                             // generic arguments on the target type
@@ -922,7 +957,14 @@ impl super::FaberCodegen {
                 }
                 writer.write(surface.contextual_keyword("est"));
                 writer.write(" ");
-                writer.write(&self.type_to_faber(*ty, types, names, interner, surface));
+                let site = HirTypeSite {
+                    owner: HirOwnerRef::Hir(expr.id),
+                    slot: HirTypeSlot::TypeCheckTarget,
+                };
+                let rendered = self
+                    .type_to_faber_at(&site, *ty, types, names, interner, surface)
+                    .unwrap_or_else(|error| self.record_type_emission_error(error));
+                writer.write(&rendered);
             }
             HirExpressionKind::Praefixum(inner) => {
                 self.write_expr(inner, types, names, interner, surface, writer);
@@ -1054,6 +1096,7 @@ impl super::FaberCodegen {
     #[allow(clippy::too_many_arguments)]
     fn write_verte_expr(
         &self,
+        owner: radix_hir::HirId,
         source: &HirExpression,
         target: TypeId,
         entries: Option<&[HirObjectField]>,
@@ -1063,6 +1106,13 @@ impl super::FaberCodegen {
         surface: &impl KeywordSurface,
         writer: &mut CodeWriter,
     ) {
+        let site = HirTypeSite {
+            owner: HirOwnerRef::Hir(owner),
+            slot: HirTypeSlot::AscriptionTarget,
+        };
+        let rendered_target = self
+            .type_to_faber_at(&site, target, types, names, interner, surface)
+            .unwrap_or_else(|error| self.record_type_emission_error(error));
         if let Some(entries) = entries {
             if self.write_forma_capture(entries, target, types, names, interner, surface, writer) {
                 return;
@@ -1093,7 +1143,7 @@ impl super::FaberCodegen {
                     return;
                 }
                 Type::Record(_) => {
-                    writer.write(&self.type_to_faber(target, types, names, interner, surface));
+                    writer.write(&rendered_target);
                     let ordered = sorted_record_entries(entries, interner);
                     if ordered.is_empty() {
                         writer.write(" {}");
@@ -1114,7 +1164,7 @@ impl super::FaberCodegen {
                         entries, types, names, interner, surface, writer,
                     );
                     writer.write(" ∷ ");
-                    writer.write(&self.type_to_faber(target, types, names, interner, surface));
+                    writer.write(&rendered_target);
                     return;
                 }
                 Type::Primitive(Primitive::Valor) => {
@@ -1133,7 +1183,7 @@ impl super::FaberCodegen {
         // trailing arithmetic operand after a reparse.
         self.write_expr_prec(source, 12, types, names, interner, surface, writer);
         writer.write(" ∷ ");
-        writer.write(&self.type_to_faber(target, types, names, interner, surface));
+        writer.write(&rendered_target);
     }
 
     fn write_json_object_entries(

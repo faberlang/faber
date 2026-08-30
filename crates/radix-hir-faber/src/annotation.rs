@@ -9,7 +9,7 @@ use crate::surface::KeywordSurface;
 use radix_codegen_shared::CodeWriter;
 use radix_hir::{
     DefId, HirAnnotation, HirAnnotationField, HirAnnotationValue, HirExpression, HirExpressionKind,
-    HirLiteral,
+    HirLiteral, HirOwnerRef, HirTypeSite, HirTypeSlot,
 };
 use radix_lexer::{lookup_keyword_spec, Interner, Symbol, Token, TokenKind};
 use radix_types::TypeTable;
@@ -23,10 +23,20 @@ impl super::FaberCodegen {
         names: &FxHashMap<DefId, Symbol>,
         interner: &Interner,
         surface: &impl KeywordSurface,
+        owner: Option<DefId>,
         writer: &mut CodeWriter,
     ) {
-        for annotation in annotations {
-            self.write_hir_annotation(annotation, types, names, interner, surface, writer);
+        for (annotation_ordinal, annotation) in annotations.iter().enumerate() {
+            self.write_hir_annotation(
+                annotation,
+                owner,
+                annotation_ordinal as u32,
+                types,
+                names,
+                interner,
+                surface,
+                writer,
+            );
             writer.newline();
         }
     }
@@ -34,6 +44,8 @@ impl super::FaberCodegen {
     pub(super) fn write_hir_annotation(
         &self,
         annotation: &HirAnnotation,
+        owner: Option<DefId>,
+        annotation_ordinal: u32,
         types: &TypeTable,
         names: &FxHashMap<DefId, Symbol>,
         interner: &Interner,
@@ -59,11 +71,29 @@ impl super::FaberCodegen {
 
         if !annotation.fields.is_empty() {
             writer.write(" { ");
+            let mut type_field_ordinal = 0;
             for (index, field) in annotation.fields.iter().enumerate() {
                 if index > 0 {
                     writer.write(", ");
                 }
-                self.write_hir_annotation_field(field, types, names, interner, surface, writer);
+                let field_ordinal = if matches!(&field.value, HirAnnotationValue::Type(_)) {
+                    let ordinal = type_field_ordinal;
+                    type_field_ordinal += 1;
+                    Some(ordinal)
+                } else {
+                    None
+                };
+                self.write_hir_annotation_field(
+                    field,
+                    owner,
+                    annotation_ordinal,
+                    field_ordinal,
+                    types,
+                    names,
+                    interner,
+                    surface,
+                    writer,
+                );
             }
             writer.write(" }");
             // An annotation carrying both a promoted field payload and raw
@@ -100,6 +130,9 @@ impl super::FaberCodegen {
     fn write_hir_annotation_field(
         &self,
         field: &HirAnnotationField,
+        owner: Option<DefId>,
+        annotation_ordinal: u32,
+        field_ordinal: Option<u32>,
         types: &TypeTable,
         names: &FxHashMap<DefId, Symbol>,
         interner: &Interner,
@@ -108,12 +141,25 @@ impl super::FaberCodegen {
     ) {
         writer.write(&self.annotation_surface_spelling(field.name, interner, surface));
         writer.write(" = ");
-        self.write_hir_annotation_value(&field.value, types, names, interner, surface, writer);
+        self.write_hir_annotation_value(
+            &field.value,
+            owner,
+            annotation_ordinal,
+            field_ordinal,
+            types,
+            names,
+            interner,
+            surface,
+            writer,
+        );
     }
 
     fn write_hir_annotation_value(
         &self,
         value: &HirAnnotationValue,
+        owner: Option<DefId>,
+        annotation_ordinal: u32,
+        field_ordinal: Option<u32>,
         types: &TypeTable,
         names: &FxHashMap<DefId, Symbol>,
         interner: &Interner,
@@ -129,7 +175,21 @@ impl super::FaberCodegen {
             HirAnnotationValue::Float(n) => writer.write(&n.to_string()),
             HirAnnotationValue::Nihil => writer.write(surface.contextual_keyword("nihil")),
             HirAnnotationValue::Type(ty) => {
-                writer.write(&self.type_to_faber(*ty, types, names, interner, surface));
+                let rendered = match (owner, field_ordinal) {
+                    (Some(owner), Some(field)) => {
+                        let site = HirTypeSite {
+                            owner: HirOwnerRef::Def(owner),
+                            slot: HirTypeSlot::AnnotationField {
+                                annotation: annotation_ordinal,
+                                field,
+                            },
+                        };
+                        self.type_to_faber_at(&site, *ty, types, names, interner, surface)
+                            .unwrap_or_else(|error| self.record_type_emission_error(error))
+                    }
+                    _ => self.type_to_faber(*ty, types, names, interner, surface),
+                };
+                writer.write(&rendered);
             }
             HirAnnotationValue::Expr(expr) => {
                 self.write_hir_annotation_expr(expr, types, names, interner, surface, writer);

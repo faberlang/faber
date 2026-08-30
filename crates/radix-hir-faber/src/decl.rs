@@ -22,7 +22,8 @@ use crate::surface::KeywordSurface;
 use radix_codegen_shared::CodeWriter;
 use radix_hir::{
     DefId, HirAnnotation, HirAvailability, HirBlock, HirEnum, HirExpressionKind, HirFunction,
-    HirInterface, HirItem, HirItemKind, HirParam, HirStruct, HirTestModifier, HirTypeParam,
+    HirInterface, HirItem, HirItemKind, HirOwnerRef, HirParam, HirStruct, HirTestModifier,
+    HirTypeParam, HirTypeSite, HirTypeSlot,
 };
 use radix_lexer::{Interner, Symbol, TokenKind};
 use radix_syntax::{CallablePosture, GenericParamKind};
@@ -41,7 +42,15 @@ impl super::FaberCodegen {
     ) {
         match &item.kind {
             HirItemKind::Function(func) => {
-                self.generate_function(func, types, names, interner, surface, writer);
+                self.generate_function(
+                    func,
+                    Some(item.def_id),
+                    types,
+                    names,
+                    interner,
+                    surface,
+                    writer,
+                );
             }
             HirItemKind::Struct(s) => {
                 self.generate_struct(s, types, names, interner, surface, writer);
@@ -58,7 +67,14 @@ impl super::FaberCodegen {
                 writer.write(&self.symbol_to_string(a.name, interner));
                 self.write_generic_params(&a.type_params, interner, surface, writer);
                 writer.write(" = ");
-                writer.write(&self.type_to_faber(a.ty, types, names, interner, surface));
+                let site = HirTypeSite {
+                    owner: HirOwnerRef::Def(item.def_id),
+                    slot: HirTypeSlot::AliasBody,
+                };
+                let ty = self
+                    .type_to_faber_at(&site, a.ty, types, names, interner, surface)
+                    .unwrap_or_else(|error| self.record_type_emission_error(error));
+                writer.write(&ty);
                 writer.newline();
             }
             HirItemKind::Schema(schema) => {
@@ -89,7 +105,14 @@ impl super::FaberCodegen {
                 writer.write(" ");
                 if let Some(ty) = c.ty {
                     if c.annotation_authored {
-                        writer.write(&self.type_to_faber(ty, types, names, interner, surface));
+                        let site = HirTypeSite {
+                            owner: HirOwnerRef::Def(item.def_id),
+                            slot: HirTypeSlot::Declared,
+                        };
+                        let rendered = self
+                            .type_to_faber_at(&site, ty, types, names, interner, surface)
+                            .unwrap_or_else(|error| self.record_type_emission_error(error));
+                        writer.write(&rendered);
                     } else {
                         // `_` hole: keep the hole instead of materializing the
                         // inferred type (materialized bounded-lista
@@ -187,6 +210,7 @@ impl super::FaberCodegen {
     pub(super) fn generate_function(
         &self,
         func: &HirFunction,
+        owner: Option<DefId>,
         types: &TypeTable,
         names: &FxHashMap<DefId, Symbol>,
         interner: &Interner,
@@ -198,7 +222,15 @@ impl super::FaberCodegen {
             return;
         }
 
-        self.write_hir_annotations(&func.annotations, types, names, interner, surface, writer);
+        self.write_hir_annotations(
+            &func.annotations,
+            types,
+            names,
+            interner,
+            surface,
+            owner,
+            writer,
+        );
 
         writer.write(surface.contextual_keyword("functio"));
         writer.write(" ");
@@ -221,6 +253,7 @@ impl super::FaberCodegen {
         self.write_function_result_types(
             func.ret_ty,
             func.err_ty,
+            owner,
             types,
             names,
             interner,
@@ -292,7 +325,15 @@ impl super::FaberCodegen {
         surface: &impl KeywordSurface,
         writer: &mut CodeWriter,
     ) {
-        self.write_hir_annotations(&s.annotations, types, names, interner, surface, writer);
+        self.write_hir_annotations(
+            &s.annotations,
+            types,
+            names,
+            interner,
+            surface,
+            None,
+            writer,
+        );
 
         writer.write(surface.contextual_keyword("genus"));
         writer.write(" ");
@@ -351,7 +392,15 @@ impl super::FaberCodegen {
                     interner,
                     writer,
                 );
-                self.generate_function(&method.func, types, names, interner, surface, writer);
+                self.generate_function(
+                    &method.func,
+                    Some(method.def_id),
+                    types,
+                    names,
+                    interner,
+                    surface,
+                    writer,
+                );
             }
         });
         writer.writeln("}");
@@ -427,7 +476,15 @@ impl super::FaberCodegen {
         let ordo_members = self.ordo_enums.get(&def_id);
         // Enum variants are normalized to the block form that remains valid
         // for both plain variants and variants carrying named fields.
-        self.write_hir_annotations(&e.annotations, types, names, interner, surface, writer);
+        self.write_hir_annotations(
+            &e.annotations,
+            types,
+            names,
+            interner,
+            surface,
+            None,
+            writer,
+        );
 
         writer.write(if ordo_members.is_some() {
             surface.keyword(TokenKind::Ordo)
@@ -530,6 +587,7 @@ impl super::FaberCodegen {
                 self.write_function_result_types(
                     method.ret_ty,
                     method.err_ty,
+                    None,
                     types,
                     names,
                     interner,
@@ -576,6 +634,7 @@ impl super::FaberCodegen {
     fn write_param(
         &self,
         param: &HirParam,
+        slot: HirTypeSlot,
         types: &TypeTable,
         names: &FxHashMap<DefId, Symbol>,
         interner: &Interner,
@@ -599,7 +658,14 @@ impl super::FaberCodegen {
                 writer.write(" ");
             }
         }
-        writer.write(&self.type_to_faber(param.ty, types, names, interner, surface));
+        let site = HirTypeSite {
+            owner: HirOwnerRef::Def(param.def_id),
+            slot,
+        };
+        let rendered = self
+            .type_to_faber_at(&site, param.ty, types, names, interner, surface)
+            .unwrap_or_else(|error| self.record_type_emission_error(error));
+        writer.write(&rendered);
         writer.write(" ");
         writer.write(&self.symbol_to_string(param.name, interner));
         self.write_sponte_marker(param.sponte, surface, writer);
@@ -636,7 +702,15 @@ impl super::FaberCodegen {
             if idx > 0 {
                 writer.write(", ");
             }
-            self.write_param(param, types, names, interner, surface, writer);
+            self.write_param(
+                param,
+                HirTypeSlot::Parameter(idx as u32),
+                types,
+                names,
+                interner,
+                surface,
+                writer,
+            );
         }
     }
 
@@ -645,6 +719,7 @@ impl super::FaberCodegen {
         &self,
         ret_ty: Option<TypeId>,
         err_ty: Option<TypeId>,
+        owner: Option<DefId>,
         types: &TypeTable,
         names: &FxHashMap<DefId, Symbol>,
         interner: &Interner,
@@ -653,11 +728,31 @@ impl super::FaberCodegen {
     ) {
         if let Some(ret) = ret_ty {
             writer.write(" → ");
-            writer.write(&self.type_to_faber(ret, types, names, interner, surface));
+            let rendered = owner
+                .map(|owner| {
+                    let site = HirTypeSite {
+                        owner: HirOwnerRef::Def(owner),
+                        slot: HirTypeSlot::Return,
+                    };
+                    self.type_to_faber_at(&site, ret, types, names, interner, surface)
+                        .unwrap_or_else(|error| self.record_type_emission_error(error))
+                })
+                .unwrap_or_else(|| self.type_to_faber(ret, types, names, interner, surface));
+            writer.write(&rendered);
         }
         if let Some(err) = err_ty {
             writer.write(" ⇥ ");
-            writer.write(&self.type_to_faber(err, types, names, interner, surface));
+            let rendered = owner
+                .map(|owner| {
+                    let site = HirTypeSite {
+                        owner: HirOwnerRef::Def(owner),
+                        slot: HirTypeSlot::Error,
+                    };
+                    self.type_to_faber_at(&site, err, types, names, interner, surface)
+                        .unwrap_or_else(|error| self.record_type_emission_error(error))
+                })
+                .unwrap_or_else(|| self.type_to_faber(err, types, names, interner, surface));
+            writer.write(&rendered);
         }
     }
 
