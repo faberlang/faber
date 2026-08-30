@@ -558,7 +558,7 @@ pub fn analyze_with_cli(
         );
     }
 
-    let (lowered, lower_errors) = crate::lower::lower(crate::lower::LowerRequest {
+    let (mut lowered, lower_errors) = crate::lower::lower(crate::lower::LowerRequest {
         program,
         resolver: &mut resolver,
         types: &mut types,
@@ -610,6 +610,7 @@ pub fn analyze_with_cli(
         Some(interner),
         config,
         Some(&companion_signatures),
+        Some(&mut lowered.presentation),
     ) {
         diagnostics.extend(e);
     }

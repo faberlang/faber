@@ -77,6 +77,50 @@ impl Lowerer<'_> {
         self.lower_type_with_context(ty, true, false)
     }
 
+    /// Lower an authored type occurrence and record its form tree.
+    ///
+    /// Performs exactly one recursive lowering with the same positional
+    /// context as the presentation-free entries (parameter slots allow scalar
+    /// `ref`/`mut`; signature slots reject holes), returns the same `TypeId`
+    /// the caller stores today, and pushes the completed [`HirTypeForm`] onto
+    /// the presentation sidecar keyed by `site`. Internal and synthesized
+    /// types keep using the presentation-free lowering entries.
+    pub fn lower_authored_type(
+        &mut self,
+        site: radix_hir::HirTypeSite,
+        ty: &TypeExpr,
+        allow_scalar_ref_mut: bool,
+        signature_position: bool,
+    ) -> TypeId {
+        debug_assert!(
+            self.form_frames.is_empty(),
+            "nested authored type capture is not supported"
+        );
+        // Marker frame: the root node's own completion (below) lands its form
+        // here as the sole argument.
+        self.form_frames.push(super::TypeFormFrame::default());
+        let ty_id = self.lower_type_with_context(ty, allow_scalar_ref_mut, signature_position);
+        let marker = self
+            .form_frames
+            .pop()
+            .expect("authored type marker frame must be on the stack");
+        let form = match marker.args.first() {
+            Some(radix_hir::HirTypeFormArg::Type(form)) => (**form).clone(),
+            // Lowering bailed out before the root node completed (e.g. a
+            // rejected hole in signature position): fail closed with an
+            // Error-typed witness over the authored level.
+            _ => radix_hir::HirTypeForm {
+                ty: ty_id,
+                head: radix_hir::HirTypeFormHead::Semantic(ty.form),
+                args: Vec::new(),
+            },
+        };
+        self.presentation
+            .authored_types
+            .push(radix_hir::HirAuthoredTypeUse { site, form });
+        ty_id
+    }
+
     /// Lower a type written in a signature clause (return or error channel).
     ///
     /// Ruling (g): signature slots stay explicit — `_` and a standalone `∪`
@@ -110,6 +154,14 @@ impl Lowerer<'_> {
         if signature_position && matches!(ty.kind, TypeExprKind::Infer | TypeExprKind::UnionHole) {
             self.error("signature_position_hole");
             return self.types.intern(Type::Error);
+        }
+
+        // Authored-form capture: every node inside a recording session owns a
+        // frame; child forms are pushed into it by the children's own
+        // completion below.
+        let capturing_form = !self.form_frames.is_empty();
+        if capturing_form {
+            self.form_frames.push(super::TypeFormFrame::default());
         }
 
         let mut ty_id = match &ty.kind {
@@ -185,7 +237,53 @@ impl Lowerer<'_> {
             ty_id = self.types.option(ty_id);
         }
 
+        if capturing_form {
+            let frame = self
+                .form_frames
+                .pop()
+                .expect("authored form frame pushed above");
+            let form = self.complete_type_form(ty, ty_id, frame);
+            // A parent frame always exists during capture: the marker frame
+            // pushed by `lower_authored_type` sits at the bottom of the stack.
+            if let Some(parent) = self.form_frames.last_mut() {
+                parent
+                    .args
+                    .push(radix_hir::HirTypeFormArg::Type(Box::new(form)));
+            }
+        }
+
         ty_id
+    }
+
+    /// Complete one authored form node from its frame.
+    ///
+    /// The witness is the node's finalized lowering result (after access
+    /// markers and nullability wrapping); the head records how the author
+    /// spelled that fact. Function types, unions, and intersections are
+    /// witness-only: their canonical shapes have no 1:1 authored-child
+    /// correspondence (param modes, `∪ nihil` stripping, sort/dedup), so they
+    /// keep no child forms and re-emit canonically.
+    fn complete_type_form(
+        &mut self,
+        expr: &TypeExpr,
+        ty: TypeId,
+        frame: super::TypeFormFrame,
+    ) -> radix_hir::HirTypeForm {
+        let head = match &expr.kind {
+            TypeExprKind::Infer => radix_hir::HirTypeFormHead::Infer,
+            TypeExprKind::UnionHole => radix_hir::HirTypeFormHead::UnionHole,
+            _ => match frame.named {
+                Some((def_id, path)) => radix_hir::HirTypeFormHead::Named { def_id, path },
+                None => radix_hir::HirTypeFormHead::Semantic(expr.form),
+            },
+        };
+        let args = match &expr.kind {
+            TypeExprKind::Func(_) | TypeExprKind::Union(_) | TypeExprKind::Intersection(_) => {
+                Vec::new()
+            }
+            _ => frame.args,
+        };
+        radix_hir::HirTypeForm { ty, head, args }
     }
 
     /// Normalize a source union into the canonical semantic union/option shape.
@@ -676,6 +774,12 @@ impl Lowerer<'_> {
             return self.types.intern(Type::Error);
         };
 
+        // Authored-form capture: record the resolved user definition so the
+        // completed head can carry the authored spelling beside its identity.
+        if let Some(frame) = self.form_frames.last_mut() {
+            frame.named = Some((def_id, vec![name.name]));
+        }
+
         let Some(symbol) = self.resolver.get_symbol(def_id) else {
             self.error("missing_type_symbol_info");
             return self.types.intern(Type::Error);
@@ -1024,7 +1128,12 @@ impl Lowerer<'_> {
     fn lower_tensor_type(&mut self, elem: &TypeExpr, figura: &FiguraExpr) -> TypeId {
         let elem_ty = self.lower_nested_type(elem);
         match self.lower_figura_expr(figura) {
-            Ok(shape) => self.types.tensor_with_shape(elem_ty, shape),
+            Ok(shape) => {
+                if let Some(frame) = self.form_frames.last_mut() {
+                    frame.args.push(radix_hir::HirTypeFormArg::Size(shape));
+                }
+                self.types.tensor_with_shape(elem_ty, shape)
+            }
             Err(message) => {
                 self.error_from_message(message);
                 self.types.intern(Type::Error)

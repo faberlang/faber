@@ -44,7 +44,7 @@ use radix_hir::{
     HirFunction, HirImport, HirImportItem, HirInterface, HirInterfaceMethod, HirItem, HirItemKind,
     HirLocal, HirMethod, HirOwnerRef, HirParam, HirParamMode, HirReceiver, HirSchema,
     HirSchemaColumn, HirStatement, HirStatementKind, HirStruct, HirTriviaOwnerKind, HirTypeAlias,
-    HirTypeParam, HirTypeParamConstraint, HirVariant, HirVariantField,
+    HirTypeParam, HirTypeParamConstraint, HirTypeSlot, HirVariant, HirVariantField,
 };
 use radix_lexer::{Span, Symbol};
 use radix_syntax::{
@@ -156,7 +156,12 @@ impl Lowerer<'_> {
             .collect()
     }
 
-    fn lower_param(&mut self, param: &Param, use_alias: bool) -> HirParam {
+    fn lower_param(
+        &mut self,
+        param: &Param,
+        use_alias: bool,
+        param_slot: Option<HirTypeSlot>,
+    ) -> HirParam {
         let def_id = self.next_def_id();
         crate::tuple_labels::record_from_type_expr(self.resolver, self.interner, def_id, &param.ty);
         let binding_name = if use_alias {
@@ -164,7 +169,18 @@ impl Lowerer<'_> {
         } else {
             &param.name
         };
-        let ty = self.lower_parameter_type(&param.ty);
+        let ty = match param_slot {
+            Some(slot) => self.lower_authored_type(
+                radix_hir::HirTypeSite {
+                    owner: radix_hir::HirOwnerRef::Def(def_id),
+                    slot,
+                },
+                &param.ty,
+                true,
+                false,
+            ),
+            None => self.lower_parameter_type(&param.ty),
+        };
         let mode = match param.ty.mode {
             Some(type_mode) => super::type_mode_hir_param_mode(type_mode),
             None => lower_param_mode(param.mode),
@@ -411,7 +427,17 @@ impl Lowerer<'_> {
                 radix_syntax::TypeExprKind::Infer | radix_syntax::TypeExprKind::UnionHole
             )
         });
-        let ty = decl.ty.as_ref().map(|ty| self.lower_type(ty));
+        let ty = decl.ty.as_ref().map(|ty| {
+            self.lower_authored_type(
+                radix_hir::HirTypeSite {
+                    owner: radix_hir::HirOwnerRef::Def(def_id),
+                    slot: HirTypeSlot::Declared,
+                },
+                ty,
+                false,
+                false,
+            )
+        });
         let value = if let Some(init) = &decl.init {
             self.lower_expr(init)
         } else {
@@ -446,13 +472,37 @@ impl Lowerer<'_> {
         self.push_type_params(type_params.iter().map(|param| (param.name, param.kind)));
         self.apply_type_param_constraints_from_annotations(&mut type_params, &annotations);
         let mut params = Vec::new();
-        for param in &decl.params {
-            params.push(self.lower_param(param, true));
+        for (ordinal, param) in decl.params.iter().enumerate() {
+            params.push(self.lower_param(
+                param,
+                true,
+                Some(HirTypeSlot::Parameter(ordinal as u32)),
+            ));
         }
         let cli_args = self.lower_cli_args_param(decl);
 
-        let ret_ty = decl.ret.as_ref().map(|ty| self.lower_signature_type(ty));
-        let err_ty = decl.err.as_ref().map(|ty| self.lower_signature_type(ty));
+        let ret_ty = decl.ret.as_ref().map(|ty| {
+            self.lower_authored_type(
+                radix_hir::HirTypeSite {
+                    owner: radix_hir::HirOwnerRef::Def(def_id),
+                    slot: HirTypeSlot::Return,
+                },
+                ty,
+                false,
+                true,
+            )
+        });
+        let err_ty = decl.err.as_ref().map(|ty| {
+            self.lower_authored_type(
+                radix_hir::HirTypeSite {
+                    owner: radix_hir::HirOwnerRef::Def(def_id),
+                    slot: HirTypeSlot::Error,
+                },
+                ty,
+                false,
+                true,
+            )
+        });
         self.push_scope();
         for param in &params {
             self.bind_local(param.name, param.def_id);
@@ -675,8 +725,12 @@ impl Lowerer<'_> {
                     );
 
                     let mut params = Vec::new();
-                    for param in &method.params {
-                        params.push(self.lower_param(param, true));
+                    for (ordinal, param) in method.params.iter().enumerate() {
+                        params.push(self.lower_param(
+                            param,
+                            true,
+                            Some(HirTypeSlot::Parameter(ordinal as u32)),
+                        ));
                     }
 
                     self.push_scope();
@@ -960,7 +1014,10 @@ impl Lowerer<'_> {
             params: method
                 .params
                 .iter()
-                .map(|param| self.lower_param(param, false))
+                .enumerate()
+                .map(|(ordinal, param)| {
+                    self.lower_param(param, false, Some(HirTypeSlot::Parameter(ordinal as u32)))
+                })
                 .collect(),
             ret_ty: method.ret.as_ref().map(|ty| self.lower_signature_type(ty)),
             err_ty: method.err.as_ref().map(|ty| self.lower_signature_type(ty)),
@@ -1012,7 +1069,15 @@ impl Lowerer<'_> {
         let def_id = self.def_id_for(decl.name.name);
         let type_params = self.lower_type_params(&decl.type_params);
         self.push_type_params(type_params.iter().map(|param| (param.name, param.kind)));
-        let ty = self.lower_type(&decl.ty);
+        let ty = self.lower_authored_type(
+            radix_hir::HirTypeSite {
+                owner: radix_hir::HirOwnerRef::Def(def_id),
+                slot: HirTypeSlot::AliasBody,
+            },
+            &decl.ty,
+            false,
+            false,
+        );
         self.pop_type_params();
 
         Some(HirItem {

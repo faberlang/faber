@@ -67,7 +67,8 @@ use radix_hir::{
     DefId, HirArrayElement, HirAvailability, HirBinOp, HirBlock, HirCape, HirCasuArm,
     HirConversioTarget, HirExpression, HirExpressionKind, HirFunction, HirId, HirItem, HirItemKind,
     HirLiteral, HirLocal, HirModule, HirObjectField, HirObjectKey, HirParam, HirParamMode,
-    HirPattern, HirStatement, HirStatementKind, HirStruct, NucleumRole,
+    HirPattern, HirPresentation, HirStatement, HirStatementKind, HirStruct, HirTypeForm,
+    HirTypeFormArg, NucleumRole,
 };
 use radix_lexer::{Interner, Symbol};
 use radix_target::Target;
@@ -447,7 +448,6 @@ pub(crate) fn typecheck(
 ) -> Result<(), Vec<SemanticError>> {
     typecheck_with_interner(hir, resolver, types, None)
 }
-
 /// Typecheck HIR with an optional [`Interner`] for symbol-level diagnostics.
 ///
 /// # Errors
@@ -461,7 +461,7 @@ pub(crate) fn typecheck_with_interner(
     interner: Option<&Interner>,
 ) -> Result<(), Vec<SemanticError>> {
     let config = crate::PassConfig::for_target(Target::HirRust);
-    typecheck_with_config(hir, resolver, types, interner, &config, None)
+    typecheck_with_config(hir, resolver, types, interner, &config, None, None)
 }
 
 /// Typecheck HIR with a caller-supplied [`PassConfig`].
@@ -476,6 +476,7 @@ pub(crate) fn typecheck_with_config(
     interner: Option<&Interner>,
     config: &crate::PassConfig,
     companion_signatures: Option<&crate::passes::companion_signature::CompanionSignatures>,
+    mut presentation: Option<&mut HirPresentation>,
 ) -> Result<(), Vec<SemanticError>> {
     let mut checker = TypeChecker::new(resolver, types, interner, config.target);
     checker.locale_pack = config.locale_pack.as_ref();
@@ -487,6 +488,9 @@ pub(crate) fn typecheck_with_config(
     }
     checker.collect_items(hir);
     checker.check_program(hir);
+    if let Some(presentation) = presentation {
+        checker.finalize_authored_forms(presentation);
+    }
 
     if checker.errors.is_empty() {
         Ok(())

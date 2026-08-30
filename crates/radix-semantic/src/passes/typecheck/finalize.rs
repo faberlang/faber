@@ -40,6 +40,25 @@ impl TypeChecker<'_> {
         self.visit_program_mut(hir);
     }
 
+    /// Canonicalize the semantic witnesses of recorded authored type forms
+    /// after inference, so the sidecar never depends on checker-local
+    /// substitution state. This writes only the witness `TypeId`s inside form
+    /// records; semantic decisions never consult presentation.
+    pub fn finalize_authored_forms(&mut self, presentation: &mut HirPresentation) {
+        for authored in &mut presentation.authored_types {
+            self.canonicalize_form(&mut authored.form);
+        }
+    }
+
+    fn canonicalize_form(&mut self, form: &mut HirTypeForm) {
+        form.ty = self.canonicalize_type(form.ty);
+        for arg in &mut form.args {
+            if let HirTypeFormArg::Type(child) = arg {
+                self.canonicalize_form(child);
+            }
+        }
+    }
+
     /// Canonicalize a type after inference, rebuilding compound shapes so nested
     /// inference variables do not survive into MIR lowering.
     ///

@@ -59,6 +59,18 @@ mod pattern;
 mod stmt;
 mod types;
 
+/// One in-progress authored form node while an authored site lowers.
+///
+/// Child forms land here in lowering order as [`HirTypeFormArg`] entries;
+/// `named` captures the resolved user-definition identity when the node
+/// spelled a nominal/alias path, so the completed head can carry the authored
+/// symbol path beside the semantic `DefId`.
+#[derive(Default)]
+pub(super) struct TypeFormFrame {
+    args: Vec<HirTypeFormArg>,
+    named: Option<(radix_types::DefId, Vec<Symbol>)>,
+}
+
 use crate::cli::{CliProgram, CliType};
 use crate::locale::LocalePack;
 use crate::{
@@ -66,10 +78,11 @@ use crate::{
 };
 use radix_diagnostics::DiagnosticArg;
 use radix_hir::{
-    HirBlock, HirBlockEnd, HirExpression, HirId, HirItem, HirModule, HirModuleEnd, HirOwnerRef,
-    HirParamMode, HirPresentation, HirSourceAnchorId, HirStatement, HirStatementKind,
-    HirTestMetadata, HirTestModifier, HirTrivia, HirTriviaAttachment, HirTriviaOwner,
-    HirTriviaOwnerKind, HirVariantPath,
+    HirAuthoredTypeUse, HirBlock, HirBlockEnd, HirExpression, HirId, HirItem, HirModule,
+    HirModuleEnd, HirOwnerRef, HirParamMode, HirPresentation, HirSourceAnchorId, HirStatement,
+    HirStatementKind, HirTestMetadata, HirTestModifier, HirTrivia, HirTriviaAttachment,
+    HirTriviaOwner, HirTriviaOwnerKind, HirTypeForm, HirTypeFormArg, HirTypeFormHead, HirTypeSite,
+    HirTypeSlot, HirVariantPath,
 };
 use radix_lexer::{Interner, Span, Symbol};
 use radix_syntax::{
@@ -134,6 +147,11 @@ pub struct Lowerer<'a> {
     /// attachments, structural block ends, the program end, and the explicit
     /// entry-start anchor. Drained into `LoweredProgram` at the end of the run.
     presentation: HirPresentation,
+
+    /// Authored type-form capture stack. Empty when no authored site is being
+    /// lowered; every node inside a capture pushes one frame and completes it
+    /// into a [`HirTypeForm`] when its lowering ends.
+    form_frames: Vec<TypeFormFrame>,
 
     /// Next synthetic definition id for bindings that did not exist in resolver output.
     next_def_id: u32,
@@ -222,6 +240,7 @@ impl<'a> Lowerer<'a> {
                 variant_paths: Vec::new(),
                 authored_types: Vec::new(),
             },
+            form_frames: Vec::new(),
             next_def_id: 1_000_000,
             errors: Vec::new(),
             current_span: Span::default(),
@@ -1065,3 +1084,6 @@ mod template_holes_test;
 #[cfg(test)]
 #[path = "type_algebra_test.rs"]
 mod type_algebra_test;
+#[cfg(test)]
+#[path = "authored_form_test.rs"]
+mod authored_form_test;

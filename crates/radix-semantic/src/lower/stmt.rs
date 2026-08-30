@@ -575,7 +575,17 @@ impl Lowerer<'_> {
                     .ty
                     .as_ref()
                     .is_some_and(|ty| matches!(ty.kind, radix_syntax::TypeExprKind::UnionHole));
-                let ty = decl.ty.as_ref().map(|ty| self.lower_type(ty));
+                let ty = decl.ty.as_ref().map(|ty| {
+                    self.lower_authored_type(
+                        radix_hir::HirTypeSite {
+                            owner: radix_hir::HirOwnerRef::Def(def_id),
+                            slot: radix_hir::HirTypeSlot::Declared,
+                        },
+                        ty,
+                        false,
+                        false,
+                    )
+                });
                 let init = decl.init.as_ref().map(|expr| self.lower_expr(expr));
                 HirStatementKind::Local(radix_hir::HirLocal {
                     def_id,
@@ -599,7 +609,17 @@ impl Lowerer<'_> {
                 // lowered statement keeps no `HirLocal`, so the authored
                 // declaration facts ride the presentation sidecar keyed by
                 // the initializer expression id.
-                let ty = decl.ty.as_ref().map(|ty| self.lower_type(ty));
+                let ty = decl.ty.as_ref().map(|ty| {
+                    self.lower_authored_type(
+                        radix_hir::HirTypeSite {
+                            owner: radix_hir::HirOwnerRef::Hir(init.id),
+                            slot: radix_hir::HirTypeSlot::DiscardBinding,
+                        },
+                        ty,
+                        false,
+                        false,
+                    )
+                });
                 self.presentation
                     .discard_binding_stmts
                     .push(radix_hir::HirDiscardBinding {
