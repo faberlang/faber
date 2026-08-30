@@ -7,10 +7,13 @@
 //! Faber arrows.
 
 use crate::surface::{KeywordSurface, TypeBindingKind};
-use radix_hir::DefId;
+use radix_codegen_shared::CodegenError;
+use radix_diagnostics::DiagnosticArg;
+use radix_hir::{DefId, HirTypeForm, HirTypeFormArg, HirTypeFormHead, HirTypeSite};
 use radix_lexer::{Interner, Symbol};
+use radix_syntax::TypeFormLevel;
 use radix_types::{
-    CollectionKind, MarkerFamily, Primitive, SemanticMutability, SemanticParamMode,
+    CollectionKind, IndexId, MarkerFamily, Primitive, SemanticMutability, SemanticParamMode,
     TensorFamilyKind, Type, TypeId, TypeTable,
 };
 use rustc_hash::FxHashMap;
@@ -345,6 +348,673 @@ impl super::FaberCodegen {
         }
     }
 
+    /// Site-aware type emission: the authored form recorded at `site`, or the
+    /// canonical spelling when no form exists there (synthesized/hand-built
+    /// HIR).
+    ///
+    /// Policy (goal §8): a present form whose root witness differs from
+    /// `type_id`, carries a level illegal for its constructor, or has the
+    /// wrong child arity/kind fails closed with [`CodegenError`] — it is
+    /// never guessed around or silently re-spelled.
+    // Dead until ATF-7 migrates the emission call sites to this boundary.
+    #[allow(dead_code)]
+    #[allow(clippy::too_many_arguments)]
+    pub(super) fn type_to_faber_at(
+        &self,
+        site: &HirTypeSite,
+        type_id: TypeId,
+        types: &TypeTable,
+        names: &FxHashMap<DefId, Symbol>,
+        interner: &Interner,
+        surface: &impl KeywordSurface,
+    ) -> Result<String, CodegenError> {
+        let Some(form) = self.authored_type_forms.get(site) else {
+            return Ok(self.type_to_faber(type_id, types, names, interner, surface));
+        };
+        if form.ty != type_id {
+            return Err(malformed_type_form(format!(
+                "authored type form witness TypeId({}) does not match the site's type TypeId({})",
+                form.ty.0, type_id.0
+            )));
+        }
+        self.type_form_to_faber(form, types, names, interner, surface)
+    }
+
+    /// Render one authored type-form node through the target keyword surface.
+    fn type_form_to_faber(
+        &self,
+        form: &HirTypeForm,
+        types: &TypeTable,
+        names: &FxHashMap<DefId, Symbol>,
+        interner: &Interner,
+        surface: &impl KeywordSurface,
+    ) -> Result<String, CodegenError> {
+        match &form.head {
+            HirTypeFormHead::Infer => {
+                Self::expect_no_form_args(form)?;
+                Ok("_".to_owned())
+            }
+            HirTypeFormHead::UnionHole => {
+                Self::expect_no_form_args(form)?;
+                Ok("∪".to_owned())
+            }
+            HirTypeFormHead::Named { def_id, path } => {
+                self.named_form_to_faber(form, *def_id, path, types, names, interner, surface)
+            }
+            HirTypeFormHead::Semantic(level) => {
+                self.semantic_form_to_faber(form, *level, types, names, interner, surface)
+            }
+        }
+    }
+
+    /// Render a user-defined alias/nominal head: the retained source path plus
+    /// its own authored argument list, which is intentionally independent of
+    /// the canonical expansion's child list. Equivalence of the instantiation
+    /// beyond def identity is FHIR/revalidation territory (goal §9/§10).
+    #[allow(clippy::too_many_arguments)]
+    fn named_form_to_faber(
+        &self,
+        form: &HirTypeForm,
+        def_id: DefId,
+        path: &[Symbol],
+        types: &TypeTable,
+        names: &FxHashMap<DefId, Symbol>,
+        interner: &Interner,
+        surface: &impl KeywordSurface,
+    ) -> Result<String, CodegenError> {
+        match types.get(form.ty) {
+            // A def-carrying witness that resolves elsewhere means the head
+            // names an unrelated definition.
+            Type::Struct(id) | Type::Enum(id) | Type::Interface(id) | Type::Alias(id, _)
+                if *id != def_id =>
+            {
+                return Err(malformed_type_form(format!(
+                    "named type form spells def DefId({}) but its witness resolves DefId({})",
+                    def_id.0, id.0
+                )));
+            }
+            Type::Param(symbol) if path.last() != Some(symbol) => {
+                return Err(malformed_type_form(
+                    "named type form spells a different generic parameter than its witness"
+                        .to_owned(),
+                ));
+            }
+            _ => {}
+        }
+        let head = path
+            .iter()
+            .map(|segment| interner.resolve(*segment))
+            .collect::<Vec<_>>()
+            .join(".");
+        if form.args.is_empty() {
+            return Ok(head);
+        }
+        let args = self.type_form_args_to_faber(&form.args, types, names, interner, surface)?;
+        Ok(format!("{head}<{}>", args.join(", ")))
+    }
+
+    /// Constructor/level spelling registry for `Semantic` heads.
+    ///
+    /// LONG renders the explicit head through the target surface, recursing
+    /// into form-tree children. SHORT renders the bare width marker (sized
+    /// numerics) or the fused `l/t/v/m/s` prefix form (lista/tensor/vector/
+    /// matrix/sparsa) over the accepted `numeric_width` vocabulary; fused
+    /// prefixes and width markers are locale-independent tokens. Anything
+    /// else — unknown levels, SHORT on constructors without a live
+    /// compression form — fails closed.
+    #[allow(clippy::too_many_arguments)]
+    fn semantic_form_to_faber(
+        &self,
+        form: &HirTypeForm,
+        level: TypeFormLevel,
+        types: &TypeTable,
+        names: &FxHashMap<DefId, Symbol>,
+        interner: &Interner,
+        surface: &impl KeywordSurface,
+    ) -> Result<String, CodegenError> {
+        match level.0 {
+            0 => self.semantic_long_form_to_faber(form, types, names, interner, surface),
+            1 => self.semantic_short_form_to_faber(form, types, interner),
+            _ => Err(malformed_type_form(format!(
+                "authored type form carries unsupported level {}",
+                level.0
+            ))),
+        }
+    }
+
+    /// SHORT spellings per the registry: bare width markers and fused
+    /// `l/t/v/m/s` roots. Width markers keep their language-wide spelling.
+    fn semantic_short_form_to_faber(
+        &self,
+        form: &HirTypeForm,
+        types: &TypeTable,
+        interner: &Interner,
+    ) -> Result<String, CodegenError> {
+        match types.get(form.ty) {
+            // Lowering's fail-closed bail-out keeps the authored level over an
+            // Error witness; render it like the canonical path.
+            Type::Error => Ok("<error>".to_owned()),
+            Type::SizedNumeric(_, width) => {
+                Self::expect_no_form_args(form)?;
+                Ok(width.faber_marker().to_owned())
+            }
+            Type::Array(_) => Ok(format!("l{}", self.fused_width_marker(form, types)?)),
+            Type::Tensor(_, shape) => match form.args.as_slice() {
+                [HirTypeFormArg::Type(child), HirTypeFormArg::Size(index)] if *index == *shape => {
+                    let marker = self.fused_child_marker(child, types)?;
+                    Ok(fused_with_figura(
+                        "t",
+                        &marker,
+                        &crate::figura::format_figura(*shape, types, interner),
+                    ))
+                }
+                _ => Err(malformed_type_form(
+                    "fused tensor root requires one width child and one size argument matching its witness"
+                        .to_owned(),
+                )),
+            },
+            // Vector/matrix/sparsa lowering records the element child only;
+            // the figura rides the witness.
+            Type::Vector(_, width) => {
+                let marker = self.fused_width_marker(form, types)?;
+                Ok(fused_with_figura(
+                    "v",
+                    &marker,
+                    &crate::figura::format_figura(*width, types, interner),
+                ))
+            }
+            Type::Matrix(_, shape) => {
+                let marker = self.fused_width_marker(form, types)?;
+                Ok(fused_with_figura(
+                    "m",
+                    &marker,
+                    &crate::figura::format_figura(*shape, types, interner),
+                ))
+            }
+            Type::Sparsa(_, shape) => {
+                let marker = self.fused_width_marker(form, types)?;
+                Ok(fused_with_figura(
+                    "s",
+                    &marker,
+                    &crate::figura::format_figura(*shape, types, interner),
+                ))
+            }
+            _ => Err(malformed_type_form(
+                "authored SHORT level is illegal for this constructor".to_owned(),
+            )),
+        }
+    }
+
+    /// LONG spellings per the registry: the explicit head for every built-in
+    /// constructor, with form-tree children where the constructor has a 1:1
+    /// authored-child shape. Witness-only constructors (function types,
+    /// unions, records, def/param identities, solved holes) re-emit
+    /// canonically from their witness.
+    #[allow(clippy::too_many_arguments)]
+    fn semantic_long_form_to_faber(
+        &self,
+        form: &HirTypeForm,
+        types: &TypeTable,
+        names: &FxHashMap<DefId, Symbol>,
+        interner: &Interner,
+        surface: &impl KeywordSurface,
+    ) -> Result<String, CodegenError> {
+        let ty = types.get(form.ty);
+        match ty {
+            Type::Error => Ok("<error>".to_owned()),
+            Type::Primitive(prim) => {
+                Self::expect_no_form_args(form)?;
+                Ok(surface
+                    .type_surface(TypeBindingKind::Primitive(*prim))
+                    .to_owned())
+            }
+            Type::SizedNumeric(prim, width) => {
+                Self::expect_no_form_args(form)?;
+                match prim {
+                    Primitive::Numerus | Primitive::Fractus => Ok(format!(
+                        "{}<{}>",
+                        surface.type_surface(TypeBindingKind::Primitive(*prim)),
+                        width.faber_marker()
+                    )),
+                    _ => Err(malformed_type_form(
+                        "sized numeric witness carries an unsupported primitive family".to_owned(),
+                    )),
+                }
+            }
+            Type::SizedInstans(precision) => {
+                Self::expect_no_form_args(form)?;
+                Ok(format!(
+                    "{}<{}>",
+                    surface.type_surface(TypeBindingKind::Primitive(Primitive::Instans)),
+                    precision.faber_marker()
+                ))
+            }
+            Type::ModularWord(width) => {
+                Self::expect_no_form_args(form)?;
+                Ok(format!(
+                    "{}<{}>",
+                    surface.contextual_keyword("modulus"),
+                    width.faber_marker()
+                ))
+            }
+            Type::BoundedTextus { capacity } => {
+                Self::expect_no_form_args(form)?;
+                Ok(self.bounded_primitive_head(
+                    Primitive::Textus,
+                    *capacity,
+                    types,
+                    interner,
+                    surface,
+                ))
+            }
+            Type::BoundedAscii { capacity } => {
+                Self::expect_no_form_args(form)?;
+                Ok(self.bounded_primitive_head(
+                    Primitive::Ascii,
+                    *capacity,
+                    types,
+                    interner,
+                    surface,
+                ))
+            }
+            Type::BoundedOcteti { capacity } => {
+                Self::expect_no_form_args(form)?;
+                Ok(self.bounded_primitive_head(
+                    Primitive::Octeti,
+                    *capacity,
+                    types,
+                    interner,
+                    surface,
+                ))
+            }
+            Type::Array(_) => Ok(format!(
+                "{}<{}>",
+                surface.type_surface(TypeBindingKind::Collection(CollectionKind::Lista)),
+                self.single_type_form_child(form, types, names, interner, surface)?
+            )),
+            Type::Queue(_) => Ok(format!(
+                "{}<{}>",
+                surface.type_surface(TypeBindingKind::Collection(CollectionKind::Queue)),
+                self.single_type_form_child(form, types, names, interner, surface)?
+            )),
+            Type::Stack(_) => Ok(format!(
+                "{}<{}>",
+                surface.type_surface(TypeBindingKind::Collection(CollectionKind::Stack)),
+                self.single_type_form_child(form, types, names, interner, surface)?
+            )),
+            Type::Set(_) => Ok(format!(
+                "{}<{}>",
+                surface.type_surface(TypeBindingKind::Collection(CollectionKind::Copia)),
+                self.single_type_form_child(form, types, names, interner, surface)?
+            )),
+            Type::Cursor(_) => Ok(format!(
+                "{}<{}>",
+                surface.type_surface(TypeBindingKind::Collection(CollectionKind::Cursor)),
+                self.single_type_form_child(form, types, names, interner, surface)?
+            )),
+            Type::Promissum(_) => Ok(format!(
+                "{}<{}>",
+                surface.type_surface(TypeBindingKind::Collection(CollectionKind::Promissum)),
+                self.single_type_form_child(form, types, names, interner, surface)?
+            )),
+            Type::PromissumFailable(_, _) => {
+                let members = self.exact_type_form_children(
+                    form, 2, types, names, interner, surface,
+                )?;
+                Ok(format!(
+                    "{}<{} ⇥ {}>",
+                    surface.type_surface(TypeBindingKind::Collection(CollectionKind::Promissum)),
+                    members[0], members[1]
+                ))
+            }
+            Type::AsyncCursor(_, _) => {
+                let members = self.exact_type_form_children(
+                    form, 2, types, names, interner, surface,
+                )?;
+                // Canonical arm keeps this spelling outside the keyword
+                // surface; mirror it exactly.
+                Ok(format!("async cursor<{} ⇥ {}>", members[0], members[1]))
+            }
+            Type::Map(_, _) => {
+                // `series` (the `tabula<textus, valor>` synonym) lowers with
+                // no form children; the synonym itself is not captured, so it
+                // re-emits through the canonical path.
+                if form.args.is_empty() {
+                    return Ok(self.type_to_faber(form.ty, types, names, interner, surface));
+                }
+                let members =
+                    self.exact_type_form_children(form, 2, types, names, interner, surface)?;
+                Ok(format!(
+                    "{}<{}, {}>",
+                    surface.type_surface(TypeBindingKind::Collection(CollectionKind::Tabula)),
+                    members[0],
+                    members[1]
+                ))
+            }
+            Type::Record(_) => {
+                // Labels and canonical field order live on the witness only.
+                Ok(self.type_to_faber(form.ty, types, names, interner, surface))
+            }
+            Type::Tensor(_, shape) => {
+                let elem = self.tensor_element_child(
+                    form,
+                    *shape,
+                    types,
+                    names,
+                    interner,
+                    surface,
+                )?;
+                Ok(self.figura_tensor_head(
+                    TensorFamilyKind::Tensor,
+                    &elem,
+                    *shape,
+                    types,
+                    interner,
+                    surface,
+                ))
+            }
+            Type::Vector(_, width) => {
+                let elem = self.single_type_form_child(form, types, names, interner, surface)?;
+                Ok(self.figura_tensor_head(
+                    TensorFamilyKind::Vector,
+                    &elem,
+                    *width,
+                    types,
+                    interner,
+                    surface,
+                ))
+            }
+            Type::Matrix(_, shape) => {
+                let elem = self.single_type_form_child(form, types, names, interner, surface)?;
+                Ok(self.figura_tensor_head(
+                    TensorFamilyKind::Matrix,
+                    &elem,
+                    *shape,
+                    types,
+                    interner,
+                    surface,
+                ))
+            }
+            Type::Sparsa(_, shape) => {
+                let elem = self.single_type_form_child(form, types, names, interner, surface)?;
+                Ok(self.figura_tensor_head(
+                    TensorFamilyKind::Sparsa,
+                    &elem,
+                    *shape,
+                    types,
+                    interner,
+                    surface,
+                ))
+            }
+            Type::Atomic(_) => Ok(format!(
+                "{}<{}>",
+                surface.type_surface(TypeBindingKind::TensorFamily(TensorFamilyKind::Atomic)),
+                self.single_type_form_child(form, types, names, interner, surface)?
+            )),
+            Type::Intervallum(_) => Ok(format!(
+                "{}<{}>",
+                surface.type_surface(TypeBindingKind::TensorFamily(TensorFamilyKind::Intervallum)),
+                self.single_type_form_child(form, types, names, interner, surface)?
+            )),
+            Type::BoundedArray { capacity, .. } => {
+                let elem = self.single_type_form_child(form, types, names, interner, surface)?;
+                Ok(format!(
+                    "{}<{elem}, {}>",
+                    surface.type_surface(TypeBindingKind::Collection(CollectionKind::Lista)),
+                    crate::figura::format_figura(*capacity, types, interner)
+                ))
+            }
+            Type::BoundedQueue { capacity, .. } => {
+                let elem = self.single_type_form_child(form, types, names, interner, surface)?;
+                Ok(format!(
+                    "{}<{elem}, {}>",
+                    surface.type_surface(TypeBindingKind::Collection(CollectionKind::Queue)),
+                    crate::figura::format_figura(*capacity, types, interner)
+                ))
+            }
+            Type::BoundedStack { capacity, .. } => {
+                let elem = self.single_type_form_child(form, types, names, interner, surface)?;
+                Ok(format!(
+                    "{}<{elem}, {}>",
+                    surface.type_surface(TypeBindingKind::Collection(CollectionKind::Stack)),
+                    crate::figura::format_figura(*capacity, types, interner)
+                ))
+            }
+            Type::Option(_) => match form.args.as_slice() {
+                // Union-normalized or solved option witnesses carry no
+                // authored child and delegate canonically.
+                [] => Ok(self.type_to_faber(form.ty, types, names, interner, surface)),
+                [HirTypeFormArg::Type(child)] => {
+                    let inner = self.type_form_to_faber(child, types, names, interner, surface)?;
+                    Ok(format!("{inner} ∪ {}", surface.contextual_keyword("nihil")))
+                }
+                _ => Err(malformed_type_form(
+                    "option form carries unexpected children".to_owned(),
+                )),
+            },
+            Type::Ref(mutability, _) => {
+                let [HirTypeFormArg::Type(child)] = form.args.as_slice() else {
+                    return Err(malformed_type_form(
+                        "reference form requires exactly one type child".to_owned(),
+                    ));
+                };
+                let prefix = match mutability {
+                    SemanticMutability::Immutable => surface.keyword(radix_lexer::TokenKind::De),
+                    SemanticMutability::Mutable => surface.keyword(radix_lexer::TokenKind::In),
+                    SemanticMutability::Own => surface.keyword(radix_lexer::TokenKind::Own),
+                    SemanticMutability::Copy => surface.keyword(radix_lexer::TokenKind::Copy),
+                };
+                let inner = self.type_form_to_faber(child, types, names, interner, surface)?;
+                Ok(format!("{prefix} {inner}"))
+            }
+            Type::Tuple(members) => {
+                let rendered = self.exact_type_form_children(
+                    form,
+                    members.len(),
+                    types,
+                    names,
+                    interner,
+                    surface,
+                )?;
+                Ok(format!(
+                    "{}<{}>",
+                    surface.contextual_keyword("iuncta"),
+                    rendered.join(", ")
+                ))
+            }
+            Type::Func(_)
+            | Type::Union(_)
+            | Type::Intersection(_)
+            | Type::Param(_)
+            | Type::Applied(_, _)
+            | Type::Alias(_, _)
+            | Type::Struct(_)
+            | Type::Enum(_)
+            | Type::Interface(_)
+            | Type::Infer(_)
+            | Type::InferUnion(_)
+            | Type::MarkerHole { .. } => {
+                // Witness-only witnesses: lowering keeps no 1:1 authored
+                // child shape here (modes, dedup, solved holes, def
+                // identities), so the node re-emits canonically.
+                Ok(self.type_to_faber(form.ty, types, names, interner, surface))
+            }
+        }
+    }
+
+    /// Render the authored argument list of a `Named` node.
+    fn type_form_args_to_faber(
+        &self,
+        args: &[HirTypeFormArg],
+        types: &TypeTable,
+        names: &FxHashMap<DefId, Symbol>,
+        interner: &Interner,
+        surface: &impl KeywordSurface,
+    ) -> Result<Vec<String>, CodegenError> {
+        args.iter()
+            .map(|arg| match arg {
+                HirTypeFormArg::Type(child) => {
+                    self.type_form_to_faber(child, types, names, interner, surface)
+                }
+                HirTypeFormArg::Size(index) => {
+                    Ok(crate::figura::format_figura(*index, types, interner))
+                }
+                HirTypeFormArg::Name(symbol) => Ok(self.symbol_to_string(*symbol, interner)),
+            })
+            .collect()
+    }
+
+    /// The exactly-one `Type` child of a unary constructor node, rendered.
+    fn single_type_form_child(
+        &self,
+        form: &HirTypeForm,
+        types: &TypeTable,
+        names: &FxHashMap<DefId, Symbol>,
+        interner: &Interner,
+        surface: &impl KeywordSurface,
+    ) -> Result<String, CodegenError> {
+        // The count is checked above; the slice is exactly one element.
+        let children = self.exact_type_form_children(form, 1, types, names, interner, surface)?;
+        let [child] = children.as_slice() else {
+            return Err(malformed_type_form(
+                "form requires exactly one type child".to_owned(),
+            ));
+        };
+        Ok(child.clone())
+    }
+
+    /// Exactly `count` `Type` children, rendered in authored order.
+    #[allow(clippy::too_many_arguments)]
+    fn exact_type_form_children(
+        &self,
+        form: &HirTypeForm,
+        count: usize,
+        types: &TypeTable,
+        names: &FxHashMap<DefId, Symbol>,
+        interner: &Interner,
+        surface: &impl KeywordSurface,
+    ) -> Result<Vec<String>, CodegenError> {
+        let children = form
+            .args
+            .iter()
+            .map(|arg| match arg {
+                HirTypeFormArg::Type(child) => Some(child.as_ref()),
+                _ => None,
+            })
+            .collect::<Option<Vec<_>>>()
+            .filter(|children| children.len() == count);
+        let Some(children) = children else {
+            return Err(malformed_type_form(format!(
+                "form requires exactly {count} type children, got {} arguments",
+                form.args.len()
+            )));
+        };
+        children
+            .iter()
+            .map(|child| self.type_form_to_faber(child, types, names, interner, surface))
+            .collect()
+    }
+
+    /// The element child of a tensor-form node, whose lowering records the
+    /// `[Type, Size]` pair; the size argument must match the witness shape.
+    #[allow(clippy::too_many_arguments)]
+    fn tensor_element_child(
+        &self,
+        form: &HirTypeForm,
+        shape: IndexId,
+        types: &TypeTable,
+        names: &FxHashMap<DefId, Symbol>,
+        interner: &Interner,
+        surface: &impl KeywordSurface,
+    ) -> Result<String, CodegenError> {
+        match form.args.as_slice() {
+            [HirTypeFormArg::Type(child), HirTypeFormArg::Size(index)] if *index == shape => {
+                self.type_form_to_faber(child, types, names, interner, surface)
+            }
+            _ => Err(malformed_type_form(
+                "tensor form requires one type child and one size argument matching its witness"
+                    .to_owned(),
+            )),
+        }
+    }
+
+    /// Width marker of a fused short root (`lu32`): exactly one argument, a
+    /// type child that is itself a SHORT authored width over a sized-numeric
+    /// witness.
+    fn fused_width_marker(
+        &self,
+        form: &HirTypeForm,
+        types: &TypeTable,
+    ) -> Result<String, CodegenError> {
+        let [HirTypeFormArg::Type(child)] = form.args.as_slice() else {
+            return Err(malformed_type_form(format!(
+                "fused short root requires exactly one type child, got {} arguments",
+                form.args.len()
+            )));
+        };
+        self.fused_child_marker(child, types)
+    }
+
+    fn fused_child_marker(
+        &self,
+        child: &HirTypeForm,
+        types: &TypeTable,
+    ) -> Result<String, CodegenError> {
+        if child.head != HirTypeFormHead::Semantic(TypeFormLevel::SHORT) {
+            return Err(malformed_type_form(
+                "fused short root requires a SHORT width child".to_owned(),
+            ));
+        }
+        match types.get(child.ty) {
+            Type::SizedNumeric(_, width) => Ok(width.faber_marker().to_owned()),
+            _ => Err(malformed_type_form(
+                "fused short root child must be a sized numeric width".to_owned(),
+            )),
+        }
+    }
+
+    fn figura_tensor_head(
+        &self,
+        kind: TensorFamilyKind,
+        child: &str,
+        figura: IndexId,
+        types: &TypeTable,
+        interner: &Interner,
+        surface: &impl KeywordSurface,
+    ) -> String {
+        format!(
+            "{}<{child}, {}>",
+            surface.type_surface(TypeBindingKind::TensorFamily(kind)),
+            crate::figura::format_figura(figura, types, interner)
+        )
+    }
+
+    fn bounded_primitive_head(
+        &self,
+        prim: Primitive,
+        capacity: IndexId,
+        types: &TypeTable,
+        interner: &Interner,
+        surface: &impl KeywordSurface,
+    ) -> String {
+        format!(
+            "{}<{}>",
+            surface.type_surface(TypeBindingKind::Primitive(prim)),
+            crate::figura::format_figura(capacity, types, interner)
+        )
+    }
+
+    fn expect_no_form_args(form: &HirTypeForm) -> Result<(), CodegenError> {
+        if form.args.is_empty() {
+            Ok(())
+        } else {
+            Err(malformed_type_form(format!(
+                "form head carries {} unexpected child arguments",
+                form.args.len()
+            )))
+        }
+    }
+
     fn format_unary_type(
         &self,
         head: &str,
@@ -432,10 +1102,10 @@ impl super::FaberCodegen {
         interner: &Interner,
         surface: &impl KeywordSurface,
     ) -> String {
-        // Long form only: `tensor<f32, [2, 2]>` is the documented default
-        // surface and re-parses in every locale. The `tf32[2, 2]` width sugar
-        // remains valid input but is not emitted canonically, so canonical
-        // round-trips keep the author's type spelling.
+        // Canonical fallback for presentation-absent sites: the long
+        // `tensor<f32, [2, 2]>` surface re-parses in every locale. Authored
+        // `tf32[2, 2]` roots render through `type_to_faber_at` from their
+        // recorded form instead; this helper is never that path.
         format!(
             "{}<{}, {}>",
             surface.type_surface(TypeBindingKind::TensorFamily(TensorFamilyKind::Tensor)),
@@ -472,6 +1142,35 @@ fn sorted_record_fields(
     ordered
 }
 
+/// Fused short spelling: the figura string is already bracketed by
+/// `format_figura` (`[2, 3]`); an inference hole (authored without brackets)
+/// emits the bare fused token.
+// Dead until ATF-7 migrates the emission call sites (only `type_to_faber_at`
+// reaches this).
+#[allow(dead_code)]
+fn fused_with_figura(prefix: &str, marker: &str, figura: &str) -> String {
+    if figura == "_" {
+        format!("{prefix}{marker}")
+    } else {
+        format!("{prefix}{marker}{figura}")
+    }
+}
+
+/// Fail-closed error for a present-but-malformed authored type form.
+// Dead until ATF-7 migrates the emission call sites (only `type_to_faber_at`
+// reaches this).
+#[allow(dead_code)]
+fn malformed_type_form(message: String) -> CodegenError {
+    CodegenError {
+        message,
+        args: vec![DiagnosticArg::new("issue", "malformed_authored_type_form")],
+    }
+}
+
 #[cfg(test)]
 #[path = "types_test.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "types_form_test.rs"]
+mod form_test;

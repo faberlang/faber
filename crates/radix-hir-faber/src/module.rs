@@ -6,7 +6,8 @@ use radix_codegen_shared::{CodeWriter, CodegenError};
 use radix_diagnostics::DiagnosticArg;
 use radix_hir::{DefId, HirExpressionKind};
 use radix_hir::{
-    HirItem, HirItemKind, HirModule, HirModuleEnd, HirPresentation, HirSourceAnchorId,
+    HirItem, HirItemKind, HirModule, HirModuleEnd, HirPresentation, HirSourceAnchorId, HirTypeForm,
+    HirTypeSite,
 };
 use radix_lexer::{Interner, Span, TokenKind};
 use radix_types::{TypeId, TypeTable};
@@ -72,6 +73,10 @@ pub struct FaberCodegen {
     /// Authored `ordo` enumerations by enum def id: emission re-sugars these
     /// with the `ordo` vocabulary and member discriminants.
     pub(crate) ordo_enums: FxHashMap<DefId, Vec<radix_hir::HirOrdoMember>>,
+    /// Authored type forms by occurrence site: type emission re-renders
+    /// exactly these authored long/short/named shapes; sites absent from the
+    /// map keep the canonical fallback spelling.
+    pub(crate) authored_type_forms: FxHashMap<HirTypeSite, HirTypeForm>,
 }
 
 /// Emit canonical Faber source from analyzed HIR and its presentation.
@@ -186,6 +191,11 @@ impl FaberCodegen {
                     .join(".");
                 (path.def_id, spelling)
             })
+            .collect();
+        self.authored_type_forms = presentation
+            .authored_types
+            .iter()
+            .map(|authored| (authored.site.clone(), authored.form.clone()))
             .collect();
 
         let mut writer = CodeWriter::new();
