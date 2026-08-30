@@ -1,22 +1,44 @@
 //! Coverage for nucleum-fragment MIR composition.
 
 use super::{
-    compose, compose_with_metadata, reject_surviving_fragment_calls_with_metadata,
-    surviving_fragment_calls_with_metadata, ExpansionBudget, ISSUE_CYCLE, ISSUE_EXPANSION,
+    compose_with_metadata, reject_surviving_fragment_calls_with_metadata,
+    surviving_fragment_calls_with_metadata, ExpansionBudget, FragmentCompositionError,
+    ISSUE_CYCLE, ISSUE_EXPANSION,
 };
 use crate::diagnostics::{semantic_message, DiagnosticArg};
 use crate::driver::{self, AnalyzeRequest, Config, Session};
 use crate::hir::DefId;
-use crate::lexer::Span;
+use crate::lexer::{Interner, Span};
 use crate::mir::{
     MirBinOp, MirBlock, MirBlockId, MirCallee, MirDeviceFunctionMetadata, MirDeviceFunctionMetadataMap, MirDeviceRole,
     MirFunction, MirFunctionId, MirFunctionOrigin, MirFunctionVisibility, MirKernelShaderStage, MirLocal, MirLocalId,
-    MirOperand, MirParam, MirParamMode, MirPlace, MirStatement, MirStatementKind, MirSyntheticFunctionIdentity,
+    MirMonomorphization, MirOperand, MirParam, MirParamMode, MirPlace, MirStatement, MirStatementKind, MirSyntheticFunctionIdentity,
     MirTerminator, MirTerminatorKind, MirType, MirValue, MirValueId, MirValueKind,
 };
 use crate::semantic::{SemanticErrorKind, TypeTable};
 use crate::test_support::{test_span, test_span_between};
 use rustc_hash::{FxHashMap, FxHashSet};
+
+/// Plain-wrapper stand-in for the deleted production `compose` (merge-16):
+/// the tests exercise composition without an explicit metadata carrier.
+fn compose(
+    functions: &mut Vec<MirFunction>,
+    monomorphizations: &[MirMonomorphization],
+    roles: &FxHashMap<DefId, MirDeviceRole>,
+    budget: ExpansionBudget,
+    interner: Option<&Interner>,
+    launch_entries: &FxHashSet<DefId>,
+) -> Vec<FragmentCompositionError> {
+    compose_with_metadata(
+        functions,
+        monomorphizations,
+        roles,
+        &MirDeviceFunctionMetadataMap::default(),
+        budget,
+        interner,
+        launch_entries,
+    )
+}
 
 const ENTRY: DefId = DefId(1);
 const FRAGMENT: DefId = DefId(2);

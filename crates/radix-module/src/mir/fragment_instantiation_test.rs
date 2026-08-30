@@ -1,17 +1,38 @@
 //! Coverage for nucleum-fragment instantiation checking and the call-legality matrix.
 
-use super::{check, FragmentInstantiationError, ISSUE_CONTEXT, ISSUE_TYPE};
+use super::{check_with_metadata, FragmentInstantiationError, ISSUE_CONTEXT, ISSUE_TYPE};
 use crate::diagnostics::{semantic_message, DiagnosticArg};
 use crate::driver::{self, AnalyzeRequest, Config, Session};
 use crate::hir::DefId;
 use crate::lexer::Span;
 use crate::mir::{
-    MirBlock, MirBlockId, MirCallee, MirDeviceRole, MirFunction, MirFunctionId, MirKernelShaderStage, MirLayoutTable,
+    MirBlock, MirBlockId, MirCallee, MirDeviceFunctionMetadataMap, MirDeviceRole, MirFunction, MirFunctionId, MirKernelShaderStage, MirLayoutTable,
     MirLocal, MirLocalId, MirMonomorphization, MirMonomorphizationKey, MirOperand, MirParam, MirParamMode, MirPlace,
     MirStatement, MirStatementKind, MirTerminator, MirTerminatorKind, MirType,
 };
 use crate::semantic::{SemanticErrorKind, TypeTable};
 use crate::test_support::{test_span, test_span_between};
+
+/// Plain-wrapper stand-in for the deleted production `check` (merge-16):
+/// the tests exercise instantiation checking without an explicit metadata carrier.
+fn check(
+    functions: &[MirFunction],
+    monomorphizations: &[MirMonomorphization],
+    layouts: &MirLayoutTable,
+    types: &TypeTable,
+    roles: &FxHashMap<DefId, MirDeviceRole>,
+    summaries: Option<&super::FragmentEffectTable>,
+) -> Vec<FragmentInstantiationError> {
+    check_with_metadata(
+        functions,
+        monomorphizations,
+        layouts,
+        types,
+        roles,
+        summaries,
+        &MirDeviceFunctionMetadataMap::default(),
+    )
+}
 use rustc_hash::FxHashMap;
 
 const ENTRY: DefId = DefId(1);
@@ -774,10 +795,8 @@ functio k(fractus<f32> x) → fractus<f32> {
 // KCM-05: synthetic kernel closures classify through the metadata carrier.
 // ---------------------------------------------------------------------------
 
-use super::check_with_metadata;
 use crate::mir::{
-    MirDeviceFunctionMetadata, MirDeviceFunctionMetadataMap, MirFunctionOrigin, MirFunctionVisibility,
-    MirSyntheticFunctionIdentity,
+    MirDeviceFunctionMetadata, MirFunctionOrigin, MirFunctionVisibility, MirSyntheticFunctionIdentity,
 };
 
 fn synthetic_closure(
