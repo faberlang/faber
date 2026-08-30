@@ -40,6 +40,20 @@ fn decode_rejects_unsupported_schema_version() {
 }
 
 #[test]
+fn decode_rejects_schema_v8_after_authored_types_wire_break() {
+    let mut artifact = stub_artifact();
+    artifact.schema_version = 8;
+    let bytes = encode(&artifact).expect("encode schema-v8 artifact");
+    assert!(matches!(
+        decode(&bytes),
+        Err(HirArtifactError::UnsupportedSchemaVersion {
+            found: 8,
+            expected: SCHEMA_VERSION,
+        })
+    ));
+}
+
+#[test]
 fn decode_accepts_imported_nominal_def_living_in_type_table() {
     // Regression (faber run --compile on triga exempla, 2026-08-03):
     // the resolver allocates imported nominal types as fresh unit-local

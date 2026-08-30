@@ -5,8 +5,10 @@ use radix_hir::{
     HirParamMode, HirRangeKind, HirStatement, HirStatementKind,
 };
 use radix_lexer::{Span, Symbol};
-use radix_syntax::ClosureModifier;
-use radix_types::{DefId, Type, TypeTable, USER_DEF_ID_BASE};
+use radix_syntax::{ClosureModifier, TypeFormLevel};
+use radix_types::{
+    DefId, IndexExpr, NumericWidth, Primitive, Type, TypeId, TypeTable, USER_DEF_ID_BASE,
+};
 
 fn lit(id: u32, value: u64) -> HirExpression {
     HirExpression {
@@ -303,4 +305,359 @@ fn dangling_provenance_identity_fails_closed() {
         ),
         "dangling last-use site must surface as a HirId DanglingIndex: {err:?}"
     );
+}
+
+fn authored_type_artifact() -> crate::artifact::HirArtifact {
+    let mut artifact = stub_artifact();
+    let mut types = TypeTable::new();
+    let u32_ty = types.sized_numeric(Primitive::Numerus, NumericWidth::U32);
+    let f32_ty = types.sized_numeric(Primitive::Fractus, NumericWidth::F32);
+    let dim_two = types.intern_index(IndexExpr::Literal(2));
+    let shape = types.intern_index(IndexExpr::Tuple(vec![dim_two, dim_two]));
+    let tensor_ty = types.tensor_with_shape(f32_ty, shape);
+    let alias_def = DefId(USER_DEF_ID_BASE + 10);
+    let alias_ty = types.intern(Type::Alias(alias_def, u32_ty));
+    let parameter_def = DefId(USER_DEF_ID_BASE + 11);
+    let alias_local_def = DefId(USER_DEF_ID_BASE + 12);
+    let hole_local_def = DefId(USER_DEF_ID_BASE + 13);
+
+    artifact.interner = vec![
+        "main".to_owned(),
+        "test".to_owned(),
+        "Word".to_owned(),
+        "word".to_owned(),
+        "unknown".to_owned(),
+    ];
+    let radix_hir::HirItemKind::Function(function) = &mut artifact.hir.items[0].kind else {
+        panic!("stub artifact item must be a function");
+    };
+    function.params.push(HirParam {
+        def_id: parameter_def,
+        name: Symbol(3),
+        ty: u32_ty,
+        mode: HirParamMode::Owned,
+        optional: false,
+        sponte: false,
+        default: None,
+        span: Span::default(),
+    });
+    function.ret_ty = Some(tensor_ty);
+    function.body = Some(HirBlock::simple(
+        vec![
+            HirStatement {
+                id: HirId(1),
+                kind: HirStatementKind::Local(radix_hir::HirLocal {
+                    def_id: alias_local_def,
+                    name: Symbol(3),
+                    ty: Some(alias_ty),
+                    init: None,
+                    mutable: false,
+                    is_await: false,
+                    runtime_provided: false,
+                    annotation_authored: true,
+                    annotation_union_hole: false,
+                }),
+                span: Span::default(),
+            },
+            HirStatement {
+                id: HirId(2),
+                kind: HirStatementKind::Local(radix_hir::HirLocal {
+                    def_id: hole_local_def,
+                    name: Symbol(4),
+                    ty: Some(u32_ty),
+                    init: None,
+                    mutable: false,
+                    is_await: false,
+                    runtime_provided: false,
+                    annotation_authored: false,
+                    annotation_union_hole: false,
+                }),
+                span: Span::default(),
+            },
+        ],
+        None,
+        Span::default(),
+    ));
+    artifact.hir.items.push(radix_hir::HirItem {
+        id: HirId(3),
+        def_id: alias_def,
+        kind: radix_hir::HirItemKind::TypeAlias(radix_hir::HirTypeAlias {
+            name: Symbol(2),
+            type_params: Vec::new(),
+            ty: u32_ty,
+        }),
+        span: Span::default(),
+    });
+    artifact.types = types.snapshot();
+    artifact.presentation.authored_types = vec![
+        radix_hir::HirAuthoredTypeUse {
+            site: radix_hir::HirTypeSite {
+                owner: radix_hir::HirOwnerRef::Def(parameter_def),
+                slot: radix_hir::HirTypeSlot::Parameter(0),
+            },
+            form: radix_hir::HirTypeForm {
+                ty: u32_ty,
+                head: radix_hir::HirTypeFormHead::Semantic(TypeFormLevel::LONG),
+                args: Vec::new(),
+            },
+        },
+        radix_hir::HirAuthoredTypeUse {
+            site: radix_hir::HirTypeSite {
+                owner: radix_hir::HirOwnerRef::Def(DefId(0)),
+                slot: radix_hir::HirTypeSlot::Return,
+            },
+            form: radix_hir::HirTypeForm {
+                ty: tensor_ty,
+                head: radix_hir::HirTypeFormHead::Semantic(TypeFormLevel::LONG),
+                args: vec![
+                    radix_hir::HirTypeFormArg::Type(Box::new(radix_hir::HirTypeForm {
+                        ty: f32_ty,
+                        head: radix_hir::HirTypeFormHead::Semantic(TypeFormLevel::SHORT),
+                        args: Vec::new(),
+                    })),
+                    radix_hir::HirTypeFormArg::Size(shape),
+                ],
+            },
+        },
+        radix_hir::HirAuthoredTypeUse {
+            site: radix_hir::HirTypeSite {
+                owner: radix_hir::HirOwnerRef::Def(alias_local_def),
+                slot: radix_hir::HirTypeSlot::Declared,
+            },
+            form: radix_hir::HirTypeForm {
+                ty: alias_ty,
+                head: radix_hir::HirTypeFormHead::Named {
+                    def_id: alias_def,
+                    path: vec![Symbol(2)],
+                },
+                args: Vec::new(),
+            },
+        },
+        radix_hir::HirAuthoredTypeUse {
+            site: radix_hir::HirTypeSite {
+                owner: radix_hir::HirOwnerRef::Def(hole_local_def),
+                slot: radix_hir::HirTypeSlot::Declared,
+            },
+            form: radix_hir::HirTypeForm {
+                ty: u32_ty,
+                head: radix_hir::HirTypeFormHead::Infer,
+                args: Vec::new(),
+            },
+        },
+    ];
+    artifact
+}
+
+#[test]
+fn authored_types_v9_round_trip_preserves_nested_forms() {
+    let artifact = authored_type_artifact();
+    let bytes = crate::encode(&artifact).expect("encode authored type artifact");
+    let decoded = crate::decode(&bytes).expect("schema-v9 authored type artifact must validate");
+    assert_eq!(
+        decoded.presentation.authored_types,
+        artifact.presentation.authored_types
+    );
+
+    let msgpack = crate::msgpack::encode_msgpack(&artifact).expect("encode msgpack artifact");
+    let decoded_msgpack =
+        crate::msgpack::decode_msgpack(&msgpack).expect("decode msgpack artifact");
+    assert_eq!(
+        decoded_msgpack.presentation.authored_types,
+        artifact.presentation.authored_types
+    );
+}
+
+#[test]
+fn duplicate_authored_type_site_fails_closed() {
+    let mut artifact = authored_type_artifact();
+    artifact
+        .presentation
+        .authored_types
+        .push(artifact.presentation.authored_types[0].clone());
+    let err = crate::decode(&crate::encode(&artifact).expect("encode"))
+        .expect_err("duplicate type sites must fail closed");
+    assert!(matches!(
+        err,
+        crate::error::HirArtifactError::InvalidPresentation {
+            issue: "duplicate_type_site",
+            ..
+        }
+    ));
+}
+
+#[test]
+fn unknown_authored_type_owner_fails_closed() {
+    let mut artifact = authored_type_artifact();
+    artifact.presentation.authored_types[0].site.owner =
+        radix_hir::HirOwnerRef::Def(DefId(USER_DEF_ID_BASE + 999));
+    let err = crate::decode(&crate::encode(&artifact).expect("encode"))
+        .expect_err("an unknown type-site owner must fail closed");
+    assert!(matches!(
+        err,
+        crate::error::HirArtifactError::DanglingIndex { kind: "DefId", .. }
+    ));
+}
+
+#[test]
+fn nonexistent_type_slot_fails_closed() {
+    let mut artifact = authored_type_artifact();
+    artifact.presentation.authored_types[0].site.slot = radix_hir::HirTypeSlot::AliasBody;
+    let err = crate::decode(&crate::encode(&artifact).expect("encode"))
+        .expect_err("a slot not legal for the owner must fail closed");
+    assert!(matches!(
+        err,
+        crate::error::HirArtifactError::InvalidPresentation {
+            issue: "unknown_type_slot",
+            ..
+        }
+    ));
+}
+
+#[test]
+fn unknown_named_definition_fails_closed() {
+    let mut artifact = authored_type_artifact();
+    let record = &mut artifact.presentation.authored_types[2];
+    let radix_hir::HirTypeFormHead::Named { def_id, .. } = &mut record.form.head else {
+        panic!("fixture must have a named form");
+    };
+    *def_id = DefId(USER_DEF_ID_BASE + 999);
+    let err = crate::decode(&crate::encode(&artifact).expect("encode"))
+        .expect_err("unknown named definition must fail closed");
+    assert!(matches!(
+        err,
+        crate::error::HirArtifactError::DanglingIndex { kind: "DefId", .. }
+    ));
+}
+
+#[test]
+fn named_definition_kind_mismatch_fails_closed() {
+    let mut artifact = authored_type_artifact();
+    let record = &mut artifact.presentation.authored_types[2];
+    let radix_hir::HirTypeFormHead::Named { def_id, .. } = &mut record.form.head else {
+        panic!("fixture must have a named form");
+    };
+    *def_id = DefId(0);
+    let err = crate::decode(&crate::encode(&artifact).expect("encode"))
+        .expect_err("a function definition cannot be a named type");
+    assert!(matches!(
+        err,
+        crate::error::HirArtifactError::InvalidPresentation {
+            issue: "named_def_not_type",
+            ..
+        }
+    ));
+}
+
+#[test]
+fn unsupported_authored_level_fails_closed() {
+    let mut artifact = authored_type_artifact();
+    let radix_hir::HirTypeFormHead::Semantic(level) =
+        &mut artifact.presentation.authored_types[0].form.head
+    else {
+        panic!("fixture must have a semantic form");
+    };
+    *level = TypeFormLevel(2);
+    let err = crate::decode(&crate::encode(&artifact).expect("encode"))
+        .expect_err("unsupported level must fail closed");
+    assert!(matches!(
+        err,
+        crate::error::HirArtifactError::InvalidPresentation {
+            issue: "numeric_level_or_arity",
+            ..
+        }
+    ));
+}
+
+#[test]
+fn wrong_authored_arity_fails_closed() {
+    let mut artifact = authored_type_artifact();
+    artifact.presentation.authored_types[1].form.args.pop();
+    let err = crate::decode(&crate::encode(&artifact).expect("encode"))
+        .expect_err("wrong aggregate arity must fail closed");
+    assert!(matches!(
+        err,
+        crate::error::HirArtifactError::InvalidPresentation {
+            issue: "aggregate_level_or_arity",
+            ..
+        }
+    ));
+}
+
+#[test]
+fn unresolved_authored_type_id_fails_closed() {
+    let mut artifact = authored_type_artifact();
+    artifact.presentation.authored_types[0].form.ty = TypeId(99_999);
+    let err = crate::decode(&crate::encode(&artifact).expect("encode"))
+        .expect_err("unresolved authored TypeId must fail closed");
+    assert!(matches!(
+        err,
+        crate::error::HirArtifactError::DanglingIndex { kind: "TypeId", .. }
+    ));
+}
+
+#[test]
+fn hole_at_non_hole_type_slot_fails_closed() {
+    let mut artifact = authored_type_artifact();
+    artifact.presentation.authored_types[0].form.head = radix_hir::HirTypeFormHead::Infer;
+    let err = crate::decode(&crate::encode(&artifact).expect("encode"))
+        .expect_err("parameter hole must fail closed");
+    assert!(matches!(
+        err,
+        crate::error::HirArtifactError::InvalidPresentation {
+            issue: "hole_in_illegal_slot",
+            ..
+        }
+    ));
+}
+
+#[test]
+fn unresolved_named_path_symbol_fails_closed() {
+    let mut artifact = authored_type_artifact();
+    let radix_hir::HirTypeFormHead::Named { path, .. } =
+        &mut artifact.presentation.authored_types[2].form.head
+    else {
+        panic!("fixture must have a named form");
+    };
+    path[0] = Symbol(99_999);
+    let err = crate::decode(&crate::encode(&artifact).expect("encode"))
+        .expect_err("unresolved named path Symbol must fail closed");
+    assert!(matches!(
+        err,
+        crate::error::HirArtifactError::DanglingIndex { kind: "Symbol", .. }
+    ));
+}
+
+#[test]
+fn unresolved_authored_size_index_fails_closed() {
+    let mut artifact = authored_type_artifact();
+    let radix_hir::HirTypeFormArg::Size(index) =
+        &mut artifact.presentation.authored_types[1].form.args[1]
+    else {
+        panic!("fixture must have a size argument");
+    };
+    *index = radix_types::IndexId(99_999);
+    let err = crate::decode(&crate::encode(&artifact).expect("encode"))
+        .expect_err("unresolved authored IndexId must fail closed");
+    assert!(matches!(
+        err,
+        crate::error::HirArtifactError::DanglingIndex {
+            kind: "IndexId",
+            ..
+        }
+    ));
+}
+
+#[test]
+fn authored_root_witness_mismatch_fails_closed() {
+    let mut artifact = authored_type_artifact();
+    artifact.presentation.authored_types[3].form.ty = TypeId(0);
+    let err = crate::decode(&crate::encode(&artifact).expect("encode"))
+        .expect_err("root witness mismatch must fail closed");
+    assert!(matches!(
+        err,
+        crate::error::HirArtifactError::InvalidPresentation {
+            issue: "root_witness_mismatch",
+            ..
+        }
+    ));
 }

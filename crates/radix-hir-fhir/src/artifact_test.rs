@@ -99,8 +99,9 @@ fn selective_import_field_kept_schema_v4_wire_breaks_ratchet_version() {
     // ratchets to 6 for resolver conversion-arm rows, and CTR-05 ratchets to
     // 7 (registry rows replace destination-owned arm rows; the enum's
     // retired conversion-arm payload leaves the serde'd HIR payload), and
-    // SCR-04 ratchets to 8 (capability-provenance summaries join the wire).
-    assert_eq!(SCHEMA_VERSION, 8);
+    // SCR-04 ratchets to 8 (capability-provenance summaries join the wire),
+    // and ATF-5 ratchets to 9 because authored type forms join presentation.
+    assert_eq!(SCHEMA_VERSION, 9);
 }
 
 // ── EOT-3W transfer wire contract ────────────────────────────────────────

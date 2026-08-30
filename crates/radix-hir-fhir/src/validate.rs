@@ -6,7 +6,968 @@
 
 use crate::artifact::HirArtifact;
 use crate::error::HirArtifactError;
-use rustc_hash::FxHashSet;
+use rustc_hash::{FxHashMap, FxHashSet};
+
+// ---------------------------------------------------------------------------
+// Authored type-site inventory and form validation (ATF-5)
+// ---------------------------------------------------------------------------
+
+fn register_type_site(
+    sites: &mut FxHashMap<radix_hir::HirTypeSite, radix_types::TypeId>,
+    owner: radix_hir::HirOwnerRef,
+    slot: radix_hir::HirTypeSlot,
+    ty: radix_types::TypeId,
+) {
+    sites
+        .entry(radix_hir::HirTypeSite { owner, slot })
+        .or_insert(ty);
+}
+
+fn register_function_type_sites(
+    sites: &mut FxHashMap<radix_hir::HirTypeSite, radix_types::TypeId>,
+    owner: radix_types::DefId,
+    function: &radix_hir::HirFunction,
+) {
+    for (ordinal, param) in function.params.iter().enumerate() {
+        register_type_site(
+            sites,
+            radix_hir::HirOwnerRef::Def(param.def_id),
+            radix_hir::HirTypeSlot::Parameter(ordinal as u32),
+            param.ty,
+        );
+    }
+    if let Some(param) = &function.cli_args {
+        register_type_site(
+            sites,
+            radix_hir::HirOwnerRef::Def(param.def_id),
+            radix_hir::HirTypeSlot::Parameter(function.params.len() as u32),
+            param.ty,
+        );
+    }
+    if let Some(ty) = function.ret_ty {
+        register_type_site(
+            sites,
+            radix_hir::HirOwnerRef::Def(owner),
+            radix_hir::HirTypeSlot::Return,
+            ty,
+        );
+    }
+    if let Some(ty) = function.err_ty {
+        register_type_site(
+            sites,
+            radix_hir::HirOwnerRef::Def(owner),
+            radix_hir::HirTypeSlot::Error,
+            ty,
+        );
+    }
+}
+
+fn register_annotation_type_sites(
+    sites: &mut FxHashMap<radix_hir::HirTypeSite, radix_types::TypeId>,
+    owner: radix_hir::HirOwnerRef,
+    annotations: &[radix_hir::HirAnnotation],
+) {
+    for (annotation, ann) in annotations.iter().enumerate() {
+        let mut type_field = 0;
+        for value in &ann.fields {
+            if let radix_hir::HirAnnotationValue::Type(ty) = &value.value {
+                register_type_site(
+                    sites,
+                    owner.clone(),
+                    radix_hir::HirTypeSlot::AnnotationField {
+                        annotation: annotation as u32,
+                        field: type_field,
+                    },
+                    *ty,
+                );
+                type_field += 1;
+            }
+        }
+    }
+}
+
+struct TypeSiteCollector {
+    sites: FxHashMap<radix_hir::HirTypeSite, radix_types::TypeId>,
+    current_expr: Option<radix_hir::HirId>,
+}
+
+impl TypeSiteCollector {
+    fn new() -> Self {
+        Self {
+            sites: FxHashMap::default(),
+            current_expr: None,
+        }
+    }
+}
+
+impl radix_hir::visit::HirVisitor for TypeSiteCollector {
+    fn visit_item(&mut self, item: &radix_hir::HirItem) {
+        let owner = radix_hir::HirOwnerRef::Def(item.def_id);
+        match &item.kind {
+            radix_hir::HirItemKind::Function(function) => {
+                register_function_type_sites(&mut self.sites, item.def_id, function);
+                register_annotation_type_sites(
+                    &mut self.sites,
+                    owner.clone(),
+                    &function.annotations,
+                );
+            }
+            radix_hir::HirItemKind::Struct(strukt) => {
+                register_annotation_type_sites(&mut self.sites, owner.clone(), &strukt.annotations);
+                for (ordinal, field) in strukt.fields.iter().enumerate() {
+                    register_type_site(
+                        &mut self.sites,
+                        owner.clone(),
+                        radix_hir::HirTypeSlot::Field(ordinal as u32),
+                        field.ty,
+                    );
+                    register_type_site(
+                        &mut self.sites,
+                        radix_hir::HirOwnerRef::Def(field.def_id),
+                        radix_hir::HirTypeSlot::Declared,
+                        field.ty,
+                    );
+                    register_annotation_type_sites(
+                        &mut self.sites,
+                        radix_hir::HirOwnerRef::Def(field.def_id),
+                        &field.annotations,
+                    );
+                }
+            }
+            radix_hir::HirItemKind::Enum(enum_item) => {
+                register_annotation_type_sites(
+                    &mut self.sites,
+                    owner.clone(),
+                    &enum_item.annotations,
+                );
+                for (ordinal, field) in enum_item.commune_fields.iter().enumerate() {
+                    register_type_site(
+                        &mut self.sites,
+                        owner.clone(),
+                        radix_hir::HirTypeSlot::Field(ordinal as u32),
+                        field.ty,
+                    );
+                }
+                for variant in &enum_item.variants {
+                    for (ordinal, field) in variant.fields.iter().enumerate() {
+                        register_type_site(
+                            &mut self.sites,
+                            radix_hir::HirOwnerRef::Def(variant.def_id),
+                            radix_hir::HirTypeSlot::Field(ordinal as u32),
+                            field.ty,
+                        );
+                    }
+                }
+            }
+            radix_hir::HirItemKind::Interface(interface) => {
+                for method in &interface.methods {
+                    for (ordinal, param) in method.params.iter().enumerate() {
+                        register_type_site(
+                            &mut self.sites,
+                            radix_hir::HirOwnerRef::Def(param.def_id),
+                            radix_hir::HirTypeSlot::Parameter(ordinal as u32),
+                            param.ty,
+                        );
+                    }
+                }
+            }
+            radix_hir::HirItemKind::TypeAlias(alias) => {
+                register_type_site(
+                    &mut self.sites,
+                    owner.clone(),
+                    radix_hir::HirTypeSlot::AliasBody,
+                    alias.ty,
+                );
+            }
+            radix_hir::HirItemKind::Schema(schema) => {
+                for (ordinal, column) in schema.columns.iter().enumerate() {
+                    register_type_site(
+                        &mut self.sites,
+                        owner.clone(),
+                        radix_hir::HirTypeSlot::Field(ordinal as u32),
+                        column.ty,
+                    );
+                }
+            }
+            radix_hir::HirItemKind::Constant(constant) => {
+                if let Some(ty) = constant.ty {
+                    register_type_site(
+                        &mut self.sites,
+                        owner.clone(),
+                        radix_hir::HirTypeSlot::Declared,
+                        ty,
+                    );
+                }
+            }
+            radix_hir::HirItemKind::Import(_) => {}
+        }
+        radix_hir::visit::walk_item(self, item);
+    }
+
+    fn visit_method(&mut self, method: &radix_hir::HirMethod) {
+        register_function_type_sites(&mut self.sites, method.def_id, &method.func);
+        register_annotation_type_sites(
+            &mut self.sites,
+            radix_hir::HirOwnerRef::Def(method.def_id),
+            &method.func.annotations,
+        );
+        radix_hir::visit::walk_method(self, method);
+    }
+
+    fn visit_local(&mut self, local: &radix_hir::HirLocal) {
+        if let Some(ty) = local.ty {
+            register_type_site(
+                &mut self.sites,
+                radix_hir::HirOwnerRef::Def(local.def_id),
+                radix_hir::HirTypeSlot::Declared,
+                ty,
+            );
+        }
+        radix_hir::visit::walk_local(self, local);
+    }
+
+    fn visit_expr(&mut self, expr: &radix_hir::HirExpression) {
+        let previous = self.current_expr.replace(expr.id);
+        match &expr.kind {
+            radix_hir::HirExpressionKind::Verte { target, .. } => {
+                register_type_site(
+                    &mut self.sites,
+                    radix_hir::HirOwnerRef::Hir(expr.id),
+                    radix_hir::HirTypeSlot::AscriptionTarget,
+                    *target,
+                );
+                // Finge casts currently lower to the same `Verte` carrier as
+                // static ascription; the wire has no discriminator to tell
+                // those two source slots apart, so both are checkable sites.
+                register_type_site(
+                    &mut self.sites,
+                    radix_hir::HirOwnerRef::Hir(expr.id),
+                    radix_hir::HirTypeSlot::ConversionTarget,
+                    *target,
+                );
+            }
+            radix_hir::HirExpressionKind::Conversio {
+                target: radix_hir::HirConversioTarget::Type(ty),
+                ..
+            } => register_type_site(
+                &mut self.sites,
+                radix_hir::HirOwnerRef::Hir(expr.id),
+                radix_hir::HirTypeSlot::ConversionTarget,
+                *ty,
+            ),
+            radix_hir::HirExpressionKind::TypeCheck { ty, .. } => register_type_site(
+                &mut self.sites,
+                radix_hir::HirOwnerRef::Hir(expr.id),
+                radix_hir::HirTypeSlot::TypeCheckTarget,
+                *ty,
+            ),
+            radix_hir::HirExpressionKind::Tuple(_, Some(type_args)) => {
+                for (ordinal, ty) in type_args.iter().enumerate() {
+                    register_type_site(
+                        &mut self.sites,
+                        radix_hir::HirOwnerRef::Hir(expr.id),
+                        radix_hir::HirTypeSlot::TupleTypeArgument(ordinal as u32),
+                        *ty,
+                    );
+                }
+            }
+            radix_hir::HirExpressionKind::Clausura(params, ret, err, _, _) => {
+                for (ordinal, param) in params.iter().enumerate() {
+                    register_type_site(
+                        &mut self.sites,
+                        radix_hir::HirOwnerRef::Def(param.def_id),
+                        radix_hir::HirTypeSlot::ClosureParameter(ordinal as u32),
+                        param.ty,
+                    );
+                }
+                if let Some(ty) = ret {
+                    register_type_site(
+                        &mut self.sites,
+                        radix_hir::HirOwnerRef::Hir(expr.id),
+                        radix_hir::HirTypeSlot::Return,
+                        *ty,
+                    );
+                }
+                if let Some(ty) = err {
+                    register_type_site(
+                        &mut self.sites,
+                        radix_hir::HirOwnerRef::Hir(expr.id),
+                        radix_hir::HirTypeSlot::Error,
+                        *ty,
+                    );
+                }
+            }
+            _ => {}
+        }
+        radix_hir::visit::walk_expr(self, expr);
+        self.current_expr = previous;
+    }
+
+    fn visit_pattern(&mut self, pattern: &radix_hir::HirPattern) {
+        if let (Some(owner), radix_hir::HirPattern::TypeTest { ty, .. }) =
+            (self.current_expr, pattern)
+        {
+            register_type_site(
+                &mut self.sites,
+                radix_hir::HirOwnerRef::Hir(owner),
+                radix_hir::HirTypeSlot::PatternType,
+                *ty,
+            );
+        }
+        radix_hir::visit::walk_pattern(self, pattern);
+    }
+}
+
+fn collect_type_site_registry(
+    artifact: &HirArtifact,
+) -> FxHashMap<radix_hir::HirTypeSite, radix_types::TypeId> {
+    let mut collector = TypeSiteCollector::new();
+    radix_hir::visit::walk_program(&mut collector, &artifact.hir);
+    for discard in &artifact.presentation.discard_binding_stmts {
+        if let Some(ty) = discard.ty {
+            register_type_site(
+                &mut collector.sites,
+                radix_hir::HirOwnerRef::Hir(discard.expr_id),
+                radix_hir::HirTypeSlot::DiscardBinding,
+                ty,
+            );
+        }
+    }
+    collector.sites
+}
+
+fn collect_named_type_defs(artifact: &HirArtifact) -> FxHashSet<radix_types::DefId> {
+    let mut defs = FxHashSet::default();
+    for item in &artifact.hir.items {
+        if matches!(
+            &item.kind,
+            radix_hir::HirItemKind::Struct(_)
+                | radix_hir::HirItemKind::Enum(_)
+                | radix_hir::HirItemKind::Interface(_)
+                | radix_hir::HirItemKind::TypeAlias(_)
+        ) {
+            defs.insert(item.def_id);
+        }
+    }
+    for (_, interface) in &artifact.resolver.file_interfaces {
+        for (_, export) in &interface.exports {
+            match export {
+                crate::artifact::FileExportSnapshot::Struct { def_id, .. }
+                | crate::artifact::FileExportSnapshot::Type {
+                    def_id: Some(def_id),
+                    ..
+                } => {
+                    defs.insert(*def_id);
+                }
+                crate::artifact::FileExportSnapshot::Function(_)
+                | crate::artifact::FileExportSnapshot::Type { def_id: None, .. } => {}
+            }
+        }
+    }
+    defs
+}
+
+fn type_site_anchor(site: &radix_hir::HirTypeSite) -> u32 {
+    match site.owner {
+        radix_hir::HirOwnerRef::Hir(id) => id.0,
+        radix_hir::HirOwnerRef::Def(def_id) => def_id.0,
+    }
+}
+
+fn type_presentation_issue(issue: &'static str, site: &radix_hir::HirTypeSite) -> HirArtifactError {
+    HirArtifactError::InvalidPresentation {
+        issue,
+        anchor: type_site_anchor(site),
+    }
+}
+
+#[allow(clippy::too_many_arguments)]
+fn validate_type_arg(
+    arg: &radix_hir::HirTypeFormArg,
+    expected: radix_types::TypeId,
+    site: &radix_hir::HirTypeSite,
+    root_slot: &radix_hir::HirTypeSlot,
+    types: &radix_types::TypeTableSnapshot,
+    named_defs: &FxHashSet<radix_types::DefId>,
+    check_symbol: &dyn Fn(radix_lexer::Symbol) -> Result<(), HirArtifactError>,
+    check_def: &dyn Fn(radix_types::DefId) -> Result<(), HirArtifactError>,
+    check_type: &dyn Fn(radix_types::TypeId) -> Result<(), HirArtifactError>,
+    check_index: &dyn Fn(radix_types::IndexId) -> Result<(), HirArtifactError>,
+) -> Result<(), HirArtifactError> {
+    let radix_hir::HirTypeFormArg::Type(child) = arg else {
+        return Err(type_presentation_issue("type_argument_kind", site));
+    };
+    if child.ty != expected {
+        return Err(type_presentation_issue("nested_witness_mismatch", site));
+    }
+    validate_type_form(
+        child,
+        site,
+        root_slot,
+        types,
+        named_defs,
+        check_symbol,
+        check_def,
+        check_type,
+        check_index,
+    )
+}
+
+fn validate_size_arg(
+    arg: &radix_hir::HirTypeFormArg,
+    expected: radix_types::IndexId,
+    site: &radix_hir::HirTypeSite,
+    check_index: &dyn Fn(radix_types::IndexId) -> Result<(), HirArtifactError>,
+) -> Result<(), HirArtifactError> {
+    let radix_hir::HirTypeFormArg::Size(index) = arg else {
+        return Err(type_presentation_issue("size_argument_kind", site));
+    };
+    check_index(*index)?;
+    if *index != expected {
+        return Err(type_presentation_issue("size_witness_mismatch", site));
+    }
+    Ok(())
+}
+
+fn validate_short_numeric_child(
+    arg: &radix_hir::HirTypeFormArg,
+    site: &radix_hir::HirTypeSite,
+    types: &radix_types::TypeTableSnapshot,
+) -> Result<(), HirArtifactError> {
+    let radix_hir::HirTypeFormArg::Type(child) = arg else {
+        return Err(type_presentation_issue("short_child_kind", site));
+    };
+    if !matches!(
+        types.types().get(child.ty.0 as usize),
+        Some(radix_types::Type::SizedNumeric(_, _))
+    ) || !matches!(
+        child.head,
+        radix_hir::HirTypeFormHead::Semantic(level) if level.0 == 1
+    ) || !child.args.is_empty()
+    {
+        return Err(type_presentation_issue("short_width_child", site));
+    }
+    Ok(())
+}
+
+#[allow(clippy::too_many_arguments)]
+fn validate_named_form(
+    form: &radix_hir::HirTypeForm,
+    site: &radix_hir::HirTypeSite,
+    types: &radix_types::TypeTableSnapshot,
+    named_defs: &FxHashSet<radix_types::DefId>,
+    path_def: radix_types::DefId,
+    path: &[radix_lexer::Symbol],
+    check_symbol: &dyn Fn(radix_lexer::Symbol) -> Result<(), HirArtifactError>,
+    check_def: &dyn Fn(radix_types::DefId) -> Result<(), HirArtifactError>,
+    check_type: &dyn Fn(radix_types::TypeId) -> Result<(), HirArtifactError>,
+    check_index: &dyn Fn(radix_types::IndexId) -> Result<(), HirArtifactError>,
+    root_slot: &radix_hir::HirTypeSlot,
+) -> Result<(), HirArtifactError> {
+    check_def(path_def)?;
+    if !named_defs.contains(&path_def) {
+        return Err(type_presentation_issue("named_def_not_type", site));
+    }
+    if path.is_empty() {
+        return Err(type_presentation_issue("empty_named_path", site));
+    }
+    for symbol in path {
+        check_symbol(*symbol)?;
+    }
+
+    let (witness_def, applied_args) = named_witness(types, form.ty)
+        .ok_or_else(|| type_presentation_issue("named_witness_not_named", site))?;
+    if witness_def != path_def {
+        return Err(type_presentation_issue(
+            "named_witness_definition_mismatch",
+            site,
+        ));
+    }
+    if applied_args.len() != form.args.len() {
+        return Err(type_presentation_issue("named_argument_arity", site));
+    }
+    for (arg, expected) in form.args.iter().zip(applied_args) {
+        match expected {
+            radix_types::AppliedArg::Type(expected) => match arg {
+                radix_hir::HirTypeFormArg::Type(child) => {
+                    if child.ty != expected {
+                        return Err(type_presentation_issue("named_argument_witness", site));
+                    }
+                    validate_type_form(
+                        child,
+                        site,
+                        root_slot,
+                        types,
+                        named_defs,
+                        check_symbol,
+                        check_def,
+                        check_type,
+                        check_index,
+                    )?;
+                }
+                radix_hir::HirTypeFormArg::Name(symbol) if matches!(types.types().get(expected.0 as usize), Some(radix_types::Type::Param(name)) if *name == *symbol) =>
+                {
+                    check_symbol(*symbol)?;
+                }
+                radix_hir::HirTypeFormArg::Name(_) => {
+                    return Err(type_presentation_issue("named_name_argument_witness", site));
+                }
+                radix_hir::HirTypeFormArg::Size(_) => {
+                    return Err(type_presentation_issue("named_argument_kind", site));
+                }
+            },
+            radix_types::AppliedArg::Size(_) => {
+                return Err(type_presentation_issue("named_size_argument", site));
+            }
+        }
+    }
+    Ok(())
+}
+
+fn named_witness(
+    types: &radix_types::TypeTableSnapshot,
+    ty: radix_types::TypeId,
+) -> Option<(radix_types::DefId, Vec<radix_types::AppliedArg>)> {
+    match types.types().get(ty.0 as usize)? {
+        radix_types::Type::Struct(def_id)
+        | radix_types::Type::Enum(def_id)
+        | radix_types::Type::Interface(def_id)
+        | radix_types::Type::Alias(def_id, _) => Some((*def_id, Vec::new())),
+        radix_types::Type::Applied(base, args) => {
+            let (def_id, _) = named_witness(types, *base)?;
+            Some((def_id, args.clone()))
+        }
+        radix_types::Type::Ref(_, inner) => named_witness(types, *inner),
+        _ => None,
+    }
+}
+
+#[allow(clippy::too_many_arguments)]
+fn validate_type_form(
+    form: &radix_hir::HirTypeForm,
+    site: &radix_hir::HirTypeSite,
+    root_slot: &radix_hir::HirTypeSlot,
+    types: &radix_types::TypeTableSnapshot,
+    named_defs: &FxHashSet<radix_types::DefId>,
+    check_symbol: &dyn Fn(radix_lexer::Symbol) -> Result<(), HirArtifactError>,
+    check_def: &dyn Fn(radix_types::DefId) -> Result<(), HirArtifactError>,
+    check_type: &dyn Fn(radix_types::TypeId) -> Result<(), HirArtifactError>,
+    check_index: &dyn Fn(radix_types::IndexId) -> Result<(), HirArtifactError>,
+) -> Result<(), HirArtifactError> {
+    check_type(form.ty)?;
+    match &form.head {
+        radix_hir::HirTypeFormHead::Infer | radix_hir::HirTypeFormHead::UnionHole => {
+            if !matches!(
+                root_slot,
+                radix_hir::HirTypeSlot::Declared | radix_hir::HirTypeSlot::DiscardBinding
+            ) {
+                return Err(type_presentation_issue("hole_in_illegal_slot", site));
+            }
+            if !form.args.is_empty() {
+                return Err(type_presentation_issue("hole_arguments", site));
+            }
+            return Ok(());
+        }
+        radix_hir::HirTypeFormHead::Named { def_id, path } => {
+            return validate_named_form(
+                form,
+                site,
+                types,
+                named_defs,
+                *def_id,
+                path,
+                check_symbol,
+                check_def,
+                check_type,
+                check_index,
+                root_slot,
+            );
+        }
+        radix_hir::HirTypeFormHead::Semantic(level) => {
+            let ty = types
+                .types()
+                .get(form.ty.0 as usize)
+                .ok_or_else(|| type_presentation_issue("type_witness_missing", site))?;
+            match ty {
+                radix_types::Type::SizedNumeric(_, _) => {
+                    if level.0 > 1 || !form.args.is_empty() {
+                        return Err(type_presentation_issue("numeric_level_or_arity", site));
+                    }
+                }
+                radix_types::Type::Primitive(_)
+                | radix_types::Type::ModularWord(_)
+                | radix_types::Type::SizedInstans(_)
+                | radix_types::Type::BoundedTextus { .. }
+                | radix_types::Type::BoundedAscii { .. }
+                | radix_types::Type::BoundedOcteti { .. } => {
+                    if level.0 != 0 || !form.args.is_empty() {
+                        return Err(type_presentation_issue("semantic_level_or_arity", site));
+                    }
+                }
+                radix_types::Type::Array(element) => {
+                    if form.args.len() != 1 {
+                        return Err(type_presentation_issue("array_argument_arity", site));
+                    }
+                    validate_type_arg(
+                        &form.args[0],
+                        *element,
+                        site,
+                        root_slot,
+                        types,
+                        named_defs,
+                        check_symbol,
+                        check_def,
+                        check_type,
+                        check_index,
+                    )?;
+                    if level.0 == 1 {
+                        validate_short_numeric_child(&form.args[0], site, types)?;
+                    } else if level.0 != 0 {
+                        return Err(type_presentation_issue("array_level", site));
+                    }
+                }
+                radix_types::Type::BoundedArray { element, .. } => {
+                    if level.0 != 0 || form.args.len() != 1 {
+                        return Err(type_presentation_issue("bounded_array_shape", site));
+                    }
+                    validate_type_arg(
+                        &form.args[0],
+                        *element,
+                        site,
+                        root_slot,
+                        types,
+                        named_defs,
+                        check_symbol,
+                        check_def,
+                        check_type,
+                        check_index,
+                    )?;
+                }
+                radix_types::Type::Tensor(element, shape)
+                | radix_types::Type::Vector(element, shape)
+                | radix_types::Type::Matrix(element, shape)
+                | radix_types::Type::Sparsa(element, shape) => {
+                    let has_explicit_shape = matches!(ty, radix_types::Type::Tensor(..));
+                    let expected_arity = if has_explicit_shape { 2 } else { 1 };
+                    if form.args.len() != expected_arity || level.0 > 1 {
+                        return Err(type_presentation_issue("aggregate_level_or_arity", site));
+                    }
+                    validate_type_arg(
+                        &form.args[0],
+                        *element,
+                        site,
+                        root_slot,
+                        types,
+                        named_defs,
+                        check_symbol,
+                        check_def,
+                        check_type,
+                        check_index,
+                    )?;
+                    if has_explicit_shape {
+                        validate_size_arg(&form.args[1], *shape, site, check_index)?;
+                    }
+                    if level.0 == 1 {
+                        validate_short_numeric_child(&form.args[0], site, types)?;
+                    }
+                    match ty {
+                        radix_types::Type::Vector(_, index)
+                            if matches!(
+                                types.indices().get(index.0 as usize),
+                                Some(radix_types::IndexExpr::Tuple(dims)) if dims.len() != 1
+                            ) =>
+                        {
+                            return Err(type_presentation_issue("vector_shape", site))
+                        }
+                        radix_types::Type::Matrix(_, index)
+                            if !matches!(
+                                types.indices().get(index.0 as usize),
+                                Some(radix_types::IndexExpr::Tuple(dims)) if dims.len() == 2
+                            ) =>
+                        {
+                            return Err(type_presentation_issue("matrix_shape", site))
+                        }
+                        _ => {}
+                    }
+                }
+                radix_types::Type::Map(key, value) => {
+                    if level.0 != 0 || (!form.args.is_empty() && form.args.len() != 2) {
+                        return Err(type_presentation_issue("map_shape", site));
+                    }
+                    if form.args.len() == 2 {
+                        validate_type_arg(
+                            &form.args[0],
+                            *key,
+                            site,
+                            root_slot,
+                            types,
+                            named_defs,
+                            check_symbol,
+                            check_def,
+                            check_type,
+                            check_index,
+                        )?;
+                        validate_type_arg(
+                            &form.args[1],
+                            *value,
+                            site,
+                            root_slot,
+                            types,
+                            named_defs,
+                            check_symbol,
+                            check_def,
+                            check_type,
+                            check_index,
+                        )?;
+                    }
+                }
+                radix_types::Type::Record(fields) => {
+                    if level.0 != 0 || form.args.len() != fields.len() {
+                        return Err(type_presentation_issue("record_shape", site));
+                    }
+                    let mut expected = fields.values().copied().collect::<Vec<_>>();
+                    for arg in &form.args {
+                        let radix_hir::HirTypeFormArg::Type(child) = arg else {
+                            return Err(type_presentation_issue("record_argument_kind", site));
+                        };
+                        let Some(position) = expected.iter().position(|ty| *ty == child.ty) else {
+                            return Err(type_presentation_issue("record_witness_mismatch", site));
+                        };
+                        expected.swap_remove(position);
+                        validate_type_form(
+                            child,
+                            site,
+                            root_slot,
+                            types,
+                            named_defs,
+                            check_symbol,
+                            check_def,
+                            check_type,
+                            check_index,
+                        )?;
+                    }
+                }
+                radix_types::Type::Promissum(element)
+                | radix_types::Type::Cursor(element)
+                | radix_types::Type::Set(element)
+                | radix_types::Type::Atomic(element)
+                | radix_types::Type::Intervallum(element)
+                | radix_types::Type::Option(element) => {
+                    if level.0 != 0 {
+                        return Err(type_presentation_issue("semantic_level", site));
+                    }
+                    if matches!(ty, radix_types::Type::Option(_)) {
+                        match form.args.as_slice() {
+                            [] => {}
+                            [arg] => validate_type_arg(
+                                arg,
+                                *element,
+                                site,
+                                root_slot,
+                                types,
+                                named_defs,
+                                check_symbol,
+                                check_def,
+                                check_type,
+                                check_index,
+                            )?,
+                            _ => return Err(type_presentation_issue("option_shape", site)),
+                        }
+                    } else {
+                        if form.args.len() != 1 {
+                            return Err(type_presentation_issue("unary_argument_arity", site));
+                        }
+                        validate_type_arg(
+                            &form.args[0],
+                            *element,
+                            site,
+                            root_slot,
+                            types,
+                            named_defs,
+                            check_symbol,
+                            check_def,
+                            check_type,
+                            check_index,
+                        )?;
+                    }
+                }
+                radix_types::Type::PromissumFailable(success, alternate)
+                | radix_types::Type::AsyncCursor(success, alternate) => {
+                    if level.0 != 0 || form.args.len() != 2 {
+                        return Err(type_presentation_issue("binary_argument_arity", site));
+                    }
+                    validate_type_arg(
+                        &form.args[0],
+                        *success,
+                        site,
+                        root_slot,
+                        types,
+                        named_defs,
+                        check_symbol,
+                        check_def,
+                        check_type,
+                        check_index,
+                    )?;
+                    validate_type_arg(
+                        &form.args[1],
+                        *alternate,
+                        site,
+                        root_slot,
+                        types,
+                        named_defs,
+                        check_symbol,
+                        check_def,
+                        check_type,
+                        check_index,
+                    )?;
+                }
+                radix_types::Type::Ref(_, inner) => {
+                    if level.0 != 0 || form.args.len() != 1 {
+                        return Err(type_presentation_issue("reference_shape", site));
+                    }
+                    validate_type_arg(
+                        &form.args[0],
+                        *inner,
+                        site,
+                        root_slot,
+                        types,
+                        named_defs,
+                        check_symbol,
+                        check_def,
+                        check_type,
+                        check_index,
+                    )?;
+                }
+                radix_types::Type::Union(_)
+                | radix_types::Type::Intersection(_)
+                | radix_types::Type::Func(_) => {
+                    if level.0 != 0 || !form.args.is_empty() {
+                        return Err(type_presentation_issue("canonical_shape", site));
+                    }
+                }
+                radix_types::Type::Tuple(members) => {
+                    if level.0 != 0 || form.args.len() != members.len() {
+                        return Err(type_presentation_issue("tuple_shape", site));
+                    }
+                    for (arg, expected) in form.args.iter().zip(members) {
+                        validate_type_arg(
+                            arg,
+                            *expected,
+                            site,
+                            root_slot,
+                            types,
+                            named_defs,
+                            check_symbol,
+                            check_def,
+                            check_type,
+                            check_index,
+                        )?;
+                    }
+                }
+                radix_types::Type::Param(_)
+                | radix_types::Type::Infer(_)
+                | radix_types::Type::InferUnion(_)
+                | radix_types::Type::MarkerHole { .. }
+                | radix_types::Type::Error => {
+                    if level.0 != 0 || !form.args.is_empty() {
+                        return Err(type_presentation_issue("opaque_shape", site));
+                    }
+                }
+                radix_types::Type::Struct(_)
+                | radix_types::Type::Enum(_)
+                | radix_types::Type::Interface(_)
+                | radix_types::Type::Alias(_, _)
+                | radix_types::Type::Applied(_, _) => {
+                    return Err(type_presentation_issue("semantic_named_constructor", site));
+                }
+                radix_types::Type::Queue(element) | radix_types::Type::Stack(element) => {
+                    if level.0 != 0 || form.args.len() != 1 {
+                        return Err(type_presentation_issue("queue_stack_shape", site));
+                    }
+                    validate_type_arg(
+                        &form.args[0],
+                        *element,
+                        site,
+                        root_slot,
+                        types,
+                        named_defs,
+                        check_symbol,
+                        check_def,
+                        check_type,
+                        check_index,
+                    )?;
+                }
+                radix_types::Type::BoundedQueue { element, .. }
+                | radix_types::Type::BoundedStack { element, .. } => {
+                    if level.0 != 0 || form.args.len() != 1 {
+                        return Err(type_presentation_issue("bounded_queue_stack_shape", site));
+                    }
+                    validate_type_arg(
+                        &form.args[0],
+                        *element,
+                        site,
+                        root_slot,
+                        types,
+                        named_defs,
+                        check_symbol,
+                        check_def,
+                        check_type,
+                        check_index,
+                    )?;
+                }
+            }
+        }
+    }
+    Ok(())
+}
+
+fn validate_authored_type_records(
+    artifact: &HirArtifact,
+    presentation: &radix_hir::HirPresentation,
+    check_symbol: &dyn Fn(radix_lexer::Symbol) -> Result<(), HirArtifactError>,
+    check_hir: &dyn Fn(radix_hir::HirId) -> Result<(), HirArtifactError>,
+    check_def: &dyn Fn(radix_types::DefId) -> Result<(), HirArtifactError>,
+    check_type: &dyn Fn(radix_types::TypeId) -> Result<(), HirArtifactError>,
+    check_index: &dyn Fn(radix_types::IndexId) -> Result<(), HirArtifactError>,
+) -> Result<(), HirArtifactError> {
+    let sites = collect_type_site_registry(artifact);
+    let named_defs = collect_named_type_defs(artifact);
+    let mut seen = FxHashSet::default();
+    for authored in &presentation.authored_types {
+        if !seen.insert(authored.site.clone()) {
+            return Err(type_presentation_issue(
+                "duplicate_type_site",
+                &authored.site,
+            ));
+        }
+        match authored.site.owner {
+            radix_hir::HirOwnerRef::Hir(id) => check_hir(id)?,
+            radix_hir::HirOwnerRef::Def(def_id) => check_def(def_id)?,
+        }
+        let Some(expected) = sites.get(&authored.site).copied() else {
+            return Err(type_presentation_issue("unknown_type_slot", &authored.site));
+        };
+        check_type(authored.form.ty)?;
+        if authored.form.ty != expected {
+            return Err(type_presentation_issue(
+                "root_witness_mismatch",
+                &authored.site,
+            ));
+        }
+        validate_type_form(
+            &authored.form,
+            &authored.site,
+            &authored.site.slot,
+            &artifact.types,
+            &named_defs,
+            check_symbol,
+            check_def,
+            check_type,
+            check_index,
+        )?;
+    }
+    Ok(())
+}
 
 // ---------------------------------------------------------------------------
 // Referential integrity validation (U2.3)
@@ -1859,7 +2820,7 @@ pub(crate) fn validate_referential_integrity(
         Ok(())
     }
 
-    // ── Presentation sidecar walk helper (schema v2) ─────────────────────
+    // ── Presentation sidecar walk helper (schema v2/v9) ─────────────────
     //
     // Presentation anchors are a dedicated namespace (HirSourceAnchorId),
     // never overloaded with HirId. The sidecar must be internally coherent:
@@ -1871,10 +2832,13 @@ pub(crate) fn validate_referential_integrity(
     // symbols fail closed (CSO E8, F7).
 
     fn validate_presentation(
+        artifact: &HirArtifact,
         presentation: &radix_hir::HirPresentation,
         check_symbol: &dyn Fn(radix_lexer::Symbol) -> Result<(), HirArtifactError>,
         check_hir: &dyn Fn(radix_hir::HirId) -> Result<(), HirArtifactError>,
         check_def: &dyn Fn(radix_types::DefId) -> Result<(), HirArtifactError>,
+        check_type: &dyn Fn(radix_types::TypeId) -> Result<(), HirArtifactError>,
+        check_index: &dyn Fn(radix_types::IndexId) -> Result<(), HirArtifactError>,
     ) -> Result<(), HirArtifactError> {
         // Owner anchor ids must be unique. Each owner's semantic back-ref,
         // when present, must resolve to an in-tree node (HirId) or a known
@@ -1981,6 +2945,16 @@ pub(crate) fn validate_referential_integrity(
                 }
             }
         }
+
+        validate_authored_type_records(
+            artifact,
+            presentation,
+            check_symbol,
+            check_hir,
+            check_def,
+            check_type,
+            check_index,
+        )?;
 
         Ok(())
     }
@@ -2272,38 +3246,47 @@ pub(crate) fn validate_referential_integrity(
 
     // 8. Type arena walk: validate TypeId/DefId/Symbol/IndexId
     //    cross-references inside the type-table snapshot.
+    let check_index = |xi: radix_types::IndexId| -> Result<(), HirArtifactError> {
+        let idx_count = artifact.types.indices().len();
+        let i = xi.0 as usize;
+        if i >= idx_count {
+            return Err(HirArtifactError::DanglingIndex {
+                kind: "IndexId",
+                index: xi.0,
+                arena_size: idx_count,
+            });
+        }
+        Ok(())
+    };
     for ty in artifact.types.types() {
-        validate_type(
-            ty,
-            &check_def,
-            &check_symbol,
-            &check_type,
-            &|xi: radix_types::IndexId| -> Result<(), HirArtifactError> {
-                let idx_count = artifact.types.indices().len();
-                let i = xi.0 as usize;
-                if i >= idx_count {
-                    return Err(HirArtifactError::DanglingIndex {
-                        kind: "IndexId",
-                        index: xi.0,
-                        arena_size: idx_count,
-                    });
-                }
-                Ok(())
-            },
-        )?;
+        validate_type(ty, &check_def, &check_symbol, &check_type, &check_index)?;
+    }
+    for index in artifact.types.indices() {
+        if let radix_types::IndexExpr::Tuple(children) = index {
+            for child in children {
+                check_index(*child)?;
+            }
+        }
+        if let radix_types::IndexExpr::Param(symbol) = index {
+            check_symbol(*symbol)?;
+        }
     }
 
-    // 9. Presentation sidecar (schema v2): every attachment anchor must name
-    //    a registered owner, owner anchors must be unique, each owner may
+    // 9. Presentation sidecar (anchors from v2, authored types from v9): every
+    //    attachment anchor must name a registered owner, owner anchors must be
+    //    unique, each owner may
     //    carry at most one attachment, every comment Symbol must resolve
     //    in the interner table, and every HirOwnerRef back-reference must
     //    name an in-tree node or known def. The entry-start anchor, when
     //    present, must name a registered owner.
     validate_presentation(
+        artifact,
         &artifact.presentation,
         &check_symbol,
         &check_hir,
         &check_def,
+        &check_type,
+        &check_index,
     )?;
 
     // 10. Capability provenance (SCR-04, schema v8): every identity key —

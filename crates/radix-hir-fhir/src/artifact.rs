@@ -460,8 +460,10 @@ pub struct FunctionProvenanceTableWire {
 /// rows keyed by the ordered pair `(source → destination)`. Version 8
 /// (SCR-04) adds the durable capability-provenance summaries
 /// (`FunctionProvenanceTableWire`); older artifacts fail closed at the
-/// schema gate as usual.
-pub const SCHEMA_VERSION: u32 = 8;
+/// schema gate as usual. Version 9 adds `HirPresentation::authored_types`;
+/// this serialized HIR presentation change is a wire break, so there is no
+/// compatibility decoder for schema-v8 artifacts.
+pub const SCHEMA_VERSION: u32 = 9;
 
 /// Serializable snapshot of one analyzed compilation unit (F1, F2, F4).
 ///
