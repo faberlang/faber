@@ -20,7 +20,9 @@ const BUDGETS: Budgets = Budgets {
     // plan/probe asserts — RMSNorm gamma resource binding (1cd75e23f),
     // interleaved rank-3 RoPE tables (a1c2b104e), and queue/stack elementwise
     // instantiation (ef44b2751), plus one RoPE row in the abi/tests.rs probe.
-    expect: 69,
+    // Re-baselined 69→71: the staged composed-matmul ABI probe (8b36e7c92)
+    // added two abi/tests.rs probe asserts without this bump.
+    expect: 71,
     // WHY: minted at D-03 baseline; frozen, not audited here.
     panic: 9,
     // WHY: minted at D-03 baseline; frozen, not audited here.
@@ -29,7 +31,9 @@ const BUDGETS: Budgets = Budgets {
     // queue/stack elementwise (ef44b2751) added the intrinsic validation
     // arm; literal_indexed_access.rs carries the checked-index arm. All
     // exhaustive over selections verified before dispatch.
-    unreachable: 5,
+    // Re-baselined 5→7: the package shape-size substitution finalizer
+    // (3729cbb6c) added two exhaustive-selection arms without this bump.
+    unreachable: 7,
     todo: 0,
     unimplemented: 0,
     // WHY: minted at D-03 baseline; frozen, not audited here.

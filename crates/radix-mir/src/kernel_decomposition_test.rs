@@ -1,6 +1,5 @@
 use super::*;
 use crate::elementwise_plan::{ElementwiseExpr, ElementwiseOp};
-use crate::kernel_plan::ComposedMatMulStageKind;
 use crate::validate::ValidatedMir;
 use crate::{
     MirBinOp, MirBlock, MirBlockId, MirCallee, MirConstant, MirFunctionId, MirLocal, MirLocalId,
@@ -528,42 +527,111 @@ fn mlp_loss_gelu_function(types: &mut TypeTable) -> MirFunction {
 }
 
 // -----------------------------------------------------------------------
-// Composed staged MLP remains one kernel unit.
+// The staged MLP body decomposes into ordinary recipe subchains — the
+// composed atomic bypass is retired from the decomposition contract.
 // -----------------------------------------------------------------------
 
 #[test]
-fn mlp_composed_body_stays_one_kernel_unit() {
+fn composed_mlp_body_decomposes_into_three_ordinary_subchains() {
     let mut types = TypeTable::new();
     let function = composed_mlp_function(&mut types);
     let validation = MirValidationContext::new(&types);
-    let decomposition =
-        decompose_kernel_function(&function, &validation).expect("composed MLP stays atomic");
+    let decomposition = decompose_kernel_function(&function, &validation)
+        .expect("composed MLP body decomposes by the ordinary rule");
 
-    assert_eq!(decomposition.subchains.len(), 1);
-    let subchain = &decomposition.subchains[0];
-    let CollectionKernelPlan::ComposedMatMul(plan) = &subchain.plan else {
-        panic!(
-            "the composed body must carry ComposedMatMul, got {:?}",
-            subchain.plan
-        );
-    };
-    assert_eq!(subchain.statements, vec![0, 1, 2, 3]);
-    assert!(subchain.consumes.is_empty());
-    assert_eq!(subchain.produced, Some(MirLocalId(7)));
-    assert_eq!(subchain.outputs, vec![MirLocalId(7)]);
-    assert_eq!(plan.edges.len(), 3);
     assert_eq!(
-        plan.stages
-            .iter()
-            .map(|stage| stage.kind)
-            .collect::<Vec<_>>(),
-        vec![
-            ComposedMatMulStageKind::Gate,
-            ComposedMatMulStageKind::Up,
-            ComposedMatMulStageKind::SwiGlu,
-            ComposedMatMulStageKind::Down,
-        ]
+        decomposition.subchains.len(),
+        3,
+        "the gate/up+mul/down body must split into three subchain kernels, got {:?}",
+        decomposition.subchains
     );
+
+    // Child 0: the gate matmul.
+    let gate = &decomposition.subchains[0];
+    assert!(
+        matches!(gate.plan, CollectionKernelPlan::TiledMatMul(_)),
+        "subchain 0 must carry the tiled-matmul plan, got {:?}",
+        gate.plan
+    );
+    assert_eq!(gate.statements, vec![0]);
+    assert!(gate.consumes.is_empty());
+    assert_eq!(gate.produced, Some(MirLocalId(4)));
+    assert_eq!(gate.outputs, vec![MirLocalId(4)]);
+
+    // Child 1: the up matmul with the elementwise mul tail folded in.
+    let up = &decomposition.subchains[1];
+    assert!(
+        matches!(up.plan, CollectionKernelPlan::TiledMatMul(_)),
+        "subchain 1 must carry the tiled-matmul plan, got {:?}",
+        up.plan
+    );
+    assert_eq!(up.statements, vec![1, 2]);
+    assert_eq!(up.consumes, vec![0]);
+    assert_eq!(up.produced, Some(MirLocalId(6)));
+    // D-2a keeps the recipe result (5) as the primary contract output even
+    // though only the mul destination (6) is read across children — the
+    // buffer-materialization decision for that residue is Unit 2's.
+    assert_eq!(up.outputs, vec![MirLocalId(5), MirLocalId(6)]);
+
+    // Child 2: the down matmul, consuming the fused activation.
+    let down = &decomposition.subchains[2];
+    assert!(
+        matches!(down.plan, CollectionKernelPlan::TiledMatMul(_)),
+        "subchain 2 must carry the tiled-matmul plan, got {:?}",
+        down.plan
+    );
+    assert_eq!(down.statements, vec![3]);
+    assert_eq!(down.consumes, vec![1]);
+    assert_eq!(down.produced, Some(MirLocalId(7)));
+    assert_eq!(down.outputs, vec![MirLocalId(7)]);
+}
+
+/// The recognizer near-miss (non-MLP by statement kinds): the SwiGLU-shaped
+/// mul sits AFTER the down matmul, so the composed recognizer has no stage
+/// ordering to offer. The body must decompose by the ordinary
+/// recipe-boundary rule — the recognizer's veto no longer gates this pass.
+fn swiglu_after_down_function(types: &mut TypeTable) -> MirFunction {
+    let r2 = rank2_tensor_ty(types, [4, 4]);
+    device_function(
+        &[(0, r2), (1, r2), (2, r2), (3, r2)],
+        vec![
+            collection_statement(MirCollectionOp::TensorMatMul, &[0, 1], 4, r2),
+            collection_statement(MirCollectionOp::TensorMatMul, &[0, 2], 5, r2),
+            collection_statement(MirCollectionOp::TensorMatMul, &[4, 5], 6, r2),
+            collection_statement(MirCollectionOp::TensorMul, &[4, 5], 7, r2),
+        ],
+        Some(6),
+        r2,
+    )
+}
+
+#[test]
+fn recognizer_vetoed_body_decomposes_by_the_ordinary_rule() {
+    let mut types = TypeTable::new();
+    let function = swiglu_after_down_function(&mut types);
+    let validation = MirValidationContext::new(&types);
+    let decomposition = decompose_kernel_function(&function, &validation)
+        .expect("the near-miss body decomposes by the ordinary rule");
+
+    assert_eq!(
+        decomposition.subchains.len(),
+        3,
+        "three live recipe ops must split into three subchain kernels, got {:?}",
+        decomposition.subchains
+    );
+    assert_eq!(decomposition.subchains[0].statements, vec![0]);
+    assert_eq!(decomposition.subchains[1].statements, vec![1]);
+    // The down matmul and the trailing mul share the last subchain (the mul
+    // is an elementwise op folding into the open recipe slice).
+    let last = &decomposition.subchains[2];
+    assert_eq!(last.statements, vec![2, 3]);
+    assert!(
+        matches!(last.plan, CollectionKernelPlan::TiledMatMul(_)),
+        "the last subchain must carry the tiled-matmul plan, got {:?}",
+        last.plan
+    );
+    // The trailing subchain reads both earlier matmul results.
+    assert_eq!(last.consumes, vec![0, 1]);
 }
 
 // -----------------------------------------------------------------------
