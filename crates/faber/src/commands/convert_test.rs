@@ -1,5 +1,5 @@
 //! Integration tests for `faber convert` (reader-locale source conversion).
-//! Ported from the former `faber format --locale` surface; see
+//! Ported from the former reader-locale conversion surface; see
 //! docs/operator/convert-command.md.
 
 use super::super::format_test::{
@@ -8,6 +8,7 @@ use super::super::format_test::{
 };
 use std::fs;
 use std::io::{Read, Write};
+use std::path::Path;
 use std::process::{Command, Stdio};
 
 #[test]
@@ -64,13 +65,15 @@ fn convert_thai_localizes_surface() {
         thai.to_str().expect("utf8 thai path"),
     ]);
 
-    // --locale drives the emitter surface: the re-emit localizes
+    // --to drives the emitter surface: the re-emit localizes
     // reader-locale keywords and types into Thai and no longer matches the
-    // Latin twin (which re-emits as `--locale la`).
+    // Latin twin (which explicitly reads and emits as `la`).
     assert_ne!(
         thai_output,
         run_faber_convert_stdout_with_args(&[
             "convert",
+            "--from",
+            "la",
             "--to",
             "la",
             "--stdout",
@@ -82,19 +85,19 @@ fn convert_thai_localizes_surface() {
     assert!(thai_output.contains("ฟังก์ชัน ทักทาย(ข้อความ name) → ข้อความ"));
     assert!(thai_output.contains("คงที่ ข้อความ greeting ← \"สวัสดี, §!\"(name)"));
     assert!(thai_output.contains("คืน greeting"));
-    assert!(thai_output.contains("ฟังก์ชัน ผ่าน(จำนวน score) → ตรรกะ"));
+    assert!(thai_output.contains("ฟังก์ชัน ผ่าน(จํานวน score) → ตรรกะ"));
     assert!(thai_output.contains("ถ้าไม่ก็ score ≥ 50 ดังนั้น คืน จริง"));
-    assert!(thai_output.contains("ฟังก์ชัน นับผ่าน(รายการ<จำนวน> scores) → จำนวน"));
-    assert!(thai_output.contains("แปร จำนวน total ← 0"));
+    assert!(thai_output.contains("ฟังก์ชัน นับผ่าน(รายการ<จํานวน> scores) → จํานวน"));
+    assert!(thai_output.contains("แปร จํานวน total ← 0"));
     assert!(thai_output.contains("วน จาก scores คงที่ score"));
     assert!(thai_output.contains("ถ้า score ≺ 0 {"));
     assert!(thai_output.contains("ไปต่อ"));
     assert!(thai_output.contains("หยุด"));
-    assert!(thai_output.contains("ฟังก์ชัน นับถอยหลัง(จำนวน start) → จำนวน"));
+    assert!(thai_output.contains("ฟังก์ชัน นับถอยหลัง(จํานวน start) → จํานวน"));
     assert!(thai_output.contains("ขณะ current ≻ 0"));
     assert!(thai_output.contains("เริ่ม {"));
-    assert!(thai_output.contains("คงที่ จำนวน score ← 82"));
-    assert!(thai_output.contains("คงที่ รายการ<จำนวน> scores ← [-1, 82, 41, 60]"));
+    assert!(thai_output.contains("คงที่ จํานวน score ← 82"));
+    assert!(thai_output.contains("คงที่ รายการ<จํานวน> scores ← [-1, 82, 41, 60]"));
     assert!(thai_output.contains("บันทึก ผ่าน(score)"));
     assert!(thai_output.contains("บันทึก นับผ่าน(scores)"));
     // The Latin keyword surface must not survive localized re-emit, and the
@@ -146,6 +149,70 @@ fn convert_stdin_to_english_localizes_latin_source() {
     );
 }
 
+/// Untagged product input defaults to English even when the conversion target
+/// is Latin. The source has no frontmatter, so `--to la` must not become the
+/// source reader pack.
+#[test]
+fn convert_untagged_english_stdin_to_latin_without_from() {
+    let source =
+        radix::module::driver::split_frontmatter(super::super::format_test::EN_TYPES_SOURCE)
+            .expect("split English fixture")
+            .body
+            .to_owned();
+    let session = super::super::format::format_session(Path::new("<stdin>"), None, &source)
+        .expect("untagged stdin must resolve the product default");
+    assert_eq!(
+        session
+            .config
+            .locale_pack
+            .as_ref()
+            .map(|pack| pack.metadata.id.as_str()),
+        Some("en")
+    );
+    let (stdout, stderr, success) = run_faber_convert_stdin("la", &source);
+    assert!(success, "untagged English stdin must read as en: {stderr}");
+    assert!(
+        stdout.contains("locale = \"la\""),
+        "output must declare la: {stdout}"
+    );
+    assert!(
+        stdout.contains("functio pack(numerus n"),
+        "target output must use the Latin surface:\n{stdout}"
+    );
+}
+
+#[test]
+fn convert_directory_resolves_each_source_locale_before_emitting_one_target() {
+    let root = tempfile::tempdir().expect("create mixed-locale directory");
+    let english = root.path().join("english.fab");
+    let latin = root.path().join("latin.fab");
+    let english_source =
+        radix::module::driver::split_frontmatter(super::super::format_test::EN_TYPES_SOURCE)
+            .expect("split English fixture")
+            .body
+            .to_owned();
+    fs::write(&english, english_source).expect("write untagged English source");
+    fs::write(&latin, super::super::format_test::VALID_BLOCK_SOURCE).expect("write Latin source");
+
+    let output = Command::new(faber_binary())
+        .args(["convert", "--to", "en"])
+        .arg(root.path())
+        .output()
+        .expect("run mixed-locale directory conversion");
+    assert!(
+        output.status.success(),
+        "mixed-locale directory conversion failed: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    let english_output = fs::read_to_string(&english).expect("read English output");
+    let latin_output = fs::read_to_string(&latin).expect("read Latin output");
+    assert!(english_output.contains("locale = \"en\""));
+    assert!(english_output.contains("fn pack(int n"));
+    assert!(latin_output.contains("locale = \"en\""));
+    assert!(latin_output.contains("fn gradus(int x)"));
+}
+
 /// Conversion rewrites the frontmatter locale with the emitted body so the
 /// result can be formatted again under its own declared surface.
 #[test]
@@ -169,6 +236,36 @@ fn convert_rewrites_frontmatter_to_target_locale() {
     assert!(
         output.contains("fn gradus(int x)"),
         "converted body must use the target locale:\n{output}"
+    );
+}
+
+#[test]
+fn convert_rewrites_locale_preserves_other_frontmatter_and_reparses() {
+    let fixture = std::env::temp_dir().join("faber-convert-frontmatter-preservation.fab");
+    let source = super::super::format_test::VALID_BLOCK_SOURCE.replace(
+        "locale = \"la\"\n",
+        "locale = \"la\"\nsectio = \"smoke\"\ngroup = \"demo.entry\"\n",
+    );
+    fs::write(&fixture, source).expect("write metadata fixture");
+    let output = run_faber_convert_stdout_with_args(&[
+        "convert",
+        "--to",
+        "en",
+        "--stdout",
+        fixture.to_str().expect("utf8 fixture path"),
+    ]);
+    fs::write(&fixture, &output).expect("write converted metadata fixture");
+    let reparsed = run_faber_format_stdout(&fixture);
+    let _ = fs::remove_file(&fixture);
+
+    assert!(output.contains("locale = \"en\""));
+    assert!(output.contains("sectio = \"smoke\""));
+    assert!(output.contains("group = \"demo.entry\""));
+    assert!(
+        reparsed.contains("locale = \"en\"")
+            && reparsed.contains("sectio = \"smoke\"")
+            && reparsed.contains("group = \"demo.entry\""),
+        "converted output must reparse with its target locale and retain metadata:\n{reparsed}"
     );
 }
 
@@ -363,7 +460,7 @@ fn lists() → int {
 fn convert_preserves_template_application_sugar() {
     // Reader-locale packs re-render the same semantic program with different
     // keyword spellings while retaining glyph shapes. The `"…"(args)` template-
-    // application postfix is a glyph shape: `--locale en` localizes
+    // application postfix is a glyph shape: `--to en` localizes
     // `nota` → `print` but must keep `print "val § here"(n)` instead of
     // expanding into `print format("val § here", n)`.
     let fixture = std::env::temp_dir().join("faber-format-rl-template-sugar.fab");
@@ -425,11 +522,11 @@ fn convert_localizes() {
     let stdout = String::from_utf8(output.stdout).expect("utf8 stdout");
     assert!(
         stdout.contains("ฟังก์ชัน"),
-        "bare --locale=th-TH must emit the Thai surface: {stdout}"
+        "--to th-TH must emit the Thai surface: {stdout}"
     );
     assert!(
         !code_only(&stdout).contains("functio"),
-        "bare --locale=th-TH must not emit the Latin keyword: {stdout}"
+        "--to th-TH must not emit the Latin keyword: {stdout}"
     );
 }
 

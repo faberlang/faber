@@ -5,7 +5,7 @@
 //! contracts: the emitted spelling for the construct under test, and
 //! idempotence (re-emitting the emitted source is byte-identical).
 
-use super::compile::{compile_canonical, compile_canonical_str};
+use super::compile::reemit_faber;
 use crate::driver::{analyze_source, AnalyzeRequest, Config, ModuleImportContract, Session};
 use crate::file_interface::{FileExport, FileExportKind, FileInterface, InterfaceEnumVariant, InterfaceNominalExport};
 use crate::import_resolve::library_home_test_support;
@@ -17,7 +17,9 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 fn emit_once(source: &str) -> String {
-    let result = compile_canonical_str("fidelity.fab", source);
+    let session = Session::new(Config::default().with_dev_stdlib());
+    let emit_pack = crate::locale::latin_locale_pack();
+    let result = reemit_faber(&session, &emit_pack, "fidelity.fab", source);
     assert!(
         result.success(),
         "compile failed: {:?}",
@@ -196,7 +198,16 @@ locale = "la"
         AnalyzeRequest { cli_program: None, contract: prepared.contract },
     )
     .expect("analyze imported variant source");
-    let result = compile_canonical(&session, &name, source);
+    let result = reemit_faber(
+        &session,
+        session
+            .config
+            .locale_pack
+            .as_ref()
+            .expect("emission locale pack"),
+        &name,
+        source,
+    );
     assert!(
         result.success(),
         "faithful imported variant output must pass the gate: {:?}",
@@ -245,7 +256,16 @@ fn canonical_revalidation_rejects_swapped_same_typed_sites() {
         AnalyzeRequest { cli_program: None, contract: prepared.contract },
     )
     .expect("analyze swapped-site source");
-    let output = compile_canonical(&session, "swapped-sites.fab", source);
+    let output = reemit_faber(
+        &session,
+        session
+            .config
+            .locale_pack
+            .as_ref()
+            .expect("emission locale pack"),
+        "swapped-sites.fab",
+        source,
+    );
     assert!(output.success(), "faithful source must pass: {:?}", output.diagnostics);
     let emitted = output.output.expect("faithful output").code;
     let swapped = emitted
@@ -389,8 +409,13 @@ fn union_hole_locals_stay_union_holes() {
     pack_path.push("../../stdlib/locale/en/pack.toml");
     let pack = crate::locale::LocalePack::from_toml_path(&pack_path).expect("installed en pack loads");
     let session = Session::new(Config::default().with_locale_pack(pack));
-    let result = compile_canonical(
+    let result = reemit_faber(
         &session,
+        session
+            .config
+            .locale_pack
+            .as_ref()
+            .expect("emission locale pack"),
         "union-hole.fab",
         "main {\n    var ∪ mixed ← 1\n    mixed ← \"salve\"\n}\n",
     );
@@ -414,8 +439,9 @@ fn nondum_availability_projects_through_en_pack() {
     pack_path.push("../../stdlib/locale/en/pack.toml");
     let pack = crate::locale::LocalePack::from_toml_path(&pack_path).expect("installed en pack loads");
     let session = Session::new(Config::default().with_locale_pack(pack));
-    let result = compile_canonical(
+    let result = reemit_faber(
         &session,
+        session.config.locale_pack.as_ref().expect("emission locale pack"),
         "nondum.fab",
         "interface tempus {\n  @ unstable { target = rs, ratio = \"not implemented\" }\n  fn siste(int handle) → void\n}\n",
     );
@@ -457,8 +483,13 @@ fn commune_annotation_round_trips_each_locale_spelling() {
     pack_path.push("../../stdlib/locale/en/pack.toml");
     let pack = crate::locale::LocalePack::from_toml_path(&pack_path).expect("installed en pack loads");
     let session = Session::new(Config::default().with_locale_pack(pack));
-    let result = compile_canonical(
+    let result = reemit_faber(
         &session,
+        session
+            .config
+            .locale_pack
+            .as_ref()
+            .expect("emission locale pack"),
         "commune-en.fab",
         "union E {\n    @ shared\n    string message\n\n    Bad\n}\n",
     );
@@ -545,8 +576,9 @@ fn authored_elige_vocabulary_round_trips() {
     pack_path.push("../../stdlib/locale/en/pack.toml");
     let pack = crate::locale::LocalePack::from_toml_path(&pack_path).expect("installed en pack loads");
     let session = Session::new(Config::default().with_locale_pack(pack));
-    let result = compile_canonical(
+    let result = reemit_faber(
         &session,
+        session.config.locale_pack.as_ref().expect("emission locale pack"),
         "switch-en.fab",
         "union Mode {\n    Small,\n    Big\n}\n\nfn name(Mode m) → string {\n    switch m {\n        case Small {\n            return \"small\"\n        }\n        default {\n            return \"big\"\n        }\n    }\n}\n",
     );
@@ -590,8 +622,13 @@ fn discard_binding_round_trips() {
     pack_path.push("../../stdlib/locale/en/pack.toml");
     let pack = crate::locale::LocalePack::from_toml_path(&pack_path).expect("installed en pack loads");
     let session = Session::new(Config::default().with_locale_pack(pack));
-    let result = compile_canonical(
+    let result = reemit_faber(
         &session,
+        session
+            .config
+            .locale_pack
+            .as_ref()
+            .expect("emission locale pack"),
         "discard-en.fab",
         "fn probe() → int {\n    const int _ ← 6 * 7\n    return 1\n}\n",
     );
@@ -618,8 +655,13 @@ fn ordo_enum_round_trips_discriminants() {
     pack_path.push("../../stdlib/locale/en/pack.toml");
     let pack = crate::locale::LocalePack::from_toml_path(&pack_path).expect("installed en pack loads");
     let session = Session::new(Config::default().with_locale_pack(pack));
-    let result = compile_canonical(
+    let result = reemit_faber(
         &session,
+        session
+            .config
+            .locale_pack
+            .as_ref()
+            .expect("emission locale pack"),
         "ordo-en.fab",
         "enum Level {\n    One = 1,\n    Two = 2\n}\n\nmain {\n    const Level level ← One\n    print level\n}\n",
     );

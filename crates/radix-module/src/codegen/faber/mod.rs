@@ -1,13 +1,10 @@
-//! Canonical Faber backend — re-exported from foundation leaf `radix-hir-faber`.
-//!
-//! LEGACY(canonical): name predates reader locales — this is the HIR→Faber
-//! re-emit used by `faber format --locale <X>` and `radix emit -t faber`.
-//! Rename in a later sweep.
+//! Faber HIR re-emission backend, re-exported from foundation leaf
+//! `radix-hir-faber`.
 
 pub use radix_hir_faber::{emit, empty_presentation, FaberCodegen, FaberOutput};
 
 pub mod compile;
-pub use compile::{compile_canonical, compile_canonical_str, emit_from_analyzed, FormatCompileResult};
+pub use compile::{emit_from_analyzed, reemit_faber, FaberReemitResult};
 
 #[doc(hidden)]
 pub mod test_gate;

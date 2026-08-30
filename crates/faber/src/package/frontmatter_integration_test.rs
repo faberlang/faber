@@ -69,10 +69,11 @@ fn load_with_faber_seams(
     spec: &PackageSpec,
     resolver: &LibraryResolver,
 ) -> Result<Vec<radix::program::PackageFile>, Vec<radix::module::diagnostics::Diagnostic>> {
-    radix::program::analyze::load_package_with_locale_pack(
+    let config = Config::default();
+    radix::program::analyze::load_package_with_config(
         spec,
         resolver,
-        None,
+        &config,
         false,
         None,
         &seams(),
@@ -119,6 +120,84 @@ main { print "peeled" }
         Some("demo.entry")
     );
     assert_eq!(file.module_segments, vec!["demo", "entry"]);
+}
+
+#[test]
+fn load_package_selects_reader_pack_per_file_before_lexing() {
+    let dir = test_temp_dir("frontmatter-per-file-locale");
+    let entry = dir.join("main.fab");
+    fs::write(
+        &entry,
+        r#"import from "./latin" latin
+
+main {
+    print latin.salutatio()
+}
+"#,
+    )
+    .expect("write English entry");
+    let latin = dir.join("latin.fab");
+    fs::write(
+        &latin,
+        r#"+++
+locale = "la"
++++
+
+functio salutatio() → textus {
+    redde "salve"
+}
+"#,
+    )
+    .expect("write Latin sibling");
+
+    let config = Config::default();
+    let spec = discover_package(&entry).expect("package");
+    let files = load_with_faber_seams(&spec, &library_resolver_from_config(&config)).expect("load");
+    let entry_file = files
+        .iter()
+        .find(|file| file.path == entry)
+        .expect("entry file");
+    let latin_file = files
+        .iter()
+        .find(|file| file.path == latin)
+        .expect("Latin file");
+
+    assert_eq!(
+        entry_file
+            .locale_pack
+            .as_ref()
+            .map(|pack| pack.metadata.id.as_str()),
+        Some("en")
+    );
+    assert_eq!(
+        latin_file
+            .locale_pack
+            .as_ref()
+            .map(|pack| pack.metadata.id.as_str()),
+        Some("la")
+    );
+}
+
+#[test]
+fn package_diagnostics_use_physical_frontmatter_lines() {
+    let dir = test_temp_dir("frontmatter-diagnostic-lines");
+    let entry = dir.join("main.fab");
+    fs::write(
+        &entry,
+        "+++\nlocale = \"en\"\nsectio = \"smoke\"\n+++\n\nmain {\n    print missing\n}\n",
+    )
+    .expect("write diagnostic fixture");
+
+    let result = compile_with_faber_seams(&Config::default(), &entry);
+    let diagnostic = result
+        .diagnostics
+        .iter()
+        .find(|diagnostic| diagnostic.code == Some("SEM008"))
+        .expect("undefined name diagnostic");
+    assert_eq!(diagnostic.line, Some(7));
+    assert_eq!(diagnostic.source_line.as_deref(), Some("    print missing"));
+    assert!(diagnostic.file.ends_with("main.fab"));
+    assert!(diagnostic.phase.to_string().contains("analysis"));
 }
 
 // ---------------------------------------------------------------------------

@@ -100,6 +100,20 @@ Common flows:
   Single-file check (non-package):
     faber check crates/exempla/corpus/salve-munde.fab
 
+  Format and convert complete Faber source units:
+    faber format path/to/file.fab --stdout
+    faber convert path/to/file.fab --to la --stdout
+    faber convert path/to/file.fab --from en --to la --stdout
+    printf 'main { print "ok" }\n' | faber convert --stdin --to la
+
+    `format` selects each file's source locale from frontmatter, then the
+    package manifest, then product-default `en`; `<stdin>` uses `en` without
+    frontmatter. `convert --from` forces one source pack for every selected
+    file, while `convert --to` is one target pack for the whole invocation.
+    Conversion requires a complete source unit, not a local-declaration
+    fragment. Converted output replaces or inserts its target `locale` key and
+    retains unrelated frontmatter metadata.
+
   Inspect resolved library home (FABER_LIBRARY_HOME or ancestor probing):
     faber doctor
     faber check-library norma

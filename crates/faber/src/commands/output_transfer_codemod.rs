@@ -193,13 +193,23 @@ fn print_declines(path: &Path, report: &CodemodReport) {
     }
 }
 
-/// Reduce and re-emit one document through `compile_canonical`.
+/// Reduce and re-emit one document through `reemit_faber`.
 #[cfg(feature = "hir-faber")]
 pub fn codemod_single_doc(path: &Path, source: &str) -> Result<CodemodReport, String> {
     let (rewritten, rewritten_statements, declines) = rewrite_source(source)?;
-    let session = super::format::format_session(path, None, &rewritten)?;
+    let session = super::format::format_session(path, None, &rewritten)
+        .map_err(|diagnostic| diagnostic.message.clone())?;
     let name = path.display().to_string();
-    let result = radix::module::codegen::faber::compile_canonical(&session, &name, &rewritten);
+    let result = radix::module::codegen::faber::reemit_faber(
+        &session,
+        session
+            .config
+            .locale_pack
+            .as_ref()
+            .expect("codemod emission locale pack"),
+        &name,
+        &rewritten,
+    );
 
     for diagnostic in &result.diagnostics {
         if !diagnostic.is_error() {

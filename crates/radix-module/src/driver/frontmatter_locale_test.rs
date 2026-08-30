@@ -25,6 +25,37 @@ fn compile_uses_frontmatter_locale_for_lexing() {
 }
 
 #[test]
+fn frontmatter_diagnostics_report_physical_line_and_body_source_line() {
+    let config = Config::default()
+        .with_target(Target::HirRust)
+        .with_stdlib(stdlib_path());
+    let session = crate::driver::Session::new(config);
+    let source = "+++
+locale = \"en\"
++++
+
+fn broken(int value) → int {
+    return missing
+}
+";
+    let result = compile(&session, "locale.fab", source, ModuleCompileRequest::default());
+    let diagnostic = result
+        .diagnostics
+        .iter()
+        .find(|diagnostic| diagnostic.code == Some("SEM008"))
+        .expect("undefined name diagnostic");
+
+    assert_eq!(diagnostic.line, Some(6));
+    assert_eq!(diagnostic.source_line.as_deref(), Some("    return missing"));
+    assert_eq!(diagnostic.file, "locale.fab");
+    assert!(diagnostic.phase.to_string().contains("analysis"));
+    let rendered = crate::diagnostics::render_expanded(diagnostic);
+    assert!(rendered.contains("error[SEM008:undefined_name] analysis locale.fab"));
+    assert!(rendered.contains("phase: analysis"));
+    assert!(rendered.contains("source: \u{2068}    return missing\u{2069}"));
+}
+
+#[test]
 fn compile_frontmatter_locale_overrides_session_pack() {
     let config = Config::default()
         .with_target(Target::HirRust)
@@ -54,8 +85,7 @@ fn explicit_session_pack_wins_over_frontmatter_locale() {
     let config = Config::default()
         .with_target(Target::HirRust)
         .with_stdlib(stdlib_path())
-        .with_locale_pack(en_pack)
-        .with_locale_pack_explicit();
+        .with_resolved_locale_pack(en_pack);
     let session = crate::driver::Session::new(config);
     let source = "+++\nlocale = \"zh-Hans\"\n+++\n\nfn salve() { }";
     let result = compile(&session, "locale.fab", source, ModuleCompileRequest::default());

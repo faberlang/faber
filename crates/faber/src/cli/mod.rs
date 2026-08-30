@@ -35,6 +35,27 @@ Packages that pin locale = \"la\" parse on the Latin keyword surface. English
 sources in those packages fail until the pin matches the source locale.
 ";
 
+const FORMAT_LONG_ABOUT: &str = "\
+Format complete Faber source units through the canonical HIR re-emitter. Each
+file selects its source reader locale independently: frontmatter, then the
+package manifest, then the product default en. --stdin has no package context
+and therefore uses en when it has no frontmatter locale. Format preserves the
+frontmatter metadata and does not translate between reader locales. For source
+conversion use `faber convert --to <LOCALE>`. A local declaration must be inside
+a complete function or `main` unit; format does not accept fragments.
+";
+
+const CONVERT_LONG_ABOUT: &str = "\
+Convert complete Faber source units between reader-locale surfaces. --from
+forces the source reader pack for every selected file; without it, each file
+uses frontmatter, then its package manifest, then the product default en. --to
+is one command-wide target pack. Successful output replaces or inserts
+frontmatter `locale = \"<target>\"` while preserving unrelated metadata. Use a
+wrapper such as `main { const list<int<u32>> values ← empty }` when probing a
+local declaration; fragments are not accepted. --stdout and --stdin emit one
+complete converted document, and --check writes nothing.
+";
+
 const CHECK_LIBRARY_LONG_ABOUT: &str = "\
 Check a named library's complete interface graph from the library home.
 
@@ -164,13 +185,12 @@ pub enum Command {
     Emit(EmitArgs),
 
     /// Format Faber source (HIR re-emit at the source's own locale)
-    #[command(
-        long_about = "Format Faber source. Re-emits through the canonical HIR path at the source's own locale (frontmatter → package [locale] → product default en). Keyword and type vocabulary stay surface-faithful. --stdout accepts exactly one file; --stdin reads one document from stdin; --check reports drift without writing."
-    )]
+    #[command(long_about = FORMAT_LONG_ABOUT)]
     Format(FormatArgs),
 
     /// Convert source between reader-locale surfaces (en, la, zh-Hans, …) —
     /// HIR-backed round-trip; not a formatter (see `faber convert --help`)
+    #[command(long_about = CONVERT_LONG_ABOUT)]
     Convert(ConvertArgs),
 
     /// Rewrite admitted print/nota statements to imported `⇇` transfers
@@ -225,13 +245,13 @@ pub struct ConvertArgs {
     #[arg(value_name = "PATH")]
     pub paths: Vec<PathBuf>,
 
-    /// Target reader locale (required; e.g. en, la, zh-Hans). Unknown
-    /// locales fail closed listing the installed pack locales
+    /// Target reader locale (required; e.g. en, la, zh-Hans). One target pack
+    /// is used for every selected complete source file.
     #[arg(long = "to", value_name = "LOCALE")]
     pub to: String,
 
-    /// Source locale override for mislabeled frontmatter (default: the
-    /// source's own frontmatter locale, falling back to `en`)
+    /// Force the source reader locale for every selected file. Without this,
+    /// each file uses frontmatter, package manifest, then product default en.
     #[arg(long = "from", value_name = "LOCALE")]
     pub from: Option<String>,
 

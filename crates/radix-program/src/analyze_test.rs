@@ -67,9 +67,10 @@ fn package_test_analysis_deadline_fails_closed() {
     let spec = discover_package(&entry).expect("discover package");
     let resolver = LibraryResolver::with_optional_home(None);
     let expired = Instant::now() - Duration::from_secs(1);
+    let config = Config::default().with_locale_pack(radix_module::locale::latin_locale_pack());
 
     let diagnostics = analyze_package_spec_with_deadline(
-        &Config::default(),
+        &config,
         spec,
         &resolver,
         true,

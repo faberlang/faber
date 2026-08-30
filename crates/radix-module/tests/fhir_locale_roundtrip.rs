@@ -157,9 +157,10 @@ fn fhir_core_renders_localized_surfaces_and_reparses_idempotently() {
     // Semantic-core integrity: every locale's render reparses under its own
     // pack and re-emits byte-identically (same HIR, different skins).
     for (locale, code) in [("la", &la), ("en", &en), ("th-TH", &th)] {
-        let config = Config::default().with_locale_pack(pack_for(locale));
+        let pack = pack_for(locale);
+        let config = Config::default().with_resolved_locale_pack(pack.clone());
         let session = Session::new(config);
-        let result = radix_module::codegen::faber::compile::compile_canonical(&session, "fhir-locale.re.fab", code);
+        let result = radix_module::codegen::faber::compile::reemit_faber(&session, &pack, "fhir-locale.re.fab", code);
         assert!(
             result.success(),
             "{locale}: rendered output must reparse cleanly: {:?}\n{code}",

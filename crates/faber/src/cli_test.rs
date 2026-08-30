@@ -578,6 +578,50 @@ fn cli_parses_convert_target_locale() {
 }
 
 #[test]
+fn locale_command_help_states_complete_unit_and_resolution_contract() {
+    let mut command = Cli::command();
+    let format = command
+        .find_subcommand_mut("format")
+        .expect("format subcommand")
+        .render_long_help()
+        .to_string();
+    let format_words = format.split_whitespace().collect::<Vec<_>>().join(" ");
+    assert!(
+        format_words.contains("Format complete Faber source units"),
+        "{format}"
+    );
+    assert!(
+        format_words.contains("frontmatter, then the package manifest"),
+        "{format}"
+    );
+    assert!(format_words.contains("complete function or"), "{format}");
+    assert!(format_words.contains("`main` unit"), "{format}");
+
+    let mut command = Cli::command();
+    let convert = command
+        .find_subcommand_mut("convert")
+        .expect("convert subcommand")
+        .render_long_help()
+        .to_string();
+    let convert_words = convert.split_whitespace().collect::<Vec<_>>().join(" ");
+    assert!(
+        convert_words.contains("Convert complete Faber source units"),
+        "{convert}"
+    );
+    assert!(convert_words.contains("--from"), "{convert}");
+    assert!(
+        convert_words.contains("one command-wide target pack"),
+        "{convert}"
+    );
+    assert!(
+        convert_words.contains("preserving unrelated metadata"),
+        "{convert}"
+    );
+    assert!(convert_words.contains("wrapper such as"), "{convert}");
+    assert!(convert_words.contains("main {"), "{convert}");
+}
+
+#[test]
 fn cli_rejects_removed_format_locale_flag() {
     let result = Cli::try_parse_from(["faber", "format", "--locale", "zh-Hans", "main.fab"]);
     assert!(

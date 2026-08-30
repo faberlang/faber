@@ -14,6 +14,12 @@ use crate::semantic::{NumericWidth, Primitive, SemanticParamMode};
 use std::fs;
 use std::path::{Path, PathBuf};
 
+fn english_config() -> crate::driver::Config {
+    let path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../stdlib/locale/en/pack.toml");
+    let pack = crate::locale::LocalePack::from_toml_path(path).expect("load English locale pack");
+    crate::driver::Config::default().with_resolved_locale_pack(pack)
+}
+
 fn temp_dir(label: &str) -> (tempfile::TempDir, PathBuf) {
     let dir = crate::test_support::test_temp_dir(&format!("provider-{label}"));
     let path = dir.path().to_path_buf();
@@ -2507,7 +2513,8 @@ main {
     )
     .expect("write entry");
 
-    let identities = crate::services::package_identity_facts_for_path(&entry)
+    let config = english_config();
+    let identities = crate::services::package_identity_facts_for_path(&entry, &config)
         .expect("en-surface local imports must register identity facts");
     assert_eq!(identities.product, "geminus", "product derives from the package root");
     assert_eq!(
@@ -2561,7 +2568,8 @@ incipit {
     )
     .expect("write entry");
 
-    let identities = crate::services::package_identity_facts_for_path(&entry)
+    let config = crate::driver::Config::default();
+    let identities = crate::services::package_identity_facts_for_path(&entry, &config)
         .expect("Latin local imports must register identity facts under the la pack");
     assert_eq!(identities.product, "adiutorium", "product derives from the package root");
     assert_eq!(
@@ -3334,7 +3342,8 @@ import from "./kernels" k
     )
     .expect("app");
 
-    let identities = package_identity_facts_for_path(&app).expect("package identity facts for the consumer");
+    let config = english_config();
+    let identities = package_identity_facts_for_path(&app, &config).expect("package identity facts for the consumer");
     assert_eq!(identities.module_segments, vec!["app".to_owned()]);
     assert_eq!(
         identities

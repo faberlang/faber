@@ -8,9 +8,11 @@
 
 use super::{compile, AnalyzeRequest, ModuleCompileRequest};
 #[cfg(feature = "hir-faber")]
-use crate::codegen::faber::compile_canonical_str;
+use crate::codegen::faber::reemit_faber;
 use crate::codegen::Target;
 use crate::diagnostics::DiagnosticArg;
+#[cfg(feature = "hir-faber")]
+use crate::driver::{Config, Session};
 use crate::test_support::test_session;
 
 // -- shared helpers (available to child test modules via super::) --
@@ -57,7 +59,13 @@ exemplars = ["./exemplars/salve-munde.th-TH.fab"]
 
 #[cfg(feature = "hir-faber")]
 pub(crate) fn faber_roundtrip(source: &str) -> String {
-    let first = compile_canonical_str("roundtrip.fab", source);
+    let pack = crate::locale::latin_locale_pack();
+    let session = Session::new(
+        Config::default()
+            .with_resolved_locale_pack(pack.clone())
+            .with_dev_stdlib(),
+    );
+    let first = reemit_faber(&session, &pack, "roundtrip.fab", source);
     assert!(
         first.success(),
         "first faber compile failed: {:?}",
@@ -71,7 +79,7 @@ pub(crate) fn faber_roundtrip(source: &str) -> String {
         panic!("expected faber output");
     };
 
-    let second = compile_canonical_str("roundtrip.fab", &first_output.code);
+    let second = reemit_faber(&session, &pack, "roundtrip.fab", &first_output.code);
     assert!(
         second.success(),
         "second faber compile failed: {:?}\n{}",
@@ -91,6 +99,18 @@ pub(crate) fn faber_roundtrip(source: &str) -> String {
         "faber emit should stabilize after one roundtrip"
     );
     second_output.code
+}
+
+#[cfg(feature = "hir-faber")]
+pub(crate) fn faber_emit(name: &str, source: &str) -> crate::codegen::faber::FaberReemitResult {
+    let pack = crate::locale::latin_locale_pack();
+    let session = Session::new(
+        Config::default()
+            .with_target(Target::HirFaber)
+            .with_resolved_locale_pack(pack.clone())
+            .with_dev_stdlib(),
+    );
+    reemit_faber(&session, &pack, name, source)
 }
 
 pub(crate) fn compile_rust_source_with_rustc(code: &str, label: &str) -> std::path::PathBuf {
@@ -525,7 +545,7 @@ fn compile_rust_success_emits_output() {
 #[test]
 #[cfg(feature = "hir-faber")]
 fn compile_faber_success_emits_output() {
-    let result = compile_canonical_str("test.fab", "incipit {}");
+    let result = faber_emit("test.fab", "incipit {}");
 
     assert!(result.success());
     // FOREIGN DIRT: result.output type changed in WIP; simplified to success check.
@@ -630,7 +650,7 @@ fn mir_lowering_error_carries_source_span() {
 fn user_defined_item_named_status_is_not_silently_dropped_from_faber_output() {
     let source = "incipit {\n  fixum numerus custom_status ← 1\n}\n";
 
-    let result = crate::codegen::faber::compile_canonical_str("custom_status.fab", source);
+    let result = faber_emit("custom_status.fab", source);
 
     assert!(
         result.success(),

@@ -94,6 +94,7 @@ fn diagnostics_locale_defaults_to_code_pack() {
     let code_pack = config.locale_pack.expect("code pack");
     let diagnostic_pack = diagnostic_pack.expect("diagnostic pack");
     assert_eq!(code_pack.metadata.id, "zh-Hans");
+    assert!(config.locale_pack_explicit);
     assert_eq!(diagnostic_pack.metadata.id, "zh-Hans");
     let _ = fs::remove_dir_all(_root);
 }

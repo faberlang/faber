@@ -127,7 +127,7 @@ pub fn cmd_format(command: &FormatCommand) {
 
 /// Convert ONE source document to an explicit target locale surface
 /// (`faber convert --to <LOCALE>`). Same HIR round-trip as the former
-/// `format --locale` mode (canonical HIR surface).
+/// reader-locale conversion mode (canonical HIR surface).
 /// `Err(())` means a diagnostic was already printed.
 #[cfg(feature = "hir-faber")]
 pub(super) fn convert_single_doc(
@@ -137,30 +137,45 @@ pub(super) fn convert_single_doc(
     source: &str,
 ) -> Result<String, ()> {
     let name = path.display().to_string();
-    let source_for_compile = match source_with_locale_override(source, from) {
-        Ok(source) => source,
-        Err(message) => {
-            eprintln!("error: {message}");
-            return Err(());
-        }
-    };
-    let session = match format_session(path, Some(to), &source_for_compile) {
+    let session = match format_session(path, from, source) {
         Ok(session) => session,
-        Err(message) => {
-            eprintln!("error: {message}");
+        Err(diagnostic) => {
+            crate::postprocess::print_diagnostics(
+                &[(*diagnostic).clone()],
+                radix::services::DiagnosticMode::Normal,
+                None,
+            );
             return Err(());
         }
     };
-    let result =
-        radix::module::codegen::faber::compile_canonical(&session, &name, &source_for_compile);
-    let mut had_error = false;
-    for diag in &result.diagnostics {
-        if diag.is_error() {
-            eprintln!("error: {}: {}", path.display(), diag.message);
-            had_error = true;
-        } else {
-            eprintln!("warning: {}: {}", path.display(), diag.message);
+    let emit_pack = match crate::package::embedded_conversion_locale_pack(to) {
+        Ok(pack) => pack,
+        Err(diagnostic) => {
+            crate::postprocess::print_diagnostics(
+                &[(*diagnostic).clone()],
+                radix::services::DiagnosticMode::Normal,
+                None,
+            );
+            return Err(());
         }
+    };
+    let result = radix::module::codegen::faber::reemit_faber(&session, &emit_pack, &name, source);
+    let had_error = result
+        .diagnostics
+        .iter()
+        .any(radix::module::diagnostics::Diagnostic::is_error);
+    crate::postprocess::print_diagnostics(
+        &result.diagnostics,
+        radix::services::DiagnosticMode::Normal,
+        None,
+    );
+    if had_error {
+        eprintln!(
+            "conversion failed while reading {} as locale '{}' and emitting locale '{}'",
+            path.display(),
+            source_locale_id(&session),
+            emit_pack.metadata.id,
+        );
     }
     let Some(output) = result.output else {
         if !had_error {
@@ -203,22 +218,31 @@ fn format_single_doc(path: &Path, source: &str) -> Result<String, ()> {
     let name = path.display().to_string();
     let session = match format_session(path, None, source) {
         Ok(session) => session,
-        Err(message) => {
-            eprintln!("error: {message}");
+        Err(diagnostic) => {
+            crate::postprocess::print_diagnostics(
+                &[(*diagnostic).clone()],
+                radix::services::DiagnosticMode::Normal,
+                None,
+            );
             return Err(());
         }
     };
-    let result = radix::module::codegen::faber::compile_canonical(&session, &name, source);
+    let emit_pack = session
+        .config
+        .locale_pack
+        .as_ref()
+        .expect("format session resolves a source locale pack");
+    let result = radix::module::codegen::faber::reemit_faber(&session, emit_pack, &name, source);
 
-    let mut had_error = false;
-    for diag in &result.diagnostics {
-        if diag.is_error() {
-            eprintln!("error: {}: {}", path.display(), diag.message);
-            had_error = true;
-        } else {
-            eprintln!("warning: {}: {}", path.display(), diag.message);
-        }
-    }
+    let had_error = result
+        .diagnostics
+        .iter()
+        .any(radix::module::diagnostics::Diagnostic::is_error);
+    crate::postprocess::print_diagnostics(
+        &result.diagnostics,
+        radix::services::DiagnosticMode::Normal,
+        None,
+    );
 
     let Some(output) = result.output else {
         if !had_error {
@@ -238,52 +262,62 @@ fn format_single_doc(path: &Path, source: &str) -> Result<String, ()> {
 
 pub(super) fn format_session(
     path: &Path,
-    locale: Option<&str>,
+    source_override: Option<&str>,
     source: &str,
-) -> Result<Session, String> {
-    // An explicit CLI locale wins. Without one, preserve an existing source
-    // locale while making an untagged source use the product default (`en`).
-    let frontmatter_locale = if locale.is_none() {
-        let peeled = peel_raw_source(&path.display().to_string(), source)
-            .map_err(|error| error.to_string())?;
-        match peeled.frontmatter {
-            Some(frontmatter) => match frontmatter.locale_result() {
-                Some(Ok(locale)) => Some(locale.to_owned()),
-                Some(Err(())) => {
-                    return Err("frontmatter 'locale' key must be a string".to_owned());
-                }
-                None => None,
-            },
-            None => None,
+) -> Result<Session, Box<radix::module::diagnostics::Diagnostic>> {
+    let name = path.display().to_string();
+    let peeled = peel_raw_source(&name, source)
+        .map_err(|error| Box::new(radix::module::driver::source_load_diagnostic(&name, &error)))?;
+    let frontmatter_locale = match peeled
+        .frontmatter
+        .as_ref()
+        .and_then(|frontmatter| frontmatter.locale_result())
+    {
+        Some(Ok(locale)) => Some(locale.to_owned()),
+        Some(Err(())) if source_override.is_none() => {
+            return Err(Box::new(
+                radix::module::diagnostics::Diagnostic::error(
+                    "frontmatter 'locale' key must be a string",
+                )
+                .with_phase(radix::module::diagnostics::DiagnosticPhase::Lex)
+                .with_code("LOCALE003")
+                .with_file(name),
+            ));
         }
-    } else {
-        None
+        Some(Err(())) => None,
+        None => None,
     };
-    let selected_locale = locale.or(frontmatter_locale.as_deref());
-
-    // The package locale probe requires a real file path. A virtual source
-    // (e.g. `--stdin`, source name `<stdin>`) has no package context, so load
-    // the selected installed pack directly. The source locale still wins for
-    // parsing through frontmatter; this pack is also the target emit surface.
-    if !path.is_file() {
-        let virtual_locale = selected_locale.unwrap_or("en");
-        let pack = crate::package::locale_pack_for_emit_with_diagnostic(&[], Some(virtual_locale))
-            .map_err(|diagnostic| diagnostic.message.clone())?
-            .ok_or_else(|| format!("reader locale '{virtual_locale}' did not resolve to a pack"))?;
-        return Ok(Session::new(
-            Config::default()
-                .with_target(Target::HirFaber)
-                .with_locale_pack(pack)
-                .with_dev_stdlib(),
-        ));
+    let selected_locale = source_override.or(frontmatter_locale.as_deref());
+    let pack = if path.is_file() {
+        crate::package::load_locale_pack_for_input(path, selected_locale)?
+    } else {
+        crate::package::locale_pack_for_emit_with_diagnostic(
+            &[],
+            Some(selected_locale.unwrap_or(crate::package::DEFAULT_CODE_LOCALE)),
+        )?
     }
+    .ok_or_else(|| {
+        Box::new(
+            radix::module::diagnostics::Diagnostic::error("reader locale did not resolve")
+                .with_code("LOCALE003")
+                .with_file(name),
+        )
+    })?;
 
-    // Locale-mode sessions need the dev stdlib path: files with
-    // `+++ locale = "…" +++` frontmatter resolve their reader pack through
-    // `Config::stdlib_path` (READER003 otherwise).
-    crate::package::config_with_locale(Target::HirFaber, path, selected_locale, None)
-        .map(|(config, _)| Session::new(config.with_dev_stdlib()))
-        .map_err(|diag| diag.message)
+    Ok(Session::new(
+        Config::default()
+            .with_target(Target::HirFaber)
+            .with_resolved_locale_pack(pack)
+            .with_dev_stdlib(),
+    ))
+}
+
+fn source_locale_id(session: &Session) -> &str {
+    session
+        .config
+        .locale_pack
+        .as_ref()
+        .map_or("<unresolved>", |pack| pack.metadata.id.as_str())
 }
 
 pub(super) fn formatted_source_for_write(
@@ -313,23 +347,15 @@ pub(super) fn converted_source_for_write(
     target_locale: &str,
 ) -> Result<String, String> {
     let formatted = formatted_source_for_write(path, raw, formatted_body)?;
-    rewrite_frontmatter_locale(&formatted, target_locale, false)
+    rewrite_frontmatter_locale(&formatted, target_locale)
 }
 
 /// Replace or insert the locale key in a source frontmatter block. The
-/// `insert_if_missing` mode is used only for the temporary source passed to
-/// canonical compilation when `--from` overrides a missing or stale key.
-fn rewrite_frontmatter_locale(
-    source: &str,
-    locale: &str,
-    insert_if_missing: bool,
-) -> Result<String, String> {
+/// conversion output always declares the target surface.
+fn rewrite_frontmatter_locale(source: &str, locale: &str) -> Result<String, String> {
     let split = split_frontmatter(source).map_err(|error| error.to_string())?;
     let Some(frontmatter) = split.frontmatter_text else {
-        if insert_if_missing {
-            return Ok(format!("+++\nlocale = \"{locale}\"\n+++\n{source}"));
-        }
-        return Ok(source.to_owned());
+        return Ok(format!("+++\nlocale = \"{locale}\"\n+++\n{source}"));
     };
 
     let mut updated = String::with_capacity(frontmatter.len());
@@ -361,16 +387,13 @@ fn rewrite_frontmatter_locale(
         }
     }
 
-    if !found && insert_if_missing {
+    if !found {
         if !updated.ends_with('\n') {
             updated.push('\n');
         }
         updated.push_str("locale = \"");
         updated.push_str(locale);
         updated.push_str("\"\n");
-    }
-    if !found && !insert_if_missing {
-        return Ok(source.to_owned());
     }
 
     let frontmatter_start = source
@@ -386,13 +409,6 @@ fn rewrite_frontmatter_locale(
         &source[frontmatter_end..body_start],
         &source[body_start..]
     ))
-}
-
-fn source_with_locale_override(source: &str, from: Option<&str>) -> Result<String, String> {
-    let Some(from) = from else {
-        return Ok(source.to_owned());
-    };
-    rewrite_frontmatter_locale(source, from, true)
 }
 
 pub(super) fn source_for_compare(_path: &Path, raw: &str) -> String {

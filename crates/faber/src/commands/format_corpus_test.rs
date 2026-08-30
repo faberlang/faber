@@ -2,7 +2,7 @@
 //!
 //! Reads every `product-corpus/format/*.fab` fixture and formats it through
 //! the exact CLI path FR-2 will install: [`super::format::format_session`] +
-//! [`radix::module::codegen::faber::compile_canonical`] +
+//! [`radix::module::codegen::faber::reemit_faber`] +
 //! [`super::format::formatted_source_for_write`]. Output must match
 //! `*.format.expected`. Each fixture is idempotent, byte-stable, and
 //! re-parses under its own locale pack.
@@ -12,7 +12,7 @@
 #![cfg(feature = "hir-faber")]
 
 use super::format::{format_session, formatted_source_for_write};
-use radix::module::codegen::faber::compile_canonical;
+use radix::module::codegen::faber::reemit_faber;
 use radix::module::codegen::faber::test_gate::{
     assert_canonical_idempotent_with_session, lex_parse_with_pack,
 };
@@ -40,10 +40,19 @@ fn canonical_pipeline(
     path: &Path,
     source: &str,
 ) -> Result<(radix::module::driver::Session, String, String), String> {
-    let session =
-        format_session(path, None, source).map_err(|err| format!("format session: {err}"))?;
+    let session = format_session(path, None, source)
+        .map_err(|err| format!("format session: {}", err.message))?;
     let name = path.display().to_string();
-    let result = compile_canonical(&session, &name, source);
+    let result = reemit_faber(
+        &session,
+        session
+            .config
+            .locale_pack
+            .as_ref()
+            .expect("format emission locale pack"),
+        &name,
+        source,
+    );
     if !result.success() {
         return Err(format!(
             "canonical format failed on {name}: {:?}",

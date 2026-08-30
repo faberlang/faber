@@ -12,6 +12,12 @@ use radix::program::paths::normalize_path;
 
 pub(crate) const DEFAULT_CODE_LOCALE: &str = "en";
 
+/// Load a conversion target from the embedded pack set. Conversion targets
+/// are command-wide and must not vary with the first input package.
+pub(crate) fn embedded_conversion_locale_pack(locale: &str) -> Result<LocalePack, Box<Diagnostic>> {
+    load_embedded_locale_pack(locale).map_err(|err| Box::new(embedded_load_diagnostic(locale, err)))
+}
+
 fn embedded_locales_list() -> String {
     EMBEDDED_LOCALE_IDS.join(", ")
 }
@@ -46,9 +52,14 @@ pub(crate) fn config_with_locale(
 ) -> Result<(Config, Option<LocalePack>), Box<Diagnostic>> {
     let code_pack = load_locale_pack_for_input(input, cli_locale)?;
     let config = match code_pack.as_ref() {
-        Some(pack) => Config::default()
-            .with_target(target)
-            .with_locale_pack(pack.clone()),
+        Some(pack) => match cli_locale {
+            Some(_) => Config::default()
+                .with_target(target)
+                .with_resolved_locale_pack(pack.clone()),
+            None => Config::default()
+                .with_target(target)
+                .with_locale_pack(pack.clone()),
+        },
         None => Config::default().with_target(target),
     };
     let diagnostic_pack =

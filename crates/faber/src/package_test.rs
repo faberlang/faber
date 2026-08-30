@@ -68,10 +68,14 @@ fn load_with_faber_seams(
     include_proba: bool,
     filter: Option<&TestSourceFilter>,
 ) -> Result<Vec<radix::program::PackageFile>, Vec<Diagnostic>> {
-    radix::program::analyze::load_package_with_locale_pack(
+    let config = locale_pack
+        .cloned()
+        .map(|pack| Config::default().with_resolved_locale_pack(pack))
+        .unwrap_or_default();
+    radix::program::analyze::load_package_with_config(
         spec,
         resolver,
-        locale_pack,
+        &config,
         include_proba,
         filter,
         &faber_analysis_seams(),
@@ -339,7 +343,7 @@ fn dev_norma_library_home() -> PathBuf {
 }
 
 /// The product-default English code pack (en = authority). The transitive
-/// loader tests below call `load_package`/`load_package_with_locale_pack`
+/// loader tests below call `load_package`/`load_package_with_config`
 /// directly; they must pass the same default pack the `compile_package*` /
 /// `analyze_package` routes apply — not the pack-less (registry-direct)
 /// lexing `load_package` would select.
@@ -7333,7 +7337,7 @@ entry = "main.fab"
 }
 
 #[test]
-fn load_package_with_locale_pack_surfaces_missing_manifest_after_validation() {
+fn load_package_with_config_surfaces_missing_manifest_after_validation() {
     let dir = test_temp_dir("manifest-missing-after-validation");
     fs::create_dir_all(dir.join("src")).expect("create src");
     fs::write(
@@ -7364,7 +7368,7 @@ entry = "main.fab"
 }
 
 #[test]
-fn load_package_with_locale_pack_rejects_malformed_manifest() {
+fn load_package_with_config_rejects_malformed_manifest() {
     let dir = test_temp_dir("manifest-malformed-load");
     fs::create_dir_all(dir.join("src")).expect("create src");
     fs::write(dir.join("faber.toml"), "this is not toml [").expect("write malformed manifest");

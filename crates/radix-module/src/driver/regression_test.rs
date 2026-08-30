@@ -3,8 +3,6 @@
 //! feature-area regression guards.
 
 use super::compile;
-#[cfg(feature = "hir-faber")]
-use crate::codegen::faber::compile_canonical_str;
 use crate::codegen::Target;
 use crate::driver::{AnalyzeRequest, Config, ModuleCompileRequest, Session};
 use crate::test_support::test_session;
@@ -27,7 +25,7 @@ genus Circle implet Drawable {
   }
 }
 "#;
-    let result = compile_canonical_str("nondum.fab", source);
+    let result = super::faber_emit("nondum.fab", source);
 
     assert!(
         result.success(),
@@ -45,7 +43,7 @@ genus Circle implet Drawable {
 fn annotation_strings_with_quotes_and_newlines_roundtrip_through_faber_codegen() {
     let source = r#"@ doc "a \"hello\" world"
 incipit {}"#;
-    let result = compile_canonical_str("test.fab", source);
+    let result = super::faber_emit("test.fab", source);
 
     assert!(result.success(), "expected compile success: {:?}", result.diagnostics);
 }
@@ -58,7 +56,7 @@ incipit {
   fixum _ x ← 42
   fixum _ y ← x ∷ textus
 }"#;
-    let result = compile_canonical_str("test.fab", source);
+    let result = super::faber_emit("test.fab", source);
 
     assert!(result.success(), "expected compile success: {:?}", result.diagnostics);
 }
@@ -209,7 +207,7 @@ fn faber_output_prefers_compact_closure_syntax() {
     let source = r"incipit {
   fixum _ double ← clausura numerus x: x * 2
 }";
-    let result = compile_canonical_str("test.fab", source);
+    let result = super::faber_emit("test.fab", source);
 
     let Some(output) = result.output else {
         panic!("expected Faber output");

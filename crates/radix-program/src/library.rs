@@ -865,15 +865,16 @@ fn resolve_library_interface_locale_pack(
     frontmatter: Option<&radix_module::driver::FileFrontmatter>,
     locale_loader: Option<LocaleLoader>,
 ) -> Result<Option<radix_module::locale::LocalePack>, Diagnostic> {
-    let file_locale = frontmatter
-        .and_then(radix_module::driver::FileFrontmatter::locale)
-        .map(str::trim)
-        .filter(|locale| !locale.is_empty());
-    match file_locale {
-        Some(locale) => {
-            load_library_locale_pack(locale_loader, &module.interface_path, Some(locale))
+    match frontmatter.and_then(radix_module::driver::FileFrontmatter::locale_result) {
+        Some(Err(())) => Err(crate::package_diagnostic_error(
+            "frontmatter 'locale' key must be a string",
+        )
+        .with_file(module.interface_path.display().to_string())
+        .with_arg("issue", "frontmatter_locale_type")),
+        Some(Ok(locale)) if !locale.trim().is_empty() => {
+            load_library_locale_pack(locale_loader, &module.interface_path, Some(locale.trim()))
         }
-        None => match library_declared_reader_locale(&module.interface_path) {
+        Some(Ok(_)) | None => match library_declared_reader_locale(&module.interface_path) {
             Some(locale) => {
                 load_library_locale_pack(locale_loader, &module.interface_path, Some(&locale))
             }

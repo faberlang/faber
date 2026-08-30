@@ -10,7 +10,7 @@
 //!    3b. **All → Latin** — every locale input compiled to Latin output
 //! 4. **Full fan-out** — every input locale × every output locale (7×7 = 49 pairs)
 
-use crate::codegen::faber::compile_canonical;
+use crate::codegen::faber::reemit_faber;
 use crate::codegen::Target;
 use crate::driver::{Config, Session};
 use crate::locale::LocalePack;
@@ -55,6 +55,17 @@ fn session_for(output_locale: &str) -> Session {
     Session::new(config)
 }
 
+/// Build a source session whose frontmatter selects the reader locale. The
+/// output pack is passed separately to `reemit_faber` so the two decisions
+/// cannot accidentally collapse into one.
+fn source_session() -> Session {
+    Session::new(
+        Config::default()
+            .with_target(Target::HirFaber)
+            .with_stdlib(stdlib_path()),
+    )
+}
+
 /// Prepend frontmatter locale to a source body.
 fn with_frontmatter(locale: &str, body: &str) -> String {
     format!("+++\nlocale = \"{locale}\"\n+++\n{body}")
@@ -68,9 +79,10 @@ fn with_frontmatter(locale: &str, body: &str) -> String {
 fn emit_to_all_locales() -> Vec<(&'static str, String)> {
     let mut emitted = Vec::with_capacity(LOCALES.len());
     for &locale in LOCALES {
-        let session = session_for(locale);
+        let session = source_session();
+        let emit_pack = load_pack(locale);
         let source = with_frontmatter("la", CANONICAL_SOURCE);
-        let result = compile_canonical(&session, "canonical.fab", &source);
+        let result = reemit_faber(&session, &emit_pack, "canonical.fab", &source);
         assert!(result.success(), "emit la → {locale} failed: {:?}", result.diagnostics);
         let code = result.output.expect("emit should produce output").code;
         assert!(!code.is_empty(), "emit to {locale} produced empty output");
@@ -114,8 +126,9 @@ fn phase2_roundtrip_every_locale() {
 
     for (locale, body) in &emitted {
         let source = with_frontmatter(locale, body);
-        let session = session_for(locale);
-        let result = compile_canonical(&session, "roundtrip.fab", &source);
+        let session = source_session();
+        let emit_pack = load_pack(locale);
+        let result = reemit_faber(&session, &emit_pack, "roundtrip.fab", &source);
         assert!(
             result.success(),
             "round-trip {locale} → {locale} failed: {:?}",
@@ -138,9 +151,10 @@ fn phase2_roundtrip_every_locale() {
 #[test]
 fn phase3a_latin_input_to_every_output() {
     for &output_locale in LOCALES {
-        let session = session_for(output_locale);
+        let session = source_session();
+        let emit_pack = load_pack(output_locale);
         let source = with_frontmatter("la", CANONICAL_SOURCE);
-        let result = compile_canonical(&session, "latin.fab", &source);
+        let result = reemit_faber(&session, &emit_pack, "latin.fab", &source);
         assert!(result.success(), "la → {output_locale} failed: {:?}", result.diagnostics);
         assert!(result.output.is_some(), "la → {output_locale} produced no output");
     }
@@ -163,7 +177,8 @@ fn phase3b_every_input_to_latin_output() {
                 .with_target(Target::HirFaber)
                 .with_stdlib(stdlib_path()),
         );
-        let result = compile_canonical(&session, "fanout.fab", &source);
+        let emit_pack = crate::locale::latin_locale_pack();
+        let result = reemit_faber(&session, &emit_pack, "fanout.fab", &source);
         assert!(result.success(), "{input_locale} → la failed: {:?}", result.diagnostics);
         assert!(result.output.is_some(), "{input_locale} → la produced no output");
     }
@@ -179,8 +194,9 @@ fn phase4_full_cross_locale_fanout() {
     for (input_locale, body) in &emitted {
         for &output_locale in LOCALES {
             let source = with_frontmatter(input_locale, body);
-            let session = session_for(output_locale);
-            let result = compile_canonical(&session, "fanout.fab", &source);
+            let session = source_session();
+            let emit_pack = load_pack(output_locale);
+            let result = reemit_faber(&session, &emit_pack, "fanout.fab", &source);
 
             if !result.success() {
                 let errors: Vec<String> = result
@@ -226,10 +242,10 @@ incipit {
 #[test]
 fn en_tensor_vacua_roundtrip_uses_pack_surface() {
     let en_pack = load_pack("en");
-    let session = session_for("en");
+    let session = source_session();
 
     let source = with_frontmatter("la", TENSOR_VACUA_SOURCE);
-    let result = compile_canonical(&session, "tensor-vacua.fab", &source);
+    let result = reemit_faber(&session, &en_pack, "tensor-vacua.fab", &source);
     assert!(result.success(), "en tensor+vacua emit failed: {:?}", result.diagnostics);
     let body = result.output.expect("emit should produce output").code;
     assert!(!body.is_empty(), "en tensor+vacua emit produced empty output");
@@ -260,7 +276,7 @@ fn en_tensor_vacua_roundtrip_uses_pack_surface() {
     // Re-parse the emitted (English-surface) program under the en session and
     // require stable re-emission (phase-2 same-HIR stability proof).
     let source = with_frontmatter("en", &body);
-    let re_result = compile_canonical(&session, "tensor-vacua-roundtrip.fab", &source);
+    let re_result = reemit_faber(&session, &en_pack, "tensor-vacua-roundtrip.fab", &source);
     assert!(
         re_result.success(),
         "en re-parse of emitted tensor+vacua failed: {:?}",
@@ -283,12 +299,12 @@ fn en_tensor_vacua_roundtrip_uses_pack_surface() {
 #[test]
 fn th_tensor_vacua_roundtrip_uses_pack_surface() {
     let th_pack = load_pack("th-TH");
-    let session = session_for("th-TH");
+    let session = source_session();
 
     // 1. Emit under th-TH: la-frontmatter Latin source compiles and prints
     // pack surfaces.
     let source = with_frontmatter("la", TENSOR_VACUA_SOURCE);
-    let result = compile_canonical(&session, "tensor-vacua.fab", &source);
+    let result = reemit_faber(&session, &th_pack, "tensor-vacua.fab", &source);
     assert!(result.success(), "th-TH tensor+vacua emit failed: {:?}", result.diagnostics);
     let body = result.output.expect("emit should produce output").code;
     assert!(!body.is_empty(), "th-TH tensor+vacua emit produced empty output");
@@ -327,7 +343,7 @@ fn th_tensor_vacua_roundtrip_uses_pack_surface() {
     // canonicalizes the Thai surface to Latin identity before semantics, so
     // lowering is unchanged.
     let source = with_frontmatter("th-TH", &body);
-    let re_result = compile_canonical(&session, "tensor-vacua-roundtrip.fab", &source);
+    let re_result = reemit_faber(&session, &th_pack, "tensor-vacua-roundtrip.fab", &source);
     assert!(
         re_result.success(),
         "th-TH re-parse of emitted tensor+vacua failed: {:?}",
@@ -356,7 +372,16 @@ fn th_locale_vacua_acceptance_is_bounded_to_owned_rows() {
     // `เทนเซอร์` tensor, `เศษ` fractus) — pack-authoritative, no Latin
     // support vocabulary under the non-la pack.
     let owned = "เริ่ม {\n  คงที่ เทนเซอร์<เศษ<f32>, []> empty ← เซตว่าง\n  บันทึก empty\n}\n";
-    let result = compile_canonical(&session, "vacua-owned.fab", owned);
+    let result = reemit_faber(
+        &session,
+        session
+            .config
+            .locale_pack
+            .as_ref()
+            .expect("emission locale pack"),
+        "vacua-owned.fab",
+        owned,
+    );
     assert!(
         result.success(),
         "owned th-TH vacua gloss should compile as the empty-collection marker: {:?}",
@@ -368,7 +393,16 @@ fn th_locale_vacua_acceptance_is_bounded_to_owned_rows() {
     // undefined variable reference, so compilation fails. If the parser
     // started accepting unmapped spellings, this would (wrongly) succeed.
     let unmapped = "เริ่ม {\n  คงที่ เทนเซอร์<เศษ<f32>, []> empty ← หุ่นจำลอง\n  บันทึก empty\n}\n";
-    let result = compile_canonical(&session, "vacua-unmapped.fab", unmapped);
+    let result = reemit_faber(
+        &session,
+        session
+            .config
+            .locale_pack
+            .as_ref()
+            .expect("emission locale pack"),
+        "vacua-unmapped.fab",
+        unmapped,
+    );
     assert!(
         !result.success(),
         "unmapped th-TH spelling must not be implicitly accepted as vacua"
@@ -379,7 +413,16 @@ fn th_locale_vacua_acceptance_is_bounded_to_owned_rows() {
 fn en_vacua_marker_rejects_after_alias_removal() {
     let session = session_for("en");
     let source = with_frontmatter("en", "main {\n  var list<int> xs ← vacua\n  print xs.length()\n}\n");
-    let result = compile_canonical(&session, "en-vacua-reject.fab", &source);
+    let result = reemit_faber(
+        &session,
+        session
+            .config
+            .locale_pack
+            .as_ref()
+            .expect("emission locale pack"),
+        "en-vacua-reject.fab",
+        &source,
+    );
     assert!(
         !result.success(),
         "en `vacua` must not claim as the empty-collection marker: {:?}",
@@ -399,7 +442,16 @@ fn en_vacua_marker_rejects_after_alias_removal() {
 fn en_empty_marker_compiles() {
     let session = session_for("en");
     let source = with_frontmatter("en", "main {\n  var list<int> xs ← empty\n  print xs.length()\n}\n");
-    let result = compile_canonical(&session, "en-empty-marker.fab", &source);
+    let result = reemit_faber(
+        &session,
+        session
+            .config
+            .locale_pack
+            .as_ref()
+            .expect("emission locale pack"),
+        "en-empty-marker.fab",
+        &source,
+    );
     assert!(result.success(), "en `empty` marker must compile: {:?}", result.diagnostics);
 }
 
@@ -407,7 +459,16 @@ fn en_empty_marker_compiles() {
 fn en_empty_named_binding_compiles_with_marker_rhs() {
     let session = session_for("en");
     let source = with_frontmatter("en", "main {\n  var list<int> empty ← empty\n  print 0\n}\n");
-    let result = compile_canonical(&session, "en-empty-shadow.fab", &source);
+    let result = reemit_faber(
+        &session,
+        session
+            .config
+            .locale_pack
+            .as_ref()
+            .expect("emission locale pack"),
+        "en-empty-shadow.fab",
+        &source,
+    );
     assert!(
         result.success(),
         "en `var list<int> empty ← empty` must compile (RHS is the marker): {:?}",
@@ -419,7 +480,16 @@ fn en_empty_named_binding_compiles_with_marker_rhs() {
 fn la_vacua_marker_still_compiles() {
     let session = session_for("la");
     let source = with_frontmatter("la", "incipit {\n  varia lista<numerus> xs ← vacua\n  nota xs.longitudo()\n}\n");
-    let result = compile_canonical(&session, "la-vacua-marker.fab", &source);
+    let result = reemit_faber(
+        &session,
+        session
+            .config
+            .locale_pack
+            .as_ref()
+            .expect("emission locale pack"),
+        "la-vacua-marker.fab",
+        &source,
+    );
     assert!(
         result.success(),
         "la `vacua` marker must still compile: {:?}",

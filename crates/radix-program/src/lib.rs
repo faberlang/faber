@@ -65,7 +65,12 @@ pub struct PackageFile {
     pub raw_source: String,
     /// Peeled Faber body used for parse spans and semantic analysis.
     pub source: String,
+    /// Byte offset of `source` within [`PackageFile::raw_source`].
+    pub body_byte_offset: u32,
     pub frontmatter: Option<radix_module::driver::FileFrontmatter>,
+    /// Reader pack selected for this file before lexing. `None` is the
+    /// compiler's Latin fallback when the product seam supplies no pack.
+    pub locale_pack: Option<radix_module::locale::LocalePack>,
     pub program: radix_module::syntax::Program,
     pub interner: radix_module::lexer::Interner,
     /// Direct `norma:` (and future provider) imports declared in this package file.

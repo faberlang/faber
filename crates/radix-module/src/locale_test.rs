@@ -1362,8 +1362,7 @@ fn en_empty_named_binding_rhs_claims_as_marker() {
         &Session::new(
             Config::default()
                 .with_target(Target::HirRust)
-                .with_locale_pack(pack)
-                .with_locale_pack_explicit(),
+                .with_resolved_locale_pack(pack),
         ),
         "en-empty-reference.fab",
         "main { print empty }",
@@ -1397,8 +1396,7 @@ fn marker_named_bindings_warn_under_en_and_la_packs() {
             &Session::new(
                 Config::default()
                     .with_target(Target::HirRust)
-                    .with_locale_pack(pack)
-                    .with_locale_pack_explicit(),
+                    .with_resolved_locale_pack(pack),
             ),
             &format!("{locale}-marker-shadow.fab"),
             source,

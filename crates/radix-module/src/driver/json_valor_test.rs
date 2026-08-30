@@ -85,7 +85,7 @@ fn json_valor_literal_distinct_keys_in_different_objects_are_not_duplicates() {
 #[cfg(feature = "hir-faber")]
 fn json_valor_literal_round_trips_through_faber_codegen() {
     let source = "incipit {\n    fixum _ d ← { \"a\": 1, \"b\": true }\n    nota d\n}";
-    let first = crate::codegen::faber::compile_canonical_str("rt1.fab", source);
+    let first = super::faber_emit("rt1.fab", source);
     assert!(first.success(), "first compile failed: {:?}", first.diagnostics);
     let Some(out) = first.output else {
         panic!("expected faber output")

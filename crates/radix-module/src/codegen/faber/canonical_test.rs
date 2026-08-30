@@ -1473,7 +1473,16 @@ fn localized_adfirma_message_uses_each_locale_surface() {
         pack_path.push(format!("../../stdlib/locale/{locale}/pack.toml"));
         let pack = crate::locale::LocalePack::from_toml_path(&pack_path).expect("installed locale pack should load");
         let session = crate::driver::Session::new(crate::driver::Config::default().with_locale_pack(pack));
-        let result = super::compile::compile_canonical(&session, &format!("mori-{locale}.fab"), source);
+        let result = super::compile::reemit_faber(
+            &session,
+            session
+                .config
+                .locale_pack
+                .as_ref()
+                .expect("emission locale pack"),
+            &format!("mori-{locale}.fab"),
+            source,
+        );
         assert!(result.success(), "{locale} canonical emit failed: {:?}", result.diagnostics);
         let output = result.output.expect("canonical output").code;
         assert!(
@@ -1494,7 +1503,16 @@ fn localized_emit_consults_locale_pack_surface() {
 
     let config = crate::driver::Config::default().with_locale_pack(pack);
     let session = crate::driver::Session::new(config);
-    let result = super::compile::compile_canonical(&session, "salve.th.fab", "ฟังก์ชัน salve() { }\n");
+    let result = super::compile::reemit_faber(
+        &session,
+        session
+            .config
+            .locale_pack
+            .as_ref()
+            .expect("emission locale pack"),
+        "salve.th.fab",
+        "ฟังก์ชัน salve() { }\n",
+    );
 
     assert!(result.success(), "{:?}", result.diagnostics);
     let output = result.output.expect("emit should produce output");
@@ -1512,9 +1530,10 @@ fn localized_emit_consults_locale_pack_surface() {
 
 #[test]
 fn canonical_emit_preserves_legacy_posture_annotation_without_duplicate_word() {
-    let session = crate::driver::Session::new(crate::driver::Config::default());
+    let pack = crate::locale::latin_locale_pack();
+    let session = crate::driver::Session::new(crate::driver::Config::default().with_locale_pack(pack.clone()));
     let result =
-        super::compile::compile_canonical(&session, "legacy-posture.fab", "@ futura\nfunctio f() → vacuum { }\n");
+        super::compile::reemit_faber(&session, &pack, "legacy-posture.fab", "@ futura\nfunctio f() → vacuum { }\n");
 
     assert!(result.success(), "{:?}", result.diagnostics);
     let output = result.output.expect("emit should produce output").code;
@@ -1542,7 +1561,16 @@ fn stream() async_generator → int {
   yield value
 }
 ";
-    let result = super::compile::compile_canonical(&session, "morphology.llm.fab", source);
+    let result = super::compile::reemit_faber(
+        &session,
+        session
+            .config
+            .locale_pack
+            .as_ref()
+            .expect("emission locale pack"),
+        "morphology.llm.fab",
+        source,
+    );
 
     assert!(result.success(), "{:?}", result.diagnostics);
     let output = result.output.expect("emit should produce output").code;
@@ -1593,7 +1621,16 @@ fn localized_emit_round_trips_under_same_pack() {
 ";
 
     // First canonical pass over localized source.
-    let first = super::compile::compile_canonical(&session, "salve.th.fab", source);
+    let first = super::compile::reemit_faber(
+        &session,
+        session
+            .config
+            .locale_pack
+            .as_ref()
+            .expect("emission locale pack"),
+        "salve.th.fab",
+        source,
+    );
     assert!(first.success(), "first pass should compile: {:?}", first.diagnostics);
     let first_code = first
         .output
@@ -1605,7 +1642,16 @@ fn localized_emit_round_trips_under_same_pack() {
 
     // Second pass: re-emit the localized output. Lossless round-trip requires the
     // localized spellings re-lex to the same token kinds, yielding identical output.
-    let second = super::compile::compile_canonical(&session, "salve.th.fab", &first_code);
+    let second = super::compile::reemit_faber(
+        &session,
+        session
+            .config
+            .locale_pack
+            .as_ref()
+            .expect("emission locale pack"),
+        "salve.th.fab",
+        &first_code,
+    );
     assert!(second.success(), "round-trip re-parse should compile: {:?}", second.diagnostics);
     let second_code = second
         .output
@@ -1748,11 +1794,17 @@ fn canonical_lex_parse(code: &str) {
 }
 
 fn canonical_round_trip(source: &str) -> (String, String) {
-    let result = super::compile_canonical_str("conversio-assign.fab", source);
+    let pack = crate::locale::latin_locale_pack();
+    let session = crate::driver::Session::new(
+        crate::driver::Config::default()
+            .with_resolved_locale_pack(pack.clone())
+            .with_dev_stdlib(),
+    );
+    let result = super::compile::reemit_faber(&session, &pack, "conversio-assign.fab", source);
     assert!(result.success(), "canonical emit failed: {:?}", result.diagnostics);
     let first = result.output.expect("output").code;
     canonical_lex_parse(&first);
-    let second = super::compile_canonical_str("conversio-assign.fab", &first);
+    let second = super::compile::reemit_faber(&session, &pack, "conversio-assign.fab", &first);
     assert!(second.success(), "re-parse should compile: {:?}", second.diagnostics);
     let second_code = second.output.expect("output").code;
     assert_eq!(first, second_code, "canonical(canonical(x)) must equal canonical(x)");

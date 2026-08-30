@@ -11,18 +11,21 @@ pub const MAX_PACKAGE_SOURCE_FILES: usize = 4096;
 pub const MAX_PACKAGE_SOURCE_BYTES: u64 = 64 * 1024 * 1024;
 
 use radix_module::diagnostics::Diagnostic;
-use radix_module::driver::{peel_raw_source, source_load_diagnostic, FileFrontmatter};
+use radix_module::driver::{peel_raw_source, source_load_diagnostic, Config, FileFrontmatter};
 use radix_module::lexer::Interner;
 use radix_module::syntax::Program;
 
 use crate::frontmatter::validate_frontmatter_against_manifest;
+use crate::library::LocaleLoader;
 use crate::manifest::FaberManifest;
 use radix_module::diagnostics::DiagnosticConvert;
 
 pub struct LoadedPackageSource {
     pub raw_source: String,
     pub body: String,
+    pub body_byte_offset: u32,
     pub frontmatter: Option<FileFrontmatter>,
+    pub locale_pack: Option<radix_module::locale::LocalePack>,
     pub program: Program,
     pub interner: Interner,
 }
@@ -170,7 +173,8 @@ mod source_files_test;
 pub fn load_package_source(
     path: &Path,
     manifest: Option<&FaberManifest>,
-    locale_pack: Option<&radix_module::locale::LocalePack>,
+    config: &Config,
+    locale_loader: LocaleLoader,
     diagnostics: &mut Vec<Diagnostic>,
 ) -> Option<LoadedPackageSource> {
     let raw_source = match fs::read_to_string(path) {
@@ -198,11 +202,20 @@ pub fn load_package_source(
         }
     }
 
+    let locale_pack = resolve_locale_pack(
+        path,
+        config,
+        locale_loader,
+        peeled.frontmatter.as_ref(),
+        diagnostics,
+    )?;
+    let body_byte_offset = peeled.body_byte_offset;
     let radix_module::driver::PeeledSource {
         body, frontmatter, ..
     } = peeled;
     let body = body.to_owned();
-    let lex_result = match locale_pack {
+    let source_diagnostic_start = diagnostics.len();
+    let lex_result = match locale_pack.as_ref() {
         Some(pack) => radix_module::lexer::lex_with_locale_pack(&body, pack),
         None => radix_module::lexer::lex(&body),
     };
@@ -218,6 +231,11 @@ pub fn load_package_source(
                 .errors
                 .iter()
                 .map(|error| Diagnostic::from_lex_error(&display_name, &body, error)),
+        );
+        radix_module::driver::adjust_diagnostic_lines_for_body(
+            &mut diagnostics[source_diagnostic_start..],
+            &raw_source,
+            body_byte_offset,
         );
         return None;
     }
@@ -235,8 +253,19 @@ pub fn load_package_source(
                 .iter()
                 .map(|error| Diagnostic::from_parse_error(&display_name, &body, error)),
         );
+        radix_module::driver::adjust_diagnostic_lines_for_body(
+            &mut diagnostics[source_diagnostic_start..],
+            &raw_source,
+            body_byte_offset,
+        );
         return None;
     }
+
+    radix_module::driver::adjust_diagnostic_lines_for_body(
+        &mut diagnostics[source_diagnostic_start..],
+        &raw_source,
+        body_byte_offset,
+    );
 
     let radix_module::parser::ParseResult {
         program, interner, ..
@@ -252,8 +281,60 @@ pub fn load_package_source(
     Some(LoadedPackageSource {
         raw_source,
         body,
+        body_byte_offset,
         frontmatter,
+        locale_pack,
         program,
         interner,
     })
+}
+
+fn resolve_locale_pack(
+    path: &Path,
+    config: &Config,
+    locale_loader: LocaleLoader,
+    frontmatter: Option<&FileFrontmatter>,
+    diagnostics: &mut Vec<Diagnostic>,
+) -> Option<Option<radix_module::locale::LocalePack>> {
+    if config.locale_pack_explicit {
+        return Some(config.locale_pack.clone());
+    }
+
+    match frontmatter.and_then(FileFrontmatter::locale_result) {
+        Some(Err(())) => {
+            diagnostics.push(
+                crate::package_diagnostic_error("frontmatter 'locale' key must be a string")
+                    .with_file(path.display().to_string())
+                    .with_arg("issue", "frontmatter_locale_type"),
+            );
+            None
+        }
+        Some(Ok(locale)) => match locale_loader(path, Some(locale)) {
+            Ok(Some(pack)) => Some(Some(pack)),
+            Ok(None) => {
+                diagnostics.push(
+                    crate::package_diagnostic_error(format!(
+                        "reader locale '{locale}' was declared but no locale pack was supplied"
+                    ))
+                    .with_file(path.display().to_string())
+                    .with_arg("issue", "locale_pack_missing"),
+                );
+                None
+            }
+            Err(diagnostic) => {
+                diagnostics.push(*diagnostic);
+                None
+            }
+        },
+        None => match config.locale_pack.clone() {
+            Some(pack) => Some(Some(pack)),
+            None => match locale_loader(path, None) {
+                Ok(pack) => Some(pack),
+                Err(diagnostic) => {
+                    diagnostics.push(*diagnostic);
+                    None
+                }
+            },
+        },
+    }
 }

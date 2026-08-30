@@ -362,9 +362,7 @@ fn config_for_target(
         None => config,
     };
     match code_pack {
-        Some(pack) if explicit => config
-            .with_locale_pack(pack.clone())
-            .with_locale_pack_explicit(),
+        Some(pack) if explicit => config.with_resolved_locale_pack(pack.clone()),
         Some(pack) => config.with_locale_pack(pack.clone()),
         None => config,
     }
@@ -497,18 +495,13 @@ pub fn prepare_program_module(
         return Err(Box::new(import_site_parse_failure_diagnostic(path, failure)));
     }
     let mut config = session.config.clone();
-    if let Some(pack) = pack {
-        config = config.with_locale_pack(pack).with_locale_pack_explicit();
+    if let Some(pack) = pack.as_ref() {
+        config = config.with_resolved_locale_pack(pack.clone());
     }
     Ok(PreparedProgramModule {
         session: crate::driver::Session::new(config),
         contract: import.into_module_contract(),
-        package_identities: package_import_identities_for_file(
-            path,
-            source,
-            session.config.locale_pack.as_ref(),
-            templates,
-        ),
+        package_identities: package_import_identities_for_file(path, source, pack.as_ref(), templates),
     })
 }
 
@@ -952,42 +945,32 @@ fn parse_reader_locale_from_toml(toml_source: &str) -> Option<String> {
 /// to record the canonical identity on the unit's own exported functions so
 /// the emitted module defines the external symbol its consumers call.
 ///
-/// The file is re-parsed under its package's effective reader pack (frontmatter
-/// locale > package `faber.toml` locale > product-default `en`) — mirroring the
-/// pack the package graph analyzed the unit under — so en-surface local
-/// imports (`import from "./x"`) register as same-package identities instead of
-/// falling through to the registry-direct Latin parse. Packages whose units
-/// carry a Latin frontmatter/manifest locale keep the registry-direct Latin
-/// surface; `None` pack (registry-direct) remains the fallback when no pack
-/// resolves (no stdlib configured).
+/// The file is re-parsed under the caller-resolved reader pack, with the
+/// source's frontmatter still able to select a pack when the caller did not
+/// make an exact choice. This mirrors the pack used by the package graph, so
+/// local imports register as same-package identities instead of falling
+/// through to a hidden product default.
 #[must_use]
-pub fn package_identity_facts_for_path(path: &Path) -> Option<crate::driver::PackageImportIdentities> {
+pub fn package_identity_facts_for_path(
+    path: &Path,
+    config: &crate::driver::Config,
+) -> Option<crate::driver::PackageImportIdentities> {
     let source = std::fs::read_to_string(path).ok()?;
-    let code_pack = package_effective_reader_pack(path, &source);
+    let code_pack = package_effective_reader_pack(path, &source, config);
     package_identity_facts_for_file(path, &source, code_pack.as_ref(), None)
 }
 
-/// Product-default code-locale id (mirror of the faber package machinery's
-/// `DEFAULT_CODE_LOCALE`): packages without a declared locale read under `en`.
-const DEFAULT_CODE_LOCALE: &str = "en";
-
-/// Resolve the reader pack a package source file parses under, mirroring the
-/// faber package machinery (`effective_package_config` plus the analysis
-/// front-end's `resolve_peeled_lex_pack` chain): the file's own
-/// `+++ locale = "…" +++` frontmatter wins, then the package's declared reader
-/// locale (`faber.toml` `[locale] locale`, legacy `[reader] locale`), then the
-/// product-default `en` pack. Returns `None` when no pack resolves (no stdlib
-/// configured), keeping registry-direct Latin parsing as the final fallback.
-fn package_effective_reader_pack(path: &Path, source: &str) -> Option<crate::locale::LocalePack> {
-    let path = absolute_cli_path(path);
-    frontmatter_locale_pack_from_source(&path.display().to_string(), source)
-        .or_else(|| package_reader_locale_pack(&path))
-        .or_else(default_code_locale_pack)
-}
-
-fn default_code_locale_pack() -> Option<crate::locale::LocalePack> {
-    let config = crate::driver::Config::default();
-    crate::driver::resolve_frontmatter_locale_pack(&config, DEFAULT_CODE_LOCALE).ok()
+fn package_effective_reader_pack(
+    path: &Path,
+    source: &str,
+    config: &crate::driver::Config,
+) -> Option<crate::locale::LocalePack> {
+    let peeled = crate::driver::peel_raw_source(&path.display().to_string(), source).ok()?;
+    let session = crate::driver::Session::new(config.clone());
+    let mut diagnostics = Vec::new();
+    crate::driver::resolve_peeled_lex_pack(&session, &peeled, &mut diagnostics)
+        .ok()
+        .flatten()
 }
 
 /// Compute package-local import identity facts for one compiled file.

@@ -1,6 +1,6 @@
 //! End-to-end package-path tests for `.proba` discovery, filters, and import boundary.
 //!
-//! Drives the real `load_package_with_locale_pack` / `compile_package*` surfaces
+//! Drives the real `load_package_with_config` / `compile_package*` surfaces
 //! (not a reimplemented mini-harness).
 
 use super::library_resolver_from_config;
@@ -55,10 +55,14 @@ fn load_with_faber_seams(
     include_proba: bool,
     filter: Option<&TestSourceFilter>,
 ) -> Result<Vec<radix::program::PackageFile>, Vec<radix::module::diagnostics::Diagnostic>> {
-    radix::program::analyze::load_package_with_locale_pack(
+    let config = locale_pack
+        .cloned()
+        .map(|pack| Config::default().with_resolved_locale_pack(pack))
+        .unwrap_or_default();
+    radix::program::analyze::load_package_with_config(
         spec,
         resolver,
-        locale_pack,
+        &config,
         include_proba,
         filter,
         &seams(),
@@ -69,7 +73,7 @@ const PROBA_IMPORT_MESSAGE: &str =
     ".proba files are test sources and cannot be imported; move shared helpers to a .fab module";
 
 /// The product-default English code pack (en = authority). The loader-level
-/// tests below drive `load_package_with_locale_pack` directly, so they must
+/// tests below drive `load_package_with_config` directly, so they must
 /// pass the same default pack the `compile_package*`/`analyze_package` routes
 /// apply — not the pack-less (registry-direct) lexing `None` would select.
 fn english_pack() -> LocalePack {
@@ -163,6 +167,71 @@ describe "helpers" {
         names.contains(&"inline.fab".to_owned()),
         "inline fab missing: {names:?}"
     );
+}
+
+#[test]
+fn load_package_selects_each_fab_and_proba_reader_pack() {
+    let dir = test_temp_dir("proba-per-file-locale");
+    write_minimal_lib_package(dir.path());
+    fs::write(
+        dir.join("src/main.fab"),
+        r#"main {
+    print "entry"
+}
+"#,
+    )
+    .expect("main.fab");
+    fs::write(
+        dir.join("src/latin.fab"),
+        r#"+++
+locale = "la"
++++
+
+functio salutatio() → textus {
+    redde "salve"
+}
+"#,
+    )
+    .expect("latin.fab");
+    fs::write(
+        dir.join("src/thai.fab"),
+        r#"+++
+locale = "th-TH"
++++
+
+ฟังก์ชัน ทักทาย() {
+}
+"#,
+    )
+    .expect("thai.fab");
+    fs::write(
+        dir.join("src/thai.proba"),
+        r#"+++
+locale = "th-TH"
++++
+
+ทดสอบ "ภาษาไทย" {
+    ยืนยัน จริง
+}
+"#,
+    )
+    .expect("thai.proba");
+
+    let spec = discover_package(dir.path()).expect("discover");
+    let resolver = library_resolver_from_config(&Config::default());
+    let files = load_with_faber_seams(&spec, &resolver, None, true, None).expect("load");
+
+    let pack_for = |name: &str| {
+        files
+            .iter()
+            .find(|file| file.path.file_name().and_then(|name| name.to_str()) == Some(name))
+            .and_then(|file| file.locale_pack.as_ref())
+            .map(|pack| pack.metadata.id.as_str())
+    };
+    assert_eq!(pack_for("main.fab"), Some("en"));
+    assert_eq!(pack_for("latin.fab"), Some("la"));
+    assert_eq!(pack_for("thai.fab"), Some("th-TH"));
+    assert_eq!(pack_for("thai.proba"), Some("th-TH"));
 }
 
 #[test]

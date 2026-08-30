@@ -192,10 +192,11 @@ impl Config {
         self
     }
 
-    /// Mark the configured reader pack as an explicit caller selection that
-    /// wins over any source frontmatter locale (CLI `--locale` semantics).
+    /// Install a resolved reader pack as an exact caller selection that wins
+    /// over any source frontmatter locale (CLI `--locale` semantics).
     #[must_use]
-    pub fn with_locale_pack_explicit(mut self) -> Self {
+    pub fn with_resolved_locale_pack(mut self, pack: LocalePack) -> Self {
+        self.locale_pack = Some(pack);
         self.locale_pack_explicit = true;
         self
     }

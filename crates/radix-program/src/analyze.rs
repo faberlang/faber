@@ -401,24 +401,14 @@ fn analyze_package_spec_with_deadline(
     deadline: Option<Instant>,
     seams: &AnalysisSeams,
 ) -> Result<AnalyzedProgram, Vec<Diagnostic>> {
-    let files = match config.locale_pack.as_ref() {
-        Some(pack) => load_package_with_locale_pack(
-            &spec,
-            library_resolver,
-            Some(pack),
-            include_proba,
-            proba_filter,
-            seams,
-        )?,
-        None => load_package_with_locale_pack(
-            &spec,
-            library_resolver,
-            None,
-            include_proba,
-            proba_filter,
-            seams,
-        )?,
-    };
+    let files = load_package_with_config(
+        &spec,
+        library_resolver,
+        config,
+        include_proba,
+        proba_filter,
+        seams,
+    )?;
     if let Some(diagnostic) = analysis_deadline_diagnostic(&spec, deadline, None, "load") {
         return Err(vec![diagnostic]);
     }
@@ -546,6 +536,15 @@ fn analyze_package_spec_with_deadline(
                 continue;
             }
         };
+        let file_session = match file.locale_pack.as_ref() {
+            Some(pack) => Session::new(
+                session
+                    .config
+                    .clone()
+                    .with_resolved_locale_pack(pack.clone()),
+            ),
+            None => Session::new(session.config.clone()),
+        };
         // PKG-ADM: the file's own package export surface is the admission
         // fact for exported size-generic kernel templates — registered here,
         // before the per-unit orphan check, so a package API with no
@@ -556,7 +555,7 @@ fn analyze_package_spec_with_deadline(
             .map(PackageKernelTemplateAdmissions::from_export_surface)
             .unwrap_or_default();
         let mut analysis = match analyze_source_with_kernel_template_admissions(
-            &session,
+            &file_session,
             &file.path.display().to_string(),
             &analysis_source,
             AnalyzeRequest {
@@ -570,8 +569,20 @@ fn analyze_package_spec_with_deadline(
             },
             &kernel_template_admissions,
         ) {
-            Ok(analysis) => analysis,
-            Err(file_diagnostics) => {
+            Ok(mut analysis) => {
+                radix_module::driver::adjust_diagnostic_lines_for_body(
+                    &mut analysis.diagnostics,
+                    &file.raw_source,
+                    file.body_byte_offset,
+                );
+                analysis
+            }
+            Err(mut file_diagnostics) => {
+                radix_module::driver::adjust_diagnostic_lines_for_body(
+                    &mut file_diagnostics,
+                    &file.raw_source,
+                    file.body_byte_offset,
+                );
                 diagnostics.extend(file_diagnostics);
                 continue;
             }
@@ -836,10 +847,10 @@ fn package_import_identities_for_file(
 /// composition). Manifests are validated through the caller-supplied product
 /// seam; source loading, import resolution, library expansion, and cycle
 /// detection are compiler-owned here.
-pub fn load_package_with_locale_pack(
+pub fn load_package_with_config(
     spec: &PackageSpec,
     library_resolver: &LibraryResolver,
-    locale_pack: Option<&radix_module::locale::LocalePack>,
+    config: &Config,
     include_proba: bool,
     proba_filter: Option<&TestSourceFilter>,
     seams: &AnalysisSeams,
@@ -926,7 +937,8 @@ pub fn load_package_with_locale_pack(
         let Some(loaded) = load_package_source(
             &canonical,
             compiler_manifest.as_ref(),
-            locale_pack,
+            config,
+            seams.locale_loader,
             &mut diagnostics,
         ) else {
             continue;
@@ -984,7 +996,9 @@ pub fn load_package_with_locale_pack(
             path: canonical,
             raw_source: loaded.raw_source,
             source: loaded.body,
+            body_byte_offset: loaded.body_byte_offset,
             frontmatter: loaded.frontmatter,
+            locale_pack: loaded.locale_pack,
             program: loaded.program,
             interner: loaded.interner,
             library_imports,

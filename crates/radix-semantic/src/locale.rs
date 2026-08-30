@@ -1201,7 +1201,7 @@ pub fn latin_locale_pack() -> LocalePack {
         // The keyword registry and type registry share the semantic namespace
         // for Latin, but pack validation requires unique surface spellings
         // across all sections. The roundtrip re-parse must use this same pack
-        // (see `codegen::faber::compile_canonical`), so the emitted `_t` spellings are
+        // (see `codegen::faber::reemit_faber`), so the emitted `_t` spellings are
         // registered type names on the parse side.
         let canonical = match spec.text {
             "nihil" => "nihil_t".to_owned(),

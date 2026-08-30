@@ -44,10 +44,14 @@ fn load_with_faber_seams(
     include_proba: bool,
     filter: Option<&radix::program::test_source_filter::TestSourceFilter>,
 ) -> Result<Vec<radix::program::PackageFile>, Vec<radix::module::diagnostics::Diagnostic>> {
-    radix::program::analyze::load_package_with_locale_pack(
+    let config = locale_pack
+        .cloned()
+        .map(|pack| Config::default().with_resolved_locale_pack(pack))
+        .unwrap_or_default();
+    radix::program::analyze::load_package_with_config(
         spec,
         resolver,
-        locale_pack,
+        &config,
         include_proba,
         filter,
         &seams(),
@@ -61,7 +65,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 /// The product-default English code pack (en = authority). The loader-level
-/// and runner-level tests below call `load_package_with_locale_pack` /
+/// and runner-level tests below call `load_package_with_config` /
 /// `run_proba_source` directly, so they must pass the same default pack the
 /// `compile_package*`/`analyze_package` routes apply — not the pack-less
 /// (registry-direct) lexing `None` / `Config::default()` would select.

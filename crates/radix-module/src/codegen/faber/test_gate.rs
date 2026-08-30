@@ -3,7 +3,7 @@
 //! Used by Faber re-emit tests and `faber-cli` format tests so one definition
 //! drives re-parse and idempotency checks.
 
-use super::compile_canonical;
+use super::reemit_faber;
 use crate::driver::Session;
 use crate::lexer;
 use crate::locale::LocalePack;
@@ -46,7 +46,7 @@ pub fn lex_parse_with_pack(code: &str, pack: Option<&LocalePack>) -> Result<(), 
     Ok(())
 }
 
-/// One canonical (HIR) format pass via [`super::compile_canonical`].
+/// One canonical (HIR) format pass via [`super::reemit_faber`].
 ///
 /// The session pack is the source's own locale (frontmatter, else Latin
 /// default), matching the D-B format entry.
@@ -67,11 +67,16 @@ pub fn canonical_format_once(name: &str, source: &str) -> Result<String, String>
 /// Returns diagnostic error messages when formatting fails, or when formatting
 /// succeeds without producing output.
 pub fn canonical_format_once_with_session(session: &Session, name: &str, source: &str) -> Result<String, String> {
-    let result = compile_canonical(session, name, source);
+    let emit_pack = session
+        .config
+        .locale_pack
+        .as_ref()
+        .ok_or_else(|| "canonical format session has no explicit locale pack".to_owned())?;
+    let result = reemit_faber(session, emit_pack, name, source);
     format_result("canonical", result)
 }
 
-fn format_result(kind: &str, result: super::FormatCompileResult) -> Result<String, String> {
+fn format_result(kind: &str, result: super::FaberReemitResult) -> Result<String, String> {
     if !result.success() {
         let messages: Vec<_> = result
             .diagnostics
@@ -161,9 +166,10 @@ fn source_locale_session(name: &str, source: &str) -> Result<Session, String> {
     let config = match pack {
         Some(pack) => Config::default()
             .with_dev_stdlib()
-            .with_locale_pack(pack)
-            .with_locale_pack_explicit(),
-        None => Config::default().with_dev_stdlib(),
+            .with_resolved_locale_pack(pack),
+        None => Config::default()
+            .with_dev_stdlib()
+            .with_resolved_locale_pack(crate::locale::latin_locale_pack()),
     };
     Ok(Session::new(config))
 }

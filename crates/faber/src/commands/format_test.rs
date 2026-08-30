@@ -3,7 +3,7 @@
 use super::format::{
     format_session, formatted_source_for_write, normalize_trailing_newline, source_for_compare,
 };
-use radix::module::codegen::faber::compile_canonical;
+use radix::module::codegen::faber::reemit_faber;
 use radix::module::codegen::faber::test_gate::{
     assert_canonical_idempotent_with_session, assert_canonical_reparses_with,
     canonical_format_once_with_session,
@@ -35,7 +35,16 @@ fn canonical_cli_pipeline(path: &Path) -> String {
     let source = fs::read_to_string(path).expect("read source");
     let session = format_session(path, None, &source).expect("format session");
     let name = path.display().to_string();
-    let result = compile_canonical(&session, &name, &source);
+    let result = reemit_faber(
+        &session,
+        session
+            .config
+            .locale_pack
+            .as_ref()
+            .expect("format emission locale pack"),
+        &name,
+        &source,
+    );
     assert!(
         result.success(),
         "canonical format failed for {name}: {:?}",
@@ -180,7 +189,7 @@ fn format_canonical_pipeline_preserves_and_reparses_comment_fixture() {
 }
 
 #[test]
-fn format_test_gate_matches_compile_canonical_pipeline_for_salve() {
+fn format_test_gate_matches_reemit_pipeline_for_salve() {
     let path = exempla("incipit/salve-munde.fab");
     let source = fs::read_to_string(&path).expect("read");
     let name = path.display().to_string();

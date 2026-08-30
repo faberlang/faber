@@ -211,8 +211,8 @@ pub use locale::available_locales;
 pub use locale::locale_pack_for_emit;
 #[allow(unused_imports)]
 pub(crate) use locale::{
-    config_with_locale, default_config_with_locale, load_locale_pack_for_input,
-    locale_pack_for_emit_with_diagnostic,
+    config_with_locale, default_config_with_locale, embedded_conversion_locale_pack,
+    load_locale_pack_for_input, locale_pack_for_emit_with_diagnostic, DEFAULT_CODE_LOCALE,
 };
 
 pub(super) const MANIFEST_FILE: &str = "faber.toml";

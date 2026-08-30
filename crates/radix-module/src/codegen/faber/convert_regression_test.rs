@@ -1,12 +1,12 @@
 //! Convert-path regression tests for the S1-U2 third repair (paren-drop + def_N).
 //!
 //! Each test drives the real reader-locale pipeline: an `la` source snippet
-//! with the exact defect shape converts to `en` via [`compile_canonical`], the
+//! with the exact defect shape converts to `en` via [`reemit_faber`], the
 //! emitted en surface is asserted to carry the regrouped/renamed shape, and
 //! the converted output re-parses and typechecks under the en pack (the
 //! converted-output-compiles oracle).
 
-use super::compile_canonical;
+use super::reemit_faber;
 use crate::codegen::Target;
 use crate::driver::{Config, Session};
 use crate::program::compile::clear_import_target_cache;
@@ -34,10 +34,9 @@ fn convert_to_en_named(name: &str, source: &str) -> String {
     let session = Session::new(
         Config::default()
             .with_target(Target::HirFaber)
-            .with_locale_pack(pack)
             .with_dev_stdlib(),
     );
-    let result = compile_canonical(&session, name, source);
+    let result = reemit_faber(&session, &pack, name, source);
     assert!(
         result.success(),
         "la source at {name} must convert cleanly: {:?}",
@@ -69,7 +68,7 @@ fn assert_en_output_compiles(name: &str, code: &str) {
 }
 
 #[test]
-fn compile_canonical_real_file_emits_session_pack_not_frontmatter() {
+fn reemit_real_file_emits_session_pack_not_frontmatter() {
     // RTR1b (`prepare_program_module`) overwrites the session pack with
     // source frontmatter on a real path. Convert must still emit the
     // requested session pack (en), not the input locale (la).

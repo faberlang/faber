@@ -1,16 +1,15 @@
 //! Canonical Faber format entry: analyze + HIR re-emit.
 //!
-//! LEGACY(canonical): the "canonical" name predates reader locales — with the
-//! reader-locale system there is no single canonical language surface, only
-//! locale surfaces. The HIR-backed Faber re-emit below is the engine behind
-//! `faber format --locale <X>`; rename `compile_canonical*` in a later sweep.
+//! The reader-locale system has no single canonical language surface, only
+//! locale surfaces. This HIR-backed Faber re-emitter is shared by `faber
+//! format` and `faber convert` with source and output packs kept separate.
 //!
 //! Owns the format-compilation workflow. Delegates lexing, parsing, and
 //! analysis to their respective subsystems; this module integrates them and
 //! produces Faber output. Does not own emit internals.
 
 use crate::codegen::CodegenError;
-use crate::driver::{analyze_source, AnalyzeRequest, AnalyzedModule, Config, Session};
+use crate::driver::{analyze_source, AnalyzeRequest, AnalyzedModule, Session};
 use crate::locale::{latin_locale_pack, KeywordSurface, LocalePack};
 use crate::program::compile::prepare_program_module_for_name;
 use crate::{Diagnostic, FaberOutput};
@@ -23,16 +22,16 @@ use radix_types::{AppliedArg, Type, TypeId};
 use rustc_hash::FxHashMap;
 use std::collections::{BTreeMap, BTreeSet};
 
-/// Output and diagnostics from one canonical Faber format invocation.
+/// Output and diagnostics from one Faber HIR re-emission invocation.
 #[derive(Debug)]
-pub struct FormatCompileResult {
-    /// Canonical Faber source when emission succeeded.
+pub struct FaberReemitResult {
+    /// Faber source when emission succeeded.
     pub output: Option<FaberOutput>,
     /// Ordered diagnostics accumulated across compiler phases.
     pub diagnostics: Vec<Diagnostic>,
 }
 
-impl FormatCompileResult {
+impl FaberReemitResult {
     /// Return true when emission produced output and no error diagnostics remain.
     pub fn success(&self) -> bool {
         self.output.is_some()
@@ -43,42 +42,18 @@ impl FormatCompileResult {
     }
 }
 
-/// Analyze source and re-emit Faber from HIR.
+/// Analyze source under `source_session` and re-emit it through `emit_pack`.
 ///
-/// LEGACY(canonical): see the module note. This is the engine behind
-/// `faber format --locale <X>`; the name predates reader locales.
+/// The source session owns peeling, lexing, parsing, imports, semantic
+/// analysis, and HIR construction. The emit pack is used only for the Faber
+/// keyword surface and for revalidation of the emitted body.
 #[must_use]
-pub fn compile_canonical(session: &Session, name: &str, source: &str) -> FormatCompileResult {
-    // The legacy no-pack path parses with the Latin pack so the round-trip
-    // re-parse sees the same type spellings the emit writes (`nihil_t`, …).
-    // Frontmatter locales still win on the first pass (`locale_pack_explicit`
-    // is not set), so `en` sources keep their reader surface there.
-    let latin_pack;
-    let owned_session;
-    let session: &Session = if session.config.locale_pack.is_none() {
-        latin_pack = latin_locale_pack();
-        owned_session = Session::new(session.config.clone().with_locale_pack(latin_pack.clone()));
-        &owned_session
-    } else {
-        session
-    };
-
-    // Session pack is the emit surface (`faber convert --to`, requested reader
-    // locale). `prepare_program_module` overwrites that pack with source
-    // frontmatter so lex/analysis match the input locale; emit must keep the
-    // incoming pack. In-memory names skip the overwrite (locale_fanout);
-    // real file paths do not (`faber convert`, format corpus).
-    let emit_pack = session
-        .config
-        .locale_pack
-        .clone()
-        .expect("compile_canonical installs the Latin pack on the no-pack path before reaching here");
-
+pub fn reemit_faber(source_session: &Session, emit_pack: &LocalePack, name: &str, source: &str) -> FaberReemitResult {
     // Path-shaped names enter the program/discovery helper; in-memory names
     // keep empty contracts. Module analysis itself never walks the filesystem.
-    let prepared = match prepare_program_module_for_name(name, source, session) {
+    let prepared = match prepare_program_module_for_name(name, source, source_session) {
         Ok(prepared) => prepared,
-        Err(diagnostic) => return FormatCompileResult { output: None, diagnostics: vec![*diagnostic] },
+        Err(diagnostic) => return FaberReemitResult { output: None, diagnostics: vec![*diagnostic] },
     };
     let session = prepared.session;
     let mut analysis = match analyze_source(
@@ -88,12 +63,12 @@ pub fn compile_canonical(session: &Session, name: &str, source: &str) -> FormatC
         AnalyzeRequest { cli_program: None, contract: prepared.contract },
     ) {
         Ok(analysis) => analysis,
-        Err(diagnostics) => return FormatCompileResult { output: None, diagnostics },
+        Err(diagnostics) => return FaberReemitResult { output: None, diagnostics },
     };
 
     // An explicit reader pack drives a reader-locale emit: keywords localize
     // but glyph-shape sugar (e.g. template application `"…"(args)`) is kept.
-    let surface = KeywordSurface::locale(&emit_pack);
+    let surface = KeywordSurface::locale(emit_pack);
     // Imported nominal types have no local definition name; carry their
     // qualified source spelling (`base.Vector3`) so the re-emit prints the
     // namespace instead of the `def_N` fallback. Compiler-generated backward
@@ -118,12 +93,12 @@ pub fn compile_canonical(session: &Session, name: &str, source: &str) -> FormatC
     ) {
         Ok(output) => {
             let output = FaberOutput { code: output.code };
-            match revalidate_emitted_output(&session, name, &output.code, &analysis, &emit_pack) {
-                Ok(()) => FormatCompileResult { output: Some(output), diagnostics: analysis.diagnostics },
+            match revalidate_emitted_output(&session, name, &output.code, &analysis, emit_pack) {
+                Ok(()) => FaberReemitResult { output: Some(output), diagnostics: analysis.diagnostics },
                 Err(diagnostic) => {
                     let mut diagnostics = analysis.diagnostics;
                     diagnostics.push(*diagnostic);
-                    FormatCompileResult { output: None, diagnostics }
+                    FaberReemitResult { output: None, diagnostics }
                 }
             }
         }
@@ -131,7 +106,7 @@ pub fn compile_canonical(session: &Session, name: &str, source: &str) -> FormatC
             analysis
                 .diagnostics
                 .push(Diagnostic::codegen_error(&err.message).with_args(err.args));
-            FormatCompileResult { output: None, diagnostics: analysis.diagnostics }
+            FaberReemitResult { output: None, diagnostics: analysis.diagnostics }
         }
     }
 }
@@ -159,8 +134,7 @@ pub(crate) fn revalidate_emitted_output(
         session
             .config
             .clone()
-            .with_locale_pack(emit_pack.clone())
-            .with_locale_pack_explicit(),
+            .with_resolved_locale_pack(emit_pack.clone()),
     );
     let expected_variants = variant_path_spelling_multiset(&input.presentation, &input.interner);
     let expected_types = authored_type_form_fingerprint(input);
@@ -781,15 +755,6 @@ fn diagnostics_summary(diagnostics: &[Diagnostic]) -> String {
         .map(|diagnostic| diagnostic.message.as_str())
         .collect::<Vec<_>>()
         .join("; ")
-}
-
-/// Convenience wrapper with a default Faber-format session config.
-///
-/// LEGACY(canonical): see the module note.
-#[must_use]
-pub fn compile_canonical_str(name: &str, source: &str) -> FormatCompileResult {
-    let session = Session::new(Config::default());
-    compile_canonical(&session, name, source)
 }
 
 /// Map codegen errors for callers that already hold analyzed state.

@@ -153,7 +153,13 @@ fn schema_artifact_round_trip_preserves_ordered_metadata() {
 fn canonical_reemits_schema_decl() {
     // The HIR-backed emitter must preserve schema decls (no silent drop, no
     // crash) so the schema surface still has a re-emit smoke.
-    let result = crate::codegen::faber::compile_canonical_str("schema_test.fab", PERSONA_BREVIS);
+    let pack = crate::locale::latin_locale_pack();
+    let session = crate::driver::Session::new(
+        crate::driver::Config::default()
+            .with_resolved_locale_pack(pack.clone())
+            .with_dev_stdlib(),
+    );
+    let result = crate::codegen::faber::reemit_faber(&session, &pack, "schema_test.fab", PERSONA_BREVIS);
     assert!(result.success(), "canonical emit failed: {:?}", result.diagnostics);
     let code = result.output.expect("canonical output").code;
     assert!(code.contains("schema PersonaBrevis"));

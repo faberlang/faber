@@ -2881,6 +2881,47 @@ pub fn analyze_source_with_kernel_template_admissions(
     request: AnalyzeRequest,
     admissions: &PackageKernelTemplateAdmissions,
 ) -> Result<AnalyzedModule, Vec<Diagnostic>> {
+    let body_byte_offset = split_frontmatter(source)
+        .ok()
+        .map(|split| split.body_byte_offset)
+        .unwrap_or(0);
+    let result = analyze_source_with_kernel_template_admissions_unadjusted(session, name, source, request, admissions);
+    match result {
+        Ok(mut analysis) => {
+            adjust_diagnostic_lines_for_body(&mut analysis.diagnostics, source, body_byte_offset);
+            Ok(analysis)
+        }
+        Err(mut diagnostics) => {
+            adjust_diagnostic_lines_for_body(&mut diagnostics, source, body_byte_offset);
+            Err(diagnostics)
+        }
+    }
+}
+
+/// Translate diagnostics whose spans were calculated against a peeled body
+/// back to physical source lines in the original document.
+pub fn adjust_diagnostic_lines_for_body(diagnostics: &mut [Diagnostic], raw_source: &str, body_byte_offset: u32) {
+    let Some(prefix) = raw_source.get(..body_byte_offset as usize) else {
+        return;
+    };
+    let body_line_offset = prefix.bytes().filter(|byte| *byte == b'\n').count() as u32;
+    if body_line_offset == 0 {
+        return;
+    }
+    for diagnostic in diagnostics {
+        if let Some(line) = diagnostic.line.as_mut() {
+            *line = line.saturating_add(body_line_offset);
+        }
+    }
+}
+
+fn analyze_source_with_kernel_template_admissions_unadjusted(
+    session: &Session,
+    name: &str,
+    source: &str,
+    request: AnalyzeRequest,
+    admissions: &PackageKernelTemplateAdmissions,
+) -> Result<AnalyzedModule, Vec<Diagnostic>> {
     let AnalyzeRequest { cli_program: cli_program_override, contract } = request;
     let mut diagnostics = Vec::new();
 
