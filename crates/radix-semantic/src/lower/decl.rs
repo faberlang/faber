@@ -467,7 +467,9 @@ impl Lowerer<'_> {
     pub fn lower_functio(&mut self, stmt: &Stmt, decl: &FuncDecl) -> Option<HirItem> {
         let def_id = self.def_id_for(decl.name.name);
 
+        self.annotation_capture = Some(HirOwnerRef::Def(def_id));
         let annotations = self.lower_annotations(&stmt.annotations);
+        self.annotation_capture = None;
         let mut type_params = self.lower_type_params(&decl.type_params);
         self.push_type_params(type_params.iter().map(|param| (param.name, param.kind)));
         self.apply_type_param_constraints_from_annotations(&mut type_params, &annotations);

@@ -148,6 +148,13 @@ pub struct Lowerer<'a> {
     /// entry-start anchor. Drained into `LoweredProgram` at the end of the run.
     presentation: HirPresentation,
 
+    /// Owner context for authored-type capture inside annotation lowering.
+    /// Set while lowering a carrying item's annotations; `None` leaves
+    /// annotation type fields presentation-free.
+    annotation_capture: Option<HirOwnerRef>,
+    annotation_ordinal: Option<u32>,
+    annotation_field_ordinal: u32,
+
     /// Authored type-form capture stack. Empty when no authored site is being
     /// lowered; every node inside a capture pushes one frame and completes it
     /// into a [`HirTypeForm`] when its lowering ends.
@@ -241,6 +248,9 @@ impl<'a> Lowerer<'a> {
                 authored_types: Vec::new(),
             },
             form_frames: Vec::new(),
+            annotation_capture: None,
+            annotation_ordinal: None,
+            annotation_field_ordinal: 0,
             next_def_id: 1_000_000,
             errors: Vec::new(),
             current_span: Span::default(),

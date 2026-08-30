@@ -13,6 +13,7 @@ use radix_hir::{
 };
 use radix_lexer::{Interner, Span, Symbol};
 use radix_syntax::{
+    TypeExpr,
     braced_cli_nomen, braced_imperium_nomen, braced_nondum_view, braced_operandus_view,
     braced_optio_view, braced_radix_lane_view, braced_radix_typus_view, braced_verte_view,
     nondum_from_stmt, radix_lane_from_stmt, verte_from_stmt, Annotation, AnnotationField,
@@ -68,8 +69,33 @@ impl Lowerer<'_> {
     pub(super) fn lower_annotations(&mut self, annotations: &[Annotation]) -> Vec<HirAnnotation> {
         annotations
             .iter()
-            .map(|annotation| self.lower_annotation(annotation))
+            .enumerate()
+            .map(|(ordinal, annotation)| {
+                self.annotation_ordinal = Some(ordinal as u32);
+                self.annotation_field_ordinal = 0;
+                let lowered = self.lower_annotation(annotation);
+                lowered
+            })
             .collect()
+    }
+
+    /// Lower a type-valued annotation field, capturing its authored form when
+    /// a carrying owner is in scope.
+    pub(super) fn lower_annotation_type(&mut self, ty: &TypeExpr) -> TypeId {
+        let field_ordinal = self.annotation_field_ordinal;
+        self.annotation_field_ordinal += 1;
+        match (self.annotation_capture.clone(), self.annotation_ordinal) {
+            (Some(owner), Some(annotation)) => self.lower_authored_type(
+                radix_hir::HirTypeSite {
+                    owner,
+                    slot: radix_hir::HirTypeSlot::AnnotationField { annotation, field: field_ordinal },
+                },
+                ty,
+                false,
+                false,
+            ),
+            _ => self.lower_type(ty),
+        }
     }
 
     pub(super) fn lower_annotation(&mut self, annotation: &Annotation) -> HirAnnotation {
@@ -268,7 +294,7 @@ impl Lowerer<'_> {
         if let Some(ty) = view.ty {
             fields.push(HirAnnotationField {
                 name: self.intern_field_name("typus"),
-                value: HirAnnotationValue::Type(self.lower_type(ty)),
+                value: HirAnnotationValue::Type(self.lower_annotation_type(ty)),
                 span: ty.span,
             });
         }
@@ -313,7 +339,7 @@ impl Lowerer<'_> {
         }
         fields.push(HirAnnotationField {
             name: self.intern_field_name("typus"),
-            value: HirAnnotationValue::Type(self.lower_type(view.ty)),
+            value: HirAnnotationValue::Type(self.lower_annotation_type(view.ty)),
             span: view.ty.span,
         });
         fields.push(HirAnnotationField {
@@ -352,7 +378,7 @@ impl Lowerer<'_> {
             AnnotationFieldValue::Expr(expr) => {
                 HirAnnotationValue::Expr(Box::new(self.lower_expr(expr)))
             }
-            AnnotationFieldValue::Type(ty) => HirAnnotationValue::Type(self.lower_type(ty)),
+            AnnotationFieldValue::Type(ty) => HirAnnotationValue::Type(self.lower_annotation_type(ty)),
         };
         Some(HirAnnotationField {
             name,
@@ -471,7 +497,7 @@ impl Lowerer<'_> {
         for ty in view.allowed {
             fields.push(HirAnnotationField {
                 name: self.intern_field_name("allowed"),
-                value: HirAnnotationValue::Type(self.lower_type(ty)),
+                value: HirAnnotationValue::Type(self.lower_annotation_type(ty)),
                 span: ty.span,
             });
         }
@@ -593,7 +619,7 @@ impl Lowerer<'_> {
         if let Some(ty) = &optio.ty {
             fields.push(HirAnnotationField {
                 name: self.intern_field_name("typus"),
-                value: HirAnnotationValue::Type(self.lower_type(ty)),
+                value: HirAnnotationValue::Type(self.lower_annotation_type(ty)),
                 span: ty.span,
             });
         }
@@ -637,7 +663,7 @@ impl Lowerer<'_> {
         }
         fields.push(HirAnnotationField {
             name: self.intern_field_name("typus"),
-            value: HirAnnotationValue::Type(self.lower_type(&operandus.ty)),
+            value: HirAnnotationValue::Type(self.lower_annotation_type(&operandus.ty)),
             span: operandus.ty.span,
         });
         fields.push(HirAnnotationField {
@@ -683,7 +709,7 @@ impl Lowerer<'_> {
         for ty in &domain.allowed {
             fields.push(HirAnnotationField {
                 name: self.intern_field_name("allowed"),
-                value: HirAnnotationValue::Type(self.lower_type(ty)),
+                value: HirAnnotationValue::Type(self.lower_annotation_type(ty)),
                 span: ty.span,
             });
         }
