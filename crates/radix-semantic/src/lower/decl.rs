@@ -687,6 +687,7 @@ impl Lowerer<'_> {
 
         let mut fields = Vec::new();
         let mut methods = Vec::new();
+        let mut field_ordinal = 0u32;
 
         for member in &decl.members {
             match &member.kind {
@@ -705,13 +706,22 @@ impl Lowerer<'_> {
                     fields.push(HirField {
                         def_id,
                         name: field.name.name,
-                        ty: self.lower_type(&field.ty),
+                        ty: self.lower_authored_type(
+                            radix_hir::HirTypeSite {
+                                owner: HirOwnerRef::Def(def_id),
+                                slot: HirTypeSlot::Field(field_ordinal),
+                            },
+                            &field.ty,
+                            false,
+                            false,
+                        ),
                         is_static: field.is_static,
                         sponte: field.sponte,
                         annotations,
                         init,
                         span: member.span,
                     });
+                    field_ordinal += 1;
                 }
                 ClassMemberKind::Method(method) => {
                     let annotations = self.lower_annotations(&member.annotations);
@@ -1111,7 +1121,15 @@ impl Lowerer<'_> {
                     .source_alias
                     .as_ref()
                     .map_or(name, |ident| ident.name);
-                let ty = self.lower_type(&column.ty);
+                let ty = self.lower_authored_type(
+                    radix_hir::HirTypeSite {
+                        owner: radix_hir::HirOwnerRef::Def(def_id),
+                        slot: HirTypeSlot::Field(order as u32),
+                    },
+                    &column.ty,
+                    false,
+                    false,
+                );
                 let nullable = matches!(self.types.get(ty), Type::Option(_));
                 HirSchemaColumn {
                     name,
