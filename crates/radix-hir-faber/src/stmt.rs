@@ -587,38 +587,39 @@ impl super::FaberCodegen {
             owner: HirOwnerRef::Def(local.def_id),
             slot: HirTypeSlot::Declared,
         };
-        if local.annotation_authored {
-            if let Some(ty) = local.ty {
-                let rendered = self
-                    .type_to_faber_at(&site, ty, types, names, interner, surface)
-                    .unwrap_or_else(|error| self.record_type_emission_error(error));
-                writer.write(&rendered);
-                writer.write(" ");
-            }
-        } else if local.init.is_some() {
-            // Inference holes keep their authored spelling when the sidecar
-            // has a site; synthesized locals retain the legacy fallback.
-            if let Some(ty) = local
-                .ty
-                .filter(|_| self.authored_type_forms.contains_key(&site))
-            {
+        if let Some(ty) = local.ty {
+            let hole_authored = self.authored_type_forms.get(&site).is_some_and(|form| {
+                matches!(
+                    form.head,
+                    radix_hir::HirTypeFormHead::Infer | radix_hir::HirTypeFormHead::UnionHole
+                )
+            });
+            if local.init.is_some() || !hole_authored {
+                // The authored form at this site is the sole authority for
+                // concrete versus hole spelling. An absent site falls back to
+                // the canonical concrete type in `type_to_faber_at`.
                 let rendered = self
                     .type_to_faber_at(&site, ty, types, names, interner, surface)
                     .unwrap_or_else(|error| self.record_type_emission_error(error));
                 writer.write(&rendered);
             } else {
-                writer.write(if local.annotation_union_hole {
-                    "∪"
-                } else {
-                    "_"
-                });
+                // An initializer-free hole is materialized so the bare
+                // binding still type-checks, preserving the existing
+                // re-check-safety policy.
+                writer.write(&self.type_to_faber(ty, types, names, interner, surface));
             }
             writer.write(" ");
-        } else if let Some(ty) = local.ty {
-            // Hole-shaped declaration without initializer (`let label` later
-            // assigned): materialize so the bare binding still type-checks.
-            writer.write(&self.type_to_faber(ty, types, names, interner, surface));
-            writer.write(" ");
+        } else if local.init.is_some() {
+            // A pre-finalization or hand-built local may not have a semantic
+            // `ty` field yet. A present form still owns its authored spelling;
+            // use its witness for the same site-aware render path.
+            if let Some(form_ty) = self.authored_type_forms.get(&site).map(|form| form.ty) {
+                let rendered = self
+                    .type_to_faber_at(&site, form_ty, types, names, interner, surface)
+                    .unwrap_or_else(|error| self.record_type_emission_error(error));
+                writer.write(&rendered);
+                writer.write(" ");
+            }
         }
         writer.write(&self.symbol_to_string(local.name, interner));
         if let Some(init) = &local.init {

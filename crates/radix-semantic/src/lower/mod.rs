@@ -78,11 +78,10 @@ use crate::{
 };
 use radix_diagnostics::DiagnosticArg;
 use radix_hir::{
-    HirAuthoredTypeUse, HirBlock, HirBlockEnd, HirExpression, HirId, HirItem, HirModule,
-    HirModuleEnd, HirOwnerRef, HirParamMode, HirPresentation, HirSourceAnchorId, HirStatement,
-    HirStatementKind, HirTestMetadata, HirTestModifier, HirTrivia, HirTriviaAttachment,
-    HirTriviaOwner, HirTriviaOwnerKind, HirTypeForm, HirTypeFormArg, HirTypeFormHead, HirTypeSite,
-    HirTypeSlot, HirVariantPath,
+    HirBlock, HirBlockEnd, HirExpression, HirId, HirItem, HirModule, HirModuleEnd, HirOwnerRef,
+    HirParamMode, HirPresentation, HirSourceAnchorId, HirStatement, HirStatementKind,
+    HirTestMetadata, HirTestModifier, HirTrivia, HirTriviaAttachment, HirTriviaOwner,
+    HirTriviaOwnerKind, HirTypeFormArg, HirVariantPath,
 };
 use radix_lexer::{Interner, Span, Symbol};
 use radix_syntax::{
@@ -376,8 +375,6 @@ impl<'a> Lowerer<'a> {
                                 mutable: false,
                                 is_await: false,
                                 runtime_provided: true,
-                                annotation_authored: true,
-                                annotation_union_hole: false,
                             }),
                             span,
                         },

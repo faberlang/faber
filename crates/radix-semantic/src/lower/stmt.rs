@@ -272,8 +272,6 @@ impl Lowerer<'_> {
                             mutable,
                             is_await,
                             runtime_provided: false,
-                            annotation_authored: false,
-                            annotation_union_hole: false,
                         }),
                         span: ident.span,
                     });
@@ -301,8 +299,6 @@ impl Lowerer<'_> {
                     mutable,
                     is_await,
                     runtime_provided: false,
-                    annotation_authored: false,
-                    annotation_union_hole: false,
                 }),
                 span: rest_ident.span,
             });
@@ -396,8 +392,6 @@ impl Lowerer<'_> {
                     mutable,
                     is_await,
                     runtime_provided: false,
-                    annotation_authored: false,
-                    annotation_union_hole: false,
                 }),
                 span: field.name.span,
             });
@@ -438,8 +432,6 @@ impl Lowerer<'_> {
                     mutable,
                     is_await,
                     runtime_provided: false,
-                    annotation_authored: false,
-                    annotation_union_hole: false,
                 }),
                 span: rest_ident.span,
             });
@@ -512,8 +504,6 @@ impl Lowerer<'_> {
                 mutable: stmt.mutability == radix_syntax::AstMutability::Mutable,
                 is_await: false,
                 runtime_provided: false,
-                annotation_authored: false,
-                annotation_union_hole: false,
             };
             out.push(HirStatement {
                 id: self.next_hir_id(),
@@ -533,8 +523,6 @@ impl Lowerer<'_> {
                 mutable: stmt.mutability == radix_syntax::AstMutability::Mutable,
                 is_await: false,
                 runtime_provided: false,
-                annotation_authored: false,
-                annotation_union_hole: false,
             };
             out.push(HirStatement {
                 id: self.next_hir_id(),
@@ -562,19 +550,6 @@ impl Lowerer<'_> {
                     }
                 }
                 self.bind_local(ident.name, def_id);
-                // A spelled annotation (not the `_` hole) is re-emitted as
-                // written; holes stay holes so re-emission cannot materialize
-                // an inferred type the source never declared.
-                let annotation_authored = decl.ty.as_ref().is_some_and(|ty| {
-                    !matches!(
-                        ty.kind,
-                        radix_syntax::TypeExprKind::Infer | radix_syntax::TypeExprKind::UnionHole
-                    )
-                });
-                let annotation_union_hole = decl
-                    .ty
-                    .as_ref()
-                    .is_some_and(|ty| matches!(ty.kind, radix_syntax::TypeExprKind::UnionHole));
                 let ty = decl.ty.as_ref().map(|ty| {
                     self.lower_authored_type(
                         radix_hir::HirTypeSite {
@@ -595,8 +570,6 @@ impl Lowerer<'_> {
                     mutable: decl.mutability == radix_syntax::AstMutability::Mutable,
                     is_await: decl.is_await,
                     runtime_provided: false,
-                    annotation_authored,
-                    annotation_union_hole,
                 })
             }
             radix_syntax::BindingPattern::Wildcard(span) => {
@@ -1127,8 +1100,6 @@ impl Lowerer<'_> {
                         mutable: false,
                         is_await: false,
                         runtime_provided: true,
-                        annotation_authored: true,
-                        annotation_union_hole: false,
                     }),
                     span,
                 },
@@ -1167,8 +1138,6 @@ impl Lowerer<'_> {
                 mutable: stmt.mutability == radix_syntax::AstMutability::Mutable,
                 is_await: false,
                 runtime_provided: false,
-                annotation_authored: true,
-                annotation_union_hole: false,
             }),
             span: self.current_span,
         });

@@ -37,9 +37,10 @@ use radix_hir::visit::{
     HirVisitor, HirVisitorMut,
 };
 use radix_hir::{
-    DefId, HirArrayElement, HirBinOp, HirBlock, HirConversioTarget, HirExpression,
-    HirExpressionKind, HirFunction, HirId, HirItemKind, HirIteraMode, HirLiteral, HirLocal,
-    HirModule, HirParam, HirRangeKind, HirStatement, HirStatementKind, HirUnOp,
+    DefId, HirArrayElement, HirAuthoredTypeUse, HirBinOp, HirBlock, HirConversioTarget,
+    HirExpression, HirExpressionKind, HirFunction, HirId, HirItemKind, HirIteraMode, HirLiteral,
+    HirLocal, HirModule, HirOwnerRef, HirParam, HirPresentation, HirRangeKind, HirStatement,
+    HirStatementKind, HirTypeSite, HirTypeSlot, HirUnOp,
 };
 use radix_lexer::{Interner, Span, Symbol};
 use rustc_hash::{FxHashMap, FxHashSet};
@@ -65,6 +66,7 @@ const CAUSA_DEFER_COORDINATES: &str = "defer_coordinates";
 /// can admit one loop and fail closed on another.
 pub fn unroll(
     hir: &mut HirModule,
+    presentation: &mut HirPresentation,
     lanes: &RadixLaneMetadata,
     interner: &mut Interner,
     types: &TypeTable,
@@ -79,7 +81,15 @@ pub fn unroll(
         let HirItemKind::Function(function) = &mut item.kind else {
             continue;
         };
-        unroll_function(function, lanes, interner, types, &mut ids, &mut errors);
+        unroll_function(
+            function,
+            presentation,
+            lanes,
+            interner,
+            types,
+            &mut ids,
+            &mut errors,
+        );
     }
 
     if errors.is_empty() {
@@ -91,6 +101,7 @@ pub fn unroll(
 
 fn unroll_function(
     function: &mut HirFunction,
+    presentation: &mut HirPresentation,
     lanes: &RadixLaneMetadata,
     interner: &mut Interner,
     types: &TypeTable,
@@ -105,6 +116,7 @@ fn unroll_function(
     let fullness = FullnessFacts::from_block(body, interner, types);
     let mut emitted_lanes = 0;
     rewrite_block(
+        presentation,
         body,
         &root_locals,
         lanes,
@@ -120,6 +132,7 @@ fn unroll_function(
 }
 
 fn rewrite_block(
+    presentation: &mut HirPresentation,
     block: &mut HirBlock,
     root_locals: &FxHashSet<DefId>,
     lanes: &RadixLaneMetadata,
@@ -152,6 +165,7 @@ fn rewrite_block(
         );
         let Some(plan) = plan else {
             rewrite_nested_stmt(
+                presentation,
                 &mut block.statements[index],
                 root_locals,
                 lanes,
@@ -179,7 +193,9 @@ fn rewrite_block(
                 // intact (3E/3F).
                 let body_multiplicity = ready.lanes.len().saturating_mul(multiplicity);
                 let mut nested_errors = Vec::new();
+                let mut nested_presentation = presentation.clone();
                 rewrite_block(
+                    &mut nested_presentation,
                     &mut ready.body,
                     root_locals,
                     lanes,
@@ -198,7 +214,9 @@ fn rewrite_block(
                     index += 1;
                     continue;
                 }
-                let (unrolled, acc_final) = emit_unrolled_lanes(&ready, interner, ids);
+                *presentation = nested_presentation;
+                let (unrolled, acc_final) =
+                    emit_unrolled_lanes(presentation, &ready, interner, ids);
                 freeze_accumulators(block, &acc_final);
                 let mut rest = block.statements.split_off(index + 1);
                 block.statements.pop();
@@ -216,6 +234,7 @@ fn rewrite_block(
 
     if let Some(mut expr) = block.expr.take() {
         rewrite_nested_expr(
+            presentation,
             &mut expr,
             root_locals,
             lanes,
@@ -250,7 +269,9 @@ fn rewrite_block(
                 let ty = expr.ty;
                 let body_multiplicity = ready.lanes.len().saturating_mul(multiplicity);
                 let mut nested_errors = Vec::new();
+                let mut nested_presentation = presentation.clone();
                 rewrite_block(
+                    &mut nested_presentation,
                     &mut ready.body,
                     root_locals,
                     lanes,
@@ -268,7 +289,9 @@ fn rewrite_block(
                     block.expr = Some(expr);
                     errors.push(decline(ready.span, causa));
                 } else {
-                    let (unrolled, acc_final) = emit_unrolled_lanes(&ready, interner, ids);
+                    *presentation = nested_presentation;
+                    let (unrolled, acc_final) =
+                        emit_unrolled_lanes(presentation, &ready, interner, ids);
                     freeze_accumulators(block, &acc_final);
                     remap_acc_paths_in_stmts(&mut block.statements, &acc_final);
                     block.expr = Some(Box::new(HirExpression {
@@ -295,6 +318,7 @@ fn first_decline_causa(errors: &[SemanticError]) -> Option<&str> {
 }
 
 fn rewrite_nested_stmt(
+    presentation: &mut HirPresentation,
     stmt: &mut HirStatement,
     root_locals: &FxHashSet<DefId>,
     lanes: &RadixLaneMetadata,
@@ -311,6 +335,7 @@ fn rewrite_nested_stmt(
         HirStatementKind::Local(local) => {
             if let Some(init) = &mut local.init {
                 rewrite_nested_expr(
+                    presentation,
                     init,
                     root_locals,
                     lanes,
@@ -327,6 +352,7 @@ fn rewrite_nested_stmt(
         }
         HirStatementKind::Expr(expr) | HirStatementKind::Redde(Some(expr)) => {
             rewrite_nested_expr(
+                presentation,
                 expr,
                 root_locals,
                 lanes,
@@ -343,6 +369,7 @@ fn rewrite_nested_stmt(
         HirStatementKind::Custodi(custodi) => {
             for clause in &mut custodi.clauses {
                 rewrite_nested_expr(
+                    presentation,
                     &mut clause.cond,
                     root_locals,
                     lanes,
@@ -356,6 +383,7 @@ fn rewrite_nested_stmt(
                     multiplicity,
                 );
                 rewrite_block(
+                    presentation,
                     &mut clause.body,
                     root_locals,
                     lanes,
@@ -379,6 +407,7 @@ fn rewrite_nested_stmt(
 }
 
 fn rewrite_nested_expr(
+    presentation: &mut HirPresentation,
     expr: &mut HirExpression,
     root_locals: &FxHashSet<DefId>,
     lanes: &RadixLaneMetadata,
@@ -393,6 +422,7 @@ fn rewrite_nested_expr(
 ) {
     match &mut expr.kind {
         HirExpressionKind::Block(block) => rewrite_block(
+            presentation,
             block,
             root_locals,
             lanes,
@@ -412,6 +442,7 @@ fn rewrite_nested_expr(
             else_block,
         } => {
             rewrite_nested_expr(
+                presentation,
                 cond,
                 root_locals,
                 lanes,
@@ -425,6 +456,7 @@ fn rewrite_nested_expr(
                 multiplicity,
             );
             rewrite_block(
+                presentation,
                 then_block,
                 root_locals,
                 lanes,
@@ -439,6 +471,7 @@ fn rewrite_nested_expr(
             );
             if let Some(catch) = then_catch {
                 rewrite_block(
+                    presentation,
                     &mut catch.body,
                     root_locals,
                     lanes,
@@ -454,6 +487,7 @@ fn rewrite_nested_expr(
             }
             if let Some(else_block) = else_block {
                 rewrite_block(
+                    presentation,
                     else_block,
                     root_locals,
                     lanes,
@@ -473,6 +507,7 @@ fn rewrite_nested_expr(
         } => {
             for scrutinee in scrutinees {
                 rewrite_nested_expr(
+                    presentation,
                     scrutinee,
                     root_locals,
                     lanes,
@@ -489,6 +524,7 @@ fn rewrite_nested_expr(
             for arm in arms {
                 if let Some(guard) = &mut arm.guard {
                     rewrite_nested_expr(
+                        presentation,
                         guard,
                         root_locals,
                         lanes,
@@ -503,6 +539,7 @@ fn rewrite_nested_expr(
                     );
                 }
                 rewrite_nested_expr(
+                    presentation,
                     &mut arm.body,
                     root_locals,
                     lanes,
@@ -519,6 +556,7 @@ fn rewrite_nested_expr(
         }
         HirExpressionKind::Loop(block) | HirExpressionKind::Itera(_, _, _, _, _, block) => {
             rewrite_block(
+                presentation,
                 block,
                 root_locals,
                 lanes,
@@ -534,6 +572,7 @@ fn rewrite_nested_expr(
         }
         HirExpressionKind::Dum(cond, block) => {
             rewrite_nested_expr(
+                presentation,
                 cond,
                 root_locals,
                 lanes,
@@ -547,6 +586,7 @@ fn rewrite_nested_expr(
                 multiplicity,
             );
             rewrite_block(
+                presentation,
                 block,
                 root_locals,
                 lanes,
@@ -562,6 +602,7 @@ fn rewrite_nested_expr(
         }
         HirExpressionKind::Binary(_, lhs, rhs) | HirExpressionKind::Assign(lhs, rhs) => {
             rewrite_nested_expr(
+                presentation,
                 lhs,
                 root_locals,
                 lanes,
@@ -575,6 +616,7 @@ fn rewrite_nested_expr(
                 multiplicity,
             );
             rewrite_nested_expr(
+                presentation,
                 rhs,
                 root_locals,
                 lanes,
@@ -599,6 +641,7 @@ fn rewrite_nested_expr(
         | HirExpressionKind::Yield(operand)
         | HirExpressionKind::TypeCheck { expr: operand, .. } => {
             rewrite_nested_expr(
+                presentation,
                 operand,
                 root_locals,
                 lanes,
@@ -614,6 +657,7 @@ fn rewrite_nested_expr(
         }
         HirExpressionKind::Index(object, index) => {
             rewrite_nested_expr(
+                presentation,
                 object,
                 root_locals,
                 lanes,
@@ -627,6 +671,7 @@ fn rewrite_nested_expr(
                 multiplicity,
             );
             rewrite_nested_expr(
+                presentation,
                 index,
                 root_locals,
                 lanes,
@@ -642,6 +687,7 @@ fn rewrite_nested_expr(
         }
         HirExpressionKind::Call(callee, _, args, _) => {
             rewrite_nested_expr(
+                presentation,
                 callee,
                 root_locals,
                 lanes,
@@ -656,6 +702,7 @@ fn rewrite_nested_expr(
             );
             for arg in args {
                 rewrite_nested_expr(
+                    presentation,
                     &mut arg.expr,
                     root_locals,
                     lanes,
@@ -672,6 +719,7 @@ fn rewrite_nested_expr(
         }
         HirExpressionKind::MethodCall(receiver, _, _, args, _) => {
             rewrite_nested_expr(
+                presentation,
                 receiver,
                 root_locals,
                 lanes,
@@ -686,6 +734,7 @@ fn rewrite_nested_expr(
             );
             for arg in args {
                 rewrite_nested_expr(
+                    presentation,
                     &mut arg.expr,
                     root_locals,
                     lanes,
@@ -1699,6 +1748,7 @@ impl HirVisitor for BodyDecline<'_> {
 }
 
 fn emit_unrolled_lanes(
+    presentation: &mut HirPresentation,
     ready: &ReadyUnroll,
     interner: &mut Interner,
     ids: &mut IdGen,
@@ -1729,8 +1779,6 @@ fn emit_unrolled_lanes(
                     mutable: false,
                     is_await: false,
                     runtime_provided: false,
-                    annotation_authored: true,
-                    annotation_union_hole: false,
                 };
                 out.push(HirStatement {
                     id: ids.next_hir(),
@@ -1790,8 +1838,6 @@ fn emit_unrolled_lanes(
                 mutable: false,
                 is_await: false,
                 runtime_provided: false,
-                annotation_authored: true,
-                annotation_union_hole: false,
             };
             out.push(HirStatement {
                 id: ids.next_hir(),
@@ -1800,7 +1846,14 @@ fn emit_unrolled_lanes(
             });
             remap.binding_value = Some(binding_def);
         }
-        let stmts = emit_iteration(&ready.body, &ready.accumulators, &mut remap, interner, ids);
+        let stmts = emit_iteration(
+            presentation,
+            &ready.body,
+            &ready.accumulators,
+            &mut remap,
+            interner,
+            ids,
+        );
         acc_current = remap.acc_current;
         out.extend(stmts);
     }
@@ -1808,6 +1861,7 @@ fn emit_unrolled_lanes(
 }
 
 fn emit_iteration(
+    presentation: &mut HirPresentation,
     body: &HirBlock,
     accumulators: &FxHashMap<DefId, AccInfo>,
     remap: &mut Remap,
@@ -1837,12 +1891,31 @@ fn emit_iteration(
             HirStatementKind::Local(local) => {
                 let new_def = ids.next_def();
                 remap.local_map.insert(local.def_id, new_def);
+                let authored_form = presentation
+                    .authored_type_at(&HirTypeSite {
+                        owner: HirOwnerRef::Def(local.def_id),
+                        slot: HirTypeSlot::Declared,
+                    })
+                    .cloned();
                 let mut local = local.clone();
                 local.def_id = new_def;
                 local.name = interner.intern(&format!("__unroll_{}", new_def.0));
                 local.mutable = false;
                 if let Some(init) = &mut local.init {
                     remap_fresh_expr(init, remap, ids);
+                }
+                if let Some(form) = authored_form {
+                    // Narrow rewrite-carrier exception: presentation is read
+                    // here only to carry an authored local form onto the fresh
+                    // unrolled binding; it never participates in type or AIR
+                    // decisions.
+                    presentation.authored_types.push(HirAuthoredTypeUse {
+                        site: HirTypeSite {
+                            owner: HirOwnerRef::Def(new_def),
+                            slot: HirTypeSlot::Declared,
+                        },
+                        form,
+                    });
                 }
                 out.push(HirStatement {
                     id: ids.next_hir(),
@@ -1900,8 +1973,6 @@ fn ssa_local(
             mutable: false,
             is_await: false,
             runtime_provided: false,
-            annotation_authored: true,
-            annotation_union_hole: false,
         }),
         span,
     }

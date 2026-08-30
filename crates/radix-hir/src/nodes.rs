@@ -745,11 +745,6 @@ pub struct HirConst {
 
     /// Whether the initializer should be awaited.
     pub is_await: bool,
-
-    /// Whether the source declaration spelled a concrete type annotation
-    /// (not the `_` hole); re-emission keeps holes as holes.
-    #[serde(default = "annotation_authored_default")]
-    pub annotation_authored: bool,
 }
 
 /// Import declaration retained after package/library resolution.
@@ -938,25 +933,6 @@ pub struct HirLocal {
 
     /// Binding is initialized by runtime/entry effects before any user statement.
     pub runtime_provided: bool,
-
-    /// Whether the source declaration spelled a concrete type annotation.
-    ///
-    /// `false` covers inference holes (`fixum _ x ← …`) and synthesized
-    /// locals; canonical re-emission then keeps the `_` hole instead of
-    /// materializing the inferred type (which can narrow later legality,
-    /// e.g. bounded-lista spreads).
-    #[serde(default = "annotation_authored_default")]
-    pub annotation_authored: bool,
-
-    /// Whether an un-authored annotation was the union hole (`∪`) rather
-    /// than the monomorphic hole (`_`); re-emission keeps the hole kind so
-    /// flow-based member growth still solves.
-    #[serde(default)]
-    pub annotation_union_hole: bool,
-}
-
-fn annotation_authored_default() -> bool {
-    true
 }
 
 /// Expression node with stable identity, optional type facts, and source span.

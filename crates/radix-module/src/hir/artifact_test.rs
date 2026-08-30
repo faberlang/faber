@@ -508,8 +508,6 @@ fn user_range_def_id_loads_ok() {
                         mutable: false,
                         is_await: false,
                         runtime_provided: false,
-                        annotation_authored: true,
-                        annotation_union_hole: false,
                         init: Some(radix_hir::HirExpression {
                             id: radix_hir::HirId(1),
                             kind: radix_hir::HirExpressionKind::Path(radix_types::DefId(
@@ -635,8 +633,6 @@ fn serialize_load_roundtrip_ok() {
                         mutable: false,
                         is_await: false,
                         runtime_provided: false,
-                        annotation_authored: true,
-                        annotation_union_hole: false,
                         init: None,
                     }),
                 }],

@@ -619,7 +619,13 @@ pub fn analyze_with_cli(
     // Skip when typecheck already failed — types on the rewritten nodes would
     // be unreliable.
     if !diagnostics.iter().any(SemanticError::is_error) {
-        if let Err(e) = passes::air_unroll::unroll(&mut hir, &radix_lanes, interner, &types) {
+        if let Err(e) = passes::air_unroll::unroll(
+            &mut hir,
+            &mut lowered.presentation,
+            &radix_lanes,
+            interner,
+            &types,
+        ) {
             diagnostics.extend(e);
         }
     }

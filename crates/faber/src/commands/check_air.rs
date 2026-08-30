@@ -150,11 +150,17 @@ pub fn advisory_rows(_name: &str, source: &str) -> Option<Vec<AirRow>> {
     // Gate re-run on cloned artifacts: `air_unroll` mutates in place, so it
     // must never see the real pipeline's `hir`/`interner`.
     let mut hir_clone = hir.clone();
+    let mut presentation_clone = result.presentation.clone();
     let mut interner_clone = interner.clone();
-    let unroll_errors =
-        air_unroll::unroll(&mut hir_clone, &lanes, &mut interner_clone, &result.types)
-            .err()
-            .unwrap_or_default();
+    let unroll_errors = air_unroll::unroll(
+        &mut hir_clone,
+        &mut presentation_clone,
+        &lanes,
+        &mut interner_clone,
+        &result.types,
+    )
+    .err()
+    .unwrap_or_default();
     let purity_errors = air_purity::check(
         &mut hir_clone,
         &mut lanes,

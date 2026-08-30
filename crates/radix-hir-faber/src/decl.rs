@@ -104,21 +104,18 @@ impl super::FaberCodegen {
                 writer.write(surface.contextual_keyword("fixum"));
                 writer.write(" ");
                 if let Some(ty) = c.ty {
-                    if c.annotation_authored {
-                        let site = HirTypeSite {
-                            owner: HirOwnerRef::Def(item.def_id),
-                            slot: HirTypeSlot::Declared,
-                        };
-                        let rendered = self
-                            .type_to_faber_at(&site, ty, types, names, interner, surface)
-                            .unwrap_or_else(|error| self.record_type_emission_error(error));
-                        writer.write(&rendered);
-                    } else {
-                        // `_` hole: keep the hole instead of materializing the
-                        // inferred type (materialized bounded-lista
-                        // annotations narrow later spread legality).
-                        writer.write("_");
-                    }
+                    let site = HirTypeSite {
+                        owner: HirOwnerRef::Def(item.def_id),
+                        slot: HirTypeSlot::Declared,
+                    };
+                    // The authored form at this site is the sole authority for
+                    // concrete versus hole spelling. An absent site is a
+                    // synthesized/hand-built binding and uses the canonical
+                    // concrete fallback inside `type_to_faber_at`.
+                    let rendered = self
+                        .type_to_faber_at(&site, ty, types, names, interner, surface)
+                        .unwrap_or_else(|error| self.record_type_emission_error(error));
+                    writer.write(&rendered);
                     writer.write(" ");
                 }
                 writer.write(&self.symbol_to_string(c.name, interner));

@@ -1130,9 +1130,7 @@ fn failed_local_initializer_does_not_bind_local() {
         init: Some(unsupported_range_expr(numerus, span, 0)),
         mutable: false,
         is_await: false,
-        annotation_authored: true,
         runtime_provided: false,
-        annotation_union_hole: false,
     };
 
     assert!(builder.lower_local(&local, span).is_none());
@@ -1150,9 +1148,7 @@ fn failed_local_initializer_does_not_bind_local() {
         init: None,
         mutable: false,
         is_await: false,
-        annotation_authored: true,
         runtime_provided: false,
-        annotation_union_hole: false,
     };
     assert!(builder.lower_local(&deferred, span).is_some());
     assert!(builder.bindings.contains_key(&DefId(10)));
@@ -1175,7 +1171,6 @@ fn failed_top_level_const_initializer_does_not_bind_const() {
         ty: Some(numerus),
         value: unsupported_range_expr(numerus, span, 0),
         is_await: false,
-        annotation_authored: true,
         mutable: false,
     };
 

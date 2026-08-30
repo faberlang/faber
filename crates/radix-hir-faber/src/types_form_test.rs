@@ -7,8 +7,11 @@
 
 use super::*;
 use crate::{empty_presentation, FaberCodegen};
-use radix_hir::{HirAuthoredTypeUse, HirModule, HirOwnerRef, HirTypeSlot};
-use radix_lexer::TokenKind;
+use radix_hir::{
+    HirAuthoredTypeUse, HirBlock, HirExpression, HirExpressionKind, HirId, HirLiteral, HirLocal,
+    HirModule, HirOwnerRef, HirStatement, HirStatementKind, HirTypeSlot,
+};
+use radix_lexer::{Span, TokenKind};
 use radix_types::{IndexExpr, InferVar, NumericWidth};
 
 /// Latin reader surface (`la`): the canonical built-in vocabulary.
@@ -995,6 +998,62 @@ fn illegal_levels_and_arity_fail_closed() {
             "malformed form at {site:?} must fail closed"
         );
     }
+}
+
+#[test]
+fn generate_local_hole_uses_authored_form_without_legacy_flags() {
+    let mut fx = fixture();
+    let name = fx.interner.intern("x");
+    let infer_ty = fx.types.intern(Type::Infer(InferVar(0)));
+    let def_id = DefId(1);
+    let site = declared_site(def_id.0);
+    let local = HirLocal {
+        def_id,
+        name,
+        ty: Some(infer_ty),
+        init: Some(HirExpression {
+            id: HirId(2),
+            kind: HirExpressionKind::Literal(HirLiteral::Int(1)),
+            ty: Some(infer_ty),
+            span: Span::default(),
+        }),
+        mutable: false,
+        is_await: false,
+        runtime_provided: false,
+    };
+    let hir = HirModule {
+        items: Vec::new(),
+        entry: Some(HirBlock::simple(
+            vec![HirStatement {
+                id: HirId(3),
+                kind: HirStatementKind::Local(local),
+                span: Span::default(),
+            }],
+            None,
+            Span::default(),
+        )),
+        entry_annotations: Vec::new(),
+        entry_args_name: None,
+        entry_is_async: false,
+    };
+    let mut presentation = empty_presentation();
+    presentation.authored_types.push(HirAuthoredTypeUse {
+        site,
+        form: HirTypeForm {
+            ty: infer_ty,
+            head: HirTypeFormHead::Infer,
+            args: Vec::new(),
+        },
+    });
+
+    let output = FaberCodegen::default()
+        .generate(&hir, &presentation, &fx.types, &fx.interner, &LaSurface)
+        .expect("authored hole must emit");
+    assert!(
+        output.code.contains("fixum _ x ←"),
+        "authored infer form must re-emit as a hole: {}",
+        output.code
+    );
 }
 
 #[test]
