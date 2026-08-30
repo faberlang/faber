@@ -33,7 +33,7 @@ use crate::{Primitive, TypeId};
 use radix_diagnostics::DiagnosticArg;
 use radix_hir::{
     HirArrayElement, HirBinOp, HirCallArg, HirConversioTarget, HirExpression, HirExpressionKind,
-    HirExtremumOp, HirLiteral, HirNonNullKind, HirObjectField, HirObjectKey, HirOptionalChainKind,
+    HirExtremumOp, HirId, HirLiteral, HirNonNullKind, HirObjectField, HirObjectKey, HirOptionalChainKind,
     HirUnOp,
 };
 use radix_syntax::{
@@ -68,7 +68,7 @@ pub fn lower_expr(lowerer: &mut Lowerer, expr: &Expr) -> HirExpression {
         ExprKind::OptionalChain(optional) => lowerer.lower_optional_chain(optional),
         ExprKind::NonNull(non_null) => lowerer.lower_non_null(non_null),
         ExprKind::Assign(assign) => lowerer.lower_assign(assign),
-        ExprKind::Verte(verte) => lowerer.lower_verte(verte),
+        ExprKind::Verte(verte) => lowerer.lower_verte(verte, id),
         ExprKind::Cede(cede_expr) => lowerer.lower_cede(cede_expr),
         ExprKind::Array(array) => lowerer.lower_serie(array),
         ExprKind::Object(_) => {
@@ -79,8 +79,8 @@ pub fn lower_expr(lowerer: &mut Lowerer, expr: &Expr) -> HirExpression {
             lowerer.error_with_args(retired_bare_object_literal_args());
             HirExpressionKind::Error
         }
-        ExprKind::Finge(finge) => lowerer.lower_finge(finge),
-        ExprKind::Clausura(closure) => lowerer.lower_clausura(closure),
+        ExprKind::Finge(finge) => lowerer.lower_finge(finge, id),
+        ExprKind::Clausura(closure) => lowerer.lower_clausura(closure, id),
         ExprKind::Intervallum(range) => lowerer.lower_intervallum(range),
         ExprKind::Conversio(conversio) => lowerer.lower_conversio(conversio),
         ExprKind::Ad(ad_expr) => lowerer.lower_ad_expr(ad_expr),
@@ -92,8 +92,8 @@ pub fn lower_expr(lowerer: &mut Lowerer, expr: &Expr) -> HirExpression {
         ExprKind::Praefixum(praefixum) => lowerer.lower_praefixum(praefixum),
         ExprKind::Ego(span) => lowerer.lower_ego(*span),
         ExprKind::Paren(expr) => lower_expr(lowerer, expr).kind,
-        ExprKind::TypeCheck(type_check) => lowerer.lower_type_check(type_check),
-        ExprKind::Iuncta(iuncta) => lowerer.lower_iuncta(iuncta),
+        ExprKind::TypeCheck(type_check) => lowerer.lower_type_check(type_check, id),
+        ExprKind::Iuncta(iuncta) => lowerer.lower_iuncta(iuncta, id),
         ExprKind::Summa(summa) => lower_summa(lowerer, summa),
         ExprKind::Maxima(extremum) => lower_extremum(lowerer, extremum, HirExtremumOp::Max),
         ExprKind::Minima(extremum) => lower_extremum(lowerer, extremum, HirExtremumOp::Min),
@@ -922,8 +922,16 @@ impl Lowerer<'_> {
     /// sources are split into entries so struct and collection construction can
     /// retain named fields without requiring a dedicated object-expression HIR
     /// shape.
-    fn lower_verte(&mut self, verte: &radix_syntax::VerteExpr) -> HirExpressionKind {
-        let target = self.lower_type(&verte.ty);
+    fn lower_verte(&mut self, verte: &radix_syntax::VerteExpr, owner: HirId) -> HirExpressionKind {
+        let target = self.lower_authored_type(
+            radix_hir::HirTypeSite {
+                owner: radix_hir::HirOwnerRef::Hir(owner),
+                slot: radix_hir::HirTypeSlot::AscriptionTarget,
+            },
+            &verte.ty,
+            false,
+            false,
+        );
         if let radix_syntax::ExprKind::Object(object) = &verte.expr.kind {
             let mut entries = Vec::new();
             for field in &object.fields {
@@ -971,7 +979,7 @@ impl Lowerer<'_> {
     ///
     /// Type arguments from the source syntax are lowered and preserved so
     /// typecheck can use them when no contextual expected tuple is available.
-    fn lower_iuncta(&mut self, iuncta: &radix_syntax::IunctaExpr) -> HirExpressionKind {
+    fn lower_iuncta(&mut self, iuncta: &radix_syntax::IunctaExpr, owner: HirId) -> HirExpressionKind {
         let mut elements = Vec::new();
         for expr in &iuncta.elements {
             elements.push(lower_expr(self, expr));
@@ -979,7 +987,18 @@ impl Lowerer<'_> {
         let type_args: Vec<TypeId> = iuncta
             .type_args
             .iter()
-            .map(|ta| self.lower_type(ta))
+            .enumerate()
+            .map(|(ordinal, ta)| {
+                self.lower_authored_type(
+                    radix_hir::HirTypeSite {
+                        owner: radix_hir::HirOwnerRef::Hir(owner),
+                        slot: radix_hir::HirTypeSlot::TupleTypeArgument(ordinal as u32),
+                    },
+                    ta,
+                    false,
+                    false,
+                )
+            })
             .collect();
         let type_args = if type_args.is_empty() {
             None
@@ -1035,7 +1054,7 @@ impl Lowerer<'_> {
     /// closed (CG2-R07). Otherwise (imported variants reached through their
     /// module alias) the terminal segment resolves through the bare table and
     /// the per-union namespace, exactly the single-segment policy (uvf-u3).
-    fn lower_finge(&mut self, finge: &radix_syntax::FingeExpr) -> HirExpressionKind {
+    fn lower_finge(&mut self, finge: &radix_syntax::FingeExpr, owner: HirId) -> HirExpressionKind {
         let Some(last) = finge.variant.last() else {
             self.error("unknown_finge_variant");
             return HirExpressionKind::Error;
@@ -1141,7 +1160,15 @@ impl Lowerer<'_> {
             // type path so a qualified name (`∷ pkg.Exitus`) resolves the
             // imported union identity. Diagnostics for a non-type or unknown
             // cast surface as the standard type-lowering errors.
-            let cast_ty = self.lower_type(cast);
+            let cast_ty = self.lower_authored_type(
+                radix_hir::HirTypeSite {
+                    owner: radix_hir::HirOwnerRef::Hir(owner),
+                    slot: radix_hir::HirTypeSlot::ConversionTarget,
+                },
+                cast,
+                false,
+                false,
+            );
             if cast_ty == self.types.intern(crate::Type::Error) {
                 return HirExpressionKind::Error;
             }
@@ -1161,7 +1188,7 @@ impl Lowerer<'_> {
     /// before the enclosing expression continues. Return and alternate-exit type
     /// annotations remain optional HIR metadata for typecheck to reconcile with
     /// the body.
-    fn lower_clausura(&mut self, closure: &radix_syntax::ClausuraExpr) -> HirExpressionKind {
+    fn lower_clausura(&mut self, closure: &radix_syntax::ClausuraExpr, owner: HirId) -> HirExpressionKind {
         let mut params = Vec::new();
         self.push_scope();
         for (ordinal, param) in closure.params.iter().enumerate() {
@@ -1208,11 +1235,31 @@ impl Lowerer<'_> {
         let ret = closure
             .ret
             .as_ref()
-            .map(|ret| self.lower_signature_type(ret));
+            .map(|ret| {
+                self.lower_authored_type(
+                    radix_hir::HirTypeSite {
+                        owner: radix_hir::HirOwnerRef::Hir(owner),
+                        slot: radix_hir::HirTypeSlot::Return,
+                    },
+                    ret,
+                    false,
+                    true,
+                )
+            });
         let err = closure
             .err
             .as_ref()
-            .map(|err| self.lower_signature_type(err));
+            .map(|err| {
+                self.lower_authored_type(
+                    radix_hir::HirTypeSite {
+                        owner: radix_hir::HirOwnerRef::Hir(owner),
+                        slot: radix_hir::HirTypeSlot::Error,
+                    },
+                    err,
+                    false,
+                    true,
+                )
+            });
         HirExpressionKind::Clausura(params, ret, err, Box::new(body), closure.modifier)
     }
 
@@ -1280,9 +1327,17 @@ impl Lowerer<'_> {
     /// Lower `expr est <type>` / `expr non est <type>` into a `TypeCheck` HIR node.
     /// The target type is resolved here; typecheck and codegen decide whether
     /// it maps to a Valor variant tag check.
-    fn lower_type_check(&mut self, tc: &radix_syntax::TypeCheckExpr) -> HirExpressionKind {
+    fn lower_type_check(&mut self, tc: &radix_syntax::TypeCheckExpr, owner: HirId) -> HirExpressionKind {
         let expr = lower_expr(self, &tc.expr);
-        let ty = self.lower_type(&tc.ty);
+        let ty = self.lower_authored_type(
+            radix_hir::HirTypeSite {
+                owner: radix_hir::HirOwnerRef::Hir(owner),
+                slot: radix_hir::HirTypeSlot::TypeCheckTarget,
+            },
+            &tc.ty,
+            false,
+            false,
+        );
         HirExpressionKind::TypeCheck {
             positive: tc.positive,
             expr: Box::new(expr),
