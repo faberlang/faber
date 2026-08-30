@@ -41,6 +41,9 @@ impl super::FaberCodegen {
         }
     }
 
+    // Site-threaded authored-form emission carries owner/slot beside the
+    // shared rendering context; the arity is the policy, not an accident.
+    #[allow(clippy::too_many_arguments)]
     pub(super) fn write_hir_annotation(
         &self,
         annotation: &HirAnnotation,
@@ -127,6 +130,7 @@ impl super::FaberCodegen {
         }
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn write_hir_annotation_field(
         &self,
         field: &HirAnnotationField,
@@ -154,6 +158,7 @@ impl super::FaberCodegen {
         );
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn write_hir_annotation_value(
         &self,
         value: &HirAnnotationValue,

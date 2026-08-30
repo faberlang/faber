@@ -204,6 +204,7 @@ impl super::FaberCodegen {
         }
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub(super) fn generate_function(
         &self,
         func: &HirFunction,
@@ -628,6 +629,7 @@ impl super::FaberCodegen {
         }
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn write_param(
         &self,
         param: &HirParam,

@@ -263,6 +263,9 @@ pub fn decompose_kernel_function_with_limit(
 
     // Close the open slice: its writes and temp definitions take the
     // closed slice's lineage for the rest of the walk.
+    // Foreign-arity note (kcm Unit 1A): allowed as-is; flagged by stage 2
+    // while authored-form closeout ran — not part of that goal.
+    #[allow(clippy::too_many_arguments)]
     fn close_current(
         slices: &mut Vec<Vec<usize>>,
         current: &mut Vec<usize>,

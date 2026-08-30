@@ -282,6 +282,11 @@ impl<P> CapabilityAnswer<P> {
     }
 
     /// Convert the answer to a standard result without changing its reason.
+    ///
+    /// # Errors
+    ///
+    /// Returns the rejection [`CapabilityReason`] when the answer is
+    /// [`Self::Rejected`](Self::Rejected).
     pub fn into_result(self) -> Result<P, CapabilityReason> {
         match self {
             Self::Proven(proof) => Ok(proof),
@@ -440,6 +445,9 @@ pub struct CaptureRequirement {
 }
 
 /// Settled effects and alternate-exit posture.
+// The four posture flags are the settled vocabulary contract (capability
+// vocabulary commit); they travel together by design.
+#[allow(clippy::struct_excessive_bools)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct EffectPosture {
     /// The body can produce a failure/alternate error result.
