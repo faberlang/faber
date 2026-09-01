@@ -6439,8 +6439,10 @@ async_main {
     assert!(
         output
             .code
-            .contains("let responsum: crate::http::response::Response ="),
-        "expected struct crate::http::response::Response (cf. crate::caelum::terminus::Endpoint), got:\n{}",
+            .contains("let _: crate::http::response::Response ="),
+        "expected the typed leaf struct crate::http::response::Response on the \
+         await binding (cf. crate::caelum::terminus::Endpoint); the name itself \
+         collapses to `_` for an unused binding per SCR-09P-04, got:\n{}",
         output.code
     );
     assert!(
