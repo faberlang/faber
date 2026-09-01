@@ -295,12 +295,14 @@ pub fn count_inline_test_modules(scrubbed: &str) -> usize {
             i += 1;
             continue;
         }
-        if chars[i] == '#' && i + 1 < chars.len() && chars[i + 1] == '[' {
-            if let Some((attr, end)) = parse_attribute(&chars, i) {
-                pending_attrs.push(attr);
-                i = end;
-                continue;
-            }
+        if chars[i] == '#'
+            && i + 1 < chars.len()
+            && chars[i + 1] == '['
+            && let Some((attr, end)) = parse_attribute(&chars, i)
+        {
+            pending_attrs.push(attr);
+            i = end;
+            continue;
         }
         if let Some((end, is_inline)) = parse_mod_item(&chars, i) {
             if is_inline && pending_attrs.iter().any(|attr| cfg_enables_test(attr)) {
@@ -373,11 +375,12 @@ fn strip_not_groups(pred: &str) -> String {
     while i < chars.len() {
         if ident_at(&chars, i, "not") {
             let j = skip_ws(&chars, i + 3);
-            if j < chars.len() && chars[j] == '(' {
-                if let Some(end) = skip_balanced(&chars, j, '(', ')') {
-                    i = end;
-                    continue;
-                }
+            if j < chars.len()
+                && chars[j] == '('
+                && let Some(end) = skip_balanced(&chars, j, '(', ')')
+            {
+                i = end;
+                continue;
             }
         }
         out.push(chars[i]);

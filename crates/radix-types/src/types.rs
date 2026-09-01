@@ -186,10 +186,10 @@ impl TypeTable {
         if let Some(&id) = self.intern_map.get(&ty) {
             return id;
         }
-        if self.first_modular_word.is_none() {
-            if let Type::ModularWord(width) = &ty {
-                self.first_modular_word = Some(*width);
-            }
+        if self.first_modular_word.is_none()
+            && let Type::ModularWord(width) = &ty
+        {
+            self.first_modular_word = Some(*width);
         }
         let id = TypeId(self.types.len() as u32);
         self.types.push(ty.clone());
@@ -339,10 +339,10 @@ impl TypeTable {
         for (index, ty) in snapshot.types.iter().enumerate() {
             // First occupancy wins — matches historical linear-scan first match.
             intern_map.entry(ty.clone()).or_insert(TypeId(index as u32));
-            if first_modular_word.is_none() {
-                if let Type::ModularWord(width) = ty {
-                    first_modular_word = Some(*width);
-                }
+            if first_modular_word.is_none()
+                && let Type::ModularWord(width) = ty
+            {
+                first_modular_word = Some(*width);
             }
         }
         Ok(Self {
