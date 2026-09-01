@@ -339,6 +339,8 @@ pub fn generate_from_analyzed_with_options(
         #[cfg(feature = "hir-faber")]
         Target::HirFaber => {
             let imported_spellings = analysis.resolver.imported_spellings(&analysis.interner);
+            let mut presentation = analysis.presentation.clone();
+            crate::hir::serialize::normalize_presentation_witnesses(&analysis.hir, &mut presentation, &analysis.types);
             let mut by_def = imported_spellings.by_def;
             by_def.extend(
                 analysis
@@ -347,7 +349,7 @@ pub fn generate_from_analyzed_with_options(
             );
             let output = faber::emit(
                 &analysis.hir,
-                &analysis.presentation,
+                &presentation,
                 &analysis.types,
                 &analysis.interner,
                 &faber::LocaleKeywordBridge(*surface),
