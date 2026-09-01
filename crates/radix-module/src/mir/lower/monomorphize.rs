@@ -9,14 +9,14 @@
 // parent module provides shared imports for lowering
 use super::*;
 use crate::mir::generic::{
-    bind_generic_type_witness_with_shapes, canonical_index, function_contains_shape_size,
+    MirShapeBindings, bind_generic_type_witness_with_shapes, canonical_index, function_contains_shape_size,
     instantiate_generic_type_with_shapes, substitute_shape_size_constants,
-    substitute_tensor_from_flat_shape_size_constants, MirShapeBindings,
+    substitute_tensor_from_flat_shape_size_constants,
 };
 use crate::mir::ty::index_projection_result_ty;
 use crate::mir::{
-    instantiate_existing_generic_type, type_contains_param, MirGenericBindings, MirMonomorphization,
-    MirMonomorphizationKey, MirPlaceBase,
+    MirGenericBindings, MirMonomorphization, MirMonomorphizationKey, MirPlaceBase, instantiate_existing_generic_type,
+    type_contains_param,
 };
 use crate::semantic::IndexId;
 

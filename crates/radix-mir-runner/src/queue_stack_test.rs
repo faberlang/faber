@@ -1,8 +1,8 @@
 //! C2 runner walker pins for queue/stack core collection operations.
 
 use super::lib_test::evaluate_collection_call;
-use crate::host::BufferHost;
 use crate::Value;
+use crate::host::BufferHost;
 use radix_lexer::{Interner, Span};
 use radix_mir::{
     MirBlockId, MirCollectionOp, MirFunction, MirFunctionId, MirIntrinsic, MirLocal, MirOperand,

@@ -6,9 +6,9 @@
 use super::*;
 use crate::driver::AnalyzeRequest;
 use crate::services::{
-    check_diagnostics_for_source, check_diagnostics_for_source_with_locale_pack, compile_cli_path, compile_cli_source,
-    compile_cli_source_with_locale_pack, discoverable_targets, target_capabilities, target_capabilities_for_surface,
-    target_extension, target_name, verify_source, TargetCommandSurface,
+    TargetCommandSurface, check_diagnostics_for_source, check_diagnostics_for_source_with_locale_pack,
+    compile_cli_path, compile_cli_source, compile_cli_source_with_locale_pack, discoverable_targets,
+    target_capabilities, target_capabilities_for_surface, target_extension, target_name, verify_source,
 };
 use std::path::PathBuf;
 
@@ -476,10 +476,12 @@ fn diagnostics_check_accepts_frontmatter_on_proba_source() {
         "frontmatter must be peeled before checking .proba: {:?}",
         result.diagnostics
     );
-    assert!(result
-        .diagnostics
-        .iter()
-        .all(|diagnostic| !diagnostic.is_error()));
+    assert!(
+        result
+            .diagnostics
+            .iter()
+            .all(|diagnostic| !diagnostic.is_error())
+    );
 }
 
 #[test]
@@ -534,10 +536,12 @@ exemplars = ["./exemplars/salve-munde.zh-Hans.fab"]
         "localized functio keyword should reach semantic check, diagnostics: {:?}",
         result.diagnostics
     );
-    assert!(result
-        .diagnostics
-        .iter()
-        .all(|diagnostic| !diagnostic.is_error()));
+    assert!(
+        result
+            .diagnostics
+            .iter()
+            .all(|diagnostic| !diagnostic.is_error())
+    );
 }
 
 #[test]
@@ -560,9 +564,11 @@ fn diagnostics_check_rejects_undeclared_latin_keyword_in_grammar_position() {
         "undeclared spelling must fail as an ordinary undefined identifier: {:?}",
         result.diagnostics
     );
-    assert!(result.diagnostics.iter().all(|diagnostic| !diagnostic
-        .code
-        .is_some_and(|code| code.starts_with("LOCALE"))));
+    assert!(result.diagnostics.iter().all(|diagnostic| {
+        !diagnostic
+            .code
+            .is_some_and(|code| code.starts_with("LOCALE"))
+    }));
 }
 
 /// Shared fixture: compiles the `add_one` nucleum and returns parsed reflection JSON.
@@ -1388,9 +1394,11 @@ fn wgsl_text_source_vertex_names_ignore_assertion_message_text() {
     assert_eq!(vertex.vertex_inputs[0].source_name.as_deref(), Some("position"));
     assert_eq!(vertex.vertex_inputs[1].source_name.as_deref(), Some("normal"));
     assert_eq!(vertex.vertex_inputs[2].source_name.as_deref(), Some("uv"));
-    assert!(wgsl_output
-        .code
-        .contains("@location(0) position: vec3<f32>"));
+    assert!(
+        wgsl_output
+            .code
+            .contains("@location(0) position: vec3<f32>")
+    );
     assert!(wgsl_output.code.contains("@location(1) normal: vec3<f32>"));
     assert!(wgsl_output.code.contains("@location(2) uv: vec2<f32>"));
 }
@@ -1771,9 +1779,11 @@ fn emit_reflection_json_rejects_non_gpu_output() {
 
     assert!(result.success(), "{:?}", result.diagnostics);
     let output = result.output.expect("rust output");
-    assert!(output_reflection_json(&output)
-        .expect("serialize reflection output")
-        .is_none());
+    assert!(
+        output_reflection_json(&output)
+            .expect("serialize reflection output")
+            .is_none()
+    );
 }
 
 #[test]
@@ -1858,9 +1868,11 @@ fn emit_helper_rejects_undeclared_latin_keyword_in_grammar_position() {
         "undeclared spelling must fail as an ordinary undefined identifier: {:?}",
         result.diagnostics
     );
-    assert!(result.diagnostics.iter().all(|diagnostic| !diagnostic
-        .code
-        .is_some_and(|code| code.starts_with("LOCALE"))));
+    assert!(result.diagnostics.iter().all(|diagnostic| {
+        !diagnostic
+            .code
+            .is_some_and(|code| code.starts_with("LOCALE"))
+    }));
 }
 
 #[test]

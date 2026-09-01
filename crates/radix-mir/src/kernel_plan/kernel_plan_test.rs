@@ -106,18 +106,20 @@ fn composed_mlp_plan_preserves_gate_up_swiglu_down_order() {
             ComposedMatMulStageKind::Down,
         ]
     );
-    assert!(plan
-        .validate_for_dispatch(
+    assert!(
+        plan.validate_for_dispatch(
             MirKernelDispatchSize { x: 1, y: 1, z: 1 },
             MirWorkgroupSize { x: 8, y: 8, z: 1 }
         )
-        .is_ok());
-    assert!(plan
-        .validate_for_dispatch(
+        .is_ok()
+    );
+    assert!(
+        plan.validate_for_dispatch(
             MirKernelDispatchSize { x: 2, y: 1, z: 1 },
             MirWorkgroupSize { x: 8, y: 8, z: 1 }
         )
-        .is_err());
+        .is_err()
+    );
 
     let mut wrong_order = plan.clone();
     wrong_order.stages[1].kind = ComposedMatMulStageKind::Down;
@@ -447,9 +449,11 @@ fn sum_reduction_plan_is_fully_populated() {
             after: BarrierPhase::SharedMemoryLoad
         })
     );
-    assert!(reduction.barriers[1..]
-        .iter()
-        .all(|point| point.after == BarrierPhase::ReductionStep));
+    assert!(
+        reduction.barriers[1..]
+            .iter()
+            .all(|point| point.after == BarrierPhase::ReductionStep)
+    );
     plan.validate().expect("built plan validates");
 }
 

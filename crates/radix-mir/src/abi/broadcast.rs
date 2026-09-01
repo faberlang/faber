@@ -9,9 +9,9 @@
 //! closed before emission (A3/A7).
 
 use crate::{
-    collection_ops::statement_collection_op, local_ty::operand_local_ty,
-    tensor_type::tensor_literal_dims, MirAbiError, MirCollectionOp, MirFunction, MirRuntimeCall,
-    MirStatementKind, MirValidationContext,
+    MirAbiError, MirCollectionOp, MirFunction, MirRuntimeCall, MirStatementKind,
+    MirValidationContext, collection_ops::statement_collection_op, local_ty::operand_local_ty,
+    tensor_type::tensor_literal_dims,
 };
 use serde::{Deserialize, Serialize};
 

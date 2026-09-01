@@ -1,8 +1,8 @@
 use super::*;
-use crate::analyze::{analyze_package, AnalyzedProgram};
+use crate::analyze::{AnalyzedProgram, analyze_package};
 use crate::discovery::PackageSpec;
 use crate::test_support::test_analysis_seams;
-use crate::{lockfile, MANIFEST_FILE};
+use crate::{MANIFEST_FILE, lockfile};
 use radix_module::codegen::Target;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -50,10 +50,11 @@ fn plan_package_rust_is_deterministic() {
 fn plan_package_rust_includes_runtime_dependency() {
     let package = empty_package("g4-plan-runtime-dep");
     let a = plan_package(&package, Target::HirRust);
-    assert!(a
-        .nodes
-        .iter()
-        .any(|n| n.kind == ArtifactKind::RuntimeDependency));
+    assert!(
+        a.nodes
+            .iter()
+            .any(|n| n.kind == ArtifactKind::RuntimeDependency)
+    );
 }
 
 #[test]

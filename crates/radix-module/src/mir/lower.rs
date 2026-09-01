@@ -33,7 +33,7 @@
 
 use crate::cli::{CliDefault, CliOperand, CliOption, CliType};
 use crate::driver::AnalyzedModule;
-use crate::hir::visit::{walk_expr, walk_program, HirVisitor};
+use crate::hir::visit::{HirVisitor, walk_expr, walk_program};
 use crate::hir::{
     DefId, HirAnnotationValue, HirArrayElement, HirBinOp, HirBlock, HirCape, HirCasuArm, HirConst, HirConversioTarget,
     HirExpression, HirExpressionKind, HirExtremumOp, HirField, HirFunction, HirItem, HirItemKind, HirIteraMode,
@@ -42,19 +42,19 @@ use crate::hir::{
 };
 use crate::lexer::{Interner, Span, Symbol};
 use crate::mir::{
-    dump_program, instantiate_existing_generic_type, type_contains_param, MirAggregate, MirAggregateFields,
-    MirAggregateItem, MirAggregateKind, MirBinOp, MirBlock, MirBlockId, MirCallee, MirClosureCallee, MirClosureCapture,
-    MirClosureEnvironment, MirClosureEnvironmentId, MirClosureValue, MirConstant, MirConversion, MirConversionFlavor,
-    MirDeviceRole, MirDiagnosticKind, MirFilumCoordinate, MirFilumSumOp, MirFunction, MirFunctionId, MirFunctionOrigin,
-    MirFunctionVisibility, MirGenericBindings, MirIntrinsic, MirKernelShaderStage, MirKeyValueOperand, MirLayoutTable,
-    MirLocal as MirLocalDecl, MirLocalId, MirMonomorphization, MirNamedOperand, MirOperand, MirOptionChainLink,
-    MirOptionOp, MirOptionUnwrapMode, MirParam, MirParamMode, MirPlace, MirPlaceBase, MirProgram, MirProjection,
-    MirProvider, MirProviderKind, MirRuntimeCall, MirStatement, MirStatementKind, MirStructFieldDefaults,
-    MirSwitchCase, MirSyntheticFunctionIdentity, MirTemp, MirTempId, MirTerminator, MirTerminatorKind, MirType,
-    MirTypeCheckOp, MirUnOp, MirValidationContext, MirValue, MirValueId, MirValueKind, ValidatedMir,
+    MirAggregate, MirAggregateFields, MirAggregateItem, MirAggregateKind, MirBinOp, MirBlock, MirBlockId, MirCallee,
+    MirClosureCallee, MirClosureCapture, MirClosureEnvironment, MirClosureEnvironmentId, MirClosureValue, MirConstant,
+    MirConversion, MirConversionFlavor, MirDeviceRole, MirDiagnosticKind, MirFilumCoordinate, MirFilumSumOp,
+    MirFunction, MirFunctionId, MirFunctionOrigin, MirFunctionVisibility, MirGenericBindings, MirIntrinsic,
+    MirKernelShaderStage, MirKeyValueOperand, MirLayoutTable, MirLocal as MirLocalDecl, MirLocalId,
+    MirMonomorphization, MirNamedOperand, MirOperand, MirOptionChainLink, MirOptionOp, MirOptionUnwrapMode, MirParam,
+    MirParamMode, MirPlace, MirPlaceBase, MirProgram, MirProjection, MirProvider, MirProviderKind, MirRuntimeCall,
+    MirStatement, MirStatementKind, MirStructFieldDefaults, MirSwitchCase, MirSyntheticFunctionIdentity, MirTemp,
+    MirTempId, MirTerminator, MirTerminatorKind, MirType, MirTypeCheckOp, MirUnOp, MirValidationContext, MirValue,
+    MirValueId, MirValueKind, ValidatedMir, dump_program, instantiate_existing_generic_type, type_contains_param,
 };
 use crate::semantic::{ConversionPair, IndexExpr, NumericWidth, Primitive, Type, TypeId, TypeTable};
-use radix_mir::device::{is_public_entry, MirDeviceFunctionMetadata, MirDeviceFunctionMetadataMap};
+use radix_mir::device::{MirDeviceFunctionMetadata, MirDeviceFunctionMetadataMap, is_public_entry};
 use radix_types::{MirCollectionOp, MirKernelBuiltin};
 use rustc_hash::{FxHashMap, FxHashSet};
 use std::sync::Arc;
@@ -77,13 +77,13 @@ mod place;
 mod runtime;
 mod stmt;
 
-use context::{function_param_map, struct_field_map, LoweringContextMaps};
+use context::{LoweringContextMaps, function_param_map, struct_field_map};
 use expr::HirExpressionLoweringVisitor;
 use item::ItemLoweringPass;
 pub use package_instantiate::{
+    ImportedDeviceIndex, ImportedDeviceRegistration, ImportedDeviceRoute, PackageStructMetadata,
     instantiate_merged_generic_calls, instantiate_merged_generic_calls_with_devices,
-    instantiate_merged_generic_calls_with_devices_and_metadata, ImportedDeviceIndex, ImportedDeviceRegistration,
-    ImportedDeviceRoute, PackageStructMetadata,
+    instantiate_merged_generic_calls_with_devices_and_metadata,
 };
 
 /// Developer-facing MIR lowering diagnostic.

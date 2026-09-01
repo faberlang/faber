@@ -113,14 +113,18 @@ fn retired_block_string_glyphs_are_rejected() {
     assert!(!result.success());
     // `❝` is an unexpected character, not a block-string token with a
     // targeted replacement diagnostic.
-    assert!(result
-        .diagnostics
-        .iter()
-        .any(|d| { d.is_error() && d.code == Some("LEX004") && d.issue() == Some("unexpected_character") }));
-    assert!(!result
-        .diagnostics
-        .iter()
-        .any(|d| d.issue() == Some("retired_block_string_delimiter")));
+    assert!(
+        result
+            .diagnostics
+            .iter()
+            .any(|d| { d.is_error() && d.code == Some("LEX004") && d.issue() == Some("unexpected_character") })
+    );
+    assert!(
+        !result
+            .diagnostics
+            .iter()
+            .any(|d| d.issue() == Some("retired_block_string_delimiter"))
+    );
 }
 
 #[test]

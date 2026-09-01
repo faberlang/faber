@@ -1,5 +1,5 @@
 use super::*;
-use crate::analyze::{analyze_package, AnalysisSeams};
+use crate::analyze::{AnalysisSeams, analyze_package};
 use crate::library::LibraryResolver;
 use crate::test_support::{accept_manifest, test_locale_pack};
 use radix_module::driver::Config;

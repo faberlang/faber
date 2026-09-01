@@ -21,14 +21,14 @@
 
 use crate::analyze::{AnalysisSeams, AnalyzedProgram, AnalyzedProgramNode};
 use crate::discovery::PackageSpec;
-use crate::import_graph::{resolve_import, ImportResolution};
+use crate::import_graph::{ImportResolution, resolve_import};
 use radix_module::diagnostics::Diagnostic;
 use radix_module::driver::Config;
-use radix_module::hir::package::{
-    build_package_with_nucleum, encode_package_msgpack, LibraryImportWire, LocalLinkWire,
-    PackageDependencyWire, PackageIdentityWire, PackageUnitInput,
-};
 use radix_module::hir::HirItemKind;
+use radix_module::hir::package::{
+    LibraryImportWire, LocalLinkWire, PackageDependencyWire, PackageIdentityWire, PackageUnitInput,
+    build_package_with_nucleum, encode_package_msgpack,
+};
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::path::{Path, PathBuf};

@@ -21,7 +21,7 @@
     feature = "hir-faber",
     feature = "hir-swift"
 ))]
-use radix_module::codegen::{generate_from_analyzed, Target};
+use radix_module::codegen::{Target, generate_from_analyzed};
 #[cfg(any(
     feature = "hir-rust",
     feature = "hir-ts",
@@ -29,7 +29,7 @@ use radix_module::codegen::{generate_from_analyzed, Target};
     feature = "hir-faber",
     feature = "hir-swift"
 ))]
-use radix_module::driver::{analyze_source, AnalyzeRequest, Config, Session};
+use radix_module::driver::{AnalyzeRequest, Config, Session, analyze_source};
 #[cfg(any(
     feature = "hir-rust",
     feature = "hir-ts",
@@ -37,7 +37,7 @@ use radix_module::driver::{analyze_source, AnalyzeRequest, Config, Session};
     feature = "hir-faber",
     feature = "hir-swift"
 ))]
-use radix_module::locale::{latin_locale_pack, KeywordSurface};
+use radix_module::locale::{KeywordSurface, latin_locale_pack};
 
 #[cfg(any(
     feature = "hir-rust",

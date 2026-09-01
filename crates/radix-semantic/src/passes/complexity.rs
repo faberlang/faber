@@ -12,7 +12,7 @@
 //! caller's deny policy promotes them.
 
 use crate::{SemanticError, SemanticErrorKind, WarningKind};
-use radix_hir::visit::{walk_block, walk_expr, walk_stmt, HirVisitor};
+use radix_hir::visit::{HirVisitor, walk_block, walk_expr, walk_stmt};
 use radix_hir::{
     HirBinOp, HirBlock, HirExpression, HirExpressionKind, HirFunction, HirItemKind, HirModule,
     HirStatement, HirStatementKind,

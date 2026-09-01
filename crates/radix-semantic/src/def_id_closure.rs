@@ -48,7 +48,9 @@ pub fn missing_emit_def_diagnostic(def_id: DefId, name: Option<&str>, file: &str
         Some(name) if !name.is_empty() => format!(
             "definition id {id} ({name}) is referenced after semantic analysis but missing from the emit def table"
         ),
-        _ => format!("definition id {id} is referenced after semantic analysis but missing from the emit def table"),
+        _ => format!(
+            "definition id {id} is referenced after semantic analysis but missing from the emit def table"
+        ),
     };
     let mut args = vec![
         DiagnosticArg::new("issue", DEF_ID_CLOSURE_ISSUE),

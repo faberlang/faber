@@ -7,7 +7,7 @@
 
 use crate::CodegenError;
 use radix_diagnostics::DiagnosticArg;
-use radix_hir::visit::{walk_expr, HirVisitor};
+use radix_hir::visit::{HirVisitor, walk_expr};
 use radix_hir::{HirExpressionKind, HirModule};
 use radix_lexer::Span;
 

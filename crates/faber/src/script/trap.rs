@@ -5,7 +5,7 @@
 
 use radix::module::mir::{Host, KernelModule, MirDiagnosticKind, MirProvider, RunnerError, Value};
 use std::any::Any;
-use std::panic::{catch_unwind, AssertUnwindSafe};
+use std::panic::{AssertUnwindSafe, catch_unwind};
 use std::process::ExitCode;
 
 /// Control-flow trap raised when interpreted Faber calls `exi` or aborts.
@@ -57,7 +57,7 @@ impl Host for TrapHost<'_> {
                     return Err(RunnerError::internal(
                         span,
                         "exit_process code is not numerus",
-                    ))
+                    ));
                 }
             };
             self.exit(code);

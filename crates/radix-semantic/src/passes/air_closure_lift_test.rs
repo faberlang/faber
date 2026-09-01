@@ -1,7 +1,7 @@
 //! Focused proofs for ARC-4 Tier-B closure lifting.
 
-use crate::test_support::analyze_source_for_target;
 use crate::SemanticErrorKind;
+use crate::test_support::analyze_source_for_target;
 use radix_hir::HirItemKind;
 use radix_target::Target;
 

@@ -9,8 +9,8 @@
 //! WHY: Broadcasting is shape unification, not a separate runtime policy. The
 //! engine is index-kind-agnostic; tensor deployment consumes it in later stages.
 
-use super::index::{IndexExpr, IndexId, IndexVar};
 use super::TypeTable;
+use super::index::{IndexExpr, IndexId, IndexVar};
 use rustc_hash::FxHashMap;
 
 /// Result of an index unification attempt.

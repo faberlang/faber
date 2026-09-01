@@ -164,9 +164,11 @@ fn define_variant_rejects_same_parent_duplicate() {
     let first = resolver
         .define_variant(union, x_name, Span::default())
         .expect("first registers");
-    assert!(resolver
-        .define_variant(union, x_name, Span::default())
-        .is_none());
+    assert!(
+        resolver
+            .define_variant(union, x_name, Span::default())
+            .is_none()
+    );
     assert_eq!(resolver.variant_child(union, x_name), Some(first));
 }
 

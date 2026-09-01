@@ -1,10 +1,10 @@
 //! Coverage for nucleum-fragment MIR composition.
 
 use super::{
-    compose_with_metadata, reject_surviving_fragment_calls_with_metadata, surviving_fragment_calls_with_metadata,
-    ExpansionBudget, FragmentCompositionError, ISSUE_CYCLE, ISSUE_EXPANSION,
+    ExpansionBudget, FragmentCompositionError, ISSUE_CYCLE, ISSUE_EXPANSION, compose_with_metadata,
+    reject_surviving_fragment_calls_with_metadata, surviving_fragment_calls_with_metadata,
 };
-use crate::diagnostics::{semantic_message, DiagnosticArg};
+use crate::diagnostics::{DiagnosticArg, semantic_message};
 use crate::driver::{self, AnalyzeRequest, Config, Session};
 use crate::hir::DefId;
 use crate::lexer::{Interner, Span};
@@ -543,10 +543,11 @@ fn depth_budget_fails_closed() {
         "depth cap must fail closed, got {errors:?}"
     );
     let err = errors.iter().find(|err| err.reason == "depth").unwrap();
-    assert!(err
-        .args
-        .iter()
-        .any(|arg| arg.name == "limit" && arg.value == "1"));
+    assert!(
+        err.args
+            .iter()
+            .any(|arg| arg.name == "limit" && arg.value == "1")
+    );
     assert!(err.args.iter().any(|arg| arg.name == "observed"));
     assert!(err.args.iter().any(|arg| arg.name == "chain"));
 }
@@ -825,10 +826,11 @@ fn kernel_budget_fails_closed() {
         .find(|err| err.issue == ISSUE_EXPANSION && err.reason == "depth")
         .unwrap_or_else(|| panic!("expected kernel depth overflow, got {errors:?}"));
     assert!(err.args.iter().any(|arg| arg.name == "observed"));
-    assert!(err
-        .args
-        .iter()
-        .any(|arg| arg.name == "limit" && arg.value == "0"));
+    assert!(
+        err.args
+            .iter()
+            .any(|arg| arg.name == "limit" && arg.value == "0")
+    );
     assert!(err.args.iter().any(|arg| arg.name == "chain"));
 }
 

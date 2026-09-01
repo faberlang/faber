@@ -1,8 +1,8 @@
 //! Driver/codegen remainders that cannot live in `radix-semantic`.
 
-use crate::codegen::Target;
-use crate::driver::{analyze_source, AnalyzeRequest, Config, Session};
 use crate::Compiler;
+use crate::codegen::Target;
+use crate::driver::{AnalyzeRequest, Config, Session, analyze_source};
 
 #[test]
 fn lege_corpus_still_checks() {

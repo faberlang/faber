@@ -8,8 +8,8 @@
 
 use super::library_resolver_from_config;
 use super::test_support::{diagnostic_has_arg, diagnostic_has_issue, test_temp_dir};
-use radix::module::driver::Config;
 use radix::module::Output;
+use radix::module::driver::Config;
 use radix::program::analyze::AnalysisSeams;
 use radix::program::discovery::PackageSpec;
 use radix::program::emit::{
@@ -373,12 +373,16 @@ main {}
         panic!("expected rust output");
     };
 
-    assert!(output
-        .code
-        .contains("#[ignore = \"faber: not selected by suite outer suite/inner suite\"]"));
-    assert!(output
-        .code
-        .contains("#[ignore = \"faber: not selected by tag focus\"]"));
+    assert!(
+        output
+            .code
+            .contains("#[ignore = \"faber: not selected by suite outer suite/inner suite\"]")
+    );
+    assert!(
+        output
+            .code
+            .contains("#[ignore = \"faber: not selected by tag focus\"]")
+    );
 }
 
 #[test]
@@ -426,9 +430,11 @@ main {}
     };
 
     assert!(!output.code.contains("not selected by suite"));
-    assert!(output
-        .code
-        .contains("#[ignore = \"faber: not selected by tag smoke\"]"));
+    assert!(
+        output
+            .code
+            .contains("#[ignore = \"faber: not selected by tag smoke\"]")
+    );
 }
 
 // ---------------------------------------------------------------------------

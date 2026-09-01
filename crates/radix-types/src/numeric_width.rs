@@ -231,11 +231,19 @@ impl WidthError {
             (WidthError::FloatOnNumerus, _) => {
                 "f16, f32, f64, and bf16 are fractus widths; use fractus<f16>, fractus<f32>, fractus<f64>, or fractus<bf16>"
             }
-            (WidthError::IntOnFractus, _) => "integer width markers are numerus widths; use numerus<…>",
-            (WidthError::TooManyParams, Primitive::Numerus) => "numerus accepts at most one width marker",
-            (WidthError::TooManyParams, Primitive::Fractus) => "fractus accepts at most one width marker",
+            (WidthError::IntOnFractus, _) => {
+                "integer width markers are numerus widths; use numerus<…>"
+            }
+            (WidthError::TooManyParams, Primitive::Numerus) => {
+                "numerus accepts at most one width marker"
+            }
+            (WidthError::TooManyParams, Primitive::Fractus) => {
+                "fractus accepts at most one width marker"
+            }
             (WidthError::TooManyParams, _) => "primitive accepts at most one width marker",
-            (WidthError::UnrecognizedMarker, Primitive::Numerus) => "unknown width marker for numerus",
+            (WidthError::UnrecognizedMarker, Primitive::Numerus) => {
+                "unknown width marker for numerus"
+            }
             (WidthError::UnrecognizedMarker, Primitive::Fractus) => {
                 "fractus accepts only f16, f32, f64, or bf16"
             }
@@ -442,7 +450,9 @@ pub fn lower_modular_word(
     report: &mut dyn FnMut(&str),
 ) -> TypeId {
     if params.len() != 1 {
-        report("modulus requires exactly one unsigned width marker; use modulus<u8>, modulus<u16>, modulus<u32>, or modulus<u64>");
+        report(
+            "modulus requires exactly one unsigned width marker; use modulus<u8>, modulus<u16>, modulus<u32>, or modulus<u64>",
+        );
         return types.intern(Type::Error);
     }
     if matches!(params[0].kind, radix_syntax::TypeExprKind::Infer) {

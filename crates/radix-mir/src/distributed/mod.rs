@@ -45,7 +45,7 @@ pub mod synthesize;
 pub mod types;
 pub mod validate;
 
-pub use canonical::{encode_logical_plan, CANONICAL_MAGIC, CANONICAL_REVISION};
+pub use canonical::{CANONICAL_MAGIC, CANONICAL_REVISION, encode_logical_plan};
 pub use derive::derive;
 pub use synthesize::synthesize;
 pub use types::*;

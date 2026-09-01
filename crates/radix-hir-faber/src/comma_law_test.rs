@@ -8,7 +8,7 @@
 
 use crate::surface::{KeywordSurface, TypeBindingKind};
 
-use crate::{empty_presentation, FaberCodegen};
+use crate::{FaberCodegen, empty_presentation};
 use radix_codegen_shared::CodeWriter;
 use radix_hir::{
     DefId, HirAnnotation, HirAnnotationField, HirAnnotationValue, HirBlock, HirCallArg, HirCasuArm,

@@ -1,7 +1,7 @@
-use crate::explain::{render_list, render_plain, Lookup, Registry};
+use crate::explain::{Lookup, Registry, render_list, render_plain};
 use crate::reference::{
+    PackMetadata, REFERENCE_ROOT_ENV, ReferenceLayout, ReferencePack, ResolvedTerm,
     pack_version_skew, parse_release_version, resolve_reference_root, resolve_reference_root_in,
-    PackMetadata, ReferenceLayout, ReferencePack, ResolvedTerm, REFERENCE_ROOT_ENV,
 };
 use crate::reference_pack_test_support::{env_lock, repo_exempla_root};
 use crate::reference_parse::entry_from_exempla;
@@ -436,9 +436,11 @@ fn pack_version_skew_accepts_matching_release_version() {
         source_commit: None,
         index_generated_on: None,
     };
-    assert!(pack_version_skew(&metadata)
-        .expect("matching version")
-        .is_none());
+    assert!(
+        pack_version_skew(&metadata)
+            .expect("matching version")
+            .is_none()
+    );
 }
 
 #[test]

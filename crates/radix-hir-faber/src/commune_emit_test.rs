@@ -1,6 +1,6 @@
 //! TEU4: Faber re-emit tail for `@ commune` union fields.
 
-use super::{empty_presentation, FaberCodegen, KeywordSurface, TypeBindingKind};
+use super::{FaberCodegen, KeywordSurface, TypeBindingKind, empty_presentation};
 use radix_hir::{
     DefId, HirEnum, HirId, HirItem, HirItemKind, HirModule, HirVariant, HirVariantField,
 };

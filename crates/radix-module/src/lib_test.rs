@@ -40,14 +40,18 @@ fn compiler_compile_reports_io_error_for_missing_file() {
     let result = compiler.compile(Path::new("/definitely/missing/faber_test_input.fab"));
 
     assert!(result.output.is_none());
-    assert!(result
-        .diagnostics
-        .iter()
-        .any(radix_diagnostics::Diagnostic::is_error));
-    assert!(result
-        .diagnostics
-        .iter()
-        .any(|d| d.is_error() && d.file == "/definitely/missing/faber_test_input.fab"));
+    assert!(
+        result
+            .diagnostics
+            .iter()
+            .any(radix_diagnostics::Diagnostic::is_error)
+    );
+    assert!(
+        result
+            .diagnostics
+            .iter()
+            .any(|d| d.is_error() && d.file == "/definitely/missing/faber_test_input.fab")
+    );
 }
 
 #[cfg(feature = "hir-rust")]

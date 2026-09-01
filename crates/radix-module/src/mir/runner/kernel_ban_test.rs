@@ -1,6 +1,6 @@
 //! Focused execution-policy proof for the device annotation ban.
 
-use super::{run_source, BufferHost, RunSourceError};
+use super::{BufferHost, RunSourceError, run_source};
 use crate::codegen::Target;
 use crate::driver::{Config, Session};
 use radix_mir_runner::RUNNER_KERNEL_REFUSED_ISSUE;

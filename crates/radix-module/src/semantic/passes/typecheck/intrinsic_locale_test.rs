@@ -26,7 +26,7 @@
 //!    changes (the canonical name flows through the HIR).
 
 use crate::diagnostics::Diagnostic;
-use crate::driver::{analyze_source, AnalyzeRequest, Config, Session};
+use crate::driver::{AnalyzeRequest, Config, Session, analyze_source};
 use crate::hir::{HirExpression, HirExpressionKind, HirModule, HirStatementKind};
 use crate::intrinsics::IntrinsicReceiver;
 use crate::mir::lower_analyzed_unit;
@@ -464,12 +464,30 @@ const TWIN_LA_SOURCE: &str = "functio sonda() → bivalens {\n    fixum lista<nu
 /// is composed from that pack's own `[keywords]`/`[types]` rows; the twin
 /// surfaces are the explicit identity rows the pack owns.
 const TWIN_TRANSLATED_SOURCES: &[(&str, &str)] = &[
-    ("ar", "دالة sonda() → منطقي {\n    ثابت قائمة<عدد> xs ← فارغ\n    أعد xs.omnia(عدد d ∴ d ≥ 0)\n}\n\nدالة aliud() → منطقي {\n    ثابت قائمة<عدد> ys ← فارغ\n    أعد ys.quilibet(عدد d ∴ d < 0)\n}\n"),
-    ("hi", "फलन sonda() → तार्किक {\n    स्थिर सूची<संख्या> xs ← खाली\n    लौटाओ xs.omnia(संख्या d ∴ d ≥ 0)\n}\n\nफलन aliud() → तार्किक {\n    स्थिर सूची<संख्या> ys ← खाली\n    लौटाओ ys.quilibet(संख्या d ∴ d < 0)\n}\n"),
-    ("th-TH", "ฟังก์ชัน sonda() → ตรรกะ {\n    คงที่ รายการ<จำนวน> xs ← เซตว่าง\n    คืน xs.omnia(จำนวน d ∴ d ≥ 0)\n}\n\nฟังก์ชัน aliud() → ตรรกะ {\n    คงที่ รายการ<จำนวน> ys ← เซตว่าง\n    คืน ys.quilibet(จำนวน d ∴ d < 0)\n}\n"),
-    ("vi", "hàm sonda() → logic {\n    hằng danh_sách<số> xs ← tập_rỗng\n    trả xs.omnia(số d ∴ d ≥ 0)\n}\n\nhàm aliud() → logic {\n    hằng danh_sách<số> ys ← tập_rỗng\n    trả ys.quilibet(số d ∴ d < 0)\n}\n"),
-    ("zh-Hans", "函数 sonda() → 布尔 {\n    常量 列表<整数> xs ← 空集\n    返回 xs.omnia(整数 d ∴ d ≥ 0)\n}\n\n函数 aliud() → 布尔 {\n    常量 列表<整数> ys ← 空集\n    返回 ys.quilibet(整数 d ∴ d < 0)\n}\n"),
-    ("zh-Hant", "函式 sonda() → 布林 {\n    定值 列表<整數> xs ← 空集\n    傳回 xs.omnia(整數 d ∴ d ≥ 0)\n}\n\n函式 aliud() → 布林 {\n    定值 列表<整數> ys ← 空集\n    傳回 ys.quilibet(整數 d ∴ d < 0)\n}\n"),
+    (
+        "ar",
+        "دالة sonda() → منطقي {\n    ثابت قائمة<عدد> xs ← فارغ\n    أعد xs.omnia(عدد d ∴ d ≥ 0)\n}\n\nدالة aliud() → منطقي {\n    ثابت قائمة<عدد> ys ← فارغ\n    أعد ys.quilibet(عدد d ∴ d < 0)\n}\n",
+    ),
+    (
+        "hi",
+        "फलन sonda() → तार्किक {\n    स्थिर सूची<संख्या> xs ← खाली\n    लौटाओ xs.omnia(संख्या d ∴ d ≥ 0)\n}\n\nफलन aliud() → तार्किक {\n    स्थिर सूची<संख्या> ys ← खाली\n    लौटाओ ys.quilibet(संख्या d ∴ d < 0)\n}\n",
+    ),
+    (
+        "th-TH",
+        "ฟังก์ชัน sonda() → ตรรกะ {\n    คงที่ รายการ<จำนวน> xs ← เซตว่าง\n    คืน xs.omnia(จำนวน d ∴ d ≥ 0)\n}\n\nฟังก์ชัน aliud() → ตรรกะ {\n    คงที่ รายการ<จำนวน> ys ← เซตว่าง\n    คืน ys.quilibet(จำนวน d ∴ d < 0)\n}\n",
+    ),
+    (
+        "vi",
+        "hàm sonda() → logic {\n    hằng danh_sách<số> xs ← tập_rỗng\n    trả xs.omnia(số d ∴ d ≥ 0)\n}\n\nhàm aliud() → logic {\n    hằng danh_sách<số> ys ← tập_rỗng\n    trả ys.quilibet(số d ∴ d < 0)\n}\n",
+    ),
+    (
+        "zh-Hans",
+        "函数 sonda() → 布尔 {\n    常量 列表<整数> xs ← 空集\n    返回 xs.omnia(整数 d ∴ d ≥ 0)\n}\n\n函数 aliud() → 布尔 {\n    常量 列表<整数> ys ← 空集\n    返回 ys.quilibet(整数 d ∴ d < 0)\n}\n",
+    ),
+    (
+        "zh-Hant",
+        "函式 sonda() → 布林 {\n    定值 列表<整數> xs ← 空集\n    傳回 xs.omnia(整數 d ∴ d ≥ 0)\n}\n\n函式 aliud() → 布林 {\n    定值 列表<整數> ys ← 空集\n    傳回 ys.quilibet(整數 d ∴ d < 0)\n}\n",
+    ),
 ];
 
 /// done-when: the en surfaces `all`/`any` resolve both twins on a real Lista

@@ -9,7 +9,7 @@
 //! per-row availability; device/host-leaf/device-runtime capability rows are
 //! **compiled-only** — a build without the feature reports no row for it.
 
-use radix::services::{target_capabilities_for_surface, TargetCapabilities, TargetCommandSurface};
+use radix::services::{TargetCapabilities, TargetCommandSurface, target_capabilities_for_surface};
 use std::collections::BTreeSet;
 
 /// Emit-target rows keyed to the faber feature that must be compiled for the
@@ -278,11 +278,7 @@ pub(crate) fn cmd_targets() {
 }
 
 fn yes_no(value: bool) -> &'static str {
-    if value {
-        "yes"
-    } else {
-        "no"
-    }
+    if value { "yes" } else { "no" }
 }
 
 #[cfg(test)]

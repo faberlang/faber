@@ -229,15 +229,17 @@ pub(super) fn run_fmir_package_image<H: Host + ?Sized>(
 ) -> Result<(), Vec<Diagnostic>> {
     check_fmir_runtime_requirements(&image)?;
     let types = TypeTable::from_snapshot(image.types).map_err(|error| {
-        vec![mir_issue_diag(
-            &image.diagnostic_path,
-            "fmir_image_type_metadata_invalid",
-            format!(
-                "could not load {} type metadata: {error}",
-                image.format.label()
-            ),
-        )
-        .with_arg("format", image.format.label())]
+        vec![
+            mir_issue_diag(
+                &image.diagnostic_path,
+                "fmir_image_type_metadata_invalid",
+                format!(
+                    "could not load {} type metadata: {error}",
+                    image.format.label()
+                ),
+            )
+            .with_arg("format", image.format.label()),
+        ]
     })?;
     let mut interner = radix_module::lexer::Interner::from_strings(image.interner);
     bind_fmir_text_runtime_cli(
@@ -279,15 +281,17 @@ pub(super) fn run_fmir_package_image_with_stats<H: Host + ?Sized>(
 ) -> Result<PackageRunStats, Vec<Diagnostic>> {
     check_fmir_runtime_requirements(&image)?;
     let types = TypeTable::from_snapshot(image.types).map_err(|error| {
-        vec![mir_issue_diag(
-            &image.diagnostic_path,
-            "fmir_image_type_metadata_invalid",
-            format!(
-                "could not load {} type metadata: {error}",
-                image.format.label()
-            ),
-        )
-        .with_arg("format", image.format.label())]
+        vec![
+            mir_issue_diag(
+                &image.diagnostic_path,
+                "fmir_image_type_metadata_invalid",
+                format!(
+                    "could not load {} type metadata: {error}",
+                    image.format.label()
+                ),
+            )
+            .with_arg("format", image.format.label()),
+        ]
     })?;
     let mut interner = radix_module::lexer::Interner::from_strings(image.interner);
     bind_fmir_text_runtime_cli(

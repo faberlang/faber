@@ -50,9 +50,9 @@
 use crate::passes::exhaustive::{collect_enum_variants, discerne_definitely_covered};
 use crate::{SemanticError, SemanticErrorKind, TypeTable};
 use radix_hir::{
-    visit::{walk_expr, walk_program, HirVisitor},
     HirBlock, HirExpression, HirExpressionKind, HirItem, HirItemKind, HirModule, HirStatement,
     HirStatementKind,
+    visit::{HirVisitor, walk_expr, walk_program},
 };
 use rustc_hash::FxHashMap;
 

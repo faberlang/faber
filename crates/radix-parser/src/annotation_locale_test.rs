@@ -4,8 +4,8 @@
 //! annotation spelling as an extension annotation. The pack's own spelling
 //! remains valid, while the same family in Latin is a structured parse error.
 
-use crate::{parse, ParseResult};
-use radix_lexer::{lex_with_locale_pack, KeywordPack, TokenKind};
+use crate::{ParseResult, parse};
+use radix_lexer::{KeywordPack, TokenKind, lex_with_locale_pack};
 
 struct EnAnnotationPack;
 

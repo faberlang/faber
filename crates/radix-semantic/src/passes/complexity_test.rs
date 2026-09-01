@@ -8,12 +8,12 @@
 //! text.
 
 use super::complexity::{
-    complexity, function_complexity, DEFAULT_COMPLEXITY_BUDGET, DEFAULT_KERNEL_COMPLEXITY_BUDGET,
+    DEFAULT_COMPLEXITY_BUDGET, DEFAULT_KERNEL_COMPLEXITY_BUDGET, complexity, function_complexity,
 };
 use super::{SemanticErrorKind, WarningKind};
+use crate::SemanticError;
 use crate::catalog_semantic::semantic_spec;
 use crate::test_support::{args_have_no_legacy_message, test_span};
-use crate::SemanticError;
 use radix_hir::{
     DefId, HirBinOp, HirBlock, HirCape, HirCasuArm, HirConversioTarget, HirCustodi,
     HirCustodiClause, HirExpression, HirExpressionKind, HirExtremumOp, HirFunction, HirId, HirItem,
@@ -677,13 +677,15 @@ fn at_baked_default_score_does_not_warn() {
     // Boundary at the census-derived baked default: 11 branches score 12 —
     // exactly the budget.
     let (module, interner) = module_with_function("edge", block(si_branches(11)));
-    assert!(complexity(
-        &module,
-        &interner,
-        DEFAULT_COMPLEXITY_BUDGET,
-        DEFAULT_KERNEL_COMPLEXITY_BUDGET
-    )
-    .is_empty());
+    assert!(
+        complexity(
+            &module,
+            &interner,
+            DEFAULT_COMPLEXITY_BUDGET,
+            DEFAULT_KERNEL_COMPLEXITY_BUDGET
+        )
+        .is_empty()
+    );
     assert_eq!(score(si_branches(11)), DEFAULT_COMPLEXITY_BUDGET);
 }
 
@@ -734,13 +736,15 @@ fn kernel_score_two_is_silent_at_baked_kernel_default() {
         "fixture sanity: one si scores 2 (the census kernel max)"
     );
     let (module, interner) = module_with_function_selected("still", kernel_body(1), true);
-    assert!(complexity(
-        &module,
-        &interner,
-        DEFAULT_COMPLEXITY_BUDGET,
-        DEFAULT_KERNEL_COMPLEXITY_BUDGET
-    )
-    .is_empty());
+    assert!(
+        complexity(
+            &module,
+            &interner,
+            DEFAULT_COMPLEXITY_BUDGET,
+            DEFAULT_KERNEL_COMPLEXITY_BUDGET
+        )
+        .is_empty()
+    );
 }
 
 #[test]

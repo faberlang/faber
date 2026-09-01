@@ -10,10 +10,10 @@
 //! lower it through the shared-memory tree floor this plan pins, so the plan
 //! law is satisfied by construction.
 
-use super::validate::{validate_composed_matmul_plan, PlanValidationError};
+use super::validate::{PlanValidationError, validate_composed_matmul_plan};
+use crate::MirScalarLayout;
 #[allow(unused_imports)] // intra-doc links only; the plan pass lives in build.rs
 use crate::abi::CollectionOpContract;
-use crate::MirScalarLayout;
 
 /// Conservative device workgroup-memory limit in bytes (L12). Real devices
 /// advertise more (the M5 Max and RTX 5070 exceed this); 32KB keeps every

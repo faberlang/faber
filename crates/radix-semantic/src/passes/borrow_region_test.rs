@@ -15,9 +15,9 @@
 
 use super::borrow_region;
 use super::borrow_region_cfg::{CfgEdgeKind, CfgNodeKind};
-use crate::test_support::{analyze_ok, analyze_source, issue};
 use crate::SemanticErrorKind;
-use radix_hir::visit::{walk_expr, HirVisitor};
+use crate::test_support::{analyze_ok, analyze_source, issue};
+use radix_hir::visit::{HirVisitor, walk_expr};
 use radix_hir::{HirBlock, HirExpression, HirExpressionKind, HirId};
 
 fn assert_region_accepted(source: &str, label: &str) {
@@ -200,15 +200,18 @@ incipit {
         .node_for_hir_id(*body_ids.last().expect("body statements"))
         .expect("body exit");
 
-    assert!(cfg
-        .successors(condition)
-        .any(|edge| edge.to == first_body && edge.kind == CfgEdgeKind::BranchTrue));
-    assert!(cfg
-        .successors(last_body)
-        .any(|edge| edge.to == condition && edge.kind == CfgEdgeKind::LoopBack));
-    assert!(cfg
-        .successors(condition)
-        .any(|edge| edge.kind == CfgEdgeKind::BranchFalse));
+    assert!(
+        cfg.successors(condition)
+            .any(|edge| edge.to == first_body && edge.kind == CfgEdgeKind::BranchTrue)
+    );
+    assert!(
+        cfg.successors(last_body)
+            .any(|edge| edge.to == condition && edge.kind == CfgEdgeKind::LoopBack)
+    );
+    assert!(
+        cfg.successors(condition)
+            .any(|edge| edge.kind == CfgEdgeKind::BranchFalse)
+    );
 }
 
 #[test]
@@ -238,21 +241,25 @@ incipit {
     let cfg = facts.cfg();
     let header = cfg.node_for_hir_id(loop_id).expect("loop header");
     let first_body = cfg.node_for_hir_id(body_ids[0]).expect("body entry");
-    assert!(cfg
-        .successors(header)
-        .any(|edge| edge.to == first_body && edge.kind == CfgEdgeKind::Next));
-    assert!(cfg
-        .edges()
-        .iter()
-        .any(|edge| edge.kind == CfgEdgeKind::Break));
-    assert!(cfg
-        .edges()
-        .iter()
-        .any(|edge| { edge.kind == CfgEdgeKind::LoopBack && edge.to == header }));
-    assert!(cfg
-        .nodes()
-        .iter()
-        .any(|node| node.kind == CfgNodeKind::Exit));
+    assert!(
+        cfg.successors(header)
+            .any(|edge| edge.to == first_body && edge.kind == CfgEdgeKind::Next)
+    );
+    assert!(
+        cfg.edges()
+            .iter()
+            .any(|edge| edge.kind == CfgEdgeKind::Break)
+    );
+    assert!(
+        cfg.edges()
+            .iter()
+            .any(|edge| { edge.kind == CfgEdgeKind::LoopBack && edge.to == header })
+    );
+    assert!(
+        cfg.nodes()
+            .iter()
+            .any(|node| node.kind == CfgNodeKind::Exit)
+    );
 }
 
 #[test]
@@ -283,16 +290,19 @@ incipit {
 ",
     );
 
-    assert!(dum
-        .cfg()
-        .edges()
-        .iter()
-        .any(|edge| edge.kind == CfgEdgeKind::LoopBack));
-    assert!(loop_facts
-        .cfg()
-        .edges()
-        .iter()
-        .any(|edge| edge.kind == CfgEdgeKind::LoopBack));
+    assert!(
+        dum.cfg()
+            .edges()
+            .iter()
+            .any(|edge| edge.kind == CfgEdgeKind::LoopBack)
+    );
+    assert!(
+        loop_facts
+            .cfg()
+            .edges()
+            .iter()
+            .any(|edge| edge.kind == CfgEdgeKind::LoopBack)
+    );
     assert!(dum.fact_reads() > 0);
     assert!(loop_facts.fact_reads() > 0);
 }

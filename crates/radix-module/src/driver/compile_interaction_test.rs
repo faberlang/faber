@@ -778,10 +778,12 @@ fn compile_rejects_invalid_frontmatter_toml() {
     let source = "+++\nbad toml [[\n+++\n\nincipit {\n  nota 42\n}";
     let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
     assert!(!result.success());
-    assert!(result
-        .diagnostics
-        .iter()
-        .any(|d| d.code == Some("PARSE052")));
+    assert!(
+        result
+            .diagnostics
+            .iter()
+            .any(|d| d.code == Some("PARSE052"))
+    );
 }
 
 #[test]
@@ -790,10 +792,12 @@ fn compile_rejects_line_start_section_directive() {
     let source = "§ 1.0\nincipit {\n  nota 42\n}";
     let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
     assert!(!result.success());
-    assert!(result
-        .diagnostics
-        .iter()
-        .any(|d| d.is_error() && d.code == Some("LEX005") && d.issue() == Some("removed_section_directive")));
+    assert!(
+        result
+            .diagnostics
+            .iter()
+            .any(|d| d.is_error() && d.code == Some("LEX005") && d.issue() == Some("removed_section_directive"))
+    );
 }
 
 #[test]
@@ -802,10 +806,12 @@ fn compile_rejects_c_style_line_comment() {
     let source = "// This should fail\nincipit {\n  nota 42\n}";
     let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
     assert!(!result.success());
-    assert!(result
-        .diagnostics
-        .iter()
-        .any(|d| d.is_error() && d.code == Some("LEX006") && d.issue() == Some("c_style_line_comment")));
+    assert!(
+        result
+            .diagnostics
+            .iter()
+            .any(|d| d.is_error() && d.code == Some("LEX006") && d.issue() == Some("c_style_line_comment"))
+    );
 }
 
 #[test]
@@ -836,10 +842,12 @@ fn compile_reports_parse_errors() {
     let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
 
     assert!(!result.success());
-    assert!(result
-        .diagnostics
-        .iter()
-        .any(|d| d.code == Some("PARSE001")));
+    assert!(
+        result
+            .diagnostics
+            .iter()
+            .any(|d| d.code == Some("PARSE001"))
+    );
     assert!(result.output.is_none());
 }
 
@@ -850,10 +858,12 @@ fn compile_rejects_retired_itera_pro_mode() {
     let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
 
     assert!(!result.success());
-    assert!(result
-        .diagnostics
-        .iter()
-        .any(|d| d.is_error() && d.code == Some("PARSE001") && d.issue() == Some("itera_mode")));
+    assert!(
+        result
+            .diagnostics
+            .iter()
+            .any(|d| d.is_error() && d.code == Some("PARSE001") && d.issue() == Some("itera_mode"))
+    );
     assert!(result.output.is_none());
 }
 
@@ -878,10 +888,12 @@ fn compile_rejects_itera_ab_over_collection() {
     let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
 
     assert!(!result.success());
-    assert!(result
-        .diagnostics
-        .iter()
-        .any(|d| d.is_error() && d.code == Some("SEM010") && d.issue() == Some("itera_ab_source_requires_range")));
+    assert!(
+        result
+            .diagnostics
+            .iter()
+            .any(|d| d.is_error() && d.code == Some("SEM010") && d.issue() == Some("itera_ab_source_requires_range"))
+    );
 }
 
 // ── return type / effect only ──
@@ -893,10 +905,12 @@ fn compile_rejects_redde_without_explicit_return_type() {
     let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
 
     assert!(!result.success());
-    assert!(result
-        .diagnostics
-        .iter()
-        .any(|d| d.is_error() && d.code == Some("SEM033")));
+    assert!(
+        result
+            .diagnostics
+            .iter()
+            .any(|d| d.is_error() && d.code == Some("SEM033"))
+    );
 }
 
 #[test]
@@ -980,10 +994,12 @@ fn compile_rejects_iace_without_function_error_channel() {
 }"#;
     let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
     assert!(!result.success());
-    assert!(result
-        .diagnostics
-        .iter()
-        .any(|d| d.is_error() && d.code == Some("SEM010") && d.issue() == Some("iace_requires_alternate_exit")));
+    assert!(
+        result
+            .diagnostics
+            .iter()
+            .any(|d| d.is_error() && d.code == Some("SEM010") && d.issue() == Some("iace_requires_alternate_exit"))
+    );
 }
 
 // ── incipit argumenta / custodi / fac topology ──
@@ -1171,9 +1187,10 @@ fn regex_conversio_no_longer_reports_unsupported_lowering_error() {
     let code = output.code;
     assert!(code.contains("\"(?g)\\d+\""));
     assert!(code.contains("↦ regex"));
-    assert!(result.diagnostics.iter().all(|d| d
-        .issue()
-        .is_none_or(|issue| issue != "unsupported_expression_kind")));
+    assert!(result.diagnostics.iter().all(|d| {
+        d.issue()
+            .is_none_or(|issue| issue != "unsupported_expression_kind")
+    }));
 }
 
 #[test]
@@ -1184,14 +1201,18 @@ fn retired_sed_fails_without_targeted_diagnostic() {
     // `sed` is a plain identifier now; the source fails with generic
     // unknown-identifier errors, never the retired `PARSE030.retired_sed`.
     assert!(!result.success());
-    assert!(!result
-        .diagnostics
-        .iter()
-        .any(|diag| diag.code == Some("PARSE030") && diag.issue() == Some("retired_sed")));
-    assert!(result
-        .diagnostics
-        .iter()
-        .any(|diag| diag.code == Some("SEM001")));
+    assert!(
+        !result
+            .diagnostics
+            .iter()
+            .any(|diag| diag.code == Some("PARSE030") && diag.issue() == Some("retired_sed"))
+    );
+    assert!(
+        result
+            .diagnostics
+            .iter()
+            .any(|diag| diag.code == Some("SEM001"))
+    );
 }
 
 #[test]
@@ -1219,10 +1240,12 @@ fn typescript_target_skips_rust_specific_cura_arena_warning() {
 }"#;
     let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
 
-    assert!(result
-        .diagnostics
-        .iter()
-        .all(|d| d.issue() != Some("rust_target_cura_arena_noop")));
+    assert!(
+        result
+            .diagnostics
+            .iter()
+            .all(|d| d.issue() != Some("rust_target_cura_arena_noop"))
+    );
 }
 
 #[test]
@@ -1290,10 +1313,12 @@ fn go_target_rejects_ad_with_explicit_policy_diagnostic() {
 
     assert!(result.output.is_none());
     assert!(!result.success());
-    assert!(result
-        .diagnostics
-        .iter()
-        .any(|d| d.is_error() && d.code == Some("PARSE020") && d.issue() == Some("ad_expression_only")));
+    assert!(
+        result
+            .diagnostics
+            .iter()
+            .any(|d| d.is_error() && d.code == Some("PARSE020") && d.issue() == Some("ad_expression_only"))
+    );
 }
 
 #[test]
@@ -1311,10 +1336,12 @@ incipit {
     assert!(!result.success());
     // `@ externa` is a retired surface; annotation-contract resolution now
     // rejects it as an unknown contract before any Go-target policy runs.
-    assert!(result
-        .diagnostics
-        .iter()
-        .any(|d| d.issue() == Some("annotatio_unknown_contract")));
+    assert!(
+        result
+            .diagnostics
+            .iter()
+            .any(|d| d.issue() == Some("annotatio_unknown_contract"))
+    );
 }
 
 #[test]
@@ -1331,10 +1358,12 @@ incipit {
 
     assert!(!result.success());
     assert!(result.output.is_none());
-    assert!(result
-        .diagnostics
-        .iter()
-        .any(|diag| diag.code == Some("PARSE012")));
+    assert!(
+        result
+            .diagnostics
+            .iter()
+            .any(|diag| diag.code == Some("PARSE012"))
+    );
 }
 
 // ── retired syntax / legacy ──
@@ -1363,10 +1392,12 @@ fn triple_quote_is_not_a_block_string_surface() {
     let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
 
     assert!(!result.success());
-    assert!(!result
-        .diagnostics
-        .iter()
-        .any(|d| d.code == Some("LEX004") && d.issue() == Some("unsupported_triple_quote_string")));
+    assert!(
+        !result
+            .diagnostics
+            .iter()
+            .any(|d| d.code == Some("LEX004") && d.issue() == Some("unsupported_triple_quote_string"))
+    );
 }
 
 #[test]
@@ -1386,10 +1417,12 @@ fn slash_block_comment_is_not_faber_syntax() {
     let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
 
     assert!(!result.success());
-    assert!(result
-        .diagnostics
-        .iter()
-        .any(|d| { d.is_error() && d.code == Some("LEX006") && d.issue() == Some("c_style_block_comment") }));
+    assert!(
+        result
+            .diagnostics
+            .iter()
+            .any(|d| { d.is_error() && d.code == Some("LEX006") && d.issue() == Some("c_style_block_comment") })
+    );
 }
 
 // ── finge / ad legacy / destructuring ──
@@ -1423,10 +1456,12 @@ fn rejects_statement_level_legacy_ad_string_route() {
     let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
 
     assert!(!result.success());
-    assert!(result
-        .diagnostics
-        .iter()
-        .any(|d| d.is_error() && d.code == Some("PARSE020") && d.issue() == Some("ad_expression_only")));
+    assert!(
+        result
+            .diagnostics
+            .iter()
+            .any(|d| d.is_error() && d.code == Some("PARSE020") && d.issue() == Some("ad_expression_only"))
+    );
 }
 
 #[test]
@@ -1464,10 +1499,12 @@ incipit {
     let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
 
     assert!(result.success(), "{:?}", result.diagnostics);
-    assert!(result
-        .diagnostics
-        .iter()
-        .all(|d| d.issue() != Some("unknown_identifier")));
+    assert!(
+        result
+            .diagnostics
+            .iter()
+            .all(|d| d.issue() != Some("unknown_identifier"))
+    );
 }
 
 #[test]
@@ -1539,10 +1576,12 @@ incipit {
 }"#;
     let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
 
-    assert!(result
-        .diagnostics
-        .iter()
-        .all(|d| d.issue() != Some("boolean_operand_required")));
+    assert!(
+        result
+            .diagnostics
+            .iter()
+            .all(|d| d.issue() != Some("boolean_operand_required"))
+    );
 }
 
 #[test]
@@ -1559,10 +1598,12 @@ incipit {
     assert!(!result.success());
     // `@ externa` is a retired surface; the unknown-annotation rejection
     // (SEM018) fires before the top-level-initializer check.
-    assert!(result
-        .diagnostics
-        .iter()
-        .any(|d| d.issue() == Some("annotatio_unknown_contract")));
+    assert!(
+        result
+            .diagnostics
+            .iter()
+            .any(|d| d.issue() == Some("annotatio_unknown_contract"))
+    );
 }
 
 #[test]
@@ -1578,14 +1619,18 @@ incipit {
 }";
     let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
 
-    assert!(result
-        .diagnostics
-        .iter()
-        .all(|d| d.issue() != Some("wrong_number_of_arguments")));
-    assert!(result
-        .diagnostics
-        .iter()
-        .all(|d| d.issue() != Some("argument_type_mismatch")));
+    assert!(
+        result
+            .diagnostics
+            .iter()
+            .all(|d| d.issue() != Some("wrong_number_of_arguments"))
+    );
+    assert!(
+        result
+            .diagnostics
+            .iter()
+            .all(|d| d.issue() != Some("argument_type_mismatch"))
+    );
 }
 
 #[test]
@@ -1600,10 +1645,12 @@ fn import_alias_usage_no_longer_reports_unknown_identifier() {
 
     assert!(matches!(result.output, Some(crate::Output::Rust(_))));
     assert!(result.diagnostics.iter().all(|d| !d.is_error()));
-    assert!(result
-        .diagnostics
-        .iter()
-        .all(|d| d.issue() != Some("unknown_identifier")));
+    assert!(
+        result
+            .diagnostics
+            .iter()
+            .all(|d| d.issue() != Some("unknown_identifier"))
+    );
 }
 
 #[test]
@@ -1618,10 +1665,12 @@ incipit {
     let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
 
     assert!(result.success(), "{:?}", result.diagnostics);
-    assert!(result
-        .diagnostics
-        .iter()
-        .all(|d| d.issue() != Some("duplicate_definition")));
+    assert!(
+        result
+            .diagnostics
+            .iter()
+            .all(|d| d.issue() != Some("duplicate_definition"))
+    );
 }
 
 #[test]
@@ -1639,10 +1688,12 @@ incipit {
     assert!(!result.success());
     // `@ externa` is a retired surface; the unknown-annotation rejection
     // (SEM018) now fires before the receiver ever reaches type inference.
-    assert!(result
-        .diagnostics
-        .iter()
-        .any(|d| d.issue() == Some("annotatio_unknown_contract")));
+    assert!(
+        result
+            .diagnostics
+            .iter()
+            .any(|d| d.issue() == Some("annotatio_unknown_contract"))
+    );
 }
 
 // ── ex object varia reassignment ──
@@ -1661,12 +1712,16 @@ incipit {
     let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
 
     assert!(result.success());
-    assert!(result
-        .diagnostics
-        .iter()
-        .all(|d| d.issue() != Some("expression_type_mismatch")));
-    assert!(result
-        .diagnostics
-        .iter()
-        .all(|d| d.issue() != Some("assignment_type_mismatch")));
+    assert!(
+        result
+            .diagnostics
+            .iter()
+            .all(|d| d.issue() != Some("expression_type_mismatch"))
+    );
+    assert!(
+        result
+            .diagnostics
+            .iter()
+            .all(|d| d.issue() != Some("assignment_type_mismatch"))
+    );
 }

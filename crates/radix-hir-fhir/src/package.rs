@@ -238,7 +238,11 @@ impl std::fmt::Display for FhirPackageError {
                  the live wire is MessagePack package schema v{expected} (ratcheted in FPF-5); \
                  rebuild the package"
             ),
-            Self::UnsupportedUnitSchemaVersion { module, found, expected } => write!(
+            Self::UnsupportedUnitSchemaVersion {
+                module,
+                found,
+                expected,
+            } => write!(
                 f,
                 "unsupported unit schema version {found} in module `{module}` (expected {expected})"
             ),
@@ -256,9 +260,16 @@ impl std::fmt::Display for FhirPackageError {
                 "FHIR package module `{from}` references missing module/export `{to}`"
             ),
             Self::MissingDependencyArtifact { name, version } => {
-                write!(f, "FHIR package dependency `{name}@{version}` is not available")
+                write!(
+                    f,
+                    "FHIR package dependency `{name}@{version}` is not available"
+                )
             }
-            Self::MismatchedContentHash { module, expected, actual } => write!(
+            Self::MismatchedContentHash {
+                module,
+                expected,
+                actual,
+            } => write!(
                 f,
                 "FHIR package module `{module}` source hash mismatch (expected {expected}, artifact has {actual})"
             ),

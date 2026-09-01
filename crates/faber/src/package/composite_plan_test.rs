@@ -354,10 +354,12 @@ fn mutated_artifact_digest_is_rejected_not_repaired() {
             ))
         })
         .expect("typed divergence diagnostic present");
-    assert!(detail
-        .args
-        .iter()
-        .any(|arg| arg.name == "detail" && arg.value.contains("content_sha256")));
+    assert!(
+        detail
+            .args
+            .iter()
+            .any(|arg| arg.name == "detail" && arg.value.contains("content_sha256"))
+    );
 }
 
 #[test]
@@ -375,9 +377,11 @@ fn typed_error_names_the_first_failing_domain() {
         "issue",
         "composite_plan_identity_divergence"
     )));
-    assert!(diagnostic
-        .args
-        .contains(&DiagnosticArg::new("domain", "model")));
+    assert!(
+        diagnostic
+            .args
+            .contains(&DiagnosticArg::new("domain", "model"))
+    );
 }
 
 #[test]

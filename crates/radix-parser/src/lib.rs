@@ -42,8 +42,8 @@ pub use error::{ParseError, ParseErrorKind};
 
 use radix_diagnostics::PhaseErrorKind;
 use radix_lexer::{
-    keyword_allowed_as_ident, keyword_spelling_for_token, lookup_keyword_spec, Interner,
-    KeywordOwner, KeywordScope, KeywordSurfaceMode, LexResult, Span, Symbol, Token, TokenKind,
+    Interner, KeywordOwner, KeywordScope, KeywordSurfaceMode, LexResult, Span, Symbol, Token,
+    TokenKind, keyword_allowed_as_ident, keyword_spelling_for_token, lookup_keyword_spec,
 };
 use radix_syntax::{ClosureModifier, CommentLine, Ident, Newline, NodeId, Program, Trivia};
 use std::collections::{HashMap, HashSet};

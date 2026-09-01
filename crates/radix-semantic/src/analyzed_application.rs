@@ -5,9 +5,9 @@
 //! or identity tables from different analysis runs.
 
 use crate::access_facts::AccessFactTable;
-use crate::function_facts::{analyze_function_facts, FunctionFactTable};
-use crate::qualified_identity::{build_qualified_identities, QualifiedIdentityTable};
-use crate::resolved_use::{analyze_resolved_uses, ResolvedUseIndex};
+use crate::function_facts::{FunctionFactTable, analyze_function_facts};
+use crate::qualified_identity::{QualifiedIdentityTable, build_qualified_identities};
+use crate::resolved_use::{ResolvedUseIndex, analyze_resolved_uses};
 use crate::{AnnotationContractMetadata, RadixLaneMetadata, Resolver, SemanticError, TypeTable};
 use radix_hir::{HirModule, LibraryRegistry};
 use std::sync::atomic::{AtomicU64, Ordering};

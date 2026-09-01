@@ -8,10 +8,10 @@
 use super::*;
 use crate::codegen::Target;
 use crate::mir::{
-    tensor_placement_policy_rows, tensor_systems_target_rows, TensorOperationFloorFamily, TensorPlacementFacet,
-    TensorPlacementStatus, TensorSystemsTarget, TensorSystemsTargetStatus,
+    TensorOperationFloorFamily, TensorPlacementFacet, TensorPlacementStatus, TensorSystemsTarget,
+    TensorSystemsTargetStatus, tensor_placement_policy_rows, tensor_systems_target_rows,
 };
-use crate::services::{target_capabilities_for_surface, TargetCommandSurface};
+use crate::services::{TargetCommandSurface, target_capabilities_for_surface};
 
 #[test]
 fn matrix_covers_required_inference_blocker_categories() {

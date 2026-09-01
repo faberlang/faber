@@ -5,14 +5,14 @@
 //! `code` / `issue()` / args on every diagnostic.
 
 use super::import_seam::{
-    importability, seam_from_flag, violation_issue, ImportSeam, Importability, ISSUE_IMPORT_INTERNA_CROSS_PACKAGE,
-    ISSUE_IMPORT_MODULE_PRIVATE,
+    ISSUE_IMPORT_INTERNA_CROSS_PACKAGE, ISSUE_IMPORT_MODULE_PRIVATE, ImportSeam, Importability, importability,
+    seam_from_flag, violation_issue,
 };
 use crate::diagnostics::Diagnostic;
 use crate::driver::AnalyzeRequest;
 use crate::import_resolve::library_home_test_support;
-use crate::semantic::passes::visibility_annotation::VisibilityTier;
 use crate::semantic::SemanticErrorKind;
+use crate::semantic::passes::visibility_annotation::VisibilityTier;
 use crate::services::check_diagnostics_for_source;
 use crate::test_support::args_have_no_legacy_message;
 use std::fs;

@@ -19,18 +19,18 @@ pub use air_mask_proof::MaskNeutralityFamily;
 pub use air_purity_proof::{GateHoleIssue, GatePurityFinding, PurityTerm};
 pub use air_unroll_proof::{UnrollRoute, UnrollRouteFacts};
 pub use coverage::{
-    render_hir_aspect_coverage, summarize_hir_aspect_coverage, HirAspectAssumption, HirAspectAssumptionStatus,
-    HirAspectCoverageEntry, HirAspectCoverageReason, HirAspectCoverageReport, HirAspectCoverageStatus,
+    HirAspectAssumption, HirAspectAssumptionStatus, HirAspectCoverageEntry, HirAspectCoverageReason,
+    HirAspectCoverageReport, HirAspectCoverageStatus, render_hir_aspect_coverage, summarize_hir_aspect_coverage,
 };
 pub use lean_checker::{
-    combined_verdict, normalize_result, parse_axiom_output, AxiomAudit, AxiomDependency, AxiomVerdict, LakeResult,
-    LeanAspectChecker, LeanAspectCheckerConfig, SorryVerdict,
+    AxiomAudit, AxiomDependency, AxiomVerdict, LakeResult, LeanAspectChecker, LeanAspectCheckerConfig, SorryVerdict,
+    combined_verdict, normalize_result, parse_axiom_output,
 };
 pub use obligation::{HirAspectBackendKind, HirAspectObligation, HirAspectObligationId};
 pub use report::{
-    report_hir_aspects, report_hir_aspects_with_interner, HirAspectDetail, HirAspectKind, HirAspectNoSpanReason,
-    HirAspectPrecondition, HirAspectReason, HirAspectRecord, HirAspectRecordKind, HirAspectReport, HirAspectSpan,
+    HirAspectDetail, HirAspectKind, HirAspectNoSpanReason, HirAspectPrecondition, HirAspectReason, HirAspectRecord,
+    HirAspectRecordKind, HirAspectReport, HirAspectSpan, report_hir_aspects, report_hir_aspects_with_interner,
 };
-pub use tla::{emit_tla_modules, HirAspectTlaModule};
-pub use tla_checker::{check_tla_modules, TlaAspectChecker, TlaAspectCheckerConfig, TlaAspectVerifier};
+pub use tla::{HirAspectTlaModule, emit_tla_modules};
+pub use tla_checker::{TlaAspectChecker, TlaAspectCheckerConfig, TlaAspectVerifier, check_tla_modules};
 pub use verifier::{HirAspectCheckResult, HirAspectCheckStatus, HirAspectEvidence, HirAspectVerifier};

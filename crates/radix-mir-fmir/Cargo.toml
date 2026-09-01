@@ -1,7 +1,7 @@
 [package]
 name = "radix-mir-fmir"
 version = "0.84.0"
-edition = "2021"
+edition = "2024"
 description = "Portable MIR package image (FMIR) schema, codec, and validation for Radix"
 license = "MIT"
 publish = false

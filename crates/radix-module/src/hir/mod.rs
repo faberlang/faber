@@ -40,7 +40,7 @@ pub mod package;
 pub mod serialize;
 pub mod visit;
 
-pub use lower::{lower, LowerError, LowerRequest};
+pub use lower::{LowerError, LowerRequest, lower};
 pub use nodes::{
     DefId, HirAnnotation, HirAnnotationField, HirAnnotationValue, HirArrayElement, HirAvailability, HirBinOp, HirBlock,
     HirBlockEnd, HirBreakableKind, HirCallArg, HirCape, HirCasuArm, HirConst, HirConversioTarget, HirCustodi,

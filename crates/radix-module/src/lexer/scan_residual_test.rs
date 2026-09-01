@@ -3,7 +3,7 @@
 //! Non-pack lexer unit tests live in `radix-lexer`. These residual tests prove
 //! the `KeywordPack` impl for reader locales still wires through `radix_module::lexer`.
 
-use crate::lexer::{lex_with_locale_pack, TokenKind};
+use crate::lexer::{TokenKind, lex_with_locale_pack};
 use crate::locale::LocalePack;
 
 #[test]

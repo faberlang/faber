@@ -1,7 +1,7 @@
 //! Focused proofs for the opt-in runner meter.
 
 use super::*;
-use crate::stats::{StatsCollector, RESERVOIR_EXACT, RESERVOIR_METHOD, RESERVOIR_SIZE};
+use crate::stats::{RESERVOIR_EXACT, RESERVOIR_METHOD, RESERVOIR_SIZE, StatsCollector};
 use radix_hir::DefId;
 use radix_lexer::Interner;
 use radix_mir::{
@@ -341,10 +341,12 @@ fn direct_cursor_stream_path_records_generator_frame_and_attribution() {
         .expect("generator row");
     assert_eq!(generator.calls, 1);
     assert!(generator.total_ns >= generator.self_ns);
-    assert!(stats
-        .intrinsics
-        .iter()
-        .any(|row| row.name == "cede" && row.calls == 1));
+    assert!(
+        stats
+            .intrinsics
+            .iter()
+            .any(|row| row.name == "cede" && row.calls == 1)
+    );
 }
 
 #[test]

@@ -1,6 +1,6 @@
 #![allow(clippy::absurd_extreme_comparisons)]
 
-use hygiene_ratchet::{assert_budgets, Budgets, ScanConfig};
+use hygiene_ratchet::{Budgets, ScanConfig, assert_budgets};
 use std::path::Path;
 
 fn config() -> ScanConfig {

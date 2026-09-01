@@ -3,8 +3,8 @@
 //! lista, sparsa, textus, and atomic receivers resolve correctly; higher-order
 //! and collection-op classifications match.
 
-use super::{IntrinsicMirKind, IntrinsicReceiver, INTRINSICS};
-use crate::driver::{analyze_source, AnalyzeRequest, Config, Session};
+use super::{INTRINSICS, IntrinsicMirKind, IntrinsicReceiver};
+use crate::driver::{AnalyzeRequest, Config, Session, analyze_source};
 use crate::intrinsics::{
     is_atomic_operator_method, lookup_method, lookup_method_for_type, mir_collection_op, receivers_for_type,
 };

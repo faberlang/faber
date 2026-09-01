@@ -159,10 +159,12 @@ fn missing_emit_package_path_is_a_structured_diagnostic() {
     assert_eq!(diagnostic.code, Some("PKG001"));
     assert_eq!(diagnostic.issue(), Some("package_path_missing"));
     assert_eq!(diagnostic.file, missing.display().to_string());
-    assert!(diagnostic
-        .args
-        .iter()
-        .any(|arg| arg.name == "path" && arg.value == missing.display().to_string()));
+    assert!(
+        diagnostic
+            .args
+            .iter()
+            .any(|arg| arg.name == "path" && arg.value == missing.display().to_string())
+    );
 
     let _ = fs::remove_dir_all(root);
 }

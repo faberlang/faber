@@ -1,6 +1,6 @@
 //! Tests for the Radix-owned ABI contract payload and renderers.
 
-use crate::abi::{host_abi, AbiPayload, COMPILER_NAME, COMPILER_VERSION};
+use crate::abi::{AbiPayload, COMPILER_NAME, COMPILER_VERSION, host_abi};
 use crate::abi::{render_json, render_rust};
 
 #[test]

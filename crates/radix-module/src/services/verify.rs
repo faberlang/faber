@@ -1,8 +1,8 @@
 //! Typed verify service. Printing and process exit live in `radix-cli`.
 
 use crate::aspect::{
-    emit_tla_modules, report_hir_aspects, summarize_hir_aspect_coverage, HirAspectBackendKind, HirAspectCoverageReport,
-    HirAspectCoverageStatus, HirAspectTlaModule, HirAspectVerifier, TlaAspectCheckerConfig, TlaAspectVerifier,
+    HirAspectBackendKind, HirAspectCoverageReport, HirAspectCoverageStatus, HirAspectTlaModule, HirAspectVerifier,
+    TlaAspectCheckerConfig, TlaAspectVerifier, emit_tla_modules, report_hir_aspects, summarize_hir_aspect_coverage,
 };
 use crate::diagnostics::Diagnostic;
 use crate::driver::{AnalyzedModule, Config, Session};
@@ -63,8 +63,8 @@ fn coverage_for_analysis(
 fn map_verifier_status(
     status: crate::aspect::HirAspectCheckStatus,
 ) -> crate::aspect::tla_checker::HirAspectCheckStatus {
-    use crate::aspect::tla_checker::HirAspectCheckStatus as Legacy;
     use crate::aspect::HirAspectCheckStatus as New;
+    use crate::aspect::tla_checker::HirAspectCheckStatus as Legacy;
     match status {
         New::Proven => Legacy::Passed,
         New::Failed => Legacy::Failed,

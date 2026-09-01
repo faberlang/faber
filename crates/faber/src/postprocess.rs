@@ -4,8 +4,8 @@
 //! Radix emits target artifacts. Faber may optionally run target-specific
 //! developer tools as part of user-facing build/emit workflows.
 
-use radix::module::codegen::Target;
 use radix::module::Output;
+use radix::module::codegen::Target;
 use radix::services::DiagnosticMode;
 use std::path::Path;
 use std::{fs, io};

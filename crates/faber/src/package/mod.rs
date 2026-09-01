@@ -67,16 +67,16 @@ mod test_route;
 pub(crate) use binding::verify_library_binding_shapes;
 #[allow(unused_imports)]
 pub use binding::{
-    verify_library_bindings, verify_library_bindings_with_probe_mode, BindingProbeMode,
+    BindingProbeMode, verify_library_bindings, verify_library_bindings_with_probe_mode,
 };
 #[allow(unused_imports)]
 pub(crate) use cargo::emit_generated_crate_with_runtime_plan;
 #[allow(unused_imports)]
 pub(crate) use cargo::invoke_cargo_build;
-pub use cargo::{emit_generated_crate, invoke_cargo_test};
 pub(crate) use cargo::{
-    package_host_selection_diagnostic, rust_runtime_plan_for_package, RustRuntimePlan,
+    RustRuntimePlan, package_host_selection_diagnostic, rust_runtime_plan_for_package,
 };
+pub use cargo::{emit_generated_crate, invoke_cargo_test};
 pub use cmd::{
     cmd_build, cmd_check_package, cmd_emit_package, should_treat_as_package_from_args,
     use_package_compiler_from_args,
@@ -95,39 +95,39 @@ pub(crate) use device::{
     run_dense_full_model_spawn_timing,
 };
 pub(crate) use dispatch::{
-    load_provider_manifests, selected_providers_for_routes, ProviderManifest,
+    ProviderManifest, load_provider_manifests, selected_providers_for_routes,
 };
 #[cfg(feature = "hir-go")]
 #[allow(unused_imports)]
-pub(crate) use go_build::{emit_go_module, invoke_go_build, GoBuildLayout};
+pub(crate) use go_build::{GoBuildLayout, emit_go_module, invoke_go_build};
 #[cfg(all(feature = "device-runtime", feature = "host-macos-arm64"))]
 #[allow(unused_imports)]
 pub(crate) use host_factory::{
+    BackendDiscoveryReceipt, E_BACKEND_UNAVAILABLE, E_DEVICE_ABI_MISMATCH, E_DEVICE_DESCRIPTOR,
+    E_DEVICE_DTYPE_MISMATCH, E_DEVICE_ENTRY_MISMATCH, E_DEVICE_SHAPE_MISMATCH, E_NO_DEVICE_PROGRAM,
     admitted_backends, construct_composite_host, create_program_session, discovery_receipt,
     effective_backend_selection, execute_device_descriptor, host_error_diagnostic,
     missing_backend_artifact, missing_device_descriptor, resolve_backend_selection,
-    BackendDiscoveryReceipt, E_BACKEND_UNAVAILABLE, E_DEVICE_ABI_MISMATCH, E_DEVICE_DESCRIPTOR,
-    E_DEVICE_DTYPE_MISMATCH, E_DEVICE_ENTRY_MISMATCH, E_DEVICE_SHAPE_MISMATCH, E_NO_DEVICE_PROGRAM,
 };
 #[allow(unused_imports)]
 pub(crate) use library_link::emit_linked_library_crates;
 #[cfg(feature = "mir-llvm")]
 #[allow(unused_imports)]
 pub use llvm_host::{
-    build_host_program, compile_nvvm_to_ptx, discover_llvm_host_toolchain,
-    ensure_llvm_runtime_archive, host_llvm_target_triple, host_triple_for, LlvmHostBuild,
-    LlvmHostProfile,
+    LlvmHostBuild, LlvmHostProfile, build_host_program, compile_nvvm_to_ptx,
+    discover_llvm_host_toolchain, ensure_llvm_runtime_archive, host_llvm_target_triple,
+    host_triple_for,
 };
 #[cfg(feature = "runner")]
 #[allow(unused_imports)]
 pub(crate) use manifest::manifest_backend_selection;
 pub(crate) use manifest::validate_manifest;
+pub use manifest::{
+    FaberManifest, ManifestProduct, ManifestProductEmit, ManifestProductKind,
+    ManifestProductShaders, read_manifest,
+};
 #[allow(unused_imports)]
 pub(crate) use manifest::{manifest_build_target_for_input, manifest_device_inputs};
-pub use manifest::{
-    read_manifest, FaberManifest, ManifestProduct, ManifestProductEmit, ManifestProductKind,
-    ManifestProductShaders,
-};
 #[cfg(feature = "runner")]
 #[allow(unused_imports)]
 pub use mir::run_fmir_image_bytes_with_stdio;
@@ -203,7 +203,7 @@ fn is_mir_backed_target(target: Target) -> bool {
 
 #[allow(unused_imports)]
 pub(crate) use embedded_locale::{
-    load_embedded_locale_pack, EmbeddedLocaleError, EMBEDDED_LOCALE_IDS,
+    EMBEDDED_LOCALE_IDS, EmbeddedLocaleError, load_embedded_locale_pack,
 };
 #[allow(unused_imports)]
 pub use locale::available_locales;
@@ -211,8 +211,9 @@ pub use locale::available_locales;
 pub use locale::locale_pack_for_emit;
 #[allow(unused_imports)]
 pub(crate) use locale::{
-    config_with_locale, default_config_with_locale, embedded_conversion_locale_pack,
-    load_locale_pack_for_input, locale_pack_for_emit_with_diagnostic, DEFAULT_CODE_LOCALE,
+    DEFAULT_CODE_LOCALE, config_with_locale, default_config_with_locale,
+    embedded_conversion_locale_pack, load_locale_pack_for_input,
+    locale_pack_for_emit_with_diagnostic,
 };
 
 pub(super) const MANIFEST_FILE: &str = "faber.toml";

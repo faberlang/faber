@@ -22,15 +22,15 @@
 
 use radix::module::diagnostics::Diagnostic;
 use radix::module::driver::Config;
-use radix::module::hir::package::{load_package, LoadedHirModule, LoadedHirPackage};
+use radix::module::hir::package::{LoadedHirModule, LoadedHirPackage, load_package};
 use radix::module::lexer::Span;
 use radix::module::semantic::passes::visibility_annotation::VisibilityTier;
 use radix::module::syntax::Visibility;
+use radix::program::LibraryImportBinding;
 use radix::program::analyze::{AnalyzedProgram, AnalyzedProgramNode, ModuleGraph, ModuleId};
 use radix::program::discovery::PackageSpec;
 use radix::program::library::LibraryResolver;
 use radix::program::library::ResolvedLibraryModule;
-use radix::program::LibraryImportBinding;
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -94,10 +94,12 @@ pub(crate) fn loaded_package_to_analyzed(
             toml::from_str::<toml::Table>(text)
                 .map(radix::module::driver::FileFrontmatter::from_table)
                 .map_err(|error| {
-                    vec![crate::package_diagnostic_error(format!(
-                        "invalid FHIR package entry frontmatter: {error}"
-                    ))
-                    .with_arg("issue", "fhir_frontmatter_invalid")]
+                    vec![
+                        crate::package_diagnostic_error(format!(
+                            "invalid FHIR package entry frontmatter: {error}"
+                        ))
+                        .with_arg("issue", "fhir_frontmatter_invalid"),
+                    ]
                 })
         })
         .transpose()?;

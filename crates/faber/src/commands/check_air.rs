@@ -6,7 +6,7 @@
 //! mutating unroll pass never touches the real pipeline result. Report-only:
 //! verdicts never change exit status or diagnostics.
 
-use radix::module::hir::visit::{walk_expr, walk_stmt, HirVisitor};
+use radix::module::hir::visit::{HirVisitor, walk_expr, walk_stmt};
 use radix::module::hir::{
     DefId, HirBlock, HirExpression, HirExpressionKind, HirFunction, HirItemKind, HirIteraMode,
     HirStatement,
@@ -93,8 +93,7 @@ struct RootBlocker {
 
 /// Advisory AIR report is single-file only for now (pattern of the package
 /// check message).
-pub const PACKAGE_AIR_MESSAGE: &str =
-    "error: `faber check --air` package mode is not supported yet; use `faber check --air <single-file.fab>`";
+pub const PACKAGE_AIR_MESSAGE: &str = "error: `faber check --air` package mode is not supported yet; use `faber check --air <single-file.fab>`";
 
 /// Header shown above the table. Snapshot honesty: the report reflects the
 /// live gate, so verdicts legitimately change when gate rulings change.

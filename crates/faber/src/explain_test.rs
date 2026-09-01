@@ -1,4 +1,4 @@
-use crate::explain::{render_json, render_plain, render_search, Lookup, Registry};
+use crate::explain::{Lookup, Registry, render_json, render_plain, render_search};
 use crate::reference::ReferencePack;
 use crate::reference_pack_test_support::{env_lock, repo_exempla_root};
 use serde::Deserialize;

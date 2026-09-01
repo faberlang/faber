@@ -1,7 +1,7 @@
 #![allow(clippy::absurd_extreme_comparisons)]
 
 use hygiene_ratchet::{
-    assert_budgets, assert_companion_tests_use_cfg_path_module_convention, Budgets, ScanConfig,
+    Budgets, ScanConfig, assert_budgets, assert_companion_tests_use_cfg_path_module_convention,
 };
 use std::path::Path;
 

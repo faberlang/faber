@@ -13,13 +13,13 @@ mod tests;
 use radix::hir::{DefId, HirItemKind, HirModule, HirTestMetadata, HirTestModifier};
 use radix::lexer::Interner;
 use radix::mir::{
-    lower_analyzed_unit, run_function_with_limits, run_function_with_stats_and_limits, BufferHost,
-    MirFunctionId, RunSourceError, RunnerError, RunnerStats, ValidatedMir,
+    BufferHost, MirFunctionId, RunSourceError, RunnerError, RunnerStats, ValidatedMir,
+    lower_analyzed_unit, run_function_with_limits, run_function_with_stats_and_limits,
 };
 use radix::module::{AnalyzedModule, Session};
 use radix::program::analyze_prepared_program_name;
 use std::collections::HashMap;
-use std::panic::{catch_unwind, AssertUnwindSafe};
+use std::panic::{AssertUnwindSafe, catch_unwind};
 use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
 

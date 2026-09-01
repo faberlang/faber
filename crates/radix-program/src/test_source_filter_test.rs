@@ -1,4 +1,4 @@
-use super::{path_pattern_matches, TestSourceFilter};
+use super::{TestSourceFilter, path_pattern_matches};
 use std::path::Path;
 
 #[test]

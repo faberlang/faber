@@ -68,7 +68,7 @@
 use crate::abi::device_view_element_count;
 use crate::device_program::{BufferRole, LaunchId};
 use crate::device_semantics::DeviceEffectBoundaryKind;
-use crate::host_partition::{callee_function_ids, CallsiteId, HostPartition, PartitionRecord};
+use crate::host_partition::{CallsiteId, HostPartition, PartitionRecord, callee_function_ids};
 use crate::layout::MirLayoutKind;
 use crate::{
     MirBlockId, MirCallee, MirConstant, MirFunction, MirFunctionId, MirLocalId, MirOperand,

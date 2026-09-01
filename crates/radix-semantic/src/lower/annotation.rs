@@ -13,12 +13,12 @@ use radix_hir::{
 };
 use radix_lexer::{Interner, Span, Symbol};
 use radix_syntax::{
-    braced_cli_nomen, braced_imperium_nomen, braced_nondum_view, braced_operandus_view,
-    braced_optio_view, braced_radix_lane_view, braced_radix_typus_view, braced_verte_view,
-    nondum_from_stmt, radix_lane_from_stmt, verte_from_stmt, Annotation, AnnotationField,
-    AnnotationFieldValue, AnnotationKind, AnnotationStmt, BracedAnnotation, CliAnnotation,
-    ImperiumAnnotation, NucleumAnnotation, OperandusAnnotation, OptioAnnotation,
-    RadixTypusDomainAnnotation, TypeExpr,
+    Annotation, AnnotationField, AnnotationFieldValue, AnnotationKind, AnnotationStmt,
+    BracedAnnotation, CliAnnotation, ImperiumAnnotation, NucleumAnnotation, OperandusAnnotation,
+    OptioAnnotation, RadixTypusDomainAnnotation, TypeExpr, braced_cli_nomen, braced_imperium_nomen,
+    braced_nondum_view, braced_operandus_view, braced_optio_view, braced_radix_lane_view,
+    braced_radix_typus_view, braced_verte_view, nondum_from_stmt, radix_lane_from_stmt,
+    verte_from_stmt,
 };
 
 fn lower_contract_payload(value: &ContractPayloadValue) -> HirAnnotationValue {

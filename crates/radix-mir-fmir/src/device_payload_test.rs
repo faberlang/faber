@@ -14,29 +14,28 @@ use crate::codec::{
 };
 use crate::error::FmirImageError;
 use crate::schema::{
-    admit_executor_plan_section_v2_with_version, canonical_program_bytes,
-    canonical_unpadded_base64, content_sha256, device_identity_hash, packet_sha256_canonical,
-    DeviceArtifactFormat, DevicePayloadEncoding, DeviceTargetId, FmirArtifactReflection,
+    ARTIFACT_ABI_VERSION, DeviceArtifactFormat, DevicePayloadEncoding, DeviceTargetId,
+    EXECUTOR_PLAN_SECTION_VERSION, FMIR_TARGET_NAME, FMIR_TEXT_TARGET_NAME, FmirArtifactReflection,
     FmirBinaryImageFile, FmirDeviceArtifact, FmirDeviceArtifactsSection, FmirDeviceBackend,
     FmirDeviceInput, FmirDeviceProgramSection, FmirDeviceSection, FmirDeviceSelection,
     FmirDeviceSymbol, FmirExecutorPlanSection, FmirExecutorPlanSectionV2, FmirReflectedKernel,
     FmirReflectedResource, FmirTextCliRootSection, FmirTextCliSection, FmirTextImageFile,
     FmirTextProgramSection, FmirTextRuntimeSection, FmirTextSourceIdentity, FmirTextSourcesSection,
-    FmirTextToolchainSection, FmirTextTypesSection, MaterializationStage, WireAxisReductionPlan,
-    WireBinding, WireBroadcastDeclaration, WireBroadcastFact, WireBufferIdentity,
-    WireBufferLifetime, WireBufferRole, WireBufferVersion, WireCausalMaskedSoftmaxPlan,
-    WireCollectionKernelPlan, WireCompanionDerivativeKind, WireCompanionRelation,
-    WireCompanionSelectedInput, WireCompanionSelectedOutput, WireDependencyEdge, WireDeviceProgram,
-    WireDeviceResource, WireDispatchSize, WireGatherPlan, WireGroupedMatMulPlan,
-    WireInitializationPolicy, WireKernelLaunchPlan, WireKernelUnit, WireLaunchUnit,
-    WireLayerNormalizationPlan, WireObservationCadence, WireObservationFact,
+    FmirTextToolchainSection, FmirTextTypesSection, LEGACY_EXECUTOR_PLAN_SECTION_VERSION,
+    MaterializationStage, PACKAGE_MIR_ARTIFACT_VERSION, WIRE_DEVICE_PROGRAM_VERSION,
+    WireAxisReductionPlan, WireBinding, WireBroadcastDeclaration, WireBroadcastFact,
+    WireBufferIdentity, WireBufferLifetime, WireBufferRole, WireBufferVersion,
+    WireCausalMaskedSoftmaxPlan, WireCollectionKernelPlan, WireCompanionDerivativeKind,
+    WireCompanionRelation, WireCompanionSelectedInput, WireCompanionSelectedOutput,
+    WireDependencyEdge, WireDeviceProgram, WireDeviceResource, WireDispatchSize, WireGatherPlan,
+    WireGroupedMatMulPlan, WireInitializationPolicy, WireKernelLaunchPlan, WireKernelUnit,
+    WireLaunchUnit, WireLayerNormalizationPlan, WireObservationCadence, WireObservationFact,
     WirePackedStorageLayout, WireProgramLifetime, WireQuantizedMatMulPlan, WireReduceOp,
     WireReducedProjection, WireResourceAccess, WireResultBuffer, WireRmsNormalizationPlan,
     WireRopePlan, WireRowSoftmaxPlan, WireSemanticValue, WireSemanticValueOrigin,
     WireSsmConv1dPlan, WireSsmScanPlan, WireStorageLayout, WireWorkgroupCount, WireWorkgroupSize,
-    ARTIFACT_ABI_VERSION, EXECUTOR_PLAN_SECTION_VERSION, FMIR_TARGET_NAME, FMIR_TEXT_TARGET_NAME,
-    LEGACY_EXECUTOR_PLAN_SECTION_VERSION, PACKAGE_MIR_ARTIFACT_VERSION,
-    WIRE_DEVICE_PROGRAM_VERSION,
+    admit_executor_plan_section_v2_with_version, canonical_program_bytes,
+    canonical_unpadded_base64, content_sha256, device_identity_hash, packet_sha256_canonical,
 };
 use radix_mir::MirProgram;
 use radix_types::TypeTable;
@@ -290,8 +289,8 @@ fn static_executor_plan() -> radix_mir::ExecutorPlanExtension {
 
 fn runtime_executor_plan_v2() -> radix_mir::device_program_plans::ExecutorPlanExtensionV2 {
     use radix_mir::device_program_plans::{
-        AllocationFact, ExecutorPlanExtensionV2, ExecutorPlanSource, LaunchBinding, RuntimeSource,
-        ViewFact, EXECUTOR_PLAN_RUNTIME_BIND_ABI_VERSION,
+        AllocationFact, EXECUTOR_PLAN_RUNTIME_BIND_ABI_VERSION, ExecutorPlanExtensionV2,
+        ExecutorPlanSource, LaunchBinding, RuntimeSource, ViewFact,
     };
     ExecutorPlanExtensionV2 {
         abi_version: EXECUTOR_PLAN_RUNTIME_BIND_ABI_VERSION,

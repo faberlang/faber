@@ -5,9 +5,9 @@
 //! Sources use the English locale pack so the fixtures read like the corpus
 //! (`interface`, `class`, `fn`, `typus`).
 
-use crate::locale::LocalePack;
-use crate::test_support::{analyze_source_with_config, AnalyzedFixture};
 use crate::PassConfig;
+use crate::locale::LocalePack;
+use crate::test_support::{AnalyzedFixture, analyze_source_with_config};
 use radix_target::Target;
 
 fn en_config() -> PassConfig {
@@ -277,7 +277,8 @@ fn via_members(Readable ∩ Seekable r) → void {{
     };
     // Alias transparency: the alias TypeId and the unfolded intersection are
     // distinct arena entries but semantically equal (`equals` peels Alias).
-    assert!(unit
-        .types
-        .equals(param_ty("via_alias"), param_ty("via_members")));
+    assert!(
+        unit.types
+            .equals(param_ty("via_alias"), param_ty("via_members"))
+    );
 }

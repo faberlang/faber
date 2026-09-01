@@ -51,6 +51,7 @@ use std::path::Path;
 
 use radix::module::codegen::Target;
 use radix::module::diagnostics::Diagnostic;
+use radix_mir::MirType;
 use radix_mir::abi::{
     MirKernelDispatchSize, MirKernelResourceAccess, MirKernelWorkgroupCount, MirWorkgroupSize,
     ReducedProjection,
@@ -63,7 +64,6 @@ use radix_mir::device_program::{
 use radix_mir::device_semantics::DeviceSemantics;
 use radix_mir::kernel_plan::CollectionKernelPlan;
 use radix_mir::layout::MirTensorStorageLayout;
-use radix_mir::MirType;
 use radix_mir_fmir::{DeviceTargetId, FmirDeviceArtifact, FmirDeviceBackend};
 use serde::Serialize;
 
@@ -817,11 +817,13 @@ fn package_source_hashes(
     let mut hashes = Vec::new();
     for unit in package.nodes.values() {
         let bytes = std::fs::read(&unit.path).map_err(|error| {
-            vec![crate::package_diagnostic_error(format!(
-                "could not read composite-plan source identity for {}: {error}",
-                unit.path.display()
-            ))
-            .with_arg("issue", "composite_plan_source_identity_unreadable")]
+            vec![
+                crate::package_diagnostic_error(format!(
+                    "could not read composite-plan source identity for {}: {error}",
+                    unit.path.display()
+                ))
+                .with_arg("issue", "composite_plan_source_identity_unreadable"),
+            ]
         })?;
         hashes.push((
             relative_or_display(&package.spec.package_root, &unit.path),

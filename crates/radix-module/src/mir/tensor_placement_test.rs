@@ -4,8 +4,8 @@
 //! explicit operation set, and implicit-movement rejection evidence.
 
 use super::{
-    tensor_placement_operations, tensor_placement_policy_rows, TensorPlacementFacet, TensorPlacementOperation,
-    TensorPlacementStatus,
+    TensorPlacementFacet, TensorPlacementOperation, TensorPlacementStatus, tensor_placement_operations,
+    tensor_placement_policy_rows,
 };
 
 #[test]
@@ -56,7 +56,8 @@ fn tensor_placement_policy_keeps_implicit_movement_fail_closed() {
         .expect("implicit movement row");
 
     assert_eq!(row.status, TensorPlacementStatus::FailClosed);
-    assert!(row
-        .evidence
-        .contains("tensor_placement_rejects_implicit_host_to_device_movement"));
+    assert!(
+        row.evidence
+            .contains("tensor_placement_rejects_implicit_host_to_device_movement")
+    );
 }

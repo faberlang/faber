@@ -21,11 +21,11 @@
 // parent module provides shared imports for lowering
 use super::*;
 use crate::hir::HirCallArg;
-use crate::semantic::lista_tensor_conversio::{
-    analyze_rectangular_lista_literal, lista_numerus_type, resolve_bounded_lista_padded_shape,
-    resolve_lista_to_tensor_shape, validate_lista_to_tensor_source, ListaToTensorShape,
-};
 use crate::semantic::IndexExpr;
+use crate::semantic::lista_tensor_conversio::{
+    ListaToTensorShape, analyze_rectangular_lista_literal, lista_numerus_type, resolve_bounded_lista_padded_shape,
+    resolve_lista_to_tensor_shape, validate_lista_to_tensor_source,
+};
 
 /// Whether a `⇥` recovery expression is side-effecting: a call or method call
 /// whose execution has observable effects. Pure recovery expressions (literals,

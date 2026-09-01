@@ -5,7 +5,7 @@
 //! logical execution graph therefore remain byte-stable for 8:1 comparability.
 
 use super::super::{
-    logical_distributed_plan_hash, wire_plan_to_plan, FmirDeviceSection, WirePlacementConstraint,
+    FmirDeviceSection, WirePlacementConstraint, logical_distributed_plan_hash, wire_plan_to_plan,
 };
 
 /// Logical rank count of the MD3J fixture.

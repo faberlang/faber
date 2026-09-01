@@ -64,9 +64,9 @@ mod failable_facts_test;
 mod haskell_emit_test;
 
 #[cfg(feature = "hir-go")]
-pub use needs::{collect_go_needs, GoNeeds};
+pub use needs::{GoNeeds, collect_go_needs};
 #[cfg(feature = "hir-rust")]
-pub use needs::{collect_rust_needs, RustNeeds};
+pub use needs::{RustNeeds, collect_rust_needs};
 /// Shared indentation-aware source writer (lives in `radix-codegen-shared`).
 pub use radix_codegen_shared::{CodeWriter, Codegen, CodegenError};
 #[cfg(feature = "hir-rust")]
@@ -79,8 +79,8 @@ pub use rust::build_representation_plan;
 /// dedicated-arm vs unspecialized-fallback tier per fixture.
 pub use radix_codegen_shared::conversio_arm;
 pub use radix_codegen_shared::conversio_arm::{
-    conversio_arm_begin, conversio_arm_clear, conversio_arm_mark_fallback, conversio_arm_take, ConversioArm,
-    ConversioArmGuard, ConversioArmRecord,
+    ConversioArm, ConversioArmGuard, ConversioArmRecord, conversio_arm_begin, conversio_arm_clear,
+    conversio_arm_mark_fallback, conversio_arm_take,
 };
 
 /// Output mode controlling access modifiers and entry-point emission.
@@ -95,9 +95,9 @@ pub enum OutputMode {
 use crate::diagnostics::DiagnosticArg;
 use crate::hir::HirModule;
 use crate::lexer::Interner;
+use crate::locale::KeywordSurface;
 #[cfg(all(test, feature = "hir-faber"))]
 use crate::locale::latin_locale_pack;
-use crate::locale::KeywordSurface;
 use crate::semantic::TypeTable;
 #[cfg(feature = "hir-rust")]
 use crate::semantic::{NumericWidth, Primitive, Type, TypeId};
@@ -275,12 +275,12 @@ pub fn generate_from_analyzed_with_options(
                         }
                     }
                 }
-                let mut gen = rust::RustCodegen::new_with_types(&analysis.hir, &analysis.interner, &analysis.types);
-                gen.set_gpu_builtins(&gpu_builtins);
-                gen.set_function_facts(&function_facts);
-                gen.set_used_import_defs(&used_imports);
-                gen.set_imported_namespace_info(namespace_info);
-                let mut output = gen.generate(&analysis.hir, &analysis.types, &analysis.interner)?;
+                let mut r#gen = rust::RustCodegen::new_with_types(&analysis.hir, &analysis.interner, &analysis.types);
+                r#gen.set_gpu_builtins(&gpu_builtins);
+                r#gen.set_function_facts(&function_facts);
+                r#gen.set_used_import_defs(&used_imports);
+                r#gen.set_imported_namespace_info(namespace_info);
+                let mut output = r#gen.generate(&analysis.hir, &analysis.types, &analysis.interner)?;
 
                 if !provider_modules.is_empty() {
                     let mut module_block = String::new();
@@ -313,19 +313,19 @@ pub fn generate_from_analyzed_with_options(
                 // output module name; HIR symbol ids remain stable.
                 let mut module_interner = analysis.interner.clone();
                 let ts_surface = ts::TsKeywordSurfaceBridge(*surface);
-                let gen = if output_mode == OutputMode::Library {
+                let r#gen = if output_mode == OutputMode::Library {
                     let namespace = module_interner.intern(module_name.unwrap_or("FaberModule"));
                     ts::TsCodegen::new_module(&analysis.hir, &module_interner, namespace)
                 } else {
                     ts::TsCodegen::new(&analysis.hir, &module_interner)
                 };
-                let mut gen = gen;
-                gen.set_failable_facts(&ts_failable_facts(&analysis.function_facts));
-                gen.set_library_registry(&analysis.libraries);
-                gen.set_gpu_builtins(&ts_gpu_builtins(&analysis.gpu_builtins));
-                gen.set_intrinsic_surface(&ts_surface);
-                register_cross_file_defids(&mut gen, &analysis.hir, &analysis.resolver);
-                let output = gen.generate(&analysis.hir, &analysis.types, &module_interner)?;
+                let mut r#gen = r#gen;
+                r#gen.set_failable_facts(&ts_failable_facts(&analysis.function_facts));
+                r#gen.set_library_registry(&analysis.libraries);
+                r#gen.set_gpu_builtins(&ts_gpu_builtins(&analysis.gpu_builtins));
+                r#gen.set_intrinsic_surface(&ts_surface);
+                register_cross_file_defids(&mut r#gen, &analysis.hir, &analysis.resolver);
+                let output = r#gen.generate(&analysis.hir, &analysis.types, &module_interner)?;
                 Ok(crate::Output::TypeScript(crate::TypeScriptOutput { code: output.code }))
             }
             #[cfg(not(feature = "hir-ts"))]
@@ -389,7 +389,7 @@ pub fn generate_from_analyzed_with_options(
 /// class: facade signatures name those types, so they must land in the emit
 /// table even when the consumer never wrote `import from "leaf"`.
 #[cfg(feature = "hir-ts")]
-fn register_cross_file_defids(gen: &mut ts::TsCodegen<'_>, hir: &HirModule, resolver: &crate::semantic::Resolver) {
+fn register_cross_file_defids(r#gen: &mut ts::TsCodegen<'_>, hir: &HirModule, resolver: &crate::semantic::Resolver) {
     for item in &hir.items {
         let crate::hir::HirItemKind::Import(import) = &item.kind else {
             continue;
@@ -400,13 +400,13 @@ fn register_cross_file_defids(gen: &mut ts::TsCodegen<'_>, hir: &HirModule, reso
                 continue;
             }
             for export in resolver.imported_file_type_exports(binding) {
-                gen.register_external_def(export.def_id, export.member, binding);
+                r#gen.register_external_def(export.def_id, export.member, binding);
             }
         }
     }
     for namespace in resolver.file_interface_namespaces() {
         for export in resolver.imported_file_type_exports(namespace) {
-            gen.register_named_def(export.def_id, export.member);
+            r#gen.register_named_def(export.def_id, export.member);
         }
     }
 }
@@ -429,10 +429,10 @@ fn ts_gpu_builtins(
 
 #[cfg(feature = "hir-go")]
 fn generate_go_from_analyzed(analysis: &crate::driver::AnalyzedModule) -> Result<crate::Output, CodegenError> {
-    let mut gen = go::GoCodegen::new(&analysis.hir, &analysis.interner);
-    gen.set_failable_facts(&go_failable_facts(&analysis.function_facts));
-    gen.set_library_registry(&analysis.libraries);
-    let output = gen.generate(&analysis.hir, &analysis.types, &analysis.interner)?;
+    let mut r#gen = go::GoCodegen::new(&analysis.hir, &analysis.interner);
+    r#gen.set_failable_facts(&go_failable_facts(&analysis.function_facts));
+    r#gen.set_library_registry(&analysis.libraries);
+    let output = r#gen.generate(&analysis.hir, &analysis.types, &analysis.interner)?;
     Ok(crate::Output::Go(crate::GoOutput { code: output.code }))
 }
 
@@ -447,16 +447,16 @@ fn generate_swift_from_analyzed(
     output_mode: OutputMode,
     module_name: Option<&str>,
 ) -> Result<crate::Output, CodegenError> {
-    let mut gen = swift::SwiftCodegen::new(&analysis.hir, &analysis.interner);
-    gen.set_failable_facts(&swift_failable_facts(&analysis.function_facts));
-    gen.set_output_mode(
+    let mut r#gen = swift::SwiftCodegen::new(&analysis.hir, &analysis.interner);
+    r#gen.set_failable_facts(&swift_failable_facts(&analysis.function_facts));
+    r#gen.set_output_mode(
         match output_mode {
             OutputMode::Application => swift::OutputMode::Application,
             OutputMode::Library => swift::OutputMode::Library,
         },
         module_name,
     );
-    let output = gen.generate(&analysis.hir, &analysis.types, &analysis.interner)?;
+    let output = r#gen.generate(&analysis.hir, &analysis.types, &analysis.interner)?;
     Ok(crate::Output::Swift(crate::SwiftOutput { code: output.code }))
 }
 
@@ -471,9 +471,9 @@ fn generate_swift_from_analyzed(
 
 #[cfg(feature = "hir-python")]
 fn generate_python_from_analyzed(analysis: &crate::driver::AnalyzedModule) -> Result<crate::Output, CodegenError> {
-    let mut gen = python::PythonCodegen::new(&analysis.hir, &analysis.interner);
-    gen.set_failable_facts(&python_failable_facts(&analysis.function_facts));
-    let output = gen.generate(&analysis.hir, &analysis.types, &analysis.interner)?;
+    let mut r#gen = python::PythonCodegen::new(&analysis.hir, &analysis.interner);
+    r#gen.set_failable_facts(&python_failable_facts(&analysis.function_facts));
+    let output = r#gen.generate(&analysis.hir, &analysis.types, &analysis.interner)?;
     Ok(crate::Output::Python(crate::PythonOutput { code: output.code }))
 }
 
@@ -484,9 +484,9 @@ fn generate_python_from_analyzed(_analysis: &crate::driver::AnalyzedModule) -> R
 
 #[cfg(feature = "hir-haskell")]
 fn generate_haskell_from_analyzed(analysis: &crate::driver::AnalyzedModule) -> Result<crate::Output, CodegenError> {
-    let mut gen = haskell::HaskellCodegen::new(&analysis.hir, &analysis.interner);
-    gen.set_failable_facts(&haskell_failable_facts(&analysis.function_facts));
-    let output = gen.generate(&analysis.hir, &analysis.types, &analysis.interner)?;
+    let mut r#gen = haskell::HaskellCodegen::new(&analysis.hir, &analysis.interner);
+    r#gen.set_failable_facts(&haskell_failable_facts(&analysis.function_facts));
+    let output = r#gen.generate(&analysis.hir, &analysis.types, &analysis.interner)?;
     Ok(crate::Output::Haskell(crate::HaskellOutput { code: output.code }))
 }
 
@@ -745,9 +745,9 @@ fn generate_ts_with_facts(
     interner: &Interner,
     facts: &crate::semantic::FunctionFactTable,
 ) -> Result<crate::Output, CodegenError> {
-    let mut gen = ts::TsCodegen::new(hir, interner);
-    gen.set_failable_facts(&ts_failable_facts(facts));
-    let output = gen.generate(hir, types, interner)?;
+    let mut r#gen = ts::TsCodegen::new(hir, interner);
+    r#gen.set_failable_facts(&ts_failable_facts(facts));
+    let output = r#gen.generate(hir, types, interner)?;
     Ok(crate::Output::TypeScript(crate::TypeScriptOutput { code: output.code }))
 }
 
@@ -768,9 +768,9 @@ fn generate_go_with_facts(
     interner: &Interner,
     facts: &crate::semantic::FunctionFactTable,
 ) -> Result<crate::Output, CodegenError> {
-    let mut gen = go::GoCodegen::new(hir, interner);
-    gen.set_failable_facts(&go_failable_facts(facts));
-    let output = gen.generate(hir, types, interner)?;
+    let mut r#gen = go::GoCodegen::new(hir, interner);
+    r#gen.set_failable_facts(&go_failable_facts(facts));
+    let output = r#gen.generate(hir, types, interner)?;
     Ok(crate::Output::Go(crate::GoOutput { code: output.code }))
 }
 
@@ -793,16 +793,16 @@ fn generate_swift_with_facts(
     output_mode: OutputMode,
     module_name: Option<&str>,
 ) -> Result<crate::Output, CodegenError> {
-    let mut gen = swift::SwiftCodegen::new(hir, interner);
-    gen.set_failable_facts(&swift_failable_facts(facts));
-    gen.set_output_mode(
+    let mut r#gen = swift::SwiftCodegen::new(hir, interner);
+    r#gen.set_failable_facts(&swift_failable_facts(facts));
+    r#gen.set_output_mode(
         match output_mode {
             OutputMode::Application => swift::OutputMode::Application,
             OutputMode::Library => swift::OutputMode::Library,
         },
         module_name,
     );
-    let output = gen.generate(hir, types, interner)?;
+    let output = r#gen.generate(hir, types, interner)?;
     Ok(crate::Output::Swift(crate::SwiftOutput { code: output.code }))
 }
 
@@ -825,9 +825,9 @@ fn generate_python_with_facts(
     interner: &Interner,
     facts: &crate::semantic::FunctionFactTable,
 ) -> Result<crate::Output, CodegenError> {
-    let mut gen = python::PythonCodegen::new(hir, interner);
-    gen.set_failable_facts(&python_failable_facts(facts));
-    let output = gen.generate(hir, types, interner)?;
+    let mut r#gen = python::PythonCodegen::new(hir, interner);
+    r#gen.set_failable_facts(&python_failable_facts(facts));
+    let output = r#gen.generate(hir, types, interner)?;
     Ok(crate::Output::Python(crate::PythonOutput { code: output.code }))
 }
 
@@ -848,9 +848,9 @@ fn generate_haskell_with_facts(
     interner: &Interner,
     facts: &crate::semantic::FunctionFactTable,
 ) -> Result<crate::Output, CodegenError> {
-    let mut gen = haskell::HaskellCodegen::new(hir, interner);
-    gen.set_failable_facts(&haskell_failable_facts(facts));
-    let output = gen.generate(hir, types, interner)?;
+    let mut r#gen = haskell::HaskellCodegen::new(hir, interner);
+    r#gen.set_failable_facts(&haskell_failable_facts(facts));
+    let output = r#gen.generate(hir, types, interner)?;
     Ok(crate::Output::Haskell(crate::HaskellOutput { code: output.code }))
 }
 
@@ -876,10 +876,10 @@ fn generate_rust_with_facts(
     reject_rust_unsupported_types(types)?;
     let gpu = rust::rust_gpu_builtins(gpu_builtins);
     let function_facts = rust::rust_function_facts(facts);
-    let mut gen = rust::RustCodegen::new_with_types(hir, interner, types);
-    gen.set_gpu_builtins(&gpu);
-    gen.set_function_facts(&function_facts);
-    let output = gen.generate(hir, types, interner)?;
+    let mut r#gen = rust::RustCodegen::new_with_types(hir, interner, types);
+    r#gen.set_gpu_builtins(&gpu);
+    r#gen.set_function_facts(&function_facts);
+    let output = r#gen.generate(hir, types, interner)?;
     Ok(crate::Output::Rust(crate::RustOutput { code: output.code }))
 }
 

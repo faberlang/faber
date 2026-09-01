@@ -1,6 +1,6 @@
 //! Focused proof for the output-transfer codemod command.
 
-use super::{codemod_single_doc, DeclineReason};
+use super::{DeclineReason, codemod_single_doc};
 use clap::Parser;
 use std::fs;
 use std::path::PathBuf;
@@ -35,9 +35,11 @@ incipit {
         report.declines
     );
     assert_eq!(report.source.matches("norma:console").count(), 1);
-    assert!(report
-        .source
-        .contains("importa ex \"norma:console\" fixum dic ut output"));
+    assert!(
+        report
+            .source
+            .contains("importa ex \"norma:console\" fixum dic ut output")
+    );
     assert!(report.source.contains("output ⇇ \"§ §\\n\"(7, \"salve\")"));
     assert!(report.source.contains("⇇"));
     assert!(!report.source.contains("nota 7, \"salve\""));

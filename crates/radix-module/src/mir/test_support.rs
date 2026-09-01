@@ -6,8 +6,8 @@
 
 use crate::codegen::Target;
 use crate::diagnostics::Diagnostic;
-use crate::driver::compile;
 use crate::driver::ModuleCompileRequest;
+use crate::driver::compile;
 use crate::test_support::test_session;
 use crate::{CompileResult, MetalTextOutput, Output, WgslTextOutput};
 

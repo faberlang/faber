@@ -67,10 +67,12 @@ functio hidden() → vacuum {
 ";
     let result = crate::test_support::analyze_source(source);
     assert!(result.is_ok());
-    assert!(!result
-        .diagnostics
-        .iter()
-        .any(|diag| !diag.is_error() && crate::semantic_spec(diag.kind).code == "WARN012"));
+    assert!(
+        !result
+            .diagnostics
+            .iter()
+            .any(|diag| !diag.is_error() && crate::semantic_spec(diag.kind).code == "WARN012")
+    );
 }
 
 #[test]
@@ -196,10 +198,12 @@ functio ambiguum() → vacuum {
 ";
     let result = crate::test_support::analyze_source(source);
     assert!(!result.is_ok(), "{:?}", result.diagnostics);
-    assert!(result
-        .diagnostics
-        .iter()
-        .any(|diag| diag.is_error() && crate::semantic_spec(diag.kind).code == "SEM019"));
+    assert!(
+        result
+            .diagnostics
+            .iter()
+            .any(|diag| diag.is_error() && crate::semantic_spec(diag.kind).code == "SEM019")
+    );
 }
 
 #[test]

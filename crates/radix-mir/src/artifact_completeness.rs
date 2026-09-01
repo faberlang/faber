@@ -26,9 +26,9 @@
 //! (rule 5), and the execution-descriptor identity is a distinct typed
 //! domain, never FNV (rule 6 / CTO9-5).
 
-use crate::boundary_abi::{region_launch_ids, HostDeviceCall, MemberKernel, RegionArgumentLayout};
-use crate::host_partition::{HostPartition, PartitionRecord};
 use crate::MirFunctionId;
+use crate::boundary_abi::{HostDeviceCall, MemberKernel, RegionArgumentLayout, region_launch_ids};
+use crate::host_partition::{HostPartition, PartitionRecord};
 use serde::{Deserialize, Serialize};
 use std::fmt;
 

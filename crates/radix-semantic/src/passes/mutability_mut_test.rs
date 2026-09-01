@@ -7,7 +7,7 @@
 use crate::test_support::{
     analyze_ok, analyze_source, analyze_source_with_config, assert_rejects_with_issue, issue,
 };
-use crate::{PassConfig, ISSUE_MUT_LOCAL};
+use crate::{ISSUE_MUT_LOCAL, PassConfig};
 
 fn assert_language_rejects(source: &str, expected: &str) {
     let result = analyze_source_with_config(source, PassConfig::base());

@@ -2,9 +2,9 @@
 //! syntax trivia carrier or reported with one structured invalid-placement
 //! diagnostic (never silently discarded, never a generic parse error).
 
-use crate::{parse, ParseError, ParseErrorKind};
-use radix_lexer::lex;
+use crate::{ParseError, ParseErrorKind, parse};
 use radix_lexer::TokenKind;
+use radix_lexer::lex;
 
 fn parse_source(source: &str) -> crate::ParseResult {
     parse(lex(source))

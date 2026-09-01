@@ -9,9 +9,9 @@
 //! note in the union section below.
 
 use super::exhaustive::{check, discerne_definitely_covered};
+use crate::SemanticError;
 use crate::test_support::args_have_no_legacy_message;
 use crate::test_support::test_span;
-use crate::SemanticError;
 use crate::{DefId, SemanticErrorKind, Type, TypeId, TypeTable, WarningKind};
 use radix_hir::{
     HirBlock, HirCasuArm, HirExpression, HirExpressionKind, HirItem, HirItemKind, HirLiteral,
@@ -304,9 +304,11 @@ fn warns_when_binding_absorbs_option_constituent() {
     let program = program_with_bare_match(match_expr);
 
     let errors = check(&program, &types).unwrap_err();
-    assert!(errors
-        .iter()
-        .any(|err| err.kind == SemanticErrorKind::Warning(WarningKind::WildcardAbsorbsNull)));
+    assert!(
+        errors
+            .iter()
+            .any(|err| err.kind == SemanticErrorKind::Warning(WarningKind::WildcardAbsorbsNull))
+    );
 }
 
 #[test]
@@ -326,9 +328,11 @@ fn suppresses_warning_when_explicit_null_arm_present() {
 
     // No hard errors, and no wildcard-absorb warning once null is handled.
     let errors = check(&program, &types).err().unwrap_or_default();
-    assert!(!errors
-        .iter()
-        .any(|err| err.kind == SemanticErrorKind::Warning(WarningKind::WildcardAbsorbsNull)));
+    assert!(
+        !errors
+            .iter()
+            .any(|err| err.kind == SemanticErrorKind::Warning(WarningKind::WildcardAbsorbsNull))
+    );
 }
 
 #[test]

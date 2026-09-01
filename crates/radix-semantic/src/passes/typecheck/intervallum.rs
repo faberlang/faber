@@ -10,7 +10,7 @@
 #[allow(clippy::wildcard_imports)]
 // parent module provides shared imports for typechecking
 use super::*;
-use crate::{is_intervallum_bound_type, Primitive, Type};
+use crate::{Primitive, Type, is_intervallum_bound_type};
 const ISSUE_RANGE_STEP_MUST_BE_NUMERIC: &str = "range_step_must_be_numeric";
 const ISSUE_INTERVALLUM_VALUE_STEP_UNSUPPORTED: &str = "intervallum_value_step_unsupported";
 const ISSUE_INTERVALLUM_BOUND_REQUIRED: &str = "intervallum_bound_required";

@@ -1,8 +1,8 @@
 //! HIR lowering preserves explicit call-site type arguments.
 
-use super::{lower, LowerRequest};
+use super::{LowerRequest, lower};
 use crate::hir::{HirExpressionKind, HirStatementKind};
-use crate::semantic::{passes, Resolver, TypeTable};
+use crate::semantic::{Resolver, TypeTable, passes};
 
 fn prepare_lower_pipeline(source: &str) -> (crate::syntax::Program, Resolver, TypeTable, crate::lexer::Interner) {
     let lex_result = crate::lexer::lex(source);

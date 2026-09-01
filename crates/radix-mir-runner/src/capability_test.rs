@@ -5,7 +5,7 @@
 //! intrinsic support, terminator gaps) and that every runtime ABI
 //! family has an explicit dispatch status in the runner ledger.
 
-use super::{classify_runner_lowerability, runner_dispatch_status, RunnerDispatchStatus};
+use super::{RunnerDispatchStatus, classify_runner_lowerability, runner_dispatch_status};
 use radix_lexer::Span;
 use radix_mir::{
     Lowerability, MirBlock, MirBlockId, MirFunction, MirFunctionId, MirLocal, MirLocalId,

@@ -4,9 +4,9 @@
 //! does not replace the existing marked-value diagnostic authority.  Its input
 //! is the one typed-HIR [`AccessFactTable`] constructed by the semantic driver.
 
-use super::borrow_region_cfg::{build_cfg, CfgError, CfgLocation, CfgNodeId, HirCfg};
+use super::borrow_region_cfg::{CfgError, CfgLocation, CfgNodeId, HirCfg, build_cfg};
 use crate::{AccessFactTable, AccessMarker, TypeTable};
-use radix_hir::visit::{walk_expr, walk_stmt, HirVisitor};
+use radix_hir::visit::{HirVisitor, walk_expr, walk_stmt};
 use radix_hir::{
     DefId, HirBlock, HirExpression, HirExpressionKind, HirId, HirItemKind, HirLocal, HirModule,
     HirStatement, HirStatementKind,

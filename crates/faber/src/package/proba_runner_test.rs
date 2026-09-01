@@ -6,14 +6,14 @@
 
 use super::test_support::test_temp_dir;
 use super::{
-    discover_package, library_resolver_from_config, test_input_route, TestInputRoute,
-    MANIFEST_LESS_TEST_MESSAGE,
+    MANIFEST_LESS_TEST_MESSAGE, TestInputRoute, discover_package, library_resolver_from_config,
+    test_input_route,
 };
 use radix::module::driver::{Config, Session};
 use radix::module::locale::LocalePack;
 use radix::program::analyze::{
-    analyze_package as analyze_package_direct,
-    analyze_package_for_tests as analyze_package_for_tests_direct, AnalysisSeams,
+    AnalysisSeams, analyze_package as analyze_package_direct,
+    analyze_package_for_tests as analyze_package_for_tests_direct,
 };
 use radix::program::discovery::PackageSpec;
 use radix::program::library::LibraryResolver;
@@ -58,8 +58,8 @@ fn load_with_faber_seams(
     )
 }
 use proba::{
-    run_proba_on_analyzed, run_proba_on_validated_with_function_ids, run_proba_source, CaseOutcome,
-    TestSelection,
+    CaseOutcome, TestSelection, run_proba_on_analyzed, run_proba_on_validated_with_function_ids,
+    run_proba_source,
 };
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -193,14 +193,18 @@ test "math ok" {
     let resolver = library_resolver_from_config(&config);
     let files =
         load_with_faber_seams(&spec, &resolver, Some(&english_pack()), false, None).expect("load");
-    assert!(files
-        .iter()
-        .all(|f| f.path.extension().and_then(|e| e.to_str()) != Some("proba")));
+    assert!(
+        files
+            .iter()
+            .all(|f| f.path.extension().and_then(|e| e.to_str()) != Some("proba"))
+    );
     let test_files = load_with_faber_seams(&spec, &resolver, Some(&english_pack()), true, None)
         .expect("load tests");
-    assert!(test_files
-        .iter()
-        .any(|f| f.path.extension().and_then(|e| e.to_str()) == Some("proba")));
+    assert!(
+        test_files
+            .iter()
+            .any(|f| f.path.extension().and_then(|e| e.to_str()) == Some("proba"))
+    );
 }
 
 #[test]

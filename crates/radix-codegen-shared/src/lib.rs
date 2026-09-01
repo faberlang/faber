@@ -178,7 +178,7 @@ impl Default for CodeWriter {
 /// through [`CodeWriter::write`] for line-start indentation.
 #[macro_export]
 macro_rules! write_code {
-    ($w:expr, $($arg:tt)*) => {
+    ($w:expr_2021, $($arg:tt)*) => {
         $w.writef(format_args!($($arg)*))
     };
 }

@@ -4,7 +4,7 @@
 //! `faber convert` (`commands/convert.rs`).
 
 use radix::module::codegen::Target;
-use radix::module::driver::{peel_raw_source, split_frontmatter, Config, Session};
+use radix::module::driver::{Config, Session, peel_raw_source, split_frontmatter};
 use std::fs;
 use std::io::Read;
 use std::path::{Path, PathBuf};

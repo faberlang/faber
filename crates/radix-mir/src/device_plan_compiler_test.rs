@@ -159,18 +159,21 @@ fn both_reference_rungs_recognize_attention_and_named_fusions() {
         assert_eq!(plan.layers[0].before_kernel_count, 20);
         assert_eq!(plan.kernel_count(0), 11);
         assert!(plan.kernel_count(0) <= 16);
-        assert!(plan
-            .schedule
-            .iter()
-            .any(|call| call.operation == LibraryOperation::CausalAttention));
-        assert!(plan
-            .schedule
-            .iter()
-            .any(|call| call.operation == LibraryOperation::QkvProjection));
-        assert!(plan
-            .schedule
-            .iter()
-            .any(|call| call.operation == LibraryOperation::SwiGlu));
+        assert!(
+            plan.schedule
+                .iter()
+                .any(|call| call.operation == LibraryOperation::CausalAttention)
+        );
+        assert!(
+            plan.schedule
+                .iter()
+                .any(|call| call.operation == LibraryOperation::QkvProjection)
+        );
+        assert!(
+            plan.schedule
+                .iter()
+                .any(|call| call.operation == LibraryOperation::SwiGlu)
+        );
         assert_eq!(plan.executor_plan.selections.len(), plan.schedule.len());
         assert!(plan.decomposition_table().contains("CausalAttention"));
     }
@@ -452,14 +455,16 @@ fn moe_program_lowers_to_router_and_grouped_expert_selection_rows() {
     let plan = PlanCompiler
         .compile(&moe_graph(facts))
         .expect("compile moe graph");
-    assert!(plan
-        .schedule
-        .iter()
-        .any(|call| call.operation == LibraryOperation::RouterSelection));
-    assert!(plan
-        .schedule
-        .iter()
-        .any(|call| call.operation == LibraryOperation::GroupedExpertGemm));
+    assert!(
+        plan.schedule
+            .iter()
+            .any(|call| call.operation == LibraryOperation::RouterSelection)
+    );
+    assert!(
+        plan.schedule
+            .iter()
+            .any(|call| call.operation == LibraryOperation::GroupedExpertGemm)
+    );
     assert_eq!(plan.executor_plan.selections.len(), plan.schedule.len());
 
     let router = plan
@@ -486,16 +491,20 @@ fn moe_program_lowers_to_router_and_grouped_expert_selection_rows() {
             .bits,
         8
     );
-    assert!(router
-        .backend_requirements
-        .iter()
-        .any(|requirement| requirement.backend == "metal"
-            && requirement.feature == "RouterSelection"));
-    assert!(router
-        .logical_signature
-        .outputs
-        .iter()
-        .all(|name| name == "expert_ids" || name == "expert_weights"));
+    assert!(
+        router
+            .backend_requirements
+            .iter()
+            .any(|requirement| requirement.backend == "metal"
+                && requirement.feature == "RouterSelection")
+    );
+    assert!(
+        router
+            .logical_signature
+            .outputs
+            .iter()
+            .all(|name| name == "expert_ids" || name == "expert_weights")
+    );
 
     let grouped = plan
         .executor_plan
@@ -503,11 +512,13 @@ fn moe_program_lowers_to_router_and_grouped_expert_selection_rows() {
         .iter()
         .find(|selection| selection.library_entry.as_deref() == Some("GroupedExpertGemm"))
         .expect("grouped expert selection row");
-    assert!(grouped
-        .backend_requirements
-        .iter()
-        .any(|requirement| requirement.backend == "metal"
-            && requirement.feature == "GroupedExpertGemm"));
+    assert!(
+        grouped
+            .backend_requirements
+            .iter()
+            .any(|requirement| requirement.backend == "metal"
+                && requirement.feature == "GroupedExpertGemm")
+    );
     // The router row precedes the grouped row so dispatch reads resident ids.
     assert!(router.kernel_index < grouped.kernel_index);
     assert!(plan.decomposition_table().contains("GroupedExpertGemm"));
@@ -687,10 +698,11 @@ fn hybrid_ssm_program_lowers_to_conv_and_scan_selection_rows() {
             .bits,
         128
     );
-    assert!(scan
-        .backend_requirements
-        .iter()
-        .any(|requirement| requirement.backend == "metal" && requirement.feature == "SsmScan"));
+    assert!(
+        scan.backend_requirements
+            .iter()
+            .any(|requirement| requirement.backend == "metal" && requirement.feature == "SsmScan")
+    );
     assert!(conv.kernel_index < scan.kernel_index);
     assert!(plan.decomposition_table().contains("SsmConv1d"));
     assert!(plan.decomposition_table().contains("SsmScan"));

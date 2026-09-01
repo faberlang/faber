@@ -368,10 +368,12 @@ fn pre_execution_and_single_source_failures_emit_no_artifact() {
     let compile_arg = compile_file.to_str().expect("UTF-8 compile stats path");
     let compile = run_faber(&compile_package, &["--stats", "--stats-file", compile_arg]);
     assert!(!compile.status.success());
-    assert!(!compile
-        .stdout
-        .windows(run_stats::STATS_MARKER.len())
-        .any(|window| { window == run_stats::STATS_MARKER.as_bytes() }));
+    assert!(
+        !compile
+            .stdout
+            .windows(run_stats::STATS_MARKER.len())
+            .any(|window| { window == run_stats::STATS_MARKER.as_bytes() })
+    );
     assert!(
         !compile_file.exists(),
         "compile failure must emit no artifact"
@@ -401,10 +403,12 @@ fn pre_execution_and_single_source_failures_emit_no_artifact() {
             "single-source refusal must be clear: {:?}",
             output
         );
-        assert!(!output
-            .stdout
-            .windows(run_stats::STATS_MARKER.len())
-            .any(|window| window == run_stats::STATS_MARKER.as_bytes()));
+        assert!(
+            !output
+                .stdout
+                .windows(run_stats::STATS_MARKER.len())
+                .any(|window| window == run_stats::STATS_MARKER.as_bytes())
+        );
         assert!(
             artifact_path.map_or(true, |path| !path.exists()),
             "single-source refusal must emit no artifact"
@@ -533,10 +537,12 @@ backend = "metal"
         stderr.contains("run statistics") && stderr.contains("device route"),
         "refusal must name the stats/device incompatibility: {stderr}"
     );
-    assert!(!output
-        .stdout
-        .windows(run_stats::STATS_MARKER.len())
-        .any(|window| window == run_stats::STATS_MARKER.as_bytes()));
+    assert!(
+        !output
+            .stdout
+            .windows(run_stats::STATS_MARKER.len())
+            .any(|window| window == run_stats::STATS_MARKER.as_bytes())
+    );
     assert!(
         !stats_file.exists(),
         "refusal must emit no artifact: {}",

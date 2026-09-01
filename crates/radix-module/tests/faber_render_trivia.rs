@@ -22,8 +22,8 @@
 
 #![cfg(feature = "hir-faber")]
 
-use radix_module::codegen::{generate_from_analyzed, Target};
-use radix_module::driver::{analyze_source, AnalyzeRequest, AnalyzedModule, Config, Session};
+use radix_module::codegen::{Target, generate_from_analyzed};
+use radix_module::driver::{AnalyzeRequest, AnalyzedModule, Config, Session, analyze_source};
 use radix_module::locale::{KeywordSurface, LocalePack};
 
 /// Installed reader pack for a locale, resolved from the repo stdlib tree.

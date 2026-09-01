@@ -23,8 +23,8 @@
 
 use super::{ParseError, ParseErrorKind, Parser};
 use radix_lexer::{
-    keyword_allowed_as_ident, keyword_spelling_for_token, lookup_keyword_spec, KeywordKind,
-    KeywordOwner, KeywordScope, TokenKind,
+    KeywordKind, KeywordOwner, KeywordScope, TokenKind, keyword_allowed_as_ident,
+    keyword_spelling_for_token, lookup_keyword_spec,
 };
 #[allow(clippy::wildcard_imports)]
 use radix_syntax::*;

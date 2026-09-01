@@ -33,10 +33,10 @@
 //! collapses to `Option(T)` vs `Union([...])` is decided at those lowering
 //! sites; MIR and backends treat that boundary as an upstream invariant.
 
-use crate::index::{IndexExpr, IndexId};
-use crate::instans_precision::{is_instans_assignable, InstansPrecision};
-use crate::numeric_width::{is_numeric_assignable, NumericWidth};
 use crate::DefId;
+use crate::index::{IndexExpr, IndexId};
+use crate::instans_precision::{InstansPrecision, is_instans_assignable};
+use crate::numeric_width::{NumericWidth, is_numeric_assignable};
 use radix_lexer::Symbol as LexSymbol;
 use rustc_hash::{FxHashMap, FxHashSet};
 use serde::{Deserialize, Serialize};

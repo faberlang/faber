@@ -1,8 +1,8 @@
 use super::plan::{
     AxisReductionPlan, BarrierPhase, BarrierPoint, CausalMaskedSoftmaxPlan, ComposedMatMulPlan,
-    DistributedSumPlan, GatherPlan, GroupedMatMulPlan, MatMulPlan, QuantizedMatMulPlan, ReduceOp,
-    ReductionPlan, RmsNormalizationPlan, RopePlan, SharedMemoryLayout, SsmConv1dPlan, SsmScanPlan,
-    TransposePlan, MATMUL_SHARED_A_BUFFER_NAME, MATMUL_SHARED_B_BUFFER_NAME,
+    DistributedSumPlan, GatherPlan, GroupedMatMulPlan, MATMUL_SHARED_A_BUFFER_NAME,
+    MATMUL_SHARED_B_BUFFER_NAME, MatMulPlan, QuantizedMatMulPlan, ReduceOp, ReductionPlan,
+    RmsNormalizationPlan, RopePlan, SharedMemoryLayout, SsmConv1dPlan, SsmScanPlan, TransposePlan,
     WORKGROUP_SHARED_MEMORY_LIMIT_BYTES,
 };
 use std::fmt;
@@ -962,10 +962,9 @@ impl fmt::Display for PlanValidationError {
                 f,
                 "distributed sum lane width {lane_width} must equal the tree-floor workgroup lane count {workgroup_x}"
             ),
-            Self::DistributedSumZeroLength => write!(
-                f,
-                "distributed sum requires a positive source length"
-            ),
+            Self::DistributedSumZeroLength => {
+                write!(f, "distributed sum requires a positive source length")
+            }
             Self::ComposedMatMulStageCount { stages, edges } => write!(
                 f,
                 "composed matmul requires four stages and three edges, got {stages} stages and {edges} edges"

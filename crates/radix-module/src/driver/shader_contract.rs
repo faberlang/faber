@@ -66,17 +66,17 @@
 use rustc_hash::{FxHashMap, FxHashSet};
 
 use crate::diagnostics::{Diagnostic, DiagnosticArg, DiagnosticPhase, Span};
-use crate::hir::visit::{walk_expr, HirVisitor};
+use crate::hir::visit::{HirVisitor, walk_expr};
 use crate::hir::{DefId, HirCallArg, HirExpression, HirExpressionKind, HirItemKind, HirLiteral, HirModule};
 use crate::lexer::{Interner, TokenKind};
 use crate::semantic::{Primitive, TypeTable};
 
 use radix_mir::{
+    ContractProvenance, MirAbiError, MirDepthStencilState, MirScalarLayout, MirStencilFaceState, MirType,
+    ShaderFragmentOutput, ShaderPipelineState, ShaderResourceBinding, ShaderVarying, ShaderVertexAttribute,
     color_target_format_from_code, depth_compare_function_from_code, input_step_mode_from_code,
     primitive_topology_from_code, resource_access_from_code, resource_kind_from_code, resource_role_from_code,
-    stage_io_role_from_code, varying_interpolation_from_code, vertex_format_from_code, ContractProvenance, MirAbiError,
-    MirDepthStencilState, MirScalarLayout, MirStencilFaceState, MirType, ShaderFragmentOutput, ShaderPipelineState,
-    ShaderResourceBinding, ShaderVarying, ShaderVertexAttribute,
+    stage_io_role_from_code, varying_interpolation_from_code, vertex_format_from_code,
 };
 
 /// Compiler-owned annotation family for the generic contract surface.

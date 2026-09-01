@@ -5,7 +5,7 @@
 //! diagnostics.
 
 use crate::annotation_contract::{
-    analyze, AnnotationAttachmentTarget, ContractFieldType, ContractPayloadValue,
+    AnnotationAttachmentTarget, ContractFieldType, ContractPayloadValue, analyze,
 };
 use crate::file_interface::{
     FileExport, FileExportKind, FileInterface, InterfaceAnnotationContract,
@@ -13,7 +13,7 @@ use crate::file_interface::{
     InterfaceTypeSnapshot,
 };
 use crate::test_support::args_have_no_legacy_message;
-use crate::{analyze as semantic_analyze, PassConfig, Primitive, SemanticErrorKind};
+use crate::{PassConfig, Primitive, SemanticErrorKind, analyze as semantic_analyze};
 use radix_hir::{HirAnnotationValue, HirItemKind};
 use radix_lexer::lex;
 use radix_parser::parse;
@@ -358,11 +358,13 @@ functio apply() → vacuum {
         result.diagnostics
     );
     let meta_name = parsed.interner.intern("Meta");
-    assert!(result
-        .annotation_contracts
-        .registry
-        .lookup_name(meta_name)
-        .is_some());
+    assert!(
+        result
+            .annotation_contracts
+            .registry
+            .lookup_name(meta_name)
+            .is_some()
+    );
     let apps: Vec<_> = result.annotation_contracts.applications().collect();
     assert_eq!(apps.len(), 1);
 }

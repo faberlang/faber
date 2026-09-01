@@ -8,8 +8,8 @@
 mod md3j_fixtures;
 
 use super::{
-    admit_device_section, admit_distributed_section, wire_plan_to_plan, FmirDeviceSection,
-    WirePlacementConstraint, WIRE_DISTRIBUTED_SECTION_VERSION,
+    FmirDeviceSection, WIRE_DISTRIBUTED_SECTION_VERSION, WirePlacementConstraint,
+    admit_device_section, admit_distributed_section, wire_plan_to_plan,
 };
 use md3j_fixtures::{
     EIGHT_GIB_BYTES, EIGHT_RANK_COUNT, OVER_BUDGET_BYTES, REALCARD_OVER_BUDGET_BYTES,

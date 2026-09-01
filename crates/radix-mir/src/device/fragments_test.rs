@@ -1,14 +1,14 @@
 //! Survivor-invariant proofs at the `ValidatedMir` / `validate_program` seam.
 
 use super::{
-    first_surviving_fragment_call, reject_nucleum_fragment_survivors, surviving_nucleum_fragments,
-    FragmentSurvivorKind, NUCLEUM_FRAGMENT_SURVIVED,
+    FragmentSurvivorKind, NUCLEUM_FRAGMENT_SURVIVED, first_surviving_fragment_call,
+    reject_nucleum_fragment_survivors, surviving_nucleum_fragments,
 };
 use crate::{
-    validate_program, validate_program_with_device_roles, MirBlock, MirBlockId, MirCallee,
-    MirDeviceContext, MirDeviceRole, MirFunction, MirFunctionId, MirLocal, MirLocalId, MirOperand,
-    MirParam, MirParamMode, MirPlace, MirProgram, MirStatement, MirStatementKind, MirTerminator,
-    MirTerminatorKind, MirType, MirValidationContext, ValidatedMir,
+    MirBlock, MirBlockId, MirCallee, MirDeviceContext, MirDeviceRole, MirFunction, MirFunctionId,
+    MirLocal, MirLocalId, MirOperand, MirParam, MirParamMode, MirPlace, MirProgram, MirStatement,
+    MirStatementKind, MirTerminator, MirTerminatorKind, MirType, MirValidationContext,
+    ValidatedMir, validate_program, validate_program_with_device_roles,
 };
 use radix_hir::DefId;
 use radix_lexer::Span;

@@ -450,15 +450,21 @@ fn device_program_composed_stages_are_inout_and_unobserved() {
             .collect::<Vec<_>>(),
         vec![5, 6, 7]
     );
-    assert!(stage_resources
-        .iter()
-        .all(|resource| resource.buffer.role == BufferRole::InOut));
-    assert!(stage_resources
-        .iter()
-        .all(|resource| resource.buffer.storage == MirTensorStorageLayout::DeviceHandle));
-    assert!(stage_resources
-        .iter()
-        .all(|resource| resource.version.version == 1));
+    assert!(
+        stage_resources
+            .iter()
+            .all(|resource| resource.buffer.role == BufferRole::InOut)
+    );
+    assert!(
+        stage_resources
+            .iter()
+            .all(|resource| resource.buffer.storage == MirTensorStorageLayout::DeviceHandle)
+    );
+    assert!(
+        stage_resources
+            .iter()
+            .all(|resource| resource.version.version == 1)
+    );
     assert_eq!(
         stage_resources
             .iter()

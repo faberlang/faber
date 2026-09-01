@@ -26,24 +26,24 @@ pub const PACKAGE_TEST_ANALYSIS_BUDGET: Duration = Duration::from_secs(30);
 
 use radix_module::diagnostics::Diagnostic;
 use radix_module::driver::{
-    analyze_source_with_kernel_template_admissions, AnalyzeRequest, AnalyzedModule, Config,
-    ModuleImportContract, PackageKernelTemplateAdmissions, Session,
+    AnalyzeRequest, AnalyzedModule, Config, ModuleImportContract, PackageKernelTemplateAdmissions,
+    Session, analyze_source_with_kernel_template_admissions,
 };
 use radix_module::lexer::Interner;
 use radix_module::semantic::passes::visibility_annotation::VisibilityTier;
 use radix_module::syntax::{ImportDecl, ImportKind, StmtKind};
 
-use crate::discovery::{discover_build_layout, discover_package, PackageSpec};
+use crate::discovery::{PackageSpec, discover_build_layout, discover_package};
 use crate::frontmatter::manifest_path_for_spec;
 use crate::import_graph::{
-    build_mount_plan, detect_import_cycles, import_unsupported_diagnostic, library_import_binding,
-    library_import_kind_diagnostic, resolve_import, ImportResolution,
+    ImportResolution, build_mount_plan, detect_import_cycles, import_unsupported_diagnostic,
+    library_import_binding, library_import_kind_diagnostic, resolve_import,
 };
 use crate::library::{
-    analysis_source_for_file, attach_library_provenance_with_links, expand_library_imports,
-    library_cached_file_interface, library_interface_declaration_surface,
-    library_interface_export_surface, library_interface_has_module, program_declaration_surface,
-    program_export_surface, LibraryInterfaceCache, LibraryResolver, LocaleLoader,
+    LibraryInterfaceCache, LibraryResolver, LocaleLoader, analysis_source_for_file,
+    attach_library_provenance_with_links, expand_library_imports, library_cached_file_interface,
+    library_interface_declaration_surface, library_interface_export_surface,
+    library_interface_has_module, program_declaration_surface, program_export_surface,
 };
 use crate::manifest::read_manifest;
 use crate::modules::module_segments_for_file;
@@ -904,11 +904,13 @@ pub fn load_package_with_config(
     } else {
         // Single-file entry: allow an explicit `.proba` path on the test path only.
         if is_proba_source_path(&spec.entry) && !include_proba {
-            return Err(vec![crate::package_diagnostic_error(
-                ".proba files are test sources; use `faber test` to load them",
-            )
-            .with_file(spec.entry.display().to_string())
-            .with_arg("issue", "proba_source_build_forbidden")]);
+            return Err(vec![
+                crate::package_diagnostic_error(
+                    ".proba files are test sources; use `faber test` to load them",
+                )
+                .with_file(spec.entry.display().to_string())
+                .with_arg("issue", "proba_source_build_forbidden"),
+            ]);
         }
         // Product graph starts at the entry file. For `faber test`, also walk
         // `source_root` for `*.proba` so colocated test files are not orphaned

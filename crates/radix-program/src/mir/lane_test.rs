@@ -497,8 +497,7 @@ const PATH_CONST_SIBLING_MATH: &str =
     "const int N ← 320\n\nconst int K ← 960\n\nconst int ELEMENTS ← N * K\n";
 const PATH_CONST_SIBLING_MAIN: &str =
     "import from \"./math\" math\n\nmain {\n    print math.ELEMENTS\n}\n";
-const PATH_CONST_LIB: &str =
-    "+++\nlocale = \"en\"\n+++\nconst int N ← 320\n\nconst int K ← 960\n\nconst int ELEMENTS ← N * K\n";
+const PATH_CONST_LIB: &str = "+++\nlocale = \"en\"\n+++\nconst int N ← 320\n\nconst int K ← 960\n\nconst int ELEMENTS ← N * K\n";
 const PATH_CONST_LIB_MAIN: &str =
     "import from \"pathclib:lib\" vals\n\nmain {\n    print vals.ELEMENTS\n}\n";
 // The rejection boundary: a `Path` to a const that is NOT a linked data

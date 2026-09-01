@@ -1,5 +1,5 @@
 use super::super::device::{
-    FmirExecutorPlanSectionV2, FmirSessionSectionV2, EXECUTOR_PLAN_SECTION_VERSION,
+    EXECUTOR_PLAN_SECTION_VERSION, FmirExecutorPlanSectionV2, FmirSessionSectionV2,
     WIRE_SESSION_SECTION_VERSION,
 };
 use super::super::executor_plan::{
@@ -8,11 +8,11 @@ use super::super::executor_plan::{
     WirePlanProvenance, WireRuntimeSource, WireViewFact,
 };
 use super::super::wire::{
-    WireBinding, WireBufferLifetime, WireBufferRole, WireCollectionKernelPlan, WireDeviceProgram,
-    WireInitializationPolicy, WireInvocationMode, WireKernelLaunchPlan, WireKernelUnit,
-    WireKvCacheAttentionFamily, WireKvCacheCapacityPolicy, WireKvCacheDtype,
-    WireKvCacheRopePairing, WireKvCacheSemanticV2, WireKvCacheVLayout,
-    WireSessionObservationCadence, WireStorageLayout, WIRE_KV_CACHE_SEMANTIC_CONTRACT_VERSION,
+    WIRE_KV_CACHE_SEMANTIC_CONTRACT_VERSION, WireBinding, WireBufferLifetime, WireBufferRole,
+    WireCollectionKernelPlan, WireDeviceProgram, WireInitializationPolicy, WireInvocationMode,
+    WireKernelLaunchPlan, WireKernelUnit, WireKvCacheAttentionFamily, WireKvCacheCapacityPolicy,
+    WireKvCacheDtype, WireKvCacheRopePairing, WireKvCacheSemanticV2, WireKvCacheVLayout,
+    WireSessionObservationCadence, WireStorageLayout,
 };
 use super::admit_session_section_v2;
 use crate::error::FmirImageError;

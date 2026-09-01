@@ -4,10 +4,10 @@
 //! codegen emits Rust glyph operations (not method calls).
 
 use super::{
-    is_numeric_bitwise_operator, is_numeric_imperativus_operator, lookup_method, lookup_method_for_type,
-    IntrinsicReceiver,
+    IntrinsicReceiver, is_numeric_bitwise_operator, is_numeric_imperativus_operator, lookup_method,
+    lookup_method_for_type,
 };
-use crate::driver::{analyze_source, AnalyzeRequest, Config, Session};
+use crate::driver::{AnalyzeRequest, Config, Session, analyze_source};
 use crate::semantic::{Primitive, Type, TypeTable};
 
 #[cfg(feature = "hir-rust")]

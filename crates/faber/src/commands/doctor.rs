@@ -7,8 +7,8 @@ use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
 
 use crate::library::{
-    library_availability, library_root_rule, resolved_library_home, specifier_identity,
-    LibraryAvailability, LibraryHomeSource, LibraryRootRule, KNOWN_LIBRARIES,
+    KNOWN_LIBRARIES, LibraryAvailability, LibraryHomeSource, LibraryRootRule, library_availability,
+    library_root_rule, resolved_library_home, specifier_identity,
 };
 
 /// One library row doctor emits.

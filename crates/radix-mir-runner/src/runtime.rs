@@ -30,11 +30,11 @@
 )]
 
 use super::value::{
-    ascii1_from_scalar, format_template, modular_operand, modular_word_mask, modular_word_result,
-    uint_width_checked_add, uint_width_checked_mul, values_equal, width_checked_add,
-    width_checked_mul, GradientStorage, MapKey, SermoValue, TensorValue, Value,
+    GradientStorage, MapKey, SermoValue, TensorValue, Value, ascii1_from_scalar, format_template,
+    modular_operand, modular_word_mask, modular_word_result, uint_width_checked_add,
+    uint_width_checked_mul, values_equal, width_checked_add, width_checked_mul,
 };
-use super::{gelu_f64, host::provider_identity, Runner, RunnerError};
+use super::{Runner, RunnerError, gelu_f64, host::provider_identity};
 use radix_hir::DefId;
 use radix_lexer::{Span, Symbol};
 use radix_mir::{
@@ -44,13 +44,13 @@ use radix_mir::{
     MirProviderKind, MirRuntimeCall, MirSermoOp, MirType, MirTypeCheckOp,
 };
 use radix_runtime_contract::tensor::{
-    tensor_dim_non_negative, tensor_flat_offset, tensor_shape_element_count,
     ERR_ACCIPE_INVALID_INDEX, ERR_CREA_INVALID_SHAPE, ERR_ELEMENT_COUNT_OVERFLOW,
     ERR_FORMA_ELEMENT_COUNT, ERR_FORMA_RESHAPE_COUNT, ERR_MATMUL_ARGUMENT_RANK,
     ERR_MATMUL_INNER_DIMENSION, ERR_MATMUL_RECEIVER_RANK, ERR_PONDE_INVALID_INDEX,
+    tensor_dim_non_negative, tensor_flat_offset, tensor_shape_element_count,
 };
 use radix_types::{
-    effective_width, IndexExpr, IndexId, NumericWidth, Primitive, Type, TypeId, TypeTable,
+    IndexExpr, IndexId, NumericWidth, Primitive, Type, TypeId, TypeTable, effective_width,
 };
 use rustc_hash::FxHashMap;
 use std::cell::RefCell;
@@ -713,7 +713,7 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                     match spread {
                         Value::Array(cell) => out.extend(cell.borrow().clone()),
                         _ => {
-                            return Err(RunnerError::internal(span, "spread operand is not array"))
+                            return Err(RunnerError::internal(span, "spread operand is not array"));
                         }
                     }
                 }
@@ -1469,7 +1469,7 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                                 return Err(RunnerError::internal(
                                     span,
                                     "collection copy/view arity",
-                                ))
+                                ));
                             }
                         };
                         Ok(array_value(borrow[start..end].to_vec()))
@@ -1955,7 +1955,7 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                 return Err(RunnerError::internal(
                     span,
                     format!("{label} result type mismatch"),
-                ))
+                ));
             }
         };
         let width = effective_width(self.types, element_ty).unwrap_or(NumericWidth::I64);
@@ -2189,7 +2189,7 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                         return Err(RunnerError::internal(
                             span,
                             "tensor neg element type mismatch",
-                        ))
+                        ));
                     }
                 })
             })
@@ -2487,7 +2487,7 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                         return Err(RunnerError::internal(
                             span,
                             "tensor sum_axis axis must be int",
-                        ))
+                        ));
                     }
                 }
             }
@@ -2595,7 +2595,7 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                 return Err(RunnerError::internal(
                     span,
                     format!("tensor layernorm axis must be int, got {other:?}"),
-                ))
+                ));
             }
         };
         let epsilon = match self.eval_operand(&args[2], span)? {
@@ -2604,7 +2604,7 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                 return Err(RunnerError::internal(
                     span,
                     format!("tensor layernorm epsilon must be float, got {other:?}"),
-                ))
+                ));
             }
         };
 
@@ -2775,7 +2775,7 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                 return Err(RunnerError::internal(
                     span,
                     format!("tensor rms_norm axis must be int, got {other:?}"),
-                ))
+                ));
             }
         };
         let epsilon = match self.eval_operand(eps_arg, span)? {
@@ -2784,7 +2784,7 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                 return Err(RunnerError::internal(
                     span,
                     format!("tensor rms_norm epsilon must be float, got {other:?}"),
-                ))
+                ));
             }
         };
 
@@ -2874,7 +2874,7 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                 return Err(RunnerError::internal(
                     span,
                     format!("tensor rope pos must be int, got {other:?}"),
-                ))
+                ));
             }
         };
         let dim = match self.eval_operand(dim_arg, span)? {
@@ -2883,7 +2883,7 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                 return Err(RunnerError::internal(
                     span,
                     format!("tensor rope dim must be int, got {other:?}"),
-                ))
+                ));
             }
         };
 
@@ -2900,7 +2900,9 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
         if dim <= 0 || dim % 2 != 0 || usize::try_from(dim).map_or(true, |d| d > last_extent) {
             return Err(RunnerError::internal(
                 span,
-                format!("tensor rope dim {dim} must be even and within the last-axis extent {last_extent}"),
+                format!(
+                    "tensor rope dim {dim} must be even and within the last-axis extent {last_extent}"
+                ),
             ));
         }
         let batch = borrow.data.len() / last_extent;
@@ -3333,7 +3335,7 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                 return Err(RunnerError::internal(
                     span,
                     "cord cursor receiver type mismatch",
-                ))
+                ));
             }
         };
         Ok(Value::Array(Rc::new(RefCell::new(elems))))
@@ -3391,7 +3393,7 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                 return Err(RunnerError::internal(
                     span,
                     "numeric receiver type mismatch",
-                ))
+                ));
             }
         };
         // Rounding ops (`round`/`floor`/`ceil`/`trunc`) are typed numerus;
@@ -3571,7 +3573,7 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                 return Err(RunnerError::internal(
                     span,
                     "argmax/argmin receiver type mismatch",
-                ))
+                ));
             }
         };
         let mut winner: Option<usize> = None;
@@ -4157,7 +4159,7 @@ fn sparse_zero_value(
                 return Err(RunnerError::internal(
                     span,
                     "sparse element type is not numeric",
-                ))
+                ));
             }
         }
     }
@@ -4205,7 +4207,7 @@ fn gradient_shape_dims(
             return Err(RunnerError::internal(
                 span,
                 "gradient shape is not a lista or tensor",
-            ))
+            ));
         }
     };
     if dims.len() != rank {

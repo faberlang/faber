@@ -4,7 +4,7 @@
 //! bodies, explicit argument writes, fragment and device-intrinsic calls; and
 //! forbidden postures, host effects, illegal role calls, and dynamic values.
 
-use super::fragment_definition::{check, DeviceEffectKind, FragmentDefinitionReport};
+use super::fragment_definition::{DeviceEffectKind, FragmentDefinitionReport, check};
 use crate::test_support::args_have_no_legacy_message;
 use crate::{PassConfig, SemanticError, SemanticErrorKind};
 use radix_target::Target;

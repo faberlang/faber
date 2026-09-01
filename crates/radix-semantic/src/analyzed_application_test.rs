@@ -1,12 +1,12 @@
 //! Coherence and fail-closed tests for the HIR v1 analyzed application contract.
 
 use crate::analyzed_application::{
-    qualify_for_target, AnalyzedApplication, AnalyzedApplicationError, AnalyzedApplicationParts,
-    QualificationStatus,
+    AnalyzedApplication, AnalyzedApplicationError, AnalyzedApplicationParts, QualificationStatus,
+    qualify_for_target,
 };
 use crate::{
-    analyze, analyze_resolved_uses, PassConfig, QualifiedDeclKind, QualifiedIdentity,
-    QualifiedIdentityTable, ResolvedUseKind, SemanticError, SemanticErrorKind,
+    PassConfig, QualifiedDeclKind, QualifiedIdentity, QualifiedIdentityTable, ResolvedUseKind,
+    SemanticError, SemanticErrorKind, analyze, analyze_resolved_uses,
 };
 use radix_lexer::Interner;
 use radix_target::Target;
@@ -56,14 +56,16 @@ incipit {
     let app = AnalyzedApplication::build(parts, &interner).expect("build application");
     assert!(app.stamp().get() > 0);
     assert!(app.hir().entry.is_some());
-    assert!(app.function_facts().has_fact(
-        app.hir()
-            .items
-            .iter()
-            .find(|item| matches!(item.kind, radix_hir::HirItemKind::Function(_)))
-            .expect("function item")
-            .def_id
-    ));
+    assert!(
+        app.function_facts().has_fact(
+            app.hir()
+                .items
+                .iter()
+                .find(|item| matches!(item.kind, radix_hir::HirItemKind::Function(_)))
+                .expect("function item")
+                .def_id
+        )
+    );
 }
 
 #[test]
@@ -242,12 +244,14 @@ incipit {
     let uses = analyze_resolved_uses(&parts.hir, &parts.types, &qualified);
     assert!(uses.locals_used().contains(&persona_def));
     assert!(uses.locals_used().contains(&identity_def));
-    assert!(uses
-        .uses_of_portable("package::demo::models::Persona")
-        .any(|use_site| use_site.kind == ResolvedUseKind::TypeRef));
-    assert!(uses
-        .uses_of_portable("package::demo::models::identity")
-        .any(|use_site| use_site.kind == ResolvedUseKind::Call));
+    assert!(
+        uses.uses_of_portable("package::demo::models::Persona")
+            .any(|use_site| use_site.kind == ResolvedUseKind::TypeRef)
+    );
+    assert!(
+        uses.uses_of_portable("package::demo::models::identity")
+            .any(|use_site| use_site.kind == ResolvedUseKind::Call)
+    );
 }
 
 #[test]

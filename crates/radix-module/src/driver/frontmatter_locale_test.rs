@@ -103,10 +103,12 @@ fn compile_rejects_unknown_frontmatter_locale() {
     let result = compile(&session, "locale.fab", source, ModuleCompileRequest::default());
 
     assert!(!result.success());
-    assert!(result
-        .diagnostics
-        .iter()
-        .any(|d| d.code == Some("LOCALE003")));
+    assert!(
+        result
+            .diagnostics
+            .iter()
+            .any(|d| d.code == Some("LOCALE003"))
+    );
 }
 
 #[test]
@@ -131,10 +133,12 @@ fn compile_rejects_frontmatter_locale_without_stdlib() {
     let result = compile(&session, "locale.fab", source, ModuleCompileRequest::default());
 
     assert!(!result.success());
-    assert!(result
-        .diagnostics
-        .iter()
-        .any(|d| d.code == Some("LOCALE003")));
+    assert!(
+        result
+            .diagnostics
+            .iter()
+            .any(|d| d.code == Some("LOCALE003"))
+    );
 }
 
 #[test]
@@ -146,10 +150,12 @@ fn compile_rejects_frontmatter_locale_with_parent_traversal() {
     let source = "+++\nlocale = \"../../etc/passwd\"\n+++\n\nfunctio salve() { }";
     let result = compile(&session, "locale.fab", source, ModuleCompileRequest::default());
     assert!(!result.success());
-    assert!(result
-        .diagnostics
-        .iter()
-        .any(|d| d.code == Some("LOCALE003")));
+    assert!(
+        result
+            .diagnostics
+            .iter()
+            .any(|d| d.code == Some("LOCALE003"))
+    );
 }
 
 #[test]
@@ -161,10 +167,12 @@ fn compile_rejects_frontmatter_locale_empty() {
     let source = "+++\nlocale = \"\"\n+++\n\nfunctio salve() { }";
     let result = compile(&session, "locale.fab", source, ModuleCompileRequest::default());
     assert!(!result.success());
-    assert!(result
-        .diagnostics
-        .iter()
-        .any(|d| d.code == Some("LOCALE003")));
+    assert!(
+        result
+            .diagnostics
+            .iter()
+            .any(|d| d.code == Some("LOCALE003"))
+    );
 }
 
 #[test]
@@ -176,10 +184,12 @@ fn compile_rejects_frontmatter_locale_absolute_path() {
     let source = "+++\nlocale = \"/etc\"\n+++\n\nfunctio salve() { }";
     let result = compile(&session, "locale.fab", source, ModuleCompileRequest::default());
     assert!(!result.success());
-    assert!(result
-        .diagnostics
-        .iter()
-        .any(|d| d.code == Some("LOCALE003")));
+    assert!(
+        result
+            .diagnostics
+            .iter()
+            .any(|d| d.code == Some("LOCALE003"))
+    );
 }
 
 #[test]
@@ -191,10 +201,12 @@ fn compile_rejects_frontmatter_locale_absolute_path_deep() {
     let source = "+++\nlocale = \"/etc/passwd\"\n+++\n\nfunctio salve() { }";
     let result = compile(&session, "locale.fab", source, ModuleCompileRequest::default());
     assert!(!result.success());
-    assert!(result
-        .diagnostics
-        .iter()
-        .any(|d| d.code == Some("LOCALE003")));
+    assert!(
+        result
+            .diagnostics
+            .iter()
+            .any(|d| d.code == Some("LOCALE003"))
+    );
 }
 
 #[test]
@@ -206,10 +218,12 @@ fn compile_rejects_frontmatter_locale_with_path_separator() {
     let source = "+++\nlocale = \"la/extra\"\n+++\n\nfunctio salve() { }";
     let result = compile(&session, "locale.fab", source, ModuleCompileRequest::default());
     assert!(!result.success());
-    assert!(result
-        .diagnostics
-        .iter()
-        .any(|d| d.code == Some("LOCALE003")));
+    assert!(
+        result
+            .diagnostics
+            .iter()
+            .any(|d| d.code == Some("LOCALE003"))
+    );
 }
 
 #[test]
@@ -221,8 +235,10 @@ fn compile_rejects_non_string_frontmatter_locale() {
     let source = "+++\nlocale = 42\n+++\n\nfunctio salve() { }";
     let result = compile(&session, "locale.fab", source, ModuleCompileRequest::default());
     assert!(!result.success());
-    assert!(result
-        .diagnostics
-        .iter()
-        .any(|d| d.code == Some("LOCALE003")));
+    assert!(
+        result
+            .diagnostics
+            .iter()
+            .any(|d| d.code == Some("LOCALE003"))
+    );
 }

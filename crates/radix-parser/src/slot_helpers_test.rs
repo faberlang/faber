@@ -6,8 +6,8 @@
 //! pin both modes directly on the helpers, independent of any dispatch site,
 //! so the token→spelling migration cannot silently break slot recognition.
 
-use super::{parse, ParseOptions, Parser};
-use radix_lexer::{lex, lex_with_locale_pack, KeywordPack, LexResult, TokenKind};
+use super::{ParseOptions, Parser, parse};
+use radix_lexer::{KeywordPack, LexResult, TokenKind, lex, lex_with_locale_pack};
 use radix_syntax::{BindingPattern, ClosureModifier, ExprKind, StmtKind};
 
 fn parse_ok_with_slot_pack(source: &str) -> super::ParseResult {

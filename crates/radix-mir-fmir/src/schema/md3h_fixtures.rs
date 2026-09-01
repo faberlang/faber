@@ -11,20 +11,20 @@
 //! Fixtures only — they exercise the existing schema; they do not change it.
 
 use super::super::{
-    logical_distributed_plan_hash, plan_to_wire_plan, wire_facts_to_facts, wire_plan_to_plan,
-    wire_program_to_program, FmirDeviceArtifactsSection, FmirDeviceProgramSection,
-    FmirDeviceSection, FmirDeviceSelection, FmirDistributedExecutionSection, WireBinding,
-    WireBufferIdentity, WireBufferLifetime, WireBufferRole, WireBufferVersion,
+    FmirDeviceArtifactsSection, FmirDeviceProgramSection, FmirDeviceSection, FmirDeviceSelection,
+    FmirDistributedExecutionSection, WIRE_DEVICE_PROGRAM_VERSION, WIRE_DISTRIBUTED_SECTION_VERSION,
+    WireBinding, WireBufferIdentity, WireBufferLifetime, WireBufferRole, WireBufferVersion,
     WireCollectionKernelPlan, WireDependencyEdge, WireDeviceProgram, WireDeviceResource,
     WireDispatchSize, WireInitializationPolicy, WireKernelLaunchPlan, WireKernelUnit,
     WireLaunchUnit, WireObservationCadence, WireObservationFact, WirePlacementContract,
     WirePlacementFact, WireProgramLifetime, WireResourceAccess, WireResultBuffer,
     WireSemanticValue, WireSemanticValueOrigin, WireStorageLayout, WireWorkgroupCount,
-    WireWorkgroupSize, WIRE_DEVICE_PROGRAM_VERSION, WIRE_DISTRIBUTED_SECTION_VERSION,
+    WireWorkgroupSize, logical_distributed_plan_hash, plan_to_wire_plan, wire_facts_to_facts,
+    wire_plan_to_plan, wire_program_to_program,
 };
 use radix_mir::distributed::{
-    DeclaredPlacement, DistributedExecutionPlan, LogicalPlacement, PartitionId,
-    PlacementConstraint, PlacementObjective, PlanVersion, LOGICAL_PLAN_VERSION,
+    DeclaredPlacement, DistributedExecutionPlan, LOGICAL_PLAN_VERSION, LogicalPlacement,
+    PartitionId, PlacementConstraint, PlacementObjective, PlanVersion,
 };
 
 /// Logical rank count of the eight-rank fixture.

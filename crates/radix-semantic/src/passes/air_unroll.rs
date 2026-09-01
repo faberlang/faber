@@ -33,8 +33,8 @@ use crate::{
     TypeTable,
 };
 use radix_hir::visit::{
-    walk_block, walk_expr, walk_expr_mut, walk_item, walk_program, walk_stmt, walk_stmt_mut,
-    HirVisitor, HirVisitorMut,
+    HirVisitor, HirVisitorMut, walk_block, walk_expr, walk_expr_mut, walk_item, walk_program,
+    walk_stmt, walk_stmt_mut,
 };
 use radix_hir::{
     DefId, HirArrayElement, HirAuthoredTypeUse, HirBinOp, HirBlock, HirConversioTarget,

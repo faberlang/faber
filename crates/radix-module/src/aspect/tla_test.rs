@@ -3,7 +3,7 @@
 //! records are skipped.
 
 use super::emit_tla_modules;
-use crate::aspect::{report_hir_aspects, HirAspectRecordKind};
+use crate::aspect::{HirAspectRecordKind, report_hir_aspects};
 use crate::hir::{
     DefId, HirBlock, HirCasuArm, HirEnum, HirExpression, HirExpressionKind, HirId, HirItem, HirItemKind, HirLiteral,
     HirModule, HirPattern, HirStatement, HirStatementKind, HirVariant,

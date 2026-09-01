@@ -8,7 +8,7 @@
 #![allow(dead_code)]
 
 use radix_diagnostics::DiagnosticArg;
-pub use radix_diagnostics::{locale_suggestion_spec, DiagnosticSpec};
+pub use radix_diagnostics::{DiagnosticSpec, locale_suggestion_spec};
 
 #[must_use]
 pub fn arg_value<'a>(args: &'a [DiagnosticArg], name: &str) -> Option<&'a str> {

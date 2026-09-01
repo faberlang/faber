@@ -127,7 +127,9 @@ fn rendered_table_contains_capability_rows_under_full_build() {
     // surface.
     for name in ["device-runtime", "host-macos-arm64"] {
         assert!(
-            !table.lines().any(|line| line.starts_with(&format!("{name} "))),
+            !table
+                .lines()
+                .any(|line| line.starts_with(&format!("{name} "))),
             "unexpected {name} capability row under the default build (feature left full-targets):\n{table}"
         );
     }

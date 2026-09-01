@@ -8,11 +8,11 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use super::{
-    is_kernel_import_path, kernel_manifest_entries, kernel_module_count, resolve_kernel_module, KernelModule,
-    KernelResolveError,
+    KernelModule, KernelResolveError, is_kernel_import_path, kernel_manifest_entries, kernel_module_count,
+    resolve_kernel_module,
 };
 use crate::codegen::Target;
-use crate::driver::{analyze_source, AnalyzeRequest, Config, Session};
+use crate::driver::{AnalyzeRequest, Config, Session, analyze_source};
 use crate::mir::lower_analyzed_unit;
 use crate::mir::{MirIntrinsic, MirProvider, MirProviderKind, MirStatementKind};
 

@@ -4,9 +4,9 @@
 //! deployment (constructors, broadcast ops, call-site `magnitudo` bind) land in
 //! Stage 5; this module provides the solve/finalize machinery they plug into.
 
+use super::TypeTable;
 use super::index::{IndexExpr, IndexId, IndexVar};
 use super::index_unify::{IndexUnifier, IndexUnifyError};
-use super::TypeTable;
 use rustc_hash::FxHashMap;
 
 pub const MISSING_TENSOR_SHAPE_MSG: &str = "cannot infer tensor shape";
@@ -15,10 +15,8 @@ pub const TENSOR_SHAPE_CONVERSIO_MSG: &str =
     "tensor shape conversion is not supported for this pair";
 pub const TENSOR_ELEMENT_CONVERSIO_MSG: &str =
     "tensor element-type conversion is not supported for this pair";
-pub const TENSOR_TO_SCALAR_CONVERSIO_MSG: &str =
-    "tensor to scalar conversion has no default element pick; use `accipe(index)` for indexed reads";
-pub const SCALAR_TO_TENSOR_CONVERSIO_MSG: &str =
-    "scalar to tensor conversion has no default broadcast shape; use `crea(shape, fill)` or `structa`";
+pub const TENSOR_TO_SCALAR_CONVERSIO_MSG: &str = "tensor to scalar conversion has no default element pick; use `accipe(index)` for indexed reads";
+pub const SCALAR_TO_TENSOR_CONVERSIO_MSG: &str = "scalar to tensor conversion has no default broadcast shape; use `crea(shape, fill)` or `structa`";
 
 /// A constraint between two index terms gathered during typechecking.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

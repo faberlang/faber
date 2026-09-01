@@ -292,9 +292,12 @@ fn shared_field_union_warns_only_teach() {
     assert!(result
         .iter()
         .any(|err| !err.is_error() && test_support::issue(err) == Some("union_nominal_members")));
-    assert!(!result
-        .iter()
-        .any(|err| !err.is_error() && test_support::issue(err) == Some("union_no_common_members")));
+    assert!(
+        !result
+            .iter()
+            .any(|err| !err.is_error()
+                && test_support::issue(err) == Some("union_no_common_members"))
+    );
 }
 
 #[test]

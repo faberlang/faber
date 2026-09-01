@@ -9,10 +9,10 @@
 //! diagnostic — never the empty `error[PKG001]: <file>` body this suite
 //! guards against.
 
-use radix_module::diagnostics::{render_plain, Diagnostic};
+use radix_module::diagnostics::{Diagnostic, render_plain};
 use radix_module::driver::Config;
 
-use crate::analyze::{check_package, AnalysisSeams};
+use crate::analyze::{AnalysisSeams, check_package};
 use crate::discovery::PackageSpec;
 use crate::library::LibraryResolver;
 use std::fs;

@@ -20,12 +20,13 @@
 //!. The lower-level MIR proof below drives the exact
 //!   `TensorGather` op with `T = 0` as an independent runner-layer check.
 
-use crate::air::{lower_program, AirExpr, AirTensorOp};
+use crate::air::{AirExpr, AirTensorOp, lower_program};
 use crate::codegen::Target;
-use crate::driver::{analyze_source, compile, AnalyzeRequest, Config, ModuleCompileRequest, Session};
+use crate::driver::{AnalyzeRequest, Config, ModuleCompileRequest, Session, analyze_source, compile};
 use crate::mir::{
-    run_entry, run_source, validate_program, BufferHost, MirAggregateFields, MirCollectionOp, MirIntrinsic, MirOperand,
-    MirPlaceBase, MirRuntimeCall, MirStatementKind, MirTempId, MirValidationContext, RunSourceError, ValidatedMir,
+    BufferHost, MirAggregateFields, MirCollectionOp, MirIntrinsic, MirOperand, MirPlaceBase, MirRuntimeCall,
+    MirStatementKind, MirTempId, MirValidationContext, RunSourceError, ValidatedMir, run_entry, run_source,
+    validate_program,
 };
 use crate::semantic::{self, PassConfig};
 use crate::test_support::test_session;

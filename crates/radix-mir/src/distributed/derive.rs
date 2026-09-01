@@ -12,6 +12,7 @@
 //! gate's (MD2-V1), not this function's — this module never rejects and
 //! never invents facts.
 
+use crate::MirType;
 use crate::abi::MirKernelResourceAccess;
 use crate::device_program::{BufferId, DeviceProgram, LaunchId, LaunchUnit};
 use crate::distributed::types::{
@@ -21,7 +22,6 @@ use crate::distributed::types::{
     TransferId, TransferOperation, TransportPath,
 };
 use crate::layout::MirTensorStorageLayout;
-use crate::MirType;
 
 /// Deterministically derive the per-device partitions and the upper execution
 /// graph for one semantic program + declared placement facts.

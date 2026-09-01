@@ -1,6 +1,6 @@
 use super::{
-    is_package_source_path, is_proba_source_path, package_source_files, MAX_PACKAGE_SOURCE_BYTES,
-    MAX_PACKAGE_SOURCE_FILES,
+    MAX_PACKAGE_SOURCE_BYTES, MAX_PACKAGE_SOURCE_FILES, is_package_source_path,
+    is_proba_source_path, package_source_files,
 };
 use std::fs;
 use std::path::PathBuf;
@@ -69,9 +69,11 @@ fn package_source_files_rejects_excess_file_count() {
     }
 
     let diagnostics = package_source_files(&root, false).expect_err("file cap must fail closed");
-    assert!(diagnostics
-        .iter()
-        .any(|diagnostic| diagnostic.issue() == Some("package_source_file_limit")));
+    assert!(
+        diagnostics
+            .iter()
+            .any(|diagnostic| diagnostic.issue() == Some("package_source_file_limit"))
+    );
     let _ = fs::remove_dir_all(&root);
 }
 
@@ -85,9 +87,11 @@ fn package_source_files_rejects_excess_total_bytes() {
     drop(file);
 
     let diagnostics = package_source_files(&root, false).expect_err("byte cap must fail closed");
-    assert!(diagnostics
-        .iter()
-        .any(|diagnostic| diagnostic.issue() == Some("package_source_byte_limit")));
+    assert!(
+        diagnostics
+            .iter()
+            .any(|diagnostic| diagnostic.issue() == Some("package_source_byte_limit"))
+    );
     let _ = fs::remove_dir_all(&root);
 }
 

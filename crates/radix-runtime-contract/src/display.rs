@@ -38,11 +38,7 @@ pub fn display_fractus<T: FractusDisplay>(value: T) -> String {
 /// Render a `bivalens` as Faber boolean text (`verum` / `falsum`).
 #[must_use]
 pub fn display_bivalens(value: bool) -> &'static str {
-    if value {
-        "verum"
-    } else {
-        "falsum"
-    }
+    if value { "verum" } else { "falsum" }
 }
 
 /// Pass through a `textus` payload (hook point kept for parity with the runtime

@@ -13,8 +13,8 @@ use super::{
     LaunchId, LaunchUnit, ObservationCadence, ResultBuffer,
 };
 use crate::abi::{
-    collection_op_contract, MirKernelResource, MirKernelResourceAccess, MirKernelResourceKind,
-    MirKernelResourceRole, MirKernelSignature,
+    MirKernelResource, MirKernelResourceAccess, MirKernelResourceKind, MirKernelResourceRole,
+    MirKernelSignature, collection_op_contract,
 };
 use crate::device::{MirCompanionMap, MirDeviceFunctionMetadataMap};
 use crate::device_program_plans::{
@@ -31,7 +31,7 @@ use crate::device_semantics::{
 use crate::kernel_decomposition::decompose_kernel_function;
 use crate::kernel_plan::CollectionKernelPlan;
 use crate::layout::MirTensorStorageLayout;
-use crate::static_shape_fold::{fold_validated_device_program, ShapeFoldError};
+use crate::static_shape_fold::{ShapeFoldError, fold_validated_device_program};
 use crate::{
     MirCallee, MirConstant, MirFunction, MirFunctionId, MirFunctionOrigin, MirFunctionVisibility,
     MirLocalId, MirOperand, MirStatementKind, MirType, ValidatedMir,
@@ -132,11 +132,9 @@ impl fmt::Display for DeviceProgramBuildError {
                 f,
                 "companion DefId({companion}) of device-resident primal DefId({primal}) is missing from the lowered MIR"
             ),
-            Self::Decomposition { function, detail } => write!(
-                f,
-                "kernel {} decomposition failed: {detail}",
-                function.0
-            ),
+            Self::Decomposition { function, detail } => {
+                write!(f, "kernel {} decomposition failed: {detail}", function.0)
+            }
             Self::SubchainTypes { detail } => {
                 write!(f, "subchain type table restoration failed: {detail}")
             }

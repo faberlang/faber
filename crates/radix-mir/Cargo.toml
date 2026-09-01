@@ -1,7 +1,7 @@
 [package]
 name = "radix-mir"
 version = "0.84.0"
-edition = "2021"
+edition = "2024"
 description = "Faber MIR model, validation, and systems analysis (core, no emit backends)"
 license = "MIT"
 publish = false

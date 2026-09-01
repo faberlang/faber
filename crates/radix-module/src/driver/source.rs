@@ -21,7 +21,7 @@
 //! keeps repeated diagnostics proportional to `log(lines)` instead of rescanning
 //! the full source for every span.
 
-use super::file_frontmatter::{parse_file_frontmatter, FileFrontmatter};
+use super::file_frontmatter::{FileFrontmatter, parse_file_frontmatter};
 use super::frontmatter::split_frontmatter;
 use crate::diagnostics::{Diagnostic, DiagnosticPhase};
 use std::path::PathBuf;

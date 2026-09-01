@@ -10,7 +10,7 @@
 //! (the `lista<numerus> ∪ textus` shape is the `ct-hole` solve's member set).
 
 use super::*;
-use radix_module::driver::{analyze_source, AnalyzeRequest, Config, ModuleImportContract, Session};
+use radix_module::driver::{AnalyzeRequest, Config, ModuleImportContract, Session, analyze_source};
 use radix_module::file_interface::{
     FileExportKind, InterfaceAliasExport, InterfaceGenericParam, InterfaceIndexSnapshot,
     InterfaceParam, InterfaceTypeSnapshot,

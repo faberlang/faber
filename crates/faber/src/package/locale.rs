@@ -5,8 +5,8 @@ use radix::module::locale::LocalePack;
 use std::path::{Path, PathBuf};
 
 use super::discover_package;
-use super::embedded_locale::{load_embedded_locale_pack, EmbeddedLocaleError, EMBEDDED_LOCALE_IDS};
-use super::manifest::{manifest_for_spec, FaberManifest};
+use super::embedded_locale::{EMBEDDED_LOCALE_IDS, EmbeddedLocaleError, load_embedded_locale_pack};
+use super::manifest::{FaberManifest, manifest_for_spec};
 use radix::program::discovery::PackageSpec;
 use radix::program::paths::normalize_path;
 

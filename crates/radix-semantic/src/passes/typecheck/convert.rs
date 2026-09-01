@@ -31,9 +31,8 @@
 use super::*;
 
 use crate::lista_tensor_conversio::{
-    analyze_rectangular_lista_literal, ensure_lista_numerus_type,
-    resolve_bounded_lista_padded_shape, validate_lista_to_tensor_source, ListaToTensorError,
-    RectangularListaLiteralError,
+    ListaToTensorError, RectangularListaLiteralError, analyze_rectangular_lista_literal,
+    ensure_lista_numerus_type, resolve_bounded_lista_padded_shape, validate_lista_to_tensor_source,
 };
 
 const ISSUE_INTERVALLUM_CLAMP_RECOVERY: &str = "intervallum_clamp_recovery_unsupported";

@@ -64,7 +64,7 @@ pub(crate) fn type_id(types: &mut TypeTable, def_id: DefId) -> TypeId {
 /// Return whether parsed source references captured `forma` templates.
 #[must_use]
 pub fn program_uses_forma(program: &radix_syntax::Program, resolver: &Resolver) -> bool {
-    use radix_syntax::{walk_expr, walk_stmt, ExprKind, IfBody, Literal, StmtKind, Visitor};
+    use radix_syntax::{ExprKind, IfBody, Literal, StmtKind, Visitor, walk_expr, walk_stmt};
 
     let Some(def_id) = def_id(resolver) else {
         return false;

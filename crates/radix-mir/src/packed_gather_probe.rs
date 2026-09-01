@@ -7,7 +7,7 @@
 
 use crate::abi::PackedStorageLayout;
 use crate::kernel_plan::{
-    admit_quantized_gather, dequant_q8_0_block, AdmittedGather, PackedDequantKind,
+    AdmittedGather, PackedDequantKind, admit_quantized_gather, dequant_q8_0_block,
 };
 
 fn parse_hex_bytes(hex: &str) -> Vec<u8> {

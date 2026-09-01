@@ -31,19 +31,19 @@ mod trivia;
 mod visit;
 
 pub use annotation_promotion::{
+    AnnotationView, InvalidAnnotationView, NondumView, RadixLaneView, RadixTypusView, VerteView,
     annotation_has_protecta, braced_nondum_view, braced_radix_lane_view,
     braced_radix_lane_view_strict, braced_radix_typus_view, braced_radix_typus_view_strict,
     braced_verte_view, nondum_from_stmt, radix_lane_from_stmt, verte_from_stmt,
-    verte_rust_methodus, AnnotationView, InvalidAnnotationView, NondumView, RadixLaneView,
-    RadixTypusView, VerteView,
+    verte_rust_methodus,
 };
 pub use ast::*;
 pub use braced_annotation::{
-    braced_cli_nomen, braced_cli_nomen_strict, braced_family_is, braced_imperium_nomen,
-    braced_imperium_nomen_strict, braced_operandus_view, braced_operandus_view_strict,
-    braced_optio_is_flag, braced_optio_view, braced_optio_view_strict, BracedAnnotationError,
-    BracedOperandusView, BracedOptioView, BracedView,
+    BracedAnnotationError, BracedOperandusView, BracedOptioView, BracedView, braced_cli_nomen,
+    braced_cli_nomen_strict, braced_family_is, braced_imperium_nomen, braced_imperium_nomen_strict,
+    braced_operandus_view, braced_operandus_view_strict, braced_optio_is_flag, braced_optio_view,
+    braced_optio_view_strict,
 };
 pub use span::Spanned;
 pub use trivia::{CommentLine, Newline, Trivia};
-pub use visit::{walk_expr, walk_stmt, Visitor};
+pub use visit::{Visitor, walk_expr, walk_stmt};

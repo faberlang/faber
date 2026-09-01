@@ -4,9 +4,9 @@
 mod dead_artifact;
 mod dead_const_copy;
 
-use dead_artifact::{dead_fold_artifact_slots, is_fold_artifact_type, FoldArtifactSlots};
+use dead_artifact::{FoldArtifactSlots, dead_fold_artifact_slots, is_fold_artifact_type};
 use dead_const_copy::{
-    dead_non_kernel_scalar_const_slots, is_non_kernel_scalar_layout, DeadConstCopySlots,
+    DeadConstCopySlots, dead_non_kernel_scalar_const_slots, is_non_kernel_scalar_layout,
 };
 
 use super::roles::MirDeviceContext;

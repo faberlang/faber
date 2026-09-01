@@ -87,10 +87,12 @@ fn embedded_default_pack_resolves_diagnostic_issue_structurally() {
     );
     assert_eq!(explanation.locale, "en");
     assert!(!explanation.message.is_empty());
-    assert!(explanation
-        .help
-        .as_deref()
-        .is_some_and(|help| !help.is_empty()));
+    assert!(
+        explanation
+            .help
+            .as_deref()
+            .is_some_and(|help| !help.is_empty())
+    );
 }
 
 #[test]

@@ -240,7 +240,7 @@ pub fn directional_view_payload_type_id(
 /// Return whether the parsed program needs compiler-owned frame types registered.
 #[must_use]
 pub fn program_needs_frame_types(program: &radix_syntax::Program, interner: &Interner) -> bool {
-    use radix_syntax::{walk_stmt, ExprKind, StmtKind, Visitor};
+    use radix_syntax::{ExprKind, StmtKind, Visitor, walk_stmt};
 
     struct FrameUsageVisitor<'a> {
         interner: &'a Interner,

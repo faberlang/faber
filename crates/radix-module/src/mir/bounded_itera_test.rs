@@ -4,7 +4,7 @@
 //! the loop (runtime-len declines `not_concrete` at `air_unroll`), so the
 //! branch stays base-lane and reverse AD never sees a non-literal scrutinee.
 
-use crate::driver::{analyze_source, AnalyzeRequest, Config, Session};
+use crate::driver::{AnalyzeRequest, Config, Session, analyze_source};
 use crate::mir::{dump_program, lower_analyzed_unit, validate_program};
 
 fn session() -> Session {

@@ -42,14 +42,14 @@ use serde::{Deserialize, Deserializer, Serialize};
 
 use crate::artifact::{
     CliProgramWire, FunctionFactTableWire, FunctionFactWire, FunctionProvenanceTableWire,
-    GpuBuiltinWire, HirArtifact, ResolvedUseWire, ResolverSnapshot, SourceIdentity, SCHEMA_VERSION,
+    GpuBuiltinWire, HirArtifact, ResolvedUseWire, ResolverSnapshot, SCHEMA_VERSION, SourceIdentity,
 };
 use crate::decode::{decode as decode_unit_bytes, encode as encode_unit_bytes};
 use crate::error::HirArtifactError;
 use crate::package::{
-    validate_dependencies, validate_local_links, validate_module_table, FhirPackage,
-    FhirPackageError, FhirPackageModule, LibraryImportWire, LocalLinkWire, PackageDependencyWire,
-    PackageIdentityWire, PACKAGE_SCHEMA_VERSION,
+    FhirPackage, FhirPackageError, FhirPackageModule, LibraryImportWire, LocalLinkWire,
+    PACKAGE_SCHEMA_VERSION, PackageDependencyWire, PackageIdentityWire, validate_dependencies,
+    validate_local_links, validate_module_table,
 };
 use crate::validate::validate_referential_integrity;
 use radix_hir::{HirModule, HirPresentation, LibraryRegistry};

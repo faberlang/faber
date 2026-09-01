@@ -1,8 +1,8 @@
 //! Pins for `faber cost` human output and the versioned `--json` contract.
 
 use super::cost::{
-    build_report, parse_min_class, render_human, render_json_compact, test_input_path, test_site,
-    CostReport, COST_LEGEND, COST_REPORT_VERSION, SOURCE_LINE_CAP,
+    COST_LEGEND, COST_REPORT_VERSION, CostReport, SOURCE_LINE_CAP, build_report, parse_min_class,
+    render_human, render_json_compact, test_input_path, test_site,
 };
 use crate::cli::{Cli, Command};
 use clap::{CommandFactory, Parser};

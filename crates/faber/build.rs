@@ -4,8 +4,8 @@
 //! binary embeds the compressed bytes and decompresses only the selected
 //! locale at runtime.
 
-use flate2::write::GzEncoder;
 use flate2::Compression;
+use flate2::write::GzEncoder;
 use std::env;
 use std::fs;
 use std::io::Write;

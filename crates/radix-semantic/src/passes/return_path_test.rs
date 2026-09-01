@@ -317,10 +317,11 @@ fn diagnostic_uses_missing_return_kind() {
         .find(|d| crate::semantic_spec(d.kind).code == "SEM033")
         .expect("SEM033 diagnostic present");
     assert_eq!(crate::semantic_spec(diag.kind).code, "SEM033");
-    assert!(diag
-        .args
-        .iter()
-        .any(|arg| arg.name == "issue" && arg.value == "control_flow_fallthrough"));
+    assert!(
+        diag.args
+            .iter()
+            .any(|arg| arg.name == "issue" && arg.value == "control_flow_fallthrough")
+    );
     // The kind is exercised transitively through the catalog; the code is the
     // stable contract. Keep a direct kind reference for documentation parity.
     let _ = SemanticErrorKind::ReturnAbsent;

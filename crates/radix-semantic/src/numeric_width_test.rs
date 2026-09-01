@@ -5,8 +5,8 @@
 //! or mismatched widths produce WidthError diagnostics.
 
 use super::numeric_width::{
-    is_numeric_width_type_sugar, lista_sugar_width_marker, sparsa_sugar_width_marker,
-    standalone_width_type, tensor_sugar_width_marker, NumericWidth, WidthError,
+    NumericWidth, WidthError, is_numeric_width_type_sugar, lista_sugar_width_marker,
+    sparsa_sugar_width_marker, standalone_width_type, tensor_sugar_width_marker,
 };
 use crate::{Primitive, TypeTable};
 

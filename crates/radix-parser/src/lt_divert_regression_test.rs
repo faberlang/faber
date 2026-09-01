@@ -40,7 +40,7 @@
 
 use crate::parse;
 use crate::test_support::parse_ok;
-use radix_lexer::{lex_with_locale_pack, KeywordPack, TokenKind};
+use radix_lexer::{KeywordPack, TokenKind, lex_with_locale_pack};
 use radix_syntax::{ExprKind, IfBody, StmtKind, TypeExprKind};
 
 /// Minimal en-like reader pack: no keyword rows, only the [types] rows the

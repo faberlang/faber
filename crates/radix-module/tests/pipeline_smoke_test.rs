@@ -8,14 +8,6 @@
 //! `backend_smoke` module's smoke helpers; these tests assert structural
 //! properties of the emitted output that do not require external tools.
 
-#[cfg(any(
-    feature = "mir-llvm",
-    feature = "mir-metal",
-    feature = "mir-wasm",
-    feature = "mir-wgsl",
-    feature = "mir-sexp"
-))]
-use radix_module::driver::{compile, Config, ModuleCompileRequest, Session};
 #[cfg(feature = "mir-llvm")]
 use radix_module::LlvmTextOutput;
 #[cfg(feature = "mir-metal")]
@@ -26,6 +18,14 @@ use radix_module::SexpOutput;
 use radix_module::WasmTextOutput;
 #[cfg(feature = "mir-wgsl")]
 use radix_module::WgslTextOutput;
+#[cfg(any(
+    feature = "mir-llvm",
+    feature = "mir-metal",
+    feature = "mir-wasm",
+    feature = "mir-wgsl",
+    feature = "mir-sexp"
+))]
+use radix_module::driver::{Config, ModuleCompileRequest, Session, compile};
 #[cfg(any(
     feature = "mir-llvm",
     feature = "mir-metal",

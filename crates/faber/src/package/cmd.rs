@@ -16,13 +16,13 @@ use super::cargo::{
     emit_generated_crate_with_runtime_plan, invoke_cargo_build, lock_generated_crate_build,
 };
 #[cfg(feature = "hir-go")]
-use super::go_build::{emit_go_module_with_postprocess, invoke_go_build, GoBuildLayout};
+use super::go_build::{GoBuildLayout, emit_go_module_with_postprocess, invoke_go_build};
 use super::manifest::FaberManifest;
 #[cfg(feature = "mir-llvm")]
-use super::{build_host_program, LlvmHostProfile};
+use super::{LlvmHostProfile, build_host_program};
 use super::{
-    config_with_locale, discover_build_layout, package_host_selection_diagnostic, read_manifest,
-    MANIFEST_FILE,
+    MANIFEST_FILE, config_with_locale, discover_build_layout, package_host_selection_diagnostic,
+    read_manifest,
 };
 use radix::program::discovery::BuildLayout;
 use radix::program::manifest::manifest_build_target;
@@ -600,12 +600,14 @@ fn single_file_rust_runtime_plan(
     _config: &radix::module::Config,
     input_path: &Path,
 ) -> Result<super::RustRuntimePlan, Vec<radix::module::Diagnostic>> {
-    Err(vec![crate::package_diagnostic_error(
-        "target `rust` is not available in this faber build; rebuild with feature `hir-rust`",
-    )
-    .with_file(input_path.display().to_string())
-    .with_arg("issue", "package_target_unavailable")
-    .with_arg("target", "rust")])
+    Err(vec![
+        crate::package_diagnostic_error(
+            "target `rust` is not available in this faber build; rebuild with feature `hir-rust`",
+        )
+        .with_file(input_path.display().to_string())
+        .with_arg("issue", "package_target_unavailable")
+        .with_arg("target", "rust"),
+    ])
 }
 
 /// Resolve the build target: an explicit CLI target wins, otherwise the

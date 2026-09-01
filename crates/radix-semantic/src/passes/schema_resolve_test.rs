@@ -11,7 +11,7 @@
 //! the pinned issue keys; and a schema records exactly its declared columns
 //! (partiality — extra source columns stay invisible).
 
-use super::{resolve, Resolver, TypeTable};
+use super::{Resolver, TypeTable, resolve};
 use crate::passes::collect;
 use crate::test_support::args_have_no_legacy_message;
 use crate::{Primitive, SemanticErrorKind, SymbolKind, Type};

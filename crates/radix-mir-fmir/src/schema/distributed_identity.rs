@@ -24,7 +24,7 @@
 //! Every domain shares the frozen [`SHA256_IDENTITY_PREFIX`] spelling:
 //! `sha256:<64-hex>`.
 
-use radix_mir::distributed::{encode_logical_plan, DistributedExecutionPlan};
+use radix_mir::distributed::{DistributedExecutionPlan, encode_logical_plan};
 
 /// The frozen `sha256:` spelling prefix shared by every same-package
 /// identity domain (A10, logical plan, bound plan).

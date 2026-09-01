@@ -8,7 +8,7 @@
 //! value-equality classification, which is why an imported type stays a
 //! value test at this layer (open row 8's documented miss).
 
-use crate::{parse, ParseResult};
+use crate::{ParseResult, parse};
 use radix_lexer::lex;
 use radix_syntax::{BinOp, ExprKind, StmtKind, TypeExprKind};
 fn parse_source(source: &str) -> ParseResult {

@@ -3,8 +3,8 @@ use super::registry::{RegistryBuffer, RegistryVersion};
 use super::types::{
     BufferId, BufferIdentity, BufferRole, BufferVersion, DeviceProgram, ResultBuffer,
 };
-use crate::abi::MirKernelResourceAccess;
 use crate::MirType;
+use crate::abi::MirKernelResourceAccess;
 
 /// Whether a slot access is consistent with the buffer's program role.
 ///

@@ -2,7 +2,7 @@
 //!
 //! Tests: each RuntimeAbiFacet has expected status per target with evidence citations.
 
-use super::{tensor_runtime_abi_rows, TensorRuntimeAbiFacet, TensorRuntimeAbiStatus, TensorRuntimeAbiTarget};
+use super::{TensorRuntimeAbiFacet, TensorRuntimeAbiStatus, TensorRuntimeAbiTarget, tensor_runtime_abi_rows};
 
 #[test]
 fn tensor_runtime_abi_rows_record_runner_execution_contract() {

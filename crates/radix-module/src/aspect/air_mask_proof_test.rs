@@ -1,8 +1,8 @@
 //! Focused proof-source and recognizer tests for APA-L2.
 
 use super::{
-    emit_mask_neutrality_theorem, is_additive_combine, is_integer_zero_seed, reduction_family, MaskNeutralityFamily,
-    MASK_NEUTRALITY_PRELUDE,
+    MASK_NEUTRALITY_PRELUDE, MaskNeutralityFamily, emit_mask_neutrality_theorem, is_additive_combine,
+    is_integer_zero_seed, reduction_family,
 };
 use crate::hir::{HirExpression, HirExpressionKind, HirId, HirLiteral};
 use crate::lexer::Span;

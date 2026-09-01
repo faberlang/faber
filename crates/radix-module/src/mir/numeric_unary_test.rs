@@ -5,8 +5,8 @@
 //! pinned here as a NEGATIVE row (fail-closed stays law, never widened).
 
 use crate::codegen::Target;
-use crate::driver::{analyze_source, AnalyzeRequest, Config, Session};
-use crate::mir::{run_source, BufferHost, RunSourceError};
+use crate::driver::{AnalyzeRequest, Config, Session, analyze_source};
+use crate::mir::{BufferHost, RunSourceError, run_source};
 
 fn session() -> Session {
     Session::new(Config::default().with_target(Target::HirTypeScript))

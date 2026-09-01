@@ -5,7 +5,7 @@
 //! between ranks behave as expected.
 
 use super::instans_precision::{
-    is_instans_assignable, InstansPrecision, InstansPrecisionError, InstansPrecisionRank,
+    InstansPrecision, InstansPrecisionError, InstansPrecisionRank, is_instans_assignable,
 };
 use crate::{Primitive, TypeTable};
 

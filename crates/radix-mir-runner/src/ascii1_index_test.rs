@@ -1,7 +1,7 @@
 //! BB-3R: scalar index returns one-byte `ascii<1>`, not a heap `String`.
 
-use super::value::{ascii1_from_scalar, scalar_text_index, Value};
 use super::RunnerError;
+use super::value::{Value, ascii1_from_scalar, scalar_text_index};
 use radix_lexer::Span;
 
 fn span() -> Span {

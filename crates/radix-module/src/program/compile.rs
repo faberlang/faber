@@ -153,10 +153,12 @@ fn read_input_source(input: &[String]) -> Result<(String, String), crate::Diagno
 fn package_reject(message: &str, issue: &str) -> crate::CompileResult {
     crate::CompileResult {
         output: None,
-        diagnostics: vec![crate::Diagnostic::error(message.to_owned())
-            .with_phase(crate::diagnostics::DiagnosticPhase::Tool)
-            .with_code("TOOL002")
-            .with_arg("issue", issue)],
+        diagnostics: vec![
+            crate::Diagnostic::error(message.to_owned())
+                .with_phase(crate::diagnostics::DiagnosticPhase::Tool)
+                .with_code("TOOL002")
+                .with_arg("issue", issue),
+        ],
     }
 }
 
@@ -286,9 +288,11 @@ fn compile_cli_path_with_locale_pack_inner(
         Err(err) => {
             return crate::CompileResult {
                 output: None,
-                diagnostics: vec![crate::Diagnostic::io_error(path, &err)
-                    .with_code("IO001")
-                    .with_arg("issue", "source_read_failed")],
+                diagnostics: vec![
+                    crate::Diagnostic::io_error(path, &err)
+                        .with_code("IO001")
+                        .with_arg("issue", "source_read_failed"),
+                ],
             };
         }
     };

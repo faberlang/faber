@@ -13,11 +13,7 @@ struct CheckErrorTally {
 /// Use a filesystem path when available so provider imports can be resolved.
 fn source_path_for_import_contract(name: &str) -> Option<std::path::PathBuf> {
     let path = std::path::PathBuf::from(name);
-    if path.is_file() {
-        Some(path)
-    } else {
-        None
-    }
+    if path.is_file() { Some(path) } else { None }
 }
 /// Result of running check through normalized diagnostics.
 #[derive(Debug)]

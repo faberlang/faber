@@ -12,7 +12,7 @@ use crate::file_interface::{
     InterfaceTypeSnapshot,
 };
 use crate::{Primitive, SemanticParamMode, Type};
-use radix_hir::visit::{walk_cape, walk_program, HirVisitor};
+use radix_hir::visit::{HirVisitor, walk_cape, walk_program};
 
 fn shape_namespace_interface() -> FileInterface {
     let shape_error = InterfaceTypeSnapshot::Nominal(InterfaceNominalType {

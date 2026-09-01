@@ -1,6 +1,6 @@
 //! Focused proof-source and recognizer tests for APA-L1.
 
-use super::{emit_unroll_equivalence_theorem, unroll_route_facts, UnrollRoute, UNROLL_PROOF_PRELUDE};
+use super::{UNROLL_PROOF_PRELUDE, UnrollRoute, emit_unroll_equivalence_theorem, unroll_route_facts};
 use crate::hir::{HirArrayElement, HirExpression, HirExpressionKind, HirId, HirIteraMode, HirLiteral};
 use crate::lexer::Span;
 use crate::semantic::{IndexExpr, Primitive, TypeTable};

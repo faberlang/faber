@@ -2,10 +2,10 @@
 //! lattice, tensor element policy, and bare-numerus identity with i64.
 
 use crate::{
-    is_ascii_format_hint, is_conversio_radix_hint, is_numeric_width_type_sugar,
-    lista_sugar_width_marker, matrix_sugar_width_marker, sparsa_sugar_width_marker,
-    standalone_width_type, tensor_sugar_width_marker, vector_sugar_width_marker, NumericWidth,
-    WidthError,
+    NumericWidth, WidthError, is_ascii_format_hint, is_conversio_radix_hint,
+    is_numeric_width_type_sugar, lista_sugar_width_marker, matrix_sugar_width_marker,
+    sparsa_sugar_width_marker, standalone_width_type, tensor_sugar_width_marker,
+    vector_sugar_width_marker,
 };
 use crate::{Primitive, TypeTable};
 

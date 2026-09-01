@@ -14,19 +14,19 @@ pub mod module {
     #[cfg(feature = "device")]
     pub use radix_module::air;
     pub use radix_module::driver::{
-        analyze_source, AnalyzeRequest, AnalyzedModule, ModuleCompileRequest, ModuleImportContract,
+        AnalyzeRequest, AnalyzedModule, ModuleCompileRequest, ModuleImportContract, analyze_source,
     };
     #[cfg(feature = "mir-core")]
     pub use radix_module::mir;
     pub use radix_module::{
+        CompileResult, Compiler, Config, Diagnostic, FaberOutput, GoOutput, HaskellOutput, Output,
+        PythonOutput, RustOutput, Session, SwiftOutput, Target, TypeScriptOutput, WarnPolicy,
+        apply_warn_policy, is_known_diagnostic_code,
+    };
+    pub use radix_module::{
         abi, aspect, builtins, cli_descriptor, codegen, diagnostics, driver, file_interface, hir,
         intrinsics, kernel, lexer, live_tuus_cursor, llvm_host, locale, parser, paths,
         runtime_contract, semantic, syntax,
-    };
-    pub use radix_module::{
-        apply_warn_policy, is_known_diagnostic_code, CompileResult, Compiler, Config, Diagnostic,
-        FaberOutput, GoOutput, HaskellOutput, Output, PythonOutput, RustOutput, Session,
-        SwiftOutput, Target, TypeScriptOutput, WarnPolicy,
     };
 }
 
@@ -38,10 +38,10 @@ pub mod cli {
 /// Typed program-layer compilation and whole-program package APIs.
 pub mod program {
     pub use radix_module::program::{
-        analyze_prepared_program_name, analyze_prepared_program_path,
-        compile_prepared_program_path, explicit_locale_pack, find_package_root, library_home,
-        package_identity_facts_for_path, prepare_program_module, prepare_program_module_for_name,
-        PreparedProgramModule, FABER_LIBRARY_HOME_ENV,
+        FABER_LIBRARY_HOME_ENV, PreparedProgramModule, analyze_prepared_program_name,
+        analyze_prepared_program_path, compile_prepared_program_path, explicit_locale_pack,
+        find_package_root, library_home, package_identity_facts_for_path, prepare_program_module,
+        prepare_program_module_for_name,
     };
     pub use radix_module::{CompileResult, Compiler};
     #[cfg(feature = "mir-llvm")]
@@ -51,9 +51,9 @@ pub mod program {
     #[cfg(feature = "mir-wasm")]
     pub use radix_program::wasm;
     pub use radix_program::{
-        analyze, artifact_plan, discovery, emit, file_interface, frontmatter, import_graph,
-        library, lockfile, manifest, member_path, modules, paths, source_files, test_source_filter,
-        LibraryImportBinding, PackageFile,
+        LibraryImportBinding, PackageFile, analyze, artifact_plan, discovery, emit, file_interface,
+        frontmatter, import_graph, library, lockfile, manifest, member_path, modules, paths,
+        source_files, test_source_filter,
     };
     #[cfg(feature = "hir-rust")]
     pub use radix_program::{codegen, rust_target};
@@ -64,20 +64,20 @@ pub mod program {
 /// Admitted typed services: values + diagnostics, no printing or process exit.
 pub mod services {
     pub use radix_module::program::{
-        analyze_prepared_program_name, analyze_prepared_program_path, compile_cli_input,
-        compile_cli_input_with_locale_pack, compile_cli_input_with_locale_pack_explicit,
-        compile_cli_path, compile_cli_path_with_locale_pack, package_identity_facts_for_path,
-        prepare_program_module, prepare_program_module_for_name, resolve_package_mode,
-        should_treat_as_package, PreparedProgramModule,
+        PreparedProgramModule, analyze_prepared_program_name, analyze_prepared_program_path,
+        compile_cli_input, compile_cli_input_with_locale_pack,
+        compile_cli_input_with_locale_pack_explicit, compile_cli_path,
+        compile_cli_path_with_locale_pack, package_identity_facts_for_path, prepare_program_module,
+        prepare_program_module_for_name, resolve_package_mode, should_treat_as_package,
     };
     pub use radix_module::services::{
-        build_output_path, check_diagnostics_for_source,
+        BuildCommand, CheckCommand, CheckDiagnosticsResult, DiagnosticMode, EmitCommand,
+        SourceInspection, TargetCapabilities, TargetCommandSurface, VerifyCommand,
+        VerifySourceResult, build_output_path, check_diagnostics_for_source,
         check_diagnostics_for_source_with_locale_pack, cli_ir_inspection_for_source,
         compile_cli_source, compile_cli_source_with_locale_pack, hir_inspection_for_source,
         hir_inspection_json, lex_inspection_for_source, output_code, parse_inspection_for_source,
-        target_capabilities, target_capabilities_for_surface, verify_source, BuildCommand,
-        CheckCommand, CheckDiagnosticsResult, DiagnosticMode, EmitCommand, SourceInspection,
-        TargetCapabilities, TargetCommandSurface, VerifyCommand, VerifySourceResult,
+        target_capabilities, target_capabilities_for_surface, verify_source,
     };
     #[cfg(feature = "mir-core")]
     pub use radix_module::services::{mir_output_for_source, output_reflection_json};
@@ -94,5 +94,5 @@ pub use radix_module::locale;
 #[cfg(feature = "mir-core")]
 pub use radix_module::mir;
 pub use radix_module::{
-    is_known_diagnostic_code, CompileResult, Compiler, Config, Diagnostic, Output, Session, Target,
+    CompileResult, Compiler, Config, Diagnostic, Output, Session, Target, is_known_diagnostic_code,
 };

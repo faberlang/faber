@@ -17,10 +17,10 @@ pub use convert::{
     convert_from_parse_error as from_parse_error, convert_from_semantic_error as from_semantic_error,
 };
 pub use radix_diagnostics::{
-    diagnostic_identity, get_line_at_offset, locale_suggestion_spec, locale_unknown_spec, nearest_char_boundary,
-    offset_to_line, parse_arg_value, unresolved_intrinsic_spec, unresolved_keyword_spec,
-    unresolved_library_member_spec, Diagnostic, DiagnosticArg, DiagnosticPhase, DiagnosticSpec, LexErrorKind,
-    ParseErrorKind, PhaseErrorKind, SemanticErrorKind, Severity, Span, WarningKind,
+    Diagnostic, DiagnosticArg, DiagnosticPhase, DiagnosticSpec, LexErrorKind, ParseErrorKind, PhaseErrorKind,
+    SemanticErrorKind, Severity, Span, WarningKind, diagnostic_identity, get_line_at_offset, locale_suggestion_spec,
+    locale_unknown_spec, nearest_char_boundary, offset_to_line, parse_arg_value, unresolved_intrinsic_spec,
+    unresolved_keyword_spec, unresolved_library_member_spec,
 };
 pub use radix_semantic::{
     all_diagnostic_specs, arg_value, lex_spec, parse_message, parse_spec, quote_arg, semantic_message, semantic_spec,

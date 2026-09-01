@@ -5,7 +5,7 @@
 
 use super::test_support::{atomic_i32_type, f32_type, indexed_local_place, rank1_tensor_type};
 use super::{
-    classify_device_safe, classify_device_safe_for_target_entry, device_roles_from_hir, MirDeviceContext, MirDeviceRole,
+    MirDeviceContext, MirDeviceRole, classify_device_safe, classify_device_safe_for_target_entry, device_roles_from_hir,
 };
 use crate::driver::{self, AnalyzeRequest, Config, Session};
 use crate::hir::{DefId, HirFunction};
@@ -145,12 +145,14 @@ fn assert_rejected_goto_policy(result: radix_types::Lowerability, message: &str)
     let radix_types::Lowerability::Rejected(gaps) = result else {
         panic!("{message}");
     };
-    assert!(gaps
-        .iter()
-        .any(|gap| gap.slug() == "target-policy-rejection" && gap.shape() == "device multi-block control flow"));
-    assert!(gaps
-        .iter()
-        .any(|gap| gap.slug() == "target-policy-rejection" && gap.shape() == "device goto terminator"));
+    assert!(
+        gaps.iter()
+            .any(|gap| gap.slug() == "target-policy-rejection" && gap.shape() == "device multi-block control flow")
+    );
+    assert!(
+        gaps.iter()
+            .any(|gap| gap.slug() == "target-policy-rejection" && gap.shape() == "device goto terminator")
+    );
 }
 
 fn classify_source(source: &str) -> radix_types::Lowerability {
@@ -287,9 +289,10 @@ fn device_safe_rejects_atomic_runtime_calls_explicitly() {
     let radix_types::Lowerability::Rejected(gaps) = classify(&program, &types) else {
         panic!("atomic runtime call must reject");
     };
-    assert!(gaps
-        .iter()
-        .any(|gap| gap.slug() == "target-policy-rejection" && gap.shape() == "kernel atomic runtime call load"));
+    assert!(
+        gaps.iter()
+            .any(|gap| gap.slug() == "target-policy-rejection" && gap.shape() == "kernel atomic runtime call load")
+    );
 }
 
 #[test]
@@ -506,9 +509,10 @@ fn device_safe_rejects_product_linked_device_call() {
     let radix_types::Lowerability::Rejected(gaps) = classify_device_safe(&validated, &context) else {
         panic!("product-linked device call must reject");
     };
-    assert!(gaps
-        .iter()
-        .any(|gap| gap.slug() == "target-policy-rejection" && gap.shape() == "device function call"));
+    assert!(
+        gaps.iter()
+            .any(|gap| gap.slug() == "target-policy-rejection" && gap.shape() == "device function call")
+    );
 }
 
 #[test]
@@ -601,12 +605,14 @@ fn device_safe_rejects_failable_control_with_abi_gap() {
     let radix_types::Lowerability::Rejected(gaps) = classify(&program, &types) else {
         panic!("try_call must reject");
     };
-    assert!(gaps
-        .iter()
-        .any(|gap| gap.slug() == "missing-abi-fact" && gap.shape() == "failable device function"));
-    assert!(gaps
-        .iter()
-        .any(|gap| gap.slug() == "missing-abi-fact" && gap.shape() == "try_call"));
+    assert!(
+        gaps.iter()
+            .any(|gap| gap.slug() == "missing-abi-fact" && gap.shape() == "failable device function")
+    );
+    assert!(
+        gaps.iter()
+            .any(|gap| gap.slug() == "missing-abi-fact" && gap.shape() == "try_call")
+    );
 }
 
 #[test]
@@ -1480,9 +1486,10 @@ fn gpu_control_device_safe_rejects_side_effecting_loop_entry_goto() {
         panic!("expected side-effecting transparent loop-entry goto to reject");
     };
 
-    assert!(gaps
-        .iter()
-        .any(|gap| gap.shape() == "device multi-block control flow"));
+    assert!(
+        gaps.iter()
+            .any(|gap| gap.shape() == "device multi-block control flow")
+    );
 }
 
 #[test]
@@ -1505,9 +1512,10 @@ fn gpu_control_device_safe_rejects_side_effecting_loop_control_entry_goto() {
         panic!("expected side-effecting transparent loop-control entry goto to reject");
     };
 
-    assert!(gaps
-        .iter()
-        .any(|gap| gap.shape() == "device multi-block control flow"));
+    assert!(
+        gaps.iter()
+            .any(|gap| gap.shape() == "device multi-block control flow")
+    );
 }
 
 #[test]
@@ -1530,12 +1538,14 @@ fn gpu_control_device_safe_rejects_side_effecting_branch_arm_goto() {
     let radix_types::Lowerability::Rejected(gaps) = classify(&program, &types) else {
         panic!("side-effecting branch arm goto must reject");
     };
-    assert!(gaps
-        .iter()
-        .any(|gap| gap.slug() == "target-policy-rejection" && gap.shape() == "device multi-block control flow"));
-    assert!(gaps
-        .iter()
-        .any(|gap| gap.slug() == "target-policy-rejection" && gap.shape() == "device branch terminator"));
+    assert!(
+        gaps.iter()
+            .any(|gap| gap.slug() == "target-policy-rejection" && gap.shape() == "device multi-block control flow")
+    );
+    assert!(
+        gaps.iter()
+            .any(|gap| gap.slug() == "target-policy-rejection" && gap.shape() == "device branch terminator")
+    );
 }
 
 #[test]
@@ -1546,12 +1556,14 @@ fn gpu_control_device_safe_rejects_side_effecting_value_join_branch_arm_goto() {
     let radix_types::Lowerability::Rejected(gaps) = classify(&program, &types) else {
         panic!("side-effecting value-join branch arm goto must reject");
     };
-    assert!(gaps
-        .iter()
-        .any(|gap| gap.slug() == "target-policy-rejection" && gap.shape() == "device multi-block control flow"));
-    assert!(gaps
-        .iter()
-        .any(|gap| gap.slug() == "target-policy-rejection" && gap.shape() == "device branch terminator"));
+    assert!(
+        gaps.iter()
+            .any(|gap| gap.slug() == "target-policy-rejection" && gap.shape() == "device multi-block control flow")
+    );
+    assert!(
+        gaps.iter()
+            .any(|gap| gap.slug() == "target-policy-rejection" && gap.shape() == "device branch terminator")
+    );
 }
 
 #[test]
@@ -1562,12 +1574,14 @@ fn gpu_control_device_safe_rejects_side_effecting_switch_arm_goto() {
     let radix_types::Lowerability::Rejected(gaps) = classify(&program, &types) else {
         panic!("side-effecting switch-arm goto must reject");
     };
-    assert!(gaps
-        .iter()
-        .any(|gap| gap.slug() == "target-policy-rejection" && gap.shape() == "device multi-block control flow"));
-    assert!(gaps
-        .iter()
-        .any(|gap| gap.slug() == "target-policy-rejection" && gap.shape() == "device switch terminator"));
+    assert!(
+        gaps.iter()
+            .any(|gap| gap.slug() == "target-policy-rejection" && gap.shape() == "device multi-block control flow")
+    );
+    assert!(
+        gaps.iter()
+            .any(|gap| gap.slug() == "target-policy-rejection" && gap.shape() == "device switch terminator")
+    );
 }
 
 #[test]
@@ -1578,12 +1592,14 @@ fn gpu_control_device_safe_rejects_side_effecting_indexed_switch_arm_goto() {
     let radix_types::Lowerability::Rejected(gaps) = classify(&program, &types) else {
         panic!("side-effecting indexed switch-arm goto must reject");
     };
-    assert!(gaps
-        .iter()
-        .any(|gap| gap.slug() == "target-policy-rejection" && gap.shape() == "device multi-block control flow"));
-    assert!(gaps
-        .iter()
-        .any(|gap| gap.slug() == "target-policy-rejection" && gap.shape() == "device switch terminator"));
+    assert!(
+        gaps.iter()
+            .any(|gap| gap.slug() == "target-policy-rejection" && gap.shape() == "device multi-block control flow")
+    );
+    assert!(
+        gaps.iter()
+            .any(|gap| gap.slug() == "target-policy-rejection" && gap.shape() == "device switch terminator")
+    );
 }
 
 #[test]
@@ -1594,12 +1610,14 @@ fn gpu_control_device_safe_rejects_side_effecting_indexed_branch_arm_goto() {
     let radix_types::Lowerability::Rejected(gaps) = classify(&program, &types) else {
         panic!("side-effecting indexed branch-arm goto must reject");
     };
-    assert!(gaps
-        .iter()
-        .any(|gap| gap.slug() == "target-policy-rejection" && gap.shape() == "device multi-block control flow"));
-    assert!(gaps
-        .iter()
-        .any(|gap| gap.slug() == "target-policy-rejection" && gap.shape() == "device branch terminator"));
+    assert!(
+        gaps.iter()
+            .any(|gap| gap.slug() == "target-policy-rejection" && gap.shape() == "device multi-block control flow")
+    );
+    assert!(
+        gaps.iter()
+            .any(|gap| gap.slug() == "target-policy-rejection" && gap.shape() == "device branch terminator")
+    );
 }
 
 #[test]
@@ -1610,12 +1628,14 @@ fn gpu_control_device_safe_rejects_side_effecting_indexed_value_join_branch_arm_
     let radix_types::Lowerability::Rejected(gaps) = classify(&program, &types) else {
         panic!("side-effecting indexed value-join branch-arm goto must reject");
     };
-    assert!(gaps
-        .iter()
-        .any(|gap| gap.slug() == "target-policy-rejection" && gap.shape() == "device multi-block control flow"));
-    assert!(gaps
-        .iter()
-        .any(|gap| gap.slug() == "target-policy-rejection" && gap.shape() == "device branch terminator"));
+    assert!(
+        gaps.iter()
+            .any(|gap| gap.slug() == "target-policy-rejection" && gap.shape() == "device multi-block control flow")
+    );
+    assert!(
+        gaps.iter()
+            .any(|gap| gap.slug() == "target-policy-rejection" && gap.shape() == "device branch terminator")
+    );
 }
 
 #[test]
@@ -1635,12 +1655,14 @@ fn gpu_control_device_safe_rejects_transparent_branch_arm_goto_with_stray_block(
     let radix_types::Lowerability::Rejected(gaps) = classify(&program, &types) else {
         panic!("stray branch-arm goto block must reject");
     };
-    assert!(gaps
-        .iter()
-        .any(|gap| gap.slug() == "target-policy-rejection" && gap.shape() == "device multi-block control flow"));
-    assert!(gaps
-        .iter()
-        .any(|gap| gap.slug() == "target-policy-rejection" && gap.shape() == "device branch terminator"));
+    assert!(
+        gaps.iter()
+            .any(|gap| gap.slug() == "target-policy-rejection" && gap.shape() == "device multi-block control flow")
+    );
+    assert!(
+        gaps.iter()
+            .any(|gap| gap.slug() == "target-policy-rejection" && gap.shape() == "device branch terminator")
+    );
 }
 
 #[test]
@@ -1660,12 +1682,14 @@ fn gpu_control_device_safe_rejects_transparent_value_join_branch_arm_goto_with_s
     let radix_types::Lowerability::Rejected(gaps) = classify(&program, &types) else {
         panic!("stray value-join branch-arm goto block must reject");
     };
-    assert!(gaps
-        .iter()
-        .any(|gap| gap.slug() == "target-policy-rejection" && gap.shape() == "device multi-block control flow"));
-    assert!(gaps
-        .iter()
-        .any(|gap| gap.slug() == "target-policy-rejection" && gap.shape() == "device branch terminator"));
+    assert!(
+        gaps.iter()
+            .any(|gap| gap.slug() == "target-policy-rejection" && gap.shape() == "device multi-block control flow")
+    );
+    assert!(
+        gaps.iter()
+            .any(|gap| gap.slug() == "target-policy-rejection" && gap.shape() == "device branch terminator")
+    );
 }
 
 #[test]
@@ -1698,12 +1722,14 @@ fn gpu_control_device_safe_rejects_transparent_indexed_value_join_branch_arm_got
     let radix_types::Lowerability::Rejected(gaps) = classify(&program, &types) else {
         panic!("stray indexed value-join branch-arm goto block must reject");
     };
-    assert!(gaps
-        .iter()
-        .any(|gap| gap.slug() == "target-policy-rejection" && gap.shape() == "device multi-block control flow"));
-    assert!(gaps
-        .iter()
-        .any(|gap| gap.slug() == "target-policy-rejection" && gap.shape() == "device branch terminator"));
+    assert!(
+        gaps.iter()
+            .any(|gap| gap.slug() == "target-policy-rejection" && gap.shape() == "device multi-block control flow")
+    );
+    assert!(
+        gaps.iter()
+            .any(|gap| gap.slug() == "target-policy-rejection" && gap.shape() == "device branch terminator")
+    );
 }
 
 #[test]
@@ -1736,12 +1762,14 @@ fn gpu_control_device_safe_rejects_transparent_indexed_branch_arm_goto_with_stra
     let radix_types::Lowerability::Rejected(gaps) = classify(&program, &types) else {
         panic!("stray indexed branch-arm goto block must reject");
     };
-    assert!(gaps
-        .iter()
-        .any(|gap| gap.slug() == "target-policy-rejection" && gap.shape() == "device multi-block control flow"));
-    assert!(gaps
-        .iter()
-        .any(|gap| gap.slug() == "target-policy-rejection" && gap.shape() == "device branch terminator"));
+    assert!(
+        gaps.iter()
+            .any(|gap| gap.slug() == "target-policy-rejection" && gap.shape() == "device multi-block control flow")
+    );
+    assert!(
+        gaps.iter()
+            .any(|gap| gap.slug() == "target-policy-rejection" && gap.shape() == "device branch terminator")
+    );
 }
 
 #[test]
@@ -1775,12 +1803,14 @@ fn gpu_control_device_safe_rejects_transparent_switch_arm_goto_with_stray_block(
     let radix_types::Lowerability::Rejected(gaps) = classify(&program, &types) else {
         panic!("stray switch-arm goto block must reject");
     };
-    assert!(gaps
-        .iter()
-        .any(|gap| gap.slug() == "target-policy-rejection" && gap.shape() == "device multi-block control flow"));
-    assert!(gaps
-        .iter()
-        .any(|gap| gap.slug() == "target-policy-rejection" && gap.shape() == "device switch terminator"));
+    assert!(
+        gaps.iter()
+            .any(|gap| gap.slug() == "target-policy-rejection" && gap.shape() == "device multi-block control flow")
+    );
+    assert!(
+        gaps.iter()
+            .any(|gap| gap.slug() == "target-policy-rejection" && gap.shape() == "device switch terminator")
+    );
 }
 
 #[test]
@@ -1800,9 +1830,10 @@ fn device_safe_rejects_text_host_value_type() {
     let radix_types::Lowerability::Rejected(gaps) = classify(&program, &types) else {
         panic!("text host value type must reject");
     };
-    assert!(gaps
-        .iter()
-        .any(|gap| gap.shape().starts_with("device host value type")));
+    assert!(
+        gaps.iter()
+            .any(|gap| gap.shape().starts_with("device host value type"))
+    );
 }
 
 #[test]
@@ -1833,9 +1864,10 @@ fn device_safe_rejects_array_aggregate_construct() {
     let radix_types::Lowerability::Rejected(gaps) = classify(&program, &types) else {
         panic!("array aggregate construct must reject");
     };
-    assert!(gaps
-        .iter()
-        .any(|gap| gap.shape() == "kernel aggregate construct"));
+    assert!(
+        gaps.iter()
+            .any(|gap| gap.shape() == "kernel aggregate construct")
+    );
 }
 
 #[test]
@@ -1856,9 +1888,10 @@ fn device_safe_rejects_array_return_type() {
     let radix_types::Lowerability::Rejected(gaps) = classify(&program, &types) else {
         panic!("array return type must reject");
     };
-    assert!(gaps
-        .iter()
-        .any(|gap| gap.shape().starts_with("device aggregate value type")));
+    assert!(
+        gaps.iter()
+            .any(|gap| gap.shape().starts_with("device aggregate value type"))
+    );
 }
 
 #[test]
@@ -2088,9 +2121,10 @@ fn device_safe_reports_rank2_tensor_device_view_layout_gap() {
     let radix_types::Lowerability::Rejected(gaps) = classify(&program, &types) else {
         panic!("rank-2 tensor device view must reject until view math exists");
     };
-    assert!(gaps
-        .iter()
-        .any(|gap| gap.slug() == "missing-layout-fact" && gap.shape() == "kernel device view rank 2"));
+    assert!(
+        gaps.iter()
+            .any(|gap| gap.slug() == "missing-layout-fact" && gap.shape() == "kernel device view rank 2")
+    );
 }
 
 fn role_func(is_kernel: bool, nucleum_fragment: bool, is_vertex: bool, is_fragment: bool) -> HirFunction {

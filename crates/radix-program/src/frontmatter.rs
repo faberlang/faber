@@ -5,9 +5,9 @@ use std::path::{Path, PathBuf};
 use radix_module::diagnostics::Diagnostic;
 use radix_module::driver::FileFrontmatter;
 
+use crate::MANIFEST_FILE;
 use crate::discovery::PackageSpec;
 use crate::manifest::FaberManifest;
-use crate::MANIFEST_FILE;
 
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct RustTestSelection {

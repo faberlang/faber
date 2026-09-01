@@ -7,7 +7,7 @@
 //! `NON_NEWLINE_TOKEN*`), and braced annotations end at `}` ([040]) — both
 //! are exempt from the line law.
 
-use crate::test_support::{assert_parse_error_matches, parse_ok, symbol_name, ParseExpectation};
+use crate::test_support::{ParseExpectation, assert_parse_error_matches, parse_ok, symbol_name};
 use radix_syntax::{AnnotationKind, StmtKind};
 
 #[test]

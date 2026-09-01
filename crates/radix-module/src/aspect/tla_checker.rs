@@ -5,11 +5,11 @@
 //! developer tool: it shells out to `java -jar` and is skipped when the TLA
 //! tools jar is not configured. It never modifies the aspect report itself.
 
-use super::tla::emit_tla_modules;
-use super::verifier::{HirAspectEvidence, HirAspectVerifier};
 use super::HirAspectBackendKind;
 use super::HirAspectReport;
 use super::HirAspectTlaModule;
+use super::tla::emit_tla_modules;
+use super::verifier::{HirAspectEvidence, HirAspectVerifier};
 use std::ffi::OsStr;
 use std::fs;
 use std::path::{Path, PathBuf};

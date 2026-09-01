@@ -5,16 +5,17 @@
 //! needs them.
 
 use super::{
-    build_browser_product, build_browser_product_static_assets, config_with_locale,
-    emit_generated_crate, emit_generated_crate_with_runtime_plan, invoke_cargo_build,
-    library_resolver_from_config, package_host_selection_diagnostic, read_manifest,
-    use_package_compiler_from_args, validate_manifest, verify_library_binding_shapes,
-    verify_library_bindings, with_lowered_package_mir, ManifestProductEmit, ManifestProductKind,
+    ManifestProductEmit, ManifestProductKind, build_browser_product,
+    build_browser_product_static_assets, config_with_locale, emit_generated_crate,
+    emit_generated_crate_with_runtime_plan, invoke_cargo_build, library_resolver_from_config,
+    package_host_selection_diagnostic, read_manifest, use_package_compiler_from_args,
+    validate_manifest, verify_library_binding_shapes, verify_library_bindings,
+    with_lowered_package_mir,
 };
 use super::{cmd::use_package_compiler, faber_analysis_seams, faber_emission_seams};
 use radix::program::analyze::AnalyzedProgram;
 use radix::program::discovery::{
-    discover_build_layout, sanitize_crate_name, BuildLayout, PackageSpec,
+    BuildLayout, PackageSpec, discover_build_layout, sanitize_crate_name,
 };
 use radix::program::emit::{
     compile_package as compile_package_compiler, compile_package_result,
@@ -173,6 +174,7 @@ fn run_mir_artifact_for_faber<H: Host + ?Sized>(
         host,
     )
 }
+use radix::module::Output;
 use radix::module::codegen::Target;
 use radix::module::diagnostics::{Diagnostic, DiagnosticArg, DiagnosticPhase};
 use radix::module::driver::Config;
@@ -181,7 +183,6 @@ use radix::module::hir::{
     HirItemKind, LibraryBinding, LibraryItem, LibraryItemKind, LibraryProvider,
 };
 use radix::module::mir::{BufferHost, Host, MirDiagnosticKind, MirProvider, RunnerError, Value};
-use radix::module::Output;
 use std::fs;
 use std::io::{Read, Write};
 use std::net::{TcpListener, TcpStream};
@@ -191,7 +192,7 @@ use std::thread;
 use std::time::Duration;
 
 use super::product::inject_product_failure_at;
-use super::test_support::{test_temp_dir, TestDir};
+use super::test_support::{TestDir, test_temp_dir};
 
 fn diagnostic_has_issue(diag: &Diagnostic, issue: &str) -> bool {
     diag.args.contains(&DiagnosticArg::new("issue", issue))
@@ -496,10 +497,12 @@ fn compile_package_reports_unresolved_external_imports() {
 
     let result = compile_with_faber_seams(&Config::default(), &entry);
     assert!(result.output.is_none());
-    assert!(result
-        .diagnostics
-        .iter()
-        .any(|diag| diagnostic_has_issue(diag, "package_import_unsupported_path")));
+    assert!(
+        result
+            .diagnostics
+            .iter()
+            .any(|diag| diagnostic_has_issue(diag, "package_import_unsupported_path"))
+    );
 }
 
 #[test]
@@ -683,9 +686,11 @@ main {
     };
     assert!(output.code.contains("fn parse"));
     assert!(output.code.contains("fn stringify"));
-    assert!(output
-        .code
-        .contains("deferred pending runtime codec dispatch"));
+    assert!(
+        output
+            .code
+            .contains("deferred pending runtime codec dispatch")
+    );
     assert!(!output.code.contains("faber::Json::parse"));
     assert!(!output.code.contains(".to_wire()"));
     assert!(!output.code.contains("norma::json::parse"));
@@ -1327,13 +1332,18 @@ main {
     let diagnostics = run_mir_artifact_for_faber(&Config::default(), &artifact, &mut host)
         .expect_err("malformed package MIR artifact should fail closed");
 
-    assert!(diagnostics
-        .iter()
-        .any(|diag| diagnostic_has_issue(diag, "package_mir_artifact_manifest_metadata_missing")));
+    assert!(
+        diagnostics.iter().any(|diag| diagnostic_has_issue(
+            diag,
+            "package_mir_artifact_manifest_metadata_missing"
+        ))
+    );
     let manifest_file = artifact.manifest_path.to_string_lossy();
-    assert!(diagnostics
-        .iter()
-        .any(|diag| diag.phase == DiagnosticPhase::Tool && diag.file == manifest_file.as_ref()));
+    assert!(
+        diagnostics
+            .iter()
+            .any(|diag| diag.phase == DiagnosticPhase::Tool && diag.file == manifest_file.as_ref())
+    );
     assert!(host.stdout_lines.is_empty());
 }
 
@@ -1592,9 +1602,11 @@ fn package_fmir_text_image_rejects_unknown_records_without_source_fallback() {
     let diagnostics = run_fmir_text_image_for_faber(&image, &mut host)
         .expect_err("unknown fmir-text records should fail closed");
 
-    assert!(diagnostics
-        .iter()
-        .any(|diag| diagnostic_has_issue(diag, "fmir_text_image_parse_failed")));
+    assert!(
+        diagnostics
+            .iter()
+            .any(|diag| diagnostic_has_issue(diag, "fmir_text_image_parse_failed"))
+    );
     assert!(host.stdout_lines.is_empty());
 }
 
@@ -4511,10 +4523,12 @@ rust_field_names = "camel"
 
     let result = compile_with_faber_seams(&Config::default(), &entry);
     assert!(result.output.is_none());
-    assert!(result
-        .diagnostics
-        .iter()
-        .any(|diag| diagnostic_has_issue(diag, "invalid_package_manifest")));
+    assert!(
+        result
+            .diagnostics
+            .iter()
+            .any(|diag| diagnostic_has_issue(diag, "invalid_package_manifest"))
+    );
 }
 
 #[test]
@@ -4533,11 +4547,13 @@ host = "native"
     .expect("write manifest");
 
     let manifest = read_manifest(&dir.join("faber.toml")).expect("read manifest");
-    assert!(manifest
-        .target
-        .get("rust")
-        .and_then(|target| target.host)
-        .is_some());
+    assert!(
+        manifest
+            .target
+            .get("rust")
+            .and_then(|target| target.host)
+            .is_some()
+    );
 }
 
 #[test]
@@ -4669,9 +4685,11 @@ fn summa(tf32[2] x) → f32 {
         &[],
     );
     let diagnostics = result.expect_err("steps on a SingleRun device program must fail closed");
-    assert!(diagnostics
-        .iter()
-        .any(|diag| { diagnostic_has_issue(diag, "package_device_steps_not_repeating") }));
+    assert!(
+        diagnostics
+            .iter()
+            .any(|diag| { diagnostic_has_issue(diag, "package_device_steps_not_repeating") })
+    );
 }
 
 #[test]
@@ -4743,10 +4761,12 @@ main {
             .map(|diag| (diag.code, diag.issue()))
             .collect::<Vec<_>>()
     );
-    assert!(!result
-        .diagnostics
-        .iter()
-        .any(|diag| diagnostic_has_issue(diag, "unused_import")));
+    assert!(
+        !result
+            .diagnostics
+            .iter()
+            .any(|diag| diagnostic_has_issue(diag, "unused_import"))
+    );
     let Some(Output::Rust(output)) = result.output else {
         panic!("expected rust output");
     };
@@ -4754,9 +4774,11 @@ main {
     assert!(output.code.contains("pub mod net"));
     assert!(output.code.contains("pub mod endpoint"));
     assert!(output.code.contains("pub struct Endpoint"));
-    assert!(output
-        .code
-        .contains("let endpoint: crate::net::endpoint::Endpoint = crate::net::endpoint::Endpoint"));
+    assert!(
+        output.code.contains(
+            "let endpoint: crate::net::endpoint::Endpoint = crate::net::endpoint::Endpoint"
+        )
+    );
 }
 
 #[test]
@@ -4796,19 +4818,23 @@ class Thing {
             .map(|diag| (diag.code, diag.issue()))
             .collect::<Vec<_>>()
     );
-    assert!(!result
-        .diagnostics
-        .iter()
-        .any(|diag| diagnostic_has_issue(diag, "unused_import")));
+    assert!(
+        !result
+            .diagnostics
+            .iter()
+            .any(|diag| diagnostic_has_issue(diag, "unused_import"))
+    );
     let Some(Output::Rust(output)) = result.output else {
         panic!("expected rust output");
     };
 
     assert!(output.code.contains("pub mod thing"));
     assert!(output.code.contains("pub struct Thing"));
-    assert!(output
-        .code
-        .contains("let item: crate::thing::Thing = crate::thing::Thing"));
+    assert!(
+        output
+            .code
+            .contains("let item: crate::thing::Thing = crate::thing::Thing")
+    );
 }
 
 #[test]
@@ -4855,9 +4881,11 @@ main {
 
     assert!(!output.code.contains("pub mod alias"));
     assert!(output.code.contains("pub struct Thing"));
-    assert!(output
-        .code
-        .contains("let item: crate::Thing::Thing = crate::Thing::Thing"));
+    assert!(
+        output
+            .code
+            .contains("let item: crate::Thing::Thing = crate::Thing::Thing")
+    );
 }
 
 #[test]
@@ -6049,10 +6077,12 @@ main {}
 
     let result = compile_with_faber_seams(&Config::default(), &entry);
     assert!(result.output.is_none());
-    assert!(result
-        .diagnostics
-        .iter()
-        .any(|diag| diagnostic_has_issue(diag, "kernel_import_script_mode_only")));
+    assert!(
+        result
+            .diagnostics
+            .iter()
+            .any(|diag| diagnostic_has_issue(diag, "kernel_import_script_mode_only"))
+    );
 }
 
 #[test]
@@ -6171,10 +6201,12 @@ main {}
         "specifier",
         "sqlite:client"
     )));
-    assert!(!result
-        .diagnostics
-        .iter()
-        .any(|diag| diagnostic_has_issue(diag, "package_import_unsupported_path")));
+    assert!(
+        !result
+            .diagnostics
+            .iter()
+            .any(|diag| diagnostic_has_issue(diag, "package_import_unsupported_path"))
+    );
 }
 
 #[test]
@@ -6287,9 +6319,11 @@ main {
         output.code.contains("crate::json::parse") || output.code.contains("json::parse"),
         "expected json::parse in generated code"
     );
-    assert!(output
-        .code
-        .contains("crate::text::split_n(path.clone(), \".\".to_string()"));
+    assert!(
+        output
+            .code
+            .contains("crate::text::split_n(path.clone(), \".\".to_string()")
+    );
 }
 
 #[test]
@@ -6398,9 +6432,11 @@ async_main {
         panic!("expected rust output");
     };
 
-    assert!(output
-        .code
-        .contains("crate::http::get(\"http://127.0.0.1:9\".to_string()).await"));
+    assert!(
+        output
+            .code
+            .contains("crate::http::get(\"http://127.0.0.1:9\".to_string()).await")
+    );
     assert!(
         output
             .code
@@ -6502,9 +6538,11 @@ fn set_config() args args {
     assert!(output.code.contains("fn set_config"));
     assert!(output.code.contains("jobs::set_config(args);"));
     assert!(output.code.contains("Usage: tool jobs config set"));
-    assert!(output
-        .code
-        .contains("command_parts[0] == \"jobs\" && command_parts[1] == \"set\""));
+    assert!(
+        output
+            .code
+            .contains("command_parts[0] == \"jobs\" && command_parts[1] == \"set\"")
+    );
 }
 
 #[test]
@@ -6585,9 +6623,11 @@ fn run() args args {
     };
 
     assert!(output.code.contains("pub verbose: bool"));
-    assert!(output
-        .code
-        .contains("println!(\"{}\", faber::display_bivalens(args.verbose));"));
+    assert!(
+        output
+            .code
+            .contains("println!(\"{}\", faber::display_bivalens(args.verbose));")
+    );
 }
 
 #[test]
@@ -6617,10 +6657,12 @@ fn run() {}
 
     let result = compile_with_faber_seams(&Config::default(), &dir);
     assert!(result.output.is_none());
-    assert!(result
-        .diagnostics
-        .iter()
-        .any(|diag| diagnostic_has_issue(diag, "local_option_global_collision")));
+    assert!(
+        result
+            .diagnostics
+            .iter()
+            .any(|diag| diagnostic_has_issue(diag, "local_option_global_collision"))
+    );
 }
 
 #[test]
@@ -6673,10 +6715,12 @@ main args args {}
 
     let result = compile_with_faber_seams(&Config::default(), &dir);
     assert!(result.output.is_none());
-    assert!(result
-        .diagnostics
-        .iter()
-        .any(|diag| diagnostic_has_issue(diag, "global_option_placement")));
+    assert!(
+        result
+            .diagnostics
+            .iter()
+            .any(|diag| diagnostic_has_issue(diag, "global_option_placement"))
+    );
 }
 
 #[test]
@@ -6790,10 +6834,12 @@ fn compile_package_rejects_import_cycles() {
 
     let result = compile_with_faber_seams(&Config::default(), &dir);
     assert!(result.output.is_none());
-    assert!(result
-        .diagnostics
-        .iter()
-        .any(|diag| diagnostic_has_issue(diag, "package_import_cycle")));
+    assert!(
+        result
+            .diagnostics
+            .iter()
+            .any(|diag| diagnostic_has_issue(diag, "package_import_cycle"))
+    );
 }
 
 #[test]
@@ -6836,10 +6882,12 @@ name = "minimal"
 
     let result = compile_with_faber_seams(&Config::default(), &entry);
     assert!(result.output.is_none());
-    assert!(result
-        .diagnostics
-        .iter()
-        .any(|diag| diagnostic_has_issue(diag, "missing_binary_entry")));
+    assert!(
+        result
+            .diagnostics
+            .iter()
+            .any(|diag| diagnostic_has_issue(diag, "missing_binary_entry"))
+    );
 }
 
 #[test]
@@ -6955,9 +7003,11 @@ bindings = "bindings/rust.toml"
     fs::write(dir.join("bindings/rust.toml"), "").expect("write bindings");
 
     let diagnostics = verify_library_bindings(&dir, "rust").expect_err("missing binding");
-    assert!(diagnostics
-        .iter()
-        .any(|diag| diagnostic_has_issue(diag, "binding_required_missing")));
+    assert!(
+        diagnostics
+            .iter()
+            .any(|diag| diagnostic_has_issue(diag, "binding_required_missing"))
+    );
 }
 
 #[test]
@@ -6999,9 +7049,11 @@ symbol = "crate::shim::missing"
     .expect("write bindings");
 
     let diagnostics = verify_library_bindings(&dir, "rust").expect_err("unknown binding");
-    assert!(diagnostics
-        .iter()
-        .any(|diag| diagnostic_has_issue(diag, "binding_unknown_declaration")));
+    assert!(
+        diagnostics
+            .iter()
+            .any(|diag| diagnostic_has_issue(diag, "binding_unknown_declaration"))
+    );
 }
 
 #[test]
@@ -7291,10 +7343,12 @@ entry = "main.fab"
 
     let result = compile_with_faber_seams(&Config::default(), &dir);
     assert!(result.output.is_none());
-    assert!(result
-        .diagnostics
-        .iter()
-        .any(|diag| diagnostic_has_issue(diag, "package_member_unsupported_source_root")));
+    assert!(
+        result
+            .diagnostics
+            .iter()
+            .any(|diag| diagnostic_has_issue(diag, "package_member_unsupported_source_root"))
+    );
 }
 
 #[test]
@@ -7362,9 +7416,10 @@ entry = "main.fab"
     let Err(err) = load_with_faber_seams(&spec, &resolver, None, false, None) else {
         panic!("missing manifest after validation must be a diagnostic, not a silent default");
     };
-    assert!(err
-        .iter()
-        .any(|d| diagnostic_has_issue(d, "package_manifest_missing_after_validation")));
+    assert!(
+        err.iter()
+            .any(|d| diagnostic_has_issue(d, "package_manifest_missing_after_validation"))
+    );
 }
 
 #[test]
@@ -7390,9 +7445,10 @@ fn load_package_with_config_rejects_malformed_manifest() {
     let Err(err) = load_with_faber_seams(&spec, &resolver, None, false, None) else {
         panic!("malformed manifest must fail loudly on load, not be swallowed");
     };
-    assert!(err
-        .iter()
-        .any(|d| diagnostic_has_issue(d, "invalid_package_manifest")));
+    assert!(
+        err.iter()
+            .any(|d| diagnostic_has_issue(d, "invalid_package_manifest"))
+    );
 }
 
 #[test]
@@ -7428,10 +7484,12 @@ source = "src"
 
     let result = compile_with_faber_seams(&Config::default(), &dir);
     assert!(result.output.is_none());
-    assert!(result
-        .diagnostics
-        .iter()
-        .any(|diag| diagnostic_has_issue(diag, "missing_binary_entry")));
+    assert!(
+        result
+            .diagnostics
+            .iter()
+            .any(|diag| diagnostic_has_issue(diag, "missing_binary_entry"))
+    );
 }
 
 #[test]
@@ -7455,10 +7513,12 @@ targets = ["rust"]
 
     let result = compile_with_faber_seams(&Config::default(), &dir);
     assert!(result.output.is_none());
-    assert!(result
-        .diagnostics
-        .iter()
-        .any(|diag| diagnostic_has_issue(diag, "invalid_package_name")));
+    assert!(
+        result
+            .diagnostics
+            .iter()
+            .any(|diag| diagnostic_has_issue(diag, "invalid_package_name"))
+    );
 }
 
 #[test]
@@ -7482,10 +7542,12 @@ targets = ["rust"]
 
     let result = compile_with_faber_seams(&Config::default(), &dir);
     assert!(result.output.is_none());
-    assert!(result
-        .diagnostics
-        .iter()
-        .any(|diag| diagnostic_has_issue(diag, "invalid_library_provider")));
+    assert!(
+        result
+            .diagnostics
+            .iter()
+            .any(|diag| diagnostic_has_issue(diag, "invalid_library_provider"))
+    );
 }
 
 #[test]
@@ -7508,10 +7570,12 @@ kind = "lib"
 
     let result = compile_with_faber_seams(&Config::default(), &dir);
     assert!(result.output.is_none());
-    assert!(result
-        .diagnostics
-        .iter()
-        .any(|diag| diagnostic_has_issue(diag, "missing_library_targets")));
+    assert!(
+        result
+            .diagnostics
+            .iter()
+            .any(|diag| diagnostic_has_issue(diag, "missing_library_targets"))
+    );
 }
 
 #[test]
@@ -8036,9 +8100,11 @@ fn saluta(string nomen) → string {
         panic!("expected rust output");
     };
 
-    assert!(output
-        .code
-        .contains("crate::auxilium::saluta(\"Marcus\".to_string())"));
+    assert!(
+        output
+            .code
+            .contains("crate::auxilium::saluta(\"Marcus\".to_string())")
+    );
     assert!(!output.code.contains("use crate::auxilium::aux"));
     assert!(output.code.contains("pub(crate) fn saluta"));
     assert!(!output.code.contains("#![allow(non_snake_case)]"));
@@ -8582,10 +8648,12 @@ main {
 
     let result = compile_with_faber_seams(&config_with_library_home(library_home.path()), &entry);
     assert!(result.output.is_none());
-    assert!(result
-        .diagnostics
-        .iter()
-        .any(|diag| { diagnostic_has_issue(diag, "qualified_type_not_exported") }));
+    assert!(
+        result
+            .diagnostics
+            .iter()
+            .any(|diag| { diagnostic_has_issue(diag, "qualified_type_not_exported") })
+    );
 }
 
 #[test]
@@ -8699,10 +8767,12 @@ version = "0.2.0"
     assert_eq!(layout.package_root, dir);
     assert!(layout.manifest_path.ends_with("faber.toml"));
     // still sibling even with odd casing in name
-    assert!(layout
-        .debug_binary
-        .to_string_lossy()
-        .ends_with("manifest-pkg"));
+    assert!(
+        layout
+            .debug_binary
+            .to_string_lossy()
+            .ends_with("manifest-pkg")
+    );
 }
 
 #[test]
@@ -8757,10 +8827,12 @@ entry = "main.fab"
         layout.generated_rust_entry,
         layout.package_root.join("target/faber/src/main.rs")
     );
-    assert!(!layout
-        .generated_rust_entry
-        .to_string_lossy()
-        .contains("/src/target/faber/"));
+    assert!(
+        !layout
+            .generated_rust_entry
+            .to_string_lossy()
+            .contains("/src/target/faber/")
+    );
 }
 
 #[test]
@@ -9640,14 +9712,18 @@ main {
     let Some(Output::Rust(output)) = result.output else {
         panic!("expected rust output");
     };
-    assert!(output
-        .code
-        .contains("deferred pending runtime codec dispatch"));
+    assert!(
+        output
+            .code
+            .contains("deferred pending runtime codec dispatch")
+    );
     assert!(!output.code.contains("faber::Json::parse"));
     assert!(!output.code.contains(".to_wire()"));
-    assert!(!output
-        .code
-        .contains("non-BMP \\\\u escapes not yet supported"));
+    assert!(
+        !output
+            .code
+            .contains("non-BMP \\\\u escapes not yet supported")
+    );
     assert!(!output.code.contains("out.pone"));
 }
 
@@ -9963,10 +10039,12 @@ main {
 
     let result = compile_with_faber_seams(&config, &entry);
     assert!(result.output.is_none());
-    assert!(result
-        .diagnostics
-        .iter()
-        .any(|diag| diagnostic_has_issue(diag, "library_import_cycle")));
+    assert!(
+        result
+            .diagnostics
+            .iter()
+            .any(|diag| diagnostic_has_issue(diag, "library_import_cycle"))
+    );
 }
 
 #[test]
@@ -10425,11 +10503,7 @@ entry = "main.fab"
 
 fn examples_sqlite_lib() -> Option<PathBuf> {
     let lib = PathBuf::from("~/work/faberlang/examples/sqlite");
-    if lib.exists() {
-        Some(lib)
-    } else {
-        None
-    }
+    if lib.exists() { Some(lib) } else { None }
 }
 
 /// Build a temp app that path-deps the shipped `examples/sqlite` package.
@@ -12817,9 +12891,11 @@ fn shell(d.Scope scope) → void {}
         "Tela web module missing: {}",
         tela_web_js.display()
     );
-    assert!(fs::read_to_string(tela_web_js)
-        .expect("tela web module")
-        .contains("webNoop"));
+    assert!(
+        fs::read_to_string(tela_web_js)
+            .expect("tela web module")
+            .contains("webNoop")
+    );
     assert_eq!(build.controllers.len(), 1);
 }
 

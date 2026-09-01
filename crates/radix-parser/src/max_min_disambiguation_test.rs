@@ -4,8 +4,8 @@
 //! claims its contextual head. Ordinary calls, receivers, and mid-expression
 //! names must remain ordinary identifiers, matching the summa precedent.
 
-use crate::{parse, ParseResult};
-use radix_lexer::{lex, lex_with_locale_pack, KeywordPack, TokenKind};
+use crate::{ParseResult, parse};
+use radix_lexer::{KeywordPack, TokenKind, lex, lex_with_locale_pack};
 use radix_syntax::{ExprKind, StmtKind};
 
 /// Minimal pack-authoritative English surface for the reduction grammar.

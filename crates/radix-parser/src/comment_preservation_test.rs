@@ -3,7 +3,7 @@
 //! Contract: leading `#` comments and blank lines attach as `Trivia` on the following statement;
 //! comments immediately before a block's `}` or before EOF attach to the block/program end boundary.
 
-use crate::{parse, ParseErrorKind};
+use crate::{ParseErrorKind, parse};
 use radix_lexer::lex;
 use radix_syntax::{CommentLine, SecusClause, StmtKind, Trivia};
 

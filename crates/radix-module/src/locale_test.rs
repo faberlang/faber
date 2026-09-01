@@ -4,18 +4,18 @@
 //! template render error propagation.
 
 use super::{
+    DiagnosticTemplateRenderError, LOCALE_PACK_SCHEMA_VERSION, LocalePack, LocalePackIssue, TemplateField,
     format_locale_pack_load_error, latin_locale_pack, load_library_locale_pack, merge_library_locale_packs,
-    validate_locale_pack, DiagnosticTemplateRenderError, LocalePack, LocalePackIssue, TemplateField,
-    LOCALE_PACK_SCHEMA_VERSION,
+    validate_locale_pack,
 };
 use crate::codegen::Target;
 use crate::diagnostics::DiagnosticConvert;
 use crate::diagnostics::{Diagnostic, DiagnosticArg};
-use crate::driver::{compile, Config, ModuleCompileRequest, Session};
+use crate::driver::{Config, ModuleCompileRequest, Session, compile};
 use crate::file_interface::{InterfaceLibraryIdentity, InterfaceMemberKind};
-use crate::lexer::{lex_with_locale_pack, LexError, LexErrorKind, LocaleSuggestion, Span, TokenKind};
+use crate::lexer::{LexError, LexErrorKind, LocaleSuggestion, Span, TokenKind, lex_with_locale_pack};
 use crate::locale::TypeBindingKind;
-use crate::parser::{parse, ParseError, ParseErrorKind};
+use crate::parser::{ParseError, ParseErrorKind, parse};
 use crate::semantic::{CollectionKind, Primitive, SemanticError, SemanticErrorKind, TensorFamilyKind};
 use crate::syntax::{BindingPattern, ExprKind, StmtKind};
 use std::collections::BTreeSet;
@@ -414,9 +414,11 @@ exemplars = ["./exemplars/missing.fab"]
     let super::LocalePackLoadError::Validation(issues) = err else {
         panic!("expected validation error");
     };
-    assert!(issues
-        .iter()
-        .any(|issue| matches!(issue, LocalePackIssue::MissingLlmExemplar { .. })));
+    assert!(
+        issues
+            .iter()
+            .any(|issue| matches!(issue, LocalePackIssue::MissingLlmExemplar { .. }))
+    );
 }
 
 #[test]
@@ -812,9 +814,10 @@ fn installed_latin_pack_has_structural_templates_for_catalog_codes() {
             ],
         ),
     ] {
-        assert!(pack
-            .diagnostics
-            .contains_key(diagnostic.code.expect("coded diagnostic")));
+        assert!(
+            pack.diagnostics
+                .contains_key(diagnostic.code.expect("coded diagnostic"))
+        );
     }
 }
 
@@ -929,9 +932,11 @@ exemplars = ["./exemplars/salve-munde.fab"]
         panic!("expected validation error");
     };
 
-    assert!(issues
-        .iter()
-        .any(|issue| matches!(issue, LocalePackIssue::MissingKeywordGroupMember { keyword, .. } if keyword == "sin")));
+    assert!(
+        issues.iter().any(
+            |issue| matches!(issue, LocalePackIssue::MissingKeywordGroupMember { keyword, .. } if keyword == "sin")
+        )
+    );
     assert!(issues.iter().any(
         |issue| matches!(issue, LocalePackIssue::MissingKeywordGroupMember { keyword, .. } if keyword == "secus")
     ));
@@ -1154,9 +1159,10 @@ exemplars = ["./salve-munde.fab"]
 
     // A type with no localized row falls back to Latin visibly.
     assert_eq!(pack.type_surface(TypeBindingKind::Primitive(Primitive::Numerus)), "numerus");
-    assert!(pack
-        .type_fallbacks()
-        .contains(&TypeBindingKind::Primitive(Primitive::Numerus)));
+    assert!(
+        pack.type_fallbacks()
+            .contains(&TypeBindingKind::Primitive(Primitive::Numerus))
+    );
 
     // Coverage gap is reported, not silent.
     assert!(pack.fallback_count() > 0);
@@ -1847,11 +1853,7 @@ fn census_diagnostic_rows_render_from_their_raising_families() {
             "PARSE010",
             "schema S {\n            columna numerus id\n            functio f() → vacuum {}\n        }",
         ),
-        (
-            "schema_inheritance",
-            "PARSE010",
-            "schema S sub T { }",
-        ),
+        ("schema_inheritance", "PARSE010", "schema S sub T { }"),
         (
             "schema_nested_column",
             "SEM008",
@@ -2004,9 +2006,11 @@ surface = "Overlook"
 fn load_library_locale_pack_skips_missing_and_loads_present() {
     let dir = crate::test_support::test_temp_dir("lib-locale-home");
     let root = dir.path();
-    assert!(load_library_locale_pack(root, "la")
-        .expect("missing is ok")
-        .is_none());
+    assert!(
+        load_library_locale_pack(root, "la")
+            .expect("missing is ok")
+            .is_none()
+    );
 
     let pack_dir = root.join("locale/la");
     std::fs::create_dir_all(&pack_dir).expect("locale dir");

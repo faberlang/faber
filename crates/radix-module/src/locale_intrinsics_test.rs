@@ -7,7 +7,7 @@
 //! without an `[intrinsics]` section.
 
 use super::{
-    latin_locale_pack, validate_locale_pack, IntrinsicBinding, LocalePack, LocalePackIssue, LocalePackLoadError,
+    IntrinsicBinding, LocalePack, LocalePackIssue, LocalePackLoadError, latin_locale_pack, validate_locale_pack,
 };
 use crate::intrinsics::IntrinsicReceiver;
 use std::path::PathBuf;

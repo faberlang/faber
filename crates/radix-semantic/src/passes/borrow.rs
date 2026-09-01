@@ -56,12 +56,12 @@ use super::borrow_region::RegionFacts;
 use super::borrow_region_cfg::CfgNodeId;
 
 use crate::{
-    AccessMarker, FuncSig, ParamType, Primitive, Resolver, SemanticError, SemanticErrorKind,
-    SemanticParamMode, Type, TypeId, TypeTable, WarningKind, ISSUE_ASSIGN_THROUGH_REF,
-    ISSUE_MUT_INTO_OWN, ISSUE_MUT_LOCAL, ISSUE_REF_TO_MUT_OR_OWN_POSITION, ISSUE_UNMARKED_INTO_OWN,
-    SUGGESTION_COPY,
+    AccessMarker, FuncSig, ISSUE_ASSIGN_THROUGH_REF, ISSUE_MUT_INTO_OWN, ISSUE_MUT_LOCAL,
+    ISSUE_REF_TO_MUT_OR_OWN_POSITION, ISSUE_UNMARKED_INTO_OWN, ParamType, Primitive, Resolver,
+    SUGGESTION_COPY, SemanticError, SemanticErrorKind, SemanticParamMode, Type, TypeId, TypeTable,
+    WarningKind,
 };
-use radix_hir::visit::{walk_expr, HirVisitor};
+use radix_hir::visit::{HirVisitor, walk_expr};
 use radix_hir::{
     DefId, HirBlock, HirCallArg, HirExpression, HirExpressionKind, HirFunction, HirItem,
     HirItemKind, HirModule, HirParamMode, HirStatement, HirStatementKind,

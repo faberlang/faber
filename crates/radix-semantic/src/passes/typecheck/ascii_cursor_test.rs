@@ -4,7 +4,7 @@ use super::TypeChecker;
 use crate::test_support;
 use crate::{IndexExpr, Primitive, Resolver, Type, TypeTable};
 use radix_intrinsics::{
-    lookup_method_for_type, receivers_for_type, IntrinsicReceiver, IntrinsicReturnKind,
+    IntrinsicReceiver, IntrinsicReturnKind, lookup_method_for_type, receivers_for_type,
 };
 use radix_lexer::Interner;
 use radix_target::Target;

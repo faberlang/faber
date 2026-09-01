@@ -1273,7 +1273,7 @@ mod tests {
     struct ExprMarker;
     impl HirVisitorMut for ExprMarker {
         fn visit_expr_mut(&mut self, expr: &mut HirExpression) {
-            if let HirExpressionKind::Literal(HirLiteral::Int(ref mut n)) = &mut expr.kind {
+            if let HirExpressionKind::Literal(HirLiteral::Int(n)) = &mut expr.kind {
                 *n = 99;
             }
             walk_expr_mut(self, expr);

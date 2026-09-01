@@ -1,8 +1,8 @@
 //! Value, option-operation, operand, place, callee, and call-argument checks.
 
 use super::{
-    signature_from_func_sig, signature_from_function, FunctionScope, GenericTypeBindings,
-    MirFunctionSignature, Validator,
+    FunctionScope, GenericTypeBindings, MirFunctionSignature, Validator, signature_from_func_sig,
+    signature_from_function,
 };
 use crate::generic::MirShapeBindings;
 use crate::{

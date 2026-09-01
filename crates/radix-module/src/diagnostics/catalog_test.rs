@@ -3,12 +3,12 @@
 //! codes remain stable; argument helpers preserve quoting.
 
 use crate::diagnostics::is_known_diagnostic_code;
-use crate::lexer::{LexErrorKind, HOMOGLYPH_ISSUE};
+use crate::lexer::{HOMOGLYPH_ISSUE, LexErrorKind};
 use crate::parser::ParseErrorKind;
 use crate::semantic::{SemanticErrorKind, WarningKind};
 use radix_diagnostics::{
-    locale_suggestion_spec, locale_unknown_spec, unresolved_intrinsic_spec, unresolved_keyword_spec,
-    unresolved_library_member_spec, DiagnosticArg, DiagnosticSpec,
+    DiagnosticArg, DiagnosticSpec, locale_suggestion_spec, locale_unknown_spec, unresolved_intrinsic_spec,
+    unresolved_keyword_spec, unresolved_library_member_spec,
 };
 use radix_semantic::catalog::{arg_value, quote_arg};
 use radix_semantic::catalog_semantic::{semantic_message, semantic_spec};

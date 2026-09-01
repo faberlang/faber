@@ -12,9 +12,8 @@ use crate::schema::{SchemaColumnDef, SchemaDef};
 use crate::schema_subset::{extra_input_columns, schema_subset};
 use crate::types::{Primitive, TypeTable};
 use crate::{
-    CapabilityRequirement, ColumnRef, ComparisonOp, FiltrumPlan, OrderRow, Predicate,
-    PredicateValue, SortDirection, SourceIdentity, Window, WindowError,
-    FILTRUM_ENCODING_VERSION_V1,
+    CapabilityRequirement, ColumnRef, ComparisonOp, FILTRUM_ENCODING_VERSION_V1, FiltrumPlan,
+    OrderRow, Predicate, PredicateValue, SortDirection, SourceIdentity, Window, WindowError,
 };
 use radix_lexer::Interner;
 

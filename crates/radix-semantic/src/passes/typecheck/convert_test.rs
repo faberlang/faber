@@ -1496,14 +1496,16 @@ fn failable_call_propagation_rejects_declared_channel_mismatch() {
         .iter()
         .find(|diag| diag.issue() == Some("failable_call_conversion_absent"))
         .expect("SEM010-shaped conversion-absent diagnostic");
-    assert!(err
-        .args
-        .iter()
-        .any(|arg| arg.name == "source" && arg.value == "bivalens"));
-    assert!(err
-        .args
-        .iter()
-        .any(|arg| arg.name == "destination" && arg.value == "numerus"));
+    assert!(
+        err.args
+            .iter()
+            .any(|arg| arg.name == "source" && arg.value == "bivalens")
+    );
+    assert!(
+        err.args
+            .iter()
+            .any(|arg| arg.name == "destination" && arg.value == "numerus")
+    );
 }
 
 #[test]
@@ -1531,14 +1533,16 @@ fn failable_call_propagation_requires_direct_row_only() {
         .iter()
         .find(|diag| diag.issue() == Some("failable_call_conversion_absent"))
         .expect("SEM010-shaped conversion-absent diagnostic");
-    assert!(err
-        .args
-        .iter()
-        .any(|arg| arg.name == "source" && arg.value == "textus"));
-    assert!(err
-        .args
-        .iter()
-        .any(|arg| arg.name == "destination" && arg.value == "fractus"));
+    assert!(
+        err.args
+            .iter()
+            .any(|arg| arg.name == "source" && arg.value == "textus")
+    );
+    assert!(
+        err.args
+            .iter()
+            .any(|arg| arg.name == "destination" && arg.value == "fractus")
+    );
 }
 
 #[test]
@@ -1673,14 +1677,16 @@ fn bare_arrow_through_registered_row_composes_declared_channel() {
         .iter()
         .find(|diag| diag.issue() == Some("failable_call_conversion_absent"))
         .expect("SEM010-shaped conversion-absent diagnostic");
-    assert!(err
-        .args
-        .iter()
-        .any(|arg| arg.name == "source" && arg.value == "bivalens"));
-    assert!(err
-        .args
-        .iter()
-        .any(|arg| arg.name == "destination" && arg.value == "numerus"));
+    assert!(
+        err.args
+            .iter()
+            .any(|arg| arg.name == "source" && arg.value == "bivalens")
+    );
+    assert!(
+        err.args
+            .iter()
+            .any(|arg| arg.name == "destination" && arg.value == "numerus")
+    );
 }
 
 #[test]
@@ -1847,12 +1853,14 @@ fn conversio_assign_channel_mismatch_keeps_sem010_shape() {
         .iter()
         .find(|diag| diag.issue() == Some("failable_call_conversion_absent"))
         .expect("SEM010-shaped conversion-absent diagnostic");
-    assert!(err
-        .args
-        .iter()
-        .any(|arg| arg.name == "source" && arg.value == "bivalens"));
-    assert!(err
-        .args
-        .iter()
-        .any(|arg| arg.name == "destination" && arg.value == "numerus"));
+    assert!(
+        err.args
+            .iter()
+            .any(|arg| arg.name == "source" && arg.value == "bivalens")
+    );
+    assert!(
+        err.args
+            .iter()
+            .any(|arg| arg.name == "destination" && arg.value == "numerus")
+    );
 }

@@ -26,16 +26,16 @@
 //!   diagnostic policy promotes warning-kind diagnostics.
 
 use crate::{
-    error::WarningKind, locale::LocalePack, Primitive, Resolver, SemanticError, SemanticErrorKind,
-    Type, TypeTable,
+    Primitive, Resolver, SemanticError, SemanticErrorKind, Type, TypeTable, error::WarningKind,
+    locale::LocalePack,
 };
-use radix_hir::visit::{walk_expr, HirVisitor};
+use radix_hir::visit::{HirVisitor, walk_expr};
 use radix_hir::{
     HirBinOp, HirBlock, HirExpression, HirExpressionKind, HirFunction, HirImport, HirItem,
     HirItemKind, HirLiteral, HirLocal, HirModule, HirParam, HirStatement, HirStatementKind,
 };
 use radix_intrinsics::{
-    is_numeric_imperativus_operator, lookup_method_for_type, mir_collection_op, IntrinsicReturnKind,
+    IntrinsicReturnKind, is_numeric_imperativus_operator, lookup_method_for_type, mir_collection_op,
 };
 use radix_lexer::{Interner, Span};
 use radix_types::MirCollectionOp;

@@ -29,10 +29,10 @@
 //! library-import fixture fails, the snapshot contract (ResolverSnapshot,
 //! LibraryRegistry) is incomplete and no other fixture would expose it.
 
-use radix_module::codegen::{generate_from_analyzed, CodegenError, Target};
-use radix_module::driver::{analyze_source, AnalyzeRequest, Config, Session};
+use radix_module::codegen::{CodegenError, Target, generate_from_analyzed};
+use radix_module::driver::{AnalyzeRequest, Config, Session, analyze_source};
 use radix_module::hir::artifact::load_fhir;
-use radix_module::locale::{latin_locale_pack, KeywordSurface};
+use radix_module::locale::{KeywordSurface, latin_locale_pack};
 
 /// Returns the documented F23 exclusion issue code for a failing
 /// fixture+target pair, when the failure matches the documented reason.
@@ -269,7 +269,7 @@ fn hir_artifact_round_trip_all() {
 /// recorded the end, leaving the sidecar with more entries than the tree.
 #[test]
 fn structural_end_count_parity_across_splicing_paths() {
-    use radix_module::hir::visit::{walk_block, HirVisitor};
+    use radix_module::hir::visit::{HirVisitor, walk_block};
 
     #[derive(Default)]
     struct EndCounter {

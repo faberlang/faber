@@ -15,7 +15,7 @@ use crate::nodes::{
     HirSourceAnchorId, HirStatement, HirStatementKind, HirTrivia, HirTriviaAttachment,
     HirTriviaOwner, HirTriviaOwnerKind,
 };
-use crate::visit::{walk_block, walk_stmt, HirVisitor};
+use crate::visit::{HirVisitor, walk_block, walk_stmt};
 use radix_lexer::{Span, Symbol};
 
 /// Half-open span helper so tests avoid raw byte literals.

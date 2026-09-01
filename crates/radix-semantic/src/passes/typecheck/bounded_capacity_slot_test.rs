@@ -5,7 +5,7 @@ use crate::passes::collect;
 use crate::passes::resolve::resolve;
 use crate::test_support;
 use crate::{IndexExpr, Resolver, TypeTable};
-use radix_lexer::{lex, Interner};
+use radix_lexer::{Interner, lex};
 use radix_parser::parse;
 use radix_target::Target;
 

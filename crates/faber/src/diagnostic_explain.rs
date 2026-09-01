@@ -6,7 +6,7 @@
 
 use crate::explain::ExplainError;
 use crate::io_buf::writeln_buf;
-use crate::package::{load_embedded_locale_pack, EMBEDDED_LOCALE_IDS};
+use crate::package::{EMBEDDED_LOCALE_IDS, load_embedded_locale_pack};
 use radix::module::locale::{DiagnosticTemplate, LocalePack};
 use serde::Serialize;
 

@@ -1,7 +1,7 @@
 //! Coverage for nucleum-fragment instantiation checking and the call-legality matrix.
 
-use super::{check_with_metadata, FragmentInstantiationError, ISSUE_CONTEXT, ISSUE_TYPE};
-use crate::diagnostics::{semantic_message, DiagnosticArg};
+use super::{FragmentInstantiationError, ISSUE_CONTEXT, ISSUE_TYPE, check_with_metadata};
+use crate::diagnostics::{DiagnosticArg, semantic_message};
 use crate::driver::{self, AnalyzeRequest, Config, Session};
 use crate::hir::DefId;
 use crate::lexer::Span;
@@ -320,10 +320,11 @@ fn host_to_fragment_is_rejected() {
     );
     let errors = check_fns(&[host, fragment], &types);
     let err = expect_issue(&errors, ISSUE_CONTEXT, "host_callable");
-    assert!(err
-        .args
-        .iter()
-        .any(|arg| arg.name == "caller" && arg.value == "host"));
+    assert!(
+        err.args
+            .iter()
+            .any(|arg| arg.name == "caller" && arg.value == "host")
+    );
 }
 
 #[test]

@@ -5,8 +5,8 @@
 //! calls, and reports fact conflicts.
 
 use super::*;
-use crate::types::TypeTable;
 use crate::Primitive;
+use crate::types::TypeTable;
 use radix_hir::DefId;
 use rustc_hash::FxHashMap;
 

@@ -7,8 +7,9 @@
 
 use crate::error::FmirImageError;
 use crate::schema::{
-    admit_device_section, check_target, check_toolchain, check_version, FmirBinaryImageFile,
-    FmirTextImageFile, FMIR_TARGET_NAME, FMIR_TEXT_TARGET_NAME, PACKAGE_MIR_ARTIFACT_VERSION,
+    FMIR_TARGET_NAME, FMIR_TEXT_TARGET_NAME, FmirBinaryImageFile, FmirTextImageFile,
+    PACKAGE_MIR_ARTIFACT_VERSION, admit_device_section, check_target, check_toolchain,
+    check_version,
 };
 
 /// Serialize a text image to pretty TOML.

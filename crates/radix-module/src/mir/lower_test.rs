@@ -1174,9 +1174,11 @@ fn failed_top_level_const_initializer_does_not_bind_const() {
         mutable: false,
     };
 
-    assert!(builder
-        .lower_const_binding(DefId(7), &konst, span)
-        .is_none());
+    assert!(
+        builder
+            .lower_const_binding(DefId(7), &konst, span)
+            .is_none()
+    );
     assert!(!builder.bindings.contains_key(&DefId(7)));
     assert_eq!(builder.errors.len(), 1);
     assert_eq!(
@@ -1563,9 +1565,11 @@ fn range_itera_stops_when_bounds_fail_to_lower() {
     let expr = HirExpression { id: HirId(5), kind: HirExpressionKind::Vacua, ty: Some(vacuum), span };
     let body = HirBlock { statements: Vec::new(), expr: None, span, ..Default::default() };
 
-    assert!(builder
-        .lower_itera_expr(crate::hir::HirIteraMode::Ab, &[], DefId(0), Symbol(0), &iter, &body, &expr)
-        .is_none());
+    assert!(
+        builder
+            .lower_itera_expr(crate::hir::HirIteraMode::Ab, &[], DefId(0), Symbol(0), &iter, &body, &expr)
+            .is_none()
+    );
     assert_eq!(builder.blocks.len(), 1);
     assert_eq!(builder.errors.len(), 1);
     assert_eq!(
@@ -2767,7 +2771,7 @@ functio mensura(lista<numerus> f) → numerus ⇥ FormaError {
         })
         .expect("mensura function def");
 
-    use crate::hir::visit::{walk_expr_mut, HirVisitorMut};
+    use crate::hir::visit::{HirVisitorMut, walk_expr_mut};
     // The analyzer leaves direct-call callee paths untyped; the package
     // rewrite must COMPUTE the function type (here from the HIR signature,
     // in faber from the resolver's file-interface `FuncSig`).
@@ -3090,12 +3094,14 @@ functio elige_color() → Color {
     assert_eq!(variants.len(), 2);
     for variant in variants {
         assert_eq!(lowered.validated.validation().variant_parents.get(variant), Some(enum_def));
-        assert!(lowered
-            .validated
-            .validation()
-            .variant_fields
-            .get(variant)
-            .is_some_and(std::collections::HashMap::is_empty));
+        assert!(
+            lowered
+                .validated
+                .validation()
+                .variant_fields
+                .get(variant)
+                .is_some_and(std::collections::HashMap::is_empty)
+        );
     }
 }
 
@@ -3419,9 +3425,11 @@ fn rejects_unsupported_runtime_method_shapes() {
     let errors =
         lower_analyzed_unit(&mut unit, Default::default()).expect_err("unsupported method remains fail-closed");
 
-    assert!(errors
-        .iter()
-        .any(|err| err.issue == "unsupported_mir_lowering_method_call_before_runtime_provider_mir_lowering"));
+    assert!(
+        errors
+            .iter()
+            .any(|err| err.issue == "unsupported_mir_lowering_method_call_before_runtime_provider_mir_lowering")
+    );
 }
 
 #[test]
@@ -3960,9 +3968,11 @@ incipit {
             .any(|callee| matches!(callee, MirCallee::Function(id) if *id == synthetic.id)),
         "kernel closure call must be direct: {calls:?}"
     );
-    assert!(calls
-        .iter()
-        .all(|callee| !matches!(callee, MirCallee::Closure(_) | MirCallee::Value(_))));
+    assert!(
+        calls
+            .iter()
+            .all(|callee| !matches!(callee, MirCallee::Closure(_) | MirCallee::Value(_)))
+    );
 
     let metadata = lowered
         .device_function_metadata
@@ -4990,10 +5000,12 @@ incipit {
         .iter()
         .find(|function| function.id == instance_id)
         .expect("monomorphized instance exists");
-    assert!(instance
-        .params
-        .iter()
-        .all(|param| !type_contains_param(&unit.types, param.ty.semantic_id())));
+    assert!(
+        instance
+            .params
+            .iter()
+            .all(|param| !type_contains_param(&unit.types, param.ty.semantic_id()))
+    );
     assert!(!type_contains_param(&unit.types, instance.return_ty.semantic_id()));
     for param in &instance.params {
         assert_tensor_dims_literal(&unit.types, param.ty);
@@ -5214,9 +5226,11 @@ incipit {
     let Err(errors) = lower_analyzed_unit(&mut unit, Default::default()) else {
         panic!("unbound child shape must fail closed");
     };
-    assert!(errors
-        .iter()
-        .any(|error| { error.issue == "invalid_mir_generic_call_signature_has_unresolved_type_parameter" }));
+    assert!(
+        errors
+            .iter()
+            .any(|error| { error.issue == "invalid_mir_generic_call_signature_has_unresolved_type_parameter" })
+    );
 }
 
 // ──────────────────────────────────────────────────────────────────────

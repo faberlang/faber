@@ -5,8 +5,8 @@
 //! expected IndexUnifyError variants.
 
 use super::{IndexUnifier, IndexUnifyError};
-use crate::index::{IndexExpr, IndexVar};
 use crate::TypeTable;
+use crate::index::{IndexExpr, IndexVar};
 use radix_lexer::Symbol;
 use rustc_hash::FxHashMap;
 

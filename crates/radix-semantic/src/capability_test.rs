@@ -72,9 +72,9 @@ fn combined_query_interface_is_implemented_by_fail_closed_provider() {
 // ── SCR-03 derived queries ───────────────────────────────────────────────────
 
 use super::DerivedCapabilityQueries;
+use crate::AccessFactTable;
 use crate::function_facts::analyze_function_facts;
 use crate::test_support::analyze_ok;
-use crate::AccessFactTable;
 use radix_lexer::Symbol;
 use radix_types::{
     IndexExpr, IndexVar, NumericWidth, Primitive as Prim, SemanticMutability, Type, TypeTable,
@@ -525,10 +525,12 @@ incipit { }
     );
     let vivum = first_param_type(hir);
 
-    assert!(queries
-        .type_capability(vivum, TypeCapabilityKind::StrictEquality)
-        .proof()
-        .is_some());
+    assert!(
+        queries
+            .type_capability(vivum, TypeCapabilityKind::StrictEquality)
+            .proof()
+            .is_some()
+    );
     assert_eq!(
         queries
             .type_capability(vivum, TypeCapabilityKind::ReflexiveEquality)

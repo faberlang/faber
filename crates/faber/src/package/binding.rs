@@ -392,15 +392,17 @@ fn prove_rust_bindings(
 
     run_rust_binding_probe(package_root, binding_path, dependencies, shim, &probes).map_err(
         |diagnostic| {
-            vec![diagnostic.with_arg(
-                "bindings",
-                manifest
-                    .functions
-                    .keys()
-                    .cloned()
-                    .collect::<Vec<_>>()
-                    .join(","),
-            )]
+            vec![
+                diagnostic.with_arg(
+                    "bindings",
+                    manifest
+                        .functions
+                        .keys()
+                        .cloned()
+                        .collect::<Vec<_>>()
+                        .join(","),
+                ),
+            ]
         },
     )
 }

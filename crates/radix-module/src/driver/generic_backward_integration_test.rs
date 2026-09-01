@@ -23,10 +23,10 @@
 
 use crate::codegen::Target;
 use crate::driver::{
-    analyze_source, apply_air_backward_bundle, lower_mir_with_context_for_target, prepare_air_backward_bundle,
-    AnalyzeRequest, FreshMirFunctionIds, SpannedCodegenError,
+    AnalyzeRequest, FreshMirFunctionIds, SpannedCodegenError, analyze_source, apply_air_backward_bundle,
+    lower_mir_with_context_for_target, prepare_air_backward_bundle,
 };
-use crate::mir::{lower_analyzed_unit, MirFunctionId};
+use crate::mir::{MirFunctionId, lower_analyzed_unit};
 use crate::semantic::{IndexExpr, Type};
 use crate::test_support::test_session;
 
@@ -120,11 +120,13 @@ incipit {
         .expect("concrete call site must form a companion instance");
     assert_eq!(companion_instance.key.shape_args.len(), 2);
     let types = lowered.validated.validation().types;
-    assert!(companion_instance
-        .key
-        .shape_args
-        .iter()
-        .all(|shape| { matches!(types.get_index(*shape), IndexExpr::Literal(_)) }));
+    assert!(
+        companion_instance
+            .key
+            .shape_args
+            .iter()
+            .all(|shape| { matches!(types.get_index(*shape), IndexExpr::Literal(_)) })
+    );
     let instance = lowered
         .program
         .functions
@@ -138,9 +140,10 @@ incipit {
         let IndexExpr::Tuple(dims) = types.get_index(*shape) else {
             panic!("companion tensor shape must be a tuple");
         };
-        assert!(dims
-            .iter()
-            .all(|dim| matches!(types.get_index(*dim), IndexExpr::Literal(_))));
+        assert!(
+            dims.iter()
+                .all(|dim| matches!(types.get_index(*dim), IndexExpr::Literal(_)))
+        );
     }
 }
 

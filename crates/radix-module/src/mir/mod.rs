@@ -42,16 +42,16 @@ mod queue_stack_test;
 
 // --- Core from radix-mir (module paths for residual code) ---
 pub use radix_mir::{
-    abi, ai_workbench_stage5, artifact_completeness, boundary_abi, capability, control, device, device_semantics, dump,
+    KernelModule, MirAtomicOp, MirCollectionOp, MirColorTargetFormat, MirDepthCompareFunction, MirDepthStencilState,
+    MirGraphicsPipelineReflection, MirInputStepMode, MirPrimitiveTopology, MirStencilFaceState, MirStencilOp, abi,
+    ai_workbench_stage5, artifact_completeness, boundary_abi, capability, control, device, device_semantics, dump,
     generic, host_partition, inference_blocker_matrix, layout, names, nodes, rank2_reduction_readiness,
     tensor_operation_floor, tensor_operation_parity, tensor_placement, tensor_runtime_abi, tensor_systems_target, ty,
-    validate, visit, KernelModule, MirAtomicOp, MirCollectionOp, MirColorTargetFormat, MirDepthCompareFunction,
-    MirDepthStencilState, MirGraphicsPipelineReflection, MirInputStepMode, MirPrimitiveTopology, MirStencilFaceState,
-    MirStencilOp,
+    validate, visit,
 };
 
 #[cfg(feature = "mir-coverage")]
-pub use coverage::{classify_mir_coverage, MirCoverageTarget, MIR_COVERAGE_TARGETS};
+pub use coverage::{MIR_COVERAGE_TARGETS, MirCoverageTarget, classify_mir_coverage};
 #[cfg(feature = "mir-llvm")]
 // DDCP3-U2 (b) mixed-path disambiguation: `LlvmEmitRequest` selects the
 // host-partition CPU-module path for a package that carries device roles
@@ -60,23 +60,23 @@ pub use coverage::{classify_mir_coverage, MirCoverageTarget, MIR_COVERAGE_TARGET
 // `llvm-text`/`llvm-host` through the lane when roles are present — no route
 // silently emits device bodies into a CPU module.
 pub use llvm_text::{
-    classify_lowerability, emit_llvm_text_probe, fmir_artifact_packet_facts, CliAdapterField, CliAdapterPlan,
-    CliRecordFunction, LlvmEmitRequest, MirLlvmTextProbeError,
+    CliAdapterField, CliAdapterPlan, CliRecordFunction, LlvmEmitRequest, MirLlvmTextProbeError, classify_lowerability,
+    emit_llvm_text_probe, fmir_artifact_packet_facts,
 };
 pub use lower::prepare_mir_lowering_interner;
 pub use lower::{
-    dump_analyzed_unit, instantiate_merged_generic_calls, instantiate_merged_generic_calls_with_devices,
-    instantiate_merged_generic_calls_with_devices_and_metadata, lower_analyzed_unit, ImportedDeviceIndex,
-    ImportedDeviceRegistration, ImportedDeviceRoute, LoweredMirUnit, MirError, MirGenericParam, MirLoweringOptions,
-    MirRuntimeRecordField, MirRuntimeRecordValue, PackageStructMetadata,
+    ImportedDeviceIndex, ImportedDeviceRegistration, ImportedDeviceRoute, LoweredMirUnit, MirError, MirGenericParam,
+    MirLoweringOptions, MirRuntimeRecordField, MirRuntimeRecordValue, PackageStructMetadata, dump_analyzed_unit,
+    instantiate_merged_generic_calls, instantiate_merged_generic_calls_with_devices,
+    instantiate_merged_generic_calls_with_devices_and_metadata, lower_analyzed_unit,
 };
 #[cfg(feature = "mir-metal")]
 pub use metal_text::{
-    emit_metal_text_probe_with_device_roles, emit_metal_text_probe_with_reflection_and_device_roles,
-    MirMetalTextProbeError, MirMetalTextProbeOutput,
+    MirMetalTextProbeError, MirMetalTextProbeOutput, emit_metal_text_probe_with_device_roles,
+    emit_metal_text_probe_with_reflection_and_device_roles,
 };
 pub use radix_mir::boundary_abi::{
-    validate_boundary_abi, BoundaryAbiError, BoundaryAbiKind, BoundaryCall, PreparedRegion, HOST_CALL_ABI_VERSION,
+    BoundaryAbiError, BoundaryAbiKind, BoundaryCall, HOST_CALL_ABI_VERSION, PreparedRegion, validate_boundary_abi,
 };
 // DDCP3-U4/U5: the typed `§ArtifactPacket` `HostDeviceCall` surface (typed
 // bindings, bounded numeric argument layout, the execution-descriptor
@@ -84,119 +84,120 @@ pub use radix_mir::boundary_abi::{
 // gate-6 hostile-shape surface. Re-export hunks serialized after U2/U3's
 // (the U4 residual; U5 adds the gate classes + the caller-route adapter).
 pub use radix_mir::artifact_completeness::{
-    check_preparation_completeness, derive_region_preparation_facts, ArtifactPacketFacts, CompletenessError,
-    EntrypointSymbolFact, LaunchDimensionFact, PreparedResourceFact, ReflectedKernelFact, ReflectedResourceFact,
-    RegionPreparationFacts,
+    ArtifactPacketFacts, CompletenessError, EntrypointSymbolFact, LaunchDimensionFact, PreparedResourceFact,
+    ReflectedKernelFact, ReflectedResourceFact, RegionPreparationFacts, check_preparation_completeness,
+    derive_region_preparation_facts,
 };
 pub use radix_mir::boundary_abi::{
-    derive_host_device_calls, execution_descriptor_hash, CallBinding, CallBindingRole, CallFailureBehavior,
-    ExecutionDescriptor, HostDeviceCall, MemberKernel, RegionArgumentLayout,
+    CallBinding, CallBindingRole, CallFailureBehavior, ExecutionDescriptor, HostDeviceCall, MemberKernel,
+    RegionArgumentLayout, derive_host_device_calls, execution_descriptor_hash,
 };
 pub use radix_mir::dump_program;
 // DDCP3-U3: the typed, serializable partition/callsite record (membership +
 // callsite mapping + explicit effect boundaries) — the compiler artifact
 // proving DDCP3 gate bullets 1 + 2. Re-export hunks serialized after U2's.
 pub use radix_mir::host_partition::{
-    derive_host_partition, derive_partition_record, derive_partition_record_with_metadata, CallsiteId, CallsiteRecord,
-    EffectBoundaryRecord, HostPartition, HostPartitionError, PartitionMember, PartitionRecord, PartitionRole,
-    RegionRecord,
+    CallsiteId, CallsiteRecord, EffectBoundaryRecord, HostPartition, HostPartitionError, PartitionMember,
+    PartitionRecord, PartitionRole, RegionRecord, derive_host_partition, derive_partition_record,
+    derive_partition_record_with_metadata,
 };
 pub use radix_mir::nodes::*;
 pub use radix_mir::{
-    ai_workbench_stage5_native_status, ai_workbench_stage5_rows, AiWorkbenchStage5Facet, AiWorkbenchStage5Row,
-    AiWorkbenchStage5Status,
+    AiWorkbenchStage5Facet, AiWorkbenchStage5Row, AiWorkbenchStage5Status, ai_workbench_stage5_native_status,
+    ai_workbench_stage5_rows,
 };
 pub use radix_mir::{
-    classify_device_safe, classify_device_safe_for_target_entry, device_entry_roles_from_hir, device_roles_from_hir,
-    MirDeviceContext, MirDeviceRole,
+    MirDeviceContext, MirDeviceRole, classify_device_safe, classify_device_safe_for_target_entry,
+    device_entry_roles_from_hir, device_roles_from_hir,
 };
 // KPC-EMIT: the imported-entry merge surface re-exported from the device
 // module (the crate-root list above predates it; `device` is public).
 // KCM-05: the synthetic-kernel metadata carrier rides the same device module.
 pub use radix_mir::device::{
-    merge_imported_entry_roles, MirDeviceFunctionMetadata, MirDeviceFunctionMetadataMap, MirImportedEntryError,
-    MirImportedEntryFact,
-};
-pub use radix_mir::{
-    constant_ty, index_projection_result_ty, option_chain_base_ty, option_payload_ty, place_base_ty, MirTypeError,
-    MirTypeLookup,
-};
-pub use radix_mir::{
-    indexed_access_parity, TensorOperationFamily, TensorOperationParityRow, TensorParityStatus, TensorParityTarget,
-};
-pub use radix_mir::{
-    inference_blocker_rows, inference_non_claims, InferenceBlockerKind, InferenceBlockerRow, InferenceBlockerStatus,
-    InferenceNonClaim, InferenceNonClaimKind,
-};
-pub(crate) use radix_mir::{instantiate_existing_generic_type, type_contains_param, MirGenericBindings};
-pub use radix_mir::{
-    rank2_reduction_readiness_rows, Rank2ReductionReadinessPath, Rank2ReductionReadinessRow,
-    Rank2ReductionReadinessStatus,
-};
-pub use radix_mir::{
-    reject_kernel_matrix_abi, validate_varying_consistency, MirAbiError, MirFragmentOutputReflection, MirFunctionAbi,
-    MirFunctionAbiParam, MirGpuReflection, MirKernelAxis, MirKernelBufferBindingKind, MirKernelBuiltin,
-    MirKernelBuiltinInput, MirKernelBuiltinInputReflection, MirKernelDispatchSize, MirKernelLaunchBindGroup,
-    MirKernelLaunchBindGroupLayoutEntry, MirKernelLaunchBinding, MirKernelLaunchPipelineBindGroupLayout,
-    MirKernelLaunchPipelineLayout, MirKernelLaunchPlan, MirKernelOffsetMode, MirKernelProvenance, MirKernelReflection,
-    MirKernelResource, MirKernelResourceAccess, MirKernelResourceKind, MirKernelResourceReflection,
-    MirKernelResourceRole, MirKernelShaderAccess, MirKernelShaderStage, MirKernelSignature, MirKernelWorkgroupCount,
-    MirRuntimeAbi, MirRuntimeAbiFamily, MirRuntimeAbiKind, MirVaryingInterpolation, MirVaryingReflection,
-    MirVertexInputFormat, MirVertexInputReflection, MirWebGpuBindGroupDescriptor, MirWebGpuBindGroupEntryDescriptor,
-    MirWebGpuBindGroupLayoutDescriptor, MirWebGpuBindGroupLayoutEntryDescriptor, MirWebGpuDispatchWorkgroups,
-    MirWebGpuLaunchAdapter, MirWebGpuPipelineLayoutDescriptor, MirWebGpuVertexAttributeDescriptor,
-    MirWebGpuVertexBufferLayoutDescriptor, MirWebGpuVertexStepMode, MirWorkgroupSize, ShaderStageIoRole,
-};
-pub use radix_mir::{
-    required_tensor_operation_floor_families, tensor_operation_floor_rows, TensorOperationFloorFamily,
-    TensorOperationFloorRow, TensorOperationFloorStatus, TensorOperationFloorTarget,
-};
-pub use radix_mir::{
-    selected_tensor_systems_family, tensor_systems_target_rows, TensorSystemsTarget, TensorSystemsTargetLayout,
-    TensorSystemsTargetRank, TensorSystemsTargetRow, TensorSystemsTargetStatus,
-};
-pub use radix_mir::{
-    tensor_placement_operations, tensor_placement_policy_rows, TensorPlacementFacet, TensorPlacementOperation,
-    TensorPlacementPolicyRow, TensorPlacementStatus,
-};
-pub use radix_mir::{
-    tensor_runtime_abi_rows, TensorRuntimeAbiFacet, TensorRuntimeAbiRow, TensorRuntimeAbiStatus, TensorRuntimeAbiTarget,
-};
-pub use radix_mir::{
-    validate_program, MirEnumRepresentation, MirFunctionSignature, MirParamSignature, MirScalarValueDomain,
-    MirValidationContext, MirValidationError, ValidatedMir, INTEGER_PAYLOAD_I64_SENTINEL, INTEGER_PAYLOAD_U64_SENTINEL,
-    INTEGER_PAYLOAD_U8_SENTINEL,
+    MirDeviceFunctionMetadata, MirDeviceFunctionMetadataMap, MirImportedEntryError, MirImportedEntryFact,
+    merge_imported_entry_roles,
 };
 pub use radix_mir::{CapabilityGap, Lowerability};
+pub use radix_mir::{
+    INTEGER_PAYLOAD_I64_SENTINEL, INTEGER_PAYLOAD_U8_SENTINEL, INTEGER_PAYLOAD_U64_SENTINEL, MirEnumRepresentation,
+    MirFunctionSignature, MirParamSignature, MirScalarValueDomain, MirValidationContext, MirValidationError,
+    ValidatedMir, validate_program,
+};
+pub use radix_mir::{
+    InferenceBlockerKind, InferenceBlockerRow, InferenceBlockerStatus, InferenceNonClaim, InferenceNonClaimKind,
+    inference_blocker_rows, inference_non_claims,
+};
+pub use radix_mir::{
+    MirAbiError, MirFragmentOutputReflection, MirFunctionAbi, MirFunctionAbiParam, MirGpuReflection, MirKernelAxis,
+    MirKernelBufferBindingKind, MirKernelBuiltin, MirKernelBuiltinInput, MirKernelBuiltinInputReflection,
+    MirKernelDispatchSize, MirKernelLaunchBindGroup, MirKernelLaunchBindGroupLayoutEntry, MirKernelLaunchBinding,
+    MirKernelLaunchPipelineBindGroupLayout, MirKernelLaunchPipelineLayout, MirKernelLaunchPlan, MirKernelOffsetMode,
+    MirKernelProvenance, MirKernelReflection, MirKernelResource, MirKernelResourceAccess, MirKernelResourceKind,
+    MirKernelResourceReflection, MirKernelResourceRole, MirKernelShaderAccess, MirKernelShaderStage,
+    MirKernelSignature, MirKernelWorkgroupCount, MirRuntimeAbi, MirRuntimeAbiFamily, MirRuntimeAbiKind,
+    MirVaryingInterpolation, MirVaryingReflection, MirVertexInputFormat, MirVertexInputReflection,
+    MirWebGpuBindGroupDescriptor, MirWebGpuBindGroupEntryDescriptor, MirWebGpuBindGroupLayoutDescriptor,
+    MirWebGpuBindGroupLayoutEntryDescriptor, MirWebGpuDispatchWorkgroups, MirWebGpuLaunchAdapter,
+    MirWebGpuPipelineLayoutDescriptor, MirWebGpuVertexAttributeDescriptor, MirWebGpuVertexBufferLayoutDescriptor,
+    MirWebGpuVertexStepMode, MirWorkgroupSize, ShaderStageIoRole, reject_kernel_matrix_abi,
+    validate_varying_consistency,
+};
 pub use radix_mir::{
     MirAggregateCarrier, MirAggregateFamily, MirAggregateLayout, MirAtomicLayout, MirDeviceMatrixLayout,
     MirDeviceVectorLayout, MirDeviceViewLayout, MirLayout, MirLayoutError, MirLayoutKind, MirLayoutTable,
     MirPackedBitOrder, MirPackedNumericFormat, MirPackedNumericLayout, MirScalarLayout, MirTensorLocusLayout,
     MirTensorStorageLayout, MirTensorStrideLayout, MirTensorViewLayout,
 };
+pub(crate) use radix_mir::{MirGenericBindings, instantiate_existing_generic_type, type_contains_param};
+pub use radix_mir::{
+    MirTypeError, MirTypeLookup, constant_ty, index_projection_result_ty, option_chain_base_ty, option_payload_ty,
+    place_base_ty,
+};
+pub use radix_mir::{
+    Rank2ReductionReadinessPath, Rank2ReductionReadinessRow, Rank2ReductionReadinessStatus,
+    rank2_reduction_readiness_rows,
+};
+pub use radix_mir::{
+    TensorOperationFamily, TensorOperationParityRow, TensorParityStatus, TensorParityTarget, indexed_access_parity,
+};
+pub use radix_mir::{
+    TensorOperationFloorFamily, TensorOperationFloorRow, TensorOperationFloorStatus, TensorOperationFloorTarget,
+    required_tensor_operation_floor_families, tensor_operation_floor_rows,
+};
+pub use radix_mir::{
+    TensorPlacementFacet, TensorPlacementOperation, TensorPlacementPolicyRow, TensorPlacementStatus,
+    tensor_placement_operations, tensor_placement_policy_rows,
+};
+pub use radix_mir::{
+    TensorRuntimeAbiFacet, TensorRuntimeAbiRow, TensorRuntimeAbiStatus, TensorRuntimeAbiTarget, tensor_runtime_abi_rows,
+};
+pub use radix_mir::{
+    TensorSystemsTarget, TensorSystemsTargetLayout, TensorSystemsTargetRank, TensorSystemsTargetRow,
+    TensorSystemsTargetStatus, selected_tensor_systems_family, tensor_systems_target_rows,
+};
 #[cfg(feature = "runner")]
 pub use runner::{
-    classify_runner_lowerability, run_analyzed, run_entry, run_entry_with_stats, run_function,
+    BufferHost, Host, RunSourceError, RunnerDispatchStatus, RunnerError, RunnerRunOutcome, RunnerStats, StdioHost,
+    Value, classify_runner_lowerability, run_analyzed, run_entry, run_entry_with_stats, run_function,
     run_function_with_limits, run_function_with_stats_and_limits, run_function_with_step_budget, run_source,
-    runner_dispatch_status, BufferHost, Host, RunSourceError, RunnerDispatchStatus, RunnerError, RunnerRunOutcome,
-    RunnerStats, StdioHost, Value,
+    runner_dispatch_status,
 };
 #[cfg(feature = "mir-sexp")]
-pub use sexp_text::{classify_sexp_lowerability, emit_sexp_text, MirSexpTextProbeError};
+pub use sexp_text::{MirSexpTextProbeError, classify_sexp_lowerability, emit_sexp_text};
 #[cfg(feature = "mir-wasm")]
-pub use wasm_text::{emit_wasm_text_probe, emit_wasm_text_probe_package_aware, MirWasmTextProbeError};
+pub use wasm_text::{MirWasmTextProbeError, emit_wasm_text_probe, emit_wasm_text_probe_package_aware};
 #[cfg(feature = "mir-wgsl")]
 pub use wgsl_text::{
-    emit_chain_descriptor, emit_wgsl_fragment_entry_contract, emit_wgsl_fragment_entry_contract_with_targets,
-    emit_wgsl_text_probe_with_device_roles, emit_wgsl_text_probe_with_reflection_and_device_roles,
-    emit_wgsl_vertex_entry_contract, BindGroupEntry, InterKernelBufferIdentity, KernelChainDescriptor,
-    KernelDescriptor, MirWgslTextProbeError, MirWgslTextProbeOutput, StorageBufferDecl,
+    BindGroupEntry, InterKernelBufferIdentity, KernelChainDescriptor, KernelDescriptor, MirWgslTextProbeError,
+    MirWgslTextProbeOutput, StorageBufferDecl, emit_chain_descriptor, emit_wgsl_fragment_entry_contract,
+    emit_wgsl_fragment_entry_contract_with_targets, emit_wgsl_text_probe_with_device_roles,
+    emit_wgsl_text_probe_with_reflection_and_device_roles, emit_wgsl_vertex_entry_contract,
 };
 
 pub use radix_mir::HANDLER_MESSAGE_FIELD;
 pub use radix_mir::{
-    ascii_literal_identity, external_function_import_name, octeti_literal_identity, regex_flags_literal_identity,
-    regex_literal_flags_suffix, regex_pattern_literal_identity, text_literal_identity, MirNames,
+    MirNames, ascii_literal_identity, external_function_import_name, octeti_literal_identity,
+    regex_flags_literal_identity, regex_literal_flags_suffix, regex_pattern_literal_identity, text_literal_identity,
 };
 pub use radix_mir::{terminator_successors, walk_operand, walk_place, walk_stmt, walk_terminator, walk_value};
 

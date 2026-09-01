@@ -15,14 +15,14 @@ use crate::file_interface::{
 use crate::hir::DefId;
 use crate::lexer::{Interner, Span};
 use crate::mir::generic::{
-    bind_generic_type_witness_with_shapes, canonical_index, function_contains_shape_size,
+    MirShapeBindings, bind_generic_type_witness_with_shapes, canonical_index, function_contains_shape_size,
     instantiate_existing_generic_type, instantiate_generic_type_with_shapes, substitute_shape_size_constants,
-    substitute_tensor_from_flat_shape_size_constants, MirShapeBindings,
+    substitute_tensor_from_flat_shape_size_constants,
 };
 use crate::mir::{
-    type_contains_param, MirCallee, MirDeviceFunctionMetadataMap, MirExternalFunctionIdentity, MirFunction,
-    MirFunctionId, MirGenericBindings, MirMonomorphization, MirMonomorphizationKey, MirOperand, MirPlace, MirPlaceBase,
-    MirProgram, MirProjection, MirStatementKind, MirTerminatorKind, MirType,
+    MirCallee, MirDeviceFunctionMetadataMap, MirExternalFunctionIdentity, MirFunction, MirFunctionId,
+    MirGenericBindings, MirMonomorphization, MirMonomorphizationKey, MirOperand, MirPlace, MirPlaceBase, MirProgram,
+    MirProjection, MirStatementKind, MirTerminatorKind, MirType, type_contains_param,
 };
 use crate::semantic::{IndexExpr, Primitive, Type, TypeTable};
 use rustc_hash::{FxHashMap, FxHashSet};

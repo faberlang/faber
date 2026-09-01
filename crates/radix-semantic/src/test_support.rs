@@ -11,7 +11,7 @@ use std::collections::BTreeMap;
 
 use radix_diagnostics::DiagnosticArg;
 use radix_hir::HirStatementKind;
-use radix_lexer::{lex, Span};
+use radix_lexer::{Span, lex};
 use radix_parser::parse;
 use radix_target::Target;
 

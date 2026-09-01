@@ -9,9 +9,9 @@ use std::sync::atomic::AtomicU64;
 use std::time::Duration;
 use wait_timeout::ChildExt;
 
-use super::air_mask_proof::{emit_mask_neutrality_theorem, MaskNeutralityFamily, MASK_NEUTRALITY_PRELUDE};
-use super::air_purity_proof::{emit_gate_purity_theorem, GATE_PURITY_PRELUDE};
-use super::air_unroll_proof::{emit_unroll_equivalence_theorem, UNROLL_PROOF_PRELUDE};
+use super::air_mask_proof::{MASK_NEUTRALITY_PRELUDE, MaskNeutralityFamily, emit_mask_neutrality_theorem};
+use super::air_purity_proof::{GATE_PURITY_PRELUDE, emit_gate_purity_theorem};
+use super::air_unroll_proof::{UNROLL_PROOF_PRELUDE, emit_unroll_equivalence_theorem};
 use super::verifier::{HirAspectCheckResult, HirAspectCheckStatus, HirAspectEvidence, HirAspectVerifier};
 use super::{
     HirAspectBackendKind, HirAspectDetail, HirAspectKind, HirAspectRecord, HirAspectRecordKind, HirAspectReport,
@@ -332,11 +332,7 @@ impl LeanAspectChecker {
             Ok(output) => {
                 let stdout = String::from_utf8_lossy(&output.stdout).into_owned();
                 let stderr = String::from_utf8_lossy(&output.stderr).into_owned();
-                if stdout.is_empty() {
-                    stderr
-                } else {
-                    stdout
-                }
+                if stdout.is_empty() { stderr } else { stdout }
             }
             Err(error) => {
                 format!("failed to launch lean: {error}")

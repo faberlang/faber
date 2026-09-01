@@ -7,8 +7,8 @@
 //! parity obligation over these programs plus the exempla corpus lives in
 //! `borrow_region_parity_test.rs`.
 
-use crate::test_support::{analyze_source, issue};
 use crate::SemanticErrorKind;
+use crate::test_support::{analyze_source, issue};
 
 fn assert_accepted(source: &str, label: &str) {
     let result = analyze_source(source);

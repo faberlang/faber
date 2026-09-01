@@ -5,8 +5,8 @@
 //! IndexInferError diagnostics.
 
 use super::{IndexConstraint, IndexInferError, IndexInferState};
-use crate::index::{IndexExpr, IndexVar};
 use crate::TypeTable;
+use crate::index::{IndexExpr, IndexVar};
 
 fn lit(types: &mut TypeTable, n: u64) -> crate::IndexId {
     types.intern_index(IndexExpr::Literal(n))

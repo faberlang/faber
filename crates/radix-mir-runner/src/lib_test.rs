@@ -274,9 +274,9 @@ fn rounding_ops_return_numerus_so_bound_compares_do_not_mismatch() {
 
 #[test]
 fn tensor_layernorm_rank2_no_affine() {
+    use crate::Value;
     use crate::host::BufferHost;
     use crate::value::TensorValue;
-    use crate::Value;
     use radix_lexer::Interner;
     use radix_mir::MirValidationContext;
     use radix_types::TypeTable;
@@ -373,9 +373,9 @@ fn tensor_layernorm_rank2_no_affine() {
 
 #[test]
 fn tensor_softmax_rank1() {
+    use crate::Value;
     use crate::host::BufferHost;
     use crate::value::TensorValue;
-    use crate::Value;
     use radix_lexer::Interner;
     use radix_mir::MirValidationContext;
     use radix_types::TypeTable;
@@ -465,9 +465,9 @@ fn tensor_softmax_rank1() {
 
 #[test]
 fn tensor_softmax_rank2() {
+    use crate::Value;
     use crate::host::BufferHost;
     use crate::value::TensorValue;
-    use crate::Value;
     use radix_lexer::Interner;
     use radix_mir::MirValidationContext;
     use radix_types::TypeTable;
@@ -564,9 +564,9 @@ fn tensor_softmax_rank2() {
 
 #[test]
 fn tensor_gelu_rank1() {
+    use crate::Value;
     use crate::host::BufferHost;
     use crate::value::TensorValue;
-    use crate::Value;
     use radix_lexer::Interner;
     use radix_mir::MirValidationContext;
     use radix_types::TypeTable;
@@ -639,9 +639,9 @@ fn tensor_gelu_rank1() {
 
 #[test]
 fn tensor_relu_rank1() {
+    use crate::Value;
     use crate::host::BufferHost;
     use crate::value::TensorValue;
-    use crate::Value;
     use radix_lexer::Interner;
     use radix_mir::MirValidationContext;
     use radix_types::TypeTable;
@@ -713,9 +713,9 @@ fn tensor_relu_rank1() {
 
 #[test]
 fn mir_unop_gelu_tensor() {
+    use crate::Value;
     use crate::host::BufferHost;
     use crate::value::TensorValue;
-    use crate::Value;
     use radix_lexer::Interner;
     use radix_mir::MirValidationContext;
     use radix_types::TypeTable;
@@ -783,9 +783,9 @@ fn mir_unop_gelu_tensor() {
 
 #[test]
 fn mir_unop_tanh_tensor() {
+    use crate::Value;
     use crate::host::BufferHost;
     use crate::value::TensorValue;
-    use crate::Value;
     use radix_lexer::Interner;
     use radix_mir::MirValidationContext;
     use radix_types::TypeTable;
@@ -851,9 +851,9 @@ fn mir_unop_tanh_tensor() {
 
 #[test]
 fn mir_unop_exp_tensor() {
+    use crate::Value;
     use crate::host::BufferHost;
     use crate::value::TensorValue;
-    use crate::Value;
     use radix_lexer::Interner;
     use radix_mir::MirValidationContext;
     use radix_types::TypeTable;
@@ -920,9 +920,9 @@ fn mir_unop_exp_tensor() {
 
 #[test]
 fn tensor_elementwise_or_scalar_broadcast() {
+    use crate::Value;
     use crate::host::BufferHost;
     use crate::value::TensorValue;
-    use crate::Value;
     use radix_lexer::Interner;
     use radix_mir::MirValidationContext;
     use radix_types::TypeTable;
@@ -1000,9 +1000,9 @@ fn tensor_elementwise_or_scalar_broadcast() {
 
 #[test]
 fn tensor_elementwise_or_scalar_broadcast_div_scalar_tensor() {
+    use crate::Value;
     use crate::host::BufferHost;
     use crate::value::TensorValue;
-    use crate::Value;
     use radix_lexer::Interner;
     use radix_mir::MirValidationContext;
     use radix_types::TypeTable;
@@ -1080,9 +1080,9 @@ fn tensor_elementwise_or_scalar_broadcast_div_scalar_tensor() {
 
 #[test]
 fn tensor_elementwise_or_scalar_broadcast_sub_scalar_tensor() {
+    use crate::Value;
     use crate::host::BufferHost;
     use crate::value::TensorValue;
-    use crate::Value;
     use radix_lexer::Interner;
     use radix_mir::MirValidationContext;
     use radix_types::TypeTable;
@@ -1158,9 +1158,9 @@ fn tensor_elementwise_or_scalar_broadcast_sub_scalar_tensor() {
 
 #[test]
 fn unop_sqrt_tensor() {
+    use crate::Value;
     use crate::host::BufferHost;
     use crate::value::TensorValue;
-    use crate::Value;
     use radix_lexer::Interner;
     use radix_mir::MirValidationContext;
     use radix_types::TypeTable;
@@ -1240,9 +1240,9 @@ fn unop_sqrt_tensor() {
 
 #[test]
 fn tensor_fill_prefix_broadcast() {
+    use crate::Value;
     use crate::host::BufferHost;
     use crate::value::TensorValue;
-    use crate::Value;
     use radix_lexer::Interner;
     use radix_mir::MirValidationContext;
     use radix_types::TypeTable;
@@ -1329,9 +1329,9 @@ fn tensor_fill_prefix_broadcast() {
 
 #[test]
 fn tensor_fill_suffix_broadcast() {
+    use crate::Value;
     use crate::host::BufferHost;
     use crate::value::TensorValue;
-    use crate::Value;
     use radix_lexer::Interner;
     use radix_mir::MirValidationContext;
     use radix_types::TypeTable;
@@ -1422,9 +1422,9 @@ fn tensor_fill_suffix_broadcast() {
 
 #[test]
 fn tensor_crux_entropia_rank2() {
+    use crate::Value;
     use crate::host::BufferHost;
     use crate::value::TensorValue;
-    use crate::Value;
     use radix_lexer::Interner;
     use radix_mir::MirValidationContext;
     use radix_types::TypeTable;
@@ -1686,8 +1686,8 @@ fn host_set_cwd_default_rejects() {
 
 #[test]
 fn tensor_elementwise_shape_mismatch_rejected() {
-    use crate::value::TensorValue;
     use crate::Value;
+    use crate::value::TensorValue;
     use radix_lexer::Interner;
     use radix_mir::MirValidationContext;
     use radix_types::TypeTable;
@@ -1757,8 +1757,8 @@ fn tensor_elementwise_shape_mismatch_rejected() {
 
 #[test]
 fn tensor_elementwise_backing_length_mismatch_rejected() {
-    use crate::value::TensorValue;
     use crate::Value;
+    use crate::value::TensorValue;
     use radix_lexer::Interner;
     use radix_mir::MirValidationContext;
     use radix_types::TypeTable;
@@ -1824,8 +1824,8 @@ fn tensor_elementwise_backing_length_mismatch_rejected() {
 
 #[test]
 fn tensor_elementwise_same_shape_succeeds() {
-    use crate::value::TensorValue;
     use crate::Value;
+    use crate::value::TensorValue;
     use radix_lexer::Interner;
     use radix_mir::MirValidationContext;
     use radix_types::TypeTable;
@@ -1914,8 +1914,8 @@ fn tensor_elementwise_same_shape_succeeds() {
 
 #[test]
 fn tensor_softmax_zero_width_rejected() {
-    use crate::value::TensorValue;
     use crate::Value;
+    use crate::value::TensorValue;
     use radix_lexer::Interner;
     use radix_mir::MirValidationContext;
     use radix_types::TypeTable;
@@ -1964,8 +1964,8 @@ fn tensor_softmax_zero_width_rejected() {
 
 #[test]
 fn tensor_softmax_rank2_zero_width_rejected() {
-    use crate::value::TensorValue;
     use crate::Value;
+    use crate::value::TensorValue;
     use radix_lexer::Interner;
     use radix_mir::MirValidationContext;
     use radix_types::TypeTable;
@@ -2009,8 +2009,8 @@ fn tensor_softmax_rank2_zero_width_rejected() {
 
 #[test]
 fn tensor_crux_entropia_zero_width_rejected() {
-    use crate::value::TensorValue;
     use crate::Value;
+    use crate::value::TensorValue;
     use radix_lexer::Interner;
     use radix_mir::MirValidationContext;
     use radix_types::TypeTable;
@@ -2233,9 +2233,9 @@ fn constant_equals_value_type_mismatch() {
 /// F-029 verify: `TensorAdd` near u8 width max must overflow.
 #[test]
 fn f029_tensor_add_u8_overflow_rejected() {
+    use crate::Value;
     use crate::host::BufferHost;
     use crate::value::TensorValue;
-    use crate::Value;
     use radix_lexer::Interner;
     use radix_mir::MirValidationContext;
     use radix_types::{NumericWidth, Primitive, Type, TypeTable};
@@ -2302,9 +2302,9 @@ fn f029_tensor_add_u8_overflow_rejected() {
 /// F-029 verify: `UInt` tensor elementwise add must succeed (not rejected).
 #[test]
 fn f029_uint_tensor_add_succeeds() {
+    use crate::Value;
     use crate::host::BufferHost;
     use crate::value::TensorValue;
-    use crate::Value;
     use radix_lexer::Interner;
     use radix_mir::MirValidationContext;
     use radix_types::{NumericWidth, Primitive, Type, TypeTable};
@@ -2371,9 +2371,9 @@ fn f029_uint_tensor_add_succeeds() {
 /// F-029 verify: `TensorDiv` by zero must be rejected.
 #[test]
 fn f029_tensor_div_zero_rejected() {
+    use crate::Value;
     use crate::host::BufferHost;
     use crate::value::TensorValue;
-    use crate::Value;
     use radix_lexer::Interner;
     use radix_mir::MirValidationContext;
     use radix_types::{NumericWidth, Primitive, Type, TypeTable};
@@ -2440,9 +2440,9 @@ fn f029_tensor_div_zero_rejected() {
 /// F-029 verify: float `TensorDiv` by zero is still allowed (floats are width-agnostic).
 #[test]
 fn f029_float_tensor_div_zero_allowed() {
+    use crate::Value;
     use crate::host::BufferHost;
     use crate::value::TensorValue;
-    use crate::Value;
     use radix_lexer::Interner;
     use radix_mir::MirValidationContext;
     use radix_types::{NumericWidth, Primitive, Type, TypeTable};
@@ -3273,9 +3273,9 @@ fn f087_exclusive_range_i64max_empty() {
 /// Helper: build a `[2,8]` left tensor, a `[8]` bias tensor, and a `TensorAdd`
 /// runtime call, then evaluate it through the runner.
 fn eval_tensor_add_bias(x_data: Vec<f64>, b_data: Vec<f64>) -> Value {
+    use crate::Value;
     use crate::host::BufferHost;
     use crate::value::TensorValue;
-    use crate::Value;
     use radix_lexer::Interner;
     use radix_mir::MirValidationContext;
     use radix_types::TypeTable;
@@ -3352,9 +3352,9 @@ fn tensor_add_rank_extension_broadcasts_8_bias_over_2_rows() {
 /// rank-extension broadcast fails closed with the typed diagnostic.
 #[test]
 fn tensor_add_invalid_broadcast_pair_fails_closed() {
+    use crate::Value;
     use crate::host::BufferHost;
     use crate::value::TensorValue;
-    use crate::Value;
     use radix_lexer::Interner;
     use radix_mir::MirValidationContext;
     use radix_types::TypeTable;
@@ -3700,9 +3700,9 @@ fn tensor_gather_selects_rows_and_fails_closed_on_bad_id() {
 
 #[test]
 fn runner_gradient_handle_create_accumulate_read_zero_round_trip() {
+    use crate::Value;
     use crate::host::BufferHost;
     use crate::value::TensorValue;
-    use crate::Value;
     use radix_lexer::Interner;
     use radix_mir::MirDiagnosticKind;
     use radix_mir::MirGradientOp;
@@ -3919,8 +3919,8 @@ fn runner_gradient_operations_fail_closed_on_unknown_or_foreign_handle() {
 
 #[test]
 fn runner_type_check_dispatches_on_runtime_variant_tag() {
-    use crate::host::BufferHost;
     use crate::Value;
+    use crate::host::BufferHost;
     use radix_lexer::Interner;
     use radix_mir::MirType;
     use radix_mir::MirTypeCheckOp;
@@ -4001,8 +4001,8 @@ fn runner_type_check_dispatches_on_runtime_variant_tag() {
 
 #[test]
 fn runner_type_check_dispatches_nominal_struct_and_enum_tags() {
-    use crate::host::BufferHost;
     use crate::Value;
+    use crate::host::BufferHost;
     use radix_hir::DefId;
     use radix_lexer::Interner;
     use radix_mir::MirType;
@@ -4065,8 +4065,8 @@ fn runner_type_check_dispatches_nominal_struct_and_enum_tags() {
 
 #[test]
 fn runner_type_check_accepts_union_member_tags() {
-    use crate::host::BufferHost;
     use crate::Value;
+    use crate::host::BufferHost;
     use radix_hir::DefId;
     use radix_lexer::Interner;
     use radix_mir::{MirType, MirTypeCheckOp, MirValidationContext};
@@ -4115,8 +4115,8 @@ fn runner_type_check_accepts_union_member_tags() {
 
 #[test]
 fn matrix_display_emits_nested_rows() {
-    use crate::value::MatrixValue;
     use crate::Value;
+    use crate::value::MatrixValue;
     use radix_lexer::Interner;
 
     let matrix = Value::Matrix(Rc::new(RefCell::new(MatrixValue {
@@ -4141,8 +4141,8 @@ fn matrix_display_emits_nested_rows() {
 
 #[test]
 fn matrix_display_rows_split_on_column_count() {
-    use crate::value::MatrixValue;
     use crate::Value;
+    use crate::value::MatrixValue;
     use radix_lexer::Interner;
 
     let matrix = Value::Matrix(Rc::new(RefCell::new(MatrixValue {
@@ -4463,8 +4463,8 @@ fn conversio_padded_tensor_from_flat_fills_dead_slots() {
 
 #[test]
 fn lista_elementwise_dynamic_pair_checks_length_and_broadcasts() {
-    use crate::host::BufferHost;
     use crate::Value;
+    use crate::host::BufferHost;
     use radix_lexer::Interner;
     use radix_mir::MirValidationContext;
     use radix_types::{Primitive, TypeTable};

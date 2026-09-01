@@ -48,7 +48,7 @@ pub(crate) fn dispatch<H: Host + ?Sized>(
                     return Err(RunnerError::internal(
                         span,
                         "exit_process code is not numerus",
-                    ))
+                    ));
                 }
             };
             host.exit(code);
@@ -146,7 +146,7 @@ pub(crate) fn dispatch<H: Host + ?Sized>(
                     return Err(RunnerError::internal(
                         span,
                         "processus.spawn ambitus expects tabula",
-                    ))
+                    ));
                 }
             };
             spawn_attached(&command_args, directorium.as_deref(), env.as_ref(), span)

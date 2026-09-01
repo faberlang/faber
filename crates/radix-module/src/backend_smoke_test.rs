@@ -7,8 +7,8 @@ use super::{
     rustc_available,
 };
 use crate::codegen::Target;
-use crate::driver::{compile, Config, ModuleCompileRequest, Session};
-use std::panic::{catch_unwind, AssertUnwindSafe};
+use crate::driver::{Config, ModuleCompileRequest, Session, compile};
+use std::panic::{AssertUnwindSafe, catch_unwind};
 
 fn emit_rust_from_faber(source: &str) -> String {
     let session = Session::new(Config::default().with_target(Target::HirRust));

@@ -1325,12 +1325,16 @@ fn check_air_json_machine_rows_are_versioned_and_complete() {
     assert_eq!(reject["annotated"], false);
     assert_eq!(reject["note"], serde_json::Value::Null);
     let reasons = reject["reasons"].as_array().expect("reasons array");
-    assert!(reasons
-        .iter()
-        .any(|reason| { reason["rule"] == "mutable_varia" && reason["via_callee"] == false }));
-    assert!(reasons
-        .iter()
-        .any(|reason| reason["rule"] == "assignment_mutation"));
+    assert!(
+        reasons
+            .iter()
+            .any(|reason| { reason["rule"] == "mutable_varia" && reason["via_callee"] == false })
+    );
+    assert!(
+        reasons
+            .iter()
+            .any(|reason| reason["rule"] == "assignment_mutation")
+    );
     for reason in reasons {
         assert!(
             reason["span"]["start"].is_u64() && reason["span"]["end"].is_u64(),

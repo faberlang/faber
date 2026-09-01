@@ -2,10 +2,10 @@
 //!
 //! Contract: each `instans<...>` syntax maps to the correct `Type::SizedInstans` variant.
 
-use super::{lower, LowerRequest};
+use super::{LowerRequest, lower};
 use crate::hir::{HirFunction, HirItemKind};
 use crate::lexer::Interner;
-use crate::semantic::{passes, InstansPrecision, Primitive, Resolver, Type, TypeTable};
+use crate::semantic::{InstansPrecision, Primitive, Resolver, Type, TypeTable, passes};
 
 fn lower_source(source: &str) -> (crate::hir::LoweredProgram, Interner, TypeTable) {
     let lex_result = crate::lexer::lex(source);

@@ -30,9 +30,9 @@ pub use decode::{decode, encode};
 pub use error::HirArtifactError;
 // FPF-5: the MessagePack package codecs are the live `.fhirpkg` wire
 // (package schema v2); the postcard package codec is the legacy v1 path.
-pub use msgpack::{decode_package_msgpack, encode_package_msgpack, MsgpackError};
+pub use msgpack::{MsgpackError, decode_package_msgpack, encode_package_msgpack};
 pub use package::{
-    decode_package, encode_package, DecodedFhirPackage, DecodedFhirPackageModule, FhirPackage,
-    FhirPackageError, FhirPackageModule, LibraryImportWire, LocalLinkWire, PackageDependencyWire,
-    PackageIdentityWire, LEGACY_PACKAGE_SCHEMA_VERSION, PACKAGE_SCHEMA_VERSION,
+    DecodedFhirPackage, DecodedFhirPackageModule, FhirPackage, FhirPackageError, FhirPackageModule,
+    LEGACY_PACKAGE_SCHEMA_VERSION, LibraryImportWire, LocalLinkWire, PACKAGE_SCHEMA_VERSION,
+    PackageDependencyWire, PackageIdentityWire, decode_package, encode_package,
 };

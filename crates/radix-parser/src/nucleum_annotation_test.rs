@@ -4,7 +4,7 @@
 //! an untyped name/argument. Standalone `@ fragment` stays the graphics
 //! annotation.
 
-use crate::test_support::{assert_parse_error_matches, parse_ok, symbol_name, ParseExpectation};
+use crate::test_support::{ParseExpectation, assert_parse_error_matches, parse_ok, symbol_name};
 use radix_syntax::AnnotationKind;
 
 fn first_annotation_kind(source: &str) -> AnnotationKindSnapshot {

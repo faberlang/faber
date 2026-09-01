@@ -4,12 +4,12 @@
 //! carry facts without prose.
 
 use super::{
-    convert_from_lex_error as from_lex_error, convert_from_locale_suggestion as from_locale_suggestion,
-    convert_from_parse_error as from_parse_error, convert_from_semantic_error as from_semantic_error,
-    DiagnosticConvert,
+    DiagnosticConvert, convert_from_lex_error as from_lex_error,
+    convert_from_locale_suggestion as from_locale_suggestion, convert_from_parse_error as from_parse_error,
+    convert_from_semantic_error as from_semantic_error,
 };
 use crate::diagnostics::{DiagnosticPhase, Severity};
-use crate::lexer::{lex, LexErrorKind, LocaleSuggestion, Span};
+use crate::lexer::{LexErrorKind, LocaleSuggestion, Span, lex};
 use crate::parser::{ParseError, ParseErrorKind};
 use crate::semantic::{SemanticError, SemanticErrorKind, WarningKind};
 use crate::test_support::assert_diagnostic_args_eq;

@@ -23,11 +23,11 @@
 //! Latin surface only) and `faber_render_trivia` (multi-locale render, no
 //! FHIR intermediary).
 
-use radix_module::codegen::{generate_from_analyzed, Target};
-use radix_module::driver::{analyze_source, AnalyzeRequest, AnalyzedModule, Config, Session};
+use radix_module::Output;
+use radix_module::codegen::{Target, generate_from_analyzed};
+use radix_module::driver::{AnalyzeRequest, AnalyzedModule, Config, Session, analyze_source};
 use radix_module::hir::artifact::load_fhir;
 use radix_module::locale::{KeywordSurface, LocalePack};
-use radix_module::Output;
 
 /// Installed reader pack for a locale, resolved from the repo stdlib tree.
 fn pack_for(locale: &str) -> LocalePack {

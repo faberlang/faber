@@ -15,8 +15,8 @@ use radix::program::library::is_valid_provider_segment;
 
 use crate::cli::CheckLibraryArgs;
 use crate::library::{
-    library_root_rule, resolved_library_home, specifier_identity, LibraryRootRule,
-    ResolvedLibraryHome, FABER_LIBRARY_HOME_ENV,
+    FABER_LIBRARY_HOME_ENV, LibraryRootRule, ResolvedLibraryHome, library_root_rule,
+    resolved_library_home, specifier_identity,
 };
 
 /// Successful name→checkout resolution. Identity is not stored: callers that

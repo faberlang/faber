@@ -7,7 +7,7 @@ use super::*;
 #[cfg(feature = "hir-rust")]
 use crate::hir::HirModule;
 #[cfg(feature = "hir-rust")]
-use crate::semantic::{analyze, PassConfig, TypeTable};
+use crate::semantic::{PassConfig, TypeTable, analyze};
 #[cfg(feature = "hir-rust")]
 use std::collections::BTreeSet;
 

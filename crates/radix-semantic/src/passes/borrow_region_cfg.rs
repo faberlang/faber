@@ -4,7 +4,7 @@
 //! on every source node and makes loop transfers explicit so later region
 //! analysis can use an ordinary finite fixpoint.
 
-use radix_hir::visit::{walk_expr, walk_stmt, HirVisitor};
+use radix_hir::visit::{HirVisitor, walk_expr, walk_stmt};
 use radix_hir::{
     DefId, HirBlock, HirExpression, HirExpressionKind, HirId, HirItemKind, HirModule, HirStatement,
     HirStatementKind,

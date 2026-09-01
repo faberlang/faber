@@ -5,6 +5,7 @@
 //! or proceed to host construction. Plan-internal consistency of a
 //! reconstructed distributed plan belongs to the fail-before-launch gate.
 
+use super::SHA256_IDENTITY_PREFIX;
 use super::device::{FmirSessionSection, FmirSessionSectionV2};
 use super::distributed::FmirDistributedExecutionSection;
 use super::wire::{
@@ -16,7 +17,6 @@ use super::wire::{
     WireReducedProjection, WireResourceAccess, WireSemanticValueOrigin, WireSessionInput,
     WireSessionObservationCadence, WireStorageLayout,
 };
-use super::SHA256_IDENTITY_PREFIX;
 
 // ---------------------------------------------------------------------------
 // Device program
@@ -1107,8 +1107,7 @@ fn validate_session_schedule(
             {
                 return Err(session_invalid(format!(
                     "session input slot {} (buffer '{}') declares cadence per_invocation, but the buffer is a once-init per-program host-provided buffer; a per-invocation cadence on a once-init buffer is the SingleRun re-copy semantic the GI4-1 discovery proved infeasible (weights would re-upload per invocation)",
-                    input.slot,
-                    buffer.name
+                    input.slot, buffer.name
                 )));
             }
             _ => {}

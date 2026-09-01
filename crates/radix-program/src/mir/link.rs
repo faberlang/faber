@@ -2,7 +2,7 @@
 
 use super::*;
 use radix_module::hir::visit::{
-    walk_expr, walk_expr_mut, walk_program_mut, HirVisitor, HirVisitorMut,
+    HirVisitor, HirVisitorMut, walk_expr, walk_expr_mut, walk_program_mut,
 };
 
 /// Post-rewrite pass: recover the function type for synthetic-path call
@@ -2951,7 +2951,7 @@ mod nary_range_link_tests {
     //! linked walk runs row-major.
 
     use super::*;
-    use radix_module::mir::{dump_program, BufferHost, MirFunctionId};
+    use radix_module::mir::{BufferHost, MirFunctionId, dump_program};
 
     const RANGE_UTIL: &str = "@ public\nfn row_max() → numerus {\n    return 2\n}\n\n@ public\nfn col_max() → numerus {\n    return 3\n}\n\n@ public\nfn emit_cell(numerus v) → numerus {\n    return v\n}\n";
 

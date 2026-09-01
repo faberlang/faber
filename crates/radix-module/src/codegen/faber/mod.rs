@@ -1,10 +1,10 @@
 //! Faber HIR re-emission backend, re-exported from foundation leaf
 //! `radix-hir-faber`.
 
-pub use radix_hir_faber::{emit, empty_presentation, FaberCodegen, FaberOutput};
+pub use radix_hir_faber::{FaberCodegen, FaberOutput, emit, empty_presentation};
 
 pub mod compile;
-pub use compile::{emit_from_analyzed, reemit_faber, FaberReemitResult};
+pub use compile::{FaberReemitResult, emit_from_analyzed, reemit_faber};
 
 #[doc(hidden)]
 pub mod test_gate;

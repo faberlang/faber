@@ -13,11 +13,11 @@
 //! constraints already discovered, finalization reports a missing annotation and
 //! leaves the erroneous state visible to the caller through diagnostics.
 
-use crate::{format_faber_type, WarningKind};
-use radix_hir::visit::{
-    walk_expr_mut, walk_field_mut, walk_function_mut, walk_local_mut, walk_stmt_mut, HirVisitorMut,
-};
+use crate::{WarningKind, format_faber_type};
 use radix_hir::HirField;
+use radix_hir::visit::{
+    HirVisitorMut, walk_expr_mut, walk_field_mut, walk_function_mut, walk_local_mut, walk_stmt_mut,
+};
 use radix_lexer::Span;
 
 #[allow(clippy::wildcard_imports)]

@@ -8,9 +8,9 @@
 //! deterministically. Schema decls are never lowered to MIR or any backend
 //! leaf.
 
-use super::{lower, LowerRequest};
+use super::{LowerRequest, lower};
 use crate::hir::{HirItemKind, HirModule};
-use crate::semantic::{passes, Primitive, Resolver, Type, TypeTable};
+use crate::semantic::{Primitive, Resolver, Type, TypeTable, passes};
 
 fn prepare_lower_pipeline(source: &str) -> (crate::syntax::Program, Resolver, TypeTable, crate::lexer::Interner) {
     let lex_result = crate::lexer::lex(source);
@@ -126,7 +126,7 @@ fn pipeline_accepts_schema_decl_end_to_end() {
 #[test]
 #[cfg(feature = "hir-fhir")]
 fn schema_artifact_round_trip_preserves_ordered_metadata() {
-    use crate::driver::{analyze_source, AnalyzeRequest, Config, Session};
+    use crate::driver::{AnalyzeRequest, Config, Session, analyze_source};
     use handroll::Sha256;
 
     let session = Session::new(Config::default());

@@ -2,9 +2,9 @@
 //! determinism, and fail-closed loading.
 
 use super::*;
-use crate::codegen::{generate_from_analyzed, Target};
-use crate::driver::{analyze_source, AnalyzeRequest, Config, Session};
-use crate::locale::{latin_locale_pack, KeywordSurface};
+use crate::codegen::{Target, generate_from_analyzed};
+use crate::driver::{AnalyzeRequest, Config, Session, analyze_source};
+use crate::locale::{KeywordSurface, latin_locale_pack};
 
 fn analyze(name: &str, source: &str) -> AnalyzedModule {
     analyze_with(name, source, Config::default())

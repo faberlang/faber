@@ -5,10 +5,10 @@
 //! ListaToTensorError diagnostics.
 
 use super::lista_tensor_conversio::{
+    ListaToTensorError, ListaToTensorShape, RectangularListaLiteralError,
     analyze_rectangular_lista_literal, ensure_lista_numerus_type,
     resolve_bounded_lista_padded_shape, resolve_lista_to_tensor_shape,
-    validate_lista_to_tensor_source, ListaToTensorError, ListaToTensorShape,
-    RectangularListaLiteralError,
+    validate_lista_to_tensor_source,
 };
 use crate::{IndexExpr, Primitive, Type, TypeId, TypeTable};
 use radix_hir::{HirArrayElement, HirExpression, HirExpressionKind, HirId, HirLiteral};

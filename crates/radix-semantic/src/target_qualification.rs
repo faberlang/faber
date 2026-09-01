@@ -5,5 +5,5 @@
 
 #[allow(unused_imports)] // public re-export surface for G5 consumers
 pub use super::analyzed_application::{
-    qualify_for_target, QualificationStatus, TargetQualification,
+    QualificationStatus, TargetQualification, qualify_for_target,
 };

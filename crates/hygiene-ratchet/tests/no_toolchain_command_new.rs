@@ -34,7 +34,7 @@
 //! documented surface still contains its spawn so this documentation cannot
 //! silently rot; the lists only shrink.
 
-use hygiene_ratchet::{collect_production_files, scan_command_new, ScanConfig};
+use hygiene_ratchet::{ScanConfig, collect_production_files, scan_command_new};
 use std::fs;
 use std::path::{Path, PathBuf};
 

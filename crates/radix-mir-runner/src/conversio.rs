@@ -6,16 +6,16 @@
 //! source `Value` shape disagrees with typed contracts (e.g. `textus ↦ bivalens`).
 
 use super::value::{
-    decimal_scale_factor, int_width_range, modular_word_mask, modular_word_result,
-    round_half_even_division, MapKey, SermoValue, TensorValue, Value,
+    MapKey, SermoValue, TensorValue, Value, decimal_scale_factor, int_width_range,
+    modular_word_mask, modular_word_result, round_half_even_division,
 };
-use super::{runtime_regex_pattern, Runner, RunnerError};
+use super::{Runner, RunnerError, runtime_regex_pattern};
 use radix_lexer::{Span, Symbol};
-use radix_mir::lista_tensor_conversio::{resolve_lista_to_tensor_shape, ListaToTensorShape};
+use radix_mir::lista_tensor_conversio::{ListaToTensorShape, resolve_lista_to_tensor_shape};
 use radix_mir::{MirConversion, MirNamedOperand, MirOperand, MirStructFieldDefaults};
 use radix_runtime_contract::instans::{Instans, InstansPraecisio};
 use radix_types::{
-    effective_width, InstansPrecision, NumericWidth, Primitive, Type, TypeId, TypeTable,
+    InstansPrecision, NumericWidth, Primitive, Type, TypeId, TypeTable, effective_width,
 };
 use rustc_hash::{FxHashMap, FxHashSet};
 use std::cell::RefCell;

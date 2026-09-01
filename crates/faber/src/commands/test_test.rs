@@ -5,7 +5,7 @@
 
 #![cfg(feature = "runner")]
 
-use proba::{run_proba_source, TestSelection};
+use proba::{TestSelection, run_proba_source};
 use radix::module::driver::{Config, Session};
 use std::fs;
 use std::path::PathBuf;

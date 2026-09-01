@@ -38,7 +38,7 @@
 use super::Lowerer;
 use crate::{CommuneField, IndexExpr, NumericWidth, Primitive, Type, TypeId};
 use radix_diagnostics::DiagnosticArg;
-use radix_hir::visit::{walk_expr, HirVisitor};
+use radix_hir::visit::{HirVisitor, walk_expr};
 use radix_hir::{
     DefId, HirAnnotation, HirBlock, HirConst, HirEnum, HirExpression, HirExpressionKind, HirField,
     HirFunction, HirImport, HirImportItem, HirInterface, HirInterfaceMethod, HirItem, HirItemKind,

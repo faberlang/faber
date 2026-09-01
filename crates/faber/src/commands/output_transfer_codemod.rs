@@ -8,7 +8,7 @@
 //! that small admitted shape is left alone and receives a machine-readable
 //! decline reason.
 
-use radix::module::lexer::{lex, Token, TokenKind};
+use radix::module::lexer::{Token, TokenKind, lex};
 use serde::Serialize;
 use std::fs;
 use std::io::Read;

@@ -8,11 +8,11 @@
 #[cfg(feature = "hir-rust")]
 pub use crate::codegen::rust::used_import_defs;
 #[cfg(feature = "hir-go")]
-pub use radix_hir_go::{collect_go_needs, GoNeeds};
+pub use radix_hir_go::{GoNeeds, collect_go_needs};
 #[cfg(feature = "hir-rust")]
-pub use radix_hir_rust::needs::{collect_rust_needs, RustNeeds};
+pub use radix_hir_rust::needs::{RustNeeds, collect_rust_needs};
 #[cfg(feature = "hir-ts")]
-pub use radix_hir_ts::needs::{collect_ts_needs, TsNeeds, TsNeedsKind};
+pub use radix_hir_ts::needs::{TsNeeds, TsNeedsKind, collect_ts_needs};
 
 /// Guard helper: production policy must not use body-text `code.contains` for import decisions.
 #[cfg(test)]

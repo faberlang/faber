@@ -1,6 +1,6 @@
 #![allow(clippy::needless_lifetimes)]
 
-use super::{kernel, RunnerError, Value};
+use super::{RunnerError, Value, kernel};
 use radix_lexer::{Interner, Span};
 use radix_mir::KernelModule;
 use radix_mir::{MirDiagnosticKind, MirProvider, MirProviderKind};

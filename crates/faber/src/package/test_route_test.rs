@@ -1,7 +1,7 @@
 use super::{
-    analyze_package_for_tests, bounded_analyze_diagnostic, run_with_analyze_budget,
-    test_route_descent, test_source_filter_for_input, TestRouteDescent,
-    PACKAGE_TEST_ANALYZE_BUDGET,
+    PACKAGE_TEST_ANALYZE_BUDGET, TestRouteDescent, analyze_package_for_tests,
+    bounded_analyze_diagnostic, run_with_analyze_budget, test_route_descent,
+    test_source_filter_for_input,
 };
 use crate::package::test_support::{diagnostic_has_arg, diagnostic_has_issue, test_temp_dir};
 use radix::module::driver::Config;

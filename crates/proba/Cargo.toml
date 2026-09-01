@@ -1,7 +1,7 @@
 [package]
 name = "proba"
 version = "0.1.0"
-edition = "2021"
+edition = "2024"
 description = "Faber proba inventory and MIR-runner case execution"
 license = "MIT"
 

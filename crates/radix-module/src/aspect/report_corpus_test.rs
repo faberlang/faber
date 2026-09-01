@@ -7,9 +7,9 @@
 //! declined shapes produce none.  Recognition is the machine-checked-structural
 //! surface only — these tests assert no proof verdict.
 
-use super::{report_hir_aspects_with_interner, HirAspectDetail, HirAspectKind, HirAspectRecordKind, HirAspectReport};
+use super::{HirAspectDetail, HirAspectKind, HirAspectRecordKind, HirAspectReport, report_hir_aspects_with_interner};
 use crate::codegen::Target;
-use crate::driver::{analyze_source, AnalyzeRequest};
+use crate::driver::{AnalyzeRequest, analyze_source};
 use crate::test_support::{corpus_file, test_session};
 
 fn report_for_exemplum(rel: &str) -> HirAspectReport {

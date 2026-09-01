@@ -170,9 +170,11 @@ fn lowers_glyph_tensor_dot_to_tensor_matmul_collection_op() {
     let binop = glyph_binop(HirBinOp::Dot, &lhs, &rhs, tensor_ty);
     let mut builder = glyph_builder(&types, tensor_ty, tensor_ty);
 
-    assert!(builder
-        .lower_binary(HirBinOp::Dot, &lhs, &rhs, &binop)
-        .is_some());
+    assert!(
+        builder
+            .lower_binary(HirBinOp::Dot, &lhs, &rhs, &binop)
+            .is_some()
+    );
     assert!(builder.errors.is_empty(), "{:?}", builder.errors);
     let has_matmul = builder.blocks.iter().any(|block| {
         block.statements.iter().any(|stmt| {
@@ -242,9 +244,11 @@ fn rejects_glyph_matrix_tensor_product_kronecker() {
     let binop = glyph_binop(HirBinOp::TensorProduct, &lhs, &rhs, matrix_ty);
     let mut builder = glyph_builder(&types, matrix_ty, matrix_ty);
 
-    assert!(builder
-        .lower_binary(HirBinOp::TensorProduct, &lhs, &rhs, &binop)
-        .is_none());
+    assert!(
+        builder
+            .lower_binary(HirBinOp::TensorProduct, &lhs, &rhs, &binop)
+            .is_none()
+    );
     assert_eq!(builder.errors.len(), 1, "{:?}", builder.errors);
     assert_eq!(
         builder.errors[0].issue,
@@ -261,9 +265,11 @@ fn rejects_glyph_tensor_tensor_product_kronecker() {
     let binop = glyph_binop(HirBinOp::TensorProduct, &lhs, &rhs, tensor_ty);
     let mut builder = glyph_builder(&types, tensor_ty, tensor_ty);
 
-    assert!(builder
-        .lower_binary(HirBinOp::TensorProduct, &lhs, &rhs, &binop)
-        .is_none());
+    assert!(
+        builder
+            .lower_binary(HirBinOp::TensorProduct, &lhs, &rhs, &binop)
+            .is_none()
+    );
     assert_eq!(builder.errors.len(), 1, "{:?}", builder.errors);
     assert_eq!(
         builder.errors[0].issue,

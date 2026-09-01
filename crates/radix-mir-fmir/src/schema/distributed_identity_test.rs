@@ -15,25 +15,26 @@
 //!   MD2-B1) is frozen to the same `sha256:<64-hex>` format.
 
 use super::{
-    canonical_program_bytes, device_identity_hash, logical_distributed_plan_hash, WireBinding,
-    WireBufferIdentity, WireBufferLifetime, WireBufferRole, WireBufferVersion,
-    WireCollectionKernelPlan, WireDependencyEdge, WireDeviceProgram, WireDeviceResource,
-    WireDispatchSize, WireInitializationPolicy, WireKernelLaunchPlan, WireKernelUnit,
-    WireLaunchUnit, WireObservationCadence, WireObservationFact, WireProgramLifetime,
-    WireResourceAccess, WireResultBuffer, WireSemanticValue, WireSemanticValueOrigin,
-    WireStorageLayout, WireWorkgroupCount, WireWorkgroupSize, SHA256_IDENTITY_PREFIX,
+    SHA256_IDENTITY_PREFIX, WireBinding, WireBufferIdentity, WireBufferLifetime, WireBufferRole,
+    WireBufferVersion, WireCollectionKernelPlan, WireDependencyEdge, WireDeviceProgram,
+    WireDeviceResource, WireDispatchSize, WireInitializationPolicy, WireKernelLaunchPlan,
+    WireKernelUnit, WireLaunchUnit, WireObservationCadence, WireObservationFact,
+    WireProgramLifetime, WireResourceAccess, WireResultBuffer, WireSemanticValue,
+    WireSemanticValueOrigin, WireStorageLayout, WireWorkgroupCount, WireWorkgroupSize,
+    canonical_program_bytes, device_identity_hash, logical_distributed_plan_hash,
 };
+use radix_mir::MirType;
 use radix_mir::device_program::{BufferId, LaunchId};
 use radix_mir::device_semantics::SemanticValueId;
 use radix_mir::distributed::{
-    encode_logical_plan, BarrierId, BarrierOperation, CollectiveId, CollectiveOperation,
-    DeclaredPlacement, DeviceProgramPartition, DistributedExecutionGraph, DistributedExecutionPlan,
-    ExecutionCommitBoundary, ExecutionOperation, LaunchOperation, LogicalPlacement, PartitionId,
-    PlacementConstraint, PlacementContract, PlacementObjective, PlanVersion, TransferDirection,
-    TransferId, TransferOperation, TransportPath, LOGICAL_PLAN_VERSION,
+    BarrierId, BarrierOperation, CollectiveId, CollectiveOperation, DeclaredPlacement,
+    DeviceProgramPartition, DistributedExecutionGraph, DistributedExecutionPlan,
+    ExecutionCommitBoundary, ExecutionOperation, LOGICAL_PLAN_VERSION, LaunchOperation,
+    LogicalPlacement, PartitionId, PlacementConstraint, PlacementContract, PlacementObjective,
+    PlanVersion, TransferDirection, TransferId, TransferOperation, TransportPath,
+    encode_logical_plan,
 };
 use radix_mir::layout::MirTensorStorageLayout;
-use radix_mir::MirType;
 use radix_types::TypeId;
 
 // -----------------------------------------------------------------------

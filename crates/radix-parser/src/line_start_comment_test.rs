@@ -1,8 +1,8 @@
 //! Line-start `#` comment policy: lexer rejects mid-line `#`; parser surfaces LEX007.
 
 use crate::test_support::args_have_no_legacy_message;
-use crate::{parse, ParseErrorKind};
-use radix_lexer::{lex, LexErrorKind, INLINE_COMMENT_ISSUE};
+use crate::{ParseErrorKind, parse};
+use radix_lexer::{INLINE_COMMENT_ISSUE, LexErrorKind, lex};
 
 const BRACE_INLINE_FIXTURE: &str = "functio f() → vacuum { fixum numerus x ← 1  # inline }\n";
 
@@ -19,10 +19,11 @@ fn assert_lex_inline_comment(source: &str) {
         .iter()
         .find(|err| err.kind == LexErrorKind::InlineComment)
         .expect("inline comment diagnostic");
-    assert!(err
-        .args
-        .iter()
-        .any(|arg| arg.name == "issue" && arg.value == INLINE_COMMENT_ISSUE));
+    assert!(
+        err.args
+            .iter()
+            .any(|arg| arg.name == "issue" && arg.value == INLINE_COMMENT_ISSUE)
+    );
     assert_eq!(err.span.start, inline_hash_offset(source));
 }
 

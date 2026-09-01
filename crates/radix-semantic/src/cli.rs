@@ -23,11 +23,11 @@
 use crate::{SemanticError, SemanticErrorKind};
 use radix_lexer::{Interner, Span};
 use radix_syntax::{
-    braced_cli_nomen, braced_cli_nomen_strict, braced_imperium_nomen_strict,
-    braced_operandus_view_strict, braced_optio_is_flag, braced_optio_view_strict, Annotation,
-    AnnotationKind, BracedAnnotationError, BracedView, Expr, ExprKind, FuncDecl, GenericArgExpr,
-    Ident, IncipitStmt, Literal, MemberExpr, OperandusAnnotation, OptioAnnotation, Program, Stmt,
-    StmtKind, TypeExpr, TypeExprKind,
+    Annotation, AnnotationKind, BracedAnnotationError, BracedView, Expr, ExprKind, FuncDecl,
+    GenericArgExpr, Ident, IncipitStmt, Literal, MemberExpr, OperandusAnnotation, OptioAnnotation,
+    Program, Stmt, StmtKind, TypeExpr, TypeExprKind, braced_cli_nomen, braced_cli_nomen_strict,
+    braced_imperium_nomen_strict, braced_operandus_view_strict, braced_optio_is_flag,
+    braced_optio_view_strict,
 };
 use rustc_hash::{FxHashMap, FxHashSet};
 

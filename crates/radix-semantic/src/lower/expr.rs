@@ -26,9 +26,9 @@
 //! records the operation and source structure; typecheck decides whether the
 //! operation is valid, and codegen decides how a valid operation is emitted.
 
-use super::{retired_bare_object_literal_args, Lowerer};
+use super::{Lowerer, retired_bare_object_literal_args};
 use crate::builtins::forma::{self as builtin_forma};
-use crate::template_holes::{analyze_template, TemplateHoleAnalysis};
+use crate::template_holes::{TemplateHoleAnalysis, analyze_template};
 use crate::{Primitive, TypeId};
 use radix_diagnostics::DiagnosticArg;
 use radix_hir::{

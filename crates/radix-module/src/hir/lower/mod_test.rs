@@ -6,13 +6,13 @@
 #[path = "error_masking_test.rs"]
 mod error_masking_test;
 
-use super::{lower, LowerRequest};
+use super::{LowerRequest, lower};
 use crate::hir::{
     HirAnnotationValue, HirAvailability, HirExpressionKind, HirFunction, HirInterface, HirItemKind, HirStatementKind,
     HirStruct, HirTestMetadata, HirTestModifier, HirTypeParamConstraint,
 };
 use crate::lexer::Interner;
-use crate::semantic::{passes, Primitive, Resolver, Type, TypeTable};
+use crate::semantic::{Primitive, Resolver, Type, TypeTable, passes};
 
 fn lower_source_result(source: &str) -> (crate::hir::LoweredProgram, Vec<crate::hir::LowerError>, Interner, TypeTable) {
     let lex_result = crate::lexer::lex(source);
@@ -550,12 +550,16 @@ functio g(textus ∪ textus ∪ numerus y) → vacuum {}";
         );
     };
     assert_eq!(members.len(), 2);
-    assert!(members
-        .iter()
-        .any(|member| matches!(types.get(*member), Type::Primitive(Primitive::Textus))));
-    assert!(members
-        .iter()
-        .any(|member| matches!(types.get(*member), Type::Primitive(Primitive::Numerus))));
+    assert!(
+        members
+            .iter()
+            .any(|member| matches!(types.get(*member), Type::Primitive(Primitive::Textus)))
+    );
+    assert!(
+        members
+            .iter()
+            .any(|member| matches!(types.get(*member), Type::Primitive(Primitive::Numerus)))
+    );
 }
 
 #[test]

@@ -9,11 +9,11 @@
 //! Package fixtures and package-shaped proofs live under `faber/corpus` —
 //! not in this crate.
 
+use crate::CompileResult;
 use crate::codegen::Target;
 use crate::diagnostics::{Diagnostic, DiagnosticArg};
-use crate::driver::{compile, Config, ModuleCompileRequest, Session};
+use crate::driver::{Config, ModuleCompileRequest, Session, compile};
 use crate::lexer::Span;
-use crate::CompileResult;
 use std::path::{Path, PathBuf};
 
 /// Root of the language keyword corpus (`radix/corpus/`).

@@ -1,4 +1,4 @@
-use super::{walk_expr, walk_stmt, walk_type_expr, Visitor, MAX_VISIT_DEPTH};
+use super::{MAX_VISIT_DEPTH, Visitor, walk_expr, walk_stmt, walk_type_expr};
 use crate::TypeFormLevel;
 use crate::{AstMutability, ExField, PathPattern};
 use crate::{

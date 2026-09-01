@@ -57,7 +57,7 @@ pub(crate) fn dispatch(verb: &str, args: &[Value], span: Span) -> Result<Value, 
                     return Err(RunnerError::internal(
                         span,
                         "aleator.random_int min expects numerus",
-                    ))
+                    ));
                 }
             };
             let max = match max {
@@ -66,7 +66,7 @@ pub(crate) fn dispatch(verb: &str, args: &[Value], span: Span) -> Result<Value, 
                     return Err(RunnerError::internal(
                         span,
                         "aleator.random_int max expects numerus",
-                    ))
+                    ));
                 }
             };
             let (lo, hi) = if min <= max { (min, max) } else { (max, min) };
@@ -85,7 +85,7 @@ pub(crate) fn dispatch(verb: &str, args: &[Value], span: Span) -> Result<Value, 
                     return Err(RunnerError::internal(
                         span,
                         "aleator.random_bytes expects numerus",
-                    ))
+                    ));
                 }
             };
             let len = usize::try_from(n.max(0)).map_err(|_| {

@@ -5,9 +5,9 @@
 //! and `keyword_allowed_as_ident()` against registry drift (see ca50d39c).
 
 use super::{
-    keyword_allowed_as_ident, keyword_group_specs, keyword_specs, keyword_spelling_for_token,
-    keyword_token_kind, lookup_keyword_spec, validate_keyword_groups, KeywordKind, KeywordOwner,
-    KeywordScope,
+    KeywordKind, KeywordOwner, KeywordScope, keyword_allowed_as_ident, keyword_group_specs,
+    keyword_specs, keyword_spelling_for_token, keyword_token_kind, lookup_keyword_spec,
+    validate_keyword_groups,
 };
 use crate::TokenKind;
 

@@ -2,8 +2,8 @@
 
 use radix_mir_fmir::admit_device_section_with_compat;
 use radix_mir_fmir::schema::{
-    default_compatibility_table, FmirDeviceSection, WirePlacementConstraint,
-    WIRE_DISTRIBUTED_SECTION_VERSION,
+    FmirDeviceSection, WIRE_DISTRIBUTED_SECTION_VERSION, WirePlacementConstraint,
+    default_compatibility_table,
 };
 
 const EIGHT_GIB: u64 = 8 * 1024 * 1024 * 1024;

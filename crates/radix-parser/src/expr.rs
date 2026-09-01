@@ -22,7 +22,7 @@
 //!   colon aliases.
 
 use super::{ParseError, ParseErrorKind, Parser};
-use radix_lexer::{lookup_keyword_spec, KeywordOwner, KeywordScope, Span, Symbol, TokenKind};
+use radix_lexer::{KeywordOwner, KeywordScope, Span, Symbol, TokenKind, lookup_keyword_spec};
 #[allow(clippy::wildcard_imports)]
 use radix_syntax::*;
 use std::collections::HashSet;
@@ -1447,9 +1447,10 @@ impl Parser {
     ///                   [`vel` expression]
     fn parse_extremum_expr(&mut self, is_maximum: bool) -> Result<Expr, ParseError> {
         let start = self.current_span();
-        debug_assert!(self
-            .is_extremum_expr_head()
-            .is_some_and(|maximum| maximum == is_maximum));
+        debug_assert!(
+            self.is_extremum_expr_head()
+                .is_some_and(|maximum| maximum == is_maximum)
+        );
         self.advance();
         self.expect_keyword_ident(TokenKind::Ex, "expected 'ex' after reduction head")?;
 

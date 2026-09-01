@@ -14,9 +14,9 @@ use crate::{
 };
 use radix_hir::{HirCallArg, HirExpression, HirExpressionKind};
 use radix_intrinsics::{
+    IntrinsicParamKind, IntrinsicReceiver, IntrinsicReturnKind, MethodIntrinsic,
     is_mutating_receiver, is_numeric_bitwise_operator, is_numeric_imperativus_operator,
-    lookup_method, lookup_method_for_type, receivers_for_type, IntrinsicParamKind,
-    IntrinsicReceiver, IntrinsicReturnKind, MethodIntrinsic,
+    lookup_method, lookup_method_for_type, receivers_for_type,
 };
 use radix_lexer::Symbol;
 

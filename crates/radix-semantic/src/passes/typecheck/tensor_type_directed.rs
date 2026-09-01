@@ -7,8 +7,8 @@
 //! diagnostics for removed or stale API shapes (structa, creata type args, argument order)
 
 use super::TypeChecker;
-use crate::tensor_type_directed::{complete_tensor_type, is_tensor_type, CompleteTensorType};
-use crate::{numeric_width, tensor_bracket, SemanticErrorKind, Type, TypeId};
+use crate::tensor_type_directed::{CompleteTensorType, complete_tensor_type, is_tensor_type};
+use crate::{SemanticErrorKind, Type, TypeId, numeric_width, tensor_bracket};
 use radix_hir::{HirCallArg, HirExpression};
 use radix_lexer::Span;
 

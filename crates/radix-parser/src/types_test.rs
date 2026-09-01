@@ -4,7 +4,7 @@
 
 use crate::test_support::args_have_no_legacy_message;
 use crate::test_support::{parse_ok, parse_program};
-use crate::{parse, ParseErrorKind};
+use crate::{ParseErrorKind, parse};
 use radix_lexer::lex;
 use radix_syntax::{ClassMemberKind, ExprKind, FiguraExpr, GenericArgExpr, StmtKind, TypeExprKind};
 
@@ -926,10 +926,12 @@ fn rejects_iuncta_label_spelling_on_call_site_type_arguments() {
 fn unlabeled_iuncta_elements_are_not_spelled_with_an_underscore_label() {
     let result = parse_program("functio f(iuncta<_: f32> pair) → vacuum {}");
     assert!(!result.success());
-    assert!(result
-        .errors
-        .iter()
-        .any(|error| error.kind == ParseErrorKind::Expected));
+    assert!(
+        result
+            .errors
+            .iter()
+            .any(|error| error.kind == ParseErrorKind::Expected)
+    );
 }
 
 #[test]

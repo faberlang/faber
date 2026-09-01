@@ -24,14 +24,16 @@ fn diagnostic_names_the_missing_def() {
     assert_eq!(diag.code, Some(DEF_ID_CLOSURE_CODE));
     assert_eq!(diag.issue(), Some(DEF_ID_CLOSURE_ISSUE));
     assert_eq!(diag.file, "render.fab");
-    assert!(diag
-        .args
-        .iter()
-        .any(|arg| arg.name == "def_id" && arg.value == "4127"));
-    assert!(diag
-        .args
-        .iter()
-        .any(|arg| arg.name == "def_name" && arg.value == "Cognita"));
+    assert!(
+        diag.args
+            .iter()
+            .any(|arg| arg.name == "def_id" && arg.value == "4127")
+    );
+    assert!(
+        diag.args
+            .iter()
+            .any(|arg| arg.name == "def_name" && arg.value == "Cognita")
+    );
 }
 
 #[test]
@@ -47,8 +49,10 @@ fn check_reports_only_the_missing_side() {
     assert_eq!(diags.len(), 1);
     assert_eq!(diags[0].code, Some(DEF_ID_CLOSURE_CODE));
     assert_eq!(diags[0].issue(), Some(DEF_ID_CLOSURE_ISSUE));
-    assert!(diags[0]
-        .args
-        .iter()
-        .any(|arg| arg.name == "def_name" && arg.value == "Known"));
+    assert!(
+        diags[0]
+            .args
+            .iter()
+            .any(|arg| arg.name == "def_name" && arg.value == "Known")
+    );
 }

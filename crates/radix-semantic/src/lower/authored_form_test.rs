@@ -6,7 +6,7 @@
 //! uses carry the authored name beside the semantic `DefId`, and whose
 //! witnesses are canonicalized after inference.
 
-use crate::test_support::{analyze_ok, AnalyzedFixture};
+use crate::test_support::{AnalyzedFixture, analyze_ok};
 use radix_hir::{
     HirItemKind, HirOwnerRef, HirStatement, HirStatementKind, HirTypeForm, HirTypeFormArg,
     HirTypeFormHead, HirTypeSlot,

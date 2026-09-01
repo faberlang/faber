@@ -7,8 +7,8 @@
 
 use super::*;
 use crate::mir::{
-    tensor_systems_target_rows, AiWorkbenchStage5Facet, AiWorkbenchStage5Status, TensorOperationFloorFamily,
-    TensorSystemsTarget, TensorSystemsTargetStatus,
+    AiWorkbenchStage5Facet, AiWorkbenchStage5Status, TensorOperationFloorFamily, TensorSystemsTarget,
+    TensorSystemsTargetStatus, tensor_systems_target_rows,
 };
 
 #[test]

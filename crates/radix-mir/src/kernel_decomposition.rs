@@ -49,12 +49,12 @@
 //! and re-labels existing MIR statements; it never introduces a GPU-specific
 //! AIR node or relowers semantics.
 
-use crate::abi::{StorageBufferLimitRecord, DEFAULT_STORAGE_BUFFER_LIMIT};
+use crate::abi::{DEFAULT_STORAGE_BUFFER_LIMIT, StorageBufferLimitRecord};
 use crate::device_program_plans::{
-    data_flow_element_ty_and_count, is_elementwise_collection_op, is_recipe_op,
-    resolve_subchain_plan, PlanMappingError,
+    PlanMappingError, data_flow_element_ty_and_count, is_elementwise_collection_op, is_recipe_op,
+    resolve_subchain_plan,
 };
-use crate::elementwise_plan::{plan_elementwise, ElementwisePlan};
+use crate::elementwise_plan::{ElementwisePlan, plan_elementwise};
 use crate::kernel_plan::CollectionKernelPlan;
 use crate::{
     MirAggregate, MirAggregateFields, MirAggregateItem, MirAggregateKind, MirBlock, MirFunction,

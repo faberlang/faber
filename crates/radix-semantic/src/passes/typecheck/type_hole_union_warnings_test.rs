@@ -12,8 +12,8 @@
 //! Closeout filter: `cargo test -p radix --lib type_hole_union_warnings`.
 
 use super::*;
-use crate::passes::typecheck::test_support;
 use crate::SemanticError;
+use crate::passes::typecheck::test_support;
 use radix_target::Target;
 
 fn count_issue(diagnostics: &[SemanticError], issue: &str) -> usize {

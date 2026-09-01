@@ -8,7 +8,7 @@
 pub mod entropy;
 pub use entropy::uuid_v4;
 pub mod sha256;
-pub use sha256::{sha256, sha256_hex, Sha256};
+pub use sha256::{Sha256, sha256, sha256_hex};
 
 #[cfg(test)]
 #[path = "lib_test.rs"]

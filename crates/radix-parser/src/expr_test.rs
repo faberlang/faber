@@ -4,10 +4,10 @@
 //! Contract: new expressions parse to the expected `ExprKind` variant; retired surface forms
 //! emit structured diagnostics.
 
+use crate::ParseResult;
 use crate::parse;
 use crate::test_support::args_have_no_legacy_message;
 use crate::test_support::{assert_parse_error_issue, parse_ok, parse_program};
-use crate::ParseResult;
 use radix_lexer::lex;
 use radix_syntax::{
     AssignOp, BinOp, ConversioTarget, ExprKind, FiguraExpr, JsonValue, Literal, StmtKind,

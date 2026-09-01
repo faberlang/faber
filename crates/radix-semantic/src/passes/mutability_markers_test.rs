@@ -3,7 +3,7 @@
 use crate::test_support::{
     analyze_ok, analyze_source_with_config, assert_rejects_with_issue, entry_local_tys,
 };
-use crate::{locale::LocalePack, PassConfig, SemanticMutability, Type, ISSUE_SCALAR_ACCESS_MARKER};
+use crate::{ISSUE_SCALAR_ACCESS_MARKER, PassConfig, SemanticMutability, Type, locale::LocalePack};
 use radix_target::Target;
 
 fn english_pack() -> LocalePack {

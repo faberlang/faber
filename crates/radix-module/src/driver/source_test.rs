@@ -2,7 +2,7 @@
 //!
 //! Contract: `SourceFile` preserves raw content while exposing a body that excludes frontmatter.
 
-use super::{source_load_diagnostic, SourceFile, SourceLoadError};
+use super::{SourceFile, SourceLoadError, source_load_diagnostic};
 use crate::diagnostics::DiagnosticPhase;
 use std::path::PathBuf;
 

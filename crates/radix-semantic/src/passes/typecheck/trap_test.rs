@@ -32,12 +32,16 @@ fn trap_binds_inference_hole_to_solved_union() {
     };
     let members = union_members(&result, local_ty);
     assert_eq!(members.len(), 2, "trap result must be a two-member union");
-    assert!(members
-        .iter()
-        .any(|ty| is_primitive(&result, *ty, Primitive::Numerus)));
-    assert!(members
-        .iter()
-        .any(|ty| is_primitive(&result, *ty, Primitive::Textus)));
+    assert!(
+        members
+            .iter()
+            .any(|ty| is_primitive(&result, *ty, Primitive::Numerus))
+    );
+    assert!(
+        members
+            .iter()
+            .any(|ty| is_primitive(&result, *ty, Primitive::Textus))
+    );
 }
 
 #[test]
@@ -68,12 +72,16 @@ fn trap_of_vacuum_success_is_distinguishable_two_member_union() {
         2,
         "vacuum success must stay an explicit member"
     );
-    assert!(members
-        .iter()
-        .any(|ty| is_primitive(&result, *ty, Primitive::Vacuum)));
-    assert!(members
-        .iter()
-        .any(|ty| is_primitive(&result, *ty, Primitive::Textus)));
+    assert!(
+        members
+            .iter()
+            .any(|ty| is_primitive(&result, *ty, Primitive::Vacuum))
+    );
+    assert!(
+        members
+            .iter()
+            .any(|ty| is_primitive(&result, *ty, Primitive::Textus))
+    );
 }
 
 #[test]

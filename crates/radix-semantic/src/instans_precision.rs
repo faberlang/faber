@@ -5,4 +5,4 @@
 //! is `radix-types::instans_precision`.
 
 pub use radix_types::instans_precision::*;
-pub use radix_types::{is_instans_assignable, InstansPrecision};
+pub use radix_types::{InstansPrecision, is_instans_assignable};

@@ -14,7 +14,7 @@
 //! - rendering is deterministic for the same inputs.
 
 use crate::surface::TypeBindingKind;
-use crate::{emit, KeywordSurface};
+use crate::{KeywordSurface, emit};
 use radix_hir::{
     DefId, HirAnnotation, HirBlock, HirBlockEnd, HirExpression, HirExpressionKind, HirField,
     HirFunction, HirId, HirItem, HirItemKind, HirLiteral, HirMethod, HirModule, HirModuleEnd,

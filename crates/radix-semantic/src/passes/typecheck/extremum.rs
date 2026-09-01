@@ -5,7 +5,7 @@
 //! statically empty shape produces `T ∪ nihil` unless the caller supplies a
 //! coalesce identity, in which case the expression produces `T`.
 
-use super::expr::{apud_arity, ApudArity, ISSUE_ITERA_APUD_ARITY_MISMATCH};
+use super::expr::{ApudArity, ISSUE_ITERA_APUD_ARITY_MISMATCH, apud_arity};
 #[allow(clippy::wildcard_imports)]
 use super::*;
 use radix_hir::HirExtremumOp;

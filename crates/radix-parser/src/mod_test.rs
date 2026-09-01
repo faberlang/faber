@@ -4,11 +4,11 @@
 //! not here. Shared parse plumbing lives in `parser::test_support`.
 
 use crate::test_support::{
-    assert_parse_error_has_no_legacy_message, assert_parse_error_issue, assert_parse_error_matches,
-    has_arg, parse_ok, parse_program, span_for, symbol_name, ParseExpectation,
+    ParseExpectation, assert_parse_error_has_no_legacy_message, assert_parse_error_issue,
+    assert_parse_error_matches, has_arg, parse_ok, parse_program, span_for, symbol_name,
 };
-use crate::{parse, ParseErrorKind, ParseResult};
-use radix_lexer::{lex_with_locale_pack, KeywordPack};
+use crate::{ParseErrorKind, ParseResult, parse};
+use radix_lexer::{KeywordPack, lex_with_locale_pack};
 use radix_syntax::{
     AnnotationKind, AstMutability, AstParamMode, BindingPattern, CallablePosture, ClassMemberKind,
     ClausuraBody, ClosureModifier, CuraKind, ExprKind, IfBody, ImportKind, IteraMode, JsonValue,
@@ -1433,7 +1433,9 @@ fn parses_object_destructuring() {
 
 #[test]
 fn parses_functio_with_all_modifiers() {
-    let result = parse_ok("@ futura\nfunctio mitte<T>(de textus nomen sponte ut alias vel \"anon\", own numerus item, ceteri T reliqua) curata allocator errata Error exitus 7 immutata iacit optiones Opts → textus {}");
+    let result = parse_ok(
+        "@ futura\nfunctio mitte<T>(de textus nomen sponte ut alias vel \"anon\", own numerus item, ceteri T reliqua) curata allocator errata Error exitus 7 immutata iacit optiones Opts → textus {}",
+    );
     let program = result
         .program
         .as_ref()
@@ -1662,10 +1664,11 @@ fn minimal_import_requires_inferrable_name() {
         .iter()
         .find(|err| err.kind == ParseErrorKind::ImportInvalid)
         .expect("invalid import diagnostic");
-    assert!(err
-        .args
-        .iter()
-        .any(|arg| arg.name == "issue" && arg.value == "import_name_inference_failed"));
+    assert!(
+        err.args
+            .iter()
+            .any(|arg| arg.name == "issue" && arg.value == "import_name_inference_failed")
+    );
 }
 
 #[test]
@@ -1708,10 +1711,11 @@ fn import_name_inference_failed_rejected() {
         .iter()
         .find(|err| err.kind == ParseErrorKind::ImportInvalid)
         .expect("invalid import diagnostic");
-    assert!(err
-        .args
-        .iter()
-        .any(|arg| arg.name == "issue" && arg.value == "import_name_inference_failed"));
+    assert!(
+        err.args
+            .iter()
+            .any(|arg| arg.name == "issue" && arg.value == "import_name_inference_failed")
+    );
     assert!(
         err.args
             .iter()
@@ -2412,9 +2416,11 @@ fn parses_itera_array_pattern_binder() {
         panic!("expected array binding pattern binder");
     };
     assert_eq!(elements.len(), 2);
-    assert!(elements
-        .iter()
-        .all(|e| matches!(e, BindingPattern::Ident(_))));
+    assert!(
+        elements
+            .iter()
+            .all(|e| matches!(e, BindingPattern::Ident(_)))
+    );
     assert!(is_rest.is_none());
 }
 
@@ -2527,8 +2533,9 @@ fn parses_elige_switch() {
 
 #[test]
 fn parses_discerne_match() {
-    let result =
-        parse_ok("discerne omnia value, other { casu Ok ut result, _ ergo redde result ceterum ergo mori \"bad\" }");
+    let result = parse_ok(
+        "discerne omnia value, other { casu Ok ut result, _ ergo redde result ceterum ergo mori \"bad\" }",
+    );
     let program = result
         .program
         .as_ref()
@@ -3195,7 +3202,9 @@ fn parses_multi_param_explicit_type_fac_closure() {
 
 #[test]
 fn parses_fallible_typed_closure() {
-    let result = parse_ok("fixum _ e ← texts.mappata(textus s → numerus ⇥ ParseError ∴ fac { redde parse(s) } cape err { redde 0 })");
+    let result = parse_ok(
+        "fixum _ e ← texts.mappata(textus s → numerus ⇥ ParseError ∴ fac { redde parse(s) } cape err { redde 0 })",
+    );
     let program = result.program.as_ref().expect("program");
     let StmtKind::Var(fallible_var) = &program.statements[0].kind else {
         panic!("expected variable");

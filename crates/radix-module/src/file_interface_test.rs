@@ -3,11 +3,11 @@
 //! nominal kinds, type params, and callables resolve correctly.
 
 use super::{
-    import_interface_type, snapshot_interface_type, FileExport, FileExportKind, FileInterface, FileInterfaceError,
-    InterfaceAliasExport, InterfaceAppliedArg, InterfaceBodyChannel, InterfaceCallable, InterfaceCanonicalBody,
-    InterfaceDeviceContract, InterfaceDeviceRole, InterfaceDeviceVisibility, InterfaceGenericParam,
-    InterfaceIndexSnapshot, InterfaceLibraryIdentity, InterfaceNominalKind, InterfaceNominalType, InterfaceParam,
-    InterfaceStructExport, InterfaceStructField, InterfaceTypeParamConstraint, InterfaceTypeSnapshot,
+    FileExport, FileExportKind, FileInterface, FileInterfaceError, InterfaceAliasExport, InterfaceAppliedArg,
+    InterfaceBodyChannel, InterfaceCallable, InterfaceCanonicalBody, InterfaceDeviceContract, InterfaceDeviceRole,
+    InterfaceDeviceVisibility, InterfaceGenericParam, InterfaceIndexSnapshot, InterfaceLibraryIdentity,
+    InterfaceNominalKind, InterfaceNominalType, InterfaceParam, InterfaceStructExport, InterfaceStructField,
+    InterfaceTypeParamConstraint, InterfaceTypeSnapshot, import_interface_type, snapshot_interface_type,
 };
 use crate::lexer::Interner;
 use crate::semantic::{
@@ -319,8 +319,8 @@ fn index_snapshot_imports_unspecified_shape() {
 #[test]
 fn conflicting_kind_snapshot_fails_closed_through_canonical_key() {
     use crate::file_interface::{
-        import_interface_type_with_resolver, FileExport, FileExportKind, FileInterface, InterfaceLibraryIdentity,
-        InterfaceStructExport, InterfaceStructField,
+        FileExport, FileExportKind, FileInterface, InterfaceLibraryIdentity, InterfaceStructExport,
+        InterfaceStructField, import_interface_type_with_resolver,
     };
     use crate::semantic::Resolver;
 
@@ -385,8 +385,8 @@ fn conflicting_kind_snapshot_fails_closed_through_canonical_key() {
 #[test]
 fn identity_bearing_snapshot_canonical_miss_fails_closed() {
     use crate::file_interface::{
-        import_interface_type_with_resolver, FileExport, FileExportKind, FileInterface, InterfaceLibraryIdentity,
-        InterfaceStructExport,
+        FileExport, FileExportKind, FileInterface, InterfaceLibraryIdentity, InterfaceStructExport,
+        import_interface_type_with_resolver,
     };
     use crate::semantic::Resolver;
 
@@ -510,12 +510,14 @@ fn reexported_same_module_nominal_callable_remaps_through_parent_interface() {
         skipped.is_empty(),
         "same-module nominal must not poison the callable: {skipped:?}"
     );
-    assert!(resolver
-        .namespace_file_function(
-            interner.intern("geometry"),
-            interner.intern("data.geometry_vertex_layout_matches"),
-        )
-        .is_some());
+    assert!(
+        resolver
+            .namespace_file_function(
+                interner.intern("geometry"),
+                interner.intern("data.geometry_vertex_layout_matches"),
+            )
+            .is_some()
+    );
 }
 
 #[test]
@@ -610,9 +612,11 @@ exemplars = ["test.fab"]
         .iter()
         .find(|skip| skip.canonical_name == "unsupported")
         .expect("unsupported field should retain WARN014 provenance");
-    assert!(skipped_field
-        .remap_reason
-        .contains("NominalIdentityUnknown"));
+    assert!(
+        skipped_field
+            .remap_reason
+            .contains("NominalIdentityUnknown")
+    );
 }
 
 /// S0-R1: declaration parameter kind/order rides the portable schema and the

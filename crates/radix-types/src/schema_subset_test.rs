@@ -9,7 +9,7 @@
 
 use crate::schema::{SchemaColumnDef, SchemaDef};
 use crate::schema_subset::{
-    extra_input_columns, schema_column_count, schema_subset, SchemaSubsetError,
+    SchemaSubsetError, extra_input_columns, schema_column_count, schema_subset,
 };
 use crate::types::{Primitive, TypeId, TypeTable};
 use radix_lexer::Interner;

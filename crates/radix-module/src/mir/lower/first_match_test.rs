@@ -10,7 +10,7 @@
 use super::*;
 use crate::codegen::Target;
 use crate::driver::{Config, Session};
-use crate::mir::{run_source, BufferHost, RunSourceError, RunnerError};
+use crate::mir::{BufferHost, RunSourceError, RunnerError, run_source};
 
 /// Run one `incipit` source and return the runner's stdout lines.
 fn run_stdout(name: &str, source: &str) -> Vec<String> {

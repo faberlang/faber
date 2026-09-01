@@ -35,10 +35,10 @@
 //!   MD-A5; MD2 carries declared constraints and objectives, never a policy
 //!   engine (the ranking engine is MD5's).
 
+use crate::MirType;
 use crate::device_program::{BufferId, LaunchId};
 use crate::device_semantics::SemanticValueId;
 use crate::layout::MirTensorStorageLayout;
-use crate::MirType;
 use std::fmt;
 
 /// Program-unique identity of one logical partition.

@@ -25,9 +25,9 @@
 //! replace the probe with a test-local mirror table — that is the drift the
 //! census audit (6aa998a8) caught.
 
-use crate::driver::{analyze_source, AnalyzeRequest, Config, Session};
+use crate::driver::{AnalyzeRequest, Config, Session, analyze_source};
 use crate::intrinsics::{
-    lookup_method, mir_collection_op, IntrinsicParamKind, IntrinsicReceiver, IntrinsicReturnKind, INTRINSICS,
+    INTRINSICS, IntrinsicParamKind, IntrinsicReceiver, IntrinsicReturnKind, lookup_method, mir_collection_op,
 };
 use radix_types::MirCollectionOp;
 use std::collections::BTreeSet;
@@ -525,7 +525,9 @@ fn run_family_controls(session: &Session) {
             .flat_map(|d| [false, true].map(|mutable| probe(&probe_source(row, d, mutable), session)))
             .collect();
         assert!(
-            outcomes.iter().any(|o| matches!(o, ProbeOutcome::Lowered | ProbeOutcome::OwnedDeeper(_))),
+            outcomes
+                .iter()
+                .any(|o| matches!(o, ProbeOutcome::Lowered | ProbeOutcome::OwnedDeeper(_))),
             "family control {family}.{control} did not lower — probe harness is broken for the {family} family (outcomes: {outcomes:?})"
         );
     }

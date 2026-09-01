@@ -12,14 +12,14 @@
 
 use std::path::Path;
 
+use radix_module::CompileResult;
 use radix_module::codegen::Target;
 use radix_module::diagnostics::Diagnostic;
 use radix_module::driver::Config;
-use radix_module::CompileResult;
 
 use crate::analyze::{
-    analyze_package_spec, effective_package_config, package_root_for_input, AnalysisSeams,
-    AnalyzedProgram,
+    AnalysisSeams, AnalyzedProgram, analyze_package_spec, effective_package_config,
+    package_root_for_input,
 };
 use crate::artifact_plan::plan_package;
 use crate::discovery::discover_package;
@@ -208,25 +208,27 @@ fn compile_package_internal(
 
     if config.target == Target::HirGo {
         #[cfg(not(feature = "hir-go"))]
-        return compile_failure(vec![crate::package_diagnostic_error(
-            "target `go` is not available in this faber build; rebuild with feature `hir-go`",
-        )
-        .with_file(input.display().to_string())
-        .with_arg("issue", "package_target_unavailable")
-        .with_arg("target", "go")]);
+        return compile_failure(vec![
+            crate::package_diagnostic_error(
+                "target `go` is not available in this faber build; rebuild with feature `hir-go`",
+            )
+            .with_file(input.display().to_string())
+            .with_arg("issue", "package_target_unavailable")
+            .with_arg("target", "go"),
+        ]);
 
         #[cfg(feature = "hir-go")]
         {
             let plan = plan_package(&package, Target::HirGo);
             if !plan.supported {
-                return compile_failure(vec![crate::package_diagnostic_error(
-                    plan.rejection.unwrap_or_else(|| {
+                return compile_failure(vec![
+                    crate::package_diagnostic_error(plan.rejection.unwrap_or_else(|| {
                         "package compilation does not support this target".to_owned()
-                    }),
-                )
-                .with_file(input.display().to_string())
-                .with_arg("issue", "package_target_unsupported")
-                .with_arg("target", plan.target)]);
+                    }))
+                    .with_file(input.display().to_string())
+                    .with_arg("issue", "package_target_unsupported")
+                    .with_arg("target", plan.target),
+                ]);
             }
             return (seams.emit_go)(&package, input);
         }
@@ -249,14 +251,14 @@ fn compile_package_internal(
         {
             let plan = plan_package(&package, Target::MirWasm);
             if !plan.supported {
-                return compile_failure(vec![crate::package_diagnostic_error(
-                    plan.rejection.unwrap_or_else(|| {
+                return compile_failure(vec![
+                    crate::package_diagnostic_error(plan.rejection.unwrap_or_else(|| {
                         "package compilation does not support this target".to_owned()
-                    }),
-                )
-                .with_file(input.display().to_string())
-                .with_arg("issue", "package_target_unsupported")
-                .with_arg("target", plan.target)]);
+                    }))
+                    .with_file(input.display().to_string())
+                    .with_arg("issue", "package_target_unsupported")
+                    .with_arg("target", plan.target),
+                ]);
             }
             let mut package = package;
             let options = crate::wasm::PackageWasmOptions::new(
@@ -293,14 +295,14 @@ fn compile_package_internal(
     if config.target != Target::HirRust {
         let plan = plan_package(&package, config.target);
         if !plan.supported {
-            return compile_failure(vec![crate::package_diagnostic_error(
-                plan.rejection.unwrap_or_else(|| {
+            return compile_failure(vec![
+                crate::package_diagnostic_error(plan.rejection.unwrap_or_else(|| {
                     "package compilation does not support this target".to_owned()
-                }),
-            )
-            .with_file(input.display().to_string())
-            .with_arg("issue", "package_target_unsupported")
-            .with_arg("target", plan.target)]);
+                }))
+                .with_file(input.display().to_string())
+                .with_arg("issue", "package_target_unsupported")
+                .with_arg("target", plan.target),
+            ]);
         }
         // Planner seams exist; full product emit for TS is later deliveries.
         return compile_failure(vec![crate::package_diagnostic_error(format!(

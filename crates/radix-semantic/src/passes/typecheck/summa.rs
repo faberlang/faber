@@ -12,7 +12,7 @@
 //! is checked under a term return contract so every `redde` in the body is
 //! unified against the term type rather than the enclosing function's return.
 
-use super::expr::{apud_arity, ApudArity, ISSUE_ITERA_APUD_ARITY_MISMATCH};
+use super::expr::{ApudArity, ISSUE_ITERA_APUD_ARITY_MISMATCH, apud_arity};
 #[allow(clippy::wildcard_imports)]
 // parent module provides shared imports for typechecking
 use super::*;

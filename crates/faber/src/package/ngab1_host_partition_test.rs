@@ -32,7 +32,7 @@
 
 use super::*;
 use crate::package::device::DEVICE_RUN_PLAN_VERSION;
-use crate::package::test_support::{test_temp_dir, TestDir};
+use crate::package::test_support::{TestDir, test_temp_dir};
 use radix::module::codegen::Target;
 use radix_mir::boundary_abi::HOST_CALL_ABI_VERSION;
 use radix_mir::device_program::{
@@ -248,8 +248,7 @@ fn ngab1_host_partition_executes_boundary_call_via_llvm_host() {
         !module_text.contains("@nucleum"),
         "the CPU module carries no device-entry annotations; got:\n{module_text}"
     );
-    let kernel_symbol =
-        "__faber_external_product_fixture_scalar_kernel_module_fixture_scalar_kernel_func_scale_kernel";
+    let kernel_symbol = "__faber_external_product_fixture_scalar_kernel_module_fixture_scalar_kernel_func_scale_kernel";
     let kernel_has_define = module_text.lines().any(|line| {
         let trimmed = line.trim_start();
         trimmed.starts_with("define") && trimmed.contains(kernel_symbol)
@@ -387,7 +386,9 @@ incipit {
             );
         }
         Ok(Ok(_)) | Ok(Err(_)) => {
-            panic!("the lifetime-negative fixture must be rejected at compile time (SEM020) without a launch")
+            panic!(
+                "the lifetime-negative fixture must be rejected at compile time (SEM020) without a launch"
+            )
         }
     }
 }

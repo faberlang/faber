@@ -2,7 +2,7 @@
 //! Proves: basic escape and control-character handling; rejects non-ASCII
 //! scalars and invalid escapes.
 
-use crate::ascii_literal::{decode_ascii_literal, AsciiLiteralError};
+use crate::ascii_literal::{AsciiLiteralError, decode_ascii_literal};
 
 #[test]
 fn decode_ascii_plain_passthrough() {

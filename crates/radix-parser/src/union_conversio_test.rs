@@ -1,7 +1,7 @@
 //! Parser contract for the `@ conversio` standalone-function marker.
 
-use crate::{parse, ParseResult};
-use radix_lexer::{lex, lex_with_locale_pack, KeywordPack, TokenKind};
+use crate::{ParseResult, parse};
+use radix_lexer::{KeywordPack, TokenKind, lex, lex_with_locale_pack};
 use radix_syntax::{AnnotationKind, StmtKind};
 
 struct EnPack;

@@ -4,11 +4,11 @@
 //! and admits each through `QuantizedMatMul`. The prefill f32 bring-up path
 //! stays unchanged; this is the packed request the device-run binds.
 
+use radix_mir::MirScalarLayout;
 use radix_mir::abi::PackedStorageLayout;
 use radix_mir::kernel_plan::{
-    admit_quantized_matmul, CollectionKernelPlan, MatMulShapes, QuantizedMatMulPlan,
+    CollectionKernelPlan, MatMulShapes, QuantizedMatMulPlan, admit_quantized_matmul,
 };
-use radix_mir::MirScalarLayout;
 
 /// One dense-rung projection (SmolLM2-360M pinned shapes).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

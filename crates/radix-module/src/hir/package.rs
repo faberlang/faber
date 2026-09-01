@@ -28,9 +28,9 @@ use rustc_hash::FxHashMap;
 use serde::{Deserialize, Serialize};
 
 pub use radix_hir_fhir::{
-    decode_package, decode_package_msgpack, encode_package, encode_package_msgpack, DecodedFhirPackage, FhirPackage,
-    FhirPackageError, LibraryImportWire, LocalLinkWire, PackageDependencyWire, PackageIdentityWire,
-    LEGACY_PACKAGE_SCHEMA_VERSION, PACKAGE_SCHEMA_VERSION,
+    DecodedFhirPackage, FhirPackage, FhirPackageError, LEGACY_PACKAGE_SCHEMA_VERSION, LibraryImportWire, LocalLinkWire,
+    PACKAGE_SCHEMA_VERSION, PackageDependencyWire, PackageIdentityWire, decode_package, decode_package_msgpack,
+    encode_package, encode_package_msgpack,
 };
 
 /// Compiler version recorded on device body artifacts (radix-module crate).

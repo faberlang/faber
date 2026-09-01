@@ -4,13 +4,13 @@
 //! Fragments have no standalone runtime identity, so no fixture here emits a
 //! fragment alone.
 
-use super::{surviving_fragment_calls_with_metadata, ExpansionBudget, ISSUE_CYCLE, ISSUE_EXPANSION};
+use super::{ExpansionBudget, ISSUE_CYCLE, ISSUE_EXPANSION, surviving_fragment_calls_with_metadata};
 use crate::diagnostics::Diagnostic;
 use crate::driver::{self, AnalyzeRequest, Config, Session};
 use crate::lexer::Span;
 use crate::mir::{
-    device_roles_from_hir, MirBinOp, MirDeviceRole, MirFunction, MirOperand, MirParamMode, MirPlaceBase, MirProgram,
-    MirStatementKind, MirValue, MirValueKind,
+    MirBinOp, MirDeviceRole, MirFunction, MirOperand, MirParamMode, MirPlaceBase, MirProgram, MirStatementKind,
+    MirValue, MirValueKind, device_roles_from_hir,
 };
 use crate::semantic::SemanticErrorKind;
 
@@ -192,13 +192,15 @@ functio k() → u32 {
             .any(|param| param.mode == MirParamMode::Lane),
         "fragment lane propagation must add the entry ABI position parameter: {entry:#?}"
     );
-    assert!(surviving_fragment_calls_with_metadata(
-        &lowered.functions,
-        &[],
-        &device_roles_from_hir(&analysis.hir),
-        &crate::mir::MirDeviceFunctionMetadataMap::default(),
-    )
-    .is_empty());
+    assert!(
+        surviving_fragment_calls_with_metadata(
+            &lowered.functions,
+            &[],
+            &device_roles_from_hir(&analysis.hir),
+            &crate::mir::MirDeviceFunctionMetadataMap::default(),
+        )
+        .is_empty()
+    );
 }
 
 #[test]
@@ -238,13 +240,15 @@ functio k() → u32 {
         1,
         "fragment lane storage must resolve to the caller's one position local: {entry:#?}"
     );
-    assert!(surviving_fragment_calls_with_metadata(
-        &lowered.functions,
-        &[],
-        &device_roles_from_hir(&analysis.hir),
-        &crate::mir::MirDeviceFunctionMetadataMap::default(),
-    )
-    .is_empty());
+    assert!(
+        surviving_fragment_calls_with_metadata(
+            &lowered.functions,
+            &[],
+            &device_roles_from_hir(&analysis.hir),
+            &crate::mir::MirDeviceFunctionMetadataMap::default(),
+        )
+        .is_empty()
+    );
 }
 
 #[test]
@@ -267,17 +271,21 @@ functio k() → u32 {
 "#;
     let (analysis, lowered) = lower(source).unwrap_or_else(|errors| panic!("transitive lane must compose: {errors:?}"));
     let entry = kernel_function(&lowered.functions, &analysis);
-    assert!(entry
-        .params
-        .iter()
-        .all(|param| param.mode != MirParamMode::LaneInherited));
-    assert!(surviving_fragment_calls_with_metadata(
-        &lowered.functions,
-        &[],
-        &device_roles_from_hir(&analysis.hir),
-        &crate::mir::MirDeviceFunctionMetadataMap::default(),
-    )
-    .is_empty());
+    assert!(
+        entry
+            .params
+            .iter()
+            .all(|param| param.mode != MirParamMode::LaneInherited)
+    );
+    assert!(
+        surviving_fragment_calls_with_metadata(
+            &lowered.functions,
+            &[],
+            &device_roles_from_hir(&analysis.hir),
+            &crate::mir::MirDeviceFunctionMetadataMap::default(),
+        )
+        .is_empty()
+    );
 }
 
 #[test]
@@ -612,13 +620,15 @@ functio k(fractus<f32> x) → fractus<f32> {
     let (analysis, lowered) =
         lower(source).unwrap_or_else(|errors| panic!("eval-once fixture must compose: {errors:?}"));
     let roles = device_roles_from_hir(&analysis.hir);
-    assert!(surviving_fragment_calls_with_metadata(
-        &lowered.functions,
-        &[],
-        &roles,
-        &crate::mir::MirDeviceFunctionMetadataMap::default(),
-    )
-    .is_empty());
+    assert!(
+        surviving_fragment_calls_with_metadata(
+            &lowered.functions,
+            &[],
+            &roles,
+            &crate::mir::MirDeviceFunctionMetadataMap::default(),
+        )
+        .is_empty()
+    );
     let entry = kernel_function(&lowered.functions, &analysis);
     let bind_locals: Vec<_> = entry
         .blocks
@@ -712,7 +722,7 @@ functio k(fractus<f32> x) → fractus<f32> {
 
 #[test]
 fn catalog_identities_stay_stable() {
-    use crate::diagnostics::{semantic_message, DiagnosticArg};
+    use crate::diagnostics::{DiagnosticArg, semantic_message};
     let definition = vec![
         DiagnosticArg::new("issue", ISSUE_CONTEXT),
         DiagnosticArg::new("reason", "host_callable"),

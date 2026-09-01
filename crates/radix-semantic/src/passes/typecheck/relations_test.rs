@@ -10,9 +10,9 @@
 //! numeric pairs, strict `≡` stays fail-closed — see the law block on
 //! `numeric_value_equality_types`.
 
-use crate::locale::LocalePack;
-use crate::test_support::{analyze_source_with_config, AnalyzedFixture};
 use crate::PassConfig;
+use crate::locale::LocalePack;
+use crate::test_support::{AnalyzedFixture, analyze_source_with_config};
 use radix_target::Target;
 
 fn en_config() -> PassConfig {

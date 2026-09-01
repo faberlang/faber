@@ -6,10 +6,10 @@
 //! list, tuple, and record elements validate and execute in the runner.
 
 use crate::codegen::Target;
-use crate::driver::{analyze_source, AnalyzeRequest, Config, Session};
+use crate::driver::{AnalyzeRequest, Config, Session, analyze_source};
 use crate::mir::{
-    lower_analyzed_unit, run_source, validate_program, BufferHost, MirConstant, MirOperand, MirPlace, MirPlaceBase,
-    MirProjection, MirValue, MirValueKind, RunSourceError,
+    BufferHost, MirConstant, MirOperand, MirPlace, MirPlaceBase, MirProjection, MirValue, MirValueKind, RunSourceError,
+    lower_analyzed_unit, run_source, validate_program,
 };
 use std::fmt::Write;
 

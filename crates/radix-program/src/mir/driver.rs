@@ -349,26 +349,32 @@ fn apply_test_link_scope(
     scope: &TestPackageScope,
 ) -> Result<ModuleId, Vec<Diagnostic>> {
     if package.roots.is_empty() {
-        return Err(vec![crate::package_diagnostic_error(
-            "package MIR test link requires at least one test root",
-        )
-        .with_file(package.spec.entry.display().to_string())]);
+        return Err(vec![
+            crate::package_diagnostic_error(
+                "package MIR test link requires at least one test root",
+            )
+            .with_file(package.spec.entry.display().to_string()),
+        ]);
     }
     let Some((anchor_id, _)) = package.node_by_path(&scope.remap_anchor) else {
-        return Err(vec![crate::package_diagnostic_error(
-            "package MIR test link remap anchor is not an analyzed program node",
-        )
-        .with_file(scope.remap_anchor.display().to_string())]);
+        return Err(vec![
+            crate::package_diagnostic_error(
+                "package MIR test link remap anchor is not an analyzed program node",
+            )
+            .with_file(scope.remap_anchor.display().to_string()),
+        ]);
     };
     let anchor_id = anchor_id.clone();
     let mut included = package.imports.local_closure(package.roots.iter());
     included.insert(anchor_id.clone());
     package.nodes.retain(|id, _| included.contains(id));
     if !package.nodes.contains_key(&anchor_id) {
-        return Err(vec![crate::package_diagnostic_error(
-            "package MIR test link lost its named remapping anchor",
-        )
-        .with_file(scope.remap_anchor.display().to_string())]);
+        return Err(vec![
+            crate::package_diagnostic_error(
+                "package MIR test link lost its named remapping anchor",
+            )
+            .with_file(scope.remap_anchor.display().to_string()),
+        ]);
     }
     Ok(anchor_id)
 }
@@ -464,14 +470,16 @@ pub(super) fn select_entry_node(package: &AnalyzedProgram) -> Result<ModuleId, V
                 .collect::<Vec<_>>();
             match entries.as_slice() {
                 [id] => Ok(id.clone()),
-                [] => Err(vec![crate::package_diagnostic_error(
-                    "package MIR run requires exactly one entry unit",
-                )
-                .with_file(package.spec.entry.display().to_string())]),
-                _ => Err(vec![crate::package_diagnostic_error(
-                    "package MIR run found multiple entry units",
-                )
-                .with_file(package.spec.entry.display().to_string())]),
+                [] => Err(vec![
+                    crate::package_diagnostic_error(
+                        "package MIR run requires exactly one entry unit",
+                    )
+                    .with_file(package.spec.entry.display().to_string()),
+                ]),
+                _ => Err(vec![
+                    crate::package_diagnostic_error("package MIR run found multiple entry units")
+                        .with_file(package.spec.entry.display().to_string()),
+                ]),
             }
         }
     }

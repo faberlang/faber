@@ -2,11 +2,11 @@ use std::path::Path;
 use std::process::Command;
 
 use super::check_library::{
-    check_dev_library, render_checkout, resolve_dev_library_from, CheckLibraryError,
+    CheckLibraryError, check_dev_library, render_checkout, resolve_dev_library_from,
 };
 use super::format_test::faber_binary;
 use crate::library::{
-    specifier_identity, LibraryHomeSource, LibraryRootRule, ResolvedLibraryHome, SpecifierIdentity,
+    LibraryHomeSource, LibraryRootRule, ResolvedLibraryHome, SpecifierIdentity, specifier_identity,
 };
 
 fn kv(report: &str, key: &str) -> String {

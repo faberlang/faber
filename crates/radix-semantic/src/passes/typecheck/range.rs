@@ -23,7 +23,7 @@
 #[allow(clippy::wildcard_imports)]
 // parent module provides shared imports for typechecking
 use super::*;
-use radix_hir::visit::{walk_expr, HirVisitor};
+use radix_hir::visit::{HirVisitor, walk_expr};
 use radix_lexer::Span;
 
 /// Every range member must be a range expression (`0‥m, n` declines here).

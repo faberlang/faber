@@ -102,8 +102,8 @@ pub use radix_lexer::textus_literal;
 use std::path::Path;
 
 pub use codegen::Target;
-pub use diagnostics::{is_known_diagnostic_code, Diagnostic, DiagnosticConvert};
-pub use driver::{apply_warn_policy, Config, ModuleCompileRequest, Session, WarnPolicy};
+pub use diagnostics::{Diagnostic, DiagnosticConvert, is_known_diagnostic_code};
+pub use driver::{Config, ModuleCompileRequest, Session, WarnPolicy, apply_warn_policy};
 
 /// Output and diagnostics from one compiler invocation.
 ///

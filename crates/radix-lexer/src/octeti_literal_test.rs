@@ -2,7 +2,7 @@
 //! Proves: compact and spaced hex forms decode correctly; invalid
 //! characters and odd digit counts are rejected.
 
-use crate::octeti_literal::{decode_octeti_hex, OctetiLiteralError};
+use crate::octeti_literal::{OctetiLiteralError, decode_octeti_hex};
 
 #[test]
 fn decode_compact_hex_multiple_bytes() {

@@ -1,5 +1,5 @@
-use crate::function_facts::{propagate_failable, RawFnDeps};
 use crate::TypeId;
+use crate::function_facts::{RawFnDeps, propagate_failable};
 use radix_hir::DefId;
 use rustc_hash::FxHashMap;
 

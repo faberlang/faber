@@ -5,9 +5,9 @@
 
 use super::library_resolver_from_config;
 use super::test_support::{diagnostic_has_issue, test_temp_dir};
+use radix::module::Output;
 use radix::module::driver::Config;
 use radix::module::locale::LocalePack;
-use radix::module::Output;
 use radix::program::analyze::AnalysisSeams;
 use radix::program::discovery::PackageSpec;
 use radix::program::emit::{

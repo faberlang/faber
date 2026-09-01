@@ -6,10 +6,10 @@
 //! compiler driver.
 
 use super::{
+    INTRINSICS, IntrinsicMirKind, IntrinsicParamKind, IntrinsicReceiver, IntrinsicReturnKind,
     is_atomic_operator_method, is_mutating_receiver, lookup_method, lookup_method_for_type,
     lookup_method_for_type_id, mir_atomic_op, mir_collection_op, mir_is_higher_order_lista,
-    receivers_for_type, receivers_for_type_id, IntrinsicMirKind, IntrinsicParamKind,
-    IntrinsicReceiver, IntrinsicReturnKind, INTRINSICS,
+    receivers_for_type, receivers_for_type_id,
 };
 use radix_types::{IndexExpr, MirAtomicOp, MirCollectionOp, Primitive, SemanticMutability, Type};
 

@@ -30,7 +30,7 @@
 //!   variant name, so later codegen can rely on resolved identity.
 
 use crate::{Primitive, SemanticError, SemanticErrorKind, Type, TypeId, TypeTable, WarningKind};
-use radix_hir::visit::{walk_expr, HirVisitor};
+use radix_hir::visit::{HirVisitor, walk_expr};
 use radix_hir::{
     DefId, HirCasuArm, HirExpression, HirExpressionKind, HirItemKind, HirModule, HirPattern,
 };

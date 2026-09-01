@@ -3,19 +3,19 @@ use radix_hir::DefId;
 use std::collections::BTreeMap;
 
 use super::{
+    ERR_GRAPHICS_PIPELINE_REQUIRES_COLOR_TARGETS, ERR_GRAPHICS_PIPELINE_REQUIRES_FRAGMENT,
+    ERR_GRAPHICS_PIPELINE_REQUIRES_VERTEX, ERR_GRAPHICS_PIPELINE_REQUIRES_VERTEX_INPUTS,
+    ERR_GRAPHICS_PIPELINE_VARYING_MISMATCH, MirAbiError, MirColorTargetFormat,
+    MirFragmentOutputReflection, MirGraphicsPipelineReflection, MirKernelBuiltin,
+    MirKernelDispatchSize, MirKernelLaunchBindGroup, MirKernelLaunchBinding, MirKernelLaunchPlan,
+    MirKernelOffsetMode, MirKernelProvenance, MirKernelReflection, MirKernelResourceReflection,
+    MirKernelShaderStage, MirKernelSignature, MirKernelWorkgroupCount, MirPrimitiveTopology,
+    MirVaryingReflection, MirVertexInputReflection, MirWorkgroupSize,
     buffer_binding_type_for_shader_access, collection_op_workgroup_count,
     combined_builtin_dependencies, layout_entry_for_launch_binding,
     pipeline_layout_for_launch_bind_groups, reflect_kernel_builtin_input, reflect_kernel_resource,
     shader_access_for_resource, validate_fragment_output_locations, validate_varying_consistency,
     validate_varying_locations, validate_vertex_input_locations, workgroup_count_for_dispatch,
-    MirAbiError, MirColorTargetFormat, MirFragmentOutputReflection, MirGraphicsPipelineReflection,
-    MirKernelBuiltin, MirKernelDispatchSize, MirKernelLaunchBindGroup, MirKernelLaunchBinding,
-    MirKernelLaunchPlan, MirKernelOffsetMode, MirKernelProvenance, MirKernelReflection,
-    MirKernelResourceReflection, MirKernelShaderStage, MirKernelSignature, MirKernelWorkgroupCount,
-    MirPrimitiveTopology, MirVaryingReflection, MirVertexInputReflection, MirWorkgroupSize,
-    ERR_GRAPHICS_PIPELINE_REQUIRES_COLOR_TARGETS, ERR_GRAPHICS_PIPELINE_REQUIRES_FRAGMENT,
-    ERR_GRAPHICS_PIPELINE_REQUIRES_VERTEX, ERR_GRAPHICS_PIPELINE_REQUIRES_VERTEX_INPUTS,
-    ERR_GRAPHICS_PIPELINE_VARYING_MISMATCH,
 };
 
 impl MirKernelReflection {

@@ -467,7 +467,7 @@ pub fn modular_word_numeric_binop(
             return Err(RunnerError::internal(
                 span,
                 "invalid modulus arithmetic operator",
-            ))
+            ));
         }
     };
     Ok(modular_word_result(value, width))
@@ -518,7 +518,7 @@ pub fn modular_word_bitwise_binop(
             return Err(RunnerError::internal(
                 span,
                 "invalid modulus bitwise operator",
-            ))
+            ));
         }
     };
     Ok(modular_word_result(value, width))
@@ -542,7 +542,7 @@ pub fn modular_word_compare_values(
             return Err(RunnerError::internal(
                 span,
                 "invalid modulus comparison operator",
-            ))
+            ));
         }
     };
     Ok(Value::Bool(result))

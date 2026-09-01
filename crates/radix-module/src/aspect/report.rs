@@ -6,17 +6,17 @@
 //! rather than re-resolving source names. Enum-variant facts are borrowed from
 //! the exhaustive-match pass so aspect recognition and pattern checking agree.
 
-use crate::hir::visit::{walk_expr, walk_item, HirVisitor};
+use crate::hir::visit::{HirVisitor, walk_expr, walk_item};
 use crate::hir::{DefId, HirCasuArm, HirExpression, HirExpressionKind, HirId, HirItem, HirItemKind, HirModule};
 use crate::lexer::{Interner, Span};
 
 use super::air_mask_proof::{
-    is_additive_body, is_additive_combine, is_integer_zero_seed, reduction_family, MaskNeutralityFamily,
+    MaskNeutralityFamily, is_additive_body, is_additive_combine, is_integer_zero_seed, reduction_family,
 };
-use super::air_purity_proof::{gate_purity_finding, GateHoleIssue, GatePurityFinding, PurityTerm};
-use super::air_unroll_proof::{unroll_route_facts, UnrollRoute};
-use crate::semantic::passes::exhaustive::{collect_enum_variants, enum_def_from_type, pattern_variant_id};
+use super::air_purity_proof::{GateHoleIssue, GatePurityFinding, PurityTerm, gate_purity_finding};
+use super::air_unroll_proof::{UnrollRoute, unroll_route_facts};
 use crate::semantic::TypeTable;
+use crate::semantic::passes::exhaustive::{collect_enum_variants, enum_def_from_type, pattern_variant_id};
 use rustc_hash::{FxHashMap, FxHashSet};
 
 #[cfg(test)]

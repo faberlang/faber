@@ -7,20 +7,19 @@ use radix_lexer::Interner;
 use radix_types::{NumericWidth, Primitive, Type, TypeId};
 
 use super::{
-    apply_collection_op_contract, buffer_element_count, buffer_element_type,
-    builtin_input_for_index_param, builtin_inputs_for_named_params, called_builtins_for_function,
-    collection_op_contract, combined_builtin_dependencies, device_view_element_count,
-    device_view_element_type, dispatch_size_for_1d_elements, is_vacuum, kernel_has_collection_op,
-    named_builtin_for_param, param_source_name, reject_kernel_matrix_abi,
-    require_same_element_type, require_u32_index, result_tuple_count, storage_buffer_limit_error,
-    CollectionOpContract, MirAbiError, MirKernelBuiltin, MirKernelBuiltinInput,
-    MirKernelBuiltinUsage, MirKernelDispatchSize, MirKernelResource, MirKernelResourceAccess,
-    MirKernelResourceKind, MirKernelResourceRole, MirKernelSignature, MirWorkgroupSize,
-    StorageBufferLimitRecord, DEFAULT_KERNEL_RESOURCE_GROUP, DEFAULT_STORAGE_BUFFER_LIMIT,
+    CollectionOpContract, DEFAULT_KERNEL_RESOURCE_GROUP, DEFAULT_STORAGE_BUFFER_LIMIT,
     ERR_INDEXED_VIEW_REQUIRES_INPUT, ERR_INDEXED_VIEW_RETURNS_VACUUM,
     ERR_KERNEL_IO_ELEMENT_MISMATCH, ERR_KERNEL_PARAM_RETURN_MISMATCH,
     ERR_KERNEL_RESOURCE_BINDING_OVERFLOW, ERR_KERNEL_RESULT_TUPLE_REQUIRED,
-    ERR_KERNEL_RESULT_TUPLE_REQUIRES_INPUT,
+    ERR_KERNEL_RESULT_TUPLE_REQUIRES_INPUT, MirAbiError, MirKernelBuiltin, MirKernelBuiltinInput,
+    MirKernelBuiltinUsage, MirKernelDispatchSize, MirKernelResource, MirKernelResourceAccess,
+    MirKernelResourceKind, MirKernelResourceRole, MirKernelSignature, MirWorkgroupSize,
+    StorageBufferLimitRecord, apply_collection_op_contract, buffer_element_count,
+    buffer_element_type, builtin_input_for_index_param, builtin_inputs_for_named_params,
+    called_builtins_for_function, collection_op_contract, combined_builtin_dependencies,
+    device_view_element_count, device_view_element_type, dispatch_size_for_1d_elements, is_vacuum,
+    kernel_has_collection_op, named_builtin_for_param, param_source_name, reject_kernel_matrix_abi,
+    require_same_element_type, require_u32_index, result_tuple_count, storage_buffer_limit_error,
 };
 
 struct IndexedViewKernelContext<'a> {

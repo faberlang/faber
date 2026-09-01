@@ -1,6 +1,6 @@
 use crate::codegen::Target;
-use crate::driver::compile;
 use crate::driver::ModuleCompileRequest;
+use crate::driver::compile;
 use crate::mir::MirKernelShaderStage;
 use crate::test_support::test_session;
 
@@ -178,10 +178,12 @@ redde verum
 "#;
     let result = compile_source(source);
     assert!(!result.success(), "unknown contract role must fail closed");
-    assert!(result
-        .diagnostics
-        .iter()
-        .any(|diag| diag.issue() == Some("shader_contract_role_unknown")));
+    assert!(
+        result
+            .diagnostics
+            .iter()
+            .any(|diag| diag.issue() == Some("shader_contract_role_unknown"))
+    );
 }
 
 #[test]
@@ -197,10 +199,12 @@ adfirma vertex_layout_matches(0, 0, "position", location, 3, 0, 12, 1, 1) mori "
     );
     let result = compile_source(&source);
     assert!(!result.success(), "non-constant contract argument must fail closed");
-    assert!(result
-        .diagnostics
-        .iter()
-        .any(|diag| diag.issue() == Some("shader_contract_arg_non_constant")));
+    assert!(
+        result
+            .diagnostics
+            .iter()
+            .any(|diag| diag.issue() == Some("shader_contract_arg_non_constant"))
+    );
 }
 
 #[test]
@@ -216,10 +220,12 @@ adfirma vertex_layout_matches(0, 0, "position", 0, 4, 0, 16, 1, 1) mori "conflic
     );
     let result = compile_source(&source);
     assert!(!result.success(), "duplicate/conflicting facts must be rejected");
-    assert!(result
-        .diagnostics
-        .iter()
-        .any(|diag| diag.issue() == Some("shader_contract_fact_conflict")));
+    assert!(
+        result
+            .diagnostics
+            .iter()
+            .any(|diag| diag.issue() == Some("shader_contract_fact_conflict"))
+    );
 }
 
 #[test]

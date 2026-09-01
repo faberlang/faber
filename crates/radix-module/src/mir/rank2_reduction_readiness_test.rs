@@ -8,11 +8,11 @@
 use super::*;
 use crate::codegen::Target;
 use crate::mir::{
-    inference_blocker_rows, tensor_operation_floor_rows, tensor_placement_policy_rows, tensor_systems_target_rows,
     InferenceBlockerKind, InferenceBlockerStatus, TensorOperationFloorStatus, TensorOperationFloorTarget,
     TensorPlacementFacet, TensorPlacementStatus, TensorSystemsTarget, TensorSystemsTargetStatus,
+    inference_blocker_rows, tensor_operation_floor_rows, tensor_placement_policy_rows, tensor_systems_target_rows,
 };
-use crate::services::{target_capabilities_for_surface, TargetCommandSurface};
+use crate::services::{TargetCommandSurface, target_capabilities_for_surface};
 
 #[test]
 fn readiness_matrix_covers_rank2_and_reductions_across_requested_paths() {

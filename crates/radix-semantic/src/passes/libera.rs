@@ -22,7 +22,7 @@
 
 use crate::{Resolver, SemanticError, SemanticErrorKind};
 use radix_hir::visit::{
-    walk_block, walk_cape, walk_expr, walk_local, walk_pattern, walk_stmt, HirVisitor,
+    HirVisitor, walk_block, walk_cape, walk_expr, walk_local, walk_pattern, walk_stmt,
 };
 use radix_hir::{
     DefId, HirBlock, HirCape, HirExpression, HirExpressionKind, HirFunction, HirLocal, HirModule,

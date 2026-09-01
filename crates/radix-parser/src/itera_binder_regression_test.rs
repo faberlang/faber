@@ -1,4 +1,4 @@
-use crate::test_support::{assert_parse_error_matches, parse_ok, ParseExpectation};
+use crate::test_support::{ParseExpectation, assert_parse_error_matches, parse_ok};
 use radix_syntax::{BindingPattern, ExprKind, IteraMode, StmtKind};
 
 #[test]
@@ -38,10 +38,12 @@ fn parses_lockstep_source_series_with_matching_binder_series() {
     };
     assert_eq!(iter_stmt.sources.len(), 3);
     assert_eq!(iter_stmt.bindings.len(), 3);
-    assert!(iter_stmt
-        .bindings
-        .iter()
-        .all(|binding| matches!(binding, BindingPattern::Ident(_))));
+    assert!(
+        iter_stmt
+            .bindings
+            .iter()
+            .all(|binding| matches!(binding, BindingPattern::Ident(_)))
+    );
     assert_eq!(iter_stmt.apud.len(), 1);
 }
 

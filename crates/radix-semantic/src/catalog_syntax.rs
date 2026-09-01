@@ -6,9 +6,9 @@
 
 #![allow(dead_code)]
 
-use super::catalog::{arg_value, quote_arg, DiagnosticSpec};
+use super::catalog::{DiagnosticSpec, arg_value, quote_arg};
 use radix_diagnostics::DiagnosticArg;
-use radix_lexer::{LexErrorKind, HOMOGLYPH_ISSUE};
+use radix_lexer::{HOMOGLYPH_ISSUE, LexErrorKind};
 use radix_parser::ParseErrorKind;
 
 // SYNTAX KINDS
@@ -69,25 +69,32 @@ pub(crate) const PARSE_ERROR_KINDS: &[ParseErrorKind] = &[
 #[must_use]
 pub fn lex_spec(kind: LexErrorKind) -> DiagnosticSpec {
     match kind {
-        LexErrorKind::UnterminatedString => {
-            DiagnosticSpec { code: "LEX001", help: Some("close the string literal before the end of the line or file") }
-        }
-        LexErrorKind::NumberInvalid => {
-            DiagnosticSpec { code: "LEX002", help: Some("check numeric separators and base prefixes") }
-        }
-        LexErrorKind::EscapeInvalid => {
-            DiagnosticSpec { code: "LEX003", help: Some("use a supported escape sequence or escape the backslash") }
-        }
-        LexErrorKind::CharacterUnexpected => {
-            DiagnosticSpec { code: "LEX004", help: Some("remove the character or escape it if it should be literal") }
-        }
+        LexErrorKind::UnterminatedString => DiagnosticSpec {
+            code: "LEX001",
+            help: Some("close the string literal before the end of the line or file"),
+        },
+        LexErrorKind::NumberInvalid => DiagnosticSpec {
+            code: "LEX002",
+            help: Some("check numeric separators and base prefixes"),
+        },
+        LexErrorKind::EscapeInvalid => DiagnosticSpec {
+            code: "LEX003",
+            help: Some("use a supported escape sequence or escape the backslash"),
+        },
+        LexErrorKind::CharacterUnexpected => DiagnosticSpec {
+            code: "LEX004",
+            help: Some("remove the character or escape it if it should be literal"),
+        },
         LexErrorKind::RemovedSectionDirective => DiagnosticSpec {
             code: "LEX005",
-            help: Some("put file metadata in +++ TOML frontmatter on line 1 instead of line-start § directives"),
+            help: Some(
+                "put file metadata in +++ TOML frontmatter on line 1 instead of line-start § directives",
+            ),
         },
-        LexErrorKind::CommentSyntaxInvalid => {
-            DiagnosticSpec { code: "LEX006", help: Some("prefix comments with # instead of // or /* */") }
-        }
+        LexErrorKind::CommentSyntaxInvalid => DiagnosticSpec {
+            code: "LEX006",
+            help: Some("prefix comments with # instead of // or /* */"),
+        },
         LexErrorKind::InlineComment => DiagnosticSpec {
             code: "LEX007",
             help: Some("put the # comment on its own line above the code it documents"),
@@ -108,76 +115,130 @@ pub fn parse_spec(kind: ParseErrorKind) -> DiagnosticSpec {
             code: "PARSE000",
             help: Some("fix the lexer error first; parsing continues from clean tokens"),
         },
-        ParseErrorKind::Expected => {
-            DiagnosticSpec { code: "PARSE001", help: Some("ensure the expected token is present in this position") }
-        }
-        ParseErrorKind::Unexpected => {
-            DiagnosticSpec { code: "PARSE002", help: Some("remove or reposition the unexpected token") }
-        }
-        ParseErrorKind::DeclarationInvalid => {
-            DiagnosticSpec { code: "PARSE010", help: Some("check declaration keywords and required parts") }
-        }
-        ParseErrorKind::FunctionNameAbsent => DiagnosticSpec { code: "PARSE011", help: None },
-        ParseErrorKind::FunctionBodyAbsent => DiagnosticSpec { code: "PARSE012", help: None },
-        ParseErrorKind::ClassNameAbsent => DiagnosticSpec { code: "PARSE013", help: None },
-        ParseErrorKind::ClassBodyAbsent => DiagnosticSpec { code: "PARSE014", help: None },
-        ParseErrorKind::ParameterInvalid => {
-            DiagnosticSpec { code: "PARSE015", help: Some("check parameter syntax and order") }
-        }
-        ParseErrorKind::TypeParameterInvalid => {
-            DiagnosticSpec { code: "PARSE016", help: Some("check type parameter list for commas and identifiers") }
-        }
-        ParseErrorKind::ModifierInvalid => {
-            DiagnosticSpec { code: "PARSE017", help: Some("move or remove the modifier") }
-        }
-        ParseErrorKind::AnnotationInvalid => {
-            DiagnosticSpec { code: "PARSE018", help: Some("add an annotation name after '@'") }
-        }
-        ParseErrorKind::ModifierDuplicate => {
-            DiagnosticSpec { code: "PARSE019", help: Some("remove the duplicate modifier") }
-        }
-        ParseErrorKind::StatementInvalid => DiagnosticSpec { code: "PARSE020", help: None },
-        ParseErrorKind::ConditionAbsent => {
-            DiagnosticSpec { code: "PARSE021", help: Some("add a condition expression") }
-        }
-        ParseErrorKind::BlockAbsent => DiagnosticSpec { code: "PARSE022", help: None },
+        ParseErrorKind::Expected => DiagnosticSpec {
+            code: "PARSE001",
+            help: Some("ensure the expected token is present in this position"),
+        },
+        ParseErrorKind::Unexpected => DiagnosticSpec {
+            code: "PARSE002",
+            help: Some("remove or reposition the unexpected token"),
+        },
+        ParseErrorKind::DeclarationInvalid => DiagnosticSpec {
+            code: "PARSE010",
+            help: Some("check declaration keywords and required parts"),
+        },
+        ParseErrorKind::FunctionNameAbsent => DiagnosticSpec {
+            code: "PARSE011",
+            help: None,
+        },
+        ParseErrorKind::FunctionBodyAbsent => DiagnosticSpec {
+            code: "PARSE012",
+            help: None,
+        },
+        ParseErrorKind::ClassNameAbsent => DiagnosticSpec {
+            code: "PARSE013",
+            help: None,
+        },
+        ParseErrorKind::ClassBodyAbsent => DiagnosticSpec {
+            code: "PARSE014",
+            help: None,
+        },
+        ParseErrorKind::ParameterInvalid => DiagnosticSpec {
+            code: "PARSE015",
+            help: Some("check parameter syntax and order"),
+        },
+        ParseErrorKind::TypeParameterInvalid => DiagnosticSpec {
+            code: "PARSE016",
+            help: Some("check type parameter list for commas and identifiers"),
+        },
+        ParseErrorKind::ModifierInvalid => DiagnosticSpec {
+            code: "PARSE017",
+            help: Some("move or remove the modifier"),
+        },
+        ParseErrorKind::AnnotationInvalid => DiagnosticSpec {
+            code: "PARSE018",
+            help: Some("add an annotation name after '@'"),
+        },
+        ParseErrorKind::ModifierDuplicate => DiagnosticSpec {
+            code: "PARSE019",
+            help: Some("remove the duplicate modifier"),
+        },
+        ParseErrorKind::StatementInvalid => DiagnosticSpec {
+            code: "PARSE020",
+            help: None,
+        },
+        ParseErrorKind::ConditionAbsent => DiagnosticSpec {
+            code: "PARSE021",
+            help: Some("add a condition expression"),
+        },
+        ParseErrorKind::BlockAbsent => DiagnosticSpec {
+            code: "PARSE022",
+            help: None,
+        },
         ParseErrorKind::ThereforeWrongContext => DiagnosticSpec {
             code: "PARSE026",
             help: Some("use 'ergo' for a single-statement body, or wrap the body in braces"),
         },
-        ParseErrorKind::ErgoWrongContext => {
-            DiagnosticSpec { code: "PARSE027", help: Some("use '∴' between a closure signature and its body") }
-        }
-        ParseErrorKind::PatternInvalid => DiagnosticSpec { code: "PARSE023", help: None },
-        ParseErrorKind::CasuArmInvalid => DiagnosticSpec { code: "PARSE024", help: None },
-        ParseErrorKind::CasuValueInvalid => {
-            DiagnosticSpec { code: "PARSE025", help: Some("use a valid case expression") }
-        }
-        ParseErrorKind::ExpressionInvalid => DiagnosticSpec { code: "PARSE030", help: Some("check expression syntax") },
-        ParseErrorKind::LiteralInvalid => DiagnosticSpec { code: "PARSE031", help: Some("check the literal form") },
-        ParseErrorKind::OperatorInvalid => {
-            DiagnosticSpec { code: "PARSE032", help: Some("check operator placement and operands") }
-        }
-        ParseErrorKind::UnterminatedGroup => {
-            DiagnosticSpec { code: "PARSE033", help: Some("close the grouping delimiter") }
-        }
-        ParseErrorKind::CallArgumentInvalid => {
-            DiagnosticSpec { code: "PARSE034", help: Some("check call argument syntax") }
-        }
-        ParseErrorKind::MemberAccessInvalid => {
-            DiagnosticSpec { code: "PARSE035", help: Some("check member access syntax") }
-        }
-        ParseErrorKind::AssignmentTargetInvalid => {
-            DiagnosticSpec { code: "PARSE036", help: Some("assign only to valid lvalues") }
-        }
-        ParseErrorKind::TypeInvalid => DiagnosticSpec { code: "PARSE040", help: Some("check type syntax") },
-        ParseErrorKind::TypeAnnotationInvalid => {
-            DiagnosticSpec { code: "PARSE041", help: Some("check type annotation form") }
-        }
-        ParseErrorKind::UnterminatedTypeParams => {
-            DiagnosticSpec { code: "PARSE042", help: Some("close the type parameter list with '>'") }
-        }
-        ParseErrorKind::ImportInvalid => DiagnosticSpec { code: "PARSE050", help: Some("check import syntax") },
+        ParseErrorKind::ErgoWrongContext => DiagnosticSpec {
+            code: "PARSE027",
+            help: Some("use '∴' between a closure signature and its body"),
+        },
+        ParseErrorKind::PatternInvalid => DiagnosticSpec {
+            code: "PARSE023",
+            help: None,
+        },
+        ParseErrorKind::CasuArmInvalid => DiagnosticSpec {
+            code: "PARSE024",
+            help: None,
+        },
+        ParseErrorKind::CasuValueInvalid => DiagnosticSpec {
+            code: "PARSE025",
+            help: Some("use a valid case expression"),
+        },
+        ParseErrorKind::ExpressionInvalid => DiagnosticSpec {
+            code: "PARSE030",
+            help: Some("check expression syntax"),
+        },
+        ParseErrorKind::LiteralInvalid => DiagnosticSpec {
+            code: "PARSE031",
+            help: Some("check the literal form"),
+        },
+        ParseErrorKind::OperatorInvalid => DiagnosticSpec {
+            code: "PARSE032",
+            help: Some("check operator placement and operands"),
+        },
+        ParseErrorKind::UnterminatedGroup => DiagnosticSpec {
+            code: "PARSE033",
+            help: Some("close the grouping delimiter"),
+        },
+        ParseErrorKind::CallArgumentInvalid => DiagnosticSpec {
+            code: "PARSE034",
+            help: Some("check call argument syntax"),
+        },
+        ParseErrorKind::MemberAccessInvalid => DiagnosticSpec {
+            code: "PARSE035",
+            help: Some("check member access syntax"),
+        },
+        ParseErrorKind::AssignmentTargetInvalid => DiagnosticSpec {
+            code: "PARSE036",
+            help: Some("assign only to valid lvalues"),
+        },
+        ParseErrorKind::TypeInvalid => DiagnosticSpec {
+            code: "PARSE040",
+            help: Some("check type syntax"),
+        },
+        ParseErrorKind::TypeAnnotationInvalid => DiagnosticSpec {
+            code: "PARSE041",
+            help: Some("check type annotation form"),
+        },
+        ParseErrorKind::UnterminatedTypeParams => DiagnosticSpec {
+            code: "PARSE042",
+            help: Some("close the type parameter list with '>'"),
+        },
+        ParseErrorKind::ImportInvalid => DiagnosticSpec {
+            code: "PARSE050",
+            help: Some("check import syntax"),
+        },
         ParseErrorKind::CommentPlacementInvalid => DiagnosticSpec {
             code: "PARSE060",
             help: Some(
@@ -474,17 +535,17 @@ fn expected_message(args: &[DiagnosticArg]) -> Option<String> {
         match issue {
             "secus_si_else_if" => return Some("use 'sin' for else-if".to_owned()),
             "requirit_iace" => {
-                return Some("expected 'iace' after the requirit condition".to_owned())
+                return Some("expected 'iace' after the requirit condition".to_owned());
             }
             "requirit_else_rejected" => {
-                return Some("'secus' is not the particle on requirit".to_owned())
+                return Some("'secus' is not the particle on requirit".to_owned());
             }
             "reice_iace" => return Some("expected 'iace' after the reice condition".to_owned()),
             "reice_else_rejected" => {
-                return Some("'secus' is not the particle on reice".to_owned())
+                return Some("'secus' is not the particle on reice".to_owned());
             }
             "adfirma_else_rejected" => {
-                return Some("'secus' is not the particle on adfirma".to_owned())
+                return Some("'secus' is not the particle on adfirma".to_owned());
             }
             "itera_mode" | "allocator_kind" | "mutability_marker" => {
                 let expected = arg_value(args, "expected")?;
@@ -499,7 +560,7 @@ fn expected_message(args: &[DiagnosticArg]) -> Option<String> {
                 ));
             }
             "sit_no_destructuring" => {
-                return Some("sit does not support destructuring patterns".to_owned())
+                return Some("sit does not support destructuring patterns".to_owned());
             }
             "test_case_or_setup" => return Some("expected test case or setup".to_owned()),
             "test_modifier_integer" => {
@@ -531,17 +592,17 @@ fn expected_message(args: &[DiagnosticArg]) -> Option<String> {
                 return Some(format!("{predicate} is no longer prefix predicate syntax"));
             }
             "equality_non_missing_est" => {
-                return Some("expected 'est' after 'non' in equality expression".to_owned())
+                return Some("expected 'est' after 'non' in equality expression".to_owned());
             }
             "est_non_spelling" => {
-                return Some("'est non' is not the identity negation spelling".to_owned())
+                return Some("'est non' is not the identity negation spelling".to_owned());
             }
             "closure_body_start" => {
-                return Some("expected ':' or '{' after closure parameters".to_owned())
+                return Some("expected ':' or '{' after closure parameters".to_owned());
             }
             "ad_ascii_route" => return Some("expected ascii literal route after 'ad'".to_owned()),
             "json_quoted_key" => {
-                return Some("JSON keys must be quoted strings; use \"name\": value".to_owned())
+                return Some("JSON keys must be quoted strings; use \"name\": value".to_owned());
             }
             "json_string_key" => return Some("expected JSON string key".to_owned()),
             "field_value_separator" => return Some("expected '='".to_owned()),
@@ -565,20 +626,20 @@ fn expected_help(args: &[DiagnosticArg]) -> Option<String> {
             "secus_si_else_if" => return Some("replace secus si with sin".to_owned()),
             "requirit_iace" => return Some("write requirit cond iace err".to_owned()),
             "requirit_else_rejected" => {
-                return Some("use 'iace' for the recoverable payload".to_owned())
+                return Some("use 'iace' for the recoverable payload".to_owned());
             }
             "reice_iace" => return Some("write reice cond iace err".to_owned()),
             "reice_else_rejected" => {
-                return Some("use 'iace' for the recoverable payload".to_owned())
+                return Some("use 'iace' for the recoverable payload".to_owned());
             }
             "adfirma_else_rejected" => {
-                return Some("use 'mori' for the optional panic message".to_owned())
+                return Some("use 'mori' for the optional panic message".to_owned());
             }
             "itera_mode" => {
-                return Some("choose one iteration mode before the iterable expression".to_owned())
+                return Some("choose one iteration mode before the iterable expression".to_owned());
             }
             "allocator_kind" => {
-                return Some("use \"arena\" or \"page\" as the allocator kind".to_owned())
+                return Some("use \"arena\" or \"page\" as the allocator kind".to_owned());
             }
             "annotation_name" => return Some("add an annotation name after @".to_owned()),
             "duplicate_rest_pattern" => {
@@ -586,7 +647,7 @@ fn expected_help(args: &[DiagnosticArg]) -> Option<String> {
                 return Some(format!("keep only one {keyword} rest binding"));
             }
             "mutability_marker" => {
-                return Some("add fixum or varia before the binding name".to_owned())
+                return Some("add fixum or varia before the binding name".to_owned());
             }
             "sit_identifier_binding" => {
                 let keyword = quote_arg(args, "keyword")?;
@@ -595,7 +656,7 @@ fn expected_help(args: &[DiagnosticArg]) -> Option<String> {
                 ));
             }
             "sit_no_destructuring" => {
-                return Some("use fixum with a destructuring pattern".to_owned())
+                return Some("use fixum with a destructuring pattern".to_owned());
             }
             "test_case_or_setup" => {
                 let proba = quote_arg(args, "proba")?;
@@ -632,24 +693,24 @@ fn expected_help(args: &[DiagnosticArg]) -> Option<String> {
                 return Some(format!("rewrite with {replacement}"));
             }
             "equality_non_missing_est" => {
-                return Some("write identity negation as non est".to_owned())
+                return Some("write identity negation as non est".to_owned());
             }
             "est_non_spelling" => return Some("use non est for identity negation".to_owned()),
             "closure_body_start" => {
-                return Some("add : for an expression body or { ... } for a block body".to_owned())
+                return Some("add : for an expression body or { ... } for a block body".to_owned());
             }
             "ad_ascii_route" => {
-                return Some("write the route as an ASCII literal after ad".to_owned())
+                return Some("write the route as an ASCII literal after ad".to_owned());
             }
             "json_quoted_key" => return Some("quote JSON object keys".to_owned()),
             "json_string_key" => {
-                return Some("start the JSON key with a string literal".to_owned())
+                return Some("start the JSON key with a string literal".to_owned());
             }
             "field_value_separator" => {
-                return Some("use = between field name and value".to_owned())
+                return Some("use = between field name and value".to_owned());
             }
             "call_type_args_start" => {
-                return Some("start call-site type arguments with <".to_owned())
+                return Some("start call-site type arguments with <".to_owned());
             }
             "gradient_empty_selector_list" => {
                 return Some(

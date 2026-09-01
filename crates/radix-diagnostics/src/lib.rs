@@ -16,14 +16,14 @@ mod span;
 mod spec;
 
 pub use diagnostic::{
-    diagnostic_identity, get_line_at_offset, nearest_char_boundary, offset_to_line,
-    parse_arg_value, Diagnostic, DiagnosticArg, DiagnosticPhase, LexErrorKind, ParseErrorKind,
-    PhaseErrorKind, SemanticErrorKind, Severity, WarningKind,
+    Diagnostic, DiagnosticArg, DiagnosticPhase, LexErrorKind, ParseErrorKind, PhaseErrorKind,
+    SemanticErrorKind, Severity, WarningKind, diagnostic_identity, get_line_at_offset,
+    nearest_char_boundary, offset_to_line, parse_arg_value,
 };
 pub use span::Span;
 pub use spec::{
-    locale_suggestion_spec, locale_unknown_spec, unresolved_intrinsic_spec,
-    unresolved_keyword_spec, unresolved_library_member_spec, DiagnosticSpec,
+    DiagnosticSpec, locale_suggestion_spec, locale_unknown_spec, unresolved_intrinsic_spec,
+    unresolved_keyword_spec, unresolved_library_member_spec,
 };
 
 #[cfg(test)]

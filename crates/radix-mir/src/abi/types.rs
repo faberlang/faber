@@ -1,6 +1,6 @@
 use crate::{
-    shader_contract::ShaderStageIoRole, MirFunction, MirFunctionId, MirIntrinsic, MirLocalId,
-    MirRuntimeCall, MirType,
+    MirFunction, MirFunctionId, MirIntrinsic, MirLocalId, MirRuntimeCall, MirType,
+    shader_contract::ShaderStageIoRole,
 };
 use radix_hir::DefId;
 use serde::Serialize;

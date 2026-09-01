@@ -4,8 +4,8 @@
 //! sorry detection; combined verdict priority.
 
 use super::{
-    combined_verdict, normalize_result, parse_axiom_output, AxiomAudit, AxiomDependency, AxiomVerdict, LakeResult,
-    LeanAspectChecker, LeanAspectCheckerConfig, SorryVerdict,
+    AxiomAudit, AxiomDependency, AxiomVerdict, LakeResult, LeanAspectChecker, LeanAspectCheckerConfig, SorryVerdict,
+    combined_verdict, normalize_result, parse_axiom_output,
 };
 use crate::aspect::verifier::{HirAspectCheckResult, HirAspectCheckStatus, HirAspectEvidence, HirAspectVerifier};
 use crate::aspect::{
@@ -1163,10 +1163,12 @@ fn lean_checker_air_kind_records_never_become_proven_via_placeholder_generator()
             result.status
         );
         assert_eq!(result.backend, HirAspectBackendKind::Lean);
-        assert!(result
-            .evidence
-            .0
-            .contains("registered without proof content"));
+        assert!(
+            result
+                .evidence
+                .0
+                .contains("registered without proof content")
+        );
         assert!(result.evidence.0.contains("refusing placeholder proof"));
     }
 }
@@ -1398,18 +1400,24 @@ fn lean_checker_gate_hole_record_yields_named_finding_never_downgraded() {
     assert_eq!(results.len(), 1);
     assert_eq!(results[0].status, HirAspectCheckStatus::Failed);
     assert_eq!(results[0].backend, HirAspectBackendKind::Lean);
-    assert!(results[0]
-        .evidence
-        .0
-        .contains("gate hole (never downgraded)"));
-    assert!(results[0]
-        .evidence
-        .0
-        .contains(crate::aspect::GateHoleIssue::AwaitingLocalInit.label()));
-    assert!(!results[0]
-        .evidence
-        .0
-        .contains("registered without proof content"));
+    assert!(
+        results[0]
+            .evidence
+            .0
+            .contains("gate hole (never downgraded)")
+    );
+    assert!(
+        results[0]
+            .evidence
+            .0
+            .contains(crate::aspect::GateHoleIssue::AwaitingLocalInit.label())
+    );
+    assert!(
+        !results[0]
+            .evidence
+            .0
+            .contains("registered without proof content")
+    );
 }
 
 #[test]
@@ -1465,14 +1473,18 @@ fn lean_checker_gate_purity_hole_keeps_named_finding_alongside_checkable_records
         results[0].status == HirAspectCheckStatus::ToolchainMissing || results[0].status == HirAspectCheckStatus::Error
     );
     assert_eq!(results[1].status, HirAspectCheckStatus::Failed);
-    assert!(results[1]
-        .evidence
-        .0
-        .contains("gate hole (never downgraded)"));
-    assert!(results[1]
-        .evidence
-        .0
-        .contains(crate::aspect::GateHoleIssue::UntranslatableErrorNode.label()));
+    assert!(
+        results[1]
+            .evidence
+            .0
+            .contains("gate hole (never downgraded)")
+    );
+    assert!(
+        results[1]
+            .evidence
+            .0
+            .contains(crate::aspect::GateHoleIssue::UntranslatableErrorNode.label())
+    );
 }
 
 #[test]

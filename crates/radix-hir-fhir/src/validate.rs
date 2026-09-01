@@ -677,7 +677,7 @@ fn validate_type_form(
                                 Some(radix_types::IndexExpr::Tuple(dims)) if dims.len() != 1
                             ) =>
                         {
-                            return Err(type_presentation_issue("vector_shape", site))
+                            return Err(type_presentation_issue("vector_shape", site));
                         }
                         radix_types::Type::Matrix(_, index)
                             if !matches!(
@@ -685,7 +685,7 @@ fn validate_type_form(
                                 Some(radix_types::IndexExpr::Tuple(dims)) if dims.len() == 2
                             ) =>
                         {
-                            return Err(type_presentation_issue("matrix_shape", site))
+                            return Err(type_presentation_issue("matrix_shape", site));
                         }
                         _ => {}
                     }
@@ -1353,11 +1353,11 @@ fn collect_expr_defs(
         } => {
             collect_expr_defs(cond, registry);
             collect_block_defs(then_block, registry);
-            if let Some(ref cape) = then_catch {
+            if let Some(cape) = then_catch {
                 registry.insert(cape.binding_def_id);
                 collect_block_defs(&cape.body, registry);
             }
-            if let Some(ref else_block) = else_block {
+            if let Some(else_block) = else_block {
                 collect_block_defs(else_block, registry);
             }
         }
@@ -1428,7 +1428,7 @@ fn collect_expr_defs(
         } => {
             collect_expr_defs(start, registry);
             collect_expr_defs(end, registry);
-            if let Some(ref s) = step {
+            if let Some(s) = step {
                 collect_expr_defs(s, registry);
             }
         }
@@ -1478,7 +1478,7 @@ fn collect_expr_defs(
         }
         HirExpressionKind::Adfirma(expr, msg) => {
             collect_expr_defs(expr, registry);
-            if let Some(ref m) = msg {
+            if let Some(m) = msg {
                 collect_expr_defs(m, registry);
             }
         }
@@ -1507,7 +1507,7 @@ fn collect_expr_defs(
             source, entries, ..
         } => {
             collect_expr_defs(source, registry);
-            if let Some(ref entries) = entries {
+            if let Some(entries) = entries {
                 for entry in entries {
                     if let radix_hir::HirObjectKey::Computed(ref e)
                     | radix_hir::HirObjectKey::Spread(ref e) = entry.key
@@ -1527,15 +1527,15 @@ fn collect_expr_defs(
             ..
         } => {
             collect_expr_defs(source, registry);
-            if let radix_hir::HirConversioTarget::Intervallum(ref e) = target {
+            if let radix_hir::HirConversioTarget::Intervallum(e) = target {
                 collect_expr_defs(e, registry);
             }
-            if let Some(ref r) = recovery {
+            if let Some(r) = recovery {
                 collect_expr_defs(r, registry);
             }
         }
         HirExpressionKind::Ad { opener, .. } => {
-            if let Some(ref o) = opener {
+            if let Some(o) = opener {
                 collect_expr_defs(o, registry);
             }
         }
@@ -1560,10 +1560,10 @@ fn collect_pattern_defs(pat: &radix_hir::HirPattern, registry: &mut FxHashSet<ra
         }
         radix_hir::HirPattern::Literal(_) | radix_hir::HirPattern::Wildcard => {}
     }
-    if let radix_hir::HirPattern::Alias(_, _, ref inner) = pat {
+    if let radix_hir::HirPattern::Alias(_, _, inner) = pat {
         collect_pattern_defs(inner, registry);
     }
-    if let radix_hir::HirPattern::Variant(_, ref sub_patterns) = pat {
+    if let radix_hir::HirPattern::Variant(_, sub_patterns) = pat {
         for sp in sub_patterns {
             collect_pattern_defs(sp, registry);
         }
@@ -1703,10 +1703,10 @@ fn collect_hir_registry(artifact: &HirArtifact) -> FxHashSet<radix_hir::HirId> {
             } => {
                 collect_expr(cond, registry);
                 collect_block(then_block, registry);
-                if let Some(ref cape) = then_catch {
+                if let Some(cape) = then_catch {
                     collect_block(&cape.body, registry);
                 }
-                if let Some(ref else_block) = else_block {
+                if let Some(else_block) = else_block {
                     collect_block(else_block, registry);
                 }
             }
@@ -1788,7 +1788,7 @@ fn collect_hir_registry(artifact: &HirArtifact) -> FxHashSet<radix_hir::HirId> {
             }
             HirExpressionKind::Adfirma(expr, msg) => {
                 collect_expr(expr, registry);
-                if let Some(ref m) = msg {
+                if let Some(m) = msg {
                     collect_expr(m, registry);
                 }
             }
@@ -1819,7 +1819,7 @@ fn collect_hir_registry(artifact: &HirArtifact) -> FxHashSet<radix_hir::HirId> {
                 source, entries, ..
             } => {
                 collect_expr(source, registry);
-                if let Some(ref entries) = entries {
+                if let Some(entries) = entries {
                     for entry in entries {
                         if let radix_hir::HirObjectKey::Computed(ref e)
                         | radix_hir::HirObjectKey::Spread(ref e) = entry.key
@@ -1839,10 +1839,10 @@ fn collect_hir_registry(artifact: &HirArtifact) -> FxHashSet<radix_hir::HirId> {
                 ..
             } => {
                 collect_expr(source, registry);
-                if let radix_hir::HirConversioTarget::Intervallum(ref e) = target {
+                if let radix_hir::HirConversioTarget::Intervallum(e) = target {
                     collect_expr(e, registry);
                 }
-                if let Some(ref r) = recovery {
+                if let Some(r) = recovery {
                     collect_expr(r, registry);
                 }
             }
@@ -1885,7 +1885,7 @@ fn collect_hir_registry(artifact: &HirArtifact) -> FxHashSet<radix_hir::HirId> {
     for item in &artifact.hir.items {
         registry.insert(item.id);
         match &item.kind {
-            radix_hir::HirItemKind::Function(ref func) => {
+            radix_hir::HirItemKind::Function(func) => {
                 for ann in &func.annotations {
                     collect_annotation(ann, &mut registry);
                 }
@@ -1898,7 +1898,7 @@ fn collect_hir_registry(artifact: &HirArtifact) -> FxHashSet<radix_hir::HirId> {
                     collect_block(body, &mut registry);
                 }
             }
-            radix_hir::HirItemKind::Struct(ref s) => {
+            radix_hir::HirItemKind::Struct(s) => {
                 for ann in &s.annotations {
                     collect_annotation(ann, &mut registry);
                 }
@@ -1924,7 +1924,7 @@ fn collect_hir_registry(artifact: &HirArtifact) -> FxHashSet<radix_hir::HirId> {
                     }
                 }
             }
-            radix_hir::HirItemKind::Interface(ref iface) => {
+            radix_hir::HirItemKind::Interface(iface) => {
                 for method in &iface.methods {
                     for param in &method.params {
                         if let Some(ref init) = param.default {
@@ -1933,7 +1933,7 @@ fn collect_hir_registry(artifact: &HirArtifact) -> FxHashSet<radix_hir::HirId> {
                     }
                 }
             }
-            radix_hir::HirItemKind::Constant(ref c) => {
+            radix_hir::HirItemKind::Constant(c) => {
                 collect_expr(&c.value, &mut registry);
             }
             _ => {}
@@ -2498,7 +2498,7 @@ pub(crate) fn validate_referential_integrity(
             } => {
                 validate_expr(cond, check_symbol, check_def, check_hir, check_type)?;
                 validate_block(then_block, check_symbol, check_def, check_hir, check_type)?;
-                if let Some(ref cape) = then_catch {
+                if let Some(cape) = then_catch {
                     check_def(cape.binding_def_id)?;
                     check_symbol(cape.binding_name)?;
                     if let Some(ty) = cape.binding_ty {
@@ -2506,7 +2506,7 @@ pub(crate) fn validate_referential_integrity(
                     }
                     validate_block(&cape.body, check_symbol, check_def, check_hir, check_type)?;
                 }
-                if let Some(ref else_block) = else_block {
+                if let Some(else_block) = else_block {
                     validate_block(else_block, check_symbol, check_def, check_hir, check_type)?;
                 }
             }
@@ -2584,7 +2584,7 @@ pub(crate) fn validate_referential_integrity(
             } => {
                 validate_expr(start, check_symbol, check_def, check_hir, check_type)?;
                 validate_expr(end, check_symbol, check_def, check_hir, check_type)?;
-                if let Some(ref s) = step {
+                if let Some(s) = step {
                     validate_expr(s, check_symbol, check_def, check_hir, check_type)?;
                 }
             }
@@ -2643,7 +2643,7 @@ pub(crate) fn validate_referential_integrity(
             }
             HirExpressionKind::Adfirma(expr, msg) => {
                 validate_expr(expr, check_symbol, check_def, check_hir, check_type)?;
-                if let Some(ref m) = msg {
+                if let Some(m) = msg {
                     validate_expr(m, check_symbol, check_def, check_hir, check_type)?;
                 }
             }
@@ -2692,7 +2692,7 @@ pub(crate) fn validate_referential_integrity(
             } => {
                 validate_expr(source, check_symbol, check_def, check_hir, check_type)?;
                 check_type(*target)?;
-                if let Some(ref entries) = entries {
+                if let Some(entries) = entries {
                     for entry in entries {
                         match &entry.key {
                             radix_hir::HirObjectKey::Ident(s)
@@ -2724,13 +2724,13 @@ pub(crate) fn validate_referential_integrity(
                 for sym in params {
                     check_symbol(*sym)?;
                 }
-                if let Some(ref r) = recovery {
+                if let Some(r) = recovery {
                     validate_expr(r, check_symbol, check_def, check_hir, check_type)?;
                 }
             }
             HirExpressionKind::Ad { route, opener } => {
                 check_symbol(*route)?;
-                if let Some(ref o) = opener {
+                if let Some(o) = opener {
                     validate_expr(o, check_symbol, check_def, check_hir, check_type)?;
                 }
             }

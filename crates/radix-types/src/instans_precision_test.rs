@@ -2,7 +2,7 @@
 //! lattice (coarse→fine assignable, fine→coarse not), and assignment in
 //! [`TypeTable`].
 
-use crate::{is_instans_assignable, InstansPrecision, InstansPrecisionError, InstansPrecisionRank};
+use crate::{InstansPrecision, InstansPrecisionError, InstansPrecisionRank, is_instans_assignable};
 use crate::{Primitive, TypeTable};
 
 #[test]

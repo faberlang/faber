@@ -11,7 +11,7 @@
 //! comment at the start of its own line. Block-end comments (before the
 //! closing `}`) remain invalid placement — out of scope for this unit.
 
-use crate::{parse, ParseErrorKind};
+use crate::{ParseErrorKind, parse};
 use radix_lexer::lex;
 use radix_syntax::{CommentLine, StmtKind, Trivia};
 

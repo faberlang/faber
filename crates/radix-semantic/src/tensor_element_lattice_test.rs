@@ -3,8 +3,8 @@
 //! These tests prove that pairwise conversion rules between element types
 //! are stable, symmetrical, and reject invalid family-width combinations.
 
-use super::tensor_element_lattice::{conversio_allowed, lattice_pair_counts, SPECS};
 use super::TypeTable;
+use super::tensor_element_lattice::{SPECS, conversio_allowed, lattice_pair_counts};
 
 #[test]
 fn tensor_element_lattice_pair_counts_are_stable() {

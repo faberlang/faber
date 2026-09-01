@@ -1,23 +1,25 @@
 use super::device::{
-    FmirDeviceSection, FmirExecutorPlanSection, FmirExecutorPlanSectionV2, FmirSessionSection,
-    FmirSessionSectionV2, EXECUTOR_PLAN_SECTION_VERSION, WIRE_SESSION_SECTION_VERSION,
+    EXECUTOR_PLAN_SECTION_VERSION, FmirDeviceSection, FmirExecutorPlanSection,
+    FmirExecutorPlanSectionV2, FmirSessionSection, FmirSessionSectionV2,
+    WIRE_SESSION_SECTION_VERSION,
 };
 use super::distributed::{
-    expected_plan_for_section, wire_plan_to_plan, FmirDistributedExecutionSection,
+    FmirDistributedExecutionSection, expected_plan_for_section, wire_plan_to_plan,
 };
 use super::executor_plan_admission::{
-    admit_executor_plan_section_v2_with_version, ExecutorPlanAdmissionError,
+    ExecutorPlanAdmissionError, admit_executor_plan_section_v2_with_version,
 };
 use super::requirements::{
-    default_compatibility_table, validate_artifact_combination, validate_compiled_in_target_in,
-    validate_duplicate_target_features, validate_target_features_in, ArtifactCompatibilityTable,
+    ArtifactCompatibilityTable, default_compatibility_table, validate_artifact_combination,
+    validate_compiled_in_target_in, validate_duplicate_target_features,
+    validate_target_features_in,
 };
 use super::wire::WireDeviceProgram;
 use super::{
-    logical_distributed_plan_hash, validate_wire_distributed_section, validate_wire_program,
-    validate_wire_session_section, validate_wire_session_section_v2, FmirDeviceBackend,
-    FmirDeviceSelection, MaterializationStage, PACKAGE_MIR_ARTIFACT_VERSION,
-    WIRE_DEVICE_PROGRAM_VERSION, WIRE_DISTRIBUTED_SECTION_VERSION,
+    FmirDeviceBackend, FmirDeviceSelection, MaterializationStage, PACKAGE_MIR_ARTIFACT_VERSION,
+    WIRE_DEVICE_PROGRAM_VERSION, WIRE_DISTRIBUTED_SECTION_VERSION, logical_distributed_plan_hash,
+    validate_wire_distributed_section, validate_wire_program, validate_wire_session_section,
+    validate_wire_session_section_v2,
 };
 use crate::schema::ARTIFACT_ABI_VERSION;
 
@@ -606,13 +608,15 @@ pub(crate) fn equivalence_gate(
     let delivered_bytes = radix_mir::distributed::encode_logical_plan(&delivered);
     let expected_bytes = radix_mir::distributed::encode_logical_plan(&expected);
     if delivered_bytes != expected_bytes {
-        return Err(crate::error::FmirImageError::DistributedSectionEquivalenceMismatch {
-            detail: format!(
-                "the delivered logical plan ({} partitions, {} operations) is not the deterministic derivation of the declared program + placement — stale or tampered; admission re-derives (program, declared placement) and compares canonical bytes with the delivered plan",
-                delivered.partitions.len(),
-                delivered.graph.operations.len(),
-            ),
-        });
+        return Err(
+            crate::error::FmirImageError::DistributedSectionEquivalenceMismatch {
+                detail: format!(
+                    "the delivered logical plan ({} partitions, {} operations) is not the deterministic derivation of the declared program + placement — stale or tampered; admission re-derives (program, declared placement) and compares canonical bytes with the delivered plan",
+                    delivered.partitions.len(),
+                    delivered.graph.operations.len(),
+                ),
+            },
+        );
     }
     Ok(())
 }

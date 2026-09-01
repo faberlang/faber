@@ -10,8 +10,8 @@
 use crate::device_program::{DeviceProgram, LaunchId};
 use crate::distributed::types::{
     DeclaredPlacement, DeviceProgramPartition, DistributedExecutionGraph, DistributedExecutionPlan,
-    ExecutionCommitBoundary, ExecutionOperation, LaunchOperation, PartitionId, PlanVersion,
-    ResultRef, LOGICAL_PLAN_VERSION,
+    ExecutionCommitBoundary, ExecutionOperation, LOGICAL_PLAN_VERSION, LaunchOperation,
+    PartitionId, PlanVersion, ResultRef,
 };
 
 /// The single logical partition of an N=1 synthesized plan (rank 0).

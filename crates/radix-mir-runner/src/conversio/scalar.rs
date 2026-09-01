@@ -452,7 +452,7 @@ impl<H: super::super::Host + ?Sized> Runner<'_, H> {
                 return Err(RunnerError::internal(
                     span,
                     "modulus conversion requires an integer value",
-                ))
+                ));
             }
         };
         let mask = modular_word_mask(width);

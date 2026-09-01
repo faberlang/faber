@@ -43,13 +43,13 @@ pub(crate) mod requirements;
 pub(crate) mod routes;
 pub(crate) mod sources;
 
-use crate::analyze::{AnalysisSeams, AnalyzedProgram, AnalyzedProgramNode, ModuleId};
-use crate::import_graph::{resolve_import, ImportResolution};
-use crate::library::{
-    library_cached_analysis, library_cached_file_interface, with_library_cached_analysis_mut,
-    LibraryInterfaceCache, LibraryResolver,
-};
 use crate::LibraryImportBinding;
+use crate::analyze::{AnalysisSeams, AnalyzedProgram, AnalyzedProgramNode, ModuleId};
+use crate::import_graph::{ImportResolution, resolve_import};
+use crate::library::{
+    LibraryInterfaceCache, LibraryResolver, library_cached_analysis, library_cached_file_interface,
+    with_library_cached_analysis_mut,
+};
 
 // ── Faber-supplied seams (RP5) ───────────────────────────────────────────────
 
@@ -132,12 +132,13 @@ pub struct MirSeams {
     pub toolchain_version: &'static str,
 }
 use radix_mir_fmir::{
+    FMIR_TARGET_NAME, FMIR_TEXT_TARGET_NAME, FmirBinaryImageFile, FmirDeviceSection,
+    FmirDeviceSelection, FmirImageError, FmirTextCliOperand, FmirTextCliRootSection,
+    FmirTextCliSection, FmirTextCliValueType, FmirTextImageFile, FmirTextProgramSection,
+    FmirTextRuntimeSection, FmirTextSourceIdentity, FmirTextSourcesSection,
+    FmirTextToolchainSection, FmirTextTypesSection, PACKAGE_MIR_ARTIFACT_VERSION,
     decode_binary_image, decode_text_image, encode_binary_image, encode_text_image,
-    is_known_host_requirement, FmirBinaryImageFile, FmirDeviceSection, FmirDeviceSelection,
-    FmirImageError, FmirTextCliOperand, FmirTextCliRootSection, FmirTextCliSection,
-    FmirTextCliValueType, FmirTextImageFile, FmirTextProgramSection, FmirTextRuntimeSection,
-    FmirTextSourceIdentity, FmirTextSourcesSection, FmirTextToolchainSection, FmirTextTypesSection,
-    FMIR_TARGET_NAME, FMIR_TEXT_TARGET_NAME, PACKAGE_MIR_ARTIFACT_VERSION,
+    is_known_host_requirement,
 };
 use radix_module::cli::{
     CliCommand, CliDefault, CliExit, CliMode, CliOperand, CliOption, CliProgram, CliType,
@@ -152,14 +153,14 @@ use radix_module::hir::{
 };
 use radix_module::lexer::{Interner, Symbol};
 use radix_module::mir::{
-    lower_analyzed_unit, run_entry, run_entry_with_stats, validate_program, Host, LoweredMirUnit,
-    MirAggregate, MirAggregateFields, MirAggregateItem, MirAggregateKind, MirBlock, MirBlockId,
-    MirCallee, MirClosureCallee, MirClosureEnvironment, MirClosureEnvironmentId, MirClosureValue,
-    MirConstant, MirDiagnosticKind, MirFunction, MirFunctionId, MirIntrinsic, MirNamedOperand,
-    MirOperand, MirOptionChainLink, MirOptionOp, MirPlace, MirProgram, MirProjection,
-    MirProviderKind, MirRuntimeCall, MirRuntimeRecordField, MirRuntimeRecordValue, MirStatement,
-    MirStatementKind, MirSwitchCase, MirTerminator, MirTerminatorKind, MirType, MirValue,
-    MirValueKind, RunnerError, RunnerStats,
+    Host, LoweredMirUnit, MirAggregate, MirAggregateFields, MirAggregateItem, MirAggregateKind,
+    MirBlock, MirBlockId, MirCallee, MirClosureCallee, MirClosureEnvironment,
+    MirClosureEnvironmentId, MirClosureValue, MirConstant, MirDiagnosticKind, MirFunction,
+    MirFunctionId, MirIntrinsic, MirNamedOperand, MirOperand, MirOptionChainLink, MirOptionOp,
+    MirPlace, MirProgram, MirProjection, MirProviderKind, MirRuntimeCall, MirRuntimeRecordField,
+    MirRuntimeRecordValue, MirStatement, MirStatementKind, MirSwitchCase, MirTerminator,
+    MirTerminatorKind, MirType, MirValue, MirValueKind, RunnerError, RunnerStats,
+    lower_analyzed_unit, run_entry, run_entry_with_stats, validate_program,
 };
 use radix_module::semantic::{
     IndexExpr, Primitive, Resolver, SymbolKind, Type, TypeId, TypeTable, TypeTableSnapshot,
@@ -606,23 +607,23 @@ pub fn imported_entry_facts(
         .collect()
 }
 
+pub use routes::FmirImageRouteDecision;
 /// Generated fmir-bin runner crates consume this public API through faber's
 /// re-export (`faber_cli::package::run_fmir_image_bytes_with_stdio`).
 pub use routes::run_fmir_image_bytes_with_stdio;
 #[cfg(feature = "hir-fhir")]
 pub use routes::run_package_mir_from_loaded;
-pub use routes::FmirImageRouteDecision;
+#[allow(unused_imports)]
+pub use routes::{
+    PackageRunStats, build_package_mir_artifact, run_package_mir, run_package_mir_artifact,
+    run_package_mir_with_selection, run_package_mir_with_selection_and_stats,
+};
 #[allow(unused_imports)] // FMIR stages consume this crate-visible image API.
 pub use routes::{
     build_package_fmir_binary_bundle, build_package_fmir_image, build_package_fmir_text_image,
     fmir_image_route_decision, run_fmir_image_path, run_fmir_image_path_with_selection,
     run_package_fmir_built_image, run_package_fmir_image, run_package_fmir_image_with_selection,
     run_package_fmir_text_image, run_package_fmir_text_image_with_selection,
-};
-#[allow(unused_imports)]
-pub use routes::{
-    build_package_mir_artifact, run_package_mir, run_package_mir_artifact,
-    run_package_mir_with_selection, run_package_mir_with_selection_and_stats, PackageRunStats,
 };
 
 #[cfg(feature = "mir-fmir")]

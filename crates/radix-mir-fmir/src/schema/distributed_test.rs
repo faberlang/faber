@@ -23,28 +23,28 @@
 //! admission surface).
 
 use super::{
-    admit_device_section, admit_distributed_section, canonical_program_bytes, device_identity_hash,
-    equivalence_gate, logical_distributed_plan_hash, plan_to_wire_plan, wire_facts_to_facts,
-    wire_plan_to_plan, wire_program_to_program, FmirBinaryImageFile, FmirDeviceArtifactsSection,
-    FmirDeviceProgramSection, FmirDeviceSection, FmirDeviceSelection,
-    FmirDistributedExecutionSection, FmirTextRuntimeSection, FmirTextSourceIdentity,
-    FmirTextSourcesSection, FmirTextToolchainSection, FmirTextTypesSection, WireBinding,
-    WireBufferIdentity, WireBufferLifetime, WireBufferRole, WireBufferVersion,
+    FMIR_TARGET_NAME, FmirBinaryImageFile, FmirDeviceArtifactsSection, FmirDeviceProgramSection,
+    FmirDeviceSection, FmirDeviceSelection, FmirDistributedExecutionSection,
+    FmirTextRuntimeSection, FmirTextSourceIdentity, FmirTextSourcesSection,
+    FmirTextToolchainSection, FmirTextTypesSection, PACKAGE_MIR_ARTIFACT_VERSION,
+    SHA256_IDENTITY_PREFIX, WIRE_DEVICE_PROGRAM_VERSION, WIRE_DISTRIBUTED_SECTION_VERSION,
+    WireBinding, WireBufferIdentity, WireBufferLifetime, WireBufferRole, WireBufferVersion,
     WireCollectionKernelPlan, WireDependencyEdge, WireDeviceProgram, WireDeviceResource,
     WireDispatchSize, WireExecutionOperation, WireKernelLaunchPlan, WireKernelUnit, WireLaunchUnit,
     WireObservationCadence, WireObservationFact, WirePlacementContract, WirePlacementFact,
     WireProgramLifetime, WireResourceAccess, WireResultBuffer, WireSemanticValue,
     WireSemanticValueOrigin, WireStorageLayout, WireWorkgroupCount, WireWorkgroupSize,
-    FMIR_TARGET_NAME, PACKAGE_MIR_ARTIFACT_VERSION, SHA256_IDENTITY_PREFIX,
-    WIRE_DEVICE_PROGRAM_VERSION, WIRE_DISTRIBUTED_SECTION_VERSION,
+    admit_device_section, admit_distributed_section, canonical_program_bytes, device_identity_hash,
+    equivalence_gate, logical_distributed_plan_hash, plan_to_wire_plan, wire_facts_to_facts,
+    wire_plan_to_plan, wire_program_to_program,
 };
 use crate::error::FmirImageError;
 use crate::{decode_binary_image, encode_binary_image};
-use radix_mir::distributed::{
-    DeclaredPlacement, DistributedExecutionPlan, LogicalPlacement, PartitionId,
-    PlacementConstraint, PlacementObjective, PlanVersion, LOGICAL_PLAN_VERSION,
-};
 use radix_mir::MirProgram;
+use radix_mir::distributed::{
+    DeclaredPlacement, DistributedExecutionPlan, LOGICAL_PLAN_VERSION, LogicalPlacement,
+    PartitionId, PlacementConstraint, PlacementObjective, PlanVersion,
+};
 use radix_types::TypeTable;
 
 /// The single-device program fixture (the section-level A10 substrate): the

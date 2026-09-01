@@ -6,10 +6,10 @@
 //! This module serves as the hub: helpers, lane/target policy tests, and basic
 //! compile success tests live here. Topic-specific sub-modules are wired below.
 
-use super::{compile, AnalyzeRequest, ModuleCompileRequest};
+use super::{AnalyzeRequest, ModuleCompileRequest, compile};
+use crate::codegen::Target;
 #[cfg(feature = "hir-faber")]
 use crate::codegen::faber::reemit_faber;
-use crate::codegen::Target;
 use crate::diagnostics::DiagnosticArg;
 #[cfg(feature = "hir-faber")]
 use crate::driver::{Config, Session};
@@ -368,9 +368,11 @@ functio loss() → numerus {
     let Some(crate::Output::WasmText(output)) = result.output else {
         panic!("expected wasm-text output");
     };
-    assert!(output
-        .code
-        .contains(r#"(func $loss (export "loss") (result i64)"#));
+    assert!(
+        output
+            .code
+            .contains(r#"(func $loss (export "loss") (result i64)"#)
+    );
 }
 
 #[test]
@@ -748,11 +750,10 @@ fn deny_warnings_suppresses_output_after_promotion() {
 fn deny_warnings_promotes_prefer_string_template_to_error() {
     use crate::driver::WarnPolicy;
 
-    let mut diags =
-        vec![
-            crate::diagnostics::Diagnostic::warning("long string concatenation; prefer a string template")
-                .with_code("WARN018"),
-        ];
+    let mut diags = vec![
+        crate::diagnostics::Diagnostic::warning("long string concatenation; prefer a string template")
+            .with_code("WARN018"),
+    ];
     super::apply_warn_policy(&mut diags, &WarnPolicy { deny_all_warnings: true, deny_codes: vec![] });
     assert!(
         diags[0].is_error(),

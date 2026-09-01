@@ -6,8 +6,8 @@
 use super::context::MirValidationContext;
 use super::error::{MirFunctionSignature, MirParamSignature, MirValidationError};
 use crate::device::{
-    reject_nucleum_fragment_survivors, MirDeviceContext, MirDeviceFunctionMetadataMap,
-    MirDeviceRole,
+    MirDeviceContext, MirDeviceFunctionMetadataMap, MirDeviceRole,
+    reject_nucleum_fragment_survivors,
 };
 use crate::visit::MirVisitor;
 use crate::{

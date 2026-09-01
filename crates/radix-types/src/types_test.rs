@@ -5,16 +5,16 @@
 //! Includes regression for Option→ignotum assignment (F2 regression) and
 //! bidirectional octeti↔lista<numerus<u8>> unify.
 
-use crate::index::{i64s_from_literal_index, IndexExpr, IndexId};
 use crate::DefId;
 use crate::InstansPrecision;
 use crate::NumericWidth;
 use crate::TypeId;
+use crate::index::{IndexExpr, IndexId, i64s_from_literal_index};
 use crate::{
-    collection_type_specs, lookup_collection_type_spec, lookup_primitive_type_spec,
-    lookup_tensor_family_type_spec, primitive_type_specs, tensor_family_type_specs, AccessMarker,
-    AppliedArg, CollectionKind, FuncSig, ParamType, Primitive, SemanticMutability,
+    AccessMarker, AppliedArg, CollectionKind, FuncSig, ParamType, Primitive, SemanticMutability,
     SemanticParamMode, TensorFamilyKind, Type, TypeParamConstraint, TypeTable,
+    collection_type_specs, lookup_collection_type_spec, lookup_primitive_type_spec,
+    lookup_tensor_family_type_spec, primitive_type_specs, tensor_family_type_specs,
 };
 
 #[test]
@@ -657,17 +657,21 @@ fn find_sized_numeric_returns_existing_intern() {
     // WHY: codegen holds `&TypeTable` (immutable) and must look up sized
     // numeric ids without interning. Octeti method routing depends on this.
     let mut types = TypeTable::new();
-    assert!(types
-        .find_sized_numeric(Primitive::Numerus, NumericWidth::U8)
-        .is_none());
+    assert!(
+        types
+            .find_sized_numeric(Primitive::Numerus, NumericWidth::U8)
+            .is_none()
+    );
     let u8 = types.sized_numeric(Primitive::Numerus, NumericWidth::U8);
     assert_eq!(
         types.find_sized_numeric(Primitive::Numerus, NumericWidth::U8),
         Some(u8)
     );
-    assert!(types
-        .find_sized_numeric(Primitive::Numerus, NumericWidth::U16)
-        .is_none());
+    assert!(
+        types
+            .find_sized_numeric(Primitive::Numerus, NumericWidth::U16)
+            .is_none()
+    );
 }
 
 #[test]

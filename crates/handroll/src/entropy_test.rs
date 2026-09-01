@@ -1,4 +1,4 @@
-use super::{os_entropy, uuid_v4, Rng};
+use super::{Rng, os_entropy, uuid_v4};
 
 #[test]
 fn seed_from_u64_pins_reference_sequence() {

@@ -6,9 +6,9 @@ use crate::cli::{TestArgs, TestOutputFormat};
 use crate::input_shape::locale_without_package_error;
 use crate::package;
 use proba::{
-    format_summary, has_solum_cases, inventory_cases, is_harness_filter_match,
-    run_proba_on_validated, run_proba_on_validated_with_function_ids, selection_skip_reason,
-    source_skip_reason, CaseOutcome, CaseResult, ProbaCase, ProbaReport, TestSelection,
+    CaseOutcome, CaseResult, ProbaCase, ProbaReport, TestSelection, format_summary,
+    has_solum_cases, inventory_cases, is_harness_filter_match, run_proba_on_validated,
+    run_proba_on_validated_with_function_ids, selection_skip_reason, source_skip_reason,
 };
 use radix::module::driver::{Config, Session};
 use radix::program::test_source_filter::TestSourceFilter;
@@ -242,11 +242,7 @@ fn empty_run_detail(unmatched_include: bool) -> &'static str {
 
 /// Exit code for an empty report: nonzero unless `--allow-no-tests`.
 fn empty_run_exit_code(allow_no_tests: bool) -> i32 {
-    if allow_no_tests {
-        0
-    } else {
-        1
-    }
+    if allow_no_tests { 0 } else { 1 }
 }
 
 /// True when `--include` was given and no analyzed unit is a `*.proba` file.
@@ -618,13 +614,13 @@ fn run_package_test_unit_with_options(
     }
 
     let Some((root_id, _)) = package.node_by_path(unit_path) else {
-        return Err(vec![radix::module::diagnostics::Diagnostic::error(
-            format!(
+        return Err(vec![
+            radix::module::diagnostics::Diagnostic::error(format!(
                 "test unit disappeared during package re-analysis: {}",
                 unit_path.display()
-            ),
-        )
-        .with_file(unit_path.display().to_string())]);
+            ))
+            .with_file(unit_path.display().to_string()),
+        ]);
     };
     let root_id = root_id.clone();
     let included = package.imports.local_closure(std::iter::once(&root_id));
@@ -633,13 +629,13 @@ fn run_package_test_unit_with_options(
     package.roots = vec![root_id.clone()];
 
     let Some(unit) = package.nodes.get(&root_id) else {
-        return Err(vec![radix::module::diagnostics::Diagnostic::error(
-            format!(
+        return Err(vec![
+            radix::module::diagnostics::Diagnostic::error(format!(
                 "test unit was not retained in its local package closure: {}",
                 unit_path.display()
-            ),
-        )
-        .with_file(unit_path.display().to_string())]);
+            ))
+            .with_file(unit_path.display().to_string()),
+        ]);
     };
     let all_cases = inventory_cases(&unit.analysis.hir, &unit.analysis.interner);
     let available = if focused {
@@ -719,13 +715,13 @@ fn run_package_test_unit(
     }
 
     let Some((root_id, _)) = package.node_by_path(unit_path) else {
-        return Err(vec![radix::module::diagnostics::Diagnostic::error(
-            format!(
+        return Err(vec![
+            radix::module::diagnostics::Diagnostic::error(format!(
                 "test unit disappeared during package re-analysis: {}",
                 unit_path.display()
-            ),
-        )
-        .with_file(unit_path.display().to_string())]);
+            ))
+            .with_file(unit_path.display().to_string()),
+        ]);
     };
     let root_id = root_id.clone();
     let included = package.imports.local_closure(std::iter::once(&root_id));
@@ -734,13 +730,13 @@ fn run_package_test_unit(
     package.roots = vec![root_id.clone()];
 
     let Some(unit) = package.nodes.get(&root_id) else {
-        return Err(vec![radix::module::diagnostics::Diagnostic::error(
-            format!(
+        return Err(vec![
+            radix::module::diagnostics::Diagnostic::error(format!(
                 "test unit was not retained in its local package closure: {}",
                 unit_path.display()
-            ),
-        )
-        .with_file(unit_path.display().to_string())]);
+            ))
+            .with_file(unit_path.display().to_string()),
+        ]);
     };
     let all_cases = inventory_cases(&unit.analysis.hir, &unit.analysis.interner);
     if all_cases.is_empty() {

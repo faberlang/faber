@@ -1,7 +1,7 @@
 [package]
 name = "radix-module"
 version = "0.84.0"
-edition = "2021"
+edition = "2024"
 description = "Recursive descent compiler for Faber → Rust/Faber"
 license = "MIT"
 

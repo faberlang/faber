@@ -340,16 +340,18 @@ fn rejects_hir_error_nodes_in_direct_faber_codegen() {
         entry_is_async: false,
     };
 
-    let mut gen = FaberCodegen::default();
+    let mut r#gen = FaberCodegen::default();
     let latin = crate::locale::latin_locale_pack();
     let surface = LocaleKeywordBridge(crate::locale::KeywordSurface::new(&latin));
-    let Err(error) = gen.generate(&program, &super::empty_presentation(), &types, &interner, &surface) else {
+    let Err(error) = r#gen.generate(&program, &super::empty_presentation(), &types, &interner, &surface) else {
         panic!("expected faber codegen error");
     };
-    assert!(error
-        .args
-        .iter()
-        .any(|arg| { arg.name == "issue" && arg.value == "hir_error_expression_reached_codegen" }));
+    assert!(
+        error
+            .args
+            .iter()
+            .any(|arg| { arg.name == "issue" && arg.value == "hir_error_expression_reached_codegen" })
+    );
 }
 
 #[test]

@@ -1,7 +1,7 @@
 //! Canonical Faber source emission for analyzed HIR.
 
 use crate::surface::KeywordSurface;
-use crate::trivia::{write_leading_trivia, TriviaIndex};
+use crate::trivia::{TriviaIndex, write_leading_trivia};
 use radix_codegen_shared::{CodeWriter, CodegenError};
 use radix_diagnostics::DiagnosticArg;
 use radix_hir::{DefId, HirExpressionKind};

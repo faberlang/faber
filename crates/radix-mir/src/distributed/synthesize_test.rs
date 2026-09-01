@@ -12,10 +12,10 @@ use crate::device_program::{
     ObservationCadence, ResultBuffer,
 };
 use crate::distributed::types::{
-    ExecutionOperation, PartitionId, PlanVersion, ResultRef, LOGICAL_PLAN_VERSION,
+    ExecutionOperation, LOGICAL_PLAN_VERSION, PartitionId, PlanVersion, ResultRef,
 };
 use crate::distributed::{
-    encode_logical_plan, DistributedExecutionGraph, DistributedExecutionPlan,
+    DistributedExecutionGraph, DistributedExecutionPlan, encode_logical_plan,
 };
 use crate::kernel_plan::CollectionKernelPlan;
 use crate::layout::MirTensorStorageLayout;

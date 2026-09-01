@@ -7,10 +7,10 @@
 //! cover the returned tensor completely.
 
 use crate::{
-    figura::i64s_from_literal_index, MirAggregateFields, MirAggregateItem, MirAggregateKind,
-    MirCollectionOp, MirConstant, MirFunction, MirIntrinsic, MirLocalId, MirOperand, MirOptionOp,
-    MirPlace, MirPlaceBase, MirRuntimeCall, MirStatementKind, MirTempId, MirTerminatorKind,
-    MirType, MirValueKind,
+    MirAggregateFields, MirAggregateItem, MirAggregateKind, MirCollectionOp, MirConstant,
+    MirFunction, MirIntrinsic, MirLocalId, MirOperand, MirOptionOp, MirPlace, MirPlaceBase,
+    MirRuntimeCall, MirStatementKind, MirTempId, MirTerminatorKind, MirType, MirValueKind,
+    figura::i64s_from_literal_index,
 };
 use radix_types::{Type, TypeTable};
 use rustc_hash::{FxHashMap, FxHashSet};

@@ -2,9 +2,9 @@
 //! Proves: fractus-only registration; typecheck acceptance; emitted Rust
 //! uses `.abs()` + `<=` not a method call.
 
-use super::{lookup_method, lookup_method_for_type, IntrinsicReceiver};
+use super::{IntrinsicReceiver, lookup_method, lookup_method_for_type};
 #[cfg(feature = "hir-rust")]
-use crate::driver::{analyze_source, AnalyzeRequest, Config, Session};
+use crate::driver::{AnalyzeRequest, Config, Session, analyze_source};
 use crate::intrinsics::mir_collection_op;
 use crate::semantic::{Primitive, TypeTable};
 use radix_types::MirCollectionOp;

@@ -8,11 +8,11 @@
 //! `Colon` token as the separator.
 
 use crate::test_support::{
-    assert_parse_error_issue, assert_parse_error_matches, parse_ok, parse_program, symbol_name,
-    ParseExpectation,
+    ParseExpectation, assert_parse_error_issue, assert_parse_error_matches, parse_ok,
+    parse_program, symbol_name,
 };
 use crate::{ParseErrorKind, ParseOptions, Parser};
-use radix_lexer::{lex, Span, Token, TokenKind};
+use radix_lexer::{Span, Token, TokenKind, lex};
 use radix_syntax::{StmtKind, Trivia, TypeExprKind};
 
 /// Owned summary of one parsed schema column, so tests compare content instead

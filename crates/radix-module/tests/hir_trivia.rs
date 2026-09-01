@@ -21,7 +21,7 @@ use radix_module::hir::{
     HirTriviaOwnerKind, LowerError, LoweredProgram,
 };
 use radix_module::lexer::Interner;
-use radix_module::semantic::{passes, Resolver, TypeTable};
+use radix_module::semantic::{Resolver, TypeTable, passes};
 
 // =============================================================================
 // Frontend harness (parse → collect → resolve → lower)

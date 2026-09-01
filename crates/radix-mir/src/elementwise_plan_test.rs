@@ -1,8 +1,8 @@
 //! Design-doc §10 Unit-1 fixtures: a typed plan or a typed barrier reason.
 
 use super::{
-    plan_elementwise, ElementwiseBarrierError, ElementwiseExpr, ElementwiseOp, ElementwisePlan,
-    IndexMapping, ReassociationPolicy,
+    ElementwiseBarrierError, ElementwiseExpr, ElementwiseOp, ElementwisePlan, IndexMapping,
+    ReassociationPolicy, plan_elementwise,
 };
 use crate::{
     MirBlock, MirBlockId, MirCollectionOp, MirConstant, MirFunction, MirFunctionId, MirIntrinsic,

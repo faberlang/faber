@@ -16,7 +16,7 @@
 #[allow(clippy::wildcard_imports)]
 // parent module provides shared imports for lowering
 use super::*;
-use crate::hir::visit::{walk_expr, HirVisitor};
+use crate::hir::visit::{HirVisitor, walk_expr};
 
 const FAILABLE_CALLBACK_MESSAGE: &str = "failable collection callbacks before failable-callable MIR lowering";
 

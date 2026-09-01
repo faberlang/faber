@@ -412,8 +412,8 @@ fn msgpack_decode_rejects_truncated_and_malformed_input() {
 // ── FPF-3: package codec (nested named unit values, OQ-3) ────────────────
 
 use crate::package::{
-    FhirPackage, FhirPackageModule, LibraryImportWire, LocalLinkWire, PackageDependencyWire,
-    PackageIdentityWire, PACKAGE_SCHEMA_VERSION,
+    FhirPackage, FhirPackageModule, LibraryImportWire, LocalLinkWire, PACKAGE_SCHEMA_VERSION,
+    PackageDependencyWire, PackageIdentityWire,
 };
 
 /// One step in a wire-tree walk: a map key or an array index.

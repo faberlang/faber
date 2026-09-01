@@ -291,17 +291,23 @@ fn simple_launch_plan_bind_group_0_non_dynamic_offset_indexes_are_sequential() {
 fn simple_launch_plan_bind_group_0_dynamic_offset_sets_are_empty() {
     let (_types, _ty, _reflection, launch) = setup_simple_kernel_reflection_launch_plan();
     assert_eq!(launch.bind_groups[0].dynamic_offset_count, 0);
-    assert!(launch.bind_groups[0]
-        .dynamic_offset_resource_indexes
-        .is_empty());
+    assert!(
+        launch.bind_groups[0]
+            .dynamic_offset_resource_indexes
+            .is_empty()
+    );
     assert_eq!(launch.bind_groups[0].dynamic_offset_resource_index_count, 0);
-    assert!(launch.bind_groups[0]
-        .dynamic_offset_binding_indexes
-        .is_empty());
+    assert!(
+        launch.bind_groups[0]
+            .dynamic_offset_binding_indexes
+            .is_empty()
+    );
     assert_eq!(launch.bind_groups[0].dynamic_offset_binding_index_count, 0);
-    assert!(launch.bind_groups[0]
-        .dynamic_offset_layout_entry_indexes
-        .is_empty());
+    assert!(
+        launch.bind_groups[0]
+            .dynamic_offset_layout_entry_indexes
+            .is_empty()
+    );
     assert_eq!(launch.bind_groups[0].dynamic_offset_layout_entry_index_count, 0);
 }
 
@@ -643,31 +649,43 @@ fn sparse_launch_plan_bind_groups_non_dynamic_offset_indexes_are_single_entry() 
 fn sparse_launch_plan_bind_groups_dynamic_offset_sets_are_empty() {
     let (_types, launch) = setup_sparse_group_launch_plan();
     assert_eq!(launch.bind_groups[0].dynamic_offset_count, 0);
-    assert!(launch.bind_groups[0]
-        .dynamic_offset_resource_indexes
-        .is_empty());
+    assert!(
+        launch.bind_groups[0]
+            .dynamic_offset_resource_indexes
+            .is_empty()
+    );
     assert_eq!(launch.bind_groups[0].dynamic_offset_resource_index_count, 0);
-    assert!(launch.bind_groups[0]
-        .dynamic_offset_binding_indexes
-        .is_empty());
+    assert!(
+        launch.bind_groups[0]
+            .dynamic_offset_binding_indexes
+            .is_empty()
+    );
     assert_eq!(launch.bind_groups[0].dynamic_offset_binding_index_count, 0);
-    assert!(launch.bind_groups[0]
-        .dynamic_offset_layout_entry_indexes
-        .is_empty());
+    assert!(
+        launch.bind_groups[0]
+            .dynamic_offset_layout_entry_indexes
+            .is_empty()
+    );
     assert_eq!(launch.bind_groups[0].dynamic_offset_layout_entry_index_count, 0);
 
     assert_eq!(launch.bind_groups[1].dynamic_offset_count, 0);
-    assert!(launch.bind_groups[1]
-        .dynamic_offset_resource_indexes
-        .is_empty());
+    assert!(
+        launch.bind_groups[1]
+            .dynamic_offset_resource_indexes
+            .is_empty()
+    );
     assert_eq!(launch.bind_groups[1].dynamic_offset_resource_index_count, 0);
-    assert!(launch.bind_groups[1]
-        .dynamic_offset_binding_indexes
-        .is_empty());
+    assert!(
+        launch.bind_groups[1]
+            .dynamic_offset_binding_indexes
+            .is_empty()
+    );
     assert_eq!(launch.bind_groups[1].dynamic_offset_binding_index_count, 0);
-    assert!(launch.bind_groups[1]
-        .dynamic_offset_layout_entry_indexes
-        .is_empty());
+    assert!(
+        launch.bind_groups[1]
+            .dynamic_offset_layout_entry_indexes
+            .is_empty()
+    );
     assert_eq!(launch.bind_groups[1].dynamic_offset_layout_entry_index_count, 0);
 }
 

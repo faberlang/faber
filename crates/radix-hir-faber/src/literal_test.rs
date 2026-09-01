@@ -26,11 +26,7 @@ impl KeywordSurface for EnglishSurface {
     }
 
     fn contextual_keyword(&self, key: &'static str) -> &str {
-        if key == "nonnumerus" {
-            "nan"
-        } else {
-            key
-        }
+        if key == "nonnumerus" { "nan" } else { key }
     }
 
     fn type_surface(&self, _kind: TypeBindingKind) -> &'static str {

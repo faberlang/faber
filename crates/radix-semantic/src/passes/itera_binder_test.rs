@@ -3,7 +3,7 @@
 //! with ordered ranges/binders and dedicated SEM010 product laws.
 
 use crate::test_support::{self, AnalyzedFixture};
-use radix_hir::visit::{walk_expr, HirVisitor};
+use radix_hir::visit::{HirVisitor, walk_expr};
 use radix_hir::{
     HirBlock, HirExpression, HirExpressionKind, HirItemKind, HirIteraMode, HirLiteral,
     HirStatementKind,

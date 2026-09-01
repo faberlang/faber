@@ -12,10 +12,10 @@
 //! [`crate::kernel_decomposition::decompose_kernel_function`].
 
 use crate::abi::{
-    collection_op_contract, storage_buffer_limit_error, CollectionOpContract, MirAbiError,
-    MirKernelResource, MirKernelResourceAccess, MirKernelResourceKind, MirKernelResourceRole,
-    MirKernelSignature, PackedStorageLayout, StorageBufferLimitRecord,
-    DEFAULT_STORAGE_BUFFER_LIMIT,
+    CollectionOpContract, DEFAULT_STORAGE_BUFFER_LIMIT, MirAbiError, MirKernelResource,
+    MirKernelResourceAccess, MirKernelResourceKind, MirKernelResourceRole, MirKernelSignature,
+    PackedStorageLayout, StorageBufferLimitRecord, collection_op_contract,
+    storage_buffer_limit_error,
 };
 use crate::device_program::{
     Binding, BufferRole, DeviceProgram, DeviceProgramError, DeviceResource, KernelUnit,

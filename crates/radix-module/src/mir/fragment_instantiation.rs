@@ -11,13 +11,13 @@ use crate::diagnostics::DiagnosticArg;
 use crate::hir::DefId;
 use crate::lexer::Span;
 use crate::mir::{
-    type_contains_param, MirCallee, MirDeviceRole, MirFunction, MirFunctionId, MirFunctionOrigin, MirKernelShaderStage,
-    MirLayoutTable, MirMonomorphization, MirOperand, MirParamMode, MirPlace, MirPlaceBase, MirStatementKind,
-    MirTerminatorKind, MirType,
+    MirCallee, MirDeviceRole, MirFunction, MirFunctionId, MirFunctionOrigin, MirKernelShaderStage, MirLayoutTable,
+    MirMonomorphization, MirOperand, MirParamMode, MirPlace, MirPlaceBase, MirStatementKind, MirTerminatorKind,
+    MirType, type_contains_param,
 };
 use crate::semantic::{
-    passes::fragment_definition::{DeviceEffectKind, FragmentEffectTable},
     Primitive, Type, TypeId, TypeTable,
+    passes::fragment_definition::{DeviceEffectKind, FragmentEffectTable},
 };
 use radix_mir::device::MirDeviceFunctionMetadataMap;
 use rustc_hash::FxHashMap;

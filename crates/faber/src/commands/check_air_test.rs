@@ -365,14 +365,18 @@ functio caller(numerus x) → numerus {
         .find(|row| row.name == "caller")
         .expect("caller row");
 
-    assert!(caller
-        .reasons
-        .iter()
-        .any(|reason| reason.rule == "callee-unresolved"));
-    assert!(caller
-        .reasons
-        .iter()
-        .all(|reason| !reason.rule.starts_with("blocked by callee")));
+    assert!(
+        caller
+            .reasons
+            .iter()
+            .any(|reason| reason.rule == "callee-unresolved")
+    );
+    assert!(
+        caller
+            .reasons
+            .iter()
+            .all(|reason| !reason.rule.starts_with("blocked by callee"))
+    );
 }
 
 /// Package-shaped input (directory or manifest) with `--air` prints an

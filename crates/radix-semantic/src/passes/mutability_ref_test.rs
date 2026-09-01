@@ -6,8 +6,8 @@
 
 use crate::test_support::{analyze_ok, assert_rejects_with_issue};
 use crate::{
-    SemanticMutability, Type, ISSUE_ASSIGN_THROUGH_REF, ISSUE_MUTATING_RECEIVER_THROUGH_REF,
-    ISSUE_REF_TO_MUT_OR_OWN_POSITION,
+    ISSUE_ASSIGN_THROUGH_REF, ISSUE_MUTATING_RECEIVER_THROUGH_REF,
+    ISSUE_REF_TO_MUT_OR_OWN_POSITION, SemanticMutability, Type,
 };
 
 #[test]

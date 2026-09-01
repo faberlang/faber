@@ -93,10 +93,12 @@ fn transpose_lexes_as_dedicated_postfix_operator() {
         "U+1D40 must lex cleanly: {:?}",
         result.errors
     );
-    assert!(result
-        .tokens
-        .iter()
-        .any(|token| token.kind == TokenKind::Transpose));
+    assert!(
+        result
+            .tokens
+            .iter()
+            .any(|token| token.kind == TokenKind::Transpose)
+    );
     assert!(!TokenKind::Transpose.is_keyword());
 }
 

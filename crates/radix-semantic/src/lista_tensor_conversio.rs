@@ -7,7 +7,7 @@
 
 use radix_hir::{HirArrayElement, HirExpression, HirExpressionKind};
 
-use super::{i64s_from_literal_index, IndexExpr, IndexId, Primitive, Type, TypeId, TypeTable};
+use super::{IndexExpr, IndexId, Primitive, Type, TypeId, TypeTable, i64s_from_literal_index};
 
 /// Outcome-ladder label when `structa` rejects a flat buffer against the target `Figura`.
 pub const LISTA_TO_TENSOR_STRUCTA_COUNT_MSG: &str =

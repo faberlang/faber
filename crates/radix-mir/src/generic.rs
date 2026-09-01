@@ -13,7 +13,7 @@ use crate::{
 };
 use radix_lexer::{Span, Symbol};
 use radix_types::{
-    i64s_from_literal_index, FuncSig, IndexExpr, IndexId, ParamType, Type, TypeId, TypeTable,
+    FuncSig, IndexExpr, IndexId, ParamType, Type, TypeId, TypeTable, i64s_from_literal_index,
 };
 use rustc_hash::{FxHashMap, FxHashSet, FxHasher};
 use std::hash::{Hash, Hasher};

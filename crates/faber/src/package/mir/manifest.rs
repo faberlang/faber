@@ -39,11 +39,11 @@ pub(super) fn manifest_device_config(
     // use, never treated as "absent".
     let steps = manifest.device.steps;
     if let Some(0) = steps {
-        return Err(vec![crate::package_diagnostic_error(
-            "faber.toml device.steps must be at least 1",
-        )
-        .with_file(layout.manifest_path.display().to_string())
-        .with_arg("issue", "package_device_steps_zero")]);
+        return Err(vec![
+            crate::package_diagnostic_error("faber.toml device.steps must be at least 1")
+                .with_file(layout.manifest_path.display().to_string())
+                .with_arg("issue", "package_device_steps_zero"),
+        ]);
     }
     let declared = !inputs.is_empty() || backend.is_some();
     Ok(DeviceManifestConfig {

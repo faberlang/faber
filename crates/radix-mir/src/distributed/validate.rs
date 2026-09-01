@@ -12,8 +12,8 @@ use crate::device_program::LaunchId;
 use crate::device_semantics::SemanticValueId;
 use crate::distributed::types::{
     BarrierId, CollectiveId, CollectiveKind, CollectiveOperation, DistributedExecutionPlan,
-    ExecutionOperation, LogicalPlacement, PartitionId, PlacementConstraint, PlacementContract,
-    PlanVersion, TransferId, TransferOperation, LOGICAL_PLAN_VERSION,
+    ExecutionOperation, LOGICAL_PLAN_VERSION, LogicalPlacement, PartitionId, PlacementConstraint,
+    PlacementContract, PlanVersion, TransferId, TransferOperation,
 };
 
 // DIAGNOSTICS

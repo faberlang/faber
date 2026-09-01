@@ -3,7 +3,7 @@
 //! modules prefix their routes; diagnostic conversion from lex/parse results
 //! works through the CLI entry point.
 
-use super::{analyze, CliMode, CliType};
+use super::{CliMode, CliType, analyze};
 use crate::diagnostics::DiagnosticConvert;
 use crate::diagnostics::{Diagnostic, DiagnosticArg};
 use crate::lexer::lex;

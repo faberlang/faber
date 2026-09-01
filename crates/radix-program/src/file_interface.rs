@@ -8,12 +8,12 @@
 use radix_module::diagnostics::{Diagnostic, DiagnosticPhase};
 use radix_module::driver::AnalyzedModule;
 use radix_module::file_interface::{
-    snapshot_interface_callable_with_identity, snapshot_interface_type_with_identity, FileExport,
-    FileExportKind, FileInterface, FileInterfaceError, InterfaceAliasExport,
+    FileExport, FileExportKind, FileInterface, FileInterfaceError, InterfaceAliasExport,
     InterfaceAnnotationContract, InterfaceAnnotationContractField, InterfaceBodyChannel,
     InterfaceDeviceContract, InterfaceDeviceRole, InterfaceDeviceVisibility, InterfaceEnumVariant,
     InterfaceGenericParam, InterfaceLibraryIdentity, InterfaceMethodExport, InterfaceNominalExport,
     InterfaceQualifiedIdentity, InterfaceStructExport, InterfaceStructField,
+    snapshot_interface_callable_with_identity, snapshot_interface_type_with_identity,
 };
 use radix_module::hir::{
     DefId, HirConst, HirEnum, HirFunction, HirInterface, HirInterfaceMethod, HirItemKind,

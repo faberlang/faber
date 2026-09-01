@@ -14,11 +14,11 @@ use std::collections::BTreeMap;
 
 use crate::test_support;
 
+use crate::Primitive;
 use crate::file_interface::{
     FileExport, FileExportKind, FileInterface, InterfaceEnumVariant, InterfaceNominalExport,
     InterfaceStructField, InterfaceTypeSnapshot,
 };
-use crate::Primitive;
 
 // ---------------------------------------------------------------------------
 // Probe P1: same-module union match, named arms + payload bindings
@@ -506,9 +506,9 @@ incipit {
 }"#,
     );
     assert!(
-        diagnostics
-            .iter()
-            .any(|d| d.is_error() && crate::semantic_spec(d.kind).code == "SEM001" && d.issue() == Some("unknown_variant")),
+        diagnostics.iter().any(|d| d.is_error()
+            && crate::semantic_spec(d.kind).code == "SEM001"
+            && d.issue() == Some("unknown_variant")),
         "expected resolve-stage unknown_variant (SEM001) for an elige casu with a non-namespace prefix, got: {diagnostics:?}"
     );
 }

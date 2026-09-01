@@ -36,7 +36,7 @@ use std::fs;
 use std::path::Path;
 
 #[cfg(feature = "runner")]
-use radix::program::mir::{mir_diag, DeviceSelection};
+use radix::program::mir::{DeviceSelection, mir_diag};
 
 // Faber's fmir-bin runner writer is the seam body radix-program's binary
 // bundle builder receives (`MirSeams::bin_runner_writer`).
@@ -176,15 +176,17 @@ fn device_section_builder(
                     if produced.contains(&program_name.buffer.name) {
                         continue;
                     }
-                    return Err(vec![mir_issue_diag(
-                        diagnostic_path,
-                        "package_device_input_missing",
-                        format!(
-                            "[device] inputs has no value for kernel `{}` input buffer `{}`",
-                            kernel.entry, program_name.buffer.name
-                        ),
-                    )
-                    .with_arg("buffer", program_name.buffer.name.clone())]);
+                    return Err(vec![
+                        mir_issue_diag(
+                            diagnostic_path,
+                            "package_device_input_missing",
+                            format!(
+                                "[device] inputs has no value for kernel `{}` input buffer `{}`",
+                                kernel.entry, program_name.buffer.name
+                            ),
+                        )
+                        .with_arg("buffer", program_name.buffer.name.clone()),
+                    ]);
                 }
             }
         }

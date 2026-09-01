@@ -4,10 +4,10 @@
 //! reduce boilerplate in parser test modules. No test logic lives here — only reusable
 //! assertions and parsing wrappers.
 
-use super::{parse, ParseError, ParseErrorKind, ParseResult};
+use super::{ParseError, ParseErrorKind, ParseResult, parse};
 use radix_diagnostics::DiagnosticArg;
 use radix_lexer::Span;
-use radix_lexer::{lex, Symbol};
+use radix_lexer::{Symbol, lex};
 
 /// Byte span covering `start..end` in hand-built fixtures.
 #[must_use]

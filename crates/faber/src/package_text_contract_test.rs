@@ -101,11 +101,12 @@ fn assert_single_locale_lex004(locale: &str) {
         config_with_locale(Target::HirRust, &fault, Some(locale), None).expect("reader config");
     let pack = pack.expect("reader pack");
     assert_eq!(pack.metadata.id.as_str(), locale);
-    assert!(pack
-        .diagnostics
-        .get("LEX004")
-        .and_then(|template| template.issues.get("unexpected_character"))
-        .is_some());
+    assert!(
+        pack.diagnostics
+            .get("LEX004")
+            .and_then(|template| template.issues.get("unexpected_character"))
+            .is_some()
+    );
 
     let diagnostics = check_with_faber_seams(&config, &fault);
     let lex004: Vec<_> = diagnostics
@@ -120,10 +121,11 @@ fn assert_single_locale_lex004(locale: &str) {
     );
     for diag in unexpected_character {
         assert!(diag.args.iter().any(|arg| arg.name == "char"));
-        assert!(pack
-            .render_diagnostic_text(diag)
-            .expect("LEX004 template should render")
-            .is_some());
+        assert!(
+            pack.render_diagnostic_text(diag)
+                .expect("LEX004 template should render")
+                .is_some()
+        );
         assert_plain_render_contract(
             &render_plain(diag, &pack),
             "error[LEX004:unexpected_character]",
@@ -169,11 +171,12 @@ fn package_render_preserves_bidi_for_arabic_sem010() {
     let (config, pack) =
         config_with_locale(Target::HirRust, &fault, Some("ar"), None).expect("reader config");
     let pack = pack.expect("reader pack");
-    assert!(pack
-        .diagnostics
-        .get("SEM010")
-        .and_then(|template| template.issues.get(ISSUE_INITIALIZER_ANNOTATION_MISMATCH))
-        .is_some());
+    assert!(
+        pack.diagnostics
+            .get("SEM010")
+            .and_then(|template| template.issues.get(ISSUE_INITIALIZER_ANNOTATION_MISMATCH))
+            .is_some()
+    );
 
     let diagnostics = check_with_faber_seams(&config, &fault);
     let sem010: Vec<_> = diagnostics
@@ -271,10 +274,11 @@ fn assert_single_locale_sem010_or_sem001(locale: &str, fault_rel: &str) {
             "missing initializer_annotation_mismatch fact for {locale}: {sem010:?}"
         );
         for diag in issue_sem010 {
-            assert!(pack
-                .render_diagnostic_text(diag)
-                .expect("SEM010 template should render")
-                .is_some());
+            assert!(
+                pack.render_diagnostic_text(diag)
+                    .expect("SEM010 template should render")
+                    .is_some()
+            );
             assert_plain_render_contract(
                 &render_plain(diag, &pack),
                 "error[SEM010:initializer_annotation_mismatch]",
@@ -295,10 +299,11 @@ fn assert_single_locale_sem010_or_sem001(locale: &str, fault_rel: &str) {
             "missing unknown_identifier fact for {locale}: {sem001:?}"
         );
         for diag in unknown_id {
-            assert!(pack
-                .render_diagnostic_text(diag)
-                .expect("SEM001 template should render")
-                .is_some());
+            assert!(
+                pack.render_diagnostic_text(diag)
+                    .expect("SEM001 template should render")
+                    .is_some()
+            );
             assert_plain_render_contract(
                 &render_plain(diag, &pack),
                 "error[SEM001:unknown_identifier]",
@@ -332,10 +337,11 @@ fn assert_single_locale_sem010_or_sem001_renders(locale: &str, fault_rel: &str) 
             "missing initializer_annotation_mismatch fact for {locale}: {sem010:?}"
         );
         for diag in issue_sem010 {
-            assert!(pack
-                .render_diagnostic_text(diag)
-                .expect("SEM010 template should render")
-                .is_some());
+            assert!(
+                pack.render_diagnostic_text(diag)
+                    .expect("SEM010 template should render")
+                    .is_some()
+            );
             assert_plain_render_contract(
                 &render_plain(diag, &pack),
                 "error[SEM010:initializer_annotation_mismatch]",
@@ -358,10 +364,11 @@ fn assert_single_locale_sem010_or_sem001_renders(locale: &str, fault_rel: &str) 
         "missing unknown_identifier fact for {locale}: {sem001:?}"
     );
     for diag in unknown_id {
-        assert!(pack
-            .render_diagnostic_text(diag)
-            .expect("SEM001 template should render")
-            .is_some());
+        assert!(
+            pack.render_diagnostic_text(diag)
+                .expect("SEM001 template should render")
+                .is_some()
+        );
         assert_plain_render_contract(
             &render_plain(diag, &pack),
             "error[SEM001:unknown_identifier]",
@@ -426,10 +433,11 @@ fn assert_single_locale_sem001_or_reader001(locale: &str, fault_rel: &str) {
         "missing SEM001 unknown_identifier fact for {locale}: {sem001:?}"
     );
     for diag in unknown_identifier {
-        assert!(pack
-            .render_diagnostic_text(diag)
-            .expect("SEM001 template should render")
-            .is_some());
+        assert!(
+            pack.render_diagnostic_text(diag)
+                .expect("SEM001 template should render")
+                .is_some()
+        );
         assert_plain_render_contract(
             &render_plain(diag, &pack),
             "error[SEM001:unknown_identifier]",
@@ -469,10 +477,12 @@ fn package_render_emits_sem001_suggestion_for_vietnamese_name() {
                 .any(|arg| arg.name == "suggestion" && arg.value == "bắt_đầu")
         })
         .expect("LOCALE002 suggestion diagnostic");
-    assert!(suggestion
-        .args
-        .iter()
-        .any(|arg| arg.name == "spelling" && arg.value == "bắtđầu"));
+    assert!(
+        suggestion
+            .args
+            .iter()
+            .any(|arg| arg.name == "spelling" && arg.value == "bắtđầu")
+    );
 
     assert_plain_render_contract(&render_plain(suggestion, &pack), "warning[LOCALE002");
 }
@@ -501,14 +511,18 @@ fn package_render_emits_reader002_accented_keyword_suggestion() {
 
     let suggestion = reader002[0];
     assert!(!suggestion.is_error());
-    assert!(suggestion
-        .args
-        .iter()
-        .any(|arg| arg.name == "spelling" && arg.value == "ham"));
-    assert!(suggestion
-        .args
-        .iter()
-        .any(|arg| arg.name == "suggestion" && arg.value == "hàm"));
+    assert!(
+        suggestion
+            .args
+            .iter()
+            .any(|arg| arg.name == "spelling" && arg.value == "ham")
+    );
+    assert!(
+        suggestion
+            .args
+            .iter()
+            .any(|arg| arg.name == "suggestion" && arg.value == "hàm")
+    );
 
     assert_plain_render_contract(&render_plain(suggestion, &pack), "warning[LOCALE002]");
 }
@@ -537,14 +551,18 @@ fn package_render_emits_reader002_typo_keyword_suggestion() {
 
     let suggestion = reader002[0];
     assert!(!suggestion.is_error());
-    assert!(suggestion
-        .args
-        .iter()
-        .any(|arg| arg.name == "spelling" && arg.value == "hamm"));
-    assert!(suggestion
-        .args
-        .iter()
-        .any(|arg| arg.name == "suggestion" && arg.value == "hàm"));
+    assert!(
+        suggestion
+            .args
+            .iter()
+            .any(|arg| arg.name == "spelling" && arg.value == "hamm")
+    );
+    assert!(
+        suggestion
+            .args
+            .iter()
+            .any(|arg| arg.name == "suggestion" && arg.value == "hàm")
+    );
 
     assert_plain_render_contract(&render_plain(suggestion, &pack), "warning[LOCALE002]");
 }

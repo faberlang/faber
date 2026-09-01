@@ -396,7 +396,10 @@ impl fmt::Display for FmirImageError {
             Self::DistributedSectionEquivalenceMismatch { detail } => {
                 write!(f, "distributed plan mismatch: {detail}")
             }
-            Self::DistributedSectionHashMismatch { expected, recomputed } => {
+            Self::DistributedSectionHashMismatch {
+                expected,
+                recomputed,
+            } => {
                 write!(
                     f,
                     "distributed-section logical-plan hash {expected} does not match the delivered plan (recomputed {recomputed})"

@@ -1,7 +1,7 @@
 [package]
 name = "radix-parser"
 version = "0.84.0"
-edition = "2021"
+edition = "2024"
 description = "Recursive-descent parser for Faber source"
 license = "MIT"
 publish = false

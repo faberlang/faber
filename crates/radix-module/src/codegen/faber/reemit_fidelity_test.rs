@@ -6,12 +6,12 @@
 //! idempotence (re-emitting the emitted source is byte-identical).
 
 use super::compile::reemit_faber;
-use crate::driver::{analyze_source, AnalyzeRequest, Config, ModuleImportContract, Session};
+use crate::Target;
+use crate::driver::{AnalyzeRequest, Config, ModuleImportContract, Session, analyze_source};
 use crate::file_interface::{FileExport, FileExportKind, FileInterface, InterfaceEnumVariant, InterfaceNominalExport};
 use crate::import_resolve::library_home_test_support;
 use crate::program::compile::prepare_program_module_for_name;
 use crate::semantic::passes::visibility_annotation::VisibilityTier;
-use crate::Target;
 use std::collections::BTreeMap;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -441,7 +441,11 @@ fn nondum_availability_projects_through_en_pack() {
     let session = Session::new(Config::default().with_locale_pack(pack));
     let result = reemit_faber(
         &session,
-        session.config.locale_pack.as_ref().expect("emission locale pack"),
+        session
+            .config
+            .locale_pack
+            .as_ref()
+            .expect("emission locale pack"),
         "nondum.fab",
         "interface tempus {\n  @ unstable { target = rs, ratio = \"not implemented\" }\n  fn siste(int handle) → void\n}\n",
     );
@@ -578,7 +582,11 @@ fn authored_elige_vocabulary_round_trips() {
     let session = Session::new(Config::default().with_locale_pack(pack));
     let result = reemit_faber(
         &session,
-        session.config.locale_pack.as_ref().expect("emission locale pack"),
+        session
+            .config
+            .locale_pack
+            .as_ref()
+            .expect("emission locale pack"),
         "switch-en.fab",
         "union Mode {\n    Small,\n    Big\n}\n\nfn name(Mode m) → string {\n    switch m {\n        case Small {\n            return \"small\"\n        }\n        default {\n            return \"big\"\n        }\n    }\n}\n",
     );

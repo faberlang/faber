@@ -73,16 +73,14 @@ pub mod matrix_shape;
 pub mod vector_width;
 
 pub use abi::{
-    collection_op_workgroup_count, rank_extension_broadcast_fact, reject_kernel_matrix_abi,
-    validate_varying_consistency, MirAbiError, MirBroadcastDeclaration, MirColorTargetFormat,
-    MirDepthCompareFunction, MirDepthStencilState, MirFragmentOutputReflection, MirFunctionAbi,
-    MirFunctionAbiParam, MirGpuReflection, MirGraphicsPipelineReflection, MirInputStepMode,
-    MirKernelBufferBindingKind, MirKernelBuiltinInput, MirKernelBuiltinInputReflection,
-    MirKernelBuiltinUsage, MirKernelDispatchSize, MirKernelLaunchBindGroup,
-    MirKernelLaunchBindGroupLayoutEntry, MirKernelLaunchBinding,
-    MirKernelLaunchPipelineBindGroupLayout, MirKernelLaunchPipelineLayout, MirKernelLaunchPlan,
-    MirKernelOffsetMode, MirKernelProvenance, MirKernelReflection, MirKernelResource,
-    MirKernelResourceAccess, MirKernelResourceKind, MirKernelResourceReflection,
+    MirAbiError, MirBroadcastDeclaration, MirColorTargetFormat, MirDepthCompareFunction,
+    MirDepthStencilState, MirFragmentOutputReflection, MirFunctionAbi, MirFunctionAbiParam,
+    MirGpuReflection, MirGraphicsPipelineReflection, MirInputStepMode, MirKernelBufferBindingKind,
+    MirKernelBuiltinInput, MirKernelBuiltinInputReflection, MirKernelBuiltinUsage,
+    MirKernelDispatchSize, MirKernelLaunchBindGroup, MirKernelLaunchBindGroupLayoutEntry,
+    MirKernelLaunchBinding, MirKernelLaunchPipelineBindGroupLayout, MirKernelLaunchPipelineLayout,
+    MirKernelLaunchPlan, MirKernelOffsetMode, MirKernelProvenance, MirKernelReflection,
+    MirKernelResource, MirKernelResourceAccess, MirKernelResourceKind, MirKernelResourceReflection,
     MirKernelResourceRole, MirKernelShaderAccess, MirKernelShaderStage, MirKernelSignature,
     MirKernelWorkgroupCount, MirPrimitiveTopology, MirRankExtensionBroadcast, MirRuntimeAbi,
     MirRuntimeAbiFamily, MirRuntimeAbiKind, MirStencilFaceState, MirStencilOp,
@@ -91,27 +89,28 @@ pub use abi::{
     MirWebGpuBindGroupLayoutDescriptor, MirWebGpuBindGroupLayoutEntryDescriptor,
     MirWebGpuDispatchWorkgroups, MirWebGpuLaunchAdapter, MirWebGpuPipelineLayoutDescriptor,
     MirWebGpuVertexAttributeDescriptor, MirWebGpuVertexBufferLayoutDescriptor,
-    MirWebGpuVertexStepMode, MirWorkgroupSize,
+    MirWebGpuVertexStepMode, MirWorkgroupSize, collection_op_workgroup_count,
+    rank_extension_broadcast_fact, reject_kernel_matrix_abi, validate_varying_consistency,
 };
 pub use ai_workbench_stage5::{
-    ai_workbench_stage5_native_status, ai_workbench_stage5_rows, AiWorkbenchStage5Facet,
-    AiWorkbenchStage5Row, AiWorkbenchStage5Status,
+    AiWorkbenchStage5Facet, AiWorkbenchStage5Row, AiWorkbenchStage5Status,
+    ai_workbench_stage5_native_status, ai_workbench_stage5_rows,
 };
 pub use boundary_abi::{
-    validate_boundary_abi, BoundaryAbiError, BoundaryAbiKind, BoundaryCall, PreparedRegion,
-    HOST_CALL_ABI_VERSION,
+    BoundaryAbiError, BoundaryAbiKind, BoundaryCall, HOST_CALL_ABI_VERSION, PreparedRegion,
+    validate_boundary_abi,
 };
 pub use cost_analysis::{
-    amplify_class, basis_tag, classify_conversion, conversion_family, cost_rollups, cost_sites,
-    foldable_tag, uncosted_tag, CostBasisRow, CostClass, CostFamily, CostFunctionRollup, CostSite,
-    CostSiteKind, CostTag, COST_BASIS,
+    COST_BASIS, CostBasisRow, CostClass, CostFamily, CostFunctionRollup, CostSite, CostSiteKind,
+    CostTag, amplify_class, basis_tag, classify_conversion, conversion_family, cost_rollups,
+    cost_sites, foldable_tag, uncosted_tag,
 };
 // Vocabulary moved down to radix-types (feature-granularity §2); re-exported
 pub use device::{
-    classify_device_safe, classify_device_safe_for_target_entry, device_entry_roles_from_hir,
-    device_roles_from_hir, first_surviving_fragment_call, reject_nucleum_fragment_survivors,
-    surviving_nucleum_fragments, FragmentSurvivor, FragmentSurvivorKind, MirDeviceContext,
-    MirDeviceRole, NUCLEUM_FRAGMENT_SURVIVED,
+    FragmentSurvivor, FragmentSurvivorKind, MirDeviceContext, MirDeviceRole,
+    NUCLEUM_FRAGMENT_SURVIVED, classify_device_safe, classify_device_safe_for_target_entry,
+    device_entry_roles_from_hir, device_roles_from_hir, first_surviving_fragment_call,
+    reject_nucleum_fragment_survivors, surviving_nucleum_fragments,
 };
 pub use device_program::{
     Binding, BufferId, BufferIdentity, BufferLifetime, BufferRegistry, BufferRole, BufferVersion,
@@ -120,49 +119,50 @@ pub use device_program::{
     RegistryVersion, ResultBuffer,
 };
 pub use device_program_plans::{
-    carried_plan_agrees, composed_matmul_plan_for_function, composed_matmul_signature_for_emission,
+    BackendRequirement, BindDescriptor, BindLayout, DECODE_GEMV_SELECTION_ENABLED,
+    DECODE_GEMV_UNIFORM, ExecutorPlanExtension, KernelLaunchDescriptor, LaunchBufferSlot,
+    LibraryBind, LibrarySelection, LogicalSignature, OffsetBinding, PACKED_BLOCK_BYTES_UNIFORM,
+    PACKED_BLOCK_ELEMENTS_UNIFORM, PACKED_BYTES_UNIFORM, PACKED_LAYOUT_GGML_TYPE_ID_UNIFORM,
+    PlanMappingError, PlanProvenance, QUANTIZED_GEMM_ENTRY, QUANTIZED_GEMV_ENTRY, RecipeKind,
+    UniformBinding, UniformType, WorkspaceBinding, carried_plan_agrees,
+    composed_matmul_plan_for_function, composed_matmul_signature_for_emission,
     executor_plan_extension, kernel_plan_for_function, launch_descriptors, plan_for_collection_op,
-    subchain_signature_for_emission, BackendRequirement, BindDescriptor, BindLayout,
-    ExecutorPlanExtension, KernelLaunchDescriptor, LaunchBufferSlot, LibraryBind, LibrarySelection,
-    LogicalSignature, OffsetBinding, PlanMappingError, PlanProvenance, RecipeKind, UniformBinding,
-    UniformType, WorkspaceBinding, DECODE_GEMV_SELECTION_ENABLED, DECODE_GEMV_UNIFORM,
-    PACKED_BLOCK_BYTES_UNIFORM, PACKED_BLOCK_ELEMENTS_UNIFORM, PACKED_BYTES_UNIFORM,
-    PACKED_LAYOUT_GGML_TYPE_ID_UNIFORM, QUANTIZED_GEMM_ENTRY, QUANTIZED_GEMV_ENTRY,
+    subchain_signature_for_emission,
 };
 pub use dump::dump_program;
 pub use elementwise_plan::{
-    elementwise_plan_summary, plan_elementwise, ConcreteTensorShape, ElementwiseBarrierError,
-    ElementwiseExpr, ElementwiseInput, ElementwiseOp, ElementwiseOutput, ElementwisePlan,
-    IndexMapping, NumericalPolicy, ReassociationPolicy, SourceSpanFact,
+    ConcreteTensorShape, ElementwiseBarrierError, ElementwiseExpr, ElementwiseInput, ElementwiseOp,
+    ElementwiseOutput, ElementwisePlan, IndexMapping, NumericalPolicy, ReassociationPolicy,
+    SourceSpanFact, elementwise_plan_summary, plan_elementwise,
 };
 pub use generic::{
-    bind_generic_type_witness, fold_shape_size_constant, function_contains_shape_size,
-    instantiate_existing_generic_type, rewrite_function_constants, substitute_shape_size_constants,
-    type_contains_param, MirGenericBindings,
+    MirGenericBindings, bind_generic_type_witness, fold_shape_size_constant,
+    function_contains_shape_size, instantiate_existing_generic_type, rewrite_function_constants,
+    substitute_shape_size_constants, type_contains_param,
 };
 pub use host_partition::{
-    derive_host_partition, derive_partition_record_with_metadata, kernel_entry_name, HostPartition,
-    HostPartitionError,
+    HostPartition, HostPartitionError, derive_host_partition,
+    derive_partition_record_with_metadata, kernel_entry_name,
 };
 pub use inference_blocker_matrix::{
-    inference_blocker_rows, inference_non_claims, InferenceBlockerKind, InferenceBlockerRow,
-    InferenceBlockerStatus, InferenceNonClaim, InferenceNonClaimKind,
+    InferenceBlockerKind, InferenceBlockerRow, InferenceBlockerStatus, InferenceNonClaim,
+    InferenceNonClaimKind, inference_blocker_rows, inference_non_claims,
 };
 pub use kernel_decomposition::{
-    decompose_kernel_function, decompose_kernel_function_with_limit, KernelDecomposition,
-    KernelSubchain,
+    KernelDecomposition, KernelSubchain, decompose_kernel_function,
+    decompose_kernel_function_with_limit,
 };
 pub use kernel_plan::{
-    admit_quantized_gather, admit_quantized_matmul, causal_softmax_row_reduction_admission,
-    rmsnorm_row_reduction_admission, simdgroup_matmul_admission, BarrierPhase, BarrierPoint,
-    CollectionKernelPlan, ComposedMatMulEdge, ComposedMatMulHandoff, ComposedMatMulPlan,
-    ComposedMatMulStage, ComposedMatMulStageKind, ComposedMatMulStageOutput, GroupedMatMulPlan,
-    MatMulPlan, MatMulShapes, OobPaddingPolicy, PackedAdmissionError, PackedDequantError,
-    PackedDequantKind, PackedDequantResolution, PlanValidationError, QuantizedGatherPlan,
-    QuantizedMatMulPlan, ReduceOp, ReductionPlan, RowReductionFacts, SharedMemoryLayout,
-    SimdgroupMatMulFacts, SsmConv1dPlan, SsmScanPlan, TransposePlan, ROW_REDUCTION_WORKGROUP_X,
-    SIMDGROUP_MATMUL_MAX_N, SIMDGROUP_MATMUL_PARTIAL_SLOTS, SIMDGROUP_MATMUL_STAGING_SLOTS,
-    TRANSPOSE_WORKGROUP_X,
+    BarrierPhase, BarrierPoint, CollectionKernelPlan, ComposedMatMulEdge, ComposedMatMulHandoff,
+    ComposedMatMulPlan, ComposedMatMulStage, ComposedMatMulStageKind, ComposedMatMulStageOutput,
+    GroupedMatMulPlan, MatMulPlan, MatMulShapes, OobPaddingPolicy, PackedAdmissionError,
+    PackedDequantError, PackedDequantKind, PackedDequantResolution, PlanValidationError,
+    QuantizedGatherPlan, QuantizedMatMulPlan, ROW_REDUCTION_WORKGROUP_X, ReduceOp, ReductionPlan,
+    RowReductionFacts, SIMDGROUP_MATMUL_MAX_N, SIMDGROUP_MATMUL_PARTIAL_SLOTS,
+    SIMDGROUP_MATMUL_STAGING_SLOTS, SharedMemoryLayout, SimdgroupMatMulFacts, SsmConv1dPlan,
+    SsmScanPlan, TRANSPOSE_WORKGROUP_X, TransposePlan, admit_quantized_gather,
+    admit_quantized_matmul, causal_softmax_row_reduction_admission,
+    rmsnorm_row_reduction_admission, simdgroup_matmul_admission,
 };
 pub use layout::{
     MirAggregateCarrier, MirAggregateFamily, MirAggregateLayout, MirAtomicLayout,
@@ -172,9 +172,9 @@ pub use layout::{
     MirTensorStrideLayout, MirTensorViewLayout,
 };
 pub use names::{
-    ascii_literal_identity, external_function_import_name, octeti_literal_identity,
+    MirNames, ascii_literal_identity, external_function_import_name, octeti_literal_identity,
     regex_flags_literal_identity, regex_literal_flags_suffix, regex_pattern_literal_identity,
-    text_literal_identity, MirNames,
+    text_literal_identity,
 };
 pub use nodes::*;
 pub use radix_types::{
@@ -182,58 +182,57 @@ pub use radix_types::{
     MirKernelBuiltin,
 };
 pub use rank2_reduction_readiness::{
-    rank2_reduction_readiness_rows, Rank2ReductionReadinessPath, Rank2ReductionReadinessRow,
-    Rank2ReductionReadinessStatus,
+    Rank2ReductionReadinessPath, Rank2ReductionReadinessRow, Rank2ReductionReadinessStatus,
+    rank2_reduction_readiness_rows,
 };
 pub use shader_contract::{
-    color_target_format_from_code, depth_compare_function_from_code,
-    fragment_entry_from_shader_contract, fragment_output_reflection_from_shader_contract,
-    graphics_pipeline_from_shader_contract, input_step_mode_from_code,
-    primitive_topology_from_code, resource_access_from_code, resource_kind_from_code,
-    resource_reflection_from_shader_contract, resource_role_from_code,
+    ContractProvenance, ShaderFragmentOutput, ShaderPipelineState, ShaderResourceBinding,
+    ShaderStageIoRole, ShaderVarying, ShaderVertexAttribute, color_target_format_from_code,
+    depth_compare_function_from_code, fragment_entry_from_shader_contract,
+    fragment_output_reflection_from_shader_contract, graphics_pipeline_from_shader_contract,
+    input_step_mode_from_code, primitive_topology_from_code, resource_access_from_code,
+    resource_kind_from_code, resource_reflection_from_shader_contract, resource_role_from_code,
     source_fragment_entry_from_shader_contract, source_vertex_entry_from_shader_contract,
     stage_io_role_from_code, varying_interpolation_from_code,
     varying_reflection_from_shader_contract, vertex_entry_from_shader_contract,
-    vertex_format_from_code, vertex_input_reflection_from_shader_contract, ContractProvenance,
-    ShaderFragmentOutput, ShaderPipelineState, ShaderResourceBinding, ShaderStageIoRole,
-    ShaderVarying, ShaderVertexAttribute,
+    vertex_format_from_code, vertex_input_reflection_from_shader_contract,
 };
 pub use static_shape_fold::{
-    admit_device_shape_materialization, fold_static_shapes, fold_validated_device_program,
     FoldedShapeFact, ShapeFactSource, ShapeFoldError, ShapeFoldKind, ShapeFoldOutcome,
-    ShapeFoldReport, ShapeFoldedAdmission,
+    ShapeFoldReport, ShapeFoldedAdmission, admit_device_shape_materialization, fold_static_shapes,
+    fold_validated_device_program,
 };
 pub use tensor_operation_floor::{
-    required_tensor_operation_floor_families, tensor_operation_floor_rows,
     TensorOperationFloorFamily, TensorOperationFloorRow, TensorOperationFloorStatus,
-    TensorOperationFloorTarget,
+    TensorOperationFloorTarget, required_tensor_operation_floor_families,
+    tensor_operation_floor_rows,
 };
 pub use tensor_operation_parity::{
-    indexed_access_parity, TensorOperationFamily, TensorOperationParityRow, TensorParityStatus,
-    TensorParityTarget,
+    TensorOperationFamily, TensorOperationParityRow, TensorParityStatus, TensorParityTarget,
+    indexed_access_parity,
 };
 pub use tensor_placement::{
-    tensor_placement_operations, tensor_placement_policy_rows, TensorPlacementFacet,
-    TensorPlacementOperation, TensorPlacementPolicyRow, TensorPlacementStatus,
+    TensorPlacementFacet, TensorPlacementOperation, TensorPlacementPolicyRow,
+    TensorPlacementStatus, tensor_placement_operations, tensor_placement_policy_rows,
 };
 pub use tensor_runtime_abi::{
-    tensor_runtime_abi_rows, TensorRuntimeAbiFacet, TensorRuntimeAbiRow, TensorRuntimeAbiStatus,
-    TensorRuntimeAbiTarget,
+    TensorRuntimeAbiFacet, TensorRuntimeAbiRow, TensorRuntimeAbiStatus, TensorRuntimeAbiTarget,
+    tensor_runtime_abi_rows,
 };
 pub use tensor_systems_target::{
-    selected_tensor_systems_family, tensor_systems_target_rows, TensorSystemsTarget,
-    TensorSystemsTargetLayout, TensorSystemsTargetRank, TensorSystemsTargetRow,
-    TensorSystemsTargetStatus,
+    TensorSystemsTarget, TensorSystemsTargetLayout, TensorSystemsTargetRank,
+    TensorSystemsTargetRow, TensorSystemsTargetStatus, selected_tensor_systems_family,
+    tensor_systems_target_rows,
 };
 pub use ty::{
-    constant_ty, index_projection_result_ty, option_chain_base_ty, option_payload_ty,
-    place_base_ty, MirTypeError, MirTypeLookup,
+    MirTypeError, MirTypeLookup, constant_ty, index_projection_result_ty, option_chain_base_ty,
+    option_payload_ty, place_base_ty,
 };
 pub use validate::{
-    validate_program, validate_program_with_device_roles, MirEnumRepresentation,
-    MirFunctionSignature, MirParamSignature, MirScalarValueDomain, MirValidationContext,
-    MirValidationError, ValidatedMir, INTEGER_PAYLOAD_I64_SENTINEL, INTEGER_PAYLOAD_U64_SENTINEL,
-    INTEGER_PAYLOAD_U8_SENTINEL,
+    INTEGER_PAYLOAD_I64_SENTINEL, INTEGER_PAYLOAD_U8_SENTINEL, INTEGER_PAYLOAD_U64_SENTINEL,
+    MirEnumRepresentation, MirFunctionSignature, MirParamSignature, MirScalarValueDomain,
+    MirValidationContext, MirValidationError, ValidatedMir, validate_program,
+    validate_program_with_device_roles,
 };
 pub use visit::{
     terminator_successors, walk_operand, walk_place, walk_stmt, walk_terminator, walk_value,

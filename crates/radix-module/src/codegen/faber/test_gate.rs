@@ -155,8 +155,8 @@ pub fn assert_canonical_reparses_with_session(session: &Session, code: &str, lab
 /// selected by the frontmatter locale, pinned into the session so both
 /// idempotency passes lex the same surface.
 fn source_locale_session(name: &str, source: &str) -> Result<Session, String> {
-    use crate::driver::peel_raw_source;
     use crate::driver::Config;
+    use crate::driver::peel_raw_source;
 
     let base = Session::new(Config::default().with_dev_stdlib());
     let peeled = peel_raw_source(name, source).map_err(|error| error.to_string())?;

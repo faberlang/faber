@@ -22,9 +22,9 @@ use radix_module::diagnostics::Diagnostic;
 use serde::Serialize;
 
 use crate::analyze::AnalyzedProgram;
-use crate::discovery::{sanitize_crate_name, PackageSpec};
-use crate::lockfile::{lock_index, read_lock, LockedPackage};
-use crate::manifest::{read_manifest, FaberManifest};
+use crate::discovery::{PackageSpec, sanitize_crate_name};
+use crate::lockfile::{LockedPackage, lock_index, read_lock};
+use crate::manifest::{FaberManifest, read_manifest};
 
 /// Qualified package identity (provider/package name + version when known).
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize)]
@@ -302,11 +302,13 @@ pub fn native_library_deps(
     let lock = match read_lock(package_root) {
         Ok(Some(lock)) => lock,
         Ok(None) => {
-            return Err(vec![crate::package_diagnostic_error(format!(
-                "faber.toml declares dependencies but {} is missing",
-                package_root.join(crate::lockfile::LOCK_FILE).display()
-            ))
-            .with_arg("issue", "missing_faber_lock")]);
+            return Err(vec![
+                crate::package_diagnostic_error(format!(
+                    "faber.toml declares dependencies but {} is missing",
+                    package_root.join(crate::lockfile::LOCK_FILE).display()
+                ))
+                .with_arg("issue", "missing_faber_lock"),
+            ]);
         }
         Err(diag) => return Err(vec![*diag]),
     };

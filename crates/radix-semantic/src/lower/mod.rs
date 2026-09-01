@@ -1046,30 +1046,40 @@ fn lowering_issue_args_from_message(message: &str) -> Vec<DiagnosticArg> {
         "f16, f32, f64, and bf16 are fractus widths; use fractus<f16>, fractus<f32>, fractus<f64>, or fractus<bf16>" => {
             issue_args("float_width_on_numerus")
         }
-        "integer width markers are numerus widths; use numerus<…>" => issue_args("integer_width_on_fractus"),
+        "integer width markers are numerus widths; use numerus<…>" => {
+            issue_args("integer_width_on_fractus")
+        }
         "numerus accepts at most one width marker" => issue_args("numerus_width_params"),
         "fractus accepts at most one width marker" => issue_args("fractus_width_params"),
         "primitive accepts at most one width marker" => issue_args("primitive_width_params"),
         "unknown width marker for numerus" => issue_args("invalid_numerus_width_marker"),
         "fractus accepts only f16, f32, f64, or bf16" => issue_args("invalid_fractus_width_marker"),
         "unknown width marker for this family" => issue_args("invalid_width_marker"),
-        "instans accepts only ms, us, or ns as a precision marker" => issue_args("invalid_precision_marker"),
+        "instans accepts only ms, us, or ns as a precision marker" => {
+            issue_args("invalid_precision_marker")
+        }
         "instans accepts at most one precision marker" => issue_args("instans_precision_params"),
         "modulus requires exactly one unsigned width marker; use modulus<u8>, modulus<u16>, modulus<u32>, or modulus<u64>" => {
             issue_args("modular_word_width_required")
         }
-        "modulus width marker must be a bare unsigned spelling such as u32" => issue_args("modular_word_width_shape"),
+        "modulus width marker must be a bare unsigned spelling such as u32" => {
+            issue_args("modular_word_width_shape")
+        }
         "modulus accepts only unsigned width markers u8, u16, u32, or u64" => {
             issue_args("unsupported_modular_word_width")
         }
-        "modulus requires an unsigned integer width marker" => issue_args("modular_word_unsigned_width_required"),
+        "modulus requires an unsigned integer width marker" => {
+            issue_args("modular_word_unsigned_width_required")
+        }
         crate::FIGURA_UNKNOWN_INDEX_MSG => issue_args("figura_unknown_index"),
         crate::FIGURA_TYPE_PARAM_IN_INDEX_MSG => issue_args("figura_type_param_in_index"),
         crate::FIGURA_NOT_INDEX_PARAM_MSG => issue_args("figura_not_index_param"),
         crate::VECTOR_WIDTH_SINGLE_DIM_MSG => issue_args("vector_width_single_dim"),
         crate::MATRIX_SHAPE_TWO_DIM_MSG => issue_args("matrix_shape_two_dim"),
         crate::ATOMIC_ELEMENT_MSG => issue_args("atomic_element"),
-        "forma template literals must lower through forma capture" => issue_args("forma_literal_lowering_path"),
+        "forma template literals must lower through forma capture" => {
+            issue_args("forma_literal_lowering_path")
+        }
         _ => issue_args("unknown_lowering_error"),
     }
 }

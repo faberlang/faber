@@ -3,7 +3,7 @@
 //! through `u64::MAX` survive lexing. These tests compile against the current
 //! `lex` API and fail at runtime until R1 lands the `u64` magnitude carrier.
 
-use crate::{lex, TokenKind};
+use crate::{TokenKind, lex};
 
 fn integer_token_count(source: &str) -> (usize, usize) {
     let result = lex(source);

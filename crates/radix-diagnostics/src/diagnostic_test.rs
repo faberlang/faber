@@ -1,4 +1,4 @@
-use super::{offset_to_line, Diagnostic, DiagnosticPhase, Span};
+use super::{Diagnostic, DiagnosticPhase, Span, offset_to_line};
 use std::path::Path;
 
 #[test]

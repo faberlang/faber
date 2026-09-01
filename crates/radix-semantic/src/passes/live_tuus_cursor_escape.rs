@@ -8,7 +8,7 @@
 
 use crate::live_tuus_cursor::{collect_live_tuus_cursor_locals, tuus_cursor_method_payload};
 use crate::{Resolver, SemanticError, SemanticErrorKind, TypeId, TypeTable};
-use radix_hir::visit::{walk_expr, walk_stmt, HirVisitor};
+use radix_hir::visit::{HirVisitor, walk_expr, walk_stmt};
 use radix_hir::{
     DefId, HirArrayElement, HirBlock, HirConversioTarget, HirExpression, HirExpressionKind,
     HirLocal, HirModule, HirObjectField, HirStatement, HirStatementKind,

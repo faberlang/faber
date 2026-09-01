@@ -29,9 +29,9 @@ use crate::distributed::derive;
 use crate::distributed::types::{
     BarrierId, CollectiveId, CollectiveOperation, DeclaredPlacement, DeviceProgramPartition,
     DistributedExecutionGraph, DistributedExecutionPlan, ExecutionCommitBoundary,
-    ExecutionOperation, LogicalPlacement, PartitionId, PlacementConstraint, PlacementContract,
-    PlacementFact, PlacementObjective, PlanVersion, TransferDirection, TransferId,
-    TransferOperation, TransportPath, LOGICAL_PLAN_VERSION,
+    ExecutionOperation, LOGICAL_PLAN_VERSION, LogicalPlacement, PartitionId, PlacementConstraint,
+    PlacementContract, PlacementFact, PlacementObjective, PlanVersion, TransferDirection,
+    TransferId, TransferOperation, TransportPath,
 };
 use crate::kernel_plan::{BatchedAttentionKind, BatchedAttentionPlan, CollectionKernelPlan};
 use crate::layout::MirTensorStorageLayout;
@@ -1098,25 +1098,33 @@ fn collection_kernel_plan_carries_no_communication_variant() {
     // seven-variant set (D1 FC6) plus the GI3-1 inference recipes, no
     // communication variant.
     let (_types, program) = cs1_program();
-    assert!(program
-        .kernels
-        .iter()
-        .all(|kernel| is_recipe_plan(&kernel.plan)));
+    assert!(
+        program
+            .kernels
+            .iter()
+            .all(|kernel| is_recipe_plan(&kernel.plan))
+    );
 
     // The communication seam is the upper execution graph, not the kernel
     // plan: the derived plan carries transfers/collectives/barriers as
     // `ExecutionOperation` variants.
     let plan = cs1();
     let graph = &plan.graph.operations;
-    assert!(graph
-        .iter()
-        .any(|operation| matches!(operation, ExecutionOperation::Transfer(_))));
-    assert!(graph
-        .iter()
-        .any(|operation| matches!(operation, ExecutionOperation::Collective(_))));
-    assert!(graph
-        .iter()
-        .any(|operation| matches!(operation, ExecutionOperation::Barrier(_))));
+    assert!(
+        graph
+            .iter()
+            .any(|operation| matches!(operation, ExecutionOperation::Transfer(_)))
+    );
+    assert!(
+        graph
+            .iter()
+            .any(|operation| matches!(operation, ExecutionOperation::Collective(_)))
+    );
+    assert!(
+        graph
+            .iter()
+            .any(|operation| matches!(operation, ExecutionOperation::Barrier(_)))
+    );
 }
 
 #[test]

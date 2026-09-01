@@ -16,8 +16,8 @@ use crate::device_program::{
     ObservationCadence, ResultBuffer,
 };
 use crate::kernel_plan::{
-    MatMulShapes, MatMulSharedMemory, OobPaddingPolicy, ReduceOp, SharedMemoryLayout,
-    MATMUL_SHARED_A_BUFFER_NAME, MATMUL_SHARED_B_BUFFER_NAME,
+    MATMUL_SHARED_A_BUFFER_NAME, MATMUL_SHARED_B_BUFFER_NAME, MatMulShapes, MatMulSharedMemory,
+    OobPaddingPolicy, ReduceOp, SharedMemoryLayout,
 };
 use crate::layout::MirTensorStorageLayout;
 use crate::{
@@ -859,9 +859,11 @@ fn composed_mlp_plan_accepts_real_lowered_assign_then_use_stage_destinations() {
         ]
     );
     assert_eq!(plan.stages[3].output.access, MirKernelResourceAccess::Write);
-    assert!(plan.stages[..3]
-        .iter()
-        .all(|stage| stage.output.access == MirKernelResourceAccess::ReadWrite));
+    assert!(
+        plan.stages[..3]
+            .iter()
+            .all(|stage| stage.output.access == MirKernelResourceAccess::ReadWrite)
+    );
 }
 
 #[test]
@@ -1602,9 +1604,11 @@ fn composed_mlp_plan_accepts_assign_then_use_stage_destinations() {
     );
     assert_eq!(plan.stages[3].output.source_local, MirLocalId(7));
     assert_eq!(plan.stages[3].output.access, MirKernelResourceAccess::Write);
-    assert!(plan.stages[..3]
-        .iter()
-        .all(|stage| stage.output.access == MirKernelResourceAccess::ReadWrite));
+    assert!(
+        plan.stages[..3]
+            .iter()
+            .all(|stage| stage.output.access == MirKernelResourceAccess::ReadWrite)
+    );
     assert_eq!(
         plan.edges
             .iter()
@@ -2555,13 +2559,15 @@ fn rms_norm_signature_binds_gamma_as_a_kernel_resource() {
     assert_eq!(emission.extra_inputs.len(), 1);
     assert_eq!(emission.extra_inputs[0].source_local, Some(MirLocalId(1)));
     assert_eq!(emission.output.binding, 2);
-    assert!(CollectionKernelPlan::from_transformer_op(
-        &shape,
-        &function,
-        &validation,
-        MirCollectionOp::TensorRmsNorm,
-    )
-    .is_some());
+    assert!(
+        CollectionKernelPlan::from_transformer_op(
+            &shape,
+            &function,
+            &validation,
+            MirCollectionOp::TensorRmsNorm,
+        )
+        .is_some()
+    );
 }
 
 #[test]

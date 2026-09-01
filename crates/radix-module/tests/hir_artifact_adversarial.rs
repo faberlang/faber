@@ -18,7 +18,7 @@
 use radix_hir::{HirFunction, HirId, HirItem, HirItemKind, HirModule, LibraryRegistry};
 use radix_hir_fhir::HirArtifactError;
 use radix_hir_fhir::{
-    FunctionFactTableWire, FunctionProvenanceTableWire, ResolverSnapshot, SourceIdentity, SCHEMA_VERSION,
+    FunctionFactTableWire, FunctionProvenanceTableWire, ResolverSnapshot, SCHEMA_VERSION, SourceIdentity,
 };
 use radix_lexer::Symbol;
 use radix_module::hir::artifact::load_fhir;

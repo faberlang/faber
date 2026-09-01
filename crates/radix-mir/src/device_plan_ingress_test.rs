@@ -24,18 +24,21 @@ fn both_rungs_compile_fused_schedule_from_header_facts() {
             assert!(layer.after_kernel_count <= 16);
         }
         assert_eq!(plan.kernel_count(0), 11);
-        assert!(plan
-            .schedule
-            .iter()
-            .any(|call| call.operation == LibraryOperation::CausalAttention));
-        assert!(plan
-            .schedule
-            .iter()
-            .any(|call| call.operation == LibraryOperation::QkvProjection));
-        assert!(plan
-            .schedule
-            .iter()
-            .any(|call| call.operation == LibraryOperation::SwiGlu));
+        assert!(
+            plan.schedule
+                .iter()
+                .any(|call| call.operation == LibraryOperation::CausalAttention)
+        );
+        assert!(
+            plan.schedule
+                .iter()
+                .any(|call| call.operation == LibraryOperation::QkvProjection)
+        );
+        assert!(
+            plan.schedule
+                .iter()
+                .any(|call| call.operation == LibraryOperation::SwiGlu)
+        );
         assert!(plan.decomposition_table().contains("CausalAttention"));
     }
 }
@@ -48,14 +51,18 @@ fn semantic_plan_key_separates_regime_and_sequence() {
         prefill.semantic_plan_identity(),
         decode.semantic_plan_identity()
     );
-    assert!(prefill
-        .semantic_plan_identity()
-        .starts_with(SEMANTIC_PLAN_KEY_CLASS));
+    assert!(
+        prefill
+            .semantic_plan_identity()
+            .starts_with(SEMANTIC_PLAN_KEY_CLASS)
+    );
     let backend = BackendArtifactKey::metal(prefill.semantic_plan_identity());
     assert!(backend.identity().starts_with(BACKEND_ARTIFACT_KEY_CLASS));
-    assert!(backend
-        .identity()
-        .contains(&prefill.semantic_plan_identity()));
+    assert!(
+        backend
+            .identity()
+            .contains(&prefill.semantic_plan_identity())
+    );
 }
 
 #[test]

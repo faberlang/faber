@@ -4,7 +4,7 @@
 //! and tuple literal index values from interned IndexExpr entries.
 
 use super::i64s_from_literal_index;
-use crate::{index::IndexExpr, TypeTable};
+use crate::{TypeTable, index::IndexExpr};
 
 #[test]
 fn i64s_from_literal_index_extracts_rank0_and_tuple_literals() {

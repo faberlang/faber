@@ -7,7 +7,7 @@
 
 use super::LocalePack;
 use crate::lexer::{keyword_specs, lex_with_locale_pack};
-use crate::parser::{parse, ParseErrorKind};
+use crate::parser::{ParseErrorKind, parse};
 use std::collections::BTreeSet;
 use std::path::PathBuf;
 

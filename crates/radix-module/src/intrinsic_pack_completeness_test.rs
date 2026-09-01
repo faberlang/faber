@@ -11,7 +11,7 @@
 //! canonical key was renamed/removed from the registry, fails here.
 
 use super::LocalePack;
-use crate::intrinsics::{IntrinsicReceiver, INTRINSICS};
+use crate::intrinsics::{INTRINSICS, IntrinsicReceiver};
 use std::collections::BTreeSet;
 use std::path::PathBuf;
 

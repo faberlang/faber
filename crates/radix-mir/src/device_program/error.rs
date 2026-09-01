@@ -318,9 +318,15 @@ impl fmt::Display for DeviceProgramError {
                 "launch {launch} references kernel {kernel_index} but the program has {kernel_count} kernels"
             ),
             Self::RepeatedLaunchId { launch } => {
-                write!(f, "launch id {launch} appears more than once in the launch sequence")
+                write!(
+                    f,
+                    "launch id {launch} appears more than once in the launch sequence"
+                )
             }
-            Self::AbsentProducingLaunch { result, produced_by } => write!(
+            Self::AbsentProducingLaunch {
+                result,
+                produced_by,
+            } => write!(
                 f,
                 "result {result} names producing launch {produced_by}, which does not exist"
             ),
@@ -423,18 +429,14 @@ impl fmt::Display for DeviceProgramError {
             Self::RepeatedRoot { root } => {
                 write!(f, "root {root} is declared more than once")
             }
-            Self::SelfDependency { launch } => write!(
-                f,
-                "dependency edge runs from launch {launch} to itself"
-            ),
+            Self::SelfDependency { launch } => {
+                write!(f, "dependency edge runs from launch {launch} to itself")
+            }
             Self::AbsentDependencyEndpoint { launch } => write!(
                 f,
                 "dependency edge names launch {launch}, which does not exist"
             ),
-            Self::RepeatedDependencyEdge {
-                producer,
-                consumer,
-            } => write!(
+            Self::RepeatedDependencyEdge { producer, consumer } => write!(
                 f,
                 "dependency edge {producer} → {consumer} is declared more than once"
             ),
@@ -476,10 +478,9 @@ impl fmt::Display for DeviceProgramError {
                 f,
                 "buffer {buffer} declares conflicting initialization policies: first {first}, second {second}"
             ),
-            Self::ObservationOutOfRange { launch } => write!(
-                f,
-                "observation names launch {launch}, which does not exist"
-            ),
+            Self::ObservationOutOfRange { launch } => {
+                write!(f, "observation names launch {launch}, which does not exist")
+            }
             Self::AbsentObservationBuffer { buffer } => write!(
                 f,
                 "observation names buffer {buffer}, which no semantic value is bound to"

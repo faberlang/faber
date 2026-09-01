@@ -3,7 +3,7 @@
 //! Shared by the Faber pretty-printer and target backends that attach Faber
 //! type annotations (Rust tensor comments in Stage 7).
 
-use super::{format_figura, MarkerFamily, Primitive, SemanticMutability, Type, TypeId, TypeTable};
+use super::{MarkerFamily, Primitive, SemanticMutability, Type, TypeId, TypeTable, format_figura};
 use radix_hir::DefId;
 use radix_lexer::{Interner, Symbol};
 use radix_types::AppliedArg;

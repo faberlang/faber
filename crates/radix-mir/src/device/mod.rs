@@ -19,8 +19,8 @@ mod safe;
 
 pub use companion::*;
 pub use fragments::{
-    first_surviving_fragment_call, reject_nucleum_fragment_survivors, surviving_nucleum_fragments,
     FragmentSurvivor, FragmentSurvivorKind, NUCLEUM_FRAGMENT_SURVIVED,
+    first_surviving_fragment_call, reject_nucleum_fragment_survivors, surviving_nucleum_fragments,
 };
 pub use roles::*;
 pub use safe::*;

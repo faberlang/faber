@@ -2,7 +2,7 @@
 //!
 //! Contract: frontmatter must start on line 1 with `+++`, be valid TOML, and be terminated by `+++`.
 
-use super::{split_frontmatter, FrontmatterError};
+use super::{FrontmatterError, split_frontmatter};
 
 #[test]
 fn no_frontmatter_returns_full_source_as_body() {

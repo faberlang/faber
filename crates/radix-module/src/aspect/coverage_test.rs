@@ -4,8 +4,8 @@
 //! skipped records stay out of success.
 
 use super::{
-    render_hir_aspect_coverage, summarize_hir_aspect_coverage, HirAspectAssumption, HirAspectCoverageEntry,
-    HirAspectCoverageReason, HirAspectCoverageReport, HirAspectCoverageStatus,
+    HirAspectAssumption, HirAspectCoverageEntry, HirAspectCoverageReason, HirAspectCoverageReport,
+    HirAspectCoverageStatus, render_hir_aspect_coverage, summarize_hir_aspect_coverage,
 };
 use crate::aspect::tla_checker::{HirAspectCheckResult, HirAspectCheckStatus};
 use crate::aspect::{
@@ -193,9 +193,11 @@ fn hir_aspect_coverage_failed_checker_render_includes_counterexample() {
         Vec::new(),
     );
 
-    assert!(coverage
-        .render_text()
-        .contains("counterexample: State 1 | State 2"));
+    assert!(
+        coverage
+            .render_text()
+            .contains("counterexample: State 1 | State 2")
+    );
     assert_eq!(coverage.entries()[0].status, HirAspectCoverageStatus::Failed);
 }
 

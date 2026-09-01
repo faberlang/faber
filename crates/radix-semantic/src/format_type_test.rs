@@ -4,8 +4,8 @@
 //! for tensor, indexed, numeric, and collection types.
 
 use super::format_faber_type;
-use crate::{index::IndexExpr, NumericWidth, Primitive, TypeTable};
-use radix_lexer::{lex, Interner};
+use crate::{NumericWidth, Primitive, TypeTable, index::IndexExpr};
+use radix_lexer::{Interner, lex};
 use radix_parser::parse;
 
 #[test]

@@ -2,7 +2,7 @@
 //! Proves: postgres, sqlite, mysql dialects use correct placeholder
 //! conventions; rendered SQL is syntactically valid for the target dialect.
 
-use super::{render_sql, CapturedForma, SqlDialect};
+use super::{CapturedForma, SqlDialect, render_sql};
 
 #[test]
 fn forma_render_postgres_uses_dollar_placeholders() {

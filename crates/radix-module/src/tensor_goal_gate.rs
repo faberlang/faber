@@ -7,7 +7,7 @@
 //! has no phase position in the semantic pipeline.
 
 use crate::diagnostics::DiagnosticArg;
-use crate::driver::{analyze_source, AnalyzeRequest, Config, Session};
+use crate::driver::{AnalyzeRequest, Config, Session, analyze_source};
 use crate::semantic::{NumericWidth, Primitive, Type, TypeTable};
 
 pub fn run_types_gate() {

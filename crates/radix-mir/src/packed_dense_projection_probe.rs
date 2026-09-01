@@ -8,7 +8,7 @@
 
 use crate::abi::PackedStorageLayout;
 use crate::kernel_plan::{
-    admit_quantized_matmul, dequant_q8_0_block, gemm_f32, CollectionKernelPlan, MatMulShapes,
+    CollectionKernelPlan, MatMulShapes, admit_quantized_matmul, dequant_q8_0_block, gemm_f32,
 };
 
 /// Named dense-rung projections (`SmolLM2` aspect, block-aligned probe dims).

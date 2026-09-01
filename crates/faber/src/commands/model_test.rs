@@ -2,7 +2,7 @@
 //!
 //! All tests use hand-crafted safetensors byte buffers — no external fixtures.
 
-use super::{parse_safetensors_metadata, TensorInfo};
+use super::{TensorInfo, parse_safetensors_metadata};
 
 // ---------------------------------------------------------------------------
 // Safetensors byte-buffer helpers

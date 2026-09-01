@@ -14,7 +14,7 @@
 
 use crate::function_facts::{CaptureFact, CaptureMode};
 use crate::{RadixLane, RadixLaneMetadata, SemanticError, SemanticErrorKind, Type, TypeTable};
-use radix_hir::visit::{walk_expr, walk_program, HirVisitor, HirVisitorMut};
+use radix_hir::visit::{HirVisitor, HirVisitorMut, walk_expr, walk_program};
 use radix_hir::{
     DefId, HirBlock, HirExpression, HirExpressionKind, HirFunction, HirId, HirItem, HirItemKind,
     HirModule, HirParam,

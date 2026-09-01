@@ -398,12 +398,16 @@ functio probe(_ u) → vacuum {
         );
     };
     assert_eq!(members.len(), 2, "solve must keep both pattern members");
-    assert!(members
-        .iter()
-        .any(|ty| matches!(result.types.get(*ty), Type::Primitive(Primitive::Numerus))));
-    assert!(members
-        .iter()
-        .any(|ty| matches!(result.types.get(*ty), Type::Primitive(Primitive::Textus))));
+    assert!(
+        members
+            .iter()
+            .any(|ty| matches!(result.types.get(*ty), Type::Primitive(Primitive::Numerus)))
+    );
+    assert!(
+        members
+            .iter()
+            .any(|ty| matches!(result.types.get(*ty), Type::Primitive(Primitive::Textus)))
+    );
 }
 
 #[test]

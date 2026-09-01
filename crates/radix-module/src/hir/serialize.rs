@@ -9,7 +9,7 @@ use radix_hir_fhir::{
     CaptureFactWire, CaptureModeWire, CliCommandWire, CliDefaultWire, CliExitWire, CliModeWire, CliOperandWire,
     CliOptionWire, CliProgramWire, CliTypeWire, FunctionFactTableWire, FunctionFactWire, FunctionProvenanceTableWire,
     FunctionProvenanceWire, GpuBuiltinWire, HirArtifact, LastUseWire, RegionRelationshipWire, ResolvedUseKeyWire,
-    ResolvedUseKindWire, ResolvedUseWire, ReturnedBorrowWire, SourceIdentity, SCHEMA_VERSION,
+    ResolvedUseKindWire, ResolvedUseWire, ReturnedBorrowWire, SCHEMA_VERSION, SourceIdentity,
 };
 
 // ── Entry point ───────────────────────────────────────────────────────────

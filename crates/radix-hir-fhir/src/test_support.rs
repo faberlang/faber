@@ -7,7 +7,7 @@
 
 use crate::artifact::{
     FunctionFactTableWire, FunctionProvenanceTableWire, HirArtifact, ResolverSnapshot,
-    SourceIdentity, SCHEMA_VERSION,
+    SCHEMA_VERSION, SourceIdentity,
 };
 use radix_hir::{
     HirFunction, HirId, HirItem, HirItemKind, HirModule, HirModuleEnd, HirPresentation,

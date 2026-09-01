@@ -1,4 +1,4 @@
-use super::{sha256, sha256_hex, Sha256};
+use super::{Sha256, sha256, sha256_hex};
 
 /// FIPS 180-4 §B.1: the empty message.
 #[test]

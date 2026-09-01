@@ -14,8 +14,8 @@
 //! - The dump should expose structure and type identity without implying that
 //!   it is valid target code.
 
-use crate::visit::MirVisitor;
 use crate::MirGradientOp;
+use crate::visit::MirVisitor;
 use std::fmt::Write;
 
 const DUMP_FUNCTION_PREFIX: &str = "f";

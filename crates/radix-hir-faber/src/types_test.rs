@@ -1,5 +1,5 @@
 use super::*;
-use crate::{empty_presentation, FaberCodegen, KeywordSurface, TypeBindingKind};
+use crate::{FaberCodegen, KeywordSurface, TypeBindingKind, empty_presentation};
 use radix_hir::{
     DefId, HirAnnotation, HirBlock, HirCallArg, HirCape, HirCasuArm, HirEnum, HirExpression,
     HirExpressionKind, HirFunction, HirId, HirImport, HirImportItem, HirItem, HirItemKind,

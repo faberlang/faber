@@ -9,7 +9,7 @@
 //! empty sources. AIR admission (bounded sources, first-live mask) stays
 //! fail-closed until AFM-4.
 
-use super::expr::{apud_arity, ApudArity, ISSUE_ITERA_APUD_ARITY_MISMATCH};
+use super::expr::{ApudArity, ISSUE_ITERA_APUD_ARITY_MISMATCH, apud_arity};
 #[allow(clippy::wildcard_imports)]
 // parent module provides shared imports for typechecking
 use super::*;

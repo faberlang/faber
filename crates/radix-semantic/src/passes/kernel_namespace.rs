@@ -6,7 +6,7 @@
 //! and later passes never see invalid kernel imports.
 
 use crate::kernel::{
-    is_kernel_glob_import_path, is_kernel_import_path, resolve_kernel_module, KernelResolveError,
+    KernelResolveError, is_kernel_glob_import_path, is_kernel_import_path, resolve_kernel_module,
 };
 use crate::{SemanticError, SemanticErrorKind};
 use radix_lexer::Interner;

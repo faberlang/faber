@@ -1,4 +1,4 @@
-use super::{width_pattern_applies, width_pattern_covers, IndexExpr, Primitive, Type, TypeTable};
+use super::{IndexExpr, Primitive, Type, TypeTable, width_pattern_applies, width_pattern_covers};
 
 fn cap(types: &mut TypeTable, value: u64) -> super::IndexId {
     types.intern_index(IndexExpr::Literal(value))

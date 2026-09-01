@@ -10,11 +10,11 @@ use std::collections::BTreeMap;
 
 use crate::test_support;
 
+use crate::Primitive;
 use crate::file_interface::{
     FileExport, FileExportKind, FileInterface, InterfaceEnumVariant, InterfaceNominalExport,
     InterfaceStructField, InterfaceTypeSnapshot,
 };
-use crate::Primitive;
 
 // ---------------------------------------------------------------------------
 // Probe P1: same-module qualified construction

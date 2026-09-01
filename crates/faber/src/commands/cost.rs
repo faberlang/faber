@@ -24,11 +24,11 @@ use crate::package;
 use radix::module::codegen::Target;
 use radix::module::diagnostics::Diagnostic;
 use radix_mir::{
-    cost_rollups, cost_sites, CostClass, CostFamily, CostFunctionRollup, CostSite, CostSiteKind,
-    CostTag,
+    CostClass, CostFamily, CostFunctionRollup, CostSite, CostSiteKind, CostTag, cost_rollups,
+    cost_sites,
 };
-use serde::ser::Serializer;
 use serde::Serialize;
+use serde::ser::Serializer;
 use std::collections::{BTreeMap, HashMap};
 use std::path::Path;
 use std::sync::Arc;

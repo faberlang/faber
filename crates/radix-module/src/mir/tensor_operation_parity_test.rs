@@ -2,7 +2,7 @@
 //!
 //! Tests: each family has expected target-status rows with evidence citations.
 
-use super::{indexed_access_parity, TensorOperationFamily, TensorParityStatus, TensorParityTarget};
+use super::{TensorOperationFamily, TensorParityStatus, TensorParityTarget, indexed_access_parity};
 use radix_types::MirCollectionOp;
 
 #[test]

@@ -67,7 +67,7 @@ fn malformed_rejects_garbage_bytes() {
 /// Construct a minimal valid HirArtifact for loader tests.
 fn minimal_test_artifact() -> HirArtifact {
     use radix_hir::{HirFunction, HirId, HirItem, HirItemKind, HirModule, LibraryRegistry};
-    use radix_hir_fhir::{FunctionFactTableWire, ResolverSnapshot, SourceIdentity, SCHEMA_VERSION};
+    use radix_hir_fhir::{FunctionFactTableWire, ResolverSnapshot, SCHEMA_VERSION, SourceIdentity};
 
     let types = TypeTable::new();
     let item = HirItem {
@@ -1087,7 +1087,7 @@ fn gpu_builtin_to_wire(b: radix_types::MirKernelBuiltin) -> radix_hir_fhir::GpuB
 
 /// Build a HirArtifact from an AnalyzedModule for round-trip testing.
 fn build_artifact_from_unit(unit: &AnalyzedModule) -> HirArtifact {
-    use radix_hir_fhir::{SourceIdentity, SCHEMA_VERSION};
+    use radix_hir_fhir::{SCHEMA_VERSION, SourceIdentity};
     HirArtifact {
         schema_version: SCHEMA_VERSION,
         source_identity: SourceIdentity {
@@ -1132,7 +1132,7 @@ fn hir_artifact_round_trip_acceptance() {
     let latin = crate::locale::latin_locale_pack();
     let surface = crate::locale::KeywordSurface::new(&latin);
 
-    use crate::codegen::{generate_from_analyzed, Target};
+    use crate::codegen::{Target, generate_from_analyzed};
 
     let targets: &[(Target, &str)] = &[
         (Target::HirRust, "Rust"),
@@ -1199,7 +1199,7 @@ fn conversio_assign_fhir_artifact_round_trip_preserves_operator() {
     let bytes = postcard::to_allocvec(&artifact).expect("serialize ↤ artifact");
     let loaded = load_fhir(&bytes).expect("load_fhir validates and loads the ↤ artifact");
 
-    use crate::codegen::{generate_from_analyzed, Target};
+    use crate::codegen::{Target, generate_from_analyzed};
     let faber =
         generate_from_analyzed(Target::HirFaber, &loaded, &surface).expect("faber re-emit from the loaded ↤ artifact");
     let crate::Output::Faber(faber) = faber else {
@@ -1229,7 +1229,7 @@ fn eot_artifact_legacy_empty_surface_roundtrips_unchanged() {
 
 #[test]
 fn capability_provenance_survives_serialize_and_load() {
-    use crate::driver::{analyze_source, AnalyzeRequest, Session};
+    use crate::driver::{AnalyzeRequest, Session, analyze_source};
     use crate::hir::serialize::from_analyzed;
 
     let session = Session::new(crate::driver::Config::default());

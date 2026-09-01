@@ -5,9 +5,9 @@
 
 use super::borrow::{analyze, analyze_modes, analyze_rust_lifetime};
 use super::{DefId, Resolver, SemanticErrorKind, TypeTable, WarningKind};
+use crate::SemanticParamMode;
 use crate::test_support::args_have_no_legacy_message;
 use crate::test_support::test_span;
-use crate::SemanticParamMode;
 use crate::{AccessMarker, FuncSig, ParamType, Primitive, SemanticError};
 use radix_hir::{
     HirBlock, HirCallArg, HirExpression, HirExpressionKind, HirFunction, HirItem, HirItemKind,

@@ -12,11 +12,11 @@ use std::collections::BTreeMap;
 
 use crate::test_support;
 
+use crate::Primitive;
 use crate::file_interface::{
     FileExport, FileExportKind, FileInterface, InterfaceEnumVariant, InterfaceNominalExport,
     InterfaceStructField, InterfaceTypeSnapshot,
 };
-use crate::Primitive;
 
 /// Install a producer-shaped file interface: a public union exports as an
 /// `Enum`-kind nominal carrying its variant metadata, exactly as the CLI

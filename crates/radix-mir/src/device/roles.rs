@@ -319,7 +319,11 @@ impl MirImportedEntryError {
                 "imported device registration f{} (def#{}) has no concrete instance in the merged program",
                 function.0, source.0
             ),
-            Self::RoleConflict { source, local, imported } => format!(
+            Self::RoleConflict {
+                source,
+                local,
+                imported,
+            } => format!(
                 "imported device registration def#{} conflicts with the local {:?} role (imported {:?})",
                 source.0, local, imported
             ),

@@ -3,7 +3,7 @@
 //! stdout normalization (pass, fail, error, timeout); env-path
 //! canonicalization.
 
-use super::{check_tla_modules, HirAspectCheckStatus, HirAspectTlaModule, TlaAspectChecker, TlaAspectCheckerConfig};
+use super::{HirAspectCheckStatus, HirAspectTlaModule, TlaAspectChecker, TlaAspectCheckerConfig, check_tla_modules};
 use std::ffi::OsString;
 use std::path::PathBuf;
 

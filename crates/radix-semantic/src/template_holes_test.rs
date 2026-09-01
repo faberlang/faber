@@ -1,6 +1,6 @@
 //! Position-law fixtures for named template holes.
 
-use super::template_holes::{analyze_template, Hole, HoleKind};
+use super::template_holes::{Hole, HoleKind, analyze_template};
 
 fn hole(kind: HoleKind, position: usize) -> Hole {
     Hole { kind, position }

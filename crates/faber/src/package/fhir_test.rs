@@ -36,7 +36,7 @@ fn run_mir_with_faber_seams<H: radix::module::mir::Host + ?Sized>(
 }
 
 use faber_hir_rust::RustFieldNamePolicy;
-use radix::module::codegen::{generate_from_analyzed, Target};
+use radix::module::codegen::{Target, generate_from_analyzed};
 use radix::module::driver::Config;
 use radix::module::hir::{LibraryItemKind, LibraryProvider};
 use radix::module::locale::LocalePack;

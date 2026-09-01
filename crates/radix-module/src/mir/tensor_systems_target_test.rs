@@ -6,8 +6,8 @@
 //! as checked debt.
 
 use super::{
-    selected_tensor_systems_family, tensor_systems_target_rows, TensorSystemsTarget, TensorSystemsTargetLayout,
-    TensorSystemsTargetRank, TensorSystemsTargetStatus,
+    TensorSystemsTarget, TensorSystemsTargetLayout, TensorSystemsTargetRank, TensorSystemsTargetStatus,
+    selected_tensor_systems_family, tensor_systems_target_rows,
 };
 use crate::mir::TensorOperationFloorFamily;
 

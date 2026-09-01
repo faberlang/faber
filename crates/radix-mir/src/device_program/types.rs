@@ -1,7 +1,7 @@
 use crate::abi::{
-    collection_op_workgroup_count, MirKernelDispatchSize, MirKernelResource,
-    MirKernelResourceAccess, MirKernelResourceKind, MirKernelResourceRole, MirKernelSignature,
-    MirKernelWorkgroupCount, MirWorkgroupSize,
+    MirKernelDispatchSize, MirKernelResource, MirKernelResourceAccess, MirKernelResourceKind,
+    MirKernelResourceRole, MirKernelSignature, MirKernelWorkgroupCount, MirWorkgroupSize,
+    collection_op_workgroup_count,
 };
 use crate::kernel_plan::CollectionKernelPlan;
 use crate::layout::MirTensorStorageLayout;

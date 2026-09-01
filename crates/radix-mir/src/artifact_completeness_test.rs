@@ -12,12 +12,12 @@
 //! needs for preparation.
 
 use super::*;
-use crate::boundary_abi::{derive_host_device_calls, MemberKernel, RegionArgumentLayout};
+use crate::boundary_abi::{MemberKernel, RegionArgumentLayout, derive_host_device_calls};
 use crate::device::{MirDeviceFunctionMetadata, MirDeviceFunctionMetadataMap};
 use crate::device_program::LaunchId;
 use crate::device_semantics::DeviceLegalityFacts;
 use crate::host_partition::{
-    derive_host_partition_with_metadata, derive_partition_record_with_metadata, PartitionRecord,
+    PartitionRecord, derive_host_partition_with_metadata, derive_partition_record_with_metadata,
 };
 use crate::{
     MirBlock, MirBlockId, MirCallee, MirDeviceRole, MirFunction, MirFunctionId, MirFunctionOrigin,

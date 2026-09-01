@@ -190,9 +190,11 @@ fn warns_on_varia_local_never_mutated() {
         &Interner::new(),
         None,
     );
-    assert!(errors
-        .iter()
-        .any(|err| err.kind == SemanticErrorKind::Warning(WarningKind::UnnecessaryVaria)));
+    assert!(
+        errors
+            .iter()
+            .any(|err| err.kind == SemanticErrorKind::Warning(WarningKind::UnnecessaryVaria))
+    );
 }
 
 #[test]
@@ -229,12 +231,16 @@ fn does_not_warn_on_unused_varia_local() {
         &Interner::new(),
         None,
     );
-    assert!(errors
-        .iter()
-        .any(|err| err.kind == SemanticErrorKind::Warning(WarningKind::UnusedVariable)));
-    assert!(!errors
-        .iter()
-        .any(|err| err.kind == SemanticErrorKind::Warning(WarningKind::UnnecessaryVaria)));
+    assert!(
+        errors
+            .iter()
+            .any(|err| err.kind == SemanticErrorKind::Warning(WarningKind::UnusedVariable))
+    );
+    assert!(
+        !errors
+            .iter()
+            .any(|err| err.kind == SemanticErrorKind::Warning(WarningKind::UnnecessaryVaria))
+    );
 }
 
 #[test]
@@ -287,9 +293,11 @@ fn does_not_warn_on_varia_local_reassigned() {
         &Interner::new(),
         None,
     );
-    assert!(!errors
-        .iter()
-        .any(|err| err.kind == SemanticErrorKind::Warning(WarningKind::UnnecessaryVaria)));
+    assert!(
+        !errors
+            .iter()
+            .any(|err| err.kind == SemanticErrorKind::Warning(WarningKind::UnnecessaryVaria))
+    );
 }
 
 #[test]
@@ -359,9 +367,11 @@ fn does_not_warn_on_varia_local_mutated_by_intrinsic_method() {
     };
 
     let errors = lint(&program, &Resolver::new(), &types, &interner, None);
-    assert!(!errors
-        .iter()
-        .any(|err| err.kind == SemanticErrorKind::Warning(WarningKind::UnnecessaryVaria)));
+    assert!(
+        !errors
+            .iter()
+            .any(|err| err.kind == SemanticErrorKind::Warning(WarningKind::UnnecessaryVaria))
+    );
 }
 
 #[test]
@@ -486,9 +496,11 @@ fn warns_on_unused_import() {
         &Interner::new(),
         None,
     );
-    assert!(errors
-        .iter()
-        .any(|err| err.kind == SemanticErrorKind::Warning(WarningKind::UnusedImport)));
+    assert!(
+        errors
+            .iter()
+            .any(|err| err.kind == SemanticErrorKind::Warning(WarningKind::UnusedImport))
+    );
 }
 
 #[test]
@@ -583,9 +595,11 @@ fn warns_on_unnecessary_cast() {
     };
 
     let errors = lint(&program, &Resolver::new(), &types, &Interner::new(), None);
-    assert!(errors
-        .iter()
-        .any(|err| err.kind == SemanticErrorKind::Warning(WarningKind::UnnecessaryCast)));
+    assert!(
+        errors
+            .iter()
+            .any(|err| err.kind == SemanticErrorKind::Warning(WarningKind::UnnecessaryCast))
+    );
 }
 
 #[test]
@@ -628,9 +642,11 @@ fn warns_on_unnecessary_cast_through_alias() {
     };
 
     let errors = lint(&program, &Resolver::new(), &types, &Interner::new(), None);
-    assert!(errors
-        .iter()
-        .any(|err| err.kind == SemanticErrorKind::Warning(WarningKind::UnnecessaryCast)));
+    assert!(
+        errors
+            .iter()
+            .any(|err| err.kind == SemanticErrorKind::Warning(WarningKind::UnnecessaryCast))
+    );
 }
 
 #[test]
@@ -736,9 +752,11 @@ fn warns_on_unreachable_after_break() {
         &Interner::new(),
         None,
     );
-    assert!(errors
-        .iter()
-        .any(|err| err.kind == SemanticErrorKind::Warning(WarningKind::UnreachableCode)));
+    assert!(
+        errors
+            .iter()
+            .any(|err| err.kind == SemanticErrorKind::Warning(WarningKind::UnreachableCode))
+    );
 }
 
 #[test]
@@ -1136,8 +1154,8 @@ incipit { nota output }"#,
 
 #[test]
 fn selective_import_resolved_use_records_each_binding() {
-    use crate::resolved_use::{analyze_resolved_uses, ResolvedUseKind};
     use crate::QualifiedIdentityTable;
+    use crate::resolved_use::{ResolvedUseKind, analyze_resolved_uses};
 
     let mut result = crate::test_support::analyze_source(
         r#"importa ex "norma:consolum" fixum dic ut output, funde,

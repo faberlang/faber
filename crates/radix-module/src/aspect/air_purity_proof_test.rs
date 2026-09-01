@@ -1,7 +1,7 @@
 //! Focused recognizer and proof-source tests for APA-L3.
 
 use super::{
-    emit_gate_purity_theorem, gate_purity_finding, GateHoleIssue, GatePurityFinding, PurityTerm, GATE_PURITY_PRELUDE,
+    GATE_PURITY_PRELUDE, GateHoleIssue, GatePurityFinding, PurityTerm, emit_gate_purity_theorem, gate_purity_finding,
 };
 use crate::hir::{
     DefId, HirBinOp, HirBlock, HirCallArg, HirExpression, HirExpressionKind, HirFunction, HirId, HirLiteral, HirLocal,

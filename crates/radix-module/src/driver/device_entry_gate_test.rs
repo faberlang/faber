@@ -8,8 +8,8 @@
 
 use super::compile;
 use crate::codegen::Target;
-use crate::driver::{analyze_source, AnalyzeRequest, Config, ModuleCompileRequest, Session};
-use crate::mir::{device_entry_roles_from_hir, device_roles_from_hir, MirDeviceRole};
+use crate::driver::{AnalyzeRequest, Config, ModuleCompileRequest, Session, analyze_source};
+use crate::mir::{MirDeviceRole, device_entry_roles_from_hir, device_roles_from_hir};
 use crate::test_support::test_session;
 
 /// A public kernel and a private `@ nucleum` helper in one unit. Both are

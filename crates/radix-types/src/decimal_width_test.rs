@@ -94,7 +94,7 @@ fn decimal_text_to_scaled_is_exact() {
 
 #[test]
 fn decimal_widths_reject_as_index_scalars() {
-    use crate::{is_decimal_index_scalar, is_integer_index_scalar, TypeTable};
+    use crate::{TypeTable, is_decimal_index_scalar, is_integer_index_scalar};
     let mut types = TypeTable::new();
     let d32 = types.sized_numeric(Primitive::Numerus, NumericWidth::D32);
     let d64 = types.sized_numeric(Primitive::Numerus, NumericWidth::D64);
@@ -108,7 +108,7 @@ fn decimal_widths_reject_as_index_scalars() {
 
 #[test]
 fn tensor_media_width_rejects_decimal_elements() {
-    use crate::{tensor_media_width, TypeTable};
+    use crate::{TypeTable, tensor_media_width};
     let mut types = TypeTable::new();
     let d32 = types.sized_numeric(Primitive::Numerus, NumericWidth::D32);
     let i32 = types.sized_numeric(Primitive::Numerus, NumericWidth::I32);

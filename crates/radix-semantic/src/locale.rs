@@ -23,19 +23,19 @@
 use crate::all_diagnostic_specs;
 use crate::file_interface::{InterfaceLibraryIdentity, InterfaceMemberKind};
 use crate::{
-    collection_type_specs, primitive_type_specs, tensor_family_type_specs, CollectionKind,
-    Primitive, TensorFamilyKind,
+    CollectionKind, Primitive, TensorFamilyKind, collection_type_specs, primitive_type_specs,
+    tensor_family_type_specs,
 };
 use radix_diagnostics::{Diagnostic, DiagnosticArg};
-use radix_intrinsics::{IntrinsicReceiver, INTRINSICS};
+use radix_intrinsics::{INTRINSICS, IntrinsicReceiver};
 use radix_lexer::{
-    keyword_group_specs, keyword_specs, keyword_spelling_for_token, keyword_token_kind,
-    lookup_keyword_spec, KeywordGroupSpec, KeywordSpec, TokenKind,
+    KeywordGroupSpec, KeywordSpec, TokenKind, keyword_group_specs, keyword_specs,
+    keyword_spelling_for_token, keyword_token_kind, lookup_keyword_spec,
 };
 use serde::Deserialize;
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::path::{Path, PathBuf};
-use unicode_normalization::{char::is_combining_mark, UnicodeNormalization};
+use unicode_normalization::{UnicodeNormalization, char::is_combining_mark};
 
 /// Reader pack schema version accepted by this implementation.
 pub const LOCALE_PACK_SCHEMA_VERSION: u32 = 1;
@@ -1490,11 +1490,7 @@ fn keyword_suggestion_candidate(
 }
 
 fn suggestion_distance_threshold(folded_char_len: usize) -> usize {
-    if folded_char_len <= 4 {
-        1
-    } else {
-        2
-    }
+    if folded_char_len <= 4 { 1 } else { 2 }
 }
 
 fn edit_distance(left: &str, right: &str) -> usize {

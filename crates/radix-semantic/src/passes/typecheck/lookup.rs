@@ -812,11 +812,7 @@ impl TypeChecker<'_> {
             }
         }
 
-        if ok {
-            expected
-        } else {
-            self.json_type()
-        }
+        if ok { expected } else { self.json_type() }
     }
 
     /// Infer the compile-time scalar type of a JSON value for map ascribe checks.

@@ -362,6 +362,6 @@ fn faber_target_capabilities(target: crate::codegen::Target) -> TargetCapabiliti
             capabilities.package = false;
             capabilities.run = false;
             capabilities
-        },
+        }
     }
 }

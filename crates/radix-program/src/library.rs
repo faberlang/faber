@@ -521,9 +521,9 @@ use std::hash::{Hash, Hasher};
 
 use radix_module::diagnostics::Diagnostic;
 use radix_module::driver::{
-    analyze_source_with_kernel_template_admissions, peel_raw_source, source_load_diagnostic,
     AnalyzeRequest, AnalyzedModule, Config, ModuleImportContract, PackageKernelTemplateAdmissions,
-    Session,
+    Session, analyze_source_with_kernel_template_admissions, peel_raw_source,
+    source_load_diagnostic,
 };
 use radix_module::file_interface::FileInterface;
 use radix_module::hir::{
@@ -533,10 +533,10 @@ use radix_module::hir::{
 use radix_module::lexer::Interner;
 use radix_module::parser;
 use radix_module::semantic::passes::visibility_annotation::{
-    has_private_visibility_annotation, statement_export_tier, VisibilityTier,
+    VisibilityTier, has_private_visibility_annotation, statement_export_tier,
 };
 use radix_module::syntax::{
-    walk_expr, AnnotationKind, Expr, ExprKind, Program, StmtKind, Visibility, Visitor,
+    AnnotationKind, Expr, ExprKind, Program, StmtKind, Visibility, Visitor, walk_expr,
 };
 
 use crate::import_graph::{
@@ -1274,7 +1274,7 @@ fn analyze_cached_library_interface_body(
                         "library interface analysis failed without diagnostics",
                     )
                     .with_file(import.module.interface_path.display().to_string())
-                }))
+                }));
         }
     };
     attach_library_provenance(

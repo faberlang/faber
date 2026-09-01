@@ -22,8 +22,8 @@ pub use validator::*;
 
 // Sibling check modules import these flattened names via `use super::{...}`.
 pub(crate) use validator::{
-    signature_from_func_sig, signature_from_function, DuplicateFunctionFinder, FunctionScope,
-    FunctionShape, GenericTypeBindings, Validator,
+    DuplicateFunctionFinder, FunctionScope, FunctionShape, GenericTypeBindings, Validator,
+    signature_from_func_sig, signature_from_function,
 };
 
 #[cfg(test)]

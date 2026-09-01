@@ -13,17 +13,17 @@
 mod md3h_fixtures;
 
 use super::{
-    admit_device_section, admit_distributed_section, wire_plan_to_plan, FmirBinaryImageFile,
-    FmirDeviceSection, FmirTextRuntimeSection, FmirTextSourceIdentity, FmirTextSourcesSection,
-    FmirTextToolchainSection, FmirTextTypesSection, WireExecutionOperation, WirePlacementContract,
-    WireTransportPath, FMIR_TARGET_NAME, PACKAGE_MIR_ARTIFACT_VERSION,
-    WIRE_DISTRIBUTED_SECTION_VERSION,
+    FMIR_TARGET_NAME, FmirBinaryImageFile, FmirDeviceSection, FmirTextRuntimeSection,
+    FmirTextSourceIdentity, FmirTextSourcesSection, FmirTextToolchainSection, FmirTextTypesSection,
+    PACKAGE_MIR_ARTIFACT_VERSION, WIRE_DISTRIBUTED_SECTION_VERSION, WireExecutionOperation,
+    WirePlacementContract, WireTransportPath, admit_device_section, admit_distributed_section,
+    wire_plan_to_plan,
 };
 use crate::error::FmirImageError;
 use crate::{decode_binary_image, encode_binary_image};
 use md3h_fixtures::{
-    eight_rank_device_section, eight_rank_program, eight_rank_section,
-    one_partition_device_section, one_partition_program, one_partition_section, EIGHT_RANK_COUNT,
+    EIGHT_RANK_COUNT, eight_rank_device_section, eight_rank_program, eight_rank_section,
+    one_partition_device_section, one_partition_program, one_partition_section,
 };
 use radix_mir::MirProgram;
 use radix_types::TypeTable;

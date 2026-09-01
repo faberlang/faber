@@ -9,12 +9,12 @@
 //! this unit. It makes an absent implementation explicit and safe while the
 //! derived queries land in SCR-03.
 
+use crate::SemanticParamMode;
 use crate::access_facts::AccessFactTable;
 use crate::function_facts::{CaptureMode, FunctionFactTable};
 use crate::passes::borrow_region::RegionFacts;
 use crate::passes::visibility_annotation::VisibilityTier;
-use crate::SemanticParamMode;
-use radix_hir::visit::{walk_expr, HirVisitor};
+use radix_hir::visit::{HirVisitor, walk_expr};
 use radix_hir::{
     DefId, HirEnum, HirExpressionKind, HirFunction, HirId, HirItemKind, HirModule, HirStruct,
 };
@@ -24,14 +24,15 @@ use serde::{Deserialize, Serialize};
 use std::cell::RefCell;
 
 pub use radix_types::{
-    CapabilityAnswer, CapabilityFamily, CapabilityKind, CapabilityReason, CapturePosture,
-    CaptureRequirement, EffectPosture, ExportVisibility, FunctionCapabilityAnswer,
-    FunctionCapabilityKind, FunctionCapabilityProof, FunctionCapabilitySummary,
-    IndexCapabilityAnswer, IndexCapabilityKind, IndexCapabilityProof, IndexCapabilitySummary,
-    Liveness, ParameterAccess, ParameterAccessPosture, PlaceCapabilityAnswer, PlaceCapabilityKind,
-    PlaceCapabilityProof, RecursionOutcome, RegionRelationship, RequiredRegionRelationships,
-    ReturnedBorrowProvenance, SolvedIndexedIdentity, TypeCapabilityAnswer, TypeCapabilityKind,
-    TypeCapabilityProof, TypeCapabilitySummary, CAPABILITY_VOCABULARY_VERSION,
+    CAPABILITY_VOCABULARY_VERSION, CapabilityAnswer, CapabilityFamily, CapabilityKind,
+    CapabilityReason, CapturePosture, CaptureRequirement, EffectPosture, ExportVisibility,
+    FunctionCapabilityAnswer, FunctionCapabilityKind, FunctionCapabilityProof,
+    FunctionCapabilitySummary, IndexCapabilityAnswer, IndexCapabilityKind, IndexCapabilityProof,
+    IndexCapabilitySummary, Liveness, ParameterAccess, ParameterAccessPosture,
+    PlaceCapabilityAnswer, PlaceCapabilityKind, PlaceCapabilityProof, RecursionOutcome,
+    RegionRelationship, RequiredRegionRelationships, ReturnedBorrowProvenance,
+    SolvedIndexedIdentity, TypeCapabilityAnswer, TypeCapabilityKind, TypeCapabilityProof,
+    TypeCapabilitySummary,
 };
 
 /// Immutable place/value capability summary keyed by an existing [`HirId`].

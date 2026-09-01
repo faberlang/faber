@@ -1103,25 +1103,25 @@ struct IdGen {
 
 impl IdGen {
     fn from_function(function: &MirFunction) -> Self {
-        let mut gen = Self { local: 0, temp: 0, block: 0, value: 0 };
+        let mut r#gen = Self { local: 0, temp: 0, block: 0, value: 0 };
         for param in &function.params {
-            gen.local = gen.local.max(param.local.0.saturating_add(1));
+            r#gen.local = r#gen.local.max(param.local.0.saturating_add(1));
         }
         for local in &function.locals {
-            gen.local = gen.local.max(local.id.0.saturating_add(1));
+            r#gen.local = r#gen.local.max(local.id.0.saturating_add(1));
         }
         for temp in &function.temps {
-            gen.temp = gen.temp.max(temp.id.0.saturating_add(1));
+            r#gen.temp = r#gen.temp.max(temp.id.0.saturating_add(1));
         }
         for block in &function.blocks {
-            gen.block = gen.block.max(block.id.0.saturating_add(1));
+            r#gen.block = r#gen.block.max(block.id.0.saturating_add(1));
             for stmt in &block.statements {
                 if let MirStatementKind::Assign { value, .. } = &stmt.kind {
-                    gen.value = gen.value.max(value.id.0.saturating_add(1));
+                    r#gen.value = r#gen.value.max(value.id.0.saturating_add(1));
                 }
             }
         }
-        gen
+        r#gen
     }
 
     fn next_local(&mut self) -> MirLocalId {

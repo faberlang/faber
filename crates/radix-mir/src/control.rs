@@ -777,8 +777,16 @@ fn structured_nested_indexed_write_loop_control(
     function: &MirFunction,
     control_kind: LoopControlKind,
 ) -> Option<StructuredNestedLoopControl> {
-    let [entry, condition, body, exit, nested_branch, continuation, control_block, nested_update] =
-        function.blocks.as_slice()
+    let [
+        entry,
+        condition,
+        body,
+        exit,
+        nested_branch,
+        continuation,
+        control_block,
+        nested_update,
+    ] = function.blocks.as_slice()
     else {
         return None;
     };

@@ -20,25 +20,25 @@ mod types;
 pub mod vocabulary;
 pub mod width_pattern;
 pub use width_pattern::{
-    is_family_catchall, literal_length_guard, width_pattern, width_pattern_applies,
-    width_pattern_covers, WidthFamily, WidthPattern,
+    WidthFamily, WidthPattern, is_family_catchall, literal_length_guard, width_pattern,
+    width_pattern_applies, width_pattern_covers,
 };
 
 pub use capability::{
-    CapabilityAnswer, CapabilityFamily, CapabilityKind, CapabilityReason, CapturePosture,
-    CaptureRequirement, EffectPosture, ExportVisibility, FunctionCapabilityAnswer,
-    FunctionCapabilityKind, FunctionCapabilityProof, FunctionCapabilitySummary,
-    IndexCapabilityAnswer, IndexCapabilityKind, IndexCapabilityProof, IndexCapabilitySummary,
-    Liveness, ParameterAccess, ParameterAccessPosture, PlaceCapabilityAnswer, PlaceCapabilityKind,
-    PlaceCapabilityProof, RecursionOutcome, RegionRelationship, RequiredRegionRelationships,
-    ReturnedBorrowProvenance, SolvedIndexedIdentity, TypeCapabilityAnswer, TypeCapabilityKind,
-    TypeCapabilityProof, TypeCapabilitySummary, CAPABILITY_VOCABULARY_VERSION,
+    CAPABILITY_VOCABULARY_VERSION, CapabilityAnswer, CapabilityFamily, CapabilityKind,
+    CapabilityReason, CapturePosture, CaptureRequirement, EffectPosture, ExportVisibility,
+    FunctionCapabilityAnswer, FunctionCapabilityKind, FunctionCapabilityProof,
+    FunctionCapabilitySummary, IndexCapabilityAnswer, IndexCapabilityKind, IndexCapabilityProof,
+    IndexCapabilitySummary, Liveness, ParameterAccess, ParameterAccessPosture,
+    PlaceCapabilityAnswer, PlaceCapabilityKind, PlaceCapabilityProof, RecursionOutcome,
+    RegionRelationship, RequiredRegionRelationships, ReturnedBorrowProvenance,
+    SolvedIndexedIdentity, TypeCapabilityAnswer, TypeCapabilityKind, TypeCapabilityProof,
+    TypeCapabilitySummary,
 };
 pub use def_id::DefId;
 pub use filtrum::{
-    CapabilityRequirement, ColumnRef, ComparisonOp, FiltrumPlan, OrderRow, Predicate,
-    PredicateValue, SortDirection, SourceIdentity, Window, WindowError,
-    FILTRUM_ENCODING_VERSION_V1,
+    CapabilityRequirement, ColumnRef, ComparisonOp, FILTRUM_ENCODING_VERSION_V1, FiltrumPlan,
+    OrderRow, Predicate, PredicateValue, SortDirection, SourceIdentity, Window, WindowError,
 };
 pub use vocabulary::{
     CapabilityGap, KernelModule, Lowerability, MirAtomicOp, MirCollectionOp, MirKernelAxis,
@@ -54,35 +54,36 @@ pub use vocabulary::{
 /// compiler crate.
 pub const USER_DEF_ID_BASE: u32 = 0x0000_1000;
 pub use index::{
-    compute_cotangent_reduction_axes, i64s_from_literal_index, parse_natural_capacity, IndexExpr,
-    IndexId, IndexVar,
+    IndexExpr, IndexId, IndexVar, compute_cotangent_reduction_axes, i64s_from_literal_index,
+    parse_natural_capacity,
 };
 pub use instans_precision::{
-    effective_instans_precision, is_instans_assignable, lower_sized_instans, InstansPrecision,
-    InstansPrecisionError, InstansPrecisionRank,
+    InstansPrecision, InstansPrecisionError, InstansPrecisionRank, effective_instans_precision,
+    is_instans_assignable, lower_sized_instans,
 };
 pub use numeric_width::{
-    effective_width, is_ascii_format_hint, is_conversio_radix_hint, is_decimal_index_scalar,
-    is_integer_index_scalar, is_integer_index_vector, is_numeric_assignable,
-    is_numeric_width_type_sugar, is_tensor_element_type, is_tensor_numeric_element,
-    lista_sugar_width_marker, lower_modular_word, lower_sized_primitive,
-    lower_standalone_width_type, matrix_sugar_width_marker, sparsa_sugar_width_marker,
-    standalone_width_type, tensor_element_conversio_allowed, tensor_media_width,
-    tensor_method_requires_numeric_element, tensor_sugar_width_marker, vector_sugar_width_marker,
-    NumericWidth, WidthError, DECIMAL_INDEX_SCALAR_MSG, DECIMAL_TENSOR_MEDIA_MSG,
-    TENSOR_ELEMENT_NUMERIC_MSG, TENSOR_INDEX_VECTOR_MSG,
+    DECIMAL_INDEX_SCALAR_MSG, DECIMAL_TENSOR_MEDIA_MSG, NumericWidth, TENSOR_ELEMENT_NUMERIC_MSG,
+    TENSOR_INDEX_VECTOR_MSG, WidthError, effective_width, is_ascii_format_hint,
+    is_conversio_radix_hint, is_decimal_index_scalar, is_integer_index_scalar,
+    is_integer_index_vector, is_numeric_assignable, is_numeric_width_type_sugar,
+    is_tensor_element_type, is_tensor_numeric_element, lista_sugar_width_marker,
+    lower_modular_word, lower_sized_primitive, lower_standalone_width_type,
+    matrix_sugar_width_marker, sparsa_sugar_width_marker, standalone_width_type,
+    tensor_element_conversio_allowed, tensor_media_width, tensor_method_requires_numeric_element,
+    tensor_sugar_width_marker, vector_sugar_width_marker,
 };
 pub use schema::{SchemaColumnDef, SchemaDef};
 pub use schema_subset::{
-    extra_input_columns, schema_column_count, schema_subset, SchemaSubsetError,
+    SchemaSubsetError, extra_input_columns, schema_column_count, schema_subset,
 };
 pub use types::{
-    collection_type_specs, is_atomic_element_type, is_intervallum_bound_type,
-    lookup_collection_type_spec, lookup_primitive_type_spec, lookup_tensor_family_type_spec,
-    primitive_type_specs, tensor_family_type_specs, AccessMarker, AppliedArg, CollectionKind,
-    CollectionTypeSpec, FuncSig, InferVar, MarkerFamily, ParamType, Primitive, PrimitiveTypeSpec,
+    ATOMIC_ELEMENT_MSG, AccessMarker, AppliedArg, CollectionKind, CollectionTypeSpec, FuncSig,
+    INTERVALLUM_BOUND_MSG, InferVar, MarkerFamily, ParamType, Primitive, PrimitiveTypeSpec,
     SemanticMutability, SemanticParamMode, TensorFamilyKind, TensorFamilyTypeSpec, Type, TypeId,
-    TypeParamConstraint, TypeTable, TypeTableSnapshot, ATOMIC_ELEMENT_MSG, INTERVALLUM_BOUND_MSG,
+    TypeParamConstraint, TypeTable, TypeTableSnapshot, collection_type_specs,
+    is_atomic_element_type, is_intervallum_bound_type, lookup_collection_type_spec,
+    lookup_primitive_type_spec, lookup_tensor_family_type_spec, primitive_type_specs,
+    tensor_family_type_specs,
 };
 
 #[cfg(test)]

@@ -22,23 +22,23 @@
 //!   1 are all unchanged).
 
 use super::{
-    admit_device_section, admit_session_section, FmirBinaryImageFile, FmirDeviceArtifactsSection,
-    FmirDeviceProgramSection, FmirDeviceSection, FmirDeviceSelection, FmirExecutorPlanSection,
-    FmirExecutorPlanSectionV2, FmirSessionSection, FmirSessionSectionV2, FmirTextRuntimeSection,
-    FmirTextSourceIdentity, FmirTextSourcesSection, FmirTextToolchainSection, FmirTextTypesSection,
-    WireBinding, WireBufferIdentity, WireBufferLifetime, WireBufferRole, WireBufferVersion,
-    WireCollectionKernelPlan, WireDeviceProgram, WireDeviceResource, WireDispatchSize,
-    WireExecutorPlanV2, WireInitializationPolicy, WireInputUpdateCadence, WireInvocationMode,
-    WireKernelLaunchPlan, WireKernelUnit, WireKvCacheAttentionFamily, WireKvCacheCapacityPolicy,
-    WireKvCacheDtype, WireKvCacheLayout, WireKvCacheRopePairing, WireKvCacheSemanticV2,
-    WireKvCacheVLayout, WireKvReservePolicy, WireLaunchUnit, WireObservationCadence,
-    WireObservationFact, WireProgramLifetime, WireResourceAccess, WireResultBuffer,
-    WireSemanticValue, WireSemanticValueOrigin, WireSessionInput, WireSessionObservationCadence,
-    WireStorageLayout, WireWorkgroupCount, WireWorkgroupSize, EXECUTOR_PLAN_SECTION_VERSION,
-    EXECUTOR_PLAN_V2_VERSION, FMIR_TARGET_NAME, LEGACY_EXECUTOR_PLAN_SECTION_VERSION,
+    EXECUTOR_PLAN_SECTION_VERSION, EXECUTOR_PLAN_V2_VERSION, FMIR_TARGET_NAME, FmirBinaryImageFile,
+    FmirDeviceArtifactsSection, FmirDeviceProgramSection, FmirDeviceSection, FmirDeviceSelection,
+    FmirExecutorPlanSection, FmirExecutorPlanSectionV2, FmirSessionSection, FmirSessionSectionV2,
+    FmirTextRuntimeSection, FmirTextSourceIdentity, FmirTextSourcesSection,
+    FmirTextToolchainSection, FmirTextTypesSection, LEGACY_EXECUTOR_PLAN_SECTION_VERSION,
     LEGACY_SESSION_SECTION_VERSION, PACKAGE_MIR_ARTIFACT_VERSION, WIRE_DEVICE_PROGRAM_VERSION,
     WIRE_DISTRIBUTED_SECTION_VERSION, WIRE_KV_CACHE_SEMANTIC_CONTRACT_VERSION,
-    WIRE_SESSION_SECTION_VERSION,
+    WIRE_SESSION_SECTION_VERSION, WireBinding, WireBufferIdentity, WireBufferLifetime,
+    WireBufferRole, WireBufferVersion, WireCollectionKernelPlan, WireDeviceProgram,
+    WireDeviceResource, WireDispatchSize, WireExecutorPlanV2, WireInitializationPolicy,
+    WireInputUpdateCadence, WireInvocationMode, WireKernelLaunchPlan, WireKernelUnit,
+    WireKvCacheAttentionFamily, WireKvCacheCapacityPolicy, WireKvCacheDtype, WireKvCacheLayout,
+    WireKvCacheRopePairing, WireKvCacheSemanticV2, WireKvCacheVLayout, WireKvReservePolicy,
+    WireLaunchUnit, WireObservationCadence, WireObservationFact, WireProgramLifetime,
+    WireResourceAccess, WireResultBuffer, WireSemanticValue, WireSemanticValueOrigin,
+    WireSessionInput, WireSessionObservationCadence, WireStorageLayout, WireWorkgroupCount,
+    WireWorkgroupSize, admit_device_section, admit_session_section,
 };
 use crate::error::FmirImageError;
 use crate::{decode_binary_image, encode_binary_image};

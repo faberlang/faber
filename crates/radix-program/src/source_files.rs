@@ -11,7 +11,7 @@ pub const MAX_PACKAGE_SOURCE_FILES: usize = 4096;
 pub const MAX_PACKAGE_SOURCE_BYTES: u64 = 64 * 1024 * 1024;
 
 use radix_module::diagnostics::Diagnostic;
-use radix_module::driver::{peel_raw_source, source_load_diagnostic, Config, FileFrontmatter};
+use radix_module::driver::{Config, FileFrontmatter, peel_raw_source, source_load_diagnostic};
 use radix_module::lexer::Interner;
 use radix_module::syntax::Program;
 

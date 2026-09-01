@@ -15,7 +15,7 @@
 use std::collections::VecDeque;
 
 use crate::{NumericWidth, Primitive, Type, TypeId, TypeTable};
-use radix_hir::visit::{walk_block, walk_expr, walk_local, HirVisitor};
+use radix_hir::visit::{HirVisitor, walk_block, walk_expr, walk_local};
 use radix_hir::{HirExpression, HirExpressionKind, HirFunction, HirItemKind, HirLocal, HirModule};
 use radix_target::Target;
 use radix_types::{CapabilityGap, Lowerability};

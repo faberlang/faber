@@ -1500,10 +1500,12 @@ fn real_lowered_mlp_body_decomposes_into_fork_join_subchains() {
         );
     }
     // The mutable output parameter rides the last statement's forward.
-    assert!(function
-        .params
-        .iter()
-        .any(|param| { param.local == MirLocalId(4) && param.mode == MirParamMode::MutRef }));
+    assert!(
+        function
+            .params
+            .iter()
+            .any(|param| { param.local == MirLocalId(4) && param.mode == MirParamMode::MutRef })
+    );
 
     let decomposition = decompose_kernel_function(&function, &validation)
         .expect("the real lowered body decomposes by the dataflow rule");

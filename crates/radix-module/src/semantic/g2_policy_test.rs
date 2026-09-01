@@ -1,8 +1,8 @@
 //! HIR v1 G2: target-neutral mode and access policy integration tests.
 
 use crate::codegen::Target;
-use crate::driver::{analyze_source, AnalyzeRequest, Config, Session};
-use crate::semantic::{analyze, PassConfig};
+use crate::driver::{AnalyzeRequest, Config, Session, analyze_source};
+use crate::semantic::{PassConfig, analyze};
 
 fn analyze_base(source: &str) -> crate::semantic::SemanticResult {
     let lex = crate::lexer::lex(source);

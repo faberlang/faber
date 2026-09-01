@@ -1,5 +1,5 @@
 use super::{
-    lock_index, read_lock, validate_dependencies_against_lock, FaberLock, LockedPackage, LOCK_FILE,
+    FaberLock, LOCK_FILE, LockedPackage, lock_index, read_lock, validate_dependencies_against_lock,
 };
 use std::collections::BTreeMap;
 use std::fs;

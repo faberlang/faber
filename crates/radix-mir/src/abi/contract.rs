@@ -7,10 +7,10 @@ use radix_lexer::Interner;
 use radix_types::NumericWidth;
 
 use super::{
-    device_view_element_count, require_u32_index, MirAbiError, MirKernelBufferBindingKind,
-    MirKernelBuiltin, MirKernelBuiltinInput, MirKernelDispatchSize, MirKernelResourceAccess,
-    MirKernelShaderAccess, MirKernelSignature, MirWorkgroupSize, ERR_KERNEL_BUILTIN_DUPLICATE_NAME,
-    ERR_KERNEL_BUILTIN_UNKNOWN_NAME,
+    ERR_KERNEL_BUILTIN_DUPLICATE_NAME, ERR_KERNEL_BUILTIN_UNKNOWN_NAME, MirAbiError,
+    MirKernelBufferBindingKind, MirKernelBuiltin, MirKernelBuiltinInput, MirKernelDispatchSize,
+    MirKernelResourceAccess, MirKernelShaderAccess, MirKernelSignature, MirWorkgroupSize,
+    device_view_element_count, require_u32_index,
 };
 
 pub(crate) fn combined_builtin_dependencies(

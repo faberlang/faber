@@ -183,11 +183,7 @@ impl Ord for Instans {
 }
 
 fn coarser_praecisio(a: InstansPraecisio, b: InstansPraecisio) -> InstansPraecisio {
-    if a.rank() <= b.rank() {
-        a
-    } else {
-        b
-    }
+    if a.rank() <= b.rank() { a } else { b }
 }
 
 /// Parse RFC3339 datetimes to nanoseconds since Unix epoch (UTC storage).

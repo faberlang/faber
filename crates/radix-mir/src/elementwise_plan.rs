@@ -12,9 +12,9 @@ use crate::device_program_plans::{
 };
 use crate::tensor_type::tensor_literal_dims;
 use crate::{
-    collection_ops::statement_collection_op, MirCollectionOp, MirConstant, MirFunction,
-    MirLayoutKind, MirLocalId, MirOperand, MirPlaceBase, MirStatement, MirStatementKind, MirTempId,
-    MirType, MirUnOp, MirValidationContext, MirValueKind,
+    MirCollectionOp, MirConstant, MirFunction, MirLayoutKind, MirLocalId, MirOperand, MirPlaceBase,
+    MirStatement, MirStatementKind, MirTempId, MirType, MirUnOp, MirValidationContext,
+    MirValueKind, collection_ops::statement_collection_op,
 };
 use radix_lexer::Span;
 use radix_types::Type;

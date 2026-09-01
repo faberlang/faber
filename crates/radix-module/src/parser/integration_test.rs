@@ -9,9 +9,9 @@
 use crate::diagnostics::Diagnostic;
 use crate::diagnostics::DiagnosticConvert;
 use crate::driver::AnalyzeRequest;
-use crate::lexer::lex;
 use crate::lexer::INLINE_COMMENT_ISSUE;
-use crate::parser::{parse, ParseErrorKind, ParseResult};
+use crate::lexer::lex;
+use crate::parser::{ParseErrorKind, ParseResult, parse};
 use crate::test_support::args_have_no_legacy_message;
 
 /// Convenience wrapper: parse source that is expected to succeed.
@@ -68,14 +68,18 @@ fn assert_retired_prefix_predicate(source: &str, predicate: &str, replacement: &
     let diagnostic = Diagnostic::from_parse_error("test.fab", source, err);
     assert_eq!(diagnostic.code, Some("PARSE001"));
     assert_eq!(diagnostic.issue(), Some("retired_prefix_predicate"));
-    assert!(diagnostic
-        .args
-        .iter()
-        .any(|arg| arg.name == "predicate" && arg.value == predicate));
-    assert!(diagnostic
-        .args
-        .iter()
-        .any(|arg| arg.name == "replacement" && arg.value == replacement));
+    assert!(
+        diagnostic
+            .args
+            .iter()
+            .any(|arg| arg.name == "predicate" && arg.value == predicate)
+    );
+    assert!(
+        diagnostic
+            .args
+            .iter()
+            .any(|arg| arg.name == "replacement" && arg.value == replacement)
+    );
 }
 
 #[test]

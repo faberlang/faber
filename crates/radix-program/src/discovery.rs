@@ -10,10 +10,10 @@ use std::path::{Path, PathBuf};
 
 use radix_module::diagnostics::Diagnostic;
 
-use crate::manifest::{manifest_build_target, read_manifest, FaberManifest};
+use crate::MANIFEST_FILE;
+use crate::manifest::{FaberManifest, manifest_build_target, read_manifest};
 use crate::member_path::resolve_package_member;
 use crate::paths::normalize_path;
-use crate::MANIFEST_FILE;
 
 /// Package entrypoints resolved from either `faber.toml` or legacy path input.
 ///

@@ -169,14 +169,18 @@ functio target() → vacuum ⇥ C { redde source() }
         .iter()
         .find(|diagnostic| diagnostic.issue() == Some("failable_call_conversion_absent"))
         .expect("direct conversion absence diagnostic");
-    assert!(error
-        .args
-        .iter()
-        .any(|arg| arg.name == "source" && arg.value == "A"));
-    assert!(error
-        .args
-        .iter()
-        .any(|arg| arg.name == "destination" && arg.value == "C"));
+    assert!(
+        error
+            .args
+            .iter()
+            .any(|arg| arg.name == "source" && arg.value == "A")
+    );
+    assert!(
+        error
+            .args
+            .iter()
+            .any(|arg| arg.name == "destination" && arg.value == "C")
+    );
     assert!(
         !error.args.iter().any(|arg| arg.name == "suggestion"),
         "no named helper exists for A → C"
@@ -233,9 +237,11 @@ fn conversion_name_suggestion_finds_an_out_of_scope_helper() {
     // Back at global scope the direct lookup misses; the name is still
     // suggestible.
     assert!(resolver.conversion_row_for(source, destination).is_none());
-    assert!(resolver
-        .conversion_name_suggestion(source, destination)
-        .is_some());
+    assert!(
+        resolver
+            .conversion_name_suggestion(source, destination)
+            .is_some()
+    );
 }
 
 #[test]

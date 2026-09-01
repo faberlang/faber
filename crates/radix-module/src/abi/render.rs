@@ -10,7 +10,7 @@
 //! are sorted because `serde_json::Value` objects are `BTreeMap`-backed by
 //! default; the Rust artifact emits sections in declaration order.
 
-use crate::abi::{fingerprint_hex, AbiPayload};
+use crate::abi::{AbiPayload, fingerprint_hex};
 use std::fmt::Write;
 
 /// Render the payload as canonical pretty JSON, including a `fingerprint` field

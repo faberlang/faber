@@ -6,7 +6,7 @@
 //! mismatch, illegal level, wrong child arity/kind).
 
 use super::*;
-use crate::{empty_presentation, FaberCodegen};
+use crate::{FaberCodegen, empty_presentation};
 use radix_hir::{
     HirAuthoredTypeUse, HirBlock, HirExpression, HirExpressionKind, HirId, HirLiteral, HirLocal,
     HirModule, HirOwnerRef, HirStatement, HirStatementKind, HirTypeSlot,

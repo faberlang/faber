@@ -970,7 +970,7 @@ impl DeviceExecuteSession {
                     return Err(HostSpawnError {
                         code: error.code,
                         message: error.message,
-                    })
+                    });
                 }
                 Ok(_) | Err(_) => {}
             }
@@ -981,7 +981,7 @@ impl DeviceExecuteSession {
                     return Err(HostSpawnError {
                         code: "E_HOST_SPAWN".to_owned(),
                         message: format!("resident control receipt JSON is invalid: {error}"),
-                    })
+                    });
                 }
             }
         }

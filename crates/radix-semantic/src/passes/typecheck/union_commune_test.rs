@@ -7,12 +7,12 @@
 
 use std::collections::BTreeMap;
 
+use crate::Primitive;
 use crate::file_interface::{
     FileExport, FileExportKind, FileInterface, InterfaceEnumVariant, InterfaceNominalExport,
     InterfaceStructField, InterfaceTypeSnapshot,
 };
 use crate::test_support;
-use crate::Primitive;
 
 const SHAPE_ERROR: &str = r"discretio ShapeError {
     @ commune

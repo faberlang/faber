@@ -10,8 +10,8 @@ use crate::{Resolver, SemanticError, SemanticErrorKind};
 use radix_hir::DefId;
 use radix_lexer::{Interner, Span, TokenKind};
 use radix_syntax::{
-    braced_radix_lane_view_strict, braced_radix_typus_view_strict, Annotation, AnnotationKind,
-    AnnotationView, ClassMemberKind, InvalidAnnotationView, Program, StmtKind,
+    Annotation, AnnotationKind, AnnotationView, ClassMemberKind, InvalidAnnotationView, Program,
+    StmtKind, braced_radix_lane_view_strict, braced_radix_typus_view_strict,
 };
 use rustc_hash::FxHashMap;
 

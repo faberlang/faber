@@ -59,9 +59,9 @@
 
 use crate::locale::LocalePack;
 use crate::{
-    types::InferVar, FuncSig, IndexExpr, IndexInferState, MarkerFamily, NumericWidth, ParamType,
-    Primitive, Resolver, SemanticError, SemanticErrorKind, SemanticParamMode, Type, TypeId,
-    TypeParamConstraint, TypeTable, WarningKind,
+    FuncSig, IndexExpr, IndexInferState, MarkerFamily, NumericWidth, ParamType, Primitive,
+    Resolver, SemanticError, SemanticErrorKind, SemanticParamMode, Type, TypeId,
+    TypeParamConstraint, TypeTable, WarningKind, types::InferVar,
 };
 use radix_hir::{
     DefId, HirArrayElement, HirAvailability, HirBinOp, HirBlock, HirCape, HirCasuArm,

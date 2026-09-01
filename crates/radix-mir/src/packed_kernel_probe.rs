@@ -6,7 +6,7 @@
 #![cfg(test)]
 
 use crate::abi::PackedStorageLayout;
-use crate::kernel_plan::{admit_quantized_matmul, PackedDequantKind};
+use crate::kernel_plan::{PackedDequantKind, admit_quantized_matmul};
 
 /// Native BF16 → f32 convert: zero-extend the 16-bit payload into the
 /// high half of an f32 (IEEE-754 bfloat16). Exact; no rounding.

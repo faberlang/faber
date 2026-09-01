@@ -5,13 +5,13 @@
 //! semantic pipeline consumes.
 
 use super::{
-    collection_type_specs, is_atomic_element_type, is_intervallum_bound_type,
-    lookup_collection_type_spec, lookup_primitive_type_spec, lookup_tensor_family_type_spec,
-    primitive_type_specs, tensor_family_type_specs, CollectionKind, Primitive, TensorFamilyKind,
-    Type, TypeTable,
+    CollectionKind, Primitive, TensorFamilyKind, Type, TypeTable, collection_type_specs,
+    is_atomic_element_type, is_intervallum_bound_type, lookup_collection_type_spec,
+    lookup_primitive_type_spec, lookup_tensor_family_type_spec, primitive_type_specs,
+    tensor_family_type_specs,
 };
-use crate::index::IndexExpr;
 use crate::NumericWidth;
+use crate::index::IndexExpr;
 use radix_hir::DefId;
 
 #[test]
@@ -417,17 +417,21 @@ fn find_sized_numeric_returns_existing_intern() {
     // WHY: codegen holds `&TypeTable` (immutable) and must look up sized
     // numeric ids without interning. Octeti method routing depends on this.
     let mut types = TypeTable::new();
-    assert!(types
-        .find_sized_numeric(Primitive::Numerus, NumericWidth::U8)
-        .is_none());
+    assert!(
+        types
+            .find_sized_numeric(Primitive::Numerus, NumericWidth::U8)
+            .is_none()
+    );
     let u8 = types.sized_numeric(Primitive::Numerus, NumericWidth::U8);
     assert_eq!(
         types.find_sized_numeric(Primitive::Numerus, NumericWidth::U8),
         Some(u8)
     );
-    assert!(types
-        .find_sized_numeric(Primitive::Numerus, NumericWidth::U16)
-        .is_none());
+    assert!(
+        types
+            .find_sized_numeric(Primitive::Numerus, NumericWidth::U16)
+            .is_none()
+    );
 }
 
 #[test]

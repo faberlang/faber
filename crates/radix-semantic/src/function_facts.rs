@@ -5,7 +5,7 @@
 //! async/generator posture, or capture sets from HIR walks at emit time.
 
 use crate::{Type, TypeId, TypeTable};
-use radix_hir::visit::{walk_expr, HirVisitor};
+use radix_hir::visit::{HirVisitor, walk_expr};
 use radix_hir::{
     DefId, HirExpression, HirExpressionKind, HirFunction, HirItemKind, HirModule, HirParam,
     HirStatementKind,

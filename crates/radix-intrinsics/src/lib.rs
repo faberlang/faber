@@ -9,8 +9,8 @@
 mod registry;
 
 pub use registry::{
-    IntrinsicMirKind, IntrinsicParamKind, IntrinsicReceiver, IntrinsicReturnKind, MethodIntrinsic,
-    INTRINSICS,
+    INTRINSICS, IntrinsicMirKind, IntrinsicParamKind, IntrinsicReceiver, IntrinsicReturnKind,
+    MethodIntrinsic,
 };
 
 use radix_types::{MirAtomicOp, MirCollectionOp};

@@ -5,7 +5,7 @@
 
 use crate::qualified_identity::QualifiedIdentityTable;
 use crate::{Type, TypeId, TypeTable};
-use radix_hir::visit::{walk_expr, walk_local, walk_pattern, walk_stmt, HirVisitor};
+use radix_hir::visit::{HirVisitor, walk_expr, walk_local, walk_pattern, walk_stmt};
 use radix_hir::{
     DefId, HirExpression, HirExpressionKind, HirItemKind, HirLocal, HirModule, HirParam,
     HirPattern, HirStatement,

@@ -11,7 +11,7 @@ use radix_hir::{
     DefId, HirAnnotation, HirAnnotationField, HirAnnotationValue, HirExpression, HirExpressionKind,
     HirLiteral, HirOwnerRef, HirTypeSite, HirTypeSlot,
 };
-use radix_lexer::{lookup_keyword_spec, Interner, Symbol, Token, TokenKind};
+use radix_lexer::{Interner, Symbol, Token, TokenKind, lookup_keyword_spec};
 use radix_types::TypeTable;
 use rustc_hash::FxHashMap;
 

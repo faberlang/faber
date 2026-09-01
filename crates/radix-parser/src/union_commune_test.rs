@@ -1,6 +1,6 @@
 //! TEU1 parser proofs for annotated shared fields in tagged unions.
 
-use crate::{parse, ParseErrorKind};
+use crate::{ParseErrorKind, parse};
 use radix_lexer::lex;
 use radix_syntax::{AnnotationKind, StmtKind};
 

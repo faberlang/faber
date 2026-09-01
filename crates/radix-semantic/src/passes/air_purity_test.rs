@@ -107,10 +107,11 @@ functio combine(fractus x, fractus y) → fractus {
     );
 
     let err = expect_air_issue(&errors, "tensor_method_receiver");
-    assert!(err
-        .args
-        .iter()
-        .any(|arg| arg.name == "method" && arg.value == "addita"));
+    assert!(
+        err.args
+            .iter()
+            .any(|arg| arg.name == "method" && arg.value == "addita")
+    );
 }
 
 #[test]

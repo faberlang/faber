@@ -9,7 +9,7 @@
 use crate::lexer::{LexError, LocaleSuggestion};
 use crate::parser::ParseError;
 use crate::semantic::SemanticError;
-use radix_diagnostics::{diagnostic_identity, Diagnostic, DiagnosticArg, DiagnosticPhase, PhaseErrorKind, Severity};
+use radix_diagnostics::{Diagnostic, DiagnosticArg, DiagnosticPhase, PhaseErrorKind, Severity, diagnostic_identity};
 use radix_semantic::catalog;
 use radix_semantic::catalog_semantic;
 use radix_semantic::catalog_syntax;

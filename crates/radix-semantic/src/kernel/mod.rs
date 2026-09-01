@@ -7,8 +7,8 @@
 mod manifest;
 
 pub use manifest::{
-    kernel_manifest_entries, kernel_module_count, kernel_module_supports_verb, KernelManifestEntry,
-    KernelModule, KERNEL_GLOB_IMPORT, KERNEL_MANIFEST_VERSION, KERNEL_PREFIX,
+    KERNEL_GLOB_IMPORT, KERNEL_MANIFEST_VERSION, KERNEL_PREFIX, KernelManifestEntry, KernelModule,
+    kernel_manifest_entries, kernel_module_count, kernel_module_supports_verb,
 };
 
 /// Outcome of resolving a `faber:<module>` import path.

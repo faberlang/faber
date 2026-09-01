@@ -15,7 +15,7 @@ pub mod stats;
 mod textus_literal;
 pub mod value;
 
-pub use capability::{classify_runner_lowerability, runner_dispatch_status, RunnerDispatchStatus};
+pub use capability::{RunnerDispatchStatus, classify_runner_lowerability, runner_dispatch_status};
 
 pub use host::{BufferHost, Host, StdioHost};
 pub use stats::{FunctionStats, IntrinsicStats, RunnerStats};
@@ -29,18 +29,18 @@ use radix_mir::{
     MirStatementKind, MirTempId, MirTerminatorKind, MirType, MirUnOp, MirValidationContext,
     MirValue, MirValueId, MirValueKind, ValidatedMir,
 };
-use radix_types::{effective_width, NumericWidth, Primitive, Type, TypeId, TypeTable};
+use radix_types::{NumericWidth, Primitive, Type, TypeId, TypeTable, effective_width};
 use rustc_hash::{FxHashMap, FxHashSet};
 use std::cell::RefCell;
 use std::rc::Rc;
 use std::time::Instant;
 use value::{
-    add_values, compare_values, decimal_numeric_binop, int_bitwise_binop, modular_word_bitnot,
-    modular_word_bitwise_binop, modular_word_compare_values, modular_word_neg,
-    modular_word_numeric_binop, numeric_binop, uint_width_checked_div, uint_width_checked_mul,
-    uint_width_checked_neg, uint_width_checked_rem, uint_width_checked_sub, values_equal,
-    width_checked_div, width_checked_mul, width_checked_neg, width_checked_rem, width_checked_sub,
-    GradientStorage, TensorValue,
+    GradientStorage, TensorValue, add_values, compare_values, decimal_numeric_binop,
+    int_bitwise_binop, modular_word_bitnot, modular_word_bitwise_binop,
+    modular_word_compare_values, modular_word_neg, modular_word_numeric_binop, numeric_binop,
+    uint_width_checked_div, uint_width_checked_mul, uint_width_checked_neg, uint_width_checked_rem,
+    uint_width_checked_sub, values_equal, width_checked_div, width_checked_mul, width_checked_neg,
+    width_checked_rem, width_checked_sub,
 };
 
 pub(crate) const RUNNER_UNSUPPORTED_PREFIX: &str = "faberscript unsupported";
@@ -703,11 +703,7 @@ fn half_to_f32(bits: u16) -> f32 {
         return if sign == 1 { -magnitude } else { magnitude };
     }
     let value = (1.0f32 + mantissa as f32 / 1024.0f32) * 2f32.powi(exponent as i32 - 15);
-    if sign == 1 {
-        -value
-    } else {
-        value
-    }
+    if sign == 1 { -value } else { value }
 }
 
 impl<H: Host + ?Sized> Runner<'_, H> {

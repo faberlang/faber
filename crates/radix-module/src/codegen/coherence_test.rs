@@ -7,7 +7,7 @@ use crate::abi::host_abi;
 use crate::codegen::Target;
 #[cfg(any(feature = "hir-go", feature = "hir-ts"))]
 use crate::driver::Config;
-use crate::intrinsics::{mir_collection_op, IntrinsicReceiver, INTRINSICS};
+use crate::intrinsics::{INTRINSICS, IntrinsicReceiver, mir_collection_op};
 #[cfg(any(feature = "hir-go", feature = "hir-ts"))]
 use crate::runtime_contract::frame::FrameStatus;
 #[cfg(any(feature = "hir-go", feature = "hir-ts"))]
@@ -326,9 +326,11 @@ fn intrinsic_host_abi_capabilities_have_registered_method_owners() {
         HOST_ONLY_SYMBOLS.len(),
         "host-only carve-out contains duplicates"
     );
-    assert!(host_only
-        .iter()
-        .all(|symbol| symbol.starts_with("__faber_rt_v1_")));
+    assert!(
+        host_only
+            .iter()
+            .all(|symbol| symbol.starts_with("__faber_rt_v1_"))
+    );
     assert!(
         host_only.is_disjoint(&symbols),
         "host-only symbols must not be method capabilities"

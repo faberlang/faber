@@ -7,10 +7,10 @@
 
 use crate::analyze::{AnalyzedProgram, AnalyzedProgramNode};
 use radix_module::diagnostics::{Diagnostic, DiagnosticPhase};
-use radix_module::hir::package::{
-    collect_nucleum_metadata, encode_nucleum_metadata, NucleumPackageError, NucleumProgramMetadata,
-};
 use radix_module::hir::NucleumRole;
+use radix_module::hir::package::{
+    NucleumPackageError, NucleumProgramMetadata, collect_nucleum_metadata, encode_nucleum_metadata,
+};
 use std::path::{Path, PathBuf};
 
 /// Sidecar file written beside `package.fhirpkg`.

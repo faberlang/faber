@@ -9,11 +9,11 @@
 //! produces Faber output. Does not own emit internals.
 
 use crate::codegen::CodegenError;
-use crate::driver::{analyze_source, AnalyzeRequest, AnalyzedModule, Session};
-use crate::locale::{latin_locale_pack, KeywordSurface, LocalePack};
+use crate::driver::{AnalyzeRequest, AnalyzedModule, Session, analyze_source};
+use crate::locale::{KeywordSurface, LocalePack, latin_locale_pack};
 use crate::program::compile::prepare_program_module_for_name;
 use crate::{Diagnostic, FaberOutput};
-use radix_hir::visit::{walk_block, walk_expr, walk_function, HirVisitor};
+use radix_hir::visit::{HirVisitor, walk_block, walk_expr, walk_function};
 use radix_hir::{
     HirExpression, HirExpressionKind, HirItem, HirItemKind, HirOwnerRef, HirTypeForm, HirTypeFormArg, HirTypeFormHead,
     HirTypeSlot,

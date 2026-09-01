@@ -2,7 +2,7 @@
 
 use crate::codegen::Target;
 use crate::driver::{Config, Session};
-use crate::mir::{run_source, BufferHost, RunSourceError};
+use crate::mir::{BufferHost, RunSourceError, run_source};
 
 fn session() -> Session {
     Session::new(Config::default().with_target(Target::HirTypeScript))

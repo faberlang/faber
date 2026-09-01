@@ -6,10 +6,10 @@ use std::fs;
 use std::path::PathBuf;
 use std::time::{SystemTime, UNIX_EPOCH};
 
+use radix_module::Output;
 use radix_module::codegen::Target;
 use radix_module::diagnostics::Diagnostic;
 use radix_module::driver::Config;
-use radix_module::Output;
 
 use super::*;
 use crate::test_support::test_analysis_seams;

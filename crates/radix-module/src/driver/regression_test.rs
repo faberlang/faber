@@ -168,10 +168,12 @@ fn statement_level_ad_does_not_roundtrip_through_faber_codegen() {
         ModuleCompileRequest::default(),
     );
     assert!(!result.success());
-    assert!(result
-        .diagnostics
-        .iter()
-        .any(|d| d.is_error() && d.code == Some("PARSE020") && d.issue() == Some("ad_expression_only")));
+    assert!(
+        result
+            .diagnostics
+            .iter()
+            .any(|d| d.is_error() && d.code == Some("PARSE020") && d.issue() == Some("ad_expression_only"))
+    );
 }
 
 #[test]
@@ -242,10 +244,12 @@ fn compact_fac_closure_rejects_redde_without_explicit_return_type() {
 
     assert!(result.output.is_none());
     assert!(!result.success());
-    assert!(result
-        .diagnostics
-        .iter()
-        .any(|d| d.is_error() && d.code == Some("SEM033") && d.issue() == Some("redde_requires_return_type")));
+    assert!(
+        result
+            .diagnostics
+            .iter()
+            .any(|d| d.is_error() && d.code == Some("SEM033") && d.issue() == Some("redde_requires_return_type"))
+    );
 }
 
 #[test]
@@ -265,10 +269,12 @@ fn contextual_compact_fac_closure_rejects_redde_without_local_return_type() {
 
     assert!(result.output.is_none());
     assert!(!result.success());
-    assert!(result
-        .diagnostics
-        .iter()
-        .any(|d| d.is_error() && d.code == Some("SEM033") && d.issue() == Some("redde_requires_return_type")));
+    assert!(
+        result
+            .diagnostics
+            .iter()
+            .any(|d| d.is_error() && d.code == Some("SEM033") && d.issue() == Some("redde_requires_return_type"))
+    );
 }
 
 #[test]
@@ -306,10 +312,12 @@ fn compact_fac_closure_rejects_iace_without_local_error_channel() {
 
     assert!(result.output.is_none());
     assert!(!result.success());
-    assert!(result
-        .diagnostics
-        .iter()
-        .any(|d| d.is_error() && d.code == Some("SEM010") && d.issue() == Some("iace_requires_alternate_exit")));
+    assert!(
+        result
+            .diagnostics
+            .iter()
+            .any(|d| d.is_error() && d.code == Some("SEM010") && d.issue() == Some("iace_requires_alternate_exit"))
+    );
 }
 
 #[test]
@@ -366,10 +374,12 @@ fn legacy_block_closure_rejects_redde_without_explicit_return_type() {
 
     assert!(result.output.is_none());
     assert!(!result.success());
-    assert!(result
-        .diagnostics
-        .iter()
-        .any(|d| d.is_error() && d.code == Some("SEM033") && d.issue() == Some("redde_requires_return_type")));
+    assert!(
+        result
+            .diagnostics
+            .iter()
+            .any(|d| d.is_error() && d.code == Some("SEM033") && d.issue() == Some("redde_requires_return_type"))
+    );
 }
 
 #[test]
@@ -400,13 +410,16 @@ incipit {
 }"#;
     let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
 
-    assert!(result.diagnostics.iter().all(|d| d
-        .issue()
-        .is_none_or(|issue| issue != "cannot_infer_expression_type")));
-    assert!(result
-        .diagnostics
-        .iter()
-        .all(|d| d.issue() != Some("condition_must_be_bivalens")));
+    assert!(result.diagnostics.iter().all(|d| {
+        d.issue()
+            .is_none_or(|issue| issue != "cannot_infer_expression_type")
+    }));
+    assert!(
+        result
+            .diagnostics
+            .iter()
+            .all(|d| d.issue() != Some("condition_must_be_bivalens"))
+    );
 }
 
 #[test]
@@ -420,9 +433,10 @@ incipit {
 }"#;
     let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
 
-    assert!(result.diagnostics.iter().all(|d| d
-        .issue()
-        .is_none_or(|issue| issue != "cannot_infer_expression_type")));
+    assert!(result.diagnostics.iter().all(|d| {
+        d.issue()
+            .is_none_or(|issue| issue != "cannot_infer_expression_type")
+    }));
 }
 
 #[test]
@@ -437,9 +451,10 @@ fn itera_de_array_index_no_longer_leaves_infer_types() {
     let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
 
     assert!(result.success());
-    assert!(result.diagnostics.iter().all(|d| d
-        .issue()
-        .is_none_or(|issue| issue != "cannot_infer_expression_type")));
+    assert!(result.diagnostics.iter().all(|d| {
+        d.issue()
+            .is_none_or(|issue| issue != "cannot_infer_expression_type")
+    }));
 }
 
 #[test]
@@ -453,9 +468,10 @@ fn itera_ab_range_no_longer_leaves_infer_types() {
     let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
 
     assert!(result.success());
-    assert!(result.diagnostics.iter().all(|d| d
-        .issue()
-        .is_none_or(|issue| issue != "cannot_infer_expression_type")));
+    assert!(result.diagnostics.iter().all(|d| {
+        d.issue()
+            .is_none_or(|issue| issue != "cannot_infer_expression_type")
+    }));
 }
 
 #[test]
@@ -469,9 +485,10 @@ fn itera_ab_inclusive_range_glyph_compiles() {
     let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
 
     assert!(result.success());
-    assert!(result.diagnostics.iter().all(|d| d
-        .issue()
-        .is_none_or(|issue| issue != "cannot_infer_expression_type")));
+    assert!(result.diagnostics.iter().all(|d| {
+        d.issue()
+            .is_none_or(|issue| issue != "cannot_infer_expression_type")
+    }));
 }
 
 #[test]
@@ -484,10 +501,12 @@ fn deferred_local_assignment_can_drive_inference() {
 }";
     let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
 
-    assert!(result
-        .diagnostics
-        .iter()
-        .all(|d| d.issue() != Some("cannot_infer_variable_type")));
+    assert!(
+        result
+            .diagnostics
+            .iter()
+            .all(|d| d.issue() != Some("cannot_infer_variable_type"))
+    );
 }
 
 #[test]
@@ -501,10 +520,12 @@ fn cura_allocator_scope_no_longer_reports_infer_variable_error() {
     let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
 
     assert!(result.success());
-    assert!(result
-        .diagnostics
-        .iter()
-        .all(|d| d.issue() != Some("cannot_infer_variable_type")));
+    assert!(
+        result
+            .diagnostics
+            .iter()
+            .all(|d| d.issue() != Some("cannot_infer_variable_type"))
+    );
 }
 
 #[test]
@@ -520,10 +541,12 @@ incipit {
     let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
 
     assert!(result.success());
-    assert!(result
-        .diagnostics
-        .iter()
-        .all(|d| d.issue() != Some("unknown_identifier")));
+    assert!(
+        result
+            .diagnostics
+            .iter()
+            .all(|d| d.issue() != Some("unknown_identifier"))
+    );
 }
 
 #[test]
@@ -579,9 +602,10 @@ fn compile_lowers_top_level_proba_to_rust_test_function() {
 incipit {}"#;
     let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
 
-    assert!(result.diagnostics.iter().all(|d| d
-        .issue()
-        .is_none_or(|issue| issue != "unhandled_statement_kind")));
+    assert!(result.diagnostics.iter().all(|d| {
+        d.issue()
+            .is_none_or(|issue| issue != "unhandled_statement_kind")
+    }));
     let output = super::rust_output(result);
     assert!(output.code.contains("#[test]"));
     assert!(output.code.contains("fn proba_"));
@@ -601,16 +625,21 @@ proba "case two" futurum "todo" {
 incipit {}"#;
     let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
 
-    assert!(result.diagnostics.iter().all(|d| d
-        .issue()
-        .is_none_or(|issue| issue != "unhandled_statement_kind")));
+    assert!(result.diagnostics.iter().all(|d| {
+        d.issue()
+            .is_none_or(|issue| issue != "unhandled_statement_kind")
+    }));
     let output = super::rust_output(result);
-    assert!(output
-        .code
-        .contains("#[ignore = \"faber: omitte - blocked\"]"));
-    assert!(output
-        .code
-        .contains("#[ignore = \"faber: futurum - todo\"]"));
+    assert!(
+        output
+            .code
+            .contains("#[ignore = \"faber: omitte - blocked\"]")
+    );
+    assert!(
+        output
+            .code
+            .contains("#[ignore = \"faber: futurum - todo\"]")
+    );
 }
 
 #[test]
@@ -634,9 +663,10 @@ fn compile_lowers_probandum_nested_cases_without_lowering_errors() {
 }"#;
     let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
 
-    assert!(result.diagnostics.iter().all(|d| d
-        .issue()
-        .is_none_or(|issue| issue != "unhandled_statement_kind")));
+    assert!(result.diagnostics.iter().all(|d| {
+        d.issue()
+            .is_none_or(|issue| issue != "unhandled_statement_kind")
+    }));
 }
 
 // ── struct / constructors / destructuring ──
@@ -657,10 +687,12 @@ genus Point {
 }";
     let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
 
-    assert!(result
-        .diagnostics
-        .iter()
-        .all(|d| d.issue() != Some("expression_type_mismatch")));
+    assert!(
+        result
+            .diagnostics
+            .iter()
+            .all(|d| d.issue() != Some("expression_type_mismatch"))
+    );
 }
 
 #[test]
@@ -717,10 +749,12 @@ fn array_destructured_vars_can_be_used_in_arithmetic() {
 }";
     let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
 
-    assert!(result
-        .diagnostics
-        .iter()
-        .all(|d| d.issue() != Some("numeric_operands_required")));
+    assert!(
+        result
+            .diagnostics
+            .iter()
+            .all(|d| d.issue() != Some("numeric_operands_required"))
+    );
 }
 
 #[test]
@@ -739,10 +773,12 @@ incipit {
 }"#;
     let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
 
-    assert!(result
-        .diagnostics
-        .iter()
-        .all(|d| d.issue() != Some("numeric_operands_required")));
+    assert!(
+        result
+            .diagnostics
+            .iter()
+            .all(|d| d.issue() != Some("numeric_operands_required"))
+    );
 }
 
 #[test]
@@ -775,10 +811,12 @@ incipit {
     let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
 
     assert!(result.success(), "{:?}", result.diagnostics);
-    assert!(result
-        .diagnostics
-        .iter()
-        .all(|d| d.issue() != Some("use_after_move")));
+    assert!(
+        result
+            .diagnostics
+            .iter()
+            .all(|d| d.issue() != Some("use_after_move"))
+    );
 }
 
 #[test]
@@ -803,10 +841,12 @@ incipit {
     let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
 
     assert!(result.success(), "{:?}", result.diagnostics);
-    assert!(result
-        .diagnostics
-        .iter()
-        .all(|d| d.issue() != Some("use_after_move")));
+    assert!(
+        result
+            .diagnostics
+            .iter()
+            .all(|d| d.issue() != Some("use_after_move"))
+    );
 }
 
 #[test]
@@ -821,10 +861,12 @@ fn empty_array_and_spread_literals_no_longer_report_annotation_or_type_errors() 
     let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
 
     assert!(result.success(), "{:?}", result.diagnostics);
-    assert!(result
-        .diagnostics
-        .iter()
-        .all(|d| d.issue() != Some("common_type_mismatch")));
+    assert!(
+        result
+            .diagnostics
+            .iter()
+            .all(|d| d.issue() != Some("common_type_mismatch"))
+    );
 }
 
 // ── typed vacua / context-free vacua ──
@@ -884,9 +926,10 @@ incipit {
 }";
     let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
 
-    assert!(result.diagnostics.iter().all(|d| d
-        .issue()
-        .is_none_or(|issue| issue != "cannot_infer_expression_type")));
+    assert!(result.diagnostics.iter().all(|d| {
+        d.issue()
+            .is_none_or(|issue| issue != "cannot_infer_expression_type")
+    }));
     assert!(result.success(), "{:?}", result.diagnostics);
 }
 
@@ -978,10 +1021,11 @@ incipit {
 }"#;
     let missing_result = compile(&session, "missing.fab", missing, ModuleCompileRequest::default());
     assert!(!missing_result.success());
-    assert!(missing_result
-        .diagnostics
-        .iter()
-        .any(|d| { d.is_error() && d.code == Some("SEM004") && d.issue() == Some("missing_required_struct_field") }));
+    assert!(
+        missing_result.diagnostics.iter().any(|d| {
+            d.is_error() && d.code == Some("SEM004") && d.issue() == Some("missing_required_struct_field")
+        })
+    );
 
     let bad_default = r#"genus User {
   numerus score = "bad"
@@ -992,10 +1036,12 @@ incipit {
 }"#;
     let default_result = compile(&session, "default.fab", bad_default, ModuleCompileRequest::default());
     assert!(!default_result.success());
-    assert!(default_result
-        .diagnostics
-        .iter()
-        .any(|d| { d.is_error() && d.code == Some("SEM010") && d.issue() == Some("field_default_type_mismatch") }));
+    assert!(
+        default_result
+            .diagnostics
+            .iter()
+            .any(|d| { d.is_error() && d.code == Some("SEM010") && d.issue() == Some("field_default_type_mismatch") })
+    );
 }
 
 // ── optional coalesce / nullable fields ──
@@ -1038,9 +1084,11 @@ incipit {
     assert!(output.code.contains("pub score: Option<i64>,"));
     assert!(output.code.contains("email: None,"));
     assert!(output.code.contains("score: None,"));
-    assert!(output
-        .code
-        .contains("email: Some(\"lin@example.com\".to_string()),"));
+    assert!(
+        output
+            .code
+            .contains("email: Some(\"lin@example.com\".to_string()),")
+    );
 }
 
 #[ignore = "slow: spawns cargo build of generated Rust binary; run with --ignored"]
@@ -1064,13 +1112,17 @@ incipit {
     let output = super::rust_output(result);
     assert!(output.code.contains("nickname: \"Anonymous\".to_string(),"));
     assert!(output.code.contains("pub email: Option<String>,"));
-    assert!(output
-        .code
-        .contains("email: Some(\"Anonymous\".to_string()),"));
+    assert!(
+        output
+            .code
+            .contains("email: Some(\"Anonymous\".to_string()),")
+    );
     assert!(output.code.contains("email: None,"));
-    assert!(output
-        .code
-        .contains("email: Some(\"ken@example.com\".to_string()),"));
+    assert!(
+        output
+            .code
+            .contains("email: Some(\"ken@example.com\".to_string()),")
+    );
     assert!(!output.code.contains(".to_string().to_string()"));
     super::compile_rust_source_with_rustc(&output.code, "nullable-field-default");
 }
@@ -1090,10 +1142,12 @@ incipit {
     let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
 
     assert!(result.success(), "{:?}", result.diagnostics);
-    assert!(result
-        .diagnostics
-        .iter()
-        .all(|d| d.issue() != Some("callee_not_callable")));
+    assert!(
+        result
+            .diagnostics
+            .iter()
+            .all(|d| d.issue() != Some("callee_not_callable"))
+    );
 }
 
 #[test]
@@ -1111,9 +1165,10 @@ incipit {
 }"#;
     let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
 
-    assert!(result.diagnostics.iter().all(|d| d
-        .issue()
-        .is_none_or(|issue| issue != "elige_case_value_shape")));
+    assert!(result.diagnostics.iter().all(|d| {
+        d.issue()
+            .is_none_or(|issue| issue != "elige_case_value_shape")
+    }));
 }
 
 #[test]
@@ -1125,9 +1180,10 @@ fn ordo_exemplum_no_longer_reports_elige_literal_error() {
     let result = compile(&session, "ordo.fab", &source, ModuleCompileRequest::default());
 
     assert!(result.success(), "{:?}", result.diagnostics);
-    assert!(result.diagnostics.iter().all(|d| d
-        .issue()
-        .is_none_or(|issue| issue != "elige_case_value_shape")));
+    assert!(result.diagnostics.iter().all(|d| {
+        d.issue()
+            .is_none_or(|issue| issue != "elige_case_value_shape")
+    }));
 }
 
 #[test]
@@ -1162,10 +1218,12 @@ incipit {
 }"#;
     let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
 
-    assert!(result
-        .diagnostics
-        .iter()
-        .all(|d| d.issue() != Some("wrong_number_of_arguments")));
+    assert!(
+        result
+            .diagnostics
+            .iter()
+            .all(|d| d.issue() != Some("wrong_number_of_arguments"))
+    );
 }
 
 #[test]
@@ -1211,10 +1269,12 @@ fn plain_union_does_not_accept_nihil_without_nullable_member() {
     let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
 
     assert!(!result.success());
-    assert!(result
-        .diagnostics
-        .iter()
-        .any(|diag| diag.is_error() && diag.code == Some("SEM010") && diag.issue() == Some("return_type_mismatch")));
+    assert!(
+        result
+            .diagnostics
+            .iter()
+            .any(|diag| diag.is_error() && diag.code == Some("SEM010") && diag.issue() == Some("return_type_mismatch"))
+    );
 }
 
 #[test]
@@ -1226,10 +1286,12 @@ fn degenerate_nihil_only_union_is_rejected() {
     let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
 
     assert!(!result.success());
-    assert!(result
-        .diagnostics
-        .iter()
-        .any(|diag| diag.is_error() && diag.code == Some("SEM008") && diag.issue() == Some("union_only_nihil")));
+    assert!(
+        result
+            .diagnostics
+            .iter()
+            .any(|diag| diag.is_error() && diag.code == Some("SEM008") && diag.issue() == Some("union_only_nihil"))
+    );
 }
 
 // ── additional regression / unused/feature-gated tests ──
@@ -1296,12 +1358,14 @@ fn object_member_and_index_chains_no_longer_report_index_errors() {
 }"#;
     let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
 
-    assert!(result.diagnostics.iter().all(|d| d
-        .issue()
-        .is_none_or(|issue| issue != "array_index_must_be_numerus")));
-    assert!(result.diagnostics.iter().all(|d| d
-        .issue()
-        .is_none_or(|issue| issue != "indexing_requires_array_or_map")));
+    assert!(result.diagnostics.iter().all(|d| {
+        d.issue()
+            .is_none_or(|issue| issue != "array_index_must_be_numerus")
+    }));
+    assert!(result.diagnostics.iter().all(|d| {
+        d.issue()
+            .is_none_or(|issue| issue != "indexing_requires_array_or_map")
+    }));
 }
 
 #[ignore = "SEM014: cannot_infer_expression_type for compact closure; feature incomplete, placeholder until closure inference is implemented"]
@@ -1314,10 +1378,12 @@ fn array_method_closure_argument_no_longer_reports_argument_type_mismatch() {
 }";
     let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
 
-    assert!(result
-        .diagnostics
-        .iter()
-        .all(|d| d.issue() != Some("argument_type_mismatch")));
+    assert!(
+        result
+            .diagnostics
+            .iter()
+            .all(|d| d.issue() != Some("argument_type_mismatch"))
+    );
 }
 
 #[ignore = "PARSE001: syntax errors in genus definition prevent compilation; feature incomplete, placeholder until ego field assignment is implemented"]
@@ -1337,10 +1403,12 @@ incipit {
 }";
     let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
 
-    assert!(result
-        .diagnostics
-        .iter()
-        .all(|d| d.issue() != Some("assignment_type_mismatch")));
+    assert!(
+        result
+            .diagnostics
+            .iter()
+            .all(|d| d.issue() != Some("assignment_type_mismatch"))
+    );
 }
 
 #[ignore = "PARSE001: json_quoted_key in object literal; feature incomplete, placeholder until objectum return type is implemented"]
@@ -1357,10 +1425,12 @@ incipit {
 }"#;
     let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
 
-    assert!(result
-        .diagnostics
-        .iter()
-        .all(|d| d.issue() != Some("unknown_type")));
+    assert!(
+        result
+            .diagnostics
+            .iter()
+            .all(|d| d.issue() != Some("unknown_type"))
+    );
 }
 
 // ── misc: curator, quidlibet, conversio type params, verte_vel ──
@@ -1377,10 +1447,12 @@ incipit {
 }"#;
     let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
 
-    assert!(result
-        .diagnostics
-        .iter()
-        .any(|d| d.is_error() && d.code == Some("SEM002") && d.issue() == Some("unknown_type")));
+    assert!(
+        result
+            .diagnostics
+            .iter()
+            .any(|d| d.is_error() && d.code == Some("SEM002") && d.issue() == Some("unknown_type"))
+    );
 }
 
 #[test]
@@ -1393,10 +1465,12 @@ fn quidlibet_container_annotation_no_longer_reports_unknown_type() {
     let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
 
     assert!(result.success(), "{:?}", result.diagnostics);
-    assert!(result
-        .diagnostics
-        .iter()
-        .all(|d| d.issue() != Some("unknown_type")));
+    assert!(
+        result
+            .diagnostics
+            .iter()
+            .all(|d| d.issue() != Some("unknown_type"))
+    );
 }
 
 #[test]
@@ -1409,10 +1483,12 @@ fn conversio_type_params_no_longer_report_unknown_type() {
     let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
 
     assert!(result.success(), "{:?}", result.diagnostics);
-    assert!(result
-        .diagnostics
-        .iter()
-        .all(|d| d.issue() != Some("unknown_type")));
+    assert!(
+        result
+            .diagnostics
+            .iter()
+            .all(|d| d.issue() != Some("unknown_type"))
+    );
 }
 
 #[test]
@@ -1428,10 +1504,12 @@ fn verte_vel_no_longer_reports_invalid_cast() {
 }"#;
     let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
 
-    assert!(result
-        .diagnostics
-        .iter()
-        .all(|d| d.issue() != Some("invalid_cast")));
+    assert!(
+        result
+            .diagnostics
+            .iter()
+            .all(|d| d.issue() != Some("invalid_cast"))
+    );
     assert!(result.success(), "{:?}", result.diagnostics);
 }
 
@@ -1458,13 +1536,17 @@ incipit {
 
     assert!(result.success());
     let output = super::rust_output(result);
-    assert!(output
-        .code
-        .contains("let name: String = \"Marcus\".to_string();"));
+    assert!(
+        output
+            .code
+            .contains("let name: String = \"Marcus\".to_string();")
+    );
     assert!(output.code.contains("return \"yes\".to_string();"));
-    assert!(output
-        .code
-        .contains("vec![\"a\".to_string(), \"b\".to_string()]"));
+    assert!(
+        output
+            .code
+            .contains("vec![\"a\".to_string(), \"b\".to_string()]")
+    );
     assert!(output.code.contains("unwrap_or(\"x\".to_string())"));
 }
 
@@ -1480,9 +1562,11 @@ fn rust_output_wraps_optional_local_initializers_in_some() {
 
     assert!(result.success());
     let output = super::rust_output(result);
-    assert!(output
-        .code
-        .contains("let actualName: Option<String> = Some(\"Marcus\".to_string());"));
+    assert!(
+        output
+            .code
+            .contains("let actualName: Option<String> = Some(\"Marcus\".to_string());")
+    );
     assert!(output.code.contains("let maybe: Option<String> = None;"));
 }
 
@@ -1532,9 +1616,11 @@ fn rust_output_uses_scalar_display_helpers_for_scribe() {
     let output = super::rust_output(result);
     assert!(output.code.contains("faber::display_fractus(f)"));
     assert!(output.code.contains("faber::display_bivalens(b)"));
-    assert!(output
-        .code
-        .contains("faber::display_text_payload((a).as_ref())"));
+    assert!(
+        output
+            .code
+            .contains("faber::display_text_payload((a).as_ref())")
+    );
 }
 
 #[test]
@@ -1578,9 +1664,11 @@ incipit {
 
     assert!(result.success());
     let output = super::rust_output(result);
-    assert!(output
-        .code
-        .contains("use crate::norma::consolum::consolum;"));
+    assert!(
+        output
+            .code
+            .contains("use crate::norma::consolum::consolum;")
+    );
     assert!(output.code.contains("use crate::commands::greet::greet;"));
     assert!(!output.code.contains("..::"));
     assert!(!output.code.contains(".::"));
@@ -1617,10 +1705,12 @@ fn typed_array_index_assignment_no_longer_reports_assignment_type_mismatch() {
     let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
 
     assert!(result.success(), "{:?}", result.diagnostics);
-    assert!(result
-        .diagnostics
-        .iter()
-        .all(|d| d.issue() != Some("assignment_type_mismatch")));
+    assert!(
+        result
+            .diagnostics
+            .iter()
+            .all(|d| d.issue() != Some("assignment_type_mismatch"))
+    );
 }
 
 // ── format/scriptum emission ──
@@ -1651,9 +1741,11 @@ fn rust_output_uses_zero_based_numbered_scriptum_placeholders() {
 
     assert!(result.success());
     let output = super::rust_output(result);
-    assert!(output
-        .code
-        .contains("println!(\"ordo: {second}, {first}\");"));
+    assert!(
+        output
+            .code
+            .contains("println!(\"ordo: {second}, {first}\");")
+    );
 }
 
 #[test]
@@ -1682,9 +1774,11 @@ fn rust_output_uses_numbered_string_literal_format_application() {
 
     assert!(result.success());
     let output = super::rust_output(result);
-    assert!(output
-        .code
-        .contains("println!(\"ordo: {second}, {first}\");"));
+    assert!(
+        output
+            .code
+            .contains("println!(\"ordo: {second}, {first}\");")
+    );
 }
 
 #[test]

@@ -14,12 +14,12 @@
 //! the GGUF-M6/M6 capstone package manifest (EXEC-01 challenge C2).
 
 use super::composite_plan::{
-    assemble_composite_plan, verify_identity_preservation, BackendLeaf, BackendSelection,
-    CompositePlanFacts, ContentIdentity, EffectCapabilityRequirements, ExpectedBuffer,
-    ExpectedSource, HostCallFact, IdentitySource, KernelIdentity, ModelIdentity, SourceRevisions,
-    SubmissionRegionFact,
+    BackendLeaf, BackendSelection, CompositePlanFacts, ContentIdentity,
+    EffectCapabilityRequirements, ExpectedBuffer, ExpectedSource, HostCallFact, IdentitySource,
+    KernelIdentity, ModelIdentity, SourceRevisions, SubmissionRegionFact, assemble_composite_plan,
+    verify_identity_preservation,
 };
-use super::test_support::{test_temp_dir, TestDir};
+use super::test_support::{TestDir, test_temp_dir};
 use radix::module::codegen::Target;
 use radix::module::diagnostics::{Diagnostic, DiagnosticArg};
 use radix::module::driver::Config;

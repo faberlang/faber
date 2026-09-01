@@ -1,8 +1,8 @@
 //! Focused proofs for target-neutral fresh-storage access facts.
 
 use super::{
-    analyze_access_facts, analyze_access_facts_with_types, AccessFact, AccessFactTable,
-    DeadSourceReason,
+    AccessFact, AccessFactTable, DeadSourceReason, analyze_access_facts,
+    analyze_access_facts_with_types,
 };
 use crate::test_support::analyze_ok;
 use crate::{AnalyzedApplication, AnalyzedApplicationParts, PassConfig};
@@ -141,9 +141,11 @@ incipit {
     let source = &locals[0];
     let facts = analyze_access_facts_with_types(&hir, &types);
 
-    assert!(facts
-        .dead_sources_of(source.def_id)
-        .any(|fact| fact.reason == DeadSourceReason::OwnTransfer));
+    assert!(
+        facts
+            .dead_sources_of(source.def_id)
+            .any(|fact| fact.reason == DeadSourceReason::OwnTransfer)
+    );
 }
 
 #[test]
@@ -160,9 +162,11 @@ incipit {
     let source = &locals[0];
     let facts = analyze_access_facts_with_types(&hir, &types);
 
-    assert!(facts
-        .dead_sources_of(source.def_id)
-        .all(|fact| { fact.reason != DeadSourceReason::OwnTransfer }));
+    assert!(
+        facts
+            .dead_sources_of(source.def_id)
+            .all(|fact| { fact.reason != DeadSourceReason::OwnTransfer })
+    );
 }
 
 #[test]

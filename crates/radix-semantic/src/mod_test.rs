@@ -5,13 +5,13 @@
 //! and structured issue arguments across error, warning, and success paths.
 
 use super::{
-    analyze, is_use_site_only_error, PassConfig, SemanticError, SemanticErrorKind, WarningKind,
+    PassConfig, SemanticError, SemanticErrorKind, WarningKind, analyze, is_use_site_only_error,
 };
 use radix_target::Target;
 
+use crate::Primitive;
 use crate::file_interface::{FileExport, FileExportKind, FileInterface, InterfaceTypeSnapshot};
 use crate::test_support::args_have_no_legacy_message;
-use crate::Primitive;
 
 #[test]
 fn hir_lowering_bridge_uses_structured_issue_arg() {
@@ -32,10 +32,11 @@ fn hir_lowering_bridge_uses_structured_issue_arg() {
         .find(|err| err.kind == SemanticErrorKind::LoweringError)
         .expect("HIR lowering diagnostic");
 
-    assert!(err
-        .args
-        .iter()
-        .any(|arg| arg.name == "issue" && arg.value == "top_level_initializer"));
+    assert!(
+        err.args
+            .iter()
+            .any(|arg| arg.name == "issue" && arg.value == "top_level_initializer")
+    );
     assert!(args_have_no_legacy_message(&err.args));
 }
 

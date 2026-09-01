@@ -1,9 +1,9 @@
 //! S0-R1: interface snapshots serialize kinded applied size arguments.
 
 use crate::file_interface::{
+    FileInterfaceError, InterfaceAppliedArg, InterfaceIndexSnapshot, InterfaceTypeSnapshot,
     import_interface_callable_with_resolver, import_interface_type,
-    snapshot_interface_callable_with_resolver, snapshot_interface_type, FileInterfaceError,
-    InterfaceAppliedArg, InterfaceIndexSnapshot, InterfaceTypeSnapshot,
+    snapshot_interface_callable_with_resolver, snapshot_interface_type,
 };
 use crate::{
     FuncSig, IndexExpr, InferVar, NumericWidth, ParamType, Primitive, Resolver, Type, TypeTable,

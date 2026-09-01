@@ -4,7 +4,7 @@
 //! `validate_carried_sub_window_projection`, `GEA3_WIRE_BUFFER_ABI_V2`)
 //! lives in `wire.rs`; these rows prove the fail-closed laws.
 
-use super::{validate_carried_sub_window_projection, WireSubWindowProjection};
+use super::{WireSubWindowProjection, validate_carried_sub_window_projection};
 
 fn window(
     element_offset: u64,

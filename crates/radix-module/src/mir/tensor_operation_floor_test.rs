@@ -6,8 +6,8 @@
 //! operations each backend supports, probes, or defers.
 
 use super::{
-    required_tensor_operation_floor_families, tensor_operation_floor_rows, TensorOperationFloorFamily,
-    TensorOperationFloorStatus, TensorOperationFloorTarget,
+    TensorOperationFloorFamily, TensorOperationFloorStatus, TensorOperationFloorTarget,
+    required_tensor_operation_floor_families, tensor_operation_floor_rows,
 };
 use radix_types::MirCollectionOp;
 

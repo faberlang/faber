@@ -1,5 +1,5 @@
 use crate::script::{
-    interpret_source, print_run_source_error, run_named, run_source, BufferHost, RunSourceError,
+    BufferHost, RunSourceError, interpret_source, print_run_source_error, run_named, run_source,
 };
 use std::process::ExitCode;
 
@@ -131,9 +131,11 @@ fn empty_source_returns_runner_no_entry_error() {
     let RunSourceError::Stepper(errors) = error else {
         panic!("expected runner error for empty source");
     };
-    assert!(errors
-        .iter()
-        .any(|error| error.issue == "runner_no_entry_function_in_mir_program"));
+    assert!(
+        errors
+            .iter()
+            .any(|error| error.issue == "runner_no_entry_function_in_mir_program")
+    );
 }
 
 #[test]

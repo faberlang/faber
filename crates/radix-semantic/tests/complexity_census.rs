@@ -31,11 +31,11 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use radix::module::paths::faberlang_home;
-use radix::module::{analyze_source, AnalyzeRequest, Session};
-use radix::program::library::{
-    with_library_cached_analysis_mut, LibraryInterfaceCache, LibraryResolver,
-};
+use radix::module::{AnalyzeRequest, Session, analyze_source};
 use radix::program::LibraryImportBinding;
+use radix::program::library::{
+    LibraryInterfaceCache, LibraryResolver, with_library_cached_analysis_mut,
+};
 use radix::{Config, Target};
 use radix_diagnostics::Span;
 use radix_hir::{HirFunction, HirItemKind, HirModule};

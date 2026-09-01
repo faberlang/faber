@@ -4,8 +4,8 @@
 //! skipping.
 
 use super::{
-    report_hir_aspects, HirAspectKind, HirAspectNoSpanReason, HirAspectPrecondition, HirAspectReason, HirAspectRecord,
-    HirAspectRecordKind, HirAspectSpan,
+    HirAspectKind, HirAspectNoSpanReason, HirAspectPrecondition, HirAspectReason, HirAspectRecord, HirAspectRecordKind,
+    HirAspectSpan, report_hir_aspects,
 };
 use crate::hir::{
     DefId, HirBinOp, HirBlock, HirCallArg, HirCasuArm, HirEnum, HirExpression, HirExpressionKind, HirFunction, HirId,
@@ -544,10 +544,12 @@ fn hir_aspect_report_recognizes_additive_reducta_and_cumulata() {
     let report = super::report_hir_aspects_with_interner(&program, &TypeTable::new(), &interner);
 
     assert_eq!(report.records().len(), 2);
-    assert!(report
-        .records()
-        .iter()
-        .all(|record| record.record_kind == HirAspectRecordKind::Recognized));
+    assert!(
+        report
+            .records()
+            .iter()
+            .all(|record| record.record_kind == HirAspectRecordKind::Recognized)
+    );
     assert_eq!(
         report
             .records()
@@ -582,10 +584,12 @@ fn hir_aspect_report_does_not_admit_non_neutral_or_non_additive_reductions() {
     let report = super::report_hir_aspects_with_interner(&program, &TypeTable::new(), &interner);
 
     assert_eq!(report.records().len(), 3);
-    assert!(report
-        .records()
-        .iter()
-        .all(|record| record.record_kind == HirAspectRecordKind::NotProven));
+    assert!(
+        report
+            .records()
+            .iter()
+            .all(|record| record.record_kind == HirAspectRecordKind::NotProven)
+    );
     assert_eq!(report.records()[0].reason, HirAspectReason::NonAdditiveCombine);
     assert_eq!(report.records()[1].reason, HirAspectReason::NonNeutralSeed);
     assert_eq!(report.records()[2].reason, HirAspectReason::NonNeutralSeed);

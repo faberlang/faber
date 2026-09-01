@@ -10,12 +10,12 @@ use std::collections::BTreeMap;
 
 use crate::test_support;
 use crate::{
+    Primitive,
     file_interface::{
         FileExport, FileExportKind, FileInterface, InterfaceAliasExport, InterfaceGenericParam,
         InterfaceIndexSnapshot, InterfaceTypeSnapshot,
     },
     passes::visibility_annotation::VisibilityTier,
-    Primitive,
 };
 
 const LOCAL_ALIASES: &str = "typus Vector<magnitudo N> = vector<f32, N>

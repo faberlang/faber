@@ -442,7 +442,7 @@ impl<H: super::super::Host + ?Sized> Runner<'_, H> {
                             recovery,
                             span,
                             "valor to genus conversion failed",
-                        )
+                        );
                     }
                 },
             };
@@ -494,7 +494,7 @@ impl<H: super::super::Host + ?Sized> Runner<'_, H> {
                             return Err(RunnerError::internal(
                                 span,
                                 "valor to genus conversion failed",
-                            ))
+                            ));
                         }
                     }
                 }
@@ -509,7 +509,7 @@ impl<H: super::super::Host + ?Sized> Runner<'_, H> {
                         return Err(RunnerError::internal(
                             span,
                             "valor to genus conversion failed",
-                        ))
+                        ));
                     }
                 },
             };

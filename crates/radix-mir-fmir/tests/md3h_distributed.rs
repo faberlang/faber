@@ -4,7 +4,7 @@
 
 use radix_mir_fmir::admit_device_section_with_compat;
 use radix_mir_fmir::schema::{
-    default_compatibility_table, FmirDeviceSection, WIRE_DISTRIBUTED_SECTION_VERSION,
+    FmirDeviceSection, WIRE_DISTRIBUTED_SECTION_VERSION, default_compatibility_table,
 };
 
 #[test]

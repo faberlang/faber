@@ -3,11 +3,11 @@
 #[cfg(feature = "hir-rust")]
 #[test]
 fn rust_locale_pack_type_alias_def_reaches_emit_table() {
-    use crate::codegen::rust::generate_def_table;
     use crate::codegen::Target;
+    use crate::codegen::rust::generate_def_table;
     use crate::semantic::{
-        analyze, analyze_resolved_uses, check_def_id_closure, emit_def_table_name, resolved_reference_defs, PassConfig,
-        DEF_ID_CLOSURE_CODE,
+        DEF_ID_CLOSURE_CODE, PassConfig, analyze, analyze_resolved_uses, check_def_id_closure, emit_def_table_name,
+        resolved_reference_defs,
     };
     use rustc_hash::{FxHashMap, FxHashSet};
 

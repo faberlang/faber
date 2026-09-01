@@ -20,8 +20,8 @@ use serde::Deserialize;
 // DDPP1-U2 (C2 feature isolation): the shared route-selection request type.
 use radix::program::library::is_valid_provider_segment;
 use radix::program::manifest::{
-    manifest_build_target, ManifestBuild, ManifestLibrary, ManifestPackage, ManifestPaths,
-    ManifestReader, ManifestTarget,
+    ManifestBuild, ManifestLibrary, ManifestPackage, ManifestPaths, ManifestReader, ManifestTarget,
+    manifest_build_target,
 };
 #[cfg(feature = "runner")]
 use radix::program::mir::DeviceSelection;

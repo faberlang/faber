@@ -3,9 +3,9 @@
 
 use super::error::MirFunctionSignature;
 use crate::{
-    instantiate_existing_generic_type, MirClosureEnvironment, MirClosureEnvironmentId,
-    MirExternalFunctionIdentity, MirGenericBindings, MirLayoutKind, MirLayoutTable,
-    MirScalarLayout, MirType,
+    MirClosureEnvironment, MirClosureEnvironmentId, MirExternalFunctionIdentity,
+    MirGenericBindings, MirLayoutKind, MirLayoutTable, MirScalarLayout, MirType,
+    instantiate_existing_generic_type,
 };
 use radix_hir::DefId;
 use radix_lexer::{Interner, Span, Symbol};
