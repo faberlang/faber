@@ -1020,6 +1020,9 @@ pub fn load_package_with_config(
                 &mut library_cache,
                 &mut diagnostics,
             );
+            if let Err(diagnostic) = merge_library_locale_pack_for_file(file) {
+                diagnostics.push(diagnostic);
+            }
         }
         files.sort_by(|a, b| a.path.cmp(&b.path));
         diagnostics.extend(detect_import_cycles(spec, &files));
@@ -1028,6 +1031,35 @@ pub fn load_package_with_config(
         }
         Ok(files)
     }
+}
+
+/// Merge library-owned member rows into the package file's consumer pack.
+///
+/// The source loader must lex and parse before it can resolve provider imports,
+/// so this projection happens after library expansion but before any unit is
+/// handed to semantic analysis. The same pack then drives the semantic import
+/// projection and keeps the parser's source identities unchanged.
+fn merge_library_locale_pack_for_file(file: &mut PackageFile) -> Result<(), Diagnostic> {
+    let Some(pack) = file.locale_pack.as_mut() else {
+        return Ok(());
+    };
+
+    let roots = file
+        .library_imports
+        .iter()
+        .chain(file.expanded_library_imports.iter())
+        .filter_map(|import| crate::find_package_root(&import.module.interface_path))
+        .collect::<BTreeSet<_>>();
+    radix_module::locale::merge_library_locale_packs(pack, roots).map_err(|err| {
+        crate::package_diagnostic_error(format!(
+            "failed to load library locale pack: {}",
+            radix_module::locale::format_locale_pack_load_error(&err)
+        ))
+        .with_phase(radix_module::diagnostics::DiagnosticPhase::Lex)
+        .with_code("LOCALE001")
+        .with_arg("issue", "library_locale_pack_load_failed")
+        .with_file(file.path.display().to_string())
+    })
 }
 
 /// Order package files for analysis: dependencies before importers.
