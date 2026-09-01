@@ -9,9 +9,7 @@ use crate::driver::ModuleCompileRequest;
 
 #[test]
 fn compile_uses_frontmatter_locale_for_lexing() {
-    let config = Config::default()
-        .with_target(Target::HirRust)
-        ;
+    let config = Config::default().with_target(Target::HirRust);
     let session = crate::driver::Session::new(config);
     let source = "+++\nlocale = \"zh-Hans\"\n+++\n\n函数 salve() { }";
     let result = compile(&session, "locale.fab", source, ModuleCompileRequest::default());
@@ -21,9 +19,7 @@ fn compile_uses_frontmatter_locale_for_lexing() {
 
 #[test]
 fn frontmatter_diagnostics_report_physical_line_and_body_source_line() {
-    let config = Config::default()
-        .with_target(Target::HirRust)
-        ;
+    let config = Config::default().with_target(Target::HirRust);
     let session = crate::driver::Session::new(config);
     let source = "+++
 locale = \"en\"
@@ -88,9 +84,7 @@ fn explicit_session_pack_wins_over_frontmatter_locale() {
 
 #[test]
 fn compile_rejects_unknown_frontmatter_locale() {
-    let config = Config::default()
-        .with_target(Target::HirRust)
-        ;
+    let config = Config::default().with_target(Target::HirRust);
     let session = crate::driver::Session::new(config);
     let source = "+++\nlocale = \"xx\"\n+++\n\nfunctio salve() { }";
     let result = compile(&session, "locale.fab", source, ModuleCompileRequest::default());
@@ -136,9 +130,7 @@ fn compile_rejects_frontmatter_locale_without_locale_root() {
 
 #[test]
 fn compile_rejects_frontmatter_locale_with_parent_traversal() {
-    let config = Config::default()
-        .with_target(Target::HirRust)
-        ;
+    let config = Config::default().with_target(Target::HirRust);
     let session = crate::driver::Session::new(config);
     let source = "+++\nlocale = \"../../etc/passwd\"\n+++\n\nfunctio salve() { }";
     let result = compile(&session, "locale.fab", source, ModuleCompileRequest::default());
@@ -153,9 +145,7 @@ fn compile_rejects_frontmatter_locale_with_parent_traversal() {
 
 #[test]
 fn compile_rejects_frontmatter_locale_empty() {
-    let config = Config::default()
-        .with_target(Target::HirRust)
-        ;
+    let config = Config::default().with_target(Target::HirRust);
     let session = crate::driver::Session::new(config);
     let source = "+++\nlocale = \"\"\n+++\n\nfunctio salve() { }";
     let result = compile(&session, "locale.fab", source, ModuleCompileRequest::default());
@@ -170,9 +160,7 @@ fn compile_rejects_frontmatter_locale_empty() {
 
 #[test]
 fn compile_rejects_frontmatter_locale_absolute_path() {
-    let config = Config::default()
-        .with_target(Target::HirRust)
-        ;
+    let config = Config::default().with_target(Target::HirRust);
     let session = crate::driver::Session::new(config);
     let source = "+++\nlocale = \"/etc\"\n+++\n\nfunctio salve() { }";
     let result = compile(&session, "locale.fab", source, ModuleCompileRequest::default());
@@ -187,9 +175,7 @@ fn compile_rejects_frontmatter_locale_absolute_path() {
 
 #[test]
 fn compile_rejects_frontmatter_locale_absolute_path_deep() {
-    let config = Config::default()
-        .with_target(Target::HirRust)
-        ;
+    let config = Config::default().with_target(Target::HirRust);
     let session = crate::driver::Session::new(config);
     let source = "+++\nlocale = \"/etc/passwd\"\n+++\n\nfunctio salve() { }";
     let result = compile(&session, "locale.fab", source, ModuleCompileRequest::default());
@@ -204,9 +190,7 @@ fn compile_rejects_frontmatter_locale_absolute_path_deep() {
 
 #[test]
 fn compile_rejects_frontmatter_locale_with_path_separator() {
-    let config = Config::default()
-        .with_target(Target::HirRust)
-        ;
+    let config = Config::default().with_target(Target::HirRust);
     let session = crate::driver::Session::new(config);
     let source = "+++\nlocale = \"la/extra\"\n+++\n\nfunctio salve() { }";
     let result = compile(&session, "locale.fab", source, ModuleCompileRequest::default());
@@ -221,9 +205,7 @@ fn compile_rejects_frontmatter_locale_with_path_separator() {
 
 #[test]
 fn compile_rejects_non_string_frontmatter_locale() {
-    let config = Config::default()
-        .with_target(Target::HirRust)
-        ;
+    let config = Config::default().with_target(Target::HirRust);
     let session = crate::driver::Session::new(config);
     let source = "+++\nlocale = 42\n+++\n\nfunctio salve() { }";
     let result = compile(&session, "locale.fab", source, ModuleCompileRequest::default());

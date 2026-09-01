@@ -852,7 +852,8 @@ main {
     )
     .expect("write entry");
 
-    let result = compile_with_faber_seams(&Config::default().with_library_home(library_home), &entry);
+    let result =
+        compile_with_faber_seams(&Config::default().with_library_home(library_home), &entry);
     assert!(
         result.success(),
         "expected locked norma platform default compile success, got {:?}",
@@ -5350,8 +5351,7 @@ incipit {
     )
     .expect("write la consolum fixture");
 
-    let la_path =
-        radix::module::locale::workspace_locale_pack_path("la");
+    let la_path = radix::module::locale::workspace_locale_pack_path("la");
     let la_pack =
         radix::module::locale::LocalePack::from_toml_path(la_path).expect("load la locale pack");
     let config = Config::default().with_locale_pack(la_pack);
@@ -5478,8 +5478,7 @@ incipit {
     )
     .expect("write la consolum input fixture");
 
-    let la_path =
-        radix::module::locale::workspace_locale_pack_path("la");
+    let la_path = radix::module::locale::workspace_locale_pack_path("la");
     let la_pack =
         radix::module::locale::LocalePack::from_toml_path(la_path).expect("load la locale pack");
     let config = Config::default().with_locale_pack(la_pack);

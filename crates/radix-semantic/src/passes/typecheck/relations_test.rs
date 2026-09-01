@@ -18,10 +18,8 @@ use radix_target::Target;
 fn en_config() -> PassConfig {
     let mut config = PassConfig::for_target(Target::HirRust);
     config.locale_pack = Some(
-        LocalePack::from_toml_path(
-            crate::locale::workspace_locale_pack_path("en"),
-        )
-        .expect("load English locale pack"),
+        LocalePack::from_toml_path(crate::locale::workspace_locale_pack_path("en"))
+            .expect("load English locale pack"),
     );
     config
 }

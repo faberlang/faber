@@ -2512,8 +2512,7 @@ incipit {
 
 #[test]
 fn en_read_binding_wins_over_lege_builtin() {
-    let pack_path =
-        crate::locale::workspace_locale_pack_path("en");
+    let pack_path = crate::locale::workspace_locale_pack_path("en");
     let pack = crate::locale::LocalePack::from_toml_path(&pack_path)
         .expect("installed en pack should load");
     let mut config = crate::PassConfig::for_target(radix_target::Target::HirRust);
@@ -2541,8 +2540,7 @@ main {
 
 #[test]
 fn en_read_fn_is_callable() {
-    let pack_path =
-        crate::locale::workspace_locale_pack_path("en");
+    let pack_path = crate::locale::workspace_locale_pack_path("en");
     let pack = crate::locale::LocalePack::from_toml_path(&pack_path)
         .expect("installed en pack should load");
     let mut config = crate::PassConfig::for_target(radix_target::Target::HirRust);

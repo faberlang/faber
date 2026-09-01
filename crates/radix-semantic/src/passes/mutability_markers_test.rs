@@ -7,10 +7,8 @@ use crate::{ISSUE_SCALAR_ACCESS_MARKER, PassConfig, SemanticMutability, Type, lo
 use radix_target::Target;
 
 fn english_pack() -> LocalePack {
-    LocalePack::from_toml_path(
-        crate::locale::workspace_locale_pack_path("en"),
-    )
-    .expect("load English locale pack")
+    LocalePack::from_toml_path(crate::locale::workspace_locale_pack_path("en"))
+        .expect("load English locale pack")
 }
 
 #[test]

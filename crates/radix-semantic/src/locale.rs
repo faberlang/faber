@@ -1354,9 +1354,7 @@ pub fn workspace_locale_root() -> PathBuf {
 /// `{workspace_locale_root}/{locale_id}/pack.toml`.
 #[must_use]
 pub fn workspace_locale_pack_path(locale_id: &str) -> PathBuf {
-    workspace_locale_root()
-        .join(locale_id)
-        .join("pack.toml")
+    workspace_locale_root().join(locale_id).join("pack.toml")
 }
 
 /// `{package_root}/locale/{locale_id}/pack.toml`.

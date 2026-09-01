@@ -32,7 +32,6 @@ use crate::intrinsics::IntrinsicReceiver;
 use crate::mir::lower_analyzed_unit;
 use crate::mir::{MirCollectionOp, MirIntrinsic, MirProgram, MirStatementKind};
 
-
 fn pack(id: &str) -> crate::locale::LocalePack {
     crate::locale::LocalePack::from_toml_path(crate::locale::workspace_locale_pack_path(id))
         .unwrap_or_else(|err| panic!("installed {id} pack should load: {err:?}"))

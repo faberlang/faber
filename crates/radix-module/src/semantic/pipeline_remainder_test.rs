@@ -8,8 +8,7 @@ use crate::driver::{AnalyzeRequest, Config, Session, analyze_source};
 fn lege_corpus_still_checks() {
     let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../corpus/lege/lege.fab");
     let source = std::fs::read_to_string(&path).expect("lege corpus fixture");
-    let config =
-        Config::default();
+    let config = Config::default();
     let result = Compiler::new(config).compile_str("lege.fab", &source);
     assert!(result.success(), "lege.fab must still compile: {:?}", result.diagnostics);
 }

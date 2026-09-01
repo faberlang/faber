@@ -632,8 +632,7 @@ fn latin_norma_consumer_keeps_canonical_surface_compatibility() {
     // surface): compile it under the explicit la code surface — the la pack's
     // registry-direct Latin authority — mirroring the R3 conversio-assign
     // precedent (Latin sources declare la identity, they are not en-migrated).
-    let la_pack_path =
-        radix::module::locale::workspace_locale_pack_path("la");
+    let la_pack_path = radix::module::locale::workspace_locale_pack_path("la");
     let la_pack = LocalePack::from_toml_path(la_pack_path).expect("load la locale pack");
     let config = Config::default()
         .with_library_home(dev_norma_library_home())
