@@ -163,7 +163,7 @@ ubique = "โกลบอล"
 [types]
 ascii = "ascii"
 textus = "ข้อความ"
-numerus = "จำนวน"
+numerus = "จํานวน"
 modulus = "ค่ามอดุลัส"
 fractus = "เศษ"
 bivalens = "ตรรกะ"

@@ -101,7 +101,11 @@ fn fhir_core_renders_localized_surfaces_and_reparses_idempotently() {
 
     let la = render(&loaded, &pack_for("la"));
     let en = render(&loaded, &pack_for("en"));
-    let th = render(&loaded, &pack_for("th-TH"));
+    let th_pack = pack_for("th-TH");
+    let th = render(&loaded, &th_pack);
+    let th_numerus = th_pack.type_surface(radix_module::locale::TypeBindingKind::Primitive(
+        radix_module::semantic::Primitive::Numerus,
+    ));
 
     // Latin surface: the semantic core keeps its authored spellings.
     assert!(
@@ -139,11 +143,11 @@ fn fhir_core_renders_localized_surfaces_and_reparses_idempotently() {
 
     // Thai surface: non-Latin script localization for keywords and types.
     assert!(
-        th.contains("ฟังก์ชัน pair() → ทูเพิล<จำนวน, ข้อความ>"),
+        th.contains(&format!("ฟังก์ชัน pair() → ทูเพิล<{th_numerus}, ข้อความ>")),
         "th tuple fn must localize keyword + type:\n{th}"
     );
     assert!(
-        th.contains("คืน ทูเพิล<จำนวน, ข้อความ> [1, \"salve\"]"),
+        th.contains(&format!("คืน ทูเพิล<{th_numerus}, ข้อความ> [1, \"salve\"]")),
         "th typed tuple literal must survive:\n{th}"
     );
     assert!(th.contains("เริ่ม {"), "th entry keyword must localize:\n{th}");
