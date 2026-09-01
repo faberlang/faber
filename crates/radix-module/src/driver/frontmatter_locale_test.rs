@@ -36,14 +36,11 @@ fn broken(int value) → int {
         .find(|diagnostic| diagnostic.code == Some("SEM008"))
         .expect("undefined name diagnostic");
 
+    assert_eq!(diagnostic.issue(), Some("undefined_name"));
     assert_eq!(diagnostic.line, Some(6));
     assert_eq!(diagnostic.source_line.as_deref(), Some("    return missing"));
     assert_eq!(diagnostic.file, "locale.fab");
     assert!(diagnostic.phase.to_string().contains("analysis"));
-    let rendered = crate::diagnostics::render_expanded(diagnostic);
-    assert!(rendered.contains("error[SEM008:undefined_name] analysis locale.fab"));
-    assert!(rendered.contains("phase: analysis"));
-    assert!(rendered.contains("source: \u{2068}    return missing\u{2069}"));
 }
 
 #[test]

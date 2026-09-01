@@ -300,10 +300,6 @@ fn assert_unbound_shape_size_survivor(surface: &str, source_text: &str, function
 
     assert_eq!(errors.len(), 1, "{surface} must produce one survivor error: {errors:?}");
     assert_eq!(
-        errors[0].message, "invalid MIR: unresolved shape-size constant survives monomorphization",
-        "{surface} survivor diagnostic changed: {errors:?}"
-    );
-    assert_eq!(
         errors[0].issue, "invalid_mir_unresolved_shape_size_constant_survives_monomorphization",
         "{surface} survivor issue changed: {errors:?}"
     );

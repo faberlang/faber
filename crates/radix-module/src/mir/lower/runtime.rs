@@ -249,7 +249,13 @@ impl FunctionBuilder<'_> {
             HirBinOp::Sub => MirCollectionOp::ArraySub,
             HirBinOp::Mul => MirCollectionOp::ArrayMul,
             HirBinOp::Div => MirCollectionOp::ArrayDiv,
-            _ => unreachable!("lista elementwise lowering only accepts arithmetic operators"),
+            _ => {
+                self.errors.push(MirError::unsupported(
+                    expr.span,
+                    "lista elementwise lowering received a non-arithmetic operator",
+                ));
+                return None;
+            }
         };
         let lhs_value = self.lower_expr_value(lhs)?;
         let rhs_value = self.lower_expr_value(rhs)?;
@@ -303,7 +309,13 @@ impl FunctionBuilder<'_> {
             MirCollectionOp::ArraySub => MirBinOp::Sub,
             MirCollectionOp::ArrayMul => MirBinOp::Mul,
             MirCollectionOp::ArrayDiv => MirBinOp::Div,
-            _ => unreachable!("lista collection op mapping"),
+            _ => {
+                self.errors.push(MirError::unsupported(
+                    expr.span,
+                    "lista elementwise lowering cannot map the collection operator",
+                ));
+                return None;
+            }
         };
         let mut fields = Vec::with_capacity(capacity);
         for index in 0..capacity {
