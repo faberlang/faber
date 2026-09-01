@@ -322,6 +322,20 @@ impl FaberCodegen {
         "<error>".to_owned()
     }
 
+    /// u32 ordinal for an enumerated type slot. A count beyond `u32::MAX`
+    /// cannot render canonically, so it records the emission error (surfaces
+    /// at the end of `generate`) and yields a placeholder ordinal instead of
+    /// panicking mid-emission.
+    pub(super) fn slot_ordinal(&self, index: usize, what: &str) -> u32 {
+        u32::try_from(index).unwrap_or_else(|_| {
+            self.record_type_emission_error(CodegenError {
+                message: format!("{what} exceeds u32::MAX"),
+                args: vec![DiagnosticArg::new("issue", "slot_ordinal_exceeds_u32")],
+            });
+            u32::MAX
+        })
+    }
+
     /// Emit item leading trivia before the item (and before its annotations).
     fn write_item_trivia(
         &self,

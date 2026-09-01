@@ -656,7 +656,7 @@ impl super::FaberCodegen {
                         let site = HirTypeSite {
                             owner: HirOwnerRef::Hir(expr.id),
                             slot: HirTypeSlot::TupleTypeArgument(
-                                u32::try_from(idx).expect("tuple argument count exceeds u32::MAX"),
+                                self.slot_ordinal(idx, "tuple argument count"),
                             ),
                         };
                         let rendered = self
@@ -753,7 +753,7 @@ impl super::FaberCodegen {
                     let site = HirTypeSite {
                         owner: HirOwnerRef::Def(param.def_id),
                         slot: HirTypeSlot::ClosureParameter(
-                            u32::try_from(idx).expect("closure parameter count exceeds u32::MAX"),
+                            self.slot_ordinal(idx, "closure parameter count"),
                         ),
                     };
                     let rendered = self

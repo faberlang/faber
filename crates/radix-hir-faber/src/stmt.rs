@@ -76,7 +76,7 @@ impl super::FaberCodegen {
     /// This is the gate for compact `ergo redde` and `sic ... secus ...`
     /// output. Blocks with additional statements or mixed tail forms stay in
     /// brace form to avoid changing control-flow meaning. The shape check is
-    /// trivia-free; [`FaberCodegen::can_write_ergo`] and
+    /// trivia-free; [`FaberCodegen::ergo_return_expr`] and
     /// [`FaberCodegen::can_write_sic_secus_chain`] additionally require that
     /// the candidate blocks carry no attached trivia.
     pub(super) fn return_expr<'a>(&self, block: &'a HirBlock) -> Option<&'a HirExpression> {
@@ -107,13 +107,16 @@ impl super::FaberCodegen {
         None
     }
 
-    /// Gate for compact `ergo redde` output.
-    ///
-    /// The candidate block must be a single-expression return shape with no
-    /// attached trivia on its statements or structural end; comment-bearing
-    /// blocks stay braced (compact joints have no comment slot).
-    pub(super) fn can_write_ergo(&self, block: &HirBlock) -> bool {
-        self.return_expr(block).is_some() && !self.trivia.block_has_trivia(block)
+    /// Compact `ergo redde` gate: the eligible return expression when the
+    /// candidate block is a single-expression return shape with no attached
+    /// trivia on its statements or structural end. Comment-bearing blocks
+    /// stay braced (compact joints have no comment slot). Sharing one lookup
+    /// between the gate and the emission keeps them from drifting.
+    pub(super) fn ergo_return_expr<'a>(&self, block: &'a HirBlock) -> Option<&'a HirExpression> {
+        if self.trivia.block_has_trivia(block) {
+            return None;
+        }
+        self.return_expr(block)
     }
 
     pub(super) fn write_statement_trivia(
@@ -359,8 +362,7 @@ impl super::FaberCodegen {
         surface: &impl KeywordSurface,
         writer: &mut CodeWriter,
     ) {
-        if self.can_write_ergo(block) {
-            let return_expr = self.return_expr(block).expect("gated by can_write_ergo");
+        if let Some(return_expr) = self.ergo_return_expr(block) {
             writer.write(" ");
             writer.write(surface.contextual_keyword("ergo"));
             writer.write(" ");

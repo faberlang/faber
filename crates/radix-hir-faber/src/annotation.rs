@@ -31,7 +31,7 @@ impl super::FaberCodegen {
             self.write_hir_annotation(
                 annotation,
                 owner,
-                u32::try_from(annotation_ordinal).expect("annotation count exceeds u32::MAX"),
+                self.slot_ordinal(annotation_ordinal, "annotation count"),
                 types,
                 names,
                 interner,
