@@ -2884,14 +2884,14 @@ pub(crate) fn validate_referential_integrity(
         }
 
         // The entry-start anchor, when present, must name a registered owner.
-        if let Some(anchor) = presentation.entry_start_anchor.as_ref() {
-            if !owner_ids.contains(&anchor.0) {
-                return Err(HirArtifactError::DanglingIndex {
-                    kind: "HirSourceAnchorId",
-                    index: anchor.0,
-                    arena_size: owner_ids.len(),
-                });
-            }
+        if let Some(anchor) = presentation.entry_start_anchor.as_ref()
+            && !owner_ids.contains(&anchor.0)
+        {
+            return Err(HirArtifactError::DanglingIndex {
+                kind: "HirSourceAnchorId",
+                index: anchor.0,
+                arena_size: owner_ids.len(),
+            });
         }
 
         // Structural ends (block ends + program end) must be anchor-consistent

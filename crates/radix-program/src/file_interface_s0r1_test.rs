@@ -19,7 +19,6 @@ use radix_module::semantic::SemanticParamMode;
 use radix_module::syntax::GenericParamKind;
 use std::collections::BTreeMap;
 
-
 const PROVIDER: &str = r#"@ publica
 typus Vector<magnitudo N> = vector<fractus<f32>, N>
 
@@ -305,8 +304,7 @@ functio call_text() → vacuum {
 /// loaded explicitly — the radix unit harness compiles bare Latin by default.
 #[test]
 fn export_probe_fixture_materializes_solved_union_param() {
-    let pack_path =
-        radix_module::locale::workspace_locale_pack_path("en");
+    let pack_path = radix_module::locale::workspace_locale_pack_path("en");
     let en_pack = radix_module::locale::LocalePack::from_toml_path(&pack_path)
         .expect("installed en pack should load");
     let session = Session::new(

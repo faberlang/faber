@@ -383,12 +383,12 @@ fn admit_executor_plan_section(
                 });
             }
         }
-        if let Some(workspace) = plan.workspace {
-            if workspace.alignment == 0 || workspace.bytes % u64::from(workspace.alignment) != 0 {
-                return Err(crate::error::FmirImageError::ExecutorPlanSectionInvalid {
-                    detail: format!("selection {position} has an invalid workspace alignment"),
-                });
-            }
+        if let Some(workspace) = plan.workspace
+            && (workspace.alignment == 0 || workspace.bytes % u64::from(workspace.alignment) != 0)
+        {
+            return Err(crate::error::FmirImageError::ExecutorPlanSectionInvalid {
+                detail: format!("selection {position} has an invalid workspace alignment"),
+            });
         }
     }
     Ok(())

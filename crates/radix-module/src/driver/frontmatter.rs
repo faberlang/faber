@@ -69,10 +69,10 @@ pub fn split_frontmatter(source: &str) -> Result<SplitFrontmatter<'_>, Frontmatt
 
     let first_line = source.lines().next();
     if first_line != Some(DELIMITER) {
-        if let Some(index) = delimiter_line_index(source) {
-            if index > 0 {
-                return Err(FrontmatterError::OpeningDelimiterNotFirstLine);
-            }
+        if let Some(index) = delimiter_line_index(source)
+            && index > 0
+        {
+            return Err(FrontmatterError::OpeningDelimiterNotFirstLine);
         }
 
         return Ok(SplitFrontmatter { frontmatter_text: None, body: source, body_byte_offset: 0 });

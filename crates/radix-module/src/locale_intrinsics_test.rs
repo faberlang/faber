@@ -11,7 +11,6 @@ use super::{
 };
 use crate::intrinsics::IntrinsicReceiver;
 
-
 fn owned_installed_pack(locale: &str) -> LocalePack {
     let path = crate::locale::workspace_locale_pack_path(&locale);
     let source = std::fs::read_to_string(&path).unwrap_or_else(|err| panic!("read installed {locale} pack: {err:?}"));

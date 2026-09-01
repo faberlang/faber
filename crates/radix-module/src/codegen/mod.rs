@@ -269,10 +269,9 @@ pub fn generate_from_analyzed_with_options(
                         .iter()
                         .find(|(name, _, _)| modules.iter().any(|segment| segment == name))
                         .map(|(_, _, failable_exports)| failable_exports)
+                        && failable_exports.contains(member)
                     {
-                        if failable_exports.contains(member) {
-                            effects.is_failable = true;
-                        }
+                        effects.is_failable = true;
                     }
                 }
                 let mut r#gen = rust::RustCodegen::new_with_types(&analysis.hir, &analysis.interner, &analysis.types);

@@ -51,23 +51,20 @@ impl Validator<'_, '_> {
                         );
                     }
                     MirUnOp::Neg => {
-                        if let Some(operand_ty) = operand_ty {
-                            if !self.is_numeric_type(operand_ty) {
-                                self.error(value.span, "neg operand is not numeric");
-                            }
+                        if let Some(operand_ty) = operand_ty
+                            && !self.is_numeric_type(operand_ty)
+                        {
+                            self.error(value.span, "neg operand is not numeric");
                         }
                         if !self.is_numeric_type(value.ty) {
                             self.error(value.span, "neg result is not numeric");
                         }
                     }
                     MirUnOp::BitNot => {
-                        if let Some(operand_ty) = operand_ty {
-                            if !self.is_numeric_integral_type(operand_ty) {
-                                self.error(
-                                    value.span,
-                                    "bitwise not operand is not numeric integral",
-                                );
-                            }
+                        if let Some(operand_ty) = operand_ty
+                            && !self.is_numeric_integral_type(operand_ty)
+                        {
+                            self.error(value.span, "bitwise not operand is not numeric integral");
                         }
                         if !self.is_numeric_integral_type(value.ty) {
                             self.error(value.span, "bitwise not result is not numeric integral");
@@ -84,10 +81,10 @@ impl Validator<'_, '_> {
                         // (AIR lowers AirTensorOp::Gelu/Tanh/Exp/Log/Relu/Sqrt to
                         // MirUnOp on tensor<f32,…>), while still rejecting genuinely
                         // non-float operands — scalar or tensor.
-                        if let Some(operand_ty) = operand_ty {
-                            if !self.is_float_operand_type(operand_ty) {
-                                self.error(value.span, "float unary operand is not fractus");
-                            }
+                        if let Some(operand_ty) = operand_ty
+                            && !self.is_float_operand_type(operand_ty)
+                        {
+                            self.error(value.span, "float unary operand is not fractus");
                         }
                         if !self.is_float_operand_type(value.ty) {
                             self.error(value.span, "float unary result is not fractus");
@@ -100,27 +97,29 @@ impl Validator<'_, '_> {
                 let rhs_ty = self.validate_operand(scope, rhs, value.span);
                 match op {
                     MirBinOp::Add | MirBinOp::Sub | MirBinOp::Mul | MirBinOp::Div => {
-                        if let Some(ty) = lhs_ty {
-                            if !self.is_arithmetic_operand_type(*op, ty) {
-                                self.error(value.span, "binary arithmetic lhs is not numeric");
-                            }
+                        if let Some(ty) = lhs_ty
+                            && !self.is_arithmetic_operand_type(*op, ty)
+                        {
+                            self.error(value.span, "binary arithmetic lhs is not numeric");
                         }
-                        if let Some(ty) = rhs_ty {
-                            if !self.is_arithmetic_operand_type(*op, ty) {
-                                self.error(value.span, "binary arithmetic rhs is not numeric");
-                            }
+                        if let Some(ty) = rhs_ty
+                            && !self.is_arithmetic_operand_type(*op, ty)
+                        {
+                            self.error(value.span, "binary arithmetic rhs is not numeric");
                         }
                     }
                     MirBinOp::Mod => {
-                        if let Some(ty) = lhs_ty {
-                            if !self.is_numeric_integral_type(ty) && !self.is_float_type(ty) {
-                                self.error(value.span, "mod lhs is not numeric integral");
-                            }
+                        if let Some(ty) = lhs_ty
+                            && !self.is_numeric_integral_type(ty)
+                            && !self.is_float_type(ty)
+                        {
+                            self.error(value.span, "mod lhs is not numeric integral");
                         }
-                        if let Some(ty) = rhs_ty {
-                            if !self.is_numeric_integral_type(ty) && !self.is_float_type(ty) {
-                                self.error(value.span, "mod rhs is not numeric integral");
-                            }
+                        if let Some(ty) = rhs_ty
+                            && !self.is_numeric_integral_type(ty)
+                            && !self.is_float_type(ty)
+                        {
+                            self.error(value.span, "mod rhs is not numeric integral");
                         }
                     }
                     MirBinOp::Eq
@@ -169,15 +168,15 @@ impl Validator<'_, '_> {
                     | MirBinOp::BitXor
                     | MirBinOp::Shl
                     | MirBinOp::Shr => {
-                        if let Some(ty) = lhs_ty {
-                            if !self.is_numeric_integral_type(ty) {
-                                self.error(value.span, "bitwise lhs is not numeric integral");
-                            }
+                        if let Some(ty) = lhs_ty
+                            && !self.is_numeric_integral_type(ty)
+                        {
+                            self.error(value.span, "bitwise lhs is not numeric integral");
                         }
-                        if let Some(ty) = rhs_ty {
-                            if !self.is_numeric_integral_type(ty) {
-                                self.error(value.span, "bitwise rhs is not numeric integral");
-                            }
+                        if let Some(ty) = rhs_ty
+                            && !self.is_numeric_integral_type(ty)
+                        {
+                            self.error(value.span, "bitwise rhs is not numeric integral");
                         }
                     }
                 }

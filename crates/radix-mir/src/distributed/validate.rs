@@ -1107,14 +1107,13 @@ fn check_mover_agreement(plan: &DistributedExecutionPlan) -> Result<(), Validate
                 });
             }
             if let (OpRef::Transfer(first), OpRef::Transfer(second)) = (reference, later_reference)
+                && identical_move(plan, first, second)
             {
-                if identical_move(plan, first, second) {
-                    return Err(ValidateError::RepeatedMove {
-                        value,
-                        original: first,
-                        duplicate: second,
-                    });
-                }
+                return Err(ValidateError::RepeatedMove {
+                    value,
+                    original: first,
+                    duplicate: second,
+                });
             }
         }
     }

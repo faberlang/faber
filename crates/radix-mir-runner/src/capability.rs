@@ -250,18 +250,18 @@ fn classify_intrinsic(
     gaps: &mut Vec<CapabilityGap>,
     seen: &mut FxHashSet<String>,
 ) {
-    if let MirIntrinsic::Provider(provider) = intrinsic {
-        if provider.kind == MirProviderKind::Package {
-            push_gap(
-                gaps,
-                seen,
-                CapabilityGap::UnsupportedMirShape {
-                    shape: "package provider has no runner host bridge".to_owned(),
-                    slug: SLUG_UNSUPPORTED,
-                },
-            );
-            return;
-        }
+    if let MirIntrinsic::Provider(provider) = intrinsic
+        && provider.kind == MirProviderKind::Package
+    {
+        push_gap(
+            gaps,
+            seen,
+            CapabilityGap::UnsupportedMirShape {
+                shape: "package provider has no runner host bridge".to_owned(),
+                slug: SLUG_UNSUPPORTED,
+            },
+        );
+        return;
     }
     let family = MirRuntimeAbi::from_intrinsic(intrinsic).family;
     if family_dispatchable_in_script(family) {

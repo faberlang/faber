@@ -745,15 +745,13 @@ pub fn collection_op_contract(
                 MirCollectionOp::TensorSoftmax => {
                     if args.first().is_some_and(|operand| {
                         softmax_operand_is_additive_mask_temp(function, operand)
-                    }) {
-                        if let Some(contract) = row_reduction_contract(
-                            function,
-                            validation,
-                            op,
-                            crate::kernel_plan::causal_softmax_row_reduction_admission,
-                        )? {
-                            return Ok(Some(contract));
-                        }
+                    }) && let Some(contract) = row_reduction_contract(
+                        function,
+                        validation,
+                        op,
+                        crate::kernel_plan::causal_softmax_row_reduction_admission,
+                    )? {
+                        return Ok(Some(contract));
                     }
                 }
                 MirCollectionOp::TensorCausalMaskedSoftmax => {

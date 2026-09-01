@@ -853,11 +853,11 @@ impl Parser {
             if self.check(&TokenKind::LtAscii) {
                 self.reject_retired_angle_type_call_constructor(&expr)?;
                 let checkpoint = self.checkpoint();
-                if let Ok(type_args) = self.parse_call_type_args() {
-                    if self.check(&TokenKind::LParen) {
-                        expr = self.parse_call_postfix(start, expr, type_args)?;
-                        continue;
-                    }
+                if let Ok(type_args) = self.parse_call_type_args()
+                    && self.check(&TokenKind::LParen)
+                {
+                    expr = self.parse_call_postfix(start, expr, type_args)?;
+                    continue;
                 }
                 self.restore(checkpoint);
                 break;
@@ -1472,8 +1472,9 @@ impl Parser {
         // have already built the explicit `source vel identity` tail. Peel
         // only that root form; parenthesized source coalescing remains inside
         // the operand as intended.
-        if coalesce.is_none() && apud.is_empty() {
-            if let Expr {
+        if coalesce.is_none()
+            && apud.is_empty()
+            && let Expr {
                 kind:
                     ExprKind::Binary(BinaryExpr {
                         op: BinOp::Coalesce,
@@ -1482,10 +1483,9 @@ impl Parser {
                     }),
                 ..
             } = source
-            {
-                source = *lhs;
-                coalesce = Some(rhs);
-            }
+        {
+            source = *lhs;
+            coalesce = Some(rhs);
         }
 
         let extremum = ExtremumExpr {
@@ -2361,15 +2361,15 @@ impl Parser {
                     .with_arg("binding_operator", "="));
             }
 
-            if let Some(label) = label {
-                if !labels.insert(label) {
-                    return Err(ParseError::structured(
-                        ParseErrorKind::Expected,
-                        label_span.expect("labeled argument span"),
-                    )
-                    .with_arg("issue", "duplicate_tuple_element_label")
-                    .with_arg("label", self.interner.resolve(label).to_owned()));
-                }
+            if let Some(label) = label
+                && !labels.insert(label)
+            {
+                return Err(ParseError::structured(
+                    ParseErrorKind::Expected,
+                    label_span.expect("labeled argument span"),
+                )
+                .with_arg("issue", "duplicate_tuple_element_label")
+                .with_arg("label", self.interner.resolve(label).to_owned()));
             }
 
             let value = Box::new(self.parse_expression()?);

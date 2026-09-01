@@ -279,13 +279,12 @@ impl KernelLaunchPlan {
         function: &MirFunction,
     ) -> Self {
         let mut launch = Self::from_signature_and_function(signature, function);
-        if let crate::kernel_plan::CollectionKernelPlan::BatchedAttention(attention) = plan {
-            if let Some(outputs) = attention
+        if let crate::kernel_plan::CollectionKernelPlan::BatchedAttention(attention) = plan
+            && let Some(outputs) = attention
                 .decode_outputs_per_workgroup
                 .filter(|outputs| *outputs > 0)
-            {
-                launch.workgroup_count.x = launch.dispatch_size.x.div_ceil(outputs);
-            }
+        {
+            launch.workgroup_count.x = launch.dispatch_size.x.div_ceil(outputs);
         }
         launch
     }

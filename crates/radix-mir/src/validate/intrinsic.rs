@@ -109,15 +109,15 @@ impl Validator<'_, '_> {
                     );
                     self.validate_runtime_conversion_route(source_ty, conversion.target_ty, span);
                 }
-                if let Some(recovery) = &conversion.recovery {
-                    if let Some(recovery_ty) = self.validate_operand(scope, recovery, span) {
-                        self.require_assignable(
-                            recovery_ty,
-                            conversion.target_ty,
-                            span,
-                            "conversion recovery type mismatch",
-                        );
-                    }
+                if let Some(recovery) = &conversion.recovery
+                    && let Some(recovery_ty) = self.validate_operand(scope, recovery, span)
+                {
+                    self.require_assignable(
+                        recovery_ty,
+                        conversion.target_ty,
+                        span,
+                        "conversion recovery type mismatch",
+                    );
                 }
                 self.validate_conversion_struct_defaults(scope, conversion, span);
             }
@@ -249,10 +249,9 @@ impl Validator<'_, '_> {
                     .args
                     .first()
                     .and_then(|arg| self.validate_operand(scope, arg, span))
+                    && self.is_gradient_handle_type_invalid(handle_ty)
                 {
-                    if self.is_gradient_handle_type_invalid(handle_ty) {
-                        self.error(span, "gradient handle type is not an opaque handle");
-                    }
+                    self.error(span, "gradient handle type is not an opaque handle");
                 }
             }
             MirGradientOp::Create => {
@@ -686,27 +685,27 @@ impl Validator<'_, '_> {
                 };
                 let key_ty = MirType::semantic(*key_ty);
                 let value_ty = MirType::semantic(*value_ty);
-                if let Some(key) = call.args.get(1) {
-                    if let Some(arg_ty) = self.validate_operand(scope, key, span) {
-                        self.require_assignable_or_fitting_constant(
-                            key,
-                            arg_ty,
-                            key_ty,
-                            span,
-                            "collection put key type mismatch",
-                        );
-                    }
+                if let Some(key) = call.args.get(1)
+                    && let Some(arg_ty) = self.validate_operand(scope, key, span)
+                {
+                    self.require_assignable_or_fitting_constant(
+                        key,
+                        arg_ty,
+                        key_ty,
+                        span,
+                        "collection put key type mismatch",
+                    );
                 }
-                if let Some(value) = call.args.get(2) {
-                    if let Some(arg_ty) = self.validate_operand(scope, value, span) {
-                        self.require_assignable_or_fitting_constant(
-                            value,
-                            arg_ty,
-                            value_ty,
-                            span,
-                            "collection put value type mismatch",
-                        );
-                    }
+                if let Some(value) = call.args.get(2)
+                    && let Some(arg_ty) = self.validate_operand(scope, value, span)
+                {
+                    self.require_assignable_or_fitting_constant(
+                        value,
+                        arg_ty,
+                        value_ty,
+                        span,
+                        "collection put value type mismatch",
+                    );
                 }
             }
             MirCollectionOp::Delete => {
@@ -827,15 +826,15 @@ impl Validator<'_, '_> {
                         "list copy/view result type mismatch",
                     );
                 }
-                if let Some(count) = call.args.get(1) {
-                    if let Some(count_ty) = self.validate_operand(scope, count, span) {
-                        self.require_exact(
-                            count_ty,
-                            self.primitive(Primitive::Numerus),
-                            span,
-                            "list copy/view count is not numerus",
-                        );
-                    }
+                if let Some(count) = call.args.get(1)
+                    && let Some(count_ty) = self.validate_operand(scope, count, span)
+                {
+                    self.require_exact(
+                        count_ty,
+                        self.primitive(Primitive::Numerus),
+                        span,
+                        "list copy/view count is not numerus",
+                    );
                 }
             }
             MirCollectionOp::Sum => {
@@ -1012,15 +1011,15 @@ impl Validator<'_, '_> {
                         "text predicate receiver is not textus",
                     );
                 }
-                if let Some(arg) = call.args.get(1) {
-                    if let Some(arg_ty) = self.validate_operand(scope, arg, span) {
-                        self.require_exact(
-                            arg_ty,
-                            self.primitive(Primitive::Textus),
-                            span,
-                            "text predicate argument is not textus",
-                        );
-                    }
+                if let Some(arg) = call.args.get(1)
+                    && let Some(arg_ty) = self.validate_operand(scope, arg, span)
+                {
+                    self.require_exact(
+                        arg_ty,
+                        self.primitive(Primitive::Textus),
+                        span,
+                        "text predicate argument is not textus",
+                    );
                 }
             }
             MirCollectionOp::RegexMatches => {
@@ -1038,15 +1037,15 @@ impl Validator<'_, '_> {
                         "regex consentit receiver is not regex",
                     );
                 }
-                if let Some(arg) = call.args.get(1) {
-                    if let Some(arg_ty) = self.validate_operand(scope, arg, span) {
-                        self.require_exact(
-                            arg_ty,
-                            self.primitive(Primitive::Textus),
-                            span,
-                            "regex consentit argument is not textus",
-                        );
-                    }
+                if let Some(arg) = call.args.get(1)
+                    && let Some(arg_ty) = self.validate_operand(scope, arg, span)
+                {
+                    self.require_exact(
+                        arg_ty,
+                        self.primitive(Primitive::Textus),
+                        span,
+                        "regex consentit argument is not textus",
+                    );
                 }
             }
             MirCollectionOp::Uppercase | MirCollectionOp::Lowercase | MirCollectionOp::Trim => {
@@ -1074,15 +1073,15 @@ impl Validator<'_, '_> {
                         "text split receiver is not textus",
                     );
                 }
-                if let Some(separator) = call.args.get(1) {
-                    if let Some(separator_ty) = self.validate_operand(scope, separator, span) {
-                        self.require_exact(
-                            separator_ty,
-                            self.primitive(Primitive::Textus),
-                            span,
-                            "text split separator is not textus",
-                        );
-                    }
+                if let Some(separator) = call.args.get(1)
+                    && let Some(separator_ty) = self.validate_operand(scope, separator, span)
+                {
+                    self.require_exact(
+                        separator_ty,
+                        self.primitive(Primitive::Textus),
+                        span,
+                        "text split separator is not textus",
+                    );
                 }
                 match self.type_kind(call.return_ty) {
                     Type::Array(inner)
@@ -1164,15 +1163,15 @@ impl Validator<'_, '_> {
                 {
                     self.error(span, "numeric clamp result type mismatch");
                 }
-                if let Some(arg) = call.args.get(1) {
-                    if let Some(actual_ty) = self.validate_operand(scope, arg, span) {
-                        self.require_assignable(
-                            actual_ty,
-                            arg_ty,
-                            span,
-                            "numeric clamp argument type mismatch",
-                        );
-                    }
+                if let Some(arg) = call.args.get(1)
+                    && let Some(actual_ty) = self.validate_operand(scope, arg, span)
+                {
+                    self.require_assignable(
+                        actual_ty,
+                        arg_ty,
+                        span,
+                        "numeric clamp argument type mismatch",
+                    );
                 }
             }
             MirCollectionOp::Approximate => {
@@ -1227,14 +1226,14 @@ impl Validator<'_, '_> {
                     span,
                     "numeric rounding result is not numerus",
                 );
-                if let Some(receiver_ty) = first_arg_ty {
-                    if !matches!(
+                if let Some(receiver_ty) = first_arg_ty
+                    && !matches!(
                         self.type_kind(receiver_ty),
                         Type::Primitive(Primitive::Fractus)
                             | Type::SizedNumeric(Primitive::Fractus, _)
-                    ) {
-                        self.error(span, "numeric rounding receiver is not fractus");
-                    }
+                    )
+                {
+                    self.error(span, "numeric rounding receiver is not fractus");
                 }
             }
             MirCollectionOp::TensorShape => {
@@ -1460,10 +1459,9 @@ impl Validator<'_, '_> {
                     .args
                     .get(1)
                     .and_then(|arg| self.validate_operand(scope, arg, span))
+                    && !self.is_numeric_type(identity)
                 {
-                    if !self.is_numeric_type(identity) {
-                        self.error(span, "tensor reduction identity is not numeric");
-                    }
+                    self.error(span, "tensor reduction identity is not numeric");
                 }
             }
             MirCollectionOp::TensorCruxEntropia => {
@@ -1696,14 +1694,14 @@ impl Validator<'_, '_> {
                 }
             }
             MirCollectionOp::CordCursor => {
-                if let Some(receiver_ty) = first_arg_ty {
-                    if !matches!(
+                if let Some(receiver_ty) = first_arg_ty
+                    && !matches!(
                         self.type_kind(receiver_ty),
                         Type::Primitive(Primitive::Ascii | Primitive::Textus)
                             | Type::BoundedAscii { .. }
-                    ) {
-                        self.error(span, "cord cursor receiver is not ascii or textus");
-                    }
+                    )
+                {
+                    self.error(span, "cord cursor receiver is not ascii or textus");
                 }
                 if !matches!(self.type_kind(call.return_ty), Type::Cursor(_)) {
                     self.error(span, "cord cursor result is not a cursor");
@@ -1807,23 +1805,21 @@ impl Validator<'_, '_> {
         if let Some(arg) = call.args.get(2) {
             self.validate_tensor_epsilon_const(scope, arg, span, "layernorm");
         }
-        if call.args.len() >= 4 {
-            if let Some(gamma_ty) = call
+        if call.args.len() >= 4
+            && let Some(gamma_ty) = call
                 .args
                 .get(3)
                 .and_then(|arg| self.validate_operand(scope, arg, span))
-            {
-                self.require_tensor_type(gamma_ty, span, "tensor layernorm gamma is not tensor");
-            }
+        {
+            self.require_tensor_type(gamma_ty, span, "tensor layernorm gamma is not tensor");
         }
-        if call.args.len() >= 5 {
-            if let Some(beta_ty) = call
+        if call.args.len() >= 5
+            && let Some(beta_ty) = call
                 .args
                 .get(4)
                 .and_then(|arg| self.validate_operand(scope, arg, span))
-            {
-                self.require_tensor_type(beta_ty, span, "tensor layernorm beta is not tensor");
-            }
+        {
+            self.require_tensor_type(beta_ty, span, "tensor layernorm beta is not tensor");
         }
         self.require_tensor_type(
             call.return_ty,
@@ -2086,10 +2082,10 @@ impl Validator<'_, '_> {
         span: Span,
         message: &'static str,
     ) {
-        if let Some(arg) = call.args.get(index) {
-            if let Some(arg_ty) = self.validate_operand(scope, arg, span) {
-                self.require_assignable(arg_ty, element_ty, span, message);
-            }
+        if let Some(arg) = call.args.get(index)
+            && let Some(arg_ty) = self.validate_operand(scope, arg, span)
+        {
+            self.require_assignable(arg_ty, element_ty, span, message);
         }
     }
 

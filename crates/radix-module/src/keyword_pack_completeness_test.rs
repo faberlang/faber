@@ -10,7 +10,6 @@ use crate::lexer::{keyword_specs, lex_with_locale_pack};
 use crate::parser::{ParseErrorKind, parse};
 use std::collections::BTreeSet;
 
-
 const INSTALLED_LOCALES: &[&str] = &["en", "la", "ar", "hi", "th-TH", "vi", "zh-Hans", "zh-Hant"];
 const CONTEXTUAL_SUMMA_KEYWORDS: &[&str] = &["summa", "filum"];
 

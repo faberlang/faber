@@ -503,10 +503,9 @@ impl Validator<'_, '_> {
                 };
                 if let (Some(element), MirLayoutKind::Scalar(result_scalar)) =
                     (layout.element, result_layout.kind)
+                    && result_scalar != element
                 {
-                    if result_scalar != element {
-                        self.error(span, "bounded array projection element layout mismatch");
-                    }
+                    self.error(span, "bounded array projection element layout mismatch");
                 }
             }
             MirLayoutKind::Aggregate(layout)

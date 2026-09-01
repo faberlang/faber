@@ -255,10 +255,10 @@ fn diagnostic_display_text(
     diag: &Diagnostic,
     pack: Option<&LocalePack>,
 ) -> Result<Option<DiagnosticDisplayText>, DiagnosticTemplateRenderError> {
-    if let Some(pack) = pack {
-        if let Some(rendered) = pack.render_diagnostic_text(diag)? {
-            return Ok(Some(DiagnosticDisplayText { message: rendered.message, help: rendered.help }));
-        }
+    if let Some(pack) = pack
+        && let Some(rendered) = pack.render_diagnostic_text(diag)?
+    {
+        return Ok(Some(DiagnosticDisplayText { message: rendered.message, help: rendered.help }));
     }
 
     if diag.code.is_none() || diag.phase == DiagnosticPhase::Codegen {

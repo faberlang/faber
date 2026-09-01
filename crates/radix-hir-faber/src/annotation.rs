@@ -242,11 +242,11 @@ impl super::FaberCodegen {
                 // Tokenless keyword values (e.g. `verum` since Batch C) still
                 // emit through the localized surface, matching the old
                 // token-shaped path.
-                if let Some(spec) = lookup_keyword_spec(spelling) {
-                    if spec.token_kind.is_none() {
-                        writer.write(surface.contextual_keyword(spec.text));
-                        return;
-                    }
+                if let Some(spec) = lookup_keyword_spec(spelling)
+                    && spec.token_kind.is_none()
+                {
+                    writer.write(surface.contextual_keyword(spec.text));
+                    return;
                 }
                 writer.write(spelling);
             }

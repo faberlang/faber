@@ -14,7 +14,6 @@ use super::LocalePack;
 use crate::intrinsics::{INTRINSICS, IntrinsicReceiver};
 use std::collections::BTreeSet;
 
-
 /// Load a pack's **owned** rows from the raw file (no `inherits` merge).
 ///
 /// WHY: the en pack inherits `la`; comparing merged packs would pass

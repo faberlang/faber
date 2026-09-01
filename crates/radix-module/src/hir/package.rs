@@ -1031,10 +1031,10 @@ fn walk_expr_callees(expr: &HirExpression, index: &NucleumIndex, names: &mut Vec
             if let HirExpressionKind::Path(def_id) = &callee.kind {
                 // v2: every device-to-device call composes (entry or helper),
                 // so every device callee is a call-graph edge.
-                if index.roles.contains_key(def_id) {
-                    if let Some(name) = index.names.get(def_id) {
-                        names.push(name.clone());
-                    }
+                if index.roles.contains_key(def_id)
+                    && let Some(name) = index.names.get(def_id)
+                {
+                    names.push(name.clone());
                 }
             }
             walk_expr_callees(callee, index, names);
@@ -1057,10 +1057,10 @@ fn walk_expr_callees(expr: &HirExpression, index: &NucleumIndex, names: &mut Vec
                 _ => None,
             };
             for payload in payloads {
-                if let Some(def_id) = sink_device_def {
-                    if let Some(name) = index.names.get(&def_id) {
-                        names.push(name.clone());
-                    }
+                if let Some(def_id) = sink_device_def
+                    && let Some(name) = index.names.get(&def_id)
+                {
+                    names.push(name.clone());
                 }
                 walk_expr_callees(payload, index, names);
             }

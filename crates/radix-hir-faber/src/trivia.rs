@@ -121,10 +121,10 @@ impl TriviaIndex {
     /// trivia, so comment-bearing blocks must stay braced (locked invariant).
     #[must_use]
     pub fn block_has_trivia(&self, block: &HirBlock) -> bool {
-        if let Some(end) = &block.end {
-            if self.for_anchor(&end.id).is_some() {
-                return true;
-            }
+        if let Some(end) = &block.end
+            && self.for_anchor(&end.id).is_some()
+        {
+            return true;
         }
         block
             .statements

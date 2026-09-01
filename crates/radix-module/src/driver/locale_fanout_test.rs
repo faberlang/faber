@@ -52,10 +52,7 @@ fn session_for(output_locale: &str) -> Session {
 /// output pack is passed separately to `reemit_faber` so the two decisions
 /// cannot accidentally collapse into one.
 fn source_session() -> Session {
-    Session::new(
-        Config::default()
-            .with_target(Target::HirFaber)
-    )
+    Session::new(Config::default().with_target(Target::HirFaber))
 }
 
 /// Prepend frontmatter locale to a source body.
@@ -164,10 +161,7 @@ fn phase3b_every_input_to_latin_output() {
     for (input_locale, body) in &emitted {
         let source = with_frontmatter(input_locale, body);
         // Latin output session (no locale_pack → Latin emit)
-        let session = Session::new(
-            Config::default()
-                .with_target(Target::HirFaber)
-        );
+        let session = Session::new(Config::default().with_target(Target::HirFaber));
         let emit_pack = crate::locale::latin_locale_pack();
         let result = reemit_faber(&session, &emit_pack, "fanout.fab", &source);
         assert!(result.success(), "{input_locale} → la failed: {:?}", result.diagnostics);

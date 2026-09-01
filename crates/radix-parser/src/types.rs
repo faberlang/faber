@@ -180,9 +180,8 @@ impl Parser {
                 span: last.span,
             };
             let name_str = self.interner.resolve(name.name).to_owned();
-            let kind = if let Some(width) =
-                radix_types::numeric_width::lista_sugar_width_marker(&name_str)
-            {
+
+            if let Some(width) = radix_types::numeric_width::lista_sugar_width_marker(&name_str) {
                 form = TypeFormLevel::SHORT;
                 self.parse_lista_width_sugar(name, width)?
             } else if let Some(width) =
@@ -219,7 +218,8 @@ impl Parser {
                     TypeExprKind::Atomic(elem)
                 } else if name_str == "promissum" {
                     let success = Box::new(self.parse_type()?);
-                    let kind = if self.eat(&TokenKind::ExitArrow) {
+
+                    if self.eat(&TokenKind::ExitArrow) {
                         let alternate = Box::new(self.parse_type()?);
                         self.expect(&TokenKind::GtAscii, "expected '>'")?;
                         TypeExprKind::PromissumFailable(success, alternate)
@@ -233,8 +233,7 @@ impl Parser {
                         }
                         self.expect(&TokenKind::GtAscii, "expected '>'")?;
                         TypeExprKind::Named(name, vec![GenericArgExpr::Type(*success)])
-                    };
-                    kind
+                    }
                 } else if name_str == "tensor"
                     || name_str == "sparsa"
                     || name_str == "vector"
@@ -313,8 +312,7 @@ impl Parser {
                 } else {
                     TypeExprKind::Qualified(path, Vec::new())
                 }
-            };
-            kind
+            }
         };
 
         if self.check(&TokenKind::LBracket) {

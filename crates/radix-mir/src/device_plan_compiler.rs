@@ -664,10 +664,10 @@ impl PlanCompiler {
                     input: *source,
                 })?;
                 for input in &node.inputs {
-                    if !candidate.source_nodes.contains(input) {
-                        if let Some(dependency) = node_to_schedule.get(input) {
-                            depends_on.insert(*dependency);
-                        }
+                    if !candidate.source_nodes.contains(input)
+                        && let Some(dependency) = node_to_schedule.get(input)
+                    {
+                        depends_on.insert(*dependency);
                     }
                 }
             }

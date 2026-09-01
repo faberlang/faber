@@ -101,23 +101,23 @@ pub fn check_diagnostics_for_source_with_locale_pack(
     if let Some(path) = source_path_for_import_contract(name) {
         let contract =
             crate::program::compile::import_contract_for_file(&path, source, resolved_pack.as_ref(), templates);
-        if let Some(pack) = resolved_pack.as_mut() {
-            if let Err(err) = crate::locale::merge_library_locale_packs(pack, &contract.library_package_roots) {
-                diagnostics.push(
-                    crate::diagnostics::Diagnostic::error(format!(
-                        "failed to load library locale pack: {}",
-                        crate::locale::format_locale_pack_load_error(&err)
-                    ))
-                    .with_phase(crate::diagnostics::DiagnosticPhase::Lex)
-                    .with_code("LOCALE001")
-                    .with_args(vec![crate::diagnostics::DiagnosticArg::new(
-                        "issue",
-                        "library_locale_pack_load_failed",
-                    )])
-                    .with_file(name.to_owned()),
-                );
-                return CheckDiagnosticsResult { diagnostics, success: false };
-            }
+        if let Some(pack) = resolved_pack.as_mut()
+            && let Err(err) = crate::locale::merge_library_locale_packs(pack, &contract.library_package_roots)
+        {
+            diagnostics.push(
+                crate::diagnostics::Diagnostic::error(format!(
+                    "failed to load library locale pack: {}",
+                    crate::locale::format_locale_pack_load_error(&err)
+                ))
+                .with_phase(crate::diagnostics::DiagnosticPhase::Lex)
+                .with_code("LOCALE001")
+                .with_args(vec![crate::diagnostics::DiagnosticArg::new(
+                    "issue",
+                    "library_locale_pack_load_failed",
+                )])
+                .with_file(name.to_owned()),
+            );
+            return CheckDiagnosticsResult { diagnostics, success: false };
         }
         pass_config.namespace_exports = contract.namespace_exports;
         pass_config.namespace_seams = contract.namespace_seams;
