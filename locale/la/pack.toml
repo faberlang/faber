@@ -1,0 +1,1470 @@
+# Library-owned member fragment for the Latin reader surface.
+# Not a reader keyword pack — only [pack] + [[library_members]].
+# Canonical names stay the English source spellings in norma/src.
+#
+# Two identities for the same module:
+#   provider = "norma"                      — radix check (`norma:text`)
+#   provider = "package", package = "norma" — faber FileInterface
+#
+# The la pack is an identity pack, so members install as-written; these rows
+# add the Latin surface projections for members whose canonical names became
+# English in Pass B.
+
+[pack]
+id = "la"
+schema_version = 1
+
+[[library_members]]
+provider = "norma"
+module_path = ["text"]
+kind = "function"
+canonical = "reverse"
+surface = "retorta"
+
+[[library_members]]
+provider = "package"
+package = "norma"
+module_path = ["text"]
+kind = "function"
+canonical = "reverse"
+surface = "retorta"
+
+[[library_members]]
+provider = "norma"
+module_path = ["text"]
+kind = "function"
+canonical = "join"
+surface = "nexa"
+
+[[library_members]]
+provider = "package"
+package = "norma"
+module_path = ["text"]
+kind = "function"
+canonical = "join"
+surface = "nexa"
+
+[[library_members]]
+provider = "norma"
+module_path = ["text"]
+kind = "function"
+canonical = "keep_if"
+surface = "retenta_iudicio"
+
+[[library_members]]
+provider = "package"
+package = "norma"
+module_path = ["text"]
+kind = "function"
+canonical = "keep_if"
+surface = "retenta_iudicio"
+
+[[library_members]]
+provider = "norma"
+module_path = ["text"]
+kind = "function"
+canonical = "keep_between"
+surface = "retenta"
+
+[[library_members]]
+provider = "package"
+package = "norma"
+module_path = ["text"]
+kind = "function"
+canonical = "keep_between"
+surface = "retenta"
+
+[[library_members]]
+provider = "norma"
+module_path = ["text"]
+kind = "function"
+canonical = "drop_between"
+surface = "expurgata"
+
+[[library_members]]
+provider = "package"
+package = "norma"
+module_path = ["text"]
+kind = "function"
+canonical = "drop_between"
+surface = "expurgata"
+
+[[library_members]]
+provider = "norma"
+module_path = ["text"]
+kind = "function"
+canonical = "split_frontmatter"
+surface = "diducta"
+
+[[library_members]]
+provider = "package"
+package = "norma"
+module_path = ["text"]
+kind = "function"
+canonical = "split_frontmatter"
+surface = "diducta"
+
+[[library_members]]
+provider = "norma"
+module_path = ["text"]
+kind = "function"
+canonical = "split_n"
+surface = "discissa"
+
+[[library_members]]
+provider = "package"
+package = "norma"
+module_path = ["text"]
+kind = "function"
+canonical = "split_n"
+surface = "discissa"
+
+[[library_members]]
+provider = "norma"
+module_path = ["text"]
+kind = "function"
+canonical = "encode"
+surface = "pange"
+
+[[library_members]]
+provider = "package"
+package = "norma"
+module_path = ["text"]
+kind = "function"
+canonical = "encode"
+surface = "pange"
+
+[[library_members]]
+provider = "norma"
+module_path = ["text"]
+kind = "function"
+canonical = "decode"
+surface = "solve"
+
+[[library_members]]
+provider = "package"
+package = "norma"
+module_path = ["text"]
+kind = "function"
+canonical = "decode"
+surface = "solve"
+
+[[library_members]]
+provider = "norma"
+module_path = ["text"]
+kind = "function"
+canonical = "count"
+surface = "reputat"
+
+[[library_members]]
+provider = "package"
+package = "norma"
+module_path = ["text"]
+kind = "function"
+canonical = "count"
+surface = "reputat"
+
+[[library_members]]
+provider = "norma"
+module_path = ["text"]
+kind = "function"
+canonical = "is_palindrome"
+surface = "reciprocus"
+
+[[library_members]]
+provider = "package"
+package = "norma"
+module_path = ["text"]
+kind = "function"
+canonical = "is_palindrome"
+surface = "reciprocus"
+
+[[library_members]]
+provider = "norma"
+module_path = ["text"]
+kind = "function"
+canonical = "chars"
+surface = "scala"
+
+[[library_members]]
+provider = "package"
+package = "norma"
+module_path = ["text"]
+kind = "function"
+canonical = "chars"
+surface = "scala"
+
+[[library_members]]
+provider = "norma"
+module_path = ["text"]
+kind = "function"
+canonical = "drop_if"
+surface = "expurgata_iudicio"
+
+[[library_members]]
+provider = "package"
+package = "norma"
+module_path = ["text"]
+kind = "function"
+canonical = "drop_if"
+surface = "expurgata_iudicio"
+
+[[library_members]]
+provider = "norma"
+module_path = ["text"]
+kind = "function"
+canonical = "suffix"
+surface = "residuum"
+
+[[library_members]]
+provider = "package"
+package = "norma"
+module_path = ["text"]
+kind = "function"
+canonical = "suffix"
+surface = "residuum"
+
+[[library_members]]
+provider = "norma"
+module_path = ["text"]
+kind = "function"
+canonical = "collapse_spaces"
+surface = "comprimata"
+
+[[library_members]]
+provider = "package"
+package = "norma"
+module_path = ["text"]
+kind = "function"
+canonical = "collapse_spaces"
+surface = "comprimata"
+
+[[library_members]]
+provider = "norma"
+module_path = ["text"]
+kind = "function"
+canonical = "to_ascii"
+surface = "angustata"
+
+[[library_members]]
+provider = "package"
+package = "norma"
+module_path = ["text"]
+kind = "function"
+canonical = "to_ascii"
+surface = "angustata"
+
+[[library_members]]
+provider = "norma"
+module_path = ["text"]
+kind = "function"
+canonical = "try_to_ascii"
+surface = "temptat"
+
+[[library_members]]
+provider = "package"
+package = "norma"
+module_path = ["text"]
+kind = "function"
+canonical = "try_to_ascii"
+surface = "temptat"
+
+[[library_members]]
+provider = "norma"
+module_path = ["text"]
+kind = "function"
+canonical = "try_decode"
+surface = "tempta"
+
+[[library_members]]
+provider = "package"
+package = "norma"
+module_path = ["text"]
+kind = "function"
+canonical = "try_decode"
+surface = "tempta"
+
+[[library_members]]
+provider = "norma"
+module_path = ["csv"]
+kind = "function"
+canonical = "parse"
+surface = "solve"
+
+[[library_members]]
+provider = "package"
+package = "norma"
+module_path = ["csv"]
+kind = "function"
+canonical = "parse"
+surface = "solve"
+
+[[library_members]]
+provider = "norma"
+module_path = ["csv"]
+kind = "function"
+canonical = "stringify"
+surface = "pange"
+
+[[library_members]]
+provider = "package"
+package = "norma"
+module_path = ["csv"]
+kind = "function"
+canonical = "stringify"
+surface = "pange"
+
+[[library_members]]
+provider = "norma"
+module_path = ["value"]
+kind = "function"
+canonical = "get"
+surface = "cape"
+
+[[library_members]]
+provider = "package"
+package = "norma"
+module_path = ["value"]
+kind = "function"
+canonical = "get"
+surface = "cape"
+
+[[library_members]]
+provider = "norma"
+module_path = ["value"]
+kind = "function"
+canonical = "require_string"
+surface = "exige"
+
+[[library_members]]
+provider = "package"
+package = "norma"
+module_path = ["value"]
+kind = "function"
+canonical = "require_string"
+surface = "exige"
+
+[[library_members]]
+provider = "norma"
+module_path = ["value"]
+kind = "function"
+canonical = "require_strings"
+surface = "exige_claves"
+
+[[library_members]]
+provider = "package"
+package = "norma"
+module_path = ["value"]
+kind = "function"
+canonical = "require_strings"
+surface = "exige_claves"
+
+[[library_members]]
+provider = "norma"
+module_path = ["fs"]
+kind = "function"
+canonical = "read_file"
+surface = "lege"
+
+[[library_members]]
+provider = "package"
+package = "norma"
+module_path = ["fs"]
+kind = "function"
+canonical = "read_file"
+surface = "lege"
+
+[[library_members]]
+provider = "norma"
+module_path = ["fs"]
+kind = "function"
+canonical = "read_range"
+surface = "partem"
+
+[[library_members]]
+provider = "package"
+package = "norma"
+module_path = ["fs"]
+kind = "function"
+canonical = "read_range"
+surface = "partem"
+
+[[library_members]]
+provider = "norma"
+module_path = ["fs"]
+kind = "function"
+canonical = "read_lines"
+surface = "carpe"
+
+[[library_members]]
+provider = "package"
+package = "norma"
+module_path = ["fs"]
+kind = "function"
+canonical = "read_lines"
+surface = "carpe"
+
+[[library_members]]
+provider = "norma"
+module_path = ["fs"]
+kind = "function"
+canonical = "write_file"
+surface = "scribe"
+
+[[library_members]]
+provider = "package"
+package = "norma"
+module_path = ["fs"]
+kind = "function"
+canonical = "write_file"
+surface = "scribe"
+
+[[library_members]]
+provider = "norma"
+module_path = ["fs"]
+kind = "function"
+canonical = "write_bytes"
+surface = "funde"
+
+[[library_members]]
+provider = "package"
+package = "norma"
+module_path = ["fs"]
+kind = "function"
+canonical = "write_bytes"
+surface = "funde"
+
+[[library_members]]
+provider = "norma"
+module_path = ["fs"]
+kind = "function"
+canonical = "write_bytes_async"
+surface = "fundet"
+
+[[library_members]]
+provider = "package"
+package = "norma"
+module_path = ["fs"]
+kind = "function"
+canonical = "write_bytes_async"
+surface = "fundet"
+
+[[library_members]]
+provider = "norma"
+module_path = ["fs"]
+kind = "function"
+canonical = "exists"
+surface = "exstat"
+
+[[library_members]]
+provider = "package"
+package = "norma"
+module_path = ["fs"]
+kind = "function"
+canonical = "exists"
+surface = "exstat"
+
+[[library_members]]
+provider = "norma"
+module_path = ["fs"]
+kind = "function"
+canonical = "is_directory"
+surface = "directoriumne"
+
+[[library_members]]
+provider = "package"
+package = "norma"
+module_path = ["fs"]
+kind = "function"
+canonical = "is_directory"
+surface = "directoriumne"
+
+[[library_members]]
+provider = "norma"
+module_path = ["fs"]
+kind = "function"
+canonical = "is_regular"
+surface = "regularene"
+
+[[library_members]]
+provider = "package"
+package = "norma"
+module_path = ["fs"]
+kind = "function"
+canonical = "is_regular"
+surface = "regularene"
+
+[[library_members]]
+provider = "norma"
+module_path = ["fs"]
+kind = "function"
+canonical = "is_symlink"
+surface = "vinculumne"
+
+[[library_members]]
+provider = "package"
+package = "norma"
+module_path = ["fs"]
+kind = "function"
+canonical = "is_symlink"
+surface = "vinculumne"
+
+[[library_members]]
+provider = "norma"
+module_path = ["fs"]
+kind = "function"
+canonical = "byte_length"
+surface = "mensura"
+
+[[library_members]]
+provider = "package"
+package = "norma"
+module_path = ["fs"]
+kind = "function"
+canonical = "byte_length"
+surface = "mensura"
+
+[[library_members]]
+provider = "norma"
+module_path = ["fs"]
+kind = "function"
+canonical = "mode"
+surface = "modus"
+
+[[library_members]]
+provider = "package"
+package = "norma"
+module_path = ["fs"]
+kind = "function"
+canonical = "mode"
+surface = "modus"
+
+[[library_members]]
+provider = "norma"
+module_path = ["fs"]
+kind = "function"
+canonical = "read_link"
+surface = "sequere"
+
+[[library_members]]
+provider = "package"
+package = "norma"
+module_path = ["fs"]
+kind = "function"
+canonical = "read_link"
+surface = "sequere"
+
+[[library_members]]
+provider = "norma"
+module_path = ["fs"]
+kind = "function"
+canonical = "create_link"
+surface = "vincula"
+
+[[library_members]]
+provider = "package"
+package = "norma"
+module_path = ["fs"]
+kind = "function"
+canonical = "create_link"
+surface = "vincula"
+
+[[library_members]]
+provider = "norma"
+module_path = ["fs"]
+kind = "function"
+canonical = "delete"
+surface = "dele"
+
+[[library_members]]
+provider = "package"
+package = "norma"
+module_path = ["fs"]
+kind = "function"
+canonical = "delete"
+surface = "dele"
+
+[[library_members]]
+provider = "norma"
+module_path = ["fs"]
+kind = "function"
+canonical = "copy"
+surface = "exscribe"
+
+[[library_members]]
+provider = "package"
+package = "norma"
+module_path = ["fs"]
+kind = "function"
+canonical = "copy"
+surface = "exscribe"
+
+[[library_members]]
+provider = "norma"
+module_path = ["fs"]
+kind = "function"
+canonical = "copy_async"
+surface = "exscribet"
+
+[[library_members]]
+provider = "package"
+package = "norma"
+module_path = ["fs"]
+kind = "function"
+canonical = "copy_async"
+surface = "exscribet"
+
+[[library_members]]
+provider = "norma"
+module_path = ["fs"]
+kind = "function"
+canonical = "rename"
+surface = "renomina"
+
+[[library_members]]
+provider = "package"
+package = "norma"
+module_path = ["fs"]
+kind = "function"
+canonical = "rename"
+surface = "renomina"
+
+[[library_members]]
+provider = "norma"
+module_path = ["fs"]
+kind = "function"
+canonical = "touch"
+surface = "tange"
+
+[[library_members]]
+provider = "package"
+package = "norma"
+module_path = ["fs"]
+kind = "function"
+canonical = "touch"
+surface = "tange"
+
+[[library_members]]
+provider = "norma"
+module_path = ["fs"]
+kind = "function"
+canonical = "set_mode"
+surface = "modum"
+
+[[library_members]]
+provider = "package"
+package = "norma"
+module_path = ["fs"]
+kind = "function"
+canonical = "set_mode"
+surface = "modum"
+
+[[library_members]]
+provider = "norma"
+module_path = ["fs"]
+kind = "function"
+canonical = "create_dir"
+surface = "crea"
+
+[[library_members]]
+provider = "package"
+package = "norma"
+module_path = ["fs"]
+kind = "function"
+canonical = "create_dir"
+surface = "crea"
+
+[[library_members]]
+provider = "norma"
+module_path = ["fs"]
+kind = "function"
+canonical = "remove_tree"
+surface = "amputa"
+
+[[library_members]]
+provider = "package"
+package = "norma"
+module_path = ["fs"]
+kind = "function"
+canonical = "remove_tree"
+surface = "amputa"
+
+[[library_members]]
+provider = "norma"
+module_path = ["fs"]
+kind = "function"
+canonical = "join"
+surface = "iunge"
+
+[[library_members]]
+provider = "package"
+package = "norma"
+module_path = ["fs"]
+kind = "function"
+canonical = "join"
+surface = "iunge"
+
+[[library_members]]
+provider = "norma"
+module_path = ["fs"]
+kind = "function"
+canonical = "parent"
+surface = "parens"
+
+[[library_members]]
+provider = "package"
+package = "norma"
+module_path = ["fs"]
+kind = "function"
+canonical = "parent"
+surface = "parens"
+
+[[library_members]]
+provider = "norma"
+module_path = ["fs"]
+kind = "function"
+canonical = "resolve"
+surface = "absolve"
+
+[[library_members]]
+provider = "package"
+package = "norma"
+module_path = ["fs"]
+kind = "function"
+canonical = "resolve"
+surface = "absolve"
+
+[[library_members]]
+provider = "norma"
+module_path = ["fs"]
+kind = "function"
+canonical = "temp_dir"
+surface = "temporarium"
+
+[[library_members]]
+provider = "package"
+package = "norma"
+module_path = ["fs"]
+kind = "function"
+canonical = "temp_dir"
+surface = "temporarium"
+
+[[library_members]]
+provider = "norma"
+module_path = ["fs"]
+kind = "function"
+canonical = "append"
+surface = "appone"
+
+[[library_members]]
+provider = "package"
+package = "norma"
+module_path = ["fs"]
+kind = "function"
+canonical = "append"
+surface = "appone"
+
+[[library_members]]
+provider = "norma"
+module_path = ["fs"]
+kind = "function"
+canonical = "is_readable"
+surface = "legibilene"
+
+[[library_members]]
+provider = "package"
+package = "norma"
+module_path = ["fs"]
+kind = "function"
+canonical = "is_readable"
+surface = "legibilene"
+
+[[library_members]]
+provider = "norma"
+module_path = ["fs"]
+kind = "function"
+canonical = "find"
+surface = "inveni"
+
+[[library_members]]
+provider = "package"
+package = "norma"
+module_path = ["fs"]
+kind = "function"
+canonical = "find"
+surface = "inveni"
+
+[[library_members]]
+provider = "norma"
+module_path = ["fs", "path"]
+kind = "function"
+canonical = "file_name"
+surface = "nomen"
+
+[[library_members]]
+provider = "package"
+package = "norma"
+module_path = ["fs", "path"]
+kind = "function"
+canonical = "file_name"
+surface = "nomen"
+
+[[library_members]]
+provider = "norma"
+module_path = ["console"]
+kind = "function"
+canonical = "read_bytes"
+surface = "hauri"
+
+[[library_members]]
+provider = "package"
+package = "norma"
+module_path = ["console"]
+kind = "function"
+canonical = "read_bytes"
+surface = "hauri"
+
+[[library_members]]
+provider = "norma"
+module_path = ["console"]
+kind = "function"
+canonical = "read_bytes_async"
+surface = "hauriet"
+
+[[library_members]]
+provider = "package"
+package = "norma"
+module_path = ["console"]
+kind = "function"
+canonical = "read_bytes_async"
+surface = "hauriet"
+
+[[library_members]]
+provider = "norma"
+module_path = ["console"]
+kind = "function"
+canonical = "read_line"
+surface = "lege"
+
+[[library_members]]
+provider = "package"
+package = "norma"
+module_path = ["console"]
+kind = "function"
+canonical = "read_line"
+surface = "lege"
+
+[[library_members]]
+provider = "norma"
+module_path = ["console"]
+kind = "function"
+canonical = "read_line_async"
+surface = "leget"
+
+[[library_members]]
+provider = "package"
+package = "norma"
+module_path = ["console"]
+kind = "function"
+canonical = "read_line_async"
+surface = "leget"
+
+[[library_members]]
+provider = "norma"
+module_path = ["console"]
+kind = "function"
+canonical = "write_bytes"
+surface = "funde"
+
+[[library_members]]
+provider = "package"
+package = "norma"
+module_path = ["console"]
+kind = "function"
+canonical = "write_bytes"
+surface = "funde"
+
+[[library_members]]
+provider = "norma"
+module_path = ["console"]
+kind = "function"
+canonical = "write_bytes_async"
+surface = "fundet"
+
+[[library_members]]
+provider = "package"
+package = "norma"
+module_path = ["console"]
+kind = "function"
+canonical = "write_bytes_async"
+surface = "fundet"
+
+[[library_members]]
+provider = "norma"
+module_path = ["console"]
+kind = "function"
+canonical = "write_line"
+surface = "scribe"
+
+[[library_members]]
+provider = "package"
+package = "norma"
+module_path = ["console"]
+kind = "function"
+canonical = "write_line"
+surface = "scribe"
+
+[[library_members]]
+provider = "norma"
+module_path = ["console"]
+kind = "function"
+canonical = "write_line_async"
+surface = "scribet"
+
+[[library_members]]
+provider = "package"
+package = "norma"
+module_path = ["console"]
+kind = "function"
+canonical = "write_line_async"
+surface = "scribet"
+
+[[library_members]]
+provider = "norma"
+module_path = ["console"]
+kind = "function"
+canonical = "write_partial"
+surface = "dic"
+
+[[library_members]]
+provider = "package"
+package = "norma"
+module_path = ["console"]
+kind = "function"
+canonical = "write_partial"
+surface = "dic"
+
+[[library_members]]
+provider = "norma"
+module_path = ["console"]
+kind = "function"
+canonical = "write_partial_async"
+surface = "dicet"
+
+[[library_members]]
+provider = "package"
+package = "norma"
+module_path = ["console"]
+kind = "function"
+canonical = "write_partial_async"
+surface = "dicet"
+
+[[library_members]]
+provider = "norma"
+module_path = ["console"]
+kind = "function"
+canonical = "warn_line"
+surface = "mone"
+
+[[library_members]]
+provider = "package"
+package = "norma"
+module_path = ["console"]
+kind = "function"
+canonical = "warn_line"
+surface = "mone"
+
+[[library_members]]
+provider = "norma"
+module_path = ["console"]
+kind = "function"
+canonical = "warn_line_async"
+surface = "monet"
+
+[[library_members]]
+provider = "package"
+package = "norma"
+module_path = ["console"]
+kind = "function"
+canonical = "warn_line_async"
+surface = "monet"
+
+[[library_members]]
+provider = "norma"
+module_path = ["console"]
+kind = "function"
+canonical = "debug_line"
+surface = "vide"
+
+[[library_members]]
+provider = "package"
+package = "norma"
+module_path = ["console"]
+kind = "function"
+canonical = "debug_line"
+surface = "vide"
+
+[[library_members]]
+provider = "norma"
+module_path = ["console"]
+kind = "function"
+canonical = "debug_line_async"
+surface = "videbit"
+
+[[library_members]]
+provider = "package"
+package = "norma"
+module_path = ["console"]
+kind = "function"
+canonical = "debug_line_async"
+surface = "videbit"
+
+[[library_members]]
+provider = "norma"
+module_path = ["console"]
+kind = "function"
+canonical = "stdin_is_tty"
+surface = "audit"
+
+[[library_members]]
+provider = "package"
+package = "norma"
+module_path = ["console"]
+kind = "function"
+canonical = "stdin_is_tty"
+surface = "audit"
+
+[[library_members]]
+provider = "norma"
+module_path = ["console"]
+kind = "function"
+canonical = "stdout_is_tty"
+surface = "loquitur"
+
+[[library_members]]
+provider = "package"
+package = "norma"
+module_path = ["console"]
+kind = "function"
+canonical = "stdout_is_tty"
+surface = "loquitur"
+
+[[library_members]]
+provider = "norma"
+module_path = ["console"]
+kind = "function"
+canonical = "stderr_is_tty"
+surface = "admonet"
+
+[[library_members]]
+provider = "package"
+package = "norma"
+module_path = ["console"]
+kind = "function"
+canonical = "stderr_is_tty"
+surface = "admonet"
+
+[[library_members]]
+provider = "norma"
+module_path = ["process"]
+kind = "function"
+canonical = "spawn"
+surface = "genera"
+
+[[library_members]]
+provider = "package"
+package = "norma"
+module_path = ["process"]
+kind = "function"
+canonical = "spawn"
+surface = "genera"
+
+[[library_members]]
+provider = "norma"
+module_path = ["process"]
+kind = "function"
+canonical = "exec"
+surface = "exsequi"
+
+[[library_members]]
+provider = "package"
+package = "norma"
+module_path = ["process"]
+kind = "function"
+canonical = "exec"
+surface = "exsequi"
+
+[[library_members]]
+provider = "norma"
+module_path = ["process"]
+kind = "function"
+canonical = "read_env"
+surface = "lege"
+
+[[library_members]]
+provider = "package"
+package = "norma"
+module_path = ["process"]
+kind = "function"
+canonical = "read_env"
+surface = "lege"
+
+[[library_members]]
+provider = "norma"
+module_path = ["process"]
+kind = "function"
+canonical = "argv"
+surface = "argumenta"
+
+[[library_members]]
+provider = "package"
+package = "norma"
+module_path = ["process"]
+kind = "function"
+canonical = "argv"
+surface = "argumenta"
+
+[[library_members]]
+provider = "norma"
+module_path = ["process"]
+kind = "function"
+canonical = "cwd"
+surface = "sedes"
+
+[[library_members]]
+provider = "package"
+package = "norma"
+module_path = ["process"]
+kind = "function"
+canonical = "cwd"
+surface = "sedes"
+
+[[library_members]]
+provider = "norma"
+module_path = ["process"]
+kind = "function"
+canonical = "exit_process"
+surface = "exi"
+
+[[library_members]]
+provider = "package"
+package = "norma"
+module_path = ["process"]
+kind = "function"
+canonical = "exit_process"
+surface = "exi"
+
+[[library_members]]
+provider = "norma"
+module_path = ["process"]
+kind = "function"
+canonical = "capture"
+surface = "captura"
+
+[[library_members]]
+provider = "package"
+package = "norma"
+module_path = ["process"]
+kind = "function"
+canonical = "capture"
+surface = "captura"
+
+[[library_members]]
+provider = "norma"
+module_path = ["process"]
+kind = "function"
+canonical = "detach"
+surface = "dimitte"
+
+[[library_members]]
+provider = "package"
+package = "norma"
+module_path = ["process"]
+kind = "function"
+canonical = "detach"
+surface = "dimitte"
+
+[[library_members]]
+provider = "norma"
+module_path = ["process"]
+kind = "function"
+canonical = "exec_async"
+surface = "exsequetur"
+
+[[library_members]]
+provider = "package"
+package = "norma"
+module_path = ["process"]
+kind = "function"
+canonical = "exec_async"
+surface = "exsequetur"
+
+[[library_members]]
+provider = "norma"
+module_path = ["process"]
+kind = "function"
+canonical = "write_env"
+surface = "scribe"
+
+[[library_members]]
+provider = "package"
+package = "norma"
+module_path = ["process"]
+kind = "function"
+canonical = "write_env"
+surface = "scribe"
+
+[[library_members]]
+provider = "norma"
+module_path = ["process"]
+kind = "function"
+canonical = "chdir"
+surface = "muta"
+
+[[library_members]]
+provider = "package"
+package = "norma"
+module_path = ["process"]
+kind = "function"
+canonical = "chdir"
+surface = "muta"
+
+[[library_members]]
+provider = "norma"
+module_path = ["process"]
+kind = "function"
+canonical = "pid"
+surface = "identitas"
+
+[[library_members]]
+provider = "package"
+package = "norma"
+module_path = ["process"]
+kind = "function"
+canonical = "pid"
+surface = "identitas"
+
+[[library_members]]
+provider = "norma"
+module_path = ["time"]
+kind = "function"
+canonical = "now"
+surface = "nunc"
+
+[[library_members]]
+provider = "package"
+package = "norma"
+module_path = ["time"]
+kind = "function"
+canonical = "now"
+surface = "nunc"
+
+[[library_members]]
+provider = "norma"
+module_path = ["time"]
+kind = "function"
+canonical = "monotonic"
+surface = "monotonicum"
+
+[[library_members]]
+provider = "package"
+package = "norma"
+module_path = ["time"]
+kind = "function"
+canonical = "monotonic"
+surface = "monotonicum"
+
+[[library_members]]
+provider = "norma"
+module_path = ["time"]
+kind = "function"
+canonical = "active"
+surface = "activum"
+
+[[library_members]]
+provider = "package"
+package = "norma"
+module_path = ["time"]
+kind = "function"
+canonical = "active"
+surface = "activum"
+
+[[library_members]]
+provider = "norma"
+module_path = ["time"]
+kind = "function"
+canonical = "sleep"
+surface = "expectet"
+
+[[library_members]]
+provider = "package"
+package = "norma"
+module_path = ["time"]
+kind = "function"
+canonical = "sleep"
+surface = "expectet"
+
+[[library_members]]
+provider = "norma"
+module_path = ["time"]
+kind = "function"
+canonical = "MILLISECOND"
+surface = "MILLISECUNDUM"
+
+[[library_members]]
+provider = "package"
+package = "norma"
+module_path = ["time"]
+kind = "function"
+canonical = "MILLISECOND"
+surface = "MILLISECUNDUM"
+
+[[library_members]]
+provider = "norma"
+module_path = ["json"]
+kind = "function"
+canonical = "stringify"
+surface = "pange"
+
+[[library_members]]
+provider = "package"
+package = "norma"
+module_path = ["json"]
+kind = "function"
+canonical = "stringify"
+surface = "pange"
+
+[[library_members]]
+provider = "norma"
+module_path = ["json"]
+kind = "function"
+canonical = "parse"
+surface = "solve"
+
+[[library_members]]
+provider = "package"
+package = "norma"
+module_path = ["json"]
+kind = "function"
+canonical = "parse"
+surface = "solve"
+
+[[library_members]]
+provider = "norma"
+module_path = ["json"]
+kind = "function"
+canonical = "try_parse"
+surface = "tempta"
+
+[[library_members]]
+provider = "package"
+package = "norma"
+module_path = ["json"]
+kind = "function"
+canonical = "try_parse"
+surface = "tempta"
+
+[[library_members]]
+provider = "norma"
+module_path = ["json", "solve"]
+kind = "function"
+canonical = "parse"
+surface = "solve"
+
+[[library_members]]
+provider = "package"
+package = "norma"
+module_path = ["json", "solve"]
+kind = "function"
+canonical = "parse"
+surface = "solve"
+
+[[library_members]]
+provider = "norma"
+module_path = ["http"]
+kind = "function"
+canonical = "get"
+surface = "petet"
+
+[[library_members]]
+provider = "package"
+package = "norma"
+module_path = ["http"]
+kind = "function"
+canonical = "get"
+surface = "petet"
+
+[[library_members]]
+provider = "norma"
+module_path = ["yaml"]
+kind = "function"
+canonical = "stringify"
+surface = "pange"
+
+[[library_members]]
+provider = "package"
+package = "norma"
+module_path = ["yaml"]
+kind = "function"
+canonical = "stringify"
+surface = "pange"
+
+[[library_members]]
+provider = "norma"
+module_path = ["yaml"]
+kind = "function"
+canonical = "parse"
+surface = "solve"
+
+[[library_members]]
+provider = "package"
+package = "norma"
+module_path = ["yaml"]
+kind = "function"
+canonical = "parse"
+surface = "solve"
+
+[[library_members]]
+provider = "norma"
+module_path = ["toml"]
+kind = "function"
+canonical = "parse"
+surface = "solve"
+
+[[library_members]]
+provider = "package"
+package = "norma"
+module_path = ["toml"]
+kind = "function"
+canonical = "parse"
+surface = "solve"
+
+[[library_members]]
+provider = "norma"
+module_path = ["model"]
+kind = "function"
+canonical = "detect_format"
+surface = "formatum"
+
+[[library_members]]
+provider = "package"
+package = "norma"
+module_path = ["model"]
+kind = "function"
+canonical = "detect_format"
+surface = "formatum"
+
+[[library_members]]
+provider = "norma"
+module_path = ["model"]
+kind = "function"
+canonical = "diagnose"
+surface = "diagnosticum"
+
+[[library_members]]
+provider = "package"
+package = "norma"
+module_path = ["model"]
+kind = "function"
+canonical = "diagnose"
+surface = "diagnosticum"

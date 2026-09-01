@@ -1,0 +1,284 @@
+# Library-owned member fragment for the English reader surface.
+# Not a reader keyword pack — only [pack] + [[library_members]].
+# Canonical names stay the English source spellings in norma/src.
+#
+# Two identities for the same module:
+#   provider = "norma"                      — radix check (`norma:text`)
+#   provider = "package", package = "norma" — faber FileInterface
+#
+# The en pack defines `norma:text` as a total identity: every public member
+# ships a row (identity rows keep the canonical spelling).
+
+[pack]
+id = "en"
+schema_version = 1
+
+[[library_members]]
+provider = "norma"
+module_path = ["text"]
+kind = "function"
+canonical = "reverse"
+surface = "reverse"
+
+[[library_members]]
+provider = "package"
+package = "norma"
+module_path = ["text"]
+kind = "function"
+canonical = "reverse"
+surface = "reverse"
+
+[[library_members]]
+provider = "norma"
+module_path = ["text"]
+kind = "function"
+canonical = "join"
+surface = "join"
+
+[[library_members]]
+provider = "package"
+package = "norma"
+module_path = ["text"]
+kind = "function"
+canonical = "join"
+surface = "join"
+
+[[library_members]]
+provider = "norma"
+module_path = ["text"]
+kind = "function"
+canonical = "keep_if"
+surface = "keep_if"
+
+[[library_members]]
+provider = "package"
+package = "norma"
+module_path = ["text"]
+kind = "function"
+canonical = "keep_if"
+surface = "keep_if"
+
+[[library_members]]
+provider = "norma"
+module_path = ["text"]
+kind = "function"
+canonical = "keep_between"
+surface = "keep_between"
+
+[[library_members]]
+provider = "package"
+package = "norma"
+module_path = ["text"]
+kind = "function"
+canonical = "keep_between"
+surface = "keep_between"
+
+[[library_members]]
+provider = "norma"
+module_path = ["text"]
+kind = "function"
+canonical = "drop_between"
+surface = "drop_between"
+
+[[library_members]]
+provider = "package"
+package = "norma"
+module_path = ["text"]
+kind = "function"
+canonical = "drop_between"
+surface = "drop_between"
+
+[[library_members]]
+provider = "norma"
+module_path = ["text"]
+kind = "function"
+canonical = "split_frontmatter"
+surface = "split_frontmatter"
+
+[[library_members]]
+provider = "package"
+package = "norma"
+module_path = ["text"]
+kind = "function"
+canonical = "split_frontmatter"
+surface = "split_frontmatter"
+
+[[library_members]]
+provider = "norma"
+module_path = ["text"]
+kind = "function"
+canonical = "split_n"
+surface = "split_n"
+
+[[library_members]]
+provider = "package"
+package = "norma"
+module_path = ["text"]
+kind = "function"
+canonical = "split_n"
+surface = "split_n"
+
+[[library_members]]
+provider = "norma"
+module_path = ["text"]
+kind = "function"
+canonical = "encode"
+surface = "encode"
+
+[[library_members]]
+provider = "package"
+package = "norma"
+module_path = ["text"]
+kind = "function"
+canonical = "encode"
+surface = "encode"
+
+[[library_members]]
+provider = "norma"
+module_path = ["text"]
+kind = "function"
+canonical = "decode"
+surface = "decode"
+
+[[library_members]]
+provider = "package"
+package = "norma"
+module_path = ["text"]
+kind = "function"
+canonical = "decode"
+surface = "decode"
+
+[[library_members]]
+provider = "norma"
+module_path = ["text"]
+kind = "function"
+canonical = "count"
+surface = "count"
+
+[[library_members]]
+provider = "package"
+package = "norma"
+module_path = ["text"]
+kind = "function"
+canonical = "count"
+surface = "count"
+
+[[library_members]]
+provider = "norma"
+module_path = ["text"]
+kind = "function"
+canonical = "is_palindrome"
+surface = "is_palindrome"
+
+[[library_members]]
+provider = "package"
+package = "norma"
+module_path = ["text"]
+kind = "function"
+canonical = "is_palindrome"
+surface = "is_palindrome"
+
+[[library_members]]
+provider = "norma"
+module_path = ["text"]
+kind = "function"
+canonical = "chars"
+surface = "chars"
+
+[[library_members]]
+provider = "package"
+package = "norma"
+module_path = ["text"]
+kind = "function"
+canonical = "chars"
+surface = "chars"
+
+[[library_members]]
+provider = "norma"
+module_path = ["text"]
+kind = "function"
+canonical = "drop_if"
+surface = "drop_if"
+
+[[library_members]]
+provider = "package"
+package = "norma"
+module_path = ["text"]
+kind = "function"
+canonical = "drop_if"
+surface = "drop_if"
+
+[[library_members]]
+provider = "norma"
+module_path = ["text"]
+kind = "function"
+canonical = "suffix"
+surface = "suffix"
+
+[[library_members]]
+provider = "package"
+package = "norma"
+module_path = ["text"]
+kind = "function"
+canonical = "suffix"
+surface = "suffix"
+
+[[library_members]]
+provider = "norma"
+module_path = ["text"]
+kind = "function"
+canonical = "collapse_spaces"
+surface = "collapse_spaces"
+
+[[library_members]]
+provider = "package"
+package = "norma"
+module_path = ["text"]
+kind = "function"
+canonical = "collapse_spaces"
+surface = "collapse_spaces"
+
+[[library_members]]
+provider = "norma"
+module_path = ["text"]
+kind = "function"
+canonical = "to_ascii"
+surface = "to_ascii"
+
+[[library_members]]
+provider = "package"
+package = "norma"
+module_path = ["text"]
+kind = "function"
+canonical = "to_ascii"
+surface = "to_ascii"
+
+[[library_members]]
+provider = "norma"
+module_path = ["text"]
+kind = "function"
+canonical = "try_to_ascii"
+surface = "try_to_ascii"
+
+[[library_members]]
+provider = "package"
+package = "norma"
+module_path = ["text"]
+kind = "function"
+canonical = "try_to_ascii"
+surface = "try_to_ascii"
+
+[[library_members]]
+provider = "norma"
+module_path = ["text"]
+kind = "function"
+canonical = "try_decode"
+surface = "try_decode"
+
+[[library_members]]
+provider = "package"
+package = "norma"
+module_path = ["text"]
+kind = "function"
+canonical = "try_decode"
+surface = "try_decode"
