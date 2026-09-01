@@ -1806,15 +1806,13 @@ fn rewrite_air_backward_calls(
 
             if let MirTerminatorKind::TryCall { callee: MirCallee::Definition { source, .. }, .. } =
                 &block.terminator.kind
-            {
-                if templates.contains_key(source) {
+                && templates.contains_key(source) {
                     return Err(SpannedCodegenError {
                         message: "generic call signature has unresolved type parameter".to_owned(),
                         args: vec![DiagnosticArg::new("issue", "air_companion_unresolved_type_parameter")],
                         span: Some(block.terminator.span),
                     });
                 }
-            }
         }
     }
     Ok(())
@@ -2985,8 +2983,8 @@ fn analyze_source_with_kernel_template_admissions_unadjusted(
     }
 
     // Rust-only borrow/lifetime checks are target qualification, not base analysis.
-    if session.config.target == Target::HirRust {
-        if let Err(borrow_errors) = semantic::qualify_rust_borrow(&unit.hir, &unit.resolver, &unit.types) {
+    if session.config.target == Target::HirRust
+        && let Err(borrow_errors) = semantic::qualify_rust_borrow(&unit.hir, &unit.resolver, &unit.types) {
             for err in &borrow_errors {
                 unit.diagnostics
                     .push(Diagnostic::from_semantic_error(name, body, err));
@@ -2995,7 +2993,6 @@ fn analyze_source_with_kernel_template_admissions_unadjusted(
                 return Err(unit.diagnostics);
             }
         }
-    }
 
     // DFV2-2: orphaned-annotation admission — fail closed at check stage, with
     // the named issue leading the diagnostic list. PKG-ADM: package-supplied
@@ -3064,9 +3061,9 @@ pub(crate) fn resolve_frontmatter_locale_pack(config: &Config, locale_id: &str) 
     // the language-pack root after symlink resolution. Input filtering already
     // blocks '/' and '..', so the primary remaining escape is a symlink inside
     // the locale directory.
-    if let Ok(canonical_root) = std::fs::canonicalize(root) {
-        if let Ok(canonical_pack_path) = std::fs::canonicalize(&pack_path) {
-            if !canonical_pack_path.starts_with(&canonical_root) {
+    if let Ok(canonical_root) = std::fs::canonicalize(root)
+        && let Ok(canonical_pack_path) = std::fs::canonicalize(&pack_path)
+            && !canonical_pack_path.starts_with(&canonical_root) {
                 return Err(Box::new(
                     Diagnostic::error(format!(
                         "frontmatter locale '{locale_id}' resolves outside the language-pack root"
@@ -3075,8 +3072,6 @@ pub(crate) fn resolve_frontmatter_locale_pack(config: &Config, locale_id: &str) 
                     .with_code(locale_unknown_spec().code),
                 ));
             }
-        }
-    }
 
     LocalePack::from_toml_path(&pack_path).map_err(|err| {
         Box::new(
@@ -3383,8 +3378,8 @@ fn collect_lane_policy_diagnostics(
     // HirRust library / package units omit AIR-lane items, companions, and
     // same-unit wrappers that reach them instead of TARGETLANE001. Single-file
     // AIR-as-rust and a kept rust-emitted caller of an omitted item still reject.
-    if target == Target::HirRust {
-        if let Some(hir) = hir {
+    if target == Target::HirRust
+        && let Some(hir) = hir {
             let omit = rust_library_omit_defs(lanes, hir);
             if rust_library_omit_applies(hir, &omit) {
                 if rust_kept_item_reaches_omit(hir, &omit) {
@@ -3396,7 +3391,6 @@ fn collect_lane_policy_diagnostics(
                 return omit;
             }
         }
-    }
     diagnostics.extend(collect_radix_lane_target_errors(lanes, target, name));
     rustc_hash::FxHashSet::default()
 }
@@ -3488,11 +3482,10 @@ fn module_call_targets(module: &HirModule) -> rustc_hash::FxHashSet<DefId> {
 
     impl HirVisitor for CallCollector {
         fn visit_expr(&mut self, expr: &HirExpression) {
-            if let HirExpressionKind::Call(callee, ..) = &expr.kind {
-                if let HirExpressionKind::Path(def_id) = callee.kind {
+            if let HirExpressionKind::Call(callee, ..) = &expr.kind
+                && let HirExpressionKind::Path(def_id) = callee.kind {
                     self.callees.insert(def_id);
                 }
-            }
             walk_expr(self, expr);
         }
     }

@@ -338,14 +338,13 @@ fn adopt_recipe(
     op: MirCollectionOp,
     plan: CollectionKernelPlan,
 ) -> Result<(), PlanMappingError> {
-    if let Some(existing) = recipe.as_ref() {
-        if existing != &plan {
+    if let Some(existing) = recipe.as_ref()
+        && existing != &plan {
             return Err(PlanMappingError::mapping(format!(
                 "kernel body mixes collection ops with conflicting recipes \
                  ({op:?} resolves to {plan:?}, but the body already carries {existing:?})"
             )));
         }
-    }
     *recipe = Some(plan);
     Ok(())
 }
@@ -2952,15 +2951,14 @@ pub fn contract_shape_signature(
                     // Persistent K/V views are written in-shader at
                     // write_position. Mark them ReadWrite so Metal binds
                     // `device` rather than `device const`.
-                    if let Ok(dims) = crate::tensor_type::tensor_literal_dims(ty, validation) {
-                        if dims.len() == 3
+                    if let Ok(dims) = crate::tensor_type::tensor_literal_dims(ty, validation)
+                        && dims.len() == 3
                             && dims[0] == kv_heads
                             && dims[2] == head_dim
                             && dims[1] != seq
                         {
                             extra.access = MirKernelResourceAccess::ReadWrite;
                         }
-                    }
                     signature.extra_inputs.push(extra);
                 }
             }
@@ -3465,8 +3463,7 @@ pub fn transformer_subchain_signature_for_emission_with_source(
         };
         if let Some((dims, _)) =
             crate::kernel_plan::transformer_recipe_shape(function, validation, op)
-        {
-            if dims.len() == 2 && admission(dims[0], dims[1]).is_some() {
+            && dims.len() == 2 && admission(dims[0], dims[1]).is_some() {
                 let lanes = u64::from(crate::kernel_plan::ROW_REDUCTION_WORKGROUP_X);
                 signature.workgroup = MirWorkgroupSize {
                     x: crate::kernel_plan::ROW_REDUCTION_WORKGROUP_X,
@@ -3480,7 +3477,6 @@ pub fn transformer_subchain_signature_for_emission_with_source(
                     z: 1,
                 };
             }
-        }
     }
     Ok(signature)
 }
@@ -3814,14 +3810,13 @@ pub fn resolve_subchain_plan(
             continue;
         }
         if is_recipe_op(op) {
-            if let Some(existing) = recipe_op {
-                if existing != op {
+            if let Some(existing) = recipe_op
+                && existing != op {
                     return Err(PlanMappingError::mapping(format!(
                         "subchain op set mixes distinct recipes ({existing:?} and {op:?}); \
                          the decomposition must split them into separate kernels"
                     )));
                 }
-            }
             recipe_op = Some(op);
         } else if !is_elementwise_collection_op(op) {
             return Err(PlanMappingError::mapping(format!(
@@ -4498,13 +4493,12 @@ fn composed_matmul_temp_has_only_producer(
         }
         producer_count += 1;
     }
-    if let MirTerminatorKind::TryCall { destination, .. } = &block.terminator.kind {
-        if destination.as_ref().is_some_and(
+    if let MirTerminatorKind::TryCall { destination, .. } = &block.terminator.kind
+        && destination.as_ref().is_some_and(
             |place| matches!(&place.base, MirPlaceBase::Temp(candidate) if candidate == &temp),
         ) {
             return false;
         }
-    }
     producer_count == 1
 }
 

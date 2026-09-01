@@ -34,11 +34,10 @@ pub fn summarize_hir_aspect_coverage(
     let mut checks = FxHashMap::default();
     let mut check_iter = check_results.iter();
     for (index, record) in report.records().iter().enumerate() {
-        if record.record_kind == HirAspectRecordKind::Recognized {
-            if let Some(result) = check_iter.next() {
+        if record.record_kind == HirAspectRecordKind::Recognized
+            && let Some(result) = check_iter.next() {
                 checks.insert(obligation_id(record, index), result);
             }
-        }
     }
     let entries = report
         .records()

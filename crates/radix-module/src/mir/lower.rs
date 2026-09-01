@@ -727,11 +727,10 @@ fn ensure_tensor_bracket_index_array_types(hir: &crate::hir::HirModule, types: &
                 let index_is_list = index
                     .ty
                     .is_some_and(|ty| crate::semantic::tensor_bracket::is_bracket_index_list_type(self.types, ty));
-                if object_is_tensor && !index_is_list {
-                    if let Some(index_ty) = index.ty {
+                if object_is_tensor && !index_is_list
+                    && let Some(index_ty) = index.ty {
                         self.elements.insert(index_ty);
                     }
-                }
             }
             walk_expr(self, expr);
         }
@@ -1106,15 +1105,14 @@ impl<'a> MirLowerer<'a> {
             builder.switch_to(entry_block);
             let mut consts_lowered = true;
             for item in &self.unit.hir.items {
-                if let HirItemKind::Constant(const_item) = &item.kind {
-                    if builder
+                if let HirItemKind::Constant(const_item) = &item.kind
+                    && builder
                         .lower_const_binding(item.def_id, const_item, item.span)
                         .is_none()
                     {
                         consts_lowered = false;
                         break;
                     }
-                }
             }
             if consts_lowered {
                 builder.visit_block(entry);
@@ -1483,11 +1481,10 @@ struct TopLevelConstCollector<'a> {
 
 impl HirVisitor for TopLevelConstCollector<'_> {
     fn visit_expr(&mut self, expr: &HirExpression) {
-        if let HirExpressionKind::Path(def_id) = expr.kind {
-            if self.top_level_consts.contains_key(&def_id) && self.seen.insert(def_id) {
+        if let HirExpressionKind::Path(def_id) = expr.kind
+            && self.top_level_consts.contains_key(&def_id) && self.seen.insert(def_id) {
                 self.found.push(def_id);
             }
-        }
         walk_expr(self, expr);
     }
 }
@@ -2251,11 +2248,10 @@ impl<'a> FunctionBuilder<'a> {
         if matches!(op, HirBinOp::And | HirBinOp::Or) {
             return self.lower_logical_short_circuit(op, lhs, rhs, expr);
         }
-        if matches!(op, HirBinOp::Is | HirBinOp::IsNot) {
-            if let Some(predicate) = self.lower_is_predicate(op, lhs, rhs, expr) {
+        if matches!(op, HirBinOp::Is | HirBinOp::IsNot)
+            && let Some(predicate) = self.lower_is_predicate(op, lhs, rhs, expr) {
                 return Some(predicate);
             }
-        }
         if matches!(op, HirBinOp::Between) {
             let collection = self.lower_expr_value(rhs)?;
             let value = self.lower_expr_value(lhs)?;
@@ -2542,9 +2538,9 @@ impl<'a> FunctionBuilder<'a> {
         expr: &HirExpression,
     ) -> Option<MirOperand> {
         let result_ty = self.expr_ty(expr)?;
-        if let HirExpressionKind::Field(object, member) = &rhs.kind {
-            if let HirExpressionKind::Path(import_def) = &object.kind {
-                if let Some(target_ty) = self
+        if let HirExpressionKind::Field(object, member) = &rhs.kind
+            && let HirExpressionKind::Path(import_def) = &object.kind
+                && let Some(target_ty) = self
                     .context
                     .imported_type_members
                     .get(&(*import_def, *member))
@@ -2558,8 +2554,6 @@ impl<'a> FunctionBuilder<'a> {
                         expr.span,
                     ));
                 }
-            }
-        }
         if matches!(rhs.kind, HirExpressionKind::Literal(HirLiteral::Nil)) {
             let operand = self.lower_expr_value(lhs)?;
             return Some(self.lower_nil_comparison(op, operand, result_ty, expr.span));

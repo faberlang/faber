@@ -239,8 +239,8 @@ impl<'lowerer, 'unit> MonomorphizationState<'lowerer, 'unit> {
                 }
             }
 
-            if let MirTerminatorKind::TryCall { destination, callee, args, error_place, .. } = &block.terminator.kind {
-                if self.is_generic_callee(callee) {
+            if let MirTerminatorKind::TryCall { destination, callee, args, error_place, .. } = &block.terminator.kind
+                && self.is_generic_callee(callee) {
                     sites.push(CallSite {
                         function: function.id,
                         block_index,
@@ -253,7 +253,6 @@ impl<'lowerer, 'unit> MonomorphizationState<'lowerer, 'unit> {
                         scope: scope.clone(),
                     });
                 }
-            }
         }
         sites
     }
@@ -636,11 +635,10 @@ impl<'lowerer, 'unit> MonomorphizationState<'lowerer, 'unit> {
                     return false;
                 }
             }
-            if let MirTerminatorKind::TryCall { callee, .. } = &mut block.terminator.kind {
-                if !self.substitute_callee(callee, bindings, &shape_params, span) {
+            if let MirTerminatorKind::TryCall { callee, .. } = &mut block.terminator.kind
+                && !self.substitute_callee(callee, bindings, &shape_params, span) {
                     return false;
                 }
-            }
         }
         true
     }
@@ -675,11 +673,10 @@ impl<'lowerer, 'unit> MonomorphizationState<'lowerer, 'unit> {
             // through the calling instance's shape bindings at key
             // derivation. Substituting it here would reject the caller-owned
             // magnitudo symbol as an unresolved type parameter.
-            if let Type::Param(sym) = self.types().get(type_arg.semantic_id()) {
-                if shape_params.contains(sym) && !bindings.contains_key(sym) {
+            if let Type::Param(sym) = self.types().get(type_arg.semantic_id())
+                && shape_params.contains(sym) && !bindings.contains_key(sym) {
                     continue;
                 }
-            }
             *type_arg = match self.substitute_ty(*type_arg, bindings, span) {
                 Some(ty) => ty,
                 None => return false,
@@ -1075,11 +1072,10 @@ fn generic_param_names(params: &[crate::hir::HirTypeParam]) -> Vec<OrderedParam>
 /// O(1) when `id.0` matches the dense vector index (common lowering order).
 /// Linear fallback keeps sparse/reordered IDs correct after template removal.
 pub(super) fn function_by_id(functions: &[MirFunction], id: MirFunctionId) -> Option<&MirFunction> {
-    if let Some(function) = functions.get(id.0 as usize) {
-        if function.id == id {
+    if let Some(function) = functions.get(id.0 as usize)
+        && function.id == id {
             return Some(function);
         }
-    }
     functions.iter().find(|function| function.id == id)
 }
 

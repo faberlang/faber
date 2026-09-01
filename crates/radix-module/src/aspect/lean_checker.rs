@@ -867,8 +867,8 @@ fn extract_declarations(source: &str) -> Vec<String> {
     for line in source.lines() {
         let trimmed = line.trim();
         for prefix in prefixes {
-            if let Some(rest) = trimmed.strip_prefix(prefix) {
-                if let Some(name) = rest.split_whitespace().next() {
+            if let Some(rest) = trimmed.strip_prefix(prefix)
+                && let Some(name) = rest.split_whitespace().next() {
                     let name = name
                         .trim_end_matches(':')
                         .trim_end_matches('(')
@@ -881,7 +881,6 @@ fn extract_declarations(source: &str) -> Vec<String> {
                         names.push(name.to_string());
                     }
                 }
-            }
         }
     }
 

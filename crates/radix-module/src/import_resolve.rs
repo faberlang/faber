@@ -209,8 +209,8 @@ pub fn resolve_namespace_import(
         });
     }
 
-    if let Some((provider, module_path)) = import_path.split_once(':') {
-        if !provider.is_empty()
+    if let Some((provider, module_path)) = import_path.split_once(':')
+        && !provider.is_empty()
             && !module_path.is_empty()
             && !module_path.contains(':')
             && is_valid_provider_segment(provider)
@@ -224,7 +224,6 @@ pub fn resolve_namespace_import(
                 issue: "import_resolve_provider_not_found",
             });
         }
-    }
 
     if !import_path.starts_with('.') {
         return Err(ImportResolveError {
@@ -418,8 +417,8 @@ fn parse_manifest_provider_name(toml_source: &str) -> Option<String> {
             in_library = trimmed == "[library]";
             continue;
         }
-        if in_library {
-            if let Some(rest) = trimmed.strip_prefix("provider") {
+        if in_library
+            && let Some(rest) = trimmed.strip_prefix("provider") {
                 let rest = rest.trim_start();
                 if let Some(value) = rest.strip_prefix('=') {
                     let value = value.trim().trim_matches('"').trim_matches('\'');
@@ -428,7 +427,6 @@ fn parse_manifest_provider_name(toml_source: &str) -> Option<String> {
                     }
                 }
             }
-        }
     }
     None
 }
@@ -449,11 +447,10 @@ pub fn library_home() -> Option<PathBuf> {
     // compilation session, so the walk runs at most once.
     LIBRARY_HOME_CACHE
         .get_or_init(|| {
-            if let Some(home) = std::env::var_os(FABER_LIBRARY_HOME_ENV).map(PathBuf::from) {
-                if home.is_dir() {
+            if let Some(home) = std::env::var_os(FABER_LIBRARY_HOME_ENV).map(PathBuf::from)
+                && home.is_dir() {
                     return Some(home);
                 }
-            }
             // Walk out of both normal checkouts and packet worktrees. A packet's
             // compile-time manifest lives below `faberlang/worktrees/<packet>/radix`,
             // so the old two-level probe stopped before the sibling `norma` checkout.
@@ -481,8 +478,8 @@ pub fn library_home() -> Option<PathBuf> {
 
 fn installed_provider_source_root(provider_repo: &Path) -> Option<PathBuf> {
     let manifest_path = provider_repo.join("faber.toml");
-    if manifest_path.is_file() {
-        if let Ok(toml_str) = std::fs::read_to_string(&manifest_path) {
+    if manifest_path.is_file()
+        && let Ok(toml_str) = std::fs::read_to_string(&manifest_path) {
             let config = parse_paths_config(&toml_str);
             if let Some(source_rel) = &config.source {
                 let root = provider_repo.join(source_rel);
@@ -490,7 +487,6 @@ fn installed_provider_source_root(provider_repo: &Path) -> Option<PathBuf> {
             }
         }
         // faber.toml exists but has no [paths].source — fall through to defaults.
-    }
     let fallback = provider_repo.join("src");
     if fallback.is_dir() {
         Some(fallback)

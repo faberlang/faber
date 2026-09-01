@@ -75,11 +75,10 @@ impl MirDeviceContext {
 
     pub fn attach_program(&mut self, program: &MirProgram) {
         for function in &program.functions {
-            if let Some(def_id) = function.source {
-                if let Some(role) = self.by_def_id.get(&def_id).copied() {
+            if let Some(def_id) = function.source
+                && let Some(role) = self.by_def_id.get(&def_id).copied() {
                     self.by_function_id.insert(function.id, role);
                 }
-            }
             if let Some(metadata) = self.by_function_metadata.get(&function.id).copied() {
                 self.by_function_id.insert(function.id, metadata.role);
             }
@@ -369,15 +368,14 @@ pub fn merge_imported_entry_roles(
                 function: fact.function,
             });
         }
-        if let Some(local) = roles_by_def.get(&fact.source) {
-            if *local != MirDeviceRole::Kernel {
+        if let Some(local) = roles_by_def.get(&fact.source)
+            && *local != MirDeviceRole::Kernel {
                 return Err(MirImportedEntryError::RoleConflict {
                     source: fact.source,
                     local: *local,
                     imported: fact.role,
                 });
             }
-        }
         roles_by_def.insert(fact.source, MirDeviceRole::Kernel);
     }
     Ok(roles_by_def)

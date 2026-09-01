@@ -215,11 +215,10 @@ impl MirProgram {
     /// sparse or reordered.
     #[must_use]
     pub fn function_by_id(&self, id: MirFunctionId) -> Option<&MirFunction> {
-        if let Some(function) = self.functions.get(id.0 as usize) {
-            if function.id == id {
+        if let Some(function) = self.functions.get(id.0 as usize)
+            && function.id == id {
                 return Some(function);
             }
-        }
         self.functions.iter().find(|function| function.id == id)
     }
 }
@@ -257,11 +256,10 @@ impl MirFunction {
     /// sparse or reordered.
     #[must_use]
     pub fn block_by_id(&self, id: MirBlockId) -> Option<&MirBlock> {
-        if let Some(block) = self.blocks.get(id.0 as usize) {
-            if block.id == id {
+        if let Some(block) = self.blocks.get(id.0 as usize)
+            && block.id == id {
                 return Some(block);
             }
-        }
         self.blocks.iter().find(|block| block.id == id)
     }
 

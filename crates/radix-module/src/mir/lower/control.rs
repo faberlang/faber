@@ -3136,10 +3136,9 @@ impl FunctionBuilder<'_> {
             }
             self.visit_stmt(stmt);
         }
-        if let Some(expr) = &block.expr {
-            if self.current_is_open() {
+        if let Some(expr) = &block.expr
+            && self.current_is_open() {
                 self.visit_expr(expr);
             }
-        }
     }
 }

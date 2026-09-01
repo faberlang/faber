@@ -1967,14 +1967,13 @@ impl Parser {
             }
             _ => None,
         };
-        if let Some(raw) = raw_annotation_name.as_deref() {
-            if let Some(expected) = self.untranslated_annotation_spelling(raw) {
+        if let Some(raw) = raw_annotation_name.as_deref()
+            && let Some(expected) = self.untranslated_annotation_spelling(raw) {
                 return Err(self
                     .invalid_annotation_error("wrong_locale_annotation")
                     .with_arg("annotation", raw)
                     .with_arg("expected", expected));
             }
-        }
         let name = self.parse_annotation_name()?;
 
         // Dispatch on the consumed annotation name's keyword identity (any

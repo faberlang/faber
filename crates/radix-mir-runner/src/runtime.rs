@@ -786,11 +786,10 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
             return Err(RunnerError::internal(span, "conversion runtime arity"));
         };
         let value = self.eval_operand(source, span)?;
-        if matches!(value, Value::Nil) {
-            if let Some(recovery) = &conversion.recovery {
+        if matches!(value, Value::Nil)
+            && let Some(recovery) = &conversion.recovery {
                 return self.eval_recovery(recovery, span);
             }
-        }
         match conversion.flavor {
             MirConversionFlavor::Cast => self.eval_cast(value, &conversion.target_ty, span),
             MirConversionFlavor::Runtime => self.eval_runtime_convert(conversion, value, span),
@@ -1045,15 +1044,14 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                 let item = self.eval_operand(item, span)?;
                 match receiver {
                     Value::Array(cell) => {
-                        if let Some(capacity) = self.collection_capacity(receiver_operand, span)? {
-                            if cell.borrow().len() >= capacity {
+                        if let Some(capacity) = self.collection_capacity(receiver_operand, span)?
+                            && cell.borrow().len() >= capacity {
                                 return Err(RunnerError::internal_with_issue(
                                     span,
                                     "bounded collection push at capacity",
                                     "runner_collection_push_capacity",
                                 ));
                             }
-                        }
                         cell.borrow_mut().push(item);
                         Ok(Value::Unit)
                     }

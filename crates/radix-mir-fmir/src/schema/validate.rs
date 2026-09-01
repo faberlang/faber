@@ -299,14 +299,13 @@ fn validate_wire_reduced_projections(
             ) {
                 continue;
             }
-            if let Some(carried) = resource.version.reduced_projection {
-                if carried != projection {
+            if let Some(carried) = resource.version.reduced_projection
+                && carried != projection {
                     return Err(wire_invalid(format!(
                         "kernel '{}' carries an axis-reduction plan projection {projection:?} that disagrees with the reduced output buffer's carried projection {carried:?}; the same fact must agree everywhere it is stamped (council-8 CB-3)",
                         kernel.entry
                     )));
                 }
-            }
         }
     }
     Ok(())
@@ -352,13 +351,12 @@ fn validate_carried_reduced_projection(
 /// step count is the route's authority; a count the route could never drive
 /// is rejected before host construction.
 fn validate_wire_step_count(wire: &WireDeviceProgram) -> Result<(), crate::error::FmirImageError> {
-    if let WireProgramLifetime::RepeatingStep(declared) = wire.lifetime {
-        if declared == 0 {
+    if let WireProgramLifetime::RepeatingStep(declared) = wire.lifetime
+        && declared == 0 {
             return Err(wire_invalid(
                 "RepeatingStep program declares step count 0; a training program must declare at least one step".to_owned(),
             ));
         }
-    }
     Ok(())
 }
 

@@ -906,11 +906,10 @@ fn statement_temp_sets(statement: &MirStatement) -> (BTreeSet<MirTempId>, BTreeS
         MirStatementKind::RuntimeCall {
             destination, call, ..
         } => {
-            if let Some(place) = destination {
-                if let MirPlaceBase::Temp(temp) = place.base.clone() {
+            if let Some(place) = destination
+                && let MirPlaceBase::Temp(temp) = place.base.clone() {
                     defined.insert(temp);
                 }
-            }
             for arg in &call.args {
                 if let Some(temp) = operand_temp(arg) {
                     referenced.insert(temp);
@@ -925,11 +924,10 @@ fn statement_temp_sets(statement: &MirStatement) -> (BTreeSet<MirTempId>, BTreeS
         MirStatementKind::Call {
             destination, args, ..
         } => {
-            if let Some(place) = destination {
-                if let MirPlaceBase::Temp(temp) = place.base.clone() {
+            if let Some(place) = destination
+                && let MirPlaceBase::Temp(temp) = place.base.clone() {
                     defined.insert(temp);
                 }
-            }
             for arg in args {
                 if let Some(temp) = operand_temp(arg) {
                     referenced.insert(temp);
@@ -948,11 +946,10 @@ fn statement_temp_sets(statement: &MirStatement) -> (BTreeSet<MirTempId>, BTreeS
                 return (defined, referenced);
             };
             for item in items {
-                if let MirAggregateItem::Operand(operand) = item {
-                    if let Some(temp) = operand_temp(operand) {
+                if let MirAggregateItem::Operand(operand) = item
+                    && let Some(temp) = operand_temp(operand) {
                         referenced.insert(temp);
                     }
-                }
             }
         }
     }
@@ -1276,8 +1273,8 @@ pub fn multi_output_result_aggregation_slots(
     // Rule 1: the function's OWN result aggregation — the local/temp base of
     // the terminator's return operand when the return type is a non-empty
     // tuple.
-    if is_non_empty_tuple_type(types, function.return_ty) {
-        if let MirTerminatorKind::Return(Some(operand)) = &function.blocks[0].terminator.kind {
+    if is_non_empty_tuple_type(types, function.return_ty)
+        && let MirTerminatorKind::Return(Some(operand)) = &function.blocks[0].terminator.kind {
             match operand {
                 MirOperand::Place(place) => match place.base {
                     MirPlaceBase::Local(local)
@@ -1318,7 +1315,6 @@ pub fn multi_output_result_aggregation_slots(
                 _ => {}
             }
         }
-    }
 
     // Rule 2: the KEPT source result-tuple local (D-6). The kept local is
     // never read (the fragment's return assembly is the synthetic's
@@ -1349,15 +1345,13 @@ pub fn multi_output_result_aggregation_slots(
                     destination,
                     aggregate,
                 } = &statement.kind
-                {
-                    if aggregate.kind == MirAggregateKind::Tuple {
+                    && aggregate.kind == MirAggregateKind::Tuple {
                         if let Some(local) = crate::read_analysis::place_local_base(destination) {
                             tuple_construct_destinations.insert(local);
                         } else if let MirPlaceBase::Temp(temp) = destination.base {
                             tuple_construct_temp_destinations.insert(temp);
                         }
                     }
-                }
                 if let Some(local) = crate::read_analysis::statement_destination(statement) {
                     written.insert(local);
                 }

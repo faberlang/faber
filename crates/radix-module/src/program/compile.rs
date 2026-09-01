@@ -615,11 +615,10 @@ fn cached_import_target(
     let canonical_key = std::fs::canonicalize(&target_path)
         .ok()
         .map(|canonical| (pack_key.cloned(), canonical));
-    if let Some(key) = &canonical_key {
-        if let Some(lookup) = serve(IMPORT_TARGET_CACHE.with(|cache| cache.borrow().get(key).cloned())) {
+    if let Some(key) = &canonical_key
+        && let Some(lookup) = serve(IMPORT_TARGET_CACHE.with(|cache| cache.borrow().get(key).cloned())) {
             return lookup;
         }
-    }
     let Ok(target_source) = std::fs::read_to_string(&target_path) else {
         return ImportTargetLookup::Unresolved;
     };
@@ -735,11 +734,10 @@ pub(crate) fn import_contract_for_file(
         contract
             .namespace_seams
             .insert(binding.clone(), crate::import_resolve::same_package(path, target_path));
-        if import_path.contains(':') {
-            if let Some(root) = crate::import_resolve::find_package_root(target_path) {
+        if import_path.contains(':')
+            && let Some(root) = crate::import_resolve::find_package_root(target_path) {
                 contract.library_package_roots.insert(root);
             }
-        }
         // Seed the transitive relative-import walk from every direct relative
         // import target (MRL-4): a module's public surface can name sibling
         // nominals through its own relative imports (`list<p.Punctum>` in a
@@ -927,8 +925,8 @@ fn parse_reader_locale_from_toml(toml_source: &str) -> Option<String> {
             in_locale_table = trimmed == "[locale]" || trimmed == "[reader]";
             continue;
         }
-        if in_locale_table {
-            if let Some(rest) = trimmed.strip_prefix("locale") {
+        if in_locale_table
+            && let Some(rest) = trimmed.strip_prefix("locale") {
                 let rest = rest.trim_start();
                 if let Some(value) = rest.strip_prefix('=') {
                     let value = value.trim().trim_matches('"').trim_matches('\'');
@@ -937,7 +935,6 @@ fn parse_reader_locale_from_toml(toml_source: &str) -> Option<String> {
                     }
                 }
             }
-        }
     }
     None
 }
@@ -1153,12 +1150,11 @@ fn import_target_identity(
     import_path: &str,
     module_identity: Option<&InterfaceLibraryIdentity>,
 ) -> Option<InterfaceLibraryIdentity> {
-    if let Some((provider, module)) = import_path.split_once(':') {
-        if !provider.is_empty() && !module.is_empty() && !module.contains(':') {
+    if let Some((provider, module)) = import_path.split_once(':')
+        && !provider.is_empty() && !module.is_empty() && !module.contains(':') {
             let module_path = module.split('/').map(str::to_owned).collect();
             return Some(InterfaceLibraryIdentity { provider: provider.to_owned(), package: None, module_path });
         }
-    }
     if let Some(relative) = import_path.strip_prefix("./") {
         // Relative sibling import: shares the exporting module's provider and
         // package, extending its module path by the relative segments.
@@ -1670,20 +1666,17 @@ fn interface_type_from_type_expr(
                         "fractus" | "float" => Some(Primitive::Fractus),
                         _ => None,
                     };
-                    if let Some(prim) = family {
-                        if let Ok(width) = NumericWidth::from_marker(width_name, prim) {
+                    if let Some(prim) = family
+                        && let Ok(width) = NumericWidth::from_marker(width_name, prim) {
                             return Some(InterfaceTypeSnapshot::SizedNumeric(prim, width));
                         }
-                    }
                 }
             }
-            if params.len() == 1 && base == "instans" {
-                if let Some(marker_ident) = generic_arg_bare_name(&params[0]) {
-                    if let Ok(precision) = InstansPrecision::from_marker(interner.resolve(marker_ident.name)) {
+            if params.len() == 1 && base == "instans"
+                && let Some(marker_ident) = generic_arg_bare_name(&params[0])
+                    && let Ok(precision) = InstansPrecision::from_marker(interner.resolve(marker_ident.name)) {
                         return Some(InterfaceTypeSnapshot::SizedInstans(precision));
                     }
-                }
-            }
             // Tuple type `iuncta<A, B, …>`. Callables returning tuples (and
             // signatures containing them) otherwise fail the whole export, so
             // the convert-path snapshot must carry the element list.
@@ -1945,11 +1938,10 @@ fn sorted_export_surface(program: &Program, interner: &crate::lexer::Interner) -
         } else {
             crate::semantic::passes::visibility_annotation::statement_export_tier(stmt, interner)
         };
-        if let Some(tier) = tier {
-            if let Some(name) = export_name(stmt, interner) {
+        if let Some(tier) = tier
+            && let Some(name) = export_name(stmt, interner) {
                 surface.insert(name, tier);
             }
-        }
     }
     surface
 }
@@ -1976,11 +1968,10 @@ fn sorted_declaration_surface(
                     .unwrap_or(VisibilityTier::Privata),
             )
         };
-        if let Some(tier) = tier {
-            if let Some(name) = export_name(stmt, interner) {
+        if let Some(tier) = tier
+            && let Some(name) = export_name(stmt, interner) {
                 surface.insert(name, tier);
             }
-        }
     }
     surface
 }
@@ -2172,11 +2163,10 @@ fn import_contract_path_allowed(path: &str, templates: Option<&BTreeMap<String, 
     if path.starts_with('§') {
         return templates.is_some();
     }
-    if let Some((provider, module)) = path.split_once(':') {
-        if !provider.is_empty() && !module.is_empty() && !module.contains(':') {
+    if let Some((provider, module)) = path.split_once(':')
+        && !provider.is_empty() && !module.is_empty() && !module.contains(':') {
             return true;
         }
-    }
     if path.starts_with("./") {
         return true;
     }

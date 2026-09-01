@@ -250,8 +250,8 @@ fn classify_intrinsic(
     gaps: &mut Vec<CapabilityGap>,
     seen: &mut FxHashSet<String>,
 ) {
-    if let MirIntrinsic::Provider(provider) = intrinsic {
-        if provider.kind == MirProviderKind::Package {
+    if let MirIntrinsic::Provider(provider) = intrinsic
+        && provider.kind == MirProviderKind::Package {
             push_gap(
                 gaps,
                 seen,
@@ -262,7 +262,6 @@ fn classify_intrinsic(
             );
             return;
         }
-    }
     let family = MirRuntimeAbi::from_intrinsic(intrinsic).family;
     if family_dispatchable_in_script(family) {
         return;

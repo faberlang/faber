@@ -112,11 +112,10 @@ impl Validator<'_, '_> {
                 args,
             } => {
                 let sig = self.validate_callee(scope, callee, stmt.span);
-                if let Some(sig) = &sig {
-                    if sig.error_ty.is_some() {
+                if let Some(sig) = &sig
+                    && sig.error_ty.is_some() {
                         self.error(stmt.span, "ordinary call callee is failable; use try_call");
                     }
-                }
                 let mut generic_bindings = GenericTypeBindings::default();
                 let mut shape_bindings = MirShapeBindings::default();
                 self.validate_call_args(
