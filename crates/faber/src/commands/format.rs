@@ -227,11 +227,20 @@ fn format_single_doc(path: &Path, source: &str) -> Result<String, ()> {
             return Err(());
         }
     };
-    let emit_pack = session
-        .config
-        .locale_pack
-        .as_ref()
-        .expect("format session resolves a source locale pack");
+    let Some(emit_pack) = session.config.locale_pack.as_ref() else {
+        // format_session always installs a resolved reader pack; reaching this
+        // means the session invariant broke, so fail closed as a diagnostic.
+        crate::postprocess::print_diagnostics(
+            &[radix::module::diagnostics::Diagnostic::error(
+                "format session did not resolve a source locale pack",
+            )
+            .with_code("LOCALE003")
+            .with_file(name)],
+            radix::services::DiagnosticMode::Normal,
+            None,
+        );
+        return Err(());
+    };
     let result = radix::module::codegen::faber::reemit_faber(&session, emit_pack, &name, source);
 
     let had_error = result
