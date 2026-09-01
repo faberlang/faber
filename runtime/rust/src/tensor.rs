@@ -20,7 +20,6 @@ pub struct Tensor<T> {
 // Contract-authority re-exports: the single canonical definition lives at
 // radix-runtime-contract/src/tensor.rs (the compiler-side authority).
 pub use crate::contract::tensor::{
-    tensor_dim_non_negative, tensor_flat_offset, tensor_shape_element_count,
     ERR_ACCIPE_INVALID_INDEX, ERR_BROADCAST_SHAPE, ERR_CREA_INVALID_SHAPE,
     ERR_DIVIDE_NON_FINITE_INPUT, ERR_DIVIDE_NON_FINITE_RESULT, ERR_DIVIDE_ZERO_DENOMINATOR,
     ERR_ELEMENT_COUNT_OVERFLOW, ERR_FORMA_ELEMENT_COUNT, ERR_FORMA_RESHAPE_COUNT,
@@ -29,6 +28,7 @@ pub use crate::contract::tensor::{
     ERR_NEGATIVE_INDEX, ERR_NEGATIVE_SLICE, ERR_PERMUTE_AXIS_OUT_OF_RANGE,
     ERR_PERMUTE_DUPLICATE_AXIS, ERR_PERMUTE_NEGATIVE_AXIS, ERR_PERMUTE_RANK,
     ERR_PONDE_INVALID_INDEX, ERR_SECTIO_INVALID_SLICE_BOUNDS, ERR_TRANSPOSE_RANK,
+    tensor_dim_non_negative, tensor_flat_offset, tensor_shape_element_count,
 };
 
 // Local domain messages, grouped by op so each kernel's error surface is
@@ -465,11 +465,7 @@ fn broadcast_shape(lhs: &[usize], rhs: &[usize]) -> Result<Vec<usize>, &'static 
 
 fn broadcast_dim(shape: &[usize], rank: usize, axis: usize) -> usize {
     let pad = rank - shape.len();
-    if axis < pad {
-        1
-    } else {
-        shape[axis - pad]
-    }
+    if axis < pad { 1 } else { shape[axis - pad] }
 }
 
 fn broadcast_index(index: &[usize], shape: &[usize]) -> Vec<usize> {

@@ -28,16 +28,15 @@ pub mod valor;
 pub use arena::{Arena, ArenaHandle};
 pub use ascii::Ascii;
 pub use ascii_bounded::{AsciiN, AsciiNOverflow};
-pub use cursor_stream::{materialize_cursor_stream, CursorStreamSink};
+pub use cursor_stream::{CursorStreamSink, materialize_cursor_stream};
 pub use display::{
-    display_bivalens, display_fractus, display_option, display_option_bivalens,
+    FractusDisplay, display_bivalens, display_fractus, display_option, display_option_bivalens,
     display_option_fractus, display_option_vacuum, display_text_payload, display_valor,
-    FractusDisplay,
 };
 pub use frame::{
-    install_host_dispatch, sermo_open_with_dispatch, Cancellation, DispatchError, FrameStatus,
-    HostDispatch, IntoFrameStatus, IntoScrinium, Meus, ResponseSender, Scrinium, Sermo,
-    SermoRequest, Tuus,
+    Cancellation, DispatchError, FrameStatus, HostDispatch, IntoFrameStatus, IntoScrinium, Meus,
+    ResponseSender, Scrinium, Sermo, SermoRequest, Tuus, install_host_dispatch,
+    sermo_open_with_dispatch,
 };
 pub use instans::{Instans, InstansPraecisio};
 pub use intervallum::{Intervallum, IntervallumKind, IntervallumNumeric, IntervallumWalk};

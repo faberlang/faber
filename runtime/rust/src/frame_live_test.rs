@@ -1,5 +1,5 @@
-use crate::frame::{self, FrameStatus, Scrinium};
 use crate::Valor;
+use crate::frame::{self, FrameStatus, Scrinium};
 
 fn seed_inbound(sermo: &mut frame::Sermo, frames: Vec<(FrameStatus, Valor)>) {
     for (status, data) in frames {

@@ -24,6 +24,13 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "fc652a48c352aef3ea3aed32080501cf3ef6ed5da78602a020c991775b0aff04"
 
 [[package]]
+name = "faber"
+version = "0.1.0"
+dependencies = [
+ "regex",
+]
+
+[[package]]
 name = "faber-http-transport"
 version = "0.1.0"
 dependencies = [
@@ -34,13 +41,6 @@ dependencies = [
  "hyper",
  "hyper-util",
  "tokio",
-]
-
-[[package]]
-name = "faber"
-version = "0.1.0"
-dependencies = [
- "regex",
 ]
 
 [[package]]

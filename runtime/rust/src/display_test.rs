@@ -1,6 +1,6 @@
 use crate::{
-    display_bivalens, display_fractus, display_option, display_option_bivalens,
-    display_option_fractus, display_option_vacuum, display_text_payload, display_valor, Valor,
+    Valor, display_bivalens, display_fractus, display_option, display_option_bivalens,
+    display_option_fractus, display_option_vacuum, display_text_payload, display_valor,
 };
 use std::collections::BTreeMap;
 

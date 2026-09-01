@@ -5,8 +5,8 @@
 
 #![allow(unused_imports)] // staged API4/API5 exports are intentionally present before all callers land.
 
-use faber::frame;
 use faber::Valor;
+use faber::frame;
 
 #[path = "concurrency.rs"]
 mod concurrency;

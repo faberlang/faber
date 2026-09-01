@@ -1,7 +1,7 @@
 [package]
 name = "faber-http-transport"
 version = "0.1.0"
-edition = "2021"
+edition = "2024"
 description = "G9 API1 Tokio/hyper HTTP accept transport with request-id correlation (packet staging; not the public http framework)"
 license = "MIT"
 publish = false

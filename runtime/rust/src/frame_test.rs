@@ -1,8 +1,8 @@
+use crate::Valor;
 use crate::frame::{
     self, Cancellation, DispatchError, FrameStatus, HostDispatch, ResponseSender, Scrinium,
     SermoRequest,
 };
-use crate::Valor;
 use std::future::Future;
 use std::pin::Pin;
 use std::sync::atomic::{AtomicUsize, Ordering};

@@ -6,8 +6,8 @@
 #![allow(dead_code)] // API5 fixture is a product proof surface used by targeted tests and later callers.
 
 use super::{
-    add_group, add_middleware, header_value, json_body, match_route, path_param, query_param,
-    ApplicationState,
+    ApplicationState, add_group, add_middleware, header_value, json_body, match_route, path_param,
+    query_param,
 };
 use bytes::Bytes;
 use faber::Valor;

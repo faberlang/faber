@@ -19,8 +19,8 @@
 //! The `valor_cape` row covers the `fac`/`cape` channel; this module is the
 //! status/payload contract the channel crosses on.
 
-use crate::contract::abi::{FaberRtStatusV1, STATUS_FALLIBLE, STATUS_OK};
 use crate::Valor;
+use crate::contract::abi::{FaberRtStatusV1, STATUS_FALLIBLE, STATUS_OK};
 
 /// Build the status-first failable error pair
 /// (`__faber_rt_v1_fallible_error`): `(STATUS_FALLIBLE, error)`.

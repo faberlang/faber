@@ -34,7 +34,7 @@ use std::time::Duration;
 use tokio::net::TcpListener;
 use tokio::sync::{Notify, Semaphore};
 use tokio::task::{JoinHandle, JoinSet};
-use tokio::time::{timeout, timeout_at, Instant};
+use tokio::time::{Instant, timeout, timeout_at};
 
 const SHUTDOWN_DRAIN_TIMEOUT: Duration = Duration::from_millis(250);
 

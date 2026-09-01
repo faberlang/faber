@@ -1,5 +1,4 @@
 use super::{
-    tensor_flat_offset, tensor_shape_element_count, tensor_shape_has_element_count, Tensor,
     ERR_BROADCAST_SHAPE, ERR_CRUX_ENTROPIA_EMPTY_TENSOR, ERR_CRUX_ENTROPIA_NON_FINITE_INPUT,
     ERR_CRUX_ENTROPIA_SHAPE_MISMATCH, ERR_CRUX_ENTROPIA_TARGET_NON_FINITE,
     ERR_CRUX_ENTROPIA_TARGET_RANGE, ERR_DIVIDE_NON_FINITE_INPUT, ERR_DIVIDE_NON_FINITE_RESULT,
@@ -10,7 +9,8 @@ use super::{
     ERR_LAYERNORM_RANK_TOO_HIGH, ERR_MATMUL_ARGUMENT_RANK, ERR_MATMUL_INNER_DIMENSION,
     ERR_MATMUL_RECEIVER_RANK, ERR_MEDIA_EMPTY, ERR_PERMUTE_AXIS_OUT_OF_RANGE,
     ERR_PERMUTE_DUPLICATE_AXIS, ERR_PERMUTE_NEGATIVE_AXIS, ERR_PERMUTE_RANK,
-    ERR_SOFTMAX_EMPTY_TENSOR, ERR_SOFTMAX_NON_FINITE_INPUT, ERR_TRANSPOSE_RANK,
+    ERR_SOFTMAX_EMPTY_TENSOR, ERR_SOFTMAX_NON_FINITE_INPUT, ERR_TRANSPOSE_RANK, Tensor,
+    tensor_flat_offset, tensor_shape_element_count, tensor_shape_has_element_count,
 };
 
 #[test]
@@ -511,7 +511,9 @@ fn permute_materializes_general_axis_order() {
     assert_eq!(permuted.magnitudines(), vec![4, 2, 3]);
     assert_eq!(
         permuted.planata(),
-        vec![0, 4, 8, 12, 16, 20, 1, 5, 9, 13, 17, 21, 2, 6, 10, 14, 18, 22, 3, 7, 11, 15, 19, 23]
+        vec![
+            0, 4, 8, 12, 16, 20, 1, 5, 9, 13, 17, 21, 2, 6, 10, 14, 18, 22, 3, 7, 11, 15, 19, 23
+        ]
     );
 }
 

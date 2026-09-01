@@ -6,7 +6,7 @@
 
 use std::collections::HashMap;
 
-use crate::tensor::{tensor_dim_non_negative, tensor_shape_element_count, Tensor};
+use crate::tensor::{Tensor, tensor_dim_non_negative, tensor_shape_element_count};
 
 // ── Contract-authority re-exports ───────────────────────────────────────────
 // Single canonical definition lives at

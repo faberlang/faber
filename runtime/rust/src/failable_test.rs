@@ -1,8 +1,8 @@
 //! Failable status/payload binding tests (promotion packet P10).
 
 use super::{error_payload, failable_ok, fallible_error, is_fallible};
-use crate::contract::abi::{FaberRtStatusV1, STATUS_FALLIBLE, STATUS_OK};
 use crate::Valor;
+use crate::contract::abi::{FaberRtStatusV1, STATUS_FALLIBLE, STATUS_OK};
 
 /// `fallible_error` pairs the error channel status first with the typed
 /// error payload — the `ReturnError` carrier of the four P10 fixtures.

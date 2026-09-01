@@ -65,17 +65,21 @@ fn dynamic_path_params_keep_literal_plus() {
 #[test]
 fn static_path_encoded_request_matches_encoded_route() {
     let table = add_get(route_table(), "/hello%20world".into(), "hello".into()).expect("route");
-    assert!(match_route(table, "GET".into(), "/hello%20world".into())
-        .expect("encoded match")
-        .is_some());
+    assert!(
+        match_route(table, "GET".into(), "/hello%20world".into())
+            .expect("encoded match")
+            .is_some()
+    );
 }
 
 #[test]
 fn static_path_decoded_request_matches_encoded_route() {
     let table = add_get(route_table(), "/hello%20world".into(), "hello".into()).expect("route");
-    assert!(match_route(table, "GET".into(), "/hello world".into())
-        .expect("decoded match")
-        .is_some());
+    assert!(
+        match_route(table, "GET".into(), "/hello world".into())
+            .expect("decoded match")
+            .is_some()
+    );
 }
 
 #[test]
@@ -112,9 +116,11 @@ fn traversal_paths_are_rejected_at_registration() {
 #[test]
 fn malformed_percent_decoded_utf8_path_fails_closed() {
     let table = add_get(route_table(), "/users/{id}".into(), "show".into()).expect("route");
-    assert!(match_route(table, "GET".into(), "/users/%C3%28".into())
-        .expect("malformed UTF-8 request should be a miss")
-        .is_none());
+    assert!(
+        match_route(table, "GET".into(), "/users/%C3%28".into())
+            .expect("malformed UTF-8 request should be a miss")
+            .is_none()
+    );
 }
 
 #[test]
@@ -309,17 +315,21 @@ fn success_response_shape_includes_error_false() {
 #[test]
 fn no_match_returns_nihil() {
     let table = add_get(route_table(), "/only".into(), "h".into()).expect("route");
-    assert!(match_route(table, "GET".into(), "/other".into())
-        .expect("ok")
-        .is_none());
+    assert!(
+        match_route(table, "GET".into(), "/other".into())
+            .expect("ok")
+            .is_none()
+    );
 }
 
 #[test]
 fn empty_path_does_not_match_non_root_route() {
     let table = add_get(route_table(), "/only".into(), "h".into()).expect("route");
-    assert!(match_route(table, "GET".into(), "".into())
-        .expect("ok")
-        .is_none());
+    assert!(
+        match_route(table, "GET".into(), "".into())
+            .expect("ok")
+            .is_none()
+    );
 }
 
 #[test]
