@@ -17,7 +17,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 fn emit_once(source: &str) -> String {
-    let session = Session::new(Config::default().with_dev_stdlib());
+    let session = Session::new(Config::default().with_dev_locale_root());
     let emit_pack = crate::locale::latin_locale_pack();
     let result = reemit_faber(&session, &emit_pack, "fidelity.fab", source);
     assert!(
@@ -74,8 +74,7 @@ impl Drop for LibraryHomeGuard {
 
 fn emit_imported_variant_case(source: &str, locale: &str) -> String {
     let pack = if locale == "en" {
-        let mut pack_path = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-        pack_path.push("../../stdlib/locale/en/pack.toml");
+        let pack_path = crate::locale::workspace_locale_pack_path("en");
         crate::locale::LocalePack::from_toml_path(&pack_path).expect("installed en pack loads")
     } else {
         crate::locale::latin_locale_pack()
@@ -405,8 +404,7 @@ fn inference_hole_locals_stay_holes() {
 fn union_hole_locals_stay_union_holes() {
     // `var ∪ x` keeps accepting flow members; materializing the solved
     // union would freeze it.
-    let mut pack_path = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-    pack_path.push("../../stdlib/locale/en/pack.toml");
+    let pack_path = crate::locale::workspace_locale_pack_path("en");
     let pack = crate::locale::LocalePack::from_toml_path(&pack_path).expect("installed en pack loads");
     let session = Session::new(Config::default().with_locale_pack(pack));
     let result = reemit_faber(
@@ -435,8 +433,7 @@ fn union_hole_locals_stay_union_holes() {
 #[test]
 fn nondum_availability_projects_through_en_pack() {
     // The availability family is a contextual keyword: `unstable` under en.
-    let mut pack_path = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-    pack_path.push("../../stdlib/locale/en/pack.toml");
+    let pack_path = crate::locale::workspace_locale_pack_path("en");
     let pack = crate::locale::LocalePack::from_toml_path(&pack_path).expect("installed en pack loads");
     let session = Session::new(Config::default().with_locale_pack(pack));
     let result = reemit_faber(
@@ -483,8 +480,7 @@ fn commune_annotation_round_trips_each_locale_spelling() {
 
     // en fixture: `@ shared` stays `@ shared` — a Latin word in an en file is
     // illegal surface (sealed locales).
-    let mut pack_path = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-    pack_path.push("../../stdlib/locale/en/pack.toml");
+    let pack_path = crate::locale::workspace_locale_pack_path("en");
     let pack = crate::locale::LocalePack::from_toml_path(&pack_path).expect("installed en pack loads");
     let session = Session::new(Config::default().with_locale_pack(pack));
     let result = reemit_faber(
@@ -576,8 +572,7 @@ fn authored_elige_vocabulary_round_trips() {
 
     // en fixture: `switch`/`default` surface spellings project through the
     // en pack and round-trip as authored.
-    let mut pack_path = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-    pack_path.push("../../stdlib/locale/en/pack.toml");
+    let pack_path = crate::locale::workspace_locale_pack_path("en");
     let pack = crate::locale::LocalePack::from_toml_path(&pack_path).expect("installed en pack loads");
     let session = Session::new(Config::default().with_locale_pack(pack));
     let result = reemit_faber(
@@ -626,8 +621,7 @@ fn discard_binding_round_trips() {
     assert!(la.contains("fixum numerus _ ← 6 * 7"), "la discard binding must survive:\n{la}");
 
     // en fixture: `const T _ ← expr` keeps the authored declaration form.
-    let mut pack_path = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-    pack_path.push("../../stdlib/locale/en/pack.toml");
+    let pack_path = crate::locale::workspace_locale_pack_path("en");
     let pack = crate::locale::LocalePack::from_toml_path(&pack_path).expect("installed en pack loads");
     let session = Session::new(Config::default().with_locale_pack(pack));
     let result = reemit_faber(
@@ -659,8 +653,7 @@ fn ordo_enum_round_trips_discriminants() {
     // build (pre-existing SEM001 on the declaration alone), so the fixture is
     // en-only — the surface keyword and discriminant emission are shared.
     // en fixture: `enum` surface spelling with discriminants round-trips.
-    let mut pack_path = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-    pack_path.push("../../stdlib/locale/en/pack.toml");
+    let pack_path = crate::locale::workspace_locale_pack_path("en");
     let pack = crate::locale::LocalePack::from_toml_path(&pack_path).expect("installed en pack loads");
     let session = Session::new(Config::default().with_locale_pack(pack));
     let result = reemit_faber(

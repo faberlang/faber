@@ -1341,6 +1341,24 @@ pub fn validate_library_member_pack(pack: &LocalePack) -> Vec<LocalePackIssue> {
     issues
 }
 
+/// Workspace language-pack root (`radix/locale`), relative to this crate.
+///
+/// Baked from `CARGO_MANIFEST_DIR` of `radix-semantic` so every caller
+/// (tests, driver discovery, embed byte-match) shares one path. Installed
+/// binaries still check [`workspace_locale_root`]`.is_dir()` before using it.
+#[must_use]
+pub fn workspace_locale_root() -> PathBuf {
+    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../locale")
+}
+
+/// `{workspace_locale_root}/{locale_id}/pack.toml`.
+#[must_use]
+pub fn workspace_locale_pack_path(locale_id: &str) -> PathBuf {
+    workspace_locale_root()
+        .join(locale_id)
+        .join("pack.toml")
+}
+
 /// `{package_root}/locale/{locale_id}/pack.toml`.
 #[must_use]
 pub fn library_locale_pack_path(package_root: impl AsRef<Path>, locale_id: &str) -> PathBuf {

@@ -108,7 +108,7 @@ fn literal_shape(types: &radix_types::TypeTable, index: radix_types::IndexId) ->
 fn package_mir_registers_imported_device_instances() {
     let dir = crate::test_support::test_temp_dir("generic-device-link");
     let entry = write_device_package(dir.as_ref());
-    let config = Config::default().with_stdlib(dir.join("libhome"));
+    let config = Config::default().with_library_home(dir.join("libhome"));
 
     with_interpreted_lowered_package_mir(
         &config,
@@ -214,7 +214,7 @@ fn package_mir_registers_imported_device_instances() {
 fn package_mir_imported_device_registrations_deduplicate_by_key() {
     let dir = crate::test_support::test_temp_dir("generic-device-link-dedup");
     let entry = write_device_package(dir.as_ref());
-    let config = Config::default().with_stdlib(dir.join("libhome"));
+    let config = Config::default().with_library_home(dir.join("libhome"));
 
     with_interpreted_lowered_package_mir(
         &config,
@@ -311,7 +311,7 @@ optlib = "1.0.0"
     fs::write(library.join("src/sigonly.fab"), SIGNATURE_ONLY_LIB).expect("write library module");
     fs::write(src.join("main.fab"), SIGNATURE_ONLY_MAIN).expect("write main.fab");
     let entry = src.join("main.fab");
-    let config = Config::default().with_stdlib(dir.join("libhome"));
+    let config = Config::default().with_library_home(dir.join("libhome"));
 
     let errors = with_interpreted_lowered_package_mir(
         &config,

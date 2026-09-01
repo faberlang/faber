@@ -22,7 +22,7 @@ fn compile_uses_locale_pack_for_keyword_lexing() {
 
 #[test]
 fn compile_accepts_en_require_surface_with_alternate_exit() {
-    let pack_path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../stdlib/locale/en/pack.toml");
+    let pack_path = crate::locale::workspace_locale_pack_path("en");
     let pack = crate::locale::LocalePack::from_toml_path(&pack_path).expect("installed en pack should load");
     let config = Config::default()
         .with_target(Target::HirRust)
@@ -36,7 +36,7 @@ fn compile_accepts_en_require_surface_with_alternate_exit() {
 
 #[test]
 fn compile_rejects_en_require_in_arrowless_function() {
-    let pack_path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../stdlib/locale/en/pack.toml");
+    let pack_path = crate::locale::workspace_locale_pack_path("en");
     let pack = crate::locale::LocalePack::from_toml_path(&pack_path).expect("installed en pack should load");
     let config = Config::default()
         .with_target(Target::HirRust)
@@ -65,7 +65,7 @@ fn compile_en_empty_marker_and_is_empty_intrinsic() {
     // en-pack-surface-fidelity V-1: the empty-collection marker is `empty`,
     // and the collection intrinsic remains `is_empty`. Both spellings must
     // compile in one source so the concepts cannot cross-contaminate.
-    let pack_path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../stdlib/locale/en/pack.toml");
+    let pack_path = crate::locale::workspace_locale_pack_path("en");
     let pack = crate::locale::LocalePack::from_toml_path(&pack_path).expect("installed en pack should load");
     let config = Config::default()
         .with_target(Target::HirRust)
@@ -84,7 +84,7 @@ fn compile_en_empty_marker_and_is_empty_intrinsic() {
 fn compile_en_vacua_marker_rejected() {
     // V-5: en rejects the Latin marker spelling; `vacua` is an ordinary
     // identifier and fails as unknown.
-    let pack_path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../stdlib/locale/en/pack.toml");
+    let pack_path = crate::locale::workspace_locale_pack_path("en");
     let pack = crate::locale::LocalePack::from_toml_path(&pack_path).expect("installed en pack should load");
     let config = Config::default()
         .with_target(Target::HirRust)
@@ -677,8 +677,7 @@ exemplars = ["./exemplars/salve-munde.zh-Hans.fab"]
 
 #[test]
 fn compile_one_letter_parameter_names_do_not_suggest_reader002() {
-    let mut pack_path = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-    pack_path.push("../../stdlib/locale/en/pack.toml");
+    let pack_path = crate::locale::workspace_locale_pack_path("en");
     let pack = crate::locale::LocalePack::from_toml_path(pack_path).expect("installed English pack should load");
 
     use crate::driver::WarnPolicy;

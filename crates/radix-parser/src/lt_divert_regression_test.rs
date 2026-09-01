@@ -44,7 +44,7 @@ use radix_lexer::{KeywordPack, TokenKind, lex_with_locale_pack};
 use radix_syntax::{ExprKind, IfBody, StmtKind, TypeExprKind};
 
 /// Minimal en-like reader pack: no keyword rows, only the [types] rows the
-/// matrix exercises (spellings from `stdlib/locale/en/pack.toml`).
+/// matrix exercises (spellings from `locale/en/pack.toml`).
 struct EnLikeTestPack;
 
 impl KeywordPack for EnLikeTestPack {

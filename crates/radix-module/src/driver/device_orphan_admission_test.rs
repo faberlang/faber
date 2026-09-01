@@ -153,7 +153,7 @@ fn orphan_is_not_reported_as_the_generic_zero_kernel_codegen_message_first() {
     let session = crate::driver::Session::new(
         crate::driver::Config::default()
             .with_target(Target::MirMetal)
-            .with_dev_stdlib(),
+            .with_dev_locale_root(),
     );
     let result = compile(&session, "orphan-generic.fab", ORPHAN_GENERIC, ModuleCompileRequest::default());
     assert!(!result.success(), "orphan must fail closed");

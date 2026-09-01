@@ -127,7 +127,7 @@ fn non_ascii_textus_cursor_still_types_as_cursor_ascii_one() {
 }
 
 fn en_pack() -> LocalePack {
-    let path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../stdlib/locale/en/pack.toml");
+    let path = crate::locale::workspace_locale_pack_path("en");
     LocalePack::from_toml_path(&path).expect("installed en pack should load")
 }
 

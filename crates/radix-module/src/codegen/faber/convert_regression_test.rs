@@ -11,13 +11,10 @@ use crate::codegen::Target;
 use crate::driver::{Config, Session};
 use crate::program::compile::clear_import_target_cache;
 use crate::services::check_diagnostics_for_source_with_locale_pack;
-use std::env;
 use std::fs;
-use std::path::PathBuf;
 
 fn en_locale_pack() -> crate::locale::LocalePack {
-    let stdlib = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../stdlib");
-    crate::locale::LocalePack::from_toml_path(stdlib.join("locale/en/pack.toml"))
+    crate::locale::LocalePack::from_toml_path(crate::locale::workspace_locale_pack_path("en"))
         .expect("installed en pack should load")
 }
 
@@ -34,7 +31,7 @@ fn convert_to_en_named(name: &str, source: &str) -> String {
     let session = Session::new(
         Config::default()
             .with_target(Target::HirFaber)
-            .with_dev_stdlib(),
+            .with_dev_locale_root(),
     );
     let result = reemit_faber(&session, &pack, name, source);
     assert!(

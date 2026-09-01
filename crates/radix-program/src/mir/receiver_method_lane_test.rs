@@ -95,7 +95,7 @@ fn prove_same_unit_method() {
     )
     .expect("write main.proba");
 
-    let config = Config::default().with_stdlib(dir.join("libhome"));
+    let config = Config::default().with_library_home(dir.join("libhome"));
     let mut package = crate::analyze::analyze_package_for_tests(
         &config,
         &package_root,

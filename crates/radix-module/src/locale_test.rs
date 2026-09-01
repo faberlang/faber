@@ -28,8 +28,7 @@ fn temp_pack_path(label: &str) -> (tempfile::TempDir, PathBuf) {
 }
 
 fn installed_pack(locale: &str) -> LocalePack {
-    let mut path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-    path.push(format!("../../stdlib/locale/{locale}/pack.toml"));
+    let path = crate::locale::workspace_locale_pack_path(&locale);
     LocalePack::from_toml_path(path).unwrap_or_else(|err| panic!("installed {locale} pack should load: {err:?}"))
 }
 
@@ -41,8 +40,7 @@ fn installed_pack(locale: &str) -> LocalePack {
 /// substitute coverage-gaps D1 forbids. `from_toml_str` keeps only the rows
 /// the pack owns.
 fn owned_pack(locale: &str) -> LocalePack {
-    let mut path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-    path.push(format!("../../stdlib/locale/{locale}/pack.toml"));
+    let path = crate::locale::workspace_locale_pack_path(&locale);
     let source = std::fs::read_to_string(&path).unwrap_or_else(|err| panic!("read installed {locale} pack: {err:?}"));
     LocalePack::from_toml_str(&source)
         .unwrap_or_else(|err| panic!("installed {locale} pack should parse owned rows: {err:?}"))
@@ -1914,6 +1912,17 @@ surface = "fac_punctum"
 
 fn demo_canvas_identity() -> InterfaceLibraryIdentity {
     InterfaceLibraryIdentity { provider: "demo".to_owned(), package: None, module_path: vec!["canvas".to_owned()] }
+}
+
+#[test]
+fn language_packs_carry_no_library_members() {
+    for locale in ["ar", "en", "hi", "la", "th-TH", "vi", "zh-Hans", "zh-Hant"] {
+        let pack = installed_pack(locale);
+        assert!(
+            pack.library_members.is_empty(),
+            "{locale} language pack must not embed library members"
+        );
+    }
 }
 
 #[test]

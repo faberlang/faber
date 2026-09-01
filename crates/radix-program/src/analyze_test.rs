@@ -30,7 +30,7 @@ fn default_locale_pack(
     _input: &Path,
     _locale: Option<&str>,
 ) -> Result<Option<radix_module::locale::LocalePack>, Box<Diagnostic>> {
-    let path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../stdlib/locale/en/pack.toml");
+    let path = radix_module::locale::workspace_locale_pack_path("en");
     let pack = radix_module::locale::LocalePack::from_toml_path(path).map_err(|err| {
         Box::new(
             Diagnostic::error(format!("failed to load English locale pack: {err}"))

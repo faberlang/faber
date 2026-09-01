@@ -2118,7 +2118,7 @@ fn emit_fhir_serializes_valid_faber_to_fhir_bytes() {
     let session = crate::driver::Session::new(
         crate::driver::Config::default()
             .with_target(crate::codegen::Target::HirFhir)
-            .with_dev_stdlib(),
+            .with_dev_locale_root(),
     );
     let unit = crate::driver::analyze_source(&session, "test.fab", source, AnalyzeRequest::default())
         .expect("analysis should succeed");
@@ -2147,7 +2147,7 @@ fn emit_fhir_round_trip_hello_world() {
     let session = crate::driver::Session::new(
         crate::driver::Config::default()
             .with_target(crate::codegen::Target::HirFhir)
-            .with_dev_stdlib(),
+            .with_dev_locale_root(),
     );
     let unit = crate::driver::analyze_source(&session, "hello-world.fab", peeled.body, AnalyzeRequest::default())
         .expect("hello-world fixture should analyze");

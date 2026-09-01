@@ -10,8 +10,7 @@ use crate::locale::LocalePack;
 use radix_target::Target;
 
 fn en_pack() -> LocalePack {
-    let path = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("../../stdlib/locale/en/pack.toml");
+    let path = crate::locale::workspace_locale_pack_path("en");
     LocalePack::from_toml_path(&path).expect("installed en pack should load")
 }
 

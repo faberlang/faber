@@ -565,7 +565,7 @@ fn identity_bearing_enum_variant_library_payload_miss_fails_closed() {
         NOMINAL_VARIANT_UTIL_LIBRARY,
         NOMINAL_VARIANT_MAIN_LIBRARY,
     );
-    let config = Config::default().with_stdlib(dir.join("libhome"));
+    let config = Config::default().with_library_home(dir.join("libhome"));
 
     let errors = with_interpreted_lowered_package_mir(
         &config,

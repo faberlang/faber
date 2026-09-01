@@ -9,7 +9,7 @@ fn lege_corpus_still_checks() {
     let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../corpus/lege/lege.fab");
     let source = std::fs::read_to_string(&path).expect("lege corpus fixture");
     let config =
-        Config::default().with_stdlib(std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../stdlib"));
+        Config::default();
     let result = Compiler::new(config).compile_str("lege.fab", &source);
     assert!(result.success(), "lege.fab must still compile: {:?}", result.diagnostics);
 }
@@ -41,7 +41,7 @@ fn th_th_example_still_checks_with_locale002_advisories() {
         .join("examples")
         .join("reader-locale/th-TH/src/main.fab");
     let source = std::fs::read_to_string(&path).expect("th-TH example");
-    let pack_path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../stdlib/locale/th-TH/pack.toml");
+    let pack_path = crate::locale::workspace_locale_pack_path("th-TH");
     let pack = crate::locale::LocalePack::from_toml_path(&pack_path).expect("installed th-TH pack should load");
     let result =
         crate::services::check_diagnostics_for_source_with_locale_pack("main.fab", &source, false, Some(&pack), None);

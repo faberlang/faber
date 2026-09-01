@@ -67,7 +67,7 @@ fn runner_session() -> Session {
     Session::new(
         Config::default()
             .with_target(Target::HirTypeScript)
-            .with_dev_stdlib(),
+            .with_dev_locale_root(),
     )
 }
 

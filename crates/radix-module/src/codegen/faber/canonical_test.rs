@@ -1471,8 +1471,7 @@ fn localized_adfirma_message_uses_each_locale_surface() {
     ];
 
     for (locale, source, expected) in cases {
-        let mut pack_path = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-        pack_path.push(format!("../../stdlib/locale/{locale}/pack.toml"));
+        let pack_path = crate::locale::workspace_locale_pack_path(&locale);
         let pack = crate::locale::LocalePack::from_toml_path(&pack_path).expect("installed locale pack should load");
         let session = crate::driver::Session::new(crate::driver::Config::default().with_locale_pack(pack));
         let result = super::compile::reemit_faber(
@@ -1499,8 +1498,7 @@ fn localized_emit_consults_locale_pack_surface() {
     // Phase 1 threading: the canonical emitter consults the reader pack surface,
     // so localized source re-emits in the localized surface (round-trip preserves
     // the spelling). This is the inverse of the old Latin-only emit behavior.
-    let mut pack_path = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-    pack_path.push("../../stdlib/locale/th-TH/pack.toml");
+    let pack_path = crate::locale::workspace_locale_pack_path("th-TH");
     let pack = crate::locale::LocalePack::from_toml_path(&pack_path).expect("installed th-TH pack should load");
 
     let config = crate::driver::Config::default().with_locale_pack(pack);
@@ -1548,8 +1546,7 @@ fn canonical_emit_preserves_legacy_posture_annotation_without_duplicate_word() {
 
 #[test]
 fn localized_emit_uses_llm_contextual_morphology_surface() {
-    let mut pack_path = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-    pack_path.push("../../stdlib/locale/en/pack.toml");
+    let pack_path = crate::locale::workspace_locale_pack_path("en");
     let pack = crate::locale::LocalePack::from_toml_path(&pack_path).expect("installed en pack should load");
 
     let config = crate::driver::Config::default().with_locale_pack(pack);
@@ -1601,15 +1598,14 @@ fn localized_emit_round_trips_under_same_pack() {
     // Phase 3 (req. #10 round-trip): localized emit -> re-parse -> re-emit under
     // the same pack is lossless. The emitted Thai surface re-lexes to the same
     // token kinds, so a second canonical pass is byte-identical (idempotent).
-    let mut pack_path = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-    pack_path.push("../../stdlib/locale/th-TH/pack.toml");
+    let pack_path = crate::locale::workspace_locale_pack_path("th-TH");
     let pack = crate::locale::LocalePack::from_toml_path(&pack_path).expect("installed th-TH pack should load");
     let config = crate::driver::Config::default().with_locale_pack(pack);
     let session = crate::driver::Session::new(config);
 
     // Localized (Thai) source: exercises functio/fixum/textus/numerus/incipit/
     // nota/redde keywords + the textus/numerus primitives + the scriptum builtin.
-    // Spellings must match stdlib/locale/th-TH/pack.toml (EBNF.th-TH glossary).
+    // Spellings must match locale/th-TH/pack.toml (EBNF.th-TH glossary).
     let source = "\
 ฟังก์ชัน salve(ข้อความ name) → ข้อความ {
     คงที่ ข้อความ greeting ← จารึก(\"salve, §!\", name)
@@ -1800,7 +1796,7 @@ fn canonical_round_trip(source: &str) -> (String, String) {
     let session = crate::driver::Session::new(
         crate::driver::Config::default()
             .with_resolved_locale_pack(pack.clone())
-            .with_dev_stdlib(),
+            .with_dev_locale_root(),
     );
     let result = super::compile::reemit_faber(&session, &pack, "conversio-assign.fab", source);
     assert!(result.success(), "canonical emit failed: {:?}", result.diagnostics);

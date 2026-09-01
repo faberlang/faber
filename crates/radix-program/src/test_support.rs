@@ -20,11 +20,10 @@ use crate::library::{LibraryResolver, LockedLibraryPackage};
 use crate::mir::{DeviceManifestConfig, DeviceSelection, MirSeams, PreparedPackageMir};
 
 /// The reader pack selected by the CLI locale or the package's `[locale]`
-/// (`[reader]` legacy alias) manifest section, loaded from the dev-tree
-/// `stdlib/locale/<id>/pack.toml` beside the radix workspace checkout. The
-/// default (no selection) is the product-default English pack. Mirrors the
-/// faber product seam; the moved mir tests use Latin-locale fixture packages
-/// (`[reader] locale = "la"`).
+/// (`[reader]` legacy alias) manifest section, loaded from the workspace
+/// language-pack tree. The default (no selection) is the product-default
+/// English pack. Mirrors the faber product seam; the moved mir tests use
+/// Latin-locale fixture packages (`[reader] locale = "la"`).
 pub fn test_locale_pack(
     input: &Path,
     cli_locale: Option<&str>,
@@ -40,10 +39,7 @@ pub fn test_locale_pack(
             .and_then(|manifest| manifest.locale.locale.clone())
             .unwrap_or_else(|| "en".to_owned())
     };
-    let path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("../../stdlib/locale")
-        .join(&locale)
-        .join("pack.toml");
+    let path = radix_module::locale::workspace_locale_pack_path(&locale);
     let pack = radix_module::locale::LocalePack::from_toml_path(path).map_err(|err| {
         Box::new(
             Diagnostic::error(format!(
@@ -141,14 +137,12 @@ fn test_executed_lane_target(config: &Config, _input: &Path) -> radix_module::co
     radix_module::codegen::Target::MirFmirBinary
 }
 
-/// A config-rooted library resolver: an explicit stdlib path becomes the
-/// library home (the moved tests use `Config::with_stdlib` fixtures); without
+/// A config-rooted library resolver: an explicit `library_home` becomes the
+/// home (the moved tests use `Config::with_library_home` fixtures); without
 /// one the resolver has no home (no `FABER_LIBRARY_HOME` in tests).
 fn test_library_resolver_for_config(config: &Config) -> LibraryResolver {
-    if config.stdlib_explicit {
-        if let Some(path) = config.stdlib_path.as_ref() {
-            return LibraryResolver::new(path.clone());
-        }
+    if let Some(path) = config.library_home.as_ref() {
+        return LibraryResolver::new(path.clone());
     }
     LibraryResolver::with_optional_home(None)
 }

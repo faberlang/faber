@@ -10,11 +10,10 @@ use super::{
     IntrinsicBinding, LocalePack, LocalePackIssue, LocalePackLoadError, latin_locale_pack, validate_locale_pack,
 };
 use crate::intrinsics::IntrinsicReceiver;
-use std::path::PathBuf;
+
 
 fn owned_installed_pack(locale: &str) -> LocalePack {
-    let mut path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-    path.push(format!("../../stdlib/locale/{locale}/pack.toml"));
+    let path = crate::locale::workspace_locale_pack_path(&locale);
     let source = std::fs::read_to_string(&path).unwrap_or_else(|err| panic!("read installed {locale} pack: {err:?}"));
     LocalePack::from_toml_str(&source)
         .unwrap_or_else(|err| panic!("installed {locale} pack should parse owned rows: {err:?}"))

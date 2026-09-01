@@ -276,7 +276,7 @@ fn call_site_count(function: &MirFunction) -> usize {
 fn library_import_composes_consumer_local_kernel_caller() {
     let dir = crate::test_support::test_temp_dir("cdc-library-compose");
     let entry = write_compose_package(dir.path(), COMPOSE_MATH_LIB, CONSUMER_KERNEL_CALLER);
-    let config = Config::default().with_stdlib(dir.join("libhome"));
+    let config = Config::default().with_library_home(dir.join("libhome"));
 
     // CDC-3: the consumer's local entry roles for the merged device-role
     // map (the same derivation the single-unit driver performs); package
@@ -384,7 +384,7 @@ fn library_import_composes_consumer_local_kernel_caller() {
 fn sibling_import_composes_consumer_local_kernel_caller() {
     let dir = crate::test_support::test_temp_dir("cdc-sibling-compose");
     let entry = write_sibling_package(dir.path(), SIBLING_MATH_LIB, SIBLING_CONSUMER_KERNEL_CALLER);
-    let config = Config::default().with_stdlib(dir.join("libhome"));
+    let config = Config::default().with_library_home(dir.join("libhome"));
 
     // CDC-3: the consumer's local entry roles; a sibling export produces no
     // imported fact, so the merged map is the consumer-local one.
@@ -499,7 +499,7 @@ fn sibling_import_composes_consumer_local_kernel_caller() {
 fn private_kernel_helper_composes_without_launch_row() {
     let dir = crate::test_support::test_temp_dir("cdc-private-helper");
     let entry = write_compose_package(dir.path(), COMPOSE_MATH_LIB, CONSUMER_PRIVATE_HELPER_CALLER);
-    let config = Config::default().with_stdlib(dir.join("libhome"));
+    let config = Config::default().with_library_home(dir.join("libhome"));
 
     with_interpreted_lowered_package_mir(
         &config,
@@ -578,7 +578,7 @@ fn private_kernel_helper_composes_without_launch_row() {
 fn host_caller_of_imported_instance_is_never_composed() {
     let dir = crate::test_support::test_temp_dir("cdc-host-caller");
     let entry = write_compose_package(dir.path(), COMPOSE_MATH_LIB, CONSUMER_HOST_CALLER);
-    let config = Config::default().with_stdlib(dir.join("libhome"));
+    let config = Config::default().with_library_home(dir.join("libhome"));
 
     with_interpreted_lowered_package_mir(
         &config,
@@ -642,7 +642,7 @@ fn host_caller_of_imported_instance_is_never_composed() {
 fn consumer_local_cycle_fails_closed_with_named_identity() {
     let dir = crate::test_support::test_temp_dir("cdc-cycle");
     let entry = write_compose_package(dir.path(), CYCLE_MATH_LIB, CONSUMER_CYCLE_CALLER);
-    let config = Config::default().with_stdlib(dir.join("libhome"));
+    let config = Config::default().with_library_home(dir.join("libhome"));
 
     let errors = with_interpreted_lowered_package_mir(
         &config,
@@ -679,7 +679,7 @@ fn consumer_local_cycle_fails_closed_with_named_identity() {
 fn consumer_local_budget_overflow_fails_closed_with_named_identity() {
     let dir = crate::test_support::test_temp_dir("cdc-budget");
     let entry = write_compose_package(dir.path(), &deep_chain_library(24), CONSUMER_BUDGET_CALLER);
-    let config = Config::default().with_stdlib(dir.join("libhome"));
+    let config = Config::default().with_library_home(dir.join("libhome"));
 
     let errors = with_interpreted_lowered_package_mir(
         &config,

@@ -88,7 +88,7 @@ fn package_mir_rewrites_runtime_conversion_types_with_imported_types() {
 fn package_mir_shadowed_alias_rewrite_skips_plain_local_method_calls() {
     let dir = crate::test_support::test_temp_dir("shadowed-alias-skip");
     let entry = write_library_package(dir.as_ref(), "gelulib", GELU_LIB, GELU_MAIN);
-    let config = Config::default().with_stdlib(dir.join("libhome"));
+    let config = Config::default().with_library_home(dir.join("libhome"));
 
     let mut host = BufferHost::default();
     run_package_mir(
@@ -193,7 +193,7 @@ locale = "en"
 fn package_mir_local_nominal_method_call_runs() {
     let dir = crate::test_support::test_temp_dir("local-method");
     let entry = write_local_method_package(dir.as_ref());
-    let config = Config::default().with_stdlib(dir.join("libhome"));
+    let config = Config::default().with_library_home(dir.join("libhome"));
 
     let mut host = BufferHost::default();
     run_package_mir(
@@ -217,7 +217,7 @@ fn package_mir_library_nominal_method_call_runs() {
     // remap.
     let dir = crate::test_support::test_temp_dir("cto1-method");
     let entry = write_library_package(dir.as_ref(), "methlib", METHOD_LIB, METHOD_MAIN);
-    let config = Config::default().with_stdlib(dir.join("libhome"));
+    let config = Config::default().with_library_home(dir.join("libhome"));
 
     let mut host = BufferHost::default();
     run_package_mir(
@@ -316,7 +316,7 @@ fn prove_linked_bodies() {
     )
     .expect("write data.proba");
 
-    let config = Config::default().with_stdlib(dir.join("libhome"));
+    let config = Config::default().with_library_home(dir.join("libhome"));
     let package = crate::analyze::analyze_package_for_tests(
         &config,
         &package_root,
@@ -417,7 +417,7 @@ fn prove_linked_bodies() {
 fn package_mir_passes_captured_entry_closure_to_linked_library_function() {
     let dir = crate::test_support::test_temp_dir("linked-library-callback");
     let entry = write_library_package(dir.as_ref(), "callbacklib", CALLBACK_LIB, CALLBACK_MAIN);
-    let config = Config::default().with_stdlib(dir.join("libhome"));
+    let config = Config::default().with_library_home(dir.join("libhome"));
 
     let mut host = BufferHost::default();
     run_package_mir(&config, &entry, &crate::test_support::test_mir_seams(), &mut host)
@@ -449,7 +449,7 @@ fn package_mir_library_nominal_failable_method_preserves_handler_reachability() 
         FAILABLE_METHOD_LIB,
         FAILABLE_METHOD_MAIN,
     );
-    let config = Config::default().with_stdlib(dir.join("libhome"));
+    let config = Config::default().with_library_home(dir.join("libhome"));
 
     let mut host = BufferHost::default();
     run_package_mir(&config, &entry, &crate::test_support::test_mir_seams(), &mut host)
@@ -471,7 +471,7 @@ fn package_mir_const_data_member_verte_initializer_transplants() {
     // top-level-const seam.
     let dir = crate::test_support::test_temp_dir("cto1-verte-const");
     let entry = write_library_package(dir.as_ref(), "verteclib", VERTE_CONST_LIB, VERTE_CONST_MAIN);
-    let config = Config::default().with_stdlib(dir.join("libhome"));
+    let config = Config::default().with_library_home(dir.join("libhome"));
 
     let mut host = BufferHost::default();
     run_package_mir(
@@ -559,7 +559,7 @@ fn package_mir_const_data_member_path_initializer_transplants_sibling() {
         PATH_CONST_SIBLING_MATH,
         PATH_CONST_SIBLING_MAIN,
     );
-    let config = Config::default().with_stdlib(dir.join("libhome"));
+    let config = Config::default().with_library_home(dir.join("libhome"));
 
     let mut host = BufferHost::default();
     run_package_mir(
@@ -588,7 +588,7 @@ fn package_mir_const_data_member_path_initializer_transplants_library() {
         PATH_CONST_LIB,
         PATH_CONST_LIB_MAIN,
     );
-    let config = Config::default().with_stdlib(dir.join("libhome"));
+    let config = Config::default().with_library_home(dir.join("libhome"));
 
     let mut host = BufferHost::default();
     run_package_mir(
@@ -619,7 +619,7 @@ fn package_mir_const_data_member_path_initializer_unlinked_target_fails_closed()
         PATH_CONST_PRIVATA_MATH,
         PATH_CONST_PRIVATA_MAIN,
     );
-    let config = Config::default().with_stdlib(dir.join("libhome"));
+    let config = Config::default().with_library_home(dir.join("libhome"));
 
     let mut host = BufferHost::default();
     let diagnostics = run_package_mir(
@@ -694,7 +694,7 @@ fn package_mir_training_loop_mlp_runs_on_fmir_lane() {
     let dir = crate::test_support::test_temp_dir("pml4-lane");
     copy_package_dir_skipping_target(&exemplum, dir.path());
 
-    let config = radix_module::driver::Config::default().with_stdlib(workspace);
+    let config = radix_module::driver::Config::default().with_library_home(workspace);
     let entry = dir.path().join("src/main.fab");
     let mut host = BufferHost::default();
     run_package_mir(
@@ -792,7 +792,7 @@ typo = "1.0.0"
     let entry = src.join("main.fab");
     fs::write(&entry, FORMA_MAIN).expect("write main.fab");
 
-    let config = Config::default().with_stdlib(dir.join("libhome"));
+    let config = Config::default().with_library_home(dir.join("libhome"));
     let mut host = BufferHost::default();
     run_package_mir(
         &config,
@@ -1044,7 +1044,7 @@ fn shadowed_alias_plain_local_method_call_is_not_rewritten() {
 fn package_mir_return_channel_declared_conversion_applies() {
     let dir = crate::test_support::test_temp_dir("return-channel-conversion");
     let entry = write_return_conversion_package(dir.path(), RETURN_CONVERSION_MLP);
-    let config = Config::default().with_stdlib(dir.join("libhome"));
+    let config = Config::default().with_library_home(dir.join("libhome"));
 
     let mut host = BufferHost::default();
     run_package_mir(
@@ -1064,7 +1064,7 @@ fn package_mir_return_channel_declared_conversion_applies() {
 fn package_mir_return_channel_mismatch_without_conversion_fails_closed() {
     let dir = crate::test_support::test_temp_dir("return-channel-no-conversion");
     let entry = write_return_conversion_package(dir.path(), RETURN_MISMATCH_MLP);
-    let config = Config::default().with_stdlib(dir.join("libhome"));
+    let config = Config::default().with_library_home(dir.join("libhome"));
 
     let mut host = BufferHost::default();
     let diagnostics = run_package_mir(
@@ -1115,7 +1115,7 @@ fn touch(int x) → int {
     let main = "import from \"orphanlib:lib\" orb\n\nmain {\n    print orb.touch(1)\n}\n";
     let dir = crate::test_support::test_temp_dir("library-kernel-admission");
     let entry = write_library_package(dir.path(), "orphanlib", library, main);
-    let config = Config::default().with_stdlib(dir.join("libhome"));
+    let config = Config::default().with_library_home(dir.join("libhome"));
 
     let mut host = BufferHost::default();
     let diagnostics = run_package_mir(

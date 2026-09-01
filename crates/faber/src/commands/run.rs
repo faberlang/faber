@@ -304,7 +304,7 @@ fn script_package_config(
         locale,
         diagnostics_locale,
     )
-    .map(|(config, _)| config.with_dev_stdlib())
+    .map(|(config, _)| config.with_dev_locale_root())
 }
 
 /// Whether `path` routes through the package-MIR runner rather than the

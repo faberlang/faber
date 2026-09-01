@@ -146,7 +146,7 @@ fn resolve_import_external_provider_stays_library() {
 
 #[test]
 fn resolve_import_nested_library_under_consumer_dir_stays_library() {
-    // Manifestless consumer at `<root>/main.fab` with `with_stdlib(<root>/lib)`
+    // Manifestless consumer at `<root>/main.fab` with `with_library_home(<root>/lib)`
     // used to prefix-match `testlib` as a self-import because source_root is
     // `<root>`. The library has its own faber.toml and must stay Library.
     let root = temp_root("nested-lib-under-consumer");

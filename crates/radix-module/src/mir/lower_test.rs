@@ -5891,7 +5891,7 @@ fn analyze_exemplum_for_mir_async(rel: &str) -> AnalyzedModule {
     let session = Session::new(
         Config::default()
             .with_target(Target::MirLlvm)
-            .with_dev_stdlib(),
+            .with_dev_locale_root(),
     );
     crate::services::analyze_prepared_program_path(&session, &path, &source).unwrap_or_else(|diagnostics| {
         let facts: Vec<String> = diagnostics

@@ -158,17 +158,17 @@ fn source_locale_session(name: &str, source: &str) -> Result<Session, String> {
     use crate::driver::Config;
     use crate::driver::peel_raw_source;
 
-    let base = Session::new(Config::default().with_dev_stdlib());
+    let base = Session::new(Config::default().with_dev_locale_root());
     let peeled = peel_raw_source(name, source).map_err(|error| error.to_string())?;
     let mut diagnostics = Vec::new();
     let pack = crate::driver::resolve_peeled_lex_pack(&base, &peeled, &mut diagnostics)
         .map_err(|()| format!("source locale pack resolution failed: {diagnostics:?}"))?;
     let config = match pack {
         Some(pack) => Config::default()
-            .with_dev_stdlib()
+            .with_dev_locale_root()
             .with_resolved_locale_pack(pack),
         None => Config::default()
-            .with_dev_stdlib()
+            .with_dev_locale_root()
             .with_resolved_locale_pack(crate::locale::latin_locale_pack()),
     };
     Ok(Session::new(config))

@@ -15,14 +15,14 @@ fn config_default_values_are_stable() {
     assert!(config.emit_comments);
     assert!(!config.warn_policy.deny_all_warnings);
     assert!(config.warn_policy.deny_codes.is_empty());
-    // The default config discovers the workspace stdlib tree so
+    // The default config discovers the workspace language-pack tree so
     // frontmatter-locale sources can load their reader packs without every
-    // caller reaching for `with_dev_stdlib()`.
-    let expected = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../stdlib");
+    // caller reaching for `with_dev_locale_root()`.
+    let expected = crate::locale::workspace_locale_root();
     assert_eq!(
-        config.stdlib_path,
+        config.locale_root,
         expected.is_dir().then_some(expected),
-        "default config should discover the workspace stdlib when present"
+        "default config should discover the workspace language packs when present"
     );
     assert!(config.locale_pack.is_none());
     assert!(!config.emit_nvvm_device_module);
@@ -30,14 +30,17 @@ fn config_default_values_are_stable() {
 
 #[test]
 fn config_builders_apply_expected_fields() {
-    let stdlib = PathBuf::from("/tmp/norma");
+    let locale_root = PathBuf::from("/tmp/locale");
+    let library_home = PathBuf::from("/tmp/libs");
     let config = Config::new()
         .with_target(Target::HirTypeScript)
-        .with_stdlib(stdlib.clone())
+        .with_locale_root(locale_root.clone())
+        .with_library_home(library_home.clone())
         .with_warn_policy(WarnPolicy { deny_all_warnings: true, deny_codes: vec!["WARN006".into()] });
 
     assert_eq!(config.target, Target::HirTypeScript);
-    assert_eq!(config.stdlib_path, Some(stdlib));
+    assert_eq!(config.locale_root, Some(locale_root));
+    assert_eq!(config.library_home, Some(library_home));
     assert!(config.warn_policy.deny_all_warnings);
     assert_eq!(config.warn_policy.deny_codes, vec!["WARN006"]);
 }

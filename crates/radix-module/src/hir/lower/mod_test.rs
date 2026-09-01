@@ -162,7 +162,7 @@ fn lowers_requirit_to_guarded_throw() {
 fn lowers_en_require_surface_to_guarded_throw() {
     // The en surface `require cond throw err` resolves to the same requirit
     // identity and desugars identically.
-    let pack_path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../stdlib/locale/en/pack.toml");
+    let pack_path = crate::locale::workspace_locale_pack_path("en");
     let pack = crate::locale::LocalePack::from_toml_path(&pack_path).expect("installed en pack should load");
     let source = "fn f() → int ⇥ string {\n  require true throw \"bad\"\n  return 1\n}";
     let (lowered, _, _) = lower_source_with_locale_pack(source, &pack);
@@ -1103,7 +1103,7 @@ fn stream() async_generator → int {
   yield value
 }
 ";
-    let pack_path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../stdlib/locale/en/pack.toml");
+    let pack_path = crate::locale::workspace_locale_pack_path("en");
     let pack = crate::locale::LocalePack::from_toml_path(&pack_path).expect("installed en pack should load");
 
     let (latin_lowered, _, _) = lower_source(latin);
@@ -1630,7 +1630,7 @@ functio traverse() → vacuum {
 #[test]
 fn llm_pack_kernel_annotation_lowers_to_latin_nucleum_family() {
     // annotation-locale wave 1: surface `@ kernel` under en → HIR family "nucleum".
-    let pack_path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../stdlib/locale/en/pack.toml");
+    let pack_path = crate::locale::workspace_locale_pack_path("en");
     let pack = crate::locale::LocalePack::from_toml_path(&pack_path).expect("installed en pack should load");
 
     let source = r"
@@ -1649,7 +1649,7 @@ fn add_one(float x) → float {
 
 #[test]
 fn llm_pack_future_annotation_lowers_to_latin_family() {
-    let pack_path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../stdlib/locale/en/pack.toml");
+    let pack_path = crate::locale::workspace_locale_pack_path("en");
     let pack = crate::locale::LocalePack::from_toml_path(&pack_path).expect("installed en pack should load");
 
     let source = r"
@@ -1668,7 +1668,7 @@ fn fetch() → int { return 1 }
 
 #[test]
 fn llm_pack_annotation_family_surfaces_project_latin_to_english() {
-    let pack_path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../stdlib/locale/en/pack.toml");
+    let pack_path = crate::locale::workspace_locale_pack_path("en");
     let pack = crate::locale::LocalePack::from_toml_path(&pack_path).expect("installed en pack should load");
 
     assert!(validate_locale_pack_ok(&pack));
@@ -1698,7 +1698,7 @@ fn localized_tensor_vacua_surface_lowers_to_latin_identity() {
     let thai_source = "เริ่ม {\n  คงที่ เทนเซอร์<เศษ<f32>, []> empty ← เซตว่าง\n}\n";
 
     let (latin_lowered, _, latin_types) = lower_source(latin_source);
-    let pack_path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../stdlib/locale/th-TH/pack.toml");
+    let pack_path = crate::locale::workspace_locale_pack_path("th-TH");
     let th_pack = crate::locale::LocalePack::from_toml_path(&pack_path).expect("installed th-TH pack should load");
     let (thai_lowered, _, thai_types) = lower_source_with_locale_pack(thai_source, &th_pack);
 

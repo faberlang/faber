@@ -16,7 +16,6 @@ use crate::driver::{Config, Session};
 use crate::locale::LocalePack;
 use crate::locale::TypeBindingKind;
 use crate::semantic::{CollectionKind, Primitive, TensorFamilyKind};
-use std::path::PathBuf;
 
 /// All locale ids with installed reader packs in the workspace stdlib.
 const LOCALES: &[&str] = &["la", "zh-Hans", "zh-Hant", "vi", "ar", "hi", "th-TH", "en"];
@@ -35,14 +34,9 @@ incipit {
 }
 ";
 
-/// Standard stdlib path for pack resolution in tests.
-fn stdlib_path() -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../stdlib")
-}
-
-/// Load a reader pack from the workspace stdlib.
+/// Load a reader pack from the workspace language-pack tree.
 fn load_pack(locale: &str) -> LocalePack {
-    let pack_path = stdlib_path().join("locale").join(locale).join("pack.toml");
+    let pack_path = crate::locale::workspace_locale_pack_path(locale);
     LocalePack::from_toml_path(&pack_path).unwrap_or_else(|err| panic!("failed to load pack for {locale}: {err}"))
 }
 
@@ -50,7 +44,6 @@ fn load_pack(locale: &str) -> LocalePack {
 fn session_for(output_locale: &str) -> Session {
     let config = Config::default()
         .with_target(Target::HirFaber)
-        .with_stdlib(stdlib_path())
         .with_locale_pack(load_pack(output_locale));
     Session::new(config)
 }
@@ -62,7 +55,6 @@ fn source_session() -> Session {
     Session::new(
         Config::default()
             .with_target(Target::HirFaber)
-            .with_stdlib(stdlib_path()),
     )
 }
 
@@ -175,7 +167,6 @@ fn phase3b_every_input_to_latin_output() {
         let session = Session::new(
             Config::default()
                 .with_target(Target::HirFaber)
-                .with_stdlib(stdlib_path()),
         );
         let emit_pack = crate::locale::latin_locale_pack();
         let result = reemit_faber(&session, &emit_pack, "fanout.fab", &source);

@@ -360,7 +360,7 @@ fn config_for_target(
     let config = crate::driver::Config::default()
         .with_target(target)
         .with_output_mode(output_mode)
-        .with_dev_stdlib();
+        .with_dev_locale_root();
     let config = match module_name {
         Some(name) => config.with_module_name(Some(name.to_owned())),
         None => config,

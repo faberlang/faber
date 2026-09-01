@@ -56,7 +56,7 @@ pub fn run_named(
 ) -> Result<ExitCode, RunSourceError> {
     let config = crate::package::default_config_with_locale(Target::HirTypeScript)
         .map_err(|diagnostic| RunSourceError::Frontend(vec![*diagnostic]))?
-        .with_dev_stdlib();
+        .with_dev_locale_root();
     let session = Session::new(config);
     run_with_session(&session, name, source, host)
 }

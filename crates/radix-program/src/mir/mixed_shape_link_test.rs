@@ -135,7 +135,7 @@ fn literal_dims(
 fn package_mir_mixed_shape_generic_instances_are_distinct() {
     let dir = crate::test_support::test_temp_dir("mixed-shape-link");
     let entry = write_mixed_shape_package(dir.as_ref());
-    let config = Config::default().with_stdlib(dir.join("libhome"));
+    let config = Config::default().with_library_home(dir.join("libhome"));
 
     with_interpreted_lowered_package_mir(
         &config,
@@ -185,7 +185,7 @@ fn package_mir_mixed_shape_generic_links_through_test_package() {
     let dir = crate::test_support::test_temp_dir("mixed-shape-test-link");
     let entry = write_mixed_shape_package(dir.as_ref());
     let package_root = entry.parent().unwrap().parent().unwrap();
-    let config = Config::default().with_stdlib(dir.join("libhome"));
+    let config = Config::default().with_library_home(dir.join("libhome"));
     let package = crate::analyze::analyze_package_for_tests(
         &config,
         package_root,

@@ -62,7 +62,7 @@ locale = "en"
 fn run_const_member_package_tests(src: &Path) -> Vec<String> {
     let package_root = src.parent().unwrap().to_path_buf();
     let stdlib_home = package_root.parent().unwrap().to_path_buf();
-    let config = Config::default().with_stdlib(stdlib_home);
+    let config = Config::default().with_library_home(stdlib_home);
     let mut package = crate::analyze::analyze_package_for_tests(
         &config,
         &package_root,

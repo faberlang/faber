@@ -224,7 +224,7 @@ fn assert_nested_tensor_output(output: Vec<String>) {
 fn package_mir_nested_library_method_calls_execute() {
     let dir = crate::test_support::test_temp_dir("method-call-mir-run");
     let entry = write_nested_tensor_package(dir.as_ref());
-    let config = Config::default().with_stdlib(dir.join("libhome"));
+    let config = Config::default().with_library_home(dir.join("libhome"));
 
     let mut host = BufferHost::default();
     run_package_mir(
@@ -288,7 +288,7 @@ fn package_test_self_provider_nested_tensor_methods_execute() {
     let dir = crate::test_support::test_temp_dir("method-call-mir-self");
     let proba_path = write_self_provider_tensor_package(dir.as_ref());
     let package_root = proba_path.parent().unwrap().parent().unwrap();
-    let config = Config::default().with_stdlib(dir.join("libhome"));
+    let config = Config::default().with_library_home(dir.join("libhome"));
     let mut package = crate::analyze::analyze_package_for_tests(
         &config,
         package_root,
@@ -463,7 +463,7 @@ fn package_test_sibling_union_payloads_project() {
     let dir = crate::test_support::test_temp_dir("union-defid-intern");
     let proba_path = write_self_provider_union_package(dir.as_ref());
     let package_root = proba_path.parent().unwrap().parent().unwrap();
-    let config = Config::default().with_stdlib(dir.join("libhome"));
+    let config = Config::default().with_library_home(dir.join("libhome"));
     let mut package = crate::analyze::analyze_package_for_tests(
         &config,
         package_root,
@@ -590,7 +590,7 @@ fn package_mir_nested_library_method_calls_link_through_test_package() {
     let dir = crate::test_support::test_temp_dir("method-call-mir-test");
     let entry = write_nested_tensor_package(dir.as_ref());
     let package_root = entry.parent().unwrap().parent().unwrap();
-    let config = Config::default().with_stdlib(dir.join("libhome"));
+    let config = Config::default().with_library_home(dir.join("libhome"));
     let mut package = crate::analyze::analyze_package_for_tests(
         &config,
         package_root,

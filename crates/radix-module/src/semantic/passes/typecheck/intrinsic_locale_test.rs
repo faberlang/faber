@@ -31,11 +31,10 @@ use crate::hir::{HirExpression, HirExpressionKind, HirModule, HirStatementKind};
 use crate::intrinsics::IntrinsicReceiver;
 use crate::mir::lower_analyzed_unit;
 use crate::mir::{MirCollectionOp, MirIntrinsic, MirProgram, MirStatementKind};
-use std::path::PathBuf;
+
 
 fn pack(id: &str) -> crate::locale::LocalePack {
-    let stdlib = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../stdlib");
-    crate::locale::LocalePack::from_toml_path(stdlib.join(format!("locale/{id}/pack.toml")))
+    crate::locale::LocalePack::from_toml_path(crate::locale::workspace_locale_pack_path(id))
         .unwrap_or_else(|err| panic!("installed {id} pack should load: {err:?}"))
 }
 

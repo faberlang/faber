@@ -129,10 +129,7 @@ fn numeric_lista_operator_law_is_localized_in_en_and_la() {
             "operator listae numericae + per elementa agit; scalaria utrimque propagantur, listae parem longitudinem requirunt; utere ↦ ad latitudinem convertendam",
         ),
     ] {
-        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("../../stdlib/locale")
-            .join(locale)
-            .join("pack.toml");
+        let path = crate::locale::workspace_locale_pack_path(locale);
         let pack = LocalePack::from_toml_path(path).expect("locale pack");
         let rendered = pack
             .render_diagnostic_text(&diagnostic)

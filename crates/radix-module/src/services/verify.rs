@@ -18,7 +18,7 @@ pub struct VerifySourceResult {
 
 #[must_use]
 pub fn verify_source(name: &str, source: &str, checker_config: Option<TlaAspectCheckerConfig>) -> VerifySourceResult {
-    let session = Session::new(Config::default().with_dev_stdlib());
+    let session = Session::new(Config::default().with_dev_locale_root());
     let analysis = match crate::program::analyze_prepared_program_name(&session, name, source) {
         Ok(analysis) => analysis,
         Err(diagnostics) => return VerifySourceResult { coverage: None, diagnostics, success: false },

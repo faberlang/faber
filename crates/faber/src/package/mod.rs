@@ -415,18 +415,13 @@ pub(crate) fn library_resolver_from_config(
     config: &radix::module::driver::Config,
 ) -> LibraryResolver {
     // The library home (provider repos such as `norma/` and `triga/`) is
-    // independent of the reader-pack stdlib path (`stdlib/locale/<id>/pack.toml`).
-    // Precedence: an explicit custom stdlib roots the library home; otherwise
-    // `FABER_LIBRARY_HOME` and the workspace probe locate provider repos. The
-    // auto-discovered dev stdlib is never a library home. The ambient probe is
-    // faber-owned (CTO memo); `radix-program` receives the resolved
-    // home as an explicit input.
-    if config.stdlib_explicit {
-        return config
-            .stdlib_path
-            .as_ref()
-            .map(|path| LibraryResolver::new(path.clone()))
-            .unwrap_or_else(crate::library::default_library_resolver);
+    // independent of the language-pack root (`locale/<id>/pack.toml`).
+    // Precedence: an explicit `library_home` on Config; otherwise
+    // `FABER_LIBRARY_HOME` and the workspace probe locate provider repos.
+    // The ambient probe is faber-owned (CTO memo); `radix-program`
+    // receives the resolved home as an explicit input.
+    if let Some(path) = config.library_home.as_ref() {
+        return LibraryResolver::new(path.clone());
     }
     crate::library::default_library_resolver()
 }

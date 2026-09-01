@@ -77,7 +77,7 @@ const PROBA_IMPORT_MESSAGE: &str =
 /// pass the same default pack the `compile_package*`/`analyze_package` routes
 /// apply — not the pack-less (registry-direct) lexing `None` would select.
 fn english_pack() -> LocalePack {
-    let path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../stdlib/locale/en/pack.toml");
+    let path = radix::module::locale::workspace_locale_pack_path("en");
     LocalePack::from_toml_path(path).expect("load English locale pack")
 }
 

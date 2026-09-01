@@ -8,7 +8,7 @@ use radix_target::Target;
 
 fn english_pack() -> LocalePack {
     LocalePack::from_toml_path(
-        std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../stdlib/locale/en/pack.toml"),
+        crate::locale::workspace_locale_pack_path("en"),
     )
     .expect("load English locale pack")
 }

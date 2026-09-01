@@ -1,0 +1,2995 @@
+[pack]
+id = "hi"
+schema_version = 1
+
+[keywords]
+discretio = "विभेद"
+fixum = "स्थिर"
+functio = "फलन"
+genus = "वर्ग"
+implendum = "अनुबन्ध"
+importa = "आयात"
+modulus = "मॉड्यूल"
+ordo = "क्रम"
+sit = "बैठा"
+typus = "प्रकार"
+schema = "स्कीमा"
+columna = "कॉलम"
+varia = "चर"
+abstractus = "अमूर्त"
+ceteri = "बाकी"
+curata = "आवंटक"
+errata = "त्रुटि"
+exitus = "निर्गम"
+generis = "स्थैतिक"
+iacit = "फेंकता"
+immutata = "अपरिवर्तित"
+interna = "आंतरिक"
+magnitudo = "आकार"
+nexum = "संबद्ध"
+iuncta = "टपल"
+optiones = "चयन"
+prae = "पूर्व"
+praefixum = "उपसर्ग"
+privata = "निजी"
+protecta = "संरक्षित"
+publica = "सार्वजनिक"
+sponte = "स्वेच्छा"
+casu = "स्थिति"
+ceterum = "अन्यतम"
+custodi = "रक्षक"
+discerne = "मिलाओ"
+dum = "जबतक"
+elige = "चुनो"
+ergo = "अतः"
+fac = "करो"
+itera = "दोहराओ"
+apud = "पर"
+secus = "अन्यथा"
+si = "यदि"
+sic = "ऐसा"
+sin = "अन्यथायदि"
+perge = "जारी"
+redde = "लौटाओ"
+rumpe = "तोड़ो"
+tacet = "मौन"
+adfirma = "पुष्टि"
+cape = "पकड़ो"
+capta = "जाल"
+cede = "आगेबढ़ो"
+iace = "इधरफेंको"
+mori = "मरोजाओ"
+requirit = "आवश्यक"
+reice = "अस्वीकार"
+clausura = "समापन"
+libera = "मुक्त"
+falsum = "असत्य"
+nihil = "शून्य"
+verum = "सत्य"
+nonnumerus = "nan"
+aut = "या"
+est = "है"
+et = "और"
+non = "नहीं"
+vel = "डिफ़ॉल्ट"
+ego = "मैं"
+finge = "गढ़ो"
+implet = "लागूकरता"
+sub = "अधीन"
+mone = "चेताओ"
+nota = "दिखाओ"
+scribe = "लिखो"
+vide = "देखो"
+argumenta = "तर्क"
+cura = "देखभाल"
+incipiet = "आरंभasync"
+incipit = "आरंभ"
+ad = "सेवा"
+fiet = "async"
+fiunt = "जनक"
+fient = "async_जनक"
+figendum = "रुको_स्थिर"
+variandum = "रुको_चर"
+reddet = "रुको_लौटाओ"
+tacebit = "रुको"
+# Empty-collection expression marker (contextual, tokenless).
+vacua = "खाली"
+primus_quem = "primus_quem"
+ubi = "ubi"
+summa = "योग"
+filum = "धागा"
+maxima = "अधिकतम"
+minima = "न्यूनतम"
+de = "से"
+ex = "सेवन"
+in = "में"
+own = "स्वामित्व"
+copy = "प्रतिलिपि"
+lege = "पढ़ो"
+lineam = "पंक्ति"
+omnia = "सब"
+scriptum = "लिखित"
+sparge = "फैलाओ"
+ut = "रूपमें"
+ante = "पहले"
+inter = "बीच"
+intra = "भीतर"
+per = "प्रति"
+ab = "सीमा"
+usque = "तक"
+erratur = "अपेक्षित_विफलता"
+fragilis = "नाज़ुक"
+futurum = "लंबित"
+metior = "मापो"
+omitte = "छोड़ो"
+postpara = "पश्चतैयार"
+postparabit = "पश्चतैयारasync"
+praepara = "पूर्वतैयार"
+praeparabit = "पूर्वतैयारasync"
+proba = "परीक्षण"
+probandum = "परीक्षणसमूह"
+repete = "पुनरावृत्ति"
+solum = "केवल"
+solum_in = "केवलमें"
+tag = "टैग"
+temporis = "समय"
+negativum = "ऋणात्मक"
+nonnihil = "अशून्य"
+nonnulla = "कुछ"
+nulla = "शून्यवत्"
+positivum = "धनात्मक"
+cli = "cli"
+commune = "commune"
+cursor = "संकेतक"
+futura = "भविष्य"
+imperium = "आदेश"
+operandus = "ऑपरेंड"
+optio = "विकल्प"
+conversion = "बदलें"
+conversio = "रूपांतरण"
+nucleum = "कर्नेल"
+vertex = "शीर्ष"
+fragment = "खंड"
+nondum = "अस्थिर"
+verte = "नाम_बदलें"
+nomen = "नाम"
+radix = "radix"
+brevis = "संक्षिप्त"
+descriptio = "विवरण"
+longum = "विस्तृत"
+lane = "लेन"
+ubique = "वैश्विक"
+
+[types]
+ascii = "ascii"
+textus = "पाठ"
+numerus = "संख्या"
+modulus = "मॉड्यूल_टाइप"
+fractus = "भिन्न"
+bivalens = "तार्किक"
+nihil = "शून्य_मान"
+vacuum = "रिक्त"
+numquam = "कभीनहीं"
+ignotum = "अज्ञात"
+octeti = "बाइट"
+regex = "regex"
+json = "json"
+valor = "मान"
+instans = "क्षण"
+objectum = "वस्तु"
+quidlibet = "कुछभी"
+lista = "सूची"
+# Shipped bounded forms: lista<T, N>, textus<N>, ascii<N>, octeti<N>.
+tabula = "तालिका"
+copia = "समुच्चय"
+promissum = "वादा"
+cursor = "कर्सर"
+queue = "कतार"
+stack = "स्टैक"
+# Tensor family: real Hindi glosses (D1) — pack-owned, no inherits substitute.
+tensor = "टेंसर"
+vector = "सदिश"
+matrix = "आव्यूह"
+sparsa = "विरल"
+atomic = "परमाणु"
+intervallum = "अंतराल"
+# संबंधपरक दृश्य प्रकार नाम (S2-U5)
+filtrum = "फ़िल्टर"
+series = "शृंखला"
+census = "गणना"
+ratio = "ratio"
+
+[diagnostics.UNRES001]
+message = "कीवर्ड '{keyword}' reader locale '{pack}' के लिए घोषित नहीं है"
+help = "इस व्याकरण स्थिति के लिए reader pack में घोषित कीवर्ड वर्तनी का उपयोग करें"
+
+[diagnostics.UNRES002]
+message = "इंट्रिंसिक '{intrinsic}' reader locale '{pack}' के लिए receiver family '{receiver}' पर घोषित नहीं है"
+help = "इस receiver family के लिए reader pack में घोषित इंट्रिंसिक वर्तनी का उपयोग करें"
+
+[diagnostics.UNRES003]
+message = "लाइब्रेरी सदस्य '{member}' identity '{identity}' के लिए reader locale '{pack}' में घोषित नहीं है"
+help = "इस लाइब्रेरी identity के लिए reader pack में घोषित सदस्य वर्तनी का उपयोग करें"
+
+[diagnostics.LOCALE002]
+message = "रीडर locale '{pack}' को keyword जैसी spelling '{spelling}' मिली"
+help = "यदि आप उस कीवर्ड का मतलब रखते हैं तो '{suggestion}' का उपयोग करें; '{spelling}' वैसा ही एक वैध नाम है"
+
+[diagnostics.LEX001]
+message = "समाप्त न हुआ string literal"
+help = "पंक्ति या फ़ाइल के अंत से पहले string literal बंद करें"
+
+[diagnostics.LEX001.issues.unterminated_ascii_literal]
+message = "समाप्त न हुआ ascii literal"
+help = "पंक्ति या फ़ाइल के अंत से पहले string literal बंद करें"
+
+[diagnostics.LEX001.issues.newline_in_ascii_literal]
+message = "समाप्त न हुआ ascii literal (literal में newline)"
+help = "पंक्ति या फ़ाइल के अंत से पहले string literal बंद करें"
+
+[diagnostics.LEX001.issues.unterminated_backtick_template_literal]
+message = "समाप्त न हुआ backtick template literal"
+help = "पंक्ति या फ़ाइल के अंत से पहले string literal बंद करें"
+
+[diagnostics.LEX001.issues.unterminated_octeti_literal]
+message = "समाप्त न हुआ octeti literal"
+help = "पंक्ति या फ़ाइल के अंत से पहले string literal बंद करें"
+
+[diagnostics.LEX001.issues.unterminated_string_literal]
+message = "समाप्त न हुआ string literal"
+help = "पंक्ति या फ़ाइल के अंत से पहले string literal बंद करें"
+
+[diagnostics.LEX001.issues.newline_in_string_literal]
+message = "समाप्त न हुआ string literal (string में newline)"
+help = "पंक्ति या फ़ाइल के अंत से पहले string literal बंद करें"
+
+[diagnostics.LEX001.issues.unterminated_guillemet_block_string_literal]
+message = "समाप्त न हुआ guillemet block string literal"
+help = "पंक्ति या फ़ाइल के अंत से पहले string literal बंद करें"
+
+[diagnostics.LEX002]
+message = "अमान्य number literal"
+help = "numeric separators और base prefixes जांचें"
+
+[diagnostics.LEX002.issues.invalid_hexadecimal_number]
+message = "अमान्य hexadecimal number"
+help = "numeric separators और base prefixes जांचें"
+
+[diagnostics.LEX002.issues.invalid_binary_number]
+message = "अमान्य binary number"
+help = "numeric separators और base prefixes जांचें"
+
+[diagnostics.LEX002.issues.invalid_octal_number]
+message = "अमान्य octal number"
+help = "numeric separators और base prefixes जांचें"
+
+[diagnostics.LEX002.issues.invalid_floating_point_number]
+message = "अमान्य floating-point number"
+help = "numeric separators और base prefixes जांचें"
+
+[diagnostics.LEX002.issues.invalid_integer]
+message = "अमान्य integer"
+help = "numeric separators और base prefixes जांचें"
+
+[diagnostics.LEX003]
+message = "अमान्य escape sequence"
+help = "समर्थित escape sequence का उपयोग करें या backslash escape करें"
+
+[diagnostics.LEX004]
+message = "अनपेक्षित वर्ण"
+help = "इस वर्ण को हटाएं या literal होना चाहिए तो इसे escape करें"
+
+[diagnostics.LEX004.issues.unexpected_character]
+message = "अनपेक्षित वर्ण: {char}"
+help = "इस वर्ण को हटाएं या literal होना चाहिए तो इसे escape करें"
+
+[diagnostics.LEX005]
+message = "हटाया गया section directive"
+help = "line-start section directives के बजाय line 1 पर +++ TOML frontmatter में file metadata रखें"
+
+[diagnostics.LEX005.issues.removed_section_directive]
+message = "file-scope § directives हटा दिए गए हैं; +++ frontmatter का उपयोग करें"
+help = "line-start § directives के बजाय line 1 पर +++ TOML frontmatter में file metadata रखें"
+
+[diagnostics.LEX006]
+message = "अमान्य comment syntax"
+help = "comments के आगे // या /* */ के बजाय # लगाएं"
+
+[diagnostics.LEX006.issues.c_style_line_comment]
+message = "C-style // comments Faber में मान्य नहीं हैं; line comments के लिए # का उपयोग करें"
+help = "comments के आगे // या /* */ के बजाय # लगाएं"
+
+[diagnostics.LEX006.issues.c_style_block_comment]
+message = "C-style /* */ block comments Faber में मान्य नहीं हैं; line comments के लिए # का उपयोग करें"
+help = "comments के आगे // या /* */ के बजाय # लगाएं"
+
+[diagnostics.LEX006.issues.unterminated_c_style_block_comment]
+message = "समाप्त न हुई C-style block comment; Faber line comments के लिए # का उपयोग करता है"
+help = "comments के आगे // या /* */ के बजाय # लगाएं"
+
+[diagnostics.LEX007]
+message = "inline comments स्वीकार नहीं हैं"
+help = "# comment को जिस code का वर्णन करता है उसके ऊपर अलग पंक्ति पर रखें"
+
+[diagnostics.LEX007.issues.inline_hash_after_code]
+message = "# comments को पंक्ति की शुरुआत में होना चाहिए; इस comment को code के ऊपर ले जाएं"
+help = "# comment को जिस code का वर्णन करता है उसके ऊपर अलग पंक्ति पर रखें"
+
+[diagnostics.PARSE000]
+message = "parsing के दौरान lexer error"
+help = "पहले lexer error ठीक करें; parsing साफ tokens से जारी रहती है"
+
+[diagnostics.PARSE001]
+message = "token अपेक्षित है"
+help = "सुनिश्चित करें कि इस स्थान पर अपेक्षित token मौजूद है"
+
+[diagnostics.PARSE001.issues.annotation_name]
+message = "annotation नाम अपेक्षित है"
+help = "@ के बाद annotation नाम जोड़ें"
+
+[diagnostics.PARSE001.issues.secus_si_else_if]
+message = "else-if के लिए 'sin' का उपयोग करें"
+help = "secus si को sin से बदलें"
+
+[diagnostics.PARSE001.issues.itera_mode]
+message = "{expected} अपेक्षित है"
+help = "iterable expression से पहले एक iteration mode चुनें"
+
+[diagnostics.PARSE001.issues.allocator_kind]
+message = "{expected} अपेक्षित है"
+help = "allocator kind के रूप में \"arena\" या \"page\" का उपयोग करें"
+
+[diagnostics.PARSE001.issues.mutability_marker]
+message = "{expected} अपेक्षित है"
+help = "binding name से पहले fixum या varia जोड़ें"
+
+[diagnostics.PARSE001.issues.itera_de_requires_fixum]
+message = "itera de bindings are always const; use {expected}"
+help = "de binds an index or key, not a mutable element; use the const form"
+
+[diagnostics.PARSE001.issues.duplicate_rest_pattern]
+message = "rest pattern पहले ही निर्दिष्ट है"
+help = "केवल एक '{keyword}' rest binding रखें"
+
+[diagnostics.PARSE001.issues.sit_identifier_binding]
+message = "'{keyword}' सीधे एक identifier bind करता है; '{keyword}' name ← expr का उपयोग करें"
+help = "'{keyword}' name ← expr लिखें या typed/destructured bindings के लिए fixum का उपयोग करें"
+
+[diagnostics.PARSE001.issues.sit_no_destructuring]
+message = "sit destructuring patterns का समर्थन नहीं करता"
+help = "destructuring pattern के साथ fixum का उपयोग करें"
+
+[diagnostics.PARSE001.issues.test_case_or_setup]
+message = "test case या setup अपेक्षित है"
+help = "body item को '{proba}', '{probandum}', या '{setup}' से शुरू करें"
+
+[diagnostics.PARSE001.issues.test_modifier_integer]
+message = "'{modifier}' के बाद integer अपेक्षित है"
+help = "'{modifier}' के बाद integer literal रखें"
+
+[diagnostics.PARSE001.issues.tensor_figura_after_element]
+message = "element type के बाद tensor को Figura shape चाहिए"
+help = "comma और Figura shape जोड़ें, जैसे tensor<T, []>"
+
+[diagnostics.PARSE001.issues.sparsa_figura_after_element]
+message = "element type के बाद sparsa को Figura shape चाहिए"
+help = "comma और Figura shape जोड़ें, जैसे sparsa<T, []>"
+
+[diagnostics.PARSE001.issues.vector_width_after_element]
+message = "element type के बाद vector को width चाहिए"
+help = "comma और vector width जोड़ें, जैसे vector<T, [4]>"
+
+[diagnostics.PARSE001.issues.matrix_figura_after_element]
+message = "element type के बाद matrix को two-dimensional Figura shape चाहिए"
+help = "comma और shape जोड़ें, जैसे matrix<T, [4, 4]>"
+
+[diagnostics.PARSE001.issues.atomic_single_element]
+message = "atomic को ठीक एक element type स्वीकार है"
+help = "अतिरिक्त type parameter हटाएं; atomic<T> का उपयोग करें"
+
+[diagnostics.PARSE001.issues.retired_type_call_constructor]
+message = "type-call constructors Faber syntax नहीं हैं"
+help = "value ↦ Type या named library constructor का उपयोग करें"
+
+[diagnostics.PARSE001.issues.retired_prefix_predicate]
+message = "{predicate} अब prefix predicate syntax नहीं है"
+help = "{replacement} के साथ फिर से लिखें"
+
+[diagnostics.PARSE001.issues.equality_non_missing_est]
+message = "equality expression में 'non' के बाद 'est' अपेक्षित है"
+help = "identity negation को non est के रूप में लिखें"
+
+[diagnostics.PARSE001.issues.est_non_spelling]
+message = "'est non' identity negation की spelling नहीं है"
+help = "identity negation के लिए non est का उपयोग करें"
+
+[diagnostics.PARSE001.issues.closure_body_start]
+message = "closure parameters के बाद ':' या block body अपेक्षित है"
+help = "expression body के लिए : या block body जोड़ें"
+
+[diagnostics.PARSE001.issues.ad_ascii_route]
+message = "'ad' के बाद ascii literal route अपेक्षित है"
+help = "route को ad के बाद ASCII literal के रूप में लिखें"
+
+[diagnostics.PARSE001.issues.json_quoted_key]
+message = "JSON keys quoted strings होने चाहिए; \"name\": value का उपयोग करें"
+help = "JSON object keys को quote करें"
+
+[diagnostics.PARSE001.issues.json_string_key]
+message = "JSON string key अपेक्षित है"
+help = "JSON key को string literal से शुरू करें"
+
+[diagnostics.PARSE001.issues.field_value_separator]
+message = "'=' अपेक्षित है"
+help = "field name और value के बीच = का उपयोग करें"
+
+[diagnostics.PARSE001.issues.call_type_args_start]
+message = "'<' अपेक्षित है"
+help = "call-site type arguments को < से शुरू करें"
+
+[diagnostics.PARSE001.issues.gradient_empty_selector_list]
+message = "∇ के बाद gradient selector list में कम से कम एक primal call argument का नाम होना चाहिए"
+help = "उन primal call arguments के नाम बताएं जिनके adjoints आप चाहते हैं, जैसे loss(x, y) ∇ [x]"
+
+[diagnostics.PARSE001.issues.requirit_iace]
+message = "{requirit} शर्त के बाद '{iace}' अपेक्षित है"
+help = "{requirit} cond {iace} err लिखें"
+
+[diagnostics.PARSE001.issues.reice_iace]
+message = "{reice} शर्त के बाद '{iace}' अपेक्षित है"
+help = "{reice} cond {iace} err लिखें"
+
+[diagnostics.PARSE001.issues.requirit_else_rejected]
+message = "'{secus}' {requirit} पर particle नहीं है"
+help = "recoverable payload के लिए '{iace}' का उपयोग करें"
+
+[diagnostics.PARSE001.issues.reice_else_rejected]
+message = "'{secus}' {reice} पर particle नहीं है"
+help = "recoverable payload के लिए '{iace}' का उपयोग करें"
+
+[diagnostics.PARSE001.issues.adfirma_else_rejected]
+message = "'{secus}' {adfirma} पर particle नहीं है"
+help = "वैकल्पिक panic संदेश के लिए '{mori}' का उपयोग करें"
+
+[diagnostics.PARSE002]
+message = "अनपेक्षित token"
+help = "अनपेक्षित token हटाएं या उसका स्थान बदलें"
+
+[diagnostics.PARSE002.issues.json_unknown_identifier_value]
+message = "JSON identifiers मान्य JSON values नहीं हैं"
+help = "true, false, null, string, number, object या array का उपयोग करें"
+
+[diagnostics.PARSE002.issues.json_faber_keyword_value]
+message = "Faber keywords मान्य JSON values नहीं हैं"
+help = "true, false, null, string, number, object या array का उपयोग करें"
+
+[diagnostics.PARSE002.issues.expected_json_value]
+message = "JSON value अपेक्षित है"
+help = "JSON value दें"
+
+[diagnostics.PARSE002.issues.json_integer_underflow]
+message = "JSON integer literal numerus से कम है"
+help = "सीमा के भीतर numerus value का उपयोग करें"
+
+[diagnostics.PARSE002.issues.expected_json_number_after_minus]
+message = "JSON में '-' के बाद number अपेक्षित है"
+help = "JSON में '-' के बाद number रखें"
+
+[diagnostics.PARSE010]
+message = "अमान्य declaration"
+help = "declaration keywords और आवश्यक parts जांचें"
+
+[diagnostics.PARSE010.issues.schema_inheritance]
+message = "schema sub, implet, या interface नहीं जोड़ सकता"
+help = "schema को साधारण संबंधपरक शीर्षक बनाए रखें"
+
+[diagnostics.PARSE010.issues.schema_method]
+message = "schema के अंदर method घोषित नहीं किया जा सकता"
+help = "method को genus पर घोषित करें"
+
+[diagnostics.PARSE011]
+message = "'{functio}' के बाद function नाम अपेक्षित है"
+help = "'{functio}' के बाद function नाम जोड़ें"
+
+[diagnostics.PARSE012]
+message = "'{functio}' declaration के लिए function body अपेक्षित है"
+help = "function declaration में '{block}' जोड़ें"
+
+[diagnostics.PARSE013]
+message = "'{genus}' के बाद class नाम अपेक्षित है"
+help = "'{genus}' के बाद class नाम जोड़ें"
+
+[diagnostics.PARSE014]
+message = "'{genus}' declaration के बाद class body अपेक्षित है"
+help = "'{genus}' declaration header के बाद block जोड़ें"
+
+[diagnostics.PARSE015]
+message = "अमान्य parameter"
+help = "parameter syntax और order जांचें"
+
+[diagnostics.PARSE015.issues.removed_fixus]
+message = "{keyword} हटा दिया गया; optional slots के लिए {optional_marker} और deferred immutable locals के लिए {immutable_marker} का उपयोग करें"
+help = "नाम के बाद {optional_marker} लगाकर optional parameter या field slots चिह्नित करें"
+
+[diagnostics.PARSE016]
+message = "अमान्य type parameter"
+help = "type parameter list में commas और identifiers जांचें"
+
+[diagnostics.PARSE016.issues.removed_prae_typus]
+message = "'{keyword}' हटा दिया गया; angle brackets से generics घोषित करें: {replacement}"
+help = "parameter list से पहले generic parameters लिखें, उदाहरण के लिए {replacement}"
+
+[diagnostics.PARSE016.issues.type_param_after_magnitudo]
+message = "generic lists में type parameters को {size_param} parameters से पहले होना चाहिए"
+help = "type parameters को {size_param} parameters से पहले ले जाएं"
+
+[diagnostics.PARSE017]
+message = "अमान्य modifier"
+help = "modifier को स्थानांतरित करें या हटाएं"
+
+[diagnostics.PARSE018]
+message = "अमान्य annotation"
+help = "'@' के बाद annotation नाम जोड़ें"
+
+[diagnostics.PARSE018.issues.invalid_modifier]
+message = "अमान्य @ {annotation} modifier"
+help = "समर्थित @ {annotation} modifier का उपयोग करें"
+
+[diagnostics.PARSE018.issues.empty_radix_typus_domain]
+message = "@ radix typus domain में कम से कम एक allowed type आवश्यक है"
+help = "in के बाद कम से कम एक allowed type सूचीबद्ध करें"
+
+[diagnostics.PARSE018.issues.expected_annotation_ident]
+message = "{context} अपेक्षित है"
+help = "इस annotation position में '{expected}' जोड़ें"
+
+[diagnostics.PARSE018.issues.unexpected_annotation_token]
+message = "{context} के बाद अनपेक्षित token"
+help = "trailing annotation token हटाएं"
+
+[diagnostics.PARSE018.issues.missing_nucleum_lane_value]
+message = "@ nucleum lane requires a string value"
+help = "use `@ nucleum lane \"position\"` or braced `lane = \"position\"`"
+
+[diagnostics.PARSE018.issues.non_string_nucleum_lane_value]
+message = "@ nucleum lane value must be a string literal"
+help = "use `@ nucleum lane \"position\"` or braced `lane = \"position\"`"
+
+[diagnostics.PARSE018.issues.wrong_locale_annotation]
+message = "annotation `@ {annotation}` इस reader surface पर घोषित नहीं है"
+help = "इस फ़ाइल की reader locale के लिए `@ {expected}` का उपयोग करें"
+
+[diagnostics.PARSE019]
+message = "duplicate modifier"
+help = "duplicate modifier हटाएं"
+
+[diagnostics.PARSE020]
+message = "अमान्य कथन"
+help = "मान्य कथन रूप उपयोग करें"
+
+[diagnostics.PARSE020.issues.ad_expression_only]
+message = "ad केवल अभिव्यक्ति स्थान पर मान्य है"
+help = "{replacement} उपयोग करें"
+
+[diagnostics.PARSE021]
+message = "शर्त गायब है"
+help = "एक शर्त अभिव्यक्ति जोड़ें"
+
+[diagnostics.PARSE022]
+message = "'{block}' ब्लॉक या '{ergo}' बॉडी अपेक्षित है"
+help = "'{block}' जोड़ें या '{ergo}' से एकल कथन शुरू करें"
+
+[diagnostics.PARSE026]
+message = "∴ केवल संक्षिप्त clausurae के लिए है; एकल-कथन बॉडी के लिए ergo उपयोग करें"
+help = "एकल-कथन बॉडी के लिए 'ergo' उपयोग करें, या बॉडी को braces में लपेटें"
+
+[diagnostics.PARSE027]
+message = "ergo केवल एकल-कथन बॉडी के लिए है; संक्षिप्त clausura के लिए ∴ उपयोग करें"
+help = "closure signature और उसकी बॉडी के बीच '∴' उपयोग करें"
+
+[diagnostics.PARSE023]
+message = "'{wildcard}' या {identifier} जैसा पैटर्न अपेक्षित है"
+help = "'{wildcard}', एक literal, या {identifier} पैटर्न उपयोग करें"
+
+[diagnostics.PARSE024]
+message = "'{casu}' arm या '{ceterum}' default अपेक्षित है"
+help = "dispatch arm को '{casu}' से शुरू करें या '{ceterum}' से बंद करें"
+
+[diagnostics.PARSE025]
+message = "अमान्य case मान"
+help = "मान्य case expression उपयोग करें"
+
+[diagnostics.PARSE030]
+message = "अमान्य अभिव्यक्ति"
+help = "अभिव्यक्ति syntax जांचें"
+
+[diagnostics.PARSE030.issues.conversio_recovery_uses_vel]
+message = "conversio recovery के लिए ⇥ उपयोग करें"
+help = "⇥ उपयोग करें; vel केवल nullish coalescing के लिए है"
+
+[diagnostics.PARSE030.issues.expected_expression]
+message = "अभिव्यक्ति अपेक्षित है"
+help = "इस स्थान पर मान्य अभिव्यक्ति दें"
+
+[diagnostics.PARSE030.issues.expression_ad_block]
+message = "expression-form ad में ब्लॉक नहीं होना चाहिए"
+help = "ब्लॉक के बिना ad 'route' (opener) ↦ T उपयोग करें"
+
+[diagnostics.PARSE030.issues.closure_block_body]
+message = "closure block body में 'fac' उपयोग होना चाहिए"
+help = "∴ के बाद संक्षिप्त closure body को {fac_body} के रूप में लिखें"
+
+[diagnostics.PARSE030.issues.closure_fac_body_dum]
+message = "closure fac body में 'dum' उपयोग नहीं कर सकते"
+help = "closure fac bodies से dum हटाएं"
+
+[diagnostics.PARSE031]
+message = "अमान्य literal"
+help = "literal रूप जांचें"
+
+[diagnostics.PARSE032]
+message = "अमान्य operator"
+help = "operator का स्थान और operands जांचें"
+
+[diagnostics.PARSE033]
+message = "असमाप्त समूह"
+help = "grouping delimiter बंद करें"
+
+[diagnostics.PARSE034]
+message = "अमान्य call argument"
+help = "call argument syntax जांचें"
+
+[diagnostics.PARSE035]
+message = "अमान्य member access"
+help = "member access syntax जांचें"
+
+[diagnostics.PARSE036]
+message = "अमान्य assignment target"
+help = "केवल मान्य lvalues को assign करें"
+
+[diagnostics.PARSE040]
+message = "अमान्य प्रकार"
+help = "प्रकार syntax जांचें"
+
+[diagnostics.PARSE040.issues.expected_type_name]
+message = "प्रकार नाम अपेक्षित है"
+help = "प्रकार को identifier, _, या function type से शुरू करें"
+
+[diagnostics.PARSE040.issues.postfix_array_syntax]
+message = "postfix T[] syntax हटा दिया गया है"
+help = "lista<T> उपयोग करें"
+
+[diagnostics.PARSE040.issues.lista_sugar_bracket_form]
+message = "lista sugar का bracket form नहीं है"
+help = "आकारित buffers के लिए tensor sugar उपयोग करें"
+
+[diagnostics.PARSE040.issues.matrix_sugar_missing_shape]
+message = "matrix sugar के लिए द्वि-आयामी bracket shape आवश्यक है"
+help = "matrix sugar को mf32[4, 4] के रूप में लिखें"
+
+[diagnostics.PARSE040.issues.lista_sugar_angle_bracket_form]
+message = "lista sugar केवल bare l+width है"
+help = "angle-bracket form के लिए lista<...> उपयोग करें"
+
+[diagnostics.PARSE040.issues.vector_sugar_angle_bracket_form]
+message = "vector sugar में bracket width उपयोग होती है"
+help = "width को vector sugar brackets में लिखें"
+
+[diagnostics.PARSE040.issues.type_sugar_angle_bracket_form]
+message = "{sugar} sugar में bracket Figura उपयोग होता है"
+help = "shape को {sugar} width sugar brackets में लिखें"
+
+[diagnostics.PARSE040.issues.invalid_figura_index]
+message = "index literal प्राकृतिक संख्या होना चाहिए"
+help = "गैर-ऋणात्मक shape index उपयोग करें"
+
+[diagnostics.PARSE040.issues.wrong_locale_type]
+message = "type '{type}' is not declared on this reader surface"
+help = "use the type spelling declared by this reader locale"
+
+[diagnostics.PARSE041]
+message = "अमान्य प्रकार annotation"
+help = "प्रकार annotation रूप जांचें"
+
+[diagnostics.PARSE042]
+message = "असमाप्त प्रकार parameters"
+help = "प्रकार parameter list को '>' से बंद करें"
+
+[diagnostics.PARSE050]
+message = "अमान्य import"
+help = "import syntax जांचें"
+
+[diagnostics.PARSE050.issues.unknown_import_field]
+message = "अज्ञात import field"
+help = "ex, visibilitas, nomen, ut, या omnia उपयोग करें"
+
+[diagnostics.PARSE050.issues.missing_import_source]
+message = "import record के लिए ex source आवश्यक है"
+help = "import record में ex = \"path\" जोड़ें"
+
+[diagnostics.PARSE050.issues.mixed_wildcard_and_named_import]
+message = "wildcard import में binding का नाम भी नहीं दे सकते"
+help = "अकेले omnia उपयोग करें, या named import के लिए nomen/ut उपयोग करें"
+
+[diagnostics.PARSE050.issues.invalid_import_visibility]
+message = "अमान्य import visibility"
+help = "publica उपयोग करें"
+
+[diagnostics.PARSE050.issues.import_privata_removed]
+message = "import से `privata` हटा दिया गया; import डिफ़ॉल्ट रूप से re-export नहीं करते"
+help = "मार्कर हटाएँ, या re-export के लिए publica उपयोग करें"
+
+[diagnostics.PARSE050.issues.import_name_inference_failed]
+message = "{path} से import नाम का अनुमान नहीं लगा सके"
+help = "{path} के लिए nomen या स्पष्ट alias लिखें"
+
+[diagnostics.SEM001]
+message = "अपरिभाषित चर"
+help = "उपयोग से पहले चर घोषित करें{?suggestion|; क्या आपका आशय |?}"
+
+[diagnostics.SEM001.issues.name_not_variant]
+message = "नाम किसी variant को संदर्भित नहीं करता"
+help = "उपयोग से पहले चर घोषित करें{?suggestion|; क्या आपका आशय |?}"
+
+[diagnostics.SEM001.issues.unknown_identifier]
+message = "अज्ञात identifier"
+help = "उपयोग से पहले चर घोषित करें{?suggestion|; क्या आपका आशय |?}"
+
+[diagnostics.SEM001.issues.scribe_callee]
+message = "अज्ञात identifier"
+help = "आउटपुट कथन के लिए कोष्ठक के बिना `{spelling} <expr>` लिखें"
+
+[diagnostics.SEM001.issues.unknown_record_field]
+message = "अज्ञात record field"
+help = "उपयोग से पहले चर घोषित करें{?suggestion|; क्या आपका आशय |?}"
+
+[diagnostics.SEM001.issues.unknown_variant]
+message = "अज्ञात variant"
+help = "उपयोग से पहले चर घोषित करें{?suggestion|; क्या आपका आशय |?}"
+
+[diagnostics.SEM001.issues.unknown_variant_fields]
+message = "अज्ञात variant fields"
+help = "उपयोग से पहले चर घोषित करें{?suggestion|; क्या आपका आशय |?}"
+
+[diagnostics.SEM002]
+message = "अपरिभाषित प्रकार"
+help = "प्रकार घोषित करें या उसे import करें"
+
+[diagnostics.SEM002.issues.figura_unknown_index]
+message = "Figura में अज्ञात index parameter"
+help = "प्रकार घोषित करें या उसे import करें"
+
+[diagnostics.SEM002.issues.float_width_on_numerus]
+message = "f16, f32 और f64 fractus widths हैं; fractus<f16>, fractus<f32>, या fractus<f64> उपयोग करें"
+help = "प्रकार घोषित करें या उसे import करें"
+
+[diagnostics.SEM002.issues.integer_width_on_fractus]
+message = "integer width markers numerus widths हैं; numerus<…> उपयोग करें"
+help = "प्रकार घोषित करें या उसे import करें"
+
+[diagnostics.SEM002.issues.invalid_precision_marker]
+message = "instans precision marker के रूप में केवल ms, us, या ns स्वीकार करता है"
+help = "प्रकार घोषित करें या उसे import करें"
+
+[diagnostics.SEM002.issues.invalid_fractus_width_marker]
+message = "fractus केवल f16, f32, या f64 स्वीकार करता है"
+help = "प्रकार घोषित करें या उसे import करें"
+
+[diagnostics.SEM002.issues.invalid_numerus_width_marker]
+message = "numerus के लिए अज्ञात width marker"
+help = "प्रकार घोषित करें या उसे import करें"
+
+[diagnostics.SEM002.issues.invalid_width_marker]
+message = "इस family के लिए अज्ञात width marker"
+help = "प्रकार घोषित करें या उसे import करें"
+
+[diagnostics.SEM002.issues.name_not_type]
+message = "नाम किसी प्रकार को संदर्भित नहीं करता"
+help = "प्रकार घोषित करें या उसे import करें"
+
+[diagnostics.SEM002.issues.precision_marker_params]
+message = "precision marker parameters स्वीकार नहीं कर सकता"
+help = "प्रकार घोषित करें या उसे import करें"
+
+[diagnostics.SEM002.issues.precision_marker_shape]
+message = "precision marker bare spelling होना चाहिए, जैसे ms या us"
+help = "प्रकार घोषित करें या उसे import करें"
+
+[diagnostics.SEM002.issues.qualified_name_not_type]
+message = "qualified name किसी प्रकार को संदर्भित नहीं करता"
+help = "प्रकार घोषित करें या उसे import करें"
+
+[diagnostics.SEM002.issues.qualified_type_not_exported]
+message = "qualified type namespace द्वारा export नहीं किया गया है"
+help = "प्रकार घोषित करें या उसे import करें"
+
+[diagnostics.SEM002.issues.qualified_type_prefix_not_namespace]
+message = "qualified type prefix को namespace का नाम देना चाहिए"
+help = "प्रकार घोषित करें या उसे import करें"
+
+[diagnostics.SEM002.issues.schema_unknown_type]
+message = "कॉलम प्रकार एक अज्ञात प्रकार का नाम देता है"
+help = "प्रकार घोषित करें या आयात करें"
+
+[diagnostics.SEM002.issues.unknown_namespace]
+message = "अज्ञात namespace"
+help = "प्रकार घोषित करें या उसे import करें"
+
+[diagnostics.SEM002.issues.unknown_qualified_type]
+message = "अज्ञात qualified type"
+help = "प्रकार घोषित करें या उसे import करें"
+
+[diagnostics.SEM002.issues.unknown_struct]
+message = "अज्ञात struct"
+help = "प्रकार घोषित करें या उसे import करें"
+
+[diagnostics.SEM002.issues.unknown_type]
+message = "अज्ञात प्रकार"
+help = "प्रकार घोषित करें या उसे import करें"
+
+[diagnostics.SEM002.issues.width_marker_params]
+message = "width marker parameters स्वीकार नहीं कर सकता"
+help = "प्रकार घोषित करें या उसे import करें"
+
+[diagnostics.SEM002.issues.width_marker_shape]
+message = "width marker bare spelling होना चाहिए, जैसे i32 या u8"
+help = "प्रकार घोषित करें या उसे import करें"
+
+[diagnostics.SEM003]
+message = "अपरिभाषित फलन"
+help = "फलन घोषित करें या उसे import करें"
+
+[diagnostics.SEM004]
+message = "अपरिभाषित member"
+help = "member नाम और प्रकार जांचें"
+
+[diagnostics.SEM004.issues.duplicate_variant_field]
+message = "दोहराया गया variant field"
+help = "प्रत्येक named variant field अधिकतम एक बार दें"
+
+[diagnostics.SEM004.issues.missing_required_struct_field]
+message = "आवश्यक struct field गायब है"
+help = "हर आवश्यक struct field को initialize करें"
+
+[diagnostics.SEM004.issues.missing_variant_field_name]
+message = "variant field नाम गायब है"
+help = "named variant construction में हर variant argument का नाम दें"
+
+[diagnostics.SEM004.issues.optional_receiver_requires_chain]
+message = "optional receiver के लिए optional chaining या non-null access आवश्यक है"
+help = "optional chaining के लिए ?. या non-null access के लिए !. उपयोग करें"
+
+[diagnostics.SEM004.issues.struct_field_requires_value]
+message = "struct field के लिए मान आवश्यक है"
+help = "struct field के लिए मान दें"
+
+[diagnostics.SEM004.issues.unknown_field]
+message = "अज्ञात field"
+help = "struct field नाम जांचें"
+
+[diagnostics.SEM004.issues.unknown_method]
+message = "अज्ञात method"
+help = "receiver प्रकार और method नाम जांचें"
+
+[diagnostics.SEM004.issues.unknown_struct_field]
+message = "अज्ञात struct field"
+help = "struct field नाम जांचें"
+
+[diagnostics.SEM004.issues.unknown_variant_field]
+message = "अज्ञात variant field"
+help = "variant field नाम जांचें"
+
+[diagnostics.SEM005]
+message = "दोहराई गई परिभाषा"
+help = "परिभाषाओं में से एक का नाम बदलें"
+
+[diagnostics.SEM005.issues.duplicate_definition]
+message = "दोहराई गई परिभाषा"
+help = "परिभाषाओं में से एक का नाम बदलें"
+
+[diagnostics.SEM005.issues.inferred_import_name_collision]
+message = "अनुमानित import नाम मौजूदा परिभाषा से टकराता है"
+help = "`ut` के साथ स्पष्ट import alias जोड़ें ताकि imported binding का नाम अद्वितीय हो"
+
+[diagnostics.SEM005.issues.schema_duplicate_source]
+message = "दो दृश्य नाम एक ही स्रोत नाम पर हल होते हैं"
+help = "एक कॉलम को भिन्न स्रोत नाम दें"
+
+[diagnostics.SEM005.issues.schema_duplicate_visible]
+message = "दो कॉलम एक ही सार्वजनिक नाम घोषित करते हैं"
+help = "एक कॉलम का नाम बदलें"
+
+[diagnostics.SEM006]
+message = "import नहीं मिला"
+help = "import path जाँचें"
+
+[diagnostics.SEM006.issues.kernel_glob_reexport]
+message = "`{path}` glob imports को re-export नहीं किया जा सकता"
+help = "publica मार्कर हटाएँ"
+
+[diagnostics.SEM006.issues.kernel_glob_named_alias]
+message = "`{path}` को named glob alias के रूप में import करना आवश्यक है"
+help = "import path जाँचें"
+
+[diagnostics.SEM006.issues.kernel_invalid_path]
+message = "{reason}"
+help = "import path जाँचें"
+
+[diagnostics.SEM006.issues.kernel_unknown_module]
+message = "अज्ञात faber kernel module '{module}'; faber host manifest देखें"
+help = "import path जाँचें"
+
+[diagnostics.SEM006.issues.kernel_norma_json_in_script]
+message = "script mode में `{script_path}` का उपयोग होता है; `{library_path}` केवल package/library के लिए है"
+help = "import path जाँचें"
+
+[diagnostics.SEM006.issues.import_interna_cross_package]
+message = "`{name}` `@ interna` है और package सीमा के पार import नहीं हो सकता"
+help = "`@ interna` नाम केवल उसी package की फ़ाइल से import करें"
+
+[diagnostics.SEM006.issues.import_module_private]
+message = "`{name}` module-private है और import नहीं हो सकता"
+help = "export करने के लिए घोषणा पर `@ publica` लगाएँ, या उसी package के लिए `@ interna`"
+
+[diagnostics.SEM007]
+message = "चक्रीय dependency"
+help = "modules के बीच का cycle तोड़ें"
+
+[diagnostics.SEM007.issues.type_alias_cycle]
+message = "type alias cycle"
+help = "modules के बीच का cycle तोड़ें"
+
+[diagnostics.SEM008]
+message = "lowering त्रुटि"
+help = "lowering के लिए AST construct ठीक करें"
+
+[diagnostics.SEM008.issues.array_destructuring_initializer]
+message = "array destructuring के लिए initializer आवश्यक है"
+help = "lowering के लिए AST construct ठीक करें"
+
+[diagnostics.SEM008.issues.array_destructuring_not_expanded]
+message = "statement lowering से पहले array destructuring को expand किया जाना चाहिए"
+help = "lowering के लिए AST construct ठीक करें"
+
+[diagnostics.SEM008.issues.atomic_compiler_owned_syntax]
+message = "atomic के लिए compiler-owned syntax आवश्यक है; atomic<T> का उपयोग करें"
+help = "lowering के लिए AST construct ठीक करें"
+
+[diagnostics.SEM008.issues.lista_arity]
+message = "lista के लिए एक type parameter आवश्यक है"
+help = "{lista}<T> का उपयोग करें; lista<T, N> shipped bounded form है"
+
+[diagnostics.SEM008.issues.tabula_arity]
+message = "tabula के लिए दो type parameters आवश्यक हैं"
+help = "lowering के लिए AST construct ठीक करें"
+
+[diagnostics.SEM008.issues.copia_arity]
+message = "copia के लिए एक type parameter आवश्यक है"
+help = "lowering के लिए AST construct ठीक करें"
+
+[diagnostics.SEM008.issues.promissum_arity]
+message = "promissum के लिए एक type parameter आवश्यक है"
+help = "lowering के लिए AST construct ठीक करें"
+
+[diagnostics.SEM008.issues.cursor_arity]
+message = "cursor के लिए एक type parameter आवश्यक है"
+help = "lowering के लिए AST construct ठीक करें"
+
+
+[diagnostics.SEM008.issues.queue_arity]
+message = "queue requires one or two type parameters"
+help = "use queue<T> or queue<T, N>"
+
+[diagnostics.SEM008.issues.stack_arity]
+message = "stack requires one or two type parameters"
+help = "use stack<T> or stack<T, N>"
+
+[diagnostics.SEM008.issues.discerne_casu_pattern_required]
+message = "discerne casu के लिए pattern आवश्यक है"
+help = "lowering के लिए AST construct ठीक करें"
+
+[diagnostics.SEM008.issues.discerne_pattern_count]
+message = "discerne pattern की संख्या subject की संख्या से मेल खानी चाहिए"
+help = "lowering के लिए AST construct ठीक करें"
+
+[diagnostics.SEM008.issues.discerne_subject_required]
+message = "discerne के लिए कम-से-कम एक subject आवश्यक है"
+help = "lowering के लिए AST construct ठीक करें"
+
+[diagnostics.SEM008.issues.duplicate_module_method_binding]
+message = "lowering के दौरान duplicate module method binding"
+help = "lowering के लिए AST construct ठीक करें"
+
+[diagnostics.SEM008.issues.ego_outside_method]
+message = "ego का उपयोग method context के बाहर किया गया"
+help = "lowering के लिए AST construct ठीक करें"
+
+[diagnostics.SEM008.issues.elige_case_value_shape]
+message = "elige case value literal या enum variant होना चाहिए"
+help = "lowering के लिए AST construct ठीक करें"
+
+[diagnostics.SEM008.issues.empty_qualified_type_path]
+message = "खाली qualified type path"
+help = "lowering के लिए AST construct ठीक करें"
+
+[diagnostics.SEM008.issues.empty_path_pattern]
+message = "खाली path pattern"
+help = "lowering के लिए AST construct ठीक करें"
+
+[diagnostics.SEM008.issues.empty_union_type]
+message = "खाली union type"
+help = "lowering के लिए AST construct ठीक करें"
+
+[diagnostics.SEM008.issues.ex_destructuring_not_expanded]
+message = "statement lowering से पहले ex destructuring को expand किया जाना चाहिए"
+help = "lowering के लिए AST construct ठीक करें"
+
+[diagnostics.SEM008.issues.finge_cast_not_type]
+message = "finge cast में किसी type का नाम होना चाहिए"
+help = "lowering के लिए AST construct ठीक करें"
+
+[diagnostics.SEM008.issues.figura_not_index_param]
+message = "नाम किसी index parameter को संदर्भित नहीं करता"
+help = "lowering के लिए AST construct ठीक करें"
+
+[diagnostics.SEM008.issues.figura_type_param_in_index]
+message = "type parameter index position में नहीं आ सकता"
+help = "lowering के लिए AST construct ठीक करें"
+
+[diagnostics.SEM008.issues.figura_unknown_index]
+message = "Figura में अज्ञात index variable"
+help = "lowering के लिए AST construct ठीक करें"
+
+[diagnostics.SEM008.issues.float_width_on_numerus]
+message = "f16, f32 और f64 fractus widths हैं; fractus<f16>, fractus<f32> या fractus<f64> का उपयोग करें"
+help = "lowering के लिए AST construct ठीक करें"
+
+[diagnostics.SEM008.issues.forma_builtin_missing]
+message = "builtin forma genus पंजीकृत नहीं है"
+help = "lowering के लिए AST construct ठीक करें"
+
+[diagnostics.SEM008.issues.forma_literal_lowering_path]
+message = "forma template literals को forma capture के माध्यम से lower किया जाना चाहिए"
+help = "lowering के लिए AST construct ठीक करें"
+
+[diagnostics.SEM008.issues.forma_literal_pattern]
+message = "forma template literals patterns में मान्य नहीं हैं"
+help = "lowering के लिए AST construct ठीक करें"
+
+[diagnostics.SEM008.issues.forma_params_field_missing]
+message = "builtin forma genus में params field नहीं है"
+help = "lowering के लिए AST construct ठीक करें"
+
+[diagnostics.SEM008.issues.forma_template_field_missing]
+message = "builtin forma genus में template field नहीं है"
+help = "lowering के लिए AST construct ठीक करें"
+
+[diagnostics.SEM008.issues.fractus_width_params]
+message = "fractus अधिकतम एक width marker स्वीकार करता है"
+help = "lowering के लिए AST construct ठीक करें"
+
+[diagnostics.SEM008.issues.integer_width_on_fractus]
+message = "integer width markers numerus widths हैं; numerus<…> का उपयोग करें"
+help = "lowering के लिए AST construct ठीक करें"
+
+[diagnostics.SEM008.issues.instans_precision_params]
+message = "instans अधिकतम एक precision marker स्वीकार करता है"
+help = "lowering के लिए AST construct ठीक करें"
+
+[diagnostics.SEM008.issues.intervallum_arity]
+message = "intervallum के लिए एक type parameter आवश्यक है"
+help = "lowering के लिए AST construct ठीक करें"
+
+[diagnostics.SEM008.issues.intervallum_bound]
+message = "intervallum bound type numerus या instans होना चाहिए"
+help = "lowering के लिए AST construct ठीक करें"
+
+[diagnostics.SEM008.issues.atomic_arity]
+message = "atomic के लिए ठीक एक element type आवश्यक है; atomic<T> का उपयोग करें"
+help = "lowering के लिए AST construct ठीक करें"
+
+[diagnostics.SEM008.issues.atomic_element]
+message = "atomic element type numerus<i32> या numerus<u32> होना चाहिए"
+help = "lowering के लिए AST construct ठीक करें"
+
+[diagnostics.SEM008.issues.atomic_incomplete]
+message = "atomic के लिए एक element type आवश्यक है; atomic<T> का उपयोग करें"
+help = "lowering के लिए AST construct ठीक करें"
+
+[diagnostics.SEM008.issues.invalid_fractus_width_marker]
+message = "fractus केवल f16, f32 या f64 स्वीकार करता है"
+help = "lowering के लिए AST construct ठीक करें"
+
+[diagnostics.SEM008.issues.invalid_lowered_expression]
+message = "lowering के दौरान अमान्य expression उत्पन्न हुआ"
+help = "lowering के लिए AST construct ठीक करें"
+
+[diagnostics.SEM008.issues.invalid_numerus_width_marker]
+message = "numerus के लिए अज्ञात width marker"
+help = "lowering के लिए AST construct ठीक करें"
+
+[diagnostics.SEM008.issues.invalid_precision_marker]
+message = "instans precision marker के रूप में केवल ms, us या ns स्वीकार करता है"
+help = "lowering के लिए AST construct ठीक करें"
+
+[diagnostics.SEM008.issues.invalid_width_marker]
+message = "इस family के लिए अज्ञात width marker"
+help = "lowering के लिए AST construct ठीक करें"
+
+[diagnostics.SEM008.issues.json_valor_pattern]
+message = "JSON document literals patterns में मान्य नहीं हैं"
+help = "lowering के लिए AST construct ठीक करें"
+
+[diagnostics.SEM008.issues.kernel_glob_call_shape]
+message = "kernel glob calls में `faber.<module>.<verb>` का उपयोग होना चाहिए"
+help = "lowering के लिए AST construct ठीक करें"
+
+[diagnostics.SEM008.issues.kernel_glob_named_alias]
+message = "`faber:*` को named alias के साथ import करना आवश्यक है"
+help = "lowering के लिए AST construct ठीक करें"
+
+[diagnostics.SEM008.issues.kernel_unknown_module]
+message = "अज्ञात faber kernel module '{module}'; faber host manifest देखें"
+help = "lowering के लिए AST construct ठीक करें"
+
+[diagnostics.SEM008.issues.matrix_incomplete]
+message = "matrix के लिए element type और shape आवश्यक हैं; matrix<T, [R, C]> का उपयोग करें"
+help = "lowering के लिए AST construct ठीक करें"
+
+[diagnostics.SEM008.issues.matrix_missing_figura]
+message = "matrix के लिए द्वि-आयामी shape आवश्यक है; matrix<T, [R, C]> का उपयोग करें"
+help = "lowering के लिए AST construct ठीक करें"
+
+[diagnostics.SEM008.issues.matrix_shape_two_dim]
+message = "matrix shape में ठीक दो dimensions होने चाहिए"
+help = "lowering के लिए AST construct ठीक करें"
+
+[diagnostics.SEM008.issues.missing_cast_symbol_info]
+message = "cast symbol information अनुपलब्ध है"
+help = "lowering के लिए AST construct ठीक करें"
+
+[diagnostics.SEM008.issues.missing_resolved_type_alias]
+message = "type alias में resolved type अनुपलब्ध है"
+help = "lowering के लिए AST construct ठीक करें"
+
+[diagnostics.SEM008.issues.missing_type_alias_symbol]
+message = "type alias के लिए symbol अनुपलब्ध है"
+help = "lowering के लिए AST construct ठीक करें"
+
+[diagnostics.SEM008.issues.missing_type_symbol_info]
+message = "type symbol information अनुपलब्ध है"
+help = "lowering के लिए AST construct ठीक करें"
+
+[diagnostics.SEM008.issues.mutable_pattern_binding]
+message = "mutable pattern bindings को अभी lower नहीं किया जाता"
+help = "lowering के लिए AST construct ठीक करें"
+
+[diagnostics.SEM008.issues.nested_array_destructuring]
+message = "nested array destructuring को अभी lower नहीं किया जाता"
+help = "lowering के लिए AST construct ठीक करें"
+
+[diagnostics.SEM008.issues.nested_object_destructuring]
+message = "nested object destructuring को अभी lower नहीं किया जाता"
+help = "lowering के लिए AST construct ठीक करें"
+
+[diagnostics.SEM008.issues.numerus_width_params]
+message = "numerus अधिकतम एक width marker स्वीकार करता है"
+help = "lowering के लिए AST construct ठीक करें"
+
+[diagnostics.SEM008.issues.object_destructuring_initializer]
+message = "object destructuring के लिए initializer आवश्यक है"
+help = "lowering के लिए AST construct ठीक करें"
+
+[diagnostics.SEM008.issues.object_destructuring_not_expanded]
+message = "statement lowering से पहले object destructuring को expand किया जाना चाहिए"
+help = "lowering के लिए AST construct ठीक करें"
+
+[diagnostics.SEM008.issues.octet_params]
+message = "octet fixed-width है और parameters स्वीकार नहीं कर सकता"
+help = "lowering के लिए AST construct ठीक करें"
+
+[diagnostics.SEM008.issues.precision_marker_shape]
+message = "precision marker ms या us जैसे bare spelling में होना चाहिए"
+help = "lowering के लिए AST construct ठीक करें"
+
+[diagnostics.SEM008.issues.primitive_params]
+message = "primitive type parameters स्वीकार नहीं कर सकता"
+help = "textus<N>, ascii<N>, और octeti<N> shipped bounded forms हैं"
+
+[diagnostics.SEM008.issues.primitive_width_params]
+message = "primitive अधिकतम एक width marker स्वीकार करता है"
+help = "lowering के लिए AST construct ठीक करें"
+
+[diagnostics.SEM008.issues.qualified_type_not_exported]
+message = "qualified type namespace द्वारा export नहीं किया गया है"
+help = "lowering के लिए AST construct ठीक करें"
+
+[diagnostics.SEM008.issues.qualified_type_prefix_not_namespace]
+message = "qualified type prefix में namespace का नाम होना चाहिए"
+help = "lowering के लिए AST construct ठीक करें"
+
+[diagnostics.SEM008.issues.radix_typus_allowed_type_not_concrete]
+message = "@ radix typus allowed type concrete होना चाहिए"
+help = "lowering के लिए AST construct ठीक करें"
+
+[diagnostics.SEM008.issues.radix_typus_non_type_param]
+message = "@ radix typus केवल type parameters पर constraint लगा सकता है"
+help = "lowering के लिए AST construct ठीक करें"
+
+[diagnostics.SEM008.issues.radix_typus_unknown_generic]
+message = "@ radix typus अज्ञात generic parameter का नाम देता है"
+help = "lowering के लिए AST construct ठीक करें"
+
+[diagnostics.SEM008.issues.retired_bare_object_literal]
+message = "bare object literal retired है; {object_literal_forms} का उपयोग करें"
+help = "lowering के लिए AST construct ठीक करें"
+
+[diagnostics.SEM008.issues.schema_nested_column]
+message = "कॉलम नेस्टेड schema घोषणा नहीं हो सकता"
+help = "नेस्टेड schema अलग घोषित करें और उसे कॉलम प्रकार के रूप में नाम दें"
+
+[diagnostics.SEM008.issues.scrinium_arity]
+message = "scrinium अधिकतम एक payload type parameter स्वीकार करता है"
+help = "lowering के लिए AST construct ठीक करें"
+
+[diagnostics.SEM008.issues.scrinium_missing_builtin]
+message = "builtin scrinium type पंजीकृत नहीं है"
+help = "lowering के लिए AST construct ठीक करें"
+
+[diagnostics.SEM008.issues.series_params]
+message = "series parameters स्वीकार नहीं कर सकता"
+help = "lowering के लिए AST construct ठीक करें"
+
+[diagnostics.SEM008.issues.sparsa_element_non_numeric]
+message = "v1 में sparsa तत्व का प्रकार संख्यात्मक होना चाहिए"
+help = "लोअरिंग के लिए AST संरचना ठीक करें"
+
+[diagnostics.SEM008.issues.sparsa_incomplete]
+message = "sparsa के लिए तत्व प्रकार और Figura आवश्यक हैं; sparsa<T, Figura> का उपयोग करें"
+help = "लोअरिंग के लिए AST संरचना ठीक करें"
+
+[diagnostics.SEM008.issues.sparsa_missing_figura]
+message = "sparsa के लिए Figura आकार आवश्यक है; rank-0 के लिए sparsa<T, []> का उपयोग करें"
+help = "लोअरिंग के लिए AST संरचना ठीक करें"
+
+[diagnostics.SEM008.issues.standalone_width_internal]
+message = "स्टैंडअलोन width प्रकार की लोअरिंग करते समय आंतरिक त्रुटि"
+help = "लोअरिंग के लिए AST संरचना ठीक करें"
+
+[diagnostics.SEM008.issues.tensor_incomplete]
+message = "tensor के लिए तत्व प्रकार और Figura आवश्यक हैं; tensor<T, Figura> का उपयोग करें"
+help = "लोअरिंग के लिए AST संरचना ठीक करें"
+
+[diagnostics.SEM008.issues.tensor_missing_figura]
+message = "tensor के लिए Figura आकार आवश्यक है; rank-0 के लिए tensor<T, []> का उपयोग करें"
+help = "लोअरिंग के लिए AST संरचना ठीक करें"
+
+[diagnostics.SEM008.issues.template_type_args]
+message = "template अनुप्रयोग प्रकार तर्क स्वीकार नहीं करता"
+help = "लोअरिंग के लिए AST संरचना ठीक करें"
+
+[diagnostics.SEM008.issues.top_level_initializer]
+message = "शीर्ष-स्तरीय चर घोषणा के लिए initializer आवश्यक है"
+help = "लोअरिंग के लिए AST संरचना ठीक करें"
+
+[diagnostics.SEM008.issues.top_level_identifier_binding]
+message = "शीर्ष-स्तरीय चर के लिए identifier binding आवश्यक है"
+help = "लोअरिंग के लिए AST संरचना ठीक करें"
+
+[diagnostics.SEM008.issues.type_name_not_type]
+message = "प्रकार नाम किसी प्रकार को संदर्भित नहीं करता"
+help = "लोअरिंग के लिए AST संरचना ठीक करें"
+
+[diagnostics.SEM008.issues.union_only_nihil]
+message = "union प्रकार में केवल 'nihil' नहीं हो सकता"
+help = "लोअरिंग के लिए AST संरचना ठीक करें"
+
+[diagnostics.SEM008.issues.undefined_name]
+message = "लोअरिंग में अपरिभाषित नाम"
+help = "लोअरिंग के लिए AST संरचना ठीक करें"
+
+[diagnostics.SEM008.issues.unhandled_statement_kind]
+message = "लोअरिंग में स्टेटमेंट का प्रकार संभाला नहीं गया"
+help = "लोअरिंग के लिए AST संरचना ठीक करें"
+
+[diagnostics.SEM008.issues.unknown_base_class]
+message = "gens घोषणा में अज्ञात आधार क्लास"
+help = "लोअरिंग के लिए AST संरचना ठीक करें"
+
+[diagnostics.SEM008.issues.unknown_finge_cast_type]
+message = "finge अभिव्यक्ति में अज्ञात cast प्रकार"
+help = "लोअरिंग के लिए AST संरचना ठीक करें"
+
+[diagnostics.SEM008.issues.unknown_finge_variant]
+message = "finge अभिव्यक्ति में अज्ञात variant"
+help = "लोअरिंग के लिए AST संरचना ठीक करें"
+
+[diagnostics.SEM008.issues.unknown_interface]
+message = "gens घोषणा में अज्ञात interface"
+help = "लोअरिंग के लिए AST संरचना ठीक करें"
+
+[diagnostics.SEM008.issues.unknown_lowering_error]
+message = "HIR लोअरिंग विफल हुई"
+help = "लोअरिंग के लिए AST संरचना ठीक करें"
+
+[diagnostics.SEM008.issues.unknown_namespace]
+message = "अज्ञात namespace"
+help = "लोअरिंग के लिए AST संरचना ठीक करें"
+
+[diagnostics.SEM008.issues.unknown_type_lowering_error]
+message = "प्रकार की लोअरिंग विफल हुई"
+help = "लोअरिंग के लिए AST संरचना ठीक करें"
+
+[diagnostics.SEM008.issues.unknown_type_name]
+message = "अज्ञात प्रकार नाम"
+help = "लोअरिंग के लिए AST संरचना ठीक करें"
+
+[diagnostics.SEM008.issues.vector_width_single_dim]
+message = "vector width एकल dimension होना चाहिए"
+help = "लोअरिंग के लिए AST संरचना ठीक करें"
+
+[diagnostics.SEM008.issues.width_marker_params]
+message = "width marker पैरामीटर स्वीकार नहीं कर सकता"
+help = "लोअरिंग के लिए AST संरचना ठीक करें"
+
+[diagnostics.SEM008.issues.width_marker_shape]
+message = "width marker i32 या u8 जैसी बिना तर्क वाली spelling होनी चाहिए"
+help = "लोअरिंग के लिए AST संरचना ठीक करें"
+
+[diagnostics.SEM009]
+message = "CLI सत्यापन त्रुटि"
+help = "चलने योग्य CLI कोड बनाने से पहले CLI annotation contract ठीक करें"
+
+[diagnostics.SEM009.issues.alias_collides_with_path]
+message = "command alias '{alias}' किसी command path से टकराता है"
+help = "चलने योग्य CLI कोड बनाने से पहले CLI annotation contract ठीक करें"
+
+[diagnostics.SEM009.issues.cli_on_non_incipit]
+message = "@ cli केवल incipit entry point को annotate कर सकता है"
+help = "चलने योग्य CLI कोड बनाने से पहले CLI annotation contract ठीक करें"
+
+[diagnostics.SEM009.issues.command_global_surface]
+message = "'ubique' विकल्प और operands @ cli entry point पर घोषित होने चाहिए"
+help = "चलने योग्य CLI कोड बनाने से पहले CLI annotation contract ठीक करें"
+
+[diagnostics.SEM009.issues.command_params_unsupported]
+message = "Phase 04 CLI commands को parsed values साधारण parameters के बजाय 'argumenta <ident>' के माध्यम से प्राप्त करने चाहिए"
+help = "चलने योग्य CLI कोड बनाने से पहले CLI annotation contract ठीक करें"
+
+[diagnostics.SEM009.issues.duplicate_binding]
+message = "{label} CLI surface में duplicate CLI binding '{binding}'"
+help = "चलने योग्य CLI कोड बनाने से पहले CLI annotation contract ठीक करें"
+
+[diagnostics.SEM009.issues.duplicate_cli_entry]
+message = "केवल एक @ cli entry point की अनुमति है"
+help = "चलने योग्य CLI कोड बनाने से पहले CLI annotation contract ठीक करें"
+
+[diagnostics.SEM009.issues.duplicate_command_alias]
+message = "duplicate command alias '{alias}'"
+help = "चलने योग्य CLI कोड बनाने से पहले CLI annotation contract ठीक करें"
+
+[diagnostics.SEM009.issues.duplicate_command_path]
+message = "duplicate command path '{path}'"
+help = "चलने योग्य CLI कोड बनाने से पहले CLI annotation contract ठीक करें"
+
+[diagnostics.SEM009.issues.duplicate_long_flag]
+message = "{label} CLI surface में duplicate long flag '{long}'"
+help = "चलने योग्य CLI कोड बनाने से पहले CLI annotation contract ठीक करें"
+
+[diagnostics.SEM009.issues.duplicate_rest_operand]
+message = "केवल एक ceteri operand की अनुमति है"
+help = "चलने योग्य CLI कोड बनाने से पहले CLI annotation contract ठीक करें"
+
+[diagnostics.SEM009.issues.duplicate_short_flag]
+message = "{label} CLI surface में duplicate short flag '{short}'"
+help = "चलने योग्य CLI कोड बनाने से पहले CLI annotation contract ठीक करें"
+
+[diagnostics.SEM009.issues.global_operand_placement]
+message = "'ubique' operands @ cli entry point पर घोषित होने चाहिए"
+help = "चलने योग्य CLI कोड बनाने से पहले CLI annotation contract ठीक करें"
+
+[diagnostics.SEM009.issues.global_option_placement]
+message = "'ubique' options @ cli entry point पर घोषित होने चाहिए"
+help = "चलने योग्य CLI कोड बनाने से पहले CLI annotation contract ठीक करें"
+
+[diagnostics.SEM009.issues.imperium_on_non_func]
+message = "@ imperium केवल functio declaration को annotate कर सकता है"
+help = "चलने योग्य CLI कोड बनाने से पहले CLI annotation contract ठीक करें"
+
+[diagnostics.SEM009.issues.invalid_command_alias]
+message = "अमान्य command alias '{alias}'"
+help = "चलने योग्य CLI कोड बनाने से पहले CLI annotation contract ठीक करें"
+
+[diagnostics.SEM009.issues.invalid_command_path]
+message = "अमान्य command path '{path}'"
+help = "चलने योग्य CLI कोड बनाने से पहले CLI annotation contract ठीक करें"
+
+[diagnostics.SEM009.issues.invalid_long_flag]
+message = "option '{binding}' के लिए अमान्य long flag '{long}'"
+help = "चलने योग्य CLI कोड बनाने से पहले CLI annotation contract ठीक करें"
+
+[diagnostics.SEM009.issues.invalid_short_flag]
+message = "option '{binding}' के लिए अमान्य short flag '{short}'"
+help = "चलने योग्य CLI कोड बनाने से पहले CLI annotation contract ठीक करें"
+
+[diagnostics.SEM009.issues.list_element_not_named]
+message = "CLI list प्रकारों में named element type होना चाहिए"
+help = "चलने योग्य CLI कोड बनाने से पहले CLI annotation contract ठीक करें"
+
+[diagnostics.SEM009.issues.local_operand_global_collision]
+message = "{label} operand '{binding}' global CLI binding से टकराता है"
+help = "चलने योग्य CLI कोड बनाने से पहले CLI annotation contract ठीक करें"
+
+[diagnostics.SEM009.issues.local_option_global_collision]
+message = "{label} option '{binding}' global CLI binding से टकराता है"
+help = "चलने योग्य CLI कोड बनाने से पहले CLI annotation contract ठीक करें"
+
+[diagnostics.SEM009.issues.missing_entry_argument]
+message = "@ cli programs को स्पष्ट 'incipit argumenta <ident>' entry point का उपयोग करना चाहिए"
+help = "चलने योग्य CLI कोड बनाने से पहले CLI annotation contract ठीक करें"
+
+[diagnostics.SEM009.issues.malformed_annotation]
+message = "{annotation} field `{field}` {expected} होना चाहिए"
+help = "चलने योग्य CLI कोड बनाने से पहले CLI annotation contract ठीक करें"
+
+[diagnostics.SEM009.issues.missing_option_flag]
+message = "{label} option '{binding}' को brevis या longum चाहिए"
+help = "चलने योग्य CLI कोड बनाने से पहले CLI annotation contract ठीक करें"
+
+[diagnostics.SEM009.issues.mounted_module_root_cli]
+message = "mounted CLI command modules को अपना @ cli entry point घोषित नहीं करना चाहिए"
+help = "चलने योग्य CLI कोड बनाने से पहले CLI annotation contract ठीक करें"
+
+[diagnostics.SEM009.issues.nested_module_mount]
+message = "@ imperia module mounts केवल root CLI entry point पर घोषित किए जा सकते हैं"
+help = "चलने योग्य CLI कोड बनाने से पहले CLI annotation contract ठीक करें"
+
+[diagnostics.SEM009.issues.operand_after_rest]
+message = "operand '{binding}' ceteri operand के बाद दिखाई देता है"
+help = "चलने योग्य CLI कोड बनाने से पहले CLI annotation contract ठीक करें"
+
+[diagnostics.SEM009.issues.orphan_cli_surface]
+message = "@ optio और @ operandus को @ cli incipit या @ imperium functio को annotate करना चाहिए"
+help = "चलने योग्य CLI कोड बनाने से पहले CLI annotation contract ठीक करें"
+
+[diagnostics.SEM009.issues.rest_not_final]
+message = "ceteri operand अंतिम operand होना चाहिए"
+help = "चलने योग्य CLI कोड बनाने से पहले CLI annotation contract ठीक करें"
+
+[diagnostics.SEM009.issues.subcommand_local_surface]
+message = "subcommand CLI programs केवल 'ubique' के साथ top-level options या operands घोषित कर सकते हैं"
+help = "चलने योग्य CLI कोड बनाने से पहले CLI annotation contract ठीक करें"
+
+[diagnostics.SEM009.issues.subcommand_root_body]
+message = "Phase 04 में subcommand CLI programs को खाली root incipit body का उपयोग करना चाहिए"
+help = "चलने योग्य CLI कोड बनाने से पहले CLI annotation contract ठीक करें"
+
+[diagnostics.SEM009.issues.unsupported_list_element_type]
+message = "असमर्थित CLI list element type '{type}'"
+help = "चलने योग्य CLI कोड बनाने से पहले CLI annotation contract ठीक करें"
+
+[diagnostics.SEM009.issues.unsupported_type]
+message = "असमर्थित CLI type '{type}'"
+help = "चलने योग्य CLI कोड बनाने से पहले CLI annotation contract ठीक करें"
+
+[diagnostics.SEM009.issues.unsupported_type_shape]
+message = "असमर्थित CLI type shape"
+help = "चलने योग्य CLI कोड बनाने से पहले CLI annotation contract ठीक करें"
+
+[diagnostics.SEM010]
+message = "प्रकार असंगति"
+help = "अभिव्यक्ति के प्रकार को अपेक्षित प्रकार से मिलाएँ"
+
+[diagnostics.SEM010.issues.argument_type_mismatch]
+message = "तर्क प्रकार असंगति"
+help = "अभिव्यक्ति के प्रकार को अपेक्षित प्रकार से मिलाएँ"
+
+[diagnostics.SEM010.issues.callee_not_callable]
+message = "callee callable नहीं है"
+help = "अभिव्यक्ति के प्रकार को अपेक्षित प्रकार से मिलाएँ"
+
+[diagnostics.SEM010.issues.figura_not_index_param]
+message = "नाम किसी index parameter को संदर्भित नहीं करता"
+help = "अभिव्यक्ति के प्रकार को अपेक्षित प्रकार से मिलाएँ"
+
+[diagnostics.SEM010.issues.assignment_type_mismatch]
+message = "assignment प्रकार असंगति"
+help = "अभिव्यक्ति के प्रकार को अपेक्षित प्रकार से मिलाएँ"
+
+[diagnostics.SEM010.issues.assert_condition_type_mismatch]
+message = "assert condition boolean होना चाहिए"
+help = "अभिव्यक्ति के प्रकार को अपेक्षित प्रकार से मिलाएँ"
+
+[diagnostics.SEM010.issues.constant_annotation_mismatch]
+message = "constant value annotation से मेल नहीं खाता"
+help = "अभिव्यक्ति के प्रकार को अपेक्षित प्रकार से मिलाएँ"
+
+[diagnostics.SEM010.issues.closure_parameter_type_mismatch]
+message = "closure parameter प्रकार असंगति"
+help = "अभिव्यक्ति के प्रकार को अपेक्षित प्रकार से मिलाएँ"
+
+[diagnostics.SEM010.issues.closure_return_type_mismatch]
+message = "closure return प्रकार असंगति"
+help = "अभिव्यक्ति के प्रकार को अपेक्षित प्रकार से मिलाएँ"
+
+[diagnostics.SEM010.issues.coalesce_fallback_type_mismatch]
+message = "coalesce fallback प्रकार असंगति"
+help = "अभिव्यक्ति के प्रकार को अपेक्षित प्रकार से मिलाएँ"
+
+[diagnostics.SEM010.issues.common_type_mismatch]
+message = "असंगत प्रकार"
+help = "अभिव्यक्ति के प्रकार को अपेक्षित प्रकार से मिलाएँ"
+
+[diagnostics.SEM010.issues.array_element_type_mismatch]
+message = "array element प्रकार असंगति"
+help = "अभिव्यक्ति के प्रकार को अपेक्षित प्रकार से मिलाएँ"
+
+[diagnostics.SEM010.issues.array_spread_element_type_mismatch]
+message = "array spread element प्रकार असंगति"
+help = "अभिव्यक्ति के प्रकार को अपेक्षित प्रकार से मिलाएँ"
+
+[diagnostics.SEM010.issues.conversio_failure_channel_type_mismatch]
+message = "propagating conversio failure channel प्रकार असंगति"
+help = "अभिव्यक्ति के प्रकार को अपेक्षित प्रकार से मिलाएँ"
+
+[diagnostics.SEM010.issues.conversio_recovery_type_mismatch]
+message = "conversio recovery प्रकार असंगति"
+help = "अभिव्यक्ति के प्रकार को अपेक्षित प्रकार से मिलाएँ"
+
+[diagnostics.SEM010.issues.cursor_iteration_requires_ex]
+message = "cursor iteration केवल itera ex का समर्थन करता है"
+help = "अभिव्यक्ति के प्रकार को अपेक्षित प्रकार से मिलाएँ"
+
+[diagnostics.SEM010.issues.expression_type_mismatch]
+message = "अभिव्यक्ति प्रकार असंगति"
+help = "अभिव्यक्ति के प्रकार को अपेक्षित प्रकार से मिलाएँ"
+
+[diagnostics.SEM010.issues.equality_exact_types_required]
+message = "equality के लिए समान प्रकार आवश्यक हैं"
+help = "अभिव्यक्ति के प्रकार को अपेक्षित प्रकार से मिलाएँ"
+
+[diagnostics.SEM010.issues.field_initializer_type_mismatch]
+message = "field initializer प्रकार असंगति"
+help = "अभिव्यक्ति के प्रकार को अपेक्षित प्रकार से मिलाएँ"
+
+[diagnostics.SEM010.issues.failable_call_enclosing_error_type_mismatch]
+message = "failable call का error type enclosing ⇥ से मेल नहीं खाता"
+help = "अभिव्यक्ति के प्रकार को अपेक्षित प्रकार से मिलाएँ"
+
+[diagnostics.SEM010.issues.failable_call_handler_error_type_mismatch]
+message = "handled failable call error type असंगति"
+help = "अभिव्यक्ति के प्रकार को अपेक्षित प्रकार से मिलाएँ"
+
+[diagnostics.SEM010.issues.field_default_type_mismatch]
+message = "फ़ील्ड का डिफ़ॉल्ट प्रकार मेल नहीं खाता"
+help = "अभिव्यक्ति का प्रकार अपेक्षित प्रकार से मिलाएँ"
+
+[diagnostics.SEM010.issues.iace_requires_alternate_exit]
+message = "iace के लिए '⇥' वैकल्पिक-निकास प्रकार वाले संलग्न फ़ंक्शन की आवश्यकता है"
+help = "अभिव्यक्ति का प्रकार अपेक्षित प्रकार से मिलाएँ"
+
+[diagnostics.SEM010.issues.iace_value_type_mismatch]
+message = "वैकल्पिक निकास के मान का प्रकार मेल नहीं खाता"
+help = "अभिव्यक्ति का प्रकार अपेक्षित प्रकार से मिलाएँ"
+
+[diagnostics.SEM010.issues.ignored_expression_result_must_resolve]
+message = "अनदेखा किया गया अभिव्यक्ति-परिणाम resolve होना चाहिए"
+help = "अभिव्यक्ति का प्रकार अपेक्षित प्रकार से मिलाएँ"
+
+[diagnostics.SEM010.issues.initializer_annotation_mismatch]
+message = "इनिशियलाइज़र annotation से मेल नहीं खाता"
+help = "अभिव्यक्ति का प्रकार अपेक्षित प्रकार से मिलाएँ"
+
+[diagnostics.SEM010.issues.incompatible_return_types]
+message = "असंगत रिटर्न प्रकार"
+help = "अभिव्यक्ति का प्रकार अपेक्षित प्रकार से मिलाएँ"
+
+[diagnostics.SEM010.issues.intervallum_bound_required]
+message = "intervallum सीमा का प्रकार numerus या instans होना चाहिए"
+help = "अभिव्यक्ति का प्रकार अपेक्षित प्रकार से मिलाएँ"
+
+[diagnostics.SEM010.issues.intervallum_clamp_operand_type_mismatch]
+message = "intervallum clamp ऑपरेंड का प्रकार मेल नहीं खाता"
+help = "अभिव्यक्ति का प्रकार अपेक्षित प्रकार से मिलाएँ"
+
+[diagnostics.SEM010.issues.intra_requires_intervallum_range]
+message = "intra के लिए intervallum रेंज आवश्यक है"
+help = "अभिव्यक्ति का प्रकार अपेक्षित प्रकार से मिलाएँ"
+
+[diagnostics.SEM010.issues.incompatible_tensor_index]
+message = "इंडेक्स आकार असंगत हैं"
+help = "अभिव्यक्ति का प्रकार अपेक्षित प्रकार से मिलाएँ"
+
+[diagnostics.SEM010.issues.invalid_cast]
+message = "अमान्य cast"
+help = "अभिव्यक्ति का प्रकार अपेक्षित प्रकार से मिलाएँ"
+
+[diagnostics.SEM010.issues.itera_ab_source_requires_range]
+message = "itera ab स्रोत एक रेंज अभिव्यक्ति होना चाहिए"
+help = "अभिव्यक्ति का प्रकार अपेक्षित प्रकार से मिलाएँ"
+
+[diagnostics.SEM010.issues.itera_apud_arity_mismatch]
+message = "{apud} निर्देशांकों की संख्या पुनरावृत्त वस्तु की रैंक के बराबर होनी चाहिए"
+help = "अभिव्यक्ति का प्रकार अपेक्षित प्रकार से मिलाएँ"
+
+[diagnostics.SEM010.issues.itera_apud_requires_ex]
+message = "{apud} निर्देशांकों के लिए {ex} पुनरावृत्ति आवश्यक है"
+help = "अभिव्यक्ति का प्रकार अपेक्षित प्रकार से मिलाएँ"
+
+[diagnostics.SEM010.issues.itera_apud_requires_shaped_iterable]
+message = "{apud} के लिए tensor या matrix पुनरावृत्त वस्तु आवश्यक है"
+help = "अभिव्यक्ति का प्रकार अपेक्षित प्रकार से मिलाएँ"
+
+[diagnostics.SEM010.issues.json_map_key_must_be_textus]
+message = "JSON map कुंजी textus होनी चाहिए"
+help = "अभिव्यक्ति का प्रकार अपेक्षित प्रकार से मिलाएँ"
+
+[diagnostics.SEM010.issues.json_nested_value_requires_valor]
+message = "नेस्टेड JSON मान के लिए tabula मान प्रकार valor आवश्यक है"
+help = "अभिव्यक्ति का प्रकार अपेक्षित प्रकार से मिलाएँ"
+
+[diagnostics.SEM010.issues.json_value_type_mismatch]
+message = "JSON मान tabula मान प्रकार से मेल नहीं खाता"
+help = "अभिव्यक्ति का प्रकार अपेक्षित प्रकार से मिलाएँ"
+
+[diagnostics.SEM010.issues.live_tuus_cursor_call_arg]
+message = "live tuus cursor मान अभी फ़ंक्शन आर्ग्युमेंट के रूप में पास नहीं किए जा सकते"
+help = "अभिव्यक्ति का प्रकार अपेक्षित प्रकार से मिलाएँ"
+
+[diagnostics.SEM010.issues.live_tuus_cursor_return]
+message = "live tuus cursor मान अभी फ़ंक्शन से लौटाए नहीं जा सकते"
+help = "अभिव्यक्ति का प्रकार अपेक्षित प्रकार से मिलाएँ"
+
+[diagnostics.SEM010.issues.live_tuus_cursor_struct]
+message = "live tuus cursor मान अभी संरचनाओं में संग्रहीत नहीं किए जा सकते"
+help = "अभिव्यक्ति का प्रकार अपेक्षित प्रकार से मिलाएँ"
+
+[diagnostics.SEM010.issues.live_tuus_cursor_reassign]
+message = "live tuus cursor स्थानीय मानों को अभी पुनः असाइन नहीं किया जा सकता"
+help = "अभिव्यक्ति का प्रकार अपेक्षित प्रकार से मिलाएँ"
+
+[diagnostics.SEM010.issues.live_tuus_cursor_copy]
+message = "live tuus cursor मानों को अभी स्थानीय मानों के बीच कॉपी या स्थानांतरित नहीं किया जा सकता"
+help = "अभिव्यक्ति का प्रकार अपेक्षित प्रकार से मिलाएँ"
+
+[diagnostics.SEM010.issues.live_tuus_cursor_conversio]
+message = "live tuus cursor मानों को अभी aggregate conversio के माध्यम से परिवर्तित नहीं किया जा सकता"
+help = "अभिव्यक्ति का प्रकार अपेक्षित प्रकार से मिलाएँ"
+
+[diagnostics.SEM010.issues.live_tuus_cursor_direct_initializer]
+message = "tuus.cursor() केवल सीधे स्थानीय इनिशियलाइज़र के रूप में समर्थित है"
+help = "अभिव्यक्ति का प्रकार अपेक्षित प्रकार से मिलाएँ"
+
+[diagnostics.SEM010.issues.live_tuus_cursor_value]
+message = "live tuus cursor मानों को अभी अभिव्यक्तियों के रूप में उपयोग नहीं किया जा सकता"
+help = "अभिव्यक्ति का प्रकार अपेक्षित प्रकार से मिलाएँ"
+
+[diagnostics.SEM010.issues.map_index_type_mismatch]
+message = "map इंडेक्स का प्रकार मेल नहीं खाता"
+help = "अभिव्यक्ति का प्रकार अपेक्षित प्रकार से मिलाएँ"
+
+[diagnostics.SEM010.issues.map_key_type_mismatch]
+message = "map कुंजी का प्रकार मेल नहीं खाता"
+help = "अभिव्यक्ति का प्रकार अपेक्षित प्रकार से मिलाएँ"
+
+[diagnostics.SEM010.issues.map_spread_key_type_mismatch]
+message = "map spread कुंजी का प्रकार मेल नहीं खाता"
+help = "अभिव्यक्ति का प्रकार अपेक्षित प्रकार से मिलाएँ"
+
+[diagnostics.SEM010.issues.map_spread_value_type_mismatch]
+message = "map spread मान का प्रकार मेल नहीं खाता"
+help = "अभिव्यक्ति का प्रकार अपेक्षित प्रकार से मिलाएँ"
+
+[diagnostics.SEM010.issues.map_value_type_mismatch]
+message = "map मान का प्रकार मेल नहीं खाता"
+help = "अभिव्यक्ति का प्रकार अपेक्षित प्रकार से मिलाएँ"
+
+[diagnostics.SEM010.issues.membership_operand_type_mismatch]
+message = "सदस्यता ऑपरेंड का प्रकार मेल नहीं खाता"
+help = "अभिव्यक्ति का प्रकार अपेक्षित प्रकार से मिलाएँ"
+
+[diagnostics.SEM010.issues.matmul_argument_rank_must_be_two]
+message = "matmul के लिए rank-2 tensor आर्ग्युमेंट आवश्यक है"
+help = "अभिव्यक्ति का प्रकार अपेक्षित प्रकार से मिलाएँ"
+
+[diagnostics.SEM010.issues.matmul_argument_shape_must_be_tuple]
+message = "matmul के लिए tuple आकार वाला rank-2 tensor आर्ग्युमेंट आवश्यक है"
+help = "अभिव्यक्ति का प्रकार अपेक्षित प्रकार से मिलाएँ"
+
+[diagnostics.SEM010.issues.matmul_receiver_rank_must_be_two]
+message = "matmul के लिए rank-2 tensor रिसीवर आवश्यक है"
+help = "अभिव्यक्ति का प्रकार अपेक्षित प्रकार से मिलाएँ"
+
+[diagnostics.SEM010.issues.matmul_receiver_shape_must_be_tuple]
+message = "matmul के लिए tuple आकार वाला rank-2 tensor रिसीवर आवश्यक है"
+help = "अभिव्यक्ति का प्रकार अपेक्षित प्रकार से मिलाएँ"
+
+[diagnostics.SEM010.issues.numeric_arithmetic_operands_identical]
+message = "संख्यात्मक अंकगणितीय ऑपरेंड के प्रकार समान होने चाहिए; स्पष्ट रूप से परिवर्तित करने के लिए ↦ का उपयोग करें"
+help = "अभिव्यक्ति का प्रकार अपेक्षित प्रकार से मिलाएँ"
+
+[diagnostics.SEM010.issues.numeric_operand_required]
+message = "संख्यात्मक ऑपरेंड आवश्यक है"
+help = "अभिव्यक्ति का प्रकार अपेक्षित प्रकार से मिलाएँ"
+
+[diagnostics.SEM010.issues.numeric_operands_required]
+message = "संख्यात्मक ऑपरेंड आवश्यक हैं"
+help = "अभिव्यक्ति का प्रकार अपेक्षित प्रकार से मिलाएँ"
+
+[diagnostics.SEM010.issues.boolean_operand_required]
+message = "बूलियन ऑपरेंड आवश्यक है"
+help = "अभिव्यक्ति का प्रकार अपेक्षित प्रकार से मिलाएँ"
+
+[diagnostics.SEM010.issues.boolean_operands_required]
+message = "बूलियन ऑपरेंड आवश्यक हैं"
+help = "अभिव्यक्ति का प्रकार अपेक्षित प्रकार से मिलाएँ"
+
+[diagnostics.SEM010.issues.integer_operand_required]
+message = "पूर्णांक ऑपरेंड आवश्यक है"
+help = "अभिव्यक्ति का प्रकार अपेक्षित प्रकार से मिलाएँ"
+
+[diagnostics.SEM010.issues.integer_operands_required]
+message = "पूर्णांक ऑपरेंड आवश्यक हैं"
+help = "अभिव्यक्ति का प्रकार अपेक्षित प्रकार से मिलाएँ"
+
+[diagnostics.SEM010.issues.instans_ordering_operands_required]
+message = "instans ऑपरेंड असंगत हैं"
+help = "अभिव्यक्ति का प्रकार अपेक्षित प्रकार से मिलाएँ"
+
+[diagnostics.SEM010.issues.pattern_type_mismatch]
+message = "पैटर्न का प्रकार मेल नहीं खाता"
+help = "अभिव्यक्ति का प्रकार अपेक्षित प्रकार से मिलाएँ"
+
+[diagnostics.SEM010.issues.parameter_default_type_mismatch]
+message = "पैरामीटर के डिफ़ॉल्ट प्रकार का मिलान नहीं होता"
+help = "अभिव्यक्ति का प्रकार अपेक्षित प्रकार से मिलाएँ"
+
+[diagnostics.SEM010.issues.range_operand_type_mismatch]
+message = "रेंज ऑपरेंड का प्रकार मेल नहीं खाता"
+help = "अभिव्यक्ति का प्रकार अपेक्षित प्रकार से मिलाएँ"
+
+[diagnostics.SEM010.issues.range_step_must_be_numeric]
+message = "रेंज स्टेप संख्यात्मक होना चाहिए"
+help = "अभिव्यक्ति का प्रकार अपेक्षित प्रकार से मिलाएँ"
+
+[diagnostics.SEM010.issues.return_type_mismatch]
+message = "रिटर्न प्रकार फ़ंक्शन हस्ताक्षर से मेल नहीं खाता"
+help = "अभिव्यक्ति का प्रकार अपेक्षित प्रकार से मिलाएँ"
+
+[diagnostics.SEM010.issues.regex_conversion_operand_type_mismatch]
+message = "regex रूपांतरण के लिए textus या ascii आवश्यक है"
+help = "अभिव्यक्ति का प्रकार अपेक्षित प्रकार से मिलाएँ"
+
+[diagnostics.SEM010.issues.string_operands_required]
+message = "स्ट्रिंग ऑपरेंड आवश्यक हैं"
+help = "अभिव्यक्ति का प्रकार अपेक्षित प्रकार से मिलाएँ"
+
+[diagnostics.SEM010.issues.atomic_arity]
+message = "atomic के लिए ठीक एक तत्व प्रकार आवश्यक है; atomic<T> का उपयोग करें"
+help = "अभिव्यक्ति का प्रकार अपेक्षित प्रकार से मिलाएँ"
+
+[diagnostics.SEM010.issues.atomic_element]
+message = "atomic तत्व प्रकार numerus<i32> या numerus<u32> होना चाहिए"
+help = "अभिव्यक्ति का प्रकार अपेक्षित प्रकार से मिलाएँ"
+
+[diagnostics.SEM010.issues.atomic_incomplete]
+message = "atomic के लिए एक तत्व प्रकार आवश्यक है; atomic<T> का उपयोग करें"
+help = "अभिव्यक्ति का प्रकार अपेक्षित प्रकार से मिलाएँ"
+
+[diagnostics.SEM010.issues.matrix_incomplete]
+message = "matrix के लिए तत्व प्रकार और आकार आवश्यक हैं; matrix<T, [R, C]> का उपयोग करें"
+help = "अभिव्यक्ति का प्रकार अपेक्षित प्रकार से मिलाएँ"
+
+[diagnostics.SEM010.issues.matrix_missing_figura]
+message = "matrix के लिए द्वि-आयामी आकार आवश्यक है; matrix<T, [R, C]> का उपयोग करें"
+help = "अभिव्यक्ति का प्रकार अपेक्षित प्रकार से मिलाएँ"
+
+[diagnostics.SEM010.issues.matrix_shape_two_dim]
+message = "matrix आकार में ठीक दो आयाम होने चाहिए"
+help = "अभिव्यक्ति का प्रकार अपेक्षित प्रकार से मिलाएँ"
+
+[diagnostics.SEM010.issues.sparsa_incomplete]
+message = "sparsa के लिए तत्व प्रकार और Figura आवश्यक हैं; sparsa<T, Figura> का उपयोग करें"
+help = "अभिव्यक्ति का प्रकार अपेक्षित प्रकार से मिलाएँ"
+
+[diagnostics.SEM010.issues.sparsa_missing_figura]
+message = "sparsa के लिए Figura आकार आवश्यक है; rank-0 के लिए sparsa<T, []> का उपयोग करें"
+help = "अभिव्यक्ति का प्रकार अपेक्षित प्रकार से मिलाएँ"
+
+[diagnostics.SEM010.issues.scalar_text_operands_required]
+message = "स्केलर टेक्स्ट ऑपरेंड आवश्यक हैं"
+help = "अभिव्यक्ति का प्रकार अपेक्षित प्रकार से मिलाएँ"
+
+[diagnostics.SEM010.issues.stream_ad_opener_type_mismatch]
+message = "stream ad ओपनर को valor में लोअर होना चाहिए"
+help = "अभिव्यक्ति का प्रकार अपेक्षित प्रकार से मिलाएँ"
+
+[diagnostics.SEM010.issues.tensor_formata_element_type_mismatch]
+message = "formata लक्ष्य तत्व प्रकार रिसीवर तत्व प्रकार से मेल खाना चाहिए"
+help = "अभिव्यक्ति का प्रकार अपेक्षित प्रकार से मिलाएँ"
+
+[diagnostics.SEM010.issues.tensor_incomplete]
+message = "tensor के लिए तत्व प्रकार और Figura आवश्यक हैं; tensor<T, Figura> का उपयोग करें"
+help = "अभिव्यक्ति का प्रकार अपेक्षित प्रकार से मिलाएँ"
+
+[diagnostics.SEM010.issues.tensor_missing_figura]
+message = "tensor के लिए Figura आकार आवश्यक है; rank-0 के लिए tensor<T, []> का उपयोग करें"
+help = "अभिव्यक्ति का प्रकार अपेक्षित प्रकार से मिलाएँ"
+
+[diagnostics.SEM010.issues.variant_pattern_scrutinee_mismatch]
+message = "variant scrutinee प्रकार से मेल नहीं खाता"
+help = "अभिव्यक्ति का प्रकार अपेक्षित प्रकार से मिलाएँ"
+
+[diagnostics.SEM010.issues.vector_element_type_mismatch]
+message = "vector तत्व का प्रकार मेल नहीं खाता"
+help = "अभिव्यक्ति का प्रकार अपेक्षित प्रकार से मिलाएँ"
+
+[diagnostics.SEM010.issues.vector_incomplete]
+message = "vector के लिए तत्व प्रकार और चौड़ाई आवश्यक हैं; vector<T, N> का उपयोग करें"
+help = "अभिव्यक्ति का प्रकार अपेक्षित प्रकार से मिलाएँ"
+
+[diagnostics.SEM010.issues.vector_missing_width]
+message = "vector के लिए चौड़ाई आवश्यक है; vector<T, 4> या vf32[4] का उपयोग करें"
+help = "अभिव्यक्ति का प्रकार अपेक्षित प्रकार से मिलाएँ"
+
+[diagnostics.SEM010.issues.gradient_expression_unsupported]
+message = "postfix gradient selection (`call(...) ∇ [places]`) को tensor-glyphs 2B autograd surface आने तक lower नहीं किया जाता; Phase 2A में कोई operand, selector या result rule सक्रिय नहीं है"
+help = "Phase 2A में gradient selection (`∇`) केवल parse-only है; eligibility/selector rules tensor-glyphs 2B के साथ आएंगे"
+
+[diagnostics.SEM011]
+message = "ऑपरेंड प्रकार अमान्य हैं"
+help = "संगत ऑपरेंड प्रकारों का उपयोग करें"
+
+[diagnostics.SEM011.issues.nucleum_lane_fragment_clash]
+message = "fragment lane binding '{fragment}' conflicts with caller lane binding '{caller}'"
+help = "keep caller and fragment lane bindings distinct"
+
+[diagnostics.SEM011.issues.range_step_must_be_numeric]
+message = "रेंज स्टेप संख्यात्मक होना चाहिए"
+help = "संख्यात्मक रेंज स्टेप का उपयोग करें"
+
+[diagnostics.SEM011.issues.intervallum_bound_required]
+message = "intervallum सीमा का प्रकार numerus या instans होना चाहिए"
+help = "सीमाओं के लिए numerus, fractus, instans या आकारित स्केलर का उपयोग करें"
+
+[diagnostics.SEM011.issues.intervallum_longitudo_bound]
+message = "momentum उपलब्ध होने तक intervallum longitudo के लिए numerus सीमाएँ आवश्यक हैं"
+help = "अभी longitudo के लिए numerus intervallum सीमाओं का उपयोग करें"
+
+[diagnostics.SEM011.issues.numeric_operands_required]
+message = "संख्यात्मक ऑपरेंड आवश्यक हैं"
+help = "इस ऑपरेटर के लिए संख्यात्मक ऑपरेंड का उपयोग करें"
+
+[diagnostics.SEM011.issues.numeric_arithmetic_operands_identical]
+message = "संख्यात्मक अंकगणितीय ऑपरेंड के प्रकार समान होने चाहिए; स्पष्ट रूप से परिवर्तित करने के लिए ↦ का उपयोग करें"
+help = "इस संख्यात्मक ऑपरेटर को लागू करने से पहले ऑपरेंड को स्पष्ट रूप से परिवर्तित करें"
+
+[diagnostics.SEM011.issues.ascii_literal_invalid_escape]
+message = "ascii लिटरल में अमान्य escape अनुक्रम है"
+help = "समर्थित ASCII लिटरल escape अनुक्रमों का उपयोग करें"
+
+[diagnostics.SEM011.issues.ascii_literal_non_ascii_scalar]
+message = "ascii लिटरल में गैर-ASCII वर्ण '{character}' है"
+help = "Unicode टेक्स्ट के लिए textus का उपयोग करें या ascii payload को केवल ASCII रखें"
+
+[diagnostics.SEM011.issues.ascii_literal_unescaped_control]
+message = "ascii लिटरल में अनएस्केप किया गया नियंत्रण वर्ण U+{codepoint} है"
+help = "ascii लिटरल में नियंत्रण वर्णों को escape करें"
+
+[diagnostics.SEM011.issues.boolean_operands_required]
+message = "बूलियन ऑपरेंड आवश्यक हैं"
+help = "इस ऑपरेटर के लिए bivalens ऑपरेंड का उपयोग करें"
+
+[diagnostics.SEM011.issues.atomic_method_requires_atomic_receiver]
+message = "atomic ऑपरेशन के लिए atomic रिसीवर आवश्यक है"
+help = "atomic<T> पर load/store/exchange/compare_exchange को कॉल करें"
+
+[diagnostics.SEM011.issues.unsupported_atomic_method]
+message = "असमर्थित atomic ऑपरेशन"
+help = "load, store, exchange या compare_exchange का उपयोग करें"
+
+[diagnostics.SEM011.issues.bitwise_method_requires_numerus_receiver]
+message = "बिटवाइज़ ऑपरेटर विधियों के लिए numerus रिसीवर आवश्यक है"
+help = "बिटवाइज़ विधियों को numerus रिसीवर पर कॉल करें"
+
+[diagnostics.SEM011.issues.deref_requires_reference]
+message = "deref के लिए reference आवश्यक है"
+help = "किसी reference मान को dereference करें"
+
+[diagnostics.SEM011.issues.densata_requires_sparsa_receiver]
+message = "densata के लिए sparsa रिसीवर आवश्यक है"
+help = "densata को sparsa मान पर कॉल करें"
+
+[diagnostics.SEM011.issues.ascii_literal_template_application]
+message = "ascii literal में template application समर्थित नहीं है"
+help = "template call के लिए textus formatting literal का उपयोग करें"
+
+[diagnostics.SEM011.issues.directional_view_method_type_args]
+message = "directional view method type arguments स्वीकार नहीं करती"
+help = "स्पष्ट type argument सूची हटाएँ"
+
+[diagnostics.SEM011.issues.dynamic_callee_type_args]
+message = "dynamic callee type arguments स्वीकार नहीं करता"
+help = "स्पष्ट type argument सूची हटाएँ"
+
+[diagnostics.SEM011.issues.dynamic_receiver_method_type_args]
+message = "dynamic receiver method type arguments स्वीकार नहीं करता"
+help = "स्पष्ट method type argument सूची हटाएँ"
+
+[diagnostics.SEM011.issues.failable_call_requires_handler]
+message = "failable call के लिए ⇥ declaring context या local handler आवश्यक है"
+help = "call को fac/cape से संभालें या ⇥ function घोषित करें"
+
+[diagnostics.SEM011.issues.generic_type_arg_domain]
+message = "type argument {rejected}, {param} के लिए अनुमत नहीं है; अपेक्षित विकल्पों में से एक: {accepted}"
+help = "इस generic parameter के लिए अनुमत type arguments में से एक चुनें"
+
+[diagnostics.SEM011.issues.gpu_builtin_device_function_required]
+message = "GPU builtin call केवल device functions के भीतर मान्य है"
+help = "GPU builtins को केवल @ nucleum या @ nucleum fragment functions के भीतर call करें"
+
+[diagnostics.SEM011.issues.gpu_builtin_type_args]
+message = "GPU builtin call type arguments स्वीकार नहीं करता"
+help = "स्पष्ट type argument सूची हटाएँ"
+
+[diagnostics.SEM011.issues.inferred_callee_type_args]
+message = "inferred callee type arguments स्वीकार नहीं करता"
+help = "स्पष्ट type argument सूची हटाएँ"
+
+[diagnostics.SEM011.issues.intrinsic_method_type_args]
+message = "intrinsic method type arguments स्वीकार नहीं करती"
+help = "स्पष्ट type argument सूची हटाएँ"
+
+[diagnostics.SEM011.issues.integer_operands_required]
+message = "integer operands आवश्यक हैं"
+help = "इस operator के लिए integer operands का उपयोग करें"
+
+[diagnostics.SEM011.issues.instans_ordering_operands_required]
+message = "असंगत instans operands"
+help = "instans values की तुलना instans values से करें"
+
+[diagnostics.SEM011.issues.json_duplicate_key]
+message = "duplicate JSON key \"{key}\""
+help = "duplicate JSON object key हटाएँ या उसका नाम बदलें"
+
+[diagnostics.SEM011.issues.method_call_type_args]
+message = "method call type arguments स्वीकार नहीं करती"
+help = "स्पष्ट type argument सूची हटाएँ"
+
+[diagnostics.SEM011.issues.numeric_lista_elements_required]
+message = "numeric lista elements आवश्यक हैं"
+help = "इस lista intrinsic के लिए numeric elements का उपयोग करें"
+
+[diagnostics.SEM011.issues.octeti_literal_invalid_character]
+message = "octeti literal में अमान्य character '{character}' है"
+help = "octeti literals में केवल hexadecimal digits का उपयोग करें"
+
+[diagnostics.SEM011.issues.octeti_literal_odd_digit_count]
+message = "octeti literal में hexadecimal digits की संख्या विषम है"
+help = "octeti literals में पूर्ण byte pairs दें"
+
+[diagnostics.SEM011.issues.octeti_literal_template_application]
+message = "octeti literals template application समर्थित नहीं करते"
+help = "octeti literal calls के बजाय textus formatting का उपयोग करें"
+
+[diagnostics.SEM011.issues.sermo_view_payload_type_arg_count]
+message = "{method} अधिकतम एक payload type argument स्वीकार करती है"
+help = "स्पष्ट type argument सूची हटाएँ"
+
+[diagnostics.SEM011.issues.template_application_type_args]
+message = "template application type arguments स्वीकार नहीं करती"
+help = "स्पष्ट type argument सूची हटाएँ"
+
+[diagnostics.SEM011.issues.variant_constructor_type_args]
+message = "variant constructor type arguments स्वीकार नहीं करता"
+help = "स्पष्ट type argument सूची हटाएँ"
+
+[diagnostics.SEM011.issues.same_width_integer_operands_required]
+message = "समान-width integer operands आवश्यक हैं"
+help = "इस operator को लागू करने से पहले integer operands को समान width में convert करें"
+
+[diagnostics.SEM011.issues.postfix_inc_dec_numerus_operand]
+message = "postfix increment/decrement के लिए numerus operand आवश्यक है"
+help = "postfix increment/decrement को numerus values पर लागू करें"
+
+[diagnostics.SEM011.issues.array_spread_requires_lista]
+message = "array spread के लिए lista operand आवश्यक है"
+help = "lista construction के भीतर lista value को spread करें"
+
+[diagnostics.SEM011.issues.struct_computed_key_forbidden]
+message = "struct construction में computed keys मान्य नहीं हैं"
+help = "struct construction में घोषित struct field names का उपयोग करें"
+
+[diagnostics.SEM011.issues.struct_spread_forbidden]
+message = "struct construction में spread fields मान्य नहीं हैं"
+help = "हर आवश्यक struct field स्पष्ट रूप से दें"
+
+[diagnostics.SEM011.issues.vector_constructor_forbids_spread]
+message = "vector constructor spread arguments स्वीकार नहीं करता"
+help = "spread arguments के बजाय vector elements स्पष्ट रूप से दें"
+
+[diagnostics.SEM011.issues.object_spread_requires_tabula]
+message = "object spread के लिए tabula operand आवश्यक है"
+help = "tabula construction के भीतर tabula value को spread करें"
+
+[diagnostics.SEM011.issues.interval_bound_single_scalar]
+message = "interval bound एक single Unicode scalar होना चाहिए"
+help = "ऐसे textus या ascii values दें जिनमें ठीक एक Unicode scalar हो"
+
+[diagnostics.SEM011.issues.numeric_operand_required]
+message = "numeric operand आवश्यक है"
+help = "इस operator के लिए numeric operand का उपयोग करें"
+
+[diagnostics.SEM011.issues.numeric_value_equality_operands_required]
+message = "≈ के लिए numeric operands आवश्यक हैं; promoted exact equality के लिए ≅ या explicit tolerance के लिए .approx का उपयोग करें"
+help = "fuzzy equality के लिए ≈ के साथ numeric operands का उपयोग करें; promoted exact equality के लिए ≅ या explicit tolerance के लिए .approx का उपयोग करें"
+
+[diagnostics.SEM011.issues.boolean_operand_required]
+message = "boolean operand आवश्यक है"
+help = "इस operator के लिए bivalens operand का उपयोग करें"
+
+[diagnostics.SEM011.issues.condition_must_be_bivalens]
+message = "condition bivalens होना चाहिए"
+help = "condition के रूप में bivalens expression का उपयोग करें"
+
+[diagnostics.SEM011.issues.integer_operand_required]
+message = "integer operand आवश्यक है"
+help = "इस operator के लिए integer operand का उपयोग करें"
+
+[diagnostics.SEM011.issues.range_operand_must_be_numeric]
+message = "range operand numeric होना चाहिए"
+help = "intervallum ranges के साथ numeric values की तुलना करें"
+
+[diagnostics.SEM011.issues.scalar_text_operands_required]
+message = "scalar text operands आवश्यक हैं"
+help = "एकल-scalar textus या ascii operands की तुलना करें"
+
+[diagnostics.SEM011.issues.string_operands_required]
+message = "string operands आवश्यक हैं"
+help = "string addition के लिए textus operands का उपयोग करें"
+
+[diagnostics.SEM011.issues.object_field_requires_value]
+message = "object field के लिए value आवश्यक है"
+help = "इस object field के लिए explicit value दें"
+
+[diagnostics.SEM011.issues.vacua_requires_collection_type]
+message = "vacua के लिए collection type आवश्यक है"
+help = "vacua को lista, tabula, copia, tensor या sparsa context दें"
+
+[diagnostics.SEM011.issues.textus_index_must_be_numerus_or_range]
+message = "textus index numerus या range होना चाहिए"
+help = "textus को numerus या integer range से index करें"
+
+[diagnostics.SEM011.issues.array_index_must_be_numerus]
+message = "array index numerus होना चाहिए"
+help = "lista values को numerus से index करें"
+
+[diagnostics.SEM011.issues.indexing_requires_array_or_map]
+message = "indexing के लिए array या map आवश्यक है"
+help = "केवल lista, tabula, tensor, textus या ignotum values को index करें"
+
+[diagnostics.SEM011.issues.tensor_index_vector_integer_elements]
+message = "tensor index vector के लिए integer elements वाली lista आवश्यक है"
+help = "समर्थित integer index elements वाली lista का उपयोग करें"
+
+[diagnostics.SEM011.issues.tensor_scalar_index_rank]
+message = "tensor scalar index के लिए rank-1 आवश्यक है; rank-N के लिए lista<integer> का उपयोग करें"
+help = "scalar index का उपयोग केवल rank-1 tensors पर करें"
+
+[diagnostics.SEM011.issues.tensor_bracket_index_integer_or_lista]
+message = "tensor bracket index के लिए integer या lista<integer> आवश्यक है"
+help = "integer scalar या integer indices वाली lista का उपयोग करें"
+
+[diagnostics.SEM011.issues.tensor_arithmetic_numeric_element_required]
+message = "tensor arithmetic के लिए numeric element type आवश्यक है"
+help = "numeric tensor या sparsa element types का उपयोग करें"
+
+[diagnostics.SEM011.issues.matrix_arithmetic_numeric_element_required]
+message = "matrix arithmetic के लिए numeric element types आवश्यक हैं"
+help = "numeric matrix element types का उपयोग करें"
+
+[diagnostics.SEM011.issues.tensor_receiver_structa_renamed]
+message = "tensor receiver method structa का नाम बदलकर strue किया गया है; seed.strue(data, shape) का उपयोग करें"
+help = "seed.strue(data, shape) का उपयोग करें"
+
+[diagnostics.SEM011.issues.tensor_receiver_creata_type_args]
+message = "tensor receiver creata type arguments स्वीकार नहीं करता; tensor.creata<CompleteTensorType>(fill) का उपयोग करें"
+help = "static construction के लिए tensor.creata<CompleteTensorType>(fill) call करें"
+
+[diagnostics.SEM011.issues.tensor_crea_argument_order]
+message = "tensor crea में पहले fill और फिर shape अपेक्षित है; seed.crea(fill, shape) का उपयोग करें"
+help = "shape से पहले fill दें"
+
+[diagnostics.SEM011.issues.tensor_structa_forma_removed]
+message = "tensor.structa_forma हटा दिया गया है; tensor.structa<CompleteTensorType>(data) का उपयोग करें"
+help = "tensor.structa<CompleteTensorType>(data) का उपयोग करें"
+
+[diagnostics.SEM011.issues.tensor_creata_runtime_shape_removed]
+message = "tensor.creata अब runtime shape argument स्वीकार नहीं करता; tensor.creata<CompleteTensorType>(fill) का उपयोग करें"
+help = "tensor.creata<CompleteTensorType>(fill) का उपयोग करें"
+
+[diagnostics.SEM011.issues.tensor_creata_complete_type_arg_required]
+message = "tensor.creata के लिए complete tensor type argument आवश्यक है; tensor.creata<CompleteTensorType>(fill) का उपयोग करें"
+help = "complete tensor type argument दें"
+
+[diagnostics.SEM011.issues.tensor_formata_complete_type_arg_required]
+message = "formata के लिए complete tensor type argument आवश्यक है; grid.formata<CompleteTensorType>() का उपयोग करें"
+help = "complete tensor type argument दें"
+
+[diagnostics.SEM011.issues.tensor_formata_forbids_value_args]
+message = "formata value arguments स्वीकार नहीं करती; runtime reshape के लिए grid.forma(shape) का उपयोग करें"
+help = "runtime reshape के लिए grid.forma(shape) का उपयोग करें"
+
+[diagnostics.SEM011.issues.tensor_type_arg_incomplete]
+message = "tensor type argument complete tensor type होना चाहिए, जैसे tf32[2, 2] या tensor<numerus, [4]>"
+help = "tensor type argument में element type और shape दोनों शामिल करें"
+
+[diagnostics.SEM012]
+message = "call योग्य नहीं है"
+help = "function या closure को call करें"
+
+[diagnostics.SEM012.issues.callee_not_callable]
+message = "callee callable नहीं है"
+help = "function, closure या callable value को call करें"
+
+[diagnostics.SEM013]
+message = "गलत arity"
+help = "arguments की संख्या समायोजित करें"
+
+[diagnostics.SEM013.issues.callee_type_args_unsupported]
+message = "callee type arguments स्वीकार नहीं करता"
+help = "स्पष्ट type argument सूची हटाएँ"
+
+[diagnostics.SEM013.issues.gpu_builtin_expects_no_arguments]
+message = "GPU builtin call को कोई argument अपेक्षित नहीं है"
+help = "call arguments हटाएँ"
+
+[diagnostics.SEM013.issues.method_accepts_no_arguments]
+message = "{method} कोई argument स्वीकार नहीं करती"
+help = "call arguments हटाएँ"
+
+[diagnostics.SEM013.issues.variant_pattern_arity_mismatch]
+message = "variant pattern arity मेल नहीं खाती"
+help = "pattern field count को variant से मिलाएँ"
+
+[diagnostics.SEM013.issues.vector_constructor_width_arity]
+message = "vector constructor argument count को vector width से मेल खाना चाहिए"
+help = "हर vector lane के लिए एक constructor element दें"
+
+[diagnostics.SEM013.issues.wrong_number_of_arguments]
+message = "arguments की गलत संख्या"
+help = "arguments की संख्या समायोजित करें"
+
+[diagnostics.SEM013.issues.wrong_number_of_type_arguments]
+message = "type arguments की गलत संख्या"
+help = "type arguments की संख्या समायोजित करें"
+
+[diagnostics.SEM014]
+message = "type annotation अनुपस्थित है"
+help = "type annotation जोड़ें"
+
+[diagnostics.SEM014.issues.cannot_infer_alternate_exit_type]
+message = "alternate-exit type infer नहीं कर सकते"
+help = "explicit type annotation जोड़ें"
+
+[diagnostics.SEM014.issues.cannot_infer_constant_type]
+message = "constant type infer नहीं कर सकते"
+help = "explicit type annotation जोड़ें"
+
+[diagnostics.SEM014.issues.cannot_infer_expression_type]
+message = "expression type infer नहीं कर सकते"
+help = "explicit type annotation जोड़ें"
+
+[diagnostics.SEM014.issues.cannot_infer_field_type]
+message = "field type infer नहीं कर सकते"
+help = "explicit type annotation जोड़ें"
+
+[diagnostics.SEM014.issues.cannot_infer_return_type]
+message = "return type infer नहीं कर सकते"
+help = "explicit type annotation जोड़ें"
+
+[diagnostics.SEM014.issues.cannot_infer_tensor_shape]
+message = "tensor shape infer नहीं कर सकते"
+help = "concrete tensor या sparsa shape दें"
+
+[diagnostics.SEM014.issues.cannot_infer_variable_type]
+message = "variable type infer नहीं कर सकते"
+help = "explicit type annotation जोड़ें"
+
+[diagnostics.SEM014.issues.directional_view_type_not_registered]
+message = "directional view type registered नहीं है"
+help = "सुनिश्चित करें कि typechecking से पहले built-in frame types registered हों"
+
+[diagnostics.SEM014.issues.explicit_type_arg_inference_unsupported]
+message = "explicit type arguments में partial inference समर्थित नहीं है"
+help = "inferred explicit type arguments को concrete types से बदलें"
+
+[diagnostics.SEM014.issues.scrinium_type_not_registered]
+message = "scrinium type registered नहीं है"
+help = "सुनिश्चित करें कि typechecking से पहले built-in frame types registered हों"
+
+[diagnostics.SEM014.issues.sermo_type_not_registered]
+message = "sermo type registered नहीं है"
+help = "सुनिश्चित करें कि typechecking से पहले built-in frame types registered हों"
+
+[diagnostics.SEM014.issues.vacua_requires_declared_type]
+message = "vacua के लिए explicit declared type आवश्यक है"
+help = "vacua के लिए declared collection type जोड़ें"
+
+[diagnostics.SEM015]
+message = "अमान्य cast"
+help = "compatible type में cast करें"
+
+[diagnostics.SEM016]
+message = "अमान्य रूपांतरण"
+help = "मान्य रूपांतरण का उपयोग करें या `⇥` के साथ इनलाइन पुनर्प्राप्ति दें"
+
+[diagnostics.SEM016.issues.intervallum_clamp_recovery_unsupported]
+message = "intervallum clamp रूपांतरण `⇥` पुनर्प्राप्ति का समर्थन नहीं करता"
+help = "इस range clamp से पुनर्प्राप्ति arm हटाएँ"
+
+[diagnostics.SEM016.issues.intervallum_target_not_range]
+message = "intervallum रूपांतरण का लक्ष्य range या intervallum मान होना चाहिए"
+help = "range या intervallum मान में रूपांतरित करें"
+
+[diagnostics.SEM016.issues.intervallum_clamp_bound_mismatch]
+message = "intervallum clamp के लिए समान bound प्रकार आवश्यक हैं"
+help = "source और target bound element प्रकारों को समान करें"
+
+[diagnostics.SEM016.issues.sermo_materialize_target_unsupported]
+message = "sermo materialization लक्ष्य समर्थित नहीं है; vacuum, valor, scalar (numerus, fractus, bivalens, textus, ascii, octeti, instans), या lista<T> अपेक्षित है"
+help = "समर्थित sermo materialization लक्ष्य चुनें"
+
+[diagnostics.SEM016.issues.intervallum_materialize_lista_element_mismatch]
+message = "intervallum materialize के लिए समान lista element प्रकार आवश्यक है"
+help = "source और target bound element प्रकारों को समान करें"
+
+[diagnostics.SEM016.issues.intervallum_materialize_tensor_element_mismatch]
+message = "intervallum materialize के लिए समान tensor element प्रकार आवश्यक है"
+help = "source और target bound element प्रकारों को समान करें"
+
+[diagnostics.SEM016.issues.lista_to_vector_literal_required]
+message = "vector materialization के लिए lista literal source आवश्यक है"
+help = "मान्य रूपांतरण का उपयोग करें या `⇥` के साथ इनलाइन पुनर्प्राप्ति दें"
+
+[diagnostics.SEM016.issues.lista_to_vector_element_mismatch]
+message = "lista से vector रूपांतरण के लिए समान element प्रकार आवश्यक हैं"
+help = "मान्य रूपांतरण का उपयोग करें या `⇥` के साथ इनलाइन पुनर्प्राप्ति दें"
+
+[diagnostics.SEM016.issues.lista_to_vector_literal_width]
+message = "lista से vector रूपांतरण के लिए literal vector width आवश्यक है"
+help = "मान्य रूपांतरण का उपयोग करें या `⇥` के साथ इनलाइन पुनर्प्राप्ति दें"
+
+[diagnostics.SEM016.issues.matrix_materialize_unsupported]
+message = "matrix materialization अभी समर्थित नहीं है"
+help = "matrix construction lowering लागू होने तक matrix मानों को typed parameters के रूप में रखें"
+
+[diagnostics.SEM016.issues.valor_to_regex_unsupported]
+message = "valor से regex रूपांतरण के लिए कोई default pattern नहीं है; `valor ↦ textus ↦ regex` का उपयोग करें"
+help = "regex में रूपांतरित करने से पहले valor को textus में रूपांतरित करें"
+
+[diagnostics.SEM016.issues.valor_to_cursor_boundary]
+message = "valor से cursor रूपांतरण eager/lazy boundary पार करता है; `valor ↦ lista` फिर `lista ↦ cursor` के माध्यम से materialize करें"
+help = "boundary पार करने से पहले cursor को lista के माध्यम से materialize करें"
+
+[diagnostics.SEM016.issues.valor_to_promissum_boundary]
+message = "valor से promissum रूपांतरण async/sync boundary पार करता है; valor synchronous है — producer को `@ futura` में wrap करें"
+help = "async value को स्पष्ट रूप से resolve या wrap करें"
+
+[diagnostics.SEM016.issues.promissum_to_valor_boundary]
+message = "promissum से valor रूपांतरण async/sync boundary पार करता है; boxing से पहले `.exspecta()` से resolve करें"
+help = "async value को स्पष्ट रूप से resolve या wrap करें"
+
+[diagnostics.SEM016.issues.cursor_to_valor_boundary]
+message = "cursor से valor रूपांतरण eager/lazy boundary पार करता है; `cursor ↦ lista` फिर `lista ↦ valor` के माध्यम से materialize करें"
+help = "boundary पार करने से पहले cursor को lista के माध्यम से materialize करें"
+
+[diagnostics.SEM016.issues.numeric_to_octeti_unspecified]
+message = "numerus, fractus, या bivalens से octeti में रूपांतरण निर्दिष्ट नहीं है (byte width और endianness); इसके बजाय `chorda` या स्पष्ट byte verbs का उपयोग करें"
+help = "chorda या स्पष्ट byte conversion helpers का उपयोग करें"
+
+[diagnostics.SEM016.issues.octeti_to_numerus_unspecified]
+message = "octeti से numerus में रूपांतरण निर्दिष्ट नहीं है (byte width और endianness); इसके बजाय `chorda` या स्पष्ट byte verbs का उपयोग करें"
+help = "chorda या स्पष्ट byte conversion helpers का उपयोग करें"
+
+[diagnostics.SEM016.issues.octeti_to_fractus_unspecified]
+message = "octeti से fractus में रूपांतरण निर्दिष्ट नहीं है (IEEE width और endianness); इसके बजाय `chorda` या स्पष्ट byte verbs का उपयोग करें"
+help = "chorda या स्पष्ट byte conversion helpers का उपयोग करें"
+
+[diagnostics.SEM016.issues.bits_pair_width_mismatch]
+message = "the Bits bitcast requires exact-width pairs: numerus<u32> ↔ fractus<f32> and numerus<u64> ↔ fractus<f64>"
+help = "convert to the matching IEEE width first: u32 pairs with f32, u64 with f64"
+
+[diagnostics.SEM016.issues.octeti_to_bivalens_unsupported]
+message = "octeti से bivalens में रूपांतरण का कोई default अर्थ नहीं है; textus में decode करें या bytes की स्पष्ट तुलना करें"
+help = "chorda या स्पष्ट byte conversion helpers का उपयोग करें"
+
+[diagnostics.SEM016.issues.promissum_target_boundary]
+message = "promissum में रूपांतरण async/sync boundary पार करता है; async wrapping के लिए `@ futura` या `.tum()` का उपयोग करें"
+help = "async value को स्पष्ट रूप से resolve या wrap करें"
+
+[diagnostics.SEM016.issues.promissum_source_boundary]
+message = "promissum से रूपांतरण async/sync boundary पार करता है; async resolution के लिए `.exspecta()` या `@ futura` `.tum()` का उपयोग करें"
+help = "async value को स्पष्ट रूप से resolve या wrap करें"
+
+[diagnostics.SEM016.issues.sparsa_collection_unsupported]
+message = "sparsa रूपांतरण का कोई default lista अर्थ नहीं है; lista रूपांतरण से पहले densata() या स्पष्ट sparse helper का उपयोग करें"
+help = "dense रूप में बदलें या स्पष्ट sparse helper का उपयोग करें"
+
+[diagnostics.SEM016.issues.sparsa_tensor_element_mismatch]
+message = "tensor और sparsa रूपांतरण के लिए समान element प्रकार आवश्यक है; representation बदलने से पहले element width को स्पष्ट रूप से रूपांतरित करें"
+help = "representation बदलने से पहले element widths को स्पष्ट रूप से रूपांतरित करें"
+
+[diagnostics.SEM016.issues.sparsa_tensor_shape_mismatch]
+message = "tensor और sparsa रूपांतरण के लिए समान Figura shape आवश्यक है; `↦` से पहले स्पष्ट रूप से reshape करें"
+help = "रूपांतरण से पहले स्पष्ट रूप से reshape करें"
+
+[diagnostics.SEM016.issues.tensor_to_scalar_unsupported]
+message = "tensor से scalar रूपांतरण में default element pick नहीं है; indexed reads के लिए `accipe(index)` का उपयोग करें"
+help = "रूपांतरण से पहले tensor को index या reduce करें"
+
+[diagnostics.SEM016.issues.scalar_to_tensor_unsupported]
+message = "scalar से tensor रूपांतरण में default broadcast shape नहीं है; `crea(shape, fill)` या `structa` का उपयोग करें"
+help = "tensor को स्पष्ट रूप से construct या fill करें"
+
+[diagnostics.SEM016.issues.tensor_shape_mismatch]
+message = "इस pair के लिए tensor shape रूपांतरण समर्थित नहीं है"
+help = "रूपांतरण से पहले स्पष्ट रूप से reshape करें"
+
+[diagnostics.SEM016.issues.tensor_element_mismatch]
+message = "इस pair के लिए tensor element-type रूपांतरण समर्थित नहीं है"
+help = "representation बदलने से पहले element widths को स्पष्ट रूप से रूपांतरित करें"
+
+[diagnostics.SEM016.issues.conversio_failure_channel_textus_required]
+message = "conversio failure को propagate करने के लिए `textus` alternate-exit channel आवश्यक है"
+help = "alternate-exit channel को textus के रूप में घोषित करें या inline recovery दें"
+
+[diagnostics.SEM016.issues.regex_operand_unsupported]
+message = "regex रूपांतरण के लिए textus या ascii operand आवश्यक है"
+help = "textus या ascii मानों को regex में रूपांतरित करें"
+
+[diagnostics.SEM016.issues.regex_recovery_unsupported]
+message = "regex रूपांतरण `⇥` recovery का समर्थन नहीं करता; regex का कोई literal form नहीं है, इसलिए प्रतिस्थापित करने के लिए target-typed value नहीं है"
+help = "इस regex रूपांतरण से recovery arm हटाएँ"
+
+[diagnostics.SEM016.issues.valor_verte_unsupported]
+message = "valor ∷ T समर्थित नहीं है — dynamic value के shape को compile time पर assert नहीं किया जा सकता। runtime extraction के लिए `↦ T` का उपयोग करें (`⇥` से recovery के साथ)।"
+help = "इसके बजाय recovery के साथ runtime `↦ T` रूपांतरण का उपयोग करें"
+
+[diagnostics.SEM016.issues.json_genus_conversion_requires_json_annotation]
+message = "json/genus रूपांतरण के लिए genus को `@ json` से चिह्नित करना आवश्यक है"
+help = "genus में `@ json` जोड़ें या स्पष्ट रूप से `valor` के माध्यम से रूपांतरित करें"
+
+[diagnostics.SEM016.issues.lista_to_tabula_unsupported]
+message = "lista से tabula रूपांतरण में default key/value derivation नहीं है; tabula constructor verb या `.in.tabula(k, v)` का उपयोग करें; pair-destructuring default बाद के लिए स्थगित है"
+help = "स्पष्ट key/value selection के साथ tabula construct करें"
+
+[diagnostics.SEM016.issues.cross_collection_unsupported]
+message = "cross-collection रूपांतरण का कोई default `↦` अर्थ नहीं है; स्पष्ट stdlib verb का उपयोग करें"
+help = "स्पष्ट stdlib conversion verb का उपयोग करें"
+
+[diagnostics.SEM016.issues.lista_to_tensor_nested]
+message = "lista से tensor रूपांतरण के लिए flat lista आवश्यक है; `↦` से पहले nested lista मानों को स्पष्ट रूप से flatten करें"
+help = "tensor में रूपांतरित करने से पहले nested lista को flatten करें"
+
+[diagnostics.SEM016.issues.lista_to_tensor_element_mismatch]
+message = "lista से tensor रूपांतरण के लिए समान element प्रकार आवश्यक हैं; `↦` से पहले elements को स्पष्ट रूप से रूपांतरित करें"
+help = "पहले lista elements को tensor element प्रकार में रूपांतरित करें"
+
+[diagnostics.SEM016.issues.rectangular_lista_literal_target]
+message = "rectangular lista literal रूपांतरण के लिए rank-2 literal tensor Figura target आवश्यक है"
+help = "nested lista literals को rank-2 tensor target में रूपांतरित करें"
+
+[diagnostics.SEM016.issues.rectangular_lista_literal_ragged]
+message = "ragged nested lista literal को tensor में रूपांतरित नहीं किया जा सकता; crea या स्पष्ट flatten verb का उपयोग करें"
+help = "हर nested row की लंबाई समान करें"
+
+[diagnostics.SEM016.issues.rectangular_lista_literal_row_length]
+message = "rectangular lista literal की row lengths अलग हैं"
+help = "हर nested row की लंबाई समान करें"
+
+[diagnostics.SEM016.issues.rectangular_lista_literal_shape]
+message = "rectangular lista literal का shape conversio target से मेल नहीं खाता"
+help = "nested literal dimensions को target Figura से मिलाएँ"
+
+[diagnostics.SEM016.issues.rectangular_lista_literal_spread]
+message = "rectangular lista literal रूपांतरण spread elements की अनुमति नहीं देता"
+help = "tensor रूपांतरण से पहले spread elements को expand करें"
+
+[diagnostics.SEM016.issues.rectangular_lista_literal_leaf]
+message = "rectangular lista literal रूपांतरण के लिए literal leaf elements आवश्यक हैं"
+help = "nested lista में literal scalar leaves का उपयोग करें"
+
+[diagnostics.SEM017]
+message = "अनुपलब्ध declaration"
+help = "उपलब्ध declaration का उपयोग करें या चिह्नित surface लागू करें"
+
+[diagnostics.SEM017.issues.nondum_method_for_target]
+message = "method `{method}` इस target के लिए nondum के रूप में चिह्नित है{?reason|: |}"
+help = "उपलब्ध declaration का उपयोग करें या target बदलें"
+
+[diagnostics.SEM018]
+message = "अमान्य annotation"
+help = "semantic lowering से पहले annotation contract ठीक करें"
+
+[diagnostics.SEM018.issues.protecta_reserved]
+message = "`{annotation}` reserved है और इसका कोई active visibility अर्थ नहीं है"
+help = "स्पष्ट export intent के लिए `{publica}` या file-private intent के लिए `{privata}` का उपयोग करें"
+
+[diagnostics.SEM018.issues.conflicting_lane]
+message = "परस्पर विरोधी @ radix lane annotations: '{existing}' और '{parsed}'"
+help = "top-level functio पर `@ radix lane \"air\"`, `@ radix lane \"mir\"`, या `@ radix lane \"hir-direct\"` का उपयोग करें"
+
+[diagnostics.SEM018.issues.nucleum_lane_invalid_identifier]
+message = "@ nucleum lane binding '{name}' is not a valid identifier"
+help = "use a valid identifier for the lane binding"
+
+[diagnostics.SEM018.issues.nucleum_lane_collision]
+message = "@ nucleum lane binding '{name}' collides with a parameter or local"
+help = "choose a lane binding name that is not already used in the entry"
+
+[diagnostics.SEM018.issues.nucleum_lane_conflicting]
+message = "conflicting @ nucleum lane bindings: '{existing}' and '{parsed}'"
+help = "declare exactly one @ nucleum lane binding"
+
+[diagnostics.SEM018.issues.missing_directive]
+message = "@ radix के लिए `lane` जैसी directive आवश्यक है"
+help = "top-level functio पर `@ radix lane \"air\"`, `@ radix lane \"mir\"`, या `@ radix lane \"hir-direct\"` का उपयोग करें"
+
+[diagnostics.SEM018.issues.missing_lane_value]
+message = "@ radix lane के लिए string value आवश्यक है"
+help = "top-level functio पर `@ radix lane \"air\"`, `@ radix lane \"mir\"`, या `@ radix lane \"hir-direct\"` का उपयोग करें"
+
+[diagnostics.SEM018.issues.non_string_lane_value]
+message = "@ radix lane value string literal होना चाहिए"
+help = "top-level functio पर `@ radix lane \"air\"`, `@ radix lane \"mir\"`, या `@ radix lane \"hir-direct\"` का उपयोग करें"
+
+[diagnostics.SEM018.issues.empty_radix_typus_domain]
+message = "@ radix typus domain में कम से कम एक अनुमत type आवश्यक है"
+help = "कम से कम एक अनुमत type के साथ `@ radix typus T in textus octeti` या braced `{radix_typus_braced}` का उपयोग करें"
+
+[diagnostics.SEM018.issues.missing_type_param]
+message = "@ radix typus के लिए generic type parameter आवश्यक है"
+help = "कम से कम एक अनुमत type के साथ `@ radix typus T in textus octeti` या braced `{radix_typus_braced}` का उपयोग करें"
+
+[diagnostics.SEM018.issues.non_identifier_type_param]
+message = "@ radix typus parameter identifier होना चाहिए"
+help = "कम से कम एक अनुमत type के साथ `@ radix typus T in textus octeti` या braced `{radix_typus_braced}` का उपयोग करें"
+
+[diagnostics.SEM018.issues.non_type_allowed]
+message = "@ radix typus allowed value type होना चाहिए"
+help = "कम से कम एक अनुमत type के साथ `@ radix typus T in textus octeti` या braced `{radix_typus_braced}` का उपयोग करें"
+
+[diagnostics.SEM018.issues.unexpected_token]
+message = "@ radix lane value के बाद अनपेक्षित token"
+help = "top-level functio पर `@ radix lane \"air\"`, `@ radix lane \"mir\"`, या `@ radix lane \"hir-direct\"` का उपयोग करें"
+
+[diagnostics.SEM018.issues.unknown_directive]
+message = "अज्ञात @ radix directive; `lane` अपेक्षित है"
+help = "top-level functio पर `@ radix lane \"air\"`, `@ radix lane \"mir\"`, या `@ radix lane \"hir-direct\"` का उपयोग करें"
+
+[diagnostics.SEM018.issues.unknown_lane]
+message = "अज्ञात @ radix lane '{lane}'; 'air', 'mir', या 'hir-direct' अपेक्षित है"
+help = "top-level functio पर `@ radix lane \"air\"`, `@ radix lane \"mir\"`, या `@ radix lane \"hir-direct\"` का उपयोग करें"
+
+[diagnostics.SEM018.issues.unsupported_placement]
+message = "@ radix lane केवल top-level functio declarations पर समर्थित है, {placement} पर नहीं"
+help = "top-level functio पर `@ radix lane \"air\"`, `@ radix lane \"mir\"`, या `@ radix lane \"hir-direct\"` का उपयोग करें"
+
+[diagnostics.SEM020]
+message = "अपरिवर्तनीय assignment"
+help = "reassignment की अनुमति के लिए `varia` binding का उपयोग करें, या अतिरिक्त assignment हटाएँ"
+
+[diagnostics.SEM020.issues.assignment_to_constant]
+message = "constant को assignment"
+help = "reassignment की अनुमति के लिए `varia` binding का उपयोग करें, या अतिरिक्त assignment हटाएँ"
+
+[diagnostics.SEM020.issues.immutable_second_assignment]
+message = "अपरिवर्तनीय binding को दूसरा assignment"
+help = "reassignment की अनुमति के लिए `varia` binding का उपयोग करें, या अतिरिक्त assignment हटाएँ"
+
+[diagnostics.SEM020.issues.imperativus_operator_method_requires_varia_receiver]
+message = "imperativus operator method के लिए varia receiver आवश्यक है"
+help = "reassignment की अनुमति के लिए `varia` binding का उपयोग करें, या अतिरिक्त assignment हटाएँ"
+
+[diagnostics.SEM021]
+message = "अमान्य assignment target"
+help = "मान्य lvalue को assign करें"
+
+[diagnostics.SEM021.issues.invalid_assignment_target]
+message = "अमान्य assignment target"
+help = "मान्य lvalue को assign करें"
+
+[diagnostics.SEM030]
+message = "break योग्य context के बाहर break"
+help = "dum, itera, fac, meus, या tuus के भीतर 'rumpe' का उपयोग करें"
+
+[diagnostics.SEM030.issues.break_outside_breakable]
+message = "{keyword}, {context} के बाहर"
+help = "dum, itera, fac, meus, या tuus के भीतर 'rumpe' का उपयोग करें"
+
+[diagnostics.SEM031]
+message = "loop के बाहर continue"
+help = "loop के भीतर 'perge' का उपयोग करें"
+
+[diagnostics.SEM031.issues.continue_outside_loop]
+message = "{keyword}, {context} के बाहर"
+help = "loop के भीतर 'perge' का उपयोग करें"
+
+[diagnostics.SEM032]
+message = "function के बाहर return"
+help = "function के भीतर 'redde' का उपयोग करें"
+
+[diagnostics.SEM032.issues.return_outside_function]
+message = "{keyword}, {context} के बाहर"
+help = "function के भीतर 'redde' का उपयोग करें"
+
+[diagnostics.SEM033]
+message = "अनुपलब्ध return"
+help = "return statement जोड़ें या return type को 'vacuum' बनाएँ"
+
+[diagnostics.SEM033.issues.control_flow_fallthrough]
+message = "सभी control-flow paths कोई value return नहीं करते"
+help = "return statement जोड़ें या return type को 'vacuum' बनाएँ"
+
+[diagnostics.SEM033.issues.redde_requires_return_type]
+message = "{keyword} के लिए स्पष्ट normal return type आवश्यक है"
+help = "return statement जोड़ें या return type को 'vacuum' बनाएँ"
+
+[diagnostics.SEM040]
+message = "non-exhaustive match"
+help = "अनुपलब्ध cases या 'ceterum' arm जोड़ें"
+
+[diagnostics.SEM040.issues.missing_variants]
+message = "non-exhaustive match"
+help = "अनुपलब्ध cases या 'ceterum' arm जोड़ें"
+
+[diagnostics.SEM041]
+message = "अप्राप्य pattern"
+help = "अप्राप्य pattern हटाएँ या उसका क्रम बदलें"
+
+[diagnostics.SEM041.issues.after_catchall]
+message = "अप्राप्य pattern"
+help = "अप्राप्य pattern हटाएँ या उसका क्रम बदलें"
+
+[diagnostics.SEM042]
+message = "दोहराया हुआ pattern"
+help = "दोहराया हुआ pattern हटाएँ"
+
+[diagnostics.SEM042.issues.duplicate_variant]
+message = "डुप्लिकेट पैटर्न"
+help = "डुप्लिकेट पैटर्न हटाएँ"
+
+[diagnostics.SEM043]
+message = "omnia के लिए enum scrutinee आवश्यक है"
+help = "`omnia` का उपयोग केवल एकल enum scrutinee के साथ करें"
+
+[diagnostics.SEM043.issues.enum_scrutinee]
+message = "'{keyword}' के लिए enum scrutinee आवश्यक है"
+help = "`omnia` का उपयोग केवल एकल enum scrutinee के साथ करें"
+
+[diagnostics.SEM043.issues.single_enum_scrutinee]
+message = "'{keyword}' के लिए एकल enum scrutinee आवश्यक है"
+help = "`omnia` का उपयोग केवल एकल enum scrutinee के साथ करें"
+
+[diagnostics.SEM044]
+message = "omnia catchall arms को प्रतिबंधित करता है"
+help = "`casu _` या `ceterum` का उपयोग करने के बजाय हर variant को स्पष्ट रूप से सूचीबद्ध करें"
+
+[diagnostics.SEM044.issues.catchall_arm]
+message = "'{keyword}' catchall arms को प्रतिबंधित करता है; हर variant को स्पष्ट रूप से सूचीबद्ध करें"
+help = "`casu _` या `ceterum` का उपयोग करने के बजाय हर variant को स्पष्ट रूप से सूचीबद्ध करें"
+
+[diagnostics.SEM050]
+message = "move के बाद उपयोग"
+help = "किसी value के move हो जाने के बाद उसका उपयोग न करें"
+
+[diagnostics.SEM050.issues.use_after_move]
+message = "move के बाद उपयोग"
+help = "किसी value के move हो जाने के बाद उसका उपयोग न करें"
+
+[diagnostics.SEM051]
+message = "move की गई value का borrow"
+help = "केवल उन values से borrow करें जिन्हें move नहीं किया गया है"
+
+[diagnostics.SEM051.issues.borrow_of_moved]
+message = "move की गई value का borrow"
+help = "केवल उन values से borrow करें जिन्हें move नहीं किया गया है"
+
+[diagnostics.SEM052]
+message = "mutable borrow संघर्ष"
+help = "एक-दूसरे पर चढ़े हुए mutable borrows से बचें"
+
+[diagnostics.SEM052.issues.mutable_borrow_conflict]
+message = "mutable borrow मौजूदा borrow से संघर्ष करता है"
+help = "एक-दूसरे पर चढ़े हुए mutable borrows से बचें"
+
+[diagnostics.SEM052.issues.shared_borrow_conflict]
+message = "shared borrow mutable borrow से संघर्ष करता है"
+help = "एक-दूसरे पर चढ़े हुए mutable borrows से बचें"
+
+[diagnostics.SEM052.issues.use_while_mutably_borrowed]
+message = "mutable borrow के दौरान उपयोग"
+help = "एक-दूसरे पर चढ़े हुए mutable borrows से बचें"
+
+[diagnostics.SEM052.issues.write_while_borrowed]
+message = "borrow के दौरान लेखन"
+help = "एक-दूसरे पर चढ़े हुए mutable borrows से बचें"
+
+[diagnostics.SEM053]
+message = "बाहर move नहीं कर सकते"
+help = "move करने के बजाय reference या clone का उपयोग करें"
+
+[diagnostics.SEM053.issues.cannot_move_while_borrowed]
+message = "borrow के दौरान बाहर move नहीं कर सकते"
+help = "move करने के बजाय reference या clone का उपयोग करें"
+
+[diagnostics.SEM054]
+message = "lifetime में असंगति"
+help = "सुनिश्चित करें कि borrowed values पर्याप्त समय तक जीवित रहें"
+
+[diagnostics.SEM055]
+message = "छिपा हुआ variable"
+help = "variables में से एक का नाम बदलें"
+
+[diagnostics.SEM055.issues.shadowed_variable]
+message = "छिपा हुआ variable"
+help = "variables में से एक का नाम बदलें"
+
+[diagnostics.SEM056]
+message = "immutable borrow को assignment"
+help = "यदि mutation अपेक्षित है, तो parameter को 'in' के रूप में घोषित करें"
+
+[diagnostics.SEM056.issues.assign_to_de_parameter]
+message = "`de` parameter को assign नहीं कर सकते"
+help = "यदि mutation अपेक्षित है, तो parameter को 'in' के रूप में घोषित करें"
+
+
+[diagnostics.SEM056.issues.mutating_receiver_through_ref]
+message = "cannot call a mutating receiver through a `ref` view"
+help = "drop the `ref` marker, or use a non-mutating method"
+
+[diagnostics.SEM056.issues.assign_through_ref]
+message = "cannot assign through a `ref` view"
+help = "drop the `ref` marker if mutation is intended"
+
+[diagnostics.SEM057]
+message = "parameter mode में असंगति"
+help = "caller और callee के बीच parameter modes को एक जैसा करें"
+
+[diagnostics.SEM057.issues.de_to_in_or_ex_position]
+message = "`de` parameter को `in` या `ex` position में pass नहीं कर सकते"
+help = "caller और callee के बीच parameter modes को एक जैसा करें"
+
+
+[diagnostics.SEM057.issues.ref_to_mut_or_own_position]
+message = "cannot pass a `ref` value to a `mut` or `own` position"
+help = "pass a `mut` or `own` value, or bind through `copy`"
+
+[diagnostics.SEM057.issues.unmarked_into_own]
+message = "cannot bind an unmarked value into `own`"
+help = "bind through `copy` to duplicate the source"
+
+[diagnostics.SEM057.issues.ref_into_own]
+message = "cannot bind a `ref` value into `own`"
+help = "bind through `copy` to duplicate the source"
+
+[diagnostics.SEM057.issues.mut_into_own]
+message = "cannot bind a `mut` value into `own`"
+help = "bind through `copy` to duplicate the source"
+
+[diagnostics.SEM057.issues.field_into_own]
+message = "cannot bind a field projection into `own`"
+help = "bind through `copy` to duplicate the source"
+
+[diagnostics.SEM057.issues.index_into_own]
+message = "cannot bind an index projection into `own`"
+help = "bind through `copy` to duplicate the source"
+
+[diagnostics.SEM057.issues.deref_into_own]
+message = "cannot bind a dereference into `own`"
+help = "bind through `copy` to duplicate the source"
+
+[diagnostics.SEM057.issues.projection_into_own]
+message = "cannot bind a projection into `own`"
+help = "bind through `copy` to duplicate the source"
+
+[diagnostics.SEM057.issues.shared_into_own]
+message = "cannot bind a shared value into `own`"
+help = "bind through `copy` to duplicate the source"
+
+[diagnostics.SEM058]
+message = "initialization से पहले उपयोग"
+help = "binding को पढ़ने से पहले assign करें, या slot को `sponte` घोषित करें"
+
+[diagnostics.SEM058.issues.possibly_uninitialized]
+message = "संभवतः uninitialized binding का उपयोग"
+help = "binding को पढ़ने से पहले assign करें, या slot को `sponte` घोषित करें"
+
+[diagnostics.SEM059]
+message = "AIR purity उल्लंघन"
+help = "`@ radix lane \"air\"` functions को स्वीकृत pure subset में रखें"
+
+[diagnostics.SEM059.issues.async_function]
+message = "@ radix lane \"{lane}\" इस function body को अस्वीकार करता है: async functions v1 AIR subset के बाहर हैं"
+help = "v1 AIR subset को pure रखें: immutable locals, pure expressions, AIR-lane calls और केवल tensor arithmetic intrinsics"
+
+[diagnostics.SEM059.issues.assignment_mutation]
+message = "@ radix lane \"{lane}\" इस function body को अस्वीकार करता है: assignment v1 AIR subset के बाहर mutation है"
+help = "v1 AIR subset को pure रखें: immutable locals, pure expressions, AIR-lane calls और केवल tensor arithmetic intrinsics"
+
+[diagnostics.SEM059.issues.breakable_block]
+message = "@ radix lane \"{lane}\" इस function body को अस्वीकार करता है: breakable blocks v1 AIR subset के बाहर हैं"
+help = "v1 AIR subset को pure रखें: immutable locals, pure expressions, AIR-lane calls और केवल tensor arithmetic intrinsics"
+
+[diagnostics.SEM059.issues.cede]
+message = "@ radix lane \"{lane}\" इस function body को अस्वीकार करता है: `cede` v1 AIR subset के बाहर है"
+help = "v1 AIR subset को pure रखें: immutable locals, pure expressions, AIR-lane calls और केवल tensor arithmetic intrinsics"
+
+[diagnostics.SEM059.issues.cli_mounted_function]
+message = "@ radix lane \"{lane}\" इस function body को अस्वीकार करता है: CLI-mounted functions v1 AIR subset के बाहर हैं"
+help = "v1 AIR subset को pure रखें: immutable locals, pure expressions, AIR-lane calls और केवल tensor arithmetic intrinsics"
+
+[diagnostics.SEM059.issues.closure]
+message = "@ radix lane \"{lane}\" इस function body को अस्वीकार करता है: closures v1 AIR subset के बाहर हैं"
+help = "v1 AIR subset को pure रखें: immutable locals, pure expressions, AIR-lane calls और केवल tensor arithmetic intrinsics"
+
+[diagnostics.SEM059.issues.conditional_recovery]
+message = "@ radix lane \"{lane}\" इस function body को अस्वीकार करता है: conditional recovery v1 AIR subset के बाहर है"
+help = "v1 AIR subset को pure रखें: immutable locals, pure expressions, AIR-lane calls और केवल tensor arithmetic intrinsics"
+
+[diagnostics.SEM059.issues.defaulted_parameter]
+message = "@ radix lane \"{lane}\" इस function body को अस्वीकार करता है: defaulted parameters v1 AIR subset के बाहर हैं"
+help = "v1 AIR subset को pure रखें: immutable locals, pure expressions, AIR-lane calls और केवल tensor arithmetic intrinsics"
+
+[diagnostics.SEM059.issues.deferred_local_init]
+message = "@ radix lane \"{lane}\" इस function body को अस्वीकार करता है: deferred local initialization v1 AIR subset के बाहर है"
+help = "v1 AIR subset को pure रखें: immutable locals, pure expressions, AIR-lane calls और केवल tensor arithmetic intrinsics"
+
+[diagnostics.SEM059.issues.diagnostic_output]
+message = "@ radix lane \"{lane}\" इस function body को अस्वीकार करता है: diagnostic output v1 AIR subset के बाहर host effect है"
+help = "v1 AIR subset को pure रखें: immutable locals, pure expressions, AIR-lane calls और केवल tensor arithmetic intrinsics"
+
+[diagnostics.SEM059.issues.dum_loop]
+message = "@ radix lane \"{lane}\" इस function body को अस्वीकार करता है: `dum` loops v1 AIR subset के बाहर हैं"
+help = "v1 AIR subset को pure रखें: immutable locals, pure expressions, AIR-lane calls और केवल tensor arithmetic intrinsics"
+
+[diagnostics.SEM059.issues.expression_ad]
+message = "@ radix lane \"{lane}\" इस function body को अस्वीकार करता है: expression-form ad v1 AIR subset के बाहर है"
+help = "v1 AIR subset को pure रखें: immutable locals, pure expressions, AIR-lane calls और केवल tensor arithmetic intrinsics"
+
+[diagnostics.SEM059.issues.expression_statement]
+message = "@ radix lane \"{lane}\" इस function body को अस्वीकार करता है: expression statements v1 AIR subset के बाहर हैं"
+help = "v1 AIR subset को pure रखें: immutable locals, pure expressions, AIR-lane calls और केवल tensor arithmetic intrinsics"
+
+[diagnostics.SEM059.issues.generator_function]
+message = "@ radix lane \"{lane}\" इस function body को अस्वीकार करता है: generator functions v1 AIR subset के बाहर हैं"
+help = "v1 AIR subset को pure रखें: immutable locals, pure expressions, AIR-lane calls और केवल tensor arithmetic intrinsics"
+
+[diagnostics.SEM059.issues.gradient_expression_unsupported]
+message = "@ radix lane \"{lane}\" इस function body को अस्वीकार करता है: postfix gradient selection (`call(...) ∇ [places]`) को tensor-glyphs 2B autograd surface आने तक lower नहीं किया जाता; Phase 2A में कोई operand, selector या result rule सक्रिय नहीं है"
+help = "Phase 2A में gradient selection (`∇`) केवल parse-only है; eligibility/selector rules tensor-glyphs 2B के साथ आएंगे"
+
+[diagnostics.SEM059.issues.iace]
+message = "@ radix lane \"{lane}\" इस function body को अस्वीकार करता है: `iace` v1 AIR subset के बाहर है"
+help = "v1 AIR subset को pure रखें: immutable locals, pure expressions, AIR-lane calls और केवल tensor arithmetic intrinsics"
+
+[diagnostics.SEM059.issues.inc_dec_mutation]
+message = "@ radix lane \"{lane}\" इस function body को अस्वीकार करता है: increment/decrement mutation v1 AIR subset के बाहर है"
+help = "v1 AIR subset को pure रखें: immutable locals, pure expressions, AIR-lane calls और केवल tensor arithmetic intrinsics"
+
+[diagnostics.SEM059.issues.input_read]
+message = "@ radix lane \"{lane}\" इस function body को अस्वीकार करता है: input reads v1 AIR subset के बाहर host effects हैं"
+help = "v1 AIR subset को pure रखें: immutable locals, pure expressions, AIR-lane calls और केवल tensor arithmetic intrinsics"
+
+[diagnostics.SEM059.issues.itera_loop]
+message = "@ radix lane \"{lane}\" इस function body को अस्वीकार करता है: `itera` loops v1 AIR subset के बाहर हैं"
+help = "v1 AIR subset को pure रखें: immutable locals, pure expressions, AIR-lane calls और केवल tensor arithmetic intrinsics"
+
+[diagnostics.SEM059.issues.kernel_device_function]
+message = "@ radix lane \"{lane}\" इस function body को अस्वीकार करता है: kernel/device functions v1 AIR subset के बाहर हैं"
+help = "v1 AIR subset को pure रखें: immutable locals, pure expressions, AIR-lane calls और केवल tensor arithmetic intrinsics"
+
+[diagnostics.SEM059.issues.loop]
+message = "@ radix lane \"{lane}\" इस function body को अस्वीकार करता है: loops v1 AIR subset के बाहर हैं"
+help = "v1 AIR subset को pure रखें: immutable locals, pure expressions, AIR-lane calls और केवल tensor arithmetic intrinsics"
+
+[diagnostics.SEM059.issues.loop_control]
+message = "@ radix lane \"{lane}\" इस function body को अस्वीकार करता है: loop control v1 AIR subset के बाहर है"
+help = "v1 AIR subset को pure रखें: immutable locals, pure expressions, AIR-lane calls और केवल tensor arithmetic intrinsics"
+
+[diagnostics.SEM059.issues.method_call]
+message = "@ radix lane \"{lane}\" इस function body को अस्वीकार करता है: method call `{method}` v1 AIR subset के बाहर है"
+help = "v1 AIR subset को pure रखें: immutable locals, pure expressions, AIR-lane calls और केवल tensor arithmetic intrinsics"
+
+[diagnostics.SEM059.issues.missing_body]
+message = "@ radix lane \"{lane}\" इस function body को अस्वीकार करता है: AIR-lane functions में body होना आवश्यक है"
+help = "v1 AIR subset को pure रखें: immutable locals, pure expressions, AIR-lane calls और केवल tensor arithmetic intrinsics"
+
+[diagnostics.SEM059.issues.mori]
+message = "@ radix lane \"{lane}\" इस function body को अस्वीकार करता है: `mori` v1 AIR subset के बाहर है"
+help = "v1 AIR subset को pure रखें: immutable locals, pure expressions, AIR-lane calls और केवल tensor arithmetic intrinsics"
+
+[diagnostics.SEM059.issues.mutable_varia]
+message = "@ radix lane \"{lane}\" इस function body को अस्वीकार करता है: mutable `varia` bindings v1 AIR subset के बाहर हैं"
+help = "v1 AIR subset को pure रखें: immutable locals, pure expressions, AIR-lane calls और केवल tensor arithmetic intrinsics"
+
+[diagnostics.SEM059.issues.named_call_arg]
+message = "@ radix lane \"{lane}\" इस function body को अस्वीकार करता है: named call arguments v1 AIR subset के बाहर हैं"
+help = "v1 AIR subset को pure रखें: immutable locals, pure expressions, AIR-lane calls और केवल tensor arithmetic intrinsics"
+
+[diagnostics.SEM059.issues.non_air_call]
+message = "@ radix lane \"{lane}\" इस function body को अस्वीकार करता है: AIR-lane functions से calls को किसी अन्य AIR-lane function को target करना आवश्यक है"
+help = "v1 AIR subset को pure रखें: immutable locals, pure expressions, AIR-lane calls और केवल tensor arithmetic intrinsics"
+
+[diagnostics.SEM059.issues.optional_null_chain]
+message = "@ radix lane \"{lane}\" इस function body को अस्वीकार करता है: optional/null assertion chains v1 AIR subset के बाहर हैं"
+help = "v1 AIR subset को pure रखें: immutable locals, pure expressions, AIR-lane calls और केवल tensor arithmetic intrinsics"
+
+[diagnostics.SEM059.issues.recoverable_handler]
+message = "@ radix lane \"{lane}\" इस function body को अस्वीकार करता है: recoverable handlers v1 AIR subset के बाहर हैं"
+help = "v1 AIR subset को pure रखें: immutable locals, pure expressions, AIR-lane calls और केवल tensor arithmetic intrinsics"
+
+[diagnostics.SEM059.issues.reference_place_op]
+message = "@ radix lane \"{lane}\" इस function body को अस्वीकार करता है: reference/place operations v1 AIR subset के बाहर हैं"
+help = "v1 AIR subset को pure रखें: immutable locals, pure expressions, AIR-lane calls और केवल tensor arithmetic intrinsics"
+
+[diagnostics.SEM059.issues.runtime_assertion]
+message = "@ radix lane \"{lane}\" इस function body को अस्वीकार करता है: runtime assertions v1 AIR subset के बाहर हैं"
+help = "v1 AIR subset को pure रखें: immutable locals, pure expressions, AIR-lane calls और केवल tensor arithmetic intrinsics"
+
+[diagnostics.SEM059.issues.runtime_conversion]
+message = "@ radix lane \"{lane}\" इस function body को अस्वीकार करता है: runtime `↦` conversion v1 AIR subset के बाहर है"
+help = "v1 AIR subset को pure रखें: immutable locals, pure expressions, AIR-lane calls और केवल tensor arithmetic intrinsics"
+
+[diagnostics.SEM059.issues.runtime_provided_binding]
+message = "@ radix lane \"{lane}\" इस function body को अस्वीकार करता है: runtime-provided bindings v1 AIR subset के बाहर हैं"
+help = "v1 AIR subset को pure रखें: immutable locals, pure expressions, AIR-lane calls और केवल tensor arithmetic intrinsics"
+
+[diagnostics.SEM059.issues.runtime_variant_check]
+message = "@ radix lane \"{lane}\" इस function body को अस्वीकार करता है: runtime `est` variant check v1 AIR subset के बाहर है"
+help = "v1 AIR subset को pure रखें: immutable locals, pure expressions, AIR-lane calls और केवल tensor arithmetic intrinsics"
+
+[diagnostics.SEM059.issues.spread_call_arg]
+message = "@ radix lane \"{lane}\" इस function body को अस्वीकार करता है: spread call arguments v1 AIR subset के बाहर हैं"
+help = "v1 AIR subset को pure रखें: immutable locals, pure expressions, AIR-lane calls और केवल tensor arithmetic intrinsics"
+
+[diagnostics.SEM059.issues.tacet]
+message = "@ radix lane \"{lane}\" इस function body को अस्वीकार करता है: `tacet` v1 AIR subset के बाहर है"
+help = "v1 AIR subset को pure रखें: immutable locals, pure expressions, AIR-lane calls और केवल tensor arithmetic intrinsics"
+
+[diagnostics.WARN001]
+message = "अप्रयुक्त variable"
+help = "variable हटाएँ या उसके आगे '_' लगाएँ"
+
+[diagnostics.WARN001.issues.unused_variable]
+message = "अप्रयुक्त variable"
+help = "variable हटाएँ या उसके आगे '_' लगाएँ"
+
+[diagnostics.WARN001.issues.unused_binding]
+message = "अप्रयुक्त binding"
+help = "variable हटाएँ या उसके आगे '_' लगाएँ"
+
+[diagnostics.WARN002]
+message = "अप्रयुक्त import"
+help = "अप्रयुक्त import हटाएँ"
+
+[diagnostics.WARN002.issues.unused_import]
+message = "अप्रयुक्त import"
+help = "अप्रयुक्त import हटाएँ"
+
+[diagnostics.WARN003]
+message = "अप्रयुक्त function"
+help = "function हटाएँ या उसे used के रूप में चिह्नित करें"
+
+[diagnostics.WARN003.issues.unused_function]
+message = "अप्रयुक्त function"
+help = "function हटाएँ या उसे used के रूप में चिह्नित करें"
+
+[diagnostics.WARN004]
+message = "अप्राप्य code"
+help = "अप्राप्य code हटाएँ"
+
+[diagnostics.WARN004.issues.unreachable_code]
+message = "अप्राप्य code"
+help = "अप्राप्य code हटाएँ"
+
+[diagnostics.WARN005]
+message = "अनावश्यक cast"
+help = "अनावश्यक cast हटाएँ"
+
+[diagnostics.WARN005.issues.unnecessary_cast]
+message = "अनावश्यक cast: type पहले से ज्ञात है"
+help = "अनावश्यक cast हटाएँ"
+
+[diagnostics.WARN007]
+message = "target no-op"
+help = "construct हटाएँ या उसे target के आधार पर gate करें"
+
+[diagnostics.WARN008]
+message = "अप्रयुक्त mutable reference parameter"
+help = "यदि mutation अनावश्यक है, तो 'in' को 'de' में बदलें"
+
+[diagnostics.WARN008.issues.unused_in_parameter]
+message = "`in` parameter में कभी mutation नहीं होता; `de` पर विचार करें"
+help = "यदि mutation अनावश्यक है, तो 'in' को 'de' में बदलें"
+
+[diagnostics.WARN009]
+message = "अप्रयुक्त move parameter"
+help = "यदि ownership transfer अनावश्यक है, तो 'ex' को 'de' में बदलें"
+
+[diagnostics.WARN009.issues.unused_ex_parameter]
+message = "`ex` पैरामीटर का कभी उपयोग नहीं किया जाता; `de` पर विचार करें"
+help = "यदि स्वामित्व हस्तांतरण आवश्यक नहीं है, तो 'ex' को 'de' में बदलें"
+
+[diagnostics.WARN010]
+message = "स्पष्ट ignotum एनोटेशन"
+help = "प्रकार-जाँच को सटीक बनाए रखने के लिए ठोस प्रकार एनोटेशन को प्राथमिकता दें"
+
+[diagnostics.WARN010.issues.explicit_ignotum_annotation]
+message = "स्पष्ट ignotum एनोटेशन सटीक प्रकार-जाँच अक्षम करता है"
+help = "प्रकार-जाँच को सटीक बनाए रखने के लिए ठोस प्रकार एनोटेशन को प्राथमिकता दें"
+
+[diagnostics.WARN011]
+message = "वाइल्डकार्ड null को समाहित करता है"
+help = "null मामले को जानबूझकर संभालने के लिए स्पष्ट `casu nihil` arm जोड़ें"
+
+[diagnostics.WARN011.issues.wildcard_absorbs_null]
+message = "catchall arm nullable scrutinee के null मामले को समाहित करता है; स्पष्ट '{casu}' {nil} arm का उपयोग करें"
+help = "null मामले को जानबूझकर संभालने के लिए स्पष्ट `casu nihil` arm जोड़ें"
+
+[diagnostics.WARN013]
+message = "अनावश्यक varia"
+help = "जब बाइंडिंग को फिर से असाइन या परिवर्तित नहीं किया जाता, तो `fixum` का उपयोग करें"
+
+[diagnostics.WARN013.issues.unnecessary_varia]
+message = "अनावश्यक varia: बाइंडिंग को फिर से असाइन या परिवर्तित नहीं किया जाता"
+help = "जब बाइंडिंग को फिर से असाइन या परिवर्तित नहीं किया जाता, तो `fixum` का उपयोग करें"
+
+[diagnostics.WARN014]
+message = "फ़ाइल इंटरफ़ेस ने असमर्थित export छोड़ दिया"
+help = "मॉड्यूल से समर्थित export का उपयोग करें, या इस हस्ताक्षर के फ़ाइल-इंटरफ़ेस कवरेज के पूर्ण होने की प्रतीक्षा करें"
+
+[diagnostics.WARN014.issues.file_interface_export_skipped]
+message = "फ़ाइल इंटरफ़ेस ने export `{namespace}.{export}` ({reason}) छोड़ दिया; अन्य export अभी भी उपलब्ध हैं"
+help = "मॉड्यूल से समर्थित export का उपयोग करें, या इस हस्ताक्षर के फ़ाइल-इंटरफ़ेस कवरेज के पूर्ण होने की प्रतीक्षा करें"
+
+[diagnostics.WARN015]
+message = "अपरिचित curata आवंटक नाम"
+help = "पहचाने गए आवंटक नाम (\"arena\", \"page\", \"alloc\", या \"allocator\") का उपयोग करें"
+
+[diagnostics.WARN015.issues.unrecognized_curata_allocator]
+message = "curata आवंटक नाम '{name}' किसी पहचाने गए आवंटक अनुबंध से मेल नहीं खाता"
+help = "पहचाने गए आवंटक नाम (\"arena\", \"page\", \"alloc\", या \"allocator\") का उपयोग करें"
+
+[diagnostics.WARN016]
+message = "monomorphic hole multi-member union में हल हुआ"
+help = "यदि sum अभिप्रेत है तो स्पष्ट union type या `∪` hole उपयोग करें"
+
+[diagnostics.WARN016.issues.monomorphic_hole_solved_to_union]
+message = "monomorphic hole `_` multi-member union `{union}` में हल हुआ"
+help = "यदि sum अभिप्रेत है तो स्पष्ट union type या `∪` hole उपयोग करें"
+
+[diagnostics.WARN017]
+message = "union hole monomorphically हल हुआ"
+help = "यदि केवल एक type अभिप्रेत है तो `_` उपयोग करें"
+
+[diagnostics.WARN017.issues.union_hole_solved_monomorphically]
+message = "union hole `∪` एक type `{type}` में हल हुआ"
+help = "यदि केवल एक type अभिप्रेत है तो `_` उपयोग करें"
+
+[llm]
+system_prompt_snippet = "Emit Hindi reader-locale Faber using Hindi keywords for declarations, control flow, loops, returns, booleans, common primitive types, and list/map collections. Keep Faber glyph syntax unchanged."
+exemplars = ["./exemplars/salve-munde.hi.fab"]
+
+
+# Queue/stack C2 named-method rows and the lista omnia/quilibet predicate
+# twins. These compiler-owned names remain canonical in every reader pack;
+# glyphs are not method aliases.
+[intrinsics]
+appende = "appende"
+decapita = "decapita"
+detrahe = "detrahe"
+longitudo = "longitudo"
+omnia = "omnia"
+quilibet = "quilibet"

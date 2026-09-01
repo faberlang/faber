@@ -1,6 +1,6 @@
 //! Compressed reader-locale packs carried in the `faber` binary.
 //!
-//! Build.rs gzips `stdlib/locale/<id>/pack.toml` into OUT_DIR. This module
+//! Build.rs gzips `locale/<id>/pack.toml` into OUT_DIR. This module
 //! embeds those artifacts and decompresses **only** the selected locale
 //! before parsing with [`LocalePack::from_toml_str`]. Unused locales stay
 //! compressed.

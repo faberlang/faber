@@ -157,7 +157,7 @@ fn canonical_reemits_schema_decl() {
     let session = crate::driver::Session::new(
         crate::driver::Config::default()
             .with_resolved_locale_pack(pack.clone())
-            .with_dev_stdlib(),
+            .with_dev_locale_root(),
     );
     let result = crate::codegen::faber::reemit_faber(&session, &pack, "schema_test.fab", PERSONA_BREVIS);
     assert!(result.success(), "canonical emit failed: {:?}", result.diagnostics);

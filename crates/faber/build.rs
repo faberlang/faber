@@ -1,6 +1,6 @@
-//! Compress `stdlib/locale/<id>/pack.toml` into `OUT_DIR` gzip artifacts.
+//! Compress `locale/<id>/pack.toml` into `OUT_DIR` gzip artifacts.
 //!
-//! The eight reader packs are the authoring source of truth. The `faber`
+//! The eight language packs are the authoring source of truth. The `faber`
 //! binary embeds the compressed bytes and decompresses only the selected
 //! locale at runtime.
 
@@ -16,7 +16,7 @@ const LOCALES: &[&str] = &["ar", "en", "hi", "la", "th-TH", "vi", "zh-Hans", "zh
 fn main() {
     let manifest_dir = PathBuf::from(env::var("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR"));
     let out_dir = PathBuf::from(env::var("OUT_DIR").expect("OUT_DIR"));
-    let locale_root = manifest_dir.join("../../stdlib/locale");
+    let locale_root = manifest_dir.join("../../locale");
     let artifact_dir = out_dir.join("locale");
     fs::create_dir_all(&artifact_dir).unwrap_or_else(|err| {
         panic!("create {}: {err}", artifact_dir.display());

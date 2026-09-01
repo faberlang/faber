@@ -216,7 +216,7 @@ fn run_round_trip(fixture_path: &str, session: &Session, surface: &KeywordSurfac
 /// F23: Swift excluded from library-import (import emission not yet supported).
 #[test]
 fn hir_artifact_round_trip_library_import() {
-    let config = Config::default().with_dev_stdlib();
+    let config = Config::default().with_dev_locale_root();
     let session = Session::new(config);
     let pack = latin_locale_pack();
     let surface = KeywordSurface::new(&pack);
@@ -236,7 +236,7 @@ fn hir_artifact_round_trip_library_import() {
 /// F23: Swift excluded from generics (Param type not yet supported).
 #[test]
 fn hir_artifact_round_trip_all() {
-    let config = Config::default().with_dev_stdlib();
+    let config = Config::default().with_dev_locale_root();
     let session = Session::new(config);
     let pack = latin_locale_pack();
     let surface = KeywordSurface::new(&pack);
@@ -284,7 +284,7 @@ fn structural_end_count_parity_across_splicing_paths() {
         }
     }
 
-    let config = Config::default().with_dev_stdlib();
+    let config = Config::default().with_dev_locale_root();
     let session = Session::new(config);
 
     // Exercises the three splicing paths: fac…dum wrap, cura scope, proba body.

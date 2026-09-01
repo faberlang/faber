@@ -550,7 +550,7 @@ fn english_pack_resolves_real_triga_and_norma_library_surfaces() {
         None,
     )
     .expect("load installed English library locale");
-    let config = config.with_stdlib(dev_norma_library_home());
+    let config = config.with_library_home(dev_norma_library_home());
     let en_pack = config
         .locale_pack
         .as_ref()
@@ -561,6 +561,10 @@ fn english_pack_resolves_real_triga_and_norma_library_surfaces() {
             .keys()
             .all(|identity| identity.package.as_deref() != Some("triga")),
         "ruling 80b59a6c(a): en pack must have zero triga library_members"
+    );
+    assert!(
+        en_pack.library_members.is_empty(),
+        "language packs must not embed library members"
     );
     let package =
         analyze_with_faber_seams(&config, &entry).expect("analyze ruled external library surfaces");
@@ -629,10 +633,10 @@ fn latin_norma_consumer_keeps_canonical_surface_compatibility() {
     // registry-direct Latin authority — mirroring the R3 conversio-assign
     // precedent (Latin sources declare la identity, they are not en-migrated).
     let la_pack_path =
-        PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../stdlib/locale/la/pack.toml");
+        radix::module::locale::workspace_locale_pack_path("la");
     let la_pack = LocalePack::from_toml_path(la_pack_path).expect("load la locale pack");
     let config = Config::default()
-        .with_stdlib(dev_norma_library_home())
+        .with_library_home(dev_norma_library_home())
         .with_locale_pack(la_pack);
     let package = analyze_with_faber_seams(&config, &entry)
         .expect("analyze Latin Norma compatibility consumer");
@@ -921,7 +925,7 @@ fn loaded_package_library_const_data_member_runs() {
     let entry = write_library_const_package(&dir);
     // The package-MIR link phase resolves library imports through the config
     // library home; the fixture library lives under `libhome/constlib/src`.
-    let config = Config::default().with_stdlib(dir.join("libhome"));
+    let config = Config::default().with_library_home(dir.join("libhome"));
 
     // U1 done_when (2): a linked-library const data member links and executes
     // through the direct package-MIR path.
@@ -984,7 +988,7 @@ kind = "bin"
 fn loaded_package_library_import_unit_parity() {
     let dir = test_temp_dir("fhir-library-parity");
     let entry = write_library_package(&dir, true);
-    let config = Config::default().with_stdlib(dev_norma_library_home());
+    let config = Config::default().with_library_home(dev_norma_library_home());
 
     let direct = analyze_with_faber_seams(&config, &entry).expect("direct analysis with norma");
     assert!(
@@ -1033,7 +1037,7 @@ fn loaded_package_library_import_unit_parity() {
 fn loaded_package_undeclared_library_import_fails_before_codegen() {
     let dir = test_temp_dir("fhir-undeclared");
     let entry = write_library_package(&dir, false);
-    let config = Config::default().with_stdlib(dev_norma_library_home());
+    let config = Config::default().with_library_home(dev_norma_library_home());
 
     // Analysis succeeds (norma resolves via the dev library home) and the
     // envelope builds, but the manifest declares no dependency record for

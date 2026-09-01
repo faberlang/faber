@@ -149,7 +149,7 @@ main {
 /// Mirror `faber test`: isolate the proba root's local import closure, name it
 /// the package entry, and run every proba test item through the linked runner.
 fn run_closure_env_package_tests(package_root: &Path, stdlib_home: &Path) -> Vec<String> {
-    let config = Config::default().with_stdlib(stdlib_home.to_path_buf());
+    let config = Config::default().with_library_home(stdlib_home.to_path_buf());
     let mut package = crate::analyze::analyze_package_for_tests(
         &config,
         package_root,

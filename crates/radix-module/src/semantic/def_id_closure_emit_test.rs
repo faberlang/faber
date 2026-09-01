@@ -11,7 +11,7 @@ fn rust_locale_pack_type_alias_def_reaches_emit_table() {
     };
     use rustc_hash::{FxHashMap, FxHashSet};
 
-    let pack_path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../stdlib/locale/th-TH/pack.toml");
+    let pack_path = crate::locale::workspace_locale_pack_path("th-TH");
     let pack = crate::locale::LocalePack::from_toml_path(&pack_path).expect("installed th-TH pack should load");
     let source = "ฟังก์ชัน ก(จำนวน n) → จำนวน {\n  คืน n\n}\n";
     let lex = crate::lexer::lex_with_locale_pack(source, &pack);

@@ -88,7 +88,7 @@ fn nvvm_emit_produces_exactly_one_entry_row_for_the_pair() {
     let session = Session::new(
         Config::default()
             .with_target(Target::MirLlvm)
-            .with_dev_stdlib()
+            .with_dev_locale_root()
             .with_nvvm_device_module(),
     );
     let result = compile(&session, "entry-pair.fab", PUBLIC_PRIVATE_PAIR, ModuleCompileRequest::default());

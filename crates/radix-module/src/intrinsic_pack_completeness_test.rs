@@ -1,6 +1,6 @@
 //! Completeness test for the en-locale intrinsic catalog (L2).
 //!
-//! Proves that `stdlib/locale/en/pack.toml` maps **every** canonical
+//! Proves that `locale/en/pack.toml` maps **every** canonical
 //! intrinsic name in the compiler registry (`INTRINSICS`) to an English
 //! surface spelling, pins the four named example mappings from the delivery,
 //! and proves that every installed reader pack exposes the queue/stack method
@@ -13,7 +13,7 @@
 use super::LocalePack;
 use crate::intrinsics::{INTRINSICS, IntrinsicReceiver};
 use std::collections::BTreeSet;
-use std::path::PathBuf;
+
 
 /// Load a pack's **owned** rows from the raw file (no `inherits` merge).
 ///
@@ -21,8 +21,7 @@ use std::path::PathBuf;
 /// vacuously for rows that belong to the parent. The completeness gate is
 /// about the rows the en pack itself owns.
 fn owned_installed_pack(locale: &str) -> LocalePack {
-    let mut path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-    path.push(format!("../../stdlib/locale/{locale}/pack.toml"));
+    let path = crate::locale::workspace_locale_pack_path(&locale);
     let source = std::fs::read_to_string(&path).unwrap_or_else(|err| panic!("read installed {locale} pack: {err:?}"));
     LocalePack::from_toml_str(&source)
         .unwrap_or_else(|err| panic!("installed {locale} pack should parse owned rows: {err:?}"))

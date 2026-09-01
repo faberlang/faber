@@ -224,7 +224,7 @@ fn census_corpus() -> TreeCensus {
     let session = Session::new(
         Config::default()
             .with_target(Target::HirRust)
-            .with_dev_stdlib(),
+            .with_dev_locale_root(),
     );
     for (rel, file) in fab_files(&corpus_root()) {
         census.files_attempted += 1;
@@ -254,16 +254,13 @@ fn census_corpus() -> TreeCensus {
 
 /// Dev-tree reader locale pack for the library cache seam (mirrors
 /// `radix-program` `test_locale_pack`: every norma/gradus module declares its
-/// locale in frontmatter, and the loader loads it from `stdlib/locale`).
+/// locale in frontmatter, and the loader loads it from `locale/`).
 fn dev_locale_pack(
     _input: &Path,
     locale: Option<&str>,
 ) -> Result<Option<radix::module::locale::LocalePack>, Box<radix::diagnostics::Diagnostic>> {
     let locale = locale.unwrap_or("en");
-    let path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("../../stdlib/locale")
-        .join(locale)
-        .join("pack.toml");
+    let path = radix_semantic::locale::workspace_locale_pack_path(locale);
     let pack = radix::module::locale::LocalePack::from_toml_path(path).map_err(|err| {
         Box::new(radix::diagnostics::Diagnostic::error(format!(
             "failed to load reader locale '{locale}' pack: {err}"

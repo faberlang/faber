@@ -1,0 +1,3441 @@
+[pack]
+id = "en"
+schema_version = 1
+
+[keywords]
+# Declarations
+discretio = "union"
+fixum = "const"
+functio = "fn"
+genus = "class"
+implendum = "interface"
+importa = "import"
+modulus = "uint"
+ordo = "enum"
+sit = "let"
+typus = "type"
+schema = "schema"
+columna = "column"
+varia = "var"
+abstractus = "abstract"
+ceteri = "rest"
+curata = "allocator"
+errata = "errors"
+exitus = "exit"
+generis = "static"
+iacit = "throws"
+immutata = "readonly"
+interna = "internal"
+magnitudo = "size"
+nexum = "nexum"
+iuncta = "tuple"
+optiones = "options"
+prae = "prae"
+praefixum = "comptime"
+privata = "private"
+protecta = "protected"
+publica = "public"
+sponte = "optional"
+# Control flow
+casu = "case"
+ceterum = "default"
+custodi = "guard"
+discerne = "match"
+dum = "while"
+elige = "switch"
+ergo = "then"
+fac = "do"
+itera = "for"
+apud = "at"
+secus = "else"
+si = "if"
+sic = "yields"
+sin = "elif"
+perge = "continue"
+redde = "return"
+rumpe = "break"
+tacet = "pass"
+# Error handling
+adfirma = "assert"
+cape = "catch"
+capta = "trap"
+cede = "yield"
+iace = "throw"
+mori = "panic"
+requirit = "require"
+reice = "reject"
+# Values and logic
+clausura = "lambda"
+libera = "free"
+falsum = "false"
+nihil = "null"
+verum = "true"
+nonnumerus = "nan"
+aut = "or"
+est = "is"
+et = "and"
+non = "not"
+vel = "coalesce"
+ego = "self"
+# OOP
+finge = "variant"
+implet = "implements"
+sub = "extends"
+# IO and diagnostics
+mone = "warn"
+nota = "print"
+scribe = "write"
+vide = "debug"
+# Entry and async
+argumenta = "args"
+cura = "with"
+incipiet = "async_main"
+incipit = "main"
+ad = "call"
+# Morphology-driven async/stream surface
+fiet = "async"
+fiunt = "generator"
+fient = "async_generator"
+figendum = "await_const"
+variandum = "await_var"
+reddet = "return_await"
+tacebit = "await"
+# Imports and modules
+de = "ref"
+ex = "from"
+in = "mut"
+own = "own"
+copy = "copy"
+lege = "read"
+lineam = "line"
+omnia = "all"
+scriptum = "format"
+sparge = "spread"
+ut = "as"
+# Range and iteration
+ante = "before"
+inter = "between"
+intra = "within"
+per = "step"
+ab = "range"
+usque = "until"
+# Testing
+erratur = "expect_failure"
+fragilis = "flaky"
+futurum = "todo"
+metior = "bench"
+omitte = "skip"
+postpara = "teardown"
+postparabit = "async_teardown"
+praepara = "setup"
+praeparabit = "async_setup"
+proba = "test"
+probandum = "describe"
+repete = "repeat"
+solum = "only"
+solum_in = "only_in"
+tag = "tag"
+temporis = "timeout"
+# Legacy predicates
+negativum = "negative"
+nonnihil = "some"
+nonnulla = "nonnulla"
+nulla = "none"
+positivum = "positive"
+# Annotation families (wave 1 — see docs/factory/annotation-locale)
+# Collision policy: fiet already owns "async"; fiunt owns "generator".
+cli = "cli"
+commune = "shared"
+cursor = "cursor"
+futura = "future"
+imperium = "command"
+operandus = "operand"
+optio = "option"
+conversio = "conversion"
+nucleum = "kernel"
+vertex = "vertex"
+fragment = "fragment"
+nondum = "unstable"
+verte = "rename"
+nomen = "name"
+radix = "radix"
+brevis = "short"
+descriptio = "description"
+longum = "long"
+lane = "lane"
+ubique = "global"
+# Empty-collection expression marker (contextual, tokenless).
+# en accepts only `empty`; the Latin spelling is not an alias.
+vacua = "empty"
+primus_quem = "primus_quem"
+ubi = "ubi"
+# Sum-reduce expression surface.
+summa = "sum"
+filum = "thread"
+maxima = "max"
+minima = "min"
+
+[types]
+ascii = "ascii"
+textus = "string"
+numerus = "int"
+modulus = "mod_ty"
+fractus = "float"
+bivalens = "bool"
+nihil = "null_ty"
+vacuum = "void"
+numquam = "never"
+ignotum = "unknown"
+octeti = "bytes"
+regex = "regex"
+json = "json"
+valor = "value"
+instans = "instant"
+objectum = "object"
+quidlibet = "any"
+lista = "list"
+# Proposed bounded forms (not shipped): lista<T, N>, textus<N>, ascii<N>, octeti<N>.
+tabula = "map"
+copia = "set"
+promissum = "promise"
+cursor = "iterator"
+queue = "queue"
+stack = "stack"
+# Tensor family: English keeps the Latin loanwords (D4) but owns the rows
+# explicitly — no inherits = "la" substitute.
+tensor = "tensor"
+vector = "vector"
+matrix = "matrix"
+sparsa = "sparsa"
+atomic = "atomic"
+intervallum = "intervallum"
+# Census relational-view type names (S2-U5): `filter` is the role-separated
+# English surface for `filtrum` (design §7.3), distinct from the `filtrata`
+# method surface by syntactic position.
+filtrum = "filter"
+series = "series"
+census = "census"
+ratio = "record"
+
+[llm]
+system_prompt_snippet = "Write Faber code using LLM-optimized English keywords (fn, let, const, if, else, match, return, etc.) with invariant structural glyphs (←, →, ∴). Type-first declarations: fn greet(string msg) → string { return msg }"
+exemplars = ["./exemplars/salve-munde.en.fab"]
+
+# -----------------------------------------------------------------------------
+# [intrinsics] — canonical intrinsic name → English surface spelling (L2)
+#
+# Maps every promoted intrinsic in intrinsics/registry.rs (INTRINSICS) to an
+# en-locale surface spelling. One row per canonical faber_name; the row
+# applies to every receiver family that owns the name (a row like
+# `accipe = "get"` covers the Lista/Tabula/Textus/Sparsa/Tensor receivers).
+# A missing row would mean canonical-only spelling (identity); the en pack is
+# COMPLETE by construction — intrinsic_pack_completeness_test.rs iterates
+# INTRINSICS and fails on any missing row.
+#
+# Naming scheme: mutating operations (return vacuum) take the plain English
+# imperative (add, sort, reverse, append, shift_right); immutable
+# value-returning counterparts take the participle/functional form (added,
+# sorted, reversed, shifted_right). Identity rows (surface == canonical) are
+# used where the canonical spelling is already English (matmul, gather, gelu,
+# load, store, union, ...).
+#
+# Rows are grouped by receiver family for review; a shared canonical is
+# listed once, in the first family that owns it, and called out in the later
+# families' comments.
+# -----------------------------------------------------------------------------
+
+[intrinsics]
+# atomic (4) — canonical spellings are already English; identity rows.
+compare_exchange = "compare_exchange"
+exchange = "exchange"
+load = "load"
+store = "store"
+
+# lista (27)
+accipe = "get"
+addita = "added"
+appende = "append"
+# LSR-W0 argmax/argmin method twins — index or nihil on empty, never −1.
+argmaxima = "argmax"
+argminima = "argmin"
+continet = "contains"
+cumulata = "cumulate"
+decapita = "remove_first"
+filtrata = "filter"
+# `inversa` serves two owners: Lista (immutable reverse) and Matrix
+# (square-matrix inverse). "invert" reads naturally for both.
+inversa = "invert"
+inverte = "reverse"
+longitudo = "length"
+mappata = "map"
+omissa = "drop"
+omnia = "all"
+ordina = "sort"
+ordinata = "sorted"
+prima = "take"
+primus = "first"
+quilibet = "any"
+reducta = "reduce"
+detrahe = "remove_last"
+sectio = "slice"
+summa = "sum"
+ultima = "take_last"
+ultimus = "last"
+vacua = "is_empty"
+
+# tabula (8) — accipe / longitudo / vacua are shared with lista above.
+claves = "keys"
+dele = "delete"
+habet = "has"
+pone = "put"
+valores = "values"
+
+# copia (11) — dele / habet / longitudo / vacua shared above.
+adde = "add"
+differentia = "difference"
+intersectio = "intersection"
+subcopia = "is_subset"
+supercopia = "is_superset"
+symmetrica = "symmetric_difference"
+unio = "union"
+
+# ascii (1) — method surface; do not retarget [types] cursor = "iterator".
+cursor = "cursor"
+
+# textus (12) — accipe / continet / longitudo / sectio / vacua shared above.
+divide = "split"
+finis = "ends_with"
+initium = "starts_with"
+maiuscula = "uppercase"
+minuscula = "lowercase"
+muta = "replace"
+recide = "trim"
+
+# numeric (numerus + fractus) (33) — addita / adde shared with lista / copia.
+absolutum = "abs"
+alterna = "flip"
+alternata = "flipped"
+complementa = "complement"
+complementata = "complemented"
+coniuncta = "bit_and"
+coniunge = "bit_and_assign"
+disiuncta = "bit_or"
+disiunge = "bit_or_assign"
+dextra = "shift_right"
+dextrata = "shifted_right"
+divida = "divide"
+divisa = "divided"
+maior = "greater"
+maxime = "at_least"
+maximus = "maximum"
+minime = "at_most"
+minimus = "minimum"
+minor = "less"
+modula = "modulo_assign"
+modulata = "modulo"
+multiplica = "multiply"
+multiplicata = "multiplied"
+nega = "negate"
+negativa = "negated"
+potentia = "power"
+signum = "sign"
+sinistra = "shift_left"
+sinistrata = "shifted_left"
+subtrahe = "subtract"
+subtracta = "subtracted"
+
+# fractus-only (5)
+approximata = { canonical = "approx", aliases = ["approximata"] }
+pavimentum = "floor"
+rotunda = "round"
+tectum = "ceiling"
+trunca = "truncate"
+
+# sparsa (6) — accipe / longitudo shared with lista above.
+densata = "densify"
+magnitudines = "shape"
+nonnihil = "nonzero_count"
+ponde = "set"
+
+# tensor (31) — longitudo / magnitudines / accipe / addita / subtrahe /
+# multiplica / nega / summa / ponde / sectio shared with earlier families.
+forma = "reshape"
+addita_bias = "added_bias"
+divisio = "divide"
+matmul = "matmul"
+media = "mean"
+reple = "fill"
+crea = "create"
+strue = "from_flat"
+planata = "flatten"
+gather = "gather"
+rms_norm = "rms_norm"
+rope_norm = "rope_norm"
+gelu = "gelu"
+silu = "silu"
+activatio_relu = "relu"
+crux_entropia = "cross_entropy"
+activatio_softmax = "softmax"
+transpone = "transpose"
+laminatio = "layer_norm"
+materialize = "materialize"
+
+# matrix (7) — addita / subtrahe / multiplica / divida / matmul / inversa
+# shared with earlier families.
+applica = "apply"
+
+# vector (10) — addita / subtrahe / multiplica / divida / longitudo / crea
+# shared with earlier families.
+productum = "dot"
+transversum = "cross"
+normalizata = "normalize"
+swizzle = "swizzle"
+
+# intervallum (5) — continet / longitudo shared with lista above.
+coercere = "clamp"
+inter = "intersect"
+# Identity row even though `union` is also the en `discretio` keyword
+# surface: keywords lex as identifiers and the parser claims them by latin
+# identity in grammar slots, so a member call `interval.union(...)` parses.
+union = "union"
+
+# regex (1)
+consentit = "matches"
+
+# -----------------------------------------------------------------------------
+# [diagnostics.*] — materialized from la (S0-U3 flat-pack materialization).
+# en's effective diagnostics previously came from `inherits = "la"`; the flat
+# pack owns the canonical templates explicitly now. la stays byte-unchanged.
+# -----------------------------------------------------------------------------
+[diagnostics.UNRES001]
+message = "keyword '{keyword}' is not declared for reader locale '{pack}'"
+help = "use a keyword spelling declared in the reader pack for this grammar position"
+
+[diagnostics.UNRES002]
+message = "intrinsic '{intrinsic}' is not declared for reader locale '{pack}' on receiver family '{receiver}'"
+help = "use an intrinsic spelling declared in the reader pack for this receiver family"
+
+[diagnostics.UNRES003]
+message = "library member '{member}' is not declared for reader locale '{pack}' for identity '{identity}'"
+help = "use a member spelling declared in the reader pack for this library identity"
+
+[diagnostics.LOCALE002]
+message = "reader locale '{pack}' saw keyword-like spelling '{spelling}'"
+help = "use '{suggestion}' if you meant that keyword; '{spelling}' is a valid name as written"
+
+[diagnostics.LOCALE003]
+message = "unknown or invalid reader locale '{locale_id}' in frontmatter"
+help = "check the locale id is a valid reader locale directory name under the standard library reader path"
+
+[diagnostics.LEX001]
+message = "unterminated string literal"
+help = "close the string literal before the end of the line or file"
+
+[diagnostics.LEX001.issues.unterminated_ascii_literal]
+message = "unterminated ascii literal"
+help = "close the string literal before the end of the line or file"
+
+[diagnostics.LEX001.issues.newline_in_ascii_literal]
+message = "unterminated ascii literal (newline in literal)"
+help = "close the string literal before the end of the line or file"
+
+[diagnostics.LEX001.issues.unterminated_backtick_template_literal]
+message = "unterminated backtick template literal"
+help = "close the string literal before the end of the line or file"
+
+[diagnostics.LEX001.issues.unterminated_octeti_literal]
+message = "unterminated bytes literal"
+help = "close the string literal before the end of the line or file"
+
+[diagnostics.LEX001.issues.unterminated_string_literal]
+message = "unterminated string literal"
+help = "close the string literal before the end of the line or file"
+
+[diagnostics.LEX001.issues.newline_in_string_literal]
+message = "unterminated string literal (newline in string)"
+help = "close the string literal before the end of the line or file"
+
+[diagnostics.LEX001.issues.unterminated_guillemet_block_string_literal]
+message = "unterminated guillemet block string literal"
+help = "close the string literal before the end of the line or file"
+
+[diagnostics.LEX002]
+message = "invalid number literal"
+help = "check numeric separators and base prefixes"
+
+[diagnostics.LEX002.issues.invalid_hexadecimal_number]
+message = "invalid hexadecimal number"
+help = "check numeric separators and base prefixes"
+
+[diagnostics.LEX002.issues.invalid_binary_number]
+message = "invalid binary number"
+help = "check numeric separators and base prefixes"
+
+[diagnostics.LEX002.issues.invalid_octal_number]
+message = "invalid octal number"
+help = "check numeric separators and base prefixes"
+
+[diagnostics.LEX002.issues.invalid_floating_point_number]
+message = "invalid floating-point number"
+help = "check numeric separators and base prefixes"
+
+[diagnostics.LEX002.issues.invalid_integer]
+message = "invalid integer"
+help = "check numeric separators and base prefixes"
+
+[diagnostics.LEX003]
+message = "invalid escape sequence"
+help = "use a supported escape sequence or escape the backslash"
+
+[diagnostics.LEX004]
+message = "unexpected character"
+help = "remove the character or escape it if it should be literal"
+
+[diagnostics.LEX004.issues.unexpected_character]
+message = "unexpected character: {char}"
+help = "remove the character or escape it if it should be literal"
+
+[diagnostics.LEX005]
+message = "removed section directive"
+help = "put file metadata in +++ TOML frontmatter on line 1 instead of line-start section directives"
+
+[diagnostics.LEX005.issues.removed_section_directive]
+message = "file-scope § directives were removed; use +++ frontmatter"
+help = "put file metadata in +++ TOML frontmatter on line 1 instead of line-start § directives"
+
+[diagnostics.LEX006]
+message = "invalid comment syntax"
+help = "prefix comments with # instead of // or /* */"
+
+[diagnostics.LEX006.issues.c_style_line_comment]
+message = "C-style // comments are not valid in Faber; use # for line comments"
+help = "prefix comments with # instead of // or /* */"
+
+[diagnostics.LEX006.issues.c_style_block_comment]
+message = "C-style /* */ block comments are not valid in Faber; use # for line comments"
+help = "prefix comments with # instead of // or /* */"
+
+[diagnostics.LEX006.issues.unterminated_c_style_block_comment]
+message = "unterminated C-style block comment; Faber uses # for line comments"
+help = "prefix comments with # instead of // or /* */"
+
+[diagnostics.LEX007]
+message = "inline comments are not accepted"
+help = "put the # comment on its own line above the code it documents"
+
+[diagnostics.LEX007.issues.inline_hash_after_code]
+message = "# comments must start a line; move this comment above the code"
+help = "put the # comment on its own line above the code it documents"
+
+[diagnostics.PARSE000]
+message = "lexer error while parsing"
+help = "fix the lexer error first; parsing continues from clean tokens"
+
+[diagnostics.PARSE001]
+message = "expected token"
+help = "ensure the expected token is present in this position"
+
+[diagnostics.PARSE001.issues.annotation_name]
+message = "expected annotation name"
+help = "add an annotation name after @"
+
+[diagnostics.PARSE001.issues.secus_si_else_if]
+message = "use '{sin}' for else-if"
+help = "replace secus {si} with {sin}"
+
+[diagnostics.PARSE001.issues.itera_mode]
+message = "expected {expected}"
+help = "choose one iteration mode before the iterable expression"
+
+[diagnostics.PARSE001.issues.allocator_kind]
+message = "expected {expected}"
+help = "use \"arena\" or \"page\" as the allocator kind"
+
+[diagnostics.PARSE001.issues.mutability_marker]
+message = "expected {expected}"
+help = "add const or var before the binding name"
+
+[diagnostics.PARSE001.issues.itera_de_requires_fixum]
+message = "itera de bindings are always const; use {expected}"
+help = "de binds an index or key, not a mutable element; use the const form"
+
+[diagnostics.PARSE001.issues.duplicate_rest_pattern]
+message = "rest pattern already specified"
+help = "keep only one '{keyword}' rest binding"
+
+[diagnostics.PARSE001.issues.sit_identifier_binding]
+message = "'{keyword}' binds one identifier directly; use '{keyword}' name ← expr"
+help = "write '{keyword}' name ← expr or use const for typed/destructured bindings"
+
+[diagnostics.PARSE001.issues.sit_no_destructuring]
+message = "sit does not support destructuring patterns"
+help = "use const with a destructuring pattern"
+
+[diagnostics.PARSE001.issues.test_case_or_setup]
+message = "expected test case or setup"
+help = "start the body item with '{proba}', '{probandum}', or '{setup}'"
+
+[diagnostics.PARSE001.issues.test_modifier_integer]
+message = "expected integer after '{modifier}'"
+help = "put an integer literal after '{modifier}'"
+
+[diagnostics.PARSE001.issues.tensor_figura_after_element]
+message = "tensor requires a Figura shape after element type"
+help = "add a comma and Figura shape, such as tensor<T, []>"
+
+[diagnostics.PARSE001.issues.sparsa_figura_after_element]
+message = "sparsa requires a Figura shape after element type"
+help = "add a comma and Figura shape, such as sparsa<T, []>"
+
+[diagnostics.PARSE001.issues.vector_width_after_element]
+message = "vector requires a width after element type"
+help = "add a comma and vector width, such as vector<T, [4]>"
+
+[diagnostics.PARSE001.issues.matrix_figura_after_element]
+message = "matrix requires a two-dimensional Figura shape after element type"
+help = "add a comma and shape, such as matrix<T, [4, 4]>"
+
+[diagnostics.PARSE001.issues.atomic_single_element]
+message = "atomic accepts exactly one element type"
+help = "remove the extra type parameter; use atomic<T>"
+
+[diagnostics.PARSE001.issues.retired_type_call_constructor]
+message = "type-call constructors are not Faber syntax"
+help = "use value ↦ Type or a named library constructor"
+
+[diagnostics.PARSE001.issues.retired_prefix_predicate]
+message = "{predicate} is no longer prefix predicate syntax"
+help = "rewrite with {replacement}"
+
+[diagnostics.PARSE001.issues.equality_non_missing_est]
+message = "expected '{est}' after '{non}' in equality expression"
+help = "write identity negation as non est"
+
+[diagnostics.PARSE001.issues.est_non_spelling]
+message = "'est non' is not the identity negation spelling"
+help = "use non est for identity negation"
+
+[diagnostics.PARSE001.issues.closure_body_start]
+message = "expected ':' or block body after closure parameters"
+help = "add : for an expression body or a block body"
+
+[diagnostics.PARSE001.issues.ad_ascii_route]
+message = "expected ascii literal route after '{ad}'"
+help = "write the route as an ASCII literal after ad"
+
+[diagnostics.PARSE001.issues.json_quoted_key]
+message = "JSON keys must be quoted strings; use \"name\": value"
+help = "quote JSON object keys"
+
+[diagnostics.PARSE001.issues.json_string_key]
+message = "expected JSON string key"
+help = "start the JSON key with a string literal"
+
+[diagnostics.PARSE001.issues.field_value_separator]
+message = "expected '='"
+help = "use = between field name and value"
+
+[diagnostics.PARSE001.issues.call_type_args_start]
+message = "expected '<'"
+help = "start call-site type arguments with <"
+
+[diagnostics.PARSE001.issues.gradient_empty_selector_list]
+message = "the gradient selector list after ∇ must name at least one primal call argument"
+help = "name the primal call arguments whose adjoints you want, e.g. loss(x, y) ∇ [x]"
+
+[diagnostics.PARSE001.issues.requirit_iace]
+message = "expected '{iace}' after the {requirit} condition"
+help = "write {requirit} cond {iace} err"
+
+[diagnostics.PARSE001.issues.reice_iace]
+message = "expected '{iace}' after the {reice} condition"
+help = "write {reice} cond {iace} err"
+
+[diagnostics.PARSE001.issues.requirit_else_rejected]
+message = "'{secus}' is not the particle on {requirit}"
+help = "use '{iace}' for the recoverable payload"
+
+[diagnostics.PARSE001.issues.reice_else_rejected]
+message = "'{secus}' is not the particle on {reice}"
+help = "use '{iace}' for the recoverable payload"
+
+[diagnostics.PARSE001.issues.adfirma_else_rejected]
+message = "'{secus}' is not the particle on {adfirma}"
+help = "use '{mori}' for the optional panic message"
+
+[diagnostics.PARSE002]
+message = "unexpected token"
+help = "remove or reposition the unexpected token"
+
+[diagnostics.PARSE002.issues.json_unknown_identifier_value]
+message = "JSON identifiers are not valid JSON values"
+help = "use true, false, null, a string, a number, an object, or an array"
+
+[diagnostics.PARSE002.issues.json_faber_keyword_value]
+message = "Faber keywords are not valid JSON values"
+help = "use true, false, null, a string, a number, an object, or an array"
+
+[diagnostics.PARSE002.issues.expected_json_value]
+message = "expected JSON value"
+help = "provide a JSON value"
+
+[diagnostics.PARSE002.issues.json_integer_underflow]
+message = "JSON integer literal underflows int"
+help = "use an int value within range"
+
+[diagnostics.PARSE002.issues.expected_json_number_after_minus]
+message = "expected number after '-' in JSON"
+help = "put a number after '-' in JSON"
+
+[diagnostics.PARSE002.issues.conversio_assign_requires_concrete_type]
+message = "conversion-directed assignment '↤' requires a concrete destination type"
+help = "write a concrete type for the binding, e.g. 'const int x ↤ value'"
+
+[diagnostics.PARSE002.issues.conversio_recovery_on_assign]
+message = "'⇥' inline recovery is legal only on conversion-directed assignment '↤'"
+help = "use '↤' for the assignment, or move the recovery expression"
+
+[diagnostics.PARSE002.issues.conversio_assign_await_unsupported]
+message = "'↤' is not supported on awaited bindings"
+help = "keep '←' for 'figendum'/'variandum' awaited bindings"
+
+[diagnostics.PARSE010]
+message = "invalid declaration"
+help = "check declaration keywords and required parts"
+
+[diagnostics.PARSE010.issues.schema_inheritance]
+message = "a schema cannot attach sub, implet, or an interface"
+help = "keep schemas as plain relational headings"
+
+[diagnostics.PARSE010.issues.schema_method]
+message = "a schema cannot declare a method"
+help = "declare the method on a class instead"
+
+[diagnostics.PARSE011]
+message = "expected function name after '{functio}'"
+help = "add a function name after '{functio}'"
+
+[diagnostics.PARSE012]
+message = "expected function body for '{functio}' declaration"
+help = "add a '{block}' to the function declaration"
+
+[diagnostics.PARSE013]
+message = "expected class name after '{genus}'"
+help = "add a class name after '{genus}'"
+
+[diagnostics.PARSE014]
+message = "expected class body after '{genus}' declaration"
+help = "add a block after the '{genus}' declaration header"
+
+[diagnostics.PARSE015]
+message = "invalid parameter"
+help = "check parameter syntax and order"
+
+[diagnostics.PARSE015.issues.removed_fixus]
+message = "{keyword} was removed; use {optional_marker} for optional slots and {immutable_marker} for deferred immutable locals"
+help = "mark optional parameter or field slots with {optional_marker} after the name"
+
+[diagnostics.PARSE015.issues.parameter_access_modifier_pair]
+message = "parameter carries both a mode prefix and a type marker; use one"
+help = "write either the parameter mode prefix or the type-position marker, not both"
+
+[diagnostics.PARSE016]
+message = "invalid type parameter"
+help = "check type parameter list for commas and identifiers"
+
+[diagnostics.PARSE016.issues.removed_prae_typus]
+message = "'{keyword}' was removed; declare generics with angle brackets: {replacement}"
+help = "write generic parameters before the parameter list, for example {replacement}"
+
+[diagnostics.PARSE016.issues.type_param_after_magnitudo]
+message = "type parameters must precede {size_param} parameters in generic lists"
+help = "move type parameters before {size_param} parameters"
+
+[diagnostics.PARSE017]
+message = "invalid modifier"
+help = "move or remove the modifier"
+
+[diagnostics.PARSE018]
+message = "invalid annotation"
+help = "add an annotation name after '@'"
+
+[diagnostics.PARSE018.issues.invalid_modifier]
+message = "invalid @ {annotation} modifier"
+help = "use a supported @ {annotation} modifier"
+
+[diagnostics.PARSE018.issues.empty_radix_typus_domain]
+message = "@ radix typus domain requires at least one allowed type"
+help = "list at least one allowed type after in"
+
+[diagnostics.PARSE018.issues.expected_annotation_ident]
+message = "expected {context}"
+help = "add '{expected}' in this annotation position"
+
+[diagnostics.PARSE018.issues.unexpected_annotation_token]
+message = "unexpected token after {context}"
+help = "remove the trailing annotation token"
+
+[diagnostics.PARSE018.issues.missing_nucleum_lane_value]
+message = "@ nucleum lane requires a string value"
+help = "use `@ nucleum lane \"position\"` or braced `lane = \"position\"`"
+
+[diagnostics.PARSE018.issues.non_string_nucleum_lane_value]
+message = "@ nucleum lane value must be a string literal"
+help = "use `@ nucleum lane \"position\"` or braced `lane = \"position\"`"
+
+[diagnostics.PARSE018.issues.wrong_locale_annotation]
+message = "annotation `@ {annotation}` is not declared on this reader surface"
+help = "use `@ {expected}` for this file's reader locale"
+
+[diagnostics.PARSE019]
+message = "duplicate modifier"
+help = "remove the duplicate modifier"
+
+[diagnostics.PARSE020]
+message = "invalid statement"
+help = "use a valid statement form"
+
+[diagnostics.PARSE020.issues.ad_expression_only]
+message = "ad is only valid in expression position"
+help = "use {replacement}"
+
+[diagnostics.PARSE021]
+message = "missing condition"
+help = "add a condition expression"
+
+[diagnostics.PARSE022]
+message = "expected '{block}' block or '{ergo}' body"
+help = "add '{block}' or introduce a single statement with '{ergo}'"
+
+[diagnostics.PARSE026]
+message = "∴ is only for compact clausurae; use {ergo} for a single-statement body"
+help = "use '{ergo}' for a single-statement body, or wrap the body in braces"
+
+[diagnostics.PARSE027]
+message = "{ergo} is only for single-statement bodies; use ∴ for a compact clausura"
+help = "use '∴' between a closure signature and its body"
+
+[diagnostics.PARSE023]
+message = "expected pattern such as '{wildcard}' or {identifier}"
+help = "use '{wildcard}', a literal, or an {identifier} pattern"
+
+[diagnostics.PARSE024]
+message = "expected '{casu}' arm or '{ceterum}' default"
+help = "start the dispatch arm with '{casu}' or close with '{ceterum}'"
+
+[diagnostics.PARSE025]
+message = "invalid case value"
+help = "use a valid case expression"
+
+[diagnostics.PARSE030]
+message = "invalid expression"
+help = "check expression syntax"
+
+[diagnostics.PARSE030.issues.conversio_recovery_uses_vel]
+message = "use ⇥ for conversio recovery"
+help = "use ⇥; vel is nullish coalescing only"
+
+[diagnostics.PARSE030.issues.expected_expression]
+message = "expected expression"
+help = "provide a valid expression in this position"
+
+[diagnostics.PARSE030.issues.expression_ad_block]
+message = "expression-form ad must not have a block"
+help = "use ad 'route' (opener) ↦ T without a block"
+
+[diagnostics.PARSE030.issues.closure_block_body]
+message = "closure block body must use '{fac}'"
+help = "write the compact closure body after ∴ as {fac_body}"
+
+[diagnostics.PARSE030.issues.closure_fac_body_dum]
+message = "closure {fac} body cannot use '{dum}'"
+help = "remove {dum} from closure {fac} bodies"
+
+[diagnostics.PARSE031]
+message = "invalid literal"
+help = "check the literal form"
+
+[diagnostics.PARSE032]
+message = "invalid operator"
+help = "check operator placement and operands"
+
+[diagnostics.PARSE033]
+message = "unterminated group"
+help = "close the grouping delimiter"
+
+[diagnostics.PARSE034]
+message = "invalid call argument"
+help = "check call argument syntax"
+
+[diagnostics.PARSE035]
+message = "invalid member access"
+help = "check member access syntax"
+
+[diagnostics.PARSE036]
+message = "invalid assignment target"
+help = "assign only to valid lvalues"
+
+[diagnostics.PARSE040]
+message = "invalid type"
+help = "check type syntax"
+
+[diagnostics.PARSE040.issues.expected_type_name]
+message = "expected type name"
+help = "start the type with an identifier, _, or function type"
+
+[diagnostics.PARSE040.issues.postfix_array_syntax]
+message = "postfix T[] syntax is removed"
+help = "use {lista}<T>"
+
+[diagnostics.PARSE040.issues.lista_sugar_bracket_form]
+message = "{lista} sugar has no bracket form"
+help = "use tensor sugar for shaped buffers"
+
+[diagnostics.PARSE040.issues.matrix_sugar_missing_shape]
+message = "matrix sugar requires a two-dimensional bracket shape"
+help = "write matrix sugar as mf32[4, 4]"
+
+[diagnostics.PARSE040.issues.lista_sugar_angle_bracket_form]
+message = "{lista} sugar is bare l+width only"
+help = "use {lista}<...> for angle-bracket form"
+
+[diagnostics.PARSE040.issues.vector_sugar_angle_bracket_form]
+message = "vector sugar uses bracket width"
+help = "write the width with vector sugar brackets"
+
+[diagnostics.PARSE040.issues.type_sugar_angle_bracket_form]
+message = "{sugar} sugar uses bracket Figura"
+help = "write the shape with {sugar} width sugar brackets"
+
+[diagnostics.PARSE040.issues.invalid_figura_index]
+message = "index literal must be a natural number"
+help = "use a non-negative shape index"
+
+[diagnostics.PARSE040.issues.iuncta_arity_exceeded]
+message = "iuncta arity {count} exceeds maximum of 16; use a class instead"
+help = "reduce the iuncta arity to 16 or fewer, or declare a class for more fields"
+
+[diagnostics.PARSE040.issues.wrong_locale_type]
+message = "type '{type}' is not declared on this reader surface"
+help = "use the type spelling declared by this reader locale"
+
+[diagnostics.PARSE041]
+message = "invalid type annotation"
+help = "check type annotation form"
+
+[diagnostics.PARSE042]
+message = "unterminated type parameters"
+help = "close the type parameter list with '>'"
+
+[diagnostics.PARSE050]
+message = "invalid import"
+help = "check import syntax"
+
+[diagnostics.PARSE050.issues.unknown_import_field]
+message = "unknown import field"
+help = "use ex, visibilitas, nomen, ut, or omnia"
+
+[diagnostics.PARSE050.issues.missing_import_source]
+message = "import record requires an ex source"
+help = "add ex = \"path\" to the import record"
+
+[diagnostics.PARSE050.issues.mixed_wildcard_and_named_import]
+message = "wildcard import cannot also name a binding"
+help = "use omnia by itself, or use nomen/ut for a named import"
+
+[diagnostics.PARSE050.issues.invalid_import_visibility]
+message = "invalid import visibility"
+help = "use publica"
+
+[diagnostics.PARSE050.issues.import_privata_removed]
+message = "`privata` on imports was removed; imports do not re-export by default"
+help = "drop the marker, or use publica to re-export"
+
+[diagnostics.PARSE050.issues.import_name_inference_failed]
+message = "could not infer import name from {path}"
+help = "spell nomen or an explicit alias for {path}"
+
+[diagnostics.PARSE060]
+message = "comment is not in a legal attachment position"
+help = "place comments before a statement, declaration, or member; or immediately before a block's closing '}' or end of file"
+
+[diagnostics.SEM001]
+message = "undefined variable"
+help = "declare the variable before use{?suggestion|; did you mean |?}"
+
+[diagnostics.SEM001.issues.name_not_variant]
+message = "name does not refer to a variant"
+help = "declare the variable before use{?suggestion|; did you mean |?}"
+
+[diagnostics.SEM001.issues.unknown_identifier]
+message = "unknown identifier"
+help = "declare the variable before use{?suggestion|; did you mean |?}"
+
+[diagnostics.SEM001.issues.scribe_callee]
+message = "unknown identifier"
+help = "write `{spelling} <expr>` without parentheses for the output statement"
+
+[diagnostics.SEM001.issues.unknown_record_field]
+message = "unknown record field"
+help = "declare the variable before use{?suggestion|; did you mean |?}"
+
+[diagnostics.SEM001.issues.unknown_variant]
+message = "unknown variant"
+help = "declare the variable before use{?suggestion|; did you mean |?}"
+
+[diagnostics.SEM001.issues.unknown_variant_fields]
+message = "unknown variant fields"
+help = "declare the variable before use{?suggestion|; did you mean |?}"
+
+[diagnostics.SEM001.issues.variant_ambiguous]
+message = "variant name is ambiguous across in-scope unions"
+help = "qualify the variant with its union name (e.g. A.X)"
+
+[diagnostics.SEM002]
+message = "undefined type"
+help = "declare the type or import it"
+
+[diagnostics.SEM002.issues.figura_unknown_index]
+message = "unknown index parameter in Figura"
+help = "declare the type or import it"
+
+[diagnostics.SEM002.issues.float_width_on_numerus]
+message = "f16, f32, and f64 are float widths; use float<f16>, float<f32>, or float<f64>"
+help = "declare the type or import it"
+
+[diagnostics.SEM002.issues.integer_width_on_fractus]
+message = "integer width markers are int widths; use int<…>"
+help = "declare the type or import it"
+
+[diagnostics.SEM002.issues.invalid_precision_marker]
+message = "instant accepts only ms, us, or ns as a precision marker"
+help = "declare the type or import it"
+
+[diagnostics.SEM002.issues.invalid_fractus_width_marker]
+message = "float accepts only f16, f32, or f64"
+help = "declare the type or import it"
+
+[diagnostics.SEM002.issues.invalid_numerus_width_marker]
+message = "unknown width marker for int"
+help = "declare the type or import it"
+
+[diagnostics.SEM002.issues.invalid_width_marker]
+message = "unknown width marker for this family"
+help = "declare the type or import it"
+
+[diagnostics.SEM002.issues.name_not_type]
+message = "name does not refer to a type"
+help = "declare the type or import it"
+
+[diagnostics.SEM002.issues.precision_marker_params]
+message = "precision marker cannot accept parameters"
+help = "declare the type or import it"
+
+[diagnostics.SEM002.issues.precision_marker_shape]
+message = "precision marker must be a bare spelling such as ms or us"
+help = "declare the type or import it"
+
+[diagnostics.SEM002.issues.qualified_name_not_type]
+message = "qualified name does not refer to a type"
+help = "declare the type or import it"
+
+[diagnostics.SEM002.issues.qualified_type_not_exported]
+message = "qualified type is not exported by namespace"
+help = "declare the type or import it"
+
+[diagnostics.SEM002.issues.qualified_type_prefix_not_namespace]
+message = "qualified type prefix must name a namespace"
+help = "declare the type or import it"
+
+[diagnostics.SEM002.issues.schema_unknown_type]
+message = "column type names an unknown type"
+help = "declare the type or import it"
+
+[diagnostics.SEM002.issues.unknown_namespace]
+message = "unknown namespace"
+help = "declare the type or import it"
+
+[diagnostics.SEM002.issues.unknown_qualified_type]
+message = "unknown qualified type"
+help = "declare the type or import it"
+
+[diagnostics.SEM002.issues.unknown_struct]
+message = "unknown struct"
+help = "declare the type or import it"
+
+[diagnostics.SEM002.issues.unknown_type]
+message = "unknown type"
+help = "declare the type or import it"
+
+[diagnostics.SEM002.issues.width_marker_params]
+message = "width marker cannot accept parameters"
+help = "declare the type or import it"
+
+[diagnostics.SEM002.issues.width_marker_shape]
+message = "width marker must be a bare spelling such as i32 or u8"
+help = "declare the type or import it"
+
+[diagnostics.SEM003]
+message = "undefined function"
+help = "declare the function or import it"
+
+[diagnostics.SEM004]
+message = "undefined member"
+help = "check the member name and type"
+
+[diagnostics.SEM004.issues.duplicate_variant_field]
+message = "duplicate variant field"
+help = "provide each named variant field at most once"
+
+[diagnostics.SEM004.issues.missing_required_struct_field]
+message = "missing required struct field"
+help = "initialize every required struct field"
+
+[diagnostics.SEM004.issues.ratio_field_missing]
+message = "missing required ratio field"
+help = "initialize every required ratio field"
+
+[diagnostics.SEM004.issues.missing_variant_field_name]
+message = "missing variant field name"
+help = "name every variant argument when using named variant construction"
+
+[diagnostics.SEM004.issues.optional_receiver_requires_chain]
+message = "optional receiver requires optional chaining or non-null access"
+help = "use ?. for optional chaining or !. for non-null access"
+
+[diagnostics.SEM004.issues.struct_field_requires_value]
+message = "struct field requires value"
+help = "provide a value for the struct field"
+
+[diagnostics.SEM004.issues.unknown_field]
+message = "unknown field"
+help = "check the struct field name"
+
+[diagnostics.SEM004.issues.unknown_method]
+message = "unknown method"
+help = "check the receiver type and method name"
+
+[diagnostics.SEM004.issues.unknown_struct_field]
+message = "unknown struct field"
+help = "check the struct field name"
+
+[diagnostics.SEM004.issues.unknown_tuple_element_label]
+message = "unknown tuple element label"
+help = "use a label declared on the iuncta annotation, or index by position"
+
+[diagnostics.SEM004.issues.unknown_variant_field]
+message = "unknown variant field"
+help = "check the variant field name"
+
+[diagnostics.SEM004.issues.unknown_union_field]
+message = "unknown union field"
+help = "check the union's `@ commune` field name"
+
+[diagnostics.SEM004.issues.union_member_not_common]
+message = "union member '{member}' is not common; lacking in: {lacking}"
+help = "narrow the receiver (`est M` branch, `discerne`) to recover per-member access"
+
+[diagnostics.SEM005]
+message = "duplicate definition"
+help = "rename one of the definitions"
+
+[diagnostics.SEM005.issues.duplicate_definition]
+message = "duplicate definition"
+help = "rename one of the definitions"
+
+[diagnostics.SEM005.issues.inferred_import_name_collision]
+message = "inferred import name conflicts with an existing definition"
+help = "add an explicit import alias with `ut` so the imported binding has a unique name"
+
+[diagnostics.SEM005.issues.schema_duplicate_source]
+message = "two visible columns resolve to the same source name"
+help = "give one of the columns a distinct source name"
+
+[diagnostics.SEM005.issues.schema_duplicate_visible]
+message = "two schema columns declare the same public name"
+help = "rename one of the columns"
+
+[diagnostics.SEM005.issues.duplicate_commune_field]
+message = "duplicate commune field"
+help = "declare each commune field once in the union region"
+
+[diagnostics.SEM005.issues.union_variant_redeclares_shared_field]
+message = "variant redeclares a commune field"
+help = "omit the commune field from the variant payload"
+
+[diagnostics.SEM006]
+message = "import not found"
+help = "check the import path"
+
+[diagnostics.SEM006.issues.kernel_glob_reexport]
+message = "`{path}` glob imports cannot be re-exported"
+help = "remove the publica marker"
+
+[diagnostics.SEM006.issues.kernel_glob_named_alias]
+message = "`{path}` must be imported as a named glob alias"
+help = "check the import path"
+
+[diagnostics.SEM006.issues.kernel_invalid_path]
+message = "{reason}"
+help = "check the import path"
+
+[diagnostics.SEM006.issues.kernel_unknown_module]
+message = "unknown faber kernel module '{module}'; see faber host manifest"
+help = "check the import path"
+
+[diagnostics.SEM006.issues.kernel_norma_json_in_script]
+message = "script mode uses `{script_path}`; `{library_path}` is package/library only"
+help = "check the import path"
+
+[diagnostics.SEM006.issues.import_interna_cross_package]
+message = "`{name}` is `@ interna` and cannot be imported across a package boundary"
+help = "import `@ interna` names only from a file in the same package"
+
+[diagnostics.SEM006.issues.import_module_private]
+message = "`{name}` is module-private and cannot be imported"
+help = "mark the declaration `@ publica` to export it, or `@ interna` for same-package use"
+
+[diagnostics.SEM007]
+message = "circular dependency"
+help = "break the cycle between modules"
+
+[diagnostics.SEM007.issues.type_alias_cycle]
+message = "type alias cycle"
+help = "break the cycle between modules"
+
+[diagnostics.SEM008]
+message = "lowering error"
+help = "fix the AST construct for lowering"
+
+[diagnostics.SEM008.issues.array_destructuring_initializer]
+message = "array destructuring requires initializer"
+help = "fix the AST construct for lowering"
+
+[diagnostics.SEM008.issues.array_destructuring_not_expanded]
+message = "array destructuring should be expanded before statement lowering"
+help = "fix the AST construct for lowering"
+
+[diagnostics.SEM008.issues.atomic_compiler_owned_syntax]
+message = "atomic requires compiler-owned syntax; use atomic<T>"
+help = "fix the AST construct for lowering"
+
+[diagnostics.SEM008.issues.iuncta_union_type_arg_unsupported]
+message = "iuncta element type argument ∪ is unsupported"
+help = "use _ for a monomorphic hole or a concrete union type"
+
+[diagnostics.SEM008.issues.ratio_union_type_arg_unsupported]
+message = "ratio element type argument ∪ is unsupported"
+help = "use _ for a monomorphic hole or a concrete union type"
+
+[diagnostics.SEM008.issues.lista_arity]
+message = "{lista} requires one type parameter"
+help = "use {lista}<T>; list<T, N> is proposed, not yet shipped"
+
+[diagnostics.SEM008.issues.tabula_arity]
+message = "map requires two type parameters"
+help = "fix the AST construct for lowering"
+
+[diagnostics.SEM008.issues.copia_arity]
+message = "set requires one type parameter"
+help = "fix the AST construct for lowering"
+
+[diagnostics.SEM008.issues.promissum_arity]
+message = "promissum requires one type parameter"
+help = "fix the AST construct for lowering"
+
+[diagnostics.SEM008.issues.cursor_arity]
+message = "cursor requires one type parameter"
+help = "fix the AST construct for lowering"
+
+
+[diagnostics.SEM008.issues.queue_arity]
+message = "queue requires one or two type parameters"
+help = "use queue<T> or queue<T, N>"
+
+[diagnostics.SEM008.issues.stack_arity]
+message = "stack requires one or two type parameters"
+help = "use stack<T> or stack<T, N>"
+
+[diagnostics.SEM008.issues.discerne_casu_pattern_required]
+message = "match {casu} requires a pattern"
+help = "fix the AST construct for lowering"
+
+[diagnostics.SEM008.issues.discerne_pattern_count]
+message = "match pattern count must match subject count"
+help = "fix the AST construct for lowering"
+
+[diagnostics.SEM008.issues.discerne_subject_required]
+message = "match requires at least one subject"
+help = "fix the AST construct for lowering"
+
+[diagnostics.SEM008.issues.duplicate_module_method_binding]
+message = "duplicate module method binding during lowering"
+help = "fix the AST construct for lowering"
+
+[diagnostics.SEM008.issues.duplicate_template_hole_label]
+message = "duplicate template hole label '{label}'"
+help = "give each named hole a unique label"
+
+[diagnostics.SEM008.issues.ego_outside_method]
+message = "ego used outside method context"
+help = "fix the AST construct for lowering"
+
+[diagnostics.SEM008.issues.elige_case_value_shape]
+message = "{elige} case value must be a literal or enum variant"
+help = "fix the AST construct for lowering"
+
+[diagnostics.SEM008.issues.empty_qualified_type_path]
+message = "empty qualified type path"
+help = "fix the AST construct for lowering"
+
+[diagnostics.SEM008.issues.empty_path_pattern]
+message = "empty path pattern"
+help = "fix the AST construct for lowering"
+
+[diagnostics.SEM008.issues.empty_union_type]
+message = "empty union type"
+help = "fix the AST construct for lowering"
+
+[diagnostics.SEM008.issues.ex_destructuring_not_expanded]
+message = "ex destructuring should be expanded before statement lowering"
+help = "fix the AST construct for lowering"
+
+[diagnostics.SEM008.issues.finge_cast_not_type]
+message = "finge cast must name a type"
+help = "fix the AST construct for lowering"
+
+[diagnostics.SEM008.issues.figura_not_index_param]
+message = "name does not refer to an index parameter"
+help = "fix the AST construct for lowering"
+
+[diagnostics.SEM008.issues.figura_type_param_in_index]
+message = "type parameter cannot appear in index position"
+help = "fix the AST construct for lowering"
+
+[diagnostics.SEM008.issues.figura_unknown_index]
+message = "unknown index variable in Figura"
+help = "fix the AST construct for lowering"
+
+[diagnostics.SEM008.issues.float_width_on_numerus]
+message = "f16, f32, and f64 are float widths; use float<f16>, float<f32>, or float<f64>"
+help = "fix the AST construct for lowering"
+
+[diagnostics.SEM008.issues.forma_builtin_missing]
+message = "builtin forma class is not registered"
+help = "fix the AST construct for lowering"
+
+[diagnostics.SEM008.issues.forma_literal_lowering_path]
+message = "forma template literals must lower through forma capture"
+help = "fix the AST construct for lowering"
+
+[diagnostics.SEM008.issues.forma_literal_pattern]
+message = "forma template literals are not valid in patterns"
+help = "fix the AST construct for lowering"
+
+[diagnostics.SEM008.issues.forma_params_field_missing]
+message = "builtin forma class is missing params field"
+help = "fix the AST construct for lowering"
+
+[diagnostics.SEM008.issues.forma_template_field_missing]
+message = "builtin forma class is missing template field"
+help = "fix the AST construct for lowering"
+
+[diagnostics.SEM008.issues.fractus_width_params]
+message = "float accepts at most one width marker"
+help = "fix the AST construct for lowering"
+
+[diagnostics.SEM008.issues.integer_width_on_fractus]
+message = "integer width markers are int widths; use int<…>"
+help = "fix the AST construct for lowering"
+
+[diagnostics.SEM008.issues.instans_precision_params]
+message = "instant accepts at most one precision marker"
+help = "fix the AST construct for lowering"
+
+[diagnostics.SEM008.issues.intervallum_arity]
+message = "intervallum requires one type parameter"
+help = "fix the AST construct for lowering"
+
+[diagnostics.SEM008.issues.intervallum_bound]
+message = "intervallum bound type must be int or instant"
+help = "fix the AST construct for lowering"
+
+[diagnostics.SEM008.issues.atomic_arity]
+message = "atomic requires exactly one element type; use atomic<T>"
+help = "fix the AST construct for lowering"
+
+[diagnostics.SEM008.issues.atomic_element]
+message = "atomic element type must be int<i32> or int<u32>"
+help = "fix the AST construct for lowering"
+
+[diagnostics.SEM008.issues.atomic_incomplete]
+message = "atomic requires one element type; use atomic<T>"
+help = "fix the AST construct for lowering"
+
+[diagnostics.SEM008.issues.invalid_fractus_width_marker]
+message = "float accepts only f16, f32, or f64"
+help = "fix the AST construct for lowering"
+
+[diagnostics.SEM008.issues.invalid_lowered_expression]
+message = "invalid expression produced during lowering"
+help = "fix the AST construct for lowering"
+
+[diagnostics.SEM008.issues.invalid_numerus_width_marker]
+message = "unknown width marker for int"
+help = "fix the AST construct for lowering"
+
+[diagnostics.SEM008.issues.invalid_precision_marker]
+message = "instant accepts only ms, us, or ns as a precision marker"
+help = "fix the AST construct for lowering"
+
+[diagnostics.SEM008.issues.invalid_width_marker]
+message = "unknown width marker for this family"
+help = "fix the AST construct for lowering"
+
+[diagnostics.SEM008.issues.json_valor_pattern]
+message = "JSON document literals are not valid in patterns"
+help = "fix the AST construct for lowering"
+
+[diagnostics.SEM008.issues.kernel_glob_call_shape]
+message = "kernel glob calls must use `faber.<module>.<verb>`"
+help = "fix the AST construct for lowering"
+
+[diagnostics.SEM008.issues.kernel_glob_named_alias]
+message = "`faber:*` must be imported with a named alias"
+help = "fix the AST construct for lowering"
+
+[diagnostics.SEM008.issues.kernel_unknown_module]
+message = "unknown faber kernel module '{module}'; see faber host manifest"
+help = "fix the AST construct for lowering"
+
+[diagnostics.SEM008.issues.labeled_actual_non_template_call]
+message = "labeled actual '{label}' is only legal at a template-call site"
+help = "use labeled actuals only when the callee is a string or forma template"
+
+[diagnostics.SEM008.issues.mixed_template_actuals_unsupported]
+message = "template application cannot mix labeled and positional actuals"
+help = "fill the template entirely by position or entirely by label"
+
+[diagnostics.SEM008.issues.matrix_incomplete]
+message = "matrix requires element type and shape; use matrix<T, [R, C]>"
+help = "fix the AST construct for lowering"
+
+[diagnostics.SEM008.issues.matrix_missing_figura]
+message = "matrix requires a two-dimensional shape; use matrix<T, [R, C]>"
+help = "fix the AST construct for lowering"
+
+[diagnostics.SEM008.issues.matrix_shape_two_dim]
+message = "matrix shape must be exactly two dimensions"
+help = "fix the AST construct for lowering"
+
+[diagnostics.SEM008.issues.missing_cast_symbol_info]
+message = "missing cast symbol information"
+help = "fix the AST construct for lowering"
+
+[diagnostics.SEM008.issues.missing_resolved_type_alias]
+message = "type alias is missing resolved type"
+help = "fix the AST construct for lowering"
+
+[diagnostics.SEM008.issues.missing_type_alias_symbol]
+message = "missing symbol for type alias"
+help = "fix the AST construct for lowering"
+
+[diagnostics.SEM008.issues.missing_type_symbol_info]
+message = "missing type symbol information"
+help = "fix the AST construct for lowering"
+
+[diagnostics.SEM008.issues.mutable_pattern_binding]
+message = "mutable pattern bindings are not lowered yet"
+help = "fix the AST construct for lowering"
+
+[diagnostics.SEM008.issues.nested_array_destructuring]
+message = "nested array destructuring is not lowered yet"
+help = "fix the AST construct for lowering"
+
+[diagnostics.SEM008.issues.nested_object_destructuring]
+message = "nested object destructuring is not lowered yet"
+help = "fix the AST construct for lowering"
+
+[diagnostics.SEM008.issues.nucleum_closure_effect]
+message = "kernel closure rejects operation '{operation}' (reason: {reason}); a kernel closure is a private device region"
+help = "fix the AST construct for lowering"
+
+[diagnostics.SEM008.issues.nucleum_closure_escape]
+message = "kernel closure escapes as a {context} value; it may only initialize an immutable local or be called in the same expression"
+help = "fix the AST construct for lowering"
+
+[diagnostics.SEM008.issues.numerus_width_params]
+message = "int accepts at most one width marker"
+help = "fix the AST construct for lowering"
+
+[diagnostics.SEM008.issues.object_destructuring_initializer]
+message = "object destructuring requires initializer"
+help = "fix the AST construct for lowering"
+
+[diagnostics.SEM008.issues.object_destructuring_not_expanded]
+message = "object destructuring should be expanded before statement lowering"
+help = "fix the AST construct for lowering"
+
+[diagnostics.SEM008.issues.octet_params]
+message = "octet is fixed-width and cannot accept parameters"
+help = "fix the AST construct for lowering"
+
+[diagnostics.SEM008.issues.precision_marker_shape]
+message = "precision marker must be a bare spelling such as ms or us"
+help = "fix the AST construct for lowering"
+
+[diagnostics.SEM008.issues.ascii_format_hint_not_capacity]
+message = "slot 1 of ascii is a capacity (NATURAL or `_`), never a format hint; write ascii<N, Hex|Bin|Oct>"
+help = "write ascii<N, Hex>, ascii<N, Bin>, or ascii<N, Oct> with N as digit width"
+
+[diagnostics.SEM008.issues.primitive_params]
+message = "primitive type cannot accept parameters"
+help = "string<N>, ascii<N>, and bytes<N> are proposed bounded forms, not yet shipped"
+
+[diagnostics.SEM008.issues.primitive_width_params]
+message = "primitive accepts at most one width marker"
+help = "fix the AST construct for lowering"
+
+[diagnostics.SEM008.issues.qualified_type_not_exported]
+message = "qualified type is not exported by namespace"
+help = "fix the AST construct for lowering"
+
+[diagnostics.SEM008.issues.qualified_type_prefix_not_namespace]
+message = "qualified type prefix must name a namespace"
+help = "fix the AST construct for lowering"
+
+[diagnostics.SEM008.issues.radix_typus_allowed_type_not_concrete]
+message = "@ radix typus allowed type must be concrete"
+help = "fix the AST construct for lowering"
+
+[diagnostics.SEM008.issues.radix_typus_non_type_param]
+message = "@ radix typus can constrain only type parameters"
+help = "fix the AST construct for lowering"
+
+[diagnostics.SEM008.issues.radix_typus_unknown_generic]
+message = "@ radix typus names an unknown generic parameter"
+help = "fix the AST construct for lowering"
+
+[diagnostics.SEM008.issues.retired_bare_object_literal]
+message = "bare object literal is retired; use {object_literal_forms}"
+help = "fix the AST construct for lowering"
+
+[diagnostics.SEM008.issues.schema_nested_column]
+message = "a column cannot be a nested schema declaration"
+help = "declare the nested schema separately and name it as the column type"
+
+[diagnostics.SEM008.issues.scrinium_arity]
+message = "scrinium accepts at most one payload type parameter"
+help = "fix the AST construct for lowering"
+
+[diagnostics.SEM008.issues.scrinium_missing_builtin]
+message = "builtin scrinium type is not registered"
+help = "fix the AST construct for lowering"
+
+[diagnostics.SEM008.issues.series_params]
+message = "series cannot accept parameters"
+help = "fix the AST construct for lowering"
+
+[diagnostics.SEM008.issues.sparsa_element_non_numeric]
+message = "sparsa element type must be numeric in v1"
+help = "fix the AST construct for lowering"
+
+[diagnostics.SEM008.issues.sparsa_incomplete]
+message = "sparsa requires element type and Figura; use sparsa<T, Figura>"
+help = "fix the AST construct for lowering"
+
+[diagnostics.SEM008.issues.sparsa_missing_figura]
+message = "sparsa requires a Figura shape; use sparsa<T, []> for rank-0"
+help = "fix the AST construct for lowering"
+
+[diagnostics.SEM008.issues.standalone_width_internal]
+message = "internal error lowering standalone width type"
+help = "fix the AST construct for lowering"
+
+[diagnostics.SEM008.issues.tensor_incomplete]
+message = "tensor requires element type and Figura; use tensor<T, Figura>"
+help = "fix the AST construct for lowering"
+
+[diagnostics.SEM008.issues.tensor_missing_figura]
+message = "tensor requires a Figura shape; use tensor<T, []> for rank-0"
+help = "fix the AST construct for lowering"
+
+[diagnostics.SEM008.issues.template_application_arity_mismatch]
+message = "template application has {actual} arguments but template has {expected} holes"
+help = "match the argument count to the template hole count"
+
+[diagnostics.SEM008.issues.template_type_args]
+message = "template application does not accept type arguments"
+help = "fix the AST construct for lowering"
+
+[diagnostics.SEM008.issues.top_level_initializer]
+message = "top-level variable declaration requires initializer"
+help = "fix the AST construct for lowering"
+
+[diagnostics.SEM008.issues.top_level_identifier_binding]
+message = "top-level variable requires an identifier binding"
+help = "fix the AST construct for lowering"
+
+[diagnostics.SEM008.issues.type_name_not_type]
+message = "type name does not refer to a type"
+help = "fix the AST construct for lowering"
+
+[diagnostics.SEM008.issues.union_only_nihil]
+message = "union type cannot consist only of '{nihil}'"
+help = "fix the AST construct for lowering"
+
+[diagnostics.SEM008.issues.undefined_name]
+message = "undefined name in lowering"
+help = "fix the AST construct for lowering"
+
+[diagnostics.SEM008.issues.unfillable_template_hole]
+message = "named template hole '{label}' is not filled"
+help = "provide a labeled actual for each named hole, or call the template by position"
+
+[diagnostics.SEM008.issues.unhandled_statement_kind]
+message = "unhandled statement kind in lowering"
+help = "fix the AST construct for lowering"
+
+[diagnostics.SEM008.issues.unknown_base_class]
+message = "unknown base class in gens declaration"
+help = "fix the AST construct for lowering"
+
+[diagnostics.SEM008.issues.unknown_finge_cast_type]
+message = "unknown cast type in finge expression"
+help = "fix the AST construct for lowering"
+
+[diagnostics.SEM008.issues.unknown_finge_variant]
+message = "unknown variant in finge expression"
+help = "fix the AST construct for lowering"
+
+[diagnostics.SEM008.issues.unknown_interface]
+message = "unknown interface in gens declaration"
+help = "fix the AST construct for lowering"
+
+[diagnostics.SEM008.issues.unknown_lowering_error]
+message = "HIR lowering failed"
+help = "fix the AST construct for lowering"
+
+[diagnostics.SEM008.issues.unknown_namespace]
+message = "unknown namespace"
+help = "fix the AST construct for lowering"
+
+[diagnostics.SEM008.issues.unknown_template_hole_label]
+message = "unknown template hole label '{label}'"
+help = "use a label declared as §{label} in the template"
+
+[diagnostics.SEM008.issues.unknown_type_lowering_error]
+message = "type lowering failed"
+help = "fix the AST construct for lowering"
+
+[diagnostics.SEM008.issues.unknown_tuple_element_label]
+message = "unknown tuple element label"
+help = "use a label declared on the iuncta annotation, or index by position"
+
+[diagnostics.SEM008.issues.unknown_type_name]
+message = "unknown type name"
+help = "fix the AST construct for lowering"
+
+[diagnostics.SEM008.issues.vector_width_single_dim]
+message = "vector width must be a single dimension"
+help = "fix the AST construct for lowering"
+
+[diagnostics.SEM008.issues.width_marker_params]
+message = "width marker cannot accept parameters"
+help = "fix the AST construct for lowering"
+
+[diagnostics.SEM008.issues.width_marker_shape]
+message = "width marker must be a bare spelling such as i32 or u8"
+help = "fix the AST construct for lowering"
+
+[diagnostics.SEM009]
+message = "CLI validation error"
+help = "fix the CLI annotation contract before emitting runnable CLI code"
+
+[diagnostics.SEM009.issues.alias_collides_with_path]
+message = "command alias '{alias}' collides with a command path"
+help = "fix the CLI annotation contract before emitting runnable CLI code"
+
+[diagnostics.SEM009.issues.cli_on_non_incipit]
+message = "@ cli may only annotate an {incipit} entry point"
+help = "fix the CLI annotation contract before emitting runnable CLI code"
+
+[diagnostics.SEM009.issues.command_global_surface]
+message = "'{ubique}' options and operands must be declared on the @ cli entry point"
+help = "fix the CLI annotation contract before emitting runnable CLI code"
+
+[diagnostics.SEM009.issues.command_params_unsupported]
+message = "Phase 04 CLI commands must receive parsed values through 'argumenta <ident>', not ordinary parameters"
+help = "fix the CLI annotation contract before emitting runnable CLI code"
+
+[diagnostics.SEM009.issues.duplicate_binding]
+message = "duplicate CLI binding '{binding}' in {label} CLI surface"
+help = "fix the CLI annotation contract before emitting runnable CLI code"
+
+[diagnostics.SEM009.issues.duplicate_cli_entry]
+message = "only one @ cli entry point is allowed"
+help = "fix the CLI annotation contract before emitting runnable CLI code"
+
+[diagnostics.SEM009.issues.duplicate_command_alias]
+message = "duplicate command alias '{alias}'"
+help = "fix the CLI annotation contract before emitting runnable CLI code"
+
+[diagnostics.SEM009.issues.duplicate_command_path]
+message = "duplicate command path '{path}'"
+help = "fix the CLI annotation contract before emitting runnable CLI code"
+
+[diagnostics.SEM009.issues.duplicate_long_flag]
+message = "duplicate long flag '{long}' in {label} CLI surface"
+help = "fix the CLI annotation contract before emitting runnable CLI code"
+
+[diagnostics.SEM009.issues.duplicate_rest_operand]
+message = "only one {ceteri} operand is allowed"
+help = "fix the CLI annotation contract before emitting runnable CLI code"
+
+[diagnostics.SEM009.issues.duplicate_short_flag]
+message = "duplicate short flag '{short}' in {label} CLI surface"
+help = "fix the CLI annotation contract before emitting runnable CLI code"
+
+[diagnostics.SEM009.issues.global_operand_placement]
+message = "'{ubique}' operands must be declared on the @ cli entry point"
+help = "fix the CLI annotation contract before emitting runnable CLI code"
+
+[diagnostics.SEM009.issues.global_option_placement]
+message = "'{ubique}' options must be declared on the @ cli entry point"
+help = "fix the CLI annotation contract before emitting runnable CLI code"
+
+[diagnostics.SEM009.issues.imperium_on_non_func]
+message = "@ {imperium} may only annotate a {functio} declaration"
+help = "fix the CLI annotation contract before emitting runnable CLI code"
+
+[diagnostics.SEM009.issues.invalid_command_alias]
+message = "invalid command alias '{alias}'"
+help = "fix the CLI annotation contract before emitting runnable CLI code"
+
+[diagnostics.SEM009.issues.invalid_command_path]
+message = "invalid command path '{path}'"
+help = "fix the CLI annotation contract before emitting runnable CLI code"
+
+[diagnostics.SEM009.issues.invalid_long_flag]
+message = "invalid long flag '{long}' for option '{binding}'"
+help = "fix the CLI annotation contract before emitting runnable CLI code"
+
+[diagnostics.SEM009.issues.invalid_short_flag]
+message = "invalid short flag '{short}' for option '{binding}'"
+help = "fix the CLI annotation contract before emitting runnable CLI code"
+
+[diagnostics.SEM009.issues.list_element_not_named]
+message = "CLI list types must use a named element type"
+help = "fix the CLI annotation contract before emitting runnable CLI code"
+
+[diagnostics.SEM009.issues.local_operand_global_collision]
+message = "{label} operand '{binding}' collides with a global CLI binding"
+help = "fix the CLI annotation contract before emitting runnable CLI code"
+
+[diagnostics.SEM009.issues.local_option_global_collision]
+message = "{label} option '{binding}' collides with a global CLI binding"
+help = "fix the CLI annotation contract before emitting runnable CLI code"
+
+[diagnostics.SEM009.issues.missing_entry_argument]
+message = "@ cli programs must use an explicit '{incipit} argumenta <ident>' entry point"
+help = "fix the CLI annotation contract before emitting runnable CLI code"
+
+[diagnostics.SEM009.issues.malformed_annotation]
+message = "{annotation} field `{field}` must be {expected}"
+help = "fix the CLI annotation contract before emitting runnable CLI code"
+
+[diagnostics.SEM009.issues.missing_option_flag]
+message = "{label} option '{binding}' needs brevis or longum"
+help = "fix the CLI annotation contract before emitting runnable CLI code"
+
+[diagnostics.SEM009.issues.mounted_module_root_cli]
+message = "mounted CLI command modules must not declare their own @ cli entry point"
+help = "fix the CLI annotation contract before emitting runnable CLI code"
+
+[diagnostics.SEM009.issues.nested_module_mount]
+message = "@ imperia module mounts may only be declared on the root CLI entry point"
+help = "fix the CLI annotation contract before emitting runnable CLI code"
+
+[diagnostics.SEM009.issues.operand_after_rest]
+message = "operand '{binding}' appears after {ceteri} operand"
+help = "fix the CLI annotation contract before emitting runnable CLI code"
+
+[diagnostics.SEM009.issues.orphan_cli_surface]
+message = "@ optio and @ operandus must annotate @ cli {incipit} or @ {imperium} {functio}"
+help = "fix the CLI annotation contract before emitting runnable CLI code"
+
+[diagnostics.SEM009.issues.rest_not_final]
+message = "{ceteri} operand must be the final operand"
+help = "fix the CLI annotation contract before emitting runnable CLI code"
+
+[diagnostics.SEM009.issues.subcommand_local_surface]
+message = "subcommand CLI programs may only declare top-level options or operands with '{ubique}'"
+help = "fix the CLI annotation contract before emitting runnable CLI code"
+
+[diagnostics.SEM009.issues.subcommand_root_body]
+message = "subcommand CLI programs must use an empty root {incipit} body in Phase 04"
+help = "fix the CLI annotation contract before emitting runnable CLI code"
+
+[diagnostics.SEM009.issues.unsupported_list_element_type]
+message = "unsupported CLI list element type '{type}'"
+help = "fix the CLI annotation contract before emitting runnable CLI code"
+
+[diagnostics.SEM009.issues.unsupported_type]
+message = "unsupported CLI type '{type}'"
+help = "fix the CLI annotation contract before emitting runnable CLI code"
+
+[diagnostics.SEM009.issues.unsupported_type_shape]
+message = "unsupported CLI type shape"
+help = "fix the CLI annotation contract before emitting runnable CLI code"
+
+[diagnostics.SEM010]
+message = "type mismatch"
+help = "make the expression type match the expected type"
+
+[diagnostics.SEM010.issues.argument_type_mismatch]
+message = "argument type mismatch"
+help = "make the expression type match the expected type"
+
+[diagnostics.SEM010.issues.callee_not_callable]
+message = "callee is not callable"
+help = "make the expression type match the expected type"
+
+[diagnostics.SEM010.issues.figura_not_index_param]
+message = "name does not refer to an index parameter"
+help = "make the expression type match the expected type"
+
+[diagnostics.SEM010.issues.assignment_type_mismatch]
+message = "assignment type mismatch"
+help = "make the expression type match the expected type"
+
+[diagnostics.SEM010.issues.assert_condition_type_mismatch]
+message = "assert condition must be boolean"
+help = "make the expression type match the expected type"
+
+[diagnostics.SEM010.issues.constant_annotation_mismatch]
+message = "constant value does not match annotation"
+help = "make the expression type match the expected type"
+
+[diagnostics.SEM010.issues.closure_parameter_type_mismatch]
+message = "closure parameter type mismatch"
+help = "make the expression type match the expected type"
+
+[diagnostics.SEM010.issues.closure_return_type_mismatch]
+message = "closure return type mismatch"
+help = "make the expression type match the expected type"
+
+[diagnostics.SEM010.issues.coalesce_fallback_type_mismatch]
+message = "coalesce fallback type mismatch"
+help = "make the expression type match the expected type"
+
+[diagnostics.SEM010.issues.common_type_mismatch]
+message = "incompatible types"
+help = "make the expression type match the expected type"
+
+[diagnostics.SEM010.issues.array_element_type_mismatch]
+message = "array element type mismatch"
+help = "make the expression type match the expected type"
+
+[diagnostics.SEM010.issues.array_spread_element_type_mismatch]
+message = "array spread element type mismatch"
+help = "make the expression type match the expected type"
+
+[diagnostics.SEM010.issues.conversio_failure_channel_type_mismatch]
+message = "propagating conversio failure channel mismatch"
+help = "make the expression type match the expected type"
+
+[diagnostics.SEM010.issues.conversio_recovery_type_mismatch]
+message = "conversio recovery type mismatch"
+help = "make the expression type match the expected type"
+
+[diagnostics.SEM010.issues.conversio_assign_inference_hole_destination]
+message = "conversion-directed assignment '↤' requires a resolved destination type"
+help = "write a concrete type for the destination, e.g. 'const int x ↤ value'"
+
+[diagnostics.SEM010.issues.cursor_iteration_requires_ex]
+message = "cursor iteration supports {itera} {ex} only"
+help = "make the expression type match the expected type"
+
+[diagnostics.SEM010.issues.expression_type_mismatch]
+message = "expression type mismatch"
+help = "make the expression type match the expected type"
+
+[diagnostics.SEM010.issues.equality_exact_types_required]
+message = "equality requires identical types; use `↦` to convert explicitly before comparing (ascii ↦ int for the scalar value, or compare against an ascii literal like 'a')"
+help = "make the expression type match the expected type"
+
+[diagnostics.SEM010.issues.field_initializer_type_mismatch]
+message = "field initializer type mismatch"
+help = "make the expression type match the expected type"
+
+[diagnostics.SEM010.issues.failable_call_enclosing_error_type_mismatch]
+message = "failable call error type does not match enclosing ⇥"
+help = "make the expression type match the expected type"
+
+[diagnostics.SEM010.issues.failable_call_handler_error_type_mismatch]
+message = "handled failable call error type mismatch"
+help = "make the expression type match the expected type"
+
+[diagnostics.SEM010.issues.field_default_type_mismatch]
+message = "field default type mismatch"
+help = "make the expression type match the expected type"
+
+[diagnostics.SEM010.issues.iace_requires_alternate_exit]
+message = "iace requires an enclosing function with a '⇥' alternate-exit type"
+help = "make the expression type match the expected type"
+
+[diagnostics.SEM010.issues.iace_value_type_mismatch]
+message = "alternate exit value type mismatch"
+help = "make the expression type match the expected type"
+
+[diagnostics.SEM010.issues.ignored_expression_result_must_resolve]
+message = "ignored expression result must resolve"
+help = "make the expression type match the expected type"
+
+[diagnostics.SEM010.issues.initializer_annotation_mismatch]
+message = "initializer does not match annotation"
+help = "make the expression type match the expected type"
+
+[diagnostics.SEM010.issues.incompatible_return_types]
+message = "incompatible return types"
+help = "make the expression type match the expected type"
+
+[diagnostics.SEM010.issues.intervallum_bound_required]
+message = "intervallum bound type must be int or instant"
+help = "make the expression type match the expected type"
+
+[diagnostics.SEM010.issues.intervallum_clamp_operand_type_mismatch]
+message = "intervallum clamp operand type mismatch"
+help = "make the expression type match the expected type"
+
+[diagnostics.SEM010.issues.intra_requires_intervallum_range]
+message = "intra requires an intervallum range"
+help = "make the expression type match the expected type"
+
+[diagnostics.SEM010.issues.incompatible_tensor_index]
+message = "index shapes are incompatible"
+help = "make the expression type match the expected type"
+
+[diagnostics.SEM010.issues.invalid_cast]
+message = "invalid cast"
+help = "make the expression type match the expected type"
+
+[diagnostics.SEM010.issues.itera_ab_source_requires_range]
+message = "{itera} ab source must be a range expression"
+help = "make the expression type match the expected type"
+
+[diagnostics.SEM010.issues.itera_apud_arity_mismatch]
+message = "{apud} coordinate count must equal the iterable rank"
+help = "make the expression type match the expected type"
+
+[diagnostics.SEM010.issues.itera_apud_requires_ex]
+message = "{apud} coordinates require {ex} iteration"
+help = "make the expression type match the expected type"
+
+[diagnostics.SEM010.issues.itera_apud_requires_shaped_iterable]
+message = "{apud} requires a tensor or matrix iterable"
+help = "make the expression type match the expected type"
+
+[diagnostics.SEM010.issues.json_map_key_must_be_textus]
+message = "JSON map key must be string"
+help = "make the expression type match the expected type"
+
+[diagnostics.SEM010.issues.json_nested_value_requires_valor]
+message = "nested JSON value requires map value type {valor}"
+help = "make the expression type match the expected type"
+
+[diagnostics.SEM010.issues.json_value_type_mismatch]
+message = "JSON value does not match map value type"
+help = "make the expression type match the expected type"
+
+[diagnostics.SEM010.issues.live_tuus_cursor_call_arg]
+message = "live {tuus} cursor values cannot be passed as function arguments yet"
+help = "make the expression type match the expected type"
+
+[diagnostics.SEM010.issues.live_tuus_cursor_return]
+message = "live {tuus} cursor values cannot be returned from functions yet"
+help = "make the expression type match the expected type"
+
+[diagnostics.SEM010.issues.live_tuus_cursor_struct]
+message = "live {tuus} cursor values cannot be stored in structures yet"
+help = "make the expression type match the expected type"
+
+[diagnostics.SEM010.issues.live_tuus_cursor_reassign]
+message = "live {tuus} cursor locals cannot be reassigned yet"
+help = "make the expression type match the expected type"
+
+[diagnostics.SEM010.issues.live_tuus_cursor_copy]
+message = "live {tuus} cursor values cannot be copied or moved between locals yet"
+help = "make the expression type match the expected type"
+
+[diagnostics.SEM010.issues.live_tuus_cursor_conversio]
+message = "live {tuus} cursor values cannot be converted through aggregate conversio yet"
+help = "make the expression type match the expected type"
+
+[diagnostics.SEM010.issues.live_tuus_cursor_direct_initializer]
+message = "tuus.cursor() is only supported as a direct local initializer"
+help = "make the expression type match the expected type"
+
+[diagnostics.SEM010.issues.live_tuus_cursor_value]
+message = "live {tuus} cursor values cannot be used as expressions yet"
+help = "make the expression type match the expected type"
+
+[diagnostics.SEM010.issues.nucleum_closure_capture]
+message = "kernel closure captures '{capture}' from an enclosing scope; a kernel closure must not capture enclosing locals or parameters"
+help = "make the expression type match the expected type"
+
+[diagnostics.SEM010.issues.nucleum_closure_type]
+message = "kernel closure {position} type '{type}' is outside the device-safe subset"
+help = "kernel closures admit scalars and tensor-family types only"
+
+[diagnostics.SEM010.issues.map_index_type_mismatch]
+message = "map index type mismatch"
+help = "make the expression type match the expected type"
+
+[diagnostics.SEM010.issues.map_key_type_mismatch]
+message = "map key type mismatch"
+help = "make the expression type match the expected type"
+
+[diagnostics.SEM010.issues.map_spread_key_type_mismatch]
+message = "map spread key type mismatch"
+help = "make the expression type match the expected type"
+
+[diagnostics.SEM010.issues.map_spread_value_type_mismatch]
+message = "map spread value type mismatch"
+help = "make the expression type match the expected type"
+
+[diagnostics.SEM010.issues.map_value_type_mismatch]
+message = "map value type mismatch"
+help = "make the expression type match the expected type"
+
+[diagnostics.SEM010.issues.membership_operand_type_mismatch]
+message = "membership operand type mismatch"
+help = "make the expression type match the expected type"
+
+[diagnostics.SEM010.issues.matmul_argument_rank_must_be_two]
+message = "matmul requires rank-2 tensor argument"
+help = "make the expression type match the expected type"
+
+[diagnostics.SEM010.issues.matmul_argument_shape_must_be_tuple]
+message = "matmul requires rank-2 tensor argument with tuple shape"
+help = "make the expression type match the expected type"
+
+[diagnostics.SEM010.issues.matmul_receiver_rank_must_be_two]
+message = "matmul requires rank-2 tensor receiver"
+help = "make the expression type match the expected type"
+
+[diagnostics.SEM010.issues.matmul_receiver_shape_must_be_tuple]
+message = "matmul requires rank-2 tensor receiver with tuple shape"
+help = "make the expression type match the expected type"
+
+[diagnostics.SEM010.issues.numeric_arithmetic_operands_identical]
+message = "numeric arithmetic operands must have identical types; use ↦ to convert explicitly"
+help = "make the expression type match the expected type"
+
+[diagnostics.SEM010.issues.numeric_operand_required]
+message = "numeric operand required"
+help = "make the expression type match the expected type"
+
+[diagnostics.SEM010.issues.numeric_operands_required]
+message = "numeric operands required"
+help = "make the expression type match the expected type"
+
+[diagnostics.SEM010.issues.boolean_operand_required]
+message = "boolean operand required"
+help = "make the expression type match the expected type"
+
+[diagnostics.SEM010.issues.boolean_operands_required]
+message = "boolean operands required"
+help = "make the expression type match the expected type"
+
+[diagnostics.SEM010.issues.integer_operand_required]
+message = "integer operand required"
+help = "make the expression type match the expected type"
+
+[diagnostics.SEM010.issues.integer_operands_required]
+message = "integer operands required"
+help = "make the expression type match the expected type"
+
+[diagnostics.SEM010.issues.instans_ordering_operands_required]
+message = "incompatible instant operands"
+help = "make the expression type match the expected type"
+
+[diagnostics.SEM010.issues.pattern_type_mismatch]
+message = "pattern type mismatch"
+help = "make the expression type match the expected type"
+
+[diagnostics.SEM010.issues.parameter_default_type_mismatch]
+message = "parameter default type mismatch"
+help = "make the expression type match the expected type"
+
+[diagnostics.SEM010.issues.range_operand_type_mismatch]
+message = "range operand type mismatch"
+help = "make the expression type match the expected type"
+
+[diagnostics.SEM010.issues.range_step_must_be_numeric]
+message = "range step must be numeric"
+help = "make the expression type match the expected type"
+
+[diagnostics.SEM010.issues.return_type_mismatch]
+message = "return type does not match function signature"
+help = "make the expression type match the expected type"
+
+[diagnostics.SEM010.issues.regex_conversion_operand_type_mismatch]
+message = "regex conversion requires string or ascii"
+help = "make the expression type match the expected type"
+
+[diagnostics.SEM010.issues.string_operands_required]
+message = "string operands required"
+help = "make the expression type match the expected type"
+
+[diagnostics.SEM010.issues.atomic_arity]
+message = "atomic requires exactly one element type; use atomic<T>"
+help = "make the expression type match the expected type"
+
+[diagnostics.SEM010.issues.atomic_element]
+message = "atomic element type must be int<i32> or int<u32>"
+help = "make the expression type match the expected type"
+
+[diagnostics.SEM010.issues.atomic_incomplete]
+message = "atomic requires one element type; use atomic<T>"
+help = "make the expression type match the expected type"
+
+[diagnostics.SEM010.issues.matrix_incomplete]
+message = "matrix requires element type and shape; use matrix<T, [R, C]>"
+help = "make the expression type match the expected type"
+
+[diagnostics.SEM010.issues.matrix_missing_figura]
+message = "matrix requires a two-dimensional shape; use matrix<T, [R, C]>"
+help = "make the expression type match the expected type"
+
+[diagnostics.SEM010.issues.matrix_shape_two_dim]
+message = "matrix shape must be exactly two dimensions"
+help = "make the expression type match the expected type"
+
+[diagnostics.SEM010.issues.sparsa_incomplete]
+message = "sparsa requires element type and Figura; use sparsa<T, Figura>"
+help = "make the expression type match the expected type"
+
+[diagnostics.SEM010.issues.sparsa_missing_figura]
+message = "sparsa requires a Figura shape; use sparsa<T, []> for rank-0"
+help = "make the expression type match the expected type"
+
+[diagnostics.SEM010.issues.scalar_text_operands_required]
+message = "scalar text operands required"
+help = "make the expression type match the expected type"
+
+[diagnostics.SEM010.issues.stream_ad_opener_type_mismatch]
+message = "stream ad opener must lower to {valor}"
+help = "make the expression type match the expected type"
+
+[diagnostics.SEM010.issues.tensor_formata_element_type_mismatch]
+message = "formata target element type must match the receiver element type"
+help = "make the expression type match the expected type"
+
+[diagnostics.SEM010.issues.tensor_incomplete]
+message = "tensor requires element type and Figura; use tensor<T, Figura>"
+help = "make the expression type match the expected type"
+
+[diagnostics.SEM010.issues.tensor_missing_figura]
+message = "tensor requires a Figura shape; use tensor<T, []> for rank-0"
+help = "make the expression type match the expected type"
+
+[diagnostics.SEM010.issues.variant_pattern_scrutinee_mismatch]
+message = "variant does not match scrutinee type"
+help = "make the expression type match the expected type"
+
+[diagnostics.SEM010.issues.vector_element_type_mismatch]
+message = "vector element type mismatch"
+help = "make the expression type match the expected type"
+
+[diagnostics.SEM010.issues.vector_incomplete]
+message = "vector requires element type and width; use vector<T, N>"
+help = "make the expression type match the expected type"
+
+[diagnostics.SEM010.issues.vector_missing_width]
+message = "vector requires a width; use vector<T, 4> or vf32[4]"
+help = "make the expression type match the expected type"
+
+[diagnostics.SEM010.issues.tuple_index_out_of_bounds]
+message = "tuple index {index} out of bounds for arity {arity}"
+help = "use an index between 0 and {max_index}"
+
+[diagnostics.SEM010.issues.octeti_index_out_of_bounds]
+message = "bytes index out of bounds"
+help = "use a range fully inside the bytes"
+
+[diagnostics.SEM010.issues.gradient_expression_unsupported]
+message = "postfix gradient selection (`call(...) ∇ [places]`) is not lowered until the tensor-glyphs 2B autograd surface lands; no operand, selector, or result rule is active in Phase 2A"
+help = "gradient selection (`∇`) is parse-only in Phase 2A; the eligibility/selector rules land with tensor-glyphs 2B"
+
+[diagnostics.SEM011]
+message = "invalid operand types"
+help = "use compatible operand types"
+
+[diagnostics.SEM011.issues.nucleum_lane_fragment_clash]
+message = "fragment lane binding '{fragment}' conflicts with caller lane binding '{caller}'"
+help = "keep caller and fragment lane bindings distinct"
+
+[diagnostics.SEM011.issues.range_step_must_be_numeric]
+message = "range step must be numeric"
+help = "use a numeric range step"
+
+[diagnostics.SEM011.issues.intervallum_bound_required]
+message = "intervallum bound type must be int or instant"
+help = "use int, float, instant, or sized scalar bounds"
+
+[diagnostics.SEM011.issues.intervallum_longitudo_bound]
+message = "intervallum longitudo requires int bounds until momentum ships"
+help = "use int intervallum bounds for longitudo today"
+
+[diagnostics.SEM011.issues.numeric_lista_operator_law]
+message = "numeric list operator {operator} is elementwise; scalars broadcast on either side, lists must have equal length; use ↦ for explicit width conversion"
+help = "apply +, -, *, or / elementwise to numeric lists; use ↦ to align numeric widths"
+
+[diagnostics.SEM011.issues.numeric_queue_stack_operator_law]
+message = "numeric {collection} operator {operator} is elementwise; scalars broadcast on either side, {collection}s must have equal length; mixed queue/stack operands are invalid; use ↦ for explicit width conversion"
+help = "apply +, -, *, or / elementwise to numeric queues or stacks; use matching kinds and ↦ to align numeric widths"
+
+[diagnostics.SEM011.issues.numeric_operands_required]
+message = "numeric operands required"
+help = "use numeric operands for this operator"
+
+[diagnostics.SEM011.issues.numeric_arithmetic_operands_identical]
+message = "numeric arithmetic operands must have identical types; use ↦ to convert explicitly"
+help = "convert operands explicitly before applying this numeric operator"
+
+[diagnostics.SEM011.issues.ascii_literal_invalid_escape]
+message = "ascii literal contains invalid escape sequence"
+help = "use supported ASCII literal escape sequences"
+
+[diagnostics.SEM011.issues.ascii_literal_non_ascii_scalar]
+message = "ascii literal contains non-ASCII character '{character}'"
+help = "use string for Unicode text or keep ascii payloads ASCII-only"
+
+[diagnostics.SEM011.issues.ascii_literal_unescaped_control]
+message = "ascii literal contains unescaped control character U+{codepoint}"
+help = "escape control characters in ascii literals"
+
+[diagnostics.SEM011.issues.ascii_literal_too_long]
+message = "ascii literal exceeds the maximum payload of 64 bytes"
+help = "shorten the ascii literal or use a string literal instead"
+
+[diagnostics.SEM011.issues.boolean_operands_required]
+message = "boolean operands required"
+help = "use bool operands for this operator"
+
+[diagnostics.SEM011.issues.atomic_method_requires_atomic_receiver]
+message = "atomic operation requires an atomic receiver"
+help = "call load/store/exchange/compare_exchange on atomic<T>"
+
+[diagnostics.SEM011.issues.unsupported_atomic_method]
+message = "unsupported atomic operation"
+help = "use load, store, exchange, or compare_exchange"
+
+[diagnostics.SEM011.issues.bitwise_method_requires_numerus_receiver]
+message = "bitwise operator methods require int receiver"
+help = "call bitwise methods on int receivers"
+
+[diagnostics.SEM011.issues.deref_requires_reference]
+message = "deref requires reference"
+help = "dereference a reference value"
+
+[diagnostics.SEM011.issues.densata_requires_sparsa_receiver]
+message = "densata requires sparsa receiver"
+help = "call densata on a sparsa value"
+
+[diagnostics.SEM011.issues.ascii_literal_template_application]
+message = "ascii literals do not support template application"
+help = "use a string formatting literal for template calls"
+
+[diagnostics.SEM011.issues.directional_view_method_type_args]
+message = "directional view method does not accept type arguments"
+help = "remove the explicit type argument list"
+
+[diagnostics.SEM011.issues.dynamic_callee_type_args]
+message = "dynamic callee does not accept type arguments"
+help = "remove the explicit type argument list"
+
+[diagnostics.SEM011.issues.dynamic_receiver_method_type_args]
+message = "dynamic receiver does not accept method type arguments"
+help = "remove the explicit type argument list"
+
+[diagnostics.SEM011.issues.failable_call_requires_handler]
+message = "failable call requires a ⇥ declaring context, a local handler, or a {capta} trap"
+help = "handle the call with {fac}/cape, capture it with {capta}, or declare a function ⇥"
+
+[diagnostics.SEM010.issues.trap_member_type_mismatch]
+message = "trap member type mismatch"
+help = "check the member type flowing into the {capta} trap"
+
+[diagnostics.SEM010.issues.trap_union_collapsed]
+message = "{capta} trap union collapsed to '{type}': success and error are the same type, so the trap cannot distinguish them"
+help = "make the success type and the error channel distinguishable, or handle the error with {fac}/cape instead"
+
+[diagnostics.SEM011.issues.generic_type_arg_domain]
+message = "type argument {rejected} is not allowed for {param}; expected one of {accepted}"
+help = "choose one of the allowed type arguments for this generic parameter"
+
+[diagnostics.SEM011.issues.gpu_builtin_device_function_required]
+message = "GPU builtin call is only valid inside device functions"
+help = "call GPU builtins only inside @ nucleum or @ nucleum fragment functions"
+
+[diagnostics.SEM011.issues.gpu_builtin_type_args]
+message = "GPU builtin call does not accept type arguments"
+help = "remove the explicit type argument list"
+
+[diagnostics.SEM011.issues.inferred_callee_type_args]
+message = "inferred callee does not accept type arguments"
+help = "remove the explicit type argument list"
+
+[diagnostics.SEM011.issues.intrinsic_method_type_args]
+message = "intrinsic method does not accept type arguments"
+help = "remove the explicit type argument list"
+
+[diagnostics.SEM011.issues.integer_operands_required]
+message = "integer operands required"
+help = "use integer operands for this operator"
+
+[diagnostics.SEM011.issues.instans_ordering_operands_required]
+message = "incompatible instant operands"
+help = "compare instant values with instant values"
+
+[diagnostics.SEM011.issues.json_duplicate_key]
+message = "duplicate JSON key \"{key}\""
+help = "remove or rename the duplicate JSON object key"
+
+[diagnostics.SEM011.issues.method_call_type_args]
+message = "method call does not accept type arguments"
+help = "remove the explicit type argument list"
+
+[diagnostics.SEM011.issues.numeric_lista_elements_required]
+message = "numeric {lista} elements required"
+help = "use numeric elements for this {lista} intrinsic"
+
+[diagnostics.SEM011.issues.octeti_literal_invalid_character]
+message = "bytes literal contains invalid character '{character}'"
+help = "use only hexadecimal digits in bytes literals"
+
+[diagnostics.SEM011.issues.octeti_literal_odd_digit_count]
+message = "bytes literal has odd hex digit count"
+help = "provide complete byte pairs in bytes literals"
+
+[diagnostics.SEM011.issues.octeti_literal_template_application]
+message = "bytes literals do not support template application"
+help = "use string formatting instead of bytes literal calls"
+
+[diagnostics.SEM011.issues.sermo_view_payload_type_arg_count]
+message = "{method} accepts at most one payload type argument"
+help = "remove the explicit type argument list"
+
+[diagnostics.SEM011.issues.template_application_type_args]
+message = "template application does not accept type arguments"
+help = "remove the explicit type argument list"
+
+[diagnostics.SEM011.issues.variant_constructor_type_args]
+message = "variant constructor does not accept type arguments"
+help = "remove the explicit type argument list"
+
+[diagnostics.SEM011.issues.same_width_integer_operands_required]
+message = "same-width integer operands required"
+help = "convert integer operands to the same width before applying this operator"
+
+[diagnostics.SEM011.issues.postfix_inc_dec_numerus_operand]
+message = "postfix increment/decrement requires int operand"
+help = "apply postfix increment/decrement to int values"
+
+[diagnostics.SEM011.issues.array_spread_requires_lista]
+message = "array spread requires {lista} operand"
+help = "spread a {lista} value inside {lista} construction"
+
+[diagnostics.SEM011.issues.struct_computed_key_forbidden]
+message = "computed keys are not valid in struct construction"
+help = "use declared struct field names in struct construction"
+
+[diagnostics.SEM011.issues.struct_spread_forbidden]
+message = "spread fields are not valid in struct construction"
+help = "provide each required struct field explicitly"
+
+[diagnostics.SEM011.issues.vector_constructor_forbids_spread]
+message = "vector constructor does not accept spread arguments"
+help = "provide explicit vector elements instead of spread arguments"
+
+[diagnostics.SEM011.issues.object_spread_requires_tabula]
+message = "object spread requires map operand"
+help = "spread a map value inside map construction"
+
+[diagnostics.SEM011.issues.interval_bound_single_scalar]
+message = "interval bound must be a single Unicode scalar"
+help = "pass string or ascii values that contain exactly one Unicode scalar"
+
+[diagnostics.SEM011.issues.numeric_operand_required]
+message = "numeric operand required"
+help = "use a numeric operand for this operator"
+
+[diagnostics.SEM011.issues.numeric_value_equality_operands_required]
+message = "≈ requires numeric operands; use ≅ for promoted exact equality or .approx for explicit tolerance"
+help = "use numeric operands with ≈ for fuzzy equality; use ≅ for promoted exact equality or .approx for explicit tolerance"
+
+[diagnostics.SEM011.issues.boolean_operand_required]
+message = "boolean operand required"
+help = "use a bool operand for this operator"
+
+[diagnostics.SEM011.issues.condition_must_be_bivalens]
+message = "condition must be bool"
+help = "use a bool expression as the condition"
+
+[diagnostics.SEM011.issues.integer_operand_required]
+message = "integer operand required"
+help = "use an integer operand for this operator"
+
+[diagnostics.SEM011.issues.range_operand_must_be_numeric]
+message = "range operand must be numeric"
+help = "compare numeric values with intervallum ranges"
+
+[diagnostics.SEM011.issues.scalar_text_operands_required]
+message = "scalar text operands required"
+help = "compare single-scalar string or ascii operands"
+
+[diagnostics.SEM011.issues.string_operands_required]
+message = "string operands required"
+help = "use string operands for string addition"
+
+[diagnostics.SEM011.issues.object_field_requires_value]
+message = "object field requires value"
+help = "provide an explicit value for this object field"
+
+[diagnostics.SEM011.issues.vacua_requires_collection_type]
+message = "empty requires a collection type"
+help = "give empty a list, map, set, tensor, or sparsa context"
+
+[diagnostics.SEM011.issues.textus_index_must_be_numerus_or_range]
+message = "string index must be int or range"
+help = "index string with int or an integer range"
+
+[diagnostics.SEM011.issues.octeti_index_must_be_numerus_or_range]
+message = "bytes index must be int or range"
+help = "index bytes with int or an integer range"
+
+[diagnostics.SEM011.issues.array_index_must_be_numerus]
+message = "array index must be int"
+help = "index {lista} values with int"
+
+[diagnostics.SEM011.issues.indexing_requires_array_or_map]
+message = "indexing requires array or map"
+help = "index only {lista}, map, tensor, string, or ignotum values"
+
+[diagnostics.SEM011.issues.tensor_index_vector_integer_elements]
+message = "tensor index vector requires {lista} of integer elements"
+help = "use {lista} of supported integer index elements"
+
+[diagnostics.SEM011.issues.tensor_scalar_index_rank]
+message = "tensor scalar index requires rank-1; use a {lista}<integer> for rank-N"
+help = "use a scalar index only on rank-1 tensors"
+
+[diagnostics.SEM011.issues.tensor_bracket_index_integer_or_lista]
+message = "tensor bracket index requires an integer or {lista}<integer>"
+help = "use an integer scalar or {lista} of integer indices"
+
+[diagnostics.SEM011.issues.tensor_arithmetic_numeric_element_required]
+message = "tensor arithmetic requires numeric element type"
+help = "use numeric tensor or sparsa element types"
+
+[diagnostics.SEM011.issues.matrix_arithmetic_numeric_element_required]
+message = "matrix arithmetic requires numeric element types"
+help = "use numeric matrix element types"
+
+[diagnostics.SEM011.issues.tensor_receiver_structa_renamed]
+message = "tensor receiver method structa was renamed to strue; use seed.strue(data, shape)"
+help = "use seed.strue(data, shape)"
+
+[diagnostics.SEM011.issues.tensor_receiver_creata_type_args]
+message = "tensor receiver creata does not accept type arguments; use tensor.creata<CompleteTensorType>(fill)"
+help = "call tensor.creata<CompleteTensorType>(fill) for static construction"
+
+[diagnostics.SEM011.issues.tensor_crea_argument_order]
+message = "tensor crea expects fill then shape; use seed.crea(fill, shape)"
+help = "pass fill before shape"
+
+[diagnostics.SEM011.issues.tensor_structa_forma_removed]
+message = "tensor.structa_forma was removed; use tensor.structa<CompleteTensorType>(data)"
+help = "use tensor.structa<CompleteTensorType>(data)"
+
+[diagnostics.SEM011.issues.tensor_creata_runtime_shape_removed]
+message = "tensor.creata no longer accepts a runtime shape argument; use tensor.creata<CompleteTensorType>(fill)"
+help = "use tensor.creata<CompleteTensorType>(fill)"
+
+[diagnostics.SEM011.issues.tensor_creata_complete_type_arg_required]
+message = "tensor.creata requires a complete tensor type argument; use tensor.creata<CompleteTensorType>(fill)"
+help = "provide a complete tensor type argument"
+
+[diagnostics.SEM011.issues.tensor_formata_complete_type_arg_required]
+message = "formata requires a complete tensor type argument; use grid.formata<CompleteTensorType>()"
+help = "provide a complete tensor type argument"
+
+[diagnostics.SEM011.issues.tensor_formata_forbids_value_args]
+message = "formata does not accept value arguments; use grid.forma(shape) for runtime reshape"
+help = "use grid.forma(shape) for runtime reshape"
+
+[diagnostics.SEM011.issues.tensor_type_arg_incomplete]
+message = "tensor type argument must be a complete tensor type such as tf32[2, 2] or tensor<int, [4]>"
+help = "include both element type and shape in the tensor type argument"
+
+[diagnostics.SEM011.issues.tuple_index_must_be_constant]
+message = "tuple subscript requires compile-time constant index"
+help = "use a literal integer index such as pair[0] or pair[1]"
+
+[diagnostics.SEM012]
+message = "not callable"
+help = "call a function or closure"
+
+[diagnostics.SEM012.issues.callee_not_callable]
+message = "callee is not callable"
+help = "call a function, closure, or callable value"
+
+[diagnostics.SEM013]
+message = "wrong arity"
+help = "adjust the number of arguments"
+
+[diagnostics.SEM013.issues.callee_type_args_unsupported]
+message = "callee does not accept type arguments"
+help = "remove the explicit type argument list"
+
+[diagnostics.SEM013.issues.gpu_builtin_expects_no_arguments]
+message = "GPU builtin call expects no arguments"
+help = "remove the call arguments"
+
+[diagnostics.SEM013.issues.method_accepts_no_arguments]
+message = "{method} accepts no arguments"
+help = "remove the call arguments"
+
+[diagnostics.SEM013.issues.variant_pattern_arity_mismatch]
+message = "variant pattern arity mismatch"
+help = "match the pattern field count to the variant"
+
+[diagnostics.SEM013.issues.vector_constructor_width_arity]
+message = "vector constructor argument count must match vector width"
+help = "provide one constructor element per vector lane"
+
+[diagnostics.SEM013.issues.wrong_number_of_arguments]
+message = "wrong number of arguments"
+help = "adjust the number of arguments"
+
+[diagnostics.SEM013.issues.wrong_number_of_type_arguments]
+message = "wrong number of type arguments"
+help = "adjust the number of type arguments"
+
+[diagnostics.SEM013.issues.iuncta_construction_arity_mismatch]
+message = "iuncta construction has {actual} elements but type has {expected}"
+help = "match the element count to the iuncta type arity"
+
+[diagnostics.SEM014]
+message = "missing type annotation"
+help = "add a type annotation"
+
+[diagnostics.SEM014.issues.cannot_infer_alternate_exit_type]
+message = "cannot infer alternate-exit type"
+help = "add an explicit type annotation"
+
+[diagnostics.SEM014.issues.cannot_infer_constant_type]
+message = "cannot infer constant type"
+help = "add an explicit type annotation"
+
+[diagnostics.SEM014.issues.cannot_infer_expression_type]
+message = "cannot infer expression type"
+help = "add an explicit type annotation"
+
+[diagnostics.SEM014.issues.cannot_infer_field_type]
+message = "cannot infer field type"
+help = "add an explicit type annotation"
+
+[diagnostics.SEM014.issues.cannot_infer_return_type]
+message = "cannot infer return type"
+help = "add an explicit type annotation"
+
+[diagnostics.SEM014.issues.cannot_infer_tensor_shape]
+message = "cannot infer tensor shape"
+help = "provide a concrete tensor or sparsa shape"
+
+[diagnostics.SEM014.issues.cannot_infer_variable_type]
+message = "cannot infer variable type"
+help = "add an explicit type annotation"
+
+[diagnostics.SEM014.issues.directional_view_type_not_registered]
+message = "directional view type not registered"
+help = "ensure built-in frame types are registered before typechecking"
+
+[diagnostics.SEM014.issues.explicit_type_arg_inference_unsupported]
+message = "partial inference in explicit type arguments is not supported"
+help = "replace inferred explicit type arguments with concrete types"
+
+[diagnostics.SEM014.issues.scrinium_type_not_registered]
+message = "scrinium type not registered"
+help = "ensure built-in frame types are registered before typechecking"
+
+[diagnostics.SEM014.issues.sermo_type_not_registered]
+message = "sermo type not registered"
+help = "ensure built-in frame types are registered before typechecking"
+
+[diagnostics.SEM014.issues.vacua_requires_declared_type]
+message = "empty requires an explicit declared type"
+help = "add a declared collection type for empty"
+
+[diagnostics.SEM015]
+message = "invalid cast"
+help = "cast to a compatible type"
+
+[diagnostics.SEM016]
+message = "invalid conversion"
+help = "use a valid conversion or provide inline recovery with `⇥`"
+
+[diagnostics.SEM016.issues.intervallum_clamp_recovery_unsupported]
+message = "intervallum clamp conversio does not support `⇥` recovery"
+help = "remove the recovery arm from this range clamp"
+
+[diagnostics.SEM016.issues.intervallum_target_not_range]
+message = "intervallum conversio target must be a range or intervallum value"
+help = "convert to a range or intervallum value"
+
+[diagnostics.SEM016.issues.intervallum_clamp_bound_mismatch]
+message = "intervallum clamp requires matching bound types"
+help = "make the source and target bound element types match"
+
+[diagnostics.SEM016.issues.sermo_materialize_target_unsupported]
+message = "sermo materialization target is not supported; expected {vacuum}, {valor}, scalar (int, float, bool, string, ascii, bytes, instant), or {lista}<T>"
+help = "choose a supported sermo materialization target"
+
+[diagnostics.SEM016.issues.intervallum_materialize_lista_element_mismatch]
+message = "intervallum materialize requires matching {lista} element type"
+help = "make the source and target bound element types match"
+
+[diagnostics.SEM016.issues.intervallum_materialize_tensor_element_mismatch]
+message = "intervallum materialize requires matching tensor element type"
+help = "make the source and target bound element types match"
+
+[diagnostics.SEM016.issues.lista_to_vector_literal_required]
+message = "vector materialization requires a {lista} literal source"
+help = "use a valid conversion or provide inline recovery with `⇥`"
+
+[diagnostics.SEM016.issues.lista_to_vector_element_mismatch]
+message = "{lista} to vector conversio requires matching element types"
+help = "use a valid conversion or provide inline recovery with `⇥`"
+
+[diagnostics.SEM016.issues.lista_to_vector_literal_width]
+message = "{lista} to vector conversio requires a literal vector width"
+help = "use a valid conversion or provide inline recovery with `⇥`"
+
+[diagnostics.SEM016.issues.matrix_materialize_unsupported]
+message = "matrix materialization requires a lista source with matching element type"
+help = "materialize a lista of matrix cells with `↦ matrix<T, [R, C]>`; a literal source needs a literal shape"
+
+[diagnostics.SEM016.issues.valor_to_regex_unsupported]
+message = "{valor} to regex conversion has no default pattern; use `{valor} ↦ string ↦ regex`"
+help = "convert {valor} to string before converting to regex"
+
+[diagnostics.SEM016.issues.valor_to_cursor_boundary]
+message = "{valor} to cursor conversion crosses the eager/lazy boundary; materialize via `{valor} ↦ {lista}` then `{lista} ↦ cursor`"
+help = "materialize the cursor through {lista} before crossing the boundary"
+
+[diagnostics.SEM016.issues.valor_to_promissum_boundary]
+message = "{valor} to promissum conversion crosses the async/sync boundary; {valor} is synchronous — wrap the producer in `@ futura`"
+help = "resolve or wrap the async value explicitly"
+
+[diagnostics.SEM016.issues.promissum_to_valor_boundary]
+message = "promissum to {valor} conversion crosses the async/sync boundary; resolve with `.exspecta()` before boxing"
+help = "resolve or wrap the async value explicitly"
+
+[diagnostics.SEM016.issues.cursor_to_valor_boundary]
+message = "cursor to {valor} conversion crosses the eager/lazy boundary; materialize via `cursor ↦ {lista}` then `{lista} ↦ {valor}`"
+help = "materialize the cursor through {lista} before crossing the boundary"
+
+[diagnostics.SEM016.issues.numeric_to_octeti_unspecified]
+message = "conversion to bytes from int, float, or bool is unspecified (byte width and endianness); use `chorda` or explicit byte verbs instead"
+help = "use chorda or explicit byte conversion helpers"
+
+[diagnostics.SEM016.issues.octeti_to_numerus_unspecified]
+message = "conversion from bytes to int is unspecified (byte width and endianness); use `chorda` or explicit byte verbs instead"
+help = "use chorda or explicit byte conversion helpers"
+
+[diagnostics.SEM016.issues.octeti_endian_width_mismatch]
+message = "bytes endian conversion requires a window whose length matches the target width (2, 4, or 8 bytes)"
+help = "use a window of 2, 4, or 8 bytes matching i16/u16, i32/u32, or i64/u64"
+
+[diagnostics.SEM016.issues.ascii_format_hint_not_capacity]
+message = "slot 1 of ascii is a capacity (NATURAL or `_`), never a format hint; write ascii<N, Hex|Bin|Oct>"
+help = "write ascii<N, Hex>, ascii<N, Bin>, or ascii<N, Oct> with N as digit width"
+
+[diagnostics.SEM016.issues.ascii_pack_width_overflow]
+message = "ascii format pack needs more digits than the declared capacity N; widen N or narrow the source first"
+help = "increase N or convert the source to a width whose digit count fits"
+
+[diagnostics.SEM016.issues.ascii_pack_negative_source]
+message = "ascii format pack rejects negative sources; narrow to an unsigned width first"
+help = "convert to an unsigned numerus width before packing"
+
+[diagnostics.SEM016.issues.octeti_to_fractus_unspecified]
+message = "conversion from bytes to float is unspecified (IEEE width and endianness); use `chorda` or explicit byte verbs instead"
+help = "use chorda or explicit byte conversion helpers"
+
+[diagnostics.SEM016.issues.bits_pair_width_mismatch]
+message = "the Bits bitcast requires exact-width pairs: numerus<u32> ↔ fractus<f32> and numerus<u64> ↔ fractus<f64>"
+help = "convert to the matching IEEE width first: u32 pairs with f32, u64 with f64"
+
+[diagnostics.SEM016.issues.octeti_to_bivalens_unsupported]
+message = "conversion from bytes to bool has no default meaning; decode to string or compare bytes explicitly"
+help = "use chorda or explicit byte conversion helpers"
+
+[diagnostics.SEM016.issues.promissum_target_boundary]
+message = "conversion to promissum crosses the async/sync boundary; use `@ futura` or `.tum()` for async wrapping"
+help = "resolve or wrap the async value explicitly"
+
+[diagnostics.SEM016.issues.promissum_source_boundary]
+message = "conversion from promissum crosses the async/sync boundary; use `.exspecta()` or `@ futura` `.tum()` for async resolution"
+help = "resolve or wrap the async value explicitly"
+
+[diagnostics.SEM016.issues.sparsa_collection_unsupported]
+message = "sparsa conversion has no default {lista} meaning; use densata() before {lista} conversion or an explicit sparse helper"
+help = "densify or use an explicit sparse helper"
+
+[diagnostics.SEM016.issues.sparsa_tensor_element_mismatch]
+message = "tensor and sparsa conversio requires the same element type; convert element width explicitly before changing representation"
+help = "convert element widths explicitly before changing representation"
+
+[diagnostics.SEM016.issues.sparsa_tensor_shape_mismatch]
+message = "tensor and sparsa conversio requires the same Figura shape; reshape explicitly before `↦`"
+help = "reshape explicitly before converting"
+
+[diagnostics.SEM016.issues.tensor_to_scalar_unsupported]
+message = "tensor to scalar conversion has no default element pick; use `accipe(index)` for indexed reads"
+help = "index or reduce the tensor before converting"
+
+[diagnostics.SEM016.issues.scalar_to_tensor_unsupported]
+message = "scalar to tensor conversion has no default broadcast shape; use `crea(shape, fill)` or `structa`"
+help = "construct or fill the tensor explicitly"
+
+[diagnostics.SEM016.issues.tensor_shape_mismatch]
+message = "tensor shape conversion is not supported for this pair"
+help = "reshape explicitly before converting"
+
+[diagnostics.SEM016.issues.tensor_element_mismatch]
+message = "tensor element-type conversion is not supported for this pair"
+help = "convert element widths explicitly before changing representation"
+
+[diagnostics.SEM016.issues.conversio_failure_channel_textus_required]
+message = "propagating conversio failure requires a `string` alternate-exit channel"
+help = "declare the alternate-exit channel as string or provide inline recovery"
+
+[diagnostics.SEM016.issues.regex_operand_unsupported]
+message = "regex conversion requires string or ascii operand"
+help = "convert string or ascii values to regex"
+
+[diagnostics.SEM016.issues.record_conversion_requires_reconstruction]
+message = "record conversion requires reconstruction; write `Type { field = value, … }` instead of converting with `↦`"
+help = "reconstruct by writing `Type { field = value, … }` instead of converting with `↦`"
+
+[diagnostics.SEM016.issues.regex_recovery_unsupported]
+message = "regex conversion does not support `⇥` recovery; regex has no literal form, so there is no target-typed value to substitute"
+help = "remove the recovery arm from this regex conversion"
+
+[diagnostics.SEM016.issues.valor_verte_unsupported]
+message = "{valor} ∷ T is not supported — a dynamic value's shape cannot be asserted at compile time. Use `↦ T` for runtime extraction (with `⇥` for recovery)."
+help = "use runtime `↦ T` conversion with `⇥` recovery instead"
+
+[diagnostics.SEM016.issues.json_genus_conversion_requires_json_annotation]
+message = "json/class conversion requires the class to be marked `@ json`"
+help = "add `@ json` to the class or convert through `{valor}` explicitly"
+
+[diagnostics.SEM016.issues.lista_to_tabula_unsupported]
+message = "{lista} to map conversion has no default key/value derivation; use a map constructor verb or `.in.map(k, v)`; pair-destructuring default deferred"
+help = "construct the map with explicit key/value selection"
+
+[diagnostics.SEM016.issues.cross_collection_unsupported]
+message = "cross-collection conversion has no default `↦` meaning; use an explicit stdlib verb"
+help = "use an explicit stdlib conversion verb"
+
+[diagnostics.SEM016.issues.lista_to_tensor_nested]
+message = "{lista} to tensor conversio requires a flat {lista}; flatten nested {lista} values explicitly before `↦`"
+help = "flatten the nested {lista} before converting to tensor"
+
+[diagnostics.SEM016.issues.lista_to_tensor_element_mismatch]
+message = "{lista} to tensor conversio requires matching element types; convert elements explicitly before `↦`"
+help = "convert {lista} elements to the tensor element type first"
+
+[diagnostics.SEM016.issues.rectangular_lista_literal_target]
+message = "rectangular {lista} literal conversio requires a rank-2 literal tensor Figura target"
+help = "convert nested {lista} literals to a rank-2 tensor target"
+
+[diagnostics.SEM016.issues.rectangular_lista_literal_ragged]
+message = "ragged nested {lista} literal cannot convert to tensor; use crea or an explicit flatten verb"
+help = "make every nested row the same length"
+
+[diagnostics.SEM016.issues.rectangular_lista_literal_row_length]
+message = "rectangular {lista} literal row lengths disagree"
+help = "make every nested row the same length"
+
+[diagnostics.SEM016.issues.rectangular_lista_literal_shape]
+message = "rectangular {lista} literal shape does not match conversio target"
+help = "match the nested literal dimensions to the target Figura"
+
+[diagnostics.SEM016.issues.rectangular_lista_literal_spread]
+message = "rectangular {lista} literal conversio does not allow spread elements"
+help = "expand spread elements before tensor conversion"
+
+[diagnostics.SEM016.issues.rectangular_lista_literal_leaf]
+message = "rectangular {lista} literal conversio requires literal leaf elements"
+help = "use literal scalar leaves in the nested {lista}"
+
+[diagnostics.SEM017]
+message = "unavailable declaration"
+help = "use an available declaration or implement the marked surface"
+
+[diagnostics.SEM017.issues.nondum_method_for_target]
+message = "method `{method}` is marked nondum for this target{?reason|: |}"
+help = "use an available declaration or change the target"
+
+[diagnostics.SEM018]
+message = "invalid annotation"
+help = "fix the annotation contract before semantic lowering"
+
+[diagnostics.SEM018.issues.protecta_reserved]
+message = "`{annotation}` is reserved and has no active visibility meaning"
+help = "use `{publica}` for explicit export intent or `{privata}` for file-private intent"
+
+[diagnostics.SEM018.issues.conflicting_lane]
+message = "conflicting @ radix lane annotations: '{existing}' and '{parsed}'"
+help = "use `@ radix lane \"air\"`, `@ radix lane \"mir\"`, or `@ radix lane \"hir-direct\"` on a top-level {functio}"
+
+[diagnostics.SEM018.issues.nucleum_lane_invalid_identifier]
+message = "@ nucleum lane binding '{name}' is not a valid identifier"
+help = "use a valid identifier for the lane binding"
+
+[diagnostics.SEM018.issues.nucleum_lane_collision]
+message = "@ nucleum lane binding '{name}' collides with a parameter or local"
+help = "choose a lane binding name that is not already used in the entry"
+
+[diagnostics.SEM018.issues.nucleum_lane_conflicting]
+message = "conflicting @ nucleum lane bindings: '{existing}' and '{parsed}'"
+help = "declare exactly one @ nucleum lane binding"
+
+[diagnostics.SEM018.issues.missing_directive]
+message = "@ radix requires a directive such as `lane`"
+help = "use `@ radix lane \"air\"`, `@ radix lane \"mir\"`, or `@ radix lane \"hir-direct\"` on a top-level {functio}"
+
+[diagnostics.SEM018.issues.missing_lane_value]
+message = "@ radix lane requires a string value"
+help = "use `@ radix lane \"air\"`, `@ radix lane \"mir\"`, or `@ radix lane \"hir-direct\"` on a top-level {functio}"
+
+[diagnostics.SEM018.issues.non_string_lane_value]
+message = "@ radix lane value must be a string literal"
+help = "use `@ radix lane \"air\"`, `@ radix lane \"mir\"`, or `@ radix lane \"hir-direct\"` on a top-level {functio}"
+
+[diagnostics.SEM018.issues.empty_radix_typus_domain]
+message = "@ radix typus domain requires at least one allowed type"
+help = "use `@ radix typus T in string bytes` or braced `{radix_typus_braced}` with at least one allowed type"
+
+[diagnostics.SEM018.issues.missing_type_param]
+message = "@ radix typus requires a generic type parameter"
+help = "use `@ radix typus T in string bytes` or braced `{radix_typus_braced}` with at least one allowed type"
+
+[diagnostics.SEM018.issues.non_identifier_type_param]
+message = "@ radix typus parameter must be an identifier"
+help = "use `@ radix typus T in string bytes` or braced `{radix_typus_braced}` with at least one allowed type"
+
+[diagnostics.SEM018.issues.non_type_allowed]
+message = "@ radix typus allowed value must be a type"
+help = "use `@ radix typus T in string bytes` or braced `{radix_typus_braced}` with at least one allowed type"
+
+[diagnostics.SEM018.issues.unexpected_token]
+message = "unexpected token after @ radix lane value"
+help = "use `@ radix lane \"air\"`, `@ radix lane \"mir\"`, or `@ radix lane \"hir-direct\"` on a top-level {functio}"
+
+[diagnostics.SEM018.issues.unknown_directive]
+message = "unknown @ radix directive; expected `lane`"
+help = "use `@ radix lane \"air\"`, `@ radix lane \"mir\"`, or `@ radix lane \"hir-direct\"` on a top-level {functio}"
+
+[diagnostics.SEM018.issues.unknown_lane]
+message = "unknown @ radix lane '{lane}'; expected 'air', 'mir', or 'hir-direct'"
+help = "use `@ radix lane \"air\"`, `@ radix lane \"mir\"`, or `@ radix lane \"hir-direct\"` on a top-level {functio}"
+
+[diagnostics.SEM018.issues.unsupported_placement]
+message = "@ radix lane is only supported on top-level {functio} declarations, not on {placement}"
+help = "use `@ radix lane \"air\"`, `@ radix lane \"mir\"`, or `@ radix lane \"hir-direct\"` on a top-level {functio}"
+
+[diagnostics.SEM018.issues.commune_on_non_union]
+message = "`@ commune` is only valid on union shared fields"
+help = "declare shared fields in a union `@ commune` region"
+
+[diagnostics.SEM019]
+message = "conflicting visibility annotations"
+help = "use a single visibility tier per declaration"
+
+[diagnostics.SEM019.issues.conflicting_visibility]
+message = "conflicting visibility annotations: '{first}' and '{second}'"
+help = "use a single visibility tier per declaration"
+
+[diagnostics.SEM020]
+message = "immutable assignment"
+help = "use a `var` binding to allow reassignment, or remove the extra assignment"
+
+[diagnostics.SEM020.issues.assignment_to_constant]
+message = "assignment to constant"
+help = "use a `var` binding to allow reassignment, or remove the extra assignment"
+
+[diagnostics.SEM020.issues.assignment_to_commune_field]
+message = "assignment to commune field"
+help = "commune fields are read-only through the union projection"
+
+[diagnostics.SEM020.issues.immutable_second_assignment]
+message = "second assignment to immutable binding"
+help = "use a `var` binding to allow reassignment, or remove the extra assignment"
+
+[diagnostics.SEM020.issues.imperativus_operator_method_requires_varia_receiver]
+message = "imperativus operator method requires var receiver"
+help = "use a `var` binding to allow reassignment, or remove the extra assignment"
+
+[diagnostics.SEM021]
+message = "invalid assignment target"
+help = "assign to a valid lvalue"
+
+[diagnostics.SEM021.issues.invalid_assignment_target]
+message = "invalid assignment target"
+help = "assign to a valid lvalue"
+
+[diagnostics.SEM030]
+message = "break outside breakable context"
+help = "use '{rumpe}' inside {dum}, {itera}, {fac}, {meus}, or {tuus}"
+
+[diagnostics.SEM030.issues.break_outside_breakable]
+message = "{keyword} outside {context}"
+help = "use '{rumpe}' inside {dum}, {itera}, {fac}, {meus}, or {tuus}"
+
+[diagnostics.SEM031]
+message = "continue outside loop"
+help = "use '{perge}' inside a loop"
+
+[diagnostics.SEM031.issues.continue_outside_loop]
+message = "{keyword} outside {context}"
+help = "use '{perge}' inside a loop"
+
+[diagnostics.SEM032]
+message = "return outside function"
+help = "use '{redde}' inside a function"
+
+[diagnostics.SEM032.issues.return_outside_function]
+message = "{keyword} outside {context}"
+help = "use '{redde}' inside a function"
+
+[diagnostics.SEM033]
+message = "missing return"
+help = "add a return statement or make the return type '{vacuum}'"
+
+[diagnostics.SEM033.issues.control_flow_fallthrough]
+message = "not all control-flow paths return a value"
+help = "add a return statement or make the return type '{vacuum}'"
+
+[diagnostics.SEM033.issues.redde_requires_return_type]
+message = "{keyword} requires an explicit normal return type"
+help = "add a return statement or make the return type '{vacuum}'"
+
+[diagnostics.SEM040]
+message = "non-exhaustive match"
+help = "add missing cases or a '{ceterum}' arm"
+
+[diagnostics.SEM040.issues.missing_variants]
+message = "non-exhaustive match"
+help = "add missing cases or a '{ceterum}' arm"
+
+[diagnostics.SEM041]
+message = "unreachable pattern"
+help = "remove or reorder the unreachable pattern"
+
+[diagnostics.SEM041.issues.after_catchall]
+message = "unreachable pattern"
+help = "remove or reorder the unreachable pattern"
+
+[diagnostics.SEM042]
+message = "duplicate pattern"
+help = "remove the duplicate pattern"
+
+[diagnostics.SEM042.issues.duplicate_variant]
+message = "duplicate pattern"
+help = "remove the duplicate pattern"
+
+[diagnostics.SEM043]
+message = "omnia requires an enum scrutinee"
+help = "use `omnia` only with a single enum scrutinee"
+
+[diagnostics.SEM043.issues.enum_scrutinee]
+message = "'{keyword}' requires an enum scrutinee"
+help = "use `omnia` only with a single enum scrutinee"
+
+[diagnostics.SEM043.issues.single_enum_scrutinee]
+message = "'{keyword}' requires a single enum scrutinee"
+help = "use `omnia` only with a single enum scrutinee"
+
+[diagnostics.SEM044]
+message = "omnia forbids catchall arms"
+help = "list every variant explicitly instead of using `{casu} _` or `{ceterum}`"
+
+[diagnostics.SEM044.issues.catchall_arm]
+message = "'{keyword}' forbids catchall arms; list every variant explicitly"
+help = "list every variant explicitly instead of using `{casu} _` or `{ceterum}`"
+
+[diagnostics.SEM050]
+message = "use after move"
+help = "avoid using a value after it has been moved"
+
+[diagnostics.SEM050.issues.use_after_move]
+message = "use after move"
+help = "avoid using a value after it has been moved"
+
+[diagnostics.SEM051]
+message = "borrow of moved value"
+help = "borrow only from values that have not been moved"
+
+[diagnostics.SEM051.issues.borrow_of_moved]
+message = "borrow of moved value"
+help = "borrow only from values that have not been moved"
+
+[diagnostics.SEM052]
+message = "mutable borrow conflict"
+help = "avoid overlapping mutable borrows"
+
+[diagnostics.SEM052.issues.mutable_borrow_conflict]
+message = "mutable borrow conflicts with existing borrow"
+help = "avoid overlapping mutable borrows"
+
+[diagnostics.SEM052.issues.shared_borrow_conflict]
+message = "shared borrow conflicts with mutable borrow"
+help = "avoid overlapping mutable borrows"
+
+[diagnostics.SEM052.issues.use_while_mutably_borrowed]
+message = "use while mutably borrowed"
+help = "avoid overlapping mutable borrows"
+
+[diagnostics.SEM052.issues.write_while_borrowed]
+message = "write while borrowed"
+help = "avoid overlapping mutable borrows"
+
+[diagnostics.SEM053]
+message = "cannot move out"
+help = "use a reference or clone instead of moving"
+
+[diagnostics.SEM053.issues.cannot_move_while_borrowed]
+message = "cannot move out while borrowed"
+help = "use a reference or clone instead of moving"
+
+[diagnostics.SEM054]
+message = "lifetime mismatch"
+help = "ensure borrowed values live long enough"
+
+[diagnostics.SEM055]
+message = "shadowed variable"
+help = "rename one of the variables"
+
+[diagnostics.SEM055.issues.shadowed_variable]
+message = "shadowed variable"
+help = "rename one of the variables"
+
+[diagnostics.SEM056]
+message = "assignment to immutable borrow"
+help = "declare the parameter as '{in}' if mutation is intended"
+
+[diagnostics.SEM056.issues.assign_to_de_parameter]
+message = "cannot assign to `de` parameter"
+help = "declare the parameter as '{in}' if mutation is intended"
+
+[diagnostics.SEM056.issues.mutating_receiver_through_ref]
+message = "cannot call a mutating receiver through a `ref` view"
+help = "drop the `ref` marker, or use a non-mutating method"
+
+[diagnostics.SEM056.issues.assign_through_ref]
+message = "cannot assign through a `ref` view"
+help = "drop the `ref` marker if mutation is intended"
+
+[diagnostics.SEM057]
+message = "parameter mode mismatch"
+help = "align parameter modes between caller and callee"
+
+[diagnostics.SEM057.issues.de_to_in_or_ex_position]
+message = "cannot pass `de` parameter to `in` or `ex` position"
+help = "align parameter modes between caller and callee"
+
+[diagnostics.SEM057.issues.ref_to_mut_or_own_position]
+message = "cannot pass a `ref` value to a `mut` or `own` position"
+help = "pass a `mut` or `own` value, or bind through `copy`"
+
+[diagnostics.SEM057.issues.unmarked_into_own]
+message = "cannot bind an unmarked value into `own`"
+help = "bind through `copy` to duplicate the source"
+
+[diagnostics.SEM057.issues.ref_into_own]
+message = "cannot bind a `ref` value into `own`"
+help = "bind through `copy` to duplicate the source"
+
+[diagnostics.SEM057.issues.mut_into_own]
+message = "cannot bind a `mut` value into `own`"
+help = "bind through `copy` to duplicate the source"
+
+[diagnostics.SEM057.issues.field_into_own]
+message = "cannot bind a field projection into `own`"
+help = "bind through `copy` to duplicate the source"
+
+[diagnostics.SEM057.issues.index_into_own]
+message = "cannot bind an index projection into `own`"
+help = "bind through `copy` to duplicate the source"
+
+[diagnostics.SEM057.issues.deref_into_own]
+message = "cannot bind a dereference into `own`"
+help = "bind through `copy` to duplicate the source"
+
+[diagnostics.SEM057.issues.projection_into_own]
+message = "cannot bind a projection into `own`"
+help = "bind through `copy` to duplicate the source"
+
+[diagnostics.SEM057.issues.shared_into_own]
+message = "cannot bind a shared value into `own`"
+help = "bind through `copy` to duplicate the source"
+
+[diagnostics.SEM058]
+message = "use before initialization"
+help = "assign the binding before reading it, or declare the slot `sponte`"
+
+[diagnostics.SEM058.issues.possibly_uninitialized]
+message = "use of possibly uninitialized binding"
+help = "assign the binding before reading it, or declare the slot `sponte`"
+
+[diagnostics.SEM059]
+message = "AIR purity violation"
+help = "keep `@ radix lane \"air\"` functions in the accepted pure subset"
+
+[diagnostics.SEM059.issues.async_function]
+message = "@ radix lane \"{lane}\" rejects this function body: async functions are outside the v1 AIR subset"
+help = "keep the v1 AIR subset pure: immutable locals, pure expressions, AIR-lane calls, and tensor arithmetic intrinsics only"
+
+[diagnostics.SEM059.issues.assignment_mutation]
+message = "@ radix lane \"{lane}\" rejects this function body: assignment is mutation outside the v1 AIR subset"
+help = "keep the v1 AIR subset pure: immutable locals, pure expressions, AIR-lane calls, and tensor arithmetic intrinsics only"
+
+[diagnostics.SEM059.issues.breakable_block]
+message = "@ radix lane \"{lane}\" rejects this function body: breakable blocks are outside the v1 AIR subset"
+help = "keep the v1 AIR subset pure: immutable locals, pure expressions, AIR-lane calls, and tensor arithmetic intrinsics only"
+
+[diagnostics.SEM059.issues.cede]
+message = "@ radix lane \"{lane}\" rejects this function body: `cede` is outside the v1 AIR subset"
+help = "keep the v1 AIR subset pure: immutable locals, pure expressions, AIR-lane calls, and tensor arithmetic intrinsics only"
+
+[diagnostics.SEM059.issues.cli_mounted_function]
+message = "@ radix lane \"{lane}\" rejects this function body: CLI-mounted functions are outside the v1 AIR subset"
+help = "keep the v1 AIR subset pure: immutable locals, pure expressions, AIR-lane calls, and tensor arithmetic intrinsics only"
+
+[diagnostics.SEM059.issues.closure]
+message = "@ radix lane \"{lane}\" rejects this function body: closures are outside the v1 AIR subset"
+help = "keep the v1 AIR subset pure: immutable locals, pure expressions, AIR-lane calls, and tensor arithmetic intrinsics only"
+
+[diagnostics.SEM059.issues.conditional_recovery]
+message = "@ radix lane \"{lane}\" rejects this function body: conditional recovery is outside the v1 AIR subset"
+help = "keep the v1 AIR subset pure: immutable locals, pure expressions, AIR-lane calls, and tensor arithmetic intrinsics only"
+
+[diagnostics.SEM059.issues.defaulted_parameter]
+message = "@ radix lane \"{lane}\" rejects this function body: defaulted parameters are outside the v1 AIR subset"
+help = "keep the v1 AIR subset pure: immutable locals, pure expressions, AIR-lane calls, and tensor arithmetic intrinsics only"
+
+[diagnostics.SEM059.issues.deferred_local_init]
+message = "@ radix lane \"{lane}\" rejects this function body: deferred local initialization is outside the v1 AIR subset"
+help = "keep the v1 AIR subset pure: immutable locals, pure expressions, AIR-lane calls, and tensor arithmetic intrinsics only"
+
+[diagnostics.SEM059.issues.diagnostic_output]
+message = "@ radix lane \"{lane}\" rejects this function body: diagnostic output is a host effect outside the v1 AIR subset"
+help = "keep the v1 AIR subset pure: immutable locals, pure expressions, AIR-lane calls, and tensor arithmetic intrinsics only"
+
+[diagnostics.SEM059.issues.dum_loop]
+message = "@ radix lane \"{lane}\" rejects this function body: `dum` loops are outside the v1 AIR subset"
+help = "keep the v1 AIR subset pure: immutable locals, pure expressions, AIR-lane calls, and tensor arithmetic intrinsics only"
+
+[diagnostics.SEM059.issues.expression_ad]
+message = "@ radix lane \"{lane}\" rejects this function body: expression-form ad is outside the v1 AIR subset"
+help = "keep the v1 AIR subset pure: immutable locals, pure expressions, AIR-lane calls, and tensor arithmetic intrinsics only"
+
+[diagnostics.SEM059.issues.expression_statement]
+message = "@ radix lane \"{lane}\" rejects this function body: expression statements are outside the v1 AIR subset"
+help = "keep the v1 AIR subset pure: immutable locals, pure expressions, AIR-lane calls, and tensor arithmetic intrinsics only"
+
+[diagnostics.SEM059.issues.generator_function]
+message = "@ radix lane \"{lane}\" rejects this function body: generator functions are outside the v1 AIR subset"
+help = "keep the v1 AIR subset pure: immutable locals, pure expressions, AIR-lane calls, and tensor arithmetic intrinsics only"
+
+[diagnostics.SEM059.issues.gradient_expression_unsupported]
+message = "@ radix lane \"{lane}\" rejects this function body: postfix gradient selection (`call(...) ∇ [places]`) is not lowered until the tensor-glyphs 2B autograd surface lands; no operand, selector, or result rule is active in Phase 2A"
+help = "gradient selection (`∇`) is parse-only in Phase 2A; the eligibility/selector rules land with tensor-glyphs 2B"
+
+[diagnostics.SEM059.issues.iace]
+message = "@ radix lane \"{lane}\" rejects this function body: `iace` is outside the v1 AIR subset"
+help = "keep the v1 AIR subset pure: immutable locals, pure expressions, AIR-lane calls, and tensor arithmetic intrinsics only"
+
+[diagnostics.SEM059.issues.inc_dec_mutation]
+message = "@ radix lane \"{lane}\" rejects this function body: increment/decrement mutation is outside the v1 AIR subset"
+help = "keep the v1 AIR subset pure: immutable locals, pure expressions, AIR-lane calls, and tensor arithmetic intrinsics only"
+
+[diagnostics.SEM059.issues.input_read]
+message = "@ radix lane \"{lane}\" rejects this function body: input reads are host effects outside the v1 AIR subset"
+help = "keep the v1 AIR subset pure: immutable locals, pure expressions, AIR-lane calls, and tensor arithmetic intrinsics only"
+
+[diagnostics.SEM059.issues.itera_loop]
+message = "@ radix lane \"{lane}\" rejects this function body: `itera` loops are outside the v1 AIR subset"
+help = "keep the v1 AIR subset pure: immutable locals, pure expressions, AIR-lane calls, and tensor arithmetic intrinsics only"
+
+[diagnostics.SEM059.issues.kernel_device_function]
+message = "@ radix lane \"{lane}\" rejects this function body: kernel/device functions are outside the v1 AIR subset"
+help = "keep the v1 AIR subset pure: immutable locals, pure expressions, AIR-lane calls, and tensor arithmetic intrinsics only"
+
+[diagnostics.SEM059.issues.loop]
+message = "@ radix lane \"{lane}\" rejects this function body: loops are outside the v1 AIR subset"
+help = "keep the v1 AIR subset pure: immutable locals, pure expressions, AIR-lane calls, and tensor arithmetic intrinsics only"
+
+[diagnostics.SEM059.issues.loop_control]
+message = "@ radix lane \"{lane}\" rejects this function body: loop control is outside the v1 AIR subset"
+help = "keep the v1 AIR subset pure: immutable locals, pure expressions, AIR-lane calls, and tensor arithmetic intrinsics only"
+
+[diagnostics.SEM059.issues.method_call]
+message = "@ radix lane \"{lane}\" rejects this function body: method call `{method}` is outside the v1 AIR subset"
+help = "keep the v1 AIR subset pure: immutable locals, pure expressions, AIR-lane calls, and tensor arithmetic intrinsics only"
+
+[diagnostics.SEM059.issues.missing_body]
+message = "@ radix lane \"{lane}\" rejects this function body: AIR-lane functions must have a body"
+help = "keep the v1 AIR subset pure: immutable locals, pure expressions, AIR-lane calls, and tensor arithmetic intrinsics only"
+
+[diagnostics.SEM059.issues.mori]
+message = "@ radix lane \"{lane}\" rejects this function body: `mori` is outside the v1 AIR subset"
+help = "keep the v1 AIR subset pure: immutable locals, pure expressions, AIR-lane calls, and tensor arithmetic intrinsics only"
+
+[diagnostics.SEM059.issues.mutable_varia]
+message = "@ radix lane \"{lane}\" rejects this function body: mutable `var` bindings are outside the v1 AIR subset"
+help = "keep the v1 AIR subset pure: immutable locals, pure expressions, AIR-lane calls, and tensor arithmetic intrinsics only"
+
+[diagnostics.SEM059.issues.named_call_arg]
+message = "@ radix lane \"{lane}\" rejects this function body: named call arguments are outside the v1 AIR subset"
+help = "keep the v1 AIR subset pure: immutable locals, pure expressions, AIR-lane calls, and tensor arithmetic intrinsics only"
+
+[diagnostics.SEM059.issues.non_air_call]
+message = "@ radix lane \"{lane}\" rejects this function body: calls from AIR-lane functions must target another AIR-lane function"
+help = "keep the v1 AIR subset pure: immutable locals, pure expressions, AIR-lane calls, and tensor arithmetic intrinsics only"
+
+[diagnostics.SEM059.issues.optional_null_chain]
+message = "@ radix lane \"{lane}\" rejects this function body: optional/null assertion chains are outside the v1 AIR subset"
+help = "keep the v1 AIR subset pure: immutable locals, pure expressions, AIR-lane calls, and tensor arithmetic intrinsics only"
+
+[diagnostics.SEM059.issues.recoverable_handler]
+message = "@ radix lane \"{lane}\" rejects this function body: recoverable handlers are outside the v1 AIR subset"
+help = "keep the v1 AIR subset pure: immutable locals, pure expressions, AIR-lane calls, and tensor arithmetic intrinsics only"
+
+[diagnostics.SEM059.issues.reference_place_op]
+message = "@ radix lane \"{lane}\" rejects this function body: reference/place operations are outside the v1 AIR subset"
+help = "keep the v1 AIR subset pure: immutable locals, pure expressions, AIR-lane calls, and tensor arithmetic intrinsics only"
+
+[diagnostics.SEM059.issues.runtime_assertion]
+message = "@ radix lane \"{lane}\" rejects this function body: runtime assertions are outside the v1 AIR subset"
+help = "keep the v1 AIR subset pure: immutable locals, pure expressions, AIR-lane calls, and tensor arithmetic intrinsics only"
+
+[diagnostics.SEM059.issues.runtime_conversion]
+message = "@ radix lane \"{lane}\" rejects this function body: runtime `↦` conversion is outside the v1 AIR subset"
+help = "keep the v1 AIR subset pure: immutable locals, pure expressions, AIR-lane calls, and tensor arithmetic intrinsics only"
+
+[diagnostics.SEM059.issues.runtime_provided_binding]
+message = "@ radix lane \"{lane}\" rejects this function body: runtime-provided bindings are outside the v1 AIR subset"
+help = "keep the v1 AIR subset pure: immutable locals, pure expressions, AIR-lane calls, and tensor arithmetic intrinsics only"
+
+[diagnostics.SEM059.issues.runtime_variant_check]
+message = "@ radix lane \"{lane}\" rejects this function body: runtime `est` variant check is outside the v1 AIR subset"
+help = "keep the v1 AIR subset pure: immutable locals, pure expressions, AIR-lane calls, and tensor arithmetic intrinsics only"
+
+[diagnostics.SEM059.issues.spread_call_arg]
+message = "@ radix lane \"{lane}\" rejects this function body: spread call arguments are outside the v1 AIR subset"
+help = "keep the v1 AIR subset pure: immutable locals, pure expressions, AIR-lane calls, and tensor arithmetic intrinsics only"
+
+[diagnostics.SEM059.issues.tacet]
+message = "@ radix lane \"{lane}\" rejects this function body: `tacet` is outside the v1 AIR subset"
+help = "keep the v1 AIR subset pure: immutable locals, pure expressions, AIR-lane calls, and tensor arithmetic intrinsics only"
+
+[diagnostics.WARN001]
+message = "unused variable"
+help = "remove the variable or prefix it with '_'"
+
+[diagnostics.WARN001.issues.unused_variable]
+message = "unused variable"
+help = "remove the variable or prefix it with '_'"
+
+[diagnostics.WARN001.issues.unused_binding]
+message = "unused binding"
+help = "remove the variable or prefix it with '_'"
+
+[diagnostics.WARN002]
+message = "unused import"
+help = "remove the unused import"
+
+[diagnostics.WARN002.issues.unused_import]
+message = "unused import"
+help = "remove the unused import"
+
+[diagnostics.WARN003]
+message = "unused function"
+help = "remove the function or mark it as used"
+
+[diagnostics.WARN003.issues.unused_function]
+message = "unused function"
+help = "remove the function or mark it as used"
+
+[diagnostics.WARN004]
+message = "unreachable code"
+help = "remove unreachable code"
+
+[diagnostics.WARN004.issues.unreachable_code]
+message = "unreachable code"
+help = "remove unreachable code"
+
+[diagnostics.WARN005]
+message = "unnecessary cast"
+help = "remove the redundant cast"
+
+[diagnostics.WARN005.issues.unnecessary_cast]
+message = "unnecessary cast: type is already known"
+help = "remove the redundant cast"
+
+[diagnostics.WARN007]
+message = "target no-op"
+help = "remove the construct or gate it by target"
+
+[diagnostics.WARN008]
+message = "unused mutable reference parameter"
+help = "change '{in}' to '{de}' if mutation is unnecessary"
+
+[diagnostics.WARN008.issues.unused_in_parameter]
+message = "`in` parameter is never mutated; consider `de`"
+help = "change '{in}' to '{de}' if mutation is unnecessary"
+
+[diagnostics.WARN009]
+message = "unused move parameter"
+help = "change '{ex}' to '{de}' if ownership transfer is unnecessary"
+
+[diagnostics.WARN009.issues.unused_ex_parameter]
+message = "`ex` parameter is never consumed; consider `de`"
+help = "change '{ex}' to '{de}' if ownership transfer is unnecessary"
+
+[diagnostics.WARN010]
+message = "explicit ignotum annotation"
+help = "prefer a concrete type annotation to keep type-checking precise"
+
+[diagnostics.WARN010.issues.explicit_ignotum_annotation]
+message = "explicit ignotum annotation disables precise type-checking"
+help = "prefer a concrete type annotation to keep type-checking precise"
+
+[diagnostics.WARN011]
+message = "wildcard absorbs null"
+help = "add an explicit `{casu} {nihil}` arm so the null case is handled deliberately"
+
+[diagnostics.WARN011.issues.wildcard_absorbs_null]
+message = "catchall arm absorbs null case of nullable scrutinee; use an explicit '{casu}' {nil} arm"
+help = "add an explicit `{casu} {nihil}` arm so the null case is handled deliberately"
+
+[diagnostics.WARN013]
+message = "unnecessary var"
+help = "use `const` when the binding is never reassigned or mutated"
+
+[diagnostics.WARN013.issues.unnecessary_varia]
+message = "unnecessary var: binding is never reassigned or mutated"
+help = "use `const` when the binding is never reassigned or mutated"
+
+[diagnostics.WARN014]
+message = "file interface skipped unsupported export"
+help = "use a supported export from the module, or wait for fuller file-interface coverage of this signature"
+
+[diagnostics.WARN014.issues.file_interface_export_skipped]
+message = "file interface skipped export `{namespace}.{export}` ({reason}); other exports still available"
+help = "use a supported export from the module, or wait for fuller file-interface coverage of this signature"
+
+[diagnostics.WARN015]
+message = "unrecognized curata allocator name"
+help = "use a recognized allocator name (\"arena\", \"page\", \"alloc\", or \"allocator\")"
+
+[diagnostics.WARN015.issues.unrecognized_curata_allocator]
+message = "curata allocator name '{name}' is not a recognized allocator contract"
+help = "use a recognized allocator name (\"arena\", \"page\", \"alloc\", or \"allocator\")"
+
+[diagnostics.WARN016]
+message = "monomorphic hole solved to multi-member union"
+help = "use an explicit union type or a `∪` hole if a sum was intended"
+
+[diagnostics.WARN016.issues.monomorphic_hole_solved_to_union]
+message = "monomorphic hole `_` solved to multi-member union `{union}`"
+help = "use an explicit union type or a `∪` hole if a sum was intended"
+
+[diagnostics.WARN017]
+message = "union hole solved monomorphically"
+help = "use `_` if only one type is intended"
+
+[diagnostics.WARN017.issues.union_hole_solved_monomorphically]
+message = "union hole `∪` solved to single type `{type}`"
+help = "use `_` if only one type is intended"
+
+[diagnostics.WARN018]
+message = "long string concatenation; prefer a string template"
+help = "use a string template (\"…§…\"(args)) for long concatenation chains"
+
+[diagnostics.WARN018.issues.prefer_string_template]
+message = "long string concatenation; prefer a string template"
+help = "use a string template (\"…§…\"(args)) for long concatenation chains"
+
+[diagnostics.WARN019]
+message = "`mut` locals are discouraged; prefer a `mut` parameter"
+help = "declare the exclusive borrow as a `mut` parameter instead of a local"
+
+[diagnostics.WARN019.issues.mut_local]
+message = "`mut` locals are discouraged; prefer a `mut` parameter"
+help = "declare the exclusive borrow as a `mut` parameter instead of a local"
+
+[diagnostics.WARN021]
+message = "binding shadows the empty-collection marker"
+help = "choose a different binding name when the empty-collection marker is needed"
+
+[diagnostics.WARN021.issues.empty_marker_shadowing]
+message = "binding shadows the empty-collection marker"
+help = "choose a different binding name when the empty-collection marker is needed"
+
+[diagnostics.WARN022]
+message = "unbounded textus scalar index walks UTF-8 and traps on non-ASCII scalars"
+help = "convert to textus<N> for O(1) indexing or iterate scalars"
+
+[diagnostics.WARN022.issues.unbounded_textus_index]
+message = "unbounded textus scalar index walks UTF-8 and traps on non-ASCII scalars"
+help = "convert to textus<N> for O(1) indexing or iterate scalars"
+
+[diagnostics.WARN023]
+message = "type test names a member its union cannot hold"
+help = "narrow with a member the union declares, or fix the tested type"
+
+[diagnostics.WARN023.issues.type_test_member_absent]
+message = "type test `{type}` is dead: not a member of `{union}`"
+help = "narrow with a member the union declares, or fix the tested type"
+
+[diagnostics.WARN024]
+message = "union of nominal members guarantees only the common members"
+help = "narrow with `est`/`discerne` to recover per-member access; both-at-once is `∩`"
+
+[diagnostics.WARN024.issues.union_nominal_members]
+message = "union `{union}` guarantees only the common members; narrow to recover per-member access"
+help = "narrow with `est`/`discerne` to recover per-member access; both-at-once is `∩`"
+
+[diagnostics.WARN025]
+message = "union shares no members; store-only until narrowed"
+help = "narrow with `est`/`discerne` before any member access; the union itself is store-only"
+
+[diagnostics.WARN025.issues.union_no_common_members]
+message = "union `{union}` shares no members; it is store-only until narrowed"
+help = "narrow with `est`/`discerne` before any member access; the union itself is store-only"
+
+[diagnostics.WARN026]
+message = "same-name method with disagreeing signatures is not common"
+help = "align the constituent signatures or rename one method to keep it common"
+
+[diagnostics.WARN026.issues.union_method_signature_shadowed]
+message = "method `{method}` is not common in `{union}`: constituent signatures disagree"
+help = "align the constituent signatures or rename one method to keep it common"

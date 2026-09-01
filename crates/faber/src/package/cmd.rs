@@ -130,7 +130,7 @@ pub fn cmd_build(command: radix::services::BuildCommand, format: bool, linter: b
         }
     } else {
         let config = match super::locale::default_config_with_locale(target) {
-            Ok(config) => config.with_dev_stdlib().with_warn_policy(warn_policy),
+            Ok(config) => config.with_dev_locale_root().with_warn_policy(warn_policy),
             Err(diag) => fail_with_diagnostic(&diag),
         };
         let locale_pack = config.locale_pack.clone();

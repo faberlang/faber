@@ -63,7 +63,7 @@ pub(crate) fn faber_roundtrip(source: &str) -> String {
     let session = Session::new(
         Config::default()
             .with_resolved_locale_pack(pack.clone())
-            .with_dev_stdlib(),
+            .with_dev_locale_root(),
     );
     let first = reemit_faber(&session, &pack, "roundtrip.fab", source);
     assert!(
@@ -108,7 +108,7 @@ pub(crate) fn faber_emit(name: &str, source: &str) -> crate::codegen::faber::Fab
         Config::default()
             .with_target(Target::HirFaber)
             .with_resolved_locale_pack(pack.clone())
-            .with_dev_stdlib(),
+            .with_dev_locale_root(),
     );
     reemit_faber(&session, &pack, name, source)
 }

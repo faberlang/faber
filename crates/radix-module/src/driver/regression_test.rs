@@ -322,7 +322,7 @@ fn compact_fac_closure_rejects_iace_without_local_error_channel() {
 
 #[test]
 fn compact_fac_closure_accepts_local_cape_without_error_channel() {
-    let session = Session::new(Config::default().with_dev_stdlib());
+    let session = Session::new(Config::default().with_dev_locale_root());
     let source = r#"incipit {
   fixum _ handled ← numerus n ∴ fac {
     iace "bad"
@@ -338,7 +338,7 @@ fn compact_fac_closure_accepts_local_cape_without_error_channel() {
 
 #[test]
 fn compact_fac_closure_cape_body_typechecks_with_redde() {
-    let session = Session::new(Config::default().with_dev_stdlib());
+    let session = Session::new(Config::default().with_dev_locale_root());
     let source = r#"functio parseFlag(textus value) → bivalens ⇥ textus {
   si value ≡ "bad" ergo iace "bad"
   redde verum

@@ -82,7 +82,7 @@ fn package_mir_unused_library_function_not_lowered() {
     // function-source must be absent.
     let dir = crate::test_support::test_temp_dir("s1u3-reach");
     let entry = write_reach_library_package(dir.as_ref());
-    let config = Config::default().with_stdlib(dir.join("libhome"));
+    let config = Config::default().with_library_home(dir.join("libhome"));
 
     with_interpreted_lowered_package_mir(&config, &entry, &crate::test_support::test_mir_seams(), |lowered| {
         let names = library_function_names(lowered);
@@ -177,7 +177,7 @@ fn package_mir_cross_library_call_keeps_callee_and_prunes_unused() {
     // callee must survive the closure.
     let dir = crate::test_support::test_temp_dir("s1u3-nested-reach");
     let entry = write_nested_reach_library_package(dir.as_ref());
-    let config = Config::default().with_stdlib(dir.join("libhome"));
+    let config = Config::default().with_library_home(dir.join("libhome"));
 
     with_interpreted_lowered_package_mir(
         &config,

@@ -1,0 +1,2983 @@
+[pack]
+id = "vi"
+schema_version = 1
+
+[keywords]
+discretio = "hợp_nhất"
+fixum = "hằng"
+functio = "hàm"
+genus = "kiểu"
+implendum = "giao_ước"
+importa = "nhập"
+modulus = "môđun"
+ordo = "liệt_kê"
+sit = "đặt"
+typus = "kiểu_tên"
+schema = "lược_đồ"
+columna = "cột"
+varia = "biến"
+abstractus = "trừu_tượng"
+ceteri = "còn_lại"
+curata = "được_sửa"
+errata = "lỗi"
+exitus = "thoát"
+generis = "tĩnh"
+iacit = "ném_lỗi"
+immutata = "bất_biến"
+interna = "nội_bộ"
+magnitudo = "kích_thước"
+nexum = "ràng_buộc"
+iuncta = "bộ"
+optiones = "lựa_chọn"
+prae = "tiền"
+praefixum = "tiền_tố"
+privata = "riêng_tư"
+protecta = "bảo_vệ"
+publica = "công_khai"
+sponte = "tự_nguyện"
+casu = "trường_hợp"
+ceterum = "mặc_định"
+custodi = "canh_gác"
+discerne = "phân_tích"
+dum = "trong_khi"
+elige = "chọn"
+ergo = "do_đó"
+fac = "làm"
+itera = "lặp"
+apud = "tại"
+secus = "khác"
+si = "nếu"
+sic = "thế"
+sin = "nếukhôngthì"
+perge = "tiếp"
+redde = "trả"
+rumpe = "dừng"
+tacet = "im_lặng"
+adfirma = "khẳng_định"
+cape = "bắt"
+capta = "bẫy"
+cede = "nhường"
+iace = "ném"
+mori = "chết"
+requirit = "yêu_cầu"
+reice = "từ_chối"
+clausura = "đóng"
+libera = "tự_do"
+falsum = "sai"
+nihil = "rỗng"
+verum = "đúng"
+nonnumerus = "nan"
+aut = "hoặc"
+est = "là"
+et = "và"
+non = "không"
+vel = "hoặc_nếu_rỗng"
+ego = "tôi"
+finge = "tạo"
+implet = "thực_thi"
+sub = "dưới"
+mone = "cảnh_báo"
+nota = "ghi_chú"
+scribe = "viết"
+vide = "xem"
+argumenta = "đối_số"
+cura = "chăm_sóc"
+incipiet = "bắt_đầu_bất_đồng_bộ"
+incipit = "bắt_đầu"
+ad = "gọi"
+fiet = "async"
+fiunt = "sinh"
+fient = "async_sinh"
+figendum = "đợi_hằng"
+variandum = "đợi_biến"
+reddet = "đợi_trả"
+tacebit = "đợi_bỏ"
+# Empty-collection expression marker (contextual, tokenless).
+vacua = "tập_rỗng"
+primus_quem = "primus_quem"
+ubi = "ubi"
+summa = "tổng"
+filum = "sợi"
+maxima = "lớn_nhất"
+minima = "nhỏ_nhất"
+de = "ra"
+ex = "từ"
+in = "vào"
+own = "sở_hữu"
+copy = "sao_chép"
+lege = "đọc"
+lineam = "dòng"
+omnia = "mọi"
+scriptum = "văn_bản_hóa"
+sparge = "rải"
+ut = "như"
+ante = "trước"
+inter = "giữa"
+intra = "trong"
+per = "qua"
+ab = "khoảng"
+usque = "tới"
+erratur = "mong_đợi_thất_bại"
+fragilis = "mong_manh"
+futurum = "việc_cần_làm"
+metior = "đo_lường"
+omitte = "bỏ_qua"
+postpara = "sau_chuẩn_bị"
+postparabit = "sẽ_sau_chuẩn_bị"
+praepara = "chuẩn_bị"
+praeparabit = "sẽ_chuẩn_bị"
+proba = "kiểm_thử"
+probandum = "đối_tượng_kiểm_thử"
+repete = "lặp_lại"
+solum = "chỉ"
+solum_in = "chỉ_trong"
+tag = "nhãn"
+temporis = "thời_gian"
+negativum = "âm"
+nonnihil = "không_rỗng"
+nonnulla = "không_null"
+nulla = "không_gì"
+positivum = "dương"
+cli = "cli"
+commune = "commune"
+cursor = "con_trỏ"
+futura = "tương_lai"
+imperium = "lệnh"
+operandus = "toán_hạng"
+optio = "tùy_chọn"
+conversion = "chuyển"
+conversio = "chuyển_đổi"
+nucleum = "hạt_nhân"
+vertex = "đỉnh"
+fragment = "mảnh"
+nondum = "không_ổn_định"
+verte = "đổi_tên"
+nomen = "tên"
+radix = "radix"
+brevis = "ngắn"
+descriptio = "mô_tả"
+longum = "dài"
+lane = "làn"
+ubique = "toàn_cục"
+
+[types]
+ascii = "ascii"
+textus = "văn_bản"
+numerus = "số"
+modulus = "môđun_kiểu"
+fractus = "thập_phân"
+bivalens = "logic"
+nihil = "rỗng_ty"
+vacuum = "trống"
+numquam = "không_bao_giờ"
+ignotum = "chưa_biết"
+octeti = "byte"
+regex = "chính_quy"
+json = "json"
+valor = "giá_trị"
+instans = "thời_điểm"
+objectum = "đối_tượng"
+quidlibet = "bất_kỳ"
+lista = "danh_sách"
+# Shipped bounded forms: lista<T, N>, textus<N>, ascii<N>, octeti<N>.
+tabula = "bảng"
+copia = "tập_hợp"
+promissum = "lời_hứa"
+cursor = "bộ_lặp"
+queue = "hàng_đợi"
+stack = "ngăn_xếp"
+# Tensor family: real Vietnamese glosses (D1) — pack-owned, no inherits substitute.
+tensor = "ten_xo"
+vector = "vectơ"
+matrix = "ma_trận"
+sparsa = "thưa"
+atomic = "nguyên_tử"
+intervallum = "miền"
+# Tên kiểu chế độ xem quan hệ (S2-U5)
+filtrum = "bộ_lọc"
+series = "chuỗi"
+census = "điều_tra"
+ratio = "ratio"
+
+[diagnostics.UNRES001]
+message = "từ khóa '{keyword}' không được khai báo cho gói đọc '{pack}'"
+help = "dùng chính tả từ khóa được khai báo trong gói đọc cho vị trí ngữ pháp này"
+
+[diagnostics.UNRES002]
+message = "hàm nội tại '{intrinsic}' không được khai báo cho gói đọc '{pack}' trên họ bộ nhận '{receiver}'"
+help = "dùng chính tả hàm nội tại được khai báo trong gói đọc cho họ bộ nhận này"
+
+[diagnostics.UNRES003]
+message = "thành viên '{member}' không được khai báo cho gói đọc '{pack}' cho định danh '{identity}'"
+help = "dùng chính tả thành viên được khai báo trong gói đọc cho định danh thư viện này"
+
+[diagnostics.LOCALE002]
+message = "gói đọc '{pack}' thấy cách viết giống từ khóa '{spelling}'"
+help = "dùng '{suggestion}' nếu bạn muốn từ khóa đó; '{spelling}' vẫn là tên hợp lệ như đã viết"
+
+[diagnostics.LEX001]
+message = "literal chuỗi chưa được kết thúc"
+help = "đóng literal chuỗi trước cuối dòng hoặc tệp"
+
+[diagnostics.LEX001.issues.unterminated_ascii_literal]
+message = "literal ASCII chưa được kết thúc"
+help = "đóng literal chuỗi trước cuối dòng hoặc tệp"
+
+[diagnostics.LEX001.issues.newline_in_ascii_literal]
+message = "literal ASCII chưa được kết thúc (có dòng mới trong literal)"
+help = "đóng literal chuỗi trước cuối dòng hoặc tệp"
+
+[diagnostics.LEX001.issues.unterminated_backtick_template_literal]
+message = "literal mẫu dấu huyền chưa được kết thúc"
+help = "đóng literal chuỗi trước cuối dòng hoặc tệp"
+
+[diagnostics.LEX001.issues.unterminated_octeti_literal]
+message = "literal octeti chưa được kết thúc"
+help = "đóng literal chuỗi trước cuối dòng hoặc tệp"
+
+[diagnostics.LEX001.issues.unterminated_string_literal]
+message = "literal chuỗi chưa được kết thúc"
+help = "đóng literal chuỗi trước cuối dòng hoặc tệp"
+
+[diagnostics.LEX001.issues.newline_in_string_literal]
+message = "literal chuỗi chưa được kết thúc (có dòng mới trong chuỗi)"
+help = "đóng literal chuỗi trước cuối dòng hoặc tệp"
+
+[diagnostics.LEX001.issues.unterminated_guillemet_block_string_literal]
+message = "literal chuỗi khối dấu ngoặc kép chưa được kết thúc"
+help = "đóng literal chuỗi trước cuối dòng hoặc tệp"
+
+[diagnostics.LEX002]
+message = "literal số không hợp lệ"
+help = "kiểm tra dấu phân cách số và tiền tố cơ số"
+
+[diagnostics.LEX002.issues.invalid_hexadecimal_number]
+message = "số thập lục phân không hợp lệ"
+help = "kiểm tra dấu phân cách số và tiền tố cơ số"
+
+[diagnostics.LEX002.issues.invalid_binary_number]
+message = "số nhị phân không hợp lệ"
+help = "kiểm tra dấu phân cách số và tiền tố cơ số"
+
+[diagnostics.LEX002.issues.invalid_octal_number]
+message = "số bát phân không hợp lệ"
+help = "kiểm tra dấu phân cách số và tiền tố cơ số"
+
+[diagnostics.LEX002.issues.invalid_floating_point_number]
+message = "số dấu phẩy động không hợp lệ"
+help = "kiểm tra dấu phân cách số và tiền tố cơ số"
+
+[diagnostics.LEX002.issues.invalid_integer]
+message = "số nguyên không hợp lệ"
+help = "kiểm tra dấu phân cách số và tiền tố cơ số"
+
+[diagnostics.LEX003]
+message = "chuỗi escape không hợp lệ"
+help = "dùng chuỗi escape được hỗ trợ hoặc escape dấu gạch chéo ngược"
+
+[diagnostics.LEX004]
+message = "ký tự không mong đợi"
+help = "xóa ký tự này hoặc escape nếu cần dùng như ký tự literal"
+
+[diagnostics.LEX004.issues.unexpected_character]
+message = "ký tự không mong đợi: {char}"
+help = "xóa ký tự này hoặc escape nếu cần dùng như ký tự literal"
+
+[diagnostics.LEX005]
+message = "chỉ thị section đã bị gỡ bỏ"
+help = "đặt metadata tệp trong frontmatter TOML +++ ở dòng 1 thay cho chỉ thị section đầu dòng"
+
+[diagnostics.LEX005.issues.removed_section_directive]
+message = "chỉ thị § ở phạm vi tệp đã bị gỡ bỏ; dùng frontmatter +++"
+help = "đặt metadata tệp trong frontmatter TOML +++ ở dòng 1 thay cho chỉ thị § đầu dòng"
+
+[diagnostics.LEX006]
+message = "cú pháp comment không hợp lệ"
+help = "đặt # trước comment thay cho // hoặc /* */"
+
+[diagnostics.LEX006.issues.c_style_line_comment]
+message = "comment // kiểu C không hợp lệ trong Faber; dùng # cho comment dòng"
+help = "đặt # trước comment thay cho // hoặc /* */"
+
+[diagnostics.LEX006.issues.c_style_block_comment]
+message = "comment khối /* */ kiểu C không hợp lệ trong Faber; dùng # cho comment dòng"
+help = "đặt # trước comment thay cho // hoặc /* */"
+
+[diagnostics.LEX006.issues.unterminated_c_style_block_comment]
+message = "comment khối kiểu C chưa được kết thúc; Faber dùng # cho comment dòng"
+help = "đặt # trước comment thay cho // hoặc /* */"
+
+[diagnostics.LEX007]
+message = "không chấp nhận comment nội dòng"
+help = "đặt comment # trên dòng riêng phía trên đoạn mã mà nó mô tả"
+
+[diagnostics.LEX007.issues.inline_hash_after_code]
+message = "comment # phải bắt đầu một dòng; chuyển comment này lên phía trên đoạn mã"
+help = "đặt comment # trên dòng riêng phía trên đoạn mã mà nó mô tả"
+
+[diagnostics.PARSE000]
+message = "lỗi lexer trong khi phân tích cú pháp"
+help = "sửa lỗi lexer trước; quá trình phân tích tiếp tục từ các token sạch"
+
+[diagnostics.PARSE001]
+message = "cần token"
+help = "đảm bảo token cần thiết có mặt tại vị trí này"
+
+[diagnostics.PARSE001.issues.annotation_name]
+message = "cần tên annotation"
+help = "thêm tên annotation sau @"
+
+[diagnostics.PARSE001.issues.secus_si_else_if]
+message = "dùng 'sin' cho else-if"
+help = "thay secus si bằng sin"
+
+[diagnostics.PARSE001.issues.itera_mode]
+message = "cần {expected}"
+help = "chọn một chế độ lặp trước biểu thức có thể lặp"
+
+[diagnostics.PARSE001.issues.allocator_kind]
+message = "cần {expected}"
+help = "dùng \"arena\" hoặc \"page\" làm loại bộ cấp phát"
+
+[diagnostics.PARSE001.issues.mutability_marker]
+message = "cần {expected}"
+help = "thêm fixum hoặc varia trước tên binding"
+
+[diagnostics.PARSE001.issues.itera_de_requires_fixum]
+message = "itera de bindings are always const; use {expected}"
+help = "de binds an index or key, not a mutable element; use the const form"
+
+[diagnostics.PARSE001.issues.duplicate_rest_pattern]
+message = "pattern rest đã được chỉ định"
+help = "chỉ giữ một binding rest '{keyword}'"
+
+[diagnostics.PARSE001.issues.sit_identifier_binding]
+message = "'{keyword}' liên kết trực tiếp với một identifier; dùng '{keyword}' name ← expr"
+help = "viết '{keyword}' name ← expr hoặc dùng fixum cho binding có kiểu hoặc destructure"
+
+[diagnostics.PARSE001.issues.sit_no_destructuring]
+message = "sit không hỗ trợ pattern destructure"
+help = "dùng fixum với pattern destructure"
+
+[diagnostics.PARSE001.issues.test_case_or_setup]
+message = "cần test case hoặc setup"
+help = "bắt đầu mục body bằng '{proba}', '{probandum}' hoặc '{setup}'"
+
+[diagnostics.PARSE001.issues.test_modifier_integer]
+message = "cần số nguyên sau '{modifier}'"
+help = "đặt literal số nguyên sau '{modifier}'"
+
+[diagnostics.PARSE001.issues.tensor_figura_after_element]
+message = "tensor cần shape Figura sau kiểu phần tử"
+help = "thêm dấu phẩy và shape Figura, ví dụ tensor<T, []>"
+
+[diagnostics.PARSE001.issues.sparsa_figura_after_element]
+message = "sparsa cần shape Figura sau kiểu phần tử"
+help = "thêm dấu phẩy và shape Figura, ví dụ sparsa<T, []>"
+
+[diagnostics.PARSE001.issues.vector_width_after_element]
+message = "vector cần width sau kiểu phần tử"
+help = "thêm dấu phẩy và width vector, ví dụ vector<T, [4]>"
+
+[diagnostics.PARSE001.issues.matrix_figura_after_element]
+message = "matrix cần shape Figura hai chiều sau kiểu phần tử"
+help = "thêm dấu phẩy và shape, ví dụ matrix<T, [4, 4]>"
+
+[diagnostics.PARSE001.issues.atomic_single_element]
+message = "atomic nhận đúng một kiểu phần tử"
+help = "xóa tham số kiểu thừa; dùng atomic<T>"
+
+[diagnostics.PARSE001.issues.retired_type_call_constructor]
+message = "constructor gọi kiểu không phải cú pháp Faber"
+help = "dùng value ↦ Type hoặc constructor thư viện có tên"
+
+[diagnostics.PARSE001.issues.retired_prefix_predicate]
+message = "{predicate} không còn là cú pháp predicate tiền tố"
+help = "viết lại bằng {replacement}"
+
+[diagnostics.PARSE001.issues.equality_non_missing_est]
+message = "cần 'est' sau 'non' trong biểu thức equality"
+help = "viết phủ định identity là non est"
+
+[diagnostics.PARSE001.issues.est_non_spelling]
+message = "'est non' không phải cách viết phủ định identity"
+help = "dùng non est cho phủ định identity"
+
+[diagnostics.PARSE001.issues.closure_body_start]
+message = "cần ':' hoặc block body sau các parameter của closure"
+help = "thêm : cho body biểu thức hoặc block body"
+
+[diagnostics.PARSE001.issues.ad_ascii_route]
+message = "cần route literal ASCII sau 'ad'"
+help = "viết route dưới dạng literal ASCII sau ad"
+
+[diagnostics.PARSE001.issues.json_quoted_key]
+message = "key JSON phải là chuỗi được đặt trong dấu nháy; dùng \"name\": value"
+help = "đặt key object JSON trong dấu nháy"
+
+[diagnostics.PARSE001.issues.json_string_key]
+message = "cần key chuỗi JSON"
+help = "bắt đầu key JSON bằng literal chuỗi"
+
+[diagnostics.PARSE001.issues.field_value_separator]
+message = "cần '='"
+help = "dùng = giữa tên field và giá trị"
+
+[diagnostics.PARSE001.issues.call_type_args_start]
+message = "cần '<'"
+help = "bắt đầu type arguments tại vị trí gọi bằng <"
+
+[diagnostics.PARSE001.issues.gradient_empty_selector_list]
+message = "danh sách gradient selector sau ∇ phải nêu tên ít nhất một primal call argument"
+help = "nêu tên các primal call arguments mà bạn muốn adjoints, ví dụ loss(x, y) ∇ [x]"
+
+[diagnostics.PARSE001.issues.requirit_iace]
+message = "cần '{iace}' sau điều kiện {requirit}"
+help = "viết {requirit} cond {iace} err"
+
+[diagnostics.PARSE001.issues.reice_iace]
+message = "cần '{iace}' sau điều kiện {reice}"
+help = "viết {reice} cond {iace} err"
+
+[diagnostics.PARSE001.issues.requirit_else_rejected]
+message = "'{secus}' không phải particle trên {requirit}"
+help = "dùng '{iace}' cho recoverable payload"
+
+[diagnostics.PARSE001.issues.reice_else_rejected]
+message = "'{secus}' không phải particle trên {reice}"
+help = "dùng '{iace}' cho recoverable payload"
+
+[diagnostics.PARSE001.issues.adfirma_else_rejected]
+message = "'{secus}' không phải particle trên {adfirma}"
+help = "dùng '{mori}' cho thông điệp panic tùy chọn"
+
+[diagnostics.PARSE002]
+message = "token không mong đợi"
+help = "xóa hoặc chuyển token không mong đợi đến vị trí đúng"
+
+[diagnostics.PARSE002.issues.json_unknown_identifier_value]
+message = "identifier JSON không phải giá trị JSON hợp lệ"
+help = "dùng true, false, null, chuỗi, số, object hoặc array"
+
+[diagnostics.PARSE002.issues.json_faber_keyword_value]
+message = "từ khóa Faber không phải giá trị JSON hợp lệ"
+help = "dùng true, false, null, chuỗi, số, object hoặc array"
+
+[diagnostics.PARSE002.issues.expected_json_value]
+message = "cần giá trị JSON"
+help = "cung cấp giá trị JSON"
+
+[diagnostics.PARSE002.issues.json_integer_underflow]
+message = "literal số nguyên JSON nhỏ hơn phạm vi numerus"
+help = "dùng giá trị numerus nằm trong phạm vi"
+
+[diagnostics.PARSE002.issues.expected_json_number_after_minus]
+message = "cần số sau '-' trong JSON"
+help = "đặt một số sau '-' trong JSON"
+
+[diagnostics.PARSE010]
+message = "declaration không hợp lệ"
+help = "kiểm tra từ khóa declaration và các phần bắt buộc"
+
+[diagnostics.PARSE010.issues.schema_inheritance]
+message = "schema không thể gắn sub, implet, hoặc interface"
+help = "giữ schema là tiêu đề quan hệ đơn thuần"
+
+[diagnostics.PARSE010.issues.schema_method]
+message = "schema không thể khai báo method"
+help = "khai báo method trên genus thay thế"
+
+[diagnostics.PARSE011]
+message = "cần tên hàm sau '{functio}'"
+help = "thêm tên hàm sau '{functio}'"
+
+[diagnostics.PARSE012]
+message = "cần body hàm cho declaration '{functio}'"
+help = "thêm '{block}' vào declaration hàm"
+
+[diagnostics.PARSE013]
+message = "cần tên class sau '{genus}'"
+help = "thêm tên class sau '{genus}'"
+
+[diagnostics.PARSE014]
+message = "cần body class sau declaration '{genus}'"
+help = "thêm block sau header declaration '{genus}'"
+
+[diagnostics.PARSE015]
+message = "parameter không hợp lệ"
+help = "kiểm tra syntax và thứ tự parameter"
+
+[diagnostics.PARSE015.issues.removed_fixus]
+message = "{keyword} đã bị gỡ bỏ; dùng {optional_marker} cho slot optional và {immutable_marker} cho local immutable trì hoãn"
+help = "đánh dấu slot parameter hoặc field optional bằng {optional_marker} sau tên"
+
+[diagnostics.PARSE016]
+message = "type parameter không hợp lệ"
+help = "kiểm tra danh sách type parameter về comma và identifier"
+
+[diagnostics.PARSE016.issues.removed_prae_typus]
+message = "'{keyword}' đã bị gỡ bỏ; khai báo generics bằng angle brackets: {replacement}"
+help = "viết generic parameters trước danh sách parameter, ví dụ {replacement}"
+
+[diagnostics.PARSE016.issues.type_param_after_magnitudo]
+message = "type parameters phải đứng trước parameters {size_param} trong danh sách generic"
+help = "di chuyển type parameters trước parameters {size_param}"
+
+[diagnostics.PARSE017]
+message = "modifier không hợp lệ"
+help = "di chuyển hoặc xóa modifier"
+
+[diagnostics.PARSE018]
+message = "annotation không hợp lệ"
+help = "thêm tên annotation sau '@'"
+
+[diagnostics.PARSE018.issues.invalid_modifier]
+message = "modifier @ {annotation} không hợp lệ"
+help = "dùng modifier @ {annotation} được hỗ trợ"
+
+[diagnostics.PARSE018.issues.empty_radix_typus_domain]
+message = "domain @ radix typus cần ít nhất một kiểu được phép"
+help = "liệt kê ít nhất một kiểu được phép sau in"
+
+[diagnostics.PARSE018.issues.expected_annotation_ident]
+message = "cần {context}"
+help = "thêm '{expected}' tại vị trí annotation này"
+
+[diagnostics.PARSE018.issues.unexpected_annotation_token]
+message = "token không mong đợi sau {context}"
+help = "xóa token annotation ở cuối"
+
+[diagnostics.PARSE018.issues.missing_nucleum_lane_value]
+message = "@ nucleum lane requires a string value"
+help = "use `@ nucleum lane \"position\"` or braced `lane = \"position\"`"
+
+[diagnostics.PARSE018.issues.non_string_nucleum_lane_value]
+message = "@ nucleum lane value must be a string literal"
+help = "use `@ nucleum lane \"position\"` or braced `lane = \"position\"`"
+
+[diagnostics.PARSE018.issues.wrong_locale_annotation]
+message = "annotation `@ {annotation}` chưa được khai báo trên bề mặt reader này"
+help = "dùng `@ {expected}` cho locale reader của tệp này"
+
+[diagnostics.PARSE019]
+message = "modifier bị lặp"
+help = "xóa modifier bị lặp"
+
+[diagnostics.PARSE020]
+message = "câu lệnh không hợp lệ"
+help = "dùng dạng câu lệnh hợp lệ"
+
+[diagnostics.PARSE020.issues.ad_expression_only]
+message = "ad chỉ hợp lệ ở vị trí biểu thức"
+help = "dùng {replacement}"
+
+[diagnostics.PARSE021]
+message = "thiếu điều kiện"
+help = "thêm một biểu thức điều kiện"
+
+[diagnostics.PARSE022]
+message = "cần khối '{block}' hoặc thân '{ergo}'"
+help = "thêm '{block}' hoặc giới thiệu một câu lệnh duy nhất bằng '{ergo}'"
+
+[diagnostics.PARSE026]
+message = "∴ chỉ dùng cho clausura rút gọn; dùng ergo cho thân một câu lệnh"
+help = "dùng 'ergo' cho thân một câu lệnh, hoặc đặt thân trong dấu ngoặc nhọn"
+
+[diagnostics.PARSE027]
+message = "ergo chỉ dùng cho thân một câu lệnh; dùng ∴ cho clausura rút gọn"
+help = "dùng '∴' giữa chữ ký clausura và thân của nó"
+
+[diagnostics.PARSE023]
+message = "cần mẫu như '{wildcard}' hoặc {identifier}"
+help = "dùng '{wildcard}', một literal, hoặc một mẫu {identifier}"
+
+[diagnostics.PARSE024]
+message = "cần nhánh '{casu}' hoặc mặc định '{ceterum}'"
+help = "bắt đầu nhánh dispatch bằng '{casu}' hoặc đóng bằng '{ceterum}'"
+
+[diagnostics.PARSE025]
+message = "giá trị case không hợp lệ"
+help = "dùng một biểu thức case hợp lệ"
+
+[diagnostics.PARSE030]
+message = "biểu thức không hợp lệ"
+help = "kiểm tra cú pháp biểu thức"
+
+[diagnostics.PARSE030.issues.conversio_recovery_uses_vel]
+message = "dùng ⇥ cho phục hồi conversio"
+help = "dùng ⇥; vel chỉ dùng cho phép hợp nhất nullish"
+
+[diagnostics.PARSE030.issues.expected_expression]
+message = "cần biểu thức"
+help = "cung cấp một biểu thức hợp lệ ở vị trí này"
+
+[diagnostics.PARSE030.issues.expression_ad_block]
+message = "ad dạng biểu thức không được có khối"
+help = "dùng ad 'route' (mở đầu) ↦ T mà không có khối"
+
+[diagnostics.PARSE030.issues.closure_block_body]
+message = "thân khối clausura phải dùng 'fac'"
+help = "viết thân clausura rút gọn sau ∴ dưới dạng {fac_body}"
+
+[diagnostics.PARSE030.issues.closure_fac_body_dum]
+message = "thân fac của clausura không thể dùng 'dum'"
+help = "xóa dum khỏi các thân fac của clausura"
+
+[diagnostics.PARSE031]
+message = "literal không hợp lệ"
+help = "kiểm tra dạng literal"
+
+[diagnostics.PARSE032]
+message = "toán tử không hợp lệ"
+help = "kiểm tra vị trí toán tử và các toán hạng"
+
+[diagnostics.PARSE033]
+message = "nhóm chưa được kết thúc"
+help = "đóng dấu phân cách nhóm"
+
+[diagnostics.PARSE034]
+message = "đối số lời gọi không hợp lệ"
+help = "kiểm tra cú pháp đối số lời gọi"
+
+[diagnostics.PARSE035]
+message = "truy cập thành viên không hợp lệ"
+help = "kiểm tra cú pháp truy cập thành viên"
+
+[diagnostics.PARSE036]
+message = "đích gán không hợp lệ"
+help = "chỉ gán cho các lvalue hợp lệ"
+
+[diagnostics.PARSE040]
+message = "kiểu không hợp lệ"
+help = "kiểm tra cú pháp kiểu"
+
+[diagnostics.PARSE040.issues.expected_type_name]
+message = "cần tên kiểu"
+help = "bắt đầu kiểu bằng một định danh, _, hoặc kiểu hàm"
+
+[diagnostics.PARSE040.issues.postfix_array_syntax]
+message = "cú pháp T[] hậu tố đã bị loại bỏ"
+help = "dùng lista<T>"
+
+[diagnostics.PARSE040.issues.lista_sugar_bracket_form]
+message = "cú pháp đường tắt lista không có dạng ngoặc vuông"
+help = "dùng đường tắt tensor cho các bộ đệm có hình dạng"
+
+[diagnostics.PARSE040.issues.matrix_sugar_missing_shape]
+message = "đường tắt matrix yêu cầu hình dạng ngoặc hai chiều"
+help = "viết đường tắt matrix dưới dạng mf32[4, 4]"
+
+[diagnostics.PARSE040.issues.lista_sugar_angle_bracket_form]
+message = "đường tắt lista chỉ là l+width trần"
+help = "dùng lista<...> cho dạng ngoặc nhọn"
+
+[diagnostics.PARSE040.issues.vector_sugar_angle_bracket_form]
+message = "đường tắt vector dùng độ rộng trong ngoặc vuông"
+help = "viết độ rộng bằng ngoặc vuông của đường tắt vector"
+
+[diagnostics.PARSE040.issues.type_sugar_angle_bracket_form]
+message = "đường tắt {sugar} dùng Figura trong ngoặc vuông"
+help = "viết hình dạng bằng ngoặc vuông độ rộng của đường tắt {sugar}"
+
+[diagnostics.PARSE040.issues.invalid_figura_index]
+message = "literal chỉ mục phải là số tự nhiên"
+help = "dùng chỉ mục hình dạng không âm"
+
+[diagnostics.PARSE040.issues.wrong_locale_type]
+message = "type '{type}' is not declared on this reader surface"
+help = "use the type spelling declared by this reader locale"
+
+[diagnostics.PARSE041]
+message = "chú thích kiểu không hợp lệ"
+help = "kiểm tra dạng chú thích kiểu"
+
+[diagnostics.PARSE042]
+message = "tham số kiểu chưa được kết thúc"
+help = "đóng danh sách tham số kiểu bằng '>'"
+
+[diagnostics.PARSE050]
+message = "import không hợp lệ"
+help = "kiểm tra cú pháp import"
+
+[diagnostics.PARSE050.issues.unknown_import_field]
+message = "trường import không xác định"
+help = "dùng ex, visibilitas, nomen, ut, hoặc omnia"
+
+[diagnostics.PARSE050.issues.missing_import_source]
+message = "bản ghi import yêu cầu nguồn ex"
+help = "thêm ex = \"path\" vào bản ghi import"
+
+[diagnostics.PARSE050.issues.mixed_wildcard_and_named_import]
+message = "import wildcard không thể đồng thời đặt tên một binding"
+help = "dùng riêng omnia, hoặc dùng nomen/ut cho import có tên"
+
+[diagnostics.PARSE050.issues.invalid_import_visibility]
+message = "visibility của import không hợp lệ"
+help = "dùng privata hoặc publica"
+
+[diagnostics.PARSE050.issues.import_name_inference_failed]
+message = "không thể suy ra tên import từ {path}"
+help = "ghi rõ nomen hoặc bí danh tường minh cho {path}"
+
+[diagnostics.SEM001]
+message = "biến chưa được định nghĩa"
+help = "khai báo biến trước khi dùng{?suggestion|; did you mean |?}"
+
+[diagnostics.SEM001.issues.name_not_variant]
+message = "tên không tham chiếu đến một variant"
+help = "khai báo biến trước khi dùng{?suggestion|; did you mean |?}"
+
+[diagnostics.SEM001.issues.unknown_identifier]
+message = "định danh không xác định"
+help = "khai báo biến trước khi dùng{?suggestion|; did you mean |?}"
+
+[diagnostics.SEM001.issues.scribe_callee]
+message = "định danh không xác định"
+help = "viết `{spelling} <expr>` không có ngoặc đơn cho câu lệnh xuất"
+
+[diagnostics.SEM001.issues.unknown_record_field]
+message = "trường bản ghi không xác định"
+help = "khai báo biến trước khi dùng{?suggestion|; did you mean |?}"
+
+[diagnostics.SEM001.issues.unknown_variant]
+message = "variant không xác định"
+help = "khai báo biến trước khi dùng{?suggestion|; did you mean |?}"
+
+[diagnostics.SEM001.issues.unknown_variant_fields]
+message = "các trường variant không xác định"
+help = "khai báo biến trước khi dùng{?suggestion|; did you mean |?}"
+
+[diagnostics.SEM002]
+message = "kiểu chưa được định nghĩa"
+help = "khai báo kiểu hoặc import kiểu đó"
+
+[diagnostics.SEM002.issues.figura_unknown_index]
+message = "tham số chỉ mục không xác định trong Figura"
+help = "khai báo kiểu hoặc import kiểu đó"
+
+[diagnostics.SEM002.issues.float_width_on_numerus]
+message = "f16, f32 và f64 là độ rộng fractus; dùng fractus<f16>, fractus<f32> hoặc fractus<f64>"
+help = "khai báo kiểu hoặc import kiểu đó"
+
+[diagnostics.SEM002.issues.integer_width_on_fractus]
+message = "ký hiệu độ rộng số nguyên là độ rộng numerus; dùng numerus<…>"
+help = "khai báo kiểu hoặc import kiểu đó"
+
+[diagnostics.SEM002.issues.invalid_precision_marker]
+message = "instans chỉ chấp nhận ms, us hoặc ns làm ký hiệu độ chính xác"
+help = "khai báo kiểu hoặc import kiểu đó"
+
+[diagnostics.SEM002.issues.invalid_fractus_width_marker]
+message = "fractus chỉ chấp nhận f16, f32 hoặc f64"
+help = "khai báo kiểu hoặc import kiểu đó"
+
+[diagnostics.SEM002.issues.invalid_numerus_width_marker]
+message = "ký hiệu độ rộng không xác định cho numerus"
+help = "khai báo kiểu hoặc import kiểu đó"
+
+[diagnostics.SEM002.issues.invalid_width_marker]
+message = "ký hiệu độ rộng không xác định cho họ kiểu này"
+help = "khai báo kiểu hoặc import kiểu đó"
+
+[diagnostics.SEM002.issues.name_not_type]
+message = "tên không tham chiếu đến một kiểu"
+help = "khai báo kiểu hoặc import kiểu đó"
+
+[diagnostics.SEM002.issues.precision_marker_params]
+message = "ký hiệu độ chính xác không thể nhận tham số"
+help = "khai báo kiểu hoặc import kiểu đó"
+
+[diagnostics.SEM002.issues.precision_marker_shape]
+message = "ký hiệu độ chính xác phải là cách viết trần như ms hoặc us"
+help = "khai báo kiểu hoặc import kiểu đó"
+
+[diagnostics.SEM002.issues.qualified_name_not_type]
+message = "tên đủ định danh không tham chiếu đến một kiểu"
+help = "khai báo kiểu hoặc import kiểu đó"
+
+[diagnostics.SEM002.issues.qualified_type_not_exported]
+message = "kiểu đủ định danh không được namespace xuất"
+help = "khai báo kiểu hoặc import kiểu đó"
+
+[diagnostics.SEM002.issues.qualified_type_prefix_not_namespace]
+message = "tiền tố kiểu đủ định danh phải đặt tên một namespace"
+help = "khai báo kiểu hoặc import kiểu đó"
+
+[diagnostics.SEM002.issues.schema_unknown_type]
+message = "kiểu cột đặt tên một kiểu không xác định"
+help = "khai báo kiểu hoặc nhập nó"
+
+[diagnostics.SEM002.issues.unknown_namespace]
+message = "namespace không xác định"
+help = "khai báo kiểu hoặc import kiểu đó"
+
+[diagnostics.SEM002.issues.unknown_qualified_type]
+message = "kiểu đủ định danh không xác định"
+help = "khai báo kiểu hoặc import kiểu đó"
+
+[diagnostics.SEM002.issues.unknown_struct]
+message = "struct không xác định"
+help = "khai báo kiểu hoặc import kiểu đó"
+
+[diagnostics.SEM002.issues.unknown_type]
+message = "kiểu không xác định"
+help = "khai báo kiểu hoặc import kiểu đó"
+
+[diagnostics.SEM002.issues.width_marker_params]
+message = "ký hiệu độ rộng không thể nhận tham số"
+help = "khai báo kiểu hoặc import kiểu đó"
+
+[diagnostics.SEM002.issues.width_marker_shape]
+message = "ký hiệu độ rộng phải là cách viết trần như i32 hoặc u8"
+help = "khai báo kiểu hoặc import kiểu đó"
+
+[diagnostics.SEM003]
+message = "hàm chưa được định nghĩa"
+help = "khai báo hàm hoặc import hàm đó"
+
+[diagnostics.SEM004]
+message = "thành viên chưa được định nghĩa"
+help = "kiểm tra tên và kiểu của thành viên"
+
+[diagnostics.SEM004.issues.duplicate_variant_field]
+message = "trường variant trùng lặp"
+help = "mỗi trường variant có tên chỉ được cung cấp nhiều nhất một lần"
+
+[diagnostics.SEM004.issues.missing_required_struct_field]
+message = "thiếu trường struct bắt buộc"
+help = "khởi tạo mọi trường struct bắt buộc"
+
+[diagnostics.SEM004.issues.missing_variant_field_name]
+message = "thiếu tên trường variant"
+help = "đặt tên cho mọi đối số variant khi dùng cách tạo variant có tên"
+
+[diagnostics.SEM004.issues.optional_receiver_requires_chain]
+message = "receiver tùy chọn yêu cầu chaining tùy chọn hoặc truy cập không null"
+help = "dùng ?. cho chaining tùy chọn hoặc !. cho truy cập không null"
+
+[diagnostics.SEM004.issues.struct_field_requires_value]
+message = "trường struct yêu cầu giá trị"
+help = "cung cấp giá trị cho trường struct"
+
+[diagnostics.SEM004.issues.unknown_field]
+message = "trường không xác định"
+help = "kiểm tra tên trường struct"
+
+[diagnostics.SEM004.issues.unknown_method]
+message = "phương thức không xác định"
+help = "kiểm tra kiểu receiver và tên phương thức"
+
+[diagnostics.SEM004.issues.unknown_struct_field]
+message = "trường struct không xác định"
+help = "kiểm tra tên trường struct"
+
+[diagnostics.SEM004.issues.unknown_variant_field]
+message = "trường variant không xác định"
+help = "kiểm tra tên trường variant"
+
+[diagnostics.SEM005]
+message = "định nghĩa trùng lặp"
+help = "đổi tên một trong các định nghĩa"
+
+[diagnostics.SEM005.issues.duplicate_definition]
+message = "định nghĩa trùng lặp"
+help = "đổi tên một trong các định nghĩa"
+
+[diagnostics.SEM005.issues.inferred_import_name_collision]
+message = "tên import suy ra xung đột với một định nghĩa hiện có"
+help = "thêm bí danh import tường minh bằng `ut` để binding đã import có tên duy nhất"
+
+[diagnostics.SEM005.issues.schema_duplicate_source]
+message = "hai tên hiển thị quy về cùng một tên nguồn"
+help = "đặt cho một cột tên nguồn khác"
+
+[diagnostics.SEM005.issues.schema_duplicate_visible]
+message = "hai cột khai báo cùng một tên công khai"
+help = "đổi tên một trong hai cột"
+
+[diagnostics.SEM006]
+message = "không tìm thấy import"
+help = "kiểm tra đường dẫn import"
+
+[diagnostics.SEM006.issues.kernel_glob_reexport]
+message = "không thể tái xuất các import glob `{path}` trong v1"
+help = "kiểm tra đường dẫn import"
+
+[diagnostics.SEM006.issues.kernel_glob_named_alias]
+message = "`{path}` phải được import dưới dạng bí danh glob có tên"
+help = "kiểm tra đường dẫn import"
+
+[diagnostics.SEM006.issues.kernel_invalid_path]
+message = "{reason}"
+help = "kiểm tra đường dẫn import"
+
+[diagnostics.SEM006.issues.kernel_unknown_module]
+message = "mô-đun kernel faber không xác định '{module}'; xem manifest host của faber"
+help = "kiểm tra đường dẫn import"
+
+[diagnostics.SEM006.issues.kernel_norma_json_in_script]
+message = "chế độ script sử dụng `{script_path}`; `{library_path}` chỉ dành cho package/library"
+help = "kiểm tra đường dẫn import"
+
+[diagnostics.SEM007]
+message = "phụ thuộc vòng"
+help = "phá vỡ chu trình giữa các mô-đun"
+
+[diagnostics.SEM007.issues.type_alias_cycle]
+message = "chu trình bí danh kiểu"
+help = "phá vỡ chu trình giữa các mô-đun"
+
+[diagnostics.SEM008]
+message = "lỗi hạ mức"
+help = "sửa cấu trúc AST để hạ mức"
+
+[diagnostics.SEM008.issues.array_destructuring_initializer]
+message = "phân rã mảng yêu cầu bộ khởi tạo"
+help = "sửa cấu trúc AST để hạ mức"
+
+[diagnostics.SEM008.issues.array_destructuring_not_expanded]
+message = "phải mở rộng phân rã mảng trước khi hạ mức câu lệnh"
+help = "sửa cấu trúc AST để hạ mức"
+
+[diagnostics.SEM008.issues.atomic_compiler_owned_syntax]
+message = "atomic yêu cầu cú pháp do trình biên dịch sở hữu; dùng atomic<T>"
+help = "sửa cấu trúc AST để hạ mức"
+
+[diagnostics.SEM008.issues.lista_arity]
+message = "lista yêu cầu một tham số kiểu"
+help = "dùng {lista}<T>; lista<T, N> là dạng bounded đã phát hành"
+
+[diagnostics.SEM008.issues.tabula_arity]
+message = "tabula yêu cầu hai tham số kiểu"
+help = "sửa cấu trúc AST để hạ mức"
+
+[diagnostics.SEM008.issues.copia_arity]
+message = "copia yêu cầu một tham số kiểu"
+help = "sửa cấu trúc AST để hạ mức"
+
+[diagnostics.SEM008.issues.promissum_arity]
+message = "promissum yêu cầu một tham số kiểu"
+help = "sửa cấu trúc AST để hạ mức"
+
+[diagnostics.SEM008.issues.cursor_arity]
+message = "cursor yêu cầu một tham số kiểu"
+help = "sửa cấu trúc AST để hạ mức"
+
+
+[diagnostics.SEM008.issues.queue_arity]
+message = "queue requires one or two type parameters"
+help = "use queue<T> or queue<T, N>"
+
+[diagnostics.SEM008.issues.stack_arity]
+message = "stack requires one or two type parameters"
+help = "use stack<T> or stack<T, N>"
+
+[diagnostics.SEM008.issues.discerne_casu_pattern_required]
+message = "discerne casu yêu cầu một mẫu"
+help = "sửa cấu trúc AST để hạ mức"
+
+[diagnostics.SEM008.issues.discerne_pattern_count]
+message = "số lượng mẫu discerne phải khớp với số lượng đối tượng"
+help = "sửa cấu trúc AST để hạ mức"
+
+[diagnostics.SEM008.issues.discerne_subject_required]
+message = "discerne yêu cầu ít nhất một đối tượng"
+help = "sửa cấu trúc AST để hạ mức"
+
+[diagnostics.SEM008.issues.duplicate_module_method_binding]
+message = "liên kết phương thức mô-đun trùng lặp trong khi hạ mức"
+help = "sửa cấu trúc AST để hạ mức"
+
+[diagnostics.SEM008.issues.ego_outside_method]
+message = "ego được dùng bên ngoài ngữ cảnh phương thức"
+help = "sửa cấu trúc AST để hạ mức"
+
+[diagnostics.SEM008.issues.elige_case_value_shape]
+message = "giá trị case của elige phải là literal hoặc biến thể enum"
+help = "sửa cấu trúc AST để hạ mức"
+
+[diagnostics.SEM008.issues.empty_qualified_type_path]
+message = "đường dẫn kiểu đủ điều kiện rỗng"
+help = "sửa cấu trúc AST để hạ mức"
+
+[diagnostics.SEM008.issues.empty_path_pattern]
+message = "mẫu đường dẫn rỗng"
+help = "sửa cấu trúc AST để hạ mức"
+
+[diagnostics.SEM008.issues.empty_union_type]
+message = "kiểu hợp rỗng"
+help = "sửa cấu trúc AST để hạ mức"
+
+[diagnostics.SEM008.issues.ex_destructuring_not_expanded]
+message = "phải mở rộng phân rã ex trước khi hạ mức câu lệnh"
+help = "sửa cấu trúc AST để hạ mức"
+
+[diagnostics.SEM008.issues.finge_cast_not_type]
+message = "phép ép kiểu finge phải nêu tên một kiểu"
+help = "sửa cấu trúc AST để hạ mức"
+
+[diagnostics.SEM008.issues.figura_not_index_param]
+message = "tên không tham chiếu đến một tham số chỉ mục"
+help = "sửa cấu trúc AST để hạ mức"
+
+[diagnostics.SEM008.issues.figura_type_param_in_index]
+message = "tham số kiểu không thể xuất hiện ở vị trí chỉ mục"
+help = "sửa cấu trúc AST để hạ mức"
+
+[diagnostics.SEM008.issues.figura_unknown_index]
+message = "biến chỉ mục không xác định trong Figura"
+help = "sửa cấu trúc AST để hạ mức"
+
+[diagnostics.SEM008.issues.float_width_on_numerus]
+message = "f16, f32 và f64 là độ rộng fractus; dùng fractus<f16>, fractus<f32> hoặc fractus<f64>"
+help = "sửa cấu trúc AST để hạ mức"
+
+[diagnostics.SEM008.issues.forma_builtin_missing]
+message = "genus forma dựng sẵn chưa được đăng ký"
+help = "sửa cấu trúc AST để hạ mức"
+
+[diagnostics.SEM008.issues.forma_literal_lowering_path]
+message = "literal mẫu forma phải được hạ mức qua forma capture"
+help = "sửa cấu trúc AST để hạ mức"
+
+[diagnostics.SEM008.issues.forma_literal_pattern]
+message = "literal mẫu forma không hợp lệ trong các mẫu"
+help = "sửa cấu trúc AST để hạ mức"
+
+[diagnostics.SEM008.issues.forma_params_field_missing]
+message = "genus forma dựng sẵn thiếu trường params"
+help = "sửa cấu trúc AST để hạ mức"
+
+[diagnostics.SEM008.issues.forma_template_field_missing]
+message = "genus forma dựng sẵn thiếu trường template"
+help = "sửa cấu trúc AST để hạ mức"
+
+[diagnostics.SEM008.issues.fractus_width_params]
+message = "fractus chấp nhận nhiều nhất một dấu độ rộng"
+help = "sửa cấu trúc AST để hạ mức"
+
+[diagnostics.SEM008.issues.integer_width_on_fractus]
+message = "các dấu độ rộng số nguyên là độ rộng numerus; dùng numerus<…>"
+help = "sửa cấu trúc AST để hạ mức"
+
+[diagnostics.SEM008.issues.instans_precision_params]
+message = "instans chấp nhận nhiều nhất một dấu độ chính xác"
+help = "sửa cấu trúc AST để hạ mức"
+
+[diagnostics.SEM008.issues.intervallum_arity]
+message = "intervallum yêu cầu một tham số kiểu"
+help = "sửa cấu trúc AST để hạ mức"
+
+[diagnostics.SEM008.issues.intervallum_bound]
+message = "kiểu cận của intervallum phải là numerus hoặc instans"
+help = "sửa cấu trúc AST để hạ mức"
+
+[diagnostics.SEM008.issues.atomic_arity]
+message = "atomic yêu cầu chính xác một kiểu phần tử; dùng atomic<T>"
+help = "sửa cấu trúc AST để hạ mức"
+
+[diagnostics.SEM008.issues.atomic_element]
+message = "kiểu phần tử atomic phải là numerus<i32> hoặc numerus<u32>"
+help = "sửa cấu trúc AST để hạ mức"
+
+[diagnostics.SEM008.issues.atomic_incomplete]
+message = "atomic yêu cầu một kiểu phần tử; dùng atomic<T>"
+help = "sửa cấu trúc AST để hạ mức"
+
+[diagnostics.SEM008.issues.invalid_fractus_width_marker]
+message = "fractus chỉ chấp nhận f16, f32 hoặc f64"
+help = "sửa cấu trúc AST để hạ mức"
+
+[diagnostics.SEM008.issues.invalid_lowered_expression]
+message = "biểu thức không hợp lệ được tạo ra trong khi hạ mức"
+help = "sửa cấu trúc AST để hạ mức"
+
+[diagnostics.SEM008.issues.invalid_numerus_width_marker]
+message = "dấu độ rộng không xác định cho numerus"
+help = "sửa cấu trúc AST để hạ mức"
+
+[diagnostics.SEM008.issues.invalid_precision_marker]
+message = "instans chỉ chấp nhận ms, us hoặc ns làm dấu độ chính xác"
+help = "sửa cấu trúc AST để hạ mức"
+
+[diagnostics.SEM008.issues.invalid_width_marker]
+message = "dấu độ rộng không xác định cho họ này"
+help = "sửa cấu trúc AST để hạ mức"
+
+[diagnostics.SEM008.issues.json_valor_pattern]
+message = "literal tài liệu JSON không hợp lệ trong các mẫu"
+help = "sửa cấu trúc AST để hạ mức"
+
+[diagnostics.SEM008.issues.kernel_glob_call_shape]
+message = "lời gọi glob của kernel phải dùng `faber.<module>.<verb>`"
+help = "sửa cấu trúc AST để hạ mức"
+
+[diagnostics.SEM008.issues.kernel_glob_named_alias]
+message = "`faber:*` phải được import bằng bí danh có tên"
+help = "sửa cấu trúc AST để hạ mức"
+
+[diagnostics.SEM008.issues.kernel_unknown_module]
+message = "mô-đun kernel faber không xác định '{module}'; xem manifest host của faber"
+help = "sửa cấu trúc AST để hạ mức"
+
+[diagnostics.SEM008.issues.matrix_incomplete]
+message = "matrix yêu cầu kiểu phần tử và hình dạng; dùng matrix<T, [R, C]>"
+help = "sửa cấu trúc AST để hạ mức"
+
+[diagnostics.SEM008.issues.matrix_missing_figura]
+message = "matrix yêu cầu hình dạng hai chiều; dùng matrix<T, [R, C]>"
+help = "sửa cấu trúc AST để hạ mức"
+
+[diagnostics.SEM008.issues.matrix_shape_two_dim]
+message = "hình dạng matrix phải có chính xác hai chiều"
+help = "sửa cấu trúc AST để hạ mức"
+
+[diagnostics.SEM008.issues.missing_cast_symbol_info]
+message = "thiếu thông tin ký hiệu ép kiểu"
+help = "sửa cấu trúc AST để hạ mức"
+
+[diagnostics.SEM008.issues.missing_resolved_type_alias]
+message = "bí danh kiểu thiếu kiểu đã phân giải"
+help = "sửa cấu trúc AST để hạ mức"
+
+[diagnostics.SEM008.issues.missing_type_alias_symbol]
+message = "thiếu ký hiệu cho bí danh kiểu"
+help = "sửa cấu trúc AST để hạ mức"
+
+[diagnostics.SEM008.issues.missing_type_symbol_info]
+message = "thiếu thông tin ký hiệu kiểu"
+help = "sửa cấu trúc AST để hạ mức"
+
+[diagnostics.SEM008.issues.mutable_pattern_binding]
+message = "liên kết mẫu có thể thay đổi chưa được hạ mức"
+help = "sửa cấu trúc AST để hạ mức"
+
+[diagnostics.SEM008.issues.nested_array_destructuring]
+message = "phân rã mảng lồng nhau chưa được hạ mức"
+help = "sửa cấu trúc AST để hạ mức"
+
+[diagnostics.SEM008.issues.nested_object_destructuring]
+message = "phân rã đối tượng lồng nhau chưa được hạ mức"
+help = "sửa cấu trúc AST để hạ mức"
+
+[diagnostics.SEM008.issues.numerus_width_params]
+message = "numerus chấp nhận nhiều nhất một dấu độ rộng"
+help = "sửa cấu trúc AST để hạ mức"
+
+[diagnostics.SEM008.issues.object_destructuring_initializer]
+message = "phân rã đối tượng yêu cầu bộ khởi tạo"
+help = "sửa cấu trúc AST để hạ mức"
+
+[diagnostics.SEM008.issues.object_destructuring_not_expanded]
+message = "phải mở rộng phân rã đối tượng trước khi hạ mức câu lệnh"
+help = "sửa cấu trúc AST để hạ mức"
+
+[diagnostics.SEM008.issues.octet_params]
+message = "octet có độ rộng cố định và không thể nhận tham số"
+help = "sửa cấu trúc AST để hạ mức"
+
+[diagnostics.SEM008.issues.precision_marker_shape]
+message = "dấu độ chính xác phải là cách viết trần như ms hoặc us"
+help = "sửa cấu trúc AST để hạ mức"
+
+[diagnostics.SEM008.issues.primitive_params]
+message = "kiểu nguyên thủy không thể nhận tham số"
+help = "textus<N>, ascii<N> và octeti<N> là dạng bounded đã phát hành"
+
+[diagnostics.SEM008.issues.primitive_width_params]
+message = "primitive chấp nhận nhiều nhất một dấu độ rộng"
+help = "sửa cấu trúc AST để hạ mức"
+
+[diagnostics.SEM008.issues.qualified_type_not_exported]
+message = "kiểu đủ điều kiện không được namespace xuất ra"
+help = "sửa cấu trúc AST để hạ mức"
+
+[diagnostics.SEM008.issues.qualified_type_prefix_not_namespace]
+message = "tiền tố kiểu đủ điều kiện phải chỉ một namespace"
+help = "sửa cấu trúc AST để hạ mức"
+
+[diagnostics.SEM008.issues.radix_typus_allowed_type_not_concrete]
+message = "kiểu được phép của @ radix typus phải là kiểu cụ thể"
+help = "sửa cấu trúc AST để hạ mức"
+
+[diagnostics.SEM008.issues.radix_typus_non_type_param]
+message = "@ radix typus chỉ có thể ràng buộc tham số kiểu"
+help = "sửa cấu trúc AST để hạ mức"
+
+[diagnostics.SEM008.issues.radix_typus_unknown_generic]
+message = "@ radix typus chỉ đến một tham số generic không xác định"
+help = "sửa cấu trúc AST để hạ mức"
+
+[diagnostics.SEM008.issues.retired_bare_object_literal]
+message = "literal đối tượng trần đã ngừng dùng; dùng {object_literal_forms}"
+help = "sửa cấu trúc AST để hạ mức"
+
+[diagnostics.SEM008.issues.schema_nested_column]
+message = "cột không thể là khai báo schema lồng nhau"
+help = "khai báo schema lồng riêng và đặt tên nó làm kiểu cột"
+
+[diagnostics.SEM008.issues.scrinium_arity]
+message = "scrinium chấp nhận nhiều nhất một tham số kiểu payload"
+help = "sửa cấu trúc AST để hạ mức"
+
+[diagnostics.SEM008.issues.scrinium_missing_builtin]
+message = "kiểu scrinium dựng sẵn chưa được đăng ký"
+help = "sửa cấu trúc AST để hạ mức"
+
+[diagnostics.SEM008.issues.series_params]
+message = "series không thể nhận tham số"
+help = "sửa cấu trúc AST để hạ mức"
+
+[diagnostics.SEM008.issues.sparsa_element_non_numeric]
+message = "kiểu phần tử sparsa phải là kiểu số trong v1"
+help = "sửa cấu trúc AST để hạ cấp"
+
+[diagnostics.SEM008.issues.sparsa_incomplete]
+message = "sparsa cần kiểu phần tử và Figura; dùng sparsa<T, Figura>"
+help = "sửa cấu trúc AST để hạ cấp"
+
+[diagnostics.SEM008.issues.sparsa_missing_figura]
+message = "sparsa cần hình dạng Figura; dùng sparsa<T, []> cho hạng 0"
+help = "sửa cấu trúc AST để hạ cấp"
+
+[diagnostics.SEM008.issues.standalone_width_internal]
+message = "lỗi nội bộ khi hạ cấp kiểu độ rộng độc lập"
+help = "sửa cấu trúc AST để hạ cấp"
+
+[diagnostics.SEM008.issues.tensor_incomplete]
+message = "tensor cần kiểu phần tử và Figura; dùng tensor<T, Figura>"
+help = "sửa cấu trúc AST để hạ cấp"
+
+[diagnostics.SEM008.issues.tensor_missing_figura]
+message = "tensor cần hình dạng Figura; dùng tensor<T, []> cho hạng 0"
+help = "sửa cấu trúc AST để hạ cấp"
+
+[diagnostics.SEM008.issues.template_type_args]
+message = "phép áp dụng template không nhận đối số kiểu"
+help = "sửa cấu trúc AST để hạ cấp"
+
+[diagnostics.SEM008.issues.top_level_initializer]
+message = "khai báo biến cấp cao nhất cần bộ khởi tạo"
+help = "sửa cấu trúc AST để hạ cấp"
+
+[diagnostics.SEM008.issues.top_level_identifier_binding]
+message = "biến cấp cao nhất cần liên kết định danh"
+help = "sửa cấu trúc AST để hạ cấp"
+
+[diagnostics.SEM008.issues.type_name_not_type]
+message = "tên kiểu không tham chiếu đến một kiểu"
+help = "sửa cấu trúc AST để hạ cấp"
+
+[diagnostics.SEM008.issues.union_only_nihil]
+message = "kiểu hợp nhất không thể chỉ gồm 'nihil'"
+help = "sửa cấu trúc AST để hạ cấp"
+
+[diagnostics.SEM008.issues.undefined_name]
+message = "tên không được định nghĩa khi hạ cấp"
+help = "sửa cấu trúc AST để hạ cấp"
+
+[diagnostics.SEM008.issues.unhandled_statement_kind]
+message = "loại câu lệnh chưa được xử lý khi hạ cấp"
+help = "sửa cấu trúc AST để hạ cấp"
+
+[diagnostics.SEM008.issues.unknown_base_class]
+message = "không biết lớp cơ sở trong khai báo gens"
+help = "sửa cấu trúc AST để hạ cấp"
+
+[diagnostics.SEM008.issues.unknown_finge_cast_type]
+message = "không biết kiểu chuyển trong biểu thức finge"
+help = "sửa cấu trúc AST để hạ cấp"
+
+[diagnostics.SEM008.issues.unknown_finge_variant]
+message = "không biết biến thể trong biểu thức finge"
+help = "sửa cấu trúc AST để hạ cấp"
+
+[diagnostics.SEM008.issues.unknown_interface]
+message = "không biết giao diện trong khai báo gens"
+help = "sửa cấu trúc AST để hạ cấp"
+
+[diagnostics.SEM008.issues.unknown_lowering_error]
+message = "hạ cấp HIR thất bại"
+help = "sửa cấu trúc AST để hạ cấp"
+
+[diagnostics.SEM008.issues.unknown_namespace]
+message = "không biết không gian tên"
+help = "sửa cấu trúc AST để hạ cấp"
+
+[diagnostics.SEM008.issues.unknown_type_lowering_error]
+message = "hạ cấp kiểu thất bại"
+help = "sửa cấu trúc AST để hạ cấp"
+
+[diagnostics.SEM008.issues.unknown_type_name]
+message = "không biết tên kiểu"
+help = "sửa cấu trúc AST để hạ cấp"
+
+[diagnostics.SEM008.issues.vector_width_single_dim]
+message = "độ rộng vector phải là một chiều duy nhất"
+help = "sửa cấu trúc AST để hạ cấp"
+
+[diagnostics.SEM008.issues.width_marker_params]
+message = "dấu độ rộng không thể nhận tham số"
+help = "sửa cấu trúc AST để hạ cấp"
+
+[diagnostics.SEM008.issues.width_marker_shape]
+message = "dấu độ rộng phải là cách viết trần như i32 hoặc u8"
+help = "sửa cấu trúc AST để hạ cấp"
+
+[diagnostics.SEM009]
+message = "lỗi xác thực CLI"
+help = "sửa hợp đồng chú thích CLI trước khi phát sinh mã CLI có thể chạy"
+
+[diagnostics.SEM009.issues.alias_collides_with_path]
+message = "bí danh lệnh '{alias}' trùng với một đường dẫn lệnh"
+help = "sửa hợp đồng chú thích CLI trước khi phát sinh mã CLI có thể chạy"
+
+[diagnostics.SEM009.issues.cli_on_non_incipit]
+message = "@ cli chỉ có thể chú thích một điểm vào incipit"
+help = "sửa hợp đồng chú thích CLI trước khi phát sinh mã CLI có thể chạy"
+
+[diagnostics.SEM009.issues.command_global_surface]
+message = "các tùy chọn và toán hạng 'ubique' phải được khai báo trên điểm vào @ cli"
+help = "sửa hợp đồng chú thích CLI trước khi phát sinh mã CLI có thể chạy"
+
+[diagnostics.SEM009.issues.command_params_unsupported]
+message = "các lệnh CLI Giai đoạn 04 phải nhận giá trị đã phân tích qua 'argumenta <ident>', không phải tham số thông thường"
+help = "sửa hợp đồng chú thích CLI trước khi phát sinh mã CLI có thể chạy"
+
+[diagnostics.SEM009.issues.duplicate_binding]
+message = "liên kết CLI trùng lặp '{binding}' trong bề mặt CLI {label}"
+help = "sửa hợp đồng chú thích CLI trước khi phát sinh mã CLI có thể chạy"
+
+[diagnostics.SEM009.issues.duplicate_cli_entry]
+message = "chỉ cho phép một điểm vào @ cli"
+help = "sửa hợp đồng chú thích CLI trước khi phát sinh mã CLI có thể chạy"
+
+[diagnostics.SEM009.issues.duplicate_command_alias]
+message = "bí danh lệnh trùng lặp '{alias}'"
+help = "sửa hợp đồng chú thích CLI trước khi phát sinh mã CLI có thể chạy"
+
+[diagnostics.SEM009.issues.duplicate_command_path]
+message = "đường dẫn lệnh trùng lặp '{path}'"
+help = "sửa hợp đồng chú thích CLI trước khi phát sinh mã CLI có thể chạy"
+
+[diagnostics.SEM009.issues.duplicate_long_flag]
+message = "cờ dài trùng lặp '{long}' trong bề mặt CLI {label}"
+help = "sửa hợp đồng chú thích CLI trước khi phát sinh mã CLI có thể chạy"
+
+[diagnostics.SEM009.issues.duplicate_rest_operand]
+message = "chỉ cho phép một toán hạng ceteri"
+help = "sửa hợp đồng chú thích CLI trước khi phát sinh mã CLI có thể chạy"
+
+[diagnostics.SEM009.issues.duplicate_short_flag]
+message = "cờ ngắn trùng lặp '{short}' trong bề mặt CLI {label}"
+help = "sửa hợp đồng chú thích CLI trước khi phát sinh mã CLI có thể chạy"
+
+[diagnostics.SEM009.issues.global_operand_placement]
+message = "các toán hạng 'ubique' phải được khai báo trên điểm vào @ cli"
+help = "sửa hợp đồng chú thích CLI trước khi phát sinh mã CLI có thể chạy"
+
+[diagnostics.SEM009.issues.global_option_placement]
+message = "các tùy chọn 'ubique' phải được khai báo trên điểm vào @ cli"
+help = "sửa hợp đồng chú thích CLI trước khi phát sinh mã CLI có thể chạy"
+
+[diagnostics.SEM009.issues.imperium_on_non_func]
+message = "@ imperium chỉ có thể chú thích một khai báo functio"
+help = "sửa hợp đồng chú thích CLI trước khi phát sinh mã CLI có thể chạy"
+
+[diagnostics.SEM009.issues.invalid_command_alias]
+message = "bí danh lệnh không hợp lệ '{alias}'"
+help = "sửa hợp đồng chú thích CLI trước khi phát sinh mã CLI có thể chạy"
+
+[diagnostics.SEM009.issues.invalid_command_path]
+message = "đường dẫn lệnh không hợp lệ '{path}'"
+help = "sửa hợp đồng chú thích CLI trước khi phát sinh mã CLI có thể chạy"
+
+[diagnostics.SEM009.issues.invalid_long_flag]
+message = "cờ dài không hợp lệ '{long}' cho tùy chọn '{binding}'"
+help = "sửa hợp đồng chú thích CLI trước khi phát sinh mã CLI có thể chạy"
+
+[diagnostics.SEM009.issues.invalid_short_flag]
+message = "cờ ngắn không hợp lệ '{short}' cho tùy chọn '{binding}'"
+help = "sửa hợp đồng chú thích CLI trước khi phát sinh mã CLI có thể chạy"
+
+[diagnostics.SEM009.issues.list_element_not_named]
+message = "kiểu danh sách CLI phải dùng kiểu phần tử có tên"
+help = "sửa hợp đồng chú thích CLI trước khi phát sinh mã CLI có thể chạy"
+
+[diagnostics.SEM009.issues.local_operand_global_collision]
+message = "toán hạng {label} '{binding}' trùng với một liên kết CLI toàn cục"
+help = "sửa hợp đồng chú thích CLI trước khi phát sinh mã CLI có thể chạy"
+
+[diagnostics.SEM009.issues.local_option_global_collision]
+message = "tùy chọn {label} '{binding}' trùng với một liên kết CLI toàn cục"
+help = "sửa hợp đồng chú thích CLI trước khi phát sinh mã CLI có thể chạy"
+
+[diagnostics.SEM009.issues.missing_entry_argument]
+message = "chương trình @ cli phải dùng điểm vào rõ ràng 'incipit argumenta <ident>'"
+help = "sửa hợp đồng chú thích CLI trước khi phát sinh mã CLI có thể chạy"
+
+[diagnostics.SEM009.issues.malformed_annotation]
+message = "trường `{field}` của {annotation} phải là {expected}"
+help = "sửa hợp đồng chú thích CLI trước khi phát sinh mã CLI có thể chạy"
+
+[diagnostics.SEM009.issues.missing_option_flag]
+message = "tùy chọn {label} '{binding}' cần brevis hoặc longum"
+help = "sửa hợp đồng chú thích CLI trước khi phát sinh mã CLI có thể chạy"
+
+[diagnostics.SEM009.issues.mounted_module_root_cli]
+message = "các mô-đun lệnh CLI được gắn kết không được khai báo điểm vào @ cli riêng"
+help = "sửa hợp đồng chú thích CLI trước khi phát sinh mã CLI có thể chạy"
+
+[diagnostics.SEM009.issues.nested_module_mount]
+message = "các điểm gắn mô-đun @ imperia chỉ có thể được khai báo trên điểm vào CLI gốc"
+help = "sửa hợp đồng chú thích CLI trước khi phát sinh mã CLI có thể chạy"
+
+[diagnostics.SEM009.issues.operand_after_rest]
+message = "toán hạng '{binding}' xuất hiện sau toán hạng ceteri"
+help = "sửa hợp đồng chú thích CLI trước khi phát sinh mã CLI có thể chạy"
+
+[diagnostics.SEM009.issues.orphan_cli_surface]
+message = "@ optio và @ operandus phải chú thích @ cli incipit hoặc @ imperium functio"
+help = "sửa hợp đồng chú thích CLI trước khi phát sinh mã CLI có thể chạy"
+
+[diagnostics.SEM009.issues.rest_not_final]
+message = "toán hạng ceteri phải là toán hạng cuối cùng"
+help = "sửa hợp đồng chú thích CLI trước khi phát sinh mã CLI có thể chạy"
+
+[diagnostics.SEM009.issues.subcommand_local_surface]
+message = "chương trình CLI lệnh con chỉ có thể khai báo tùy chọn hoặc toán hạng cấp cao nhất với 'ubique'"
+help = "sửa hợp đồng chú thích CLI trước khi phát sinh mã CLI có thể chạy"
+
+[diagnostics.SEM009.issues.subcommand_root_body]
+message = "chương trình CLI lệnh con phải dùng thân incipit gốc rỗng trong Giai đoạn 04"
+help = "sửa hợp đồng chú thích CLI trước khi phát sinh mã CLI có thể chạy"
+
+[diagnostics.SEM009.issues.unsupported_list_element_type]
+message = "kiểu phần tử danh sách CLI không được hỗ trợ '{type}'"
+help = "sửa hợp đồng chú thích CLI trước khi phát sinh mã CLI có thể chạy"
+
+[diagnostics.SEM009.issues.unsupported_type]
+message = "kiểu CLI không được hỗ trợ '{type}'"
+help = "sửa hợp đồng chú thích CLI trước khi phát sinh mã CLI có thể chạy"
+
+[diagnostics.SEM009.issues.unsupported_type_shape]
+message = "hình dạng kiểu CLI không được hỗ trợ"
+help = "sửa hợp đồng chú thích CLI trước khi phát sinh mã CLI có thể chạy"
+
+[diagnostics.SEM010]
+message = "không khớp kiểu"
+help = "làm cho kiểu biểu thức khớp với kiểu mong đợi"
+
+[diagnostics.SEM010.issues.argument_type_mismatch]
+message = "không khớp kiểu đối số"
+help = "làm cho kiểu biểu thức khớp với kiểu mong đợi"
+
+[diagnostics.SEM010.issues.callee_not_callable]
+message = "đối tượng được gọi không thể gọi được"
+help = "làm cho kiểu biểu thức khớp với kiểu mong đợi"
+
+[diagnostics.SEM010.issues.figura_not_index_param]
+message = "tên không tham chiếu đến một tham số chỉ mục"
+help = "làm cho kiểu biểu thức khớp với kiểu mong đợi"
+
+[diagnostics.SEM010.issues.assignment_type_mismatch]
+message = "không khớp kiểu phép gán"
+help = "làm cho kiểu biểu thức khớp với kiểu mong đợi"
+
+[diagnostics.SEM010.issues.assert_condition_type_mismatch]
+message = "điều kiện assert phải là boolean"
+help = "làm cho kiểu biểu thức khớp với kiểu mong đợi"
+
+[diagnostics.SEM010.issues.constant_annotation_mismatch]
+message = "giá trị hằng số không khớp với chú thích"
+help = "làm cho kiểu biểu thức khớp với kiểu mong đợi"
+
+[diagnostics.SEM010.issues.closure_parameter_type_mismatch]
+message = "không khớp kiểu tham số closure"
+help = "làm cho kiểu biểu thức khớp với kiểu mong đợi"
+
+[diagnostics.SEM010.issues.closure_return_type_mismatch]
+message = "không khớp kiểu trả về của closure"
+help = "làm cho kiểu biểu thức khớp với kiểu mong đợi"
+
+[diagnostics.SEM010.issues.coalesce_fallback_type_mismatch]
+message = "không khớp kiểu giá trị dự phòng coalesce"
+help = "làm cho kiểu biểu thức khớp với kiểu mong đợi"
+
+[diagnostics.SEM010.issues.common_type_mismatch]
+message = "các kiểu không tương thích"
+help = "làm cho kiểu biểu thức khớp với kiểu mong đợi"
+
+[diagnostics.SEM010.issues.array_element_type_mismatch]
+message = "không khớp kiểu phần tử mảng"
+help = "làm cho kiểu biểu thức khớp với kiểu mong đợi"
+
+[diagnostics.SEM010.issues.array_spread_element_type_mismatch]
+message = "không khớp kiểu phần tử trải mảng"
+help = "làm cho kiểu biểu thức khớp với kiểu mong đợi"
+
+[diagnostics.SEM010.issues.conversio_failure_channel_type_mismatch]
+message = "không khớp kiểu kênh lỗi conversio được truyền tiếp"
+help = "làm cho kiểu biểu thức khớp với kiểu mong đợi"
+
+[diagnostics.SEM010.issues.conversio_recovery_type_mismatch]
+message = "không khớp kiểu khôi phục conversio"
+help = "làm cho kiểu biểu thức khớp với kiểu mong đợi"
+
+[diagnostics.SEM010.issues.cursor_iteration_requires_ex]
+message = "duyệt cursor chỉ hỗ trợ itera ex"
+help = "làm cho kiểu biểu thức khớp với kiểu mong đợi"
+
+[diagnostics.SEM010.issues.expression_type_mismatch]
+message = "không khớp kiểu biểu thức"
+help = "làm cho kiểu biểu thức khớp với kiểu mong đợi"
+
+[diagnostics.SEM010.issues.equality_exact_types_required]
+message = "phép so sánh bằng yêu cầu các kiểu giống hệt nhau"
+help = "làm cho kiểu biểu thức khớp với kiểu mong đợi"
+
+[diagnostics.SEM010.issues.field_initializer_type_mismatch]
+message = "không khớp kiểu bộ khởi tạo trường"
+help = "làm cho kiểu biểu thức khớp với kiểu mong đợi"
+
+[diagnostics.SEM010.issues.failable_call_enclosing_error_type_mismatch]
+message = "kiểu lỗi của lời gọi có thể thất bại không khớp với ⇥ bao quanh"
+help = "làm cho kiểu biểu thức khớp với kiểu mong đợi"
+
+[diagnostics.SEM010.issues.failable_call_handler_error_type_mismatch]
+message = "không khớp kiểu lỗi của lời gọi có thể thất bại đã được xử lý"
+help = "làm cho kiểu biểu thức khớp với kiểu mong đợi"
+
+[diagnostics.SEM010.issues.field_default_type_mismatch]
+message = "kiểu giá trị mặc định của field không khớp"
+help = "đảm bảo kiểu biểu thức khớp với kiểu được yêu cầu"
+
+[diagnostics.SEM010.issues.iace_requires_alternate_exit]
+message = "iace yêu cầu hàm bao quanh có kiểu thoát thay thế '⇥'"
+help = "đảm bảo kiểu biểu thức khớp với kiểu được yêu cầu"
+
+[diagnostics.SEM010.issues.iace_value_type_mismatch]
+message = "kiểu giá trị thoát thay thế không khớp"
+help = "đảm bảo kiểu biểu thức khớp với kiểu được yêu cầu"
+
+[diagnostics.SEM010.issues.ignored_expression_result_must_resolve]
+message = "kết quả biểu thức bị bỏ qua phải được resolve"
+help = "đảm bảo kiểu biểu thức khớp với kiểu được yêu cầu"
+
+[diagnostics.SEM010.issues.initializer_annotation_mismatch]
+message = "initializer không khớp với annotation"
+help = "đảm bảo kiểu biểu thức khớp với kiểu được yêu cầu"
+
+[diagnostics.SEM010.issues.incompatible_return_types]
+message = "các kiểu trả về không tương thích"
+help = "đảm bảo kiểu biểu thức khớp với kiểu được yêu cầu"
+
+[diagnostics.SEM010.issues.intervallum_bound_required]
+message = "kiểu bound của intervallum phải là numerus hoặc instans"
+help = "đảm bảo kiểu biểu thức khớp với kiểu được yêu cầu"
+
+[diagnostics.SEM010.issues.intervallum_clamp_operand_type_mismatch]
+message = "kiểu toán hạng clamp của intervallum không khớp"
+help = "đảm bảo kiểu biểu thức khớp với kiểu được yêu cầu"
+
+[diagnostics.SEM010.issues.intra_requires_intervallum_range]
+message = "intra yêu cầu một range intervallum"
+help = "đảm bảo kiểu biểu thức khớp với kiểu được yêu cầu"
+
+[diagnostics.SEM010.issues.incompatible_tensor_index]
+message = "các shape index không tương thích"
+help = "đảm bảo kiểu biểu thức khớp với kiểu được yêu cầu"
+
+[diagnostics.SEM010.issues.invalid_cast]
+message = "cast không hợp lệ"
+help = "đảm bảo kiểu biểu thức khớp với kiểu được yêu cầu"
+
+[diagnostics.SEM010.issues.itera_ab_source_requires_range]
+message = "source của itera ab phải là biểu thức range"
+help = "đảm bảo kiểu biểu thức khớp với kiểu được yêu cầu"
+
+[diagnostics.SEM010.issues.itera_apud_arity_mismatch]
+message = "số tọa độ {apud} phải bằng bậc của iterable"
+help = "đảm bảo kiểu biểu thức khớp với kiểu được yêu cầu"
+
+[diagnostics.SEM010.issues.itera_apud_requires_ex]
+message = "tọa độ {apud} yêu cầu lặp {ex}"
+help = "đảm bảo kiểu biểu thức khớp với kiểu được yêu cầu"
+
+[diagnostics.SEM010.issues.itera_apud_requires_shaped_iterable]
+message = "{apud} yêu cầu iterable dạng tensor hoặc matrix"
+help = "đảm bảo kiểu biểu thức khớp với kiểu được yêu cầu"
+
+[diagnostics.SEM010.issues.json_map_key_must_be_textus]
+message = "key map JSON phải là textus"
+help = "đảm bảo kiểu biểu thức khớp với kiểu được yêu cầu"
+
+[diagnostics.SEM010.issues.json_nested_value_requires_valor]
+message = "giá trị JSON lồng nhau yêu cầu kiểu giá trị valor của tabula"
+help = "đảm bảo kiểu biểu thức khớp với kiểu được yêu cầu"
+
+[diagnostics.SEM010.issues.json_value_type_mismatch]
+message = "giá trị JSON không khớp với kiểu giá trị của tabula"
+help = "đảm bảo kiểu biểu thức khớp với kiểu được yêu cầu"
+
+[diagnostics.SEM010.issues.live_tuus_cursor_call_arg]
+message = "chưa thể truyền giá trị cursor tuus đang hoạt động làm đối số hàm"
+help = "đảm bảo kiểu biểu thức khớp với kiểu được yêu cầu"
+
+[diagnostics.SEM010.issues.live_tuus_cursor_return]
+message = "chưa thể trả về giá trị cursor tuus đang hoạt động từ hàm"
+help = "đảm bảo kiểu biểu thức khớp với kiểu được yêu cầu"
+
+[diagnostics.SEM010.issues.live_tuus_cursor_struct]
+message = "chưa thể lưu giá trị cursor tuus đang hoạt động trong struct"
+help = "đảm bảo kiểu biểu thức khớp với kiểu được yêu cầu"
+
+[diagnostics.SEM010.issues.live_tuus_cursor_reassign]
+message = "chưa thể gán lại local cursor tuus đang hoạt động"
+help = "đảm bảo kiểu biểu thức khớp với kiểu được yêu cầu"
+
+[diagnostics.SEM010.issues.live_tuus_cursor_copy]
+message = "chưa thể sao chép hoặc di chuyển giá trị cursor tuus đang hoạt động giữa các local"
+help = "đảm bảo kiểu biểu thức khớp với kiểu được yêu cầu"
+
+[diagnostics.SEM010.issues.live_tuus_cursor_conversio]
+message = "chưa thể chuyển đổi giá trị cursor tuus đang hoạt động qua conversio aggregate"
+help = "đảm bảo kiểu biểu thức khớp với kiểu được yêu cầu"
+
+[diagnostics.SEM010.issues.live_tuus_cursor_direct_initializer]
+message = "tuus.cursor() chỉ được hỗ trợ làm initializer local trực tiếp"
+help = "đảm bảo kiểu biểu thức khớp với kiểu được yêu cầu"
+
+[diagnostics.SEM010.issues.live_tuus_cursor_value]
+message = "chưa thể dùng giá trị cursor tuus đang hoạt động làm biểu thức"
+help = "đảm bảo kiểu biểu thức khớp với kiểu được yêu cầu"
+
+[diagnostics.SEM010.issues.map_index_type_mismatch]
+message = "kiểu index map không khớp"
+help = "đảm bảo kiểu biểu thức khớp với kiểu được yêu cầu"
+
+[diagnostics.SEM010.issues.map_key_type_mismatch]
+message = "kiểu key map không khớp"
+help = "đảm bảo kiểu biểu thức khớp với kiểu được yêu cầu"
+
+[diagnostics.SEM010.issues.map_spread_key_type_mismatch]
+message = "kiểu key map spread không khớp"
+help = "đảm bảo kiểu biểu thức khớp với kiểu được yêu cầu"
+
+[diagnostics.SEM010.issues.map_spread_value_type_mismatch]
+message = "kiểu value map spread không khớp"
+help = "đảm bảo kiểu biểu thức khớp với kiểu được yêu cầu"
+
+[diagnostics.SEM010.issues.map_value_type_mismatch]
+message = "kiểu value map không khớp"
+help = "đảm bảo kiểu biểu thức khớp với kiểu được yêu cầu"
+
+[diagnostics.SEM010.issues.membership_operand_type_mismatch]
+message = "kiểu toán hạng membership không khớp"
+help = "đảm bảo kiểu biểu thức khớp với kiểu được yêu cầu"
+
+[diagnostics.SEM010.issues.matmul_argument_rank_must_be_two]
+message = "matmul yêu cầu đối số tensor có rank-2"
+help = "đảm bảo kiểu biểu thức khớp với kiểu được yêu cầu"
+
+[diagnostics.SEM010.issues.matmul_argument_shape_must_be_tuple]
+message = "matmul yêu cầu đối số tensor rank-2 có shape tuple"
+help = "đảm bảo kiểu biểu thức khớp với kiểu được yêu cầu"
+
+[diagnostics.SEM010.issues.matmul_receiver_rank_must_be_two]
+message = "matmul yêu cầu receiver tensor rank-2"
+help = "đảm bảo kiểu biểu thức khớp với kiểu được yêu cầu"
+
+[diagnostics.SEM010.issues.matmul_receiver_shape_must_be_tuple]
+message = "matmul yêu cầu receiver tensor có shape tuple"
+help = "đảm bảo kiểu biểu thức khớp với kiểu được yêu cầu"
+
+[diagnostics.SEM010.issues.numeric_arithmetic_operands_identical]
+message = "các toán hạng số học phải có kiểu giống hệt nhau; dùng ↦ để chuyển đổi rõ ràng"
+help = "đảm bảo kiểu biểu thức khớp với kiểu được yêu cầu"
+
+[diagnostics.SEM010.issues.numeric_operand_required]
+message = "cần toán hạng số"
+help = "đảm bảo kiểu biểu thức khớp với kiểu được yêu cầu"
+
+[diagnostics.SEM010.issues.numeric_operands_required]
+message = "cần các toán hạng số"
+help = "đảm bảo kiểu biểu thức khớp với kiểu được yêu cầu"
+
+[diagnostics.SEM010.issues.boolean_operand_required]
+message = "cần toán hạng logic"
+help = "đảm bảo kiểu biểu thức khớp với kiểu được yêu cầu"
+
+[diagnostics.SEM010.issues.boolean_operands_required]
+message = "cần các toán hạng logic"
+help = "đảm bảo kiểu biểu thức khớp với kiểu được yêu cầu"
+
+[diagnostics.SEM010.issues.integer_operand_required]
+message = "cần toán hạng số nguyên"
+help = "đảm bảo kiểu biểu thức khớp với kiểu được yêu cầu"
+
+[diagnostics.SEM010.issues.integer_operands_required]
+message = "cần các toán hạng số nguyên"
+help = "đảm bảo kiểu biểu thức khớp với kiểu được yêu cầu"
+
+[diagnostics.SEM010.issues.instans_ordering_operands_required]
+message = "các toán hạng instans không tương thích"
+help = "đảm bảo kiểu biểu thức khớp với kiểu được yêu cầu"
+
+[diagnostics.SEM010.issues.pattern_type_mismatch]
+message = "kiểu pattern không khớp"
+help = "đảm bảo kiểu biểu thức khớp với kiểu được yêu cầu"
+
+[diagnostics.SEM010.issues.parameter_default_type_mismatch]
+message = "kiểu giá trị mặc định của parameter không khớp"
+help = "đảm bảo kiểu biểu thức khớp với kiểu được yêu cầu"
+
+[diagnostics.SEM010.issues.range_operand_type_mismatch]
+message = "kiểu toán hạng range không khớp"
+help = "đảm bảo kiểu biểu thức khớp với kiểu được yêu cầu"
+
+[diagnostics.SEM010.issues.range_step_must_be_numeric]
+message = "step của range phải là số"
+help = "đảm bảo kiểu biểu thức khớp với kiểu được yêu cầu"
+
+[diagnostics.SEM010.issues.return_type_mismatch]
+message = "kiểu trả về không khớp với chữ ký hàm"
+help = "đảm bảo kiểu biểu thức khớp với kiểu được yêu cầu"
+
+[diagnostics.SEM010.issues.regex_conversion_operand_type_mismatch]
+message = "chuyển đổi regex yêu cầu textus hoặc ascii"
+help = "đảm bảo kiểu biểu thức khớp với kiểu được yêu cầu"
+
+[diagnostics.SEM010.issues.string_operands_required]
+message = "cần các toán hạng chuỗi"
+help = "đảm bảo kiểu biểu thức khớp với kiểu được yêu cầu"
+
+[diagnostics.SEM010.issues.atomic_arity]
+message = "atomic yêu cầu đúng một kiểu phần tử; dùng atomic<T>"
+help = "đảm bảo kiểu biểu thức khớp với kiểu được yêu cầu"
+
+[diagnostics.SEM010.issues.atomic_element]
+message = "kiểu phần tử atomic phải là numerus<i32> hoặc numerus<u32>"
+help = "đảm bảo kiểu biểu thức khớp với kiểu được yêu cầu"
+
+[diagnostics.SEM010.issues.atomic_incomplete]
+message = "atomic yêu cầu một kiểu phần tử; dùng atomic<T>"
+help = "đảm bảo kiểu biểu thức khớp với kiểu được yêu cầu"
+
+[diagnostics.SEM010.issues.matrix_incomplete]
+message = "matrix yêu cầu kiểu phần tử và shape; dùng matrix<T, [R, C]>"
+help = "đảm bảo kiểu biểu thức khớp với kiểu được yêu cầu"
+
+[diagnostics.SEM010.issues.matrix_missing_figura]
+message = "matrix yêu cầu shape hai chiều; dùng matrix<T, [R, C]>"
+help = "đảm bảo kiểu biểu thức khớp với kiểu được yêu cầu"
+
+[diagnostics.SEM010.issues.matrix_shape_two_dim]
+message = "shape của matrix phải có đúng hai chiều"
+help = "đảm bảo kiểu biểu thức khớp với kiểu được yêu cầu"
+
+[diagnostics.SEM010.issues.sparsa_incomplete]
+message = "sparsa yêu cầu kiểu phần tử và Figura; dùng sparsa<T, Figura>"
+help = "đảm bảo kiểu biểu thức khớp với kiểu được yêu cầu"
+
+[diagnostics.SEM010.issues.sparsa_missing_figura]
+message = "sparsa yêu cầu shape Figura; dùng sparsa<T, []> cho rank-0"
+help = "đảm bảo kiểu biểu thức khớp với kiểu được yêu cầu"
+
+[diagnostics.SEM010.issues.scalar_text_operands_required]
+message = "cần các toán hạng text vô hướng"
+help = "đảm bảo kiểu biểu thức khớp với kiểu được yêu cầu"
+
+[diagnostics.SEM010.issues.stream_ad_opener_type_mismatch]
+message = "opener stream ad phải được hạ xuống valor"
+help = "đảm bảo kiểu biểu thức khớp với kiểu được yêu cầu"
+
+[diagnostics.SEM010.issues.tensor_formata_element_type_mismatch]
+message = "kiểu phần tử đích của formata phải khớp với kiểu phần tử receiver"
+help = "đảm bảo kiểu biểu thức khớp với kiểu được yêu cầu"
+
+[diagnostics.SEM010.issues.tensor_incomplete]
+message = "tensor yêu cầu kiểu phần tử và Figura; dùng tensor<T, Figura>"
+help = "đảm bảo kiểu biểu thức khớp với kiểu được yêu cầu"
+
+[diagnostics.SEM010.issues.tensor_missing_figura]
+message = "tensor yêu cầu shape Figura; dùng tensor<T, []> cho rank-0"
+help = "đảm bảo kiểu biểu thức khớp với kiểu được yêu cầu"
+
+[diagnostics.SEM010.issues.variant_pattern_scrutinee_mismatch]
+message = "variant không khớp với kiểu scrutinee"
+help = "đảm bảo kiểu biểu thức khớp với kiểu được yêu cầu"
+
+[diagnostics.SEM010.issues.vector_element_type_mismatch]
+message = "kiểu phần tử vector không khớp"
+help = "đảm bảo kiểu biểu thức khớp với kiểu được yêu cầu"
+
+[diagnostics.SEM010.issues.vector_incomplete]
+message = "vector yêu cầu kiểu phần tử và độ rộng; dùng vector<T, N>"
+help = "đảm bảo kiểu biểu thức khớp với kiểu được yêu cầu"
+
+[diagnostics.SEM010.issues.vector_missing_width]
+message = "vector yêu cầu độ rộng; dùng vector<T, 4> hoặc vf32[4]"
+help = "đảm bảo kiểu biểu thức khớp với kiểu được yêu cầu"
+
+[diagnostics.SEM010.issues.gradient_expression_unsupported]
+message = "postfix gradient selection (`call(...) ∇ [places]`) chưa được lowering cho đến khi bề mặt autograd tensor-glyphs 2B ra mắt; không có quy tắc operand, selector hay result nào hoạt động trong Phase 2A"
+help = "gradient selection (`∇`) chỉ parse-only trong Phase 2A; các quy tắc eligibility/selector sẽ ra mắt cùng tensor-glyphs 2B"
+
+[diagnostics.SEM011]
+message = "kiểu toán hạng không hợp lệ"
+help = "dùng các kiểu toán hạng tương thích"
+
+[diagnostics.SEM011.issues.nucleum_lane_fragment_clash]
+message = "fragment lane binding '{fragment}' conflicts with caller lane binding '{caller}'"
+help = "keep caller and fragment lane bindings distinct"
+
+[diagnostics.SEM011.issues.range_step_must_be_numeric]
+message = "step của range phải là số"
+help = "dùng step range dạng số"
+
+[diagnostics.SEM011.issues.intervallum_bound_required]
+message = "kiểu bound của intervallum phải là numerus hoặc instans"
+help = "dùng bound intervallum dạng numerus, fractus, instans hoặc scalar có kích thước"
+
+[diagnostics.SEM011.issues.intervallum_longitudo_bound]
+message = "intervallum longitudo hiện yêu cầu bound numerus cho đến khi momentum được triển khai"
+help = "hiện dùng bound numerus cho intervallum longitudo"
+
+[diagnostics.SEM011.issues.numeric_operands_required]
+message = "cần các toán hạng số"
+help = "dùng các toán hạng số cho toán tử này"
+
+[diagnostics.SEM011.issues.numeric_arithmetic_operands_identical]
+message = "các toán hạng số học phải có kiểu giống hệt nhau; dùng ↦ để chuyển đổi rõ ràng"
+help = "chuyển đổi rõ ràng các toán hạng trước khi áp dụng toán tử số học này"
+
+[diagnostics.SEM011.issues.ascii_literal_invalid_escape]
+message = "literal ascii chứa chuỗi escape không hợp lệ"
+help = "dùng các chuỗi escape được hỗ trợ cho literal ASCII"
+
+[diagnostics.SEM011.issues.ascii_literal_non_ascii_scalar]
+message = "literal ascii chứa ký tự không phải ASCII '{character}'"
+help = "dùng textus cho văn bản Unicode hoặc chỉ giữ payload ascii là ASCII"
+
+[diagnostics.SEM011.issues.ascii_literal_unescaped_control]
+message = "literal ascii chứa ký tự điều khiển chưa escape U+{codepoint}"
+help = "escape các ký tự điều khiển trong literal ascii"
+
+[diagnostics.SEM011.issues.boolean_operands_required]
+message = "cần các toán hạng logic"
+help = "dùng các toán hạng bivalens cho toán tử này"
+
+[diagnostics.SEM011.issues.atomic_method_requires_atomic_receiver]
+message = "phép toán atomic yêu cầu receiver atomic"
+help = "gọi load/store/exchange/compare_exchange trên atomic<T>"
+
+[diagnostics.SEM011.issues.unsupported_atomic_method]
+message = "phép toán atomic không được hỗ trợ"
+help = "dùng load, store, exchange hoặc compare_exchange"
+
+[diagnostics.SEM011.issues.bitwise_method_requires_numerus_receiver]
+message = "các method toán tử bitwise yêu cầu receiver numerus"
+help = "gọi các method bitwise trên receiver numerus"
+
+[diagnostics.SEM011.issues.deref_requires_reference]
+message = "deref yêu cầu reference"
+help = "dereference một giá trị reference"
+
+[diagnostics.SEM011.issues.densata_requires_sparsa_receiver]
+message = "densata yêu cầu receiver sparsa"
+help = "gọi densata trên một giá trị sparsa"
+
+[diagnostics.SEM011.issues.ascii_literal_template_application]
+message = "literal ascii không hỗ trợ áp dụng template"
+help = "dùng literal định dạng textus cho các lời gọi template"
+
+[diagnostics.SEM011.issues.directional_view_method_type_args]
+message = "phương thức directional view không nhận đối số kiểu"
+help = "xóa danh sách đối số kiểu được chỉ rõ"
+
+[diagnostics.SEM011.issues.dynamic_callee_type_args]
+message = "callee động không nhận đối số kiểu"
+help = "xóa danh sách đối số kiểu được chỉ rõ"
+
+[diagnostics.SEM011.issues.dynamic_receiver_method_type_args]
+message = "receiver động không nhận đối số kiểu của phương thức"
+help = "xóa danh sách đối số kiểu của phương thức được chỉ rõ"
+
+[diagnostics.SEM011.issues.failable_call_requires_handler]
+message = "lời gọi có thể thất bại cần context khai báo ⇥ hoặc handler cục bộ"
+help = "xử lý lời gọi bằng fac/cape hoặc khai báo hàm ⇥"
+
+[diagnostics.SEM011.issues.generic_type_arg_domain]
+message = "đối số kiểu {rejected} không được phép cho {param}; cần một trong các giá trị {accepted}"
+help = "chọn một đối số kiểu được phép cho tham số generic này"
+
+[diagnostics.SEM011.issues.gpu_builtin_device_function_required]
+message = "lời gọi builtin GPU chỉ hợp lệ bên trong các hàm thiết bị"
+help = "chỉ gọi builtin GPU bên trong các hàm @ nucleum hoặc @ nucleum fragment"
+
+[diagnostics.SEM011.issues.gpu_builtin_type_args]
+message = "lời gọi builtin GPU không nhận đối số kiểu"
+help = "xóa danh sách đối số kiểu được chỉ rõ"
+
+[diagnostics.SEM011.issues.inferred_callee_type_args]
+message = "callee được suy luận không nhận đối số kiểu"
+help = "xóa danh sách đối số kiểu được chỉ rõ"
+
+[diagnostics.SEM011.issues.intrinsic_method_type_args]
+message = "phương thức intrinsic không nhận đối số kiểu"
+help = "xóa danh sách đối số kiểu được chỉ rõ"
+
+[diagnostics.SEM011.issues.integer_operands_required]
+message = "cần các toán hạng số nguyên"
+help = "dùng các toán hạng số nguyên cho toán tử này"
+
+[diagnostics.SEM011.issues.instans_ordering_operands_required]
+message = "các toán hạng instans không tương thích"
+help = "so sánh các giá trị instans với các giá trị instans"
+
+[diagnostics.SEM011.issues.json_duplicate_key]
+message = "khóa JSON bị trùng \"{key}\""
+help = "xóa hoặc đổi tên khóa đối tượng JSON bị trùng"
+
+[diagnostics.SEM011.issues.method_call_type_args]
+message = "lời gọi phương thức không nhận đối số kiểu"
+help = "xóa danh sách đối số kiểu được chỉ rõ"
+
+[diagnostics.SEM011.issues.numeric_lista_elements_required]
+message = "cần các phần tử số trong lista"
+help = "dùng các phần tử số cho intrinsic lista này"
+
+[diagnostics.SEM011.issues.octeti_literal_invalid_character]
+message = "literal octeti chứa ký tự không hợp lệ '{character}'"
+help = "chỉ dùng chữ số thập lục phân trong các literal octeti"
+
+[diagnostics.SEM011.issues.octeti_literal_odd_digit_count]
+message = "literal octeti có số chữ số thập lục phân lẻ"
+help = "cung cấp các cặp byte hoàn chỉnh trong các literal octeti"
+
+[diagnostics.SEM011.issues.octeti_literal_template_application]
+message = "literal octeti không hỗ trợ áp dụng template"
+help = "dùng định dạng textus thay vì các lời gọi literal octeti"
+
+[diagnostics.SEM011.issues.sermo_view_payload_type_arg_count]
+message = "{method} nhận nhiều nhất một đối số kiểu payload"
+help = "xóa danh sách đối số kiểu được chỉ rõ"
+
+[diagnostics.SEM011.issues.template_application_type_args]
+message = "áp dụng template không nhận đối số kiểu"
+help = "xóa danh sách đối số kiểu được chỉ rõ"
+
+[diagnostics.SEM011.issues.variant_constructor_type_args]
+message = "constructor variant không nhận đối số kiểu"
+help = "xóa danh sách đối số kiểu được chỉ rõ"
+
+[diagnostics.SEM011.issues.same_width_integer_operands_required]
+message = "cần các toán hạng số nguyên cùng độ rộng"
+help = "chuyển các toán hạng số nguyên về cùng độ rộng trước khi áp dụng toán tử này"
+
+[diagnostics.SEM011.issues.postfix_inc_dec_numerus_operand]
+message = "tăng/giảm hậu tố cần toán hạng numerus"
+help = "áp dụng tăng/giảm hậu tố cho các giá trị numerus"
+
+[diagnostics.SEM011.issues.array_spread_requires_lista]
+message = "spread mảng cần toán hạng lista"
+help = "spread một giá trị lista bên trong phần tạo lista"
+
+[diagnostics.SEM011.issues.struct_computed_key_forbidden]
+message = "khóa được tính không hợp lệ trong phần tạo struct"
+help = "dùng tên trường struct đã khai báo trong phần tạo struct"
+
+[diagnostics.SEM011.issues.struct_spread_forbidden]
+message = "các trường spread không hợp lệ trong phần tạo struct"
+help = "cung cấp rõ ràng từng trường struct bắt buộc"
+
+[diagnostics.SEM011.issues.vector_constructor_forbids_spread]
+message = "constructor vector không nhận đối số spread"
+help = "cung cấp rõ ràng các phần tử vector thay vì đối số spread"
+
+[diagnostics.SEM011.issues.object_spread_requires_tabula]
+message = "spread đối tượng cần toán hạng tabula"
+help = "spread một giá trị tabula bên trong phần tạo tabula"
+
+[diagnostics.SEM011.issues.interval_bound_single_scalar]
+message = "biên interval phải là một scalar Unicode duy nhất"
+help = "truyền các giá trị textus hoặc ascii chứa đúng một scalar Unicode"
+
+[diagnostics.SEM011.issues.numeric_operand_required]
+message = "cần toán hạng số"
+help = "dùng một toán hạng số cho toán tử này"
+
+[diagnostics.SEM011.issues.numeric_value_equality_operands_required]
+message = "≈ cần các toán hạng số; dùng ≅ cho phép so sánh chính xác sau khi mở rộng hoặc .approx cho dung sai tường minh"
+help = "dùng toán hạng số với ≈ cho so sánh fuzzy; dùng ≅ cho phép so sánh chính xác sau khi mở rộng hoặc .approx cho dung sai tường minh"
+
+[diagnostics.SEM011.issues.boolean_operand_required]
+message = "cần toán hạng boolean"
+help = "dùng một toán hạng bivalens cho toán tử này"
+
+[diagnostics.SEM011.issues.condition_must_be_bivalens]
+message = "condition phải là bivalens"
+help = "dùng một biểu thức bivalens làm condition"
+
+[diagnostics.SEM011.issues.integer_operand_required]
+message = "cần toán hạng số nguyên"
+help = "dùng một toán hạng số nguyên cho toán tử này"
+
+[diagnostics.SEM011.issues.range_operand_must_be_numeric]
+message = "toán hạng range phải là số"
+help = "so sánh các giá trị số bằng các range intervallum"
+
+[diagnostics.SEM011.issues.scalar_text_operands_required]
+message = "cần các toán hạng văn bản scalar"
+help = "so sánh các toán hạng textus hoặc ascii một scalar"
+
+[diagnostics.SEM011.issues.string_operands_required]
+message = "cần các toán hạng chuỗi"
+help = "dùng các toán hạng textus cho phép cộng chuỗi"
+
+[diagnostics.SEM011.issues.object_field_requires_value]
+message = "trường đối tượng cần một giá trị"
+help = "cung cấp một giá trị rõ ràng cho trường đối tượng này"
+
+[diagnostics.SEM011.issues.vacua_requires_collection_type]
+message = "vacua cần một kiểu collection"
+help = "cung cấp cho vacua context lista, tabula, copia, tensor hoặc sparsa"
+
+[diagnostics.SEM011.issues.textus_index_must_be_numerus_or_range]
+message = "chỉ mục textus phải là numerus hoặc range"
+help = "lập chỉ mục textus bằng numerus hoặc range số nguyên"
+
+[diagnostics.SEM011.issues.array_index_must_be_numerus]
+message = "chỉ mục mảng phải là numerus"
+help = "lập chỉ mục các giá trị lista bằng numerus"
+
+[diagnostics.SEM011.issues.indexing_requires_array_or_map]
+message = "lập chỉ mục cần mảng hoặc map"
+help = "chỉ lập chỉ mục các giá trị lista, tabula, tensor, textus hoặc ignotum"
+
+[diagnostics.SEM011.issues.tensor_index_vector_integer_elements]
+message = "vector chỉ mục tensor cần lista gồm các phần tử số nguyên"
+help = "dùng lista gồm các phần tử chỉ mục số nguyên được hỗ trợ"
+
+[diagnostics.SEM011.issues.tensor_scalar_index_rank]
+message = "chỉ mục scalar tensor cần rank-1; dùng lista<integer> cho rank-N"
+help = "chỉ dùng chỉ mục scalar trên tensor rank-1"
+
+[diagnostics.SEM011.issues.tensor_bracket_index_integer_or_lista]
+message = "chỉ mục ngoặc tensor cần một số nguyên hoặc lista<integer>"
+help = "dùng scalar số nguyên hoặc lista gồm các chỉ mục số nguyên"
+
+[diagnostics.SEM011.issues.tensor_arithmetic_numeric_element_required]
+message = "phép toán tensor cần kiểu phần tử số"
+help = "dùng kiểu phần tử tensor hoặc sparsa số"
+
+[diagnostics.SEM011.issues.matrix_arithmetic_numeric_element_required]
+message = "phép toán matrix cần các kiểu phần tử số"
+help = "dùng các kiểu phần tử matrix số"
+
+[diagnostics.SEM011.issues.tensor_receiver_structa_renamed]
+message = "phương thức receiver tensor structa đã được đổi tên thành strue; dùng seed.strue(data, shape)"
+help = "dùng seed.strue(data, shape)"
+
+[diagnostics.SEM011.issues.tensor_receiver_creata_type_args]
+message = "creata của receiver tensor không nhận đối số kiểu; dùng tensor.creata<CompleteTensorType>(fill)"
+help = "gọi tensor.creata<CompleteTensorType>(fill) để tạo tĩnh"
+
+[diagnostics.SEM011.issues.tensor_crea_argument_order]
+message = "tensor crea cần fill trước rồi đến shape; dùng seed.crea(fill, shape)"
+help = "truyền fill trước shape"
+
+[diagnostics.SEM011.issues.tensor_structa_forma_removed]
+message = "tensor.structa_forma đã bị xóa; dùng tensor.structa<CompleteTensorType>(data)"
+help = "dùng tensor.structa<CompleteTensorType>(data)"
+
+[diagnostics.SEM011.issues.tensor_creata_runtime_shape_removed]
+message = "tensor.creata không còn nhận đối số shape runtime; dùng tensor.creata<CompleteTensorType>(fill)"
+help = "dùng tensor.creata<CompleteTensorType>(fill)"
+
+[diagnostics.SEM011.issues.tensor_creata_complete_type_arg_required]
+message = "tensor.creata cần đối số kiểu tensor đầy đủ; dùng tensor.creata<CompleteTensorType>(fill)"
+help = "cung cấp một đối số kiểu tensor đầy đủ"
+
+[diagnostics.SEM011.issues.tensor_formata_complete_type_arg_required]
+message = "formata cần đối số kiểu tensor đầy đủ; dùng grid.formata<CompleteTensorType>()"
+help = "cung cấp một đối số kiểu tensor đầy đủ"
+
+[diagnostics.SEM011.issues.tensor_formata_forbids_value_args]
+message = "formata không nhận đối số giá trị; dùng grid.forma(shape) để reshape runtime"
+help = "dùng grid.forma(shape) để reshape runtime"
+
+[diagnostics.SEM011.issues.tensor_type_arg_incomplete]
+message = "đối số kiểu tensor phải là kiểu tensor đầy đủ như tf32[2, 2] hoặc tensor<numerus, [4]>"
+help = "bao gồm cả kiểu phần tử và shape trong đối số kiểu tensor"
+
+[diagnostics.SEM012]
+message = "không thể gọi"
+help = "gọi một hàm hoặc closure"
+
+[diagnostics.SEM012.issues.callee_not_callable]
+message = "callee không thể gọi được"
+help = "gọi một hàm, closure hoặc giá trị callable"
+
+[diagnostics.SEM013]
+message = "sai arity"
+help = "điều chỉnh số lượng đối số"
+
+[diagnostics.SEM013.issues.callee_type_args_unsupported]
+message = "callee không nhận đối số kiểu"
+help = "xóa danh sách đối số kiểu được chỉ rõ"
+
+[diagnostics.SEM013.issues.gpu_builtin_expects_no_arguments]
+message = "lời gọi builtin GPU không nhận đối số"
+help = "xóa các đối số của lời gọi"
+
+[diagnostics.SEM013.issues.method_accepts_no_arguments]
+message = "{method} không nhận đối số"
+help = "xóa các đối số của lời gọi"
+
+[diagnostics.SEM013.issues.variant_pattern_arity_mismatch]
+message = "arity của pattern variant không khớp"
+help = "điều chỉnh số trường của pattern cho khớp với variant"
+
+[diagnostics.SEM013.issues.vector_constructor_width_arity]
+message = "số đối số của constructor vector phải khớp với độ rộng vector"
+help = "cung cấp một phần tử constructor cho mỗi lane vector"
+
+[diagnostics.SEM013.issues.wrong_number_of_arguments]
+message = "sai số lượng đối số"
+help = "điều chỉnh số lượng đối số"
+
+[diagnostics.SEM013.issues.wrong_number_of_type_arguments]
+message = "sai số lượng đối số kiểu"
+help = "điều chỉnh số lượng đối số kiểu"
+
+[diagnostics.SEM014]
+message = "thiếu chú thích kiểu"
+help = "thêm chú thích kiểu"
+
+[diagnostics.SEM014.issues.cannot_infer_alternate_exit_type]
+message = "không thể suy luận kiểu alternate-exit"
+help = "thêm chú thích kiểu rõ ràng"
+
+[diagnostics.SEM014.issues.cannot_infer_constant_type]
+message = "không thể suy luận kiểu hằng số"
+help = "thêm chú thích kiểu rõ ràng"
+
+[diagnostics.SEM014.issues.cannot_infer_expression_type]
+message = "không thể suy luận kiểu biểu thức"
+help = "thêm chú thích kiểu rõ ràng"
+
+[diagnostics.SEM014.issues.cannot_infer_field_type]
+message = "không thể suy luận kiểu trường"
+help = "thêm chú thích kiểu rõ ràng"
+
+[diagnostics.SEM014.issues.cannot_infer_return_type]
+message = "không thể suy luận kiểu trả về"
+help = "thêm chú thích kiểu rõ ràng"
+
+[diagnostics.SEM014.issues.cannot_infer_tensor_shape]
+message = "không thể suy luận shape tensor"
+help = "cung cấp shape tensor hoặc sparsa cụ thể"
+
+[diagnostics.SEM014.issues.cannot_infer_variable_type]
+message = "không thể suy luận kiểu biến"
+help = "thêm chú thích kiểu rõ ràng"
+
+[diagnostics.SEM014.issues.directional_view_type_not_registered]
+message = "kiểu directional view chưa được đăng ký"
+help = "đảm bảo các kiểu frame builtin được đăng ký trước khi kiểm tra kiểu"
+
+[diagnostics.SEM014.issues.explicit_type_arg_inference_unsupported]
+message = "không hỗ trợ suy luận một phần trong các đối số kiểu rõ ràng"
+help = "thay các đối số kiểu rõ ràng được suy luận bằng các kiểu cụ thể"
+
+[diagnostics.SEM014.issues.scrinium_type_not_registered]
+message = "kiểu scrinium chưa được đăng ký"
+help = "đảm bảo các kiểu frame builtin được đăng ký trước khi kiểm tra kiểu"
+
+[diagnostics.SEM014.issues.sermo_type_not_registered]
+message = "kiểu sermo chưa được đăng ký"
+help = "đảm bảo các kiểu frame builtin được đăng ký trước khi kiểm tra kiểu"
+
+[diagnostics.SEM014.issues.vacua_requires_declared_type]
+message = "vacua cần một kiểu được khai báo rõ ràng"
+help = "thêm kiểu collection được khai báo cho vacua"
+
+[diagnostics.SEM015]
+message = "ép kiểu không hợp lệ"
+help = "ép sang một kiểu tương thích"
+
+[diagnostics.SEM016]
+message = "chuyển đổi không hợp lệ"
+help = "sử dụng chuyển đổi hợp lệ hoặc cung cấp khôi phục nội tuyến bằng `⇥`"
+
+[diagnostics.SEM016.issues.intervallum_clamp_recovery_unsupported]
+message = "chuyển đổi clamp intervallum không hỗ trợ khôi phục bằng `⇥`"
+help = "xóa nhánh khôi phục khỏi clamp miền giá trị này"
+
+[diagnostics.SEM016.issues.intervallum_target_not_range]
+message = "đích chuyển đổi intervallum phải là giá trị range hoặc intervallum"
+help = "chuyển đổi sang giá trị range hoặc intervallum"
+
+[diagnostics.SEM016.issues.intervallum_clamp_bound_mismatch]
+message = "clamp intervallum yêu cầu các kiểu cận phải khớp nhau"
+help = "làm cho các kiểu phần tử cận nguồn và đích khớp nhau"
+
+[diagnostics.SEM016.issues.sermo_materialize_target_unsupported]
+message = "đích vật chất hóa sermo không được hỗ trợ; cần vacuum, valor, scalar (numerus, fractus, bivalens, textus, ascii, octeti, instans), hoặc lista<T>"
+help = "chọn một đích vật chất hóa sermo được hỗ trợ"
+
+[diagnostics.SEM016.issues.intervallum_materialize_lista_element_mismatch]
+message = "vật chất hóa intervallum yêu cầu kiểu phần tử lista phải khớp nhau"
+help = "làm cho các kiểu phần tử cận nguồn và đích khớp nhau"
+
+[diagnostics.SEM016.issues.intervallum_materialize_tensor_element_mismatch]
+message = "vật chất hóa intervallum yêu cầu kiểu phần tử tensor phải khớp nhau"
+help = "làm cho các kiểu phần tử cận nguồn và đích khớp nhau"
+
+[diagnostics.SEM016.issues.lista_to_vector_literal_required]
+message = "vật chất hóa vector yêu cầu nguồn là literal lista"
+help = "sử dụng chuyển đổi hợp lệ hoặc cung cấp khôi phục nội tuyến bằng `⇥`"
+
+[diagnostics.SEM016.issues.lista_to_vector_element_mismatch]
+message = "chuyển đổi lista sang vector yêu cầu các kiểu phần tử khớp nhau"
+help = "sử dụng chuyển đổi hợp lệ hoặc cung cấp khôi phục nội tuyến bằng `⇥`"
+
+[diagnostics.SEM016.issues.lista_to_vector_literal_width]
+message = "chuyển đổi lista sang vector yêu cầu độ rộng vector dạng literal"
+help = "sử dụng chuyển đổi hợp lệ hoặc cung cấp khôi phục nội tuyến bằng `⇥`"
+
+[diagnostics.SEM016.issues.matrix_materialize_unsupported]
+message = "vật chất hóa matrix chưa được hỗ trợ"
+help = "giữ các giá trị matrix dưới dạng tham số có kiểu cho đến khi hạ cấp việc tạo matrix được triển khai"
+
+[diagnostics.SEM016.issues.valor_to_regex_unsupported]
+message = "chuyển đổi valor sang regex không có mẫu mặc định; sử dụng `valor ↦ textus ↦ regex`"
+help = "chuyển đổi valor sang textus trước khi chuyển đổi sang regex"
+
+[diagnostics.SEM016.issues.valor_to_cursor_boundary]
+message = "chuyển đổi valor sang cursor vượt qua ranh giới eager/lazy; vật chất hóa bằng `valor ↦ lista` rồi `lista ↦ cursor`"
+help = "vật chất hóa cursor qua lista trước khi vượt qua ranh giới"
+
+[diagnostics.SEM016.issues.valor_to_promissum_boundary]
+message = "chuyển đổi valor sang promissum vượt qua ranh giới bất đồng bộ/đồng bộ; valor là đồng bộ — bọc producer trong `@ futura`"
+help = "giải quyết hoặc bọc giá trị bất đồng bộ một cách rõ ràng"
+
+[diagnostics.SEM016.issues.promissum_to_valor_boundary]
+message = "chuyển đổi promissum sang valor vượt qua ranh giới bất đồng bộ/đồng bộ; giải quyết bằng `.exspecta()` trước khi đóng gói"
+help = "giải quyết hoặc bọc giá trị bất đồng bộ một cách rõ ràng"
+
+[diagnostics.SEM016.issues.cursor_to_valor_boundary]
+message = "chuyển đổi cursor sang valor vượt qua ranh giới eager/lazy; vật chất hóa bằng `cursor ↦ lista` rồi `lista ↦ valor`"
+help = "vật chất hóa cursor qua lista trước khi vượt qua ranh giới"
+
+[diagnostics.SEM016.issues.numeric_to_octeti_unspecified]
+message = "chuyển đổi từ numerus, fractus hoặc bivalens sang octeti chưa được đặc tả (độ rộng byte và thứ tự byte); thay vào đó sử dụng `chorda` hoặc các động từ byte rõ ràng"
+help = "sử dụng chorda hoặc các trình trợ giúp chuyển đổi byte rõ ràng"
+
+[diagnostics.SEM016.issues.octeti_to_numerus_unspecified]
+message = "chuyển đổi từ octeti sang numerus chưa được đặc tả (độ rộng byte và thứ tự byte); thay vào đó sử dụng `chorda` hoặc các động từ byte rõ ràng"
+help = "sử dụng chorda hoặc các trình trợ giúp chuyển đổi byte rõ ràng"
+
+[diagnostics.SEM016.issues.octeti_to_fractus_unspecified]
+message = "chuyển đổi từ octeti sang fractus chưa được đặc tả (độ rộng IEEE và thứ tự byte); thay vào đó sử dụng `chorda` hoặc các động từ byte rõ ràng"
+help = "sử dụng chorda hoặc các trình trợ giúp chuyển đổi byte rõ ràng"
+
+[diagnostics.SEM016.issues.bits_pair_width_mismatch]
+message = "the Bits bitcast requires exact-width pairs: numerus<u32> ↔ fractus<f32> and numerus<u64> ↔ fractus<f64>"
+help = "convert to the matching IEEE width first: u32 pairs with f32, u64 with f64"
+
+[diagnostics.SEM016.issues.octeti_to_bivalens_unsupported]
+message = "chuyển đổi từ octeti sang bivalens không có ý nghĩa mặc định; giải mã sang textus hoặc so sánh byte một cách rõ ràng"
+help = "sử dụng chorda hoặc các trình trợ giúp chuyển đổi byte rõ ràng"
+
+[diagnostics.SEM016.issues.promissum_target_boundary]
+message = "chuyển đổi sang promissum vượt qua ranh giới bất đồng bộ/đồng bộ; sử dụng `@ futura` hoặc `.tum()` để bọc bất đồng bộ"
+help = "giải quyết hoặc bọc giá trị bất đồng bộ một cách rõ ràng"
+
+[diagnostics.SEM016.issues.promissum_source_boundary]
+message = "chuyển đổi từ promissum vượt qua ranh giới bất đồng bộ/đồng bộ; sử dụng `.exspecta()` hoặc `@ futura` `.tum()` để giải quyết bất đồng bộ"
+help = "giải quyết hoặc bọc giá trị bất đồng bộ một cách rõ ràng"
+
+[diagnostics.SEM016.issues.sparsa_collection_unsupported]
+message = "chuyển đổi sparsa không có ý nghĩa lista mặc định; sử dụng densata() trước khi chuyển đổi lista hoặc một trình trợ giúp sparse rõ ràng"
+help = "làm dày hoặc sử dụng một trình trợ giúp sparse rõ ràng"
+
+[diagnostics.SEM016.issues.sparsa_tensor_element_mismatch]
+message = "chuyển đổi tensor và sparsa yêu cầu cùng kiểu phần tử; chuyển đổi rõ ràng độ rộng phần tử trước khi thay đổi biểu diễn"
+help = "chuyển đổi rõ ràng độ rộng phần tử trước khi thay đổi biểu diễn"
+
+[diagnostics.SEM016.issues.sparsa_tensor_shape_mismatch]
+message = "chuyển đổi tensor và sparsa yêu cầu cùng hình Figura; reshape rõ ràng trước `↦`"
+help = "reshape rõ ràng trước khi chuyển đổi"
+
+[diagnostics.SEM016.issues.tensor_to_scalar_unsupported]
+message = "chuyển đổi tensor sang scalar không có lựa chọn phần tử mặc định; sử dụng `accipe(index)` để đọc theo chỉ mục"
+help = "lập chỉ mục hoặc reduce tensor trước khi chuyển đổi"
+
+[diagnostics.SEM016.issues.scalar_to_tensor_unsupported]
+message = "chuyển đổi scalar sang tensor không có hình dạng broadcast mặc định; sử dụng `crea(shape, fill)` hoặc `structa`"
+help = "tạo hoặc điền tensor một cách rõ ràng"
+
+[diagnostics.SEM016.issues.tensor_shape_mismatch]
+message = "chuyển đổi hình dạng tensor không được hỗ trợ cho cặp này"
+help = "reshape rõ ràng trước khi chuyển đổi"
+
+[diagnostics.SEM016.issues.tensor_element_mismatch]
+message = "chuyển đổi kiểu phần tử tensor không được hỗ trợ cho cặp này"
+help = "chuyển đổi rõ ràng độ rộng phần tử trước khi thay đổi biểu diễn"
+
+[diagnostics.SEM016.issues.conversio_failure_channel_textus_required]
+message = "lan truyền lỗi conversio yêu cầu một kênh thoát thay thế kiểu `textus`"
+help = "khai báo kênh thoát thay thế là textus hoặc cung cấp khôi phục nội tuyến"
+
+[diagnostics.SEM016.issues.regex_operand_unsupported]
+message = "chuyển đổi regex yêu cầu toán hạng textus hoặc ascii"
+help = "chuyển đổi giá trị textus hoặc ascii sang regex"
+
+[diagnostics.SEM016.issues.regex_recovery_unsupported]
+message = "chuyển đổi regex không hỗ trợ khôi phục bằng `⇥`; regex không có dạng literal, nên không có giá trị theo kiểu đích để thay thế"
+help = "xóa nhánh khôi phục khỏi chuyển đổi regex này"
+
+[diagnostics.SEM016.issues.valor_verte_unsupported]
+message = "valor ∷ T không được hỗ trợ — không thể khẳng định hình dạng của giá trị động tại thời điểm biên dịch. Sử dụng `↦ T` để trích xuất lúc chạy (với `⇥` để khôi phục)."
+help = "thay vào đó sử dụng chuyển đổi lúc chạy `↦ T` với khôi phục `⇥`"
+
+[diagnostics.SEM016.issues.json_genus_conversion_requires_json_annotation]
+message = "chuyển đổi json/genus yêu cầu genus được đánh dấu `@ json`"
+help = "thêm `@ json` vào genus hoặc chuyển đổi rõ ràng qua `valor`"
+
+[diagnostics.SEM016.issues.lista_to_tabula_unsupported]
+message = "chuyển đổi lista sang tabula không có suy diễn key/value mặc định; sử dụng động từ tạo tabula hoặc `.in.tabula(k, v)`; mặc định phân rã cặp được hoãn lại"
+help = "tạo tabula với lựa chọn key/value rõ ràng"
+
+[diagnostics.SEM016.issues.cross_collection_unsupported]
+message = "chuyển đổi giữa các collection không có ý nghĩa `↦` mặc định; sử dụng một động từ chuyển đổi stdlib rõ ràng"
+help = "sử dụng một động từ chuyển đổi stdlib rõ ràng"
+
+[diagnostics.SEM016.issues.lista_to_tensor_nested]
+message = "chuyển đổi lista sang tensor yêu cầu lista phẳng; làm phẳng rõ ràng các giá trị lista lồng nhau trước `↦`"
+help = "làm phẳng lista lồng nhau trước khi chuyển đổi sang tensor"
+
+[diagnostics.SEM016.issues.lista_to_tensor_element_mismatch]
+message = "chuyển đổi lista sang tensor yêu cầu các kiểu phần tử khớp nhau; chuyển đổi phần tử rõ ràng trước `↦`"
+help = "trước tiên chuyển đổi các phần tử lista sang kiểu phần tử tensor"
+
+[diagnostics.SEM016.issues.rectangular_lista_literal_target]
+message = "chuyển đổi literal lista hình chữ nhật yêu cầu đích Figura tensor literal hạng 2"
+help = "chuyển đổi các literal lista lồng nhau sang đích tensor hạng 2"
+
+[diagnostics.SEM016.issues.rectangular_lista_literal_ragged]
+message = "literal lista lồng nhau không đều không thể chuyển đổi sang tensor; sử dụng crea hoặc một động từ làm phẳng rõ ràng"
+help = "làm cho mọi hàng lồng nhau có cùng độ dài"
+
+[diagnostics.SEM016.issues.rectangular_lista_literal_row_length]
+message = "độ dài các hàng của literal lista hình chữ nhật không khớp nhau"
+help = "làm cho mọi hàng lồng nhau có cùng độ dài"
+
+[diagnostics.SEM016.issues.rectangular_lista_literal_shape]
+message = "hình dạng literal lista hình chữ nhật không khớp với đích conversio"
+help = "khớp các chiều literal lồng nhau với Figura đích"
+
+[diagnostics.SEM016.issues.rectangular_lista_literal_spread]
+message = "chuyển đổi literal lista hình chữ nhật không cho phép phần tử spread"
+help = "mở rộng các phần tử spread trước khi chuyển đổi tensor"
+
+[diagnostics.SEM016.issues.rectangular_lista_literal_leaf]
+message = "chuyển đổi literal lista hình chữ nhật yêu cầu các phần tử lá là literal"
+help = "sử dụng các lá scalar dạng literal trong lista lồng nhau"
+
+[diagnostics.SEM017]
+message = "khai báo không khả dụng"
+help = "sử dụng khai báo khả dụng hoặc triển khai bề mặt được đánh dấu"
+
+[diagnostics.SEM017.issues.nondum_method_for_target]
+message = "phương thức `{method}` được đánh dấu nondum cho đích này{?reason|: |}"
+help = "sử dụng khai báo khả dụng hoặc thay đổi đích"
+
+[diagnostics.SEM018]
+message = "chú thích không hợp lệ"
+help = "sửa hợp đồng chú thích trước khi hạ cấp ngữ nghĩa"
+
+[diagnostics.SEM018.issues.protecta_reserved]
+message = "`{annotation}` được dành riêng và không có ý nghĩa hiển thị đang hoạt động"
+help = "sử dụng `{publica}` cho ý định xuất rõ ràng hoặc `{privata}` cho ý định chỉ dành cho tệp"
+
+[diagnostics.SEM018.issues.conflicting_lane]
+message = "các chú thích lane @ radix xung đột: '{existing}' và '{parsed}'"
+help = "sử dụng `@ radix lane \"air\"`, `@ radix lane \"mir\"`, hoặc `@ radix lane \"hir-direct\"` trên một functio cấp cao nhất"
+
+[diagnostics.SEM018.issues.nucleum_lane_invalid_identifier]
+message = "@ nucleum lane binding '{name}' is not a valid identifier"
+help = "use a valid identifier for the lane binding"
+
+[diagnostics.SEM018.issues.nucleum_lane_collision]
+message = "@ nucleum lane binding '{name}' collides with a parameter or local"
+help = "choose a lane binding name that is not already used in the entry"
+
+[diagnostics.SEM018.issues.nucleum_lane_conflicting]
+message = "conflicting @ nucleum lane bindings: '{existing}' and '{parsed}'"
+help = "declare exactly one @ nucleum lane binding"
+
+[diagnostics.SEM018.issues.missing_directive]
+message = "@ radix yêu cầu một chỉ thị như `lane`"
+help = "sử dụng `@ radix lane \"air\"`, `@ radix lane \"mir\"`, hoặc `@ radix lane \"hir-direct\"` trên một functio cấp cao nhất"
+
+[diagnostics.SEM018.issues.missing_lane_value]
+message = "@ radix lane yêu cầu một giá trị chuỗi"
+help = "sử dụng `@ radix lane \"air\"`, `@ radix lane \"mir\"`, hoặc `@ radix lane \"hir-direct\"` trên một functio cấp cao nhất"
+
+[diagnostics.SEM018.issues.non_string_lane_value]
+message = "giá trị @ radix lane phải là một literal chuỗi"
+help = "sử dụng `@ radix lane \"air\"`, `@ radix lane \"mir\"`, hoặc `@ radix lane \"hir-direct\"` trên một functio cấp cao nhất"
+
+[diagnostics.SEM018.issues.empty_radix_typus_domain]
+message = "miền typus @ radix yêu cầu ít nhất một kiểu được cho phép"
+help = "sử dụng `@ radix typus T in textus octeti` hoặc `{radix_typus_braced}` với ít nhất một kiểu được cho phép"
+
+[diagnostics.SEM018.issues.missing_type_param]
+message = "@ radix typus yêu cầu một tham số kiểu tổng quát"
+help = "sử dụng `@ radix typus T in textus octeti` hoặc `{radix_typus_braced}` với ít nhất một kiểu được cho phép"
+
+[diagnostics.SEM018.issues.non_identifier_type_param]
+message = "tham số typus @ radix phải là một định danh"
+help = "sử dụng `@ radix typus T in textus octeti` hoặc `{radix_typus_braced}` với ít nhất một kiểu được cho phép"
+
+[diagnostics.SEM018.issues.non_type_allowed]
+message = "giá trị được cho phép của typus @ radix phải là một kiểu"
+help = "sử dụng `@ radix typus T in textus octeti` hoặc `{radix_typus_braced}` với ít nhất một kiểu được cho phép"
+
+[diagnostics.SEM018.issues.unexpected_token]
+message = "token không mong đợi sau giá trị @ radix lane"
+help = "sử dụng `@ radix lane \"air\"`, `@ radix lane \"mir\"`, hoặc `@ radix lane \"hir-direct\"` trên một functio cấp cao nhất"
+
+[diagnostics.SEM018.issues.unknown_directive]
+message = "chỉ thị @ radix không xác định; cần `lane`"
+help = "sử dụng `@ radix lane \"air\"`, `@ radix lane \"mir\"`, hoặc `@ radix lane \"hir-direct\"` trên một functio cấp cao nhất"
+
+[diagnostics.SEM018.issues.unknown_lane]
+message = "lane @ radix không xác định '{lane}'; cần 'air', 'mir', hoặc 'hir-direct'"
+help = "sử dụng `@ radix lane \"air\"`, `@ radix lane \"mir\"`, hoặc `@ radix lane \"hir-direct\"` trên một functio cấp cao nhất"
+
+[diagnostics.SEM018.issues.unsupported_placement]
+message = "@ radix lane chỉ được hỗ trợ trên các khai báo functio cấp cao nhất, không phải trên {placement}"
+help = "sử dụng `@ radix lane \"air\"`, `@ radix lane \"mir\"`, hoặc `@ radix lane \"hir-direct\"` trên một functio cấp cao nhất"
+
+[diagnostics.SEM020]
+message = "gán bất biến"
+help = "sử dụng liên kết `varia` để cho phép gán lại, hoặc xóa phép gán bổ sung"
+
+[diagnostics.SEM020.issues.assignment_to_constant]
+message = "gán cho hằng số"
+help = "sử dụng liên kết `varia` để cho phép gán lại, hoặc xóa phép gán bổ sung"
+
+[diagnostics.SEM020.issues.immutable_second_assignment]
+message = "phép gán thứ hai cho liên kết bất biến"
+help = "sử dụng liên kết `varia` để cho phép gán lại, hoặc xóa phép gán bổ sung"
+
+[diagnostics.SEM020.issues.imperativus_operator_method_requires_varia_receiver]
+message = "phương thức toán tử imperativus yêu cầu receiver varia"
+help = "sử dụng liên kết `varia` để cho phép gán lại, hoặc xóa phép gán bổ sung"
+
+[diagnostics.SEM021]
+message = "đích gán không hợp lệ"
+help = "gán cho một lvalue hợp lệ"
+
+[diagnostics.SEM021.issues.invalid_assignment_target]
+message = "đích gán không hợp lệ"
+help = "gán cho một lvalue hợp lệ"
+
+[diagnostics.SEM030]
+message = "break nằm ngoài ngữ cảnh có thể break"
+help = "sử dụng 'rumpe' bên trong dum, itera, fac, meus hoặc tuus"
+
+[diagnostics.SEM030.issues.break_outside_breakable]
+message = "{keyword} nằm ngoài {context}"
+help = "sử dụng 'rumpe' bên trong dum, itera, fac, meus hoặc tuus"
+
+[diagnostics.SEM031]
+message = "continue nằm ngoài vòng lặp"
+help = "sử dụng 'perge' bên trong một vòng lặp"
+
+[diagnostics.SEM031.issues.continue_outside_loop]
+message = "{keyword} nằm ngoài {context}"
+help = "sử dụng 'perge' bên trong một vòng lặp"
+
+[diagnostics.SEM032]
+message = "return nằm ngoài hàm"
+help = "sử dụng 'redde' bên trong một hàm"
+
+[diagnostics.SEM032.issues.return_outside_function]
+message = "{keyword} nằm ngoài {context}"
+help = "sử dụng 'redde' bên trong một hàm"
+
+[diagnostics.SEM033]
+message = "thiếu return"
+help = "thêm câu lệnh return hoặc đặt kiểu trả về là 'vacuum'"
+
+[diagnostics.SEM033.issues.control_flow_fallthrough]
+message = "không phải mọi đường điều khiển đều trả về một giá trị"
+help = "thêm câu lệnh return hoặc đặt kiểu trả về là 'vacuum'"
+
+[diagnostics.SEM033.issues.redde_requires_return_type]
+message = "{keyword} yêu cầu kiểu trả về thông thường rõ ràng"
+help = "thêm câu lệnh return hoặc đặt kiểu trả về là 'vacuum'"
+
+[diagnostics.SEM040]
+message = "match không đầy đủ"
+help = "thêm các trường hợp còn thiếu hoặc một nhánh 'ceterum'"
+
+[diagnostics.SEM040.issues.missing_variants]
+message = "match không đầy đủ"
+help = "thêm các trường hợp còn thiếu hoặc một nhánh 'ceterum'"
+
+[diagnostics.SEM041]
+message = "mẫu không thể đạt tới"
+help = "xóa hoặc sắp xếp lại mẫu không thể đạt tới"
+
+[diagnostics.SEM041.issues.after_catchall]
+message = "mẫu không thể đạt tới"
+help = "xóa hoặc sắp xếp lại mẫu không thể đạt tới"
+
+[diagnostics.SEM042]
+message = "mẫu trùng lặp"
+help = "xóa mẫu trùng lặp"
+
+[diagnostics.SEM042.issues.duplicate_variant]
+message = "mẫu trùng lặp"
+help = "xóa mẫu trùng lặp"
+
+[diagnostics.SEM043]
+message = "omnia yêu cầu đối tượng xét là một enum"
+help = "chỉ dùng `omnia` với một đối tượng xét enum duy nhất"
+
+[diagnostics.SEM043.issues.enum_scrutinee]
+message = "'{keyword}' yêu cầu đối tượng xét là một enum"
+help = "chỉ dùng `omnia` với một đối tượng xét enum duy nhất"
+
+[diagnostics.SEM043.issues.single_enum_scrutinee]
+message = "'{keyword}' yêu cầu một đối tượng xét enum duy nhất"
+help = "chỉ dùng `omnia` với một đối tượng xét enum duy nhất"
+
+[diagnostics.SEM044]
+message = "omnia không cho phép các nhánh bắt tất cả"
+help = "liệt kê rõ mọi biến thể thay vì dùng `casu _` hoặc `ceterum`"
+
+[diagnostics.SEM044.issues.catchall_arm]
+message = "'{keyword}' không cho phép các nhánh bắt tất cả; hãy liệt kê rõ mọi biến thể"
+help = "liệt kê rõ mọi biến thể thay vì dùng `casu _` hoặc `ceterum`"
+
+[diagnostics.SEM050]
+message = "sử dụng sau khi di chuyển"
+help = "tránh sử dụng giá trị sau khi giá trị đó đã được di chuyển"
+
+[diagnostics.SEM050.issues.use_after_move]
+message = "sử dụng sau khi di chuyển"
+help = "tránh sử dụng giá trị sau khi giá trị đó đã được di chuyển"
+
+[diagnostics.SEM051]
+message = "mượn giá trị đã di chuyển"
+help = "chỉ mượn từ các giá trị chưa bị di chuyển"
+
+[diagnostics.SEM051.issues.borrow_of_moved]
+message = "mượn giá trị đã di chuyển"
+help = "chỉ mượn từ các giá trị chưa bị di chuyển"
+
+[diagnostics.SEM052]
+message = "xung đột mượn có thể thay đổi"
+help = "tránh các lượt mượn có thể thay đổi chồng lấn"
+
+[diagnostics.SEM052.issues.mutable_borrow_conflict]
+message = "lượt mượn có thể thay đổi xung đột với lượt mượn hiện có"
+help = "tránh các lượt mượn có thể thay đổi chồng lấn"
+
+[diagnostics.SEM052.issues.shared_borrow_conflict]
+message = "lượt mượn dùng chung xung đột với lượt mượn có thể thay đổi"
+help = "tránh các lượt mượn có thể thay đổi chồng lấn"
+
+[diagnostics.SEM052.issues.use_while_mutably_borrowed]
+message = "sử dụng trong khi đang được mượn có thể thay đổi"
+help = "tránh các lượt mượn có thể thay đổi chồng lấn"
+
+[diagnostics.SEM052.issues.write_while_borrowed]
+message = "ghi trong khi đang được mượn"
+help = "tránh các lượt mượn có thể thay đổi chồng lấn"
+
+[diagnostics.SEM053]
+message = "không thể di chuyển ra ngoài"
+help = "dùng tham chiếu hoặc bản sao thay vì di chuyển"
+
+[diagnostics.SEM053.issues.cannot_move_while_borrowed]
+message = "không thể di chuyển ra ngoài trong khi đang được mượn"
+help = "dùng tham chiếu hoặc bản sao thay vì di chuyển"
+
+[diagnostics.SEM054]
+message = "thời hạn sống không khớp"
+help = "bảo đảm các giá trị được mượn sống đủ lâu"
+
+[diagnostics.SEM055]
+message = "biến bị che khuất"
+help = "đổi tên một trong các biến"
+
+[diagnostics.SEM055.issues.shadowed_variable]
+message = "biến bị che khuất"
+help = "đổi tên một trong các biến"
+
+[diagnostics.SEM056]
+message = "gán cho lượt mượn bất biến"
+help = "khai báo tham số là 'in' nếu muốn thay đổi nó"
+
+[diagnostics.SEM056.issues.assign_to_de_parameter]
+message = "không thể gán cho tham số `de`"
+help = "khai báo tham số là 'in' nếu muốn thay đổi nó"
+
+
+[diagnostics.SEM056.issues.mutating_receiver_through_ref]
+message = "cannot call a mutating receiver through a `ref` view"
+help = "drop the `ref` marker, or use a non-mutating method"
+
+[diagnostics.SEM056.issues.assign_through_ref]
+message = "cannot assign through a `ref` view"
+help = "drop the `ref` marker if mutation is intended"
+
+[diagnostics.SEM057]
+message = "chế độ tham số không khớp"
+help = "đồng bộ chế độ tham số giữa bên gọi và bên được gọi"
+
+[diagnostics.SEM057.issues.de_to_in_or_ex_position]
+message = "không thể truyền tham số `de` vào vị trí `in` hoặc `ex`"
+help = "đồng bộ chế độ tham số giữa bên gọi và bên được gọi"
+
+
+[diagnostics.SEM057.issues.ref_to_mut_or_own_position]
+message = "cannot pass a `ref` value to a `mut` or `own` position"
+help = "pass a `mut` or `own` value, or bind through `copy`"
+
+[diagnostics.SEM057.issues.unmarked_into_own]
+message = "cannot bind an unmarked value into `own`"
+help = "bind through `copy` to duplicate the source"
+
+[diagnostics.SEM057.issues.ref_into_own]
+message = "cannot bind a `ref` value into `own`"
+help = "bind through `copy` to duplicate the source"
+
+[diagnostics.SEM057.issues.mut_into_own]
+message = "cannot bind a `mut` value into `own`"
+help = "bind through `copy` to duplicate the source"
+
+[diagnostics.SEM057.issues.field_into_own]
+message = "cannot bind a field projection into `own`"
+help = "bind through `copy` to duplicate the source"
+
+[diagnostics.SEM057.issues.index_into_own]
+message = "cannot bind an index projection into `own`"
+help = "bind through `copy` to duplicate the source"
+
+[diagnostics.SEM057.issues.deref_into_own]
+message = "cannot bind a dereference into `own`"
+help = "bind through `copy` to duplicate the source"
+
+[diagnostics.SEM057.issues.projection_into_own]
+message = "cannot bind a projection into `own`"
+help = "bind through `copy` to duplicate the source"
+
+[diagnostics.SEM057.issues.shared_into_own]
+message = "cannot bind a shared value into `own`"
+help = "bind through `copy` to duplicate the source"
+
+[diagnostics.SEM058]
+message = "sử dụng trước khi khởi tạo"
+help = "gán cho liên kết trước khi đọc nó, hoặc khai báo ô là `sponte`"
+
+[diagnostics.SEM058.issues.possibly_uninitialized]
+message = "sử dụng liên kết có thể chưa được khởi tạo"
+help = "gán cho liên kết trước khi đọc nó, hoặc khai báo ô là `sponte`"
+
+[diagnostics.SEM059]
+message = "vi phạm tính thuần AIR"
+help = "giữ các hàm `@ radix lane \"air\"` trong tập con thuần được chấp nhận"
+
+[diagnostics.SEM059.issues.async_function]
+message = "@ radix lane \"{lane}\" từ chối thân hàm này: hàm bất đồng bộ nằm ngoài tập con AIR v1"
+help = "giữ tập con AIR v1 thuần: biến cục bộ bất biến, biểu thức thuần, lệnh gọi lane AIR và chỉ các nội tại số học tensor"
+
+[diagnostics.SEM059.issues.assignment_mutation]
+message = "@ radix lane \"{lane}\" từ chối thân hàm này: phép gán là thay đổi nằm ngoài tập con AIR v1"
+help = "giữ tập con AIR v1 thuần: biến cục bộ bất biến, biểu thức thuần, lệnh gọi lane AIR và chỉ các nội tại số học tensor"
+
+[diagnostics.SEM059.issues.breakable_block]
+message = "@ radix lane \"{lane}\" từ chối thân hàm này: khối có thể thoát nằm ngoài tập con AIR v1"
+help = "giữ tập con AIR v1 thuần: biến cục bộ bất biến, biểu thức thuần, lệnh gọi lane AIR và chỉ các nội tại số học tensor"
+
+[diagnostics.SEM059.issues.cede]
+message = "@ radix lane \"{lane}\" từ chối thân hàm này: `cede` nằm ngoài tập con AIR v1"
+help = "giữ tập con AIR v1 thuần: biến cục bộ bất biến, biểu thức thuần, lệnh gọi lane AIR và chỉ các nội tại số học tensor"
+
+[diagnostics.SEM059.issues.cli_mounted_function]
+message = "@ radix lane \"{lane}\" từ chối thân hàm này: các hàm gắn với CLI nằm ngoài tập con AIR v1"
+help = "giữ tập con AIR v1 thuần: biến cục bộ bất biến, biểu thức thuần, lệnh gọi lane AIR và chỉ các nội tại số học tensor"
+
+[diagnostics.SEM059.issues.closure]
+message = "@ radix lane \"{lane}\" từ chối thân hàm này: closure nằm ngoài tập con AIR v1"
+help = "giữ tập con AIR v1 thuần: biến cục bộ bất biến, biểu thức thuần, lệnh gọi lane AIR và chỉ các nội tại số học tensor"
+
+[diagnostics.SEM059.issues.conditional_recovery]
+message = "@ radix lane \"{lane}\" từ chối thân hàm này: khôi phục có điều kiện nằm ngoài tập con AIR v1"
+help = "giữ tập con AIR v1 thuần: biến cục bộ bất biến, biểu thức thuần, lệnh gọi lane AIR và chỉ các nội tại số học tensor"
+
+[diagnostics.SEM059.issues.defaulted_parameter]
+message = "@ radix lane \"{lane}\" từ chối thân hàm này: tham số có giá trị mặc định nằm ngoài tập con AIR v1"
+help = "giữ tập con AIR v1 thuần: biến cục bộ bất biến, biểu thức thuần, lệnh gọi lane AIR và chỉ các nội tại số học tensor"
+
+[diagnostics.SEM059.issues.deferred_local_init]
+message = "@ radix lane \"{lane}\" từ chối thân hàm này: khởi tạo biến cục bộ trì hoãn nằm ngoài tập con AIR v1"
+help = "giữ tập con AIR v1 thuần: biến cục bộ bất biến, biểu thức thuần, lệnh gọi lane AIR và chỉ các nội tại số học tensor"
+
+[diagnostics.SEM059.issues.diagnostic_output]
+message = "@ radix lane \"{lane}\" từ chối thân hàm này: xuất chẩn đoán là hiệu ứng máy chủ nằm ngoài tập con AIR v1"
+help = "giữ tập con AIR v1 thuần: biến cục bộ bất biến, biểu thức thuần, lệnh gọi lane AIR và chỉ các nội tại số học tensor"
+
+[diagnostics.SEM059.issues.dum_loop]
+message = "@ radix lane \"{lane}\" từ chối thân hàm này: vòng lặp `dum` nằm ngoài tập con AIR v1"
+help = "giữ tập con AIR v1 thuần: biến cục bộ bất biến, biểu thức thuần, lệnh gọi lane AIR và chỉ các nội tại số học tensor"
+
+[diagnostics.SEM059.issues.expression_ad]
+message = "@ radix lane \"{lane}\" từ chối thân hàm này: ad dạng biểu thức nằm ngoài tập con AIR v1"
+help = "giữ tập con AIR v1 thuần: biến cục bộ bất biến, biểu thức thuần, lệnh gọi lane AIR và chỉ các nội tại số học tensor"
+
+[diagnostics.SEM059.issues.expression_statement]
+message = "@ radix lane \"{lane}\" từ chối thân hàm này: câu lệnh biểu thức nằm ngoài tập con AIR v1"
+help = "giữ tập con AIR v1 thuần: biến cục bộ bất biến, biểu thức thuần, lệnh gọi lane AIR và chỉ các nội tại số học tensor"
+
+[diagnostics.SEM059.issues.generator_function]
+message = "@ radix lane \"{lane}\" từ chối thân hàm này: hàm sinh nằm ngoài tập con AIR v1"
+help = "giữ tập con AIR v1 thuần: biến cục bộ bất biến, biểu thức thuần, lệnh gọi lane AIR và chỉ các nội tại số học tensor"
+
+[diagnostics.SEM059.issues.gradient_expression_unsupported]
+message = "@ radix lane \"{lane}\" từ chối thân hàm này: postfix gradient selection (`call(...) ∇ [places]`) chưa được lowering cho đến khi bề mặt autograd tensor-glyphs 2B ra mắt; không có quy tắc operand, selector hay result nào hoạt động trong Phase 2A"
+help = "gradient selection (`∇`) chỉ parse-only trong Phase 2A; các quy tắc eligibility/selector sẽ ra mắt cùng tensor-glyphs 2B"
+
+[diagnostics.SEM059.issues.iace]
+message = "@ radix lane \"{lane}\" từ chối thân hàm này: `iace` nằm ngoài tập con AIR v1"
+help = "giữ tập con AIR v1 thuần: biến cục bộ bất biến, biểu thức thuần, lệnh gọi lane AIR và chỉ các nội tại số học tensor"
+
+[diagnostics.SEM059.issues.inc_dec_mutation]
+message = "@ radix lane \"{lane}\" từ chối thân hàm này: thay đổi do tăng/giảm nằm ngoài tập con AIR v1"
+help = "giữ tập con AIR v1 thuần: biến cục bộ bất biến, biểu thức thuần, lệnh gọi lane AIR và chỉ các nội tại số học tensor"
+
+[diagnostics.SEM059.issues.input_read]
+message = "@ radix lane \"{lane}\" từ chối thân hàm này: đọc đầu vào là hiệu ứng máy chủ nằm ngoài tập con AIR v1"
+help = "giữ tập con AIR v1 thuần: biến cục bộ bất biến, biểu thức thuần, lệnh gọi lane AIR và chỉ các nội tại số học tensor"
+
+[diagnostics.SEM059.issues.itera_loop]
+message = "@ radix lane \"{lane}\" từ chối thân hàm này: vòng lặp `itera` nằm ngoài tập con AIR v1"
+help = "giữ tập con AIR v1 thuần: biến cục bộ bất biến, biểu thức thuần, lệnh gọi lane AIR và chỉ các nội tại số học tensor"
+
+[diagnostics.SEM059.issues.kernel_device_function]
+message = "@ radix lane \"{lane}\" từ chối thân hàm này: các hàm kernel/thiết bị nằm ngoài tập con AIR v1"
+help = "giữ tập con AIR v1 thuần: biến cục bộ bất biến, biểu thức thuần, lệnh gọi lane AIR và chỉ các nội tại số học tensor"
+
+[diagnostics.SEM059.issues.loop]
+message = "@ radix lane \"{lane}\" từ chối thân hàm này: các vòng lặp nằm ngoài tập con AIR v1"
+help = "giữ tập con AIR v1 thuần: biến cục bộ bất biến, biểu thức thuần, lệnh gọi lane AIR và chỉ các nội tại số học tensor"
+
+[diagnostics.SEM059.issues.loop_control]
+message = "@ radix lane \"{lane}\" từ chối thân hàm này: điều khiển vòng lặp nằm ngoài tập con AIR v1"
+help = "giữ tập con AIR v1 thuần: biến cục bộ bất biến, biểu thức thuần, lệnh gọi lane AIR và chỉ các nội tại số học tensor"
+
+[diagnostics.SEM059.issues.method_call]
+message = "@ radix lane \"{lane}\" từ chối thân hàm này: lệnh gọi phương thức `{method}` nằm ngoài tập con AIR v1"
+help = "giữ tập con AIR v1 thuần: biến cục bộ bất biến, biểu thức thuần, lệnh gọi lane AIR và chỉ các nội tại số học tensor"
+
+[diagnostics.SEM059.issues.missing_body]
+message = "@ radix lane \"{lane}\" từ chối thân hàm này: các hàm lane AIR phải có thân hàm"
+help = "giữ tập con AIR v1 thuần: biến cục bộ bất biến, biểu thức thuần, lệnh gọi lane AIR và chỉ các nội tại số học tensor"
+
+[diagnostics.SEM059.issues.mori]
+message = "@ radix lane \"{lane}\" từ chối thân hàm này: `mori` nằm ngoài tập con AIR v1"
+help = "giữ tập con AIR v1 thuần: biến cục bộ bất biến, biểu thức thuần, lệnh gọi lane AIR và chỉ các nội tại số học tensor"
+
+[diagnostics.SEM059.issues.mutable_varia]
+message = "@ radix lane \"{lane}\" từ chối thân hàm này: các liên kết `varia` có thể thay đổi nằm ngoài tập con AIR v1"
+help = "giữ tập con AIR v1 thuần: biến cục bộ bất biến, biểu thức thuần, lệnh gọi lane AIR và chỉ các nội tại số học tensor"
+
+[diagnostics.SEM059.issues.named_call_arg]
+message = "@ radix lane \"{lane}\" từ chối thân hàm này: đối số gọi có tên nằm ngoài tập con AIR v1"
+help = "giữ tập con AIR v1 thuần: biến cục bộ bất biến, biểu thức thuần, lệnh gọi lane AIR và chỉ các nội tại số học tensor"
+
+[diagnostics.SEM059.issues.non_air_call]
+message = "@ radix lane \"{lane}\" từ chối thân hàm này: các lệnh gọi từ hàm lane AIR phải nhắm đến một hàm lane AIR khác"
+help = "giữ tập con AIR v1 thuần: biến cục bộ bất biến, biểu thức thuần, lệnh gọi lane AIR và chỉ các nội tại số học tensor"
+
+[diagnostics.SEM059.issues.optional_null_chain]
+message = "@ radix lane \"{lane}\" từ chối thân hàm này: chuỗi khẳng định tùy chọn/null nằm ngoài tập con AIR v1"
+help = "giữ tập con AIR v1 thuần: biến cục bộ bất biến, biểu thức thuần, lệnh gọi lane AIR và chỉ các nội tại số học tensor"
+
+[diagnostics.SEM059.issues.recoverable_handler]
+message = "@ radix lane \"{lane}\" từ chối thân hàm này: trình xử lý có thể khôi phục nằm ngoài tập con AIR v1"
+help = "giữ tập con AIR v1 thuần: biến cục bộ bất biến, biểu thức thuần, lệnh gọi lane AIR và chỉ các nội tại số học tensor"
+
+[diagnostics.SEM059.issues.reference_place_op]
+message = "@ radix lane \"{lane}\" từ chối thân hàm này: các phép toán tham chiếu/địa điểm nằm ngoài tập con AIR v1"
+help = "giữ tập con AIR v1 thuần: biến cục bộ bất biến, biểu thức thuần, lệnh gọi lane AIR và chỉ các nội tại số học tensor"
+
+[diagnostics.SEM059.issues.runtime_assertion]
+message = "@ radix lane \"{lane}\" từ chối thân hàm này: các khẳng định thời gian chạy nằm ngoài tập con AIR v1"
+help = "giữ tập con AIR v1 thuần: biến cục bộ bất biến, biểu thức thuần, lệnh gọi lane AIR và chỉ các nội tại số học tensor"
+
+[diagnostics.SEM059.issues.runtime_conversion]
+message = "@ radix lane \"{lane}\" từ chối thân hàm này: phép chuyển đổi thời gian chạy `↦` nằm ngoài tập con AIR v1"
+help = "giữ tập con AIR v1 thuần: biến cục bộ bất biến, biểu thức thuần, lệnh gọi lane AIR và chỉ các nội tại số học tensor"
+
+[diagnostics.SEM059.issues.runtime_provided_binding]
+message = "@ radix lane \"{lane}\" từ chối thân hàm này: các liên kết do thời gian chạy cung cấp nằm ngoài tập con AIR v1"
+help = "giữ tập con AIR v1 thuần: biến cục bộ bất biến, biểu thức thuần, lệnh gọi lane AIR và chỉ các nội tại số học tensor"
+
+[diagnostics.SEM059.issues.runtime_variant_check]
+message = "@ radix lane \"{lane}\" từ chối thân hàm này: kiểm tra biến thể thời gian chạy `est` nằm ngoài tập con AIR v1"
+help = "giữ tập con AIR v1 thuần: biến cục bộ bất biến, biểu thức thuần, lệnh gọi lane AIR và chỉ các nội tại số học tensor"
+
+[diagnostics.SEM059.issues.spread_call_arg]
+message = "@ radix lane \"{lane}\" từ chối thân hàm này: đối số gọi trải rộng nằm ngoài tập con AIR v1"
+help = "giữ tập con AIR v1 thuần: biến cục bộ bất biến, biểu thức thuần, lệnh gọi lane AIR và chỉ các nội tại số học tensor"
+
+[diagnostics.SEM059.issues.tacet]
+message = "@ radix lane \"{lane}\" từ chối thân hàm này: `tacet` nằm ngoài tập con AIR v1"
+help = "giữ tập con AIR v1 thuần: biến cục bộ bất biến, biểu thức thuần, lệnh gọi lane AIR và chỉ các nội tại số học tensor"
+
+[diagnostics.WARN001]
+message = "biến không được sử dụng"
+help = "xóa biến hoặc thêm tiền tố '_' vào biến"
+
+[diagnostics.WARN001.issues.unused_variable]
+message = "biến không được sử dụng"
+help = "xóa biến hoặc thêm tiền tố '_' vào biến"
+
+[diagnostics.WARN001.issues.unused_binding]
+message = "liên kết không được sử dụng"
+help = "xóa biến hoặc thêm tiền tố '_' vào biến"
+
+[diagnostics.WARN002]
+message = "nhập không được sử dụng"
+help = "xóa phần nhập không được sử dụng"
+
+[diagnostics.WARN002.issues.unused_import]
+message = "nhập không được sử dụng"
+help = "xóa phần nhập không được sử dụng"
+
+[diagnostics.WARN003]
+message = "hàm không được sử dụng"
+help = "xóa hàm hoặc đánh dấu hàm là được sử dụng"
+
+[diagnostics.WARN003.issues.unused_function]
+message = "hàm không được sử dụng"
+help = "xóa hàm hoặc đánh dấu hàm là được sử dụng"
+
+[diagnostics.WARN004]
+message = "mã không thể đạt tới"
+help = "xóa mã không thể đạt tới"
+
+[diagnostics.WARN004.issues.unreachable_code]
+message = "mã không thể đạt tới"
+help = "xóa mã không thể đạt tới"
+
+[diagnostics.WARN005]
+message = "ép kiểu không cần thiết"
+help = "xóa phép ép kiểu dư thừa"
+
+[diagnostics.WARN005.issues.unnecessary_cast]
+message = "ép kiểu không cần thiết: kiểu đã được biết"
+help = "xóa phép ép kiểu dư thừa"
+
+[diagnostics.WARN007]
+message = "đích không có tác dụng"
+help = "xóa cấu trúc hoặc giới hạn cấu trúc theo đích"
+
+[diagnostics.WARN008]
+message = "tham số tham chiếu có thể thay đổi không được sử dụng"
+help = "đổi 'in' thành 'de' nếu không cần thay đổi"
+
+[diagnostics.WARN008.issues.unused_in_parameter]
+message = "tham số `in` không bao giờ bị thay đổi; cân nhắc dùng `de`"
+help = "đổi 'in' thành 'de' nếu không cần thay đổi"
+
+[diagnostics.WARN009]
+message = "tham số di chuyển không được sử dụng"
+help = "đổi 'ex' thành 'de' nếu không cần chuyển quyền sở hữu"
+
+[diagnostics.WARN009.issues.unused_ex_parameter]
+message = "parameter `ex` không bao giờ được sử dụng; hãy cân nhắc dùng `de`"
+help = "đổi 'ex' thành 'de' nếu không cần chuyển quyền sở hữu"
+
+[diagnostics.WARN010]
+message = "chú thích kiểu ignotum rõ ràng"
+help = "ưu tiên chú thích kiểu cụ thể để giữ việc kiểm tra kiểu được chính xác"
+
+[diagnostics.WARN010.issues.explicit_ignotum_annotation]
+message = "chú thích kiểu ignotum rõ ràng vô hiệu hóa việc kiểm tra kiểu chính xác"
+help = "ưu tiên chú thích kiểu cụ thể để giữ việc kiểm tra kiểu được chính xác"
+
+[diagnostics.WARN011]
+message = "wildcard hấp thụ null"
+help = "thêm nhánh `casu nihil` rõ ràng để xử lý trường hợp null một cách có chủ đích"
+
+[diagnostics.WARN011.issues.wildcard_absorbs_null]
+message = "nhánh catchall hấp thụ trường hợp null của scrutinee nullable; dùng nhánh '{casu}' {nil} rõ ràng"
+help = "thêm nhánh `casu nihil` rõ ràng để xử lý trường hợp null một cách có chủ đích"
+
+[diagnostics.WARN013]
+message = "varia không cần thiết"
+help = "dùng `fixum` khi binding không bao giờ được gán lại hoặc thay đổi"
+
+[diagnostics.WARN013.issues.unnecessary_varia]
+message = "varia không cần thiết: binding không bao giờ được gán lại hoặc thay đổi"
+help = "dùng `fixum` khi binding không bao giờ được gán lại hoặc thay đổi"
+
+[diagnostics.WARN014]
+message = "file interface đã bỏ qua export không được hỗ trợ"
+help = "dùng export được hỗ trợ từ module, hoặc chờ file interface hỗ trợ đầy đủ chữ ký này"
+
+[diagnostics.WARN014.issues.file_interface_export_skipped]
+message = "file interface đã bỏ qua export `{namespace}.{export}` ({reason}); các export khác vẫn khả dụng"
+help = "dùng export được hỗ trợ từ module, hoặc chờ file interface hỗ trợ đầy đủ chữ ký này"
+
+[diagnostics.WARN015]
+message = "tên allocator curata không được nhận diện"
+help = "dùng tên allocator được nhận diện (\"arena\", \"page\", \"alloc\" hoặc \"allocator\")"
+
+[diagnostics.WARN015.issues.unrecognized_curata_allocator]
+message = "tên allocator curata '{name}' không khớp với hợp đồng allocator được nhận diện"
+help = "dùng tên allocator được nhận diện (\"arena\", \"page\", \"alloc\" hoặc \"allocator\")"
+
+[diagnostics.WARN016]
+message = "monomorphic hole đã giải thành multi-member union"
+help = "dùng union type tường minh hoặc `∪` hole nếu sum được chủ đích"
+
+[diagnostics.WARN016.issues.monomorphic_hole_solved_to_union]
+message = "monomorphic hole `_` đã giải thành multi-member union `{union}`"
+help = "dùng union type tường minh hoặc `∪` hole nếu sum được chủ đích"
+
+[diagnostics.WARN017]
+message = "union hole đã giải theo monomorphic"
+help = "dùng `_` nếu chỉ một type được chủ đích"
+
+[diagnostics.WARN017.issues.union_hole_solved_monomorphically]
+message = "union hole `∪` đã giải thành type đơn `{type}`"
+help = "dùng `_` nếu chỉ một type được chủ đích"
+
+[llm]
+system_prompt_snippet = "Emit Vietnamese reader-locale Faber using Vietnamese keywords for declarations, control flow, loops, returns, booleans, common primitive types, and list/map collections. Keep Faber glyph syntax unchanged and preserve Vietnamese tone marks."
+exemplars = ["./exemplars/salve-munde.vi.fab"]
+
+
+# Queue/stack C2 named-method rows and the lista omnia/quilibet predicate
+# twins. These compiler-owned names remain canonical in every reader pack;
+# glyphs are not method aliases.
+[intrinsics]
+appende = "appende"
+decapita = "decapita"
+detrahe = "detrahe"
+longitudo = "longitudo"
+omnia = "omnia"
+quilibet = "quilibet"

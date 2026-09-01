@@ -290,7 +290,7 @@ pub fn hir_inspection_json(
 #[cfg(feature = "mir-core")]
 pub fn mir_output_for_source(name: &str, raw_source: &str) -> Result<String, Vec<String>> {
     let source_file = source_file(name.to_owned(), raw_source.to_owned()).map_err(|error| vec![error])?;
-    let session = crate::driver::Session::new(crate::driver::Config::default().with_dev_stdlib());
+    let session = crate::driver::Session::new(crate::driver::Config::default().with_dev_locale_root());
     let prepared = match crate::program::prepare_program_module_for_name(&source_file.name, raw_source, &session) {
         Ok(prepared) => prepared,
         Err(diagnostic) => return Err(format_mir_frontend_diagnostics(&source_file, vec![*diagnostic])),

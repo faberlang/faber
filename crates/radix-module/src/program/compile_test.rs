@@ -15,7 +15,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 fn english_config() -> crate::driver::Config {
-    let path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../stdlib/locale/en/pack.toml");
+    let path = crate::locale::workspace_locale_pack_path("en");
     let pack = crate::locale::LocalePack::from_toml_path(path).expect("load English locale pack");
     crate::driver::Config::default().with_resolved_locale_pack(pack)
 }
@@ -2056,14 +2056,12 @@ incipit {
 // `[library] provider` segment (web:dom → the faber-web checkout).
 
 fn en_locale_pack() -> crate::locale::LocalePack {
-    let stdlib = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../stdlib");
-    crate::locale::LocalePack::from_toml_path(stdlib.join("locale/en/pack.toml"))
+    crate::locale::LocalePack::from_toml_path(crate::locale::workspace_locale_pack_path("en"))
         .expect("installed en pack should load")
 }
 
 fn la_locale_pack() -> crate::locale::LocalePack {
-    let stdlib = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../stdlib");
-    crate::locale::LocalePack::from_toml_path(stdlib.join("locale/la/pack.toml"))
+    crate::locale::LocalePack::from_toml_path(crate::locale::workspace_locale_pack_path("la"))
         .expect("installed la pack should load")
 }
 

@@ -196,10 +196,7 @@ fn queue_stack_arithmetic_diagnostic_is_localized_in_en_and_la() {
             "operator queue numerica + per elementa agit; scalaria utrimque propagantur, queue parem longitudinem requirit; operanda queue/stack mixta invalida sunt; utere ↦ ad latitudinem convertendam",
         ),
     ] {
-        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("../../stdlib/locale")
-            .join(locale)
-            .join("pack.toml");
+        let path = crate::locale::workspace_locale_pack_path(locale);
         let pack = crate::locale::LocalePack::from_toml_path(path).expect("locale pack");
         let rendered = pack
             .render_diagnostic_text(&diagnostic)

@@ -1,0 +1,12 @@
++++
+locale = "llm"
++++
+
+fn greet(string msg) → string {
+  return msg
+}
+
+main {
+  const _ greeting ← greet("Hello, World!")
+  print greeting
+}

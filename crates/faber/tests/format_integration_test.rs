@@ -19,12 +19,12 @@ fn exempla(path: &str) -> PathBuf {
 /// English reader pack — the product-default surface the CLI uses for
 /// untagged sources and `locale = "en"` frontmatter files.
 fn english_pack() -> radix::module::locale::LocalePack {
-    let path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../stdlib/locale/en/pack.toml");
+    let path = radix::module::locale::workspace_locale_pack_path("en");
     radix::module::locale::LocalePack::from_toml_path(path).expect("load English locale pack")
 }
 
 fn latin_pack() -> radix::module::locale::LocalePack {
-    let path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../stdlib/locale/la/pack.toml");
+    let path = radix::module::locale::workspace_locale_pack_path("la");
     radix::module::locale::LocalePack::from_toml_path(path).expect("load Latin locale pack")
 }
 

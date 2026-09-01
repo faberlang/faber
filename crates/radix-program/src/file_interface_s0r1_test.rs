@@ -18,7 +18,7 @@ use radix_module::file_interface::{
 use radix_module::semantic::SemanticParamMode;
 use radix_module::syntax::GenericParamKind;
 use std::collections::BTreeMap;
-use std::path::PathBuf;
+
 
 const PROVIDER: &str = r#"@ publica
 typus Vector<magnitudo N> = vector<fractus<f32>, N>
@@ -306,7 +306,7 @@ functio call_text() → vacuum {
 #[test]
 fn export_probe_fixture_materializes_solved_union_param() {
     let pack_path =
-        PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../stdlib/locale/en/pack.toml");
+        radix_module::locale::workspace_locale_pack_path("en");
     let en_pack = radix_module::locale::LocalePack::from_toml_path(&pack_path)
         .expect("installed en pack should load");
     let session = Session::new(

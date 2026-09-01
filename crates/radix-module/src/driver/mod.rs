@@ -3009,11 +3009,11 @@ fn analyze_source_with_kernel_template_admissions_unadjusted(
     Ok(unit)
 }
 
-/// Resolve a frontmatter `locale` id to a `LocalePack` via stdlib.
+/// Resolve a frontmatter `locale` id to a `LocalePack` via the language-pack root.
 ///
 /// # Errors
 ///
-/// Returns a `Diagnostic` when `stdlib_path` is not configured or the pack
+/// Returns a `Diagnostic` when `locale_root` is not configured or the pack
 /// cannot be loaded.
 pub(crate) fn resolve_frontmatter_locale_pack(config: &Config, locale_id: &str) -> Result<LocalePack, Box<Diagnostic>> {
     // Reject empty locale ids
@@ -3048,29 +3048,28 @@ pub(crate) fn resolve_frontmatter_locale_pack(config: &Config, locale_id: &str) 
         ));
     }
 
-    let root = config.stdlib_path.as_ref().ok_or_else(|| {
+    let root = config.locale_root.as_ref().ok_or_else(|| {
         Box::new(
             Diagnostic::error(format!(
-                "frontmatter declares locale '{locale_id}' but no standard library path is configured"
+                "frontmatter declares locale '{locale_id}' but no language-pack root is configured"
             ))
             .with_phase(DiagnosticPhase::Lex)
             .with_code(locale_unknown_spec().code),
         )
     })?;
 
-    let reader_root = root.join("locale");
-    let pack_path = reader_root.join(locale_id).join("pack.toml");
+    let pack_path = root.join(locale_id).join("pack.toml");
 
     // Defense-in-depth containment check: verify the resolved path stays within
-    // the reader directory after symlink resolution.  Input filtering already
+    // the language-pack root after symlink resolution. Input filtering already
     // blocks '/' and '..', so the primary remaining escape is a symlink inside
-    // the stdlib reader directory.
-    if let Ok(canonical_reader_root) = std::fs::canonicalize(&reader_root) {
+    // the locale directory.
+    if let Ok(canonical_root) = std::fs::canonicalize(root) {
         if let Ok(canonical_pack_path) = std::fs::canonicalize(&pack_path) {
-            if !canonical_pack_path.starts_with(&canonical_reader_root) {
+            if !canonical_pack_path.starts_with(&canonical_root) {
                 return Err(Box::new(
                     Diagnostic::error(format!(
-                        "frontmatter locale '{locale_id}' resolves outside the reader directory"
+                        "frontmatter locale '{locale_id}' resolves outside the language-pack root"
                     ))
                     .with_phase(DiagnosticPhase::Lex)
                     .with_code(locale_unknown_spec().code),

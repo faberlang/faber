@@ -1,0 +1,2995 @@
+[pack]
+id = "th-TH"
+schema_version = 1
+
+[keywords]
+discretio = "สหภาพแยก"
+fixum = "คงที่"
+functio = "ฟังก์ชัน"
+genus = "ชนิด"
+implendum = "สัญญา"
+importa = "นำเข้า"
+modulus = "โมดูลัส"
+ordo = "ลำดับ"
+sit = "อนุมานคงที่"
+typus = "ชนิดนามแฝง"
+schema = "สคีมา"
+columna = "คอลัมน์"
+varia = "แปร"
+abstractus = "นามธรรม"
+ceteri = "ที่เหลือ"
+curata = "จัดการ"
+errata = "ข้อผิดพลาด"
+exitus = "ทางออก"
+generis = "ของชนิด"
+iacit = "โยนผล"
+immutata = "ไม่เปลี่ยนแปลง"
+interna = "ภายในองค์กร"
+magnitudo = "ขนาด"
+nexum = "ผูก"
+iuncta = "ทูเพิล"
+optiones = "ทางเลือก"
+prae = "ก่อนหน้า"
+praefixum = "นำหน้า"
+privata = "ส่วนตัว"
+protecta = "ป้องกัน"
+publica = "สาธารณะ"
+sponte = "สมัครใจ"
+casu = "กรณี"
+ceterum = "อื่น"
+custodi = "คุ้มครอง"
+discerne = "แยก"
+dum = "ขณะ"
+elige = "เลือก"
+ergo = "ดังนั้น"
+fac = "ทำ"
+itera = "วน"
+apud = "ที่"
+secus = "มิฉะนั้น"
+si = "ถ้า"
+sic = "เช่นนั้น"
+sin = "ถ้าไม่ก็"
+perge = "ไปต่อ"
+redde = "คืน"
+rumpe = "หยุด"
+tacet = "เงียบ"
+adfirma = "ยืนยัน"
+cape = "จับ"
+capta = "ดัก"
+cede = "ให้"
+iace = "โยน"
+mori = "ตาย"
+requirit = "ต้องการ"
+reice = "ปฏิเสธ"
+clausura = "ปิดล้อม"
+libera = "อิสระ"
+falsum = "เท็จ"
+nihil = "ว่าง"
+verum = "จริง"
+nonnumerus = "nan"
+aut = "หรือ"
+est = "เป็น"
+et = "และ"
+non = "ไม่"
+vel = "หรือว่าง"
+ego = "ตัวฉัน"
+finge = "สร้าง"
+implet = "เติมเต็ม"
+sub = "สืบทอด"
+mone = "เตือน"
+nota = "บันทึก"
+scribe = "เขียน"
+vide = "ดู"
+argumenta = "อาร์กิวเมนต์"
+cura = "ดูแล"
+incipiet = "เริ่มอะซิงก์"
+incipit = "เริ่ม"
+ad = "ถึง"
+fiet = "อะซิงก์"
+fiunt = "สตรีม"
+fient = "สตรีมอะซิงก์"
+figendum = "รอคง"
+variandum = "รอแปร"
+reddet = "รอคืน"
+tacebit = "รอทิ้ง"
+# Empty-collection expression marker (contextual, tokenless).
+vacua = "เซตว่าง"
+primus_quem = "primus_quem"
+ubi = "ubi"
+summa = "ผลรวม"
+filum = "เส้นใย"
+maxima = "สูงสุด"
+minima = "ต่ำสุด"
+de = "จาก"
+ex = "ออก"
+in = "ใน"
+own = "เป็นเจ้าของ"
+copy = "สำเนา"
+lege = "อ่าน"
+lineam = "บรรทัด"
+omnia = "ทั้งหมด"
+scriptum = "จารึก"
+sparge = "กระจาย"
+ut = "ในชื่อ"
+ante = "ก่อน"
+inter = "ระหว่าง"
+intra = "ภายใน"
+per = "ต่อ"
+ab = "ช่วง"
+usque = "จนถึง"
+erratur = "คาดหวัง_ล้มเหลว"
+fragilis = "เปราะบาง"
+futurum = "ค้าง"
+metior = "วัด"
+omitte = "ละเว้น"
+postpara = "หลังเตรียม"
+postparabit = "จะหลังเตรียม"
+praepara = "เตรียม"
+praeparabit = "จะเตรียม"
+proba = "ทดสอบ"
+probandum = "ทดสอบชุด"
+repete = "ทำซ้ำ"
+solum = "เฉพาะ"
+solum_in = "เฉพาะใน"
+tag = "แท็ก"
+temporis = "เวลา"
+negativum = "ลบ"
+nonnihil = "ไม่ว่าง"
+nonnulla = "ไม่เป็นค่าว่าง"
+nulla = "ว่างเปล่า"
+positivum = "บวก"
+cli = "cli"
+commune = "commune"
+cursor = "เคอร์เซอร์"
+futura = "อนาคต"
+imperium = "คำสั่ง"
+operandus = "ตัวถูกดำเนินการ"
+optio = "ตัวเลือก"
+conversion = "แปลง"
+conversio = "การแปลง"
+nucleum = "เคอร์เนล"
+vertex = "จุดยอด"
+fragment = "ส่วนย่อย"
+nondum = "ไม่เสถียร"
+verte = "เปลี่ยนชื่อ"
+nomen = "ชื่อ"
+radix = "radix"
+brevis = "สั้น"
+descriptio = "คำอธิบาย"
+longum = "ยาว"
+lane = "เลน"
+ubique = "โกลบอล"
+
+[types]
+ascii = "ascii"
+textus = "ข้อความ"
+numerus = "จำนวน"
+modulus = "ค่ามอดุลัส"
+fractus = "เศษ"
+bivalens = "ตรรกะ"
+nihil = "นัล"
+vacuum = "เปล่า"
+numquam = "ไม่เคย"
+ignotum = "ไม่รู้"
+octeti = "ไบต์"
+regex = "regex"
+json = "json"
+valor = "ค่า"
+instans = "อินสแตนซ์"
+objectum = "ออบเจ็กต์"
+quidlibet = "อะไรก็ได้"
+lista = "รายการ"
+# Shipped bounded forms: lista<T, N>, textus<N>, ascii<N>, octeti<N>.
+tabula = "ตาราง"
+copia = "ชุด"
+promissum = "คำมั่น"
+cursor = "ตัวชี้"
+queue = "คิว"
+stack = "สแตก"
+# Tensor family: real Thai glosses (D1) — pack-owned, no inherits substitute.
+tensor = "เทนเซอร์"
+vector = "เวกเตอร์"
+matrix = "เมทริกซ์"
+sparsa = "กระจัดกระจาย"
+atomic = "อะตอมิก"
+intervallum = "อันตรภาค"
+# ชื่อประเภทมุมมองเชิงสัมพันธ์ (S2-U5)
+filtrum = "ตัวกรอง"
+series = "ซีรีส์"
+census = "สำมะโน"
+ratio = "ratio"
+
+[diagnostics.UNRES001]
+message = "คีย์เวิร์ด '{keyword}' ไม่ได้ประกาศไว้สำหรับชุดภาษา '{pack}'"
+help = "ใช้การสะกดคีย์เวิร์ดที่ประกาศในชุดภาษาสำหรับตำแหน่งไวยากรณ์นี้"
+
+[diagnostics.UNRES002]
+message = "อินทรินซิก '{intrinsic}' ไม่ได้ประกาศไว้สำหรับชุดภาษา '{pack}' บนตระกูลตัวรับ '{receiver}'"
+help = "ใช้การสะกดอินทรินซิกที่ประกาศในชุดภาษาสำหรับตระกูลตัวรับนี้"
+
+[diagnostics.UNRES003]
+message = "สมาชิก '{member}' ไม่ได้ประกาศไว้สำหรับชุดภาษา '{pack}' สำหรับเอกลักษณ์ '{identity}'"
+help = "ใช้การสะกดสมาชิกที่ประกาศในชุดภาษาสำหรับเอกลักษณ์ไลบรารีนี้"
+
+[diagnostics.LOCALE002]
+message = "ชุดภาษา '{pack}' พบการสะกดที่คล้ายคำสำคัญ '{spelling}'"
+help = "ใช้ '{suggestion}' หากตั้งใจหมายถึงคำสำคัญ; '{spelling}' เป็นชื่อที่ใช้ได้ตามที่เขียน"
+
+[diagnostics.LEX001]
+message = "ลิเทอรัลสตริงไม่ปิดท้าย"
+help = "ปิดลิเทอรัลสตริงก่อนจบบรรทัดหรือไฟล์"
+
+[diagnostics.LEX001.issues.unterminated_ascii_literal]
+message = "ลิเทอรัล ascii ไม่ปิดท้าย"
+help = "ปิดลิเทอรัลสตริงก่อนจบบรรทัดหรือไฟล์"
+
+[diagnostics.LEX001.issues.newline_in_ascii_literal]
+message = "ลิเทอรัล ascii ไม่ปิดท้าย (มีบรรทัดใหม่ในลิเทอรัล)"
+help = "ปิดลิเทอรัลสตริงก่อนจบบรรทัดหรือไฟล์"
+
+[diagnostics.LEX001.issues.unterminated_backtick_template_literal]
+message = "ลิเทอรัลเทมเพลต backtick ไม่ปิดท้าย"
+help = "ปิดลิเทอรัลสตริงก่อนจบบรรทัดหรือไฟล์"
+
+[diagnostics.LEX001.issues.unterminated_octeti_literal]
+message = "ลิเทอรัล octeti ไม่ปิดท้าย"
+help = "ปิดลิเทอรัลสตริงก่อนจบบรรทัดหรือไฟล์"
+
+[diagnostics.LEX001.issues.unterminated_string_literal]
+message = "ลิเทอรัลสตริงไม่ปิดท้าย"
+help = "ปิดลิเทอรัลสตริงก่อนจบบรรทัดหรือไฟล์"
+
+[diagnostics.LEX001.issues.newline_in_string_literal]
+message = "ลิเทอรัลสตริงไม่ปิดท้าย (มีบรรทัดใหม่ในสตริง)"
+help = "ปิดลิเทอรัลสตริงก่อนจบบรรทัดหรือไฟล์"
+
+[diagnostics.LEX001.issues.unterminated_guillemet_block_string_literal]
+message = "ลิเทอรัลสตริงบล็อก guillemet ไม่ปิดท้าย"
+help = "ปิดลิเทอรัลสตริงก่อนจบบรรทัดหรือไฟล์"
+
+[diagnostics.LEX002]
+message = "ลิเทอรัลตัวเลขไม่ถูกต้อง"
+help = "ตรวจตัวคั่นตัวเลขและคำนำหน้าฐาน"
+
+[diagnostics.LEX002.issues.invalid_hexadecimal_number]
+message = "เลขฐานสิบหกไม่ถูกต้อง"
+help = "ตรวจตัวคั่นตัวเลขและคำนำหน้าฐาน"
+
+[diagnostics.LEX002.issues.invalid_binary_number]
+message = "เลขฐานสองไม่ถูกต้อง"
+help = "ตรวจตัวคั่นตัวเลขและคำนำหน้าฐาน"
+
+[diagnostics.LEX002.issues.invalid_octal_number]
+message = "เลขฐานแปดไม่ถูกต้อง"
+help = "ตรวจตัวคั่นตัวเลขและคำนำหน้าฐาน"
+
+[diagnostics.LEX002.issues.invalid_floating_point_number]
+message = "เลขทศนิยมไม่ถูกต้อง"
+help = "ตรวจตัวคั่นตัวเลขและคำนำหน้าฐาน"
+
+[diagnostics.LEX002.issues.invalid_integer]
+message = "จำนวนเต็มไม่ถูกต้อง"
+help = "ตรวจตัวคั่นตัวเลขและคำนำหน้าฐาน"
+
+[diagnostics.LEX003]
+message = "ลำดับ escape ไม่ถูกต้อง"
+help = "ใช้ลำดับ escape ที่รองรับ หรือ escape backslash"
+
+[diagnostics.LEX004]
+message = "พบอักขระที่ไม่คาดคิด"
+help = "ลบอักขระนี้ หรือ escape หากต้องการให้เป็นลิเทอรัล"
+
+[diagnostics.LEX004.issues.unexpected_character]
+message = "พบอักขระที่ไม่คาดคิด: {char}"
+help = "ลบอักขระนี้ หรือ escape หากต้องการให้เป็นลิเทอรัล"
+
+[diagnostics.LEX005]
+message = "คำสั่ง section ถูกนำออกแล้ว"
+help = "ใส่เมทาดาทาไฟล์ใน frontmatter TOML +++ ที่บรรทัด 1 แทนคำสั่ง section ที่ต้นบรรทัด"
+
+[diagnostics.LEX005.issues.removed_section_directive]
+message = "คำสั่ง § ระดับไฟล์ถูกนำออกแล้ว; ใช้ frontmatter +++"
+help = "ใส่เมทาดาทาไฟล์ใน frontmatter TOML +++ ที่บรรทัด 1 แทนคำสั่ง § ที่ต้นบรรทัด"
+
+[diagnostics.LEX006]
+message = "ไวยากรณ์คอมเมนต์ไม่ถูกต้อง"
+help = "ขึ้นต้นคอมเมนต์ด้วย # แทน // หรือ /* */"
+
+[diagnostics.LEX006.issues.c_style_line_comment]
+message = "คอมเมนต์ // แบบ C ไม่ถูกต้องใน Faber; ใช้ # สำหรับคอมเมนต์บรรทัด"
+help = "ขึ้นต้นคอมเมนต์ด้วย # แทน // หรือ /* */"
+
+[diagnostics.LEX006.issues.c_style_block_comment]
+message = "คอมเมนต์บล็อก /* */ แบบ C ไม่ถูกต้องใน Faber; ใช้ # สำหรับคอมเมนต์บรรทัด"
+help = "ขึ้นต้นคอมเมนต์ด้วย # แทน // หรือ /* */"
+
+[diagnostics.LEX006.issues.unterminated_c_style_block_comment]
+message = "คอมเมนต์บล็อกแบบ C ไม่ปิดท้าย; Faber ใช้ # สำหรับคอมเมนต์บรรทัด"
+help = "ขึ้นต้นคอมเมนต์ด้วย # แทน // หรือ /* */"
+
+[diagnostics.LEX007]
+message = "ไม่รับคอมเมนต์ในบรรทัดเดียวกับโค้ด"
+help = "ย้ายคอมเมนต์ # ไปไว้บรรทัดของตนเองเหนือโค้ดที่อธิบาย"
+
+[diagnostics.LEX007.issues.inline_hash_after_code]
+message = "คอมเมนต์ # ต้องเริ่มต้นบรรทัด; ย้ายคอมเมนต์นี้ไปไว้เหนือโค้ด"
+help = "ย้ายคอมเมนต์ # ไปไว้บรรทัดของตนเองเหนือโค้ดที่อธิบาย"
+
+[diagnostics.PARSE000]
+message = "เกิดข้อผิดพลาดของ lexer ระหว่างการแยกวิเคราะห์"
+help = "แก้ข้อผิดพลาดของ lexer ก่อน การแยกวิเคราะห์จะดำเนินต่อจากโทเค็นที่สะอาด"
+
+[diagnostics.PARSE001]
+message = "ต้องมีโทเค็น"
+help = "ตรวจให้แน่ใจว่ามีโทเค็นที่คาดไว้ในตำแหน่งนี้"
+
+[diagnostics.PARSE001.issues.annotation_name]
+message = "ต้องมีชื่อ annotation"
+help = "เพิ่มชื่อ annotation หลัง @"
+
+[diagnostics.PARSE001.issues.secus_si_else_if]
+message = "ใช้ 'sin' สำหรับ else-if"
+help = "แทนที่ secus si ด้วย sin"
+
+[diagnostics.PARSE001.issues.itera_mode]
+message = "ต้องมี {expected}"
+help = "เลือกโหมดการวนซ้ำหนึ่งโหมดก่อนนิพจน์ iterable"
+
+[diagnostics.PARSE001.issues.allocator_kind]
+message = "ต้องมี {expected}"
+help = "ใช้ \"arena\" หรือ \"page\" เป็นชนิด allocator"
+
+[diagnostics.PARSE001.issues.mutability_marker]
+message = "ต้องมี {expected}"
+help = "เพิ่ม fixum หรือ varia ก่อนชื่อ binding"
+
+[diagnostics.PARSE001.issues.itera_de_requires_fixum]
+message = "itera de bindings are always const; use {expected}"
+help = "de binds an index or key, not a mutable element; use the const form"
+
+[diagnostics.PARSE001.issues.duplicate_rest_pattern]
+message = "ระบุ rest pattern แล้ว"
+help = "คง binding rest '{keyword}' ไว้เพียงรายการเดียว"
+
+[diagnostics.PARSE001.issues.sit_identifier_binding]
+message = "'{keyword}' ผูก identifier หนึ่งรายการโดยตรง; ใช้ '{keyword}' name ← expr"
+help = "เขียน '{keyword}' name ← expr หรือใช้ fixum สำหรับ binding แบบมีชนิด/แยกโครงสร้าง"
+
+[diagnostics.PARSE001.issues.sit_no_destructuring]
+message = "sit ไม่รองรับแพตเทิร์นการแยกโครงสร้าง"
+help = "ใช้ fixum กับแพตเทิร์นการแยกโครงสร้าง"
+
+[diagnostics.PARSE001.issues.test_case_or_setup]
+message = "ต้องมี test case หรือ setup"
+help = "เริ่มรายการในบอดีด้วย '{proba}', '{probandum}' หรือ '{setup}'"
+
+[diagnostics.PARSE001.issues.test_modifier_integer]
+message = "ต้องมีจำนวนเต็มหลัง '{modifier}'"
+help = "ใส่ลิเทอรัลจำนวนเต็มหลัง '{modifier}'"
+
+[diagnostics.PARSE001.issues.tensor_figura_after_element]
+message = "tensor ต้องมีรูปร่าง Figura หลังชนิดสมาชิก"
+help = "เพิ่มจุลภาคและรูปร่าง Figura เช่น tensor<T, []>"
+
+[diagnostics.PARSE001.issues.sparsa_figura_after_element]
+message = "sparsa ต้องมีรูปร่าง Figura หลังชนิดสมาชิก"
+help = "เพิ่มจุลภาคและรูปร่าง Figura เช่น sparsa<T, []>"
+
+[diagnostics.PARSE001.issues.vector_width_after_element]
+message = "vector ต้องมีความกว้างหลังชนิดสมาชิก"
+help = "เพิ่มจุลภาคและความกว้าง vector เช่น vector<T, [4]>"
+
+[diagnostics.PARSE001.issues.matrix_figura_after_element]
+message = "matrix ต้องมีรูปร่าง Figura สองมิติหลังชนิดสมาชิก"
+help = "เพิ่มจุลภาคและรูปร่าง เช่น matrix<T, [4, 4]>"
+
+[diagnostics.PARSE001.issues.atomic_single_element]
+message = "atomic รับชนิดสมาชิกได้เพียงหนึ่งชนิดเท่านั้น"
+help = "ลบพารามิเตอร์ชนิดที่เกินมา; ใช้ atomic<T>"
+
+[diagnostics.PARSE001.issues.retired_type_call_constructor]
+message = "คอนสตรัคเตอร์แบบเรียกชนิดไม่ใช่ไวยากรณ์ Faber"
+help = "ใช้ value ↦ Type หรือคอนสตรัคเตอร์ของไลบรารีที่มีชื่อ"
+
+[diagnostics.PARSE001.issues.retired_prefix_predicate]
+message = "{predicate} ไม่ใช่ไวยากรณ์ predicate นำหน้าอีกต่อไป"
+help = "เขียนใหม่ด้วย {replacement}"
+
+[diagnostics.PARSE001.issues.equality_non_missing_est]
+message = "ต้องมี 'est' หลัง 'non' ในนิพจน์ equality"
+help = "เขียนการปฏิเสธ identity เป็น non est"
+
+[diagnostics.PARSE001.issues.est_non_spelling]
+message = "'est non' ไม่ใช่รูปสะกดของการปฏิเสธ identity"
+help = "ใช้ non est สำหรับการปฏิเสธ identity"
+
+[diagnostics.PARSE001.issues.closure_body_start]
+message = "ต้องมี ':' หรือบอดีบล็อกหลังพารามิเตอร์ clausura"
+help = "เพิ่ม : สำหรับบอดีนิพจน์หรือบอดีบล็อก"
+
+[diagnostics.PARSE001.issues.ad_ascii_route]
+message = "ต้องมีเส้นทางลิเทอรัล ascii หลัง 'ad'"
+help = "เขียนเส้นทางเป็นลิเทอรัล ASCII หลัง ad"
+
+[diagnostics.PARSE001.issues.json_quoted_key]
+message = "คีย์ JSON ต้องเป็นสตริงในเครื่องหมายคำพูด; ใช้ \"name\": value"
+help = "ใส่เครื่องหมายคำพูดให้คีย์ออบเจ็กต์ JSON"
+
+[diagnostics.PARSE001.issues.json_string_key]
+message = "ต้องมีคีย์สตริง JSON"
+help = "เริ่มคีย์ JSON ด้วยลิเทอรัลสตริง"
+
+[diagnostics.PARSE001.issues.field_value_separator]
+message = "ต้องมี '='"
+help = "ใช้ = ระหว่างชื่อฟิลด์และค่า"
+
+[diagnostics.PARSE001.issues.call_type_args_start]
+message = "ต้องมี '<'"
+help = "เริ่มอาร์กิวเมนต์ชนิดของจุดเรียกด้วย <"
+
+[diagnostics.PARSE001.issues.gradient_empty_selector_list]
+message = "รายการ gradient selector หลัง ∇ ต้องระบุ primal call argument อย่างน้อยหนึ่งรายการ"
+help = "ระบุ primal call arguments ที่คุณต้องการ adjoints เช่น loss(x, y) ∇ [x]"
+
+[diagnostics.PARSE001.issues.requirit_iace]
+message = "ต้องมี '{iace}' หลังเงื่อนไข {requirit}"
+help = "เขียน {requirit} cond {iace} err"
+
+[diagnostics.PARSE001.issues.reice_iace]
+message = "ต้องมี '{iace}' หลังเงื่อนไข {reice}"
+help = "เขียน {reice} cond {iace} err"
+
+[diagnostics.PARSE001.issues.requirit_else_rejected]
+message = "'{secus}' ไม่ใช่ particle ของ {requirit}"
+help = "ใช้ '{iace}' สำหรับ recoverable payload"
+
+[diagnostics.PARSE001.issues.reice_else_rejected]
+message = "'{secus}' ไม่ใช่ particle ของ {reice}"
+help = "ใช้ '{iace}' สำหรับ recoverable payload"
+
+[diagnostics.PARSE001.issues.adfirma_else_rejected]
+message = "'{secus}' ไม่ใช่ particle ของ {adfirma}"
+help = "ใช้ '{mori}' สำหรับข้อความ panic ที่เลือกได้"
+
+[diagnostics.PARSE002]
+message = "พบโทเค็นที่ไม่คาดคิด"
+help = "ลบหรือย้ายโทเค็นที่ไม่คาดคิด"
+
+[diagnostics.PARSE002.issues.json_unknown_identifier_value]
+message = "identifier ของ JSON ไม่ใช่ค่าที่ถูกต้องของ JSON"
+help = "ใช้ true, false, null, สตริง, ตัวเลข, ออบเจ็กต์ หรืออาร์เรย์"
+
+[diagnostics.PARSE002.issues.json_faber_keyword_value]
+message = "คำสำคัญ Faber ไม่ใช่ค่าที่ถูกต้องของ JSON"
+help = "ใช้ true, false, null, สตริง, ตัวเลข, ออบเจ็กต์ หรืออาร์เรย์"
+
+[diagnostics.PARSE002.issues.expected_json_value]
+message = "ต้องมีค่า JSON"
+help = "ระบุค่า JSON"
+
+[diagnostics.PARSE002.issues.json_integer_underflow]
+message = "ลิเทอรัลจำนวนเต็ม JSON ต่ำกว่าช่วงของ numerus"
+help = "ใช้ค่า numerus ที่อยู่ในช่วง"
+
+[diagnostics.PARSE002.issues.expected_json_number_after_minus]
+message = "ต้องมีตัวเลขหลัง '-' ใน JSON"
+help = "ใส่ตัวเลขหลัง '-' ใน JSON"
+
+[diagnostics.PARSE010]
+message = "declaration ไม่ถูกต้อง"
+help = "ตรวจคำสำคัญของ declaration และส่วนที่จำเป็น"
+
+[diagnostics.PARSE010.issues.schema_inheritance]
+message = "schema ไม่สามารถแนบ sub, implet, หรือ interface ได้"
+help = "ให้ schema เป็นส่วนหัวเชิงสัมพันธ์ธรรมดา"
+
+[diagnostics.PARSE010.issues.schema_method]
+message = "schema ไม่สามารถประกาศ method ได้"
+help = "ประกาศ method บน genus แทน"
+
+[diagnostics.PARSE011]
+message = "ต้องมีชื่อฟังก์ชันหลัง '{functio}'"
+help = "เพิ่มชื่อฟังก์ชันหลัง '{functio}'"
+
+[diagnostics.PARSE012]
+message = "ต้องมีบอดีฟังก์ชันสำหรับ declaration '{functio}'"
+help = "เพิ่ม '{block}' ให้ declaration ฟังก์ชัน"
+
+[diagnostics.PARSE013]
+message = "ต้องมีชื่อคลาสหลัง '{genus}'"
+help = "เพิ่มชื่อคลาสหลัง '{genus}'"
+
+[diagnostics.PARSE014]
+message = "ต้องมีบอดีคลาสหลัง declaration '{genus}'"
+help = "เพิ่มบล็อกหลังส่วนหัว declaration '{genus}'"
+
+[diagnostics.PARSE015]
+message = "พารามิเตอร์ไม่ถูกต้อง"
+help = "ตรวจไวยากรณ์และลำดับพารามิเตอร์"
+
+[diagnostics.PARSE015.issues.removed_fixus]
+message = "{keyword} ถูกลบแล้ว; ใช้ {optional_marker} สำหรับช่อง optional และ {immutable_marker} สำหรับ local immutable ที่เลื่อนไว้"
+help = "ทำเครื่องหมายช่อง parameter หรือ field ที่ optional ด้วย {optional_marker} หลังชื่อ"
+
+[diagnostics.PARSE016]
+message = "พารามิเตอร์ชนิดไม่ถูกต้อง"
+help = "ตรวจรายการพารามิเตอร์ชนิดว่ามีจุลภาคและตัวระบุครบ"
+
+[diagnostics.PARSE016.issues.removed_prae_typus]
+message = "'{keyword}' ถูกลบแล้ว; ประกาศ generics ด้วย angle brackets: {replacement}"
+help = "เขียน generic parameters ก่อนรายการ parameter เช่น {replacement}"
+
+[diagnostics.PARSE016.issues.type_param_after_magnitudo]
+message = "type parameters ต้องมาก่อน parameters {size_param} ในรายการ generic"
+help = "ย้าย type parameters ให้อยู่ก่อน parameters {size_param}"
+
+[diagnostics.PARSE017]
+message = "modifier ไม่ถูกต้อง"
+help = "ย้ายหรือลบ modifier"
+
+[diagnostics.PARSE018]
+message = "annotation ไม่ถูกต้อง"
+help = "เพิ่มชื่อ annotation หลัง '@'"
+
+[diagnostics.PARSE018.issues.invalid_modifier]
+message = "modifier @ {annotation} ไม่ถูกต้อง"
+help = "ใช้ modifier @ {annotation} ที่รองรับ"
+
+[diagnostics.PARSE018.issues.empty_radix_typus_domain]
+message = "domain @ radix typus ต้องมีชนิดที่อนุญาตอย่างน้อยหนึ่งชนิด"
+help = "ระบุชนิดที่อนุญาตอย่างน้อยหนึ่งชนิดหลัง in"
+
+[diagnostics.PARSE018.issues.expected_annotation_ident]
+message = "ต้องมี {context}"
+help = "เพิ่ม '{expected}' ในตำแหน่ง annotation นี้"
+
+[diagnostics.PARSE018.issues.unexpected_annotation_token]
+message = "โทเค็นที่ไม่คาดคิดหลัง {context}"
+help = "ลบโทเค็น annotation ที่ตามมา"
+
+[diagnostics.PARSE018.issues.missing_nucleum_lane_value]
+message = "@ nucleum lane requires a string value"
+help = "use `@ nucleum lane \"position\"` or braced `lane = \"position\"`"
+
+[diagnostics.PARSE018.issues.non_string_nucleum_lane_value]
+message = "@ nucleum lane value must be a string literal"
+help = "use `@ nucleum lane \"position\"` or braced `lane = \"position\"`"
+
+[diagnostics.PARSE018.issues.wrong_locale_annotation]
+message = "annotation `@ {annotation}` ไม่ได้ประกาศในพื้นผิว reader นี้"
+help = "ใช้ `@ {expected}` สำหรับ locale ของไฟล์นี้"
+
+[diagnostics.PARSE019]
+message = "modifier ซ้ำ"
+help = "ลบ modifier ที่ซ้ำ"
+
+[diagnostics.PARSE020]
+message = "คำสั่งไม่ถูกต้อง"
+help = "ใช้รูปแบบคำสั่งที่ถูกต้อง"
+
+[diagnostics.PARSE020.issues.ad_expression_only]
+message = "ad ใช้ได้เฉพาะในตำแหน่งนิพจน์"
+help = "ใช้ {replacement}"
+
+[diagnostics.PARSE021]
+message = "ขาดเงื่อนไข"
+help = "เพิ่มนิพจน์เงื่อนไข"
+
+[diagnostics.PARSE022]
+message = "ต้องมีบล็อก '{block}' หรือบอดี '{ergo}'"
+help = "เพิ่ม '{block}' หรือเริ่มคำสั่งเดียวด้วย '{ergo}'"
+
+[diagnostics.PARSE026]
+message = "∴ ใช้ได้เฉพาะ clausura แบบย่อ; ใช้ ergo สำหรับบอดีคำสั่งเดียว"
+help = "ใช้ 'ergo' สำหรับบอดีคำสั่งเดียว หรือครอบบอดีด้วยวงเล็บปีกกา"
+
+[diagnostics.PARSE027]
+message = "ergo ใช้ได้เฉพาะบอดีคำสั่งเดียว; ใช้ ∴ สำหรับ clausura แบบย่อ"
+help = "ใช้ '∴' ระหว่างลายเซ็น clausura กับบอดี"
+
+[diagnostics.PARSE023]
+message = "ต้องมีแพตเทิร์น เช่น '{wildcard}' หรือ {identifier}"
+help = "ใช้ '{wildcard}', ลิเทอรัล หรือแพตเทิร์น {identifier}"
+
+[diagnostics.PARSE024]
+message = "ต้องมีแขนง '{casu}' หรือค่าเริ่มต้น '{ceterum}'"
+help = "เริ่มแขนง dispatch ด้วย '{casu}' หรือปิดด้วย '{ceterum}'"
+
+[diagnostics.PARSE025]
+message = "ค่ากรณีไม่ถูกต้อง"
+help = "ใช้ expression ของกรณีที่ถูกต้อง"
+
+[diagnostics.PARSE030]
+message = "นิพจน์ไม่ถูกต้อง"
+help = "ตรวจไวยากรณ์นิพจน์"
+
+[diagnostics.PARSE030.issues.conversio_recovery_uses_vel]
+message = "ใช้ ⇥ สำหรับการกู้คืน conversio"
+help = "ใช้ ⇥; vel ใช้สำหรับการรวมค่า nullish เท่านั้น"
+
+[diagnostics.PARSE030.issues.expected_expression]
+message = "ต้องมีนิพจน์"
+help = "ระบุนิพจน์ที่ถูกต้องในตำแหน่งนี้"
+
+[diagnostics.PARSE030.issues.expression_ad_block]
+message = "ad รูปแบบนิพจน์ต้องไม่มีบล็อก"
+help = "ใช้ ad 'route' (ตัวเปิด) ↦ T โดยไม่มีบล็อก"
+
+[diagnostics.PARSE030.issues.closure_block_body]
+message = "บอดีบล็อกของ clausura ต้องใช้ 'fac'"
+help = "เขียนบอดี clausura แบบย่อหลัง ∴ เป็น {fac_body}"
+
+[diagnostics.PARSE030.issues.closure_fac_body_dum]
+message = "บอดี fac ของ clausura ใช้ 'dum' ไม่ได้"
+help = "ลบ dum จากบอดี fac ของ clausura"
+
+[diagnostics.PARSE031]
+message = "ลิเทอรัลไม่ถูกต้อง"
+help = "ตรวจรูปแบบลิเทอรัล"
+
+[diagnostics.PARSE032]
+message = "ตัวดำเนินการไม่ถูกต้อง"
+help = "ตรวจตำแหน่งตัวดำเนินการและตัวถูกดำเนินการ"
+
+[diagnostics.PARSE033]
+message = "กลุ่มไม่ปิดท้าย"
+help = "ปิดตัวคั่นกลุ่ม"
+
+[diagnostics.PARSE034]
+message = "อาร์กิวเมนต์การเรียกไม่ถูกต้อง"
+help = "ตรวจไวยากรณ์อาร์กิวเมนต์การเรียก"
+
+[diagnostics.PARSE035]
+message = "การเข้าถึงสมาชิกไม่ถูกต้อง"
+help = "ตรวจไวยากรณ์การเข้าถึงสมาชิก"
+
+[diagnostics.PARSE036]
+message = "เป้าหมายการกำหนดค่าไม่ถูกต้อง"
+help = "กำหนดค่าเฉพาะให้ lvalue ที่ถูกต้อง"
+
+[diagnostics.PARSE040]
+message = "ชนิดไม่ถูกต้อง"
+help = "ตรวจไวยากรณ์ชนิด"
+
+[diagnostics.PARSE040.issues.expected_type_name]
+message = "ต้องมีชื่อชนิด"
+help = "เริ่มชนิดด้วยตัวระบุ, _, หรือชนิดฟังก์ชัน"
+
+[diagnostics.PARSE040.issues.postfix_array_syntax]
+message = "ไวยากรณ์ T[] ต่อท้ายถูกนำออกแล้ว"
+help = "ใช้ lista<T>"
+
+[diagnostics.PARSE040.issues.lista_sugar_bracket_form]
+message = "lista sugar ไม่มีรูปแบบวงเล็บ"
+help = "ใช้ tensor sugar สำหรับบัฟเฟอร์ที่มีรูปร่าง"
+
+[diagnostics.PARSE040.issues.matrix_sugar_missing_shape]
+message = "matrix sugar ต้องมีรูปร่างวงเล็บสองมิติ"
+help = "เขียน matrix sugar เป็น mf32[4, 4]"
+
+[diagnostics.PARSE040.issues.lista_sugar_angle_bracket_form]
+message = "lista sugar มีได้เฉพาะ l+width แบบเปลือย"
+help = "ใช้ lista<...> สำหรับรูปแบบวงเล็บแหลม"
+
+[diagnostics.PARSE040.issues.vector_sugar_angle_bracket_form]
+message = "vector sugar ใช้ความกว้างในวงเล็บ"
+help = "เขียนความกว้างด้วยวงเล็บของ vector sugar"
+
+[diagnostics.PARSE040.issues.type_sugar_angle_bracket_form]
+message = "{sugar} sugar ใช้ Figura ในวงเล็บ"
+help = "เขียนรูปร่างด้วยวงเล็บ width sugar ของ {sugar}"
+
+[diagnostics.PARSE040.issues.invalid_figura_index]
+message = "ลิเทอรัลดัชนีต้องเป็นจำนวนธรรมชาติ"
+help = "ใช้ดัชนีรูปร่างที่ไม่เป็นลบ"
+
+[diagnostics.PARSE040.issues.wrong_locale_type]
+message = "type '{type}' is not declared on this reader surface"
+help = "use the type spelling declared by this reader locale"
+
+[diagnostics.PARSE041]
+message = "คำอธิบายชนิดไม่ถูกต้อง"
+help = "ตรวจรูปแบบคำอธิบายชนิด"
+
+[diagnostics.PARSE042]
+message = "พารามิเตอร์ชนิดไม่ปิดท้าย"
+help = "ปิดรายการพารามิเตอร์ชนิดด้วย '>'"
+
+[diagnostics.PARSE050]
+message = "การนำเข้าไม่ถูกต้อง"
+help = "ตรวจไวยากรณ์การนำเข้า"
+
+[diagnostics.PARSE050.issues.unknown_import_field]
+message = "ฟิลด์การนำเข้าไม่รู้จัก"
+help = "ใช้ ex, visibilitas, nomen, ut หรือ omnia"
+
+[diagnostics.PARSE050.issues.missing_import_source]
+message = "เรกคอร์ดการนำเข้าต้องมีแหล่งที่มา ex"
+help = "เพิ่ม ex = \"path\" ในเรกคอร์ดการนำเข้า"
+
+[diagnostics.PARSE050.issues.mixed_wildcard_and_named_import]
+message = "การนำเข้า wildcard ไม่สามารถตั้งชื่อ binding ร่วมได้"
+help = "ใช้ omnia เพียงอย่างเดียว หรือใช้ nomen/ut สำหรับการนำเข้าที่มีชื่อ"
+
+[diagnostics.PARSE050.issues.invalid_import_visibility]
+message = "visibility ของการนำเข้าไม่ถูกต้อง"
+help = "ใช้ publica"
+
+[diagnostics.PARSE050.issues.import_privata_removed]
+message = "`privata` ถูกนำออกจากการนำเข้าแล้ว; การนำเข้าไม่ re-export โดยค่าเริ่มต้น"
+help = "ลบเครื่องหมายออก หรือใช้ publica เพื่อ re-export"
+
+[diagnostics.PARSE050.issues.import_name_inference_failed]
+message = "ไม่สามารถอนุมานชื่อการนำเข้าจาก {path} ได้"
+help = "ระบุ nomen หรือ alias ที่ชัดเจนสำหรับ {path}"
+
+[diagnostics.SEM001]
+message = "ตัวแปรไม่ได้กำหนด"
+help = "ประกาศตัวแปรก่อนใช้{?suggestion|; หมายถึง |?}"
+
+[diagnostics.SEM001.issues.name_not_variant]
+message = "ชื่อไม่ได้อ้างถึง variant"
+help = "ประกาศตัวแปรก่อนใช้{?suggestion|; หมายถึง |?}"
+
+[diagnostics.SEM001.issues.unknown_identifier]
+message = "ตัวระบุไม่รู้จัก"
+help = "ประกาศตัวแปรก่อนใช้{?suggestion|; หมายถึง |?}"
+
+[diagnostics.SEM001.issues.scribe_callee]
+message = "ตัวระบุไม่รู้จัก"
+help = "เขียน `{spelling} <expr>` โดยไม่มีวงเล็บสำหรับคำสั่งส่งออก"
+
+[diagnostics.SEM001.issues.unknown_record_field]
+message = "ฟิลด์เรกคอร์ดไม่รู้จัก"
+help = "ประกาศตัวแปรก่อนใช้{?suggestion|; หมายถึง |?}"
+
+[diagnostics.SEM001.issues.unknown_variant]
+message = "variant ไม่รู้จัก"
+help = "ประกาศตัวแปรก่อนใช้{?suggestion|; หมายถึง |?}"
+
+[diagnostics.SEM001.issues.unknown_variant_fields]
+message = "ฟิลด์ variant ไม่รู้จัก"
+help = "ประกาศตัวแปรก่อนใช้{?suggestion|; หมายถึง |?}"
+
+[diagnostics.SEM002]
+message = "ชนิดไม่ได้กำหนด"
+help = "ประกาศชนิดหรือนำเข้า"
+
+[diagnostics.SEM002.issues.figura_unknown_index]
+message = "พารามิเตอร์ดัชนีใน Figura ไม่รู้จัก"
+help = "ประกาศชนิดหรือนำเข้า"
+
+[diagnostics.SEM002.issues.float_width_on_numerus]
+message = "f16, f32 และ f64 เป็นความกว้างของ fractus; ใช้ fractus<f16>, fractus<f32> หรือ fractus<f64>"
+help = "ประกาศชนิดหรือนำเข้า"
+
+[diagnostics.SEM002.issues.integer_width_on_fractus]
+message = "เครื่องหมายความกว้างจำนวนเต็มเป็นความกว้างของ numerus; ใช้ numerus<…>"
+help = "ประกาศชนิดหรือนำเข้า"
+
+[diagnostics.SEM002.issues.invalid_precision_marker]
+message = "instans รับเครื่องหมายความแม่นยำเฉพาะ ms, us หรือ ns"
+help = "ประกาศชนิดหรือนำเข้า"
+
+[diagnostics.SEM002.issues.invalid_fractus_width_marker]
+message = "fractus รับเฉพาะ f16, f32 หรือ f64"
+help = "ประกาศชนิดหรือนำเข้า"
+
+[diagnostics.SEM002.issues.invalid_numerus_width_marker]
+message = "เครื่องหมายความกว้างของ numerus ไม่รู้จัก"
+help = "ประกาศชนิดหรือนำเข้า"
+
+[diagnostics.SEM002.issues.invalid_width_marker]
+message = "เครื่องหมายความกว้างสำหรับตระกูลนี้ไม่รู้จัก"
+help = "ประกาศชนิดหรือนำเข้า"
+
+[diagnostics.SEM002.issues.name_not_type]
+message = "ชื่อไม่ได้อ้างถึงชนิด"
+help = "ประกาศชนิดหรือนำเข้า"
+
+[diagnostics.SEM002.issues.precision_marker_params]
+message = "เครื่องหมายความแม่นยำรับพารามิเตอร์ไม่ได้"
+help = "ประกาศชนิดหรือนำเข้า"
+
+[diagnostics.SEM002.issues.precision_marker_shape]
+message = "เครื่องหมายความแม่นยำต้องเป็นการเขียนแบบเปลือย เช่น ms หรือ us"
+help = "ประกาศชนิดหรือนำเข้า"
+
+[diagnostics.SEM002.issues.qualified_name_not_type]
+message = "ชื่อแบบมีคุณสมบัติไม่ได้อ้างถึงชนิด"
+help = "ประกาศชนิดหรือนำเข้า"
+
+[diagnostics.SEM002.issues.qualified_type_not_exported]
+message = "ชนิดแบบมีคุณสมบัติไม่ได้ถูกส่งออกโดย namespace"
+help = "ประกาศชนิดหรือนำเข้า"
+
+[diagnostics.SEM002.issues.qualified_type_prefix_not_namespace]
+message = "คำนำหน้าชนิดแบบมีคุณสมบัติต้องระบุ namespace"
+help = "ประกาศชนิดหรือนำเข้า"
+
+[diagnostics.SEM002.issues.schema_unknown_type]
+message = "ประเภทคอลัมน์อ้างถึงประเภทที่ไม่รู้จัก"
+help = "ประกาศประเภทหรือนำเข้า"
+
+[diagnostics.SEM002.issues.unknown_namespace]
+message = "namespace ไม่รู้จัก"
+help = "ประกาศชนิดหรือนำเข้า"
+
+[diagnostics.SEM002.issues.unknown_qualified_type]
+message = "ชนิดแบบมีคุณสมบัติไม่รู้จัก"
+help = "ประกาศชนิดหรือนำเข้า"
+
+[diagnostics.SEM002.issues.unknown_struct]
+message = "struct ไม่รู้จัก"
+help = "ประกาศชนิดหรือนำเข้า"
+
+[diagnostics.SEM002.issues.unknown_type]
+message = "ชนิดไม่รู้จัก"
+help = "ประกาศชนิดหรือนำเข้า"
+
+[diagnostics.SEM002.issues.width_marker_params]
+message = "เครื่องหมายความกว้างรับพารามิเตอร์ไม่ได้"
+help = "ประกาศชนิดหรือนำเข้า"
+
+[diagnostics.SEM002.issues.width_marker_shape]
+message = "เครื่องหมายความกว้างต้องเป็นการเขียนแบบเปลือย เช่น i32 หรือ u8"
+help = "ประกาศชนิดหรือนำเข้า"
+
+[diagnostics.SEM003]
+message = "ฟังก์ชันไม่ได้กำหนด"
+help = "ประกาศฟังก์ชันหรือนำเข้า"
+
+[diagnostics.SEM004]
+message = "สมาชิกไม่ได้กำหนด"
+help = "ตรวจชื่อสมาชิกและชนิด"
+
+[diagnostics.SEM004.issues.duplicate_variant_field]
+message = "ฟิลด์ variant ซ้ำ"
+help = "ระบุฟิลด์ variant ที่มีชื่อแต่ละฟิลด์ไม่เกินหนึ่งครั้ง"
+
+[diagnostics.SEM004.issues.missing_required_struct_field]
+message = "ขาดฟิลด์ struct ที่จำเป็น"
+help = "กำหนดค่าเริ่มต้นให้ฟิลด์ struct ที่จำเป็นทุกฟิลด์"
+
+[diagnostics.SEM004.issues.missing_variant_field_name]
+message = "ขาดชื่อฟิลด์ variant"
+help = "ตั้งชื่ออาร์กิวเมนต์ variant ทุกตัวเมื่อสร้าง variant แบบระบุชื่อ"
+
+[diagnostics.SEM004.issues.optional_receiver_requires_chain]
+message = "receiver แบบ optional ต้องใช้ optional chaining หรือการเข้าถึงแบบไม่เป็น null"
+help = "ใช้ ?. สำหรับ optional chaining หรือ !. สำหรับการเข้าถึงแบบไม่เป็น null"
+
+[diagnostics.SEM004.issues.struct_field_requires_value]
+message = "ฟิลด์ struct ต้องมีค่า"
+help = "ระบุค่าให้ฟิลด์ struct"
+
+[diagnostics.SEM004.issues.unknown_field]
+message = "ฟิลด์ไม่รู้จัก"
+help = "ตรวจชื่อฟิลด์ struct"
+
+[diagnostics.SEM004.issues.unknown_method]
+message = "เมธอดไม่รู้จัก"
+help = "ตรวจชนิด receiver และชื่อเมธอด"
+
+[diagnostics.SEM004.issues.unknown_struct_field]
+message = "ฟิลด์ struct ไม่รู้จัก"
+help = "ตรวจชื่อฟิลด์ struct"
+
+[diagnostics.SEM004.issues.unknown_variant_field]
+message = "ฟิลด์ variant ไม่รู้จัก"
+help = "ตรวจชื่อฟิลด์ variant"
+
+[diagnostics.SEM005]
+message = "คำจำกัดความซ้ำ"
+help = "เปลี่ยนชื่อคำจำกัดความหนึ่งรายการ"
+
+[diagnostics.SEM005.issues.duplicate_definition]
+message = "คำจำกัดความซ้ำ"
+help = "เปลี่ยนชื่อคำจำกัดความหนึ่งรายการ"
+
+[diagnostics.SEM005.issues.inferred_import_name_collision]
+message = "ชื่อการนำเข้าที่อนุมานขัดแย้งกับคำจำกัดความที่มีอยู่"
+help = "เพิ่ม alias การนำเข้าที่ชัดเจนด้วย `ut` เพื่อให้ binding ที่นำเข้ามีชื่อไม่ซ้ำ"
+
+[diagnostics.SEM005.issues.schema_duplicate_source]
+message = "ชื่อที่มองเห็นสองชื่อแก้เป็นชื่อต้นทางเดียวกัน"
+help = "ให้คอลัมน์หนึ่งมีชื่อต้นทางที่ต่างกัน"
+
+[diagnostics.SEM005.issues.schema_duplicate_visible]
+message = "คอลัมน์สองคอลัมน์ประกาศชื่อสาธารณะเดียวกัน"
+help = "เปลี่ยนชื่อคอลัมน์ใดคอลัมน์หนึ่ง"
+
+[diagnostics.SEM006]
+message = "ไม่พบการนำเข้า"
+help = "ตรวจเส้นทางการนำเข้า"
+
+[diagnostics.SEM006.issues.kernel_glob_reexport]
+message = "ไม่สามารถส่งออกการนำเข้า glob `{path}` ซ้ำได้"
+help = "ลบเครื่องหมาย publica ออก"
+
+[diagnostics.SEM006.issues.kernel_glob_named_alias]
+message = "ต้องนำเข้า `{path}` เป็น named glob alias"
+help = "ตรวจเส้นทางการนำเข้า"
+
+[diagnostics.SEM006.issues.kernel_invalid_path]
+message = "{reason}"
+help = "ตรวจเส้นทางการนำเข้า"
+
+[diagnostics.SEM006.issues.kernel_unknown_module]
+message = "ไม่รู้จักโมดูล faber kernel '{module}'; ดู faber host manifest"
+help = "ตรวจเส้นทางการนำเข้า"
+
+[diagnostics.SEM006.issues.kernel_norma_json_in_script]
+message = "โหมดสคริปต์ใช้ `{script_path}`; `{library_path}` ใช้เฉพาะแพ็กเกจ/ไลบรารี"
+help = "ตรวจเส้นทางการนำเข้า"
+
+[diagnostics.SEM006.issues.import_interna_cross_package]
+message = "`{name}` เป็น `@ interna` และไม่สามารถนำเข้าข้ามขอบเขตแพ็กเกจได้"
+help = "นำเข้าชื่อ `@ interna` ได้เฉพาะจากไฟล์ในแพ็กเกจเดียวกัน"
+
+[diagnostics.SEM006.issues.import_module_private]
+message = "`{name}` เป็นแบบ module-private และไม่สามารถนำเข้าได้"
+help = "ทำเครื่องหมายประกาศด้วย `@ publica` เพื่อส่งออก หรือ `@ interna` สำหรับใช้ในแพ็กเกจเดียวกัน"
+
+[diagnostics.SEM007]
+message = "การพึ่งพาแบบวนรอบ"
+help = "ตัดวงจรระหว่างโมดูล"
+
+[diagnostics.SEM007.issues.type_alias_cycle]
+message = "วงจร type alias"
+help = "ตัดวงจรระหว่างโมดูล"
+
+[diagnostics.SEM008]
+message = "ข้อผิดพลาดระหว่าง lowering"
+help = "แก้โครงสร้าง AST สำหรับ lowering"
+
+[diagnostics.SEM008.issues.array_destructuring_initializer]
+message = "การแยกโครงสร้าง array ต้องมี initializer"
+help = "แก้โครงสร้าง AST สำหรับ lowering"
+
+[diagnostics.SEM008.issues.array_destructuring_not_expanded]
+message = "ต้องขยายการแยกโครงสร้าง array ก่อนลดระดับคำสั่ง"
+help = "แก้โครงสร้าง AST สำหรับ lowering"
+
+[diagnostics.SEM008.issues.atomic_compiler_owned_syntax]
+message = "atomic ต้องใช้ไวยากรณ์ที่คอมไพเลอร์เป็นเจ้าของ; ใช้ atomic<T>"
+help = "แก้โครงสร้าง AST สำหรับ lowering"
+
+[diagnostics.SEM008.issues.lista_arity]
+message = "lista ต้องมีพารามิเตอร์ชนิดหนึ่งรายการ"
+help = "ใช้ {lista}<T>; lista<T, N> เป็นรูปแบบความจุที่จัดส่งแล้ว"
+
+[diagnostics.SEM008.issues.tabula_arity]
+message = "tabula ต้องมีพารามิเตอร์ชนิดสองรายการ"
+help = "แก้โครงสร้าง AST สำหรับ lowering"
+
+[diagnostics.SEM008.issues.copia_arity]
+message = "copia ต้องมีพารามิเตอร์ชนิดหนึ่งรายการ"
+help = "แก้โครงสร้าง AST สำหรับ lowering"
+
+[diagnostics.SEM008.issues.promissum_arity]
+message = "promissum ต้องมีพารามิเตอร์ชนิดหนึ่งรายการ"
+help = "แก้โครงสร้าง AST สำหรับ lowering"
+
+[diagnostics.SEM008.issues.cursor_arity]
+message = "cursor ต้องมีพารามิเตอร์ชนิดหนึ่งรายการ"
+help = "แก้โครงสร้าง AST สำหรับ lowering"
+
+
+[diagnostics.SEM008.issues.queue_arity]
+message = "queue requires one or two type parameters"
+help = "use queue<T> or queue<T, N>"
+
+[diagnostics.SEM008.issues.stack_arity]
+message = "stack requires one or two type parameters"
+help = "use stack<T> or stack<T, N>"
+
+[diagnostics.SEM008.issues.discerne_casu_pattern_required]
+message = "discerne casu ต้องมีแพตเทิร์น"
+help = "แก้โครงสร้าง AST สำหรับ lowering"
+
+[diagnostics.SEM008.issues.discerne_pattern_count]
+message = "จำนวนแพตเทิร์น discerne ต้องตรงกับจำนวน subject"
+help = "แก้โครงสร้าง AST สำหรับ lowering"
+
+[diagnostics.SEM008.issues.discerne_subject_required]
+message = "discerne ต้องมี subject อย่างน้อยหนึ่งรายการ"
+help = "แก้โครงสร้าง AST สำหรับ lowering"
+
+[diagnostics.SEM008.issues.duplicate_module_method_binding]
+message = "มีการผูกเมธอดโมดูลซ้ำระหว่าง lowering"
+help = "แก้โครงสร้าง AST สำหรับ lowering"
+
+[diagnostics.SEM008.issues.ego_outside_method]
+message = "ใช้ ego นอกบริบทเมธอด"
+help = "แก้โครงสร้าง AST สำหรับ lowering"
+
+[diagnostics.SEM008.issues.elige_case_value_shape]
+message = "ค่า case ของ elige ต้องเป็นลิเทอรัลหรือ enum variant"
+help = "แก้โครงสร้าง AST สำหรับ lowering"
+
+[diagnostics.SEM008.issues.empty_qualified_type_path]
+message = "เส้นทาง qualified type ว่างเปล่า"
+help = "แก้โครงสร้าง AST สำหรับ lowering"
+
+[diagnostics.SEM008.issues.empty_path_pattern]
+message = "แพตเทิร์นเส้นทางว่างเปล่า"
+help = "แก้โครงสร้าง AST สำหรับ lowering"
+
+[diagnostics.SEM008.issues.empty_union_type]
+message = "ชนิด union ว่างเปล่า"
+help = "แก้โครงสร้าง AST สำหรับ lowering"
+
+[diagnostics.SEM008.issues.ex_destructuring_not_expanded]
+message = "ต้องขยายการแยกโครงสร้าง ex ก่อนลดระดับคำสั่ง"
+help = "แก้โครงสร้าง AST สำหรับ lowering"
+
+[diagnostics.SEM008.issues.finge_cast_not_type]
+message = "finge cast ต้องระบุชื่อชนิด"
+help = "แก้โครงสร้าง AST สำหรับ lowering"
+
+[diagnostics.SEM008.issues.figura_not_index_param]
+message = "ชื่อนี้ไม่อ้างถึงพารามิเตอร์ดัชนี"
+help = "แก้โครงสร้าง AST สำหรับ lowering"
+
+[diagnostics.SEM008.issues.figura_type_param_in_index]
+message = "พารามิเตอร์ชนิดไม่สามารถอยู่ในตำแหน่งดัชนีได้"
+help = "แก้โครงสร้าง AST สำหรับ lowering"
+
+[diagnostics.SEM008.issues.figura_unknown_index]
+message = "ตัวแปรดัชนีที่ไม่รู้จักใน Figura"
+help = "แก้โครงสร้าง AST สำหรับ lowering"
+
+[diagnostics.SEM008.issues.float_width_on_numerus]
+message = "f16, f32 และ f64 เป็นความกว้างของ fractus; ใช้ fractus<f16>, fractus<f32> หรือ fractus<f64>"
+help = "แก้โครงสร้าง AST สำหรับ lowering"
+
+[diagnostics.SEM008.issues.forma_builtin_missing]
+message = "ยังไม่ได้ลงทะเบียน genus forma ในตัว"
+help = "แก้โครงสร้าง AST สำหรับ lowering"
+
+[diagnostics.SEM008.issues.forma_literal_lowering_path]
+message = "ต้องลดระดับ forma template literals ผ่าน forma capture"
+help = "แก้โครงสร้าง AST สำหรับ lowering"
+
+[diagnostics.SEM008.issues.forma_literal_pattern]
+message = "forma template literals ไม่ถูกต้องในแพตเทิร์น"
+help = "แก้โครงสร้าง AST สำหรับ lowering"
+
+[diagnostics.SEM008.issues.forma_params_field_missing]
+message = "genus forma ในตัวไม่มีฟิลด์ params"
+help = "แก้โครงสร้าง AST สำหรับ lowering"
+
+[diagnostics.SEM008.issues.forma_template_field_missing]
+message = "genus forma ในตัวไม่มีฟิลด์ template"
+help = "แก้โครงสร้าง AST สำหรับ lowering"
+
+[diagnostics.SEM008.issues.fractus_width_params]
+message = "fractus รับตัวระบุความกว้างได้มากที่สุดหนึ่งรายการ"
+help = "แก้โครงสร้าง AST สำหรับ lowering"
+
+[diagnostics.SEM008.issues.integer_width_on_fractus]
+message = "ตัวระบุความกว้างจำนวนเต็มเป็นความกว้างของ numerus; ใช้ numerus<…>"
+help = "แก้โครงสร้าง AST สำหรับ lowering"
+
+[diagnostics.SEM008.issues.instans_precision_params]
+message = "instans รับตัวระบุความละเอียดได้มากที่สุดหนึ่งรายการ"
+help = "แก้โครงสร้าง AST สำหรับ lowering"
+
+[diagnostics.SEM008.issues.intervallum_arity]
+message = "intervallum ต้องมีพารามิเตอร์ชนิดหนึ่งรายการ"
+help = "แก้โครงสร้าง AST สำหรับ lowering"
+
+[diagnostics.SEM008.issues.intervallum_bound]
+message = "ชนิดขอบเขตของ intervallum ต้องเป็น numerus หรือ instans"
+help = "แก้โครงสร้าง AST สำหรับ lowering"
+
+[diagnostics.SEM008.issues.atomic_arity]
+message = "atomic ต้องมีชนิดสมาชิกเพียงหนึ่งรายการพอดี; ใช้ atomic<T>"
+help = "แก้โครงสร้าง AST สำหรับ lowering"
+
+[diagnostics.SEM008.issues.atomic_element]
+message = "ชนิดสมาชิกของ atomic ต้องเป็น numerus<i32> หรือ numerus<u32>"
+help = "แก้โครงสร้าง AST สำหรับ lowering"
+
+[diagnostics.SEM008.issues.atomic_incomplete]
+message = "atomic ต้องมีชนิดสมาชิกหนึ่งรายการ; ใช้ atomic<T>"
+help = "แก้โครงสร้าง AST สำหรับ lowering"
+
+[diagnostics.SEM008.issues.invalid_fractus_width_marker]
+message = "fractus รับได้เฉพาะ f16, f32 หรือ f64"
+help = "แก้โครงสร้าง AST สำหรับ lowering"
+
+[diagnostics.SEM008.issues.invalid_lowered_expression]
+message = "เกิด expression ที่ไม่ถูกต้องระหว่าง lowering"
+help = "แก้โครงสร้าง AST สำหรับ lowering"
+
+[diagnostics.SEM008.issues.invalid_numerus_width_marker]
+message = "ไม่รู้จักตัวระบุความกว้างสำหรับ numerus"
+help = "แก้โครงสร้าง AST สำหรับ lowering"
+
+[diagnostics.SEM008.issues.invalid_precision_marker]
+message = "instans รับเฉพาะ ms, us หรือ ns เป็นตัวระบุความละเอียด"
+help = "แก้โครงสร้าง AST สำหรับ lowering"
+
+[diagnostics.SEM008.issues.invalid_width_marker]
+message = "ไม่รู้จักตัวระบุความกว้างสำหรับตระกูลนี้"
+help = "แก้โครงสร้าง AST สำหรับ lowering"
+
+[diagnostics.SEM008.issues.json_valor_pattern]
+message = "JSON document literals ไม่ถูกต้องในแพตเทิร์น"
+help = "แก้โครงสร้าง AST สำหรับ lowering"
+
+[diagnostics.SEM008.issues.kernel_glob_call_shape]
+message = "การเรียก kernel glob ต้องใช้ `faber.<module>.<verb>`"
+help = "แก้โครงสร้าง AST สำหรับ lowering"
+
+[diagnostics.SEM008.issues.kernel_glob_named_alias]
+message = "ต้องนำเข้า `faber:*` ด้วย alias ที่มีชื่อ"
+help = "แก้โครงสร้าง AST สำหรับ lowering"
+
+[diagnostics.SEM008.issues.kernel_unknown_module]
+message = "ไม่รู้จักโมดูล faber kernel '{module}'; ดู faber host manifest"
+help = "แก้โครงสร้าง AST สำหรับ lowering"
+
+[diagnostics.SEM008.issues.matrix_incomplete]
+message = "matrix ต้องมีชนิดสมาชิกและ shape; ใช้ matrix<T, [R, C]>"
+help = "แก้โครงสร้าง AST สำหรับ lowering"
+
+[diagnostics.SEM008.issues.matrix_missing_figura]
+message = "matrix ต้องมี shape สองมิติ; ใช้ matrix<T, [R, C]>"
+help = "แก้โครงสร้าง AST สำหรับ lowering"
+
+[diagnostics.SEM008.issues.matrix_shape_two_dim]
+message = "shape ของ matrix ต้องมีสองมิติพอดี"
+help = "แก้โครงสร้าง AST สำหรับ lowering"
+
+[diagnostics.SEM008.issues.missing_cast_symbol_info]
+message = "ไม่มีข้อมูลสัญลักษณ์ cast"
+help = "แก้โครงสร้าง AST สำหรับ lowering"
+
+[diagnostics.SEM008.issues.missing_resolved_type_alias]
+message = "type alias ไม่มีชนิดที่แก้การอ้างอิงแล้ว"
+help = "แก้โครงสร้าง AST สำหรับ lowering"
+
+[diagnostics.SEM008.issues.missing_type_alias_symbol]
+message = "ไม่มีสัญลักษณ์สำหรับ type alias"
+help = "แก้โครงสร้าง AST สำหรับ lowering"
+
+[diagnostics.SEM008.issues.missing_type_symbol_info]
+message = "ไม่มีข้อมูลสัญลักษณ์ชนิด"
+help = "แก้โครงสร้าง AST สำหรับ lowering"
+
+[diagnostics.SEM008.issues.mutable_pattern_binding]
+message = "ยังไม่รองรับการลดระดับการผูกแพตเทิร์นแบบเปลี่ยนแปลงได้"
+help = "แก้โครงสร้าง AST สำหรับ lowering"
+
+[diagnostics.SEM008.issues.nested_array_destructuring]
+message = "ยังไม่รองรับการลดระดับการแยกโครงสร้าง array ซ้อนกัน"
+help = "แก้โครงสร้าง AST สำหรับ lowering"
+
+[diagnostics.SEM008.issues.nested_object_destructuring]
+message = "ยังไม่รองรับการลดระดับการแยกโครงสร้าง object ซ้อนกัน"
+help = "แก้โครงสร้าง AST สำหรับ lowering"
+
+[diagnostics.SEM008.issues.numerus_width_params]
+message = "numerus รับตัวระบุความกว้างได้มากที่สุดหนึ่งรายการ"
+help = "แก้โครงสร้าง AST สำหรับ lowering"
+
+[diagnostics.SEM008.issues.object_destructuring_initializer]
+message = "การแยกโครงสร้าง object ต้องมี initializer"
+help = "แก้โครงสร้าง AST สำหรับ lowering"
+
+[diagnostics.SEM008.issues.object_destructuring_not_expanded]
+message = "ต้องขยายการแยกโครงสร้าง object ก่อนลดระดับคำสั่ง"
+help = "แก้โครงสร้าง AST สำหรับ lowering"
+
+[diagnostics.SEM008.issues.octet_params]
+message = "octet มีความกว้างตายตัวและรับพารามิเตอร์ไม่ได้"
+help = "แก้โครงสร้าง AST สำหรับ lowering"
+
+[diagnostics.SEM008.issues.precision_marker_shape]
+message = "ตัวระบุความละเอียดต้องเป็นการสะกดเปล่า เช่น ms หรือ us"
+help = "แก้โครงสร้าง AST สำหรับ lowering"
+
+[diagnostics.SEM008.issues.primitive_params]
+message = "ชนิด primitive รับพารามิเตอร์ไม่ได้"
+help = "textus<N>, ascii<N> และ octeti<N> เป็นรูปแบบความจุที่จัดส่งแล้ว"
+
+[diagnostics.SEM008.issues.primitive_width_params]
+message = "primitive รับตัวระบุความกว้างได้มากที่สุดหนึ่งรายการ"
+help = "แก้โครงสร้าง AST สำหรับ lowering"
+
+[diagnostics.SEM008.issues.qualified_type_not_exported]
+message = "namespace ไม่ได้ส่งออก qualified type"
+help = "แก้โครงสร้าง AST สำหรับ lowering"
+
+[diagnostics.SEM008.issues.qualified_type_prefix_not_namespace]
+message = "คำนำหน้า qualified type ต้องระบุชื่อ namespace"
+help = "แก้โครงสร้าง AST สำหรับ lowering"
+
+[diagnostics.SEM008.issues.radix_typus_allowed_type_not_concrete]
+message = "ชนิดที่อนุญาตของ @ radix typus ต้องเป็นชนิดรูปธรรม"
+help = "แก้โครงสร้าง AST สำหรับ lowering"
+
+[diagnostics.SEM008.issues.radix_typus_non_type_param]
+message = "@ radix typus จำกัดได้เฉพาะพารามิเตอร์ชนิด"
+help = "แก้โครงสร้าง AST สำหรับ lowering"
+
+[diagnostics.SEM008.issues.radix_typus_unknown_generic]
+message = "@ radix typus ระบุพารามิเตอร์ generic ที่ไม่รู้จัก"
+help = "แก้โครงสร้าง AST สำหรับ lowering"
+
+[diagnostics.SEM008.issues.retired_bare_object_literal]
+message = "bare object literal ถูกเลิกใช้แล้ว; ใช้ {object_literal_forms}"
+help = "แก้โครงสร้าง AST สำหรับ lowering"
+
+[diagnostics.SEM008.issues.schema_nested_column]
+message = "คอลัมน์ไม่สามารถเป็นการประกาศ schema ซ้อนได้"
+help = "ประกาศ schema ที่ซ้อนแยกต่างหากและตั้งชื่อเป็นประเภทคอลัมน์"
+
+[diagnostics.SEM008.issues.scrinium_arity]
+message = "scrinium รับพารามิเตอร์ชนิด payload ได้มากที่สุดหนึ่งรายการ"
+help = "แก้โครงสร้าง AST สำหรับ lowering"
+
+[diagnostics.SEM008.issues.scrinium_missing_builtin]
+message = "ยังไม่ได้ลงทะเบียนชนิด scrinium ในตัว"
+help = "แก้โครงสร้าง AST สำหรับ lowering"
+
+[diagnostics.SEM008.issues.series_params]
+message = "series รับพารามิเตอร์ไม่ได้"
+help = "แก้โครงสร้าง AST สำหรับ lowering"
+
+[diagnostics.SEM008.issues.sparsa_element_non_numeric]
+message = "ชนิดขององค์ประกอบ sparsa ต้องเป็นชนิดตัวเลขใน v1"
+help = "แก้ไขโครงสร้าง AST สำหรับการลดรูป"
+
+[diagnostics.SEM008.issues.sparsa_incomplete]
+message = "sparsa ต้องมีชนิดองค์ประกอบและ Figura ให้ใช้ sparsa<T, Figura>"
+help = "แก้ไขโครงสร้าง AST สำหรับการลดรูป"
+
+[diagnostics.SEM008.issues.sparsa_missing_figura]
+message = "sparsa ต้องมีรูปร่าง Figura ให้ใช้ sparsa<T, []> สำหรับ rank-0"
+help = "แก้ไขโครงสร้าง AST สำหรับการลดรูป"
+
+[diagnostics.SEM008.issues.standalone_width_internal]
+message = "เกิดข้อผิดพลาดภายในขณะลดรูปชนิด width แบบเดี่ยว"
+help = "แก้ไขโครงสร้าง AST สำหรับการลดรูป"
+
+[diagnostics.SEM008.issues.tensor_incomplete]
+message = "tensor ต้องมีชนิดองค์ประกอบและ Figura ให้ใช้ tensor<T, Figura>"
+help = "แก้ไขโครงสร้าง AST สำหรับการลดรูป"
+
+[diagnostics.SEM008.issues.tensor_missing_figura]
+message = "tensor ต้องมีรูปร่าง Figura ให้ใช้ tensor<T, []> สำหรับ rank-0"
+help = "แก้ไขโครงสร้าง AST สำหรับการลดรูป"
+
+[diagnostics.SEM008.issues.template_type_args]
+message = "การใช้ template ไม่รับอาร์กิวเมนต์ชนิดข้อมูล"
+help = "แก้ไขโครงสร้าง AST สำหรับการลดรูป"
+
+[diagnostics.SEM008.issues.top_level_initializer]
+message = "การประกาศตัวแปรระดับบนสุดต้องมี initializer"
+help = "แก้ไขโครงสร้าง AST สำหรับการลดรูป"
+
+[diagnostics.SEM008.issues.top_level_identifier_binding]
+message = "ตัวแปรระดับบนสุดต้องมีการผูกกับ identifier"
+help = "แก้ไขโครงสร้าง AST สำหรับการลดรูป"
+
+[diagnostics.SEM008.issues.type_name_not_type]
+message = "ชื่อชนิดข้อมูลไม่ได้อ้างถึงชนิดข้อมูล"
+help = "แก้ไขโครงสร้าง AST สำหรับการลดรูป"
+
+[diagnostics.SEM008.issues.union_only_nihil]
+message = "ชนิด union ต้องไม่ประกอบด้วย 'nihil' เพียงอย่างเดียว"
+help = "แก้ไขโครงสร้าง AST สำหรับการลดรูป"
+
+[diagnostics.SEM008.issues.undefined_name]
+message = "มีชื่อที่ไม่ได้กำหนดในการลดรูป"
+help = "แก้ไขโครงสร้าง AST สำหรับการลดรูป"
+
+[diagnostics.SEM008.issues.unhandled_statement_kind]
+message = "ไม่รองรับชนิดของ statement นี้ในการลดรูป"
+help = "แก้ไขโครงสร้าง AST สำหรับการลดรูป"
+
+[diagnostics.SEM008.issues.unknown_base_class]
+message = "ไม่รู้จักคลาสฐานในการประกาศ gens"
+help = "แก้ไขโครงสร้าง AST สำหรับการลดรูป"
+
+[diagnostics.SEM008.issues.unknown_finge_cast_type]
+message = "ไม่รู้จักชนิด cast ใน expression finge"
+help = "แก้ไขโครงสร้าง AST สำหรับการลดรูป"
+
+[diagnostics.SEM008.issues.unknown_finge_variant]
+message = "ไม่รู้จัก variant ใน expression finge"
+help = "แก้ไขโครงสร้าง AST สำหรับการลดรูป"
+
+[diagnostics.SEM008.issues.unknown_interface]
+message = "ไม่รู้จัก interface ในการประกาศ gens"
+help = "แก้ไขโครงสร้าง AST สำหรับการลดรูป"
+
+[diagnostics.SEM008.issues.unknown_lowering_error]
+message = "การลดรูป HIR ล้มเหลว"
+help = "แก้ไขโครงสร้าง AST สำหรับการลดรูป"
+
+[diagnostics.SEM008.issues.unknown_namespace]
+message = "ไม่รู้จัก namespace"
+help = "แก้ไขโครงสร้าง AST สำหรับการลดรูป"
+
+[diagnostics.SEM008.issues.unknown_type_lowering_error]
+message = "การลดรูปชนิดข้อมูลล้มเหลว"
+help = "แก้ไขโครงสร้าง AST สำหรับการลดรูป"
+
+[diagnostics.SEM008.issues.unknown_type_name]
+message = "ไม่รู้จักชื่อชนิดข้อมูล"
+help = "แก้ไขโครงสร้าง AST สำหรับการลดรูป"
+
+[diagnostics.SEM008.issues.vector_width_single_dim]
+message = "vector width ต้องเป็นมิติเดียว"
+help = "แก้ไขโครงสร้าง AST สำหรับการลดรูป"
+
+[diagnostics.SEM008.issues.width_marker_params]
+message = "width marker ไม่รับพารามิเตอร์"
+help = "แก้ไขโครงสร้าง AST สำหรับการลดรูป"
+
+[diagnostics.SEM008.issues.width_marker_shape]
+message = "width marker ต้องเป็นรูปแบบที่ไม่มีอาร์กิวเมนต์ เช่น i32 หรือ u8"
+help = "แก้ไขโครงสร้าง AST สำหรับการลดรูป"
+
+[diagnostics.SEM009]
+message = "ข้อผิดพลาดในการตรวจสอบ CLI"
+help = "แก้ไข contract ของคำอธิบายประกอบ CLI ก่อนสร้างโค้ด CLI ที่เรียกใช้ได้"
+
+[diagnostics.SEM009.issues.alias_collides_with_path]
+message = "alias ของคำสั่ง '{alias}' ชนกับเส้นทางคำสั่ง"
+help = "แก้ไข contract ของคำอธิบายประกอบ CLI ก่อนสร้างโค้ด CLI ที่เรียกใช้ได้"
+
+[diagnostics.SEM009.issues.cli_on_non_incipit]
+message = "@ cli สามารถใส่คำอธิบายประกอบให้จุดเข้า incipit ได้เท่านั้น"
+help = "แก้ไข contract ของคำอธิบายประกอบ CLI ก่อนสร้างโค้ด CLI ที่เรียกใช้ได้"
+
+[diagnostics.SEM009.issues.command_global_surface]
+message = "ต้องประกาศตัวเลือกและ operand 'ubique' บนจุดเข้า @ cli"
+help = "แก้ไข contract ของคำอธิบายประกอบ CLI ก่อนสร้างโค้ด CLI ที่เรียกใช้ได้"
+
+[diagnostics.SEM009.issues.command_params_unsupported]
+message = "คำสั่ง CLI ใน Phase 04 ต้องรับค่าที่แยกวิเคราะห์แล้วผ่าน 'argumenta <ident>' ไม่ใช่พารามิเตอร์ทั่วไป"
+help = "แก้ไข contract ของคำอธิบายประกอบ CLI ก่อนสร้างโค้ด CLI ที่เรียกใช้ได้"
+
+[diagnostics.SEM009.issues.duplicate_binding]
+message = "มีการผูก CLI ซ้ำ '{binding}' ในพื้นผิว CLI ของ {label}"
+help = "แก้ไข contract ของคำอธิบายประกอบ CLI ก่อนสร้างโค้ด CLI ที่เรียกใช้ได้"
+
+[diagnostics.SEM009.issues.duplicate_cli_entry]
+message = "อนุญาตให้มีจุดเข้า @ cli ได้เพียงจุดเดียว"
+help = "แก้ไข contract ของคำอธิบายประกอบ CLI ก่อนสร้างโค้ด CLI ที่เรียกใช้ได้"
+
+[diagnostics.SEM009.issues.duplicate_command_alias]
+message = "มี alias ของคำสั่งซ้ำ '{alias}'"
+help = "แก้ไข contract ของคำอธิบายประกอบ CLI ก่อนสร้างโค้ด CLI ที่เรียกใช้ได้"
+
+[diagnostics.SEM009.issues.duplicate_command_path]
+message = "มีเส้นทางคำสั่งซ้ำ '{path}'"
+help = "แก้ไข contract ของคำอธิบายประกอบ CLI ก่อนสร้างโค้ด CLI ที่เรียกใช้ได้"
+
+[diagnostics.SEM009.issues.duplicate_long_flag]
+message = "มี long flag ซ้ำ '{long}' ในพื้นผิว CLI ของ {label}"
+help = "แก้ไข contract ของคำอธิบายประกอบ CLI ก่อนสร้างโค้ด CLI ที่เรียกใช้ได้"
+
+[diagnostics.SEM009.issues.duplicate_rest_operand]
+message = "อนุญาตให้มี operand ceteri ได้เพียงหนึ่งรายการ"
+help = "แก้ไข contract ของคำอธิบายประกอบ CLI ก่อนสร้างโค้ด CLI ที่เรียกใช้ได้"
+
+[diagnostics.SEM009.issues.duplicate_short_flag]
+message = "มี short flag ซ้ำ '{short}' ในพื้นผิว CLI ของ {label}"
+help = "แก้ไข contract ของคำอธิบายประกอบ CLI ก่อนสร้างโค้ด CLI ที่เรียกใช้ได้"
+
+[diagnostics.SEM009.issues.global_operand_placement]
+message = "ต้องประกาศ operand 'ubique' บนจุดเข้า @ cli"
+help = "แก้ไข contract ของคำอธิบายประกอบ CLI ก่อนสร้างโค้ด CLI ที่เรียกใช้ได้"
+
+[diagnostics.SEM009.issues.global_option_placement]
+message = "ต้องประกาศตัวเลือก 'ubique' บนจุดเข้า @ cli"
+help = "แก้ไข contract ของคำอธิบายประกอบ CLI ก่อนสร้างโค้ด CLI ที่เรียกใช้ได้"
+
+[diagnostics.SEM009.issues.imperium_on_non_func]
+message = "@ imperium สามารถใส่คำอธิบายประกอบให้การประกาศ functio ได้เท่านั้น"
+help = "แก้ไข contract ของคำอธิบายประกอบ CLI ก่อนสร้างโค้ด CLI ที่เรียกใช้ได้"
+
+[diagnostics.SEM009.issues.invalid_command_alias]
+message = "alias ของคำสั่งไม่ถูกต้อง '{alias}'"
+help = "แก้ไข contract ของคำอธิบายประกอบ CLI ก่อนสร้างโค้ด CLI ที่เรียกใช้ได้"
+
+[diagnostics.SEM009.issues.invalid_command_path]
+message = "เส้นทางคำสั่งไม่ถูกต้อง '{path}'"
+help = "แก้ไข contract ของคำอธิบายประกอบ CLI ก่อนสร้างโค้ด CLI ที่เรียกใช้ได้"
+
+[diagnostics.SEM009.issues.invalid_long_flag]
+message = "long flag ไม่ถูกต้อง '{long}' สำหรับตัวเลือก '{binding}'"
+help = "แก้ไข contract ของคำอธิบายประกอบ CLI ก่อนสร้างโค้ด CLI ที่เรียกใช้ได้"
+
+[diagnostics.SEM009.issues.invalid_short_flag]
+message = "short flag ไม่ถูกต้อง '{short}' สำหรับตัวเลือก '{binding}'"
+help = "แก้ไข contract ของคำอธิบายประกอบ CLI ก่อนสร้างโค้ด CLI ที่เรียกใช้ได้"
+
+[diagnostics.SEM009.issues.list_element_not_named]
+message = "ชนิดรายการ CLI ต้องใช้ชนิดองค์ประกอบที่มีชื่อ"
+help = "แก้ไข contract ของคำอธิบายประกอบ CLI ก่อนสร้างโค้ด CLI ที่เรียกใช้ได้"
+
+[diagnostics.SEM009.issues.local_operand_global_collision]
+message = "operand '{binding}' ของ {label} ชนกับการผูก CLI ส่วนกลาง"
+help = "แก้ไข contract ของคำอธิบายประกอบ CLI ก่อนสร้างโค้ด CLI ที่เรียกใช้ได้"
+
+[diagnostics.SEM009.issues.local_option_global_collision]
+message = "ตัวเลือก '{binding}' ของ {label} ชนกับการผูก CLI ส่วนกลาง"
+help = "แก้ไข contract ของคำอธิบายประกอบ CLI ก่อนสร้างโค้ด CLI ที่เรียกใช้ได้"
+
+[diagnostics.SEM009.issues.missing_entry_argument]
+message = "โปรแกรม @ cli ต้องใช้จุดเข้า 'incipit argumenta <ident>' ที่ระบุอย่างชัดเจน"
+help = "แก้ไข contract ของคำอธิบายประกอบ CLI ก่อนสร้างโค้ด CLI ที่เรียกใช้ได้"
+
+[diagnostics.SEM009.issues.malformed_annotation]
+message = "ฟิลด์ {annotation} `{field}` ต้องเป็น {expected}"
+help = "แก้ไข contract ของคำอธิบายประกอบ CLI ก่อนสร้างโค้ด CLI ที่เรียกใช้ได้"
+
+[diagnostics.SEM009.issues.missing_option_flag]
+message = "ตัวเลือก {label} '{binding}' ต้องมี brevis หรือ longum"
+help = "แก้ไข contract ของคำอธิบายประกอบ CLI ก่อนสร้างโค้ด CLI ที่เรียกใช้ได้"
+
+[diagnostics.SEM009.issues.mounted_module_root_cli]
+message = "โมดูลคำสั่ง CLI ที่เมานต์ต้องไม่ประกาศจุดเข้า @ cli ของตนเอง"
+help = "แก้ไข contract ของคำอธิบายประกอบ CLI ก่อนสร้างโค้ด CLI ที่เรียกใช้ได้"
+
+[diagnostics.SEM009.issues.nested_module_mount]
+message = "การเมานต์โมดูล @ imperia สามารถประกาศได้เฉพาะบนจุดเข้า CLI รากเท่านั้น"
+help = "แก้ไข contract ของคำอธิบายประกอบ CLI ก่อนสร้างโค้ด CLI ที่เรียกใช้ได้"
+
+[diagnostics.SEM009.issues.operand_after_rest]
+message = "operand '{binding}' ปรากฏหลัง operand ceteri"
+help = "แก้ไข contract ของคำอธิบายประกอบ CLI ก่อนสร้างโค้ด CLI ที่เรียกใช้ได้"
+
+[diagnostics.SEM009.issues.orphan_cli_surface]
+message = "@ optio และ @ operandus ต้องใส่คำอธิบายประกอบให้ @ cli incipit หรือ @ imperium functio"
+help = "แก้ไข contract ของคำอธิบายประกอบ CLI ก่อนสร้างโค้ด CLI ที่เรียกใช้ได้"
+
+[diagnostics.SEM009.issues.rest_not_final]
+message = "operand ceteri ต้องเป็น operand สุดท้าย"
+help = "แก้ไข contract ของคำอธิบายประกอบ CLI ก่อนสร้างโค้ด CLI ที่เรียกใช้ได้"
+
+[diagnostics.SEM009.issues.subcommand_local_surface]
+message = "โปรแกรม CLI แบบ subcommand สามารถประกาศตัวเลือกหรือ operand ระดับบนสุดได้ด้วย 'ubique' เท่านั้น"
+help = "แก้ไข contract ของคำอธิบายประกอบ CLI ก่อนสร้างโค้ด CLI ที่เรียกใช้ได้"
+
+[diagnostics.SEM009.issues.subcommand_root_body]
+message = "โปรแกรม CLI แบบ subcommand ต้องใช้ body ว่างของ incipit รากใน Phase 04"
+help = "แก้ไข contract ของคำอธิบายประกอบ CLI ก่อนสร้างโค้ด CLI ที่เรียกใช้ได้"
+
+[diagnostics.SEM009.issues.unsupported_list_element_type]
+message = "ไม่รองรับชนิดองค์ประกอบรายการ CLI '{type}'"
+help = "แก้ไข contract ของคำอธิบายประกอบ CLI ก่อนสร้างโค้ด CLI ที่เรียกใช้ได้"
+
+[diagnostics.SEM009.issues.unsupported_type]
+message = "ไม่รองรับชนิด CLI '{type}'"
+help = "แก้ไข contract ของคำอธิบายประกอบ CLI ก่อนสร้างโค้ด CLI ที่เรียกใช้ได้"
+
+[diagnostics.SEM009.issues.unsupported_type_shape]
+message = "ไม่รองรับรูปร่างชนิด CLI"
+help = "แก้ไข contract ของคำอธิบายประกอบ CLI ก่อนสร้างโค้ด CLI ที่เรียกใช้ได้"
+
+[diagnostics.SEM010]
+message = "ชนิดข้อมูลไม่ตรงกัน"
+help = "ทำให้ชนิดของ expression ตรงกับชนิดที่คาดไว้"
+
+[diagnostics.SEM010.issues.argument_type_mismatch]
+message = "ชนิดของอาร์กิวเมนต์ไม่ตรงกัน"
+help = "ทำให้ชนิดของ expression ตรงกับชนิดที่คาดไว้"
+
+[diagnostics.SEM010.issues.callee_not_callable]
+message = "ไม่สามารถเรียกใช้ callee ได้"
+help = "ทำให้ชนิดของ expression ตรงกับชนิดที่คาดไว้"
+
+[diagnostics.SEM010.issues.figura_not_index_param]
+message = "ชื่อไม่ได้อ้างถึงพารามิเตอร์ดัชนี"
+help = "ทำให้ชนิดของ expression ตรงกับชนิดที่คาดไว้"
+
+[diagnostics.SEM010.issues.assignment_type_mismatch]
+message = "ชนิดของ assignment ไม่ตรงกัน"
+help = "ทำให้ชนิดของ expression ตรงกับชนิดที่คาดไว้"
+
+[diagnostics.SEM010.issues.assert_condition_type_mismatch]
+message = "เงื่อนไข assert ต้องเป็น boolean"
+help = "ทำให้ชนิดของ expression ตรงกับชนิดที่คาดไว้"
+
+[diagnostics.SEM010.issues.constant_annotation_mismatch]
+message = "ค่าคงที่ไม่ตรงกับคำอธิบายประกอบ"
+help = "ทำให้ชนิดของ expression ตรงกับชนิดที่คาดไว้"
+
+[diagnostics.SEM010.issues.closure_parameter_type_mismatch]
+message = "ชนิดของพารามิเตอร์ closure ไม่ตรงกัน"
+help = "ทำให้ชนิดของ expression ตรงกับชนิดที่คาดไว้"
+
+[diagnostics.SEM010.issues.closure_return_type_mismatch]
+message = "ชนิดผลลัพธ์ของ closure ไม่ตรงกัน"
+help = "ทำให้ชนิดของ expression ตรงกับชนิดที่คาดไว้"
+
+[diagnostics.SEM010.issues.coalesce_fallback_type_mismatch]
+message = "ชนิดของ fallback ใน coalesce ไม่ตรงกัน"
+help = "ทำให้ชนิดของ expression ตรงกับชนิดที่คาดไว้"
+
+[diagnostics.SEM010.issues.common_type_mismatch]
+message = "ชนิดข้อมูลเข้ากันไม่ได้"
+help = "ทำให้ชนิดของ expression ตรงกับชนิดที่คาดไว้"
+
+[diagnostics.SEM010.issues.array_element_type_mismatch]
+message = "ชนิดขององค์ประกอบ array ไม่ตรงกัน"
+help = "ทำให้ชนิดของ expression ตรงกับชนิดที่คาดไว้"
+
+[diagnostics.SEM010.issues.array_spread_element_type_mismatch]
+message = "ชนิดขององค์ประกอบที่กระจายจาก array ไม่ตรงกัน"
+help = "ทำให้ชนิดของ expression ตรงกับชนิดที่คาดไว้"
+
+[diagnostics.SEM010.issues.conversio_failure_channel_type_mismatch]
+message = "ชนิดของช่องทางความล้มเหลวจาก conversio ที่ส่งต่อไม่ตรงกัน"
+help = "ทำให้ชนิดของ expression ตรงกับชนิดที่คาดไว้"
+
+[diagnostics.SEM010.issues.conversio_recovery_type_mismatch]
+message = "ชนิดของการกู้คืน conversio ไม่ตรงกัน"
+help = "ทำให้ชนิดของ expression ตรงกับชนิดที่คาดไว้"
+
+[diagnostics.SEM010.issues.cursor_iteration_requires_ex]
+message = "การวนซ้ำ cursor รองรับเฉพาะ itera ex"
+help = "ทำให้ชนิดของ expression ตรงกับชนิดที่คาดไว้"
+
+[diagnostics.SEM010.issues.expression_type_mismatch]
+message = "ชนิดของ expression ไม่ตรงกัน"
+help = "ทำให้ชนิดของ expression ตรงกับชนิดที่คาดไว้"
+
+[diagnostics.SEM010.issues.equality_exact_types_required]
+message = "การเปรียบเทียบเท่ากันต้องใช้ชนิดข้อมูลเดียวกัน"
+help = "ทำให้ชนิดของ expression ตรงกับชนิดที่คาดไว้"
+
+[diagnostics.SEM010.issues.field_initializer_type_mismatch]
+message = "ชนิดของ field initializer ไม่ตรงกัน"
+help = "ทำให้ชนิดของ expression ตรงกับชนิดที่คาดไว้"
+
+[diagnostics.SEM010.issues.failable_call_enclosing_error_type_mismatch]
+message = "ชนิดข้อผิดพลาดของ failable call ไม่ตรงกับ ⇥ ที่ครอบอยู่"
+help = "ทำให้ชนิดของ expression ตรงกับชนิดที่คาดไว้"
+
+[diagnostics.SEM010.issues.failable_call_handler_error_type_mismatch]
+message = "ชนิดข้อผิดพลาดของ failable call ที่จัดการแล้วไม่ตรงกัน"
+help = "ทำให้ชนิดของ expression ตรงกับชนิดที่คาดไว้"
+
+[diagnostics.SEM010.issues.field_default_type_mismatch]
+message = "ชนิดของค่าเริ่มต้นของฟิลด์ไม่ตรงกัน"
+help = "ทำให้ชนิดของนิพจน์ตรงกับชนิดที่คาดไว้"
+
+[diagnostics.SEM010.issues.iace_requires_alternate_exit]
+message = "iace ต้องอยู่ภายในฟังก์ชันที่มีชนิดทางออกทางเลือก '⇥'"
+help = "ทำให้ชนิดของนิพจน์ตรงกับชนิดที่คาดไว้"
+
+[diagnostics.SEM010.issues.iace_value_type_mismatch]
+message = "ชนิดของค่าทางออกทางเลือกไม่ตรงกัน"
+help = "ทำให้ชนิดของนิพจน์ตรงกับชนิดที่คาดไว้"
+
+[diagnostics.SEM010.issues.ignored_expression_result_must_resolve]
+message = "ผลลัพธ์ของนิพจน์ที่ไม่ใช้ต้องแก้ความหมายได้"
+help = "ทำให้ชนิดของนิพจน์ตรงกับชนิดที่คาดไว้"
+
+[diagnostics.SEM010.issues.initializer_annotation_mismatch]
+message = "ตัวเริ่มต้นไม่ตรงกับคำกำกับชนิด"
+help = "ทำให้ชนิดของนิพจน์ตรงกับชนิดที่คาดไว้"
+
+[diagnostics.SEM010.issues.incompatible_return_types]
+message = "ชนิดค่าที่ส่งกลับเข้ากันไม่ได้"
+help = "ทำให้ชนิดของนิพจน์ตรงกับชนิดที่คาดไว้"
+
+[diagnostics.SEM010.issues.intervallum_bound_required]
+message = "ชนิดขอบเขตของ intervallum ต้องเป็น numerus หรือ instans"
+help = "ทำให้ชนิดของนิพจน์ตรงกับชนิดที่คาดไว้"
+
+[diagnostics.SEM010.issues.intervallum_clamp_operand_type_mismatch]
+message = "ชนิดตัวถูกดำเนินการสำหรับการจำกัดค่า intervallum ไม่ตรงกัน"
+help = "ทำให้ชนิดของนิพจน์ตรงกับชนิดที่คาดไว้"
+
+[diagnostics.SEM010.issues.intra_requires_intervallum_range]
+message = "intra ต้องใช้ช่วง intervallum"
+help = "ทำให้ชนิดของนิพจน์ตรงกับชนิดที่คาดไว้"
+
+[diagnostics.SEM010.issues.incompatible_tensor_index]
+message = "รูปร่างดัชนีเข้ากันไม่ได้"
+help = "ทำให้ชนิดของนิพจน์ตรงกับชนิดที่คาดไว้"
+
+[diagnostics.SEM010.issues.invalid_cast]
+message = "การแปลงชนิดไม่ถูกต้อง"
+help = "ทำให้ชนิดของนิพจน์ตรงกับชนิดที่คาดไว้"
+
+[diagnostics.SEM010.issues.itera_ab_source_requires_range]
+message = "แหล่งข้อมูลของ itera ab ต้องเป็นนิพจน์ช่วง"
+help = "ทำให้ชนิดของนิพจน์ตรงกับชนิดที่คาดไว้"
+
+[diagnostics.SEM010.issues.itera_apud_arity_mismatch]
+message = "จำนวนพิกัด {apud} ต้องเท่ากับอันดับของตัววนซ้ำ"
+help = "ทำให้ชนิดของนิพจน์ตรงกับชนิดที่คาดไว้"
+
+[diagnostics.SEM010.issues.itera_apud_requires_ex]
+message = "พิกัด {apud} ต้องใช้การวนซ้ำแบบ {ex}"
+help = "ทำให้ชนิดของนิพจน์ตรงกับชนิดที่คาดไว้"
+
+[diagnostics.SEM010.issues.itera_apud_requires_shaped_iterable]
+message = "{apud} ต้องใช้ตัววนซ้ำแบบ tensor หรือ matrix"
+help = "ทำให้ชนิดของนิพจน์ตรงกับชนิดที่คาดไว้"
+
+[diagnostics.SEM010.issues.json_map_key_must_be_textus]
+message = "คีย์แมป JSON ต้องเป็น textus"
+help = "ทำให้ชนิดของนิพจน์ตรงกับชนิดที่คาดไว้"
+
+[diagnostics.SEM010.issues.json_nested_value_requires_valor]
+message = "ค่า JSON ซ้อนต้องใช้ชนิดค่า valor ของ tabula"
+help = "ทำให้ชนิดของนิพจน์ตรงกับชนิดที่คาดไว้"
+
+[diagnostics.SEM010.issues.json_value_type_mismatch]
+message = "ค่า JSON ไม่ตรงกับชนิดค่าใน tabula"
+help = "ทำให้ชนิดของนิพจน์ตรงกับชนิดที่คาดไว้"
+
+[diagnostics.SEM010.issues.live_tuus_cursor_call_arg]
+message = "ยังไม่สามารถส่งค่าเคอร์เซอร์ tuus ที่ทำงานอยู่เป็นอาร์กิวเมนต์ฟังก์ชันได้"
+help = "ทำให้ชนิดของนิพจน์ตรงกับชนิดที่คาดไว้"
+
+[diagnostics.SEM010.issues.live_tuus_cursor_return]
+message = "ยังไม่สามารถส่งคืนค่าเคอร์เซอร์ tuus ที่ทำงานอยู่จากฟังก์ชันได้"
+help = "ทำให้ชนิดของนิพจน์ตรงกับชนิดที่คาดไว้"
+
+[diagnostics.SEM010.issues.live_tuus_cursor_struct]
+message = "ยังไม่สามารถเก็บค่าเคอร์เซอร์ tuus ที่ทำงานอยู่ในโครงสร้างได้"
+help = "ทำให้ชนิดของนิพจน์ตรงกับชนิดที่คาดไว้"
+
+[diagnostics.SEM010.issues.live_tuus_cursor_reassign]
+message = "ยังไม่สามารถกำหนดค่าใหม่ให้ตัวแปรท้องถิ่นเคอร์เซอร์ tuus ที่ทำงานอยู่ได้"
+help = "ทำให้ชนิดของนิพจน์ตรงกับชนิดที่คาดไว้"
+
+[diagnostics.SEM010.issues.live_tuus_cursor_copy]
+message = "ยังไม่สามารถคัดลอกหรือย้ายค่าเคอร์เซอร์ tuus ที่ทำงานอยู่ระหว่างตัวแปรท้องถิ่นได้"
+help = "ทำให้ชนิดของนิพจน์ตรงกับชนิดที่คาดไว้"
+
+[diagnostics.SEM010.issues.live_tuus_cursor_conversio]
+message = "ยังไม่สามารถแปลงค่าเคอร์เซอร์ tuus ที่ทำงานอยู่ผ่าน conversio แบบรวมได้"
+help = "ทำให้ชนิดของนิพจน์ตรงกับชนิดที่คาดไว้"
+
+[diagnostics.SEM010.issues.live_tuus_cursor_direct_initializer]
+message = "tuus.cursor() รองรับเฉพาะตัวเริ่มต้นตัวแปรท้องถิ่นโดยตรงเท่านั้น"
+help = "ทำให้ชนิดของนิพจน์ตรงกับชนิดที่คาดไว้"
+
+[diagnostics.SEM010.issues.live_tuus_cursor_value]
+message = "ยังไม่สามารถใช้ค่าเคอร์เซอร์ tuus ที่ทำงานอยู่เป็นนิพจน์ได้"
+help = "ทำให้ชนิดของนิพจน์ตรงกับชนิดที่คาดไว้"
+
+[diagnostics.SEM010.issues.map_index_type_mismatch]
+message = "ชนิดดัชนีแมปไม่ตรงกัน"
+help = "ทำให้ชนิดของนิพจน์ตรงกับชนิดที่คาดไว้"
+
+[diagnostics.SEM010.issues.map_key_type_mismatch]
+message = "ชนิดคีย์แมปไม่ตรงกัน"
+help = "ทำให้ชนิดของนิพจน์ตรงกับชนิดที่คาดไว้"
+
+[diagnostics.SEM010.issues.map_spread_key_type_mismatch]
+message = "ชนิดคีย์ที่กระจายจากแมปไม่ตรงกัน"
+help = "ทำให้ชนิดของนิพจน์ตรงกับชนิดที่คาดไว้"
+
+[diagnostics.SEM010.issues.map_spread_value_type_mismatch]
+message = "ชนิดค่าที่กระจายจากแมปไม่ตรงกัน"
+help = "ทำให้ชนิดของนิพจน์ตรงกับชนิดที่คาดไว้"
+
+[diagnostics.SEM010.issues.map_value_type_mismatch]
+message = "ชนิดค่าแมปไม่ตรงกัน"
+help = "ทำให้ชนิดของนิพจน์ตรงกับชนิดที่คาดไว้"
+
+[diagnostics.SEM010.issues.membership_operand_type_mismatch]
+message = "ชนิดตัวถูกดำเนินการของการตรวจสมาชิกไม่ตรงกัน"
+help = "ทำให้ชนิดของนิพจน์ตรงกับชนิดที่คาดไว้"
+
+[diagnostics.SEM010.issues.matmul_argument_rank_must_be_two]
+message = "matmul ต้องใช้อาร์กิวเมนต์เทนเซอร์แรงก์ 2"
+help = "ทำให้ชนิดของนิพจน์ตรงกับชนิดที่คาดไว้"
+
+[diagnostics.SEM010.issues.matmul_argument_shape_must_be_tuple]
+message = "matmul ต้องใช้อาร์กิวเมนต์เทนเซอร์แรงก์ 2 ที่มีรูปร่างเป็นทูเพิล"
+help = "ทำให้ชนิดของนิพจน์ตรงกับชนิดที่คาดไว้"
+
+[diagnostics.SEM010.issues.matmul_receiver_rank_must_be_two]
+message = "matmul ต้องใช้ตัวรับเทนเซอร์แรงก์ 2"
+help = "ทำให้ชนิดของนิพจน์ตรงกับชนิดที่คาดไว้"
+
+[diagnostics.SEM010.issues.matmul_receiver_shape_must_be_tuple]
+message = "matmul ต้องใช้ตัวรับเทนเซอร์แรงก์ 2 ที่มีรูปร่างเป็นทูเพิล"
+help = "ทำให้ชนิดของนิพจน์ตรงกับชนิดที่คาดไว้"
+
+[diagnostics.SEM010.issues.numeric_arithmetic_operands_identical]
+message = "ตัวถูกดำเนินการเลขคณิตเชิงตัวเลขต้องมีชนิดเหมือนกัน ใช้ ↦ เพื่อแปลงอย่างชัดเจน"
+help = "ทำให้ชนิดของนิพจน์ตรงกับชนิดที่คาดไว้"
+
+[diagnostics.SEM010.issues.numeric_operand_required]
+message = "ต้องมีตัวถูกดำเนินการตัวเลข"
+help = "ทำให้ชนิดของนิพจน์ตรงกับชนิดที่คาดไว้"
+
+[diagnostics.SEM010.issues.numeric_operands_required]
+message = "ต้องมีตัวถูกดำเนินการตัวเลข"
+help = "ทำให้ชนิดของนิพจน์ตรงกับชนิดที่คาดไว้"
+
+[diagnostics.SEM010.issues.boolean_operand_required]
+message = "ต้องมีตัวถูกดำเนินการบูลีน"
+help = "ทำให้ชนิดของนิพจน์ตรงกับชนิดที่คาดไว้"
+
+[diagnostics.SEM010.issues.boolean_operands_required]
+message = "ต้องมีตัวถูกดำเนินการบูลีน"
+help = "ทำให้ชนิดของนิพจน์ตรงกับชนิดที่คาดไว้"
+
+[diagnostics.SEM010.issues.integer_operand_required]
+message = "ต้องมีตัวถูกดำเนินการจำนวนเต็ม"
+help = "ทำให้ชนิดของนิพจน์ตรงกับชนิดที่คาดไว้"
+
+[diagnostics.SEM010.issues.integer_operands_required]
+message = "ต้องมีตัวถูกดำเนินการจำนวนเต็ม"
+help = "ทำให้ชนิดของนิพจน์ตรงกับชนิดที่คาดไว้"
+
+[diagnostics.SEM010.issues.instans_ordering_operands_required]
+message = "ตัวถูกดำเนินการ instans เข้ากันไม่ได้"
+help = "ทำให้ชนิดของนิพจน์ตรงกับชนิดที่คาดไว้"
+
+[diagnostics.SEM010.issues.pattern_type_mismatch]
+message = "ชนิดแพตเทิร์นไม่ตรงกัน"
+help = "ทำให้ชนิดของนิพจน์ตรงกับชนิดที่คาดไว้"
+
+[diagnostics.SEM010.issues.parameter_default_type_mismatch]
+message = "ชนิดค่าเริ่มต้นของพารามิเตอร์ไม่ตรงกัน"
+help = "ทำให้ชนิดของนิพจน์ตรงกับชนิดที่คาดไว้"
+
+[diagnostics.SEM010.issues.range_operand_type_mismatch]
+message = "ชนิดตัวถูกดำเนินการของช่วงไม่ตรงกัน"
+help = "ทำให้ชนิดของนิพจน์ตรงกับชนิดที่คาดไว้"
+
+[diagnostics.SEM010.issues.range_step_must_be_numeric]
+message = "ขั้นของช่วงต้องเป็นตัวเลข"
+help = "ทำให้ชนิดของนิพจน์ตรงกับชนิดที่คาดไว้"
+
+[diagnostics.SEM010.issues.return_type_mismatch]
+message = "ชนิดค่าที่ส่งกลับไม่ตรงกับลายเซ็นฟังก์ชัน"
+help = "ทำให้ชนิดของนิพจน์ตรงกับชนิดที่คาดไว้"
+
+[diagnostics.SEM010.issues.regex_conversion_operand_type_mismatch]
+message = "การแปลง regex ต้องใช้ textus หรือ ascii"
+help = "ทำให้ชนิดของนิพจน์ตรงกับชนิดที่คาดไว้"
+
+[diagnostics.SEM010.issues.string_operands_required]
+message = "ต้องมีตัวถูกดำเนินการสตริง"
+help = "ทำให้ชนิดของนิพจน์ตรงกับชนิดที่คาดไว้"
+
+[diagnostics.SEM010.issues.atomic_arity]
+message = "atomic ต้องมีชนิดสมาชิกเพียงหนึ่งชนิดเท่านั้น ใช้ atomic<T>"
+help = "ทำให้ชนิดของนิพจน์ตรงกับชนิดที่คาดไว้"
+
+[diagnostics.SEM010.issues.atomic_element]
+message = "ชนิดสมาชิกของ atomic ต้องเป็น numerus<i32> หรือ numerus<u32>"
+help = "ทำให้ชนิดของนิพจน์ตรงกับชนิดที่คาดไว้"
+
+[diagnostics.SEM010.issues.atomic_incomplete]
+message = "atomic ต้องมีชนิดสมาชิกหนึ่งชนิด ใช้ atomic<T>"
+help = "ทำให้ชนิดของนิพจน์ตรงกับชนิดที่คาดไว้"
+
+[diagnostics.SEM010.issues.matrix_incomplete]
+message = "matrix ต้องมีชนิดสมาชิกและรูปร่าง ใช้ matrix<T, [R, C]>"
+help = "ทำให้ชนิดของนิพจน์ตรงกับชนิดที่คาดไว้"
+
+[diagnostics.SEM010.issues.matrix_missing_figura]
+message = "matrix ต้องมีรูปร่างสองมิติ ใช้ matrix<T, [R, C]>"
+help = "ทำให้ชนิดของนิพจน์ตรงกับชนิดที่คาดไว้"
+
+[diagnostics.SEM010.issues.matrix_shape_two_dim]
+message = "รูปร่างของ matrix ต้องมีสองมิติพอดี"
+help = "ทำให้ชนิดของนิพจน์ตรงกับชนิดที่คาดไว้"
+
+[diagnostics.SEM010.issues.sparsa_incomplete]
+message = "sparsa ต้องมีชนิดสมาชิกและ Figura ใช้ sparsa<T, Figura>"
+help = "ทำให้ชนิดของนิพจน์ตรงกับชนิดที่คาดไว้"
+
+[diagnostics.SEM010.issues.sparsa_missing_figura]
+message = "sparsa ต้องมีรูปร่าง Figura ใช้ sparsa<T, []> สำหรับแรงก์ 0"
+help = "ทำให้ชนิดของนิพจน์ตรงกับชนิดที่คาดไว้"
+
+[diagnostics.SEM010.issues.scalar_text_operands_required]
+message = "ต้องมีตัวถูกดำเนินการข้อความสเกลาร์"
+help = "ทำให้ชนิดของนิพจน์ตรงกับชนิดที่คาดไว้"
+
+[diagnostics.SEM010.issues.stream_ad_opener_type_mismatch]
+message = "ตัวเปิด stream ad ต้องลดรูปเป็น valor"
+help = "ทำให้ชนิดของนิพจน์ตรงกับชนิดที่คาดไว้"
+
+[diagnostics.SEM010.issues.tensor_formata_element_type_mismatch]
+message = "ชนิดสมาชิกเป้าหมายของ formata ต้องตรงกับชนิดสมาชิกของตัวรับ"
+help = "ทำให้ชนิดของนิพจน์ตรงกับชนิดที่คาดไว้"
+
+[diagnostics.SEM010.issues.tensor_incomplete]
+message = "tensor ต้องมีชนิดสมาชิกและ Figura ใช้ tensor<T, Figura>"
+help = "ทำให้ชนิดของนิพจน์ตรงกับชนิดที่คาดไว้"
+
+[diagnostics.SEM010.issues.tensor_missing_figura]
+message = "tensor ต้องมีรูปร่าง Figura ใช้ tensor<T, []> สำหรับแรงก์ 0"
+help = "ทำให้ชนิดของนิพจน์ตรงกับชนิดที่คาดไว้"
+
+[diagnostics.SEM010.issues.variant_pattern_scrutinee_mismatch]
+message = "variant ไม่ตรงกับชนิดที่ตรวจสอบ"
+help = "ทำให้ชนิดของนิพจน์ตรงกับชนิดที่คาดไว้"
+
+[diagnostics.SEM010.issues.vector_element_type_mismatch]
+message = "ชนิดสมาชิกเวกเตอร์ไม่ตรงกัน"
+help = "ทำให้ชนิดของนิพจน์ตรงกับชนิดที่คาดไว้"
+
+[diagnostics.SEM010.issues.vector_incomplete]
+message = "vector ต้องมีชนิดสมาชิกและความกว้าง ใช้ vector<T, N>"
+help = "ทำให้ชนิดของนิพจน์ตรงกับชนิดที่คาดไว้"
+
+[diagnostics.SEM010.issues.vector_missing_width]
+message = "vector ต้องมีความกว้าง ใช้ vector<T, 4> หรือ vf32[4]"
+help = "ทำให้ชนิดของนิพจน์ตรงกับชนิดที่คาดไว้"
+
+[diagnostics.SEM010.issues.gradient_expression_unsupported]
+message = "postfix gradient selection (`call(...) ∇ [places]`) จะยังไม่ถูก lower จนกว่า tensor-glyphs 2B autograd surface จะมา; ไม่มีกฎ operand, selector หรือ result ใดทำงานใน Phase 2A"
+help = "gradient selection (`∇`) เป็นเพียง parse-only ใน Phase 2A; กฎ eligibility/selector จะมาพร้อมกับ tensor-glyphs 2B"
+
+[diagnostics.SEM011]
+message = "ชนิดตัวถูกดำเนินการไม่ถูกต้อง"
+help = "ใช้ชนิดตัวถูกดำเนินการที่เข้ากันได้"
+
+[diagnostics.SEM011.issues.nucleum_lane_fragment_clash]
+message = "fragment lane binding '{fragment}' conflicts with caller lane binding '{caller}'"
+help = "keep caller and fragment lane bindings distinct"
+
+[diagnostics.SEM011.issues.range_step_must_be_numeric]
+message = "ขั้นของช่วงต้องเป็นตัวเลข"
+help = "ใช้ขั้นช่วงที่เป็นตัวเลข"
+
+[diagnostics.SEM011.issues.intervallum_bound_required]
+message = "ชนิดขอบเขตของ intervallum ต้องเป็น numerus หรือ instans"
+help = "ใช้ขอบเขต numerus, fractus, instans หรือสเกลาร์ที่มีขนาด"
+
+[diagnostics.SEM011.issues.intervallum_longitudo_bound]
+message = "intervallum longitudo ต้องใช้ขอบเขต numerus จนกว่า momentum จะพร้อมใช้งาน"
+help = "ใช้ขอบเขต intervallum แบบ numerus สำหรับ longitudo ในขณะนี้"
+
+[diagnostics.SEM011.issues.numeric_operands_required]
+message = "ต้องมีตัวถูกดำเนินการตัวเลข"
+help = "ใช้ตัวถูกดำเนินการตัวเลขสำหรับตัวดำเนินการนี้"
+
+[diagnostics.SEM011.issues.numeric_arithmetic_operands_identical]
+message = "ตัวถูกดำเนินการเลขคณิตเชิงตัวเลขต้องมีชนิดเหมือนกัน ใช้ ↦ เพื่อแปลงอย่างชัดเจน"
+help = "แปลงตัวถูกดำเนินการอย่างชัดเจนก่อนใช้ตัวดำเนินการตัวเลขนี้"
+
+[diagnostics.SEM011.issues.ascii_literal_invalid_escape]
+message = "ลิเทอรัล ascii มีลำดับเอสเคปที่ไม่ถูกต้อง"
+help = "ใช้ลำดับเอสเคปที่รองรับสำหรับลิเทอรัล ASCII"
+
+[diagnostics.SEM011.issues.ascii_literal_non_ascii_scalar]
+message = "ลิเทอรัล ascii มีอักขระที่ไม่ใช่ ASCII '{character}'"
+help = "ใช้ textus สำหรับข้อความ Unicode หรือให้ข้อมูล ascii มีเฉพาะ ASCII"
+
+[diagnostics.SEM011.issues.ascii_literal_unescaped_control]
+message = "ลิเทอรัล ascii มีอักขระควบคุมที่ไม่ได้เอสเคป U+{codepoint}"
+help = "เอสเคปอักขระควบคุมในลิเทอรัล ascii"
+
+[diagnostics.SEM011.issues.boolean_operands_required]
+message = "ต้องมีตัวถูกดำเนินการบูลีน"
+help = "ใช้ตัวถูกดำเนินการ bivalens สำหรับตัวดำเนินการนี้"
+
+[diagnostics.SEM011.issues.atomic_method_requires_atomic_receiver]
+message = "การดำเนินการ atomic ต้องใช้ตัวรับ atomic"
+help = "เรียก load, store, exchange หรือ compare_exchange บน atomic<T>"
+
+[diagnostics.SEM011.issues.unsupported_atomic_method]
+message = "ไม่รองรับการดำเนินการ atomic"
+help = "ใช้ load, store, exchange หรือ compare_exchange"
+
+[diagnostics.SEM011.issues.bitwise_method_requires_numerus_receiver]
+message = "เมธอดตัวดำเนินการระดับบิตต้องใช้ตัวรับ numerus"
+help = "เรียกเมธอดระดับบิตบนตัวรับ numerus"
+
+[diagnostics.SEM011.issues.deref_requires_reference]
+message = "deref ต้องใช้รีเฟอเรนซ์"
+help = "ยกเลิกการอ้างอิงค่าที่เป็นรีเฟอเรนซ์"
+
+[diagnostics.SEM011.issues.densata_requires_sparsa_receiver]
+message = "densata ต้องใช้ตัวรับ sparsa"
+help = "เรียก densata บนค่า sparsa"
+
+[diagnostics.SEM011.issues.ascii_literal_template_application]
+message = "ลิเทอรัล ascii ไม่รองรับการใช้ template"
+help = "ใช้ลิเทอรัลจัดรูปแบบ textus สำหรับการเรียก template"
+
+[diagnostics.SEM011.issues.directional_view_method_type_args]
+message = "เมธอด directional view ไม่รับอาร์กิวเมนต์ชนิดข้อมูล"
+help = "ลบรายการอาร์กิวเมนต์ชนิดข้อมูลที่ระบุอย่างชัดเจน"
+
+[diagnostics.SEM011.issues.dynamic_callee_type_args]
+message = "callee แบบไดนามิกไม่รับอาร์กิวเมนต์ชนิดข้อมูล"
+help = "ลบรายการอาร์กิวเมนต์ชนิดข้อมูลที่ระบุอย่างชัดเจน"
+
+[diagnostics.SEM011.issues.dynamic_receiver_method_type_args]
+message = "เมธอดของตัวรับแบบไดนามิกไม่รับอาร์กิวเมนต์ชนิดข้อมูลของเมธอด"
+help = "ลบรายการอาร์กิวเมนต์ชนิดข้อมูลของเมธอดที่ระบุอย่างชัดเจน"
+
+[diagnostics.SEM011.issues.failable_call_requires_handler]
+message = "การเรียกที่อาจล้มเหลวต้องมีบริบทการประกาศ ⇥ หรือ handler ภายใน"
+help = "จัดการการเรียกด้วย fac/cape หรือประกาศฟังก์ชัน ⇥"
+
+[diagnostics.SEM011.issues.generic_type_arg_domain]
+message = "อาร์กิวเมนต์ชนิดข้อมูล {rejected} ไม่อนุญาตสำหรับ {param}; ต้องเป็นหนึ่งใน {accepted}"
+help = "เลือกอาร์กิวเมนต์ชนิดข้อมูลที่อนุญาตสำหรับพารามิเตอร์ generic นี้"
+
+[diagnostics.SEM011.issues.gpu_builtin_device_function_required]
+message = "การเรียก GPU builtin ใช้ได้เฉพาะภายในฟังก์ชัน device"
+help = "เรียก GPU builtin เฉพาะภายในฟังก์ชัน @ nucleum หรือ @ nucleum fragment"
+
+[diagnostics.SEM011.issues.gpu_builtin_type_args]
+message = "การเรียก GPU builtin ไม่รับอาร์กิวเมนต์ชนิดข้อมูล"
+help = "ลบรายการอาร์กิวเมนต์ชนิดข้อมูลที่ระบุอย่างชัดเจน"
+
+[diagnostics.SEM011.issues.inferred_callee_type_args]
+message = "callee ที่อนุมานไม่ได้รับอาร์กิวเมนต์ชนิดข้อมูล"
+help = "ลบรายการอาร์กิวเมนต์ชนิดข้อมูลที่ระบุอย่างชัดเจน"
+
+[diagnostics.SEM011.issues.intrinsic_method_type_args]
+message = "เมธอด intrinsic ไม่รับอาร์กิวเมนต์ชนิดข้อมูล"
+help = "ลบรายการอาร์กิวเมนต์ชนิดข้อมูลที่ระบุอย่างชัดเจน"
+
+[diagnostics.SEM011.issues.integer_operands_required]
+message = "ต้องใช้อ็อปแรนด์ชนิด integer"
+help = "ใช้อ็อปแรนด์ชนิด integer สำหรับโอเปอเรเตอร์นี้"
+
+[diagnostics.SEM011.issues.instans_ordering_operands_required]
+message = "อ็อปแรนด์ instans ไม่เข้ากัน"
+help = "เปรียบเทียบค่า instans กับค่า instans"
+
+[diagnostics.SEM011.issues.json_duplicate_key]
+message = "คีย์ JSON ซ้ำกัน \"{key}\""
+help = "ลบหรือเปลี่ยนชื่อคีย์อ็อบเจ็กต์ JSON ที่ซ้ำกัน"
+
+[diagnostics.SEM011.issues.method_call_type_args]
+message = "การเรียกเมธอดไม่รับอาร์กิวเมนต์ชนิดข้อมูล"
+help = "ลบรายการอาร์กิวเมนต์ชนิดข้อมูลที่ระบุอย่างชัดเจน"
+
+[diagnostics.SEM011.issues.numeric_lista_elements_required]
+message = "ต้องใช้องค์ประกอบ numeric ของ lista"
+help = "ใช้องค์ประกอบ numeric สำหรับ intrinsic ของ lista นี้"
+
+[diagnostics.SEM011.issues.octeti_literal_invalid_character]
+message = "ลิเทอรัล octeti มีอักขระไม่ถูกต้อง '{character}'"
+help = "ใช้เฉพาะเลขฐานสิบหกในลิเทอรัล octeti"
+
+[diagnostics.SEM011.issues.octeti_literal_odd_digit_count]
+message = "ลิเทอรัล octeti มีจำนวนเลขฐานสิบหกเป็นคี่"
+help = "ระบุคู่ไบต์ให้ครบในลิเทอรัล octeti"
+
+[diagnostics.SEM011.issues.octeti_literal_template_application]
+message = "ลิเทอรัล octeti ไม่รองรับการใช้ template"
+help = "ใช้การจัดรูปแบบ textus แทนการเรียกลิเทอรัล octeti"
+
+[diagnostics.SEM011.issues.sermo_view_payload_type_arg_count]
+message = "{method} รับอาร์กิวเมนต์ชนิด payload ได้ไม่เกินหนึ่งรายการ"
+help = "ลบรายการอาร์กิวเมนต์ชนิดข้อมูลที่ระบุอย่างชัดเจน"
+
+[diagnostics.SEM011.issues.template_application_type_args]
+message = "การใช้ template ไม่รับอาร์กิวเมนต์ชนิดข้อมูล"
+help = "ลบรายการอาร์กิวเมนต์ชนิดข้อมูลที่ระบุอย่างชัดเจน"
+
+[diagnostics.SEM011.issues.variant_constructor_type_args]
+message = "ตัวสร้าง variant ไม่รับอาร์กิวเมนต์ชนิดข้อมูล"
+help = "ลบรายการอาร์กิวเมนต์ชนิดข้อมูลที่ระบุอย่างชัดเจน"
+
+[diagnostics.SEM011.issues.same_width_integer_operands_required]
+message = "ต้องใช้อ็อปแรนด์ integer ที่มีความกว้างเท่ากัน"
+help = "แปลงอ็อปแรนด์ integer ให้มีความกว้างเท่ากันก่อนใช้โอเปอเรเตอร์นี้"
+
+[diagnostics.SEM011.issues.postfix_inc_dec_numerus_operand]
+message = "การเพิ่ม/ลดค่าแบบ postfix ต้องใช้อ็อปแรนด์ numerus"
+help = "ใช้การเพิ่ม/ลดค่าแบบ postfix กับค่า numerus"
+
+[diagnostics.SEM011.issues.array_spread_requires_lista]
+message = "การกระจาย array ต้องใช้อ็อปแรนด์ lista"
+help = "กระจายค่า lista ภายในการสร้าง lista"
+
+[diagnostics.SEM011.issues.struct_computed_key_forbidden]
+message = "คีย์ที่คำนวณไม่ได้ใช้ในการสร้าง struct"
+help = "ใช้ชื่อฟิลด์ struct ที่ประกาศไว้ในการสร้าง struct"
+
+[diagnostics.SEM011.issues.struct_spread_forbidden]
+message = "ฟิลด์ที่กระจายไม่ได้ใช้ในการสร้าง struct"
+help = "ระบุฟิลด์ struct ที่จำเป็นแต่ละฟิลด์อย่างชัดเจน"
+
+[diagnostics.SEM011.issues.vector_constructor_forbids_spread]
+message = "ตัวสร้าง vector ไม่รับอาร์กิวเมนต์แบบกระจาย"
+help = "ระบุองค์ประกอบ vector อย่างชัดเจนแทนอาร์กิวเมนต์แบบกระจาย"
+
+[diagnostics.SEM011.issues.object_spread_requires_tabula]
+message = "การกระจาย object ต้องใช้อ็อปแรนด์ tabula"
+help = "กระจายค่า tabula ภายในการสร้าง tabula"
+
+[diagnostics.SEM011.issues.interval_bound_single_scalar]
+message = "ขอบเขต interval ต้องเป็น Unicode scalar เดียว"
+help = "ส่งค่า textus หรือ ascii ที่มี Unicode scalar เพียงหนึ่งค่า"
+
+[diagnostics.SEM011.issues.numeric_operand_required]
+message = "ต้องใช้อ็อปแรนด์ numeric"
+help = "ใช้อ็อปแรนด์ numeric สำหรับโอเปอเรเตอร์นี้"
+
+[diagnostics.SEM011.issues.numeric_value_equality_operands_required]
+message = "≈ ต้องใช้อ็อปแรนด์ numeric; ใช้ ≅ สำหรับความเท่ากันแบบ exact หลัง promotion หรือ .approx สำหรับ tolerance ที่ระบุเอง"
+help = "สำหรับ fuzzy equality ใช้ ≈ กับ numeric operands; ใช้ ≅ สำหรับความเท่ากันแบบ exact หลัง promotion หรือ .approx สำหรับ tolerance ที่ระบุเอง"
+
+[diagnostics.SEM011.issues.boolean_operand_required]
+message = "ต้องใช้อ็อปแรนด์ boolean"
+help = "ใช้อ็อปแรนด์ bivalens สำหรับโอเปอเรเตอร์นี้"
+
+[diagnostics.SEM011.issues.condition_must_be_bivalens]
+message = "เงื่อนไขต้องเป็น bivalens"
+help = "ใช้นิพจน์ bivalens เป็นเงื่อนไข"
+
+[diagnostics.SEM011.issues.integer_operand_required]
+message = "ต้องใช้อ็อปแรนด์ integer"
+help = "ใช้อ็อปแรนด์ integer สำหรับโอเปอเรเตอร์นี้"
+
+[diagnostics.SEM011.issues.range_operand_must_be_numeric]
+message = "อ็อปแรนด์ range ต้องเป็น numeric"
+help = "เปรียบเทียบค่า numeric กับช่วง intervallum"
+
+[diagnostics.SEM011.issues.scalar_text_operands_required]
+message = "ต้องใช้อ็อปแรนด์ข้อความ scalar"
+help = "เปรียบเทียบอ็อปแรนด์ textus หรือ ascii ที่มี scalar เดียว"
+
+[diagnostics.SEM011.issues.string_operands_required]
+message = "ต้องใช้อ็อปแรนด์ string"
+help = "ใช้อ็อปแรนด์ textus สำหรับการบวก string"
+
+[diagnostics.SEM011.issues.object_field_requires_value]
+message = "ฟิลด์ object ต้องมีค่า"
+help = "ระบุค่าอย่างชัดเจนสำหรับฟิลด์ object นี้"
+
+[diagnostics.SEM011.issues.vacua_requires_collection_type]
+message = "vacua ต้องมีชนิด collection"
+help = "กำหนดบริบท lista, tabula, copia, tensor หรือ sparsa ให้ vacua"
+
+[diagnostics.SEM011.issues.textus_index_must_be_numerus_or_range]
+message = "ดัชนี textus ต้องเป็น numerus หรือ range"
+help = "ใช้ numerus หรือช่วง integer เพื่อทำดัชนี textus"
+
+[diagnostics.SEM011.issues.array_index_must_be_numerus]
+message = "ดัชนี array ต้องเป็น numerus"
+help = "ใช้ numerus เพื่อทำดัชนีค่า lista"
+
+[diagnostics.SEM011.issues.indexing_requires_array_or_map]
+message = "การทำดัชนีต้องใช้ array หรือ map"
+help = "ทำดัชนีเฉพาะค่า lista, tabula, tensor, textus หรือ ignotum"
+
+[diagnostics.SEM011.issues.tensor_index_vector_integer_elements]
+message = "เวกเตอร์ดัชนี tensor ต้องเป็น lista ที่มีองค์ประกอบ integer"
+help = "ใช้ lista ที่มีองค์ประกอบดัชนี integer ที่รองรับ"
+
+[diagnostics.SEM011.issues.tensor_scalar_index_rank]
+message = "ดัชนี scalar ของ tensor ต้องมี rank-1; ใช้ lista<integer> สำหรับ rank-N"
+help = "ใช้ดัชนี scalar เฉพาะกับ tensor rank-1"
+
+[diagnostics.SEM011.issues.tensor_bracket_index_integer_or_lista]
+message = "ดัชนีในวงเล็บของ tensor ต้องเป็น integer หรือ lista<integer>"
+help = "ใช้ scalar integer หรือ lista ของดัชนี integer"
+
+[diagnostics.SEM011.issues.tensor_arithmetic_numeric_element_required]
+message = "การคำนวณ tensor ต้องมีชนิดองค์ประกอบ numeric"
+help = "ใช้ชนิดองค์ประกอบ tensor หรือ sparsa แบบ numeric"
+
+[diagnostics.SEM011.issues.matrix_arithmetic_numeric_element_required]
+message = "การคำนวณ matrix ต้องมีชนิดองค์ประกอบ numeric"
+help = "ใช้ชนิดองค์ประกอบ matrix แบบ numeric"
+
+[diagnostics.SEM011.issues.tensor_receiver_structa_renamed]
+message = "เมธอด structa ของตัวรับ tensor เปลี่ยนชื่อเป็น strue แล้ว; ใช้ seed.strue(data, shape)"
+help = "ใช้ seed.strue(data, shape)"
+
+[diagnostics.SEM011.issues.tensor_receiver_creata_type_args]
+message = "creata ของตัวรับ tensor ไม่รับอาร์กิวเมนต์ชนิดข้อมูล; ใช้ tensor.creata<CompleteTensorType>(fill)"
+help = "เรียก tensor.creata<CompleteTensorType>(fill) สำหรับการสร้างแบบคงที่"
+
+[diagnostics.SEM011.issues.tensor_crea_argument_order]
+message = "tensor crea ต้องรับ fill ก่อน shape; ใช้ seed.crea(fill, shape)"
+help = "ส่ง fill ก่อน shape"
+
+[diagnostics.SEM011.issues.tensor_structa_forma_removed]
+message = "tensor.structa_forma ถูกลบแล้ว; ใช้ tensor.structa<CompleteTensorType>(data)"
+help = "ใช้ tensor.structa<CompleteTensorType>(data)"
+
+[diagnostics.SEM011.issues.tensor_creata_runtime_shape_removed]
+message = "tensor.creata ไม่รับอาร์กิวเมนต์ shape ระหว่างรันไทม์อีกต่อไป; ใช้ tensor.creata<CompleteTensorType>(fill)"
+help = "ใช้ tensor.creata<CompleteTensorType>(fill)"
+
+[diagnostics.SEM011.issues.tensor_creata_complete_type_arg_required]
+message = "tensor.creata ต้องมีอาร์กิวเมนต์ชนิด tensor ที่สมบูรณ์; ใช้ tensor.creata<CompleteTensorType>(fill)"
+help = "ระบุอาร์กิวเมนต์ชนิด tensor ที่สมบูรณ์"
+
+[diagnostics.SEM011.issues.tensor_formata_complete_type_arg_required]
+message = "formata ต้องมีอาร์กิวเมนต์ชนิด tensor ที่สมบูรณ์; ใช้ grid.formata<CompleteTensorType>()"
+help = "ระบุอาร์กิวเมนต์ชนิด tensor ที่สมบูรณ์"
+
+[diagnostics.SEM011.issues.tensor_formata_forbids_value_args]
+message = "formata ไม่รับอาร์กิวเมนต์ค่า; ใช้ grid.forma(shape) เพื่อปรับรูปร่างระหว่างรันไทม์"
+help = "ใช้ grid.forma(shape) เพื่อปรับรูปร่างระหว่างรันไทม์"
+
+[diagnostics.SEM011.issues.tensor_type_arg_incomplete]
+message = "อาร์กิวเมนต์ชนิด tensor ต้องเป็นชนิด tensor ที่สมบูรณ์ เช่น tf32[2, 2] หรือ tensor<numerus, [4]>"
+help = "รวมทั้งชนิดองค์ประกอบและรูปร่างไว้ในอาร์กิวเมนต์ชนิด tensor"
+
+[diagnostics.SEM012]
+message = "เรียกใช้ไม่ได้"
+help = "เรียกฟังก์ชันหรือ closure"
+
+[diagnostics.SEM012.issues.callee_not_callable]
+message = "callee เรียกใช้ไม่ได้"
+help = "เรียกฟังก์ชัน, closure หรือค่าที่เรียกใช้ได้"
+
+[diagnostics.SEM013]
+message = "จำนวนอาร์กิวเมนต์ไม่ถูกต้อง"
+help = "ปรับจำนวนอาร์กิวเมนต์"
+
+[diagnostics.SEM013.issues.callee_type_args_unsupported]
+message = "callee ไม่รับอาร์กิวเมนต์ชนิดข้อมูล"
+help = "ลบรายการอาร์กิวเมนต์ชนิดข้อมูลที่ระบุอย่างชัดเจน"
+
+[diagnostics.SEM013.issues.gpu_builtin_expects_no_arguments]
+message = "การเรียก GPU builtin ต้องไม่มีอาร์กิวเมนต์"
+help = "ลบอาร์กิวเมนต์ของการเรียก"
+
+[diagnostics.SEM013.issues.method_accepts_no_arguments]
+message = "{method} ไม่รับอาร์กิวเมนต์"
+help = "ลบอาร์กิวเมนต์ของการเรียก"
+
+[diagnostics.SEM013.issues.variant_pattern_arity_mismatch]
+message = "จำนวนฟิลด์ของ variant pattern ไม่ตรงกัน"
+help = "ปรับจำนวนฟิลด์ของ pattern ให้ตรงกับ variant"
+
+[diagnostics.SEM013.issues.vector_constructor_width_arity]
+message = "จำนวนอาร์กิวเมนต์ของตัวสร้าง vector ต้องตรงกับความกว้างของ vector"
+help = "ระบุองค์ประกอบตัวสร้างหนึ่งรายการต่อ vector lane"
+
+[diagnostics.SEM013.issues.wrong_number_of_arguments]
+message = "จำนวนอาร์กิวเมนต์ไม่ถูกต้อง"
+help = "ปรับจำนวนอาร์กิวเมนต์"
+
+[diagnostics.SEM013.issues.wrong_number_of_type_arguments]
+message = "จำนวนอาร์กิวเมนต์ชนิดข้อมูลไม่ถูกต้อง"
+help = "ปรับจำนวนอาร์กิวเมนต์ชนิดข้อมูล"
+
+[diagnostics.SEM014]
+message = "ไม่มีคำอธิบายชนิดข้อมูล"
+help = "เพิ่มคำอธิบายชนิดข้อมูล"
+
+[diagnostics.SEM014.issues.cannot_infer_alternate_exit_type]
+message = "ไม่สามารถอนุมานชนิด alternate-exit ได้"
+help = "เพิ่มคำอธิบายชนิดข้อมูลอย่างชัดเจน"
+
+[diagnostics.SEM014.issues.cannot_infer_constant_type]
+message = "ไม่สามารถอนุมานชนิดค่าคงที่ได้"
+help = "เพิ่มคำอธิบายชนิดข้อมูลอย่างชัดเจน"
+
+[diagnostics.SEM014.issues.cannot_infer_expression_type]
+message = "ไม่สามารถอนุมานชนิดนิพจน์ได้"
+help = "เพิ่มคำอธิบายชนิดข้อมูลอย่างชัดเจน"
+
+[diagnostics.SEM014.issues.cannot_infer_field_type]
+message = "ไม่สามารถอนุมานชนิดฟิลด์ได้"
+help = "เพิ่มคำอธิบายชนิดข้อมูลอย่างชัดเจน"
+
+[diagnostics.SEM014.issues.cannot_infer_return_type]
+message = "ไม่สามารถอนุมานชนิดค่าที่ส่งกลับได้"
+help = "เพิ่มคำอธิบายชนิดข้อมูลอย่างชัดเจน"
+
+[diagnostics.SEM014.issues.cannot_infer_tensor_shape]
+message = "ไม่สามารถอนุมานรูปร่าง tensor ได้"
+help = "ระบุรูปร่าง tensor หรือ sparsa ที่เป็นรูปธรรม"
+
+[diagnostics.SEM014.issues.cannot_infer_variable_type]
+message = "ไม่สามารถอนุมานชนิดตัวแปรได้"
+help = "เพิ่มคำอธิบายชนิดข้อมูลอย่างชัดเจน"
+
+[diagnostics.SEM014.issues.directional_view_type_not_registered]
+message = "ยังไม่ได้ลงทะเบียนชนิด directional view"
+help = "ตรวจสอบให้แน่ใจว่าลงทะเบียนชนิด frame ในตัวแล้วก่อนตรวจสอบชนิด"
+
+[diagnostics.SEM014.issues.explicit_type_arg_inference_unsupported]
+message = "ไม่รองรับการอนุมานบางส่วนในอาร์กิวเมนต์ชนิดข้อมูลที่ระบุอย่างชัดเจน"
+help = "แทนที่อาร์กิวเมนต์ชนิดข้อมูลที่อนุมานด้วยชนิดข้อมูลที่เป็นรูปธรรม"
+
+[diagnostics.SEM014.issues.scrinium_type_not_registered]
+message = "ยังไม่ได้ลงทะเบียนชนิด scrinium"
+help = "ตรวจสอบให้แน่ใจว่าลงทะเบียนชนิด frame ในตัวแล้วก่อนตรวจสอบชนิด"
+
+[diagnostics.SEM014.issues.sermo_type_not_registered]
+message = "ยังไม่ได้ลงทะเบียนชนิด sermo"
+help = "ตรวจสอบให้แน่ใจว่าลงทะเบียนชนิด frame ในตัวแล้วก่อนตรวจสอบชนิด"
+
+[diagnostics.SEM014.issues.vacua_requires_declared_type]
+message = "vacua ต้องมีชนิดที่ประกาศไว้อย่างชัดเจน"
+help = "เพิ่มชนิด collection ที่ประกาศไว้สำหรับ vacua"
+
+[diagnostics.SEM015]
+message = "การแปลงชนิดไม่ถูกต้อง"
+help = "แปลงเป็นชนิดที่เข้ากันได้"
+
+[diagnostics.SEM016]
+message = "การแปลงไม่ถูกต้อง"
+help = "ใช้การแปลงที่ถูกต้องหรือระบุการกู้คืนแบบอินไลน์ด้วย `⇥`"
+
+[diagnostics.SEM016.issues.intervallum_clamp_recovery_unsupported]
+message = "การแปลง intervallum clamp ไม่รองรับการกู้คืนด้วย `⇥`"
+help = "นำ arm การกู้คืนออกจาก range clamp นี้"
+
+[diagnostics.SEM016.issues.intervallum_target_not_range]
+message = "เป้าหมายการแปลง intervallum ต้องเป็นค่า range หรือ intervallum"
+help = "แปลงเป็นค่า range หรือ intervallum"
+
+[diagnostics.SEM016.issues.intervallum_clamp_bound_mismatch]
+message = "intervallum clamp ต้องการชนิด bound ที่ตรงกัน"
+help = "ทำให้ชนิดองค์ประกอบ bound ของต้นทางและเป้าหมายตรงกัน"
+
+[diagnostics.SEM016.issues.sermo_materialize_target_unsupported]
+message = "ไม่รองรับเป้าหมายการ materialize ของ sermo; ต้องเป็น vacuum, valor, scalar (numerus, fractus, bivalens, textus, ascii, octeti, instans) หรือ lista<T>"
+help = "เลือกเป้าหมายการ materialize ของ sermo ที่รองรับ"
+
+[diagnostics.SEM016.issues.intervallum_materialize_lista_element_mismatch]
+message = "intervallum materialize ต้องการชนิดองค์ประกอบ lista ที่ตรงกัน"
+help = "ทำให้ชนิดองค์ประกอบ bound ของต้นทางและเป้าหมายตรงกัน"
+
+[diagnostics.SEM016.issues.intervallum_materialize_tensor_element_mismatch]
+message = "intervallum materialize ต้องการชนิดองค์ประกอบ tensor ที่ตรงกัน"
+help = "ทำให้ชนิดองค์ประกอบ bound ของต้นทางและเป้าหมายตรงกัน"
+
+[diagnostics.SEM016.issues.lista_to_vector_literal_required]
+message = "การ materialize เป็น vector ต้องมีแหล่งที่มาเป็น lista literal"
+help = "ใช้การแปลงที่ถูกต้องหรือระบุการกู้คืนแบบอินไลน์ด้วย `⇥`"
+
+[diagnostics.SEM016.issues.lista_to_vector_element_mismatch]
+message = "การแปลง lista เป็น vector ต้องการชนิดองค์ประกอบที่ตรงกัน"
+help = "ใช้การแปลงที่ถูกต้องหรือระบุการกู้คืนแบบอินไลน์ด้วย `⇥`"
+
+[diagnostics.SEM016.issues.lista_to_vector_literal_width]
+message = "การแปลง lista เป็น vector ต้องมีความกว้าง vector แบบ literal"
+help = "ใช้การแปลงที่ถูกต้องหรือระบุการกู้คืนแบบอินไลน์ด้วย `⇥`"
+
+[diagnostics.SEM016.issues.matrix_materialize_unsupported]
+message = "ยังไม่รองรับการ materialize matrix"
+help = "คงค่า matrix เป็นพารามิเตอร์ที่มีชนิดจนกว่าจะนำการลดรูปการสร้าง matrix มาใช้"
+
+[diagnostics.SEM016.issues.valor_to_regex_unsupported]
+message = "การแปลง valor เป็น regex ไม่มีแพตเทิร์นเริ่มต้น; ใช้ `valor ↦ textus ↦ regex`"
+help = "แปลง valor เป็น textus ก่อนแปลงเป็น regex"
+
+[diagnostics.SEM016.issues.valor_to_cursor_boundary]
+message = "การแปลง valor เป็น cursor ข้ามขอบเขต eager/lazy; materialize ผ่าน `valor ↦ lista` แล้ว `lista ↦ cursor`"
+help = "materialize cursor ผ่าน lista ก่อนข้ามขอบเขต"
+
+[diagnostics.SEM016.issues.valor_to_promissum_boundary]
+message = "การแปลง valor เป็น promissum ข้ามขอบเขต async/sync; valor เป็นแบบ synchronous — ห่อ producer ด้วย `@ futura`"
+help = "resolve หรือห่อค่า async อย่างชัดเจน"
+
+[diagnostics.SEM016.issues.promissum_to_valor_boundary]
+message = "การแปลง promissum เป็น valor ข้ามขอบเขต async/sync; resolve ด้วย `.exspecta()` ก่อนทำ boxing"
+help = "resolve หรือห่อค่า async อย่างชัดเจน"
+
+[diagnostics.SEM016.issues.cursor_to_valor_boundary]
+message = "การแปลง cursor เป็น valor ข้ามขอบเขต eager/lazy; materialize ผ่าน `cursor ↦ lista` แล้ว `lista ↦ valor`"
+help = "materialize cursor ผ่าน lista ก่อนข้ามขอบเขต"
+
+[diagnostics.SEM016.issues.numeric_to_octeti_unspecified]
+message = "การแปลงจาก numerus, fractus หรือ bivalens เป็น octeti ไม่ได้ระบุไว้ (ความกว้างไบต์และ endianness); ใช้ `chorda` หรือกริยาไบต์ที่ระบุชัดเจนแทน"
+help = "ใช้ chorda หรือ helper การแปลงไบต์ที่ระบุชัดเจน"
+
+[diagnostics.SEM016.issues.octeti_to_numerus_unspecified]
+message = "การแปลงจาก octeti เป็น numerus ไม่ได้ระบุไว้ (ความกว้างไบต์และ endianness); ใช้ `chorda` หรือกริยาไบต์ที่ระบุชัดเจนแทน"
+help = "ใช้ chorda หรือ helper การแปลงไบต์ที่ระบุชัดเจน"
+
+[diagnostics.SEM016.issues.octeti_to_fractus_unspecified]
+message = "การแปลงจาก octeti เป็น fractus ไม่ได้ระบุไว้ (ความกว้าง IEEE และ endianness); ใช้ `chorda` หรือกริยาไบต์ที่ระบุชัดเจนแทน"
+help = "ใช้ chorda หรือ helper การแปลงไบต์ที่ระบุชัดเจน"
+
+[diagnostics.SEM016.issues.bits_pair_width_mismatch]
+message = "the Bits bitcast requires exact-width pairs: numerus<u32> ↔ fractus<f32> and numerus<u64> ↔ fractus<f64>"
+help = "convert to the matching IEEE width first: u32 pairs with f32, u64 with f64"
+
+[diagnostics.SEM016.issues.octeti_to_bivalens_unsupported]
+message = "การแปลงจาก octeti เป็น bivalens ไม่มีความหมายเริ่มต้น; ถอดรหัสเป็น textus หรือเปรียบเทียบไบต์อย่างชัดเจน"
+help = "ใช้ chorda หรือ helper การแปลงไบต์ที่ระบุชัดเจน"
+
+[diagnostics.SEM016.issues.promissum_target_boundary]
+message = "การแปลงเป็น promissum ข้ามขอบเขต async/sync; ใช้ `@ futura` หรือ `.tum()` สำหรับการห่อแบบ async"
+help = "resolve หรือห่อค่า async อย่างชัดเจน"
+
+[diagnostics.SEM016.issues.promissum_source_boundary]
+message = "การแปลงจาก promissum ข้ามขอบเขต async/sync; ใช้ `.exspecta()` หรือ `@ futura` `.tum()` สำหรับการ resolve แบบ async"
+help = "resolve หรือห่อค่า async อย่างชัดเจน"
+
+[diagnostics.SEM016.issues.sparsa_collection_unsupported]
+message = "การแปลง sparsa ไม่มีความหมาย lista เริ่มต้น; ใช้ densata() ก่อนการแปลงเป็น lista หรือใช้ sparse helper ที่ระบุชัดเจน"
+help = "ทำให้เป็นแบบหนาแน่นหรือใช้ sparse helper ที่ระบุชัดเจน"
+
+[diagnostics.SEM016.issues.sparsa_tensor_element_mismatch]
+message = "การแปลง tensor และ sparsa ต้องการชนิดองค์ประกอบเดียวกัน; แปลงความกว้างองค์ประกอบอย่างชัดเจนก่อนเปลี่ยน representation"
+help = "แปลงความกว้างองค์ประกอบอย่างชัดเจนก่อนเปลี่ยน representation"
+
+[diagnostics.SEM016.issues.sparsa_tensor_shape_mismatch]
+message = "การแปลง tensor และ sparsa ต้องการ Figura shape เดียวกัน; reshape อย่างชัดเจนก่อน `↦`"
+help = "reshape อย่างชัดเจนก่อนการแปลง"
+
+[diagnostics.SEM016.issues.tensor_to_scalar_unsupported]
+message = "การแปลง tensor เป็น scalar ไม่มีการเลือกองค์ประกอบเริ่มต้น; ใช้ `accipe(index)` สำหรับการอ่านแบบมีดัชนี"
+help = "ทำดัชนีหรือลดรูป tensor ก่อนการแปลง"
+
+[diagnostics.SEM016.issues.scalar_to_tensor_unsupported]
+message = "การแปลง scalar เป็น tensor ไม่มี broadcast shape เริ่มต้น; ใช้ `crea(shape, fill)` หรือ `structa`"
+help = "สร้างหรือเติม tensor อย่างชัดเจน"
+
+[diagnostics.SEM016.issues.tensor_shape_mismatch]
+message = "ไม่รองรับการแปลง shape ของ tensor สำหรับคู่นี้"
+help = "reshape อย่างชัดเจนก่อนการแปลง"
+
+[diagnostics.SEM016.issues.tensor_element_mismatch]
+message = "ไม่รองรับการแปลงชนิดองค์ประกอบ tensor สำหรับคู่นี้"
+help = "แปลงความกว้างองค์ประกอบอย่างชัดเจนก่อนเปลี่ยน representation"
+
+[diagnostics.SEM016.issues.conversio_failure_channel_textus_required]
+message = "การส่งต่อความล้มเหลวของ conversio ต้องมีช่องทาง alternate-exit เป็น `textus`"
+help = "ประกาศช่องทาง alternate-exit เป็น textus หรือระบุการกู้คืนแบบอินไลน์"
+
+[diagnostics.SEM016.issues.regex_operand_unsupported]
+message = "การแปลง regex ต้องการ operand เป็น textus หรือ ascii"
+help = "แปลงค่า textus หรือ ascii เป็น regex"
+
+[diagnostics.SEM016.issues.regex_recovery_unsupported]
+message = "การแปลง regex ไม่รองรับการกู้คืนด้วย `⇥`; regex ไม่มีรูปแบบ literal จึงไม่มีค่าที่มีชนิดตามเป้าหมายให้แทนที่"
+help = "นำ arm การกู้คืนออกจากการแปลง regex นี้"
+
+[diagnostics.SEM016.issues.valor_verte_unsupported]
+message = "ไม่รองรับ valor ∷ T — ไม่สามารถยืนยัน shape ของค่า dynamic ณ เวลาคอมไพล์ได้ ใช้ `↦ T` สำหรับการดึงค่า ณ runtime (พร้อม `⇥` สำหรับการกู้คืน)"
+help = "ใช้การแปลง runtime `↦ T` พร้อมการกู้คืนด้วย `⇥` แทน"
+
+[diagnostics.SEM016.issues.json_genus_conversion_requires_json_annotation]
+message = "การแปลง json/genus ต้องทำเครื่องหมาย genus ด้วย `@ json`"
+help = "เพิ่ม `@ json` ให้ genus หรือแปลงผ่าน `valor` อย่างชัดเจน"
+
+[diagnostics.SEM016.issues.lista_to_tabula_unsupported]
+message = "การแปลง lista เป็น tabula ไม่มีการอนุมาน key/value เริ่มต้น; ใช้กริยาตัวสร้าง tabula หรือ `.in.tabula(k, v)`; การแยกโครงสร้างคู่ถูกเลื่อนไว้ก่อน"
+help = "สร้าง tabula โดยเลือก key/value อย่างชัดเจน"
+
+[diagnostics.SEM016.issues.cross_collection_unsupported]
+message = "การแปลงข้ามคอลเลกชันไม่มีความหมาย `↦` เริ่มต้น; ใช้กริยา stdlib ที่ระบุชัดเจน"
+help = "ใช้กริยาแปลง stdlib ที่ระบุชัดเจน"
+
+[diagnostics.SEM016.issues.lista_to_tensor_nested]
+message = "การแปลง lista เป็น tensor ต้องใช้ lista แบบแบน; flatten ค่า lista ซ้อนกันอย่างชัดเจนก่อน `↦`"
+help = "flatten lista ซ้อนกันก่อนแปลงเป็น tensor"
+
+[diagnostics.SEM016.issues.lista_to_tensor_element_mismatch]
+message = "การแปลง lista เป็น tensor ต้องการชนิดองค์ประกอบที่ตรงกัน; แปลงองค์ประกอบอย่างชัดเจนก่อน `↦`"
+help = "แปลงองค์ประกอบ lista เป็นชนิดองค์ประกอบ tensor ก่อน"
+
+[diagnostics.SEM016.issues.rectangular_lista_literal_target]
+message = "การแปลง lista literal แบบสี่เหลี่ยมต้องมีเป้าหมาย tensor Figura แบบ literal rank-2"
+help = "แปลง lista literal ซ้อนกันเป็นเป้าหมาย tensor rank-2"
+
+[diagnostics.SEM016.issues.rectangular_lista_literal_ragged]
+message = "ไม่สามารถแปลง lista literal ซ้อนกันที่มีแถวยาวไม่เท่ากันเป็น tensor ได้; ใช้ crea หรือกริยา flatten ที่ระบุชัดเจน"
+help = "ทำให้ทุกแถวซ้อนกันมีความยาวเท่ากัน"
+
+[diagnostics.SEM016.issues.rectangular_lista_literal_row_length]
+message = "ความยาวแถวของ lista literal แบบสี่เหลี่ยมไม่ตรงกัน"
+help = "ทำให้ทุกแถวซ้อนกันมีความยาวเท่ากัน"
+
+[diagnostics.SEM016.issues.rectangular_lista_literal_shape]
+message = "shape ของ lista literal แบบสี่เหลี่ยมไม่ตรงกับเป้าหมาย conversio"
+help = "ทำให้มิติของ literal ที่ซ้อนกันตรงกับ Figura เป้าหมาย"
+
+[diagnostics.SEM016.issues.rectangular_lista_literal_spread]
+message = "การแปลง lista literal แบบสี่เหลี่ยมไม่อนุญาต spread elements"
+help = "ขยาย spread elements ก่อนการแปลงเป็น tensor"
+
+[diagnostics.SEM016.issues.rectangular_lista_literal_leaf]
+message = "การแปลง lista literal แบบสี่เหลี่ยมต้องใช้องค์ประกอบ leaf แบบ literal"
+help = "ใช้ leaf scalar แบบ literal ใน lista ที่ซ้อนกัน"
+
+[diagnostics.SEM017]
+message = "declaration ไม่พร้อมใช้งาน"
+help = "ใช้ declaration ที่พร้อมใช้งานหรือนำ surface ที่ระบุไว้มาใช้"
+
+[diagnostics.SEM017.issues.nondum_method_for_target]
+message = "method `{method}` ถูกทำเครื่องหมาย nondum สำหรับ target นี้{?reason|: |}"
+help = "ใช้ declaration ที่พร้อมใช้งานหรือเปลี่ยน target"
+
+[diagnostics.SEM018]
+message = "annotation ไม่ถูกต้อง"
+help = "แก้ contract ของ annotation ก่อน semantic lowering"
+
+[diagnostics.SEM018.issues.protecta_reserved]
+message = "`{annotation}` เป็นชื่อสงวนและไม่มีความหมายด้าน visibility ที่ใช้งานอยู่"
+help = "ใช้ `{publica}` เพื่อระบุเจตนาการ export อย่างชัดเจน หรือ `{privata}` เพื่อระบุเจตนาให้ใช้ได้เฉพาะในไฟล์"
+
+[diagnostics.SEM018.issues.conflicting_lane]
+message = "annotation lane ของ @ radix ขัดแย้งกัน: '{existing}' และ '{parsed}'"
+help = "ใช้ `@ radix lane \"air\"`, `@ radix lane \"mir\"` หรือ `@ radix lane \"hir-direct\"` บน functio ระดับ top-level"
+
+[diagnostics.SEM018.issues.nucleum_lane_invalid_identifier]
+message = "@ nucleum lane binding '{name}' is not a valid identifier"
+help = "use a valid identifier for the lane binding"
+
+[diagnostics.SEM018.issues.nucleum_lane_collision]
+message = "@ nucleum lane binding '{name}' collides with a parameter or local"
+help = "choose a lane binding name that is not already used in the entry"
+
+[diagnostics.SEM018.issues.nucleum_lane_conflicting]
+message = "conflicting @ nucleum lane bindings: '{existing}' and '{parsed}'"
+help = "declare exactly one @ nucleum lane binding"
+
+[diagnostics.SEM018.issues.missing_directive]
+message = "@ radix ต้องมี directive เช่น `lane`"
+help = "ใช้ `@ radix lane \"air\"`, `@ radix lane \"mir\"` หรือ `@ radix lane \"hir-direct\"` บน functio ระดับ top-level"
+
+[diagnostics.SEM018.issues.missing_lane_value]
+message = "@ radix lane ต้องมีค่า string"
+help = "ใช้ `@ radix lane \"air\"`, `@ radix lane \"mir\"` หรือ `@ radix lane \"hir-direct\"` บน functio ระดับ top-level"
+
+[diagnostics.SEM018.issues.non_string_lane_value]
+message = "ค่า @ radix lane ต้องเป็น string literal"
+help = "ใช้ `@ radix lane \"air\"`, `@ radix lane \"mir\"` หรือ `@ radix lane \"hir-direct\"` บน functio ระดับ top-level"
+
+[diagnostics.SEM018.issues.empty_radix_typus_domain]
+message = "โดเมน typus ของ @ radix ต้องมีชนิดที่อนุญาตอย่างน้อยหนึ่งชนิด"
+help = "ใช้ `@ radix typus T in textus octeti` หรือ `{radix_typus_braced}` พร้อมชนิดที่อนุญาตอย่างน้อยหนึ่งชนิด"
+
+[diagnostics.SEM018.issues.missing_type_param]
+message = "@ radix typus ต้องมีพารามิเตอร์ชนิด generic"
+help = "ใช้ `@ radix typus T in textus octeti` หรือ `{radix_typus_braced}` พร้อมชนิดที่อนุญาตอย่างน้อยหนึ่งชนิด"
+
+[diagnostics.SEM018.issues.non_identifier_type_param]
+message = "พารามิเตอร์ typus ของ @ radix ต้องเป็น identifier"
+help = "ใช้ `@ radix typus T in textus octeti` หรือ `{radix_typus_braced}` พร้อมชนิดที่อนุญาตอย่างน้อยหนึ่งชนิด"
+
+[diagnostics.SEM018.issues.non_type_allowed]
+message = "ค่าที่อนุญาตของ @ radix typus ต้องเป็นชนิด"
+help = "ใช้ `@ radix typus T in textus octeti` หรือ `{radix_typus_braced}` พร้อมชนิดที่อนุญาตอย่างน้อยหนึ่งชนิด"
+
+[diagnostics.SEM018.issues.unexpected_token]
+message = "มี token ที่ไม่คาดคิดหลังค่า @ radix lane"
+help = "ใช้ `@ radix lane \"air\"`, `@ radix lane \"mir\"` หรือ `@ radix lane \"hir-direct\"` บน functio ระดับ top-level"
+
+[diagnostics.SEM018.issues.unknown_directive]
+message = "ไม่รู้จัก directive ของ @ radix; ต้องเป็น `lane`"
+help = "ใช้ `@ radix lane \"air\"`, `@ radix lane \"mir\"` หรือ `@ radix lane \"hir-direct\"` บน functio ระดับ top-level"
+
+[diagnostics.SEM018.issues.unknown_lane]
+message = "ไม่รู้จัก lane ของ @ radix '{lane}'; ต้องเป็น 'air', 'mir' หรือ 'hir-direct'"
+help = "ใช้ `@ radix lane \"air\"`, `@ radix lane \"mir\"` หรือ `@ radix lane \"hir-direct\"` บน functio ระดับ top-level"
+
+[diagnostics.SEM018.issues.unsupported_placement]
+message = "รองรับ @ radix lane เฉพาะบน declaration functio ระดับ top-level ไม่ใช่บน {placement}"
+help = "ใช้ `@ radix lane \"air\"`, `@ radix lane \"mir\"` หรือ `@ radix lane \"hir-direct\"` บน functio ระดับ top-level"
+
+[diagnostics.SEM020]
+message = "การกำหนดค่าให้ค่าคงที่"
+help = "ใช้ binding `varia` เพื่อให้กำหนดค่าใหม่ได้ หรือนำการกำหนดค่าเพิ่มเติมออก"
+
+[diagnostics.SEM020.issues.assignment_to_constant]
+message = "การกำหนดค่าให้ค่าคงที่"
+help = "ใช้ binding `varia` เพื่อให้กำหนดค่าใหม่ได้ หรือนำการกำหนดค่าเพิ่มเติมออก"
+
+[diagnostics.SEM020.issues.immutable_second_assignment]
+message = "การกำหนดค่าครั้งที่สองให้ binding ที่เปลี่ยนแปลงไม่ได้"
+help = "ใช้ binding `varia` เพื่อให้กำหนดค่าใหม่ได้ หรือนำการกำหนดค่าเพิ่มเติมออก"
+
+[diagnostics.SEM020.issues.imperativus_operator_method_requires_varia_receiver]
+message = "method ตัวดำเนินการ imperativus ต้องการ receiver แบบ varia"
+help = "ใช้ binding `varia` เพื่อให้กำหนดค่าใหม่ได้ หรือนำการกำหนดค่าเพิ่มเติมออก"
+
+[diagnostics.SEM021]
+message = "เป้าหมายการกำหนดค่าไม่ถูกต้อง"
+help = "กำหนดค่าให้ lvalue ที่ถูกต้อง"
+
+[diagnostics.SEM021.issues.invalid_assignment_target]
+message = "เป้าหมายการกำหนดค่าไม่ถูกต้อง"
+help = "กำหนดค่าให้ lvalue ที่ถูกต้อง"
+
+[diagnostics.SEM030]
+message = "break อยู่นอกบริบทที่รองรับ break"
+help = "ใช้ 'rumpe' ภายใน dum, itera, fac, meus หรือ tuus"
+
+[diagnostics.SEM030.issues.break_outside_breakable]
+message = "{keyword} อยู่นอก {context}"
+help = "ใช้ 'rumpe' ภายใน dum, itera, fac, meus หรือ tuus"
+
+[diagnostics.SEM031]
+message = "continue อยู่นอกลูป"
+help = "ใช้ 'perge' ภายในลูป"
+
+[diagnostics.SEM031.issues.continue_outside_loop]
+message = "{keyword} อยู่นอก {context}"
+help = "ใช้ 'perge' ภายในลูป"
+
+[diagnostics.SEM032]
+message = "return อยู่นอกฟังก์ชัน"
+help = "ใช้ 'redde' ภายในฟังก์ชัน"
+
+[diagnostics.SEM032.issues.return_outside_function]
+message = "{keyword} อยู่นอก {context}"
+help = "ใช้ 'redde' ภายในฟังก์ชัน"
+
+[diagnostics.SEM033]
+message = "ไม่มี return"
+help = "เพิ่มคำสั่ง return หรือกำหนดชนิด return เป็น 'vacuum'"
+
+[diagnostics.SEM033.issues.control_flow_fallthrough]
+message = "เส้นทาง control-flow ไม่ได้ return ค่าทั้งหมด"
+help = "เพิ่มคำสั่ง return หรือกำหนดชนิด return เป็น 'vacuum'"
+
+[diagnostics.SEM033.issues.redde_requires_return_type]
+message = "{keyword} ต้องมีชนิด return ปกติที่ระบุอย่างชัดเจน"
+help = "เพิ่มคำสั่ง return หรือกำหนดชนิด return เป็น 'vacuum'"
+
+[diagnostics.SEM040]
+message = "match ครอบคลุมไม่ครบทุกกรณี"
+help = "เพิ่มกรณีที่ขาดหายหรือ arm 'ceterum'"
+
+[diagnostics.SEM040.issues.missing_variants]
+message = "match ครอบคลุมไม่ครบทุกกรณี"
+help = "เพิ่มกรณีที่ขาดหายหรือ arm 'ceterum'"
+
+[diagnostics.SEM041]
+message = "แพตเทิร์นที่ไปไม่ถึง"
+help = "นำแพตเทิร์นที่ไปไม่ถึงออกหรือจัดลำดับใหม่"
+
+[diagnostics.SEM041.issues.after_catchall]
+message = "แพตเทิร์นที่ไปไม่ถึง"
+help = "นำแพตเทิร์นที่ไปไม่ถึงออกหรือจัดลำดับใหม่"
+
+[diagnostics.SEM042]
+message = "แพตเทิร์นซ้ำ"
+help = "นำแพตเทิร์นที่ซ้ำออก"
+
+[diagnostics.SEM042.issues.duplicate_variant]
+message = "รูปแบบซ้ำกัน"
+help = "ลบรูปแบบที่ซ้ำกัน"
+
+[diagnostics.SEM043]
+message = "omnia ต้องใช้ตัวตรวจสอบ enum"
+help = "ใช้ `omnia` กับตัวตรวจสอบ enum เพียงตัวเดียวเท่านั้น"
+
+[diagnostics.SEM043.issues.enum_scrutinee]
+message = "'{keyword}' ต้องใช้ตัวตรวจสอบ enum"
+help = "ใช้ `omnia` กับตัวตรวจสอบ enum เพียงตัวเดียวเท่านั้น"
+
+[diagnostics.SEM043.issues.single_enum_scrutinee]
+message = "'{keyword}' ต้องใช้ตัวตรวจสอบ enum เพียงตัวเดียว"
+help = "ใช้ `omnia` กับตัวตรวจสอบ enum เพียงตัวเดียวเท่านั้น"
+
+[diagnostics.SEM044]
+message = "omnia ไม่อนุญาตแขนงครอบคลุมทั้งหมด"
+help = "ระบุทุก variant อย่างชัดเจนแทนการใช้ `casu _` หรือ `ceterum`"
+
+[diagnostics.SEM044.issues.catchall_arm]
+message = "'{keyword}' ไม่อนุญาตแขนงครอบคลุมทั้งหมด; ระบุทุก variant อย่างชัดเจน"
+help = "ระบุทุก variant อย่างชัดเจนแทนการใช้ `casu _` หรือ `ceterum`"
+
+[diagnostics.SEM050]
+message = "ใช้หลังการย้ายค่า"
+help = "อย่าใช้ค่าหลังจากที่ค่าถูกย้ายแล้ว"
+
+[diagnostics.SEM050.issues.use_after_move]
+message = "ใช้หลังการย้ายค่า"
+help = "อย่าใช้ค่าหลังจากที่ค่าถูกย้ายแล้ว"
+
+[diagnostics.SEM051]
+message = "ยืมค่าที่ถูกย้ายแล้ว"
+help = "ยืมเฉพาะค่าที่ยังไม่ถูกย้าย"
+
+[diagnostics.SEM051.issues.borrow_of_moved]
+message = "ยืมค่าที่ถูกย้ายแล้ว"
+help = "ยืมเฉพาะค่าที่ยังไม่ถูกย้าย"
+
+[diagnostics.SEM052]
+message = "การยืมแบบเปลี่ยนแปลงได้ขัดแย้งกัน"
+help = "หลีกเลี่ยงการยืมแบบเปลี่ยนแปลงได้ที่ทับซ้อนกัน"
+
+[diagnostics.SEM052.issues.mutable_borrow_conflict]
+message = "การยืมแบบเปลี่ยนแปลงได้ขัดแย้งกับการยืมที่มีอยู่"
+help = "หลีกเลี่ยงการยืมแบบเปลี่ยนแปลงได้ที่ทับซ้อนกัน"
+
+[diagnostics.SEM052.issues.shared_borrow_conflict]
+message = "การยืมร่วมขัดแย้งกับการยืมแบบเปลี่ยนแปลงได้"
+help = "หลีกเลี่ยงการยืมแบบเปลี่ยนแปลงได้ที่ทับซ้อนกัน"
+
+[diagnostics.SEM052.issues.use_while_mutably_borrowed]
+message = "ใช้ขณะถูกยืมแบบเปลี่ยนแปลงได้"
+help = "หลีกเลี่ยงการยืมแบบเปลี่ยนแปลงได้ที่ทับซ้อนกัน"
+
+[diagnostics.SEM052.issues.write_while_borrowed]
+message = "เขียนขณะถูกยืม"
+help = "หลีกเลี่ยงการยืมแบบเปลี่ยนแปลงได้ที่ทับซ้อนกัน"
+
+[diagnostics.SEM053]
+message = "ไม่สามารถย้ายค่าออกได้"
+help = "ใช้ reference หรือ clone แทนการย้ายค่า"
+
+[diagnostics.SEM053.issues.cannot_move_while_borrowed]
+message = "ไม่สามารถย้ายค่าออกขณะถูกยืมได้"
+help = "ใช้ reference หรือ clone แทนการย้ายค่า"
+
+[diagnostics.SEM054]
+message = "อายุการใช้งานไม่ตรงกัน"
+help = "ตรวจสอบให้ค่าที่ถูกยืมมีอายุยาวนานเพียงพอ"
+
+[diagnostics.SEM055]
+message = "ตัวแปรถูกบดบัง"
+help = "เปลี่ยนชื่อหนึ่งในตัวแปร"
+
+[diagnostics.SEM055.issues.shadowed_variable]
+message = "ตัวแปรถูกบดบัง"
+help = "เปลี่ยนชื่อหนึ่งในตัวแปร"
+
+[diagnostics.SEM056]
+message = "กำหนดค่าให้การยืมแบบไม่เปลี่ยนแปลงไม่ได้"
+help = "ประกาศพารามิเตอร์เป็น 'in' หากต้องการเปลี่ยนแปลงค่า"
+
+[diagnostics.SEM056.issues.assign_to_de_parameter]
+message = "ไม่สามารถกำหนดค่าให้พารามิเตอร์ `de` ได้"
+help = "ประกาศพารามิเตอร์เป็น 'in' หากต้องการเปลี่ยนแปลงค่า"
+
+
+[diagnostics.SEM056.issues.mutating_receiver_through_ref]
+message = "cannot call a mutating receiver through a `ref` view"
+help = "drop the `ref` marker, or use a non-mutating method"
+
+[diagnostics.SEM056.issues.assign_through_ref]
+message = "cannot assign through a `ref` view"
+help = "drop the `ref` marker if mutation is intended"
+
+[diagnostics.SEM057]
+message = "โหมดพารามิเตอร์ไม่ตรงกัน"
+help = "จัดโหมดพารามิเตอร์ของผู้เรียกและฟังก์ชันปลายทางให้ตรงกัน"
+
+[diagnostics.SEM057.issues.de_to_in_or_ex_position]
+message = "ไม่สามารถส่งพารามิเตอร์ `de` ไปยังตำแหน่ง `in` หรือ `ex` ได้"
+help = "จัดโหมดพารามิเตอร์ของผู้เรียกและฟังก์ชันปลายทางให้ตรงกัน"
+
+
+[diagnostics.SEM057.issues.ref_to_mut_or_own_position]
+message = "cannot pass a `ref` value to a `mut` or `own` position"
+help = "pass a `mut` or `own` value, or bind through `copy`"
+
+[diagnostics.SEM057.issues.unmarked_into_own]
+message = "cannot bind an unmarked value into `own`"
+help = "bind through `copy` to duplicate the source"
+
+[diagnostics.SEM057.issues.ref_into_own]
+message = "cannot bind a `ref` value into `own`"
+help = "bind through `copy` to duplicate the source"
+
+[diagnostics.SEM057.issues.mut_into_own]
+message = "cannot bind a `mut` value into `own`"
+help = "bind through `copy` to duplicate the source"
+
+[diagnostics.SEM057.issues.field_into_own]
+message = "cannot bind a field projection into `own`"
+help = "bind through `copy` to duplicate the source"
+
+[diagnostics.SEM057.issues.index_into_own]
+message = "cannot bind an index projection into `own`"
+help = "bind through `copy` to duplicate the source"
+
+[diagnostics.SEM057.issues.deref_into_own]
+message = "cannot bind a dereference into `own`"
+help = "bind through `copy` to duplicate the source"
+
+[diagnostics.SEM057.issues.projection_into_own]
+message = "cannot bind a projection into `own`"
+help = "bind through `copy` to duplicate the source"
+
+[diagnostics.SEM057.issues.shared_into_own]
+message = "cannot bind a shared value into `own`"
+help = "bind through `copy` to duplicate the source"
+
+[diagnostics.SEM058]
+message = "ใช้ก่อนเริ่มต้นค่า"
+help = "กำหนดค่าให้ binding ก่อนอ่าน หรือประกาศ slot เป็น `sponte`"
+
+[diagnostics.SEM058.issues.possibly_uninitialized]
+message = "ใช้ binding ที่อาจยังไม่ได้เริ่มต้นค่า"
+help = "กำหนดค่าให้ binding ก่อนอ่าน หรือประกาศ slot เป็น `sponte`"
+
+[diagnostics.SEM059]
+message = "ละเมิดความบริสุทธิ์ของ AIR"
+help = "ให้ฟังก์ชัน `@ radix lane \"air\"` อยู่ในเซตย่อยบริสุทธิ์ที่ยอมรับ"
+
+[diagnostics.SEM059.issues.async_function]
+message = "@ radix lane \"{lane}\" ปฏิเสธตัวฟังก์ชันนี้: ฟังก์ชัน async อยู่นอกเซตย่อย AIR v1"
+help = "รักษาเซตย่อย AIR v1 ให้บริสุทธิ์: local ที่ไม่เปลี่ยนแปลง, นิพจน์บริสุทธิ์, การเรียก AIR-lane และ intrinsic การคำนวณ tensor เท่านั้น"
+
+[diagnostics.SEM059.issues.assignment_mutation]
+message = "@ radix lane \"{lane}\" ปฏิเสธตัวฟังก์ชันนี้: การกำหนดค่าเป็นการเปลี่ยนแปลงที่อยู่นอกเซตย่อย AIR v1"
+help = "รักษาเซตย่อย AIR v1 ให้บริสุทธิ์: local ที่ไม่เปลี่ยนแปลง, นิพจน์บริสุทธิ์, การเรียก AIR-lane และ intrinsic การคำนวณ tensor เท่านั้น"
+
+[diagnostics.SEM059.issues.breakable_block]
+message = "@ radix lane \"{lane}\" ปฏิเสธตัวฟังก์ชันนี้: บล็อกที่หยุดได้อยู่นอกเซตย่อย AIR v1"
+help = "รักษาเซตย่อย AIR v1 ให้บริสุทธิ์: local ที่ไม่เปลี่ยนแปลง, นิพจน์บริสุทธิ์, การเรียก AIR-lane และ intrinsic การคำนวณ tensor เท่านั้น"
+
+[diagnostics.SEM059.issues.cede]
+message = "@ radix lane \"{lane}\" ปฏิเสธตัวฟังก์ชันนี้: `cede` อยู่นอกเซตย่อย AIR v1"
+help = "รักษาเซตย่อย AIR v1 ให้บริสุทธิ์: local ที่ไม่เปลี่ยนแปลง, นิพจน์บริสุทธิ์, การเรียก AIR-lane และ intrinsic การคำนวณ tensor เท่านั้น"
+
+[diagnostics.SEM059.issues.cli_mounted_function]
+message = "@ radix lane \"{lane}\" ปฏิเสธตัวฟังก์ชันนี้: ฟังก์ชันที่เชื่อมกับ CLI อยู่นอกเซตย่อย AIR v1"
+help = "รักษาเซตย่อย AIR v1 ให้บริสุทธิ์: local ที่ไม่เปลี่ยนแปลง, นิพจน์บริสุทธิ์, การเรียก AIR-lane และ intrinsic การคำนวณ tensor เท่านั้น"
+
+[diagnostics.SEM059.issues.closure]
+message = "@ radix lane \"{lane}\" ปฏิเสธตัวฟังก์ชันนี้: closure อยู่นอกเซตย่อย AIR v1"
+help = "รักษาเซตย่อย AIR v1 ให้บริสุทธิ์: local ที่ไม่เปลี่ยนแปลง, นิพจน์บริสุทธิ์, การเรียก AIR-lane และ intrinsic การคำนวณ tensor เท่านั้น"
+
+[diagnostics.SEM059.issues.conditional_recovery]
+message = "@ radix lane \"{lane}\" ปฏิเสธตัวฟังก์ชันนี้: การกู้คืนแบบมีเงื่อนไขอยู่นอกเซตย่อย AIR v1"
+help = "รักษาเซตย่อย AIR v1 ให้บริสุทธิ์: local ที่ไม่เปลี่ยนแปลง, นิพจน์บริสุทธิ์, การเรียก AIR-lane และ intrinsic การคำนวณ tensor เท่านั้น"
+
+[diagnostics.SEM059.issues.defaulted_parameter]
+message = "@ radix lane \"{lane}\" ปฏิเสธตัวฟังก์ชันนี้: พารามิเตอร์ที่มีค่าเริ่มต้นอยู่นอกเซตย่อย AIR v1"
+help = "รักษาเซตย่อย AIR v1 ให้บริสุทธิ์: local ที่ไม่เปลี่ยนแปลง, นิพจน์บริสุทธิ์, การเรียก AIR-lane และ intrinsic การคำนวณ tensor เท่านั้น"
+
+[diagnostics.SEM059.issues.deferred_local_init]
+message = "@ radix lane \"{lane}\" ปฏิเสธตัวฟังก์ชันนี้: การเริ่มต้นค่า local ที่เลื่อนเวลาอยู่นอกเซตย่อย AIR v1"
+help = "รักษาเซตย่อย AIR v1 ให้บริสุทธิ์: local ที่ไม่เปลี่ยนแปลง, นิพจน์บริสุทธิ์, การเรียก AIR-lane และ intrinsic การคำนวณ tensor เท่านั้น"
+
+[diagnostics.SEM059.issues.diagnostic_output]
+message = "@ radix lane \"{lane}\" ปฏิเสธตัวฟังก์ชันนี้: เอาต์พุตการวินิจฉัยเป็นผลกระทบของโฮสต์ที่อยู่นอกเซตย่อย AIR v1"
+help = "รักษาเซตย่อย AIR v1 ให้บริสุทธิ์: local ที่ไม่เปลี่ยนแปลง, นิพจน์บริสุทธิ์, การเรียก AIR-lane และ intrinsic การคำนวณ tensor เท่านั้น"
+
+[diagnostics.SEM059.issues.dum_loop]
+message = "@ radix lane \"{lane}\" ปฏิเสธตัวฟังก์ชันนี้: ลูป `dum` อยู่นอกเซตย่อย AIR v1"
+help = "รักษาเซตย่อย AIR v1 ให้บริสุทธิ์: local ที่ไม่เปลี่ยนแปลง, นิพจน์บริสุทธิ์, การเรียก AIR-lane และ intrinsic การคำนวณ tensor เท่านั้น"
+
+[diagnostics.SEM059.issues.expression_ad]
+message = "@ radix lane \"{lane}\" ปฏิเสธตัวฟังก์ชันนี้: ad รูปนิพจน์อยู่นอกเซตย่อย AIR v1"
+help = "รักษาเซตย่อย AIR v1 ให้บริสุทธิ์: local ที่ไม่เปลี่ยนแปลง, นิพจน์บริสุทธิ์, การเรียก AIR-lane และ intrinsic การคำนวณ tensor เท่านั้น"
+
+[diagnostics.SEM059.issues.expression_statement]
+message = "@ radix lane \"{lane}\" ปฏิเสธตัวฟังก์ชันนี้: คำสั่งนิพจน์อยู่นอกเซตย่อย AIR v1"
+help = "รักษาเซตย่อย AIR v1 ให้บริสุทธิ์: local ที่ไม่เปลี่ยนแปลง, นิพจน์บริสุทธิ์, การเรียก AIR-lane และ intrinsic การคำนวณ tensor เท่านั้น"
+
+[diagnostics.SEM059.issues.generator_function]
+message = "@ radix lane \"{lane}\" ปฏิเสธตัวฟังก์ชันนี้: ฟังก์ชัน generator อยู่นอกเซตย่อย AIR v1"
+help = "รักษาเซตย่อย AIR v1 ให้บริสุทธิ์: local ที่ไม่เปลี่ยนแปลง, นิพจน์บริสุทธิ์, การเรียก AIR-lane และ intrinsic การคำนวณ tensor เท่านั้น"
+
+[diagnostics.SEM059.issues.gradient_expression_unsupported]
+message = "@ radix lane \"{lane}\" ปฏิเสธตัวฟังก์ชันนี้: postfix gradient selection (`call(...) ∇ [places]`) จะยังไม่ถูก lower จนกว่า tensor-glyphs 2B autograd surface จะมา; ไม่มีกฎ operand, selector หรือ result ใดทำงานใน Phase 2A"
+help = "gradient selection (`∇`) เป็นเพียง parse-only ใน Phase 2A; กฎ eligibility/selector จะมาพร้อมกับ tensor-glyphs 2B"
+
+[diagnostics.SEM059.issues.iace]
+message = "@ radix lane \"{lane}\" ปฏิเสธตัวฟังก์ชันนี้: `iace` อยู่นอกเซตย่อย AIR v1"
+help = "รักษาเซตย่อย AIR v1 ให้บริสุทธิ์: local ที่ไม่เปลี่ยนแปลง, นิพจน์บริสุทธิ์, การเรียก AIR-lane และ intrinsic การคำนวณ tensor เท่านั้น"
+
+[diagnostics.SEM059.issues.inc_dec_mutation]
+message = "@ radix lane \"{lane}\" ปฏิเสธตัวฟังก์ชันนี้: การเปลี่ยนแปลงด้วยการเพิ่ม/ลดค่าอยู่นอกเซตย่อย AIR v1"
+help = "รักษาเซตย่อย AIR v1 ให้บริสุทธิ์: local ที่ไม่เปลี่ยนแปลง, นิพจน์บริสุทธิ์, การเรียก AIR-lane และ intrinsic การคำนวณ tensor เท่านั้น"
+
+[diagnostics.SEM059.issues.input_read]
+message = "@ radix lane \"{lane}\" ปฏิเสธตัวฟังก์ชันนี้: การอ่านอินพุตเป็นผลกระทบของโฮสต์ที่อยู่นอกเซตย่อย AIR v1"
+help = "รักษาเซตย่อย AIR v1 ให้บริสุทธิ์: local ที่ไม่เปลี่ยนแปลง, นิพจน์บริสุทธิ์, การเรียก AIR-lane และ intrinsic การคำนวณ tensor เท่านั้น"
+
+[diagnostics.SEM059.issues.itera_loop]
+message = "@ radix lane \"{lane}\" ปฏิเสธตัวฟังก์ชันนี้: ลูป `itera` อยู่นอกเซตย่อย AIR v1"
+help = "รักษาเซตย่อย AIR v1 ให้บริสุทธิ์: local ที่ไม่เปลี่ยนแปลง, นิพจน์บริสุทธิ์, การเรียก AIR-lane และ intrinsic การคำนวณ tensor เท่านั้น"
+
+[diagnostics.SEM059.issues.kernel_device_function]
+message = "@ radix lane \"{lane}\" ปฏิเสธตัวฟังก์ชันนี้: ฟังก์ชัน kernel/device อยู่นอกเซตย่อย AIR v1"
+help = "รักษาเซตย่อย AIR v1 ให้บริสุทธิ์: local ที่ไม่เปลี่ยนแปลง, นิพจน์บริสุทธิ์, การเรียก AIR-lane และ intrinsic การคำนวณ tensor เท่านั้น"
+
+[diagnostics.SEM059.issues.loop]
+message = "@ radix lane \"{lane}\" ปฏิเสธตัวฟังก์ชันนี้: ลูปอยู่นอกเซตย่อย AIR v1"
+help = "รักษาเซตย่อย AIR v1 ให้บริสุทธิ์: local ที่ไม่เปลี่ยนแปลง, นิพจน์บริสุทธิ์, การเรียก AIR-lane และ intrinsic การคำนวณ tensor เท่านั้น"
+
+[diagnostics.SEM059.issues.loop_control]
+message = "@ radix lane \"{lane}\" ปฏิเสธตัวฟังก์ชันนี้: การควบคุมลูปอยู่นอกเซตย่อย AIR v1"
+help = "รักษาเซตย่อย AIR v1 ให้บริสุทธิ์: local ที่ไม่เปลี่ยนแปลง, นิพจน์บริสุทธิ์, การเรียก AIR-lane และ intrinsic การคำนวณ tensor เท่านั้น"
+
+[diagnostics.SEM059.issues.method_call]
+message = "@ radix lane \"{lane}\" ปฏิเสธตัวฟังก์ชันนี้: การเรียกเมธอด `{method}` อยู่นอกเซตย่อย AIR v1"
+help = "รักษาเซตย่อย AIR v1 ให้บริสุทธิ์: local ที่ไม่เปลี่ยนแปลง, นิพจน์บริสุทธิ์, การเรียก AIR-lane และ intrinsic การคำนวณ tensor เท่านั้น"
+
+[diagnostics.SEM059.issues.missing_body]
+message = "@ radix lane \"{lane}\" ปฏิเสธตัวฟังก์ชันนี้: ฟังก์ชัน AIR-lane ต้องมีบอดี"
+help = "รักษาเซตย่อย AIR v1 ให้บริสุทธิ์: local ที่ไม่เปลี่ยนแปลง, นิพจน์บริสุทธิ์, การเรียก AIR-lane และ intrinsic การคำนวณ tensor เท่านั้น"
+
+[diagnostics.SEM059.issues.mori]
+message = "@ radix lane \"{lane}\" ปฏิเสธตัวฟังก์ชันนี้: `mori` อยู่นอกเซตย่อย AIR v1"
+help = "รักษาเซตย่อย AIR v1 ให้บริสุทธิ์: local ที่ไม่เปลี่ยนแปลง, นิพจน์บริสุทธิ์, การเรียก AIR-lane และ intrinsic การคำนวณ tensor เท่านั้น"
+
+[diagnostics.SEM059.issues.mutable_varia]
+message = "@ radix lane \"{lane}\" ปฏิเสธตัวฟังก์ชันนี้: binding `varia` แบบเปลี่ยนแปลงได้อยู่นอกเซตย่อย AIR v1"
+help = "รักษาเซตย่อย AIR v1 ให้บริสุทธิ์: local ที่ไม่เปลี่ยนแปลง, นิพจน์บริสุทธิ์, การเรียก AIR-lane และ intrinsic การคำนวณ tensor เท่านั้น"
+
+[diagnostics.SEM059.issues.named_call_arg]
+message = "@ radix lane \"{lane}\" ปฏิเสธตัวฟังก์ชันนี้: อาร์กิวเมนต์การเรียกแบบมีชื่ออยู่นอกเซตย่อย AIR v1"
+help = "รักษาเซตย่อย AIR v1 ให้บริสุทธิ์: local ที่ไม่เปลี่ยนแปลง, นิพจน์บริสุทธิ์, การเรียก AIR-lane และ intrinsic การคำนวณ tensor เท่านั้น"
+
+[diagnostics.SEM059.issues.non_air_call]
+message = "@ radix lane \"{lane}\" ปฏิเสธตัวฟังก์ชันนี้: การเรียกจากฟังก์ชัน AIR-lane ต้องเรียกไปยังฟังก์ชัน AIR-lane อื่น"
+help = "รักษาเซตย่อย AIR v1 ให้บริสุทธิ์: local ที่ไม่เปลี่ยนแปลง, นิพจน์บริสุทธิ์, การเรียก AIR-lane และ intrinsic การคำนวณ tensor เท่านั้น"
+
+[diagnostics.SEM059.issues.optional_null_chain]
+message = "@ radix lane \"{lane}\" ปฏิเสธตัวฟังก์ชันนี้: chain การยืนยัน optional/null อยู่นอกเซตย่อย AIR v1"
+help = "รักษาเซตย่อย AIR v1 ให้บริสุทธิ์: local ที่ไม่เปลี่ยนแปลง, นิพจน์บริสุทธิ์, การเรียก AIR-lane และ intrinsic การคำนวณ tensor เท่านั้น"
+
+[diagnostics.SEM059.issues.recoverable_handler]
+message = "@ radix lane \"{lane}\" ปฏิเสธตัวฟังก์ชันนี้: handler ที่กู้คืนได้อยู่นอกเซตย่อย AIR v1"
+help = "รักษาเซตย่อย AIR v1 ให้บริสุทธิ์: local ที่ไม่เปลี่ยนแปลง, นิพจน์บริสุทธิ์, การเรียก AIR-lane และ intrinsic การคำนวณ tensor เท่านั้น"
+
+[diagnostics.SEM059.issues.reference_place_op]
+message = "@ radix lane \"{lane}\" ปฏิเสธตัวฟังก์ชันนี้: การดำเนินการ reference/place อยู่นอกเซตย่อย AIR v1"
+help = "รักษาเซตย่อย AIR v1 ให้บริสุทธิ์: local ที่ไม่เปลี่ยนแปลง, นิพจน์บริสุทธิ์, การเรียก AIR-lane และ intrinsic การคำนวณ tensor เท่านั้น"
+
+[diagnostics.SEM059.issues.runtime_assertion]
+message = "@ radix lane \"{lane}\" ปฏิเสธตัวฟังก์ชันนี้: การยืนยันขณะรันไทม์อยู่นอกเซตย่อย AIR v1"
+help = "รักษาเซตย่อย AIR v1 ให้บริสุทธิ์: local ที่ไม่เปลี่ยนแปลง, นิพจน์บริสุทธิ์, การเรียก AIR-lane และ intrinsic การคำนวณ tensor เท่านั้น"
+
+[diagnostics.SEM059.issues.runtime_conversion]
+message = "@ radix lane \"{lane}\" ปฏิเสธตัวฟังก์ชันนี้: การแปลง `↦` ขณะรันไทม์อยู่นอกเซตย่อย AIR v1"
+help = "รักษาเซตย่อย AIR v1 ให้บริสุทธิ์: local ที่ไม่เปลี่ยนแปลง, นิพจน์บริสุทธิ์, การเรียก AIR-lane และ intrinsic การคำนวณ tensor เท่านั้น"
+
+[diagnostics.SEM059.issues.runtime_provided_binding]
+message = "@ radix lane \"{lane}\" ปฏิเสธตัวฟังก์ชันนี้: binding ที่รันไทม์จัดหาให้ อยู่นอกเซตย่อย AIR v1"
+help = "รักษาเซตย่อย AIR v1 ให้บริสุทธิ์: local ที่ไม่เปลี่ยนแปลง, นิพจน์บริสุทธิ์, การเรียก AIR-lane และ intrinsic การคำนวณ tensor เท่านั้น"
+
+[diagnostics.SEM059.issues.runtime_variant_check]
+message = "@ radix lane \"{lane}\" ปฏิเสธตัวฟังก์ชันนี้: การตรวจ variant `est` ขณะรันไทม์อยู่นอกเซตย่อย AIR v1"
+help = "รักษาเซตย่อย AIR v1 ให้บริสุทธิ์: local ที่ไม่เปลี่ยนแปลง, นิพจน์บริสุทธิ์, การเรียก AIR-lane และ intrinsic การคำนวณ tensor เท่านั้น"
+
+[diagnostics.SEM059.issues.spread_call_arg]
+message = "@ radix lane \"{lane}\" ปฏิเสธตัวฟังก์ชันนี้: อาร์กิวเมนต์การเรียกแบบกระจายอยู่นอกเซตย่อย AIR v1"
+help = "รักษาเซตย่อย AIR v1 ให้บริสุทธิ์: local ที่ไม่เปลี่ยนแปลง, นิพจน์บริสุทธิ์, การเรียก AIR-lane และ intrinsic การคำนวณ tensor เท่านั้น"
+
+[diagnostics.SEM059.issues.tacet]
+message = "@ radix lane \"{lane}\" ปฏิเสธตัวฟังก์ชันนี้: `tacet` อยู่นอกเซตย่อย AIR v1"
+help = "รักษาเซตย่อย AIR v1 ให้บริสุทธิ์: local ที่ไม่เปลี่ยนแปลง, นิพจน์บริสุทธิ์, การเรียก AIR-lane และ intrinsic การคำนวณ tensor เท่านั้น"
+
+[diagnostics.WARN001]
+message = "ตัวแปรไม่ได้ใช้"
+help = "ลบตัวแปรหรือเติม '_' นำหน้า"
+
+[diagnostics.WARN001.issues.unused_variable]
+message = "ตัวแปรไม่ได้ใช้"
+help = "ลบตัวแปรหรือเติม '_' นำหน้า"
+
+[diagnostics.WARN001.issues.unused_binding]
+message = "binding ไม่ได้ใช้"
+help = "ลบตัวแปรหรือเติม '_' นำหน้า"
+
+[diagnostics.WARN002]
+message = "การนำเข้าไม่ได้ใช้"
+help = "ลบการนำเข้าที่ไม่ได้ใช้"
+
+[diagnostics.WARN002.issues.unused_import]
+message = "การนำเข้าไม่ได้ใช้"
+help = "ลบการนำเข้าที่ไม่ได้ใช้"
+
+[diagnostics.WARN003]
+message = "ฟังก์ชันไม่ได้ใช้"
+help = "ลบฟังก์ชันหรือทำเครื่องหมายว่าใช้แล้ว"
+
+[diagnostics.WARN003.issues.unused_function]
+message = "ฟังก์ชันไม่ได้ใช้"
+help = "ลบฟังก์ชันหรือทำเครื่องหมายว่าใช้แล้ว"
+
+[diagnostics.WARN004]
+message = "โค้ดที่ไปไม่ถึง"
+help = "ลบโค้ดที่ไปไม่ถึง"
+
+[diagnostics.WARN004.issues.unreachable_code]
+message = "โค้ดที่ไปไม่ถึง"
+help = "ลบโค้ดที่ไปไม่ถึง"
+
+[diagnostics.WARN005]
+message = "การแปลงชนิดที่ไม่จำเป็น"
+help = "ลบการแปลงชนิดที่ซ้ำซ้อน"
+
+[diagnostics.WARN005.issues.unnecessary_cast]
+message = "การแปลงชนิดที่ไม่จำเป็น: ทราบชนิดอยู่แล้ว"
+help = "ลบการแปลงชนิดที่ซ้ำซ้อน"
+
+[diagnostics.WARN007]
+message = "target ไม่ทำอะไร"
+help = "ลบโครงสร้างนี้หรือจำกัดการใช้ตาม target"
+
+[diagnostics.WARN008]
+message = "พารามิเตอร์อ้างอิงแบบเปลี่ยนแปลงได้ไม่ได้ใช้"
+help = "เปลี่ยน 'in' เป็น 'de' หากไม่จำเป็นต้องเปลี่ยนแปลงค่า"
+
+[diagnostics.WARN008.issues.unused_in_parameter]
+message = "พารามิเตอร์ `in` ไม่เคยถูกเปลี่ยนแปลง; พิจารณาใช้ `de`"
+help = "เปลี่ยน 'in' เป็น 'de' หากไม่จำเป็นต้องเปลี่ยนแปลงค่า"
+
+[diagnostics.WARN009]
+message = "พารามิเตอร์ย้ายค่าไม่ได้ใช้"
+help = "เปลี่ยน 'ex' เป็น 'de' หากไม่จำเป็นต้องโอนความเป็นเจ้าของ"
+
+[diagnostics.WARN009.issues.unused_ex_parameter]
+message = "พารามิเตอร์ `ex` ไม่เคยถูกใช้; พิจารณาใช้ `de`"
+help = "เปลี่ยน 'ex' เป็น 'de' หากไม่จำเป็นต้องโอน ownership"
+
+[diagnostics.WARN010]
+message = "คำอธิบาย ignotum แบบชัดแจ้ง"
+help = "เลือกคำอธิบายชนิดที่เป็นรูปธรรมเพื่อให้การตรวจชนิดแม่นยำ"
+
+[diagnostics.WARN010.issues.explicit_ignotum_annotation]
+message = "คำอธิบาย ignotum แบบชัดแจ้งปิดใช้การตรวจชนิดอย่างแม่นยำ"
+help = "เลือกคำอธิบายชนิดที่เป็นรูปธรรมเพื่อให้การตรวจชนิดแม่นยำ"
+
+[diagnostics.WARN011]
+message = "wildcard ครอบคลุมค่า null"
+help = "เพิ่มแขนง `casu nihil` อย่างชัดแจ้งเพื่อจัดการกรณี null โดยตั้งใจ"
+
+[diagnostics.WARN011.issues.wildcard_absorbs_null]
+message = "แขนง catchall ครอบคลุมกรณี null ของ scrutinee ที่อาจเป็น null; ใช้แขนง '{casu}' {nil} อย่างชัดแจ้ง"
+help = "เพิ่มแขนง `casu nihil` อย่างชัดแจ้งเพื่อจัดการกรณี null โดยตั้งใจ"
+
+[diagnostics.WARN013]
+message = "varia ไม่จำเป็น"
+help = "ใช้ `fixum` เมื่อ binding ไม่เคยถูกกำหนดค่าหรือแก้ไขใหม่"
+
+[diagnostics.WARN013.issues.unnecessary_varia]
+message = "varia ไม่จำเป็น: binding ไม่เคยถูกกำหนดค่าหรือแก้ไขใหม่"
+help = "ใช้ `fixum` เมื่อ binding ไม่เคยถูกกำหนดค่าหรือแก้ไขใหม่"
+
+[diagnostics.WARN014]
+message = "อินเทอร์เฟซไฟล์ข้าม export ที่ไม่รองรับ"
+help = "ใช้ export ที่โมดูลรองรับ หรือรอ coverage ของอินเทอร์เฟซไฟล์สำหรับลายเซ็นนี้"
+
+[diagnostics.WARN014.issues.file_interface_export_skipped]
+message = "อินเทอร์เฟซไฟล์ข้าม export `{namespace}.{export}` ({reason}); export อื่นยังใช้ได้"
+help = "ใช้ export ที่โมดูลรองรับ หรือรอ coverage ของอินเทอร์เฟซไฟล์สำหรับลายเซ็นนี้"
+
+[diagnostics.WARN015]
+message = "ชื่อ allocator ของ curata ไม่รู้จัก"
+help = "ใช้ชื่อ allocator ที่รู้จัก (\"arena\", \"page\", \"alloc\" หรือ \"allocator\")"
+
+[diagnostics.WARN015.issues.unrecognized_curata_allocator]
+message = "ชื่อ allocator ของ curata '{name}' ไม่ใช่สัญญา allocator ที่รู้จัก"
+help = "ใช้ชื่อ allocator ที่รู้จัก (\"arena\", \"page\", \"alloc\" หรือ \"allocator\")"
+
+[diagnostics.WARN016]
+message = "monomorphic hole แก้เป็น multi-member union"
+help = "ใช้ union type ที่ชัดเจนหรือ `∪` hole ถ้าตั้งใจให้เป็น sum"
+
+[diagnostics.WARN016.issues.monomorphic_hole_solved_to_union]
+message = "monomorphic hole `_` แก้เป็น multi-member union `{union}`"
+help = "ใช้ union type ที่ชัดเจนหรือ `∪` hole ถ้าตั้งใจให้เป็น sum"
+
+[diagnostics.WARN017]
+message = "union hole แก้แบบ monomorphic"
+help = "ใช้ `_` ถ้าตั้งใจให้เป็น type เดียวเท่านั้น"
+
+[diagnostics.WARN017.issues.union_hole_solved_monomorphically]
+message = "union hole `∪` แก้เป็น type เดียว `{type}`"
+help = "ใช้ `_` ถ้าตั้งใจให้เป็น type เดียวเท่านั้น"
+
+[llm]
+system_prompt_snippet = "Emit Thai reader-locale Faber using Thai keywords for declarations, control flow, loops, returns, booleans, common primitive types, and lista/tabula collections. Keep Faber glyph syntax unchanged."
+exemplars = ["./exemplars/salve-munde.th-TH.fab"]
+
+
+# Queue/stack C2 named-method rows and the lista omnia/quilibet predicate
+# twins. These compiler-owned names remain canonical in every reader pack;
+# glyphs are not method aliases.
+[intrinsics]
+appende = "appende"
+decapita = "decapita"
+detrahe = "detrahe"
+longitudo = "longitudo"
+omnia = "omnia"
+quilibet = "quilibet"

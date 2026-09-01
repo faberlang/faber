@@ -1,0 +1,2983 @@
+[pack]
+id = "ar"
+schema_version = 1
+
+[keywords]
+discretio = "تمايز"
+fixum = "ثابت"
+functio = "دالة"
+genus = "صنف"
+implendum = "عقد"
+importa = "استورد"
+modulus = "حلقة"
+ordo = "ترتيب"
+sit = "ليكن"
+typus = "نمط"
+schema = "مخطط"
+columna = "عمود"
+varia = "متغير"
+abstractus = "مجرد"
+ceteri = "باقي"
+curata = "مخصص"
+errata = "مخطئ"
+exitus = "مخرج"
+generis = "سكوني"
+iacit = "يرمي"
+immutata = "ثابتة"
+interna = "داخلي"
+magnitudo = "حجم"
+nexum = "مرتبط"
+iuncta = "توبل"
+optiones = "خيارات"
+prae = "سابق"
+praefixum = "بادئة"
+privata = "خاص"
+protecta = "محمي"
+publica = "عام"
+sponte = "اختياري"
+casu = "حالة"
+ceterum = "افتراضي"
+custodi = "احرس"
+discerne = "طابق"
+dum = "طالما"
+elige = "اختر"
+ergo = "إذن"
+fac = "افعل"
+itera = "كرر"
+apud = "عند"
+secus = "وإلا"
+si = "إذا"
+sic = "فإذا"
+sin = "وإلاإذا"
+perge = "تابع"
+redde = "أعد"
+rumpe = "اكسر"
+tacet = "صمت"
+adfirma = "أكد"
+cape = "التقط"
+capta = "فخ"
+cede = "سلم"
+iace = "ارم"
+mori = "انهر"
+requirit = "يتطلب"
+reice = "يرفض"
+clausura = "إغلاق"
+libera = "حر"
+falsum = "خطأ"
+nihil = "لاشيء"
+verum = "صواب"
+nonnumerus = "nan"
+aut = "أو"
+est = "هو"
+et = "و"
+non = "ليس"
+vel = "عوض"
+ego = "ذات"
+finge = "أنشئ"
+implet = "حقق"
+sub = "امتد"
+mone = "نبه"
+nota = "اعرض"
+scribe = "اكتب"
+vide = "شاهد"
+argumenta = "وسائط"
+cura = "اعتن"
+incipiet = "استهلال"
+incipit = "بداية"
+ad = "اتصل"
+fiet = "غيرمتزامن"
+fiunt = "مولد"
+fient = "مولد_غيرمتزامن"
+figendum = "انتظر_ثابت"
+variandum = "انتظر_متغير"
+reddet = "أعد_منتظرا"
+tacebit = "انتظر"
+# Empty-collection expression marker (contextual, tokenless).
+vacua = "فارغ"
+primus_quem = "primus_quem"
+ubi = "ubi"
+summa = "مجموع"
+filum = "خيط"
+maxima = "الأقصى"
+minima = "الأدنى"
+de = "عن"
+ex = "من"
+in = "في"
+own = "ملك"
+copy = "نسخة"
+lege = "اقرأ"
+lineam = "سطرا"
+omnia = "جميع"
+scriptum = "حرر"
+sparge = "انشر"
+ut = "كـ"
+ante = "قبل"
+inter = "بين"
+intra = "ضمن"
+per = "كل"
+ab = "نطاق"
+usque = "حتى"
+erratur = "توقع_الفشل"
+fragilis = "هش"
+futurum = "مستقبلي"
+metior = "قس"
+omitte = "أهمل"
+postpara = "لاحق"
+postparabit = "سيلحق"
+praepara = "جهز"
+praeparabit = "سيهيئ"
+proba = "اختبر"
+probandum = "مختبر"
+repete = "معاد"
+solum = "فقط"
+solum_in = "حصري"
+tag = "وسم"
+temporis = "زمني"
+negativum = "سلبي"
+nonnihil = "موجود"
+nonnulla = "مليء"
+nulla = "خال"
+positivum = "موجب"
+cli = "cli"
+commune = "commune"
+cursor = "cursor"
+futura = "مستقبل"
+imperium = "أمر"
+operandus = "معامل"
+optio = "خيار"
+conversion = "حوّل"
+conversio = "تحويل"
+nucleum = "نواة"
+vertex = "رأس"
+fragment = "جزء"
+nondum = "غير_مستقر"
+verte = "إعادة_تسمية"
+nomen = "اسم"
+radix = "radix"
+brevis = "مختصر"
+descriptio = "وصف"
+longum = "مفصل"
+lane = "مسار"
+ubique = "عمومي"
+
+[types]
+ascii = "أسكي"
+textus = "نص"
+numerus = "عدد"
+modulus = "نوع_حلقة"
+fractus = "كسر"
+bivalens = "منطقي"
+nihil = "نوع_لاشيء"
+vacuum = "فراغ"
+numquam = "أبدا"
+ignotum = "مجهول"
+octeti = "بايتات"
+regex = "تعبير"
+json = "جسون"
+valor = "قيمة"
+instans = "لحظة"
+objectum = "كائن"
+quidlibet = "مهما"
+lista = "قائمة"
+# Shipped bounded forms: lista<T, N>, textus<N>, ascii<N>, octeti<N>.
+tabula = "جدول"
+copia = "مجموعة"
+promissum = "وعد"
+cursor = "مؤشر"
+queue = "طابور"
+stack = "مكدس"
+# Tensor family: real Arabic glosses (D1) — pack-owned, no inherits substitute.
+tensor = "موتر"
+vector = "متجه"
+matrix = "مصفوفة"
+sparsa = "متفرقة"
+atomic = "ذري"
+intervallum = "فترة"
+# أسماء أنواع الرؤية العلائقية (S2-U5)
+filtrum = "مرشح"
+series = "سلسلة"
+census = "تعداد"
+ratio = "ratio"
+
+[diagnostics.UNRES001]
+message = "الكلمة '{keyword}' غير معلنة لحزمة القارئ '{pack}'"
+help = "استخدم تهجئة كلمة معلنة في حزمة القارئ لهذا الموضع النحوي"
+
+[diagnostics.UNRES002]
+message = "الدالة الجوهرية '{intrinsic}' غير معلنة لحزمة القارئ '{pack}' لعائلة المتلقي '{receiver}'"
+help = "استخدم تهجئة دالة جوهرية معلنة في حزمة القارئ لهذه العائلة"
+
+[diagnostics.UNRES003]
+message = "العضو '{member}' غير معلن لحزمة القارئ '{pack}' لهوية '{identity}'"
+help = "استخدم تهجئة عضو معلنة في حزمة القارئ لهذه الهوية"
+
+[diagnostics.LOCALE002]
+message = "حزمة القارئ '{pack}' وجدت كتابة تشبه كلمة مفتاحية '{spelling}'"
+help = "استخدم '{suggestion}' إذا كنت تقصد الكلمة المفتاحية؛ '{spelling}' اسم صالح كما هو مكتوب"
+
+[diagnostics.LEX001]
+message = "حرفية سلسلة غير مغلقة"
+help = "أغلق حرفية السلسلة قبل نهاية السطر أو الملف"
+
+[diagnostics.LEX001.issues.unterminated_ascii_literal]
+message = "حرفية ascii غير مغلقة"
+help = "أغلق حرفية السلسلة قبل نهاية السطر أو الملف"
+
+[diagnostics.LEX001.issues.newline_in_ascii_literal]
+message = "حرفية ascii غير مغلقة (سطر جديد في الحرفية)"
+help = "أغلق حرفية السلسلة قبل نهاية السطر أو الملف"
+
+[diagnostics.LEX001.issues.unterminated_backtick_template_literal]
+message = "حرفية قالب backtick غير مغلقة"
+help = "أغلق حرفية السلسلة قبل نهاية السطر أو الملف"
+
+[diagnostics.LEX001.issues.unterminated_octeti_literal]
+message = "حرفية octeti غير مغلقة"
+help = "أغلق حرفية السلسلة قبل نهاية السطر أو الملف"
+
+[diagnostics.LEX001.issues.unterminated_string_literal]
+message = "حرفية سلسلة غير مغلقة"
+help = "أغلق حرفية السلسلة قبل نهاية السطر أو الملف"
+
+[diagnostics.LEX001.issues.newline_in_string_literal]
+message = "حرفية سلسلة غير مغلقة (سطر جديد في السلسلة)"
+help = "أغلق حرفية السلسلة قبل نهاية السطر أو الملف"
+
+[diagnostics.LEX001.issues.unterminated_guillemet_block_string_literal]
+message = "حرفية سلسلة كتلة guillemet غير مغلقة"
+help = "أغلق حرفية السلسلة قبل نهاية السطر أو الملف"
+
+[diagnostics.LEX002]
+message = "حرفية عدد غير صالحة"
+help = "تحقق من فواصل الأرقام وبادئات الأساس"
+
+[diagnostics.LEX002.issues.invalid_hexadecimal_number]
+message = "عدد ست عشري غير صالح"
+help = "تحقق من فواصل الأرقام وبادئات الأساس"
+
+[diagnostics.LEX002.issues.invalid_binary_number]
+message = "عدد ثنائي غير صالح"
+help = "تحقق من فواصل الأرقام وبادئات الأساس"
+
+[diagnostics.LEX002.issues.invalid_octal_number]
+message = "عدد ثماني غير صالح"
+help = "تحقق من فواصل الأرقام وبادئات الأساس"
+
+[diagnostics.LEX002.issues.invalid_floating_point_number]
+message = "عدد floating-point غير صالح"
+help = "تحقق من فواصل الأرقام وبادئات الأساس"
+
+[diagnostics.LEX002.issues.invalid_integer]
+message = "عدد صحيح غير صالح"
+help = "تحقق من فواصل الأرقام وبادئات الأساس"
+
+[diagnostics.LEX003]
+message = "تسلسل escape غير صالح"
+help = "استخدم تسلسل escape مدعوما أو اهرب backslash"
+
+[diagnostics.LEX004]
+message = "محرف غير متوقع"
+help = "أزل المحرف أو اهربه إذا كان يجب أن يكون حرفيا"
+
+[diagnostics.LEX004.issues.unexpected_character]
+message = "محرف غير متوقع: {char}"
+help = "أزل المحرف أو اهربه إذا كان يجب أن يكون حرفيا"
+
+[diagnostics.LEX005]
+message = "توجيه section أزيل"
+help = "ضع البيانات الوصفية للملف في +++ TOML frontmatter على السطر 1 بدلا من توجيهات section في بداية السطر"
+
+[diagnostics.LEX005.issues.removed_section_directive]
+message = "توجيهات § على مستوى الملف أزيلت؛ استخدم +++ frontmatter"
+help = "ضع البيانات الوصفية للملف في +++ TOML frontmatter على السطر 1 بدلا من توجيهات § في بداية السطر"
+
+[diagnostics.LEX006]
+message = "صياغة تعليق غير صالحة"
+help = "استخدم # لبدء التعليقات بدلا من // أو /* */"
+
+[diagnostics.LEX006.issues.c_style_line_comment]
+message = "تعليقات // بنمط C غير صالحة في Faber؛ استخدم # للتعليقات السطرية"
+help = "استخدم # لبدء التعليقات بدلا من // أو /* */"
+
+[diagnostics.LEX006.issues.c_style_block_comment]
+message = "تعليقات /* */ بنمط C غير صالحة في Faber؛ استخدم # للتعليقات السطرية"
+help = "استخدم # لبدء التعليقات بدلا من // أو /* */"
+
+[diagnostics.LEX006.issues.unterminated_c_style_block_comment]
+message = "تعليق كتلة بنمط C غير مغلق؛ Faber يستخدم # للتعليقات السطرية"
+help = "استخدم # لبدء التعليقات بدلا من // أو /* */"
+
+[diagnostics.LEX007]
+message = "التعليقات المضمنة غير مقبولة"
+help = "ضع تعليق # على سطره الخاص فوق الكود الذي يوثقه"
+
+[diagnostics.LEX007.issues.inline_hash_after_code]
+message = "تعليقات # يجب أن تبدأ سطرا؛ انقل هذا التعليق فوق الكود"
+help = "ضع تعليق # على سطره الخاص فوق الكود الذي يوثقه"
+
+[diagnostics.PARSE000]
+message = "خطأ في المحلل المعجمي أثناء التحليل"
+help = "أصلح خطأ المحلل المعجمي أولا؛ يستمر التحليل من الرموز النظيفة"
+
+[diagnostics.PARSE001]
+message = "مطلوب {expected}"
+help = "أضف {expected} في هذا الموضع"
+
+[diagnostics.PARSE001.issues.annotation_name]
+message = "مطلوب اسم تعليمة"
+help = "أضف اسم التعليمة بعد @"
+
+[diagnostics.PARSE001.issues.secus_si_else_if]
+message = "استخدم '{sin}' لـ else-if"
+help = "استبدل {secus} {si} بـ {sin}"
+
+[diagnostics.PARSE001.issues.itera_mode]
+message = "مطلوب {expected}"
+help = "اختر صيغة تكرار واحدة قبل تعبير iterable"
+
+[diagnostics.PARSE001.issues.allocator_kind]
+message = "مطلوب {expected}"
+help = "استخدم \"arena\" أو \"page\" كنوع allocator"
+
+[diagnostics.PARSE001.issues.mutability_marker]
+message = "مطلوب {expected}"
+help = "أضف {fixum} أو {varia} قبل اسم الربط"
+
+[diagnostics.PARSE001.issues.itera_de_requires_fixum]
+message = "itera de bindings are always const; use {expected}"
+help = "de binds an index or key, not a mutable element; use the const form"
+
+[diagnostics.PARSE001.issues.duplicate_rest_pattern]
+message = "نمط rest محدد مسبقا"
+help = "احتفظ بربط rest واحد فقط '{keyword}'"
+
+[diagnostics.PARSE001.issues.sit_identifier_binding]
+message = "'{keyword}' يربط معرفا واحدا مباشرة؛ استخدم '{keyword}' name ← expr"
+help = "اكتب '{keyword}' name ← expr أو استخدم {fixum} للارتباطات المنمطة/المفككة"
+
+[diagnostics.PARSE001.issues.sit_no_destructuring]
+message = "{sit} لا يدعم أنماط التفكيك"
+help = "استخدم {fixum} مع نمط تفكيك"
+
+[diagnostics.PARSE001.issues.test_case_or_setup]
+message = "مطلوب test case أو setup"
+help = "ابدأ عنصر الجسم بـ '{proba}' أو '{probandum}' أو '{setup}'"
+
+[diagnostics.PARSE001.issues.test_modifier_integer]
+message = "مطلوب عدد صحيح بعد '{modifier}'"
+help = "ضع حرفية عدد صحيح بعد '{modifier}'"
+
+[diagnostics.PARSE001.issues.tensor_figura_after_element]
+message = "tensor يتطلب Figura shape بعد element type"
+help = "أضف فاصلة و Figura shape، مثل tensor<T, []>"
+
+[diagnostics.PARSE001.issues.sparsa_figura_after_element]
+message = "sparsa يتطلب Figura shape بعد element type"
+help = "أضف فاصلة و Figura shape، مثل sparsa<T, []>"
+
+[diagnostics.PARSE001.issues.vector_width_after_element]
+message = "vector يتطلب width بعد element type"
+help = "أضف فاصلة و vector width، مثل vector<T, [4]>"
+
+[diagnostics.PARSE001.issues.matrix_figura_after_element]
+message = "matrix يتطلب Figura shape ثنائي الأبعاد بعد element type"
+help = "أضف فاصلة و shape، مثل matrix<T, [4, 4]>"
+
+[diagnostics.PARSE001.issues.atomic_single_element]
+message = "atomic يقبل element type واحدا بالضبط"
+help = "أزل معامل النوع الإضافي؛ استخدم atomic<T>"
+
+[diagnostics.PARSE001.issues.retired_type_call_constructor]
+message = "type-call constructors ليست صياغة Faber"
+help = "استخدم value ↦ Type أو named library constructor"
+
+[diagnostics.PARSE001.issues.retired_prefix_predicate]
+message = "{predicate} لم يعد prefix predicate syntax"
+help = "أعد الكتابة بـ {replacement}"
+
+[diagnostics.PARSE001.issues.equality_non_missing_est]
+message = "مطلوب '{est}' بعد '{non}' في تعبير equality"
+help = "اكتب identity negation كـ {non} {est}"
+
+[diagnostics.PARSE001.issues.est_non_spelling]
+message = "'{est} {non}' ليست تهجئة identity negation"
+help = "استخدم {non} {est} لـ identity negation"
+
+[diagnostics.PARSE001.issues.closure_body_start]
+message = "مطلوب ':' أو block body بعد closure parameters"
+help = "أضف : لـ expression body أو block body"
+
+[diagnostics.PARSE001.issues.ad_ascii_route]
+message = "مطلوب ascii literal route بعد '{ad}'"
+help = "اكتب route كـ ASCII literal بعد {ad}"
+
+[diagnostics.PARSE001.issues.json_quoted_key]
+message = "JSON keys يجب أن تكون strings مقتبسة؛ استخدم \"name\": value"
+help = "اقتبس JSON object keys"
+
+[diagnostics.PARSE001.issues.json_string_key]
+message = "مطلوب JSON string key"
+help = "ابدأ JSON key بـ string literal"
+
+[diagnostics.PARSE001.issues.field_value_separator]
+message = "مطلوب '='"
+help = "استخدم = بين field name و value"
+
+[diagnostics.PARSE001.issues.call_type_args_start]
+message = "مطلوب '<'"
+help = "ابدأ call-site type arguments بـ <"
+
+[diagnostics.PARSE001.issues.gradient_empty_selector_list]
+message = "قائمة gradient selector بعد ∇ يجب أن تذكر primal call argument واحدًا على الأقل"
+help = "اذكر primal call arguments التي تريد adjoints لها، مثل loss(x, y) ∇ [x]"
+
+[diagnostics.PARSE001.issues.requirit_iace]
+message = "مطلوب '{iace}' بعد شرط {requirit}"
+help = "اكتب {requirit} cond {iace} err"
+
+[diagnostics.PARSE001.issues.reice_iace]
+message = "مطلوب '{iace}' بعد شرط {reice}"
+help = "اكتب {reice} cond {iace} err"
+
+[diagnostics.PARSE001.issues.requirit_else_rejected]
+message = "'{secus}' ليست الجزيئة على {requirit}"
+help = "استخدم '{iace}' للحمل القابل للاسترداد"
+
+[diagnostics.PARSE001.issues.reice_else_rejected]
+message = "'{secus}' ليست الجزيئة على {reice}"
+help = "استخدم '{iace}' للحمل القابل للاسترداد"
+
+[diagnostics.PARSE001.issues.adfirma_else_rejected]
+message = "'{secus}' ليست الجزيئة على {adfirma}"
+help = "استخدم '{mori}' لرسالة الذعر الاختيارية"
+
+[diagnostics.PARSE002]
+message = "رمز غير متوقع"
+help = "أزل الرمز أو انقله إلى موضع صحيح"
+
+[diagnostics.PARSE002.issues.json_unknown_identifier_value]
+message = "معرفات JSON ليست قيما صالحة في JSON"
+help = "استخدم true أو false أو null أو سلسلة أو رقما أو كائنا أو مصفوفة"
+
+[diagnostics.PARSE002.issues.json_faber_keyword_value]
+message = "كلمات Faber المفتاحية ليست قيما صالحة في JSON"
+help = "استخدم true أو false أو null أو سلسلة أو رقما أو كائنا أو مصفوفة"
+
+[diagnostics.PARSE002.issues.expected_json_value]
+message = "قيمة JSON مطلوبة"
+help = "أضف قيمة JSON"
+
+[diagnostics.PARSE002.issues.json_integer_underflow]
+message = "حرفية عدد صحيح في JSON أصغر من نطاق {numerus}"
+help = "استخدم قيمة {numerus} ضمن النطاق"
+
+[diagnostics.PARSE002.issues.expected_json_number_after_minus]
+message = "مطلوب رقم بعد '-' في JSON"
+help = "ضع رقما بعد '-' في JSON"
+
+[diagnostics.PARSE010]
+message = "تصريح غير صالح"
+help = "تحقق من كلمات التصريح والأجزاء المطلوبة"
+
+[diagnostics.PARSE010.issues.schema_inheritance]
+message = "لا يمكن لـ schema أن يربط sub أو implet أو interface"
+help = "أبقِ schema كترويسة علائقية بسيطة"
+
+[diagnostics.PARSE010.issues.schema_method]
+message = "لا يمكن لـ schema أن يعلن method"
+help = "أعلن الـ method على genus بدلا من ذلك"
+
+[diagnostics.PARSE011]
+message = "مطلوب اسم دالة بعد {functio}"
+help = "أضف اسم الدالة بعد {functio}"
+
+[diagnostics.PARSE012]
+message = "مطلوب جسم دالة لتصريح {functio}"
+help = "add a '{block}' to the function declaration"
+
+[diagnostics.PARSE013]
+message = "مطلوب اسم صنف بعد {genus}"
+help = "أضف اسم الصنف بعد {genus}"
+
+[diagnostics.PARSE014]
+message = "مطلوب جسم صنف بعد تصريح {genus}"
+help = "أضف كتلة بعد ترويسة تصريح {genus}"
+
+[diagnostics.PARSE015]
+message = "معامل غير صالح"
+help = "تحقق من صياغة المعامل وترتيبه"
+
+[diagnostics.PARSE015.issues.removed_fixus]
+message = "أزيل {keyword}؛ استخدم {optional_marker} للخانات الاختيارية و {immutable_marker} للمحليات الثابتة المؤجلة"
+help = "علم خانات المعاملات أو الحقول الاختيارية بـ {optional_marker} بعد الاسم"
+
+[diagnostics.PARSE016]
+message = "معامل نوع غير صالح"
+help = "تحقق من قائمة معاملات النوع للفواصل والمعرفات"
+
+[diagnostics.PARSE016.issues.removed_prae_typus]
+message = "أزيل '{keyword}'؛ صرح عن generics بأقواس زاوية: {replacement}"
+help = "اكتب generic parameters قبل قائمة المعاملات، مثل {replacement}"
+
+[diagnostics.PARSE016.issues.type_param_after_magnitudo]
+message = "يجب أن تسبق معاملات النوع معاملات {size_param} في قوائم generic"
+help = "انقل معاملات النوع قبل معاملات {size_param}"
+
+[diagnostics.PARSE017]
+message = "معدل غير صالح"
+help = "انقل المعدل أو أزله"
+
+[diagnostics.PARSE018]
+message = "تعليمة غير صالحة"
+help = "أضف اسم تعليمة بعد '@'"
+
+[diagnostics.PARSE018.issues.invalid_modifier]
+message = "معدل @ {annotation} غير صالح"
+help = "استخدم معدلا مدعوما @ {annotation}"
+
+[diagnostics.PARSE018.issues.empty_radix_typus_domain]
+message = "نطاق @ radix typus يتطلب نوعا مسموحا واحدا على الأقل"
+help = "اذكر نوعا مسموحا واحدا على الأقل بعد in"
+
+[diagnostics.PARSE018.issues.expected_annotation_ident]
+message = "مطلوب {context}"
+help = "أضف '{expected}' في موضع التعليمة هذا"
+
+[diagnostics.PARSE018.issues.unexpected_annotation_token]
+message = "رمز غير متوقع بعد {context}"
+help = "أزل رمز التعليمة اللاحق"
+
+[diagnostics.PARSE018.issues.missing_nucleum_lane_value]
+message = "@ nucleum lane requires a string value"
+help = "use `@ nucleum lane \"position\"` or braced `lane = \"position\"`"
+
+[diagnostics.PARSE018.issues.non_string_nucleum_lane_value]
+message = "@ nucleum lane value must be a string literal"
+help = "use `@ nucleum lane \"position\"` or braced `lane = \"position\"`"
+
+[diagnostics.PARSE018.issues.wrong_locale_annotation]
+message = "التعليق التوضيحي `@ {annotation}` غير معلن في سطح القارئ هذا"
+help = "استخدم `@ {expected}` للغة القارئ في هذا الملف"
+
+[diagnostics.PARSE019]
+message = "معدل مكرر"
+help = "أزل المعدل المكرر"
+
+[diagnostics.PARSE020]
+message = "عبارة غير صالحة"
+help = "استخدم صيغة عبارة صالحة"
+
+[diagnostics.PARSE020.issues.ad_expression_only]
+message = "{ad} صالح فقط في موضع تعبير"
+help = "استخدم {replacement}"
+
+[diagnostics.PARSE021]
+message = "شرط مفقود"
+help = "أضف تعبير شرط"
+
+[diagnostics.PARSE022]
+message = "مطلوبة كتلة '{block}' أو جسم '{ergo}'"
+help = "أضف '{block}' أو قدم عبارة واحدة باستخدام '{ergo}'"
+
+[diagnostics.PARSE026]
+message = "∴ للإغلاقات المدمجة فقط؛ استخدم {ergo} لجسم عبارة واحدة"
+help = "استخدم '{ergo}' لجسم عبارة واحدة، أو غلف الجسم بأقواس"
+
+[diagnostics.PARSE027]
+message = "{ergo} للأجسام ذات العبارة الواحدة فقط؛ استخدم ∴ للإغلاق المدمج"
+help = "استخدم '∴' بين توقيع الإغلاق وجسمه"
+
+[diagnostics.PARSE023]
+message = "مطلوب نمط مثل '{wildcard}' أو {identifier}"
+help = "استخدم '{wildcard}' أو حرفية أو نمط {identifier}"
+
+[diagnostics.PARSE024]
+message = "مطلوب فرع '{casu}' أو default '{ceterum}'"
+help = "ابدأ ذراع dispatch بـ '{casu}' أو أغلق بـ '{ceterum}'"
+
+[diagnostics.PARSE025]
+message = "قيمة case غير صالحة"
+help = "استخدم تعبير case صالحا"
+
+[diagnostics.PARSE030]
+message = "تعبير غير صالح"
+help = "تحقق من صياغة التعبير"
+
+[diagnostics.PARSE030.issues.conversio_recovery_uses_vel]
+message = "استخدم ⇥ لاسترداد conversio"
+help = "استخدم ⇥؛ {vel} للـ nullish coalescing فقط"
+
+[diagnostics.PARSE030.issues.expected_expression]
+message = "تعبير مطلوب"
+help = "قدم تعبيرا صالحا في هذا الموضع"
+
+[diagnostics.PARSE030.issues.expression_ad_block]
+message = "صيغة {ad} التعبيرية يجب ألا تحتوي على كتلة"
+help = "استخدم {ad} 'route' (opener) ↦ T بلا كتلة"
+
+[diagnostics.PARSE030.issues.closure_block_body]
+message = "closure block body يجب أن يستخدم '{fac}'"
+help = "اكتب compact closure body بعد ∴ بالشكل {fac_body}"
+
+[diagnostics.PARSE030.issues.closure_fac_body_dum]
+message = "closure {fac} body لا يمكن أن يستخدم '{dum}'"
+help = "أزل {dum} من closure {fac} bodies"
+
+[diagnostics.PARSE031]
+message = "حرفية غير صالحة"
+help = "تحقق من صيغة الحرفية"
+
+[diagnostics.PARSE032]
+message = "عامل غير صالح"
+help = "تحقق من موضع العامل والمعاملات"
+
+[diagnostics.PARSE033]
+message = "مجموعة غير مغلقة"
+help = "أغلق محدد المجموعة"
+
+[diagnostics.PARSE034]
+message = "وسيط استدعاء غير صالح"
+help = "تحقق من صياغة وسيط الاستدعاء"
+
+[diagnostics.PARSE035]
+message = "وصول عضو غير صالح"
+help = "تحقق من صياغة وصول العضو"
+
+[diagnostics.PARSE036]
+message = "هدف إسناد غير صالح"
+help = "أسند فقط إلى lvalues صالحة"
+
+[diagnostics.PARSE040]
+message = "نوع غير صالح"
+help = "تحقق من صياغة النوع"
+
+[diagnostics.PARSE040.issues.expected_type_name]
+message = "اسم نوع مطلوب"
+help = "ابدأ النوع بمعرف أو _ أو function type"
+
+[diagnostics.PARSE040.issues.postfix_array_syntax]
+message = "صياغة postfix T[] أزيلت"
+help = "استخدم {lista}<T>"
+
+[diagnostics.PARSE040.issues.lista_sugar_bracket_form]
+message = "{lista} sugar ليس لها شكل bracket"
+help = "استخدم tensor sugar للـ shaped buffers"
+
+[diagnostics.PARSE040.issues.matrix_sugar_missing_shape]
+message = "matrix sugar يتطلب bracket shape ثنائي الأبعاد"
+help = "اكتب matrix sugar بالشكل mf32[4, 4]"
+
+[diagnostics.PARSE040.issues.lista_sugar_angle_bracket_form]
+message = "{lista} sugar هو l+width عار فقط"
+help = "استخدم {lista}<...> لشكل angle-bracket"
+
+[diagnostics.PARSE040.issues.vector_sugar_angle_bracket_form]
+message = "vector sugar يستخدم bracket width"
+help = "اكتب width باستخدام vector sugar brackets"
+
+[diagnostics.PARSE040.issues.type_sugar_angle_bracket_form]
+message = "{sugar} sugar يستخدم bracket Figura"
+help = "اكتب shape باستخدام {sugar} width sugar brackets"
+
+[diagnostics.PARSE040.issues.invalid_figura_index]
+message = "index literal يجب أن يكون عددا طبيعيا"
+help = "استخدم shape index غير سالب"
+
+[diagnostics.PARSE040.issues.wrong_locale_type]
+message = "type '{type}' is not declared on this reader surface"
+help = "use the type spelling declared by this reader locale"
+
+[diagnostics.PARSE041]
+message = "تعليمة نوع غير صالحة"
+help = "تحقق من صيغة تعليمة النوع"
+
+[diagnostics.PARSE042]
+message = "معاملات نوع غير مغلقة"
+help = "أغلق قائمة معاملات النوع بـ '>'"
+
+[diagnostics.PARSE050]
+message = "استيراد غير صالح"
+help = "تحقق من صياغة الاستيراد"
+
+[diagnostics.PARSE050.issues.unknown_import_field]
+message = "حقل استيراد غير معروف"
+help = "استخدم {ex} أو visibilitas أو nomen أو {ut} أو {omnia}"
+
+[diagnostics.PARSE050.issues.missing_import_source]
+message = "import record يتطلب {ex} source"
+help = "أضف {ex} = \"path\" إلى import record"
+
+[diagnostics.PARSE050.issues.mixed_wildcard_and_named_import]
+message = "wildcard import لا يمكنه تسمية binding أيضا"
+help = "استخدم {omnia} وحده، أو nomen/{ut} لاستيراد named"
+
+[diagnostics.PARSE050.issues.invalid_import_visibility]
+message = "visibility للاستيراد غير صالحة"
+help = "استخدم {privata} أو {publica}"
+
+[diagnostics.PARSE050.issues.import_name_inference_failed]
+message = "تعذر استنتاج اسم الاستيراد من {path}"
+help = "اكتب nomen أو alias صريحا لـ {path}"
+
+[diagnostics.SEM001]
+message = "متغير غير معرف"
+help = "صرح عن المتغير قبل استخدامه{?suggestion|؛ هل قصدت |?}"
+
+[diagnostics.SEM001.issues.name_not_variant]
+message = "الاسم لا يشير إلى variant"
+help = "صرح عن المتغير قبل استخدامه{?suggestion|؛ هل قصدت |?}"
+
+[diagnostics.SEM001.issues.unknown_identifier]
+message = "معرف غير معروف"
+help = "صرح عن المعرف قبل استخدامه{?suggestion|؛ هل قصدت |?}"
+
+[diagnostics.SEM001.issues.scribe_callee]
+message = "معرف غير معروف"
+help = "اكتب `{spelling} <expr>` بدون أقواس لجملة الإخراج"
+
+[diagnostics.SEM001.issues.unknown_record_field]
+message = "record field غير معروف"
+help = "صرح عن المتغير قبل استخدامه{?suggestion|؛ هل قصدت |?}"
+
+[diagnostics.SEM001.issues.unknown_variant]
+message = "variant غير معروف"
+help = "صرح عن المتغير قبل استخدامه{?suggestion|؛ هل قصدت |?}"
+
+[diagnostics.SEM001.issues.unknown_variant_fields]
+message = "variant fields غير معروفة"
+help = "صرح عن المتغير قبل استخدامه{?suggestion|؛ هل قصدت |?}"
+
+[diagnostics.SEM002]
+message = "type غير معرف"
+help = "صرح عن type أو استورده"
+
+[diagnostics.SEM002.issues.figura_unknown_index]
+message = "index parameter غير معروف في Figura"
+help = "صرح عن type أو استورده"
+
+[diagnostics.SEM002.issues.float_width_on_numerus]
+message = "f16 و f32 و f64 هي عروض {fractus}؛ استخدم {fractus}<f16> أو {fractus}<f32> أو {fractus}<f64>"
+help = "صرح عن type أو استورده"
+
+[diagnostics.SEM002.issues.integer_width_on_fractus]
+message = "integer width markers هي عروض {numerus}؛ استخدم {numerus}<...>"
+help = "صرح عن type أو استورده"
+
+[diagnostics.SEM002.issues.invalid_precision_marker]
+message = "{instans} يقبل فقط ms أو us أو ns كـ precision marker"
+help = "صرح عن type أو استورده"
+
+[diagnostics.SEM002.issues.invalid_fractus_width_marker]
+message = "{fractus} يقبل فقط f16 أو f32 أو f64"
+help = "صرح عن type أو استورده"
+
+[diagnostics.SEM002.issues.invalid_numerus_width_marker]
+message = "width marker غير معروف لـ {numerus}"
+help = "صرح عن type أو استورده"
+
+[diagnostics.SEM002.issues.invalid_width_marker]
+message = "width marker غير معروف لهذه family"
+help = "صرح عن type أو استورده"
+
+[diagnostics.SEM002.issues.name_not_type]
+message = "الاسم لا يشير إلى type"
+help = "صرح عن type أو استورده"
+
+[diagnostics.SEM002.issues.precision_marker_params]
+message = "precision marker لا يقبل parameters"
+help = "صرح عن type أو استورده"
+
+[diagnostics.SEM002.issues.precision_marker_shape]
+message = "precision marker يجب أن يكون كتابة عارية مثل ms أو us"
+help = "صرح عن type أو استورده"
+
+[diagnostics.SEM002.issues.qualified_name_not_type]
+message = "qualified name لا يشير إلى type"
+help = "صرح عن type أو استورده"
+
+[diagnostics.SEM002.issues.qualified_type_not_exported]
+message = "namespace لا يصدر qualified type"
+help = "صرح عن type أو استورده"
+
+[diagnostics.SEM002.issues.qualified_type_prefix_not_namespace]
+message = "qualified type prefix يجب أن يسمي namespace"
+help = "صرح عن type أو استورده"
+
+[diagnostics.SEM002.issues.schema_unknown_type]
+message = "نوع العمود يسمي نوعا غير معروف"
+help = "أعلن النوع أو استورده"
+
+[diagnostics.SEM002.issues.unknown_namespace]
+message = "namespace غير معروف"
+help = "صرح عن type أو استورده"
+
+[diagnostics.SEM002.issues.unknown_qualified_type]
+message = "qualified type غير معروف"
+help = "صرح عن type أو استورده"
+
+[diagnostics.SEM002.issues.unknown_struct]
+message = "struct غير معروف"
+help = "صرح عن type أو استورده"
+
+[diagnostics.SEM002.issues.unknown_type]
+message = "type غير معروف"
+help = "صرح عن type أو استورده"
+
+[diagnostics.SEM002.issues.width_marker_params]
+message = "width marker لا يقبل parameters"
+help = "صرح عن type أو استورده"
+
+[diagnostics.SEM002.issues.width_marker_shape]
+message = "width marker يجب أن يكون كتابة عارية مثل i32 أو u8"
+help = "صرح عن type أو استورده"
+
+[diagnostics.SEM003]
+message = "function غير معرف"
+help = "صرح عن function أو استورده"
+
+[diagnostics.SEM004]
+message = "member غير معرف"
+help = "تحقق من اسم member والنوع"
+
+[diagnostics.SEM004.issues.duplicate_variant_field]
+message = "variant field مكرر"
+help = "قدم كل named variant field مرة واحدة على الأكثر"
+
+[diagnostics.SEM004.issues.missing_required_struct_field]
+message = "struct field مطلوب مفقود"
+help = "هيئ كل struct field مطلوب"
+
+[diagnostics.SEM004.issues.missing_variant_field_name]
+message = "اسم variant field مفقود"
+help = "سم كل variant argument عند استخدام named variant construction"
+
+[diagnostics.SEM004.issues.optional_receiver_requires_chain]
+message = "optional receiver يتطلب optional chaining أو non-null access"
+help = "استخدم ?. للـ optional chaining أو !. للـ non-null access"
+
+[diagnostics.SEM004.issues.struct_field_requires_value]
+message = "struct field يتطلب قيمة"
+help = "قدم قيمة للـ struct field"
+
+[diagnostics.SEM004.issues.unknown_field]
+message = "field غير معروف"
+help = "تحقق من اسم struct field"
+
+[diagnostics.SEM004.issues.unknown_method]
+message = "method غير معروف"
+help = "تحقق من نوع receiver واسم method"
+
+[diagnostics.SEM004.issues.unknown_struct_field]
+message = "struct field غير معروف"
+help = "تحقق من اسم struct field"
+
+[diagnostics.SEM004.issues.unknown_variant_field]
+message = "variant field غير معروف"
+help = "تحقق من اسم variant field"
+
+[diagnostics.SEM005]
+message = "تعريف مكرر"
+help = "أعد تسمية أحد التعريفات"
+
+[diagnostics.SEM005.issues.duplicate_definition]
+message = "تعريف مكرر"
+help = "أعد تسمية أحد التعريفات"
+
+[diagnostics.SEM005.issues.inferred_import_name_collision]
+message = "اسم الاستيراد المستنتج يتعارض مع تعريف موجود"
+help = "أضف alias استيراد صريحا باستخدام `{ut}` ليكون اسم binding المستورد فريدا"
+
+[diagnostics.SEM005.issues.schema_duplicate_source]
+message = "اسمان ظاهران يحلان إلى نفس اسم المصدر"
+help = "امنح أحد العمودين اسما مصدريا مختلفا"
+
+[diagnostics.SEM005.issues.schema_duplicate_visible]
+message = "عمودان يعلنان نفس الاسم العام"
+help = "أعد تسمية أحد العمودين"
+
+[diagnostics.SEM006]
+message = "استيراد غير موجود"
+help = "تحقق من مسار الاستيراد"
+
+[diagnostics.SEM006.issues.kernel_glob_reexport]
+message = "لا يمكن re-export لـ `{path}` glob imports في v1"
+help = "تحقق من مسار الاستيراد"
+
+[diagnostics.SEM006.issues.kernel_glob_named_alias]
+message = "يجب استيراد `{path}` كـ named glob alias"
+help = "تحقق من مسار الاستيراد"
+
+[diagnostics.SEM006.issues.kernel_invalid_path]
+message = "{reason}"
+help = "تحقق من مسار الاستيراد"
+
+[diagnostics.SEM006.issues.kernel_unknown_module]
+message = "faber kernel module غير معروف '{module}'؛ راجع faber host manifest"
+help = "تحقق من مسار الاستيراد"
+
+[diagnostics.SEM006.issues.kernel_norma_json_in_script]
+message = "script mode يستخدم `{script_path}`؛ `{library_path}` للـ package/library فقط"
+help = "تحقق من مسار الاستيراد"
+
+[diagnostics.SEM007]
+message = "اعتماد دائري"
+help = "اكسر الدورة بين الوحدات"
+
+[diagnostics.SEM007.issues.type_alias_cycle]
+message = "دورة type alias"
+help = "اكسر الدورة بين الوحدات"
+
+[diagnostics.SEM008]
+message = "خطأ تخفيض"
+help = "أصلح تركيب AST للتخفيض"
+
+[diagnostics.SEM008.issues.array_destructuring_initializer]
+message = "array destructuring يتطلب initializer"
+help = "أصلح تركيب AST للتخفيض"
+
+[diagnostics.SEM008.issues.array_destructuring_not_expanded]
+message = "array destructuring يجب توسيعه قبل statement lowering"
+help = "أصلح تركيب AST للتخفيض"
+
+[diagnostics.SEM008.issues.atomic_compiler_owned_syntax]
+message = "atomic يتطلب compiler-owned syntax؛ استخدم atomic<T>"
+help = "أصلح تركيب AST للتخفيض"
+
+[diagnostics.SEM008.issues.lista_arity]
+message = "{lista} يتطلب معامل نوع واحدا"
+help = "استخدم {lista}<T>؛ lista<T, N> شكل محدود مشحون"
+
+[diagnostics.SEM008.issues.tabula_arity]
+message = "{tabula} يتطلب معاملي نوع"
+help = "أصلح تركيب AST للتخفيض"
+
+[diagnostics.SEM008.issues.copia_arity]
+message = "{copia} يتطلب معامل نوع واحدا"
+help = "أصلح تركيب AST للتخفيض"
+
+[diagnostics.SEM008.issues.promissum_arity]
+message = "{promissum} يتطلب معامل نوع واحدا"
+help = "أصلح تركيب AST للتخفيض"
+
+[diagnostics.SEM008.issues.cursor_arity]
+message = "{cursor} يتطلب معامل نوع واحدا"
+help = "أصلح تركيب AST للتخفيض"
+
+
+[diagnostics.SEM008.issues.queue_arity]
+message = "queue requires one or two type parameters"
+help = "use queue<T> or queue<T, N>"
+
+[diagnostics.SEM008.issues.stack_arity]
+message = "stack requires one or two type parameters"
+help = "use stack<T> or stack<T, N>"
+
+[diagnostics.SEM008.issues.discerne_casu_pattern_required]
+message = "{discerne} {casu} يتطلب نمطا"
+help = "أصلح تركيب AST للتخفيض"
+
+[diagnostics.SEM008.issues.discerne_pattern_count]
+message = "عدد أنماط {discerne} يجب أن يطابق عدد subjects"
+help = "أصلح تركيب AST للتخفيض"
+
+[diagnostics.SEM008.issues.discerne_subject_required]
+message = "{discerne} يتطلب subject واحدا على الأقل"
+help = "أصلح تركيب AST للتخفيض"
+
+[diagnostics.SEM008.issues.duplicate_module_method_binding]
+message = "duplicate module method binding أثناء التخفيض"
+help = "أصلح تركيب AST للتخفيض"
+
+[diagnostics.SEM008.issues.ego_outside_method]
+message = "{ego} استخدم خارج سياق method"
+help = "أصلح تركيب AST للتخفيض"
+
+[diagnostics.SEM008.issues.elige_case_value_shape]
+message = "{elige} case value يجب أن يكون literal أو enum variant"
+help = "أصلح تركيب AST للتخفيض"
+
+[diagnostics.SEM008.issues.empty_qualified_type_path]
+message = "qualified type path فارغ"
+help = "أصلح تركيب AST للتخفيض"
+
+[diagnostics.SEM008.issues.empty_path_pattern]
+message = "path pattern فارغ"
+help = "أصلح تركيب AST للتخفيض"
+
+[diagnostics.SEM008.issues.empty_union_type]
+message = "union type فارغ"
+help = "أصلح تركيب AST للتخفيض"
+
+[diagnostics.SEM008.issues.ex_destructuring_not_expanded]
+message = "{ex} destructuring يجب توسيعه قبل statement lowering"
+help = "أصلح تركيب AST للتخفيض"
+
+[diagnostics.SEM008.issues.finge_cast_not_type]
+message = "{finge} cast يجب أن يسمي type"
+help = "أصلح تركيب AST للتخفيض"
+
+[diagnostics.SEM008.issues.figura_not_index_param]
+message = "الاسم لا يشير إلى index parameter"
+help = "أصلح تركيب AST للتخفيض"
+
+[diagnostics.SEM008.issues.figura_type_param_in_index]
+message = "type parameter لا يمكن أن يظهر في index position"
+help = "أصلح تركيب AST للتخفيض"
+
+[diagnostics.SEM008.issues.figura_unknown_index]
+message = "index variable غير معروف في Figura"
+help = "أصلح تركيب AST للتخفيض"
+
+[diagnostics.SEM008.issues.float_width_on_numerus]
+message = "f16 و f32 و f64 هي عروض {fractus}؛ استخدم {fractus}<f16> أو {fractus}<f32> أو {fractus}<f64>"
+help = "أصلح تركيب AST للتخفيض"
+
+[diagnostics.SEM008.issues.forma_builtin_missing]
+message = "builtin forma genus غير مسجل"
+help = "أصلح تركيب AST للتخفيض"
+
+[diagnostics.SEM008.issues.forma_literal_lowering_path]
+message = "forma template literals يجب أن تخفض عبر forma capture"
+help = "أصلح تركيب AST للتخفيض"
+
+[diagnostics.SEM008.issues.forma_literal_pattern]
+message = "forma template literals غير صالحة في patterns"
+help = "أصلح تركيب AST للتخفيض"
+
+[diagnostics.SEM008.issues.forma_params_field_missing]
+message = "builtin forma genus يفتقد params field"
+help = "أصلح تركيب AST للتخفيض"
+
+[diagnostics.SEM008.issues.forma_template_field_missing]
+message = "builtin forma genus يفتقد template field"
+help = "أصلح تركيب AST للتخفيض"
+
+[diagnostics.SEM008.issues.fractus_width_params]
+message = "{fractus} يقبل width marker واحدا على الأكثر"
+help = "أصلح تركيب AST للتخفيض"
+
+[diagnostics.SEM008.issues.integer_width_on_fractus]
+message = "integer width markers هي عروض {numerus}؛ استخدم {numerus}<...>"
+help = "أصلح تركيب AST للتخفيض"
+
+[diagnostics.SEM008.issues.instans_precision_params]
+message = "{instans} يقبل precision marker واحدا على الأكثر"
+help = "أصلح تركيب AST للتخفيض"
+
+[diagnostics.SEM008.issues.intervallum_arity]
+message = "intervallum يتطلب معامل نوع واحدا"
+help = "أصلح تركيب AST للتخفيض"
+
+[diagnostics.SEM008.issues.intervallum_bound]
+message = "intervallum bound type يجب أن يكون {numerus} أو {instans}"
+help = "أصلح تركيب AST للتخفيض"
+
+[diagnostics.SEM008.issues.atomic_arity]
+message = "atomic يتطلب element type واحدا بالضبط؛ استخدم atomic<T>"
+help = "أصلح تركيب AST للتخفيض"
+
+[diagnostics.SEM008.issues.atomic_element]
+message = "atomic element type يجب أن يكون {numerus}<i32> أو {numerus}<u32>"
+help = "أصلح تركيب AST للتخفيض"
+
+[diagnostics.SEM008.issues.atomic_incomplete]
+message = "atomic يتطلب element type واحدا؛ استخدم atomic<T>"
+help = "أصلح تركيب AST للتخفيض"
+
+[diagnostics.SEM008.issues.invalid_fractus_width_marker]
+message = "{fractus} يقبل فقط f16 أو f32 أو f64"
+help = "أصلح تركيب AST للتخفيض"
+
+[diagnostics.SEM008.issues.invalid_lowered_expression]
+message = "expression غير صالح أنتج أثناء التخفيض"
+help = "أصلح تركيب AST للتخفيض"
+
+[diagnostics.SEM008.issues.invalid_numerus_width_marker]
+message = "width marker غير معروف لـ {numerus}"
+help = "أصلح تركيب AST للتخفيض"
+
+[diagnostics.SEM008.issues.invalid_precision_marker]
+message = "{instans} يقبل فقط ms أو us أو ns كـ precision marker"
+help = "أصلح تركيب AST للتخفيض"
+
+[diagnostics.SEM008.issues.invalid_width_marker]
+message = "width marker غير معروف لهذه family"
+help = "أصلح تركيب AST للتخفيض"
+
+[diagnostics.SEM008.issues.json_valor_pattern]
+message = "JSON document literals غير صالحة في patterns"
+help = "أصلح تركيب AST للتخفيض"
+
+[diagnostics.SEM008.issues.kernel_glob_call_shape]
+message = "kernel glob calls يجب أن تستخدم `faber.<module>.<verb>`"
+help = "أصلح تركيب AST للتخفيض"
+
+[diagnostics.SEM008.issues.kernel_glob_named_alias]
+message = "`faber:*` يجب استيراده بـ named alias"
+help = "أصلح تركيب AST للتخفيض"
+
+[diagnostics.SEM008.issues.kernel_unknown_module]
+message = "faber kernel module غير معروف '{module}'؛ راجع faber host manifest"
+help = "أصلح تركيب AST للتخفيض"
+
+[diagnostics.SEM008.issues.matrix_incomplete]
+message = "matrix يتطلب element type و shape؛ استخدم matrix<T, [R, C]>"
+help = "أصلح تركيب AST للتخفيض"
+
+[diagnostics.SEM008.issues.matrix_missing_figura]
+message = "matrix يتطلب shape ثنائي الأبعاد؛ استخدم matrix<T, [R, C]>"
+help = "أصلح تركيب AST للتخفيض"
+
+[diagnostics.SEM008.issues.matrix_shape_two_dim]
+message = "matrix shape يجب أن يكون بعدين بالضبط"
+help = "أصلح تركيب AST للتخفيض"
+
+[diagnostics.SEM008.issues.missing_cast_symbol_info]
+message = "معلومات cast symbol مفقودة"
+help = "أصلح تركيب AST للتخفيض"
+
+[diagnostics.SEM008.issues.missing_resolved_type_alias]
+message = "type alias يفتقد resolved type"
+help = "أصلح تركيب AST للتخفيض"
+
+[diagnostics.SEM008.issues.missing_type_alias_symbol]
+message = "symbol مفقود لـ type alias"
+help = "أصلح تركيب AST للتخفيض"
+
+[diagnostics.SEM008.issues.missing_type_symbol_info]
+message = "معلومات type symbol مفقودة"
+help = "أصلح تركيب AST للتخفيض"
+
+[diagnostics.SEM008.issues.mutable_pattern_binding]
+message = "mutable pattern bindings لم تخفض بعد"
+help = "أصلح تركيب AST للتخفيض"
+
+[diagnostics.SEM008.issues.nested_array_destructuring]
+message = "nested array destructuring لم يخفض بعد"
+help = "أصلح تركيب AST للتخفيض"
+
+[diagnostics.SEM008.issues.nested_object_destructuring]
+message = "nested object destructuring لم يخفض بعد"
+help = "أصلح تركيب AST للتخفيض"
+
+[diagnostics.SEM008.issues.numerus_width_params]
+message = "{numerus} يقبل width marker واحدا على الأكثر"
+help = "أصلح تركيب AST للتخفيض"
+
+[diagnostics.SEM008.issues.object_destructuring_initializer]
+message = "object destructuring يتطلب initializer"
+help = "أصلح تركيب AST للتخفيض"
+
+[diagnostics.SEM008.issues.object_destructuring_not_expanded]
+message = "object destructuring يجب توسيعه قبل statement lowering"
+help = "أصلح تركيب AST للتخفيض"
+
+[diagnostics.SEM008.issues.octet_params]
+message = "octet هو fixed-width ولا يقبل parameters"
+help = "أصلح تركيب AST للتخفيض"
+
+[diagnostics.SEM008.issues.precision_marker_shape]
+message = "precision marker يجب أن يكون كتابة عارية مثل ms أو us"
+help = "أصلح تركيب AST للتخفيض"
+
+[diagnostics.SEM008.issues.primitive_params]
+message = "primitive type لا يقبل parameters"
+help = "textus<N> و ascii<N> و octeti<N> أشكال محدودة مشحونة"
+
+[diagnostics.SEM008.issues.primitive_width_params]
+message = "primitive يقبل width marker واحدا على الأكثر"
+help = "أصلح تركيب AST للتخفيض"
+
+[diagnostics.SEM008.issues.qualified_type_not_exported]
+message = "namespace لا يصدر qualified type"
+help = "أصلح تركيب AST للتخفيض"
+
+[diagnostics.SEM008.issues.qualified_type_prefix_not_namespace]
+message = "qualified type prefix يجب أن يسمي namespace"
+help = "أصلح تركيب AST للتخفيض"
+
+[diagnostics.SEM008.issues.radix_typus_allowed_type_not_concrete]
+message = "@ radix typus allowed type يجب أن يكون concrete"
+help = "أصلح تركيب AST للتخفيض"
+
+[diagnostics.SEM008.issues.radix_typus_non_type_param]
+message = "@ radix typus يمكن أن يقيد فقط type parameters"
+help = "أصلح تركيب AST للتخفيض"
+
+[diagnostics.SEM008.issues.radix_typus_unknown_generic]
+message = "@ radix typus يسمي generic parameter غير معروف"
+help = "أصلح تركيب AST للتخفيض"
+
+[diagnostics.SEM008.issues.retired_bare_object_literal]
+message = "bare object literal متقاعد؛ استخدم {object_literal_forms}"
+help = "أصلح تركيب AST للتخفيض"
+
+[diagnostics.SEM008.issues.schema_nested_column]
+message = "لا يمكن أن يكون العمود schema متداخلا"
+help = "أعلن الـ schema المتداخل منفصلا وسمِّه كنوع العمود"
+
+[diagnostics.SEM008.issues.scrinium_arity]
+message = "scrinium يقبل payload type parameter واحدا على الأكثر"
+help = "أصلح تركيب AST للتخفيض"
+
+[diagnostics.SEM008.issues.scrinium_missing_builtin]
+message = "builtin scrinium type غير مسجل"
+help = "أصلح تركيب AST للتخفيض"
+
+[diagnostics.SEM008.issues.series_params]
+message = "series لا يقبل parameters"
+help = "أصلح تركيب AST للتخفيض"
+
+[diagnostics.SEM008.issues.sparsa_element_non_numeric]
+message = "sparsa element type يجب أن يكون numeric في v1"
+help = "أصلح تركيب AST للتخفيض"
+
+[diagnostics.SEM008.issues.sparsa_incomplete]
+message = "sparsa يتطلب element type و Figura؛ استخدم sparsa<T, Figura>"
+help = "أصلح تركيب AST للتخفيض"
+
+[diagnostics.SEM008.issues.sparsa_missing_figura]
+message = "sparsa يتطلب Figura shape؛ استخدم sparsa<T, []> للرتبة-0"
+help = "أصلح تركيب AST للتخفيض"
+
+[diagnostics.SEM008.issues.standalone_width_internal]
+message = "internal error تخفيض standalone width type"
+help = "أصلح تركيب AST للتخفيض"
+
+[diagnostics.SEM008.issues.tensor_incomplete]
+message = "tensor يتطلب element type و Figura؛ استخدم tensor<T, Figura>"
+help = "أصلح تركيب AST للتخفيض"
+
+[diagnostics.SEM008.issues.tensor_missing_figura]
+message = "tensor يتطلب Figura shape؛ استخدم tensor<T, []> للرتبة-0"
+help = "أصلح تركيب AST للتخفيض"
+
+[diagnostics.SEM008.issues.template_type_args]
+message = "template application لا يقبل type arguments"
+help = "أصلح تركيب AST للتخفيض"
+
+[diagnostics.SEM008.issues.top_level_initializer]
+message = "top-level variable declaration يتطلب initializer"
+help = "أصلح تركيب AST للتخفيض"
+
+[diagnostics.SEM008.issues.top_level_identifier_binding]
+message = "top-level variable يتطلب identifier binding"
+help = "أصلح تركيب AST للتخفيض"
+
+[diagnostics.SEM008.issues.type_name_not_type]
+message = "type name لا يشير إلى type"
+help = "أصلح تركيب AST للتخفيض"
+
+[diagnostics.SEM008.issues.union_only_nihil]
+message = "union type لا يمكن أن يتكون من '{nihil}' فقط"
+help = "أصلح تركيب AST للتخفيض"
+
+[diagnostics.SEM008.issues.undefined_name]
+message = "اسم غير معرف في التخفيض"
+help = "أصلح تركيب AST للتخفيض"
+
+[diagnostics.SEM008.issues.unhandled_statement_kind]
+message = "unhandled statement kind في التخفيض"
+help = "أصلح تركيب AST للتخفيض"
+
+[diagnostics.SEM008.issues.unknown_base_class]
+message = "base class غير معروف في gens declaration"
+help = "أصلح تركيب AST للتخفيض"
+
+[diagnostics.SEM008.issues.unknown_finge_cast_type]
+message = "cast type غير معروف في {finge} expression"
+help = "أصلح تركيب AST للتخفيض"
+
+[diagnostics.SEM008.issues.unknown_finge_variant]
+message = "variant غير معروف في {finge} expression"
+help = "أصلح تركيب AST للتخفيض"
+
+[diagnostics.SEM008.issues.unknown_interface]
+message = "interface غير معروف في gens declaration"
+help = "أصلح تركيب AST للتخفيض"
+
+[diagnostics.SEM008.issues.unknown_lowering_error]
+message = "فشل HIR lowering"
+help = "أصلح تركيب AST للتخفيض"
+
+[diagnostics.SEM008.issues.unknown_namespace]
+message = "namespace غير معروف"
+help = "أصلح تركيب AST للتخفيض"
+
+[diagnostics.SEM008.issues.unknown_type_lowering_error]
+message = "فشل type lowering"
+help = "أصلح تركيب AST للتخفيض"
+
+[diagnostics.SEM008.issues.unknown_type_name]
+message = "type name غير معروف"
+help = "أصلح تركيب AST للتخفيض"
+
+[diagnostics.SEM008.issues.vector_width_single_dim]
+message = "vector width يجب أن يكون بعدا واحدا"
+help = "أصلح تركيب AST للتخفيض"
+
+[diagnostics.SEM008.issues.width_marker_params]
+message = "width marker لا يقبل parameters"
+help = "أصلح تركيب AST للتخفيض"
+
+[diagnostics.SEM008.issues.width_marker_shape]
+message = "width marker يجب أن يكون كتابة عارية مثل i32 أو u8"
+help = "أصلح تركيب AST للتخفيض"
+
+[diagnostics.SEM009]
+message = "خطأ في CLI validation"
+help = "أصلح عقد CLI annotation قبل emit runnable CLI code"
+
+[diagnostics.SEM009.issues.alias_collides_with_path]
+message = "command alias '{alias}' يتعارض مع command path"
+help = "أصلح عقد CLI annotation قبل emit runnable CLI code"
+
+[diagnostics.SEM009.issues.cli_on_non_incipit]
+message = "@ cli يمكن أن annotate فقط {incipit} entry point"
+help = "أصلح عقد CLI annotation قبل emit runnable CLI code"
+
+[diagnostics.SEM009.issues.command_global_surface]
+message = "'ubique' options و operands يجب أن تعلن على @ cli entry point"
+help = "أصلح عقد CLI annotation قبل emit runnable CLI code"
+
+[diagnostics.SEM009.issues.command_params_unsupported]
+message = "Phase 04 CLI commands يجب أن تستقبل parsed values عبر 'argumenta <ident>' وليس parameters عادية"
+help = "أصلح عقد CLI annotation قبل emit runnable CLI code"
+
+[diagnostics.SEM009.issues.duplicate_binding]
+message = "CLI binding '{binding}' مكرر في {label} CLI surface"
+help = "أصلح عقد CLI annotation قبل emit runnable CLI code"
+
+[diagnostics.SEM009.issues.duplicate_cli_entry]
+message = "يسمح بواحد فقط من @ cli entry point"
+help = "أصلح عقد CLI annotation قبل emit runnable CLI code"
+
+[diagnostics.SEM009.issues.duplicate_command_alias]
+message = "command alias '{alias}' مكرر"
+help = "أصلح عقد CLI annotation قبل emit runnable CLI code"
+
+[diagnostics.SEM009.issues.duplicate_command_path]
+message = "command path '{path}' مكرر"
+help = "أصلح عقد CLI annotation قبل emit runnable CLI code"
+
+[diagnostics.SEM009.issues.duplicate_long_flag]
+message = "long flag '{long}' مكرر في {label} CLI surface"
+help = "أصلح عقد CLI annotation قبل emit runnable CLI code"
+
+[diagnostics.SEM009.issues.duplicate_rest_operand]
+message = "يسمح بواحد فقط من {ceteri} operand"
+help = "أصلح عقد CLI annotation قبل emit runnable CLI code"
+
+[diagnostics.SEM009.issues.duplicate_short_flag]
+message = "short flag '{short}' مكرر في {label} CLI surface"
+help = "أصلح عقد CLI annotation قبل emit runnable CLI code"
+
+[diagnostics.SEM009.issues.global_operand_placement]
+message = "'ubique' operands يجب أن تعلن على @ cli entry point"
+help = "أصلح عقد CLI annotation قبل emit runnable CLI code"
+
+[diagnostics.SEM009.issues.global_option_placement]
+message = "'ubique' options يجب أن تعلن على @ cli entry point"
+help = "أصلح عقد CLI annotation قبل emit runnable CLI code"
+
+[diagnostics.SEM009.issues.imperium_on_non_func]
+message = "@ imperium يمكن أن annotate فقط {functio} declaration"
+help = "أصلح عقد CLI annotation قبل emit runnable CLI code"
+
+[diagnostics.SEM009.issues.invalid_command_alias]
+message = "command alias '{alias}' غير صالح"
+help = "أصلح عقد CLI annotation قبل emit runnable CLI code"
+
+[diagnostics.SEM009.issues.invalid_command_path]
+message = "command path '{path}' غير صالح"
+help = "أصلح عقد CLI annotation قبل emit runnable CLI code"
+
+[diagnostics.SEM009.issues.invalid_long_flag]
+message = "long flag '{long}' غير صالح لـ option '{binding}'"
+help = "أصلح عقد CLI annotation قبل emit runnable CLI code"
+
+[diagnostics.SEM009.issues.invalid_short_flag]
+message = "short flag '{short}' غير صالح لـ option '{binding}'"
+help = "أصلح عقد CLI annotation قبل emit runnable CLI code"
+
+[diagnostics.SEM009.issues.list_element_not_named]
+message = "CLI list types يجب أن تستخدم named element type"
+help = "أصلح عقد CLI annotation قبل emit runnable CLI code"
+
+[diagnostics.SEM009.issues.local_operand_global_collision]
+message = "{label} operand '{binding}' يتعارض مع global CLI binding"
+help = "أصلح عقد CLI annotation قبل emit runnable CLI code"
+
+[diagnostics.SEM009.issues.local_option_global_collision]
+message = "{label} option '{binding}' يتعارض مع global CLI binding"
+help = "أصلح عقد CLI annotation قبل emit runnable CLI code"
+
+[diagnostics.SEM009.issues.missing_entry_argument]
+message = "@ cli programs يجب أن تستخدم '{incipit} argumenta <ident>' entry point صريحا"
+help = "أصلح عقد CLI annotation قبل emit runnable CLI code"
+
+[diagnostics.SEM009.issues.malformed_annotation]
+message = "{annotation} field `{field}` يجب أن يكون {expected}"
+help = "أصلح عقد CLI annotation قبل emit runnable CLI code"
+
+[diagnostics.SEM009.issues.missing_option_flag]
+message = "{label} option '{binding}' يحتاج brevis أو longum"
+help = "أصلح عقد CLI annotation قبل emit runnable CLI code"
+
+[diagnostics.SEM009.issues.mounted_module_root_cli]
+message = "mounted CLI command modules يجب ألا تعلن @ cli entry point خاصا بها"
+help = "أصلح عقد CLI annotation قبل emit runnable CLI code"
+
+[diagnostics.SEM009.issues.nested_module_mount]
+message = "@ imperia module mounts يمكن إعلانها فقط على root CLI entry point"
+help = "أصلح عقد CLI annotation قبل emit runnable CLI code"
+
+[diagnostics.SEM009.issues.operand_after_rest]
+message = "operand '{binding}' يظهر بعد {ceteri} operand"
+help = "أصلح عقد CLI annotation قبل emit runnable CLI code"
+
+[diagnostics.SEM009.issues.orphan_cli_surface]
+message = "@ optio و @ operandus يجب أن annotate @ cli {incipit} أو @ imperium {functio}"
+help = "أصلح عقد CLI annotation قبل emit runnable CLI code"
+
+[diagnostics.SEM009.issues.rest_not_final]
+message = "{ceteri} operand يجب أن يكون operand الأخير"
+help = "أصلح عقد CLI annotation قبل emit runnable CLI code"
+
+[diagnostics.SEM009.issues.subcommand_local_surface]
+message = "subcommand CLI programs يمكنها فقط إعلان top-level options أو operands مع 'ubique'"
+help = "أصلح عقد CLI annotation قبل emit runnable CLI code"
+
+[diagnostics.SEM009.issues.subcommand_root_body]
+message = "subcommand CLI programs يجب أن تستخدم root {incipit} body فارغا في Phase 04"
+help = "أصلح عقد CLI annotation قبل emit runnable CLI code"
+
+[diagnostics.SEM009.issues.unsupported_list_element_type]
+message = "CLI list element type '{type}' غير مدعوم"
+help = "أصلح عقد CLI annotation قبل emit runnable CLI code"
+
+[diagnostics.SEM009.issues.unsupported_type]
+message = "CLI type '{type}' غير مدعوم"
+help = "أصلح عقد CLI annotation قبل emit runnable CLI code"
+
+[diagnostics.SEM009.issues.unsupported_type_shape]
+message = "CLI type shape غير مدعوم"
+help = "أصلح عقد CLI annotation قبل emit runnable CLI code"
+
+[diagnostics.SEM010]
+message = "عدم تطابق في النوع"
+help = "اجعل نوع التعبير مطابقا للنوع المتوقع"
+
+[diagnostics.SEM010.issues.argument_type_mismatch]
+message = "عدم تطابق في argument type"
+help = "اجعل نوع التعبير مطابقا للنوع المتوقع"
+
+[diagnostics.SEM010.issues.callee_not_callable]
+message = "callee غير قابل للاستدعاء"
+help = "اجعل نوع التعبير مطابقا للنوع المتوقع"
+
+[diagnostics.SEM010.issues.figura_not_index_param]
+message = "الاسم لا يشير إلى index parameter"
+help = "اجعل نوع التعبير مطابقا للنوع المتوقع"
+
+[diagnostics.SEM010.issues.assignment_type_mismatch]
+message = "عدم تطابق في assignment type"
+help = "اجعل نوع التعبير مطابقا للنوع المتوقع"
+
+[diagnostics.SEM010.issues.assert_condition_type_mismatch]
+message = "assert condition يجب أن يكون {bivalens}"
+help = "اجعل نوع التعبير مطابقا للنوع المتوقع"
+
+[diagnostics.SEM010.issues.constant_annotation_mismatch]
+message = "constant value لا يطابق annotation"
+help = "اجعل نوع التعبير مطابقا للنوع المتوقع"
+
+[diagnostics.SEM010.issues.closure_parameter_type_mismatch]
+message = "عدم تطابق في closure parameter type"
+help = "اجعل نوع التعبير مطابقا للنوع المتوقع"
+
+[diagnostics.SEM010.issues.closure_return_type_mismatch]
+message = "عدم تطابق في closure return type"
+help = "اجعل نوع التعبير مطابقا للنوع المتوقع"
+
+[diagnostics.SEM010.issues.coalesce_fallback_type_mismatch]
+message = "عدم تطابق في coalesce fallback type"
+help = "اجعل نوع التعبير مطابقا للنوع المتوقع"
+
+[diagnostics.SEM010.issues.common_type_mismatch]
+message = "أنواع غير متوافقة"
+help = "اجعل نوع التعبير مطابقا للنوع المتوقع"
+
+[diagnostics.SEM010.issues.array_element_type_mismatch]
+message = "عدم تطابق في array element type"
+help = "اجعل نوع التعبير مطابقا للنوع المتوقع"
+
+[diagnostics.SEM010.issues.array_spread_element_type_mismatch]
+message = "عدم تطابق في array spread element type"
+help = "اجعل نوع التعبير مطابقا للنوع المتوقع"
+
+[diagnostics.SEM010.issues.conversio_failure_channel_type_mismatch]
+message = "عدم تطابق propagating conversio failure channel"
+help = "اجعل نوع التعبير مطابقا للنوع المتوقع"
+
+[diagnostics.SEM010.issues.conversio_recovery_type_mismatch]
+message = "عدم تطابق في conversio recovery type"
+help = "اجعل نوع التعبير مطابقا للنوع المتوقع"
+
+[diagnostics.SEM010.issues.cursor_iteration_requires_ex]
+message = "cursor iteration يدعم {itera} {ex} فقط"
+help = "اجعل نوع التعبير مطابقا للنوع المتوقع"
+
+[diagnostics.SEM010.issues.expression_type_mismatch]
+message = "عدم تطابق في expression type"
+help = "اجعل نوع التعبير مطابقا للنوع المتوقع"
+
+[diagnostics.SEM010.issues.equality_exact_types_required]
+message = "equality يتطلب أنواعا متطابقة"
+help = "اجعل نوع التعبير مطابقا للنوع المتوقع"
+
+[diagnostics.SEM010.issues.field_initializer_type_mismatch]
+message = "عدم تطابق في field initializer type"
+help = "اجعل نوع التعبير مطابقا للنوع المتوقع"
+
+[diagnostics.SEM010.issues.failable_call_enclosing_error_type_mismatch]
+message = "failable call error type لا يطابق enclosing ⇥"
+help = "اجعل نوع التعبير مطابقا للنوع المتوقع"
+
+[diagnostics.SEM010.issues.failable_call_handler_error_type_mismatch]
+message = "عدم تطابق في handled failable call error type"
+help = "اجعل نوع التعبير مطابقا للنوع المتوقع"
+
+[diagnostics.SEM010.issues.field_default_type_mismatch]
+message = "عدم تطابق في field default type"
+help = "اجعل نوع التعبير مطابقا للنوع المتوقع"
+
+[diagnostics.SEM010.issues.iace_requires_alternate_exit]
+message = "{iace} يتطلب enclosing function مع '⇥' alternate-exit type"
+help = "اجعل نوع التعبير مطابقا للنوع المتوقع"
+
+[diagnostics.SEM010.issues.iace_value_type_mismatch]
+message = "عدم تطابق في alternate exit value type"
+help = "اجعل نوع التعبير مطابقا للنوع المتوقع"
+
+[diagnostics.SEM010.issues.ignored_expression_result_must_resolve]
+message = "ignored expression result يجب أن يحل"
+help = "اجعل نوع التعبير مطابقا للنوع المتوقع"
+
+[diagnostics.SEM010.issues.initializer_annotation_mismatch]
+message = "قيمة التهيئة لا تطابق النوع المعلن"
+help = "اجعل نوع قيمة التهيئة مطابقا للنوع المعلن"
+
+[diagnostics.SEM010.issues.incompatible_return_types]
+message = "return types غير متوافقة"
+help = "اجعل نوع التعبير مطابقا للنوع المتوقع"
+
+[diagnostics.SEM010.issues.intervallum_bound_required]
+message = "intervallum bound type يجب أن يكون {numerus} أو {instans}"
+help = "اجعل نوع التعبير مطابقا للنوع المتوقع"
+
+[diagnostics.SEM010.issues.intervallum_clamp_operand_type_mismatch]
+message = "عدم تطابق في intervallum clamp operand type"
+help = "اجعل نوع التعبير مطابقا للنوع المتوقع"
+
+[diagnostics.SEM010.issues.intra_requires_intervallum_range]
+message = "{intra} يتطلب intervallum range"
+help = "اجعل نوع التعبير مطابقا للنوع المتوقع"
+
+[diagnostics.SEM010.issues.incompatible_tensor_index]
+message = "index shapes غير متوافقة"
+help = "اجعل نوع التعبير مطابقا للنوع المتوقع"
+
+[diagnostics.SEM010.issues.invalid_cast]
+message = "cast غير صالح"
+help = "اجعل نوع التعبير مطابقا للنوع المتوقع"
+
+[diagnostics.SEM010.issues.itera_ab_source_requires_range]
+message = "{itera} ab source يجب أن يكون range expression"
+help = "اجعل نوع التعبير مطابقا للنوع المتوقع"
+
+[diagnostics.SEM010.issues.itera_apud_arity_mismatch]
+message = "عدد إحداثيات {apud} يجب أن يساوي رتبة الكائن القابل للتكرار"
+help = "اجعل نوع التعبير مطابقا للنوع المتوقع"
+
+[diagnostics.SEM010.issues.itera_apud_requires_ex]
+message = "إحداثيات {apud} تتطلب تكرار {ex}"
+help = "اجعل نوع التعبير مطابقا للنوع المتوقع"
+
+[diagnostics.SEM010.issues.itera_apud_requires_shaped_iterable]
+message = "{apud} يتطلب كائنًا قابلًا للتكرار من نوع tensor أو matrix"
+help = "اجعل نوع التعبير مطابقا للنوع المتوقع"
+
+[diagnostics.SEM010.issues.json_map_key_must_be_textus]
+message = "JSON map key يجب أن يكون {textus}"
+help = "اجعل نوع التعبير مطابقا للنوع المتوقع"
+
+[diagnostics.SEM010.issues.json_nested_value_requires_valor]
+message = "nested JSON value يتطلب {tabula} value type {valor}"
+help = "اجعل نوع التعبير مطابقا للنوع المتوقع"
+
+[diagnostics.SEM010.issues.json_value_type_mismatch]
+message = "JSON value لا يطابق {tabula} value type"
+help = "اجعل نوع التعبير مطابقا للنوع المتوقع"
+
+[diagnostics.SEM010.issues.live_tuus_cursor_call_arg]
+message = "live tuus cursor values لا يمكن تمريرها كـ function arguments بعد"
+help = "اجعل نوع التعبير مطابقا للنوع المتوقع"
+
+[diagnostics.SEM010.issues.live_tuus_cursor_return]
+message = "live tuus cursor values لا يمكن إرجاعها من functions بعد"
+help = "اجعل نوع التعبير مطابقا للنوع المتوقع"
+
+[diagnostics.SEM010.issues.live_tuus_cursor_struct]
+message = "live tuus cursor values لا يمكن تخزينها في structures بعد"
+help = "اجعل نوع التعبير مطابقا للنوع المتوقع"
+
+[diagnostics.SEM010.issues.live_tuus_cursor_reassign]
+message = "live tuus cursor locals لا يمكن إعادة إسنادها بعد"
+help = "اجعل نوع التعبير مطابقا للنوع المتوقع"
+
+[diagnostics.SEM010.issues.live_tuus_cursor_copy]
+message = "live tuus cursor values لا يمكن نسخها أو نقلها بين locals بعد"
+help = "اجعل نوع التعبير مطابقا للنوع المتوقع"
+
+[diagnostics.SEM010.issues.live_tuus_cursor_conversio]
+message = "live tuus cursor values لا يمكن تحويلها عبر aggregate conversio بعد"
+help = "اجعل نوع التعبير مطابقا للنوع المتوقع"
+
+[diagnostics.SEM010.issues.live_tuus_cursor_direct_initializer]
+message = "tuus.cursor() مدعوم فقط كـ direct local initializer"
+help = "اجعل نوع التعبير مطابقا للنوع المتوقع"
+
+[diagnostics.SEM010.issues.live_tuus_cursor_value]
+message = "live tuus cursor values لا يمكن استخدامها كـ expressions بعد"
+help = "اجعل نوع التعبير مطابقا للنوع المتوقع"
+
+[diagnostics.SEM010.issues.map_index_type_mismatch]
+message = "عدم تطابق في map index type"
+help = "اجعل نوع التعبير مطابقا للنوع المتوقع"
+
+[diagnostics.SEM010.issues.map_key_type_mismatch]
+message = "عدم تطابق في map key type"
+help = "اجعل نوع التعبير مطابقا للنوع المتوقع"
+
+[diagnostics.SEM010.issues.map_spread_key_type_mismatch]
+message = "عدم تطابق في map spread key type"
+help = "اجعل نوع التعبير مطابقا للنوع المتوقع"
+
+[diagnostics.SEM010.issues.map_spread_value_type_mismatch]
+message = "عدم تطابق في map spread value type"
+help = "اجعل نوع التعبير مطابقا للنوع المتوقع"
+
+[diagnostics.SEM010.issues.map_value_type_mismatch]
+message = "عدم تطابق في map value type"
+help = "اجعل نوع التعبير مطابقا للنوع المتوقع"
+
+[diagnostics.SEM010.issues.membership_operand_type_mismatch]
+message = "عدم تطابق في membership operand type"
+help = "اجعل نوع التعبير مطابقا للنوع المتوقع"
+
+[diagnostics.SEM010.issues.matmul_argument_rank_must_be_two]
+message = "matmul يتطلب rank-2 tensor argument"
+help = "اجعل نوع التعبير مطابقا للنوع المتوقع"
+
+[diagnostics.SEM010.issues.matmul_argument_shape_must_be_tuple]
+message = "matmul يتطلب rank-2 tensor argument مع tuple shape"
+help = "اجعل نوع التعبير مطابقا للنوع المتوقع"
+
+[diagnostics.SEM010.issues.matmul_receiver_rank_must_be_two]
+message = "matmul يتطلب rank-2 tensor receiver"
+help = "اجعل نوع التعبير مطابقا للنوع المتوقع"
+
+[diagnostics.SEM010.issues.matmul_receiver_shape_must_be_tuple]
+message = "matmul يتطلب rank-2 tensor receiver مع tuple shape"
+help = "اجعل نوع التعبير مطابقا للنوع المتوقع"
+
+[diagnostics.SEM010.issues.numeric_arithmetic_operands_identical]
+message = "numeric arithmetic operands يجب أن تكون أنواعها متطابقة؛ استخدم ↦ للتحويل الصريح"
+help = "اجعل نوع التعبير مطابقا للنوع المتوقع"
+
+[diagnostics.SEM010.issues.numeric_operand_required]
+message = "numeric operand مطلوب"
+help = "اجعل نوع التعبير مطابقا للنوع المتوقع"
+
+[diagnostics.SEM010.issues.numeric_operands_required]
+message = "numeric operands مطلوبة"
+help = "اجعل نوع التعبير مطابقا للنوع المتوقع"
+
+[diagnostics.SEM010.issues.boolean_operand_required]
+message = "{bivalens} operand مطلوب"
+help = "اجعل نوع التعبير مطابقا للنوع المتوقع"
+
+[diagnostics.SEM010.issues.boolean_operands_required]
+message = "{bivalens} operands مطلوبة"
+help = "اجعل نوع التعبير مطابقا للنوع المتوقع"
+
+[diagnostics.SEM010.issues.integer_operand_required]
+message = "integer operand مطلوب"
+help = "اجعل نوع التعبير مطابقا للنوع المتوقع"
+
+[diagnostics.SEM010.issues.integer_operands_required]
+message = "integer operands مطلوبة"
+help = "اجعل نوع التعبير مطابقا للنوع المتوقع"
+
+[diagnostics.SEM010.issues.instans_ordering_operands_required]
+message = "incompatible {instans} operands"
+help = "اجعل نوع التعبير مطابقا للنوع المتوقع"
+
+[diagnostics.SEM010.issues.pattern_type_mismatch]
+message = "عدم تطابق في pattern type"
+help = "اجعل نوع التعبير مطابقا للنوع المتوقع"
+
+[diagnostics.SEM010.issues.parameter_default_type_mismatch]
+message = "عدم تطابق في parameter default type"
+help = "اجعل نوع التعبير مطابقا للنوع المتوقع"
+
+[diagnostics.SEM010.issues.range_operand_type_mismatch]
+message = "عدم تطابق في range operand type"
+help = "اجعل نوع التعبير مطابقا للنوع المتوقع"
+
+[diagnostics.SEM010.issues.range_step_must_be_numeric]
+message = "range step يجب أن يكون numeric"
+help = "اجعل نوع التعبير مطابقا للنوع المتوقع"
+
+[diagnostics.SEM010.issues.return_type_mismatch]
+message = "return type لا يطابق function signature"
+help = "اجعل نوع التعبير مطابقا للنوع المتوقع"
+
+[diagnostics.SEM010.issues.regex_conversion_operand_type_mismatch]
+message = "{regex} conversion يتطلب {textus} أو {ascii}"
+help = "اجعل نوع التعبير مطابقا للنوع المتوقع"
+
+[diagnostics.SEM010.issues.string_operands_required]
+message = "string operands مطلوبة"
+help = "اجعل نوع التعبير مطابقا للنوع المتوقع"
+
+[diagnostics.SEM010.issues.atomic_arity]
+message = "atomic يتطلب element type واحدا بالضبط؛ استخدم atomic<T>"
+help = "اجعل نوع التعبير مطابقا للنوع المتوقع"
+
+[diagnostics.SEM010.issues.atomic_element]
+message = "atomic element type يجب أن يكون {numerus}<i32> أو {numerus}<u32>"
+help = "اجعل نوع التعبير مطابقا للنوع المتوقع"
+
+[diagnostics.SEM010.issues.atomic_incomplete]
+message = "atomic يتطلب element type واحدا؛ استخدم atomic<T>"
+help = "اجعل نوع التعبير مطابقا للنوع المتوقع"
+
+[diagnostics.SEM010.issues.matrix_incomplete]
+message = "matrix يتطلب element type و shape؛ استخدم matrix<T, [R, C]>"
+help = "اجعل نوع التعبير مطابقا للنوع المتوقع"
+
+[diagnostics.SEM010.issues.matrix_missing_figura]
+message = "matrix يتطلب shape ثنائي الأبعاد؛ استخدم matrix<T, [R, C]>"
+help = "اجعل نوع التعبير مطابقا للنوع المتوقع"
+
+[diagnostics.SEM010.issues.matrix_shape_two_dim]
+message = "matrix shape يجب أن يكون بعدين بالضبط"
+help = "اجعل نوع التعبير مطابقا للنوع المتوقع"
+
+[diagnostics.SEM010.issues.sparsa_incomplete]
+message = "sparsa يتطلب element type و Figura؛ استخدم sparsa<T, Figura>"
+help = "اجعل نوع التعبير مطابقا للنوع المتوقع"
+
+[diagnostics.SEM010.issues.sparsa_missing_figura]
+message = "sparsa يتطلب Figura shape؛ استخدم sparsa<T, []> للرتبة-0"
+help = "اجعل نوع التعبير مطابقا للنوع المتوقع"
+
+[diagnostics.SEM010.issues.scalar_text_operands_required]
+message = "scalar text operands مطلوبة"
+help = "اجعل نوع التعبير مطابقا للنوع المتوقع"
+
+[diagnostics.SEM010.issues.stream_ad_opener_type_mismatch]
+message = "stream {ad} opener يجب أن يخفض إلى {valor}"
+help = "اجعل نوع التعبير مطابقا للنوع المتوقع"
+
+[diagnostics.SEM010.issues.tensor_formata_element_type_mismatch]
+message = "formata target element type يجب أن يطابق receiver element type"
+help = "اجعل نوع التعبير مطابقا للنوع المتوقع"
+
+[diagnostics.SEM010.issues.tensor_incomplete]
+message = "tensor يتطلب element type و Figura؛ استخدم tensor<T, Figura>"
+help = "اجعل نوع التعبير مطابقا للنوع المتوقع"
+
+[diagnostics.SEM010.issues.tensor_missing_figura]
+message = "tensor يتطلب Figura shape؛ استخدم tensor<T, []> للرتبة-0"
+help = "اجعل نوع التعبير مطابقا للنوع المتوقع"
+
+[diagnostics.SEM010.issues.variant_pattern_scrutinee_mismatch]
+message = "variant لا يطابق scrutinee type"
+help = "اجعل نوع التعبير مطابقا للنوع المتوقع"
+
+[diagnostics.SEM010.issues.vector_element_type_mismatch]
+message = "عدم تطابق في vector element type"
+help = "اجعل نوع التعبير مطابقا للنوع المتوقع"
+
+[diagnostics.SEM010.issues.vector_incomplete]
+message = "vector يتطلب element type و width؛ استخدم vector<T, N>"
+help = "اجعل نوع التعبير مطابقا للنوع المتوقع"
+
+[diagnostics.SEM010.issues.vector_missing_width]
+message = "vector يتطلب width؛ استخدم vector<T, 4> أو vf32[4]"
+help = "اجعل نوع التعبير مطابقا للنوع المتوقع"
+
+[diagnostics.SEM010.issues.gradient_expression_unsupported]
+message = "postfix gradient selection (`call(...) ∇ [places]`) لن يُنزَّل حتى تصل surface الخاصة بـ tensor-glyphs 2B autograd؛ لا توجد قاعدة operand أو selector أو result نشطة في Phase 2A"
+help = "gradient selection (`∇`) للتحليل فقط في Phase 2A؛ قواعد eligibility/selector ستصل مع tensor-glyphs 2B"
+
+[diagnostics.SEM011]
+message = "أنواع operands غير صالحة"
+help = "استخدم أنواع operands متوافقة"
+
+[diagnostics.SEM011.issues.nucleum_lane_fragment_clash]
+message = "fragment lane binding '{fragment}' conflicts with caller lane binding '{caller}'"
+help = "keep caller and fragment lane bindings distinct"
+
+[diagnostics.SEM011.issues.range_step_must_be_numeric]
+message = "range step يجب أن يكون numeric"
+help = "استخدم numeric range step"
+
+[diagnostics.SEM011.issues.intervallum_bound_required]
+message = "intervallum bound type يجب أن يكون {numerus} أو {instans}"
+help = "استخدم {numerus} أو {fractus} أو {instans} أو sized scalar bounds"
+
+[diagnostics.SEM011.issues.intervallum_longitudo_bound]
+message = "intervallum longitudo يتطلب {numerus} bounds حتى يشحن momentum"
+help = "استخدم {numerus} intervallum bounds لـ longitudo حاليا"
+
+[diagnostics.SEM011.issues.numeric_operands_required]
+message = "numeric operands مطلوبة"
+help = "استخدم numeric operands لهذا العامل"
+
+[diagnostics.SEM011.issues.numeric_arithmetic_operands_identical]
+message = "numeric arithmetic operands يجب أن تكون أنواعها متطابقة؛ استخدم ↦ للتحويل الصريح"
+help = "حول operands صراحة قبل تطبيق هذا العامل العددي"
+
+[diagnostics.SEM011.issues.ascii_literal_invalid_escape]
+message = "{ascii} literal يحتوي escape sequence غير صالح"
+help = "استخدم ASCII literal escape sequences المدعومة"
+
+[diagnostics.SEM011.issues.ascii_literal_non_ascii_scalar]
+message = "{ascii} literal يحتوي محرفا non-ASCII '{character}'"
+help = "استخدم {textus} لنص Unicode أو أبق {ascii} payloads ASCII فقط"
+
+[diagnostics.SEM011.issues.ascii_literal_unescaped_control]
+message = "{ascii} literal يحتوي control character غير مهروب U+{codepoint}"
+help = "اهرب control characters في {ascii} literals"
+
+[diagnostics.SEM011.issues.boolean_operands_required]
+message = "{bivalens} operands مطلوبة"
+help = "استخدم {bivalens} operands لهذا العامل"
+
+[diagnostics.SEM011.issues.atomic_method_requires_atomic_receiver]
+message = "atomic operation يتطلب atomic receiver"
+help = "استدع load/store/exchange/compare_exchange على atomic<T>"
+
+[diagnostics.SEM011.issues.unsupported_atomic_method]
+message = "atomic operation غير مدعوم"
+help = "استخدم load أو store أو exchange أو compare_exchange"
+
+[diagnostics.SEM011.issues.bitwise_method_requires_numerus_receiver]
+message = "bitwise operator methods تتطلب {numerus} receiver"
+help = "استدع bitwise methods على {numerus} receivers"
+
+[diagnostics.SEM011.issues.deref_requires_reference]
+message = "deref يتطلب reference"
+help = "dereference قيمة reference"
+
+[diagnostics.SEM011.issues.densata_requires_sparsa_receiver]
+message = "densata يتطلب sparsa receiver"
+help = "استدع densata على قيمة sparsa"
+
+[diagnostics.SEM011.issues.ascii_literal_template_application]
+message = "{ascii} literals لا تدعم template application"
+help = "استخدم {textus} formatting literal لـ template calls"
+
+[diagnostics.SEM011.issues.directional_view_method_type_args]
+message = "directional view method لا يقبل type arguments"
+help = "أزل قائمة type argument الصريحة"
+
+[diagnostics.SEM011.issues.dynamic_callee_type_args]
+message = "dynamic callee لا يقبل type arguments"
+help = "أزل قائمة type argument الصريحة"
+
+[diagnostics.SEM011.issues.dynamic_receiver_method_type_args]
+message = "dynamic receiver لا يقبل method type arguments"
+help = "أزل قائمة type argument الصريحة"
+
+[diagnostics.SEM011.issues.failable_call_requires_handler]
+message = "failable call يتطلب ⇥ declaring context أو local handler"
+help = "عالج الاستدعاء بـ {fac}/{cape} أو صرح عن function ⇥"
+
+[diagnostics.SEM011.issues.generic_type_arg_domain]
+message = "type argument {rejected} غير مسموح لـ {param}؛ متوقع واحد من {accepted}"
+help = "اختر أحد type arguments المسموحة لهذا generic parameter"
+
+[diagnostics.SEM011.issues.gpu_builtin_device_function_required]
+message = "GPU builtin call صالح فقط داخل device functions"
+help = "استدع GPU builtins فقط داخل دوال @ nucleum أو @ nucleum fragment"
+
+[diagnostics.SEM011.issues.gpu_builtin_type_args]
+message = "GPU builtin call لا يقبل type arguments"
+help = "أزل قائمة type argument الصريحة"
+
+[diagnostics.SEM011.issues.inferred_callee_type_args]
+message = "inferred callee لا يقبل type arguments"
+help = "أزل قائمة type argument الصريحة"
+
+[diagnostics.SEM011.issues.intrinsic_method_type_args]
+message = "intrinsic method لا يقبل type arguments"
+help = "أزل قائمة type argument الصريحة"
+
+[diagnostics.SEM011.issues.integer_operands_required]
+message = "integer operands مطلوبة"
+help = "استخدم integer operands لهذا العامل"
+
+[diagnostics.SEM011.issues.instans_ordering_operands_required]
+message = "incompatible {instans} operands"
+help = "قارن قيم {instans} مع قيم {instans}"
+
+[diagnostics.SEM011.issues.json_duplicate_key]
+message = "JSON key مكرر \"{key}\""
+help = "أزل أو أعد تسمية JSON object key المكرر"
+
+[diagnostics.SEM011.issues.method_call_type_args]
+message = "method call لا يقبل type arguments"
+help = "أزل قائمة type argument الصريحة"
+
+[diagnostics.SEM011.issues.numeric_lista_elements_required]
+message = "numeric {lista} elements مطلوبة"
+help = "استخدم numeric elements لـ {lista} intrinsic هذا"
+
+[diagnostics.SEM011.issues.octeti_literal_invalid_character]
+message = "{octeti} literal يحتوي محرفا غير صالح '{character}'"
+help = "استخدم فقط hexadecimal digits في {octeti} literals"
+
+[diagnostics.SEM011.issues.octeti_literal_odd_digit_count]
+message = "{octeti} literal له عدد فردي من hex digits"
+help = "قدم complete byte pairs في {octeti} literals"
+
+[diagnostics.SEM011.issues.octeti_literal_template_application]
+message = "{octeti} literals لا تدعم template application"
+help = "استخدم {textus} formatting بدلا من {octeti} literal calls"
+
+[diagnostics.SEM011.issues.sermo_view_payload_type_arg_count]
+message = "{method} يقبل payload type argument واحدا على الأكثر"
+help = "أزل قائمة type argument الصريحة"
+
+[diagnostics.SEM011.issues.template_application_type_args]
+message = "template application لا يقبل type arguments"
+help = "أزل قائمة type argument الصريحة"
+
+[diagnostics.SEM011.issues.variant_constructor_type_args]
+message = "variant constructor لا يقبل type arguments"
+help = "أزل قائمة type argument الصريحة"
+
+[diagnostics.SEM011.issues.same_width_integer_operands_required]
+message = "same-width integer operands مطلوبة"
+help = "حول integer operands إلى نفس width قبل تطبيق هذا العامل"
+
+[diagnostics.SEM011.issues.postfix_inc_dec_numerus_operand]
+message = "postfix increment/decrement يتطلب {numerus} operand"
+help = "طبق postfix increment/decrement على قيم {numerus}"
+
+[diagnostics.SEM011.issues.array_spread_requires_lista]
+message = "array spread يتطلب {lista} operand"
+help = "انشر قيمة {lista} داخل {lista} construction"
+
+[diagnostics.SEM011.issues.struct_computed_key_forbidden]
+message = "computed keys غير صالحة في struct construction"
+help = "استخدم declared struct field names في struct construction"
+
+[diagnostics.SEM011.issues.struct_spread_forbidden]
+message = "spread fields غير صالحة في struct construction"
+help = "قدم كل required struct field صراحة"
+
+[diagnostics.SEM011.issues.vector_constructor_forbids_spread]
+message = "vector constructor لا يقبل spread arguments"
+help = "قدم explicit vector elements بدلا من spread arguments"
+
+[diagnostics.SEM011.issues.object_spread_requires_tabula]
+message = "object spread يتطلب {tabula} operand"
+help = "انشر قيمة {tabula} داخل {tabula} construction"
+
+[diagnostics.SEM011.issues.interval_bound_single_scalar]
+message = "interval bound يجب أن يكون Unicode scalar واحدا"
+help = "مرر قيم {textus} أو {ascii} تحتوي Unicode scalar واحدا بالضبط"
+
+[diagnostics.SEM011.issues.numeric_operand_required]
+message = "numeric operand مطلوب"
+help = "استخدم numeric operand لهذا العامل"
+
+[diagnostics.SEM011.issues.numeric_value_equality_operands_required]
+message = "≈ يتطلب numeric operands؛ استخدم ≅ لـ promoted exact equality أو .approx لـ explicit tolerance"
+help = "استخدم numeric operands مع ≈ لـ fuzzy equality؛ استخدم ≅ لـ promoted exact equality أو .approx لـ explicit tolerance"
+
+[diagnostics.SEM011.issues.boolean_operand_required]
+message = "{bivalens} operand مطلوب"
+help = "استخدم {bivalens} operand لهذا العامل"
+
+[diagnostics.SEM011.issues.condition_must_be_bivalens]
+message = "condition يجب أن يكون {bivalens}"
+help = "استخدم تعبير {bivalens} كـ condition"
+
+[diagnostics.SEM011.issues.integer_operand_required]
+message = "integer operand مطلوب"
+help = "استخدم integer operand لهذا العامل"
+
+[diagnostics.SEM011.issues.range_operand_must_be_numeric]
+message = "range operand يجب أن يكون numeric"
+help = "قارن قيم numeric مع intervallum ranges"
+
+[diagnostics.SEM011.issues.scalar_text_operands_required]
+message = "scalar text operands مطلوبة"
+help = "قارن single-scalar {textus} أو {ascii} operands"
+
+[diagnostics.SEM011.issues.string_operands_required]
+message = "string operands مطلوبة"
+help = "استخدم {textus} operands لـ string addition"
+
+[diagnostics.SEM011.issues.object_field_requires_value]
+message = "object field يتطلب قيمة"
+help = "قدم قيمة صريحة لـ object field هذا"
+
+[diagnostics.SEM011.issues.vacua_requires_collection_type]
+message = "vacua يتطلب collection type"
+help = "أعط vacua سياق {lista} أو {tabula} أو {copia} أو tensor أو sparsa"
+
+[diagnostics.SEM011.issues.textus_index_must_be_numerus_or_range]
+message = "{textus} index يجب أن يكون {numerus} أو range"
+help = "فهرس {textus} بـ {numerus} أو integer range"
+
+[diagnostics.SEM011.issues.array_index_must_be_numerus]
+message = "array index يجب أن يكون {numerus}"
+help = "فهرس قيم {lista} بـ {numerus}"
+
+[diagnostics.SEM011.issues.indexing_requires_array_or_map]
+message = "indexing يتطلب array أو map"
+help = "فهرس فقط {lista} أو {tabula} أو tensor أو {textus} أو {ignotum} values"
+
+[diagnostics.SEM011.issues.tensor_index_vector_integer_elements]
+message = "tensor index vector يتطلب {lista} من integer elements"
+help = "استخدم {lista} من supported integer index elements"
+
+[diagnostics.SEM011.issues.tensor_scalar_index_rank]
+message = "tensor scalar index يتطلب rank-1؛ استخدم {lista}<integer> للرتبة-N"
+help = "استخدم scalar index فقط على rank-1 tensors"
+
+[diagnostics.SEM011.issues.tensor_bracket_index_integer_or_lista]
+message = "tensor bracket index يتطلب integer أو {lista}<integer>"
+help = "استخدم integer scalar أو {lista} من integer indices"
+
+[diagnostics.SEM011.issues.tensor_arithmetic_numeric_element_required]
+message = "tensor arithmetic يتطلب numeric element type"
+help = "استخدم numeric tensor أو sparsa element types"
+
+[diagnostics.SEM011.issues.matrix_arithmetic_numeric_element_required]
+message = "matrix arithmetic يتطلب numeric element types"
+help = "استخدم numeric matrix element types"
+
+[diagnostics.SEM011.issues.tensor_receiver_structa_renamed]
+message = "tensor receiver method structa أعيد تسميته إلى strue؛ استخدم seed.strue(data, shape)"
+help = "استخدم seed.strue(data, shape)"
+
+[diagnostics.SEM011.issues.tensor_receiver_creata_type_args]
+message = "tensor receiver creata لا يقبل type arguments؛ استخدم tensor.creata<CompleteTensorType>(fill)"
+help = "استدع tensor.creata<CompleteTensorType>(fill) لـ static construction"
+
+[diagnostics.SEM011.issues.tensor_crea_argument_order]
+message = "tensor crea يتوقع fill ثم shape؛ استخدم seed.crea(fill, shape)"
+help = "مرر fill قبل shape"
+
+[diagnostics.SEM011.issues.tensor_structa_forma_removed]
+message = "tensor.structa_forma أزيل؛ استخدم tensor.structa<CompleteTensorType>(data)"
+help = "استخدم tensor.structa<CompleteTensorType>(data)"
+
+[diagnostics.SEM011.issues.tensor_creata_runtime_shape_removed]
+message = "tensor.creata لم يعد يقبل runtime shape argument؛ استخدم tensor.creata<CompleteTensorType>(fill)"
+help = "استخدم tensor.creata<CompleteTensorType>(fill)"
+
+[diagnostics.SEM011.issues.tensor_creata_complete_type_arg_required]
+message = "tensor.creata يتطلب complete tensor type argument؛ استخدم tensor.creata<CompleteTensorType>(fill)"
+help = "قدم complete tensor type argument"
+
+[diagnostics.SEM011.issues.tensor_formata_complete_type_arg_required]
+message = "formata يتطلب complete tensor type argument؛ استخدم grid.formata<CompleteTensorType>()"
+help = "قدم complete tensor type argument"
+
+[diagnostics.SEM011.issues.tensor_formata_forbids_value_args]
+message = "formata لا يقبل value arguments؛ استخدم grid.forma(shape) لـ runtime reshape"
+help = "استخدم grid.forma(shape) لـ runtime reshape"
+
+[diagnostics.SEM011.issues.tensor_type_arg_incomplete]
+message = "tensor type argument يجب أن يكون complete tensor type مثل tf32[2, 2] أو tensor<{numerus}, [4]>"
+help = "ضمن element type و shape في tensor type argument"
+
+[diagnostics.SEM012]
+message = "غير قابل للاستدعاء"
+help = "استدع functio أو closure"
+
+[diagnostics.SEM012.issues.callee_not_callable]
+message = "callee غير قابل للاستدعاء"
+help = "استدع functio أو closure أو قيمة قابلة للاستدعاء"
+
+[diagnostics.SEM013]
+message = "عدد arguments غير صحيح"
+help = "اضبط عدد arguments"
+
+[diagnostics.SEM013.issues.callee_type_args_unsupported]
+message = "callee لا يقبل type arguments"
+help = "احذف قائمة type argument الصريحة"
+
+[diagnostics.SEM013.issues.gpu_builtin_expects_no_arguments]
+message = "استدعاء GPU builtin لا يتوقع arguments"
+help = "احذف call arguments"
+
+[diagnostics.SEM013.issues.method_accepts_no_arguments]
+message = "{method} لا يقبل arguments"
+help = "احذف call arguments"
+
+[diagnostics.SEM013.issues.variant_pattern_arity_mismatch]
+message = "عدم تطابق arity في variant pattern"
+help = "طابق عدد pattern field مع variant"
+
+[diagnostics.SEM013.issues.vector_constructor_width_arity]
+message = "عدد arguments في vector constructor يجب أن يطابق عرض vector"
+help = "قدم constructor element واحدا لكل vector lane"
+
+[diagnostics.SEM013.issues.wrong_number_of_arguments]
+message = "عدد arguments غير صحيح"
+help = "اضبط عدد arguments"
+
+[diagnostics.SEM013.issues.wrong_number_of_type_arguments]
+message = "عدد type arguments غير صحيح"
+help = "اضبط عدد type arguments"
+
+[diagnostics.SEM014]
+message = "type annotation مفقود"
+help = "أضف type annotation"
+
+[diagnostics.SEM014.issues.cannot_infer_alternate_exit_type]
+message = "تعذر استنتاج alternate-exit type"
+help = "أضف type annotation صريحا"
+
+[diagnostics.SEM014.issues.cannot_infer_constant_type]
+message = "تعذر استنتاج constant type"
+help = "أضف type annotation صريحا"
+
+[diagnostics.SEM014.issues.cannot_infer_expression_type]
+message = "تعذر استنتاج expression type"
+help = "أضف type annotation صريحا"
+
+[diagnostics.SEM014.issues.cannot_infer_field_type]
+message = "تعذر استنتاج field type"
+help = "أضف type annotation صريحا"
+
+[diagnostics.SEM014.issues.cannot_infer_return_type]
+message = "تعذر استنتاج return type"
+help = "أضف type annotation صريحا"
+
+[diagnostics.SEM014.issues.cannot_infer_tensor_shape]
+message = "تعذر استنتاج tensor shape"
+help = "قدم concrete tensor أو sparsa shape"
+
+[diagnostics.SEM014.issues.cannot_infer_variable_type]
+message = "تعذر استنتاج variable type"
+help = "أضف type annotation صريحا"
+
+[diagnostics.SEM014.issues.directional_view_type_not_registered]
+message = "directional view type غير مسجل"
+help = "تأكد من تسجيل built-in frame types قبل typechecking"
+
+[diagnostics.SEM014.issues.explicit_type_arg_inference_unsupported]
+message = "partial inference في explicit type arguments غير مدعوم"
+help = "استبدل inferred explicit type arguments بـ concrete types"
+
+[diagnostics.SEM014.issues.scrinium_type_not_registered]
+message = "scrinium type غير مسجل"
+help = "تأكد من تسجيل built-in frame types قبل typechecking"
+
+[diagnostics.SEM014.issues.sermo_type_not_registered]
+message = "sermo type غير مسجل"
+help = "تأكد من تسجيل built-in frame types قبل typechecking"
+
+[diagnostics.SEM014.issues.vacua_requires_declared_type]
+message = "vacua يتطلب declared type صريحا"
+help = "أضف declared collection type لـ vacua"
+
+[diagnostics.SEM015]
+message = "cast غير صالح"
+help = "cast إلى type متوافق"
+
+[diagnostics.SEM016]
+message = "conversion غير صالح"
+help = "استخدم conversion صالحا أو قدم inline recovery باستخدام `⇥`"
+
+[diagnostics.SEM016.issues.intervallum_clamp_recovery_unsupported]
+message = "intervallum clamp conversio لا يدعم recovery `⇥`"
+help = "احذف recovery arm من range clamp هذا"
+
+[diagnostics.SEM016.issues.intervallum_target_not_range]
+message = "target في intervallum conversio يجب أن يكون range أو intervallum value"
+help = "حول إلى range أو intervallum value"
+
+[diagnostics.SEM016.issues.intervallum_clamp_bound_mismatch]
+message = "intervallum clamp يتطلب bound types متطابقة"
+help = "طابق source و target bound element types"
+
+[diagnostics.SEM016.issues.sermo_materialize_target_unsupported]
+message = "sermo materialization target غير مدعوم؛ متوقع {vacuum} أو {valor} أو scalar ({numerus}، {fractus}، {bivalens}، {textus}، {ascii}، {octeti}، {instans}) أو {lista}<T>"
+help = "اختر sermo materialization target مدعوما"
+
+[diagnostics.SEM016.issues.intervallum_materialize_lista_element_mismatch]
+message = "intervallum materialize يتطلب {lista} element type مطابقا"
+help = "طابق source و target bound element types"
+
+[diagnostics.SEM016.issues.intervallum_materialize_tensor_element_mismatch]
+message = "intervallum materialize يتطلب tensor element type مطابقا"
+help = "طابق source و target bound element types"
+
+[diagnostics.SEM016.issues.lista_to_vector_literal_required]
+message = "vector materialization يتطلب {lista} literal source"
+help = "استخدم conversion صالحا أو قدم inline recovery باستخدام `⇥`"
+
+[diagnostics.SEM016.issues.lista_to_vector_element_mismatch]
+message = "{lista} إلى vector conversio يتطلب element types متطابقة"
+help = "استخدم conversion صالحا أو قدم inline recovery باستخدام `⇥`"
+
+[diagnostics.SEM016.issues.lista_to_vector_literal_width]
+message = "{lista} إلى vector conversio يتطلب literal vector width"
+help = "استخدم conversion صالحا أو قدم inline recovery باستخدام `⇥`"
+
+[diagnostics.SEM016.issues.matrix_materialize_unsupported]
+message = "matrix materialization غير مدعوم بعد"
+help = "أبق matrix values كـ typed parameters حتى يتم تنفيذ matrix construction lowering"
+
+[diagnostics.SEM016.issues.valor_to_regex_unsupported]
+message = "{valor} إلى {regex} conversion بلا default pattern؛ استخدم `{valor} ↦ {textus} ↦ {regex}`"
+help = "حول {valor} إلى {textus} قبل التحويل إلى {regex}"
+
+[diagnostics.SEM016.issues.valor_to_cursor_boundary]
+message = "{valor} إلى {cursor} conversion يعبر eager/lazy boundary؛ materialize عبر `{valor} ↦ {lista}` ثم `{lista} ↦ {cursor}`"
+help = "materialize {cursor} عبر {lista} قبل عبور boundary"
+
+[diagnostics.SEM016.issues.valor_to_promissum_boundary]
+message = "{valor} إلى {promissum} conversion يعبر async/sync boundary؛ {valor} synchronous — غلف المنتج في `@ futura`"
+help = "resolve أو wrap async value صراحة"
+
+[diagnostics.SEM016.issues.promissum_to_valor_boundary]
+message = "{promissum} إلى {valor} conversion يعبر async/sync boundary؛ resolve بـ `.exspecta()` قبل boxing"
+help = "resolve أو wrap async value صراحة"
+
+[diagnostics.SEM016.issues.cursor_to_valor_boundary]
+message = "{cursor} إلى {valor} conversion يعبر eager/lazy boundary؛ materialize عبر `{cursor} ↦ {lista}` ثم `{lista} ↦ {valor}`"
+help = "materialize {cursor} عبر {lista} قبل عبور boundary"
+
+[diagnostics.SEM016.issues.numeric_to_octeti_unspecified]
+message = "conversion من {numerus} أو {fractus} أو {bivalens} إلى {octeti} غير محدد (byte width و endianness)؛ استخدم `chorda` أو explicit byte verbs بدلا من ذلك"
+help = "استخدم chorda أو explicit byte conversion helpers"
+
+[diagnostics.SEM016.issues.octeti_to_numerus_unspecified]
+message = "conversion من {octeti} إلى {numerus} غير محدد (byte width و endianness)؛ استخدم `chorda` أو explicit byte verbs بدلا من ذلك"
+help = "استخدم chorda أو explicit byte conversion helpers"
+
+[diagnostics.SEM016.issues.octeti_to_fractus_unspecified]
+message = "conversion من {octeti} إلى {fractus} غير محدد (IEEE width و endianness)؛ استخدم `chorda` أو explicit byte verbs بدلا من ذلك"
+help = "استخدم chorda أو explicit byte conversion helpers"
+
+[diagnostics.SEM016.issues.bits_pair_width_mismatch]
+message = "the Bits bitcast requires exact-width pairs: numerus<u32> ↔ fractus<f32> and numerus<u64> ↔ fractus<f64>"
+help = "convert to the matching IEEE width first: u32 pairs with f32, u64 with f64"
+
+[diagnostics.SEM016.issues.octeti_to_bivalens_unsupported]
+message = "conversion من {octeti} إلى {bivalens} بلا default meaning؛ فك إلى {textus} أو قارن bytes صراحة"
+help = "استخدم chorda أو explicit byte conversion helpers"
+
+[diagnostics.SEM016.issues.promissum_target_boundary]
+message = "conversion إلى {promissum} يعبر async/sync boundary؛ استخدم `@ futura` أو `.tum()` للـ async wrapping"
+help = "resolve أو wrap async value صراحة"
+
+[diagnostics.SEM016.issues.promissum_source_boundary]
+message = "conversion من {promissum} يعبر async/sync boundary؛ استخدم `.exspecta()` أو `@ futura` `.tum()` للـ async resolution"
+help = "resolve أو wrap async value صراحة"
+
+[diagnostics.SEM016.issues.sparsa_collection_unsupported]
+message = "sparsa conversion بلا default {lista} meaning؛ استخدم densata() قبل {lista} conversion أو explicit sparse helper"
+help = "densify أو استخدم explicit sparse helper"
+
+[diagnostics.SEM016.issues.sparsa_tensor_element_mismatch]
+message = "tensor و sparsa conversio يتطلبان element type نفسه؛ حول element width صراحة قبل تغيير representation"
+help = "حول element widths صراحة قبل تغيير representation"
+
+[diagnostics.SEM016.issues.sparsa_tensor_shape_mismatch]
+message = "tensor و sparsa conversio يتطلبان Figura shape نفسه؛ reshape صراحة قبل `↦`"
+help = "reshape صراحة قبل التحويل"
+
+[diagnostics.SEM016.issues.tensor_to_scalar_unsupported]
+message = "tensor إلى scalar conversion بلا default element pick؛ استخدم `accipe(index)` للـ indexed reads"
+help = "index أو reduce tensor قبل التحويل"
+
+[diagnostics.SEM016.issues.scalar_to_tensor_unsupported]
+message = "scalar إلى tensor conversion بلا default broadcast shape؛ استخدم `crea(shape, fill)` أو `structa`"
+help = "construct أو fill tensor صراحة"
+
+[diagnostics.SEM016.issues.tensor_shape_mismatch]
+message = "tensor shape conversion غير مدعوم لهذا الزوج"
+help = "reshape صراحة قبل التحويل"
+
+[diagnostics.SEM016.issues.tensor_element_mismatch]
+message = "tensor element-type conversion غير مدعوم لهذا الزوج"
+help = "حول element widths صراحة قبل تغيير representation"
+
+[diagnostics.SEM016.issues.conversio_failure_channel_textus_required]
+message = "propagating conversio failure يتطلب alternate-exit channel من نوع `{textus}`"
+help = "صرح alternate-exit channel كـ {textus} أو قدم inline recovery"
+
+[diagnostics.SEM016.issues.regex_operand_unsupported]
+message = "{regex} conversion يتطلب {textus} أو {ascii} operand"
+help = "حول {textus} أو {ascii} values إلى {regex}"
+
+[diagnostics.SEM016.issues.regex_recovery_unsupported]
+message = "{regex} conversion لا يدعم recovery `⇥`؛ {regex} ليس له literal form، لذا لا توجد target-typed value للاستبدال"
+help = "احذف recovery arm من {regex} conversion هذا"
+
+[diagnostics.SEM016.issues.valor_verte_unsupported]
+message = "{valor} ∷ T غير مدعوم — لا يمكن تأكيد dynamic value's shape في compile time. استخدم `↦ T` للـ runtime extraction (مع `⇥` للـ recovery)."
+help = "استخدم runtime `↦ T` conversion مع recovery `⇥` بدلا من ذلك"
+
+[diagnostics.SEM016.issues.json_genus_conversion_requires_json_annotation]
+message = "{json}/{genus} conversion يتطلب أن يكون {genus} معلمًا `@ {json}`"
+help = "أضف `@ {json}` إلى {genus} أو حول عبر `{valor}` صراحة"
+
+[diagnostics.SEM016.issues.lista_to_tabula_unsupported]
+message = "{lista} إلى {tabula} conversion بلا default key/value derivation؛ استخدم {tabula} constructor verb أو `.in.{tabula}(k, v)`؛ pair-destructuring default مؤجل"
+help = "construct {tabula} باختيار key/value صريح"
+
+[diagnostics.SEM016.issues.cross_collection_unsupported]
+message = "cross-collection conversion بلا default `↦` meaning؛ استخدم explicit stdlib verb"
+help = "استخدم explicit stdlib conversion verb"
+
+[diagnostics.SEM016.issues.lista_to_tensor_nested]
+message = "{lista} إلى tensor conversio يتطلب flat {lista}؛ flatten nested {lista} values صراحة قبل `↦`"
+help = "flatten nested {lista} قبل التحويل إلى tensor"
+
+[diagnostics.SEM016.issues.lista_to_tensor_element_mismatch]
+message = "{lista} إلى tensor conversio يتطلب element types متطابقة؛ حول elements صراحة قبل `↦`"
+help = "حول {lista} elements إلى tensor element type أولا"
+
+[diagnostics.SEM016.issues.rectangular_lista_literal_target]
+message = "rectangular {lista} literal conversio يتطلب rank-2 literal tensor Figura target"
+help = "حول nested {lista} literals إلى rank-2 tensor target"
+
+[diagnostics.SEM016.issues.rectangular_lista_literal_ragged]
+message = "ragged nested {lista} literal لا يمكن تحويله إلى tensor؛ استخدم crea أو explicit flatten verb"
+help = "اجعل كل nested row بنفس الطول"
+
+[diagnostics.SEM016.issues.rectangular_lista_literal_row_length]
+message = "rectangular {lista} literal row lengths غير متطابقة"
+help = "اجعل كل nested row بنفس الطول"
+
+[diagnostics.SEM016.issues.rectangular_lista_literal_shape]
+message = "rectangular {lista} literal shape لا يطابق conversio target"
+help = "طابق nested literal dimensions مع target Figura"
+
+[diagnostics.SEM016.issues.rectangular_lista_literal_spread]
+message = "rectangular {lista} literal conversio لا يسمح بـ spread elements"
+help = "وسع spread elements قبل tensor conversion"
+
+[diagnostics.SEM016.issues.rectangular_lista_literal_leaf]
+message = "rectangular {lista} literal conversio يتطلب literal leaf elements"
+help = "استخدم literal scalar leaves في nested {lista}"
+
+[diagnostics.SEM017]
+message = "declaration غير متاح"
+help = "استخدم declaration متاحا أو implement السطح المعلم"
+
+[diagnostics.SEM017.issues.nondum_method_for_target]
+message = "method `{method}` معلم nondum لهذا target{?reason|: |}"
+help = "استخدم declaration متاحا أو غير target"
+
+[diagnostics.SEM018]
+message = "annotation غير صالح"
+help = "أصلح عقد annotation قبل semantic lowering"
+
+[diagnostics.SEM018.issues.protecta_reserved]
+message = "`{annotation}` محجوز وليس له معنى visibility نشط"
+help = "استخدم `{publica}` للـ explicit export intent أو `{privata}` للـ file-private intent"
+
+[diagnostics.SEM018.issues.conflicting_lane]
+message = "@ radix lane annotations متعارضة: '{existing}' و '{parsed}'"
+help = "استخدم `@ radix lane \"air\"` أو `@ radix lane \"mir\"` أو `@ radix lane \"hir-direct\"` على top-level {functio}"
+
+[diagnostics.SEM018.issues.nucleum_lane_invalid_identifier]
+message = "@ nucleum lane binding '{name}' is not a valid identifier"
+help = "use a valid identifier for the lane binding"
+
+[diagnostics.SEM018.issues.nucleum_lane_collision]
+message = "@ nucleum lane binding '{name}' collides with a parameter or local"
+help = "choose a lane binding name that is not already used in the entry"
+
+[diagnostics.SEM018.issues.nucleum_lane_conflicting]
+message = "conflicting @ nucleum lane bindings: '{existing}' and '{parsed}'"
+help = "declare exactly one @ nucleum lane binding"
+
+[diagnostics.SEM018.issues.missing_directive]
+message = "@ radix يتطلب directive مثل `lane`"
+help = "استخدم `@ radix lane \"air\"` أو `@ radix lane \"mir\"` أو `@ radix lane \"hir-direct\"` على top-level {functio}"
+
+[diagnostics.SEM018.issues.missing_lane_value]
+message = "@ radix lane يتطلب string value"
+help = "استخدم `@ radix lane \"air\"` أو `@ radix lane \"mir\"` أو `@ radix lane \"hir-direct\"` على top-level {functio}"
+
+[diagnostics.SEM018.issues.non_string_lane_value]
+message = "@ radix lane value يجب أن يكون string literal"
+help = "استخدم `@ radix lane \"air\"` أو `@ radix lane \"mir\"` أو `@ radix lane \"hir-direct\"` على top-level {functio}"
+
+[diagnostics.SEM018.issues.empty_radix_typus_domain]
+message = "@ radix typus domain يتطلب type مسموحا واحدا على الأقل"
+help = "استخدم `@ radix typus T in {textus} {octeti}` أو braced `{radix_typus_braced}` مع type مسموح واحد على الأقل"
+
+[diagnostics.SEM018.issues.missing_type_param]
+message = "@ radix typus يتطلب generic type parameter"
+help = "استخدم `@ radix typus T in {textus} {octeti}` أو braced `{radix_typus_braced}` مع type مسموح واحد على الأقل"
+
+[diagnostics.SEM018.issues.non_identifier_type_param]
+message = "@ radix typus parameter يجب أن يكون identifier"
+help = "استخدم `@ radix typus T in {textus} {octeti}` أو braced `{radix_typus_braced}` مع type مسموح واحد على الأقل"
+
+[diagnostics.SEM018.issues.non_type_allowed]
+message = "@ radix typus allowed value يجب أن يكون type"
+help = "استخدم `@ radix typus T in {textus} {octeti}` أو braced `{radix_typus_braced}` مع type مسموح واحد على الأقل"
+
+[diagnostics.SEM018.issues.unexpected_token]
+message = "unexpected token بعد @ radix lane value"
+help = "استخدم `@ radix lane \"air\"` أو `@ radix lane \"mir\"` أو `@ radix lane \"hir-direct\"` على top-level {functio}"
+
+[diagnostics.SEM018.issues.unknown_directive]
+message = "@ radix directive غير معروف؛ متوقع `lane`"
+help = "استخدم `@ radix lane \"air\"` أو `@ radix lane \"mir\"` أو `@ radix lane \"hir-direct\"` على top-level {functio}"
+
+[diagnostics.SEM018.issues.unknown_lane]
+message = "@ radix lane '{lane}' غير معروف؛ متوقع 'air' أو 'mir' أو 'hir-direct'"
+help = "استخدم `@ radix lane \"air\"` أو `@ radix lane \"mir\"` أو `@ radix lane \"hir-direct\"` على top-level {functio}"
+
+[diagnostics.SEM018.issues.unsupported_placement]
+message = "@ radix lane مدعوم فقط على top-level {functio} declarations وليس على {placement}"
+help = "استخدم `@ radix lane \"air\"` أو `@ radix lane \"mir\"` أو `@ radix lane \"hir-direct\"` على top-level {functio}"
+
+[diagnostics.SEM020]
+message = "إسناد إلى غير قابل للتغيير"
+help = "استخدم ربط `{varia}` للسماح بإعادة الإسناد أو أزل الإسناد الإضافي"
+
+[diagnostics.SEM020.issues.assignment_to_constant]
+message = "إسناد إلى constant"
+help = "استخدم ربط `{varia}` للسماح بإعادة الإسناد أو أزل الإسناد الإضافي"
+
+[diagnostics.SEM020.issues.immutable_second_assignment]
+message = "إسناد ثان إلى immutable binding"
+help = "استخدم ربط `{varia}` للسماح بإعادة الإسناد أو أزل الإسناد الإضافي"
+
+[diagnostics.SEM020.issues.imperativus_operator_method_requires_varia_receiver]
+message = "imperativus operator method يتطلب {varia} receiver"
+help = "استخدم ربط `{varia}` للسماح بإعادة الإسناد أو أزل الإسناد الإضافي"
+
+[diagnostics.SEM021]
+message = "هدف إسناد غير صالح"
+help = "أسند إلى lvalue صالح"
+
+[diagnostics.SEM021.issues.invalid_assignment_target]
+message = "هدف إسناد غير صالح"
+help = "أسند إلى lvalue صالح"
+
+[diagnostics.SEM030]
+message = "{keyword} خارج سياق breakable"
+help = "استخدم '{rumpe}' داخل {dum} أو {itera} أو {fac} أو meus أو tuus"
+
+[diagnostics.SEM030.issues.break_outside_breakable]
+message = "{keyword} خارج {context}"
+help = "استخدم '{rumpe}' داخل {dum} أو {itera} أو {fac} أو meus أو tuus"
+
+[diagnostics.SEM031]
+message = "{keyword} خارج حلقة"
+help = "استخدم '{perge}' داخل حلقة"
+
+[diagnostics.SEM031.issues.continue_outside_loop]
+message = "{keyword} خارج {context}"
+help = "استخدم '{perge}' داخل حلقة"
+
+[diagnostics.SEM032]
+message = "{keyword} خارج دالة"
+help = "استخدم '{redde}' داخل دالة"
+
+[diagnostics.SEM032.issues.return_outside_function]
+message = "{keyword} خارج {context}"
+help = "استخدم '{redde}' داخل دالة"
+
+[diagnostics.SEM033]
+message = "return مفقود"
+help = "أضف عبارة return أو اجعل return type '{vacuum}'"
+
+[diagnostics.SEM033.issues.control_flow_fallthrough]
+message = "ليس كل control-flow paths تعيد قيمة"
+help = "أضف عبارة return أو اجعل return type '{vacuum}'"
+
+[diagnostics.SEM033.issues.redde_requires_return_type]
+message = "{keyword} يتطلب explicit normal return type"
+help = "أضف عبارة return أو اجعل return type '{vacuum}'"
+
+[diagnostics.SEM040]
+message = "match غير شامل"
+help = "أضف cases ناقصة أو ذراع '{ceterum}'"
+
+[diagnostics.SEM040.issues.missing_variants]
+message = "match غير شامل"
+help = "أضف cases ناقصة أو ذراع '{ceterum}'"
+
+[diagnostics.SEM041]
+message = "نمط غير قابل للوصول"
+help = "أزل النمط غير القابل للوصول أو أعد ترتيبه"
+
+[diagnostics.SEM041.issues.after_catchall]
+message = "نمط غير قابل للوصول"
+help = "أزل النمط غير القابل للوصول أو أعد ترتيبه"
+
+[diagnostics.SEM042]
+message = "نمط مكرر"
+help = "أزل النمط المكرر"
+
+[diagnostics.SEM042.issues.duplicate_variant]
+message = "نمط مكرر"
+help = "أزل النمط المكرر"
+
+[diagnostics.SEM043]
+message = "{omnia} يتطلب enum scrutinee"
+help = "استخدم `{omnia}` فقط مع enum scrutinee واحد"
+
+[diagnostics.SEM043.issues.enum_scrutinee]
+message = "'{keyword}' يتطلب enum scrutinee"
+help = "استخدم `{omnia}` فقط مع enum scrutinee واحد"
+
+[diagnostics.SEM043.issues.single_enum_scrutinee]
+message = "'{keyword}' يتطلب enum scrutinee واحدا"
+help = "استخدم `{omnia}` فقط مع enum scrutinee واحد"
+
+[diagnostics.SEM044]
+message = "{omnia} يمنع catchall arms"
+help = "اذكر كل variant صراحة بدلا من استخدام `{casu} _` أو `{ceterum}`"
+
+[diagnostics.SEM044.issues.catchall_arm]
+message = "'{keyword}' يمنع catchall arms؛ اذكر كل variant صراحة"
+help = "اذكر كل variant صراحة بدلا من استخدام `{casu} _` أو `{ceterum}`"
+
+[diagnostics.SEM050]
+message = "استخدام بعد النقل"
+help = "تجنب استخدام قيمة بعد نقلها"
+
+[diagnostics.SEM050.issues.use_after_move]
+message = "استخدام بعد النقل"
+help = "تجنب استخدام قيمة بعد نقلها"
+
+[diagnostics.SEM051]
+message = "استعارة قيمة منقولة"
+help = "استعر فقط من قيم لم تنقل"
+
+[diagnostics.SEM051.issues.borrow_of_moved]
+message = "استعارة قيمة منقولة"
+help = "استعر فقط من قيم لم تنقل"
+
+[diagnostics.SEM052]
+message = "تعارض استعارة متغيرة"
+help = "تجنب الاستعارات المتغيرة المتداخلة"
+
+[diagnostics.SEM052.issues.mutable_borrow_conflict]
+message = "الاستعارة المتغيرة تتعارض مع استعارة موجودة"
+help = "تجنب الاستعارات المتغيرة المتداخلة"
+
+[diagnostics.SEM052.issues.shared_borrow_conflict]
+message = "الاستعارة المشتركة تتعارض مع الاستعارة المتغيرة"
+help = "تجنب الاستعارات المتغيرة المتداخلة"
+
+[diagnostics.SEM052.issues.use_while_mutably_borrowed]
+message = "استخدام أثناء الاستعارة المتغيرة"
+help = "تجنب الاستعارات المتغيرة المتداخلة"
+
+[diagnostics.SEM052.issues.write_while_borrowed]
+message = "كتابة أثناء الاستعارة"
+help = "تجنب الاستعارات المتغيرة المتداخلة"
+
+[diagnostics.SEM053]
+message = "لا يمكن النقل للخارج"
+help = "استخدم reference أو clone بدلا من النقل"
+
+[diagnostics.SEM053.issues.cannot_move_while_borrowed]
+message = "لا يمكن النقل للخارج أثناء الاستعارة"
+help = "استخدم reference أو clone بدلا من النقل"
+
+[diagnostics.SEM054]
+message = "عدم تطابق lifetime"
+help = "تأكد أن القيم المستعارة تعيش طويلا بما يكفي"
+
+[diagnostics.SEM055]
+message = "متغير مظلل"
+help = "أعد تسمية أحد المتغيرات"
+
+[diagnostics.SEM055.issues.shadowed_variable]
+message = "متغير مظلل"
+help = "أعد تسمية أحد المتغيرات"
+
+[diagnostics.SEM056]
+message = "إسناد إلى استعارة غير قابلة للتغيير"
+help = "صرح عن parameter كـ '{in}' إذا كان التعديل مقصودا"
+
+[diagnostics.SEM056.issues.assign_to_de_parameter]
+message = "لا يمكن الإسناد إلى `{de}` parameter"
+help = "صرح عن parameter كـ '{in}' إذا كان التعديل مقصودا"
+
+
+[diagnostics.SEM056.issues.mutating_receiver_through_ref]
+message = "cannot call a mutating receiver through a `ref` view"
+help = "drop the `ref` marker, or use a non-mutating method"
+
+[diagnostics.SEM056.issues.assign_through_ref]
+message = "cannot assign through a `ref` view"
+help = "drop the `ref` marker if mutation is intended"
+
+[diagnostics.SEM057]
+message = "عدم تطابق parameter mode"
+help = "طابق parameter modes بين caller و callee"
+
+[diagnostics.SEM057.issues.de_to_in_or_ex_position]
+message = "لا يمكن تمرير `{de}` parameter إلى `{in}` أو `{ex}` position"
+help = "طابق parameter modes بين caller و callee"
+
+
+[diagnostics.SEM057.issues.ref_to_mut_or_own_position]
+message = "cannot pass a `ref` value to a `mut` or `own` position"
+help = "pass a `mut` or `own` value, or bind through `copy`"
+
+[diagnostics.SEM057.issues.unmarked_into_own]
+message = "cannot bind an unmarked value into `own`"
+help = "bind through `copy` to duplicate the source"
+
+[diagnostics.SEM057.issues.ref_into_own]
+message = "cannot bind a `ref` value into `own`"
+help = "bind through `copy` to duplicate the source"
+
+[diagnostics.SEM057.issues.mut_into_own]
+message = "cannot bind a `mut` value into `own`"
+help = "bind through `copy` to duplicate the source"
+
+[diagnostics.SEM057.issues.field_into_own]
+message = "cannot bind a field projection into `own`"
+help = "bind through `copy` to duplicate the source"
+
+[diagnostics.SEM057.issues.index_into_own]
+message = "cannot bind an index projection into `own`"
+help = "bind through `copy` to duplicate the source"
+
+[diagnostics.SEM057.issues.deref_into_own]
+message = "cannot bind a dereference into `own`"
+help = "bind through `copy` to duplicate the source"
+
+[diagnostics.SEM057.issues.projection_into_own]
+message = "cannot bind a projection into `own`"
+help = "bind through `copy` to duplicate the source"
+
+[diagnostics.SEM057.issues.shared_into_own]
+message = "cannot bind a shared value into `own`"
+help = "bind through `copy` to duplicate the source"
+
+[diagnostics.SEM058]
+message = "استخدام قبل التهيئة"
+help = "أسند الربط قبل قراءته أو صرح عن الخانة `{sponte}`"
+
+[diagnostics.SEM058.issues.possibly_uninitialized]
+message = "استخدام binding ربما غير مهيأ"
+help = "أسند الربط قبل قراءته أو صرح عن الخانة `{sponte}`"
+
+[diagnostics.SEM059]
+message = "انتهاك AIR purity"
+help = "أبق دوال `@ radix lane \"air\"` في المجموعة النقية المقبولة"
+
+[diagnostics.SEM059.issues.async_function]
+message = "@ radix lane \"{lane}\" يرفض جسم هذه الدالة: async functions خارج v1 AIR subset"
+help = "أبق v1 AIR subset نقيا: immutable locals و pure expressions و AIR-lane calls و tensor arithmetic intrinsics فقط"
+
+[diagnostics.SEM059.issues.assignment_mutation]
+message = "@ radix lane \"{lane}\" يرفض جسم هذه الدالة: assignment هو mutation خارج v1 AIR subset"
+help = "أبق v1 AIR subset نقيا: immutable locals و pure expressions و AIR-lane calls و tensor arithmetic intrinsics فقط"
+
+[diagnostics.SEM059.issues.breakable_block]
+message = "@ radix lane \"{lane}\" يرفض جسم هذه الدالة: breakable blocks خارج v1 AIR subset"
+help = "أبق v1 AIR subset نقيا: immutable locals و pure expressions و AIR-lane calls و tensor arithmetic intrinsics فقط"
+
+[diagnostics.SEM059.issues.cede]
+message = "@ radix lane \"{lane}\" يرفض جسم هذه الدالة: `{cede}` خارج v1 AIR subset"
+help = "أبق v1 AIR subset نقيا: immutable locals و pure expressions و AIR-lane calls و tensor arithmetic intrinsics فقط"
+
+[diagnostics.SEM059.issues.cli_mounted_function]
+message = "@ radix lane \"{lane}\" يرفض جسم هذه الدالة: CLI-mounted functions خارج v1 AIR subset"
+help = "أبق v1 AIR subset نقيا: immutable locals و pure expressions و AIR-lane calls و tensor arithmetic intrinsics فقط"
+
+[diagnostics.SEM059.issues.closure]
+message = "@ radix lane \"{lane}\" يرفض جسم هذه الدالة: closures خارج v1 AIR subset"
+help = "أبق v1 AIR subset نقيا: immutable locals و pure expressions و AIR-lane calls و tensor arithmetic intrinsics فقط"
+
+[diagnostics.SEM059.issues.conditional_recovery]
+message = "@ radix lane \"{lane}\" يرفض جسم هذه الدالة: conditional recovery خارج v1 AIR subset"
+help = "أبق v1 AIR subset نقيا: immutable locals و pure expressions و AIR-lane calls و tensor arithmetic intrinsics فقط"
+
+[diagnostics.SEM059.issues.defaulted_parameter]
+message = "@ radix lane \"{lane}\" يرفض جسم هذه الدالة: defaulted parameters خارج v1 AIR subset"
+help = "أبق v1 AIR subset نقيا: immutable locals و pure expressions و AIR-lane calls و tensor arithmetic intrinsics فقط"
+
+[diagnostics.SEM059.issues.deferred_local_init]
+message = "@ radix lane \"{lane}\" يرفض جسم هذه الدالة: deferred local initialization خارج v1 AIR subset"
+help = "أبق v1 AIR subset نقيا: immutable locals و pure expressions و AIR-lane calls و tensor arithmetic intrinsics فقط"
+
+[diagnostics.SEM059.issues.diagnostic_output]
+message = "@ radix lane \"{lane}\" يرفض جسم هذه الدالة: diagnostic output هو host effect خارج v1 AIR subset"
+help = "أبق v1 AIR subset نقيا: immutable locals و pure expressions و AIR-lane calls و tensor arithmetic intrinsics فقط"
+
+[diagnostics.SEM059.issues.dum_loop]
+message = "@ radix lane \"{lane}\" يرفض جسم هذه الدالة: `{dum}` loops خارج v1 AIR subset"
+help = "أبق v1 AIR subset نقيا: immutable locals و pure expressions و AIR-lane calls و tensor arithmetic intrinsics فقط"
+
+[diagnostics.SEM059.issues.expression_ad]
+message = "@ radix lane \"{lane}\" يرفض جسم هذه الدالة: expression-form {ad} خارج v1 AIR subset"
+help = "أبق v1 AIR subset نقيا: immutable locals و pure expressions و AIR-lane calls و tensor arithmetic intrinsics فقط"
+
+[diagnostics.SEM059.issues.expression_statement]
+message = "@ radix lane \"{lane}\" يرفض جسم هذه الدالة: expression statements خارج v1 AIR subset"
+help = "أبق v1 AIR subset نقيا: immutable locals و pure expressions و AIR-lane calls و tensor arithmetic intrinsics فقط"
+
+[diagnostics.SEM059.issues.generator_function]
+message = "@ radix lane \"{lane}\" يرفض جسم هذه الدالة: generator functions خارج v1 AIR subset"
+help = "أبق v1 AIR subset نقيا: immutable locals و pure expressions و AIR-lane calls و tensor arithmetic intrinsics فقط"
+
+[diagnostics.SEM059.issues.gradient_expression_unsupported]
+message = "@ radix lane \"{lane}\" يرفض جسم هذه الدالة: postfix gradient selection (`call(...) ∇ [places]`) لن يُنزَّل حتى تصل surface الخاصة بـ tensor-glyphs 2B autograd؛ لا توجد قاعدة operand أو selector أو result نشطة في Phase 2A"
+help = "gradient selection (`∇`) للتحليل فقط في Phase 2A؛ قواعد eligibility/selector ستصل مع tensor-glyphs 2B"
+
+[diagnostics.SEM059.issues.iace]
+message = "@ radix lane \"{lane}\" يرفض جسم هذه الدالة: `{iace}` خارج v1 AIR subset"
+help = "أبق v1 AIR subset نقيا: immutable locals و pure expressions و AIR-lane calls و tensor arithmetic intrinsics فقط"
+
+[diagnostics.SEM059.issues.inc_dec_mutation]
+message = "@ radix lane \"{lane}\" يرفض جسم هذه الدالة: increment/decrement mutation خارج v1 AIR subset"
+help = "أبق v1 AIR subset نقيا: immutable locals و pure expressions و AIR-lane calls و tensor arithmetic intrinsics فقط"
+
+[diagnostics.SEM059.issues.input_read]
+message = "@ radix lane \"{lane}\" يرفض جسم هذه الدالة: input reads هي host effects خارج v1 AIR subset"
+help = "أبق v1 AIR subset نقيا: immutable locals و pure expressions و AIR-lane calls و tensor arithmetic intrinsics فقط"
+
+[diagnostics.SEM059.issues.itera_loop]
+message = "@ radix lane \"{lane}\" يرفض جسم هذه الدالة: `{itera}` loops خارج v1 AIR subset"
+help = "أبق v1 AIR subset نقيا: immutable locals و pure expressions و AIR-lane calls و tensor arithmetic intrinsics فقط"
+
+[diagnostics.SEM059.issues.kernel_device_function]
+message = "@ radix lane \"{lane}\" يرفض جسم هذه الدالة: kernel/device functions خارج v1 AIR subset"
+help = "أبق v1 AIR subset نقيا: immutable locals و pure expressions و AIR-lane calls و tensor arithmetic intrinsics فقط"
+
+[diagnostics.SEM059.issues.loop]
+message = "@ radix lane \"{lane}\" يرفض جسم هذه الدالة: loops خارج v1 AIR subset"
+help = "أبق v1 AIR subset نقيا: immutable locals و pure expressions و AIR-lane calls و tensor arithmetic intrinsics فقط"
+
+[diagnostics.SEM059.issues.loop_control]
+message = "@ radix lane \"{lane}\" يرفض جسم هذه الدالة: loop control خارج v1 AIR subset"
+help = "أبق v1 AIR subset نقيا: immutable locals و pure expressions و AIR-lane calls و tensor arithmetic intrinsics فقط"
+
+[diagnostics.SEM059.issues.method_call]
+message = "@ radix lane \"{lane}\" يرفض جسم هذه الدالة: method call `{method}` خارج v1 AIR subset"
+help = "أبق v1 AIR subset نقيا: immutable locals و pure expressions و AIR-lane calls و tensor arithmetic intrinsics فقط"
+
+[diagnostics.SEM059.issues.missing_body]
+message = "@ radix lane \"{lane}\" يرفض جسم هذه الدالة: AIR-lane functions يجب أن يكون لها body"
+help = "أبق v1 AIR subset نقيا: immutable locals و pure expressions و AIR-lane calls و tensor arithmetic intrinsics فقط"
+
+[diagnostics.SEM059.issues.mori]
+message = "@ radix lane \"{lane}\" يرفض جسم هذه الدالة: `{mori}` خارج v1 AIR subset"
+help = "أبق v1 AIR subset نقيا: immutable locals و pure expressions و AIR-lane calls و tensor arithmetic intrinsics فقط"
+
+[diagnostics.SEM059.issues.mutable_varia]
+message = "@ radix lane \"{lane}\" يرفض جسم هذه الدالة: mutable `{varia}` bindings خارج v1 AIR subset"
+help = "أبق v1 AIR subset نقيا: immutable locals و pure expressions و AIR-lane calls و tensor arithmetic intrinsics فقط"
+
+[diagnostics.SEM059.issues.named_call_arg]
+message = "@ radix lane \"{lane}\" يرفض جسم هذه الدالة: named call arguments خارج v1 AIR subset"
+help = "أبق v1 AIR subset نقيا: immutable locals و pure expressions و AIR-lane calls و tensor arithmetic intrinsics فقط"
+
+[diagnostics.SEM059.issues.non_air_call]
+message = "@ radix lane \"{lane}\" يرفض جسم هذه الدالة: calls من AIR-lane functions يجب أن تستهدف AIR-lane function أخرى"
+help = "أبق v1 AIR subset نقيا: immutable locals و pure expressions و AIR-lane calls و tensor arithmetic intrinsics فقط"
+
+[diagnostics.SEM059.issues.optional_null_chain]
+message = "@ radix lane \"{lane}\" يرفض جسم هذه الدالة: optional/null assertion chains خارج v1 AIR subset"
+help = "أبق v1 AIR subset نقيا: immutable locals و pure expressions و AIR-lane calls و tensor arithmetic intrinsics فقط"
+
+[diagnostics.SEM059.issues.recoverable_handler]
+message = "@ radix lane \"{lane}\" يرفض جسم هذه الدالة: recoverable handlers خارج v1 AIR subset"
+help = "أبق v1 AIR subset نقيا: immutable locals و pure expressions و AIR-lane calls و tensor arithmetic intrinsics فقط"
+
+[diagnostics.SEM059.issues.reference_place_op]
+message = "@ radix lane \"{lane}\" يرفض جسم هذه الدالة: reference/place operations خارج v1 AIR subset"
+help = "أبق v1 AIR subset نقيا: immutable locals و pure expressions و AIR-lane calls و tensor arithmetic intrinsics فقط"
+
+[diagnostics.SEM059.issues.runtime_assertion]
+message = "@ radix lane \"{lane}\" يرفض جسم هذه الدالة: runtime assertions خارج v1 AIR subset"
+help = "أبق v1 AIR subset نقيا: immutable locals و pure expressions و AIR-lane calls و tensor arithmetic intrinsics فقط"
+
+[diagnostics.SEM059.issues.runtime_conversion]
+message = "@ radix lane \"{lane}\" يرفض جسم هذه الدالة: runtime `↦` conversion خارج v1 AIR subset"
+help = "أبق v1 AIR subset نقيا: immutable locals و pure expressions و AIR-lane calls و tensor arithmetic intrinsics فقط"
+
+[diagnostics.SEM059.issues.runtime_provided_binding]
+message = "@ radix lane \"{lane}\" يرفض جسم هذه الدالة: runtime-provided bindings خارج v1 AIR subset"
+help = "أبق v1 AIR subset نقيا: immutable locals و pure expressions و AIR-lane calls و tensor arithmetic intrinsics فقط"
+
+[diagnostics.SEM059.issues.runtime_variant_check]
+message = "@ radix lane \"{lane}\" يرفض جسم هذه الدالة: runtime `{est}` variant check خارج v1 AIR subset"
+help = "أبق v1 AIR subset نقيا: immutable locals و pure expressions و AIR-lane calls و tensor arithmetic intrinsics فقط"
+
+[diagnostics.SEM059.issues.spread_call_arg]
+message = "@ radix lane \"{lane}\" يرفض جسم هذه الدالة: spread call arguments خارج v1 AIR subset"
+help = "أبق v1 AIR subset نقيا: immutable locals و pure expressions و AIR-lane calls و tensor arithmetic intrinsics فقط"
+
+[diagnostics.SEM059.issues.tacet]
+message = "@ radix lane \"{lane}\" يرفض جسم هذه الدالة: `{tacet}` خارج v1 AIR subset"
+help = "أبق v1 AIR subset نقيا: immutable locals و pure expressions و AIR-lane calls و tensor arithmetic intrinsics فقط"
+
+[diagnostics.WARN001]
+message = "متغير غير مستخدم"
+help = "أزل المتغير أو ابدأه بـ '_'"
+
+[diagnostics.WARN001.issues.unused_variable]
+message = "متغير غير مستخدم"
+help = "أزل المتغير أو ابدأه بـ '_'"
+
+[diagnostics.WARN001.issues.unused_binding]
+message = "ربط غير مستخدم"
+help = "أزل المتغير أو ابدأه بـ '_'"
+
+[diagnostics.WARN002]
+message = "استيراد غير مستخدم"
+help = "أزل الاستيراد غير المستخدم"
+
+[diagnostics.WARN002.issues.unused_import]
+message = "استيراد غير مستخدم"
+help = "أزل الاستيراد غير المستخدم"
+
+[diagnostics.WARN003]
+message = "دالة غير مستخدمة"
+help = "أزل الدالة أو علمها كمستخدمة"
+
+[diagnostics.WARN003.issues.unused_function]
+message = "دالة غير مستخدمة"
+help = "أزل الدالة أو علمها كمستخدمة"
+
+[diagnostics.WARN004]
+message = "كود غير قابل للوصول"
+help = "أزل الكود غير القابل للوصول"
+
+[diagnostics.WARN004.issues.unreachable_code]
+message = "كود غير قابل للوصول"
+help = "أزل الكود غير القابل للوصول"
+
+[diagnostics.WARN005]
+message = "cast غير ضروري"
+help = "أزل الـ cast الزائد"
+
+[diagnostics.WARN005.issues.unnecessary_cast]
+message = "cast غير ضروري: type معروف مسبقا"
+help = "أزل الـ cast الزائد"
+
+[diagnostics.WARN007]
+message = "target no-op"
+help = "أزل construct أو gate ب target"
+
+[diagnostics.WARN008]
+message = "unused mutable reference parameter"
+help = "غير '{in}' إلى '{de}' إذا كان التعديل غير ضروري"
+
+[diagnostics.WARN008.issues.unused_in_parameter]
+message = "`{in}` parameter لا يعدل أبدا؛ اعتبر `{de}`"
+help = "غير '{in}' إلى '{de}' إذا كان التعديل غير ضروري"
+
+[diagnostics.WARN009]
+message = "unused move parameter"
+help = "غير '{ex}' إلى '{de}' إذا كان نقل الملكية غير ضروري"
+
+[diagnostics.WARN009.issues.unused_ex_parameter]
+message = "`{ex}` parameter لا يستهلك أبدا؛ اعتبر `{de}`"
+help = "غير '{ex}' إلى '{de}' إذا كان نقل الملكية غير ضروري"
+
+[diagnostics.WARN010]
+message = "explicit {ignotum} annotation"
+help = "فضل concrete type annotation للحفاظ على type-checking دقيق"
+
+[diagnostics.WARN010.issues.explicit_ignotum_annotation]
+message = "explicit {ignotum} annotation يعطل type-checking الدقيق"
+help = "فضل concrete type annotation للحفاظ على type-checking دقيق"
+
+[diagnostics.WARN011]
+message = "wildcard يمتص null"
+help = "أضف ذراع `{casu} {nihil}` صريحة لتتم معالجة حالة null عمدا"
+
+[diagnostics.WARN011.issues.wildcard_absorbs_null]
+message = "catchall arm تمتص null case من nullable scrutinee؛ استخدم ذراع '{casu}' {nil} صريحة"
+help = "أضف ذراع `{casu} {nihil}` صريحة لتتم معالجة حالة null عمدا"
+
+[diagnostics.WARN013]
+message = "{varia} غير ضروري"
+help = "استخدم `{fixum}` عندما لا يعاد إسناد binding أو تعديله أبدا"
+
+[diagnostics.WARN013.issues.unnecessary_varia]
+message = "{varia} غير ضروري: binding لا يعاد إسناده أو تعديله أبدا"
+help = "استخدم `{fixum}` عندما لا يعاد إسناد binding أو تعديله أبدا"
+
+[diagnostics.WARN014]
+message = "file interface تخطى export غير مدعوم"
+help = "استخدم export مدعوما من module أو انتظر file-interface coverage أكمل لـ signature هذا"
+
+[diagnostics.WARN014.issues.file_interface_export_skipped]
+message = "file interface تخطى export `{namespace}.{export}` ({reason})؛ exports أخرى لا تزال متاحة"
+help = "استخدم export مدعوما من module أو انتظر file-interface coverage أكمل لـ signature هذا"
+
+[diagnostics.WARN015]
+message = "اسم curata allocator غير معروف"
+help = "استخدم اسم allocator معروفا (\"arena\" أو \"page\" أو \"alloc\" أو \"allocator\")"
+
+[diagnostics.WARN015.issues.unrecognized_curata_allocator]
+message = "curata allocator name '{name}' ليس عقد allocator معروفا"
+help = "استخدم اسم allocator معروفا (\"arena\" أو \"page\" أو \"alloc\" أو \"allocator\")"
+
+[diagnostics.WARN016]
+message = "monomorphic hole حُل إلى multi-member union"
+help = "استخدم union type صريحا أو `∪` hole إذا كان sum مقصودا"
+
+[diagnostics.WARN016.issues.monomorphic_hole_solved_to_union]
+message = "monomorphic hole `_` حُل إلى multi-member union `{union}`"
+help = "استخدم union type صريحا أو `∪` hole إذا كان sum مقصودا"
+
+[diagnostics.WARN017]
+message = "union hole حُل monomorphically"
+help = "استخدم `_` إذا كان type واحد فقط مقصودا"
+
+[diagnostics.WARN017.issues.union_hole_solved_monomorphically]
+message = "union hole `∪` حُل إلى type واحد `{type}`"
+help = "استخدم `_` إذا كان type واحد فقط مقصودا"
+
+[llm]
+system_prompt_snippet = "Emit Arabic reader-locale Faber using Arabic keywords for declarations, control flow, loops, returns, booleans, common primitive types, and list/map collections. Keep Faber glyph syntax unchanged and keep source in logical order."
+exemplars = ["./exemplars/salve-munde.ar.fab"]
+
+
+# Queue/stack C2 named-method rows and the lista omnia/quilibet predicate
+# twins. These compiler-owned names remain canonical in every reader pack;
+# glyphs are not method aliases.
+[intrinsics]
+appende = "appende"
+decapita = "decapita"
+detrahe = "detrahe"
+longitudo = "longitudo"
+omnia = "omnia"
+quilibet = "quilibet"

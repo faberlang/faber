@@ -1,0 +1,2983 @@
+[pack]
+id = "zh-Hans"
+schema_version = 1
+
+[keywords]
+discretio = "判别"
+fixum = "常量"
+functio = "函数"
+genus = "类"
+implendum = "契约"
+importa = "导入"
+modulus = "模数"
+ordo = "枚举"
+sit = "设"
+typus = "类型"
+schema = "架构"
+columna = "列"
+varia = "变量"
+abstractus = "抽象"
+ceteri = "其余"
+curata = "委派"
+errata = "勘误"
+exitus = "退出"
+generis = "静态"
+iacit = "可抛"
+immutata = "不变"
+interna = "内部"
+magnitudo = "维度"
+nexum = "属性"
+iuncta = "元组"
+optiones = "可选项"
+prae = "前"
+praefixum = "前缀"
+privata = "私有"
+protecta = "保护"
+publica = "公开"
+sponte = "可选"
+casu = "情况"
+ceterum = "默认"
+custodi = "守护"
+discerne = "匹配"
+dum = "当"
+elige = "选择"
+ergo = "则"
+fac = "执行"
+itera = "遍历"
+apud = "在"
+secus = "否则"
+si = "如果"
+sic = "乃"
+sin = "否则如果"
+perge = "继续"
+redde = "返回"
+rumpe = "中断"
+tacet = "静默"
+adfirma = "断言"
+cape = "捕获"
+capta = "陷阱"
+cede = "让出"
+iace = "抛错"
+mori = "崩溃"
+requirit = "需求"
+reice = "拒绝"
+clausura = "闭包"
+libera = "自由"
+falsum = "假"
+nihil = "空"
+verum = "真"
+nonnumerus = "nan"
+aut = "或"
+est = "是"
+et = "且"
+non = "非"
+vel = "兜底"
+ego = "自身"
+finge = "构造"
+implet = "实现"
+sub = "继承"
+mone = "警告"
+nota = "显示"
+scribe = "写入"
+vide = "查看"
+argumenta = "参数"
+cura = "管护"
+incipiet = "异步入口"
+incipit = "入口"
+ad = "调用"
+fiet = "异步"
+fiunt = "流"
+fient = "异流"
+figendum = "等定"
+variandum = "等变"
+reddet = "等返"
+tacebit = "等弃"
+# Empty-collection expression marker (contextual, tokenless).
+vacua = "空集"
+primus_quem = "primus_quem"
+ubi = "ubi"
+summa = "求和"
+filum = "线程"
+maxima = "最大"
+minima = "最小"
+de = "借自"
+ex = "取自"
+in = "传入"
+own = "拥有"
+copy = "拷贝"
+lege = "读取"
+lineam = "行"
+omnia = "全部"
+scriptum = "格式化"
+sparge = "展开"
+ut = "作为"
+ante = "迄"
+inter = "间"
+intra = "内"
+per = "步"
+ab = "范围"
+usque = "到"
+erratur = "预期失败"
+fragilis = "易碎"
+futurum = "预期"
+metior = "计量"
+omitte = "跳过"
+postpara = "收尾"
+postparabit = "异步收尾"
+praepara = "备置"
+praeparabit = "异步备置"
+proba = "测试"
+probandum = "验题"
+repete = "重复"
+solum = "仅"
+solum_in = "仅于"
+tag = "标签"
+temporis = "时限"
+negativum = "负"
+nonnihil = "有值"
+nonnulla = "诸值"
+nulla = "皆无"
+positivum = "正"
+cli = "命令行"
+commune = "commune"
+cursor = "迭代器"
+futura = "未来"
+imperium = "命令"
+operandus = "操作数"
+optio = "选项"
+conversion = "变换"
+conversio = "转换"
+nucleum = "内核"
+vertex = "顶点"
+fragment = "片段"
+nondum = "不稳定"
+verte = "改名"
+nomen = "名称"
+radix = "radix"
+brevis = "简"
+descriptio = "描述"
+longum = "详"
+lane = "车道"
+ubique = "全局"
+
+[types]
+ascii = "窄字串"
+textus = "文本"
+numerus = "整数"
+modulus = "模数类型"
+fractus = "小数"
+bivalens = "布尔"
+nihil = "空类型"
+vacuum = "无值"
+numquam = "永不"
+ignotum = "未知"
+octeti = "字节"
+regex = "regex"
+json = "json"
+valor = "动态值"
+instans = "时刻"
+objectum = "对象"
+quidlibet = "任意"
+lista = "列表"
+# Shipped bounded forms: lista<T, N>, textus<N>, ascii<N>, octeti<N>.
+tabula = "映射"
+copia = "集合"
+promissum = "期约"
+cursor = "游标"
+queue = "队列"
+stack = "栈"
+# Tensor family: real simplified-Chinese glosses (D1) — pack-owned, no inherits substitute.
+tensor = "张量"
+vector = "向量"
+matrix = "矩阵"
+sparsa = "稀疏"
+atomic = "原子"
+intervallum = "区间"
+# 关系视图类型名（S2-U5）
+filtrum = "过滤器"
+series = "序列"
+census = "普查"
+ratio = "ratio"
+
+[diagnostics.UNRES001]
+message = "关键字 '{keyword}' 未在读者语言包 '{pack}' 中声明"
+help = "在此语法位置使用读者语言包中声明的关键字拼写"
+
+[diagnostics.UNRES002]
+message = "内建函数 '{intrinsic}' 未在读者语言包 '{pack}' 中为接收者族 '{receiver}' 声明"
+help = "为此接收者族使用读者语言包中声明的内建函数拼写"
+
+[diagnostics.UNRES003]
+message = "库成员 '{member}' 未在读者语言包 '{pack}' 中为标识 '{identity}' 声明"
+help = "为此库标识使用读者语言包中声明的成员拼写"
+
+[diagnostics.LOCALE002]
+message = "读者语言包 {pack} 发现类似关键字的写法 {spelling}"
+help = "若本意是关键字请使用 {suggestion}；{spelling} 按原样是合法名称"
+
+[diagnostics.LEX001]
+message = "未闭合字符串字面量"
+help = "在行尾或文件结束前闭合字符串字面量"
+
+[diagnostics.LEX001.issues.unterminated_ascii_literal]
+message = "未闭合 ascii 字面量"
+help = "在行尾或文件结束前闭合字符串字面量"
+
+[diagnostics.LEX001.issues.newline_in_ascii_literal]
+message = "未闭合 ascii 字面量（字面量中出现换行）"
+help = "在行尾或文件结束前闭合字符串字面量"
+
+[diagnostics.LEX001.issues.unterminated_backtick_template_literal]
+message = "未闭合 backtick template 字面量"
+help = "在行尾或文件结束前闭合字符串字面量"
+
+[diagnostics.LEX001.issues.unterminated_octeti_literal]
+message = "未闭合 octeti 字面量"
+help = "在行尾或文件结束前闭合字符串字面量"
+
+[diagnostics.LEX001.issues.unterminated_string_literal]
+message = "未闭合字符串字面量"
+help = "在行尾或文件结束前闭合字符串字面量"
+
+[diagnostics.LEX001.issues.newline_in_string_literal]
+message = "未闭合字符串字面量（字符串中出现换行）"
+help = "在行尾或文件结束前闭合字符串字面量"
+
+[diagnostics.LEX001.issues.unterminated_guillemet_block_string_literal]
+message = "未闭合 guillemet block string 字面量"
+help = "在行尾或文件结束前闭合字符串字面量"
+
+[diagnostics.LEX002]
+message = "无效数字字面量"
+help = "检查 numeric separators 和 base prefixes"
+
+[diagnostics.LEX002.issues.invalid_hexadecimal_number]
+message = "无效十六进制数字"
+help = "检查 numeric separators 和 base prefixes"
+
+[diagnostics.LEX002.issues.invalid_binary_number]
+message = "无效二进制数字"
+help = "检查 numeric separators 和 base prefixes"
+
+[diagnostics.LEX002.issues.invalid_octal_number]
+message = "无效八进制数字"
+help = "检查 numeric separators 和 base prefixes"
+
+[diagnostics.LEX002.issues.invalid_floating_point_number]
+message = "无效浮点数"
+help = "检查 numeric separators 和 base prefixes"
+
+[diagnostics.LEX002.issues.invalid_integer]
+message = "无效整数"
+help = "检查 numeric separators 和 base prefixes"
+
+[diagnostics.LEX003]
+message = "无效转义序列"
+help = "使用受支持的转义序列，或转义反斜杠"
+
+[diagnostics.LEX004]
+message = "意外字符"
+help = "删除该字符，或在需要作为字面量时进行转义"
+
+[diagnostics.LEX004.issues.unexpected_character]
+message = "意外字符：{char}"
+help = "删除该字符，或在需要作为字面量时进行转义"
+
+[diagnostics.LEX005]
+message = "已移除 section directive"
+help = "把文件元数据放进第 1 行的 +++ TOML frontmatter，而不是行首 section directives"
+
+[diagnostics.LEX005.issues.removed_section_directive]
+message = "文件级 § directives 已移除；请使用 +++ frontmatter"
+help = "把文件元数据放进第 1 行的 +++ TOML frontmatter，而不是行首 § directives"
+
+[diagnostics.LEX006]
+message = "无效注释语法"
+help = "注释请加 # 前缀，而不是 // 或 /* */"
+
+[diagnostics.LEX006.issues.c_style_line_comment]
+message = "Faber 不接受 C 风格 // 注释；行注释请使用 #"
+help = "注释请加 # 前缀，而不是 // 或 /* */"
+
+[diagnostics.LEX006.issues.c_style_block_comment]
+message = "Faber 不接受 C 风格 /* */ block 注释；行注释请使用 #"
+help = "注释请加 # 前缀，而不是 // 或 /* */"
+
+[diagnostics.LEX006.issues.unterminated_c_style_block_comment]
+message = "未闭合 C 风格 block 注释；Faber 行注释使用 #"
+help = "注释请加 # 前缀，而不是 // 或 /* */"
+
+[diagnostics.LEX007]
+message = "不接受 inline 注释"
+help = "把 # 注释放在它所说明的代码上一行"
+
+[diagnostics.LEX007.issues.inline_hash_after_code]
+message = "# 注释必须独占一行；请把注释移到代码上方"
+help = "把 # 注释放在它所说明的代码上一行"
+
+[diagnostics.PARSE000]
+message = "解析时发生 lexer 错误"
+help = "先修正 lexer 错误；解析会从干净的 tokens 继续"
+
+[diagnostics.PARSE001]
+message = "需要 token"
+help = "确保此位置存在期望的 token"
+
+[diagnostics.PARSE001.issues.annotation_name]
+message = "需要注解名称"
+help = "在 @ 后添加注解名称"
+
+[diagnostics.PARSE001.issues.secus_si_else_if]
+message = "else-if 请使用 'sin'"
+help = "把 secus si 替换为 sin"
+
+[diagnostics.PARSE001.issues.itera_mode]
+message = "需要 {expected}"
+help = "在 iterable 表达式之前选择一种 iteration mode"
+
+[diagnostics.PARSE001.issues.allocator_kind]
+message = "需要 {expected}"
+help = "allocator kind 使用 \"arena\" 或 \"page\""
+
+[diagnostics.PARSE001.issues.mutability_marker]
+message = "需要 {expected}"
+help = "在 binding 名称前添加 fixum 或 varia"
+
+[diagnostics.PARSE001.issues.itera_de_requires_fixum]
+message = "itera de bindings are always const; use {expected}"
+help = "de binds an index or key, not a mutable element; use the const form"
+
+[diagnostics.PARSE001.issues.duplicate_rest_pattern]
+message = "rest pattern 已指定"
+help = "只保留一个 '{keyword}' rest binding"
+
+[diagnostics.PARSE001.issues.sit_identifier_binding]
+message = "'{keyword}' 直接绑定单个标识符；请使用 '{keyword}' name ← expr"
+help = "写成 '{keyword}' name ← expr，或对 typed/destructured bindings 使用 fixum"
+
+[diagnostics.PARSE001.issues.sit_no_destructuring]
+message = "sit 不支持 destructuring patterns"
+help = "对 destructuring pattern 使用 fixum"
+
+[diagnostics.PARSE001.issues.test_case_or_setup]
+message = "需要 test case 或 setup"
+help = "用 '{proba}'、'{probandum}' 或 '{setup}' 开始 body item"
+
+[diagnostics.PARSE001.issues.test_modifier_integer]
+message = "'{modifier}' 后需要整数"
+help = "在 '{modifier}' 后放置整数字面量"
+
+[diagnostics.PARSE001.issues.tensor_figura_after_element]
+message = "tensor 需要在 element type 之后有 Figura shape"
+help = "添加逗号和 Figura shape，例如 tensor<T, []>"
+
+[diagnostics.PARSE001.issues.sparsa_figura_after_element]
+message = "sparsa 需要在 element type 之后有 Figura shape"
+help = "添加逗号和 Figura shape，例如 sparsa<T, []>"
+
+[diagnostics.PARSE001.issues.vector_width_after_element]
+message = "vector 需要在 element type 之后有 width"
+help = "添加逗号和 vector width，例如 vector<T, [4]>"
+
+[diagnostics.PARSE001.issues.matrix_figura_after_element]
+message = "matrix 需要在 element type 之后有二维 Figura shape"
+help = "添加逗号和 shape，例如 matrix<T, [4, 4]>"
+
+[diagnostics.PARSE001.issues.atomic_single_element]
+message = "atomic 只接受一个 element type"
+help = "移除多余的 type parameter；使用 atomic<T>"
+
+[diagnostics.PARSE001.issues.retired_type_call_constructor]
+message = "type-call constructors 不是 Faber 语法"
+help = "使用 value ↦ Type 或命名 library constructor"
+
+[diagnostics.PARSE001.issues.retired_prefix_predicate]
+message = "{predicate} 已不再是 prefix predicate 语法"
+help = "用 {replacement} 重写"
+
+[diagnostics.PARSE001.issues.equality_non_missing_est]
+message = "equality 表达式中 'non' 之后需要 'est'"
+help = "identity negation 写成 non est"
+
+[diagnostics.PARSE001.issues.est_non_spelling]
+message = "'est non' 不是 identity negation 的写法"
+help = "identity negation 使用 non est"
+
+[diagnostics.PARSE001.issues.closure_body_start]
+message = "closure parameters 之后需要 ':' 或 block body"
+help = "为 expression body 添加 :，或添加 block body"
+
+[diagnostics.PARSE001.issues.ad_ascii_route]
+message = "'ad' 之后需要 ascii literal route"
+help = "在 ad 之后把 route 写成 ASCII literal"
+
+[diagnostics.PARSE001.issues.json_quoted_key]
+message = "JSON keys 必须是带引号的字符串；请使用 \"name\": value"
+help = "为 JSON object keys 加引号"
+
+[diagnostics.PARSE001.issues.json_string_key]
+message = "需要 JSON string key"
+help = "以字符串字面量开始 JSON key"
+
+[diagnostics.PARSE001.issues.field_value_separator]
+message = "需要 '='"
+help = "field name 和 value 之间使用 ="
+
+[diagnostics.PARSE001.issues.call_type_args_start]
+message = "需要 '<'"
+help = "以 < 开始 call-site type arguments"
+
+[diagnostics.PARSE001.issues.gradient_empty_selector_list]
+message = "∇ 之后的 gradient selector list 必须至少指定一个 primal call argument"
+help = "指定你想要其 adjoints 的 primal call arguments，例如 loss(x, y) ∇ [x]"
+
+[diagnostics.PARSE001.issues.requirit_iace]
+message = "{requirit} 条件之后需要 '{iace}'"
+help = "写成 {requirit} cond {iace} err"
+
+[diagnostics.PARSE001.issues.reice_iace]
+message = "{reice} 条件之后需要 '{iace}'"
+help = "写成 {reice} cond {iace} err"
+
+[diagnostics.PARSE001.issues.requirit_else_rejected]
+message = "'{secus}' 不是 {requirit} 的 particle"
+help = "用 '{iace}' 写出可恢复载荷"
+
+[diagnostics.PARSE001.issues.reice_else_rejected]
+message = "'{secus}' 不是 {reice} 的 particle"
+help = "用 '{iace}' 写出可恢复载荷"
+
+[diagnostics.PARSE001.issues.adfirma_else_rejected]
+message = "'{secus}' 不是 {adfirma} 的 particle"
+help = "用 '{mori}' 写出可选 panic 消息"
+
+[diagnostics.PARSE002]
+message = "意外标记"
+help = "删除该标记，或把它移到正确位置"
+
+[diagnostics.PARSE002.issues.json_unknown_identifier_value]
+message = "JSON 标识符不是有效的 JSON 值"
+help = "使用 true、false、null、字符串、数字、对象或数组"
+
+[diagnostics.PARSE002.issues.json_faber_keyword_value]
+message = "Faber 关键字不是有效的 JSON 值"
+help = "使用 true、false、null、字符串、数字、对象或数组"
+
+[diagnostics.PARSE002.issues.expected_json_value]
+message = "需要 JSON 值"
+help = "提供 JSON 值"
+
+[diagnostics.PARSE002.issues.json_integer_underflow]
+message = "JSON 整数字面量低于 numerus 范围"
+help = "使用范围内的 numerus 值"
+
+[diagnostics.PARSE002.issues.expected_json_number_after_minus]
+message = "JSON 中 '-' 后需要数字"
+help = "在 JSON 的 '-' 后放置数字"
+
+[diagnostics.PARSE010]
+message = "无效声明"
+help = "检查声明关键字和必需部分"
+
+[diagnostics.PARSE010.issues.schema_inheritance]
+message = "schema 不能附加 sub、implet 或 interface"
+help = "保持 schema 为纯关系表头"
+
+[diagnostics.PARSE010.issues.schema_method]
+message = "schema 不能声明 method"
+help = "请在 genus 上声明 method"
+
+[diagnostics.PARSE011]
+message = "在 {functio} 后需要函数名"
+help = "在 {functio} 后添加函数名"
+
+[diagnostics.PARSE012]
+message = "{functio} 声明需要函数体"
+help = "add a '{block}' to the function declaration"
+
+[diagnostics.PARSE013]
+message = "在 {genus} 后需要类名"
+help = "在 {genus} 后添加类名"
+
+[diagnostics.PARSE014]
+message = "{genus} 声明后需要类体"
+help = "在 {genus} 声明头后添加代码块"
+
+[diagnostics.PARSE015]
+message = "无效参数"
+help = "检查参数语法和顺序"
+
+[diagnostics.PARSE015.issues.removed_fixus]
+message = "{keyword} 已移除；可选槽位使用 {optional_marker}，延后不可变局部量使用 {immutable_marker}"
+help = "在名称后用 {optional_marker} 标记可选参数或字段槽位"
+
+[diagnostics.PARSE016]
+message = "无效类型参数"
+help = "检查类型参数列表中的逗号和标识符"
+
+[diagnostics.PARSE016.issues.removed_prae_typus]
+message = "'{keyword}' 已移除；使用尖括号声明泛型：{replacement}"
+help = "把泛型参数写在参数列表之前，例如 {replacement}"
+
+[diagnostics.PARSE016.issues.type_param_after_magnitudo]
+message = "类型参数必须位于泛型列表中的 {size_param} 参数之前"
+help = "把类型参数移到 {size_param} 参数之前"
+
+[diagnostics.PARSE017]
+message = "无效修饰符"
+help = "移动或删除该修饰符"
+
+[diagnostics.PARSE018]
+message = "无效注解"
+help = "在 '@' 后添加注解名称"
+
+[diagnostics.PARSE018.issues.invalid_modifier]
+message = "无效 @ {annotation} 修饰符"
+help = "使用受支持的 @ {annotation} 修饰符"
+
+[diagnostics.PARSE018.issues.empty_radix_typus_domain]
+message = "@ radix typus domain 至少需要一个允许的类型"
+help = "在 in 后列出至少一个允许的类型"
+
+[diagnostics.PARSE018.issues.expected_annotation_ident]
+message = "需要 {context}"
+help = "在此注解位置添加 '{expected}'"
+
+[diagnostics.PARSE018.issues.unexpected_annotation_token]
+message = "{context} 后有意外标记"
+help = "删除尾随注解标记"
+
+[diagnostics.PARSE018.issues.missing_nucleum_lane_value]
+message = "@ nucleum lane requires a string value"
+help = "use `@ nucleum lane \"position\"` or braced `lane = \"position\"`"
+
+[diagnostics.PARSE018.issues.non_string_nucleum_lane_value]
+message = "@ nucleum lane value must be a string literal"
+help = "use `@ nucleum lane \"position\"` or braced `lane = \"position\"`"
+
+[diagnostics.PARSE018.issues.wrong_locale_annotation]
+message = "注解 `@ {annotation}` 未在此读取器表面声明"
+help = "对该文件的读取器语言环境使用 `@ {expected}`"
+
+[diagnostics.PARSE019]
+message = "重复修饰符"
+help = "删除重复的修饰符"
+
+[diagnostics.PARSE020]
+message = "无效语句"
+help = "使用有效语句形式"
+
+[diagnostics.PARSE020.issues.ad_expression_only]
+message = "ad 只能用于表达式位置"
+help = "使用 {replacement}"
+
+[diagnostics.PARSE021]
+message = "缺少条件"
+help = "添加条件表达式"
+
+[diagnostics.PARSE022]
+message = "需要 '{block}' 代码块或 '{ergo}' 主体"
+help = "添加 '{block}'，或用 '{ergo}' 引入单个语句"
+
+[diagnostics.PARSE026]
+message = "∴ 仅用于 compact clausurae；单语句主体请使用 ergo"
+help = "单语句主体使用 'ergo'，或用花括号包裹主体"
+
+[diagnostics.PARSE027]
+message = "ergo 仅用于单语句主体；compact clausura 请使用 ∴"
+help = "在 closure 签名和其主体之间使用 '∴'"
+
+[diagnostics.PARSE023]
+message = "需要模式，例如 '{wildcard}' 或 {identifier}"
+help = "使用 '{wildcard}'、字面量或 {identifier} 模式"
+
+[diagnostics.PARSE024]
+message = "需要 '{casu}' 分支或 '{ceterum}' 默认分支"
+help = "用 '{casu}' 开始 dispatch 分支，或用 '{ceterum}' 结束"
+
+[diagnostics.PARSE025]
+message = "无效 case 值"
+help = "使用有效的 case 表达式"
+
+[diagnostics.PARSE030]
+message = "无效表达式"
+help = "检查表达式语法"
+
+[diagnostics.PARSE030.issues.conversio_recovery_uses_vel]
+message = "使用 ⇥ 进行 conversio recovery"
+help = "使用 ⇥；vel 仅用于 nullish coalescing"
+
+[diagnostics.PARSE030.issues.expected_expression]
+message = "需要表达式"
+help = "在此位置提供有效表达式"
+
+[diagnostics.PARSE030.issues.expression_ad_block]
+message = "表达式形式 ad 不能有代码块"
+help = "使用没有代码块的 ad 'route' (opener) ↦ T"
+
+[diagnostics.PARSE030.issues.closure_block_body]
+message = "closure block body 必须使用 'fac'"
+help = "把 ∴ 后的 compact closure body 写成 {fac_body}"
+
+[diagnostics.PARSE030.issues.closure_fac_body_dum]
+message = "closure fac body 不能使用 'dum'"
+help = "从 closure fac bodies 中移除 dum"
+
+[diagnostics.PARSE031]
+message = "无效字面量"
+help = "检查字面量形式"
+
+[diagnostics.PARSE032]
+message = "无效运算符"
+help = "检查运算符位置和操作数"
+
+[diagnostics.PARSE033]
+message = "未闭合分组"
+help = "闭合分组分隔符"
+
+[diagnostics.PARSE034]
+message = "无效调用参数"
+help = "检查调用参数语法"
+
+[diagnostics.PARSE035]
+message = "无效成员访问"
+help = "检查成员访问语法"
+
+[diagnostics.PARSE036]
+message = "无效赋值目标"
+help = "只能赋值给有效的左值"
+
+[diagnostics.PARSE040]
+message = "无效类型"
+help = "检查类型语法"
+
+[diagnostics.PARSE040.issues.expected_type_name]
+message = "需要类型名"
+help = "以 identifier、_ 或 function type 开始类型"
+
+[diagnostics.PARSE040.issues.postfix_array_syntax]
+message = "postfix T[] 语法已移除"
+help = "使用 lista<T>"
+
+[diagnostics.PARSE040.issues.lista_sugar_bracket_form]
+message = "lista sugar 没有 bracket 形式"
+help = "对 shaped buffers 使用 tensor sugar"
+
+[diagnostics.PARSE040.issues.matrix_sugar_missing_shape]
+message = "matrix sugar 需要二维 bracket shape"
+help = "把 matrix sugar 写成 mf32[4, 4]"
+
+[diagnostics.PARSE040.issues.lista_sugar_angle_bracket_form]
+message = "lista sugar 只能是裸 l+width"
+help = "angle-bracket 形式使用 lista<...>"
+
+[diagnostics.PARSE040.issues.vector_sugar_angle_bracket_form]
+message = "vector sugar 使用 bracket width"
+help = "用 vector sugar brackets 写 width"
+
+[diagnostics.PARSE040.issues.type_sugar_angle_bracket_form]
+message = "{sugar} sugar 使用 bracket Figura"
+help = "用 {sugar} width sugar brackets 写 shape"
+
+[diagnostics.PARSE040.issues.invalid_figura_index]
+message = "index 字面量必须是自然数"
+help = "使用非负 shape index"
+
+[diagnostics.PARSE040.issues.wrong_locale_type]
+message = "type '{type}' is not declared on this reader surface"
+help = "use the type spelling declared by this reader locale"
+
+[diagnostics.PARSE041]
+message = "无效类型标注"
+help = "检查类型标注形式"
+
+[diagnostics.PARSE042]
+message = "未闭合类型参数"
+help = "用 '>' 闭合类型参数列表"
+
+[diagnostics.PARSE050]
+message = "无效导入"
+help = "检查导入语法"
+
+[diagnostics.PARSE050.issues.unknown_import_field]
+message = "未知导入字段"
+help = "使用 ex、visibilitas、nomen、ut 或 omnia"
+
+[diagnostics.PARSE050.issues.missing_import_source]
+message = "import record 需要 ex source"
+help = "向 import record 添加 ex = \"path\""
+
+[diagnostics.PARSE050.issues.mixed_wildcard_and_named_import]
+message = "wildcard import 不能同时命名 binding"
+help = "单独使用 omnia，或用 nomen/ut 进行 named import"
+
+[diagnostics.PARSE050.issues.invalid_import_visibility]
+message = "无效导入可见性"
+help = "使用 privata 或 publica"
+
+[diagnostics.PARSE050.issues.import_name_inference_failed]
+message = "无法从 {path} 推断导入名"
+help = "为 {path} 写出 nomen 或显式 alias"
+
+[diagnostics.SEM001]
+message = "未定义变量"
+help = "先声明变量再使用{?suggestion|；你是不是想用 |？}"
+
+[diagnostics.SEM001.issues.name_not_variant]
+message = "名称未指向 variant"
+help = "先声明变量再使用{?suggestion|；你是不是想用 |？}"
+
+[diagnostics.SEM001.issues.unknown_identifier]
+message = "未知标识符"
+help = "先声明标识符再使用{?suggestion|；你是不是想用 |？}"
+
+[diagnostics.SEM001.issues.scribe_callee]
+message = "未知标识符"
+help = "若要输出语句，请写不带括号的 `{spelling} <expr>`"
+
+[diagnostics.SEM001.issues.unknown_record_field]
+message = "未知 record field"
+help = "先声明变量再使用{?suggestion|；你是不是想用 |？}"
+
+[diagnostics.SEM001.issues.unknown_variant]
+message = "未知 variant"
+help = "先声明变量再使用{?suggestion|；你是不是想用 |？}"
+
+[diagnostics.SEM001.issues.unknown_variant_fields]
+message = "未知 variant fields"
+help = "先声明变量再使用{?suggestion|；你是不是想用 |？}"
+
+[diagnostics.SEM002]
+message = "未定义 type"
+help = "声明 type 或导入它"
+
+[diagnostics.SEM002.issues.figura_unknown_index]
+message = "Figura 中的 index parameter 未知"
+help = "声明 type 或导入它"
+
+[diagnostics.SEM002.issues.float_width_on_numerus]
+message = "f16、f32 和 f64 是 fractus 宽度；请使用 fractus<f16>、fractus<f32> 或 fractus<f64>"
+help = "声明 type 或导入它"
+
+[diagnostics.SEM002.issues.integer_width_on_fractus]
+message = "integer width markers 是 numerus 宽度；请使用 numerus<…>"
+help = "声明 type 或导入它"
+
+[diagnostics.SEM002.issues.invalid_precision_marker]
+message = "instans 只接受 ms、us 或 ns 作为 precision marker"
+help = "声明 type 或导入它"
+
+[diagnostics.SEM002.issues.invalid_fractus_width_marker]
+message = "fractus 只接受 f16、f32 或 f64"
+help = "声明 type 或导入它"
+
+[diagnostics.SEM002.issues.invalid_numerus_width_marker]
+message = "numerus 的 width marker 未知"
+help = "声明 type 或导入它"
+
+[diagnostics.SEM002.issues.invalid_width_marker]
+message = "此 family 的 width marker 未知"
+help = "声明 type 或导入它"
+
+[diagnostics.SEM002.issues.name_not_type]
+message = "名称未指向 type"
+help = "声明 type 或导入它"
+
+[diagnostics.SEM002.issues.precision_marker_params]
+message = "precision marker 不能接受 parameters"
+help = "声明 type 或导入它"
+
+[diagnostics.SEM002.issues.precision_marker_shape]
+message = "precision marker 必须是裸写法，例如 ms 或 us"
+help = "声明 type 或导入它"
+
+[diagnostics.SEM002.issues.qualified_name_not_type]
+message = "qualified name 未指向 type"
+help = "声明 type 或导入它"
+
+[diagnostics.SEM002.issues.qualified_type_not_exported]
+message = "namespace 未导出 qualified type"
+help = "声明 type 或导入它"
+
+[diagnostics.SEM002.issues.qualified_type_prefix_not_namespace]
+message = "qualified type prefix 必须命名一个 namespace"
+help = "声明 type 或导入它"
+
+[diagnostics.SEM002.issues.schema_unknown_type]
+message = "列类型指定了一个未知类型"
+help = "声明该类型或导入它"
+
+[diagnostics.SEM002.issues.unknown_namespace]
+message = "未知 namespace"
+help = "声明 type 或导入它"
+
+[diagnostics.SEM002.issues.unknown_qualified_type]
+message = "未知 qualified type"
+help = "声明 type 或导入它"
+
+[diagnostics.SEM002.issues.unknown_struct]
+message = "未知 struct"
+help = "声明 type 或导入它"
+
+[diagnostics.SEM002.issues.unknown_type]
+message = "未知 type"
+help = "声明 type 或导入它"
+
+[diagnostics.SEM002.issues.width_marker_params]
+message = "width marker 不能接受 parameters"
+help = "声明 type 或导入它"
+
+[diagnostics.SEM002.issues.width_marker_shape]
+message = "width marker 必须是裸写法，例如 i32 或 u8"
+help = "声明 type 或导入它"
+
+[diagnostics.SEM003]
+message = "未定义 function"
+help = "声明 function 或导入它"
+
+[diagnostics.SEM004]
+message = "未定义 member"
+help = "检查 member 名称和类型"
+
+[diagnostics.SEM004.issues.duplicate_variant_field]
+message = "variant field 重复"
+help = "每个 named variant field 最多提供一次"
+
+[diagnostics.SEM004.issues.missing_required_struct_field]
+message = "缺少必需 struct field"
+help = "初始化每个必需 struct field"
+
+[diagnostics.SEM004.issues.missing_variant_field_name]
+message = "缺少 variant field 名称"
+help = "使用 named variant construction 时为每个 variant argument 命名"
+
+[diagnostics.SEM004.issues.optional_receiver_requires_chain]
+message = "optional receiver 需要 optional chaining 或 non-null access"
+help = "使用 ?. 进行 optional chaining，或使用 !. 进行 non-null access"
+
+[diagnostics.SEM004.issues.struct_field_requires_value]
+message = "struct field 需要值"
+help = "为 struct field 提供值"
+
+[diagnostics.SEM004.issues.unknown_field]
+message = "未知 field"
+help = "检查 struct field 名称"
+
+[diagnostics.SEM004.issues.unknown_method]
+message = "未知 method"
+help = "检查 receiver 类型和 method 名称"
+
+[diagnostics.SEM004.issues.unknown_struct_field]
+message = "未知 struct field"
+help = "检查 struct field 名称"
+
+[diagnostics.SEM004.issues.unknown_variant_field]
+message = "未知 variant field"
+help = "检查 variant field 名称"
+
+[diagnostics.SEM005]
+message = "重复定义"
+help = "重命名其中一个定义"
+
+[diagnostics.SEM005.issues.duplicate_definition]
+message = "重复定义"
+help = "重命名其中一个定义"
+
+[diagnostics.SEM005.issues.inferred_import_name_collision]
+message = "推断的导入名与已有定义冲突"
+help = "用 `ut` 添加显式导入 alias，让导入 binding 名称唯一"
+
+[diagnostics.SEM005.issues.schema_duplicate_source]
+message = "两个可见名称解析为同一个源名称"
+help = "为其中一个列指定不同的源名称"
+
+[diagnostics.SEM005.issues.schema_duplicate_visible]
+message = "两个列声明了相同的公共名称"
+help = "重命名其中一个列"
+
+[diagnostics.SEM006]
+message = "未找到导入"
+help = "检查导入路径"
+
+[diagnostics.SEM006.issues.kernel_glob_reexport]
+message = "`{path}` glob imports 在 v1 中不能 re-export"
+help = "检查导入路径"
+
+[diagnostics.SEM006.issues.kernel_glob_named_alias]
+message = "`{path}` 必须作为 named glob alias 导入"
+help = "检查导入路径"
+
+[diagnostics.SEM006.issues.kernel_invalid_path]
+message = "{reason}"
+help = "检查导入路径"
+
+[diagnostics.SEM006.issues.kernel_unknown_module]
+message = "未知 faber kernel module '{module}'；参见 faber host manifest"
+help = "检查导入路径"
+
+[diagnostics.SEM006.issues.kernel_norma_json_in_script]
+message = "script mode 使用 `{script_path}`；`{library_path}` 仅用于 package/library"
+help = "检查导入路径"
+
+[diagnostics.SEM007]
+message = "循环依赖"
+help = "打破模块之间的循环"
+
+[diagnostics.SEM007.issues.type_alias_cycle]
+message = "type alias 循环"
+help = "打破模块之间的循环"
+
+[diagnostics.SEM008]
+message = "lowering 错误"
+help = "修正用于 lowering 的 AST construct"
+
+[diagnostics.SEM008.issues.array_destructuring_initializer]
+message = "array destructuring 需要 initializer"
+help = "修正用于 lowering 的 AST construct"
+
+[diagnostics.SEM008.issues.array_destructuring_not_expanded]
+message = "array destructuring 应在 statement lowering 之前展开"
+help = "修正用于 lowering 的 AST construct"
+
+[diagnostics.SEM008.issues.atomic_compiler_owned_syntax]
+message = "atomic 需要 compiler-owned 语法；请使用 atomic<T>"
+help = "修正用于 lowering 的 AST construct"
+
+[diagnostics.SEM008.issues.lista_arity]
+message = "lista 需要一个 type parameter"
+help = "使用 {lista}<T>；lista<T, N> 是已交付的有界形式"
+
+[diagnostics.SEM008.issues.tabula_arity]
+message = "tabula 需要两个 type parameters"
+help = "修正用于 lowering 的 AST construct"
+
+[diagnostics.SEM008.issues.copia_arity]
+message = "copia 需要一个 type parameter"
+help = "修正用于 lowering 的 AST construct"
+
+[diagnostics.SEM008.issues.promissum_arity]
+message = "promissum 需要一个 type parameter"
+help = "修正用于 lowering 的 AST construct"
+
+[diagnostics.SEM008.issues.cursor_arity]
+message = "cursor 需要一个 type parameter"
+help = "修正用于 lowering 的 AST construct"
+
+
+[diagnostics.SEM008.issues.queue_arity]
+message = "queue requires one or two type parameters"
+help = "use queue<T> or queue<T, N>"
+
+[diagnostics.SEM008.issues.stack_arity]
+message = "stack requires one or two type parameters"
+help = "use stack<T> or stack<T, N>"
+
+[diagnostics.SEM008.issues.discerne_casu_pattern_required]
+message = "discerne casu 需要一个 pattern"
+help = "修正用于 lowering 的 AST construct"
+
+[diagnostics.SEM008.issues.discerne_pattern_count]
+message = "discerne pattern 数量必须匹配 subject 数量"
+help = "修正用于 lowering 的 AST construct"
+
+[diagnostics.SEM008.issues.discerne_subject_required]
+message = "discerne 至少需要一个 subject"
+help = "修正用于 lowering 的 AST construct"
+
+[diagnostics.SEM008.issues.duplicate_module_method_binding]
+message = "lowering 期间出现重复 module method binding"
+help = "修正用于 lowering 的 AST construct"
+
+[diagnostics.SEM008.issues.ego_outside_method]
+message = "ego 在 method context 之外使用"
+help = "修正用于 lowering 的 AST construct"
+
+[diagnostics.SEM008.issues.elige_case_value_shape]
+message = "elige case value 必须是字面量或 enum variant"
+help = "修正用于 lowering 的 AST construct"
+
+[diagnostics.SEM008.issues.empty_qualified_type_path]
+message = "空的 qualified type path"
+help = "修正用于 lowering 的 AST construct"
+
+[diagnostics.SEM008.issues.empty_path_pattern]
+message = "空的 path pattern"
+help = "修正用于 lowering 的 AST construct"
+
+[diagnostics.SEM008.issues.empty_union_type]
+message = "空的 union type"
+help = "修正用于 lowering 的 AST construct"
+
+[diagnostics.SEM008.issues.ex_destructuring_not_expanded]
+message = "ex destructuring 应在 statement lowering 之前展开"
+help = "修正用于 lowering 的 AST construct"
+
+[diagnostics.SEM008.issues.finge_cast_not_type]
+message = "finge cast 必须命名一个 type"
+help = "修正用于 lowering 的 AST construct"
+
+[diagnostics.SEM008.issues.figura_not_index_param]
+message = "名称未指向 index parameter"
+help = "修正用于 lowering 的 AST construct"
+
+[diagnostics.SEM008.issues.figura_type_param_in_index]
+message = "type parameter 不能出现在 index 位置"
+help = "修正用于 lowering 的 AST construct"
+
+[diagnostics.SEM008.issues.figura_unknown_index]
+message = "Figura 中有未知 index 变量"
+help = "修正用于 lowering 的 AST construct"
+
+[diagnostics.SEM008.issues.float_width_on_numerus]
+message = "f16、f32 和 f64 是 fractus 宽度；请使用 fractus<f16>、fractus<f32> 或 fractus<f64>"
+help = "修正用于 lowering 的 AST construct"
+
+[diagnostics.SEM008.issues.forma_builtin_missing]
+message = "builtin forma genus 未注册"
+help = "修正用于 lowering 的 AST construct"
+
+[diagnostics.SEM008.issues.forma_literal_lowering_path]
+message = "forma template literals 必须通过 forma capture 进行 lowering"
+help = "修正用于 lowering 的 AST construct"
+
+[diagnostics.SEM008.issues.forma_literal_pattern]
+message = "forma template literals 在 patterns 中无效"
+help = "修正用于 lowering 的 AST construct"
+
+[diagnostics.SEM008.issues.forma_params_field_missing]
+message = "builtin forma genus 缺少 params field"
+help = "修正用于 lowering 的 AST construct"
+
+[diagnostics.SEM008.issues.forma_template_field_missing]
+message = "builtin forma genus 缺少 template field"
+help = "修正用于 lowering 的 AST construct"
+
+[diagnostics.SEM008.issues.fractus_width_params]
+message = "fractus 最多接受一个 width marker"
+help = "修正用于 lowering 的 AST construct"
+
+[diagnostics.SEM008.issues.integer_width_on_fractus]
+message = "integer width markers 是 numerus 宽度；请使用 numerus<…>"
+help = "修正用于 lowering 的 AST construct"
+
+[diagnostics.SEM008.issues.instans_precision_params]
+message = "instans 最多接受一个 precision marker"
+help = "修正用于 lowering 的 AST construct"
+
+[diagnostics.SEM008.issues.intervallum_arity]
+message = "intervallum 需要一个 type parameter"
+help = "修正用于 lowering 的 AST construct"
+
+[diagnostics.SEM008.issues.intervallum_bound]
+message = "intervallum bound type 必须是 numerus 或 instans"
+help = "修正用于 lowering 的 AST construct"
+
+[diagnostics.SEM008.issues.atomic_arity]
+message = "atomic 恰好需要一个 element type；请使用 atomic<T>"
+help = "修正用于 lowering 的 AST construct"
+
+[diagnostics.SEM008.issues.atomic_element]
+message = "atomic element type 必须是 numerus<i32> 或 numerus<u32>"
+help = "修正用于 lowering 的 AST construct"
+
+[diagnostics.SEM008.issues.atomic_incomplete]
+message = "atomic 需要一个 element type；请使用 atomic<T>"
+help = "修正用于 lowering 的 AST construct"
+
+[diagnostics.SEM008.issues.invalid_fractus_width_marker]
+message = "fractus 只接受 f16、f32 或 f64"
+help = "修正用于 lowering 的 AST construct"
+
+[diagnostics.SEM008.issues.invalid_lowered_expression]
+message = "lowering 期间产生无效表达式"
+help = "修正用于 lowering 的 AST construct"
+
+[diagnostics.SEM008.issues.invalid_numerus_width_marker]
+message = "numerus 的 width marker 未知"
+help = "修正用于 lowering 的 AST construct"
+
+[diagnostics.SEM008.issues.invalid_precision_marker]
+message = "instans 只接受 ms、us 或 ns 作为 precision marker"
+help = "修正用于 lowering 的 AST construct"
+
+[diagnostics.SEM008.issues.invalid_width_marker]
+message = "此 family 的 width marker 未知"
+help = "修正用于 lowering 的 AST construct"
+
+[diagnostics.SEM008.issues.json_valor_pattern]
+message = "JSON document literals 在 patterns 中无效"
+help = "修正用于 lowering 的 AST construct"
+
+[diagnostics.SEM008.issues.kernel_glob_call_shape]
+message = "kernel glob calls 必须使用 `faber.<module>.<verb>`"
+help = "修正用于 lowering 的 AST construct"
+
+[diagnostics.SEM008.issues.kernel_glob_named_alias]
+message = "`faber:*` 必须用 named alias 导入"
+help = "修正用于 lowering 的 AST construct"
+
+[diagnostics.SEM008.issues.kernel_unknown_module]
+message = "未知 faber kernel module '{module}'；参见 faber host manifest"
+help = "修正用于 lowering 的 AST construct"
+
+[diagnostics.SEM008.issues.matrix_incomplete]
+message = "matrix 需要 element type 和 shape；请使用 matrix<T, [R, C]>"
+help = "修正用于 lowering 的 AST construct"
+
+[diagnostics.SEM008.issues.matrix_missing_figura]
+message = "matrix 需要二维 shape；请使用 matrix<T, [R, C]>"
+help = "修正用于 lowering 的 AST construct"
+
+[diagnostics.SEM008.issues.matrix_shape_two_dim]
+message = "matrix shape 必须恰好是二维"
+help = "修正用于 lowering 的 AST construct"
+
+[diagnostics.SEM008.issues.missing_cast_symbol_info]
+message = "缺少 cast symbol 信息"
+help = "修正用于 lowering 的 AST construct"
+
+[diagnostics.SEM008.issues.missing_resolved_type_alias]
+message = "type alias 缺少 resolved type"
+help = "修正用于 lowering 的 AST construct"
+
+[diagnostics.SEM008.issues.missing_type_alias_symbol]
+message = "type alias 缺少 symbol"
+help = "修正用于 lowering 的 AST construct"
+
+[diagnostics.SEM008.issues.missing_type_symbol_info]
+message = "缺少 type symbol 信息"
+help = "修正用于 lowering 的 AST construct"
+
+[diagnostics.SEM008.issues.mutable_pattern_binding]
+message = "mutable pattern bindings 尚未实现 lowering"
+help = "修正用于 lowering 的 AST construct"
+
+[diagnostics.SEM008.issues.nested_array_destructuring]
+message = "nested array destructuring 尚未实现 lowering"
+help = "修正用于 lowering 的 AST construct"
+
+[diagnostics.SEM008.issues.nested_object_destructuring]
+message = "nested object destructuring 尚未实现 lowering"
+help = "修正用于 lowering 的 AST construct"
+
+[diagnostics.SEM008.issues.numerus_width_params]
+message = "numerus 最多接受一个 width marker"
+help = "修正用于 lowering 的 AST construct"
+
+[diagnostics.SEM008.issues.object_destructuring_initializer]
+message = "object destructuring 需要 initializer"
+help = "修正用于 lowering 的 AST construct"
+
+[diagnostics.SEM008.issues.object_destructuring_not_expanded]
+message = "object destructuring 应在 statement lowering 之前展开"
+help = "修正用于 lowering 的 AST construct"
+
+[diagnostics.SEM008.issues.octet_params]
+message = "octet 是 fixed-width 的，不能接受 parameters"
+help = "修正用于 lowering 的 AST construct"
+
+[diagnostics.SEM008.issues.precision_marker_shape]
+message = "precision marker 必须是裸写法，例如 ms 或 us"
+help = "修正用于 lowering 的 AST construct"
+
+[diagnostics.SEM008.issues.primitive_params]
+message = "primitive type 不能接受 parameters"
+help = "textus<N>、ascii<N> 和 octeti<N> 是已交付的有界形式"
+
+[diagnostics.SEM008.issues.primitive_width_params]
+message = "primitive 最多接受一个 width marker"
+help = "修正用于 lowering 的 AST construct"
+
+[diagnostics.SEM008.issues.qualified_type_not_exported]
+message = "namespace 未导出 qualified type"
+help = "修正用于 lowering 的 AST construct"
+
+[diagnostics.SEM008.issues.qualified_type_prefix_not_namespace]
+message = "qualified type prefix 必须命名一个 namespace"
+help = "修正用于 lowering 的 AST construct"
+
+[diagnostics.SEM008.issues.radix_typus_allowed_type_not_concrete]
+message = "@ radix typus allowed type 必须是 concrete"
+help = "修正用于 lowering 的 AST construct"
+
+[diagnostics.SEM008.issues.radix_typus_non_type_param]
+message = "@ radix typus 只能约束 type parameters"
+help = "修正用于 lowering 的 AST construct"
+
+[diagnostics.SEM008.issues.radix_typus_unknown_generic]
+message = "@ radix typus 命名了未知的 generic parameter"
+help = "修正用于 lowering 的 AST construct"
+
+[diagnostics.SEM008.issues.retired_bare_object_literal]
+message = "bare object literal 已退役；请使用 {object_literal_forms}"
+help = "修正用于 lowering 的 AST construct"
+
+[diagnostics.SEM008.issues.schema_nested_column]
+message = "列不能是嵌套的 schema 声明"
+help = "单独声明嵌套的 schema 并将其命名为列类型"
+
+[diagnostics.SEM008.issues.scrinium_arity]
+message = "scrinium 最多接受一个 payload type parameter"
+help = "修正用于 lowering 的 AST construct"
+
+[diagnostics.SEM008.issues.scrinium_missing_builtin]
+message = "builtin scrinium type 未注册"
+help = "修正用于 lowering 的 AST construct"
+
+[diagnostics.SEM008.issues.series_params]
+message = "series 不能接受 parameters"
+help = "修正用于 lowering 的 AST construct"
+
+[diagnostics.SEM008.issues.sparsa_element_non_numeric]
+message = "v1 中 sparsa element type 必须是 numeric"
+help = "修正用于 lowering 的 AST construct"
+
+[diagnostics.SEM008.issues.sparsa_incomplete]
+message = "sparsa 需要 element type 和 Figura；请使用 sparsa<T, Figura>"
+help = "修正用于 lowering 的 AST construct"
+
+[diagnostics.SEM008.issues.sparsa_missing_figura]
+message = "sparsa 需要 Figura shape；rank-0 请使用 sparsa<T, []>"
+help = "修正用于 lowering 的 AST construct"
+
+[diagnostics.SEM008.issues.standalone_width_internal]
+message = "lowering standalone width type 时出现内部错误"
+help = "修正用于 lowering 的 AST construct"
+
+[diagnostics.SEM008.issues.tensor_incomplete]
+message = "tensor 需要 element type 和 Figura；请使用 tensor<T, Figura>"
+help = "修正用于 lowering 的 AST construct"
+
+[diagnostics.SEM008.issues.tensor_missing_figura]
+message = "tensor 需要 Figura shape；rank-0 请使用 tensor<T, []>"
+help = "修正用于 lowering 的 AST construct"
+
+[diagnostics.SEM008.issues.template_type_args]
+message = "template application 不接受 type arguments"
+help = "修正用于 lowering 的 AST construct"
+
+[diagnostics.SEM008.issues.top_level_initializer]
+message = "顶层变量声明需要 initializer"
+help = "修正用于 lowering 的 AST construct"
+
+[diagnostics.SEM008.issues.top_level_identifier_binding]
+message = "顶层变量需要 identifier binding"
+help = "修正用于 lowering 的 AST construct"
+
+[diagnostics.SEM008.issues.type_name_not_type]
+message = "type name 未指向 type"
+help = "修正用于 lowering 的 AST construct"
+
+[diagnostics.SEM008.issues.union_only_nihil]
+message = "union type 不能只由 'nihil' 组成"
+help = "修正用于 lowering 的 AST construct"
+
+[diagnostics.SEM008.issues.undefined_name]
+message = "lowering 中出现未定义名称"
+help = "修正用于 lowering 的 AST construct"
+
+[diagnostics.SEM008.issues.unhandled_statement_kind]
+message = "lowering 中出现未处理的 statement kind"
+help = "修正用于 lowering 的 AST construct"
+
+[diagnostics.SEM008.issues.unknown_base_class]
+message = "gens 声明中出现未知 base class"
+help = "修正用于 lowering 的 AST construct"
+
+[diagnostics.SEM008.issues.unknown_finge_cast_type]
+message = "finge 表达式中出现未知 cast type"
+help = "修正用于 lowering 的 AST construct"
+
+[diagnostics.SEM008.issues.unknown_finge_variant]
+message = "finge 表达式中出现未知 variant"
+help = "修正用于 lowering 的 AST construct"
+
+[diagnostics.SEM008.issues.unknown_interface]
+message = "gens 声明中出现未知 interface"
+help = "修正用于 lowering 的 AST construct"
+
+[diagnostics.SEM008.issues.unknown_lowering_error]
+message = "HIR lowering 失败"
+help = "修正用于 lowering 的 AST construct"
+
+[diagnostics.SEM008.issues.unknown_namespace]
+message = "未知 namespace"
+help = "修正用于 lowering 的 AST construct"
+
+[diagnostics.SEM008.issues.unknown_type_lowering_error]
+message = "type lowering 失败"
+help = "修正用于 lowering 的 AST construct"
+
+[diagnostics.SEM008.issues.unknown_type_name]
+message = "未知 type name"
+help = "修正用于 lowering 的 AST construct"
+
+[diagnostics.SEM008.issues.vector_width_single_dim]
+message = "vector width 必须是单一维度"
+help = "修正用于 lowering 的 AST construct"
+
+[diagnostics.SEM008.issues.width_marker_params]
+message = "width marker 不能接受 parameters"
+help = "修正用于 lowering 的 AST construct"
+
+[diagnostics.SEM008.issues.width_marker_shape]
+message = "width marker 必须是裸写法，例如 i32 或 u8"
+help = "修正用于 lowering 的 AST construct"
+
+[diagnostics.SEM009]
+message = "CLI validation 无效"
+help = "在 emit runnable CLI code 前修正 CLI annotation contract"
+
+[diagnostics.SEM009.issues.alias_collides_with_path]
+message = "command alias '{alias}' 与 command path 冲突"
+help = "在 emit runnable CLI code 前修正 CLI annotation contract"
+
+[diagnostics.SEM009.issues.cli_on_non_incipit]
+message = "@ cli 只能 annotate incipit entry point"
+help = "在 emit runnable CLI code 前修正 CLI annotation contract"
+
+[diagnostics.SEM009.issues.command_global_surface]
+message = "'ubique' options 和 operands 必须声明在 @ cli entry point 上"
+help = "在 emit runnable CLI code 前修正 CLI annotation contract"
+
+[diagnostics.SEM009.issues.command_params_unsupported]
+message = "Phase 04 CLI commands 必须通过 'argumenta <ident>' 接收 parsed values，而不是普通 parameters"
+help = "在 emit runnable CLI code 前修正 CLI annotation contract"
+
+[diagnostics.SEM009.issues.duplicate_binding]
+message = "{label} CLI surface 中的 CLI binding '{binding}' 重复"
+help = "在 emit runnable CLI code 前修正 CLI annotation contract"
+
+[diagnostics.SEM009.issues.duplicate_cli_entry]
+message = "只允许一个 @ cli entry point"
+help = "在 emit runnable CLI code 前修正 CLI annotation contract"
+
+[diagnostics.SEM009.issues.duplicate_command_alias]
+message = "command alias '{alias}' 重复"
+help = "在 emit runnable CLI code 前修正 CLI annotation contract"
+
+[diagnostics.SEM009.issues.duplicate_command_path]
+message = "command path '{path}' 重复"
+help = "在 emit runnable CLI code 前修正 CLI annotation contract"
+
+[diagnostics.SEM009.issues.duplicate_long_flag]
+message = "{label} CLI surface 中的 long flag '{long}' 重复"
+help = "在 emit runnable CLI code 前修正 CLI annotation contract"
+
+[diagnostics.SEM009.issues.duplicate_rest_operand]
+message = "只允许一个 ceteri operand"
+help = "在 emit runnable CLI code 前修正 CLI annotation contract"
+
+[diagnostics.SEM009.issues.duplicate_short_flag]
+message = "{label} CLI surface 中的 short flag '{short}' 重复"
+help = "在 emit runnable CLI code 前修正 CLI annotation contract"
+
+[diagnostics.SEM009.issues.global_operand_placement]
+message = "'ubique' operands 必须声明在 @ cli entry point 上"
+help = "在 emit runnable CLI code 前修正 CLI annotation contract"
+
+[diagnostics.SEM009.issues.global_option_placement]
+message = "'ubique' options 必须声明在 @ cli entry point 上"
+help = "在 emit runnable CLI code 前修正 CLI annotation contract"
+
+[diagnostics.SEM009.issues.imperium_on_non_func]
+message = "@ imperium 只能 annotate functio declaration"
+help = "在 emit runnable CLI code 前修正 CLI annotation contract"
+
+[diagnostics.SEM009.issues.invalid_command_alias]
+message = "command alias '{alias}' 无效"
+help = "在 emit runnable CLI code 前修正 CLI annotation contract"
+
+[diagnostics.SEM009.issues.invalid_command_path]
+message = "command path '{path}' 无效"
+help = "在 emit runnable CLI code 前修正 CLI annotation contract"
+
+[diagnostics.SEM009.issues.invalid_long_flag]
+message = "option '{binding}' 的 long flag '{long}' 无效"
+help = "在 emit runnable CLI code 前修正 CLI annotation contract"
+
+[diagnostics.SEM009.issues.invalid_short_flag]
+message = "option '{binding}' 的 short flag '{short}' 无效"
+help = "在 emit runnable CLI code 前修正 CLI annotation contract"
+
+[diagnostics.SEM009.issues.list_element_not_named]
+message = "CLI list types 必须使用 named element type"
+help = "在 emit runnable CLI code 前修正 CLI annotation contract"
+
+[diagnostics.SEM009.issues.local_operand_global_collision]
+message = "{label} operand '{binding}' 与 global CLI binding 冲突"
+help = "在 emit runnable CLI code 前修正 CLI annotation contract"
+
+[diagnostics.SEM009.issues.local_option_global_collision]
+message = "{label} option '{binding}' 与 global CLI binding 冲突"
+help = "在 emit runnable CLI code 前修正 CLI annotation contract"
+
+[diagnostics.SEM009.issues.missing_entry_argument]
+message = "@ cli programs 必须使用显式 'incipit argumenta <ident>' entry point"
+help = "在 emit runnable CLI code 前修正 CLI annotation contract"
+
+[diagnostics.SEM009.issues.malformed_annotation]
+message = "{annotation} field `{field}` 必须是 {expected}"
+help = "在 emit runnable CLI code 前修正 CLI annotation contract"
+
+[diagnostics.SEM009.issues.missing_option_flag]
+message = "{label} option '{binding}' 需要 brevis 或 longum"
+help = "在 emit runnable CLI code 前修正 CLI annotation contract"
+
+[diagnostics.SEM009.issues.mounted_module_root_cli]
+message = "mounted CLI command modules 不能声明自己的 @ cli entry point"
+help = "在 emit runnable CLI code 前修正 CLI annotation contract"
+
+[diagnostics.SEM009.issues.nested_module_mount]
+message = "@ imperia module mounts 只能声明在 root CLI entry point 上"
+help = "在 emit runnable CLI code 前修正 CLI annotation contract"
+
+[diagnostics.SEM009.issues.operand_after_rest]
+message = "operand '{binding}' 出现在 ceteri operand 之后"
+help = "在 emit runnable CLI code 前修正 CLI annotation contract"
+
+[diagnostics.SEM009.issues.orphan_cli_surface]
+message = "@ optio 和 @ operandus 必须 annotate @ cli incipit 或 @ imperium functio"
+help = "在 emit runnable CLI code 前修正 CLI annotation contract"
+
+[diagnostics.SEM009.issues.rest_not_final]
+message = "ceteri operand 必须是最后一个 operand"
+help = "在 emit runnable CLI code 前修正 CLI annotation contract"
+
+[diagnostics.SEM009.issues.subcommand_local_surface]
+message = "subcommand CLI programs 只能用 'ubique' 声明 top-level options 或 operands"
+help = "在 emit runnable CLI code 前修正 CLI annotation contract"
+
+[diagnostics.SEM009.issues.subcommand_root_body]
+message = "Phase 04 中 subcommand CLI programs 必须使用空的 root incipit body"
+help = "在 emit runnable CLI code 前修正 CLI annotation contract"
+
+[diagnostics.SEM009.issues.unsupported_list_element_type]
+message = "不支持 CLI list element type '{type}'"
+help = "在 emit runnable CLI code 前修正 CLI annotation contract"
+
+[diagnostics.SEM009.issues.unsupported_type]
+message = "不支持 CLI type '{type}'"
+help = "在 emit runnable CLI code 前修正 CLI annotation contract"
+
+[diagnostics.SEM009.issues.unsupported_type_shape]
+message = "不支持 CLI type shape"
+help = "在 emit runnable CLI code 前修正 CLI annotation contract"
+
+[diagnostics.SEM010]
+message = "类型不匹配"
+help = "使表达式类型与期望类型一致"
+
+[diagnostics.SEM010.issues.argument_type_mismatch]
+message = "argument 类型不匹配"
+help = "使表达式类型与期望类型一致"
+
+[diagnostics.SEM010.issues.callee_not_callable]
+message = "callee 不可调用"
+help = "使表达式类型与期望类型一致"
+
+[diagnostics.SEM010.issues.figura_not_index_param]
+message = "名称未指向 index parameter"
+help = "使表达式类型与期望类型一致"
+
+[diagnostics.SEM010.issues.assignment_type_mismatch]
+message = "assignment 类型不匹配"
+help = "使表达式类型与期望类型一致"
+
+[diagnostics.SEM010.issues.assert_condition_type_mismatch]
+message = "assert condition 必须是 boolean"
+help = "使表达式类型与期望类型一致"
+
+[diagnostics.SEM010.issues.constant_annotation_mismatch]
+message = "constant 值与标注不匹配"
+help = "使表达式类型与期望类型一致"
+
+[diagnostics.SEM010.issues.closure_parameter_type_mismatch]
+message = "closure parameter 类型不匹配"
+help = "使表达式类型与期望类型一致"
+
+[diagnostics.SEM010.issues.closure_return_type_mismatch]
+message = "closure 返回类型不匹配"
+help = "使表达式类型与期望类型一致"
+
+[diagnostics.SEM010.issues.coalesce_fallback_type_mismatch]
+message = "coalesce fallback 类型不匹配"
+help = "使表达式类型与期望类型一致"
+
+[diagnostics.SEM010.issues.common_type_mismatch]
+message = "不兼容类型"
+help = "使表达式类型与期望类型一致"
+
+[diagnostics.SEM010.issues.array_element_type_mismatch]
+message = "array element 类型不匹配"
+help = "使表达式类型与期望类型一致"
+
+[diagnostics.SEM010.issues.array_spread_element_type_mismatch]
+message = "array spread element 类型不匹配"
+help = "使表达式类型与期望类型一致"
+
+[diagnostics.SEM010.issues.conversio_failure_channel_type_mismatch]
+message = "propagating conversio failure channel 不匹配"
+help = "使表达式类型与期望类型一致"
+
+[diagnostics.SEM010.issues.conversio_recovery_type_mismatch]
+message = "conversio recovery 类型不匹配"
+help = "使表达式类型与期望类型一致"
+
+[diagnostics.SEM010.issues.cursor_iteration_requires_ex]
+message = "cursor iteration 只支持 itera ex"
+help = "使表达式类型与期望类型一致"
+
+[diagnostics.SEM010.issues.expression_type_mismatch]
+message = "表达式类型不匹配"
+help = "使表达式类型与期望类型一致"
+
+[diagnostics.SEM010.issues.equality_exact_types_required]
+message = "equality 要求类型完全一致"
+help = "使表达式类型与期望类型一致"
+
+[diagnostics.SEM010.issues.field_initializer_type_mismatch]
+message = "field initializer 类型不匹配"
+help = "使表达式类型与期望类型一致"
+
+[diagnostics.SEM010.issues.failable_call_enclosing_error_type_mismatch]
+message = "failable call error type 与外层 ⇥ 不匹配"
+help = "使表达式类型与期望类型一致"
+
+[diagnostics.SEM010.issues.failable_call_handler_error_type_mismatch]
+message = "handled failable call error type 不匹配"
+help = "使表达式类型与期望类型一致"
+
+[diagnostics.SEM010.issues.field_default_type_mismatch]
+message = "field default 类型不匹配"
+help = "使表达式类型与期望类型一致"
+
+[diagnostics.SEM010.issues.iace_requires_alternate_exit]
+message = "iace 需要一个带 '⇥' alternate-exit type 的外层函数"
+help = "使表达式类型与期望类型一致"
+
+[diagnostics.SEM010.issues.iace_value_type_mismatch]
+message = "alternate exit value 类型不匹配"
+help = "使表达式类型与期望类型一致"
+
+[diagnostics.SEM010.issues.ignored_expression_result_must_resolve]
+message = "ignored expression result 必须能 resolve"
+help = "使表达式类型与期望类型一致"
+
+[diagnostics.SEM010.issues.initializer_annotation_mismatch]
+message = "初始值与标注类型不匹配"
+help = "使初始值类型与声明类型一致"
+
+[diagnostics.SEM010.issues.incompatible_return_types]
+message = "返回类型不兼容"
+help = "使表达式类型与期望类型一致"
+
+[diagnostics.SEM010.issues.intervallum_bound_required]
+message = "intervallum bound type 必须是 numerus 或 instans"
+help = "使表达式类型与期望类型一致"
+
+[diagnostics.SEM010.issues.intervallum_clamp_operand_type_mismatch]
+message = "intervallum clamp operand 类型不匹配"
+help = "使表达式类型与期望类型一致"
+
+[diagnostics.SEM010.issues.intra_requires_intervallum_range]
+message = "intra 需要一个 intervallum range"
+help = "使表达式类型与期望类型一致"
+
+[diagnostics.SEM010.issues.incompatible_tensor_index]
+message = "index shapes 不兼容"
+help = "使表达式类型与期望类型一致"
+
+[diagnostics.SEM010.issues.invalid_cast]
+message = "cast 无效"
+help = "使表达式类型与期望类型一致"
+
+[diagnostics.SEM010.issues.itera_ab_source_requires_range]
+message = "itera ab source 必须是 range 表达式"
+help = "使表达式类型与期望类型一致"
+
+[diagnostics.SEM010.issues.itera_apud_arity_mismatch]
+message = "{apud} 坐标数量必须等于可迭代对象的秩"
+help = "使表达式类型与期望类型一致"
+
+[diagnostics.SEM010.issues.itera_apud_requires_ex]
+message = "{apud} 坐标需要 {ex} 迭代"
+help = "使表达式类型与期望类型一致"
+
+[diagnostics.SEM010.issues.itera_apud_requires_shaped_iterable]
+message = "{apud} 需要张量或矩阵可迭代对象"
+help = "使表达式类型与期望类型一致"
+
+[diagnostics.SEM010.issues.json_map_key_must_be_textus]
+message = "JSON map key 必须是 textus"
+help = "使表达式类型与期望类型一致"
+
+[diagnostics.SEM010.issues.json_nested_value_requires_valor]
+message = "nested JSON value 需要 tabula value type valor"
+help = "使表达式类型与期望类型一致"
+
+[diagnostics.SEM010.issues.json_value_type_mismatch]
+message = "JSON 值与 tabula value type 不匹配"
+help = "使表达式类型与期望类型一致"
+
+[diagnostics.SEM010.issues.live_tuus_cursor_call_arg]
+message = "live tuus cursor values 暂不能作为函数 arguments 传递"
+help = "使表达式类型与期望类型一致"
+
+[diagnostics.SEM010.issues.live_tuus_cursor_return]
+message = "live tuus cursor values 暂不能从函数返回"
+help = "使表达式类型与期望类型一致"
+
+[diagnostics.SEM010.issues.live_tuus_cursor_struct]
+message = "live tuus cursor values 暂不能存入 structures"
+help = "使表达式类型与期望类型一致"
+
+[diagnostics.SEM010.issues.live_tuus_cursor_reassign]
+message = "live tuus cursor locals 暂不能重新赋值"
+help = "使表达式类型与期望类型一致"
+
+[diagnostics.SEM010.issues.live_tuus_cursor_copy]
+message = "live tuus cursor values 暂不能在 locals 之间复制或移动"
+help = "使表达式类型与期望类型一致"
+
+[diagnostics.SEM010.issues.live_tuus_cursor_conversio]
+message = "live tuus cursor values 暂不能通过 aggregate conversio 转换"
+help = "使表达式类型与期望类型一致"
+
+[diagnostics.SEM010.issues.live_tuus_cursor_direct_initializer]
+message = "tuus.cursor() 只支持作为直接的 local initializer"
+help = "使表达式类型与期望类型一致"
+
+[diagnostics.SEM010.issues.live_tuus_cursor_value]
+message = "live tuus cursor values 暂不能作为表达式使用"
+help = "使表达式类型与期望类型一致"
+
+[diagnostics.SEM010.issues.map_index_type_mismatch]
+message = "map index 类型不匹配"
+help = "使表达式类型与期望类型一致"
+
+[diagnostics.SEM010.issues.map_key_type_mismatch]
+message = "map key 类型不匹配"
+help = "使表达式类型与期望类型一致"
+
+[diagnostics.SEM010.issues.map_spread_key_type_mismatch]
+message = "map spread key 类型不匹配"
+help = "使表达式类型与期望类型一致"
+
+[diagnostics.SEM010.issues.map_spread_value_type_mismatch]
+message = "map spread value 类型不匹配"
+help = "使表达式类型与期望类型一致"
+
+[diagnostics.SEM010.issues.map_value_type_mismatch]
+message = "map value 类型不匹配"
+help = "使表达式类型与期望类型一致"
+
+[diagnostics.SEM010.issues.membership_operand_type_mismatch]
+message = "membership operand 类型不匹配"
+help = "使表达式类型与期望类型一致"
+
+[diagnostics.SEM010.issues.matmul_argument_rank_must_be_two]
+message = "matmul 需要 rank-2 tensor argument"
+help = "使表达式类型与期望类型一致"
+
+[diagnostics.SEM010.issues.matmul_argument_shape_must_be_tuple]
+message = "matmul 需要 rank-2 tensor argument 且为 tuple shape"
+help = "使表达式类型与期望类型一致"
+
+[diagnostics.SEM010.issues.matmul_receiver_rank_must_be_two]
+message = "matmul 需要 rank-2 tensor receiver"
+help = "使表达式类型与期望类型一致"
+
+[diagnostics.SEM010.issues.matmul_receiver_shape_must_be_tuple]
+message = "matmul 需要 rank-2 tensor receiver 且为 tuple shape"
+help = "使表达式类型与期望类型一致"
+
+[diagnostics.SEM010.issues.numeric_arithmetic_operands_identical]
+message = "numeric arithmetic operands 必须类型完全一致；请用 ↦ 显式转换"
+help = "使表达式类型与期望类型一致"
+
+[diagnostics.SEM010.issues.numeric_operand_required]
+message = "需要 numeric operand"
+help = "使表达式类型与期望类型一致"
+
+[diagnostics.SEM010.issues.numeric_operands_required]
+message = "需要 numeric operands"
+help = "使表达式类型与期望类型一致"
+
+[diagnostics.SEM010.issues.boolean_operand_required]
+message = "需要 boolean operand"
+help = "使表达式类型与期望类型一致"
+
+[diagnostics.SEM010.issues.boolean_operands_required]
+message = "需要 boolean operands"
+help = "使表达式类型与期望类型一致"
+
+[diagnostics.SEM010.issues.integer_operand_required]
+message = "需要 integer operand"
+help = "使表达式类型与期望类型一致"
+
+[diagnostics.SEM010.issues.integer_operands_required]
+message = "需要 integer operands"
+help = "使表达式类型与期望类型一致"
+
+[diagnostics.SEM010.issues.instans_ordering_operands_required]
+message = "不兼容的 instans operands"
+help = "使表达式类型与期望类型一致"
+
+[diagnostics.SEM010.issues.pattern_type_mismatch]
+message = "pattern 类型不匹配"
+help = "使表达式类型与期望类型一致"
+
+[diagnostics.SEM010.issues.parameter_default_type_mismatch]
+message = "parameter default 类型不匹配"
+help = "使表达式类型与期望类型一致"
+
+[diagnostics.SEM010.issues.range_operand_type_mismatch]
+message = "range operand 类型不匹配"
+help = "使表达式类型与期望类型一致"
+
+[diagnostics.SEM010.issues.range_step_must_be_numeric]
+message = "range step 必须是 numeric"
+help = "使表达式类型与期望类型一致"
+
+[diagnostics.SEM010.issues.return_type_mismatch]
+message = "返回类型与函数签名不匹配"
+help = "使表达式类型与期望类型一致"
+
+[diagnostics.SEM010.issues.regex_conversion_operand_type_mismatch]
+message = "regex conversion 需要 textus 或 ascii"
+help = "使表达式类型与期望类型一致"
+
+[diagnostics.SEM010.issues.string_operands_required]
+message = "需要 string operands"
+help = "使表达式类型与期望类型一致"
+
+[diagnostics.SEM010.issues.atomic_arity]
+message = "atomic 恰好需要一个 element type；请使用 atomic<T>"
+help = "使表达式类型与期望类型一致"
+
+[diagnostics.SEM010.issues.atomic_element]
+message = "atomic element type 必须是 numerus<i32> 或 numerus<u32>"
+help = "使表达式类型与期望类型一致"
+
+[diagnostics.SEM010.issues.atomic_incomplete]
+message = "atomic 需要一个 element type；请使用 atomic<T>"
+help = "使表达式类型与期望类型一致"
+
+[diagnostics.SEM010.issues.matrix_incomplete]
+message = "matrix 需要 element type 和 shape；请使用 matrix<T, [R, C]>"
+help = "使表达式类型与期望类型一致"
+
+[diagnostics.SEM010.issues.matrix_missing_figura]
+message = "matrix 需要二维 shape；请使用 matrix<T, [R, C]>"
+help = "使表达式类型与期望类型一致"
+
+[diagnostics.SEM010.issues.matrix_shape_two_dim]
+message = "matrix shape 必须恰好是二维"
+help = "使表达式类型与期望类型一致"
+
+[diagnostics.SEM010.issues.sparsa_incomplete]
+message = "sparsa 需要 element type 和 Figura；请使用 sparsa<T, Figura>"
+help = "使表达式类型与期望类型一致"
+
+[diagnostics.SEM010.issues.sparsa_missing_figura]
+message = "sparsa 需要 Figura shape；rank-0 请使用 sparsa<T, []>"
+help = "使表达式类型与期望类型一致"
+
+[diagnostics.SEM010.issues.scalar_text_operands_required]
+message = "需要 scalar text operands"
+help = "使表达式类型与期望类型一致"
+
+[diagnostics.SEM010.issues.stream_ad_opener_type_mismatch]
+message = "stream ad opener 必须降级为 valor"
+help = "使表达式类型与期望类型一致"
+
+[diagnostics.SEM010.issues.tensor_formata_element_type_mismatch]
+message = "formata target element type 必须与 receiver element type 匹配"
+help = "使表达式类型与期望类型一致"
+
+[diagnostics.SEM010.issues.tensor_incomplete]
+message = "tensor 需要 element type 和 Figura；请使用 tensor<T, Figura>"
+help = "使表达式类型与期望类型一致"
+
+[diagnostics.SEM010.issues.tensor_missing_figura]
+message = "tensor 需要 Figura shape；rank-0 请使用 tensor<T, []>"
+help = "使表达式类型与期望类型一致"
+
+[diagnostics.SEM010.issues.variant_pattern_scrutinee_mismatch]
+message = "variant 与 scrutinee type 不匹配"
+help = "使表达式类型与期望类型一致"
+
+[diagnostics.SEM010.issues.vector_element_type_mismatch]
+message = "vector element 类型不匹配"
+help = "使表达式类型与期望类型一致"
+
+[diagnostics.SEM010.issues.vector_incomplete]
+message = "vector 需要 element type 和 width；请使用 vector<T, N>"
+help = "使表达式类型与期望类型一致"
+
+[diagnostics.SEM010.issues.vector_missing_width]
+message = "vector 需要 width；请使用 vector<T, 4> 或 vf32[4]"
+help = "使表达式类型与期望类型一致"
+
+[diagnostics.SEM010.issues.gradient_expression_unsupported]
+message = "postfix gradient selection（`call(...) ∇ [places]`）在 tensor-glyphs 2B autograd surface 落地之前不会被 lowering；Phase 2A 中没有 operand、selector 或 result 规则生效"
+help = "Phase 2A 中 gradient selection（`∇`）仅为 parse-only；eligibility/selector 规则随 tensor-glyphs 2B 落地"
+
+[diagnostics.SEM011]
+message = "无效 operand 类型"
+help = "使用兼容的 operand 类型"
+
+[diagnostics.SEM011.issues.nucleum_lane_fragment_clash]
+message = "fragment lane binding '{fragment}' conflicts with caller lane binding '{caller}'"
+help = "keep caller and fragment lane bindings distinct"
+
+[diagnostics.SEM011.issues.range_step_must_be_numeric]
+message = "range step 必须是 numeric"
+help = "使用 numeric range step"
+
+[diagnostics.SEM011.issues.intervallum_bound_required]
+message = "intervallum bound type 必须是 numerus 或 instans"
+help = "使用 numerus、fractus、instans 或 sized scalar bounds"
+
+[diagnostics.SEM011.issues.intervallum_longitudo_bound]
+message = "在 momentum 发布之前，intervallum longitudo 需要 numerus bounds"
+help = "目前 longitudo 使用 numerus intervallum bounds"
+
+[diagnostics.SEM011.issues.numeric_operands_required]
+message = "需要 numeric operands"
+help = "为此运算符使用 numeric operands"
+
+[diagnostics.SEM011.issues.numeric_arithmetic_operands_identical]
+message = "numeric arithmetic operands 必须类型完全一致；请用 ↦ 显式转换"
+help = "在应用此 numeric 运算符之前显式转换 operands"
+
+[diagnostics.SEM011.issues.ascii_literal_invalid_escape]
+message = "ascii literal 包含无效转义序列"
+help = "使用受支持的 ASCII literal 转义序列"
+
+[diagnostics.SEM011.issues.ascii_literal_non_ascii_scalar]
+message = "ascii literal 包含非 ASCII 字符 '{character}'"
+help = "Unicode 文本请使用 textus，或保持 ascii payloads 仅含 ASCII"
+
+[diagnostics.SEM011.issues.ascii_literal_unescaped_control]
+message = "ascii literal 包含未转义的控制字符 U+{codepoint}"
+help = "在 ascii literals 中转义控制字符"
+
+[diagnostics.SEM011.issues.boolean_operands_required]
+message = "需要 boolean operands"
+help = "为此运算符使用 bivalens operands"
+
+[diagnostics.SEM011.issues.atomic_method_requires_atomic_receiver]
+message = "atomic operation 需要 atomic receiver"
+help = "在 atomic<T> 上调用 load/store/exchange/compare_exchange"
+
+[diagnostics.SEM011.issues.unsupported_atomic_method]
+message = "不支持的 atomic operation"
+help = "使用 load、store、exchange 或 compare_exchange"
+
+[diagnostics.SEM011.issues.bitwise_method_requires_numerus_receiver]
+message = "bitwise 运算符方法需要 numerus receiver"
+help = "在 numerus receivers 上调用 bitwise 方法"
+
+[diagnostics.SEM011.issues.deref_requires_reference]
+message = "deref 需要 reference"
+help = "对 reference value 进行 dereference"
+
+[diagnostics.SEM011.issues.densata_requires_sparsa_receiver]
+message = "densata 需要 sparsa receiver"
+help = "在 sparsa value 上调用 densata"
+
+[diagnostics.SEM011.issues.ascii_literal_template_application]
+message = "ascii literals 不支持 template application"
+help = "为 template calls 使用 textus formatting literal"
+
+[diagnostics.SEM011.issues.directional_view_method_type_args]
+message = "directional view method 不接受 type arguments"
+help = "移除显式 type argument 列表"
+
+[diagnostics.SEM011.issues.dynamic_callee_type_args]
+message = "dynamic callee 不接受 type arguments"
+help = "移除显式 type argument 列表"
+
+[diagnostics.SEM011.issues.dynamic_receiver_method_type_args]
+message = "dynamic receiver 不接受 method type arguments"
+help = "移除显式 type argument 列表"
+
+[diagnostics.SEM011.issues.failable_call_requires_handler]
+message = "failable call 需要声明 ⇥ 的 context 或 local handler"
+help = "用 fac/cape 处理该 call，或声明一个函数 ⇥"
+
+[diagnostics.SEM011.issues.generic_type_arg_domain]
+message = "type argument {rejected} 不被 {param} 允许；期望 {accepted} 之一"
+help = "为此 generic parameter 选择一个允许的 type argument"
+
+[diagnostics.SEM011.issues.gpu_builtin_device_function_required]
+message = "GPU builtin 调用仅在 device 函数内有效"
+help = "仅在 @ nucleum 或 @ nucleum fragment 函数内调用 GPU builtins"
+
+[diagnostics.SEM011.issues.gpu_builtin_type_args]
+message = "GPU builtin 调用不接受 type arguments"
+help = "移除显式 type argument 列表"
+
+[diagnostics.SEM011.issues.inferred_callee_type_args]
+message = "inferred callee 不接受 type arguments"
+help = "移除显式 type argument 列表"
+
+[diagnostics.SEM011.issues.intrinsic_method_type_args]
+message = "intrinsic method 不接受 type arguments"
+help = "移除显式 type argument 列表"
+
+[diagnostics.SEM011.issues.integer_operands_required]
+message = "需要 integer operands"
+help = "为此运算符使用 integer operands"
+
+[diagnostics.SEM011.issues.instans_ordering_operands_required]
+message = "不兼容的 instans operands"
+help = "用 instans values 与 instans values 比较"
+
+[diagnostics.SEM011.issues.json_duplicate_key]
+message = "重复的 JSON key \"{key}\""
+help = "删除或重命名重复的 JSON object key"
+
+[diagnostics.SEM011.issues.method_call_type_args]
+message = "method call 不接受 type arguments"
+help = "移除显式 type argument 列表"
+
+[diagnostics.SEM011.issues.numeric_lista_elements_required]
+message = "需要 numeric lista elements"
+help = "为此 lista intrinsic 使用 numeric elements"
+
+[diagnostics.SEM011.issues.octeti_literal_invalid_character]
+message = "octeti literal 包含无效字符 '{character}'"
+help = "在 octeti literals 中只使用十六进制数字"
+
+[diagnostics.SEM011.issues.octeti_literal_odd_digit_count]
+message = "octeti literal 的十六进制数字个数为奇数"
+help = "在 octeti literals 中提供完整的 byte pairs"
+
+[diagnostics.SEM011.issues.octeti_literal_template_application]
+message = "octeti literals 不支持 template application"
+help = "用 textus formatting 代替 octeti literal calls"
+
+[diagnostics.SEM011.issues.sermo_view_payload_type_arg_count]
+message = "{method} 最多接受一个 payload type argument"
+help = "移除显式 type argument 列表"
+
+[diagnostics.SEM011.issues.template_application_type_args]
+message = "template application 不接受 type arguments"
+help = "移除显式 type argument 列表"
+
+[diagnostics.SEM011.issues.variant_constructor_type_args]
+message = "variant constructor 不接受 type arguments"
+help = "移除显式 type argument 列表"
+
+[diagnostics.SEM011.issues.same_width_integer_operands_required]
+message = "需要相同宽度的 integer operands"
+help = "在应用此运算符前把 integer operands 转换为相同宽度"
+
+[diagnostics.SEM011.issues.postfix_inc_dec_numerus_operand]
+message = "postfix increment/decrement 需要 numerus operand"
+help = "对 numerus values 应用 postfix increment/decrement"
+
+[diagnostics.SEM011.issues.array_spread_requires_lista]
+message = "array spread 需要 lista operand"
+help = "在 lista construction 内 spread 一个 lista value"
+
+[diagnostics.SEM011.issues.struct_computed_key_forbidden]
+message = "struct construction 中不支持 computed keys"
+help = "在 struct construction 中使用已声明的 struct field 名称"
+
+[diagnostics.SEM011.issues.struct_spread_forbidden]
+message = "struct construction 中不支持 spread fields"
+help = "显式提供每个必需 struct field"
+
+[diagnostics.SEM011.issues.vector_constructor_forbids_spread]
+message = "vector constructor 不接受 spread arguments"
+help = "显式提供 vector elements，而非 spread arguments"
+
+[diagnostics.SEM011.issues.object_spread_requires_tabula]
+message = "object spread 需要 tabula operand"
+help = "在 tabula construction 内 spread 一个 tabula value"
+
+[diagnostics.SEM011.issues.interval_bound_single_scalar]
+message = "interval bound 必须是单个 Unicode scalar"
+help = "传入恰好包含一个 Unicode scalar 的 textus 或 ascii values"
+
+[diagnostics.SEM011.issues.numeric_operand_required]
+message = "需要 numeric operand"
+help = "为此运算符使用 numeric operand"
+
+[diagnostics.SEM011.issues.numeric_value_equality_operands_required]
+message = "≈ 需要 numeric operands；提升后的精确相等请用 ≅，显式容差请用 .approx"
+help = "模糊相等使用 ≈ 与 numeric operands；提升后的精确相等使用 ≅，显式容差使用 .approx"
+
+[diagnostics.SEM011.issues.boolean_operand_required]
+message = "需要 boolean operand"
+help = "为此运算符使用 bivalens operand"
+
+[diagnostics.SEM011.issues.condition_must_be_bivalens]
+message = "condition 必须是 bivalens"
+help = "用 bivalens 表达式作为 condition"
+
+[diagnostics.SEM011.issues.integer_operand_required]
+message = "需要 integer operand"
+help = "为此运算符使用 integer operand"
+
+[diagnostics.SEM011.issues.range_operand_must_be_numeric]
+message = "range operand 必须是 numeric"
+help = "用 intervallum ranges 比较 numeric values"
+
+[diagnostics.SEM011.issues.scalar_text_operands_required]
+message = "需要 scalar text operands"
+help = "比较单一 scalar 的 textus 或 ascii operands"
+
+[diagnostics.SEM011.issues.string_operands_required]
+message = "需要 string operands"
+help = "为 string 加法使用 textus operands"
+
+[diagnostics.SEM011.issues.object_field_requires_value]
+message = "object field 需要值"
+help = "为此 object field 提供显式值"
+
+[diagnostics.SEM011.issues.vacua_requires_collection_type]
+message = "vacua 需要 collection type"
+help = "为 vacua 给出 lista、tabula、copia、tensor 或 sparsa context"
+
+[diagnostics.SEM011.issues.textus_index_must_be_numerus_or_range]
+message = "textus index 必须是 numerus 或 range"
+help = "用 numerus 或整数 range 索引 textus"
+
+[diagnostics.SEM011.issues.array_index_must_be_numerus]
+message = "array index 必须是 numerus"
+help = "用 numerus 索引 lista values"
+
+[diagnostics.SEM011.issues.indexing_requires_array_or_map]
+message = "indexing 需要 array 或 map"
+help = "只能索引 lista、tabula、tensor、textus 或 ignotum values"
+
+[diagnostics.SEM011.issues.tensor_index_vector_integer_elements]
+message = "tensor index vector 需要 lista of integer elements"
+help = "使用 lista of supported integer index elements"
+
+[diagnostics.SEM011.issues.tensor_scalar_index_rank]
+message = "tensor scalar index 需要 rank-1；rank-N 请使用 lista<integer>"
+help = "仅对 rank-1 tensors 使用 scalar index"
+
+[diagnostics.SEM011.issues.tensor_bracket_index_integer_or_lista]
+message = "tensor bracket index 需要 integer 或 lista<integer>"
+help = "使用 integer scalar 或 lista of integer indices"
+
+[diagnostics.SEM011.issues.tensor_arithmetic_numeric_element_required]
+message = "tensor arithmetic 需要 numeric element type"
+help = "使用 numeric tensor 或 sparsa element types"
+
+[diagnostics.SEM011.issues.matrix_arithmetic_numeric_element_required]
+message = "matrix arithmetic 需要 numeric element types"
+help = "使用 numeric matrix element types"
+
+[diagnostics.SEM011.issues.tensor_receiver_structa_renamed]
+message = "tensor receiver method structa 已更名为 strue；请使用 seed.strue(data, shape)"
+help = "使用 seed.strue(data, shape)"
+
+[diagnostics.SEM011.issues.tensor_receiver_creata_type_args]
+message = "tensor receiver creata 不接受 type arguments；请使用 tensor.creata<CompleteTensorType>(fill)"
+help = "为静态 construction 调用 tensor.creata<CompleteTensorType>(fill)"
+
+[diagnostics.SEM011.issues.tensor_crea_argument_order]
+message = "tensor crea 期望 fill 在前 shape 在后；请使用 seed.crea(fill, shape)"
+help = "fill 写在 shape 之前"
+
+[diagnostics.SEM011.issues.tensor_structa_forma_removed]
+message = "tensor.structa_forma 已移除；请使用 tensor.structa<CompleteTensorType>(data)"
+help = "使用 tensor.structa<CompleteTensorType>(data)"
+
+[diagnostics.SEM011.issues.tensor_creata_runtime_shape_removed]
+message = "tensor.creata 不再接受 runtime shape argument；请使用 tensor.creata<CompleteTensorType>(fill)"
+help = "使用 tensor.creata<CompleteTensorType>(fill)"
+
+[diagnostics.SEM011.issues.tensor_creata_complete_type_arg_required]
+message = "tensor.creata 需要完整的 tensor type argument；请使用 tensor.creata<CompleteTensorType>(fill)"
+help = "提供完整的 tensor type argument"
+
+[diagnostics.SEM011.issues.tensor_formata_complete_type_arg_required]
+message = "formata 需要完整的 tensor type argument；请使用 grid.formata<CompleteTensorType>()"
+help = "提供完整的 tensor type argument"
+
+[diagnostics.SEM011.issues.tensor_formata_forbids_value_args]
+message = "formata 不接受 value arguments；runtime reshape 请使用 grid.forma(shape)"
+help = "runtime reshape 使用 grid.forma(shape)"
+
+[diagnostics.SEM011.issues.tensor_type_arg_incomplete]
+message = "tensor type argument 必须是完整的 tensor type，例如 tf32[2, 2] 或 tensor<numerus, [4]>"
+help = "在 tensor type argument 中同时包含 element type 和 shape"
+
+[diagnostics.SEM012]
+message = "不可调用"
+help = "调用 function 或 closure"
+
+[diagnostics.SEM012.issues.callee_not_callable]
+message = "callee 不可调用"
+help = "调用 function、closure 或可调用值"
+
+[diagnostics.SEM013]
+message = "参数数量错误"
+help = "调整参数数量"
+
+[diagnostics.SEM013.issues.callee_type_args_unsupported]
+message = "callee 不接受 type arguments"
+help = "移除显式 type argument 列表"
+
+[diagnostics.SEM013.issues.gpu_builtin_expects_no_arguments]
+message = "GPU builtin 调用不应带 arguments"
+help = "移除 call arguments"
+
+[diagnostics.SEM013.issues.method_accepts_no_arguments]
+message = "{method} 不接受 arguments"
+help = "移除 call arguments"
+
+[diagnostics.SEM013.issues.variant_pattern_arity_mismatch]
+message = "variant pattern arity 不匹配"
+help = "使 pattern field 数量匹配 variant"
+
+[diagnostics.SEM013.issues.vector_constructor_width_arity]
+message = "vector constructor argument 数量必须匹配 vector 宽度"
+help = "为每个 vector lane 提供一个 constructor element"
+
+[diagnostics.SEM013.issues.wrong_number_of_arguments]
+message = "arguments 数量错误"
+help = "调整 arguments 数量"
+
+[diagnostics.SEM013.issues.wrong_number_of_type_arguments]
+message = "type arguments 数量错误"
+help = "调整 type arguments 数量"
+
+[diagnostics.SEM014]
+message = "缺少 type annotation"
+help = "添加 type annotation"
+
+[diagnostics.SEM014.issues.cannot_infer_alternate_exit_type]
+message = "无法推断 alternate-exit type"
+help = "添加显式 type annotation"
+
+[diagnostics.SEM014.issues.cannot_infer_constant_type]
+message = "无法推断 constant type"
+help = "添加显式 type annotation"
+
+[diagnostics.SEM014.issues.cannot_infer_expression_type]
+message = "无法推断 expression type"
+help = "添加显式 type annotation"
+
+[diagnostics.SEM014.issues.cannot_infer_field_type]
+message = "无法推断 field type"
+help = "添加显式 type annotation"
+
+[diagnostics.SEM014.issues.cannot_infer_return_type]
+message = "无法推断 return type"
+help = "添加显式 type annotation"
+
+[diagnostics.SEM014.issues.cannot_infer_tensor_shape]
+message = "无法推断 tensor shape"
+help = "提供具体 tensor 或 sparsa shape"
+
+[diagnostics.SEM014.issues.cannot_infer_variable_type]
+message = "无法推断 variable type"
+help = "添加显式 type annotation"
+
+[diagnostics.SEM014.issues.directional_view_type_not_registered]
+message = "directional view type 未注册"
+help = "确保 built-in frame types 在 typechecking 前已注册"
+
+[diagnostics.SEM014.issues.explicit_type_arg_inference_unsupported]
+message = "explicit type arguments 中不支持 partial inference"
+help = "把 inferred explicit type arguments 替换为 concrete types"
+
+[diagnostics.SEM014.issues.scrinium_type_not_registered]
+message = "scrinium type 未注册"
+help = "确保 built-in frame types 在 typechecking 前已注册"
+
+[diagnostics.SEM014.issues.sermo_type_not_registered]
+message = "sermo type 未注册"
+help = "确保 built-in frame types 在 typechecking 前已注册"
+
+[diagnostics.SEM014.issues.vacua_requires_declared_type]
+message = "vacua 需要显式 declared type"
+help = "为 vacua 添加 declared collection type"
+
+[diagnostics.SEM015]
+message = "cast 无效"
+help = "cast 到 compatible type"
+
+[diagnostics.SEM016]
+message = "conversion 无效"
+help = "使用有效 conversion，或用 `⇥` 提供 inline recovery"
+
+[diagnostics.SEM016.issues.intervallum_clamp_recovery_unsupported]
+message = "intervallum clamp conversio 不支持 `⇥` recovery"
+help = "从这个 range clamp 中移除 recovery arm"
+
+[diagnostics.SEM016.issues.intervallum_target_not_range]
+message = "intervallum conversio target 必须是 range 或 intervallum value"
+help = "convert 到 range 或 intervallum value"
+
+[diagnostics.SEM016.issues.intervallum_clamp_bound_mismatch]
+message = "intervallum clamp 需要匹配的 bound types"
+help = "使 source 和 target bound element types 匹配"
+
+[diagnostics.SEM016.issues.sermo_materialize_target_unsupported]
+message = "不支持这个 sermo materialization target"
+help = "选择受支持的 sermo materialization target"
+
+[diagnostics.SEM016.issues.intervallum_materialize_lista_element_mismatch]
+message = "intervallum materialize 需要匹配的 lista element type"
+help = "使 source 和 target bound element types 匹配"
+
+[diagnostics.SEM016.issues.intervallum_materialize_tensor_element_mismatch]
+message = "intervallum materialize 需要匹配的 tensor element type"
+help = "使 source 和 target bound element types 匹配"
+
+[diagnostics.SEM016.issues.lista_to_vector_literal_required]
+message = "vector materialization 需要 lista literal source"
+help = "使用有效 conversion，或用 `⇥` 提供 inline recovery"
+
+[diagnostics.SEM016.issues.lista_to_vector_element_mismatch]
+message = "lista 到 vector conversio 需要匹配的 element types"
+help = "使用有效 conversion，或用 `⇥` 提供 inline recovery"
+
+[diagnostics.SEM016.issues.lista_to_vector_literal_width]
+message = "lista 到 vector conversio 需要 literal vector width"
+help = "使用有效 conversion，或用 `⇥` 提供 inline recovery"
+
+[diagnostics.SEM016.issues.matrix_materialize_unsupported]
+message = "尚不支持 matrix materialization"
+help = "在 matrix construction lowering 实现前，把 matrix values 保留为 typed parameters"
+
+[diagnostics.SEM016.issues.valor_to_regex_unsupported]
+message = "valor 到 regex conversion 没有 default pattern"
+help = "先把 valor convert 到 textus，再 convert 到 regex"
+
+[diagnostics.SEM016.issues.valor_to_cursor_boundary]
+message = "valor 到 cursor conversion 跨越 eager/lazy boundary"
+help = "跨越 boundary 前先通过 lista materialize cursor"
+
+[diagnostics.SEM016.issues.valor_to_promissum_boundary]
+message = "valor 到 promissum conversion 跨越 async/sync boundary"
+help = "显式 resolve 或 wrap async value"
+
+[diagnostics.SEM016.issues.promissum_to_valor_boundary]
+message = "promissum 到 valor conversion 跨越 async/sync boundary"
+help = "显式 resolve 或 wrap async value"
+
+[diagnostics.SEM016.issues.cursor_to_valor_boundary]
+message = "cursor 到 valor conversion 跨越 eager/lazy boundary"
+help = "跨越 boundary 前先通过 lista materialize cursor"
+
+[diagnostics.SEM016.issues.numeric_to_octeti_unspecified]
+message = "从 numerus、fractus 或 bivalens 到 octeti 的 conversion 未指定"
+help = "使用 chorda 或显式 byte conversion helpers"
+
+[diagnostics.SEM016.issues.octeti_to_numerus_unspecified]
+message = "从 octeti 到 numerus 的 conversion 未指定"
+help = "使用 chorda 或显式 byte conversion helpers"
+
+[diagnostics.SEM016.issues.octeti_to_fractus_unspecified]
+message = "从 octeti 到 fractus 的 conversion 未指定"
+help = "使用 chorda 或显式 byte conversion helpers"
+
+[diagnostics.SEM016.issues.bits_pair_width_mismatch]
+message = "the Bits bitcast requires exact-width pairs: numerus<u32> ↔ fractus<f32> and numerus<u64> ↔ fractus<f64>"
+help = "convert to the matching IEEE width first: u32 pairs with f32, u64 with f64"
+
+[diagnostics.SEM016.issues.octeti_to_bivalens_unsupported]
+message = "从 octeti 到 bivalens 的 conversion 没有 default meaning"
+help = "使用 chorda 或显式 byte conversion helpers"
+
+[diagnostics.SEM016.issues.promissum_target_boundary]
+message = "conversion 到 promissum 跨越 async/sync boundary"
+help = "显式 resolve 或 wrap async value"
+
+[diagnostics.SEM016.issues.promissum_source_boundary]
+message = "conversion 从 promissum 跨越 async/sync boundary"
+help = "显式 resolve 或 wrap async value"
+
+[diagnostics.SEM016.issues.sparsa_collection_unsupported]
+message = "sparsa conversion 没有 default lista meaning"
+help = "densify，或使用显式 sparse helper"
+
+[diagnostics.SEM016.issues.sparsa_tensor_element_mismatch]
+message = "tensor 和 sparsa conversio 需要相同 element type"
+help = "更改 representation 前显式 convert element widths"
+
+[diagnostics.SEM016.issues.sparsa_tensor_shape_mismatch]
+message = "tensor 和 sparsa conversio 需要相同 Figura shape"
+help = "convert 前显式 reshape"
+
+[diagnostics.SEM016.issues.tensor_to_scalar_unsupported]
+message = "tensor 到 scalar conversion 没有 default element pick"
+help = "convert 前 index 或 reduce tensor"
+
+[diagnostics.SEM016.issues.scalar_to_tensor_unsupported]
+message = "scalar 到 tensor conversion 没有 default broadcast shape"
+help = "显式 construct 或 fill tensor"
+
+[diagnostics.SEM016.issues.tensor_shape_mismatch]
+message = "不支持这组 tensor shape conversion"
+help = "convert 前显式 reshape"
+
+[diagnostics.SEM016.issues.tensor_element_mismatch]
+message = "不支持这组 tensor element-type conversion"
+help = "更改 representation 前显式 convert element widths"
+
+[diagnostics.SEM016.issues.conversio_failure_channel_textus_required]
+message = "propagating conversio failure 需要 `textus` alternate-exit channel"
+help = "把 alternate-exit channel 声明为 textus，或提供 inline recovery"
+
+[diagnostics.SEM016.issues.regex_operand_unsupported]
+message = "regex conversion 需要 textus 或 ascii operand"
+help = "把 textus 或 ascii values convert 到 regex"
+
+[diagnostics.SEM016.issues.regex_recovery_unsupported]
+message = "regex conversion 不支持 `⇥` recovery"
+help = "从这个 regex conversion 中移除 recovery arm"
+
+[diagnostics.SEM016.issues.valor_verte_unsupported]
+message = "不支持 valor ∷ T；dynamic shape 不能在 compile time 断言"
+help = "改用 runtime `↦ T` conversion，并用 `⇥` recovery"
+
+[diagnostics.SEM016.issues.json_genus_conversion_requires_json_annotation]
+message = "json/genus conversion 要求该 genus 标记为 `@ json`"
+help = "为 genus 添加 `@ json`，或通过 `valor` 显式 convert"
+
+[diagnostics.SEM016.issues.lista_to_tabula_unsupported]
+message = "lista 到 tabula conversion 没有 default key/value derivation"
+help = "用显式 key/value selection construct tabula"
+
+[diagnostics.SEM016.issues.cross_collection_unsupported]
+message = "cross-collection conversion 没有 default `↦` meaning"
+help = "使用显式 stdlib conversion verb"
+
+[diagnostics.SEM016.issues.lista_to_tensor_nested]
+message = "lista 到 tensor conversio 需要 flat lista"
+help = "convert 到 tensor 前先 flatten nested lista"
+
+[diagnostics.SEM016.issues.lista_to_tensor_element_mismatch]
+message = "lista 到 tensor conversio 需要匹配的 element types"
+help = "先把 lista elements convert 到 tensor element type"
+
+[diagnostics.SEM016.issues.rectangular_lista_literal_target]
+message = "rectangular lista literal conversio 需要 rank-2 literal tensor Figura target"
+help = "把 nested lista literals convert 到 rank-2 tensor target"
+
+[diagnostics.SEM016.issues.rectangular_lista_literal_ragged]
+message = "ragged nested lista literal 不能 convert 到 tensor"
+help = "使每个 nested row 长度相同"
+
+[diagnostics.SEM016.issues.rectangular_lista_literal_row_length]
+message = "rectangular lista literal row lengths 不一致"
+help = "使每个 nested row 长度相同"
+
+[diagnostics.SEM016.issues.rectangular_lista_literal_shape]
+message = "rectangular lista literal shape 与 conversio target 不匹配"
+help = "使 nested literal dimensions 匹配 target Figura"
+
+[diagnostics.SEM016.issues.rectangular_lista_literal_spread]
+message = "rectangular lista literal conversio 不允许 spread elements"
+help = "tensor conversion 前展开 spread elements"
+
+[diagnostics.SEM016.issues.rectangular_lista_literal_leaf]
+message = "rectangular lista literal conversio 需要 literal leaf elements"
+help = "在 nested lista 中使用 literal scalar leaves"
+
+[diagnostics.SEM017]
+message = "declaration 不可用"
+help = "使用可用 declaration 或实现标记的 surface"
+
+[diagnostics.SEM017.issues.nondum_method_for_target]
+message = "method `{method}` 在此 target 被标记为 nondum{?reason|: |}"
+help = "使用可用 declaration 或更改 target"
+
+[diagnostics.SEM018]
+message = "annotation 无效"
+help = "在 semantic lowering 前修正 annotation contract"
+
+[diagnostics.SEM018.issues.protecta_reserved]
+message = "`{annotation}` 是保留项，没有启用的 visibility 含义"
+help = "使用 `{publica}` 表示明确 export 意图，或使用 `{privata}` 表示 file-private 意图"
+
+[diagnostics.SEM018.issues.conflicting_lane]
+message = "@ radix lane annotations 冲突: '{existing}' 和 '{parsed}'"
+help = "在 top-level functio 上使用 `@ radix lane \"air\"`、`@ radix lane \"mir\"` 或 `@ radix lane \"hir-direct\"`"
+
+[diagnostics.SEM018.issues.nucleum_lane_invalid_identifier]
+message = "@ nucleum lane binding '{name}' is not a valid identifier"
+help = "use a valid identifier for the lane binding"
+
+[diagnostics.SEM018.issues.nucleum_lane_collision]
+message = "@ nucleum lane binding '{name}' collides with a parameter or local"
+help = "choose a lane binding name that is not already used in the entry"
+
+[diagnostics.SEM018.issues.nucleum_lane_conflicting]
+message = "conflicting @ nucleum lane bindings: '{existing}' and '{parsed}'"
+help = "declare exactly one @ nucleum lane binding"
+
+[diagnostics.SEM018.issues.missing_directive]
+message = "@ radix 需要 directive，例如 `lane`"
+help = "在 top-level functio 上使用 `@ radix lane \"air\"`、`@ radix lane \"mir\"` 或 `@ radix lane \"hir-direct\"`"
+
+[diagnostics.SEM018.issues.missing_lane_value]
+message = "@ radix lane 需要字符串值"
+help = "在 top-level functio 上使用 `@ radix lane \"air\"`、`@ radix lane \"mir\"` 或 `@ radix lane \"hir-direct\"`"
+
+[diagnostics.SEM018.issues.non_string_lane_value]
+message = "@ radix lane 值必须是 string literal"
+help = "在 top-level functio 上使用 `@ radix lane \"air\"`、`@ radix lane \"mir\"` 或 `@ radix lane \"hir-direct\"`"
+
+[diagnostics.SEM018.issues.empty_radix_typus_domain]
+message = "@ radix typus domain 至少需要一个 allowed type"
+help = "使用 `@ radix typus T in textus octeti`，或带至少一个 allowed type 的 braced `{radix_typus_braced}`"
+
+[diagnostics.SEM018.issues.missing_type_param]
+message = "@ radix typus 需要 generic type parameter"
+help = "使用 `@ radix typus T in textus octeti`，或带至少一个 allowed type 的 braced `{radix_typus_braced}`"
+
+[diagnostics.SEM018.issues.non_identifier_type_param]
+message = "@ radix typus parameter 必须是 identifier"
+help = "使用 `@ radix typus T in textus octeti`，或带至少一个 allowed type 的 braced `{radix_typus_braced}`"
+
+[diagnostics.SEM018.issues.non_type_allowed]
+message = "@ radix typus allowed value 必须是 type"
+help = "使用 `@ radix typus T in textus octeti`，或带至少一个 allowed type 的 braced `{radix_typus_braced}`"
+
+[diagnostics.SEM018.issues.unexpected_token]
+message = "@ radix lane 值后有意外 token"
+help = "在 top-level functio 上使用 `@ radix lane \"air\"`、`@ radix lane \"mir\"` 或 `@ radix lane \"hir-direct\"`"
+
+[diagnostics.SEM018.issues.unknown_directive]
+message = "未知 @ radix directive；应为 `lane`"
+help = "在 top-level functio 上使用 `@ radix lane \"air\"`、`@ radix lane \"mir\"` 或 `@ radix lane \"hir-direct\"`"
+
+[diagnostics.SEM018.issues.unknown_lane]
+message = "未知 @ radix lane '{lane}'；应为 'air'、'mir' 或 'hir-direct'"
+help = "在 top-level functio 上使用 `@ radix lane \"air\"`、`@ radix lane \"mir\"` 或 `@ radix lane \"hir-direct\"`"
+
+[diagnostics.SEM018.issues.unsupported_placement]
+message = "@ radix lane 只支持 top-level functio declarations，不支持 {placement}"
+help = "在 top-level functio 上使用 `@ radix lane \"air\"`、`@ radix lane \"mir\"` 或 `@ radix lane \"hir-direct\"`"
+
+[diagnostics.SEM020]
+message = "immutable 赋值"
+help = "使用 `varia` binding 允许重新赋值，或移除多余赋值"
+
+[diagnostics.SEM020.issues.assignment_to_constant]
+message = "向 constant 赋值"
+help = "使用 `varia` binding 允许重新赋值，或移除多余赋值"
+
+[diagnostics.SEM020.issues.immutable_second_assignment]
+message = "第二次赋值给 immutable binding"
+help = "使用 `varia` binding 允许重新赋值，或移除多余赋值"
+
+[diagnostics.SEM020.issues.imperativus_operator_method_requires_varia_receiver]
+message = "imperativus operator method 需要 varia receiver"
+help = "使用 `varia` binding 允许重新赋值，或移除多余赋值"
+
+[diagnostics.SEM021]
+message = "无效赋值目标"
+help = "赋值给有效的 lvalue"
+
+[diagnostics.SEM021.issues.invalid_assignment_target]
+message = "无效赋值目标"
+help = "赋值给有效的 lvalue"
+
+[diagnostics.SEM030]
+message = "break 出现在不可中断的 context 之外"
+help = "在 dum、itera、fac、meus 或 tuus 内使用 'rumpe'"
+
+[diagnostics.SEM030.issues.break_outside_breakable]
+message = "{keyword} 出现在 {context} 之外"
+help = "在 dum、itera、fac、meus 或 tuus 内使用 'rumpe'"
+
+[diagnostics.SEM031]
+message = "continue 出现在循环之外"
+help = "在循环内使用 'perge'"
+
+[diagnostics.SEM031.issues.continue_outside_loop]
+message = "{keyword} 出现在 {context} 之外"
+help = "在循环内使用 'perge'"
+
+[diagnostics.SEM032]
+message = "return 出现在函数之外"
+help = "在函数内使用 'redde'"
+
+[diagnostics.SEM032.issues.return_outside_function]
+message = "{keyword} 出现在 {context} 之外"
+help = "在函数内使用 'redde'"
+
+[diagnostics.SEM033]
+message = "缺少返回"
+help = "添加返回语句，或把返回类型设为 'vacuum'"
+
+[diagnostics.SEM033.issues.control_flow_fallthrough]
+message = "并非所有控制流路径都返回值"
+help = "添加返回语句，或把返回类型设为 'vacuum'"
+
+[diagnostics.SEM033.issues.redde_requires_return_type]
+message = "{keyword} 需要显式正常返回类型"
+help = "添加返回语句，或把返回类型设为 'vacuum'"
+
+[diagnostics.SEM040]
+message = "match 不 exhaustive"
+help = "添加缺失的 cases 或一个 'ceterum' arm"
+
+[diagnostics.SEM040.issues.missing_variants]
+message = "match 不 exhaustive"
+help = "添加缺失的 cases 或一个 'ceterum' arm"
+
+[diagnostics.SEM041]
+message = "不可达 pattern"
+help = "删除或重排不可达 pattern"
+
+[diagnostics.SEM041.issues.after_catchall]
+message = "不可达 pattern"
+help = "删除或重排不可达 pattern"
+
+[diagnostics.SEM042]
+message = "重复 pattern"
+help = "删除重复 pattern"
+
+[diagnostics.SEM042.issues.duplicate_variant]
+message = "重复 pattern"
+help = "删除重复 pattern"
+
+[diagnostics.SEM043]
+message = "omnia 需要 enum scrutinee"
+help = "`omnia` 只能与单个 enum scrutinee 一起使用"
+
+[diagnostics.SEM043.issues.enum_scrutinee]
+message = "'{keyword}' 需要 enum scrutinee"
+help = "`omnia` 只能与单个 enum scrutinee 一起使用"
+
+[diagnostics.SEM043.issues.single_enum_scrutinee]
+message = "'{keyword}' 需要单个 enum scrutinee"
+help = "`omnia` 只能与单个 enum scrutinee 一起使用"
+
+[diagnostics.SEM044]
+message = "omnia 禁止 catchall arms"
+help = "显式列出每个 variant，而不是使用 `casu _` 或 `ceterum`"
+
+[diagnostics.SEM044.issues.catchall_arm]
+message = "'{keyword}' 禁止 catchall arms；请显式列出每个 variant"
+help = "显式列出每个 variant，而不是使用 `casu _` 或 `ceterum`"
+
+[diagnostics.SEM050]
+message = "move 后使用"
+help = "避免在 value 被 move 之后再使用它"
+
+[diagnostics.SEM050.issues.use_after_move]
+message = "move 后使用"
+help = "避免在 value 被 move 之后再使用它"
+
+[diagnostics.SEM051]
+message = "借用 moved value"
+help = "只借用尚未 move 的 values"
+
+[diagnostics.SEM051.issues.borrow_of_moved]
+message = "借用 moved value"
+help = "只借用尚未 move 的 values"
+
+[diagnostics.SEM052]
+message = "mutable borrow 冲突"
+help = "避免重叠的 mutable borrows"
+
+[diagnostics.SEM052.issues.mutable_borrow_conflict]
+message = "mutable borrow 与已有 borrow 冲突"
+help = "避免重叠的 mutable borrows"
+
+[diagnostics.SEM052.issues.shared_borrow_conflict]
+message = "shared borrow 与 mutable borrow 冲突"
+help = "避免重叠的 mutable borrows"
+
+[diagnostics.SEM052.issues.use_while_mutably_borrowed]
+message = "在 mutably borrowed 时使用"
+help = "避免重叠的 mutable borrows"
+
+[diagnostics.SEM052.issues.write_while_borrowed]
+message = "在 borrowed 时写入"
+help = "避免重叠的 mutable borrows"
+
+[diagnostics.SEM053]
+message = "无法 move 出"
+help = "使用 reference 或 clone，而不是 move"
+
+[diagnostics.SEM053.issues.cannot_move_while_borrowed]
+message = "borrowed 时无法 move 出"
+help = "使用 reference 或 clone，而不是 move"
+
+[diagnostics.SEM054]
+message = "lifetime 不匹配"
+help = "确保 borrowed values 存活足够久"
+
+[diagnostics.SEM055]
+message = "shadowed 变量"
+help = "重命名其中一个变量"
+
+[diagnostics.SEM055.issues.shadowed_variable]
+message = "shadowed 变量"
+help = "重命名其中一个变量"
+
+[diagnostics.SEM056]
+message = "向 immutable borrow 赋值"
+help = "若有意修改，请把 parameter 声明为 'in'"
+
+[diagnostics.SEM056.issues.assign_to_de_parameter]
+message = "不能向 `de` parameter 赋值"
+help = "若有意修改，请把 parameter 声明为 'in'"
+
+
+[diagnostics.SEM056.issues.mutating_receiver_through_ref]
+message = "cannot call a mutating receiver through a `ref` view"
+help = "drop the `ref` marker, or use a non-mutating method"
+
+[diagnostics.SEM056.issues.assign_through_ref]
+message = "cannot assign through a `ref` view"
+help = "drop the `ref` marker if mutation is intended"
+
+[diagnostics.SEM057]
+message = "parameter mode 不匹配"
+help = "在 caller 与 callee 之间对齐 parameter modes"
+
+[diagnostics.SEM057.issues.de_to_in_or_ex_position]
+message = "不能把 `de` parameter 传给 `in` 或 `ex` position"
+help = "在 caller 与 callee 之间对齐 parameter modes"
+
+
+[diagnostics.SEM057.issues.ref_to_mut_or_own_position]
+message = "cannot pass a `ref` value to a `mut` or `own` position"
+help = "pass a `mut` or `own` value, or bind through `copy`"
+
+[diagnostics.SEM057.issues.unmarked_into_own]
+message = "cannot bind an unmarked value into `own`"
+help = "bind through `copy` to duplicate the source"
+
+[diagnostics.SEM057.issues.ref_into_own]
+message = "cannot bind a `ref` value into `own`"
+help = "bind through `copy` to duplicate the source"
+
+[diagnostics.SEM057.issues.mut_into_own]
+message = "cannot bind a `mut` value into `own`"
+help = "bind through `copy` to duplicate the source"
+
+[diagnostics.SEM057.issues.field_into_own]
+message = "cannot bind a field projection into `own`"
+help = "bind through `copy` to duplicate the source"
+
+[diagnostics.SEM057.issues.index_into_own]
+message = "cannot bind an index projection into `own`"
+help = "bind through `copy` to duplicate the source"
+
+[diagnostics.SEM057.issues.deref_into_own]
+message = "cannot bind a dereference into `own`"
+help = "bind through `copy` to duplicate the source"
+
+[diagnostics.SEM057.issues.projection_into_own]
+message = "cannot bind a projection into `own`"
+help = "bind through `copy` to duplicate the source"
+
+[diagnostics.SEM057.issues.shared_into_own]
+message = "cannot bind a shared value into `own`"
+help = "bind through `copy` to duplicate the source"
+
+[diagnostics.SEM058]
+message = "初始化前使用"
+help = "读取前先给 binding 赋值，或把 slot 声明为 `sponte`"
+
+[diagnostics.SEM058.issues.possibly_uninitialized]
+message = "使用了可能未初始化的 binding"
+help = "读取前先给 binding 赋值，或把 slot 声明为 `sponte`"
+
+[diagnostics.SEM059]
+message = "AIR purity violation"
+help = "把 `@ radix lane \"air\"` 函数保持在接受的 pure subset 之内"
+
+[diagnostics.SEM059.issues.async_function]
+message = "@ radix lane \"{lane}\" 拒绝此函数体：async 函数不在 v1 AIR subset 之内"
+help = "保持 v1 AIR subset 纯净：仅限 immutable locals、pure expressions、AIR-lane calls 和 tensor arithmetic intrinsics"
+
+[diagnostics.SEM059.issues.assignment_mutation]
+message = "@ radix lane \"{lane}\" 拒绝此函数体：assignment 是 mutation，不在 v1 AIR subset 之内"
+help = "保持 v1 AIR subset 纯净：仅限 immutable locals、pure expressions、AIR-lane calls 和 tensor arithmetic intrinsics"
+
+[diagnostics.SEM059.issues.breakable_block]
+message = "@ radix lane \"{lane}\" 拒绝此函数体：breakable blocks 不在 v1 AIR subset 之内"
+help = "保持 v1 AIR subset 纯净：仅限 immutable locals、pure expressions、AIR-lane calls 和 tensor arithmetic intrinsics"
+
+[diagnostics.SEM059.issues.cede]
+message = "@ radix lane \"{lane}\" 拒绝此函数体：`cede` 不在 v1 AIR subset 之内"
+help = "保持 v1 AIR subset 纯净：仅限 immutable locals、pure expressions、AIR-lane calls 和 tensor arithmetic intrinsics"
+
+[diagnostics.SEM059.issues.cli_mounted_function]
+message = "@ radix lane \"{lane}\" 拒绝此函数体：CLI-mounted 函数不在 v1 AIR subset 之内"
+help = "保持 v1 AIR subset 纯净：仅限 immutable locals、pure expressions、AIR-lane calls 和 tensor arithmetic intrinsics"
+
+[diagnostics.SEM059.issues.closure]
+message = "@ radix lane \"{lane}\" 拒绝此函数体：closures 不在 v1 AIR subset 之内"
+help = "保持 v1 AIR subset 纯净：仅限 immutable locals、pure expressions、AIR-lane calls 和 tensor arithmetic intrinsics"
+
+[diagnostics.SEM059.issues.conditional_recovery]
+message = "@ radix lane \"{lane}\" 拒绝此函数体：conditional recovery 不在 v1 AIR subset 之内"
+help = "保持 v1 AIR subset 纯净：仅限 immutable locals、pure expressions、AIR-lane calls 和 tensor arithmetic intrinsics"
+
+[diagnostics.SEM059.issues.defaulted_parameter]
+message = "@ radix lane \"{lane}\" 拒绝此函数体：defaulted parameters 不在 v1 AIR subset 之内"
+help = "保持 v1 AIR subset 纯净：仅限 immutable locals、pure expressions、AIR-lane calls 和 tensor arithmetic intrinsics"
+
+[diagnostics.SEM059.issues.deferred_local_init]
+message = "@ radix lane \"{lane}\" 拒绝此函数体：deferred local initialization 不在 v1 AIR subset 之内"
+help = "保持 v1 AIR subset 纯净：仅限 immutable locals、pure expressions、AIR-lane calls 和 tensor arithmetic intrinsics"
+
+[diagnostics.SEM059.issues.diagnostic_output]
+message = "@ radix lane \"{lane}\" 拒绝此函数体：diagnostic output 是 host effect，不在 v1 AIR subset 之内"
+help = "保持 v1 AIR subset 纯净：仅限 immutable locals、pure expressions、AIR-lane calls 和 tensor arithmetic intrinsics"
+
+[diagnostics.SEM059.issues.dum_loop]
+message = "@ radix lane \"{lane}\" 拒绝此函数体：`dum` loops 不在 v1 AIR subset 之内"
+help = "保持 v1 AIR subset 纯净：仅限 immutable locals、pure expressions、AIR-lane calls 和 tensor arithmetic intrinsics"
+
+[diagnostics.SEM059.issues.expression_ad]
+message = "@ radix lane \"{lane}\" 拒绝此函数体：expression-form ad 不在 v1 AIR subset 之内"
+help = "保持 v1 AIR subset 纯净：仅限 immutable locals、pure expressions、AIR-lane calls 和 tensor arithmetic intrinsics"
+
+[diagnostics.SEM059.issues.expression_statement]
+message = "@ radix lane \"{lane}\" 拒绝此函数体：expression statements 不在 v1 AIR subset 之内"
+help = "保持 v1 AIR subset 纯净：仅限 immutable locals、pure expressions、AIR-lane calls 和 tensor arithmetic intrinsics"
+
+[diagnostics.SEM059.issues.generator_function]
+message = "@ radix lane \"{lane}\" 拒绝此函数体：generator functions 不在 v1 AIR subset 之内"
+help = "保持 v1 AIR subset 纯净：仅限 immutable locals、pure expressions、AIR-lane calls 和 tensor arithmetic intrinsics"
+
+[diagnostics.SEM059.issues.gradient_expression_unsupported]
+message = "@ radix lane \"{lane}\" 拒绝此函数体：postfix gradient selection（`call(...) ∇ [places]`）在 tensor-glyphs 2B autograd surface 落地之前不会被 lowering；Phase 2A 中没有 operand、selector 或 result 规则生效"
+help = "Phase 2A 中 gradient selection（`∇`）仅为 parse-only；eligibility/selector 规则随 tensor-glyphs 2B 落地"
+
+[diagnostics.SEM059.issues.iace]
+message = "@ radix lane \"{lane}\" 拒绝此函数体：`iace` 不在 v1 AIR subset 之内"
+help = "保持 v1 AIR subset 纯净：仅限 immutable locals、pure expressions、AIR-lane calls 和 tensor arithmetic intrinsics"
+
+[diagnostics.SEM059.issues.inc_dec_mutation]
+message = "@ radix lane \"{lane}\" 拒绝此函数体：increment/decrement mutation 不在 v1 AIR subset 之内"
+help = "保持 v1 AIR subset 纯净：仅限 immutable locals、pure expressions、AIR-lane calls 和 tensor arithmetic intrinsics"
+
+[diagnostics.SEM059.issues.input_read]
+message = "@ radix lane \"{lane}\" 拒绝此函数体：input reads 是 host effect，不在 v1 AIR subset 之内"
+help = "保持 v1 AIR subset 纯净：仅限 immutable locals、pure expressions、AIR-lane calls 和 tensor arithmetic intrinsics"
+
+[diagnostics.SEM059.issues.itera_loop]
+message = "@ radix lane \"{lane}\" 拒绝此函数体：`itera` loops 不在 v1 AIR subset 之内"
+help = "保持 v1 AIR subset 纯净：仅限 immutable locals、pure expressions、AIR-lane calls 和 tensor arithmetic intrinsics"
+
+[diagnostics.SEM059.issues.kernel_device_function]
+message = "@ radix lane \"{lane}\" 拒绝此函数体：kernel/device 函数不在 v1 AIR subset 之内"
+help = "保持 v1 AIR subset 纯净：仅限 immutable locals、pure expressions、AIR-lane calls 和 tensor arithmetic intrinsics"
+
+[diagnostics.SEM059.issues.loop]
+message = "@ radix lane \"{lane}\" 拒绝此函数体：loops 不在 v1 AIR subset 之内"
+help = "保持 v1 AIR subset 纯净：仅限 immutable locals、pure expressions、AIR-lane calls 和 tensor arithmetic intrinsics"
+
+[diagnostics.SEM059.issues.loop_control]
+message = "@ radix lane \"{lane}\" 拒绝此函数体：loop control 不在 v1 AIR subset 之内"
+help = "保持 v1 AIR subset 纯净：仅限 immutable locals、pure expressions、AIR-lane calls 和 tensor arithmetic intrinsics"
+
+[diagnostics.SEM059.issues.method_call]
+message = "@ radix lane \"{lane}\" 拒绝此函数体：method call `{method}` 不在 v1 AIR subset 之内"
+help = "保持 v1 AIR subset 纯净：仅限 immutable locals、pure expressions、AIR-lane calls 和 tensor arithmetic intrinsics"
+
+[diagnostics.SEM059.issues.missing_body]
+message = "@ radix lane \"{lane}\" 拒绝此函数体：AIR-lane 函数必须有 body"
+help = "保持 v1 AIR subset 纯净：仅限 immutable locals、pure expressions、AIR-lane calls 和 tensor arithmetic intrinsics"
+
+[diagnostics.SEM059.issues.mori]
+message = "@ radix lane \"{lane}\" 拒绝此函数体：`mori` 不在 v1 AIR subset 之内"
+help = "保持 v1 AIR subset 纯净：仅限 immutable locals、pure expressions、AIR-lane calls 和 tensor arithmetic intrinsics"
+
+[diagnostics.SEM059.issues.mutable_varia]
+message = "@ radix lane \"{lane}\" 拒绝此函数体：mutable `varia` bindings 不在 v1 AIR subset 之内"
+help = "保持 v1 AIR subset 纯净：仅限 immutable locals、pure expressions、AIR-lane calls 和 tensor arithmetic intrinsics"
+
+[diagnostics.SEM059.issues.named_call_arg]
+message = "@ radix lane \"{lane}\" 拒绝此函数体：named call arguments 不在 v1 AIR subset 之内"
+help = "保持 v1 AIR subset 纯净：仅限 immutable locals、pure expressions、AIR-lane calls 和 tensor arithmetic intrinsics"
+
+[diagnostics.SEM059.issues.non_air_call]
+message = "@ radix lane \"{lane}\" 拒绝此函数体：AIR-lane 函数的 calls 必须以另一个 AIR-lane 函数为目标"
+help = "保持 v1 AIR subset 纯净：仅限 immutable locals、pure expressions、AIR-lane calls 和 tensor arithmetic intrinsics"
+
+[diagnostics.SEM059.issues.optional_null_chain]
+message = "@ radix lane \"{lane}\" 拒绝此函数体：optional/null assertion chains 不在 v1 AIR subset 之内"
+help = "保持 v1 AIR subset 纯净：仅限 immutable locals、pure expressions、AIR-lane calls 和 tensor arithmetic intrinsics"
+
+[diagnostics.SEM059.issues.recoverable_handler]
+message = "@ radix lane \"{lane}\" 拒绝此函数体：recoverable handlers 不在 v1 AIR subset 之内"
+help = "保持 v1 AIR subset 纯净：仅限 immutable locals、pure expressions、AIR-lane calls 和 tensor arithmetic intrinsics"
+
+[diagnostics.SEM059.issues.reference_place_op]
+message = "@ radix lane \"{lane}\" 拒绝此函数体：reference/place operations 不在 v1 AIR subset 之内"
+help = "保持 v1 AIR subset 纯净：仅限 immutable locals、pure expressions、AIR-lane calls 和 tensor arithmetic intrinsics"
+
+[diagnostics.SEM059.issues.runtime_assertion]
+message = "@ radix lane \"{lane}\" 拒绝此函数体：runtime assertions 不在 v1 AIR subset 之内"
+help = "保持 v1 AIR subset 纯净：仅限 immutable locals、pure expressions、AIR-lane calls 和 tensor arithmetic intrinsics"
+
+[diagnostics.SEM059.issues.runtime_conversion]
+message = "@ radix lane \"{lane}\" 拒绝此函数体：runtime `↦` conversion 不在 v1 AIR subset 之内"
+help = "保持 v1 AIR subset 纯净：仅限 immutable locals、pure expressions、AIR-lane calls 和 tensor arithmetic intrinsics"
+
+[diagnostics.SEM059.issues.runtime_provided_binding]
+message = "@ radix lane \"{lane}\" 拒绝此函数体：runtime-provided bindings 不在 v1 AIR subset 之内"
+help = "保持 v1 AIR subset 纯净：仅限 immutable locals、pure expressions、AIR-lane calls 和 tensor arithmetic intrinsics"
+
+[diagnostics.SEM059.issues.runtime_variant_check]
+message = "@ radix lane \"{lane}\" 拒绝此函数体：runtime `est` variant check 不在 v1 AIR subset 之内"
+help = "保持 v1 AIR subset 纯净：仅限 immutable locals、pure expressions、AIR-lane calls 和 tensor arithmetic intrinsics"
+
+[diagnostics.SEM059.issues.spread_call_arg]
+message = "@ radix lane \"{lane}\" 拒绝此函数体：spread call arguments 不在 v1 AIR subset 之内"
+help = "保持 v1 AIR subset 纯净：仅限 immutable locals、pure expressions、AIR-lane calls 和 tensor arithmetic intrinsics"
+
+[diagnostics.SEM059.issues.tacet]
+message = "@ radix lane \"{lane}\" 拒绝此函数体：`tacet` 不在 v1 AIR subset 之内"
+help = "保持 v1 AIR subset 纯净：仅限 immutable locals、pure expressions、AIR-lane calls 和 tensor arithmetic intrinsics"
+
+[diagnostics.WARN001]
+message = "未使用变量"
+help = "删除该变量，或加 '_' 前缀"
+
+[diagnostics.WARN001.issues.unused_variable]
+message = "未使用变量"
+help = "删除该变量，或加 '_' 前缀"
+
+[diagnostics.WARN001.issues.unused_binding]
+message = "未使用 binding"
+help = "删除该变量，或加 '_' 前缀"
+
+[diagnostics.WARN002]
+message = "未使用导入"
+help = "删除未使用的导入"
+
+[diagnostics.WARN002.issues.unused_import]
+message = "未使用导入"
+help = "删除未使用的导入"
+
+[diagnostics.WARN003]
+message = "未使用函数"
+help = "删除该函数，或将其标记为已使用"
+
+[diagnostics.WARN003.issues.unused_function]
+message = "未使用函数"
+help = "删除该函数，或将其标记为已使用"
+
+[diagnostics.WARN004]
+message = "不可达代码"
+help = "删除不可达代码"
+
+[diagnostics.WARN004.issues.unreachable_code]
+message = "不可达代码"
+help = "删除不可达代码"
+
+[diagnostics.WARN005]
+message = "不必要的 cast"
+help = "删除多余的 cast"
+
+[diagnostics.WARN005.issues.unnecessary_cast]
+message = "不必要的 cast：类型已知"
+help = "删除多余的 cast"
+
+[diagnostics.WARN007]
+message = "target no-op"
+help = "移除 construct 或按 target gate 它"
+
+[diagnostics.WARN008]
+message = "未使用的 mutable reference parameter"
+help = "若无需修改，请把 'in' 改为 'de'"
+
+[diagnostics.WARN008.issues.unused_in_parameter]
+message = "`in` parameter 从未被修改；考虑使用 `de`"
+help = "若无需修改，请把 'in' 改为 'de'"
+
+[diagnostics.WARN009]
+message = "未使用的 move parameter"
+help = "若无需所有权转移，请把 'ex' 改为 'de'"
+
+[diagnostics.WARN009.issues.unused_ex_parameter]
+message = "`ex` parameter 从未被消费；考虑使用 `de`"
+help = "若无需所有权转移，请把 'ex' 改为 'de'"
+
+[diagnostics.WARN010]
+message = "显式 ignotum 标注"
+help = "优先使用具体类型标注，以保持类型检查精确"
+
+[diagnostics.WARN010.issues.explicit_ignotum_annotation]
+message = "显式 ignotum 标注会禁用精确类型检查"
+help = "优先使用具体类型标注，以保持类型检查精确"
+
+[diagnostics.WARN011]
+message = "wildcard 吸收 null"
+help = "添加显式 `casu nihil` arm，使 null case 得到刻意处理"
+
+[diagnostics.WARN011.issues.wildcard_absorbs_null]
+message = "catchall arm 吸收 nullable scrutinee 的 null case；请使用显式 '{casu}' {nil} arm"
+help = "添加显式 `casu nihil` arm，使 null case 得到刻意处理"
+
+[diagnostics.WARN013]
+message = "不必要的 varia"
+help = "当 binding 从未重新赋值或修改时，请使用 `fixum`"
+
+[diagnostics.WARN013.issues.unnecessary_varia]
+message = "不必要的 varia：binding 从未重新赋值或修改"
+help = "当 binding 从未重新赋值或修改时，请使用 `fixum`"
+
+[diagnostics.WARN014]
+message = "file interface 跳过了不支持的 export"
+help = "使用该模块中受支持的 export，或等待该 signature 的更完整 file-interface 覆盖"
+
+[diagnostics.WARN014.issues.file_interface_export_skipped]
+message = "file interface 跳过了 export `{namespace}.{export}` ({reason})；其他 exports 仍可用"
+help = "使用该模块中受支持的 export，或等待该 signature 的更完整 file-interface 覆盖"
+
+[diagnostics.WARN015]
+message = "无法识别的 curata allocator 名称"
+help = "使用受认可的 allocator 名称（\"arena\"、\"page\"、\"alloc\" 或 \"allocator\"）"
+
+[diagnostics.WARN015.issues.unrecognized_curata_allocator]
+message = "curata allocator 名称 '{name}' 不是受认可的 allocator contract"
+help = "使用受认可的 allocator 名称（\"arena\"、\"page\"、\"alloc\" 或 \"allocator\"）"
+
+[diagnostics.WARN016]
+message = "monomorphic hole 被求解为 multi-member union"
+help = "如果意在和类型，请使用显式 union type 或 `∪` hole"
+
+[diagnostics.WARN016.issues.monomorphic_hole_solved_to_union]
+message = "monomorphic hole `_` 被求解为 multi-member union `{union}`"
+help = "如果意在和类型，请使用显式 union type 或 `∪` hole"
+
+[diagnostics.WARN017]
+message = "union hole 被 monomorphically 求解"
+help = "如果只意在一个类型，请使用 `_`"
+
+[diagnostics.WARN017.issues.union_hole_solved_monomorphically]
+message = "union hole `∪` 被求解为单一类型 `{type}`"
+help = "如果只意在一个类型，请使用 `_`"
+
+[llm]
+system_prompt_snippet = "Emit Simplified Chinese reader-locale Faber using Chinese keywords for declarations, control flow, loops, returns, booleans, common primitive types, and list/map collections. Keep Faber glyph syntax unchanged."
+exemplars = ["./exemplars/salve-munde.zh-Hans.fab"]
+
+
+# Queue/stack C2 named-method rows and the lista omnia/quilibet predicate
+# twins. These compiler-owned names remain canonical in every reader pack;
+# glyphs are not method aliases.
+[intrinsics]
+appende = "appende"
+decapita = "decapita"
+detrahe = "detrahe"
+longitudo = "longitudo"
+omnia = "omnia"
+quilibet = "quilibet"

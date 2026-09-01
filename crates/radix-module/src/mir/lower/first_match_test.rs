@@ -17,7 +17,7 @@ fn run_stdout(name: &str, source: &str) -> Vec<String> {
     let session = Session::new(
         Config::default()
             .with_target(Target::HirTypeScript)
-            .with_dev_stdlib(),
+            .with_dev_locale_root(),
     );
     let mut host = BufferHost::default();
     match run_source(&session, name, source, &mut host) {
@@ -37,7 +37,7 @@ fn run_trapped(name: &str, source: &str) -> Vec<RunnerError> {
     let session = Session::new(
         Config::default()
             .with_target(Target::HirTypeScript)
-            .with_dev_stdlib(),
+            .with_dev_locale_root(),
     );
     let mut host = BufferHost::default();
     match run_source(&session, name, source, &mut host) {

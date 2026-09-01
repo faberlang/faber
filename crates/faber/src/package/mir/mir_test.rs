@@ -130,7 +130,7 @@ fn package_fmir_image_provisions_decomposed_companion_upstream_seed() {
     copy_package_dir_skipping_target(&exemplum, dir.path());
 
     let config = radix::module::driver::Config::default()
-        .with_stdlib(workspace)
+        .with_library_home(workspace)
         .with_target(radix::module::codegen::Target::MirFmirBinary);
     let image = radix::program::mir::build_package_fmir_image(
         &config,

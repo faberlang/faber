@@ -308,7 +308,7 @@ pub(super) fn format_session(
         Config::default()
             .with_target(Target::HirFaber)
             .with_resolved_locale_pack(pack)
-            .with_dev_stdlib(),
+            .with_dev_locale_root(),
     ))
 }
 

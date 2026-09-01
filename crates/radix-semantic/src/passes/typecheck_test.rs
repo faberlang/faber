@@ -201,7 +201,7 @@ fn same_named_en_empty_fn_wins_over_bare_marker_and_typechecks_loudly() {
     // `fn empty() → Headers` binding wins and makes collection positions type
     // check against Headers instead of silently using Vec::new().
     let pack_path =
-        std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../stdlib/locale/en/pack.toml");
+        crate::locale::workspace_locale_pack_path("en");
     let pack = crate::locale::LocalePack::from_toml_path(&pack_path)
         .expect("installed en pack should load");
     let mut config = crate::PassConfig::for_target(Target::HirRust);

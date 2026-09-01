@@ -81,7 +81,7 @@ fn literal_shape(types: &radix_types::TypeTable, index: radix_types::IndexId) ->
 fn sibling_generic_kernel_registers_with_ordered_use_site_bindings() {
     let dir = crate::test_support::test_temp_dir("sgr0-sibling-generic");
     let entry = write_sibling_generic_package(dir.path());
-    let config = Config::default().with_stdlib(dir.join("libhome"));
+    let config = Config::default().with_library_home(dir.join("libhome"));
 
     with_interpreted_lowered_package_mir(
         &config,

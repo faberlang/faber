@@ -199,16 +199,12 @@ pub fn resolve_namespace_import(
         });
     }
 
-    if let Some(stdlib_path) = import_path.strip_prefix("norma:") {
-        if let Some(path) = resolve_stdlib_import(stdlib_path) {
-            return Ok(path);
-        }
-        // Fall through to library provider resolution for norma:
-        if let Some(path) = resolve_library_provider_import("norma", stdlib_path) {
+    if let Some(module_path) = import_path.strip_prefix("norma:") {
+        if let Some(path) = resolve_library_provider_import("norma", module_path) {
             return Ok(path);
         }
         return Err(ImportResolveError {
-            message: format!("stdlib import 'norma:{stdlib_path}' not found"),
+            message: format!("norma import 'norma:{module_path}' not found"),
             issue: "import_resolve_norma_not_found",
         });
     }
@@ -355,16 +351,6 @@ fn is_valid_provider_segment(provider: &str) -> bool {
         && provider
             .chars()
             .all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '-')
-}
-
-fn resolve_stdlib_import(import_path: &str) -> Option<PathBuf> {
-    let root = Path::new(env!("CARGO_MANIFEST_DIR"))
-        .parent()?
-        .parent()?
-        .join("stdlib")
-        .join("norma");
-    let candidate = root.join(import_path);
-    resolve_fab_file(&candidate)
 }
 
 fn resolve_library_provider_import(provider: &str, module_path: &str) -> Option<PathBuf> {

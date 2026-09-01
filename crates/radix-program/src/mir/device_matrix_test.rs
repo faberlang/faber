@@ -107,7 +107,7 @@ fn matrix_dir(label: &str) -> crate::test_support::TestDir {
 }
 
 fn twins_config(dir: &Path) -> Config {
-    Config::default().with_stdlib(dir.join("libhome"))
+    Config::default().with_library_home(dir.join("libhome"))
 }
 
 fn literal_shape(types: &radix_types::TypeTable, index: radix_types::IndexId) -> Option<i64> {

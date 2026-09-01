@@ -235,7 +235,7 @@ fn analyze(source: &str) -> crate::driver::AnalyzedModule {
     let session = Session::new(
         Config::default()
             .with_target(Target::HirTypeScript)
-            .with_dev_stdlib(),
+            .with_dev_locale_root(),
     );
     crate::driver::analyze_source(&session, "test.fab", source, AnalyzeRequest::default()).expect("analysis succeeds")
 }

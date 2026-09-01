@@ -349,7 +349,7 @@ fn dev_norma_library_home() -> PathBuf {
 /// `analyze_package` routes apply — not the pack-less (registry-direct)
 /// lexing `load_package` would select.
 fn english_pack() -> radix::module::locale::LocalePack {
-    let path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../stdlib/locale/en/pack.toml");
+    let path = radix::module::locale::workspace_locale_pack_path("en");
     radix::module::locale::LocalePack::from_toml_path(path).expect("load English locale pack")
 }
 
@@ -852,7 +852,7 @@ main {
     )
     .expect("write entry");
 
-    let result = compile_with_faber_seams(&Config::default().with_stdlib(library_home), &entry);
+    let result = compile_with_faber_seams(&Config::default().with_library_home(library_home), &entry);
     assert!(
         result.success(),
         "expected locked norma platform default compile success, got {:?}",
@@ -1059,7 +1059,7 @@ main args args {
     .expect("write entry");
 
     let artifact = build_mir_artifact_for_faber(
-        &Config::default().with_stdlib(dev_norma_library_home()),
+        &Config::default().with_library_home(dev_norma_library_home()),
         &entry,
         &[dir.to_string_lossy().into_owned()],
     )
@@ -1266,7 +1266,7 @@ fn artifact_harness_run_test(
     setup: impl FnOnce(&'static str) -> ArtifactHarnessCaseInner,
 ) {
     let case = setup(_case_name);
-    let config = Config::default().with_stdlib(dev_norma_library_home());
+    let config = Config::default().with_library_home(dev_norma_library_home());
     let artifact = build_mir_artifact_for_faber(&config, &case.input, &case.argumenta)
         .unwrap_or_else(|diagnostics| {
             panic!(
@@ -2122,7 +2122,7 @@ main {
     .expect("write entry");
 
     let reached = with_lowered_package_mir(
-        &Config::default().with_stdlib(dev_norma_library_home()),
+        &Config::default().with_library_home(dev_norma_library_home()),
         &entry,
         |lowered| {
             assert!(!lowered.program.functions.is_empty());
@@ -2211,7 +2211,7 @@ main args args {
 
     let mut host = BufferHost::with_argumenta(vec![fixture_root.to_string_lossy().into_owned()]);
     let result = run_mir_for_faber(
-        &Config::default().with_stdlib(dev_norma_library_home()),
+        &Config::default().with_library_home(dev_norma_library_home()),
         &entry,
         &mut host,
     );
@@ -2262,7 +2262,7 @@ main args args {
 
     let mut host = BufferHost::with_argumenta(vec![fixture_root.to_string_lossy().into_owned()]);
     let result = run_mir_for_faber(
-        &Config::default().with_stdlib(dev_norma_library_home()),
+        &Config::default().with_library_home(dev_norma_library_home()),
         &entry,
         &mut host,
     );
@@ -2317,7 +2317,7 @@ main args args {
 
     let mut host = BufferHost::with_argumenta(vec![fixture_root.to_string_lossy().into_owned()]);
     let result = run_mir_for_faber(
-        &Config::default().with_stdlib(dev_norma_library_home()),
+        &Config::default().with_library_home(dev_norma_library_home()),
         &entry,
         &mut host,
     );
@@ -2366,7 +2366,7 @@ main args args {
 
     let mut host = BufferHost::with_argumenta(vec![fixture_root.to_string_lossy().into_owned()]);
     let result = run_mir_for_faber(
-        &Config::default().with_stdlib(dev_norma_library_home()),
+        &Config::default().with_library_home(dev_norma_library_home()),
         &entry,
         &mut host,
     );
@@ -2418,7 +2418,7 @@ main args args {
 
     let mut host = BufferHost::with_argumenta(vec![fixture_root.to_string_lossy().into_owned()]);
     let result = run_mir_for_faber(
-        &Config::default().with_stdlib(dev_norma_library_home()),
+        &Config::default().with_library_home(dev_norma_library_home()),
         &entry,
         &mut host,
     );
@@ -2472,7 +2472,7 @@ main args args {
 
     let mut host = BufferHost::with_argumenta(vec![fixture_root.to_string_lossy().into_owned()]);
     let result = run_mir_for_faber(
-        &Config::default().with_stdlib(dev_norma_library_home()),
+        &Config::default().with_library_home(dev_norma_library_home()),
         &entry,
         &mut host,
     );
@@ -2524,7 +2524,7 @@ main args args {
 
     let mut host = BufferHost::with_argumenta(vec![fixture_root.to_string_lossy().into_owned()]);
     let result = run_mir_for_faber(
-        &Config::default().with_stdlib(dev_norma_library_home()),
+        &Config::default().with_library_home(dev_norma_library_home()),
         &entry,
         &mut host,
     );
@@ -4279,7 +4279,7 @@ main {
 
     let mut host = BufferHost::default();
     let result = run_mir_for_faber(
-        &Config::default().with_stdlib(dev_norma_library_home()),
+        &Config::default().with_library_home(dev_norma_library_home()),
         &entry,
         &mut host,
     );
@@ -4679,7 +4679,7 @@ fn summa(tf32[2] x) → f32 {
     let entry = dir.join("src").join("main.fab");
     let result = build_fmir_image_for_faber(
         &Config::default()
-            .with_stdlib(dev_norma_library_home())
+            .with_library_home(dev_norma_library_home())
             .with_target(Target::MirFmirBinary),
         &entry,
         &[],
@@ -5351,7 +5351,7 @@ incipit {
     .expect("write la consolum fixture");
 
     let la_path =
-        PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../stdlib/locale/la/pack.toml");
+        radix::module::locale::workspace_locale_pack_path("la");
     let la_pack =
         radix::module::locale::LocalePack::from_toml_path(la_path).expect("load la locale pack");
     let config = Config::default().with_locale_pack(la_pack);
@@ -5479,7 +5479,7 @@ incipit {
     .expect("write la consolum input fixture");
 
     let la_path =
-        PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../stdlib/locale/la/pack.toml");
+        radix::module::locale::workspace_locale_pack_path("la");
     let la_pack =
         radix::module::locale::LocalePack::from_toml_path(la_path).expect("load la locale pack");
     let config = Config::default().with_locale_pack(la_pack);
@@ -7808,7 +7808,7 @@ fn probe() → bool {
     )
     .expect("write consumer entry");
 
-    let config = Config::default().with_stdlib(lib_root);
+    let config = Config::default().with_library_home(lib_root);
     let diagnostics = check_with_faber_seams(&config, &consumer.join("src/main.fab"));
 
     assert!(
@@ -9755,7 +9755,7 @@ fn seed_temp_library_text(library_home: &Path) {
 }
 
 fn config_with_library_home(library_home: &Path) -> Config {
-    Config::default().with_stdlib(library_home.to_path_buf())
+    Config::default().with_library_home(library_home.to_path_buf())
 }
 
 fn write_installed_library_manifest(
@@ -11098,7 +11098,7 @@ main {
     )
     .unwrap();
     let result = compile_with_faber_seams(
-        &Config::default().with_stdlib(dev_norma_library_home()),
+        &Config::default().with_library_home(dev_norma_library_home()),
         &app,
     );
     assert!(
@@ -14148,7 +14148,7 @@ main {
 
     let config = radix::module::driver::Config::default()
         .with_target(radix::module::codegen::Target::MirFmirBinary)
-        .with_stdlib(lib_root);
+        .with_library_home(lib_root);
     let mut host = BufferHost::default();
     let result = run_mir_for_faber(&config, &entry, &mut host);
 
@@ -14231,7 +14231,7 @@ main {
 
     let config = radix::module::driver::Config::default()
         .with_target(radix::module::codegen::Target::MirFmirBinary)
-        .with_stdlib(lib_root);
+        .with_library_home(lib_root);
     let mut host = BufferHost::default();
     let diagnostics = run_mir_for_faber(&config, &entry, &mut host)
         .expect_err("unresolvable companion should fail closed at link time");
@@ -14309,7 +14309,7 @@ main {
 
     let config = Config::default()
         .with_target(Target::MirFmirBinary)
-        .with_stdlib(lib_root);
+        .with_library_home(lib_root);
     let mut host = BufferHost::default();
     let result = run_mir_for_faber(&config, &entry, &mut host);
 
@@ -14404,7 +14404,7 @@ main {
 
     let config = radix::module::driver::Config::default()
         .with_target(radix::module::codegen::Target::MirFmirBinary)
-        .with_stdlib(lib_root);
+        .with_library_home(lib_root);
     let mut host = BufferHost::default();
     let result = run_mir_for_faber(&config, &entry, &mut host);
 
@@ -14510,7 +14510,7 @@ main {
 
     let config = radix::module::driver::Config::default()
         .with_target(radix::module::codegen::Target::MirFmirBinary)
-        .with_stdlib(lib_root);
+        .with_library_home(lib_root);
     let mut host = BufferHost::default();
     let result = run_mir_for_faber(&config, &entry, &mut host);
 

@@ -557,7 +557,7 @@ fn collect_provider_modules(
             // Latin-default session instead of failing PARSE001.
             let mut config = crate::driver::Config::default()
                 .with_bodyless_functions()
-                .with_dev_stdlib();
+                .with_dev_locale_root();
             if let Some(pack) = crate::program::compile::package_reader_locale_pack(&provider_path) {
                 config = config.with_locale_pack(pack);
             }

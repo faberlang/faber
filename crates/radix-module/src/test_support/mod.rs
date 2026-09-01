@@ -65,7 +65,7 @@ pub fn test_span_between(start: u32, end: u32) -> Span {
 /// checkout provides them.
 #[must_use]
 pub fn test_session(target: Target) -> Session {
-    Session::new(Config::default().with_target(target).with_dev_stdlib())
+    Session::new(Config::default().with_target(target).with_dev_locale_root())
 }
 
 /// Cargo-managed temp root for test fixtures: `<target-dir>/tmp/`.

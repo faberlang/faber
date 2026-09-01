@@ -46,8 +46,7 @@ use std::path::{Path, PathBuf};
 /// `string`, `union`, `match`, `case`, `switch`, `class`, `enum`, `variant`,
 /// `∷`, `return` are all en-keywords).
 fn en_locale_pack() -> crate::locale::LocalePack {
-    let stdlib = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../stdlib");
-    crate::locale::LocalePack::from_toml_path(stdlib.join("locale/en/pack.toml"))
+    crate::locale::LocalePack::from_toml_path(crate::locale::workspace_locale_pack_path("en"))
         .expect("installed en pack should load")
 }
 

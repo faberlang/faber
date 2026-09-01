@@ -19,8 +19,8 @@
 //!   target and changing it would silently change the public compiler API.
 //!   Minimal builds select their intended target explicitly.
 //! - Comments are emitted by default so generated code remains inspectable.
-//! - `stdlib_path` is optional; package-mode library resolution owns the richer
-//!   stdlib provider story.
+//! - `locale_root` is optional; package-mode library resolution owns provider
+//!   repos through `library_home`, not this field.
 
 use crate::codegen::{OutputMode, Target};
 use crate::diagnostics::Severity;
@@ -71,15 +71,15 @@ pub struct Config {
     /// Whether generated output should preserve explanatory comments.
     pub emit_comments: bool,
 
-    /// Optional explicit stdlib path for callers that do not use package mode.
-    pub stdlib_path: Option<PathBuf>,
+    /// Optional language-pack root (`radix/locale`) for frontmatter locale load.
+    pub locale_root: Option<PathBuf>,
 
-    /// Whether [`Config::stdlib_path`] was supplied explicitly by the caller
-    /// (via [`Config::with_stdlib`]) rather than auto-discovered from the
-    /// workspace checkout. An explicit stdlib roots library provider
-    /// resolution (custom layouts); the auto-discovered dev stdlib is the
-    /// reader-pack directory only.
-    pub stdlib_explicit: bool,
+    /// Optional library-home override (provider repos such as `norma/`).
+    ///
+    /// Independent of [`Config::locale_root`]. Package-mode resolution and
+    /// `FABER_LIBRARY_HOME` own the richer story; this slot is the test and
+    /// custom-layout override.
+    pub library_home: Option<PathBuf>,
 
     /// Warning-promotion policy applied at the compilation boundary.
     pub warn_policy: WarnPolicy,
@@ -133,10 +133,10 @@ impl Default for Config {
             target: Target::HirRust,
             emit_comments: true,
             // Frontmatter-locale sources resolve their reader pack through the
-            // stdlib path, so the default config discovers the workspace
-            // stdlib tree when one is present (no-op for installed builds).
-            stdlib_path: discover_dev_stdlib(),
-            stdlib_explicit: false,
+            // language-pack root, so the default config discovers the workspace
+            // `locale/` tree when one is present (no-op for installed builds).
+            locale_root: discover_dev_locale_root(),
+            library_home: None,
             warn_policy: WarnPolicy::default(),
             locale_pack: None,
             locale_pack_explicit: false,
@@ -166,15 +166,17 @@ impl Config {
         self
     }
 
-    /// Override the stdlib root used by callers outside package resolution.
-    ///
-    /// An explicit stdlib is a custom layout: it also roots library provider
-    /// resolution for consumers that derive the library home from the config
-    /// (see the faber `library_resolver_from_config`).
+    /// Override the language-pack root used by frontmatter locale load.
     #[must_use]
-    pub fn with_stdlib(mut self, path: PathBuf) -> Self {
-        self.stdlib_path = Some(path);
-        self.stdlib_explicit = true;
+    pub fn with_locale_root(mut self, path: PathBuf) -> Self {
+        self.locale_root = Some(path);
+        self
+    }
+
+    /// Override the library home used by package-mode provider resolution.
+    #[must_use]
+    pub fn with_library_home(mut self, path: PathBuf) -> Self {
+        self.library_home = Some(path);
         self
     }
 
@@ -260,36 +262,29 @@ impl Config {
         self
     }
 
-    /// Ensure the workspace stdlib directory is configured for this session.
+    /// Ensure the workspace language-pack root is configured for this session.
     ///
     /// Most sources now carry `+++ locale = "…" +++` frontmatter whose reader
-    /// pack is loaded through [`Config::stdlib_path`], so dev/test sessions
-    /// must reach the workspace `stdlib/` tree. [`Config::default`] already
+    /// pack is loaded through [`Config::locale_root`], so dev/test sessions
+    /// must reach the workspace `locale/` tree. [`Config::default`] already
     /// performs this discovery; this builder re-applies it for configs that
-    /// were constructed with an explicit empty stdlib slot.
-    ///
-    /// The dev stdlib is the auto-discovered reader-pack directory, never a
-    /// custom layout, so it does not mark the stdlib explicit.
+    /// were constructed with an empty locale-root slot.
     #[must_use]
-    pub fn with_dev_stdlib(mut self) -> Self {
-        if let Some(candidate) = discover_dev_stdlib() {
-            self.stdlib_path = Some(candidate);
-            self.stdlib_explicit = false;
+    pub fn with_dev_locale_root(mut self) -> Self {
+        if let Some(candidate) = discover_dev_locale_root() {
+            self.locale_root = Some(candidate);
         }
         self
     }
 }
 
-/// Discover the workspace stdlib directory from the source checkout layout.
+/// Discover the workspace language-pack root from the source checkout layout.
 ///
-/// Returns the `stdlib/` directory under the crate root when the compiled-in
-/// `CARGO_MANIFEST_DIR` points to a workspace checkout that contains the
-/// expected `stdlib/locale/` tree (`<root>/../../stdlib` in the faberlang
-/// container layout). Returns `None` when the binary is installed outside the
-/// workspace or the directory is absent, so released builds keep their
-/// stdlib-less default.
-fn discover_dev_stdlib() -> Option<PathBuf> {
-    let candidate = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../stdlib");
+/// Returns [`crate::locale::workspace_locale_root`] when that directory exists.
+/// Returns `None` when the binary is installed outside the workspace or the
+/// directory is absent, so released builds keep their pack-less default.
+fn discover_dev_locale_root() -> Option<PathBuf> {
+    let candidate = crate::locale::workspace_locale_root();
     candidate.is_dir().then_some(candidate)
 }
 

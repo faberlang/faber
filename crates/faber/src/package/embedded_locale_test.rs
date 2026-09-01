@@ -1,10 +1,8 @@
 use super::*;
 use std::fs;
-use std::path::PathBuf;
 
 fn tree_pack_bytes(locale: &str) -> Vec<u8> {
-    let path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("../../stdlib/locale")
+    let path = radix::module::locale::workspace_locale_root()
         .join(locale)
         .join("pack.toml");
     fs::read(&path).unwrap_or_else(|err| panic!("read {}: {err}", path.display()))
@@ -28,7 +26,7 @@ fn all_embedded_packs_decompress_to_tree_bytes_and_parse() {
         assert_eq!(
             decoded,
             tree_pack_bytes(locale),
-            "embedded {locale} must byte-match stdlib/locale/{locale}/pack.toml"
+            "embedded {locale} must byte-match locale/{locale}/pack.toml"
         );
         let toml = std::str::from_utf8(&decoded).unwrap_or_else(|err| {
             panic!("embedded {locale} is not UTF-8: {err}");
