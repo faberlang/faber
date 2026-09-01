@@ -878,9 +878,10 @@ fn witness_mismatch_fails_closed() {
         )
         .expect_err("witness mismatch must fail closed");
     assert!(
-        err.message.contains("does not match"),
-        "unexpected error message: {}",
-        err.message
+        err.args
+            .iter()
+            .any(|arg| arg.name == "issue" && arg.value == "authored_type_form_witness_mismatch"),
+        "expected structured authored_type_form_witness_mismatch issue, got: {err:?}"
     );
 }
 

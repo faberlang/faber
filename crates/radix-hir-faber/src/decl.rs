@@ -703,9 +703,7 @@ impl super::FaberCodegen {
             }
             self.write_param(
                 param,
-                HirTypeSlot::Parameter(
-                    u32::try_from(idx).expect("parameter count exceeds u32::MAX"),
-                ),
+                HirTypeSlot::Parameter(self.slot_ordinal(idx, "parameter count")),
                 types,
                 names,
                 interner,

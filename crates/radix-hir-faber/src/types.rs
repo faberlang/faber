@@ -370,10 +370,16 @@ impl super::FaberCodegen {
             return Ok(self.type_to_faber(type_id, types, names, interner, surface));
         };
         if form.ty != type_id {
-            return Err(malformed_type_form(format!(
-                "authored type form witness TypeId({}) does not match the site's type TypeId({})",
-                form.ty.0, type_id.0
-            )));
+            return Err(CodegenError {
+                message: format!(
+                    "authored type form witness TypeId({}) does not match the site's type TypeId({})",
+                    form.ty.0, type_id.0
+                ),
+                args: vec![DiagnosticArg::new(
+                    "issue",
+                    "authored_type_form_witness_mismatch",
+                )],
+            });
         }
         self.type_form_to_faber(form, types, names, interner, surface)
     }
