@@ -28,9 +28,14 @@ impl Drop for EnvRestore {
 }
 
 fn restore_env(key: &str, value: Option<std::ffi::OsString>) {
+    // SAFETY: serialized by ENV_LOCK; edition 2024 marks env mutation unsafe.
     match value {
-        Some(value) => std::env::set_var(key, value),
-        None => std::env::remove_var(key),
+        Some(value) => unsafe {
+            std::env::set_var(key, value);
+        },
+        None => unsafe {
+            std::env::remove_var(key);
+        },
     }
 }
 
@@ -38,7 +43,10 @@ fn restore_env(key: &str, value: Option<std::ffi::OsString>) {
 fn workspace_library_probe_finds_sibling_norma_when_home_unset() {
     let _guard = env_guard();
     let _env = EnvRestore::capture();
-    std::env::remove_var(FABER_LIBRARY_HOME_ENV);
+    // SAFETY: serialized by ENV_LOCK; edition 2024 marks env mutation unsafe.
+    unsafe {
+        std::env::remove_var(FABER_LIBRARY_HOME_ENV);
+    }
 
     let home = default_library_home();
     assert!(home.is_some());
@@ -50,7 +58,10 @@ fn explicit_library_home_wins_over_workspace_probe() {
     let _guard = env_guard();
     let _env = EnvRestore::capture();
     let explicit = PathBuf::from("/tmp/faber-explicit-library-home-test");
-    std::env::set_var(FABER_LIBRARY_HOME_ENV, &explicit);
+    // SAFETY: serialized by ENV_LOCK; edition 2024 marks env mutation unsafe.
+    unsafe {
+        std::env::set_var(FABER_LIBRARY_HOME_ENV, &explicit);
+    }
 
     assert_eq!(default_library_home(), Some(explicit.clone()));
     let resolved = resolved_library_home().expect("env home");
@@ -62,7 +73,10 @@ fn explicit_library_home_wins_over_workspace_probe() {
 fn unset_home_records_ancestor_probe_provenance() {
     let _guard = env_guard();
     let _env = EnvRestore::capture();
-    std::env::remove_var(FABER_LIBRARY_HOME_ENV);
+    // SAFETY: serialized by ENV_LOCK; edition 2024 marks env mutation unsafe.
+    unsafe {
+        std::env::remove_var(FABER_LIBRARY_HOME_ENV);
+    }
 
     let resolved = resolved_library_home().expect("workspace probe");
     assert_eq!(resolved.source, LibraryHomeSource::AncestorProbe);

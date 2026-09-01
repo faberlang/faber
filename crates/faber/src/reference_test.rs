@@ -12,6 +12,22 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 static NEXT_TEMP_DIR: AtomicU64 = AtomicU64::new(0);
 
+/// Edition 2024 marks env mutation unsafe; REFERENCE_ROOT_ENV writers hold `env_lock()`.
+fn env_set(key: &str, value: impl AsRef<std::ffi::OsStr>) {
+    // SAFETY: caller holds `env_lock()`.
+    unsafe {
+        std::env::set_var(key, value);
+    }
+}
+
+/// Remove `key`; same locking contract as `env_set`.
+fn env_remove(key: &str) {
+    // SAFETY: caller holds `env_lock()`.
+    unsafe {
+        std::env::remove_var(key);
+    }
+}
+
 /// Unique scratch dir under the platform temp root (never inside a workspace).
 fn temp_dir(label: &str) -> PathBuf {
     let nonce = SystemTime::now()
@@ -151,7 +167,7 @@ fn dev_walkup_does_not_resolve_when_disabled() {
 fn dev_fallback_loads_repo_exempla_index() {
     let _guard = env_lock();
     let previous = std::env::var(REFERENCE_ROOT_ENV).ok();
-    std::env::remove_var(REFERENCE_ROOT_ENV);
+    env_remove(REFERENCE_ROOT_ENV);
 
     let pack = ReferencePack::load().expect("dev fallback loads repo exempla");
     // 201 since b07cc8c3e (LSR-W2 reice/reject keyword + meta/reice.fab exemplum).
@@ -162,7 +178,7 @@ fn dev_fallback_loads_repo_exempla_index() {
     assert!(pack.term("≡").is_some());
 
     if let Some(value) = previous {
-        std::env::set_var(REFERENCE_ROOT_ENV, value);
+        env_set(REFERENCE_ROOT_ENV, value);
     }
 }
 
@@ -199,7 +215,7 @@ fn env_override_wins_over_dev_fallback() {
     }
 
     let previous = std::env::var(REFERENCE_ROOT_ENV).ok();
-    std::env::set_var(REFERENCE_ROOT_ENV, &pack_root);
+    env_set(REFERENCE_ROOT_ENV, &pack_root);
 
     let resolved = resolve_reference_root().expect("env override resolves");
     assert_eq!(
@@ -212,9 +228,9 @@ fn env_override_wins_over_dev_fallback() {
     assert!(pack.resolve_exempla_path("functio/functio.fab").is_file());
     assert_eq!(pack.metadata().faber_version.as_deref(), Some("ci"));
 
-    std::env::remove_var(REFERENCE_ROOT_ENV);
+    env_remove(REFERENCE_ROOT_ENV);
     if let Some(value) = previous {
-        std::env::set_var(REFERENCE_ROOT_ENV, value);
+        env_set(REFERENCE_ROOT_ENV, value);
     }
 }
 
@@ -222,15 +238,15 @@ fn env_override_wins_over_dev_fallback() {
 fn missing_root_reports_actionable_error() {
     let _guard = env_lock();
     let previous = std::env::var(REFERENCE_ROOT_ENV).ok();
-    std::env::set_var(REFERENCE_ROOT_ENV, "/tmp/faber-reference-pack-missing-test");
+    env_set(REFERENCE_ROOT_ENV, "/tmp/faber-reference-pack-missing-test");
 
     let err = ReferencePack::load().expect_err("missing pack fails");
     assert!(err.message.contains("index.toml"));
     assert!(err.message.contains(REFERENCE_ROOT_ENV));
 
-    std::env::remove_var(REFERENCE_ROOT_ENV);
+    env_remove(REFERENCE_ROOT_ENV);
     if let Some(value) = previous {
-        std::env::set_var(REFERENCE_ROOT_ENV, value);
+        env_set(REFERENCE_ROOT_ENV, value);
     }
 }
 
@@ -312,7 +328,7 @@ fn audit_finding_topics_resolve_with_current_behavior() {
 fn load_from_disk_builds_explain_registry() {
     let _guard = env_lock();
     let previous = std::env::var(REFERENCE_ROOT_ENV).ok();
-    std::env::remove_var(REFERENCE_ROOT_ENV);
+    env_remove(REFERENCE_ROOT_ENV);
 
     let registry = Registry::load_from_disk().expect("disk registry");
     // 215 since b07cc8c3e (LSR-W2 reice/reject keyword + meta/reice.fab exemplum).
@@ -321,7 +337,7 @@ fn load_from_disk_builds_explain_registry() {
     assert!(list.contains("reference:"));
 
     if let Some(value) = previous {
-        std::env::set_var(REFERENCE_ROOT_ENV, value);
+        env_set(REFERENCE_ROOT_ENV, value);
     }
 }
 
@@ -362,7 +378,7 @@ fn parse_exempla_entry_for_manifest_concept() {
 fn disk_render_plain_includes_short_contract_for_functio() {
     let _guard = env_lock();
     let previous = std::env::var(REFERENCE_ROOT_ENV).ok();
-    std::env::remove_var(REFERENCE_ROOT_ENV);
+    env_remove(REFERENCE_ROOT_ENV);
 
     let disk = Registry::load_from_disk().expect("disk");
     let lookup = disk.lookup("functio").expect("functio");
@@ -372,7 +388,7 @@ fn disk_render_plain_includes_short_contract_for_functio() {
     assert!(rendered.contains("functio <name>"));
 
     if let Some(value) = previous {
-        std::env::set_var(REFERENCE_ROOT_ENV, value);
+        env_set(REFERENCE_ROOT_ENV, value);
     }
 }
 

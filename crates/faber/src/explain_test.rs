@@ -137,14 +137,20 @@ fn render_json_is_valid() {
 fn load_aliases_disk_registry_entry_point() {
     let _guard = env_lock();
     let previous = std::env::var(crate::reference::REFERENCE_ROOT_ENV).ok();
-    std::env::remove_var(crate::reference::REFERENCE_ROOT_ENV);
+    // SAFETY: serialized by env_lock(); edition 2024 marks env mutation unsafe.
+    unsafe {
+        std::env::remove_var(crate::reference::REFERENCE_ROOT_ENV);
+    }
 
     let registry = Registry::load().expect("load via disk entry point");
     // 215 since b07cc8c3e (LSR-W2 reice/reject keyword + meta/reice.fab exemplum).
     assert_eq!(registry.entries().len(), 215);
 
     if let Some(value) = previous {
-        std::env::set_var(crate::reference::REFERENCE_ROOT_ENV, value);
+        // SAFETY: serialized by env_lock(); edition 2024 marks env mutation unsafe.
+        unsafe {
+            std::env::set_var(crate::reference::REFERENCE_ROOT_ENV, value);
+        }
     }
 }
 
