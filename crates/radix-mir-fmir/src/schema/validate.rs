@@ -159,7 +159,15 @@ fn validate_wire_composed_matmul_plans(
                         )));
                     }
                 }
-                _ => unreachable!("validated composed stage count"),
+                // The zip against `expected` bounds index to 0..=4, so this
+                // arm cannot fire; wire admission still fails closed here
+                // rather than panicking at the decode boundary.
+                _ => {
+                    return Err(wire_invalid(format!(
+                        "kernel '{}' carries composed matmul stage {index} outside the four validated stages",
+                        kernel.entry
+                    )));
+                }
             }
             let expected_role = if index == 3 {
                 WireBufferRole::Output
