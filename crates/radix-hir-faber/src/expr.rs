@@ -170,12 +170,13 @@ impl super::FaberCodegen {
                 // currently emitted by this backend.
                 let mut wrote_finge = false;
                 if let HirExpressionKind::Path(def_id) = &callee.kind
-                    && self.variant_def_ids.contains(def_id) {
-                        self.write_finge_construction(
-                            *def_id, args, types, names, interner, surface, writer,
-                        );
-                        wrote_finge = true;
-                    }
+                    && self.variant_def_ids.contains(def_id)
+                {
+                    self.write_finge_construction(
+                        *def_id, args, types, names, interner, surface, writer,
+                    );
+                    wrote_finge = true;
+                }
                 if !wrote_finge {
                     self.write_expr_prec(callee, 13, types, names, interner, surface, writer);
                     self.write_call_type_args(type_args, types, names, interner, surface, writer);
@@ -1278,16 +1279,17 @@ impl super::FaberCodegen {
         writer.write_raw(interner.resolve(*sym));
         writer.write("`");
         if let Some(param_exprs) = param_exprs
-            && !param_exprs.is_empty() {
-                writer.write("(");
-                for (idx, expr) in param_exprs.iter().enumerate() {
-                    if idx > 0 {
-                        writer.write(", ");
-                    }
-                    self.write_expr(expr, types, names, interner, surface, writer);
+            && !param_exprs.is_empty()
+        {
+            writer.write("(");
+            for (idx, expr) in param_exprs.iter().enumerate() {
+                if idx > 0 {
+                    writer.write(", ");
                 }
-                writer.write(")");
+                self.write_expr(expr, types, names, interner, surface, writer);
             }
+            writer.write(")");
+        }
         true
     }
 
@@ -1304,33 +1306,34 @@ impl super::FaberCodegen {
     ) {
         if let Some(expr) = &body.expr
             && let HirExpressionKind::Loop(loop_block) = &expr.kind
-                && let Some((body_stmts, cond)) = self.as_fac_loop(loop_block) {
-                    writer.write(surface.contextual_keyword("fac"));
-                    writer.writeln(" {");
-                    writer.indented(|writer| {
-                        for stmt in body_stmts {
-                            self.write_stmt(stmt, types, names, interner, surface, writer);
-                        }
-                        self.write_block_end_trivia(loop_block, interner, writer);
-                    });
-                    writer.write("} ");
-                    writer.write(surface.contextual_keyword("dum"));
-                    writer.write(" ");
-                    self.write_expr(cond, types, names, interner, surface, writer);
-                    writer.newline();
-                    writer.write(surface.keyword(TokenKind::Cape));
-                    writer.write(" ");
-                    self.write_cape_block_named(
-                        &catch.body,
-                        Some(catch.binding_name),
-                        types,
-                        names,
-                        interner,
-                        surface,
-                        writer,
-                    );
-                    return;
+            && let Some((body_stmts, cond)) = self.as_fac_loop(loop_block)
+        {
+            writer.write(surface.contextual_keyword("fac"));
+            writer.writeln(" {");
+            writer.indented(|writer| {
+                for stmt in body_stmts {
+                    self.write_stmt(stmt, types, names, interner, surface, writer);
                 }
+                self.write_block_end_trivia(loop_block, interner, writer);
+            });
+            writer.write("} ");
+            writer.write(surface.contextual_keyword("dum"));
+            writer.write(" ");
+            self.write_expr(cond, types, names, interner, surface, writer);
+            writer.newline();
+            writer.write(surface.keyword(TokenKind::Cape));
+            writer.write(" ");
+            self.write_cape_block_named(
+                &catch.body,
+                Some(catch.binding_name),
+                types,
+                names,
+                interner,
+                surface,
+                writer,
+            );
+            return;
+        }
 
         writer.write(surface.contextual_keyword("fac"));
         writer.writeln(" {");
@@ -1365,10 +1368,11 @@ impl super::FaberCodegen {
     ) {
         if body.statements.is_empty()
             && let Some(expr) = &body.expr
-                && let HirExpressionKind::Block(inner) = &expr.kind {
-                    self.write_block(inner, types, names, interner, surface, writer);
-                    return;
-                }
+            && let HirExpressionKind::Block(inner) = &expr.kind
+        {
+            self.write_block(inner, types, names, interner, surface, writer);
+            return;
+        }
         self.write_block(body, types, names, interner, surface, writer);
     }
 
@@ -1477,10 +1481,11 @@ impl super::FaberCodegen {
         // not a `finge` construction. Keep its exact source path when the HIR
         // has collapsed the path to the variant `DefId`.
         if fields.is_empty()
-            && let Some(spelling) = self.authored_variant_spellings.get(&variant_def) {
-                writer.write(spelling);
-                return;
-            }
+            && let Some(spelling) = self.authored_variant_spellings.get(&variant_def)
+        {
+            writer.write(spelling);
+            return;
+        }
         writer.write(surface.keyword(TokenKind::Finge));
         writer.write(" ");
         // Bare local names that two local unions share (or that collide with

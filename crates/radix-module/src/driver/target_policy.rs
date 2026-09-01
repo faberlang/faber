@@ -473,9 +473,10 @@ fn scan_rust_stmt(stmt: &Stmt, file: &str, diagnostics: &mut Vec<Diagnostic>) {
         StmtKind::Class(class) => {
             for member in &class.members {
                 if let ClassMemberKind::Method(method) = &member.kind
-                    && let Some(body) = &method.body {
-                        scan_rust_block(body, file, diagnostics);
-                    }
+                    && let Some(body) = &method.body
+                {
+                    scan_rust_block(body, file, diagnostics);
+                }
             }
         }
         StmtKind::Interface(_) => {}
@@ -872,9 +873,10 @@ fn scan_rust_warning_stmt(stmt: &Stmt, file: &str, diagnostics: &mut Vec<Diagnos
         StmtKind::Class(class) => {
             for member in &class.members {
                 if let ClassMemberKind::Method(method) = &member.kind
-                    && let Some(body) = &method.body {
-                        scan_rust_warning_block(body, file, diagnostics);
-                    }
+                    && let Some(body) = &method.body
+                {
+                    scan_rust_warning_block(body, file, diagnostics);
+                }
             }
         }
         StmtKind::Probandum(test) => scan_rust_warning_test(test, file, diagnostics),

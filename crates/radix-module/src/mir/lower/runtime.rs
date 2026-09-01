@@ -97,31 +97,32 @@ impl FunctionBuilder<'_> {
         }
 
         if let HirExpressionKind::Path(def_id) = receiver.kind
-            && let Some(import) = self.context.provider_imports.get(&def_id).cloned() {
-                // D-PA1/D-PA2: a resolvable user-code provider call (the
-                // import resolved to a sibling module under package identity
-                // context) lowers to a signature-known external definition
-                // keyed to the VERB — the direct cross-module symbol reference,
-                // not a versioned host ABI call and not the raw provider route.
-                if let Some(verb_def) = import
-                    .file_interface_functions
-                    .as_ref()
-                    .and_then(|functions| functions.get(&method))
-                {
-                    let lowered_args = self.lower_hir_call_args(args)?;
-                    return self.lower_definition_call(*verb_def, Vec::new(), lowered_args, conversion, expr);
-                }
+            && let Some(import) = self.context.provider_imports.get(&def_id).cloned()
+        {
+            // D-PA1/D-PA2: a resolvable user-code provider call (the
+            // import resolved to a sibling module under package identity
+            // context) lowers to a signature-known external definition
+            // keyed to the VERB — the direct cross-module symbol reference,
+            // not a versioned host ABI call and not the raw provider route.
+            if let Some(verb_def) = import
+                .file_interface_functions
+                .as_ref()
+                .and_then(|functions| functions.get(&method))
+            {
                 let lowered_args = self.lower_hir_call_args(args)?;
-                let ty = self.expr_ty(expr)?;
-                let mut module = import.module;
-                module.push(import.item);
-                return Some(self.runtime_call_value(
-                    MirIntrinsic::Provider(MirProvider { kind: import.kind, module, name: method }),
-                    lowered_args,
-                    ty,
-                    expr.span,
-                ));
+                return self.lower_definition_call(*verb_def, Vec::new(), lowered_args, conversion, expr);
             }
+            let lowered_args = self.lower_hir_call_args(args)?;
+            let ty = self.expr_ty(expr)?;
+            let mut module = import.module;
+            module.push(import.item);
+            return Some(self.runtime_call_value(
+                MirIntrinsic::Provider(MirProvider { kind: import.kind, module, name: method }),
+                lowered_args,
+                ty,
+                expr.span,
+            ));
+        }
 
         let method_name = self.resolve_method_name(method)?.to_owned();
         if let Some(lowered) = self.lower_sermo_method(receiver, &method_name, args, expr) {
@@ -143,43 +144,40 @@ impl FunctionBuilder<'_> {
             return Some(lowered);
         }
         if method_name == "silu"
-            && let Some(receiver_ty) = receiver.ty {
-                let payload = self.types.get(self.method_receiver_payload_id(receiver_ty));
-                if let Some(entry) = crate::intrinsics::lookup_method_for_type(payload, &method_name, args.len())
-                    && matches!(entry.receiver, crate::intrinsics::IntrinsicReceiver::Tensor) {
-                        return self.lower_tensor_silu(receiver, expr);
-                    }
+            && let Some(receiver_ty) = receiver.ty
+        {
+            let payload = self.types.get(self.method_receiver_payload_id(receiver_ty));
+            if let Some(entry) = crate::intrinsics::lookup_method_for_type(payload, &method_name, args.len())
+                && matches!(entry.receiver, crate::intrinsics::IntrinsicReceiver::Tensor)
+            {
+                return self.lower_tensor_silu(receiver, expr);
             }
+        }
 
         if let Some(receiver_ty) = receiver.ty {
             let payload = self.types.get(self.method_receiver_payload_id(receiver_ty));
             if let Some(entry) = crate::intrinsics::lookup_method_for_type(payload, &method_name, args.len())
-                && crate::intrinsics::mir_is_higher_order_lista(entry) {
-                    let closure = &args[0].expr;
-                    return match entry.mir_kind {
-                        crate::intrinsics::IntrinsicMirKind::HigherOrderAll => {
-                            self.lower_omnia(receiver, closure, expr)
-                        }
-                        crate::intrinsics::IntrinsicMirKind::HigherOrderAny => {
-                            self.lower_quilibet(receiver, closure, expr)
-                        }
-                        crate::intrinsics::IntrinsicMirKind::HigherOrderFiltrata => {
-                            self.lower_filtrata(receiver, closure, expr)
-                        }
-                        crate::intrinsics::IntrinsicMirKind::HigherOrderMap => {
-                            self.lower_mappata(receiver, closure, expr)
-                        }
-                        crate::intrinsics::IntrinsicMirKind::HigherOrderReduce => {
-                            let initial = &args[1].expr;
-                            self.lower_reducta(receiver, closure, initial, expr)
-                        }
-                        crate::intrinsics::IntrinsicMirKind::HigherOrderCumulata => {
-                            let initial = &args[1].expr;
-                            self.lower_cumulata(receiver, closure, initial, expr)
-                        }
-                        _ => None,
-                    };
-                }
+                && crate::intrinsics::mir_is_higher_order_lista(entry)
+            {
+                let closure = &args[0].expr;
+                return match entry.mir_kind {
+                    crate::intrinsics::IntrinsicMirKind::HigherOrderAll => self.lower_omnia(receiver, closure, expr),
+                    crate::intrinsics::IntrinsicMirKind::HigherOrderAny => self.lower_quilibet(receiver, closure, expr),
+                    crate::intrinsics::IntrinsicMirKind::HigherOrderFiltrata => {
+                        self.lower_filtrata(receiver, closure, expr)
+                    }
+                    crate::intrinsics::IntrinsicMirKind::HigherOrderMap => self.lower_mappata(receiver, closure, expr),
+                    crate::intrinsics::IntrinsicMirKind::HigherOrderReduce => {
+                        let initial = &args[1].expr;
+                        self.lower_reducta(receiver, closure, initial, expr)
+                    }
+                    crate::intrinsics::IntrinsicMirKind::HigherOrderCumulata => {
+                        let initial = &args[1].expr;
+                        self.lower_cumulata(receiver, closure, initial, expr)
+                    }
+                    _ => None,
+                };
+            }
         }
 
         let Some(op) = self.collection_method_op(receiver, method, args, expr.span) else {
@@ -2079,11 +2077,14 @@ impl FunctionBuilder<'_> {
         args: &[HirCallArg],
         span: Span,
     ) -> Option<Vec<MirOperand>> {
-        if args.len() == 1 && args[0].spread
+        if args.len() == 1
+            && args[0].spread
             && let Some(params) = self.context.function_params.get(&callee)
-                && params.len() > 1 && params.iter().all(|param| !param.optional) {
-                    return self.lower_spread_call_args(&args[0].expr, params.len(), span);
-                }
+            && params.len() > 1
+            && params.iter().all(|param| !param.optional)
+        {
+            return self.lower_spread_call_args(&args[0].expr, params.len(), span);
+        }
 
         if let Some(params) = self.context.callable_param_lower_meta(callee) {
             let mut lowered = Vec::with_capacity(params.len());
@@ -2236,10 +2237,11 @@ impl FunctionBuilder<'_> {
                 .get(def_id)
                 .copied()
                 .unwrap_or(false)
-            && let Some(error_ty) = self.callable_error_ty(callee) {
-                let callee = MirCallee::definition_with_type_args(*def_id, explicit_type_args);
-                return self.lower_failable_call(callee, lowered_args, ty, error_ty, conversion, expr.span);
-            }
+            && let Some(error_ty) = self.callable_error_ty(callee)
+        {
+            let callee = MirCallee::definition_with_type_args(*def_id, explicit_type_args);
+            return self.lower_failable_call(callee, lowered_args, ty, error_ty, conversion, expr.span);
+        }
 
         self.lower_definition_call(*def_id, explicit_type_args, lowered_args, conversion, expr)
     }
@@ -2622,17 +2624,20 @@ impl FunctionBuilder<'_> {
             .first()
             .is_some_and(|arg| matches!(arg.kind, HirExpressionKind::Literal(HirLiteral::String(_))));
         if let Some(template) = template
-            && has_literal_template && args.len() > 1 && args.len() <= 3 {
-                let mut lowered_args = Vec::with_capacity(args.len());
-                for arg in args {
-                    lowered_args.push(self.lower_expr_value(arg)?);
-                }
-                let text_ty = MirType::semantic(self.types.primitive(Primitive::Textus));
-                let formatted =
-                    self.runtime_call_value(MirIntrinsic::FormatString { template }, lowered_args, text_ty, expr.span);
-                self.runtime_call_value(intrinsic, vec![formatted], return_ty, expr.span);
-                return Some(MirOperand::Constant(MirConstant::Unit));
+            && has_literal_template
+            && args.len() > 1
+            && args.len() <= 3
+        {
+            let mut lowered_args = Vec::with_capacity(args.len());
+            for arg in args {
+                lowered_args.push(self.lower_expr_value(arg)?);
             }
+            let text_ty = MirType::semantic(self.types.primitive(Primitive::Textus));
+            let formatted =
+                self.runtime_call_value(MirIntrinsic::FormatString { template }, lowered_args, text_ty, expr.span);
+            self.runtime_call_value(intrinsic, vec![formatted], return_ty, expr.span);
+            return Some(MirOperand::Constant(MirConstant::Unit));
+        }
         // L23 (d57baa50): the multi-arg grouping carries the HIR-Rust lane's
         // space-join for EVERY arg count — one diagnostic call with the joined
         // payload instead of one call per argument. The previous gate limited
@@ -2901,16 +2906,19 @@ impl FunctionBuilder<'_> {
                 expr.span,
             ));
         }
-        if recovery.is_none() && matches!(self.normalized_type(target), Type::Vector(_, _))
-            && let HirExpressionKind::Array(elements) = &source.kind {
-                return self.lower_array(elements, expr, MirAggregateKind::Vector);
-            }
+        if recovery.is_none()
+            && matches!(self.normalized_type(target), Type::Vector(_, _))
+            && let HirExpressionKind::Array(elements) = &source.kind
+        {
+            return self.lower_array(elements, expr, MirAggregateKind::Vector);
+        }
         if recovery.is_none()
             && let Type::Matrix(_, shape) = self.normalized_type(target).clone()
-                && let Some((rows, columns)) = crate::semantic::literal_matrix_shape(shape, self.types)
-                    && let HirExpressionKind::Array(elements) = &source.kind {
-                        return self.lower_matrix_from_nested_lista(elements, rows, columns, ty, expr);
-                    }
+            && let Some((rows, columns)) = crate::semantic::literal_matrix_shape(shape, self.types)
+            && let HirExpressionKind::Array(elements) = &source.kind
+        {
+            return self.lower_matrix_from_nested_lista(elements, rows, columns, ty, expr);
+        }
         // Route C (AEU-5): bounded numeric lista snapshots into a padded
         // tensor. The trailing `TensorFromFlat` fill operand is a real value —
         // the caller's `⇥` fill or the numeric zero — never a `MaybeUninit`
@@ -2941,17 +2949,18 @@ impl FunctionBuilder<'_> {
             None => None,
         };
         if recovery.is_none()
-            && let Some(handler) = self.handlers.last().cloned() {
-                return Some(self.lower_handled_conversio(HandledConversio {
-                    source,
-                    source_ty: conversion_source_ty,
-                    target,
-                    params,
-                    return_ty: ty,
-                    handler,
-                    span: expr.span,
-                }));
-            }
+            && let Some(handler) = self.handlers.last().cloned()
+        {
+            return Some(self.lower_handled_conversio(HandledConversio {
+                source,
+                source_ty: conversion_source_ty,
+                target,
+                params,
+                return_ty: ty,
+                handler,
+                span: expr.span,
+            }));
+        }
         Some(self.runtime_call_value(
             MirIntrinsic::Convert(MirConversion {
                 flavor: MirConversionFlavor::Runtime,
@@ -2994,9 +3003,10 @@ impl FunctionBuilder<'_> {
 
     fn lower_conversio_source(&mut self, source: &HirExpression, target: TypeId) -> Option<MirOperand> {
         if let HirExpressionKind::Literal(HirLiteral::JsonValor(value)) = &source.kind
-            && matches!(self.normalized_type(target), Type::Primitive(Primitive::Valor)) {
-                return self.lower_json_valor_literal(value, Some(target), source.span);
-            }
+            && matches!(self.normalized_type(target), Type::Primitive(Primitive::Valor))
+        {
+            return self.lower_json_valor_literal(value, Some(target), source.span);
+        }
         self.lower_expr_value(source)
     }
 

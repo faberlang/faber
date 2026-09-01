@@ -455,9 +455,9 @@ pub fn build_device_program(
                     .params
                     .get(param.param_position as usize)
                     .map(|param| param.local)
-                {
-                    param_updates.insert((param.step_function, param_local), param.update_output);
-                }
+            {
+                param_updates.insert((param.step_function, param_local), param.update_output);
+            }
         }
     }
     let mut builder = KernelBuilder::new(
@@ -793,18 +793,19 @@ impl<'a> KernelBuilder<'a> {
             );
         }
         if let Ok(signature) = &whole_signature
-            && let Ok(Some(plan)) = kernel_plan_for_function(function, signature, self.validation) {
-                return self.emit_subchain(
-                    function,
-                    function,
-                    signature,
-                    plan,
-                    base_entry,
-                    None,
-                    &return_tuple_locals,
-                    &mut BTreeMap::new(),
-                );
-            }
+            && let Ok(Some(plan)) = kernel_plan_for_function(function, signature, self.validation)
+        {
+            return self.emit_subchain(
+                function,
+                function,
+                signature,
+                plan,
+                base_entry,
+                None,
+                &return_tuple_locals,
+                &mut BTreeMap::new(),
+            );
+        }
 
         // Decomposition path (S5-U1/U5): split the body at recipe boundaries
         // into subchain kernels, each carrying exactly one recipe (or an
@@ -936,31 +937,30 @@ impl<'a> KernelBuilder<'a> {
         // device-to-device edge).
         if let Some(source) = function.source
             && self.companion_gradient_slots.contains_key(&source.0)
-                && let Some(fields) = decomposition.return_tuple_fields(function) {
-                    for (slot, field_local) in fields.iter().enumerate() {
-                        let slot = u32::try_from(slot).unwrap_or(u32::MAX);
-                        if !self.companion_gradient_slots[&source.0].contains(&slot) {
-                            continue;
-                        }
-                        let Some((producer_index, output_position)) =
-                            decomposition.producer_position(*field_local)
-                        else {
-                            continue;
-                        };
-                        let output_position = u32::try_from(output_position).unwrap_or(u32::MAX);
-                        let Some(&buffer_id) =
-                            subchain_output_buffer_ids.get(&(producer_index, output_position))
-                        else {
-                            continue;
-                        };
-                        if let Some(entry) =
-                            self.buffers.iter_mut().find(|entry| entry.id == buffer_id)
-                        {
-                            entry.gradient = true;
-                        }
-                        self.gradient_buffers.insert((source.0, slot), buffer_id);
-                    }
+            && let Some(fields) = decomposition.return_tuple_fields(function)
+        {
+            for (slot, field_local) in fields.iter().enumerate() {
+                let slot = u32::try_from(slot).unwrap_or(u32::MAX);
+                if !self.companion_gradient_slots[&source.0].contains(&slot) {
+                    continue;
                 }
+                let Some((producer_index, output_position)) =
+                    decomposition.producer_position(*field_local)
+                else {
+                    continue;
+                };
+                let output_position = u32::try_from(output_position).unwrap_or(u32::MAX);
+                let Some(&buffer_id) =
+                    subchain_output_buffer_ids.get(&(producer_index, output_position))
+                else {
+                    continue;
+                };
+                if let Some(entry) = self.buffers.iter_mut().find(|entry| entry.id == buffer_id) {
+                    entry.gradient = true;
+                }
+                self.gradient_buffers.insert((source.0, slot), buffer_id);
+            }
+        }
         Ok(())
     }
 
@@ -1132,10 +1132,9 @@ impl<'a> KernelBuilder<'a> {
                 });
                 id
             };
-            if is_param_input
-                && let Some(local) = resource.source_local {
-                    param_buffer_by_local.insert(local, buffer_id);
-                }
+            if is_param_input && let Some(local) = resource.source_local {
+                param_buffer_by_local.insert(local, buffer_id);
+            }
             // Record the companion's gradient output buffers as they are
             // minted (the train_step kernels built afterwards alias them);
             // a companion gradient slot is a per-step scratch value, never an

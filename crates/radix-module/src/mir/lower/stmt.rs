@@ -36,9 +36,10 @@ impl HirVisitor for FunctionBuilder<'_> {
         }
 
         if let Some(expr) = &block.expr
-            && self.current_is_open() {
-                self.visit_expr(expr);
-            }
+            && self.current_is_open()
+        {
+            self.visit_expr(expr);
+        }
     }
 
     /// Lower one HIR statement into the current MIR block.

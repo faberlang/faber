@@ -868,19 +868,20 @@ fn extract_declarations(source: &str) -> Vec<String> {
         let trimmed = line.trim();
         for prefix in prefixes {
             if let Some(rest) = trimmed.strip_prefix(prefix)
-                && let Some(name) = rest.split_whitespace().next() {
-                    let name = name
-                        .trim_end_matches(':')
-                        .trim_end_matches('(')
-                        .trim_end_matches(')');
-                    if !name.is_empty()
-                        && name
-                            .chars()
-                            .all(|c| c.is_alphanumeric() || c == '_' || c == '\'')
-                    {
-                        names.push(name.to_string());
-                    }
+                && let Some(name) = rest.split_whitespace().next()
+            {
+                let name = name
+                    .trim_end_matches(':')
+                    .trim_end_matches('(')
+                    .trim_end_matches(')');
+                if !name.is_empty()
+                    && name
+                        .chars()
+                        .all(|c| c.is_alphanumeric() || c == '_' || c == '\'')
+                {
+                    names.push(name.to_string());
                 }
+            }
         }
     }
 

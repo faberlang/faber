@@ -859,15 +859,15 @@ fn validate_host_calls(
                             && !validation
                                 .types
                                 .equals(found.semantic_id(), expected.semantic_id())
-                            {
-                                return Err(BoundaryAbiError::Type {
-                                    host: host.id,
-                                    kernel: kernel.id,
-                                    position,
-                                    expected,
-                                    found,
-                                });
-                            }
+                        {
+                            return Err(BoundaryAbiError::Type {
+                                host: host.id,
+                                kernel: kernel.id,
+                                position,
+                                expected,
+                                found,
+                            });
+                        }
 
                         // Wrong shape: the crossing value's element count must
                         // equal the kernel's declared boundary element count.
@@ -876,15 +876,16 @@ fn validate_host_calls(
                         let argument_count = element_count_of(argument_ty, validation);
                         let declared_count = element_count_of(declared.ty, validation);
                         if let Some(expected_count) = declared_count
-                            && argument_count != Some(expected_count) {
-                                return Err(BoundaryAbiError::Shape {
-                                    host: host.id,
-                                    kernel: kernel.id,
-                                    position,
-                                    expected_count,
-                                    found_count: argument_count,
-                                });
-                            }
+                            && argument_count != Some(expected_count)
+                        {
+                            return Err(BoundaryAbiError::Shape {
+                                host: host.id,
+                                kernel: kernel.id,
+                                position,
+                                expected_count,
+                                found_count: argument_count,
+                            });
+                        }
                     }
 
                     // ── Observation: no input may hold this kernel's own
@@ -904,37 +905,40 @@ fn validate_host_calls(
                     // the producing launch's result as an input.
                     for argument in args {
                         if let MirOperand::Temp(temp) = argument
-                            && pending_outputs.contains_key(temp) {
-                                return Err(BoundaryAbiError::Observation {
-                                    host: host.id,
-                                    kernel: kernel.id,
-                                    local: MirLocalId(temp.0),
-                                });
-                            }
+                            && pending_outputs.contains_key(temp)
+                        {
+                            return Err(BoundaryAbiError::Observation {
+                                host: host.id,
+                                kernel: kernel.id,
+                                local: MirLocalId(temp.0),
+                            });
+                        }
                     }
 
                     // ── Lifetime: the output must not land in a host
                     //    parameter (direct local destination). ─────────────
                     if let Some(local) = destination_local
-                        && scope.parameter_local(local) {
-                            return Err(BoundaryAbiError::Lifetime {
-                                host: host.id,
-                                kernel: kernel.id,
-                                parameter: local,
-                            });
-                        }
+                        && scope.parameter_local(local)
+                    {
+                        return Err(BoundaryAbiError::Lifetime {
+                            host: host.id,
+                            kernel: kernel.id,
+                            parameter: local,
+                        });
+                    }
 
                     // ── Mutation: the output must not be routed into the
                     //    storage of a read-only input value (direct aliasing
                     //    or the value-flow `_1 = %t` pattern). ─────────────
                     if let Some(local) = destination_local
-                        && arg_locals.contains(&Some(local)) {
-                            return Err(BoundaryAbiError::Mutation {
-                                host: host.id,
-                                kernel: kernel.id,
-                                local,
-                            });
-                        }
+                        && arg_locals.contains(&Some(local))
+                    {
+                        return Err(BoundaryAbiError::Mutation {
+                            host: host.id,
+                            kernel: kernel.id,
+                            local,
+                        });
+                    }
 
                     // Record the call's pending output for the value-flow
                     // checks (the temp destination, or the direct local).
@@ -945,9 +949,10 @@ fn validate_host_calls(
                         }
                         None => {
                             if let Some(local) = destination_local
-                                && !local_holds_output.contains(&local) {
-                                    local_holds_output.push(local);
-                                }
+                                && !local_holds_output.contains(&local)
+                            {
+                                local_holds_output.push(local);
+                            }
                         }
                     }
                 }
@@ -961,26 +966,27 @@ fn validate_host_calls(
                         continue;
                     };
                     if let MirValueKind::Operand(MirOperand::Temp(temp)) = &value.kind
-                        && let Some(arg_locals) = pending_outputs.remove(temp) {
-                            if scope.parameter_local(local) {
-                                return Err(BoundaryAbiError::Lifetime {
-                                    host: host.id,
-                                    kernel: kernel.id,
-                                    parameter: local,
-                                });
-                            }
-                            if arg_locals.contains(&local) {
-                                return Err(BoundaryAbiError::Mutation {
-                                    host: host.id,
-                                    kernel: kernel.id,
-                                    local,
-                                });
-                            }
-                            if !local_holds_output.contains(&local) {
-                                local_holds_output.push(local);
-                            }
-                            continue;
+                        && let Some(arg_locals) = pending_outputs.remove(temp)
+                    {
+                        if scope.parameter_local(local) {
+                            return Err(BoundaryAbiError::Lifetime {
+                                host: host.id,
+                                kernel: kernel.id,
+                                parameter: local,
+                            });
                         }
+                        if arg_locals.contains(&local) {
+                            return Err(BoundaryAbiError::Mutation {
+                                host: host.id,
+                                kernel: kernel.id,
+                                local,
+                            });
+                        }
+                        if !local_holds_output.contains(&local) {
+                            local_holds_output.push(local);
+                        }
+                        continue;
+                    }
                     // A non-call-output assignment overwrites the local: it no
                     // longer holds a kernel output, so a later boundary call
                     // cannot observe stale region work through it.

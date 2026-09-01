@@ -129,22 +129,24 @@ fn collect_device_calls(
     for block in &function.blocks {
         for statement in &block.statements {
             if let MirStatementKind::Call { callee, .. } = &statement.kind
-                && is_device_callee(callee, program, device) {
-                    survivors.push(FragmentSurvivor {
-                        kind: FragmentSurvivorKind::Call,
-                        span: statement.span,
-                        function: function.id,
-                    });
-                }
-        }
-        if let MirTerminatorKind::TryCall { callee, .. } = &block.terminator.kind
-            && is_device_callee(callee, program, device) {
+                && is_device_callee(callee, program, device)
+            {
                 survivors.push(FragmentSurvivor {
                     kind: FragmentSurvivorKind::Call,
-                    span: block.terminator.span,
+                    span: statement.span,
                     function: function.id,
                 });
             }
+        }
+        if let MirTerminatorKind::TryCall { callee, .. } = &block.terminator.kind
+            && is_device_callee(callee, program, device)
+        {
+            survivors.push(FragmentSurvivor {
+                kind: FragmentSurvivorKind::Call,
+                span: block.terminator.span,
+                function: function.id,
+            });
+        }
     }
 }
 

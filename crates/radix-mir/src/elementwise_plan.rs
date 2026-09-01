@@ -477,11 +477,12 @@ pub fn plan_elementwise(
             }
             StatementRole::Other => {
                 if let Some(slot) = dest_slot
-                    && consumer_counts.get(&slot).copied().unwrap_or(0) > 0 {
-                        return Err(ElementwiseBarrierError::Effect {
-                            span: statement.span,
-                        });
-                    }
+                    && consumer_counts.get(&slot).copied().unwrap_or(0) > 0
+                {
+                    return Err(ElementwiseBarrierError::Effect {
+                        span: statement.span,
+                    });
+                }
             }
         }
     }

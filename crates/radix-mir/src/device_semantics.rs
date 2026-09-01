@@ -768,9 +768,10 @@ impl DeviceSemantics {
         on_stack.push(launch);
         for edge in &self.dependencies {
             if edge.producer == launch
-                && let Some(cycle_edge) = self.cycle_through(edge.consumer, visited, on_stack) {
-                    return Some(cycle_edge);
-                }
+                && let Some(cycle_edge) = self.cycle_through(edge.consumer, visited, on_stack)
+            {
+                return Some(cycle_edge);
+            }
         }
         on_stack.retain(|seen| *seen != launch);
         None

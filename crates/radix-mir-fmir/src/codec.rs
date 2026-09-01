@@ -110,12 +110,13 @@ pub fn decode_binary_image(
     // layout predates the optional device section (3→4 clean break, N1.7)
     // must report UnsupportedVersion, not a generic Parse error.
     if let Some(actual) = read_version_varint(bytes)
-        && actual != PACKAGE_MIR_ARTIFACT_VERSION {
-            return Err(FmirImageError::VersionMismatch {
-                actual,
-                expected: PACKAGE_MIR_ARTIFACT_VERSION,
-            });
-        }
+        && actual != PACKAGE_MIR_ARTIFACT_VERSION
+    {
+        return Err(FmirImageError::VersionMismatch {
+            actual,
+            expected: PACKAGE_MIR_ARTIFACT_VERSION,
+        });
+    }
     let image: FmirBinaryImageFile =
         postcard::from_bytes(bytes).map_err(|error| FmirImageError::Parse(error.to_string()))?;
     check_version(image.version)?;

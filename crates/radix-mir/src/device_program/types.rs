@@ -283,9 +283,9 @@ impl KernelLaunchPlan {
             && let Some(outputs) = attention
                 .decode_outputs_per_workgroup
                 .filter(|outputs| *outputs > 0)
-            {
-                launch.workgroup_count.x = launch.dispatch_size.x.div_ceil(outputs);
-            }
+        {
+            launch.workgroup_count.x = launch.dispatch_size.x.div_ceil(outputs);
+        }
         launch
     }
 }

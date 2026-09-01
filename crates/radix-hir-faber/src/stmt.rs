@@ -55,9 +55,10 @@ impl super::FaberCodegen {
             return None;
         };
         if let Some(eb) = else_block
-            && (!eb.statements.is_empty() || eb.expr.is_some()) {
-                return None;
-            }
+            && (!eb.statements.is_empty() || eb.expr.is_some())
+        {
+            return None;
+        }
         let HirExpressionKind::Unary(radix_hir::HirUnOp::Not, inner) = &cond.kind else {
             return None;
         };
@@ -135,9 +136,10 @@ impl super::FaberCodegen {
         writer: &mut CodeWriter,
     ) {
         if let Some(end) = &block.end
-            && let Some(trivia) = self.trivia.for_anchor(&end.id) {
-                crate::trivia::write_leading_trivia(trivia, interner, writer);
-            }
+            && let Some(trivia) = self.trivia.for_anchor(&end.id)
+        {
+            crate::trivia::write_leading_trivia(trivia, interner, writer);
+        }
     }
 
     /// Detect an else-block that is semantically a `sin` branch.
@@ -449,9 +451,10 @@ impl super::FaberCodegen {
             // Omit compiler-synthesized locals (shader implicit IO, CLI args);
             // they are runtime-provided, not authored source.
             if let HirStatementKind::Local(local) = &stmt.kind
-                && local.runtime_provided {
-                    continue;
-                }
+                && local.runtime_provided
+            {
+                continue;
+            }
             self.write_stmt(stmt, types, names, interner, surface, writer);
         }
         if let Some(expr) = &block.expr {

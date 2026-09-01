@@ -243,12 +243,13 @@ impl<'a> InstantiationChecker<'a> {
         }
         for (param, arg) in callable_params.iter().zip(args.iter()) {
             if let Some(actual) = self.operand_ty(caller_fn, arg)
-                && !self.types_fit(param.ty, actual) {
-                    let expected = self.type_label(param.ty);
-                    let actual = self.type_label(actual);
-                    self.ty(caller, "argument", span, definition_span, Some(&expected), Some(&actual));
-                    return;
-                }
+                && !self.types_fit(param.ty, actual)
+            {
+                let expected = self.type_label(param.ty);
+                let actual = self.type_label(actual);
+                self.ty(caller, "argument", span, definition_span, Some(&expected), Some(&actual));
+                return;
+            }
             if !self.mode_legal(param.mode, arg) {
                 self.ty(
                     caller,
@@ -267,12 +268,13 @@ impl<'a> InstantiationChecker<'a> {
         }
         if let Some(dest) = destination
             && let Some(expected_ty) = self.place_ty(caller_fn, dest)
-                && !self.types_fit(expected_ty, sig.return_ty) {
-                    let expected = self.type_label(expected_ty);
-                    let actual = self.type_label(sig.return_ty);
-                    self.ty(caller, "return", span, definition_span, Some(&expected), Some(&actual));
-                    return;
-                }
+            && !self.types_fit(expected_ty, sig.return_ty)
+        {
+            let expected = self.type_label(expected_ty);
+            let actual = self.type_label(sig.return_ty);
+            self.ty(caller, "return", span, definition_span, Some(&expected), Some(&actual));
+            return;
+        }
         if failable || !self.effect_fits(sig) {
             self.ty(caller, "effect", span, definition_span, None, None);
         }
@@ -320,9 +322,10 @@ impl<'a> InstantiationChecker<'a> {
                 continue;
             };
             if let Some((expected, got)) = self.tensor_shape_pair(param.ty, actual)
-                && !self.types.index_equals(expected, got) {
-                    return Some((format!("{expected:?}"), format!("{got:?}")));
-                }
+                && !self.types.index_equals(expected, got)
+            {
+                return Some((format!("{expected:?}"), format!("{got:?}")));
+            }
         }
         None
     }

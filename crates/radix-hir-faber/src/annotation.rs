@@ -243,10 +243,11 @@ impl super::FaberCodegen {
                 // emit through the localized surface, matching the old
                 // token-shaped path.
                 if let Some(spec) = lookup_keyword_spec(spelling)
-                    && spec.token_kind.is_none() {
-                        writer.write(surface.contextual_keyword(spec.text));
-                        return;
-                    }
+                    && spec.token_kind.is_none()
+                {
+                    writer.write(surface.contextual_keyword(spec.text));
+                    return;
+                }
                 writer.write(spelling);
             }
             TokenKind::Colon => writer.write(":"),

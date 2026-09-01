@@ -1165,9 +1165,10 @@ impl Parser {
     /// spelling.
     fn parse_contextual_ident(&mut self, owner: KeywordOwner) -> Result<Ident, ParseError> {
         if let Some(kind) = self.current_keyword_ident()
-            && keyword_allowed_as_ident(owner, &kind).is_none() {
-                return Err(Self::expected_error("identifier", self.current_span()));
-            }
+            && keyword_allowed_as_ident(owner, &kind).is_none()
+        {
+            return Err(Self::expected_error("identifier", self.current_span()));
+        }
         let token = self.advance();
         let span = token.span;
         match &token.kind {

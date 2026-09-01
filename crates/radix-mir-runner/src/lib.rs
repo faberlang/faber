@@ -544,9 +544,10 @@ fn run_function_with_explicit_limits_and_stats<H: Host + ?Sized>(
         )]);
     }
     if let Some(function) = program.function_by_id(function_id)
-        && function.shader_stage == Some(MirKernelShaderStage::Compute) {
-            return Err(vec![kernel_refused(function.span)]);
-        }
+        && function.shader_stage == Some(MirKernelShaderStage::Compute)
+    {
+        return Err(vec![kernel_refused(function.span)]);
+    }
     if let Some((function, reason)) = program.functions.iter().find_map(|function| {
         function_unsupported_bounded_carrier(function, context.types)
             .map(|reason| (function, reason))
@@ -734,9 +735,10 @@ impl<H: Host + ?Sized> Runner<'_, H> {
     fn pop_frame(&mut self) -> Option<Frame> {
         let frame = self.frames.pop();
         if let Some(frame) = frame.as_ref()
-            && let Some(stats) = self.stats.as_mut() {
-                stats.leave_function(frame.function);
-            }
+            && let Some(stats) = self.stats.as_mut()
+        {
+            stats.leave_function(frame.function);
+        }
         frame
     }
 
@@ -793,19 +795,21 @@ impl<H: Host + ?Sized> Runner<'_, H> {
                 .steps_taken
                 .is_multiple_of(Self::DEADLINE_CHECK_INTERVAL)
             && let Some(deadline) = self.deadline
-                && Instant::now() >= deadline {
-                    self.errors
-                        .push(RunnerError::internal(span, "wall-clock timeout exceeded"));
-                    return false;
-                }
+            && Instant::now() >= deadline
+        {
+            self.errors
+                .push(RunnerError::internal(span, "wall-clock timeout exceeded"));
+            return false;
+        }
         if let Some(limit) = self.step_limit
-            && self.steps_taken >= limit {
-                self.errors.push(RunnerError::internal(
-                    span,
-                    format!("interpreter step budget exhausted after {limit} steps"),
-                ));
-                return false;
-            }
+            && self.steps_taken >= limit
+        {
+            self.errors.push(RunnerError::internal(
+                span,
+                format!("interpreter step budget exhausted after {limit} steps"),
+            ));
+            return false;
+        }
         self.steps_taken += 1;
         true
     }
@@ -896,10 +900,10 @@ impl<H: Host + ?Sized> Runner<'_, H> {
                         if let Some(destination) = destination
                             && let Err(error) =
                                 self.write_place(&destination, value, terminator.span)
-                            {
-                                self.fail(error);
-                                continue;
-                            }
+                        {
+                            self.fail(error);
+                            continue;
+                        }
                         self.set_active_block(ok_block, terminator.span);
                     }
                     Ok(CallOutcome::Err(error_value)) => {
@@ -1023,9 +1027,10 @@ impl<H: Host + ?Sized> Runner<'_, H> {
                     },
                 };
                 if let (Some(name), Some(started)) = (intrinsic_name, intrinsic_started)
-                    && let Some(stats) = self.stats.as_mut() {
-                        stats.record_intrinsic(name, started);
-                    }
+                    && let Some(stats) = self.stats.as_mut()
+                {
+                    stats.record_intrinsic(name, started);
+                }
                 let Some(result) = result? else {
                     return Ok(StatementOutcome::FrameReturned);
                 };

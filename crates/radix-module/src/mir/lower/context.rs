@@ -361,16 +361,17 @@ impl<'a> LoweringContextMaps<'a> {
         // identity so the sibling unit's emitted module defines each function
         // under the external symbol its consumers call (`__faber_external_…`).
         if let Some(product) = &self.package_product
-            && !self.package_module_segments.is_empty() {
-                self.validation.external_function_identities.insert(
-                    def_id,
-                    MirExternalFunctionIdentity::new(
-                        product.clone(),
-                        self.package_module_segments.clone(),
-                        self.interner.resolve(function.name),
-                    ),
-                );
-            }
+            && !self.package_module_segments.is_empty()
+        {
+            self.validation.external_function_identities.insert(
+                def_id,
+                MirExternalFunctionIdentity::new(
+                    product.clone(),
+                    self.package_module_segments.clone(),
+                    self.interner.resolve(function.name),
+                ),
+            );
+        }
     }
 
     fn record_struct_item(&mut self, def_id: DefId, strukt: &HirStruct) {

@@ -240,19 +240,20 @@ impl<'lowerer, 'unit> MonomorphizationState<'lowerer, 'unit> {
             }
 
             if let MirTerminatorKind::TryCall { destination, callee, args, error_place, .. } = &block.terminator.kind
-                && self.is_generic_callee(callee) {
-                    sites.push(CallSite {
-                        function: function.id,
-                        block_index,
-                        location: CallLocation::Terminator,
-                        destination: destination.clone(),
-                        callee: callee.clone(),
-                        args: args.clone(),
-                        error_place: Some(error_place.clone()),
-                        span: block.terminator.span,
-                        scope: scope.clone(),
-                    });
-                }
+                && self.is_generic_callee(callee)
+            {
+                sites.push(CallSite {
+                    function: function.id,
+                    block_index,
+                    location: CallLocation::Terminator,
+                    destination: destination.clone(),
+                    callee: callee.clone(),
+                    args: args.clone(),
+                    error_place: Some(error_place.clone()),
+                    span: block.terminator.span,
+                    scope: scope.clone(),
+                });
+            }
         }
         sites
     }
@@ -636,9 +637,10 @@ impl<'lowerer, 'unit> MonomorphizationState<'lowerer, 'unit> {
                 }
             }
             if let MirTerminatorKind::TryCall { callee, .. } = &mut block.terminator.kind
-                && !self.substitute_callee(callee, bindings, &shape_params, span) {
-                    return false;
-                }
+                && !self.substitute_callee(callee, bindings, &shape_params, span)
+            {
+                return false;
+            }
         }
         true
     }
@@ -674,9 +676,11 @@ impl<'lowerer, 'unit> MonomorphizationState<'lowerer, 'unit> {
             // derivation. Substituting it here would reject the caller-owned
             // magnitudo symbol as an unresolved type parameter.
             if let Type::Param(sym) = self.types().get(type_arg.semantic_id())
-                && shape_params.contains(sym) && !bindings.contains_key(sym) {
-                    continue;
-                }
+                && shape_params.contains(sym)
+                && !bindings.contains_key(sym)
+            {
+                continue;
+            }
             *type_arg = match self.substitute_ty(*type_arg, bindings, span) {
                 Some(ty) => ty,
                 None => return false,
@@ -1073,9 +1077,10 @@ fn generic_param_names(params: &[crate::hir::HirTypeParam]) -> Vec<OrderedParam>
 /// Linear fallback keeps sparse/reordered IDs correct after template removal.
 pub(super) fn function_by_id(functions: &[MirFunction], id: MirFunctionId) -> Option<&MirFunction> {
     if let Some(function) = functions.get(id.0 as usize)
-        && function.id == id {
-            return Some(function);
-        }
+        && function.id == id
+    {
+        return Some(function);
+    }
     functions.iter().find(|function| function.id == id)
 }
 

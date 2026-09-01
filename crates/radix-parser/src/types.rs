@@ -180,10 +180,8 @@ impl Parser {
                 span: last.span,
             };
             let name_str = self.interner.resolve(name.name).to_owned();
-            
-            if let Some(width) =
-                radix_types::numeric_width::lista_sugar_width_marker(&name_str)
-            {
+
+            if let Some(width) = radix_types::numeric_width::lista_sugar_width_marker(&name_str) {
                 form = TypeFormLevel::SHORT;
                 self.parse_lista_width_sugar(name, width)?
             } else if let Some(width) =
@@ -220,7 +218,7 @@ impl Parser {
                     TypeExprKind::Atomic(elem)
                 } else if name_str == "promissum" {
                     let success = Box::new(self.parse_type()?);
-                    
+
                     if self.eat(&TokenKind::ExitArrow) {
                         let alternate = Box::new(self.parse_type()?);
                         self.expect(&TokenKind::GtAscii, "expected '>'")?;

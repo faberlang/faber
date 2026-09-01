@@ -332,17 +332,18 @@ pub fn instantiate_merged_generic_calls_with_devices_and_metadata(
     for (source, route) in imported_devices.iter() {
         let role = mir_role(route.contract.role);
         if let Some(consumer) = device_roles.insert(*source, role)
-            && consumer != role {
-                return Err(vec![MirError {
-                    message: format!(
-                        "consumer-local device role for def#{} conflicts with the imported route ({consumer:?} vs {role:?})",
-                        source.0
-                    ),
-                    issue: CONSUMER_DEVICE_ROLE_CONFLICT.to_owned(),
-                    span: Span::default(),
-                    definition_span: None,
-                }]);
-            }
+            && consumer != role
+        {
+            return Err(vec![MirError {
+                message: format!(
+                    "consumer-local device role for def#{} conflicts with the imported route ({consumer:?} vs {role:?})",
+                    source.0
+                ),
+                issue: CONSUMER_DEVICE_ROLE_CONFLICT.to_owned(),
+                span: Span::default(),
+                definition_span: None,
+            }]);
+        }
     }
     if !device_roles.is_empty() {
         let mut launch_entries = consumer_launch_entries
@@ -565,24 +566,22 @@ impl PackageInstantiate<'_> {
                 if let MirStatementKind::Assign { value, .. } = &statement.kind {
                     scope.values.insert(value.id, value.ty);
                 }
-                if let MirStatementKind::Call {
-                    destination,
-                    callee: MirCallee::Definition { source, type_args },
-                    args,
-                } = &statement.kind
-                    && self.templates.contains_key(source) {
-                        calls.push(PendingCall {
-                            function: function.id,
-                            block_index,
-                            statement_index: Some(statement_index),
-                            destination: destination.clone(),
-                            source: *source,
-                            type_args: type_args.clone(),
-                            args: args.clone(),
-                            span: statement.span,
-                            scope: scope.clone(),
-                        });
-                    }
+                if let MirStatementKind::Call { destination, callee: MirCallee::Definition { source, type_args }, args } =
+                    &statement.kind
+                    && self.templates.contains_key(source)
+                {
+                    calls.push(PendingCall {
+                        function: function.id,
+                        block_index,
+                        statement_index: Some(statement_index),
+                        destination: destination.clone(),
+                        source: *source,
+                        type_args: type_args.clone(),
+                        args: args.clone(),
+                        span: statement.span,
+                        scope: scope.clone(),
+                    });
+                }
             }
             if let MirTerminatorKind::TryCall {
                 destination,
@@ -590,19 +589,20 @@ impl PackageInstantiate<'_> {
                 args,
                 ..
             } = &block.terminator.kind
-                && self.templates.contains_key(source) {
-                    calls.push(PendingCall {
-                        function: function.id,
-                        block_index,
-                        statement_index: None,
-                        destination: destination.clone(),
-                        source: *source,
-                        type_args: type_args.clone(),
-                        args: args.clone(),
-                        span: block.terminator.span,
-                        scope: scope.clone(),
-                    });
-                }
+                && self.templates.contains_key(source)
+            {
+                calls.push(PendingCall {
+                    function: function.id,
+                    block_index,
+                    statement_index: None,
+                    destination: destination.clone(),
+                    source: *source,
+                    type_args: type_args.clone(),
+                    args: args.clone(),
+                    span: block.terminator.span,
+                    scope: scope.clone(),
+                });
+            }
         }
         calls
     }
@@ -628,19 +628,19 @@ impl PackageInstantiate<'_> {
         // shape; the ascribed destination is the concrete [8,8]/[8] fact.
         if let Some(destination) = &call.destination
             && let Some(actual) = self.place_ty(destination, &call.scope, call.span)
-                && !type_contains_param(self.types, actual.semantic_id())
-                    && !bind_generic_type_witness_with_shapes(
-                        self.types,
-                        template.return_ty,
-                        actual,
-                        &mut type_bindings,
-                        &mut shape_bindings,
-                    )
-                {
-                    self.errors
-                        .push(MirError::validation(call.span, "destination type mismatch"));
-                    return None;
-                }
+            && !type_contains_param(self.types, actual.semantic_id())
+            && !bind_generic_type_witness_with_shapes(
+                self.types,
+                template.return_ty,
+                actual,
+                &mut type_bindings,
+                &mut shape_bindings,
+            )
+        {
+            self.errors
+                .push(MirError::validation(call.span, "destination type mismatch"));
+            return None;
+        }
         for (index, arg) in call.args.iter().enumerate() {
             let Some(expected) = template.params.get(index) else {
                 continue;
@@ -857,9 +857,10 @@ impl PackageInstantiate<'_> {
         let mut shape_args = key.shape_args.iter();
         for param in params {
             if param.is_shape
-                && let Some(concrete) = shape_args.next().copied() {
-                    shape_bindings.insert(param.name, concrete);
-                }
+                && let Some(concrete) = shape_args.next().copied()
+            {
+                shape_bindings.insert(param.name, concrete);
+            }
         }
         shape_bindings
     }
@@ -875,8 +876,9 @@ impl PackageInstantiate<'_> {
         // body channel (signature-only, or an incompatible artifact) is never
         // instantiated — the role bit alone does not validate the call.
         if let Some(route) = self.imported_devices.get(key.source)
-            && !route.contract.is_composable() {
-                self.errors.push(MirError {
+            && !route.contract.is_composable()
+        {
+            self.errors.push(MirError {
                     message: format!(
                         "signature-only device import `{}` cannot be instantiated: no source body and no canonical body artifact",
                         route.display_key()
@@ -885,8 +887,8 @@ impl PackageInstantiate<'_> {
                     span,
                     definition_span: None,
                 });
-                return None;
-            }
+            return None;
+        }
         if let Some(existing) = self.instance_index.get(key).copied() {
             self.register_device_instance(key, existing);
             return Some(existing);
@@ -1024,9 +1026,10 @@ impl PackageInstantiate<'_> {
                 }
             }
             if let MirTerminatorKind::TryCall { callee, .. } = &mut block.terminator.kind
-                && !self.substitute_callee(callee, bindings, &shape_params, span) {
-                    return false;
-                }
+                && !self.substitute_callee(callee, bindings, &shape_params, span)
+            {
+                return false;
+            }
         }
         true
     }
@@ -1048,9 +1051,11 @@ impl PackageInstantiate<'_> {
             // reject the caller-owned magnitudo symbol as an unresolved type
             // parameter.
             if let Type::Param(sym) = self.types.get(type_arg.semantic_id())
-                && shape_params.contains(sym) && !bindings.contains_key(sym) {
-                    continue;
-                }
+                && shape_params.contains(sym)
+                && !bindings.contains_key(sym)
+            {
+                continue;
+            }
             *type_arg = match self.substitute_ty(*type_arg, bindings, span) {
                 Some(ty) => ty,
                 None => return false,
@@ -1412,9 +1417,10 @@ fn finalize_function(
             }
         }
         if let MirTerminatorKind::TryCall { callee, .. } = &mut block.terminator.kind
-            && !finalize_callee(types, callee, type_bindings, shape_bindings, span, errors) {
-                return false;
-            }
+            && !finalize_callee(types, callee, type_bindings, shape_bindings, span, errors)
+        {
+            return false;
+        }
     }
     repair_mean_shape_size_constants(types, function);
     let _ = substitute_tensor_from_flat_shape_size_constants(types, function, shape_bindings);
@@ -1439,9 +1445,11 @@ fn finalize_callee(
         // the calling instance, so finalization must leave it symbolic
         // rather than reject it as an unresolved type parameter.
         if let Type::Param(sym) = types.get(type_arg.semantic_id())
-            && shape_bindings.contains_key(sym) && !type_bindings.contains_key(sym) {
-                continue;
-            }
+            && shape_bindings.contains_key(sym)
+            && !type_bindings.contains_key(sym)
+        {
+            continue;
+        }
         *type_arg = match finalize_ty(types, *type_arg, type_bindings, shape_bindings, span, errors) {
             Some(ty) => ty,
             None => return false,

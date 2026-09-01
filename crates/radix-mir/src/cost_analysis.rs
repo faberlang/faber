@@ -666,9 +666,10 @@ fn absorb_statement(
     let src_foldable = statement_source_foldable(function, statement, foldable);
     let mut changed = false;
     if let MirStatementKind::Assign { value, .. } = &statement.kind
-        && src_foldable {
-            changed |= foldable.values.insert(value.id);
-        }
+        && src_foldable
+    {
+        changed |= foldable.values.insert(value.id);
+    }
     if let Some(local) = statement_destination(statement) {
         changed |= consider_local(local, src_foldable, params, foldable, tainted_locals);
         return changed;

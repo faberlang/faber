@@ -324,9 +324,11 @@ impl CompositionPass<'_> {
             let mut edges = Vec::new();
             for site in resolver.device_sites(function) {
                 if let Some(callee) = resolver.resolve_function(&site.callee)
-                    && self.is_device_callee(callee) && !edges.contains(&callee.id) {
-                        edges.push(callee.id);
-                    }
+                    && self.is_device_callee(callee)
+                    && !edges.contains(&callee.id)
+                {
+                    edges.push(callee.id);
+                }
             }
             graph.insert(function.id, edges);
         }
@@ -618,14 +620,16 @@ impl CompositionPass<'_> {
         {
             let mut mut_target = None;
             if param.mode == MirParamMode::MutRef
-                && let MirOperand::Place(place) = arg {
-                    if place.projections.is_empty()
-                        && let MirPlaceBase::Local(caller_local) = place.base {
-                            alpha.locals.insert(param.local, caller_local);
-                            continue;
-                        }
-                    mut_target = Some((place.clone(), param.ty));
+                && let MirOperand::Place(place) = arg
+            {
+                if place.projections.is_empty()
+                    && let MirPlaceBase::Local(caller_local) = place.base
+                {
+                    alpha.locals.insert(param.local, caller_local);
+                    continue;
                 }
+                mut_target = Some((place.clone(), param.ty));
+            }
             let new_local = ids.next_local();
             alpha.locals.insert(param.local, new_local);
             caller.locals.push(MirLocal {
@@ -652,9 +656,10 @@ impl CompositionPass<'_> {
             }
         }
         if let Some(fragment_lane) = lane_param(callee)
-            && let Some(caller_lane_local) = caller_lane_local {
-                alpha.locals.insert(fragment_lane.local, caller_lane_local);
-            }
+            && let Some(caller_lane_local) = caller_lane_local
+        {
+            alpha.locals.insert(fragment_lane.local, caller_lane_local);
+        }
         for local in &callee.locals {
             if alpha.locals.contains_key(&local.id) {
                 continue;
@@ -847,32 +852,34 @@ impl Resolver<'_> {
         for (block_index, block) in function.blocks.iter().enumerate() {
             for (stmt_index, stmt) in block.statements.iter().enumerate() {
                 if let MirStatementKind::Call { destination, callee, args } = &stmt.kind
-                    && self.is_device_callee(callee) {
-                        sites.push(CallSite {
-                            block_index,
-                            block_id: block.id,
-                            stmt_index: Some(stmt_index),
-                            is_try_call: false,
-                            destination: destination.clone(),
-                            callee: callee.clone(),
-                            args: args.clone(),
-                            span: stmt.span,
-                        });
-                    }
-            }
-            if let MirTerminatorKind::TryCall { destination, callee, args, .. } = &block.terminator.kind
-                && self.is_device_callee(callee) {
+                    && self.is_device_callee(callee)
+                {
                     sites.push(CallSite {
                         block_index,
                         block_id: block.id,
-                        stmt_index: None,
-                        is_try_call: true,
+                        stmt_index: Some(stmt_index),
+                        is_try_call: false,
                         destination: destination.clone(),
                         callee: callee.clone(),
                         args: args.clone(),
-                        span: block.terminator.span,
+                        span: stmt.span,
                     });
                 }
+            }
+            if let MirTerminatorKind::TryCall { destination, callee, args, .. } = &block.terminator.kind
+                && self.is_device_callee(callee)
+            {
+                sites.push(CallSite {
+                    block_index,
+                    block_id: block.id,
+                    stmt_index: None,
+                    is_try_call: true,
+                    destination: destination.clone(),
+                    callee: callee.clone(),
+                    args: args.clone(),
+                    span: block.terminator.span,
+                });
+            }
         }
         sites
     }

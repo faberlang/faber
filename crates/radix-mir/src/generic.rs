@@ -149,16 +149,17 @@ fn try_bind_generic_type_witness(
 
     // Neither side is Alias — nullable_inner will not walk an Alias cycle here.
     if let Some(expected_inner) = types.nullable_inner(expected)
-        && let Some(actual_inner) = types.nullable_inner(actual) {
-            return try_bind_generic_type_witness(
-                types,
-                expected_inner,
-                actual_inner,
-                generic_bindings,
-                shape_bindings,
-                seen,
-            );
-        }
+        && let Some(actual_inner) = types.nullable_inner(actual)
+    {
+        return try_bind_generic_type_witness(
+            types,
+            expected_inner,
+            actual_inner,
+            generic_bindings,
+            shape_bindings,
+            seen,
+        );
+    }
 
     match (types.get(expected), types.get(actual)) {
         (Type::Array(expected_inner), Type::Array(actual_inner))
@@ -2345,9 +2346,10 @@ fn rewrite_place_constants(
 ) -> bool {
     for projection in &mut place.projections {
         if let MirProjection::Index(index) = projection
-            && !rewrite_operand_constants(index, rewrite) {
-                return false;
-            }
+            && !rewrite_operand_constants(index, rewrite)
+        {
+            return false;
+        }
     }
     true
 }

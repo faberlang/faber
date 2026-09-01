@@ -125,9 +125,10 @@ impl Validator<'_, '_> {
                     }
                 });
                 if let Some(expected_len) = expected_len
-                    && items.len() != expected_len {
-                        self.error(span, "vector aggregate element count does not match width");
-                    }
+                    && items.len() != expected_len
+                {
+                    self.error(span, "vector aggregate element count does not match width");
+                }
                 for item in items {
                     match item {
                         MirAggregateItem::Operand(value) => {
@@ -166,9 +167,10 @@ impl Validator<'_, '_> {
                         (None, None)
                     };
                 if let Some(expected_len) = expected_len
-                    && items.len() != expected_len {
-                        self.error(span, "matrix aggregate element count does not match shape");
-                    }
+                    && items.len() != expected_len
+                {
+                    self.error(span, "matrix aggregate element count does not match shape");
+                }
                 for item in items {
                     match item {
                         MirAggregateItem::Operand(value) => {
