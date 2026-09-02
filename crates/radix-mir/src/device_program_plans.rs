@@ -219,12 +219,22 @@ pub fn kernel_plan_for_function_with_limit(
         }
         return Ok(Some(plan));
     }
-    // The composed MLP body is a single target-neutral recipe even though it
-    // contains three matmul calls and one pointwise consumer. Resolve it
-    // before the ordinary one-recipe scan, which would correctly reject the
-    // mixed body as multiple conflicting recipes.
-    if let Some(plan) = composed_matmul_plan_for_function(function, validation)? {
-        return Ok(Some(CollectionKernelPlan::ComposedMatMul(plan)));
+    // Live-recipe-statement census: the op scan below is deduplicated by op
+    // kind, so two LIVE statements of the SAME recipe op would adopt ONE
+    // plan by plan-equality — silently folding a multi-recipe body into a
+    // single kernel whose matmul shapes read only the first statement. Fail
+    // closed instead: one kernel, one recipe statement. Distinct-op mixes
+    // stay with the scan below, whose `adopt_recipe` owns the pinned
+    // "conflicting recipes" diagnostic.
+    let stability_max_dead = crate::abi::stability_max_is_dead(function);
+    let live_recipes = live_recipe_statements(function, stability_max_dead);
+    if live_recipes.len() > 1 && live_recipes.iter().all(|op| *op == live_recipes[0]) {
+        return Err(PlanMappingError::mapping(format!(
+            "kernel body carries {} live {:?} recipe statements \
+             (one recipe statement per kernel)",
+            live_recipes.len(),
+            live_recipes[0],
+        )));
     }
     // Scan ALL statements: the kernel body's plan is decided by its complete
     // collection-op set, never by the first matching statement (N3.2).
@@ -237,7 +247,6 @@ pub fn kernel_plan_for_function_with_limit(
     // are resolved once from the body's matmul statement scan.
     let contract = collection_op_contract(function, validation)?;
     let matmul_shapes = kernel_matmul_shapes(function, validation)?;
-    let stability_max_dead = crate::abi::stability_max_is_dead(function);
     let mut recipe: Option<CollectionKernelPlan> = None;
     for op in ops {
         // PGC-R5: a DEAD stability-max reduction is not a recipe — the
@@ -297,6 +306,45 @@ pub fn kernel_plan_for_function_with_limit(
         }
     }
     Ok(recipe)
+}
+
+/// The body's LIVE recipe statements in scan order (the F2 census) —
+/// statement level, never deduplicated by op kind the way the op scan is.
+/// A recipe statement whose destination is never read is dead (the same
+/// dead filter `collection_ops_with_read_context` applies), and a PGC-R5
+/// dead stability-max `TensorMax`/`TensorMin` is not a recipe (the same
+/// skip the op scan applies).
+fn live_recipe_statements(
+    function: &MirFunction,
+    stability_max_dead: bool,
+) -> Vec<MirCollectionOp> {
+    let mut recipes = Vec::new();
+    for block in &function.blocks {
+        for statement in &block.statements {
+            let Some(op) = crate::collection_ops::statement_collection_op(statement) else {
+                continue;
+            };
+            let MirStatementKind::RuntimeCall { destination, .. } = &statement.kind else {
+                continue;
+            };
+            if stability_max_dead
+                && matches!(op, MirCollectionOp::TensorMax | MirCollectionOp::TensorMin)
+            {
+                continue;
+            }
+            if !is_recipe_op(op) {
+                continue;
+            }
+            if destination
+                .as_ref()
+                .is_some_and(|dest| !crate::read_analysis::place_is_read(function, dest))
+            {
+                continue;
+            }
+            recipes.push(op);
+        }
+    }
+    recipes
 }
 
 /// The kernel body's `FilumSum` declarations (SFR-5): each entry is the
@@ -3656,13 +3704,55 @@ fn sum_axis_destination_shape(
 /// subchains share the source function's local tables — so recording the
 /// produced local on the contract output gives the producer a
 /// `MirLocal` origin the consumer (same function, same local) joins by
-/// semantic identity. Non-local destinations (temps, or no destination)
-/// yield `None` and the Synthetic origin fallback stays honest.
+/// semantic identity. A source-shaped recipe may instead write a result
+/// temp that the IMMEDIATELY-following assignment forwards to an unprojected
+/// local (the real lowering's assign-then-use shape) — the forwarded local
+/// is the recipe's data-flow identity. Destinations without such a local
+/// identity (a bare temp with no forward, a projected place, or no
+/// destination) yield `None` and the Synthetic origin fallback stays honest.
 fn recipe_destination_local_for(function: &MirFunction, op: MirCollectionOp) -> Option<MirLocalId> {
-    let (_, destination) = first_collection_call(function, |found| found == op)?;
-    match destination?.base {
+    let (block_index, statement_index, destination) = 'found: {
+        for (block_index, block) in function.blocks.iter().enumerate() {
+            for (statement_index, statement) in block.statements.iter().enumerate() {
+                if crate::collection_ops::statement_collection_op(statement) != Some(op) {
+                    continue;
+                }
+                let MirStatementKind::RuntimeCall { destination, .. } = &statement.kind else {
+                    continue;
+                };
+                break 'found (block_index, statement_index, destination.as_ref());
+            }
+        }
+        return None;
+    };
+    let place = destination?;
+    if !place.projections.is_empty() {
+        return None;
+    }
+    match place.base {
         MirPlaceBase::Local(local) => Some(local),
-        MirPlaceBase::Temp(_) => None,
+        MirPlaceBase::Temp(temp) => {
+            // The assign-then-use forward: the next statement copies the
+            // recipe's result temp into the declared stage local.
+            let next = function
+                .blocks
+                .get(block_index)?
+                .statements
+                .get(statement_index + 1)?;
+            let MirStatementKind::Assign { place, value } = &next.kind else {
+                return None;
+            };
+            let MirPlaceBase::Local(local) = place.base else {
+                return None;
+            };
+            if !place.projections.is_empty() {
+                return None;
+            }
+            let MirValueKind::Operand(MirOperand::Temp(forwarded_temp)) = &value.kind else {
+                return None;
+            };
+            (*forwarded_temp == temp).then_some(local)
+        }
     }
 }
 

@@ -406,6 +406,109 @@ fn matmul_function(types: &mut TypeTable) -> MirFunction {
     }
 }
 
+/// `m1 = matmul(x, w1); m2 = matmul(x, w2); out = add(m1, m2)` — TWO live
+/// same-kind recipe statements of identical operand shapes (the trailing add
+/// keeps both results live): the deduplicated op scan sees ONE
+/// `TensorMatMul` op and would silently adopt one whole-body plan while
+/// `kernel_matmul_shapes` reads only the first statement.
+fn double_matmul_function(types: &mut TypeTable) -> MirFunction {
+    let left = rank2_tensor_ty(types, [17, 12]);
+    let right = rank2_tensor_ty(types, [12, 33]);
+    let out = rank2_tensor_ty(types, [17, 33]);
+    let local = |id: u32, ty: MirType| MirLocal {
+        id: MirLocalId(id),
+        name: None,
+        ty,
+        mutable: false,
+        span: test_span(),
+    };
+    let matmul = |left: u32, right: u32, destination: u32| MirStatement {
+        kind: MirStatementKind::RuntimeCall {
+            destination: Some(MirPlace::local(MirLocalId(destination))),
+            call: MirRuntimeCall {
+                intrinsic: MirIntrinsic::Collection(MirCollectionOp::TensorMatMul),
+                args: vec![
+                    MirOperand::Place(MirPlace::local(MirLocalId(left))),
+                    MirOperand::Place(MirPlace::local(MirLocalId(right))),
+                ],
+                return_ty: out,
+            },
+        },
+        span: test_span(),
+    };
+    MirFunction {
+        id: MirFunctionId(0),
+        source: None,
+        name: None,
+        params: vec![
+            MirParam {
+                local: MirLocalId(0),
+                name: None,
+                ty: left,
+                mode: MirParamMode::Owned,
+                span: test_span(),
+            },
+            MirParam {
+                local: MirLocalId(1),
+                name: None,
+                ty: right,
+                mode: MirParamMode::Owned,
+                span: test_span(),
+            },
+            MirParam {
+                local: MirLocalId(2),
+                name: None,
+                ty: right,
+                mode: MirParamMode::Owned,
+                span: test_span(),
+            },
+        ],
+        locals: vec![
+            local(0, left),
+            local(1, right),
+            local(2, right),
+            local(3, out),
+            local(4, out),
+            local(5, out),
+        ],
+        temps: Vec::new(),
+        blocks: vec![MirBlock {
+            id: MirBlockId(0),
+            statements: vec![
+                matmul(0, 1, 3),
+                matmul(0, 2, 4),
+                MirStatement {
+                    kind: MirStatementKind::RuntimeCall {
+                        destination: Some(MirPlace::local(MirLocalId(5))),
+                        call: MirRuntimeCall {
+                            intrinsic: MirIntrinsic::Collection(MirCollectionOp::TensorAdd),
+                            args: vec![
+                                MirOperand::Place(MirPlace::local(MirLocalId(3))),
+                                MirOperand::Place(MirPlace::local(MirLocalId(4))),
+                            ],
+                            return_ty: out,
+                        },
+                    },
+                    span: test_span(),
+                },
+            ],
+            terminator: MirTerminator {
+                kind: MirTerminatorKind::Return(Some(MirOperand::Place(MirPlace::local(
+                    MirLocalId(5),
+                )))),
+                span: test_span(),
+            },
+            span: test_span(),
+        }],
+        return_ty: out,
+        error_ty: None,
+        is_async: false,
+        is_generator: false,
+        shader_stage: None,
+        span: test_span(),
+    }
+}
+
 /// A source-shaped composed MLP body: each matmul writes a temporary, and
 /// the immediately following typed assignment forwards that result to the
 /// stage local consumed by the next operation.
@@ -2645,6 +2748,33 @@ fn multi_op_body_conflicting_recipes_fail_closed() {
     assert!(
         error.message.contains("conflicting recipes"),
         "expected the conflicting-recipes diagnostic, got: {}",
+        error.message
+    );
+}
+
+#[test]
+fn whole_function_plan_rejects_multiple_recipe_statements() {
+    // Same-kind multiplicity is invisible to the deduplicated op scan (it
+    // adopts the second recipe by plan equality while the matmul shape scan
+    // reads only the first statement) — the live-recipe census fails closed
+    // instead. Distinct-op mixes keep the "conflicting recipes" diagnostic
+    // (the test above); this is the same-op tier.
+    let mut types = TypeTable::new();
+    let function = double_matmul_function(&mut types);
+    let shapes = MatMulShapes {
+        m: 17,
+        k: 12,
+        n: 33,
+        left_layout: crate::MirScalarLayout::F32,
+        right_layout: crate::MirScalarLayout::F32,
+    };
+    let signature = matmul_signature(shapes, 5, 3);
+    let validation = MirValidationContext::new(&types);
+    let error = kernel_plan_for_function(&function, &signature, &validation)
+        .expect_err("two live same-kind recipe statements must not resolve one plan");
+    assert!(
+        error.message.contains("one recipe statement per kernel"),
+        "expected the census diagnostic, got: {}",
         error.message
     );
 }

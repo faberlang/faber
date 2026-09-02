@@ -3,15 +3,14 @@ use crate::abi::MirKernelResourceAccess;
 use crate::device::MirCompanionMap;
 use crate::device::{MirDeviceFunctionMetadata, MirDeviceFunctionMetadataMap};
 use crate::device_program::{
-    BufferLifetime, BufferRole, DeviceGradientLink, DeviceProgramLifetime, DeviceTrainableParam,
-    DeviceTrainingFacts, ObservationCadence,
+    BufferId, BufferLifetime, BufferRole, DeviceGradientLink, DeviceProgramLifetime,
+    DeviceTrainableParam, DeviceTrainingFacts, ObservationCadence,
 };
 use crate::device_semantics::{
     LosslessMirCompanionEntry, MirCompanionSelectedInput, MirCompanionSelectedOutput,
     SemanticValueOrigin,
 };
 use crate::kernel_plan::CollectionKernelPlan;
-use crate::layout::MirTensorStorageLayout;
 use crate::{
     MirAggregate, MirAggregateFields, MirAggregateItem, MirAggregateKind, MirBlock, MirBlockId,
     MirCollectionOp, MirFunction, MirFunctionId, MirFunctionOrigin, MirFunctionVisibility,
@@ -388,37 +387,65 @@ fn constructor_returns_program_and_semantics_from_validated_mir() {
         .expect("constructor output passes the shared semantic gate");
 }
 
+/// Spec `stage-2-device-program-materialization` §4 H1 / B6: the real
+/// Faber-lowered MLP body materializes through the GENERIC decomposition
+/// path as four children — never a composed one-kernel shortcut. The
+/// fixture ships unnamed with no shader stage; the constructor selects
+/// named Compute-stage functions and resolves entry names through the
+/// interner, so a mutable copy carries both facts explicitly.
 #[test]
-fn device_program_composed_stages_are_inout_and_unobserved() {
+fn device_program_composed_body_materializes_four_generic_children() {
     let mut types = TypeTable::new();
     let mut interner = Interner::new();
-    let r2 = rank2_tensor_ty(&mut types, [4, 4]);
-    let function = device_function(
-        1,
-        &mut interner,
-        "composed_mlp",
-        &[
-            (0, "x", r2),
-            (1, "gate_weight", r2),
-            (2, "up_weight", r2),
-            (3, "down_weight", r2),
-            (4, "gate", r2),
-            (5, "up", r2),
-            (6, "swiglu", r2),
-            (7, "down", r2),
-        ],
-        &[0, 1, 2, 3],
-        vec![
-            collection_statement(MirCollectionOp::TensorMatMul, &[0, 1], 4, r2),
-            collection_statement(MirCollectionOp::TensorMatMul, &[0, 2], 5, r2),
-            collection_statement(MirCollectionOp::TensorMul, &[4, 5], 6, r2),
-            collection_statement(MirCollectionOp::TensorMatMul, &[6, 3], 7, r2),
-        ],
-        Some(MirOperand::Place(MirPlace::local(MirLocalId(7)))),
-        Vec::new(),
-        r2,
-        true,
-    );
+    let mut function =
+        crate::device_program_plans::tests::composed_mlp_real_lowered_function(&mut types);
+    function.name = Some(interner.intern("composed_mlp"));
+    function.shader_stage = Some(MirKernelShaderStage::Compute);
+    // The fixture's collection results carry the lowering's alias type ids;
+    // the full MIR validator requires plain tensor results (`type_kind`
+    // does not look through `Type::Alias`), so normalize each call's return
+    // type to its alias target on the mutable copy.
+    for block in &mut function.blocks {
+        for statement in &mut block.statements {
+            if let MirStatementKind::RuntimeCall { call, .. } = &mut statement.kind
+                && let Type::Alias(_, inner) = types.get(call.return_ty.semantic_id())
+            {
+                call.return_ty = MirType::semantic(*inner);
+            }
+        }
+    }
+    // The real lowering names its locals; the fixture ships unnamed for the
+    // plan-pass tests. Names keep the constructor's name+shape wiring from
+    // false-joining same-shape anonymous inputs (gate vs up weights).
+    let local_names: [(u32, &str); 10] = [
+        (0, "x"),
+        (1, "gate_weight"),
+        (2, "up_weight"),
+        (3, "down_weight"),
+        (4, "down"),
+        (5, "seed"),
+        (6, "gate"),
+        (7, "up"),
+        (8, "activated"),
+        (9, "fused"),
+    ];
+    for (id, name) in local_names {
+        let symbol = interner.intern(name);
+        if let Some(param) = function
+            .params
+            .iter_mut()
+            .find(|param| param.local == MirLocalId(id))
+        {
+            param.name = Some(symbol);
+        }
+        if let Some(local) = function
+            .locals
+            .iter_mut()
+            .find(|local| local.id == MirLocalId(id))
+        {
+            local.name = Some(symbol);
+        }
+    }
     let validated = validated(&types, vec![function]);
     let (program, semantics, _) = build_device_program(
         &validated,
@@ -429,76 +456,138 @@ fn device_program_composed_stages_are_inout_and_unobserved() {
         0,
         &fixture_metadata(&validated.program().functions),
     )
-    .expect("the composed body should materialize as one device kernel");
+    .expect("the composed MLP body materializes through the generic path");
 
-    assert_eq!(program.kernels.len(), 1);
-    assert_eq!(program.launches.len(), 1);
-    assert!(matches!(
-        program.kernels[0].plan,
-        CollectionKernelPlan::ComposedMatMul(_)
-    ));
-    let stage_resources: Vec<_> = program.kernels[0]
-        .resources
+    // Four children with deterministic entries and plans by position: the
+    // gate matmul, the up matmul, the elementwise SiLU join, the down matmul.
+    assert_eq!(program.kernels.len(), 4);
+    let entries: Vec<&str> = program
+        .kernels
         .iter()
-        .filter(|resource| resource.access == MirKernelResourceAccess::ReadWrite)
+        .map(|kernel| kernel.entry.as_str())
         .collect();
-    assert_eq!(stage_resources.len(), 3);
     assert_eq!(
-        stage_resources
-            .iter()
-            .map(|resource| resource.binding.binding)
-            .collect::<Vec<_>>(),
-        vec![5, 6, 7]
+        entries,
+        [
+            "composed_mlp__0",
+            "composed_mlp__1",
+            "composed_mlp__2",
+            "composed_mlp__3",
+        ]
     );
-    assert!(
-        stage_resources
-            .iter()
-            .all(|resource| resource.buffer.role == BufferRole::InOut)
-    );
-    assert!(
-        stage_resources
-            .iter()
-            .all(|resource| resource.buffer.storage == MirTensorStorageLayout::DeviceHandle)
-    );
-    assert!(
-        stage_resources
-            .iter()
-            .all(|resource| resource.version.version == 1)
-    );
-    assert_eq!(
-        stage_resources
-            .iter()
-            .map(|resource| resource.buffer.id)
-            .collect::<BTreeSet<_>>()
-            .len(),
-        3,
-        "Gate, Up, and SwiGLU need distinct scratch identities"
-    );
-    for (resource, local) in stage_resources.iter().zip([4, 5, 6]) {
-        let value = semantics
-            .values
-            .iter()
-            .find(|value| value.id.0 == resource.buffer.id.0)
-            .expect("every stage buffer has a semantic value");
-        assert_eq!(
-            value.origin,
-            SemanticValueOrigin::MirLocal {
-                function: MirFunctionId(1),
-                local,
-            }
+    for (kernel, wants_matmul) in program.kernels.iter().zip([true, true, false, true]) {
+        let plan_matches = if wants_matmul {
+            matches!(kernel.plan, CollectionKernelPlan::TiledMatMul(_))
+        } else {
+            matches!(kernel.plan, CollectionKernelPlan::Elementwise)
+        };
+        assert!(
+            plan_matches,
+            "kernel {} carries the wrong plan",
+            kernel.entry
         );
     }
-    assert_eq!(program.results.len(), 1, "only Down is host-observed");
-    assert_eq!(program.results[0].buffer.role, BufferRole::Output);
-    assert!(stage_resources.iter().all(|resource| {
-        !program
-            .results
+
+    // Four launches, each bound to exactly its kernel.
+    assert_eq!(program.launches.len(), 4);
+    let launch_id = |kernel_index: usize| {
+        let bound: Vec<_> = program
+            .launches
             .iter()
-            .any(|result| result.buffer.id == resource.buffer.id)
-    }));
+            .filter(|launch| launch.kernel_index == kernel_index)
+            .collect();
+        assert_eq!(
+            bound.len(),
+            1,
+            "kernel {kernel_index} has exactly one launch"
+        );
+        bound[0].id
+    };
+    let (gate, up, join, down) = (launch_id(0), launch_id(1), launch_id(2), launch_id(3));
+
+    // A buffer's semantic origin, resolved through the value bindings.
+    let origin_of = |buffer: BufferId| {
+        let binding = semantics
+            .bindings
+            .iter()
+            .find(|binding| binding.buffer == buffer)
+            .expect("every program buffer has a semantic binding");
+        semantics
+            .values
+            .iter()
+            .find(|value| value.id == binding.value)
+            .expect("every binding has a semantic value")
+            .origin
+            .clone()
+    };
+
+    // Roots: neither gate nor up carries an incoming edge.
+    assert!(
+        semantics
+            .dependencies
+            .iter()
+            .all(|edge| edge.consumer != gate && edge.consumer != up),
+        "gate and up are independent roots"
+    );
+
+    // Join: exactly two producer edges — the gate result (local 6) and the
+    // up result (local 7) — on distinct buffers.
+    let join_edges: Vec<_> = semantics
+        .dependencies
+        .iter()
+        .filter(|edge| edge.consumer == join)
+        .collect();
+    assert_eq!(join_edges.len(), 2, "the join consumes both roots");
+    assert_ne!(join_edges[0].buffer, join_edges[1].buffer);
+    let join_origins: Vec<_> = join_edges
+        .iter()
+        .map(|edge| origin_of(edge.buffer))
+        .collect();
+    assert!(join_origins.iter().any(|origin| *origin
+        == SemanticValueOrigin::MirLocal {
+            function: MirFunctionId(0),
+            local: 6,
+        }));
+    assert!(join_origins.iter().any(|origin| *origin
+        == SemanticValueOrigin::MirLocal {
+            function: MirFunctionId(0),
+            local: 7,
+        }));
+
+    // Negative: no gate → up edge in either direction.
+    assert!(
+        !semantics.dependencies.iter().any(|edge| {
+            (edge.producer == gate && edge.consumer == up)
+                || (edge.producer == up && edge.consumer == gate)
+        }),
+        "gate and up are never serialized against each other"
+    );
+
+    // Down: exactly one incoming edge from the join (the fused activation).
+    let down_edges: Vec<_> = semantics
+        .dependencies
+        .iter()
+        .filter(|edge| edge.consumer == down)
+        .collect();
+    assert_eq!(down_edges.len(), 1);
+    assert_eq!(down_edges[0].producer, join);
+
+    // The MutRef output param (local 4) binds as the program's final
+    // result, produced by the down child's launch.
+    let output_origin = SemanticValueOrigin::MirLocal {
+        function: MirFunctionId(0),
+        local: 4,
+    };
+    let result = program
+        .results
+        .iter()
+        .find(|result| origin_of(result.buffer.id) == output_origin)
+        .expect("the MutRef output param binds as the program result");
+    assert_eq!(result.produced_by, down);
+
     program
         .validate_with_semantics(&semantics)
-        .expect("composed stage materialization passes semantic validation");
+        .expect("the four-child program passes the shared semantic gate");
 }
 
 // ── DPSC-U4a gap 1: the decomposition fallback (oracle: faber
