@@ -401,6 +401,20 @@ fn inference_hole_locals_stay_holes() {
 }
 
 #[test]
+fn ratio_authored_type_stays_stable_after_witness_normalization() {
+    // Record fields are stored in canonical map order, while authored ratio
+    // children retain source order. Re-emission must normalize both analyses
+    // without changing the authored ratio declaration.
+    let code = assert_idempotent(
+        "fixum ratio<g: f32, w: numerus> point ← ratio<g: f32, w: numerus> { g = 1.0, w = 2 }\nscribe point.g\nscribe point.w\n",
+    );
+    assert!(
+        code.contains("ratio<g: f32, w: numerus> point"),
+        "ratio authored type must survive witness normalization:\n{code}"
+    );
+}
+
+#[test]
 fn union_hole_locals_stay_union_holes() {
     // `var ∪ x` keeps accepting flow members; materializing the solved
     // union would freeze it.

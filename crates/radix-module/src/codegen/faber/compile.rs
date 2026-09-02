@@ -158,7 +158,7 @@ pub(crate) fn revalidate_emitted_output(
         emitted,
         AnalyzeRequest { cli_program: None, contract: prepared.contract },
     );
-    let reanalysis = match reanalysis {
+    let mut reanalysis = match reanalysis {
         Ok(reanalysis) if reanalysis.diagnostics.iter().any(Diagnostic::is_error) => {
             return Err(Box::new(revalidation_failure(
                 name,
@@ -179,6 +179,14 @@ pub(crate) fn revalidate_emitted_output(
             )));
         }
     };
+    // Apply the same artifact-boundary witness reconciliation to the emitted
+    // reanalysis before comparing authored forms. Without this, record fields
+    // can have equivalent source forms with different canonical map order.
+    crate::hir::serialize::normalize_presentation_witnesses(
+        &reanalysis.hir,
+        &mut reanalysis.presentation,
+        &reanalysis.types,
+    );
     let actual_variants = variant_path_spelling_multiset(&reanalysis.presentation, &reanalysis.interner);
     if actual_variants != expected_variants {
         return Err(Box::new(revalidation_failure(
