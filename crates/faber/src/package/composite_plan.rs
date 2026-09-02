@@ -1279,7 +1279,6 @@ fn plan_spelling(plan: &CollectionKernelPlan) -> &'static str {
         CollectionKernelPlan::SsmConv1d(_) => "ssm-conv1d",
         CollectionKernelPlan::SsmScan(_) => "ssm-scan",
         CollectionKernelPlan::DistributedSum(_) => "distributed-sum",
-        CollectionKernelPlan::ComposedMatMul(_) => "composed-matmul",
     }
 }
 

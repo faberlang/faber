@@ -19,7 +19,7 @@ use radix_mir::device_program::{
     ObservationCadence, ResultBuffer,
 };
 use radix_mir::device_semantics::DeviceSemantics;
-use radix_mir::kernel_plan::{CollectionKernelPlan, ComposedMatMulHandoff, ComposedMatMulPlan};
+use radix_mir::kernel_plan::CollectionKernelPlan;
 use radix_mir::layout::MirTensorStorageLayout;
 use radix_mir::nodes::{MirFunctionId, MirType};
 use radix_mir_fmir::{
@@ -382,14 +382,4 @@ fn typed_error_names_the_first_failing_domain() {
             .args
             .contains(&DiagnosticArg::new("domain", "model"))
     );
-}
-
-#[test]
-fn composite_plan_spells_composed_matmul() {
-    let plan = CollectionKernelPlan::ComposedMatMul(ComposedMatMulPlan {
-        stages: Vec::new(),
-        edges: Vec::new(),
-        handoff: ComposedMatMulHandoff::WorkgroupBarrier,
-    });
-    assert_eq!(plan_spelling(&plan), "composed-matmul");
 }

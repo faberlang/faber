@@ -10,7 +10,6 @@
 //! lower it through the shared-memory tree floor this plan pins, so the plan
 //! law is satisfied by construction.
 
-use super::validate::{PlanValidationError, validate_composed_matmul_plan};
 use crate::MirScalarLayout;
 #[allow(unused_imports)] // intra-doc links only; the plan pass lives in build.rs
 use crate::abi::CollectionOpContract;
@@ -135,125 +134,6 @@ pub enum CollectionKernelPlan {
     /// shared-memory tree floor the plan pins (plan law by construction).
     /// See [`DistributedSumPlan`].
     DistributedSum(DistributedSumPlan),
-    /// One target-neutral gate → up → SwiGLU → down composed matmul body.
-    /// The three computed intermediates are explicit typed stage outputs;
-    /// they are not read-only extra inputs and are not inferred from text.
-    ComposedMatMul(ComposedMatMulPlan),
-}
-
-/// The four ordered operations in a composed MLP matmul body.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum ComposedMatMulStageKind {
-    /// The first projection producer.
-    Gate,
-    /// The second projection producer.
-    Up,
-    /// The pointwise gate/up consumer.
-    SwiGlu,
-    /// The terminal projection producer.
-    Down,
-}
-
-/// Typed destination facts for one composed stage.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ComposedMatMulStageOutput {
-    /// The source MIR local whose value is written by this stage.
-    pub source_local: crate::MirLocalId,
-    /// Scalar element layout of the stage buffer.
-    pub element_ty: crate::MirScalarLayout,
-    /// Number of elements in the stage buffer.
-    pub element_count: u64,
-    /// The stage destination must be writable and device-resident.
-    pub access: crate::MirKernelResourceAccess,
-}
-
-/// One typed stage in [`ComposedMatMulPlan`].
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ComposedMatMulStage {
-    /// Fixed semantic role of this stage.
-    pub kind: ComposedMatMulStageKind,
-    /// Matmul geometry for Gate, Up, and Down; absent only for SwiGLU.
-    pub shape: Option<MatMulShapes>,
-    /// Typed destination resource for the stage.
-    pub output: ComposedMatMulStageOutput,
-}
-
-/// One explicit producer → consumer edge in a composed body.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ComposedMatMulEdge {
-    /// Zero-based producer stage index.
-    pub producer: u8,
-    /// Zero-based consumer stage index.
-    pub consumer: u8,
-    /// The typed local carried across the edge.
-    pub source_local: crate::MirLocalId,
-    /// Element layout carried across the edge.
-    pub element_ty: crate::MirScalarLayout,
-    /// Element count carried across the edge.
-    pub element_count: u64,
-}
-
-/// Synchronization mode for a composed stage handoff.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum ComposedMatMulHandoff {
-    /// All stage reads are dominated by an explicit workgroup barrier.
-    WorkgroupBarrier,
-}
-
-/// Target-neutral contract for one gate → up → SwiGLU → down body.
-///
-/// A composed body remains one kernel unit. Gate, up, and SwiGLU use distinct
-/// `Output/ReadWrite` stage resources; only Down uses the primary
-/// `Output/Write` resource. The explicit edge list is the synchronization
-/// authority, so an emitter must never recover stage order from names.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ComposedMatMulPlan {
-    /// The four stages in execution order.
-    pub stages: Vec<ComposedMatMulStage>,
-    /// The three adjacent producer/consumer edges.
-    pub edges: Vec<ComposedMatMulEdge>,
-    /// The admitted device handoff rule.
-    pub handoff: ComposedMatMulHandoff,
-}
-
-impl ComposedMatMulPlan {
-    /// Validate the closed stage/edge contract without assuming a backend.
-    ///
-    /// # Errors
-    /// Returns [`PlanValidationError`] when a stage is missing, duplicated,
-    /// untyped, or connected to the wrong producer/consumer.
-    pub fn validate(&self) -> Result<(), PlanValidationError> {
-        validate_composed_matmul_plan(self)
-    }
-
-    /// Validate the contract against the launch geometry. The current
-    /// handoff is deliberately conservative: a workgroup barrier cannot
-    /// publish a producer write to a different workgroup, so composed stages
-    /// are admitted only for a single-workgroup dispatch.
-    ///
-    /// # Errors
-    /// Returns [`PlanValidationError`] when the selected synchronization mode
-    /// cannot cover the dispatch.
-    pub fn validate_for_dispatch(
-        &self,
-        dispatch: crate::MirKernelDispatchSize,
-        workgroup: crate::MirWorkgroupSize,
-    ) -> Result<(), PlanValidationError> {
-        self.validate()?;
-        match self.handoff {
-            ComposedMatMulHandoff::WorkgroupBarrier
-                if dispatch.x != 1
-                    || dispatch.y != 1
-                    || dispatch.z != 1
-                    || workgroup.x == 0
-                    || workgroup.y == 0
-                    || workgroup.z == 0 =>
-            {
-                Err(PlanValidationError::ComposedMatMulUnsupportedHandoff)
-            }
-            ComposedMatMulHandoff::WorkgroupBarrier => Ok(()),
-        }
-    }
 }
 
 /// Axis-reduction recipe plan (name frozen by S6-N1; admission, resolution,

@@ -21,8 +21,7 @@
 //! [`crate::device_program_plans::RecipeKind`].
 
 use super::*;
-use crate::abi::{MirKernelResourceAccess, PackedStorageLayout, ReducedProjection};
-use crate::{MirLocalId, MirScalarLayout};
+use crate::abi::{PackedStorageLayout, ReducedProjection};
 
 /// Closed variant-name set. Adding a [`CollectionKernelPlan`] variant
 /// without listing it here is a red test once the exhaustive match compiles.
@@ -44,7 +43,6 @@ const KNOWN_VARIANTS: &[&str] = &[
     "SsmConv1d",
     "SsmScan",
     "DistributedSum",
-    "ComposedMatMul",
 ];
 
 /// Known match families that must name every [`CollectionKernelPlan`] variant.
@@ -117,7 +115,6 @@ fn variant_coverage(plan: &CollectionKernelPlan) -> FamilyCoverage {
         CollectionKernelPlan::SsmConv1d(_) => covered("SsmConv1d"),
         CollectionKernelPlan::SsmScan(_) => covered("SsmScan"),
         CollectionKernelPlan::DistributedSum(_) => covered("DistributedSum"),
-        CollectionKernelPlan::ComposedMatMul(_) => covered("ComposedMatMul"),
     }
 }
 
@@ -285,87 +282,7 @@ fn representative_plans() -> [CollectionKernelPlan; KNOWN_VARIANTS.len()] {
             layout: PackedStorageLayout::F32,
         }),
         CollectionKernelPlan::DistributedSum(dummy_distributed_sum()),
-        CollectionKernelPlan::ComposedMatMul(dummy_composed_matmul()),
     ]
-}
-
-fn dummy_composed_matmul() -> ComposedMatMulPlan {
-    let output = |local| ComposedMatMulStageOutput {
-        source_local: MirLocalId(local),
-        element_ty: MirScalarLayout::F32,
-        element_count: 1,
-        access: MirKernelResourceAccess::ReadWrite,
-    };
-    ComposedMatMulPlan {
-        stages: vec![
-            ComposedMatMulStage {
-                kind: ComposedMatMulStageKind::Gate,
-                shape: Some(MatMulShapes {
-                    m: 1,
-                    k: 1,
-                    n: 1,
-                    left_layout: MirScalarLayout::F32,
-                    right_layout: MirScalarLayout::F32,
-                }),
-                output: output(0),
-            },
-            ComposedMatMulStage {
-                kind: ComposedMatMulStageKind::Up,
-                shape: Some(MatMulShapes {
-                    m: 1,
-                    k: 1,
-                    n: 1,
-                    left_layout: MirScalarLayout::F32,
-                    right_layout: MirScalarLayout::F32,
-                }),
-                output: output(1),
-            },
-            ComposedMatMulStage {
-                kind: ComposedMatMulStageKind::SwiGlu,
-                shape: None,
-                output: output(2),
-            },
-            ComposedMatMulStage {
-                kind: ComposedMatMulStageKind::Down,
-                shape: Some(MatMulShapes {
-                    m: 1,
-                    k: 1,
-                    n: 1,
-                    left_layout: MirScalarLayout::F32,
-                    right_layout: MirScalarLayout::F32,
-                }),
-                output: ComposedMatMulStageOutput {
-                    source_local: MirLocalId(3),
-                    access: MirKernelResourceAccess::Write,
-                    ..output(3)
-                },
-            },
-        ],
-        edges: vec![
-            ComposedMatMulEdge {
-                producer: 0,
-                consumer: 1,
-                source_local: MirLocalId(0),
-                element_ty: MirScalarLayout::F32,
-                element_count: 1,
-            },
-            ComposedMatMulEdge {
-                producer: 1,
-                consumer: 2,
-                source_local: MirLocalId(1),
-                element_ty: MirScalarLayout::F32,
-                element_count: 1,
-            },
-            ComposedMatMulEdge {
-                producer: 2,
-                consumer: 3,
-                source_local: MirLocalId(2),
-                element_ty: MirScalarLayout::F32,
-                element_count: 1,
-            },
-        ],
-        handoff: ComposedMatMulHandoff::WorkgroupBarrier,
-    }
 }
 
 fn dummy_distributed_sum() -> DistributedSumPlan {

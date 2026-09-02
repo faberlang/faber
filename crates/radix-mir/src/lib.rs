@@ -124,9 +124,8 @@ pub use device_program_plans::{
     LibraryBind, LibrarySelection, LogicalSignature, OffsetBinding, PACKED_BLOCK_BYTES_UNIFORM,
     PACKED_BLOCK_ELEMENTS_UNIFORM, PACKED_BYTES_UNIFORM, PACKED_LAYOUT_GGML_TYPE_ID_UNIFORM,
     PlanMappingError, PlanProvenance, QUANTIZED_GEMM_ENTRY, QUANTIZED_GEMV_ENTRY, RecipeKind,
-    UniformBinding, UniformType, WorkspaceBinding, carried_plan_agrees,
-    composed_matmul_plan_for_function, composed_matmul_signature_for_emission,
-    executor_plan_extension, kernel_plan_for_function, launch_descriptors, plan_for_collection_op,
+    UniformBinding, UniformType, WorkspaceBinding, carried_plan_agrees, executor_plan_extension,
+    kernel_plan_for_function, launch_descriptors, plan_for_collection_op,
     subchain_signature_for_emission,
 };
 pub use dump::dump_program;
@@ -153,15 +152,13 @@ pub use kernel_decomposition::{
     decompose_kernel_function_with_limit,
 };
 pub use kernel_plan::{
-    BarrierPhase, BarrierPoint, CollectionKernelPlan, ComposedMatMulEdge, ComposedMatMulHandoff,
-    ComposedMatMulPlan, ComposedMatMulStage, ComposedMatMulStageKind, ComposedMatMulStageOutput,
-    GroupedMatMulPlan, MatMulPlan, MatMulShapes, OobPaddingPolicy, PackedAdmissionError,
-    PackedDequantError, PackedDequantKind, PackedDequantResolution, PlanValidationError,
-    QuantizedGatherPlan, QuantizedMatMulPlan, ROW_REDUCTION_WORKGROUP_X, ReduceOp, ReductionPlan,
-    RowReductionFacts, SIMDGROUP_MATMUL_MAX_N, SIMDGROUP_MATMUL_PARTIAL_SLOTS,
-    SIMDGROUP_MATMUL_STAGING_SLOTS, SharedMemoryLayout, SimdgroupMatMulFacts, SsmConv1dPlan,
-    SsmScanPlan, TRANSPOSE_WORKGROUP_X, TransposePlan, admit_quantized_gather,
-    admit_quantized_matmul, causal_softmax_row_reduction_admission,
+    BarrierPhase, BarrierPoint, CollectionKernelPlan, GroupedMatMulPlan, MatMulPlan, MatMulShapes,
+    OobPaddingPolicy, PackedAdmissionError, PackedDequantError, PackedDequantKind,
+    PackedDequantResolution, PlanValidationError, QuantizedGatherPlan, QuantizedMatMulPlan,
+    ROW_REDUCTION_WORKGROUP_X, ReduceOp, ReductionPlan, RowReductionFacts, SIMDGROUP_MATMUL_MAX_N,
+    SIMDGROUP_MATMUL_PARTIAL_SLOTS, SIMDGROUP_MATMUL_STAGING_SLOTS, SharedMemoryLayout,
+    SimdgroupMatMulFacts, SsmConv1dPlan, SsmScanPlan, TRANSPOSE_WORKGROUP_X, TransposePlan,
+    admit_quantized_gather, admit_quantized_matmul, causal_softmax_row_reduction_admission,
     rmsnorm_row_reduction_admission, simdgroup_matmul_admission,
 };
 pub use layout::{
