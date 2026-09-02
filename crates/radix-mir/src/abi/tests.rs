@@ -1757,11 +1757,17 @@ fn kernel_admission_rejects_sparse_storage_by_name() {
 }
 
 #[test]
-fn kernel_admission_adds_rank_three_without_opening_rank_four() {
+fn kernel_admission_adds_rank_three_and_four_with_rank_five_closed() {
     let rank3 = crate::MirDeviceViewLayout::device_handle_row_major(crate::MirScalarLayout::F32, 3);
     require_kernel_device_view(rank3, false).expect("contiguous rank-3 device view is admitted");
 
+    // U1 head-axis: the batched matmul route binds the rank-4 Q operand
+    // (`[kv_heads, q_per_kv, query_seq, head_dim]`); rank 5 stays
+    // fail-closed.
     let rank4 = crate::MirDeviceViewLayout::device_handle_row_major(crate::MirScalarLayout::F32, 4);
-    let error = require_kernel_device_view(rank4, false).expect_err("rank 4 stays fail-closed");
-    assert_eq!(error.message, "kernel device view rank 4");
+    require_kernel_device_view(rank4, false).expect("contiguous rank-4 device view is admitted");
+
+    let rank5 = crate::MirDeviceViewLayout::device_handle_row_major(crate::MirScalarLayout::F32, 5);
+    let error = require_kernel_device_view(rank5, false).expect_err("rank 5 stays fail-closed");
+    assert_eq!(error.message, "kernel device view rank 5");
 }

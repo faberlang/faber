@@ -33,7 +33,37 @@ pub(crate) fn validate_wire_program(
     validate_wire_axes(wire, &launches)?;
     validate_wire_step_count(wire)?;
     validate_wire_broadcast_facts(wire)?;
+    validate_wire_matmul_batch_facts(wire)?;
     validate_wire_reduced_projections(wire)?;
+    Ok(())
+}
+
+/// A carried batched tiled-matmul plan (U1 head-axis) must satisfy the
+/// batch law internally: positive M/K/N/tile, positive batch counts, and
+/// the argument batch count dividing the receiver's (the prefix share).
+/// The fact is carried, never inferred — the same admission discipline as
+/// the S6-C2 broadcast fact.
+fn validate_wire_matmul_batch_facts(
+    wire: &WireDeviceProgram,
+) -> Result<(), crate::error::FmirImageError> {
+    for kernel in &wire.kernels {
+        let WireCollectionKernelPlan::BatchedTiledMatMul(plan) = &kernel.plan else {
+            continue;
+        };
+        if plan.m == 0
+            || plan.k == 0
+            || plan.n == 0
+            || plan.tile == 0
+            || plan.batch == 0
+            || plan.right_batch == 0
+            || plan.batch % plan.right_batch != 0
+        {
+            return Err(wire_invalid(format!(
+                "kernel '{}' carries a batched tiled-matmul plan violating the batch law (M={}, K={}, N={}, tile={}, batch={}, right_batch={}); batch and right_batch must be positive and right_batch must divide batch",
+                kernel.entry, plan.m, plan.k, plan.n, plan.tile, plan.batch, plan.right_batch
+            )));
+        }
+    }
     Ok(())
 }
 

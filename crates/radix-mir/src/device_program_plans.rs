@@ -15,7 +15,7 @@ use crate::abi::{
     CollectionOpContract, DEFAULT_STORAGE_BUFFER_LIMIT, MirAbiError, MirKernelResource,
     MirKernelResourceAccess, MirKernelResourceKind, MirKernelResourceRole, MirKernelSignature,
     PackedStorageLayout, StorageBufferLimitRecord, collection_op_contract,
-    storage_buffer_limit_error,
+    device_view_element_count, storage_buffer_limit_error,
 };
 use crate::device_program::{
     Binding, BufferRole, DeviceProgram, DeviceProgramError, DeviceResource, KernelUnit,
@@ -2800,15 +2800,28 @@ pub fn contract_shape_signature(
             let shapes = kernel_matmul_shapes(function, validation)?.ok_or_else(|| {
                 PlanMappingError::mapping("matmul subchain has no operand shapes")
             })?;
-            let left_ty = recipe_operand_ty(function, MirCollectionOp::TensorMatMul)?;
+            let (left_ty, right_ty) = matmul_operand_tys(function)?;
             let element_ty = tensor_element_ty(left_ty, validation)?;
-            signature.input = storage_input(0, element_ty, shapes.m.saturating_mul(shapes.k));
+            // U1 head-axis: the signature describes the buffers the launch
+            // binds — the operands' FULL tensor extents (`batch·M·K` left,
+            // `right_batch·K·N` right, `batch·M·N` output), never the bare
+            // rank-2 dims. `from_contract` re-derives the batch counts
+            // from exactly these extents.
+            signature.input = storage_input(
+                0,
+                element_ty,
+                device_view_element_count(left_ty, validation)?,
+            );
             signature.extra_inputs.push(storage_input(
                 1,
                 element_ty,
-                shapes.k.saturating_mul(shapes.n),
+                device_view_element_count(right_ty, validation)?,
             ));
-            signature.output = storage_output(2, element_ty, shapes.m.saturating_mul(shapes.n));
+            signature.output = storage_output(
+                2,
+                element_ty,
+                signature.input.element_count / shapes.k * shapes.n,
+            );
             signature.output.source_local =
                 recipe_destination_local_for(function, MirCollectionOp::TensorMatMul);
             signature.workgroup = MirWorkgroupSize {
@@ -3963,12 +3976,33 @@ fn kernel_matmul_shapes(
         .map_err(PlanMappingError::mapping)?;
     let right_dims = crate::tensor_type::tensor_literal_dims(right_ty, validation)
         .map_err(PlanMappingError::mapping)?;
-    if left_dims.len() != 2 || !(1..=2).contains(&right_dims.len()) {
+    // U1 head-axis: a rank-3/4 receiver with a rank-2+ right operand is the
+    // batched contraction; the argument's leading batch dims must be a
+    // prefix of the receiver's (the GQA share). The plan's batch counts
+    // derive from the signature's resource extents in `from_contract`;
+    // this resolver pins the dims law.
+    let batched_rank = left_dims.len() >= 3
+        && left_dims.len() <= 4
+        && right_dims.len() >= 2
+        && right_dims.len() <= left_dims.len();
+    if batched_rank {
+        for axis in 0..right_dims.len() - 2 {
+            if left_dims[axis] != right_dims[axis] {
+                return Err(PlanMappingError::mapping(
+                    "batched matmul requires the right operand's leading batch dims to be a prefix of the left operand's batch dims",
+                ));
+            }
+        }
+        if left_dims[left_dims.len() - 1] != right_dims[right_dims.len() - 2] {
+            return Err(PlanMappingError::mapping(
+                "matmul inner dimensions must match",
+            ));
+        }
+    } else if left_dims.len() != 2 || !(1..=2).contains(&right_dims.len()) {
         return Err(PlanMappingError::mapping(
             "matmul requires a rank-2 left tensor and rank-1 or rank-2 right tensor",
         ));
-    }
-    if left_dims[1] != right_dims[0] {
+    } else if left_dims[1] != right_dims[0] {
         return Err(PlanMappingError::mapping(
             "matmul inner dimensions must match",
         ));
@@ -3988,13 +4022,45 @@ fn kernel_matmul_shapes(
             "matmul operands require device-view layouts",
         ));
     };
+    // Batched trailing dims: the last two axes are the contraction's
+    // [M, K] / [K, N]; rank-2 keeps `right_dims.get(1)` (the promoted
+    // rank-1 RHS carries N = 1).
+    let (m_index, k_index) = if left_dims.len() >= 3 {
+        (left_dims.len() - 2, left_dims.len() - 1)
+    } else {
+        (0, 1)
+    };
+    let n = if right_dims.len() >= 2 {
+        right_dims[right_dims.len() - 1]
+    } else {
+        1
+    };
     Ok(Some(MatMulShapes {
-        m: left_dims[0],
-        k: left_dims[1],
-        n: right_dims.get(1).copied().unwrap_or(1),
+        m: left_dims[m_index],
+        k: left_dims[k_index],
+        n,
         left_layout: left_view.element,
         right_layout: right_view.element,
     }))
+}
+
+/// U1 head-axis: the left and right operand types of the body's
+/// `TensorMatMul` statement — the same typed statement scan
+/// [`kernel_matmul_shapes`] resolves dims from, factored so
+/// [`contract_shape_signature`] can bind the operands' FULL tensor extents
+/// (`batch·M·K` / `right_batch·K·N`) as the resource element counts.
+fn matmul_operand_tys(function: &MirFunction) -> Result<(MirType, MirType), PlanMappingError> {
+    let Some((call, _)) = first_collection_call(function, |op| op == MirCollectionOp::TensorMatMul)
+    else {
+        return Err(PlanMappingError::mapping(
+            "matmul subchain has no TensorMatMul statement",
+        ));
+    };
+    let left_ty = crate::local_ty::operand_local_ty(function, &call.args[0])
+        .ok_or_else(|| PlanMappingError::mapping("matmul left operand has no local type"))?;
+    let right_ty = crate::local_ty::operand_local_ty(function, &call.args[1])
+        .ok_or_else(|| PlanMappingError::mapping("matmul right operand has no local type"))?;
+    Ok((left_ty, right_ty))
 }
 
 #[cfg(test)]

@@ -301,6 +301,23 @@ fn constrain_matmul_result_shape_with_rank1(
         );
         return;
     };
+    // U1 head-axis: a rank-3/4 receiver over a rank-2+ argument is the
+    // batched contraction (leading head axes). The argument's leading
+    // batch dims must be a PREFIX of the receiver's (the GQA share: K/V
+    // per kv-head broadcast over q-per-kv heads); the result carries the
+    // receiver's full batch dims over `[M, N]`. The rank-1 GEMV promotion
+    // stays rank-2-only — a batched contraction requires a trailing
+    // `[K, N]` matrix on the argument.
+    if receiver_tuple.len() >= 3 && receiver_tuple.len() <= 4 {
+        constrain_batched_matmul_result_shape(
+            checker,
+            &receiver_tuple,
+            &arg_tuple,
+            result_shape,
+            span,
+        );
+        return;
+    }
     if receiver_tuple.len() != 2 {
         checker.error_issue(
             SemanticErrorKind::TypeMismatch,
@@ -339,6 +356,54 @@ fn constrain_matmul_result_shape_with_rank1(
         let n_id = checker.types.intern_index(n_expr);
         vec![m_id, n_id]
     };
+    let result = checker.types.intern_index(IndexExpr::Tuple(result_dims));
+    checker.constrain_index_equal(result_shape, result, span);
+}
+
+/// Constrain the batched matmul result shape (U1 head-axis): receiver
+/// `[B…, M, K]` × argument `[b…, K, N]` → `[B…, M, N]`, where the
+/// argument's batch dims `b…` are a PREFIX of the receiver's `B…`. A
+/// prefix-axis mismatch, a too-high argument rank, or a rank-1 argument
+/// reuses the existing typed matmul issues (`incompatible_tensor_index`
+/// from the unifier, or the rank codes) — no new locale-backed codes.
+fn constrain_batched_matmul_result_shape(
+    checker: &mut TypeChecker<'_>,
+    receiver_tuple: &[IndexId],
+    arg_tuple: &[IndexId],
+    result_shape: IndexId,
+    span: Span,
+) {
+    if arg_tuple.len() < 2 || arg_tuple.len() > receiver_tuple.len() {
+        checker.error_issue(
+            SemanticErrorKind::TypeMismatch,
+            ISSUE_MATMUL_ARGUMENT_RANK_MUST_BE_TWO,
+            span,
+        );
+        return;
+    }
+    let batch_axis_count = arg_tuple.len() - 2;
+    // WHY: unify each shared leading axis exactly, like the rank-2 inner-dim
+    // check — a failed batch-axis unification must not let downstream
+    // constraints treat the contraction as valid (the unifier emits
+    // `incompatible_tensor_index`).
+    for axis in 0..batch_axis_count {
+        if unify_tensor_shape_indices(checker, receiver_tuple[axis], arg_tuple[axis], span).is_err()
+        {
+            return;
+        }
+    }
+    let receiver_rows = receiver_tuple[receiver_tuple.len() - 2];
+    let receiver_cols = receiver_tuple[receiver_tuple.len() - 1];
+    let argument_rows = arg_tuple[arg_tuple.len() - 2];
+    let argument_cols = arg_tuple[arg_tuple.len() - 1];
+    if unify_tensor_shape_indices(checker, receiver_cols, argument_rows, span).is_err() {
+        return;
+    }
+    // The result carries the receiver's batch dims verbatim (the argument's
+    // shorter batch prefix broadcast-shares them), then `[M, N]`.
+    let mut result_dims = receiver_tuple[..receiver_tuple.len() - 2].to_vec();
+    result_dims.push(receiver_rows);
+    result_dims.push(argument_cols);
     let result = checker.types.intern_index(IndexExpr::Tuple(result_dims));
     checker.constrain_index_equal(result_shape, result, span);
 }

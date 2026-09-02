@@ -157,7 +157,14 @@ impl CollectionKernelPlan {
                     return None;
                 };
                 let tile = MATMUL_TILE;
-                if !shapes_match_matmul_dispatch(shapes, dispatch_x, dispatch_y, tile) {
+                // U1 head-axis: the batch facts derive from the signature's
+                // own element counts — the ABI resource extents of the
+                // operand tensors (`batch·M·K` left, `right_batch·K·N`
+                // right, `batch·M·N` output). An exact division with a
+                // positive quotient is a typed-fact derivation, never a
+                // guess: anything else fails closed below.
+                let (batch, right_batch) = matmul_batch_from_signature(signature, shapes)?;
+                if !shapes_match_matmul_dispatch(shapes, dispatch_x, dispatch_y, tile, batch) {
                     return None;
                 }
                 if !signature_matches_matmul(signature, dispatch_x, dispatch_y, shapes) {
@@ -187,6 +194,8 @@ impl CollectionKernelPlan {
                     },
                     barriers: matmul_barrier_schedule(),
                     oob_padding: OobPaddingPolicy::ZeroFill,
+                    batch,
+                    right_batch,
                 }))
             }
             CollectionOpContract::Transpose { m, n } => {
@@ -221,7 +230,7 @@ impl CollectionKernelPlan {
                     left_layout: MirScalarLayout::F32,
                     right_layout: MirScalarLayout::F32,
                 };
-                if !shapes_match_matmul_dispatch(shapes, dispatch_x, dispatch_y, MATMUL_TILE) {
+                if !shapes_match_matmul_dispatch(shapes, dispatch_x, dispatch_y, MATMUL_TILE, 1) {
                     return None;
                 }
                 if !signature_matches_matmul(signature, dispatch_x, dispatch_y, shapes) {
@@ -251,7 +260,7 @@ impl CollectionKernelPlan {
                     left_layout: MirScalarLayout::F32,
                     right_layout: MirScalarLayout::F32,
                 };
-                if !shapes_match_matmul_dispatch(shapes, dispatch_x, dispatch_y, MATMUL_TILE) {
+                if !shapes_match_matmul_dispatch(shapes, dispatch_x, dispatch_y, MATMUL_TILE, 1) {
                     return None;
                 }
                 if !signature_matches_grouped_matmul(
@@ -682,19 +691,62 @@ pub(crate) fn matmul_barrier_schedule() -> Vec<BarrierPoint> {
 /// The matmul shapes must reproduce the contract's tile grid: `dispatch_y`
 /// tiles the `M` rows and `dispatch_x` tiles the `N` columns. A
 /// shapes/dispatch mismatch means the caller resolved shapes that disagree
-/// with the contract the signature carries.
+/// with the contract the signature carries. A batched plan (U1 head-axis)
+/// folds the batch into `dispatch_y` — one padded row-block of
+/// `ceil(M/tile)` tiles per batch — so an ordinary rank-2 launch
+/// (`batch == 1`) keeps the legacy law byte-identically.
 fn shapes_match_matmul_dispatch(
     shapes: MatMulShapes,
     dispatch_x: u64,
     dispatch_y: u64,
     tile: u32,
+    batch: u64,
 ) -> bool {
     let tile = u64::from(tile);
-    if shapes.m == 1 {
-        dispatch_y == 1 && dispatch_x == shapes.n.div_ceil(tile)
+    if batch == 1 {
+        if shapes.m == 1 {
+            dispatch_y == 1 && dispatch_x == shapes.n.div_ceil(tile)
+        } else {
+            dispatch_y == shapes.m.div_ceil(tile) && dispatch_x == shapes.n.div_ceil(tile)
+        }
     } else {
-        dispatch_y == shapes.m.div_ceil(tile) && dispatch_x == shapes.n.div_ceil(tile)
+        dispatch_y == batch * shapes.m.div_ceil(tile) && dispatch_x == shapes.n.div_ceil(tile)
     }
+}
+
+/// U1 head-axis: derive the batch counts from the signature's own resource
+/// extents. The left operand buffer holds `batch·M·K` elements and the
+/// right `right_batch·K·N`; both quotients must divide exactly and be
+/// positive, and the output must hold exactly `batch·M·N` — any
+/// contradiction fails closed (`None`) rather than yielding a plan that
+/// disagrees with the buffers the launch binds.
+fn matmul_batch_from_signature(
+    signature: &MirKernelSignature,
+    shapes: MatMulShapes,
+) -> Option<(u64, u64)> {
+    if shapes.m == 0 || shapes.k == 0 || shapes.n == 0 {
+        return None;
+    }
+    let left_count = signature.input.element_count;
+    let right_count = signature
+        .extra_inputs
+        .first()
+        .map_or(0, |resource| resource.element_count);
+    if left_count == 0 || right_count == 0 {
+        return None;
+    }
+    let batch = left_count / (shapes.m * shapes.k);
+    let right_batch = right_count / (shapes.k * shapes.n);
+    if batch == 0
+        || right_batch == 0
+        || batch * shapes.m * shapes.k != left_count
+        || right_batch * shapes.k * shapes.n != right_count
+        || !batch.is_multiple_of(right_batch)
+        || signature.output.element_count != batch * shapes.m * shapes.n
+    {
+        return None;
+    }
+    Some((batch, right_batch))
 }
 
 /// The reduction signature must already carry the contract it was built
@@ -717,24 +769,27 @@ fn signature_matches_reduction(
 
 /// The matmul signature must already carry the contract it was built from:
 /// `apply_collection_op_contract` sets workgroup `(8, 8, 1)`, the tile-grid
-/// dispatch, and the operand buffers hold the flat `M·K` (left) / `K·N`
-/// (right) element counts with the `M·N` output.
+/// dispatch, and the operand buffers hold the flat `batch·M·K` (left) /
+/// `right_batch·K·N` (right) element counts with the `batch·M·N` output —
+/// `batch == 1` is the ordinary rank-2 law. The count law is the batch
+/// derivation itself (`matmul_batch_from_signature`): a signature whose
+/// extents contradict the shapes yields no batch facts and no plan.
 fn signature_matches_matmul(
     signature: &MirKernelSignature,
     dispatch_x: u64,
     dispatch_y: u64,
     shapes: MatMulShapes,
 ) -> bool {
+    if matmul_batch_from_signature(signature, shapes).is_none() {
+        return false;
+    }
     signature.workgroup.x == MATMUL_TILE
         && signature.workgroup.y == MATMUL_TILE
         && signature.workgroup.z == 1
         && signature.dispatch_size.x == dispatch_x
         && signature.dispatch_size.y == dispatch_y
         && signature.dispatch_size.z == 1
-        && signature.input.element_count == shapes.m.saturating_mul(shapes.k)
-        && signature.output.element_count == shapes.m.saturating_mul(shapes.n)
         && signature.extra_inputs.len() == 1
-        && signature.extra_inputs[0].element_count == shapes.k.saturating_mul(shapes.n)
 }
 
 /// The grouped-matmul signature must already carry the contract it was built

@@ -335,6 +335,8 @@ pub(super) fn tiled_matmul_from_shapes(shapes: MatMulShapes) -> CollectionKernel
         },
         barriers: matmul_barrier_schedule(),
         oob_padding: OobPaddingPolicy::ZeroFill,
+        batch: 1,
+        right_batch: 1,
     })
 }
 

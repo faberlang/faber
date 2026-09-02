@@ -179,9 +179,24 @@ fn validate_oob_padding_coverage(plan: &ReductionPlan) -> Result<(), PlanValidat
 
 pub(super) fn validate_matmul_plan(plan: &MatMulPlan) -> Result<(), PlanValidationError> {
     validate_matmul_workgroup(plan)?;
+    validate_matmul_batch_law(plan)?;
     validate_matmul_shared_memory(plan)?;
     validate_matmul_barrier_coverage(plan)?;
     validate_matmul_oob_padding_coverage(plan)?;
+    Ok(())
+}
+
+/// U1 head-axis batch law: both batch counts are positive and the argument
+/// batch count divides the receiver's (the argument batch dims are a
+/// prefix of the receiver's — the GQA share; the prefix itself is a
+/// resolution-time typed fact, the plan carries only the counts).
+fn validate_matmul_batch_law(plan: &MatMulPlan) -> Result<(), PlanValidationError> {
+    if plan.batch == 0 || plan.right_batch == 0 || !plan.batch.is_multiple_of(plan.right_batch) {
+        return Err(PlanValidationError::MatMulBatchLaw {
+            batch: plan.batch,
+            right_batch: plan.right_batch,
+        });
+    }
     Ok(())
 }
 
@@ -429,8 +444,11 @@ fn validate_matmul_workgroup(plan: &MatMulPlan) -> Result<(), PlanValidationErro
         // `(w, 1)` with `w` a tile multiple up to 64 — the one-row body
         // streams each output column independently (no shared tiles, no
         // barriers), so any admitted lane count is correct and the width
-        // is an occupancy knob, not an addressing fact.
-        let one_row = plan.m == 1
+        // is an occupancy knob, not an addressing fact. A batched plan
+        // (U1 head-axis) always keeps the cooperative-tile body, so the
+        // exception stays rank-2-only.
+        let one_row = plan.batch == 1
+            && plan.m == 1
             && plan.workgroup_y == 1
             && plan.workgroup_x.is_multiple_of(plan.tile)
             && plan.workgroup_x <= 64;
@@ -623,6 +641,9 @@ pub enum PlanValidationError {
     /// dispatches an empty grid and the padded-tile arithmetic would divide
     /// by a zero tile).
     MatMulZeroDimension { m: u64, k: u64, n: u64, tile: u32 },
+    /// U1 head-axis batch law: both batch counts positive and the argument
+    /// batch count dividing the receiver's (the prefix share).
+    MatMulBatchLaw { batch: u64, right_batch: u64 },
     /// The OOB padding policy does not cover a matmul operand tile tail.
     MatMulOobPaddingCoverage {
         buffer_name: String,
@@ -753,6 +774,10 @@ impl fmt::Display for PlanValidationError {
             Self::MatMulZeroDimension { m, k, n, tile } => write!(
                 f,
                 "matmul requires positive M/K/N and a non-zero tile, got M={m}, K={k}, N={n}, tile={tile}"
+            ),
+            Self::MatMulBatchLaw { batch, right_batch } => write!(
+                f,
+                "matmul batch law violated: batch={batch}, right_batch={right_batch} (both must be positive and right_batch must divide batch)"
             ),
             Self::MatMulOobPaddingCoverage {
                 buffer_name,

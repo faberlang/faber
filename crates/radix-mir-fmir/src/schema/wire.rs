@@ -484,6 +484,11 @@ pub enum WireCollectionKernelPlan {
     RankExtensionAdd(WireBroadcastFact),
     /// Tiled-matmul recipe.
     TiledMatMul(WireMatMulPlan),
+    /// Batched tiled-matmul recipe (U1 head-axis): leading head axes with
+    /// the argument's batch dims a prefix of the receiver's. A distinct
+    /// variant — the rank-2 `TiledMatMul` image is unchanged and a
+    /// batched fact can never decode as rank-2 by omission.
+    BatchedTiledMatMul(WireBatchedMatMulPlan),
     /// Sequential tree-reduction recipe.
     TreeReduction(WireReductionPlan),
     /// Rank-2 transpose recipe (S5-U1).
@@ -968,6 +973,42 @@ pub struct WireMatMulPlan {
     /// Right operand scalar layout; defaults to F32 for legacy images.
     #[serde(default)]
     pub right_layout: WireMatMulLayout,
+    /// Square tile edge.
+    pub tile: u32,
+    /// Workgroup lane count on `x`.
+    pub workgroup_x: u32,
+    /// Workgroup lane count on `y`.
+    pub workgroup_y: u32,
+    /// The two shared-memory operand tiles.
+    pub shared_memory: WireMatMulSharedMemory,
+    /// Per-K-tile barrier schedule.
+    pub barriers: Vec<WireBarrierPoint>,
+    /// Zero-fill policy for the operand tail tiles.
+    pub oob_padding: WireOobPaddingPolicy,
+}
+
+/// Batched tiled-matmul recipe (U1 head-axis). Field-for-field with
+/// [`WireMatMulPlan`] plus the batch facts; the wire admits both codecs'
+/// lossless round-trip and the decode-side admission validates the batch
+/// law fail-closed.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct WireBatchedMatMulPlan {
+    /// Left matrix rows `M` (per batch).
+    pub m: u64,
+    /// Contracted inner dimension `K`.
+    pub k: u64,
+    /// Right matrix columns `N`.
+    pub n: u64,
+    /// Left operand scalar layout.
+    pub left_layout: WireMatMulLayout,
+    /// Right operand scalar layout.
+    pub right_layout: WireMatMulLayout,
+    /// Product of the receiver's leading batch axes (the head axes).
+    pub batch: u64,
+    /// Product of the argument's leading batch axes — a prefix share of
+    /// `batch`; must divide `batch`.
+    pub right_batch: u64,
     /// Square tile edge.
     pub tile: u32,
     /// Workgroup lane count on `x`.

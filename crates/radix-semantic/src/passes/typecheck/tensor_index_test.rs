@@ -525,6 +525,125 @@ nota "rankagnostic ok"
     );
 }
 
+// --- U1 head-axis: batched rank-3/4 matmul admission (leading head axes) ---
+
+#[test]
+fn batched_matmul_decode_shape_typechecks() {
+    // GQA decode: Q [5,3,1,64] · Kᵀ [5,64,76] → scores [5,3,1,76]. The
+    // shared leading kv-head axis 5 is the prefix share; query_seq is 1
+    // (rectangular decode, never square).
+    accepts(
+        r"incipit {
+  fixum tensor<fractus<f32>, [5, 3, 1, 64]> q ← vacua
+  fixum tensor<fractus<f32>, [5, 64, 76]> kt ← vacua
+  fixum tensor<fractus<f32>, [5, 3, 1, 76]> scores ← q · kt
+  nota scores.longitudo()
+}",
+    );
+}
+
+#[test]
+fn batched_matmul_prefill_shape_typechecks() {
+    // Prefill: [5,3,36,64] · [5,64,36] → [5,3,36,36].
+    accepts(
+        r"incipit {
+  fixum tensor<fractus<f32>, [5, 3, 36, 64]> q ← vacua
+  fixum tensor<fractus<f32>, [5, 64, 36]> kt ← vacua
+  fixum tensor<fractus<f32>, [5, 3, 36, 36]> scores ← q · kt
+  nota scores.longitudo()
+}",
+    );
+}
+
+#[test]
+fn batched_matmul_wrong_result_shape_rejects() {
+    // The result must carry the receiver's batch dims over [M, N] — a
+    // [76]-major result shape contradicts the constraint.
+    rejects_with_issue(
+        r"incipit {
+  fixum tensor<fractus<f32>, [5, 3, 1, 64]> q ← vacua
+  fixum tensor<fractus<f32>, [5, 64, 76]> kt ← vacua
+  fixum tensor<fractus<f32>, [5, 3, 76, 1]> scores ← q · kt
+  nota scores.longitudo()
+}",
+        "incompatible_tensor_index",
+    );
+}
+
+#[test]
+fn batched_matmul_prefix_mismatch_rejects() {
+    // The argument's leading batch dims must be a prefix of the
+    // receiver's (kv-head share): 6 ≠ 5.
+    rejects_with_issue(
+        r"incipit {
+  fixum tensor<fractus<f32>, [5, 3, 1, 64]> q ← vacua
+  fixum tensor<fractus<f32>, [6, 64, 76]> kt ← vacua
+  fixum tensor<fractus<f32>, [5, 3, 1, 76]> scores ← q · kt
+  nota scores.longitudo()
+}",
+        "incompatible_tensor_index",
+    );
+}
+
+#[test]
+fn batched_matmul_inner_dim_mismatch_rejects() {
+    // K tail must unify: 64 ≠ 63.
+    rejects_with_issue(
+        r"incipit {
+  fixum tensor<fractus<f32>, [5, 3, 1, 64]> q ← vacua
+  fixum tensor<fractus<f32>, [5, 63, 76]> kt ← vacua
+  fixum tensor<fractus<f32>, [5, 3, 1, 76]> scores ← q · kt
+  nota scores.longitudo()
+}",
+        "incompatible_tensor_index",
+    );
+}
+
+#[test]
+fn batched_matmul_rank1_argument_rejects() {
+    // The rank-1 GEMV promotion stays rank-2-only: a batched contraction
+    // requires a trailing [K, N] matrix on the argument.
+    rejects_with_issue(
+        r"incipit {
+  fixum tensor<fractus<f32>, [5, 3, 1, 64]> q ← vacua
+  fixum tensor<fractus<f32>, [64]> k ← vacua
+  fixum tensor<fractus<f32>, [5, 3, 1]> scores ← q · k
+  nota scores.longitudo()
+}",
+        "matmul_argument_rank_must_be_two",
+    );
+}
+
+#[test]
+fn batched_matmul_rank5_receiver_still_rejects() {
+    // Admission is rank-3/4 (the settled GEA3 shapes); rank-5+ fails
+    // closed with the existing receiver rank issue.
+    rejects_with_issue(
+        r"incipit {
+  fixum tensor<fractus<f32>, [2, 2, 2, 2, 2]> a ← vacua
+  fixum tensor<fractus<f32>, [2, 2, 2]> b ← vacua
+  fixum tensor<fractus<f32>, [2, 2, 2, 2, 2]> c ← a · b
+  nota c.longitudo()
+}",
+        "matmul_receiver_rank_must_be_two",
+    );
+}
+
+#[test]
+fn batched_matmul_argument_rank_above_receiver_rejects() {
+    // The argument's batch rank cannot exceed the receiver's (a longer
+    // batch prefix than the receiver has is not a share).
+    rejects_with_issue(
+        r"incipit {
+  fixum tensor<fractus<f32>, [5, 64, 76]> kt ← vacua
+  fixum tensor<fractus<f32>, [3, 5, 64, 76]> q ← vacua
+  fixum tensor<fractus<f32>, [3, 5, 64, 76]> scores ← kt · q
+  nota scores.longitudo()
+}",
+        "matmul_argument_rank_must_be_two",
+    );
+}
+
 // --- S0-G8: vector lane access ---
 
 #[test]

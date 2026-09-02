@@ -154,6 +154,8 @@ fn dummy_matmul() -> MatMulPlan {
         },
         barriers: Vec::new(),
         oob_padding: OobPaddingPolicy::ZeroFill,
+        batch: 1,
+        right_batch: 1,
     }
 }
 

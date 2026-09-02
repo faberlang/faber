@@ -2552,6 +2552,8 @@ fn matmul_kernel_descriptor_reports_tiled_matmul_recipe() {
         },
         barriers: Vec::new(),
         oob_padding: OobPaddingPolicy::ZeroFill,
+        batch: 1,
+        right_batch: 1,
     };
     let kernel = KernelUnit {
         function: MirFunctionId(0),

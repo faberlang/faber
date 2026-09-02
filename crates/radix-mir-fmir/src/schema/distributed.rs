@@ -559,6 +559,35 @@ fn wire_kernel_plan(plan: &WireCollectionKernelPlan) -> CollectionKernelPlan {
                 },
                 barriers: plan.barriers.iter().map(wire_barrier_point).collect(),
                 oob_padding: wire_oob_padding(plan.oob_padding),
+                // The legacy wire plan carries no batch axes — an ordinary
+                // rank-2 image. Batched images ride the dedicated
+                // `BatchedTiledMatMul` variant, never a silent default.
+                batch: 1,
+                right_batch: 1,
+            })
+        }
+        // U1 head-axis: the batched tiled-matmul image (leading head axes;
+        // the argument's batch dims a prefix of the receiver's). A distinct
+        // variant — not a defaulted field on the rank-2 plan — so a
+        // batched fact can never decode as rank-2 by omission.
+        WireCollectionKernelPlan::BatchedTiledMatMul(plan) => {
+            CollectionKernelPlan::TiledMatMul(MatMulPlan {
+                m: plan.m,
+                k: plan.k,
+                n: plan.n,
+                left_layout: wire_matmul_layout(plan.left_layout),
+                right_layout: wire_matmul_layout(plan.right_layout),
+                tile: plan.tile,
+                workgroup_x: plan.workgroup_x,
+                workgroup_y: plan.workgroup_y,
+                shared_memory: MatMulSharedMemory {
+                    shared_a: wire_shared_layout(&plan.shared_memory.shared_a),
+                    shared_b: wire_shared_layout(&plan.shared_memory.shared_b),
+                },
+                barriers: plan.barriers.iter().map(wire_barrier_point).collect(),
+                oob_padding: wire_oob_padding(plan.oob_padding),
+                batch: plan.batch,
+                right_batch: plan.right_batch,
             })
         }
         WireCollectionKernelPlan::TreeReduction(plan) => {

@@ -540,6 +540,15 @@ pub struct MatMulPlan {
     pub barriers: Vec<BarrierPoint>,
     /// Zero-fill policy for the operand tail tiles (L16).
     pub oob_padding: OobPaddingPolicy,
+    /// Product of the receiver's leading batch axes (head-axis batched
+    /// matmul, U1 head-axis): `1` for an ordinary rank-2 contraction. The
+    /// launch folds the batch into `dispatch_y` — one padded row-block per
+    /// batch — so the workgroup/tile laws are unchanged.
+    pub batch: u64,
+    /// Product of the argument's leading batch axes. The argument batch
+    /// dims are a PREFIX of the receiver's (the GQA share: K/V per kv-head
+    /// broadcast over q-per-kv heads); `right_batch` divides `batch`.
+    pub right_batch: u64,
 }
 
 /// The two shared-memory operand tiles of the tiled-matmul recipe.
@@ -588,7 +597,9 @@ pub struct SimdgroupMatMulFacts {
 
 /// PGC-R4: admit the Metal simdgroup-matrix fast path for a tiled-matmul
 /// plan. Plan-level gates: the multi-row law (`m > 1` with the canonical
-/// `(tile, tile)` workgroup), `k` a tile multiple (the direct device
+/// `(tile, tile)` workgroup), the rank-2 law (`batch == 1` — a batched
+/// plan keeps the scalar cooperative-tile body and its batch decomposition),
+/// `k` a tile multiple (the direct device
 /// `simdgroup_load` path admits no K tail), f32 operands, and `m` NOT a
 /// tile multiple — the recipe exists for the padded-FMA partial-band class
 /// (the prefill `M = 36` family); tile-multiple shapes have no padding
@@ -601,6 +612,7 @@ pub fn simdgroup_matmul_admission(plan: &MatMulPlan) -> Option<SimdgroupMatMulFa
     if plan.tile != MATMUL_TILE
         || plan.workgroup_x != MATMUL_TILE
         || plan.workgroup_y != MATMUL_TILE
+        || plan.batch != 1
         || plan.m <= 1
         || plan.k == 0
         || !plan.k.is_multiple_of(tile)

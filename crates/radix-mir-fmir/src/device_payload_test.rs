@@ -23,17 +23,19 @@ use crate::schema::{
     FmirTextProgramSection, FmirTextRuntimeSection, FmirTextSourceIdentity, FmirTextSourcesSection,
     FmirTextToolchainSection, FmirTextTypesSection, LEGACY_EXECUTOR_PLAN_SECTION_VERSION,
     MaterializationStage, PACKAGE_MIR_ARTIFACT_VERSION, WIRE_DEVICE_PROGRAM_VERSION,
-    WireAxisReductionPlan, WireBinding, WireBroadcastDeclaration, WireBroadcastFact,
-    WireBufferIdentity, WireBufferLifetime, WireBufferRole, WireBufferVersion,
-    WireCausalMaskedSoftmaxPlan, WireCollectionKernelPlan, WireCompanionDerivativeKind,
-    WireCompanionRelation, WireCompanionSelectedInput, WireCompanionSelectedOutput,
-    WireDependencyEdge, WireDeviceProgram, WireDeviceResource, WireDispatchSize, WireGatherPlan,
-    WireGroupedMatMulPlan, WireInitializationPolicy, WireKernelLaunchPlan, WireKernelUnit,
-    WireLaunchUnit, WireLayerNormalizationPlan, WireObservationCadence, WireObservationFact,
-    WirePackedStorageLayout, WireProgramLifetime, WireQuantizedMatMulPlan, WireReduceOp,
-    WireReducedProjection, WireResourceAccess, WireResultBuffer, WireRmsNormalizationPlan,
-    WireRopePlan, WireRowSoftmaxPlan, WireSemanticValue, WireSemanticValueOrigin,
-    WireSsmConv1dPlan, WireSsmScanPlan, WireStorageLayout, WireWorkgroupCount, WireWorkgroupSize,
+    WireAxisReductionPlan, WireBarrierPhase, WireBarrierPoint, WireBatchedMatMulPlan, WireBinding,
+    WireBroadcastDeclaration, WireBroadcastFact, WireBufferIdentity, WireBufferLifetime,
+    WireBufferRole, WireBufferVersion, WireCausalMaskedSoftmaxPlan, WireCollectionKernelPlan,
+    WireCompanionDerivativeKind, WireCompanionRelation, WireCompanionSelectedInput,
+    WireCompanionSelectedOutput, WireDependencyEdge, WireDeviceProgram, WireDeviceResource,
+    WireDispatchSize, WireGatherPlan, WireGroupedMatMulPlan, WireInitializationPolicy,
+    WireKernelLaunchPlan, WireKernelUnit, WireLaunchUnit, WireLayerNormalizationPlan,
+    WireMatMulLayout, WireMatMulSharedMemory, WireObservationCadence, WireObservationFact,
+    WireOobPaddingPolicy, WirePackedStorageLayout, WireProgramLifetime, WireQuantizedMatMulPlan,
+    WireReduceOp, WireReducedProjection, WireResourceAccess, WireResultBuffer,
+    WireRmsNormalizationPlan, WireRopePlan, WireRowSoftmaxPlan, WireSemanticValue,
+    WireSemanticValueOrigin, WireSharedMemoryLayout, WireSsmConv1dPlan, WireSsmScanPlan,
+    WireStorageLayout, WireWorkgroupCount, WireWorkgroupSize,
     admit_executor_plan_section_v2_with_version, canonical_program_bytes,
     canonical_unpadded_base64, content_sha256, device_identity_hash, packet_sha256_canonical,
 };
@@ -3215,4 +3217,117 @@ fn r_pack_packed_kernel_plans_round_trip_on_the_wire() {
             "the packed-kernel plan survives the wire round-trip"
         );
     }
+}
+
+/// U1 head-axis: the batched tiled-matmul wire plan (leading head axes,
+/// prefix-shared right batch) round-trips through the text codec on the
+/// accepted wire version and decodes to a `TiledMatMul` plan carrying the
+/// batch facts — a batched image never decodes as rank-2 by omission, and
+/// the rank-2 `TiledMatMul` image is unchanged (no version bump).
+#[test]
+fn batched_matmul_wire_plan_round_trips_with_batch_facts() {
+    assert_eq!(WIRE_DEVICE_PROGRAM_VERSION, 10);
+    let shared = || WireMatMulSharedMemory {
+        shared_a: WireSharedMemoryLayout {
+            element_byte_width: 4,
+            slot_count: 64,
+            buffer_name: "shared_a".to_owned(),
+        },
+        shared_b: WireSharedMemoryLayout {
+            element_byte_width: 4,
+            slot_count: 64,
+            buffer_name: "shared_b".to_owned(),
+        },
+    };
+    let barrier = WireBarrierPoint {
+        after: WireBarrierPhase::SharedMemoryLoad,
+    };
+    // Decode attention: [5,3,1,64] · [5,64,76] → [5,3,1,76].
+    let decode = WireCollectionKernelPlan::BatchedTiledMatMul(WireBatchedMatMulPlan {
+        m: 1,
+        k: 64,
+        n: 76,
+        left_layout: WireMatMulLayout::F32,
+        right_layout: WireMatMulLayout::F32,
+        batch: 15,
+        right_batch: 5,
+        tile: 8,
+        workgroup_x: 8,
+        workgroup_y: 8,
+        shared_memory: shared(),
+        barriers: vec![barrier.clone()],
+        oob_padding: WireOobPaddingPolicy::ZeroFill,
+    });
+    // Prefill attention: [5,3,36,64] · [5,64,36] → [5,3,36,36].
+    let prefill = WireCollectionKernelPlan::BatchedTiledMatMul(WireBatchedMatMulPlan {
+        m: 36,
+        k: 64,
+        n: 36,
+        left_layout: WireMatMulLayout::F32,
+        right_layout: WireMatMulLayout::F32,
+        batch: 15,
+        right_batch: 5,
+        tile: 8,
+        workgroup_x: 8,
+        workgroup_y: 8,
+        shared_memory: shared(),
+        barriers: vec![barrier],
+        oob_padding: WireOobPaddingPolicy::ZeroFill,
+    });
+    for plan in [decode, prefill] {
+        let mut program = sample_wire_program();
+        program.kernels[0].plan = plan.clone();
+        let mut section = sample_device_section();
+        section.device_program.program = program;
+        let image = text_image_with_device(Some(section));
+        let decoded = decode_text_image(&encode_text_image(&image).unwrap(), TOOLCHAIN)
+            .unwrap_or_else(|error| panic!("batched plan {plan:?} must admit cleanly: {error}"));
+        assert_eq!(
+            decoded.device.unwrap().device_program.program.kernels[0].plan,
+            plan,
+            "the batched tiled-matmul plan survives the wire round-trip"
+        );
+    }
+}
+
+/// A `BatchedTiledMatMul` wire plan violating the batch law (a right_batch
+/// that does not divide batch) fails wire admission typed, never decodes.
+#[test]
+fn batched_matmul_wire_plan_batch_law_fails_closed() {
+    let mut program = sample_wire_program();
+    program.kernels[0].plan = WireCollectionKernelPlan::BatchedTiledMatMul(WireBatchedMatMulPlan {
+        m: 1,
+        k: 64,
+        n: 76,
+        left_layout: WireMatMulLayout::F32,
+        right_layout: WireMatMulLayout::F32,
+        batch: 15,
+        right_batch: 4,
+        tile: 8,
+        workgroup_x: 8,
+        workgroup_y: 8,
+        shared_memory: WireMatMulSharedMemory {
+            shared_a: WireSharedMemoryLayout {
+                element_byte_width: 4,
+                slot_count: 64,
+                buffer_name: "shared_a".to_owned(),
+            },
+            shared_b: WireSharedMemoryLayout {
+                element_byte_width: 4,
+                slot_count: 64,
+                buffer_name: "shared_b".to_owned(),
+            },
+        },
+        barriers: Vec::new(),
+        oob_padding: WireOobPaddingPolicy::ZeroFill,
+    });
+    let mut section = sample_device_section();
+    section.device_program.program = program;
+    let image = text_image_with_device(Some(section));
+    let error = decode_text_image(&encode_text_image(&image).unwrap(), TOOLCHAIN)
+        .expect_err("a batch-law violation must fail wire admission");
+    assert!(
+        error.to_string().contains("batch law"),
+        "expected the typed batch-law diagnostic, got: {error}"
+    );
 }

@@ -483,9 +483,10 @@ pub(crate) fn require_kernel_device_view(
         return Err(MirAbiError::new("kernel device view layout"));
     }
     // GEA2-U4b: the frozen interleaved RoPE table is a contiguous rank-3
-    // device view. Keep the existing storage, layout, and element gates
-    // unchanged; rank 3 is the only additive extension here.
-    if view.rank < 1 || view.rank > 3 {
+    // device view. U1 head-axis: the batched matmul route's rank-4 Q
+    // operand (`[kv_heads, q_per_kv, query_seq, head_dim]` — the settled
+    // GEA3 layout) extends the cap to 4; rank 5+ stays fail-closed.
+    if view.rank < 1 || view.rank > 4 {
         return Err(MirAbiError::new(format!(
             "kernel device view rank {}",
             view.rank

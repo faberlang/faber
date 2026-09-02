@@ -635,6 +635,40 @@ pub fn collection_op_contract(
                         .map_err(MirAbiError::new)?;
                     let right_dims = crate::tensor_type::tensor_literal_dims(right_ty, validation)
                         .map_err(MirAbiError::new)?;
+                    let tile: u64 = 8;
+                    // U1 head-axis: a rank-3/4 receiver with a rank-2+ right
+                    // operand carrying leading batch axes is the batched
+                    // contraction (decode `[5,3,1,64]·[5,64,76]` and prefill
+                    // `[5,3,36,64]·[5,64,36]`). The argument's batch dims
+                    // must be a PREFIX of the receiver's (the GQA share:
+                    // K/V per kv-head broadcast over q-per-kv heads). The
+                    // batch folds into `dispatch_y` — one padded row-block
+                    // per batch — so the workgroup/tile grid laws are
+                    // unchanged and the rank-2 arm stays byte-identical.
+                    let batched_rank = left_dims.len() >= 3
+                        && left_dims.len() <= 4
+                        && right_dims.len() >= 2
+                        && right_dims.len() <= left_dims.len();
+                    if batched_rank {
+                        let batch_axis_count = right_dims.len() - 2;
+                        for axis in 0..batch_axis_count {
+                            if left_dims[axis] != right_dims[axis] {
+                                return Err(MirAbiError::new(
+                                    "batched matmul requires the right operand's leading batch dims to be a prefix of the left operand's batch dims",
+                                ));
+                            }
+                        }
+                        if left_dims[left_dims.len() - 1] != right_dims[right_dims.len() - 2] {
+                            return Err(MirAbiError::new("matmul inner dimensions must match"));
+                        }
+                        let m = left_dims[left_dims.len() - 2];
+                        let n = right_dims[right_dims.len() - 1];
+                        let batch = left_dims[..left_dims.len() - 2].iter().product::<u64>();
+                        return Ok(Some(CollectionOpContract::MatMul {
+                            dispatch_x: n.div_ceil(tile),
+                            dispatch_y: batch * m.div_ceil(tile),
+                        }));
+                    }
                     if left_dims.len() != 2 || !(1..=2).contains(&right_dims.len()) {
                         return Err(MirAbiError::new(
                             "matmul dispatch contract requires a rank-2 left tensor and rank-1 or rank-2 right tensor",
@@ -643,7 +677,6 @@ pub fn collection_op_contract(
                     if left_dims[1] != right_dims[0] {
                         return Err(MirAbiError::new("matmul inner dimensions must match"));
                     }
-                    let tile: u64 = 8;
                     let right_columns = right_dims.get(1).copied().unwrap_or(1);
                     return Ok(Some(CollectionOpContract::MatMul {
                         dispatch_x: right_columns.div_ceil(tile),

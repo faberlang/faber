@@ -247,6 +247,8 @@ fn matmul_plan() -> MatMulPlan {
         },
         barriers: matmul_barrier_schedule(),
         oob_padding: OobPaddingPolicy::ZeroFill,
+        batch: 1,
+        right_batch: 1,
     }
 }
 
@@ -2337,4 +2339,225 @@ fn row_reduction_admission_covers_pinned_family_and_refuses_others() {
     // Zero extents fail closed.
     assert!(rmsnorm_row_reduction_admission(0, 960).is_none());
     assert!(rmsnorm_row_reduction_admission(36, 0).is_none());
+}
+
+// --- U1 head-axis: batched tiled-matmul selection (leading head axes) ---
+
+/// A post-contract BATCHED matmul signature: workgroup `(8, 8, 1)`, the
+/// batch-folded tile-grid dispatch (`dispatch_y = batch · ceil(M/8)`), and
+/// operand buffers sized to the FULL tensor extents — `batch·M·K` left,
+/// `right_batch·K·N` right, `batch·M·N` output. The shape the kernel ABI
+/// produces for a head-axis batched matmul kernel.
+fn batched_matmul_signature(
+    shapes: MatMulShapes,
+    batch: u64,
+    right_batch: u64,
+    dispatch_x: u64,
+    dispatch_y: u64,
+) -> MirKernelSignature {
+    let mut types = TypeTable::new();
+    let element_ty = f32_ty(&mut types);
+    MirKernelSignature {
+        function: MirFunctionId(0),
+        input: MirKernelResource {
+            group: 0,
+            binding: 0,
+            kind: MirKernelResourceKind::StorageBuffer,
+            role: MirKernelResourceRole::Input,
+            access: MirKernelResourceAccess::Read,
+            element_ty,
+            element_count: batch * shapes.m * shapes.k,
+            source_local: Some(MirLocalId(0)),
+            source_name: None,
+            reduced_projection: None,
+        },
+        extra_inputs: vec![MirKernelResource {
+            group: 0,
+            binding: 1,
+            kind: MirKernelResourceKind::StorageBuffer,
+            role: MirKernelResourceRole::Input,
+            access: MirKernelResourceAccess::Read,
+            element_ty,
+            element_count: right_batch * shapes.k * shapes.n,
+            source_local: Some(MirLocalId(1)),
+            source_name: None,
+            reduced_projection: None,
+        }],
+        output: MirKernelResource {
+            group: 0,
+            binding: 2,
+            kind: MirKernelResourceKind::StorageBuffer,
+            role: MirKernelResourceRole::Output,
+            access: MirKernelResourceAccess::Write,
+            element_ty,
+            element_count: batch * shapes.m * shapes.n,
+            source_local: None,
+            source_name: None,
+            reduced_projection: None,
+        },
+        extra_outputs: Vec::new(),
+        accumulation_buffers: Vec::new(),
+        builtin_inputs: Vec::new(),
+        called_builtins: Vec::new(),
+        workgroup: MirWorkgroupSize {
+            x: MATMUL_TILE,
+            y: MATMUL_TILE,
+            z: 1,
+        },
+        dispatch_size: MirKernelDispatchSize {
+            x: dispatch_x,
+            y: dispatch_y,
+            z: 1,
+        },
+    }
+}
+
+/// U1 head-axis done-when: the decode attention shape — rectangular
+/// `[5,3,1,64] · [5,64,76] → [5,3,1,76]` (query_seq 1, key_seq 76, never
+/// square) — selects a batch-extended TiledMatMul plan (batch 15 over the
+/// `[5,3]` leading axes; the `[5]` kv-head share is the right batch) and
+/// validates.
+#[test]
+fn batched_matmul_decode_shape_selects_batched_plan() {
+    let shapes = MatMulShapes {
+        m: 1,
+        k: 64,
+        n: 76,
+        left_layout: crate::MirScalarLayout::F32,
+        right_layout: crate::MirScalarLayout::F32,
+    };
+    // dispatch_x = ceil(76/8) = 10; dispatch_y = 15 · ceil(1/8) = 15.
+    let signature = batched_matmul_signature(shapes, 15, 5, 10, 15);
+    let contract = CollectionOpContract::MatMul {
+        dispatch_x: 10,
+        dispatch_y: 15,
+    };
+    let plan = CollectionKernelPlan::from_contract(
+        &signature,
+        &contract,
+        MirCollectionOp::TensorMatMul,
+        Some(shapes),
+    )
+    .expect("the batched decode contract builds a plan");
+    let CollectionKernelPlan::TiledMatMul(matmul) = &plan else {
+        panic!("expected a tiled-matmul plan");
+    };
+    assert_eq!((matmul.m, matmul.k, matmul.n), (1, 64, 76));
+    assert_eq!(
+        (matmul.batch, matmul.right_batch),
+        (15, 5),
+        "the batch facts derive from the signature's operand extents"
+    );
+    assert_eq!(
+        (matmul.workgroup_x, matmul.workgroup_y),
+        (MATMUL_TILE, MATMUL_TILE)
+    );
+    plan.validate().expect("the batched decode plan validates");
+}
+
+/// U1 head-axis done-when: the prefill attention shape —
+/// `[5,3,36,64] · [5,64,36] → [5,3,36,36]` — selects the batch-extended
+/// plan with the batch folded into the row-block dispatch
+/// (`dispatch_y = 15 · ceil(36/8) = 75`).
+#[test]
+fn batched_matmul_prefill_shape_selects_batched_plan() {
+    let shapes = MatMulShapes {
+        m: 36,
+        k: 64,
+        n: 36,
+        left_layout: crate::MirScalarLayout::F32,
+        right_layout: crate::MirScalarLayout::F32,
+    };
+    let signature = batched_matmul_signature(shapes, 15, 5, 5, 75);
+    let contract = CollectionOpContract::MatMul {
+        dispatch_x: 5,
+        dispatch_y: 75,
+    };
+    let plan = CollectionKernelPlan::from_contract(
+        &signature,
+        &contract,
+        MirCollectionOp::TensorMatMul,
+        Some(shapes),
+    )
+    .expect("the batched prefill contract builds a plan");
+    let CollectionKernelPlan::TiledMatMul(matmul) = &plan else {
+        panic!("expected a tiled-matmul plan");
+    };
+    assert_eq!((matmul.m, matmul.k, matmul.n), (36, 64, 36));
+    assert_eq!((matmul.batch, matmul.right_batch), (15, 5));
+    plan.validate().expect("the batched prefill plan validates");
+}
+
+/// The batch derivation is a typed-fact law, not a fallback: a signature
+/// whose operand extents contradict the shapes (an output count that is
+/// not `batch·M·N`) yields no plan.
+#[test]
+fn batched_matmul_count_contradiction_returns_none() {
+    let shapes = MatMulShapes {
+        m: 1,
+        k: 64,
+        n: 76,
+        left_layout: crate::MirScalarLayout::F32,
+        right_layout: crate::MirScalarLayout::F32,
+    };
+    let mut signature = batched_matmul_signature(shapes, 15, 5, 10, 15);
+    signature.output.element_count += 1;
+    let contract = CollectionOpContract::MatMul {
+        dispatch_x: 10,
+        dispatch_y: 15,
+    };
+    assert!(
+        CollectionKernelPlan::from_contract(
+            &signature,
+            &contract,
+            MirCollectionOp::TensorMatMul,
+            Some(shapes),
+        )
+        .is_none(),
+        "an output extent that contradicts the batch law must fail closed"
+    );
+}
+
+/// The dispatch law folds the batch into `dispatch_y`: a rank-2-shaped
+/// `dispatch_y` under a batched signature yields no plan.
+#[test]
+fn batched_matmul_dispatch_without_batch_fold_returns_none() {
+    let shapes = MatMulShapes {
+        m: 36,
+        k: 64,
+        n: 36,
+        left_layout: crate::MirScalarLayout::F32,
+        right_layout: crate::MirScalarLayout::F32,
+    };
+    let signature = batched_matmul_signature(shapes, 15, 5, 5, 5);
+    let contract = CollectionOpContract::MatMul {
+        dispatch_x: 5,
+        dispatch_y: 5,
+    };
+    assert!(
+        CollectionKernelPlan::from_contract(
+            &signature,
+            &contract,
+            MirCollectionOp::TensorMatMul,
+            Some(shapes),
+        )
+        .is_none(),
+        "a batched signature requires the batch-folded dispatch_y"
+    );
+}
+
+/// A hand-broken plan violating the batch law (right_batch does not divide
+/// batch) fails validation with the typed MatMulBatchLaw error.
+#[test]
+fn batched_matmul_batch_law_validation_fails_closed() {
+    let mut plan = matmul_plan();
+    plan.batch = 15;
+    plan.right_batch = 4;
+    assert_eq!(
+        matmul_plan_validation_error(&plan),
+        PlanValidationError::MatMulBatchLaw {
+            batch: 15,
+            right_batch: 4
+        }
+    );
 }
