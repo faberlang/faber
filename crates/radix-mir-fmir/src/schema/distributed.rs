@@ -65,8 +65,8 @@ use radix_mir::kernel_plan::{
     AxisReductionPlan, BarrierPhase, BarrierPoint, BatchedAttentionKind, BatchedAttentionPlan,
     CausalMaskedSoftmaxPlan, CollectionKernelPlan, GatherPlan, GroupedMatMulPlan,
     LayerNormalizationPlan, MatMulPlan, MatMulSharedMemory, OobPaddingPolicy, QuantizedMatMulPlan,
-    ReduceOp, ReductionPlan, RmsNormalizationPlan, RopePlan, RowSoftmaxPlan, SharedMemoryLayout,
-    SsmConv1dPlan, SsmScanPlan, TransposePlan,
+    ReduceOp, ReductionPlan, RmsNormalizationPlan, RopePlan, RowSoftmaxBatch, RowSoftmaxMask,
+    RowSoftmaxPlan, SharedMemoryLayout, SsmConv1dPlan, SsmScanPlan, TransposePlan,
 };
 use radix_mir::layout::MirTensorStorageLayout;
 use radix_mir::{MirFunctionId, MirScalarLayout, MirType};
@@ -623,7 +623,25 @@ fn wire_kernel_plan(plan: &WireCollectionKernelPlan) -> CollectionKernelPlan {
             })
         }
         WireCollectionKernelPlan::RowSoftmax(plan) => {
-            CollectionKernelPlan::RowSoftmax(RowSoftmaxPlan { axis: plan.axis })
+            CollectionKernelPlan::RowSoftmax(RowSoftmaxPlan {
+                axis: plan.axis,
+                // The legacy wire image carries no batch axes — the
+                // ordinary rank-1/2 law. Batched images ride the dedicated
+                // `BatchedRowSoftmax` variant, never a silent default.
+                batched: None,
+            })
+        }
+        // U2 head-axis: the batched row-softmax image (leading head/query
+        // axes; the additive mask operand kept as a broadcast count).
+        WireCollectionKernelPlan::BatchedRowSoftmax(plan) => {
+            CollectionKernelPlan::RowSoftmax(RowSoftmaxPlan {
+                axis: plan.axis,
+                batched: Some(RowSoftmaxBatch {
+                    batch: plan.batch,
+                    width: plan.width,
+                    mask: plan.mask_count.map(|count| RowSoftmaxMask { count }),
+                }),
+            })
         }
         WireCollectionKernelPlan::LayerNormalization(plan) => {
             CollectionKernelPlan::LayerNormalization(LayerNormalizationPlan { axis: plan.axis })

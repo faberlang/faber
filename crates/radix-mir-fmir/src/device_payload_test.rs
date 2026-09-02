@@ -23,19 +23,19 @@ use crate::schema::{
     FmirTextProgramSection, FmirTextRuntimeSection, FmirTextSourceIdentity, FmirTextSourcesSection,
     FmirTextToolchainSection, FmirTextTypesSection, LEGACY_EXECUTOR_PLAN_SECTION_VERSION,
     MaterializationStage, PACKAGE_MIR_ARTIFACT_VERSION, WIRE_DEVICE_PROGRAM_VERSION,
-    WireAxisReductionPlan, WireBarrierPhase, WireBarrierPoint, WireBatchedMatMulPlan, WireBinding,
-    WireBroadcastDeclaration, WireBroadcastFact, WireBufferIdentity, WireBufferLifetime,
-    WireBufferRole, WireBufferVersion, WireCausalMaskedSoftmaxPlan, WireCollectionKernelPlan,
-    WireCompanionDerivativeKind, WireCompanionRelation, WireCompanionSelectedInput,
-    WireCompanionSelectedOutput, WireDependencyEdge, WireDeviceProgram, WireDeviceResource,
-    WireDispatchSize, WireGatherPlan, WireGroupedMatMulPlan, WireInitializationPolicy,
-    WireKernelLaunchPlan, WireKernelUnit, WireLaunchUnit, WireLayerNormalizationPlan,
-    WireMatMulLayout, WireMatMulSharedMemory, WireObservationCadence, WireObservationFact,
-    WireOobPaddingPolicy, WirePackedStorageLayout, WireProgramLifetime, WireQuantizedMatMulPlan,
-    WireReduceOp, WireReducedProjection, WireResourceAccess, WireResultBuffer,
-    WireRmsNormalizationPlan, WireRopePlan, WireRowSoftmaxPlan, WireSemanticValue,
-    WireSemanticValueOrigin, WireSharedMemoryLayout, WireSsmConv1dPlan, WireSsmScanPlan,
-    WireStorageLayout, WireWorkgroupCount, WireWorkgroupSize,
+    WireAxisReductionPlan, WireBarrierPhase, WireBarrierPoint, WireBatchedMatMulPlan,
+    WireBatchedRowSoftmaxPlan, WireBinding, WireBroadcastDeclaration, WireBroadcastFact,
+    WireBufferIdentity, WireBufferLifetime, WireBufferRole, WireBufferVersion,
+    WireCausalMaskedSoftmaxPlan, WireCollectionKernelPlan, WireCompanionDerivativeKind,
+    WireCompanionRelation, WireCompanionSelectedInput, WireCompanionSelectedOutput,
+    WireDependencyEdge, WireDeviceProgram, WireDeviceResource, WireDispatchSize, WireGatherPlan,
+    WireGroupedMatMulPlan, WireInitializationPolicy, WireKernelLaunchPlan, WireKernelUnit,
+    WireLaunchUnit, WireLayerNormalizationPlan, WireMatMulLayout, WireMatMulSharedMemory,
+    WireObservationCadence, WireObservationFact, WireOobPaddingPolicy, WirePackedStorageLayout,
+    WireProgramLifetime, WireQuantizedMatMulPlan, WireReduceOp, WireReducedProjection,
+    WireResourceAccess, WireResultBuffer, WireRmsNormalizationPlan, WireRopePlan,
+    WireRowSoftmaxPlan, WireSemanticValue, WireSemanticValueOrigin, WireSharedMemoryLayout,
+    WireSsmConv1dPlan, WireSsmScanPlan, WireStorageLayout, WireWorkgroupCount, WireWorkgroupSize,
     admit_executor_plan_section_v2_with_version, canonical_program_bytes,
     canonical_unpadded_base64, content_sha256, device_identity_hash, packet_sha256_canonical,
 };
@@ -3321,6 +3321,78 @@ fn batched_matmul_wire_plan_batch_law_fails_closed() {
         barriers: Vec::new(),
         oob_padding: WireOobPaddingPolicy::ZeroFill,
     });
+    let mut section = sample_device_section();
+    section.device_program.program = program;
+    let image = text_image_with_device(Some(section));
+    let error = decode_text_image(&encode_text_image(&image).unwrap(), TOOLCHAIN)
+        .expect_err("a batch-law violation must fail wire admission");
+    assert!(
+        error.to_string().contains("batch law"),
+        "expected the typed batch-law diagnostic, got: {error}"
+    );
+}
+
+/// U2 head-axis: the batched row-softmax wire plan (leading head/query
+/// axes, additive mask count kept) round-trips through the text codec on
+/// the accepted wire version — a batched image never decodes as the
+/// rank-1/2 `RowSoftmax` by omission, and the legacy image is unchanged
+/// (no version bump).
+#[test]
+fn batched_softmax_wire_plan_round_trips_with_batch_facts() {
+    assert_eq!(WIRE_DEVICE_PROGRAM_VERSION, 10);
+    // Decode attention: scores [5,3,1,76] + declared-length mask [1,76].
+    let decode = WireCollectionKernelPlan::BatchedRowSoftmax(WireBatchedRowSoftmaxPlan {
+        axis: 3,
+        batch: 15,
+        width: 76,
+        mask_count: Some(76),
+    });
+    // Prefill attention: scores [5,3,36,36] + causal mask [36,36]
+    // (15 heads × 36 query rows = 540 rows of width 36).
+    let prefill = WireCollectionKernelPlan::BatchedRowSoftmax(WireBatchedRowSoftmaxPlan {
+        axis: 3,
+        batch: 15 * 36,
+        width: 36,
+        mask_count: Some(36 * 36),
+    });
+    // A plain batched softmax (no mask operand) round-trips with None.
+    let plain = WireCollectionKernelPlan::BatchedRowSoftmax(WireBatchedRowSoftmaxPlan {
+        axis: 3,
+        batch: 15,
+        width: 76,
+        mask_count: None,
+    });
+    for plan in [decode, prefill, plain] {
+        let mut program = sample_wire_program();
+        program.kernels[0].plan = plan.clone();
+        let mut section = sample_device_section();
+        section.device_program.program = program;
+        let image = text_image_with_device(Some(section));
+        let decoded = decode_text_image(&encode_text_image(&image).unwrap(), TOOLCHAIN)
+            .unwrap_or_else(|error| {
+                panic!("batched softmax plan {plan:?} must admit cleanly: {error}")
+            });
+        assert_eq!(
+            decoded.device.unwrap().device_program.program.kernels[0].plan,
+            plan,
+            "the batched row-softmax plan survives the wire round-trip"
+        );
+    }
+}
+
+/// A `BatchedRowSoftmax` wire plan violating the batch law (a mask count
+/// that does not divide batch·width) fails wire admission typed, never
+/// decodes.
+#[test]
+fn batched_softmax_wire_plan_batch_law_fails_closed() {
+    let mut program = sample_wire_program();
+    program.kernels[0].plan =
+        WireCollectionKernelPlan::BatchedRowSoftmax(WireBatchedRowSoftmaxPlan {
+            axis: 3,
+            batch: 15,
+            width: 76,
+            mask_count: Some(75),
+        });
     let mut section = sample_device_section();
     section.device_program.program = program;
     let image = text_image_with_device(Some(section));

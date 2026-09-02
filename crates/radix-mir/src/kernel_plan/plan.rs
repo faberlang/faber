@@ -163,6 +163,38 @@ pub struct AxisReductionPlan {
 pub struct RowSoftmaxPlan {
     /// Row axis (the last axis in v1).
     pub axis: u64,
+    /// U2 head-axis batch facts; `None` is the ordinary rank-1/2 image
+    /// (rank-2 resolution and the legacy wire decode) — a batched fact can
+    /// never decode as rank-2 by omission.
+    pub batched: Option<RowSoftmaxBatch>,
+}
+
+/// U2 head-axis batch facts on the row-softmax recipe: the softmax operand
+/// carries leading head/query axes, so the last-axis row law runs once per
+/// flattened leading-axis row. The last two axes are `query_seq × key_seq`
+/// and are NOT required to be square (decode is rectangular `1 × L`).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RowSoftmaxBatch {
+    /// Product of the leading head/query axes — the row count the body's
+    /// row-wise law runs over.
+    pub batch: u64,
+    /// Last-axis (row) width — the key extent each row softmaxes over.
+    pub width: u64,
+    /// Additive mask operand facts (`None` for a plain batched softmax).
+    /// The mask is data (0 at admitted positions, negative beyond), kept
+    /// as an operand — never folded into the softmax or the scale.
+    pub mask: Option<RowSoftmaxMask>,
+}
+
+/// U2 head-axis additive-mask facts: the mask buffer's element count under
+/// the right-aligned broadcast (the mask dims are a trailing block of the
+/// score dims; each mask dim equals the score dim or is a leading 1). The
+/// body reads `mask[flat % count]`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RowSoftmaxMask {
+    /// The mask buffer's element count; positive and divides
+    /// `batch * width`.
+    pub count: u64,
 }
 
 /// Layer-normalization recipe plan (name frozen by S6-N1; admission,

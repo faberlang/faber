@@ -263,7 +263,10 @@ fn representative_plans() -> [CollectionKernelPlan; KNOWN_VARIANTS.len()] {
             dispatch_x: 1,
         }),
         CollectionKernelPlan::AxisReduction(dummy_axis_reduction()),
-        CollectionKernelPlan::RowSoftmax(RowSoftmaxPlan { axis: 0 }),
+        CollectionKernelPlan::RowSoftmax(RowSoftmaxPlan {
+            axis: 0,
+            batched: None,
+        }),
         CollectionKernelPlan::LayerNormalization(LayerNormalizationPlan { axis: 0 }),
         CollectionKernelPlan::Gather(dummy_gather()),
         CollectionKernelPlan::RmsNormalization(dummy_rms()),

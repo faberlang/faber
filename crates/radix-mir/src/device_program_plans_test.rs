@@ -1819,7 +1819,10 @@ fn softmax_function_resolves_row_softmax_plan() {
     assert_eq!(plan.axis, 1, "row softmax normalizes over the last axis");
     derived.validate().expect("the derived plan validates");
     // A carried plan built from the same typed facts agrees exactly.
-    let carried = CollectionKernelPlan::RowSoftmax(crate::kernel_plan::RowSoftmaxPlan { axis: 1 });
+    let carried = CollectionKernelPlan::RowSoftmax(crate::kernel_plan::RowSoftmaxPlan {
+        axis: 1,
+        batched: None,
+    });
     assert!(carried_plan_agrees(&carried, Some(&derived)));
 }
 
@@ -2136,7 +2139,10 @@ fn transformer_recipe_kinds_are_typed() {
     );
     assert_eq!(
         RecipeKind::from_plan(&CollectionKernelPlan::RowSoftmax(
-            crate::kernel_plan::RowSoftmaxPlan { axis: 1 }
+            crate::kernel_plan::RowSoftmaxPlan {
+                axis: 1,
+                batched: None
+            }
         )),
         RecipeKind::RowSoftmax
     );
@@ -2160,7 +2166,10 @@ fn transformer_plans_report_zero_shared_memory() {
     let kernel = KernelUnit {
         function: MirFunctionId(0),
         entry: "softmaxa".to_owned(),
-        plan: CollectionKernelPlan::RowSoftmax(crate::kernel_plan::RowSoftmaxPlan { axis: 1 }),
+        plan: CollectionKernelPlan::RowSoftmax(crate::kernel_plan::RowSoftmaxPlan {
+            axis: 1,
+            batched: None,
+        }),
         resources: vec![
             resource(
                 input,

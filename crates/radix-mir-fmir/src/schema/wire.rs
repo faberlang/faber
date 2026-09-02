@@ -501,6 +501,11 @@ pub enum WireCollectionKernelPlan {
     /// S6-C2): numerically stable softmax over the last (row) axis. Mirrors
     /// `kernel_plan::RowSoftmaxPlan`; admission/resolution is S6-P1.
     RowSoftmax(WireRowSoftmaxPlan),
+    /// Batched row-softmax recipe (U2 head-axis): leading head/query axes
+    /// with the additive mask operand kept as a broadcast fact. A distinct
+    /// variant — the rank-1/2 `RowSoftmax` image is unchanged and a
+    /// batched fact can never decode as rank-2 by omission.
+    BatchedRowSoftmax(WireBatchedRowSoftmaxPlan),
     /// Layer-normalization recipe (S6-N1 name freeze; wire mirror lands in
     /// S6-C2): row mean/var with optional affine. Mirrors
     /// `kernel_plan::LayerNormalizationPlan`; admission/resolution is S6-P1.
@@ -720,6 +725,24 @@ pub fn validate_carried_sub_window_projection(
 pub struct WireRowSoftmaxPlan {
     /// Row axis (the last axis in v1).
     pub axis: u64,
+}
+
+/// Batched row-softmax recipe plan (U2 head-axis; wire mirror of
+/// `kernel_plan::RowSoftmaxBatch`). The leading head/query axes fold into
+/// the row count; the additive mask operand is kept as a broadcast count
+/// fact. The decode-side admission validates the batch law fail-closed.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct WireBatchedRowSoftmaxPlan {
+    /// Row axis (the last axis).
+    pub axis: u64,
+    /// Product of the leading head/query axes — the row count.
+    pub batch: u64,
+    /// Last-axis (row) width — the key extent.
+    pub width: u64,
+    /// The additive mask buffer's element count; `None` for a plain
+    /// batched softmax. When carried it must divide `batch · width`.
+    pub mask_count: Option<u64>,
 }
 
 /// Layer-normalization recipe plan (wire mirror of

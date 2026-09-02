@@ -4,8 +4,8 @@ use super::plan::{
     GatherPlan, GroupedMatMulPlan, LayerNormalizationPlan, MATMUL_SHARED_A_BUFFER_NAME,
     MATMUL_SHARED_B_BUFFER_NAME, MATMUL_TILE, MatMulPlan, MatMulShapes, MatMulSharedMemory,
     OobPaddingPolicy, REDUCTION_SHARED_BUFFER_NAME, ReduceOp, ReductionPlan, RmsNormalizationPlan,
-    RopePlan, RowSoftmaxPlan, SharedMemoryLayout, SsmConv1dPlan, SsmScanPlan,
-    TRANSPOSE_WORKGROUP_X, TransposePlan,
+    RopePlan, RowSoftmaxBatch, RowSoftmaxMask, RowSoftmaxPlan, SharedMemoryLayout, SsmConv1dPlan,
+    SsmScanPlan, TRANSPOSE_WORKGROUP_X, TransposePlan,
 };
 use super::validate::{
     PlanValidationError, validate_axis_reduction_plan, validate_batched_attention_plan,
@@ -481,8 +481,19 @@ impl CollectionKernelPlan {
                 if !signature_matches_transformer_counts(signature, count, count) {
                     return None;
                 }
+                if op == MirCollectionOp::TensorSoftmax && dims.len() > 2 {
+                    // U2 head-axis: a rank-3/4 softmax is the batched row
+                    // law — leading head/query axes fold into the row
+                    // count, the last axis stays the row width, and the
+                    // additive-idiom mask (when present) rides the plan as
+                    // an operand fact.
+                    return batched_row_softmax_plan(signature, function, validation, &dims, axis);
+                }
                 let plan = if op == MirCollectionOp::TensorSoftmax {
-                    CollectionKernelPlan::RowSoftmax(RowSoftmaxPlan { axis })
+                    CollectionKernelPlan::RowSoftmax(RowSoftmaxPlan {
+                        axis,
+                        batched: None,
+                    })
                 } else {
                     CollectionKernelPlan::LayerNormalization(LayerNormalizationPlan { axis })
                 };
@@ -633,9 +644,12 @@ impl CollectionKernelPlan {
             // fact (last-axis constraint, epsilon const/finite, affine
             // operand shapes, element counts) is a resolution-time typed
             // check in [`CollectionKernelPlan::from_transformer_op`].
-            CollectionKernelPlan::RowSoftmax(_) | CollectionKernelPlan::LayerNormalization(_) => {
-                Ok(())
+            // U2 head-axis: a batched row-softmax image additionally pins
+            // the batch/mask counts law.
+            CollectionKernelPlan::RowSoftmax(plan) => {
+                super::validate::validate_row_softmax_plan(plan)
             }
+            CollectionKernelPlan::LayerNormalization(_) => Ok(()),
             // GI3-1: the inference recipes carry no static grid/shared-memory
             // structure — every algorithmic fact (axis/epsilon/gamma-width,
             // pos/dim/row-width, table/id dims, causal extents) is a
@@ -860,6 +874,188 @@ fn signature_matches_transformer_counts(
     signature.input.element_count == input_count && signature.output.element_count == output_count
 }
 
+/// U2 head-axis: resolve the batched row-softmax facts from the softmax
+/// statement's own typed facts. `dims` are the softmax operand's literal
+/// dims (rank 3-4, already count-checked against the signature): the
+/// leading head/query axes fold into the batch (the row count), the last
+/// axis is the row width, and the additive-idiom mask — when the operand
+/// is the `(scores + mask)` temp — rides the plan as an operand fact
+/// cross-checked against the signature's own resources. A rank-3/4
+/// operand that is a NON-additive elementwise temp fails closed (the
+/// batched body reads raw buffers only, v1).
+fn batched_row_softmax_plan(
+    signature: &MirKernelSignature,
+    function: &MirFunction,
+    validation: &MirValidationContext<'_>,
+    dims: &[u64],
+    axis: u64,
+) -> Option<CollectionKernelPlan> {
+    let width = *dims.last()?;
+    let batch = dims[..dims.len() - 1]
+        .iter()
+        .copied()
+        .try_fold(1_u64, u64::checked_mul)?;
+    if batch == 0 || width == 0 {
+        return None;
+    }
+    let args = transformer_statement_args(function, MirCollectionOp::TensorSoftmax)?;
+    let operand = args.first()?;
+    let operand_is_temp = match operand {
+        MirOperand::Temp(_) => true,
+        MirOperand::Place(place) => matches!(place.base, MirPlaceBase::Temp(_)),
+        _ => false,
+    };
+    // A plain local operand is the unmasked batched softmax; a temp
+    // operand must be the additive `(scores + mask)` idiom (anything else
+    // fails closed — the batched body reads raw buffers only, v1).
+    let mask = if operand_is_temp {
+        Some(batched_softmax_mask_facts(
+            signature, function, validation, dims, operand,
+        )?)
+    } else {
+        None
+    };
+    Some(CollectionKernelPlan::RowSoftmax(RowSoftmaxPlan {
+        axis,
+        batched: Some(RowSoftmaxBatch { batch, width, mask }),
+    }))
+}
+
+/// The additive-mask operand facts of a batched softmax whose operand is
+/// the `(scores + mask)` temp: the mask dims must satisfy the broadcast
+/// law and the signature must carry both addend buffers at their own
+/// extents (the A3 cross-check — the resource for each addend local must
+/// exist, be read-only, and hold exactly the addend's element count).
+/// `None` fails closed.
+fn batched_softmax_mask_facts(
+    signature: &MirKernelSignature,
+    function: &MirFunction,
+    validation: &MirValidationContext<'_>,
+    score_dims: &[u64],
+    operand: &MirOperand,
+) -> Option<RowSoftmaxMask> {
+    if !crate::abi::softmax_operand_is_additive_mask_temp(function, operand) {
+        // A non-additive elementwise temp at rank 3/4 has no batched body
+        // in v1 — never a silent reshape of the composition.
+        return None;
+    }
+    // The additive idiom's `TensorAdd(scores, mask)` statement: the
+    // receiver (args[0]) carries the full score shape; the argument
+    // (args[1]) is the broadcast mask.
+    let addends = additive_mask_add_args(function, operand)?;
+    let scores_local = operand_local_id(&addends[0])?;
+    let mask_local = operand_local_id(&addends[1])?;
+    let receiver_dims = transformer_operand_dims(function, &addends[0], validation)?;
+    if receiver_dims.as_slice() != score_dims {
+        return None;
+    }
+    let mask_dims = transformer_operand_dims(function, &addends[1], validation)?;
+    let count = mask_broadcast_count(score_dims, &mask_dims)?;
+    let total = dims_product(score_dims)?;
+    // A3 cross-check: both addend locals resolve to read-only kernel
+    // resources holding exactly their own element counts.
+    let resource_count = |local: MirLocalId, expected: u64| {
+        signature.resources().any(|resource| {
+            resource.source_local == Some(local)
+                && resource.access == MirKernelResourceAccess::Read
+                && resource.element_count == expected
+        })
+    };
+    if !resource_count(scores_local, total) || !resource_count(mask_local, count) {
+        return None;
+    }
+    Some(RowSoftmaxMask { count })
+}
+
+/// The `(scores, mask)` local ids of the additive-idiom `TensorAdd`
+/// statement feeding a softmax operand (U2 head-axis emitter surface):
+/// `args[0]` is the scores receiver, `args[1]` the broadcast mask. `None`
+/// when the operand is not the additive idiom or an addend is not a plain
+/// local.
+#[must_use]
+pub fn softmax_additive_mask_locals(
+    function: &MirFunction,
+    operand: &MirOperand,
+) -> Option<(MirLocalId, MirLocalId)> {
+    let args = additive_mask_add_args(function, operand)?;
+    Some((operand_local_id(&args[0])?, operand_local_id(&args[1])?))
+}
+
+/// The `(scores, mask)` local operands of the `TensorAdd` statement whose
+/// destination is the softmax's additive-idiom temp (the same statement
+/// scan [`crate::abi::softmax_operand_is_additive_mask_temp`] admits).
+fn additive_mask_add_args<'a>(
+    function: &'a MirFunction,
+    operand: &MirOperand,
+) -> Option<&'a [MirOperand]> {
+    let destination_base = match operand {
+        MirOperand::Temp(temp) => MirPlaceBase::Temp(*temp),
+        MirOperand::Place(place) => place.base.clone(),
+        _ => return None,
+    };
+    for block in &function.blocks {
+        for statement in &block.statements {
+            let MirStatementKind::RuntimeCall {
+                destination: Some(destination),
+                call:
+                    MirRuntimeCall {
+                        intrinsic: crate::MirIntrinsic::Collection(MirCollectionOp::TensorAdd),
+                        args,
+                        ..
+                    },
+            } = &statement.kind
+            else {
+                continue;
+            };
+            if destination.base == destination_base && args.len() == 2 {
+                return Some(args);
+            }
+        }
+    }
+    None
+}
+
+/// The local id of a plain local-place operand (`None` for temps,
+/// constants, and projected places — the additive idiom's addends are
+/// plain locals by construction).
+fn operand_local_id(operand: &MirOperand) -> Option<MirLocalId> {
+    match operand {
+        MirOperand::Place(place) => match place.base {
+            MirPlaceBase::Local(local) if place.projections.is_empty() => Some(local),
+            _ => None,
+        },
+        _ => None,
+    }
+}
+
+/// U2 head-axis mask broadcast law: the mask dims (right-aligned against
+/// the score dims) must be a trailing block of FULL dims — leading 1s are
+/// broadcast, and from the mask's first non-1 dim onward every mask dim
+/// must equal its aligned score dim. Under that law (and only it) the
+/// flat score index's trailing digits ARE the mask's flat index, so the
+/// body reads `mask[flat % count]`; any other geometry fails closed
+/// (`None`). Returns the mask's element count on admission.
+fn mask_broadcast_count(score_dims: &[u64], mask_dims: &[u64]) -> Option<u64> {
+    if mask_dims.is_empty() || mask_dims.len() > score_dims.len() {
+        return None;
+    }
+    let offset = score_dims.len() - mask_dims.len();
+    let cutoff = mask_dims
+        .iter()
+        .position(|&dim| dim != 1)
+        .unwrap_or(mask_dims.len());
+    for (index, &dim) in mask_dims.iter().enumerate() {
+        if index >= cutoff && dim != score_dims[offset + index] {
+            return None;
+        }
+    }
+    mask_dims
+        .iter()
+        .copied()
+        .try_fold(1_u64, u64::checked_mul)
+        .filter(|count| *count > 0)
+}
+
 /// The transformer recipe's typed shape facts: the literal dims of the
 /// operand tensor and the resolved axis, cross-checked against the op's
 /// const-operand constraints.
@@ -897,7 +1093,10 @@ pub(crate) fn transformer_recipe_shape(
             let args = transformer_statement_args(function, MirCollectionOp::TensorSoftmax)?;
             let dims = transformer_operand_dims(function, &args[0], validation)?;
             let rank = dims.len();
-            if rank == 0 || rank > 2 {
+            // U2 head-axis: rank 1-4 — the batched softmax carries leading
+            // head/query axes over the same last-axis row law; rank 5+
+            // stays outside the admitted surface.
+            if rank == 0 || rank > 4 {
                 return None;
             }
             Some((dims, (rank - 1) as u64))

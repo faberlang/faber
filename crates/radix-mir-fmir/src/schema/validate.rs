@@ -34,6 +34,7 @@ pub(crate) fn validate_wire_program(
     validate_wire_step_count(wire)?;
     validate_wire_broadcast_facts(wire)?;
     validate_wire_matmul_batch_facts(wire)?;
+    validate_wire_row_softmax_batch_facts(wire)?;
     validate_wire_reduced_projections(wire)?;
     Ok(())
 }
@@ -61,6 +62,35 @@ fn validate_wire_matmul_batch_facts(
             return Err(wire_invalid(format!(
                 "kernel '{}' carries a batched tiled-matmul plan violating the batch law (M={}, K={}, N={}, tile={}, batch={}, right_batch={}); batch and right_batch must be positive and right_batch must divide batch",
                 kernel.entry, plan.m, plan.k, plan.n, plan.tile, plan.batch, plan.right_batch
+            )));
+        }
+    }
+    Ok(())
+}
+
+/// A carried batched row-softmax plan (U2 head-axis) must satisfy the
+/// batch law internally: positive batch/width and — when the additive
+/// mask count is carried — a positive count dividing `batch · width`
+/// (the mask dims are a trailing block of the score dims, so the
+/// broadcast read `flat % count` covers exactly the mask buffer). The
+/// fact is carried, never inferred.
+fn validate_wire_row_softmax_batch_facts(
+    wire: &WireDeviceProgram,
+) -> Result<(), crate::error::FmirImageError> {
+    for kernel in &wire.kernels {
+        let WireCollectionKernelPlan::BatchedRowSoftmax(plan) = &kernel.plan else {
+            continue;
+        };
+        let total = plan.batch.saturating_mul(plan.width);
+        if plan.batch == 0
+            || plan.width == 0
+            || plan
+                .mask_count
+                .is_some_and(|count| count == 0 || total % count != 0)
+        {
+            return Err(wire_invalid(format!(
+                "kernel '{}' carries a batched row-softmax plan violating the batch law (batch={}, width={}, mask_count={:?}); batch and width must be positive and a carried mask count must be positive and divide batch·width",
+                kernel.entry, plan.batch, plan.width, plan.mask_count
             )));
         }
     }

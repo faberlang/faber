@@ -1498,9 +1498,12 @@ fn axis_reduction_plan_validate_rejects_non_sum_op() {
 
 #[test]
 fn transformer_plans_validate() {
-    CollectionKernelPlan::RowSoftmax(RowSoftmaxPlan { axis: 1 })
-        .validate()
-        .expect("row-softmax plan validates");
+    CollectionKernelPlan::RowSoftmax(RowSoftmaxPlan {
+        axis: 1,
+        batched: None,
+    })
+    .validate()
+    .expect("row-softmax plan validates");
     CollectionKernelPlan::LayerNormalization(LayerNormalizationPlan { axis: 1 })
         .validate()
         .expect("layer-normalization plan validates");
@@ -2413,8 +2416,8 @@ fn batched_matmul_signature(
 }
 
 /// U1 head-axis done-when: the decode attention shape — rectangular
-/// `[5,3,1,64] · [5,64,76] → [5,3,1,76]` (query_seq 1, key_seq 76, never
-/// square) — selects a batch-extended TiledMatMul plan (batch 15 over the
+/// `[5,3,1,64] · [5,64,76] → [5,3,1,76]` (`query_seq` 1, `key_seq` 76, never
+/// square) — selects a batch-extended `TiledMatMul` plan (batch 15 over the
 /// `[5,3]` leading axes; the `[5]` kv-head share is the right batch) and
 /// validates.
 #[test]
@@ -2546,8 +2549,8 @@ fn batched_matmul_dispatch_without_batch_fold_returns_none() {
     );
 }
 
-/// A hand-broken plan violating the batch law (right_batch does not divide
-/// batch) fails validation with the typed MatMulBatchLaw error.
+/// A hand-broken plan violating the batch law (`right_batch` does not divide
+/// `batch`) fails validation with the typed `MatMulBatchLaw` error.
 #[test]
 fn batched_matmul_batch_law_validation_fails_closed() {
     let mut plan = matmul_plan();
@@ -2558,6 +2561,348 @@ fn batched_matmul_batch_law_validation_fails_closed() {
         PlanValidationError::MatMulBatchLaw {
             batch: 15,
             right_batch: 4
+        }
+    );
+}
+
+// --- U2 head-axis: batched additive-masked row-softmax (rank-3/4) ---
+
+/// A `tf32[dims]` tensor type with static literal dims (any rank).
+fn literal_dims_tensor_ty(types: &mut TypeTable, dims: &[u64]) -> MirType {
+    let element = f32_ty(types);
+    let dim_ids = dims
+        .iter()
+        .map(|&dim| types.intern_index(IndexExpr::Literal(dim)))
+        .collect::<Vec<_>>();
+    let shape = types.intern_index(IndexExpr::Tuple(dim_ids));
+    MirType::semantic(types.intern(Type::Tensor(element.semantic_id(), shape)))
+}
+
+/// The batched masked-softmax kernel body — the decode/prefill entry
+/// shape: params `(scores, mask, out, lane)`, the additive idiom's
+/// `TensorAdd(scores, mask)` temp, and one `TensorSoftmax(temp) → out`.
+fn batched_masked_softmax_function(
+    types: &mut TypeTable,
+    score_dims: &[u64],
+    mask_dims: &[u64],
+) -> MirFunction {
+    let scores_ty = literal_dims_tensor_ty(types, score_dims);
+    let mask_ty = literal_dims_tensor_ty(types, mask_dims);
+    let out_ty = literal_dims_tensor_ty(types, score_dims);
+    let u32_ty = MirType::semantic(types.sized_numeric(Primitive::Numerus, NumericWidth::U32));
+    let vacuum_ty = MirType::semantic(types.primitive(Primitive::Vacuum));
+    let tensor_param = |local: MirLocalId, ty: MirType| MirParam {
+        local,
+        name: None,
+        ty,
+        mode: MirParamMode::Owned,
+        span: test_span(),
+    };
+    MirFunction {
+        id: MirFunctionId(0),
+        source: Some(radix_hir::DefId(1)),
+        name: None,
+        params: vec![
+            tensor_param(MirLocalId(0), scores_ty),
+            tensor_param(MirLocalId(1), mask_ty),
+            tensor_param(MirLocalId(2), out_ty),
+            tensor_param(MirLocalId(3), u32_ty),
+        ],
+        locals: Vec::new(),
+        temps: vec![crate::MirTemp {
+            id: crate::MirTempId(0),
+            ty: scores_ty,
+            span: test_span(),
+        }],
+        blocks: vec![MirBlock {
+            id: MirBlockId(0),
+            statements: vec![
+                MirStatement {
+                    kind: MirStatementKind::RuntimeCall {
+                        destination: Some(MirPlace::temp(crate::MirTempId(0))),
+                        call: MirRuntimeCall {
+                            intrinsic: MirIntrinsic::Collection(MirCollectionOp::TensorAdd),
+                            args: vec![
+                                MirOperand::Place(MirPlace::local(MirLocalId(0))),
+                                MirOperand::Place(MirPlace::local(MirLocalId(1))),
+                            ],
+                            return_ty: scores_ty,
+                        },
+                    },
+                    span: test_span(),
+                },
+                MirStatement {
+                    kind: MirStatementKind::RuntimeCall {
+                        destination: Some(MirPlace::local(MirLocalId(2))),
+                        call: MirRuntimeCall {
+                            intrinsic: MirIntrinsic::Collection(MirCollectionOp::TensorSoftmax),
+                            args: vec![MirOperand::Temp(crate::MirTempId(0))],
+                            return_ty: out_ty,
+                        },
+                    },
+                    span: test_span(),
+                },
+            ],
+            terminator: MirTerminator {
+                kind: MirTerminatorKind::Return(None),
+                span: test_span(),
+            },
+            span: test_span(),
+        }],
+        return_ty: vacuum_ty,
+        error_ty: None,
+        is_async: false,
+        is_generator: false,
+        shader_stage: None,
+        span: test_span(),
+    }
+}
+
+/// The whole-function storage-buffer signature the ABI builds for the
+/// batched masked-softmax entry: input `scores` (binding 0), extra input
+/// `mask` (binding 1), output (binding 2), all at their FULL tensor
+/// extents under the generic 1D contract (workgroup `(1,1,1)`, dispatch
+/// = element count).
+fn batched_masked_softmax_signature(
+    types: &mut TypeTable,
+    score_count: u64,
+    mask_count: u64,
+) -> MirKernelSignature {
+    let element_ty = f32_ty(types);
+    let resource = |binding: u32,
+                    role: MirKernelResourceRole,
+                    access: MirKernelResourceAccess,
+                    count: u64,
+                    local: Option<MirLocalId>| MirKernelResource {
+        group: 0,
+        binding,
+        kind: MirKernelResourceKind::StorageBuffer,
+        role,
+        access,
+        element_ty,
+        element_count: count,
+        source_local: local,
+        source_name: None,
+        reduced_projection: None,
+    };
+    MirKernelSignature {
+        function: MirFunctionId(0),
+        input: resource(
+            0,
+            MirKernelResourceRole::Input,
+            MirKernelResourceAccess::Read,
+            score_count,
+            Some(MirLocalId(0)),
+        ),
+        extra_inputs: vec![resource(
+            1,
+            MirKernelResourceRole::Input,
+            MirKernelResourceAccess::Read,
+            mask_count,
+            Some(MirLocalId(1)),
+        )],
+        output: resource(
+            2,
+            MirKernelResourceRole::Output,
+            MirKernelResourceAccess::Write,
+            score_count,
+            Some(MirLocalId(2)),
+        ),
+        extra_outputs: Vec::new(),
+        accumulation_buffers: Vec::new(),
+        builtin_inputs: Vec::new(),
+        called_builtins: Vec::new(),
+        workgroup: MirWorkgroupSize { x: 1, y: 1, z: 1 },
+        dispatch_size: MirKernelDispatchSize {
+            x: score_count,
+            y: 1,
+            z: 1,
+        },
+    }
+}
+
+/// U2 head-axis done-when (decode): rectangular scores `[5,3,1,76]` with
+/// the declared-length additive mask `[1,76]` (broadcast over heads) —
+/// the last two axes are `query_seq` × `key_seq`, NOT square seq×seq —
+/// resolve one batched row-softmax plan (batch 15 rows of width 76; mask
+/// count 76) and validate.
+#[test]
+fn batched_softmax_decode_shape_selects_batched_plan() {
+    let mut types = TypeTable::new();
+    let function = batched_masked_softmax_function(&mut types, &[5, 3, 1, 76], &[1, 76]);
+    let signature = batched_masked_softmax_signature(&mut types, 15 * 76, 76);
+    let validation = MirValidationContext::new(&types);
+    let plan = CollectionKernelPlan::from_transformer_op(
+        &signature,
+        &function,
+        &validation,
+        MirCollectionOp::TensorSoftmax,
+    )
+    .expect("the batched decode softmax resolves a plan");
+    let CollectionKernelPlan::RowSoftmax(softmax) = &plan else {
+        panic!("expected the row-softmax recipe, got: {plan:?}");
+    };
+    let batch = softmax.batched.as_ref().expect("batched facts");
+    assert_eq!(softmax.axis, 3, "the row axis stays the last axis");
+    assert_eq!((batch.batch, batch.width), (15, 76));
+    assert_eq!(
+        batch.mask.as_ref().map(|mask| mask.count),
+        Some(76),
+        "the declared-length [1,76] mask is the broadcast operand"
+    );
+    plan.validate().expect("the batched decode plan validates");
+}
+
+/// U2 head-axis done-when (prefill): `[5,3,36,36]` scores with the causal
+/// additive mask `[36,36]` resolve the batched plan (batch 15 rows of
+/// width 36; mask count 1296 — the trailing [36,36] block).
+#[test]
+fn batched_softmax_prefill_shape_selects_batched_plan() {
+    let mut types = TypeTable::new();
+    let function = batched_masked_softmax_function(&mut types, &[5, 3, 36, 36], &[36, 36]);
+    let signature = batched_masked_softmax_signature(&mut types, 15 * 36 * 36, 36 * 36);
+    let validation = MirValidationContext::new(&types);
+    let plan = CollectionKernelPlan::from_transformer_op(
+        &signature,
+        &function,
+        &validation,
+        MirCollectionOp::TensorSoftmax,
+    )
+    .expect("the batched prefill softmax resolves a plan");
+    let CollectionKernelPlan::RowSoftmax(softmax) = &plan else {
+        panic!("expected the row-softmax recipe, got: {plan:?}");
+    };
+    let batch = softmax.batched.as_ref().expect("batched facts");
+    // 15 head rows × 36 query rows = 540 rows, each softmaxing 36 keys.
+    assert_eq!((batch.batch, batch.width), (15 * 36, 36));
+    assert_eq!(
+        batch.mask.as_ref().map(|mask| mask.count),
+        Some(36 * 36),
+        "the causal [36,36] mask is the broadcast operand"
+    );
+    plan.validate().expect("the batched prefill plan validates");
+}
+
+/// A rank-3/4 softmax over a plain local operand (no additive idiom)
+/// resolves the batched facts with NO mask — the plain batched softmax.
+#[test]
+fn batched_softmax_plain_operand_resolves_without_mask() {
+    let mut types = TypeTable::new();
+    let mut function = batched_masked_softmax_function(&mut types, &[5, 3, 1, 76], &[1, 76]);
+    // Drop the additive temp: softmax over the raw scores local.
+    function.temps.clear();
+    let scores_ty = function.params[0].ty;
+    let softmax = &mut function.blocks[0].statements[1];
+    let MirStatementKind::RuntimeCall { call, .. } = &mut softmax.kind else {
+        panic!("fixture");
+    };
+    call.args = vec![MirOperand::Place(MirPlace::local(MirLocalId(0)))];
+    call.return_ty = scores_ty;
+    function.blocks[0].statements.remove(0);
+    let signature = batched_masked_softmax_signature(&mut types, 15 * 76, 76);
+    let validation = MirValidationContext::new(&types);
+    let plan = CollectionKernelPlan::from_transformer_op(
+        &signature,
+        &function,
+        &validation,
+        MirCollectionOp::TensorSoftmax,
+    )
+    .expect("the plain batched softmax resolves a plan");
+    let CollectionKernelPlan::RowSoftmax(softmax) = &plan else {
+        panic!("expected the row-softmax recipe, got: {plan:?}");
+    };
+    let batch = softmax.batched.as_ref().expect("batched facts");
+    assert_eq!((batch.batch, batch.width), (15, 76));
+    assert!(
+        batch.mask.is_none(),
+        "no additive idiom means no mask operand"
+    );
+    plan.validate().expect("the plain batched plan validates");
+}
+
+/// The mask broadcast law is a trailing-block law: a mask dim that
+/// contradicts its aligned score dim (`[2,38]` against the trailing
+/// `[1,76]`) fails closed — no plan, never a reshaped guess.
+#[test]
+fn batched_softmax_mask_broadcast_law_violation_returns_none() {
+    let mut types = TypeTable::new();
+    let function = batched_masked_softmax_function(&mut types, &[5, 3, 1, 76], &[2, 38]);
+    let signature = batched_masked_softmax_signature(&mut types, 15 * 76, 2 * 38);
+    let validation = MirValidationContext::new(&types);
+    assert!(
+        CollectionKernelPlan::from_transformer_op(
+            &signature,
+            &function,
+            &validation,
+            MirCollectionOp::TensorSoftmax,
+        )
+        .is_none(),
+        "a mask that is not a trailing block of the score dims must fail closed"
+    );
+}
+
+/// The signature's mask resource must carry the mask's own element count
+/// (the A3 cross-check) — a contradicting extent yields no plan.
+#[test]
+fn batched_softmax_mask_count_contradiction_returns_none() {
+    let mut types = TypeTable::new();
+    let function = batched_masked_softmax_function(&mut types, &[5, 3, 1, 76], &[1, 76]);
+    // The signature lies about the mask buffer size (152 ≠ 76).
+    let signature = batched_masked_softmax_signature(&mut types, 15 * 76, 152);
+    let validation = MirValidationContext::new(&types);
+    assert!(
+        CollectionKernelPlan::from_transformer_op(
+            &signature,
+            &function,
+            &validation,
+            MirCollectionOp::TensorSoftmax,
+        )
+        .is_none(),
+        "a mask resource extent that contradicts the mask dims must fail closed"
+    );
+}
+
+/// Rank admission is 3/4 (the settled GEA3 shapes); rank-5 still fails
+/// closed.
+#[test]
+fn batched_softmax_rank5_still_fails_closed() {
+    let mut types = TypeTable::new();
+    let function = batched_masked_softmax_function(&mut types, &[2, 2, 2, 2, 2], &[1, 2]);
+    let signature = batched_masked_softmax_signature(&mut types, 32, 2);
+    let validation = MirValidationContext::new(&types);
+    assert!(
+        CollectionKernelPlan::from_transformer_op(
+            &signature,
+            &function,
+            &validation,
+            MirCollectionOp::TensorSoftmax,
+        )
+        .is_none(),
+        "rank-5 softmax stays outside the admitted surface"
+    );
+}
+
+/// A hand-broken batched plan whose mask count does not divide
+/// `batch · width` fails validation with the typed `RowSoftmaxBatchLaw`.
+#[test]
+fn batched_softmax_batch_law_validation_fails_closed() {
+    let plan = CollectionKernelPlan::RowSoftmax(RowSoftmaxPlan {
+        axis: 3,
+        batched: Some(RowSoftmaxBatch {
+            batch: 15,
+            width: 76,
+            mask: Some(RowSoftmaxMask { count: 75 }),
+        }),
+    });
+    let error = plan
+        .validate()
+        .expect_err("a non-dividing mask count must fail validation");
+    assert_eq!(
+        error,
+        PlanValidationError::RowSoftmaxBatchLaw {
+            batch: 15,
+            width: 76,
+            mask_count: 75,
         }
     );
 }

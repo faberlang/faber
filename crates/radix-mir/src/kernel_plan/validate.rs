@@ -2,7 +2,7 @@ use super::plan::{
     AxisReductionPlan, BarrierPhase, BarrierPoint, CausalMaskedSoftmaxPlan, DistributedSumPlan,
     GatherPlan, GroupedMatMulPlan, MATMUL_SHARED_A_BUFFER_NAME, MATMUL_SHARED_B_BUFFER_NAME,
     MatMulPlan, QuantizedMatMulPlan, ReduceOp, ReductionPlan, RmsNormalizationPlan, RopePlan,
-    SharedMemoryLayout, SsmConv1dPlan, SsmScanPlan, TransposePlan,
+    RowSoftmaxPlan, SharedMemoryLayout, SsmConv1dPlan, SsmScanPlan, TransposePlan,
     WORKGROUP_SHARED_MEMORY_LIMIT_BYTES,
 };
 use std::fmt;
@@ -196,6 +196,38 @@ fn validate_matmul_batch_law(plan: &MatMulPlan) -> Result<(), PlanValidationErro
             batch: plan.batch,
             right_batch: plan.right_batch,
         });
+    }
+    Ok(())
+}
+
+/// U2 head-axis row-softmax batch law: positive batch/width and — when the
+/// additive mask operand is carried — a positive mask count that divides
+/// `batch · width` (the mask dims are a trailing block of the score dims,
+/// so the broadcast read `flat % count` covers exactly the mask buffer).
+/// The trailing-block geometry itself is a resolution-time typed fact; the
+/// plan carries only the counts.
+pub(super) fn validate_row_softmax_plan(plan: &RowSoftmaxPlan) -> Result<(), PlanValidationError> {
+    let Some(batch) = &plan.batched else {
+        // The ordinary rank-1/2 image: no static batch structure (every
+        // algorithmic fact is a resolution-time typed check).
+        return Ok(());
+    };
+    if batch.batch == 0 || batch.width == 0 {
+        return Err(PlanValidationError::RowSoftmaxBatchLaw {
+            batch: batch.batch,
+            width: batch.width,
+            mask_count: batch.mask.as_ref().map_or(0, |mask| mask.count),
+        });
+    }
+    if let Some(mask) = &batch.mask {
+        let total = batch.batch.saturating_mul(batch.width);
+        if mask.count == 0 || !total.is_multiple_of(mask.count) {
+            return Err(PlanValidationError::RowSoftmaxBatchLaw {
+                batch: batch.batch,
+                width: batch.width,
+                mask_count: mask.count,
+            });
+        }
     }
     Ok(())
 }
@@ -644,6 +676,14 @@ pub enum PlanValidationError {
     /// U1 head-axis batch law: both batch counts positive and the argument
     /// batch count dividing the receiver's (the prefix share).
     MatMulBatchLaw { batch: u64, right_batch: u64 },
+    /// U2 head-axis row-softmax batch law: positive batch/width and — when
+    /// the additive mask operand is carried — a positive mask count that
+    /// divides `batch · width`.
+    RowSoftmaxBatchLaw {
+        batch: u64,
+        width: u64,
+        mask_count: u64,
+    },
     /// The OOB padding policy does not cover a matmul operand tile tail.
     MatMulOobPaddingCoverage {
         buffer_name: String,
@@ -778,6 +818,14 @@ impl fmt::Display for PlanValidationError {
             Self::MatMulBatchLaw { batch, right_batch } => write!(
                 f,
                 "matmul batch law violated: batch={batch}, right_batch={right_batch} (both must be positive and right_batch must divide batch)"
+            ),
+            Self::RowSoftmaxBatchLaw {
+                batch,
+                width,
+                mask_count,
+            } => write!(
+                f,
+                "row-softmax batch law violated: batch={batch}, width={width}, mask_count={mask_count} (batch and width must be positive; a carried mask count must be positive and divide batch·width)"
             ),
             Self::MatMulOobPaddingCoverage {
                 buffer_name,

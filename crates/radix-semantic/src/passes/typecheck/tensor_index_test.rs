@@ -673,3 +673,48 @@ fn vector_bracket_index_requires_integer() {
         "array_index_must_be_numerus",
     );
 }
+
+// --- U2 head-axis: batched additive-masked softmax (rank-3/4) ---
+
+#[test]
+fn batched_masked_softmax_decode_shape_typechecks() {
+    // Decode: rectangular scores [5,3,1,76] + declared-length additive
+    // mask [1,76] (broadcast over heads), softmax over the last axis —
+    // the last two axes are query_seq × key_seq, never required square.
+    accepts(
+        r"incipit {
+    fixum tensor<fractus<f32>, [5, 3, 1, 76]> scores ← vacua
+    fixum tensor<fractus<f32>, [1, 76]> length_mask ← vacua
+    fixum tensor<fractus<f32>, [5, 3, 1, 76]> probabilities ← (scores + length_mask).activatio_softmax()
+    nota probabilities.longitudo()
+}",
+    );
+}
+
+#[test]
+fn batched_masked_softmax_prefill_shape_typechecks() {
+    // Prefill: [5,3,36,36] scores + causal additive mask [36,36].
+    accepts(
+        r"incipit {
+    fixum tensor<fractus<f32>, [5, 3, 36, 36]> scores ← vacua
+    fixum tensor<fractus<f32>, [36, 36]> causal_mask ← vacua
+    fixum tensor<fractus<f32>, [5, 3, 36, 36]> probabilities ← (scores + causal_mask).activatio_softmax()
+    nota probabilities.longitudo()
+}",
+    );
+}
+
+#[test]
+fn batched_masked_softmax_non_broadcast_mask_rejects() {
+    // A mask dim that contradicts its aligned score dim (38 against 76)
+    // is not a broadcast — the merged shape constraint fails typed.
+    rejects_with_issue(
+        r"incipit {
+    fixum tensor<fractus<f32>, [5, 3, 1, 76]> scores ← vacua
+    fixum tensor<fractus<f32>, [2, 38]> bad_mask ← vacua
+    fixum tensor<fractus<f32>, [5, 3, 1, 76]> probabilities ← (scores + bad_mask).activatio_softmax()
+    nota probabilities.longitudo()
+}",
+        "incompatible_tensor_index",
+    );
+}
