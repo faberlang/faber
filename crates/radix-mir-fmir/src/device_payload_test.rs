@@ -547,7 +547,7 @@ fn device_section_with_no_artifacts_round_trips() {
 #[test]
 fn reduced_projection_program_decodes_under_the_new_wire_version() {
     // Council-8 CB-3 decode-path coverage: a device program carrying the
-    // new wire-8 reduced-resource projection facts — the `AxisReduction`
+    // new wire-10 reduced-resource projection facts — the `AxisReduction`
     // plan projection AND the reduced buffer version's carried projection —
     // decodes through BOTH codec paths (the text `fmir-text` codec and the
     // binary postcard codec) under the accepted wire version, with the
@@ -578,7 +578,7 @@ fn reduced_projection_program_decodes_under_the_new_wire_version() {
     // Text decode path (the `fmir-text` TOML codec).
     let text_image = text_image_with_device(Some(section.clone()));
     let text_decoded = decode_text_image(&encode_text_image(&text_image).unwrap(), TOOLCHAIN)
-        .expect("wire-8 program decodes through the text codec");
+        .expect("wire-10 program decodes through the text codec");
     let text_device = text_decoded.device.expect("device section present");
     assert_eq!(text_device.device_program.v, WIRE_DEVICE_PROGRAM_VERSION);
     assert_eq!(
@@ -608,7 +608,7 @@ fn reduced_projection_program_decodes_under_the_new_wire_version() {
     let binary_image = binary_image_with_device(Some(section));
     let binary_decoded =
         decode_binary_image(&encode_binary_image(&binary_image).unwrap(), TOOLCHAIN)
-            .expect("wire-8 program decodes through the postcard codec");
+            .expect("wire-10 program decodes through the postcard codec");
     let binary_device = binary_decoded.device.expect("device section present");
     assert_eq!(binary_device.device_program.v, WIRE_DEVICE_PROGRAM_VERSION);
     assert_eq!(
@@ -1813,14 +1813,14 @@ fn decode_rejects_old_wire_version_in_binary_image() {
 
 #[test]
 fn mixed_wire_version_fails_with_the_named_incompatible_diagnostic() {
-    // Council-8 CB-3 (the 7 → 8 clean break): a device section carrying the
-    // immediately-previous wire version is a MIXED-version payload and must
-    // fail closed with the NAMED "incompatible wire version" diagnostic —
-    // the focused `UnsupportedDeviceProgramVersion` error whose display
-    // names the incompatibility — never an opaque decode failure and never
-    // a generic field-level error that hides the version gate.
+    // The v9 → v10 clean break makes a device section carrying the
+    // immediately-previous wire version a MIXED-version payload. It must
+    // fail closed with the NAMED "incompatible wire version" diagnostic
+    // before field-level interpretation. The malformed roots below prove
+    // that nested-version admission runs first.
     let mut section = sample_device_section();
     section.device_program.v = WIRE_DEVICE_PROGRAM_VERSION - 1;
+    section.device_program.program.roots.clear();
     let image = text_image_with_device(Some(section.clone()));
     let text = encode_text_image(&image).expect("encode text image");
     match decode_text_image(&text, TOOLCHAIN) {
@@ -1854,7 +1854,7 @@ fn mixed_wire_version_fails_with_the_named_incompatible_diagnostic() {
 #[test]
 fn decode_rejects_outer_version_independently_of_nested_version() {
     // The outer gate is also independent: a v5 image whose nested device
-    // program is already the current v4 still fails on the OUTER version
+    // program is already the current v10 still fails on the OUTER version
     // first — the two versions never gate through each other (F7).
     let mut image = text_image_with_device(Some(sample_device_section()));
     image.version = 5;
@@ -2155,6 +2155,211 @@ fn two_kernel_chain_program() -> WireDeviceProgram {
         }],
         relations: Vec::new(),
     }
+}
+
+/// A generic four-child program with ordinary elementwise recipes. Each child
+/// consumes the prior child's version and publishes the next one; there is no
+/// composed or stage-specific wire shape involved.
+fn four_kernel_chain_program() -> WireDeviceProgram {
+    let buffer = |id: u32, name: &str, role: WireBufferRole, lifetime: WireBufferLifetime| {
+        WireBufferIdentity {
+            id,
+            name: name.to_owned(),
+            role,
+            storage: WireStorageLayout::DeviceHandle,
+            lifetime,
+            semantic_value: id,
+        }
+    };
+    let version = |count| WireBufferVersion {
+        version: 1,
+        element_ty: "f32".to_owned(),
+        element_count: count,
+        reduced_projection: None,
+    };
+    let resource = |buffer, access, initialization| {
+        let count = 4;
+        WireDeviceResource {
+            buffer,
+            version: version(count),
+            binding: WireBinding {
+                group: 0,
+                binding: 0,
+            },
+            access,
+            generation: 1,
+            initialization,
+        }
+    };
+    let launch = || WireKernelLaunchPlan {
+        workgroup: WireWorkgroupSize { x: 8, y: 1, z: 1 },
+        dispatch_size: WireDispatchSize { x: 4, y: 1, z: 1 },
+        workgroup_count: WireWorkgroupCount { x: 1, y: 1, z: 1 },
+    };
+    let a = buffer(1, "a", WireBufferRole::InOut, WireBufferLifetime::PerStep);
+    let b = buffer(2, "b", WireBufferRole::InOut, WireBufferLifetime::PerStep);
+    let c = buffer(3, "c", WireBufferRole::InOut, WireBufferLifetime::PerStep);
+    let d = buffer(
+        4,
+        "d",
+        WireBufferRole::Output,
+        WireBufferLifetime::ObservationPoint,
+    );
+    let kernel = |function: u32, entry: &str, resources: Vec<WireDeviceResource>| WireKernelUnit {
+        function,
+        entry: entry.to_owned(),
+        plan: WireCollectionKernelPlan::Elementwise,
+        resources,
+        launch: launch(),
+    };
+    WireDeviceProgram {
+        kernels: vec![
+            kernel(
+                0,
+                "child__0",
+                vec![resource(
+                    a.clone(),
+                    WireResourceAccess::Write,
+                    WireInitializationPolicy::KernelInitialized,
+                )],
+            ),
+            kernel(
+                1,
+                "child__1",
+                vec![
+                    resource(
+                        a.clone(),
+                        WireResourceAccess::Read,
+                        WireInitializationPolicy::KernelInitialized,
+                    ),
+                    resource(
+                        b.clone(),
+                        WireResourceAccess::Write,
+                        WireInitializationPolicy::KernelInitialized,
+                    ),
+                ],
+            ),
+            kernel(
+                2,
+                "child__2",
+                vec![
+                    resource(
+                        b.clone(),
+                        WireResourceAccess::Read,
+                        WireInitializationPolicy::KernelInitialized,
+                    ),
+                    resource(
+                        c.clone(),
+                        WireResourceAccess::Write,
+                        WireInitializationPolicy::KernelInitialized,
+                    ),
+                ],
+            ),
+            kernel(
+                3,
+                "child__3",
+                vec![
+                    resource(
+                        c.clone(),
+                        WireResourceAccess::Read,
+                        WireInitializationPolicy::KernelInitialized,
+                    ),
+                    resource(
+                        d.clone(),
+                        WireResourceAccess::Write,
+                        WireInitializationPolicy::KernelInitialized,
+                    ),
+                ],
+            ),
+        ],
+        launches: (1..=4)
+            .zip(0..4)
+            .map(|(id, kernel_index)| WireLaunchUnit { id, kernel_index })
+            .collect(),
+        lifetime: WireProgramLifetime::SingleRun,
+        results: vec![WireResultBuffer {
+            buffer: d,
+            version: version(4),
+            role: WireBufferRole::Output,
+            produced_by: 4,
+            observation: WireObservationFact {
+                at_launch: 4,
+                cadence: WireObservationCadence::PerStep,
+            },
+        }],
+        semantic_values: (1..=4)
+            .map(|id| WireSemanticValue {
+                id,
+                name: format!("value_{id}"),
+                origin: WireSemanticValueOrigin::Synthetic {
+                    label: format!("child-{id}-output"),
+                },
+            })
+            .collect(),
+        roots: vec![1],
+        dependencies: vec![
+            WireDependencyEdge {
+                producer: 1,
+                consumer: 2,
+                buffer: 1,
+                version: 1,
+            },
+            WireDependencyEdge {
+                producer: 2,
+                consumer: 3,
+                buffer: 2,
+                version: 1,
+            },
+            WireDependencyEdge {
+                producer: 3,
+                consumer: 4,
+                buffer: 3,
+                version: 1,
+            },
+        ],
+        relations: Vec::new(),
+    }
+}
+
+#[test]
+fn v10_generic_four_kernel_program_round_trips_with_identical_identity() {
+    let program = four_kernel_chain_program();
+    let mut section = sample_device_section();
+    section.device_program.program = program.clone();
+    section.device_program.v = WIRE_VERSION;
+
+    let text_image = text_image_with_device(Some(section.clone()));
+    let text = encode_text_image(&text_image).expect("encode v10 text image");
+    let text_decoded = decode_text_image(&text, TOOLCHAIN).expect("decode v10 text image");
+    let text_program = text_decoded
+        .device
+        .expect("text device section")
+        .device_program
+        .program;
+
+    let binary_image = binary_image_with_device(Some(section));
+    let bytes = encode_binary_image(&binary_image).expect("encode v10 binary image");
+    let binary_decoded = decode_binary_image(&bytes, TOOLCHAIN).expect("decode v10 binary image");
+    let binary_program = binary_decoded
+        .device
+        .expect("binary device section")
+        .device_program
+        .program;
+
+    assert_eq!(text_program.kernels.len(), 4);
+    assert_eq!(text_program, program);
+    assert_eq!(binary_program, program);
+    assert_eq!(
+        canonical_program_bytes(&text_program),
+        canonical_program_bytes(&binary_program),
+        "text and binary codecs preserve one canonical generic multi-child identity"
+    );
+    let sources = ["fnv64:four-child"];
+    assert_eq!(
+        device_identity_hash(&sources, &canonical_program_bytes(&text_program)),
+        device_identity_hash(&sources, &canonical_program_bytes(&binary_program)),
+        "text and binary codecs preserve the same device identity"
+    );
 }
 
 fn sample_relation() -> WireCompanionRelation {
@@ -2963,7 +3168,7 @@ fn gi3_inference_recipe_plans_round_trip_on_the_wire() {
 /// semantic facts, no version bump.
 #[test]
 fn r_pack_packed_kernel_plans_round_trip_on_the_wire() {
-    assert_eq!(WIRE_DEVICE_PROGRAM_VERSION, 9);
+    assert_eq!(WIRE_DEVICE_PROGRAM_VERSION, 10);
     let plans = [
         WireCollectionKernelPlan::QuantizedMatMul(WireQuantizedMatMulPlan {
             m: 8,

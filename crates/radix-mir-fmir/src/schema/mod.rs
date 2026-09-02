@@ -139,20 +139,22 @@ pub const ARTIFACT_ABI_VERSION: u32 = 8;
 /// reduced buffer version carries the producer-defined **reduced-resource
 /// projection** (`axis_extent` + `inner_stride`) so consumers never
 /// reconstruct the reduced-buffer mapping from element count), and `8 → 9`
-/// by GEA3-A2f: the composed gate/up/SwiGLU/down plan and its typed staged
-/// producer facts are carried and admitted as a distinct wire variant).
+/// by GEA3-A2f: the fixed composed matmul wire variant was carried as a
+/// transitional shape. The current kernel-codegen clean break is `9 → 10`:
+/// that retired variant is not admitted; generic multi-child programs are the
+/// sole v10 device-program representation.
 /// Admitted independently of the outer image version:
 /// [`admit_device_section`] rejects a mismatched nested version before any
 /// field-level interpretation, with a focused diagnostic
 /// ([`UnsupportedDeviceProgramVersion`](crate::error::FmirImageError::DeviceProgramVersionMismatch)).
-pub const WIRE_DEVICE_PROGRAM_VERSION: u32 = 9;
+pub const WIRE_DEVICE_PROGRAM_VERSION: u32 = 10;
 
 /// The version ratchet of the optional distributed execution section
 /// (MD2-W1 A7). The section carries its OWN nested version, admitted
 /// fail-closed **before field interpretation** (the `admit_device_section`
 /// pattern, FC4) — independently of the nested device-program wire version
 /// and the outer image version. The first distributed-section shape is v1;
-/// the nested `WIRE_DEVICE_PROGRAM_VERSION = 9` and the outer
+/// the nested `WIRE_DEVICE_PROGRAM_VERSION = 10` and the outer
 /// `PACKAGE_MIR_ARTIFACT_VERSION = 7` stay untouched (FC1).
 pub const WIRE_DISTRIBUTED_SECTION_VERSION: u32 = 1;
 

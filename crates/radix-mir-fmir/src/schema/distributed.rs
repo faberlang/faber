@@ -63,12 +63,10 @@ use radix_mir::distributed::{
 };
 use radix_mir::kernel_plan::{
     AxisReductionPlan, BarrierPhase, BarrierPoint, BatchedAttentionKind, BatchedAttentionPlan,
-    CausalMaskedSoftmaxPlan, CollectionKernelPlan, ComposedMatMulEdge, ComposedMatMulHandoff,
-    ComposedMatMulPlan, ComposedMatMulStage, ComposedMatMulStageKind, ComposedMatMulStageOutput,
-    GatherPlan, GroupedMatMulPlan, LayerNormalizationPlan, MatMulPlan, MatMulShapes,
-    MatMulSharedMemory, OobPaddingPolicy, QuantizedMatMulPlan, ReduceOp, ReductionPlan,
-    RmsNormalizationPlan, RopePlan, RowSoftmaxPlan, SharedMemoryLayout, SsmConv1dPlan, SsmScanPlan,
-    TransposePlan,
+    CausalMaskedSoftmaxPlan, CollectionKernelPlan, GatherPlan, GroupedMatMulPlan,
+    LayerNormalizationPlan, MatMulPlan, MatMulSharedMemory, OobPaddingPolicy, QuantizedMatMulPlan,
+    ReduceOp, ReductionPlan, RmsNormalizationPlan, RopePlan, RowSoftmaxPlan, SharedMemoryLayout,
+    SsmConv1dPlan, SsmScanPlan, TransposePlan,
 };
 use radix_mir::layout::MirTensorStorageLayout;
 use radix_mir::{MirFunctionId, MirScalarLayout, MirType};
@@ -77,9 +75,9 @@ use radix_types::TypeId;
 use super::wire::{
     WireBarrierPhase, WireBarrierPoint, WireBatchedAttentionKind, WireBufferIdentity,
     WireBufferLifetime, WireBufferRole, WireBufferVersion, WireCollectionKernelPlan,
-    WireComposedMatMulHandoff, WireComposedMatMulStageKind, WireDeviceProgram, WireKernelUnit,
-    WireMatMulLayout, WireOobPaddingPolicy, WirePackedStorageLayout, WireProgramLifetime,
-    WireReduceOp, WireResourceAccess, WireResultBuffer, WireSharedMemoryLayout, WireStorageLayout,
+    WireDeviceProgram, WireKernelUnit, WireMatMulLayout, WireOobPaddingPolicy,
+    WirePackedStorageLayout, WireProgramLifetime, WireReduceOp, WireResourceAccess,
+    WireResultBuffer, WireSharedMemoryLayout, WireStorageLayout,
 };
 use crate::error::FmirImageError;
 
@@ -692,51 +690,6 @@ fn wire_kernel_plan(plan: &WireCollectionKernelPlan) -> CollectionKernelPlan {
             state_dim: plan.state_dim,
             layout: wire_packed_layout(plan.layout),
         }),
-        WireCollectionKernelPlan::ComposedMatMul(plan) => {
-            CollectionKernelPlan::ComposedMatMul(ComposedMatMulPlan {
-                stages: plan
-                    .stages
-                    .iter()
-                    .map(|stage| ComposedMatMulStage {
-                        kind: match stage.kind {
-                            WireComposedMatMulStageKind::Gate => ComposedMatMulStageKind::Gate,
-                            WireComposedMatMulStageKind::Up => ComposedMatMulStageKind::Up,
-                            WireComposedMatMulStageKind::SwiGlu => ComposedMatMulStageKind::SwiGlu,
-                            WireComposedMatMulStageKind::Down => ComposedMatMulStageKind::Down,
-                        },
-                        shape: stage.shape.map(|shape| MatMulShapes {
-                            m: shape.m,
-                            k: shape.k,
-                            n: shape.n,
-                            left_layout: wire_matmul_layout(shape.left_layout),
-                            right_layout: wire_matmul_layout(shape.right_layout),
-                        }),
-                        output: ComposedMatMulStageOutput {
-                            source_local: radix_mir::MirLocalId(stage.output.source_local),
-                            element_ty: wire_matmul_layout(stage.output.element_ty),
-                            element_count: stage.output.element_count,
-                            access: wire_access_to_access(stage.output.access),
-                        },
-                    })
-                    .collect(),
-                edges: plan
-                    .edges
-                    .iter()
-                    .map(|edge| ComposedMatMulEdge {
-                        producer: edge.producer,
-                        consumer: edge.consumer,
-                        source_local: radix_mir::MirLocalId(edge.source_local),
-                        element_ty: wire_matmul_layout(edge.element_ty),
-                        element_count: edge.element_count,
-                    })
-                    .collect(),
-                handoff: match plan.handoff {
-                    WireComposedMatMulHandoff::WorkgroupBarrier => {
-                        ComposedMatMulHandoff::WorkgroupBarrier
-                    }
-                },
-            })
-        }
     }
 }
 

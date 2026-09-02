@@ -5,7 +5,7 @@
 //!
 //! Proves the MD2-W1 done-when:
 //!
-//! - a wire-8 single-device image WITHOUT the section decodes, admits, and
+//! - a wire-10 single-device image WITHOUT the section decodes, admits, and
 //!   runs unchanged (the section is `None` — the independent single-device
 //!   path; `admit_device_section` admits it and `device_identity_hash` is
 //!   unchanged);
@@ -662,7 +662,7 @@ fn unknown_element_type_spelling_fails_closed() {
 
 #[test]
 fn single_device_section_without_distributed_admits_unchanged() {
-    // A wire-8 device section WITHOUT the distributed section admits through
+    // A wire-10 device section WITHOUT the distributed section admits through
     // the existing device-section admission unchanged (the independent
     // single-device path; MD-A15).
     let section = device_section_with_distributed(None);
