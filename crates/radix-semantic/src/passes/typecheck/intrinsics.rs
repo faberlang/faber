@@ -939,12 +939,35 @@ fn check_tensor_method_args(
     for ((arg, kind), param) in args.iter_mut().zip(entry.params.iter()).zip(params.iter()) {
         if *kind == IntrinsicParamKind::NumerusArray {
             check_integer_index_vector_arg(checker, arg, span);
+        } else if *kind == IntrinsicParamKind::NumerusIndex && arg_is_symbolic_size(checker, &arg.expr)
+        {
+            // WHY (SGR-C1): a body-visible `magnitudo` parameter names its
+            // compile-time size at an index slot. Lowering types it as the
+            // rigid symbolic-size marker `Type::Param`; checked without an
+            // expected type the marker stays rigid. Admission is slot-local:
+            // the same marker in any other value position keeps failing
+            // ordinary unification.
+            checker.check_expr(&mut arg.expr);
         } else {
             let arg_ty = checker.check_expr_with_expected(&mut arg.expr, Some(param.ty));
             checker.unify_assign_issue(arg_ty, param.ty, arg.span, ISSUE_ARGUMENT_TYPE_MISMATCH);
         }
     }
     ret
+}
+
+/// True when the argument is a bare reference to a body-visible `magnitudo`
+/// parameter, lowered as a `Path` to a `Param`-kind symbol typed
+/// `Type::Param(name)`. Purely a peek: no diagnostics, no inference.
+fn arg_is_symbolic_size(checker: &TypeChecker<'_>, expr: &HirExpression) -> bool {
+    let HirExpressionKind::Path(def_id) = &expr.kind else {
+        return false;
+    };
+    checker
+        .resolver
+        .get_symbol(*def_id)
+        .and_then(|symbol| symbol.ty)
+        .is_some_and(|ty| matches!(checker.types.get(ty), Type::Param(_)))
 }
 
 /// Typecheck a tensor index-vector argument and validate it is an i64-fit

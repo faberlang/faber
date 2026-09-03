@@ -1161,6 +1161,67 @@ fn resolve_pattern_bind(
     }
 }
 
+/// Positions whose method-intrinsic slots are `NumerusIndex` for a
+/// member-syntax callee, when every registry entry sharing the spelling and
+/// arity agrees on those positions.
+///
+/// Resolution cannot see the receiver's type family, so a cross-family
+/// disagreement stays fail-closed (no exemption) and typecheck re-owns the
+/// admission per receiver. Spellings match the canonical registry names — the
+/// `la` and `en` packs identity-map intrinsic surfaces — so a pack that
+/// surface-renames an intrinsic keeps the stricter `SEM001` rejection here.
+fn member_intrinsic_index_positions(
+    interner: &Interner,
+    callee: &Expr,
+    arg_count: usize,
+) -> Vec<usize> {
+    let ExprKind::Member(member) = &callee.kind else {
+        return Vec::new();
+    };
+    let spelling = interner.resolve(member.member.name);
+    let mut agreed: Option<Vec<usize>> = None;
+    for entry in radix_intrinsics::INTRINSICS {
+        if entry.faber_name != spelling || entry.arg_count != arg_count {
+            continue;
+        }
+        let positions: Vec<usize> = entry
+            .params
+            .iter()
+            .enumerate()
+            .filter(|(_, kind)| **kind == radix_intrinsics::IntrinsicParamKind::NumerusIndex)
+            .map(|(position, _)| position)
+            .collect();
+        match &mut agreed {
+            None => agreed = Some(positions),
+            Some(existing) if *existing == positions => {}
+            Some(_) => return Vec::new(),
+        }
+    }
+    agreed.unwrap_or_default()
+}
+
+/// True when a positional argument is a bare `magnitudo` parameter name
+/// admitted at a `NumerusIndex` intrinsic slot — the only expression position
+/// where an `IndexParam` may name a value. Every other position keeps the
+/// `SEM001` not-a-value rejection at the expression identifier gate.
+fn admits_index_param_value(
+    resolver: &Resolver,
+    index_positions: &[usize],
+    position: usize,
+    arg: &radix_syntax::Argument,
+) -> bool {
+    if arg.label.is_some() || arg.is_spread || !index_positions.contains(&position) {
+        return false;
+    }
+    let ExprKind::Ident(ident) = &arg.value.kind else {
+        return false;
+    };
+    resolver
+        .lookup(ident.name)
+        .and_then(|def_id| resolver.get_symbol(def_id))
+        .is_some_and(|symbol| symbol.kind == SymbolKind::IndexParam)
+}
+
 fn resolve_expr(
     resolver: &mut Resolver,
     interner: &Interner,
@@ -1218,7 +1279,12 @@ fn resolve_expr(
             // live, so resolving it here keeps calls consistent with every
             // other position (`arg`, receiver, index base, and chain base).
             resolve_expr(resolver, interner, &expr.callee, errors);
-            for arg in &expr.args {
+            let index_positions =
+                member_intrinsic_index_positions(interner, &expr.callee, expr.args.len());
+            for (position, arg) in expr.args.iter().enumerate() {
+                if admits_index_param_value(resolver, &index_positions, position, arg) {
+                    continue;
+                }
                 resolve_expr(resolver, interner, &arg.value, errors);
             }
         }
