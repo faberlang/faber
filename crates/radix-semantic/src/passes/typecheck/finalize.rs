@@ -156,7 +156,6 @@ impl TypeChecker<'_> {
                 let err = sig.err.map(|err_ty| self.canonicalize_type(err_ty));
                 self.types.function(FuncSig {
                     type_params: sig.type_params.clone(),
-                    type_param_constraints: sig.type_param_constraints.clone(),
                     params,
                     ret,
                     err,

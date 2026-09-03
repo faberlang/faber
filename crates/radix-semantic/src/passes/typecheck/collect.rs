@@ -81,17 +81,7 @@ impl TypeChecker<'_> {
         let (ret, err) =
             self.callable_boundary_return(ret, func.err_ty, func.is_async, func.is_generator);
         FuncSig {
-            type_params: func.type_params.iter().map(|param| param.name).collect(),
-            type_param_constraints: func
-                .type_params
-                .iter()
-                .map(|param| match &param.constraint {
-                    radix_hir::HirTypeParamConstraint::Any => TypeParamConstraint::Any,
-                    radix_hir::HirTypeParamConstraint::OneOf(allowed) => {
-                        TypeParamConstraint::OneOf(allowed.clone())
-                    }
-                })
-                .collect(),
+            type_params: HirTypeParam::descriptors(&func.type_params),
             params,
             ret,
             err,
@@ -199,7 +189,6 @@ impl TypeChecker<'_> {
                 InterfaceMethodInfo {
                     sig: FuncSig {
                         type_params: Vec::new(),
-                        type_param_constraints: Vec::new(),
                         params,
                         ret,
                         err,

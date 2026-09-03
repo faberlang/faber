@@ -132,7 +132,6 @@ fn build_comprehensive_table() -> (TypeTable, Vec<TypeId>) {
     // ── Function signature ───────────────────────────────────────────────
     let fn_id = t.function(crate::FuncSig {
         type_params: Vec::new(),
-        type_param_constraints: Vec::new(),
         params: vec![ParamType {
             ty: numerus,
             mode: SemanticParamMode::Owned,
@@ -449,7 +448,6 @@ fn compound_reflexivity_holds_exhaustively() {
 
     type_ids.push(table.function(crate::FuncSig {
         type_params: Vec::new(),
-        type_param_constraints: Vec::new(),
         params: vec![ParamType {
             ty: numerus,
             mode: SemanticParamMode::Ref,

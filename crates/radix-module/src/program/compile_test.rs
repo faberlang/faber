@@ -164,7 +164,16 @@ fn imported_shapes() → matrix<f32, [3, 3]> {
     let FileExportKind::Function(add) = &interface.exports["add"].kind else {
         panic!("add must snapshot as a function export");
     };
-    assert_eq!(add.type_params, vec!["N".to_owned()]);
+    let add_param_names: Vec<&str> = add
+        .type_params
+        .iter()
+        .map(|param| param.name.as_str())
+        .collect();
+    assert_eq!(add_param_names, vec!["N"]);
+    assert!(add
+        .type_params
+        .iter()
+        .all(|param| param.kind == crate::syntax::GenericParamKind::Magnitudo));
     assert_eq!(
         add.params,
         vec![

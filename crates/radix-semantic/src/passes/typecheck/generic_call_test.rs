@@ -801,8 +801,20 @@ fn math_namespace_interface() -> crate::file_interface::FileInterface {
     interface.insert(FileExport {
         name: "add".to_owned(),
         kind: FileExportKind::Function(InterfaceCallable {
-            type_params: vec!["M".to_owned(), "N".to_owned()],
-            type_param_constraints: Vec::new(),
+            type_params: vec![
+                crate::file_interface::InterfaceCallableParam {
+                    name: "M".to_owned(),
+                    kind: radix_syntax::GenericParamKind::Magnitudo,
+                    constraint: crate::file_interface::InterfaceTypeParamConstraint::Any,
+                    default: None,
+                },
+                crate::file_interface::InterfaceCallableParam {
+                    name: "N".to_owned(),
+                    kind: radix_syntax::GenericParamKind::Magnitudo,
+                    constraint: crate::file_interface::InterfaceTypeParamConstraint::Any,
+                    default: None,
+                },
+            ],
             params: vec![
                 InterfaceParam {
                     ty: tensor_mn.clone(),

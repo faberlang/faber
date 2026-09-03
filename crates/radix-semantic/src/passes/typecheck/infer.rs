@@ -89,8 +89,8 @@ impl TypeChecker<'_> {
                 if let Some(err) = sig.err {
                     kids.push(err);
                 }
-                for c in &sig.type_param_constraints {
-                    if let TypeParamConstraint::OneOf(types) = c {
+                for param in &sig.type_params {
+                    if let TypeParamConstraint::OneOf(types) = &param.constraint {
                         kids.extend(types.iter().copied());
                     }
                 }
@@ -706,7 +706,6 @@ impl TypeChecker<'_> {
         };
         self.types.function(FuncSig {
             type_params: sig_a.type_params.clone(),
-            type_param_constraints: sig_a.type_param_constraints.clone(),
             params,
             ret,
             err,

@@ -68,12 +68,15 @@ impl TypeChecker<'_> {
         expected: Option<TypeId>,
         solve_shape_params: bool,
     ) -> TypeId {
-        // Magnitudo shape params are recognized by symbol identity: they lower
-        // exclusively into `IndexExpr::Param` positions inside tensor/vector/
-        // matrix/sparsa shapes, so the shape-param set is derived from the
-        // signature rather than carried as a `FuncSig` field.
+        // Magnitudo shape params are carried by the signature's generic
+        // descriptors: the declared sort is authoritative, so a size param
+        // is a shape param even when no signature shape mentions it.
         let shape_symbols = if solve_shape_params {
-            self.collect_shape_param_symbols(sig)
+            sig.type_params
+                .iter()
+                .filter(|param| param.sort == GenericParamSort::Magnitudo)
+                .map(|param| param.name)
+                .collect()
         } else {
             FxHashSet::default()
         };
@@ -84,7 +87,6 @@ impl TypeChecker<'_> {
             (sig, Some(param_vars), shape_vars)
         } else if let Some(error_ty) = self.reject_invalid_explicit_type_args(
             sig,
-            &shape_symbols,
             explicit_type_args,
             args,
             span,
@@ -95,13 +97,13 @@ impl TypeChecker<'_> {
             return self.error_type;
         } else {
             let mut param_vars = FxHashMap::default();
-            for (sym, ty) in sig
+            for (param, ty) in sig
                 .type_params
                 .iter()
-                .filter(|sym| !shape_symbols.contains(sym))
+                .filter(|param| param.sort == GenericParamSort::Typus)
                 .zip(explicit_type_args.iter())
             {
-                param_vars.insert(*sym, *ty);
+                param_vars.insert(param.name, *ty);
             }
             let mut shape_vars = self.shape_vars_for(sig, &shape_symbols);
             self.bind_explicit_magnitudo_args(sig, explicit_type_args, &mut shape_vars);
@@ -140,7 +142,6 @@ impl TypeChecker<'_> {
     fn reject_invalid_explicit_type_args(
         &mut self,
         sig: &FuncSig,
-        shape_symbols: &FxHashSet<Symbol>,
         explicit_type_args: &[TypeId],
         args: &mut [HirCallArg],
         span: radix_lexer::Span,
@@ -159,7 +160,7 @@ impl TypeChecker<'_> {
         let type_param_count = sig
             .type_params
             .iter()
-            .filter(|sym| !shape_symbols.contains(sym))
+            .filter(|param| param.sort == GenericParamSort::Typus)
             .count();
         if type_param_count == 0 {
             // GSF-1: a size-only callee also accepts caller-owned symbolic
@@ -207,13 +208,8 @@ impl TypeChecker<'_> {
         span: radix_lexer::Span,
     ) -> bool {
         let mut rejected = false;
-        for ((param, constraint), witness) in sig
-            .type_params
-            .iter()
-            .zip(sig.type_param_constraints.iter())
-            .zip(witnesses.iter())
-        {
-            if self.type_arg_rejects_domain(*param, constraint, *witness, span) {
+        for (param, witness) in sig.type_params.iter().zip(witnesses.iter()) {
+            if self.type_arg_rejects_domain(param.name, &param.constraint, *witness, span) {
                 rejected = true;
             }
         }
@@ -227,18 +223,16 @@ impl TypeChecker<'_> {
         span: radix_lexer::Span,
     ) -> bool {
         let mut rejected = false;
-        for (param, constraint) in sig
-            .type_params
-            .iter()
-            .zip(sig.type_param_constraints.iter())
-        {
-            let Some(witness) = param_vars.get(param).copied() else {
+        for param in &sig.type_params {
+            let Some(witness) = param_vars.get(&param.name).copied() else {
                 continue;
             };
             if self.is_infer(self.resolve_inferred_type(witness)) {
                 continue;
             }
-            if self.type_arg_rejects_domain(*param, constraint, witness, span) {
+            if self
+                .type_arg_rejects_domain(param.name, &param.constraint, witness, span)
+            {
                 rejected = true;
             }
         }
@@ -305,7 +299,6 @@ impl TypeChecker<'_> {
     ) -> FuncSig {
         FuncSig {
             type_params: sig.type_params.clone(),
-            type_param_constraints: sig.type_param_constraints.clone(),
             params: sig
                 .params
                 .iter()
@@ -503,23 +496,6 @@ impl TypeChecker<'_> {
         }
     }
 
-    /// Collect the distinct shape-param symbols of `sig`.
-    ///
-    /// Magnitudo params lower only into `IndexExpr::Param` positions, so the
-    /// symbols found in tensor/vector/matrix/sparsa shapes are exactly the
-    /// shape params — no separate kind list is needed.
-    fn collect_shape_param_symbols(&self, sig: &FuncSig) -> FxHashSet<Symbol> {
-        let mut symbols = FxHashSet::default();
-        for param in &sig.params {
-            self.collect_shape_params_in_type(param.ty, &mut symbols);
-        }
-        self.collect_shape_params_in_type(sig.ret, &mut symbols);
-        if let Some(err) = sig.err {
-            self.collect_shape_params_in_type(err, &mut symbols);
-        }
-        symbols
-    }
-
     fn magnitudo_literal_of(&self, ty: TypeId) -> Option<u64> {
         let Type::Param(sym) = self.types.get(ty) else {
             return None;
@@ -565,97 +541,10 @@ impl TypeChecker<'_> {
         explicit_type_args: &[TypeId],
         shape_vars: &mut FxHashMap<Symbol, crate::IndexId>,
     ) {
-        for (sym, ty) in sig.type_params.iter().zip(explicit_type_args.iter()) {
+        for (param, ty) in sig.type_params.iter().zip(explicit_type_args.iter()) {
             if let Some(index) = self.explicit_size_witness_index(*ty) {
-                shape_vars.insert(*sym, index);
+                shape_vars.insert(param.name, index);
             }
-        }
-    }
-
-    fn collect_shape_params_in_type(&self, ty: TypeId, out: &mut FxHashSet<Symbol>) {
-        match self.types.get(ty).clone() {
-            Type::Tensor(_, shape)
-            | Type::Vector(_, shape)
-            | Type::Matrix(_, shape)
-            | Type::Sparsa(_, shape)
-            | Type::BoundedAscii { capacity: shape }
-            | Type::BoundedTextus { capacity: shape }
-            | Type::BoundedOcteti { capacity: shape } => {
-                self.collect_shape_params_in_index(shape, out);
-            }
-            Type::BoundedArray { element, capacity } => {
-                self.collect_shape_params_in_type(element, out);
-                self.collect_shape_params_in_index(capacity, out);
-            }
-            Type::Array(inner)
-            | Type::Set(inner)
-            | Type::Option(inner)
-            | Type::Promissum(inner)
-            | Type::Cursor(inner)
-            | Type::Intervallum(inner)
-            | Type::Ref(_, inner) => self.collect_shape_params_in_type(inner, out),
-            // S0-G2: alias bodies are a foreign param scope — the alias's own
-            // declaration params are not this signature's shape params, so
-            // neither a bare alias use nor an applied alias's base contributes
-            // symbols. A function's magnitudo params reach here only through
-            // builtin shape positions and applied argument positions.
-            Type::Map(key, value)
-            | Type::PromissumFailable(key, value)
-            | Type::AsyncCursor(key, value) => {
-                self.collect_shape_params_in_type(key, out);
-                self.collect_shape_params_in_type(value, out);
-            }
-            Type::Record(fields) => {
-                for field in fields.values() {
-                    self.collect_shape_params_in_type(*field, out);
-                }
-            }
-            Type::Tuple(elements) => {
-                for element in elements {
-                    self.collect_shape_params_in_type(element, out);
-                }
-            }
-            Type::Union(members) => {
-                for member in members {
-                    self.collect_shape_params_in_type(member, out);
-                }
-            }
-            Type::Func(sig) => {
-                for param in &sig.params {
-                    self.collect_shape_params_in_type(param.ty, out);
-                }
-                self.collect_shape_params_in_type(sig.ret, out);
-                if let Some(err) = sig.err {
-                    self.collect_shape_params_in_type(err, out);
-                }
-            }
-            Type::Applied(_base, args) => {
-                for arg in args {
-                    match arg {
-                        radix_types::AppliedArg::Type(id) => {
-                            self.collect_shape_params_in_type(id, out);
-                        }
-                        radix_types::AppliedArg::Size(id) => {
-                            self.collect_shape_params_in_index(id, out);
-                        }
-                    }
-                }
-            }
-            _ => {}
-        }
-    }
-
-    fn collect_shape_params_in_index(&self, id: IndexId, out: &mut FxHashSet<Symbol>) {
-        match self.types.get_index(id) {
-            IndexExpr::Param(sym) => {
-                out.insert(*sym);
-            }
-            IndexExpr::Tuple(dims) => {
-                for dim in dims {
-                    self.collect_shape_params_in_index(*dim, out);
-                }
-            }
-            _ => {}
         }
     }
 

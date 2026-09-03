@@ -1373,7 +1373,6 @@ impl RowHarness {
     fn total_sig(&mut self) -> FuncSig {
         FuncSig {
             type_params: Vec::new(),
-            type_param_constraints: Vec::new(),
             params: Vec::new(),
             ret: self.types.primitive(Primitive::Vacuum),
             err: None,
@@ -1385,7 +1384,6 @@ impl RowHarness {
     fn conversion_fn_sig(&mut self, err: Option<TypeId>) -> FuncSig {
         FuncSig {
             type_params: Vec::new(),
-            type_param_constraints: Vec::new(),
             params: vec![ParamType {
                 ty: self.types.primitive(Primitive::Vacuum),
                 mode: SemanticParamMode::Owned,

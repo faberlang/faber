@@ -611,6 +611,7 @@ fn declaration_and_annotation_lists_emit_between_only() {
             name: interner.intern("T"),
             span: span(),
             constraint: HirTypeParamConstraint::Any,
+            default: None,
         },
         HirTypeParam {
             def_id: DefId(2),
@@ -618,6 +619,7 @@ fn declaration_and_annotation_lists_emit_between_only() {
             name: interner.intern("U"),
             span: span(),
             constraint: HirTypeParamConstraint::Any,
+            default: None,
         },
         HirTypeParam {
             def_id: DefId(3),
@@ -625,6 +627,7 @@ fn declaration_and_annotation_lists_emit_between_only() {
             name: interner.intern("N"),
             span: span(),
             constraint: HirTypeParamConstraint::Any,
+            default: None,
         },
     ];
     let params = vec![
@@ -849,7 +852,6 @@ fn type_positions_pin_fixed_and_item_shape_separators() {
     let tuple = types.intern(Type::Tuple(vec![textus, numerus]));
     let function = types.intern(Type::Func(FuncSig {
         type_params: Vec::new(),
-        type_param_constraints: Vec::new(),
         params: vec![
             ParamType {
                 ty: textus,
@@ -973,6 +975,7 @@ fn canonical_reemission_is_idempotent_for_the_cs1_fixture() {
             name: type_name,
             span: span(),
             constraint: HirTypeParamConstraint::Any,
+            default: None,
         }],
         vec![HirParam {
             def_id: DefId(2),

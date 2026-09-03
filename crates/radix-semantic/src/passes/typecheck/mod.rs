@@ -59,8 +59,8 @@
 
 use crate::locale::LocalePack;
 use crate::{
-    FuncSig, IndexExpr, IndexInferState, MarkerFamily, NumericWidth, ParamType, Primitive,
-    Resolver, SemanticError, SemanticErrorKind, SemanticParamMode, Type, TypeId,
+    FuncSig, GenericParamSort, IndexExpr, IndexInferState, MarkerFamily, NumericWidth, ParamType,
+    Primitive, Resolver, SemanticError, SemanticErrorKind, SemanticParamMode, Type, TypeId,
     TypeParamConstraint, TypeTable, WarningKind, types::InferVar,
 };
 use radix_hir::{
@@ -68,7 +68,7 @@ use radix_hir::{
     HirConversioTarget, HirExpression, HirExpressionKind, HirFunction, HirId, HirItem, HirItemKind,
     HirLiteral, HirLocal, HirModule, HirObjectField, HirObjectKey, HirParam, HirParamMode,
     HirPattern, HirPresentation, HirStatement, HirStatementKind, HirStruct, HirTypeForm,
-    HirTypeFormArg, NucleumRole,
+    HirTypeFormArg, HirTypeParam, NucleumRole,
 };
 use radix_lexer::{Interner, Symbol};
 use radix_target::Target;

@@ -17,9 +17,9 @@ use radix_module::file_interface::{
 };
 use radix_module::hir::{
     DefId, HirConst, HirEnum, HirFunction, HirInterface, HirInterfaceMethod, HirItemKind,
-    HirParamMode, HirStruct, HirTypeAlias, HirTypeParam, HirTypeParamConstraint, NucleumRole,
+    HirParamMode, HirStruct, HirTypeAlias, HirTypeParam, NucleumRole,
 };
-use radix_module::semantic::{FuncSig, ParamType, SemanticParamMode, Type, TypeParamConstraint};
+use radix_module::semantic::{FuncSig, ParamType, SemanticParamMode, Type};
 use std::collections::BTreeSet;
 
 /// Portable export identity for annotation contracts on library file interfaces.
@@ -354,7 +354,6 @@ fn snapshot_interface_method(
     });
     let sig = FuncSig {
         type_params: Vec::new(),
-        type_param_constraints: Vec::new(),
         params: method
             .params
             .iter()
@@ -449,18 +448,7 @@ fn snapshot_struct_method(
             .primitive(radix_module::semantic::Primitive::Vacuum)
     });
     let sig = FuncSig {
-        type_params: method
-            .func
-            .type_params
-            .iter()
-            .map(|param| param.name)
-            .collect(),
-        type_param_constraints: method
-            .func
-            .type_params
-            .iter()
-            .map(|param| type_param_constraint(&param.constraint))
-            .collect(),
+        type_params: HirTypeParam::descriptors(&method.func.type_params),
         params: method
             .func
             .params
@@ -543,12 +531,7 @@ fn snapshot_function(
         .with_file(file_label.to_owned())
     })?;
     let sig = FuncSig {
-        type_params: func.type_params.iter().map(|param| param.name).collect(),
-        type_param_constraints: func
-            .type_params
-            .iter()
-            .map(|param| type_param_constraint(&param.constraint))
-            .collect(),
+        type_params: HirTypeParam::descriptors(&func.type_params),
         params: func
             .params
             .iter()
@@ -639,13 +622,6 @@ fn snapshot_const(
         export_identity.map(identity_for).as_ref(),
     )
     .map_err(|err| interface_error(file_label, name, err))
-}
-
-fn type_param_constraint(constraint: &HirTypeParamConstraint) -> TypeParamConstraint {
-    match constraint {
-        HirTypeParamConstraint::Any => TypeParamConstraint::Any,
-        HirTypeParamConstraint::OneOf(types) => TypeParamConstraint::OneOf(types.clone()),
-    }
 }
 
 fn param_mode(mode: HirParamMode) -> SemanticParamMode {

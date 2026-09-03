@@ -54,7 +54,6 @@ fn function_typed_value_callee_program(types: &mut TypeTable, args: Vec<MirOpera
     let vacuum = types.primitive(Primitive::Vacuum);
     let callee = MirType::semantic(types.function(FuncSig {
         type_params: Vec::new(),
-        type_param_constraints: Vec::new(),
         params: vec![ParamType { ty: number, mode: SemanticParamMode::Owned, optional: false }],
         ret: vacuum,
         err: None,

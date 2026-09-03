@@ -605,6 +605,7 @@ fn serialize_load_roundtrip_ok() {
                 kind: radix_syntax::GenericParamKind::Typus,
                 constraint: radix_hir::HirTypeParamConstraint::Any,
                 span: radix_lexer::Span::default(),
+                default: None,
             }],
             params: vec![radix_hir::HirParam {
                 def_id: radix_types::DefId(radix_types::USER_DEF_ID_BASE + 2),

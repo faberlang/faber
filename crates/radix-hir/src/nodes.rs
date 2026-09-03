@@ -28,7 +28,10 @@
 
 use radix_lexer::{Span, Symbol, Token};
 use radix_syntax::{CallablePosture, GenericParamKind, JsonValue, TypeFormLevel, Visibility};
-use radix_types::{IndexId, TypeId};
+use radix_types::{
+    GenericParamDescriptor, GenericParamSort, IndexId, SemanticGenericParamDefault, TypeId,
+    TypeParamConstraint,
+};
 use rustc_hash::{FxHashMap, FxHashSet};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
@@ -448,6 +451,10 @@ pub struct HirTypeParam {
 
     /// Source-declared admission rule for concrete type arguments.
     pub constraint: HirTypeParamConstraint,
+
+    /// Declaration-time `=` default; the variant always matches `kind` because
+    /// the parser enforces the pairing at the source spelling.
+    pub default: Option<SemanticGenericParamDefault>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -466,6 +473,29 @@ impl HirTypeParam {
     /// Type parameters only — size/index parameters are compile-time facts for a later phase.
     pub fn typus_params(params: &[Self]) -> impl Iterator<Item = &Self> {
         params.iter().filter(|param| param.is_typus())
+    }
+
+    /// Semantic descriptor for this declared parameter.
+    #[must_use]
+    pub fn descriptor(&self) -> GenericParamDescriptor {
+        GenericParamDescriptor {
+            name: self.name,
+            sort: match self.kind {
+                GenericParamKind::Typus => GenericParamSort::Typus,
+                GenericParamKind::Magnitudo => GenericParamSort::Magnitudo,
+            },
+            constraint: match &self.constraint {
+                HirTypeParamConstraint::Any => TypeParamConstraint::Any,
+                HirTypeParamConstraint::OneOf(allowed) => TypeParamConstraint::OneOf(allowed.clone()),
+            },
+            default: self.default.clone(),
+        }
+    }
+
+    /// Ordered semantic descriptors for one declaration's generic row.
+    #[must_use]
+    pub fn descriptors(params: &[Self]) -> Vec<GenericParamDescriptor> {
+        params.iter().map(Self::descriptor).collect()
     }
 }
 

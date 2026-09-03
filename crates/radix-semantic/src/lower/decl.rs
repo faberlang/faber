@@ -152,6 +152,17 @@ impl Lowerer<'_> {
                 name: param.name.name,
                 span: param.span,
                 constraint: HirTypeParamConstraint::Any,
+                // The parser guarantees the default variant matches the
+                // declared sort, so lowering maps the payload without
+                // re-checking the pairing.
+                default: param.default.as_ref().map(|default| match default {
+                    radix_syntax::GenericParamDefault::Typus(ty) => {
+                        radix_types::SemanticGenericParamDefault::Typus(self.lower_parameter_type(ty))
+                    }
+                    radix_syntax::GenericParamDefault::Magnitudo { value, .. } => {
+                        radix_types::SemanticGenericParamDefault::Magnitudo(*value)
+                    }
+                }),
             })
             .collect()
     }

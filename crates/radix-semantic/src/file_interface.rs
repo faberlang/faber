@@ -5,9 +5,9 @@
 //! Importers remap structural snapshots into their own semantic `TypeTable`.
 
 use crate::{
-    FuncSig, IndexExpr, IndexId, InstansPrecision, NumericWidth, ParamType, Primitive, Resolver,
-    SemanticMutability, SemanticParamMode, SymbolKind, Type, TypeId, TypeParamConstraint,
-    TypeTable,
+    FuncSig, GenericParamDescriptor, GenericParamSort, IndexExpr, IndexId, InstansPrecision,
+    NumericWidth, ParamType, Primitive, Resolver, SemanticGenericParamDefault, SemanticMutability,
+    SemanticParamMode, SymbolKind, Type, TypeId, TypeParamConstraint, TypeTable,
 };
 use radix_hir::{DefId, HirExpression};
 use radix_lexer::Interner;
@@ -273,8 +273,9 @@ pub enum InterfaceIndexSnapshot {
 /// Callable signature snapshot used by function exports and function types.
 #[derive(Debug, Clone, PartialEq)]
 pub struct InterfaceCallable {
-    pub type_params: Vec<String>,
-    pub type_param_constraints: Vec<InterfaceTypeParamConstraint>,
+    /// Ordered generic-declaration parameters (`typus`/`magnitudo`) with
+    /// constraint and default.
+    pub type_params: Vec<InterfaceCallableParam>,
     pub params: Vec<InterfaceParam>,
     pub ret: Box<InterfaceTypeSnapshot>,
     pub err: Option<Box<InterfaceTypeSnapshot>>,
@@ -383,6 +384,28 @@ impl InterfaceCanonicalBody {
             body_hash: format!("{hash:016x}"),
         }
     }
+}
+
+/// One declared generic parameter of an exported callable.
+///
+/// Kind, constraint, and default travel with the name so importers rebuild
+/// [`GenericParamDescriptor`] rows without parallel vectors or shape
+/// occurrence.
+#[derive(Debug, Clone, PartialEq)]
+pub struct InterfaceCallableParam {
+    pub name: String,
+    pub kind: GenericParamKind,
+    pub constraint: InterfaceTypeParamConstraint,
+    pub default: Option<InterfaceGenericParamDefault>,
+}
+
+/// Snapshot form of a generic parameter's declaration-time default.
+///
+/// The variant always matches the parameter's [`GenericParamKind`].
+#[derive(Debug, Clone, PartialEq)]
+pub enum InterfaceGenericParamDefault {
+    Typus(Box<InterfaceTypeSnapshot>),
+    Magnitudo(u64),
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -1146,12 +1169,29 @@ fn import_interface_callable_inner(
         type_params: callable
             .type_params
             .iter()
-            .map(|name| interner.intern(name))
-            .collect(),
-        type_param_constraints: callable
-            .type_param_constraints
-            .iter()
-            .map(|constraint| import_type_param_constraint(constraint, types, interner))
+            .map(|param| {
+                Ok(GenericParamDescriptor {
+                    name: interner.intern(&param.name),
+                    sort: match param.kind {
+                        GenericParamKind::Typus => GenericParamSort::Typus,
+                        GenericParamKind::Magnitudo => GenericParamSort::Magnitudo,
+                    },
+                    constraint: import_type_param_constraint(&param.constraint, types, interner)?,
+                    default: param
+                        .default
+                        .as_ref()
+                        .map(|default| match default {
+                            InterfaceGenericParamDefault::Typus(snapshot) => {
+                                import_interface_type_inner(snapshot, types, interner, resolver)
+                                    .map(SemanticGenericParamDefault::Typus)
+                            }
+                            InterfaceGenericParamDefault::Magnitudo(value) => {
+                                Ok(SemanticGenericParamDefault::Magnitudo(*value))
+                            }
+                        })
+                        .transpose()?,
+                })
+            })
             .collect::<FileInterfaceResult<Vec<_>>>()?,
         params: callable
             .params
@@ -1215,12 +1255,37 @@ fn snapshot_interface_callable_inner(
         type_params: sig
             .type_params
             .iter()
-            .map(|param| interner.resolve(*param).to_owned())
-            .collect(),
-        type_param_constraints: sig
-            .type_param_constraints
-            .iter()
-            .map(|constraint| snapshot_type_param_constraint(constraint, types, interner))
+            .map(|param| {
+                Ok(InterfaceCallableParam {
+                    name: interner.resolve(param.name).to_owned(),
+                    kind: match param.sort {
+                        GenericParamSort::Typus => GenericParamKind::Typus,
+                        GenericParamSort::Magnitudo => GenericParamKind::Magnitudo,
+                    },
+                    constraint: snapshot_type_param_constraint(&param.constraint, types, interner)?,
+                    default: param
+                        .default
+                        .as_ref()
+                        .map(|default| match default {
+                            SemanticGenericParamDefault::Typus(ty) => {
+                                snapshot_interface_type_inner(
+                                    *ty,
+                                    types,
+                                    interner,
+                                    resolver,
+                                    module_identity,
+                                )
+                                .map(|snapshot| {
+                                    InterfaceGenericParamDefault::Typus(Box::new(snapshot))
+                                })
+                            }
+                            SemanticGenericParamDefault::Magnitudo(value) => {
+                                Ok(InterfaceGenericParamDefault::Magnitudo(*value))
+                            }
+                        })
+                        .transpose()?,
+                })
+            })
             .collect::<FileInterfaceResult<Vec<_>>>()?,
         params: sig
             .params

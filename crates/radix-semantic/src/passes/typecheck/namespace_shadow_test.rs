@@ -39,7 +39,6 @@ fn shape_namespace_interface() -> FileInterface {
         name: "numel".to_owned(),
         kind: FileExportKind::Function(InterfaceCallable {
             type_params: Vec::new(),
-            type_param_constraints: Vec::new(),
             params: vec![InterfaceParam {
                 ty: InterfaceTypeSnapshot::Array(Box::new(InterfaceTypeSnapshot::Primitive(
                     Primitive::Numerus,
@@ -58,7 +57,6 @@ fn shape_namespace_interface() -> FileInterface {
         name: "message".to_owned(),
         kind: FileExportKind::Function(InterfaceCallable {
             type_params: Vec::new(),
-            type_param_constraints: Vec::new(),
             params: vec![InterfaceParam {
                 ty: shape_error,
                 mode: SemanticParamMode::Owned,

@@ -276,7 +276,6 @@ impl TypeChecker<'_> {
 
         let sig = FuncSig {
             type_params: Vec::new(),
-            type_param_constraints: Vec::new(),
             params: params
                 .iter()
                 .map(|param| ParamType {

@@ -1,5 +1,5 @@
 use super::*;
-use crate::TypeParamConstraint;
+use crate::{GenericParamDescriptor, GenericParamSort, TypeParamConstraint};
 use radix_lexer::Symbol;
 use radix_target::Target;
 
@@ -142,7 +142,6 @@ fn function_type_join_uses_contravariant_params() {
     // f1: (f32) → void  (narrower param)
     let sig_a = FuncSig {
         type_params: vec![],
-        type_param_constraints: vec![],
         params: vec![ParamType {
             ty: f32_id,
             mode: SemanticParamMode::Owned,
@@ -158,7 +157,6 @@ fn function_type_join_uses_contravariant_params() {
     // f2: (fractus) → void  (wider param)
     let sig_b = FuncSig {
         type_params: vec![],
-        type_param_constraints: vec![],
         params: vec![ParamType {
             ty: fractus,
             mode: SemanticParamMode::Owned,
@@ -176,7 +174,6 @@ fn function_type_join_uses_contravariant_params() {
     // double-borrow `types`.
     let func_c = types.function(FuncSig {
         type_params: vec![],
-        type_param_constraints: vec![],
         params: vec![ParamType {
             ty: f32_id,
             mode: SemanticParamMode::Owned,
@@ -239,8 +236,12 @@ fn occurs_in_detects_var_in_type_param_constraints() {
     let numerus = checker.numerus_type();
 
     let sig = FuncSig {
-        type_params: vec![Symbol(0)],
-        type_param_constraints: vec![TypeParamConstraint::OneOf(vec![infer, numerus])],
+        type_params: vec![GenericParamDescriptor {
+            name: Symbol(0),
+            sort: GenericParamSort::Typus,
+            constraint: TypeParamConstraint::OneOf(vec![infer, numerus]),
+            default: None,
+        }],
         params: vec![],
         ret: numerus,
         err: None,
@@ -265,8 +266,12 @@ fn occurs_in_ignores_any_constraint() {
 
     // Create a FuncSig with TypeParamConstraint::Any (no TypeId references).
     let sig = FuncSig {
-        type_params: vec![Symbol(0)],
-        type_param_constraints: vec![TypeParamConstraint::Any],
+        type_params: vec![GenericParamDescriptor {
+            name: Symbol(0),
+            sort: GenericParamSort::Typus,
+            constraint: TypeParamConstraint::Any,
+            default: None,
+        }],
         params: vec![],
         ret: numerus,
         err: None,

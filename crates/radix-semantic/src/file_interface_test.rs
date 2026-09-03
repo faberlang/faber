@@ -6,10 +6,22 @@ use crate::file_interface::{
     snapshot_interface_callable_with_resolver, snapshot_interface_type,
 };
 use crate::{
-    FuncSig, IndexExpr, InferVar, NumericWidth, ParamType, Primitive, Resolver, Type, TypeTable,
+    FuncSig, GenericParamDescriptor, GenericParamSort, IndexExpr, InferVar, NumericWidth,
+    ParamType, Primitive, Resolver, Type, TypeTable,
 };
 use radix_lexer::Interner;
+use radix_syntax::GenericParamKind;
 use radix_types::AppliedArg;
+
+/// One unconstrained, default-free `magnitudo` descriptor for call fixtures.
+fn magnitudo_param(symbol: radix_lexer::Symbol) -> GenericParamDescriptor {
+    GenericParamDescriptor {
+        name: symbol,
+        sort: GenericParamSort::Magnitudo,
+        constraint: crate::TypeParamConstraint::Any,
+        default: None,
+    }
+}
 
 #[test]
 fn file_interface_preserves_generic_size_literal_round_trip() {
@@ -137,11 +149,7 @@ fn twin_sig(types: &mut TypeTable, interner: &mut Interner) -> FuncSig {
     let shape = types.intern_index(IndexExpr::Tuple(vec![dim_m, dim_k]));
     let tensor = types.tensor_with_shape(elem, shape);
     FuncSig {
-        type_params: vec![m, k],
-        type_param_constraints: vec![
-            crate::TypeParamConstraint::Any,
-            crate::TypeParamConstraint::Any,
-        ],
+        type_params: vec![magnitudo_param(m), magnitudo_param(k)],
         params: vec![ParamType {
             ty: tensor,
             mode: crate::SemanticParamMode::Owned,
@@ -168,8 +176,16 @@ fn twin_callable_snapshot_preserves_size_params_and_shape_witnesses() {
     let callable = snapshot_interface_callable_with_resolver(&sig, &types, &interner, &resolver)
         .expect("twin signature must be representable");
 
-    assert_eq!(callable.type_params, vec!["M".to_owned(), "K".to_owned()]);
-    assert_eq!(callable.type_param_constraints.len(), 2);
+    let names: Vec<&str> = callable
+        .type_params
+        .iter()
+        .map(|param| param.name.as_str())
+        .collect();
+    assert_eq!(names, vec!["M", "K"]);
+    assert!(callable
+        .type_params
+        .iter()
+        .all(|param| param.kind == GenericParamKind::Magnitudo));
     assert_eq!(
         callable.params[0].ty,
         InterfaceTypeSnapshot::Tensor(
@@ -213,7 +229,7 @@ fn twin_callable_round_trips_param_witnesses_to_consumer_tables() {
     let imported_params: Vec<String> = imported
         .type_params
         .iter()
-        .map(|param| target_interner.resolve(*param).to_owned())
+        .map(|param| target_interner.resolve(param.name).to_owned())
         .collect();
     assert_eq!(imported_params, vec!["M".to_owned(), "K".to_owned()]);
     let Type::Tensor(elem, shape) = target_types.get(imported.ret) else {

@@ -3193,7 +3193,6 @@ fn lower_type_expr_with_context(
                 .transpose()?;
             types.function(FuncSig {
                 type_params: Vec::new(),
-                type_param_constraints: Vec::new(),
                 params,
                 ret,
                 err,
