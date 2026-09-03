@@ -2614,6 +2614,10 @@ impl KeywordPack for EnGuardPack {
             "range" => Some("ab"),
             "at" => Some("apud"),
             "const" => Some("fixum"),
+            "fn" => Some("functio"),
+            "size" => Some("magnitudo"),
+            "coalesce" => Some("vel"),
+            "void" => Some("vacuum"),
             _ => None,
         }
     }
@@ -4249,6 +4253,109 @@ fn rejects_type_params_after_magnitudo_params() {
     assert_parse_error_has_no_legacy_message(err);
     assert_eq!(err.args[1].name, "size_param");
     assert_eq!(err.args[1].value, "magnitudo");
+}
+
+#[test]
+fn parses_generic_type_default() {
+    let result = parse_ok("functio identity<T = textus>(T value) → T { redde value }");
+    let program = result.program.as_ref().expect("program");
+    let StmtKind::Func(func) = &program.statements[0].kind else {
+        panic!("expected function");
+    };
+    assert_eq!(func.type_params.len(), 1);
+    let param = &func.type_params[0];
+    assert_eq!(param.kind, radix_syntax::GenericParamKind::Typus);
+    let Some(radix_syntax::GenericParamDefault::Typus(ty)) = &param.default else {
+        panic!("expected typus default, got {:?}", param.default);
+    };
+    let TypeExprKind::Named(name, _) = &ty.kind else {
+        panic!("expected named type default, got {:?}", ty.kind);
+    };
+    assert_eq!(symbol_name(&result, name.name), "textus");
+}
+
+#[test]
+fn parses_generic_size_default() {
+    let result = parse_ok("functio bounded<magnitudo D = 64>(numerus x) → vacuum {}");
+    let program = result.program.as_ref().expect("program");
+    let StmtKind::Func(func) = &program.statements[0].kind else {
+        panic!("expected function");
+    };
+    assert_eq!(func.type_params.len(), 1);
+    let param = &func.type_params[0];
+    assert_eq!(param.kind, radix_syntax::GenericParamKind::Magnitudo);
+    let Some(radix_syntax::GenericParamDefault::Magnitudo { value, .. }) = &param.default else {
+        panic!("expected magnitudo default, got {:?}", param.default);
+    };
+    assert_eq!(*value, 64);
+}
+
+#[test]
+fn parses_trailing_generic_defaults_across_sorts() {
+    let result = parse_ok("functio pair<T = textus, magnitudo D = 64>() → vacuum {}");
+    let program = result.program.as_ref().expect("program");
+    let StmtKind::Func(func) = &program.statements[0].kind else {
+        panic!("expected function");
+    };
+    assert!(func.type_params[0].default.is_some());
+    assert!(func.type_params[1].default.is_some());
+}
+
+#[test]
+fn rejects_non_trailing_generic_default() {
+    assert_parse_error_issue(
+        "functio f<T = textus, U>(numerus x) → vacuum {}",
+        "generic_default_not_trailing",
+    );
+
+    let result = parse_program("functio f<T = textus, U>(numerus x) → vacuum {}");
+    let err = result
+        .errors
+        .iter()
+        .find(|err| has_arg(err, "issue", "generic_default_not_trailing"))
+        .expect("non-trailing default diagnostic");
+    assert_eq!(err.kind, ParseErrorKind::TypeParameterInvalid);
+    assert_eq!(err.args[1].name, "parameter");
+    assert_eq!(err.args[1].value, "U");
+}
+
+#[test]
+fn rejects_generic_default_missing_value() {
+    assert_parse_error_issue(
+        "functio f<T = >(numerus x) → vacuum {}",
+        "generic_default_missing_value",
+    );
+    assert_parse_error_issue(
+        "functio f<magnitudo D = >(numerus x) → vacuum {}",
+        "generic_default_missing_value",
+    );
+}
+
+#[test]
+fn rejects_generic_default_wrong_expression_class() {
+    // A magnitudo default is a NATURAL literal, never a name or expression.
+    assert_parse_error_issue(
+        "functio f<magnitudo D = D>(numerus x) → vacuum {}",
+        "generic_default_wrong_class",
+    );
+    // A typus default is a type annotation, never a natural literal.
+    assert_parse_error_issue(
+        "functio f<T = 64>(numerus x) → vacuum {}",
+        "generic_default_wrong_class",
+    );
+}
+
+#[test]
+fn rejects_vel_generic_default_spelling() {
+    assert_parse_error_issue(
+        "functio f<T vel 64>(numerus x) → vacuum {}",
+        "removed_vel_generic_default",
+    );
+    // `coalesce` is the en-surface spelling of `vel` and hits the same rule.
+    assert_en_parse_error_issue(
+        "fn f<size D coalesce 64>() → void {}",
+        "removed_vel_generic_default",
+    );
 }
 
 // =============================================================================
