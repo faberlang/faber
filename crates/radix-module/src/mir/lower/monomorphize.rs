@@ -578,6 +578,14 @@ impl<'lowerer, 'unit> MonomorphizationState<'lowerer, 'unit> {
         }
 
         self.lowerer.functions.push(instance);
+        // Device-role rows are keyed by function id, so a minted instance
+        // starts without the template's explicit facts. Copy (not move) the
+        // template row with the instance as its parent — package
+        // instantiation still reads the original template row.
+        if let Some(mut metadata) = self.lowerer.device_function_metadata.get(&template.id).copied() {
+            metadata.identity.parent = id;
+            self.lowerer.device_function_metadata.insert(id, metadata);
+        }
         self.monomorphizations
             .push(MirMonomorphization { key: key.clone(), function: id });
         self.instance_index.insert(key.clone(), id);
