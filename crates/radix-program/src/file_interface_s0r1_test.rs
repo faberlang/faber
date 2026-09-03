@@ -415,7 +415,12 @@ fn twin_export_preserves_producer_identity_and_export_name() {
     else {
         panic!("expected gemma export, got {:?}", interface.exports);
     };
-    assert_eq!(callable.type_params, vec!["M".to_owned(), "K".to_owned()]);
+    let param_names: Vec<&str> = callable
+        .type_params
+        .iter()
+        .map(|param| param.name.as_str())
+        .collect();
+    assert_eq!(param_names, vec!["M", "K"]);
     assert!(matches!(
         callable.params[0].ty,
         InterfaceTypeSnapshot::Tensor(

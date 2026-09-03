@@ -673,7 +673,6 @@ fn imports_function_export_before_struct_alphabetically() {
         name: "applica".to_owned(),
         kind: FileExportKind::Function(InterfaceCallable {
             type_params: Vec::new(),
-            type_param_constraints: Vec::new(),
             params: vec![InterfaceParam {
                 ty: InterfaceTypeSnapshot::Nominal(InterfaceNominalType {
                     kind: InterfaceNominalKind::Struct,
@@ -737,7 +736,6 @@ fn projects_localized_library_members_by_identity_and_rejects_unmapped_canonical
     };
     let callable = || InterfaceCallable {
         type_params: Vec::new(),
-        type_param_constraints: Vec::new(),
         params: Vec::new(),
         ret: Box::new(InterfaceTypeSnapshot::Primitive(Primitive::Vacuum)),
         err: None,
@@ -896,7 +894,6 @@ fn skipped_locale_members_keep_structured_provenance_and_sibling_exports() {
     };
     let callable = || InterfaceCallable {
         type_params: Vec::new(),
-        type_param_constraints: Vec::new(),
         params: Vec::new(),
         ret: Box::new(InterfaceTypeSnapshot::Primitive(Primitive::Vacuum)),
         err: None,
@@ -1056,7 +1053,6 @@ fn identity_row_library_members_resolve_under_strict_pack() {
     };
     let callable = || InterfaceCallable {
         type_params: Vec::new(),
-        type_param_constraints: Vec::new(),
         params: Vec::new(),
         ret: Box::new(InterfaceTypeSnapshot::Primitive(Primitive::Vacuum)),
         err: None,

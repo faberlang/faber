@@ -38,7 +38,6 @@ pub fn register(resolver: &mut Resolver, types: &mut TypeTable, interner: &mut I
         let ret = gpu_builtin_return_type(builtin, types);
         let ty = types.function(FuncSig {
             type_params: Vec::new(),
-            type_param_constraints: Vec::new(),
             params: Vec::new(),
             ret,
             err: None,

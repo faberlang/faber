@@ -4,14 +4,16 @@
 
 use super::{
     FileExport, FileExportKind, FileInterface, FileInterfaceError, InterfaceAliasExport, InterfaceAppliedArg,
-    InterfaceBodyChannel, InterfaceCallable, InterfaceCanonicalBody, InterfaceDeviceContract, InterfaceDeviceRole,
-    InterfaceDeviceVisibility, InterfaceGenericParam, InterfaceIndexSnapshot, InterfaceLibraryIdentity,
-    InterfaceNominalKind, InterfaceNominalType, InterfaceParam, InterfaceStructExport, InterfaceStructField,
+    InterfaceBodyChannel, InterfaceCallable, InterfaceCallableParam, InterfaceCanonicalBody,
+    InterfaceDeviceContract, InterfaceDeviceRole, InterfaceDeviceVisibility, InterfaceGenericParam,
+    InterfaceIndexSnapshot, InterfaceLibraryIdentity, InterfaceNominalKind, InterfaceNominalType,
+    InterfaceParam, InterfaceStructExport, InterfaceStructField,
     InterfaceTypeParamConstraint, InterfaceTypeSnapshot, import_interface_type, snapshot_interface_type,
 };
 use crate::lexer::Interner;
 use crate::semantic::{
-    IndexExpr, InstansPrecision, NumericWidth, ParamType, Primitive, SemanticMutability, SemanticParamMode, Type,
+    GenericParamDescriptor, GenericParamSort, IndexExpr, InstansPrecision, NumericWidth, ParamType,
+    Primitive, SemanticGenericParamDefault, SemanticMutability, SemanticParamMode, Type,
     TypeParamConstraint, TypeTable,
 };
 use std::collections::BTreeMap;
@@ -67,8 +69,12 @@ fn failable_generic_callable_round_trips() {
     let param_ty = source_types.intern(Type::Param(param_t));
     let lista_t = source_types.array(param_ty);
     let sig = crate::semantic::FuncSig {
-        type_params: vec![param_t],
-        type_param_constraints: vec![TypeParamConstraint::OneOf(vec![textus, numerus])],
+        type_params: vec![GenericParamDescriptor {
+            name: param_t,
+            sort: GenericParamSort::Typus,
+            constraint: TypeParamConstraint::OneOf(vec![textus, numerus]),
+            default: Some(SemanticGenericParamDefault::Typus(numerus)),
+        }],
         params: vec![ParamType { ty: lista_t, mode: SemanticParamMode::Owned, optional: true }],
         ret: param_ty,
         err: Some(textus),
@@ -87,8 +93,9 @@ fn failable_generic_callable_round_trips() {
         panic!("expected imported function type");
     };
     assert_eq!(imported_sig.type_params.len(), 1);
-    assert_eq!(target_interner.resolve(imported_sig.type_params[0]), "T");
-    assert_eq!(imported_sig.params.len(), 1);
+    assert_eq!(target_interner.resolve(imported_sig.type_params[0].name), "T");
+    assert_eq!(imported_sig.type_params[0].sort, GenericParamSort::Typus);
+    assert!(imported_sig.params.len() == 1);
     assert!(imported_sig.params[0].optional);
     assert_eq!(imported_sig.params[0].mode, SemanticParamMode::Owned);
     assert_eq!(imported_sig.err, None);
@@ -100,7 +107,7 @@ fn failable_generic_callable_round_trips() {
     assert!(imported_sig.is_async);
     assert!(!imported_sig.is_generator);
 
-    let TypeParamConstraint::OneOf(options) = &imported_sig.type_param_constraints[0] else {
+    let TypeParamConstraint::OneOf(options) = &imported_sig.type_params[0].constraint else {
         panic!("expected type param constraint");
     };
     assert_eq!(
@@ -110,6 +117,11 @@ fn failable_generic_callable_round_trips() {
             target_types.primitive(Primitive::Numerus)
         ]
     );
+    let Some(SemanticGenericParamDefault::Typus(default_ty)) = imported_sig.type_params[0].default
+    else {
+        panic!("expected typus default to survive the snapshot round trip");
+    };
+    assert_eq!(default_ty, target_types.primitive(Primitive::Numerus));
 }
 
 #[test]
@@ -183,8 +195,12 @@ fn manual_snapshot_imports_records_unions_and_sized_types() {
 #[test]
 fn callable_snapshot_can_be_constructed_without_source_type_table() {
     let callable = InterfaceCallable {
-        type_params: vec!["T".to_owned()],
-        type_param_constraints: vec![InterfaceTypeParamConstraint::Any],
+        type_params: vec![InterfaceCallableParam {
+            name: "T".to_owned(),
+            kind: crate::syntax::GenericParamKind::Typus,
+            constraint: InterfaceTypeParamConstraint::Any,
+            default: None,
+        }],
         params: vec![InterfaceParam {
             ty: InterfaceTypeSnapshot::Param("T".to_owned()),
             mode: SemanticParamMode::Move,
@@ -213,7 +229,6 @@ fn callable_snapshot_can_be_constructed_without_source_type_table() {
 fn async_callable_import_wraps_declared_return_in_promissum() {
     let callable = InterfaceCallable {
         type_params: Vec::new(),
-        type_param_constraints: Vec::new(),
         params: Vec::new(),
         ret: Box::new(InterfaceTypeSnapshot::Primitive(Primitive::Vacuum)),
         err: None,
@@ -240,7 +255,6 @@ fn async_callable_import_wraps_declared_return_in_promissum() {
 fn async_generator_callable_import_wraps_declared_return_in_async_cursor() {
     let callable = InterfaceCallable {
         type_params: Vec::new(),
-        type_param_constraints: Vec::new(),
         params: Vec::new(),
         ret: Box::new(InterfaceTypeSnapshot::Primitive(Primitive::Numerus)),
         err: Some(Box::new(InterfaceTypeSnapshot::Primitive(Primitive::Textus))),
@@ -476,7 +490,6 @@ fn reexported_same_module_nominal_callable_remaps_through_parent_interface() {
         name: "data.geometry_vertex_layout_matches".to_owned(),
         kind: FileExportKind::Function(InterfaceCallable {
             type_params: Vec::new(),
-            type_param_constraints: Vec::new(),
             params: vec![InterfaceParam {
                 ty: InterfaceTypeSnapshot::Nominal(InterfaceNominalType {
                     kind: InterfaceNominalKind::Struct,

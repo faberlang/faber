@@ -2616,7 +2616,6 @@ fn eot_selective_test_interface() -> crate::file_interface::FileInterface {
 
     let callable = || InterfaceCallable {
         type_params: Vec::new(),
-        type_param_constraints: Vec::new(),
         params: vec![InterfaceParam {
             ty: InterfaceTypeSnapshot::Primitive(Primitive::Textus),
             mode: SemanticParamMode::Ref,

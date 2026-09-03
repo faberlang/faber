@@ -256,7 +256,6 @@ fn census_rows(types: &mut TypeTable) -> Vec<Type> {
     rows.push(Type::Interface(DefId(12)));
     rows.push(Type::Func(FuncSig {
         type_params: vec![],
-        type_param_constraints: vec![],
         params: vec![],
         ret: float64_ty,
         err: None,

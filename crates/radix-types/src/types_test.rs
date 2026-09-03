@@ -11,11 +11,22 @@ use crate::NumericWidth;
 use crate::TypeId;
 use crate::index::{IndexExpr, IndexId, i64s_from_literal_index};
 use crate::{
-    AccessMarker, AppliedArg, CollectionKind, FuncSig, ParamType, Primitive, SemanticMutability,
-    SemanticParamMode, TensorFamilyKind, Type, TypeParamConstraint, TypeTable,
-    collection_type_specs, lookup_collection_type_spec, lookup_primitive_type_spec,
-    lookup_tensor_family_type_spec, primitive_type_specs, tensor_family_type_specs,
+    AccessMarker, AppliedArg, CollectionKind, FuncSig, GenericParamDescriptor, GenericParamSort,
+    ParamType, Primitive, SemanticGenericParamDefault, SemanticMutability, SemanticParamMode,
+    TensorFamilyKind, Type, TypeParamConstraint, TypeTable, collection_type_specs,
+    lookup_collection_type_spec, lookup_primitive_type_spec, lookup_tensor_family_type_spec,
+    primitive_type_specs, tensor_family_type_specs,
 };
+
+/// One unconstrained, default-free `typus` descriptor for FuncSig tests.
+fn typus_param(symbol: radix_lexer::Symbol) -> GenericParamDescriptor {
+    GenericParamDescriptor {
+        name: symbol,
+        sort: GenericParamSort::Typus,
+        constraint: TypeParamConstraint::Any,
+        default: None,
+    }
+}
 
 #[test]
 fn generic_applied_arg_preserves_index_kind() {
@@ -1143,8 +1154,7 @@ fn f004_func_sig_equals_includes_type_params() {
     let vacuum = types.primitive(Primitive::Vacuum);
 
     let sig_t = FuncSig {
-        type_params: vec![radix_lexer::Symbol(100)], // "T"
-        type_param_constraints: vec![TypeParamConstraint::Any],
+        type_params: vec![typus_param(radix_lexer::Symbol(100))], // "T"
         params: vec![ParamType {
             ty: numerus,
             mode: SemanticParamMode::Owned,
@@ -1156,8 +1166,7 @@ fn f004_func_sig_equals_includes_type_params() {
         is_generator: false,
     };
     let sig_u = FuncSig {
-        type_params: vec![radix_lexer::Symbol(200)], // "U"
-        type_param_constraints: vec![TypeParamConstraint::Any],
+        type_params: vec![typus_param(radix_lexer::Symbol(200))], // "U"
         params: vec![ParamType {
             ty: numerus,
             mode: SemanticParamMode::Owned,
@@ -1190,8 +1199,7 @@ fn f004_func_sig_equal_when_type_params_match() {
     let vacuum = types.primitive(Primitive::Vacuum);
 
     let sig_a = FuncSig {
-        type_params: vec![radix_lexer::Symbol(42)], // "T"
-        type_param_constraints: vec![TypeParamConstraint::Any],
+        type_params: vec![typus_param(radix_lexer::Symbol(42))], // "T"
         params: vec![ParamType {
             ty: numerus,
             mode: SemanticParamMode::Owned,
@@ -1203,8 +1211,7 @@ fn f004_func_sig_equal_when_type_params_match() {
         is_generator: false,
     };
     let sig_b = FuncSig {
-        type_params: vec![radix_lexer::Symbol(42)], // same "T"
-        type_param_constraints: vec![TypeParamConstraint::Any],
+        type_params: vec![typus_param(radix_lexer::Symbol(42))], // same "T"
         params: vec![ParamType {
             ty: numerus,
             mode: SemanticParamMode::Owned,
@@ -1224,6 +1231,138 @@ fn f004_func_sig_equal_when_type_params_match() {
         "F-004: identical FuncSig must hash-cons to same TypeId"
     );
     assert!(types.equals(id_a, id_b));
+}
+
+// --- GPD-2: ordered generic descriptor ---
+
+#[test]
+fn gpd2_descriptor_equality_distinguishes_sort_and_default() {
+    let name = radix_lexer::Symbol(7);
+    let typus = typus_param(name);
+    let magnitudo = GenericParamDescriptor {
+        sort: GenericParamSort::Magnitudo,
+        ..typus.clone()
+    };
+    let defaulted = GenericParamDescriptor {
+        default: Some(SemanticGenericParamDefault::Magnitudo(64)),
+        ..magnitudo.clone()
+    };
+    let renamed = GenericParamDescriptor {
+        name: radix_lexer::Symbol(8),
+        ..typus.clone()
+    };
+
+    assert_eq!(typus, typus.clone(), "descriptor equals itself");
+    assert_ne!(typus, magnitudo, "same name, different sort");
+    assert_ne!(magnitudo, defaulted, "same sort, default added");
+    assert_ne!(typus, renamed, "different name");
+    assert_ne!(
+        typus,
+        GenericParamDescriptor {
+            constraint: TypeParamConstraint::OneOf(vec![TypeId(1)]),
+            ..typus.clone()
+        },
+        "different constraint"
+    );
+}
+
+#[test]
+fn gpd2_descriptor_hash_agrees_with_equality() {
+    use std::collections::hash_map::DefaultHasher;
+    use std::hash::{Hash, Hasher};
+
+    let hash_of = |descriptor: &GenericParamDescriptor| {
+        let mut hasher = DefaultHasher::new();
+        descriptor.hash(&mut hasher);
+        hasher.finish()
+    };
+    let typus = typus_param(radix_lexer::Symbol(7));
+    let magnitudo = GenericParamDescriptor {
+        sort: GenericParamSort::Magnitudo,
+        default: Some(SemanticGenericParamDefault::Magnitudo(64)),
+        ..typus.clone()
+    };
+
+    assert_eq!(
+        hash_of(&typus),
+        hash_of(&typus.clone()),
+        "equal descriptors hash equal"
+    );
+    assert_ne!(
+        hash_of(&typus),
+        hash_of(&magnitudo),
+        "descriptor hash covers sort and default"
+    );
+}
+
+#[test]
+fn gpd2_descriptor_serde_round_trip_preserves_fields() {
+    let typus_default = {
+        let mut types = TypeTable::new();
+        let numerus = types.primitive(Primitive::Numerus);
+        SemanticGenericParamDefault::Typus(numerus)
+    };
+    let descriptor = GenericParamDescriptor {
+        name: radix_lexer::Symbol(7),
+        sort: GenericParamSort::Magnitudo,
+        constraint: TypeParamConstraint::OneOf(vec![TypeId(3), TypeId(4)]),
+        default: Some(SemanticGenericParamDefault::Magnitudo(64)),
+    };
+    let other = GenericParamDescriptor {
+        name: radix_lexer::Symbol(9),
+        sort: GenericParamSort::Typus,
+        constraint: TypeParamConstraint::OneOf(vec![TypeId(3), TypeId(4)]),
+        default: Some(typus_default),
+    };
+
+    for value in [descriptor, other] {
+        let encoded = serde_json::to_string(&value).expect("descriptor serializes");
+        let decoded: GenericParamDescriptor =
+            serde_json::from_str(&encoded).expect("descriptor deserializes");
+        assert_eq!(value, decoded, "serde round trip preserves descriptor");
+    }
+}
+
+#[test]
+fn gpd2_func_sig_equals_includes_sort_and_default() {
+    let mut types = TypeTable::new();
+    let numerus = types.primitive(Primitive::Numerus);
+    let vacuum = types.primitive(Primitive::Vacuum);
+    let sig_of = |default: Option<SemanticGenericParamDefault>, sort: GenericParamSort| FuncSig {
+        type_params: vec![GenericParamDescriptor {
+            name: radix_lexer::Symbol(42),
+            sort,
+            constraint: TypeParamConstraint::Any,
+            default,
+        }],
+        params: vec![ParamType {
+            ty: numerus,
+            mode: SemanticParamMode::Owned,
+            optional: false,
+        }],
+        ret: vacuum,
+        err: None,
+        is_async: false,
+        is_generator: false,
+    };
+
+    let bare_id = types.function(sig_of(None, GenericParamSort::Typus));
+    let defaulted_id = types.function(sig_of(
+        Some(SemanticGenericParamDefault::Magnitudo(64)),
+        GenericParamSort::Magnitudo,
+    ));
+    let magnitudo_bare_id = types.function(sig_of(None, GenericParamSort::Magnitudo));
+
+    assert_ne!(bare_id, magnitudo_bare_id, "typus and magnitudo rows are distinct sigs");
+    assert_ne!(
+        magnitudo_bare_id,
+        defaulted_id,
+        "a defaulted size param is a different signature"
+    );
+    assert!(
+        !types.equals(bare_id, defaulted_id),
+        "equals must consult descriptor sort/default, not only names"
+    );
 }
 
 // --- F-005: Index u64::MAX clamp ---

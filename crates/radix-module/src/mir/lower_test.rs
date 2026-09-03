@@ -2786,7 +2786,6 @@ functio mensura(lista<numerus> f) → numerus ⇥ FormaError {
     };
     let mensura_function_ty = unit.types.function(crate::semantic::FuncSig {
         type_params: Vec::new(),
-        type_param_constraints: Vec::new(),
         params: mensura_function
             .params
             .iter()
@@ -3449,7 +3448,6 @@ fn lowers_imported_nominal_method_to_provider_runtime_call() {
                 name: "metire".to_owned(),
                 callable: InterfaceCallable {
                     type_params: Vec::new(),
-                    type_param_constraints: Vec::new(),
                     params: Vec::new(),
                     ret: Box::new(InterfaceTypeSnapshot::Primitive(Primitive::Numerus)),
                     err: None,
@@ -5319,14 +5317,27 @@ incipit {
     nota value
 }
 "#;
-    let mut unit = analyze(source);
-    let Err(errors) = lower_analyzed_unit(&mut unit, Default::default()) else {
-        panic!("unbound child shape must fail closed");
+    // GPD-2: `inner<magnitudo N>` declares a size param its own signature
+    // shapes never mention. The declared sort is authoritative (no
+    // shape-occurrence derivation), so the unbound child fails closed at
+    // analysis with SEM014 instead of surfacing an unresolved param at MIR
+    // lowering.
+    let session = Session::new(Config::default().with_target(Target::HirTypeScript));
+    let errors = match crate::driver::analyze_source(
+        &session,
+        "test.fab",
+        source,
+        AnalyzeRequest::default(),
+    ) {
+        Ok(_) => panic!("unbound child shape must fail closed"),
+        Err(errors) => errors,
     };
     assert!(
         errors
             .iter()
-            .any(|error| { error.issue == "invalid_mir_generic_call_signature_has_unresolved_type_parameter" })
+            .any(|error| error.issue() == Some("cannot_infer_tensor_shape")
+                && error.args.iter().any(|arg| arg.name == "param" && arg.value == "N")),
+        "expected SEM014 cannot_infer_tensor_shape for N, got {errors:?}"
     );
 }
 

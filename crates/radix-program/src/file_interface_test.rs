@@ -302,7 +302,12 @@ fn typed_kernel_twin_export_materializes_as_interface_callable() {
             interface.exports
         );
     };
-    assert_eq!(callable.type_params, vec!["M".to_owned(), "K".to_owned()]);
+    let param_names: Vec<&str> = callable
+        .type_params
+        .iter()
+        .map(|param| param.name.as_str())
+        .collect();
+    assert_eq!(param_names, vec!["M", "K"]);
     let expected = InterfaceTypeSnapshot::Tensor(
         Box::new(InterfaceTypeSnapshot::SizedNumeric(
             Primitive::Fractus,

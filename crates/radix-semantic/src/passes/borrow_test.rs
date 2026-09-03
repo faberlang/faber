@@ -42,7 +42,6 @@ fn reports_use_after_move() {
     let numerus = types.primitive(Primitive::Numerus);
     let func_ty = types.function(FuncSig {
         type_params: Vec::new(),
-        type_param_constraints: Vec::new(),
         params: vec![ParamType {
             ty: numerus,
             mode: SemanticParamMode::Move,
@@ -336,7 +335,6 @@ fn reports_use_after_move_in_assignment_index() {
     let numerus = types.primitive(Primitive::Numerus);
     let move_callee_ty = types.function(FuncSig {
         type_params: Vec::new(),
-        type_param_constraints: Vec::new(),
         params: vec![ParamType {
             ty: numerus,
             mode: SemanticParamMode::Move,
@@ -486,7 +484,6 @@ fn reports_de_passed_to_in_position() {
     let numerus = types.primitive(Primitive::Numerus);
     let callee_ty = types.function(FuncSig {
         type_params: Vec::new(),
-        type_param_constraints: Vec::new(),
         params: vec![ParamType {
             ty: numerus,
             mode: SemanticParamMode::MutRef,
@@ -731,7 +728,6 @@ fn analyze_modes_rejects_use_after_move_without_rust_lifetime() {
     let own_numerus = types.access_marker(AccessMarker::Own, numerus);
     let func_ty = types.function(FuncSig {
         type_params: Vec::new(),
-        type_param_constraints: Vec::new(),
         params: vec![ParamType {
             ty: own_numerus,
             mode: SemanticParamMode::Owned,

@@ -1044,7 +1044,6 @@ fn instantiate_existing_type_id_with_shapes(
         Type::Func(sig) => {
             let sig = FuncSig {
                 type_params: sig.type_params.clone(),
-                type_param_constraints: sig.type_param_constraints.clone(),
                 params: sig
                     .params
                     .iter()
@@ -1644,7 +1643,6 @@ fn instantiate_mutable_type_id(
         Type::Func(sig) => {
             let sig = FuncSig {
                 type_params: sig.type_params.clone(),
-                type_param_constraints: sig.type_param_constraints.clone(),
                 params: sig
                     .params
                     .iter()

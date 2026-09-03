@@ -180,7 +180,6 @@ impl TypeChecker<'_> {
     fn signature_from_arg_types(&mut self, params: Vec<ParamType>) -> FuncSig {
         FuncSig {
             type_params: Vec::new(),
-            type_param_constraints: Vec::new(),
             params,
             ret: self.fresh_infer(),
             err: None,
@@ -903,7 +902,6 @@ impl TypeChecker<'_> {
     ) -> TypeId {
         let sig = FuncSig {
             type_params: Vec::new(),
-            type_param_constraints: Vec::new(),
             params,
             ret,
             err: None,
@@ -1515,7 +1513,6 @@ impl TypeChecker<'_> {
             }
             let sig = FuncSig {
                 type_params: Vec::new(),
-                type_param_constraints: Vec::new(),
                 params: vec![ParamType {
                     ty: param_ty,
                     mode: SemanticParamMode::Owned,

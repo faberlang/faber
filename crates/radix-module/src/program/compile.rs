@@ -7,11 +7,12 @@
 
 use crate::file_interface::{
     FileExport, FileExportKind, FileInterface, InterfaceAliasExport, InterfaceAnnotationContract,
-    InterfaceAnnotationContractField, InterfaceBodyChannel, InterfaceCallable, InterfaceDeviceContract,
-    InterfaceDeviceRole, InterfaceDeviceVisibility, InterfaceEnumVariant, InterfaceGenericParam,
-    InterfaceIndexSnapshot, InterfaceLibraryIdentity, InterfaceMethodExport, InterfaceNominalExport,
-    InterfaceNominalKind, InterfaceNominalType, InterfaceParam, InterfaceStructExport, InterfaceStructField,
-    InterfaceTypeSnapshot,
+    InterfaceAnnotationContractField, InterfaceBodyChannel, InterfaceCallable, InterfaceCallableParam,
+    InterfaceDeviceContract, InterfaceDeviceRole, InterfaceDeviceVisibility, InterfaceEnumVariant,
+    InterfaceGenericParam, InterfaceGenericParamDefault, InterfaceIndexSnapshot,
+    InterfaceLibraryIdentity, InterfaceMethodExport, InterfaceNominalExport, InterfaceNominalKind,
+    InterfaceNominalType, InterfaceParam, InterfaceStructExport, InterfaceStructField,
+    InterfaceTypeParamConstraint, InterfaceTypeSnapshot,
 };
 use crate::semantic::passes::visibility_annotation::VisibilityTier;
 use crate::semantic::{ContractFieldType, InstansPrecision, NumericWidth, Primitive, SemanticParamMode};
@@ -1255,6 +1256,8 @@ fn file_export_from_stmt(
                 .map(|tp| interner.resolve(tp.name.name).to_owned())
                 .collect();
             let type_param_names: BTreeSet<&str> = type_params.iter().map(String::as_str).collect();
+            let callable_type_params =
+                interface_callable_params(&decl.type_params, interner, &type_param_names, nominal_kinds, ctx)?;
             let mut params = Vec::new();
             for param in &decl.params {
                 params.push(InterfaceParam {
@@ -1285,8 +1288,7 @@ fn file_export_from_stmt(
             Some(FileExport {
                 name,
                 kind: FileExportKind::Function(InterfaceCallable {
-                    type_params,
-                    type_param_constraints: Vec::new(),
+                    type_params: callable_type_params,
                     params,
                     ret: Box::new(ret),
                     err,
@@ -1328,6 +1330,13 @@ fn file_export_from_stmt(
                         .map(|tp| interner.resolve(tp.name.name).to_owned())
                         .collect();
                     let type_param_names: BTreeSet<&str> = type_params.iter().map(String::as_str).collect();
+                    let callable_type_params = interface_callable_params(
+                        &method.type_params,
+                        interner,
+                        &type_param_names,
+                        nominal_kinds,
+                        ctx,
+                    )?;
                     let mut params = Vec::new();
                     for param in &method.params {
                         params.push(InterfaceParam {
@@ -1365,8 +1374,7 @@ fn file_export_from_stmt(
                     Some(InterfaceMethodExport {
                         name: interner.resolve(method.name.name).to_owned(),
                         callable: InterfaceCallable {
-                            type_params,
-                            type_param_constraints: Vec::new(),
+                            type_params: callable_type_params,
                             params,
                             ret: Box::new(ret),
                             err,
@@ -1567,6 +1575,46 @@ fn interface_generic_params(
         .collect()
 }
 
+/// Callable-side descriptor row for the AST export snapshot.
+///
+/// Stage 1 never carried constraints, so they stay `Any`; defaults snapshot
+/// through the same type-expression walker as parameter types.
+fn interface_callable_params(
+    params: &[crate::syntax::TypeParam],
+    interner: &crate::lexer::Interner,
+    type_param_names: &BTreeSet<&str>,
+    nominal_kinds: &BTreeMap<String, InterfaceNominalKind>,
+    ctx: &SnapshotContext,
+) -> Option<Vec<InterfaceCallableParam>> {
+    params
+        .iter()
+        .map(|param| {
+            Some(InterfaceCallableParam {
+                name: interner.resolve(param.name.name).to_owned(),
+                kind: param.kind,
+                constraint: InterfaceTypeParamConstraint::Any,
+                default: match &param.default {
+                    Some(crate::syntax::GenericParamDefault::Typus(expr)) => {
+                        Some(InterfaceGenericParamDefault::Typus(Box::new(
+                            interface_type_from_type_expr(
+                                expr,
+                                interner,
+                                type_param_names,
+                                nominal_kinds,
+                                ctx,
+                            )?,
+                        )))
+                    }
+                    Some(crate::syntax::GenericParamDefault::Magnitudo { value, .. }) => {
+                        Some(InterfaceGenericParamDefault::Magnitudo(*value))
+                    }
+                    None => None,
+                },
+            })
+        })
+        .collect()
+}
+
 fn interface_type_from_generic_arg(
     arg: &radix_syntax::GenericArgExpr,
     interner: &crate::lexer::Interner,
@@ -1722,7 +1770,6 @@ fn interface_type_from_type_expr(
             };
             Some(InterfaceTypeSnapshot::Func(InterfaceCallable {
                 type_params: Vec::new(),
-                type_param_constraints: Vec::new(),
                 params,
                 ret: Box::new(ret),
                 err,

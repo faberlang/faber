@@ -346,7 +346,6 @@ pub(super) fn check_intrinsic_method_call(
             let mapped = checker.fresh_infer();
             let mapper_ty = checker.types.function(FuncSig {
                 type_params: Vec::new(),
-                type_param_constraints: Vec::new(),
                 params: vec![ParamType {
                     ty: inner,
                     mode: SemanticParamMode::Owned,
@@ -359,7 +358,6 @@ pub(super) fn check_intrinsic_method_call(
             });
             let sig = FuncSig {
                 type_params: Vec::new(),
-                type_param_constraints: Vec::new(),
                 params: vec![ParamType {
                     ty: mapper_ty,
                     mode: SemanticParamMode::Owned,
@@ -388,7 +386,6 @@ pub(super) fn check_intrinsic_method_call(
             let acc = checker.fresh_infer();
             let reducer_ty = checker.types.function(FuncSig {
                 type_params: Vec::new(),
-                type_param_constraints: Vec::new(),
                 params: vec![
                     ParamType {
                         ty: acc,
@@ -408,7 +405,6 @@ pub(super) fn check_intrinsic_method_call(
             });
             let sig = FuncSig {
                 type_params: Vec::new(),
-                type_param_constraints: Vec::new(),
                 params: vec![
                     ParamType {
                         ty: reducer_ty,
@@ -454,7 +450,6 @@ pub(super) fn check_intrinsic_method_call(
                 let err = checker.textus_type();
                 let sig = FuncSig {
                     type_params: Vec::new(),
-                    type_param_constraints: Vec::new(),
                     params,
                     ret,
                     err: Some(err),
@@ -580,7 +575,6 @@ fn resolve_param_kind(
             let bool_ty = checker.bool_type();
             checker.types.function(FuncSig {
                 type_params: Vec::new(),
-                type_param_constraints: Vec::new(),
                 params: vec![ParamType {
                     ty: inner,
                     mode: SemanticParamMode::Owned,
@@ -599,7 +593,6 @@ fn resolve_param_kind(
             let ret = checker.fresh_infer();
             checker.types.function(FuncSig {
                 type_params: Vec::new(),
-                type_param_constraints: Vec::new(),
                 params: vec![ParamType {
                     ty: inner,
                     mode: SemanticParamMode::Owned,

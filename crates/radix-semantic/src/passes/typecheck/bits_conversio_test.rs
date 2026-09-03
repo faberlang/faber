@@ -229,7 +229,6 @@ fn bits_builtin_row_carries_no_declared_channel() {
     let vacuum = checker.vacuum_type();
     let sig = FuncSig {
         type_params: Vec::new(),
-        type_param_constraints: Vec::new(),
         params: Vec::new(),
         ret: vacuum,
         err: Some(u32),

@@ -982,7 +982,16 @@ impl TypeTable {
                         .type_params
                         .iter()
                         .zip(b_sig.type_params.iter())
-                        .all(|(a_name, b_name)| a_name == b_name)
+                        .all(|(a_param, b_param)| {
+                            a_param.name == b_param.name
+                                && a_param.sort == b_param.sort
+                                && self
+                                    .type_param_constraint_equal(&a_param.constraint, &b_param.constraint)
+                                && self.generic_param_defaults_equal(
+                                    &a_param.default,
+                                    &b_param.default,
+                                )
+                        })
                     && a_sig.params.len() == b_sig.params.len()
                     && a_sig
                         .params
@@ -1001,10 +1010,6 @@ impl TypeTable {
                     }
                     && a_sig.is_async == b_sig.is_async
                     && a_sig.is_generator == b_sig.is_generator
-                    && self.type_param_constraints_equal(
-                        &a_sig.type_param_constraints,
-                        &b_sig.type_param_constraints,
-                    )
             }
             (Type::Param(a_name), Type::Param(b_name)) => a_name == b_name,
             (Type::Applied(a_base, a_args), Type::Applied(b_base, b_args)) => {
@@ -1074,23 +1079,32 @@ impl TypeTable {
         true
     }
 
-    fn type_param_constraints_equal(
-        &self,
-        a: &[TypeParamConstraint],
-        b: &[TypeParamConstraint],
-    ) -> bool {
-        if a.len() != b.len() {
-            return false;
-        }
-        a.iter().zip(b.iter()).all(|(a_constraint, b_constraint)| {
-            match (a_constraint, b_constraint) {
-                (TypeParamConstraint::Any, TypeParamConstraint::Any) => true,
-                (TypeParamConstraint::OneOf(a_types), TypeParamConstraint::OneOf(b_types)) => {
-                    self.union_members_equal(a_types, b_types)
-                }
-                _ => false,
+    fn type_param_constraint_equal(&self, a: &TypeParamConstraint, b: &TypeParamConstraint) -> bool {
+        match (a, b) {
+            (TypeParamConstraint::Any, TypeParamConstraint::Any) => true,
+            (TypeParamConstraint::OneOf(a_types), TypeParamConstraint::OneOf(b_types)) => {
+                self.union_members_equal(a_types, b_types)
             }
-        })
+            _ => false,
+        }
+    }
+
+    fn generic_param_defaults_equal(
+        &self,
+        a: &Option<SemanticGenericParamDefault>,
+        b: &Option<SemanticGenericParamDefault>,
+    ) -> bool {
+        match (a, b) {
+            (Some(SemanticGenericParamDefault::Typus(a_ty)), Some(SemanticGenericParamDefault::Typus(b_ty))) => {
+                self.equals(*a_ty, *b_ty)
+            }
+            (
+                Some(SemanticGenericParamDefault::Magnitudo(a_value)),
+                Some(SemanticGenericParamDefault::Magnitudo(b_value)),
+            ) => a_value == b_value,
+            (None, None) => true,
+            _ => false,
+        }
     }
 
     /// Return whether a value of type `from` can be used where `to` is expected.
@@ -2076,7 +2090,7 @@ fn type_refs_in_bounds(ty: &Type, types_len: usize, indices_len: usize) -> bool 
             sig.params.iter().all(|p| type_in_bounds(&p.ty))
                 && type_in_bounds(&sig.ret)
                 && sig.err.is_none_or(|e| type_in_bounds(&e))
-                && sig.type_param_constraints.iter().all(|c| match c {
+                && sig.type_params.iter().all(|param| match &param.constraint {
                     TypeParamConstraint::Any => true,
                     TypeParamConstraint::OneOf(ids) => ids.iter().all(type_in_bounds),
                 })
@@ -2167,13 +2181,48 @@ impl SemanticMutability {
 /// about calls without re-reading syntax annotations.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct FuncSig {
-    pub type_params: Vec<LexSymbol>,
-    pub type_param_constraints: Vec<TypeParamConstraint>,
+    /// Ordered declaration row of generic parameters.
+    ///
+    /// Sort, constraint, and default travel with each name so no consumer has
+    /// to reconstruct the kind from where the name occurs in the signature.
+    pub type_params: Vec<GenericParamDescriptor>,
     pub params: Vec<ParamType>,
     pub ret: TypeId,
     pub err: Option<TypeId>,
     pub is_async: bool,
     pub is_generator: bool,
+}
+
+/// Declared sort of one generic parameter.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum GenericParamSort {
+    /// Type parameter (`T`, `U`, …).
+    Typus,
+    /// Compile-time size/index parameter (`magnitudo N`).
+    Magnitudo,
+}
+
+/// Declaration-time `=` default of one generic parameter.
+///
+/// The variant always matches the parameter's [`GenericParamSort`]; the parser
+/// enforces the pairing at the source spelling.
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum SemanticGenericParamDefault {
+    /// Type default, legal on [`GenericParamSort::Typus`] parameters.
+    Typus(TypeId),
+    /// Natural-literal default, legal on [`GenericParamSort::Magnitudo`]
+    /// parameters.
+    Magnitudo(u64),
+}
+
+/// One ordered generic parameter of a callable contract.
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct GenericParamDescriptor {
+    pub name: LexSymbol,
+    pub sort: GenericParamSort,
+    /// Source-declared admission rule for concrete type arguments.
+    pub constraint: TypeParamConstraint,
+    pub default: Option<SemanticGenericParamDefault>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]

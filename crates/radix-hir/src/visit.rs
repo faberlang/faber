@@ -1518,6 +1518,7 @@ mod tests {
                         name: Symbol(3),
                         span: Span::default(),
                         constraint: HirTypeParamConstraint::Any,
+                        default: None,
                     }],
                     ty: TypeId(0),
                 }),

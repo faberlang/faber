@@ -191,7 +191,6 @@ fn type_to_faber_emits_fn_type_param_modes() {
     // the underlying `Type::Ref` prints it and no separate prefix is added.
     let sig = FuncSig {
         type_params: Vec::new(),
-        type_param_constraints: Vec::new(),
         params: vec![ParamType {
             ty: ref_textus,
             mode: SemanticParamMode::Ref,
@@ -212,7 +211,6 @@ fn type_to_faber_emits_fn_type_param_modes() {
     // explicit type-position marker instead of being silently dropped.
     let owned_sig = FuncSig {
         type_params: Vec::new(),
-        type_param_constraints: Vec::new(),
         params: vec![ParamType {
             ty: textus,
             mode: SemanticParamMode::Move,

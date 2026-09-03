@@ -3047,15 +3047,17 @@ pub(crate) fn validate_referential_integrity(
                 if let Some(et) = sig.err {
                     check_type(et)?;
                 }
-                for constraint in &sig.type_param_constraints {
-                    if let radix_types::TypeParamConstraint::OneOf(tys) = constraint {
+                for param in &sig.type_params {
+                    if let radix_types::TypeParamConstraint::OneOf(tys) = &param.constraint {
                         for ty in tys {
                             check_type(*ty)?;
                         }
                     }
-                }
-                for sym in &sig.type_params {
-                    check_symbol(*sym)?;
+                    if let Some(radix_types::SemanticGenericParamDefault::Typus(ty)) = param.default
+                    {
+                        check_type(ty)?;
+                    }
+                    check_symbol(param.name)?;
                 }
                 for pt in &sig.params {
                     check_type(pt.ty)?;
@@ -3102,11 +3104,16 @@ pub(crate) fn validate_referential_integrity(
                     if let Some(et) = sig.err {
                         check_type(et)?;
                     }
-                    for constraint in &sig.type_param_constraints {
-                        if let radix_types::TypeParamConstraint::OneOf(tys) = constraint {
+                    for param in &sig.type_params {
+                        if let radix_types::TypeParamConstraint::OneOf(tys) = &param.constraint {
                             for ty in tys {
                                 check_type(*ty)?;
                             }
+                        }
+                        if let Some(radix_types::SemanticGenericParamDefault::Typus(ty)) =
+                            param.default
+                        {
+                            check_type(ty)?;
                         }
                     }
                     for pt in &sig.params {

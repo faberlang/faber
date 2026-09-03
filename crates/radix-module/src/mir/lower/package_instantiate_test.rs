@@ -395,7 +395,6 @@ fn artifact_restored_signature_only_device_route_fails_closed() {
         name: "scala".to_owned(),
         kind: FileExportKind::Function(InterfaceCallable {
             type_params: Vec::new(),
-            type_param_constraints: Vec::new(),
             params: Vec::new(),
             ret: Box::new(InterfaceTypeSnapshot::Primitive(Primitive::Vacuum)),
             err: None,
