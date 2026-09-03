@@ -38,7 +38,7 @@ use crate::hir::{
     DefId, HirAnnotationValue, HirArrayElement, HirBinOp, HirBlock, HirCape, HirCasuArm, HirConst, HirConversioTarget,
     HirExpression, HirExpressionKind, HirExtremumOp, HirField, HirFunction, HirItem, HirItemKind, HirIteraMode,
     HirLiteral, HirLocal, HirMethod, HirNonNullKind, HirObjectField, HirObjectKey, HirOptionalChainKind, HirParamMode,
-    HirPattern, HirRangeKind, HirScribeKind, HirStatement, HirStatementKind, HirStruct, HirUnOp,
+    HirPattern, HirRangeKind, HirScribeKind, HirStatement, HirStatementKind, HirStruct, HirTypeParam, HirUnOp,
 };
 use crate::lexer::{Interner, Span, Symbol};
 use crate::mir::{
@@ -53,7 +53,7 @@ use crate::mir::{
     MirTempId, MirTerminator, MirTerminatorKind, MirType, MirTypeCheckOp, MirUnOp, MirValidationContext, MirValue,
     MirValueId, MirValueKind, ValidatedMir, dump_program, instantiate_existing_generic_type, type_contains_param,
 };
-use crate::semantic::{ConversionPair, IndexExpr, NumericWidth, Primitive, Type, TypeId, TypeTable};
+use crate::semantic::{ConversionPair, IndexExpr, IndexId, NumericWidth, Primitive, Type, TypeId, TypeTable};
 use radix_mir::device::{MirDeviceFunctionMetadata, MirDeviceFunctionMetadataMap, is_public_entry};
 use radix_types::{MirCollectionOp, MirKernelBuiltin};
 use rustc_hash::{FxHashMap, FxHashSet};
@@ -1029,6 +1029,10 @@ impl<'a> MirLowerer<'a> {
             config.device_role,
             shader_stage,
         );
+        builder.size_params = match &config.target {
+            CallableLoweringTarget::Function(function) => size_param_names(&function.type_params),
+            CallableLoweringTarget::Method { method, .. } => size_param_names(&method.func.type_params),
+        };
         let (body, cli_args) = match config.target {
             CallableLoweringTarget::Function(function) => {
                 for param in &function.params {
@@ -1269,6 +1273,29 @@ fn shader_stage_for_function(function: &HirFunction) -> Option<MirKernelShaderSt
     } else {
         None
     }
+}
+
+/// Body-visible `magnitudo` parameters of one callable, def → name. A value
+/// position naming one of these defs carries its compile-time size into MIR
+/// (sgr C2a); `typus` parameters are types, never values.
+fn size_param_names(params: &[HirTypeParam]) -> FxHashMap<DefId, Symbol> {
+    params
+        .iter()
+        .filter(|param| !param.is_typus())
+        .map(|param| (param.def_id, param.name))
+        .collect()
+}
+
+/// Interned `IndexExpr::Param` node for one size parameter. Signature shapes
+/// intern the node whenever the parameter appears in a type, so the ordinary
+/// body-visible case resolves; a parameter with no node anywhere has no
+/// symbolic carrier and the path fails closed.
+fn symbolic_size_index(types: &TypeTable, name: Symbol) -> Option<IndexId> {
+    (0..types.index_count()).find_map(|index| {
+        #[expect(clippy::cast_possible_truncation, reason = "IndexId is a u32 arena index by design")]
+        let id = IndexId(index as u32);
+        matches!(types.get_index(id), IndexExpr::Param(found) if *found == name).then_some(id)
+    })
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -1536,6 +1563,10 @@ struct FunctionBuilder<'a> {
     kernel_local_callees: FxHashMap<MirLocalId, MirFunctionId>,
     captured_bindings: FxHashMap<DefId, MirPlace>,
     captured_binding_metadata: FxHashMap<DefId, (Symbol, MirType)>,
+    /// Enclosing callable's `magnitudo` parameters, def → name. A body path
+    /// to one of these defs lowers to the symbolic size operand, never a
+    /// runtime local (sgr C2a).
+    size_params: FxHashMap<DefId, Symbol>,
     parent_function_id: MirFunctionId,
     device_role: Option<MirDeviceRole>,
     shader_stage: Option<MirKernelShaderStage>,
@@ -1584,6 +1615,7 @@ impl<'a> FunctionBuilder<'a> {
             kernel_local_callees: FxHashMap::default(),
             captured_bindings: FxHashMap::default(),
             captured_binding_metadata: FxHashMap::default(),
+            size_params: FxHashMap::default(),
             parent_function_id,
             device_role,
             shader_stage,
@@ -2101,6 +2133,16 @@ impl<'a> FunctionBuilder<'a> {
             if let Some(konst) = self.context.top_level_consts.get(&def_id).copied() {
                 let binding = self.lower_top_level_const_binding(def_id, konst, expr.span)?;
                 return Some(MirOperand::Place(MirPlace::local(binding.local)));
+            }
+            // sgr C2a: a body-visible `magnitudo` parameter names its
+            // compile-time size, not a runtime value. Carry it as the
+            // symbolic shape-size operand on the parameter's own interned
+            // node — shape bindings at instantiation fold it to the concrete
+            // size; AIR never sees it unsubstituted.
+            if let Some(name) = self.size_params.get(&def_id).copied()
+                && let Some(shape) = symbolic_size_index(self.types, name)
+            {
+                return Some(MirOperand::Constant(MirConstant::ShapeSize { shape, axis: None }));
             }
             self.errors
                 .push(MirError::unsupported(expr.span, "path that does not resolve to a local value"));

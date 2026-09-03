@@ -4634,6 +4634,53 @@ functio describe(Resultatus<numerus> r) → textus {
     validate_program(&lowered.program, lowered.validated.validation()).expect("generic enum payload MIR validates");
 }
 
+/// sgr C2a: a body-visible `magnitudo` parameter at an intrinsic index slot
+/// lowers to the symbolic shape-size operand on the parameter's own node, so
+/// the generic template exists for instantiation to bind later (C2b). The
+/// path must never resolve to a runtime local.
+#[test]
+fn body_size_param_path_carries_symbolic_shape_size_operand() {
+    let source = r#"
+functio rope_q<T, magnitudo D, magnitudo d, magnitudo P>(tensor<T, [D, d]> input, tensor<T, [P, d, 3]> rota, in tensor<T, [D, d]> output) → vacuum {
+    output ← input.rope_norm(0, d)
+}
+"#;
+    let mut unit = analyze(source);
+    let lowered = lower_analyzed_unit(&mut unit, Default::default())
+        .expect("generic rope template must lower, not reject the size-param path");
+
+    assert_eq!(lowered.generic_templates.len(), 1, "rope_q stays one generic template");
+    let template = &lowered.generic_templates[0];
+    let rope_calls = template
+        .blocks
+        .iter()
+        .flat_map(|block| block.statements.iter())
+        .filter_map(|statement| match &statement.kind {
+            MirStatementKind::RuntimeCall { call, .. } => Some(call),
+            _ => None,
+        })
+        .filter(|call| matches!(call.intrinsic, MirIntrinsic::Collection(MirCollectionOp::TensorRope)))
+        .collect::<Vec<_>>();
+    assert_eq!(rope_calls.len(), 1, "one tensor-rope call in the template");
+    let call = rope_calls[0];
+    assert!(
+        matches!(call.args.get(1), Some(MirOperand::Constant(MirConstant::Int(0)))),
+        "rope position stays a literal: {:?}",
+        call.args
+    );
+    let Some(MirOperand::Constant(MirConstant::ShapeSize { shape, axis: None })) = call.args.get(2) else {
+        panic!("rope dim must carry the symbolic size operand: {:?}", call.args);
+    };
+    match unit.types.get_index(*shape) {
+        IndexExpr::Param(symbol) => assert_eq!(
+            unit.interner.resolve(*symbol),
+            "d",
+            "the operand must reference the size parameter's own interned node"
+        ),
+        other => panic!("shape node must be the d parameter, got {other:?}"),
+    }
+}
+
 #[test]
 // Sparse tensor operations (interleaved with generic monomorphization above).
 fn sparsa_nonnihil_lowers_to_distinct_runtime_operation() {
