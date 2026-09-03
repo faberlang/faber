@@ -4937,6 +4937,53 @@ incipit {
 // 4A — magnitudo shape params monomorphize at concrete call sites.
 // ──────────────────────────────────────────────────────────────────────
 
+#[test]
+fn monomorphized_device_instance_carries_copied_template_metadata() {
+    let mut unit = analyze(
+        r#"
+@ nucleum
+functio duplum<T>(T x) → T {
+    redde x
+}
+
+incipit {
+    fixum numerus v ← duplum<numerus>(7)
+    nota v
+}
+"#,
+    );
+    let lowered = lower_analyzed_unit(&mut unit, Default::default()).expect("MIR lowering succeeds");
+
+    assert_eq!(lowered.monomorphizations.len(), 1);
+    let instance_id = lowered.monomorphizations[0].function;
+    let instance = lowered
+        .program
+        .functions
+        .iter()
+        .find(|function| function.id == instance_id)
+        .expect("monomorphized instance in program");
+    let template = lowered
+        .generic_templates
+        .iter()
+        .find(|template| template.source == instance.source)
+        .expect("generic template survives lowering");
+
+    let template_row = lowered
+        .device_function_metadata
+        .get(&template.id)
+        .expect("template device metadata row still present (copy, not move)");
+    let instance_row = lowered
+        .device_function_metadata
+        .get(&instance_id)
+        .expect("instance carries the copied device metadata row");
+
+    assert_eq!(instance_row.identity.parent, instance_id, "instance row parent is the instance id");
+    assert_eq!(instance_row.role, template_row.role);
+    assert_eq!(instance_row.visibility, template_row.visibility);
+    assert_eq!(instance_row.origin, template_row.origin);
+    assert_eq!(template_row.identity.parent, template.id, "template row keeps its own parent");
+}
+
 /// Every tensor dimension of `ty` (through the type table) is a literal.
 fn assert_tensor_dims_literal(types: &TypeTable, ty: MirType) {
     match types.get(ty.semantic_id()) {
