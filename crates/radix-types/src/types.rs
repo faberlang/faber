@@ -978,20 +978,20 @@ impl TypeTable {
             (_, Type::Alias(_, b_inner)) => self.type_equal_with_seen(a, self.get(*b_inner), seen),
             (Type::Func(a_sig), Type::Func(b_sig)) => {
                 a_sig.type_params.len() == b_sig.type_params.len()
-                    && a_sig
-                        .type_params
-                        .iter()
-                        .zip(b_sig.type_params.iter())
-                        .all(|(a_param, b_param)| {
+                    && a_sig.type_params.iter().zip(b_sig.type_params.iter()).all(
+                        |(a_param, b_param)| {
                             a_param.name == b_param.name
                                 && a_param.sort == b_param.sort
-                                && self
-                                    .type_param_constraint_equal(&a_param.constraint, &b_param.constraint)
+                                && self.type_param_constraint_equal(
+                                    &a_param.constraint,
+                                    &b_param.constraint,
+                                )
                                 && self.generic_param_defaults_equal(
                                     &a_param.default,
                                     &b_param.default,
                                 )
-                        })
+                        },
+                    )
                     && a_sig.params.len() == b_sig.params.len()
                     && a_sig
                         .params
@@ -1079,7 +1079,11 @@ impl TypeTable {
         true
     }
 
-    fn type_param_constraint_equal(&self, a: &TypeParamConstraint, b: &TypeParamConstraint) -> bool {
+    fn type_param_constraint_equal(
+        &self,
+        a: &TypeParamConstraint,
+        b: &TypeParamConstraint,
+    ) -> bool {
         match (a, b) {
             (TypeParamConstraint::Any, TypeParamConstraint::Any) => true,
             (TypeParamConstraint::OneOf(a_types), TypeParamConstraint::OneOf(b_types)) => {
@@ -1095,9 +1099,10 @@ impl TypeTable {
         b: &Option<SemanticGenericParamDefault>,
     ) -> bool {
         match (a, b) {
-            (Some(SemanticGenericParamDefault::Typus(a_ty)), Some(SemanticGenericParamDefault::Typus(b_ty))) => {
-                self.equals(*a_ty, *b_ty)
-            }
+            (
+                Some(SemanticGenericParamDefault::Typus(a_ty)),
+                Some(SemanticGenericParamDefault::Typus(b_ty)),
+            ) => self.equals(*a_ty, *b_ty),
             (
                 Some(SemanticGenericParamDefault::Magnitudo(a_value)),
                 Some(SemanticGenericParamDefault::Magnitudo(b_value)),

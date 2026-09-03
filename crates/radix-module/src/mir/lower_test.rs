@@ -5323,12 +5323,7 @@ incipit {
     // analysis with SEM014 instead of surfacing an unresolved param at MIR
     // lowering.
     let session = Session::new(Config::default().with_target(Target::HirTypeScript));
-    let errors = match crate::driver::analyze_source(
-        &session,
-        "test.fab",
-        source,
-        AnalyzeRequest::default(),
-    ) {
+    let errors = match crate::driver::analyze_source(&session, "test.fab", source, AnalyzeRequest::default()) {
         Ok(_) => panic!("unbound child shape must fail closed"),
         Err(errors) => errors,
     };
@@ -5336,7 +5331,10 @@ incipit {
         errors
             .iter()
             .any(|error| error.issue() == Some("cannot_infer_tensor_shape")
-                && error.args.iter().any(|arg| arg.name == "param" && arg.value == "N")),
+                && error
+                    .args
+                    .iter()
+                    .any(|arg| arg.name == "param" && arg.value == "N")),
         "expected SEM014 cannot_infer_tensor_shape for N, got {errors:?}"
     );
 }

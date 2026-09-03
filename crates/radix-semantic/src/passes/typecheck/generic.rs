@@ -85,12 +85,9 @@ impl TypeChecker<'_> {
             let mut shape_vars = self.shape_vars_for(sig, &shape_symbols);
             let sig = self.substitute_func_sig(sig, &mut param_vars, Some(&mut shape_vars));
             (sig, Some(param_vars), shape_vars)
-        } else if let Some(error_ty) = self.reject_invalid_explicit_type_args(
-            sig,
-            explicit_type_args,
-            args,
-            span,
-        ) {
+        } else if let Some(error_ty) =
+            self.reject_invalid_explicit_type_args(sig, explicit_type_args, args, span)
+        {
             return error_ty;
         } else if self.reject_type_arg_domain_misses(sig, explicit_type_args, span) {
             self.typecheck_call_arg_exprs(args);
@@ -230,9 +227,7 @@ impl TypeChecker<'_> {
             if self.is_infer(self.resolve_inferred_type(witness)) {
                 continue;
             }
-            if self
-                .type_arg_rejects_domain(param.name, &param.constraint, witness, span)
-            {
+            if self.type_arg_rejects_domain(param.name, &param.constraint, witness, span) {
                 rejected = true;
             }
         }

@@ -157,7 +157,9 @@ impl Lowerer<'_> {
                 // re-checking the pairing.
                 default: param.default.as_ref().map(|default| match default {
                     radix_syntax::GenericParamDefault::Typus(ty) => {
-                        radix_types::SemanticGenericParamDefault::Typus(self.lower_parameter_type(ty))
+                        radix_types::SemanticGenericParamDefault::Typus(
+                            self.lower_parameter_type(ty),
+                        )
                     }
                     radix_syntax::GenericParamDefault::Magnitudo { value, .. } => {
                         radix_types::SemanticGenericParamDefault::Magnitudo(*value)

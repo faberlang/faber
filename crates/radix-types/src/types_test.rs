@@ -1353,10 +1353,12 @@ fn gpd2_func_sig_equals_includes_sort_and_default() {
     ));
     let magnitudo_bare_id = types.function(sig_of(None, GenericParamSort::Magnitudo));
 
-    assert_ne!(bare_id, magnitudo_bare_id, "typus and magnitudo rows are distinct sigs");
     assert_ne!(
-        magnitudo_bare_id,
-        defaulted_id,
+        bare_id, magnitudo_bare_id,
+        "typus and magnitudo rows are distinct sigs"
+    );
+    assert_ne!(
+        magnitudo_bare_id, defaulted_id,
         "a defaulted size param is a different signature"
     );
     assert!(

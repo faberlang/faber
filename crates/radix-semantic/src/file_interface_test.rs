@@ -182,10 +182,12 @@ fn twin_callable_snapshot_preserves_size_params_and_shape_witnesses() {
         .map(|param| param.name.as_str())
         .collect();
     assert_eq!(names, vec!["M", "K"]);
-    assert!(callable
-        .type_params
-        .iter()
-        .all(|param| param.kind == GenericParamKind::Magnitudo));
+    assert!(
+        callable
+            .type_params
+            .iter()
+            .all(|param| param.kind == GenericParamKind::Magnitudo)
+    );
     assert_eq!(
         callable.params[0].ty,
         InterfaceTypeSnapshot::Tensor(

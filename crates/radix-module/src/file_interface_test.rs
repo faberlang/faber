@@ -4,17 +4,16 @@
 
 use super::{
     FileExport, FileExportKind, FileInterface, FileInterfaceError, InterfaceAliasExport, InterfaceAppliedArg,
-    InterfaceBodyChannel, InterfaceCallable, InterfaceCallableParam, InterfaceCanonicalBody,
-    InterfaceDeviceContract, InterfaceDeviceRole, InterfaceDeviceVisibility, InterfaceGenericParam,
-    InterfaceIndexSnapshot, InterfaceLibraryIdentity, InterfaceNominalKind, InterfaceNominalType,
-    InterfaceParam, InterfaceStructExport, InterfaceStructField,
-    InterfaceTypeParamConstraint, InterfaceTypeSnapshot, import_interface_type, snapshot_interface_type,
+    InterfaceBodyChannel, InterfaceCallable, InterfaceCallableParam, InterfaceCanonicalBody, InterfaceDeviceContract,
+    InterfaceDeviceRole, InterfaceDeviceVisibility, InterfaceGenericParam, InterfaceIndexSnapshot,
+    InterfaceLibraryIdentity, InterfaceNominalKind, InterfaceNominalType, InterfaceParam, InterfaceStructExport,
+    InterfaceStructField, InterfaceTypeParamConstraint, InterfaceTypeSnapshot, import_interface_type,
+    snapshot_interface_type,
 };
 use crate::lexer::Interner;
 use crate::semantic::{
-    GenericParamDescriptor, GenericParamSort, IndexExpr, InstansPrecision, NumericWidth, ParamType,
-    Primitive, SemanticGenericParamDefault, SemanticMutability, SemanticParamMode, Type,
-    TypeParamConstraint, TypeTable,
+    GenericParamDescriptor, GenericParamSort, IndexExpr, InstansPrecision, NumericWidth, ParamType, Primitive,
+    SemanticGenericParamDefault, SemanticMutability, SemanticParamMode, Type, TypeParamConstraint, TypeTable,
 };
 use std::collections::BTreeMap;
 
@@ -117,8 +116,7 @@ fn failable_generic_callable_round_trips() {
             target_types.primitive(Primitive::Numerus)
         ]
     );
-    let Some(SemanticGenericParamDefault::Typus(default_ty)) = imported_sig.type_params[0].default
-    else {
+    let Some(SemanticGenericParamDefault::Typus(default_ty)) = imported_sig.type_params[0].default else {
         panic!("expected typus default to survive the snapshot round trip");
     };
     assert_eq!(default_ty, target_types.primitive(Primitive::Numerus));
