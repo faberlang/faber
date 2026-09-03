@@ -1196,4 +1196,55 @@ impl MirKernelSignature {
             }
         }
     }
+
+    /// The launched THREAD count on the first invocation builtin's axis —
+    /// the bound an OOB early-return guard against a GLOBAL invocation id
+    /// must compare with (F-049 successor, ordg).
+    ///
+    /// The shared dispatch law (`collection_op_workgroup_count`) counts
+    /// `dispatch_size` in threads on every contract except the matmul
+    /// family, whose axes are workgroup/tile grids — there the coverage is
+    /// `workgroup × dispatch_size` per axis, exactly the facts the
+    /// one-row dispatch setter knows together. Returning the raw
+    /// matmul-family axis truncated real launches (Review 2 A1/A2: a
+    /// one-row GEMV kept 60 of 960 columns, poisoning the 0.845 t/s
+    /// capture). Non-global builtins keep [`Self::oob_guard_limit`]'s
+    /// static axis bound (workgroup-id guards compare against the
+    /// workgroup grid, which the matmul-family dispatch already is).
+    ///
+    /// Returns `None` when the coverage does not fit `u32` — callers must
+    /// fail closed instead of emitting a silently truncated guard.
+    #[must_use]
+    pub fn oob_guard_thread_coverage(
+        &self,
+        function: &MirFunction,
+        first_builtin: MirKernelBuiltin,
+    ) -> Option<u32> {
+        let (extent, width) = match first_builtin {
+            MirKernelBuiltin::GlobalInvocationX | MirKernelBuiltin::GlobalInvocationId => {
+                (self.dispatch_size.x, u64::from(self.workgroup.x))
+            }
+            MirKernelBuiltin::GlobalInvocationY => {
+                (self.dispatch_size.y, u64::from(self.workgroup.y))
+            }
+            MirKernelBuiltin::GlobalInvocationZ => {
+                (self.dispatch_size.z, u64::from(self.workgroup.z))
+            }
+            _ => return Some(self.oob_guard_limit(first_builtin)),
+        };
+        let matmul_grid = kernel_has_collection_op(function, |op| {
+            matches!(
+                op,
+                crate::MirCollectionOp::TensorMatMul
+                    | crate::MirCollectionOp::TensorQuantizedMatMul
+                    | crate::MirCollectionOp::TensorGroupedMatMul
+            )
+        });
+        let threads = if matmul_grid {
+            extent.checked_mul(width)?
+        } else {
+            extent
+        };
+        u32::try_from(threads).ok()
+    }
 }
