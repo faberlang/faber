@@ -582,7 +582,12 @@ impl<'lowerer, 'unit> MonomorphizationState<'lowerer, 'unit> {
         // starts without the template's explicit facts. Copy (not move) the
         // template row with the instance as its parent — package
         // instantiation still reads the original template row.
-        if let Some(mut metadata) = self.lowerer.device_function_metadata.get(&template.id).copied() {
+        if let Some(mut metadata) = self
+            .lowerer
+            .device_function_metadata
+            .get(&template.id)
+            .copied()
+        {
             metadata.identity.parent = id;
             self.lowerer.device_function_metadata.insert(id, metadata);
         }

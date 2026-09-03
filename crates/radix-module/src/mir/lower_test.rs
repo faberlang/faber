@@ -5024,7 +5024,10 @@ incipit {
         .get(&instance_id)
         .expect("instance carries the copied device metadata row");
 
-    assert_eq!(instance_row.identity.parent, instance_id, "instance row parent is the instance id");
+    assert_eq!(
+        instance_row.identity.parent, instance_id,
+        "instance row parent is the instance id"
+    );
     assert_eq!(instance_row.role, template_row.role);
     assert_eq!(instance_row.visibility, template_row.visibility);
     assert_eq!(instance_row.origin, template_row.origin);

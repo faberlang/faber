@@ -4,6 +4,8 @@
 //! Shared temp-dir and diagnostic arg helpers stay local until a second consumer
 //! needs them.
 
+#[cfg(feature = "mir-metal")]
+use super::cmd::compile_package_metal_text;
 use super::{
     ManifestProductEmit, ManifestProductKind, build_browser_product,
     build_browser_product_static_assets, config_with_locale, emit_generated_crate,
@@ -13,8 +15,6 @@ use super::{
     with_lowered_package_mir,
 };
 use super::{cmd::use_package_compiler, faber_analysis_seams, faber_emission_seams};
-#[cfg(feature = "mir-metal")]
-use super::cmd::compile_package_metal_text;
 use radix::program::analyze::AnalyzedProgram;
 use radix::program::discovery::{
     BuildLayout, PackageSpec, discover_build_layout, sanitize_crate_name,
