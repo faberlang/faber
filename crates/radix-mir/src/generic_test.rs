@@ -963,6 +963,26 @@ fn fold_shape_size_constant_matches_air_fold_semantics() {
     );
 }
 
+/// sgr C3: a bare `Param` size scalar (the `magnitudo` reference a generic
+/// body lowers with `axis: None`) folds to the bound integer — rope dims and
+/// other NumerusIndex positions are integers. Tuple-shape folds keep the f64
+/// AIR-mirror carrier (previous test).
+#[test]
+fn fold_shape_size_param_substitutes_to_int() {
+    let mut types = TypeTable::new();
+    let dim = Symbol(102);
+    let param_dim = types.intern_index(IndexExpr::Param(dim));
+    let bound = types.intern_index(IndexExpr::Literal(64));
+    let mut shape_bindings = MirShapeBindings::default();
+    shape_bindings.insert(dim, bound);
+
+    assert_eq!(
+        fold_shape_size_constant(&mut types, param_dim, None, &shape_bindings),
+        Some(MirConstant::Int(64)),
+        "the substituted size scalar must be the integer bound, not a float"
+    );
+}
+
 #[test]
 fn substitute_shape_size_fails_closed_on_missing_binding() {
     let mut types = TypeTable::new();
