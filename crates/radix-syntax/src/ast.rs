@@ -292,7 +292,22 @@ pub enum GenericParamKind {
 pub struct TypeParam {
     pub kind: GenericParamKind,
     pub name: Ident,
+    /// Declared `=` default. A generic default is a declaration-time fact, so
+    /// the variant always matches the declared sort; semantic phases read it
+    /// instead of re-deriving the class from the payload shape.
+    pub default: Option<GenericParamDefault>,
     pub span: Span,
+}
+
+/// Source-shaped default on one generic parameter.
+#[derive(Debug)]
+pub enum GenericParamDefault {
+    /// Type default (`T = type_annotation`), legal on `Typus` parameters.
+    Typus(Box<TypeExpr>),
+    /// Natural-literal default (`magnitudo D = 64`), legal on `Magnitudo`
+    /// parameters. Runtime expressions and dependent defaults are not part of
+    /// the grammar.
+    Magnitudo { value: u64, span: Span },
 }
 
 #[derive(Debug)]

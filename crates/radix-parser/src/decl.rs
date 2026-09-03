@@ -2715,10 +2715,17 @@ impl Parser {
     /// Parse an optional angle-bracket generic parameter list.
     ///
     /// GRAMMAR:
-    ///   generic-params := '<' generic-param (',' generic-param)* '>'
-    ///   generic-param  := ident | `magnitudo` ident
+    ///   generic-params       := '<' generic-param (',' generic-param)* '>'
+    ///   generic-param        := ident generic-type-default?
+    ///                          | `magnitudo` ident generic-size-default?
+    ///   generic-type-default := '=' type
+    ///   generic-size-default := '=' NATURAL
     ///
-    /// Type parameters (`T`) precede size parameters (`magnitudo N`).
+    /// Type parameters (`T`) precede size parameters (`magnitudo N`). A
+    /// default is a declaration-time fact spelled with `=`; once one parameter
+    /// defaults, every later parameter must default so positional generic
+    /// application stays unambiguous. The runtime optional-value spelling
+    /// `vel` (localized `coalesce`) is rejected in this position.
     fn parse_generic_params(&mut self) -> Result<Vec<TypeParam>, ParseError> {
         if !self.eat(&TokenKind::LtAscii) {
             return Ok(Vec::new());
@@ -2726,6 +2733,7 @@ impl Parser {
 
         let mut params = Vec::new();
         let mut seen_magnitudo = false;
+        let mut seen_default = false;
         loop {
             let start = self.current_span();
             let (kind, name) = if self.eat_keyword_ident(TokenKind::Magnitudo) {
@@ -2737,8 +2745,27 @@ impl Parser {
                 }
                 (GenericParamKind::Typus, self.parse_ident()?)
             };
+
+            if self.check_keyword_ident(TokenKind::Vel) {
+                return Err(self.vel_generic_default_error());
+            }
+
+            let default = if self.eat(&TokenKind::Eq) {
+                seen_default = true;
+                Some(self.parse_generic_default(kind, &name)?)
+            } else {
+                if seen_default {
+                    return Err(self.generic_default_not_trailing_error(&name));
+                }
+                None
+            };
             let span = start.merge(name.span);
-            params.push(TypeParam { kind, name, span });
+            params.push(TypeParam {
+                kind,
+                name,
+                default,
+                span,
+            });
 
             if !self.consume_item_separator(&TokenKind::GtAscii, "generic_parameters")? {
                 break;
@@ -2747,6 +2774,94 @@ impl Parser {
 
         self.expect(&TokenKind::GtAscii, "expected '>' after generic parameters")?;
         Ok(params)
+    }
+
+    /// Parse the `=` default of one generic parameter, by declared sort.
+    ///
+    /// The two sorts own closed default domains: a type annotation for `T`,
+    /// a natural literal for `magnitudo`. Cross-sort payloads are rejected
+    /// here instead of being parsed and reclassified later.
+    fn parse_generic_default(
+        &mut self,
+        kind: GenericParamKind,
+        name: &Ident,
+    ) -> Result<GenericParamDefault, ParseError> {
+        let missing = matches!(self.peek().kind, TokenKind::Comma | TokenKind::GtAscii);
+        if missing {
+            return Err(self.generic_default_missing_value_error(kind, name));
+        }
+        match kind {
+            GenericParamKind::Typus => {
+                if let TokenKind::Integer(_) = self.peek().kind {
+                    return Err(self.generic_default_wrong_class_error(kind, name));
+                }
+                Ok(GenericParamDefault::Typus(Box::new(self.parse_type()?)))
+            }
+            GenericParamKind::Magnitudo => {
+                if let TokenKind::Integer(value) = self.peek().kind {
+                    let span = self.current_span();
+                    self.advance();
+                    return Ok(GenericParamDefault::Magnitudo { value, span });
+                }
+                Err(self.generic_default_wrong_class_error(kind, name))
+            }
+        }
+    }
+
+    fn generic_default_sort(kind: GenericParamKind) -> &'static str {
+        match kind {
+            GenericParamKind::Typus => "typus",
+            GenericParamKind::Magnitudo => "magnitudo",
+        }
+    }
+
+    fn generic_default_expectation(kind: GenericParamKind) -> &'static str {
+        match kind {
+            GenericParamKind::Typus => "type_annotation",
+            GenericParamKind::Magnitudo => "natural_literal",
+        }
+    }
+
+    fn vel_generic_default_error(&self) -> ParseError {
+        ParseError::structured(ParseErrorKind::TypeParameterInvalid, self.current_span())
+            .with_arg("issue", "removed_vel_generic_default")
+            .with_arg("keyword", "vel")
+            .with_arg("replacement", "=")
+    }
+
+    fn generic_default_not_trailing_error(&self, name: &Ident) -> ParseError {
+        ParseError::structured(ParseErrorKind::TypeParameterInvalid, name.span)
+            .with_arg("issue", "generic_default_not_trailing")
+            .with_arg("parameter", self.interner.resolve(name.name).to_owned())
+    }
+
+    fn generic_default_missing_value_error(
+        &self,
+        kind: GenericParamKind,
+        name: &Ident,
+    ) -> ParseError {
+        ParseError::structured(ParseErrorKind::TypeParameterInvalid, self.current_span())
+            .with_arg("issue", "generic_default_missing_value")
+            .with_arg(
+                "parameter",
+                self.interner.resolve(name.name).to_owned(),
+            )
+            .with_arg("expected", Self::generic_default_expectation(kind))
+    }
+
+    fn generic_default_wrong_class_error(
+        &self,
+        kind: GenericParamKind,
+        name: &Ident,
+    ) -> ParseError {
+        ParseError::structured(ParseErrorKind::TypeParameterInvalid, self.current_span())
+            .with_arg("issue", "generic_default_wrong_class")
+            .with_arg("sort", Self::generic_default_sort(kind))
+            .with_arg(
+                "parameter",
+                self.interner.resolve(name.name).to_owned(),
+            )
+            .with_arg("expected", Self::generic_default_expectation(kind))
     }
 
     fn removed_prae_typus_error(&self) -> ParseError {
