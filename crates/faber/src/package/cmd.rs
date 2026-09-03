@@ -38,6 +38,7 @@ fn fail(message: &str) -> ! {
     not(feature = "hir-fhir"),
     not(feature = "mir-llvm"),
     not(feature = "mir-wasm"),
+    not(feature = "mir-metal"),
     not(feature = "hir-go"),
 ))]
 fn exit_target_feature_unavailable(target_name: &str, feature: &str) -> ! {
@@ -313,6 +314,32 @@ pub fn cmd_build(command: radix::services::BuildCommand, format: bool, linter: b
                 ),
             };
             println!("{}", build.manifest.output.display());
+            return;
+        }
+    }
+
+    // SGR-U2: `.fab` metal-text builds use the package lane. The interpreted
+    // merged consumer instantiates library imports so concrete imported device
+    // registrations join the entry-role map before the probe; the single-file
+    // lane has no registrations and fails the empty-kernels gate.
+    if is_package && target == Target::MirMetal {
+        #[cfg(not(feature = "mir-metal"))]
+        exit_target_feature_unavailable("metal-text", "mir-metal");
+        #[cfg(feature = "mir-metal")]
+        {
+            let code = match compile_package_metal_text(&config, &input_path) {
+                Ok(code) => code,
+                Err(diagnostics) => report_diagnostics_and_exit(
+                    &diagnostics,
+                    locale_pack.as_ref(),
+                    "metal-text package build failed",
+                ),
+            };
+            let output_path =
+                radix::services::build_output_path(&command.out_dir, &input_path, target, is_package);
+            let code = crate::postprocess::postprocess_code(code, target, format, linter);
+            write_output_file(&output_path, code.as_bytes());
+            println!("{}", output_path.display());
             return;
         }
     }
@@ -663,9 +690,10 @@ fn should_treat_as_package(path: &std::path::Path) -> bool {
 
 /// Target-aware package routing for emit/build.
 ///
-/// Single `.fab` files use the package loader for Rust and package-image
-/// targets so `norma:*` imports resolve through the package graph. MIR
-/// probe targets and HIR inspection targets (`go`, `ts`) use the radix
+/// Single `.fab` files use the package loader for Rust, package-image, and
+/// metal-text targets so `norma:*` imports resolve through the package graph
+/// and metal-text sees the merged consumer's imported device registrations.
+/// MIR probe targets and HIR inspection targets (`go`, `ts`) use the radix
 /// single-file path, matching `radix emit`.
 pub fn use_package_compiler(target: Target, path: &std::path::Path, force_package: bool) -> bool {
     if force_package {
@@ -685,6 +713,7 @@ pub fn use_package_compiler(target: Target, path: &std::path::Path, force_packag
                 | Target::HirFhir
                 | Target::MirLlvmHost
                 | Target::MirWasm
+                | Target::MirMetal
         );
     }
     false
@@ -901,6 +930,63 @@ pub fn cmd_emit_package(command: radix::services::EmitCommand, format: bool, lin
     let code =
         crate::postprocess::postprocess_code(output_code(output), command.target, format, linter);
     print!("{code}");
+}
+
+/// Compile a package `.fab` entry to metal-text through the interpreted
+/// merged consumer: the package-MIR driver links library imports into the
+/// merged program and registers their concrete device instances, and the
+/// emit joins those registrations into the entry-role map the same way the
+/// module driver's text-target handoff does. Local entry roles come from the
+/// lowered unit's explicit metadata carrier, never from name inference.
+///
+/// Returns the generated Metal Shading Language source.
+#[cfg(feature = "mir-metal")]
+fn compile_package_metal_text(
+    config: &radix::module::Config,
+    input_path: &Path,
+) -> Result<String, Vec<radix::module::Diagnostic>> {
+    let merged = radix::program::mir::with_interpreted_lowered_package_mir(
+        config,
+        input_path,
+        &super::mir::faber_mir_seams(),
+        |lowered| -> Result<String, Vec<radix::module::Diagnostic>> {
+            let mut local_entry_roles = radix::module::semantic::FxHashMap::default();
+            for function in &lowered.program.functions {
+                if let Some(source) = function.source
+                    && let Some(role) = lowered
+                        .device_function_metadata
+                        .get(&function.id)
+                        .and_then(radix_mir::device::MirDeviceFunctionMetadata::entry_role)
+                {
+                    local_entry_roles.insert(source, role);
+                }
+            }
+            let device_roles = radix_mir::device::merge_imported_entry_roles(
+                local_entry_roles,
+                &radix::program::mir::imported_entry_facts(lowered),
+                &lowered.program,
+            )
+            .map_err(|error| {
+                vec![crate::package_diagnostic_error(error.message())
+                    .with_file(input_path.display().to_string())
+                    .with_arg("issue", error.issue())]
+            })?;
+            radix_mir_metal::emit_metal_text_probe_with_reflection_and_function_metadata(
+                &device_roles,
+                &lowered.device_function_metadata,
+                &lowered.validated,
+                &lowered.interner,
+            )
+            .map(|output| output.source)
+            .map_err(|error| {
+                vec![crate::package_diagnostic_error(error.message)
+                    .with_file(input_path.display().to_string())
+                    .with_arg("issue", error.issue)
+                    .with_arg("shape", error.shape)]
+            })
+        },
+    )?;
+    merged
 }
 
 fn compile_package_input(

@@ -10454,7 +10454,7 @@ main {
 }
 
 #[test]
-fn use_package_compiler_keeps_rust_fab_on_package_path() {
+fn use_package_compiler_keeps_rust_and_metal_fab_on_package_path() {
     let fab = Path::new("main.fab");
     assert!(use_package_compiler(Target::HirRust, fab, false));
     assert!(use_package_compiler(Target::MirScena, fab, false));
@@ -10462,6 +10462,7 @@ fn use_package_compiler_keeps_rust_fab_on_package_path() {
     assert!(use_package_compiler(Target::MirFmirBinary, fab, false));
     assert!(use_package_compiler(Target::MirFmirBundle, fab, false));
     assert!(use_package_compiler(Target::HirFhir, fab, false));
+    assert!(use_package_compiler(Target::MirMetal, fab, false));
     assert!(!use_package_compiler(Target::MirWgsl, fab, false));
     assert!(!use_package_compiler(Target::MirLlvm, fab, false));
     assert!(!use_package_compiler(Target::HirTypeScript, fab, false));
