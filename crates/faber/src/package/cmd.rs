@@ -335,8 +335,12 @@ pub fn cmd_build(command: radix::services::BuildCommand, format: bool, linter: b
                     "metal-text package build failed",
                 ),
             };
-            let output_path =
-                radix::services::build_output_path(&command.out_dir, &input_path, target, is_package);
+            let output_path = radix::services::build_output_path(
+                &command.out_dir,
+                &input_path,
+                target,
+                is_package,
+            );
             let code = crate::postprocess::postprocess_code(code, target, format, linter);
             write_output_file(&output_path, code.as_bytes());
             println!("{}", output_path.display());
@@ -914,8 +918,7 @@ pub fn cmd_emit_package(command: radix::services::EmitCommand, format: bool, lin
                 eprintln!("error: target does not expose GPU reflection metadata");
                 std::process::exit(1);
             }
-            let code =
-                crate::postprocess::postprocess_code(code, command.target, format, linter);
+            let code = crate::postprocess::postprocess_code(code, command.target, format, linter);
             if let Some(out) = command.output {
                 crate::postprocess::write_text_artifact(&out, &code);
             } else {
@@ -1012,9 +1015,11 @@ pub(super) fn compile_package_metal_text(
                 &lowered.program,
             )
             .map_err(|error| {
-                vec![crate::package_diagnostic_error(error.message())
-                    .with_file(input_path.display().to_string())
-                    .with_arg("issue", error.issue())]
+                vec![
+                    crate::package_diagnostic_error(error.message())
+                        .with_file(input_path.display().to_string())
+                        .with_arg("issue", error.issue()),
+                ]
             })?;
             radix_mir_metal::emit_metal_text_probe_with_reflection_and_function_metadata(
                 &device_roles,
@@ -1024,10 +1029,12 @@ pub(super) fn compile_package_metal_text(
             )
             .map(|output| output.source)
             .map_err(|error| {
-                vec![crate::package_diagnostic_error(error.message)
-                    .with_file(input_path.display().to_string())
-                    .with_arg("issue", error.issue)
-                    .with_arg("shape", error.shape)]
+                vec![
+                    crate::package_diagnostic_error(error.message)
+                        .with_file(input_path.display().to_string())
+                        .with_arg("issue", error.issue)
+                        .with_arg("shape", error.shape),
+                ]
             })
         },
     )?;

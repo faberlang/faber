@@ -939,7 +939,8 @@ fn check_tensor_method_args(
     for ((arg, kind), param) in args.iter_mut().zip(entry.params.iter()).zip(params.iter()) {
         if *kind == IntrinsicParamKind::NumerusArray {
             check_integer_index_vector_arg(checker, arg, span);
-        } else if *kind == IntrinsicParamKind::NumerusIndex && arg_is_symbolic_size(checker, &arg.expr)
+        } else if *kind == IntrinsicParamKind::NumerusIndex
+            && arg_is_symbolic_size(checker, &arg.expr)
         {
             // WHY (SGR-C1): a body-visible `magnitudo` parameter names its
             // compile-time size at an index slot. Lowering types it as the

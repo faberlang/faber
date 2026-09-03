@@ -1268,16 +1268,11 @@ fn minted_instance_substitutes_shape_size_param_to_concrete_integer() {
                 kind: MirStatementKind::RuntimeCall {
                     destination: None,
                     call: crate::mir::MirRuntimeCall {
-                        intrinsic: crate::mir::MirIntrinsic::Collection(
-                            crate::mir::MirCollectionOp::TensorRope,
-                        ),
+                        intrinsic: crate::mir::MirIntrinsic::Collection(crate::mir::MirCollectionOp::TensorRope),
                         args: vec![
                             MirOperand::Place(MirPlace::local(crate::mir::MirLocalId(0))),
                             MirOperand::Constant(crate::mir::MirConstant::Int(0)),
-                            MirOperand::Constant(crate::mir::MirConstant::ShapeSize {
-                                shape: param_dim,
-                                axis: None,
-                            }),
+                            MirOperand::Constant(crate::mir::MirConstant::ShapeSize { shape: param_dim, axis: None }),
                         ],
                         return_ty: MirType::semantic(vacuum),
                     },
@@ -1372,12 +1367,18 @@ fn minted_instance_substitutes_shape_size_param_to_concrete_integer() {
             _ => None,
         })
         .filter(|call| {
-            matches!(call.intrinsic, crate::mir::MirIntrinsic::Collection(crate::mir::MirCollectionOp::TensorRope))
+            matches!(
+                call.intrinsic,
+                crate::mir::MirIntrinsic::Collection(crate::mir::MirCollectionOp::TensorRope)
+            )
         })
         .collect::<Vec<_>>();
     assert_eq!(rope_calls.len(), 1, "one tensor-rope call in the instance");
     assert!(
-        matches!(rope_calls[0].args.get(1), Some(MirOperand::Constant(crate::mir::MirConstant::Int(0)))),
+        matches!(
+            rope_calls[0].args.get(1),
+            Some(MirOperand::Constant(crate::mir::MirConstant::Int(0)))
+        ),
         "rope position stays the literal 0: {:?}",
         rope_calls[0].args
     );
