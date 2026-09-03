@@ -2842,10 +2842,7 @@ impl Parser {
     ) -> ParseError {
         ParseError::structured(ParseErrorKind::TypeParameterInvalid, self.current_span())
             .with_arg("issue", "generic_default_missing_value")
-            .with_arg(
-                "parameter",
-                self.interner.resolve(name.name).to_owned(),
-            )
+            .with_arg("parameter", self.interner.resolve(name.name).to_owned())
             .with_arg("expected", Self::generic_default_expectation(kind))
     }
 
@@ -2857,10 +2854,7 @@ impl Parser {
         ParseError::structured(ParseErrorKind::TypeParameterInvalid, self.current_span())
             .with_arg("issue", "generic_default_wrong_class")
             .with_arg("sort", Self::generic_default_sort(kind))
-            .with_arg(
-                "parameter",
-                self.interner.resolve(name.name).to_owned(),
-            )
+            .with_arg("parameter", self.interner.resolve(name.name).to_owned())
             .with_arg("expected", Self::generic_default_expectation(kind))
     }
 
