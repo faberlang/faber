@@ -2836,6 +2836,54 @@ fn rope_rejects_odd_dim_const() {
 }
 
 #[test]
+fn rope_accepts_symbolic_shape_size_dim() {
+    // Generic templates carry `Param(d)` dims as symbolic ShapeSize; the
+    // validator must admit them like a temp and wait for instantiate fold.
+    let mut types = TypeTable::new();
+    let return_ty = tensor_mty(&mut types, &[8]);
+    let param_shape = types.intern_index(IndexExpr::Param(Symbol(900)));
+    let program = cci_collection_program(
+        &mut types,
+        MirCollectionOp::TensorRope,
+        vec![
+            MirOperand::Constant(MirConstant::Int(1)),
+            MirOperand::Constant(MirConstant::ShapeSize {
+                shape: param_shape,
+                axis: None,
+            }),
+        ],
+        return_ty,
+    );
+    let errors = validate(&program, &types);
+    assert!(
+        errors.is_empty(),
+        "symbolic rope dim must pass validation, got: {errors:?}"
+    );
+}
+
+#[test]
+fn rope_rejects_float_dim_const() {
+    let mut types = TypeTable::new();
+    let return_ty = tensor_mty(&mut types, &[8]);
+    let program = cci_collection_program(
+        &mut types,
+        MirCollectionOp::TensorRope,
+        vec![
+            MirOperand::Constant(MirConstant::Int(1)),
+            MirOperand::Constant(MirConstant::Float(64.0)),
+        ],
+        return_ty,
+    );
+    let errors = validate(&program, &types);
+    assert!(
+        errors
+            .iter()
+            .any(|e| e.contains("rope dim must be an int constant or temp")),
+        "expected rope dim constant-kind error, got: {errors:?}"
+    );
+}
+
+#[test]
 fn rms_norm_rejects_non_tensor_receiver() {
     let mut types = TypeTable::new();
     let numerus = MirType::semantic(types.primitive(Primitive::Numerus));

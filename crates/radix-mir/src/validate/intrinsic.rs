@@ -1922,7 +1922,13 @@ impl Validator<'_, '_> {
                         );
                     }
                 }
-                MirOperand::Value(_) | MirOperand::Temp(_) | MirOperand::Place(_) => {}
+                // Symbolic size-param dims ride in as ShapeSize on generic
+                // templates; the instantiate seam folds them to Int before
+                // link, so numeric checks wait for the concrete value.
+                MirOperand::Value(_)
+                | MirOperand::Temp(_)
+                | MirOperand::Place(_)
+                | MirOperand::Constant(MirConstant::ShapeSize { .. }) => {}
                 MirOperand::Constant(_) => {
                     self.error(span, "tensor rope dim must be an int constant or temp");
                 }
