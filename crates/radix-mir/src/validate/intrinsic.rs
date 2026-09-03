@@ -1891,46 +1891,63 @@ impl Validator<'_, '_> {
         }
         if let Some(arg) = call.args.get(2) {
             let _ = self.validate_operand(scope, arg, span);
-            match arg {
-                MirOperand::Constant(MirConstant::Int(dim_val)) => {
-                    if *dim_val <= 0 {
-                        self.error(span, format!("tensor rope dim {dim_val} must be positive"));
-                    }
-                    if *dim_val % 2 != 0 {
-                        self.error(span, format!("tensor rope dim {dim_val} must be even"));
-                    }
-                    // Elements past `dim` stay; only the last-axis width is a bound.
-                    let last_extent = match self.type_kind(receiver_ty) {
-                        Type::Tensor(_, shape) => match self.context.types.get_index(*shape) {
-                            IndexExpr::Tuple(dims) => dims.last().and_then(|dim| {
-                                match self.context.types.get_index(*dim) {
-                                    IndexExpr::Literal(count) => i64::try_from(*count).ok(),
-                                    _ => None,
-                                }
-                            }),
-                            IndexExpr::Literal(count) => i64::try_from(*count).ok(),
-                            _ => None,
-                        },
-                        _ => None,
-                    };
-                    if last_extent.is_some_and(|extent| *dim_val > extent) {
-                        self.error(
-                            span,
-                            format!(
-                                "tensor rope dim {dim_val} exceeds the last-axis extent {last_extent:?}"
-                            ),
-                        );
-                    }
+            // Numeric dim constants share the Int checks regardless of
+            // literal kind: UInt covers `numerus` dims, whole-number Float
+            // covers literal shape sizes (which fold to Float at lowering;
+            // symbolic ones stay ShapeSize below).
+            let dim_val = match arg {
+                MirOperand::Constant(MirConstant::Int(dim_val)) => Some(*dim_val),
+                MirOperand::Constant(MirConstant::UInt(dim_val)) => i64::try_from(*dim_val).ok(),
+                MirOperand::Constant(MirConstant::Float(dim_val)) => {
+                    // The round trip rejects fractional and out-of-range dims.
+                    (dim_val.is_finite()
+                        && dim_val.fract() == 0.0
+                        && (*dim_val as i64) as f64 == *dim_val)
+                        .then_some(*dim_val as i64)
                 }
+                _ => None,
+            };
+            if let Some(dim_val) = dim_val {
+                if dim_val <= 0 {
+                    self.error(span, format!("tensor rope dim {dim_val} must be positive"));
+                }
+                if dim_val % 2 != 0 {
+                    self.error(span, format!("tensor rope dim {dim_val} must be even"));
+                }
+                // Elements past `dim` stay; only the last-axis width is a bound.
+                let last_extent = match self.type_kind(receiver_ty) {
+                    Type::Tensor(_, shape) => match self.context.types.get_index(*shape) {
+                        IndexExpr::Tuple(dims) => dims.last().and_then(|dim| {
+                            match self.context.types.get_index(*dim) {
+                                IndexExpr::Literal(count) => i64::try_from(*count).ok(),
+                                _ => None,
+                            }
+                        }),
+                        IndexExpr::Literal(count) => i64::try_from(*count).ok(),
+                        _ => None,
+                    },
+                    _ => None,
+                };
+                if last_extent.is_some_and(|extent| dim_val > extent) {
+                    self.error(
+                        span,
+                        format!(
+                            "tensor rope dim {dim_val} exceeds the last-axis extent {last_extent:?}"
+                        ),
+                    );
+                }
+            } else {
                 // Symbolic size-param dims ride in as ShapeSize on generic
                 // templates; the instantiate seam folds them to Int before
                 // link, so numeric checks wait for the concrete value.
-                MirOperand::Value(_)
-                | MirOperand::Temp(_)
-                | MirOperand::Place(_)
-                | MirOperand::Constant(MirConstant::ShapeSize { .. }) => {}
-                MirOperand::Constant(_) => {
-                    self.error(span, "tensor rope dim must be an int constant or temp");
+                match arg {
+                    MirOperand::Value(_)
+                    | MirOperand::Temp(_)
+                    | MirOperand::Place(_)
+                    | MirOperand::Constant(MirConstant::ShapeSize { .. }) => {}
+                    MirOperand::Constant(_) => {
+                        self.error(span, "tensor rope dim must be an int constant or temp");
+                    }
                 }
             }
         }

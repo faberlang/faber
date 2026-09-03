@@ -2862,7 +2862,7 @@ fn rope_accepts_symbolic_shape_size_dim() {
 }
 
 #[test]
-fn rope_rejects_float_dim_const() {
+fn rope_rejects_fractional_float_dim_const() {
     let mut types = TypeTable::new();
     let return_ty = tensor_mty(&mut types, &[8]);
     let program = cci_collection_program(
@@ -2870,7 +2870,7 @@ fn rope_rejects_float_dim_const() {
         MirCollectionOp::TensorRope,
         vec![
             MirOperand::Constant(MirConstant::Int(1)),
-            MirOperand::Constant(MirConstant::Float(64.0)),
+            MirOperand::Constant(MirConstant::Float(1.5)),
         ],
         return_ty,
     );
@@ -2880,6 +2880,89 @@ fn rope_rejects_float_dim_const() {
             .iter()
             .any(|e| e.contains("rope dim must be an int constant or temp")),
         "expected rope dim constant-kind error, got: {errors:?}"
+    );
+}
+
+#[test]
+fn rope_accepts_whole_number_float_dim() {
+    // Literal shape sizes fold to Float at lowering; whole-number dims
+    // must clear the same checks as Int, not the constant-kind error.
+    let mut types = TypeTable::new();
+    let return_ty = tensor_mty(&mut types, &[8]);
+    let program = cci_collection_program(
+        &mut types,
+        MirCollectionOp::TensorRope,
+        vec![
+            MirOperand::Constant(MirConstant::Int(1)),
+            MirOperand::Constant(MirConstant::Float(4.0)),
+        ],
+        return_ty,
+    );
+    let errors = validate(&program, &types);
+    assert!(
+        errors.is_empty(),
+        "whole-number float rope dim must pass validation, got: {errors:?}"
+    );
+}
+
+#[test]
+fn rope_accepts_uint_dim() {
+    let mut types = TypeTable::new();
+    let return_ty = tensor_mty(&mut types, &[8]);
+    let program = cci_collection_program(
+        &mut types,
+        MirCollectionOp::TensorRope,
+        vec![
+            MirOperand::Constant(MirConstant::Int(1)),
+            MirOperand::Constant(MirConstant::UInt(4)),
+        ],
+        return_ty,
+    );
+    let errors = validate(&program, &types);
+    assert!(
+        errors.is_empty(),
+        "uint rope dim must pass validation, got: {errors:?}"
+    );
+}
+
+#[test]
+fn rope_rejects_odd_whole_number_float_dim() {
+    // Whole-number floats run the Int checks, so parity still fires.
+    let mut types = TypeTable::new();
+    let return_ty = tensor_mty(&mut types, &[8]);
+    let program = cci_collection_program(
+        &mut types,
+        MirCollectionOp::TensorRope,
+        vec![
+            MirOperand::Constant(MirConstant::Int(1)),
+            MirOperand::Constant(MirConstant::Float(3.0)),
+        ],
+        return_ty,
+    );
+    let errors = validate(&program, &types);
+    assert!(
+        errors.iter().any(|e| e.contains("rope") && e.contains("even")),
+        "expected rope parity error, got: {errors:?}"
+    );
+}
+
+#[test]
+fn rope_rejects_odd_uint_dim() {
+    let mut types = TypeTable::new();
+    let return_ty = tensor_mty(&mut types, &[8]);
+    let program = cci_collection_program(
+        &mut types,
+        MirCollectionOp::TensorRope,
+        vec![
+            MirOperand::Constant(MirConstant::Int(1)),
+            MirOperand::Constant(MirConstant::UInt(3)),
+        ],
+        return_ty,
+    );
+    let errors = validate(&program, &types);
+    assert!(
+        errors.iter().any(|e| e.contains("rope") && e.contains("even")),
+        "expected rope parity error, got: {errors:?}"
     );
 }
 
