@@ -2030,12 +2030,14 @@ pub fn rewrite_function_constants(
     true
 }
 
-/// Fold one shape-size scalar term to the concrete `MirConstant::Float` it
-/// denotes: `magnitudo` shape params substitute through `shape_bindings`
-/// first, then an all-literal shape folds to the element count
-/// (`axis: None`) or one axis extent. Returns `None` — the fail-closed
-/// signal — when any dim stays symbolic (`Param`, `Infer`, `Unspecified`)
-/// or the axis is out of range. Mirrors the AIR fold semantics
+/// Fold one shape-size scalar term to its concrete constant: a bare `Param`
+/// size scalar (`axis: None`) substitutes to the bound integer
+/// (`MirConstant::Int` — size operands such as rope dims are integers),
+/// while tuple shapes fold to the element count (`axis: None`) or one axis
+/// extent as `MirConstant::Float`. `magnitudo` shape params substitute
+/// through `shape_bindings` first. Returns `None` — the fail-closed signal
+/// — when any dim stays symbolic (`Param`, `Infer`, `Unspecified`) or the
+/// axis is out of range. Extent folds mirror the AIR fold semantics
 /// (`AirExpr::ShapeSize` → `AirLiteral::Float`), including the f64 carrier.
 #[must_use]
 pub fn fold_shape_size_constant(
@@ -2044,6 +2046,7 @@ pub fn fold_shape_size_constant(
     axis: Option<i64>,
     shape_bindings: &MirShapeBindings,
 ) -> Option<MirConstant> {
+    let size_param = axis.is_none() && matches!(types.get_index(shape), IndexExpr::Param(_));
     let substituted = substitute_index_params(types, shape, shape_bindings);
     let dims = i64s_from_literal_index(substituted, types)?;
     let value = match axis {
@@ -2062,15 +2065,20 @@ pub fn fold_shape_size_constant(
             *dims.get(a_usize)?
         }
     };
-    // Semantic: the concrete size as f64 (the same carrier the literal
-    // companion path always emitted); precision loss only above 2^53.
+    if size_param {
+        return Some(MirConstant::Int(value));
+    }
+    // Semantic: extent and tuple-size folds keep the concrete size as f64
+    // (the same carrier the literal companion path always emitted and the
+    // lista→tensor conversion consumes); precision loss only above 2^53.
     #[expect(clippy::cast_precision_loss)]
     Some(MirConstant::Float(value as f64))
 }
 
 /// Substitute every `MirConstant::ShapeSize` term in a function body to its
-/// concrete `MirConstant::Float` value from `shape_bindings` (Phase-4
-/// monomorphization producer fact). Terms that cannot fold — missing or
+/// concrete constant from `shape_bindings` (Phase-4 monomorphization
+/// producer fact): the bound integer for a bare size param, the f64 value
+/// for extent folds. Terms that cannot fold — missing or
 /// unresolved shape bindings, `Infer`/`Unspecified` dims, or out-of-range
 /// axes — are left untouched and `false` is returned so the caller can fail
 /// closed through one stable diagnostic.

@@ -1382,7 +1382,7 @@ fn minted_instance_substitutes_shape_size_param_to_concrete_integer() {
         rope_calls[0].args
     );
     assert!(
-        matches!(rope_calls[0].args.get(2), Some(MirOperand::Constant(crate::mir::MirConstant::Float(value))) if *value == 64.0),
+        matches!(rope_calls[0].args.get(2), Some(MirOperand::Constant(crate::mir::MirConstant::Int(dim))) if *dim == 64),
         "instantiated rope dim must be the concrete integer from the size binding: {:?}",
         rope_calls[0].args
     );
