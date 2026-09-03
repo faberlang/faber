@@ -461,6 +461,48 @@ nota "rank-one transpose body ok"
 }
 
 #[test]
+fn batched_transpose_decode_shape_typechecks() {
+    // U3 head-axis decode fixture: K [5,76,64] → Kᵀ [5,64,76] — the
+    // leading head axis stays, the trailing [M, N] pair swaps.
+    accepts(
+        r#"functio key_transpose_decode(tensor<f32, [5, 76, 64]> keys) → tensor<f32, [5, 64, 76]> {
+    redde keys.transpone()
+}
+
+nota "batched transpose decode body ok"
+"#,
+    );
+}
+
+#[test]
+fn batched_transpose_prefill_shape_typechecks() {
+    // U3 head-axis prefill fixture: K [5,36,64] → Kᵀ [5,64,36].
+    accepts(
+        r#"functio key_transpose_prefill(tensor<f32, [5, 36, 64]> keys) → tensor<f32, [5, 64, 36]> {
+    redde keys.transpone()
+}
+
+nota "batched transpose prefill body ok"
+"#,
+    );
+}
+
+#[test]
+fn batched_transpose_wrong_result_shape_rejects() {
+    // A result that keeps the un-swapped trailing pair is not the batched
+    // transpose law — the shape unifier rejects typed.
+    rejects_with_issue(
+        r#"functio bad_batched_transpose(tensor<f32, [5, 76, 64]> keys) → tensor<f32, [5, 76, 64]> {
+    redde keys.transpone()
+}
+
+nota "bad batched transpose body"
+"#,
+        "incompatible_tensor_index",
+    );
+}
+
+#[test]
 fn tensor_broadcast_symbolic_stretches_size_one_dim() {
     // [B,1] + [B,D] → [B,D] via broadcast merge with Param dims.
     accepts(

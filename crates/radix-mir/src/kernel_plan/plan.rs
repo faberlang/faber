@@ -740,6 +740,11 @@ pub struct TransposePlan {
     /// Dispatch extent on `x` (`M·N` output elements, one thread per
     /// output element).
     pub dispatch_x: u64,
+    /// U3 head-axis batch count; `None` is the unchanged rank-2 image
+    /// (rank-2 resolution and the legacy wire decode) — a batched fact can
+    /// never decode as rank-2 by omission. The leading head axes fold into
+    /// the same 1D contract: `dispatch_x` is `batch·M·N`.
+    pub batched: Option<u64>,
 }
 
 /// Shared-memory buffer layout for a recipe.

@@ -384,12 +384,13 @@ fn glyph_transpose_rank1_is_permanently_declined() {
 }
 
 #[test]
-fn glyph_transpose_rank3_is_deferred_to_batched_consumer() {
-    rejects_transpose_with_issue(
+fn glyph_transpose_rank3_typechecks_as_batched_transpose() {
+    // U3 head-axis: the rank-3+ deferral is closed by the batched-transpose
+    // consumer — leading batch axes stay, the trailing [M, N] pair swaps.
+    accepts(
         r"functio transpose(tensor<f32, [2, 3, 4]> batch) → tensor<f32, [2, 4, 3]> {
     redde batchᵀ
 }",
-        "glyph_transpose_rank3_plus_deferred_batched_consumer",
     );
 }
 

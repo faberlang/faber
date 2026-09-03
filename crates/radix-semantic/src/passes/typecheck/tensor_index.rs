@@ -27,8 +27,6 @@ pub(super) const ISSUE_GLYPH_TRANSPOSE_OPERANDS_UNSUPPORTED: &str =
     "glyph_transpose_operands_unsupported";
 pub(super) const ISSUE_GLYPH_TRANSPOSE_RANK1: &str =
     "glyph_transpose_rank1_no_row_column_distinction";
-pub(super) const ISSUE_GLYPH_TRANSPOSE_RANK3_PLUS: &str =
-    "glyph_transpose_rank3_plus_deferred_batched_consumer";
 pub(super) const ISSUE_GLYPH_TRANSPOSE_RANK_REQUIRED: &str = "glyph_transpose_static_rank_required";
 const TENSOR_ADDITA: &str = "addita";
 const TENSOR_SUBTRAHE: &str = "subtrahe";
@@ -87,10 +85,12 @@ pub(super) fn tensor_with_fresh_shape(checker: &mut TypeChecker<'_>, elem: TypeI
 }
 
 /// Return the named rank-law decline for the source-only `ᵀ` glyph, when the
-/// receiver is not an admitted rank-2 tensor or matrix. Rank-1 is a permanent
-/// decline: there is no row/column distinction. Rank 3+ is deliberately
-/// deferred until a batched-transpose consumer owns the shape and device
-/// contract.
+/// receiver is not an admitted tensor or matrix. Rank-1 is a permanent
+/// decline: there is no row/column distinction. Rank-3+ is the U3 head-axis
+/// batched transpose (leading batch axes stay, the trailing `[M, N]` swaps)
+/// — the `glyph_transpose_rank3_plus_deferred_batched_consumer` deferral is
+/// closed by the batched-transpose consumer contract; rank 5+ fails closed
+/// at the MIR transpose contract's typed rank gate.
 pub(super) fn glyph_transpose_rank_issue(
     checker: &mut TypeChecker<'_>,
     receiver_ty: TypeId,
@@ -116,7 +116,7 @@ pub(super) fn glyph_transpose_rank_issue(
         IndexExpr::Tuple(dims) => match dims.len() {
             2 => None,
             0 | 1 => Some(ISSUE_GLYPH_TRANSPOSE_RANK1),
-            _ => Some(ISSUE_GLYPH_TRANSPOSE_RANK3_PLUS),
+            _ => None,
         },
         IndexExpr::Param(_) | IndexExpr::Infer(_) | IndexExpr::Unspecified => {
             Some(ISSUE_GLYPH_TRANSPOSE_RANK_REQUIRED)
@@ -411,7 +411,9 @@ fn constrain_batched_matmul_result_shape(
 /// Constrain `result_shape` to the transpose of `receiver`'s shape.
 ///
 /// For a rank-2 receiver [R, C], the result is [C, R]. For rank-1, it is
-/// identity. Shape holes are preserved.
+/// identity. For rank-3+ (U3 head-axis batched transpose), the leading
+/// batch axes stay verbatim and the trailing `[M, N]` pair swaps:
+/// `[B…, M, N] → [B…, N, M]`. Shape holes are preserved.
 fn constrain_transpose_result_shape(
     checker: &mut TypeChecker<'_>,
     receiver_shape: IndexId,
@@ -425,18 +427,27 @@ fn constrain_transpose_result_shape(
         // Shape holes pass through: leave result unconstrained.
         return;
     };
-    if receiver_tuple.len() != 2 {
-        // Transpose of non-rank-2 tensor is a no-op; pin result to receiver.
+    if receiver_tuple.len() < 2 {
+        // Transpose of a rank-0/1 tensor is a no-op; pin result to receiver.
         checker.constrain_index_equal(result_shape, receiver_shape, span);
         return;
     }
-    let r_expr = checker.types.get_index(receiver_tuple[0]).clone();
-    let c_expr = checker.types.get_index(receiver_tuple[1]).clone();
-    let r_id = checker.types.intern_index(r_expr);
-    let c_id = checker.types.intern_index(c_expr);
-    let result = checker
+    // Swap the trailing pair; the leading batch axes (if any) stay
+    // verbatim — the batched transpose law.
+    let rows = checker
         .types
-        .intern_index(IndexExpr::Tuple(vec![c_id, r_id]));
+        .get_index(receiver_tuple[receiver_tuple.len() - 2])
+        .clone();
+    let columns = checker
+        .types
+        .get_index(receiver_tuple[receiver_tuple.len() - 1])
+        .clone();
+    let rows_id = checker.types.intern_index(rows);
+    let columns_id = checker.types.intern_index(columns);
+    let mut result_dims = receiver_tuple[..receiver_tuple.len() - 2].to_vec();
+    result_dims.push(columns_id);
+    result_dims.push(rows_id);
+    let result = checker.types.intern_index(IndexExpr::Tuple(result_dims));
     checker.constrain_index_equal(result_shape, result, span);
 }
 

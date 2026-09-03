@@ -99,6 +99,18 @@ pub enum CollectionOpContract {
         /// Source columns `N` of the rank-2 operand (output rows).
         n: u64,
     },
+    /// U3 head-axis batched transpose: leading batch (head) axes over the
+    /// swapped trailing `[M, N]`. A distinct variant — the rank-2
+    /// `Transpose` image and every rank-2 backend arm stay unchanged, and
+    /// a batched fact can never resolve as rank-2 by omission.
+    BatchedTranspose {
+        /// Product of the leading batch axes (the head count).
+        batch: u64,
+        /// Source rows `M` per batch (output columns).
+        m: u64,
+        /// Source columns `N` per batch (output rows).
+        n: u64,
+    },
     /// Packed quantized GEMM (R-PACK-01A). Same tile grid as [`Self::MatMul`];
     /// the layout class is a typed GGML type-id fact.
     QuantizedMatMul {
@@ -450,6 +462,21 @@ pub(crate) fn apply_collection_op_contract(
                 z: 1,
             };
         }
+        // U3 head-axis: the batch folds into the same elementwise-style 1D
+        // contract — one thread per output element of the whole batched
+        // `[batch, N, M]` output (`batch · M · N` threads).
+        CollectionOpContract::BatchedTranspose { batch, m, n } => {
+            signature.workgroup = MirWorkgroupSize {
+                x: crate::kernel_plan::TRANSPOSE_WORKGROUP_X,
+                y: 1,
+                z: 1,
+            };
+            signature.dispatch_size = MirKernelDispatchSize {
+                x: batch.saturating_mul(m).saturating_mul(n),
+                y: 1,
+                z: 1,
+            };
+        }
         CollectionOpContract::QuantizedMatMul {
             dispatch_x,
             dispatch_y,
@@ -692,9 +719,31 @@ pub fn collection_op_contract(
                     };
                     let dims = crate::tensor_type::tensor_literal_dims(operand_ty, validation)
                         .map_err(MirAbiError::new)?;
+                    if dims.len() == 3 || dims.len() == 4 {
+                        // U3 head-axis: a rank-3/4 operand is the batched
+                        // transpose — leading batch (head) axes fold into
+                        // the batch count, the trailing `[M, N]` pair swaps.
+                        // Rank 5+ stays closed at this typed gate (the
+                        // device-view family admits at most rank 4).
+                        let m = dims[dims.len() - 2];
+                        let n = dims[dims.len() - 1];
+                        let batch = dims[..dims.len() - 2]
+                            .iter()
+                            .copied()
+                            .try_fold(1_u64, u64::checked_mul)
+                            .ok_or_else(|| {
+                                MirAbiError::new("batched transpose batch count overflows u64")
+                            })?;
+                        if m == 0 || n == 0 || batch == 0 {
+                            return Err(MirAbiError::new(
+                                "transpose dispatch contract requires non-zero dimensions",
+                            ));
+                        }
+                        return Ok(Some(CollectionOpContract::BatchedTranspose { batch, m, n }));
+                    }
                     if dims.len() != 2 {
                         return Err(MirAbiError::new(
-                            "transpose dispatch contract requires a rank-2 tensor operand",
+                            "transpose dispatch contract requires a rank-2 tensor operand, or rank-3/4 for the batched transpose (rank 5+ is closed)",
                         ));
                     }
                     if dims[0] == 0 || dims[1] == 0 {

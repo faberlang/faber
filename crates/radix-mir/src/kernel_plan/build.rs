@@ -210,6 +210,28 @@ impl CollectionKernelPlan {
                     n,
                     workgroup_x: signature.workgroup.x,
                     dispatch_x: signature.dispatch_size.x,
+                    batched: None,
+                }))
+            }
+            CollectionOpContract::BatchedTranspose { batch, m, n } => {
+                if op != MirCollectionOp::TensorTranspose {
+                    return None;
+                }
+                // U3 head-axis: the batch fact derives from the signature's
+                // own element counts — the operand's full extent
+                // (`batch·M·N`) with the trailing dims already pinned by the
+                // contract. An exact division with a positive quotient
+                // agreeing with the carried batch is a typed-fact
+                // cross-check, never a guess; anything else fails closed.
+                if !signature_matches_batched_transpose(signature, batch, m, n) {
+                    return None;
+                }
+                Some(CollectionKernelPlan::Transpose(TransposePlan {
+                    m,
+                    n,
+                    workgroup_x: signature.workgroup.x,
+                    dispatch_x: signature.dispatch_size.x,
+                    batched: Some(batch),
                 }))
             }
             CollectionOpContract::QuantizedMatMul {
@@ -848,6 +870,29 @@ fn signature_matches_ssm_extent(signature: &MirKernelSignature, extent: u64) -> 
 /// `[N,M]` tensor has the same element count as the `[M,N]` source).
 fn signature_matches_transpose(signature: &MirKernelSignature, m: u64, n: u64) -> bool {
     let count = m.saturating_mul(n);
+    signature.workgroup.x == TRANSPOSE_WORKGROUP_X
+        && signature.workgroup.y == 1
+        && signature.workgroup.z == 1
+        && signature.dispatch_size.x == count
+        && signature.dispatch_size.y == 1
+        && signature.dispatch_size.z == 1
+        && signature.input.element_count == count
+        && signature.output.element_count == count
+}
+
+/// U3 head-axis: the batched transpose signature cross-check — the same
+/// elementwise-style 1D contract over the batch-folded thread count, with
+/// the input/output resources carrying the operands' full `batch·M·N`
+/// extents and the carried batch agreeing with the input's own count.
+fn signature_matches_batched_transpose(
+    signature: &MirKernelSignature,
+    batch: u64,
+    m: u64,
+    n: u64,
+) -> bool {
+    let Some(count) = batch.checked_mul(m).and_then(|count| count.checked_mul(n)) else {
+        return false;
+    };
     signature.workgroup.x == TRANSPOSE_WORKGROUP_X
         && signature.workgroup.y == 1
         && signature.workgroup.z == 1

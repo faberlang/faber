@@ -22,7 +22,10 @@ const BUDGETS: Budgets = Budgets {
     // instantiation (ef44b2751), plus one RoPE row in the abi/tests.rs probe.
     // Re-baselined 69→71: the staged composed-matmul ABI probe (8b36e7c92)
     // added two abi/tests.rs probe asserts without this bump.
-    expect: 71,
+    // Re-baselined 71→74: the U3 head-axis batched-transpose admission
+    // (head-axis-attention) added three abi/tests.rs probe asserts (rank-3,
+    // rank-4 contract resolution and the rank-5 typed gate).
+    expect: 74,
     // WHY: minted at D-03 baseline; frozen, not audited here.
     panic: 9,
     // WHY: minted at D-03 baseline; frozen, not audited here.

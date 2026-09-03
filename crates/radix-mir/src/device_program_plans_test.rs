@@ -2318,6 +2318,7 @@ fn kernel_plan_for_function_derives_transpose_plan() {
         n: 4,
         workgroup_x: crate::kernel_plan::TRANSPOSE_WORKGROUP_X,
         dispatch_x: 16,
+        batched: None,
     });
     assert!(carried_plan_agrees(&carried, Some(&derived)));
 }

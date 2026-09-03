@@ -35,6 +35,7 @@ pub(crate) fn validate_wire_program(
     validate_wire_broadcast_facts(wire)?;
     validate_wire_matmul_batch_facts(wire)?;
     validate_wire_row_softmax_batch_facts(wire)?;
+    validate_wire_transpose_batch_facts(wire)?;
     validate_wire_reduced_projections(wire)?;
     Ok(())
 }
@@ -91,6 +92,28 @@ fn validate_wire_row_softmax_batch_facts(
             return Err(wire_invalid(format!(
                 "kernel '{}' carries a batched row-softmax plan violating the batch law (batch={}, width={}, mask_count={:?}); batch and width must be positive and a carried mask count must be positive and divide batch·width",
                 kernel.entry, plan.batch, plan.width, plan.mask_count
+            )));
+        }
+    }
+    Ok(())
+}
+
+/// A carried batched transpose plan (U3 head-axis) must satisfy the batch
+/// law internally: positive M/N/batch and a dispatch extent tiling exactly
+/// `batch·M·N` output elements (the batch folds into the same 1D
+/// contract). The fact is carried, never inferred.
+fn validate_wire_transpose_batch_facts(
+    wire: &WireDeviceProgram,
+) -> Result<(), crate::error::FmirImageError> {
+    for kernel in &wire.kernels {
+        let WireCollectionKernelPlan::BatchedTranspose(plan) = &kernel.plan else {
+            continue;
+        };
+        let total = plan.batch.saturating_mul(plan.m).saturating_mul(plan.n);
+        if plan.batch == 0 || plan.m == 0 || plan.n == 0 || plan.dispatch_x != total {
+            return Err(wire_invalid(format!(
+                "kernel '{}' carries a batched transpose plan violating the batch law (batch={}, m={}, n={}, dispatch_x={}); batch, m, and n must be positive and dispatch_x must equal batch·m·n",
+                kernel.entry, plan.batch, plan.m, plan.n, plan.dispatch_x
             )));
         }
     }

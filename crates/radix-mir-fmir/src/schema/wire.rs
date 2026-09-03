@@ -493,6 +493,11 @@ pub enum WireCollectionKernelPlan {
     TreeReduction(WireReductionPlan),
     /// Rank-2 transpose recipe (S5-U1).
     Transpose(WireTransposePlan),
+    /// Batched transpose recipe (U3 head-axis): leading head axes over the
+    /// swapped trailing `[M, N]`. A distinct variant — the rank-2
+    /// `Transpose` image is unchanged and a batched fact can never decode
+    /// as rank-2 by omission.
+    BatchedTranspose(WireBatchedTransposePlan),
     /// Axis-reduction recipe (S6-N1 name freeze; wire mirror lands in S6-C2):
     /// reduce a tensor over a single axis by `op`. Mirrors
     /// `kernel_plan::AxisReductionPlan`; admission/resolution is S6-P1.
@@ -968,6 +973,25 @@ pub struct WireTransposePlan {
     /// Workgroup lane count on `x` (the elementwise-style 1D contract).
     pub workgroup_x: u32,
     /// Dispatch extent on `x` (`M·N` output elements).
+    pub dispatch_x: u64,
+}
+
+/// Batched transpose recipe (U3 head-axis): `[batch, M, N] → [batch, N, M]`
+/// under the same elementwise-style 1D contract (the batch folds into the
+/// dispatch extent). The wire admits both codecs' lossless round-trip and
+/// the decode-side admission validates the batch law fail-closed.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct WireBatchedTransposePlan {
+    /// Product of the leading batch axes (the head count).
+    pub batch: u64,
+    /// Source rows `M` per batch (output columns).
+    pub m: u64,
+    /// Source columns `N` per batch (output rows).
+    pub n: u64,
+    /// Workgroup lane count on `x` (the elementwise-style 1D contract).
+    pub workgroup_x: u32,
+    /// Dispatch extent on `x` (`batch·M·N` output elements).
     pub dispatch_x: u64,
 }
 

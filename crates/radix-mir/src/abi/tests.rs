@@ -915,6 +915,142 @@ fn transpose_contract_rejects_rank1_operand() {
     );
 }
 
+/// A batched-transpose kernel function: one `TensorTranspose` over a
+/// rank-3+ operand whose leading batch axes stay and trailing pair swaps
+/// (U3 head-axis — the `[5,76,64] → [5,64,76]` K/Kᵀ shape).
+fn batched_transpose_function(types: &mut TypeTable, dims: &[u64]) -> MirFunction {
+    let f32_id = types.sized_numeric(Primitive::Fractus, NumericWidth::F32);
+    let intern_dims = |types: &mut TypeTable, dims: &[u64]| {
+        let dim_ids = dims
+            .iter()
+            .map(|&dim| types.intern_index(IndexExpr::Literal(dim)))
+            .collect::<Vec<_>>();
+        types.intern_index(IndexExpr::Tuple(dim_ids))
+    };
+    let in_shape = intern_dims(types, dims);
+    let tensor_ty = MirType::semantic(types.intern(Type::Tensor(f32_id, in_shape)));
+    let mut out_dims = dims.to_vec();
+    let last = out_dims.len() - 1;
+    out_dims.swap(last - 1, last);
+    let out_shape = intern_dims(types, &out_dims);
+    let out_ty = MirType::semantic(types.intern(Type::Tensor(f32_id, out_shape)));
+    let span = Span::default();
+    MirFunction {
+        id: MirFunctionId(0),
+        source: Some(DefId(12)),
+        name: None,
+        params: vec![MirParam {
+            local: MirLocalId(0),
+            name: None,
+            ty: tensor_ty,
+            mode: MirParamMode::Owned,
+            span,
+        }],
+        locals: vec![
+            MirLocal {
+                id: MirLocalId(0),
+                name: None,
+                ty: tensor_ty,
+                mutable: false,
+                span,
+            },
+            MirLocal {
+                id: MirLocalId(1),
+                name: None,
+                ty: out_ty,
+                mutable: false,
+                span,
+            },
+        ],
+        temps: Vec::new(),
+        blocks: vec![MirBlock {
+            id: MirBlockId(0),
+            statements: vec![MirStatement {
+                kind: MirStatementKind::RuntimeCall {
+                    destination: Some(MirPlace::local(MirLocalId(1))),
+                    call: MirRuntimeCall {
+                        intrinsic: MirIntrinsic::Collection(MirCollectionOp::TensorTranspose),
+                        args: vec![MirOperand::Place(MirPlace::local(MirLocalId(0)))],
+                        return_ty: out_ty,
+                    },
+                },
+                span,
+            }],
+            terminator: MirTerminator {
+                kind: MirTerminatorKind::Return(Some(MirOperand::Place(MirPlace::local(
+                    MirLocalId(1),
+                )))),
+                span,
+            },
+            span,
+        }],
+        return_ty: out_ty,
+        error_ty: None,
+        is_async: false,
+        is_generator: false,
+        shader_stage: None,
+        span,
+    }
+}
+
+#[test]
+fn batched_transpose_contract_resolves_rank3_head_axes() {
+    // U3 head-axis decode fixture: the rank-3 K view `[5,76,64]` resolves
+    // the batched contract — batch 5 (leading axes), trailing [M,N] pair.
+    let mut types = TypeTable::new();
+    let function = batched_transpose_function(&mut types, &[5, 76, 64]);
+    let validation = MirValidationContext::new(&types);
+    let contract = collection_op_contract(&function, &validation)
+        .expect("batched transpose facts resolve")
+        .expect("batched transpose body carries a dispatch contract");
+    assert_eq!(
+        contract,
+        CollectionOpContract::BatchedTranspose {
+            batch: 5,
+            m: 76,
+            n: 64
+        },
+        "the rank-3 transpose must resolve the batched dispatch contract"
+    );
+}
+
+#[test]
+fn batched_transpose_contract_resolves_rank4_head_axes() {
+    // A rank-4 operand folds BOTH leading axes into the batch (the same
+    // law the softmax family admits).
+    let mut types = TypeTable::new();
+    let function = batched_transpose_function(&mut types, &[5, 3, 36, 64]);
+    let validation = MirValidationContext::new(&types);
+    let contract = collection_op_contract(&function, &validation)
+        .expect("rank-4 batched transpose facts resolve")
+        .expect("rank-4 batched transpose body carries a dispatch contract");
+    assert_eq!(
+        contract,
+        CollectionOpContract::BatchedTranspose {
+            batch: 15,
+            m: 36,
+            n: 64
+        },
+        "the rank-4 transpose must fold both leading axes into the batch"
+    );
+}
+
+#[test]
+fn batched_transpose_contract_rejects_rank5_operand() {
+    // Rank 5+ stays closed at the typed rank gate (the device-view family
+    // cap).
+    let mut types = TypeTable::new();
+    let function = batched_transpose_function(&mut types, &[2, 3, 4, 5, 6]);
+    let validation = MirValidationContext::new(&types);
+    let error = collection_op_contract(&function, &validation)
+        .expect_err("rank-5 transpose must fail the contract resolver");
+    assert!(
+        error.message.contains("rank 5+ is closed"),
+        "diagnostic must name the closed rank gate, got: {}",
+        error.message
+    );
+}
+
 #[test]
 fn transpose_signature_applies_elementwise_style_dispatch() {
     // S5-U1 apply arm: a square MLP 4×4 transpose kernel carries the

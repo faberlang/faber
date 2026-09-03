@@ -1147,9 +1147,6 @@ fn semantic_invalid_operand_types_message(args: &[DiagnosticArg]) -> Option<Stri
         "glyph_transpose_rank1_no_row_column_distinction" => {
             Some("postfix transpose ᵀ is permanently unavailable for rank-1 tensors: there is no row/column distinction".to_owned())
         }
-        "glyph_transpose_rank3_plus_deferred_batched_consumer" => {
-            Some("postfix transpose ᵀ is deferred for rank-3+ tensors until a batched-transpose consumer owns the contract".to_owned())
-        }
         "glyph_transpose_static_rank_required" => {
             Some("postfix transpose ᵀ requires a statically known rank-2 tensor in v1".to_owned())
         }
@@ -1342,9 +1339,6 @@ fn semantic_invalid_operand_types_help(args: &[DiagnosticArg]) -> Option<String>
         }
         "glyph_transpose_rank1_no_row_column_distinction" => {
             Some("rank-1 transpose is permanently declined because it has no row/column distinction".to_owned())
-        }
-        "glyph_transpose_rank3_plus_deferred_batched_consumer" => {
-            Some("rank-3+ transpose waits for a batched-transpose consumer; use a rank-2 tensor in v1".to_owned())
         }
         "glyph_transpose_static_rank_required" => {
             Some("give ᵀ a statically known rank-2 tensor; shape-generic transpose is not admitted in v1".to_owned())

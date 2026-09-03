@@ -250,7 +250,24 @@ pub(super) fn validate_transpose_plan(plan: &TransposePlan) -> Result<(), PlanVa
             workgroup_x: plan.workgroup_x,
         });
     }
-    if plan.dispatch_x != plan.m.saturating_mul(plan.n) {
+    let count = match plan.batched {
+        // U3 head-axis: the batch folds into the same 1D contract — the
+        // dispatch tiles `batch·M·N` output elements, one thread per
+        // element across the whole batched output.
+        Some(batch) => {
+            if batch == 0 {
+                return Err(PlanValidationError::TransposeBatchLaw {
+                    batch,
+                    m: plan.m,
+                    n: plan.n,
+                    dispatch_x: plan.dispatch_x,
+                });
+            }
+            batch.saturating_mul(plan.m).saturating_mul(plan.n)
+        }
+        None => plan.m.saturating_mul(plan.n),
+    };
+    if plan.dispatch_x != count {
         return Err(PlanValidationError::TransposeDispatchMismatch {
             m: plan.m,
             n: plan.n,
@@ -698,6 +715,15 @@ pub enum PlanValidationError {
     /// The transpose dispatch extent must tile exactly `M·N` output
     /// elements (one thread per output element).
     TransposeDispatchMismatch { m: u64, n: u64, dispatch_x: u64 },
+    /// U3 head-axis batched transpose law: the carried batch count must be
+    /// positive and the dispatch extent must tile exactly `batch·M·N`
+    /// output elements (the batch folds into the same 1D contract).
+    TransposeBatchLaw {
+        batch: u64,
+        m: u64,
+        n: u64,
+        dispatch_x: u64,
+    },
     /// The axis-reduction recipe's v1 closed op set is `Sum` only — a
     /// mean-over-axis is not part of the transformer surface.
     AxisReductionUnsupportedOp { op: ReduceOp },
@@ -847,6 +873,15 @@ impl fmt::Display for PlanValidationError {
                 f,
                 "transpose dispatch extent {dispatch_x} must tile exactly {m}×{n} = {} output elements",
                 m.saturating_mul(*n)
+            ),
+            Self::TransposeBatchLaw {
+                batch,
+                m,
+                n,
+                dispatch_x,
+            } => write!(
+                f,
+                "batched transpose batch law violated: batch={batch}, m={m}, n={n}, dispatch_x={dispatch_x} (batch must be positive and dispatch_x must equal batch·M·N)"
             ),
             Self::AxisReductionUnsupportedOp { op } => {
                 write!(f, "axis-reduction recipe v1 admits only Sum, got {op:?}")

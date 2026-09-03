@@ -2853,6 +2853,29 @@ pub fn contract_shape_signature(
                 z: 1,
             };
         }
+        // U3 head-axis: the signature describes the buffers the launch
+        // binds — the batched operand's FULL `batch·M·N` extent, never the
+        // bare per-batch dims. `from_contract` re-derives the batch count
+        // from exactly this extent.
+        CollectionOpContract::BatchedTranspose { batch, m, n } => {
+            let operand_ty = recipe_operand_ty(function, MirCollectionOp::TensorTranspose)?;
+            let element_ty = tensor_element_ty(operand_ty, validation)?;
+            let count = batch.saturating_mul(m).saturating_mul(n);
+            signature.input = storage_input(0, element_ty, count);
+            signature.output = storage_output(1, element_ty, count);
+            signature.output.source_local =
+                recipe_destination_local_for(function, MirCollectionOp::TensorTranspose);
+            signature.workgroup = MirWorkgroupSize {
+                x: crate::kernel_plan::TRANSPOSE_WORKGROUP_X,
+                y: 1,
+                z: 1,
+            };
+            signature.dispatch_size = MirKernelDispatchSize {
+                x: count,
+                y: 1,
+                z: 1,
+            };
+        }
         CollectionOpContract::QuantizedMatMul {
             dispatch_x,
             dispatch_y,

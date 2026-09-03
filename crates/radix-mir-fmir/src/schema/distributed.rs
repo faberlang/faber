@@ -607,6 +607,21 @@ fn wire_kernel_plan(plan: &WireCollectionKernelPlan) -> CollectionKernelPlan {
                 n: plan.n,
                 workgroup_x: plan.workgroup_x,
                 dispatch_x: plan.dispatch_x,
+                // The legacy wire image carries no batch axes — the
+                // ordinary rank-2 law. Batched images ride the dedicated
+                // `BatchedTranspose` variant, never a silent default.
+                batched: None,
+            })
+        }
+        // U3 head-axis: the batched transpose image (leading head axes
+        // over the swapped trailing [M, N]).
+        WireCollectionKernelPlan::BatchedTranspose(plan) => {
+            CollectionKernelPlan::Transpose(TransposePlan {
+                m: plan.m,
+                n: plan.n,
+                workgroup_x: plan.workgroup_x,
+                dispatch_x: plan.dispatch_x,
+                batched: Some(plan.batch),
             })
         }
         WireCollectionKernelPlan::AxisReduction(plan) => {

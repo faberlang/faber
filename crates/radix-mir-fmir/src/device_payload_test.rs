@@ -24,8 +24,8 @@ use crate::schema::{
     FmirTextToolchainSection, FmirTextTypesSection, LEGACY_EXECUTOR_PLAN_SECTION_VERSION,
     MaterializationStage, PACKAGE_MIR_ARTIFACT_VERSION, WIRE_DEVICE_PROGRAM_VERSION,
     WireAxisReductionPlan, WireBarrierPhase, WireBarrierPoint, WireBatchedMatMulPlan,
-    WireBatchedRowSoftmaxPlan, WireBinding, WireBroadcastDeclaration, WireBroadcastFact,
-    WireBufferIdentity, WireBufferLifetime, WireBufferRole, WireBufferVersion,
+    WireBatchedRowSoftmaxPlan, WireBatchedTransposePlan, WireBinding, WireBroadcastDeclaration,
+    WireBroadcastFact, WireBufferIdentity, WireBufferLifetime, WireBufferRole, WireBufferVersion,
     WireCausalMaskedSoftmaxPlan, WireCollectionKernelPlan, WireCompanionDerivativeKind,
     WireCompanionRelation, WireCompanionSelectedInput, WireCompanionSelectedOutput,
     WireDependencyEdge, WireDeviceProgram, WireDeviceResource, WireDispatchSize, WireGatherPlan,
@@ -3392,6 +3392,74 @@ fn batched_softmax_wire_plan_batch_law_fails_closed() {
             batch: 15,
             width: 76,
             mask_count: Some(75),
+        });
+    let mut section = sample_device_section();
+    section.device_program.program = program;
+    let image = text_image_with_device(Some(section));
+    let error = decode_text_image(&encode_text_image(&image).unwrap(), TOOLCHAIN)
+        .expect_err("a batch-law violation must fail wire admission");
+    assert!(
+        error.to_string().contains("batch law"),
+        "expected the typed batch-law diagnostic, got: {error}"
+    );
+}
+
+/// U3 head-axis: the batched transpose wire plan (leading head axes over
+/// the swapped trailing [M, N]) round-trips through the text codec on the
+/// accepted wire version — a batched image never decodes as the rank-2
+/// `Transpose` by omission, and the legacy image is unchanged (no version
+/// bump).
+#[test]
+fn batched_transpose_wire_plan_round_trips_with_batch_facts() {
+    assert_eq!(WIRE_DEVICE_PROGRAM_VERSION, 10);
+    // Decode attention: K [5,76,64] → Kᵀ [5,64,76] over the row-major
+    // [76,320] arena.
+    let decode = WireCollectionKernelPlan::BatchedTranspose(WireBatchedTransposePlan {
+        batch: 5,
+        m: 76,
+        n: 64,
+        workgroup_x: 64,
+        dispatch_x: 5 * 76 * 64,
+    });
+    // Prefill attention: K [5,36,64] → Kᵀ [5,64,36].
+    let prefill = WireCollectionKernelPlan::BatchedTranspose(WireBatchedTransposePlan {
+        batch: 5,
+        m: 36,
+        n: 64,
+        workgroup_x: 64,
+        dispatch_x: 5 * 36 * 64,
+    });
+    for plan in [decode, prefill] {
+        let mut program = sample_wire_program();
+        program.kernels[0].plan = plan.clone();
+        let mut section = sample_device_section();
+        section.device_program.program = program;
+        let image = text_image_with_device(Some(section));
+        let decoded = decode_text_image(&encode_text_image(&image).unwrap(), TOOLCHAIN)
+            .unwrap_or_else(|error| {
+                panic!("batched transpose plan {plan:?} must admit cleanly: {error}")
+            });
+        assert_eq!(
+            decoded.device.unwrap().device_program.program.kernels[0].plan,
+            plan,
+            "the batched transpose plan survives the wire round-trip"
+        );
+    }
+}
+
+/// A `BatchedTranspose` wire plan violating the batch law (a dispatch
+/// extent that does not tile batch·M·N) fails wire admission typed, never
+/// decodes.
+#[test]
+fn batched_transpose_wire_plan_batch_law_fails_closed() {
+    let mut program = sample_wire_program();
+    program.kernels[0].plan =
+        WireCollectionKernelPlan::BatchedTranspose(WireBatchedTransposePlan {
+            batch: 5,
+            m: 76,
+            n: 64,
+            workgroup_x: 64,
+            dispatch_x: 76 * 64,
         });
     let mut section = sample_device_section();
     section.device_program.program = program;

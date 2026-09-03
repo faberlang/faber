@@ -640,6 +640,7 @@ fn validate_rejects_transpose_zero_dimension() {
         n: 4,
         workgroup_x: TRANSPOSE_WORKGROUP_X,
         dispatch_x: 0,
+        batched: None,
     });
     assert_eq!(
         plan.validate().expect_err("zero-dim transpose must fail"),
@@ -654,6 +655,7 @@ fn validate_rejects_transpose_zero_workgroup() {
         n: 4,
         workgroup_x: 0,
         dispatch_x: 16,
+        batched: None,
     });
     assert_eq!(
         plan.validate().expect_err("zero workgroup must fail"),
@@ -668,6 +670,7 @@ fn validate_rejects_transpose_dispatch_mismatch() {
         n: 4,
         workgroup_x: TRANSPOSE_WORKGROUP_X,
         dispatch_x: 15,
+        batched: None,
     });
     assert_eq!(
         plan.validate().expect_err("dispatch mismatch must fail"),
@@ -675,6 +678,160 @@ fn validate_rejects_transpose_dispatch_mismatch() {
             m: 4,
             n: 4,
             dispatch_x: 15,
+        }
+    );
+}
+
+// --- U3 head-axis: batched transpose selection (leading head axes) ---
+
+/// A batched-transpose signature: the elementwise-style 1D contract with
+/// the batch folded into the resource extents and dispatch — the operand's
+/// full `batch·M·N` count, one thread per batched output element.
+fn batched_transpose_signature(batch: u64, m: u64, n: u64) -> MirKernelSignature {
+    let mut signature = transpose_signature(m, n);
+    let count = batch * m * n;
+    signature.input.element_count = count;
+    signature.output.element_count = count;
+    signature.dispatch_size.x = count;
+    signature
+}
+
+/// U3 head-axis done-when: the decode fixture — K `[5,76,64] → Kᵀ
+/// [5,64,76]` over the row-major `[76,320]` arena — selects ONE batched
+/// transpose kernel: the plan carries the batch fact (`Some(5)`), the
+/// per-head dims, and the batch-folded dispatch `5·76·64`.
+#[test]
+fn batched_transpose_decode_shape_selects_batched_plan() {
+    let signature = batched_transpose_signature(5, 76, 64);
+    let contract = CollectionOpContract::BatchedTranspose {
+        batch: 5,
+        m: 76,
+        n: 64,
+    };
+    let plan = CollectionKernelPlan::from_contract(
+        &signature,
+        &contract,
+        MirCollectionOp::TensorTranspose,
+        None,
+    )
+    .expect("batched transpose contract builds a plan");
+    let CollectionKernelPlan::Transpose(transpose) = &plan else {
+        panic!("expected a transpose plan, got {plan:?}");
+    };
+    assert_eq!((transpose.m, transpose.n), (76, 64));
+    assert_eq!(transpose.batched, Some(5));
+    assert_eq!(transpose.workgroup_x, TRANSPOSE_WORKGROUP_X);
+    assert_eq!(transpose.dispatch_x, 5 * 76 * 64);
+    plan.validate().expect("batched transpose plan validates");
+}
+
+/// U3 head-axis done-when: the prefill fixture — K `[5,36,64] → Kᵀ
+/// [5,64,36]` — selects the same single batched kernel.
+#[test]
+fn batched_transpose_prefill_shape_selects_batched_plan() {
+    let signature = batched_transpose_signature(5, 36, 64);
+    let contract = CollectionOpContract::BatchedTranspose {
+        batch: 5,
+        m: 36,
+        n: 64,
+    };
+    let plan = CollectionKernelPlan::from_contract(
+        &signature,
+        &contract,
+        MirCollectionOp::TensorTranspose,
+        None,
+    )
+    .expect("batched transpose contract builds a plan");
+    let CollectionKernelPlan::Transpose(transpose) = &plan else {
+        panic!("expected a transpose plan, got {plan:?}");
+    };
+    assert_eq!((transpose.m, transpose.n), (36, 64));
+    assert_eq!(transpose.batched, Some(5));
+    assert_eq!(transpose.dispatch_x, 5 * 36 * 64);
+    plan.validate().expect("batched transpose plan validates");
+}
+
+/// A signature whose resource extent contradicts the contract's batched
+/// count resolves no plan — the batch is a typed-fact cross-check, never
+/// a guess.
+#[test]
+fn batched_transpose_count_contradiction_returns_none() {
+    let mut signature = batched_transpose_signature(5, 76, 64);
+    signature.input.element_count = 5 * 76 * 64 + 1;
+    let contract = CollectionOpContract::BatchedTranspose {
+        batch: 5,
+        m: 76,
+        n: 64,
+    };
+    assert!(
+        CollectionKernelPlan::from_contract(
+            &signature,
+            &contract,
+            MirCollectionOp::TensorTranspose,
+            None,
+        )
+        .is_none(),
+        "a contradicting input extent must resolve no plan"
+    );
+}
+
+/// A rank-2 contract on a rank-2 signature keeps the ordinary image: no
+/// batch fact (the rank-2 path is unchanged).
+#[test]
+fn rank2_transpose_plan_carries_no_batch_fact() {
+    let signature = transpose_signature(4, 4);
+    let contract = CollectionOpContract::Transpose { m: 4, n: 4 };
+    let plan = CollectionKernelPlan::from_contract(
+        &signature,
+        &contract,
+        MirCollectionOp::TensorTranspose,
+        None,
+    )
+    .expect("rank-2 transpose contract builds a plan");
+    let CollectionKernelPlan::Transpose(transpose) = &plan else {
+        panic!("expected a transpose plan, got {plan:?}");
+    };
+    assert_eq!(transpose.batched, None);
+}
+
+#[test]
+fn validate_rejects_batched_transpose_zero_batch() {
+    let plan = CollectionKernelPlan::Transpose(TransposePlan {
+        m: 76,
+        n: 64,
+        workgroup_x: TRANSPOSE_WORKGROUP_X,
+        dispatch_x: 76 * 64,
+        batched: Some(0),
+    });
+    assert_eq!(
+        plan.validate().expect_err("zero batch must fail"),
+        PlanValidationError::TransposeBatchLaw {
+            batch: 0,
+            m: 76,
+            n: 64,
+            dispatch_x: 76 * 64,
+        }
+    );
+}
+
+#[test]
+fn validate_rejects_batched_transpose_dispatch_mismatch() {
+    // The dispatch tiles only one head's output: the batch-folded law
+    // fails typed.
+    let plan = CollectionKernelPlan::Transpose(TransposePlan {
+        m: 76,
+        n: 64,
+        workgroup_x: TRANSPOSE_WORKGROUP_X,
+        dispatch_x: 76 * 64,
+        batched: Some(5),
+    });
+    assert_eq!(
+        plan.validate()
+            .expect_err("batched dispatch mismatch must fail"),
+        PlanValidationError::TransposeDispatchMismatch {
+            m: 76,
+            n: 64,
+            dispatch_x: 76 * 64,
         }
     );
 }

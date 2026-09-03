@@ -261,6 +261,7 @@ fn representative_plans() -> [CollectionKernelPlan; KNOWN_VARIANTS.len()] {
             n: 1,
             workgroup_x: 1,
             dispatch_x: 1,
+            batched: None,
         }),
         CollectionKernelPlan::AxisReduction(dummy_axis_reduction()),
         CollectionKernelPlan::RowSoftmax(RowSoftmaxPlan {
