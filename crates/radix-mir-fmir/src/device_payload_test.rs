@@ -549,7 +549,7 @@ fn device_section_with_no_artifacts_round_trips() {
 #[test]
 fn reduced_projection_program_decodes_under_the_new_wire_version() {
     // Council-8 CB-3 decode-path coverage: a device program carrying the
-    // new wire-10 reduced-resource projection facts — the `AxisReduction`
+    // new wire-11 reduced-resource projection facts — the `AxisReduction`
     // plan projection AND the reduced buffer version's carried projection —
     // decodes through BOTH codec paths (the text `fmir-text` codec and the
     // binary postcard codec) under the accepted wire version, with the
@@ -580,7 +580,7 @@ fn reduced_projection_program_decodes_under_the_new_wire_version() {
     // Text decode path (the `fmir-text` TOML codec).
     let text_image = text_image_with_device(Some(section.clone()));
     let text_decoded = decode_text_image(&encode_text_image(&text_image).unwrap(), TOOLCHAIN)
-        .expect("wire-10 program decodes through the text codec");
+        .expect("wire-11 program decodes through the text codec");
     let text_device = text_decoded.device.expect("device section present");
     assert_eq!(text_device.device_program.v, WIRE_DEVICE_PROGRAM_VERSION);
     assert_eq!(
@@ -610,7 +610,7 @@ fn reduced_projection_program_decodes_under_the_new_wire_version() {
     let binary_image = binary_image_with_device(Some(section));
     let binary_decoded =
         decode_binary_image(&encode_binary_image(&binary_image).unwrap(), TOOLCHAIN)
-            .expect("wire-10 program decodes through the postcard codec");
+            .expect("wire-11 program decodes through the postcard codec");
     let binary_device = binary_decoded.device.expect("device section present");
     assert_eq!(binary_device.device_program.v, WIRE_DEVICE_PROGRAM_VERSION);
     assert_eq!(
@@ -1815,7 +1815,8 @@ fn decode_rejects_old_wire_version_in_binary_image() {
 
 #[test]
 fn mixed_wire_version_fails_with_the_named_incompatible_diagnostic() {
-    // The v9 → v10 clean break makes a device section carrying the
+    // The v10 → v11 clean break (S2: the batched plan variants landed
+    // inside wire-10 without a ratchet) makes a device section carrying the
     // immediately-previous wire version a MIXED-version payload. It must
     // fail closed with the NAMED "incompatible wire version" diagnostic
     // before field-level interpretation. The malformed roots below prove
@@ -3170,7 +3171,7 @@ fn gi3_inference_recipe_plans_round_trip_on_the_wire() {
 /// semantic facts, no version bump.
 #[test]
 fn r_pack_packed_kernel_plans_round_trip_on_the_wire() {
-    assert_eq!(WIRE_DEVICE_PROGRAM_VERSION, 10);
+    assert_eq!(WIRE_DEVICE_PROGRAM_VERSION, 11);
     let plans = [
         WireCollectionKernelPlan::QuantizedMatMul(WireQuantizedMatMulPlan {
             m: 8,
@@ -3223,10 +3224,11 @@ fn r_pack_packed_kernel_plans_round_trip_on_the_wire() {
 /// prefix-shared right batch) round-trips through the text codec on the
 /// accepted wire version and decodes to a `TiledMatMul` plan carrying the
 /// batch facts — a batched image never decodes as rank-2 by omission, and
-/// the rank-2 `TiledMatMul` image is unchanged (no version bump).
+/// the rank-2 `TiledMatMul` image is unchanged. The variant landed inside
+/// wire-10 un-ratcheted; the S2 clean break records it at wire 11.
 #[test]
 fn batched_matmul_wire_plan_round_trips_with_batch_facts() {
-    assert_eq!(WIRE_DEVICE_PROGRAM_VERSION, 10);
+    assert_eq!(WIRE_DEVICE_PROGRAM_VERSION, 11);
     let shared = || WireMatMulSharedMemory {
         shared_a: WireSharedMemoryLayout {
             element_byte_width: 4,
@@ -3335,11 +3337,12 @@ fn batched_matmul_wire_plan_batch_law_fails_closed() {
 /// U2 head-axis: the batched row-softmax wire plan (leading head/query
 /// axes, additive mask count kept) round-trips through the text codec on
 /// the accepted wire version — a batched image never decodes as the
-/// rank-1/2 `RowSoftmax` by omission, and the legacy image is unchanged
-/// (no version bump).
+/// rank-1/2 `RowSoftmax` by omission, and the legacy image is unchanged.
+/// The variant landed inside wire-10 un-ratcheted; the S2 clean break
+/// records it at wire 11.
 #[test]
 fn batched_softmax_wire_plan_round_trips_with_batch_facts() {
-    assert_eq!(WIRE_DEVICE_PROGRAM_VERSION, 10);
+    assert_eq!(WIRE_DEVICE_PROGRAM_VERSION, 11);
     // Decode attention: scores [5,3,1,76] + declared-length mask [1,76].
     let decode = WireCollectionKernelPlan::BatchedRowSoftmax(WireBatchedRowSoftmaxPlan {
         axis: 3,
@@ -3407,11 +3410,12 @@ fn batched_softmax_wire_plan_batch_law_fails_closed() {
 /// U3 head-axis: the batched transpose wire plan (leading head axes over
 /// the swapped trailing [M, N]) round-trips through the text codec on the
 /// accepted wire version — a batched image never decodes as the rank-2
-/// `Transpose` by omission, and the legacy image is unchanged (no version
-/// bump).
+/// `Transpose` by omission, and the legacy image is unchanged. The
+/// variant landed inside wire-10 un-ratcheted; the S2 clean break
+/// records it at wire 11.
 #[test]
 fn batched_transpose_wire_plan_round_trips_with_batch_facts() {
-    assert_eq!(WIRE_DEVICE_PROGRAM_VERSION, 10);
+    assert_eq!(WIRE_DEVICE_PROGRAM_VERSION, 11);
     // Decode attention: K [5,76,64] → Kᵀ [5,64,76] over the row-major
     // [76,320] arena.
     let decode = WireCollectionKernelPlan::BatchedTranspose(WireBatchedTransposePlan {

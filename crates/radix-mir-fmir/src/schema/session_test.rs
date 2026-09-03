@@ -11,14 +11,14 @@
 //!
 //! - the session facts round-trip on the wire (session section + cadence +
 //!   invocation mode + KV layout) through admission and the binary codec;
-//! - a wire-10 image WITHOUT the section admits unchanged (single-device
+//! - a wire-11 image WITHOUT the section admits unchanged (single-device
 //!   packages do not require the section — the MD-A15 precedent);
 //! - every mutated session fact fails admission with a typed diagnostic
 //!   naming the violated class + exact failing fact;
 //! - the versioned ratchet is declared ([`WIRE_SESSION_SECTION_VERSION`]) and
 //!   enforced (a stale version fails closed);
 //! - the accepted wire versions stay untouched (the nested device-program
-//!   wire 10, the outer image version 6, and the distributed-section version
+//!   wire 11, the outer image version 6, and the distributed-section version
 //!   1 are all unchanged).
 
 use super::{
@@ -299,7 +299,7 @@ fn session_image_round_trips_through_the_binary_codec() {
 
 #[test]
 fn single_device_section_without_session_admits_unchanged() {
-    // A wire-10 device section WITHOUT the cadence/session section admits
+    // A wire-11 device section WITHOUT the cadence/session section admits
     // through the existing device-section admission unchanged (single-device
     // packages do not require the section — the MD-A15 precedent).
     let section = device_section_with_session(None);
@@ -598,7 +598,7 @@ fn session_section_version_ratchet_is_declared() {
     assert_eq!(EXECUTOR_PLAN_SECTION_VERSION, 2);
     assert_eq!(EXECUTOR_PLAN_V2_VERSION, 2);
     assert_eq!(LEGACY_EXECUTOR_PLAN_SECTION_VERSION, 1);
-    assert_eq!(WIRE_DEVICE_PROGRAM_VERSION, 10);
+    assert_eq!(WIRE_DEVICE_PROGRAM_VERSION, 11);
     assert_eq!(PACKAGE_MIR_ARTIFACT_VERSION, 7);
     assert_eq!(WIRE_DISTRIBUTED_SECTION_VERSION, 1);
 }

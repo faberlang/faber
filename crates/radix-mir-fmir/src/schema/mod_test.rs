@@ -6,7 +6,7 @@ fn artifact_version_is_7_for_the_device_artifact_packet_schema() {
 }
 
 #[test]
-fn device_program_wire_version_is_10_after_the_kernel_codegen_break() {
+fn device_program_wire_version_is_11_after_the_batched_variant_break() {
     // Stage 3R U1 bumped the nested device-program wire version 3 → 4
     // (S1); S5-U5b bumps it 4 → 5 (the declared RepeatingStep step count
     // rides the lifetime variant); S5A-U1 bumps it 5 → 6 (every result
@@ -17,23 +17,28 @@ fn device_program_wire_version_is_10_after_the_kernel_codegen_break() {
     // shape changes become version-visible — wire-7 was an unpublished
     // clean break, no pre-GI3-1 wire-7 artifact escaped the repo — and
     // every AxisReduction plan + reduced buffer version carries the
-    // producer-defined reduced-resource projection). The nested wire
+    // producer-defined reduced-resource projection). The `9 → 10`
+    // kernel-codegen break dropped the transitional composed-matmul
+    // variant. S2 bumps it 10 → 11 (the batched plan variants
+    // `BatchedTiledMatMul`/`BatchedRowSoftmax`/`BatchedTranspose` landed
+    // inside wire-10 without a ratchet; a stale wire-10 device section
+    // fails nested admission before field interpretation). The nested wire
     // version ratchets independently of the outer image version (S8) —
     // it currently does NOT coincide numerically with
     // `PACKAGE_MIR_ARTIFACT_VERSION`; the two are admitted by separate
     // gates.
-    assert_eq!(WIRE_DEVICE_PROGRAM_VERSION, 10);
+    assert_eq!(WIRE_DEVICE_PROGRAM_VERSION, 11);
 }
 
 #[test]
 fn distributed_section_versions_leave_the_accepted_wire_untouched() {
-    // MD2-W1 (A7): the distributed section rides the accepted wire 10 as
+    // MD2-W1 (A7): the distributed section rides the accepted wire 11 as
     // an optional sibling field with its OWN version ratchet. The nested
     // device-program wire version, the outer image version, and the
     // section's own version are admitted by separate gates; none of the
     // frozen version constants changes with the distributed section.
     assert_eq!(WIRE_DISTRIBUTED_SECTION_VERSION, 1);
-    assert_eq!(WIRE_DEVICE_PROGRAM_VERSION, 10);
+    assert_eq!(WIRE_DEVICE_PROGRAM_VERSION, 11);
     assert_eq!(PACKAGE_MIR_ARTIFACT_VERSION, 7);
 }
 
