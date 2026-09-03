@@ -71,6 +71,8 @@ pub use radix_semantic::builtins;
 pub mod cli;
 pub mod cli_descriptor;
 pub mod codegen;
+#[cfg(feature = "mir-metal")]
+pub mod device_export;
 pub mod diagnostics;
 pub mod driver;
 pub mod file_interface;
