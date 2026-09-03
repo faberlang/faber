@@ -1232,3 +1232,175 @@ fn two_shape_instances_keep_canonical_keys_and_do_not_merge() {
         );
     }
 }
+
+/// sgr C2b: minting an instance from a generic template substitutes a
+/// body-visible `magnitudo` operand — the symbolic `ShapeSize { Param(d) }`
+/// C2a lowers for `rope_norm(0, d)` — to the concrete integer bound by the
+/// call site's size witness. The shared template keeps its symbolic operand
+/// (copy-not-move posture); only the minted instance concretizes.
+#[test]
+fn minted_instance_substitutes_shape_size_param_to_concrete_integer() {
+    const SOURCE: DefId = DefId(78);
+    let mut types = TypeTable::new();
+    let interner = Interner::new();
+    let element = types.primitive(Primitive::Fractus);
+    let vacuum = types.primitive(Primitive::Vacuum);
+    let param_row = types.intern_index(IndexExpr::Param(crate::lexer::Symbol(710)));
+    let param_dim = types.intern_index(IndexExpr::Param(crate::lexer::Symbol(711)));
+    let template_shape = types.intern_index(IndexExpr::Tuple(vec![param_row, param_dim]));
+    let template_tensor = MirType::semantic(types.tensor_with_shape(element, template_shape));
+    let template = MirFunction {
+        id: MirFunctionId(0),
+        source: Some(SOURCE),
+        name: None,
+        params: vec![crate::mir::MirParam {
+            local: crate::mir::MirLocalId(0),
+            name: None,
+            ty: template_tensor,
+            mode: crate::mir::MirParamMode::Owned,
+            span: Span::default(),
+        }],
+        locals: Vec::new(),
+        temps: Vec::new(),
+        blocks: vec![MirBlock {
+            id: crate::mir::MirBlockId(0),
+            statements: vec![MirStatement {
+                kind: MirStatementKind::RuntimeCall {
+                    destination: None,
+                    call: crate::mir::MirRuntimeCall {
+                        intrinsic: crate::mir::MirIntrinsic::Collection(
+                            crate::mir::MirCollectionOp::TensorRope,
+                        ),
+                        args: vec![
+                            MirOperand::Place(MirPlace::local(crate::mir::MirLocalId(0))),
+                            MirOperand::Constant(crate::mir::MirConstant::Int(0)),
+                            MirOperand::Constant(crate::mir::MirConstant::ShapeSize {
+                                shape: param_dim,
+                                axis: None,
+                            }),
+                        ],
+                        return_ty: MirType::semantic(vacuum),
+                    },
+                },
+                span: Span::default(),
+            }],
+            terminator: MirTerminator { kind: MirTerminatorKind::Return(None), span: Span::default() },
+            span: Span::default(),
+        }],
+        return_ty: MirType::semantic(vacuum),
+        error_ty: None,
+        is_async: false,
+        is_generator: false,
+        shader_stage: None,
+        span: Span::default(),
+    };
+
+    let row = types.intern_index(IndexExpr::Literal(8));
+    let dim = types.intern_index(IndexExpr::Literal(64));
+    let concrete_shape = types.intern_index(IndexExpr::Tuple(vec![row, dim]));
+    let concrete_tensor = MirType::semantic(types.tensor_with_shape(element, concrete_shape));
+    let mut program = MirProgram {
+        functions: vec![MirFunction {
+            id: MirFunctionId(1),
+            source: None,
+            name: None,
+            params: Vec::new(),
+            locals: vec![crate::mir::MirLocal {
+                id: crate::mir::MirLocalId(0),
+                name: None,
+                ty: concrete_tensor,
+                mutable: false,
+                span: Span::default(),
+            }],
+            temps: Vec::new(),
+            blocks: vec![MirBlock {
+                id: crate::mir::MirBlockId(0),
+                statements: vec![MirStatement {
+                    kind: MirStatementKind::Call {
+                        destination: None,
+                        callee: MirCallee::Definition { source: SOURCE, type_args: Vec::new() },
+                        args: vec![MirOperand::Place(MirPlace::local(crate::mir::MirLocalId(0)))],
+                    },
+                    span: Span::default(),
+                }],
+                terminator: MirTerminator { kind: MirTerminatorKind::Return(None), span: Span::default() },
+                span: Span::default(),
+            }],
+            return_ty: MirType::semantic(vacuum),
+            error_ty: None,
+            is_async: false,
+            is_generator: false,
+            shader_stage: None,
+            span: Span::default(),
+        }],
+        ..MirProgram::default()
+    };
+    let generic_params = vec![(
+        SOURCE,
+        vec![
+            MirGenericParam { name: crate::lexer::Symbol(710), is_shape: true },
+            MirGenericParam { name: crate::lexer::Symbol(711), is_shape: true },
+        ],
+    )];
+
+    let (monomorphizations, _) = instantiate_merged_generic_calls_with_devices_and_metadata(
+        &mut program,
+        &[template.clone()],
+        &generic_params,
+        &mut types,
+        &interner,
+        None,
+        &mut MirDeviceFunctionMetadataMap::default(),
+        &ImportedDeviceIndex::from_routes([]),
+        &HashMap::new(),
+        &std::collections::HashSet::new(),
+    )
+    .expect("the rope template must instantiate with the concrete size witness");
+
+    assert_eq!(monomorphizations.len(), 1, "one call site mints one instance");
+    let instance = program
+        .functions
+        .iter()
+        .find(|function| function.id == monomorphizations[0].function)
+        .expect("the minted instance joins the program");
+    let rope_calls = instance
+        .blocks
+        .iter()
+        .flat_map(|block| block.statements.iter())
+        .filter_map(|statement| match &statement.kind {
+            MirStatementKind::RuntimeCall { call, .. } => Some(call),
+            _ => None,
+        })
+        .filter(|call| {
+            matches!(call.intrinsic, crate::mir::MirIntrinsic::Collection(crate::mir::MirCollectionOp::TensorRope))
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(rope_calls.len(), 1, "one tensor-rope call in the instance");
+    assert!(
+        matches!(rope_calls[0].args.get(1), Some(MirOperand::Constant(crate::mir::MirConstant::Int(0)))),
+        "rope position stays the literal 0: {:?}",
+        rope_calls[0].args
+    );
+    assert!(
+        matches!(rope_calls[0].args.get(2), Some(MirOperand::Constant(crate::mir::MirConstant::Float(value))) if *value == 64.0),
+        "instantiated rope dim must be the concrete integer from the size binding: {:?}",
+        rope_calls[0].args
+    );
+    assert!(
+        !function_contains_shape_size(&mut instance.clone()),
+        "no symbolic shape-size operand survives instantiation"
+    );
+    let template_rope_dim = template
+        .blocks
+        .iter()
+        .flat_map(|block| block.statements.iter())
+        .find_map(|statement| match &statement.kind {
+            MirStatementKind::RuntimeCall { call, .. } => call.args.get(2).cloned(),
+            _ => None,
+        })
+        .expect("the template keeps its rope statement");
+    assert!(
+        matches!(template_rope_dim, MirOperand::Constant(crate::mir::MirConstant::ShapeSize { shape, axis: None }) if shape == param_dim),
+        "the shared template keeps its symbolic operand (copy-not-move): {template_rope_dim:?}"
+    );
+}
