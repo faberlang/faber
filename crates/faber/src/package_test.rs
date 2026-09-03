@@ -13,6 +13,8 @@ use super::{
     with_lowered_package_mir,
 };
 use super::{cmd::use_package_compiler, faber_analysis_seams, faber_emission_seams};
+#[cfg(feature = "mir-metal")]
+use super::cmd::compile_package_metal_text;
 use radix::program::analyze::AnalyzedProgram;
 use radix::program::discovery::{
     BuildLayout, PackageSpec, discover_build_layout, sanitize_crate_name,
@@ -10466,6 +10468,72 @@ fn use_package_compiler_keeps_rust_and_metal_fab_on_package_path() {
     assert!(!use_package_compiler(Target::MirWgsl, fab, false));
     assert!(!use_package_compiler(Target::MirLlvm, fab, false));
     assert!(!use_package_compiler(Target::HirTypeScript, fab, false));
+}
+
+const EMIT_METAL_KERNEL_MODULE: &str = r#"+++
+locale = "en"
++++
+
+@ kernel
+@ public
+fn linear<size M, size K, size N>(tensor<f32, [M, K]> x, tensor<f32, [K, N]> w, tensor<f32, [M, N]> b) → tensor<f32, [M, N]> {
+    return (x · w) + b
+}
+"#;
+
+const EMIT_METAL_HOST_CONSUMER: &str = r#"+++
+locale = "en"
++++
+
+import from "./nn" nn
+
+fn main() → void {
+    const tensor<f32, []> seed ← empty
+    const _ x ← seed.from_flat([1.0, 2.0, 3.0, 4.0], [2, 2])
+    const _ w ← seed.from_flat([1.0, 0.0, 0.0, 1.0], [2, 2])
+    const _ b ← seed.from_flat([0.1, 0.1, 0.1, 0.1], [2, 2])
+    const _ r ← nn.linear(x, w, b)
+    print "ok"
+}
+"#;
+
+/// SGR-U2: `emit -t metal-text` on a `.fab` entry takes the merged-consumer
+/// lane — the same source the build branch compiles — instead of
+/// radix-program::emit, whose artifact plan has no MirMetal arm and reports
+/// the input as `package_target_unsupported`.
+#[cfg(feature = "mir-metal")]
+#[test]
+fn emit_metal_text_package_entry_emits_imported_kernel_msl() {
+    let dir = test_temp_dir("emit-metal-text");
+    fs::create_dir_all(dir.join("src")).expect("src");
+    fs::write(dir.join("src/nn.fab"), EMIT_METAL_KERNEL_MODULE).expect("kernel module");
+    fs::write(dir.join("src/main.fab"), EMIT_METAL_HOST_CONSUMER).expect("host consumer");
+    fs::write(
+        dir.join("faber.toml"),
+        r#"
+[package]
+name = "emit-metal-text"
+version = "1.0.0"
+edition = "2026"
+
+[paths]
+source = "src"
+entry = "main.fab"
+
+[build]
+kind = "bin"
+"#,
+    )
+    .expect("manifest");
+    let entry = dir.join("src/main.fab");
+
+    assert!(use_package_compiler(Target::MirMetal, &entry, false));
+    let (config, _) = config_with_locale(Target::MirMetal, &entry, None, None).expect("config");
+    let code = compile_package_metal_text(&config, &entry).expect("metal-text emit");
+    assert!(
+        code.contains("kernel void"),
+        "expected emitted MSL kernels, got:\n{code}"
+    );
 }
 
 #[test]

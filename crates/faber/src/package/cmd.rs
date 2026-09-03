@@ -879,6 +879,51 @@ pub fn cmd_check_package(
 /// Unlike `cmd_build`, this command does not materialize the generated Cargo
 /// crate. It is a compiler-inspection surface for the assembled backend output.
 pub fn cmd_emit_package(command: radix::services::EmitCommand, format: bool, linter: bool) {
+    // SGR-U2: `.fab` metal-text emits take the package lane's merged
+    // consumer, mirroring the build branch — radix-program::emit has no
+    // MirMetal artifact plan and reports the input as unsupported.
+    if use_package_compiler_from_args(command.target, &command.input, command.package)
+        && command.target == Target::MirMetal
+    {
+        #[cfg(not(feature = "mir-metal"))]
+        exit_target_feature_unavailable("metal-text", "mir-metal");
+        #[cfg(feature = "mir-metal")]
+        {
+            let path = super::absolutize_path(std::path::Path::new(&command.input[0]));
+            let (config, locale_pack) = match config_with_locale(
+                command.target,
+                &path,
+                command.locale.as_deref(),
+                command.diagnostics_locale.as_deref(),
+            ) {
+                Ok(selection) => selection,
+                Err(diag) => {
+                    let diag = super::attach_path_diagnostic_context(diag);
+                    fail_with_diagnostic(&diag)
+                }
+            };
+            let code = match compile_package_metal_text(&config, &path) {
+                Ok(code) => code,
+                Err(diagnostics) => report_diagnostics_and_exit(
+                    &diagnostics,
+                    locale_pack.as_ref(),
+                    "metal-text package emit failed",
+                ),
+            };
+            if command.reflection {
+                eprintln!("error: target does not expose GPU reflection metadata");
+                std::process::exit(1);
+            }
+            let code =
+                crate::postprocess::postprocess_code(code, command.target, format, linter);
+            if let Some(out) = command.output {
+                crate::postprocess::write_text_artifact(&out, &code);
+            } else {
+                print!("{code}");
+            }
+            return;
+        }
+    }
     let (result, locale_pack) = compile_package_input(
         &command.input,
         command.package,
@@ -941,7 +986,7 @@ pub fn cmd_emit_package(command: radix::services::EmitCommand, format: bool, lin
 ///
 /// Returns the generated Metal Shading Language source.
 #[cfg(feature = "mir-metal")]
-fn compile_package_metal_text(
+pub(super) fn compile_package_metal_text(
     config: &radix::module::Config,
     input_path: &Path,
 ) -> Result<String, Vec<radix::module::Diagnostic>> {
