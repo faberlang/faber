@@ -459,7 +459,11 @@ impl Lowerer<'_> {
         let annotations = self.lower_annotations(&stmt.annotations);
         self.annotation_capture = None;
         let mut type_params = self.lower_type_params(&decl.type_params);
-        self.push_type_params(type_params.iter().map(|param| (param.name, param.kind)));
+        self.push_type_params(
+            type_params
+                .iter()
+                .map(|param| (param.def_id, param.name, param.kind)),
+        );
         self.apply_type_param_constraints_from_annotations(&mut type_params, &annotations);
         let mut params = Vec::new();
         for (ordinal, param) in decl.params.iter().enumerate() {
@@ -665,7 +669,11 @@ impl Lowerer<'_> {
 
         let type_params = self.lower_type_params(&decl.type_params);
 
-        self.push_type_params(type_params.iter().map(|param| (param.name, param.kind)));
+        self.push_type_params(
+            type_params
+                .iter()
+                .map(|param| (param.def_id, param.name, param.kind)),
+        );
         let mut annotations = Vec::new();
         for annotation in &stmt.annotations {
             if !self.annotation_ast_family_is(annotation, "annotatio") {
@@ -717,7 +725,7 @@ impl Lowerer<'_> {
                     self.push_type_params(
                         method_type_params
                             .iter()
-                            .map(|param| (param.name, param.kind)),
+                            .map(|param| (param.def_id, param.name, param.kind)),
                     );
                     self.apply_type_param_constraints_from_annotations(
                         &mut method_type_params,
@@ -951,7 +959,11 @@ impl Lowerer<'_> {
 
         let type_params = self.lower_type_params(&decl.type_params);
 
-        self.push_type_params(type_params.iter().map(|param| (param.name, param.kind)));
+        self.push_type_params(
+            type_params
+                .iter()
+                .map(|param| (param.def_id, param.name, param.kind)),
+        );
 
         let commune = self.lower_commune_fields(decl);
         self.resolver
@@ -1033,7 +1045,11 @@ impl Lowerer<'_> {
 
         let type_params = self.lower_type_params(&decl.type_params);
 
-        self.push_type_params(type_params.iter().map(|param| (param.name, param.kind)));
+        self.push_type_params(
+            type_params
+                .iter()
+                .map(|param| (param.def_id, param.name, param.kind)),
+        );
 
         let methods = decl
             .methods
@@ -1068,7 +1084,11 @@ impl Lowerer<'_> {
     pub fn lower_typus(&mut self, stmt: &Stmt, decl: &TypeAliasDecl) -> Option<HirItem> {
         let def_id = self.def_id_for(decl.name.name);
         let type_params = self.lower_type_params(&decl.type_params);
-        self.push_type_params(type_params.iter().map(|param| (param.name, param.kind)));
+        self.push_type_params(
+            type_params
+                .iter()
+                .map(|param| (param.def_id, param.name, param.kind)),
+        );
         let ty = self.lower_authored_type(
             radix_hir::HirTypeSite {
                 owner: radix_hir::HirOwnerRef::Def(def_id),

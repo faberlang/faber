@@ -283,6 +283,14 @@ impl Lowerer<'_> {
         if let Some(def_id) = self.lookup_name(ident.name) {
             return HirExpressionKind::Path(def_id);
         }
+        // A lexical `magnitudo` parameter may name its compile-time size in
+        // value position (the intrinsic `NumerusIndex` slots admitted by
+        // resolve). Mint the body-visible parameter binding typed as the
+        // symbolic-size marker — never a `Path` to the `IndexParam`
+        // declaration def, whose scope ended with the resolve pass.
+        if let Some(def_id) = self.define_body_size_param(ident.name) {
+            return HirExpressionKind::Path(def_id);
+        }
         match self.resolver.lookup_variant_bare(ident.name) {
             crate::BareVariantLookup::Single(def_id) => HirExpressionKind::Path(def_id),
             crate::BareVariantLookup::Ambiguous { .. } => {

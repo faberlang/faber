@@ -172,7 +172,7 @@ pub struct Lowerer<'a> {
     local_scopes: Vec<FxHashMap<Symbol, radix_hir::DefId>>,
 
     /// Lexical generic-parameter names visible while lowering signatures.
-    type_param_scopes: Vec<FxHashMap<Symbol, GenericParamKind>>,
+    type_param_scopes: Vec<FxHashMap<Symbol, (radix_hir::DefId, GenericParamKind)>>,
 
     /// Current self type for lowering `ego` expressions inside methods.
     current_ego_struct: Option<radix_hir::DefId>,
@@ -291,11 +291,11 @@ impl<'a> Lowerer<'a> {
     /// Enter a lexical scope of generic-parameter names for signature lowering.
     pub(super) fn push_type_params(
         &mut self,
-        params: impl IntoIterator<Item = (Symbol, GenericParamKind)>,
+        params: impl IntoIterator<Item = (radix_hir::DefId, Symbol, GenericParamKind)>,
     ) {
         let mut layer = FxHashMap::default();
-        for (name, kind) in params {
-            layer.insert(name, kind);
+        for (def_id, name, kind) in params {
+            layer.insert(name, (def_id, kind));
         }
         self.type_param_scopes.push(layer);
     }
@@ -311,10 +311,43 @@ impl<'a> Lowerer<'a> {
     }
 
     pub(super) fn lexical_generic_param_kind(&self, name: Symbol) -> Option<GenericParamKind> {
+        self.lexical_type_param(name).map(|(_, kind)| kind)
+    }
+
+    /// The HIR type-parameter entry (its `HirTypeParam` def and kind) for a
+    /// body-visible generic parameter name, innermost scope first.
+    fn lexical_type_param(&self, name: Symbol) -> Option<(radix_hir::DefId, GenericParamKind)> {
         self.type_param_scopes
             .iter()
             .rev()
             .find_map(|layer| layer.get(&name).copied())
+    }
+
+    /// Bind a body-visible `magnitudo` parameter named in value position.
+    ///
+    /// Reuses the parameter's own `HirTypeParam` def — already registered in
+    /// the emit def table — and installs the resolver symbol type
+    /// `Type::Param(name)`, the rigid symbolic-size marker generic bodies
+    /// already typecheck with. Typecheck admits the marker at intrinsic
+    /// `NumerusIndex` slots and rejects misplaced uses through ordinary unify
+    /// failure. The `IndexParam` declaration def from the resolve pass is
+    /// never referenced: its scope ended before lowering.
+    pub(super) fn define_body_size_param(&mut self, name: Symbol) -> Option<radix_hir::DefId> {
+        let (def_id, GenericParamKind::Magnitudo) = self.lexical_type_param(name)? else {
+            return None;
+        };
+        let ty = self.types.intern(Type::Param(name));
+        // Register so typechecker's `check_path` fallback can `get_symbol(def_id)`.
+        self.resolver.register_unbound_symbol(crate::Symbol {
+            def_id,
+            name,
+            kind: crate::SymbolKind::Param,
+            ty: Some(ty),
+            mutable: false,
+            span: self.current_span,
+        });
+        self.bind_local(name, def_id);
+        Some(def_id)
     }
 
     /// Lower a complete resolved syntax program into HIR.

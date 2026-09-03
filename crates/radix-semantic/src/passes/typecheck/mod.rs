@@ -901,6 +901,10 @@ mod tensor_index_test;
 mod tensor_index_width_test;
 
 #[cfg(test)]
+#[path = "index_param_value_test.rs"]
+mod index_param_value_test;
+
+#[cfg(test)]
 #[path = "tensor_lattice_matrix_test.rs"]
 mod tensor_lattice_matrix_test;
 

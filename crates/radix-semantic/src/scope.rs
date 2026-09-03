@@ -3150,6 +3150,19 @@ impl Resolver {
         Ok(def_id)
     }
 
+    /// Register a compiler-managed symbol without binding its name in any scope.
+    ///
+    /// Used for the body-visible `magnitudo` parameters minted during HIR
+    /// lowering: their names resolve through the lowerer's lexical scopes, and
+    /// the symbols-map entry exists only so `check_path` can read the stored
+    /// type by `DefId`. Unlike [`Self::define`], a same-name binding elsewhere
+    /// is not an error — each minted parameter owns a fresh def.
+    pub fn register_unbound_symbol(&mut self, symbol: Symbol) -> DefId {
+        let def_id = symbol.def_id;
+        self.symbols.insert(def_id, symbol);
+        def_id
+    }
+
     /// Look up the nearest visible definition for a source name.
     #[must_use]
     pub fn lookup(&self, name: LexSymbol) -> Option<DefId> {
