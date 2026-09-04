@@ -15,6 +15,11 @@ conforms. This document remains the design authority; the Radix campaign named
 above is the delivery ledger. Neither document claims that naming a backend,
 model format, or kernel family delivers it.
 
+The general cross-library microkernel boundary is defined by
+[Host Execution Architecture](host-execution-architecture.md). This GPU
+contract specializes that boundary; it does not permit an operating-system or
+device host to acquire Gradus semantics.
+
 ## Core invariant
 
 ```text

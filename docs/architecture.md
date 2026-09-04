@@ -5,10 +5,12 @@ package workflow. These diagrams render natively on GitHub; the styled version
 of the compilation model also lives on
 [the documentation site](https://faberlang.dev/en-US/toolchain/radix.html).
 
-GPU computation follows the cross-repository ownership and execution contract
-in [GPU Execution Architecture](gpu-execution-architecture.md): Gradus owns ML
-semantics and Faber-authored kernels, Radix compiles target artifacts and
-execution facts, and Hosts binds and executes them on physical devices.
+All platform execution follows the microkernel boundary in
+[Host Execution Architecture](host-execution-architecture.md): libraries own
+portable behavior, Radix compiles target artifacts and complete execution
+facts, and Hosts supplies physical capabilities and executes those artifacts.
+GPU computation adds the specialized rules in
+[GPU Execution Architecture](gpu-execution-architecture.md).
 
 ## Compilation model
 
@@ -96,5 +98,7 @@ flowchart LR
 
 Package acquisition is owned by [Cista](https://github.com/faberlang/cista);
 the `faber` CLI consumes the resulting project lock. Concrete filesystem,
-process, network, browser, LLVM, and device behavior belongs in Hosts, not the
-generated-language packages.
+process, network, browser, LLVM, and device capabilities belong in Hosts.
+Portable Norma, Triga, Tela, Gradus, and other library behavior does not: Hosts
+executes compiled artifacts and bounded capability requests without becoming a
+second implementation of those libraries.
