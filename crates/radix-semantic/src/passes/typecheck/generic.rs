@@ -320,11 +320,7 @@ impl TypeChecker<'_> {
         params: &[radix_types::GenericParamDescriptor],
         len: usize,
     ) -> bool {
-        let required = params
-            .iter()
-            .take_while(|param| param.default.is_none())
-            .count();
-        len >= required && len <= params.len()
+        crate::types::generic_explicit_prefix_len_in_range(params, len)
     }
 
     /// Structured wrong-sort rejection for one explicit generic argument.

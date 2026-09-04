@@ -960,3 +960,7 @@ mod union_value_test;
 #[cfg(test)]
 #[path = "generic_defaults_test.rs"]
 mod generic_defaults_test;
+
+#[cfg(test)]
+#[path = "named_type_defaults_test.rs"]
+mod named_type_defaults_test;

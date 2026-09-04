@@ -31,10 +31,10 @@
 
 use super::types::{FuncSig, Type, TypeId, TypeTable};
 use crate::file_interface::{
-    FileExportKind, FileInterface, FileInterfaceError, InterfaceGenericParam,
-    InterfaceLibraryIdentity, InterfaceMemberKind, InterfaceMethodExport, InterfaceNominalExport,
-    InterfaceNominalKind, InterfaceStructExport, import_interface_callable_with_resolver,
-    import_interface_type_with_resolver,
+    import_interface_callable_with_resolver, import_interface_type_with_resolver, FileExportKind,
+    FileInterface, FileInterfaceError, InterfaceGenericParam, InterfaceLibraryIdentity,
+    InterfaceMemberKind, InterfaceMethodExport, InterfaceNominalExport, InterfaceNominalKind,
+    InterfaceStructExport,
 };
 use crate::locale::LocalePack;
 use crate::passes::visibility_annotation::VisibilityTier;
@@ -671,6 +671,10 @@ pub struct Resolver {
     /// Kept separate from identifier spellings so kind selection is never
     /// inferred from the source name.
     generic_param_kinds: FxHashMap<DefId, Vec<radix_syntax::GenericParamKind>>,
+    /// Ordered generic descriptors, including declaration defaults, for local
+    /// named types. HIR lowering uses this identity-keyed row when applying a
+    /// trailing default suffix to a type application.
+    generic_param_descriptors: FxHashMap<DefId, Vec<radix_types::GenericParamDescriptor>>,
     current_scope: ScopeId,
     next_def_id: u32,
     next_builtin_def_id: u32,
@@ -783,6 +787,7 @@ impl Resolver {
             scopes: vec![global],
             symbols: FxHashMap::default(),
             generic_param_kinds: FxHashMap::default(),
+            generic_param_descriptors: FxHashMap::default(),
             current_scope: ScopeId(0),
             next_def_id: USER_DEF_ID_BASE,
             next_builtin_def_id: BUILTIN_DEF_ID_BASE,
@@ -3259,6 +3264,28 @@ impl Resolver {
         self.generic_param_kinds.get(&def_id).map(Vec::as_slice)
     }
 
+    /// Record ordered generic descriptors, including declaration defaults, for
+    /// a named type identity.
+    pub fn register_generic_param_descriptors(
+        &mut self,
+        def_id: DefId,
+        descriptors: impl IntoIterator<Item = radix_types::GenericParamDescriptor>,
+    ) {
+        self.generic_param_descriptors
+            .insert(def_id, descriptors.into_iter().collect());
+    }
+
+    /// Return ordered generic descriptors for a named type identity.
+    #[must_use]
+    pub fn generic_param_descriptors(
+        &self,
+        def_id: DefId,
+    ) -> Option<&[radix_types::GenericParamDescriptor]> {
+        self.generic_param_descriptors
+            .get(&def_id)
+            .map(Vec::as_slice)
+    }
+
     /// Register the resolved relational schema metadata for a schema
     /// definition.
     pub fn register_schema(&mut self, def_id: DefId, schema: crate::SchemaDef) {
@@ -3484,6 +3511,7 @@ impl Resolver {
             scopes: vec![global],
             symbols: FxHashMap::default(),
             generic_param_kinds: FxHashMap::default(),
+            generic_param_descriptors: FxHashMap::default(),
             current_scope: ScopeId(0),
             next_def_id: USER_DEF_ID_BASE,
             next_builtin_def_id: BUILTIN_DEF_ID_BASE,
