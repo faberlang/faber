@@ -60,6 +60,16 @@ fn rope_norm_rejects_size_name_in_runtime_value_slot() {
 }
 
 #[test]
+fn rope_norm_rejects_type_argument_in_size_slot() {
+    rejects_with_issue(
+        r"functio rotate<T>(tf32[2, 8] x) → tf32[2, 8] {
+    redde x.rope_norm<T>(5)
+}",
+        "generic_type_arg_sort",
+    );
+}
+
+#[test]
 fn size_param_in_arithmetic_still_rejects() {
     rejects_with_issue(
         r"functio bad<magnitudo d>(tensor<f32, [8, d]> input) → f32 {

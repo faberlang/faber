@@ -395,7 +395,116 @@ incipit {
     );
 }
 
+#[test]
+fn generic_air_instance_over_unroll_budget_fails_closed() {
+    let source = r#"
+@ radix lane "air"
+functio generic_too_wide<magnitudo N>(tensor<f32, [N]> x) → f32 {
+    itera ex x fixum value { }
+    redde 0.0
+}
+
+incipit {
+    fixum tensor<f32, [65]> x ← vacua
+    fixum f32 y ← generic_too_wide(x)
+    nota y
+}
+"#;
+
+    let result = analyze_source(
+        &test_session(Target::MirLlvm),
+        "generic_unroll_over_budget.fab",
+        source,
+        AnalyzeRequest::default(),
+    );
+    let Err(diagnostics) = result else {
+        panic!("a concrete generic AIR instance above UNROLL_BUDGET must fail closed");
+    };
+    assert!(
+        diagnostics.iter().any(|diagnostic| {
+            diagnostic.issue() == Some("itera_loop")
+                && diagnostic
+                    .args
+                    .iter()
+                    .any(|arg| arg.name == "causa" && arg.value == "budget")
+        }),
+        "expected the specialized generic instance to report the unroll budget, got {diagnostics:?}"
+    );
+}
+
 // ── unit-3F: masked len ≤ N unrolled body generates a companion ──
+
+#[test]
+fn generic_masked_route_reaches_concrete_backward_companion() {
+    let source = r#"
+@ radix lane "air"
+@ radix backward "generic_masked_mean_backward"
+functio generic_masked_mean<magnitudo N>(
+    tensor<f32, [N]> x, tensor<f32, [N]> mask
+) → f32 {
+    varia tensor<f32, [N]> acc ← x
+    itera ex x fixum value {
+        acc ← acc.addita(x)
+    }
+    redde acc.multiplica(mask).media()
+}
+
+incipit {
+    fixum tensor<f32, [4]> x ← vacua
+    fixum tensor<f32, [4]> mask ← vacua
+    fixum f32 y ← generic_masked_mean(x, mask)
+    nota y
+}
+"#;
+
+    let session = test_session(Target::MirLlvm);
+    let mut analysis = analyze_source(&session, "generic_masked_mean.fab", source, AnalyzeRequest::default())
+        .expect("generic caller-mask AIR instance must analyze cleanly");
+    let bundle = expect_codegen_ok(
+        prepare_air_backward_bundle(&mut analysis),
+        "generic caller-mask AIR instance must prepare a backward bundle",
+    )
+    .expect("the concrete generic masked primal must produce a backward bundle");
+
+    let primal_symbol = analysis.interner.intern("generic_masked_mean");
+    let primal = bundle
+        .air_program
+        .functions
+        .iter()
+        .find(|function| function.name == primal_symbol)
+        .expect("the concrete generic masked primal must enter AIR");
+    assert!(
+        !primal
+            .body
+            .bindings
+            .iter()
+            .any(|binding| matches!(binding.expr, crate::air::AirExpr::If { .. })),
+        "generic caller-mask unroll must be guard-free before reverse AD"
+    );
+    assert!(
+        primal.body.bindings.iter().any(|binding| {
+            matches!(
+                binding.expr,
+                crate::air::AirExpr::TensorOp { op: crate::air::AirTensorOp::Mul, .. }
+            )
+        }),
+        "the concrete generic instance must retain the caller-built mask multiply"
+    );
+
+    let mut lowered =
+        lower_analyzed_unit(&mut analysis, Default::default()).expect("generic masked primal should lower to MIR");
+    expect_codegen_ok(
+        apply_air_backward_bundle(&mut lowered, bundle, false),
+        "generic caller-mask body must generate a reverse-AD companion",
+    );
+    let names = mir_function_names(&lowered.program, &lowered.interner);
+    assert!(
+        names
+            .iter()
+            .any(|name| name == "generic_masked_mean_backward"),
+        "generic caller-mask companion must be installed in MIR; got functions: {names:?}"
+    );
+}
 
 #[test]
 fn unrolled_masked_route_generates_companion_through_driver() {

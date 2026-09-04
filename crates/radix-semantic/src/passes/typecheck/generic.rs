@@ -294,6 +294,18 @@ impl TypeChecker<'_> {
                 }
                 return None;
             }
+            if sig.type_params.iter().any(|param| {
+                param.sort == GenericParamSort::Magnitudo
+                    && explicit_type_args.iter().any(|ty| {
+                        matches!(self.types.get(*ty), Type::Param(sym)
+                            if self.magnitudo_literal_of(*ty).is_none()
+                                && !self.is_size_param_symbol(*sym))
+                    })
+            }) {
+                self.reject_type_arg_sort(&sig.type_params[0], span);
+                self.typecheck_call_arg_exprs(args);
+                return Some(self.error_type);
+            }
             self.wrong_arity("callee_type_args_unsupported", span);
             self.typecheck_call_arg_exprs(args);
             return Some(self.error_type);
@@ -677,7 +689,26 @@ impl TypeChecker<'_> {
         !explicit_type_args.is_empty()
             && explicit_type_args
                 .iter()
-                .all(|ty| matches!(self.types.get(*ty), Type::Param(_)))
+                .all(|ty| match self.types.get(*ty) {
+                    Type::Param(sym) => {
+                        self.magnitudo_literal_of(*ty).is_some() || self.is_size_param_symbol(*sym)
+                    }
+                    _ => false,
+                })
+    }
+
+    /// Whether `sym` names a caller-owned compile-time size parameter. HIR
+    /// keeps generic type and size parameters in the same `Type::Param` form,
+    /// so the active function declaration supplies the lexical sort while the
+    /// resolver covers imported index parameters.
+    fn is_size_param_symbol(&self, sym: Symbol) -> bool {
+        if let Some(kind) = self.current_generic_param_kinds.get(&sym) {
+            return *kind == radix_syntax::GenericParamKind::Magnitudo;
+        }
+        self.resolver
+            .lookup(sym)
+            .and_then(|def_id| self.resolver.get_symbol(def_id))
+            .is_some_and(|symbol| symbol.kind == crate::SymbolKind::IndexParam)
     }
 
     /// Index witness of an explicit magnitudo argument: NATURAL spellings
@@ -691,7 +722,10 @@ impl TypeChecker<'_> {
         let name = self.interner?.resolve(sym);
         match radix_types::parse_natural_capacity(name) {
             Some(value) => Some(self.types.intern_index(IndexExpr::Literal(value))),
-            None => Some(self.types.intern_index(IndexExpr::Param(sym))),
+            None if self.is_size_param_symbol(sym) => {
+                Some(self.types.intern_index(IndexExpr::Param(sym)))
+            }
+            None => None,
         }
     }
 

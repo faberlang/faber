@@ -185,7 +185,7 @@ functio wrong<A>(tensor<f32, [2, 4]> x) → tensor<f32, [2, 4]> {
 }
 
 incipit { tacet }",
-        "argument_type_mismatch",
+        "generic_type_arg_sort",
     );
 }
 

@@ -40,6 +40,13 @@ impl TypeChecker<'_> {
     pub fn check_function(&mut self, def_id: DefId, func: &mut HirFunction) {
         self.reject_json_annotations_on_site(&func.annotations, "functio");
         let func_name = self.function_display_name(def_id).unwrap_or_default();
+        let previous_generic_param_kinds = std::mem::replace(
+            &mut self.current_generic_param_kinds,
+            func.type_params
+                .iter()
+                .map(|param| (param.name, param.kind))
+                .collect(),
+        );
         self.push_scope();
         for (idx, param) in func.params.iter_mut().enumerate() {
             if let Some(default) = &mut param.default {
@@ -114,6 +121,7 @@ impl TypeChecker<'_> {
         self.inferred_return = prev_inferred;
         self.allow_inferred_return = prev_allow_inferred;
         self.pop_scope();
+        self.current_generic_param_kinds = previous_generic_param_kinds;
     }
 
     /// Check a constant initializer and record the resulting global type.

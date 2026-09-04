@@ -327,6 +327,12 @@ pub(crate) struct TypeChecker<'a> {
     /// declaration order. Absent or empty means the nominal is not generic.
     pub type_params_by_def: FxHashMap<DefId, Vec<Symbol>>,
 
+    /// Sorts of the generic parameters on the function body currently being
+    /// checked. Explicit symbolic size arguments carry only a `Symbol` in
+    /// `Type::Param`, so the active declaration row is needed to distinguish
+    /// a caller-owned `magnitudo` witness from a caller-owned type parameter.
+    pub current_generic_param_kinds: FxHashMap<Symbol, radix_syntax::GenericParamKind>,
+
     /// Declared return type while checking a function body.
     pub current_return: Option<TypeId>,
 
@@ -536,6 +542,7 @@ impl<'a> TypeChecker<'a> {
             variant_field_names: FxHashMap::default(),
             variant_parent: FxHashMap::default(),
             type_params_by_def: FxHashMap::default(),
+            current_generic_param_kinds: FxHashMap::default(),
             current_return: None,
             current_error: None,
             pending_conversion: None,
