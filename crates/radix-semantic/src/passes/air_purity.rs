@@ -74,6 +74,13 @@ impl AirPurityChecker<'_> {
             let HirItemKind::Function(function) = &item.kind else {
                 continue;
             };
+            // Symbolic generic AIR templates are source/FHIR declarations. The
+            // concrete clones produced before this pass own executable AIR
+            // admission; checking the template would reject its intentional
+            // symbolic loop bounds a second time.
+            if !function.type_params.is_empty() {
+                continue;
+            }
             self.check_air_function(function, item.def_id, item.span);
         }
     }

@@ -3345,6 +3345,16 @@ pub(crate) fn validate_referential_integrity(
         }
     }
 
+    // 12. Compiler lane metadata (schema v11): a rehydrated AIR unit must
+    // reference only declarations and symbols present in the same artifact.
+    for entry in &artifact.radix_lanes {
+        check_def(entry.def_id)?;
+        if let Some(backward) = entry.backward {
+            check_symbol(backward.companion_name)?;
+            check_def(backward.companion_def_id)?;
+        }
+    }
+
     Ok(())
 }
 

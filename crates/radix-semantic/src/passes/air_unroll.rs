@@ -81,6 +81,12 @@ pub fn unroll(
         let HirItemKind::Function(function) = &mut item.kind else {
             continue;
         };
+        // Generic templates are retained for source/FHIR and are not an
+        // executable AIR body. Reachable concrete clones have already been
+        // appended by `air_specialize` and carry no type parameters.
+        if !function.type_params.is_empty() {
+            continue;
+        }
         unroll_function(
             function,
             presentation,

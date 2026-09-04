@@ -329,8 +329,8 @@ functio too_wide(tensor<f32, [9, 8]> x) → f32 {
 }
 
 #[test]
-fn apud_generic_dims_decline_not_concrete() {
-    let errors = air_errors(
+fn apud_generic_template_is_retained_until_a_concrete_call() {
+    let result = analyze(
         r#"
 @ radix lane "air"
 functio generic_grid<magnitudo M, magnitudo N>(tensor<f32, [M, N]> x) → f32 {
@@ -339,7 +339,12 @@ functio generic_grid<magnitudo M, magnitudo N>(tensor<f32, [M, N]> x) → f32 {
 }
 "#,
     );
-    expect_decline_causa(&errors, "not_concrete");
+    assert!(
+        air_errors_from(&result).is_empty(),
+        "an uninstantiated generic template is not an executable AIR body: {:?}",
+        result.diagnostics
+    );
+    assert!(has_itera(result.hir.as_ref().expect("typed HIR")));
 }
 
 #[test]
@@ -390,8 +395,8 @@ fn coordinate_lane_tuples(hir: &HirModule, rank: usize) -> Vec<Vec<u64>> {
 }
 
 #[test]
-fn tensor_ex_symbolic_shape_declines_not_concrete() {
-    let errors = air_errors(
+fn tensor_ex_generic_template_is_retained_until_a_concrete_call() {
+    let result = analyze(
         r#"
 @ radix lane "air"
 functio generic_sum<magnitudo N>(tensor<f32, [N]> x) → f32 {
@@ -400,7 +405,12 @@ functio generic_sum<magnitudo N>(tensor<f32, [N]> x) → f32 {
 }
 "#,
     );
-    expect_decline_causa(&errors, "not_concrete");
+    assert!(
+        air_errors_from(&result).is_empty(),
+        "an uninstantiated generic template is not an executable AIR body: {:?}",
+        result.diagnostics
+    );
+    assert!(has_itera(result.hir.as_ref().expect("typed HIR")));
 }
 
 #[test]

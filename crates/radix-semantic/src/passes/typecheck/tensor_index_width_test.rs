@@ -224,10 +224,10 @@ fn rms_norm_typechecks_with_axis_epsilon_and_gamma_peer() {
 }
 
 #[test]
-fn rope_norm_typechecks_with_pos_and_dim_numerus_args() {
+fn rope_norm_typechecks_with_generic_dim_and_pos_argument() {
     accepts(
         r"functio rotate(tf32[2, 8] x) → tf32[2, 8] {
-    redde x.rope_norm(5, 8)
+    redde x.rope_norm<8>(5)
 }",
     );
 }

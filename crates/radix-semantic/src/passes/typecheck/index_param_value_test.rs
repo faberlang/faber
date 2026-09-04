@@ -1,10 +1,8 @@
 //! SGR-C1: `magnitudo` parameters name values only at `NumerusIndex` slots.
 //!
-//! A body-visible size parameter (`size d` / `magnitudo d`) may appear as a
-//! bare value argument exactly where an intrinsic declares an index slot
-//! (`rope_norm(position, d)`); every other expression position keeps the
-//! `SEM001` not-a-value rejection, and lowering types the admitted parameter
-//! as the rigid symbolic-size marker so misplaced uses fail unification.
+//! A body-visible size parameter is a type-level witness. It is legal in the
+//! generic argument slot of `rope_norm<d>(position)`, but it is not a runtime
+//! value and must not be admitted as one by intrinsic argument lowering.
 
 fn compile(source: &str) -> crate::test_support::AnalyzedFixture {
     crate::test_support::analyze_source(source)
@@ -33,12 +31,32 @@ fn rejects_with_issue(source: &str, issue: &str) {
 }
 
 const ROPE_Q_PROBE: &str = r"functio rope_q<T, magnitudo D, magnitudo d, magnitudo P>(tensor<T, [D, d]> input, tensor<T, [P, d, 3]> rota, in tensor<T, [D, d]> output) → vacuum {
-    output ← input.rope_norm(0, d)
+    output ← input.rope_norm<d>(0)
 }";
 
 #[test]
-fn rope_norm_accepts_body_size_param_at_index_slot() {
+fn rope_norm_accepts_body_size_param_as_generic_argument() {
     accepts(ROPE_Q_PROBE);
+}
+
+#[test]
+fn rope_norm_rejects_literal_dimension_in_runtime_value_slot() {
+    rejects_with_issue(
+        r"functio rotate(tf32[2, 8] x) → tf32[2, 8] {
+    redde x.rope_norm(5, 8)
+}",
+        "rope_norm_dim_required",
+    );
+}
+
+#[test]
+fn rope_norm_rejects_size_name_in_runtime_value_slot() {
+    rejects_with_issue(
+        r"functio rotate<magnitudo d>(tf32[2, d] x) → tf32[2, d] {
+    redde x.rope_norm(5, d)
+}",
+        "name_not_value",
+    );
 }
 
 #[test]

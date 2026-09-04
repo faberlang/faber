@@ -242,3 +242,80 @@ fn package_mir_links_generic_caller_forwarding_type_args_to_namespace_callee() {
         );
     });
 }
+
+const AIR_TYPEARG_UTIL: &str = r#"@ radix lane "air"
+@ public
+fn rope<size D>(tf32[2, D] x) → tf32[2, D] {
+    return x.rope_norm<D>(0)
+}
+"#;
+
+const AIR_TYPEARG_MAIN: &str = r#"import from "./util" * as utilModule
+
+fn main() → void {
+    const tf32[] seed ← empty
+    const tf32[2, 8] x ← seed.from_flat([1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0, 11.0, 12.0, 13.0, 14.0, 15.0, 16.0], [2, 8])
+    const tf32[2, 64] y ← seed.from_flat([1.0, 2.0, 3.0, 4.0], [2, 64])
+    const _ a ← utilModule.rope<8>(x)
+    const _ b ← utilModule.rope<64>(y)
+    const _ c ← utilModule.rope(y)
+}
+"#;
+
+fn write_air_typearg_package(dir: &std::path::Path) -> std::path::PathBuf {
+    let src = dir.join("src");
+    fs::create_dir_all(&src).expect("create package src");
+    fs::write(
+        dir.join("faber.toml"),
+        r#"
+[package]
+name = "air-typearg-link"
+version = "1.0.0"
+edition = "2026"
+
+[paths]
+source = "src"
+entry = "main.fab"
+
+[build]
+kind = "bin"
+"#,
+    )
+    .expect("write faber.toml");
+    fs::write(src.join("util.fab"), AIR_TYPEARG_UTIL).expect("write util.fab");
+    fs::write(src.join("main.fab"), AIR_TYPEARG_MAIN).expect("write main.fab");
+    src.join("main.fab")
+}
+
+#[test]
+fn package_mir_specializes_imported_air_rope_before_lowering() {
+    let dir = crate::test_support::test_temp_dir("air-typearg-link");
+    let entry = write_air_typearg_package(dir.as_ref());
+
+    with_interpreted_lowered_package_mir(
+        &Config::default(),
+        &entry,
+        &crate::test_support::test_mir_seams(),
+        |lowered| {
+            let mut shapes = named_param_shapes(lowered, "rope");
+            shapes.sort();
+            assert_eq!(
+                shapes,
+                vec![vec![2, 8], vec![2, 64]],
+                "imported AIR rope must lower one concrete provider instance per distinct dimension"
+            );
+            assert_eq!(
+                lowered
+                    .generic_templates
+                    .iter()
+                    .filter(|template| template
+                        .name
+                        .is_some_and(|name| lowered.interner.resolve(name) == "rope"))
+                    .count(),
+                0,
+                "a generic AIR provider template must not enter executable MIR"
+            );
+        },
+    )
+    .unwrap_or_else(|errors| panic!("imported AIR rope package must lower, got {errors:?}"));
+}

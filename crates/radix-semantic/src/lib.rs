@@ -617,6 +617,26 @@ pub fn analyze_with_cli(
         diagnostics.extend(e);
     }
 
+    // Concrete generic AIR instances must exist before named unroll: symbolic
+    // templates remain source/FHIR facts, while their reachable concrete clones
+    // expose literal shapes and bounds to the existing transform.
+    if !diagnostics.iter().any(SemanticError::is_error)
+        && matches!(
+            config.target,
+            Target::MirStepper
+                | Target::MirWasm
+                | Target::MirLlvm
+                | Target::MirLlvmHost
+                | Target::MirAmd
+                | Target::MirMetal
+                | Target::MirWgsl
+                | Target::MirSexp
+                | Target::MirScena
+        )
+    {
+        passes::air_specialize::specialize(&mut hir, &mut radix_lanes, &mut types, interner);
+    }
+
     // Named unroll: concrete-N `itera ab` → straight line, before air_purity.
     // Skip when typecheck already failed — types on the rewritten nodes would
     // be unreliable.

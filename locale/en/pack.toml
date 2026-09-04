@@ -379,6 +379,9 @@ activatio_softmax = "softmax"
 transpone = "transpose"
 laminatio = "layer_norm"
 materialize = "materialize"
+# `formata` is a static type-directed view; keep the canonical spelling until
+# English owns a distinct surface name for it.
+formata = "formata"
 
 # matrix (7) — addita / subtrahe / multiplica / divida / matmul / inversa
 # shared with earlier families.

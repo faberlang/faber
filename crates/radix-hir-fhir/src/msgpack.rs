@@ -42,7 +42,8 @@ use serde::{Deserialize, Deserializer, Serialize};
 
 use crate::artifact::{
     CliProgramWire, FunctionFactTableWire, FunctionFactWire, FunctionProvenanceTableWire,
-    GpuBuiltinWire, HirArtifact, ResolvedUseWire, ResolverSnapshot, SCHEMA_VERSION, SourceIdentity,
+    GpuBuiltinWire, HirArtifact, RadixLaneEntryWire, ResolvedUseWire, ResolverSnapshot,
+    SCHEMA_VERSION, SourceIdentity,
 };
 use crate::decode::{decode as decode_unit_bytes, encode as encode_unit_bytes};
 use crate::error::HirArtifactError;
@@ -1235,6 +1236,7 @@ struct HirArtifactDto {
     cli_program: Option<CliProgramWire>,
     types: TypeTableSnapshot,
     resolved_generic_calls: Vec<ResolvedGenericCall>,
+    radix_lanes: Vec<RadixLaneEntryWire>,
     interner: Vec<String>,
     resolver: ResolverSnapshot,
     libraries: LibraryRegistry,
@@ -1255,6 +1257,7 @@ impl From<&HirArtifact> for HirArtifactDto {
             cli_program: artifact.cli_program.clone(),
             types: artifact.types.clone(),
             resolved_generic_calls: artifact.resolved_generic_calls.clone(),
+            radix_lanes: artifact.radix_lanes.clone(),
             interner: artifact.interner.clone(),
             resolver: artifact.resolver.clone(),
             libraries: artifact.libraries.clone(),
@@ -1295,6 +1298,7 @@ impl From<HirArtifactDto> for HirArtifact {
             cli_program: dto.cli_program,
             types: dto.types,
             resolved_generic_calls: dto.resolved_generic_calls,
+            radix_lanes: dto.radix_lanes,
             interner: dto.interner,
             resolver: dto.resolver,
             libraries: dto.libraries,

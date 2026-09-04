@@ -70,6 +70,33 @@ impl RadixLaneMetadata {
         self.lanes.iter().map(|(&def_id, &lane)| (def_id, lane))
     }
 
+    /// Deterministic lane snapshot for analyzed-HIR artifacts. Backward rows
+    /// are joined here because a rehydrated AIR unit needs both the lane and
+    /// its companion identity before it can run the concrete AIR pipeline.
+    pub fn snapshot(&self) -> Vec<(DefId, RadixLane, Option<RadixBackward>)> {
+        let mut entries = self
+            .lanes
+            .iter()
+            .map(|(&def_id, &lane)| (def_id, lane, self.backward.get(&def_id).copied()))
+            .collect::<Vec<_>>();
+        entries.sort_by_key(|(def_id, _, _)| def_id.0);
+        entries
+    }
+
+    /// Rebuild lane metadata from the portable snapshot representation.
+    pub fn from_snapshot(
+        entries: impl IntoIterator<Item = (DefId, RadixLane, Option<RadixBackward>)>,
+    ) -> Self {
+        let mut metadata = Self::default();
+        for (def_id, lane, backward) in entries {
+            metadata.insert(def_id, lane);
+            if let Some(backward) = backward {
+                metadata.insert_backward(def_id, backward);
+            }
+        }
+        metadata
+    }
+
     /// Record a backward annotation for a function definition.
     pub fn insert_backward(&mut self, def_id: DefId, mut backward: RadixBackward) {
         // Allocate a fresh DefId for the companion if one hasn't been set.

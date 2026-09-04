@@ -131,6 +131,15 @@ impl MirError {
             definition_span: None,
         }
     }
+
+    fn missing_generic_air_template(span: Span, source: u32) -> Self {
+        Self {
+            message: format!("generic AIR definition #{source} has no analyzed template"),
+            issue: "generic_air_template_missing".to_owned(),
+            span,
+            definition_span: None,
+        }
+    }
 }
 
 fn mir_lower_issue(prefix: &str, detail: &str) -> String {

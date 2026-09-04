@@ -31,12 +31,12 @@ fn registry_rows_are_unique_per_receiver_name_generic_arity_and_value_arity() {
 }
 
 #[test]
-fn empty_generic_rows_reject_angle_brackets_and_formata_declares_typus() {
+fn empty_generic_rows_reject_angle_brackets_and_declared_rows_are_explicit() {
     let formata = lookup_method(IntrinsicReceiver::Tensor, "formata", 0).expect("formata");
     assert_eq!(formata.generic_arity(), 1);
     assert_eq!(formata.generic[0].sort, GenericParamSort::Typus);
     for entry in INTRINSICS {
-        if entry.faber_name == "formata" {
+        if matches!(entry.faber_name, "formata" | "rope_norm") {
             continue;
         }
         assert!(
@@ -89,6 +89,10 @@ fn lookup_generic_arity_distinguishes_empty_rows() {
         lookup_method_generic(IntrinsicReceiver::Lista, "longitudo", 1, 0).is_none(),
         "empty-generic rows do not match a nonempty generic arity"
     );
+    let rope = lookup_method_generic(IntrinsicReceiver::Tensor, "rope_norm", 1, 1)
+        .expect("generic rope_norm row");
+    assert_eq!(rope.generic[0].sort, GenericParamSort::Magnitudo);
+    assert!(lookup_method_generic(IntrinsicReceiver::Tensor, "rope_norm", 0, 2).is_none());
 }
 
 #[test]

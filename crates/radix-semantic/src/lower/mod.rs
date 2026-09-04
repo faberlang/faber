@@ -177,6 +177,12 @@ pub struct Lowerer<'a> {
     /// Current self type for lowering `ego` expressions inside methods.
     current_ego_struct: Option<radix_hir::DefId>,
 
+    /// Allow a bare generic nominal while lowering the target of a constructor
+    /// object. Type annotations still reject omitted required arguments, but
+    /// `C { ... }` needs to reach typecheck so its enclosing expected type can
+    /// supply the witnesses.
+    allow_bare_generic_construction: bool,
+
     /// Synthetic module import bindings created by `importa ex "faber:*"`.
     kernel_glob_imports: FxHashMap<(Symbol, Symbol), radix_hir::DefId>,
 
@@ -256,6 +262,7 @@ impl<'a> Lowerer<'a> {
             local_scopes: Vec::new(),
             type_param_scopes: Vec::new(),
             current_ego_struct: None,
+            allow_bare_generic_construction: false,
             kernel_glob_imports: FxHashMap::default(),
             kernel_glob_aliases: FxHashSet::default(),
             cli_program,
@@ -321,33 +328,6 @@ impl<'a> Lowerer<'a> {
             .iter()
             .rev()
             .find_map(|layer| layer.get(&name).copied())
-    }
-
-    /// Bind a body-visible `magnitudo` parameter named in value position.
-    ///
-    /// Reuses the parameter's own `HirTypeParam` def — already registered in
-    /// the emit def table — and installs the resolver symbol type
-    /// `Type::Param(name)`, the rigid symbolic-size marker generic bodies
-    /// already typecheck with. Typecheck admits the marker at intrinsic
-    /// `NumerusIndex` slots and rejects misplaced uses through ordinary unify
-    /// failure. The `IndexParam` declaration def from the resolve pass is
-    /// never referenced: its scope ended before lowering.
-    pub(super) fn define_body_size_param(&mut self, name: Symbol) -> Option<radix_hir::DefId> {
-        let (def_id, GenericParamKind::Magnitudo) = self.lexical_type_param(name)? else {
-            return None;
-        };
-        let ty = self.types.intern(Type::Param(name));
-        // Register so typechecker's `check_path` fallback can `get_symbol(def_id)`.
-        self.resolver.register_unbound_symbol(crate::Symbol {
-            def_id,
-            name,
-            kind: crate::SymbolKind::Param,
-            ty: Some(ty),
-            mutable: false,
-            span: self.current_span,
-        });
-        self.bind_local(name, def_id);
-        Some(def_id)
     }
 
     /// Lower a complete resolved syntax program into HIR.

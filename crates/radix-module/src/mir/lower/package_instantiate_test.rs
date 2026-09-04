@@ -1234,7 +1234,7 @@ fn two_shape_instances_keep_canonical_keys_and_do_not_merge() {
 
 /// sgr C2b: minting an instance from a generic template substitutes a
 /// body-visible `magnitudo` operand — the symbolic `ShapeSize { Param(d) }`
-/// C2a lowers for `rope_norm(0, d)` — to the concrete integer bound by the
+/// C2a lowers for `rope_norm<d>(0)` — to the concrete integer bound by the
 /// call site's size witness. The shared template keeps its symbolic operand
 /// (copy-not-move posture); only the minted instance concretizes.
 #[test]

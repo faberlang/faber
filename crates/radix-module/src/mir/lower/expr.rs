@@ -45,8 +45,8 @@ pub(super) trait HirExpressionLoweringVisitor {
                 self.visit_call_expr(callee, type_args, args, *conversion, expr)
             }
             HirExpressionKind::Transfer { sink, payloads } => self.visit_transfer_expr(sink, payloads, expr),
-            HirExpressionKind::MethodCall(receiver, method, _, args, conversion) => {
-                self.visit_method_call_expr(receiver, *method, args, *conversion, expr)
+            HirExpressionKind::MethodCall(receiver, method, generic_args, args, conversion) => {
+                self.visit_method_call_expr(receiver, *method, generic_args, args, *conversion, expr)
             }
             HirExpressionKind::Field(object, name) => self.visit_field_expr(object, *name, expr),
             HirExpressionKind::Index(object, index) => self.visit_index_expr(object, index, expr),
@@ -161,6 +161,7 @@ pub(super) trait HirExpressionLoweringVisitor {
         &mut self,
         receiver: &HirExpression,
         method: Symbol,
+        generic_args: &[TypeId],
         args: &[HirCallArg],
         conversion: Option<DefId>,
         expr: &HirExpression,
@@ -426,11 +427,12 @@ impl HirExpressionLoweringVisitor for FunctionBuilder<'_> {
         &mut self,
         receiver: &HirExpression,
         method: Symbol,
+        generic_args: &[TypeId],
         args: &[HirCallArg],
         conversion: Option<DefId>,
         expr: &HirExpression,
     ) -> Option<MirOperand> {
-        self.lower_method_call(receiver, method, args, conversion, expr)
+        self.lower_method_call(receiver, method, generic_args, args, conversion, expr)
     }
 
     fn visit_field_expr(&mut self, object: &HirExpression, name: Symbol, expr: &HirExpression) -> Option<MirOperand> {

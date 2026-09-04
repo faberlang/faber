@@ -999,7 +999,8 @@ impl TypeChecker<'_> {
             if let Some(sig) = self.functions.get(def_id).cloned() {
                 if let Some(name) = self.resolver.get_symbol(*def_id).map(|symbol| symbol.name) {
                     self.set_chorda_scalar_closure_context(name);
-                    let ret = self.check_instantiated_call(
+                    let ret = self.check_instantiated_call_for_callee(
+                        *def_id,
                         &sig,
                         explicit_type_args,
                         args,
@@ -1009,7 +1010,8 @@ impl TypeChecker<'_> {
                     self.validate_interval_bound_call_args(name, &sig, args);
                     return ret;
                 }
-                return self.check_instantiated_call(
+                return self.check_instantiated_call_for_callee(
+                    *def_id,
                     &sig,
                     explicit_type_args,
                     args,

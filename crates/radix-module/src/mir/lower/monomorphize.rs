@@ -275,10 +275,12 @@ impl<'lowerer, 'unit> MonomorphizationState<'lowerer, 'unit> {
         }
 
         let template = self.templates.get(source).cloned().or_else(|| {
-            self.lowerer.errors.push(MirError::validation(
-                span,
-                format!("generic definition #{} has no MIR template", source.0),
-            ));
+            let error = if self.lowerer.unit.radix_lanes.lane_for(*source) == Some(crate::semantic::RadixLane::Air) {
+                MirError::missing_generic_air_template(span, source.0)
+            } else {
+                MirError::validation(span, format!("generic definition #{} has no MIR template", source.0))
+            };
+            self.lowerer.errors.push(error);
             None
         })?;
 

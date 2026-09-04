@@ -4632,15 +4632,15 @@ functio describe(Resultatus<numerus> r) → textus {
     validate_program(&lowered.program, lowered.validated.validation()).expect("generic enum payload MIR validates");
 }
 
-/// sgr C2a: a body-visible `magnitudo` parameter at an intrinsic index slot
-/// lowers to the symbolic shape-size operand on the parameter's own node, so
-/// the generic template exists for instantiation to bind later (C2b). The
-/// path must never resolve to a runtime local.
+/// A generic `rope_norm<d>(pos)` template lowers its compile-time dimension to
+/// the existing symbolic shape-size MIR constant, so the non-AIR MIR
+/// monomorphizer can bind it later. The path must never resolve to a runtime
+/// local.
 #[test]
-fn body_size_param_path_carries_symbolic_shape_size_operand() {
+fn generic_rope_dim_lowers_to_symbolic_shape_size_operand() {
     let source = r#"
 functio rope_q<T, magnitudo D, magnitudo d, magnitudo P>(tensor<T, [D, d]> input, tensor<T, [P, d, 3]> rota, in tensor<T, [D, d]> output) → vacuum {
-    output ← input.rope_norm(0, d)
+    output ← input.rope_norm<d>(0)
 }
 "#;
     let mut unit = analyze(source);

@@ -44,6 +44,7 @@
 
 pub mod air_closure_lift;
 pub mod air_purity;
+pub mod air_specialize;
 pub mod air_tensor_intrinsics;
 pub mod air_unroll;
 pub mod borrow;

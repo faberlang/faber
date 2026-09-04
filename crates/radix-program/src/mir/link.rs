@@ -468,6 +468,7 @@ pub(super) fn local_namespace_call_targets(
 
     Ok(PackageMirLinks {
         calls: links.targets,
+        air_calls: HashMap::new(),
         data_member_targets: links.data_member_targets,
         data_members: links.data_members,
         namespaces: links.namespaces,

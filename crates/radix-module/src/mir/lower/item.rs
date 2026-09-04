@@ -53,6 +53,16 @@ impl HirVisitor for ItemLoweringPass<'_, '_, '_> {
     fn visit_item(&mut self, item: &HirItem) {
         match &item.kind {
             HirItemKind::Function(function) => {
+                // Generic AIR bodies are source templates. Their concrete
+                // clones are planned before this pass and are the only AIR
+                // functions eligible for MIR lowering; sending the symbolic
+                // template through the ordinary MIR route would either
+                // reject an AIR-only body or bypass the pre-AIR contract.
+                if !function.type_params.is_empty()
+                    && self.lowerer.unit.radix_lanes.lane_for(item.def_id) == Some(crate::semantic::RadixLane::Air)
+                {
+                    return;
+                }
                 self.lowerer.lower_function(item, function, self.body_ctx);
             }
             HirItemKind::Struct(strukt) => {

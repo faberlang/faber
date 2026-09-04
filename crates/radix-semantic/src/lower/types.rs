@@ -852,7 +852,7 @@ impl Lowerer<'_> {
                 .resolver
                 .generic_param_kinds(def_id)
                 .is_some_and(|kinds| !kinds.is_empty());
-        if params.is_empty() && !has_declared_params {
+        if params.is_empty() && (!has_declared_params || self.allow_bare_generic_construction) {
             return base;
         }
 

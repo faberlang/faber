@@ -29,6 +29,7 @@ mod air_backward;
 #[cfg(not(feature = "device"))]
 #[path = "air_backward_stub.rs"]
 mod air_backward;
+mod air_specialize;
 mod cli_bind;
 pub(crate) mod cli_plan;
 pub(crate) mod cli_values;
@@ -398,6 +399,11 @@ struct PlannedCliOperand<'a> {
 
 struct PackageMirLinks {
     calls: NamespaceCallTargets,
+    /// Call-site-specific targets for concrete AIR instances. Namespace calls
+    /// share one import/member target until package planning resolves their
+    /// concrete generic key; this map then gives each call its instance
+    /// synthetic source identity.
+    air_calls: HashMap<(PathBuf, u32, u32, DefId), DefId>,
     namespaces: NamespaceExports,
     sources: SourceRewrites,
     /// Next free synthetic def id; the library-lowering pass continues from

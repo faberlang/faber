@@ -43,6 +43,29 @@ pub enum NominalKind {
     Interface,
 }
 
+/// Portable compiler-lane kind. Kept in the FHIR crate so artifact loading
+/// does not depend on the semantic implementation crate.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum RadixLaneWire {
+    Air,
+    Mir,
+    HirDirect,
+}
+
+/// Portable lane entry, including the optional reverse-AD companion identity.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct RadixLaneEntryWire {
+    pub def_id: DefId,
+    pub lane: RadixLaneWire,
+    pub backward: Option<RadixBackwardWire>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct RadixBackwardWire {
+    pub companion_name: Symbol,
+    pub companion_def_id: DefId,
+}
+
 // ---------------------------------------------------------------------------
 // File interface snapshot types
 // ---------------------------------------------------------------------------
@@ -467,8 +490,10 @@ pub struct FunctionProvenanceTableWire {
 /// compatibility decoder for schema-v8 artifacts. Version 10 carries the
 /// resolved generic binding vectors (`TypeTable.resolved_generic_calls`) so
 /// decoded modules keep the binder's explicit/inferred/defaulted call facts
-/// instead of only the declaration descriptors.
-pub const SCHEMA_VERSION: u32 = 10;
+/// instead of only the declaration descriptors. Version 11 carries compiler
+/// lane and backward-companion metadata so rehydrated AIR templates cannot be
+/// mistaken for ordinary HIR-only functions or silently bypass AIR admission.
+pub const SCHEMA_VERSION: u32 = 11;
 
 /// Serializable snapshot of one analyzed compilation unit (F1, F2, F4).
 ///
@@ -483,7 +508,8 @@ pub const SCHEMA_VERSION: u32 = 10;
 /// - **F2**: `HirArtifact` struct lives in `radix-hir` foundation crate.
 /// - **F3**: schema version starts at 1.
 /// - **F13**: `gpu_builtins` included via wire DTO.
-/// - **F14**: `radix_lanes`, `graphics_source` excluded.
+/// - **F14**: `graphics_source` excluded; compiler lanes are preserved because
+///   AIR specialization depends on them.
 /// - **F17**: `cli_program` via `CliProgramWire` (`F18`).
 /// - **F18**: `CliProgramWire` DTO owned by `radix-hir`.
 /// - **F19**: `ResolverSnapshot` foundation-owned in `radix-hir`.
@@ -518,6 +544,10 @@ pub struct HirArtifact {
     /// binder's explicit/inferred/defaulted facts without re-running
     /// inference.
     pub resolved_generic_calls: Vec<ResolvedGenericCall>,
+
+    /// Compiler lane metadata required to rehydrate and specialize AIR
+    /// templates (schema v11).
+    pub radix_lanes: Vec<RadixLaneEntryWire>,
 
     /// Ordered string interner table (not the Interner struct directly).
     pub interner: Vec<String>,

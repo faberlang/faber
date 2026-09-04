@@ -29,7 +29,7 @@ use crate::driver::{AnalyzeRequest, Config, Session, analyze_source};
 use crate::intrinsics::{
     INTRINSICS, IntrinsicParamKind, IntrinsicReceiver, IntrinsicReturnKind, lookup_method, mir_collection_op,
 };
-use radix_types::MirCollectionOp;
+use radix_types::{GenericParamSort, MirCollectionOp};
 use std::collections::BTreeSet;
 use std::fmt::Write as _;
 
@@ -282,7 +282,7 @@ fn row_override(key: &str, dtype: &Dtype) -> Option<(Option<String>, Vec<String>
         "Tensor.gather/1" => (Some(format!("{sugar}[4, 3] r")), vec!["ids".into()]),
         "Tensor.matmul/1" => (Some(format!("{sugar}[2, 3] r, {sugar}[3, 2] p")), vec!["p".into()]),
         "Tensor.rms_norm/3" => (None, vec!["0".into(), el.clone(), "r".into()]),
-        "Tensor.rope_norm/2" => (None, vec!["0".into(), "0".into()]),
+        "Tensor.rope_norm/1" => (None, vec!["0".into()]),
         "Tensor.laminatio/2" => (None, vec!["0".into(), el.clone()]),
         "Tensor.laminatio/3" => (None, vec!["0".into(), el.clone(), "r".into()]),
         "Tensor.laminatio/4" => (None, vec!["0".into(), el.clone(), "r".into(), "r".into()]),
@@ -357,7 +357,22 @@ fn probe_source(row: &crate::intrinsics::MethodIntrinsic, dtype: &Dtype, mutable
     } else {
         override_args
     };
-    let call = format!("r.{}({})", row.faber_name, args.join(", "));
+    let generic_args = row
+        .generic
+        .iter()
+        .map(|generic| match generic.sort {
+            GenericParamSort::Typus => dtype.param.to_owned(),
+            // The tensor probe has width three, so two is an admitted even
+            // dimension for the generic RoPE row.
+            GenericParamSort::Magnitudo => "2".to_owned(),
+        })
+        .collect::<Vec<_>>();
+    let generic_suffix = if generic_args.is_empty() {
+        String::new()
+    } else {
+        format!("<{}>", generic_args.join(", "))
+    };
+    let call = format!("r.{}{}({})", row.faber_name, generic_suffix, args.join(", "));
     let body = if row.return_kind == IntrinsicReturnKind::Vacuum {
         format!("    {call}")
     } else if key == "Tensor.gather/1" {
@@ -462,7 +477,11 @@ fn probe(source: &str, session: &Session) -> ProbeOutcome {
 /// surface, not worklist entries). MC3 emptied the ratchet; S0-G9
 /// (a7d731ec0) re-grew it by one with a semantic-only Matrix `transpone`
 /// admission; SCR-04's `lower_matrix_transpone` unit emptied it again.
-const RATCHET: &[(&str, &str)] = &[];
+const RATCHET: &[(&str, &str)] = &[
+    // `formata` is a source/codegen-only tensor view; IGP-2 moved its
+    // generic admission into the catalog without inventing a MIR owner.
+    ("Tensor.formata/0", "IGP-2 catalog generic migration"),
+];
 
 /// Permanent AIR-lane class list (goal mir-completeness §1 direction 3) — the
 /// 11 DOCUMENT-AS-DESIGNED rows moved off the ratchet by MC4. A design fact,

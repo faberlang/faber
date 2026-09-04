@@ -96,6 +96,7 @@ pub fn with_linked_test_package_mir<R>(
         &mut library_cache,
         None,
     )?;
+    air_specialize::plan_package_instances(&mut package, &mut links)?;
     reserve_test_scope_sources(&package, &anchor_path, &mut links);
     for unit in package.nodes.values_mut() {
         rewrite_unit_namespace_calls(
@@ -106,6 +107,7 @@ pub fn with_linked_test_package_mir<R>(
             &links.method_targets,
         )?;
     }
+    air_specialize::rewrite_package_instance_calls(&mut package, &links.air_calls);
 
     let cli_plan = CliPackagePlan::default();
     let mut lowered = lower_package_units(
@@ -240,13 +242,14 @@ fn prepare_package_mir<R>(
     let cli_plan = plan_cli_package(&mut package, argumenta, cli_mode)?;
     let library_resolver = package.library_resolver.clone();
     let mut library_cache = (seams.library_cache_for_config)(config);
-    let links = local_namespace_call_targets(
+    let mut links = local_namespace_call_targets(
         &package,
         consumer,
         &library_resolver,
         &mut library_cache,
         loaded_links,
     )?;
+    air_specialize::plan_package_instances(&mut package, &mut links)?;
     let entry_id = select_entry_node(&package)?;
     let entry_path = package
         .nodes
@@ -267,6 +270,7 @@ fn prepare_package_mir<R>(
             &links.method_targets,
         )?;
     }
+    air_specialize::rewrite_package_instance_calls(&mut package, &links.air_calls);
 
     let mut lowered = lower_package_units(
         &mut package,

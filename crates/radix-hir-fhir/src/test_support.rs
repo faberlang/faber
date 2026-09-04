@@ -77,6 +77,7 @@ pub(crate) fn stub_artifact() -> HirArtifact {
         cli_program: None,
         types: types.snapshot(),
         resolved_generic_calls: Vec::new(),
+        radix_lanes: Vec::new(),
         interner: vec!["main".to_string(), "test".to_string()],
         resolver: ResolverSnapshot {
             namespace_exports: Vec::new(),

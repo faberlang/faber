@@ -9,8 +9,9 @@ use radix_hir::visit::{HirVisitor, walk_expr, walk_item, walk_method, walk_patte
 use radix_hir_fhir::{
     CaptureFactWire, CaptureModeWire, CliCommandWire, CliDefaultWire, CliExitWire, CliModeWire, CliOperandWire,
     CliOptionWire, CliProgramWire, CliTypeWire, FunctionFactTableWire, FunctionFactWire, FunctionProvenanceTableWire,
-    FunctionProvenanceWire, GpuBuiltinWire, HirArtifact, LastUseWire, RegionRelationshipWire, ResolvedUseKeyWire,
-    ResolvedUseKindWire, ResolvedUseWire, ReturnedBorrowWire, SCHEMA_VERSION, SourceIdentity,
+    FunctionProvenanceWire, GpuBuiltinWire, HirArtifact, LastUseWire, RadixBackwardWire, RadixLaneEntryWire,
+    RadixLaneWire, RegionRelationshipWire, ResolvedUseKeyWire, ResolvedUseKindWire, ResolvedUseWire,
+    ReturnedBorrowWire, SCHEMA_VERSION, SourceIdentity,
 };
 use radix_types::{AppliedArg, Type, TypeId, TypeTable};
 use rustc_hash::FxHashMap;
@@ -44,6 +45,23 @@ pub fn from_analyzed(unit: &AnalyzedModule, content_hash: &str, relative_path: &
         cli_program: unit.cli_program.as_ref().map(cli_program_wire),
         types: unit.types.snapshot(),
         resolved_generic_calls: unit.types.resolved_generic_calls.clone(),
+        radix_lanes: unit
+            .radix_lanes
+            .snapshot()
+            .into_iter()
+            .map(|(def_id, lane, backward)| RadixLaneEntryWire {
+                def_id,
+                lane: match lane {
+                    crate::semantic::RadixLane::Air => RadixLaneWire::Air,
+                    crate::semantic::RadixLane::Mir => RadixLaneWire::Mir,
+                    crate::semantic::RadixLane::HirDirect => RadixLaneWire::HirDirect,
+                },
+                backward: backward.map(|backward| RadixBackwardWire {
+                    companion_name: backward.companion_name,
+                    companion_def_id: backward.companion_def_id,
+                }),
+            })
+            .collect(),
         interner: unit.interner.to_string_table(),
         resolver: unit.resolver.to_snapshot(),
         libraries: unit.libraries.clone(),

@@ -283,14 +283,6 @@ impl Lowerer<'_> {
         if let Some(def_id) = self.lookup_name(ident.name) {
             return HirExpressionKind::Path(def_id);
         }
-        // A lexical `magnitudo` parameter may name its compile-time size in
-        // value position (the intrinsic `NumerusIndex` slots admitted by
-        // resolve). Mint the body-visible parameter binding typed as the
-        // symbolic-size marker — never a `Path` to the `IndexParam`
-        // declaration def, whose scope ended with the resolve pass.
-        if let Some(def_id) = self.define_body_size_param(ident.name) {
-            return HirExpressionKind::Path(def_id);
-        }
         match self.resolver.lookup_variant_bare(ident.name) {
             crate::BareVariantLookup::Single(def_id) => HirExpressionKind::Path(def_id),
             crate::BareVariantLookup::Ambiguous { .. } => {
@@ -931,6 +923,11 @@ impl Lowerer<'_> {
     /// retain named fields without requiring a dedicated object-expression HIR
     /// shape.
     fn lower_verte(&mut self, verte: &radix_syntax::VerteExpr, owner: HirId) -> HirExpressionKind {
+        let previous_bare_generic_construction = self.allow_bare_generic_construction;
+        self.allow_bare_generic_construction = matches!(
+            &verte.expr.kind,
+            radix_syntax::ExprKind::Object(_) | radix_syntax::ExprKind::Finge(_)
+        );
         let target = self.lower_authored_type(
             radix_hir::HirTypeSite {
                 owner: radix_hir::HirOwnerRef::Hir(owner),
@@ -940,6 +937,7 @@ impl Lowerer<'_> {
             false,
             false,
         );
+        self.allow_bare_generic_construction = previous_bare_generic_construction;
         if let radix_syntax::ExprKind::Object(object) = &verte.expr.kind {
             let mut entries = Vec::new();
             for field in &object.fields {
@@ -1172,6 +1170,8 @@ impl Lowerer<'_> {
             // type path so a qualified name (`∷ pkg.Exitus`) resolves the
             // imported union identity. Diagnostics for a non-type or unknown
             // cast surface as the standard type-lowering errors.
+            let previous_bare_generic_construction = self.allow_bare_generic_construction;
+            self.allow_bare_generic_construction = true;
             let cast_ty = self.lower_authored_type(
                 radix_hir::HirTypeSite {
                     owner: radix_hir::HirOwnerRef::Hir(owner),
@@ -1181,6 +1181,7 @@ impl Lowerer<'_> {
                 false,
                 false,
             );
+            self.allow_bare_generic_construction = previous_bare_generic_construction;
             if cast_ty == self.types.intern(crate::Type::Error) {
                 return HirExpressionKind::Error;
             }

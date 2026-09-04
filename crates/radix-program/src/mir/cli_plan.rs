@@ -919,7 +919,7 @@ pub(super) fn push_type_rewrite(
     rewrites.push((source, target));
 }
 
-pub(super) fn import_semantic_type(
+pub(crate) fn import_semantic_type(
     source: &TypeTable,
     target: &mut TypeTable,
     ty: TypeId,
@@ -1513,7 +1513,7 @@ fn import_nominal_by_canonical_key(
     ctx.shared_nominals.get(&(*kind, name.clone())).copied()
 }
 
-pub(super) fn import_index_expr(
+pub(crate) fn import_index_expr(
     source: &TypeTable,
     target: &mut TypeTable,
     index: radix_module::semantic::IndexId,

@@ -1337,6 +1337,13 @@ pub fn prepare_air_backward_bundle(
     }
 
     let (air_program, air_mir) = air_mir_from_analysis(analysis)?;
+    if air_program.functions.is_empty() {
+        // Generic AIR declarations are source/FHIR templates.  The semantic
+        // specialization pass only admits concrete, reachable instances, so
+        // an annotated template with no concrete call site has no executable
+        // backward bundle to prepare.
+        return Ok(None);
+    }
 
     // Pre-intern gradient-tuple types for every AIR function so that
     // `transform_reverse_ad` can find them via `find_tuple` when it runs

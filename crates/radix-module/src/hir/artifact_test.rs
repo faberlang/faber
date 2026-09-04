@@ -109,6 +109,7 @@ fn minimal_test_artifact() -> HirArtifact {
         cli_program: None,
         types: types.snapshot(),
         resolved_generic_calls: Vec::new(),
+        radix_lanes: Vec::new(),
         interner: vec!["main".to_string(), "test".to_string()],
         resolver: ResolverSnapshot {
             namespace_exports: Vec::new(),
@@ -1101,6 +1102,23 @@ fn build_artifact_from_unit(unit: &AnalyzedModule) -> HirArtifact {
         cli_program: None,
         types: unit.types.snapshot(),
         resolved_generic_calls: unit.types.resolved_generic_calls.clone(),
+        radix_lanes: unit
+            .radix_lanes
+            .snapshot()
+            .into_iter()
+            .map(|(def_id, lane, backward)| radix_hir_fhir::RadixLaneEntryWire {
+                def_id,
+                lane: match lane {
+                    crate::semantic::RadixLane::Air => radix_hir_fhir::RadixLaneWire::Air,
+                    crate::semantic::RadixLane::Mir => radix_hir_fhir::RadixLaneWire::Mir,
+                    crate::semantic::RadixLane::HirDirect => radix_hir_fhir::RadixLaneWire::HirDirect,
+                },
+                backward: backward.map(|backward| radix_hir_fhir::RadixBackwardWire {
+                    companion_name: backward.companion_name,
+                    companion_def_id: backward.companion_def_id,
+                }),
+            })
+            .collect(),
         interner: unit.interner.to_string_table(),
         resolver: unit.resolver.to_snapshot(),
         libraries: unit.libraries.clone(),
@@ -1403,4 +1421,30 @@ incipit {
         "decoded rows keep the call-span key"
     );
     let _ = fallback_name;
+}
+
+#[test]
+fn air_lane_metadata_survives_fhir_round_trip() {
+    let source = r#"@ radix lane "air"
+functio lane_probe() → numerus {
+    redde 1
+}
+
+incipit {
+    nota lane_probe()
+}
+"#;
+    let session =
+        crate::driver::Session::new(crate::driver::Config::default().with_target(crate::codegen::Target::MirWasm));
+    let unit = crate::driver::analyze_source(&session, "lane.fab", source, AnalyzeRequest::default())
+        .expect("analyze lane source");
+    let lane_def = unit
+        .radix_lanes
+        .iter()
+        .find_map(|(def_id, lane)| (lane == crate::semantic::RadixLane::Air).then_some(def_id))
+        .expect("AIR lane metadata");
+
+    let artifact = crate::hir::serialize::from_analyzed(&unit, "deadbeef", "lane.fab");
+    let loaded = load_fhir(&serialize_artifact(&artifact)).expect("load lane artifact");
+    assert_eq!(loaded.radix_lanes.lane_for(lane_def), Some(crate::semantic::RadixLane::Air));
 }

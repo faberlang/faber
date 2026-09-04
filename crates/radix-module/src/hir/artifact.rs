@@ -11,12 +11,11 @@ use crate::driver::AnalyzedModule;
 use crate::driver::GraphicsSourceFacts;
 use crate::semantic::{
     AnnotationContractMetadata, CaptureFact, CaptureMode, FunctionFact, FunctionFactTable, FunctionProvenanceTable,
-    QualifiedIdentityTable, RadixLaneMetadata, ResolvedUse, ResolvedUseIndex, ResolvedUseKey, ResolvedUseKind,
-    Resolver,
+    QualifiedIdentityTable, ResolvedUse, ResolvedUseIndex, ResolvedUseKey, ResolvedUseKind, Resolver,
 };
 use radix_hir_fhir::{
     CaptureFactWire, CaptureModeWire, CliProgramWire, FunctionFactTableWire, FunctionFactWire, GpuBuiltinWire,
-    HirArtifactError, ResolvedUseKeyWire, ResolvedUseKindWire, ResolvedUseWire,
+    HirArtifactError, RadixLaneWire, ResolvedUseKeyWire, ResolvedUseKindWire, ResolvedUseWire,
 };
 use radix_lexer::Interner;
 use radix_types::TypeTable;
@@ -342,6 +341,22 @@ pub(crate) fn reconstruct_unit(artifact: radix_hir_fhir::HirArtifact) -> Result<
 
     let analysis_stamp = crate::semantic::AnalysisStamp::from_persisted(artifact.analysis_stamp);
 
+    let radix_lanes =
+        crate::semantic::RadixLaneMetadata::from_snapshot(artifact.radix_lanes.into_iter().map(|entry| {
+            let lane = match entry.lane {
+                RadixLaneWire::Air => crate::semantic::RadixLane::Air,
+                RadixLaneWire::Mir => crate::semantic::RadixLane::Mir,
+                RadixLaneWire::HirDirect => crate::semantic::RadixLane::HirDirect,
+            };
+            let backward = entry
+                .backward
+                .map(|backward| crate::semantic::RadixBackward {
+                    companion_name: backward.companion_name,
+                    companion_def_id: backward.companion_def_id,
+                });
+            (entry.def_id, lane, backward)
+        }));
+
     Ok(AnalyzedModule::from_loaded_with_presentation(
         analysis_stamp,
         interner,
@@ -356,7 +371,7 @@ pub(crate) fn reconstruct_unit(artifact: radix_hir_fhir::HirArtifact) -> Result<
         resolved_uses,
         QualifiedIdentityTable::default(),
         provenance,
-        RadixLaneMetadata::default(),
+        radix_lanes,
         gpu_builtins,
         GraphicsSourceFacts::default(),
         Vec::new(), // diagnostics

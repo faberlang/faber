@@ -2282,6 +2282,11 @@ pub struct ResolvedGenericBinding {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ResolvedGenericCall {
     pub call_span: radix_lexer::Span,
+    /// Resolved declaration identity when the call was a direct named call.
+    /// Older artifact readers may omit this field; the span remains useful for
+    /// diagnostics and for callers that do not need instance planning.
+    #[serde(default)]
+    pub callee: Option<DefId>,
     pub bindings: Vec<ResolvedGenericBinding>,
 }
 

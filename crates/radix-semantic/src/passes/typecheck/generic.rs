@@ -42,7 +42,30 @@ impl TypeChecker<'_> {
         span: radix_lexer::Span,
         expected: Option<TypeId>,
     ) -> TypeId {
-        self.check_instantiated_call_impl(sig, explicit_type_args, args, span, expected, true)
+        self.check_instantiated_call_impl(sig, explicit_type_args, args, span, expected, true, None)
+    }
+
+    /// Typecheck a direct call while retaining its declaration identity for
+    /// later concrete-instance planning. The ordinary wrapper remains useful
+    /// for synthesized signatures and method paths without a stable id here.
+    pub fn check_instantiated_call_for_callee(
+        &mut self,
+        callee: radix_hir::DefId,
+        sig: &FuncSig,
+        explicit_type_args: &[TypeId],
+        args: &mut [HirCallArg],
+        span: radix_lexer::Span,
+        expected: Option<TypeId>,
+    ) -> TypeId {
+        self.check_instantiated_call_impl(
+            sig,
+            explicit_type_args,
+            args,
+            span,
+            expected,
+            true,
+            Some(callee),
+        )
     }
 
     /// Intrinsic-method argument checking with rigid shape terms.
@@ -59,7 +82,7 @@ impl TypeChecker<'_> {
         args: &mut [HirCallArg],
         span: radix_lexer::Span,
     ) -> TypeId {
-        self.check_instantiated_call_impl(sig, &[], args, span, None, false)
+        self.check_instantiated_call_impl(sig, &[], args, span, None, false, None)
     }
 
     fn check_instantiated_call_impl(
@@ -70,6 +93,7 @@ impl TypeChecker<'_> {
         span: radix_lexer::Span,
         expected: Option<TypeId>,
         solve_shape_params: bool,
+        callee: Option<radix_hir::DefId>,
     ) -> TypeId {
         // Magnitudo shape params are carried by the signature's generic
         // descriptors: the declared sort is authoritative, so a size param
@@ -184,6 +208,7 @@ impl TypeChecker<'_> {
                 ) {
                     self.types.resolved_generic_calls.push(ResolvedGenericCall {
                         call_span: span,
+                        callee,
                         bindings,
                     });
                 }
