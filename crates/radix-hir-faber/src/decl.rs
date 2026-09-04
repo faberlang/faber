@@ -27,7 +27,7 @@ use radix_hir::{
 };
 use radix_lexer::{Interner, Symbol, TokenKind};
 use radix_syntax::{CallablePosture, GenericParamKind};
-use radix_types::{TypeId, TypeTable};
+use radix_types::{SemanticGenericParamDefault, TypeId, TypeTable};
 use rustc_hash::FxHashMap;
 
 impl super::FaberCodegen {
@@ -65,7 +65,7 @@ impl super::FaberCodegen {
                 writer.write(surface.contextual_keyword("typus"));
                 writer.write(" ");
                 writer.write(&self.symbol_to_string(a.name, interner));
-                self.write_generic_params(&a.type_params, interner, surface, writer);
+                self.write_generic_params(&a.type_params, types, names, interner, surface, writer);
                 writer.write(" = ");
                 let site = HirTypeSite {
                     owner: HirOwnerRef::Def(item.def_id),
@@ -233,7 +233,7 @@ impl super::FaberCodegen {
         writer.write(surface.contextual_keyword("functio"));
         writer.write(" ");
         writer.write(&self.symbol_to_string(func.name, interner));
-        self.write_generic_params(&func.type_params, interner, surface, writer);
+        self.write_generic_params(&func.type_params, types, names, interner, surface, writer);
         writer.write("(");
         self.write_param_list(&func.params, types, names, interner, surface, writer);
         writer.write(")");
@@ -337,7 +337,7 @@ impl super::FaberCodegen {
         writer.write(" ");
         writer.write(&self.symbol_to_string(s.name, interner));
 
-        self.write_generic_params(&s.type_params, interner, surface, writer);
+        self.write_generic_params(&s.type_params, types, names, interner, surface, writer);
 
         if let Some(parent) = s.extends {
             writer.write(" ");
@@ -492,7 +492,7 @@ impl super::FaberCodegen {
         writer.write(" ");
         writer.write(&self.symbol_to_string(e.name, interner));
 
-        self.write_generic_params(&e.type_params, interner, surface, writer);
+        self.write_generic_params(&e.type_params, types, names, interner, surface, writer);
 
         writer.writeln(" {");
         writer.indented(|writer| {
@@ -567,7 +567,7 @@ impl super::FaberCodegen {
         writer.write(" ");
         writer.write(&self.symbol_to_string(i.name, interner));
 
-        self.write_generic_params(&i.type_params, interner, surface, writer);
+        self.write_generic_params(&i.type_params, types, names, interner, surface, writer);
 
         writer.writeln(" {");
         writer.indented(|writer| {
@@ -807,6 +807,8 @@ impl super::FaberCodegen {
     fn write_generic_params(
         &self,
         params: &[HirTypeParam],
+        types: &TypeTable,
+        names: &FxHashMap<DefId, Symbol>,
         interner: &Interner,
         surface: &impl KeywordSurface,
         writer: &mut CodeWriter,
@@ -827,6 +829,17 @@ impl super::FaberCodegen {
                     writer.write(surface.keyword(TokenKind::Magnitudo));
                     writer.write(" ");
                     writer.write(&self.symbol_to_string(param.name, interner));
+                }
+            }
+            if let Some(default) = &param.default {
+                writer.write(" = ");
+                match default {
+                    SemanticGenericParamDefault::Typus(ty) => {
+                        writer.write(&self.type_to_faber(*ty, types, names, interner, surface));
+                    }
+                    SemanticGenericParamDefault::Magnitudo(value) => {
+                        writer.write(&value.to_string());
+                    }
                 }
             }
         }

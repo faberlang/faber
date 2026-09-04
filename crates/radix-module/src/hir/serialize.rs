@@ -43,6 +43,7 @@ pub fn from_analyzed(unit: &AnalyzedModule, content_hash: &str, relative_path: &
         presentation,
         cli_program: unit.cli_program.as_ref().map(cli_program_wire),
         types: unit.types.snapshot(),
+        resolved_generic_calls: unit.types.resolved_generic_calls.clone(),
         interner: unit.interner.to_string_table(),
         resolver: unit.resolver.to_snapshot(),
         libraries: unit.libraries.clone(),

@@ -53,7 +53,7 @@ use crate::package::{
 };
 use crate::validate::validate_referential_integrity;
 use radix_hir::{HirModule, HirPresentation, LibraryRegistry};
-use radix_types::{DefId, TypeTableSnapshot};
+use radix_types::{DefId, ResolvedGenericCall, TypeTableSnapshot};
 
 /// Maximum nesting depth accepted when parsing a `MessagePack` document.
 ///
@@ -1234,6 +1234,7 @@ struct HirArtifactDto {
     presentation: HirPresentation,
     cli_program: Option<CliProgramWire>,
     types: TypeTableSnapshot,
+    resolved_generic_calls: Vec<ResolvedGenericCall>,
     interner: Vec<String>,
     resolver: ResolverSnapshot,
     libraries: LibraryRegistry,
@@ -1253,6 +1254,7 @@ impl From<&HirArtifact> for HirArtifactDto {
             presentation: artifact.presentation.clone(),
             cli_program: artifact.cli_program.clone(),
             types: artifact.types.clone(),
+            resolved_generic_calls: artifact.resolved_generic_calls.clone(),
             interner: artifact.interner.clone(),
             resolver: artifact.resolver.clone(),
             libraries: artifact.libraries.clone(),
@@ -1292,6 +1294,7 @@ impl From<HirArtifactDto> for HirArtifact {
             presentation: dto.presentation,
             cli_program: dto.cli_program,
             types: dto.types,
+            resolved_generic_calls: dto.resolved_generic_calls,
             interner: dto.interner,
             resolver: dto.resolver,
             libraries: dto.libraries,

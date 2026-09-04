@@ -302,9 +302,13 @@ pub fn load_fhir(bytes: &[u8]) -> Result<AnalyzedModule, HirArtifactError> {
 /// (`crate::hir::package`), which reconstructs every embedded unit through
 /// this same path so package units and standalone units rebuild identically.
 pub(crate) fn reconstruct_unit(artifact: radix_hir_fhir::HirArtifact) -> Result<AnalyzedModule, HirArtifactError> {
-    // TypeTable: rebuild from snapshot (CTM E.2).
-    let types = TypeTable::from_snapshot(artifact.types)
+    // TypeTable: rebuild from snapshot (CTM E.2), then restore the typecheck
+    // binder's resolved generic call vectors (schema v10) so specialization
+    // reads the original explicit/inferred/defaulted facts instead of
+    // re-running inference.
+    let mut types = TypeTable::from_snapshot(artifact.types)
         .map_err(|msg| HirArtifactError::MalformedSnapshot { kind: "types", detail: msg })?;
+    types.resolved_generic_calls = artifact.resolved_generic_calls;
 
     // Interner: rebuild from ordered string table.
     let interner = Interner::from_string_table(artifact.interner);
