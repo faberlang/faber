@@ -2020,6 +2020,18 @@ pub(crate) fn validate_referential_integrity(
 
     use radix_hir::{HirExpressionKind, HirItemKind, HirStatementKind};
 
+    // A `Typus` default names a concrete type arena slot; `Magnitudo` defaults
+    // are literals and carry no reference.
+    fn validate_type_param_default(
+        default: &Option<radix_types::SemanticGenericParamDefault>,
+        check_type: &dyn Fn(radix_types::TypeId) -> Result<(), HirArtifactError>,
+    ) -> Result<(), HirArtifactError> {
+        if let Some(radix_types::SemanticGenericParamDefault::Typus(ty)) = default {
+            check_type(*ty)?;
+        }
+        Ok(())
+    }
+
     // Recursive walkers for the HIR tree.
     fn validate_items(
         items: &[radix_hir::HirItem],
@@ -2052,6 +2064,7 @@ pub(crate) fn validate_referential_integrity(
                     check_type(*ty)?;
                 }
             }
+            validate_type_param_default(&tp.default, check_type)?;
         }
         for param in &func.params {
             check_def(param.def_id)?;
@@ -2117,6 +2130,7 @@ pub(crate) fn validate_referential_integrity(
                             check_type(*ty)?;
                         }
                     }
+                    validate_type_param_default(&tp.default, check_type)?;
                 }
                 for ann in &s.annotations {
                     validate_annotation(ann, check_symbol, check_def, check_hir, check_type)?;
@@ -2159,6 +2173,7 @@ pub(crate) fn validate_referential_integrity(
                             check_type(*ty)?;
                         }
                     }
+                    validate_type_param_default(&tp.default, check_type)?;
                 }
                 for field in &e.commune_fields {
                     check_symbol(field.name)?;
@@ -2183,6 +2198,7 @@ pub(crate) fn validate_referential_integrity(
                             check_type(*ty)?;
                         }
                     }
+                    validate_type_param_default(&tp.default, check_type)?;
                 }
                 for method in &iface.methods {
                     for a in &method.availability {
@@ -2221,6 +2237,7 @@ pub(crate) fn validate_referential_integrity(
                             check_type(*ty)?;
                         }
                     }
+                    validate_type_param_default(&tp.default, check_type)?;
                 }
                 check_type(a.ty)?;
             }
@@ -3313,6 +3330,18 @@ pub(crate) fn validate_referential_integrity(
         for last_use in &row.last_uses {
             check_def(last_use.borrower)?;
             check_hir(last_use.site)?;
+        }
+    }
+
+    // 11. Resolved generic bindings (schema v10): each binding name and
+    //     kind-tagged witness must resolve against the interner and arenas.
+    for row in &artifact.resolved_generic_calls {
+        for binding in &row.bindings {
+            check_symbol(binding.name)?;
+            match binding.witness {
+                radix_types::GenericWitness::Typus(ty) => check_type(ty)?,
+                radix_types::GenericWitness::Magnitudo(xi) => check_index(xi)?,
+            }
         }
     }
 

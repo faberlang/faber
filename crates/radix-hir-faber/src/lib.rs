@@ -24,6 +24,9 @@ pub mod types;
 mod comma_law_test;
 
 #[cfg(test)]
+mod generic_default_emit_test;
+
+#[cfg(test)]
 mod commune_emit_test;
 
 // Mirrors the lint-fix-1 cfg-gate landing on main: ungated test modules fail

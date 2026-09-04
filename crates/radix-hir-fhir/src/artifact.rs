@@ -22,7 +22,9 @@
 //!   snapshot so prebuilt artifacts retain typed error-conversion lookup.
 
 use radix_lexer::{Span, Symbol};
-use radix_types::{DefId, FuncSig, SemanticParamMode, TypeId, TypeTableSnapshot};
+use radix_types::{
+    DefId, FuncSig, ResolvedGenericCall, SemanticParamMode, TypeId, TypeTableSnapshot,
+};
 use serde::{Deserialize, Serialize};
 
 // ---------------------------------------------------------------------------
@@ -462,8 +464,11 @@ pub struct FunctionProvenanceTableWire {
 /// (`FunctionProvenanceTableWire`); older artifacts fail closed at the
 /// schema gate as usual. Version 9 adds `HirPresentation::authored_types`;
 /// this serialized HIR presentation change is a wire break, so there is no
-/// compatibility decoder for schema-v8 artifacts.
-pub const SCHEMA_VERSION: u32 = 9;
+/// compatibility decoder for schema-v8 artifacts. Version 10 carries the
+/// resolved generic binding vectors (`TypeTable.resolved_generic_calls`) so
+/// decoded modules keep the binder's explicit/inferred/defaulted call facts
+/// instead of only the declaration descriptors.
+pub const SCHEMA_VERSION: u32 = 10;
 
 /// Serializable snapshot of one analyzed compilation unit (F1, F2, F4).
 ///
@@ -506,6 +511,13 @@ pub struct HirArtifact {
 
     /// Type table snapshot (direct serde).
     pub types: TypeTableSnapshot,
+
+    /// Complete resolved generic vectors for the unit's checked generic
+    /// calls, in call checking order (schema v10). Restored onto the
+    /// reconstructed [`radix_types::TypeTable`] so specialization reads the
+    /// binder's explicit/inferred/defaulted facts without re-running
+    /// inference.
+    pub resolved_generic_calls: Vec<ResolvedGenericCall>,
 
     /// Ordered string interner table (not the Interner struct directly).
     pub interner: Vec<String>,

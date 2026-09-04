@@ -108,6 +108,7 @@ fn minimal_test_artifact() -> HirArtifact {
         presentation: empty_presentation(),
         cli_program: None,
         types: types.snapshot(),
+        resolved_generic_calls: Vec::new(),
         interner: vec!["main".to_string(), "test".to_string()],
         resolver: ResolverSnapshot {
             namespace_exports: Vec::new(),
@@ -1099,6 +1100,7 @@ fn build_artifact_from_unit(unit: &AnalyzedModule) -> HirArtifact {
         presentation: unit.presentation.clone(),
         cli_program: None,
         types: unit.types.snapshot(),
+        resolved_generic_calls: unit.types.resolved_generic_calls.clone(),
         interner: unit.interner.to_string_table(),
         resolver: unit.resolver.to_snapshot(),
         libraries: unit.libraries.clone(),
@@ -1268,4 +1270,137 @@ incipit { }
     let loaded_row = loaded.provenance.get(function_def).expect("loaded row");
     assert_eq!(loaded_row, &original_row);
     assert_eq!(loaded.analysis_stamp, unit.analysis_stamp);
+}
+
+// ── GPD-5: generic descriptors and resolved binding vectors on the wire ──
+
+#[test]
+fn generic_defaults_and_resolved_calls_survive_fhir_round_trip() {
+    let source = r#"functio pick<T = textus, magnitudo D = 64>(T x) → T {
+    redde x
+}
+
+functio fallback<T = textus>() → textus {
+    redde "salve"
+}
+
+incipit {
+    fixum _ a ← pick(1)
+    nota fallback()
+}
+"#;
+
+    let session = crate::driver::Session::new(crate::driver::Config::default());
+    let mut unit = crate::driver::analyze_source(&session, "gpd.fab", source, AnalyzeRequest::default())
+        .expect("analyze generic-default source");
+
+    let textus = unit.types.primitive(radix_types::Primitive::Textus);
+    let pick_name = unit.interner.intern("pick");
+    let fallback_name = unit.interner.intern("fallback");
+
+    // Descriptor facts on the analyzed unit before the wire.
+    let pick_item = unit
+        .hir
+        .items
+        .iter()
+        .find(|item| matches!(&item.kind, radix_hir::HirItemKind::Function(f) if f.name == pick_name))
+        .expect("pick item");
+    let radix_hir::HirItemKind::Function(pick) = &pick_item.kind else {
+        unreachable!()
+    };
+    assert_eq!(pick.type_params.len(), 2);
+    assert!(
+        matches!(
+            &pick.type_params[0].default,
+            Some(radix_types::SemanticGenericParamDefault::Typus(ty)) if *ty == textus
+        ),
+        "pick T must carry the textus default"
+    );
+    assert!(
+        matches!(
+            &pick.type_params[1].default,
+            Some(radix_types::SemanticGenericParamDefault::Magnitudo(64))
+        ),
+        "pick D must carry the 64 default"
+    );
+
+    // The wire carries the descriptors and the binder's resolved vectors.
+    let artifact = crate::hir::serialize::from_analyzed(&unit, "deadbeef", "gpd.fab");
+    assert!(
+        !artifact.resolved_generic_calls.is_empty(),
+        "artifact must carry resolved generic call rows"
+    );
+    let bytes = serialize_artifact(&artifact);
+    let loaded = load_fhir(&bytes).expect("load");
+
+    // Decoded descriptors keep the exact declared defaults.
+    let loaded_pick = loaded
+        .hir
+        .items
+        .iter()
+        .find(|item| matches!(&item.kind, radix_hir::HirItemKind::Function(f) if f.name == pick_name))
+        .expect("loaded pick item");
+    let radix_hir::HirItemKind::Function(loaded_pick_fn) = &loaded_pick.kind else {
+        unreachable!()
+    };
+    assert_eq!(loaded_pick_fn.type_params, pick.type_params);
+
+    // Decoded TypeTable restores the complete resolved vectors, provenance
+    // included: pick's T is inferred, D is defaulted; fallback's T is defaulted.
+    assert_eq!(
+        loaded.types.resolved_generic_calls, unit.types.resolved_generic_calls,
+        "decoded unit must restore the original resolved vectors"
+    );
+    let resolve_name = |unit: &AnalyzedModule, sym| unit.interner.resolve(sym).to_string();
+    let pick_row = unit
+        .types
+        .resolved_generic_calls
+        .iter()
+        .find(|row| row.bindings.len() == 2)
+        .expect("pick row with two bindings");
+    let t = pick_row
+        .bindings
+        .iter()
+        .find(|b| resolve_name(&unit, b.name) == "T")
+        .expect("T binding");
+    assert_eq!(t.source, radix_types::GenericBindingSource::Inferred);
+    assert!(
+        matches!(t.witness, radix_types::GenericWitness::Typus(ty) if ty != textus),
+        "inferred T must witness the argument type, not the default"
+    );
+    let d = pick_row
+        .bindings
+        .iter()
+        .find(|b| resolve_name(&unit, b.name) == "D")
+        .expect("D binding");
+    assert_eq!(d.source, radix_types::GenericBindingSource::Defaulted);
+    assert!(matches!(
+        d.witness,
+        radix_types::GenericWitness::Magnitudo(id)
+            if matches!(unit.types.get_index(id), radix_types::IndexExpr::Literal(64))
+    ));
+
+    let fallback_row = unit
+        .types
+        .resolved_generic_calls
+        .iter()
+        .find(|row| row.bindings.len() == 1)
+        .expect("fallback row with one binding");
+    assert_eq!(fallback_row.bindings[0].source, radix_types::GenericBindingSource::Defaulted);
+    assert!(
+        matches!(
+            fallback_row.bindings[0].witness,
+            radix_types::GenericWitness::Typus(ty) if ty == textus
+        ),
+        "fallback T must witness textus"
+    );
+    assert!(
+        loaded
+            .types
+            .resolved_generic_calls
+            .iter()
+            .any(|row| row.call_span == fallback_row.call_span),
+        "decoded rows keep the call-span key"
+    );
+    let _ = fallback_name;
 }

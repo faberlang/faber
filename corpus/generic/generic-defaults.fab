@@ -1,0 +1,64 @@
++++
+term = "generic-defaults"
+kind = "concept"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "functio_decl", "generic_params", "generic_param", "generic_type_default", "generic_size_default", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "type_arguments", "call_type_args", "type_argument", "call_suffix", "argument_list", "argument", "expression", "literal", "redde_stmt", "incipit_stmt", "nota_stmt"]
+category = "type"
+canonical = true
+summary = "Generic parameter defaults declared with = ; explicit arguments and inference beat the default."
+syntax = "fn f<T = string, size D = 64>(...) — binding order: explicit, then inference, then the declared default"
+related = ["generic", "generic-call-type-args", "functio"]
+locale = "en"
++++
+# =============================================================================
+# generic-defaults — Generic parameter defaults with the = spelling
+# =============================================================================
+#
+# What this teaches:
+#   • Generic parameters may declare compile-time defaults: T = string and size D = 64.
+#   • Binding order at each call: explicit arguments, then inference, then the declared default.
+#   • Related keywords: fn, size
+#
+# Common mistakes:
+#   • Defaults must trail — a parameter without a default may not follow one — and `=` here is a compile-time fact, not the removed vel/coalesce runtime fallback.
+#
+# See also: generic, generic-call-type-args, functio
+# =============================================================================
+
+# generic-defaults — declared = defaults on generic parameters
+#
+# GRAMMAR:
+#   genericParam :← ident genericTypeDefault? | 'size' ident genericSizeDefault?
+#   genericTypeDefault :← '=' typeAnnotation
+#   genericSizeDefault :← '=' NATURAL
+#
+# EXPECTED OUTPUT:
+#   42
+#   media
+#
+# Explicit and inferred witnesses beat the declared default: pick<int>(42)
+# binds T explicitly; pick("media") infers T from the argument. Neither
+# call consults `T = string`.
+#
+# BACKEND: A call whose default actually fires has no call-site MIR
+# evidence until specialization consumes the resolved binding vector.
+# Defaulted call sites (fallback(), and bounded(1) relying on
+# `size D = 64` with D absent from the shapes) are declared here and
+# proven by `faber check` and the semantic binder; their execution is
+# deferred (whitelist: generic/generic-defaults.fab).
+
+fn pick<T = string>(T x) → T {
+    return x
+}
+
+fn fallback<T = string>() → string {
+    return "salve"
+}
+
+fn bounded<size D = 64>(int x) → int {
+    return x
+}
+
+main {
+    print pick<int>(42)
+    print pick("media")
+}
