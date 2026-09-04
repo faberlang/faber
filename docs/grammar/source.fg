@@ -822,6 +822,7 @@ param_list    := (parameter (',' parameter)*)?
 generic_params := '<' generic_param (',' generic_param)* '>'
 @formerly genericParam
 generic_param  := IDENTIFIER generic_type_default? | 'magnitudo' IDENTIFIER generic_size_default?
+# defaults are declaration-time facts; once one parameter defaults, every following parameter must default
 generic_type_default := '=' type_annotation
 generic_size_default := '=' NATURAL
 @formerly callTypeArgs
