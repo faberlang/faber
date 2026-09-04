@@ -47,7 +47,6 @@ const ISSUE_FAILABLE_CALL_REQUIRES_HANDLER: &str = "failable_call_requires_handl
 const ISSUE_GPU_BUILTIN_DEVICE_FUNCTION_REQUIRED: &str = "gpu_builtin_device_function_required";
 const ISSUE_GPU_BUILTIN_TYPE_ARGS: &str = "gpu_builtin_type_args";
 const ISSUE_INFERRED_CALLEE_TYPE_ARGS: &str = "inferred_callee_type_args";
-const ISSUE_INTRINSIC_METHOD_TYPE_ARGS: &str = "intrinsic_method_type_args";
 const ISSUE_METHOD_CALL_TYPE_ARGS: &str = "method_call_type_args";
 const ISSUE_OCTETI_LITERAL_TEMPLATE_APPLICATION: &str = "octeti_literal_template_application";
 const ISSUE_SERMO_VIEW_PAYLOAD_TYPE_ARG_COUNT: &str = "sermo_view_payload_type_arg_count";
@@ -546,19 +545,12 @@ impl TypeChecker<'_> {
         let tensor_higher_order_method = matches!(resolved_receiver, Type::Tensor(_, _))
             && super::super::air_closure_lift::is_higher_order_method(&method_name);
         if super::intrinsics::receiver_supports_intrinsics(resolved_receiver) {
-            if self.reject_explicit_type_args_on_dynamic_callee(
-                explicit_type_args,
-                args,
-                receiver.span,
-                ISSUE_INTRINSIC_METHOD_TYPE_ARGS,
-            ) {
-                return self.error_type;
-            }
             if let Some(result) = super::intrinsics::check_intrinsic_method_call(
                 self,
                 receiver,
                 receiver_ty,
                 name,
+                explicit_type_args,
                 args,
                 receiver.span,
             ) {

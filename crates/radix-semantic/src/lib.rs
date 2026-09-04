@@ -423,6 +423,7 @@ pub fn analyze_with_cli(
     // never shadow them.
     crate::builtins::register(&mut resolver, &mut types, interner);
     crate::builtins::register_frame_types_if_needed(program, &mut resolver, &mut types, interner);
+    intern_catalog_generic_names(interner);
     if let Some(pack) = config.locale_pack.as_ref() {
         register_locale_pack_type_spellings(pack, &mut resolver, &mut types, interner);
     }
@@ -868,6 +869,14 @@ fn imported_struct_def_id(
         return Some(def_id);
     }
     imported_struct_by_name.get(member_name).copied()
+}
+
+fn intern_catalog_generic_names(interner: &mut Interner) {
+    for entry in radix_intrinsics::INTRINSICS {
+        for param in entry.generic {
+            interner.intern(param.name);
+        }
+    }
 }
 
 fn register_locale_pack_type_spellings(

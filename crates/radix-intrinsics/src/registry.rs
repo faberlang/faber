@@ -5,7 +5,7 @@
 //! lowering adapters; they must not grow parallel string tables for promoted
 //! intrinsics.
 
-use radix_types::{MirAtomicOp, MirCollectionOp};
+use radix_types::{GenericParamSort, MirAtomicOp, MirCollectionOp};
 
 /// Compiler-owned intrinsic receiver families.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -133,15 +133,53 @@ pub enum IntrinsicMirKind {
     CodegenOnly,
 }
 
+/// Static catalog generic declaration.
+///
+/// Catalog rows cannot hold interned [`radix_types::GenericParamDescriptor`]
+/// values at static init. Typecheck interns these names into descriptors and
+/// then uses the shared generic binder. An empty list on a row means explicit
+/// angle-bracket arguments are illegal.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct CatalogGenericParam {
+    pub name: &'static str,
+    pub sort: GenericParamSort,
+}
+
+impl CatalogGenericParam {
+    #[must_use]
+    pub const fn typus(name: &'static str) -> Self {
+        Self {
+            name,
+            sort: GenericParamSort::Typus,
+        }
+    }
+
+    #[must_use]
+    pub const fn magnitudo(name: &'static str) -> Self {
+        Self {
+            name,
+            sort: GenericParamSort::Magnitudo,
+        }
+    }
+}
+
 /// One compiler-owned intrinsic method row.
 #[derive(Debug, Clone, Copy)]
 pub struct MethodIntrinsic {
     pub receiver: IntrinsicReceiver,
     pub faber_name: &'static str,
+    pub generic: &'static [CatalogGenericParam],
     pub arg_count: usize,
     pub params: &'static [IntrinsicParamKind],
     pub return_kind: IntrinsicReturnKind,
     pub mir_kind: IntrinsicMirKind,
+}
+
+impl MethodIntrinsic {
+    #[must_use]
+    pub fn generic_arity(&self) -> usize {
+        self.generic.len()
+    }
 }
 
 macro_rules! intrinsic {
@@ -149,6 +187,7 @@ macro_rules! intrinsic {
         MethodIntrinsic {
             receiver: IntrinsicReceiver::$receiver,
             faber_name: $name,
+            generic: &[],
             arg_count: $args,
             params: $params,
             return_kind: IntrinsicReturnKind::$ret,
@@ -159,6 +198,7 @@ macro_rules! intrinsic {
         MethodIntrinsic {
             receiver: IntrinsicReceiver::$receiver,
             faber_name: $name,
+            generic: &[],
             arg_count: $args,
             params: $params,
             return_kind: IntrinsicReturnKind::$ret,
@@ -169,6 +209,7 @@ macro_rules! intrinsic {
         MethodIntrinsic {
             receiver: IntrinsicReceiver::$receiver,
             faber_name: $name,
+            generic: &[],
             arg_count: $args,
             params: $params,
             return_kind: IntrinsicReturnKind::$ret,

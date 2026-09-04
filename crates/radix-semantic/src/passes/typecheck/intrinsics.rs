@@ -10,13 +10,14 @@
 
 use super::TypeChecker;
 use crate::{
-    FuncSig, NumericWidth, ParamType, Primitive, SemanticErrorKind, SemanticParamMode, Type, TypeId,
+    FuncSig, GenericParamDescriptor, NumericWidth, ParamType, Primitive, SemanticErrorKind,
+    SemanticParamMode, Type, TypeId, TypeParamConstraint,
 };
 use radix_hir::{HirCallArg, HirExpression, HirExpressionKind};
 use radix_intrinsics::{
-    IntrinsicParamKind, IntrinsicReceiver, IntrinsicReturnKind, MethodIntrinsic,
-    is_mutating_receiver, is_numeric_bitwise_operator, is_numeric_imperativus_operator,
-    lookup_method, lookup_method_for_type, receivers_for_type,
+    CatalogGenericParam, IntrinsicParamKind, IntrinsicReceiver, IntrinsicReturnKind,
+    MethodIntrinsic, is_mutating_receiver, is_numeric_bitwise_operator,
+    is_numeric_imperativus_operator, lookup_method, lookup_method_for_type, receivers_for_type,
 };
 use radix_lexer::Symbol;
 
@@ -33,6 +34,7 @@ const ISSUE_TENSOR_INDEX_VECTOR_INTEGER_ELEMENTS: &str = "tensor_index_vector_in
 const ISSUE_TENSOR_MEDIA_DECIMAL: &str = "tensor_media_decimal_rejected";
 const ISSUE_IMPERATIVUS_OPERATOR_METHOD_REQUIRES_VARIA_RECEIVER: &str =
     "imperativus_operator_method_requires_varia_receiver";
+const ISSUE_INTRINSIC_METHOD_TYPE_ARGS: &str = "intrinsic_method_type_args";
 pub(super) const ISSUE_ATOMIC_METHOD_REQUIRES_ATOMIC_RECEIVER: &str =
     "atomic_method_requires_atomic_receiver";
 pub(super) const ISSUE_UNSUPPORTED_ATOMIC_METHOD: &str = "unsupported_atomic_method";
@@ -149,6 +151,32 @@ pub(super) fn receiver_supports_intrinsics(receiver_ty: &Type) -> bool {
     !receivers_for_type(receiver_ty).is_empty()
 }
 
+/// Intern catalog generic names into GPD descriptors.
+///
+/// Names are pre-interned during analysis setup. A missing symbol is a
+/// programming error in that setup, not a caller-facing unknown-method miss.
+fn interned_catalog_generics(
+    checker: &TypeChecker<'_>,
+    generic: &[CatalogGenericParam],
+) -> Vec<GenericParamDescriptor> {
+    generic
+        .iter()
+        .map(|param| GenericParamDescriptor {
+            name: interned_catalog_name(checker, param.name).unwrap_or(Symbol(0)),
+            sort: param.sort,
+            constraint: TypeParamConstraint::Any,
+            default: None,
+        })
+        .collect()
+}
+
+fn interned_catalog_name(checker: &TypeChecker<'_>, name: &str) -> Option<Symbol> {
+    let interner = checker.interner?;
+    let index = interner.strings().iter().position(|s| s == name)?;
+    #[allow(clippy::cast_possible_truncation)]
+    Some(Symbol(index as u32))
+}
+
 /// Type-check a promoted intrinsic method call when the receiver type matches.
 ///
 /// Lookup is pack-authoritative (db54b442): under any non-la reader pack, a
@@ -166,6 +194,7 @@ pub(super) fn check_intrinsic_method_call(
     receiver: &HirExpression,
     receiver_ty: TypeId,
     name: &mut Symbol,
+    explicit_type_args: &[TypeId],
     args: &mut [HirCallArg],
     span: radix_lexer::Span,
 ) -> Option<TypeId> {
@@ -243,6 +272,11 @@ pub(super) fn check_intrinsic_method_call(
     } else {
         entry
     };
+    if entry.generic.is_empty() && !explicit_type_args.is_empty() {
+        checker.invalid_operand_types(ISSUE_INTRINSIC_METHOD_TYPE_ARGS, span);
+        checker.typecheck_call_arg_exprs(args);
+        return Some(checker.error_type);
+    }
     let bounded_appende = entry.faber_name == "appende"
         && matches!(
             resolved,
@@ -440,7 +474,21 @@ pub(super) fn check_intrinsic_method_call(
             // `lista<numerus>` and rejects sized-integer lists under the v1
             // widening lattice; route tensor calls through a structural checker
             // instead of widening that lattice globally.
-            let result = if matches!(entry.receiver, radix_intrinsics::IntrinsicReceiver::Tensor)
+            let result = if !entry.generic.is_empty() {
+                // Declared catalog generics use GPD's binder. Empty rows keep
+                // the rigid/tensor paths below so receiver-owned shape params
+                // stay unsolved.
+                let type_params = interned_catalog_generics(checker, entry.generic);
+                let sig = FuncSig {
+                    type_params,
+                    params,
+                    ret,
+                    err: None,
+                    is_async: false,
+                    is_generator: false,
+                };
+                checker.check_instantiated_call(&sig, explicit_type_args, args, span, None)
+            } else if matches!(entry.receiver, radix_intrinsics::IntrinsicReceiver::Tensor)
                 || matches!(entry.receiver, radix_intrinsics::IntrinsicReceiver::Sparsa)
             {
                 check_tensor_method_args(checker, entry, &params, args, ret, span)

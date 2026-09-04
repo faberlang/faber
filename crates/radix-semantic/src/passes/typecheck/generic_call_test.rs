@@ -661,6 +661,17 @@ fn explicit_generic_call_rejects_intrinsic_method_type_args() {
 }
 
 #[test]
+fn empty_generic_catalog_row_rejects_type_args_without_a_method_name_branch() {
+    rejects_with_issue(
+        r"incipit {
+    fixum lista<numerus> xs ← [1, 2, 3]
+    varia _ ok ← xs.continet<textus>(1)
+}",
+        "intrinsic_method_type_args",
+    );
+}
+
+#[test]
 fn sermo_tuus_typed_view_typechecks_in_iteration() {
     accepts(
         r#"incipit {

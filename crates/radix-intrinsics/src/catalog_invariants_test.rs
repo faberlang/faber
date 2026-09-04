@@ -6,19 +6,40 @@
 //! compiler driver.
 
 use super::{
-    INTRINSICS, IntrinsicMirKind, IntrinsicParamKind, IntrinsicReceiver, IntrinsicReturnKind,
-    is_atomic_operator_method, is_mutating_receiver, lookup_method, lookup_method_for_type,
-    lookup_method_for_type_id, mir_atomic_op, mir_collection_op, mir_is_higher_order_lista,
-    receivers_for_type, receivers_for_type_id,
+    CatalogGenericParam, INTRINSICS, IntrinsicMirKind, IntrinsicParamKind, IntrinsicReceiver,
+    IntrinsicReturnKind, MethodIntrinsic, is_atomic_operator_method, is_mutating_receiver,
+    lookup_method, lookup_method_for_type, lookup_method_for_type_id, lookup_method_generic,
+    mir_atomic_op, mir_collection_op, mir_is_higher_order_lista, receivers_for_type,
+    receivers_for_type_id,
 };
-use radix_types::{IndexExpr, MirAtomicOp, MirCollectionOp, Primitive, SemanticMutability, Type};
+use radix_types::{
+    GenericParamSort, IndexExpr, MirAtomicOp, MirCollectionOp, Primitive, SemanticMutability, Type,
+};
 
 #[test]
-fn registry_rows_are_unique_per_receiver_name_and_arity() {
+fn registry_rows_are_unique_per_receiver_name_generic_arity_and_value_arity() {
     let mut seen = std::collections::HashSet::new();
     for entry in INTRINSICS {
-        let key = (entry.receiver, entry.faber_name, entry.arg_count);
+        let key = (
+            entry.receiver,
+            entry.faber_name,
+            entry.generic.len(),
+            entry.arg_count,
+        );
         assert!(seen.insert(key), "duplicate registry row: {key:?}");
+    }
+}
+
+#[test]
+fn production_catalog_rows_declare_no_generics() {
+    for entry in INTRINSICS {
+        assert!(
+            entry.generic.is_empty(),
+            "{:?}::{} still has an empty generic list until IGP-2/ROP-1 declare rows",
+            entry.receiver,
+            entry.faber_name
+        );
+        assert_eq!(entry.generic_arity(), 0);
     }
 }
 
@@ -31,6 +52,46 @@ fn lookup_resolves_registered_rows() {
         "arity must be exact"
     );
     assert!(lookup_method(IntrinsicReceiver::Lista, "nonexistent", 0).is_none());
+}
+
+#[test]
+fn lookup_generic_arity_distinguishes_empty_rows() {
+    assert!(lookup_method_generic(IntrinsicReceiver::Lista, "longitudo", 0, 0).is_some());
+    assert!(
+        lookup_method_generic(IntrinsicReceiver::Lista, "longitudo", 1, 0).is_none(),
+        "empty-generic rows do not match a nonempty generic arity"
+    );
+}
+
+#[test]
+fn catalog_generic_param_sorts_are_declaration_data() {
+    const DIM: &[CatalogGenericParam] = &[CatalogGenericParam::magnitudo("dim")];
+    let typus = CatalogGenericParam::typus("T");
+    let magnitudo = CatalogGenericParam::magnitudo("dim");
+    assert_eq!(typus.sort, GenericParamSort::Typus);
+    assert_eq!(magnitudo.sort, GenericParamSort::Magnitudo);
+    let empty_row = lookup_method(IntrinsicReceiver::Lista, "longitudo", 0).expect("longitudo");
+    let declared = MethodIntrinsic {
+        generic: DIM,
+        ..*empty_row
+    };
+    assert_eq!(empty_row.generic_arity(), 0);
+    assert_eq!(declared.generic_arity(), 1);
+    assert_ne!(
+        (
+            empty_row.receiver,
+            empty_row.faber_name,
+            empty_row.generic.len(),
+            empty_row.arg_count
+        ),
+        (
+            declared.receiver,
+            declared.faber_name,
+            declared.generic.len(),
+            declared.arg_count
+        ),
+        "generic arity is part of the uniqueness key"
+    );
 }
 
 #[test]

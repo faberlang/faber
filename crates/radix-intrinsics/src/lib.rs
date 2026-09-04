@@ -9,22 +9,52 @@
 mod registry;
 
 pub use registry::{
-    INTRINSICS, IntrinsicMirKind, IntrinsicParamKind, IntrinsicReceiver, IntrinsicReturnKind,
-    MethodIntrinsic,
+    CatalogGenericParam, INTRINSICS, IntrinsicMirKind, IntrinsicParamKind, IntrinsicReceiver,
+    IntrinsicReturnKind, MethodIntrinsic,
 };
 
 use radix_types::{MirAtomicOp, MirCollectionOp};
 use radix_types::{Primitive, Type, TypeId, TypeTable};
 
-/// Lookup a promoted intrinsic by receiver family, Faber name, and arity.
+/// Lookup a promoted intrinsic by receiver family, Faber name, and value arity.
+///
+/// Value-arity lookup remains unique while every row's generic list is empty.
+/// When a later unit adds a generic row, [`lookup_method_generic`] distinguishes
+/// it from a same-name value-arity twin. Typecheck uses this function, then
+/// inspects [`MethodIntrinsic::generic`] so a declared row can bind through the
+/// shared generic binder instead of falling through as an unknown method.
 #[must_use]
 pub fn lookup_method(
     receiver: IntrinsicReceiver,
     method: &str,
     arg_count: usize,
 ) -> Option<&'static MethodIntrinsic> {
+    let mut found = None;
+    for entry in INTRINSICS {
+        if entry.receiver == receiver && entry.faber_name == method && entry.arg_count == arg_count
+        {
+            if found.is_some() {
+                return None;
+            }
+            found = Some(entry);
+        }
+    }
+    found
+}
+
+/// Lookup a promoted intrinsic by receiver, name, generic arity, and value arity.
+#[must_use]
+pub fn lookup_method_generic(
+    receiver: IntrinsicReceiver,
+    method: &str,
+    generic_count: usize,
+    arg_count: usize,
+) -> Option<&'static MethodIntrinsic> {
     INTRINSICS.iter().find(|entry| {
-        entry.receiver == receiver && entry.faber_name == method && entry.arg_count == arg_count
+        entry.receiver == receiver
+            && entry.faber_name == method
+            && entry.generic.len() == generic_count
+            && entry.arg_count == arg_count
     })
 }
 

@@ -9,9 +9,10 @@
 //! proven in the leaf).
 
 pub use radix_intrinsics::{
-    INTRINSICS, IntrinsicMirKind, IntrinsicParamKind, IntrinsicReceiver, IntrinsicReturnKind, MethodIntrinsic,
-    is_atomic_operator_method, is_numeric_bitwise_operator, is_numeric_imperativus_operator, lookup_method,
-    lookup_method_for_type, mir_atomic_op, mir_collection_op, mir_is_higher_order_lista, receivers_for_type,
+    CatalogGenericParam, INTRINSICS, IntrinsicMirKind, IntrinsicParamKind, IntrinsicReceiver, IntrinsicReturnKind,
+    MethodIntrinsic, is_atomic_operator_method, is_numeric_bitwise_operator, is_numeric_imperativus_operator,
+    lookup_method, lookup_method_for_type, lookup_method_generic, mir_atomic_op, mir_collection_op,
+    mir_is_higher_order_lista, receivers_for_type,
 };
 
 #[cfg(test)]
