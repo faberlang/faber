@@ -758,6 +758,16 @@ pub(super) fn lower_package_units<'a>(
             &mut consumer_launch_entries,
         );
         let mut lowered = lower_unit(unit, &cli_plan.entry_records, no_fuse)?;
+        let lowered_source_types = TypeTable::from_snapshot(
+            lowered.validated.validation().types.snapshot(),
+        )
+        .map_err(|message| {
+            vec![mir_issue_diag(
+                &unit_path,
+                "package_mir_source_types_snapshot",
+                message,
+            )]
+        })?;
         // KPC-WIRE (c): this unit's module-owned route map was transferred
         // into the lowered unit instead of being dropped; join it to the
         // linker's synthetic template sources for this caller now, while the
@@ -803,12 +813,12 @@ pub(super) fn lower_package_units<'a>(
         );
         let mut def_remap = nominal_def_remap.clone();
         def_remap.extend(variant_remap.iter().map(|(key, dest)| (*key, *dest)));
+        let param_symbols = super::intern_param_symbols(
+            lowered.validated.validation().types,
+            &lowered.interner,
+            &mut entry.analysis.interner,
+        );
         let source_to_entry_types = {
-            let param_symbols = super::intern_param_symbols(
-                lowered.validated.validation().types,
-                &lowered.interner,
-                &mut entry.analysis.interner,
-            );
             let nominal = NominalImportContext {
                 nominal_map: &nominal_map,
                 def_remap: &def_remap,
@@ -822,6 +832,12 @@ pub(super) fn lower_package_units<'a>(
                 Some(&nominal),
             )
         };
+        rewrite_lowered_shape_size_indices(
+            &mut lowered,
+            &lowered_source_types,
+            &mut entry.analysis.types,
+            &param_symbols,
+        );
         record_shared_nominals(
             &source_names,
             lowered.validated.validation().types,
@@ -970,6 +986,15 @@ pub(super) fn lower_package_units<'a>(
                         return Ok(());
                     }
                 };
+                let lowered_source_types =
+                    match TypeTable::from_snapshot(lowered.validated.validation().types.snapshot())
+                    {
+                        Ok(types) => types,
+                        Err(message) => {
+                            diagnostics.push(mir_lowering_diag(&library.path, message));
+                            return Ok(());
+                        }
+                    };
                 if let Some(bundle) = bundle {
                     if let Err(message) = super::air_backward::apply(&mut lowered, bundle, no_fuse)
                     {
@@ -1008,12 +1033,12 @@ pub(super) fn lower_package_units<'a>(
                 );
                 let mut def_remap = nominal_def_remap.clone();
                 def_remap.extend(variant_remap.iter().map(|(key, dest)| (*key, *dest)));
+                let param_symbols = super::intern_param_symbols(
+                    lowered.validated.validation().types,
+                    &lowered.interner,
+                    &mut entry.analysis.interner,
+                );
                 let source_to_entry_types = {
-                    let param_symbols = super::intern_param_symbols(
-                        lowered.validated.validation().types,
-                        &lowered.interner,
-                        &mut entry.analysis.interner,
-                    );
                     let nominal = NominalImportContext {
                         nominal_map: &nominal_map,
                         def_remap: &def_remap,
@@ -1027,6 +1052,12 @@ pub(super) fn lower_package_units<'a>(
                         Some(&nominal),
                     )
                 };
+                rewrite_lowered_shape_size_indices(
+                    &mut lowered,
+                    &lowered_source_types,
+                    &mut entry.analysis.types,
+                    &param_symbols,
+                );
                 record_shared_nominals(
                     &source_names,
                     lowered.validated.validation().types,
@@ -1850,6 +1881,57 @@ pub(super) fn rewrite_lowered_type_ids(
         for capture in &mut environment.captures {
             rewrite_type_id(&mut capture.ty, rewrites);
         }
+    }
+}
+
+/// Rehome compiler-owned shape-size indices when a sibling or library MIR
+/// unit is merged into the entry type table. Unlike a tensor type, a
+/// `MirConstant::ShapeSize` stores an `IndexId` directly, so the ordinary
+/// `TypeId` rewrite cannot move it across the package boundary. Re-intern the
+/// full index expression and its parameter symbols in the entry namespace.
+fn rewrite_lowered_shape_size_indices(
+    lowered: &mut LoweredMirUnit<'_>,
+    source_types: &TypeTable,
+    target_types: &mut TypeTable,
+    param_symbols: &HashMap<Symbol, Symbol>,
+) {
+    let mut rewrite_function = |function: &mut MirFunction| {
+        let _ = radix_module::mir::generic::rewrite_function_constants(function, &mut |constant| {
+            let MirConstant::ShapeSize { shape, .. } = constant else {
+                return true;
+            };
+            *shape = import_shape_size_index(source_types, target_types, *shape, param_symbols);
+            true
+        });
+    };
+    for function in &mut lowered.program.functions {
+        rewrite_function(function);
+    }
+    for function in &mut lowered.generic_templates {
+        rewrite_function(function);
+    }
+}
+
+fn import_shape_size_index(
+    source_types: &TypeTable,
+    target_types: &mut TypeTable,
+    index: radix_module::semantic::IndexId,
+    param_symbols: &HashMap<Symbol, Symbol>,
+) -> radix_module::semantic::IndexId {
+    match source_types.get_index(index).clone() {
+        IndexExpr::Tuple(items) => {
+            let items = items
+                .into_iter()
+                .map(|item| {
+                    import_shape_size_index(source_types, target_types, item, param_symbols)
+                })
+                .collect();
+            target_types.intern_index(IndexExpr::Tuple(items))
+        }
+        IndexExpr::Param(symbol) => target_types.intern_index(IndexExpr::Param(
+            param_symbols.get(&symbol).copied().unwrap_or(symbol),
+        )),
+        other => target_types.intern_index(other),
     }
 }
 
