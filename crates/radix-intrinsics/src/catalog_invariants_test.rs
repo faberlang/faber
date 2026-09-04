@@ -7,10 +7,10 @@
 
 use super::{
     CatalogGenericParam, INTRINSICS, IntrinsicMirKind, IntrinsicParamKind, IntrinsicReceiver,
-    IntrinsicReturnKind, MethodIntrinsic, is_atomic_operator_method, is_mutating_receiver,
-    lookup_method, lookup_method_for_type, lookup_method_for_type_id, lookup_method_generic,
-    mir_atomic_op, mir_collection_op, mir_is_higher_order_lista, receivers_for_type,
-    receivers_for_type_id,
+    IntrinsicReturnKind, MethodIntrinsic, NAMESPACE_INTRINSICS, is_atomic_operator_method,
+    is_mutating_receiver, lookup_method, lookup_method_for_type, lookup_method_for_type_id,
+    lookup_method_generic, lookup_namespace_method, lookup_namespace_method_by_name, mir_atomic_op,
+    mir_collection_op, mir_is_higher_order_lista, receivers_for_type, receivers_for_type_id,
 };
 use radix_types::{
     GenericParamSort, IndexExpr, MirAtomicOp, MirCollectionOp, Primitive, SemanticMutability, Type,
@@ -31,16 +31,44 @@ fn registry_rows_are_unique_per_receiver_name_generic_arity_and_value_arity() {
 }
 
 #[test]
-fn production_catalog_rows_declare_no_generics() {
+fn empty_generic_rows_reject_angle_brackets_and_formata_declares_typus() {
+    let formata = lookup_method(IntrinsicReceiver::Tensor, "formata", 0).expect("formata");
+    assert_eq!(formata.generic_arity(), 1);
+    assert_eq!(formata.generic[0].sort, GenericParamSort::Typus);
     for entry in INTRINSICS {
+        if entry.faber_name == "formata" {
+            continue;
+        }
         assert!(
             entry.generic.is_empty(),
-            "{:?}::{} still has an empty generic list until IGP-2/ROP-1 declare rows",
+            "{:?}::{} keeps an empty generic list",
             entry.receiver,
             entry.faber_name
         );
-        assert_eq!(entry.generic_arity(), 0);
     }
+}
+
+#[test]
+fn namespace_catalog_rows_are_unique_and_generic() {
+    let mut seen = std::collections::HashSet::new();
+    for entry in NAMESPACE_INTRINSICS {
+        let key = (
+            entry.namespace,
+            entry.faber_name,
+            entry.generic.len(),
+            entry.arg_count,
+        );
+        assert!(seen.insert(key), "duplicate namespace row: {key:?}");
+        assert!(
+            !entry.generic.is_empty(),
+            "{}::{} must declare generics",
+            entry.namespace,
+            entry.faber_name
+        );
+    }
+    assert!(lookup_namespace_method("tensor", "creata", 1).is_some());
+    assert!(lookup_namespace_method_by_name("sermo", "tuus").is_some());
+    assert!(lookup_namespace_method("tensor", "creata", 2).is_none());
 }
 
 #[test]

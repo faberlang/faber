@@ -9,8 +9,9 @@
 mod registry;
 
 pub use registry::{
-    CatalogGenericParam, INTRINSICS, IntrinsicMirKind, IntrinsicParamKind, IntrinsicReceiver,
-    IntrinsicReturnKind, MethodIntrinsic,
+    CatalogGenericDefault, CatalogGenericParam, INTRINSICS, IntrinsicMirKind, IntrinsicParamKind,
+    IntrinsicReceiver, IntrinsicReturnKind, MethodIntrinsic, NAMESPACE_INTRINSICS,
+    NamespaceIntrinsic, NamespaceReturnKind,
 };
 
 use radix_types::{MirAtomicOp, MirCollectionOp};
@@ -42,6 +43,26 @@ pub fn lookup_method(
     found
 }
 
+/// Lookup the unique row for a receiver and name, ignoring value arity.
+///
+/// Returns `None` when two rows share the name with different value arities.
+#[must_use]
+pub fn lookup_method_named(
+    receiver: IntrinsicReceiver,
+    method: &str,
+) -> Option<&'static MethodIntrinsic> {
+    let mut found = None;
+    for entry in INTRINSICS {
+        if entry.receiver == receiver && entry.faber_name == method {
+            if found.is_some() {
+                return None;
+            }
+            found = Some(entry);
+        }
+    }
+    found
+}
+
 /// Lookup a promoted intrinsic by receiver, name, generic arity, and value arity.
 #[must_use]
 pub fn lookup_method_generic(
@@ -56,6 +77,46 @@ pub fn lookup_method_generic(
             && entry.generic.len() == generic_count
             && entry.arg_count == arg_count
     })
+}
+
+/// Lookup a namespace/struct catalog row by owner, name, and value arity.
+#[must_use]
+pub fn lookup_namespace_method(
+    namespace: &str,
+    method: &str,
+    arg_count: usize,
+) -> Option<&'static NamespaceIntrinsic> {
+    let mut found = None;
+    for entry in NAMESPACE_INTRINSICS {
+        if entry.namespace == namespace
+            && entry.faber_name == method
+            && entry.arg_count == arg_count
+        {
+            if found.is_some() {
+                return None;
+            }
+            found = Some(entry);
+        }
+    }
+    found
+}
+
+/// Lookup a namespace/struct catalog row by name, ignoring value arity.
+#[must_use]
+pub fn lookup_namespace_method_by_name(
+    namespace: &str,
+    method: &str,
+) -> Option<&'static NamespaceIntrinsic> {
+    let mut found = None;
+    for entry in NAMESPACE_INTRINSICS {
+        if entry.namespace == namespace && entry.faber_name == method {
+            if found.is_some() {
+                return None;
+            }
+            found = Some(entry);
+        }
+    }
+    found
 }
 
 /// Map a normalized semantic receiver type to intrinsic receiver families.

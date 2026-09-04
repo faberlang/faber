@@ -877,6 +877,11 @@ fn intern_catalog_generic_names(interner: &mut Interner) {
             interner.intern(param.name);
         }
     }
+    for entry in radix_intrinsics::NAMESPACE_INTRINSICS {
+        for param in entry.generic {
+            interner.intern(param.name);
+        }
+    }
 }
 
 fn register_locale_pack_type_spellings(

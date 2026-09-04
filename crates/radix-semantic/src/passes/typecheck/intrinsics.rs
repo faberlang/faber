@@ -9,15 +9,17 @@
 //! requirements on arithmetic intrinsics
 
 use super::TypeChecker;
+use crate::tensor_type_directed::{complete_tensor_type, is_tensor_type};
 use crate::{
     FuncSig, GenericParamDescriptor, NumericWidth, ParamType, Primitive, SemanticErrorKind,
-    SemanticParamMode, Type, TypeId, TypeParamConstraint,
+    SemanticGenericParamDefault, SemanticParamMode, Type, TypeId, TypeParamConstraint,
 };
 use radix_hir::{HirCallArg, HirExpression, HirExpressionKind};
 use radix_intrinsics::{
-    CatalogGenericParam, IntrinsicParamKind, IntrinsicReceiver, IntrinsicReturnKind,
-    MethodIntrinsic, is_mutating_receiver, is_numeric_bitwise_operator,
-    is_numeric_imperativus_operator, lookup_method, lookup_method_for_type, receivers_for_type,
+    CatalogGenericDefault, CatalogGenericParam, IntrinsicParamKind, IntrinsicReceiver,
+    IntrinsicReturnKind, MethodIntrinsic, is_mutating_receiver, is_numeric_bitwise_operator,
+    is_numeric_imperativus_operator, lookup_method, lookup_method_for_type, lookup_method_named,
+    receivers_for_type,
 };
 use radix_lexer::Symbol;
 
@@ -35,6 +37,8 @@ const ISSUE_TENSOR_MEDIA_DECIMAL: &str = "tensor_media_decimal_rejected";
 const ISSUE_IMPERATIVUS_OPERATOR_METHOD_REQUIRES_VARIA_RECEIVER: &str =
     "imperativus_operator_method_requires_varia_receiver";
 const ISSUE_INTRINSIC_METHOD_TYPE_ARGS: &str = "intrinsic_method_type_args";
+const ISSUE_TENSOR_FORMATA_ELEMENT_TYPE_MISMATCH: &str = "tensor_formata_element_type_mismatch";
+const ISSUE_TENSOR_TYPE_ARG_INCOMPLETE: &str = "tensor_type_arg_incomplete";
 pub(super) const ISSUE_ATOMIC_METHOD_REQUIRES_ATOMIC_RECEIVER: &str =
     "atomic_method_requires_atomic_receiver";
 pub(super) const ISSUE_UNSUPPORTED_ATOMIC_METHOD: &str = "unsupported_atomic_method";
@@ -155,19 +159,39 @@ pub(super) fn receiver_supports_intrinsics(receiver_ty: &Type) -> bool {
 ///
 /// Names are pre-interned during analysis setup. A missing symbol is a
 /// programming error in that setup, not a caller-facing unknown-method miss.
-fn interned_catalog_generics(
-    checker: &TypeChecker<'_>,
+pub(super) fn interned_catalog_generics(
+    checker: &mut TypeChecker<'_>,
     generic: &[CatalogGenericParam],
 ) -> Vec<GenericParamDescriptor> {
-    generic
-        .iter()
-        .map(|param| GenericParamDescriptor {
-            name: interned_catalog_name(checker, param.name).unwrap_or(Symbol(0)),
+    let mut out = Vec::with_capacity(generic.len());
+    for param in generic {
+        let name = interned_catalog_name(checker, param.name).unwrap_or(Symbol(0));
+        let default = match param.default {
+            Some(CatalogGenericDefault::Valor) => Some(SemanticGenericParamDefault::Typus(
+                checker.types.primitive(Primitive::Valor),
+            )),
+            None => None,
+        };
+        out.push(GenericParamDescriptor {
+            name,
             sort: param.sort,
             constraint: TypeParamConstraint::Any,
-            default: None,
-        })
-        .collect()
+            default,
+        });
+    }
+    out
+}
+
+fn lookup_intrinsic_row(
+    receiver_ty: &Type,
+    method: &str,
+    arg_count: usize,
+) -> Option<&'static MethodIntrinsic> {
+    lookup_method_for_type(receiver_ty, method, arg_count).or_else(|| {
+        receivers_for_type(receiver_ty)
+            .iter()
+            .find_map(|family| lookup_method_named(*family, method))
+    })
 }
 
 fn interned_catalog_name(checker: &TypeChecker<'_>, name: &str) -> Option<Symbol> {
@@ -175,6 +199,58 @@ fn interned_catalog_name(checker: &TypeChecker<'_>, name: &str) -> Option<Symbol
     let index = interner.strings().iter().position(|s| s == name)?;
     #[allow(clippy::cast_possible_truncation)]
     Some(Symbol(index as u32))
+}
+
+/// Catalog-driven generic/value arity. Returns true when the call is rejected.
+pub(super) fn reject_catalog_arity(
+    checker: &mut TypeChecker<'_>,
+    generic: &[CatalogGenericParam],
+    arg_count: usize,
+    missing_generic_issue: Option<&'static str>,
+    excess_generic_issue: Option<&'static str>,
+    value_arity_issue: Option<&'static str>,
+    diagnostic_method: Option<&'static str>,
+    explicit_type_args: &[TypeId],
+    args: &mut [HirCallArg],
+    span: radix_lexer::Span,
+) -> bool {
+    if arg_count == 0 && !args.is_empty() {
+        let issue = value_arity_issue.unwrap_or("wrong_number_of_arguments");
+        if value_arity_issue.is_some() {
+            checker.invalid_operand_types(issue, span);
+        } else {
+            checker.wrong_arity(issue, span);
+        }
+        checker.typecheck_call_arg_exprs(args);
+        return true;
+    }
+    let required = generic
+        .iter()
+        .filter(|param| param.default.is_none())
+        .count();
+    let max = generic.len();
+    if explicit_type_args.len() < required {
+        if let Some(issue) = missing_generic_issue {
+            checker.invalid_operand_types(issue, span);
+        } else {
+            checker.wrong_arity("wrong_number_of_type_arguments", span);
+        }
+        checker.typecheck_call_arg_exprs(args);
+        return true;
+    }
+    if explicit_type_args.len() > max {
+        let issue = excess_generic_issue.unwrap_or("wrong_number_of_type_arguments");
+        if let Some(method) = diagnostic_method {
+            checker.invalid_operand_types_with_args(issue, span, &[("method", method.to_owned())]);
+        } else if excess_generic_issue.is_some() {
+            checker.invalid_operand_types(issue, span);
+        } else {
+            checker.wrong_arity(issue, span);
+        }
+        checker.typecheck_call_arg_exprs(args);
+        return true;
+    }
+    false
 }
 
 /// Type-check a promoted intrinsic method call when the receiver type matches.
@@ -202,7 +278,6 @@ pub(super) fn check_intrinsic_method_call(
     // dispatches on its substituted builtin carrier.
     let receiver_resolved = checker.value_carrier_type(receiver_ty);
     let (_, payload_ty) = checker.types.peel_access_marker(receiver_resolved);
-    let resolved = checker.types.get(payload_ty);
     let method_name = checker.interner.map_or_else(
         || "method".to_owned(),
         |interner| interner.resolve(*name).to_owned(),
@@ -216,35 +291,39 @@ pub(super) fn check_intrinsic_method_call(
     // registry-direct: the spelling IS the canonical Latin identity.
     let mut effective_name = method_name.as_str();
     let mut entry = None;
-    match checker.locale_pack {
-        Some(pack) if pack.metadata.id != "la" => {
-            if let Some(canonical) = receivers_for_type(resolved)
-                .iter()
-                .find_map(|family| pack.intrinsic_canonical(*family, method_name.as_str()))
-            {
-                if let Some(canonical_entry) =
-                    lookup_method_for_type(resolved, canonical, args.len())
+    let is_modular = matches!(checker.types.get(payload_ty), Type::ModularWord(_));
+    {
+        let resolved = checker.types.get(payload_ty);
+        match checker.locale_pack {
+            Some(pack) if pack.metadata.id != "la" => {
+                if let Some(canonical) = receivers_for_type(resolved)
+                    .iter()
+                    .find_map(|family| pack.intrinsic_canonical(*family, method_name.as_str()))
                 {
-                    entry = Some(canonical_entry);
-                    effective_name = canonical;
+                    if let Some(canonical_entry) =
+                        lookup_intrinsic_row(resolved, canonical, args.len())
+                    {
+                        entry = Some(canonical_entry);
+                        effective_name = canonical;
+                    }
+                }
+                // WHY: under a non-la pack a spelling that resolves in the registry
+                // but is not a declared pack surface is the canonical Latin name
+                // used in the wrong locale — a compile error, not a Latin
+                // fallback. Genuinely unknown methods (no pack row, no registry
+                // entry) keep today's silent miss so unknown-method diagnostics
+                // stay pack-agnostic.
+                if entry.is_none()
+                    && lookup_intrinsic_row(resolved, method_name.as_str(), args.len()).is_some()
+                {
+                    checker.undefined_member("unknown_method", span);
+                    return Some(checker.error_type);
                 }
             }
-            // WHY: under a non-la pack a spelling that resolves in the registry
-            // but is not a declared pack surface is the canonical Latin name
-            // used in the wrong locale — a compile error, not a Latin
-            // fallback. Genuinely unknown methods (no pack row, no registry
-            // entry) keep today's silent miss so unknown-method diagnostics
-            // stay pack-agnostic.
-            if entry.is_none()
-                && lookup_method_for_type(resolved, method_name.as_str(), args.len()).is_some()
-            {
-                checker.undefined_member("unknown_method", span);
-                return Some(checker.error_type);
+            // la pack or no pack: registry-direct lookup (canonical Latin identity).
+            _ => {
+                entry = lookup_intrinsic_row(resolved, method_name.as_str(), args.len());
             }
-        }
-        // la pack or no pack: registry-direct lookup (canonical Latin identity).
-        _ => {
-            entry = lookup_method_for_type(resolved, method_name.as_str(), args.len());
         }
     }
     // Rewrite the HIR method symbol to the canonical registry spelling so the
@@ -267,7 +346,7 @@ pub(super) fn check_intrinsic_method_call(
     // WHY: on modular receivers `subtrahe` is the value-returning wrapping
     // twin of `subtracta` (the R3 width vector table), not the in-place
     // numerus mutation; both names wrap at the declared width.
-    let entry = if matches!(resolved, Type::ModularWord(_)) && effective_name == "subtrahe" {
+    let entry = if is_modular && effective_name == "subtrahe" {
         lookup_method(IntrinsicReceiver::Numeric, "subtracta", args.len()).unwrap_or(entry)
     } else {
         entry
@@ -277,6 +356,23 @@ pub(super) fn check_intrinsic_method_call(
         checker.typecheck_call_arg_exprs(args);
         return Some(checker.error_type);
     }
+    if !entry.generic.is_empty()
+        && reject_catalog_arity(
+            checker,
+            entry.generic,
+            entry.arg_count,
+            entry.missing_generic_issue,
+            entry.excess_generic_issue,
+            entry.value_arity_issue,
+            None,
+            explicit_type_args,
+            args,
+            span,
+        )
+    {
+        return Some(checker.error_type);
+    }
+    let resolved = checker.types.get(payload_ty);
     let bounded_appende = entry.faber_name == "appende"
         && matches!(
             resolved,
@@ -507,6 +603,11 @@ pub(super) fn check_intrinsic_method_call(
                 checker.check_instantiated_call(&sig, &[], args, span, None)
             } else {
                 checker.check_known_method_args(args, params, ret, span)
+            };
+            let result = if matches!(entry.return_kind, IntrinsicReturnKind::GenericTypus) {
+                validate_generic_typus_tensor(checker, receiver_ty, result, span)
+            } else {
+                result
             };
             if entry.faber_name == "accipe" && !args.is_empty() {
                 super::tensor_index::reject_static_bounded_index_oob(
@@ -858,7 +959,48 @@ fn resolve_return_type(
         | IntrinsicReturnKind::MapperSet
         | IntrinsicReturnKind::ReducerInfer
         | IntrinsicReturnKind::ReducerArray => checker.error_type,
+        IntrinsicReturnKind::GenericTypus => {
+            let Some(name) = entry
+                .generic
+                .first()
+                .and_then(|param| interned_catalog_name(checker, param.name))
+            else {
+                return checker.error_type;
+            };
+            checker.types.intern(Type::Param(name))
+        }
     }
+}
+
+pub(super) fn validate_generic_typus_tensor(
+    checker: &mut TypeChecker<'_>,
+    receiver_ty: TypeId,
+    result: TypeId,
+    span: radix_lexer::Span,
+) -> TypeId {
+    let resolved = checker.resolve_inferred_type(result);
+    if !is_tensor_type(resolved, checker.types) {
+        checker.invalid_operand_types(ISSUE_TENSOR_TYPE_ARG_INCOMPLETE, span);
+        return checker.error_type;
+    }
+    let Some(complete) = complete_tensor_type(resolved, checker.types) else {
+        checker.invalid_operand_types(ISSUE_TENSOR_TYPE_ARG_INCOMPLETE, span);
+        return checker.error_type;
+    };
+    let recv = checker.resolve_inferred_type(receiver_ty);
+    if let Type::Tensor(elem, _) = checker.types.get(recv)
+        && !checker.types.equals(*elem, complete.elem)
+    {
+        checker.error_issue(
+            SemanticErrorKind::TypeMismatch,
+            ISSUE_TENSOR_FORMATA_ELEMENT_TYPE_MISMATCH,
+            span,
+        );
+        return checker.error_type;
+    }
+    checker
+        .types
+        .tensor_with_shape(complete.elem, complete.shape)
 }
 
 /// Typecheck `matrix.applica(vector)`: peer width must equal matrix columns;

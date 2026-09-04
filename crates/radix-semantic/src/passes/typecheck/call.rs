@@ -49,7 +49,6 @@ const ISSUE_GPU_BUILTIN_TYPE_ARGS: &str = "gpu_builtin_type_args";
 const ISSUE_INFERRED_CALLEE_TYPE_ARGS: &str = "inferred_callee_type_args";
 const ISSUE_METHOD_CALL_TYPE_ARGS: &str = "method_call_type_args";
 const ISSUE_OCTETI_LITERAL_TEMPLATE_APPLICATION: &str = "octeti_literal_template_application";
-const ISSUE_SERMO_VIEW_PAYLOAD_TYPE_ARG_COUNT: &str = "sermo_view_payload_type_arg_count";
 const ISSUE_TEMPLATE_APPLICATION_TYPE_ARGS: &str = "template_application_type_args";
 const ISSUE_UNION_MEMBER_NOT_COMMON: &str = "union_member_not_common";
 const ISSUE_UNION_NOMINAL_MEMBERS: &str = "union_nominal_members";
@@ -684,36 +683,51 @@ impl TypeChecker<'_> {
         if !self.is_sermo_receiver(receiver_ty) {
             return None;
         }
-        let view = match method_name {
-            "tuus" => DirectionalViewKind::Tuus,
-            "meus" => DirectionalViewKind::Meus,
-            _ => return None,
-        };
-        let method_label = match view {
-            DirectionalViewKind::Tuus => "sermo.tuus",
-            DirectionalViewKind::Meus => "sermo.meus",
-        };
+        let entry = radix_intrinsics::lookup_namespace_method_by_name("sermo", method_name)?;
+        let method_label = entry.diagnostic_method.unwrap_or(entry.faber_name);
         if !args.is_empty() {
             self.typecheck_call_arg_exprs(args);
             self.wrong_arity_with_arg("method_accepts_no_arguments", span, "method", method_label);
             return Some(self.error_type);
         }
-        if explicit_type_args.len() > 1 {
-            self.invalid_operand_types_with_args(
-                ISSUE_SERMO_VIEW_PAYLOAD_TYPE_ARG_COUNT,
-                span,
-                &[("method", method_label.to_owned())],
-            );
+        if super::intrinsics::reject_catalog_arity(
+            self,
+            entry.generic,
+            entry.arg_count,
+            entry.missing_generic_issue,
+            entry.excess_generic_issue,
+            entry.value_arity_issue,
+            entry.diagnostic_method,
+            explicit_type_args,
+            args,
+            span,
+        ) {
             return Some(self.error_type);
         }
-
-        let payload_ty = explicit_type_args
-            .first()
-            .copied()
-            .unwrap_or_else(|| self.types.primitive(Primitive::Valor));
-        let view_def = match view {
-            DirectionalViewKind::Tuus => crate::builtins::frame_types::tuus_def_id(self.resolver),
-            DirectionalViewKind::Meus => crate::builtins::frame_types::meus_def_id(self.resolver),
+        let type_params = super::intrinsics::interned_catalog_generics(self, entry.generic);
+        let Some(param_name) = type_params.first().map(|param| param.name) else {
+            return Some(self.error_type);
+        };
+        let ret = self.types.intern(Type::Param(param_name));
+        let sig = FuncSig {
+            type_params,
+            params: Vec::new(),
+            ret,
+            err: None,
+            is_async: false,
+            is_generator: false,
+        };
+        let mut bind_args = Vec::new();
+        let payload_ty =
+            self.check_instantiated_call(&sig, explicit_type_args, &mut bind_args, span, None);
+        let view_def = match entry.return_kind {
+            radix_intrinsics::NamespaceReturnKind::SermoTuus => {
+                crate::builtins::frame_types::tuus_def_id(self.resolver)
+            }
+            radix_intrinsics::NamespaceReturnKind::SermoMeus => {
+                crate::builtins::frame_types::meus_def_id(self.resolver)
+            }
+            radix_intrinsics::NamespaceReturnKind::GenericTypus => return None,
         };
         let Some(view_def) = view_def else {
             self.missing_type_annotation("directional_view_type_not_registered", span);

@@ -115,6 +115,8 @@ pub enum IntrinsicReturnKind {
     TextusArray,
     /// `cursor<ascii<1>>` — the `ascii.cursor()` / later `textus.cursor()` walk.
     CursorAsciiOne,
+    /// The bound type of the first Typus generic (`formata`).
+    GenericTypus,
 }
 
 /// How MIR should treat a promoted intrinsic, when applicable.
@@ -139,10 +141,18 @@ pub enum IntrinsicMirKind {
 /// values at static init. Typecheck interns these names into descriptors and
 /// then uses the shared generic binder. An empty list on a row means explicit
 /// angle-bracket arguments are illegal.
+/// Static `=` default for a catalog generic. Interned at typecheck.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CatalogGenericDefault {
+    /// `valor` — the sermo view payload default.
+    Valor,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct CatalogGenericParam {
     pub name: &'static str,
     pub sort: GenericParamSort,
+    pub default: Option<CatalogGenericDefault>,
 }
 
 impl CatalogGenericParam {
@@ -151,6 +161,16 @@ impl CatalogGenericParam {
         Self {
             name,
             sort: GenericParamSort::Typus,
+            default: None,
+        }
+    }
+
+    #[must_use]
+    pub const fn typus_default_valor(name: &'static str) -> Self {
+        Self {
+            name,
+            sort: GenericParamSort::Typus,
+            default: Some(CatalogGenericDefault::Valor),
         }
     }
 
@@ -159,6 +179,7 @@ impl CatalogGenericParam {
         Self {
             name,
             sort: GenericParamSort::Magnitudo,
+            default: None,
         }
     }
 }
@@ -173,6 +194,9 @@ pub struct MethodIntrinsic {
     pub params: &'static [IntrinsicParamKind],
     pub return_kind: IntrinsicReturnKind,
     pub mir_kind: IntrinsicMirKind,
+    pub missing_generic_issue: Option<&'static str>,
+    pub excess_generic_issue: Option<&'static str>,
+    pub value_arity_issue: Option<&'static str>,
 }
 
 impl MethodIntrinsic {
@@ -192,6 +216,9 @@ macro_rules! intrinsic {
             params: $params,
             return_kind: IntrinsicReturnKind::$ret,
             mir_kind: IntrinsicMirKind::Collection(MirCollectionOp::$op),
+            missing_generic_issue: None,
+            excess_generic_issue: None,
+            value_arity_issue: None,
         }
     };
     ($receiver:ident, $name:expr, $args:expr, $params:expr, $ret:ident, atomic $op:ident) => {
@@ -203,6 +230,9 @@ macro_rules! intrinsic {
             params: $params,
             return_kind: IntrinsicReturnKind::$ret,
             mir_kind: IntrinsicMirKind::Atomic(MirAtomicOp::$op),
+            missing_generic_issue: None,
+            excess_generic_issue: None,
+            value_arity_issue: None,
         }
     };
     ($receiver:ident, $name:expr, $args:expr, $params:expr, $ret:ident, $mir:ident) => {
@@ -214,9 +244,17 @@ macro_rules! intrinsic {
             params: $params,
             return_kind: IntrinsicReturnKind::$ret,
             mir_kind: IntrinsicMirKind::$mir,
+            missing_generic_issue: None,
+            excess_generic_issue: None,
+            value_arity_issue: None,
         }
     };
 }
+
+const FORMATA_GENERIC: &[CatalogGenericParam] = &[CatalogGenericParam::typus("T")];
+const CREATA_GENERIC: &[CatalogGenericParam] = &[CatalogGenericParam::typus("T")];
+const STRUCTA_GENERIC: &[CatalogGenericParam] = &[CatalogGenericParam::typus("T")];
+const SERMO_VIEW_GENERIC: &[CatalogGenericParam] = &[CatalogGenericParam::typus_default_valor("T")];
 
 /// Full promoted intrinsic catalog. Keep rows sorted by receiver, then name.
 pub static INTRINSICS: &[MethodIntrinsic] = &[
@@ -733,6 +771,18 @@ pub static INTRINSICS: &[MethodIntrinsic] = &[
         SameAsReceiver,
         collection TensorFromFlat
     ),
+    MethodIntrinsic {
+        receiver: IntrinsicReceiver::Tensor,
+        faber_name: "formata",
+        generic: FORMATA_GENERIC,
+        arg_count: 0,
+        params: &[],
+        return_kind: IntrinsicReturnKind::GenericTypus,
+        mir_kind: IntrinsicMirKind::CodegenOnly,
+        missing_generic_issue: Some("tensor_formata_complete_type_arg_required"),
+        excess_generic_issue: None,
+        value_arity_issue: Some("tensor_formata_forbids_value_args"),
+    },
     intrinsic!(Tensor, "planata", 0, &[], ArrayInner, collection TensorFlatten),
     // CCI-1: the bounded common-case intrinsic rows (RMSNorm, RoPE, row
     // gather). Source spellings/signatures frozen in
@@ -1000,4 +1050,80 @@ pub static INTRINSICS: &[MethodIntrinsic] = &[
     // (`continet`/`initium`/`finis`). Spelling recorded in the G12-U1 unit
     // report (Open Q #3 default).
     intrinsic!(Regex, "consentit", 1, &[IntrinsicParamKind::Textus], Bool, collection RegexMatches),
+];
+
+/// How a namespace/struct catalog row publishes its result after generic binding.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum NamespaceReturnKind {
+    /// The bound first Typus argument (`tensor.creata` / `tensor.structa`).
+    GenericTypus,
+    /// `tuus<T>` directional view.
+    SermoTuus,
+    /// `meus<T>` directional view.
+    SermoMeus,
+}
+
+/// Compiler-owned namespace or named-struct intrinsic row.
+///
+/// Namespace constructors are not fake receivers. They share the catalog
+/// generic descriptor shape and binder with [`MethodIntrinsic`].
+#[derive(Debug, Clone, Copy)]
+pub struct NamespaceIntrinsic {
+    pub namespace: &'static str,
+    pub faber_name: &'static str,
+    pub generic: &'static [CatalogGenericParam],
+    pub arg_count: usize,
+    pub missing_generic_issue: Option<&'static str>,
+    pub excess_generic_issue: Option<&'static str>,
+    pub value_arity_issue: Option<&'static str>,
+    pub diagnostic_method: Option<&'static str>,
+    pub return_kind: NamespaceReturnKind,
+}
+
+/// Namespace and sermo-view catalog. Empty generic lists are illegal here.
+pub static NAMESPACE_INTRINSICS: &[NamespaceIntrinsic] = &[
+    NamespaceIntrinsic {
+        namespace: "sermo",
+        faber_name: "meus",
+        generic: SERMO_VIEW_GENERIC,
+        arg_count: 0,
+        missing_generic_issue: None,
+        excess_generic_issue: Some("sermo_view_payload_type_arg_count"),
+        value_arity_issue: None,
+        diagnostic_method: Some("sermo.meus"),
+        return_kind: NamespaceReturnKind::SermoMeus,
+    },
+    NamespaceIntrinsic {
+        namespace: "sermo",
+        faber_name: "tuus",
+        generic: SERMO_VIEW_GENERIC,
+        arg_count: 0,
+        missing_generic_issue: None,
+        excess_generic_issue: Some("sermo_view_payload_type_arg_count"),
+        value_arity_issue: None,
+        diagnostic_method: Some("sermo.tuus"),
+        return_kind: NamespaceReturnKind::SermoTuus,
+    },
+    NamespaceIntrinsic {
+        namespace: "tensor",
+        faber_name: "creata",
+        generic: CREATA_GENERIC,
+        arg_count: 1,
+        missing_generic_issue: Some("tensor_creata_complete_type_arg_required"),
+        excess_generic_issue: None,
+        value_arity_issue: None,
+        diagnostic_method: None,
+        return_kind: NamespaceReturnKind::GenericTypus,
+    },
+    NamespaceIntrinsic {
+        namespace: "tensor",
+        faber_name: "structa",
+        generic: STRUCTA_GENERIC,
+        arg_count: 1,
+        missing_generic_issue: None,
+        excess_generic_issue: None,
+        value_arity_issue: None,
+        diagnostic_method: None,
+        return_kind: NamespaceReturnKind::GenericTypus,
+    },
 ];
