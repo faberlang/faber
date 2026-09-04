@@ -61,7 +61,7 @@ use radix_syntax::{
     Program, SiStmt, Stmt, StmtKind, TypeExpr, TypeExprKind, TypeParam,
 };
 use radix_types::AppliedArg;
-use unicode_normalization::{char::is_combining_mark, UnicodeNormalization};
+use unicode_normalization::{UnicodeNormalization, char::is_combining_mark};
 
 const ISSUE_DUPLICATE_DEFINITION: &str = "duplicate_definition";
 const ISSUE_EMPTY_QUALIFIED_TYPE_PATH: &str = "empty_qualified_type_path";
@@ -3335,11 +3335,7 @@ fn lower_type_expr_with_context(
             } else {
                 types.intern(Type::Union(cleaned))
             };
-            if had_nihil {
-                types.option(base)
-            } else {
-                base
-            }
+            if had_nihil { types.option(base) } else { base }
         }
     };
 

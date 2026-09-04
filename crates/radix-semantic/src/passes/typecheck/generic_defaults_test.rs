@@ -56,7 +56,11 @@ fn binding_named<'a>(fixture: &'a AnalyzedFixture, name: &str) -> &'a ResolvedGe
         })
 }
 
-fn assert_type_witness(fixture: &AnalyzedFixture, binding: &ResolvedGenericBinding, primitive: Primitive) {
+fn assert_type_witness(
+    fixture: &AnalyzedFixture,
+    binding: &ResolvedGenericBinding,
+    primitive: Primitive,
+) {
     let GenericWitness::Typus(ty) = binding.witness else {
         panic!("expected a type witness, got {:?}", binding.witness);
     };
@@ -242,9 +246,10 @@ incipit {
             .types
             .resolved_generic_calls
             .iter()
-            .all(|row| row.bindings.iter().all(|binding| {
-                fixture.interner.resolve(binding.name) != "T"
-            }))
+            .all(|row| row
+                .bindings
+                .iter()
+                .all(|binding| { fixture.interner.resolve(binding.name) != "T" }))
     );
 }
 
