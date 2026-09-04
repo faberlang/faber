@@ -369,9 +369,7 @@ impl TypeChecker<'_> {
             if self.is_infer(self.resolve_inferred_type(witness)) {
                 continue;
             }
-            if self
-                .type_arg_rejects_domain(param.name, &param.constraint, witness, span)
-            {
+            if self.type_arg_rejects_domain(param.name, &param.constraint, witness, span) {
                 rejected = true;
             }
         }

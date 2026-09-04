@@ -9,10 +9,9 @@ use crate::file_interface::{
     FileExport, FileExportKind, FileInterface, InterfaceAliasExport, InterfaceAnnotationContract,
     InterfaceAnnotationContractField, InterfaceBodyChannel, InterfaceCallable, InterfaceCallableParam,
     InterfaceDeviceContract, InterfaceDeviceRole, InterfaceDeviceVisibility, InterfaceEnumVariant,
-    InterfaceGenericParam, InterfaceGenericParamDefault, InterfaceIndexSnapshot,
-    InterfaceLibraryIdentity, InterfaceMethodExport, InterfaceNominalExport, InterfaceNominalKind,
-    InterfaceNominalType, InterfaceParam, InterfaceStructExport, InterfaceStructField,
-    InterfaceTypeParamConstraint, InterfaceTypeSnapshot,
+    InterfaceGenericParam, InterfaceGenericParamDefault, InterfaceIndexSnapshot, InterfaceLibraryIdentity,
+    InterfaceMethodExport, InterfaceNominalExport, InterfaceNominalKind, InterfaceNominalType, InterfaceParam,
+    InterfaceStructExport, InterfaceStructField, InterfaceTypeParamConstraint, InterfaceTypeSnapshot,
 };
 use crate::semantic::passes::visibility_annotation::VisibilityTier;
 use crate::semantic::{ContractFieldType, InstansPrecision, NumericWidth, Primitive, SemanticParamMode};
@@ -1595,15 +1594,13 @@ fn interface_callable_params(
                 constraint: InterfaceTypeParamConstraint::Any,
                 default: match &param.default {
                     Some(crate::syntax::GenericParamDefault::Typus(expr)) => {
-                        Some(InterfaceGenericParamDefault::Typus(Box::new(
-                            interface_type_from_type_expr(
-                                expr,
-                                interner,
-                                type_param_names,
-                                nominal_kinds,
-                                ctx,
-                            )?,
-                        )))
+                        Some(InterfaceGenericParamDefault::Typus(Box::new(interface_type_from_type_expr(
+                            expr,
+                            interner,
+                            type_param_names,
+                            nominal_kinds,
+                            ctx,
+                        )?)))
                     }
                     Some(crate::syntax::GenericParamDefault::Magnitudo { value, .. }) => {
                         Some(InterfaceGenericParamDefault::Magnitudo(*value))

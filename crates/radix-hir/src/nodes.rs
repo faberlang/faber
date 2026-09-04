@@ -486,7 +486,9 @@ impl HirTypeParam {
             },
             constraint: match &self.constraint {
                 HirTypeParamConstraint::Any => TypeParamConstraint::Any,
-                HirTypeParamConstraint::OneOf(allowed) => TypeParamConstraint::OneOf(allowed.clone()),
+                HirTypeParamConstraint::OneOf(allowed) => {
+                    TypeParamConstraint::OneOf(allowed.clone())
+                }
             },
             default: self.default.clone(),
         }

@@ -170,10 +170,11 @@ fn imported_shapes() → matrix<f32, [3, 3]> {
         .map(|param| param.name.as_str())
         .collect();
     assert_eq!(add_param_names, vec!["N"]);
-    assert!(add
-        .type_params
-        .iter()
-        .all(|param| param.kind == crate::syntax::GenericParamKind::Magnitudo));
+    assert!(
+        add.type_params
+            .iter()
+            .all(|param| param.kind == crate::syntax::GenericParamKind::Magnitudo)
+    );
     assert_eq!(
         add.params,
         vec![
