@@ -8,9 +8,9 @@
 use crate::{MirLayoutId, MirType};
 use radix_types::{IndexExpr, IndexId, NumericWidth, Primitive, Type, TypeId, TypeTable};
 use rustc_hash::{FxHashMap, FxHashSet};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum MirScalarLayout {
     Bool,
     I8,

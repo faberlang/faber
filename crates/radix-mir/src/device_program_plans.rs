@@ -2687,7 +2687,7 @@ fn recipe_operand_ty(
     };
     call.args
         .first()
-        .and_then(|arg| crate::local_ty::operand_local_ty(function, arg))
+        .and_then(|arg| crate::local_ty::operand_ty(function, arg))
         .ok_or_else(|| {
             PlanMappingError::mapping(format!("{op:?} recipe operand has no local type"))
         })
@@ -3696,7 +3696,7 @@ fn sum_axis_destination_shape(
             return None;
         }
         let operand = call.args.first()?;
-        let operand_ty = crate::local_ty::operand_local_ty(source, operand)?;
+        let operand_ty = crate::local_ty::operand_ty(source, operand)?;
         let dims = crate::tensor_type::tensor_literal_dims(operand_ty, validation).ok()?;
         let axis = match call.args.get(1)? {
             MirOperand::Constant(MirConstant::Int(axis)) => u64::try_from(*axis).ok()?,
@@ -3991,9 +3991,9 @@ fn kernel_matmul_shapes(
             "matmul requires exactly two tensor operands",
         ));
     }
-    let left_ty = crate::local_ty::operand_local_ty(function, &call.args[0])
+    let left_ty = crate::local_ty::operand_ty(function, &call.args[0])
         .ok_or_else(|| PlanMappingError::mapping("matmul left operand has no local type"))?;
-    let right_ty = crate::local_ty::operand_local_ty(function, &call.args[1])
+    let right_ty = crate::local_ty::operand_ty(function, &call.args[1])
         .ok_or_else(|| PlanMappingError::mapping("matmul right operand has no local type"))?;
     let left_dims = crate::tensor_type::tensor_literal_dims(left_ty, validation)
         .map_err(PlanMappingError::mapping)?;
@@ -4079,9 +4079,9 @@ fn matmul_operand_tys(function: &MirFunction) -> Result<(MirType, MirType), Plan
             "matmul subchain has no TensorMatMul statement",
         ));
     };
-    let left_ty = crate::local_ty::operand_local_ty(function, &call.args[0])
+    let left_ty = crate::local_ty::operand_ty(function, &call.args[0])
         .ok_or_else(|| PlanMappingError::mapping("matmul left operand has no local type"))?;
-    let right_ty = crate::local_ty::operand_local_ty(function, &call.args[1])
+    let right_ty = crate::local_ty::operand_ty(function, &call.args[1])
         .ok_or_else(|| PlanMappingError::mapping("matmul right operand has no local type"))?;
     Ok((left_ty, right_ty))
 }

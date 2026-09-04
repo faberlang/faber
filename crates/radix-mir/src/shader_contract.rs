@@ -25,7 +25,7 @@ use crate::{
 };
 use radix_hir::DefId;
 use radix_lexer::Span;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 const ERR_SHADER_VERTEX_FORMAT_CODE: &str = "unsupported shader vertex format code";
 const ERR_SHADER_COLOR_TARGET_CODE: &str = "unsupported shader color target format code";
@@ -50,7 +50,7 @@ fn unsupported_code_error(message: &'static str, issue: &'static str, code: u32)
 /// color-valued stage I/O, and [`Self::Transform`] is the transform storage
 /// resource. [`Self::Other`] is the default for attributes with no special
 /// stage semantics (normals, texture coordinates, …).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
 pub enum ShaderStageIoRole {
     /// Vertex position attribute.
     Position,

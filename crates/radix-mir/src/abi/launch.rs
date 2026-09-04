@@ -155,7 +155,7 @@ impl MirKernelShaderStage {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum MirVertexInputFormat {
     Float32x2,
     Float32x3,
@@ -174,7 +174,7 @@ impl MirVertexInputFormat {
 }
 
 /// Color attachment texture format for a graphics pipeline target.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum MirColorTargetFormat {
     Rgba8Unorm,
     Bgra8Unorm,
@@ -193,7 +193,7 @@ impl MirColorTargetFormat {
 }
 
 /// Primitive topology for draw calls.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum MirPrimitiveTopology {
     TriangleList,
     LineList,
@@ -212,7 +212,7 @@ impl MirPrimitiveTopology {
 }
 
 /// Depth comparison function for depth testing.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum MirDepthCompareFunction {
     Never,
     Less,
@@ -241,7 +241,7 @@ impl MirDepthCompareFunction {
 }
 
 /// Stencil operation applied when the stencil test fails or passes.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum MirStencilOp {
     Keep,
     Zero,
@@ -270,7 +270,7 @@ impl MirStencilOp {
 }
 
 /// Per-face stencil state (front or back).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub struct MirStencilFaceState {
     pub compare: MirDepthCompareFunction,
     pub fail_op: MirStencilOp,
@@ -289,7 +289,7 @@ impl MirStencilFaceState {
 }
 
 /// Depth/stencil state for a graphics pipeline.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub struct MirDepthStencilState {
     pub depth_write_enabled: bool,
     pub depth_compare: MirDepthCompareFunction,
@@ -308,7 +308,7 @@ pub struct MirDepthStencilState {
 /// convenience accessors derived from the vector lengths.
 ///
 /// Produced by [`MirKernelReflection::graphics_pipeline_reflection`].
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct MirGraphicsPipelineReflection {
     pub color_target_formats: Vec<MirColorTargetFormat>,
     pub primitive_topology: MirPrimitiveTopology,

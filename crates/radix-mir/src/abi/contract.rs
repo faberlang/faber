@@ -629,7 +629,7 @@ pub fn collection_op_contract(
                     }
                     let Some(operand_ty) = args
                         .first()
-                        .and_then(|arg| crate::local_ty::operand_local_ty(function, arg))
+                        .and_then(|arg| crate::local_ty::operand_ty(function, arg))
                     else {
                         continue;
                     };
@@ -648,13 +648,13 @@ pub fn collection_op_contract(
                 MirCollectionOp::TensorMatMul => {
                     let Some(left_ty) = args
                         .first()
-                        .and_then(|arg| crate::local_ty::operand_local_ty(function, arg))
+                        .and_then(|arg| crate::local_ty::operand_ty(function, arg))
                     else {
                         continue;
                     };
                     let Some(right_ty) = args
                         .get(1)
-                        .and_then(|arg| crate::local_ty::operand_local_ty(function, arg))
+                        .and_then(|arg| crate::local_ty::operand_ty(function, arg))
                     else {
                         continue;
                     };
@@ -713,7 +713,7 @@ pub fn collection_op_contract(
                 MirCollectionOp::TensorTranspose => {
                     let Some(operand_ty) = args
                         .first()
-                        .and_then(|arg| crate::local_ty::operand_local_ty(function, arg))
+                        .and_then(|arg| crate::local_ty::operand_ty(function, arg))
                     else {
                         continue;
                     };
@@ -1124,7 +1124,7 @@ fn packed_rank2_matmul_operands(
 ) -> Result<([u64; 2], [u64; 2], PackedStorageLayout), MirAbiError> {
     let Some(left_ty) = args
         .first()
-        .and_then(|arg| crate::local_ty::operand_local_ty(function, arg))
+        .and_then(|arg| crate::local_ty::operand_ty(function, arg))
     else {
         return Err(MirAbiError::new(
             "quantized matmul requires a rank-2 left tensor operand",
@@ -1132,7 +1132,7 @@ fn packed_rank2_matmul_operands(
     };
     let Some(right_ty) = args
         .get(1)
-        .and_then(|arg| crate::local_ty::operand_local_ty(function, arg))
+        .and_then(|arg| crate::local_ty::operand_ty(function, arg))
     else {
         return Err(MirAbiError::new(
             "quantized matmul requires a rank-2 right tensor operand",
@@ -1340,7 +1340,7 @@ fn projection_step_rows(
 ) -> Result<u64, MirAbiError> {
     let Some(input_ty) = args
         .first()
-        .and_then(|arg| crate::local_ty::operand_local_ty(function, arg))
+        .and_then(|arg| crate::local_ty::operand_ty(function, arg))
     else {
         return Err(MirAbiError::new(
             "batched projection requires a rank-2 input tensor",
@@ -1411,7 +1411,7 @@ fn grouped_matmul_contract(
 ) -> Result<CollectionOpContract, MirAbiError> {
     let Some(left_ty) = args
         .first()
-        .and_then(|arg| crate::local_ty::operand_local_ty(function, arg))
+        .and_then(|arg| crate::local_ty::operand_ty(function, arg))
     else {
         return Err(MirAbiError::new(
             "grouped matmul requires a left tensor operand",
@@ -1419,7 +1419,7 @@ fn grouped_matmul_contract(
     };
     let Some(right_ty) = args
         .get(1)
-        .and_then(|arg| crate::local_ty::operand_local_ty(function, arg))
+        .and_then(|arg| crate::local_ty::operand_ty(function, arg))
     else {
         return Err(MirAbiError::new(
             "grouped matmul requires a rank-3 right tensor operand",
@@ -1476,13 +1476,13 @@ fn ssm_conv1d_contract(
 ) -> Result<CollectionOpContract, MirAbiError> {
     let Some(input_ty) = args
         .first()
-        .and_then(|arg| crate::local_ty::operand_local_ty(function, arg))
+        .and_then(|arg| crate::local_ty::operand_ty(function, arg))
     else {
         return Err(MirAbiError::new("ssm conv1d requires an input tensor"));
     };
     let Some(kernel_ty) = args
         .get(1)
-        .and_then(|arg| crate::local_ty::operand_local_ty(function, arg))
+        .and_then(|arg| crate::local_ty::operand_ty(function, arg))
     else {
         return Err(MirAbiError::new("ssm conv1d requires a kernel tensor"));
     };
@@ -1525,7 +1525,7 @@ fn ssm_scan_contract(
 ) -> Result<CollectionOpContract, MirAbiError> {
     let Some(input_ty) = args
         .first()
-        .and_then(|arg| crate::local_ty::operand_local_ty(function, arg))
+        .and_then(|arg| crate::local_ty::operand_ty(function, arg))
     else {
         return Err(MirAbiError::new("ssm scan requires an input tensor"));
     };

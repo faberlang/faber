@@ -5,7 +5,9 @@
 //! the kernel decomposition. This is the single implementation; the
 //! [`MirTypeLookup`] trait for place-base resolution lives here too.
 
-use crate::{MirFunction, MirLocalId, MirOperand, MirTempId, MirType};
+use crate::{
+    MirFunction, MirLocalId, MirOperand, MirStatementKind, MirTempId, MirType, MirValueId,
+};
 
 /// The MIR type of a local (params first, then declared locals).
 pub(crate) fn local_ty(function: &MirFunction, local: MirLocalId) -> Option<MirType> {
@@ -28,6 +30,35 @@ pub(crate) fn local_ty(function: &MirFunction, local: MirLocalId) -> Option<MirT
 pub(crate) fn operand_local_ty(function: &MirFunction, operand: &MirOperand) -> Option<MirType> {
     let local = crate::read_analysis::operand_local(operand)?;
     local_ty(function, local)
+}
+
+/// Resolve the type of any typed MIR operand, including compiler-created
+/// temporaries and statement-defined values. Plan mapping needs this broader
+/// lookup for expressions such as `weights.transpose()` whose result is a
+/// `Value`, not a source local.
+pub(crate) fn operand_ty(function: &MirFunction, operand: &MirOperand) -> Option<MirType> {
+    match operand {
+        MirOperand::Place(place) => match place.base {
+            crate::MirPlaceBase::Local(local) => local_ty(function, local),
+            crate::MirPlaceBase::Temp(temp) => function.temp_ty(temp),
+        },
+        MirOperand::Temp(temp) => function.temp_ty(*temp),
+        MirOperand::Value(value) => value_ty(function, *value),
+        MirOperand::Constant(_) => None,
+    }
+}
+
+fn value_ty(function: &MirFunction, value: MirValueId) -> Option<MirType> {
+    function
+        .blocks
+        .iter()
+        .flat_map(|block| &block.statements)
+        .find_map(|statement| {
+            let MirStatementKind::Assign { value: defined, .. } = &statement.kind else {
+                return None;
+            };
+            (defined.id == value).then_some(defined.ty)
+        })
 }
 
 /// Per-function `MirType` lookup for place-base resolution.

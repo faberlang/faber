@@ -3,7 +3,7 @@ use crate::{
     MirScalarLayout, MirType, MirValidationContext, shader_contract::ShaderStageIoRole,
 };
 use radix_types::{IndexExpr, IndexId, Primitive, Type};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 use super::{
     ERR_INDEXED_KERNEL_DEVICE_VIEW, ERR_KERNEL_AGGREGATE_LAYOUT, ERR_KERNEL_BUILTIN_SCALAR_INPUT,
@@ -16,7 +16,7 @@ use super::{
     kernel_atomic_element_count_error, kernel_atomic_param_error, kernel_atomic_reflection_error,
 };
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct MirKernelResourceReflection {
     pub group: u32,
     pub binding: u32,
@@ -96,7 +96,7 @@ pub struct MirKernelBuiltinInput {
     pub ty: MirType,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct MirKernelBuiltinInputReflection {
     pub source_local: MirLocalId,
     pub source_name: Option<String>,
@@ -106,7 +106,7 @@ pub struct MirKernelBuiltinInputReflection {
     pub layout: MirScalarLayout,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum MirKernelResourceKind {
     StorageBuffer,
     /// Runtime-extent count channel (U2, L3/L5).
@@ -135,13 +135,13 @@ impl MirKernelResourceKind {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum MirKernelResourceRole {
     Input,
     Output,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum MirKernelResourceAccess {
     Read,
     Write,
@@ -182,21 +182,21 @@ impl MirKernelBufferBindingKind {
 
 pub(crate) const DEFAULT_KERNEL_RESOURCE_GROUP: u32 = 0;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub struct MirWorkgroupSize {
     pub x: u32,
     pub y: u32,
     pub z: u32,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub struct MirKernelDispatchSize {
     pub x: u64,
     pub y: u64,
     pub z: u64,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub struct MirKernelWorkgroupCount {
     pub x: u64,
     pub y: u64,

@@ -3,7 +3,7 @@ use crate::{
     shader_contract::ShaderStageIoRole,
 };
 use radix_hir::DefId;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 use super::{
     MirGraphicsPipelineReflection, MirKernelBuiltin, MirKernelBuiltinInput,
@@ -358,13 +358,13 @@ impl MirKernelBuiltinUsage {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct MirGpuReflection {
     pub kernels: Vec<MirKernelReflection>,
     pub pipeline: Option<MirGraphicsPipelineReflection>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct MirKernelReflection {
     pub function: MirFunctionId,
     pub provenance: MirKernelProvenance,
@@ -381,14 +381,14 @@ pub struct MirKernelReflection {
     pub workgroup_count: MirKernelWorkgroupCount,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum MirKernelProvenance {
     MirFunction(MirFunctionId),
     SourceFunction(DefId),
 }
 
 /// Vertex input step mode: per-vertex or per-instance.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum MirInputStepMode {
     Vertex,
     Instance,
@@ -404,7 +404,7 @@ impl MirInputStepMode {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct MirVertexInputReflection {
     pub source_name: Option<String>,
     pub location: u32,
@@ -419,7 +419,7 @@ pub struct MirVertexInputReflection {
 /// Vertex-output / fragment-input contract. A varying is a value that flows from
 /// the vertex stage to the fragment stage; its location, format, and
 /// interpolation must agree across both stages.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct MirVaryingReflection {
     pub source_name: String,
     pub location: u32,
@@ -429,7 +429,7 @@ pub struct MirVaryingReflection {
     pub role: ShaderStageIoRole,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum MirVaryingInterpolation {
     Perspective,
     Linear,
@@ -437,7 +437,7 @@ pub enum MirVaryingInterpolation {
 }
 
 /// Fragment render-target output.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct MirFragmentOutputReflection {
     pub location: u32,
     pub format: MirVertexInputFormat,
