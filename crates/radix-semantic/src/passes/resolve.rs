@@ -48,9 +48,10 @@ use crate::error::WarningKind;
 use crate::instans_precision::InstansPrecisionError;
 use crate::numeric_width::WidthError;
 use crate::{
-    BareVariantLookup, CollectionKind, FuncSig, IndexExpr, ParamType, Primitive,
-    QualifiedVariantPathLookup, Resolver, SchemaColumnDef, SchemaDef, ScopeKind, SemanticError,
-    SemanticErrorKind, SemanticParamMode, Symbol, SymbolKind, Type, TypeId, TypeTable,
+    BareVariantLookup, CollectionKind, FuncSig, GenericParamDescriptor, GenericParamSort,
+    IndexExpr, ParamType, Primitive, QualifiedVariantPathLookup, Resolver, SchemaColumnDef,
+    SchemaDef, ScopeKind, SemanticError, SemanticErrorKind, SemanticGenericParamDefault,
+    SemanticParamMode, Symbol, SymbolKind, Type, TypeId, TypeTable,
 };
 use radix_hir::DefId;
 use radix_lexer::Interner;
@@ -60,7 +61,7 @@ use radix_syntax::{
     Program, SiStmt, Stmt, StmtKind, TypeExpr, TypeExprKind, TypeParam,
 };
 use radix_types::AppliedArg;
-use unicode_normalization::{UnicodeNormalization, char::is_combining_mark};
+use unicode_normalization::{char::is_combining_mark, UnicodeNormalization};
 
 const ISSUE_DUPLICATE_DEFINITION: &str = "duplicate_definition";
 const ISSUE_EMPTY_QUALIFIED_TYPE_PATH: &str = "empty_qualified_type_path";
@@ -191,6 +192,7 @@ pub fn resolve(
     resolve_selective_imports(program, resolver, interner, types, &mut errors);
 
     resolve_alias_types(&aliases, resolver, interner, types, &mut errors);
+    register_named_generic_descriptors(program, resolver, interner, types, &mut errors);
     resolve_schema_decls(program, resolver, interner, types, &mut errors);
 
     if errors.is_empty() {
@@ -2905,6 +2907,79 @@ enum TypeLowerError {
     CollectionArity(CollectionKind),
 }
 
+/// Register complete generic descriptors for named declarations after aliases
+/// have been resolved. The resolver's kind rows predate declaration defaults;
+/// this identity-keyed row lets HIR lowering apply the same ordered
+/// explicit-prefix/default-suffix law used by callable binding.
+fn register_named_generic_descriptors(
+    program: &Program,
+    resolver: &mut Resolver,
+    interner: &Interner,
+    types: &mut TypeTable,
+    errors: &mut Vec<SemanticError>,
+) {
+    for stmt in &program.statements {
+        let (name, params) = match &stmt.kind {
+            StmtKind::TypeAlias(decl) => (&decl.name, &decl.type_params),
+            StmtKind::Class(decl) => (&decl.name, &decl.type_params),
+            StmtKind::Interface(decl) => (&decl.name, &decl.type_params),
+            StmtKind::Union(decl) => (&decl.name, &decl.type_params),
+            _ => continue,
+        };
+        let Some(def_id) = resolver.lookup(name.name) else {
+            continue;
+        };
+
+        resolver.enter_scope(ScopeKind::Module);
+        for param in params {
+            define_generic_param(resolver, param, errors);
+        }
+        let mut descriptors = Vec::with_capacity(params.len());
+        for param in params {
+            let default = match &param.default {
+                Some(radix_syntax::GenericParamDefault::Typus(ty)) => {
+                    match lower_type_expr(ty, resolver, interner, types) {
+                        Ok(default) => Some(SemanticGenericParamDefault::Typus(default)),
+                        Err(error) => {
+                            record_type_lowering_error(error, ty.span, errors);
+                            None
+                        }
+                    }
+                }
+                Some(radix_syntax::GenericParamDefault::Magnitudo { value, .. }) => {
+                    Some(SemanticGenericParamDefault::Magnitudo(*value))
+                }
+                None => None,
+            };
+            descriptors.push(GenericParamDescriptor {
+                name: param.name.name,
+                sort: match param.kind {
+                    radix_syntax::GenericParamKind::Typus => GenericParamSort::Typus,
+                    radix_syntax::GenericParamKind::Magnitudo => GenericParamSort::Magnitudo,
+                },
+                constraint: crate::TypeParamConstraint::Any,
+                default,
+            });
+        }
+        resolver.exit_scope();
+        resolver.register_generic_param_descriptors(def_id, descriptors);
+    }
+}
+
+fn record_type_lowering_error(
+    error: TypeLowerError,
+    span: radix_lexer::Span,
+    errors: &mut Vec<SemanticError>,
+) {
+    match error {
+        TypeLowerError::UnboundAlias => errors.push(lowering_error(ISSUE_TYPE_ALIAS_CYCLE, span)),
+        TypeLowerError::Issue(issue) => errors.push(lowering_error(issue, span)),
+        TypeLowerError::CollectionArity(collection) => {
+            errors.push(lowering_collection_arity_error(collection, span))
+        }
+    }
+}
+
 fn resolve_alias_types(
     aliases: &[AliasEntry<'_>],
     resolver: &mut Resolver,
@@ -3260,7 +3335,11 @@ fn lower_type_expr_with_context(
             } else {
                 types.intern(Type::Union(cleaned))
             };
-            if had_nihil { types.option(base) } else { base }
+            if had_nihil {
+                types.option(base)
+            } else {
+                base
+            }
         }
     };
 

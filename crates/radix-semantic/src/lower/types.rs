@@ -29,8 +29,8 @@
 
 use super::Lowerer;
 use crate::{
-    CollectionKind, FuncSig, IndexExpr, IndexId, InferVar, ParamType, Primitive, SemanticParamMode,
-    Type, TypeId,
+    CollectionKind, FuncSig, IndexExpr, IndexId, InferVar, ParamType, Primitive,
+    SemanticGenericParamDefault, SemanticParamMode, Type, TypeId,
 };
 use radix_syntax::{FiguraExpr, GenericArgExpr, GenericParamKind, Ident, TypeExpr, TypeExprKind};
 use radix_types::AppliedArg;
@@ -482,16 +482,56 @@ impl Lowerer<'_> {
         }
     }
 
+    /// Lower a named declaration's explicit prefix and append its declared
+    /// trailing defaults. This is the type-application counterpart of the
+    /// GPD-3 callable binder: positional explicit arguments are sort-checked,
+    /// only a defaulted suffix may be omitted, and a required omission fails
+    /// before an incomplete `Type::Applied` can escape lowering.
     fn lower_declared_applied_args(
         &mut self,
         def_id: crate::DefId,
         params: &[GenericArgExpr],
-    ) -> Vec<AppliedArg> {
-        let kinds = self
+    ) -> Option<Vec<AppliedArg>> {
+        let descriptors = self
             .resolver
-            .generic_param_kinds(def_id)
+            .generic_param_descriptors(def_id)
             .map(ToOwned::to_owned);
-        self.lower_applied_args_directed(kinds.as_deref(), params)
+        let Some(descriptors) = descriptors else {
+            let kinds = self
+                .resolver
+                .generic_param_kinds(def_id)
+                .map(ToOwned::to_owned);
+            return Some(self.lower_applied_args_directed(kinds.as_deref(), params));
+        };
+
+        if !crate::types::generic_explicit_prefix_len_in_range(&descriptors, params.len()) {
+            self.error("generic_argument_arity_mismatch");
+            return None;
+        }
+
+        let kinds: Vec<GenericParamKind> = descriptors
+            .iter()
+            .map(|param| match param.sort {
+                crate::GenericParamSort::Typus => GenericParamKind::Typus,
+                crate::GenericParamSort::Magnitudo => GenericParamKind::Magnitudo,
+            })
+            .collect();
+        let mut args = self.lower_applied_args_directed(Some(&kinds[..params.len()]), params);
+        for descriptor in descriptors.iter().skip(params.len()) {
+            let Some(default) = &descriptor.default else {
+                // This is only reachable for a malformed non-trailing
+                // declaration default. Keep the binder fail-closed.
+                self.error("generic_argument_arity_mismatch");
+                return None;
+            };
+            args.push(match default {
+                SemanticGenericParamDefault::Typus(ty) => AppliedArg::Type(*ty),
+                SemanticGenericParamDefault::Magnitudo(value) => {
+                    AppliedArg::Size(self.types.intern_index(IndexExpr::Literal(*value)))
+                }
+            });
+        }
+        Some(args)
     }
 
     /// Lower applied arguments under an ordered declaration-kind list.
@@ -804,11 +844,24 @@ impl Lowerer<'_> {
             }
         };
 
-        if params.is_empty() {
+        let has_declared_params = self
+            .resolver
+            .generic_param_descriptors(def_id)
+            .is_some_and(|descriptors| !descriptors.is_empty())
+            || self
+                .resolver
+                .generic_param_kinds(def_id)
+                .is_some_and(|kinds| !kinds.is_empty());
+        if params.is_empty() && !has_declared_params {
             return base;
         }
 
-        let args = self.lower_declared_applied_args(def_id, params);
+        let Some(args) = self.lower_declared_applied_args(def_id, params) else {
+            return self.types.intern(Type::Error);
+        };
+        if args.is_empty() {
+            return base;
+        }
         self.types.intern(Type::Applied(base, args))
     }
 
@@ -1104,19 +1157,33 @@ impl Lowerer<'_> {
             .resolver
             .namespace_exports_member(namespace.name, type_name.name)
         {
-            if let Some(type_id) = self
-                .resolver
-                .lookup_type(type_name.name)
-                .and_then(|def_id| self.resolver.get_symbol(def_id))
-                .and_then(|symbol| symbol.ty)
+            if let Some((def_id, type_id)) =
+                self.resolver
+                    .lookup_type(type_name.name)
+                    .and_then(|def_id| {
+                        self.resolver
+                            .get_symbol(def_id)
+                            .and_then(|symbol| symbol.ty)
+                            .map(|type_id| (def_id, type_id))
+                    })
             {
-                if params.is_empty() {
+                let has_declared_params = self
+                    .resolver
+                    .generic_param_descriptors(def_id)
+                    .is_some_and(|descriptors| !descriptors.is_empty())
+                    || self
+                        .resolver
+                        .generic_param_kinds(def_id)
+                        .is_some_and(|kinds| !kinds.is_empty());
+                if params.is_empty() && !has_declared_params {
                     return type_id;
                 }
-                let args = params
-                    .iter()
-                    .map(|param| self.lower_applied_arg(param))
-                    .collect();
+                let Some(args) = self.lower_declared_applied_args(def_id, params) else {
+                    return self.types.intern(Type::Error);
+                };
+                if args.is_empty() {
+                    return type_id;
+                }
                 return self.types.intern(Type::Applied(type_id, args));
             }
         }

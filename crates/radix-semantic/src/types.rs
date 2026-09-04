@@ -6,16 +6,31 @@
 //! semantic callers keep one path.
 
 pub use radix_types::{
-    ATOMIC_ELEMENT_MSG, AccessMarker, CollectionKind, CollectionTypeSpec, FuncSig,
-    GenericBindingSource, GenericParamDescriptor, GenericParamSort, GenericWitness,
-    INTERVALLUM_BOUND_MSG, InferVar, MarkerFamily, ParamType, Primitive, PrimitiveTypeSpec,
+    collection_type_specs, is_atomic_element_type, is_intervallum_bound_type,
+    lookup_collection_type_spec, lookup_primitive_type_spec, lookup_tensor_family_type_spec,
+    primitive_type_specs, tensor_family_type_specs, AccessMarker, CollectionKind,
+    CollectionTypeSpec, FuncSig, GenericBindingSource, GenericParamDescriptor, GenericParamSort,
+    GenericWitness, InferVar, MarkerFamily, ParamType, Primitive, PrimitiveTypeSpec,
     ResolvedGenericBinding, ResolvedGenericCall, SemanticGenericParamDefault, SemanticMutability,
     SemanticParamMode, TensorFamilyKind, TensorFamilyTypeSpec, Type, TypeId, TypeParamConstraint,
-    TypeTable, TypeTableSnapshot, collection_type_specs, is_atomic_element_type,
-    is_intervallum_bound_type, lookup_collection_type_spec, lookup_primitive_type_spec,
-    lookup_tensor_family_type_spec, primitive_type_specs, tensor_family_type_specs,
+    TypeTable, TypeTableSnapshot, ATOMIC_ELEMENT_MSG, INTERVALLUM_BOUND_MSG,
 };
 pub use radix_types::{SchemaColumnDef, SchemaDef};
+
+/// Whether an explicit generic prefix is admissible under the shared
+/// explicit-prefix/default-suffix binder law. A prefix must cover every
+/// non-defaulted descriptor and may omit only the trailing defaulted suffix.
+#[must_use]
+pub fn generic_explicit_prefix_len_in_range(
+    params: &[radix_types::GenericParamDescriptor],
+    len: usize,
+) -> bool {
+    let required = params
+        .iter()
+        .take_while(|param| param.default.is_none())
+        .count();
+    len >= required && len <= params.len()
+}
 
 /// Stable lowering issue for a marker on a scalar carrier.
 pub const ISSUE_SCALAR_ACCESS_MARKER: &str = "scalar_access_marker";
