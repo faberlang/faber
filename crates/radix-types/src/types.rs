@@ -99,6 +99,13 @@ pub struct TypeTable {
     /// Populated during typecheck so exhaustiveness and return-path passes can
     /// resolve imported enums whose variants are not declared in the local HIR.
     pub variant_parent: FxHashMap<DefId, DefId>,
+
+    /// Complete resolved generic vectors for checked generic calls, in call
+    /// checking order.
+    ///
+    /// Populated during typecheck (see [`ResolvedGenericCall`]) so consumers
+    /// read the binding result instead of re-running inference.
+    pub resolved_generic_calls: Vec<ResolvedGenericCall>,
 }
 
 /// Opaque serialized view of a [`TypeTable`] for MIR images.
@@ -144,6 +151,7 @@ impl TypeTable {
             find_equal_memo: RefCell::new(FxHashMap::default()),
             first_modular_word: None,
             variant_parent: FxHashMap::default(),
+            resolved_generic_calls: Vec::new(),
         };
 
         for prim in [
@@ -357,6 +365,7 @@ impl TypeTable {
             find_equal_memo: RefCell::new(FxHashMap::default()),
             first_modular_word,
             variant_parent: FxHashMap::default(),
+            resolved_generic_calls: Vec::new(),
         })
     }
 
@@ -2229,6 +2238,46 @@ pub struct GenericParamDescriptor {
 pub enum TypeParamConstraint {
     Any,
     OneOf(Vec<TypeId>),
+}
+
+/// How the call binder resolved one generic parameter.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum GenericBindingSource {
+    /// Bound by the caller's explicit generic prefix.
+    Explicit,
+    /// Solved from value arguments, receiver shapes, or the expected result.
+    Inferred,
+    /// Still unbound after inference; the declaration's `=` default fired.
+    Defaulted,
+}
+
+/// Resolved witness of one generic parameter at a checked call.
+///
+/// The variant matches the parameter's declared [`GenericParamSort`]: type
+/// parameters bind a type, size parameters bind an index expression.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum GenericWitness {
+    Typus(TypeId),
+    Magnitudo(IndexId),
+}
+
+/// One parameter's resolved binding, in declaration order.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct ResolvedGenericBinding {
+    pub name: LexSymbol,
+    pub source: GenericBindingSource,
+    pub witness: GenericWitness,
+}
+
+/// Complete ordered resolved generic vector for one checked generic call.
+///
+/// Recorded by the typecheck binder so downstream specialization never has to
+/// repeat inference or guess which defaults fired. Rows accumulate in call
+/// checking order; the span identifies the call site within the source module.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ResolvedGenericCall {
+    pub call_span: radix_lexer::Span,
+    pub bindings: Vec<ResolvedGenericBinding>,
 }
 
 /// Type and passing policy for one function parameter.

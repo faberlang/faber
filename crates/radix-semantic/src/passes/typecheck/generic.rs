@@ -21,6 +21,9 @@ use radix_hir::HirCallArg;
 
 const ISSUE_GENERIC_TYPE_ARG_DOMAIN: &str = "generic_type_arg_domain";
 const ISSUE_EXPRESSION_TYPE_MISMATCH: &str = "expression_type_mismatch";
+/// GPD-3: an explicit generic argument whose spelling does not match the
+/// declared sort of the positional parameter it would bind.
+const ISSUE_GENERIC_TYPE_ARG_SORT: &str = "generic_type_arg_sort";
 
 /// Diagnostic issue for a shape param left unbound at a call site (D6).
 ///
@@ -80,43 +83,116 @@ impl TypeChecker<'_> {
         } else {
             FxHashSet::default()
         };
-        let (sig, inferred_vars, shape_vars) = if explicit_type_args.is_empty() {
-            let mut param_vars = FxHashMap::default();
-            let mut shape_vars = self.shape_vars_for(sig, &shape_symbols);
-            let sig = self.substitute_func_sig(sig, &mut param_vars, Some(&mut shape_vars));
-            (sig, Some(param_vars), shape_vars)
-        } else if let Some(error_ty) = self.reject_invalid_explicit_type_args(
-            sig,
-            explicit_type_args,
-            args,
-            span,
-        ) {
-            return error_ty;
-        } else if self.reject_type_arg_domain_misses(sig, explicit_type_args, span) {
-            self.typecheck_call_arg_exprs(args);
-            return self.error_type;
-        } else {
-            let mut param_vars = FxHashMap::default();
-            for (param, ty) in sig
-                .type_params
-                .iter()
-                .filter(|param| param.sort == GenericParamSort::Typus)
-                .zip(explicit_type_args.iter())
-            {
-                param_vars.insert(param.name, *ty);
-            }
-            let mut shape_vars = self.shape_vars_for(sig, &shape_symbols);
-            self.bind_explicit_magnitudo_args(sig, explicit_type_args, &mut shape_vars);
-            (
-                self.substitute_func_sig(sig, &mut param_vars, Some(&mut shape_vars)),
-                Some(param_vars),
-                shape_vars,
-            )
-        };
+        let (sig, inferred_vars, mut shape_vars, explicit_bound) =
+            if explicit_type_args.is_empty() {
+                let mut param_vars = FxHashMap::default();
+                // Pre-create one infer per Typus descriptor so a param that
+                // occurs in no signature type still has a bindable slot for
+                // defaults and for the resolved-binding record.
+                for param in &sig.type_params {
+                    if param.sort == GenericParamSort::Typus {
+                        let infer = self.fresh_infer();
+                        param_vars.insert(param.name, infer);
+                    }
+                }
+                let mut shape_vars = self.shape_vars_for(sig, &shape_symbols);
+                let sig = self.substitute_func_sig(sig, &mut param_vars, Some(&mut shape_vars));
+                (sig, Some(param_vars), shape_vars, FxHashSet::default())
+            } else if let Some(error_ty) = self.reject_invalid_explicit_type_args(
+                sig,
+                explicit_type_args,
+                args,
+                span,
+            ) {
+                return error_ty;
+            } else if self.reject_type_arg_domain_misses(sig, explicit_type_args, span) {
+                self.typecheck_call_arg_exprs(args);
+                return self.error_type;
+            } else {
+                let mut param_vars = FxHashMap::default();
+                let mut explicit_bound = FxHashSet::default();
+                let size_prefix = self.explicit_args_are_magnitudo_list(explicit_type_args)
+                    || (sig
+                        .type_params
+                        .iter()
+                        .all(|param| param.sort != GenericParamSort::Typus)
+                        && self.explicit_args_are_size_witnesses(explicit_type_args));
+                if size_prefix {
+                    // Positional size prefix: every zipped descriptor is a
+                    // magnitudo param (sort-checked by the arity validator).
+                    let mut shape_vars = self.shape_vars_for(sig, &shape_symbols);
+                    self.bind_explicit_magnitudo_args(
+                        sig,
+                        explicit_type_args,
+                        &mut shape_vars,
+                        &mut explicit_bound,
+                    );
+                    for param in &sig.type_params {
+                        if param.sort == GenericParamSort::Typus {
+                            let infer = self.fresh_infer();
+                            param_vars.insert(param.name, infer);
+                        }
+                    }
+                    (
+                        self.substitute_func_sig(sig, &mut param_vars, Some(&mut shape_vars)),
+                        Some(param_vars),
+                        shape_vars,
+                        explicit_bound,
+                    )
+                } else {
+                    // Type prefix binds the leading typus params; the rest are
+                    // instantiated as fresh infers so inference can solve them.
+                    for (param, ty) in sig
+                        .type_params
+                        .iter()
+                        .filter(|param| param.sort == GenericParamSort::Typus)
+                        .zip(explicit_type_args.iter())
+                    {
+                        param_vars.insert(param.name, *ty);
+                        explicit_bound.insert(param.name);
+                    }
+                    for param in &sig.type_params {
+                        if param.sort == GenericParamSort::Typus {
+                            param_vars
+                                .entry(param.name)
+                                .or_insert_with(|| self.fresh_infer());
+                        }
+                    }
+                    let mut shape_vars = self.shape_vars_for(sig, &shape_symbols);
+                    (
+                        self.substitute_func_sig(sig, &mut param_vars, Some(&mut shape_vars)),
+                        Some(param_vars),
+                        shape_vars,
+                        explicit_bound,
+                    )
+                }
+            };
 
         self.check_call_args(&sig, args, span);
         if let Some(expected) = expected {
             self.unify_carrier_assign(sig.ret, expected, span, ISSUE_EXPRESSION_TYPE_MISMATCH);
+        }
+        // GPD-3: inference is complete, so declared defaults now bind every
+        // still-unbound parameter and the complete ordered vector is recorded
+        // for downstream specialization. A defaulted hole counts as bound, so
+        // the rejections below only fire for genuinely unresolved slots.
+        if solve_shape_params {
+            if let Some(param_vars) = &inferred_vars {
+                if let Some(bindings) = self.resolve_generic_bindings(
+                    &sig,
+                    param_vars,
+                    &mut shape_vars,
+                    &explicit_bound,
+                    span,
+                ) {
+                    self.types
+                        .resolved_generic_calls
+                        .push(ResolvedGenericCall {
+                            call_span: span,
+                            bindings,
+                        });
+                }
+            }
         }
         // D6: a shape param bound by neither arguments nor the expected type is
         // an explicit error (SEM014), never a silent guess.
@@ -136,9 +212,10 @@ impl TypeChecker<'_> {
 
     /// Returns the shared error type when explicit args are invalid for `sig`.
     ///
-    /// A NATURAL-only list whose length matches the full param list binds
-    /// magnitudo params. Otherwise arity counts Typus params; shape params
-    /// then bind from argument/expected shapes (D1).
+    /// A NATURAL-only list binds the leading magnitudo descriptors
+    /// positionally; a non-natural list counts Typus params. Either way the
+    /// prefix may omit only a trailing defaulted suffix (GPD-3), and every
+    /// bound argument must match its descriptor's declared sort.
     fn reject_invalid_explicit_type_args(
         &mut self,
         sig: &FuncSig,
@@ -149,18 +226,38 @@ impl TypeChecker<'_> {
         debug_assert!(!explicit_type_args.is_empty());
 
         if self.explicit_args_are_magnitudo_list(explicit_type_args) {
-            if explicit_type_args.len() == sig.type_params.len() {
-                return None;
+            for param in sig
+                .type_params
+                .iter()
+                .zip(explicit_type_args.iter())
+                .map(|(param, _)| param)
+            {
+                if param.sort == GenericParamSort::Typus {
+                    self.reject_type_arg_sort(param, span);
+                    self.typecheck_call_arg_exprs(args);
+                    return Some(self.error_type);
+                }
             }
-            self.wrong_arity("wrong_number_of_type_arguments", span);
-            self.typecheck_call_arg_exprs(args);
-            return Some(self.error_type);
+            if !self.explicit_prefix_len_in_range(&sig.type_params, explicit_type_args.len()) {
+                self.wrong_arity("wrong_number_of_type_arguments", span);
+                self.typecheck_call_arg_exprs(args);
+                return Some(self.error_type);
+            }
+            return None;
         }
 
         let type_param_count = sig
             .type_params
             .iter()
             .filter(|param| param.sort == GenericParamSort::Typus)
+            .count();
+        // Trailing defaults make the defaulted Typus params a suffix of the
+        // Typus list, so the required prefix is the non-defaulted Typus count.
+        let typus_min = sig
+            .type_params
+            .iter()
+            .filter(|param| param.sort == GenericParamSort::Typus)
+            .take_while(|param| param.default.is_none())
             .count();
         if type_param_count == 0 {
             // GSF-1: a size-only callee also accepts caller-owned symbolic
@@ -170,21 +267,35 @@ impl TypeChecker<'_> {
             if !sig.type_params.is_empty()
                 && self.explicit_args_are_size_witnesses(explicit_type_args)
             {
-                if explicit_type_args.len() == sig.type_params.len() {
-                    return None;
+                if !self.explicit_prefix_len_in_range(&sig.type_params, explicit_type_args.len())
+                {
+                    self.wrong_arity("wrong_number_of_type_arguments", span);
+                    self.typecheck_call_arg_exprs(args);
+                    return Some(self.error_type);
                 }
-                self.wrong_arity("wrong_number_of_type_arguments", span);
-                self.typecheck_call_arg_exprs(args);
-                return Some(self.error_type);
+                return None;
             }
             self.wrong_arity("callee_type_args_unsupported", span);
             self.typecheck_call_arg_exprs(args);
             return Some(self.error_type);
         }
-        if explicit_type_args.len() != type_param_count {
+        let len = explicit_type_args.len();
+        if len < typus_min || len > type_param_count {
             self.wrong_arity("wrong_number_of_type_arguments", span);
             self.typecheck_call_arg_exprs(args);
             return Some(self.error_type);
+        }
+        for (param, ty) in sig
+            .type_params
+            .iter()
+            .filter(|param| param.sort == GenericParamSort::Typus)
+            .zip(explicit_type_args.iter())
+        {
+            if self.magnitudo_literal_of(*ty).is_some() {
+                self.reject_type_arg_sort(param, span);
+                self.typecheck_call_arg_exprs(args);
+                return Some(self.error_type);
+            }
         }
         if explicit_type_args
             .iter()
@@ -199,6 +310,38 @@ impl TypeChecker<'_> {
             return Some(self.error_type);
         }
         None
+    }
+
+    /// Whether an explicit prefix of `len` arguments is an admissible length
+    /// for `params` in positional order: it must cover every non-defaulted
+    /// parameter and may omit only the defaulted trailing suffix.
+    fn explicit_prefix_len_in_range(
+        &self,
+        params: &[radix_types::GenericParamDescriptor],
+        len: usize,
+    ) -> bool {
+        let required = params
+            .iter()
+            .take_while(|param| param.default.is_none())
+            .count();
+        len >= required && len <= params.len()
+    }
+
+    /// Structured wrong-sort rejection for one explicit generic argument.
+    fn reject_type_arg_sort(&mut self, param: &radix_types::GenericParamDescriptor, span: radix_lexer::Span) {
+        let param_name = self.interner.map_or_else(
+            || "T".to_owned(),
+            |interner| interner.resolve(param.name).to_owned(),
+        );
+        let expected = match param.sort {
+            GenericParamSort::Typus => "a type argument",
+            GenericParamSort::Magnitudo => "a size argument",
+        };
+        self.invalid_operand_types_with_args(
+            ISSUE_GENERIC_TYPE_ARG_SORT,
+            span,
+            &[("param", param_name), ("expected", expected.to_owned())],
+        );
     }
 
     fn reject_type_arg_domain_misses(
@@ -540,12 +683,123 @@ impl TypeChecker<'_> {
         sig: &FuncSig,
         explicit_type_args: &[TypeId],
         shape_vars: &mut FxHashMap<Symbol, crate::IndexId>,
+        explicit_bound: &mut FxHashSet<Symbol>,
     ) {
         for (param, ty) in sig.type_params.iter().zip(explicit_type_args.iter()) {
             if let Some(index) = self.explicit_size_witness_index(*ty) {
                 shape_vars.insert(param.name, index);
+                explicit_bound.insert(param.name);
             }
         }
+    }
+
+    /// GPD-3 ordered binding result: explicit prefix, then inference, then the
+    /// declared default. Returns `None` when any slot stays unresolved after
+    /// all three stages, in which case no complete vector is recorded.
+    ///
+    /// A defaulted type param binds its still-unsolved infer var, and a
+    /// defaulted size param solves its still-unsolved index hole, so later
+    /// checks (constraints, D6 shape rejection) observe the default witness.
+    fn resolve_generic_bindings(
+        &mut self,
+        sig: &FuncSig,
+        param_vars: &FxHashMap<Symbol, TypeId>,
+        shape_vars: &mut FxHashMap<Symbol, IndexId>,
+        explicit_bound: &FxHashSet<Symbol>,
+        span: radix_lexer::Span,
+    ) -> Option<Vec<ResolvedGenericBinding>> {
+        let mut bindings = Vec::with_capacity(sig.type_params.len());
+        for param in &sig.type_params {
+            let (source, witness) = if explicit_bound.contains(&param.name) {
+                (GenericBindingSource::Explicit, self.witness_of(param, param_vars, shape_vars)?)
+            } else {
+                match param.sort {
+                    GenericParamSort::Typus => {
+                        let var_ty = *param_vars.get(&param.name)?;
+                        let resolved = self.resolve_inferred_type(var_ty);
+                        if !self.is_infer(resolved) {
+                            (GenericBindingSource::Inferred, GenericWitness::Typus(resolved))
+                        } else if let Some(
+                            SemanticGenericParamDefault::Typus(default_ty),
+                        ) = param.default
+                        {
+                            let bound = self.bind_type_param_default(var_ty, default_ty, span)?;
+                            (GenericBindingSource::Defaulted, GenericWitness::Typus(bound))
+                        } else {
+                            return None;
+                        }
+                    }
+                    GenericParamSort::Magnitudo => {
+                        let hole = *shape_vars.get(&param.name)?;
+                        let resolved = self.resolve_index(hole);
+                        if !matches!(self.types.get_index(resolved), IndexExpr::Infer(_)) {
+                            (GenericBindingSource::Inferred, GenericWitness::Magnitudo(resolved))
+                        } else if let Some(
+                            SemanticGenericParamDefault::Magnitudo(value),
+                        ) = param.default
+                        {
+                            let bound = self.bind_size_param_default(resolved, value);
+                            (GenericBindingSource::Defaulted, GenericWitness::Magnitudo(bound))
+                        } else {
+                            return None;
+                        }
+                    }
+                }
+            };
+            bindings.push(ResolvedGenericBinding {
+                name: param.name,
+                source,
+                witness,
+            });
+        }
+        Some(bindings)
+    }
+
+    /// Witness for an explicitly bound parameter, read back from the binding
+    /// maps. Returns `None` when the maps lack the slot (never expected for a
+    /// bound param, but keeps the caller total).
+    fn witness_of(
+        &mut self,
+        param: &radix_types::GenericParamDescriptor,
+        param_vars: &FxHashMap<Symbol, TypeId>,
+        shape_vars: &mut FxHashMap<Symbol, IndexId>,
+    ) -> Option<GenericWitness> {
+        match param.sort {
+            GenericParamSort::Typus => {
+                let ty = self.resolve_inferred_type(*param_vars.get(&param.name)?);
+                Some(GenericWitness::Typus(ty))
+            }
+            GenericParamSort::Magnitudo => {
+                let id = self.resolve_index(*shape_vars.get(&param.name)?);
+                Some(GenericWitness::Magnitudo(id))
+            }
+        }
+    }
+
+    /// Solve one still-unsolved type infer var to its declared default.
+    /// Returns `None` when the bind failed and reported its own diagnostic.
+    fn bind_type_param_default(
+        &mut self,
+        var_ty: TypeId,
+        default_ty: TypeId,
+        span: radix_lexer::Span,
+    ) -> Option<TypeId> {
+        if let Some(var) = self.infer_var_of(var_ty) {
+            self.bind_infer_exact_issue(var, default_ty, span, ISSUE_GENERIC_TYPE_ARG_DOMAIN);
+        }
+        let bound = self.resolve_inferred_type(var_ty);
+        if self.is_infer(bound) {
+            return None;
+        }
+        Some(bound)
+    }
+
+    /// Solve one still-unsolved index hole to its declared natural default.
+    fn bind_size_param_default(&mut self, hole: IndexId, value: u64) -> IndexId {
+        let literal = self.types.intern_index(IndexExpr::Literal(value));
+        let mut unifier = self.index_infer.unifier(self.types);
+        let _ = unifier.unify(hole, literal);
+        literal
     }
 
     /// Allocate one fresh index hole per distinct shape-param symbol (D1).

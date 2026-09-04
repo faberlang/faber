@@ -2292,6 +2292,10 @@ help = "make the success type and the error channel distinguishable, or handle t
 message = "type argument {rejected} is not allowed for {param}; expected one of {accepted}"
 help = "choose one of the allowed type arguments for this generic parameter"
 
+[diagnostics.SEM011.issues.generic_type_arg_sort]
+message = "generic parameter {param} expects {expected}, but the positional argument has the other kind"
+help = "match each explicit generic argument to the declared sort of the parameter it binds"
+
 [diagnostics.SEM011.issues.gpu_builtin_device_function_required]
 message = "GPU builtin call is only valid inside device functions"
 help = "call GPU builtins only inside @ nucleum or @ nucleum fragment functions"

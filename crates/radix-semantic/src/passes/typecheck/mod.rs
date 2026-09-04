@@ -59,9 +59,10 @@
 
 use crate::locale::LocalePack;
 use crate::{
-    FuncSig, GenericParamSort, IndexExpr, IndexInferState, MarkerFamily, NumericWidth, ParamType,
-    Primitive, Resolver, SemanticError, SemanticErrorKind, SemanticParamMode, Type, TypeId,
-    TypeParamConstraint, TypeTable, WarningKind, types::InferVar,
+    FuncSig, GenericBindingSource, GenericParamSort, GenericWitness, IndexExpr, IndexInferState,
+    MarkerFamily, NumericWidth, ParamType, Primitive, ResolvedGenericBinding, ResolvedGenericCall,
+    Resolver, SemanticError, SemanticErrorKind, SemanticGenericParamDefault, SemanticParamMode,
+    Type, TypeId, TypeParamConstraint, TypeTable, WarningKind, types::InferVar,
 };
 use radix_hir::{
     DefId, HirArrayElement, HirAvailability, HirBinOp, HirBlock, HirCape, HirCasuArm,
@@ -955,3 +956,7 @@ mod union_pattern_test;
 #[cfg(test)]
 #[path = "union_value_test.rs"]
 mod union_value_test;
+
+#[cfg(test)]
+#[path = "generic_defaults_test.rs"]
+mod generic_defaults_test;
