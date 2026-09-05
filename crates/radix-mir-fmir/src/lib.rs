@@ -46,6 +46,16 @@ pub use schema::{
     validate_artifact_combination, validate_compiled_in_target, validate_duplicate_target_features,
     validate_target_features,
 };
+pub use schema::{
+    HOST_EXECUTION_SCHEMA, HOST_EXECUTION_WIRE_VERSION, HOST_INVOCATION_SCHEMA,
+    HOST_INVOCATION_WIRE_VERSION, HostExecutionWireError, WireHostAccessV1, WireHostArtifactV1,
+    WireHostBindingWindowV1, WireHostDependencyV1, WireHostExecutionEnvelopeV1,
+    WireHostExecutionProgramV1, WireHostInitializationV1, WireHostInvocationEnvelopeV1,
+    WireHostInvocationV1, WireHostInvocationWindowV1, WireHostKernelSlotV1, WireHostKernelV1,
+    WireHostLaunchBindingV1, WireHostLaunchV1, WireHostObservationV1, WireHostResourceLifetimeV1,
+    WireHostResourceV1, WireHostTargetV1, encode_host_execution_v1, encode_host_invocation_v1,
+    host_execution_sha256, host_invocation_sha256,
+};
 
 #[cfg(test)]
 #[path = "device_payload_test.rs"]

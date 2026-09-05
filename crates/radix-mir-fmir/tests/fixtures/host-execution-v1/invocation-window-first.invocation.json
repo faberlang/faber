@@ -1,0 +1,1 @@
+{"schema":"faber.host-invocation","version":1,"invocation":{"execution_sha256":"sha256:05250d35103261dbe7f76eb1235e816cdf7031ee1261fb7947d87e6bf5c5dec8","correlation_id":"invocation-window-first","windows":[{"window_slot":1,"byte_offset":16,"byte_length":16}],"requested_observations":[]}}
