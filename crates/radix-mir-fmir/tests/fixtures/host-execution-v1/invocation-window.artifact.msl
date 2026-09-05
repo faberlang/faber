@@ -1,0 +1,10 @@
+#include <metal_stdlib>
+using namespace metal;
+
+kernel void opaque_dynamic_entry(
+    device const uchar* source [[buffer(0)]],
+    uint index [[thread_position_in_grid]]
+) {
+    (void)source;
+    (void)index;
+}

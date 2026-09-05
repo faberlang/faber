@@ -1,0 +1,17 @@
+#include <metal_stdlib>
+using namespace metal;
+
+kernel void backend_entry_a(
+    device uchar* values [[buffer(0)]],
+    uint index [[thread_position_in_grid]]
+) {
+    values[index] = values[index];
+}
+
+kernel void backend_entry_b(
+    device const uchar* values [[buffer(0)]],
+    uint index [[thread_position_in_grid]]
+) {
+    (void)values;
+    (void)index;
+}

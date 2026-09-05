@@ -7,8 +7,18 @@
 
 use super::*;
 
-const ARTIFACT_HASH: &str =
-    "sha256:0000000000000000000000000000000000000000000000000000000000000000";
+const UNFAMILIAR_SINGLE_KERNEL_ARTIFACT: &[u8] =
+    include_bytes!("../../tests/fixtures/host-execution-v1/unfamiliar-single-kernel.artifact.msl");
+const MULTI_LAUNCH_DEPENDENCY_ARTIFACT: &[u8] =
+    include_bytes!("../../tests/fixtures/host-execution-v1/multi-launch-dependency.artifact.msl");
+const PREPARED_RESOURCE_ARTIFACT: &[u8] =
+    include_bytes!("../../tests/fixtures/host-execution-v1/prepared-resource.artifact.msl");
+const INVOCATION_WINDOW_ARTIFACT: &[u8] =
+    include_bytes!("../../tests/fixtures/host-execution-v1/invocation-window.artifact.msl");
+const OBSERVATION_ARTIFACT: &[u8] =
+    include_bytes!("../../tests/fixtures/host-execution-v1/observation.artifact.msl");
+const FINAL_ENTRY_DIVERGENCE_ARTIFACT: &[u8] =
+    include_bytes!("../../tests/fixtures/host-execution-v1/final-entry-divergence.artifact.ptx");
 
 fn single_kernel_execution() -> WireHostExecutionEnvelopeV1 {
     WireHostExecutionEnvelopeV1 {
@@ -19,12 +29,7 @@ fn single_kernel_execution() -> WireHostExecutionEnvelopeV1 {
                 backend: "metal".to_owned(),
                 required_features: vec!["macos-arm64".to_owned(), "metal".to_owned()],
             },
-            artifact: WireHostArtifactV1 {
-                format: "msl".to_owned(),
-                abi_version: 1,
-                byte_length: 3,
-                sha256: ARTIFACT_HASH.to_owned(),
-            },
+            artifact: artifact("msl", UNFAMILIAR_SINGLE_KERNEL_ARTIFACT),
             resources: vec![WireHostResourceV1 {
                 id: 1,
                 byte_capacity: 4,
@@ -68,7 +73,7 @@ fn invocation() -> WireHostInvocationEnvelopeV1 {
         version: HOST_INVOCATION_WIRE_VERSION,
         invocation: WireHostInvocationV1 {
             execution_sha256:
-                "sha256:c875eef32ac68cf962c79221da637bcf646a16c287b6bb81b71d876883dc6e4b".to_owned(),
+                "sha256:574e4f0465f11eb87d8b23abfe2f991082297cd98fb386ba74b3cae24f46fb42".to_owned(),
             correlation_id: "corr-1".to_owned(),
             windows: vec![WireHostInvocationWindowV1 {
                 window_slot: 1,
@@ -91,10 +96,12 @@ fn v1_execution_and_invocation_envelope_constants_are_independent() {
 
 #[test]
 fn canonical_execution_bytes_and_sha256_are_exact() {
-    let bytes = encode_host_execution_v1(&single_kernel_execution()).expect("valid packet");
+    let execution = single_kernel_execution();
+    let artifact_sha256 = execution.program.artifact.sha256.clone();
+    let bytes = encode_host_execution_v1(&execution).expect("valid packet");
     let expected = format!(
-        r#"{{"schema":"faber.host-execution","version":1,"program":{{"target":{{"backend":"metal","required_features":["macos-arm64","metal"]}},"artifact":{{"format":"msl","abi_version":1,"byte_length":3,"sha256":"{}"}},"resources":[{{"id":1,"byte_capacity":4,"byte_alignment":4,"lifetime":"prepared_execution","initialization":{{"kind":"supplied","input_slot":1}}}}],"kernels":[{{"id":1,"entry":"mystery_kernel","block":[1,1,1],"slots":[{{"id":1,"group":0,"binding":0,"access":"read"}}]}}],"launches":[{{"id":1,"kernel":1,"grid":[1,1,1],"bindings":[{{"slot":1,"resource":1,"window":{{"kind":"exact","byte_offset":0,"byte_length":4}}}}]}}],"dependencies":[],"observations":[]}}}}"#,
-        ARTIFACT_HASH
+        r#"{{"schema":"faber.host-execution","version":1,"program":{{"target":{{"backend":"metal","required_features":["macos-arm64","metal"]}},"artifact":{{"format":"msl","abi_version":1,"byte_length":204,"sha256":"{}"}},"resources":[{{"id":1,"byte_capacity":4,"byte_alignment":4,"lifetime":"prepared_execution","initialization":{{"kind":"supplied","input_slot":1}}}}],"kernels":[{{"id":1,"entry":"mystery_kernel","block":[1,1,1],"slots":[{{"id":1,"group":0,"binding":0,"access":"read"}}]}}],"launches":[{{"id":1,"kernel":1,"grid":[1,1,1],"bindings":[{{"slot":1,"resource":1,"window":{{"kind":"exact","byte_offset":0,"byte_length":4}}}}]}}],"dependencies":[],"observations":[]}}}}"#,
+        artifact_sha256
     );
     assert_eq!(
         String::from_utf8(bytes.clone()).expect("canonical JSON is UTF-8"),
@@ -102,7 +109,7 @@ fn canonical_execution_bytes_and_sha256_are_exact() {
     );
     assert_eq!(
         sha256_digest(&bytes),
-        "sha256:c875eef32ac68cf962c79221da637bcf646a16c287b6bb81b71d876883dc6e4b"
+        "sha256:574e4f0465f11eb87d8b23abfe2f991082297cd98fb386ba74b3cae24f46fb42"
     );
 }
 
@@ -111,11 +118,11 @@ fn canonical_invocation_bytes_and_sha256_are_exact() {
     let bytes = encode_host_invocation_v1(&invocation()).expect("valid invocation");
     assert_eq!(
         String::from_utf8(bytes.clone()).expect("canonical JSON is UTF-8"),
-        r#"{"schema":"faber.host-invocation","version":1,"invocation":{"execution_sha256":"sha256:c875eef32ac68cf962c79221da637bcf646a16c287b6bb81b71d876883dc6e4b","correlation_id":"corr-1","windows":[{"window_slot":1,"byte_offset":8,"byte_length":16}],"requested_observations":[1]}}"#
+        r#"{"schema":"faber.host-invocation","version":1,"invocation":{"execution_sha256":"sha256:574e4f0465f11eb87d8b23abfe2f991082297cd98fb386ba74b3cae24f46fb42","correlation_id":"corr-1","windows":[{"window_slot":1,"byte_offset":8,"byte_length":16}],"requested_observations":[1]}}"#
     );
     assert_eq!(
         sha256_digest(&bytes),
-        "sha256:c16f067326596e7bf1ab7b2feb4afa69532dae591f99ffbb905e3b0e58cb9a48"
+        "sha256:b3d4c5f25a91786a9cfe850099f351f42aac28a0ce4389d802c4b5305148e022"
     );
 }
 
@@ -302,7 +309,7 @@ fn committed_v1_fixtures_are_exact_radix_producer_packets() {
                 backend: "metal".to_owned(),
                 required_features: vec!["metal".to_owned()],
             },
-            artifact: artifact("msl", 4, '1'),
+            artifact: artifact("msl", MULTI_LAUNCH_DEPENDENCY_ARTIFACT),
             resources: vec![resource(
                 1,
                 64,
@@ -341,7 +348,7 @@ fn committed_v1_fixtures_are_exact_radix_producer_packets() {
                 backend: "metal".to_owned(),
                 required_features: vec!["metal".to_owned()],
             },
-            artifact: artifact("msl", 5, '2'),
+            artifact: artifact("msl", PREPARED_RESOURCE_ARTIFACT),
             resources: vec![
                 resource(
                     1,
@@ -445,7 +452,7 @@ fn committed_v1_fixtures_are_exact_radix_producer_packets() {
                 backend: "metal".to_owned(),
                 required_features: vec!["metal".to_owned()],
             },
-            artifact: artifact("msl", 6, '3'),
+            artifact: artifact("msl", INVOCATION_WINDOW_ARTIFACT),
             resources: vec![resource(
                 1,
                 96,
@@ -536,7 +543,7 @@ fn committed_v1_fixtures_are_exact_radix_producer_packets() {
                 backend: "metal".to_owned(),
                 required_features: vec!["metal".to_owned()],
             },
-            artifact: artifact("msl", 7, '4'),
+            artifact: artifact("msl", OBSERVATION_ARTIFACT),
             resources: vec![resource(
                 1,
                 8,
@@ -600,7 +607,7 @@ fn committed_v1_fixtures_are_exact_radix_producer_packets() {
                 backend: "cuda".to_owned(),
                 required_features: vec!["compute_90".to_owned(), "cuda".to_owned()],
             },
-            artifact: artifact("ptx", 10, '5'),
+            artifact: artifact("ptx", FINAL_ENTRY_DIVERGENCE_ARTIFACT),
             resources: vec![resource(
                 1,
                 8,
@@ -639,12 +646,12 @@ fn assert_fixture(name: &str, produced: Vec<u8>, expected: &[u8], expected_hash:
     );
 }
 
-fn artifact(format: &str, byte_length: u64, fill: char) -> WireHostArtifactV1 {
+fn artifact(format: &str, bytes: &[u8]) -> WireHostArtifactV1 {
     WireHostArtifactV1 {
         format: format.to_owned(),
         abi_version: 1,
-        byte_length,
-        sha256: hash(fill),
+        byte_length: u64::try_from(bytes.len()).expect("fixture byte length fits u64"),
+        sha256: sha256_digest(bytes),
     }
 }
 
@@ -696,8 +703,4 @@ fn binding(slot: u32, resource: u32, byte_length: u64) -> WireHostLaunchBindingV
             byte_length,
         },
     }
-}
-
-fn hash(fill: char) -> String {
-    format!("sha256:{}", fill.to_string().repeat(64))
 }

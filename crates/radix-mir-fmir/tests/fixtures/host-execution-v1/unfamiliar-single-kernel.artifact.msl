@@ -1,0 +1,10 @@
+#include <metal_stdlib>
+using namespace metal;
+
+kernel void mystery_kernel(
+    device const uchar* input [[buffer(0)]],
+    uint index [[thread_position_in_grid]]
+) {
+    (void)input;
+    (void)index;
+}

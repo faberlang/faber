@@ -1,1 +1,1 @@
-{"schema":"faber.host-invocation","version":1,"invocation":{"execution_sha256":"sha256:f7b2fd1e8b5b377645e9eb7b21e06447d34eadb4c1f47967dad461293b3b21b0","correlation_id":"opaque-observation-correlation","windows":[],"requested_observations":[1]}}
+{"schema":"faber.host-invocation","version":1,"invocation":{"execution_sha256":"sha256:471578f6da00a4f5736d05c188999d0757ba17a08ea22d7434f21be2ca2bedf6","correlation_id":"opaque-observation-correlation","windows":[],"requested_observations":[1]}}

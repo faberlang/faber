@@ -1,0 +1,9 @@
+#include <metal_stdlib>
+using namespace metal;
+
+kernel void opaque_observation_entry(
+    device uchar* output [[buffer(0)]],
+    uint index [[thread_position_in_grid]]
+) {
+    output[index] = 0;
+}
