@@ -1,1 +1,1 @@
-{"schema":"faber.host-invocation","version":1,"invocation":{"execution_sha256":"sha256:445cf710b070baea0f4bd95767387be4927714914f39b99c09a2b64679e8159a","correlation_id":"invocation-window-second","windows":[{"window_slot":1,"byte_offset":64,"byte_length":32}],"requested_observations":[]}}
+{"schema":"faber.host-invocation","version":1,"invocation":{"execution_sha256":"sha256:c6e3ed197e70b30b257d54c4ae7738281063b542ddbb1c913f97eb0cea53a684","correlation_id":"invocation-window-second","windows":[{"window_slot":1,"byte_offset":64,"byte_length":32}],"requested_observations":[]}}

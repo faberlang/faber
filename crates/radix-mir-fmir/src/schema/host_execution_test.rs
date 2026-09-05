@@ -73,7 +73,7 @@ fn invocation() -> WireHostInvocationEnvelopeV1 {
         version: HOST_INVOCATION_WIRE_VERSION,
         invocation: WireHostInvocationV1 {
             execution_sha256:
-                "sha256:574e4f0465f11eb87d8b23abfe2f991082297cd98fb386ba74b3cae24f46fb42".to_owned(),
+                "sha256:b71f50cb1d0644c6302337b1bb7c1e0b5c94a08007eb6d037daab1e895bb719b".to_owned(),
             correlation_id: "corr-1".to_owned(),
             windows: vec![WireHostInvocationWindowV1 {
                 window_slot: 1,
@@ -100,8 +100,8 @@ fn canonical_execution_bytes_and_sha256_are_exact() {
     let artifact_sha256 = execution.program.artifact.sha256.clone();
     let bytes = encode_host_execution_v1(&execution).expect("valid packet");
     let expected = format!(
-        r#"{{"schema":"faber.host-execution","version":1,"program":{{"target":{{"backend":"metal","required_features":["macos-arm64","metal"]}},"artifact":{{"format":"msl","abi_version":1,"byte_length":204,"sha256":"{}"}},"resources":[{{"id":1,"byte_capacity":4,"byte_alignment":4,"lifetime":"prepared_execution","initialization":{{"kind":"supplied","input_slot":1}}}}],"kernels":[{{"id":1,"entry":"mystery_kernel","block":[1,1,1],"slots":[{{"id":1,"group":0,"binding":0,"access":"read"}}]}}],"launches":[{{"id":1,"kernel":1,"grid":[1,1,1],"bindings":[{{"slot":1,"resource":1,"window":{{"kind":"exact","byte_offset":0,"byte_length":4}}}}]}}],"dependencies":[],"observations":[]}}}}"#,
-        artifact_sha256
+        r#"{{"schema":"faber.host-execution","version":1,"program":{{"target":{{"backend":"metal","required_features":["macos-arm64","metal"]}},"artifact":{{"format":"msl","abi_version":{},"byte_length":204,"sha256":"{}"}},"resources":[{{"id":1,"byte_capacity":4,"byte_alignment":4,"lifetime":"prepared_execution","initialization":{{"kind":"supplied","input_slot":1}}}}],"kernels":[{{"id":1,"entry":"mystery_kernel","block":[1,1,1],"slots":[{{"id":1,"group":0,"binding":0,"access":"read"}}]}}],"launches":[{{"id":1,"kernel":1,"grid":[1,1,1],"bindings":[{{"slot":1,"resource":1,"window":{{"kind":"exact","byte_offset":0,"byte_length":4}}}}]}}],"dependencies":[],"observations":[]}}}}"#,
+        ARTIFACT_ABI_VERSION, artifact_sha256
     );
     assert_eq!(
         String::from_utf8(bytes.clone()).expect("canonical JSON is UTF-8"),
@@ -109,7 +109,7 @@ fn canonical_execution_bytes_and_sha256_are_exact() {
     );
     assert_eq!(
         sha256_digest(&bytes),
-        "sha256:574e4f0465f11eb87d8b23abfe2f991082297cd98fb386ba74b3cae24f46fb42"
+        "sha256:b71f50cb1d0644c6302337b1bb7c1e0b5c94a08007eb6d037daab1e895bb719b"
     );
 }
 
@@ -118,11 +118,11 @@ fn canonical_invocation_bytes_and_sha256_are_exact() {
     let bytes = encode_host_invocation_v1(&invocation()).expect("valid invocation");
     assert_eq!(
         String::from_utf8(bytes.clone()).expect("canonical JSON is UTF-8"),
-        r#"{"schema":"faber.host-invocation","version":1,"invocation":{"execution_sha256":"sha256:574e4f0465f11eb87d8b23abfe2f991082297cd98fb386ba74b3cae24f46fb42","correlation_id":"corr-1","windows":[{"window_slot":1,"byte_offset":8,"byte_length":16}],"requested_observations":[1]}}"#
+        r#"{"schema":"faber.host-invocation","version":1,"invocation":{"execution_sha256":"sha256:b71f50cb1d0644c6302337b1bb7c1e0b5c94a08007eb6d037daab1e895bb719b","correlation_id":"corr-1","windows":[{"window_slot":1,"byte_offset":8,"byte_length":16}],"requested_observations":[1]}}"#
     );
     assert_eq!(
         sha256_digest(&bytes),
-        "sha256:b3d4c5f25a91786a9cfe850099f351f42aac28a0ce4389d802c4b5305148e022"
+        "sha256:b9160000139c631893bac780b60155277de2308eaf42f43778b86c9923263f23"
     );
 }
 
@@ -649,7 +649,7 @@ fn assert_fixture(name: &str, produced: Vec<u8>, expected: &[u8], expected_hash:
 fn artifact(format: &str, bytes: &[u8]) -> WireHostArtifactV1 {
     WireHostArtifactV1 {
         format: format.to_owned(),
-        abi_version: 1,
+        abi_version: ARTIFACT_ABI_VERSION,
         byte_length: u64::try_from(bytes.len()).expect("fixture byte length fits u64"),
         sha256: sha256_digest(bytes),
     }
