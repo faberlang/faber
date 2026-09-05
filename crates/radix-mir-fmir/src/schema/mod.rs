@@ -38,6 +38,7 @@ mod executor_plan;
 mod executor_plan_admission;
 mod hash;
 mod host_execution;
+mod host_execution_project;
 mod image;
 mod requirements;
 mod validate;
@@ -52,6 +53,7 @@ pub use executor_plan::*;
 pub use executor_plan_admission::*;
 pub use hash::*;
 pub use host_execution::*;
+pub use host_execution_project::*;
 pub use image::*;
 pub use requirements::*;
 pub(crate) use validate::*;
@@ -84,6 +86,10 @@ mod wire_test;
 #[cfg(test)]
 #[path = "host_execution_test.rs"]
 mod host_execution_test;
+
+#[cfg(test)]
+#[path = "host_execution_project_test.rs"]
+mod host_execution_project_test;
 
 /// Image schema version. Ratchets as clean breaks; there is no compatibility
 /// decoder (A7). `3 → 4` clean break adds the optional `device` section
