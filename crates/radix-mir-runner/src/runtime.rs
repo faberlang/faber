@@ -2862,13 +2862,13 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
         span: Span,
         rotate_half: bool,
     ) -> Result<Value, RunnerError> {
-        const FREQ_BASE: f64 = 100_000.0;
-
-        // MIR layout: [x, pos, dim]. Shared by TensorRope and TensorRopeHalf.
-        let [input, pos_arg, dim_arg] = args else {
+        // MIR layout: [x, pos, dim, rope_table]. Shared by TensorRope and
+        // TensorRopeHalf. The table is the sole angle source; the runner
+        // mirrors the device interleaved `[rows, dim/2, 3]` contract.
+        let [input, pos_arg, dim_arg, table_arg] = args else {
             return Err(RunnerError::internal(span, "tensor rope arity"));
         };
-        let pos = match self.eval_operand(pos_arg, span)? {
+        let _pos = match self.eval_operand(pos_arg, span)? {
             Value::Int(i) => i,
             other => {
                 return Err(RunnerError::internal(
@@ -2913,20 +2913,30 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
             ));
         }
 
-        // llama-arch NORM consecutive-pair, or Qwen/NeoX rotate_half.
-        // freq_base frozen at 100000 (the CCI-1 v1 source constant).
-        let pos_f = pos as f64;
-        let dim_f = dim as f64;
+        let table = self.tensor_arg(table_arg, span)?;
+        let table_borrow = table.borrow();
+        let expected_table_shape = vec![batch as i64, (dim / 2), 3];
+        if table_borrow.shape != expected_table_shape {
+            return Err(RunnerError::internal(
+                span,
+                format!(
+                    "tensor rope table shape {:?} must be {:?}",
+                    table_borrow.shape, expected_table_shape
+                ),
+            ));
+        }
+
+        // llama-arch NORM consecutive-pair, or Qwen/NeoX rotate_half. The
+        // table stores [angle, cos(angle), sin(angle)] for each row/pair.
         let half = (dim / 2) as usize;
         let mut output = Vec::with_capacity(borrow.data.len());
         for row in 0..batch {
             let base = row * last_extent;
             let mut row_data: Vec<Value> = borrow.data[base..base + last_extent].to_vec();
             for k in 0..half {
-                let kf = k as f64;
-                let theta = pos_f * FREQ_BASE.powf(-(2.0 * kf) / dim_f);
-                let cos = theta.cos();
-                let sin = theta.sin();
+                let table_base = (row * half + k) * 3;
+                let cos = numeric_as_f64(&table_borrow.data[table_base + 1], span)?;
+                let sin = numeric_as_f64(&table_borrow.data[table_base + 2], span)?;
                 let (i0, i1) = if rotate_half {
                     (k, k + half)
                 } else {

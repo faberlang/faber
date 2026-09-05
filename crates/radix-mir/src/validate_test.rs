@@ -2521,7 +2521,7 @@ fn cci_collection_program(
     args: Vec<MirOperand>,
     receiver_and_return_ty: MirType,
 ) -> MirProgram {
-    let locals = vec![
+    let mut locals = vec![
         MirLocal {
             id: MirLocalId(0),
             ty: receiver_and_return_ty,
@@ -2538,6 +2538,18 @@ fn cci_collection_program(
             span: Span::default(),
         },
     ];
+    if matches!(op, MirCollectionOp::TensorRope | MirCollectionOp::TensorRopeHalf) {
+        locals.insert(
+            1,
+            MirLocal {
+                id: MirLocalId(1),
+                ty: receiver_and_return_ty,
+                name: None,
+                mutable: false,
+                span: Span::default(),
+            },
+        );
+    }
     let mut call_args = args;
     call_args.insert(
         0,
@@ -2823,6 +2835,7 @@ fn rope_rejects_odd_dim_const() {
         vec![
             MirOperand::Constant(MirConstant::Int(1)),
             MirOperand::Constant(MirConstant::Int(3)),
+            MirOperand::Place(MirPlace::local(MirLocalId(1))),
         ],
         return_ty,
     );
@@ -2851,6 +2864,7 @@ fn rope_accepts_symbolic_shape_size_dim() {
                 shape: param_shape,
                 axis: None,
             }),
+            MirOperand::Place(MirPlace::local(MirLocalId(1))),
         ],
         return_ty,
     );
@@ -2871,6 +2885,7 @@ fn rope_rejects_float_dim_const() {
         vec![
             MirOperand::Constant(MirConstant::Int(1)),
             MirOperand::Constant(MirConstant::Float(64.0)),
+            MirOperand::Place(MirPlace::local(MirLocalId(1))),
         ],
         return_ty,
     );
@@ -2916,6 +2931,7 @@ fn rope_rejects_non_tensor_receiver() {
         vec![
             MirOperand::Constant(MirConstant::Int(1)),
             MirOperand::Constant(MirConstant::Int(2)),
+            MirOperand::Place(MirPlace::local(MirLocalId(1))),
         ],
         numerus,
     );

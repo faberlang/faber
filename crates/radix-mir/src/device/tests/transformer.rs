@@ -351,6 +351,16 @@ fn tensor_ty_1d(types: &mut TypeTable, dim: u64) -> MirType {
     MirType::semantic(types.intern(Type::Tensor(f32, shape)))
 }
 
+fn tensor_ty_3d(types: &mut TypeTable, dims: [u64; 3]) -> MirType {
+    let f32 = f32_ty(types).semantic_id();
+    let dim_ids = dims
+        .iter()
+        .map(|&dim| types.intern_index(IndexExpr::Literal(dim)))
+        .collect::<Vec<_>>();
+    let shape = types.intern_index(IndexExpr::Tuple(dim_ids));
+    MirType::semantic(types.intern(Type::Tensor(f32, shape)))
+}
+
 /// The `Array(numerus<u32>)` ids-vector type (the GI3-1 gather signature's
 /// first extra input at the u32 kernel-index layout).
 fn ids_array_ty(types: &mut TypeTable) -> MirType {
@@ -532,10 +542,10 @@ fn gi3_rms_norm_kernel_function(types: &mut TypeTable, id: u32) -> MirFunction {
 }
 
 /// The GI3-1 `RoPE` kernel shape (mirrors `rope_kernel_program`): `x` plus
-/// the two host-precomputed 32-entry cos/sin tables as extra input params.
+/// the explicit interleaved `[9, 32, 3]` table as an extra input param.
 fn gi3_rope_kernel_function(types: &mut TypeTable, id: u32) -> MirFunction {
     let tensor = rank2_tensor_ty(types, [9, 64]);
-    let table = tensor_ty_1d(types, 32);
+    let table = tensor_ty_3d(types, [9, 32, 3]);
     let span = test_span();
     MirFunction {
         id: MirFunctionId(id),
@@ -556,13 +566,6 @@ fn gi3_rope_kernel_function(types: &mut TypeTable, id: u32) -> MirFunction {
                 mode: MirParamMode::Owned,
                 span,
             },
-            MirParam {
-                local: MirLocalId(2),
-                name: None,
-                ty: table,
-                mode: MirParamMode::Owned,
-                span,
-            },
         ],
         locals: vec![
             MirLocal {
@@ -574,13 +577,6 @@ fn gi3_rope_kernel_function(types: &mut TypeTable, id: u32) -> MirFunction {
             },
             MirLocal {
                 id: MirLocalId(1),
-                name: None,
-                ty: table,
-                mutable: false,
-                span,
-            },
-            MirLocal {
-                id: MirLocalId(2),
                 name: None,
                 ty: table,
                 mutable: false,
@@ -606,6 +602,7 @@ fn gi3_rope_kernel_function(types: &mut TypeTable, id: u32) -> MirFunction {
                             MirOperand::Place(MirPlace::local(MirLocalId(0))),
                             MirOperand::Constant(MirConstant::Int(0)),
                             MirOperand::Constant(MirConstant::Int(64)),
+                            MirOperand::Place(MirPlace::local(MirLocalId(1))),
                         ],
                         return_ty: tensor,
                     },

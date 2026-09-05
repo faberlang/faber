@@ -89,7 +89,7 @@ fn lookup_generic_arity_distinguishes_empty_rows() {
         lookup_method_generic(IntrinsicReceiver::Lista, "longitudo", 1, 0).is_none(),
         "empty-generic rows do not match a nonempty generic arity"
     );
-    let rope = lookup_method_generic(IntrinsicReceiver::Tensor, "rope_norm", 1, 1)
+    let rope = lookup_method_generic(IntrinsicReceiver::Tensor, "rope_norm", 1, 2)
         .expect("generic rope_norm row");
     assert_eq!(rope.generic[0].sort, GenericParamSort::Magnitudo);
     assert!(lookup_method_generic(IntrinsicReceiver::Tensor, "rope_norm", 0, 2).is_none());

@@ -282,7 +282,7 @@ fn row_override(key: &str, dtype: &Dtype) -> Option<(Option<String>, Vec<String>
         "Tensor.gather/1" => (Some(format!("{sugar}[4, 3] r")), vec!["ids".into()]),
         "Tensor.matmul/1" => (Some(format!("{sugar}[2, 3] r, {sugar}[3, 2] p")), vec!["p".into()]),
         "Tensor.rms_norm/3" => (None, vec!["0".into(), el.clone(), "r".into()]),
-        "Tensor.rope_norm/1" => (None, vec!["0".into()]),
+        "Tensor.rope_norm/2" => (Some(format!("{sugar}[2, 4, 3] r")), vec!["0".into(), "r".into()]),
         "Tensor.laminatio/2" => (None, vec!["0".into(), el.clone()]),
         "Tensor.laminatio/3" => (None, vec!["0".into(), el.clone(), "r".into()]),
         "Tensor.laminatio/4" => (None, vec!["0".into(), el.clone(), "r".into(), "r".into()]),

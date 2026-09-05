@@ -4640,7 +4640,7 @@ functio describe(Resultatus<numerus> r) → textus {
 fn generic_rope_dim_lowers_to_symbolic_shape_size_operand() {
     let source = r#"
 functio rope_q<T, magnitudo D, magnitudo d, magnitudo P>(tensor<T, [D, d]> input, tensor<T, [P, d, 3]> rota, in tensor<T, [D, d]> output) → vacuum {
-    output ← input.rope_norm<d>(0)
+    output ← input.rope_norm<d>(0, rota)
 }
 "#;
     let mut unit = analyze(source);

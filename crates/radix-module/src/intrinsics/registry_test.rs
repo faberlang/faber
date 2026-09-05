@@ -314,10 +314,16 @@ fn cci1_common_case_intrinsic_rows_resolve_on_the_tensor_receiver() {
     assert_eq!(rms_norm.return_kind, crate::intrinsics::IntrinsicReturnKind::SameAsReceiver);
     assert_eq!(mir_collection_op(rms_norm), Some(MirCollectionOp::TensorRmsNorm));
 
-    let rope_norm = lookup_method_for_type(tensor_ty, "rope_norm", 1).expect("tensor rope_norm");
+    let rope_norm = lookup_method_for_type(tensor_ty, "rope_norm", 2).expect("tensor rope_norm");
     assert_eq!(rope_norm.receiver, IntrinsicReceiver::Tensor);
-    assert_eq!(rope_norm.arg_count, 1);
-    assert_eq!(rope_norm.params, &[crate::intrinsics::IntrinsicParamKind::NumerusIndex]);
+    assert_eq!(rope_norm.arg_count, 2);
+    assert_eq!(
+        rope_norm.params,
+        &[
+            crate::intrinsics::IntrinsicParamKind::NumerusIndex,
+            crate::intrinsics::IntrinsicParamKind::TensorPeer,
+        ]
+    );
     assert_eq!(rope_norm.generic.len(), 1);
     assert_eq!(rope_norm.generic[0].sort, radix_types::GenericParamSort::Magnitudo);
     assert_eq!(rope_norm.return_kind, crate::intrinsics::IntrinsicReturnKind::SameAsReceiver);
@@ -332,7 +338,7 @@ fn cci1_common_case_intrinsic_rows_resolve_on_the_tensor_receiver() {
 
     // No other arity exists for these spellings (bounded rows).
     assert!(lookup_method_for_type(tensor_ty, "rms_norm", 2).is_none());
-    assert!(lookup_method_for_type(tensor_ty, "rope_norm", 2).is_none());
+    assert!(lookup_method_for_type(tensor_ty, "rope_norm", 1).is_none());
     assert!(lookup_method_for_type(tensor_ty, "gather", 2).is_none());
 }
 

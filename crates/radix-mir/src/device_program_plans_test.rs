@@ -60,6 +60,16 @@ fn rank2_tensor_ty(types: &mut TypeTable, dims: [u64; 2]) -> MirType {
     MirType::semantic(types.intern(Type::Tensor(f32_ty, shape)))
 }
 
+fn rank3_tensor_ty(types: &mut TypeTable, dims: [u64; 3]) -> MirType {
+    let f32_ty = types.sized_numeric(Primitive::Fractus, NumericWidth::F32);
+    let dim_ids = dims
+        .iter()
+        .map(|&dim| types.intern_index(IndexExpr::Literal(dim)))
+        .collect::<Vec<_>>();
+    let shape = types.intern_index(IndexExpr::Tuple(dim_ids));
+    MirType::semantic(types.intern(Type::Tensor(f32_ty, shape)))
+}
+
 /// A rank-2 `fractus<f64>[M, N]` tensor type — the genuinely f64 operator-graph
 /// element that stays fail-closed (S5A-U2: no f64 scalar admits at the device
 /// boundary, whatever the tensor graph looks like).
@@ -3130,15 +3140,97 @@ fn rms_norm_function(types: &mut TypeTable) -> MirFunction {
     }
 }
 
-/// A rank-2 `RoPE` kernel: `t = rope_norm(x, pos, dim)` over `[2, 64]` (the
-/// pinned head dimension) with the NORM consecutive-pair (pos, dim).
+/// A rank-2 `RoPE` kernel: `t = rope_norm(x, pos, dim, rope_table)` over
+/// `[2, 64]` with the explicit interleaved `[2, 32, 3]` table.
 fn rope_function(types: &mut TypeTable, pos: i64, dim: i64) -> MirFunction {
-    rank2_const_op_function(
-        types,
-        [2, 64],
-        MirCollectionOp::TensorRope,
-        vec![MirConstant::Int(pos), MirConstant::Int(dim)],
-    )
+    rope_function_for_op(types, pos, dim, MirCollectionOp::TensorRope)
+}
+
+fn rope_function_for_op(
+    types: &mut TypeTable,
+    pos: i64,
+    dim: i64,
+    op: MirCollectionOp,
+) -> MirFunction {
+    let input = rank2_tensor_ty(types, [2, 64]);
+    let table = rank3_tensor_ty(types, [2, 32, 3]);
+    MirFunction {
+        id: MirFunctionId(0),
+        source: None,
+        name: None,
+        params: vec![
+            MirParam {
+                local: MirLocalId(0),
+                name: None,
+                ty: input,
+                mode: MirParamMode::Owned,
+                span: test_span(),
+            },
+            MirParam {
+                local: MirLocalId(1),
+                name: None,
+                ty: table,
+                mode: MirParamMode::Owned,
+                span: test_span(),
+            },
+        ],
+        locals: vec![
+            MirLocal {
+                id: MirLocalId(0),
+                name: None,
+                ty: input,
+                mutable: false,
+                span: test_span(),
+            },
+            MirLocal {
+                id: MirLocalId(1),
+                name: None,
+                ty: table,
+                mutable: false,
+                span: test_span(),
+            },
+            MirLocal {
+                id: MirLocalId(2),
+                name: None,
+                ty: input,
+                mutable: true,
+                span: test_span(),
+            },
+        ],
+        temps: Vec::new(),
+        blocks: vec![MirBlock {
+            id: MirBlockId(0),
+            statements: vec![MirStatement {
+                kind: MirStatementKind::RuntimeCall {
+                    destination: Some(MirPlace::local(MirLocalId(2))),
+                    call: MirRuntimeCall {
+                        intrinsic: MirIntrinsic::Collection(op),
+                        args: vec![
+                            MirOperand::Place(MirPlace::local(MirLocalId(0))),
+                            MirOperand::Constant(MirConstant::Int(pos)),
+                            MirOperand::Constant(MirConstant::Int(dim)),
+                            MirOperand::Place(MirPlace::local(MirLocalId(1))),
+                        ],
+                        return_ty: input,
+                    },
+                },
+                span: test_span(),
+            }],
+            terminator: MirTerminator {
+                kind: MirTerminatorKind::Return(Some(MirOperand::Place(MirPlace::local(
+                    MirLocalId(2),
+                )))),
+                span: test_span(),
+            },
+            span: test_span(),
+        }],
+        return_ty: input,
+        error_ty: None,
+        is_async: false,
+        is_generator: false,
+        shader_stage: None,
+        span: test_span(),
+    }
 }
 
 /// A row-gather kernel: `t = gather(table, ids)` over the pinned `[960, 49152]`
@@ -3339,8 +3431,9 @@ fn rope_function_resolves_rope_plan() {
     // NORM consecutive-pair (pos=0, dim=64) and the row width 64.
     let mut types = TypeTable::new();
     let function = rope_function(&mut types, 0, 64);
-    let signature = transformer_signature(2 * 64, 2 * 64);
     let validation = MirValidationContext::new(&types);
+    let signature = transformer_shape_signature(&function, MirCollectionOp::TensorRope, &validation)
+        .expect("rope shape signature resolves");
     let derived = kernel_plan_for_function(&function, &signature, &validation)
         .expect("rope function facts resolve")
         .expect("rope function carries a recipe plan");
@@ -3359,8 +3452,8 @@ fn rope_function_resolves_rope_plan() {
         pos: 0,
         dim: 64,
         width: 64,
-        per_row: false,
-        rows: 0,
+        per_row: true,
+        rows: 2,
         rotate_half: false,
     });
     assert!(carried_plan_agrees(&carried, Some(&derived)));
@@ -3369,14 +3462,11 @@ fn rope_function_resolves_rope_plan() {
 #[test]
 fn rope_half_function_resolves_rotate_half_plan() {
     let mut types = TypeTable::new();
-    let function = rank2_const_op_function(
-        &mut types,
-        [2, 64],
-        MirCollectionOp::TensorRopeHalf,
-        vec![MirConstant::Int(0), MirConstant::Int(64)],
-    );
-    let signature = transformer_signature(2 * 64, 2 * 64);
+    let function = rope_function_for_op(&mut types, 0, 64, MirCollectionOp::TensorRopeHalf);
     let validation = MirValidationContext::new(&types);
+    let signature =
+        transformer_shape_signature(&function, MirCollectionOp::TensorRopeHalf, &validation)
+            .expect("rope_half shape signature resolves");
     let derived = kernel_plan_for_function(&function, &signature, &validation)
         .expect("rope_half function facts resolve")
         .expect("rope_half function carries a recipe plan");

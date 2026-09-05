@@ -231,9 +231,8 @@ pub struct RmsNormalizationPlan {
     /// Normalization axis (from the trailing const operand; the last axis
     /// in v1).
     pub axis: u64,
-    /// Epsilon as f32 bits (the CCI-1 `epsilon_bits` precedent — the AIR
-    /// node stores the op-precision f32 bits; the pinned row's eps is the
-    /// f32 value 1e-5). The device surface is f32 (L7).
+    /// Epsilon as f32 bits. A zero value is reserved for a dynamic epsilon
+    /// operand, which remains explicit in the MIR call and kernel signature.
     pub epsilon_bits: u32,
     /// Normalization dimension width (the row extent gamma spans).
     pub width: u64,

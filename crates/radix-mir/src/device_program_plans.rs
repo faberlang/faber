@@ -3173,6 +3173,18 @@ pub fn transformer_shape_signature(
     // Bind the typed rank-1 peer here so both the plan/emitter lookup and the
     // decomposition seam see the same stable input ordering: x, gamma, out.
     if op == MirCollectionOp::TensorRmsNorm {
+        let epsilon_local = rms_norm_epsilon_local(function);
+        if let Some(epsilon_local) = epsilon_local {
+            let epsilon_ty = function_local_ty(function, epsilon_local)?;
+            let (epsilon_element_ty, epsilon_count) =
+                data_flow_element_ty_and_count(epsilon_ty, validation)?;
+            signature.extra_inputs.push(storage_input_with_local(
+                1,
+                epsilon_element_ty,
+                epsilon_count,
+                epsilon_local,
+            ));
+        }
         let gamma_local = rms_norm_gamma_local(function).ok_or_else(|| {
             PlanMappingError::mapping(
                 "TensorRmsNorm gamma peer has no local in the transformer signature",
@@ -3180,11 +3192,32 @@ pub fn transformer_shape_signature(
         })?;
         let gamma_ty = function_local_ty(function, gamma_local)?;
         let (gamma_element_ty, gamma_count) = data_flow_element_ty_and_count(gamma_ty, validation)?;
+        let gamma_binding = if epsilon_local.is_some() { 2 } else { 1 };
         signature.extra_inputs.push(storage_input_with_local(
-            1,
+            gamma_binding,
             gamma_element_ty,
             gamma_count,
             gamma_local,
+        ));
+        signature.output.binding = gamma_binding + 1;
+    }
+    // RoPE's interleaved angle table is a caller-owned kernel resource. Bind
+    // the exact fourth MIR operand; the planner and emitters must never scan
+    // unrelated tensor parameters to discover a table.
+    if op.is_rope() {
+        let table_local = rope_table_local(function, op).ok_or_else(|| {
+            PlanMappingError::mapping(
+                "TensorRope table operand has no local in the transformer signature",
+            )
+        })?;
+        let table_ty = function_local_ty(function, table_local)?;
+        let (table_element_ty, table_count) =
+            data_flow_element_ty_and_count(table_ty, validation)?;
+        signature.extra_inputs.push(storage_input_with_local(
+            1,
+            table_element_ty,
+            table_count,
+            table_local,
         ));
         signature.output.binding = 2;
     }
@@ -3330,6 +3363,26 @@ fn rms_norm_gamma_local(function: &MirFunction) -> Option<MirLocalId> {
     call.args
         .get(3)
         .and_then(crate::read_analysis::operand_local)
+}
+
+/// The explicit RMSNorm epsilon operand when it is a kernel parameter. A
+/// literal epsilon is specialized into the recipe plan and has no resource.
+fn rms_norm_epsilon_local(function: &MirFunction) -> Option<MirLocalId> {
+    let (call, _) = first_collection_call(function, |op| op == MirCollectionOp::TensorRmsNorm)?;
+    match call.args.get(2)? {
+        MirOperand::Place(place) if place.projections.is_empty() => match place.base {
+            MirPlaceBase::Local(local) => Some(local),
+            MirPlaceBase::Temp(_) => None,
+        },
+        _ => None,
+    }
+}
+
+/// The explicit caller-provided interleaved RoPE table operand (the fourth
+/// runtime-call argument after `[x, pos, dim]`).
+fn rope_table_local(function: &MirFunction, op: MirCollectionOp) -> Option<MirLocalId> {
+    let (call, _) = first_collection_call(function, |found| found == op)?;
+    call.args.get(3).and_then(crate::read_analysis::operand_local)
 }
 
 /// The emission signature for a decomposition subchain kernel (S5-U1b
@@ -3497,6 +3550,19 @@ pub fn transformer_subchain_signature_for_emission_with_source(
             extra.source_local = Some(gamma_local);
         }
         bound.push(gamma_local);
+    }
+    // RoPE's table resource is already part of the recipe-shaped signature;
+    // mark its explicit call operand bound so generic data-flow discovery does
+    // not append a duplicate input.
+    if let Some(table_local) = rope_table_local(function, op) {
+        if let Some(extra) = signature
+            .extra_inputs
+            .iter_mut()
+            .find(|resource| resource.source_local == Some(table_local))
+        {
+            extra.source_local = Some(table_local);
+        }
+        bound.push(table_local);
     }
     finish_subchain_emission_signature(
         function,

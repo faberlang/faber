@@ -557,8 +557,6 @@ impl Validator<'_, '_> {
             | MirCollectionOp::TensorSet
             | MirCollectionOp::TensorCreate
             | MirCollectionOp::TensorSlice
-            | MirCollectionOp::TensorRope
-            | MirCollectionOp::TensorRopeHalf
             | MirCollectionOp::TensorQuantizedMatMul
             | MirCollectionOp::TensorGroupedMatMul
             | MirCollectionOp::TensorSsmConv1d
@@ -568,6 +566,7 @@ impl Validator<'_, '_> {
             // keeps its exact-count 3-argument contract.
             MirCollectionOp::TensorFromFlat => 3,
             MirCollectionOp::TensorRmsNorm => 4,
+            MirCollectionOp::TensorRope | MirCollectionOp::TensorRopeHalf => 4,
             MirCollectionOp::TensorLayerNorm => 0,
             MirCollectionOp::TensorGather => 0,
             // Compiler-owned M3 lowering carries tensor peers followed by a
@@ -1933,6 +1932,13 @@ impl Validator<'_, '_> {
                     self.error(span, "tensor rope dim must be an int constant or temp");
                 }
             }
+        }
+        if let Some(table_ty) = call
+            .args
+            .get(3)
+            .and_then(|arg| self.validate_operand(scope, arg, span))
+        {
+            self.require_tensor_type(table_ty, span, "tensor rope table is not tensor");
         }
         self.require_tensor_type(call.return_ty, span, "tensor rope result is not tensor");
     }

@@ -30,6 +30,16 @@ fn rank2_tensor_ty(types: &mut TypeTable, dims: [u64; 2]) -> MirType {
     MirType::semantic(types.intern(Type::Tensor(f32, shape)))
 }
 
+fn rank3_tensor_ty(types: &mut TypeTable, dims: [u64; 3]) -> MirType {
+    let f32 = f32_ty(types).semantic_id();
+    let dim_ids = dims
+        .iter()
+        .map(|&dim| types.intern_index(IndexExpr::Literal(dim)))
+        .collect::<Vec<_>>();
+    let shape = types.intern_index(IndexExpr::Tuple(dim_ids));
+    MirType::semantic(types.intern(Type::Tensor(f32, shape)))
+}
+
 /// A rank-1 `tf32[n]` tensor type.
 fn rank1_tensor_ty(types: &mut TypeTable, count: u64) -> MirType {
     let f32 = f32_ty(types).semantic_id();
@@ -2526,23 +2536,25 @@ fn rms_norm_decomposition_function(types: &mut TypeTable) -> MirFunction {
     )
 }
 
-/// A RoPE-bearing body: `t = rope_norm(x, 0, 64)` over `[2, 64]` (the
-/// pinned NORM consecutive-pair).
+/// A RoPE-bearing body: `t = rope_norm(x, 0, 64, rope_table)` over `[2, 64]`
+/// with the explicit interleaved `[2, 32, 3]` table.
 fn rope_decomposition_function(types: &mut TypeTable) -> MirFunction {
     let r2 = rank2_tensor_ty(types, [2, 64]);
+    let table = rank3_tensor_ty(types, [2, 32, 3]);
     device_function(
-        &[(0, r2)],
+        &[(0, r2), (1, table)],
         vec![collection_statement_operands(
             MirCollectionOp::TensorRope,
             vec![
                 MirOperand::Place(MirPlace::local(MirLocalId(0))),
                 MirOperand::Constant(MirConstant::Int(0)),
                 MirOperand::Constant(MirConstant::Int(64)),
+                MirOperand::Place(MirPlace::local(MirLocalId(1))),
             ],
-            1,
+            2,
             r2,
         )],
-        Some(1),
+        Some(2),
         r2,
     )
 }

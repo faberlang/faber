@@ -17,10 +17,9 @@ use super::validate::{
 use crate::abi::{CollectionOpContract, MirKernelSignature};
 use crate::{
     MirCollectionOp, MirConstant, MirFunction, MirKernelResourceAccess, MirKernelResourceRole,
-    MirLocalId, MirOperand, MirParam, MirParamMode, MirPlaceBase, MirRuntimeCall, MirScalarLayout,
+    MirLayoutKind, MirLocalId, MirOperand, MirPlaceBase, MirRuntimeCall, MirScalarLayout,
     MirStatementKind, MirValidationContext, MirValueKind, MirWorkgroupSize,
 };
-use radix_types::Type;
 
 /// Whether a kernel signature's **result-tuple contract** is coherent for
 /// plan resolution (S3-A1): every output resource (the first plus the extra
@@ -532,7 +531,7 @@ impl CollectionKernelPlan {
                 if !signature_matches_transformer_counts(signature, count, count) {
                     return None;
                 }
-                let (epsilon_bits, width, gamma_local) =
+                let (epsilon_bits, _epsilon_local, width, gamma_local) =
                     rms_norm_const_facts(function, validation, &dims, axis)?;
                 // Gamma is data, but it must still be present in the typed
                 // kernel resource signature. This keeps plan admission tied
@@ -555,14 +554,10 @@ impl CollectionKernelPlan {
             }
             MirCollectionOp::TensorRope | MirCollectionOp::TensorRopeHalf => {
                 // GI3-1: the RoPE recipe resolves pos/dim from the trailing
-                // const operands and the row width from the operand dims
-                // (the last-axis extent; elements beyond `dim` are
-                // preserved unrotated). Per-position mode (the GI3-1
-                // contract amendment) is carried by the cos/sin table
-                // operand shapes — the GEA2 route uses one interleaved
-                // `[rows, dim/2, 3]` table, while legacy rank-2
-                // `[rows, dim/2]` pairs rotate every row at its own
-                // position. `TensorRopeHalf` selects
+                // const operands and the row width from the operand dims.
+                // The caller-provided interleaved `[rows, dim/2, 3]` table
+                // is the explicit fourth MIR operand; no unrelated kernel
+                // parameter is eligible as a table. `TensorRopeHalf` selects
                 // Qwen/NeoX rotate_half pairing; `TensorRope` stays llama
                 // consecutive-pair.
                 let (dims, axis) = transformer_recipe_shape(function, validation, op)?;
@@ -1305,29 +1300,46 @@ fn literal_const_operand(function: &MirFunction, operand: &MirOperand) -> Option
 /// the mandatory affine
 /// gamma peer must be a rank-1 tensor of the normalization dimension (the
 /// CCI-1 source contract). Returns the f32 epsilon bits (the CCI-1
-/// `epsilon_bits` precedent — the op-precision f32 bits), the normalization
-/// width, and the gamma source local; `None` when a const or typed-peer
-/// constraint fails.
+/// `epsilon_bits` precedent — the op-precision f32 bits) when literal, or
+/// zero when the explicit scalar epsilon is dynamic; the normalization width,
+/// and the gamma source local. `None` means a const or typed-peer constraint
+/// failed.
 fn rms_norm_const_facts(
     function: &MirFunction,
     validation: &MirValidationContext<'_>,
     dims: &[u64],
     axis: u64,
-) -> Option<(u32, u64, MirLocalId)> {
+) -> Option<(u32, Option<MirLocalId>, u64, MirLocalId)> {
     let args = transformer_statement_args(function, MirCollectionOp::TensorRmsNorm)?;
     if args.len() != 4 {
         return None;
     }
-    let MirConstant::Float(epsilon) = literal_const_operand(function, &args[2])? else {
-        return None;
+    let (epsilon_bits, epsilon_local) = match literal_const_operand(function, &args[2]) {
+        Some(MirConstant::Float(epsilon)) => {
+            // WHY: the device recipe stores the operation-precision f32 bits;
+            // reject overflow and underflow after IEEE-754 narrowing.
+            #[allow(clippy::cast_possible_truncation)]
+            let epsilon = epsilon as f32;
+            if !epsilon.is_finite() || epsilon <= 0.0 {
+                return None;
+            }
+            (epsilon.to_bits(), None)
+        }
+        Some(_) => return None,
+        None => {
+            let epsilon_local = crate::read_analysis::operand_local(&args[2])?;
+            let epsilon_ty = crate::local_ty::local_ty(function, epsilon_local)?;
+            if !validation
+                .layouts
+                .layout_for_type(epsilon_ty)
+                .ok()
+                .is_some_and(|layout| matches!(layout.kind, MirLayoutKind::Scalar(_)))
+            {
+                return None;
+            }
+            (0, Some(epsilon_local))
+        }
     };
-    // WHY: the device recipe stores the operation-precision f32 bits; reject
-    // overflow and underflow after the IEEE-754 narrowing below.
-    #[allow(clippy::cast_possible_truncation)]
-    let epsilon = epsilon as f32;
-    if !epsilon.is_finite() || epsilon <= 0.0 {
-        return None;
-    }
     let norm_index = usize::try_from(axis)
         .ok()
         .filter(|index| *index < dims.len())?;
@@ -1342,14 +1354,15 @@ fn rms_norm_const_facts(
         return None;
     }
     let gamma_local = crate::read_analysis::operand_local(&args[3])?;
-    Some((epsilon.to_bits(), norm_dim, gamma_local))
+    Some((epsilon_bits, epsilon_local, norm_dim, gamma_local))
 }
 
 /// The `TensorRope` / `TensorRopeHalf` const-operand facts (GI3-1): `pos`
 /// must be a non-negative `MirConstant::Int`/`UInt` and `dim` a positive,
 /// even `MirConstant::Int`/`UInt` not exceeding the last-axis extent (the
-/// CCI-1 source contract; the MIR validator re-checks). Returns
-/// `(pos, dim, width)`; `None` when a const constraint fails.
+/// CCI-1 source contract; the MIR validator re-checks). The fourth operand
+/// must be the caller-provided interleaved `[rows, dim/2, 3]` tensor. Returns
+/// `(pos, dim, width)`; `None` when a const or table-shape constraint fails.
 fn rope_plan_facts(
     function: &MirFunction,
     validation: &MirValidationContext<'_>,
@@ -1361,7 +1374,7 @@ fn rope_plan_facts(
         return None;
     }
     let args = transformer_statement_args(function, op)?;
-    if args.len() != 3 {
+    if args.len() != 4 {
         return None;
     }
     let pos = const_non_negative(args.get(1)?)?;
@@ -1376,108 +1389,19 @@ fn rope_plan_facts(
     if dim > width {
         return None;
     }
-    // Per-position mode is a typed fact of the kernel's table operands. The
-    // current GEA2 route carries ONE frozen rank-3 `[rows, dim/2, 3]`
-    // interleaved table; its component 0 is the host-owned angle and the
-    // device reads cos/sin from components 1/2. Preserve the earlier forms
-    // for existing callers: the rank-1/rank-2 two-table pair and the
-    // table-free single-position route (position from the const operand).
-    let x_local = crate::read_analysis::operand_local(args.first()?)?;
-    let destination = rope_destination_base(function, op)?;
-    // Source-level `mut` output params can be distinct from the runtime-call
-    // destination local after lowering. Exclude both identities so the
-    // canonical one-table route sees exactly the table resource.
-    let output_param = function
-        .params
+    let table_local = crate::read_analysis::operand_local(args.get(3)?)?;
+    let table_ty = crate::local_ty::local_ty(function, table_local)?;
+    let table_dims = crate::tensor_type::tensor_literal_dims(table_ty, validation).ok()?;
+    let expected_rows = dims
         .iter()
-        .find(|param| param.mode == MirParamMode::MutRef)
-        .map(|param| param.local);
-    let tables: Vec<&MirParam> = function
-        .params
-        .iter()
-        .filter(|param| {
-            param.local != x_local
-                && !matches!(destination, MirPlaceBase::Local(local) if local == param.local)
-                && Some(param.local) != output_param
-                && crate::local_ty::local_ty(function, param.local).is_some_and(|ty| {
-                    matches!(validation.types.get(ty.semantic_id()), Type::Tensor(..))
-                })
-        })
-        .collect();
-    let (per_row, rows) = match tables.as_slice() {
-        [table] => {
-            let table_dims = crate::tensor_type::tensor_literal_dims(
-                crate::local_ty::local_ty(function, table.local)?,
-                validation,
-            )
-            .ok()?;
-            let expected_rows = *dims.first()?;
-            let expected_pairs = dim / 2;
-            match table_dims.as_slice() {
-                [table_rows, table_pairs, components]
-                    if *table_rows == expected_rows
-                        && *table_pairs == expected_pairs
-                        && *components == 3 =>
-                {
-                    (true, *table_rows)
-                }
-                _ => return None,
-            }
-        }
-        [cos_table, sin_table] => {
-            let first_dims = crate::tensor_type::tensor_literal_dims(
-                crate::local_ty::local_ty(function, cos_table.local)?,
-                validation,
-            )
-            .ok()?;
-            let second_dims = crate::tensor_type::tensor_literal_dims(
-                crate::local_ty::local_ty(function, sin_table.local)?,
-                validation,
-            )
-            .ok()?;
-            if first_dims != second_dims {
-                return None;
-            }
-            match first_dims.as_slice() {
-                [pairs] if *pairs == dim / 2 => (false, 0),
-                [table_rows, pairs] if *table_rows == *dims.first()? && *pairs == dim / 2 => {
-                    (true, *table_rows)
-                }
-                _ => return None,
-            }
-        }
-        // Table-free single-position mode: the kernel derives the angle from
-        // the `pos` const operand, so no table params ride the signature.
-        // The dedicated per-target emitters (e.g. the NVVM GI3 probe) reject
-        // this shape with their own missing-table diagnostic.
-        [] => (false, 0),
-        _ => return None,
-    };
-    Some((pos, dim, width, per_row, rows))
-}
-
-/// The `TensorRope` / `TensorRopeHalf` statement's destination base (the
-/// rotated output). A temporary destination is valid before the lowered
-/// output-forward assign, so the table scan must not reject it.
-fn rope_destination_base(function: &MirFunction, op: MirCollectionOp) -> Option<MirPlaceBase> {
-    for block in &function.blocks {
-        for statement in &block.statements {
-            if crate::collection_ops::statement_collection_op(statement) != Some(op) {
-                continue;
-            }
-            let MirStatementKind::RuntimeCall { destination, .. } = &statement.kind else {
-                continue;
-            };
-            let Some(place) = destination else {
-                return None;
-            };
-            if !place.projections.is_empty() {
-                return None;
-            }
-            return Some(place.base.clone());
-        }
+        .take(dims.len().saturating_sub(1))
+        .copied()
+        .product::<u64>();
+    let expected_pairs = dim / 2;
+    if table_dims != [expected_rows, expected_pairs, 3] {
+        return None;
     }
-    None
+    Some((pos, dim, width, true, expected_rows))
 }
 
 /// A non-negative integer const operand (the pos/dim consts of `RoPE` and the

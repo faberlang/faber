@@ -813,8 +813,11 @@ pub static INTRINSICS: &[MethodIntrinsic] = &[
         receiver: IntrinsicReceiver::Tensor,
         faber_name: "rope_norm",
         generic: &[CatalogGenericParam::magnitudo("dim")],
-        arg_count: 1,
-        params: &[IntrinsicParamKind::NumerusIndex],
+        arg_count: 2,
+        params: &[
+            IntrinsicParamKind::NumerusIndex,
+            IntrinsicParamKind::TensorPeer,
+        ],
         return_kind: IntrinsicReturnKind::SameAsReceiver,
         mir_kind: IntrinsicMirKind::Collection(MirCollectionOp::TensorRope),
         missing_generic_issue: Some("rope_norm_dim_required"),

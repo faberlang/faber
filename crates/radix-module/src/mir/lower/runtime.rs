@@ -219,8 +219,8 @@ impl FunctionBuilder<'_> {
         Some(value)
     }
 
-    /// Lower the clean-break `rope_norm<dim>(pos)` surface to the existing
-    /// MIR `[x, pos, dim]` collection contract. A concrete generic argument
+    /// Lower the clean-break `rope_norm<dim>(pos, rope_table)` surface to the
+    /// MIR `[x, pos, dim, rope_table]` collection contract. A concrete generic argument
     /// becomes an integer constant; a generic template carries the compiler-
     /// owned symbolic shape-size constant until MIR monomorphization binds it.
     fn lower_tensor_rope_norm(
@@ -245,20 +245,21 @@ impl FunctionBuilder<'_> {
             ));
             return None;
         };
-        let [pos] = args else {
+        let [pos, rope_table] = args else {
             self.errors.push(MirError::validation(
                 expr.span,
-                "rope_norm requires exactly one position argument",
+                "rope_norm requires a position and an explicit rope table argument",
             ));
             return None;
         };
         let receiver = self.lower_expr_value(receiver)?;
         let pos = self.lower_expr_value(&pos.expr)?;
+        let rope_table = self.lower_expr_value(&rope_table.expr)?;
         let dim = self.lower_rope_dim(generic_args, expr.span)?;
         let ty = self.expr_ty(expr)?;
         Some(self.runtime_call_value(
             MirIntrinsic::Collection(MirCollectionOp::TensorRope),
-            vec![receiver, pos, dim],
+            vec![receiver, pos, dim, rope_table],
             ty,
             expr.span,
         ))
