@@ -1543,6 +1543,7 @@ prefer sugar. Choose per module or file.
 - `需求` is the recoverable require statement (en surface `require … throw …`), the typed-error-channel twin of `断言`. `需求 cond 抛错 err` desugars to `如果 非 (cond) { 抛错 err }` at lowering; the thrown value enters the function's `⇥ E` channel and is catchable by `捕获`/`执行`, unlike `断言` (fatal). A `需求` statement in a `⇥`-less function is a compile error, same as `抛错`. The particle is `抛错` (en `throw`) and is required.
 
 - `拒绝` is the reject statement (en surface `reject … throw …`), the boolean opposite of `需求`. `拒绝 cond 抛错 err` desugars to `如果 (cond) { 抛错 err }` at lowering — it throws when the condition holds, where `需求` throws when it fails. The thrown value enters the function's `⇥ E` channel and is catchable by `捕获`/`执行`. A `拒绝` statement in a `⇥`-less function is a compile error, same as `抛错`. The particle is `抛错` (en `throw`) and is required.
+- `@ conversio` (en `@ conversion`) on a top-level `函数` declares an admitted error conversion: the parameter's type is the source error, the return type is the destination, and the compiler enrolls that ordered pair so a propagating `⇥ E` failure converts at the boundary instead of needing a per-caller wrapper. The marker is bare and the conversion is an ordinary function outside any union body; only a direct (source, destination) row is admitted — a missing row fails closed and is never auto-composed into a chain. The earlier union-arm form (the marker carrying a payload inside a `判别` body) is retracted.
 ---
 
 ## Expressions
