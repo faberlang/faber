@@ -38,7 +38,9 @@ fn declared_error_conversion_propagates_through_mir_runner() {
     let report = run(
         r#"
 discretio Sourceum { Failed }
-discretio Destinatio { @ conversio Sourceum err { redde finge Converted {} ∷ Destinatio } Converted }
+discretio Destinatio { Converted }
+@ conversio
+functio ex_source(Sourceum err) → Destinatio { redde finge Converted {} ∷ Destinatio }
 functio source() → vacuum ⇥ Sourceum { iace finge Failed {} ∷ Sourceum }
 functio target() → vacuum ⇥ Destinatio { source() }
 proba "conversion" {
