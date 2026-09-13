@@ -808,7 +808,10 @@ impl Tensor<f32> {
 
         let softmax = self.softmax()?;
         let eps = 1e-7_f32;
-        let last_dim = (0..self.shape[rank - 1]).fold(0.0_f32, |count, _| count + 1.0);
+        // The class count must use integer-to-float rounding; repeated f32 addition
+        // stops advancing once the count exceeds f32's consecutive integer range.
+        #[allow(clippy::cast_precision_loss)]
+        let last_dim = self.shape[rank - 1] as f32;
 
         let mut sum = 0.0_f32;
         let softmax_data = softmax.planata();
@@ -986,15 +989,22 @@ fn layernorm_moments<I>(values: I) -> (f32, f32)
 where
     I: Iterator<Item = f32> + Clone,
 {
-    let count = values.clone().fold(0.0_f32, |count, _| count + 1.0);
-    let mean = values.clone().sum::<f32>() / count;
+    // The moments accumulate in f64 so finite f32 inputs do not overflow their
+    // sums. The runtime intentionally narrows each completed moment to f32.
+    #[allow(clippy::cast_precision_loss)]
+    let count = values.clone().count() as f64;
+    let mean = values.clone().map(f64::from).sum::<f64>() / count;
+    #[allow(clippy::cast_possible_truncation)]
+    let mean = mean as f32;
     let variance = values
         .map(|value| {
-            let distance = value - mean;
+            let distance = f64::from(value) - f64::from(mean);
             distance * distance
         })
-        .sum::<f32>()
+        .sum::<f64>()
         / count;
+    #[allow(clippy::cast_possible_truncation)]
+    let variance = variance as f32;
     (mean, variance)
 }
 
@@ -1007,7 +1017,8 @@ fn layernorm_value(
     gamma: Option<&[f32]>,
     beta: Option<&[f32]>,
 ) -> f32 {
-    let normalized = (value - mean) / (variance + epsilon).sqrt();
+    let inverse_standard_deviation = 1.0 / (variance + epsilon).sqrt();
+    let normalized = (value - mean) * inverse_standard_deviation;
     match (gamma, beta) {
         (Some(gamma), Some(beta)) => normalized * gamma[affine_index] + beta[affine_index],
         (Some(gamma), None) => normalized * gamma[affine_index],
