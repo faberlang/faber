@@ -13,6 +13,7 @@ use bytes::Bytes;
 use faber::Valor;
 use faber_http_transport::{HttpRequest, HttpResponse, HttpTransport, TransportConfig};
 use std::collections::BTreeMap;
+use std::fmt::Write as _;
 use std::net::SocketAddr;
 use std::time::Duration;
 
@@ -54,7 +55,7 @@ impl ServiceFixture {
     /// # Errors
     /// Returns an error when the requested operation cannot be completed.
     pub fn counter(&self) -> Result<i64, String> {
-        match self.state.get("requests").map_err(state_error)? {
+        match self.state.get("requests").map_err(|error| state_error(&error))? {
             Some(Valor::Numerus(value)) => Ok(value),
             Some(_) => Err("shared counter is not numeric".to_owned()),
             None => Ok(0),
@@ -76,7 +77,7 @@ async fn dispatch(routes: Valor, state: ApplicationState, request: HttpRequest) 
     let handler = valor_text(&matched, "handler").unwrap_or_default();
     let mut response = match handler.as_str() {
         "show_item" => show_item(matched, request),
-        "create_item" => create_item(request),
+        "create_item" => create_item(&request),
         "slow" => slow(state).await,
         "fail" => json_error(500, "fixture_failure"),
         _ => json_error(500, "unknown_handler"),
@@ -108,11 +109,10 @@ fn show_item(matched: Valor, request: HttpRequest) -> HttpResponse {
     )
 }
 
-fn create_item(request: HttpRequest) -> HttpResponse {
+fn create_item(request: &HttpRequest) -> HttpResponse {
     let body = String::from_utf8_lossy(&request.body).into_owned();
-    let parsed = match json_body(body) {
-        Ok(value) => value,
-        Err(_) => return json_error(400, "invalid_json_object"),
+    let Ok(parsed) = json_body(body) else {
+        return json_error(400, "invalid_json_object");
     };
     let Some(name) = valor_text(&parsed, "name") else {
         return json_error(400, "missing_name");
@@ -196,7 +196,8 @@ fn json_string(value: &str) -> String {
             '\r' => encoded.push_str("\\r"),
             '\t' => encoded.push_str("\\t"),
             character if character.is_control() => {
-                encoded.push_str(&format!("\\u{:04x}", character as u32));
+                write!(&mut encoded, "\\u{:04x}", character as u32)
+                    .expect("writing to String cannot fail");
             }
             character => encoded.push(character),
         }
@@ -220,7 +221,7 @@ fn json_error(status: u16, issue: &str) -> HttpResponse {
     json_response(status, format!(r#"{{"error":true,"issue":"{issue}"}}"#))
 }
 
-fn state_error(error: super::StateError) -> String {
+fn state_error(error: &super::StateError) -> String {
     format!("state error: {error:?}")
 }
 
