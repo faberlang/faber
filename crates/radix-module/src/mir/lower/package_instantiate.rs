@@ -243,6 +243,8 @@ pub fn instantiate_merged_generic_calls_with_devices(
 /// carrier. Production package linking uses this entry point so source-derived
 /// visibility and source-less synthetic closure identity survive the generic
 /// instantiation/composition boundary.
+/// # Errors
+/// Returns an error when the input or persisted artifact is invalid.
 #[allow(clippy::type_complexity)]
 pub fn instantiate_merged_generic_calls_with_devices_and_metadata(
     program: &mut MirProgram,

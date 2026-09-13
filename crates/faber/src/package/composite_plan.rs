@@ -3,7 +3,7 @@
 //!
 //! The composite plan is the Faber-owned product join of the DDPP0
 //! `CompiledPackage` shape (`docs/factory/direct-device-product-pipeline/
-//! ddpp0-contract.md` §ProductShape) and the EXEC-01 campaign row: one
+//! ddpp0-contract.md` §`ProductShape`) and the EXEC-01 campaign row: one
 //! analyzed Faber package over a public Gradus model graph becomes one typed
 //! plan carrying package identity, model identity, backend selection, the
 //! target-neutral `DeviceProgram`, device artifacts with their
@@ -22,7 +22,7 @@
 //! WHY: the campaign join is a build-time typed value; there is no new
 //! top-level CLI (EXEC-01 challenge C1).
 //!
-//! # Assembly rule (DDPP0 §ProductShape)
+//! # Assembly rule (DDPP0 §`ProductShape`)
 //!
 //! Assembly composes typed facts only: `AnalyzedProgram` → per-target
 //! [`ArtifactPlan`](radix::program::artifact_plan::ArtifactPlan) (package identity),
@@ -37,7 +37,7 @@
 //! - The document schema is versioned (`composite-plan v1`).
 //! - Identity digests stay separate domains (`content_sha256` vs
 //!   `packet_sha256`) and never become semantic identity (DDPP0
-//!   §IdentityDomains rule 1).
+//!   §`IdentityDomains` rule 1).
 //! - The rendering is deterministic for a fixed plan: maps are ordered,
 //!   non-semantic collections are sorted at assembly, and the device
 //!   program's kernel/launch/result order is carried verbatim.
@@ -136,7 +136,7 @@ impl BackendLeaf {
 
 /// Backend selection row: one leaf + the typed target id + required
 /// features + the required-capacity fact. Capability truth only (DDPP0
-/// §SelectionPolicy rule 3); no machine is claimed here.
+/// §`SelectionPolicy` rule 3); no machine is claimed here.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct BackendSelection {
     pub backend: BackendLeaf,
@@ -171,7 +171,7 @@ pub struct SubmissionRegionFact {
 }
 
 /// Effect and capability requirements the plan may exercise (DDPP0
-/// §ProductShape effect/capability requirements).
+/// §`ProductShape` effect/capability requirements).
 #[derive(Debug, Clone, PartialEq, Eq, Default, Serialize)]
 pub struct EffectCapabilityRequirements {
     /// Declared host effect requirements.

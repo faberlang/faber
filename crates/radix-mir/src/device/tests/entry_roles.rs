@@ -44,7 +44,7 @@ fn kernel_fact(source: DefId, function: MirFunctionId) -> MirImportedEntryFact {
     }
 }
 
-/// done_when (a)/(d): a launchable public Kernel registration supplies a
+/// `done_when` (a)/(d): a launchable public Kernel registration supplies a
 /// concrete entry — the zero-entry red is gone once the carrier has rows.
 #[test]
 fn launchable_public_kernel_registration_admits_the_template_source() {
@@ -71,7 +71,7 @@ fn launchable_public_kernel_registration_admits_the_template_source() {
     );
 }
 
-/// done_when (b): private imported helpers and Fragment-role registrations
+/// `done_when` (b): private imported helpers and Fragment-role registrations
 /// produce no launch row — even mislabeled facts cannot buy one.
 #[test]
 fn private_helpers_and_fragments_never_admit_a_launch_row() {
@@ -114,7 +114,7 @@ fn private_helpers_and_fragments_never_admit_a_launch_row() {
     );
 }
 
-/// done_when (c): a registration without a resolvable concrete instance
+/// `done_when` (c): a registration without a resolvable concrete instance
 /// never reaches an emitter — the merge fails closed with the named issue.
 #[test]
 fn unresolved_instance_fails_closed_before_emission() {
@@ -155,7 +155,7 @@ fn local_role_disagreement_fails_closed() {
     assert_eq!(error.issue(), IMPORTED_DEVICE_ENTRY_ROLE_CONFLICT);
 }
 
-/// done_when (f): local entry behavior passes through unchanged — public
+/// `done_when` (f): local entry behavior passes through unchanged — public
 /// entries, private non-entries, and graphics Fragment roles all survive a
 /// merge that adds imported rows.
 #[test]

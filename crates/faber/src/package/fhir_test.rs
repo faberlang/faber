@@ -81,7 +81,7 @@ const LIBRARY_CONST_VALS: &str =
     "+++\nlocale = \"en\"\n+++\nconst string LIBRARY_VALUE ← \"salve\"\n";
 
 /// Entry that CALLS a const data member — an unsupported shape that must
-/// keep the non-function fail-closed diagnostic (U1 done_when 4).
+/// keep the non-function fail-closed diagnostic (U1 `done_when` 4).
 const CONST_MEMBER_CALL_MAIN: &str =
     "import from \"./util\" * as utilModule\n\nmain {\n    print utilModule.VALUE()\n}\n";
 
@@ -148,7 +148,7 @@ kind = "bin"
 
 /// Package whose entry imports a const data member from a lock-resolved
 /// library fixture (`constlib:vals`), proving library const members link and
-/// execute through package MIR (U1 done_when 2). The library lives under a
+/// execute through package MIR (U1 `done_when` 2). The library lives under a
 /// config library home (`libhome/constlib/src`) so both the analysis phase
 /// (lock resolver) and the package-MIR link phase (config home resolver)
 /// resolve `constlib:vals`.

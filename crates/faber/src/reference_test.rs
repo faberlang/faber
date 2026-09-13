@@ -12,7 +12,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 static NEXT_TEMP_DIR: AtomicU64 = AtomicU64::new(0);
 
-/// Edition 2024 marks env mutation unsafe; REFERENCE_ROOT_ENV writers hold `env_lock()`.
+/// Edition 2024 marks env mutation unsafe; `REFERENCE_ROOT_ENV` writers hold `env_lock()`.
 fn env_set(key: &str, value: impl AsRef<std::ffi::OsStr>) {
     // SAFETY: caller holds `env_lock()`.
     unsafe {

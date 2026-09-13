@@ -705,7 +705,7 @@ fn temp_destination_collection_plans_through_temp_consumer() {
 }
 
 /// The admitted `MirUnOp::Exp` tensor unary is a typed unary producer —
-/// the exact node the real SiLU expansion carries (1A-bis F3).
+/// the exact node the real `SiLU` expansion carries (1A-bis F3).
 #[test]
 fn admitted_tensor_exp_assign_yields_plan() {
     let mut types = TypeTable::new();

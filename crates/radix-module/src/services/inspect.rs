@@ -287,6 +287,8 @@ pub fn hir_inspection_json(
 }
 
 /// Produce MIR inspection text without exiting the process.
+/// # Errors
+/// Returns an error when the input or persisted artifact is invalid.
 #[cfg(feature = "mir-core")]
 pub fn mir_output_for_source(name: &str, raw_source: &str) -> Result<String, Vec<String>> {
     let source_file = source_file(name.to_owned(), raw_source.to_owned()).map_err(|error| vec![error])?;

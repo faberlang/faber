@@ -54,7 +54,7 @@ pub(crate) const MANIFEST_FILE: &str = "faber.toml";
 
 /// One loaded package source file.
 ///
-/// RP2c: moved from `crates/faber/src/package/mod.rs` with the import-graph
+/// `RP2c`: moved from `crates/faber/src/package/mod.rs` with the import-graph
 /// and library surfaces that operate on it. Faber keeps constructing these
 /// through its loader (via re-export) until RP3 moves multi-unit analysis.
 pub struct PackageFile {
@@ -83,7 +83,7 @@ pub struct PackageFile {
 /// One expanded library-import binding carried by a package file or analyzed
 /// unit.
 ///
-/// RP2c: moved from `crates/faber/src/package/mod.rs`; the import graph and
+/// `RP2c`: moved from `crates/faber/src/package/mod.rs`; the import graph and
 /// library expansion surfaces construct these, and faber's analysis/emission
 /// halves consume them through the re-export.
 #[derive(Clone)]

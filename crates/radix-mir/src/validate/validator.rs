@@ -104,6 +104,8 @@ impl<'a> ValidatedMir<'a> {
     /// The metadata is kept alongside the validation operation so role-aware
     /// checks classify synthetic private kernels without inferring from
     /// `source`, generated names, or shader stage.
+    /// # Errors
+    /// Returns an error when the input or persisted artifact is invalid.
     pub fn with_device_roles_and_metadata(
         program: MirProgram,
         mut context: MirValidationContext<'a>,
@@ -184,6 +186,8 @@ pub fn validate_program_with_device_roles(
     clippy::implicit_hasher,
     reason = "FxHashMap is the crate-wide map type for device roles"
 )]
+/// # Errors
+/// Returns an error when the input or persisted artifact is invalid.
 pub fn validate_program_with_device_roles_and_metadata(
     program: &MirProgram,
     context: &MirValidationContext<'_>,

@@ -230,6 +230,8 @@ impl fmt::Display for HostExecutionWireError {
 impl Error for HostExecutionWireError {}
 
 /// Validates and encodes an exact compact v1 static execution packet.
+/// # Errors
+/// Returns an error when the input or persisted artifact is invalid.
 pub fn encode_host_execution_v1(
     envelope: &WireHostExecutionEnvelopeV1,
 ) -> Result<Vec<u8>, HostExecutionWireError> {
@@ -238,6 +240,8 @@ pub fn encode_host_execution_v1(
 }
 
 /// Validates and encodes an exact compact v1 dynamic invocation packet.
+/// # Errors
+/// Returns an error when the input or persisted artifact is invalid.
 pub fn encode_host_invocation_v1(
     envelope: &WireHostInvocationEnvelopeV1,
 ) -> Result<Vec<u8>, HostExecutionWireError> {

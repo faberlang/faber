@@ -965,7 +965,7 @@ fn fold_shape_size_constant_matches_air_fold_semantics() {
 
 /// sgr C3: a bare `Param` size scalar (the `magnitudo` reference a generic
 /// body lowers with `axis: None`) folds to the bound integer — rope dims and
-/// other NumerusIndex positions are integers. Tuple-shape folds keep the f64
+/// other `NumerusIndex` positions are integers. Tuple-shape folds keep the f64
 /// AIR-mirror carrier (previous test).
 #[test]
 fn fold_shape_size_param_substitutes_to_int() {

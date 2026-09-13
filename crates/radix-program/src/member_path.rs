@@ -8,6 +8,8 @@ use std::path::{Component, Path, PathBuf};
 
 use radix_module::diagnostics::Diagnostic;
 
+/// # Errors
+/// Returns an error when the input or persisted artifact is invalid.
 pub fn resolve_package_member(
     package_root: &Path,
     relative: &str,

@@ -465,6 +465,8 @@ pub struct PreparedProgramModule {
 /// Build caller-supplied analysis inputs from a real file path.
 ///
 /// This is the program/discovery helper. Module analysis must not call it.
+/// # Errors
+/// Returns an error when the input or persisted artifact is invalid.
 pub fn prepare_program_module(
     path: &Path,
     source: &str,
@@ -512,6 +514,8 @@ pub fn prepare_program_module(
 
 /// Program/discovery helper keyed by diagnostic name: walk only when `name`
 /// is an existing file. In-memory names keep empty contracts.
+/// # Errors
+/// Returns an error when the input or persisted artifact is invalid.
 pub fn prepare_program_module_for_name(
     name: &str,
     source: &str,
@@ -533,6 +537,8 @@ pub fn prepare_program_module_for_name(
 ///
 /// Module analysis stays fail-closed. Path-shaped e2e / interpret / verify
 /// callers enter here instead of empty-contract [`crate::driver::analyze_source`].
+/// # Errors
+/// Returns an error when the input or persisted artifact is invalid.
 pub fn analyze_prepared_program_path(
     session: &crate::driver::Session,
     path: &Path,
@@ -550,6 +556,8 @@ pub fn analyze_prepared_program_path(
 /// Analyze a diagnostic name after program-layer discovery when `name` is a file.
 ///
 /// In-memory names keep empty contracts.
+/// # Errors
+/// Returns an error when the input or persisted artifact is invalid.
 pub fn analyze_prepared_program_name(
     session: &crate::driver::Session,
     name: &str,
@@ -869,6 +877,8 @@ pub(crate) fn frontmatter_locale_pack_from_frontmatter(
 /// Mirrors the frontmatter-locale resolver, but an explicit CLI locale that
 /// cannot be resolved exits with the resolver's diagnostic instead of falling
 /// back silently. Returns `None` when no locale was given.
+/// # Errors
+/// Returns an error when the input or persisted artifact is invalid.
 #[allow(clippy::result_large_err)]
 pub fn explicit_locale_pack(locale: Option<&str>) -> Result<Option<crate::locale::LocalePack>, crate::Diagnostic> {
     let Some(locale) = locale.map(str::trim).filter(|s| !s.is_empty()) else {
