@@ -357,23 +357,11 @@ pub(super) fn local_namespace_call_targets(
                         continue;
                     };
                     for import_item in &import.items {
-                        let binding = unit
-                            .analysis
-                            .interner
-                            .resolve(import_item.alias.unwrap_or(import_item.name));
-                        let exports = unit
-                            .namespace_exports
-                            .get(binding)
-                            .cloned()
-                            .unwrap_or_default()
-                            .into_keys()
-                            .collect::<BTreeSet<_>>();
-                        link_sibling_import_item(
+                        link_import_item_to_sibling(
                             &mut links,
-                            &unit.path,
-                            import_item.def_id,
+                            unit,
+                            import_item,
                             sibling,
-                            &exports,
                             &sibling_product,
                         );
                     }
@@ -389,23 +377,11 @@ pub(super) fn local_namespace_call_targets(
                         .copied()
                     {
                         for import_item in &import.items {
-                            let binding = unit
-                                .analysis
-                                .interner
-                                .resolve(import_item.alias.unwrap_or(import_item.name));
-                            let exports = unit
-                                .namespace_exports
-                                .get(binding)
-                                .cloned()
-                                .unwrap_or_default()
-                                .into_keys()
-                                .collect::<BTreeSet<_>>();
-                            link_sibling_import_item(
+                            link_import_item_to_sibling(
                                 &mut links,
-                                &unit.path,
-                                import_item.def_id,
+                                unit,
+                                import_item,
                                 sibling,
-                                &exports,
                                 &sibling_product,
                             );
                         }
@@ -488,6 +464,37 @@ pub(super) fn local_namespace_call_targets(
         method_targets: links.method_targets,
         imported_device_routes: links.imported_device_routes,
     })
+}
+
+/// Link one import item of a package-owned sibling: derive the caller's
+/// exports under the item's effective binding and hand them to
+/// [`link_sibling_import_item`].
+fn link_import_item_to_sibling(
+    links: &mut PackageMirLinkAccumulator,
+    unit: &AnalyzedProgramNode,
+    import_item: &radix_module::hir::HirImportItem,
+    sibling: &AnalyzedProgramNode,
+    product: &str,
+) {
+    let binding = unit
+        .analysis
+        .interner
+        .resolve(import_item.alias.unwrap_or(import_item.name));
+    let exports = unit
+        .namespace_exports
+        .get(binding)
+        .cloned()
+        .unwrap_or_default()
+        .into_keys()
+        .collect::<BTreeSet<_>>();
+    link_sibling_import_item(
+        links,
+        &unit.path,
+        import_item.def_id,
+        sibling,
+        &exports,
+        product,
+    );
 }
 
 fn link_sibling_import_item(
@@ -575,84 +582,69 @@ fn link_library_import_site(
         );
         return;
     };
-    let functions =
-        if let Ok(analysis) = library_cached_analysis(&import, library_resolver, library_cache) {
-            let mut functions = analysis
-                .hir
-                .items
-                .iter()
-                .filter_map(|item| {
-                    let HirItemKind::Function(function) = &item.kind else {
-                        return None;
-                    };
-                    Some(ExportedFunction {
-                        name: analysis.interner.resolve(function.name).to_owned(),
-                        def_id: item.def_id,
-                    })
-                })
-                .collect::<Vec<_>>();
-            // Compiler-generated companions have no HIR item, but their source
-            // DefId is the identity carried by their generated MIR function.
-            // A declared companion with no resolvable symbol fails closed
-            // here (stable `package_mir_companion_unresolved` identity)
-            // instead of silently vanishing from the link and surfacing later
-            // as an unstable runner-internal error.
-            for (primal_def_id, backward) in analysis.radix_lanes.iter_backward() {
-                let name = analysis
-                    .interner
-                    .resolve(backward.companion_name)
-                    .to_owned();
-                if !companion_resolves(analysis, primal_def_id, backward) {
-                    push_companion_unresolved(
-                        &mut links.diagnostics,
-                        &site.caller_path,
-                        &site.import_path,
-                        &name,
-                        PackageMirConsumer::Interpreted,
-                    );
-                    continue;
-                }
-                functions.push(ExportedFunction {
-                    name,
-                    def_id: backward.companion_def_id,
-                });
-            }
-            functions
-        } else {
-            push_library_import_unsupported(
+    // One cached analysis feeds both the function and const tables; a second
+    // query would be a pure cache hit with the same fail-closed branch.
+    let Ok(analysis) = library_cached_analysis(&import, library_resolver, library_cache) else {
+        push_library_import_unsupported(
+            &mut links.diagnostics,
+            &site.caller_path,
+            &site.import_path,
+            PackageMirConsumer::Interpreted,
+        );
+        return;
+    };
+    let mut functions = analysis
+        .hir
+        .items
+        .iter()
+        .filter_map(|item| {
+            let HirItemKind::Function(function) = &item.kind else {
+                return None;
+            };
+            Some(ExportedFunction {
+                name: analysis.interner.resolve(function.name).to_owned(),
+                def_id: item.def_id,
+            })
+        })
+        .collect::<Vec<_>>();
+    // Compiler-generated companions have no HIR item, but their source
+    // DefId is the identity carried by their generated MIR function.
+    // A declared companion with no resolvable symbol fails closed
+    // here (stable `package_mir_companion_unresolved` identity)
+    // instead of silently vanishing from the link and surfacing later
+    // as an unstable runner-internal error.
+    for (primal_def_id, backward) in analysis.radix_lanes.iter_backward() {
+        let name = analysis.interner.resolve(backward.companion_name).to_owned();
+        if !companion_resolves(analysis, primal_def_id, backward) {
+            push_companion_unresolved(
                 &mut links.diagnostics,
                 &site.caller_path,
                 &site.import_path,
+                &name,
                 PackageMirConsumer::Interpreted,
             );
-            return;
-        };
-    let consts =
-        if let Ok(analysis) = library_cached_analysis(&import, library_resolver, library_cache) {
-            analysis
-                .hir
-                .items
-                .iter()
-                .filter_map(|item| {
-                    let HirItemKind::Constant(konst) = &item.kind else {
-                        return None;
-                    };
-                    Some(ExportedConst {
-                        name: analysis.interner.resolve(konst.name).to_owned(),
-                        def_id: item.def_id,
-                        konst: konst.clone(),
-                    })
-                })
-                .collect::<Vec<_>>()
-        } else {
-            push_library_import_unsupported(
-                &mut links.diagnostics,
-                &site.caller_path,
-                &site.import_path,
-                PackageMirConsumer::Interpreted,
-            );
-            return;
-        };
+            continue;
+        }
+        functions.push(ExportedFunction {
+            name,
+            def_id: backward.companion_def_id,
+        });
+    }
+    let consts = analysis
+        .hir
+        .items
+        .iter()
+        .filter_map(|item| {
+            let HirItemKind::Constant(konst) = &item.kind else {
+                return None;
+            };
+            Some(ExportedConst {
+                name: analysis.interner.resolve(konst.name).to_owned(),
+                def_id: item.def_id,
+                konst: konst.clone(),
+            })
+        })
+        .collect::<Vec<_>>();
     let exports = interface.exports.keys().cloned().collect::<BTreeSet<_>>();
     let library_path = module.interface_path.clone();
 
