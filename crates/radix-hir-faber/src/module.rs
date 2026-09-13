@@ -434,18 +434,12 @@ fn is_compiler_injected_item(item: &HirItem) -> bool {
     item.def_id.0 < radix_types::USER_DEF_ID_BASE
 }
 
-/// Whether `generate_item` will re-emit an annotation sequence for this item.
+/// Whether `generate_item` will re-emit the item's annotation sequence.
 ///
-/// Functions, structs, and enums write their annotation sequences (see
-/// `decl.rs`); the item trivia then drops its trailing annotation-line
-/// terminator (see `trivia::without_following_annotation`).
+/// Item trivia drops its trailing annotation-line terminator when the shared
+/// envelope carries annotations (see `trivia::without_following_annotation`).
 fn item_has_rendered_annotations(item: &HirItem) -> bool {
-    match &item.kind {
-        HirItemKind::Function(func) => !func.annotations.is_empty(),
-        HirItemKind::Struct(s) => !s.annotations.is_empty(),
-        HirItemKind::Enum(e) => !e.annotations.is_empty(),
-        _ => false,
-    }
+    !item.annotations.is_empty()
 }
 
 /// Reject HIR programs containing legacy unsupported nodes before emission.

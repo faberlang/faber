@@ -1,10 +1,11 @@
 use super::*;
 use crate::{FaberCodegen, KeywordSurface, TypeBindingKind, empty_presentation};
 use radix_hir::{
-    DefId, HirAnnotation, HirBlock, HirCallArg, HirCape, HirCasuArm, HirEnum, HirExpression,
-    HirExpressionKind, HirFunction, HirId, HirImport, HirImportItem, HirItem, HirItemKind,
-    HirLiteral, HirLocal, HirModule, HirObjectField, HirObjectKey, HirPattern, HirStatement,
-    HirStatementKind, HirStruct, HirVariant,
+    DefId, HirAnnotation, HirBlock, HirCallArg, HirCape, HirCasuArm, HirConst, HirEnum,
+    HirExpression, HirExpressionKind, HirFunction, HirId, HirImport, HirImportItem, HirInterface,
+    HirInterfaceMethod, HirItem, HirItemKind, HirLiteral, HirLocal, HirModule, HirObjectField,
+    HirObjectKey, HirOrdoEnum, HirOrdoMember, HirPattern, HirPresentation, HirSchema,
+    HirSchemaColumn, HirStatement, HirStatementKind, HirStruct, HirTypeAlias, HirVariant,
 };
 use radix_lexer::{Interner, Span, TokenKind};
 
@@ -86,6 +87,9 @@ impl KeywordSurface for LatinSurface {
             TokenKind::Sub => "sub",
             TokenKind::Implet => "implet",
             TokenKind::Generis => "generis",
+            TokenKind::Ordo => "ordo",
+            TokenKind::Schema => "schema",
+            TokenKind::Columna => "columna",
             _ => "?",
         }
     }
@@ -486,16 +490,44 @@ fn span() -> Span {
 }
 
 fn generate_faber(program: &HirModule, types: &TypeTable, interner: &Interner) -> String {
+    generate_faber_with_presentation(program, &empty_presentation(), types, interner)
+}
+
+fn generate_faber_with_presentation(
+    program: &HirModule,
+    presentation: &HirPresentation,
+    types: &TypeTable,
+    interner: &Interner,
+) -> String {
     FaberCodegen::default()
-        .generate(
-            program,
-            &empty_presentation(),
-            types,
-            interner,
-            &LatinSurface,
-        )
+        .generate(program, presentation, types, interner, &LatinSurface)
         .expect("codegen")
         .code
+}
+
+fn module_with_item(item: HirItem) -> HirModule {
+    HirModule {
+        items: vec![item],
+        entry: None,
+        entry_annotations: Vec::new(),
+        entry_args_name: None,
+        entry_is_async: false,
+    }
+}
+
+fn assert_publica_precedes(code: &str, declaration: &str) {
+    let annotation = code
+        .lines()
+        .position(|line| line.contains("publica"))
+        .unwrap_or_else(|| panic!("item must re-emit its @ publica annotation:\n{code}"));
+    let declaration = code
+        .lines()
+        .position(|line| line.contains(declaration))
+        .unwrap_or_else(|| panic!("declaration `{declaration}` must be emitted:\n{code}"));
+    assert!(
+        annotation < declaration,
+        "@ publica must precede `{declaration}`:\n{code}"
+    );
 }
 
 #[test]
@@ -527,6 +559,7 @@ fn multi_import_emits_all_items() {
 
     let program = HirModule {
         items: vec![HirItem {
+            annotations: Vec::new(),
             id: HirId(0),
             def_id: DefId(radix_types::USER_DEF_ID_BASE),
             kind: HirItemKind::Import(import),
@@ -617,12 +650,12 @@ fn discerne_omnia_preserves_exhaustiveness() {
         nucleum_fragment: false,
         is_vertex: false,
         is_fragment: false,
-        annotations: Vec::new(),
         test: None,
     };
 
     let program = HirModule {
         items: vec![HirItem {
+            annotations: Vec::new(),
             id: HirId(0),
             def_id: DefId(radix_types::USER_DEF_ID_BASE),
             kind: HirItemKind::Function(Box::new(function)),
@@ -746,12 +779,12 @@ fn si_with_cape_preserves_cape_keyword() {
         nucleum_fragment: false,
         is_vertex: false,
         is_fragment: false,
-        annotations: Vec::new(),
         test: None,
     };
 
     let program = HirModule {
         items: vec![HirItem {
+            annotations: Vec::new(),
             id: HirId(0),
             def_id: DefId(radix_types::USER_DEF_ID_BASE),
             kind: HirItemKind::Function(Box::new(function)),
@@ -877,12 +910,12 @@ fn si_cape_else_with_compact_else_preserves_cape() {
         nucleum_fragment: false,
         is_vertex: false,
         is_fragment: false,
-        annotations: Vec::new(),
         test: None,
     };
 
     let program = HirModule {
         items: vec![HirItem {
+            annotations: Vec::new(),
             id: HirId(0),
             def_id: DefId(radix_types::USER_DEF_ID_BASE),
             kind: HirItemKind::Function(Box::new(function)),
@@ -1023,12 +1056,12 @@ fn fac_loop_detection_long_body() {
         nucleum_fragment: false,
         is_vertex: false,
         is_fragment: false,
-        annotations: Vec::new(),
         test: None,
     };
 
     let program = HirModule {
         items: vec![HirItem {
+            annotations: Vec::new(),
             id: HirId(0),
             def_id: DefId(radix_types::USER_DEF_ID_BASE),
             kind: HirItemKind::Function(Box::new(function)),
@@ -1280,12 +1313,12 @@ fn closure_params_preserve_sponte_and_defaults() {
         nucleum_fragment: false,
         is_vertex: false,
         is_fragment: false,
-        annotations: Vec::new(),
         test: None,
     };
 
     let program = HirModule {
         items: vec![HirItem {
+            annotations: Vec::new(),
             id: HirId(0),
             def_id: DefId(radix_types::USER_DEF_ID_BASE),
             kind: HirItemKind::Function(Box::new(function)),
@@ -1338,6 +1371,7 @@ fn import_privata_emits_no_visibility_keyword() {
 
     let program = HirModule {
         items: vec![HirItem {
+            annotations: Vec::new(),
             id: HirId(0),
             def_id: DefId(radix_types::USER_DEF_ID_BASE),
             kind: HirItemKind::Import(import),
@@ -1412,6 +1446,7 @@ fn selective_import_program(interner: &mut Interner, publica: bool) -> HirModule
 
     HirModule {
         items: vec![HirItem {
+            annotations: Vec::new(),
             id: HirId(0),
             def_id: DefId(radix_types::USER_DEF_ID_BASE),
             kind: HirItemKind::Import(import),
@@ -1503,6 +1538,7 @@ fn selective_import_identity_alias_collapses_to_member_name() {
 
     let program = HirModule {
         items: vec![HirItem {
+            annotations: Vec::new(),
             id: HirId(0),
             def_id: DefId(radix_types::USER_DEF_ID_BASE),
             kind: HirItemKind::Import(import),
@@ -1534,7 +1570,6 @@ fn union_last_variant_has_no_trailing_comma() {
     let enum_item = HirEnum {
         name: interner.intern("DType"),
         type_params: Vec::new(),
-        annotations: Vec::new(),
         commune_fields: Vec::new(),
         variants: vec![
             HirVariant {
@@ -1554,6 +1589,7 @@ fn union_last_variant_has_no_trailing_comma() {
 
     let program = HirModule {
         items: vec![HirItem {
+            annotations: Vec::new(),
             id: HirId(0),
             def_id: DefId(radix_types::USER_DEF_ID_BASE),
             kind: HirItemKind::Enum(enum_item),
@@ -1587,12 +1623,12 @@ fn struct_publica_annotation_reemits() {
     let publica = interner.intern("publica");
 
     let struct_item = HirItem {
+        annotations: vec![HirAnnotation::with_fields(publica, Vec::new(), span())],
         id: HirId(0),
         def_id: DefId(radix_types::USER_DEF_ID_BASE),
         kind: HirItemKind::Struct(HirStruct {
             name: interner.intern("Artifactus"),
             type_params: Vec::new(),
-            annotations: vec![HirAnnotation::with_fields(publica, Vec::new(), span())],
             fields: Vec::new(),
             methods: Vec::new(),
             extends: None,
@@ -1635,12 +1671,12 @@ fn enum_publica_annotation_reemits() {
     let publica = interner.intern("publica");
 
     let enum_item = HirItem {
+        annotations: vec![HirAnnotation::with_fields(publica, Vec::new(), span())],
         id: HirId(0),
         def_id: DefId(radix_types::USER_DEF_ID_BASE),
         kind: HirItemKind::Enum(HirEnum {
             name: interner.intern("DType"),
             type_params: Vec::new(),
-            annotations: vec![HirAnnotation::with_fields(publica, Vec::new(), span())],
             commune_fields: Vec::new(),
             variants: vec![HirVariant {
                 def_id: DefId(1),
@@ -1673,6 +1709,231 @@ fn enum_publica_annotation_reemits() {
         code.lines().position(|line| line == publica_line).unwrap() < discretio_line,
         "@ publica must precede the union declaration:\n{code}"
     );
+}
+
+#[test]
+fn function_publica_annotation_reemits() {
+    let mut interner = Interner::new();
+    let types = TypeTable::new();
+    let item = HirItem {
+        annotations: vec![HirAnnotation::with_fields(
+            interner.intern("publica"),
+            Vec::new(),
+            span(),
+        )],
+        id: HirId(0),
+        def_id: DefId(radix_types::USER_DEF_ID_BASE),
+        kind: HirItemKind::Function(Box::new(HirFunction {
+            name: interner.intern("saluta"),
+            type_params: Vec::new(),
+            params: Vec::new(),
+            cli_args: None,
+            ret_ty: None,
+            err_ty: None,
+            body: Some(HirBlock::simple(Vec::new(), None, span())),
+            posture: radix_syntax::CallablePosture::SyncFinite,
+            is_async: false,
+            is_generator: false,
+            is_kernel: false,
+            nucleum_fragment: false,
+            is_vertex: false,
+            is_fragment: false,
+            test: None,
+        })),
+        span: span(),
+    };
+
+    let code = generate_faber(&module_with_item(item), &types, &interner);
+    assert_publica_precedes(&code, "functio saluta");
+}
+
+#[test]
+fn ordo_publica_annotation_reemits() {
+    let mut interner = Interner::new();
+    let types = TypeTable::new();
+    let item_def = DefId(radix_types::USER_DEF_ID_BASE);
+    let variant_def = DefId(radix_types::USER_DEF_ID_BASE + 1);
+    let item = HirItem {
+        annotations: vec![HirAnnotation::with_fields(
+            interner.intern("publica"),
+            Vec::new(),
+            span(),
+        )],
+        id: HirId(0),
+        def_id: item_def,
+        kind: HirItemKind::Enum(HirEnum {
+            name: interner.intern("Color"),
+            type_params: Vec::new(),
+            commune_fields: Vec::new(),
+            variants: vec![HirVariant {
+                def_id: variant_def,
+                name: interner.intern("Red"),
+                fields: Vec::new(),
+                span: span(),
+            }],
+        }),
+        span: span(),
+    };
+    let mut presentation = empty_presentation();
+    presentation.ordo_enums.push(HirOrdoEnum {
+        def_id: item_def,
+        members: vec![HirOrdoMember {
+            def_id: variant_def,
+            value: None,
+        }],
+    });
+
+    let code =
+        generate_faber_with_presentation(&module_with_item(item), &presentation, &types, &interner);
+    assert_publica_precedes(&code, "ordo Color");
+}
+
+#[test]
+fn interface_publica_annotation_reemits() {
+    let mut interner = Interner::new();
+    let types = TypeTable::new();
+    let item = HirItem {
+        annotations: vec![HirAnnotation::with_fields(
+            interner.intern("publica"),
+            Vec::new(),
+            span(),
+        )],
+        id: HirId(0),
+        def_id: DefId(radix_types::USER_DEF_ID_BASE),
+        kind: HirItemKind::Interface(HirInterface {
+            name: interner.intern("Legibile"),
+            type_params: Vec::new(),
+            methods: vec![HirInterfaceMethod {
+                availability: Vec::new(),
+                name: interner.intern("lege"),
+                params: Vec::new(),
+                ret_ty: None,
+                err_ty: None,
+                posture: radix_syntax::CallablePosture::SyncFinite,
+                span: span(),
+            }],
+        }),
+        span: span(),
+    };
+
+    let code = generate_faber(&module_with_item(item), &types, &interner);
+    assert_publica_precedes(&code, "implendum Legibile");
+}
+
+#[test]
+fn type_alias_publica_annotation_reemits() {
+    let mut interner = Interner::new();
+    let types = TypeTable::new();
+    let item = HirItem {
+        annotations: vec![HirAnnotation::with_fields(
+            interner.intern("publica"),
+            Vec::new(),
+            span(),
+        )],
+        id: HirId(0),
+        def_id: DefId(radix_types::USER_DEF_ID_BASE),
+        kind: HirItemKind::TypeAlias(HirTypeAlias {
+            name: interner.intern("Alias"),
+            type_params: Vec::new(),
+            ty: types.primitive(radix_types::Primitive::Numerus),
+        }),
+        span: span(),
+    };
+
+    let code = generate_faber(&module_with_item(item), &types, &interner);
+    assert_publica_precedes(&code, "typus Alias");
+}
+
+#[test]
+fn schema_publica_annotation_reemits() {
+    let mut interner = Interner::new();
+    let types = TypeTable::new();
+    let column = interner.intern("id");
+    let item = HirItem {
+        annotations: vec![HirAnnotation::with_fields(
+            interner.intern("publica"),
+            Vec::new(),
+            span(),
+        )],
+        id: HirId(0),
+        def_id: DefId(radix_types::USER_DEF_ID_BASE),
+        kind: HirItemKind::Schema(HirSchema {
+            name: interner.intern("Quaerenda"),
+            columns: vec![HirSchemaColumn {
+                name: column,
+                source: column,
+                ty: types.primitive(radix_types::Primitive::Numerus),
+                nullable: false,
+                order: 0,
+            }],
+        }),
+        span: span(),
+    };
+
+    let code = generate_faber(&module_with_item(item), &types, &interner);
+    assert_publica_precedes(&code, "schema Quaerenda");
+}
+
+#[test]
+fn constant_publica_annotation_reemits() {
+    let mut interner = Interner::new();
+    let types = TypeTable::new();
+    let numerus = types.primitive(radix_types::Primitive::Numerus);
+    let item = HirItem {
+        annotations: vec![HirAnnotation::with_fields(
+            interner.intern("publica"),
+            Vec::new(),
+            span(),
+        )],
+        id: HirId(0),
+        def_id: DefId(radix_types::USER_DEF_ID_BASE),
+        kind: HirItemKind::Constant(HirConst {
+            name: interner.intern("VALOR"),
+            ty: Some(numerus),
+            value: HirExpression {
+                id: HirId(1),
+                kind: HirExpressionKind::Literal(HirLiteral::Int(1)),
+                ty: Some(numerus),
+                span: span(),
+            },
+            mutable: false,
+            is_await: false,
+        }),
+        span: span(),
+    };
+
+    let code = generate_faber(&module_with_item(item), &types, &interner);
+    assert_publica_precedes(&code, "fixum numerus VALOR");
+}
+
+#[test]
+fn import_publica_annotation_reemits() {
+    let mut interner = Interner::new();
+    let types = TypeTable::new();
+    let binding = interner.intern("console");
+    let item = HirItem {
+        annotations: vec![HirAnnotation::with_fields(
+            interner.intern("publica"),
+            Vec::new(),
+            span(),
+        )],
+        id: HirId(0),
+        def_id: DefId(radix_types::USER_DEF_ID_BASE),
+        kind: HirItemKind::Import(HirImport {
+            path: interner.intern("norma:console"),
+            visibility: radix_syntax::Visibility::Privata,
+            items: vec![HirImportItem {
+                def_id: DefId(radix_types::USER_DEF_ID_BASE + 1),
+                name: binding,
+                alias: None,
+            }],
+            selective: false,
+        }),
+        span: span(),
+    };
+
+    let code = generate_faber(&module_with_item(item), &types, &interner);
+    assert_publica_precedes(&code, "importa ex");
 }
 
 #[test]
@@ -1717,7 +1978,6 @@ fn call_to_local_variant_reemits_finge_construction() {
     let enum_item = HirEnum {
         name: interner.intern("DType"),
         type_params: Vec::new(),
-        annotations: Vec::new(),
         commune_fields: Vec::new(),
         variants: vec![HirVariant {
             def_id: variant_def,
@@ -1766,19 +2026,20 @@ fn call_to_local_variant_reemits_finge_construction() {
         nucleum_fragment: false,
         is_vertex: false,
         is_fragment: false,
-        annotations: Vec::new(),
         test: None,
     };
 
     let program = HirModule {
         items: vec![
             HirItem {
+                annotations: Vec::new(),
                 id: HirId(0),
                 def_id: DefId(radix_types::USER_DEF_ID_BASE),
                 kind: HirItemKind::Enum(enum_item),
                 span: span(),
             },
             HirItem {
+                annotations: Vec::new(),
                 id: HirId(1),
                 def_id: DefId(radix_types::USER_DEF_ID_BASE + 1),
                 kind: HirItemKind::Function(Box::new(function)),
@@ -1812,7 +2073,6 @@ fn finge_with_named_fields_reemits_braced_fields() {
     let enum_item = HirEnum {
         name: interner.intern("TensorError"),
         type_params: Vec::new(),
-        annotations: Vec::new(),
         commune_fields: Vec::new(),
         variants: vec![HirVariant {
             def_id: variant_def,
@@ -1876,19 +2136,20 @@ fn finge_with_named_fields_reemits_braced_fields() {
         nucleum_fragment: false,
         is_vertex: false,
         is_fragment: false,
-        annotations: Vec::new(),
         test: None,
     };
 
     let program = HirModule {
         items: vec![
             HirItem {
+                annotations: Vec::new(),
                 id: HirId(0),
                 def_id: DefId(radix_types::USER_DEF_ID_BASE),
                 kind: HirItemKind::Enum(enum_item),
                 span: span(),
             },
             HirItem {
+                annotations: Vec::new(),
                 id: HirId(1),
                 def_id: DefId(radix_types::USER_DEF_ID_BASE + 1),
                 kind: HirItemKind::Function(Box::new(function)),
@@ -1995,12 +2256,12 @@ fn intrinsic_method_call_localizes_through_surface() {
         nucleum_fragment: false,
         is_vertex: false,
         is_fragment: false,
-        annotations: Vec::new(),
         test: None,
     };
 
     let program = HirModule {
         items: vec![HirItem {
+            annotations: Vec::new(),
             id: HirId(0),
             def_id: DefId(radix_types::USER_DEF_ID_BASE),
             kind: HirItemKind::Function(Box::new(function)),
@@ -2127,12 +2388,12 @@ fn cape_handler_keeps_leading_author_local() {
         nucleum_fragment: false,
         is_vertex: false,
         is_fragment: false,
-        annotations: Vec::new(),
         test: None,
     };
 
     let program = HirModule {
         items: vec![HirItem {
+            annotations: Vec::new(),
             id: HirId(0),
             def_id: DefId(radix_types::USER_DEF_ID_BASE),
             kind: HirItemKind::Function(Box::new(function)),
@@ -2210,12 +2471,12 @@ fn transfer_program(interner: &mut Interner) -> HirModule {
         nucleum_fragment: false,
         is_vertex: false,
         is_fragment: false,
-        annotations: Vec::new(),
         test: None,
     };
 
     HirModule {
         items: vec![HirItem {
+            annotations: Vec::new(),
             id: HirId(0),
             def_id: DefId(radix_types::USER_DEF_ID_BASE),
             kind: HirItemKind::Function(Box::new(function)),

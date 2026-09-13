@@ -183,6 +183,7 @@ fn function_item(
     annotations: Vec<HirAnnotation>,
 ) -> HirItem {
     HirItem {
+        annotations,
         id: HirId(id),
         def_id: DefId(def_id),
         kind: HirItemKind::Function(Box::new(HirFunction {
@@ -201,7 +202,6 @@ fn function_item(
             is_vertex: false,
             is_fragment: false,
             test: None,
-            annotations,
         })),
         span: span(),
     }
@@ -472,6 +472,7 @@ fn emits_member_trivia_for_struct_fields_and_methods() {
     };
     let method_body = HirBlock::simple(vec![redde_stmt(5, 50, 7)], None, span());
     let method = HirMethod {
+        annotations: Vec::new(),
         def_id: DefId(101),
         func: HirFunction {
             name: interner.intern("greet"),
@@ -489,7 +490,6 @@ fn emits_member_trivia_for_struct_fields_and_methods() {
             is_vertex: false,
             is_fragment: false,
             test: None,
-            annotations: Vec::new(),
         },
         receiver: HirReceiver::None,
         span: span(),
@@ -497,7 +497,6 @@ fn emits_member_trivia_for_struct_fields_and_methods() {
     let s = HirStruct {
         name: interner.intern("Person"),
         type_params: Vec::new(),
-        annotations: Vec::new(),
         fields: vec![field],
         methods: vec![method],
         extends: None,
@@ -506,6 +505,7 @@ fn emits_member_trivia_for_struct_fields_and_methods() {
     };
     let hir = program(
         vec![HirItem {
+            annotations: Vec::new(),
             id: HirId(1),
             def_id: DefId(USER_DEF_ID_BASE),
             kind: HirItemKind::Struct(s),

@@ -7,7 +7,7 @@ use radix_hir::{
     HirBlock, HirFunction, HirId, HirItem, HirItemKind, HirModule, HirParam, HirParamMode,
     HirTypeParam, HirTypeParamConstraint,
 };
-use radix_lexer::{Interner, Span, Symbol, TokenKind};
+use radix_lexer::{Interner, Span, TokenKind};
 use radix_syntax::GenericParamKind;
 use radix_types::{Primitive, SemanticGenericParamDefault, TypeTable};
 
@@ -54,6 +54,7 @@ fn type_param(
 fn function(name: &str, type_params: Vec<HirTypeParam>, interner: &mut Interner) -> HirItem {
     let types = TypeTable::new();
     HirItem {
+        annotations: Vec::new(),
         id: HirId(0),
         def_id: radix_types::DefId(radix_types::USER_DEF_ID_BASE),
         kind: HirItemKind::Function(Box::new(HirFunction {
@@ -87,7 +88,6 @@ fn function(name: &str, type_params: Vec<HirTypeParam>, interner: &mut Interner)
             is_vertex: false,
             is_fragment: false,
             test: None,
-            annotations: Vec::new(),
         })),
         span: span(),
     }
