@@ -85,7 +85,7 @@ macro_rules! impl_intervallum_numeric_unsigned {
             fn walk_ascend(self) -> Self { self + 1 }
             fn walk_descend(self) -> Self { self.wrapping_sub(1) }
 
-            fn to_i64(self) -> i64 { self as i64 }
+            fn to_i64(self) -> i64 { i64::from(self) }
         })+
     }
 }

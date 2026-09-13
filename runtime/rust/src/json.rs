@@ -234,7 +234,7 @@ fn render_string(value: &str) -> String {
             '\r' => out.push_str("\\r"),
             '\t' => out.push_str("\\t"),
             ch if ch.is_control() => {
-                write!(out, "\\u{:04x}", u32::from(ch)).expect("writing to String cannot fail")
+                write!(out, "\\u{:04x}", u32::from(ch)).expect("writing to String cannot fail");
             }
             ch => out.push(ch),
         }
