@@ -66,9 +66,7 @@ mod test_route;
 #[allow(unused_imports)]
 pub(crate) use binding::verify_library_binding_shapes;
 #[allow(unused_imports)]
-pub use binding::{
-    BindingProbeMode, verify_library_bindings, verify_library_bindings_with_probe_mode,
-};
+pub use binding::verify_library_bindings;
 #[allow(unused_imports)]
 pub(crate) use cargo::emit_generated_crate_with_runtime_plan;
 #[allow(unused_imports)]

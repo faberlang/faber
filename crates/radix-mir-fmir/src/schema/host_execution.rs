@@ -625,7 +625,7 @@ fn require_strict_strings(
     let mut previous = None;
     for value in values {
         require_nonempty(field, value)?;
-        if previous.is_some_and(|prior: &str| prior >= value.as_str()) {
+        if previous.is_some_and(|prior| prior >= value.as_str()) {
             return Err(HostExecutionWireError::invalid(
                 field,
                 "must be strict lexicographic order",
@@ -652,23 +652,20 @@ fn require_strict_ids(field: &'static str, values: &[u32]) -> Result<(), HostExe
 }
 
 fn require_sha256(field: &'static str, value: &str) -> Result<(), HostExecutionWireError> {
-    let Some(hex) = value.strip_prefix("sha256:") else {
-        return Err(HostExecutionWireError::invalid(
+    let valid = value.strip_prefix("sha256:").is_some_and(|hex| {
+        hex.len() == 64
+            && hex
+                .bytes()
+                .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+    });
+    if valid {
+        Ok(())
+    } else {
+        Err(HostExecutionWireError::invalid(
             field,
             "must use sha256:<64 lowercase hex digits>",
-        ));
-    };
-    if hex.len() != 64
-        || !hex
-            .bytes()
-            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
-    {
-        return Err(HostExecutionWireError::invalid(
-            field,
-            "must use sha256:<64 lowercase hex digits>",
-        ));
+        ))
     }
-    Ok(())
 }
 
 fn validate_dimensions(

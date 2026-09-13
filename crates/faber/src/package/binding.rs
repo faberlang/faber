@@ -57,7 +57,7 @@ pub struct BindingVerification {
 }
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
-pub enum BindingProbeMode {
+enum BindingProbeMode {
     #[cfg(feature = "hir-rust")]
     ShapeOnly,
     Cargo,
@@ -78,7 +78,7 @@ pub fn verify_library_binding_shapes(
     verify_library_bindings_with_probe_mode(package_root, target, BindingProbeMode::ShapeOnly)
 }
 
-pub fn verify_library_bindings_with_probe_mode(
+fn verify_library_bindings_with_probe_mode(
     package_root: &Path,
     target: &str,
     probe_mode: BindingProbeMode,
