@@ -463,15 +463,14 @@ impl FunctionBuilder<'_> {
                 .push(MirError::missing_type(source.span, "primus_quem source"));
             return None;
         };
-        let elem_ty = match self.normalized_type(source_ty) {
-            Type::Array(inner) => MirType::semantic(*inner),
-            _ => {
-                self.errors.push(MirError::unsupported(
-                    source.span,
-                    "primus_quem source before array first-match MIR lowering",
-                ));
-                return None;
-            }
+        let elem_ty = if let Type::Array(inner) = self.normalized_type(source_ty) {
+            MirType::semantic(*inner)
+        } else {
+            self.errors.push(MirError::unsupported(
+                source.span,
+                "primus_quem source before array first-match MIR lowering",
+            ));
+            return None;
         };
         let result_ty = self.expr_ty(expr)?;
         let collection_ty = MirType::semantic(source_ty);

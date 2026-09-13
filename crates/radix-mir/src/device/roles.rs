@@ -274,7 +274,7 @@ pub struct MirImportedEntryFact {
 }
 
 /// Fail-closed merge outcomes for [`merge_imported_entry_roles`] (KPC-EMIT
-/// done_when (c)/(e)): a fact that cannot be proven against the merged
+/// `done_when` (c)/(e)): a fact that cannot be proven against the merged
 /// program never reaches an emitter.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum MirImportedEntryError {

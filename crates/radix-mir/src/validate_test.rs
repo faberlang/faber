@@ -2538,7 +2538,10 @@ fn cci_collection_program(
             span: Span::default(),
         },
     ];
-    if matches!(op, MirCollectionOp::TensorRope | MirCollectionOp::TensorRopeHalf) {
+    if matches!(
+        op,
+        MirCollectionOp::TensorRope | MirCollectionOp::TensorRopeHalf
+    ) {
         locals.insert(
             1,
             MirLocal {

@@ -292,7 +292,7 @@ fn walk_expr(expr: &HirExpression) -> ValueJudgment {
 /// non-vacuous — it excludes a nonempty class of terms.  Translation lands
 /// in `Except Effect PureValue` (the `radix-hir-lean` `Except`
 /// correspondence): `ok` is the pure type fragment, `error` is an effect.
-pub const GATE_PURITY_PRELUDE: &str = r#"-- Machine-checked structural evidence for the AIR gate/purity
+pub const GATE_PURITY_PRELUDE: &str = r"-- Machine-checked structural evidence for the AIR gate/purity
 -- correspondence (Line 3, v1 scalar/let/call subset).  Structural only: no
 -- semantic-preservation claim, no numeric claim, no execution claim.
 
@@ -394,7 +394,7 @@ monadic effect. -/
 theorem gatePurityCorrespondence (t : Term) (h : GateAdmits t) :
     (∃ v, t.translate = Except.ok v) ∧ t.effects = [] :=
   ⟨gateAdmittedInhabitsPureFragment t h, gateAdmittedCarriesNoEffects t h⟩
-"#;
+";
 
 /// Emit one real theorem for a recognized gate-purity obligation.
 ///

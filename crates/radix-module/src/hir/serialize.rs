@@ -349,7 +349,7 @@ impl HirVisitor for TypeSiteRegistry {
                     radix_hir::HirOwnerRef::Hir(expr.id),
                     radix_hir::HirTypeSlot::ConversionTarget,
                     *ty,
-                )
+                );
             }
             radix_hir::HirExpressionKind::TypeCheck { ty, .. } => register_site(
                 &mut self.sites,
@@ -445,7 +445,7 @@ fn normalize_type_form(form: &mut radix_hir::HirTypeForm, expected: TypeId, type
             normalize_size_arg(form, *shape);
         }
         Type::Vector(inner, _) | Type::Matrix(inner, _) | Type::Sparsa(inner, _) => {
-            normalize_first_type_arg(form, *inner, types)
+            normalize_first_type_arg(form, *inner, types);
         }
         Type::Map(key, value) | Type::PromissumFailable(key, value) | Type::AsyncCursor(key, value) => {
             normalize_type_args(form, &[*key, *value], types);

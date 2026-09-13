@@ -1620,23 +1620,18 @@ fn build_subchain_function(
         let last_local = indices.iter().rev().find_map(|&index| {
             crate::read_analysis::statement_destination(&block.statements[index])
         });
-        match last_local {
-            Some(local) => {
-                terminator = MirTerminator {
-                    kind: MirTerminatorKind::Return(Some(MirOperand::Place(MirPlace::local(
-                        local,
-                    )))),
-                    span,
-                };
-                return_ty = source_local_ty(source, local);
-            }
-            None => {
-                terminator = MirTerminator {
-                    kind: MirTerminatorKind::Return(None),
-                    span,
-                };
-                return_ty = source.return_ty;
-            }
+        if let Some(local) = last_local {
+            terminator = MirTerminator {
+                kind: MirTerminatorKind::Return(Some(MirOperand::Place(MirPlace::local(local)))),
+                span,
+            };
+            return_ty = source_local_ty(source, local);
+        } else {
+            terminator = MirTerminator {
+                kind: MirTerminatorKind::Return(None),
+                span,
+            };
+            return_ty = source.return_ty;
         }
     } else {
         terminator = MirTerminator {

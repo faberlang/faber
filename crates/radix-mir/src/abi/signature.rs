@@ -109,8 +109,8 @@ fn runtime_extent_resource(binding: u32, extent_ty: TypeId) -> MirKernelResource
 /// `TensorGather` ids operand (`args[1]` of the gather statement). The
 /// count is the gather's output row count `T`, resolved from the
 /// statement's return-type dims (`[T, D]`) — the same typed fact
-/// `gather_recipe_facts` (kernel_plan/build.rs) admits, so the ids buffer
-/// count and the GatherPlan's `id_count` cannot disagree. `None` — the
+/// `gather_recipe_facts` (`kernel_plan/build.rs`) admits, so the ids buffer
+/// count and the `GatherPlan`'s `id_count` cannot disagree. `None` — the
 /// input keeps the ordinary device-view law — when the param is not the
 /// typed gather ids operand of a well-shaped gather statement.
 fn gather_ids_param_count(

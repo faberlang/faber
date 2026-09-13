@@ -180,7 +180,7 @@ fn literal_array_length(source: &HirExpression) -> Option<usize> {
 /// The model carries lane values as `Int` (the pass enumerates `i64` lanes),
 /// a per-lane binding block, and an aborting step function.  Evaluation is
 /// structural: it consumes the lane sequence and never computes numerics.
-pub const UNROLL_PROOF_PRELUDE: &str = r#"-- Machine-checked structural evidence for the AIR unroll route.
+pub const UNROLL_PROOF_PRELUDE: &str = r"-- Machine-checked structural evidence for the AIR unroll route.
 -- Structural only: lane sequences, splice order, and failure order. No
 -- float type, no numeric-body semantics, no execution claim.
 
@@ -274,7 +274,7 @@ theorem unrollFailureBehaviorPreserved (step : UnrollStep α) (lanes : List Int)
     isAbort (evalUnrolled step (unrolledStraightLine lanes) acc) =
       isAbort (sourceLaneLoop step lanes acc) := by
   rw [unrollEvaluationPreservesSourceOrder]
-"#;
+";
 
 /// Emit one real theorem for a recognized unroll-equivalence obligation.
 ///
@@ -284,7 +284,7 @@ theorem unrollFailureBehaviorPreserved (step : UnrollStep α) (lanes : List Int)
 pub fn emit_unroll_equivalence_theorem(name: &str, lanes: &[i64]) -> String {
     let lane_list = lanes
         .iter()
-        .map(|lane| lane.to_string())
+        .map(std::string::ToString::to_string)
         .collect::<Vec<_>>()
         .join(", ");
     format!(

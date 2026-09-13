@@ -436,6 +436,7 @@ impl ImportContract {
 
 /// Program-layer compile of one on-disk source: discover contracts, then
 /// fail-closed module analysis.
+#[must_use]
 pub fn compile_prepared_program_path(
     session: &crate::driver::Session,
     path: &Path,
@@ -798,7 +799,7 @@ fn collect_transitive_relative_interfaces(
         let import_path = interner.resolve(decl.path);
         if !import_path.starts_with("./") {
             continue;
-        };
+        }
         if !import_contract_path_allowed(import_path, templates) {
             continue;
         }

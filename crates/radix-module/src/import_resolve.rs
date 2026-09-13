@@ -316,6 +316,7 @@ fn absolute_path(path: &Path) -> PathBuf {
     }
 }
 
+#[must_use]
 pub fn find_package_root(from_file: &Path) -> Option<PathBuf> {
     let start = from_file.parent()?.to_path_buf();
     PACKAGE_ROOT_CACHE.with(|cache| {

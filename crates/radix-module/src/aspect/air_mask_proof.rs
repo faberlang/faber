@@ -92,7 +92,7 @@ fn contains_float(expr: &HirExpression) -> bool {
 /// `dead` is caller-provided.  The generated proof never constructs a mask in
 /// the AIR region; `zeroFilledSuffix` models only the already-materialized
 /// boundary value supplied to the reduction.
-pub const MASK_NEUTRALITY_PRELUDE: &str = r#"-- Machine-checked structural evidence for the AIR maskless zero-fill route.
+pub const MASK_NEUTRALITY_PRELUDE: &str = r"-- Machine-checked structural evidence for the AIR maskless zero-fill route.
 -- The caller supplies the dead-lane count; this module performs no mask construction.
 def foldWith (combine : Nat → Nat → Nat) (seed : Nat) (values : List Nat) : Nat :=
   values.foldl combine seed
@@ -130,7 +130,7 @@ theorem additiveScanMaskNeutrality (live : List Nat) (dead : Nat) :
     foldWith (fun acc value => acc + value) 0 (zeroFilledSuffix live dead) =
       foldWith (fun acc value => acc + value) 0 live := by
   exact additiveReduceMaskNeutrality live dead
-"#;
+";
 
 /// Emit one real theorem for a recognized mask-neutrality obligation.
 #[must_use]

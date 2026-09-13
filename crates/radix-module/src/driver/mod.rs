@@ -2823,6 +2823,7 @@ pub struct PackageKernelTemplateAdmissions {
 
 impl PackageKernelTemplateAdmissions {
     /// Wrap a package export surface as the per-unit admission input.
+    #[must_use]
     pub fn from_export_surface(
         exports: &BTreeMap<String, crate::semantic::passes::visibility_annotation::VisibilityTier>,
     ) -> Self {
@@ -2889,8 +2890,7 @@ pub fn analyze_source_with_kernel_template_admissions(
 ) -> Result<AnalyzedModule, Vec<Diagnostic>> {
     let body_byte_offset = split_frontmatter(source)
         .ok()
-        .map(|split| split.body_byte_offset)
-        .unwrap_or(0);
+        .map_or(0, |split| split.body_byte_offset);
     let result = analyze_source_with_kernel_template_admissions_unadjusted(session, name, source, request, admissions);
     match result {
         Ok(mut analysis) => {
