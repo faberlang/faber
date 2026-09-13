@@ -863,7 +863,7 @@ impl FunctionBuilder<'_> {
             let HirPattern::TypeTest { ty, binding, .. } = pattern else {
                 if matches!(pattern, HirPattern::Wildcard | HirPattern::Binding(_, _)) {
                     has_default = true;
-                    self.lower_type_test_arm_body(arm, destination.clone(), result_ty, &scrutinee_place, scrutinee_ty)?;
+                    self.lower_type_test_arm_body(arm, destination.clone(), result_ty)?;
                     reaches_join |= self.terminate_open_current(MirTerminatorKind::Goto(join_id), arm.span);
                     break;
                 }
@@ -879,7 +879,7 @@ impl FunctionBuilder<'_> {
                 if let Some((def_id, name)) = binding {
                     self.bind_type_test_family(*def_id, *name, &scrutinee_place, scrutinee_ty, arm.span)?;
                 }
-                self.lower_type_test_arm_body(arm, destination.clone(), result_ty, &scrutinee_place, scrutinee_ty)?;
+                self.lower_type_test_arm_body(arm, destination.clone(), result_ty)?;
                 reaches_join |= self.terminate_open_current(MirTerminatorKind::Goto(join_id), arm.span);
                 break;
             }
@@ -929,30 +929,14 @@ impl FunctionBuilder<'_> {
 
             self.switch_to(then_id);
             if let Some((def_id, name)) = binding {
-                let binding_ty = if radix_types::width_pattern(self.types, *ty).is_some() {
+                let bound_ty = if radix_types::width_pattern(self.types, *ty).is_some() {
                     scrutinee_ty
                 } else {
                     *ty
                 };
-                let binding_ty = MirType::semantic(binding_ty);
-                let local = self.next_local_id();
-                self.locals.push(MirLocalDecl {
-                    id: local,
-                    name: Some(*name),
-                    ty: binding_ty,
-                    mutable: false,
-                    span: arm.span,
-                });
-                self.bindings
-                    .insert(*def_id, LocalBinding { local, ty: binding_ty });
-                self.assign(
-                    MirPlace::local(local),
-                    MirOperand::Place(scrutinee_place.clone()),
-                    binding_ty,
-                    arm.span,
-                );
+                self.bind_type_test_family(*def_id, *name, &scrutinee_place, bound_ty, arm.span)?;
             }
-            self.lower_type_test_arm_body(arm, destination.clone(), result_ty, &scrutinee_place, scrutinee_ty)?;
+            self.lower_type_test_arm_body(arm, destination.clone(), result_ty)?;
             reaches_join |= self.terminate_open_current(MirTerminatorKind::Goto(join_id), arm.span);
             self.switch_to(else_id);
         }
@@ -979,10 +963,10 @@ impl FunctionBuilder<'_> {
         def_id: DefId,
         name: Symbol,
         scrutinee_place: &MirPlace,
-        scrutinee_ty: TypeId,
+        bound_ty: TypeId,
         span: Span,
     ) -> Option<()> {
-        let binding_ty = MirType::semantic(scrutinee_ty);
+        let binding_ty = MirType::semantic(bound_ty);
         let local = self.next_local_id();
         self.locals
             .push(MirLocalDecl { id: local, name: Some(name), ty: binding_ty, mutable: false, span });
@@ -1002,8 +986,6 @@ impl FunctionBuilder<'_> {
         arm: &HirCasuArm,
         destination: Option<MirPlace>,
         result_ty: TypeId,
-        _scrutinee_place: &MirPlace,
-        _scrutinee_ty: TypeId,
     ) -> Option<()> {
         if let Some(destination) = destination {
             let HirExpressionKind::Block(block) = &arm.body.kind else {
