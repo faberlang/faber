@@ -2,6 +2,7 @@
 
 use crate::{Ascii, Instans, InstansPraecisio};
 use std::collections::{BTreeMap, HashMap};
+use std::hash::BuildHasher;
 
 /// Canonical dynamic value for Faber `valor` / `ignotum` lowering.
 #[derive(Debug, Clone, PartialEq, Default)]
@@ -126,9 +127,10 @@ where
     }
 }
 
-impl<V> FromValor for HashMap<String, V>
+impl<V, S> FromValor for HashMap<String, V, S>
 where
     V: FromValor,
+    S: BuildHasher + Default,
 {
     fn from_valor(v: &Valor) -> Option<Self> {
         let Valor::Tabula(tab) = v else {
