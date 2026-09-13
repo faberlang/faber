@@ -584,15 +584,12 @@ impl FunctionBuilder<'_> {
                 .push(MirError::missing_type(source.span, "filum summa source type"));
             return None;
         };
-        let element_ty = match self.normalized_type(source_ty) {
-            Type::Tensor(element, _) => *element,
-            _ => {
-                self.errors.push(MirError::unsupported(
-                    source.span,
-                    "filum summa source before tensor MIR lowering",
-                ));
-                return None;
-            }
+        let element_ty = if let Type::Tensor(element, _) = self.normalized_type(source_ty) { *element } else {
+            self.errors.push(MirError::unsupported(
+                source.span,
+                "filum summa source before tensor MIR lowering",
+            ));
+            return None;
         };
         // The source operand lowers into the real flow (ahead of the
         // capture) so the declaration's argument is a live kernel value.

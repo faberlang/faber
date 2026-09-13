@@ -3364,7 +3364,7 @@ fn rms_norm_gamma_local(function: &MirFunction) -> Option<MirLocalId> {
         .and_then(crate::read_analysis::operand_local)
 }
 
-/// The explicit RMSNorm epsilon operand when it is a kernel parameter. A
+/// The explicit `RMSNorm` epsilon operand when it is a kernel parameter. A
 /// literal epsilon is specialized into the recipe plan and has no resource.
 fn rms_norm_epsilon_local(function: &MirFunction) -> Option<MirLocalId> {
     let (call, _) = first_collection_call(function, |op| op == MirCollectionOp::TensorRmsNorm)?;
@@ -3377,7 +3377,7 @@ fn rms_norm_epsilon_local(function: &MirFunction) -> Option<MirLocalId> {
     }
 }
 
-/// The explicit caller-provided interleaved RoPE table operand (the fourth
+/// The explicit caller-provided interleaved `RoPE` table operand (the fourth
 /// runtime-call argument after `[x, pos, dim]`).
 fn rope_table_local(function: &MirFunction, op: MirCollectionOp) -> Option<MirLocalId> {
     let (call, _) = first_collection_call(function, |found| found == op)?;

@@ -499,8 +499,7 @@ impl CompositionPass<'_> {
                 callee.id,
                 site.block_id,
                 site.stmt_index
-                    .map(|index| index as u32)
-                    .unwrap_or(u32::MAX),
+                    .map_or(u32::MAX, |index| index as u32),
             );
             let inlines = account
                 .sites
@@ -516,12 +515,9 @@ impl CompositionPass<'_> {
                 self.push_expansion("failable", site.span, 1, 0, &chain);
                 return;
             }
-            let new_blocks = match self.inline_call(caller_id, &site, &callee) {
-                Some(blocks) => blocks,
-                None => {
-                    self.push_expansion("survived", site.span, 1, 0, &chain);
-                    return;
-                }
+            let new_blocks = if let Some(blocks) = self.inline_call(caller_id, &site, &callee) { blocks } else {
+                self.push_expansion("survived", site.span, 1, 0, &chain);
+                return;
             };
             account.nodes = account.nodes.saturating_add(cloned_nodes);
             account.instances = account.instances.saturating_add(1);
@@ -786,9 +782,7 @@ impl CompositionPass<'_> {
     fn chain_labels(&self, ids: &[MirFunctionId]) -> String {
         ids.iter()
             .map(|id| {
-                self.function(*id)
-                    .map(|function| function_label(function, self.interner))
-                    .unwrap_or_else(|| format!("fn#{}", id.0))
+                self.function(*id).map_or_else(|| format!("fn#{}", id.0), |function| function_label(function, self.interner))
             })
             .collect::<Vec<_>>()
             .join(" → ")
@@ -1038,8 +1032,7 @@ fn normalize_cycle(cycle: &[MirFunctionId]) -> Vec<MirFunctionId> {
         .iter()
         .enumerate()
         .min_by_key(|(_, id)| id.0)
-        .map(|(index, _)| index)
-        .unwrap_or(0);
+        .map_or(0, |(index, _)| index);
     let mut rotated = body[min_at..].to_vec();
     rotated.extend_from_slice(&body[..min_at]);
     if let Some(first) = rotated.first().copied() {

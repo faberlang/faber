@@ -261,7 +261,7 @@ pub fn generate_from_analyzed_with_options(
                 // unwrapping: an `ad`-verb provider function emits `Result`
                 // even without a declared `⇥` channel, so widen the imported
                 // namespace effects for those members.
-                for ((def_id, member), effects) in namespace_info.function_effects.iter_mut() {
+                for ((def_id, member), effects) in &mut namespace_info.function_effects {
                     let Some(modules) = namespace_info.modules.get(def_id) else {
                         continue;
                     };
@@ -613,9 +613,7 @@ fn collect_provider_modules(
             // namespace calls then target `crate::<module>::…` paths that
             // exist. The `contains_key` guard above is the cycle brake.
             let nested_from = provider_path
-                .parent()
-                .map(std::path::Path::to_path_buf)
-                .unwrap_or_else(|| std::path::Path::new(".").to_path_buf());
+                .parent().map_or_else(|| std::path::Path::new(".").to_path_buf(), std::path::Path::to_path_buf);
             collect_provider_modules(&unit, &nested_from, modules)?;
             let namespace_info = rust::build_file_import_namespaces(
                 &unit.hir,

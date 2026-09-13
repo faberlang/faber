@@ -683,14 +683,12 @@ pub fn validate_carried_sub_window_projection(
     }
     if write_access && !projection.is_contiguous() {
         return Err(format!(
-            "{carrier} carries a strided sub-window projection ({:?}) on a write slot; a scattered write is not one binding (GEA3-WIRE-BUFFER-V2)",
-            projection
+            "{carrier} carries a strided sub-window projection ({projection:?}) on a write slot; a scattered write is not one binding (GEA3-WIRE-BUFFER-V2)"
         ));
     }
     let Some(derived) = projection.window_element_count() else {
         return Err(format!(
-            "{carrier} carries a sub-window projection whose row_width · row_count saturates u64 ({:?}); a saturated window cannot address a real buffer (GEA3-WIRE-BUFFER-V2)",
-            projection
+            "{carrier} carries a sub-window projection whose row_width · row_count saturates u64 ({projection:?}); a saturated window cannot address a real buffer (GEA3-WIRE-BUFFER-V2)"
         ));
     };
     if projection.derived_element_count != derived {
@@ -706,8 +704,7 @@ pub fn validate_carried_sub_window_projection(
     }
     let Some(span) = projection.covering_span() else {
         return Err(format!(
-            "{carrier} carries a sub-window projection whose covering span saturates u64 ({:?}); a saturated span cannot address a real buffer (GEA3-WIRE-BUFFER-V2)",
-            projection
+            "{carrier} carries a sub-window projection whose covering span saturates u64 ({projection:?}); a saturated span cannot address a real buffer (GEA3-WIRE-BUFFER-V2)"
         ));
     };
     match projection

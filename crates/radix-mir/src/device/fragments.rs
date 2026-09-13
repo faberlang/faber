@@ -122,7 +122,7 @@ fn collect_device_calls(
 ) {
     if !matches!(
         device.role_for_function(function),
-        Some(MirDeviceRole::Kernel) | Some(MirDeviceRole::Fragment)
+        Some(MirDeviceRole::Kernel | MirDeviceRole::Fragment)
     ) {
         return;
     }
@@ -162,13 +162,13 @@ fn is_device_callee(callee: &MirCallee, program: &MirProgram, device: &MirDevice
             .is_some_and(|function| {
                 matches!(
                     role_of(function),
-                    Some(MirDeviceRole::Kernel) | Some(MirDeviceRole::Fragment)
+                    Some(MirDeviceRole::Kernel | MirDeviceRole::Fragment)
                 )
             }),
         MirCallee::Definition { source, .. } => {
             if matches!(
                 device.role_for_def(*source),
-                Some(MirDeviceRole::Kernel) | Some(MirDeviceRole::Fragment)
+                Some(MirDeviceRole::Kernel | MirDeviceRole::Fragment)
             ) {
                 return true;
             }
@@ -176,7 +176,7 @@ fn is_device_callee(callee: &MirCallee, program: &MirProgram, device: &MirDevice
                 function.source == Some(*source)
                     && matches!(
                         role_of(function),
-                        Some(MirDeviceRole::Kernel) | Some(MirDeviceRole::Fragment)
+                        Some(MirDeviceRole::Kernel | MirDeviceRole::Fragment)
                     )
             })
         }
