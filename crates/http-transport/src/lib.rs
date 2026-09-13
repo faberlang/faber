@@ -137,12 +137,11 @@ impl CorrelationTable {
     }
 
     pub fn complete(&self, id: &str, status: u16) {
-        if let Ok(mut map) = self.inner.lock() {
-            if let Some(mut entry) = map.remove(id) {
+        if let Ok(mut map) = self.inner.lock()
+            && let Some(mut entry) = map.remove(id) {
                 entry.completed = true;
                 entry.status = Some(status);
             }
-        }
     }
 
     fn remove(&self, id: &str) {
