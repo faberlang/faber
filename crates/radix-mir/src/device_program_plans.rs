@@ -492,18 +492,12 @@ pub fn carried_resources_agree_for_library_dispatch(
 /// One carried slot against one signature slot — the shared per-slot law of
 /// both agreement predicates (role/access coherence plus exact typed facts).
 fn carried_slot_agrees(carried: &DeviceResource, signature: &MirKernelResource) -> bool {
-    let derived = BufferRole::from_abi_role(signature.role, signature.access);
-    let compatible = match derived {
-        Some(derived_role) => {
-            derived_role == carried.buffer.role || carried.buffer.role == BufferRole::InOut
-        }
-        None => false,
-    };
-    if !compatible {
+    let Some(derived_role) = BufferRole::from_abi_role(signature.role, signature.access) else {
         return false;
-    }
-    if signature.element_ty != carried.version.element_ty
-        || signature.element_count != carried.version.element_count
+    };
+    (derived_role == carried.buffer.role || carried.buffer.role == BufferRole::InOut)
+        && signature.element_ty == carried.version.element_ty
+        && signature.element_count == carried.version.element_count
         // The carried reduced-resource projection (council-8 CB-3) must
         // agree with the version's — a stale or dropped projection is a
         // carried-fact disagreement, never silently tolerated. A
@@ -514,12 +508,8 @@ fn carried_slot_agrees(carried: &DeviceResource, signature: &MirKernelResource) 
         // another kernel's source); it cannot reconstruct the producer's
         // fact and trusts the carried version — the mapping is carried,
         // never re-derived by a consumer.
-        || (signature.reduced_projection.is_some()
-            && signature.reduced_projection != carried.version.reduced_projection)
-    {
-        return false;
-    }
-    true
+        && (signature.reduced_projection.is_none()
+            || signature.reduced_projection == carried.version.reduced_projection)
 }
 
 /// Whether a kernel unit dispatches a library body whose launch may carry
