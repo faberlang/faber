@@ -153,7 +153,6 @@ pub fn inject_hir_item(
     let strukt = HirStruct {
         name: interner.intern(FORMA_NAME),
         type_params: Vec::new(),
-        annotations: Vec::new(),
         fields: vec![
             HirField {
                 def_id: resolver.fresh_def_id(),
@@ -183,6 +182,7 @@ pub fn inject_hir_item(
     };
 
     items.push(HirItem {
+        annotations: Vec::new(),
         id: HirId(0),
         def_id,
         kind: HirItemKind::Struct(strukt),

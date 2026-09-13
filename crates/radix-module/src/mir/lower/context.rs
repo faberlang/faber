@@ -374,7 +374,7 @@ impl<'a> LoweringContextMaps<'a> {
         }
     }
 
-    fn record_struct_item(&mut self, def_id: DefId, strukt: &HirStruct) {
+    fn record_struct_item(&mut self, def_id: DefId, annotations: &[radix_hir::HirAnnotation], strukt: &HirStruct) {
         self.validation
             .struct_type_params
             .insert(def_id, strukt.type_params.iter().map(|param| param.name).collect());
@@ -406,7 +406,7 @@ impl<'a> LoweringContextMaps<'a> {
         let mut optional_fields = FxHashSet::default();
         let mut nullable_fields = FxHashSet::default();
         let mut json_field_keys = FxHashMap::default();
-        let is_json_struct = annotations_contain_family(&strukt.annotations, self.interner, "json");
+        let is_json_struct = annotations_contain_family(annotations, self.interner, "json");
         for field in &strukt.fields {
             if !field.is_static {
                 fields.insert(field.name, MirType::semantic(field.ty));
@@ -916,7 +916,9 @@ impl HirVisitor for LoweringContextMaps<'_> {
     fn visit_item(&mut self, item: &HirItem) {
         match &item.kind {
             HirItemKind::Function(function) => self.record_function_item(item.def_id, function),
-            HirItemKind::Struct(strukt) => self.record_struct_item(item.def_id, strukt),
+            HirItemKind::Struct(strukt) => {
+                self.record_struct_item(item.def_id, &item.annotations, strukt);
+            }
             HirItemKind::Enum(enum_item) => self.record_enum_item(enum_item, item.def_id),
             HirItemKind::Import(import) => self.record_import_item(import),
             HirItemKind::Interface(_)

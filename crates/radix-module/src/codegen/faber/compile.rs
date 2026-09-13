@@ -333,6 +333,9 @@ impl<'a> StructuralOwnerIndex<'a> {
         let path = format!("{parent}.{}", self.interner.resolve(method.func.name));
         self.owners
             .insert(method.def_id, StructuralOwner::Named(path.clone()));
+        for annotation in &method.annotations {
+            self.visit_annotation(annotation);
+        }
         self.visit_function_in_context(path, &method.func);
     }
 }
@@ -357,6 +360,9 @@ impl HirVisitor for StructuralOwnerIndex<'_> {
     }
 
     fn visit_item(&mut self, item: &HirItem) {
+        for annotation in &item.annotations {
+            self.visit_annotation(annotation);
+        }
         match &item.kind {
             HirItemKind::Function(function) => {
                 let path = self.interner.resolve(function.name).to_owned();
@@ -368,9 +374,6 @@ impl HirVisitor for StructuralOwnerIndex<'_> {
                 let parent = self.interner.resolve(strukt.name).to_owned();
                 self.owners
                     .insert(item.def_id, StructuralOwner::Named(parent.clone()));
-                for annotation in &strukt.annotations {
-                    self.visit_annotation(annotation);
-                }
                 for field in &strukt.fields {
                     self.visit_field(field);
                 }
@@ -382,9 +385,6 @@ impl HirVisitor for StructuralOwnerIndex<'_> {
                 let path = self.interner.resolve(enumeration.name).to_owned();
                 self.owners
                     .insert(item.def_id, StructuralOwner::Named(path));
-                for annotation in &enumeration.annotations {
-                    self.visit_annotation(annotation);
-                }
             }
             HirItemKind::Interface(interface) => {
                 let parent = self.interner.resolve(interface.name).to_owned();

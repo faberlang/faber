@@ -63,16 +63,16 @@ pub fn extract_callable_contracts(
             }
             Some(
                 reject_signature_only_fragment(function, &name, file_label).and_then(|()| {
-                    snapshot_function(function, analysis, file_label, None).map(|callable| {
-                        AnalyzedCallableContract {
+                    snapshot_function(function, &item.annotations, analysis, file_label, None).map(
+                        |callable| AnalyzedCallableContract {
                             def_id: item.def_id,
                             span: item.span,
                             name,
                             callable,
                             has_body: function.body.is_some(),
                             nucleum_role: function.nucleum_role(),
-                        }
-                    })
+                        },
+                    )
                 }),
             )
         })
@@ -108,6 +108,7 @@ pub fn extract_file_interface_with_identity(
                 reject_signature_only_fragment(func, &name, file_label)?;
                 FileExportKind::Function(snapshot_function(
                     func,
+                    &item.annotations,
                     analysis,
                     file_label,
                     export_identity,
@@ -518,6 +519,7 @@ fn annotation_contract_export(
 
 fn snapshot_function(
     func: &HirFunction,
+    annotations: &[radix_module::hir::HirAnnotation],
     analysis: &AnalyzedModule,
     file_label: &str,
     export_identity: Option<&ExportIdentityContext>,
@@ -559,7 +561,7 @@ fn snapshot_function(
     // the library/package interface source, and without the same fact an
     // exported `@ kernel`/`@ nucleum` declaration arrives at the package seam
     // with `device: None` and its role can never cross the import boundary.
-    if let Some(contract) = device_contract_from_hir(func, &analysis.interner) {
+    if let Some(contract) = device_contract_from_hir(func, annotations, &analysis.interner) {
         callable.device = Some(contract);
     }
     Ok(callable)
@@ -573,14 +575,14 @@ fn snapshot_function(
 /// [`InterfaceBodyChannel::Missing`] — never a silent signature-only export.
 fn device_contract_from_hir(
     func: &HirFunction,
+    annotations: &[radix_module::hir::HirAnnotation],
     interner: &radix_module::lexer::Interner,
 ) -> Option<InterfaceDeviceContract> {
     let role = match func.nucleum_role()? {
         NucleumRole::Entry => InterfaceDeviceRole::Kernel,
         NucleumRole::Fragment => InterfaceDeviceRole::Fragment,
     };
-    let visibility = if func
-        .annotations
+    let visibility = if annotations
         .iter()
         .any(|annotation| interner.resolve(annotation.family) == "publica")
     {

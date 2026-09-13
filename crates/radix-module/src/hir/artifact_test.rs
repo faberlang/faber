@@ -71,6 +71,7 @@ fn minimal_test_artifact() -> HirArtifact {
 
     let types = TypeTable::new();
     let item = HirItem {
+        annotations: Vec::new(),
         id: HirId(0),
         def_id: radix_types::DefId(0),
         kind: HirItemKind::Function(Box::new(HirFunction {
@@ -89,7 +90,6 @@ fn minimal_test_artifact() -> HirArtifact {
             is_vertex: false,
             is_fragment: false,
             test: None,
-            annotations: Vec::new(),
         })),
         span: radix_lexer::Span::default(),
     };
@@ -230,6 +230,7 @@ fn selective_import_survives_module_hir_load() {
         "funde".to_string(),
     ];
     artifact.hir.items.push(radix_hir::HirItem {
+        annotations: Vec::new(),
         id: radix_hir::HirId(1),
         def_id: radix_types::DefId(radix_types::USER_DEF_ID_BASE + 42),
         kind: radix_hir::HirItemKind::Import(HirImport {
@@ -435,7 +436,6 @@ fn loader_referential_integrity() {
         is_vertex: false,
         is_fragment: false,
         test: None,
-        annotations: Vec::new(),
     };
     // Replace the existing item with the corrupt function.
     artifact.hir.items[0].kind = HirItemKind::Function(Box::new(bad_func));
@@ -477,6 +477,7 @@ fn user_range_def_id_loads_ok() {
 
     // Two items with user-range DefIds.
     let item0 = radix_hir::HirItem {
+        annotations: Vec::new(),
         id: radix_hir::HirId(0),
         def_id: radix_types::DefId(radix_types::USER_DEF_ID_BASE),
         kind: radix_hir::HirItemKind::Function(Box::new(radix_hir::HirFunction {
@@ -530,11 +531,11 @@ fn user_range_def_id_loads_ok() {
             is_vertex: false,
             is_fragment: false,
             test: None,
-            annotations: Vec::new(),
         })),
         span: radix_lexer::Span::default(),
     };
     let item1 = radix_hir::HirItem {
+        annotations: Vec::new(),
         id: radix_hir::HirId(1),
         def_id: radix_types::DefId(radix_types::USER_DEF_ID_BASE + 1),
         kind: radix_hir::HirItemKind::Function(Box::new(radix_hir::HirFunction {
@@ -553,7 +554,6 @@ fn user_range_def_id_loads_ok() {
             is_vertex: false,
             is_fragment: false,
             test: None,
-            annotations: Vec::new(),
         })),
         span: radix_lexer::Span::default(),
     };
@@ -597,6 +597,7 @@ fn serialize_load_roundtrip_ok() {
     let mut artifact = minimal_test_artifact();
 
     let func_item = radix_hir::HirItem {
+        annotations: Vec::new(),
         id: radix_hir::HirId(0),
         def_id: radix_types::DefId(radix_types::USER_DEF_ID_BASE),
         kind: radix_hir::HirItemKind::Function(Box::new(radix_hir::HirFunction {
@@ -649,7 +650,6 @@ fn serialize_load_roundtrip_ok() {
             is_vertex: false,
             is_fragment: false,
             test: None,
-            annotations: Vec::new(),
         })),
         span: radix_lexer::Span::default(),
     };

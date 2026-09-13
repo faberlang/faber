@@ -83,7 +83,6 @@ fn function(body: HirBlock) -> HirFunction {
         is_vertex: false,
         is_fragment: false,
         test: None,
-        annotations: Vec::new(),
     }
 }
 
@@ -109,6 +108,7 @@ fn module_with_function_selected(
     func.is_kernel = is_kernel;
     let module = HirModule {
         items: vec![HirItem {
+            annotations: Vec::new(),
             id: HirId(0),
             def_id: DefId(1),
             kind: HirItemKind::Function(Box::new(func)),

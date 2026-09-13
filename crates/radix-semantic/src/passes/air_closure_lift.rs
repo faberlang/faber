@@ -220,10 +220,10 @@ impl<'a> LiftVisitor<'a> {
             is_vertex: false,
             is_fragment: false,
             test: None,
-            annotations: Vec::new(),
         };
         let item_id = self.fresh_hir_id();
         self.pending.push(HirItem {
+            annotations: Vec::new(),
             id: item_id,
             def_id,
             kind: HirItemKind::Function(Box::new(function)),

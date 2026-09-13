@@ -34,6 +34,7 @@ use radix_types::{DefId, TypeId, TypeTable};
 fn minimal_test_artifact() -> radix_hir_fhir::HirArtifact {
     let types = TypeTable::new();
     let item = HirItem {
+        annotations: Vec::new(),
         id: HirId(0),
         def_id: DefId(0),
         kind: HirItemKind::Function(Box::new(HirFunction {
@@ -52,7 +53,6 @@ fn minimal_test_artifact() -> radix_hir_fhir::HirArtifact {
             is_vertex: false,
             is_fragment: false,
             test: None,
-            annotations: Vec::new(),
         })),
         span: radix_lexer::Span::default(),
     };

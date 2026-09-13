@@ -375,6 +375,7 @@ fn authored_type_artifact() -> crate::artifact::HirArtifact {
         Span::default(),
     ));
     artifact.hir.items.push(radix_hir::HirItem {
+        annotations: Vec::new(),
         id: HirId(3),
         def_id: alias_def,
         kind: radix_hir::HirItemKind::TypeAlias(radix_hir::HirTypeAlias {

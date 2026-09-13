@@ -1405,6 +1405,7 @@ fn transplant_data_member(
         is_await: member.konst.is_await,
     };
     Ok(HirItem {
+        annotations: Vec::new(),
         // The synthetic def id doubles as a unique item/expression id; no
         // unit-local HIR id range collides with the package-MIR synthetic range.
         id: HirId(member.synthetic.0),

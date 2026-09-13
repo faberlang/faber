@@ -72,7 +72,6 @@ fn function(statements: Vec<HirStatement>) -> HirFunction {
         is_vertex: false,
         is_fragment: false,
         test: None,
-        annotations: Vec::new(),
     }
 }
 

@@ -23,7 +23,6 @@ fn commune_fields_round_trip_on_union_payload() {
     let hir_enum = HirEnum {
         name: interner.intern("ShapeError"),
         type_params: Vec::new(),
-        annotations: Vec::new(),
         commune_fields: vec![HirVariantField {
             name: message,
             ty: textus,
@@ -57,6 +56,7 @@ fn commune_fields_round_trip_on_union_payload() {
     };
     let mut artifact = stub_artifact();
     artifact.hir.items = vec![HirItem {
+        annotations: Vec::new(),
         id: HirId(0),
         def_id: enum_def,
         kind: HirItemKind::Enum(hir_enum.clone()),

@@ -192,8 +192,8 @@ pub fn device_role_for_hir_function(func: &HirFunction) -> Option<MirDeviceRole>
 /// dispatchable entries; unmarked `@ nucleum` functions are module-internal
 /// helpers that are never given a launch ABI.
 #[must_use]
-pub fn is_public_entry(func: &HirFunction, interner: &Interner) -> bool {
-    func.annotations
+pub fn is_public_entry(annotations: &[radix_hir::HirAnnotation], interner: &Interner) -> bool {
+    annotations
         .iter()
         .any(|annotation| interner.resolve(annotation.family) == PUBLICA_FAMILY)
 }
@@ -213,13 +213,19 @@ pub fn device_entry_roles_from_hir(
     for item in &hir.items {
         match &item.kind {
             HirItemKind::Function(func) => {
-                if let Some(role) = device_entry_role_for_hir_function(func, interner) {
+                if let Some(role) =
+                    device_entry_role_for_hir_function(func, &item.annotations, interner)
+                {
                     roles_by_def.insert(item.def_id, role);
                 }
             }
             HirItemKind::Struct(strukt) => {
                 for method in &strukt.methods {
-                    if let Some(role) = device_entry_role_for_hir_function(&method.func, interner) {
+                    if let Some(role) = device_entry_role_for_hir_function(
+                        &method.func,
+                        &method.annotations,
+                        interner,
+                    ) {
                         roles_by_def.insert(method.def_id, role);
                     }
                 }
@@ -246,10 +252,12 @@ fn device_entry_role_for_visibility(role: MirDeviceRole, public: bool) -> Option
 #[must_use]
 fn device_entry_role_for_hir_function(
     func: &HirFunction,
+    annotations: &[radix_hir::HirAnnotation],
     interner: &Interner,
 ) -> Option<MirDeviceRole> {
-    device_role_for_hir_function(func)
-        .and_then(|role| device_entry_role_for_visibility(role, is_public_entry(func, interner)))
+    device_role_for_hir_function(func).and_then(|role| {
+        device_entry_role_for_visibility(role, is_public_entry(annotations, interner))
+    })
 }
 
 /// One concrete imported device instance's target-admission facts (KPC-EMIT).

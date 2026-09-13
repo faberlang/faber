@@ -8,8 +8,8 @@
 use super::Lowerer;
 use crate::{ContractPayloadValue, Primitive, ResolvedContractApplication, Type, TypeId};
 use radix_hir::{
-    HirAnnotation, HirAnnotationField, HirAnnotationValue, HirAvailability, HirTypeParam,
-    HirTypeParamConstraint,
+    DefId, HirAnnotation, HirAnnotationField, HirAnnotationValue, HirAvailability, HirOwnerRef,
+    HirTypeParam, HirTypeParamConstraint,
 };
 use radix_lexer::{Interner, Span, Symbol};
 use radix_syntax::{
@@ -65,6 +65,17 @@ pub fn try_parse_nondum_annotation(
 }
 
 impl Lowerer<'_> {
+    pub(super) fn lower_item_annotations(
+        &mut self,
+        def_id: DefId,
+        annotations: &[Annotation],
+    ) -> Vec<HirAnnotation> {
+        self.annotation_capture = Some(HirOwnerRef::Def(def_id));
+        let lowered = self.lower_annotations(annotations);
+        self.annotation_capture = None;
+        lowered
+    }
+
     pub(super) fn lower_annotations(&mut self, annotations: &[Annotation]) -> Vec<HirAnnotation> {
         annotations
             .iter()

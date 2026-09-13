@@ -59,12 +59,12 @@ fn discerne_expr(
 fn enum_program(exprs: Vec<HirExpression>) -> HirModule {
     let mut program = expr_program(exprs);
     program.items.push(HirItem {
+        annotations: Vec::new(),
         id: HirId(200),
         def_id: DefId(1),
         kind: HirItemKind::Enum(HirEnum {
             name: crate::lexer::Symbol(1),
             type_params: Vec::new(),
-            annotations: Vec::new(),
             commune_fields: Vec::new(),
             variants: vec![
                 HirVariant {
@@ -794,6 +794,7 @@ fn gate_redde(id: u32, value: HirExpression) -> HirStatement {
 
 fn gate_function_item(id: u32, statements: Vec<HirStatement>) -> HirItem {
     HirItem {
+        annotations: Vec::new(),
         id: HirId(id),
         def_id: DefId(id + 200),
         kind: HirItemKind::Function(Box::new(HirFunction {
@@ -812,7 +813,6 @@ fn gate_function_item(id: u32, statements: Vec<HirStatement>) -> HirItem {
             is_vertex: false,
             is_fragment: false,
             test: None,
-            annotations: Vec::new(),
         })),
         span: test_span_between(10, 20),
     }

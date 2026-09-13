@@ -172,10 +172,10 @@ fn register_contract_surface(
     surface: &mut FxHashMap<DefId, ShaderContractRole>,
 ) {
     for item in &hir.items {
-        let HirItemKind::Function(function) = &item.kind else {
+        let HirItemKind::Function(_) = &item.kind else {
             continue;
         };
-        for annotation in &function.annotations {
+        for annotation in &item.annotations {
             if interner.resolve(annotation.family) != SHADER_CONTRACT_ANNOTATION {
                 continue;
             }

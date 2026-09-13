@@ -3527,15 +3527,17 @@ fn nucleum_orphan_diagnostics(
     // Package exports are top-level statements; struct methods never are, so
     // a method sharing an exported name must not inherit its admission.
     let annotated = unit.hir.items.iter().flat_map(|item| match &item.kind {
-        HirItemKind::Function(function) => vec![(true, item.def_id, function.as_ref(), item.span)],
+        HirItemKind::Function(function) => {
+            vec![(true, item.def_id, function.as_ref(), item.annotations.as_slice(), item.span)]
+        }
         HirItemKind::Struct(strukt) => strukt
             .methods
             .iter()
-            .map(|method| (false, method.def_id, &method.func, method.span))
+            .map(|method| (false, method.def_id, &method.func, method.annotations.as_slice(), method.span))
             .collect::<Vec<_>>(),
         _ => Vec::new(),
     });
-    for (is_top_level, def_id, function, definition_span) in annotated {
+    for (is_top_level, def_id, function, annotations, definition_span) in annotated {
         // Signature-only declarations defer to the DFV2-3 import/linkage channel.
         if !function.is_kernel || function.body.is_none() || function.type_params.is_empty() {
             continue;
@@ -3550,8 +3552,7 @@ fn nucleum_orphan_diagnostics(
         if is_top_level && admissions.admits_template(function_name) {
             continue;
         }
-        let annotation_span = function
-            .annotations
+        let annotation_span = annotations
             .iter()
             .find(|annotation| unit.interner.resolve(annotation.family) == NUCLEUM_FAMILY)
             .map_or(definition_span, |annotation| annotation.span);
@@ -3736,13 +3737,13 @@ fn collect_vertex_entries(
         let crate::hir::HirItemKind::Function(function) = &item.kind else {
             continue;
         };
-        let vertex_payload_count: usize = function
+        let vertex_payload_count: usize = item
             .annotations
             .iter()
             .filter(|annotation| interner.resolve(annotation.family) == "vertex")
             .map(|annotation| annotation.fields.len() + annotation.raw_args.len())
             .sum();
-        if function
+        if item
             .annotations
             .iter()
             .any(|annotation| interner.resolve(annotation.family) == "vertex")
@@ -3778,14 +3779,14 @@ fn collect_fragment_entries(
         let crate::hir::HirItemKind::Function(function) = &item.kind else {
             continue;
         };
-        if !function
+        if !item
             .annotations
             .iter()
             .any(|annotation| interner.resolve(annotation.family) == "fragment")
         {
             continue;
         }
-        let fragment_payload_count: usize = function
+        let fragment_payload_count: usize = item
             .annotations
             .iter()
             .filter(|annotation| interner.resolve(annotation.family) == "fragment")

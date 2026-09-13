@@ -185,6 +185,9 @@ pub struct HirItem {
 
     /// Definition reached by paths that name this declaration.
     pub def_id: DefId,
+
+    /// Source-level annotations attached to this top-level declaration.
+    pub annotations: Vec<HirAnnotation>,
     pub kind: HirItemKind,
     pub span: Span,
 }
@@ -370,7 +373,6 @@ pub struct HirFunction {
 
     /// Structured metadata for lowered Faber test cases.
     pub test: Option<HirTestMetadata>,
-    pub annotations: Vec<HirAnnotation>,
 }
 
 impl HirFunction {
@@ -553,7 +555,6 @@ pub enum HirParamMode {
 pub struct HirStruct {
     pub name: Symbol,
     pub type_params: Vec<HirTypeParam>,
-    pub annotations: Vec<HirAnnotation>,
 
     /// Instance/static fields in source order.
     pub fields: Vec<HirField>,
@@ -606,6 +607,9 @@ pub struct HirMethod {
     /// Shared function payload for the method signature and body.
     pub func: HirFunction,
 
+    /// Source-level annotations attached to this member declaration.
+    pub annotations: Vec<HirAnnotation>,
+
     /// Receiver mode lowered from method syntax.
     pub receiver: HirReceiver,
     pub span: Span,
@@ -632,10 +636,6 @@ pub enum HirReceiver {
 pub struct HirEnum {
     pub name: Symbol,
     pub type_params: Vec<HirTypeParam>,
-    /// Item-level annotations (`@ publica`, `@ interna`, …). Carried so the
-    /// canonical Faber emitter can preserve declaration visibility through
-    /// convert round-trips.
-    pub annotations: Vec<HirAnnotation>,
     /// Fields declared in the union's `@ commune` region.
     ///
     /// Backends prepend these fields to every variant payload. Keeping the

@@ -19,6 +19,7 @@ use radix_types::{DefId, TypeTable};
 /// A minimal schema-v2 artifact that passes referential-integrity validation.
 pub(crate) fn stub_artifact() -> HirArtifact {
     let item = HirItem {
+        annotations: Vec::new(),
         id: HirId(0),
         def_id: DefId(0),
         kind: HirItemKind::Function(Box::new(HirFunction {
@@ -37,7 +38,6 @@ pub(crate) fn stub_artifact() -> HirArtifact {
             is_vertex: false,
             is_fragment: false,
             test: None,
-            annotations: Vec::new(),
         })),
         span: Span::default(),
     };
@@ -136,6 +136,7 @@ pub(crate) fn selective_import_artifact() -> HirArtifact {
         selective: true,
     };
     artifact.hir.items.push(radix_hir::HirItem {
+        annotations: Vec::new(),
         id: HirId(1),
         def_id: DefId(USER_DEF_ID_BASE + 42),
         kind: radix_hir::HirItemKind::Import(import),

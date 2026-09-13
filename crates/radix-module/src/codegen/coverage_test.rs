@@ -185,6 +185,7 @@ fn go_rejects_ad_with_stable_slug() {
     };
     let hir = HirModule {
         items: vec![HirItem {
+            annotations: Vec::new(),
             id: HirId(3),
             def_id: DefId(1),
             kind: HirItemKind::Function(Box::new(HirFunction {
@@ -203,7 +204,6 @@ fn go_rejects_ad_with_stable_slug() {
                 is_vertex: false,
                 is_fragment: false,
                 test: None,
-                annotations: Vec::new(),
             })),
             span: Span::default(),
         }],

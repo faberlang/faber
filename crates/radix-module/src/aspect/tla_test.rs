@@ -41,12 +41,12 @@ fn discerne_omnia_expr(id: u32, span: Span, scrutinee_ty: TypeId, patterns: Vec<
 fn enum_program(expr: HirExpression) -> HirModule {
     HirModule {
         items: vec![HirItem {
+            annotations: Vec::new(),
             id: HirId(200),
             def_id: DefId(1),
             kind: HirItemKind::Enum(HirEnum {
                 name: crate::lexer::Symbol(1),
                 type_params: Vec::new(),
-                annotations: Vec::new(),
                 commune_fields: Vec::new(),
                 variants: vec![
                     HirVariant {

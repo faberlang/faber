@@ -82,12 +82,12 @@ fn emits_basic_function_and_entry() {
         is_vertex: false,
         is_fragment: false,
 
-        annotations: Vec::new(),
         test: None,
     };
 
     let program = HirModule {
         items: vec![HirItem {
+            annotations: Vec::new(),
             id: crate::hir::HirId(0),
             def_id: DefId(USER_DEF_ID_BASE),
             kind: HirItemKind::Function(Box::new(function)),
@@ -116,6 +116,7 @@ fn emits_alternate_exit_signature() {
 
     let program = HirModule {
         items: vec![HirItem {
+            annotations: Vec::new(),
             id: crate::hir::HirId(0),
             def_id: DefId(USER_DEF_ID_BASE),
             kind: HirItemKind::Function(Box::new(HirFunction {
@@ -134,7 +135,6 @@ fn emits_alternate_exit_signature() {
                 is_vertex: false,
                 is_fragment: false,
 
-                annotations: Vec::new(),
                 test: None,
             })),
             span: span(),
@@ -179,6 +179,7 @@ fn emits_post_name_declaration_markers_for_params_and_fields() {
     let program = HirModule {
         items: vec![
             HirItem {
+                annotations: Vec::new(),
                 id: crate::hir::HirId(2),
                 def_id: DefId(USER_DEF_ID_BASE + 2),
                 kind: HirItemKind::Function(Box::new(HirFunction {
@@ -197,18 +198,17 @@ fn emits_post_name_declaration_markers_for_params_and_fields() {
                     is_vertex: false,
                     is_fragment: false,
 
-                    annotations: Vec::new(),
                     test: None,
                 })),
                 span: span(),
             },
             HirItem {
+                annotations: Vec::new(),
                 id: crate::hir::HirId(3),
                 def_id: DefId(3),
                 kind: HirItemKind::Struct(HirStruct {
                     name: profile,
                     type_params: Vec::new(),
-                    annotations: Vec::new(),
                     fields: vec![HirField {
                         def_id: DefId(4),
                         name,
@@ -402,12 +402,12 @@ fn emits_parameter_references_with_original_names() {
         is_vertex: false,
         is_fragment: false,
 
-        annotations: Vec::new(),
         test: None,
     };
 
     let program = HirModule {
         items: vec![HirItem {
+            annotations: Vec::new(),
             id: crate::hir::HirId(0),
             def_id: DefId(USER_DEF_ID_BASE),
             kind: HirItemKind::Function(Box::new(function)),
@@ -540,12 +540,12 @@ fn emits_si_sin_secus_chain_with_ergo_redde() {
         is_vertex: false,
         is_fragment: false,
 
-        annotations: Vec::new(),
         test: None,
     };
 
     let program = HirModule {
         items: vec![HirItem {
+            annotations: Vec::new(),
             id: crate::hir::HirId(0),
             def_id: DefId(USER_DEF_ID_BASE),
             kind: HirItemKind::Function(Box::new(function)),
@@ -643,12 +643,12 @@ fn canonical_si_continuations_start_on_new_lines() {
         is_vertex: false,
         is_fragment: false,
 
-        annotations: Vec::new(),
         test: None,
     };
 
     let program = HirModule {
         items: vec![HirItem {
+            annotations: Vec::new(),
             id: crate::hir::HirId(0),
             def_id: DefId(USER_DEF_ID_BASE),
             kind: HirItemKind::Function(Box::new(function)),
@@ -968,7 +968,6 @@ fn emits_synthetic_proba_functions_as_proba_cases() {
         is_vertex: false,
         is_fragment: false,
 
-        annotations: Vec::new(),
         test: Some(HirTestMetadata {
             name,
             suite_path: vec![suite],
@@ -979,6 +978,7 @@ fn emits_synthetic_proba_functions_as_proba_cases() {
 
     let program = HirModule {
         items: vec![HirItem {
+            annotations: Vec::new(),
             id: crate::hir::HirId(0),
             def_id: DefId(USER_DEF_ID_BASE),
             kind: HirItemKind::Function(Box::new(function)),
@@ -1083,12 +1083,12 @@ fn discerne_patterns_preserve_bindings_aliases_variants_and_guards() {
     let textus = types.primitive(Primitive::Textus);
 
     let enum_item = HirItem {
+        annotations: Vec::new(),
         id: crate::hir::HirId(0),
         def_id: DefId(USER_DEF_ID_BASE),
         kind: HirItemKind::Enum(HirEnum {
             name: event,
             type_params: Vec::new(),
-            annotations: Vec::new(),
             commune_fields: Vec::new(),
             variants: vec![HirVariant {
                 def_id: DefId(2),
@@ -1282,12 +1282,12 @@ fn forma_capture_with_spread_params_falls_back_to_struct_literal() {
 
     let program = HirModule {
         items: vec![HirItem {
+            annotations: Vec::new(),
             id: crate::hir::HirId(0),
             def_id: DefId(USER_DEF_ID_BASE + 42),
             kind: HirItemKind::Struct(HirStruct {
                 name: forma,
                 type_params: Vec::new(),
-                annotations: Vec::new(),
                 fields: Vec::new(),
                 methods: Vec::new(),
                 extends: None,
@@ -1386,19 +1386,19 @@ fn emits_braced_unit_marker_from_hir_annotation() {
         nucleum_fragment: false,
         is_vertex: false,
         is_fragment: false,
-        annotations: vec![HirAnnotation {
-            family: futura,
-            fields: Vec::new(),
-            raw_args: Vec::new(),
-            contract_id: None,
-            brace_authored: true,
-            span: span(),
-        }],
         test: None,
     };
 
     let program = HirModule {
         items: vec![HirItem {
+            annotations: vec![HirAnnotation {
+                family: futura,
+                fields: Vec::new(),
+                raw_args: Vec::new(),
+                contract_id: None,
+                brace_authored: true,
+                span: span(),
+            }],
             id: crate::hir::HirId(0),
             def_id: DefId(USER_DEF_ID_BASE),
             kind: HirItemKind::Function(Box::new(function)),
@@ -1716,6 +1716,7 @@ fn re_emits_ego_as_self_keyword_not_type_name() {
     let method_def = DefId(USER_DEF_ID_BASE + 51);
 
     let method = HirMethod {
+        annotations: Vec::new(),
         def_id: method_def,
         func: HirFunction {
             cli_args: None,
@@ -1744,7 +1745,6 @@ fn re_emits_ego_as_self_keyword_not_type_name() {
             nucleum_fragment: false,
             is_vertex: false,
             is_fragment: false,
-            annotations: Vec::new(),
             test: None,
         },
         receiver: HirReceiver::None,
@@ -1752,12 +1752,12 @@ fn re_emits_ego_as_self_keyword_not_type_name() {
     };
     let program = HirModule {
         items: vec![HirItem {
+            annotations: Vec::new(),
             id: crate::hir::HirId(0),
             def_id: ray_def,
             kind: HirItemKind::Struct(HirStruct {
                 name: name_ray,
                 type_params: Vec::new(),
-                annotations: Vec::new(),
                 fields: Vec::new(),
                 methods: vec![method],
                 extends: None,

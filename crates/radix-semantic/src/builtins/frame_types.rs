@@ -347,6 +347,7 @@ fn inject_scrinium(
     }
 
     items.push(HirItem {
+        annotations: Vec::new(),
         id: HirId(0),
         def_id,
         kind: HirItemKind::Struct(HirStruct {
@@ -359,7 +360,6 @@ fn inject_scrinium(
                 constraint: radix_hir::HirTypeParamConstraint::Any,
                 default: None,
             }],
-            annotations: Vec::new(),
             fields,
             methods: Vec::new(),
             extends: None,
@@ -395,12 +395,12 @@ fn inject_status(
         .collect();
 
     items.push(HirItem {
+        annotations: Vec::new(),
         id: HirId(0),
         def_id,
         kind: HirItemKind::Enum(HirEnum {
             name: interner.intern(STATUS_NAME),
             type_params: Vec::new(),
-            annotations: Vec::new(),
             commune_fields: Vec::new(),
             variants,
         }),
@@ -424,6 +424,7 @@ fn inject_directional_view(
     }
     let payload_param = interner.intern("T");
     items.push(HirItem {
+        annotations: Vec::new(),
         id: HirId(0),
         def_id,
         kind: HirItemKind::Struct(HirStruct {
@@ -436,7 +437,6 @@ fn inject_directional_view(
                 constraint: radix_hir::HirTypeParamConstraint::Any,
                 default: None,
             }],
-            annotations: Vec::new(),
             fields: Vec::new(),
             methods: Vec::new(),
             extends: None,
@@ -461,12 +461,12 @@ fn inject_sermo(
     }
 
     items.push(HirItem {
+        annotations: Vec::new(),
         id: HirId(0),
         def_id,
         kind: HirItemKind::Struct(HirStruct {
             name: interner.intern(SERMO_NAME),
             type_params: Vec::new(),
-            annotations: Vec::new(),
             fields: Vec::new(),
             methods: Vec::new(),
             extends: None,

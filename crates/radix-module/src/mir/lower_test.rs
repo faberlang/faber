@@ -5484,7 +5484,6 @@ fn shader_stage_rejects_conflicting_annotations() {
             nucleum_fragment: false,
             is_vertex,
             is_fragment,
-            annotations: Vec::new(),
             test: None,
         }
     }
