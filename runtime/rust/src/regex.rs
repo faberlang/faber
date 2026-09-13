@@ -27,6 +27,11 @@ impl Regex {
     /// matches nothing (`false`) rather than panicking — script mode surfaces
     /// the compile error loudly at the stepper eval; the compiled runtime has
     /// no error channel on this verb.
+    // The owned `String` is the generated-code calling convention:
+    // `radix/crates/radix-hir-rust/src/expr/call/intrinsics.rs::generate_regex_method`
+    // emits `{ let t: String = …; receiver.consentit(t) }`; accepting `&str`
+    // would break emitted programs.
+    #[allow(clippy::needless_pass_by_value)]
     #[must_use]
     pub fn consentit(&self, textus: String) -> bool {
         regex::Regex::new(&self.pattern).is_ok_and(|regex| regex.is_match(&textus))
