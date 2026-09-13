@@ -22,6 +22,7 @@ fn utc_1979() -> Instans {
 }
 
 #[test]
+#[allow(clippy::float_cmp)]
 fn valor_scalaria_extracts_scalars_and_recovers_i64() {
     // conversio/valor-scalaria.fab — `count ≡ 42`, `ratio ≡ 3.5`,
     // `widened ≡ 7.0`, `flag ≡ true`, `greeting ≡ "salve"`,
@@ -32,9 +33,9 @@ fn valor_scalaria_extracts_scalars_and_recovers_i64() {
         valor_get_i64_or(&Valor::Textus("not-a-number".to_owned()), 0),
         0
     );
-    assert!((valor_get_f64_or(&Valor::Fractus(3.5), 0.0) - 3.5).abs() <= f64::EPSILON);
+    assert_eq!(valor_get_f64_or(&Valor::Fractus(3.5), 0.0), 3.5);
     // Numerus widens to fractus losslessly.
-    assert!((valor_get_f64_or(&Valor::Numerus(7), 0.0) - 7.0).abs() <= f64::EPSILON);
+    assert_eq!(valor_get_f64_or(&Valor::Numerus(7), 0.0), 7.0);
     assert!(valor_get_i1_or(&Valor::Bivalens(true), false));
     assert_eq!(
         valor_get_text_or(&Valor::Textus("salve".to_owned()), "x"),

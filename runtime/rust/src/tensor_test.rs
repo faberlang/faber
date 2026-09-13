@@ -343,17 +343,19 @@ fn addita_integer_tensors_sum_without_widening() {
 }
 
 #[test]
+#[allow(clippy::float_cmp)]
 fn summa_folds_all_elements_to_element_type() {
     let grid = Tensor::structa(vec![1.0f32, 2.0, 3.0, 4.0], &[2, 2]).unwrap();
-    assert!((grid.summa() - 10.0).abs() <= f32::EPSILON);
+    assert_eq!(grid.summa(), 10.0);
     let ints = Tensor::structa(vec![1i64, 2, 3, 4], &[4]).unwrap();
     assert_eq!(ints.summa(), 10);
 }
 
 #[test]
+#[allow(clippy::float_cmp)]
 fn summa_empty_tensor_returns_default() {
     let empty_f32 = Tensor::<f32>::structa(Vec::new(), &[0]).unwrap();
-    assert!(empty_f32.summa().abs() <= f32::EPSILON);
+    assert_eq!(empty_f32.summa(), 0.0);
 
     let empty_ints = Tensor::<i64>::structa(Vec::new(), &[0, 0]).unwrap();
     assert_eq!(empty_ints.summa(), 0);
@@ -462,10 +464,11 @@ fn divide_rejects_broadcast_shape_mismatch() {
 }
 
 #[test]
+#[allow(clippy::float_cmp)]
 fn media_averages_f32_elements() {
     let tensor = Tensor::structa(vec![1.0f32, 2.0, 3.0, 4.0], &[2, 2]).unwrap();
 
-    assert!((tensor.media().unwrap() - 2.5).abs() <= f32::EPSILON);
+    assert_eq!(tensor.media().unwrap(), 2.5);
 }
 
 #[test]
@@ -722,6 +725,15 @@ fn layernorm_rank1_no_affine() {
             "rank-1 layernorm output {a} differs from expected {e}"
         );
     }
+}
+
+#[test]
+fn layernorm_equal_max_finite_values_remain_finite() {
+    let input = Tensor::structa(vec![f32::MAX, f32::MAX], &[2]).unwrap();
+
+    let result = input.layernorm(0, 1e-5, None, None).unwrap();
+
+    assert_eq!(result.planata(), vec![0.0, 0.0]);
 }
 
 #[test]
