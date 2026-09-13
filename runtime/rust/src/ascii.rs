@@ -121,7 +121,8 @@ impl Ascii {
             Self {
                 repr: Repr::Inline {
                     bytes,
-                    len: payload.len() as u8,
+                    len: u8::try_from(payload.len())
+                        .expect("inline ASCII payload length must fit in u8"),
                 },
             }
         } else {
