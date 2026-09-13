@@ -373,7 +373,7 @@ async fn accept_loop(
             break;
         }
 
-        let permit = if let Ok(p) = slots.clone().try_acquire_owned() { p } else {
+        let Ok(permit) = slots.clone().try_acquire_owned() else {
             tokio::spawn(reject_busy_connection(
                 stream,
                 busy_rejection_timeout(config.request_timeout),
@@ -525,7 +525,7 @@ async fn handle_connection(
         body,
     };
 
-    let response = if let Ok(resp) = timeout_at(deadline, handler(carrier)).await { resp } else {
+    let Ok(response) = timeout_at(deadline, handler(carrier)).await else {
         correlation.complete(StatusCode::GATEWAY_TIMEOUT.as_u16());
         return error_response(StatusCode::GATEWAY_TIMEOUT, &request_id, "handler timeout");
     };

@@ -320,8 +320,8 @@ async fn cancel_during_inflight_handler_surfaces_unavailable_or_client_error() {
             );
             let _ = id;
         }
-        Ok(Err(_)) => {}
-        Err(_) => panic!("client hung after shutdown"),
+        Ok(Err(error)) => assert!(error.is_panic(), "client task was cancelled: {error}"),
+        Err(error) => panic!("client hung after shutdown: {error}"),
     }
 
     transport.shutdown_and_join().await;
