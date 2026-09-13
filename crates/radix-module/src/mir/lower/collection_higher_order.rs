@@ -294,8 +294,7 @@ impl FunctionBuilder<'_> {
             return None;
         };
         let normalized = self.normalized_type(receiver_ty);
-        if matches!(normalized, Type::Array(_) | Type::BoundedArray { .. }) {
-        } else {
+        if !matches!(normalized, Type::Array(_) | Type::BoundedArray { .. }) {
             self.errors.push(MirError::unsupported(
                 receiver.span,
                 "collection transform before array MIR lowering",
