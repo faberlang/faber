@@ -2,7 +2,6 @@
     clippy::bool_to_int_with_if,
     clippy::cast_lossless,
     clippy::format_push_string,
-    clippy::match_bool,
     clippy::match_same_arms,
     clippy::needless_pass_by_value,
     clippy::only_used_in_recursion,
@@ -75,13 +74,13 @@ impl<H: super::super::Host + ?Sized> Runner<'_, H> {
             // Render the JSON document directly from concrete `Value`, mirroring
             // the prior `value_to_runtime_json_valor` -> `faber::Json::to_wire`
             // composition without the `Valor`/`Json` middleman.
-            return match self.check_json_document(&value, span)? {
-                true => Ok(Value::Str(self.value_to_json_wire(&value, span)?)),
-                false => Err(RunnerError::internal(
+            if !self.check_json_document(&value, span)? {
+                return Err(RunnerError::internal(
                     span,
                     "json to textus conversion failed",
-                )),
-            };
+                ));
+            }
+            return Ok(Value::Str(self.value_to_json_wire(&value, span)?));
         }
         Ok(Value::Str(match value {
             Value::Str(text) => text,
@@ -750,9 +749,10 @@ impl<H: super::super::Host + ?Sized> Runner<'_, H> {
         recovery: Option<&MirOperand>,
         span: Span,
     ) -> Result<Value, RunnerError> {
-        match self.check_json_document(&value, span)? {
-            true => self.materialize_json_value(value, span),
-            false => self.recover_or_fail(recovery, span, "valor to json conversion failed"),
+        if self.check_json_document(&value, span)? {
+            self.materialize_json_value(value, span)
+        } else {
+            self.recover_or_fail(recovery, span, "valor to json conversion failed")
         }
     }
 
@@ -998,12 +998,13 @@ impl<H: super::super::Host + ?Sized> Runner<'_, H> {
     }
 
     pub(crate) fn require_json_value(&self, value: &Value, span: Span) -> Result<(), RunnerError> {
-        match self.check_json_document(value, span)? {
-            true => Ok(()),
-            false => Err(RunnerError::internal(
+        if self.check_json_document(value, span)? {
+            Ok(())
+        } else {
+            Err(RunnerError::internal(
                 span,
                 "valor to json conversion failed",
-            )),
+            ))
         }
     }
 
