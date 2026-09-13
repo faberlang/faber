@@ -29,8 +29,7 @@ impl Regex {
     /// no error channel on this verb.
     #[must_use]
     pub fn consentit(&self, textus: String) -> bool {
-        regex::Regex::new(&self.pattern)
-            .is_ok_and(|regex| regex.is_match(&textus))
+        regex::Regex::new(&self.pattern).is_ok_and(|regex| regex.is_match(&textus))
     }
 }
 

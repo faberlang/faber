@@ -50,7 +50,11 @@ fn display_valor_fractus() {
 #[test]
 fn display_valor_textus() {
     assert_eq!(display_valor(&Valor::Textus("salve".into())), "salve");
-    assert_eq!(display_valor(&Valor::Textus(String::new())), "", "empty textus");
+    assert_eq!(
+        display_valor(&Valor::Textus(String::new())),
+        "",
+        "empty textus"
+    );
 }
 
 #[test]

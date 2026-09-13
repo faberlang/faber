@@ -101,9 +101,13 @@ impl<const N: usize> OctetiN<N> {
     }
 
     /// `longitudo` — same as [`Self::len`], as `i64`.
+    ///
+    /// # Panics
+    ///
+    /// Panics when the declared capacity permits a length above [`i64::MAX`].
     #[must_use]
     pub fn longitudo(&self) -> i64 {
-        self.len as i64
+        i64::try_from(self.len).expect("octet payload length must fit in i64")
     }
 
     /// Whether `len == 0`.

@@ -101,9 +101,13 @@ impl<const N: usize> TextusN<N> {
     }
 
     /// `longitudo` — same as [`Self::len`], as `i64`.
+    ///
+    /// # Panics
+    ///
+    /// Panics when the declared capacity permits a length above [`i64::MAX`].
     #[must_use]
     pub fn longitudo(&self) -> i64 {
-        self.len as i64
+        i64::try_from(self.len).expect("text payload length must fit in i64")
     }
 
     /// Whether `len == 0`.
@@ -127,8 +131,12 @@ impl<const N: usize> TextusN<N> {
 
     /// Scalar `[i]` → `ascii<1>`. Spare `len..N` is not a readable index.
     ///
-    /// Direct slot, not a UTF-8 walk. Panics if the stored scalar is not ASCII
-    /// (live non-ASCII trap; `ascii<1>` cannot carry it).
+    /// Direct slot, not a UTF-8 walk.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the stored scalar is not ASCII (live non-ASCII trap;
+    /// `ascii<1>` cannot carry it).
     #[must_use]
     pub fn get(&self, i: usize) -> Option<AsciiN<1>> {
         let ch = *self.as_scalars().get(i)?;
@@ -137,7 +145,9 @@ impl<const N: usize> TextusN<N> {
             code <= 0x7F,
             "textus scalar index traps on non-ASCII scalar U+{code:04X}"
         );
-        Some(AsciiN::<1>::from_byte(code as u8))
+        Some(AsciiN::<1>::from_byte(
+            u8::try_from(code).expect("validated ASCII scalar must fit in u8"),
+        ))
     }
 
     /// Bounded → unbounded: copy the valid prefix.

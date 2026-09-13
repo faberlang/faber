@@ -249,10 +249,14 @@ impl<T: Clone + Default> Tensor<T> {
 
     pub fn reple(&mut self, value: T) {
         let offsets = self.logical_offsets();
+        let Some((&last_offset, preceding_offsets)) = offsets.split_last() else {
+            return;
+        };
         let mut data = tensor_data(&self.data);
-        for offset in offsets {
+        for &offset in preceding_offsets {
             data[offset] = value.clone();
         }
+        data[last_offset] = value;
     }
 
     /// Element-wise conversion preserving shape metadata.
@@ -429,22 +433,22 @@ fn unravel_index(mut ordinal: usize, shape: &[usize]) -> Vec<usize> {
     index
 }
 
-fn permute_axes(axes: &[i64], rank: usize) -> Result<Vec<usize>, &'static str> {
-    if axes.len() != rank {
+fn permute_axes(axis_order: &[i64], rank: usize) -> Result<Vec<usize>, &'static str> {
+    if axis_order.len() != rank {
         return Err(ERR_PERMUTE_RANK);
     }
     let mut parsed = Vec::with_capacity(rank);
     let mut seen = vec![false; rank];
-    for &axis in axes {
-        let axis = parse_non_negative(axis, ERR_PERMUTE_NEGATIVE_AXIS)?;
-        if axis >= rank {
+    for &requested_axis in axis_order {
+        let axis_index = parse_non_negative(requested_axis, ERR_PERMUTE_NEGATIVE_AXIS)?;
+        if axis_index >= rank {
             return Err(ERR_PERMUTE_AXIS_OUT_OF_RANGE);
         }
-        if seen[axis] {
+        if seen[axis_index] {
             return Err(ERR_PERMUTE_DUPLICATE_AXIS);
         }
-        seen[axis] = true;
-        parsed.push(axis);
+        seen[axis_index] = true;
+        parsed.push(axis_index);
     }
     Ok(parsed)
 }
@@ -619,10 +623,7 @@ impl Tensor<f32> {
             }
         }
         Ok(Tensor::from_contiguous(
-            self.planata()
-                .into_iter()
-                .map(f32::sqrt)
-                .collect(),
+            self.planata().into_iter().map(f32::sqrt).collect(),
             self.shape.clone(),
         ))
     }
@@ -807,7 +808,7 @@ impl Tensor<f32> {
 
         let softmax = self.softmax()?;
         let eps = 1e-7_f32;
-        let last_dim = self.shape[rank - 1] as f32;
+        let last_dim = (0..self.shape[rank - 1]).fold(0.0_f32, |count, _| count + 1.0);
 
         let mut sum = 0.0_f32;
         let softmax_data = softmax.planata();
@@ -958,141 +959,111 @@ impl Tensor<f32> {
             }
         }
 
-        // Forward computation: manual shape-loops
+        let gamma_data = gamma.map(Tensor::planata);
+        let beta_data = beta.map(Tensor::planata);
         if rank == 1 {
-            // Normalize over the entire vector
-            let cols = self.shape[0];
-
-            // Compute mean
-            let mean: f64 = input_data.iter().map(|&v| f64::from(v)).sum::<f64>() / cols as f64;
-            let mean = mean as f32;
-
-            // Compute variance
-            let var: f64 = input_data
-                .iter()
-                .map(|&v| {
-                    let d = f64::from(v) - f64::from(mean);
-                    d * d
-                })
-                .sum::<f64>()
-                / cols as f64;
-            let var = var as f32;
-
-            let inv_std = 1.0 / (var + epsilon).sqrt();
-
-            // Compute normalized and optionally affine
-            let gamma_data = gamma.map(Tensor::planata);
-            let beta_data = beta.map(Tensor::planata);
-            let result: Vec<f32> = input_data
-                .iter()
-                .enumerate()
-                .map(|(i, &v)| {
-                    let centered = v - mean;
-                    let norm = centered * inv_std;
-                    match (&gamma_data, &beta_data) {
-                        (Some(g), Some(b)) => norm * g[i] + b[i],
-                        (Some(g), None) => norm * g[i],
-                        (None, Some(b)) => norm + b[i],
-                        (None, None) => norm,
-                    }
-                })
-                .collect();
-            Ok(Tensor::from_contiguous(result, vec![cols]))
+            Ok(layernorm_rank1(
+                &input_data,
+                epsilon,
+                gamma_data.as_deref(),
+                beta_data.as_deref(),
+            ))
         } else {
-            // rank == 2, axis 0 or 1
-            let rows = self.shape[0];
-            let cols = self.shape[1];
-
-            // For axis=1: normalize each row independently
-            // For axis=0: normalize each column independently
-            let normalize_along_cols = axis_usize == 1;
-
-            // Hoisted once: gamma/beta are fixed for the call, so their flat
-            // data feeds every row/column slice instead of being re-materialized
-            // per element (mirrors the rank-1 branch above).
-            let gamma_data = gamma.map(Tensor::planata);
-            let beta_data = beta.map(Tensor::planata);
-
-            let result: Vec<f32> = if normalize_along_cols {
-                let mut result = vec![0.0_f32; rows * cols];
-
-                for r in 0..rows {
-                    let row_start = r * cols;
-                    let row_end = row_start + cols;
-                    let row_data = &input_data[row_start..row_end];
-
-                    // Mean
-                    let mean: f64 = row_data.iter().map(|&v| f64::from(v)).sum::<f64>() / cols as f64;
-                    let mean = mean as f32;
-
-                    // Variance
-                    let var: f64 = row_data
-                        .iter()
-                        .map(|&v| {
-                            let d = f64::from(v) - f64::from(mean);
-                            d * d
-                        })
-                        .sum::<f64>()
-                        / cols as f64;
-                    let var = var as f32;
-
-                    let inv_std = 1.0 / (var + epsilon).sqrt();
-
-                    for c in 0..cols {
-                        let idx = row_start + c;
-                        let centered = input_data[idx] - mean;
-                        let norm = centered * inv_std;
-
-                        result[idx] = match (&gamma_data, &beta_data) {
-                            (Some(g), Some(b)) => norm * g[c] + b[c],
-                            (Some(g), None) => norm * g[c],
-                            (None, Some(b)) => norm + b[c],
-                            (None, None) => norm,
-                        };
-                    }
-                }
-                result
-            } else {
-                // axis=0: normalize each column independently
-                let mut result = vec![0.0_f32; rows * cols];
-
-                for c in 0..cols {
-                    // Collect column data
-                    let mut col_sum: f64 = 0.0;
-                    for r in 0..rows {
-                        col_sum += f64::from(input_data[r * cols + c]);
-                    }
-                    let mean = (col_sum / rows as f64) as f32;
-
-                    let mut col_var: f64 = 0.0;
-                    for r in 0..rows {
-                        let v = input_data[r * cols + c];
-                        let d = f64::from(v) - f64::from(mean);
-                        col_var += d * d;
-                    }
-                    let var = (col_var / rows as f64) as f32;
-                    let inv_std = 1.0 / (var + epsilon).sqrt();
-
-                    for r in 0..rows {
-                        let idx = r * cols + c;
-                        let centered = input_data[idx] - mean;
-                        let norm = centered * inv_std;
-
-                        result[idx] = match (&gamma_data, &beta_data) {
-                            (Some(g), Some(b)) => norm * g[r] + b[r],
-                            // Gamma/beta for axis=0: shape matches rows, apply per row.
-                            (Some(g), None) => norm * g[r],
-                            (None, Some(b)) => norm + b[r],
-                            (None, None) => norm,
-                        };
-                    }
-                }
-                result
-            };
-
-            Ok(Tensor::from_contiguous(result, vec![rows, cols]))
+            Ok(layernorm_rank2(
+                &input_data,
+                self.shape[0],
+                self.shape[1],
+                axis_usize,
+                epsilon,
+                gamma_data.as_deref(),
+                beta_data.as_deref(),
+            ))
         }
     }
+}
+
+fn layernorm_moments<I>(values: I) -> (f32, f32)
+where
+    I: Iterator<Item = f32> + Clone,
+{
+    let count = values.clone().fold(0.0_f32, |count, _| count + 1.0);
+    let mean = values.clone().sum::<f32>() / count;
+    let variance = values
+        .map(|value| {
+            let distance = value - mean;
+            distance * distance
+        })
+        .sum::<f32>()
+        / count;
+    (mean, variance)
+}
+
+fn layernorm_value(
+    value: f32,
+    mean: f32,
+    variance: f32,
+    epsilon: f32,
+    affine_index: usize,
+    gamma: Option<&[f32]>,
+    beta: Option<&[f32]>,
+) -> f32 {
+    let normalized = (value - mean) / (variance + epsilon).sqrt();
+    match (gamma, beta) {
+        (Some(gamma), Some(beta)) => normalized * gamma[affine_index] + beta[affine_index],
+        (Some(gamma), None) => normalized * gamma[affine_index],
+        (None, Some(beta)) => normalized + beta[affine_index],
+        (None, None) => normalized,
+    }
+}
+
+fn layernorm_rank1(
+    input: &[f32],
+    epsilon: f32,
+    gamma: Option<&[f32]>,
+    beta: Option<&[f32]>,
+) -> Tensor<f32> {
+    let (mean, variance) = layernorm_moments(input.iter().copied());
+    let result = input
+        .iter()
+        .enumerate()
+        .map(|(index, &value)| layernorm_value(value, mean, variance, epsilon, index, gamma, beta))
+        .collect();
+    Tensor::from_contiguous(result, vec![input.len()])
+}
+
+fn layernorm_rank2(
+    input: &[f32],
+    rows: usize,
+    columns: usize,
+    axis: usize,
+    epsilon: f32,
+    gamma: Option<&[f32]>,
+    beta: Option<&[f32]>,
+) -> Tensor<f32> {
+    let mut result = vec![0.0_f32; rows * columns];
+    if axis == 1 {
+        for row in 0..rows {
+            let row_start = row * columns;
+            let row_end = row_start + columns;
+            let (mean, variance) = layernorm_moments(input[row_start..row_end].iter().copied());
+            for column in 0..columns {
+                let index = row_start + column;
+                result[index] =
+                    layernorm_value(input[index], mean, variance, epsilon, column, gamma, beta);
+            }
+        }
+    } else {
+        for column in 0..columns {
+            let values = (0..rows).map(|row| input[row * columns + column]);
+            let (mean, variance) = layernorm_moments(values);
+            for row in 0..rows {
+                let index = row * columns + column;
+                result[index] =
+                    layernorm_value(input[index], mean, variance, epsilon, row, gamma, beta);
+            }
+        }
+    }
+    Tensor::from_contiguous(result, vec![rows, columns])
 }
 
 fn checked_divide_f32(numerator: f32, denominator: f32) -> Result<f32, &'static str> {

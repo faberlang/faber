@@ -63,7 +63,12 @@ impl<const N: usize> AsciiN<N> {
     /// Build from an ASCII payload of length `≤ N`.
     ///
     /// Returns [`Err`] if `value.len() > N` (overflow uses declared `N`; no
-    /// truncate). Panics if `value` is not ASCII.
+    /// truncate).
+    ///
+    /// # Panics
+    ///
+    /// Panics if `value` is not ASCII.
+    ///
     /// # Errors
     /// Returns an error when the requested operation cannot be completed.
     pub fn new(value: &str) -> Result<Self, AsciiNOverflow> {
@@ -90,6 +95,11 @@ impl<const N: usize> AsciiN<N> {
     }
 
     /// Append one ASCII byte. Fails closed when `len == N`.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `byte` is not ASCII.
+    ///
     /// # Errors
     /// Returns an error when the requested operation cannot be completed.
     pub fn appende(&mut self, byte: u8) -> Result<(), AsciiNOverflow> {
@@ -115,9 +125,13 @@ impl<const N: usize> AsciiN<N> {
     }
 
     /// `longitudo` — same as [`Self::len`], as `i64`.
+    ///
+    /// # Panics
+    ///
+    /// Panics when the declared capacity permits a length above [`i64::MAX`].
     #[must_use]
     pub fn longitudo(&self) -> i64 {
-        self.len as i64
+        i64::try_from(self.len).expect("ASCII payload length must fit in i64")
     }
 
     /// Whether `len == 0`.
@@ -139,8 +153,10 @@ impl<const N: usize> AsciiN<N> {
 
     #[must_use]
     pub fn as_str(&self) -> &str {
-        // SAFETY-equivalent: every constructor stores only ASCII, a subset of UTF-8.
-        std::str::from_utf8(self.as_bytes()).expect("ascii payload must be valid utf-8")
+        // Every constructor stores only ASCII, a subset of UTF-8.
+        std::str::from_utf8(self.as_bytes()).unwrap_or_else(|_| {
+            unreachable!("AsciiN invariant violated: payload must be valid UTF-8")
+        })
     }
 
     /// Scalar `[i]` → `ascii<1>`. Spare `len..N` is not a readable index.

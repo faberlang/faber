@@ -29,13 +29,19 @@ pub struct Scrinium {
     pub trace: Option<Valor>,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum RuntimeResponseState {
+    Pending,
+    Generated,
+}
+
 #[derive(Debug)]
 struct SermoInner {
     conversation_id: String,
     route: String,
     outgoing: Vec<Scrinium>,
     incoming: VecDeque<Scrinium>,
-    runtime_response_generated: bool,
+    runtime_response_state: RuntimeResponseState,
     incoming_drained: bool,
     /// Terminal `status` observed on the inbound direction (`done`, `error`, or `cancel`).
     incoming_terminal: Option<FrameStatus>,
@@ -449,7 +455,7 @@ impl Sermo {
 
     pub fn push_incoming(&mut self, frame: Scrinium) {
         let mut inner = lock_sermo(&self.inner);
-        inner.runtime_response_generated = true;
+        inner.runtime_response_state = RuntimeResponseState::Generated;
         inner.incoming.push_back(frame);
         wake_incoming(&mut inner);
         self.inner.incoming_changed.notify_all();
@@ -463,9 +469,10 @@ impl Sermo {
 
 pub fn sermo_set_opener(sermo: &mut Sermo, data: Valor) {
     if let Some(request) = lock_sermo(&sermo.inner).outgoing.first_mut()
-        && request.status == FrameStatus::Request {
-            request.data = data;
-        }
+        && request.status == FrameStatus::Request
+    {
+        request.data = data;
+    }
 }
 
 #[must_use]
@@ -486,7 +493,7 @@ pub fn sermo_open(route: &str) -> Sermo {
                 trace: None,
             }],
             incoming: VecDeque::new(),
-            runtime_response_generated: false,
+            runtime_response_state: RuntimeResponseState::Pending,
             incoming_drained: false,
             incoming_terminal: None,
             incoming_wake_epoch: 0,
@@ -517,7 +524,7 @@ pub fn test_response_sender(route: &str) -> (Sermo, ResponseSender, Cancellation
     let sermo = sermo_open(route);
     {
         let mut inner = lock_sermo(&sermo.inner);
-        inner.runtime_response_generated = true;
+        inner.runtime_response_state = RuntimeResponseState::Generated;
     }
     let cancellation = Cancellation {
         cancelled: Arc::new(AtomicBool::new(false)),
@@ -803,10 +810,10 @@ fn cancel_runtime_response(shared: &Arc<SermoShared>) {
 }
 
 fn ensure_runtime_response_started(shared: &Arc<SermoShared>, inner: &mut SermoInner) {
-    if inner.runtime_response_generated {
+    if inner.runtime_response_state == RuntimeResponseState::Generated {
         return;
     }
-    inner.runtime_response_generated = true;
+    inner.runtime_response_state = RuntimeResponseState::Generated;
     let request = sermo_request(inner, None);
     let cancellation = Cancellation {
         cancelled: Arc::new(AtomicBool::new(false)),
@@ -816,7 +823,7 @@ fn ensure_runtime_response_started(shared: &Arc<SermoShared>, inner: &mut SermoI
     let dispatch = inner
         .host_dispatch
         .as_ref()
-        .map(|override_dispatch| Arc::clone(&override_dispatch.0));
+        .map(|override_dispatch| &override_dispatch.0);
     if let Err(error) = start_host_dispatch(request, responses.clone(), cancellation, dispatch) {
         // The caller holds the sermo lock while starting dispatch, and
         // `reject_start_error` enqueues through that same (non-reentrant)
@@ -835,10 +842,10 @@ where
 
 fn ensure_runtime_response_started_for_target(sermo: &mut Sermo, target: &'static str) {
     let mut inner = lock_sermo(&sermo.inner);
-    if inner.runtime_response_generated {
+    if inner.runtime_response_state == RuntimeResponseState::Generated {
         return;
     }
-    inner.runtime_response_generated = true;
+    inner.runtime_response_state = RuntimeResponseState::Generated;
     let request = sermo_request(&inner, Some(target));
     let cancellation = Cancellation {
         cancelled: Arc::new(AtomicBool::new(false)),
@@ -848,7 +855,7 @@ fn ensure_runtime_response_started_for_target(sermo: &mut Sermo, target: &'stati
     let dispatch = inner
         .host_dispatch
         .as_ref()
-        .map(|override_dispatch| Arc::clone(&override_dispatch.0));
+        .map(|override_dispatch| &override_dispatch.0);
     if let Err(error) = start_host_dispatch(request, responses.clone(), cancellation, dispatch) {
         // The caller holds the sermo lock while starting dispatch, and
         // `reject_start_error` enqueues through that same (non-reentrant)
@@ -862,7 +869,7 @@ fn start_host_dispatch(
     request: SermoRequest,
     responses: ResponseSender,
     cancellation: Cancellation,
-    override_dispatch: Option<Arc<dyn HostDispatch>>,
+    override_dispatch: Option<&Arc<dyn HostDispatch>>,
 ) -> Result<(), DispatchError> {
     // S1-U3 split, stabilized: the faber runtime package owns the
     // HostDispatch contract plus builtin routes (`runtime:echo`,
@@ -871,7 +878,7 @@ fn start_host_dispatch(
     // covers it.
     // Unrelated routes stay fail-closed against the host error (no host is
     // installed → `host_dispatch_unavailable`).
-    if let Some(dispatch) = &override_dispatch {
+    if let Some(dispatch) = override_dispatch {
         return dispatch_or_builtin_fallback(dispatch, request, responses, cancellation);
     }
     if let Some(dispatch) = HOST_DISPATCH.get() {

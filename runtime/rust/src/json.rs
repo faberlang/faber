@@ -4,6 +4,7 @@ use crate::Valor;
 use std::collections::BTreeMap;
 use std::convert::TryFrom;
 use std::fmt;
+use std::fmt::Write as _;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Json(Valor);
@@ -232,7 +233,9 @@ fn render_string(value: &str) -> String {
             '\n' => out.push_str("\\n"),
             '\r' => out.push_str("\\r"),
             '\t' => out.push_str("\\t"),
-            ch if ch.is_control() => out.push_str(&format!("\\u{:04x}", ch as u32)),
+            ch if ch.is_control() => {
+                write!(out, "\\u{:04x}", u32::from(ch)).expect("writing to String cannot fail");
+            }
             ch => out.push(ch),
         }
     }
@@ -260,8 +263,8 @@ impl<'a> Parser<'a> {
             Some(b'f') => self.parse_literal("false", Valor::Bivalens(false), path),
             Some(b'n') => self.parse_literal("null", Valor::Nihil, path),
             Some(b'-' | b'0'..=b'9') => self.parse_number(path),
-            Some(other) => Err(self.syntax(path, format!("unexpected byte 0x{other:02x}"))),
-            None => Err(self.syntax(path, "unexpected end of input")),
+            Some(other) => Err(Self::syntax(path, format!("unexpected byte 0x{other:02x}"))),
+            None => Err(Self::syntax(path, "unexpected end of input")),
         }
     }
 
@@ -315,13 +318,13 @@ impl<'a> Parser<'a> {
         let mut out = String::new();
         loop {
             let Some(ch) = self.next_char() else {
-                return Err(self.syntax(path, "unterminated string"));
+                return Err(Self::syntax(path, "unterminated string"));
             };
             match ch {
                 '"' => return Ok(out),
                 '\\' => out.push(self.parse_escape(path)?),
                 ch if ch.is_control() => {
-                    return Err(self.syntax(path, "unescaped control character in string"));
+                    return Err(Self::syntax(path, "unescaped control character in string"));
                 }
                 ch => out.push(ch),
             }
@@ -330,7 +333,7 @@ impl<'a> Parser<'a> {
 
     fn parse_escape(&mut self, path: &str) -> Result<char, JsonError> {
         let Some(ch) = self.next_char() else {
-            return Err(self.syntax(path, "unterminated escape"));
+            return Err(Self::syntax(path, "unterminated escape"));
         };
         match ch {
             '"' | '\\' | '/' => Ok(ch),
@@ -340,7 +343,7 @@ impl<'a> Parser<'a> {
             'r' => Ok('\r'),
             't' => Ok('\t'),
             'u' => self.parse_unicode_escape(path),
-            _ => Err(self.syntax(path, format!("invalid escape \\{ch}"))),
+            _ => Err(Self::syntax(path, format!("invalid escape \\{ch}"))),
         }
     }
 
@@ -348,31 +351,31 @@ impl<'a> Parser<'a> {
         let high = self.parse_hex_quad(path)?;
         if !(0xd800..=0xdbff).contains(&high) {
             return char::from_u32(u32::from(high))
-                .ok_or_else(|| self.syntax(path, "invalid unicode scalar"));
+                .ok_or_else(|| Self::syntax(path, "invalid unicode scalar"));
         }
 
         let save = self.pos;
         if self.next_char() != Some('\\') || self.next_char() != Some('u') {
             self.pos = save;
-            return Err(self.syntax(path, "high surrogate without low surrogate"));
+            return Err(Self::syntax(path, "high surrogate without low surrogate"));
         }
 
         let low = self.parse_hex_quad(path)?;
         if !(0xdc00..=0xdfff).contains(&low) {
-            return Err(self.syntax(path, "high surrogate without low surrogate"));
+            return Err(Self::syntax(path, "high surrogate without low surrogate"));
         }
         let scalar = 0x10000 + (u32::from(high - 0xd800) << 10) + u32::from(low - 0xdc00);
-        char::from_u32(scalar).ok_or_else(|| self.syntax(path, "invalid unicode scalar"))
+        char::from_u32(scalar).ok_or_else(|| Self::syntax(path, "invalid unicode scalar"))
     }
 
     fn parse_hex_quad(&mut self, path: &str) -> Result<u16, JsonError> {
         let mut value = 0u16;
         for _ in 0..4 {
             let Some(ch) = self.next_char() else {
-                return Err(self.syntax(path, "short unicode escape"));
+                return Err(Self::syntax(path, "short unicode escape"));
             };
             let Some(digit) = ch.to_digit(16) else {
-                return Err(self.syntax(path, "invalid unicode escape"));
+                return Err(Self::syntax(path, "invalid unicode escape"));
             };
             // SAFETY: digit is 0..=15 from to_digit(16), safe for u16.
             #[allow(clippy::cast_possible_truncation)]
@@ -392,7 +395,7 @@ impl<'a> Parser<'a> {
             self.pos += expected.len();
             Ok(value)
         } else {
-            Err(self.syntax(path, format!("expected {expected}")))
+            Err(Self::syntax(path, format!("expected {expected}")))
         }
     }
 
@@ -482,7 +485,7 @@ impl<'a> Parser<'a> {
         if self.consume(byte) {
             Ok(())
         } else {
-            Err(self.syntax(path, format!("expected {}", byte as char)))
+            Err(Self::syntax(path, format!("expected {}", byte as char)))
         }
     }
 
@@ -492,7 +495,7 @@ impl<'a> Parser<'a> {
         Some(ch)
     }
 
-    fn syntax(&self, path: &str, message: impl Into<String>) -> JsonError {
+    fn syntax(path: &str, message: impl Into<String>) -> JsonError {
         JsonError::new(path, JsonErrorKind::InvalidSyntax(message.into()))
     }
 

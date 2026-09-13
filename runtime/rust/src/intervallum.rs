@@ -31,15 +31,19 @@ pub trait IntervallumNumeric: PartialOrd + Copy + Sized {
     fn one() -> Self;
     fn zero() -> Self;
 
+    #[must_use]
     fn saturating_add(self, rhs: Self) -> Self;
+    #[must_use]
     fn saturating_sub(self, rhs: Self) -> Self;
 
     /// Step one unit forward (toward +∞).  Wraps for unsigned underflow-safe
     /// walking; callers guard against MAX beforehand.
+    #[must_use]
     fn walk_ascend(self) -> Self;
 
     /// Step one unit backward (toward −∞).  Wraps for unsigned underflow-safe
     /// walking; callers guard against MIN beforehand.
+    #[must_use]
     fn walk_descend(self) -> Self;
 
     /// Convert to `i64` for cardinality / length returns.
@@ -61,7 +65,7 @@ macro_rules! impl_intervallum_numeric_signed {
             fn walk_ascend(self) -> Self { self + 1 }
             fn walk_descend(self) -> Self { self - 1 }
 
-            fn to_i64(self) -> i64 { self as i64 }
+            fn to_i64(self) -> i64 { i64::from(self) }
         })+
     }
 }
@@ -81,13 +85,43 @@ macro_rules! impl_intervallum_numeric_unsigned {
             fn walk_ascend(self) -> Self { self + 1 }
             fn walk_descend(self) -> Self { self.wrapping_sub(1) }
 
-            fn to_i64(self) -> i64 { self as i64 }
+            fn to_i64(self) -> i64 { i64::from(self) }
         })+
     }
 }
 
 impl_intervallum_numeric_signed!(i8, i16, i32, i64);
-impl_intervallum_numeric_unsigned!(u8, u16, u32, u64);
+impl_intervallum_numeric_unsigned!(u8, u16, u32);
+
+impl IntervallumNumeric for u64 {
+    const MAX: Self = Self::MAX;
+    const MIN: Self = Self::MIN;
+
+    fn one() -> Self {
+        1
+    }
+    fn zero() -> Self {
+        0
+    }
+
+    fn saturating_add(self, rhs: Self) -> Self {
+        self.saturating_add(rhs)
+    }
+    fn saturating_sub(self, rhs: Self) -> Self {
+        self.saturating_sub(rhs)
+    }
+
+    fn walk_ascend(self) -> Self {
+        self + 1
+    }
+    fn walk_descend(self) -> Self {
+        self.wrapping_sub(1)
+    }
+
+    fn to_i64(self) -> i64 {
+        i64::try_from(self).unwrap_or(i64::MAX)
+    }
+}
 
 // ---------------------------------------------------------------------------
 // Generic struct-level constructors
@@ -494,7 +528,7 @@ impl<T: IntervallumNumeric> Iterator for IntervallumWalk<T> {
             return (0, Some(0));
         }
         // Bound to usize::MAX for safety.
-        let len_usize: usize = len as usize;
+        let len_usize = usize::try_from(len).unwrap_or(usize::MAX);
         (0, Some(len_usize))
     }
 }
