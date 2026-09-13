@@ -130,12 +130,7 @@ pub fn parse_paths_config(toml_source: &str) -> PathsConfig {
                 let value = value_raw.trim_matches('"').trim_matches('\'');
                 if !key.is_empty() && !value.is_empty() {
                     // Reject absolute template values or those with `..` segments.
-                    if value.starts_with('/')
-                        || value == ".."
-                        || value.starts_with("../")
-                        || value.contains("/../")
-                        || value.ends_with("/..")
-                    {
+                    if contains_path_traversal(value) {
                         continue;
                     }
                     templates.insert(key, value.to_owned());
@@ -283,8 +278,8 @@ fn resolve_template_import(
 /// Returns `true` if `path` contains any `..` segment that would escape
 /// an intended directory scope.
 ///
-/// This mirrors the template-value sanitization in [`parse_paths_config`],
-/// applied to the `rest` portion of a `§name/rest` template import.
+/// Shared by the template-value sanitization in [`parse_paths_config`] and
+/// the `rest` portion of a `§name/rest` template import.
 fn contains_path_traversal(path: &str) -> bool {
     path.starts_with('/') || path == ".." || path.starts_with("../") || path.contains("/../") || path.ends_with("/..")
 }
