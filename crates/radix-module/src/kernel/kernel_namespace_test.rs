@@ -14,6 +14,7 @@ use super::{
 use crate::codegen::Target;
 use crate::driver::{AnalyzeRequest, Config, Session, analyze_source};
 use crate::mir::lower_analyzed_unit;
+use crate::mir::MirLoweringOptions;
 use crate::mir::{MirIntrinsic, MirProvider, MirProviderKind, MirStatementKind};
 
 fn workspace_root() -> PathBuf {

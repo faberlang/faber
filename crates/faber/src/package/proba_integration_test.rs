@@ -17,6 +17,7 @@ use radix::program::emit::{
 use radix::program::library::LibraryResolver;
 use radix::program::test_source_filter::TestSourceFilter;
 use std::fs;
+use std::collections::BTreeMap;
 use std::path::Path;
 
 fn seams() -> AnalysisSeams {

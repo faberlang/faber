@@ -5,6 +5,7 @@
 //! branch stays base-lane and reverse AD never sees a non-literal scrutinee.
 
 use crate::driver::{AnalyzeRequest, Config, Session, analyze_source};
+use crate::mir::MirLoweringOptions;
 use crate::mir::{dump_program, lower_analyzed_unit, validate_program};
 
 fn session() -> Session {

@@ -23,6 +23,7 @@
 use crate::air::{AirExpr, AirTensorOp, lower_program};
 use crate::codegen::Target;
 use crate::driver::{AnalyzeRequest, Config, ModuleCompileRequest, Session, analyze_source, compile};
+use crate::mir::MirLoweringOptions;
 use crate::mir::{
     BufferHost, MirAggregateFields, MirCollectionOp, MirIntrinsic, MirOperand, MirPlaceBase, MirRuntimeCall,
     MirStatementKind, MirTempId, MirValidationContext, RunSourceError, ValidatedMir, run_entry, run_source,

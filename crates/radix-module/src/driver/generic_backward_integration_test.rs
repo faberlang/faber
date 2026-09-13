@@ -26,6 +26,7 @@ use crate::driver::{
     AnalyzeRequest, FreshMirFunctionIds, SpannedCodegenError, analyze_source, apply_air_backward_bundle,
     lower_mir_with_context_for_target, prepare_air_backward_bundle,
 };
+use crate::mir::MirLoweringOptions;
 use crate::mir::lower_analyzed_unit;
 use crate::semantic::IndexExpr;
 use crate::test_support::test_session;

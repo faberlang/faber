@@ -5,6 +5,7 @@ use crate::diagnostics::{DiagnosticArg, semantic_message};
 use crate::driver::{self, AnalyzeRequest, Config, Session};
 use crate::hir::DefId;
 use crate::lexer::Span;
+use crate::mir::MirLoweringOptions;
 use crate::mir::{
     MirBlock, MirBlockId, MirCallee, MirDeviceFunctionMetadataMap, MirDeviceRole, MirFunction, MirFunctionId,
     MirKernelShaderStage, MirLayoutTable, MirLocal, MirLocalId, MirMonomorphization, MirMonomorphizationKey,

@@ -29,6 +29,7 @@ use crate::diagnostics::Diagnostic;
 use crate::driver::{AnalyzeRequest, Config, Session, analyze_source};
 use crate::hir::{HirExpression, HirExpressionKind, HirModule, HirStatementKind};
 use crate::intrinsics::IntrinsicReceiver;
+use crate::mir::MirLoweringOptions;
 use crate::mir::lower_analyzed_unit;
 use crate::mir::{MirCollectionOp, MirIntrinsic, MirProgram, MirStatementKind};
 

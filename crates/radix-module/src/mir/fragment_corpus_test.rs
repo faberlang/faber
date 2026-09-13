@@ -8,6 +8,7 @@ use super::{ExpansionBudget, ISSUE_CYCLE, ISSUE_EXPANSION, surviving_fragment_ca
 use crate::diagnostics::Diagnostic;
 use crate::driver::{self, AnalyzeRequest, Config, Session};
 use crate::lexer::Span;
+use crate::mir::MirLoweringOptions;
 use crate::mir::{
     MirBinOp, MirDeviceRole, MirFunction, MirOperand, MirParamMode, MirPlaceBase, MirProgram, MirStatementKind,
     MirValue, MirValueKind, device_roles_from_hir,

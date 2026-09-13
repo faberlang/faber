@@ -2958,6 +2958,10 @@ mod nary_range_link_tests {
     //! linked walk runs row-major.
 
     use super::*;
+    use crate::mir::{run_package_mir, with_interpreted_lowered_package_mir};
+    use radix_module::driver::Config;
+    use radix_module::mir::LoweredMirUnit;
+    use std::fs;
     use radix_module::mir::{BufferHost, MirFunctionId, dump_program};
 
     const RANGE_UTIL: &str = "@ public\nfn row_max() → numerus {\n    return 2\n}\n\n@ public\nfn col_max() → numerus {\n    return 3\n}\n\n@ public\nfn emit_cell(numerus v) → numerus {\n    return v\n}\n";

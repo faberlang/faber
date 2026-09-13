@@ -25,6 +25,7 @@ use radix::program::emit::{
 };
 use radix::program::manifest::ManifestRustHost;
 use radix::program::test_source_filter::TestSourceFilter;
+use std::collections::BTreeMap;
 fn analyze_with_faber_seams(
     config: &Config,
     input: &Path,

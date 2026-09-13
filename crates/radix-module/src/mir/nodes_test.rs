@@ -11,6 +11,7 @@ use crate::mir::dump_program;
 use crate::semantic::{Primitive, TypeTable};
 use crate::test_support::test_span;
 use radix_mir::device::MirDeviceFunctionMetadata;
+use std::collections::HashMap;
 
 #[test]
 fn mir_type_wraps_semantic_type_and_reserves_layout_slot() {

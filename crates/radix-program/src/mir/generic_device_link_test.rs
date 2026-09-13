@@ -8,6 +8,8 @@
 //! registration dedup by key, and the fail-closed signature-only boundary.
 
 use super::fs;
+#[cfg(test)]
+use super::{Config, with_interpreted_lowered_package_mir};
 
 const DEVICE_MATH_LIB: &str = r#"+++
 locale = "en"

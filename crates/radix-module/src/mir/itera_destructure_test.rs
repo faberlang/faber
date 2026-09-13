@@ -7,6 +7,7 @@
 
 use crate::codegen::Target;
 use crate::driver::{AnalyzeRequest, Config, Session, analyze_source};
+use crate::mir::MirLoweringOptions;
 use crate::mir::{
     BufferHost, MirConstant, MirOperand, MirPlace, MirPlaceBase, MirProjection, MirValue, MirValueKind, RunSourceError,
     lower_analyzed_unit, run_source, validate_program,
