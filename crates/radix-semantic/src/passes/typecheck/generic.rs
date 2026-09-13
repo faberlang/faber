@@ -119,7 +119,7 @@ impl TypeChecker<'_> {
                     param_vars.insert(param.name, infer);
                 }
             }
-            let mut shape_vars = self.shape_vars_for(sig, &shape_symbols);
+            let mut shape_vars = self.shape_vars_for(&shape_symbols);
             let sig = self.substitute_func_sig(sig, &mut param_vars, Some(&mut shape_vars));
             (sig, Some(param_vars), shape_vars, FxHashSet::default())
         } else if let Some(error_ty) =
@@ -141,7 +141,7 @@ impl TypeChecker<'_> {
             if size_prefix {
                 // Positional size prefix: every zipped descriptor is a
                 // magnitudo param (sort-checked by the arity validator).
-                let mut shape_vars = self.shape_vars_for(sig, &shape_symbols);
+                let mut shape_vars = self.shape_vars_for(&shape_symbols);
                 self.bind_explicit_magnitudo_args(
                     sig,
                     explicit_type_args,
@@ -179,7 +179,7 @@ impl TypeChecker<'_> {
                             .or_insert_with(|| self.fresh_infer());
                     }
                 }
-                let mut shape_vars = self.shape_vars_for(sig, &shape_symbols);
+                let mut shape_vars = self.shape_vars_for(&shape_symbols);
                 (
                     self.substitute_func_sig(sig, &mut param_vars, Some(&mut shape_vars)),
                     Some(param_vars),
@@ -868,7 +868,6 @@ impl TypeChecker<'_> {
     /// Allocate one fresh index hole per distinct shape-param symbol (D1).
     fn shape_vars_for(
         &mut self,
-        _sig: &FuncSig,
         shape_symbols: &FxHashSet<Symbol>,
     ) -> FxHashMap<Symbol, IndexId> {
         shape_symbols
