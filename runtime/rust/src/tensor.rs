@@ -249,10 +249,14 @@ impl<T: Clone + Default> Tensor<T> {
 
     pub fn reple(&mut self, value: T) {
         let offsets = self.logical_offsets();
+        let Some((&last_offset, preceding_offsets)) = offsets.split_last() else {
+            return;
+        };
         let mut data = tensor_data(&self.data);
-        for offset in offsets {
+        for &offset in preceding_offsets {
             data[offset] = value.clone();
         }
+        data[last_offset] = value;
     }
 
     /// Element-wise conversion preserving shape metadata.
