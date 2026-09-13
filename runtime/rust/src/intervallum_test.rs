@@ -138,7 +138,14 @@ fn longitudo_ascending_exclusive() {
         finis: 10,
         kind: IntervallumKind::Exclusive,
     };
-    assert_eq!(range.longitudo(), range.ad_lista().len() as i64);
+    assert_eq!(
+        range.longitudo(),
+        range
+            .ad_lista()
+            .len()
+            .try_into()
+            .expect("test range length fits i64")
+    );
 }
 
 #[test]
@@ -148,7 +155,14 @@ fn longitudo_ascending_inclusive() {
         finis: 10,
         kind: IntervallumKind::Inclusive,
     };
-    assert_eq!(range.longitudo(), range.ad_lista().len() as i64);
+    assert_eq!(
+        range.longitudo(),
+        range
+            .ad_lista()
+            .len()
+            .try_into()
+            .expect("test range length fits i64")
+    );
 }
 
 #[test]
@@ -158,7 +172,14 @@ fn longitudo_descending_exclusive() {
         finis: 0,
         kind: IntervallumKind::Exclusive,
     };
-    assert_eq!(range.longitudo(), range.ad_lista().len() as i64);
+    assert_eq!(
+        range.longitudo(),
+        range
+            .ad_lista()
+            .len()
+            .try_into()
+            .expect("test range length fits i64")
+    );
 }
 
 #[test]
@@ -168,7 +189,14 @@ fn longitudo_single_point_inclusive() {
         finis: 5,
         kind: IntervallumKind::Inclusive,
     };
-    assert_eq!(range.longitudo(), range.ad_lista().len() as i64);
+    assert_eq!(
+        range.longitudo(),
+        range
+            .ad_lista()
+            .len()
+            .try_into()
+            .expect("test range length fits i64")
+    );
 }
 
 // --- Descending span tests (directional ranges) ---
@@ -230,14 +258,28 @@ fn descending_inclusive_ad_lista() {
 fn descending_exclusive_longitudo() {
     let range = Intervallum::exclusive(5, 0);
     assert_eq!(range.longitudo(), 5);
-    assert_eq!(range.longitudo(), range.ad_lista().len() as i64);
+    assert_eq!(
+        range.longitudo(),
+        range
+            .ad_lista()
+            .len()
+            .try_into()
+            .expect("test range length fits i64")
+    );
 }
 
 #[test]
 fn descending_inclusive_longitudo() {
     let range = Intervallum::inclusive(5, 0);
     assert_eq!(range.longitudo(), 6);
-    assert_eq!(range.longitudo(), range.ad_lista().len() as i64);
+    assert_eq!(
+        range.longitudo(),
+        range
+            .ad_lista()
+            .len()
+            .try_into()
+            .expect("test range length fits i64")
+    );
 }
 
 #[test]
@@ -413,7 +455,13 @@ fn i32_inter_intersection() {
 fn i32_longitudo_matches_list() {
     let r = Intervallum::inclusive(100_i32, 200);
     assert_eq!(r.longitudo(), 101);
-    assert_eq!(r.longitudo(), r.ad_lista().len() as i64);
+    assert_eq!(
+        r.longitudo(),
+        r.ad_lista()
+            .len()
+            .try_into()
+            .expect("test range length fits i64")
+    );
 }
 
 // ===========================================================================
@@ -504,7 +552,13 @@ fn u32_ascending_ad_lista() {
 fn u32_longitudo_matches_list() {
     let r = Intervallum::inclusive(1_u32, 10);
     assert_eq!(r.longitudo(), 10);
-    assert_eq!(r.longitudo(), r.ad_lista().len() as i64);
+    assert_eq!(
+        r.longitudo(),
+        r.ad_lista()
+            .len()
+            .try_into()
+            .expect("test range length fits i64")
+    );
 }
 
 #[test]
