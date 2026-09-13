@@ -3432,8 +3432,9 @@ fn rope_function_resolves_rope_plan() {
     let mut types = TypeTable::new();
     let function = rope_function(&mut types, 0, 64);
     let validation = MirValidationContext::new(&types);
-    let signature = transformer_shape_signature(&function, MirCollectionOp::TensorRope, &validation)
-        .expect("rope shape signature resolves");
+    let signature =
+        transformer_shape_signature(&function, MirCollectionOp::TensorRope, &validation)
+            .expect("rope shape signature resolves");
     let derived = kernel_plan_for_function(&function, &signature, &validation)
         .expect("rope function facts resolve")
         .expect("rope function carries a recipe plan");
