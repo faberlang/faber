@@ -221,13 +221,12 @@ fn register_annotation_sites(
 impl HirVisitor for TypeSiteRegistry {
     fn visit_item(&mut self, item: &radix_hir::HirItem) {
         let owner = radix_hir::HirOwnerRef::Def(item.def_id);
+        register_annotation_sites(&mut self.sites, owner.clone(), &item.annotations);
         match &item.kind {
             radix_hir::HirItemKind::Function(function) => {
                 register_function_sites(&mut self.sites, item.def_id, function);
-                register_annotation_sites(&mut self.sites, owner.clone(), &function.annotations);
             }
             radix_hir::HirItemKind::Struct(strukt) => {
-                register_annotation_sites(&mut self.sites, owner.clone(), &strukt.annotations);
                 for (ordinal, field) in strukt.fields.iter().enumerate() {
                     register_site(
                         &mut self.sites,
@@ -249,7 +248,6 @@ impl HirVisitor for TypeSiteRegistry {
                 }
             }
             radix_hir::HirItemKind::Enum(enumeration) => {
-                register_annotation_sites(&mut self.sites, owner.clone(), &enumeration.annotations);
                 for (ordinal, field) in enumeration.commune_fields.iter().enumerate() {
                     register_site(
                         &mut self.sites,
@@ -306,11 +304,7 @@ impl HirVisitor for TypeSiteRegistry {
 
     fn visit_method(&mut self, method: &radix_hir::HirMethod) {
         register_function_sites(&mut self.sites, method.def_id, &method.func);
-        register_annotation_sites(
-            &mut self.sites,
-            radix_hir::HirOwnerRef::Def(method.def_id),
-            &method.func.annotations,
-        );
+        register_annotation_sites(&mut self.sites, radix_hir::HirOwnerRef::Def(method.def_id), &method.annotations);
         walk_method(self, method);
     }
 

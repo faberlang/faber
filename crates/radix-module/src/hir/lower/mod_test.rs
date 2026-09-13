@@ -927,9 +927,9 @@ functio f() → vacuum { redde }
     assert_eq!(func.posture, crate::syntax::CallablePosture::AsyncFinite);
     assert!(func.is_async);
     assert!(!func.is_generator);
-    assert_eq!(func.annotations.len(), 1);
-    assert_eq!(interner.resolve(func.annotations[0].family), "futura");
-    assert!(func.annotations[0].fields.is_empty());
+    assert_eq!(lowered.hir.items[0].annotations.len(), 1);
+    assert_eq!(interner.resolve(lowered.hir.items[0].annotations[0].family), "futura");
+    assert!(lowered.hir.items[0].annotations[0].fields.is_empty());
 }
 
 #[test]
@@ -945,8 +945,8 @@ functio f() → numerus { cede 1 }
     assert_eq!(func.posture, crate::syntax::CallablePosture::SyncStream);
     assert!(!func.is_async);
     assert!(func.is_generator);
-    assert_eq!(func.annotations.len(), 1);
-    assert_eq!(interner.resolve(func.annotations[0].family), "cursor");
+    assert_eq!(lowered.hir.items[0].annotations.len(), 1);
+    assert_eq!(interner.resolve(lowered.hir.items[0].annotations[0].family), "cursor");
 }
 
 #[test]
@@ -1127,9 +1127,9 @@ functio plane_vertex() → vacuum { redde }
     assert!(!func.nucleum_fragment);
     assert!(func.is_vertex, "is_vertex should be true after @vertex annotation wiring");
     assert!(!func.is_fragment);
-    assert_eq!(func.annotations.len(), 1);
-    assert_eq!(interner.resolve(func.annotations[0].family), "vertex");
-    assert!(func.annotations[0].fields.is_empty());
+    assert_eq!(lowered.hir.items[0].annotations.len(), 1);
+    assert_eq!(interner.resolve(lowered.hir.items[0].annotations[0].family), "vertex");
+    assert!(lowered.hir.items[0].annotations[0].fields.is_empty());
 }
 
 #[test]
@@ -1161,8 +1161,8 @@ functio k() → vacuum { redde }
     assert_eq!(func.nucleum_role(), Some(crate::hir::NucleumRole::Entry));
     assert!(func.is_kernel);
     assert!(!func.nucleum_fragment);
-    assert_eq!(interner.resolve(func.annotations[0].family), "nucleum");
-    assert!(func.annotations[0].fields.is_empty());
+    assert_eq!(interner.resolve(lowered.hir.items[0].annotations[0].family), "nucleum");
+    assert!(lowered.hir.items[0].annotations[0].fields.is_empty());
 }
 
 #[test]
@@ -1178,10 +1178,13 @@ functio helper() → vacuum { redde }
     assert_eq!(func.nucleum_role(), Some(crate::hir::NucleumRole::Fragment));
     assert!(!func.is_kernel);
     assert!(func.nucleum_fragment);
-    assert_eq!(interner.resolve(func.annotations[0].family), "nucleum");
-    assert_eq!(func.annotations[0].fields.len(), 1);
-    assert_eq!(interner.resolve(func.annotations[0].fields[0].name), "fragment");
-    assert!(matches!(func.annotations[0].fields[0].value, HirAnnotationValue::Bool(true)));
+    assert_eq!(interner.resolve(lowered.hir.items[0].annotations[0].family), "nucleum");
+    assert_eq!(lowered.hir.items[0].annotations[0].fields.len(), 1);
+    assert_eq!(interner.resolve(lowered.hir.items[0].annotations[0].fields[0].name), "fragment");
+    assert!(matches!(
+        lowered.hir.items[0].annotations[0].fields[0].value,
+        HirAnnotationValue::Bool(true)
+    ));
 }
 
 #[test]
@@ -1191,15 +1194,13 @@ fn lowers_cli_annotation_into_normalized_fields() {
 functio main() → vacuum { redde }
 "#;
     let (lowered, interner, _) = lower_source(source);
-    let HirItemKind::Function(func) = &lowered.hir.items[0].kind else {
-        panic!("expected function item");
-    };
-    assert_eq!(func.annotations.len(), 1);
-    assert_eq!(interner.resolve(func.annotations[0].family), "cli");
-    assert_eq!(func.annotations[0].fields.len(), 1);
-    assert_eq!(interner.resolve(func.annotations[0].fields[0].name), "nomen");
+    assert!(matches!(lowered.hir.items[0].kind, HirItemKind::Function(_)));
+    assert_eq!(lowered.hir.items[0].annotations.len(), 1);
+    assert_eq!(interner.resolve(lowered.hir.items[0].annotations[0].family), "cli");
+    assert_eq!(lowered.hir.items[0].annotations[0].fields.len(), 1);
+    assert_eq!(interner.resolve(lowered.hir.items[0].annotations[0].fields[0].name), "nomen");
     assert!(matches!(
-        func.annotations[0].fields[0].value,
+        lowered.hir.items[0].annotations[0].fields[0].value,
         HirAnnotationValue::String(sym) if interner.resolve(sym) == "smoke"
     ));
 }
@@ -1217,9 +1218,9 @@ functio f() → vacuum { redde }
     assert_eq!(func.posture, crate::syntax::CallablePosture::AsyncFinite);
     assert!(func.is_async);
     assert!(!func.is_generator);
-    assert_eq!(func.annotations.len(), 1);
-    assert_eq!(interner.resolve(func.annotations[0].family), "futura");
-    assert!(func.annotations[0].fields.is_empty());
+    assert_eq!(lowered.hir.items[0].annotations.len(), 1);
+    assert_eq!(interner.resolve(lowered.hir.items[0].annotations[0].family), "futura");
+    assert!(lowered.hir.items[0].annotations[0].fields.is_empty());
 }
 
 #[test]
@@ -1244,20 +1245,13 @@ functio f() → vacuum { redde }
     let (sugar_lowered, sugar_interner, _) = lower_source(sugar);
     let (canonical_lowered, canonical_interner, _) = lower_source(canonical);
 
-    let sugar_func = match &sugar_lowered.hir.items[0].kind {
-        HirItemKind::Function(func) => func,
-        other => panic!("expected function item, got {other:?}"),
-    };
-    let canonical_func = match &canonical_lowered.hir.items[0].kind {
-        HirItemKind::Function(func) => func,
-        other => panic!("expected function item, got {other:?}"),
-    };
+    assert!(matches!(sugar_lowered.hir.items[0].kind, HirItemKind::Function(_)));
+    assert!(matches!(canonical_lowered.hir.items[0].kind, HirItemKind::Function(_)));
+    assert_eq!(sugar_lowered.hir.items[0].annotations.len(), 1);
+    assert_eq!(canonical_lowered.hir.items[0].annotations.len(), 1);
 
-    assert_eq!(sugar_func.annotations.len(), 1);
-    assert_eq!(canonical_func.annotations.len(), 1);
-
-    let sugar_ann = &sugar_func.annotations[0];
-    let canonical_ann = &canonical_func.annotations[0];
+    let sugar_ann = &sugar_lowered.hir.items[0].annotations[0];
+    let canonical_ann = &canonical_lowered.hir.items[0].annotations[0];
     assert_eq!(sugar_interner.resolve(sugar_ann.family), "optio");
     assert_eq!(canonical_interner.resolve(canonical_ann.family), "optio");
     assert_eq!(sugar_ann.fields.len(), canonical_ann.fields.len());
@@ -1545,10 +1539,8 @@ fn preserves_top_level_fixum_immutability() {
 }
 
 fn annotations_on_first_item(program: &crate::hir::HirModule) -> &[crate::hir::HirAnnotation] {
-    let HirItemKind::Function(func) = &program.items[0].kind else {
-        panic!("expected function item");
-    };
-    &func.annotations
+    assert!(matches!(program.items[0].kind, HirItemKind::Function(_)));
+    &program.items[0].annotations
 }
 
 fn assert_hir_annotation_values_match(
@@ -1644,7 +1636,7 @@ fn add_one(float x) → float {
         panic!("expected function item");
     };
     assert!(func.is_kernel, "expected is_kernel from @ kernel → nucleum");
-    assert_eq!(interner.resolve(func.annotations[0].family), "nucleum");
+    assert_eq!(interner.resolve(lowered.hir.items[0].annotations[0].family), "nucleum");
 }
 
 #[test]
@@ -1663,7 +1655,7 @@ fn fetch() → int { return 1 }
         panic!("expected future function");
     };
     assert!(future_fn.is_async, "expected is_async from @ future → futura");
-    assert_eq!(interner.resolve(future_fn.annotations[0].family), "futura");
+    assert_eq!(interner.resolve(lowered.hir.items[0].annotations[0].family), "futura");
 }
 
 #[test]

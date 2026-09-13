@@ -2144,7 +2144,6 @@ fn role_func(is_kernel: bool, nucleum_fragment: bool, is_vertex: bool, is_fragme
         nucleum_fragment,
         is_vertex,
         is_fragment,
-        annotations: Vec::new(),
         test: None,
     }
 }

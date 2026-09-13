@@ -103,17 +103,12 @@ impl TypeSiteCollector {
 impl radix_hir::visit::HirVisitor for TypeSiteCollector {
     fn visit_item(&mut self, item: &radix_hir::HirItem) {
         let owner = radix_hir::HirOwnerRef::Def(item.def_id);
+        register_annotation_type_sites(&mut self.sites, owner.clone(), &item.annotations);
         match &item.kind {
             radix_hir::HirItemKind::Function(function) => {
                 register_function_type_sites(&mut self.sites, item.def_id, function);
-                register_annotation_type_sites(
-                    &mut self.sites,
-                    owner.clone(),
-                    &function.annotations,
-                );
             }
             radix_hir::HirItemKind::Struct(strukt) => {
-                register_annotation_type_sites(&mut self.sites, owner.clone(), &strukt.annotations);
                 for (ordinal, field) in strukt.fields.iter().enumerate() {
                     register_type_site(
                         &mut self.sites,
@@ -135,11 +130,6 @@ impl radix_hir::visit::HirVisitor for TypeSiteCollector {
                 }
             }
             radix_hir::HirItemKind::Enum(enum_item) => {
-                register_annotation_type_sites(
-                    &mut self.sites,
-                    owner.clone(),
-                    &enum_item.annotations,
-                );
                 for (ordinal, field) in enum_item.commune_fields.iter().enumerate() {
                     register_type_site(
                         &mut self.sites,
@@ -209,7 +199,7 @@ impl radix_hir::visit::HirVisitor for TypeSiteCollector {
         register_annotation_type_sites(
             &mut self.sites,
             radix_hir::HirOwnerRef::Def(method.def_id),
-            &method.func.annotations,
+            &method.annotations,
         );
         radix_hir::visit::walk_method(self, method);
     }
@@ -985,6 +975,9 @@ fn collect_def_registry(artifact: &HirArtifact) -> FxHashSet<radix_types::DefId>
     // Walk HIR items for definition-site DefIds.
     for item in &artifact.hir.items {
         registry.insert(item.def_id);
+        for ann in &item.annotations {
+            collect_annotation_defs(ann, &mut registry);
+        }
         match &item.kind {
             HirItemKind::Function(func) => {
                 collect_function_defs(func, &mut registry);
@@ -992,9 +985,6 @@ fn collect_def_registry(artifact: &HirArtifact) -> FxHashSet<radix_types::DefId>
             HirItemKind::Struct(s) => {
                 for tp in &s.type_params {
                     registry.insert(tp.def_id);
-                }
-                for ann in &s.annotations {
-                    collect_annotation_defs(ann, &mut registry);
                 }
                 for field in &s.fields {
                     registry.insert(field.def_id);
@@ -1007,6 +997,9 @@ fn collect_def_registry(artifact: &HirArtifact) -> FxHashSet<radix_types::DefId>
                 }
                 for method in &s.methods {
                     registry.insert(method.def_id);
+                    for ann in &method.annotations {
+                        collect_annotation_defs(ann, &mut registry);
+                    }
                     collect_function_defs(&method.func, &mut registry);
                 }
             }
@@ -1136,9 +1129,6 @@ fn collect_function_defs(
     }
     if let Some(ref cli) = func.cli_args {
         collect_param_defs(cli, registry);
-    }
-    for ann in &func.annotations {
-        collect_annotation_defs(ann, registry);
     }
     if let Some(ref body) = func.body {
         collect_block_defs(body, registry);
@@ -1884,11 +1874,11 @@ fn collect_hir_registry(artifact: &HirArtifact) -> FxHashSet<radix_hir::HirId> {
     // Collect from all items and entry.
     for item in &artifact.hir.items {
         registry.insert(item.id);
+        for ann in &item.annotations {
+            collect_annotation(ann, &mut registry);
+        }
         match &item.kind {
             radix_hir::HirItemKind::Function(func) => {
-                for ann in &func.annotations {
-                    collect_annotation(ann, &mut registry);
-                }
                 for param in &func.params {
                     if let Some(ref init) = param.default {
                         collect_expr(init, &mut registry);
@@ -1899,9 +1889,6 @@ fn collect_hir_registry(artifact: &HirArtifact) -> FxHashSet<radix_hir::HirId> {
                 }
             }
             radix_hir::HirItemKind::Struct(s) => {
-                for ann in &s.annotations {
-                    collect_annotation(ann, &mut registry);
-                }
                 for field in &s.fields {
                     for ann in &field.annotations {
                         collect_annotation(ann, &mut registry);
@@ -1911,7 +1898,7 @@ fn collect_hir_registry(artifact: &HirArtifact) -> FxHashSet<radix_hir::HirId> {
                     }
                 }
                 for method in &s.methods {
-                    for ann in &method.func.annotations {
+                    for ann in &method.annotations {
                         collect_annotation(ann, &mut registry);
                     }
                     for param in &method.func.params {
@@ -2043,6 +2030,9 @@ pub(crate) fn validate_referential_integrity(
         for item in items {
             check_hir(item.id)?;
             check_def(item.def_id)?;
+            for ann in &item.annotations {
+                validate_annotation(ann, check_symbol, check_def, check_hir, check_type)?;
+            }
             validate_item_kind(&item.kind, check_symbol, check_def, check_hir, check_type)?;
         }
         Ok(())
@@ -2103,9 +2093,6 @@ pub(crate) fn validate_referential_integrity(
                 }
             }
         }
-        for ann in &func.annotations {
-            validate_annotation(ann, check_symbol, check_def, check_hir, check_type)?;
-        }
         Ok(())
     }
 
@@ -2132,9 +2119,6 @@ pub(crate) fn validate_referential_integrity(
                     }
                     validate_type_param_default(&tp.default, check_type)?;
                 }
-                for ann in &s.annotations {
-                    validate_annotation(ann, check_symbol, check_def, check_hir, check_type)?;
-                }
                 for field in &s.fields {
                     check_def(field.def_id)?;
                     check_symbol(field.name)?;
@@ -2148,6 +2132,9 @@ pub(crate) fn validate_referential_integrity(
                 }
                 for method in &s.methods {
                     check_def(method.def_id)?;
+                    for ann in &method.annotations {
+                        validate_annotation(ann, check_symbol, check_def, check_hir, check_type)?;
+                    }
                     validate_function(
                         &method.func,
                         check_symbol,

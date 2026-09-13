@@ -37,8 +37,13 @@ impl TypeChecker<'_> {
     /// return type is omitted, the function is effect-only: it accepts
     /// statement-only bodies, rejects `redde`, and finalizes the normal return
     /// channel to `vacuum`.
-    pub fn check_function(&mut self, def_id: DefId, func: &mut HirFunction) {
-        self.reject_json_annotations_on_site(&func.annotations, "functio");
+    pub fn check_function(
+        &mut self,
+        def_id: DefId,
+        annotations: &[radix_hir::HirAnnotation],
+        func: &mut HirFunction,
+    ) {
+        self.reject_json_annotations_on_site(annotations, "functio");
         let func_name = self.function_display_name(def_id).unwrap_or_default();
         let previous_generic_param_kinds = std::mem::replace(
             &mut self.current_generic_param_kinds,
@@ -173,7 +178,9 @@ impl TypeChecker<'_> {
     /// them.
     pub fn check_item(&mut self, item: &mut HirItem) {
         match &mut item.kind {
-            HirItemKind::Function(func) => self.check_function(item.def_id, func),
+            HirItemKind::Function(func) => {
+                self.check_function(item.def_id, &item.annotations, func);
+            }
             HirItemKind::Constant(const_item) => self.check_const(item.def_id, const_item),
             HirItemKind::Struct(struct_item) => {
                 self.check_json_struct_contract(item.def_id, struct_item);
@@ -189,7 +196,7 @@ impl TypeChecker<'_> {
                     }
                 }
                 for method in &mut struct_item.methods {
-                    self.check_function(method.def_id, &mut method.func);
+                    self.check_function(method.def_id, &method.annotations, &mut method.func);
                 }
             }
             _ => {}

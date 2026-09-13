@@ -469,6 +469,7 @@ fn warns_on_unreachable_code() {
 fn warns_on_unused_import() {
     let program = HirModule {
         items: vec![HirItem {
+            annotations: Vec::new(),
             id: radix_hir::HirId(0),
             def_id: radix_hir::DefId(10),
             kind: HirItemKind::Import(HirImport {

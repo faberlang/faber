@@ -272,7 +272,6 @@ fn empty_function(
         is_vertex: false,
         is_fragment: false,
         test: None,
-        annotations: Vec::new(),
     }
 }
 
@@ -679,14 +678,9 @@ fn declaration_and_annotation_lists_emit_between_only() {
         ],
         span(),
     );
-    let function = HirFunction {
-        annotations: vec![annotation],
-        ..function
-    };
     let genus = HirStruct {
         name: interner.intern("S"),
         type_params: Vec::new(),
-        annotations: Vec::new(),
         fields: vec![
             radix_hir::HirField {
                 def_id: DefId(20),
@@ -717,7 +711,6 @@ fn declaration_and_annotation_lists_emit_between_only() {
     let enm = HirEnum {
         name: interner.intern("E"),
         type_params: Vec::new(),
-        annotations: Vec::new(),
         commune_fields: Vec::new(),
         variants: vec![
             HirVariant {
@@ -771,24 +764,28 @@ fn declaration_and_annotation_lists_emit_between_only() {
     let hir = radix_hir::HirModule {
         items: vec![
             HirItem {
+                annotations: Vec::new(),
                 id: radix_hir::HirId(1),
                 def_id: DefId(radix_types::USER_DEF_ID_BASE),
                 kind: HirItemKind::Import(import),
                 span: span(),
             },
             HirItem {
+                annotations: vec![annotation],
                 id: radix_hir::HirId(2),
                 def_id: DefId(radix_types::USER_DEF_ID_BASE + 1),
                 kind: HirItemKind::Function(Box::new(function)),
                 span: span(),
             },
             HirItem {
+                annotations: Vec::new(),
                 id: radix_hir::HirId(3),
                 def_id: DefId(radix_types::USER_DEF_ID_BASE + 2),
                 kind: HirItemKind::Struct(genus),
                 span: span(),
             },
             HirItem {
+                annotations: Vec::new(),
                 id: radix_hir::HirId(4),
                 def_id: DefId(radix_types::USER_DEF_ID_BASE + 3),
                 kind: HirItemKind::Enum(enm),
@@ -990,6 +987,7 @@ fn canonical_reemission_is_idempotent_for_the_cs1_fixture() {
     );
     let hir = radix_hir::HirModule {
         items: vec![HirItem {
+            annotations: Vec::new(),
             id: radix_hir::HirId(1),
             def_id: DefId(radix_types::USER_DEF_ID_BASE),
             kind: HirItemKind::Function(Box::new(function)),

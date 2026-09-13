@@ -144,6 +144,9 @@ pub fn walk_program<V: HirVisitor>(visitor: &mut V, program: &HirModule) {
 /// Item-level definitions are reported before child signatures/bodies so
 /// definition collectors can see the outer declaration before nested bindings.
 pub fn walk_item<V: HirVisitor>(visitor: &mut V, item: &HirItem) {
+    for annotation in &item.annotations {
+        visitor.visit_annotation(annotation);
+    }
     match &item.kind {
         HirItemKind::Function(function) => {
             visitor.visit_def(item.def_id, function.name);
@@ -153,9 +156,6 @@ pub fn walk_item<V: HirVisitor>(visitor: &mut V, item: &HirItem) {
             visitor.visit_def(item.def_id, strukt.name);
             for type_param in &strukt.type_params {
                 visitor.visit_type_param(type_param);
-            }
-            for annotation in &strukt.annotations {
-                visitor.visit_annotation(annotation);
             }
             for field in &strukt.fields {
                 visitor.visit_field(field);
@@ -214,9 +214,6 @@ pub fn walk_function<V: HirVisitor>(visitor: &mut V, function: &HirFunction) {
     }
     if let Some(param) = &function.cli_args {
         visitor.visit_param(param);
-    }
-    for annotation in &function.annotations {
-        visitor.visit_annotation(annotation);
     }
     if let Some(body) = &function.body {
         visitor.visit_block(body);
@@ -734,6 +731,9 @@ pub fn walk_program_mut<V: HirVisitorMut>(visitor: &mut V, program: &mut HirModu
 }
 
 pub fn walk_item_mut<V: HirVisitorMut>(visitor: &mut V, item: &mut HirItem) {
+    for annotation in &mut item.annotations {
+        visitor.visit_annotation_mut(annotation);
+    }
     match &mut item.kind {
         HirItemKind::Function(function) => {
             visitor.visit_def(item.def_id, function.name);
@@ -743,9 +743,6 @@ pub fn walk_item_mut<V: HirVisitorMut>(visitor: &mut V, item: &mut HirItem) {
             visitor.visit_def(item.def_id, strukt.name);
             for type_param in &mut strukt.type_params {
                 visitor.visit_type_param_mut(type_param);
-            }
-            for annotation in &mut strukt.annotations {
-                visitor.visit_annotation_mut(annotation);
             }
             for field in &mut strukt.fields {
                 visitor.visit_field_mut(field);
@@ -804,9 +801,6 @@ pub fn walk_function_mut<V: HirVisitorMut>(visitor: &mut V, function: &mut HirFu
     }
     if let Some(param) = &mut function.cli_args {
         visitor.visit_param_mut(param);
-    }
-    for annotation in &mut function.annotations {
-        visitor.visit_annotation_mut(annotation);
     }
     if let Some(body) = &mut function.body {
         visitor.visit_block_mut(body);
@@ -1296,8 +1290,8 @@ mod tests {
         }
     }
 
-    // PRP-016 integration: walk_item/walk_function must drive function
-    // .annotations through visit_program, not just the standalone helper.
+    // PRP-016 integration: walk_item must drive envelope annotations through
+    // visit_program, not just the standalone helper.
     fn program_with_annotated_function() -> HirModule {
         use crate::nodes::{HirItem, HirItemKind};
         let func = HirFunction {
@@ -1316,10 +1310,10 @@ mod tests {
             is_vertex: false,
             is_fragment: false,
             test: None,
-            annotations: vec![annotation_expr()],
         };
         HirModule {
             items: vec![HirItem {
+                annotations: vec![annotation_expr()],
                 id: HirId(0),
                 def_id: DefId(0),
                 kind: HirItemKind::Function(Box::new(func)),
@@ -1349,10 +1343,8 @@ mod tests {
         let mut program = program_with_annotated_function();
         let mut marker = ExprMarker;
         marker.visit_program_mut(&mut program);
-        let HirItemKind::Function(func) = &program.items[0].kind else {
-            panic!("expected function")
-        };
-        match &func.annotations[0].fields[0].value {
+        assert!(matches!(program.items[0].kind, HirItemKind::Function(_)));
+        match &program.items[0].annotations[0].fields[0].value {
             HirAnnotationValue::Expr(expr) => match &expr.kind {
                 HirExpressionKind::Literal(HirLiteral::Int(n)) => {
                     assert_eq!(
@@ -1508,6 +1500,7 @@ mod tests {
         use radix_types::TypeId;
         HirModule {
             items: vec![HirItem {
+                annotations: Vec::new(),
                 id: HirId(0),
                 def_id: DefId(1),
                 kind: HirItemKind::TypeAlias(HirTypeAlias {

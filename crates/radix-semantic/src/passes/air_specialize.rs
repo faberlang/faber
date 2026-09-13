@@ -18,8 +18,8 @@ use crate::{
 };
 use radix_hir::visit::{HirVisitor, HirVisitorMut, walk_expr, walk_expr_mut};
 use radix_hir::{
-    DefId, HirAnnotationValue, HirExpression, HirExpressionKind, HirFunction, HirId, HirItem,
-    HirItemKind, HirLocal, HirModule, HirParam, HirStatement, HirTypeParam,
+    DefId, HirExpression, HirExpressionKind, HirFunction, HirId, HirItem, HirItemKind, HirLocal,
+    HirModule, HirParam, HirStatement, HirTypeParam,
 };
 use radix_lexer::{Interner, Span, Symbol};
 use rustc_hash::{FxHashMap, FxHashSet};
@@ -175,6 +175,7 @@ fn specialize_with_requests(
                 &mut ids,
             );
             let item = HirItem {
+                annotations: Vec::new(),
                 id: ids.next_hir(),
                 def_id: instance,
                 span: template.span,
@@ -622,14 +623,6 @@ fn substitute_function(
     function.err_ty = function
         .err_ty
         .map(|ty| substitute_type(ty, type_map, index_map, types, interner));
-    for annotation in &mut function.annotations {
-        for field in &mut annotation.fields {
-            if let HirAnnotationValue::Type(ty) = &mut field.value {
-                *ty = substitute_type(*ty, type_map, index_map, types, interner);
-            }
-        }
-    }
-
     let mut rewriter = InstanceRewriter {
         type_map,
         index_map,

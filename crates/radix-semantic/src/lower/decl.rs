@@ -429,6 +429,7 @@ impl Lowerer<'_> {
         };
 
         let def_id = self.def_id_for(name);
+        let annotations = self.lower_item_annotations(def_id, &stmt.annotations);
         let ty = decl.ty.as_ref().map(|ty| {
             self.lower_authored_type(
                 radix_hir::HirTypeSite {
@@ -448,6 +449,7 @@ impl Lowerer<'_> {
         };
 
         let item = HirItem {
+            annotations,
             id: self.next_hir_id(),
             def_id,
             kind: HirItemKind::Constant(HirConst {
@@ -468,9 +470,7 @@ impl Lowerer<'_> {
     pub fn lower_functio(&mut self, stmt: &Stmt, decl: &FuncDecl) -> Option<HirItem> {
         let def_id = self.def_id_for(decl.name.name);
 
-        self.annotation_capture = Some(HirOwnerRef::Def(def_id));
-        let annotations = self.lower_annotations(&stmt.annotations);
-        self.annotation_capture = None;
+        let annotations = self.lower_item_annotations(def_id, &stmt.annotations);
         let mut type_params = self.lower_type_params(&decl.type_params);
         self.push_type_params(
             type_params
@@ -608,10 +608,10 @@ impl Lowerer<'_> {
             is_vertex,
             is_fragment,
             test: None,
-            annotations,
         };
 
         Some(HirItem {
+            annotations,
             id: self.next_hir_id(),
             def_id,
             kind: HirItemKind::Function(Box::new(func)),
@@ -687,12 +687,7 @@ impl Lowerer<'_> {
                 .iter()
                 .map(|param| (param.def_id, param.name, param.kind)),
         );
-        let mut annotations = Vec::new();
-        for annotation in &stmt.annotations {
-            if !self.annotation_ast_family_is(annotation, "annotatio") {
-                annotations.push(self.lower_annotation(annotation));
-            }
-        }
+        let annotations = self.lower_item_annotations(def_id, &stmt.annotations);
 
         let mut fields = Vec::new();
         let mut methods = Vec::new();
@@ -808,7 +803,6 @@ impl Lowerer<'_> {
                             "fragment",
                         ),
                         test: None,
-                        annotations,
                     };
 
                     let method_def_id = self.next_def_id();
@@ -825,6 +819,7 @@ impl Lowerer<'_> {
                     }
 
                     methods.push(HirMethod {
+                        annotations,
                         def_id: method_def_id,
                         func,
                         receiver: HirReceiver::None,
@@ -860,7 +855,6 @@ impl Lowerer<'_> {
         let struct_item = HirStruct {
             name: decl.name.name,
             type_params,
-            annotations,
             fields,
             methods,
             extends,
@@ -869,6 +863,7 @@ impl Lowerer<'_> {
         };
 
         Some(HirItem {
+            annotations,
             id: self.next_hir_id(),
             def_id,
             kind: HirItemKind::Struct(struct_item),
@@ -879,6 +874,7 @@ impl Lowerer<'_> {
     /// Plain `ordo` variants carry names and `DefId`s; payload fields belong to `discretio`.
     pub fn lower_ordo(&mut self, stmt: &Stmt, decl: &EnumDecl) -> Option<HirItem> {
         let def_id = self.def_id_for(decl.name.name);
+        let annotations = self.lower_item_annotations(def_id, &stmt.annotations);
 
         // Surface fidelity: authored `ordo` members carry discriminants the
         // union-shaped HIR drops; keep them on the presentation sidecar so
@@ -912,12 +908,12 @@ impl Lowerer<'_> {
         let enum_item = HirEnum {
             name: decl.name.name,
             type_params: Vec::new(),
-            annotations: self.lower_annotations(&stmt.annotations),
             commune_fields: Vec::new(),
             variants,
         };
 
         Some(HirItem {
+            annotations,
             id: self.next_hir_id(),
             def_id,
             kind: HirItemKind::Enum(enum_item),
@@ -969,6 +965,7 @@ impl Lowerer<'_> {
         decl: &UnionDecl,
     ) -> Option<(HirItem, Vec<HirItem>)> {
         let def_id = self.def_id_for(decl.name.name);
+        let annotations = self.lower_item_annotations(def_id, &stmt.annotations);
 
         let type_params = self.lower_type_params(&decl.type_params);
 
@@ -995,7 +992,6 @@ impl Lowerer<'_> {
         let enum_item = HirEnum {
             name: decl.name.name,
             type_params,
-            annotations: self.lower_annotations(&stmt.annotations),
             commune_fields: commune
                 .into_iter()
                 .map(|field| HirVariantField {
@@ -1009,6 +1005,7 @@ impl Lowerer<'_> {
 
         Some((
             HirItem {
+                annotations,
                 id: self.next_hir_id(),
                 def_id,
                 kind: HirItemKind::Enum(enum_item),
@@ -1055,6 +1052,7 @@ impl Lowerer<'_> {
     /// later passes that have fully lowered types.
     pub fn lower_implendum(&mut self, stmt: &Stmt, decl: &InterfaceDecl) -> Option<HirItem> {
         let def_id = self.def_id_for(decl.name.name);
+        let annotations = self.lower_item_annotations(def_id, &stmt.annotations);
 
         let type_params = self.lower_type_params(&decl.type_params);
 
@@ -1087,6 +1085,7 @@ impl Lowerer<'_> {
         };
 
         Some(HirItem {
+            annotations,
             id: self.next_hir_id(),
             def_id,
             kind: HirItemKind::Interface(interface),
@@ -1096,6 +1095,7 @@ impl Lowerer<'_> {
 
     pub fn lower_typus(&mut self, stmt: &Stmt, decl: &TypeAliasDecl) -> Option<HirItem> {
         let def_id = self.def_id_for(decl.name.name);
+        let annotations = self.lower_item_annotations(def_id, &stmt.annotations);
         let type_params = self.lower_type_params(&decl.type_params);
         self.push_type_params(
             type_params
@@ -1114,6 +1114,7 @@ impl Lowerer<'_> {
         self.pop_type_params();
 
         Some(HirItem {
+            annotations,
             id: self.next_hir_id(),
             def_id,
             kind: HirItemKind::TypeAlias(HirTypeAlias {
@@ -1131,6 +1132,7 @@ impl Lowerer<'_> {
     /// `T ∪ nihil`, and source order. See docs/design/relational-views.md §2.
     pub fn lower_schema(&mut self, stmt: &Stmt, decl: &SchemaDecl) -> Option<HirItem> {
         let def_id = self.def_id_for(decl.name.name);
+        let annotations = self.lower_item_annotations(def_id, &stmt.annotations);
 
         let columns = decl
             .columns
@@ -1163,6 +1165,7 @@ impl Lowerer<'_> {
             .collect();
 
         Some(HirItem {
+            annotations,
             id: self.next_hir_id(),
             def_id,
             kind: HirItemKind::Schema(HirSchema {
@@ -1179,6 +1182,7 @@ impl Lowerer<'_> {
     /// and provider loading are not decided here.
     pub fn lower_importa(&mut self, stmt: &Stmt, decl: &ImportDecl) -> Option<HirItem> {
         let def_id = self.next_def_id();
+        let annotations = self.lower_item_annotations(def_id, &stmt.annotations);
 
         let selective = matches!(&decl.kind, ImportKind::Selective { .. })
             && self.interner.resolve(decl.path) != crate::kernel::KERNEL_GLOB_IMPORT;
@@ -1266,6 +1270,7 @@ impl Lowerer<'_> {
         };
 
         Some(HirItem {
+            annotations,
             id: self.next_hir_id(),
             def_id,
             kind: HirItemKind::Import(HirImport {

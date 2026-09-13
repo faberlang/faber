@@ -119,12 +119,12 @@ fn match_expr_with_arms(scrutinee_ty: TypeId, arm_patterns: Vec<Vec<HirPattern>>
 fn program_with_match(enum_def: DefId, match_expr: HirExpression) -> HirModule {
     HirModule {
         items: vec![HirItem {
+            annotations: Vec::new(),
             id: radix_hir::HirId(10),
             def_id: enum_def,
             kind: HirItemKind::Enum(radix_hir::HirEnum {
                 name: radix_lexer::Symbol(1),
                 type_params: Vec::new(),
-                annotations: Vec::new(),
                 commune_fields: Vec::new(),
                 variants: vec![
                     HirVariant {
@@ -524,12 +524,12 @@ fn program_with_variants(
 ) -> HirModule {
     HirModule {
         items: vec![HirItem {
+            annotations: Vec::new(),
             id: radix_hir::HirId(10),
             def_id: enum_def,
             kind: HirItemKind::Enum(radix_hir::HirEnum {
                 name: radix_lexer::Symbol(1),
                 type_params: Vec::new(),
-                annotations: Vec::new(),
                 commune_fields: Vec::new(),
                 variants,
             }),

@@ -40,12 +40,12 @@ fn emit_shape_error() -> String {
     let mismatch_def = DefId(radix_types::USER_DEF_ID_BASE + 2);
     let hir = HirModule {
         items: vec![HirItem {
+            annotations: Vec::new(),
             id: HirId(1),
             def_id: enum_def,
             kind: HirItemKind::Enum(HirEnum {
                 name: interner.intern("ShapeError"),
                 type_params: Vec::new(),
-                annotations: Vec::new(),
                 commune_fields: vec![HirVariantField {
                     name: interner.intern("message"),
                     ty: textus,

@@ -818,12 +818,12 @@ fn struct_computed_key_uses_structured_issue_arg() {
     };
     let mut program = HirModule {
         items: vec![radix_hir::HirItem {
+            annotations: Vec::new(),
             id: radix_hir::HirId(0),
             def_id: struct_def,
             kind: HirItemKind::Struct(radix_hir::HirStruct {
                 name: radix_lexer::Symbol(1),
                 type_params: Vec::new(),
-                annotations: Vec::new(),
                 fields: vec![radix_hir::HirField {
                     def_id: DefId(1),
                     name: field_name,
@@ -896,12 +896,12 @@ fn struct_spread_field_uses_structured_issue_arg() {
     };
     let mut program = HirModule {
         items: vec![radix_hir::HirItem {
+            annotations: Vec::new(),
             id: radix_hir::HirId(0),
             def_id: struct_def,
             kind: HirItemKind::Struct(radix_hir::HirStruct {
                 name: radix_lexer::Symbol(1),
                 type_params: Vec::new(),
-                annotations: Vec::new(),
                 fields: vec![radix_hir::HirField {
                     def_id: DefId(1),
                     name: field_name,
@@ -1170,6 +1170,7 @@ fn inferred_callee_nested_argument_emits_one_argument_mismatch_diagnostic() {
     };
     let mut program = HirModule {
         items: vec![radix_hir::HirItem {
+            annotations: Vec::new(),
             id: radix_hir::HirId(0),
             def_id: bad_def,
             kind: HirItemKind::Function(Box::new(radix_hir::HirFunction {
@@ -1196,7 +1197,6 @@ fn inferred_callee_nested_argument_emits_one_argument_mismatch_diagnostic() {
                 nucleum_fragment: false,
                 is_vertex: false,
                 is_fragment: false,
-                annotations: Vec::new(),
                 test: None,
             })),
             span: test_span(),

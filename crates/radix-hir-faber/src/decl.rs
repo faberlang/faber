@@ -40,10 +40,20 @@ impl super::FaberCodegen {
         surface: &impl KeywordSurface,
         writer: &mut CodeWriter,
     ) {
+        self.write_hir_annotations(
+            &item.annotations,
+            types,
+            names,
+            interner,
+            surface,
+            Some(item.def_id),
+            writer,
+        );
         match &item.kind {
             HirItemKind::Function(func) => {
                 self.generate_function(
                     func,
+                    &item.annotations,
                     Some(item.def_id),
                     types,
                     names,
@@ -208,6 +218,7 @@ impl super::FaberCodegen {
     pub(super) fn generate_function(
         &self,
         func: &HirFunction,
+        annotations: &[HirAnnotation],
         owner: Option<DefId>,
         types: &TypeTable,
         names: &FxHashMap<DefId, Symbol>,
@@ -219,16 +230,6 @@ impl super::FaberCodegen {
             self.generate_proba_function(func, types, names, interner, surface, writer);
             return;
         }
-
-        self.write_hir_annotations(
-            &func.annotations,
-            types,
-            names,
-            interner,
-            surface,
-            owner,
-            writer,
-        );
 
         writer.write(surface.contextual_keyword("functio"));
         writer.write(" ");
@@ -245,7 +246,7 @@ impl super::FaberCodegen {
             writer.write(" ");
             writer.write(&self.symbol_to_string(cli_args.name, interner));
         }
-        if !has_legacy_posture_annotation(&func.annotations, interner) {
+        if !has_legacy_posture_annotation(annotations, interner) {
             self.write_callable_posture(func.posture, surface, writer);
         }
         self.write_function_result_types(
@@ -323,16 +324,6 @@ impl super::FaberCodegen {
         surface: &impl KeywordSurface,
         writer: &mut CodeWriter,
     ) {
-        self.write_hir_annotations(
-            &s.annotations,
-            types,
-            names,
-            interner,
-            surface,
-            None,
-            writer,
-        );
-
         writer.write(surface.contextual_keyword("genus"));
         writer.write(" ");
         writer.write(&self.symbol_to_string(s.name, interner));
@@ -386,12 +377,22 @@ impl super::FaberCodegen {
                 }
                 self.write_member_trivia(
                     method.def_id,
-                    !method.func.annotations.is_empty(),
+                    !method.annotations.is_empty(),
                     interner,
+                    writer,
+                );
+                self.write_hir_annotations(
+                    &method.annotations,
+                    types,
+                    names,
+                    interner,
+                    surface,
+                    Some(method.def_id),
                     writer,
                 );
                 self.generate_function(
                     &method.func,
+                    &method.annotations,
                     Some(method.def_id),
                     types,
                     names,
@@ -474,16 +475,6 @@ impl super::FaberCodegen {
         let ordo_members = self.ordo_enums.get(&def_id);
         // Enum variants are normalized to the block form that remains valid
         // for both plain variants and variants carrying named fields.
-        self.write_hir_annotations(
-            &e.annotations,
-            types,
-            names,
-            interner,
-            surface,
-            None,
-            writer,
-        );
-
         writer.write(if ordo_members.is_some() {
             surface.keyword(TokenKind::Ordo)
         } else {

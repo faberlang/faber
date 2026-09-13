@@ -790,6 +790,7 @@ struct CallableLoweringParts {
 }
 
 struct CallableLoweringConfig<'input> {
+    annotations: &'input [radix_hir::HirAnnotation],
     error_ty: Option<MirType>,
     parent_function_id: MirFunctionId,
     device_role: Option<MirDeviceRole>,
@@ -874,6 +875,7 @@ impl<'a> MirLowerer<'a> {
             item.span,
             return_ty,
             function,
+            &item.annotations,
             CallableLoweringTarget::Function(function),
             body_ctx,
         );
@@ -904,6 +906,7 @@ impl<'a> MirLowerer<'a> {
             method.span,
             return_ty,
             &method.func,
+            &method.annotations,
             CallableLoweringTarget::Method { struct_item, strukt, method, receiver_ty },
             body_ctx,
         );
@@ -923,6 +926,7 @@ impl<'a> MirLowerer<'a> {
         span: Span,
         return_ty: TypeId,
         function: &HirFunction,
+        annotations: &[radix_hir::HirAnnotation],
         target: CallableLoweringTarget<'_>,
         body_ctx: &BodyLoweringContext<'_, '_>,
     ) {
@@ -944,6 +948,7 @@ impl<'a> MirLowerer<'a> {
         } = self.lower_callable_body(
             body_ctx,
             CallableLoweringConfig {
+                annotations,
                 error_ty,
                 parent_function_id,
                 device_role: device_role_for_function(function),
@@ -968,7 +973,7 @@ impl<'a> MirLowerer<'a> {
                     identity: MirSyntheticFunctionIdentity { parent: parent_function_id, ordinal: 0 },
                     role,
                     shader_stage,
-                    visibility: if is_public_entry(function, &self.unit.interner) {
+                    visibility: if is_public_entry(annotations, &self.unit.interner) {
                         MirFunctionVisibility::Public
                     } else {
                         MirFunctionVisibility::Private
@@ -1047,7 +1052,7 @@ impl<'a> MirLowerer<'a> {
                 for param in &function.params {
                     builder.add_param(param.def_id, param.name, param.ty, param.mode, param.span);
                 }
-                let explicit_lane = lane_binding_local(function, &self.unit.interner);
+                let explicit_lane = lane_binding_local(function, config.annotations, &self.unit.interner);
                 if let Some((def_id, name, ty, span)) = explicit_lane {
                     builder.add_lane_param(def_id, name, ty, span);
                 }
@@ -1067,7 +1072,9 @@ impl<'a> MirLowerer<'a> {
                 for param in &method.func.params {
                     builder.add_param(param.def_id, param.name, param.ty, param.mode, param.span);
                 }
-                if let Some((def_id, name, ty, span)) = lane_binding_local(&method.func, &self.unit.interner) {
+                if let Some((def_id, name, ty, span)) =
+                    lane_binding_local(&method.func, config.annotations, &self.unit.interner)
+                {
                     builder.add_lane_param(def_id, name, ty, span);
                 }
                 (method.func.body.as_ref(), None)
@@ -1173,8 +1180,12 @@ impl<'a> MirLowerer<'a> {
     }
 }
 
-fn lane_binding_local(function: &HirFunction, interner: &Interner) -> Option<(DefId, Symbol, TypeId, Span)> {
-    let lane = function.annotations.iter().find_map(|annotation| {
+fn lane_binding_local(
+    function: &HirFunction,
+    annotations: &[radix_hir::HirAnnotation],
+    interner: &Interner,
+) -> Option<(DefId, Symbol, TypeId, Span)> {
+    let lane = annotations.iter().find_map(|annotation| {
         if interner.resolve(annotation.family) != "nucleum" {
             return None;
         }

@@ -82,6 +82,7 @@ fn reports_use_after_move() {
 
     let program = HirModule {
         items: vec![HirItem {
+            annotations: Vec::new(),
             id: radix_hir::HirId(0),
             def_id: DefId(0),
             kind: HirItemKind::Function(Box::new(HirFunction {
@@ -130,7 +131,6 @@ fn reports_use_after_move() {
                 is_vertex: false,
                 is_fragment: false,
 
-                annotations: Vec::new(),
                 test: None,
             })),
             span: test_span(),
@@ -182,6 +182,7 @@ fn reports_mutable_borrow_conflict() {
 
     let program = HirModule {
         items: vec![HirItem {
+            annotations: Vec::new(),
             id: radix_hir::HirId(0),
             def_id: DefId(0),
             kind: HirItemKind::Function(Box::new(HirFunction {
@@ -225,7 +226,6 @@ fn reports_mutable_borrow_conflict() {
                 is_vertex: false,
                 is_fragment: false,
 
-                annotations: Vec::new(),
                 test: None,
             })),
             span: test_span(),
@@ -272,6 +272,7 @@ fn reports_assign_to_de_parameter() {
 
     let program = HirModule {
         items: vec![HirItem {
+            annotations: Vec::new(),
             id: radix_hir::HirId(0),
             def_id: DefId(0),
             kind: HirItemKind::Function(Box::new(HirFunction {
@@ -308,7 +309,6 @@ fn reports_assign_to_de_parameter() {
                 is_vertex: false,
                 is_fragment: false,
 
-                annotations: Vec::new(),
                 test: None,
             })),
             span: test_span(),
@@ -406,6 +406,7 @@ fn reports_use_after_move_in_assignment_index() {
 
     let program = HirModule {
         items: vec![HirItem {
+            annotations: Vec::new(),
             id: radix_hir::HirId(0),
             def_id: DefId(0),
             kind: HirItemKind::Function(Box::new(HirFunction {
@@ -461,7 +462,6 @@ fn reports_use_after_move_in_assignment_index() {
                 is_vertex: false,
                 is_fragment: false,
 
-                annotations: Vec::new(),
                 test: None,
             })),
             span: test_span(),
@@ -523,6 +523,7 @@ fn reports_de_passed_to_in_position() {
 
     let program = HirModule {
         items: vec![HirItem {
+            annotations: Vec::new(),
             id: radix_hir::HirId(0),
             def_id: DefId(0),
             kind: HirItemKind::Function(Box::new(HirFunction {
@@ -559,7 +560,6 @@ fn reports_de_passed_to_in_position() {
                 is_vertex: false,
                 is_fragment: false,
 
-                annotations: Vec::new(),
                 test: None,
             })),
             span: test_span(),
@@ -593,6 +593,7 @@ fn warns_when_in_parameter_is_never_mutated() {
 
     let program = HirModule {
         items: vec![HirItem {
+            annotations: Vec::new(),
             id: radix_hir::HirId(0),
             def_id: DefId(0),
             kind: HirItemKind::Function(Box::new(HirFunction {
@@ -629,7 +630,6 @@ fn warns_when_in_parameter_is_never_mutated() {
                 is_vertex: false,
                 is_fragment: false,
 
-                annotations: Vec::new(),
                 test: None,
             })),
             span: test_span(),
@@ -663,6 +663,7 @@ fn warns_when_ex_parameter_is_never_consumed() {
 
     let program = HirModule {
         items: vec![HirItem {
+            annotations: Vec::new(),
             id: radix_hir::HirId(0),
             def_id: DefId(0),
             kind: HirItemKind::Function(Box::new(HirFunction {
@@ -699,7 +700,6 @@ fn warns_when_ex_parameter_is_never_consumed() {
                 is_vertex: false,
                 is_fragment: false,
 
-                annotations: Vec::new(),
                 test: None,
             })),
             span: test_span(),
@@ -775,6 +775,7 @@ fn analyze_modes_rejects_use_after_move_without_rust_lifetime() {
 
     let program = HirModule {
         items: vec![HirItem {
+            annotations: Vec::new(),
             id: radix_hir::HirId(0),
             def_id: DefId(0),
             kind: HirItemKind::Function(Box::new(HirFunction {
@@ -817,7 +818,6 @@ fn analyze_modes_rejects_use_after_move_without_rust_lifetime() {
                 nucleum_fragment: false,
                 is_vertex: false,
                 is_fragment: false,
-                annotations: Vec::new(),
                 test: None,
             })),
             span: test_span(),
@@ -893,6 +893,7 @@ fn reports_write_while_borrowed_via_mutating_method_call() {
 
     let program = HirModule {
         items: vec![HirItem {
+            annotations: Vec::new(),
             id: radix_hir::HirId(0),
             def_id: DefId(0),
             kind: HirItemKind::Function(Box::new(HirFunction {
@@ -935,7 +936,6 @@ fn reports_write_while_borrowed_via_mutating_method_call() {
                 nucleum_fragment: false,
                 is_vertex: false,
                 is_fragment: false,
-                annotations: Vec::new(),
                 test: None,
             })),
             span: test_span(),
@@ -995,6 +995,7 @@ fn allows_consecutive_mutating_method_calls_on_same_receiver() {
 
     let program = HirModule {
         items: vec![HirItem {
+            annotations: Vec::new(),
             id: radix_hir::HirId(0),
             def_id: DefId(0),
             kind: HirItemKind::Function(Box::new(HirFunction {
@@ -1037,7 +1038,6 @@ fn allows_consecutive_mutating_method_calls_on_same_receiver() {
                 nucleum_fragment: false,
                 is_vertex: false,
                 is_fragment: false,
-                annotations: Vec::new(),
                 test: None,
             })),
             span: test_span(),
@@ -1107,6 +1107,7 @@ fn allows_non_mutating_method_call_while_borrowed() {
 
     let program = HirModule {
         items: vec![HirItem {
+            annotations: Vec::new(),
             id: radix_hir::HirId(0),
             def_id: DefId(0),
             kind: HirItemKind::Function(Box::new(HirFunction {
@@ -1149,7 +1150,6 @@ fn allows_non_mutating_method_call_while_borrowed() {
                 nucleum_fragment: false,
                 is_vertex: false,
                 is_fragment: false,
-                annotations: Vec::new(),
                 test: None,
             })),
             span: test_span(),
@@ -1204,6 +1204,7 @@ fn mutating_method_call_marks_param_as_mutated() {
 
     let program = HirModule {
         items: vec![HirItem {
+            annotations: Vec::new(),
             id: radix_hir::HirId(0),
             def_id: DefId(0),
             kind: HirItemKind::Function(Box::new(HirFunction {
@@ -1239,7 +1240,6 @@ fn mutating_method_call_marks_param_as_mutated() {
                 nucleum_fragment: false,
                 is_vertex: false,
                 is_fragment: false,
-                annotations: Vec::new(),
                 test: None,
             })),
             span: test_span(),
@@ -1267,6 +1267,7 @@ fn bodyless_function_with_in_param_has_no_warning() {
 
     let program = HirModule {
         items: vec![HirItem {
+            annotations: Vec::new(),
             id: radix_hir::HirId(0),
             def_id: DefId(0),
             kind: HirItemKind::Function(Box::new(HirFunction {
@@ -1293,7 +1294,6 @@ fn bodyless_function_with_in_param_has_no_warning() {
                 nucleum_fragment: false,
                 is_vertex: false,
                 is_fragment: false,
-                annotations: Vec::new(),
                 test: None,
             })),
             span: test_span(),
@@ -1318,6 +1318,7 @@ fn bodyless_function_with_ex_param_has_no_warning() {
 
     let program = HirModule {
         items: vec![HirItem {
+            annotations: Vec::new(),
             id: radix_hir::HirId(0),
             def_id: DefId(0),
             kind: HirItemKind::Function(Box::new(HirFunction {
@@ -1344,7 +1345,6 @@ fn bodyless_function_with_ex_param_has_no_warning() {
                 nucleum_fragment: false,
                 is_vertex: false,
                 is_fragment: false,
-                annotations: Vec::new(),
                 test: None,
             })),
             span: test_span(),
@@ -1369,6 +1369,7 @@ fn bodyless_function_with_owned_param_is_ok() {
 
     let program = HirModule {
         items: vec![HirItem {
+            annotations: Vec::new(),
             id: radix_hir::HirId(0),
             def_id: DefId(0),
             kind: HirItemKind::Function(Box::new(HirFunction {
@@ -1395,7 +1396,6 @@ fn bodyless_function_with_owned_param_is_ok() {
                 nucleum_fragment: false,
                 is_vertex: false,
                 is_fragment: false,
-                annotations: Vec::new(),
                 test: None,
             })),
             span: test_span(),
@@ -1420,6 +1420,7 @@ fn empty_function_body_has_no_borrow_errors() {
 
     let program = HirModule {
         items: vec![HirItem {
+            annotations: Vec::new(),
             id: radix_hir::HirId(0),
             def_id: DefId(0),
             kind: HirItemKind::Function(Box::new(HirFunction {
@@ -1446,7 +1447,6 @@ fn empty_function_body_has_no_borrow_errors() {
                 nucleum_fragment: false,
                 is_vertex: false,
                 is_fragment: false,
-                annotations: Vec::new(),
                 test: None,
             })),
             span: test_span(),
@@ -1530,6 +1530,7 @@ fn dual_explicit_ref_program(param_ty: radix_types::TypeId) -> HirModule {
     };
     HirModule {
         items: vec![HirItem {
+            annotations: Vec::new(),
             id: radix_hir::HirId(0),
             def_id: DefId(0),
             kind: HirItemKind::Function(Box::new(HirFunction {
@@ -1572,7 +1573,6 @@ fn dual_explicit_ref_program(param_ty: radix_types::TypeId) -> HirModule {
                 nucleum_fragment: false,
                 is_vertex: false,
                 is_fragment: false,
-                annotations: Vec::new(),
                 test: None,
             })),
             span: test_span(),
@@ -1652,6 +1652,7 @@ fn const_into_mut_sequential_use_program(types: &mut TypeTable) -> HirModule {
     };
     HirModule {
         items: vec![HirItem {
+            annotations: Vec::new(),
             id: radix_hir::HirId(0),
             def_id: DefId(0),
             kind: HirItemKind::Function(Box::new(HirFunction {
@@ -1678,7 +1679,6 @@ fn const_into_mut_sequential_use_program(types: &mut TypeTable) -> HirModule {
                 nucleum_fragment: false,
                 is_vertex: false,
                 is_fragment: false,
-                annotations: Vec::new(),
                 test: None,
             })),
             span: test_span(),

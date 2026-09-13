@@ -378,9 +378,11 @@ pub enum NucleumVisibility {
 const PUBLICA_FAMILY: &str = "publica";
 
 /// Launch visibility of one HIR device function.
-fn nucleum_visibility(function: &HirFunction, interner: &crate::lexer::Interner) -> NucleumVisibility {
-    let public = function
-        .annotations
+fn nucleum_visibility(
+    annotations: &[radix_hir::HirAnnotation],
+    interner: &crate::lexer::Interner,
+) -> NucleumVisibility {
+    let public = annotations
         .iter()
         .any(|annotation| interner.resolve(annotation.family) == PUBLICA_FAMILY);
     if public {
@@ -817,9 +819,15 @@ pub fn collect_nucleum_metadata(
     for item in &analysis.hir.items {
         match &item.kind {
             HirItemKind::Function(function) => {
-                if let Some(record) =
-                    nucleum_item_from_function(item.def_id, function, relative_path, analysis, &index, &effects)?
-                {
+                if let Some(record) = nucleum_item_from_function(
+                    item.def_id,
+                    function,
+                    &item.annotations,
+                    relative_path,
+                    analysis,
+                    &index,
+                    &effects,
+                )? {
                     metadata.items.push(record);
                 }
             }
@@ -828,6 +836,7 @@ pub fn collect_nucleum_metadata(
                     if let Some(record) = nucleum_item_from_function(
                         method.def_id,
                         &method.func,
+                        &method.annotations,
                         relative_path,
                         analysis,
                         &index,
@@ -851,6 +860,7 @@ pub fn collect_nucleum_metadata(
 fn nucleum_item_from_function(
     def_id: DefId,
     function: &HirFunction,
+    annotations: &[radix_hir::HirAnnotation],
     relative_path: &str,
     analysis: &AnalyzedModule,
     index: &NucleumIndex,
@@ -860,7 +870,7 @@ fn nucleum_item_from_function(
         return Ok(None);
     };
     let name = analysis.interner.resolve(function.name).to_owned();
-    let visibility = nucleum_visibility(function, &analysis.interner);
+    let visibility = nucleum_visibility(annotations, &analysis.interner);
     let has_hir_body = function.body.is_some();
     // DFV2-5: every device function carries the v2 body artifact skeleton —
     // constraints, effect summary, and toolchain identity travel with both

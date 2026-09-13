@@ -99,6 +99,7 @@ impl TypeChecker<'_> {
     pub fn collect_struct(
         &mut self,
         def_id: DefId,
+        annotations: &[radix_hir::HirAnnotation],
         struct_item: &HirStruct,
         span: radix_lexer::Span,
     ) {
@@ -108,7 +109,7 @@ impl TypeChecker<'_> {
         let mut own_bodyless = FxHashSet::default();
         let mut own_bodied = FxHashSet::default();
 
-        if self.annotations_contain_json(&struct_item.annotations) {
+        if self.annotations_contain_json(annotations) {
             self.json_structs.insert(def_id);
         }
 
@@ -406,7 +407,7 @@ impl TypeChecker<'_> {
                     }
                 }
                 HirItemKind::Struct(struct_item) => {
-                    self.collect_struct(item.def_id, struct_item, item.span)
+                    self.collect_struct(item.def_id, &item.annotations, struct_item, item.span)
                 }
                 HirItemKind::Interface(interface_item) => {
                     self.collect_interface(item.def_id, interface_item)

@@ -907,6 +907,7 @@ impl<'a> Lowerer<'a> {
         body.end = case_end;
 
         HirItem {
+            annotations: Vec::new(),
             id: self.next_hir_id(),
             def_id,
             kind: radix_hir::HirItemKind::Function(Box::new(radix_hir::HirFunction {
@@ -924,7 +925,6 @@ impl<'a> Lowerer<'a> {
                 nucleum_fragment: false,
                 is_vertex: false,
                 is_fragment: false,
-                annotations: Vec::new(),
                 test: Some(HirTestMetadata {
                     name: case.name,
                     suite_path: suite_path.to_vec(),
