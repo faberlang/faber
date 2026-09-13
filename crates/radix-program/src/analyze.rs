@@ -93,12 +93,6 @@ impl ModuleGraph {
         self.local.get(from).map(Vec::as_slice).unwrap_or(&[])
     }
 
-    /// Library import bindings from `from`, in recorded order.
-    #[allow(dead_code)]
-    pub(crate) fn library_edges(&self, from: &ModuleId) -> &[LibraryImportBinding] {
-        self.library.get(from).map(Vec::as_slice).unwrap_or(&[])
-    }
-
     /// Local successors of `from`.
     pub fn local_successors(&self, from: &ModuleId) -> impl Iterator<Item = &ModuleId> {
         self.local_edges(from).iter().map(|(_, target)| target)
@@ -179,7 +173,6 @@ impl AnalyzedProgram {
         self.nodes.iter().find(|(_, node)| node.path == path)
     }
 
-    #[allow(dead_code)]
     pub(crate) fn node_by_path_mut(
         &mut self,
         path: &Path,
