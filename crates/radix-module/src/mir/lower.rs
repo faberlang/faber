@@ -160,23 +160,6 @@ fn mir_lower_issue(prefix: &str, detail: &str) -> String {
     issue.trim_end_matches('_').to_owned()
 }
 
-/// Lower a semantically analyzed HIR unit into a validated MIR unit.
-///
-/// The returned unit carries a program that has already passed MIR validation,
-/// along with the validation token and lowering metadata. Lowering failures and
-/// validation failures share the same error type so callers can treat the MIR
-/// pipeline as one fail-closed developer command.
-///
-/// # Errors
-/// Returns `MirError` values for unsupported HIR surfaces, missing semantic
-/// types, sealed-block misuse, and post-lowering validation failures.
-pub fn lower_analyzed_unit(
-    unit: &mut AnalyzedModule,
-    options: MirLoweringOptions,
-) -> Result<LoweredMirUnit<'_>, Vec<MirError>> {
-    lower_analyzed_unit_with_options(unit, options)
-}
-
 /// MIR output plus the proving validated-MIR token and auxiliary lowering data.
 pub struct LoweredMirUnit<'a> {
     /// Unvalidated program copy for backward-compat mutation (driver post-lower patches).
@@ -278,7 +261,17 @@ pub enum MirRuntimeRecordValue {
     Array { ty: MirType, items: Vec<MirOperand> },
 }
 
-fn lower_analyzed_unit_with_options(
+/// Lower a semantically analyzed HIR unit into a validated MIR unit.
+///
+/// The returned unit carries a program that has already passed MIR validation,
+/// along with the validation token and lowering metadata. Lowering failures and
+/// validation failures share the same error type so callers can treat the MIR
+/// pipeline as one fail-closed developer command.
+///
+/// # Errors
+/// Returns `MirError` values for unsupported HIR surfaces, missing semantic
+/// types, sealed-block misuse, and post-lowering validation failures.
+pub fn lower_analyzed_unit(
     unit: &mut AnalyzedModule,
     options: MirLoweringOptions,
 ) -> Result<LoweredMirUnit<'_>, Vec<MirError>> {
@@ -1724,7 +1717,7 @@ impl<'a> FunctionBuilder<'a> {
     /// in the function body (e.g. `position`, `out_position`) resolve to
     /// these injected MIR locals.
     ///
-    /// The item list is pre-built in [`lower_analyzed_unit_with_options`].
+    /// The item list is pre-built in [`lower_analyzed_unit`].
     #[cfg(test)]
     fn add_test_binding(&mut self, def_id: DefId, ty: MirType, mutable: bool) -> MirLocalId {
         let local = self.next_local_id();
