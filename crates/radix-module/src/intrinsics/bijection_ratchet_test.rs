@@ -29,8 +29,8 @@ use crate::driver::{AnalyzeRequest, Config, Session, analyze_source};
 use crate::intrinsics::{
     INTRINSICS, IntrinsicParamKind, IntrinsicReceiver, IntrinsicReturnKind, lookup_method, mir_collection_op,
 };
-use radix_types::{GenericParamSort, MirCollectionOp};
 use crate::mir::MirLoweringOptions;
+use radix_types::{GenericParamSort, MirCollectionOp};
 use std::collections::BTreeSet;
 use std::fmt::Write as _;
 

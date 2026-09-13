@@ -4,8 +4,8 @@
 use super::*;
 use crate::codegen::{Target, generate_from_analyzed};
 use crate::driver::{AnalyzeRequest, Config, Session, analyze_source};
-use crate::mir::MirLoweringOptions;
 use crate::locale::{KeywordSurface, latin_locale_pack};
+use crate::mir::MirLoweringOptions;
 
 fn analyze(name: &str, source: &str) -> AnalyzedModule {
     analyze_with(name, source, Config::default())

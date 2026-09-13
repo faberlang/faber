@@ -866,10 +866,7 @@ impl TypeChecker<'_> {
     }
 
     /// Allocate one fresh index hole per distinct shape-param symbol (D1).
-    fn shape_vars_for(
-        &mut self,
-        shape_symbols: &FxHashSet<Symbol>,
-    ) -> FxHashMap<Symbol, IndexId> {
+    fn shape_vars_for(&mut self, shape_symbols: &FxHashSet<Symbol>) -> FxHashMap<Symbol, IndexId> {
         shape_symbols
             .iter()
             .map(|sym| (*sym, self.fresh_index_hole()))
