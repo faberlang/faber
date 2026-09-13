@@ -9,7 +9,7 @@
 //! rather than treating a definition as globally dead.
 
 use crate::{AccessMarker, Type, TypeTable};
-use radix_hir::visit::{HirVisitor, walk_expr, walk_local};
+use radix_hir::visit::{HirVisitor, walk_expr, walk_local, walk_stmt};
 use radix_hir::{
     DefId, HirArrayElement, HirBlock, HirExpression, HirExpressionKind, HirFunction, HirId,
     HirItemKind, HirLocal, HirModule, HirStatement, HirStatementKind,
@@ -640,7 +640,7 @@ impl HirVisitor for DeadSourceAnalyzer<'_> {
                     self.branch_depth = self.branch_depth.saturating_sub(1);
                 }
             }
-            _ => walk_stmt_for_access(self, statement),
+            _ => walk_stmt(self, statement),
         }
     }
 
@@ -779,25 +779,5 @@ impl HirVisitor for DeadSourceAnalyzer<'_> {
             }
             _ => walk_expr(self, expr),
         }
-    }
-}
-
-fn walk_stmt_for_access(visitor: &mut DeadSourceAnalyzer<'_>, statement: &HirStatement) {
-    match &statement.kind {
-        HirStatementKind::Expr(expr) => visitor.visit_expr(expr),
-        HirStatementKind::IncDec(inc_dec) => visitor.visit_expr(&inc_dec.target),
-        HirStatementKind::Redde(value) => {
-            if let Some(value) = value {
-                visitor.visit_expr(value);
-            }
-        }
-        HirStatementKind::Custodi(custodi) => {
-            for clause in &custodi.clauses {
-                visitor.visit_expr(&clause.cond);
-                visitor.visit_block(&clause.body);
-            }
-        }
-        HirStatementKind::Rumpe | HirStatementKind::Perge | HirStatementKind::Tacet => {}
-        HirStatementKind::Local(_) => unreachable!("locals are handled by visit_stmt"),
     }
 }
