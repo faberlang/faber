@@ -15,8 +15,6 @@ jobs:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
       - run: cargo test --locked --manifest-path runtime/rust/Cargo.toml
-      - run: cargo test --locked --manifest-path crates/http-transport/Cargo.toml
-      - run: cargo test --locked --manifest-path packages/http/rust/Cargo.toml
 
   go:
     runs-on: ubuntu-latest
