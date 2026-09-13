@@ -130,7 +130,9 @@ fn convert_elements_preserves_shape_and_maps_values() {
 #[test]
 fn convert_elements_empty_tensor() {
     let tensor: Tensor<i64> = Tensor::structa(Vec::new(), &[0, 5]).expect("zero-extent shape");
-    let converted: Tensor<f64> = tensor.convert_elements(|v| v as f64);
+    let converted: Tensor<f64> = tensor.convert_elements(|_| -> f64 {
+        unreachable!("conversion closure is not called for an empty tensor")
+    });
     assert_eq!(converted.magnitudines(), vec![0, 5]);
     assert_eq!(converted.planata(), Vec::<f64>::new());
 }
@@ -343,7 +345,7 @@ fn addita_integer_tensors_sum_without_widening() {
 #[test]
 fn summa_folds_all_elements_to_element_type() {
     let grid = Tensor::structa(vec![1.0f32, 2.0, 3.0, 4.0], &[2, 2]).unwrap();
-    assert_eq!(grid.summa(), 10.0);
+    assert!((grid.summa() - 10.0).abs() <= f32::EPSILON);
     let ints = Tensor::structa(vec![1i64, 2, 3, 4], &[4]).unwrap();
     assert_eq!(ints.summa(), 10);
 }
@@ -351,10 +353,10 @@ fn summa_folds_all_elements_to_element_type() {
 #[test]
 fn summa_empty_tensor_returns_default() {
     let empty_f32 = Tensor::<f32>::structa(Vec::new(), &[0]).unwrap();
-    assert_eq!(empty_f32.summa(), 0.0);
+    assert!(empty_f32.summa().abs() <= f32::EPSILON);
 
-    let empty_i64 = Tensor::<i64>::structa(Vec::new(), &[0, 0]).unwrap();
-    assert_eq!(empty_i64.summa(), 0);
+    let empty_ints = Tensor::<i64>::structa(Vec::new(), &[0, 0]).unwrap();
+    assert_eq!(empty_ints.summa(), 0);
 }
 
 #[test]
@@ -463,7 +465,7 @@ fn divide_rejects_broadcast_shape_mismatch() {
 fn media_averages_f32_elements() {
     let tensor = Tensor::structa(vec![1.0f32, 2.0, 3.0, 4.0], &[2, 2]).unwrap();
 
-    assert_eq!(tensor.media().unwrap(), 2.5);
+    assert!((tensor.media().unwrap() - 2.5).abs() <= f32::EPSILON);
 }
 
 #[test]
@@ -661,7 +663,14 @@ fn layernorm_matches_reference_rank2_axis1_no_affine() {
     // Row 1: mean=5.0, var=0.6667, same inv_std
     // Expected row 1: [-1.2247, 0.0, 1.2247]
     let result_data = result.planata();
-    let expected: Vec<f32> = vec![-1.2247449, 0.0, 1.2247449, -1.2247449, 0.0, 1.2247449];
+    let expected: Vec<f32> = vec![
+        -1.224_744_9,
+        0.0,
+        1.224_744_9,
+        -1.224_744_9,
+        0.0,
+        1.224_744_9,
+    ];
     for (a, e) in result_data.iter().zip(expected.iter()) {
         assert!(
             (a - e).abs() < 1e-4,
@@ -706,7 +715,7 @@ fn layernorm_rank1_no_affine() {
 
     assert_eq!(result.magnitudines(), vec![3]);
     // mean=2.0, var=(1+0+1)/3=0.6667, inv_std≈1.2247
-    let expected = [-1.2247449f32, 0.0, 1.2247449];
+    let expected = [-1.224_744_9_f32, 0.0, 1.224_744_9];
     for (a, e) in result.planata().iter().zip(expected.iter()) {
         assert!(
             (a - e).abs() < 1e-4,
