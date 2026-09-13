@@ -603,17 +603,17 @@ impl FragmentDefinitionChecker<'_> {
                 self.effect(span, "captured_mut_host");
                 return;
             }
-            if let Some(ty) = symbol.ty {
-                if is_func_type(ty, self.types) {
-                    self.effect(span, "dynamic_function");
-                }
+            if let Some(ty) = symbol.ty
+                && is_func_type(ty, self.types)
+            {
+                self.effect(span, "dynamic_function");
             }
             return;
         }
-        if let Some(ty) = self.path_type(def_id) {
-            if is_func_type(ty, self.types) {
-                self.effect(span, "dynamic_function");
-            }
+        if let Some(ty) = self.path_type(def_id)
+            && is_func_type(ty, self.types)
+        {
+            self.effect(span, "dynamic_function");
         }
     }
 

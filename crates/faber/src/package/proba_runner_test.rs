@@ -101,10 +101,10 @@ targets = ["rust"]
     .expect("manifest");
     fs::write(
         dir.join("src/lib.fab"),
-        r#"fn identity(int n) → int {
+        r"fn identity(int n) → int {
     return n
 }
-"#,
+",
     )
     .expect("lib.fab");
 }
@@ -302,11 +302,11 @@ fn entryless_package_proba_roots_link_once_and_run_with_original_ids() {
     write_minimal_lib_package(dir.path());
     fs::write(
         dir.join("src/lib.fab"),
-        r#"@ public
+        r"@ public
 fn double(int n) → int {
     return n + n
 }
-"#,
+",
     )
     .expect("lib.fab");
     fs::write(
@@ -450,10 +450,10 @@ locale = "en"
     .expect("manifest");
     fs::write(
         dir.join("src/lib.fab"),
-        r#"fn identity(int n) → int {
+        r"fn identity(int n) → int {
     return n
 }
-"#,
+",
     )
     .expect("lib.fab");
 }
@@ -466,7 +466,7 @@ fn with_package_cwd(dir: &Path, f: impl FnOnce()) {
     let guard = CWD_LOCK
         .get_or_init(|| std::sync::Mutex::new(()))
         .lock()
-        .unwrap_or_else(|poisoned| poisoned.into_inner());
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
     let original_cwd = std::env::current_dir().expect("current dir");
     std::env::set_current_dir(dir).expect("chdir");
     f();
@@ -607,11 +607,11 @@ fn write_in_package_import_fixture(dir: &Path) -> PathBuf {
     write_minimal_lib_package(dir);
     fs::write(
         dir.join("src/mathesis.fab"),
-        r#"@ public
+        r"@ public
 fn PI() → float {
     return 3.14159
 }
-"#,
+",
     )
     .expect("mathesis.fab");
     let proba = dir.join("src/mathesis.proba");
@@ -776,15 +776,12 @@ fn no_package_single_file_route_cannot_resolve_in_package_import() {
         None,
         false,
     );
-    match result {
-        Ok(report) => {
-            assert!(
-                !report.success(),
-                "bare --no-package route must not resolve in-package imports: {report:?}"
-            );
-        }
-        Err(_) => {
-            // Frontend/MIR error on the import is also the bare-route failure.
-        }
+    if let Ok(report) = result {
+        assert!(
+            !report.success(),
+            "bare --no-package route must not resolve in-package imports: {report:?}"
+        );
+    } else {
+        // Frontend/MIR error on the import is also the bare-route failure.
     }
 }

@@ -60,6 +60,7 @@ pub struct EmissionSeams {
 }
 
 /// Failed compile: no output, and no Go modules.
+#[must_use]
 pub fn compile_failure(diagnostics: Vec<Diagnostic>) -> PackageCompileResult {
     PackageCompileResult {
         compile_result: CompileResult {
@@ -91,12 +92,14 @@ fn finalize_package_compile_result(
 ///
 /// RP4: moved from `crates/faber/src/package/compile.rs`; the seam bundle
 /// carries only product-owned analysis and Go toolchain inputs.
+#[must_use]
 pub fn compile_package(config: &Config, input: &Path, seams: &EmissionSeams) -> CompileResult {
     compile_package_result(config, input, seams).compile_result
 }
 
 /// Compile a package and keep the full Go result envelope. Used by Faber's
 /// Go package adapter; `compile_package` returns only the compiler result.
+#[must_use]
 pub fn compile_package_result(
     config: &Config,
     input: &Path,
@@ -114,6 +117,7 @@ pub fn compile_package_result(
 /// assert on generated Rust. Product `faber test` uses the MIR runner instead.
 ///
 /// RP4: moved from `crates/faber/src/package/compile.rs`.
+#[must_use]
 pub fn compile_package_with_test_selection(
     config: &Config,
     input: &Path,
@@ -127,6 +131,7 @@ pub fn compile_package_with_test_selection(
 /// which `*.proba` files are loaded (`--include` / `--exclude` on `faber test`).
 ///
 /// RP4: moved from `crates/faber/src/package/compile.rs`.
+#[must_use]
 pub fn compile_package_with_test_options(
     config: &Config,
     input: &Path,
@@ -147,6 +152,8 @@ pub fn compile_package_with_test_options(
 /// faber-owned; this entry runs the shared analysis spine and hands the
 /// analyzed package to the caller-supplied plan constructor (explicit input,
 /// no ambient seams). `R` is the caller's plan type.
+/// # Errors
+/// Returns an error when the input or persisted artifact is invalid.
 pub fn package_rust_runtime_plan<R>(
     config: &Config,
     input: &Path,

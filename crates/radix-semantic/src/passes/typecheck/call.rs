@@ -384,12 +384,10 @@ impl TypeChecker<'_> {
         if let Some(def_id) = self
             .struct_def_from_type(receiver_ty)
             .or_else(|| self.interface_def_from_type(receiver_ty))
-        {
-            if let Some(canonical_name) =
+            && let Some(canonical_name) =
                 self.resolver.imported_method_canonical_name(def_id, *name)
-            {
-                *name = canonical_name;
-            }
+        {
+            *name = canonical_name;
         }
         let method_name = self.method_display_name(*name);
         let method_name = if method_name == super::tensor_index::GLYPH_TRANSPOSE_METHOD {
@@ -415,12 +413,12 @@ impl TypeChecker<'_> {
                 .map_or(super::tensor_index::TENSOR_TRANSPONE, |pack| {
                     pack.intrinsic_surface(super::tensor_index::TENSOR_TRANSPONE)
                 });
-            if let Some(interner) = self.interner {
-                if let Some(index) = interner.strings().iter().position(|s| s == surface) {
-                    #[allow(clippy::cast_possible_truncation)]
-                    {
-                        *name = radix_lexer::Symbol(index as u32);
-                    }
+            if let Some(interner) = self.interner
+                && let Some(index) = interner.strings().iter().position(|s| s == surface)
+            {
+                #[allow(clippy::cast_possible_truncation)]
+                {
+                    *name = radix_lexer::Symbol(index as u32);
                 }
             }
             surface.to_owned()
@@ -485,16 +483,16 @@ impl TypeChecker<'_> {
         // A member callee normally names a method, but lowering preserves the
         // same MethodCall shape for a function-valued struct field. Probe the
         // field only after method lookup so an explicit method always wins.
-        if let Some(field_ty) = self.lookup_field_type(receiver_ty, *name) {
-            if let Some(sig) = self.signature_from_type(field_ty) {
-                return self.check_instantiated_call(
-                    &sig,
-                    explicit_type_args,
-                    args,
-                    receiver.span,
-                    expected,
-                );
-            }
+        if let Some(field_ty) = self.lookup_field_type(receiver_ty, *name)
+            && let Some(sig) = self.signature_from_type(field_ty)
+        {
+            return self.check_instantiated_call(
+                &sig,
+                explicit_type_args,
+                args,
+                receiver.span,
+                expected,
+            );
         }
 
         // U1R common-member rule: a `∪` receiver calls a method only when
@@ -597,32 +595,30 @@ impl TypeChecker<'_> {
                 .resolver
                 .get_symbol(*module_def_id)
                 .map(|symbol| symbol.name)
-            {
-                if !self
+                && !self
                     .resolver
                     .namespace_exports_member_canonical(namespace, *name)
+            {
+                self.typecheck_call_arg_exprs(args);
+                if let Some(issue) = self
+                    .resolver
+                    .namespace_member_rejection_issue(namespace, *name)
                 {
-                    self.typecheck_call_arg_exprs(args);
-                    if let Some(issue) = self
-                        .resolver
-                        .namespace_member_rejection_issue(namespace, *name)
-                    {
-                        self.errors.push(crate::passes::import_seam::diagnostic(
-                            receiver.span,
-                            issue,
-                            &method_name,
-                        ));
-                    } else if self.resolver.namespace_has_file_interface(namespace) {
-                        self.undefined_member_with_args(
-                            "namespace_missing_export",
-                            receiver.span,
-                            &[("member", method_name.clone())],
-                        );
-                    } else {
-                        self.undefined_member("unknown_method", receiver.span);
-                    }
-                    return self.error_type;
+                    self.errors.push(crate::passes::import_seam::diagnostic(
+                        receiver.span,
+                        issue,
+                        &method_name,
+                    ));
+                } else if self.resolver.namespace_has_file_interface(namespace) {
+                    self.undefined_member_with_args(
+                        "namespace_missing_export",
+                        receiver.span,
+                        &[("member", method_name.clone())],
+                    );
+                } else {
+                    self.undefined_member("unknown_method", receiver.span);
                 }
+                return self.error_type;
             }
             if let Some(result) = self.check_tensor_namespace_method_call(
                 *module_def_id,
@@ -984,11 +980,10 @@ impl TypeChecker<'_> {
                     );
                     return self.error_type;
                 }
-                if let Some(symbol) = self.resolver.get_symbol(*def_id) {
-                    if let Some(Type::Func(sig)) = symbol.ty.as_ref().map(|ty| self.types.get(*ty))
-                    {
-                        return sig.ret;
-                    }
+                if let Some(symbol) = self.resolver.get_symbol(*def_id)
+                    && let Some(Type::Func(sig)) = symbol.ty.as_ref().map(|ty| self.types.get(*ty))
+                {
+                    return sig.ret;
                 }
                 // WHY: registration always attaches a Func signature; this fallback keeps checking alive if lookup fails.
                 return self
@@ -1460,18 +1455,16 @@ impl TypeChecker<'_> {
                     // ordered pair (direct lookup only). A row whose
                     // conversion function declares `⇥ E` composes that
                     // declared channel through the destination channel.
-                    if let Some(row) = self.resolver.conversion_row_for(source_ty, destination_ty) {
-                        if let Some(fn_id) = row.fn_def_id {
-                            if let Some(channel) =
-                                self.functions.get(&fn_id).and_then(|sig| sig.err)
-                            {
-                                if !self.check_registered_row_channel(channel, span) {
-                                    return false;
-                                }
-                            }
-                            self.pending_conversion = Some(fn_id);
+                    if let Some(row) = self.resolver.conversion_row_for(source_ty, destination_ty)
+                        && let Some(fn_id) = row.fn_def_id
+                    {
+                        if let Some(channel) = self.functions.get(&fn_id).and_then(|sig| sig.err)
+                            && !self.check_registered_row_channel(channel, span)
+                        {
                             return false;
                         }
+                        self.pending_conversion = Some(fn_id);
+                        return false;
                     }
                     self.conversion_absent_diagnostic(source_ty, destination_ty, span);
                     return false;
@@ -1650,10 +1643,10 @@ impl TypeChecker<'_> {
                 .chain((0..arity).map(|_| self.fresh_infer()))
                 .collect();
         }
-        if let Some(args) = self.applied_args_for_def(expected, def_id) {
-            if args.len() == arity {
-                return args;
-            }
+        if let Some(args) = self.applied_args_for_def(expected, def_id)
+            && args.len() == arity
+        {
+            return args;
         }
         (0..arity).map(|_| self.fresh_infer()).collect()
     }

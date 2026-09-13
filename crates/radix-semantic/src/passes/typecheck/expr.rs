@@ -705,11 +705,11 @@ impl TypeChecker<'_> {
                 return self.error_type;
             }
         };
-        if let Some(shape) = tensor_shape {
-            if self.is_unresolved_index_hole(shape) {
-                let rank0 = self.types.rank0_shape();
-                self.constrain_index_equal(shape, rank0, span);
-            }
+        if let Some(shape) = tensor_shape
+            && self.is_unresolved_index_hole(shape)
+        {
+            let rank0 = self.types.rank0_shape();
+            self.constrain_index_equal(shape, rank0, span);
         }
         resolved
     }

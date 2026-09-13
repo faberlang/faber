@@ -33,16 +33,19 @@ const TEST_NAME: &str = "test.fab";
 // ---------------------------------------------------------------------------
 
 /// Run the full compiler pipeline with the default Rust target.
+#[must_use]
 pub fn compile_and_get_result(source: &str) -> CompileResult {
     Compiler::new(Config::default().with_target(Target::HirRust)).compile_str(TEST_NAME, source)
 }
 
 /// Run the full compiler pipeline for a specific backend target.
+#[must_use]
 pub fn compile_for_target_and_get_result(source: &str, target: Target) -> CompileResult {
     Compiler::new(Config::default().with_target(target)).compile_str(TEST_NAME, source)
 }
 
 /// Run the full compiler pipeline and return raw diagnostics.
+#[must_use]
 pub fn compile_and_get_diagnostics(source: &str) -> Vec<Diagnostic> {
     compile_and_get_result(source).diagnostics
 }
@@ -55,6 +58,7 @@ pub fn compile_and_get_diagnostics(source: &str) -> Vec<Diagnostic> {
 ///
 /// Diagnostics are collected from both the `Ok(AnalyzedModule.diagnostics)` and
 /// `Err(Vec<Diagnostic>)` arms so callers always receive a flat list.
+#[must_use]
 pub fn analyze_and_get_diagnostics(source: &str) -> Vec<Diagnostic> {
     let session = driver::Session::new(Config::default().with_target(Target::HirRust));
     match driver::analyze_source(&session, TEST_NAME, source, AnalyzeRequest::default()) {
@@ -185,6 +189,7 @@ pub fn assert_analysis_rejects_with_issue(source: &str, issue: &str) {
 ///
 /// This is the canonical replacement for the per-file `structured_issue`
 /// helper that was duplicated in `typecheck_test.rs`.
+#[must_use]
 pub fn semantic_error_has_issue(err: &SemanticError, issue: &str) -> bool {
     crate::test_support::args_have_no_legacy_message(&err.args)
         && err

@@ -623,34 +623,34 @@ impl Lowerer<'_> {
             segment_names.insert(0, inner.member.name);
             object = &inner.object;
         }
-        if let radix_syntax::ExprKind::Ident(base) = &object.kind {
-            if let Some(module) = segment_names.first().copied() {
-                if let Some(def_id) = self.kernel_glob_imports.get(&(base.name, module)).copied() {
-                    if segment_names.len() == 1 {
-                        self.error("kernel_glob_call_shape");
-                    }
-                    let recv = radix_hir::HirExpression {
-                        id: self.next_hir_id(),
-                        kind: radix_hir::HirExpressionKind::Path(def_id),
-                        ty: None,
-                        span: object.span,
-                    };
-                    let combined = segment_names
-                        .iter()
-                        .skip(1)
-                        .map(|sym| self.interner.resolve(*sym))
-                        .collect::<Vec<_>>()
-                        .join(".");
-                    let name = self.interner.intern(&combined);
-                    return (recv, name);
+        if let radix_syntax::ExprKind::Ident(base) = &object.kind
+            && let Some(module) = segment_names.first().copied()
+        {
+            if let Some(def_id) = self.kernel_glob_imports.get(&(base.name, module)).copied() {
+                if segment_names.len() == 1 {
+                    self.error("kernel_glob_call_shape");
                 }
-                if self.kernel_glob_aliases.contains(&base.name) {
-                    let module_name = self.interner.resolve(module);
-                    self.error_with_args(vec![
-                        radix_diagnostics::DiagnosticArg::new("issue", "kernel_unknown_module"),
-                        radix_diagnostics::DiagnosticArg::new("module", module_name),
-                    ]);
-                }
+                let recv = radix_hir::HirExpression {
+                    id: self.next_hir_id(),
+                    kind: radix_hir::HirExpressionKind::Path(def_id),
+                    ty: None,
+                    span: object.span,
+                };
+                let combined = segment_names
+                    .iter()
+                    .skip(1)
+                    .map(|sym| self.interner.resolve(*sym))
+                    .collect::<Vec<_>>()
+                    .join(".");
+                let name = self.interner.intern(&combined);
+                return (recv, name);
+            }
+            if self.kernel_glob_aliases.contains(&base.name) {
+                let module_name = self.interner.resolve(module);
+                self.error_with_args(vec![
+                    radix_diagnostics::DiagnosticArg::new("issue", "kernel_unknown_module"),
+                    radix_diagnostics::DiagnosticArg::new("module", module_name),
+                ]);
             }
         }
         let recv = lower_expr(self, object);
@@ -687,20 +687,16 @@ impl Lowerer<'_> {
     /// Receiver-field legality remains a typecheck concern for every other
     /// member expression.
     fn lower_membrum(&mut self, member: &radix_syntax::MemberExpr) -> HirExpressionKind {
-        if let radix_syntax::ExprKind::Ident(base) = &member.object.kind {
-            if let Some(base_def) = self.lookup_name(base.name) {
-                if let Some(base_symbol) = self.resolver.get_symbol(base_def) {
-                    if base_symbol.kind == crate::SymbolKind::Enum {
-                        if let Some(variant_def) =
-                            self.resolver.variant_child(base_def, member.member.name)
-                        {
-                            return HirExpressionKind::Path(variant_def);
-                        }
-                        self.error("unknown_variant");
-                        return HirExpressionKind::Error;
-                    }
-                }
+        if let radix_syntax::ExprKind::Ident(base) = &member.object.kind
+            && let Some(base_def) = self.lookup_name(base.name)
+            && let Some(base_symbol) = self.resolver.get_symbol(base_def)
+            && base_symbol.kind == crate::SymbolKind::Enum
+        {
+            if let Some(variant_def) = self.resolver.variant_child(base_def, member.member.name) {
+                return HirExpressionKind::Path(variant_def);
             }
+            self.error("unknown_variant");
+            return HirExpressionKind::Error;
         }
         // Imported namespace variant values (`module.Type.VARIANT`, uvf-u4):
         // the object is a two-segment path whose penultimate segment names a
@@ -710,42 +706,36 @@ impl Lowerer<'_> {
         // `finge`/pattern-path resolution. The intermediate `module.Type` has
         // no expression role of its own; only the full variant path is a
         // first-class value reference.
-        if let radix_syntax::ExprKind::Member(obj) = &member.object.kind {
-            if let radix_syntax::ExprKind::Ident(base) = &obj.object.kind {
-                if let Some(base_def) = self.lookup_name(base.name) {
-                    if let Some(base_symbol) = self.resolver.get_symbol(base_def) {
-                        if base_symbol.kind == crate::SymbolKind::Module {
-                            if let Some((variant_def, _)) =
-                                self.resolver.namespace_file_type_variant(
-                                    base.name,
-                                    obj.member.name,
-                                    member.member.name,
-                                )
-                            {
-                                self.record_variant_path(
-                                    variant_def,
-                                    &[base.name, obj.member.name, member.member.name],
-                                );
-                                return HirExpressionKind::Path(variant_def);
-                            }
-                            // The penultimate segment names a type export. A
-                            // member of a variant-bearing (enum/union) export
-                            // that is not one of its declared variants is a
-                            // genuine miss — fail closed like the same-module
-                            // enum shorthand. Struct exports keep the
-                            // field-access path.
-                            if let Some(type_def) = self
-                                .resolver
-                                .namespace_file_type_def(base.name, obj.member.name)
-                            {
-                                if self.resolver.imported_nominal_has_variants(type_def) {
-                                    self.error("unknown_variant");
-                                    return HirExpressionKind::Error;
-                                }
-                            }
-                        }
-                    }
-                }
+        if let radix_syntax::ExprKind::Member(obj) = &member.object.kind
+            && let radix_syntax::ExprKind::Ident(base) = &obj.object.kind
+            && let Some(base_def) = self.lookup_name(base.name)
+            && let Some(base_symbol) = self.resolver.get_symbol(base_def)
+            && base_symbol.kind == crate::SymbolKind::Module
+        {
+            if let Some((variant_def, _)) = self.resolver.namespace_file_type_variant(
+                base.name,
+                obj.member.name,
+                member.member.name,
+            ) {
+                self.record_variant_path(
+                    variant_def,
+                    &[base.name, obj.member.name, member.member.name],
+                );
+                return HirExpressionKind::Path(variant_def);
+            }
+            // The penultimate segment names a type export. A
+            // member of a variant-bearing (enum/union) export
+            // that is not one of its declared variants is a
+            // genuine miss — fail closed like the same-module
+            // enum shorthand. Struct exports keep the
+            // field-access path.
+            if let Some(type_def) = self
+                .resolver
+                .namespace_file_type_def(base.name, obj.member.name)
+                && self.resolver.imported_nominal_has_variants(type_def)
+            {
+                self.error("unknown_variant");
+                return HirExpressionKind::Error;
             }
         }
 
@@ -1318,10 +1308,9 @@ impl Lowerer<'_> {
         let regex_ty = self.types.primitive(Primitive::Regex);
         if matches!(target, HirConversioTarget::Type(ty) if ty == regex_ty)
             && conversio.recovery.is_none()
+            && let Some(pattern) = regex_pattern_symbol(&source)
         {
-            if let Some(pattern) = regex_pattern_symbol(&source) {
-                return HirExpressionKind::Literal(HirLiteral::Regex(pattern, None));
-            }
+            return HirExpressionKind::Literal(HirLiteral::Regex(pattern, None));
         }
         let recovery = conversio
             .recovery
@@ -1526,10 +1515,10 @@ fn lower_call_generic_arg(lowerer: &mut Lowerer<'_>, arg: &GenericArgExpr) -> Ty
     // forwarded magnitudo witness (`sink<T, D>(x)` inside
     // `forward<magnitudo T, magnitudo D>`), not a type — the ordinary type
     // path would report unknown_type_name at the symbolic argument.
-    if let Some(name) = call_arg_bare_name(arg) {
-        if call_arg_names_caller_size_param(lowerer, name) {
-            return lowerer.types.intern(crate::Type::Param(name));
-        }
+    if let Some(name) = call_arg_bare_name(arg)
+        && call_arg_names_caller_size_param(lowerer, name)
+    {
+        return lowerer.types.intern(crate::Type::Param(name));
     }
     match lowerer.lower_applied_arg(arg) {
         radix_types::AppliedArg::Type(id) => id,

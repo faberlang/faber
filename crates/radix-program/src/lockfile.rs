@@ -45,16 +45,19 @@ pub struct LockedPackage {
 }
 
 impl LockedPackage {
+    #[must_use]
     pub fn artifact_path(&self) -> PathBuf {
         PathBuf::from(&self.artifact)
     }
 
+    #[must_use]
     pub fn target_manifest_path(&self) -> PathBuf {
         PathBuf::from(&self.target_manifest)
     }
 
     /// Resolve a lock path field relative to the **application** package root
     /// (directory that contains `faber.lock`), not the process CWD.
+    #[must_use]
     pub fn resolve_path(app_package_root: &Path, locked_path: &str) -> PathBuf {
         let path = PathBuf::from(locked_path);
         if path.is_absolute() {
@@ -64,16 +67,22 @@ impl LockedPackage {
         }
     }
 
+    #[must_use]
     pub fn package_root_path(&self, app_package_root: &Path) -> PathBuf {
         Self::resolve_path(app_package_root, &self.package_root)
     }
 
+    #[must_use]
     pub fn interface_root_path_for(&self, app_package_root: &Path) -> PathBuf {
         Self::resolve_path(app_package_root, &self.interface_root)
     }
 }
 
 /// Read `faber.lock` from a package root when present.
+/// # Errors
+/// Returns an error when the input or persisted artifact is invalid.
+/// # Panics
+/// Panics when required internal state is absent.
 pub fn read_lock(package_root: &Path) -> Result<Option<FaberLock>, Box<Diagnostic>> {
     let path = package_root.join(LOCK_FILE);
     if !path.is_file() {
@@ -102,6 +111,8 @@ pub fn read_lock(package_root: &Path) -> Result<Option<FaberLock>, Box<Diagnosti
 }
 
 /// Index locked packages by name.
+/// # Errors
+/// Returns an error when the input or persisted artifact is invalid.
 pub fn lock_index(
     lock_path: &Path,
     lock: &FaberLock,
@@ -130,6 +141,7 @@ pub fn lock_index(
 
 /// Validate that declared exact dependencies are present in the lock with matching versions
 /// and that locked paths exist on disk.
+#[must_use]
 pub fn validate_dependencies_against_lock(
     package_root: &Path,
     dependencies: &BTreeMap<String, String>,

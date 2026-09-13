@@ -8,7 +8,10 @@
 //! analyzed HIR required by the AIR contract and remain fail-closed at their
 //! existing boundary.
 
-use super::*;
+use super::{
+    AnalyzedProgram, BTreeMap, DefId, Diagnostic, DiagnosticPhase, HashMap, PackageMirLinks, Path,
+    PathBuf, TypeId,
+};
 use radix_module::DiagnosticConvert;
 use radix_module::hir::visit::{HirVisitor, HirVisitorMut, walk_expr, walk_expr_mut, walk_program};
 use radix_module::hir::{HirExpression, HirExpressionKind, HirItemKind, HirTypeParam};

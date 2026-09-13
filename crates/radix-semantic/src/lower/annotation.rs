@@ -83,8 +83,8 @@ impl Lowerer<'_> {
             .map(|(ordinal, annotation)| {
                 self.annotation_ordinal = Some(ordinal as u32);
                 self.annotation_field_ordinal = 0;
-                let lowered = self.lower_annotation(annotation);
-                lowered
+
+                self.lower_annotation(annotation)
             })
             .collect()
     }

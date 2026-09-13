@@ -100,8 +100,7 @@ fn canonical_execution_bytes_and_sha256_are_exact() {
     let artifact_sha256 = execution.program.artifact.sha256.clone();
     let bytes = encode_host_execution_v1(&execution).expect("valid packet");
     let expected = format!(
-        r#"{{"schema":"faber.host-execution","version":1,"program":{{"target":{{"backend":"metal","required_features":["macos-arm64","metal"]}},"artifact":{{"format":"msl","abi_version":{},"byte_length":204,"sha256":"{}"}},"resources":[{{"id":1,"byte_capacity":4,"byte_alignment":4,"lifetime":"prepared_execution","initialization":{{"kind":"supplied","input_slot":1}}}}],"kernels":[{{"id":1,"entry":"mystery_kernel","block":[1,1,1],"slots":[{{"id":1,"group":0,"binding":0,"access":"read"}}]}}],"launches":[{{"id":1,"kernel":1,"grid":[1,1,1],"bindings":[{{"slot":1,"resource":1,"window":{{"kind":"exact","byte_offset":0,"byte_length":4}}}}]}}],"dependencies":[],"observations":[]}}}}"#,
-        ARTIFACT_ABI_VERSION, artifact_sha256
+        r#"{{"schema":"faber.host-execution","version":1,"program":{{"target":{{"backend":"metal","required_features":["macos-arm64","metal"]}},"artifact":{{"format":"msl","abi_version":{ARTIFACT_ABI_VERSION},"byte_length":204,"sha256":"{artifact_sha256}"}},"resources":[{{"id":1,"byte_capacity":4,"byte_alignment":4,"lifetime":"prepared_execution","initialization":{{"kind":"supplied","input_slot":1}}}}],"kernels":[{{"id":1,"entry":"mystery_kernel","block":[1,1,1],"slots":[{{"id":1,"group":0,"binding":0,"access":"read"}}]}}],"launches":[{{"id":1,"kernel":1,"grid":[1,1,1],"bindings":[{{"slot":1,"resource":1,"window":{{"kind":"exact","byte_offset":0,"byte_length":4}}}}]}}],"dependencies":[],"observations":[]}}}}"#
     );
     assert_eq!(
         String::from_utf8(bytes.clone()).expect("canonical JSON is UTF-8"),

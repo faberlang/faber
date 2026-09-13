@@ -634,7 +634,7 @@ fn collect_provider_modules(
                     imported_function_params: None,
                     imported_namespace_info: Some(namespace_info),
                     gpu_builtins: &[],
-                    field_name_policy: Default::default(),
+                    field_name_policy: radix_hir_rust::RustFieldNamePolicy::default(),
                     native_host_bootstrap: false,
                 },
             )?;

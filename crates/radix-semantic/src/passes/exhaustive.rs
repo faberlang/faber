@@ -268,18 +268,20 @@ fn check_match(
     // is a warning, not an error: existing catchalls keep compiling. Once an
     // explicit null arm exists, a trailing catchall legitimately covers only
     // the remaining non-null values, so the warning is suppressed.
-    if has_catchall && !explicit_null_arm && scrutinee_has_null_constituent(scrutinee_ty, types) {
-        if let Some(span) = catchall_span {
-            errors.push(
-                SemanticError::structured(
-                    SemanticErrorKind::Warning(WarningKind::WildcardAbsorbsNull),
-                    span,
-                )
-                .with_arg("issue", "wildcard_absorbs_null")
-                .with_arg("casu", "casu")
-                .with_arg("nil", "nihil"),
-            );
-        }
+    if has_catchall
+        && !explicit_null_arm
+        && scrutinee_has_null_constituent(scrutinee_ty, types)
+        && let Some(span) = catchall_span
+    {
+        errors.push(
+            SemanticError::structured(
+                SemanticErrorKind::Warning(WarningKind::WildcardAbsorbsNull),
+                span,
+            )
+            .with_arg("issue", "wildcard_absorbs_null")
+            .with_arg("casu", "casu")
+            .with_arg("nil", "nihil"),
+        );
     }
 
     if !has_catchall {

@@ -1,6 +1,19 @@
 //! Plan package CLI dispatch: root entry, argument parsing, and subcommands.
 
-use super::*;
+use super::{
+    AnalyzedProgram, AnalyzedProgramNode, BTreeSet, CliCommand, CliDefault, CliDispatchPlan,
+    CliEntryRecords, CliMode, CliOperand, CliOption, CliPackagePlan, CliPlanningMode, CliProgram,
+    CliRecordFieldsByLocal, CliRecordTypeRewrite, CliType, DefId, Diagnostic, FmirTextCliOperand,
+    FmirTextCliRootSection, FmirTextCliSection, FmirTextCliValueType, HashMap, HirItemKind, Host,
+    IndexExpr, InterfaceLibraryIdentity, InterfaceNominalKind, Interner, MirConstant, MirOperand,
+    MirRuntimeRecordField, MirRuntimeRecordValue, MirType, ModuleId, PlannedCliOperand,
+    PlannedCliOption, Resolver, Symbol, SymbolKind, Type, TypeId, TypeTable, cli_default_value,
+    cli_operand_consumes_many, cli_operand_record_fields, cli_option_is_nullable, cli_option_value,
+    cli_record_type, command_has_unsupported_options, command_in_unit, command_unit_id,
+    has_unsupported_package_mir_operands, is_package_mir_supported_option, matching_cli_command,
+    package_mir_cli_exit_code, plan_cli_command_records, push_cli_option_default_diagnostic,
+    unsupported_cli_diagnostic,
+};
 use radix_module::driver::AnalyzedModule;
 use radix_module::file_interface::{FileExportKind, FileInterface};
 
@@ -487,50 +500,47 @@ pub(super) fn parse_cli_arguments_with_mode(
                 argument_index += 1;
                 continue;
             }
-            let raw = match inline_value {
-                Some(value) => value,
-                None => {
-                    argument_index += 1;
-                    let Some(value) = argumenta.get(argument_index) else {
-                        push_cli_option_missing_value_diagnostic(unit, argument, diagnostics);
-                        return None;
-                    };
-                    value.clone()
-                }
+            let raw = if let Some(value) = inline_value {
+                value
+            } else {
+                argument_index += 1;
+                let Some(value) = argumenta.get(argument_index) else {
+                    push_cli_option_missing_value_diagnostic(unit, argument, diagnostics);
+                    return None;
+                };
+                value.clone()
             };
             option_fields[option_index].value =
                 MirRuntimeRecordValue::Operand(cli_option_value(unit, option, &raw, diagnostics)?);
             argument_index += 1;
             continue;
         }
-        if let Some(name) = argument.strip_prefix('-') {
-            if !name.is_empty() {
-                let Some(option_index) = options
-                    .iter()
-                    .position(|option| option.option.short.as_deref() == Some(name))
-                else {
-                    push_cli_option_match_diagnostic(unit, argument, diagnostics);
-                    return None;
-                };
-                let option = &options[option_index];
-                if option.option.flag {
-                    option_fields[option_index].value = MirRuntimeRecordValue::Operand(
-                        MirOperand::Constant(MirConstant::Bool(true)),
-                    );
-                    argument_index += 1;
-                    continue;
-                }
-                argument_index += 1;
-                let Some(raw) = argumenta.get(argument_index) else {
-                    push_cli_option_missing_value_diagnostic(unit, argument, diagnostics);
-                    return None;
-                };
-                option_fields[option_index].value = MirRuntimeRecordValue::Operand(
-                    cli_option_value(unit, option, raw, diagnostics)?,
-                );
+        if let Some(name) = argument.strip_prefix('-')
+            && !name.is_empty()
+        {
+            let Some(option_index) = options
+                .iter()
+                .position(|option| option.option.short.as_deref() == Some(name))
+            else {
+                push_cli_option_match_diagnostic(unit, argument, diagnostics);
+                return None;
+            };
+            let option = &options[option_index];
+            if option.option.flag {
+                option_fields[option_index].value =
+                    MirRuntimeRecordValue::Operand(MirOperand::Constant(MirConstant::Bool(true)));
                 argument_index += 1;
                 continue;
             }
+            argument_index += 1;
+            let Some(raw) = argumenta.get(argument_index) else {
+                push_cli_option_missing_value_diagnostic(unit, argument, diagnostics);
+                return None;
+            };
+            option_fields[option_index].value =
+                MirRuntimeRecordValue::Operand(cli_option_value(unit, option, raw, diagnostics)?);
+            argument_index += 1;
+            continue;
         }
         if stop_at_first_positional {
             return Some(ParsedCliArguments {
@@ -942,7 +952,7 @@ pub(super) struct NominalImportContext<'a> {
     /// Source nominal `DefId` → unified entry `TypeId`.
     pub nominal_map: &'a HashMap<DefId, TypeId>,
     /// Source struct/enum/variant `DefId` → merged dest, so interned types
-    /// carry the same DefId as remapped aggregates and projections.
+    /// carry the same `DefId` as remapped aggregates and projections.
     pub def_remap: &'a HashMap<DefId, DefId>,
     /// Source nominal `DefId` → (kind, export name). Intern falls back to
     /// `shared_nominals` so leftover unions unify by name instead of minting
@@ -1001,7 +1011,7 @@ pub(super) fn intern_param_symbols(
 /// nominal's own module identity (mirror of the snapshot side); for the source
 /// unit's own exported nominals that is the source module identity.
 ///
-/// Fail-closed (council-11 correct_before_next_phase): an identity-bearing
+/// Fail-closed (council-11 `correct_before_next_phase)`: an identity-bearing
 /// nominal of a module the entry analysis knows must never silently keep its
 /// source-local identity — a canonical-table miss for such a nominal returns
 /// an unknown-identity error. Modules the entry never imported, identity-less
@@ -1074,7 +1084,7 @@ pub(super) fn build_nominal_remap(
 /// enum export name), which maps to the consumer enum `DefId`; the consumer
 /// variant then resolves by name through `variant_child`.
 ///
-/// Fail-closed (council-11 correct_before_next_phase): an identity-bearing
+/// Fail-closed (council-11 `correct_before_next_phase)`: an identity-bearing
 /// variant of an enum whose module the entry analysis knows must never
 /// silently retain its source-local identity — an unresolved consumer variant
 /// returns an unknown-identity error. Enums of modules the entry never
@@ -1172,10 +1182,9 @@ fn fallback_entry_nominal_type(
     if !entry
         .resolver
         .imported_nominal_type_is_ambiguous(kind, name)
+        && let Some(ty) = entry.resolver.imported_nominal_type(kind, name)
     {
-        if let Some(ty) = entry.resolver.imported_nominal_type(kind, name) {
-            return Some(ty);
-        }
+        return Some(ty);
     }
     let expected = match kind {
         InterfaceNominalKind::Struct => SymbolKind::Struct,

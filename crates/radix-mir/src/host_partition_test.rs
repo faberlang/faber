@@ -881,7 +881,7 @@ fn synthetic_row(function_id: u32) -> (MirFunctionId, MirDeviceFunctionMetadata)
 #[test]
 fn derive_host_partition_without_carrier_yields_no_device_for_source_less_compute() {
     let mut types = TypeTable::new();
-    let mut interner = Interner::new();
+    let interner = Interner::new();
     let f32_ty = f32(&mut types);
     let program = MirProgram {
         functions: vec![private_synthetic_closure(1, f32_ty)],
@@ -901,7 +901,7 @@ fn derive_host_partition_without_carrier_yields_no_device_for_source_less_comput
 #[test]
 fn uncalled_private_synthetic_closure_never_becomes_a_launch_row() {
     let mut types = TypeTable::new();
-    let mut interner = Interner::new();
+    let interner = Interner::new();
     let f32_ty = f32(&mut types);
     let program = MirProgram {
         functions: vec![private_synthetic_closure(1, f32_ty)],

@@ -235,10 +235,12 @@ fn imported_shapes() → matrix<f32, [3, 3]> {
             d.is_error()
                 && matches!(
                     d.issue(),
-                    Some("expression_type_mismatch")
-                        | Some("initializer_annotation_mismatch")
-                        | Some("return_type_mismatch")
-                        | Some("numeric_operands_required")
+                    Some(
+                        "expression_type_mismatch"
+                            | "initializer_annotation_mismatch"
+                            | "return_type_mismatch"
+                            | "numeric_operands_required"
+                    )
                 )
         }),
         "no SEM010/SEM011 cascade may survive the emit route: {:?}",
@@ -379,14 +381,14 @@ targets = ["rust"]
     .expect("manifest");
     fs::write(
         provider.join("src/probe.fab"),
-        r#"
+        r"
 @ publica
 functio aperta() → vacuum {
 }
 @ interna
 functio clausa() → vacuum {
 }
-"#,
+",
     )
     .expect("lib");
 
@@ -430,11 +432,11 @@ targets = ["rust"]
     .expect("manifest");
     fs::write(
         provider.join("src/probe.fab"),
-        r#"
+        r"
 @ interna
 functio clausa() → vacuum {
 }
-"#,
+",
     )
     .expect("lib");
 
@@ -491,11 +493,11 @@ targets = ["rust"]
     .expect("manifest");
     fs::write(
         provider.join("src/probe.fab"),
-        r#"
+        r"
 @ publica
 functio aperta() → vacuum {
 }
-"#,
+",
     )
     .expect("lib");
 
@@ -604,10 +606,10 @@ targets = ["rust"]
     .expect("manifest");
     fs::write(
         provider.join("src/probe.fab"),
-        r#"
+        r"
 @ publica
 typus Nomen = textus
-"#,
+",
     )
     .expect("lib");
 
@@ -670,10 +672,10 @@ targets = ["rust"]
     .expect("manifest");
     fs::write(
         provider.join("src/probe.fab"),
-        r#"
+        r"
 @ interna
 typus Nomen = textus
-"#,
+",
     )
     .expect("lib");
 
@@ -734,9 +736,9 @@ targets = ["rust"]
     .expect("manifest");
     fs::write(
         provider.join("src/probe.fab"),
-        r#"
+        r"
 typus Nomen = textus
-"#,
+",
     )
     .expect("lib");
 
@@ -2400,7 +2402,7 @@ targets = ["rust"]
     .expect("manifest");
     fs::write(
         lib.join("src/canvas.fab"),
-        r#"
+        r"
 @ public
 class Point {
     int x
@@ -2410,7 +2412,7 @@ class Point {
 fn make_point(int x) → Point {
     return Point { x = x }
 }
-"#,
+",
     )
     .expect("provider source");
     fs::write(
@@ -2883,7 +2885,7 @@ fn interface_snapshot_projects_union_and_enum_variants() {
     // (SEM001.unknown_variant / SEM008 on imported union refs).
     let (program, interner) = super::parse_program_for_namespace_exports(
         "producer.fab",
-        r#"
+        r"
 @ publica
 discretio Eventum {
     Ictus { numerus vis },
@@ -2895,7 +2897,7 @@ ordo Gradus {
     Parvus,
     Magnus
 }
-"#,
+",
         None,
     )
     .expect("parse producer source");
@@ -3016,13 +3018,13 @@ targets = ["rust"]
     .expect("manifest");
     fs::write(
         provider.join("src/eventum.fab"),
-        r#"
+        r"
 @ publica
 discretio Eventum {
     Ictus { numerus vis },
     Sonitus
 }
-"#,
+",
     )
     .expect("eventum");
     let app = home.join("app.fab");
@@ -3332,13 +3334,13 @@ name = "probe"
     .expect("manifest");
     fs::write(
         home.join("kernels.fab"),
-        r#"
+        r"
 @ kernel
 @ public
 fn scala(float<f32> x) → float<f32> {
     return x + 1.0
 }
-"#,
+",
     )
     .expect("sibling kernels");
     let app = home.join("app.fab");
@@ -3354,10 +3356,7 @@ import from "./kernels" k
     let identities = package_identity_facts_for_path(&app, &config).expect("package identity facts for the consumer");
     assert_eq!(identities.module_segments, vec!["app".to_owned()]);
     assert_eq!(
-        identities
-            .imports
-            .get("k")
-            .map(|segments| segments.as_slice()),
+        identities.imports.get("k").map(std::vec::Vec::as_slice),
         Some(&["kernels".to_owned()][..])
     );
 

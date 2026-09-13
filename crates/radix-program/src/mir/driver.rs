@@ -1,6 +1,14 @@
 //! Package-MIR driver: prepare a package and lend it to a probe or lower it for a route.
 
-use super::*;
+use super::{
+    AnalyzedProgram, BTreeMap, CliPackagePlan, CliPlanningMode, Config, DefId,
+    DeviceManifestConfig, Diagnostic, HashMap, HirItemKind, LoweredMirUnit, MirIntrinsic,
+    MirProviderKind, MirRuntimeCall, MirSeams, MirStatementKind, ModuleId, PackageMirConsumer,
+    PackageMirLinks, Path, PathBuf, PreparedPackageMir, TestFunctionIds, TestPackageScope,
+    air_specialize, canonicalize_direct_definition_callees, collect_package_runtime_requirements,
+    local_namespace_call_targets, lower_package_units, mir_diag, mir_lowering_diag,
+    plan_cli_package, rewrite_unit_namespace_calls, validate_program,
+};
 
 struct PackageMirPreparation<'a> {
     config: &'a Config,
@@ -15,6 +23,8 @@ struct PackageMirPreparation<'a> {
 /// Package ownership remains inside radix-program so callers cannot retain
 /// validation references or reconstruct library resolution independently.
 /// Faber product seams enter through [`MirSeams`].
+/// # Errors
+/// Returns an error when the input or persisted artifact is invalid.
 pub fn with_lowered_package_mir<R>(
     config: &Config,
     input: &Path,
@@ -41,6 +51,8 @@ pub fn with_lowered_package_mir<R>(
 ///
 /// Test-facing probe: faber's device tests and the radix-program mir tests
 /// consume it through the seams.
+/// # Errors
+/// Returns an error when the input or persisted artifact is invalid.
 pub fn with_interpreted_lowered_package_mir<R>(
     config: &Config,
     input: &Path,
@@ -66,6 +78,10 @@ pub fn with_interpreted_lowered_package_mir<R>(
 /// is the named remapping/type-identity host. The local import closure of
 /// those roots is taken from [`AnalyzedProgram::imports`]. Library imports
 /// are linked through the normal interpreted consumer.
+/// # Errors
+/// Returns an error when the input or persisted artifact is invalid.
+/// # Panics
+/// Panics when required internal state is absent.
 pub fn with_linked_test_package_mir<R>(
     mut package: AnalyzedProgram,
     scope: &TestPackageScope,
@@ -76,7 +92,7 @@ pub fn with_linked_test_package_mir<R>(
     if package
         .diagnostics
         .iter()
-        .any(|diagnostic| diagnostic.is_error())
+        .any(radix_module::Diagnostic::is_error)
     {
         return Err(package.diagnostics);
     }
@@ -235,7 +251,7 @@ fn prepare_package_mir<R>(
     if package
         .diagnostics
         .iter()
-        .any(|diagnostic| diagnostic.is_error())
+        .any(radix_module::Diagnostic::is_error)
     {
         return Err(package.diagnostics);
     }

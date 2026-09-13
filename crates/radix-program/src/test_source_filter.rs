@@ -15,6 +15,7 @@ pub struct TestSourceFilter {
 }
 
 impl TestSourceFilter {
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         self.include.is_empty() && self.exclude.is_empty()
     }
@@ -24,6 +25,7 @@ impl TestSourceFilter {
     /// `faber test src/cache.proba` is a package route (manifest-backed root)
     /// and must not load every sibling `*.proba`. Exclude patterns from an
     /// existing filter are preserved; include is replaced by this file.
+    #[must_use]
     pub fn restricting_explicit_proba(
         existing: Option<&Self>,
         source_root: &Path,
@@ -38,11 +40,13 @@ impl TestSourceFilter {
     ///
     /// Product `*.fab` files are never filtered here — only callers should pass
     /// `*.proba` (or other test-only roots).
+    #[must_use]
     pub fn allows_path(&self, source_root: &Path, path: &Path) -> bool {
         let rel = relative_display(source_root, path);
         self.allows_relative(&rel)
     }
 
+    #[must_use]
     pub fn allows_relative(&self, rel: &str) -> bool {
         let rel = normalize_rel(rel);
         if !self.include.is_empty() {
@@ -86,6 +90,7 @@ fn relative_display(source_root: &Path, path: &Path) -> String {
 /// - no other metacharacters
 /// - if the pattern has no `/` and no `*`, also match when the file name equals
 ///   the pattern or `pattern.proba` / `pattern.fab`
+#[must_use]
 pub fn path_pattern_matches(pattern: &str, rel: &str) -> bool {
     let pattern = normalize_rel(pattern);
     let rel = normalize_rel(rel);

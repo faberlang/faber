@@ -367,7 +367,7 @@ fn strict_and_reflexive_equality_stay_distinct_for_floats() {
 
 #[test]
 fn canonical_hash_eligibility_fails_closed_without_a_settled_hash_law() {
-    let mut table = TypeTable::new();
+    let table = TypeTable::new();
     let num = table.primitive(Prim::Numerus);
     let queries = table_queries(table);
 

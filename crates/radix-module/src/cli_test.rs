@@ -34,7 +34,7 @@ fn analyze_mounted_source(source: &str, prefix: &[&str]) -> super::CliAnalysis {
     let result = parse_program(source);
     let prefix = prefix
         .iter()
-        .map(|segment| segment.to_string())
+        .map(std::string::ToString::to_string)
         .collect::<Vec<_>>();
     super::analyze_mounted_module(result.program.as_ref().expect("program"), &result.interner, &prefix)
 }

@@ -212,8 +212,7 @@ fn load_locale_pack_from_file(
 fn package_root_for_selection(spec: &PackageSpec, manifest_path: Option<&Path>) -> PathBuf {
     manifest_path
         .and_then(Path::parent)
-        .map(normalize_path)
-        .unwrap_or_else(|| spec.source_root.clone())
+        .map_or_else(|| spec.source_root.clone(), normalize_path)
 }
 
 /// Resolve a CLI reader locale to a pack for single-file emit while retaining

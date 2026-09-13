@@ -1122,7 +1122,7 @@ incipit {
 #[test]
 fn rust_target_accepts_elige_cape_attachments() {
     let session = test_session(Target::HirRust);
-    let source = r#"functio probe(numerus x) → vacuum {
+    let source = r"functio probe(numerus x) → vacuum {
   elige x {
     casu 1 {
       tacet
@@ -1134,7 +1134,7 @@ fn rust_target_accepts_elige_cape_attachments() {
 
 incipit {
   probe(1)
-}"#;
+}";
     let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
 
     assert!(result.success(), "{:?}", result.diagnostics);

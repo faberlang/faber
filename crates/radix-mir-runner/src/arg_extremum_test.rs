@@ -111,10 +111,7 @@ fn argmax_first_index_tie_law_is_the_parallel_combine_law() {
     // reproduce the full-scan winner for every split point.
     let full = [3.0_f64, 1.0, 3.0, 2.0, 3.0];
     for split in 1..full.len() {
-        let (left, right) = (
-            floats(&full[..split].to_vec()),
-            floats(&full[split..].to_vec()),
-        );
+        let (left, right) = (floats(&full[..split]), floats(&full[split..]));
         let left_winner = match argmax(left.clone()) {
             Value::Int(index) => {
                 let index = usize::try_from(index).expect("index");

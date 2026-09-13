@@ -165,10 +165,9 @@ pub(super) fn apply_tensor_intrinsic_shape_constraints(
             if let (Some(start), Some(end)) = (
                 static_numerus_literal(&args[0].expr),
                 static_numerus_literal(&args[1].expr),
-            ) {
-                if let Some(output) = sectio_axis0_shape(checker, input_shape, start, end) {
-                    checker.constrain_index_equal(result_shape, output, span);
-                }
+            ) && let Some(output) = sectio_axis0_shape(checker, input_shape, start, end)
+            {
+                checker.constrain_index_equal(result_shape, output, span);
             }
         }
         name if is_tensor_broadcast_elementwise(name) && args.len() == 1 => {

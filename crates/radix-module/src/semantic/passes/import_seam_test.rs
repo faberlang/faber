@@ -61,7 +61,7 @@ targets = ["rust"]
     .expect("manifest");
 }
 
-const TARGET_SOURCE: &str = r#"
+const TARGET_SOURCE: &str = r"
 @ publica
 functio aperta() → vacuum {
 }
@@ -76,7 +76,7 @@ functio secretum() → vacuum {
 
 functio occultum() → vacuum {
 }
-"#;
+";
 
 const CONSUMER_TEMPLATE: &str = r#"
 importa ex "{import}" {binding}
@@ -270,9 +270,11 @@ incipit {
         if home.join("norma/src/value.fab").is_file() {
             break home;
         }
-        if !home.pop() {
-            panic!("expected norma/src/value.fab as ancestor of {}", env!("CARGO_MANIFEST_DIR"));
-        }
+        assert!(
+            home.pop(),
+            "expected norma/src/value.fab as ancestor of {}",
+            env!("CARGO_MANIFEST_DIR")
+        );
     };
     let _guard = LibraryHomeGuard::set(&home);
     let result = crate::Compiler::new(crate::driver::Config::default()).compile(&app);

@@ -284,24 +284,23 @@ impl HirVisitorMut for LiftVisitor<'_> {
     }
 
     fn visit_expr_mut(&mut self, expr: &mut HirExpression) {
-        if self.in_air_function {
-            if let HirExpressionKind::MethodCall(_, method, _, args, _) = &mut expr.kind {
-                let method_name = self.interner.resolve(*method);
-                if is_higher_order_method(method_name) {
-                    if let Some(combine) = args.first_mut() {
-                        if matches!(combine.expr.kind, HirExpressionKind::Clausura(..)) {
-                            let placeholder = HirExpression {
-                                id: combine.expr.id,
-                                kind: HirExpressionKind::Error,
-                                ty: combine.expr.ty,
-                                span: combine.expr.span,
-                            };
-                            let closure = std::mem::replace(&mut combine.expr, placeholder);
-                            if let Ok(path) = self.lift_callback(closure) {
-                                combine.expr = path
-                            }
-                        }
-                    }
+        if self.in_air_function
+            && let HirExpressionKind::MethodCall(_, method, _, args, _) = &mut expr.kind
+        {
+            let method_name = self.interner.resolve(*method);
+            if is_higher_order_method(method_name)
+                && let Some(combine) = args.first_mut()
+                && matches!(combine.expr.kind, HirExpressionKind::Clausura(..))
+            {
+                let placeholder = HirExpression {
+                    id: combine.expr.id,
+                    kind: HirExpressionKind::Error,
+                    ty: combine.expr.ty,
+                    span: combine.expr.span,
+                };
+                let closure = std::mem::replace(&mut combine.expr, placeholder);
+                if let Ok(path) = self.lift_callback(closure) {
+                    combine.expr = path
                 }
             }
         }

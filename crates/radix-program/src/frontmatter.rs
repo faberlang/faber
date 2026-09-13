@@ -16,6 +16,7 @@ pub struct RustTestSelection {
     pub tag: Option<String>,
 }
 
+#[must_use]
 pub fn manifest_path_for_spec(spec: &PackageSpec) -> Option<PathBuf> {
     let direct = spec.source_root.join(MANIFEST_FILE);
     if direct.exists() {
@@ -51,6 +52,7 @@ fn frontmatter_manifest_conflict(
     )
 }
 
+#[must_use]
 pub fn validate_frontmatter_against_manifest(
     path: &Path,
     frontmatter: Option<&FileFrontmatter>,
@@ -62,72 +64,70 @@ pub fn validate_frontmatter_against_manifest(
     if let Some(target) = frontmatter.build_target() {
         // An unset manifest target is the implicit portable default; a
         // frontmatter target then applies without conflict.
-        if let Some(manifest_target) = manifest.build.target.as_deref() {
-            if let Some(diag) = frontmatter_manifest_conflict(
+        if let Some(manifest_target) = manifest.build.target.as_deref()
+            && let Some(diag) = frontmatter_manifest_conflict(
                 &file,
                 "[build].target",
                 target,
                 "target",
                 manifest_target,
-            ) {
-                return Some(diag);
-            }
-        }
-    }
-    if let Some(kind) = frontmatter.build_kind() {
-        if let Some(diag) =
-            frontmatter_manifest_conflict(&file, "[build].kind", kind, "kind", &manifest.build.kind)
+            )
         {
             return Some(diag);
         }
     }
+    if let Some(kind) = frontmatter.build_kind()
+        && let Some(diag) =
+            frontmatter_manifest_conflict(&file, "[build].kind", kind, "kind", &manifest.build.kind)
+    {
+        return Some(diag);
+    }
 
-    if let Some(name) = frontmatter.package_name() {
-        if let Some(diag) = frontmatter_manifest_conflict(
+    if let Some(name) = frontmatter.package_name()
+        && let Some(diag) = frontmatter_manifest_conflict(
             &file,
             "[package].name",
             name,
             "name",
             &manifest.package.name,
-        ) {
-            return Some(diag);
-        }
+        )
+    {
+        return Some(diag);
     }
-    if let Some(version) = frontmatter.package_version() {
-        if let Some(diag) = frontmatter_manifest_conflict(
+    if let Some(version) = frontmatter.package_version()
+        && let Some(diag) = frontmatter_manifest_conflict(
             &file,
             "[package].version",
             version,
             "version",
             &manifest.package.version,
-        ) {
-            return Some(diag);
-        }
+        )
+    {
+        return Some(diag);
     }
 
-    if let Some(source) = frontmatter.paths_source() {
-        if let Some(diag) = frontmatter_manifest_conflict(
+    if let Some(source) = frontmatter.paths_source()
+        && let Some(diag) = frontmatter_manifest_conflict(
             &file,
             "[paths].source",
             source,
             "paths.source",
             &manifest.paths.source,
-        ) {
-            return Some(diag);
-        }
+        )
+    {
+        return Some(diag);
     }
-    if let Some(entry) = frontmatter.paths_entry() {
-        if let Some(manifest_entry) = manifest.paths.entry.as_deref() {
-            if let Some(diag) = frontmatter_manifest_conflict(
-                &file,
-                "[paths].entry",
-                entry,
-                "paths.entry",
-                manifest_entry,
-            ) {
-                return Some(diag);
-            }
-        }
+    if let Some(entry) = frontmatter.paths_entry()
+        && let Some(manifest_entry) = manifest.paths.entry.as_deref()
+        && let Some(diag) = frontmatter_manifest_conflict(
+            &file,
+            "[paths].entry",
+            entry,
+            "paths.entry",
+            manifest_entry,
+        )
+    {
+        return Some(diag);
     }
 
     None
@@ -142,11 +142,9 @@ pub fn merge_entry_test_selection(
     let cli_overrides =
         selection.name.is_some() || selection.suite.is_some() || selection.tag.is_some();
 
-    if !cli_overrides {
-        if let Some(entry) = entry {
-            selection.suite = entry.sectio().map(str::to_owned);
-            selection.tag = entry.probanda_first_tag();
-        }
+    if !cli_overrides && let Some(entry) = entry {
+        selection.suite = entry.sectio().map(str::to_owned);
+        selection.tag = entry.probanda_first_tag();
     }
 
     (selection.name.is_some() || selection.suite.is_some() || selection.tag.is_some())

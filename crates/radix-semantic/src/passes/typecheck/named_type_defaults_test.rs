@@ -40,7 +40,7 @@ functio use_contract(Contract value) → numerus {
 #[test]
 fn explicit_prefix_and_full_named_type_arguments_share_the_descriptor_law() {
     test_support::assert_accepts(
-        r#"genus Pair<T, U = textus> {
+        r"genus Pair<T, U = textus> {
     T first
     U second
 }
@@ -63,20 +63,20 @@ functio sized_default(Sized value) → numerus {
 
 functio sized_explicit(Sized<8> value) → numerus {
     redde 1
-}"#,
+}",
     );
 }
 
 #[test]
 fn named_type_application_rejects_wrong_kind() {
     test_support::assert_rejects_with_issue(
-        r#"genus Box<T = textus> {
+        r"genus Box<T = textus> {
     T value
 }
 
 functio use(Box<4> value) → numerus {
     redde 1
-}"#,
+}",
         "generic_argument_kind_mismatch",
     );
 }
@@ -84,13 +84,13 @@ functio use(Box<4> value) → numerus {
 #[test]
 fn named_type_application_rejects_excess_arguments() {
     test_support::assert_rejects_with_issue(
-        r#"genus Box<T = textus> {
+        r"genus Box<T = textus> {
     T value
 }
 
 functio use(Box<numerus, textus> value) → numerus {
     redde 1
-}"#,
+}",
         "generic_argument_arity_mismatch",
     );
 }
@@ -98,14 +98,14 @@ functio use(Box<numerus, textus> value) → numerus {
 #[test]
 fn named_type_application_rejects_missing_required_arguments() {
     test_support::assert_rejects_with_issue(
-        r#"genus Pair<T, U = textus> {
+        r"genus Pair<T, U = textus> {
     T first
     U second
 }
 
 functio use(Pair value) → numerus {
     redde 1
-}"#,
+}",
         "generic_argument_arity_mismatch",
     );
 }

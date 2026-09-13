@@ -1,6 +1,11 @@
 //! Remap program text symbols across interner tables.
 
-use super::*;
+use super::{
+    Interner, MirAggregate, MirAggregateFields, MirAggregateItem, MirCallee, MirConstant,
+    MirFunction, MirOperand, MirOptionChainLink, MirOptionOp, MirPlace, MirProgram, MirProjection,
+    MirRuntimeCall, MirStatement, MirStatementKind, MirTerminator, MirTerminatorKind, MirValue,
+    MirValueKind, Symbol,
+};
 
 /// Remap a name symbol from the lowering interner into the merged interner.
 /// A symbol outside the source interner's string table is a GENERATED
@@ -106,7 +111,7 @@ pub(super) fn remap_terminator_text_symbols(
 ) {
     match &mut terminator.kind {
         MirTerminatorKind::Return(Some(operand)) | MirTerminatorKind::ReturnError(operand) => {
-            remap_operand_text_symbols(operand, source, target)
+            remap_operand_text_symbols(operand, source, target);
         }
         MirTerminatorKind::TryCall {
             destination,
@@ -125,7 +130,7 @@ pub(super) fn remap_terminator_text_symbols(
             remap_place_text_symbols(error_place, source, target);
         }
         MirTerminatorKind::Branch { condition, .. } => {
-            remap_operand_text_symbols(condition, source, target)
+            remap_operand_text_symbols(condition, source, target);
         }
         MirTerminatorKind::Switch { value, cases, .. } => {
             remap_operand_text_symbols(value, source, target);
@@ -147,7 +152,7 @@ pub(super) fn remap_value_text_symbols(
     match &mut value.kind {
         MirValueKind::Operand(operand) => remap_operand_text_symbols(operand, source, target),
         MirValueKind::Closure(closure) => {
-            remap_operand_text_symbols(&mut closure.environment, source, target)
+            remap_operand_text_symbols(&mut closure.environment, source, target);
         }
         MirValueKind::Unary { operand, .. } => remap_operand_text_symbols(operand, source, target),
         MirValueKind::Binary { lhs, rhs, .. } => {
@@ -198,7 +203,7 @@ pub(super) fn remap_callee_text_symbols(
 ) {
     match callee {
         MirCallee::Closure(closure) => {
-            remap_operand_text_symbols(&mut closure.environment, source, target)
+            remap_operand_text_symbols(&mut closure.environment, source, target);
         }
         MirCallee::Value(operand) => remap_operand_text_symbols(operand, source, target),
         MirCallee::Function(_) | MirCallee::Definition { .. } => {}
@@ -242,7 +247,7 @@ pub(super) fn remap_aggregate_text_symbols(
             for item in items {
                 match item {
                     MirAggregateItem::Operand(operand) | MirAggregateItem::Spread(operand) => {
-                        remap_operand_text_symbols(operand, source, target)
+                        remap_operand_text_symbols(operand, source, target);
                     }
                 }
             }

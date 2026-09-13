@@ -1265,7 +1265,7 @@ fn lean_checker_unroll_equivalence_full_verify_real_theorem() {
     // The real Line-1 harness check: lake build + sorry scan + transitive
     // allowlisted axiom audit over the generated unroll-equivalence theorem.
     let config = LeanAspectCheckerConfig::default();
-    let temp = PathBuf::from(std::env::temp_dir());
+    let temp = std::env::temp_dir();
     let checker = LeanAspectChecker::new(config, temp);
     let record = HirAspectRecord::recognized(
         HirAspectKind::UnrollEquivalence,
@@ -1493,7 +1493,7 @@ fn lean_checker_gate_purity_full_verify_real_theorem() {
     // The real Line-3 harness check: lake build + sorry scan + transitive
     // allowlisted axiom audit over the generated gate-purity theorem.
     let config = LeanAspectCheckerConfig::default();
-    let temp = PathBuf::from(std::env::temp_dir());
+    let temp = std::env::temp_dir();
     let checker = LeanAspectChecker::new(config, temp);
     let record = admitted_gate_purity_record();
     let report = HirAspectReport::from_records(HirAspectPrecondition::CheckedHir, vec![record]);

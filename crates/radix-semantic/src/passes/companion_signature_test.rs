@@ -254,9 +254,9 @@ fn generic_companion_probe_source(call: &str, declarations: &str) -> String {
 fn generic_companion_implicit_call_substitutes_tuple_return_shapes() {
     let source = generic_companion_probe_source(
         "fixum [gx, gw] ← loss_backward(x, w, nil(), upstream)\n    fixum f32 consumed ← consume(x, gw)\n    nota consumed",
-        r#"functio consume(tensor<f32, [2, 2]> gx, tensor<f32, [2, 2]> gw) → f32 {
+        r"functio consume(tensor<f32, [2, 2]> gx, tensor<f32, [2, 2]> gw) → f32 {
     redde 1.0
-}"#,
+}",
     );
     let result = analyze_result(&source);
     let errors = &result.diagnostics;

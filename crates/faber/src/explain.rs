@@ -384,10 +384,10 @@ impl Registry {
             for legacy in &entry.legacy {
                 // If a legacy spelling has its own non-canonical entry, prefer
                 // that full entry over a bare legacy alias.
-                if let Some(explicit_index) = self.terms.get(legacy) {
-                    if !self.entries[*explicit_index].canonical {
-                        continue;
-                    }
+                if let Some(explicit_index) = self.terms.get(legacy)
+                    && !self.entries[*explicit_index].canonical
+                {
+                    continue;
                 }
 
                 insert_unique(&mut self.legacy, legacy, index, "legacy alias")?;

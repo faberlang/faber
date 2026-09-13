@@ -475,12 +475,10 @@ impl TypeChecker<'_> {
         if matches!(
             self.types.get(target_resolved),
             Type::Primitive(Primitive::Regex)
-        ) {
-            if let Some(error_ty) =
-                self.check_regex_conversio(source, source_ty, recovery.is_some(), span)
-            {
-                return error_ty;
-            }
+        ) && let Some(error_ty) =
+            self.check_regex_conversio(source, source_ty, recovery.is_some(), span)
+        {
+            return error_ty;
         }
 
         if let Some(error_ty) = self.check_rejected_primitive_conversio(
@@ -525,10 +523,10 @@ impl TypeChecker<'_> {
         if let Some(result_ty) =
             self.check_lista_to_matrix_conversio(source, source_ty, target_carrier, span)
         {
-            if !self.types.equals(result_ty, self.error_type) {
-                if let Some(recovery) = recovery {
-                    self.note_conversio_recovery_checked(recovery, target_resolved);
-                }
+            if !self.types.equals(result_ty, self.error_type)
+                && let Some(recovery) = recovery
+            {
+                self.note_conversio_recovery_checked(recovery, target_resolved);
             }
             return self.conversio_written_identity(result_ty, target_carrier, target_resolved);
         }
@@ -536,34 +534,33 @@ impl TypeChecker<'_> {
         if let Some(result_ty) =
             self.check_register_conversio(source, source_ty, target_carrier, params, span)
         {
-            if !self.types.equals(result_ty, self.error_type) {
-                if let Some(recovery) = recovery {
-                    self.note_conversio_recovery_checked(recovery, target_resolved);
-                }
+            if !self.types.equals(result_ty, self.error_type)
+                && let Some(recovery) = recovery
+            {
+                self.note_conversio_recovery_checked(recovery, target_resolved);
             }
             return self.conversio_written_identity(result_ty, target_carrier, target_resolved);
         }
 
-        if !matches!(source.kind, HirExpressionKind::Array(_)) {
-            if let Some(result_ty) =
+        if !matches!(source.kind, HirExpressionKind::Array(_))
+            && let Some(result_ty) =
                 self.check_bounded_lista_to_vector_conversio(source_ty, target_carrier, span)
+        {
+            if !self.types.equals(result_ty, self.error_type)
+                && let Some(recovery) = recovery
             {
-                if !self.types.equals(result_ty, self.error_type) {
-                    if let Some(recovery) = recovery {
-                        self.note_conversio_recovery_checked(recovery, target_resolved);
-                    }
-                }
-                return self.conversio_written_identity(result_ty, target_carrier, target_resolved);
+                self.note_conversio_recovery_checked(recovery, target_resolved);
             }
+            return self.conversio_written_identity(result_ty, target_carrier, target_resolved);
         }
 
         if let Some(result_ty) =
             self.check_lista_to_vector_conversio(source, source_ty, target_carrier, span)
         {
-            if !self.types.equals(result_ty, self.error_type) {
-                if let Some(recovery) = recovery {
-                    self.note_conversio_recovery_checked(recovery, target_resolved);
-                }
+            if !self.types.equals(result_ty, self.error_type)
+                && let Some(recovery) = recovery
+            {
+                self.note_conversio_recovery_checked(recovery, target_resolved);
             }
             return self.conversio_written_identity(result_ty, target_carrier, target_resolved);
         }
@@ -590,17 +587,16 @@ impl TypeChecker<'_> {
         if let Some(row) = self
             .resolver
             .conversion_row_for(self.resolve_inferred_type(source_ty), target_resolved)
+            && let Some(fn_id) = row.fn_def_id
         {
-            if let Some(fn_id) = row.fn_def_id {
-                if let Some(channel) = self.functions.get(&fn_id).and_then(|sig| sig.err) {
-                    if let Some(recovery) = recovery {
-                        self.note_conversio_recovery_checked(recovery, target_resolved);
-                    } else {
-                        self.check_registered_row_channel(channel, span);
-                    }
+            if let Some(channel) = self.functions.get(&fn_id).and_then(|sig| sig.err) {
+                if let Some(recovery) = recovery {
+                    self.note_conversio_recovery_checked(recovery, target_resolved);
+                } else {
+                    self.check_registered_row_channel(channel, span);
                 }
-                return target_resolved;
             }
+            return target_resolved;
         }
 
         // All specialized checks above handle known conversion paths; anything
@@ -1118,11 +1114,11 @@ impl TypeChecker<'_> {
         ) {
             let from = crate::numeric_width::effective_width(self.types, source_ty);
             let to = crate::numeric_width::effective_width(self.types, target_resolved);
-            if let (Some(from), Some(to)) = (from, to) {
-                if NumericWidth::is_decimal_narrowing_conversio(from, to) {
-                    self.invalid_conversion(ISSUE_DECIMAL_NARROWING_REJECTED, span);
-                    return Some(self.error_type);
-                }
+            if let (Some(from), Some(to)) = (from, to)
+                && NumericWidth::is_decimal_narrowing_conversio(from, to)
+            {
+                self.invalid_conversion(ISSUE_DECIMAL_NARROWING_REJECTED, span);
+                return Some(self.error_type);
             }
         }
         let issue = match (
@@ -1365,13 +1361,12 @@ impl TypeChecker<'_> {
                     return Some(target_resolved);
                 }
 
-                if !has_recovery {
-                    if let Some(issue) =
+                if !has_recovery
+                    && let Some(issue) =
                         self.ascii_format_pack_const_issue(source, resolved_capacity, params)
-                    {
-                        self.invalid_conversion(issue, span);
-                        return Some(self.error_type);
-                    }
+                {
+                    self.invalid_conversion(issue, span);
+                    return Some(self.error_type);
                 }
                 Some(target_resolved)
             }
@@ -2701,14 +2696,12 @@ impl TypeChecker<'_> {
         // fields against `N ↦ 3`.
         if let Some(expected) = expected {
             let resolved_expected = self.resolve_inferred_type(expected);
-            if let Type::Applied(expected_base, _) = self.types.get(resolved_expected) {
-                if let Type::Struct(expected_def) =
+            if let Type::Applied(expected_base, _) = self.types.get(resolved_expected)
+                && let Type::Struct(expected_def) =
                     self.types.get(self.resolve_inferred_type(*expected_base))
-                {
-                    if *expected_def == def_id {
-                        return resolved_expected;
-                    }
-                }
+                && *expected_def == def_id
+            {
+                return resolved_expected;
             }
         }
         let witnesses =
@@ -2773,10 +2766,10 @@ impl TypeChecker<'_> {
             return;
         };
 
-        if let Some(width) = crate::literal_vector_width(width, self.types) {
-            if elements.len() != usize::from(width) {
-                self.wrong_arity("vector_constructor_width_arity", span);
-            }
+        if let Some(width) = crate::literal_vector_width(width, self.types)
+            && elements.len() != usize::from(width)
+        {
+            self.wrong_arity("vector_constructor_width_arity", span);
         }
 
         for element in elements {

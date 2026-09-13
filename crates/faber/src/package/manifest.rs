@@ -1,6 +1,6 @@
 //! Product view of the package manifest (`faber.toml`).
 //!
-//! RP2a: the compiler view (package identity, source paths, library identity,
+//! `RP2a`: the compiler view (package identity, source paths, library identity,
 //! build target, locale, dependencies, lock-resolved inputs) moved to
 //! `radix-program`. This module keeps the product-only manifest
 //! interpretation — `[device]`, `[product]`, `[dispatch]`,
@@ -103,7 +103,7 @@ pub struct ManifestDevice {
     #[serde(default)]
     pub inputs: BTreeMap<String, Vec<f64>>,
 
-    /// Declared training step count of the package's RepeatingStep device
+    /// Declared training step count of the package's `RepeatingStep` device
     /// program (S5-U5b). Defaults to 100 when absent; validated against the
     /// source training loop's constant bound at construction (a mismatch
     /// fails closed). `None` selects the portable default.
@@ -402,25 +402,25 @@ pub(crate) fn validate_manifest(
         }
     }
 
-    if let Some(entry) = manifest.paths.entry.as_deref() {
-        if entry.trim().is_empty() {
-            return Err(Box::new(
-                crate::package_diagnostic_error("faber.toml paths.entry must not be empty")
-                    .with_file(path.display().to_string()),
-            ));
-        }
+    if let Some(entry) = manifest.paths.entry.as_deref()
+        && entry.trim().is_empty()
+    {
+        return Err(Box::new(
+            crate::package_diagnostic_error("faber.toml paths.entry must not be empty")
+                .with_file(path.display().to_string()),
+        ));
     }
 
-    if let Some(library) = &manifest.library {
-        if !is_valid_provider_segment(&library.provider) {
-            return Err(Box::new(
+    if let Some(library) = &manifest.library
+        && !is_valid_provider_segment(&library.provider)
+    {
+        return Err(Box::new(
                 crate::package_diagnostic_error(
                     "faber.toml library.provider must contain only ASCII letters, numbers, underscore, or hyphen",
                 )
                 .with_file(path.display().to_string())
                 .with_arg("issue", "invalid_library_provider"),
             ));
-        }
     }
 
     match manifest.build.kind.as_str() {
@@ -448,28 +448,28 @@ pub(crate) fn validate_manifest(
     // at package load — a zero count is a contradiction (a RepeatingStep
     // program must drive at least one step) and fails closed early, never
     // silently ignored.
-    if let Some(steps) = manifest.device.steps {
-        if steps == 0 {
-            return Err(Box::new(
-                crate::package_diagnostic_error("faber.toml device.steps must be at least 1")
-                    .with_file(path.display().to_string())
-                    .with_arg("issue", "package_device_steps_zero")
-                    .with_arg("steps", steps.to_string()),
-            ));
-        }
+    if let Some(steps) = manifest.device.steps
+        && steps == 0
+    {
+        return Err(Box::new(
+            crate::package_diagnostic_error("faber.toml device.steps must be at least 1")
+                .with_file(path.display().to_string())
+                .with_arg("issue", "package_device_steps_zero")
+                .with_arg("steps", steps.to_string()),
+        ));
     }
 
     if let Some(product) = &manifest.product {
         validate_product(product, path)?;
     }
 
-    if let Some(locale) = manifest.locale.locale.as_deref() {
-        if locale.trim().is_empty() {
-            return Err(Box::new(
-                crate::package_diagnostic_error("faber.toml locale must not be empty")
-                    .with_file(path.display().to_string()),
-            ));
-        }
+    if let Some(locale) = manifest.locale.locale.as_deref()
+        && locale.trim().is_empty()
+    {
+        return Err(Box::new(
+            crate::package_diagnostic_error("faber.toml locale must not be empty")
+                .with_file(path.display().to_string()),
+        ));
     }
 
     if let Some(pack) = manifest.locale.pack.as_deref() {
@@ -538,16 +538,16 @@ pub(crate) fn validate_manifest(
                     .with_arg("issue", "invalid_target_table"),
             ));
         }
-        if let Some(bindings) = config.bindings.as_deref() {
-            if bindings.trim().is_empty() {
-                return Err(Box::new(
-                    crate::package_diagnostic_error(
-                        "faber.toml target bindings path must not be empty",
-                    )
-                    .with_file(path.display().to_string())
-                    .with_arg("issue", "invalid_target_bindings"),
-                ));
-            }
+        if let Some(bindings) = config.bindings.as_deref()
+            && bindings.trim().is_empty()
+        {
+            return Err(Box::new(
+                crate::package_diagnostic_error(
+                    "faber.toml target bindings path must not be empty",
+                )
+                .with_file(path.display().to_string())
+                .with_arg("issue", "invalid_target_bindings"),
+            ));
         }
         if config.host.is_some() && target != "rust" {
             return Err(Box::new(

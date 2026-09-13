@@ -147,8 +147,7 @@ pub fn verify_library_bindings_with_probe_mode(
     let provider = manifest
         .library
         .as_ref()
-        .map(|library| library.provider.as_str())
-        .unwrap_or(&manifest.package.name);
+        .map_or(&manifest.package.name, |library| library.provider.as_str());
     let (package, declarations) = collect_binding_contracts(provider, package_root)?;
     validate_bindings(&binding_path, &binding_manifest, &declarations)?;
     let shim = validate_shim(package_root, &binding_path, &binding_manifest)?;

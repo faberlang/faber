@@ -61,6 +61,7 @@ fn module_segments(source_root: &Path, file: &Path) -> Vec<String> {
 /// - every other character (including `-`) becomes `_`
 /// - empty / all-separator → `m`
 /// - leading digit → prefix `m_`
+#[must_use]
 pub fn sanitize_rust_module_ident(segment: &str) -> String {
     let mut out = String::with_capacity(segment.len().max(1));
     for c in segment.chars() {

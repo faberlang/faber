@@ -39,11 +39,11 @@ main {
 
 #[test]
 fn kernel_closure_called_from_incipit_is_refused_by_runner() {
-    let source = r#"incipit {
+    let source = r"incipit {
     fixum _ kernel ← (numerus value) nucleum → numerus ∴ value * 2
     fixum numerus result ← kernel(21)
 }
-"#;
+";
     let mut host = BufferHost::default();
     let error = run_source(
         &Session::new(Config::default().with_target(Target::HirRust)),
@@ -63,7 +63,7 @@ fn kernel_closure_called_from_incipit_is_refused_by_runner() {
 
 #[test]
 fn nested_kernel_closure_call_is_refused_before_body_execution() {
-    let source = r#"functio wrapper() → vacuum {
+    let source = r"functio wrapper() → vacuum {
     fixum _ kernel ← (numerus value) nucleum → numerus ∴ value * 2
     fixum numerus result ← kernel(21)
 }
@@ -71,7 +71,7 @@ fn nested_kernel_closure_call_is_refused_before_body_execution() {
 incipit {
     wrapper()
 }
-"#;
+";
     let mut host = BufferHost::default();
     let error = run_source(
         &Session::new(Config::default().with_target(Target::HirRust)),

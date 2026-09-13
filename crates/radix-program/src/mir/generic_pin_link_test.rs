@@ -14,12 +14,12 @@ use radix_module::mir::{
 };
 use radix_module::semantic::{IndexExpr, Type};
 
-const PIN_UTIL: &str = r#"@ public
+const PIN_UTIL: &str = r"@ public
 fn gather<size V, size D, size T>(tensor<f32, [V, D]> table, list<int> ids) → tensor<f32, [T, D]> {
     const list<f32> flat ← table ↦ list<f32>
     return flat ↦ tensor<f32, [T, D]>
 }
-"#;
+";
 
 const PIN_MAIN: &str = r#"import from "./util" * as utilModule
 

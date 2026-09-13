@@ -12,7 +12,7 @@
 //! `run_loaded_package_fhir` (execution) — stay faber-side and consume the
 //! forwarded builder (ownership-freeze §5.3).
 //!
-//! FPF-5: the `.fhirpkg` write path emits the MessagePack envelope (package
+//! FPF-5: the `.fhirpkg` write path emits the `MessagePack` envelope (package
 //! schema v2); the retired v1 postcard envelope is never written.
 //!
 //! The format crate (`radix-hir-fhir`) owns the wire types and codec; this
@@ -58,12 +58,14 @@ pub struct PackageFhir {
 /// module table (paths, segments, entry flag, export names), the explicit
 /// local link table (binding → target module path), library references
 /// (binding/package/module — no absolute paths), dependency coordinates, and
-/// ordered per-unit artifacts. FPF-5: encoding is the MessagePack package
+/// ordered per-unit artifacts. FPF-5: encoding is the `MessagePack` package
 /// codec (schema v2) — the single writer, no postcard output.
 ///
 /// RP5: moved from `crates/faber/src/package/fhir.rs`; faber product seams
 /// (locale packs, manifest validation, library resolver construction) enter
 /// through [`AnalysisSeams`].
+/// # Errors
+/// Returns an error when the input or persisted artifact is invalid.
 pub fn build_package_fhir(
     config: &Config,
     input: &Path,
@@ -73,7 +75,7 @@ pub fn build_package_fhir(
     if package
         .diagnostics
         .iter()
-        .any(|diagnostic| diagnostic.is_error())
+        .any(radix_module::Diagnostic::is_error)
     {
         return Err(package.diagnostics);
     }
@@ -184,12 +186,10 @@ fn package_identity(
             edition: manifest.package.edition.clone(),
         },
         None => PackageIdentityWire {
-            name: package
-                .spec
-                .package_root
-                .file_name()
-                .map(|name| name.to_string_lossy().into_owned())
-                .unwrap_or_else(|| "package".to_owned()),
+            name: package.spec.package_root.file_name().map_or_else(
+                || "package".to_owned(),
+                |name| name.to_string_lossy().into_owned(),
+            ),
             version: "0.1.0".to_owned(),
             edition: "2026".to_owned(),
         },
@@ -222,12 +222,11 @@ fn dependency_records(
         let locked = locked_by_name.get(name.as_str());
         records.push(PackageDependencyWire {
             name: name.clone(),
-            version: locked
-                .map(|entry| entry.version.clone())
-                .unwrap_or_else(|| manifest_version.clone()),
-            lock_identity: locked
-                .map(|entry| entry.source.clone())
-                .unwrap_or_else(|| FHIR_PACKAGE_UNLOCKED_LOCK_IDENTITY.to_owned()),
+            version: locked.map_or_else(|| manifest_version.clone(), |entry| entry.version.clone()),
+            lock_identity: locked.map_or_else(
+                || FHIR_PACKAGE_UNLOCKED_LOCK_IDENTITY.to_owned(),
+                |entry| entry.source.clone(),
+            ),
             checksum: None,
         });
     }

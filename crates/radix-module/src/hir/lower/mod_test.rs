@@ -1730,11 +1730,11 @@ fn entry_statements(lowered: &crate::hir::LoweredProgram) -> &[crate::hir::HirSt
 #[test]
 fn unshadowed_lege_lowers_to_readline() {
     let (lowered, _, _) = lower_source(
-        r#"
+        r"
 incipit {
   fixum _ input ← lege
 }
-"#,
+",
     );
     let HirStatementKind::Local(local) = &entry_statements(&lowered)[0].kind else {
         panic!("expected local");
@@ -1805,11 +1805,11 @@ incipit {
 #[test]
 fn unshadowed_vacua_lowers_to_vacua() {
     let (lowered, _, _) = lower_source(
-        r#"
+        r"
 incipit {
   fixum lista<numerus> values ← vacua
 }
-"#,
+",
     );
     let HirStatementKind::Local(local) = &entry_statements(&lowered)[0].kind else {
         panic!("expected local");
@@ -1856,12 +1856,12 @@ incipit {
 #[test]
 fn vacua_call_lowers_to_call_on_path() {
     let (lowered, _, _) = lower_source(
-        r#"
+        r"
 functio vacua() → numerus { redde 1 }
 incipit {
   fixum _ x ← vacua()
 }
-"#,
+",
     );
     let function_def = lowered.hir.items[0].def_id;
     let HirStatementKind::Local(local) = &entry_statements(&lowered)[0].kind else {

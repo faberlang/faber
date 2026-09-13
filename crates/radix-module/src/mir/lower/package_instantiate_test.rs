@@ -1339,7 +1339,7 @@ fn minted_instance_substitutes_shape_size_param_to_concrete_integer() {
 
     let (monomorphizations, _) = instantiate_merged_generic_calls_with_devices_and_metadata(
         &mut program,
-        &[template.clone()],
+        std::slice::from_ref(&template),
         &generic_params,
         &mut types,
         &interner,

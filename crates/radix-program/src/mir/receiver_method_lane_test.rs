@@ -42,7 +42,7 @@ locale = "en"
     // are the executed-value oracles.
     fs::write(
         src.join("math.fab"),
-        r#"
+        r"
 @ public
 class Vector3 {
     int x
@@ -76,7 +76,7 @@ fn dot(ref Vector3 axis) → int {
 fn sample() → Vector3 {
     return Vector3 { x = 3, y = 4, z = 0 }
 }
-"#,
+",
     )
     .expect("write math.fab");
     fs::write(

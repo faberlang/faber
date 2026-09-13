@@ -161,22 +161,22 @@ impl TypeChecker<'_> {
         // `const _ r ← capta { ... }`: the monomorphic `_` hole binds to the
         // trap hole so the local's type is the solved union (the U-02 arm
         // would otherwise strand the `_` as an unbound pending member).
-        if expected_var.is_none() {
-            if let Some(expected) = expected {
-                let resolved = self.resolve_inferred_type(expected);
-                let mono_var = match self.types.get(resolved) {
-                    Type::Infer(var) => Some(*var),
-                    _ => None,
-                };
-                if let Some(mono_var) = mono_var {
-                    let hole = self.union_hole_type_id(var);
-                    self.bind_infer_with_diagnostic(
-                        mono_var,
-                        hole,
-                        span,
-                        ISSUE_TRAP_MEMBER_TYPE_MISMATCH,
-                    );
-                }
+        if expected_var.is_none()
+            && let Some(expected) = expected
+        {
+            let resolved = self.resolve_inferred_type(expected);
+            let mono_var = match self.types.get(resolved) {
+                Type::Infer(var) => Some(*var),
+                _ => None,
+            };
+            if let Some(mono_var) = mono_var {
+                let hole = self.union_hole_type_id(var);
+                self.bind_infer_with_diagnostic(
+                    mono_var,
+                    hole,
+                    span,
+                    ISSUE_TRAP_MEMBER_TYPE_MISMATCH,
+                );
             }
         }
 
@@ -355,13 +355,12 @@ impl TypeChecker<'_> {
         // (with `expected`); the final join keeps the hole open. The issue
         // tag mirrors `common_type`'s; a hole-vs-hole join short-circuits in
         // `unify_with_policy` before any diagnostic can fire.
-        if let Some(expected) = expected {
-            if self
+        if let Some(expected) = expected
+            && self
                 .infer_union_var_of(self.resolve_inferred_type(expected))
                 .is_some()
-            {
-                return self.unify_join(then_ty, else_ty, cond.span, "common_type_mismatch");
-            }
+        {
+            return self.unify_join(then_ty, else_ty, cond.span, "common_type_mismatch");
         }
 
         self.common_type(then_ty, else_ty, cond.span)
@@ -410,13 +409,12 @@ impl TypeChecker<'_> {
         // the same Binary(Is) shape as value equality. Promote only a known
         // variant path to the closed variant-member predicate; literals and
         // ordinary values retain their equality semantics.
-        if matches!(op, HirBinOp::Is | HirBinOp::IsNot) {
-            if let HirExpressionKind::Path(variant_def) = rhs.kind {
-                if self.variant_parent.contains_key(&variant_def) {
-                    let member = self.types.intern(Type::Struct(variant_def));
-                    return self.type_check_refinement(matches!(op, HirBinOp::Is), lhs, member);
-                }
-            }
+        if matches!(op, HirBinOp::Is | HirBinOp::IsNot)
+            && let HirExpressionKind::Path(variant_def) = rhs.kind
+            && self.variant_parent.contains_key(&variant_def)
+        {
+            let member = self.types.intern(Type::Struct(variant_def));
+            return self.type_check_refinement(matches!(op, HirBinOp::Is), lhs, member);
         }
         // `x non est nihil` narrows the taken branch; `x est nihil` narrows
         // the fallthrough.

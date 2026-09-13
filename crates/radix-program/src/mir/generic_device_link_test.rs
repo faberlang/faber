@@ -7,7 +7,7 @@
 //! joined route (identity + v2 contract), the concrete monomorphization key,
 //! registration dedup by key, and the fail-closed signature-only boundary.
 
-use super::*;
+use super::fs;
 
 const DEVICE_MATH_LIB: &str = r#"+++
 locale = "en"

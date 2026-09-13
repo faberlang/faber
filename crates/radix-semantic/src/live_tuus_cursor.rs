@@ -60,15 +60,15 @@ pub fn collect_live_tuus_cursor_locals<'a>(
 
     impl radix_hir::visit::HirVisitor for Collector<'_, '_> {
         fn visit_local(&mut self, local: &HirLocal) {
-            if let Some(init) = &local.init {
-                if let Some(payload) = tuus_cursor_method_payload(
+            if let Some(init) = &local.init
+                && let Some(payload) = tuus_cursor_method_payload(
                     init,
                     self.tuus_def_id,
                     self.resolve_symbol,
                     self.types,
-                ) {
-                    self.locals.insert(local.def_id, payload);
-                }
+                )
+            {
+                self.locals.insert(local.def_id, payload);
             }
             radix_hir::visit::walk_local(self, local);
         }

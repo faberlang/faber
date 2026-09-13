@@ -88,13 +88,13 @@ fn assert_size_witness(fixture: &AnalyzedFixture, binding: &ResolvedGenericBindi
 #[test]
 fn explicit_type_arg_beats_declared_default() {
     let fixture = compile(
-        r#"functio pick<T = textus>(T x) → T {
+        r"functio pick<T = textus>(T x) → T {
     redde x
 }
 
 incipit {
     fixum _ n ← pick<numerus>(1)
-}"#,
+}",
     );
     accepts(&fixture);
     let binding = binding_named(&fixture, "T");
@@ -105,13 +105,13 @@ incipit {
 #[test]
 fn inferred_witness_beats_declared_default() {
     let fixture = compile(
-        r#"functio pick<T = textus>(T x) → T {
+        r"functio pick<T = textus>(T x) → T {
     redde x
 }
 
 incipit {
     fixum _ n ← pick(1)
-}"#,
+}",
     );
     accepts(&fixture);
     let binding = binding_named(&fixture, "T");
@@ -139,13 +139,13 @@ incipit {
 #[test]
 fn size_param_absent_from_all_shapes_still_defaults() {
     let fixture = compile(
-        r#"functio sized<magnitudo D = 4>(numerus x) → numerus {
+        r"functio sized<magnitudo D = 4>(numerus x) → numerus {
     redde x
 }
 
 incipit {
     fixum _ n ← sized(7)
-}"#,
+}",
     );
     accepts(&fixture);
     let binding = binding_named(&fixture, "D");
@@ -156,13 +156,13 @@ incipit {
 #[test]
 fn partial_type_prefix_defaults_trailing_suffix() {
     let fixture = compile(
-        r#"functio duo<T, U = textus>(T a) → T {
+        r"functio duo<T, U = textus>(T a) → T {
     redde a
 }
 
 incipit {
     fixum _ n ← duo<numerus>(1)
-}"#,
+}",
     );
     accepts(&fixture);
     let explicit = binding_named(&fixture, "T");
@@ -176,13 +176,13 @@ incipit {
 #[test]
 fn partial_size_prefix_defaults_trailing_suffix() {
     let fixture = compile(
-        r#"functio tag<magnitudo M, magnitudo N = 2>(numerus x) → numerus {
+        r"functio tag<magnitudo M, magnitudo N = 2>(numerus x) → numerus {
     redde x
 }
 
 incipit {
     fixum _ n ← tag<9>(1)
-}"#,
+}",
     );
     accepts(&fixture);
     let explicit = binding_named(&fixture, "M");
@@ -196,13 +196,13 @@ incipit {
 #[test]
 fn mixed_sort_vector_records_defaults_for_both_kinds() {
     let fixture = compile(
-        r#"functio trio<T = textus, magnitudo D = 8>(numerus x) → numerus {
+        r"functio trio<T = textus, magnitudo D = 8>(numerus x) → numerus {
     redde x
 }
 
 incipit {
     fixum _ n ← trio(5)
-}"#,
+}",
     );
     accepts(&fixture);
     let typus = binding_named(&fixture, "T");
@@ -216,13 +216,13 @@ incipit {
 #[test]
 fn unresolved_size_param_without_default_still_rejected() {
     let fixture = compile(
-        r#"functio need<magnitudo D>(numerus x) → numerus {
+        r"functio need<magnitudo D>(numerus x) → numerus {
     redde x
 }
 
 incipit {
     fixum _ n ← need(1)
-}"#,
+}",
     );
     rejects_with_issue(&fixture, "cannot_infer_tensor_shape");
 }
@@ -230,13 +230,13 @@ incipit {
 #[test]
 fn unresolved_type_param_without_default_keeps_binding_incomplete() {
     let fixture = compile(
-        r#"functio open<T>() → T {
+        r"functio open<T>() → T {
     redde vacua
 }
 
 incipit {
     nota open()
-}"#,
+}",
     );
     // No explicit arg, no inference witness, no default: the slot stays
     // unresolved, so no complete resolved vector is recorded for the call.
@@ -270,13 +270,13 @@ incipit {
 #[test]
 fn natural_prefix_leading_with_typus_param_rejects_wrong_sort() {
     let fixture = compile(
-        r#"functio duo<T, magnitudo D = 4>(numerus x) → numerus {
+        r"functio duo<T, magnitudo D = 4>(numerus x) → numerus {
     redde x
 }
 
 incipit {
     fixum _ n ← duo<7>(1)
-}"#,
+}",
     );
     rejects_with_issue(&fixture, "generic_type_arg_sort");
 }
@@ -284,13 +284,13 @@ incipit {
 #[test]
 fn too_many_explicit_type_args_rejected() {
     let fixture = compile(
-        r#"functio one<T>(T x) → T {
+        r"functio one<T>(T x) → T {
     redde x
 }
 
 incipit {
     fixum _ x ← one<numerus, textus>(1)
-}"#,
+}",
     );
     rejects_with_issue(&fixture, "wrong_number_of_type_arguments");
 }
@@ -298,13 +298,13 @@ incipit {
 #[test]
 fn prefix_shorter_than_required_params_rejected() {
     let fixture = compile(
-        r#"functio duo<T, U>(T a, U b) → T {
+        r"functio duo<T, U>(T a, U b) → T {
     redde a
 }
 
 incipit {
     fixum _ n ← duo<numerus>(1, 2)
-}"#,
+}",
     );
     rejects_with_issue(&fixture, "wrong_number_of_type_arguments");
 }

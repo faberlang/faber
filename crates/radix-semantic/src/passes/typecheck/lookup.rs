@@ -323,19 +323,17 @@ impl TypeChecker<'_> {
     /// returns only declared contracts. Fallback collection methods and `ignotum`
     /// escape behavior are handled by call checking.
     pub fn lookup_method_signature(&self, receiver_ty: TypeId, name: Symbol) -> Option<FuncSig> {
-        if let Some(struct_def) = self.struct_def_from_type(receiver_ty) {
-            if let Some(info) = self.structs.get(&struct_def) {
-                if let Some(sig) = info.methods.get(&name) {
-                    return Some(sig.clone());
-                }
-            }
+        if let Some(struct_def) = self.struct_def_from_type(receiver_ty)
+            && let Some(info) = self.structs.get(&struct_def)
+            && let Some(sig) = info.methods.get(&name)
+        {
+            return Some(sig.clone());
         }
-        if let Some(interface_def) = self.interface_def_from_type(receiver_ty) {
-            if let Some(methods) = self.interfaces.get(&interface_def) {
-                if let Some(method) = methods.get(&name) {
-                    return Some(method.sig.clone());
-                }
-            }
+        if let Some(interface_def) = self.interface_def_from_type(receiver_ty)
+            && let Some(methods) = self.interfaces.get(&interface_def)
+            && let Some(method) = methods.get(&name)
+        {
+            return Some(method.sig.clone());
         }
         None
     }
@@ -674,23 +672,23 @@ impl TypeChecker<'_> {
                 // A bounded expected type is the literal's real carrier
                 // contract. Check concrete capacities here so a literal cannot
                 // silently widen to bare `ascii` before the assignment check.
-                if let Some(expected) = expected.map(|ty| self.resolve_inferred_type(ty)) {
-                    if let Type::BoundedAscii { capacity } = self.types.get(expected) {
-                        let capacity = self.resolve_index(*capacity);
-                        if let IndexExpr::Literal(capacity) = self.types.get_index(capacity) {
-                            if decoded.len() as u64 > *capacity {
-                                self.invalid_operand_types_with_args(
-                                    "ascii_literal_too_long",
-                                    span,
-                                    &[("capacity", capacity.to_string())],
-                                );
-                                return self.error_type;
-                            }
-                            // Keep the expected concrete carrier so Rust emit
-                            // constructs `AsciiN<N>` rather than widening the
-                            // literal to bare `Ascii`.
-                            return expected;
+                if let Some(expected) = expected.map(|ty| self.resolve_inferred_type(ty))
+                    && let Type::BoundedAscii { capacity } = self.types.get(expected)
+                {
+                    let capacity = self.resolve_index(*capacity);
+                    if let IndexExpr::Literal(capacity) = self.types.get_index(capacity) {
+                        if decoded.len() as u64 > *capacity {
+                            self.invalid_operand_types_with_args(
+                                "ascii_literal_too_long",
+                                span,
+                                &[("capacity", capacity.to_string())],
+                            );
+                            return self.error_type;
                         }
+                        // Keep the expected concrete carrier so Rust emit
+                        // constructs `AsciiN<N>` rather than widening the
+                        // literal to bare `Ascii`.
+                        return expected;
                     }
                 }
 

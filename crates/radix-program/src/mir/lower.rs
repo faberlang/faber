@@ -1,11 +1,30 @@
 //! Lower package units (and libraries) into the merged package MIR program.
 
-use super::*;
+use super::{
+    AnalyzedProgram, AnalyzedProgramNode, BTreeMap, CliEntryRecords, CliPackagePlan,
+    CliRecordTypeRewrite, DataMemberLink, DefId, Diagnostic, HashMap, HashSet, HirConst,
+    HirExpression, HirExpressionKind, HirId, HirItem, HirItemKind, HirLiteral, HirObjectField,
+    IndexExpr, InterfaceNominalKind, Interner, LibraryInterfaceCache, LibraryResolver,
+    LoweredMirUnit, MirAggregate, MirAggregateFields, MirAggregateItem, MirAggregateKind, MirBlock,
+    MirBlockId, MirCallee, MirClosureCallee, MirClosureEnvironment, MirClosureEnvironmentId,
+    MirClosureValue, MirConstant, MirFunction, MirFunctionId, MirIntrinsic, MirOperand,
+    MirOptionChainLink, MirOptionOp, MirPlace, MirProgram, MirProjection, MirRuntimeCall,
+    MirStatement, MirStatementKind, MirSwitchCase, MirTerminator, MirTerminatorKind, MirType,
+    MirValue, MirValueKind, ModuleId, NominalImportContext, PACKAGE_MIR_SYNTHETIC_DEF_BASE,
+    PackageMirLinks, Path, PathBuf, Primitive, Resolver, SourceRewrites, Symbol, Type, TypeId,
+    TypeTable, build_nominal_remap, build_variant_remap, exported_nominal_names,
+    extend_unmapped_library_sources, import_semantic_type_with_nominal, library_cached_analysis,
+    library_cached_file_interface, lower_analyzed_unit, mir_diag, mir_issue_diag,
+    mir_lowering_diag, push_type_rewrite, record_shared_nominals, remap_function_text_symbols,
+    remap_optional_symbol, remap_program_text_symbols, rewrite_analysis_namespace_calls,
+    rewrite_closure_environment_sources, rewrite_generic_param_sources, rewrite_program_sources,
+    rewrite_templates_sources, source_nominal_names, with_library_cached_analysis_mut,
+};
 use radix_module::file_interface::FileInterface;
 use radix_module::mir::{MirDeviceFunctionMetadataMap, MirFunctionSignature};
 
 /// Struct/enum/function validation metadata remapped from a sibling or
-/// library unit into the entry's DefId / TypeId / Symbol space.
+/// library unit into the entry's `DefId` / `TypeId` / Symbol space.
 ///
 /// Self-provider method bodies (gradus `t.get()`, `Tensor { dtype = … }`)
 /// lower against the source unit's metadata. Nested sibling nominals such as
@@ -391,14 +410,14 @@ fn remap_metadata_def(
     if let Some(mapped) = remap.get(&def) {
         return *mapped;
     }
-    if matches!(kind, MetadataDefKind::Nominal) {
-        if let Some(ty) = nominal_map.get(&def) {
-            match entry_types.get(*ty) {
-                Type::Struct(mapped) | Type::Enum(mapped) | Type::Interface(mapped) => {
-                    return *mapped;
-                }
-                _ => {}
+    if matches!(kind, MetadataDefKind::Nominal)
+        && let Some(ty) = nominal_map.get(&def)
+    {
+        match entry_types.get(*ty) {
+            Type::Struct(mapped) | Type::Enum(mapped) | Type::Interface(mapped) => {
+                return *mapped;
             }
+            _ => {}
         }
     }
     def
@@ -975,7 +994,10 @@ pub(super) fn lower_package_units<'a>(
                         return Ok(());
                     }
                 };
-                let mut lowered = match lower_analyzed_unit(analysis, Default::default()) {
+                let mut lowered = match lower_analyzed_unit(
+                    analysis,
+                    radix_module::mir::MirLoweringOptions::default(),
+                ) {
                     Ok(lowered) => lowered,
                     Err(errors) => {
                         diagnostics.extend(
@@ -995,12 +1017,11 @@ pub(super) fn lower_package_units<'a>(
                             return Ok(());
                         }
                     };
-                if let Some(bundle) = bundle {
-                    if let Err(message) = super::air_backward::apply(&mut lowered, bundle, no_fuse)
-                    {
-                        diagnostics.push(mir_lowering_diag(&library.path, message));
-                        return Ok(());
-                    }
+                if let Some(bundle) = bundle
+                    && let Err(message) = super::air_backward::apply(&mut lowered, bundle, no_fuse)
+                {
+                    diagnostics.push(mir_lowering_diag(&library.path, message));
+                    return Ok(());
                 }
                 remap_program_text_symbols(
                     &mut lowered.program,
@@ -1968,7 +1989,7 @@ fn rewrite_generic_identity(
 /// through the same `source_rewrites` map `rewrite_program_sources` applies
 /// to that unit's lowered program; sibling units pass the map, the entry
 /// unit passes `None` (its definitions are identity-keyed in the merged
-/// program). One DefId should never join two facts; if a rewrite collision
+/// program). One `DefId` should never join two facts; if a rewrite collision
 /// ever produced one, the last write is inert because the merged program's
 /// own `ensure_unique_definition_sources` guard rejects the underlying
 /// duplicate-source collision first.
@@ -1997,7 +2018,7 @@ fn collect_consumer_device_facts(
 }
 
 /// Join one unit's transferred imported-device route map to the merged
-/// synthetic template `DefId`s (KPC-WIRE done_when (c)).
+/// synthetic template `DefId`s (KPC-WIRE `done_when` (c)).
 ///
 /// The module-side map is keyed by import-item `DefId`; the linker's call
 /// table keys the same import item plus verb to the synthetic source the
@@ -2241,7 +2262,7 @@ fn rewrite_function_variant_defs(
 /// defs: every nominal the map sends to an entry-side `Type::{Struct,Enum,
 /// Interface}(def)` becomes a `(source DefId → entry DefId)` rewrite, so
 /// leftover unions intern under the merged identity instead of colliding on
-/// source-local DefIds (cache.fab `KvDtype` / `VLayout` / `LayerStructure`).
+/// source-local `DefIds` (cache.fab `KvDtype` / `VLayout` / `LayerStructure`).
 fn build_nominal_def_remap(
     nominal_map: &HashMap<DefId, TypeId>,
     entry_types: &TypeTable,
@@ -2280,10 +2301,10 @@ fn rewrite_function_struct_defs(function: &mut MirFunction, struct_remap: &HashM
             let MirStatementKind::Construct { aggregate, .. } = &mut statement.kind else {
                 continue;
             };
-            if let MirAggregateKind::Struct(def_id) = &mut aggregate.kind {
-                if let Some(rewritten) = struct_remap.get(def_id) {
-                    aggregate.kind = MirAggregateKind::Struct(*rewritten);
-                }
+            if let MirAggregateKind::Struct(def_id) = &mut aggregate.kind
+                && let Some(rewritten) = struct_remap.get(def_id)
+            {
+                aggregate.kind = MirAggregateKind::Struct(*rewritten);
             }
         }
     }
@@ -2310,10 +2331,10 @@ fn rewrite_statement_variant_defs(
             }
         }
         MirStatementKind::Construct { aggregate, .. } => {
-            if let MirAggregateKind::EnumVariant(def_id) = &mut aggregate.kind {
-                if let Some(rewritten) = variant_remap.get(def_id) {
-                    aggregate.kind = MirAggregateKind::EnumVariant(*rewritten);
-                }
+            if let MirAggregateKind::EnumVariant(def_id) = &mut aggregate.kind
+                && let Some(rewritten) = variant_remap.get(def_id)
+            {
+                aggregate.kind = MirAggregateKind::EnumVariant(*rewritten);
             }
             rewrite_aggregate_variant_defs(aggregate, variant_remap);
         }
@@ -2528,7 +2549,10 @@ pub(super) fn lower_unit<'a>(
             },
         )
     } else {
-        lower_analyzed_unit(&mut unit.analysis, Default::default())
+        lower_analyzed_unit(
+            &mut unit.analysis,
+            radix_module::mir::MirLoweringOptions::default(),
+        )
     };
     let mut lowered = result.map_err(|errors| {
         errors
@@ -2685,7 +2709,7 @@ fn function_id_overflow_diag(path: &Path, message: &str) -> Diagnostic {
 }
 
 /// Rebuild the validated-MIR token after package merging shifts IDs and
-/// appends functions/closure_environments. The prior token proved the
+/// appends `functions/closure_environments`. The prior token proved the
 /// pre-merge program; the merged program needs its own proof.
 pub(super) fn rebuild_merged_validated(
     merged: &mut LoweredMirUnit<'_>,
@@ -2730,20 +2754,20 @@ pub(super) fn ensure_unique_definition_sources(
             continue;
         };
         let identity = (function.name, function.span);
-        if let Some(existing) = seen.insert(source, identity) {
-            if existing != identity {
-                return Err(vec![
-                    mir_issue_diag(
-                        path,
-                        "package_mir_duplicate_function_source",
-                        format!(
-                            "package MIR link found duplicate function source def#{}",
-                            source.0
-                        ),
-                    )
-                    .with_arg("def_id", source.0.to_string()),
-                ]);
-            }
+        if let Some(existing) = seen.insert(source, identity)
+            && existing != identity
+        {
+            return Err(vec![
+                mir_issue_diag(
+                    path,
+                    "package_mir_duplicate_function_source",
+                    format!(
+                        "package MIR link found duplicate function source def#{}",
+                        source.0
+                    ),
+                )
+                .with_arg("def_id", source.0.to_string()),
+            ]);
         }
     }
     Ok(())
@@ -2762,6 +2786,8 @@ pub(super) fn ensure_unique_definition_sources(
 /// while preserving call identity. Generic (typed) or ambiguous edges stay
 /// `Definition` and are still rejected by the gate when they cross a
 /// boundary.
+/// # Errors
+/// Returns an error when the input or persisted artifact is invalid.
 pub fn canonicalize_direct_definition_callees(
     lowered: &mut LoweredMirUnit<'_>,
     diagnostic_path: &Path,
@@ -2889,7 +2915,7 @@ pub(super) fn shift_place_ids(place: &mut MirPlace, offset: u32) {
     for projection in &mut place.projections {
         match projection {
             MirProjection::ClosureCapture { environment, .. } => {
-                shift_environment_id(environment, offset)
+                shift_environment_id(environment, offset);
             }
             MirProjection::Index(operand) => shift_operand_ids(operand, offset),
             MirProjection::Field(_)
@@ -3045,10 +3071,10 @@ struct SyntheticReferenceCollector {
 
 impl radix_module::hir::visit::HirVisitor for SyntheticReferenceCollector {
     fn visit_expr(&mut self, expr: &HirExpression) {
-        if let HirExpressionKind::Path(def_id) = &expr.kind {
-            if def_id.0 >= PACKAGE_MIR_SYNTHETIC_DEF_BASE {
-                self.references.insert(*def_id);
-            }
+        if let HirExpressionKind::Path(def_id) = &expr.kind
+            && def_id.0 >= PACKAGE_MIR_SYNTHETIC_DEF_BASE
+        {
+            self.references.insert(*def_id);
         }
         radix_module::hir::visit::walk_expr(self, expr);
     }
@@ -3349,10 +3375,10 @@ fn reachable_library_function_set(
 ) -> (HashSet<MirFunctionId>, Vec<DefId>) {
     let mut work: Vec<MirFunctionId> = Vec::new();
     for function in &program.functions {
-        if let Some(source) = function.source {
-            if reachable_seed.contains(&source) {
-                work.push(function.id);
-            }
+        if let Some(source) = function.source
+            && reachable_seed.contains(&source)
+        {
+            work.push(function.id);
         }
     }
     let mut reachable = HashSet::new();

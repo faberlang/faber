@@ -1,6 +1,17 @@
 //! FMIR image construction and loading (source-built, text, and binary formats).
 
-use super::*;
+use super::{
+    DefId, Diagnostic, FMIR_TARGET_NAME, FMIR_TEXT_TARGET_NAME, FmirBinaryImageFile,
+    FmirDeviceSection, FmirImageError, FmirPackageImage, FmirPackageImageFormat,
+    FmirTextCliSection, FmirTextImageFile, FmirTextProgramSection, FmirTextRuntimeSection,
+    FmirTextSourcesSection, FmirTextToolchainSection, FmirTextTypesSection, HashMap, HashSet, Host,
+    LoweredMirUnit, MirClosureEnvironment, MirProgram, MirSeams, MirType,
+    PACKAGE_MIR_ARTIFACT_VERSION, PackageRunStats, Path, PathBuf, PreparedPackageMir, Symbol,
+    TypeTable, TypeTableSnapshot, bind_fmir_text_runtime_cli, check_fmir_runtime_requirements,
+    decode_binary_image, decode_text_image, encode_binary_image, encode_text_image, fnv64_hex, fs,
+    mir_diag, mir_issue_diag, relative_or_display, run_entry, run_entry_with_stats,
+    runner_diagnostics, source_identity,
+};
 
 /// Struct, variant, and closure validation metadata carried by in-memory package FMIR
 /// images (codex-gap S1 U2 VALUE members).
@@ -317,10 +328,10 @@ pub(super) fn run_fmir_package_image_with_stats<H: Host + ?Sized>(
     let result = outcome
         .result
         .map_err(|errors| runner_diagnostics(&image.diagnostic_path, errors));
-    if result.is_ok() {
-        if let Some(code) = image.exit_code {
-            host.exit(code);
-        }
+    if result.is_ok()
+        && let Some(code) = image.exit_code
+    {
+        host.exit(code);
     }
     Ok(PackageRunStats {
         stats: outcome.stats,
@@ -888,6 +899,8 @@ pub(super) fn fmir_image_decode_error(
     }
 }
 
+/// # Errors
+/// Returns an error when the input or persisted artifact is invalid.
 pub fn load_fmir_text_image(
     text: &str,
     path: &Path,
@@ -906,6 +919,8 @@ pub fn load_fmir_text_image(
     )
 }
 
+/// # Errors
+/// Returns an error when the input or persisted artifact is invalid.
 pub fn load_fmir_image(
     bytes: &[u8],
     path: &Path,

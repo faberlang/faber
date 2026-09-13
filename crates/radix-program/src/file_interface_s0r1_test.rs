@@ -19,7 +19,7 @@ use radix_module::semantic::SemanticParamMode;
 use radix_module::syntax::GenericParamKind;
 use std::collections::BTreeMap;
 
-const PROVIDER: &str = r#"@ publica
+const PROVIDER: &str = r"@ publica
 typus Vector<magnitudo N> = vector<fractus<f32>, N>
 
 @ publica
@@ -27,7 +27,7 @@ typus Wrapper<T> = lista<T>
 
 @ publica
 functio origin() → Vector<3>
-"#;
+";
 
 fn provider_interface() -> FileInterface {
     let session = Session::new(
@@ -220,11 +220,11 @@ functio bad() → math.Wrapper<3>
 /// match over `lista<numerus>` and `textus` arms solves the param to
 /// `lista<numerus> ∪ textus`. The export side does not wait for the solver —
 /// it materializes the union the interface snapshot receives.
-const SOLVED_UNION_PROVIDER: &str = r#"@ publica
+const SOLVED_UNION_PROVIDER: &str = r"@ publica
 functio probe(lista<numerus> ∪ textus u) → vacuum {
     tacet
 }
-"#;
+";
 
 fn solved_union_provider_interface() -> FileInterface {
     let session = Session::new(
@@ -357,7 +357,7 @@ fn export_probe_fixture_materializes_solved_union_param() {
 /// tensor shape witnesses are the declared `magnitudo` parameters. The
 /// same-unit concrete caller keeps orphan admission silent so the round trip
 /// proves the interface, not the admission family (PKG-ADM owns that).
-const TWIN_PROVIDER: &str = r#"@ publica
+const TWIN_PROVIDER: &str = r"@ publica
 functio gemma<magnitudo M, magnitudo K>(
     tensor<f32, [M, K]> x
 ) → tensor<f32, [M, K]> {
@@ -367,7 +367,7 @@ functio gemma<magnitudo M, magnitudo K>(
 functio appellans(tensor<f32, [4, 8]> x) → tensor<f32, [4, 8]> {
     redde gemma(x)
 }
-"#;
+";
 
 fn twin_provider_interface() -> FileInterface {
     let session = Session::new(

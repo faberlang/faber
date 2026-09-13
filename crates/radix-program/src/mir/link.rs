@@ -1,6 +1,16 @@
 //! Package-local namespace-call linking and rewrite passes.
 
-use super::*;
+use super::{
+    AnalyzedProgram, AnalyzedProgramNode, BTreeMap, BTreeSet, DataMemberLink, DefId, Diagnostic,
+    HashMap, HashSet, HirBlock, HirCallArg, HirCape, HirCasuArm, HirConst, HirExpression,
+    HirExpressionKind, HirItemKind, HirNonNullKind, HirObjectField, HirOptionalChainKind,
+    HirStatement, HirStatementKind, ImportResolution, Interner, LibraryImportBinding,
+    LibraryInterfaceCache, LibraryLinkTarget, LibraryResolver, MethodCallTargets,
+    NamespaceCallTargets, NamespaceDataMemberTargets, NamespaceExports,
+    PACKAGE_MIR_SYNTHETIC_DEF_BASE, PackageMirConsumer, PackageMirLinks, Path, PathBuf, Primitive,
+    Resolver, SourceRewrites, Symbol, Type, TypeId, TypeTable, is_bridged_norma_import_path,
+    library_cached_analysis, library_cached_file_interface, resolve_import,
+};
 use radix_module::hir::visit::{
     HirVisitor, HirVisitorMut, walk_expr, walk_expr_mut, walk_program_mut,
 };
@@ -23,12 +33,11 @@ struct SyntheticCalleeTypePass<'a> {
 
 impl HirVisitorMut for SyntheticCalleeTypePass<'_> {
     fn visit_expr_mut(&mut self, expr: &mut radix_module::hir::HirExpression) {
-        if let HirExpressionKind::Call(callee, ..) = &mut expr.kind {
-            if let HirExpressionKind::Path(def_id) = callee.kind {
-                if let Some(function_ty) = self.method_types.get(&def_id).copied() {
-                    callee.ty = Some(function_ty);
-                }
-            }
+        if let HirExpressionKind::Call(callee, ..) = &mut expr.kind
+            && let HirExpressionKind::Path(def_id) = callee.kind
+            && let Some(function_ty) = self.method_types.get(&def_id).copied()
+        {
+            callee.ty = Some(function_ty);
         }
         walk_expr_mut(self, expr);
     }
@@ -69,10 +78,11 @@ impl HirVisitorMut for SyntheticCapeBindingPass<'_> {
                     ambiguous: false,
                 };
                 collector.visit_block(body);
-                if collector.has_failable && !collector.ambiguous {
-                    if let Some(error_ty) = collector.agreed {
-                        catch.binding_ty = Some(error_ty);
-                    }
+                if collector.has_failable
+                    && !collector.ambiguous
+                    && let Some(error_ty) = collector.agreed
+                {
+                    catch.binding_ty = Some(error_ty);
                 }
             }
         }
@@ -92,14 +102,14 @@ struct CapeFailableCollector<'a> {
 
 impl HirVisitor for CapeFailableCollector<'_> {
     fn visit_expr(&mut self, expr: &radix_module::hir::HirExpression) {
-        if let HirExpressionKind::Call(callee, ..) = &expr.kind {
-            if let Some(error_ty) = self.synthetic_callee_error_ty(callee) {
-                self.has_failable = true;
-                match self.agreed {
-                    None => self.agreed = Some(error_ty),
-                    Some(existing) if existing != error_ty => self.ambiguous = true,
-                    _ => {}
-                }
+        if let HirExpressionKind::Call(callee, ..) = &expr.kind
+            && let Some(error_ty) = self.synthetic_callee_error_ty(callee)
+        {
+            self.has_failable = true;
+            match self.agreed {
+                None => self.agreed = Some(error_ty),
+                Some(existing) if existing != error_ty => self.ambiguous = true,
+                _ => {}
             }
         }
         walk_expr(self, expr);
@@ -195,7 +205,7 @@ fn synthetic_method_function_types(
     {
         methods_by_receiver.insert(def_id, struct_methods);
     }
-    for ((receiver_def, method_name), _synthetic) in methods {
+    for (receiver_def, method_name) in methods.keys() {
         let Some(struct_methods) = methods_by_receiver.get(receiver_def) else {
             continue;
         };
@@ -555,20 +565,18 @@ fn link_library_import_site(
         import_span: radix_module::lexer::Span::default(),
         module: module.clone(),
     };
-    let interface = match library_cached_file_interface(&import, library_resolver, library_cache) {
-        Ok(interface) => interface,
-        Err(_) => {
-            push_library_import_unsupported(
-                &mut links.diagnostics,
-                &site.caller_path,
-                &site.import_path,
-                PackageMirConsumer::Interpreted,
-            );
-            return;
-        }
+    let Ok(interface) = library_cached_file_interface(&import, library_resolver, library_cache)
+    else {
+        push_library_import_unsupported(
+            &mut links.diagnostics,
+            &site.caller_path,
+            &site.import_path,
+            PackageMirConsumer::Interpreted,
+        );
+        return;
     };
-    let functions = match library_cached_analysis(&import, library_resolver, library_cache) {
-        Ok(analysis) => {
+    let functions =
+        if let Ok(analysis) = library_cached_analysis(&import, library_resolver, library_cache) {
             let mut functions = analysis
                 .hir
                 .items
@@ -610,8 +618,7 @@ fn link_library_import_site(
                 });
             }
             functions
-        }
-        Err(_) => {
+        } else {
             push_library_import_unsupported(
                 &mut links.diagnostics,
                 &site.caller_path,
@@ -619,25 +626,25 @@ fn link_library_import_site(
                 PackageMirConsumer::Interpreted,
             );
             return;
-        }
-    };
-    let consts = match library_cached_analysis(&import, library_resolver, library_cache) {
-        Ok(analysis) => analysis
-            .hir
-            .items
-            .iter()
-            .filter_map(|item| {
-                let HirItemKind::Constant(konst) = &item.kind else {
-                    return None;
-                };
-                Some(ExportedConst {
-                    name: analysis.interner.resolve(konst.name).to_owned(),
-                    def_id: item.def_id,
-                    konst: konst.clone(),
+        };
+    let consts =
+        if let Ok(analysis) = library_cached_analysis(&import, library_resolver, library_cache) {
+            analysis
+                .hir
+                .items
+                .iter()
+                .filter_map(|item| {
+                    let HirItemKind::Constant(konst) = &item.kind else {
+                        return None;
+                    };
+                    Some(ExportedConst {
+                        name: analysis.interner.resolve(konst.name).to_owned(),
+                        def_id: item.def_id,
+                        konst: konst.clone(),
+                    })
                 })
-            })
-            .collect::<Vec<_>>(),
-        Err(_) => {
+                .collect::<Vec<_>>()
+        } else {
             push_library_import_unsupported(
                 &mut links.diagnostics,
                 &site.caller_path,
@@ -645,8 +652,7 @@ fn link_library_import_site(
                 PackageMirConsumer::Interpreted,
             );
             return;
-        }
-    };
+        };
     let exports = interface.exports.keys().cloned().collect::<BTreeSet<_>>();
     let library_path = module.interface_path.clone();
 
@@ -773,17 +779,15 @@ fn link_nested_library_imports(
     while library_index < links.libraries.len() {
         let library = links.libraries[library_index].import.clone();
         library_index += 1;
-        let sites = match nested_library_import_sites(&library, library_resolver, library_cache) {
-            Ok(sites) => sites,
-            Err(_) => {
-                push_library_import_unsupported(
-                    &mut links.diagnostics,
-                    &library.module.interface_path,
-                    &library.module.package,
-                    PackageMirConsumer::Interpreted,
-                );
-                continue;
-            }
+        let Ok(sites) = nested_library_import_sites(&library, library_resolver, library_cache)
+        else {
+            push_library_import_unsupported(
+                &mut links.diagnostics,
+                &library.module.interface_path,
+                &library.module.package,
+                PackageMirConsumer::Interpreted,
+            );
+            continue;
         };
         for site in sites {
             if is_bridged_norma_import_path(&site.import_path) {
@@ -791,7 +795,13 @@ fn link_nested_library_imports(
             }
             match library_resolver.resolve(&site.import_path) {
                 Ok(Some(module)) => {
-                    link_library_import_site(links, &site, &module, library_resolver, library_cache)
+                    link_library_import_site(
+                        links,
+                        &site,
+                        &module,
+                        library_resolver,
+                        library_cache,
+                    );
                 }
                 Ok(None) | Err(_) => push_library_import_unsupported(
                     &mut links.diagnostics,
@@ -920,7 +930,7 @@ fn link_library_method_targets(
         sources.push(SourceStruct {
             source_path: library.path.clone(),
             identity: interface.identity.clone(),
-            methods: collect_methods(&interface, &analysis),
+            methods: collect_methods(&interface, analysis),
         });
     }
 
@@ -1173,31 +1183,31 @@ pub(super) fn rewrite_analysis_namespace_calls(
     // definition in its own analysis, so the caller's `MethodCall` cannot
     // resolve through the caller's own genus table — the rewrite makes the
     // link explicit before lowering.
-    if let Some(methods) = method_targets.get(unit_path) {
-        if !methods.is_empty() {
-            // CG2-R08: recover the callee function type for every synthetic
-            // method-call target so a failable linked method keeps its
-            // try-call edge (a ty:None callee would lower as a plain call and
-            // orphan the cape handler's blocks, PKG001).
-            let method_function_types = synthetic_method_function_types(analysis, methods);
-            let mut rewriter = LibraryMethodCallRewriter {
-                types: &analysis.types,
-                interner: &analysis.interner,
-                methods,
-                method_function_types: &method_function_types,
-                diagnostics: Vec::new(),
-            };
-            radix_module::hir::visit::walk_program_mut(&mut rewriter, &mut analysis.hir);
-            if !rewriter.diagnostics.is_empty() {
-                return Err(rewriter
-                    .diagnostics
-                    .into_iter()
-                    .map(|message| {
-                        crate::package_diagnostic_error(message)
-                            .with_file(unit_path.display().to_string())
-                    })
-                    .collect());
-            }
+    if let Some(methods) = method_targets.get(unit_path)
+        && !methods.is_empty()
+    {
+        // CG2-R08: recover the callee function type for every synthetic
+        // method-call target so a failable linked method keeps its
+        // try-call edge (a ty:None callee would lower as a plain call and
+        // orphan the cape handler's blocks, PKG001).
+        let method_function_types = synthetic_method_function_types(analysis, methods);
+        let mut rewriter = LibraryMethodCallRewriter {
+            types: &analysis.types,
+            interner: &analysis.interner,
+            methods,
+            method_function_types: &method_function_types,
+            diagnostics: Vec::new(),
+        };
+        radix_module::hir::visit::walk_program_mut(&mut rewriter, &mut analysis.hir);
+        if !rewriter.diagnostics.is_empty() {
+            return Err(rewriter
+                .diagnostics
+                .into_iter()
+                .map(|message| {
+                    crate::package_diagnostic_error(message)
+                        .with_file(unit_path.display().to_string())
+                })
+                .collect());
         }
     }
     let mut diagnostics = Vec::new();
@@ -2331,25 +2341,21 @@ fn rewrite_namespace_variant_members(analysis: &mut radix_module::driver::Analyz
 
     impl HirVisitorMut for VariantMemberRewriter<'_> {
         fn visit_expr_mut(&mut self, expr: &mut HirExpression) {
-            if let HirExpressionKind::Field(object, field) = &expr.kind {
-                if let HirExpressionKind::Path(namespace_def) = &object.kind {
-                    if let Some(namespace) = self
-                        .resolver
-                        .get_symbol(*namespace_def)
-                        .map(|symbol| symbol.name)
-                    {
-                        if let Some((variant_def, _ty)) =
-                            self.resolver.namespace_file_variant(namespace, *field)
-                        {
-                            // The typechecker already assigned the variant's
-                            // value type (`Type::Enum(consumer enum def)`) to
-                            // the field expression; `lower_path` needs that
-                            // type to construct the consumer variant, so the
-                            // rewritten path keeps the expression's type.
-                            expr.kind = HirExpressionKind::Path(variant_def);
-                        }
-                    }
-                }
+            if let HirExpressionKind::Field(object, field) = &expr.kind
+                && let HirExpressionKind::Path(namespace_def) = &object.kind
+                && let Some(namespace) = self
+                    .resolver
+                    .get_symbol(*namespace_def)
+                    .map(|symbol| symbol.name)
+                && let Some((variant_def, _ty)) =
+                    self.resolver.namespace_file_variant(namespace, *field)
+            {
+                // The typechecker already assigned the variant's
+                // value type (`Type::Enum(consumer enum def)`) to
+                // the field expression; `lower_path` needs that
+                // type to construct the consumer variant, so the
+                // rewritten path keeps the expression's type.
+                expr.kind = HirExpressionKind::Path(variant_def);
             }
             walk_expr_mut(self, expr);
         }
@@ -2367,9 +2373,9 @@ pub(super) struct ShadowedAliasRewriter<'a> {
     pub(super) interner: &'a Interner,
     pub(super) targets: &'a NamespaceCallTargets,
     pub(super) imports: &'a HashMap<String, DefId>,
-    /// DefId → binding name for every definition introduced by HIR lowering
+    /// `DefId` → binding name for every definition introduced by HIR lowering
     /// (params, locals, itera/cape/pattern bindings, closure params, entry
-    /// args). These synthetic defs (>= 1_000_000) are never registered in the
+    /// args). These synthetic defs (>= `1_000_000`) are never registered in the
     /// resolver's symbol table, so this HIR-derived map is the only way to
     /// recover a synthetic receiver's name.
     pub(super) local_names: &'a HashMap<DefId, Symbol>,
@@ -2493,22 +2499,22 @@ impl ShadowedAliasRewriter<'_> {
             },
             _ => None,
         };
-        struct_def.map_or(false, |def| self.genus_methods.contains(&(def, method)))
+        struct_def.is_some_and(|def| self.genus_methods.contains(&(def, method)))
     }
 }
 impl HirVisitorMut for ShadowedAliasRewriter<'_> {
     fn visit_expr_mut(&mut self, expr: &mut HirExpression) {
         match &mut expr.kind {
             HirExpressionKind::Call(callee, _, args, _) => {
-                if let HirExpressionKind::Field(receiver, method) = &callee.kind {
-                    if let Some(synthetic) = self.import_target(receiver, *method, args.len()) {
-                        **callee = HirExpression {
-                            id: receiver.id,
-                            kind: HirExpressionKind::Path(synthetic),
-                            ty: None,
-                            span: receiver.span,
-                        };
-                    }
+                if let HirExpressionKind::Field(receiver, method) = &callee.kind
+                    && let Some(synthetic) = self.import_target(receiver, *method, args.len())
+                {
+                    **callee = HirExpression {
+                        id: receiver.id,
+                        kind: HirExpressionKind::Path(synthetic),
+                        ty: None,
+                        span: receiver.span,
+                    };
                 }
             }
             HirExpressionKind::MethodCall(receiver, method, type_args, args, _) => {

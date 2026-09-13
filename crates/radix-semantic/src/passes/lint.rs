@@ -563,17 +563,16 @@ impl HirVisitor for LintContext<'_> {
                 target,
                 entries,
             } => {
-                if entries.is_none() {
-                    if let Some(inner_ty) = source.ty {
-                        if self.types.equals(inner_ty, *target) {
-                            self.warnings.push((
-                                WarningKind::UnnecessaryCast,
-                                ISSUE_UNNECESSARY_CAST,
-                                expr.span,
-                                None,
-                            ));
-                        }
-                    }
+                if entries.is_none()
+                    && let Some(inner_ty) = source.ty
+                    && self.types.equals(inner_ty, *target)
+                {
+                    self.warnings.push((
+                        WarningKind::UnnecessaryCast,
+                        ISSUE_UNNECESSARY_CAST,
+                        expr.span,
+                        None,
+                    ));
                 }
                 walk_expr(self, expr);
             }

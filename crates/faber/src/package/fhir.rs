@@ -6,7 +6,7 @@
 //!
 //! - [`load_package_fhir`] loads a `.fhirpkg` envelope in a fresh process
 //!   with no lexer/parser/resolver/analyzer pass (FPF-5: the wire is the
-//!   MessagePack package envelope, schema v2; retired v1 postcard bytes are
+//!   `MessagePack` package envelope, schema v2; retired v1 postcard bytes are
 //!   rejected with the named legacy error);
 //! - [`loaded_package_to_analyzed`] rehydrates an [`AnalyzedProgram`] so the
 //!   existing Rust/FMIR/canonical-Faber assembly paths consume loaded units —
@@ -41,7 +41,7 @@ use std::path::{Path, PathBuf};
 
 /// Load a FHIR package artifact source-independently.
 ///
-/// The format crate's MessagePack decoder runs the legacy postcard
+/// The format crate's `MessagePack` decoder runs the legacy postcard
 /// rejection, the package version gate, per-unit gates (unit schema + F3 +
 /// U2.3 referential integrity + source-hash consistency), and package-level
 /// module/dependency/link checks; the radix loader reconstructs each unit's
@@ -202,8 +202,7 @@ pub(crate) fn loaded_package_to_analyzed(
     }
     let roots = entry
         .clone()
-        .map(|id| vec![id])
-        .unwrap_or_else(|| nodes.keys().cloned().collect());
+        .map_or_else(|| nodes.keys().cloned().collect(), |id| vec![id]);
 
     Ok(AnalyzedProgram {
         spec,

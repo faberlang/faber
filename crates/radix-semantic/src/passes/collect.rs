@@ -120,13 +120,12 @@ pub fn collect(
                     SymbolKind::Enum,
                 );
                 for member in &decl.members {
-                    if let Some(enum_def) = enum_def {
-                        if resolver
+                    if let Some(enum_def) = enum_def
+                        && resolver
                             .define_variant(enum_def, member.name.name, member.name.span)
                             .is_none()
-                        {
-                            duplicate_variant_error(&mut errors, member.name.span);
-                        }
+                    {
+                        duplicate_variant_error(&mut errors, member.name.span);
                     }
                 }
             }
@@ -139,13 +138,12 @@ pub fn collect(
                     SymbolKind::Enum,
                 );
                 for variant in &decl.variants {
-                    if let Some(enum_def) = enum_def {
-                        if resolver
+                    if let Some(enum_def) = enum_def
+                        && resolver
                             .define_variant(enum_def, variant.name.name, variant.name.span)
                             .is_none()
-                        {
-                            duplicate_variant_error(&mut errors, variant.name.span);
-                        }
+                    {
+                        duplicate_variant_error(&mut errors, variant.name.span);
                     }
                 }
             }

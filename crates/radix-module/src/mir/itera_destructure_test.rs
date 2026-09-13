@@ -20,7 +20,7 @@ fn session() -> Session {
 fn initializer_shape(source: &str, function_name: &str, names: &[&str]) -> Vec<String> {
     let mut unit = analyze_source(&session(), "itera-destructure.fab", source, AnalyzeRequest::default())
         .expect("fixture analyzes");
-    let lowered = lower_analyzed_unit(&mut unit, Default::default()).expect("fixture lowers to MIR");
+    let lowered = lower_analyzed_unit(&mut unit, MirLoweringOptions::default()).expect("fixture lowers to MIR");
     let function = lowered
         .program
         .functions
@@ -108,7 +108,7 @@ fn place_shape(place: &MirPlace, interner: &crate::lexer::Interner) -> String {
 fn assert_lowered_and_valid(source: &str) {
     let mut unit = analyze_source(&session(), "itera-destructure.fab", source, AnalyzeRequest::default())
         .expect("fixture analyzes");
-    let lowered = lower_analyzed_unit(&mut unit, Default::default()).expect("fixture lowers to MIR");
+    let lowered = lower_analyzed_unit(&mut unit, MirLoweringOptions::default()).expect("fixture lowers to MIR");
     validate_program(&lowered.program, lowered.validated.validation()).expect("fixture MIR validates");
 }
 
@@ -127,26 +127,26 @@ fn loop_binder_mir_matches_binding_position_for_each_pattern_form() {
     let cases = vec![
         (
             "array positional",
-            r#"
+            r"
 functio bind(lista<numerus> row) → vacuum {
     fixum [a, b] ← row
     tacet
 }
-"#,
-            r#"
+",
+            r"
 functio loopum(lista<lista<numerus>> rows) → vacuum {
     itera ex rows fixum [a, b] {
         tacet
     }
 }
-"#,
+",
             "bind",
             "loopum",
             vec!["a", "b"],
         ),
         (
             "object by-label",
-            r#"
+            r"
 genus Point {
     numerus x = 0
     numerus y = 0
@@ -156,8 +156,8 @@ functio bind(Point point) → vacuum {
     fixum {x ut left, y} ← point
     tacet
 }
-"#,
-            r#"
+",
+            r"
 genus Point {
     numerus x = 0
     numerus y = 0
@@ -168,45 +168,45 @@ functio loopum(lista<Point> points) → vacuum {
         tacet
     }
 }
-"#,
+",
             "bind",
             "loopum",
             vec!["left", "y"],
         ),
         (
             "array rest",
-            r#"
+            r"
 functio bind(lista<numerus> row) → vacuum {
     fixum [head, ceteri tail] ← row
     tacet
 }
-"#,
-            r#"
+",
+            r"
 functio loopum(lista<lista<numerus>> rows) → vacuum {
     itera ex rows fixum [head, ceteri tail] {
         tacet
     }
 }
-"#,
+",
             "bind",
             "loopum",
             vec!["head", "tail"],
         ),
         (
             "array underscore",
-            r#"
+            r"
 functio bind(lista<numerus> row) → vacuum {
     fixum [_, value] ← row
     tacet
 }
-"#,
-            r#"
+",
+            r"
 functio loopum(lista<lista<numerus>> rows) → vacuum {
     itera ex rows fixum [_, value] {
         tacet
     }
 }
-"#,
+",
             "bind",
             "loopum",
             vec!["value"],
@@ -222,7 +222,7 @@ functio loopum(lista<lista<numerus>> rows) → vacuum {
 
 #[test]
 fn itera_ex_rest_over_lista_of_listax_validates_and_runs() {
-    let source = r#"
+    let source = r"
 functio sum_rest(lista<lista<numerus>> rows) → numerus {
     varia numerus total ← 0
     itera ex rows fixum [head, ceteri tail] {
@@ -236,7 +236,7 @@ incipit {
     fixum lista<lista<numerus>> rows ← [[1, 2, 3], [4, 5, 6]]
     nota sum_rest(rows)
 }
-"#;
+";
     assert_lowered_and_valid(source);
     // Rest inherits the binding-position carrier semantics: `tail` is the
     // source list path, so this is 2 * (1 + 4), not a sliced-tail sum.
@@ -245,7 +245,7 @@ incipit {
 
 #[test]
 fn itera_ex_over_lista_of_tuples_validates_and_runs() {
-    let source = r#"
+    let source = r"
 functio sum_pairs(lista<iuncta<numerus, numerus>> pairs) → numerus {
     varia numerus total ← 0
     itera ex pairs fixum [left, right] {
@@ -261,14 +261,14 @@ incipit {
     ]
     nota sum_pairs(pairs)
 }
-"#;
+";
     assert_lowered_and_valid(source);
     assert_eq!(run(source), ["10"]);
 }
 
 #[test]
 fn itera_ex_over_lista_of_records_validates_and_runs() {
-    let source = r#"
+    let source = r"
 genus Point {
     numerus x = 0
     numerus y = 0
@@ -289,7 +289,7 @@ incipit {
     ]
     nota sum_points(points)
 }
-"#;
+";
     assert_lowered_and_valid(source);
     assert_eq!(run(source), ["10"]);
 }

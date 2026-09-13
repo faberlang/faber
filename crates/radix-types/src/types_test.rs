@@ -18,7 +18,7 @@ use crate::{
     primitive_type_specs, tensor_family_type_specs,
 };
 
-/// One unconstrained, default-free `typus` descriptor for FuncSig tests.
+/// One unconstrained, default-free `typus` descriptor for `FuncSig` tests.
 fn typus_param(symbol: radix_lexer::Symbol) -> GenericParamDescriptor {
     GenericParamDescriptor {
         name: symbol,
@@ -1298,7 +1298,7 @@ fn gpd2_descriptor_hash_agrees_with_equality() {
 #[test]
 fn gpd2_descriptor_serde_round_trip_preserves_fields() {
     let typus_default = {
-        let mut types = TypeTable::new();
+        let types = TypeTable::new();
         let numerus = types.primitive(Primitive::Numerus);
         SemanticGenericParamDefault::Typus(numerus)
     };

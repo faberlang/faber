@@ -32,12 +32,12 @@ targets = ["fhir"]
     .expect("manifest");
     fs::write(
         dir.join("src/lib.fab"),
-        r#"
+        r"
 @ public
 fn n() → int {
   return 1
 }
-"#,
+",
     )
     .expect("lib.fab");
     fs::write(

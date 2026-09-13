@@ -31,7 +31,7 @@ fn spawn_via_stub_cli(request: DeviceExecuteRequest, stdout: &str) -> HostSpawnE
 fn distributed_stub_cli() -> (tempfile::TempDir, PathBuf) {
     let dir = tempfile::tempdir().expect("tempdir");
     let path = dir.path().join("faber-host-macos-arm64");
-    let script = r##"#!/bin/sh
+    let script = r#"#!/bin/sh
 case "$*" in
   *"device-execute --backend cuda --distributed-image "*" --bind-count 1")
     printf '%s\n' '{"physical_device_count":1,"physical_device_ids":["cuda:test"],"virtual_partition_count":8,"virtual_partition_ids":["partition:0"],"fixture_identity_class":"virtual","transport_class":"host_staged","hardware_isolation_claimed":false,"bind_shape":"8:1","communication_graph_edge_count":3,"snapshot_id":"snapshot:test","logical_distributed_plan_hash":"sha256:logical","bound_distributed_plan_hash":"sha256:bound","transaction_state":"prepared"}'
@@ -39,7 +39,7 @@ case "$*" in
     ;;
   *) exit 64 ;;
 esac
-"##;
+"#;
     std::fs::write(&path, script).expect("write distributed stub");
     #[cfg(unix)]
     {
@@ -53,7 +53,7 @@ esac
 fn n1_distributed_stub_cli() -> (tempfile::TempDir, PathBuf) {
     let dir = tempfile::tempdir().expect("tempdir");
     let path = dir.path().join("faber-host-macos-arm64");
-    let script = r##"#!/bin/sh
+    let script = r#"#!/bin/sh
 case "$*" in
   *"device-execute --backend metal --distributed-image "*" --bind-count 1")
     printf '%s\n' '{"physical_device_count":1,"physical_device_ids":["metal:test"],"virtual_partition_count":1,"virtual_partition_ids":["implicit-local"],"fixture_identity_class":"virtual","transport_class":"none","hardware_isolation_claimed":false,"bind_shape":"1:1","communication_graph_edge_count":0,"snapshot_id":"snapshot:n1","logical_distributed_plan_hash":"sha256:logical-n1","bound_distributed_plan_hash":"sha256:bound-n1","transaction_state":"prepared"}'
@@ -61,7 +61,7 @@ case "$*" in
     ;;
   *) exit 64 ;;
 esac
-"##;
+"#;
     std::fs::write(&path, script).expect("write N=1 distributed stub");
     #[cfg(unix)]
     {
@@ -75,7 +75,7 @@ esac
 fn resident_stub_cli() -> (tempfile::TempDir, PathBuf) {
     let dir = tempfile::tempdir().expect("tempdir");
     let path = dir.path().join("faber-host-macos-arm64");
-    let script = r##"#!/bin/sh
+    let script = r#"#!/bin/sh
 IFS= read -r command || exit 2
 printf '%s\n' '{"operation":"load","lifecycle":{"prepares":1,"reuses":0,"resets":0,"releases":0,"module_reloads":0,"per_program_reallocs":0,"live_handles":3},"kernel_count":5219}'
 steps=0
@@ -95,7 +95,7 @@ while IFS= read -r command; do
     *) exit 2 ;;
   esac
 done
-"##;
+"#;
     std::fs::write(&path, script).expect("write resident stub");
     #[cfg(unix)]
     {
@@ -109,7 +109,7 @@ done
 fn pretty_error_resident_stub_cli() -> (tempfile::TempDir, PathBuf) {
     let dir = tempfile::tempdir().expect("tempdir");
     let path = dir.path().join("faber-host-macos-arm64");
-    let script = r##"#!/bin/sh
+    let script = r#"#!/bin/sh
 IFS= read -r command || exit 2
 cat <<'JSON'
 {
@@ -119,7 +119,7 @@ cat <<'JSON'
 }
 JSON
 exit 2
-"##;
+"#;
     std::fs::write(&path, script).expect("write pretty error resident stub");
     #[cfg(unix)]
     {
@@ -133,7 +133,7 @@ exit 2
 fn order_violation_stub_cli() -> (tempfile::TempDir, PathBuf) {
     let dir = tempfile::tempdir().expect("tempdir");
     let path = dir.path().join("faber-host-macos-arm64");
-    let script = r##"#!/bin/sh
+    let script = r#"#!/bin/sh
 loaded=0
 while IFS= read -r command; do
   case "$command" in
@@ -174,7 +174,7 @@ while IFS= read -r command; do
       ;;
   esac
 done
-"##;
+"#;
     std::fs::write(&path, script).expect("write order violation stub");
     #[cfg(unix)]
     {
@@ -500,9 +500,8 @@ fn resident_control_client_keeps_one_child_across_load_steps_reset_release() {
 fn resident_control_client_accepts_pretty_terminal_host_error() {
     let (_dir, host) = pretty_error_resident_stub_cli();
     let request = malformed_request();
-    let error = match open_device_session_at(&host, &request) {
-        Ok(_) => panic!("pretty terminal HostError must be surfaced structurally"),
-        Err(error) => error,
+    let Err(error) = open_device_session_at(&host, &request) else {
+        panic!("pretty terminal HostError must be surfaced structurally")
     };
     assert_eq!(error.code, "E_DEVICE_DESCRIPTOR");
     assert_eq!(error.message, "prepared session descriptor is invalid");
@@ -570,8 +569,8 @@ fn assert_bit_exact(inputs: &BTreeMap<u32, Vec<f32>>) {
     }
 }
 
-/// First spawn-wire divergence: packed GGUF word `0xff810000` (SmolLM2
-/// file offset 1_774_948) encoded as `"NaN"` and decoded as `0x7fc00000`.
+/// First spawn-wire divergence: packed GGUF word `0xff810000` (`SmolLM2`
+/// file offset `1_774_948`) encoded as `"NaN"` and decoded as `0x7fc00000`.
 #[test]
 fn spawn_inputs_preserve_smollm2_first_nan_payload() {
     const FIRST: u32 = 0xff81_0000;
@@ -627,7 +626,7 @@ fn weight_map_json_names_byte_ranges_not_payloads() {
     assert!(!text.contains("0xff810000"), "{text}");
 }
 
-/// Round-trip a real SmolLM2 packed prefix when the pinned GGUF is present.
+/// Round-trip a real `SmolLM2` packed prefix when the pinned GGUF is present.
 #[test]
 fn spawn_inputs_round_trip_smollm2_packed_prefix() {
     const PATH: &str = "~/ai/models/SmolLM2-360M-Instruct-Q4_K_M.gguf";

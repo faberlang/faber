@@ -23,7 +23,7 @@ fn run(source: &str) -> Vec<String> {
 
 #[test]
 fn queue_iteration_is_fifo_and_stack_iteration_is_top_first_lifo() {
-    let source = r#"
+    let source = r"
 incipit {
     varia queue<numerus> q ← vacua
     q.appende(1)
@@ -41,7 +41,7 @@ incipit {
         nota item
     }
 }
-"#;
+";
 
     assert_eq!(
         run(source),
@@ -52,7 +52,7 @@ incipit {
 
 #[test]
 fn queue_stack_elementwise_uses_live_window_kind_and_both_broadcast_directions() {
-    let source = r#"
+    let source = r"
 incipit {
     varia queue<numerus> q ← vacua
     q.appende(1)
@@ -83,7 +83,7 @@ incipit {
         nota item
     }
 }
-"#;
+";
 
     assert_eq!(
         run(source),
@@ -94,7 +94,7 @@ incipit {
 
 #[test]
 fn queue_stack_elementwise_live_length_mismatch_is_a_hard_runner_error() {
-    let source = r#"
+    let source = r"
 incipit {
     varia queue<numerus> q ← vacua
     q.appende(1)
@@ -103,7 +103,7 @@ incipit {
     r.appende(10)
     fixum queue<numerus> _ ← q + r
 }
-"#;
+";
     let mut host = BufferHost::default();
     let error = run_source(&session(), "queue-stack-arithmetic.fab", source, &mut host)
         .expect_err("different live queue lengths must reject");

@@ -1579,10 +1579,10 @@ fn inherited_pack_path(path: &Path, parent_id: &str) -> PathBuf {
         return PathBuf::from(parent_id);
     };
 
-    if path.file_name().and_then(|name| name.to_str()) == Some("pack.toml") {
-        if let Some(root) = dir.parent() {
-            return root.join(parent_id).join("pack.toml");
-        }
+    if path.file_name().and_then(|name| name.to_str()) == Some("pack.toml")
+        && let Some(root) = dir.parent()
+    {
+        return root.join(parent_id).join("pack.toml");
     }
 
     dir.join(format!("{parent_id}.toml"))
@@ -1835,13 +1835,13 @@ fn validate_intrinsics(pack: &LocalePack, issues: &mut Vec<LocalePackIssue>) {
             registered = true;
             let scope = surfaces_by_family.entry(entry.receiver).or_default();
             for surface in std::iter::once(&binding.canonical).chain(binding.aliases.iter()) {
-                if let Some(previous) = scope.insert(surface.clone(), key.clone()) {
-                    if &previous != key {
-                        issues.push(LocalePackIssue::DuplicateIntrinsicSurface {
-                            receiver: entry.receiver,
-                            surface: surface.clone(),
-                        });
-                    }
+                if let Some(previous) = scope.insert(surface.clone(), key.clone())
+                    && &previous != key
+                {
+                    issues.push(LocalePackIssue::DuplicateIntrinsicSurface {
+                        receiver: entry.receiver,
+                        surface: surface.clone(),
+                    });
                 }
             }
         }

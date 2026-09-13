@@ -794,10 +794,10 @@ impl HirVisitor for Collector<'_> {
     fn visit_local(&mut self, local: &HirLocal) {
         if local.mutable {
             self.facts.remove(&local.def_id);
-        } else if let Some(init) = &local.init {
-            if let Some(length) = static_length(init, self.interner, self.facts, self.types) {
-                self.facts.insert(local.def_id, length);
-            }
+        } else if let Some(init) = &local.init
+            && let Some(length) = static_length(init, self.interner, self.facts, self.types)
+        {
+            self.facts.insert(local.def_id, length);
         }
         radix_hir::visit::walk_local(self, local);
     }
@@ -1557,10 +1557,10 @@ fn block_accumulators(block: &HirBlock, body: &HirBlock) -> FxHashMap<DefId, Acc
 fn collect_straight_assigns(block: &HirBlock, assigned: &mut FxHashSet<DefId>) {
     for stmt in &block.statements {
         if let HirStatementKind::Expr(expr) = &stmt.kind {
-            if let HirExpressionKind::Assign(lhs, _) = &expr.kind {
-                if let HirExpressionKind::Path(def) = lhs.kind {
-                    assigned.insert(def);
-                }
+            if let HirExpressionKind::Assign(lhs, _) = &expr.kind
+                && let HirExpressionKind::Path(def) = lhs.kind
+            {
+                assigned.insert(def);
             }
             // A nested unroll unit splices straight-line lanes into this
             // block, so its body's assigns are accumulator updates here too.
@@ -1878,17 +1878,16 @@ fn emit_iteration(
     for stmt in &body.statements {
         match &stmt.kind {
             HirStatementKind::Expr(expr) => {
-                if let HirExpressionKind::Assign(lhs, rhs) = &expr.kind {
-                    if let HirExpressionKind::Path(acc) = lhs.kind {
-                        if let Some(info) = accumulators.get(&acc) {
-                            let mut rhs = rhs.as_ref().clone();
-                            remap_fresh_expr(&mut rhs, remap, ids);
-                            let new_def = ids.next_def();
-                            out.push(ssa_local(new_def, *info, rhs, stmt.span, interner, ids));
-                            remap.acc_current.insert(acc, new_def);
-                            continue;
-                        }
-                    }
+                if let HirExpressionKind::Assign(lhs, rhs) = &expr.kind
+                    && let HirExpressionKind::Path(acc) = lhs.kind
+                    && let Some(info) = accumulators.get(&acc)
+                {
+                    let mut rhs = rhs.as_ref().clone();
+                    remap_fresh_expr(&mut rhs, remap, ids);
+                    let new_def = ids.next_def();
+                    out.push(ssa_local(new_def, *info, rhs, stmt.span, interner, ids));
+                    remap.acc_current.insert(acc, new_def);
+                    continue;
                 }
                 let mut stmt = stmt.clone();
                 remap_fresh_stmt(&mut stmt, remap, ids);
@@ -1938,17 +1937,16 @@ fn emit_iteration(
     }
     if let Some(expr) = &body.expr {
         let mut expr = expr.clone();
-        if let HirExpressionKind::Assign(lhs, rhs) = &expr.kind {
-            if let HirExpressionKind::Path(acc) = lhs.kind {
-                if let Some(info) = accumulators.get(&acc) {
-                    let mut rhs = rhs.as_ref().clone();
-                    remap_fresh_expr(&mut rhs, remap, ids);
-                    let new_def = ids.next_def();
-                    out.push(ssa_local(new_def, *info, rhs, expr.span, interner, ids));
-                    remap.acc_current.insert(acc, new_def);
-                    return out;
-                }
-            }
+        if let HirExpressionKind::Assign(lhs, rhs) = &expr.kind
+            && let HirExpressionKind::Path(acc) = lhs.kind
+            && let Some(info) = accumulators.get(&acc)
+        {
+            let mut rhs = rhs.as_ref().clone();
+            remap_fresh_expr(&mut rhs, remap, ids);
+            let new_def = ids.next_def();
+            out.push(ssa_local(new_def, *info, rhs, expr.span, interner, ids));
+            remap.acc_current.insert(acc, new_def);
+            return out;
         }
         remap_fresh_expr(&mut expr, remap, ids);
         out.push(HirStatement {
@@ -2070,11 +2068,11 @@ struct AccRemap<'a> {
 
 impl HirVisitorMut for AccRemap<'_> {
     fn visit_expr_mut(&mut self, expr: &mut HirExpression) {
-        if let HirExpressionKind::Path(def) = &mut expr.kind {
-            if let Some(mapped) = self.acc_final.get(def) {
-                *def = *mapped;
-                return;
-            }
+        if let HirExpressionKind::Path(def) = &mut expr.kind
+            && let Some(mapped) = self.acc_final.get(def)
+        {
+            *def = *mapped;
+            return;
         }
         walk_expr_mut(self, expr);
     }
@@ -2082,10 +2080,10 @@ impl HirVisitorMut for AccRemap<'_> {
 
 fn freeze_accumulators(block: &mut HirBlock, acc_final: &FxHashMap<DefId, DefId>) {
     for stmt in &mut block.statements {
-        if let HirStatementKind::Local(local) = &mut stmt.kind {
-            if acc_final.contains_key(&local.def_id) {
-                local.mutable = false;
-            }
+        if let HirStatementKind::Local(local) = &mut stmt.kind
+            && acc_final.contains_key(&local.def_id)
+        {
+            local.mutable = false;
         }
     }
 }

@@ -118,13 +118,12 @@ fn empty_tensor_gather_ids(program: &mut crate::mir::MirProgram) -> usize {
                 })
                 .collect();
             for statement in &mut block.statements {
-                if let MirStatementKind::Construct { destination, aggregate } = &mut statement.kind {
-                    if let MirPlaceBase::Temp(id) = destination.base {
-                        if ids_temps.contains(&id) {
-                            aggregate.fields = MirAggregateFields::Ordered(Vec::new());
-                            emptied += 1;
-                        }
-                    }
+                if let MirStatementKind::Construct { destination, aggregate } = &mut statement.kind
+                    && let MirPlaceBase::Temp(id) = destination.base
+                    && ids_temps.contains(&id)
+                {
+                    aggregate.fields = MirAggregateFields::Ordered(Vec::new());
+                    emptied += 1;
                 }
             }
         }
@@ -313,7 +312,7 @@ incipit {
         AnalyzeRequest::default(),
     )
     .expect("exact tensor OOB source should analyze");
-    let lowered = crate::mir::lower_analyzed_unit(&mut analysis, Default::default())
+    let lowered = crate::mir::lower_analyzed_unit(&mut analysis, MirLoweringOptions::default())
         .expect("exact tensor OOB source should lower");
     let tensor_get = lowered
         .program
@@ -481,7 +480,7 @@ incipit {
 ";
     let mut analysis =
         analyze_source(&runner_session(), "gather_empty.fab", source, AnalyzeRequest::default()).expect("frontend");
-    let lowered = crate::mir::lower_analyzed_unit(&mut analysis, Default::default()).expect("lowering");
+    let lowered = crate::mir::lower_analyzed_unit(&mut analysis, MirLoweringOptions::default()).expect("lowering");
 
     let mut empty_program = lowered.program.clone();
     let emptied = empty_tensor_gather_ids(&mut empty_program);

@@ -1626,7 +1626,7 @@ fn iace_throw_never_consults_registry_seam() {
     checker.functions.insert(row_fn, row_sig);
     checker.current_error = Some(super::ErrorSink::Function(numerus));
 
-    let mut thrown = textus_literal_expr(1);
+    let thrown = textus_literal_expr(1);
     let mut throw_expr = HirExpression {
         id: HirId(2),
         kind: HirExpressionKind::Throw(Box::new(thrown)),

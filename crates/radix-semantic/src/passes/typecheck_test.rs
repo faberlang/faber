@@ -374,13 +374,13 @@ functio usus(Ligatio ligatio) → textus {
 #[test]
 fn callable_struct_field_member_call_checks_argument_count() {
     test_support::assert_rejects_with_issue(
-        r#"
+        r"
 genus Eventum { textus nomen }
 genus Ligatio { (Eventum) → textus nuntius }
 functio usus(Ligatio ligatio) → textus {
     redde ligatio.nuntius()
 }
-"#,
+",
         "wrong_number_of_arguments",
     );
 }

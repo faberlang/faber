@@ -22,6 +22,7 @@
 //!   faber-side; this crate only ever receives explicit homes.
 
 use std::collections::BTreeMap;
+use std::fmt::Write as _;
 use std::path::{Path, PathBuf};
 
 /// Locked package interface root used for build-time resolution.
@@ -219,6 +220,7 @@ impl LibraryResolver {
     /// `None` means no library home is available (deterministic for the same
     /// input); the faber side resolves `FABER_LIBRARY_HOME` / workspace probing
     /// and passes the result here.
+    #[must_use]
     pub fn with_optional_home(library_home: Option<PathBuf>) -> Self {
         Self {
             library_home,
@@ -228,6 +230,7 @@ impl LibraryResolver {
     }
 
     /// Attach declared dependencies and locked package interface roots.
+    #[must_use]
     pub fn with_package_lock(
         mut self,
         declared: BTreeMap<String, String>,
@@ -244,6 +247,8 @@ impl LibraryResolver {
     /// slash specifiers. For `norma`, malformed paths and missing interface
     /// files are reported as library diagnostics because the user clearly
     /// selected the built-in provider and should see available module names.
+    /// # Errors
+    /// Returns an error when the input or persisted artifact is invalid.
     pub fn resolve(
         &self,
         specifier: &str,
@@ -375,9 +380,7 @@ impl LibraryResolver {
         self.library_home.clone().ok_or_else(|| {
             LibraryResolveError::LibraryHomeMissing {
                 specifier: specifier.to_owned(),
-                hint: format!(
-                    "set FABER_LIBRARY_HOME to a directory containing provider repos, such as <home>/norma/src"
-                ),
+                hint: "set FABER_LIBRARY_HOME to a directory containing provider repos, such as <home>/norma/src".to_string(),
             }
         })
     }
@@ -469,6 +472,7 @@ fn is_valid_module_segment(segment: &str) -> bool {
             .all(|ch| ch.is_ascii_alphanumeric() || matches!(ch, '_' | '-'))
 }
 
+#[must_use]
 pub fn is_valid_provider_segment(segment: &str) -> bool {
     !segment.is_empty()
         && segment
@@ -598,6 +602,7 @@ impl Default for LibraryInterfaceCache {
 }
 
 impl LibraryInterfaceCache {
+    #[must_use]
     pub fn with_config(config: &Config) -> Self {
         Self {
             entries: BTreeMap::new(),
@@ -620,6 +625,8 @@ impl LibraryInterfaceCache {
     }
 }
 
+/// # Errors
+/// Returns an error when the input or persisted artifact is invalid.
 pub fn analysis_source_for_file(
     file: &PackageFile,
     _library_resolver: &LibraryResolver,
@@ -628,6 +635,8 @@ pub fn analysis_source_for_file(
     Ok(file.source.clone())
 }
 
+/// # Errors
+/// Returns an error when the input or persisted artifact is invalid.
 pub fn library_interface_export_surface(
     import: &LibraryImportBinding,
     library_resolver: &LibraryResolver,
@@ -646,6 +655,8 @@ pub fn library_interface_export_surface(
     Ok(surface)
 }
 
+/// # Errors
+/// Returns an error when the input or persisted artifact is invalid.
 pub fn library_interface_declaration_surface(
     import: &LibraryImportBinding,
     library_resolver: &LibraryResolver,
@@ -661,8 +672,7 @@ fn library_module_label(import: &LibraryImportBinding) -> String {
     import
         .module
         .module_name()
-        .map(str::to_owned)
-        .unwrap_or_else(|| import.module.package.clone())
+        .map_or_else(|| import.module.package.clone(), str::to_owned)
 }
 
 fn library_identity_key(identity: &LibraryIdentity) -> LibraryIdentityKey {
@@ -672,6 +682,7 @@ fn library_identity_key(identity: &LibraryIdentity) -> LibraryIdentityKey {
     }
 }
 
+#[must_use]
 pub fn synthetic_library_item_def_id(
     module: &ResolvedLibraryModule,
     exported_name: &str,
@@ -785,9 +796,10 @@ fn visit_transitive_library_import(
     let module_label = library_module_label(import);
 
     if walk.seen.contains(&key) {
-        if let Some(existing) = walk.seen_bindings.get(&key) {
-            if existing != &import.binding {
-                diagnostics.push(
+        if let Some(existing) = walk.seen_bindings.get(&key)
+            && existing != &import.binding
+        {
+            diagnostics.push(
                     crate::package_diagnostic_error(format!(
                         "library module `{module_label}` is imported under conflicting aliases `{existing}` and `{}`",
                         import.binding
@@ -799,7 +811,6 @@ fn visit_transitive_library_import(
                     .with_arg("alias", import.binding.clone())
                     .with_span(import.import_span),
                 );
-            }
         }
         return;
     }
@@ -952,7 +963,7 @@ fn read_and_parse_library_interface(
         );
         if let Some(err) = parse.errors.first() {
             let diagnostic = Diagnostic::from_parse_error(&display_name, peeled.body, err);
-            message.push_str(&format!(": {}", diagnostic.message));
+            let _ = write!(message, ": {}", diagnostic.message);
         }
         return Err(crate::package_diagnostic_error(message)
             .with_file(module.interface_path.display().to_string()));
@@ -991,6 +1002,8 @@ fn load_cached_library_interface<'a>(
     })
 }
 
+/// # Errors
+/// Returns an error when the input or persisted artifact is invalid.
 pub fn library_cached_file_interface(
     import: &LibraryImportBinding,
     library_resolver: &LibraryResolver,
@@ -1018,6 +1031,8 @@ pub fn library_cached_file_interface(
         })
 }
 
+/// # Errors
+/// Returns an error when the input or persisted artifact is invalid.
 pub fn library_cached_analysis<'a>(
     import: &LibraryImportBinding,
     library_resolver: &LibraryResolver,
@@ -1041,6 +1056,8 @@ pub fn library_cached_analysis<'a>(
         })
 }
 
+/// # Errors
+/// Returns an error when the input or persisted artifact is invalid.
 #[cfg(feature = "hir-rust")]
 pub fn library_cached_expanded_imports(
     import: &LibraryImportBinding,
@@ -1065,6 +1082,8 @@ pub fn library_cached_expanded_imports(
         })
 }
 
+/// # Errors
+/// Returns an error when the input or persisted artifact is invalid.
 pub fn with_library_cached_analysis_mut<T>(
     import: &LibraryImportBinding,
     library_resolver: &LibraryResolver,
@@ -1102,10 +1121,13 @@ pub fn with_library_cached_analysis_mut<T>(
 }
 
 #[cfg(feature = "hir-rust")]
+#[must_use]
 pub fn library_module_segments(import: &LibraryImportBinding) -> Vec<String> {
     import.module.module_path.clone()
 }
 
+/// # Errors
+/// Returns an error when the input or persisted artifact is invalid.
 #[cfg(feature = "hir-rust")]
 pub fn library_generates_rust_module(
     import: &LibraryImportBinding,
@@ -1363,6 +1385,8 @@ fn library_imports_from_cached(
     imports
 }
 
+/// # Errors
+/// Returns an error when the input or persisted artifact is invalid.
 pub fn library_interface_has_module(
     _import: &LibraryImportBinding,
     _library_cache: &mut LibraryInterfaceCache,
@@ -1370,6 +1394,8 @@ pub fn library_interface_has_module(
     Ok(false)
 }
 
+/// # Errors
+/// Returns an error when the input or persisted artifact is invalid.
 pub fn attach_library_provenance(
     analysis: &mut radix_module::driver::AnalyzedModule,
     imports: &[LibraryImportBinding],
@@ -1380,6 +1406,8 @@ pub fn attach_library_provenance(
 }
 
 /// Attach library provenance, routing native-binding package deps to external crates (G4).
+/// # Errors
+/// Returns an error when the input or persisted artifact is invalid.
 pub fn attach_library_provenance_with_links(
     analysis: &mut radix_module::driver::AnalyzedModule,
     imports: &[LibraryImportBinding],
@@ -1641,6 +1669,7 @@ fn library_interface_items(
     Ok(items)
 }
 
+#[must_use]
 pub fn program_declaration_surface(
     program: &Program,
     interner: &Interner,
@@ -1666,6 +1695,7 @@ pub fn program_declaration_surface(
     surface
 }
 
+#[must_use]
 pub fn program_export_surface(
     program: &Program,
     interner: &Interner,
@@ -1729,6 +1759,7 @@ fn backward_companion_export_names(
     names
 }
 
+#[must_use]
 pub fn has_private_visibility(
     annotations: &[radix_module::syntax::Annotation],
     interner: &Interner,

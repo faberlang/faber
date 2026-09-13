@@ -42,7 +42,7 @@ fn glyph_f32_matrix_ty(types: &mut TypeTable) -> TypeId {
 
 /// A builder whose params `a`/`b` (DefId 0/1) carry the given types, with the
 /// entry block open.
-fn glyph_builder<'a>(types: &'a TypeTable, lhs_ty: TypeId, rhs_ty: TypeId) -> FunctionBuilder<'a> {
+fn glyph_builder(types: &TypeTable, lhs_ty: TypeId, rhs_ty: TypeId) -> FunctionBuilder<'_> {
     let mut builder = FunctionBuilder::new(types);
     builder.add_param(DefId(0), Symbol(0), lhs_ty, HirParamMode::Owned, Span::default());
     builder.add_param(DefId(1), Symbol(1), rhs_ty, HirParamMode::Owned, Span::default());
@@ -391,8 +391,8 @@ functio vecmat(vector<f32, 2> v, matrix<f32, [2, 2]> m) → vector<f32, 2> {
 }
 ",
     );
-    let errors =
-        lower_analyzed_unit(&mut unit, Default::default()).expect_err("vector·matrix must fail closed on the MIR lane");
+    let errors = lower_analyzed_unit(&mut unit, MirLoweringOptions::default())
+        .expect_err("vector·matrix must fail closed on the MIR lane");
     assert_eq!(errors.len(), 1, "{errors:?}");
     assert_eq!(
         errors[0].issue,

@@ -109,7 +109,7 @@ fn decode_round_trips_registry_conversion_rows() {
     use radix_types::{DefId, Primitive, TypeTable};
 
     let mut artifact = stub_artifact();
-    let mut types = TypeTable::new();
+    let types = TypeTable::new();
     let source = types.primitive(Primitive::Numerus);
     let destination = types.primitive(Primitive::Fractus);
     artifact.types = types.snapshot();
@@ -163,7 +163,7 @@ fn decode_rejects_registry_row_with_dangling_fn_def() {
     use radix_types::{DefId, Primitive, TypeTable, USER_DEF_ID_BASE};
 
     let mut artifact = stub_artifact();
-    let mut types = TypeTable::new();
+    let types = TypeTable::new();
     let source = types.primitive(Primitive::Numerus);
     let destination = types.primitive(Primitive::Fractus);
     artifact.types = types.snapshot();

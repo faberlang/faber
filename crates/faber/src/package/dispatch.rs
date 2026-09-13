@@ -31,10 +31,10 @@ pub(crate) fn selected_providers_for_routes(
 ) -> BTreeSet<String> {
     let mut providers = explicit.iter().cloned().collect::<BTreeSet<_>>();
     for route in routes {
-        if let Some(provider) = route.split([':', '/']).next() {
-            if !provider.is_empty() {
-                providers.insert(provider.to_owned());
-            }
+        if let Some(provider) = route.split([':', '/']).next()
+            && !provider.is_empty()
+        {
+            providers.insert(provider.to_owned());
         }
     }
     providers

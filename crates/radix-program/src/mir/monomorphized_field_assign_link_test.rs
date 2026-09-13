@@ -30,7 +30,7 @@
 use super::*;
 use radix_module::semantic::{IndexExpr, Type};
 
-const SEAM_UTIL: &str = r#"@ public
+const SEAM_UTIL: &str = r"@ public
 class Box<size D, size Q> {
     tensor<f32, [D]> ln1
     tensor<f32, [D, Q]> wq
@@ -56,7 +56,7 @@ fn width_of<size A, size B>(tensor<f32, [A, B]> t) → int {
     const list<f32> data ← t ↦ list<f32>
     return data.length()
 }
-"#;
+";
 
 const SEAM_MODEL: &str = r#"import from "./util" util
 

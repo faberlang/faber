@@ -1,6 +1,11 @@
 //! Rewrite program source identities and unmapped library sources.
 
-use super::*;
+use super::{
+    DefId, HashSet, MirAggregate, MirAggregateFields, MirAggregateItem, MirCallee,
+    MirClosureEnvironment, MirConstant, MirFunction, MirOperand, MirOptionChainLink, MirOptionOp,
+    MirPlace, MirProgram, MirProjection, MirStatement, MirStatementKind, MirTerminator,
+    MirTerminatorKind, MirValue, MirValueKind, Path, SourceRewrites,
+};
 
 pub(super) fn rewrite_templates_sources(
     templates: &mut [MirFunction],
@@ -43,10 +48,10 @@ pub(super) fn rewrite_program_sources(
         return;
     }
     for function in &mut program.functions {
-        if let Some(source) = function.source {
-            if let Some(rewritten) = rewritten_source(unit_path, source, source_rewrites) {
-                function.source = Some(rewritten);
-            }
+        if let Some(source) = function.source
+            && let Some(rewritten) = rewritten_source(unit_path, source, source_rewrites)
+        {
+            function.source = Some(rewritten);
         }
         for block in &mut function.blocks {
             for statement in &mut block.statements {
@@ -132,7 +137,7 @@ pub(super) fn rewrite_statement_sources(
 ) {
     match &mut statement.kind {
         MirStatementKind::Assign { value, .. } => {
-            rewrite_value_sources(value, unit_path, source_rewrites)
+            rewrite_value_sources(value, unit_path, source_rewrites);
         }
         MirStatementKind::Call { callee, args, .. } => {
             rewrite_callee_sources(callee, unit_path, source_rewrites);
@@ -146,7 +151,7 @@ pub(super) fn rewrite_statement_sources(
             }
         }
         MirStatementKind::Construct { aggregate, .. } => {
-            rewrite_aggregate_sources(aggregate, unit_path, source_rewrites)
+            rewrite_aggregate_sources(aggregate, unit_path, source_rewrites);
         }
     }
 }
@@ -173,7 +178,7 @@ pub(super) fn rewrite_terminator_sources(
             rewrite_place_sources(error_place, unit_path, source_rewrites);
         }
         MirTerminatorKind::Branch { condition, .. } => {
-            rewrite_operand_sources(condition, unit_path, source_rewrites)
+            rewrite_operand_sources(condition, unit_path, source_rewrites);
         }
         MirTerminatorKind::Switch { value, cases, .. } => {
             rewrite_operand_sources(value, unit_path, source_rewrites);
@@ -194,13 +199,13 @@ pub(super) fn rewrite_value_sources(
 ) {
     match &mut value.kind {
         MirValueKind::Operand(operand) => {
-            rewrite_operand_sources(operand, unit_path, source_rewrites)
+            rewrite_operand_sources(operand, unit_path, source_rewrites);
         }
         MirValueKind::Closure(closure) => {
-            rewrite_operand_sources(&mut closure.environment, unit_path, source_rewrites)
+            rewrite_operand_sources(&mut closure.environment, unit_path, source_rewrites);
         }
         MirValueKind::Unary { operand, .. } => {
-            rewrite_operand_sources(operand, unit_path, source_rewrites)
+            rewrite_operand_sources(operand, unit_path, source_rewrites);
         }
         MirValueKind::Binary { lhs, rhs, .. } => {
             rewrite_operand_sources(lhs, unit_path, source_rewrites);
@@ -218,7 +223,7 @@ pub(super) fn rewrite_operand_sources(
     match operand {
         MirOperand::Place(place) => rewrite_place_sources(place, unit_path, source_rewrites),
         MirOperand::Constant(constant) => {
-            rewrite_constant_sources(constant, unit_path, source_rewrites)
+            rewrite_constant_sources(constant, unit_path, source_rewrites);
         }
         MirOperand::Temp(_) | MirOperand::Value(_) => {}
     }
@@ -242,7 +247,7 @@ pub(super) fn rewrite_place_sources(
                 }
             }
             MirProjection::Index(operand) => {
-                rewrite_operand_sources(operand, unit_path, source_rewrites)
+                rewrite_operand_sources(operand, unit_path, source_rewrites);
             }
             MirProjection::Field(_)
             | MirProjection::VectorLane(_)
@@ -313,7 +318,7 @@ pub(super) fn rewrite_option_sources(
         | MirOptionOp::IsNil(operand)
         | MirOptionOp::IsNotNil(operand)
         | MirOptionOp::Unwrap { value: operand, .. } => {
-            rewrite_operand_sources(operand, unit_path, source_rewrites)
+            rewrite_operand_sources(operand, unit_path, source_rewrites);
         }
         MirOptionOp::Coalesce { value, fallback } => {
             rewrite_operand_sources(value, unit_path, source_rewrites);
@@ -338,7 +343,7 @@ pub(super) fn rewrite_option_chain_sources(
         // identity-mapped like a plain field.
         MirOptionChainLink::VariantField { .. } | MirOptionChainLink::Field(_) => {}
         MirOptionChainLink::Index(operand) => {
-            rewrite_operand_sources(operand, unit_path, source_rewrites)
+            rewrite_operand_sources(operand, unit_path, source_rewrites);
         }
         MirOptionChainLink::Call { callee, args } => {
             rewrite_callee_sources(callee, unit_path, source_rewrites);

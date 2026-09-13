@@ -3,11 +3,11 @@
 //! No hosts Cargo, git, or registry dependency. The client writes the CLI
 //! file surface (`--descriptor` JSON, `--module` raw bytes, `--inputs` JSON
 //! for tiny per-step values, optional `--weights` GGUF + `--weight-map`)
-//! and parses the receipt / HostError JSON the CLI prints.
+//! and parses the receipt / `HostError` JSON the CLI prints.
 //!
 //! Error taxonomy (CLI owns the codes):
 //! - exit 0 — receipt JSON
-//! - exit 2 — HostError JSON on stdout; this client surfaces `code` /
+//! - exit 2 — `HostError` JSON on stdout; this client surfaces `code` /
 //!   `message` verbatim (`E_INVALID_ARGS` vs `E_DEVICE_DESCRIPTOR` stay distinct)
 //! - exit 64 / spawn failure / unreadable child output — `E_HOST_SPAWN`
 
@@ -261,22 +261,23 @@ pub(crate) fn cache_key_seam(
             });
         }
     };
-    let range_map_identity = request
-        .weight_map_json
-        .as_deref()
-        .map(handroll::sha256_hex)
-        .unwrap_or_else(|| handroll::sha256_hex(b"no-packed-ranges"));
+    let range_map_identity = request.weight_map_json.as_deref().map_or_else(
+        || handroll::sha256_hex(b"no-packed-ranges"),
+        handroll::sha256_hex,
+    );
     let artifact_identity = options
         .artifact_identity
         .filter(|identity| !identity.is_empty())
-        .map(str::to_owned)
-        .unwrap_or_else(|| {
-            digest_parts(&[
-                request.backend.as_bytes(),
-                &request.descriptor_json,
-                &request.module_image,
-            ])
-        });
+        .map_or_else(
+            || {
+                digest_parts(&[
+                    request.backend.as_bytes(),
+                    &request.descriptor_json,
+                    &request.module_image,
+                ])
+            },
+            str::to_owned,
+        );
     let mut target_features = options.target_features.to_vec();
     target_features.sort();
     Ok(DeviceCacheKeyMaterial {
@@ -477,7 +478,7 @@ pub struct DeviceExecuteReceipt {
     /// Composite-host construction wall (Metal device admit).
     #[serde(default)]
     pub host_construct_us: u64,
-    /// Session create wall (module compile + PerProgram alloc).
+    /// Session create wall (module compile + `PerProgram` alloc).
     #[serde(default)]
     pub session_create_us: u64,
     /// Load wall exposed at the spawn seam. For one-shot execution this is
@@ -488,10 +489,10 @@ pub struct DeviceExecuteReceipt {
     /// Module compile + pipeline-create wall inside session create.
     #[serde(default)]
     pub load_module_us: u64,
-    /// PerProgram allocation wall inside session create.
+    /// `PerProgram` allocation wall inside session create.
     #[serde(default)]
     pub per_program_alloc_us: u64,
-    /// Host→device copy-in wall (packed-weight upload on SingleRun).
+    /// Host→device copy-in wall (packed-weight upload on `SingleRun`).
     #[serde(default)]
     pub copy_in_us: u64,
     /// Host command encoding wall copied from the F4H1 steady-state phase.
@@ -1087,13 +1088,13 @@ fn execute_distributed_at(
             message: format!("distributed prepare receipt JSON is invalid: {error}"),
         });
     }
-    if let Ok(parsed) = serde_json::from_slice::<WireHostError>(&output.stdout) {
-        if !parsed.code.is_empty() {
-            return Err(HostSpawnError {
-                code: parsed.code,
-                message: parsed.message,
-            });
-        }
+    if let Ok(parsed) = serde_json::from_slice::<WireHostError>(&output.stdout)
+        && !parsed.code.is_empty()
+    {
+        return Err(HostSpawnError {
+            code: parsed.code,
+            message: parsed.message,
+        });
     }
     Err(HostSpawnError {
         code: "E_HOST_SPAWN".to_owned(),
@@ -1111,7 +1112,7 @@ fn elapsed_us(start: std::time::Instant) -> u64 {
 
 /// Decode one `device-execute` child response.
 ///
-/// A parseable HostError JSON on stdout is returned as-is. The client does
+/// A parseable `HostError` JSON on stdout is returned as-is. The client does
 /// not rewrite CLI codes into `E_HOST_SPAWN`.
 fn decode_device_execute_output(
     status: Option<i32>,
@@ -1124,13 +1125,13 @@ fn decode_device_execute_output(
             message: format!("device-execute receipt JSON is invalid: {error}"),
         });
     }
-    if let Ok(parsed) = serde_json::from_slice::<WireHostError>(stdout) {
-        if !parsed.code.is_empty() {
-            return Err(HostSpawnError {
-                code: parsed.code,
-                message: parsed.message,
-            });
-        }
+    if let Ok(parsed) = serde_json::from_slice::<WireHostError>(stdout)
+        && !parsed.code.is_empty()
+    {
+        return Err(HostSpawnError {
+            code: parsed.code,
+            message: parsed.message,
+        });
     }
     Err(HostSpawnError {
         code: "E_HOST_SPAWN".to_owned(),
@@ -1220,28 +1221,26 @@ fn resolve_host_cli_at_root(
             return Ok(candidate);
         }
     }
-    if build_if_missing {
-        if let Some(package) = route.cargo_package {
-            let status = Command::new("cargo")
-                .args(["build", "--release", "-p", package, "--manifest-path"])
-                .arg(hosts.join("Cargo.toml"))
-                .status()
-                .map_err(|error| HostSpawnError {
-                    code: "E_HOST_SPAWN".to_owned(),
-                    message: format!("failed to build {package}: {error}"),
-                })?;
-            let built = hosts.join("target/release").join(route.binary);
-            if status.success() && built.is_file() {
-                return Ok(built);
-            }
-            return Err(HostSpawnError {
+    if build_if_missing && let Some(package) = route.cargo_package {
+        let status = Command::new("cargo")
+            .args(["build", "--release", "-p", package, "--manifest-path"])
+            .arg(hosts.join("Cargo.toml"))
+            .status()
+            .map_err(|error| HostSpawnError {
                 code: "E_HOST_SPAWN".to_owned(),
-                message: format!(
-                    "cargo build -p {package} failed ({status}); missing {}",
-                    built.display()
-                ),
-            });
+                message: format!("failed to build {package}: {error}"),
+            })?;
+        let built = hosts.join("target/release").join(route.binary);
+        if status.success() && built.is_file() {
+            return Ok(built);
         }
+        return Err(HostSpawnError {
+            code: "E_HOST_SPAWN".to_owned(),
+            message: format!(
+                "cargo build -p {package} failed ({status}); missing {}",
+                built.display()
+            ),
+        });
     }
     let message = if route.backend == "metal" {
         format!(
@@ -1620,9 +1619,10 @@ fn f32_to_json(value: f32) -> serde_json::Value {
     } else if value == f32::NEG_INFINITY {
         serde_json::Value::String("-Infinity".to_owned())
     } else {
-        serde_json::Number::from_f64(f64::from(value))
-            .map(serde_json::Value::Number)
-            .unwrap_or_else(|| serde_json::Value::String(hex_f32_bits(value)))
+        serde_json::Number::from_f64(f64::from(value)).map_or_else(
+            || serde_json::Value::String(hex_f32_bits(value)),
+            serde_json::Value::Number,
+        )
     }
 }
 
@@ -1702,8 +1702,7 @@ impl WorkDir {
     fn create() -> Result<Self, HostSpawnError> {
         let nanos = SystemTime::now()
             .duration_since(UNIX_EPOCH)
-            .map(|elapsed| elapsed.as_nanos())
-            .unwrap_or(0);
+            .map_or(0, |elapsed| elapsed.as_nanos());
         let path = std::env::temp_dir().join(format!(
             "faber-device-execute-{}-{nanos}",
             std::process::id()

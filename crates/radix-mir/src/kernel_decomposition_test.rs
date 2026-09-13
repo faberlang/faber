@@ -1481,7 +1481,7 @@ fn real_lowered_mlp_body_decomposes_into_fork_join_subchains() {
     let ops: Vec<Option<MirCollectionOp>> = block
         .statements
         .iter()
-        .map(|statement| crate::collection_ops::statement_collection_op(statement))
+        .map(crate::collection_ops::statement_collection_op)
         .collect();
     let expected_ops = [
         Some(MirCollectionOp::TensorMatMul),
@@ -1575,10 +1575,10 @@ fn real_lowered_mlp_body_decomposes_into_fork_join_subchains() {
     );
 }
 
-fn expect_binary<'a>(
-    expr: &'a ElementwiseExpr,
+fn expect_binary(
+    expr: &ElementwiseExpr,
     op: ElementwiseOp,
-) -> (&'a ElementwiseExpr, &'a ElementwiseExpr) {
+) -> (&ElementwiseExpr, &ElementwiseExpr) {
     match expr {
         ElementwiseExpr::Binary {
             op: found,
@@ -1590,7 +1590,7 @@ fn expect_binary<'a>(
     }
 }
 
-fn expect_unary<'a>(expr: &'a ElementwiseExpr, op: ElementwiseOp) -> &'a ElementwiseExpr {
+fn expect_unary(expr: &ElementwiseExpr, op: ElementwiseOp) -> &ElementwiseExpr {
     match expr {
         ElementwiseExpr::Unary {
             op: found, operand, ..

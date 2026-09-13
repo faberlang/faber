@@ -210,12 +210,12 @@ fn load_package_rejects_invalid_frontmatter_toml() {
     let entry = dir.join("main.fab");
     fs::write(
         &entry,
-        r#"+++
+        r"+++
 sectio = 
 +++
 
 main {}
-"#,
+",
     )
     .expect("write entry");
 
@@ -534,7 +534,7 @@ targets = ["rust"]
     .expect("manifest");
     fs::write(
         src.join("math.fab"),
-        r#"@ public
+        r"@ public
 class Vector3 {
     f32 x
     f32 y
@@ -545,7 +545,7 @@ class Vector3 {
 fn vector3(f32 x, f32 y, f32 z) → Vector3 {
     return Vector3 { x = x, y = y, z = z }
 }
-"#,
+",
     )
     .expect("math.fab");
     fs::write(

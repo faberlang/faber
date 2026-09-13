@@ -16,7 +16,7 @@
 //! runtime model, and unsupported package shapes return diagnostics.
 //!
 //! Faber product surfaces stay faber-side and enter here through explicit
-//! [`MirSeams`] (the RP4 EmissionSeams posture): executed-lane target
+//! [`MirSeams`] (the RP4 `EmissionSeams` posture): executed-lane target
 //! resolution, library resolver/cache construction, the `[device]` manifest
 //! projection, the device-section builder, the host-construction route
 //! policy, and the fmir-bin runner writer. Nothing here reads the ambient
@@ -183,7 +183,7 @@ type NamespaceDataMemberTargets = HashMap<(PathBuf, DefId, String), DefId>;
 /// `receiver.method(args)` into `Path(synthetic)(receiver, args)` so the
 /// library's lowered method function (source = the same synthetic) resolves
 /// in the merged program. Keyed per caller path because each unit's imported
-/// nominal carries its own canonical entry-side DefId.
+/// nominal carries its own canonical entry-side `DefId`.
 type MethodCallTargets = HashMap<PathBuf, HashMap<(DefId, String), DefId>>;
 type CliRecordFieldsByLocal = HashMap<Symbol, Vec<MirRuntimeRecordField>>;
 type CliEntryRecords = HashMap<PathBuf, CliRecordFieldsByLocal>;
@@ -346,6 +346,7 @@ pub struct TestPackageScope {
 impl TestPackageScope {
     /// Test-link scope from an analyzed program: explicit program roots plus
     /// one named remapping host.
+    #[must_use]
     pub fn for_program(
         package: &AnalyzedProgram,
         functions: Vec<(PathBuf, radix_module::hir::DefId)>,
@@ -493,9 +494,10 @@ impl FmirPackageImage {
 /// FNV-1a 64-bit idiom for the S1/S2 SOURCE-identity surface only
 /// ([`crate::mir::fnv64_hex`] — the embedded-image fingerprint and the A10
 /// identity's source half). This is the separate source-identity FNV surface
-/// explicitly preserved by ddpp0-contract §FnvRemoval; it is NOT the removed
+/// explicitly preserved by ddpp0-contract §`FnvRemoval`; it is NOT the removed
 /// backend-artifact FNV provenance (B1–B7). Standard FNV-1a, identical to the
 /// deleted `radix_mir_fmir::fnv1a64`.
+#[must_use]
 pub fn fnv1a64(bytes: &[u8]) -> u64 {
     const FNV1A64_OFFSET: u64 = 0xcbf2_9ce4_8422_2325;
     const FNV1A64_PRIME: u64 = 0x0000_0100_0000_01b3;
@@ -512,6 +514,7 @@ pub fn fnv1a64(bytes: &[u8]) -> u64 {
 ///
 /// RP5: moved from faber's `bin_runner.rs` with the image construction that
 /// consumes it; faber's fmir-bin runner writer re-exports it.
+#[must_use]
 pub fn fnv64_hex(bytes: &[u8]) -> String {
     format!("fnv64:{:016x}", fnv1a64(bytes))
 }
@@ -522,6 +525,8 @@ pub fn fnv64_hex(bytes: &[u8]) -> String {
 ///
 /// RP5: moved from faber's `bin_runner.rs` with the image construction that
 /// consumes it.
+/// # Errors
+/// Returns an error when the input or persisted artifact is invalid.
 pub fn source_identity(
     path: &Path,
     package_root: &Path,
@@ -541,18 +546,43 @@ pub fn source_identity(
 // Submodule items are imported here (sibling modules reach each other
 // through `use super::*`); the explicit re-exports below carry the seams
 // faber's package surface (and fhir.rs) depend on.
-use cli_bind::*;
-use cli_plan::*;
-use cli_values::*;
-use diag::*;
-use driver::*;
-use image::*;
-use link::*;
-use lower::*;
-use manifest::*;
-use remap::*;
-use requirements::*;
-use sources::*;
+use cli_bind::bind_fmir_text_runtime_cli;
+use cli_plan::{
+    NominalImportContext, build_nominal_remap, build_variant_remap, exported_nominal_names,
+    import_semantic_type_with_nominal, intern_param_symbols, parse_cli_arguments, plan_cli_package,
+    planned_cli_operands, planned_cli_options, push_type_rewrite, record_shared_nominals,
+    source_nominal_names,
+};
+use cli_values::{
+    cli_default_value, cli_operand_consumes_many, cli_operand_record_fields,
+    cli_option_is_nullable, cli_option_value, cli_record_type, command_has_unsupported_options,
+    command_in_unit, command_unit_id, has_unsupported_package_mir_operands,
+    is_package_mir_supported_option, matching_cli_command, package_mir_cli_exit_code,
+    plan_cli_command_records, push_cli_option_default_diagnostic, unsupported_cli_diagnostic,
+};
+use diag::{mir_issue_diag, mir_lowering_diag, runner_diagnostics};
+use driver::{
+    is_bridged_norma_import_path, with_prepared_package_mir, with_prepared_package_mir_from_loaded,
+    with_prepared_package_mir_with_cli_mode,
+};
+use image::{
+    FmirValidationMetadata, fmir_package_image_from_lowered, package_fmir_binary_image,
+    package_fmir_text_image, run_fmir_package_image, run_fmir_package_image_with_stats,
+};
+use link::{
+    local_namespace_call_targets, rewrite_analysis_namespace_calls, rewrite_unit_namespace_calls,
+};
+use lower::lower_package_units;
+use manifest::{
+    package_artifact_dir, package_artifact_root, package_mir_manifest,
+    validate_package_mir_manifest, write_package_image,
+};
+use remap::{remap_function_text_symbols, remap_optional_symbol, remap_program_text_symbols};
+use requirements::{check_fmir_runtime_requirements, collect_package_runtime_requirements};
+use sources::{
+    extend_unmapped_library_sources, rewrite_closure_environment_sources,
+    rewrite_generic_param_sources, rewrite_program_sources, rewrite_templates_sources,
+};
 
 // The moved helpers live in `pub(crate)` submodules; re-export the ones
 // faber's package surface re-exports (`pub use` so `radix_program::mir::…`

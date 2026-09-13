@@ -9,7 +9,7 @@
 use super::*;
 use radix_module::semantic::{IndexExpr, Type};
 
-const GSF1_MAIN: &str = r#"fn sink<size M, size N>(tensor<f32, [M, N]> x) → tensor<f32, [M, N]> {
+const GSF1_MAIN: &str = r"fn sink<size M, size N>(tensor<f32, [M, N]> x) → tensor<f32, [M, N]> {
     return x
 }
 
@@ -23,7 +23,7 @@ main {
     const list<int> s ← r.shape()
     print s.length()
 }
-"#;
+";
 
 fn write_gsf1_package(dir: &std::path::Path) -> std::path::PathBuf {
     let src = dir.join("src");

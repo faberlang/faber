@@ -28,7 +28,7 @@ use radix_module::locale::{KeywordSurface, LocalePack};
 
 /// Installed reader pack for a locale, resolved from the repo stdlib tree.
 fn pack_for(locale: &str) -> LocalePack {
-    let pack_path = radix_module::locale::workspace_locale_pack_path(&locale);
+    let pack_path = radix_module::locale::workspace_locale_pack_path(locale);
     LocalePack::from_toml_path(&pack_path).unwrap_or_else(|err| panic!("installed {locale} pack should load: {err}"))
 }
 

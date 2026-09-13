@@ -220,12 +220,14 @@ fn default_build_kind() -> String {
 
 /// Map a manifest `[build] target` value (or `None` for the implicit portable
 /// default) to a compiler [`Target`].
+/// # Errors
+/// Returns an error when the input or persisted artifact is invalid.
 pub fn manifest_build_target(target: Option<&str>, path: &Path) -> Result<Target, Box<Diagnostic>> {
     match target.map(str::trim) {
         None => Ok(Target::HirFhir),
         Some("rust") => Ok(Target::HirRust),
         Some("fhir") => Ok(Target::HirFhir),
-        Some("ts") | Some("typescript") => Ok(Target::HirTypeScript),
+        Some("ts" | "typescript") => Ok(Target::HirTypeScript),
         Some("scena") => Ok(Target::MirScena),
         Some("fmir-text") => Ok(Target::MirFmir),
         Some("fmir") => Ok(Target::MirFmirBinary),
@@ -246,6 +248,8 @@ pub fn manifest_build_target(target: Option<&str>, path: &Path) -> Result<Target
 ///
 /// Product-only sections are tolerated (they are faber's product view);
 /// unknown fields inside the declared compiler tables still fail closed.
+/// # Errors
+/// Returns an error when the input or persisted artifact is invalid.
 pub fn read_manifest(path: &Path) -> Result<FaberManifest, Box<Diagnostic>> {
     let source =
         fs::read_to_string(path).map_err(|err| Box::new(Diagnostic::io_error(path, &err)))?;

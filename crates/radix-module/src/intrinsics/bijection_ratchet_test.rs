@@ -269,8 +269,8 @@ fn dtype(
 /// rows also need a different receiver shape than the family default. Returns
 /// `(param_override, args)`.
 fn row_override(key: &str, dtype: &Dtype) -> Option<(Option<String>, Vec<String>)> {
-    let el = dtype.el.to_string();
-    let idx = dtype.idx.to_string();
+    let el = dtype.el.clone();
+    let idx = dtype.idx.clone();
     // Element sugar for this dtype (`tf32` / `ti32`).
     let sugar = dtype.name;
     let (param, args): (Option<String>, Vec<String>) = match key {
@@ -299,9 +299,9 @@ fn row_override(key: &str, dtype: &Dtype) -> Option<(Option<String>, Vec<String>
 
 fn arg_expr(kind: IntrinsicParamKind, dtype: &Dtype, receiver_expr: &str) -> String {
     match kind {
-        IntrinsicParamKind::Inner | IntrinsicParamKind::AtomicElement => dtype.el.to_string(),
+        IntrinsicParamKind::Inner | IntrinsicParamKind::AtomicElement => dtype.el.clone(),
         IntrinsicParamKind::Key => "\"k\"".into(),
-        IntrinsicParamKind::Value => dtype.el.to_string(),
+        IntrinsicParamKind::Value => dtype.el.clone(),
         IntrinsicParamKind::NumerusIndex => "0".into(),
         IntrinsicParamKind::Textus => "\"xy\"".into(),
         IntrinsicParamKind::SetInner => "altera".into(),
@@ -317,7 +317,7 @@ fn arg_expr(kind: IntrinsicParamKind, dtype: &Dtype, receiver_expr: &str) -> Str
                 "0".into()
             }
         }
-        IntrinsicParamKind::NumerusArray => dtype.idx.to_string(),
+        IntrinsicParamKind::NumerusArray => dtype.idx.clone(),
         IntrinsicParamKind::ElementArray => "flat".into(),
         IntrinsicParamKind::ReceiverSelf => receiver_expr.to_string(),
         IntrinsicParamKind::TensorPeer | IntrinsicParamKind::TensorMatmulPeer => receiver_expr.to_string(),
@@ -347,7 +347,7 @@ fn probe_source(row: &crate::intrinsics::MethodIntrinsic, dtype: &Dtype, mutable
         // Imperative rows need a mutable place; `in` params do not lower as
         // one, so the mutable probe binds a `varia` local instead.
         decl_locals = format!("{}\n", dtype.decl);
-        param = dtype.extra_param.clone();
+        param.clone_from(&dtype.extra_param);
     }
     let args = if override_args.is_empty() {
         row.params
@@ -361,7 +361,7 @@ fn probe_source(row: &crate::intrinsics::MethodIntrinsic, dtype: &Dtype, mutable
         .generic
         .iter()
         .map(|generic| match generic.sort {
-            GenericParamSort::Typus => dtype.param.to_owned(),
+            GenericParamSort::Typus => dtype.param.clone(),
             // The tensor probe has width three, so two is an admitted even
             // dimension for the generic RoPE row.
             GenericParamSort::Magnitudo => "2".to_owned(),
@@ -447,7 +447,7 @@ fn probe(source: &str, session: &Session) -> ProbeOutcome {
         }
     };
 
-    match crate::mir::lower_analyzed_unit(&mut analysis, Default::default()) {
+    match crate::mir::lower_analyzed_unit(&mut analysis, MirLoweringOptions::default()) {
         Ok(_) => ProbeOutcome::Lowered,
         Err(errors) => {
             let issues = errors.iter().map(|e| e.issue.as_str()).collect::<Vec<_>>();
@@ -633,8 +633,7 @@ fn probe_air_gaps(registry_gaps: &BTreeSet<String>) -> BTreeSet<String> {
         // registry row at all).
         let tensor_row_green = (0..=4).any(|arity| {
             lookup_method(IntrinsicReceiver::Tensor, name, arity)
-                .map(|row| !registry_gaps.contains(&row_key(row)))
-                .unwrap_or(false)
+                .is_some_and(|row| !registry_gaps.contains(&row_key(row)))
         });
         if !tensor_row_green {
             gaps.insert(format!("AIR.{name}"));
@@ -667,7 +666,7 @@ fn bijection_ratchet_equals_probe_derived_gap_set() {
         "ratchet and AIR-lane class list must be disjoint — a row is either a worklist entry or a design fact, never both"
     );
     let expected: BTreeSet<&str> = ratchet.union(&air_classes).copied().collect();
-    let derived_ref: BTreeSet<&str> = derived.iter().map(|s| s.as_str()).collect();
+    let derived_ref: BTreeSet<&str> = derived.iter().map(std::string::String::as_str).collect();
 
     let mut report = String::new();
     if derived_ref != expected {

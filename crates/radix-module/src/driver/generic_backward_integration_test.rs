@@ -125,7 +125,8 @@ fn unresolved_generic_backward_template_is_not_executable() {
     );
     assert!(bundle.is_none(), "an uncalled generic AIR template has no executable bundle");
 
-    let lowered = lower_analyzed_unit(&mut analysis, Default::default()).expect("template lowering succeeds");
+    let lowered =
+        lower_analyzed_unit(&mut analysis, MirLoweringOptions::default()).expect("template lowering succeeds");
     assert!(
         lowered.program.functions.is_empty(),
         "generic AIR templates do not enter executable MIR"
@@ -171,7 +172,8 @@ fn generic_backward_template_stays_out_of_executable_mir() {
         "backward bundle preparation should succeed",
     );
     assert!(bundle.is_none(), "no concrete call means no generated companion");
-    let lowered = lower_analyzed_unit(&mut analysis, Default::default()).expect("generic primal should lower to MIR");
+    let lowered =
+        lower_analyzed_unit(&mut analysis, MirLoweringOptions::default()).expect("generic primal should lower to MIR");
     assert!(lowered.program.functions.is_empty(), "the generic primal is not executable MIR");
     assert!(
         lowered.generic_templates.is_empty(),
@@ -278,8 +280,8 @@ incipit {
          by prepare_air_backward_bundle (ensure_broadcast_reduction_types wiring)"
     );
 
-    let mut lowered =
-        lower_analyzed_unit(&mut analysis, Default::default()).expect("generic broadcast primal should lower to MIR");
+    let mut lowered = lower_analyzed_unit(&mut analysis, MirLoweringOptions::default())
+        .expect("generic broadcast primal should lower to MIR");
     expect_codegen_ok(
         apply_air_backward_bundle(&mut lowered, bundle, false),
         "broadcast-using generic primal companion must generate without \
@@ -336,7 +338,7 @@ functio lane_sum(tensor<f32, [4]> x) → f32 {
     );
 
     let mut lowered =
-        lower_analyzed_unit(&mut analysis, Default::default()).expect("unrolled primal should lower to MIR");
+        lower_analyzed_unit(&mut analysis, MirLoweringOptions::default()).expect("unrolled primal should lower to MIR");
     expect_codegen_ok(
         apply_air_backward_bundle(&mut lowered, bundle, false),
         "unrolled full-prefix body must generate a reverse_ad companion",
@@ -491,8 +493,8 @@ incipit {
         "the concrete generic instance must retain the caller-built mask multiply"
     );
 
-    let mut lowered =
-        lower_analyzed_unit(&mut analysis, Default::default()).expect("generic masked primal should lower to MIR");
+    let mut lowered = lower_analyzed_unit(&mut analysis, MirLoweringOptions::default())
+        .expect("generic masked primal should lower to MIR");
     expect_codegen_ok(
         apply_air_backward_bundle(&mut lowered, bundle, false),
         "generic caller-mask body must generate a reverse-AD companion",
@@ -547,7 +549,7 @@ functio masked_lane_mean(tensor<f32, [4]> x, tensor<f32, [4]> mask) → f32 {
     );
 
     let mut lowered =
-        lower_analyzed_unit(&mut analysis, Default::default()).expect("masked primal should lower to MIR");
+        lower_analyzed_unit(&mut analysis, MirLoweringOptions::default()).expect("masked primal should lower to MIR");
     expect_codegen_ok(
         apply_air_backward_bundle(&mut lowered, bundle, false),
         "masked unrolled body must generate a reverse_ad companion",

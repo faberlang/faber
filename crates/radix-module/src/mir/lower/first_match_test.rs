@@ -7,7 +7,6 @@
 //! propagation through the runner's error channel (a trap in a post-match
 //! lane is observable even though a match was already found).
 
-use super::*;
 use crate::codegen::Target;
 use crate::driver::{Config, Session};
 use crate::mir::{BufferHost, RunSourceError, RunnerError, run_source};
@@ -54,12 +53,12 @@ fn run_trapped(name: &str, source: &str) -> Vec<RunnerError> {
 fn first_match_returns_the_first_live_element() {
     let lines = run_stdout(
         "afm3_match.fab",
-        r#"incipit {
+        r"incipit {
     fixum lista<fractus> xs ← [5.0, 7.0, 9.0]
     fixum fractus ∪ nihil r ← primus_quem(xs, ubi x { x > 6.0 })
     fixum fractus out ← r vel -1.0
     nota out
-}"#,
+}",
     );
     assert_eq!(lines, vec!["7.0".to_owned()], "first live element is 7.0");
 }
@@ -68,12 +67,12 @@ fn first_match_returns_the_first_live_element() {
 fn first_match_no_match_yields_nihil() {
     let lines = run_stdout(
         "afm3_no_match.fab",
-        r#"incipit {
+        r"incipit {
     fixum lista<fractus> xs ← [1.0, 2.0]
     fixum fractus ∪ nihil r ← primus_quem(xs, ubi x { x > 5.0 })
     fixum fractus out ← r vel -1.0
     nota out
-}"#,
+}",
     );
     assert_eq!(lines, vec!["-1.0".to_owned()], "no match must be nihil (sentinel -1.0)");
 }
@@ -82,12 +81,12 @@ fn first_match_no_match_yields_nihil() {
 fn first_match_empty_source_yields_nihil() {
     let lines = run_stdout(
         "afm3_empty.fab",
-        r#"incipit {
+        r"incipit {
     fixum lista<fractus> xs ← vacua
     fixum fractus ∪ nihil r ← primus_quem(xs, ubi x { x > 5.0 })
     fixum fractus out ← r vel -1.0
     nota out
-}"#,
+}",
     );
     assert_eq!(lines, vec!["-1.0".to_owned()], "empty source must be nihil (sentinel -1.0)");
 }

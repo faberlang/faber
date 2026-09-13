@@ -7,6 +7,7 @@ use std::path::{Component, Path, PathBuf};
 /// Package compilation uses normalized paths as stable graph keys, but must not
 /// require `std::fs::canonicalize` because missing files should become compiler
 /// diagnostics rather than path-resolution panics.
+#[must_use]
 pub fn normalize_path(path: &Path) -> PathBuf {
     let mut normalized = PathBuf::new();
     for component in path.components() {

@@ -719,7 +719,7 @@ fn deny_policy_does_not_touch_info_or_errors() {
 
 #[test]
 fn deny_warnings_suppresses_output_after_promotion() {
-    use crate::driver::{AnalyzeRequest, Config, ModuleCompileRequest, Session, WarnPolicy};
+    use crate::driver::{Config, ModuleCompileRequest, Session, WarnPolicy};
 
     let session =
         Session::new(Config::default().with_warn_policy(WarnPolicy { deny_all_warnings: true, deny_codes: vec![] }));
