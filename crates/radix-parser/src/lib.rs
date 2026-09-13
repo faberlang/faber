@@ -466,11 +466,7 @@ impl Parser {
     /// any source surface (latin, or a pack spelling resolved to its latin
     /// key), or `None` when the current token is not a keyword.
     fn current_keyword_ident(&self) -> Option<TokenKind> {
-        let TokenKind::Ident(sym) = self.peek().kind else {
-            return None;
-        };
-        let latin = self.keyword_claim_key(sym)?;
-        lookup_keyword_spec(latin).and_then(|spec| spec.token_kind.clone())
+        self.keyword_ident_at(0)
     }
 
     /// Resolve a lookahead word to its locale-independent keyword identity.
@@ -938,6 +934,18 @@ impl Parser {
         Ok(())
     }
 
+    /// Whether the parser sits at a boundary that terminates an expression
+    /// list (`}`/EOF, a same-line break, a `cape` clause, or a statement-start
+    /// keyword). `cape` is explicit here because, unlike a statement start,
+    /// it is deliberately absent from [`Self::is_recovery_boundary`].
+    fn at_expression_list_boundary(&self) -> bool {
+        self.is_at_end()
+            || self.check(&TokenKind::RBrace)
+            || self.raw_newline_before_next_word()
+            || self.check_keyword_ident(TokenKind::Cape)
+            || self.is_recovery_boundary(&self.peek().kind)
+    }
+
     /// Consume a separator for an expression list terminated by a statement
     /// boundary rather than a punctuation delimiter.
     fn consume_item_separator_to_boundary(
@@ -946,12 +954,7 @@ impl Parser {
     ) -> Result<bool, ParseError> {
         if self.eat(&TokenKind::Comma) {
             let comma_span = self.previous_span();
-            if self.is_at_end()
-                || self.check(&TokenKind::RBrace)
-                || self.raw_newline_before_next_word()
-                || self.check_keyword_ident(TokenKind::Cape)
-                || self.is_recovery_boundary(&self.peek().kind)
-            {
+            if self.at_expression_list_boundary() {
                 return Err(ParseError::structured(ParseErrorKind::Expected, comma_span)
                     .with_arg("issue", "item_list_trailing_comma")
                     .with_arg("family", "item_list")
@@ -960,12 +963,7 @@ impl Parser {
             return Ok(true);
         }
 
-        if self.is_at_end()
-            || self.check(&TokenKind::RBrace)
-            || self.raw_newline_before_next_word()
-            || self.check_keyword_ident(TokenKind::Cape)
-            || self.is_recovery_boundary(&self.peek().kind)
-        {
+        if self.at_expression_list_boundary() {
             return Ok(false);
         }
 
