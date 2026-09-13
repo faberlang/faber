@@ -949,19 +949,6 @@ impl Lowerer<'_> {
     }
 
     pub fn lower_discretio(&mut self, stmt: &Stmt, decl: &UnionDecl) -> Option<HirItem> {
-        self.lower_discretio_parts(stmt, decl)
-            .map(|(enum_item, _)| enum_item)
-    }
-
-    pub(super) fn lower_discretio_items(&mut self, stmt: &Stmt, decl: &UnionDecl) -> Vec<HirItem> {
-        self.lower_discretio(stmt, decl).into_iter().collect()
-    }
-
-    fn lower_discretio_parts(
-        &mut self,
-        stmt: &Stmt,
-        decl: &UnionDecl,
-    ) -> Option<(HirItem, Vec<HirItem>)> {
         let def_id = self.def_id_for(decl.name.name);
         let annotations = self.lower_item_annotations(def_id, &stmt.annotations);
 
@@ -1001,16 +988,17 @@ impl Lowerer<'_> {
             variants,
         };
 
-        Some((
-            HirItem {
-                annotations,
-                id: self.next_hir_id(),
-                def_id,
-                kind: HirItemKind::Enum(enum_item),
-                span: stmt.span,
-            },
-            Vec::new(),
-        ))
+        Some(HirItem {
+            annotations,
+            id: self.next_hir_id(),
+            def_id,
+            kind: HirItemKind::Enum(enum_item),
+            span: stmt.span,
+        })
+    }
+
+    pub(super) fn lower_discretio_items(&mut self, stmt: &Stmt, decl: &UnionDecl) -> Vec<HirItem> {
+        self.lower_discretio(stmt, decl).into_iter().collect()
     }
 
     fn lower_commune_fields(&mut self, decl: &UnionDecl) -> Vec<CommuneField> {

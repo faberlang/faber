@@ -1485,7 +1485,6 @@ impl Lowerer<'_> {
         }
     }
 
-    // moves block into expression node
     fn expr_from_block(&mut self, block: HirBlock, span: Span) -> HirExpression {
         HirExpression {
             id: self.next_hir_id(),
@@ -1495,7 +1494,6 @@ impl Lowerer<'_> {
         }
     }
 
-    // moves expression into block
     pub(super) fn block_from_expr(&mut self, expr: HirExpression) -> HirBlock {
         HirBlock::simple(Vec::new(), Some(Box::new(expr)), self.current_span)
     }
@@ -1515,14 +1513,12 @@ impl Lowerer<'_> {
         }
     }
 
-    // wraps body into handled expression
     fn handled_expr(&mut self, body: HirExpression, catch: radix_hir::HirCape) -> HirExpression {
         let span = self.current_span;
         let body = self.block_from_expr(body);
         self.handled_block_expr(body, catch, span)
     }
 
-    // moves body and catch into expression node
     fn handled_block_expr(
         &mut self,
         body: HirBlock,
