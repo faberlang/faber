@@ -72,6 +72,7 @@ impl HttpResponse {
         }
     }
 
+    #[must_use]
     pub fn empty(status: u16) -> Self {
         Self {
             status,
@@ -118,6 +119,7 @@ pub struct CorrelationEntry {
 }
 
 impl CorrelationTable {
+    #[must_use]
     pub fn new() -> Self {
         Self::default()
     }
@@ -155,7 +157,7 @@ impl CorrelationTable {
     }
 
     pub fn len(&self) -> usize {
-        self.inner.lock().map(|m| m.len()).unwrap_or(0)
+        self.inner.lock().map_or(0, |m| m.len())
     }
 
     pub fn is_empty(&self) -> bool {
@@ -225,6 +227,8 @@ impl ConnectionTasks {
 
 impl HttpTransport {
     /// Bind `127.0.0.1:0` (or `addr`) and start serving with `handler`.
+    /// # Errors
+    /// Returns an error when the requested operation cannot be completed.
     pub async fn serve<F, Fut>(
         addr: SocketAddr,
         config: TransportConfig,
@@ -356,31 +360,25 @@ async fn accept_loop(
         tokio::pin!(cancelled);
 
         let (stream, _peer) = tokio::select! {
-            ready = &mut accept => match ready {
-                Ok(pair) => pair,
-                Err(_) => {
-                    if cancel.load(Ordering::SeqCst) {
-                        break;
-                    }
-                    continue;
+            ready = &mut accept => if let Ok(pair) = ready { pair } else {
+                if cancel.load(Ordering::SeqCst) {
+                    break;
                 }
+                continue;
             },
-            _ = &mut cancelled => break,
+            () = &mut cancelled => break,
         };
 
         if cancel.load(Ordering::SeqCst) {
             break;
         }
 
-        let permit = match slots.clone().try_acquire_owned() {
-            Ok(p) => p,
-            Err(_) => {
-                tokio::spawn(reject_busy_connection(
-                    stream,
-                    busy_rejection_timeout(config.request_timeout),
-                ));
-                continue;
-            }
+        let permit = if let Ok(p) = slots.clone().try_acquire_owned() { p } else {
+            tokio::spawn(reject_busy_connection(
+                stream,
+                busy_rejection_timeout(config.request_timeout),
+            ));
+            continue;
         };
 
         let config = config.clone();
@@ -527,12 +525,9 @@ async fn handle_connection(
         body,
     };
 
-    let response = match timeout_at(deadline, handler(carrier)).await {
-        Ok(resp) => resp,
-        Err(_) => {
-            correlation.complete(StatusCode::GATEWAY_TIMEOUT.as_u16());
-            return error_response(StatusCode::GATEWAY_TIMEOUT, &request_id, "handler timeout");
-        }
+    let response = if let Ok(resp) = timeout_at(deadline, handler(carrier)).await { resp } else {
+        correlation.complete(StatusCode::GATEWAY_TIMEOUT.as_u16());
+        return error_response(StatusCode::GATEWAY_TIMEOUT, &request_id, "handler timeout");
     };
 
     if cancel.load(Ordering::SeqCst) {
@@ -550,7 +545,7 @@ async fn handle_connection(
 
 fn collect_headers(headers: &http::HeaderMap) -> Vec<(String, String)> {
     let mut out = Vec::new();
-    for (name, value) in headers.iter() {
+    for (name, value) in headers {
         if let Ok(v) = value.to_str() {
             out.push((name.as_str().to_owned(), v.to_owned()));
         }

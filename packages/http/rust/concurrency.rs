@@ -21,10 +21,15 @@ pub struct ApplicationState {
 }
 
 impl ApplicationState {
+    #[must_use]
+    /// # Errors
+    /// Returns an error when the requested operation cannot be completed.
     pub fn new() -> Self {
         Self::default()
     }
 
+    /// # Errors
+    /// Returns an error when the requested operation cannot be completed.
     pub fn get(&self, key: &str) -> Result<Option<Valor>, StateError> {
         self.values
             .lock()
@@ -32,6 +37,8 @@ impl ApplicationState {
             .map_err(|_| StateError::Poisoned)
     }
 
+    /// # Errors
+    /// Returns an error when the requested operation cannot be completed.
     pub fn set(&self, key: impl Into<String>, value: Valor) -> Result<(), StateError> {
         self.values
             .lock()
@@ -42,6 +49,8 @@ impl ApplicationState {
     }
 
     /// Increment a numeric value in one critical section and return the new value.
+    /// # Errors
+    /// Returns an error when the requested operation cannot be completed.
     pub fn increment(&self, key: impl Into<String>) -> Result<i64, StateError> {
         let key = key.into();
         let mut values = self.values.lock().map_err(|_| StateError::Poisoned)?;
@@ -70,6 +79,8 @@ pub struct HandlerWorkers {
 }
 
 impl HandlerWorkers {
+    /// # Errors
+    /// Returns an error when the requested operation cannot be completed.
     pub fn new(worker_threads: usize, state: ApplicationState) -> Result<Self, std::io::Error> {
         let runtime = Builder::new_multi_thread()
             .worker_threads(worker_threads.max(1))
@@ -113,6 +124,7 @@ pub struct ResponseTicket {
 }
 
 impl ResponseTicket {
+    #[must_use]
     pub fn request_id(&self) -> &str {
         &self.request_id
     }

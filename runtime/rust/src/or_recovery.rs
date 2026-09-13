@@ -120,9 +120,7 @@ pub fn valor_get_genus_or(
 /// `octeti` payload; substitute `fallback` on invalid UTF-8 bytes.
 #[must_use]
 pub fn octeti_get_text_or(bytes: &[u8], fallback: &str) -> String {
-    std::str::from_utf8(bytes)
-        .map(str::to_owned)
-        .unwrap_or_else(|_| fallback.to_owned())
+    std::str::from_utf8(bytes).map_or_else(|_| fallback.to_owned(), str::to_owned)
 }
 
 /// `octeti_get_ascii_or` (`__faber_rt_v1_octeti_get_ascii_or`): ASCII-narrow

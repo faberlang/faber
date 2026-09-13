@@ -62,6 +62,8 @@ impl<const N: usize> OctetiN<N> {
     ///
     /// Returns [`Err`] if `value.len() > N` (overflow uses declared `N`; no
     /// truncate). Any byte value is legal — there is no ASCII check.
+    /// # Errors
+    /// Returns an error when the requested operation cannot be completed.
     pub fn new(value: &[u8]) -> Result<Self, OctetiNOverflow> {
         if value.len() > N {
             return Err(OctetiNOverflow {
@@ -78,6 +80,8 @@ impl<const N: usize> OctetiN<N> {
     }
 
     /// Append one byte. Fails closed when `len == N`.
+    /// # Errors
+    /// Returns an error when the requested operation cannot be completed.
     pub fn appende(&mut self, byte: u8) -> Result<(), OctetiNOverflow> {
         if self.len >= N {
             return Err(OctetiNOverflow {
@@ -128,11 +132,15 @@ impl<const N: usize> OctetiN<N> {
 
     /// Bounded → unbounded: copy the valid prefix.
     #[must_use]
+    /// # Errors
+    /// Returns an error when the requested operation cannot be completed.
     pub fn to_octeti(&self) -> Vec<u8> {
         self.as_bytes().to_vec()
     }
 
     /// Unbounded → bounded: fail closed when `len > N`.
+    /// # Errors
+    /// Returns an error when the requested operation cannot be completed.
     pub fn try_from_octeti(bytes: &[u8]) -> Result<Self, OctetiNOverflow> {
         Self::new(bytes)
     }

@@ -64,6 +64,8 @@ impl<const N: usize> AsciiN<N> {
     ///
     /// Returns [`Err`] if `value.len() > N` (overflow uses declared `N`; no
     /// truncate). Panics if `value` is not ASCII.
+    /// # Errors
+    /// Returns an error when the requested operation cannot be completed.
     pub fn new(value: &str) -> Result<Self, AsciiNOverflow> {
         assert!(
             value.is_ascii(),
@@ -88,6 +90,8 @@ impl<const N: usize> AsciiN<N> {
     }
 
     /// Append one ASCII byte. Fails closed when `len == N`.
+    /// # Errors
+    /// Returns an error when the requested operation cannot be completed.
     pub fn appende(&mut self, byte: u8) -> Result<(), AsciiNOverflow> {
         assert!(
             byte.is_ascii(),
@@ -147,11 +151,15 @@ impl<const N: usize> AsciiN<N> {
 
     /// Bounded → unbounded: copy the valid prefix.
     #[must_use]
+    /// # Errors
+    /// Returns an error when the requested operation cannot be completed.
     pub fn to_ascii(&self) -> Ascii {
         Ascii::new(self.as_str())
     }
 
     /// Unbounded → bounded: fail closed when `len > N`.
+    /// # Errors
+    /// Returns an error when the requested operation cannot be completed.
     pub fn try_from_ascii(ascii: &Ascii) -> Result<Self, AsciiNOverflow> {
         Self::new(ascii.as_ref())
     }

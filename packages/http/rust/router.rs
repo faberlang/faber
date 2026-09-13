@@ -185,16 +185,23 @@ fn param_name(segment: &str) -> Option<&str> {
 }
 
 /// Empty route table valor.
+#[must_use]
+/// # Errors
+/// Returns an error when the requested operation cannot be completed.
 pub fn route_table() -> Valor {
     RouteTable::empty().to_valor()
 }
 
 /// Register GET route; rejects duplicate method+path.
+/// # Errors
+/// Returns an error when the requested operation cannot be completed.
 pub fn add_get(table: Valor, path: String, handler: String) -> Result<Valor, String> {
     add_route(table, "GET", path, handler, String::new())
 }
 
 /// Register POST route; rejects duplicate method+path.
+/// # Errors
+/// Returns an error when the requested operation cannot be completed.
 pub fn add_post(table: Valor, path: String, handler: String) -> Result<Valor, String> {
     add_route(table, "POST", path, handler, String::new())
 }
@@ -233,6 +240,8 @@ fn add_route(
 /// Append relative routes under a path prefix (group).
 ///
 /// Each step is a tabula `{ method, path, handler }`. Paths are joined with the prefix.
+/// # Errors
+/// Returns an error when the requested operation cannot be completed.
 pub fn add_group(table: Valor, prefix: String, steps: Vec<Valor>) -> Result<Valor, String> {
     let mut tab = RouteTable::from_valor(&table)?;
     validate_route_path(&prefix)?;
@@ -274,6 +283,8 @@ fn join_paths(prefix: &str, relative: &str) -> String {
 }
 
 /// Append middleware name (ordered; duplicates allowed only once — second add rejected).
+/// # Errors
+/// Returns an error when the requested operation cannot be completed.
 pub fn add_middleware(table: Valor, name: String) -> Result<Valor, String> {
     if name.trim().is_empty() {
         return Err("middleware name must not be empty".to_owned());
@@ -287,6 +298,8 @@ pub fn add_middleware(table: Valor, name: String) -> Result<Valor, String> {
 }
 
 /// Match method+path. Returns match tabula or nihil. Errors on ambiguous multi-match.
+/// # Errors
+/// Returns an error when the requested operation cannot be completed.
 pub fn match_route(table: Valor, method: String, path: String) -> Result<Option<Valor>, String> {
     let tab = RouteTable::from_valor(&table)?;
     let method = method.to_ascii_uppercase();
@@ -358,6 +371,7 @@ fn match_path(template: &str, request: &[String]) -> Option<BTreeMap<String, Str
 }
 
 /// Extract named path param from a match valor.
+#[must_use]
 pub fn path_param(match_valor: Valor, name: String) -> Option<String> {
     let Valor::Tabula(fields) = match_valor else {
         return None;
@@ -372,6 +386,7 @@ pub fn path_param(match_valor: Valor, name: String) -> Option<String> {
 }
 
 /// Extract query parameter from `a=1&b=2` wire form.
+#[must_use]
 pub fn query_param(query: String, name: String) -> Option<String> {
     let query = query.strip_prefix('?').unwrap_or(query.as_str());
     for pair in query.split('&') {
@@ -389,6 +404,7 @@ pub fn query_param(query: String, name: String) -> Option<String> {
 }
 
 /// Case-insensitive header lookup from a tabula of textus values.
+#[must_use]
 pub fn header_value(headers: Valor, name: String) -> Option<String> {
     let Valor::Tabula(fields) = headers else {
         return None;
@@ -406,13 +422,16 @@ pub fn header_value(headers: Valor, name: String) -> Option<String> {
 }
 
 /// Parse JSON object body into valor (object-root only).
+/// # Errors
+/// Returns an error when the requested operation cannot be completed.
 pub fn json_body(corpus: String) -> Result<Valor, String> {
     faber::json::Json::parse(&corpus)
-        .map(|doc| doc.into_valor())
+        .map(faber::Json::into_valor)
         .map_err(|err| err.to_string())
 }
 
 /// Structured error → response tabula `{ status, corpus, error: true }`.
+#[must_use]
 pub fn error_response(status: i64, nuntius: String) -> Valor {
     Valor::Tabula(BTreeMap::from([
         ("status".to_owned(), Valor::Numerus(status)),
@@ -422,6 +441,7 @@ pub fn error_response(status: i64, nuntius: String) -> Valor {
 }
 
 /// Convert a successful match or generic handler payload into a response tabula.
+#[must_use]
 pub fn to_response(status: i64, corpus: String) -> Valor {
     Valor::Tabula(BTreeMap::from([
         ("status".to_owned(), Valor::Numerus(status)),

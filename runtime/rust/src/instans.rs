@@ -406,7 +406,7 @@ fn is_leap_year(year: i32) -> bool {
 /// Days from 1970-01-01 to the given civil date (Howard Hinnant).
 fn days_from_civil(year: i32, month: u32, day: u32) -> i64 {
     let mut y = year;
-    y -= if month <= 2 { 1 } else { 0 };
+    y -= i32::from(month <= 2);
     let era = (if y >= 0 { y } else { y - 399 }) / 400;
     let yoe = y - era * 400;
     // SAFETY: month/day values are 1..=12 and validated, safe for i32.

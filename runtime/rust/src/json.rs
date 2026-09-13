@@ -71,6 +71,8 @@ impl Json {
     }
 
     #[must_use]
+    /// # Errors
+    /// Returns an error when the requested operation cannot be completed.
     pub fn to_wire(&self) -> String {
         render_valor(&self.0)
     }

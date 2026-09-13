@@ -50,8 +50,8 @@ fn from_valor_extracts_string() {
         Some("hi".into())
     );
     assert_eq!(
-        String::from_valor(&Valor::Textus("".into())),
-        Some("".into())
+        String::from_valor(&Valor::Textus(String::new())),
+        Some(String::new())
     );
 }
 
@@ -109,7 +109,7 @@ fn from_valor_ascii_rejects_non_ascii_textus() {
 #[test]
 fn from_valor_ascii_accepts_empty_textus() {
     assert_eq!(
-        Ascii::from_valor(&Valor::Textus("".into())),
+        Ascii::from_valor(&Valor::Textus(String::new())),
         Some(Ascii::new(""))
     );
 }

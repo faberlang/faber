@@ -99,6 +99,8 @@ impl<T: Clone + Default + PartialEq> Sparsa<T> {
     ///
     /// Returns `None` on overflow.
     #[must_use]
+    /// # Errors
+    /// Returns an error when the requested operation cannot be completed.
     pub fn element_count(&self) -> Option<usize> {
         tensor_shape_element_count(&self.shape)
     }

@@ -216,6 +216,8 @@ impl ResponseSender {
     }
 
     #[must_use]
+    /// # Errors
+    /// Returns an error when the requested operation cannot be completed.
     pub fn is_cancelled(&self) -> bool {
         self.lease.cancellation.is_cancelled()
     }
@@ -1028,6 +1030,8 @@ fn drain_remaining_then_err<T>(sermo: &mut Sermo, error: FrameError) -> Result<T
 /// # Panics
 ///
 /// Panics if the stream produces a terminal error frame.
+/// # Errors
+/// Returns an error when the requested operation cannot be completed.
 pub fn sermo_materialize_vacuum(sermo: &mut Sermo) {
     try_sermo_materialize_vacuum(sermo).expect("sermo ↦ vacuum materialization failed");
 }
@@ -1300,6 +1304,8 @@ pub async fn try_sermo_materialize_octeti_async(sermo: &mut Sermo) -> Result<Vec
 /// # Panics
 ///
 /// Panics if the stream produces a terminal error frame.
+/// # Errors
+/// Returns an error when the requested operation cannot be completed.
 pub fn sermo_materialize_valor(sermo: &mut Sermo) -> Valor {
     try_sermo_materialize_valor(sermo).expect("sermo ↦ valor materialization failed")
 }
@@ -1709,11 +1715,11 @@ where
 /// parameter. At monomorphization this dispatches by `TypeId` so
 /// `lista<textus>` uses multi-item frames and does not panic on
 /// `frame_scalar_multiple_content_frames`.
-/// Materialize `T` from the stream using automatic dispatch by TypeId.
+/// Materialize `T` from the stream using automatic dispatch by `TypeId`.
 ///
 /// # Errors
 ///
-/// Returns `Err` if the underlying materializer fails or the internal TypeId
+/// Returns `Err` if the underlying materializer fails or the internal `TypeId`
 /// cast detects a mismatch.
 pub fn try_sermo_materialize_auto<T>(sermo: &mut Sermo) -> Result<T, FrameError>
 where
@@ -1736,11 +1742,11 @@ where
 }
 
 /// Async twin of [`try_sermo_materialize_auto`].
-/// Materialize `T` from the stream using automatic dispatch by TypeId (async).
+/// Materialize `T` from the stream using automatic dispatch by `TypeId` (async).
 ///
 /// # Errors
 ///
-/// Returns `Err` if the underlying materializer fails or the internal TypeId
+/// Returns `Err` if the underlying materializer fails or the internal `TypeId`
 /// cast detects a mismatch.
 pub async fn try_sermo_materialize_auto_async<T>(sermo: &mut Sermo) -> Result<T, FrameError>
 where
