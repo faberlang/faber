@@ -829,30 +829,21 @@ pub(crate) fn validate_wire_session_section(
     wire: &WireDeviceProgram,
 ) -> Result<(), crate::error::FmirImageError> {
     let kv = &section.kv_layout;
-    if kv.slots == 0 {
-        return Err(session_invalid(
-            "kv layout declares `slots` 0; a zero-slot layout is not a layout (it would silently produce a zero-byte KV)".to_owned(),
-        ));
-    }
-    if kv.context_length == 0 {
-        return Err(session_invalid(
-            "kv layout declares `context_length` 0; a zero-context layout is not a layout (it would silently produce a zero-byte KV)".to_owned(),
-        ));
-    }
-    if kv.layer_count == 0 {
-        return Err(session_invalid(
-            "kv layout declares `layer_count` 0; a zero-layer layout is not a layout (it would silently produce a zero-byte KV)".to_owned(),
-        ));
-    }
-    if kv.kv_head_count == 0 {
-        return Err(session_invalid(
-            "kv layout declares `kv_head_count` 0; a zero-head layout is not a layout (it would silently produce a zero-byte KV)".to_owned(),
-        ));
-    }
-    if kv.head_dim == 0 {
-        return Err(session_invalid(
-            "kv layout declares `head_dim` 0; a zero-dim layout is not a layout (it would silently produce a zero-byte KV)".to_owned(),
-        ));
+    // Zero checks name the field and its spelled kind so each diagnostic
+    // stays verbatim (`zero-slot`, `zero-context`, `zero-layer`, `zero-head`,
+    // `zero-dim`).
+    for (field, kind, value) in [
+        ("slots", "slot", kv.slots),
+        ("context_length", "context", kv.context_length),
+        ("layer_count", "layer", kv.layer_count),
+        ("kv_head_count", "head", kv.kv_head_count),
+        ("head_dim", "dim", kv.head_dim),
+    ] {
+        if value == 0 {
+            return Err(session_invalid(format!(
+                "kv layout declares `{field}` 0; a zero-{kind} layout is not a layout (it would silently produce a zero-byte KV)"
+            )));
+        }
     }
     if !matches!(kv.dtype, WireKvCacheDtype::F32) {
         return Err(session_invalid(format!(
