@@ -614,7 +614,10 @@ fn link_library_import_site(
     // instead of silently vanishing from the link and surfacing later
     // as an unstable runner-internal error.
     for (primal_def_id, backward) in analysis.radix_lanes.iter_backward() {
-        let name = analysis.interner.resolve(backward.companion_name).to_owned();
+        let name = analysis
+            .interner
+            .resolve(backward.companion_name)
+            .to_owned();
         if !companion_resolves(analysis, primal_def_id, backward) {
             push_companion_unresolved(
                 &mut links.diagnostics,
