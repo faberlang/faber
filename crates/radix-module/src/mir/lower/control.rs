@@ -3107,14 +3107,15 @@ impl FunctionBuilder<'_> {
         // and `rumpe` both goto `exit_id`. This must run before the epilogue is
         // built so the predecessor stays the active cursor and body statements
         // are not emitted into a sealed block.
-        let mut context = BreakableContext { perge_target: None, rumpe_target: exit_id, rumpe_used: false };
+        let context = BreakableContext { perge_target: None, rumpe_target: exit_id, rumpe_used: false };
         self.breakables.push(context);
         self.visit_block_statements(block);
         // WHY: read back the context so `rumpe_used` reflects any `rumpe` that
         // fired while lowering the body. The body may have pushed and popped
         // nested breakable scopes, so a copy taken upfront would go stale.
-        context = *self.breakables.last().unwrap();
-        self.breakables.pop();
+        let Some(context) = self.breakables.pop() else {
+            return;
+        };
         let body_reaches = self.terminate_open_current(MirTerminatorKind::Goto(exit_id), span);
 
         // The after-block is reachable if the body's straight-line fall-through
