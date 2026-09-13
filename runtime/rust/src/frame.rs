@@ -460,11 +460,10 @@ impl Sermo {
 }
 
 pub fn sermo_set_opener(sermo: &mut Sermo, data: Valor) {
-    if let Some(request) = lock_sermo(&sermo.inner).outgoing.first_mut() {
-        if request.status == FrameStatus::Request {
+    if let Some(request) = lock_sermo(&sermo.inner).outgoing.first_mut()
+        && request.status == FrameStatus::Request {
             request.data = data;
         }
-    }
 }
 
 #[must_use]
