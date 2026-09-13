@@ -3665,12 +3665,6 @@ fn lower_named_type(
             }
             return Ok(ty);
         }
-        if matches!(
-            prim,
-            Primitive::Ascii | Primitive::Textus | Primitive::Octeti
-        ) {
-            return lower_bounded_primitive(prim, params, resolver, interner, types);
-        }
         if !params.is_empty() {
             return Err(TypeLowerError::Issue(ISSUE_PRIMITIVE_PARAMS));
         }
