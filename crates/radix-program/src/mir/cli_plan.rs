@@ -4,7 +4,7 @@ use super::{
     AnalyzedProgram, AnalyzedProgramNode, BTreeSet, CliCommand, CliDefault, CliDispatchPlan,
     CliEntryRecords, CliMode, CliOperand, CliOption, CliPackagePlan, CliPlanningMode, CliProgram,
     CliRecordFieldsByLocal, CliRecordTypeRewrite, CliType, DefId, Diagnostic, FmirTextCliOperand,
-    FmirTextCliRootSection, FmirTextCliSection, FmirTextCliValueType, HashMap, HirItemKind, Host,
+    FmirTextCliRootSection, FmirTextCliSection, FmirTextCliValueType, HashMap, HirItemKind,
     IndexExpr, InterfaceLibraryIdentity, InterfaceNominalKind, Interner, MirConstant, MirOperand,
     MirRuntimeRecordField, MirRuntimeRecordValue, MirType, ModuleId, PlannedCliOperand,
     PlannedCliOption, Resolver, Symbol, SymbolKind, Type, TypeId, TypeTable, cli_default_value,
