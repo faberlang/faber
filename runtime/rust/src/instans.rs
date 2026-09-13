@@ -14,6 +14,7 @@
 //! (`try_from_valor`).
 
 use crate::valor::Valor;
+use std::fmt::Write as _;
 
 const NANOS_PER_SECOND: i64 = 1_000_000_000;
 const NANOS_PER_MILLI: i64 = 1_000_000;
@@ -279,7 +280,7 @@ fn format_rfc3339_utc(nanos: i64, praecisio: InstansPraecisio) -> String {
     if digits > 0 {
         let fraction = nanos_remainder / 10u32.pow(9 - digits as u32);
         out.push('.');
-        out.push_str(&format!("{fraction:0digits$}"));
+        write!(out, "{fraction:0digits$}").expect("writing to String cannot fail");
     }
     out.push('Z');
     out
@@ -427,9 +428,9 @@ fn days_from_civil(year: i32, month: u32, day: u32) -> i64 {
 )]
 fn civil_from_days(z: i64) -> (i32, u32, u32) {
     let z = z + 719_468;
-    let era = (if z >= 0 { z } else { z - 146096 }) / 146097;
-    let doe = (z - era * 146097) as u32;
-    let yoe = (doe - doe / 1460 + doe / 36524 - doe / 146096) / 365;
+    let era = (if z >= 0 { z } else { z - 146_096 }) / 146_097;
+    let doe = (z - era * 146_097) as u32;
+    let yoe = (doe - doe / 1_460 + doe / 36_524 - doe / 146_096) / 365;
     let mut y = yoe as i32 + (era * 400) as i32;
     let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
     let mp = (5 * doy + 2) / 153;
