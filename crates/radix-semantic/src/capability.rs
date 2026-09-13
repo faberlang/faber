@@ -4,10 +4,6 @@
 //! capability derivation. It owns no type, access, region, function, resolved
 //! use, qualified identity, or visibility table. Implementors must answer from
 //! the immutable authorities belonging to one analyzed snapshot.
-//!
-//! [`FailClosedCapabilityQueries`] is deliberately the only implementation in
-//! this unit. It makes an absent implementation explicit and safe while the
-//! derived queries land in SCR-03.
 
 use crate::SemanticParamMode;
 use crate::access_facts::AccessFactTable;
@@ -830,15 +826,11 @@ impl<'a> DerivedCapabilityQueries<'a> {
                 self.merge_optional_index(&mut identity.width, *width)?;
                 self.child_identity(ty, visiting, identity)
             }
-            Type::BoundedArray { .. } | Type::BoundedQueue { .. } | Type::BoundedStack { .. } => {
-                let capacity = match self.types.get(ty) {
-                    Type::BoundedArray { capacity, .. }
-                    | Type::BoundedQueue { capacity, .. }
-                    | Type::BoundedStack { capacity, .. } => *capacity,
-                    _ => unreachable!("arm guard guarantees a bounded collection"),
-                };
-                self.index_solved(capacity)?;
-                self.merge_optional_index(&mut identity.capacity, capacity)?;
+            Type::BoundedArray { capacity, .. }
+            | Type::BoundedQueue { capacity, .. }
+            | Type::BoundedStack { capacity, .. } => {
+                self.index_solved(*capacity)?;
+                self.merge_optional_index(&mut identity.capacity, *capacity)?;
                 self.child_identity(ty, visiting, identity)
             }
             Type::BoundedTextus { capacity }
