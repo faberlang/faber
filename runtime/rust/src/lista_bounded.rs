@@ -67,8 +67,7 @@ impl<T, const N: usize> ListaN<T, N> {
 
         let mut bounded = Self::empty();
         for value in values {
-            bounded.slots[bounded.len].write(value);
-            bounded.len += 1;
+            bounded.appende(value)?;
         }
         Ok(bounded)
     }
@@ -124,15 +123,17 @@ impl<T, const N: usize> ListaN<T, N> {
         self.as_slice().get(index)
     }
 
+    fn initialized_prefix(slots: &[MaybeUninit<T>; N], len: usize) -> &[T] {
+        // SAFETY: callers maintain `slots[0..len]` as initialized and `len <= N`.
+        // `MaybeUninit<T>` has the same layout and alignment as `T`.
+        unsafe { std::slice::from_raw_parts(slots.as_ptr().cast::<T>(), len) }
+    }
+
     /// Read the initialized prefix. The spare range is never represented as a
     /// slice of `T`.
     #[must_use]
     pub fn as_slice(&self) -> &[T] {
-        // SAFETY: `slots[0..self.len]` are initialized by `empty` + `appende`
-        // or `try_from_vec`, and `self.len <= N` is maintained by those
-        // constructors and methods. `MaybeUninit<T>` has the same layout and
-        // alignment as `T`; the slice is limited to the initialized prefix.
-        unsafe { std::slice::from_raw_parts(self.slots.as_ptr().cast::<T>(), self.len) }
+        Self::initialized_prefix(&self.slots, self.len)
     }
 
     /// Iterate over the initialized prefix only.
@@ -179,8 +180,7 @@ impl<T, const N: usize> ListaN<T, N> {
 
         let mut bounded = Self::empty();
         for value in values {
-            bounded.slots[bounded.len].write(value.clone());
-            bounded.len += 1;
+            bounded.appende(value.clone())?;
         }
         Ok(bounded)
     }
@@ -240,8 +240,8 @@ impl<T: std::fmt::Debug, const N: usize> std::fmt::Debug for ListaN<T, N> {
         f.debug_struct("ListaN")
             .field("n", &N)
             .field("len", &self.len)
-            .field("items", &self.as_slice())
-            .finish_non_exhaustive()
+            .field("items", &Self::initialized_prefix(&self.slots, self.len))
+            .finish()
     }
 }
 
