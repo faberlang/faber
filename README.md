@@ -195,9 +195,6 @@ The Rust ABI and carrier sources are under
 filesystem, process, network, browser, LLVM, and device behavior belongs in
 Hosts, not these generated-language packages.
 
-The [HTTP package](packages/http/) and
-[Rust HTTP transport](crates/http-transport/) are also public here.
-
 ## Repository map
 
 ```mermaid

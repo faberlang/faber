@@ -12,7 +12,6 @@ asked. Container law: [`../AGENTS.md`](../AGENTS.md).
 
 - `runtime/{rust,typescript,go,swift}`: generated-language support packages.
 - `packages/`: public Faber packages.
-- `crates/http-transport`: public Rust transport package.
 - `docs/EBNF.md`: canonical public grammar (English authority; radix gates its
   vocabulary audit against this file).
 - `docs/EBNF_MATRIX.md`, `docs/CONVERSIO_MATRIX.md`: rendered target matrices.
@@ -43,8 +42,6 @@ Run the focused package command for the changed target:
 
 ```sh
 cargo test --manifest-path runtime/rust/Cargo.toml
-cargo test --manifest-path crates/http-transport/Cargo.toml
-cargo test --manifest-path packages/http/rust/Cargo.toml
 (cd runtime/go && go test ./...)
 (cd runtime/swift && swift test)
 (cd runtime/typescript && npx tsc --noEmit)
