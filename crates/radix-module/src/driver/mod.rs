@@ -745,8 +745,8 @@ fn generate_llvm_text_output(
         // bodies into a CPU module.
         let code = if emit_nvvm_device_module || device_roles.is_empty() {
             crate::mir::emit_llvm_text_probe(crate::mir::LlvmEmitRequest {
-                device_roles: Some(device_roles.clone()),
-                device_function_metadata: Some(llvm_metadata.clone()),
+                device_roles: Some(device_roles),
+                device_function_metadata: Some(llvm_metadata),
                 ..crate::mir::LlvmEmitRequest::new(&mir.validated, &mir.interner)
             })
             .map_err(llvm_text_codegen_error)?
@@ -762,7 +762,7 @@ fn generate_llvm_text_output(
             // adapter (crate::mir::fmir_artifact_packet_facts, U4 residual) is
             // available to that seam at this route.
             crate::mir::emit_llvm_text_probe(crate::mir::LlvmEmitRequest {
-                device_roles: Some(device_roles.clone()),
+                device_roles: Some(device_roles),
                 device_function_metadata: Some(llvm_metadata),
                 host_partition: true,
                 host_partition_legality: crate::mir::device_semantics::DeviceLegalityFacts::default(),
