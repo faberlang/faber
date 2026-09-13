@@ -842,40 +842,10 @@ impl Resolver<'_> {
     /// pass only expands device callers, so host-boundary call sites stay
     /// untouched.
     fn device_sites(&self, function: &MirFunction) -> Vec<CallSite> {
-        let mut sites = Vec::new();
-        for (block_index, block) in function.blocks.iter().enumerate() {
-            for (stmt_index, stmt) in block.statements.iter().enumerate() {
-                if let MirStatementKind::Call { destination, callee, args } = &stmt.kind
-                    && self.is_device_callee(callee)
-                {
-                    sites.push(CallSite {
-                        block_index,
-                        block_id: block.id,
-                        stmt_index: Some(stmt_index),
-                        is_try_call: false,
-                        destination: destination.clone(),
-                        callee: callee.clone(),
-                        args: args.clone(),
-                        span: stmt.span,
-                    });
-                }
-            }
-            if let MirTerminatorKind::TryCall { destination, callee, args, .. } = &block.terminator.kind
-                && self.is_device_callee(callee)
-            {
-                sites.push(CallSite {
-                    block_index,
-                    block_id: block.id,
-                    stmt_index: None,
-                    is_try_call: true,
-                    destination: destination.clone(),
-                    callee: callee.clone(),
-                    args: args.clone(),
-                    span: block.terminator.span,
-                });
-            }
-        }
-        sites
+        self.all_callees(function)
+            .into_iter()
+            .filter(|site| self.is_device_callee(&site.callee))
+            .collect()
     }
 
     /// Every call site in one function, device or not (prune reference scan).

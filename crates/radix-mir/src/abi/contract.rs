@@ -1,7 +1,7 @@
 use crate::{
     MirCollectionOp, MirConstant, MirFunction, MirIntrinsic, MirLocalId, MirOperand, MirParam,
-    MirParamMode, MirPlace, MirPlaceBase, MirRuntimeCall, MirStatement, MirStatementKind,
-    MirTempId, MirType, MirValidationContext, MirValueKind,
+    MirParamMode, MirPlace, MirPlaceBase, MirRuntimeCall, MirStatementKind, MirTempId, MirType,
+    MirValidationContext, MirValueKind,
 };
 use radix_lexer::Interner;
 use radix_types::NumericWidth;
@@ -1015,7 +1015,10 @@ pub fn stability_max_is_dead(function: &MirFunction) -> bool {
             ) {
                 continue;
             }
-            let destination = statement_destination(statement);
+            let destination = match &statement.kind {
+                MirStatementKind::RuntimeCall { destination, .. } => destination.as_ref(),
+                _ => None,
+            };
             let dead = destination
                 .as_ref()
                 .is_some_and(|dest| reduction_destination_is_dead(function, dest));
@@ -1026,14 +1029,6 @@ pub fn stability_max_is_dead(function: &MirFunction) -> bool {
         }
     }
     saw_stability
-}
-
-/// The runtime-call destination of a collection statement, when present.
-fn statement_destination(statement: &MirStatement) -> Option<&MirPlace> {
-    match &statement.kind {
-        MirStatementKind::RuntimeCall { destination, .. } => destination.as_ref(),
-        _ => None,
-    }
 }
 
 /// PGC-R5: whether a softmax operand is the additive-mask idiom — a temp
