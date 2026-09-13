@@ -241,7 +241,7 @@ impl Lowerer<'_> {
                 .form_frames
                 .pop()
                 .expect("authored form frame pushed above");
-            let form = self.complete_type_form(ty, ty_id, frame);
+            let form = Self::complete_type_form(ty, ty_id, frame);
             // A parent frame always exists during capture: the marker frame
             // pushed by `lower_authored_type` sits at the bottom of the stack.
             if let Some(parent) = self.form_frames.last_mut() {
@@ -263,7 +263,6 @@ impl Lowerer<'_> {
     /// correspondence (param modes, `∪ nihil` stripping, sort/dedup), so they
     /// keep no child forms and re-emit canonically.
     fn complete_type_form(
-        &mut self,
         expr: &TypeExpr,
         ty: TypeId,
         frame: super::TypeFormFrame,
