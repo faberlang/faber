@@ -12,8 +12,7 @@ impl HttpTransport {
     fn tracked_connections(&self) -> usize {
         self.connections
             .lock()
-            .map(|mut tasks| tasks.len())
-            .unwrap_or(0)
+            .map_or(0, |mut tasks| tasks.len())
     }
 }
 use hyper::{Request, StatusCode};
@@ -99,7 +98,7 @@ async fn concurrent_correlation_two_slow_requests() {
     assert_eq!(ba, format!("{ida}:alpha"));
     assert_eq!(bb, format!("{idb}:beta"));
     assert!(
-        elapsed < delay * 2 - Duration::from_millis(20),
+        elapsed < (delay * 2).checked_sub(Duration::from_millis(20)).unwrap(),
         "expected overlap; elapsed={elapsed:?} delay={delay:?}"
     );
 
@@ -263,17 +262,14 @@ async fn shutdown_stops_accept_and_drains() {
                 .expect("req"),
         )
         .await;
-    match second {
-        Ok(resp) => {
-            assert!(
-                resp.status() == StatusCode::SERVICE_UNAVAILABLE || resp.status().is_server_error(),
-                "unexpected status {}",
-                resp.status()
-            );
-        }
-        Err(_) => {
-            // Connection refused / reset after accept stopped is also clean.
-        }
+    if let Ok(resp) = second {
+        assert!(
+            resp.status() == StatusCode::SERVICE_UNAVAILABLE || resp.status().is_server_error(),
+            "unexpected status {}",
+            resp.status()
+        );
+    } else {
+        // Connection refused / reset after accept stopped is also clean.
     }
 
     assert!(transport.is_cancelled());

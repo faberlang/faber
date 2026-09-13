@@ -36,6 +36,8 @@ pub struct ListaN<T, const N: usize> {
 impl<T, const N: usize> ListaN<T, N> {
     /// Construct an empty bounded list. Spare slots remain unreadable.
     #[must_use]
+    /// # Errors
+    /// Returns an error when the requested operation cannot be completed.
     pub fn empty() -> Self {
         Self {
             slots: std::array::from_fn(|_| MaybeUninit::uninit()),
@@ -45,11 +47,15 @@ impl<T, const N: usize> ListaN<T, N> {
 
     /// Construct from an unbounded `Vec<T>`, failing closed when it is too
     /// long. The oversized input is not truncated or silently reallocated.
+    /// # Errors
+    /// Returns an error when the requested operation cannot be completed.
     pub fn new(values: Vec<T>) -> Result<Self, ListaNOverflow> {
         Self::try_from_vec(values)
     }
 
     /// Construct from an unbounded `Vec<T>`, failing closed when `len > N`.
+    /// # Errors
+    /// Returns an error when the requested operation cannot be completed.
     pub fn try_from_vec(values: Vec<T>) -> Result<Self, ListaNOverflow> {
         let attempted = values.len();
         if attempted > N {
@@ -73,6 +79,8 @@ impl<T, const N: usize> ListaN<T, N> {
 
     /// Append one element. Returns a recoverable error when `len == N` and
     /// leaves the initialized prefix unchanged.
+    /// # Errors
+    /// Returns an error when the requested operation cannot be completed.
     pub fn appende(&mut self, value: T) -> Result<(), ListaNOverflow> {
         if self.len >= N {
             return Err(ListaNOverflow {
@@ -124,7 +132,7 @@ impl<T, const N: usize> ListaN<T, N> {
         // or `try_from_vec`, and `self.len <= N` is maintained by those
         // constructors and methods. `MaybeUninit<T>` has the same layout and
         // alignment as `T`; the slice is limited to the initialized prefix.
-        unsafe { std::slice::from_raw_parts(self.slots.as_ptr() as *const T, self.len) }
+        unsafe { std::slice::from_raw_parts(self.slots.as_ptr().cast::<T>(), self.len) }
     }
 
     /// Iterate over the initialized prefix only.
@@ -144,6 +152,8 @@ impl<T, const N: usize> ListaN<T, N> {
 
     /// Alias for [`Self::to_lista`] using the Rust carrier name.
     #[must_use]
+    /// # Errors
+    /// Returns an error when the requested operation cannot be completed.
     pub fn to_vec(&self) -> Vec<T>
     where
         T: Clone,
@@ -153,6 +163,8 @@ impl<T, const N: usize> ListaN<T, N> {
 
     /// Unbounded → bounded: copy a `lista<T>` prefix and fail closed when
     /// `len > N`.
+    /// # Errors
+    /// Returns an error when the requested operation cannot be completed.
     pub fn try_from_lista(values: &[T]) -> Result<Self, ListaNOverflow>
     where
         T: Clone,

@@ -13,6 +13,9 @@ license = "MIT"
 # build without the private compiler workspace.
 [workspace]
 
+[lints.clippy]
+pedantic = "deny"
+
 [lib]
 name = "faber"
 path = "src/lib.rs"

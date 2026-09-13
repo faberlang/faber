@@ -141,7 +141,7 @@ where
 }
 
 impl From<()> for Valor {
-    fn from(_: ()) -> Self {
+    fn from((): ()) -> Self {
         Valor::Nihil
     }
 }

@@ -12,7 +12,7 @@
 //! - `iace/functio-fallibilis.fab` — fac/cape recovery of a `⇥` error (prints
 //!   `5` then `0`, recovered from division-by-zero);
 //! - `iace/functio-propagans.fab` — `⇥` propagation through a call chain
-//!   (try_call re-throws without a local handler);
+//!   (`try_call` re-throws without a local handler);
 //! - `iace/iace-si-guard.fab` — `iace` with a `si` guard (conditional throw);
 //! - `operatores/function-types.fab` — `→ T` / `→ T ⇥ E` signature types.
 //!

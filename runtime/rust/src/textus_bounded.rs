@@ -59,6 +59,8 @@ impl<const N: usize> TextusN<N> {
     ///
     /// Returns [`Err`] if the Unicode scalar count exceeds `N` (overflow uses
     /// declared `N`; no truncate). `N` counts scalars, not UTF-8 bytes.
+    /// # Errors
+    /// Returns an error when the requested operation cannot be completed.
     pub fn new(value: &str) -> Result<Self, TextusNOverflow> {
         let attempted = value.chars().count();
         if attempted > N {
@@ -78,6 +80,8 @@ impl<const N: usize> TextusN<N> {
     }
 
     /// Append one Unicode scalar. Fails closed when `len == N`.
+    /// # Errors
+    /// Returns an error when the requested operation cannot be completed.
     pub fn appende(&mut self, scalar: char) -> Result<(), TextusNOverflow> {
         if self.len >= N {
             return Err(TextusNOverflow {
@@ -138,11 +142,15 @@ impl<const N: usize> TextusN<N> {
 
     /// Bounded → unbounded: copy the valid prefix.
     #[must_use]
+    /// # Errors
+    /// Returns an error when the requested operation cannot be completed.
     pub fn to_textus(&self) -> String {
         self.as_scalars().iter().collect()
     }
 
     /// Unbounded → bounded: fail closed when scalar `len > N`.
+    /// # Errors
+    /// Returns an error when the requested operation cannot be completed.
     pub fn try_from_textus(value: &str) -> Result<Self, TextusNOverflow> {
         Self::new(value)
     }

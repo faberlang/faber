@@ -32,7 +32,7 @@ fn two_slow_handlers_overlap_and_update_state_deterministically() {
     assert_ne!(first, second);
     assert_eq!(state.get("requests"), Ok(Some(Valor::Numerus(2))));
     assert!(
-        started.elapsed() < delay * 2 - Duration::from_millis(20),
+        started.elapsed() < (delay * 2).checked_sub(Duration::from_millis(20)).unwrap(),
         "slow handlers did not overlap"
     );
 }

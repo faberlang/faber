@@ -26,6 +26,8 @@ pub struct ServiceFixture {
 }
 
 impl ServiceFixture {
+    /// # Errors
+    /// Returns an error when the requested operation cannot be completed.
     pub async fn serve() -> Result<Self, String> {
         let routes = fixture_routes()?;
         let state = ApplicationState::new();
@@ -43,10 +45,14 @@ impl ServiceFixture {
         Ok(Self { transport, state })
     }
 
+    /// # Errors
+    /// Returns an error when the requested operation cannot be completed.
     pub fn local_addr(&self) -> SocketAddr {
         self.transport.local_addr()
     }
 
+    /// # Errors
+    /// Returns an error when the requested operation cannot be completed.
     pub fn counter(&self) -> Result<i64, String> {
         match self.state.get("requests").map_err(state_error)? {
             Some(Valor::Numerus(value)) => Ok(value),

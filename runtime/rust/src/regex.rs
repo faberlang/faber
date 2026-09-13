@@ -30,8 +30,7 @@ impl Regex {
     #[must_use]
     pub fn consentit(&self, textus: String) -> bool {
         regex::Regex::new(&self.pattern)
-            .map(|regex| regex.is_match(&textus))
-            .unwrap_or(false)
+            .is_ok_and(|regex| regex.is_match(&textus))
     }
 }
 

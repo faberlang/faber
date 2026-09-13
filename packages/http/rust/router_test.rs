@@ -326,7 +326,7 @@ fn no_match_returns_nihil() {
 fn empty_path_does_not_match_non_root_route() {
     let table = add_get(route_table(), "/only".into(), "h".into()).expect("route");
     assert!(
-        match_route(table, "GET".into(), "".into())
+        match_route(table, "GET".into(), String::new())
             .expect("ok")
             .is_none()
     );
@@ -343,7 +343,7 @@ fn path_param_missing_key_returns_none() {
 
 #[test]
 fn query_param_empty_string_returns_none() {
-    assert_eq!(query_param("".into(), "q".into()), None);
+    assert_eq!(query_param(String::new(), "q".into()), None);
 }
 
 #[test]

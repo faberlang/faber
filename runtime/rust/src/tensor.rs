@@ -79,6 +79,8 @@ pub const ERR_LAYERNORM_BETA_NON_FINITE: &str =
 pub const ERR_LAYERNORM_EPSILON_INVALID: &str = "layernorm epsilon must be > 0 and finite.";
 
 #[must_use]
+/// # Errors
+/// Returns an error when the requested operation cannot be completed.
 pub fn tensor_shape_has_element_count(shape: &[i64], actual: usize) -> bool {
     tensor_shape_element_count(shape) == Some(actual)
 }
@@ -163,6 +165,8 @@ impl<T: Clone + Default> Tensor<T> {
     }
 
     #[must_use]
+    /// # Errors
+    /// Returns an error when the requested operation cannot be completed.
     pub fn element_count(&self) -> usize {
         element_count_usize(&self.shape)
     }
@@ -286,6 +290,8 @@ impl<T: Clone + Default> Tensor<T> {
     }
 
     #[must_use]
+    /// # Errors
+    /// Returns an error when the requested operation cannot be completed.
     pub fn materialize(&self) -> Self {
         Self::from_contiguous(self.planata(), self.shape.clone())
     }
@@ -580,7 +586,7 @@ impl Tensor<f32> {
     ///
     /// Returns `Err` if any element is NaN or infinite.
     pub fn relu(&self) -> Result<Tensor<f32>, &'static str> {
-        for &value in self.planata().iter() {
+        for &value in &self.planata() {
             if !value.is_finite() {
                 return Err(ERR_RELU_NON_FINITE_INPUT);
             }
@@ -604,7 +610,7 @@ impl Tensor<f32> {
     ///
     /// Returns `Err` if any element is NaN, infinite, or negative.
     pub fn sqrt(&self) -> Result<Tensor<f32>, &'static str> {
-        for &value in self.planata().iter() {
+        for &value in &self.planata() {
             if !value.is_finite() {
                 return Err(ERR_SQRT_NON_FINITE_INPUT);
             }
@@ -615,7 +621,7 @@ impl Tensor<f32> {
         Ok(Tensor::from_contiguous(
             self.planata()
                 .into_iter()
-                .map(|value| value.sqrt())
+                .map(f32::sqrt)
                 .collect(),
             self.shape.clone(),
         ))
@@ -632,7 +638,7 @@ impl Tensor<f32> {
     ///
     /// Returns `Err` if any element is NaN or infinite.
     pub fn gelu(&self) -> Result<Tensor<f32>, &'static str> {
-        for &value in self.planata().iter() {
+        for &value in &self.planata() {
             if !value.is_finite() {
                 return Err(ERR_GELU_NON_FINITE_INPUT);
             }
@@ -661,13 +667,13 @@ impl Tensor<f32> {
     /// Returns `Err` if any input element is NaN or infinite, or if any
     /// result overflows to a non-finite value.
     pub fn exp(&self) -> Result<Tensor<f32>, &'static str> {
-        for &value in self.planata().iter() {
+        for &value in &self.planata() {
             if !value.is_finite() {
                 return Err(ERR_EXP_NON_FINITE_INPUT);
             }
         }
         let mut data = Vec::with_capacity(self.element_count());
-        for &value in self.planata().iter() {
+        for &value in &self.planata() {
             let result = value.exp();
             if !result.is_finite() {
                 return Err(ERR_EXP_OVERFLOW);
@@ -687,7 +693,7 @@ impl Tensor<f32> {
     /// Returns `Err` if any input element is NaN, infinite, or zero/negative,
     /// or if any result is non-finite.
     pub fn log(&self) -> Result<Tensor<f32>, &'static str> {
-        for &value in self.planata().iter() {
+        for &value in &self.planata() {
             if !value.is_finite() {
                 return Err(ERR_LOG_NON_FINITE_INPUT);
             }
@@ -696,7 +702,7 @@ impl Tensor<f32> {
             }
         }
         let mut data = Vec::with_capacity(self.element_count());
-        for &value in self.planata().iter() {
+        for &value in &self.planata() {
             let result = value.ln();
             if !result.is_finite() {
                 return Err(ERR_LOG_NON_FINITE_RESULT);
@@ -706,7 +712,7 @@ impl Tensor<f32> {
         Ok(Tensor::from_contiguous(data, self.shape.clone()))
     }
 
-    /// Softmax: exp(x_i - max(x)) / sum(exp(x_j - max(x))) with numerical
+    /// Softmax: `exp(x_i` - max(x)) / `sum(exp(x_j` - max(x))) with numerical
     /// stability. Operates on rank-1 (vector) or rank-2 (batched row-wise,
     /// axis 1 — the last axis).
     ///
@@ -762,7 +768,7 @@ impl Tensor<f32> {
     /// Cross-entropy loss with internal softmax over the last axis.
     ///
     /// Computes `-sum(targets * log(softmax(logits) + ε)) / N` where
-    /// ε = 1e-7 for numerical stability and N = last_dim (number of classes).
+    /// ε = 1e-7 for numerical stability and N = `last_dim` (number of classes).
     /// Operates on rank-1 (single example) or rank-2 (batched, row-wise).
     ///
     /// Cross-entropy loss: `-sum(targets * log(softmax(logits) + ε)) / N`.
@@ -778,12 +784,12 @@ impl Tensor<f32> {
         if self.element_count() == 0 {
             return Err(ERR_CRUX_ENTROPIA_EMPTY_TENSOR);
         }
-        for &value in self.planata().iter() {
+        for &value in &self.planata() {
             if !value.is_finite() {
                 return Err(ERR_CRUX_ENTROPIA_NON_FINITE_INPUT);
             }
         }
-        for &value in targets.planata().iter() {
+        for &value in &targets.planata() {
             if !value.is_finite() {
                 return Err(ERR_CRUX_ENTROPIA_TARGET_NON_FINITE);
             }
@@ -958,14 +964,14 @@ impl Tensor<f32> {
             let cols = self.shape[0];
 
             // Compute mean
-            let mean: f64 = input_data.iter().map(|&v| v as f64).sum::<f64>() / cols as f64;
+            let mean: f64 = input_data.iter().map(|&v| f64::from(v)).sum::<f64>() / cols as f64;
             let mean = mean as f32;
 
             // Compute variance
             let var: f64 = input_data
                 .iter()
                 .map(|&v| {
-                    let d = v as f64 - mean as f64;
+                    let d = f64::from(v) - f64::from(mean);
                     d * d
                 })
                 .sum::<f64>()
@@ -975,8 +981,8 @@ impl Tensor<f32> {
             let inv_std = 1.0 / (var + epsilon).sqrt();
 
             // Compute normalized and optionally affine
-            let gamma_data = gamma.map(|g| g.planata());
-            let beta_data = beta.map(|b| b.planata());
+            let gamma_data = gamma.map(Tensor::planata);
+            let beta_data = beta.map(Tensor::planata);
             let result: Vec<f32> = input_data
                 .iter()
                 .enumerate()
@@ -1004,8 +1010,8 @@ impl Tensor<f32> {
             // Hoisted once: gamma/beta are fixed for the call, so their flat
             // data feeds every row/column slice instead of being re-materialized
             // per element (mirrors the rank-1 branch above).
-            let gamma_data = gamma.map(|g| g.planata());
-            let beta_data = beta.map(|b| b.planata());
+            let gamma_data = gamma.map(Tensor::planata);
+            let beta_data = beta.map(Tensor::planata);
 
             let result: Vec<f32> = if normalize_along_cols {
                 let mut result = vec![0.0_f32; rows * cols];
@@ -1016,14 +1022,14 @@ impl Tensor<f32> {
                     let row_data = &input_data[row_start..row_end];
 
                     // Mean
-                    let mean: f64 = row_data.iter().map(|&v| v as f64).sum::<f64>() / cols as f64;
+                    let mean: f64 = row_data.iter().map(|&v| f64::from(v)).sum::<f64>() / cols as f64;
                     let mean = mean as f32;
 
                     // Variance
                     let var: f64 = row_data
                         .iter()
                         .map(|&v| {
-                            let d = v as f64 - mean as f64;
+                            let d = f64::from(v) - f64::from(mean);
                             d * d
                         })
                         .sum::<f64>()
@@ -1054,14 +1060,14 @@ impl Tensor<f32> {
                     // Collect column data
                     let mut col_sum: f64 = 0.0;
                     for r in 0..rows {
-                        col_sum += input_data[r * cols + c] as f64;
+                        col_sum += f64::from(input_data[r * cols + c]);
                     }
                     let mean = (col_sum / rows as f64) as f32;
 
                     let mut col_var: f64 = 0.0;
                     for r in 0..rows {
                         let v = input_data[r * cols + c];
-                        let d = v as f64 - mean as f64;
+                        let d = f64::from(v) - f64::from(mean);
                         col_var += d * d;
                     }
                     let var = (col_var / rows as f64) as f32;
