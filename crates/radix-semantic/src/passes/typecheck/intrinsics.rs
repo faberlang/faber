@@ -74,7 +74,14 @@ impl IntrinsicTypeContext {
             | Type::Queue(inner)
             | Type::BoundedQueue { element: inner, .. }
             | Type::Stack(inner)
-            | Type::BoundedStack { element: inner, .. } => Self {
+            | Type::BoundedStack { element: inner, .. }
+            | Type::Set(inner)
+            | Type::Tensor(inner, _)
+            | Type::Sparsa(inner, _)
+            | Type::Matrix(inner, _)
+            | Type::Vector(inner, _)
+            | Type::Intervallum(inner)
+            | Type::Atomic(inner) => Self {
                 inner: Some(*inner),
                 key: None,
                 value: None,
@@ -84,42 +91,6 @@ impl IntrinsicTypeContext {
                 inner: None,
                 key: Some(*key),
                 value: Some(*value),
-                receiver_ty: Some(resolved),
-            },
-            Type::Set(inner) => Self {
-                inner: Some(*inner),
-                key: None,
-                value: None,
-                receiver_ty: Some(resolved),
-            },
-            Type::Tensor(inner, _) | Type::Sparsa(inner, _) => Self {
-                inner: Some(*inner),
-                key: None,
-                value: None,
-                receiver_ty: Some(resolved),
-            },
-            Type::Matrix(inner, _) => Self {
-                inner: Some(*inner),
-                key: None,
-                value: None,
-                receiver_ty: Some(resolved),
-            },
-            Type::Vector(inner, _) => Self {
-                inner: Some(*inner),
-                key: None,
-                value: None,
-                receiver_ty: Some(resolved),
-            },
-            Type::Intervallum(bound) => Self {
-                inner: Some(*bound),
-                key: None,
-                value: None,
-                receiver_ty: Some(resolved),
-            },
-            Type::Atomic(inner) => Self {
-                inner: Some(*inner),
-                key: None,
-                value: None,
                 receiver_ty: Some(resolved),
             },
             // WHY: `octeti` unifies with `lista<numerus<u8>>` (DEFER-029). Its
@@ -469,30 +440,8 @@ pub(super) fn check_intrinsic_method_call(
                 return Some(checker.error_type);
             };
             let mapped = checker.fresh_infer();
-            let mapper_ty = checker.types.function(FuncSig {
-                type_params: Vec::new(),
-                params: vec![ParamType {
-                    ty: inner,
-                    mode: SemanticParamMode::Owned,
-                    optional: false,
-                }],
-                ret: mapped,
-                err: None,
-                is_async: false,
-                is_generator: false,
-            });
-            let sig = FuncSig {
-                type_params: Vec::new(),
-                params: vec![ParamType {
-                    ty: mapper_ty,
-                    mode: SemanticParamMode::Owned,
-                    optional: false,
-                }],
-                ret: mapped,
-                err: None,
-                is_async: false,
-                is_generator: false,
-            };
+            let mapper_ty = checker.types.function(simple_sig(vec![inner], mapped));
+            let sig = simple_sig(vec![mapper_ty], mapped);
             checker.check_call_args(&sig, args, span);
             let ret = checker.resolve_inferred_type(mapped);
             // F2-SET-MAP admissibility gate: `types.set` IS the existing
@@ -509,44 +458,8 @@ pub(super) fn check_intrinsic_method_call(
                 return Some(checker.error_type);
             };
             let acc = checker.fresh_infer();
-            let reducer_ty = checker.types.function(FuncSig {
-                type_params: Vec::new(),
-                params: vec![
-                    ParamType {
-                        ty: acc,
-                        mode: SemanticParamMode::Owned,
-                        optional: false,
-                    },
-                    ParamType {
-                        ty: inner,
-                        mode: SemanticParamMode::Owned,
-                        optional: false,
-                    },
-                ],
-                ret: acc,
-                err: None,
-                is_async: false,
-                is_generator: false,
-            });
-            let sig = FuncSig {
-                type_params: Vec::new(),
-                params: vec![
-                    ParamType {
-                        ty: reducer_ty,
-                        mode: SemanticParamMode::Owned,
-                        optional: false,
-                    },
-                    ParamType {
-                        ty: acc,
-                        mode: SemanticParamMode::Owned,
-                        optional: false,
-                    },
-                ],
-                ret: acc,
-                err: None,
-                is_async: false,
-                is_generator: false,
-            };
+            let reducer_ty = checker.types.function(simple_sig(vec![acc, inner], acc));
+            let sig = simple_sig(vec![reducer_ty, acc], acc);
             checker.check_call_args(&sig, args, span);
             let resolved = checker.resolve_inferred_type(acc);
             if matches!(entry.return_kind, IntrinsicReturnKind::ReducerArray) {
@@ -579,9 +492,11 @@ pub(super) fn check_intrinsic_method_call(
                     is_generator: false,
                 };
                 checker.check_instantiated_call(&sig, explicit_type_args, args, span, None)
-            } else if matches!(entry.receiver, radix_intrinsics::IntrinsicReceiver::Tensor)
-                || matches!(entry.receiver, radix_intrinsics::IntrinsicReceiver::Sparsa)
-            {
+            } else if matches!(
+                entry.receiver,
+                radix_intrinsics::IntrinsicReceiver::Tensor
+                    | radix_intrinsics::IntrinsicReceiver::Sparsa
+            ) {
                 check_tensor_method_args(checker, entry, &params, args, ret, span)
             } else if bounded_appende {
                 // D6: bounded `appende` is a typed recoverable alternate exit.
@@ -668,6 +583,26 @@ fn matrix_numeric_element_allowed(
     false
 }
 
+/// Monomorphic owned-param call signature — the shape every intrinsic-built
+/// closure and checked call in this file shares.
+fn simple_sig(params: Vec<TypeId>, ret: TypeId) -> FuncSig {
+    FuncSig {
+        type_params: Vec::new(),
+        params: params
+            .into_iter()
+            .map(|ty| ParamType {
+                ty,
+                mode: SemanticParamMode::Owned,
+                optional: false,
+            })
+            .collect(),
+        ret,
+        err: None,
+        is_async: false,
+        is_generator: false,
+    }
+}
+
 fn resolve_param_types(
     checker: &mut TypeChecker<'_>,
     entry: &MethodIntrinsic,
@@ -717,36 +652,14 @@ fn resolve_param_kind(
                 return checker.error_type;
             };
             let bool_ty = checker.bool_type();
-            checker.types.function(FuncSig {
-                type_params: Vec::new(),
-                params: vec![ParamType {
-                    ty: inner,
-                    mode: SemanticParamMode::Owned,
-                    optional: false,
-                }],
-                ret: bool_ty,
-                err: None,
-                is_async: false,
-                is_generator: false,
-            })
+            checker.types.function(simple_sig(vec![inner], bool_ty))
         }
         IntrinsicParamKind::Mapper => {
             let Some(inner) = ctx.inner else {
                 return checker.error_type;
             };
             let ret = checker.fresh_infer();
-            checker.types.function(FuncSig {
-                type_params: Vec::new(),
-                params: vec![ParamType {
-                    ty: inner,
-                    mode: SemanticParamMode::Owned,
-                    optional: false,
-                }],
-                ret,
-                err: None,
-                is_async: false,
-                is_generator: false,
-            })
+            checker.types.function(simple_sig(vec![inner], ret))
         }
         IntrinsicParamKind::ReceiverSelf => ctx.receiver_ty.unwrap_or(checker.error_type),
         IntrinsicParamKind::TensorPeer => {
@@ -825,17 +738,14 @@ fn resolve_return_type(
             checker.types.option(value)
         }
         IntrinsicReturnKind::ArrayInner => {
-            if matches!(entry.receiver, radix_intrinsics::IntrinsicReceiver::Tensor)
-                || matches!(entry.receiver, radix_intrinsics::IntrinsicReceiver::Sparsa)
+            if matches!(
+                entry.receiver,
+                radix_intrinsics::IntrinsicReceiver::Tensor
+                    | radix_intrinsics::IntrinsicReceiver::Sparsa
+            ) && entry.faber_name == "magnitudines"
             {
-                if entry.faber_name == "magnitudines" {
-                    let numerus = checker.numerus_type();
-                    return checker.types.array(numerus);
-                }
-                let Some(inner) = ctx.inner else {
-                    return checker.error_type;
-                };
-                return checker.types.array(inner);
+                let numerus = checker.numerus_type();
+                return checker.types.array(numerus);
             }
             let Some(inner) = ctx.inner else {
                 return checker.error_type;
