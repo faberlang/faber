@@ -613,7 +613,8 @@ fn collect_provider_modules(
             // namespace calls then target `crate::<module>::…` paths that
             // exist. The `contains_key` guard above is the cycle brake.
             let nested_from = provider_path
-                .parent().map_or_else(|| std::path::Path::new(".").to_path_buf(), std::path::Path::to_path_buf);
+                .parent()
+                .map_or_else(|| std::path::Path::new(".").to_path_buf(), std::path::Path::to_path_buf);
             collect_provider_modules(&unit, &nested_from, modules)?;
             let namespace_info = rust::build_file_import_namespaces(
                 &unit.hir,

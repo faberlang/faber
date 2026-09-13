@@ -324,7 +324,8 @@ impl<'a> StructuralOwnerIndex<'a> {
 
     fn current_function_path(&self) -> String {
         self.functions
-            .last().map_or_else(|| "<module>".to_owned(), |frame| frame.path.clone())
+            .last()
+            .map_or_else(|| "<module>".to_owned(), |frame| frame.path.clone())
     }
 
     fn visit_struct_method(&mut self, parent: &str, method: &crate::hir::HirMethod) {

@@ -498,8 +498,7 @@ impl CompositionPass<'_> {
                 caller_id,
                 callee.id,
                 site.block_id,
-                site.stmt_index
-                    .map_or(u32::MAX, |index| index as u32),
+                site.stmt_index.map_or(u32::MAX, |index| index as u32),
             );
             let inlines = account
                 .sites
@@ -515,7 +514,9 @@ impl CompositionPass<'_> {
                 self.push_expansion("failable", site.span, 1, 0, &chain);
                 return;
             }
-            let new_blocks = if let Some(blocks) = self.inline_call(caller_id, &site, &callee) { blocks } else {
+            let new_blocks = if let Some(blocks) = self.inline_call(caller_id, &site, &callee) {
+                blocks
+            } else {
                 self.push_expansion("survived", site.span, 1, 0, &chain);
                 return;
             };
@@ -782,7 +783,8 @@ impl CompositionPass<'_> {
     fn chain_labels(&self, ids: &[MirFunctionId]) -> String {
         ids.iter()
             .map(|id| {
-                self.function(*id).map_or_else(|| format!("fn#{}", id.0), |function| function_label(function, self.interner))
+                self.function(*id)
+                    .map_or_else(|| format!("fn#{}", id.0), |function| function_label(function, self.interner))
             })
             .collect::<Vec<_>>()
             .join(" → ")

@@ -1622,9 +1622,7 @@ fn build_subchain_function(
         });
         if let Some(local) = last_local {
             terminator = MirTerminator {
-                kind: MirTerminatorKind::Return(Some(MirOperand::Place(MirPlace::local(
-                    local,
-                )))),
+                kind: MirTerminatorKind::Return(Some(MirOperand::Place(MirPlace::local(local)))),
                 span,
             };
             return_ty = source_local_ty(source, local);
