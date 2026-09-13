@@ -996,8 +996,8 @@ impl TypeTable {
                                     &b_param.constraint,
                                 )
                                 && self.generic_param_defaults_equal(
-                                    &a_param.default,
-                                    &b_param.default,
+                                    a_param.default.as_ref(),
+                                    b_param.default.as_ref(),
                                 )
                         },
                     )
@@ -1104,8 +1104,8 @@ impl TypeTable {
 
     fn generic_param_defaults_equal(
         &self,
-        a: &Option<SemanticGenericParamDefault>,
-        b: &Option<SemanticGenericParamDefault>,
+        a: Option<&SemanticGenericParamDefault>,
+        b: Option<&SemanticGenericParamDefault>,
     ) -> bool {
         match (a, b) {
             (
