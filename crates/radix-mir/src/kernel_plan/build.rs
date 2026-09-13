@@ -531,7 +531,7 @@ impl CollectionKernelPlan {
                 if !signature_matches_transformer_counts(signature, count, count) {
                     return None;
                 }
-                let (epsilon_bits, _epsilon_local, width, gamma_local) =
+                let (epsilon_bits, width, gamma_local) =
                     rms_norm_const_facts(function, validation, &dims, axis)?;
                 // Gamma is data, but it must still be present in the typed
                 // kernel resource signature. This keeps plan admission tied
@@ -1123,7 +1123,7 @@ pub(crate) fn transformer_recipe_shape(
                 // v1: rank 1-2 only (the runner's constraint).
                 return None;
             }
-            let axis = const_axis(args.get(1)?)?;
+            let axis = const_non_negative(args.get(1)?)?;
             if axis >= rank as u64 {
                 return None;
             }
@@ -1151,7 +1151,7 @@ pub(crate) fn transformer_recipe_shape(
             let axis = (rank - 1) as u64;
             // v1: layer norm normalizes over the last axis; the const axis
             // must agree (the plan never infers facts, A3).
-            if const_axis(args.get(1)?)? != axis {
+            if const_non_negative(args.get(1)?)? != axis {
                 return None;
             }
             if !layer_norm_const_facts(function, validation, &dims, axis) {
@@ -1169,7 +1169,7 @@ pub(crate) fn transformer_recipe_shape(
                 return None;
             }
             let axis = (rank - 1) as u64;
-            if const_axis(args.get(1)?)? != axis {
+            if const_non_negative(args.get(1)?)? != axis {
                 return None;
             }
             Some((dims, axis))
@@ -1309,12 +1309,12 @@ fn rms_norm_const_facts(
     validation: &MirValidationContext<'_>,
     dims: &[u64],
     axis: u64,
-) -> Option<(u32, Option<MirLocalId>, u64, MirLocalId)> {
+) -> Option<(u32, u64, MirLocalId)> {
     let args = transformer_statement_args(function, MirCollectionOp::TensorRmsNorm)?;
     if args.len() != 4 {
         return None;
     }
-    let (epsilon_bits, epsilon_local) = match literal_const_operand(function, &args[2]) {
+    let epsilon_bits = match literal_const_operand(function, &args[2]) {
         Some(MirConstant::Float(epsilon)) => {
             // WHY: the device recipe stores the operation-precision f32 bits;
             // reject overflow and underflow after IEEE-754 narrowing.
@@ -1323,7 +1323,7 @@ fn rms_norm_const_facts(
             if !epsilon.is_finite() || epsilon <= 0.0 {
                 return None;
             }
-            (epsilon.to_bits(), None)
+            epsilon.to_bits()
         }
         Some(_) => return None,
         None => {
@@ -1337,7 +1337,7 @@ fn rms_norm_const_facts(
             {
                 return None;
             }
-            (0, Some(epsilon_local))
+            0
         }
     };
     let norm_index = usize::try_from(axis)
@@ -1354,7 +1354,7 @@ fn rms_norm_const_facts(
         return None;
     }
     let gamma_local = crate::read_analysis::operand_local(&args[3])?;
-    Some((epsilon_bits, epsilon_local, norm_dim, gamma_local))
+    Some((epsilon_bits, norm_dim, gamma_local))
 }
 
 /// The `TensorRope` / `TensorRopeHalf` const-operand facts (GI3-1): `pos`
@@ -1520,13 +1520,6 @@ fn transformer_operand_dims(
             .map(|entry| entry.ty)
     })?;
     crate::tensor_type::tensor_literal_dims(ty, validation).ok()
-}
-
-/// The axis const operand: a non-negative `MirConstant::Int` or a
-/// `MirConstant::UInt` (the trailing const operands of the transformer
-/// lowerings).
-fn const_axis(operand: &MirOperand) -> Option<u64> {
-    const_non_negative(operand)
 }
 
 /// The flattened element count of the literal dims.

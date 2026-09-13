@@ -2188,7 +2188,7 @@ pub(super) fn rewrite_statement_type_id(
     rewrites: &[(TypeId, TypeId)],
 ) {
     match &mut statement.kind {
-        MirStatementKind::Assign { value, .. } => rewrite_value_type_id(value, rewrites),
+        MirStatementKind::Assign { value, .. } => rewrite_type_id(&mut value.ty, rewrites),
         MirStatementKind::Call { callee, .. } => {
             // A generic callee's explicit type args are semantic types from
             // the imported unit's table; unrewritten ids alias unrelated
@@ -2216,10 +2216,6 @@ pub(super) fn rewrite_statement_type_id(
             rewrite_type_id(&mut aggregate.ty, rewrites);
         }
     }
-}
-
-pub(super) fn rewrite_value_type_id(value: &mut MirValue, rewrites: &[(TypeId, TypeId)]) {
-    rewrite_type_id(&mut value.ty, rewrites);
 }
 
 /// Rewrite a lowered source program's enum-variant definitions to the
