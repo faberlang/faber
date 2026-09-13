@@ -265,17 +265,12 @@ pub fn confirm_packed_admission(
     }
     if let Some(operand) = trailing_layout_operand(function, MirCollectionOp::TensorGather) {
         let layout = packed_layout_from_operand(operand)?;
-        let CollectionKernelPlan::Gather(gather) = plan else {
+        // `GatherPlan` carries no layout field, so the gate is plan-shape only.
+        if !matches!(plan, CollectionKernelPlan::Gather(_)) {
             return Err(PackedAdmissionError::UnrepresentableLayout {
                 ggml_type_id: layout.ggml_type_id(),
             });
-        };
-        let _ = admit_quantized_gather(
-            layout,
-            gather.table_rows,
-            gather.table_cols,
-            gather.id_count,
-        );
+        }
     }
     Ok(())
 }
