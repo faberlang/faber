@@ -67,12 +67,8 @@ impl<T, const N: usize> ListaN<T, N> {
 
         let mut bounded = Self::empty();
         for value in values {
-            // The length check above makes this append infallible. Keeping the
-            // checked operation here preserves one overflow policy for all
-            // insertion paths.
-            bounded
-                .appende(value)
-                .expect("validated Vec length must fit ListaN capacity");
+            bounded.slots[bounded.len].write(value);
+            bounded.len += 1;
         }
         Ok(bounded)
     }
@@ -101,9 +97,13 @@ impl<T, const N: usize> ListaN<T, N> {
     }
 
     /// `longitudo` — the runtime length as `i64`.
+    ///
+    /// # Panics
+    ///
+    /// Panics when the declared capacity permits a length above [`i64::MAX`].
     #[must_use]
     pub fn longitudo(&self) -> i64 {
-        self.len as i64
+        i64::try_from(self.len).expect("list length must fit in i64")
     }
 
     /// Whether the initialized prefix is empty.
@@ -179,9 +179,8 @@ impl<T, const N: usize> ListaN<T, N> {
 
         let mut bounded = Self::empty();
         for value in values {
-            bounded
-                .appende(value.clone())
-                .expect("validated lista length must fit ListaN capacity");
+            bounded.slots[bounded.len].write(value.clone());
+            bounded.len += 1;
         }
         Ok(bounded)
     }
@@ -242,7 +241,16 @@ impl<T: std::fmt::Debug, const N: usize> std::fmt::Debug for ListaN<T, N> {
             .field("n", &N)
             .field("len", &self.len)
             .field("items", &self.as_slice())
-            .finish()
+            .finish_non_exhaustive()
+    }
+}
+
+impl<'a, T, const N: usize> IntoIterator for &'a ListaN<T, N> {
+    type Item = &'a T;
+    type IntoIter = std::slice::Iter<'a, T>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.iter()
     }
 }
 
