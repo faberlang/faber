@@ -483,7 +483,7 @@ pub(crate) fn typecheck_with_config(
     interner: Option<&Interner>,
     config: &crate::PassConfig,
     companion_signatures: Option<&crate::passes::companion_signature::CompanionSignatures>,
-    mut presentation: Option<&mut HirPresentation>,
+    presentation: Option<&mut HirPresentation>,
 ) -> Result<(), Vec<SemanticError>> {
     let mut checker = TypeChecker::new(resolver, types, interner, config.target);
     checker.locale_pack = config.locale_pack.as_ref();

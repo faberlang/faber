@@ -424,10 +424,8 @@ pub(crate) fn resolve_reference_root_in(
         return Ok(root);
     }
 
-    if dev_tree_allowed {
-        if let Some(root) = dev_repo_root(cwd, exe) {
-            return Ok(root);
-        }
+    if dev_tree_allowed && let Some(root) = dev_repo_root(cwd, exe) {
+        return Ok(root);
     }
 
     Err(ReferenceError::new(format!(
@@ -587,10 +585,10 @@ fn dev_repo_root(cwd: Option<&Path>, exe: Option<&Path>) -> Option<PathBuf> {
     if let Some(cwd) = cwd {
         starts.push(cwd.to_path_buf());
     }
-    if let Some(exe) = exe {
-        if let Some(parent) = exe.parent() {
-            starts.push(parent.to_path_buf());
-        }
+    if let Some(exe) = exe
+        && let Some(parent) = exe.parent()
+    {
+        starts.push(parent.to_path_buf());
     }
 
     for mut dir in starts {
@@ -605,10 +603,10 @@ fn dev_repo_root(cwd: Option<&Path>, exe: Option<&Path>) -> Option<PathBuf> {
                 "radix/crates/exempla/corpus/index.toml",
             ] {
                 let index = dir.join(rel);
-                if index.is_file() {
-                    if let Some(parent) = index.parent() {
-                        return Some(parent.to_path_buf());
-                    }
+                if index.is_file()
+                    && let Some(parent) = index.parent()
+                {
+                    return Some(parent.to_path_buf());
                 }
             }
             if !dir.pop() {

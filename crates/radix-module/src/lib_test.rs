@@ -82,11 +82,11 @@ fn shape_generic_tensor_reple_value_emits_filled_copy() {
     let compiler = Compiler::new(Config::default());
     let result = compiler.compile_str(
         "generic-shape.fab",
-        r#"functio sgd_step<magnitudo Figura>(tensor<f32, Figura> param, tensor<f32, Figura> grad, f32 lr) → tensor<f32, Figura> {
+        r"functio sgd_step<magnitudo Figura>(tensor<f32, Figura> param, tensor<f32, Figura> grad, f32 lr) → tensor<f32, Figura> {
     fixum tensor<f32, Figura> lr_fill ← param.reple(lr)
     fixum tensor<f32, Figura> scaled ← grad.multiplica(lr_fill)
     redde param.subtrahe(scaled)
-}"#,
+}",
     );
 
     assert!(result.success(), "shape-generic reple must rust-emit: {:?}", result.diagnostics);
@@ -114,11 +114,11 @@ fn tensor_reple_statement_stays_in_place() {
     let compiler = Compiler::new(Config::default());
     let result = compiler.compile_str(
         "shape-fill.fab",
-        r#"incipit {
+        r"incipit {
     varia tensor<f32, [2, 3]> t ← vacua
     t.reple(4.0)
     nota t.longitudo()
-}"#,
+}",
     );
 
     assert!(result.success(), "statement reple must rust-emit: {:?}", result.diagnostics);

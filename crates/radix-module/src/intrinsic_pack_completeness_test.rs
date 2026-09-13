@@ -20,7 +20,7 @@ use std::collections::BTreeSet;
 /// vacuously for rows that belong to the parent. The completeness gate is
 /// about the rows the en pack itself owns.
 fn owned_installed_pack(locale: &str) -> LocalePack {
-    let path = crate::locale::workspace_locale_pack_path(&locale);
+    let path = crate::locale::workspace_locale_pack_path(locale);
     let source = std::fs::read_to_string(&path).unwrap_or_else(|err| panic!("read installed {locale} pack: {err:?}"));
     LocalePack::from_toml_str(&source)
         .unwrap_or_else(|err| panic!("installed {locale} pack should parse owned rows: {err:?}"))

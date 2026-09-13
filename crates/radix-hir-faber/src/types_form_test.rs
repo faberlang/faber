@@ -18,7 +18,7 @@ use radix_types::{IndexExpr, InferVar, NumericWidth};
 struct LaSurface;
 
 impl KeywordSurface for LaSurface {
-    fn keyword(&self, _kind: TokenKind) -> &str {
+    fn keyword(&self, _kind: TokenKind) -> &'static str {
         "kw"
     }
 
@@ -44,7 +44,7 @@ impl KeywordSurface for LaSurface {
 struct EnSurface;
 
 impl KeywordSurface for EnSurface {
-    fn keyword(&self, _kind: TokenKind) -> &str {
+    fn keyword(&self, _kind: TokenKind) -> &'static str {
         "kw"
     }
 

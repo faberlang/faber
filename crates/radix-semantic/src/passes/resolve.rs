@@ -896,21 +896,18 @@ fn resolve_elige_case_value(
 ) {
     if let ExprKind::Member(member) = &value.kind {
         let last_span = member.member.span;
-        if let Some(segments) = member_segments(member) {
-            if segments.len() >= 3 {
-                match resolver.qualified_variant_path(&segments) {
-                    QualifiedVariantPathLookup::Variant(_) => return,
-                    QualifiedVariantPathLookup::UnknownVariant
-                    | QualifiedVariantPathLookup::NotQualified => {
-                        errors.push(
-                            SemanticError::structured(
-                                SemanticErrorKind::VariableUndefined,
-                                last_span,
-                            )
+        if let Some(segments) = member_segments(member)
+            && segments.len() >= 3
+        {
+            match resolver.qualified_variant_path(&segments) {
+                QualifiedVariantPathLookup::Variant(_) => return,
+                QualifiedVariantPathLookup::UnknownVariant
+                | QualifiedVariantPathLookup::NotQualified => {
+                    errors.push(
+                        SemanticError::structured(SemanticErrorKind::VariableUndefined, last_span)
                             .with_arg("issue", ISSUE_UNKNOWN_VARIANT),
-                        );
-                        return;
-                    }
+                    );
+                    return;
                 }
             }
         }
@@ -1194,13 +1191,13 @@ fn resolve_expr(
             };
             // Type-kind names (structs, enums, interfaces, type aliases, type
             // params, index params) must not be accepted in expression position.
-            if let Some(symbol) = resolver.get_symbol(def_id) {
-                if !symbol.kind.is_value_name() {
-                    errors.push(
-                        SemanticError::structured(SemanticErrorKind::VariableUndefined, ident.span)
-                            .with_arg("issue", ISSUE_NAME_NOT_VALUE),
-                    );
-                }
+            if let Some(symbol) = resolver.get_symbol(def_id)
+                && !symbol.kind.is_value_name()
+            {
+                errors.push(
+                    SemanticError::structured(SemanticErrorKind::VariableUndefined, ident.span)
+                        .with_arg("issue", ISSUE_NAME_NOT_VALUE),
+                );
             }
         }
         ExprKind::Literal(_) => {}
@@ -1228,34 +1225,27 @@ fn resolve_expr(
             // Enum-variant paths (e.g. `Color.rubrum`) must be accepted in
             // expression position even though the bare enum name is not a
             // value. Mirror the HIR `lower_membrum` logic.
-            if let ExprKind::Ident(base) = &expr.object.kind {
-                if resolve_enum_variant_member(resolver, base, &expr.member, errors) {
-                    return;
-                }
+            if let ExprKind::Ident(base) = &expr.object.kind
+                && resolve_enum_variant_member(resolver, base, &expr.member, errors)
+            {
+                return;
             }
             resolve_expr(resolver, interner, &expr.object, errors);
             // Strict library-pack surfaces are total for the library they
             // define: only the listed surface spellings resolve at the source
             // boundary. Post-HIR canonical lookups could resolve the installed
             // member, so reject the non-listed spelling here (SEM010).
-            if let ExprKind::Ident(base) = &expr.object.kind {
-                if let Some(def_id) = resolver.lookup(base.name) {
-                    if let Some(symbol) = resolver.get_symbol(def_id) {
-                        if symbol.kind == SymbolKind::Module
-                            && !resolver
-                                .namespace_member_surface_valid(symbol.name, expr.member.name)
-                        {
-                            errors.push(
-                                SemanticError::structured(
-                                    SemanticErrorKind::MemberUndefined,
-                                    expr.member.span,
-                                )
-                                .with_arg("issue", ISSUE_NAMESPACE_MISSING_EXPORT)
-                                .with_arg("member", interner.resolve(expr.member.name).to_owned()),
-                            );
-                        }
-                    }
-                }
+            if let ExprKind::Ident(base) = &expr.object.kind
+                && let Some(def_id) = resolver.lookup(base.name)
+                && let Some(symbol) = resolver.get_symbol(def_id)
+                && symbol.kind == SymbolKind::Module
+                && !resolver.namespace_member_surface_valid(symbol.name, expr.member.name)
+            {
+                errors.push(
+                    SemanticError::structured(SemanticErrorKind::MemberUndefined, expr.member.span)
+                        .with_arg("issue", ISSUE_NAMESPACE_MISSING_EXPORT)
+                        .with_arg("member", interner.resolve(expr.member.name).to_owned()),
+                );
             }
         }
         ExprKind::Index(expr) => {

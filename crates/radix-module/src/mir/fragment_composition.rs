@@ -514,9 +514,7 @@ impl CompositionPass<'_> {
                 self.push_expansion("failable", site.span, 1, 0, &chain);
                 return;
             }
-            let new_blocks = if let Some(blocks) = self.inline_call(caller_id, &site, &callee) {
-                blocks
-            } else {
+            let Some(new_blocks) = self.inline_call(caller_id, &site, &callee) else {
                 self.push_expansion("survived", site.span, 1, 0, &chain);
                 return;
             };

@@ -662,10 +662,10 @@ impl<'a> DerivedCapabilityQueries<'a> {
                 result
             }
             Type::Ref(mutability, inner) => match (law, mutability.access_marker()) {
-                (TypeLaw::Transfer | TypeLaw::ExplicitDuplicate, AccessMarker::Own)
-                | (TypeLaw::Transfer | TypeLaw::ExplicitDuplicate, AccessMarker::Copy) => {
-                    self.type_law(*inner, law, visiting)
-                }
+                (
+                    TypeLaw::Transfer | TypeLaw::ExplicitDuplicate,
+                    AccessMarker::Own | AccessMarker::Copy,
+                ) => self.type_law(*inner, law, visiting),
                 // Borrow and acquisition views that cannot transfer still
                 // propagate classification failures from the pointee.
                 (TypeLaw::Transfer | TypeLaw::ExplicitDuplicate, _) => {
@@ -1008,10 +1008,10 @@ impl<'a> DerivedCapabilityQueries<'a> {
         let Some(site) = self.place_site(hir_id) else {
             return CapabilityAnswer::Rejected(CapabilityReason::MissingFact);
         };
-        if let Some(ty) = site.ty {
-            if let Err(reason) = self.classify_only(ty, &mut Vec::new()) {
-                return CapabilityAnswer::Rejected(reason);
-            }
+        if let Some(ty) = site.ty
+            && let Err(reason) = self.classify_only(ty, &mut Vec::new())
+        {
+            return CapabilityAnswer::Rejected(reason);
         }
         // Place/value capability is keyed to a source-binding use; other
         // expression shapes have no binding to query.

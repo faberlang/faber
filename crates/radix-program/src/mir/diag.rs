@@ -1,6 +1,6 @@
 //! Package-MIR diagnostic constructors.
 
-use super::*;
+use super::{Diagnostic, DiagnosticPhase, Path, RunnerError};
 
 pub fn mir_diag(path: &Path, message: impl Into<String>) -> Diagnostic {
     crate::package_diagnostic_error(message).with_file(path.display().to_string())

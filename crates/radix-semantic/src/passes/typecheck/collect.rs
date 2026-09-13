@@ -455,15 +455,15 @@ impl TypeChecker<'_> {
             let Some(mut heritage) = self.struct_heritage.get(def_id).cloned() else {
                 continue;
             };
-            if let Some(parent) = heritage.extends {
-                if !self.structs.contains_key(&parent) {
-                    self.error_issue(
-                        SemanticErrorKind::TypeMismatch,
-                        ISSUE_EXTENDS_REQUIRES_GENUS,
-                        *span,
-                    );
-                    heritage.extends = None;
-                }
+            if let Some(parent) = heritage.extends
+                && !self.structs.contains_key(&parent)
+            {
+                self.error_issue(
+                    SemanticErrorKind::TypeMismatch,
+                    ISSUE_EXTENDS_REQUIRES_GENUS,
+                    *span,
+                );
+                heritage.extends = None;
             }
             let mut implements = heritage.implements.clone();
             implements.retain(|iface| self.interfaces.contains_key(iface));

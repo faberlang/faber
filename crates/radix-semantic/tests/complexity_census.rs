@@ -122,7 +122,9 @@ fn nearest_rank(sorted: &[u32], pct: u32) -> Option<u32> {
     if count == 0 {
         return None;
     }
-    let rank = (((count as u64) * u64::from(pct) + 99) / 100).clamp(1, count as u64) as usize;
+    let rank = ((count as u64) * u64::from(pct))
+        .div_ceil(100)
+        .clamp(1, count as u64) as usize;
     Some(sorted[rank - 1])
 }
 
@@ -474,9 +476,7 @@ fn render_census(trees: &[TreeCensus]) -> String {
 
     out.push_str("\n## Files not scored (honest failure list)\n\n");
     let any_failure = trees.iter().any(|tree| !tree.failures.is_empty());
-    if !any_failure {
-        out.push_str("None — every attempted file analyzed.\n");
-    } else {
+    if any_failure {
         out.push_str("| Tree | File | Leading diagnostics |\n");
         out.push_str("| --- | --- | --- |\n");
         for tree in trees {
@@ -488,6 +488,8 @@ fn render_census(trees: &[TreeCensus]) -> String {
                 );
             }
         }
+    } else {
+        out.push_str("None — every attempted file analyzed.\n");
     }
 
     out.push_str("\n## Per-function rows\n\n");

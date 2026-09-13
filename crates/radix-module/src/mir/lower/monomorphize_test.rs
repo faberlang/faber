@@ -126,11 +126,11 @@ fn shape_size_instance(shape: IndexId, source: DefId) -> MirFunction {
 #[test]
 fn finalize_rewrites_instance_shape_size_from_shape_args() {
     let mut unit = analyzed_unit(
-        r#"
+        r"
 functio add_tensors<magnitudo B, magnitudo D>(tensor<f32, [B, D]> a, tensor<f32, [B, D]> b) → tensor<f32, [B, D]> {
     redde a.addita(b)
 }
-"#,
+",
     );
     let source = generic_def_id(&unit, "add_tensors");
     let symbol_b = unit.interner.intern("B");
@@ -171,11 +171,11 @@ functio add_tensors<magnitudo B, magnitudo D>(tensor<f32, [B, D]> a, tensor<f32,
 #[test]
 fn finalize_fails_closed_on_out_of_range_shape_size_axis() {
     let mut unit = analyzed_unit(
-        r#"
+        r"
 functio add_tensors<magnitudo B, magnitudo D>(tensor<f32, [B, D]> a, tensor<f32, [B, D]> b) → tensor<f32, [B, D]> {
     redde a.addita(b)
 }
-"#,
+",
     );
     let source = generic_def_id(&unit, "add_tensors");
     let symbol_b = unit.interner.intern("B");
@@ -214,11 +214,11 @@ functio add_tensors<magnitudo B, magnitudo D>(tensor<f32, [B, D]> a, tensor<f32,
 #[test]
 fn finalize_fails_closed_on_missing_and_infer_shape_args() {
     let mut unit = analyzed_unit(
-        r#"
+        r"
 functio add_tensors<magnitudo B, magnitudo D>(tensor<f32, [B, D]> a, tensor<f32, [B, D]> b) → tensor<f32, [B, D]> {
     redde a.addita(b)
 }
-"#,
+",
     );
     let source = generic_def_id(&unit, "add_tensors");
     let symbol_b = unit.interner.intern("B");
@@ -313,11 +313,11 @@ fn assert_unbound_shape_size_survivor(surface: &str, source_text: &str, function
 fn dense_ref01_survivor_population_is_fail_closed() {
     assert_unbound_shape_size_survivor(
         "dense REF-01",
-        r#"
+        r"
 functio pin<magnitudo A, magnitudo B>(tensor<f32, [A, B]> t) → tensor<f32, [A, B]> {
     redde t
 }
-"#,
+",
         "pin",
         &["A", "B"],
     );
@@ -327,11 +327,11 @@ functio pin<magnitudo A, magnitudo B>(tensor<f32, [A, B]> t) → tensor<f32, [A,
 fn gather_twin_survivor_population_is_fail_closed() {
     assert_unbound_shape_size_survivor(
         "gather twin",
-        r#"
+        r"
 functio gather<magnitudo T, magnitudo V, magnitudo D>(tensor<f32, [T, D]> table) → tensor<f32, [T, D]> {
     redde table
 }
-"#,
+",
         "gather",
         &["T", "D"],
     );
@@ -341,11 +341,11 @@ functio gather<magnitudo T, magnitudo V, magnitudo D>(tensor<f32, [T, D]> table)
 fn krs_oracle_survivor_population_is_fail_closed() {
     assert_unbound_shape_size_survivor(
         "KRS oracle",
-        r#"
+        r"
 functio dense_qkv<magnitudo T, magnitudo D, magnitudo Q, magnitudo K>(tensor<f32, [T, Q]> q) → tensor<f32, [T, Q]> {
     redde q
 }
-"#,
+",
         "dense_qkv",
         &["T", "Q"],
     );

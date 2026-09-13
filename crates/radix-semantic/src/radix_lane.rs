@@ -73,6 +73,7 @@ impl RadixLaneMetadata {
     /// Deterministic lane snapshot for analyzed-HIR artifacts. Backward rows
     /// are joined here because a rehydrated AIR unit needs both the lane and
     /// its companion identity before it can run the concrete AIR pipeline.
+    #[must_use]
     pub fn snapshot(&self) -> Vec<(DefId, RadixLane, Option<RadixBackward>)> {
         let mut entries = self
             .lanes
@@ -193,22 +194,22 @@ pub fn collect(
                     if let Some(l) = lane {
                         metadata.insert(def_id, l);
                     }
-                    if let Some(b) = backward {
-                        if lane == Some(RadixLane::Air) {
-                            // Consume pre-allocated DefId from the pre-resolve
-                            // pass so MIR/driver identity stays stable.
-                            let bw = if let Some(&pre_def_id) =
-                                companion_predeclarations.by_name.get(&b.companion_name)
-                            {
-                                RadixBackward {
-                                    companion_name: b.companion_name,
-                                    companion_def_id: pre_def_id,
-                                }
-                            } else {
-                                b
-                            };
-                            metadata.insert_backward(def_id, bw);
-                        }
+                    if let Some(b) = backward
+                        && lane == Some(RadixLane::Air)
+                    {
+                        // Consume pre-allocated DefId from the pre-resolve
+                        // pass so MIR/driver identity stays stable.
+                        let bw = if let Some(&pre_def_id) =
+                            companion_predeclarations.by_name.get(&b.companion_name)
+                        {
+                            RadixBackward {
+                                companion_name: b.companion_name,
+                                companion_def_id: pre_def_id,
+                            }
+                        } else {
+                            b
+                        };
+                        metadata.insert_backward(def_id, bw);
                     }
                 }
             }

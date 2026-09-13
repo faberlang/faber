@@ -211,7 +211,7 @@ functio target() → vacuum ⇥ C { redde source() }
 #[test]
 fn conversion_name_suggestion_finds_an_out_of_scope_helper() {
     let mut resolver = Resolver::new();
-    let mut types = TypeTable::new();
+    let types = TypeTable::new();
     let source = types.primitive(Primitive::Textus);
     let destination = types.primitive(Primitive::Numerus);
     let fn_id = DefId(900);

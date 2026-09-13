@@ -53,7 +53,7 @@ pub fn run_source<H: Host + ?Sized>(
 /// Returns [`RunnerError`] values for MIR lowering failures and
 /// interpretation-time failures.
 pub fn run_analyzed<H: Host + ?Sized>(unit: &mut AnalyzedModule, host: &mut H) -> Result<(), Vec<RunnerError>> {
-    let lowered = lower_analyzed_unit(unit, Default::default()).map_err(|errors| {
+    let lowered = lower_analyzed_unit(unit, crate::mir::MirLoweringOptions::default()).map_err(|errors| {
         errors
             .into_iter()
             .map(|error| RunnerError::internal(error.span, error.message))

@@ -367,20 +367,19 @@ impl HirVisitor for BodyVisitor<'_> {
                 walk_expr(self, expr);
             }
             HirExpressionKind::Call(callee, _, _, _) => {
-                if !self.suppressed {
-                    if let HirExpressionKind::Path(def_id) = &callee.kind {
-                        self.deps.calls.insert(*def_id);
-                    }
+                if !self.suppressed
+                    && let HirExpressionKind::Path(def_id) = &callee.kind
+                {
+                    self.deps.calls.insert(*def_id);
                 }
                 walk_expr(self, expr);
             }
             HirExpressionKind::MethodCall(receiver, method, _, _, _) => {
-                if !self.suppressed {
-                    if let Some(method_def) =
+                if !self.suppressed
+                    && let Some(method_def) =
                         resolve_method_call_def(self.method_index, receiver, *method, self.types)
-                    {
-                        self.deps.calls.insert(method_def);
-                    }
+                {
+                    self.deps.calls.insert(method_def);
                 }
                 walk_expr(self, expr);
             }

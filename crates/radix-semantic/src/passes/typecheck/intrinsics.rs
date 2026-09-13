@@ -299,13 +299,11 @@ pub(super) fn check_intrinsic_method_call(
                 if let Some(canonical) = receivers_for_type(resolved)
                     .iter()
                     .find_map(|family| pack.intrinsic_canonical(*family, method_name.as_str()))
-                {
-                    if let Some(canonical_entry) =
+                    && let Some(canonical_entry) =
                         lookup_intrinsic_row(resolved, canonical, args.len())
-                    {
-                        entry = Some(canonical_entry);
-                        effective_name = canonical;
-                    }
+                {
+                    entry = Some(canonical_entry);
+                    effective_name = canonical;
                 }
                 // WHY: under a non-la pack a spelling that resolves in the registry
                 // but is not a declared pack surface is the canonical Latin name
@@ -333,14 +331,13 @@ pub(super) fn check_intrinsic_method_call(
     // canonical spelling was pre-interned by the pack-spelling registration
     // pass, so its symbol is recovered from the intern table (no mutable
     // interner needed here).
-    if effective_name != method_name.as_str() {
-        if let Some(interner) = checker.interner {
-            if let Some(index) = interner.strings().iter().position(|s| s == effective_name) {
-                #[allow(clippy::cast_possible_truncation)]
-                let canonical_symbol = Symbol(index as u32);
-                *name = canonical_symbol;
-            }
-        }
+    if effective_name != method_name.as_str()
+        && let Some(interner) = checker.interner
+        && let Some(index) = interner.strings().iter().position(|s| s == effective_name)
+    {
+        #[allow(clippy::cast_possible_truncation)]
+        let canonical_symbol = Symbol(index as u32);
+        *name = canonical_symbol;
     }
     let entry = entry?;
     // WHY: on modular receivers `subtrahe` is the value-returning wrapping
@@ -435,12 +432,10 @@ pub(super) fn check_intrinsic_method_call(
         entry.receiver,
         radix_intrinsics::IntrinsicReceiver::Intervallum
     ) && entry.faber_name == "longitudo"
+        && let Some(bound) = ctx.inner
+        && !checker.check_intervallum_longitudo_bound(bound, span)
     {
-        if let Some(bound) = ctx.inner {
-            if !checker.check_intervallum_longitudo_bound(bound, span) {
-                return Some(checker.error_type);
-            }
-        }
+        return Some(checker.error_type);
     }
 
     // Matrix `applica`: matrix[R,C] × vector[C] → vector[R] (CPU register subset).

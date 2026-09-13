@@ -330,17 +330,17 @@ impl Builder {
     ) -> Result<Fragment, CfgError> {
         match &statement.kind {
             HirStatementKind::Local(local) => {
-                if let Some(init) = &local.init {
-                    if is_control_expression(init) {
-                        let mut fragment = self.build_expression(init, loop_context)?;
-                        let binding = self.cfg.add_node(
-                            CfgNodeKind::Statement,
-                            location(Some(statement.id), Some(local.def_id), statement.span),
-                        );
-                        self.connect_normals(&fragment, binding, CfgEdgeKind::Next);
-                        fragment.normal = vec![binding];
-                        return Ok(fragment);
-                    }
+                if let Some(init) = &local.init
+                    && is_control_expression(init)
+                {
+                    let mut fragment = self.build_expression(init, loop_context)?;
+                    let binding = self.cfg.add_node(
+                        CfgNodeKind::Statement,
+                        location(Some(statement.id), Some(local.def_id), statement.span),
+                    );
+                    self.connect_normals(&fragment, binding, CfgEdgeKind::Next);
+                    fragment.normal = vec![binding];
+                    return Ok(fragment);
                 }
                 Ok(Fragment::terminal(self.cfg.add_node(
                     CfgNodeKind::Statement,

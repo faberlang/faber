@@ -95,12 +95,12 @@ main {
     .expect("write entry");
     fs::write(
         dir.join("lib.fab"),
-        r#"
+        r"
 @ public
 fn answer() → int {
     return 42
 }
-"#,
+",
     )
     .expect("write lib");
 

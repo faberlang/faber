@@ -64,14 +64,12 @@ struct LanePathCollector<'a> {
 
 impl HirVisitor for LanePathCollector<'_> {
     fn visit_expr(&mut self, expr: &HirExpression) {
-        if let HirExpressionKind::Path(def_id) = expr.kind {
-            if let Some(symbol) = self.resolver.get_symbol(def_id) {
-                if symbol.kind == crate::SymbolKind::Lane
-                    && !self.lanes.iter().any(|(existing, ..)| *existing == def_id)
-                {
-                    self.lanes.push((def_id, symbol.name, expr.span));
-                }
-            }
+        if let HirExpressionKind::Path(def_id) = expr.kind
+            && let Some(symbol) = self.resolver.get_symbol(def_id)
+            && symbol.kind == crate::SymbolKind::Lane
+            && !self.lanes.iter().any(|(existing, ..)| *existing == def_id)
+        {
+            self.lanes.push((def_id, symbol.name, expr.span));
         }
         walk_expr(self, expr);
     }

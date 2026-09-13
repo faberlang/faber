@@ -941,7 +941,7 @@ functio _probe(tensor<f32, [4, 8]> a, tensor<f32, [4, 8]> b) → tensor<f32, [4,
 fn imported_namespace_generic_call_host_expected_control() {
     // Control E shape: the same imported call inside a host entry with a
     // concrete annotation — proves the repair is not device-context-only.
-    let mut unit = analyze_math_consumer(
+    let unit = analyze_math_consumer(
         r#"importa ex "./math" math
 
 incipit {
@@ -973,7 +973,7 @@ fn imported_namespace_generic_call_binds_explicit_magnitudo_args() {
     // Control F repaired: explicit size witnesses on the imported generic
     // callee instantiate instead of tripping the dynamic-receiver rejection
     // the ignotum route produced.
-    let mut unit = analyze_math_consumer(
+    let unit = analyze_math_consumer(
         r#"importa ex "./math" math
 
 functio _probe(tensor<f32, [4, 8]> a, tensor<f32, [4, 8]> b) → tensor<f32, [4, 8]> {
@@ -1049,7 +1049,7 @@ fn namespace_call_without_import_surface_keeps_bare_driver_leniency() {
     // driver-owned (the import graph must propagate the target failure), not a
     // semantic guess from an absent contract. This test pins that the generic
     // repair does not turn contract absence into hard errors.
-    let mut unit = crate::test_support::analyze_source_with_import_contract(
+    let unit = crate::test_support::analyze_source_with_import_contract(
         r#"importa ex "./math" math
 
 functio _probe(tensor<f32, [4, 8]> a, tensor<f32, [4, 8]> b) → tensor<f32, [4, 8]> {
@@ -1072,14 +1072,14 @@ fn ignotum_value_receiver_method_keeps_dynamic_route() {
     // ignotum-typed VALUE receiver (not an import namespace) keeps the
     // documented escape, including its explicit-type-args rejection.
     rejects_with_args(
-        r#"functio box(ignotum v) → ignotum {
+        r"functio box(ignotum v) → ignotum {
     redde v
 }
 
 incipit {
     fixum ignotum receiver ← box(1)
     receiver.meth<textus>()
-}"#,
+}",
         &[DiagnosticArg::new(
             "issue",
             "dynamic_receiver_method_type_args",

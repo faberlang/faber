@@ -4,7 +4,7 @@
 //! Every probe assembles the plan from typed facts and verifies it against a
 //! pristine [`IdentitySource`]; the mutation in one identity domain must
 //! reject construction with a typed diagnostic naming the first failing
-//! domain. No silent repair, no FNV fallback (DDPP0 §IdentityDomains rule 1).
+//! domain. No silent repair, no FNV fallback (DDPP0 §`IdentityDomains` rule 1).
 
 use super::*;
 use crate::package::PackageSpec;

@@ -24,7 +24,7 @@ pub struct PackedProjectionOp {
 }
 
 /// SmolLM2-360M-Instruct dense-rung projection inventory (GQA per-head
-/// QKV/O, SwiGLU FFN, tied logits). `T = 9`, `H = 960`, `D = 64`,
+/// QKV/O, `SwiGLU` FFN, tied logits). `T = 9`, `H = 960`, `D = 64`,
 /// `FFN = 2560`, `V = 49152`.
 pub const DENSE_PROJECTIONS: &[PackedProjectionOp] = &[
     PackedProjectionOp {

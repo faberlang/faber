@@ -27,7 +27,7 @@ fn is_sealed_conversio_alias_omission(locale: &str, key: &str) -> bool {
 
 /// Load a pack's **owned** rows from the raw file (no `inherits` merge).
 fn owned_installed_pack(locale: &str) -> LocalePack {
-    let path = crate::locale::workspace_locale_pack_path(&locale);
+    let path = crate::locale::workspace_locale_pack_path(locale);
     let source = std::fs::read_to_string(&path).unwrap_or_else(|err| panic!("read installed {locale} pack: {err:?}"));
     LocalePack::from_toml_str(&source)
         .unwrap_or_else(|err| panic!("installed {locale} pack should parse owned rows: {err:?}"))

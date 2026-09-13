@@ -296,10 +296,10 @@ impl HirVisitor for LiberaChecker<'_> {
     }
 
     fn visit_pattern(&mut self, pattern: &HirPattern) {
-        if let HirPattern::Binding(def_id, _) | HirPattern::Alias(def_id, _, _) = pattern {
-            if let Some(scope) = self.scopes.last_mut() {
-                scope.insert(*def_id);
-            }
+        if let HirPattern::Binding(def_id, _) | HirPattern::Alias(def_id, _, _) = pattern
+            && let Some(scope) = self.scopes.last_mut()
+        {
+            scope.insert(*def_id);
         }
         walk_pattern(self, pattern);
     }
@@ -329,7 +329,7 @@ impl HirVisitor for LiberaChecker<'_> {
 
     fn visit_expr(&mut self, expr: &HirExpression) {
         match &expr.kind {
-            HirExpressionKind::Clausura(params, _, err, body, modifier) => match modifier {
+            HirExpressionKind::Clausura(params, _, _err, body, modifier) => match modifier {
                 ClosureModifier::Libera => {
                     self.check_libera_closure(params, body);
                     for param in params {
@@ -535,10 +535,10 @@ impl HirVisitor for CaptureProbe {
     }
 
     fn visit_pattern(&mut self, pattern: &HirPattern) {
-        if let HirPattern::Binding(def_id, _) | HirPattern::Alias(def_id, _, _) = pattern {
-            if let Some(scope) = self.scopes.last_mut() {
-                scope.insert(*def_id);
-            }
+        if let HirPattern::Binding(def_id, _) | HirPattern::Alias(def_id, _, _) = pattern
+            && let Some(scope) = self.scopes.last_mut()
+        {
+            scope.insert(*def_id);
         }
         walk_pattern(self, pattern);
     }

@@ -436,10 +436,10 @@ pub fn library_home() -> Option<PathBuf> {
     // so parallel vertex-source tests don't pick up a transient temp path.
     #[cfg(test)]
     {
-        if let Some(ref home) = library_home_test_support::get_thread_library_home() {
-            if home.is_dir() {
-                return Some(home.clone());
-            }
+        if let Some(ref home) = library_home_test_support::get_thread_library_home()
+            && home.is_dir()
+        {
+            return Some(home.clone());
         }
     }
     // Production path: env-var check + ancestor walk, memoized per process.

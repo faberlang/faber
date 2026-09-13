@@ -36,6 +36,8 @@ pub struct LoadedPackageSource {
 /// - When `include_proba` is true (the `faber test` path), also includes
 ///   `*.proba` test sources. Normal `faber build` / `faber run` keep
 ///   `include_proba = false` so tests never enter the production graph.
+/// # Errors
+/// Returns an error when the input or persisted artifact is invalid.
 pub fn package_source_files(
     source_root: &Path,
     include_proba: bool,
@@ -89,8 +91,7 @@ pub fn package_source_files(
                         &canonical_root,
                         "package_source_file_limit",
                         format!(
-                            "package source file limit exceeded: maximum is {} files",
-                            MAX_PACKAGE_SOURCE_FILES
+                            "package source file limit exceeded: maximum is {MAX_PACKAGE_SOURCE_FILES} files"
                         ),
                         (files.len() + 1).to_string(),
                         MAX_PACKAGE_SOURCE_FILES.to_string(),
@@ -108,8 +109,7 @@ pub fn package_source_files(
                         &canonical_root,
                         "package_source_byte_limit",
                         format!(
-                            "package source byte limit exceeded: maximum is {} bytes",
-                            MAX_PACKAGE_SOURCE_BYTES
+                            "package source byte limit exceeded: maximum is {MAX_PACKAGE_SOURCE_BYTES} bytes"
                         ),
                         u64::MAX.to_string(),
                         MAX_PACKAGE_SOURCE_BYTES.to_string(),
@@ -120,8 +120,7 @@ pub fn package_source_files(
                         &canonical_root,
                         "package_source_byte_limit",
                         format!(
-                            "package source byte limit exceeded: maximum is {} bytes",
-                            MAX_PACKAGE_SOURCE_BYTES
+                            "package source byte limit exceeded: maximum is {MAX_PACKAGE_SOURCE_BYTES} bytes"
                         ),
                         new_total_bytes.to_string(),
                         MAX_PACKAGE_SOURCE_BYTES.to_string(),
@@ -154,6 +153,7 @@ fn package_source_limit_diagnostic(
         .with_arg("limit", limit)
 }
 
+#[must_use]
 pub fn is_package_source_path(path: &Path, include_proba: bool) -> bool {
     match path.extension().and_then(|extension| extension.to_str()) {
         Some("fab") => true,
@@ -162,6 +162,7 @@ pub fn is_package_source_path(path: &Path, include_proba: bool) -> bool {
     }
 }
 
+#[must_use]
 pub fn is_proba_source_path(path: &Path) -> bool {
     path.extension().and_then(|extension| extension.to_str()) == Some("proba")
 }
@@ -193,13 +194,12 @@ pub fn load_package_source(
             return None;
         }
     };
-    if let Some(manifest) = manifest {
-        if let Some(diagnostic) =
+    if let Some(manifest) = manifest
+        && let Some(diagnostic) =
             validate_frontmatter_against_manifest(path, peeled.frontmatter.as_ref(), manifest)
-        {
-            diagnostics.push(diagnostic);
-            return None;
-        }
+    {
+        diagnostics.push(diagnostic);
+        return None;
     }
 
     let locale_pack = resolve_locale_pack(

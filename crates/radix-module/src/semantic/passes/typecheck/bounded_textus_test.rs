@@ -13,13 +13,13 @@ fn rust_code(result: crate::CompileResult) -> String {
 #[test]
 fn bounded_textus_scalar_index_emits_o1_ascii_one() {
     let result = compile_and_get_result(
-        r#"functio probe(textus<32> xs) → ascii<1> {
+        r"functio probe(textus<32> xs) → ascii<1> {
     redde xs[0]
 }
 
 incipit {
     nota 0
-}"#,
+}",
     );
     assert!(result.success(), "diagnostics: {:?}", result.diagnostics);
     let code = rust_code(result);
@@ -40,7 +40,7 @@ incipit {
 #[test]
 fn bounded_textus_conversions_follow_d7() {
     let diagnostics = analyze_and_get_diagnostics(
-        r#"typus TextusOcto = textus<8>
+        r"typus TextusOcto = textus<8>
 
 functio bridges(textus<8> bounded, textus unbounded) → vacuum {
     fixum textus widened ← bounded ↦ textus
@@ -51,7 +51,7 @@ functio bridges(textus<8> bounded, textus unbounded) → vacuum {
 
 incipit {
     nota 0
-}"#,
+}",
     );
     assert!(
         !diagnostics.iter().any(crate::Diagnostic::is_error),
@@ -61,13 +61,13 @@ incipit {
 
 #[test]
 fn bounded_textus_rejects_non_rust_targets_fail_closed() {
-    let source = r#"functio probe(textus<32> xs) → ascii<1> {
+    let source = r"functio probe(textus<32> xs) → ascii<1> {
     redde xs[0]
 }
 
 incipit {
     nota 0
-}"#;
+}";
     for target in [Target::HirTypeScript, Target::HirGo] {
         let result = compile_for_target_and_get_result(source, target);
         assert!(!result.success(), "target {target:?} must reject bounded textus");

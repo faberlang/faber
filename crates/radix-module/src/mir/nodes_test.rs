@@ -11,6 +11,7 @@ use crate::mir::dump_program;
 use crate::semantic::{Primitive, TypeTable};
 use crate::test_support::test_span;
 use radix_mir::device::MirDeviceFunctionMetadata;
+use std::collections::HashMap;
 
 #[test]
 fn mir_type_wraps_semantic_type_and_reserves_layout_slot() {
@@ -57,7 +58,7 @@ fn synthetic_device_metadata_attaches_to_source_less_functions() {
     )]
     .into_iter()
     .collect();
-    let mut device = MirDeviceContext::from_hir_roles_with_metadata(Default::default(), &metadata);
+    let mut device = MirDeviceContext::from_hir_roles_with_metadata(HashMap::default(), &metadata);
     device.attach_program(&program);
 
     assert_eq!(device.role_for_function(&function), Some(MirDeviceRole::Kernel));

@@ -1,4 +1,9 @@
 use super::*;
+use super::cli_bind::{FmirTextCliBinding, patch_fmir_text_cli_record};
+use super::cli_plan::{fmir_text_cli_value_type, fmir_text_runtime_cli_value_type};
+use super::lower::{append_shifted_parts, checked_shifted_function_id};
+use super::manifest::escape_manifest_value;
+use super::requirements::{is_known_fmir_kernel_requirement, is_known_fmir_runtime_requirement};
 use radix_module::lexer::Span;
 use radix_module::mir::MirTempId;
 use std::path::Path;

@@ -9,8 +9,7 @@ use super::{
 };
 use crate::hir::{
     DefId, HirBinOp, HirBlock, HirCallArg, HirCasuArm, HirEnum, HirExpression, HirExpressionKind, HirFunction, HirId,
-    HirItem, HirItemKind, HirLiteral, HirLocal, HirModule, HirParam, HirPattern, HirStatement, HirStatementKind,
-    HirVariant,
+    HirItem, HirItemKind, HirLiteral, HirLocal, HirModule, HirPattern, HirStatement, HirStatementKind, HirVariant,
 };
 use crate::lexer::{Interner, Span};
 use crate::semantic::{Primitive, Type, TypeId, TypeTable};

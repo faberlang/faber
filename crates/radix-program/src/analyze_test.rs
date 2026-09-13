@@ -101,13 +101,13 @@ fn analyze_package_exposes_multifile_units_without_rust_emit() {
     let entry = dir.join("main.fab");
     fs::write(
         &entry,
-        r##"
+        r#"
 import from "./thing" thing
 
 main {
   print thing.label()
 }
-"##,
+"#,
     )
     .expect("write entry");
     let module = dir.join("thing.fab");
@@ -190,12 +190,12 @@ main {
     .expect("write entry");
     fs::write(
         dir.join("lib.fab"),
-        r#"
+        r"
 @ public
 fn broken() → int {
   return nonexistent_value
 }
-"#,
+",
     )
     .expect("write module");
 
@@ -221,13 +221,13 @@ fn analyze_package_records_entry_roots_and_local_import_edges() {
     let entry = dir.join("main.fab");
     fs::write(
         &entry,
-        r##"
+        r#"
 import from "./thing" thing
 
 main {
   print thing.label()
 }
-"##,
+"#,
     )
     .expect("write entry");
     fs::write(
@@ -285,22 +285,22 @@ targets = ["fhir"]
     fs::create_dir_all(dir.join("src")).expect("mkdir src");
     fs::write(
         dir.join("src/alpha.fab"),
-        r#"
+        r"
 @ public
 fn alpha() → int {
   return 1
 }
-"#,
+",
     )
     .expect("write alpha");
     fs::write(
         dir.join("src/beta.fab"),
-        r#"
+        r"
 @ public
 fn beta() → int {
   return 2
 }
-"#,
+",
     )
     .expect("write beta");
 
@@ -341,12 +341,12 @@ targets = ["fhir"]
     fs::create_dir_all(dir.join("src")).expect("mkdir src");
     fs::write(
         dir.join("src/lib.fab"),
-        r#"
+        r"
 @ public
 fn n() → int {
   return 1
 }
-"#,
+",
     )
     .expect("write lib");
     fs::write(
@@ -422,13 +422,13 @@ targets = ["fhir"]
     fs::create_dir_all(dir.join("src")).expect("mkdir src");
     fs::write(
         dir.join("src/math.fab"),
-        r#"
+        r"
 @ kernel
 @ public
 fn add<size M, size N>(tensor<f32, [M, N]> a, tensor<f32, [M, N]> b) → tensor<f32, [M, N]> {
   return a + b
 }
-"#,
+",
     )
     .expect("write math");
 
@@ -486,13 +486,13 @@ targets = ["fhir"]
     fs::create_dir_all(dir.join("src")).expect("mkdir src");
     fs::write(
         dir.join("src/math.fab"),
-        r#"
+        r"
 @ kernel
 @ private
 fn add<size M, size N>(tensor<f32, [M, N]> a, tensor<f32, [M, N]> b) → tensor<f32, [M, N]> {
   return a + b
 }
-"#,
+",
     )
     .expect("write math");
 

@@ -10,7 +10,7 @@
 //! package consumers use it directly.
 //!
 //! Product orchestration stays faber-side and enters here through explicit
-//! [`AnalysisSeams`] (the RP2c `LocaleLoader` posture): reader-locale pack
+//! [`AnalysisSeams`] (the `RP2c` `LocaleLoader` posture): reader-locale pack
 //! loading, strict product-view manifest validation, `FABER_LIBRARY_HOME` /
 //! workspace probing, and the G4 linked-crate map from faber's artifact plan.
 //! Nothing here reads the ambient environment.
@@ -152,6 +152,7 @@ pub struct AnalyzedProgram {
 
 impl AnalyzedProgram {
     /// Empty program for the given spec (tests and FHIR rehydration).
+    #[must_use]
     pub fn from_spec(spec: PackageSpec) -> Self {
         Self {
             spec,
@@ -168,10 +169,12 @@ impl AnalyzedProgram {
     // Go package assembly (`generate_package_go_result`) consumes the entry
     // node directly. `allow(dead_code)`: dead only in builds without `hir-go`.
     #[allow(dead_code)]
+    #[must_use]
     pub fn entry_node(&self) -> Option<&AnalyzedProgramNode> {
         self.entry.as_ref().and_then(|id| self.nodes.get(id))
     }
 
+    #[must_use]
     pub fn node_by_path(&self, path: &Path) -> Option<(&ModuleId, &AnalyzedProgramNode)> {
         self.nodes.iter().find(|(_, node)| node.path == path)
     }
@@ -189,12 +192,13 @@ impl AnalyzedProgram {
     /// Declared package entry wins. Otherwise the remapping host is a test
     /// root ([`Self::roots`], least [`ModuleId`]). A non-test library module
     /// must not be the host: `lower_package_units` treats the host as the
-    /// merge entry (original DefIds), while sibling namespace calls are
+    /// merge entry (original `DefIds`), while sibling namespace calls are
     /// rewritten to synthetics — using the callee as host leaves those
     /// synthetics without a MIR function.
     ///
     /// Missing hosts fall back to [`PackageSpec::entry`] so the linker can
     /// fail closed.
+    #[must_use]
     pub fn test_remap_anchor(&self) -> PathBuf {
         if let Some(node) = self.entry_node() {
             return node.path.clone();
@@ -202,10 +206,10 @@ impl AnalyzedProgram {
         if let Some((_, node)) = self.node_by_path(&self.spec.entry) {
             return node.path.clone();
         }
-        if let Some(id) = self.roots.iter().min() {
-            if let Some(node) = self.nodes.get(id) {
-                return node.path.clone();
-            }
+        if let Some(id) = self.roots.iter().min()
+            && let Some(node) = self.nodes.get(id)
+        {
+            return node.path.clone();
         }
         self.spec.entry.clone()
     }
@@ -253,6 +257,8 @@ pub struct AnalysisSeams {
 ///
 /// RP3: moved from `crates/faber/src/package/compile.rs`; the seam bundle is
 /// the faber product-orchestration input.
+/// # Errors
+/// Returns an error when the input or persisted artifact is invalid.
 pub fn analyze_package(
     config: &Config,
     input: &Path,
@@ -274,6 +280,7 @@ pub fn analyze_package(
 /// RP6: moved from `crates/faber/src/package/compile.rs` (the command-entry
 /// adapter); the faber command consumes this entry directly with the product
 /// seams.
+#[must_use]
 pub fn check_package(config: &Config, input: &Path, seams: &AnalysisSeams) -> Vec<Diagnostic> {
     match analyze_package(config, input, seams) {
         Ok(package) => package.diagnostics,
@@ -287,6 +294,8 @@ pub fn check_package(config: &Config, input: &Path, seams: &AnalysisSeams) -> Ve
 /// stay free of test sources.
 ///
 /// RP3: moved from `crates/faber/src/package/compile.rs`.
+/// # Errors
+/// Returns an error when the input or persisted artifact is invalid.
 pub fn analyze_package_for_tests(
     config: &Config,
     input: &Path,
@@ -330,6 +339,8 @@ fn explicit_proba_path_filter(
 ///
 /// RP3: moved from `crates/faber/src/package/compile.rs`; the locale-pack
 /// loader is the caller-supplied product seam.
+/// # Errors
+/// Returns an error when the input or persisted artifact is invalid.
 pub fn effective_package_config(
     config: &Config,
     input: &Path,
@@ -350,6 +361,7 @@ pub fn effective_package_config(
 ///
 /// RP3: moved from `crates/faber/src/package/compile.rs`; consumed by faber's
 /// emission half through the package-module adapter.
+#[must_use]
 pub fn package_root_for_input(input: &Path) -> PathBuf {
     match discover_build_layout(input) {
         Ok(layout) => layout.package_root,
@@ -372,6 +384,8 @@ pub fn package_root_for_input(input: &Path) -> PathBuf {
 /// RP3: moved from `crates/faber/src/package/compile.rs` (the multi-unit
 /// analysis core — composing radix single-unit analysis, never a duplicated
 /// compiler phase).
+/// # Errors
+/// Returns an error when the input or persisted artifact is invalid.
 pub fn analyze_package_spec(
     config: &Config,
     spec: PackageSpec,
@@ -603,10 +617,8 @@ fn analyze_package_spec_with_deadline(
         if !is_entry {
             analysis.hir.entry = None;
         }
-        if is_entry {
-            if let Some(root_cli) = mount_plan.root_cli.clone() {
-                analysis.cli_program = Some(root_cli);
-            }
+        if is_entry && let Some(root_cli) = mount_plan.root_cli.clone() {
+            analysis.cli_program = Some(root_cli);
         }
 
         let export_names = export_surfaces_by_path
@@ -658,7 +670,7 @@ fn analyze_package_spec_with_deadline(
     if let Some(diagnostic) = analysis_deadline_diagnostic(&spec, deadline, None, "package") {
         diagnostics.push(diagnostic);
     }
-    if diagnostics.iter().any(|diag| diag.is_error()) {
+    if diagnostics.iter().any(radix_module::Diagnostic::is_error) {
         return Err(diagnostics);
     }
 
@@ -748,10 +760,10 @@ fn program_roots(
     if let Some((id, _)) = nodes.iter().find(|(_, node)| node.is_entry) {
         return vec![id.clone()];
     }
-    if spec.entry.is_file() {
-        if let Some((id, _)) = nodes.iter().find(|(_, node)| node.path == spec.entry) {
-            return vec![id.clone()];
-        }
+    if spec.entry.is_file()
+        && let Some((id, _)) = nodes.iter().find(|(_, node)| node.path == spec.entry)
+    {
+        return vec![id.clone()];
     }
     nodes.keys().cloned().collect()
 }
@@ -847,6 +859,8 @@ fn package_import_identities_for_file(
 /// composition). Manifests are validated through the caller-supplied product
 /// seam; source loading, import resolution, library expansion, and cycle
 /// detection are compiler-owned here.
+/// # Errors
+/// Returns an error when the input or persisted artifact is invalid.
 pub fn load_package_with_config(
     spec: &PackageSpec,
     library_resolver: &LibraryResolver,
@@ -1008,7 +1022,7 @@ pub fn load_package_with_config(
         });
     }
 
-    if diagnostics.iter().any(|diag| diag.is_error()) {
+    if diagnostics.iter().any(radix_module::Diagnostic::is_error) {
         Err(diagnostics)
     } else {
         let mut library_cache =
@@ -1026,7 +1040,7 @@ pub fn load_package_with_config(
         }
         files.sort_by(|a, b| a.path.cmp(&b.path));
         diagnostics.extend(detect_import_cycles(spec, &files));
-        if diagnostics.iter().any(|diag| diag.is_error()) {
+        if diagnostics.iter().any(radix_module::Diagnostic::is_error) {
             return Err(diagnostics);
         }
         Ok(files)

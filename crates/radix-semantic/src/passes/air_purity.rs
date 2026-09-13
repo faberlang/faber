@@ -547,10 +547,10 @@ impl AirPurityChecker<'_> {
         let Some(combine) = args.first() else {
             return;
         };
-        if let HirExpressionKind::Path(def_id) = &combine.expr.kind {
-            if self.lanes.lane_for(*def_id) != Some(RadixLane::Air) {
-                self.reject(combine.span, "non_air_call");
-            }
+        if let HirExpressionKind::Path(def_id) = &combine.expr.kind
+            && self.lanes.lane_for(*def_id) != Some(RadixLane::Air)
+        {
+            self.reject(combine.span, "non_air_call");
         }
     }
 
@@ -586,12 +586,11 @@ impl AirPurityChecker<'_> {
     /// recovery arm owns every exit), and a rethrowing catch declines under
     /// its own cause instead.
     fn check_recovery(&mut self, cape: &HirCape, outer_ty: Option<TypeId>) {
-        if !block_has_unconditional_throw(&cape.body) {
-            if let Some(outer) = outer_ty {
-                if self.normal_exit_type(&cape.body) != Some(outer) {
-                    self.reject(cape.span, "recovery_type_mismatch");
-                }
-            }
+        if !block_has_unconditional_throw(&cape.body)
+            && let Some(outer) = outer_ty
+            && self.normal_exit_type(&cape.body) != Some(outer)
+        {
+            self.reject(cape.span, "recovery_type_mismatch");
         }
         self.handler_regions.push(HandlerRegion::Catch);
         self.check_block(&cape.body);

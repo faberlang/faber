@@ -9,7 +9,6 @@ use radix_intrinsics::{
 };
 use radix_lexer::Interner;
 use radix_target::Target;
-use std::path::PathBuf;
 
 /// Direct table pin: `textus.cursor()` is the same `ascii_one_type()` as `textus[i]`.
 #[test]

@@ -197,32 +197,31 @@ impl TypeChecker<'_> {
         // still-unbound parameter and the complete ordered vector is recorded
         // for downstream specialization. A defaulted hole counts as bound, so
         // the rejections below only fire for genuinely unresolved slots.
-        if solve_shape_params {
-            if let Some(param_vars) = &inferred_vars {
-                if let Some(bindings) = self.resolve_generic_bindings(
-                    &sig,
-                    param_vars,
-                    &mut shape_vars,
-                    &explicit_bound,
-                    span,
-                ) {
-                    self.types.resolved_generic_calls.push(ResolvedGenericCall {
-                        call_span: span,
-                        callee,
-                        bindings,
-                    });
-                }
-            }
+        if solve_shape_params
+            && let Some(param_vars) = &inferred_vars
+            && let Some(bindings) = self.resolve_generic_bindings(
+                &sig,
+                param_vars,
+                &mut shape_vars,
+                &explicit_bound,
+                span,
+            )
+        {
+            self.types.resolved_generic_calls.push(ResolvedGenericCall {
+                call_span: span,
+                callee,
+                bindings,
+            });
         }
         // D6: a shape param bound by neither arguments nor the expected type is
         // an explicit error (SEM014), never a silent guess.
         if self.reject_unbound_shape_params(&shape_vars, span) {
             return self.error_type;
         }
-        if let Some(param_vars) = inferred_vars {
-            if self.reject_inferred_type_arg_domain_misses(&sig, &param_vars, span) {
-                return self.error_type;
-            }
+        if let Some(param_vars) = inferred_vars
+            && self.reject_inferred_type_arg_domain_misses(&sig, &param_vars, span)
+        {
+            return self.error_type;
         }
         if self.reject_failable_call(&sig, span) {
             return self.error_type;

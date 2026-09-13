@@ -764,12 +764,12 @@ impl TypeChecker<'_> {
         let mut current = ty;
         let mut path: Vec<InferVar> = Vec::new();
         loop {
-            if let Some(infer) = self.infer_var_of(current) {
-                if let Some(subst) = self.substitutions.borrow().get(&infer).copied() {
-                    path.push(infer);
-                    current = subst;
-                    continue;
-                }
+            if let Some(infer) = self.infer_var_of(current)
+                && let Some(subst) = self.substitutions.borrow().get(&infer).copied()
+            {
+                path.push(infer);
+                current = subst;
+                continue;
             }
             match self.types.get(current) {
                 Type::Alias(_, resolved) => current = *resolved,

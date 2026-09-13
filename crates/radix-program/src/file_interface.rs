@@ -1,6 +1,6 @@
 //! Cross-unit file-interface snapshot extraction for package compilation.
 //!
-//! RP2c: moved from `crates/faber/src/package/file_interface.rs`. Extracts
+//! `RP2c`: moved from `crates/faber/src/package/file_interface.rs`. Extracts
 //! the portable export surface of an analyzed unit (functions, types,
 //! interfaces, constants, `@ radix backward` companions) for import-boundary
 //! contracts between package units and library interfaces.
@@ -43,6 +43,8 @@ pub struct AnalyzedCallableContract {
     pub nucleum_role: Option<NucleumRole>,
 }
 
+/// # Errors
+/// Returns an error when the input or persisted artifact is invalid.
 pub fn extract_callable_contracts(
     analysis: &AnalyzedModule,
     export_names: &[String],
@@ -79,6 +81,8 @@ pub fn extract_callable_contracts(
         .collect()
 }
 
+/// # Errors
+/// Returns an error when the input or persisted artifact is invalid.
 pub fn extract_file_interface_with_identity(
     analysis: &AnalyzedModule,
     export_names: &[String],

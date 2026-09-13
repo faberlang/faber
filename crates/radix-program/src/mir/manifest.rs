@@ -1,6 +1,11 @@
 //! Package-MIR artifact root, manifest writing, and manifest helpers.
 
-use super::*;
+use std::fmt::Write as _;
+
+use super::{
+    Diagnostic, PACKAGE_MIR_ARTIFACT_DIR, PACKAGE_MIR_ARTIFACT_VERSION, PACKAGE_MIR_TARGET_NAME,
+    Path, PathBuf, PreparedPackageMir, fs, mir_diag, mir_issue_diag,
+};
 
 pub(super) fn package_artifact_root(input: &Path) -> Result<PathBuf, Vec<Diagnostic>> {
     crate::discovery::discover_build_layout(input)
@@ -44,14 +49,14 @@ pub(super) fn package_mir_manifest(
 ) -> String {
     let entry = escape_manifest_value(&relative_or_display(package_root, &prepared.entry_path));
     let mut manifest = format!(
-        "version = {}\ntarget = \"{}\"\nentry = \"{}\"\nentry_function = \"run_entry\"\n\n[runtime]\n",
-        PACKAGE_MIR_ARTIFACT_VERSION, PACKAGE_MIR_TARGET_NAME, entry
+        "version = {PACKAGE_MIR_ARTIFACT_VERSION}\ntarget = \"{PACKAGE_MIR_TARGET_NAME}\"\nentry = \"{entry}\"\nentry_function = \"run_entry\"\n\n[runtime]\n"
     );
     for requirement in &prepared.runtime_requirements {
-        manifest.push_str(&format!(
+        let _ = write!(
+            manifest,
             "requirement = \"{}\"\n",
             escape_manifest_value(requirement)
-        ));
+        );
     }
     manifest.push_str("\n[sources]\n");
     let mut sources = prepared
@@ -61,11 +66,12 @@ pub(super) fn package_mir_manifest(
         .collect::<Vec<_>>();
     sources.sort();
     for source in sources {
-        manifest.push_str(&format!("file = \"{}\"\n", escape_manifest_value(&source)));
+        let _ = write!(manifest, "file = \"{}\"\n", escape_manifest_value(&source));
     }
     manifest
 }
 
+#[must_use]
 pub fn relative_or_display(root: &Path, path: &Path) -> String {
     path.strip_prefix(root)
         .unwrap_or(path)
@@ -75,6 +81,7 @@ pub fn relative_or_display(root: &Path, path: &Path) -> String {
 
 /// TOML basic-string escaping (backslash + double quote), shared by the
 /// manifest-value and path writers.
+#[must_use]
 pub fn escape_toml_basic_string(value: &str) -> String {
     value.replace('\\', "\\\\").replace('"', "\\\"")
 }

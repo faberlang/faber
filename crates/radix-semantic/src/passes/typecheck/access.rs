@@ -75,12 +75,11 @@ impl TypeChecker<'_> {
             }
             HirExpressionKind::Field(object, name) => {
                 let ty = self.check_field(object, *name);
-                if let Some(object_ty) = object.ty {
-                    if let Some(enum_def) = self.enum_def_from_type(object_ty) {
-                        if self.resolver.commune_field(enum_def, *name).is_some() {
-                            self.immutable_assignment("assignment_to_commune_field", target.span);
-                        }
-                    }
+                if let Some(object_ty) = object.ty
+                    && let Some(enum_def) = self.enum_def_from_type(object_ty)
+                    && self.resolver.commune_field(enum_def, *name).is_some()
+                {
+                    self.immutable_assignment("assignment_to_commune_field", target.span);
                 }
                 ty
             }
@@ -264,10 +263,10 @@ impl TypeChecker<'_> {
             // well-formed on a rank-1 tensor. Rank-N tensors require `[[r, c, …]]`
             // or a `lista<integer>` value. When the shape is an inference hole we
             // defer the rank check to runtime/later inference rather than guess.
-            if let Some(rank) = self.static_tensor_rank(shape) {
-                if rank != 1 {
-                    self.invalid_operand_types(ISSUE_TENSOR_SCALAR_INDEX_RANK, index_span);
-                }
+            if let Some(rank) = self.static_tensor_rank(shape)
+                && rank != 1
+            {
+                self.invalid_operand_types(ISSUE_TENSOR_SCALAR_INDEX_RANK, index_span);
             }
         } else {
             self.invalid_operand_types(ISSUE_TENSOR_BRACKET_INDEX_INTEGER_OR_LISTA, index_span);
@@ -321,23 +320,23 @@ impl TypeChecker<'_> {
             return self.project_ref_view(object_ty, field_ty);
         }
         if let Some(struct_def) = self.struct_def_from_type(object_ty) {
-            if let Some(info) = self.structs.get(&struct_def) {
-                if let Some(field) = info.fields.get(&name).copied() {
-                    if let Some(payload_ty) =
-                        self.scrinium_payload_field_type(object_ty, struct_def, name)
-                    {
-                        return payload_ty;
-                    }
-                    // S0-G8: an applied generic nominal projects its field
-                    // types through the application — `Box<3>.minima` is
-                    // `vector<f32, 3>`, not the declared `vector<f32, N>`.
-                    let field_ty = self.applied_field_type(object_ty, struct_def, field.ty);
-                    if field.optional {
-                        let optional_ty = self.types.option(field_ty);
-                        return self.project_ref_view(object_ty, optional_ty);
-                    }
-                    return self.project_ref_view(object_ty, field_ty);
+            if let Some(info) = self.structs.get(&struct_def)
+                && let Some(field) = info.fields.get(&name).copied()
+            {
+                if let Some(payload_ty) =
+                    self.scrinium_payload_field_type(object_ty, struct_def, name)
+                {
+                    return payload_ty;
                 }
+                // S0-G8: an applied generic nominal projects its field
+                // types through the application — `Box<3>.minima` is
+                // `vector<f32, 3>`, not the declared `vector<f32, N>`.
+                let field_ty = self.applied_field_type(object_ty, struct_def, field.ty);
+                if field.optional {
+                    let optional_ty = self.types.option(field_ty);
+                    return self.project_ref_view(object_ty, optional_ty);
+                }
+                return self.project_ref_view(object_ty, field_ty);
             }
             self.undefined_member("unknown_struct_field", span);
             return self.error_type;
@@ -629,10 +628,10 @@ impl TypeChecker<'_> {
 
     /// Whether `expr` is a declared `ref` root or a projection of one.
     pub(super) fn expr_is_ref_view(&self, expr: &HirExpression) -> bool {
-        if let Some(ty) = expr.ty {
-            if self.types.is_ref_view(self.resolve_inferred_type(ty)) {
-                return true;
-            }
+        if let Some(ty) = expr.ty
+            && self.types.is_ref_view(self.resolve_inferred_type(ty))
+        {
+            return true;
         }
         match &expr.kind {
             HirExpressionKind::Field(object, _)
@@ -842,14 +841,14 @@ impl TypeChecker<'_> {
             return;
         };
         let len = bytes.len();
-        if let Some((start, end)) = static_octeti_index_window(index) {
-            if start > end || end > len {
-                self.error_issue(
-                    SemanticErrorKind::TypeMismatch,
-                    ISSUE_OCTETI_INDEX_OUT_OF_BOUNDS,
-                    index.span,
-                );
-            }
+        if let Some((start, end)) = static_octeti_index_window(index)
+            && (start > end || end > len)
+        {
+            self.error_issue(
+                SemanticErrorKind::TypeMismatch,
+                ISSUE_OCTETI_INDEX_OUT_OF_BOUNDS,
+                index.span,
+            );
         }
     }
     /// Checks ordinary field syntax by synthesizing the receiver first.
@@ -859,25 +858,24 @@ impl TypeChecker<'_> {
         // file interface, mirroring how the call path resolves namespace
         // functions. Type exports stay type-position-only; structs/enums/
         // aliases referenced as values keep their existing error path.
-        if let HirExpressionKind::Path(module_def_id) = &object.kind {
-            if let Some(namespace) = self
+        if let HirExpressionKind::Path(module_def_id) = &object.kind
+            && let Some(namespace) = self
                 .resolver
                 .get_symbol(*module_def_id)
                 .map(|symbol| symbol.name)
+        {
+            if let Some(ty) = self
+                .resolver
+                .namespace_file_const_canonical(namespace, name)
             {
-                if let Some(ty) = self
-                    .resolver
-                    .namespace_file_const_canonical(namespace, name)
-                {
-                    return ty;
-                }
-                // Namespace enum-variant value references (`module.VARIANT`)
-                // resolve through the imported enum's variant table; the
-                // variant's value type is `Type::Enum(consumer enum def)`
-                // (codex-gap S1 U2 VALUE members).
-                if let Some((_, ty)) = self.resolver.namespace_file_variant(namespace, name) {
-                    return ty;
-                }
+                return ty;
+            }
+            // Namespace enum-variant value references (`module.VARIANT`)
+            // resolve through the imported enum's variant table; the
+            // variant's value type is `Type::Enum(consumer enum def)`
+            // (codex-gap S1 U2 VALUE members).
+            if let Some((_, ty)) = self.resolver.namespace_file_variant(namespace, name) {
+                return ty;
             }
         }
         let obj_ty = self.check_expr(object);

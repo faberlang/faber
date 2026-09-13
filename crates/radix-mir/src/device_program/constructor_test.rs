@@ -543,16 +543,14 @@ fn device_program_composed_body_materializes_four_generic_children() {
         .iter()
         .map(|edge| origin_of(edge.buffer))
         .collect();
-    assert!(join_origins.iter().any(|origin| *origin
-        == SemanticValueOrigin::MirLocal {
-            function: MirFunctionId(0),
-            local: 6,
-        }));
-    assert!(join_origins.iter().any(|origin| *origin
-        == SemanticValueOrigin::MirLocal {
-            function: MirFunctionId(0),
-            local: 7,
-        }));
+    assert!(join_origins.contains(&SemanticValueOrigin::MirLocal {
+        function: MirFunctionId(0),
+        local: 6,
+    }));
+    assert!(join_origins.contains(&SemanticValueOrigin::MirLocal {
+        function: MirFunctionId(0),
+        local: 7,
+    }));
 
     // Negative: no gate → up edge in either direction.
     assert!(

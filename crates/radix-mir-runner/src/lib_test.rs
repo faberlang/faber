@@ -193,7 +193,7 @@ fn converts_numeric_array_to_octeti_in_one_step() {
 
     let mut host = BufferHost::default();
     let type_table = TypeTable::default();
-    let mut interner = Interner::new();
+    let interner = Interner::new();
     let context = MirValidationContext::new(&type_table);
     let program = MirProgram::new();
     let runner = Runner::new(&program, &context, &type_table, &interner, &mut host);
@@ -221,7 +221,7 @@ fn rounding_ops_return_numerus_so_bound_compares_do_not_mismatch() {
     let types = TypeTable::new();
     let numerus = types.primitive(Primitive::Numerus);
     let fractus = types.primitive(Primitive::Fractus);
-    let mut interner = Interner::new();
+    let interner = Interner::new();
     let context = MirValidationContext::new(&types);
     let mut program = MirProgram::new();
     program.functions.push(make_function());
@@ -298,7 +298,7 @@ fn tensor_layernorm_rank2_no_affine() {
     // --- 2. Build minimal runner context ---
     let mut host = BufferHost::default();
     let type_table = TypeTable::default();
-    let mut interner = Interner::new();
+    let interner = Interner::new();
     let context = MirValidationContext::new(&type_table);
     let mut program = MirProgram::new();
     program.functions.push(make_function());
@@ -390,7 +390,7 @@ fn tensor_softmax_rank1() {
     // --- 2. Build minimal runner context ---
     let mut host = BufferHost::default();
     let type_table = TypeTable::default();
-    let mut interner = Interner::new();
+    let interner = Interner::new();
     let context = MirValidationContext::new(&type_table);
     let mut program = MirProgram::new();
     program.functions.push(make_function());
@@ -488,7 +488,7 @@ fn tensor_softmax_rank2() {
 
     let mut host = BufferHost::default();
     let type_table = TypeTable::default();
-    let mut interner = Interner::new();
+    let interner = Interner::new();
     let context = MirValidationContext::new(&type_table);
     let mut program = MirProgram::new();
     program.functions.push(make_function());
@@ -582,7 +582,7 @@ fn tensor_gelu_rank1() {
     // --- 2. Build minimal runner context ---
     let mut host = BufferHost::default();
     let type_table = TypeTable::default();
-    let mut interner = Interner::new();
+    let interner = Interner::new();
     let context = MirValidationContext::new(&type_table);
     let mut program = MirProgram::new();
     program.functions.push(make_function());
@@ -657,7 +657,7 @@ fn tensor_relu_rank1() {
     // --- 2. Build minimal runner context ---
     let mut host = BufferHost::default();
     let type_table = TypeTable::default();
-    let mut interner = Interner::new();
+    let interner = Interner::new();
     let context = MirValidationContext::new(&type_table);
     let mut program = MirProgram::new();
     program.functions.push(make_function());
@@ -729,7 +729,7 @@ fn mir_unop_gelu_tensor() {
 
     let mut host = BufferHost::default();
     let type_table = TypeTable::default();
-    let mut interner = Interner::new();
+    let interner = Interner::new();
     let context = MirValidationContext::new(&type_table);
     let mut program = MirProgram::new();
     program.functions.push(make_function());
@@ -799,7 +799,7 @@ fn mir_unop_tanh_tensor() {
 
     let mut host = BufferHost::default();
     let type_table = TypeTable::default();
-    let mut interner = Interner::new();
+    let interner = Interner::new();
     let context = MirValidationContext::new(&type_table);
     let mut program = MirProgram::new();
     program.functions.push(make_function());
@@ -867,7 +867,7 @@ fn mir_unop_exp_tensor() {
 
     let mut host = BufferHost::default();
     let type_table = TypeTable::default();
-    let mut interner = Interner::new();
+    let interner = Interner::new();
     let context = MirValidationContext::new(&type_table);
     let mut program = MirProgram::new();
     program.functions.push(make_function());
@@ -936,7 +936,7 @@ fn tensor_elementwise_or_scalar_broadcast() {
 
     let mut host = BufferHost::default();
     let type_table = TypeTable::default();
-    let mut interner = Interner::new();
+    let interner = Interner::new();
     let context = MirValidationContext::new(&type_table);
     let mut program = MirProgram::new();
     program.functions.push(make_function());
@@ -1016,7 +1016,7 @@ fn tensor_elementwise_or_scalar_broadcast_div_scalar_tensor() {
 
     let mut host = BufferHost::default();
     let type_table = TypeTable::default();
-    let mut interner = Interner::new();
+    let interner = Interner::new();
     let context = MirValidationContext::new(&type_table);
     let mut program = MirProgram::new();
     program.functions.push(make_function());
@@ -1096,7 +1096,7 @@ fn tensor_elementwise_or_scalar_broadcast_sub_scalar_tensor() {
 
     let mut host = BufferHost::default();
     let type_table = TypeTable::default();
-    let mut interner = Interner::new();
+    let interner = Interner::new();
     let context = MirValidationContext::new(&type_table);
     let mut program = MirProgram::new();
     program.functions.push(make_function());
@@ -1180,7 +1180,7 @@ fn unop_sqrt_tensor() {
     // --- 2. Build minimal runner context ---
     let mut host = BufferHost::default();
     let type_table = TypeTable::default();
-    let mut interner = Interner::new();
+    let interner = Interner::new();
     let context = MirValidationContext::new(&type_table);
     let mut program = MirProgram::new();
     program.functions.push(make_function());
@@ -1264,7 +1264,7 @@ fn tensor_fill_prefix_broadcast() {
     // --- 2. Build minimal runner context ---
     let mut host = BufferHost::default();
     let type_table = TypeTable::default();
-    let mut interner = Interner::new();
+    let interner = Interner::new();
     let context = MirValidationContext::new(&type_table);
     let mut program = MirProgram::new();
     program.functions.push(make_function());
@@ -1357,7 +1357,7 @@ fn tensor_fill_suffix_broadcast() {
     // --- 2. Build minimal runner context ---
     let mut host = BufferHost::default();
     let type_table = TypeTable::default();
-    let mut interner = Interner::new();
+    let interner = Interner::new();
     let context = MirValidationContext::new(&type_table);
     let mut program = MirProgram::new();
     program.functions.push(make_function());
@@ -1460,7 +1460,7 @@ fn tensor_crux_entropia_rank2() {
     // --- 3. Build minimal runner context ---
     let mut host = BufferHost::default();
     let type_table = TypeTable::default();
-    let mut interner = Interner::new();
+    let interner = Interner::new();
     let context = MirValidationContext::new(&type_table);
     let mut program = MirProgram::new();
     program.functions.push(make_function());
@@ -1708,7 +1708,7 @@ fn tensor_elementwise_shape_mismatch_rejected() {
 
     let mut host = BufferHost::default();
     let type_table = TypeTable::default();
-    let mut interner = Interner::new();
+    let interner = Interner::new();
     let context = MirValidationContext::new(&type_table);
     let mut program = MirProgram::new();
     program.functions.push(make_function());
@@ -1779,7 +1779,7 @@ fn tensor_elementwise_backing_length_mismatch_rejected() {
 
     let mut host = BufferHost::default();
     let type_table = TypeTable::default();
-    let mut interner = Interner::new();
+    let interner = Interner::new();
     let context = MirValidationContext::new(&type_table);
     let mut program = MirProgram::new();
     program.functions.push(make_function());
@@ -1859,7 +1859,7 @@ fn tensor_elementwise_same_shape_succeeds() {
 
     let mut host = BufferHost::default();
     let type_table = TypeTable::default();
-    let mut interner = Interner::new();
+    let interner = Interner::new();
     let context = MirValidationContext::new(&type_table);
     let mut program = MirProgram::new();
     program.functions.push(make_function());
@@ -1928,7 +1928,7 @@ fn tensor_softmax_zero_width_rejected() {
 
     let mut host = BufferHost::default();
     let type_table = TypeTable::default();
-    let mut interner = Interner::new();
+    let interner = Interner::new();
     let context = MirValidationContext::new(&type_table);
     let mut program = MirProgram::new();
     program.functions.push(make_function());
@@ -1978,7 +1978,7 @@ fn tensor_softmax_rank2_zero_width_rejected() {
 
     let mut host = BufferHost::default();
     let type_table = TypeTable::default();
-    let mut interner = Interner::new();
+    let interner = Interner::new();
     let context = MirValidationContext::new(&type_table);
     let mut program = MirProgram::new();
     program.functions.push(make_function());
@@ -2027,7 +2027,7 @@ fn tensor_crux_entropia_zero_width_rejected() {
 
     let mut host = BufferHost::default();
     let type_table = TypeTable::default();
-    let mut interner = Interner::new();
+    let interner = Interner::new();
     let context = MirValidationContext::new(&type_table);
     let mut program = MirProgram::new();
     program.functions.push(make_function());
@@ -2142,7 +2142,7 @@ fn regex_pattern_only_unknown_flags() {
 fn constant_equals_value_int_equal() {
     let konst = MirConstant::Int(42);
     let value = Value::Int(42);
-    let mut interner = Interner::new();
+    let interner = Interner::new();
     assert!(constant_equals_value(&konst, &value, &interner));
 }
 
@@ -2150,7 +2150,7 @@ fn constant_equals_value_int_equal() {
 fn constant_equals_value_int_not_equal() {
     let konst = MirConstant::Int(42);
     let value = Value::Int(7);
-    let mut interner = Interner::new();
+    let interner = Interner::new();
     assert!(!constant_equals_value(&konst, &value, &interner));
 }
 
@@ -2158,7 +2158,7 @@ fn constant_equals_value_int_not_equal() {
 fn constant_equals_value_uint_equal() {
     let konst = MirConstant::UInt(100);
     let value = Value::UInt(100);
-    let mut interner = Interner::new();
+    let interner = Interner::new();
     assert!(constant_equals_value(&konst, &value, &interner));
 }
 
@@ -2166,7 +2166,7 @@ fn constant_equals_value_uint_equal() {
 fn constant_equals_value_uint_not_equal() {
     let konst = MirConstant::UInt(100);
     let value = Value::UInt(50);
-    let mut interner = Interner::new();
+    let interner = Interner::new();
     assert!(!constant_equals_value(&konst, &value, &interner));
 }
 
@@ -2174,7 +2174,7 @@ fn constant_equals_value_uint_not_equal() {
 fn constant_equals_value_int_uint_cross_equal() {
     let konst = MirConstant::Int(5);
     let value = Value::UInt(5);
-    let mut interner = Interner::new();
+    let interner = Interner::new();
     assert!(constant_equals_value(&konst, &value, &interner));
 }
 
@@ -2182,7 +2182,7 @@ fn constant_equals_value_int_uint_cross_equal() {
 fn constant_equals_value_int_uint_cross_negative() {
     let konst = MirConstant::Int(-1);
     let value = Value::UInt(0);
-    let mut interner = Interner::new();
+    let interner = Interner::new();
     assert!(!constant_equals_value(&konst, &value, &interner));
 }
 
@@ -2190,7 +2190,7 @@ fn constant_equals_value_int_uint_cross_negative() {
 fn constant_equals_value_bool_equal() {
     let konst = MirConstant::Bool(true);
     let value = Value::Bool(true);
-    let mut interner = Interner::new();
+    let interner = Interner::new();
     assert!(constant_equals_value(&konst, &value, &interner));
 }
 
@@ -2198,7 +2198,7 @@ fn constant_equals_value_bool_equal() {
 fn constant_equals_value_bool_not_equal() {
     let konst = MirConstant::Bool(true);
     let value = Value::Bool(false);
-    let mut interner = Interner::new();
+    let interner = Interner::new();
     assert!(!constant_equals_value(&konst, &value, &interner));
 }
 
@@ -2206,7 +2206,7 @@ fn constant_equals_value_bool_not_equal() {
 fn constant_equals_value_nil() {
     let konst = MirConstant::Nil;
     let value = Value::Nil;
-    let mut interner = Interner::new();
+    let interner = Interner::new();
     assert!(constant_equals_value(&konst, &value, &interner));
 }
 
@@ -2214,7 +2214,7 @@ fn constant_equals_value_nil() {
 fn constant_equals_value_unit() {
     let konst = MirConstant::Unit;
     let value = Value::Unit;
-    let mut interner = Interner::new();
+    let interner = Interner::new();
     assert!(constant_equals_value(&konst, &value, &interner));
 }
 
@@ -2222,7 +2222,7 @@ fn constant_equals_value_unit() {
 fn constant_equals_value_type_mismatch() {
     let konst = MirConstant::Int(42);
     let value = Value::Bool(false);
-    let mut interner = Interner::new();
+    let interner = Interner::new();
     assert!(!constant_equals_value(&konst, &value, &interner));
 }
 
@@ -2255,7 +2255,7 @@ fn f029_tensor_add_u8_overflow_rejected() {
     })));
 
     let mut host = BufferHost::default();
-    let mut interner = Interner::new();
+    let interner = Interner::new();
     let context = MirValidationContext::new(&type_table);
     let mut program = MirProgram::new();
     program.functions.push(make_function());
@@ -2323,7 +2323,7 @@ fn f029_uint_tensor_add_succeeds() {
     })));
 
     let mut host = BufferHost::default();
-    let mut interner = Interner::new();
+    let interner = Interner::new();
     let context = MirValidationContext::new(&type_table);
     let mut program = MirProgram::new();
     program.functions.push(make_function());
@@ -2393,7 +2393,7 @@ fn f029_tensor_div_zero_rejected() {
     })));
 
     let mut host = BufferHost::default();
-    let mut interner = Interner::new();
+    let interner = Interner::new();
     let context = MirValidationContext::new(&type_table);
     let mut program = MirProgram::new();
     program.functions.push(make_function());
@@ -2460,7 +2460,7 @@ fn f029_float_tensor_div_zero_allowed() {
     })));
 
     let mut host = BufferHost::default();
-    let mut interner = Interner::new();
+    let interner = Interner::new();
     let context = MirValidationContext::new(&type_table);
     let mut program = MirProgram::new();
     program.functions.push(make_function());
@@ -2530,7 +2530,7 @@ fn f082_reversed_interval_bounds_rejected() {
     program.functions.push(make_function());
 
     let mut host = BufferHost::default();
-    let mut interner = Interner::new();
+    let interner = Interner::new();
     let mut runner = crate::Runner::new(&program, &context, &type_table, &interner, &mut host);
 
     let fn0 = program.functions.first().unwrap();
@@ -2589,7 +2589,7 @@ fn f082_valid_interval_bounds_accepted() {
     program.functions.push(make_function());
 
     let mut host = BufferHost::default();
-    let mut interner = Interner::new();
+    let interner = Interner::new();
     let mut runner = crate::Runner::new(&program, &context, &type_table, &interner, &mut host);
 
     let fn0 = program.functions.first().unwrap();
@@ -2651,7 +2651,7 @@ fn f088_interval_clamp_empty_exclusive_interval_no_panic() {
     program.functions.push(make_function());
 
     let mut host = BufferHost::default();
-    let mut interner = Interner::new();
+    let interner = Interner::new();
     let mut runner = crate::Runner::new(&program, &context, &type_table, &interner, &mut host);
 
     let fn0 = program.functions.first().unwrap();
@@ -2708,7 +2708,7 @@ fn f088_interval_clamp_exclusive_interval_clamps_into_range() {
     program.functions.push(make_function());
 
     let mut host = BufferHost::default();
-    let mut interner = Interner::new();
+    let interner = Interner::new();
     let mut runner = crate::Runner::new(&program, &context, &type_table, &interner, &mut host);
 
     let fn0 = program.functions.first().unwrap();
@@ -2768,7 +2768,7 @@ fn sum_numeric_u8_overflow_rejects() {
     program.functions.push(make_function());
 
     let mut host = BufferHost::default();
-    let mut interner = Interner::new();
+    let interner = Interner::new();
     let mut runner = crate::Runner::new(&program, &context, &type_table, &interner, &mut host);
 
     let fn0 = program.functions.first().unwrap();
@@ -2818,7 +2818,7 @@ fn sum_numeric_width_boundary_succeeds() {
     program.functions.push(make_function());
 
     let mut host = BufferHost::default();
-    let mut interner = Interner::new();
+    let interner = Interner::new();
     let mut runner = crate::Runner::new(&program, &context, &type_table, &interner, &mut host);
 
     let fn0 = program.functions.first().unwrap();
@@ -2910,7 +2910,7 @@ fn f083_optional_variant_field_nil_fallback() {
     program.functions.push(make_function());
 
     let mut host = BufferHost::default();
-    let mut interner = Interner::new();
+    let interner = Interner::new();
     let mut runner = crate::Runner::new(&program, &context, &type_table, &interner, &mut host);
 
     let fn0 = program.functions.first().unwrap();
@@ -2960,7 +2960,7 @@ fn f083_required_variant_field_errors() {
     program.functions.push(make_function());
 
     let mut host = BufferHost::default();
-    let mut interner = Interner::new();
+    let interner = Interner::new();
     let mut runner = crate::Runner::new(&program, &context, &type_table, &interner, &mut host);
 
     let fn0 = program.functions.first().unwrap();
@@ -3105,7 +3105,7 @@ fn f086_octeti_append_non_place_returns_modified() {
     program.functions.push(make_function());
 
     let mut host = BufferHost::default();
-    let mut interner = Interner::new();
+    let interner = Interner::new();
     let mut runner = crate::Runner::new(&program, &context, &type_table, &interner, &mut host);
 
     let fn0 = program.functions.first().unwrap();
@@ -3166,7 +3166,7 @@ fn f087_inclusive_range_materialize_i64max() {
     program.functions.push(make_function());
 
     let mut host = BufferHost::default();
-    let mut interner = Interner::new();
+    let interner = Interner::new();
     let mut runner = crate::Runner::new(&program, &context, &type_table, &interner, &mut host);
 
     let fn0 = program.functions.first().unwrap();
@@ -3228,7 +3228,7 @@ fn f087_exclusive_range_i64max_empty() {
     program.functions.push(make_function());
 
     let mut host = BufferHost::default();
-    let mut interner = Interner::new();
+    let interner = Interner::new();
     let mut runner = crate::Runner::new(&program, &context, &type_table, &interner, &mut host);
 
     let fn0 = program.functions.first().unwrap();
@@ -3291,7 +3291,7 @@ fn eval_tensor_add_bias(x_data: Vec<f64>, b_data: Vec<f64>) -> Value {
 
     let mut host = BufferHost::default();
     let type_table = TypeTable::default();
-    let mut interner = Interner::new();
+    let interner = Interner::new();
     let context = MirValidationContext::new(&type_table);
     let mut program = MirProgram::new();
     program.functions.push(make_function());
@@ -3371,7 +3371,7 @@ fn tensor_add_invalid_broadcast_pair_fails_closed() {
 
     let mut host = BufferHost::default();
     let type_table = TypeTable::default();
-    let mut interner = Interner::new();
+    let interner = Interner::new();
     let context = MirValidationContext::new(&type_table);
     let mut program = MirProgram::new();
     program.functions.push(make_function());
@@ -3415,7 +3415,7 @@ pub(super) fn evaluate_collection_call(
 
     let mut host = BufferHost::default();
     let type_table = TypeTable::default();
-    let mut interner = Interner::new();
+    let interner = Interner::new();
     let context = MirValidationContext::new(&type_table);
     let mut program = MirProgram::new();
     program.functions.push(make_function());
@@ -3712,7 +3712,7 @@ fn runner_gradient_handle_create_accumulate_read_zero_round_trip() {
     // --- 1. Build the round-trip program state ---
     let mut host = BufferHost::default();
     let type_table = TypeTable::default();
-    let mut interner = Interner::new();
+    let interner = Interner::new();
     let context = MirValidationContext::new(&type_table);
     let mut program = MirProgram::new();
     program.functions.push(make_function());
@@ -3872,7 +3872,7 @@ fn runner_gradient_operations_fail_closed_on_unknown_or_foreign_handle() {
 
     let mut host = BufferHost::default();
     let type_table = TypeTable::default();
-    let mut interner = Interner::new();
+    let interner = Interner::new();
     let context = MirValidationContext::new(&type_table);
     let mut program = MirProgram::new();
     program.functions.push(make_function());
@@ -3930,7 +3930,7 @@ fn runner_type_check_dispatches_on_runtime_variant_tag() {
 
     let mut host = BufferHost::default();
     let type_table = TypeTable::default();
-    let mut interner = Interner::new();
+    let interner = Interner::new();
     let context = MirValidationContext::new(&type_table);
     let mut program = MirProgram::new();
     program.functions.push(make_function());
@@ -4012,7 +4012,7 @@ fn runner_type_check_dispatches_nominal_struct_and_enum_tags() {
 
     let mut host = BufferHost::default();
     let mut type_table = TypeTable::default();
-    let mut interner = Interner::new();
+    let interner = Interner::new();
     let struct_def = DefId(10);
     let enum_def = DefId(20);
     let variant_def = DefId(21);
@@ -4074,7 +4074,7 @@ fn runner_type_check_accepts_union_member_tags() {
 
     let mut host = BufferHost::default();
     let mut type_table = TypeTable::default();
-    let mut interner = Interner::new();
+    let interner = Interner::new();
     let struct_def = DefId(30);
     let numerus = type_table.primitive(Primitive::Numerus);
     let struct_ty = type_table.intern(Type::Struct(struct_def));
@@ -4132,7 +4132,7 @@ fn matrix_display_emits_nested_rows() {
         ],
     })));
 
-    let mut interner = Interner::new();
+    let interner = Interner::new();
     let text = matrix
         .display(&interner, Span::default())
         .expect("matrix display must succeed");
@@ -4158,7 +4158,7 @@ fn matrix_display_rows_split_on_column_count() {
         ],
     })));
 
-    let mut interner = Interner::new();
+    let interner = Interner::new();
     let text = matrix
         .display(&interner, Span::default())
         .expect("matrix display must succeed");
@@ -4343,7 +4343,7 @@ fn recovery_calls_index_only_orphan_temp_destinations() {
 
     let mut host = BufferHost::default();
     let type_table = TypeTable::default();
-    let mut interner = Interner::new();
+    let interner = Interner::new();
     let context = MirValidationContext::new(&type_table);
     let mut program = MirProgram::new();
     program.functions.push(function);
@@ -4384,7 +4384,7 @@ fn conversio_padded_tensor_from_flat_fills_dead_slots() {
     program.functions.push(make_function());
 
     let mut host = BufferHost::default();
-    let mut interner = Interner::new();
+    let interner = Interner::new();
     let mut runner = crate::Runner::new(&program, &context, &type_table, &interner, &mut host);
     let fn0 = program.functions.first().unwrap();
     runner.push_frame(fn0.id, crate::MirBlockId(0));
@@ -4473,7 +4473,7 @@ fn lista_elementwise_dynamic_pair_checks_length_and_broadcasts() {
     let numerus = types.primitive(Primitive::Numerus);
     let lista = types.array(numerus);
     let context = MirValidationContext::new(&types);
-    let mut interner = Interner::new();
+    let interner = Interner::new();
     let mut host = BufferHost::default();
     let mut program = MirProgram::new();
     program.functions.push(make_function());

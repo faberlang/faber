@@ -25,6 +25,7 @@ use radix::program::emit::{
 };
 use radix::program::manifest::ManifestRustHost;
 use radix::program::test_source_filter::TestSourceFilter;
+use std::collections::BTreeMap;
 fn analyze_with_faber_seams(
     config: &Config,
     input: &Path,
@@ -878,13 +879,13 @@ fn package_emits_rustfmt_clean_generated_main_for_multifile_package() {
     let entry = dir.join("main.fab");
     fs::write(
         &entry,
-        r##"
+        r#"
 import from "./thing" thing
 
 main {
   print thing.label()
 }
-"##,
+"#,
     )
     .expect("write entry");
     fs::write(
@@ -934,13 +935,13 @@ fn package_mir_linking_executes_two_file_package_without_rust_emit() {
     let entry = dir.join("main.fab");
     fs::write(
         &entry,
-        r##"
+        r#"
 import from "./thing" thing
 
 main {
   print thing.label()
 }
-"##,
+"#,
     )
     .expect("write entry");
     fs::write(
@@ -1673,8 +1674,7 @@ main args args {
     )
     .expect("build fmir-text image");
     let image_text = fs::read_to_string(&image.image_path).expect("read image");
-    let image_text =
-        image_text.replacen(r#"{ Primitive = "Textus" }"#, r#"{ Struct = 999999 }"#, 1);
+    let image_text = image_text.replacen(r#"{ Primitive = "Textus" }"#, r"{ Struct = 999999 }", 1);
     fs::write(&image.image_path, image_text).expect("write corrupt type metadata");
     fs::remove_file(&entry).expect("remove source after image build");
 
@@ -3775,13 +3775,13 @@ fn package_mir_linking_executes_text_returning_local_import() {
     let entry = dir.join("main.fab");
     fs::write(
         &entry,
-        r##"
+        r#"
 import from "./thing" thing
 
 main {
   print thing.label()
 }
-"##,
+"#,
     )
     .expect("write entry");
     fs::write(
@@ -3816,7 +3816,7 @@ fn package_mir_manifest_imports_shared_text_helper_outside_source_root() {
     let fixture = coreutils_like_package("package-mir-shared-outside-source");
     fs::write(
         fixture.src.join("main.fab"),
-        r##"
+        r#"
 import from "§gnu/format" gnu_format
 
 @ cli "echo"
@@ -3824,17 +3824,17 @@ import from "§gnu/format" gnu_format
 main args args {
   print gnu_format.identity(args.word)
 }
-"##,
+"#,
     )
     .expect("write entry");
     fs::write(
         fixture.common.join("format.fab"),
-        r#"
+        r"
 @ public
 fn identity(string word) → string {
   return word
 }
-"#,
+",
     )
     .expect("write shared helper");
 
@@ -3859,7 +3859,7 @@ fn package_mir_manifest_shared_rest_operand_joiner_executes() {
     let fixture = coreutils_like_package("package-mir-shared-rest-joiner");
     fs::write(
         fixture.src.join("main.fab"),
-        r##"
+        r#"
 import from "§gnu/format" gnu_format
 
 @ cli "echo"
@@ -3867,7 +3867,7 @@ import from "§gnu/format" gnu_format
 main args args {
   print gnu_format.inter_spatia(args.words)
 }
-"##,
+"#,
     )
     .expect("write entry");
     fs::write(
@@ -3909,7 +3909,7 @@ fn package_mir_manifest_shared_import_chain_outside_source_root_executes() {
     let fixture = coreutils_like_package("package-mir-shared-import-chain");
     fs::write(
         fixture.src.join("main.fab"),
-        r##"
+        r#"
 import from "§gnu/stdio" gnu_stdio
 
 @ cli "echo"
@@ -3917,29 +3917,29 @@ import from "§gnu/stdio" gnu_stdio
 main args args {
   gnu_stdio.scribe_identity(args.word)
 }
-"##,
+"#,
     )
     .expect("write entry");
     fs::write(
         fixture.common.join("stdio.fab"),
-        r##"
+        r#"
 import from "./format" format
 
 @ public
 fn scribe_identity(string word) → void {
   print format.identity(word)
 }
-"##,
+"#,
     )
     .expect("write shared stdio");
     fs::write(
         fixture.common.join("format.fab"),
-        r#"
+        r"
 @ public
 fn identity(string word) → string {
   return word
 }
-"#,
+",
     )
     .expect("write shared format");
 
@@ -3964,35 +3964,35 @@ fn package_mir_manifest_shared_import_cycle_reports_cycle() {
     let fixture = coreutils_like_package("package-mir-shared-import-cycle");
     fs::write(
         fixture.src.join("main.fab"),
-        r##"
+        r#"
 import from "§gnu/a" a
 
 main {
   print a.value()
 }
-"##,
+"#,
     )
     .expect("write entry");
     fs::write(
         fixture.common.join("a.fab"),
-        r##"
+        r#"
 import from "./b" b
 
 fn value() → int {
   return b.value()
 }
-"##,
+"#,
     )
     .expect("write shared a");
     fs::write(
         fixture.common.join("b.fab"),
-        r##"
+        r#"
 import from "./a" a
 
 fn value() → int {
   return a.value()
 }
-"##,
+"#,
     )
     .expect("write shared b");
 
@@ -4018,18 +4018,18 @@ fn package_mir_manifest_shared_private_export_reports_namespace_diagnostic() {
     let fixture = coreutils_like_package("package-mir-shared-private-export");
     fs::write(
         fixture.src.join("main.fab"),
-        r##"
+        r#"
 import from "§gnu/format" gnu_format
 
 main {
   print gnu_format.hidden("salve")
 }
-"##,
+"#,
     )
     .expect("write entry");
     fs::write(
         fixture.common.join("format.fab"),
-        r#"
+        r"
 @ private
 fn hidden(string word) → string {
   return word
@@ -4038,7 +4038,7 @@ fn hidden(string word) → string {
 fn identity(string word) → string {
   return word
 }
-"#,
+",
     )
     .expect("write shared format");
 
@@ -4066,13 +4066,13 @@ fn package_mir_linking_executes_non_entry_local_call_chain() {
     let entry = dir.join("main.fab");
     fs::write(
         &entry,
-        r##"
+        r#"
 import from "./service" Service
 
 main {
   Service.run()
 }
-"##,
+"#,
     )
     .expect("write entry");
     fs::write(
@@ -4089,12 +4089,12 @@ fn run() → void {
     .expect("write service");
     fs::write(
         dir.join("util.fab"),
-        r#"
+        r"
 @ public
 fn adde(int left, int right) → int {
   return left + right
 }
-"#,
+",
     )
     .expect("write util");
 
@@ -4122,7 +4122,7 @@ fn package_mir_linking_keeps_duplicate_file_stem_functions_path_scoped() {
     let entry = dir.join("main.fab");
     fs::write(
         &entry,
-        r##"
+        r#"
 import from "./a/util" A
 import from "./b/util" B
 
@@ -4130,27 +4130,27 @@ main {
   print A.label()
   print B.label()
 }
-"##,
+"#,
     )
     .expect("write entry");
     fs::write(
         dir.join("a").join("util.fab"),
-        r#"
+        r"
 @ public
 fn label() → int {
   return 1
 }
-"#,
+",
     )
     .expect("write a util");
     fs::write(
         dir.join("b").join("util.fab"),
-        r#"
+        r"
 @ public
 fn label() → int {
   return 2
 }
-"#,
+",
     )
     .expect("write b util");
 
@@ -4176,18 +4176,18 @@ fn package_mir_linking_reports_private_namespace_diagnostic() {
     let entry = dir.join("main.fab");
     fs::write(
         &entry,
-        r##"
+        r#"
 import from "./auxilium" Aux
 
 main {
   print Aux.secretum()
 }
-"##,
+"#,
     )
     .expect("write entry");
     fs::write(
         dir.join("auxilium.fab"),
-        r#"
+        r"
 @ private
 fn secretum() → int {
   return 1
@@ -4196,7 +4196,7 @@ fn secretum() → int {
 fn publicum() → int {
   return 2
 }
-"#,
+",
     )
     .expect("write auxilium");
 
@@ -4224,22 +4224,22 @@ fn package_mir_linking_reports_nested_namespace_call_as_unsupported() {
     let entry = dir.join("main.fab");
     fs::write(
         &entry,
-        r##"
+        r#"
 import from "./auxilium" Aux
 
 main {
   print Aux.mathesis.dupla(4)
 }
-"##,
+"#,
     )
     .expect("write entry");
     fs::write(
         dir.join("auxilium.fab"),
-        r#"
+        r"
 fn dupla(int n) → int {
   return n * 2
 }
-"#,
+",
     )
     .expect("write auxilium");
 
@@ -4802,12 +4802,12 @@ main {
     .expect("write entry");
     fs::write(
         dir.join("thing.fab"),
-        r#"
+        r"
 @ public
 class Thing {
     string name
 }
-"#,
+",
     )
     .expect("write type module");
 
@@ -4846,11 +4846,11 @@ fn compile_package_preserves_file_stem_named_type_under_import_alias() {
     write_temp_library_fixture(
         library_home.path(),
         "Thing",
-        r#"
+        r"
 genus Thing {
     textus name
 }
-"#,
+",
     );
 
     let dir = test_temp_dir("alias-stem-type-entry");
@@ -6054,7 +6054,7 @@ main {
 
     let diagnostics = check_with_faber_seams(&Config::default(), &dir.join("faber.toml"));
     assert!(
-        !diagnostics.iter().any(|diag| diag.is_error()),
+        !diagnostics.iter().any(radix::Diagnostic::is_error),
         "expected wildcard library import to resolve in check, got {:?}",
         diagnostics
             .iter()
@@ -7441,7 +7441,7 @@ fn load_package_with_config_rejects_malformed_manifest() {
         package_root: dir.path().to_path_buf(),
         source_root: dir.join("src"),
         entry: dir.join("src/main.fab"),
-        templates: Default::default(),
+        templates: BTreeMap::default(),
         manifest_backed: true,
     };
     let resolver = library_resolver_from_config(&Config::default());
@@ -8139,12 +8139,12 @@ main {
     .expect("write entry");
     fs::write(
         dir.join("auxilium.fab"),
-        r#"
+        r"
 @ public
 fn adde(int left, int right) → int {
     return left + right
 }
-"#,
+",
     )
     .expect("write module");
 
@@ -8196,7 +8196,7 @@ fn label(string nomen) → string {
 
     let diagnostics = check_with_faber_seams(&Config::default(), &entry);
     assert!(
-        !diagnostics.iter().any(|diag| diag.is_error()),
+        !diagnostics.iter().any(radix::Diagnostic::is_error),
         "expected typed file namespace function call, got {:?}",
         diagnostics
             .iter()
@@ -8222,12 +8222,12 @@ main {
     .expect("write entry");
     fs::write(
         dir.join("auxilium.fab"),
-        r#"
+        r"
 @ public
 fn label(string nomen) → string {
     return nomen
 }
-"#,
+",
     )
     .expect("write module");
 
@@ -8263,7 +8263,7 @@ main {
 
     let diagnostics = check_with_faber_seams(&Config::default(), &entry);
     assert!(
-        !diagnostics.iter().any(|diag| diag.is_error()),
+        !diagnostics.iter().any(radix::Diagnostic::is_error),
         "expected typed fs/path namespace call, got {:?}",
         diagnostics
             .iter()
@@ -8278,11 +8278,11 @@ fn check_package_types_top_level_json_solve_namespace_call() {
     write_temp_library_fixture(
         library_home.path(),
         "json/solve",
-        r#"
+        r"
 functio solve(textus json) → valor {
     redde json ↦ valor
 }
-"#,
+",
     );
 
     let dir = test_temp_dir("top-level-json-solve-entry");
@@ -8303,7 +8303,7 @@ main {
     let diagnostics =
         check_with_faber_seams(&config_with_library_home(library_home.path()), &entry);
     assert!(
-        !diagnostics.iter().any(|diag| diag.is_error()),
+        !diagnostics.iter().any(radix::Diagnostic::is_error),
         "expected typed top-level json/solve namespace call, got {:?}",
         diagnostics
             .iter()
@@ -8393,12 +8393,12 @@ fn run() → void {
     .expect("write service");
     fs::write(
         dir.join("util.fab"),
-        r#"
+        r"
 @ public
 fn adde(int left, int right) → int {
     return left + right
 }
-"#,
+",
     )
     .expect("write util");
 
@@ -8437,22 +8437,22 @@ main {
     .expect("write entry");
     fs::write(
         dir.join("a").join("types.fab"),
-        r#"
+        r"
 @ public
 class Thing {
     string label
 }
-"#,
+",
     )
     .expect("write a types");
     fs::write(
         dir.join("b").join("types.fab"),
-        r#"
+        r"
 @ public
 class Thing {
     string label
 }
-"#,
+",
     )
     .expect("write b types");
 
@@ -8484,12 +8484,12 @@ main {
     .expect("write entry");
     fs::write(
         dir.join("auxilium.fab"),
-        r#"
+        r"
 @ public
 fn dupla(int n) → int {
     return n * 2
 }
-"#,
+",
     )
     .expect("write module");
 
@@ -8598,7 +8598,7 @@ main {
     .expect("write entry");
     fs::write(
         dir.join("parser.fab"),
-        r#"
+        r"
 @ private
 fn scan(string input) → string {
     return input
@@ -8607,7 +8607,7 @@ fn scan(string input) → string {
 fn solve(string input) → string {
     return input
 }
-"#,
+",
     )
     .expect("write module");
 
@@ -8625,14 +8625,14 @@ fn compile_package_rejects_private_library_type_through_file_namespace_alias() {
     write_temp_library_fixture(
         library_home.path(),
         "types",
-        r#"
+        r"
 @ privata
 genus Secretum {
 }
 
 genus Publicum {
 }
-"#,
+",
     );
 
     let dir = test_temp_dir("private-library-type-entry");
@@ -9392,12 +9392,12 @@ fn generated_package_ad_avoids_private_host_bridge_dependency() {
     fs::write(
         &entry,
         format!(
-            r#"
+            r"
 main {{
     const string body ← call 'solum:lege' ({path_lit}) ↦ string
     print body
 }}
-"#
+"
         ),
     )
     .expect("write entry");
@@ -9459,12 +9459,12 @@ host = "native"
     fs::write(
         pkg.join("src/main.fab"),
         format!(
-            r#"
+            r"
 main {{
     const string body ← call 'solum:lege' ({path_lit}) ↦ string
     print body
 }}
-"#
+"
         ),
     )
     .expect("write entry");
@@ -9574,12 +9574,12 @@ host = "native"
     fs::write(
         pkg.join("src/main.fab"),
         format!(
-            r#"
+            r"
 async_main {{
     const string body ← call 'solum:lege' ({path_lit}) ↦ string
     print body
 }}
-"#
+"
         ),
     )
     .expect("write entry");
@@ -9911,11 +9911,11 @@ fn transitive_nested_lista_lista_textus_typechecks() {
     write_temp_library_fixture(
         library_home.path(),
         "nested_lista_probe",
-        r#"
+        r"
 functio vacua_tabula() → lista<lista<textus>> {
     redde vacua
 }
-"#,
+",
     );
 
     let dir = test_temp_dir("transitive-nested-lista-entry");
@@ -10499,7 +10499,7 @@ fn main() → void {
 
 /// SGR-U2: `emit -t metal-text` on a `.fab` entry takes the merged-consumer
 /// lane — the same source the build branch compiles — instead of
-/// radix-program::emit, whose artifact plan has no MirMetal arm and reports
+/// `radix-program::emit`, whose artifact plan has no `MirMetal` arm and reports
 /// the input as `package_target_unsupported`.
 #[cfg(feature = "mir-metal")]
 #[test]
@@ -12238,7 +12238,7 @@ symbol = "webDomOnFrame"
     .expect("ts.toml");
     fs::write(
         lib.join("runtime/dom.ts"),
-        r#"export type WebDomScope = { readonly root: ParentNode; readonly selector: string };
+        r"export type WebDomScope = { readonly root: ParentNode; readonly selector: string };
 export type WebDomElement = { readonly selector: string };
 export type WebDomEvent = { readonly kind: string };
 export type WebDomFrameState = { readonly frame: number };
@@ -12289,7 +12289,7 @@ export function webDomOnFrame(handler: WebDomFrameHandler): WebDomSubscription {
     void handler;
     return { unsubscribe() {} };
 }
-"#,
+",
     )
     .expect("dom shim");
 }
@@ -12354,7 +12354,7 @@ fn g10_web1_tela_package_exports_controller_contract() {
 #[test]
 fn g10_web2_product_static_assets_are_deterministic_and_manifested() {
     let dir = test_temp_dir("g10-web2-static-assets");
-    write_browser_product_manifest(&dir, r#""#);
+    write_browser_product_manifest(&dir, r"");
     write_static_asset_roots(&dir);
     fs::write(dir.join("pages/index.html"), "<main>Hello</main>\n").expect("page");
     fs::write(dir.join("styles/site.css"), "main { color: red; }\n").expect("style");
@@ -12412,7 +12412,7 @@ fn g10_web2_product_static_assets_are_deterministic_and_manifested() {
 #[test]
 fn g10_web2_product_static_assets_fail_closed_on_missing_root_collision_and_stale_output() {
     let missing = test_temp_dir("g10-web2-missing-root");
-    write_browser_product_manifest(&missing, r#""#);
+    write_browser_product_manifest(&missing, r"");
     fs::create_dir_all(missing.join("pages")).expect("pages");
     fs::create_dir_all(missing.join("styles")).expect("styles");
     let manifest = read_manifest(&missing.join("faber.toml")).expect("manifest");
@@ -12441,7 +12441,7 @@ public = "public"
     assert!(diagnostic_has_issue(&err, "product_asset_collision"));
 
     let stale = test_temp_dir("g10-web2-stale-output");
-    write_browser_product_manifest(&stale, r#""#);
+    write_browser_product_manifest(&stale, r"");
     write_static_asset_roots(&stale);
     fs::write(stale.join("pages/index.html"), "ok\n").expect("page");
     fs::create_dir_all(stale.join("dist/pages")).expect("dist pages");
@@ -13966,14 +13966,14 @@ fn package_fmir_text_image_round_trips_upper_half_u64_constants() {
     let entry = dir.join("main.fab");
     fs::write(
         &entry,
-        r#"
+        r"
 main {
   const int<u64> max ← 18446744073709551615
   const int<u64> sha ← 9223372036854775808
   print max
   print sha
 }
-"#,
+",
     )
     .expect("write entry");
 
@@ -14003,14 +14003,14 @@ fn package_fmir_image_round_trips_upper_half_u64_constants() {
     let entry = dir.join("main.fab");
     fs::write(
         &entry,
-        r#"
+        r"
 main {
   const int<u64> max ← 18446744073709551615
   const int<u64> sha ← 9223372036854775808
   print max
   print sha
 }
-"#,
+",
     )
     .expect("write entry");
 
@@ -14348,10 +14348,10 @@ targets = ["fmir"]
     .expect("write library manifest");
     fs::write(
         lib_root.join("testlib/src/inner.fab"),
-        r#"functio dupla(numerus value) → numerus {
+        r"functio dupla(numerus value) → numerus {
     redde value * 2
 }
-"#,
+",
     )
     .expect("write nested library module");
     fs::write(
@@ -14543,10 +14543,10 @@ functio simple_loss(
     .expect("write gradient module");
     fs::write(
         lib_root.join("testgrad/src/tensor.fab"),
-        r#"functio fill(f32 v) → f32 {
+        r"functio fill(f32 v) → f32 {
     redde v
 }
-"#,
+",
     )
     .expect("write tensor module");
     fs::write(

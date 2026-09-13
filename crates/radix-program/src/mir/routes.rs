@@ -1,6 +1,17 @@
 //! Package-MIR run/build route API: route selection, image loading, and the stdio entry.
 
-use super::*;
+use super::{
+    AnalyzedProgram, BTreeMap, CliPlanningMode, Config, DeviceSelection, Diagnostic,
+    FMIR_BIN_ARTIFACT_DIR, FMIR_BIN_ENTRYPOINT_FILE, FMIR_IMAGE_FILE, FMIR_TEXT_IMAGE_FILE,
+    FmirPackageImage, FmirPackageImageFormat, Host, MirSeams, PACKAGE_MIR_MANIFEST_FILE,
+    PackageFmirBinaryBundle, PackageFmirImage, PackageFmirTextImage, PackageMirArtifact, Path,
+    PathBuf, RunnerStats, fmir_package_image_from_lowered, fs, load_fmir_image,
+    load_fmir_text_image, mir_diag, package_artifact_dir, package_artifact_root,
+    package_fmir_binary_image, package_fmir_text_image, package_mir_manifest,
+    run_fmir_package_image, run_fmir_package_image_with_stats, validate_package_mir_manifest,
+    with_prepared_package_mir, with_prepared_package_mir_from_loaded,
+    with_prepared_package_mir_with_cli_mode, write_package_image,
+};
 
 /// The started package run's diagnostic-statistics outcome (RSM route
 /// transport): the meter summary plus the started run's status. Compile/load
@@ -13,6 +24,8 @@ pub struct PackageRunStats {
     pub result: Result<(), Vec<Diagnostic>>,
 }
 
+/// # Errors
+/// Returns an error when the input or persisted artifact is invalid.
 pub fn run_package_mir<H: Host + ?Sized>(
     config: &Config,
     input: &Path,
@@ -43,6 +56,8 @@ pub fn run_package_mir<H: Host + ?Sized>(
 /// [`run_package_mir`] with an explicit selection override (the CLI
 /// `--backend` flag, N1.1 precedence: CLI > image's declared selection >
 /// `auto`).
+/// # Errors
+/// Returns an error when the input or persisted artifact is invalid.
 pub fn run_package_mir_with_selection<H: Host + ?Sized>(
     config: &Config,
     input: &Path,
@@ -72,6 +87,8 @@ pub fn run_package_mir_with_selection<H: Host + ?Sized>(
 /// arming the CPU/FMIR leg's collector. `false` reproduces the unmetered
 /// route; the single-source route is intentionally out of scope (refused by
 /// the faber CLI layer, RSM-3).
+/// # Errors
+/// Returns an error when the input or persisted artifact is invalid.
 pub fn run_package_mir_with_selection_and_stats<H: Host + ?Sized>(
     config: &Config,
     input: &Path,
@@ -105,6 +122,8 @@ pub fn run_package_mir_with_selection_and_stats<H: Host + ?Sized>(
 /// Run a FHIR-loaded package in-process: reconstruct the package from the
 /// envelope, lower to FMIR, and execute with the provided host — no Rust, no
 /// source checkout. Local imports resolve from the envelope's link table.
+/// # Errors
+/// Returns an error when the input or persisted artifact is invalid.
 pub fn run_package_mir_from_loaded<H: Host + ?Sized>(
     config: &Config,
     package: AnalyzedProgram,
@@ -136,6 +155,8 @@ pub fn run_package_mir_from_loaded<H: Host + ?Sized>(
     )
 }
 
+/// # Errors
+/// Returns an error when the input or persisted artifact is invalid.
 pub fn build_package_mir_artifact(
     config: &Config,
     input: &Path,
@@ -159,6 +180,8 @@ pub fn build_package_mir_artifact(
     })
 }
 
+/// # Errors
+/// Returns an error when the input or persisted artifact is invalid.
 pub fn build_package_fmir_text_image(
     config: &Config,
     input: &Path,
@@ -186,6 +209,8 @@ pub fn build_package_fmir_text_image(
     )
 }
 
+/// # Errors
+/// Returns an error when the input or persisted artifact is invalid.
 pub fn build_package_fmir_image(
     config: &Config,
     input: &Path,
@@ -217,6 +242,8 @@ pub fn build_package_fmir_image(
 /// with missing field metadata. The image file is still written so the
 /// artifact surface is unchanged; the run consumes the in-memory image under
 /// the same host-construction policy (CPU runner vs device route).
+/// # Errors
+/// Returns an error when the input or persisted artifact is invalid.
 pub fn run_package_fmir_built_image<H: Host + ?Sized>(
     config: &Config,
     input: &Path,
@@ -252,6 +279,8 @@ pub fn run_package_fmir_built_image<H: Host + ?Sized>(
     )
 }
 
+/// # Errors
+/// Returns an error when the input or persisted artifact is invalid.
 pub fn build_package_fmir_binary_bundle(
     config: &Config,
     input: &Path,
@@ -294,6 +323,8 @@ pub fn build_package_fmir_binary_bundle(
     )
 }
 
+/// # Errors
+/// Returns an error when the input or persisted artifact is invalid.
 pub fn run_package_mir_artifact<H: Host + ?Sized>(
     config: &Config,
     artifact: &PackageMirArtifact,
@@ -310,6 +341,8 @@ pub fn run_package_mir_artifact<H: Host + ?Sized>(
     run_package_mir(config, &artifact.entry, seams, host)
 }
 
+/// # Errors
+/// Returns an error when the input or persisted artifact is invalid.
 pub fn run_package_fmir_text_image<H: Host + ?Sized>(
     image: &PackageFmirTextImage,
     seams: &MirSeams,
@@ -325,6 +358,8 @@ pub fn run_package_fmir_text_image<H: Host + ?Sized>(
     run_loaded_fmir_image_route(loaded, seams, host)
 }
 
+/// # Errors
+/// Returns an error when the input or persisted artifact is invalid.
 pub fn run_package_fmir_text_image_with_selection<H: Host + ?Sized>(
     image: &PackageFmirTextImage,
     selection: DeviceSelection,
@@ -341,6 +376,8 @@ pub fn run_package_fmir_text_image_with_selection<H: Host + ?Sized>(
     run_loaded_fmir_image_route_with_selection(loaded, selection, seams, host)
 }
 
+/// # Errors
+/// Returns an error when the input or persisted artifact is invalid.
 pub fn run_package_fmir_image<H: Host + ?Sized>(
     image: &PackageFmirImage,
     seams: &MirSeams,
@@ -349,6 +386,8 @@ pub fn run_package_fmir_image<H: Host + ?Sized>(
     run_fmir_image_path(&image.image_path, seams, host)
 }
 
+/// # Errors
+/// Returns an error when the input or persisted artifact is invalid.
 pub fn run_package_fmir_image_with_selection<H: Host + ?Sized>(
     image: &PackageFmirImage,
     selection: DeviceSelection,
@@ -415,6 +454,8 @@ pub(super) fn run_loaded_fmir_image_route_with_selection_and_stats<H: Host + ?Si
     run_fmir_package_image_with_stats(image, host)
 }
 
+/// # Errors
+/// Returns an error when the input or persisted artifact is invalid.
 pub fn run_fmir_image_path<H: Host + ?Sized>(
     image_path: &Path,
     seams: &MirSeams,
@@ -425,6 +466,8 @@ pub fn run_fmir_image_path<H: Host + ?Sized>(
 
 /// Run an FMIR image file under the one host-construction policy, with an
 /// optional selection override (the image-runner `--backend` flag).
+/// # Errors
+/// Returns an error when the input or persisted artifact is invalid.
 pub fn run_fmir_image_path_with_selection<H: Host + ?Sized>(
     image_path: &Path,
     selection_override: Option<DeviceSelection>,
@@ -465,6 +508,8 @@ pub struct FmirImageRouteDecision {
 /// Load a binary FMIR image for the host-factory route decision without
 /// executing it (fail-before-launch: the image is decoded and admitted before
 /// any launch). The caller runs the image separately.
+/// # Errors
+/// Returns an error when the input or persisted artifact is invalid.
 pub fn fmir_image_route_decision(
     image_path: &Path,
     seams: &MirSeams,
@@ -490,6 +535,8 @@ pub fn fmir_image_route_decision(
     })
 }
 
+/// # Errors
+/// Returns an error when the input or persisted artifact is invalid.
 pub fn run_fmir_image_bytes_with_stdio(
     image_bytes: &[u8],
     diagnostic_path: &Path,

@@ -1,6 +1,12 @@
 //! Package-MIR CLI record/value planning and supported-surface checks.
 
-use super::*;
+use super::{
+    AnalyzedProgram, AnalyzedProgramNode, CliCommand, CliDefault, CliExit, CliOperand, CliOption,
+    CliRecordFieldsByLocal, CliType, Diagnostic, HashMap, MirConstant, MirOperand,
+    MirRuntimeRecordField, MirRuntimeRecordValue, MirType, ModuleId, Path, PlannedCliOperand,
+    PlannedCliOption, Primitive, Symbol, TypeId, parse_cli_arguments, planned_cli_operands,
+    planned_cli_options,
+};
 
 pub(super) fn plan_cli_command_records(
     unit: &mut AnalyzedProgramNode,
@@ -96,27 +102,30 @@ pub(super) fn cli_operand_value(
             let payload = textus_literal_payload(value);
             MirConstant::String(unit.analysis.interner.intern(&payload))
         }
-        CliType::Numerus => match value.parse::<i64>() {
-            Ok(value) => MirConstant::Int(value),
-            Err(_) => {
+        CliType::Numerus => {
+            if let Ok(value) = value.parse::<i64>() {
+                MirConstant::Int(value)
+            } else {
                 push_cli_operand_parse_diagnostic(unit, operand, "numerus", value, diagnostics);
                 return None;
             }
-        },
-        CliType::Fractus => match value.parse::<f64>() {
-            Ok(value) => MirConstant::Float(value),
-            Err(_) => {
+        }
+        CliType::Fractus => {
+            if let Ok(value) = value.parse::<f64>() {
+                MirConstant::Float(value)
+            } else {
                 push_cli_operand_parse_diagnostic(unit, operand, "fractus", value, diagnostics);
                 return None;
             }
-        },
-        CliType::Bivalens => match value.parse::<bool>() {
-            Ok(value) => MirConstant::Bool(value),
-            Err(_) => {
+        }
+        CliType::Bivalens => {
+            if let Ok(value) = value.parse::<bool>() {
+                MirConstant::Bool(value)
+            } else {
                 push_cli_operand_parse_diagnostic(unit, operand, "bivalens", value, diagnostics);
                 return None;
             }
-        },
+        }
         CliType::Octeti => MirConstant::Octeti(value.as_bytes().to_vec()),
         CliType::ListaTextus | CliType::ListaNumerus => return None,
     };
@@ -157,27 +166,30 @@ pub(super) fn cli_operand_list_item_value(
                 unit.analysis.interner.intern(&payload),
             )))
         }
-        CliType::Numerus | CliType::ListaNumerus => match value.parse::<i64>() {
-            Ok(value) => Some(MirOperand::Constant(MirConstant::Int(value))),
-            Err(_) => {
+        CliType::Numerus | CliType::ListaNumerus => {
+            if let Ok(value) = value.parse::<i64>() {
+                Some(MirOperand::Constant(MirConstant::Int(value)))
+            } else {
                 push_cli_operand_parse_diagnostic(unit, operand, "numerus", value, diagnostics);
                 None
             }
-        },
-        CliType::Fractus => match value.parse::<f64>() {
-            Ok(value) => Some(MirOperand::Constant(MirConstant::Float(value))),
-            Err(_) => {
+        }
+        CliType::Fractus => {
+            if let Ok(value) = value.parse::<f64>() {
+                Some(MirOperand::Constant(MirConstant::Float(value)))
+            } else {
                 push_cli_operand_parse_diagnostic(unit, operand, "fractus", value, diagnostics);
                 None
             }
-        },
-        CliType::Bivalens => match value.parse::<bool>() {
-            Ok(value) => Some(MirOperand::Constant(MirConstant::Bool(value))),
-            Err(_) => {
+        }
+        CliType::Bivalens => {
+            if let Ok(value) = value.parse::<bool>() {
+                Some(MirOperand::Constant(MirConstant::Bool(value)))
+            } else {
                 push_cli_operand_parse_diagnostic(unit, operand, "bivalens", value, diagnostics);
                 None
             }
-        },
+        }
         CliType::Octeti => None,
     }
 }
@@ -193,27 +205,30 @@ pub(super) fn cli_option_value(
             let payload = textus_literal_payload(value);
             MirConstant::String(unit.analysis.interner.intern(&payload))
         }
-        CliType::Numerus => match value.parse::<i64>() {
-            Ok(value) => MirConstant::Int(value),
-            Err(_) => {
+        CliType::Numerus => {
+            if let Ok(value) = value.parse::<i64>() {
+                MirConstant::Int(value)
+            } else {
                 push_cli_option_parse_diagnostic(unit, option, "numerus", value, diagnostics);
                 return None;
             }
-        },
-        CliType::Fractus => match value.parse::<f64>() {
-            Ok(value) => MirConstant::Float(value),
-            Err(_) => {
+        }
+        CliType::Fractus => {
+            if let Ok(value) = value.parse::<f64>() {
+                MirConstant::Float(value)
+            } else {
                 push_cli_option_parse_diagnostic(unit, option, "fractus", value, diagnostics);
                 return None;
             }
-        },
-        CliType::Bivalens => match value.parse::<bool>() {
-            Ok(value) => MirConstant::Bool(value),
-            Err(_) => {
+        }
+        CliType::Bivalens => {
+            if let Ok(value) = value.parse::<bool>() {
+                MirConstant::Bool(value)
+            } else {
                 push_cli_option_parse_diagnostic(unit, option, "bivalens", value, diagnostics);
                 return None;
             }
-        },
+        }
         CliType::Octeti | CliType::ListaTextus | CliType::ListaNumerus => return None,
     };
     Some(MirOperand::Constant(constant))
@@ -555,20 +570,19 @@ pub(super) fn package_mir_cli_exit_code(
         return Some(None);
     };
     match exit {
-        CliExit::Fixed(code) => match i32::try_from(*code) {
-            Ok(code) => Some(Some(code)),
-            Err(_) => {
+        CliExit::Fixed(code) => {
+            if let Ok(code) = i32::try_from(*code) {
+                Some(Some(code))
+            } else {
                 diagnostics.push(unsupported_cli_diagnostic(
                     &unit.path,
                     "CLI exit codes outside i32 range",
                 ));
                 None
             }
-        },
+        }
         CliExit::Field { object, field } => {
-            let args_name = args_name
-                .map(|symbol| unit.analysis.interner.resolve(symbol))
-                .unwrap_or("");
+            let args_name = args_name.map_or("", |symbol| unit.analysis.interner.resolve(symbol));
             if object != args_name {
                 diagnostics.push(unsupported_cli_diagnostic(
                     &unit.path,
@@ -580,15 +594,14 @@ pub(super) fn package_mir_cli_exit_code(
                 let name = unit.analysis.interner.resolve(record_field.name);
                 (name == field).then(|| package_mir_runtime_record_i32(&record_field.value))?
             });
-            match value {
-                Some(code) => Some(Some(code)),
-                None => {
-                    diagnostics.push(unsupported_cli_diagnostic(
-                        &unit.path,
-                        "CLI dynamic exit expressions",
-                    ));
-                    None
-                }
+            if let Some(code) = value {
+                Some(Some(code))
+            } else {
+                diagnostics.push(unsupported_cli_diagnostic(
+                    &unit.path,
+                    "CLI dynamic exit expressions",
+                ));
+                None
             }
         }
         CliExit::Binding(_) | CliExit::Unsupported => {

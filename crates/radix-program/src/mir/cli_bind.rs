@@ -1,6 +1,10 @@
 //! Bind the fmir-text runtime CLI section into the lowered program.
 
-use super::*;
+use super::{
+    Diagnostic, FmirTextCliSection, FmirTextCliValueType, HashSet, Host, Interner,
+    MirAggregateFields, MirAggregateItem, MirAggregateKind, MirConstant, MirFunction,
+    MirNamedOperand, MirOperand, MirPlace, MirProgram, MirStatementKind, Path, mir_diag,
+};
 
 pub(super) fn bind_fmir_text_runtime_cli<H: Host + ?Sized>(
     program: &mut MirProgram,
@@ -190,8 +194,7 @@ pub(super) fn fmir_text_function_matches_entry(
     }
     function
         .name
-        .map(|name| interner.resolve(name) == entry_function)
-        .unwrap_or(false)
+        .is_some_and(|name| interner.resolve(name) == entry_function)
 }
 
 pub(super) fn patch_fmir_text_cli_record_fields(

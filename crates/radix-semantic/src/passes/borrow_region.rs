@@ -425,10 +425,10 @@ impl<'a> EventCollector<'a> {
     fn new(cfg: &'a HirCfg, types: &'a TypeTable, access_facts: &'a AccessFactTable) -> Self {
         let mut source_kills: FxHashMap<DefId, Vec<CfgNodeId>> = FxHashMap::default();
         for fact in access_facts.dead_sources() {
-            if let Some(site) = fact.site {
-                if let Some(node) = cfg.node_for_hir_id(site) {
-                    source_kills.entry(fact.source).or_default().push(node);
-                }
+            if let Some(site) = fact.site
+                && let Some(node) = cfg.node_for_hir_id(site)
+            {
+                source_kills.entry(fact.source).or_default().push(node);
             }
         }
         for nodes in source_kills.values_mut() {
@@ -509,10 +509,10 @@ impl HirVisitor for EventCollector<'_> {
             .cfg
             .node_for_hir_id(expression.id)
             .or_else(|| self.locations.last().copied());
-        if let HirExpressionKind::Path(def_id) = &expression.kind {
-            if let Some(node) = node {
-                self.uses.entry(*def_id).or_default().push(node);
-            }
+        if let HirExpressionKind::Path(def_id) = &expression.kind
+            && let Some(node) = node
+        {
+            self.uses.entry(*def_id).or_default().push(node);
         }
         if let Some(node) = node {
             self.locations.push(node);

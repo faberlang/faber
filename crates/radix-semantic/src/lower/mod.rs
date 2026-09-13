@@ -707,25 +707,25 @@ impl<'a> Lowerer<'a> {
     /// CLI metadata falls back to `ignotum` so ordinary compilation does not
     /// need a second lowering path.
     pub(super) fn command_args_type(&mut self, function: Symbol) -> TypeId {
-        if let Some(cli) = self.cli_program {
-            if let Some(command) = cli.commands.iter().find(|command| {
+        if let Some(cli) = self.cli_program
+            && let Some(command) = cli.commands.iter().find(|command| {
                 command.module_path.is_none() && command.function_symbol == function
-            }) {
-                let mut fields = FxHashMap::default();
-                for option in cli.global_options.iter().chain(command.options.iter()) {
-                    let ty = self.cli_value_type(
-                        &option.ty,
-                        option.default.is_none() && !option.flag,
-                        false,
-                    );
-                    fields.insert(option.binding_symbol, ty);
-                }
-                for operand in cli.global_operands.iter().chain(command.operands.iter()) {
-                    let ty = self.cli_value_type(&operand.ty, false, operand.rest);
-                    fields.insert(operand.binding_symbol, ty);
-                }
-                return self.types.intern(Type::Record(fields));
+            })
+        {
+            let mut fields = FxHashMap::default();
+            for option in cli.global_options.iter().chain(command.options.iter()) {
+                let ty = self.cli_value_type(
+                    &option.ty,
+                    option.default.is_none() && !option.flag,
+                    false,
+                );
+                fields.insert(option.binding_symbol, ty);
             }
+            for operand in cli.global_operands.iter().chain(command.operands.iter()) {
+                let ty = self.cli_value_type(&operand.ty, false, operand.rest);
+                fields.insert(operand.binding_symbol, ty);
+            }
+            return self.types.intern(Type::Record(fields));
         }
 
         self.types.primitive(Primitive::Ignotum)

@@ -99,11 +99,8 @@ where
         .spawn(move || {
             tx.send(work()).ok();
         });
-    let handle = match spawn {
-        Ok(handle) => handle,
-        Err(_) => {
-            return Err(());
-        }
+    let Ok(handle) = spawn else {
+        return Err(());
     };
     match rx.recv_timeout(budget) {
         Ok(value) => match handle.join() {

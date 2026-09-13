@@ -431,28 +431,21 @@ impl<'a> BorrowChecker<'a> {
                     // Region-routed explicit-ref bind of a marked root: the
                     // borrowing local's region releases the conflict at last
                     // use instead of the old block-exit approximation.
-                    if let HirExpressionKind::Ref(kind, inner) = &init.kind {
-                        if let Some(source) = Self::root_def_id(inner) {
-                            if self.tracks_explicit_ref(source)
-                                && (self.mut_roots.contains(&source)
-                                    || self.ref_roots.contains(&source))
-                            {
-                                self.check_projection_inputs(inner);
-                                match kind {
-                                    radix_hir::HirRefKind::Shared => {
-                                        self.borrow_shared_with(
-                                            source,
-                                            Some(local.def_id),
-                                            init.span,
-                                        );
-                                    }
-                                    radix_hir::HirRefKind::Mutable => {
-                                        self.borrow_mut_with(source, Some(local.def_id), init.span);
-                                    }
-                                }
-                                return;
+                    if let HirExpressionKind::Ref(kind, inner) = &init.kind
+                        && let Some(source) = Self::root_def_id(inner)
+                        && self.tracks_explicit_ref(source)
+                        && (self.mut_roots.contains(&source) || self.ref_roots.contains(&source))
+                    {
+                        self.check_projection_inputs(inner);
+                        match kind {
+                            radix_hir::HirRefKind::Shared => {
+                                self.borrow_shared_with(source, Some(local.def_id), init.span);
+                            }
+                            radix_hir::HirRefKind::Mutable => {
+                                self.borrow_mut_with(source, Some(local.def_id), init.span);
                             }
                         }
+                        return;
                     }
                     if local.ty.is_some_and(|ty| self.types.is_copy_view(ty)) {
                         self.bind_copy_from(init);
@@ -474,10 +467,10 @@ impl<'a> BorrowChecker<'a> {
             HirStatementKind::Expr(expr) => self.check_expr(expr),
             HirStatementKind::Redde(value) => {
                 if let Some(expr) = value {
-                    if let Some(def_id) = Self::root_def_id(expr) {
-                        if let Some(usage) = self.param_usage.get_mut(&def_id) {
-                            usage.returned = true;
-                        }
+                    if let Some(def_id) = Self::root_def_id(expr)
+                        && let Some(usage) = self.param_usage.get_mut(&def_id)
+                    {
+                        usage.returned = true;
                     }
                     self.check_expr(expr);
                 }
@@ -543,29 +536,29 @@ impl<'a> BorrowChecker<'a> {
         }
 
         for (arg, param) in args.iter().zip(params.iter()) {
-            if let Some(arg_def_id) = Self::root_def_id(&arg.expr) {
-                if let Some(arg_usage) = self.param_usage.get_mut(&arg_def_id) {
-                    if matches!(
+            if let Some(arg_def_id) = Self::root_def_id(&arg.expr)
+                && let Some(arg_usage) = self.param_usage.get_mut(&arg_def_id)
+            {
+                if matches!(
+                    param.mode,
+                    SemanticParamMode::MutRef | SemanticParamMode::Move
+                ) {
+                    arg_usage.passed_in_or_ex = true;
+                }
+                if matches!(param.mode, SemanticParamMode::Move) {
+                    arg_usage.passed_ex = true;
+                }
+                if matches!(arg_usage.mode, HirParamMode::De)
+                    && matches!(
                         param.mode,
                         SemanticParamMode::MutRef | SemanticParamMode::Move
-                    ) {
-                        arg_usage.passed_in_or_ex = true;
-                    }
-                    if matches!(param.mode, SemanticParamMode::Move) {
-                        arg_usage.passed_ex = true;
-                    }
-                    if matches!(arg_usage.mode, HirParamMode::De)
-                        && matches!(
-                            param.mode,
-                            SemanticParamMode::MutRef | SemanticParamMode::Move
-                        )
-                    {
-                        self.error(
-                            SemanticErrorKind::ModeMismatch,
-                            ISSUE_DE_TO_IN_OR_EX_POSITION,
-                            arg.expr.span,
-                        );
-                    }
+                    )
+                {
+                    self.error(
+                        SemanticErrorKind::ModeMismatch,
+                        ISSUE_DE_TO_IN_OR_EX_POSITION,
+                        arg.expr.span,
+                    );
                 }
             }
             if self.arg_is_ref_view(&arg.expr) && self.dest_is_mut_or_own(param) {
@@ -652,16 +645,15 @@ impl<'a> BorrowChecker<'a> {
     }
 
     fn check_lvalue(&mut self, target: &HirExpression) {
-        if Self::is_projection(target) {
-            if let Some(def_id) = Self::root_def_id(target) {
-                if self.ref_roots.contains(&def_id) {
-                    self.error(
-                        SemanticErrorKind::AssignToImmutableBorrow,
-                        ISSUE_ASSIGN_THROUGH_REF,
-                        target.span,
-                    );
-                }
-            }
+        if Self::is_projection(target)
+            && let Some(def_id) = Self::root_def_id(target)
+            && self.ref_roots.contains(&def_id)
+        {
+            self.error(
+                SemanticErrorKind::AssignToImmutableBorrow,
+                ISSUE_ASSIGN_THROUGH_REF,
+                target.span,
+            );
         }
         if let Some(def_id) = Self::root_def_id(target) {
             self.check_projection_inputs(target);
@@ -800,10 +792,10 @@ impl<'a> BorrowChecker<'a> {
     }
 
     fn arg_is_exclusive(&self, expr: &HirExpression) -> bool {
-        if let Some(ty) = expr.ty {
-            if self.types.is_exclusive_value(ty) {
-                return true;
-            }
+        if let Some(ty) = expr.ty
+            && self.types.is_exclusive_value(ty)
+        {
+            return true;
         }
         match Self::root_def_id(expr) {
             Some(def_id) => self.own_roots.contains(&def_id),
@@ -833,15 +825,15 @@ impl<'a> BorrowChecker<'a> {
     }
 
     fn arg_is_ref_view(&self, expr: &HirExpression) -> bool {
-        if let Some(ty) = expr.ty {
-            if self.types.is_ref_view(ty) {
-                return true;
-            }
+        if let Some(ty) = expr.ty
+            && self.types.is_ref_view(ty)
+        {
+            return true;
         }
-        if let Some(def_id) = Self::root_def_id(expr) {
-            if self.ref_roots.contains(&def_id) {
-                return true;
-            }
+        if let Some(def_id) = Self::root_def_id(expr)
+            && self.ref_roots.contains(&def_id)
+        {
+            return true;
         }
         match &expr.kind {
             HirExpressionKind::Field(object, _)
@@ -852,15 +844,15 @@ impl<'a> BorrowChecker<'a> {
     }
 
     fn arg_is_mut_view(&self, expr: &HirExpression) -> bool {
-        if let Some(ty) = expr.ty {
-            if self.types.is_mut_view(ty) {
-                return true;
-            }
+        if let Some(ty) = expr.ty
+            && self.types.is_mut_view(ty)
+        {
+            return true;
         }
-        if let Some(def_id) = Self::root_def_id(expr) {
-            if self.mut_roots.contains(&def_id) {
-                return true;
-            }
+        if let Some(def_id) = Self::root_def_id(expr)
+            && self.mut_roots.contains(&def_id)
+        {
+            return true;
         }
         match &expr.kind {
             HirExpressionKind::Field(object, _)

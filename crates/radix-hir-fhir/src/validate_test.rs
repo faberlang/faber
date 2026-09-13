@@ -237,12 +237,12 @@ fn itera_range_dangling_range_def_fails_closed() {
     let HirExpressionKind::Intervallum { end, .. } = &mut ranges[1].kind else {
         panic!("expected intervallum range axis");
     };
-    *end = Box::new(HirExpression {
+    **end = HirExpression {
         id: HirId(11),
         kind: HirExpressionKind::Path(DefId(USER_DEF_ID_BASE + 999)),
         ty: None,
         span: Span::default(),
-    });
+    };
     let bytes = encode(&artifact).expect("encode artifact");
     let err = decode(&bytes).expect_err("dangling range def must fail closed");
     assert!(

@@ -28,7 +28,7 @@ fn temp_pack_path(label: &str) -> (tempfile::TempDir, PathBuf) {
 }
 
 fn installed_pack(locale: &str) -> LocalePack {
-    let path = crate::locale::workspace_locale_pack_path(&locale);
+    let path = crate::locale::workspace_locale_pack_path(locale);
     LocalePack::from_toml_path(path).unwrap_or_else(|err| panic!("installed {locale} pack should load: {err:?}"))
 }
 
@@ -40,7 +40,7 @@ fn installed_pack(locale: &str) -> LocalePack {
 /// substitute coverage-gaps D1 forbids. `from_toml_str` keeps only the rows
 /// the pack owns.
 fn owned_pack(locale: &str) -> LocalePack {
-    let path = crate::locale::workspace_locale_pack_path(&locale);
+    let path = crate::locale::workspace_locale_pack_path(locale);
     let source = std::fs::read_to_string(&path).unwrap_or_else(|err| panic!("read installed {locale} pack: {err:?}"));
     LocalePack::from_toml_str(&source)
         .unwrap_or_else(|err| panic!("installed {locale} pack should parse owned rows: {err:?}"))

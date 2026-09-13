@@ -644,10 +644,10 @@ impl CliBuilder<'_> {
     fn reject_nested_module_mounts(&mut self, program: &Program) {
         for stmt in &program.statements {
             for annotation in &stmt.annotations {
-                if let AnnotationKind::Statement(annotation_stmt) = &annotation.kind {
-                    if self.interner.resolve(annotation_stmt.name.name) == "imperia" {
-                        self.error(annotation.span, ISSUE_NESTED_MODULE_MOUNT);
-                    }
+                if let AnnotationKind::Statement(annotation_stmt) = &annotation.kind
+                    && self.interner.resolve(annotation_stmt.name.name) == "imperia"
+                {
+                    self.error(annotation.span, ISSUE_NESTED_MODULE_MOUNT);
                 }
             }
         }

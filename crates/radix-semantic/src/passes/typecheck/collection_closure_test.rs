@@ -74,13 +74,13 @@ fn set_filtrata_result_is_not_a_lista() {
 #[test]
 fn set_filtrata_rejects_wrong_element_predicate() {
     crate::test_support::assert_rejects_with_issue(
-        r#"functio keep(textus t) → bivalens {
+        r"functio keep(textus t) → bivalens {
     redde t.longitudo() > 0
 }
 
 functio bad(copia<numerus> s) → copia<numerus> {
     redde s.filtrata(keep)
-}"#,
+}",
         "argument_type_mismatch",
     );
 }
@@ -186,13 +186,13 @@ fn set_mappata_result_is_not_a_lista() {
 #[test]
 fn set_mappata_rejects_wrong_element_mapper() {
     crate::test_support::assert_rejects_with_issue(
-        r#"functio label(textus t) → textus {
+        r"functio label(textus t) → textus {
     redde t
 }
 
 functio bad(copia<numerus> s) → copia<textus> {
     redde s.mappata(label)
-}"#,
+}",
         "argument_type_mismatch",
     );
 }

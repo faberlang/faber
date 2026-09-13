@@ -322,7 +322,7 @@ fn fixture_identity_source(package: &AnalyzedProgram) -> IdentitySource {
 }
 
 /// Standard FNV-1a 64-bit (the preserved source-identity idiom, ddpp0-contract
-/// §FnvRemoval).
+/// §`FnvRemoval`).
 fn fnv1a64(bytes: &[u8]) -> u64 {
     const FNV1A64_OFFSET: u64 = 0xcbf2_9ce4_8422_2325;
     const FNV1A64_PRIME: u64 = 0x0000_0100_0000_01b3;

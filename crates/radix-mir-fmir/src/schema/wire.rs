@@ -657,6 +657,8 @@ impl WireSubWindowProjection {
 /// that derived count, the window nests inside the producer buffer's own
 /// element count, and a strided window is rejected for write access (a
 /// scattered write cannot be one binding). Errors name the broken law.
+/// # Errors
+/// Returns an error when the input or persisted artifact is invalid.
 pub fn validate_carried_sub_window_projection(
     carrier: &str,
     element_count: u64,

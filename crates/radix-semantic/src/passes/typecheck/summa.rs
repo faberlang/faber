@@ -121,19 +121,19 @@ pub(super) fn check_summa_expr(
     // Tail gate: the cyclic schedule is `k ≡ f (mod W)` with W = 32; a
     // statically known element count K with `K % W ≠ 0` fails closed at
     // admission. Only the distributed form has lanes.
-    if filum.is_some() {
-        if let Some(dims) = summa_source_extent(checker, dispatch_ty) {
-            let k: u64 = dims
-                .iter()
-                .map(|d| u64::try_from(*d).unwrap_or(u64::MAX))
-                .product();
-            if !k.is_multiple_of(SUMMA_LANE_WIDTH) {
-                checker.error_issue(
-                    SemanticErrorKind::TypeMismatch,
-                    ISSUE_SUMMA_TAIL_NOT_ALIGNED,
-                    span,
-                );
-            }
+    if filum.is_some()
+        && let Some(dims) = summa_source_extent(checker, dispatch_ty)
+    {
+        let k: u64 = dims
+            .iter()
+            .map(|d| u64::try_from(*d).unwrap_or(u64::MAX))
+            .product();
+        if !k.is_multiple_of(SUMMA_LANE_WIDTH) {
+            checker.error_issue(
+                SemanticErrorKind::TypeMismatch,
+                ISSUE_SUMMA_TAIL_NOT_ALIGNED,
+                span,
+            );
         }
     }
 

@@ -1,6 +1,10 @@
 //! FMIR runtime-requirement checks and collection.
 
-use super::*;
+use super::{
+    BTreeSet, CliPackagePlan, Diagnostic, FmirPackageImage, Interner, LoweredMirUnit,
+    MirDiagnosticKind, MirIntrinsic, MirProviderKind, MirRuntimeCall, MirStatementKind,
+    is_known_host_requirement, mir_issue_diag,
+};
 
 pub(super) fn check_fmir_runtime_requirements(
     image: &FmirPackageImage,
@@ -87,9 +91,10 @@ pub(super) fn collect_runtime_call_requirement(
         }
         MirIntrinsic::Provider(provider) => {
             if let MirProviderKind::Kernel(module) = provider.kind {
-                let verb = interner
-                    .map(|interner| interner.resolve(provider.name).to_owned())
-                    .unwrap_or_else(|| format!("#{}", provider.name.0));
+                let verb = interner.map_or_else(
+                    || format!("#{}", provider.name.0),
+                    |interner| interner.resolve(provider.name).to_owned(),
+                );
                 collect_kernel_host_requirements(module, &verb, requirements);
                 requirements.insert(format!("kernel:{}.{}", module.name(), verb));
             }

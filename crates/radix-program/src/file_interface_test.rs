@@ -35,7 +35,7 @@ fn analyze(source: &str) -> radix_module::driver::AnalyzedModule {
 #[test]
 fn extract_file_interface_snapshots_public_exports() {
     let analysis = analyze(
-        r#"@ publica
+        r"@ publica
 functio salve(textus nomen) → textus {
     redde nomen
 }
@@ -54,7 +54,7 @@ genus Persona {
 implendum Loquax {
     functio loqui() → textus
 }
-"#,
+",
     );
     let export_names = [
         "salve".to_owned(),
@@ -84,7 +84,7 @@ implendum Loquax {
 #[test]
 fn extract_file_interface_round_trips_public_commune_fields() {
     let analysis = analyze(
-        r#"@ publica
+        r"@ publica
         discretio ShapeError {
             @ commune
             textus message
@@ -92,7 +92,7 @@ fn extract_file_interface_round_trips_public_commune_fields() {
             Incompatible,
             ElementMismatch { numerus expected numerus actual }
         }
-        "#,
+        ",
     );
     let interface = extract_file_interface_with_identity(
         &analysis,
@@ -165,7 +165,7 @@ fn extract_file_interface_with_identity_sets_identity() {
 #[test]
 fn extract_callable_contracts_covers_only_public_functions() {
     let analysis = analyze(
-        r#"@ publica
+        r"@ publica
 functio open() → vacuum {
     tacet
 }
@@ -174,7 +174,7 @@ functio open() → vacuum {
 functio closed() → vacuum {
     tacet
 }
-"#,
+",
     );
     let export_names = ["open".to_owned()];
     let contracts = extract_callable_contracts(&analysis, &export_names, "test.fab")

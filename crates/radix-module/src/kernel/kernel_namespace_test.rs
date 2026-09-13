@@ -14,6 +14,7 @@ use super::{
 use crate::codegen::Target;
 use crate::driver::{AnalyzeRequest, Config, Session, analyze_source};
 use crate::mir::lower_analyzed_unit;
+use crate::mir::MirLoweringOptions;
 use crate::mir::{MirIntrinsic, MirProvider, MirProviderKind, MirStatementKind};
 
 fn workspace_root() -> PathBuf {
@@ -166,7 +167,7 @@ incipit {
 }
 "#;
     let mut unit = analyze_source(&session, "kernel-import.fab", source, AnalyzeRequest::default()).expect("analysis");
-    let program = lower_analyzed_unit(&mut unit, Default::default())
+    let program = lower_analyzed_unit(&mut unit, MirLoweringOptions::default())
         .map(|lowered| lowered.program)
         .expect("lower");
 
@@ -201,7 +202,7 @@ incipit {
 "#;
     let mut unit =
         analyze_source(&session, "kernel-toml-import.fab", source, AnalyzeRequest::default()).expect("analysis");
-    let program = lower_analyzed_unit(&mut unit, Default::default())
+    let program = lower_analyzed_unit(&mut unit, MirLoweringOptions::default())
         .map(|lowered| lowered.program)
         .expect("lower");
 
@@ -237,7 +238,7 @@ incipit {
 "#;
     let mut unit =
         analyze_source(&session, "kernel-glob-import.fab", source, AnalyzeRequest::default()).expect("analysis");
-    let program = lower_analyzed_unit(&mut unit, Default::default())
+    let program = lower_analyzed_unit(&mut unit, MirLoweringOptions::default())
         .map(|lowered| lowered.program)
         .expect("lower");
 

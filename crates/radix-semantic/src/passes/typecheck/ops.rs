@@ -740,15 +740,15 @@ impl TypeChecker<'_> {
         // F-009: Option preservation — when one side is Option<T> and the other
         // side (T or nihil) can be lifted into it, the join must produce
         // Option<T>, not unwrap to T.
-        if let Type::Option(_) = self.types.get(left) {
-            if self.types.is_assignable(right, left) {
-                return left;
-            }
+        if let Type::Option(_) = self.types.get(left)
+            && self.types.is_assignable(right, left)
+        {
+            return left;
         }
-        if let Type::Option(_) = self.types.get(right) {
-            if self.types.is_assignable(left, right) {
-                return right;
-            }
+        if let Type::Option(_) = self.types.get(right)
+            && self.types.is_assignable(left, right)
+        {
+            return right;
         }
 
         if self.types.is_assignable(left, right) {
@@ -1335,13 +1335,12 @@ impl TypeChecker<'_> {
                     if let (Some((lhs_rows, lhs_k)), Some((rhs_k, rhs_cols))) = (
                         self.matrix_shape_dims(lhs_shape),
                         self.matrix_shape_dims(rhs_shape),
-                    ) {
-                        if self.types.get_index(lhs_k) == self.types.get_index(rhs_k) {
-                            let shape = self
-                                .types
-                                .intern_index(IndexExpr::Tuple(vec![lhs_rows, rhs_cols]));
-                            return self.types.matrix_with_shape(elem, shape);
-                        }
+                    ) && self.types.get_index(lhs_k) == self.types.get_index(rhs_k)
+                    {
+                        let shape = self
+                            .types
+                            .intern_index(IndexExpr::Tuple(vec![lhs_rows, rhs_cols]));
+                        return self.types.matrix_with_shape(elem, shape);
                     }
                     self.glyph_invalid_operand(op, GLYPH_INNER_DIM_MISMATCH, lhs.span);
                     return self.error_type;

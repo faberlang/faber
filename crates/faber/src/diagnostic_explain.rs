@@ -186,10 +186,10 @@ impl DiagnosticLookupKey {
         if !is_diagnostic_code(code) {
             return None;
         }
-        if let Some(issue) = issue {
-            if !is_diagnostic_issue(issue) {
-                return None;
-            }
+        if let Some(issue) = issue
+            && !is_diagnostic_issue(issue)
+        {
+            return None;
         }
         Some(Self {
             code: code.to_owned(),

@@ -8,6 +8,7 @@ use crate::diagnostics::{DiagnosticArg, semantic_message};
 use crate::driver::{self, AnalyzeRequest, Config, Session};
 use crate::hir::DefId;
 use crate::lexer::{Interner, Span};
+use crate::mir::MirLoweringOptions;
 use crate::mir::{
     MirBinOp, MirBlock, MirBlockId, MirCallee, MirDeviceFunctionMetadata, MirDeviceFunctionMetadataMap, MirDeviceRole,
     MirFunction, MirFunctionId, MirFunctionOrigin, MirFunctionVisibility, MirKernelShaderStage, MirLocal, MirLocalId,
@@ -438,8 +439,7 @@ fn direct_cycle_is_rejected_with_full_cycle() {
         .args
         .iter()
         .find(|arg| arg.name == "cycle")
-        .map(|arg| arg.value.as_str())
-        .unwrap_or("");
+        .map_or("", |arg| arg.value.as_str());
     assert!(cycle.contains('#'), "full cycle must be in the diagnostic: {cycle}");
     assert!(cycle.contains('→') || cycle.contains("->") || cycle.matches('#').count() >= 1);
 }
@@ -501,8 +501,7 @@ fn transitive_cycle_is_rejected() {
         .args
         .iter()
         .find(|arg| arg.name == "cycle")
-        .map(|arg| arg.value.as_str())
-        .unwrap_or("");
+        .map_or("", |arg| arg.value.as_str());
     assert!(cycle.contains('#') && cycle.contains('→'), "full cycle required: {cycle}");
 }
 
@@ -628,7 +627,8 @@ functio k(fractus<f32> x) → fractus<f32> {
     let mut analysis =
         driver::analyze_source(&session, "device.fab", source, AnalyzeRequest::default()).expect("analyze source");
     let roles = crate::mir::device_roles_from_hir(&analysis.hir);
-    let lowered = crate::mir::lower_analyzed_unit(&mut analysis, Default::default()).expect("composition must succeed");
+    let lowered = crate::mir::lower_analyzed_unit(&mut analysis, MirLoweringOptions::default())
+        .expect("composition must succeed");
     assert!(
         surviving_fragment_calls_with_metadata(
             &lowered.program.functions,
@@ -663,8 +663,8 @@ functio k(fractus<f32> x) → fractus<f32> {
     let session = Session::new(Config::default());
     let mut analysis =
         driver::analyze_source(&session, "device.fab", source, AnalyzeRequest::default()).expect("analyze source");
-    let errors =
-        crate::mir::lower_analyzed_unit(&mut analysis, Default::default()).expect_err("cycle must fail closed");
+    let errors = crate::mir::lower_analyzed_unit(&mut analysis, MirLoweringOptions::default())
+        .expect_err("cycle must fail closed");
     assert!(
         errors.iter().any(|err| err.issue == ISSUE_CYCLE),
         "expected nucleum_fragment_cycle, got {errors:?}"
@@ -689,8 +689,8 @@ functio k(fractus<f32> x) → fractus<f32> {
         let session = Session::new(Config::default());
         let mut analysis =
             driver::analyze_source(&session, "device.fab", source, AnalyzeRequest::default()).expect("analyze source");
-        let errors =
-            crate::mir::lower_analyzed_unit(&mut analysis, Default::default()).expect_err("budget must fail closed");
+        let errors = crate::mir::lower_analyzed_unit(&mut analysis, MirLoweringOptions::default())
+            .expect_err("budget must fail closed");
         assert!(
             errors.iter().any(|err| err.issue == ISSUE_EXPANSION),
             "expected nucleum_fragment_expansion, got {errors:?}"
@@ -723,8 +723,7 @@ fn kernel_helper_call_composes() {
         functions
             .iter()
             .all(|function| function.source != Some(KERNEL_HELPER)),
-        "the composed private helper must be pruned: {:#?}",
-        functions
+        "the composed private helper must be pruned: {functions:#?}"
     );
 }
 
@@ -764,8 +763,7 @@ fn transitive_kernel_calls_compose() {
         functions
             .iter()
             .all(|function| function.source != Some(KERNEL_HELPER)),
-        "composed transitive helpers must be pruned: {:#?}",
-        functions
+        "composed transitive helpers must be pruned: {functions:#?}"
     );
 }
 
@@ -806,8 +804,7 @@ fn kernel_cycle_is_rejected_with_full_cycle() {
         .args
         .iter()
         .find(|arg| arg.name == "cycle")
-        .map(|arg| arg.value.as_str())
-        .unwrap_or("");
+        .map_or("", |arg| arg.value.as_str());
     assert!(cycle.contains('#') && cycle.contains('→'), "full cycle required: {cycle}");
 }
 
@@ -884,8 +881,7 @@ fn host_call_to_kernel_entry_is_not_composed() {
         functions
             .iter()
             .any(|function| function.id == MirFunctionId(1)),
-        "the called entry must stay a program symbol: {:#?}",
-        functions
+        "the called entry must stay a program symbol: {functions:#?}"
     );
 }
 
@@ -971,8 +967,8 @@ functio k(fractus<f32> x) → fractus<f32> {
     let mut analysis =
         driver::analyze_source(&session, "device.fab", source, AnalyzeRequest::default()).expect("analyze source");
     let roles = crate::mir::device_roles_from_hir(&analysis.hir);
-    let lowered =
-        crate::mir::lower_analyzed_unit(&mut analysis, Default::default()).expect("kernel helper must compose");
+    let lowered = crate::mir::lower_analyzed_unit(&mut analysis, MirLoweringOptions::default())
+        .expect("kernel helper must compose");
     assert!(
         surviving_fragment_calls_with_metadata(
             &lowered.program.functions,
@@ -1200,7 +1196,8 @@ functio k(fractus<f32> x) → fractus<f32> {
     let mut analysis =
         driver::analyze_source(&session, "device.fab", source, AnalyzeRequest::default()).expect("analyze source");
     let roles = crate::mir::device_roles_from_hir(&analysis.hir);
-    let lowered = crate::mir::lower_analyzed_unit(&mut analysis, Default::default()).expect("composition must succeed");
+    let lowered = crate::mir::lower_analyzed_unit(&mut analysis, MirLoweringOptions::default())
+        .expect("composition must succeed");
     let kernel = lowered
         .program
         .functions
@@ -1641,8 +1638,7 @@ fn kernel_caller_composes_synthetic_kernel_closure() {
         functions
             .iter()
             .all(|function| function.id != MirFunctionId(2)),
-        "the composed private closure must be pruned: {:#?}",
-        functions
+        "the composed private closure must be pruned: {functions:#?}"
     );
 }
 

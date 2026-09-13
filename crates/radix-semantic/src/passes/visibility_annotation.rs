@@ -115,10 +115,10 @@ fn check_declaration_visibility(
     push_protecta_diagnostics(annotations, interner, errors);
     let mut tiers: Vec<(VisibilityTier, Span)> = Vec::new();
     for annotation in annotations {
-        if let Some(tier) = visibility_tier(annotation, interner) {
-            if !tiers.iter().any(|(seen, _)| *seen == tier) {
-                tiers.push((tier, annotation.span));
-            }
+        if let Some(tier) = visibility_tier(annotation, interner)
+            && !tiers.iter().any(|(seen, _)| *seen == tier)
+        {
+            tiers.push((tier, annotation.span));
         }
     }
     if tiers.len() > 1 {

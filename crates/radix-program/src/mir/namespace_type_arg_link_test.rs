@@ -12,11 +12,11 @@
 use super::*;
 use radix_module::semantic::{IndexExpr, Type};
 
-const TYPEARG_UTIL: &str = r#"@ public
+const TYPEARG_UTIL: &str = r"@ public
 fn id<size N>(tensor<f32, [N]> x) → tensor<f32, [N]> {
     return x
 }
-"#;
+";
 
 const TYPEARG_EXPLICIT_MAIN: &str = r#"import from "./util" * as utilModule
 

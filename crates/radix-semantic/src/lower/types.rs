@@ -1156,8 +1156,7 @@ impl Lowerer<'_> {
         if self
             .resolver
             .namespace_exports_member(namespace.name, type_name.name)
-        {
-            if let Some((def_id, type_id)) =
+            && let Some((def_id, type_id)) =
                 self.resolver
                     .lookup_type(type_name.name)
                     .and_then(|def_id| {
@@ -1166,26 +1165,25 @@ impl Lowerer<'_> {
                             .and_then(|symbol| symbol.ty)
                             .map(|type_id| (def_id, type_id))
                     })
-            {
-                let has_declared_params = self
+        {
+            let has_declared_params = self
+                .resolver
+                .generic_param_descriptors(def_id)
+                .is_some_and(|descriptors| !descriptors.is_empty())
+                || self
                     .resolver
-                    .generic_param_descriptors(def_id)
-                    .is_some_and(|descriptors| !descriptors.is_empty())
-                    || self
-                        .resolver
-                        .generic_param_kinds(def_id)
-                        .is_some_and(|kinds| !kinds.is_empty());
-                if params.is_empty() && !has_declared_params {
-                    return type_id;
-                }
-                let Some(args) = self.lower_declared_applied_args(def_id, params) else {
-                    return self.types.intern(Type::Error);
-                };
-                if args.is_empty() {
-                    return type_id;
-                }
-                return self.types.intern(Type::Applied(type_id, args));
+                    .generic_param_kinds(def_id)
+                    .is_some_and(|kinds| !kinds.is_empty());
+            if params.is_empty() && !has_declared_params {
+                return type_id;
             }
+            let Some(args) = self.lower_declared_applied_args(def_id, params) else {
+                return self.types.intern(Type::Error);
+            };
+            if args.is_empty() {
+                return type_id;
+            }
+            return self.types.intern(Type::Applied(type_id, args));
         }
         self.error("unknown qualified type");
         self.types.intern(Type::Error)

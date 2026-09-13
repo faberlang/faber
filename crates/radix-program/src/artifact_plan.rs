@@ -45,6 +45,7 @@ pub struct ModuleId {
 
 impl ModuleId {
     /// Identity for `segments` inside the package named by `spec`.
+    #[must_use]
     pub fn for_spec(spec: &PackageSpec, segments: Vec<String>) -> Self {
         Self {
             package: package_id_from_spec(spec),
@@ -123,11 +124,14 @@ pub struct ArtifactPlan {
 
 impl ArtifactPlan {
     /// Stable pretty JSON for tests and tooling.
+    /// # Errors
+    /// Returns an error when the input or persisted artifact is invalid.
     pub fn to_debug_json(&self) -> Result<String, String> {
         serde_json::to_string_pretty(self).map_err(|err| err.to_string())
     }
 
     /// Whether the plan includes a named runtime dependency node (e.g. `rust:runtime:tokio`).
+    #[must_use]
     pub fn has_runtime_dependency(&self, id: &str) -> bool {
         self.nodes
             .iter()
@@ -136,6 +140,7 @@ impl ArtifactPlan {
 }
 
 /// Build an artifact plan from a shared analyzed package for one target.
+#[must_use]
 pub fn plan_package(package: &AnalyzedProgram, target: Target) -> ArtifactPlan {
     let package_id = package_id_from_spec(&package.spec);
     let target_label = target_name(target);
@@ -262,6 +267,7 @@ pub(crate) fn plan_or_reject(
 }
 
 /// Map provider names to Cargo crate names for native-binding library deps.
+#[must_use]
 pub fn linked_library_crate_map(app_root: &Path) -> BTreeMap<String, String> {
     let mut map = BTreeMap::new();
     let Some(lock) = read_lock(app_root).ok().flatten() else {
@@ -285,6 +291,8 @@ pub fn linked_library_crate_map(app_root: &Path) -> BTreeMap<String, String> {
 }
 
 /// Locked packages that must be emitted as generated library crates for Rust.
+/// # Errors
+/// Returns an error when the input or persisted artifact is invalid.
 pub fn native_library_deps(
     package_root: &Path,
 ) -> Result<Vec<(String, LockedPackage, FaberManifest)>, Vec<Diagnostic>> {
@@ -407,18 +415,19 @@ fn library_needs_native_crate(app_package_root: &Path, locked: &LockedPackage) -
 
 /// Qualified package identity from a live [`PackageSpec`] (manifest name/version
 /// when present, otherwise the package-root directory name).
+#[must_use]
 pub fn package_id_from_spec(spec: &PackageSpec) -> PackageId {
     let manifest = read_manifest(&spec.package_root.join(crate::MANIFEST_FILE)).ok();
-    let name = manifest
-        .as_ref()
-        .map(|manifest| manifest.package.name.clone())
-        .unwrap_or_else(|| {
+    let name = manifest.as_ref().map_or_else(
+        || {
             spec.package_root
                 .file_name()
                 .and_then(|s| s.to_str())
                 .unwrap_or("package")
                 .to_owned()
-        });
+        },
+        |manifest| manifest.package.name.clone(),
+    );
     let version = manifest.map(|manifest| manifest.package.version);
     PackageId { name, version }
 }

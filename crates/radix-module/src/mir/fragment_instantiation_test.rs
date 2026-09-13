@@ -5,6 +5,7 @@ use crate::diagnostics::{DiagnosticArg, semantic_message};
 use crate::driver::{self, AnalyzeRequest, Config, Session};
 use crate::hir::DefId;
 use crate::lexer::Span;
+use crate::mir::MirLoweringOptions;
 use crate::mir::{
     MirBlock, MirBlockId, MirCallee, MirDeviceFunctionMetadataMap, MirDeviceRole, MirFunction, MirFunctionId,
     MirKernelShaderStage, MirLayoutTable, MirLocal, MirLocalId, MirMonomorphization, MirMonomorphizationKey,
@@ -748,7 +749,8 @@ functio outer(fractus<f32> x) → fractus<f32> {
     let mut analysis =
         driver::analyze_source(&session, "device.fab", source, AnalyzeRequest::default()).expect("analyze source");
     let roles = crate::mir::device_roles_from_hir(&analysis.hir);
-    let lowered = crate::mir::lower_analyzed_unit(&mut analysis, Default::default()).expect("Entry→Entry must compose");
+    let lowered = crate::mir::lower_analyzed_unit(&mut analysis, MirLoweringOptions::default())
+        .expect("Entry→Entry must compose");
     assert!(
         crate::mir::fragment_composition::surviving_fragment_calls_with_metadata(
             &lowered.program.functions,
@@ -779,8 +781,8 @@ functio k(fractus<f32> x) → fractus<f32> {
     let mut analysis =
         driver::analyze_source(&session, "device.fab", source, AnalyzeRequest::default()).expect("analyze source");
     let roles = crate::mir::device_roles_from_hir(&analysis.hir);
-    let lowered =
-        crate::mir::lower_analyzed_unit(&mut analysis, Default::default()).expect("legal Entry→Fragment must compose");
+    let lowered = crate::mir::lower_analyzed_unit(&mut analysis, MirLoweringOptions::default())
+        .expect("legal Entry→Fragment must compose");
     assert!(
         crate::mir::fragment_composition::surviving_fragment_calls_with_metadata(
             &lowered.program.functions,

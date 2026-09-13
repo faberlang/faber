@@ -964,7 +964,7 @@ pub fn cmd_emit_package(command: radix::services::EmitCommand, format: bool, lin
             if let Some(path) = command.output {
                 crate::postprocess::write_text_artifact(&path, &reflection_json);
             } else {
-                println!("{}", reflection_json);
+                println!("{reflection_json}");
             }
             return;
         }

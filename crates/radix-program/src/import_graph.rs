@@ -1,6 +1,6 @@
 //! Local/library import graph construction for package compilation.
 //!
-//! RP2c: moved from `crates/faber/src/package/import_graph.rs`. Owns local
+//! `RP2c`: moved from `crates/faber/src/package/import_graph.rs`. Owns local
 //! import resolution (template/relative/source-root forms), library-vs-local
 //! routing through the explicit [`LibraryResolver`], cycle detection, mounted
 //! CLI plan construction, and the import diagnostics (cycle, missing module,
@@ -31,6 +31,8 @@ struct MountSpec {
     span: Span,
 }
 
+/// # Errors
+/// Returns an error when the input or persisted artifact is invalid.
 pub fn build_mount_plan(
     spec: &PackageSpec,
     files: &[PackageFile],
@@ -126,8 +128,12 @@ pub fn build_mount_plan(
         let Some(mut mounted_cli) = module_analysis.program else {
             continue;
         };
-        mounted_cli.global_options = root_cli.global_options.clone();
-        mounted_cli.global_operands = root_cli.global_operands.clone();
+        mounted_cli
+            .global_options
+            .clone_from(&root_cli.global_options);
+        mounted_cli
+            .global_operands
+            .clone_from(&root_cli.global_operands);
         diagnostics.extend(validate_mounted_global_collisions(
             &mounted_cli.commands,
             &root_cli,
@@ -372,6 +378,7 @@ fn validate_mounted_global_collisions(
     diagnostics
 }
 
+#[must_use]
 pub fn detect_import_cycles(spec: &PackageSpec, files: &[PackageFile]) -> Vec<Diagnostic> {
     let by_path = files
         .iter()
@@ -418,6 +425,7 @@ pub enum ImportResolution {
     Error(Diagnostic),
 }
 
+#[must_use]
 pub fn resolve_import(
     spec: &PackageSpec,
     library_resolver: &LibraryResolver,
@@ -599,6 +607,7 @@ fn resolve_module_candidates(base: &Path) -> Option<PathBuf> {
         .map(|candidate| normalize_path(&candidate))
 }
 
+#[must_use]
 pub fn library_import_binding(
     interner: &Interner,
     decl: &ImportDecl,
@@ -639,6 +648,7 @@ pub fn library_import_binding(
     }
 }
 
+#[must_use]
 pub fn library_resolve_diagnostic(file: &Path, err: LibraryResolveError) -> Diagnostic {
     match err {
         LibraryResolveError::OldBuiltinNormaSpecifier {
@@ -746,6 +756,7 @@ pub fn library_resolve_diagnostic(file: &Path, err: LibraryResolveError) -> Diag
     }
 }
 
+#[must_use]
 pub fn inner_library_import_unresolved_diagnostic(
     file: &Path,
     decl: &ImportDecl,
@@ -758,6 +769,7 @@ pub fn inner_library_import_unresolved_diagnostic(
     .with_span(decl.span)
 }
 
+#[must_use]
 pub fn library_import_kind_diagnostic(
     file: &Path,
     decl: &ImportDecl,
@@ -780,6 +792,7 @@ fn kernel_import_script_only_diagnostic(file: &Path, import_path: &str) -> Diagn
     .with_arg("path", import_path.to_owned())
 }
 
+#[must_use]
 pub fn import_unsupported_diagnostic(
     file: &Path,
     decl: &ImportDecl,

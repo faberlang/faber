@@ -4,6 +4,7 @@
 use super::*;
 use crate::codegen::{Target, generate_from_analyzed};
 use crate::driver::{AnalyzeRequest, Config, Session, analyze_source};
+use crate::mir::MirLoweringOptions;
 use crate::locale::{KeywordSurface, latin_locale_pack};
 
 fn analyze(name: &str, source: &str) -> AnalyzedModule {
@@ -611,7 +612,7 @@ fn signature_only_device_import_fails_closed() {
 /// Lower the unit and attach canonical MIR bodies to `metadata`.
 #[cfg(feature = "mir-core")]
 fn attach_bodies(metadata: &mut NucleumProgramMetadata, unit: &mut AnalyzedModule) {
-    let lowered = crate::mir::lower_analyzed_unit(unit, Default::default()).expect("lower device unit");
+    let lowered = crate::mir::lower_analyzed_unit(unit, MirLoweringOptions::default()).expect("lower device unit");
     metadata.attach_canonical_mir(lowered.validated.program(), "device.fab");
 }
 
@@ -722,7 +723,7 @@ fn non_launch_device_bodies_are_omitted_from_target_symbols() {
 #[test]
 fn importable_device_bodies_carry_canonical_mir_artifact() {
     let mut unit = analyze("device.fab", nucleum_source());
-    let mut metadata = collect_nucleum_metadata(&mut unit, "device.fab").expect("collect");
+    let mut metadata = collect_nucleum_metadata(&unit, "device.fab").expect("collect");
     attach_bodies(&mut metadata, &mut unit);
     metadata
         .require_canonical_mir()
@@ -751,7 +752,7 @@ fn importable_device_bodies_carry_canonical_mir_artifact() {
 #[test]
 fn device_body_import_gate_fails_closed_on_missing_tampered_and_stale_bodies() {
     let mut unit = analyze("device.fab", nucleum_source());
-    let mut metadata = collect_nucleum_metadata(&mut unit, "device.fab").expect("collect");
+    let mut metadata = collect_nucleum_metadata(&unit, "device.fab").expect("collect");
 
     // Missing: the pre-attach artifact has no canonical bytes.
     let err = metadata
@@ -827,7 +828,7 @@ fn device_contract_bridge_carries_role_visibility_and_template() {
     // transport — role and launch visibility map through, and the canonical
     // template is the serialized body bytes.
     let mut unit = analyze("device.fab", nucleum_source());
-    let mut metadata = collect_nucleum_metadata(&mut unit, "device.fab").expect("collect");
+    let mut metadata = collect_nucleum_metadata(&unit, "device.fab").expect("collect");
     attach_bodies(&mut metadata, &mut unit);
 
     let k = nucleum_item(&metadata, "k").clone();

@@ -124,29 +124,29 @@ impl TypeChecker<'_> {
                 if matches!(pattern.as_ref(), HirPattern::Binding(_, _)) {
                     return;
                 }
-                if let HirPattern::Variant(variant_def, patterns) = pattern.as_ref() {
-                    if patterns.is_empty() {
-                        // Unit-variant aliases can validate the enum parent
-                        // without recursing into an empty destructuring shape.
-                        let Some(parent) = self.variant_parent.get(variant_def).copied() else {
-                            self.error_issue(
-                                SemanticErrorKind::VariableUndefined,
-                                "unknown_variant",
-                                span,
-                            );
-                            return;
-                        };
-                        if let Some(expected_parent) = self.enum_def_from_type(expected) {
-                            if expected_parent != parent {
-                                self.error_issue(
-                                    SemanticErrorKind::TypeMismatch,
-                                    ISSUE_VARIANT_PATTERN_SCRUTINEE_MISMATCH,
-                                    span,
-                                );
-                            }
-                        }
+                if let HirPattern::Variant(variant_def, patterns) = pattern.as_ref()
+                    && patterns.is_empty()
+                {
+                    // Unit-variant aliases can validate the enum parent
+                    // without recursing into an empty destructuring shape.
+                    let Some(parent) = self.variant_parent.get(variant_def).copied() else {
+                        self.error_issue(
+                            SemanticErrorKind::VariableUndefined,
+                            "unknown_variant",
+                            span,
+                        );
                         return;
+                    };
+                    if let Some(expected_parent) = self.enum_def_from_type(expected)
+                        && expected_parent != parent
+                    {
+                        self.error_issue(
+                            SemanticErrorKind::TypeMismatch,
+                            ISSUE_VARIANT_PATTERN_SCRUTINEE_MISMATCH,
+                            span,
+                        );
                     }
+                    return;
                 }
                 self.check_pattern(pattern, expected, span);
             }
@@ -164,14 +164,14 @@ impl TypeChecker<'_> {
                     return;
                 };
 
-                if let Some(expected_parent) = self.enum_def_from_type(expected) {
-                    if expected_parent != parent {
-                        self.error_issue(
-                            SemanticErrorKind::TypeMismatch,
-                            ISSUE_VARIANT_PATTERN_SCRUTINEE_MISMATCH,
-                            span,
-                        );
-                    }
+                if let Some(expected_parent) = self.enum_def_from_type(expected)
+                    && expected_parent != parent
+                {
+                    self.error_issue(
+                        SemanticErrorKind::TypeMismatch,
+                        ISSUE_VARIANT_PATTERN_SCRUTINEE_MISMATCH,
+                        span,
+                    );
                 }
 
                 let Some(fields) = self.variant_fields.get(variant_def).cloned() else {

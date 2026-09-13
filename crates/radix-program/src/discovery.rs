@@ -3,7 +3,7 @@
 //! Discovery resolves a package entrypoint (from `faber.toml` or a legacy path
 //! input) into a [`PackageSpec`] and derives the generated-Cargo
 //! [`BuildLayout`]. Inputs must be absolute: the ambient-CWD absolutization
-//! seam stays faber-side (RP2b, CTO memo) and is applied before these
+//! seam stays faber-side (`RP2b`, CTO memo) and is applied before these
 //! entry points are called.
 
 use std::path::{Path, PathBuf};
@@ -98,6 +98,7 @@ impl BuildLayout {
     }
 
     /// Returns the sanitized name used for the generated binary and crate.
+    #[must_use]
     pub fn binary_name(&self) -> &str {
         self.debug_binary
             .file_name()
@@ -115,6 +116,7 @@ impl BuildLayout {
 /// - trim leading/trailing separators
 /// - if result empty, fallback to "package"
 /// - if starts with a digit, prefix "p-" (Cargo prefers letter or _ start for some contexts)
+#[must_use]
 pub fn sanitize_crate_name(name: &str) -> String {
     if name.trim().is_empty() {
         return "package".to_owned();
@@ -131,10 +133,10 @@ pub fn sanitize_crate_name(name: &str) -> String {
     }
     let mut s = out.trim_matches(|c: char| c == '-' || c == '_').to_owned();
     if s.is_empty() {
-        s = "package".to_owned();
+        "package".clone_into(&mut s);
     }
     if s.chars().next().is_some_and(|c| c.is_ascii_digit()) {
-        s = format!("p-{}", s);
+        s = format!("p-{s}");
     }
     s
 }
@@ -163,6 +165,7 @@ fn missing_package_path_diagnostic(path: &Path, base: &Path) -> Box<Diagnostic> 
     )
 }
 
+#[must_use]
 pub fn is_manifest_backed_or_directory_package_input(input: &Path) -> bool {
     let input = normalize_path(input);
     if input.file_name().and_then(|name| name.to_str()) == Some(MANIFEST_FILE) {
@@ -174,6 +177,8 @@ pub fn is_manifest_backed_or_directory_package_input(input: &Path) -> bool {
     input.is_file() && nearest_manifest_for_file(&normalize_path(&input)).is_some()
 }
 
+/// # Errors
+/// Returns an error when the input or persisted artifact is invalid.
 pub fn discover_package(input: &Path) -> PackageDiscoveryResult {
     let base = input
         .parent()
@@ -188,6 +193,8 @@ pub fn discover_package(input: &Path) -> PackageDiscoveryResult {
 /// for compiler callers. Product callers that absolutize a relative CLI input
 /// should pass the original resolution base so missing-path diagnostics explain
 /// the user's invocation rather than the normalized path's parent.
+/// # Errors
+/// Returns an error when the input or persisted artifact is invalid.
 pub fn discover_package_with_base(input: &Path, base: &Path) -> PackageDiscoveryResult {
     let input = normalize_path(input);
     if !input.exists() {
@@ -284,7 +291,7 @@ fn parse_manifest_with_entry(path: &Path, entry: PathBuf) -> PackageDiscoveryRes
 /// (package identity, source-root set, entry, library provider, build kind)
 /// with the same diagnostic codes. Product-only policy (`[device]`, `[format]`,
 /// `[product]`, `[dispatch]`, locale) stays faber-side and is applied by
-/// faber's discovery wrapper after this (RP2b seam).
+/// faber's discovery wrapper after this (`RP2b` seam).
 fn validate_compiler_manifest(
     manifest: &FaberManifest,
     path: &Path,
@@ -345,25 +352,25 @@ fn validate_compiler_manifest(
         }
     }
 
-    if let Some(entry) = manifest.paths.entry.as_deref() {
-        if entry.trim().is_empty() {
-            return Err(Box::new(
-                crate::package_diagnostic_error("faber.toml paths.entry must not be empty")
-                    .with_file(path.display().to_string()),
-            ));
-        }
+    if let Some(entry) = manifest.paths.entry.as_deref()
+        && entry.trim().is_empty()
+    {
+        return Err(Box::new(
+            crate::package_diagnostic_error("faber.toml paths.entry must not be empty")
+                .with_file(path.display().to_string()),
+        ));
     }
 
-    if let Some(library) = &manifest.library {
-        if !is_valid_provider_segment(&library.provider) {
-            return Err(Box::new(
+    if let Some(library) = &manifest.library
+        && !is_valid_provider_segment(&library.provider)
+    {
+        return Err(Box::new(
                 crate::package_diagnostic_error(
                     "faber.toml library.provider must contain only ASCII letters, numbers, underscore, or hyphen",
                 )
                 .with_file(path.display().to_string())
                 .with_arg("issue", "invalid_library_provider"),
             ));
-        }
     }
 
     match manifest.build.kind.as_str() {
@@ -441,7 +448,7 @@ fn validate_library_build(manifest: &FaberManifest, path: &Path) -> Result<(), B
     Ok(())
 }
 
-/// Pure provider-name segment predicate (RP2c consolidates the production
+/// Pure provider-name segment predicate (`RP2c` consolidates the production
 /// resolver copy into `library.rs`; discovery keeps its own for now).
 fn is_valid_provider_segment(segment: &str) -> bool {
     !segment.is_empty()
@@ -491,6 +498,8 @@ fn resolve_path_templates(
 /// (a bare `CurDir` normalizes to an empty path, which `resolve_package_member`
 /// correctly rejects as naming nothing). All other values are rejected earlier
 /// by [`validate_compiler_manifest`].
+/// # Errors
+/// Returns an error when the input or persisted artifact is invalid.
 pub fn resolve_source_root(
     package_root: &Path,
     source: &str,
@@ -522,6 +531,8 @@ fn manifest_entry_path(
 /// name needed for generated crate and binary paths. Manifest-backed packages
 /// use `package.name`; legacy non-manifest inputs fall back to their directory
 /// name so old direct-file workflows still have deterministic output paths.
+/// # Errors
+/// Returns an error when the input or persisted artifact is invalid.
 pub fn discover_build_layout(input: &Path) -> Result<BuildLayout, Box<Diagnostic>> {
     let display_path = input.to_path_buf();
     let input = normalize_path(input);

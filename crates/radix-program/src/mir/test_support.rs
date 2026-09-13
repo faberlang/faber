@@ -5,7 +5,7 @@
 //! suite. Non-`cfg(test)` because faber (a dependent crate) consumes the
 //! summaries.
 
-use super::*;
+use super::{Diagnostic, FmirBinaryImageFile, FmirTextImageFile, MirProgram, Path, mir_diag};
 
 #[derive(Debug, PartialEq, Eq)]
 pub struct FmirImageTestSummary {
@@ -19,6 +19,8 @@ pub struct FmirImageTestSummary {
     pub function_count: usize,
 }
 
+/// # Errors
+/// Returns an error when the input or persisted artifact is invalid.
 pub fn fmir_text_image_test_summary(
     text: &str,
     path: &Path,
@@ -47,6 +49,8 @@ pub fn fmir_text_image_test_summary(
     })
 }
 
+/// # Errors
+/// Returns an error when the input or persisted artifact is invalid.
 pub fn fmir_image_test_summary(
     bytes: &[u8],
     path: &Path,

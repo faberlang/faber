@@ -64,7 +64,7 @@ fn test_resolver_for_package(
     config: &Config,
     package_root: &Path,
 ) -> Result<LibraryResolver, Vec<Diagnostic>> {
-    let mut resolver = test_library_resolver_for_config(config);
+    let resolver = test_library_resolver_for_config(config);
     let manifest_path = package_root.join(crate::MANIFEST_FILE);
     if !manifest_path.is_file() {
         return Ok(resolver);

@@ -17,7 +17,8 @@ use radix::program::emit::{
 use radix::program::library::LibraryResolver;
 use radix::program::test_source_filter::TestSourceFilter;
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::collections::BTreeMap;
+use std::path::Path;
 
 fn seams() -> AnalysisSeams {
     crate::package::faber_analysis_seams()
@@ -104,7 +105,7 @@ targets = ["rust"]
     .expect("manifest");
     fs::write(
         dir.join("src/helpers.fab"),
-        r#"@ public
+        r"@ public
 fn double(int n) → int {
     return n * 2
 }
@@ -113,7 +114,7 @@ fn double(int n) → int {
 fn identity(int n) → int {
     return n
 }
-"#,
+",
     )
     .expect("helpers.fab");
 }
@@ -278,7 +279,7 @@ fn single_file_proba_entry_fails_closed_outside_test_path() {
         package_root: dir.path().to_path_buf(),
         source_root: dir.path().to_path_buf(),
         entry: proba.clone(),
-        templates: Default::default(),
+        templates: BTreeMap::default(),
         manifest_backed: false,
     };
     let resolver = library_resolver_from_config(&Config::default());
@@ -444,9 +445,9 @@ fn compile_build_path_ignores_adjacent_proba() {
     write_minimal_lib_package(dir.path());
     fs::write(
         dir.join("src/helpers.proba"),
-        r#"// this would not even parse as product — intentionally invalid if loaded
+        r"// this would not even parse as product — intentionally invalid if loaded
 this is not valid faber
-"#,
+",
     )
     .expect("helpers.proba");
 
@@ -576,7 +577,7 @@ targets = ["rust"]
     // Slim pure surface matching mathesis-style catalog helpers.
     fs::write(
         src.join("mathesis.fab"),
-        r#"@ public
+        r"@ public
 fn PI() → float {
     return 3.141592653589793
 }
@@ -585,7 +586,7 @@ fn PI() → float {
 fn addita(float a, float b) → float {
     return a + b
 }
-"#,
+",
     )
     .expect("mathesis.fab");
     // En-surface fixture mirroring the norma mathesis catalog style (import +

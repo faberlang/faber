@@ -1471,7 +1471,7 @@ fn localized_adfirma_message_uses_each_locale_surface() {
     ];
 
     for (locale, source, expected) in cases {
-        let pack_path = crate::locale::workspace_locale_pack_path(&locale);
+        let pack_path = crate::locale::workspace_locale_pack_path(locale);
         let pack = crate::locale::LocalePack::from_toml_path(&pack_path).expect("installed locale pack should load");
         let session = crate::driver::Session::new(crate::driver::Config::default().with_locale_pack(pack));
         let result = super::compile::reemit_faber(

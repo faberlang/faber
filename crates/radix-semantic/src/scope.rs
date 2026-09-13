@@ -1210,12 +1210,11 @@ impl Resolver {
                             let member_sym = interner.intern(&projected_member);
                             if let Some(ImportedFileExport::Type(existing)) =
                                 imported.exports.get(&member_sym)
+                                && let Some(enum_def) = existing.def_id
                             {
-                                if let Some(enum_def) = existing.def_id {
-                                    self.import_enum_variants_partial(
-                                        enum_def, nominal, types, interner,
-                                    );
-                                }
+                                self.import_enum_variants_partial(
+                                    enum_def, nominal, types, interner,
+                                );
                             }
                         }
                     }
@@ -2069,19 +2068,17 @@ impl Resolver {
                         // the three-part `module.Union.VARIANT` spelling is
                         // not accepted in expression/call position, so it
                         // cannot ride this shared map.
-                        if let Some(enum_def) = export.def_id {
-                            if let Some(variants) = self.imported_enum_variants.get(&enum_def) {
-                                for variant in variants {
-                                    let variant_name = interner.resolve(variant.name);
-                                    by_def.insert(
-                                        variant.def_id,
-                                        format!("{namespace}.{variant_name}"),
-                                    );
-                                    by_def_pattern.insert(
-                                        variant.def_id,
-                                        format!("{namespace}.{member}.{variant_name}"),
-                                    );
-                                }
+                        if let Some(enum_def) = export.def_id
+                            && let Some(variants) = self.imported_enum_variants.get(&enum_def)
+                        {
+                            for variant in variants {
+                                let variant_name = interner.resolve(variant.name);
+                                by_def
+                                    .insert(variant.def_id, format!("{namespace}.{variant_name}"));
+                                by_def_pattern.insert(
+                                    variant.def_id,
+                                    format!("{namespace}.{member}.{variant_name}"),
+                                );
                             }
                         }
                     }
@@ -3226,10 +3223,10 @@ impl Resolver {
 
         while let Some(id) = scope_id {
             let scope = &self.scopes[id.0 as usize];
-            if let Some(entry) = scope.symbols.get(&name) {
-                if entry.kind.is_type() {
-                    return Some(entry.def_id);
-                }
+            if let Some(entry) = scope.symbols.get(&name)
+                && entry.kind.is_type()
+            {
+                return Some(entry.def_id);
             }
             scope_id = scope.parent;
         }

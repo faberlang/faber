@@ -94,7 +94,7 @@ fn failable_generic_callable_round_trips() {
     assert_eq!(imported_sig.type_params.len(), 1);
     assert_eq!(target_interner.resolve(imported_sig.type_params[0].name), "T");
     assert_eq!(imported_sig.type_params[0].sort, GenericParamSort::Typus);
-    assert!(imported_sig.params.len() == 1);
+    assert_eq!(imported_sig.params.len(), 1);
     assert!(imported_sig.params[0].optional);
     assert_eq!(imported_sig.params[0].mode, SemanticParamMode::Owned);
     assert_eq!(imported_sig.err, None);

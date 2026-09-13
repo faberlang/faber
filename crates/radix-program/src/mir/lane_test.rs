@@ -269,12 +269,12 @@ locale = "en"
     .expect("write self-provider faber.toml");
     fs::write(
         src.join("codes.fab"),
-        r#"
+        r"
 @ public
 fn encoded(int n) → int {
     return n + 50
 }
-"#,
+",
     )
     .expect("write codes.fab");
     fs::write(
@@ -485,7 +485,7 @@ fn package_mir_const_data_member_verte_initializer_transplants() {
         .parse()
         .expect("the const value prints");
     assert!(
-        (value - 0.7978845608028654).abs() < 1e-4,
+        (value - 0.797_884_560_802_865_4).abs() < 1e-4,
         "the ascription-cast const must keep its value, got {value}"
     );
 }
@@ -663,12 +663,12 @@ fn copy_package_dir_skipping_target(src: &std::path::Path, dest: &std::path::Pat
 /// evaluations of the documented convergence — compared under the documented
 /// 5e-4 absolute tolerance against the f32 self-hosted runner output).
 const PML4_PINS: [(usize, f64); 6] = [
-    (0, 1.576448169383708),
-    (10, 0.7815377070077427),
-    (25, 0.4303461875641296),
-    (50, 0.13848813116166797),
-    (75, 0.04746405569680761),
-    (99, 0.017928625511508454),
+    (0, 1.576_448_169_383_708),
+    (10, 0.781_537_707_007_742_7),
+    (25, 0.430_346_187_564_129_6),
+    (50, 0.138_488_131_161_667_97),
+    (75, 0.047_464_055_696_807_61),
+    (99, 0.017_928_625_511_508_454),
 ];
 
 #[test]

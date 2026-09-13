@@ -182,15 +182,15 @@ impl TypeChecker<'_> {
 
         self.push_scope();
         for (idx, param) in params.iter().enumerate() {
-            if let Some(sig) = &expected_sig {
-                if let Some(expected_param) = sig.params.get(idx) {
-                    self.unify_assign_issue(
-                        param.ty,
-                        expected_param.ty,
-                        param.span,
-                        ISSUE_CLOSURE_PARAMETER_TYPE_MISMATCH,
-                    );
-                }
+            if let Some(sig) = &expected_sig
+                && let Some(expected_param) = sig.params.get(idx)
+            {
+                self.unify_assign_issue(
+                    param.ty,
+                    expected_param.ty,
+                    param.span,
+                    ISSUE_CLOSURE_PARAMETER_TYPE_MISMATCH,
+                );
             }
             let scalar_text = self.mark_chorda_scalar_closure_param && idx == 0;
             let mutable = matches!(param.mode, HirParamMode::In);
@@ -326,8 +326,13 @@ impl TypeChecker<'_> {
         for _ in 0..16 {
             match self.types.get(current) {
                 Type::Alias(_, inner) => current = *inner,
-                Type::Primitive(Primitive::Bivalens | Primitive::Vacuum | Primitive::Numquam)
-                | Type::Primitive(Primitive::Numerus | Primitive::Fractus)
+                Type::Primitive(
+                    Primitive::Bivalens
+                    | Primitive::Vacuum
+                    | Primitive::Numquam
+                    | Primitive::Numerus
+                    | Primitive::Fractus,
+                )
                 | Type::SizedNumeric(..)
                 | Type::ModularWord(_)
                 | Type::Atomic(_)
@@ -404,15 +409,15 @@ impl TypeChecker<'_> {
         let element_types: Option<Vec<TypeId>> =
             expected_elements.or_else(|| explicit_type_args.cloned());
 
-        if let Some(elems) = &element_types {
-            if elems.len() != items.len() {
-                self.wrong_arity(
-                    "iuncta_construction_arity_mismatch",
-                    items
-                        .first()
-                        .map_or(radix_lexer::Span::default(), |e| e.span),
-                );
-            }
+        if let Some(elems) = &element_types
+            && elems.len() != items.len()
+        {
+            self.wrong_arity(
+                "iuncta_construction_arity_mismatch",
+                items
+                    .first()
+                    .map_or(radix_lexer::Span::default(), |e| e.span),
+            );
         }
 
         let mut types = Vec::new();
@@ -582,16 +587,16 @@ impl TypeChecker<'_> {
             _ => {}
         }
 
-        if let Type::Array(a_inner) = self.types.get(a_resolved).clone() {
-            if !matches!(self.types.get(b_resolved), Type::Array(_)) {
-                return self.common_type(a_inner, b, span);
-            }
+        if let Type::Array(a_inner) = self.types.get(a_resolved).clone()
+            && !matches!(self.types.get(b_resolved), Type::Array(_))
+        {
+            return self.common_type(a_inner, b, span);
         }
 
-        if let Type::Array(b_inner) = self.types.get(b_resolved).clone() {
-            if !matches!(self.types.get(a_resolved), Type::Array(_)) {
-                return self.common_type(a, b_inner, span);
-            }
+        if let Type::Array(b_inner) = self.types.get(b_resolved).clone()
+            && !matches!(self.types.get(a_resolved), Type::Array(_))
+        {
+            return self.common_type(a, b_inner, span);
         }
 
         self.common_type(a, b, span)

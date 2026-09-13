@@ -513,12 +513,11 @@ pub fn analyze_with_cli(
         diagnostics.extend(e);
     }
 
-    if config.script_kernel_mode {
-        if let Err(e) =
+    if config.script_kernel_mode
+        && let Err(e) =
             passes::kernel_namespace::validate_script_kernel_library_imports(program, interner)
-        {
-            diagnostics.extend(e);
-        }
+    {
+        diagnostics.extend(e);
     }
 
     // Resolve still runs after collection errors so users see as many name
@@ -640,16 +639,16 @@ pub fn analyze_with_cli(
     // Named unroll: concrete-N `itera ab` → straight line, before air_purity.
     // Skip when typecheck already failed — types on the rewritten nodes would
     // be unreliable.
-    if !diagnostics.iter().any(SemanticError::is_error) {
-        if let Err(e) = passes::air_unroll::unroll(
+    if !diagnostics.iter().any(SemanticError::is_error)
+        && let Err(e) = passes::air_unroll::unroll(
             &mut hir,
             &mut lowered.presentation,
             &radix_lanes,
             interner,
             &types,
-        ) {
-            diagnostics.extend(e);
-        }
+        )
+    {
+        diagnostics.extend(e);
     }
 
     if let Err(e) = passes::air_purity::check(&mut hir, &mut radix_lanes, interner, &types) {
@@ -685,10 +684,10 @@ pub fn analyze_with_cli(
         diagnostics.extend(e);
     }
 
-    if config.exhaustiveness {
-        if let Err(e) = passes::exhaustive::check(&hir, &types) {
-            diagnostics.extend(e);
-        }
+    if config.exhaustiveness
+        && let Err(e) = passes::exhaustive::check(&hir, &types)
+    {
+        diagnostics.extend(e);
     }
 
     if let Err(e) = passes::return_path::analyze(&hir, &types) {

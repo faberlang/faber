@@ -1290,39 +1290,36 @@ impl Lowerer<'_> {
                             }
                         }
                     }
-                    if segments.len() == 2 {
-                        if let Some((def_id, _)) = self
+                    if segments.len() == 2
+                        && let Some((def_id, _)) = self
                             .resolver
                             .namespace_file_variant(segments[0], segments[1])
-                        {
-                            self.record_variant_path(def_id, &segments);
-                            return HirPattern::Variant(def_id, Vec::new());
-                        }
+                    {
+                        self.record_variant_path(def_id, &segments);
+                        return HirPattern::Variant(def_id, Vec::new());
                     }
                 }
                 // Qualified `casu A.X`: resolve the suffix against A's union
                 // when A is a known union/enum; otherwise fall back to the
                 // bare-name path (single-union behavior preserved).
-                if let radix_syntax::ExprKind::Ident(base) = &member.object.kind {
-                    if let Some(base_def) = self.lookup_name(base.name) {
-                        if self
-                            .resolver
-                            .get_symbol(base_def)
-                            .is_some_and(|symbol| symbol.kind == crate::SymbolKind::Enum)
-                        {
-                            if let Some(variant_def) =
-                                self.resolver.variant_child(base_def, member.member.name)
-                            {
-                                if let Some(segments) = member_segments(member) {
-                                    self.record_variant_path(variant_def, &segments);
-                                }
-                                return HirPattern::Variant(variant_def, Vec::new());
-                            }
-                            self.current_span = span;
-                            self.error("elige_case_value_shape");
-                            return HirPattern::Wildcard;
+                if let radix_syntax::ExprKind::Ident(base) = &member.object.kind
+                    && let Some(base_def) = self.lookup_name(base.name)
+                    && self
+                        .resolver
+                        .get_symbol(base_def)
+                        .is_some_and(|symbol| symbol.kind == crate::SymbolKind::Enum)
+                {
+                    if let Some(variant_def) =
+                        self.resolver.variant_child(base_def, member.member.name)
+                    {
+                        if let Some(segments) = member_segments(member) {
+                            self.record_variant_path(variant_def, &segments);
                         }
+                        return HirPattern::Variant(variant_def, Vec::new());
                     }
+                    self.current_span = span;
+                    self.error("elige_case_value_shape");
+                    return HirPattern::Wildcard;
                 }
                 self.lower_elige_variant_pattern(member.member.name, span)
             }

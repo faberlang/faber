@@ -2031,7 +2031,7 @@ fn lower_graphics_mir_with_context_for_target(
     // that continues to compute lowering (F-107). The full HIR lowers safely
     // to target-neutral MIR; graphics-specific filtering is a selection on
     // the output, not a precondition on the input.
-    crate::mir::lower_analyzed_unit(analysis, Default::default()).map_err(mir_errors_to_spanned)
+    crate::mir::lower_analyzed_unit(analysis, crate::mir::MirLoweringOptions::default()).map_err(mir_errors_to_spanned)
 }
 
 #[cfg_attr(not(feature = "device"), allow(unused_variables))]
@@ -2043,7 +2043,8 @@ fn lower_mir_with_context_for_target(
     #[cfg(feature = "device")]
     let bundle = prepare_air_backward_bundle(analysis)?;
     #[cfg_attr(not(feature = "device"), allow(unused_mut))]
-    let mut lowered = crate::mir::lower_analyzed_unit(analysis, Default::default()).map_err(mir_errors_to_spanned)?;
+    let mut lowered = crate::mir::lower_analyzed_unit(analysis, crate::mir::MirLoweringOptions::default())
+        .map_err(mir_errors_to_spanned)?;
     #[cfg(feature = "device")]
     if let Some(bundle) = bundle {
         apply_air_backward_bundle(&mut lowered, bundle, no_fuse)?;

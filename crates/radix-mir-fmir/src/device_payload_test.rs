@@ -3292,7 +3292,7 @@ fn batched_matmul_wire_plan_round_trips_with_batch_facts() {
     }
 }
 
-/// A `BatchedTiledMatMul` wire plan violating the batch law (a right_batch
+/// A `BatchedTiledMatMul` wire plan violating the batch law (a `right_batch`
 /// that does not divide batch) fails wire admission typed, never decodes.
 #[test]
 fn batched_matmul_wire_plan_batch_law_fails_closed() {
