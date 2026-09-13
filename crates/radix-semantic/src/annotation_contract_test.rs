@@ -87,7 +87,7 @@ functio apply() → vacuum {
         .items
         .iter()
         .find_map(|item| match &item.kind {
-            HirItemKind::Function(func) => func
+            HirItemKind::Function(_) => item
                 .annotations
                 .iter()
                 .find(|ann| ann.contract_id.is_some()),
