@@ -32,13 +32,13 @@ expr_stmt ::= expression
 block_stmt ::= '{' statement* '}'
 # formerly: varDecl
 # [009] fixum_decl
-fixum_decl ::= ('定值' | '變值') type_annotation IDENTIFIER (('←' expression) | ('↤' assignment inline_recovery?) | ('⇤' expression))?
+fixum_decl ::= ('定值' | '變值') type_annotation IDENTIFIER (('←' expression) | ('↤' assignment inline_recovery?) | ('↢' expression))?
 # formerly: awaitVarDecl
 # [010] figendum_decl
 figendum_decl ::= ('等定' | '等變') type_annotation IDENTIFIER '←' expression
 # formerly: sitDecl
 # [011] sit_decl
-sit_decl ::= '設為' IDENTIFIER (('←' | '⇤') expression)?
+sit_decl ::= '設為' IDENTIFIER (('←' | '↢') expression)?
 # formerly: arrayDestruct
 # [012] array_destruct
 array_destruct ::= ('定值' | '變值') array_pattern '←' expression
@@ -1130,8 +1130,8 @@ Entries are trivia-delimited.
   binding (reassignable), like `let`.
 - `等定` / `等變` await a `promissum<T>` or `promissum<T ⇥ E>`, bind
   the resolved `T`, and propagate a compatible alternate `E`.
-- `⇤` is the await-directed initializer for an ordinary declaration:
-  `定值 T name ⇤ future`, `變值 T name ⇤ future`, or `設為 name ⇤ future`.
+- `↢` is the await-directed initializer for an ordinary declaration:
+  `定值 T name ↢ future`, `變值 T name ↢ future`, or `設為 name ↢ future`.
   It has the same await and alternate-propagation semantics as
   `等定 T name ← future`, but it is not a general expression operator and
   cannot target an existing place.

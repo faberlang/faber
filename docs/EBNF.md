@@ -32,13 +32,13 @@ expr_stmt ::= expression
 block_stmt ::= '{' statement* '}'
 # formerly: varDecl
 # [009] fixum_decl
-fixum_decl ::= ('fixum' | 'varia') type_annotation IDENTIFIER (('←' expression) | ('↤' assignment inline_recovery?) | ('⇤' expression))?
+fixum_decl ::= ('fixum' | 'varia') type_annotation IDENTIFIER (('←' expression) | ('↤' assignment inline_recovery?) | ('↢' expression))?
 # formerly: awaitVarDecl
 # [010] figendum_decl
 figendum_decl ::= ('figendum' | 'variandum') type_annotation IDENTIFIER '←' expression
 # formerly: sitDecl
 # [011] sit_decl
-sit_decl ::= 'sit' IDENTIFIER (('←' | '⇤') expression)?
+sit_decl ::= 'sit' IDENTIFIER (('←' | '↢') expression)?
 # formerly: arrayDestruct
 # [012] array_destruct
 array_destruct ::= ('fixum' | 'varia') array_pattern '←' expression
@@ -1130,8 +1130,8 @@ Entries are trivia-delimited.
   binding (reassignable), like `let`.
 - `figendum` / `variandum` await a `promissum<T>` or `promissum<T ⇥ E>`, bind
   the resolved `T`, and propagate a compatible alternate `E`.
-- `⇤` is the await-directed initializer for an ordinary declaration:
-  `fixum T name ⇤ future`, `varia T name ⇤ future`, or `sit name ⇤ future`.
+- `↢` is the await-directed initializer for an ordinary declaration:
+  `fixum T name ↢ future`, `varia T name ↢ future`, or `sit name ↢ future`.
   It has the same await and alternate-propagation semantics as
   `figendum T name ← future`, but it is not a general expression operator and
   cannot target an existing place.
