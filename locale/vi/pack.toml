@@ -2265,7 +2265,7 @@ message = "chuyển đổi valor sang promissum vượt qua ranh giới bất đ
 help = "giải quyết hoặc bọc giá trị bất đồng bộ một cách rõ ràng"
 
 [diagnostics.SEM016.issues.promissum_to_valor_boundary]
-message = "chuyển đổi promissum sang valor vượt qua ranh giới bất đồng bộ/đồng bộ; gán giá trị đã phân giải bằng `⇤` trước khi đóng gói"
+message = "chuyển đổi promissum sang valor vượt qua ranh giới bất đồng bộ/đồng bộ; gán giá trị đã phân giải bằng `↢` trước khi đóng gói"
 help = "giải quyết hoặc bọc giá trị bất đồng bộ một cách rõ ràng"
 
 [diagnostics.SEM016.issues.cursor_to_valor_boundary]
@@ -2297,7 +2297,7 @@ message = "chuyển đổi sang promissum vượt qua ranh giới bất đồng 
 help = "giải quyết hoặc bọc giá trị bất đồng bộ một cách rõ ràng"
 
 [diagnostics.SEM016.issues.promissum_source_boundary]
-message = "chuyển đổi từ promissum vượt qua ranh giới bất đồng bộ/đồng bộ; gán giá trị đã phân giải bằng `⇤` trong thân hàm bất đồng bộ"
+message = "chuyển đổi từ promissum vượt qua ranh giới bất đồng bộ/đồng bộ; gán giá trị đã phân giải bằng `↢` trong thân hàm bất đồng bộ"
 help = "giải quyết hoặc bọc giá trị bất đồng bộ một cách rõ ràng"
 
 [diagnostics.SEM016.issues.sparsa_collection_unsupported]

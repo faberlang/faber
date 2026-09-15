@@ -2327,12 +2327,12 @@ fn eot_transfer_ascii_alias_does_not_produce_transfer_token() {
 }
 
 // ---------------------------------------------------------------------------
-// ADB-U1 — ⇤ (U+21E4) await-directed binding initializer
+// ADB-U1 — ↢ (U+21A2) await-directed binding initializer
 // ---------------------------------------------------------------------------
 
 #[test]
 fn await_assign_glyph_has_a_dedicated_token() {
-    let result = lex("\u{21E4}");
+    let result = lex("\u{21A2}");
     assert!(result.errors.is_empty(), "{:?}", result.errors);
     assert_eq!(
         result
@@ -2345,8 +2345,21 @@ fn await_assign_glyph_has_a_dedicated_token() {
 }
 
 #[test]
+fn former_await_assign_glyph_is_rejected() {
+    let result = lex("\u{21E4}");
+    assert!(!result.errors.is_empty());
+    assert!(
+        !result
+            .tokens
+            .iter()
+            .any(|token| token.kind == TokenKind::AwaitAssign),
+        "the retired glyph must not remain an await-assignment alias"
+    );
+}
+
+#[test]
 fn await_assign_glyph_is_distinct_from_neighbor_arrows() {
-    let result = lex("⇤ ← ↤ ⇥ ⇇ → ↦");
+    let result = lex("↢ ← ↤ ⇥ ⇇ → ↦");
     assert!(result.errors.is_empty(), "{:?}", result.errors);
     assert_eq!(
         result

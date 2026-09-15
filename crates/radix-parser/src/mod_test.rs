@@ -4675,7 +4675,7 @@ fn parses_variandum_await_binding() {
 
 #[test]
 fn parses_await_directed_fixum_binding() {
-    let result = parse_ok("functio f() fiet → vacuum { fixum numerus x ⇤ fut redde x }");
+    let result = parse_ok("functio f() fiet → vacuum { fixum numerus x ↢ fut redde x }");
     let program = result.program.as_ref().expect("program");
     let StmtKind::Func(func) = &program.statements[0].kind else {
         panic!("expected function");
@@ -4692,7 +4692,7 @@ fn parses_await_directed_fixum_binding() {
 #[test]
 fn parses_await_directed_varia_and_sit_bindings() {
     let result =
-        parse_ok("functio f() fiet → vacuum { varia numerus x ⇤ fut sit y ⇤ fut redde y }");
+        parse_ok("functio f() fiet → vacuum { varia numerus x ↢ fut sit y ↢ fut redde y }");
     let program = result.program.as_ref().expect("program");
     let StmtKind::Func(func) = &program.statements[0].kind else {
         panic!("expected function");
@@ -4714,15 +4714,15 @@ fn parses_await_directed_varia_and_sit_bindings() {
 
 #[test]
 fn await_directed_assignment_is_not_a_general_expression_operator() {
-    let result = parse_program("functio f() fiet → vacuum { x ⇤ fut }");
+    let result = parse_program("functio f() fiet → vacuum { x ↢ fut }");
     assert!(!result.success());
 }
 
 #[test]
 fn rejects_await_directed_destructuring_and_missing_initializers() {
     for source in [
-        "functio f() fiet { fixum [x] ⇤ future }",
-        "functio f() fiet { fixum numerus x ⇤ }",
+        "functio f() fiet { fixum [x] ↢ future }",
+        "functio f() fiet { fixum numerus x ↢ }",
     ] {
         let result = parse_program(source);
         assert!(

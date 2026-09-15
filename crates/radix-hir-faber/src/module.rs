@@ -71,7 +71,7 @@ pub struct FaberCodegen {
     /// Initializer-expression ids of authored discard bindings (`fixum T _ ← e`)
     /// with their declaration facts, for re-emitting the binding.
     pub(crate) discard_bindings: FxHashMap<radix_hir::HirId, radix_hir::HirDiscardBinding>,
-    /// Definitions whose awaited initializer used the `⇤` spelling.
+    /// Definitions whose awaited initializer used the `↢` spelling.
     pub(crate) await_assignment_bindings: FxHashSet<DefId>,
     /// Authored `ordo` enumerations by enum def id: emission re-sugars these
     /// with the `ordo` vocabulary and member discriminants.

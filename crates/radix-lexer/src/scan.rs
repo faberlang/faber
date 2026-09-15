@@ -304,7 +304,7 @@ impl<'a> Lexer<'a> {
             '⇇' => TokenKind::Transfer,
             '↦' => TokenKind::Conversio,
             '↤' => TokenKind::ConversioAssign,
-            '⇤' => TokenKind::AwaitAssign,
+            '↢' => TokenKind::AwaitAssign,
             '↑' => TokenKind::PostInc,
             '↓' => TokenKind::PostDec,
             '∷' => TokenKind::Verte,

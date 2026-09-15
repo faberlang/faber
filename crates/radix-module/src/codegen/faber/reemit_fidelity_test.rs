@@ -664,10 +664,10 @@ fn discard_binding_round_trips() {
 #[test]
 fn await_assignment_and_morphology_keep_their_authored_forms() {
     let code = assert_idempotent(
-        "functio fetch() fiet → numerus {\n    redde 7\n}\n\nfunctio use_both() fiet → numerus {\n    fixum numerus arrow ⇤ fetch()\n    figendum numerus morphology ← fetch()\n    redde arrow + morphology\n}\n",
+        "functio fetch() fiet → numerus {\n    redde 7\n}\n\nfunctio use_both() fiet → numerus {\n    fixum numerus arrow ↢ fetch()\n    figendum numerus morphology ← fetch()\n    redde arrow + morphology\n}\n",
     );
     assert!(
-        code.contains("fixum numerus arrow ⇤ fetch()"),
+        code.contains("fixum numerus arrow ↢ fetch()"),
         "await-directed assignment must survive:\n{code}"
     );
     assert!(

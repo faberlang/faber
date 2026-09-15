@@ -180,7 +180,7 @@ impl VarDecl {
 pub enum AwaitBindingForm {
     /// Morphological `figendum` or `variandum` declaration with `←`.
     Morphology,
-    /// Ordinary declaration keyword with the `⇤` initializer operator.
+    /// Ordinary declaration keyword with the `↢` initializer operator.
     Assignment,
 }
 

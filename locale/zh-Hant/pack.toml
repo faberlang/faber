@@ -2265,7 +2265,7 @@ message = "valor 至 promissum 轉換跨越 async/sync 邊界；valor 是同步�
 help = "明確解析或包裝 async 值"
 
 [diagnostics.SEM016.issues.promissum_to_valor_boundary]
-message = "promissum 至 valor 轉換跨越 async/sync 邊界；裝箱前使用 `⇤` 綁定已解析的值"
+message = "promissum 至 valor 轉換跨越 async/sync 邊界；裝箱前使用 `↢` 綁定已解析的值"
 help = "明確解析或包裝 async 值"
 
 [diagnostics.SEM016.issues.cursor_to_valor_boundary]
@@ -2297,7 +2297,7 @@ message = "轉換為 promissum 會跨越 async/sync 邊界；使用 `@ futura` �
 help = "明確解析或包裝 async 值"
 
 [diagnostics.SEM016.issues.promissum_source_boundary]
-message = "從 promissum 轉換會跨越 async/sync 邊界；在可非同步執行的主體中使用 `⇤` 綁定已解析的值"
+message = "從 promissum 轉換會跨越 async/sync 邊界；在可非同步執行的主體中使用 `↢` 綁定已解析的值"
 help = "明確解析或包裝 async 值"
 
 [diagnostics.SEM016.issues.sparsa_collection_unsupported]

@@ -705,7 +705,7 @@ fn semantic_invalid_conversion_message(args: &[DiagnosticArg]) -> Option<String>
             "valor to promissum conversion crosses the async/sync boundary; valor is synchronous — wrap the producer in `@ futura`".to_owned(),
         ),
         "promissum_to_valor_boundary" => Some(
-            "promissum to valor conversion crosses the async/sync boundary; bind the resolved value with `⇤` before boxing".to_owned(),
+            "promissum to valor conversion crosses the async/sync boundary; bind the resolved value with `↢` before boxing".to_owned(),
         ),
         "cursor_to_valor_boundary" => Some(
             "cursor to valor conversion crosses the eager/lazy boundary; materialize via `cursor ↦ lista` then `lista ↦ valor`".to_owned(),
@@ -749,7 +749,7 @@ fn semantic_invalid_conversion_message(args: &[DiagnosticArg]) -> Option<String>
             "conversion to promissum crosses the async/sync boundary; use `@ futura` or `.tum()` for async wrapping".to_owned(),
         ),
         "promissum_source_boundary" => Some(
-            "conversion from promissum crosses the async/sync boundary; bind the resolved value with `⇤` in an async-capable body".to_owned(),
+            "conversion from promissum crosses the async/sync boundary; bind the resolved value with `↢` in an async-capable body".to_owned(),
         ),
         "sparsa_collection_unsupported" => Some(
             "sparsa conversion has no default lista meaning; use densata() before lista conversion or an explicit sparse helper".to_owned(),

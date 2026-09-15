@@ -463,7 +463,7 @@ fn accepts_await_directed_binding_of_a_stored_promise() {
 
 functio caller() fiet → textus {
   fixum promissum<textus> pending ← fetch()
-  fixum textus value ⇤ pending
+  fixum textus value ↢ pending
   redde value
 }"#,
     );
@@ -494,7 +494,7 @@ fn accepts_await_directed_failable_promise_with_matching_alternate_exit() {
 
 functio caller() fiet → numerus ⇥ textus {
   sit pending ← fetch()
-  sit value ⇤ pending
+  sit value ↢ pending
   redde value
 }"#,
     );
@@ -633,7 +633,7 @@ fn rejects_await_directed_binding_outside_async_context() {
 }
 
 incipit {
-  fixum textus value ⇤ fetch()
+  fixum textus value ↢ fetch()
 }"#,
         "await_bind_requires_async_context",
     );
@@ -642,7 +642,7 @@ incipit {
 #[test]
 fn rejects_await_directed_binding_of_a_non_promise() {
     test_support::assert_rejects_with_issue(
-        "incipiet { fixum numerus value ⇤ 1 }",
+        "incipiet { fixum numerus value ↢ 1 }",
         "await_bind_requires_promissum",
     );
 }

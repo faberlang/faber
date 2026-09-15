@@ -144,7 +144,7 @@ impl super::FaberCodegen {
                         self.write_expr_prec(recovery, 12, types, names, interner, surface, writer);
                     }
                 } else {
-                    writer.write(if await_assignment { " ⇤ " } else { " ← " });
+                    writer.write(if await_assignment { " ↢ " } else { " ← " });
                     self.write_expr(&c.value, types, names, interner, surface, writer);
                 }
                 writer.newline();

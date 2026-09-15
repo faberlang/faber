@@ -1786,7 +1786,7 @@ category = "logic"
 
 [[files]]
 path = "await-assignment/await-assignment.fab"
-term = "⇤"
+term = "↢"
 kind = "operator"
 category = "async"
 

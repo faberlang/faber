@@ -135,7 +135,7 @@ impl Parser {
     /// Parse `fixum` and `varia` binding declarations.
     ///
     /// GRAMMAR:
-    ///   var-decl := (`fixum` | `varia`) type pattern ['←' expr | '↤' expr | '⇤' expr]
+    ///   var-decl := (`fixum` | `varia`) type pattern ['←' expr | '↤' expr | '↢' expr]
     ///
     /// Simple bindings carry an explicit type slot, including `_` for inference.
     /// Destructuring keeps its historical untyped shape because the binding
@@ -175,7 +175,7 @@ impl Parser {
         } else if self.eat(&TokenKind::AwaitAssign) {
             if !matches!(binding, BindingPattern::Ident(_)) {
                 return Err(Self::expected_error(
-                    "named binding before '⇤'",
+                    "named binding before '↢'",
                     self.previous_span(),
                 ));
             }
