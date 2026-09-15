@@ -1,0 +1,37 @@
++++
+term = "⇤"
+kind = "operator"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "functio_decl", "param_list", "parameter", "callable_posture", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "fixum_decl", "sit_decl", "expression", "call_expr", "call_suffix", "argument_list", "literal", "incipiet_stmt"]
+category = "async"
+canonical = true
+summary = "Awaits a promissum while initializing an ordinary binding."
+syntax = "fixum T name ⇤ future"
+related = ["figendum", "variandum", "fiet", "promissum"]
+locale = "la"
++++
+# =============================================================================
+# ⇤ — Await-directed binding initializer
+# =============================================================================
+#
+# What this teaches:
+#   • Keep fixum, varia, or sit while awaiting the initializer.
+#   • The glyph is a binding boundary, not an inline expression operator.
+#   • A stored promissum can be resolved in a later declaration.
+#
+# See also: figendum, variandum, fiet, promissum
+# =============================================================================
+
+``
+`fab
+functio responde(numerus value) fiet → numerus {
+    redde value
+}
+
+incipiet {
+    fixum promissum<numerus> pending ← responde(7)
+    fixum numerus immutable ⇤ pending
+    varia numerus mutable ⇤ responde(8)
+    sit inferred ⇤ responde(9)
+}
+`
+``

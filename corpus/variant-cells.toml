@@ -1186,3 +1186,37 @@ expected = true
 required = true
 decline = true
 note = "KCM-07 semantic reject; nucleum_closure_escape context=ordinary_argument"
+
+# =============================================================================
+# await-directed binding (3 declaration cells)
+# =============================================================================
+
+[[cells]]
+id = "await-assignment.fixum"
+family = "await-assignment"
+cell = "fixum T name ⇤ promissum<T>"
+status = "direct"
+exemplum = "await-assignment/await-assignment.fab"
+expected = true
+required = true
+note = "exemplum runs three awaited declarations; empty stdout is intentional"
+
+[[cells]]
+id = "await-assignment.varia"
+family = "await-assignment"
+cell = "varia T name ⇤ promissum<T>"
+status = "direct"
+exemplum = "await-assignment/await-assignment.fab"
+expected = true
+required = true
+note = "exemplum runs three awaited declarations; empty stdout is intentional"
+
+[[cells]]
+id = "await-assignment.sit"
+family = "await-assignment"
+cell = "sit name ⇤ promissum<T>"
+status = "direct"
+exemplum = "await-assignment/await-assignment.fab"
+expected = true
+required = true
+note = "exemplum runs three awaited declarations; empty stdout is intentional"

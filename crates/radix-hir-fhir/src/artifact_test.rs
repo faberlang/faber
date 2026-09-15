@@ -103,7 +103,7 @@ fn selective_import_field_kept_schema_v4_wire_breaks_ratchet_version() {
     // and ATF-5 ratchets to 9 because authored type forms join presentation,
     // and GPD-5 ratchets to 10 because resolved generic binding vectors join
     // the wire.
-    assert_eq!(SCHEMA_VERSION, 11);
+    assert_eq!(SCHEMA_VERSION, 12);
 }
 
 // ── EOT-3W transfer wire contract ────────────────────────────────────────

@@ -2277,7 +2277,7 @@ message = "valor से promissum रूपांतरण async/sync boundary �
 help = "async value को स्पष्ट रूप से resolve या wrap करें"
 
 [diagnostics.SEM016.issues.promissum_to_valor_boundary]
-message = "promissum से valor रूपांतरण async/sync boundary पार करता है; boxing से पहले `.exspecta()` से resolve करें"
+message = "promissum से valor रूपांतरण async/sync boundary पार करता है; boxing से पहले resolved value को `⇤` से bind करें"
 help = "async value को स्पष्ट रूप से resolve या wrap करें"
 
 [diagnostics.SEM016.issues.cursor_to_valor_boundary]
@@ -2309,7 +2309,7 @@ message = "promissum में रूपांतरण async/sync boundary प�
 help = "async value को स्पष्ट रूप से resolve या wrap करें"
 
 [diagnostics.SEM016.issues.promissum_source_boundary]
-message = "promissum से रूपांतरण async/sync boundary पार करता है; async resolution के लिए `.exspecta()` या `@ futura` `.tum()` का उपयोग करें"
+message = "promissum से रूपांतरण async/sync boundary पार करता है; resolved value को async-capable body में `⇤` से bind करें"
 help = "async value को स्पष्ट रूप से resolve या wrap करें"
 
 [diagnostics.SEM016.issues.sparsa_collection_unsupported]

@@ -158,13 +158,30 @@ pub struct VarDecl {
     /// Binding policy from `fixum` or `varia`.
     pub mutability: AstMutability,
 
-    /// Whether the initializer was marked for await-like binding behavior.
-    pub is_await: bool,
+    /// Authored await-binding surface, absent for an immediate initializer.
+    pub await_form: Option<AwaitBindingForm>,
 
     /// Written type annotation, if present; inference is resolved later.
     pub ty: Option<TypeExpr>,
     pub binding: BindingPattern,
     pub init: Option<Box<Expr>>,
+}
+
+impl VarDecl {
+    /// Whether this declaration awaits its initializer before binding.
+    #[must_use]
+    pub fn is_await(&self) -> bool {
+        self.await_form.is_some()
+    }
+}
+
+/// Source spelling used to request await-binding behavior.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AwaitBindingForm {
+    /// Morphological `figendum` or `variandum` declaration with `←`.
+    Morphology,
+    /// Ordinary declaration keyword with the `⇤` initializer operator.
+    Assignment,
 }
 
 /// Binding target syntax used by declarations and destructuring forms.

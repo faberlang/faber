@@ -10,10 +10,10 @@ use crate::test_support::{
 use crate::{ParseErrorKind, ParseResult, parse};
 use radix_lexer::{KeywordPack, lex_with_locale_pack};
 use radix_syntax::{
-    AnnotationKind, AstMutability, AstParamMode, BindingPattern, CallablePosture, ClassMemberKind,
-    ClausuraBody, ClosureModifier, CuraKind, ExprKind, IfBody, ImportKind, IteraMode, JsonValue,
-    Literal, Pattern, PatternBind, PraeparaKind, ProbaModifier, ScribeKind, SecusClause, StmtKind,
-    TypeExprKind,
+    AnnotationKind, AstMutability, AstParamMode, AwaitBindingForm, BindingPattern, CallablePosture,
+    ClassMemberKind, ClausuraBody, ClosureModifier, CuraKind, ExprKind, IfBody, ImportKind,
+    IteraMode, JsonValue, Literal, Pattern, PatternBind, PraeparaKind, ProbaModifier, ScribeKind,
+    SecusClause, StmtKind, TypeExprKind,
 };
 
 fn generic_arg_type(arg: &radix_syntax::GenericArgExpr) -> &radix_syntax::TypeExpr {
@@ -4652,7 +4652,8 @@ fn parses_figendum_await_binding() {
     let StmtKind::Var(decl) = &body.statements[0].kind else {
         panic!("expected var decl");
     };
-    assert!(decl.is_await);
+    assert!(decl.is_await());
+    assert_eq!(decl.await_form, Some(AwaitBindingForm::Morphology));
     assert_eq!(decl.mutability, AstMutability::Immutable);
 }
 
@@ -4667,8 +4668,68 @@ fn parses_variandum_await_binding() {
     let StmtKind::Var(decl) = &body.statements[0].kind else {
         panic!("expected var decl");
     };
-    assert!(decl.is_await);
+    assert!(decl.is_await());
+    assert_eq!(decl.await_form, Some(AwaitBindingForm::Morphology));
     assert_eq!(decl.mutability, AstMutability::Mutable);
+}
+
+#[test]
+fn parses_await_directed_fixum_binding() {
+    let result = parse_ok("functio f() fiet → vacuum { fixum numerus x ⇤ fut redde x }");
+    let program = result.program.as_ref().expect("program");
+    let StmtKind::Func(func) = &program.statements[0].kind else {
+        panic!("expected function");
+    };
+    let body = func.body.as_ref().expect("body");
+    let StmtKind::Var(decl) = &body.statements[0].kind else {
+        panic!("expected var decl");
+    };
+    assert!(decl.is_await());
+    assert_eq!(decl.await_form, Some(AwaitBindingForm::Assignment));
+    assert_eq!(decl.mutability, AstMutability::Immutable);
+}
+
+#[test]
+fn parses_await_directed_varia_and_sit_bindings() {
+    let result =
+        parse_ok("functio f() fiet → vacuum { varia numerus x ⇤ fut sit y ⇤ fut redde y }");
+    let program = result.program.as_ref().expect("program");
+    let StmtKind::Func(func) = &program.statements[0].kind else {
+        panic!("expected function");
+    };
+    let body = func.body.as_ref().expect("body");
+    let StmtKind::Var(varia) = &body.statements[0].kind else {
+        panic!("expected varia declaration");
+    };
+    let StmtKind::Var(sit) = &body.statements[1].kind else {
+        panic!("expected sit declaration");
+    };
+    assert!(varia.is_await());
+    assert_eq!(varia.await_form, Some(AwaitBindingForm::Assignment));
+    assert_eq!(varia.mutability, AstMutability::Mutable);
+    assert!(sit.is_await());
+    assert_eq!(sit.await_form, Some(AwaitBindingForm::Assignment));
+    assert_eq!(sit.mutability, AstMutability::Immutable);
+}
+
+#[test]
+fn await_directed_assignment_is_not_a_general_expression_operator() {
+    let result = parse_program("functio f() fiet → vacuum { x ⇤ fut }");
+    assert!(!result.success());
+}
+
+#[test]
+fn rejects_await_directed_destructuring_and_missing_initializers() {
+    for source in [
+        "functio f() fiet { fixum [x] ⇤ future }",
+        "functio f() fiet { fixum numerus x ⇤ }",
+    ] {
+        let result = parse_program(source);
+        assert!(
+            !result.errors.is_empty(),
+            "expected parse failure for {source:?}"
+        );
+    }
 }
 
 #[test]

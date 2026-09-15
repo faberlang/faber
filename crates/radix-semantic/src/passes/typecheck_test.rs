@@ -455,6 +455,52 @@ functio caller() fiet → textus {
 }
 
 #[test]
+fn accepts_await_directed_binding_of_a_stored_promise() {
+    let unit = analyze(
+        r#"functio fetch() fiet → textus {
+  redde "data"
+}
+
+functio caller() fiet → textus {
+  fixum promissum<textus> pending ← fetch()
+  fixum textus value ⇤ pending
+  redde value
+}"#,
+    );
+    assert!(unit.success(), "diagnostics: {:?}", unit.diagnostics);
+
+    let HirItemKind::Function(function) = &unit.hir.as_ref().expect("hir").items[1].kind else {
+        panic!("expected caller function");
+    };
+    let HirStatementKind::Local(local) =
+        &function.body.as_ref().expect("caller body").statements[1].kind
+    else {
+        panic!("expected awaited local");
+    };
+    assert!(local.is_await);
+    assert!(
+        unit.presentation
+            .await_assignment_bindings
+            .contains(&local.def_id)
+    );
+}
+
+#[test]
+fn accepts_await_directed_failable_promise_with_matching_alternate_exit() {
+    test_support::assert_accepts(
+        r#"functio fetch() fiet → numerus ⇥ textus {
+  iace "bad"
+}
+
+functio caller() fiet → numerus ⇥ textus {
+  sit pending ← fetch()
+  sit value ⇤ pending
+  redde value
+}"#,
+    );
+}
+
+#[test]
 fn accepts_stored_failable_async_future_without_immediate_alternate_exit() {
     test_support::assert_accepts(
         r#"functio fetch() fiet → numerus ⇥ textus {
@@ -576,6 +622,28 @@ incipit {
   figendum _ value ← fetch()
 }"#,
         "await_bind_requires_async_context",
+    );
+}
+
+#[test]
+fn rejects_await_directed_binding_outside_async_context() {
+    test_support::assert_rejects_with_issue(
+        r#"functio fetch() fiet → textus {
+  redde "data"
+}
+
+incipit {
+  fixum textus value ⇤ fetch()
+}"#,
+        "await_bind_requires_async_context",
+    );
+}
+
+#[test]
+fn rejects_await_directed_binding_of_a_non_promise() {
+    test_support::assert_rejects_with_issue(
+        "incipiet { fixum numerus value ⇤ 1 }",
+        "await_bind_requires_promissum",
     );
 }
 

@@ -427,6 +427,12 @@ impl Lowerer<'_> {
         };
 
         let def_id = self.def_id_for(name);
+        if matches!(
+            decl.await_form,
+            Some(radix_syntax::AwaitBindingForm::Assignment)
+        ) {
+            self.presentation.await_assignment_bindings.push(def_id);
+        }
         let annotations = self.lower_item_annotations(def_id, &stmt.annotations);
         let ty = decl.ty.as_ref().map(|ty| {
             self.lower_authored_type(
@@ -455,7 +461,7 @@ impl Lowerer<'_> {
                 ty,
                 value,
                 mutable: decl.mutability == AstMutability::Mutable,
-                is_await: decl.is_await,
+                is_await: decl.is_await(),
             }),
             span: stmt.span,
         };

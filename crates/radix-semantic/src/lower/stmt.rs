@@ -221,7 +221,7 @@ impl Lowerer<'_> {
             return Vec::new();
         };
 
-        self.lower_array_destructure_pattern(&decl.binding, init, decl.mutability, decl.is_await)
+        self.lower_array_destructure_pattern(&decl.binding, init, decl.mutability, decl.is_await())
     }
 
     fn lower_array_destructure_pattern(
@@ -321,7 +321,7 @@ impl Lowerer<'_> {
             return Vec::new();
         };
 
-        self.lower_object_destructure_pattern(&decl.binding, init, decl.mutability, decl.is_await)
+        self.lower_object_destructure_pattern(&decl.binding, init, decl.mutability, decl.is_await())
     }
 
     fn lower_object_destructure_pattern(
@@ -538,6 +538,12 @@ impl Lowerer<'_> {
         match &decl.binding {
             radix_syntax::BindingPattern::Ident(ident) => {
                 let def_id = self.next_def_id();
+                if matches!(
+                    decl.await_form,
+                    Some(radix_syntax::AwaitBindingForm::Assignment)
+                ) {
+                    self.presentation.await_assignment_bindings.push(def_id);
+                }
                 if let Some(ty) = &decl.ty {
                     crate::tuple_labels::record_from_type_expr(
                         self.resolver,
@@ -568,7 +574,7 @@ impl Lowerer<'_> {
                     ty,
                     init,
                     mutable: decl.mutability == radix_syntax::AstMutability::Mutable,
-                    is_await: decl.is_await,
+                    is_await: decl.is_await(),
                     runtime_provided: false,
                 })
             }
@@ -599,7 +605,7 @@ impl Lowerer<'_> {
                         expr_id: init.id,
                         ty,
                         mutable: decl.mutability == radix_syntax::AstMutability::Mutable,
-                        is_await: decl.is_await,
+                        is_await: decl.is_await(),
                     });
                 HirStatementKind::Expr(init)
             }

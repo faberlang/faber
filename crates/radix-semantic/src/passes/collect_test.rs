@@ -75,14 +75,14 @@ fn reports_duplicate_definitions() {
     let sym = interner.intern("x");
     let var = VarDecl {
         mutability: AstMutability::Immutable,
-        is_await: false,
+        await_form: None,
         ty: None,
         binding: radix_syntax::BindingPattern::Ident(ident_sym(sym)),
         init: None,
     };
     let var2 = VarDecl {
         mutability: AstMutability::Immutable,
-        is_await: false,
+        await_form: None,
         ty: None,
         binding: radix_syntax::BindingPattern::Ident(ident_sym(sym)),
         init: None,
@@ -107,7 +107,7 @@ fn inferred_import_name_collision_requests_explicit_alias() {
     let sym = interner.intern("chorda");
     let var = VarDecl {
         mutability: AstMutability::Immutable,
-        is_await: false,
+        await_form: None,
         ty: None,
         binding: radix_syntax::BindingPattern::Ident(ident_sym(sym)),
         init: None,
@@ -143,7 +143,7 @@ fn inferred_import_name_collision_requests_explicit_alias() {
 fn top_level_var_requires_identifier_binding() {
     let program = program(vec![stmt(StmtKind::Var(VarDecl {
         mutability: AstMutability::Immutable,
-        is_await: false,
+        await_form: None,
         ty: None,
         binding: radix_syntax::BindingPattern::Wildcard(Span::default()),
         init: None,

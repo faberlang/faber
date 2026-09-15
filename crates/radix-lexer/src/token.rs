@@ -318,6 +318,7 @@ pub enum TokenKind {
     // === Comparison ===
     Eq,              // =
     Assign,          // ←
+    AwaitAssign,     // ⇤ U+21E4
     ConversioAssign, // ↤ U+21A4
     EqEq,            // ≡
     EqEqEq,          // reserved; no source form

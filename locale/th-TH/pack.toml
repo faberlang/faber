@@ -2277,7 +2277,7 @@ message = "การแปลง valor เป็น promissum ข้ามขอ
 help = "resolve หรือห่อค่า async อย่างชัดเจน"
 
 [diagnostics.SEM016.issues.promissum_to_valor_boundary]
-message = "การแปลง promissum เป็น valor ข้ามขอบเขต async/sync; resolve ด้วย `.exspecta()` ก่อนทำ boxing"
+message = "การแปลง promissum เป็น valor ข้ามขอบเขต async/sync; bind ค่าที่ resolve แล้วด้วย `⇤` ก่อนทำ boxing"
 help = "resolve หรือห่อค่า async อย่างชัดเจน"
 
 [diagnostics.SEM016.issues.cursor_to_valor_boundary]
@@ -2309,7 +2309,7 @@ message = "การแปลงเป็น promissum ข้ามขอบเ�
 help = "resolve หรือห่อค่า async อย่างชัดเจน"
 
 [diagnostics.SEM016.issues.promissum_source_boundary]
-message = "การแปลงจาก promissum ข้ามขอบเขต async/sync; ใช้ `.exspecta()` หรือ `@ futura` `.tum()` สำหรับการ resolve แบบ async"
+message = "การแปลงจาก promissum ข้ามขอบเขต async/sync; bind ค่าที่ resolve แล้วด้วย `⇤` ใน async-capable body"
 help = "resolve หรือห่อค่า async อย่างชัดเจน"
 
 [diagnostics.SEM016.issues.sparsa_collection_unsupported]

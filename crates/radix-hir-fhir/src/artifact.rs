@@ -493,7 +493,9 @@ pub struct FunctionProvenanceTableWire {
 /// instead of only the declaration descriptors. Version 11 carries compiler
 /// lane and backward-companion metadata so rehydrated AIR templates cannot be
 /// mistaken for ordinary HIR-only functions or silently bypass AIR admission.
-pub const SCHEMA_VERSION: u32 = 11;
+/// Version 12 records authored `⇤` await-directed binding spellings in the
+/// presentation sidecar.
+pub const SCHEMA_VERSION: u32 = 12;
 
 /// Serializable snapshot of one analyzed compilation unit (F1, F2, F4).
 ///

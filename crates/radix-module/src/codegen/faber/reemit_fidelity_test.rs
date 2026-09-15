@@ -662,6 +662,21 @@ fn discard_binding_round_trips() {
 }
 
 #[test]
+fn await_assignment_and_morphology_keep_their_authored_forms() {
+    let code = assert_idempotent(
+        "functio fetch() fiet → numerus {\n    redde 7\n}\n\nfunctio use_both() fiet → numerus {\n    fixum numerus arrow ⇤ fetch()\n    figendum numerus morphology ← fetch()\n    redde arrow + morphology\n}\n",
+    );
+    assert!(
+        code.contains("fixum numerus arrow ⇤ fetch()"),
+        "await-directed assignment must survive:\n{code}"
+    );
+    assert!(
+        code.contains("figendum numerus morphology ← fetch()"),
+        "morphological await binding must remain unchanged:\n{code}"
+    );
+}
+
+#[test]
 fn ordo_enum_round_trips_discriminants() {
     // la note: the la-surface `ordo` declaration does not register in this
     // build (pre-existing SEM001 on the declaration alone), so the fixture is

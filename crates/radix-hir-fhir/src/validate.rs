@@ -1113,6 +1113,29 @@ fn collect_def_registry(artifact: &HirArtifact) -> FxHashSet<radix_types::DefId>
     registry
 }
 
+#[derive(Default)]
+struct AwaitBindingCollector {
+    defs: FxHashSet<radix_types::DefId>,
+}
+
+impl radix_hir::visit::HirVisitor for AwaitBindingCollector {
+    fn visit_item(&mut self, item: &radix_hir::HirItem) {
+        if let radix_hir::HirItemKind::Constant(constant) = &item.kind
+            && constant.is_await
+        {
+            self.defs.insert(item.def_id);
+        }
+        radix_hir::visit::walk_item(self, item);
+    }
+
+    fn visit_local(&mut self, local: &radix_hir::HirLocal) {
+        if local.is_await {
+            self.defs.insert(local.def_id);
+        }
+        radix_hir::visit::walk_local(self, local);
+    }
+}
+
 /// Register a function's own def sites and any nested sites in defaults,
 /// annotations, or the body. Parameter defaults can introduce closures,
 /// `itera` bindings, and `cape` bindings; skipping them false-rejects a
@@ -2862,6 +2885,24 @@ pub(crate) fn validate_referential_integrity(
             }
         }
 
+        let mut await_bindings = AwaitBindingCollector::default();
+        radix_hir::visit::walk_program(&mut await_bindings, &artifact.hir);
+        let mut await_assignment_defs = FxHashSet::default();
+        for def_id in &presentation.await_assignment_bindings {
+            check_def(*def_id)?;
+            if !await_bindings.defs.contains(def_id) {
+                return Err(HirArtifactError::InvalidPresentation {
+                    issue: "await_assignment_binding_not_awaited",
+                    anchor: def_id.0,
+                });
+            }
+            if !await_assignment_defs.insert(*def_id) {
+                return Err(HirArtifactError::InvalidPresentation {
+                    issue: "duplicate_await_assignment_binding",
+                    anchor: def_id.0,
+                });
+            }
+        }
         // Every attachment anchor must name a registered owner, each owner
         // may carry at most one attachment, and comment Symbols must resolve
         // in the interner table.

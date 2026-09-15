@@ -1754,6 +1754,11 @@ pub struct HirPresentation {
     #[serde(default)]
     pub discard_binding_stmts: Vec<HirDiscardBinding>,
 
+    /// Definitions whose awaited initializer was authored with `⇤` rather
+    /// than the `figendum` or `variandum` morphology.
+    #[serde(default)]
+    pub await_assignment_bindings: Vec<DefId>,
+
     /// Authored `ordo` enumerations, keyed by the enum's def id. Emission
     /// re-sugars exactly these with the `ordo` vocabulary and member
     /// discriminants; authored `discretio` unions are unaffected.

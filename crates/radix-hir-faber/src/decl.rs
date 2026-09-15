@@ -111,7 +111,8 @@ impl super::FaberCodegen {
                 writer.newline();
             }
             HirItemKind::Constant(c) => {
-                writer.write(surface.contextual_keyword("fixum"));
+                let await_assignment = self.await_assignment_bindings.contains(&item.def_id);
+                writer.write(surface.contextual_keyword(if c.mutable { "varia" } else { "fixum" }));
                 writer.write(" ");
                 if let Some(ty) = c.ty {
                     let site = HirTypeSite {
@@ -143,7 +144,7 @@ impl super::FaberCodegen {
                         self.write_expr_prec(recovery, 12, types, names, interner, surface, writer);
                     }
                 } else {
-                    writer.write(" ← ");
+                    writer.write(if await_assignment { " ⇤ " } else { " ← " });
                     self.write_expr(&c.value, types, names, interner, surface, writer);
                 }
                 writer.newline();

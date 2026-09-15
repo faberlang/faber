@@ -2265,7 +2265,7 @@ message = "{valor} إلى {promissum} conversion يعبر async/sync boundary؛ 
 help = "resolve أو wrap async value صراحة"
 
 [diagnostics.SEM016.issues.promissum_to_valor_boundary]
-message = "{promissum} إلى {valor} conversion يعبر async/sync boundary؛ resolve بـ `.exspecta()` قبل boxing"
+message = "{promissum} إلى {valor} conversion يعبر async/sync boundary؛ bind القيمة المحلولة بـ `⇤` قبل boxing"
 help = "resolve أو wrap async value صراحة"
 
 [diagnostics.SEM016.issues.cursor_to_valor_boundary]
@@ -2297,7 +2297,7 @@ message = "conversion إلى {promissum} يعبر async/sync boundary؛ استخ
 help = "resolve أو wrap async value صراحة"
 
 [diagnostics.SEM016.issues.promissum_source_boundary]
-message = "conversion من {promissum} يعبر async/sync boundary؛ استخدم `.exspecta()` أو `@ futura` `.tum()` للـ async resolution"
+message = "conversion من {promissum} يعبر async/sync boundary؛ bind القيمة المحلولة بـ `⇤` في async-capable body"
 help = "resolve أو wrap async value صراحة"
 
 [diagnostics.SEM016.issues.sparsa_collection_unsupported]

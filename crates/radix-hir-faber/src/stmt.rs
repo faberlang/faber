@@ -577,11 +577,14 @@ impl super::FaberCodegen {
         surface: &impl KeywordSurface,
         writer: &mut CodeWriter,
     ) {
-        let keyword = match (local.is_await, local.mutable) {
-            (true, false) => surface.contextual_keyword("figendum"),
-            (true, true) => surface.contextual_keyword("variandum"),
-            (false, false) => surface.contextual_keyword("fixum"),
-            (false, true) => surface.contextual_keyword("varia"),
+        let await_assignment = self.await_assignment_bindings.contains(&local.def_id);
+        let keyword = match (local.is_await, await_assignment, local.mutable) {
+            (true, true, false) => surface.contextual_keyword("fixum"),
+            (true, true, true) => surface.contextual_keyword("varia"),
+            (true, false, false) => surface.contextual_keyword("figendum"),
+            (true, false, true) => surface.contextual_keyword("variandum"),
+            (false, _, false) => surface.contextual_keyword("fixum"),
+            (false, _, true) => surface.contextual_keyword("varia"),
         };
         writer.write(keyword);
         writer.write(" ");
@@ -640,7 +643,7 @@ impl super::FaberCodegen {
                     self.write_expr_prec(recovery, 12, types, names, interner, surface, writer);
                 }
             } else {
-                writer.write(" ← ");
+                writer.write(if await_assignment { " ⇤ " } else { " ← " });
                 self.write_expr(init, types, names, interner, surface, writer);
             }
         }

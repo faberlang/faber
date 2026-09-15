@@ -2327,6 +2327,47 @@ fn eot_transfer_ascii_alias_does_not_produce_transfer_token() {
 }
 
 // ---------------------------------------------------------------------------
+// ADB-U1 — ⇤ (U+21E4) await-directed binding initializer
+// ---------------------------------------------------------------------------
+
+#[test]
+fn await_assign_glyph_has_a_dedicated_token() {
+    let result = lex("\u{21E4}");
+    assert!(result.errors.is_empty(), "{:?}", result.errors);
+    assert_eq!(
+        result
+            .tokens
+            .iter()
+            .map(|token| token.kind.clone())
+            .collect::<Vec<_>>(),
+        vec![TokenKind::AwaitAssign, TokenKind::Eof]
+    );
+}
+
+#[test]
+fn await_assign_glyph_is_distinct_from_neighbor_arrows() {
+    let result = lex("⇤ ← ↤ ⇥ ⇇ → ↦");
+    assert!(result.errors.is_empty(), "{:?}", result.errors);
+    assert_eq!(
+        result
+            .tokens
+            .iter()
+            .map(|token| token.kind.clone())
+            .collect::<Vec<_>>(),
+        vec![
+            TokenKind::AwaitAssign,
+            TokenKind::Assign,
+            TokenKind::ConversioAssign,
+            TokenKind::ExitArrow,
+            TokenKind::Transfer,
+            TokenKind::Arrow,
+            TokenKind::Conversio,
+            TokenKind::Eof,
+        ]
+    );
+}
+
+// ---------------------------------------------------------------------------
 // decimal-widths D1: decimal literals preserve exact digit text (R0 fix)
 // ---------------------------------------------------------------------------
 

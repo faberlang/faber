@@ -2664,7 +2664,7 @@ message = "{valor} to promissum conversion crosses the async/sync boundary; {val
 help = "resolve or wrap the async value explicitly"
 
 [diagnostics.SEM016.issues.promissum_to_valor_boundary]
-message = "promissum to {valor} conversion crosses the async/sync boundary; resolve with `.exspecta()` before boxing"
+message = "promissum to {valor} conversion crosses the async/sync boundary; bind the resolved value with `⇤` before boxing"
 help = "resolve or wrap the async value explicitly"
 
 [diagnostics.SEM016.issues.cursor_to_valor_boundary]
@@ -2712,7 +2712,7 @@ message = "conversion to promissum crosses the async/sync boundary; use `@ futur
 help = "resolve or wrap the async value explicitly"
 
 [diagnostics.SEM016.issues.promissum_source_boundary]
-message = "conversion from promissum crosses the async/sync boundary; use `.exspecta()` or `@ futura` `.tum()` for async resolution"
+message = "conversion from promissum crosses the async/sync boundary; bind the resolved value with `⇤` in an async-capable body"
 help = "resolve or wrap the async value explicitly"
 
 [diagnostics.SEM016.issues.sparsa_collection_unsupported]

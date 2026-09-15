@@ -71,6 +71,8 @@ pub struct FaberCodegen {
     /// Initializer-expression ids of authored discard bindings (`fixum T _ ← e`)
     /// with their declaration facts, for re-emitting the binding.
     pub(crate) discard_bindings: FxHashMap<radix_hir::HirId, radix_hir::HirDiscardBinding>,
+    /// Definitions whose awaited initializer used the `⇤` spelling.
+    pub(crate) await_assignment_bindings: FxHashSet<DefId>,
     /// Authored `ordo` enumerations by enum def id: emission re-sugars these
     /// with the `ordo` vocabulary and member discriminants.
     pub(crate) ordo_enums: FxHashMap<DefId, Vec<radix_hir::HirOrdoMember>>,
@@ -142,6 +144,7 @@ pub fn empty_presentation() -> HirPresentation {
         guard_si_ids: Vec::new(),
         elige_expr_ids: Vec::new(),
         discard_binding_stmts: Vec::new(),
+        await_assignment_bindings: Vec::new(),
         ordo_enums: Vec::new(),
         variant_paths: Vec::new(),
         authored_types: Vec::new(),
@@ -177,6 +180,11 @@ impl FaberCodegen {
             .discard_binding_stmts
             .iter()
             .map(|binding| (binding.expr_id, binding.clone()))
+            .collect();
+        self.await_assignment_bindings = presentation
+            .await_assignment_bindings
+            .iter()
+            .copied()
             .collect();
         self.ordo_enums = presentation
             .ordo_enums

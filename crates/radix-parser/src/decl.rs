@@ -135,7 +135,7 @@ impl Parser {
     /// Parse `fixum` and `varia` binding declarations.
     ///
     /// GRAMMAR:
-    ///   var-decl := (`fixum` | `varia`) type pattern ['←' expr | '↤' expr]
+    ///   var-decl := (`fixum` | `varia`) type pattern ['←' expr | '↤' expr | '⇤' expr]
     ///
     /// Simple bindings carry an explicit type slot, including `_` for inference.
     /// Destructuring keeps its historical untyped shape because the binding
@@ -163,19 +163,33 @@ impl Parser {
 
         let binding = self.parse_binding_pattern()?;
 
-        let init = if self.eat(&TokenKind::Assign) {
-            Some(Box::new(self.parse_expression()?))
+        let (init, await_form) = if self.eat(&TokenKind::Assign) {
+            (Some(Box::new(self.parse_expression()?)), None)
         } else if self.check(&TokenKind::ConversioAssign) {
-            Some(Box::new(
-                self.parse_conversio_assign_initializer(ty.as_ref(), &binding)?,
-            ))
+            (
+                Some(Box::new(
+                    self.parse_conversio_assign_initializer(ty.as_ref(), &binding)?,
+                )),
+                None,
+            )
+        } else if self.eat(&TokenKind::AwaitAssign) {
+            if !matches!(binding, BindingPattern::Ident(_)) {
+                return Err(Self::expected_error(
+                    "named binding before '⇤'",
+                    self.previous_span(),
+                ));
+            }
+            (
+                Some(Box::new(self.parse_expression()?)),
+                Some(AwaitBindingForm::Assignment),
+            )
         } else {
-            None
+            (None, None)
         };
 
         Ok(StmtKind::Var(VarDecl {
             mutability,
-            is_await: false,
+            await_form,
             ty,
             binding,
             init,
@@ -261,7 +275,7 @@ impl Parser {
 
         Ok(StmtKind::Var(VarDecl {
             mutability,
-            is_await: true,
+            await_form: Some(AwaitBindingForm::Morphology),
             ty,
             binding,
             init,
@@ -321,8 +335,8 @@ impl Parser {
         let ident = self.parse_ident()?;
         let binding = BindingPattern::Ident(ident);
 
-        let init = if self.eat(&TokenKind::Assign) {
-            Some(Box::new(self.parse_expression()?))
+        let (init, await_form) = if self.eat(&TokenKind::Assign) {
+            (Some(Box::new(self.parse_expression()?)), None)
         } else if self.check(&TokenKind::ConversioAssign) {
             // `sit` is an inferred binding (≡ `fixum _`): no concrete
             // destination type, so conversion-directed assignment is rejected.
@@ -330,13 +344,18 @@ impl Parser {
                 ParseError::structured(ParseErrorKind::Unexpected, self.current_span())
                     .with_arg("issue", "conversio_assign_requires_concrete_type"),
             );
+        } else if self.eat(&TokenKind::AwaitAssign) {
+            (
+                Some(Box::new(self.parse_expression()?)),
+                Some(AwaitBindingForm::Assignment),
+            )
         } else {
             // WHY: `sit x` is the inferred deferred immutable (≡ `fixum _ x`).
             // We do not peek for a trailing identifier here: newlines are not
             // token-level separators, so the next statement's leading identifier
             // would be misread as an explicit-type attempt. Stray tokens surface
             // as natural parse errors from the block parser.
-            None
+            (None, None)
         };
 
         let ty = Some(TypeExpr {
@@ -350,7 +369,7 @@ impl Parser {
 
         Ok(StmtKind::Var(VarDecl {
             mutability: AstMutability::Immutable,
-            is_await: false,
+            await_form,
             ty,
             binding,
             init,

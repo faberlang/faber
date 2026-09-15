@@ -10,6 +10,47 @@ fn encode_decode_round_trip_preserves_artifact() {
 }
 
 #[test]
+fn encode_decode_round_trip_preserves_await_assignment_presentation() {
+    use radix_hir::{HirBlock, HirId, HirItemKind, HirLocal, HirStatement, HirStatementKind};
+    use radix_lexer::{Span, Symbol};
+    use radix_types::DefId;
+
+    let mut artifact = stub_artifact();
+    let local_def = DefId(1);
+    let HirItemKind::Function(function) = &mut artifact.hir.items[0].kind else {
+        panic!("stub item must be a function");
+    };
+    function.body = Some(HirBlock::simple(
+        vec![HirStatement {
+            id: HirId(1),
+            kind: HirStatementKind::Local(HirLocal {
+                def_id: local_def,
+                name: Symbol(1),
+                ty: None,
+                init: None,
+                mutable: false,
+                is_await: true,
+                runtime_provided: false,
+            }),
+            span: Span::default(),
+        }],
+        None,
+        Span::default(),
+    ));
+    artifact
+        .presentation
+        .await_assignment_bindings
+        .push(local_def);
+
+    let bytes = encode(&artifact).expect("encode artifact");
+    let decoded = decode(&bytes).expect("decode artifact");
+    assert_eq!(
+        decoded.presentation.await_assignment_bindings,
+        vec![local_def]
+    );
+}
+
+#[test]
 fn decode_rejects_garbage_bytes_fail_closed() {
     let result = decode(b"\x00\x01\x02\xff\xfe\xfd");
     assert!(result.is_err(), "garbage bytes must fail closed");
@@ -48,6 +89,20 @@ fn decode_rejects_schema_v8_after_authored_types_wire_break() {
         decode(&bytes),
         Err(HirArtifactError::UnsupportedSchemaVersion {
             found: 8,
+            expected: SCHEMA_VERSION,
+        })
+    ));
+}
+
+#[test]
+fn decode_rejects_schema_v11_after_await_assignment_presentation_break() {
+    let mut artifact = stub_artifact();
+    artifact.schema_version = 11;
+    let bytes = encode(&artifact).expect("encode schema-v11 artifact");
+    assert!(matches!(
+        decode(&bytes),
+        Err(HirArtifactError::UnsupportedSchemaVersion {
+            found: 11,
             expected: SCHEMA_VERSION,
         })
     ));
