@@ -225,6 +225,13 @@ role = "alternate_exit"
 claiming_slots = ["alternate_exit_clause", "inline_recovery"]
 
 [[glyphs]]
+glyph = "⇤"
+codepoint = "U+21E4"
+unicode_name = "LEFTWARDS ARROW TO BAR"
+role = "await_assignment"
+claiming_slots = ["fixum_decl", "sit_decl"]
+
+[[glyphs]]
 glyph = "∇"
 codepoint = "U+2207"
 unicode_name = "NABLA"
@@ -804,11 +811,11 @@ expr_stmt      := expression
 block_stmt     := '{' statement* '}'
 
 @formerly varDecl
-fixum_decl      := ('fixum' | 'varia') type_annotation IDENTIFIER (('←' expression) | ('↤' assignment inline_recovery?))?
+fixum_decl      := ('fixum' | 'varia') type_annotation IDENTIFIER (('←' expression) | ('↤' assignment inline_recovery?) | ('⇤' expression))?
 @formerly awaitVarDecl
 figendum_decl := ('figendum' | 'variandum') type_annotation IDENTIFIER '←' expression
 @formerly sitDecl
-sit_decl      := 'sit' IDENTIFIER ('←' expression)?
+sit_decl      := 'sit' IDENTIFIER (('←' | '⇤') expression)?
 @formerly arrayDestruct
 array_destruct := ('fixum' | 'varia') array_pattern '←' expression
 @formerly objectDestruct

@@ -32,13 +32,13 @@ expr_stmt ::= expression
 block_stmt ::= '{' statement* '}'
 # formerly: varDecl
 # [009] fixum_decl
-fixum_decl ::= ('स्थिर' | 'चर') type_annotation IDENTIFIER (('←' expression) | ('↤' assignment inline_recovery?))?
+fixum_decl ::= ('स्थिर' | 'चर') type_annotation IDENTIFIER (('←' expression) | ('↤' assignment inline_recovery?) | ('⇤' expression))?
 # formerly: awaitVarDecl
 # [010] figendum_decl
 figendum_decl ::= ('रुको_स्थिर' | 'रुको_चर') type_annotation IDENTIFIER '←' expression
 # formerly: sitDecl
 # [011] sit_decl
-sit_decl ::= 'बैठा' IDENTIFIER ('←' expression)?
+sit_decl ::= 'बैठा' IDENTIFIER (('←' | '⇤') expression)?
 # formerly: arrayDestruct
 # [012] array_destruct
 array_destruct ::= ('स्थिर' | 'चर') array_pattern '←' expression
@@ -1130,6 +1130,11 @@ Entries are trivia-delimited.
   binding (reassignable), like `let`.
 - `रुको_स्थिर` / `रुको_चर` await a `promissum<T>` or `promissum<T ⇥ E>`, bind
   the resolved `T`, and propagate a compatible alternate `E`.
+- `⇤` is the await-directed initializer for an ordinary declaration:
+  `स्थिर T name ⇤ future`, `चर T name ⇤ future`, or `बैठा name ⇤ future`.
+  It has the same await and alternate-propagation semantics as
+  `रुको_स्थिर T name ← future`, but it is not a general expression operator and
+  cannot target an existing place.
 - Use `_` as the type annotation when the initializer determines the type: `स्थिर _ name ← value`
 - `बैठा name ← value` is sugar for `स्थिर _ name ← value` (inferred immutable local)
 - `बैठा name` (no initializer) is sugar for `स्थिर _ name` — the inferred deferred

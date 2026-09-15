@@ -32,13 +32,13 @@ expr_stmt ::= expression
 block_stmt ::= '{' statement* '}'
 # formerly: varDecl
 # [009] fixum_decl
-fixum_decl ::= ('ثابت' | 'متغير') type_annotation IDENTIFIER (('←' expression) | ('↤' assignment inline_recovery?))?
+fixum_decl ::= ('ثابت' | 'متغير') type_annotation IDENTIFIER (('←' expression) | ('↤' assignment inline_recovery?) | ('⇤' expression))?
 # formerly: awaitVarDecl
 # [010] figendum_decl
 figendum_decl ::= ('انتظر_ثابت' | 'انتظر_متغير') type_annotation IDENTIFIER '←' expression
 # formerly: sitDecl
 # [011] sit_decl
-sit_decl ::= 'ليكن' IDENTIFIER ('←' expression)?
+sit_decl ::= 'ليكن' IDENTIFIER (('←' | '⇤') expression)?
 # formerly: arrayDestruct
 # [012] array_destruct
 array_destruct ::= ('ثابت' | 'متغير') array_pattern '←' expression
@@ -1130,6 +1130,11 @@ Entries are trivia-delimited.
   binding (reassignable), like `let`.
 - `انتظر_ثابت` / `انتظر_متغير` await a `promissum<T>` or `promissum<T ⇥ E>`, bind
   the resolved `T`, and propagate a compatible alternate `E`.
+- `⇤` is the await-directed initializer for an ordinary declaration:
+  `ثابت T name ⇤ future`, `متغير T name ⇤ future`, or `ليكن name ⇤ future`.
+  It has the same await and alternate-propagation semantics as
+  `انتظر_ثابت T name ← future`, but it is not a general expression operator and
+  cannot target an existing place.
 - Use `_` as the type annotation when the initializer determines the type: `ثابت _ name ← value`
 - `ليكن name ← value` is sugar for `ثابت _ name ← value` (inferred immutable local)
 - `ليكن name` (no initializer) is sugar for `ثابت _ name` — the inferred deferred
