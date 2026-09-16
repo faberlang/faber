@@ -1367,11 +1367,10 @@ impl Parser {
 
     /// A qualified user type may start with a lowercase namespace binding,
     /// while its terminal nominal name still follows the capitalized type
-    /// spelling convention (`types.Board`).
+    /// spelling convention (`types.Board`). The caller has already matched an
+    /// identifier head, so only the dot and the terminal spelling are checked.
     fn is_qualified_capitalized_type_name(&self) -> bool {
-        if !matches!(self.peek().kind, TokenKind::Ident(_))
-            || !matches!(self.peek_at(1).kind, TokenKind::Dot)
-        {
+        if !matches!(self.peek_at(1).kind, TokenKind::Dot) {
             return false;
         }
 
