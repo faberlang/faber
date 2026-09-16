@@ -6,6 +6,7 @@ use super::{
     MirRuntimeCall, MirStatement, MirStatementKind, MirTerminator, MirTerminatorKind, MirValue,
     MirValueKind, Symbol,
 };
+use radix_module::mir::{MirFilumSumOp, MirIntrinsic, MirSermoOp};
 
 /// Remap a name symbol from the lowering interner into the merged interner.
 /// A symbol outside the source interner's string table is a GENERATED
@@ -23,6 +24,12 @@ pub(super) fn remap_optional_symbol(
             symbol
         }
     })
+}
+
+/// Remap a name symbol that is always present; the generated-identity guard of
+/// [`remap_optional_symbol`] applies unchanged.
+fn remap_symbol(name: Symbol, source: &Interner, target: &mut Interner) -> Symbol {
+    remap_optional_symbol(Some(name), source, target).expect("symbol is present")
 }
 
 pub(super) fn remap_function_text_symbols(
@@ -215,31 +222,87 @@ pub(super) fn remap_runtime_call_text_symbols(
     source: &Interner,
     target: &mut Interner,
 ) {
-    if let radix_module::mir::MirIntrinsic::Provider(provider) = &mut call.intrinsic {
-        for part in &mut provider.module {
-            *part = target.intern(source.resolve(*part));
+    // EXHAUSTIVE by design: every `MirIntrinsic` variant states whether its
+    // payload carries interner symbols. Keep it wildcard-free so a new
+    // intrinsic fails to compile here instead of silently resolving to
+    // unrelated text in the merged interner.
+    match &mut call.intrinsic {
+        MirIntrinsic::Provider(provider) => {
+            for part in &mut provider.module {
+                *part = remap_symbol(*part, source, target);
+            }
+            provider.name = remap_symbol(provider.name, source, target);
         }
-        provider.name = target.intern(source.resolve(provider.name));
-    }
-    if let radix_module::mir::MirIntrinsic::FormatString { template } = &mut call.intrinsic {
-        *template = target.intern(source.resolve(*template));
-    }
-    if let radix_module::mir::MirIntrinsic::Convert(conversion) = &mut call.intrinsic {
-        for param in &mut conversion.params {
-            *param = target.intern(source.resolve(*param));
+        MirIntrinsic::FormatString { template } => {
+            *template = remap_symbol(*template, source, target);
         }
-        if let Some(recovery) = &mut conversion.recovery {
-            remap_operand_text_symbols(recovery, source, target);
-        }
-        for defaults in &mut conversion.struct_defaults {
-            for field in &mut defaults.fields {
-                field.name = target.intern(source.resolve(field.name));
-                remap_operand_text_symbols(&mut field.value, source, target);
+        MirIntrinsic::Convert(conversion) => {
+            for param in &mut conversion.params {
+                *param = remap_symbol(*param, source, target);
+            }
+            if let Some(recovery) = &mut conversion.recovery {
+                remap_operand_text_symbols(recovery, source, target);
+            }
+            for defaults in &mut conversion.struct_defaults {
+                for field in &mut defaults.fields {
+                    field.name = remap_symbol(field.name, source, target);
+                    remap_operand_text_symbols(&mut field.value, source, target);
+                }
             }
         }
+        MirIntrinsic::Sermo(op) => remap_sermo_text_symbols(op, source, target),
+        MirIntrinsic::FilumSum(filum) => remap_filum_sum_text_symbols(filum, source, target),
+        // Ids, plans, and tags only — no interner symbols to re-intern.
+        MirIntrinsic::Diagnostic(_)
+        | MirIntrinsic::Assert
+        | MirIntrinsic::Collection(_)
+        | MirIntrinsic::Atomic(_)
+        | MirIntrinsic::Panic
+        | MirIntrinsic::SermoOpen
+        | MirIntrinsic::SermoSetOpener
+        | MirIntrinsic::ReadLine
+        | MirIntrinsic::Cede
+        | MirIntrinsic::GpuBuiltin(_)
+        | MirIntrinsic::CursorStream(_)
+        | MirIntrinsic::Gradient(_)
+        | MirIntrinsic::TypeCheck(_) => {}
     }
     for arg in &mut call.args {
         remap_operand_text_symbols(arg, source, target);
+    }
+}
+
+/// Sermo frame metadata carries the `data` field's symbol. The merged program
+/// resolves it against the merged frame's field map, so an un-remapped symbol
+/// either misses that map or indexes an unrelated string.
+fn remap_sermo_text_symbols(op: &mut MirSermoOp, source: &Interner, target: &mut Interner) {
+    match op {
+        MirSermoOp::Receive { data_field, .. } | MirSermoOp::Cursor { data_field, .. } => {
+            *data_field = remap_symbol(*data_field, source, target);
+        }
+        MirSermoOp::ViewMeus
+        | MirSermoOp::ViewTuus
+        | MirSermoOp::Send
+        | MirSermoOp::Finish
+        | MirSermoOp::DrainCursor => {}
+    }
+}
+
+/// Filum declaration facts carry the lane, term, and coordinate binder names
+/// plus the captured term body — real MIR whose own statements, and any
+/// intrinsic nested in them, hold lowering-interner symbols.
+fn remap_filum_sum_text_symbols(
+    filum: &mut MirFilumSumOp,
+    source: &Interner,
+    target: &mut Interner,
+) {
+    filum.filum_binder = remap_optional_symbol(filum.filum_binder, source, target);
+    filum.term_binder_name = remap_optional_symbol(filum.term_binder_name, source, target);
+    for coordinate in &mut filum.coordinates {
+        coordinate.name = remap_optional_symbol(coordinate.name, source, target);
+    }
+    for statement in &mut filum.term_body {
+        remap_statement_text_symbols(statement, source, target);
     }
 }
 
