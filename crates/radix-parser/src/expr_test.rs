@@ -52,6 +52,26 @@ fn conversio_capitalized_user_type_target_parses_as_type() {
 }
 
 #[test]
+fn conversio_qualified_capitalized_user_type_target_parses_as_type() {
+    let result = parse_ok(r"fixum _ person ← payload ↦ types.Person");
+    let program = result.program.as_ref().expect("program");
+    let StmtKind::Var(var) = &program.statements[0].kind else {
+        panic!("expected variable declaration");
+    };
+    let expr = var.init.as_deref().expect("initializer");
+    let ExprKind::Conversio(conversio) = &expr.kind else {
+        panic!("expected conversio expression, got {:?}", expr.kind);
+    };
+    let ConversioTarget::Explicit(target) = &conversio.target else {
+        panic!("expected explicit conversio target");
+    };
+    assert!(matches!(
+        target.kind,
+        TypeExprKind::Qualified(ref path, ref params) if path.len() == 2 && params.is_empty()
+    ));
+}
+
+#[test]
 fn conversio_to_tokenless_type_keyword_target_parses_as_type() {
     // Batch A made `modulus`/`iuncta` tokenless; as conversio targets they must
     // still route to an explicit type, not the range fallback.

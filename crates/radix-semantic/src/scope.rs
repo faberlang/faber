@@ -299,6 +299,7 @@ pub struct ImportedFileInterfaceMethod {
 
 #[derive(Debug, Clone)]
 struct ImportedFileStruct {
+    is_json: bool,
     def_id: DefId,
     ty: TypeId,
     fields: Vec<ImportedFileStructField>,
@@ -1598,6 +1599,7 @@ impl Resolver {
             self.canonical_nominal_for(Some(InterfaceNominalKind::Struct), identity.as_ref(), name)
         }) {
             return Ok(ImportedFileExport::Struct(ImportedFileStruct {
+                is_json: strukt.is_json,
                 def_id: existing_def,
                 ty: existing_ty,
                 fields: Vec::new(),
@@ -1634,6 +1636,7 @@ impl Resolver {
             },
         );
         Ok(ImportedFileExport::Struct(ImportedFileStruct {
+            is_json: strukt.is_json,
             def_id,
             ty,
             fields: Vec::new(),
@@ -2285,6 +2288,16 @@ impl Resolver {
             .insert(canonical_key.clone(), ty);
         self.canonical_imported_nominal_defs
             .insert(canonical_key, def_id);
+    }
+
+    pub fn imported_json_structs(&self) -> impl Iterator<Item = DefId> + '_ {
+        self.file_interfaces
+            .values()
+            .flat_map(|interface| interface.exports.values())
+            .filter_map(|export| match export {
+                ImportedFileExport::Struct(strukt) if strukt.is_json => Some(strukt.def_id),
+                _ => None,
+            })
     }
 
     #[must_use]
@@ -3449,7 +3462,12 @@ impl Resolver {
                                     decl_param_kinds: Vec::new(),
                                 })
                             }
-                            FileExportSnapshot::Struct { def_id, ty, fields } => {
+                            FileExportSnapshot::Struct {
+                                def_id,
+                                ty,
+                                fields,
+                                is_json,
+                            } => {
                                 let imported_fields: Vec<ImportedFileStructField> = fields
                                     .into_iter()
                                     .map(|field| ImportedFileStructField {
@@ -3461,6 +3479,7 @@ impl Resolver {
                                     })
                                     .collect();
                                 ImportedFileExport::Struct(ImportedFileStruct {
+                                    is_json,
                                     def_id,
                                     ty,
                                     fields: imported_fields,
@@ -3586,6 +3605,7 @@ impl Resolver {
                                 def_id: ty.def_id,
                             },
                             ImportedFileExport::Struct(strukt) => FileExportSnapshot::Struct {
+                                is_json: strukt.is_json,
                                 def_id: strukt.def_id,
                                 ty: strukt.ty,
                                 fields: strukt

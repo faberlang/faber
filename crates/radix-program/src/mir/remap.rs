@@ -215,6 +215,12 @@ pub(super) fn remap_runtime_call_text_symbols(
     source: &Interner,
     target: &mut Interner,
 ) {
+    if let radix_module::mir::MirIntrinsic::Provider(provider) = &mut call.intrinsic {
+        for part in &mut provider.module {
+            *part = target.intern(source.resolve(*part));
+        }
+        provider.name = target.intern(source.resolve(provider.name));
+    }
     if let radix_module::mir::MirIntrinsic::FormatString { template } = &mut call.intrinsic {
         *template = target.intern(source.resolve(*template));
     }

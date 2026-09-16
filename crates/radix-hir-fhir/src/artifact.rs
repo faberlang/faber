@@ -94,6 +94,7 @@ pub enum FileExportSnapshot {
         def_id: DefId,
         ty: TypeId,
         fields: Vec<StructFieldSnapshot>,
+        is_json: bool,
     },
 }
 
@@ -494,8 +495,9 @@ pub struct FunctionProvenanceTableWire {
 /// lane and backward-companion metadata so rehydrated AIR templates cannot be
 /// mistaken for ordinary HIR-only functions or silently bypass AIR admission.
 /// Version 12 records authored `↢` await-directed binding spellings in the
-/// presentation sidecar.
-pub const SCHEMA_VERSION: u32 = 12;
+/// presentation sidecar. Version 13 preserves imported structs' JSON conversion
+/// opt-in in resolver snapshots.
+pub const SCHEMA_VERSION: u32 = 13;
 
 /// Serializable snapshot of one analyzed compilation unit (F1, F2, F4).
 ///

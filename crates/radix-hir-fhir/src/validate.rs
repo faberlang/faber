@@ -3171,7 +3171,9 @@ pub(crate) fn validate_referential_integrity(
                         check_def(*d)?;
                     }
                 }
-                FileExportSnapshot::Struct { def_id, ty, fields } => {
+                FileExportSnapshot::Struct {
+                    def_id, ty, fields, ..
+                } => {
                     check_def(*def_id)?;
                     check_type(*ty)?;
                     for field in fields {

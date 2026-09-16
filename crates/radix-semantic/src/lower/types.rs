@@ -216,6 +216,7 @@ impl Lowerer<'_> {
             TypeExprKind::Intersection(members) => self.lower_intersection_type(members),
         };
 
+        let base_ty = ty_id;
         if let Some(mode) = ty.mode {
             let marker = crate::access_marker_from_type_mode(mode);
             if self.types.is_scalar_for_access_marker(ty_id)
@@ -232,6 +233,7 @@ impl Lowerer<'_> {
             }
         }
 
+        let marked_ty = ty_id;
         if ty.nullable {
             ty_id = self.types.option(ty_id);
         }
@@ -241,7 +243,20 @@ impl Lowerer<'_> {
                 .form_frames
                 .pop()
                 .expect("authored form frame pushed above");
-            let form = Self::complete_type_form(ty, ty_id, frame);
+            let mut form = Self::complete_type_form(ty, base_ty, frame);
+            // Access and nullable modifiers wrap the authored carrier. Keep
+            // its name and generic children beneath each semantic wrapper.
+            for wrapper_ty in [marked_ty, ty_id] {
+                if wrapper_ty != form.ty {
+                    form = radix_hir::HirTypeForm {
+                        ty: wrapper_ty,
+                        head: radix_hir::HirTypeFormHead::Semantic(
+                            radix_syntax::TypeFormLevel::LONG,
+                        ),
+                        args: vec![radix_hir::HirTypeFormArg::Type(Box::new(form))],
+                    };
+                }
+            }
             // A parent frame always exists during capture: the marker frame
             // pushed by `lower_authored_type` sits at the bottom of the stack.
             if let Some(parent) = self.form_frames.last_mut() {
@@ -256,9 +271,9 @@ impl Lowerer<'_> {
 
     /// Complete one authored form node from its frame.
     ///
-    /// The witness is the node's finalized lowering result (after access
-    /// markers and nullability wrapping); the head records how the author
-    /// spelled that fact. Function types, unions, and intersections are
+    /// The witness is the base carrier before access and nullable wrappers;
+    /// the head records how the author spelled that fact. Function types,
+    /// unions, and intersections are
     /// witness-only: their canonical shapes have no 1:1 authored-child
     /// correspondence (param modes, `∪ nihil` stripping, sort/dedup), so they
     /// keep no child forms and re-emit canonically.

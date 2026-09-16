@@ -130,6 +130,8 @@ impl InterfaceGenericParam {
 /// importing unit.
 #[derive(Debug, Clone, PartialEq)]
 pub struct InterfaceStructExport {
+    /// Whether the declaration opts into typed JSON conversion.
+    pub is_json: bool,
     pub name: String,
     /// Ordered generic-declaration parameters (`typus`/`magnitudo`).
     pub params: Vec<InterfaceGenericParam>,

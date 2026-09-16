@@ -137,6 +137,7 @@ fn decode_accepts_imported_nominal_def_living_in_type_table() {
                 exports: vec![(
                     Symbol(1),
                     FileExportSnapshot::Struct {
+                        is_json: true,
                         def_id: imported_def,
                         ty: struct_ty,
                         fields: Vec::new(),
@@ -151,7 +152,10 @@ fn decode_accepts_imported_nominal_def_living_in_type_table() {
     };
     let bytes = encode(&artifact).expect("encode artifact");
     let decoded = decode(&bytes).expect("imported nominal def in type table must load");
-    assert_eq!(decoded.resolver.file_interfaces.len(), 1);
+    assert_eq!(
+        decoded.resolver.file_interfaces,
+        artifact.resolver.file_interfaces
+    );
 }
 
 #[test]

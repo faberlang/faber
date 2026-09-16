@@ -38,6 +38,47 @@ fn make_function() -> MirFunction {
 }
 
 #[test]
+fn malformed_json_provider_uses_declared_alternate_return() {
+    for raw in ["", "{not-json}"] {
+        let types = TypeTable::new();
+        let mut interner = Interner::new();
+        let input = interner.intern(raw);
+        let parse = interner.intern("parse");
+        let mut function = make_function();
+        function.error_ty = Some(MirType::semantic(types.primitive(Primitive::Textus)));
+        let mut program = MirProgram::new();
+        program.functions.push(function);
+        let context = MirValidationContext::new(&types);
+        let mut host = BufferHost::default();
+        let mut runner = Runner::new(&program, &context, &types, &interner, &mut host);
+        runner.push_frame(MirFunctionId(0), MirBlockId(0));
+        let statement = radix_mir::MirStatement {
+            span: Span::default(),
+            kind: MirStatementKind::RuntimeCall {
+                destination: None,
+                call: MirRuntimeCall {
+                    intrinsic: MirIntrinsic::Provider(MirProvider {
+                        kind: radix_mir::MirProviderKind::Kernel(KernelModule::Json),
+                        module: vec![],
+                        name: parse,
+                    }),
+                    args: vec![MirOperand::Constant(MirConstant::String(input))],
+                    return_ty: MirType::semantic(types.primitive(Primitive::Json)),
+                },
+            },
+        };
+        let outcome = runner
+            .execute_statement(&statement)
+            .expect("catchable parse error");
+        assert!(matches!(outcome, StatementOutcome::FrameReturned));
+        assert!(runner.frames.is_empty());
+        assert!(
+            matches!(runner.return_error, Some(Value::Str(ref message)) if message.starts_with("json.parse failed:"))
+        );
+    }
+}
+
+#[test]
 fn scalar_mut_param_propagates_through_runner_frames() {
     use crate::host::BufferHost;
     use radix_lexer::Interner;

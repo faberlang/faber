@@ -345,6 +345,7 @@ fn conflicting_kind_snapshot_fails_closed_through_canonical_key() {
     interface.insert(FileExport {
         name: "Terminus".to_owned(),
         kind: FileExportKind::Struct(InterfaceStructExport {
+            is_json: false,
             params: Vec::new(),
             name: "Terminus".to_owned(),
             fields: vec![InterfaceStructField {
@@ -421,6 +422,7 @@ fn identity_bearing_snapshot_canonical_miss_fails_closed() {
         i.insert(FileExport {
             name: "Persona".to_owned(),
             kind: FileExportKind::Struct(InterfaceStructExport {
+                is_json: false,
                 params: Vec::new(),
                 name: "Persona".to_owned(),
                 fields: Vec::new(),
@@ -477,6 +479,7 @@ fn reexported_same_module_nominal_callable_remaps_through_parent_interface() {
     interface.insert(FileExport {
         name: "data.BufferGeometry".to_owned(),
         kind: FileExportKind::Struct(InterfaceStructExport {
+            is_json: false,
             params: Vec::new(),
             name: "BufferGeometry".to_owned(),
             fields: Vec::new(),
@@ -555,6 +558,7 @@ fn strict_locale_pack_keeps_supported_struct_fields_without_field_rows() {
     interface.insert(FileExport {
         name: "BufferAttribute".to_owned(),
         kind: FileExportKind::Struct(InterfaceStructExport {
+            is_json: false,
             params: Vec::new(),
             name: "BufferAttribute".to_owned(),
             fields: vec![
@@ -654,6 +658,7 @@ fn file_interface_preserves_generic_size_decl_kinds_on_import() {
     interface.insert(FileExport {
         name: "Box".to_owned(),
         kind: FileExportKind::Struct(InterfaceStructExport {
+            is_json: false,
             params: vec![InterfaceGenericParam { name: "N".to_owned(), kind: GenericParamKind::Magnitudo }],
             name: "Box".to_owned(),
             fields: Vec::new(),

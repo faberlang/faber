@@ -40,6 +40,11 @@ pub(crate) mod link;
 pub(crate) mod lower;
 pub(crate) mod manifest;
 pub(crate) mod remap;
+#[cfg(test)]
+mod remap_test;
+
+#[cfg(test)]
+mod json_import_test;
 pub(crate) mod requirements;
 pub(crate) mod routes;
 pub(crate) mod sources;

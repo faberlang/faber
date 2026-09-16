@@ -126,6 +126,7 @@ pub fn extract_file_interface_with_identity(
             )?),
             HirItemKind::Struct(strukt) => FileExportKind::Struct(snapshot_struct(
                 strukt,
+                &item.annotations,
                 analysis,
                 file_label,
                 &name,
@@ -385,6 +386,7 @@ fn snapshot_interface_method(
 
 fn snapshot_struct(
     strukt: &HirStruct,
+    annotations: &[radix_module::hir::HirAnnotation],
     analysis: &AnalyzedModule,
     file_label: &str,
     name: &str,
@@ -432,6 +434,9 @@ fn snapshot_struct(
         .collect::<Result<Vec<_>, Diagnostic>>()?;
 
     Ok(InterfaceStructExport {
+        is_json: annotations
+            .iter()
+            .any(|annotation| analysis.interner.resolve(annotation.family) == "json"),
         name: analysis.interner.resolve(strukt.name).to_owned(),
         params: interface_generic_params(&strukt.type_params, &analysis.interner),
         fields,

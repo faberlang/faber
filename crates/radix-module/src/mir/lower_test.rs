@@ -3441,6 +3441,7 @@ fn lowers_imported_nominal_method_to_provider_runtime_call() {
     interface.insert(FileExport {
         name: "Sample".to_owned(),
         kind: FileExportKind::Struct(InterfaceStructExport {
+            is_json: false,
             params: Vec::new(),
             name: "Sample".to_owned(),
             fields: Vec::new(),

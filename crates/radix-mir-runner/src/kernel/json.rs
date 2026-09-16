@@ -39,8 +39,13 @@ pub(crate) fn dispatch(verb: &str, args: &[Value], span: Span) -> Result<Value, 
 }
 
 fn parse_json(raw: &str, span: Span) -> Result<Value, RunnerError> {
-    let value = serde_json::from_str(raw)
-        .map_err(|err| RunnerError::internal(span, format!("json.parse failed: {err}")))?;
+    let value = serde_json::from_str(raw).map_err(|err| {
+        RunnerError::internal_with_issue(
+            span,
+            format!("json.parse failed: {err}"),
+            crate::RUNNER_JSON_PARSE_FAILED,
+        )
+    })?;
     json_to_value(value, span)
 }
 

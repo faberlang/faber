@@ -51,6 +51,9 @@ pub(crate) const RUNNER_CODE_UNSUPPORTED: &str = "runner_unsupported";
 /// Stable diagnostic code for internal runner failures (D-02-07).
 pub(crate) const RUNNER_CODE_INTERNAL: &str = "runner_internal";
 
+/// Malformed input to the failable JSON parser follows its text alternate exit.
+pub(crate) const RUNNER_JSON_PARSE_FAILED: &str = "runner_json_parse_failed";
+
 /// Stable diagnostic identity for refusing execution of a device-annotated
 /// function. The runner's execution policy keys on MIR shader-stage metadata,
 /// not on source names or rendered diagnostic text.
@@ -1013,15 +1016,20 @@ impl<H: Host + ?Sized> Runner<'_, H> {
                         match self.eval_convert(conversion, &call.args, statement.span) {
                             Ok(value) => Ok(Some(value)),
                             Err(error) if error.is_conversion_failure() => {
-                                self.propagate_conversion_failure(error).map(|_| None)
+                                self.propagate_runtime_failure(error).map(|_| None)
                             }
                             Err(error) => Err(error),
                         }
                     }
                     _ => match self.eval_runtime_call(call, statement.span) {
                         Ok(value) => Ok(Some(value)),
-                        Err(error) if error.issue == "runner_collection_push_capacity" => {
-                            self.propagate_conversion_failure(error).map(|_| None)
+                        Err(error)
+                            if matches!(
+                                error.issue.as_str(),
+                                "runner_collection_push_capacity" | RUNNER_JSON_PARSE_FAILED
+                            ) =>
+                        {
+                            self.propagate_runtime_failure(error).map(|_| None)
                         }
                         Err(error) => Err(error),
                     },
@@ -1066,7 +1074,7 @@ impl<H: Host + ?Sized> Runner<'_, H> {
         }
     }
 
-    fn propagate_conversion_failure(
+    fn propagate_runtime_failure(
         &mut self,
         error: RunnerError,
     ) -> Result<StatementOutcome, RunnerError> {
@@ -1083,7 +1091,7 @@ impl<H: Host + ?Sized> Runner<'_, H> {
         ) {
             return Err(RunnerError::internal(
                 error.span,
-                "recoverable runtime conversio requires textus-compatible alternate-exit type",
+                "recoverable runtime failure requires textus-compatible alternate-exit type",
             ));
         }
 

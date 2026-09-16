@@ -1399,6 +1399,7 @@ fn file_export_from_stmt(
             Some(FileExport {
                 name: name.clone(),
                 kind: FileExportKind::Struct(InterfaceStructExport {
+                    is_json: annotations_include_callable_family(&stmt.annotations, interner, "json"),
                     name,
                     params: interface_generic_params(&decl.type_params, interner),
                     fields,

@@ -33,6 +33,44 @@ fn analyze(source: &str) -> radix_module::driver::AnalyzedModule {
 }
 
 #[test]
+fn imported_json_struct_keeps_conversion_opt_in() {
+    for annotated in [true, false] {
+        let annotation = if annotated { "@ json {}" } else { "" };
+        let producer = analyze(&format!(
+            "@ publica\n{annotation}\ngenus Data {{ numerus value }}"
+        ));
+        let interface = extract_file_interface_with_identity(
+            &producer,
+            &["Data".to_owned()],
+            "model.fab",
+            None,
+        )
+        .expect("extract model interface");
+        let consumer = analyze_source(
+            &Session::new(Config::default().with_target(radix_module::codegen::Target::HirRust)),
+            "consumer.fab",
+            r#"importa ex "model:types" model
+functio encode(model.Data value) → json { redde value ↦ json }
+functio decode(json value) → model.Data { redde value ↦ model.Data }
+"#,
+            AnalyzeRequest {
+                cli_program: None,
+                contract: ModuleImportContract {
+                    file_interfaces: BTreeMap::from([("model".to_owned(), interface)]),
+                    ..ModuleImportContract::default()
+                },
+            },
+        );
+        assert_eq!(
+            consumer.is_ok(),
+            annotated,
+            "annotation={annotated}: {:?}",
+            consumer.err()
+        );
+    }
+}
+
+#[test]
 fn extract_file_interface_snapshots_public_exports() {
     let analysis = analyze(
         r"@ publica

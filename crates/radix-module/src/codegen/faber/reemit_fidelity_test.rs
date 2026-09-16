@@ -40,6 +40,16 @@ fn assert_idempotent(source: &str) -> String {
     first
 }
 
+#[test]
+fn access_marked_parameter_forms_keep_their_inner_type() {
+    let source = "genus Box { numerus value }\nfunctio update(in Box box, de lista<numerus> items, in numerus count, de li32 compact) { tacet }\n";
+    let emitted = assert_idempotent(source);
+    assert!(emitted.contains("in Box box"), "{emitted}");
+    assert!(emitted.contains("de lista<numerus> items"), "{emitted}");
+    assert!(emitted.contains("in numerus count"), "{emitted}");
+    assert!(emitted.contains("de li32 compact"), "{emitted}");
+}
+
 fn imported_token_interface() -> FileInterface {
     let mut interface = FileInterface::new();
     interface.insert(FileExport {

@@ -1300,6 +1300,7 @@ impl Parser {
                 || matches!(latin, "modulus" | "iuncta");
             if !Self::is_conversio_type_keyword(latin)
                 && !Self::is_capitalized_type_name(name)
+                && !self.is_qualified_capitalized_type_name()
                 && !is_type_slot_keyword
             {
                 // Use parse_range (not parse_additive) so range tails
@@ -1362,6 +1363,31 @@ impl Parser {
 
     fn is_capitalized_type_name(name: &str) -> bool {
         name.chars().next().is_some_and(char::is_uppercase)
+    }
+
+    /// A qualified user type may start with a lowercase namespace binding,
+    /// while its terminal nominal name still follows the capitalized type
+    /// spelling convention (`types.Board`).
+    fn is_qualified_capitalized_type_name(&self) -> bool {
+        if !matches!(self.peek().kind, TokenKind::Ident(_))
+            || !matches!(self.peek_at(1).kind, TokenKind::Dot)
+        {
+            return false;
+        }
+
+        let mut offset = 1;
+        loop {
+            offset += 1;
+            let TokenKind::Ident(sym) = self.peek_at(offset).kind else {
+                return false;
+            };
+            let name = self.interner.resolve(sym);
+            offset += 1;
+            if matches!(self.peek_at(offset).kind, TokenKind::Dot) {
+                continue;
+            }
+            return Self::is_capitalized_type_name(name);
+        }
     }
 
     // PRIMARY EXPRESSIONS

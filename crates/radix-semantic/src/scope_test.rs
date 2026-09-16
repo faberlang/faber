@@ -365,3 +365,38 @@ fn conversion_registry_rejects_duplicate_builtin_pair() {
         })
     );
 }
+
+#[cfg(feature = "hir-fhir")]
+#[test]
+fn resolver_snapshot_round_trips_imported_json_opt_in() {
+    use radix_hir_fhir::artifact::{FileExportSnapshot, FileInterfaceSnapshot, ResolverSnapshot};
+    use radix_types::TypeId;
+
+    let snapshot = ResolverSnapshot {
+        file_interfaces: vec![(
+            LexSymbol(0),
+            FileInterfaceSnapshot {
+                exports: vec![(
+                    LexSymbol(1),
+                    FileExportSnapshot::Struct {
+                        def_id: DefId(7),
+                        ty: TypeId(8),
+                        fields: Vec::new(),
+                        is_json: true,
+                    },
+                )],
+            },
+        )],
+        ..Resolver::new().to_snapshot()
+    };
+    let resolver = Resolver::from_snapshot(snapshot);
+    assert_eq!(
+        resolver.imported_json_structs().collect::<Vec<_>>(),
+        vec![DefId(7)]
+    );
+    let restored = Resolver::from_snapshot(resolver.to_snapshot());
+    assert_eq!(
+        restored.imported_json_structs().collect::<Vec<_>>(),
+        vec![DefId(7)]
+    );
+}
