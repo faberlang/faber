@@ -1755,10 +1755,7 @@ impl Validator<'_, '_> {
         match (kind, constant) {
             (TensorConstKind::Int, MirConstant::Int(_))
             | (TensorConstKind::Float, MirConstant::Float(_)) => predicate(self, constant),
-            _ => self.error(
-                span,
-                format!("tensor {label} {name} must be {message}"),
-            ),
+            _ => self.error(span, format!("tensor {label} {name} must be {message}")),
         }
     }
 
