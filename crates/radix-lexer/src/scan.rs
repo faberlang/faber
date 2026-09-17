@@ -129,6 +129,15 @@ impl Interner {
         &self.strings[sym.0 as usize]
     }
 
+    /// Look up the symbol for a byte-exact interned string.
+    ///
+    /// Read-only reverse lookup over the intern table: no normalization, no
+    /// insertion. Returns `None` for text that was never interned.
+    #[must_use]
+    pub fn lookup(&self, s: &str) -> Option<Symbol> {
+        self.map.get(s).copied()
+    }
+
     /// Return interned strings in symbol-id order.
     #[must_use]
     pub fn strings(&self) -> &[String] {

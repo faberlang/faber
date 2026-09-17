@@ -167,9 +167,7 @@ fn lookup_intrinsic_row(
 
 fn interned_catalog_name(checker: &TypeChecker<'_>, name: &str) -> Option<Symbol> {
     let interner = checker.interner?;
-    let index = interner.strings().iter().position(|s| s == name)?;
-    #[allow(clippy::cast_possible_truncation)]
-    Some(Symbol(index as u32))
+    interner.lookup(name)
 }
 
 /// Catalog-driven generic/value arity. Returns true when the call is rejected.
@@ -304,10 +302,8 @@ pub(super) fn check_intrinsic_method_call(
     // interner needed here).
     if effective_name != method_name.as_str()
         && let Some(interner) = checker.interner
-        && let Some(index) = interner.strings().iter().position(|s| s == effective_name)
+        && let Some(canonical_symbol) = interner.lookup(effective_name)
     {
-        #[allow(clippy::cast_possible_truncation)]
-        let canonical_symbol = Symbol(index as u32);
         *name = canonical_symbol;
     }
     let entry = entry?;
