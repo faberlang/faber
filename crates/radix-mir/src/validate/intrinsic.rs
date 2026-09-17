@@ -1892,52 +1892,63 @@ impl Validator<'_, '_> {
         receiver_ty: MirType,
         span: Span,
     ) {
-        self.validate_tensor_const_arg(
-            scope,
-            arg,
-            span,
-            TensorConstValidation {
-                kind: TensorConstKind::Int,
-                label: "rope",
-                name: "dim",
-                message: "an int constant or temp",
-                exemption: TensorConstExemption::ShapeSize,
-            },
-            |this: &mut Self, constant: &MirConstant| {
-                let MirConstant::Int(dim_val) = constant else {
-                    unreachable!("integer tensor constant expected")
+        let _ = self.validate_operand(scope, arg, span);
+        let dim_val = match arg {
+            MirOperand::Constant(MirConstant::Int(dim_val)) => *dim_val,
+            MirOperand::Constant(MirConstant::UInt(dim_val)) => {
+                let Some(dim_val) = i64::try_from(*dim_val).ok() else {
+                    self.error(span, "tensor rope dim must be an int constant or temp");
+                    return;
                 };
-                if *dim_val <= 0 {
-                    this.error(span, format!("tensor rope dim {dim_val} must be positive"));
+                dim_val
+            }
+            MirOperand::Constant(MirConstant::Float(dim_val)) => {
+                // Whole-number floats are emitted by literal shape lowering.
+                let valid = dim_val.is_finite()
+                    && dim_val.fract() == 0.0
+                    && (*dim_val as i64) as f64 == *dim_val;
+                if !valid {
+                    self.error(span, "tensor rope dim must be an int constant or temp");
+                    return;
                 }
-                if *dim_val % 2 != 0 {
-                    this.error(span, format!("tensor rope dim {dim_val} must be even"));
+                *dim_val as i64
+            }
+            MirOperand::Value(_)
+            | MirOperand::Temp(_)
+            | MirOperand::Place(_)
+            | MirOperand::Constant(MirConstant::ShapeSize { .. }) => return,
+            MirOperand::Constant(_) => {
+                self.error(span, "tensor rope dim must be an int constant or temp");
+                return;
+            }
+        };
+        if dim_val <= 0 {
+            self.error(span, format!("tensor rope dim {dim_val} must be positive"));
+        }
+        if dim_val % 2 != 0 {
+            self.error(span, format!("tensor rope dim {dim_val} must be even"));
+        }
+        // Elements past `dim` stay; only the last-axis width is a bound.
+        let last_extent = match self.type_kind(receiver_ty) {
+            Type::Tensor(_, shape) => match self.context.types.get_index(*shape) {
+                IndexExpr::Tuple(dims) => {
+                    dims.last()
+                        .and_then(|dim| match self.context.types.get_index(*dim) {
+                            IndexExpr::Literal(count) => i64::try_from(*count).ok(),
+                            _ => None,
+                        })
                 }
-                // Elements past `dim` stay; only the last-axis width is a bound.
-                let last_extent = match this.type_kind(receiver_ty) {
-                    Type::Tensor(_, shape) => match this.context.types.get_index(*shape) {
-                        IndexExpr::Tuple(dims) => {
-                            dims.last()
-                                .and_then(|dim| match this.context.types.get_index(*dim) {
-                                    IndexExpr::Literal(count) => i64::try_from(*count).ok(),
-                                    _ => None,
-                                })
-                        }
-                        IndexExpr::Literal(count) => i64::try_from(*count).ok(),
-                        _ => None,
-                    },
-                    _ => None,
-                };
-                if last_extent.is_some_and(|extent| *dim_val > extent) {
-                    this.error(
-                        span,
-                        format!(
-                            "tensor rope dim {dim_val} exceeds the last-axis extent {last_extent:?}"
-                        ),
-                    );
-                }
+                IndexExpr::Literal(count) => i64::try_from(*count).ok(),
+                _ => None,
             },
-        );
+            _ => None,
+        };
+        if last_extent.is_some_and(|extent| dim_val > extent) {
+            self.error(
+                span,
+                format!("tensor rope dim {dim_val} exceeds the last-axis extent {last_extent:?}"),
+            );
+        }
     }
 
     pub(crate) fn validate_tensor_layernorm(
