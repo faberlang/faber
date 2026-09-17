@@ -40,6 +40,26 @@ fn expect_issue(source: &str, issue: &str) {
     assert!(args_have_no_legacy_message(&err.args));
 }
 
+fn expect_definition_issues(source: &str, expected: &[&str]) {
+    let lex_result = lex(source);
+    let mut parsed = parse(lex_result);
+    let program = parsed.program.expect("parse");
+    let config = PassConfig::for_target(Target::HirRust);
+    let result = semantic_analyze(&program, &config, &mut parsed.interner);
+    let actual: Vec<_> = result
+        .diagnostics
+        .iter()
+        .filter_map(|error| {
+            error
+                .args
+                .iter()
+                .find(|arg| arg.name == "issue")
+                .map(|arg| arg.value.as_str())
+        })
+        .collect();
+    assert_eq!(actual, expected, "diagnostics={:?}", result.diagnostics);
+}
+
 fn analyze_ok(source: &str) -> crate::SemanticResult {
     let lex_result = lex(source);
     let mut parsed = parse(lex_result);
@@ -368,6 +388,33 @@ functio apply() → vacuum {
     );
     let apps: Vec<_> = result.annotation_contracts.applications().collect();
     assert_eq!(apps.len(), 1);
+}
+
+#[test]
+fn commune_field_uniqueness_diagnostics_keep_issue_args() {
+    expect_definition_issues(
+        r#"discretio Eventum {
+    @ commune
+    textus message
+    @ commune
+    textus message
+}
+"#,
+        &["duplicate_commune_field"],
+    );
+    let parsed = parse(lex(r#"discretio Eventum {
+    @ commune
+    textus message
+
+    Variant { textus message }
+}
+"#));
+    assert!(parsed.errors.iter().any(|error| {
+        error
+            .args
+            .iter()
+            .any(|arg| arg.name == "issue" && arg.value == "union_variant_redeclares_shared_field")
+    }));
 }
 
 #[test]
