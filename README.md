@@ -105,12 +105,12 @@ development, and surfaces may change between releases.
 ## Install
 
 Release archives are published at
-[faberlang/releases](https://github.com/faberlang/releases/releases). The
-current release is **faber-v1.8.0**:
+[faberlang/releases](https://github.com/faberlang/releases/releases). That
+page is the version authority.
 
 ```sh
 # Pick the archive for your platform from the release page.
-tar -xzf faber-v1.8.0-<target>.tar.gz
+tar -xzf <archive>.tar.gz
 ./bin/faber --version
 ```
 
