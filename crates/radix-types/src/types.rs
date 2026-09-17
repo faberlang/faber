@@ -435,11 +435,8 @@ impl TypeTable {
 
     /// Find an existing `lista<T>` id for the given element type, if one was interned.
     #[must_use]
-    #[allow(clippy::cast_possible_truncation)]
     pub fn find_array(&self, element: TypeId) -> Option<TypeId> {
-        self.types.iter().enumerate().find_map(|(index, ty)| {
-            matches!(ty, Type::Array(inner) if *inner == element).then_some(TypeId(index as u32))
-        })
+        self.intern_map.get(&Type::Array(element)).copied()
     }
 
     /// Return an existing or freshly interned `lista<T>` id.
@@ -1060,32 +1057,63 @@ impl TypeTable {
             return true;
         }
 
-        // Sort-and-scan: O(n log n). Construction-time canonicalize sorts union
-        // members by TypeId, so identical multisets share interned form; this
-        // path still handles pre-canonical or snapshot-restored member order.
+        // Sort by the semantic key used for union deduplication. Semantically
+        // equal members share a key, so matching can stay within corresponding
+        // key runs instead of scanning the entire other union.
         let mut a_sorted: Vec<TypeId> = a_types.to_vec();
         let mut b_sorted: Vec<TypeId> = b_types.to_vec();
-        a_sorted.sort_unstable_by_key(|id| id.0);
-        b_sorted.sort_unstable_by_key(|id| id.0);
+        a_sorted.sort_unstable_by_key(|id| (self.union_member_sort_key(*id).0, id.0));
+        b_sorted.sort_unstable_by_key(|id| (self.union_member_sort_key(*id).0, id.0));
 
         // Fast path: identical TypeId multisets (common after hash-cons).
         if a_sorted == b_sorted {
             return true;
         }
 
-        // Multiset match under type_equal for alias/coercion cases where
-        // PartialEq-distinct TypeIds still compare equal.
-        let mut matched = vec![false; b_sorted.len()];
-        for a_ty in &a_sorted {
-            let Some(index) = b_sorted.iter().enumerate().find_map(|(index, b_ty)| {
-                (!matched[index] && self.equals(*a_ty, *b_ty)).then_some(index)
-            }) else {
+        // Equal keys are only a necessary condition: aliases and numeric
+        // coercions still need semantic matching, and duplicate members must
+        // consume distinct entries on the other side.
+        let mut a_start = 0;
+        let mut b_start = 0;
+        while a_start < a_sorted.len() {
+            let a_key = self.union_member_sort_key(a_sorted[a_start]);
+            let a_end = a_sorted[a_start..]
+                .iter()
+                .position(|id| self.union_member_sort_key(*id) != a_key)
+                .map_or(a_sorted.len(), |offset| a_start + offset);
+
+            if b_start == b_sorted.len()
+                || self.union_member_sort_key(b_sorted[b_start]) != a_key
+            {
                 return false;
-            };
-            matched[index] = true;
+            }
+            let b_end = b_sorted[b_start..]
+                .iter()
+                .position(|id| self.union_member_sort_key(*id) != a_key)
+                .map_or(b_sorted.len(), |offset| b_start + offset);
+            if a_end - a_start != b_end - b_start {
+                return false;
+            }
+
+            let mut matched = vec![false; b_end - b_start];
+            for a_ty in &a_sorted[a_start..a_end] {
+                let Some(index) = b_sorted[b_start..b_end]
+                    .iter()
+                    .enumerate()
+                    .find_map(|(index, b_ty)| {
+                        (!matched[index] && self.equals(*a_ty, *b_ty)).then_some(index)
+                    })
+                else {
+                    return false;
+                };
+                matched[index] = true;
+            }
+
+            a_start = a_end;
+            b_start = b_end;
         }
 
-        true
+        b_start == b_sorted.len()
     }
 
     fn type_param_constraint_equal(

@@ -144,6 +144,18 @@ fn still_assigns_same_type_id() {
 }
 
 #[test]
+fn find_array_returns_the_interned_structural_entry() {
+    let mut types = TypeTable::new();
+    let numerus = types.primitive(Primitive::Numerus);
+    let array = types.array(numerus);
+    let count = types.type_count();
+
+    assert_eq!(types.find_array(numerus), Some(array));
+    assert_eq!(types.ensure_array(numerus), array);
+    assert_eq!(types.type_count(), count);
+}
+
+#[test]
 fn union_equality_ignores_member_order() {
     let mut types = TypeTable::new();
     let textus = types.primitive(Primitive::Textus);
@@ -153,6 +165,23 @@ fn union_equality_ignores_member_order() {
     let second = types.intern(Type::Union(vec![numerus, textus]));
 
     assert!(types.equals(first, second));
+}
+
+#[test]
+fn union_equality_matches_semantic_duplicates_by_sort_key_run() {
+    let mut types = TypeTable::new();
+    let numerus = types.primitive(Primitive::Numerus);
+    let numerus_i64 = types.sized_numeric(Primitive::Numerus, NumericWidth::I64);
+    let textus = types.primitive(Primitive::Textus);
+    let alias = types.intern(Type::Alias(DefId(0), numerus));
+
+    let first = types.intern(Type::Union(vec![alias, textus, numerus_i64, textus]));
+    let second = types.intern(Type::Union(vec![textus, numerus, textus, numerus]));
+    assert!(types.equals(first, second));
+
+    let different_multiplicity =
+        types.intern(Type::Union(vec![numerus, textus, textus, textus]));
+    assert!(!types.equals(first, different_multiplicity));
 }
 
 #[test]
