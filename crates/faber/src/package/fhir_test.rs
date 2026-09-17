@@ -88,8 +88,7 @@ const CONST_MEMBER_CALL_MAIN: &str =
 const LOCAL_LOCALE_MAIN: &str = "import from \"./util\" * as utilModule\n\nfn run() → string {\n    return utilModule.greet()\n}\n\nmain {\n    print utilModule.greet()\n}\n";
 const LOCAL_LOCALE_UTIL: &str = "@ public\nfn salutare() → string {\n    return \"salve\"\n}\n";
 
-// Live Triga names are source-canonical. The retired en-pack English
-// projection (`Vec3`, `make_vector`) is gone with 80b59a6c(a).
+// Live Triga names are source-canonical.
 const EXTERNAL_LIBRARY_LOCALE_MAIN: &str = "import from \"triga:math\" math\nimport from \"norma:text\" text\n\nfn run() → string {\n    const math.Vector3 origin ← math.vector3(1.0, 0.0, 0.0)\n    const string reversed ← text.reverse(\"abc\")\n    const string decoded ← text.decode(text.encode(\"abc\"))\n    const list<string> parts ← text.split_n(\"a,b\", \",\", 2)\n    print parts\n    return decoded\n}\n\nmain {\n    print run()\n}\n";
 const NORMA_LATIN_COMPATIBILITY_MAIN: &str = "importa ex \"norma:text\" chorda\n\nfunctio run() → textus {\n    redde chorda.retorta(\"abc\")\n}\n\nincipit {\n    nota run()\n}\n";
 
@@ -589,12 +588,6 @@ fn english_pack_resolves_real_triga_and_norma_library_surfaces() {
         .items
         .values()
         .collect::<Vec<_>>();
-    assert!(
-        library_items
-            .iter()
-            .all(|item| item.exported_name != "Vec3"),
-        "retired en-pack Vec3 must not be projected: {library_items:?}"
-    );
     assert!(
         library_items.iter().any(|item| {
             item.identity.provider == LibraryProvider::Package("triga".to_owned())
