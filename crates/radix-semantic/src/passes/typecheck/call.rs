@@ -414,12 +414,9 @@ impl TypeChecker<'_> {
                     pack.intrinsic_surface(super::tensor_index::TENSOR_TRANSPONE)
                 });
             if let Some(interner) = self.interner
-                && let Some(index) = interner.strings().iter().position(|s| s == surface)
+                && let Some(symbol) = interner.lookup(surface)
             {
-                #[allow(clippy::cast_possible_truncation)]
-                {
-                    *name = radix_lexer::Symbol(index as u32);
-                }
+                *name = symbol;
             }
             surface.to_owned()
         } else {
