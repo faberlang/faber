@@ -268,10 +268,15 @@ explicit per-function error contract — to solve what B1 solves library-side.
 
 - Gradus is pre-1.0: whatever ships lands as a clean break
   (`gradus/docs/compatibility-policy.md` v1.2.2; no shims).
-- The cross-module variant boundary (`SEM001`/`SEM041`) is pinned as
-  defect-sprint registry rows 1 and 9 in radix (`P0`/`S4`, recheck triggers
-  recorded) — the fix is radix-scheduled compiler work, not a language-law
-  change. Session correction of this doc's original framing.
+- The old cross-module variant boundary (once pinned as defect-sprint
+  registry rows 1 and 9) is resolved: imported-union consumer matching and
+  qualified variant construction check green in radix — landed by the
+  `union-variant-namespace` goal (2026-08-10); live proofs in
+  `radix/crates/radix-semantic/src/passes/typecheck/union_pattern_test.rs`
+  and `union_construction_test.rs`. The `SEM001`/`SEM041` codes earlier
+  drafts of this section cited now name unrelated live diagnostics
+  (`VariableUndefined` / `UnreachablePattern`,
+  `radix/crates/radix-semantic/src/catalog_semantic.rs`).
 - **Fold-don't-churn stands until this design lands**: no mirror or
   remap-chain edits ride the gradus cleanup train (U1–U13) or the
   F14/O6-spawned units (U14 block records, U15 facade split).

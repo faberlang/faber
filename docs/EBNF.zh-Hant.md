@@ -9,7 +9,6 @@ snake_case spine and their anchors are derived from those IDs.
 The grammar below is the identity rendering of the validated source. Normative detail is kept in this English sidecar and rendered as documentation; the source remains the syntax authority.
 
 ```ebnf
-# formerly: fabFile
 # [001] fab_file
 fab_file ::= frontmatter? program
 # [002] frontmatter
@@ -18,292 +17,206 @@ frontmatter ::= FRONTMATTER_DELIMITER NEWLINE TOML_LINES FRONTMATTER_DELIMITER N
 program ::= statement*
 # [004] statement
 statement ::= annotation* statement_core
-# formerly: statementCore
 # [005] statement_core
 statement_core ::= importa_decl | binding_decl | functio_decl | genus_decl | implendum_decl | typus_decl | ordo_decl | discretio_decl | si_stmt | dum_stmt | itera_stmt | elige_stmt | discerne_stmt | custodi_stmt | cura_stmt | fac_stmt | redde_stmt | reddet_stmt | tacebit_stmt | cede_stmt | rumpe_stmt | perge_stmt | tacet_stmt | iace_stmt | adfirma_stmt | requirit_stmt | reice_stmt | nota_stmt | incipit_stmt | incipiet_stmt | ex_stmt | probandum_decl | proba_stmt | block_stmt | inc_dec_stmt | expr_stmt
-# formerly: bindingDecl
 # [006] binding_decl
 binding_decl ::= fixum_decl | sit_decl | array_destruct | object_destruct | figendum_decl
-# formerly: exprStmt
 # [007] expr_stmt
 expr_stmt ::= expression
-# formerly: blockStmt
 # [008] block_stmt
 block_stmt ::= '{' statement* '}'
-# formerly: varDecl
 # [009] fixum_decl
 fixum_decl ::= ('定值' | '變值') type_annotation IDENTIFIER (('←' expression) | ('↤' assignment inline_recovery?) | ('↢' expression))?
-# formerly: awaitVarDecl
 # [010] figendum_decl
 figendum_decl ::= ('等定' | '等變') type_annotation IDENTIFIER '←' expression
-# formerly: sitDecl
 # [011] sit_decl
 sit_decl ::= '設為' IDENTIFIER (('←' | '↢') expression)?
-# formerly: arrayDestruct
 # [012] array_destruct
 array_destruct ::= ('定值' | '變值') array_pattern '←' expression
-# formerly: objectDestruct
 # [013] object_destruct
 object_destruct ::= ('定值' | '變值') object_pattern '←' expression
-# formerly: funcDecl
 # [014] functio_decl
 functio_decl ::= '函式' IDENTIFIER generic_params? '(' param_list ')' func_modifier* callable_posture? return_clause? alternate_exit_clause? block_stmt
-# formerly: paramList
 # [015] param_list
 param_list ::= (parameter (',' parameter)*)?
-# formerly: genericParams
 # [016] generic_params
 generic_params ::= '<' generic_param (',' generic_param)* '>'
-# formerly: genericParam
 # [017] generic_param
 generic_param ::= IDENTIFIER generic_type_default? | '尺寸' IDENTIFIER generic_size_default?
 # [018] generic_type_default
 generic_type_default ::= '=' type_annotation
 # [019] generic_size_default
 generic_size_default ::= '=' NATURAL
-# formerly: callTypeArgs
 # [020] call_type_args
 call_type_args ::= '<' type_annotation (',' type_annotation)* '>'
 # [021] parameter
 parameter ::= '其餘'? type_annotation IDENTIFIER '可選'? ('作為' IDENTIFIER)? ('或取' expression)?
-# formerly: funcModifier
 # [022] func_modifier
 func_modifier ::= '引數' IDENTIFIER | '管理' IDENTIFIER ('作為' IDENTIFIER)? | '錯誤' IDENTIFIER | '出口' (IDENTIFIER | NUMBER) | '不變' | '可拋' | '可選項' IDENTIFIER
-# formerly: callablePosture
 # [023] callable_posture
 callable_posture ::= '異步' | '流' | '異流'
-# formerly: returnClause
 # [024] return_clause
 return_clause ::= '→' type_annotation
-# formerly: alternateExitClause
 # [025] alternate_exit_clause
 alternate_exit_clause ::= '⇥' type_annotation
-# formerly: stmtBodyJoint
 # [026] ergo_joint
 ergo_joint ::= '則'
-# formerly: clausuraJoint
 # [027] clausura_joint
 clausura_joint ::= '∴'
-# formerly: clausuraExpr
 # [028] clausura_expr
 clausura_expr ::= compact_clausura_expr | clausura_legacy_expr
-# formerly: compactClausuraExpr
 # [029] compact_clausura_expr
 compact_clausura_expr ::= clausura_signature clausura_joint (expression | fac_block)
-# formerly: clausuraSignature
 # [030] clausura_signature
 clausura_signature ::= (clausura_param | '(' clausura_params? ')') closure_modifier? return_clause? alternate_exit_clause?
 # [031] closure_modifier
 closure_modifier ::= '自由' | '內核'
-# formerly: closureFacBlock
 # [032] fac_block
 fac_block ::= '執行' block_stmt cape_clause?
-# formerly: legacyClausuraExpr
 # [033] clausura_legacy_expr
 clausura_legacy_expr ::= '閉包' clausura_params? closure_modifier? ('→' type_annotation)? (':' expression | block_stmt)
-# formerly: clausuraParams
 # [034] clausura_params
 clausura_params ::= clausura_param (',' clausura_param)*
-# formerly: clausuraParam
 # [035] clausura_param
 clausura_param ::= type_annotation IDENTIFIER
-# formerly: genusDecl
 # [036] genus_decl
 genus_decl ::= '抽象'? '類型' IDENTIFIER generic_params? ('子' IDENTIFIER)? ('實作' IDENTIFIER ((',' | '∩') IDENTIFIER)*)? '{' genus_member* '}'
-# formerly: genusMember
 # [037] genus_member
 genus_member ::= annotation* (field_decl | functio_method_decl)
-# formerly: fieldDecl
 # [038] field_decl
 field_decl ::= '靜態'? '綁定'? type_annotation IDENTIFIER '可選'? ('=' expression)?
-# formerly: methodDecl
 # [039] functio_method_decl
 functio_method_decl ::= '函式' IDENTIFIER generic_params? '(' param_list ')' func_modifier* callable_posture? return_clause? alternate_exit_clause? block_stmt
 # [040] annotation
 annotation ::= nucleum_annotation | braced_annotation | annotation_sugar
-# formerly: annotationName
 # [041] annotation_name
 annotation_name ::= ANNOTATION_NAME
-# formerly: bracedAnnotation
 # [042] braced_annotation
 braced_annotation ::= '@' annotation_name '{' annotation_field_list? '}'
-# formerly: annotationFieldList
 # [043] annotation_field_list
 annotation_field_list ::= annotation_field (',' annotation_field)*
-# formerly: annotationField
 # [044] annotation_field
 annotation_field ::= ANNOTATION_FIELD_NAME '=' (expression | type_annotation)
-# formerly: annotationSugar
 # [045] annotation_sugar
 annotation_sugar ::= '@' annotation_name NON_NEWLINE_TOKEN* NEWLINE
-# formerly: nucleumAnnotation
 # [046] nucleum_annotation
 nucleum_annotation ::= nucleum_sugar | nucleum_braced
-# formerly: nucleumSugar
 # [047] nucleum_sugar
 nucleum_sugar ::= '@' '內核' nucleum_modifier? NEWLINE
-# formerly: nucleumBraced
 # [048] nucleum_braced
 nucleum_braced ::= '@' '內核' '{' nucleum_field_list? '}'
-# formerly: nucleumModifier
 # [049] nucleum_modifier
 nucleum_modifier ::= '片段'
-# formerly: nucleumFieldList
 # [050] nucleum_field_list
 nucleum_field_list ::= nucleum_field (',' nucleum_field)*
-# formerly: nucleumField
 # [051] nucleum_field
 nucleum_field ::= '片段' '=' ('真' | '假')
-# formerly: implendumDecl
 # [052] implendum_decl
 implendum_decl ::= '待實作介面' IDENTIFIER generic_params? '{' implendum_method_decl* '}'
-# formerly: implendumMethod
 # [053] implendum_method_decl
 implendum_method_decl ::= annotation* '函式' IDENTIFIER '(' param_list ')' func_modifier* callable_posture? return_clause? alternate_exit_clause?
-# formerly: typeAliasDecl
 # [054] typus_decl
 typus_decl ::= '型別' IDENTIFIER generic_params? '=' type_annotation
-# formerly: enumDecl
 # [055] ordo_decl
 ordo_decl ::= '列舉' IDENTIFIER '{' enum_member (',' enum_member)* '}'
-# formerly: enumMember
 # [056] enum_member
 enum_member ::= IDENTIFIER ('=' ('-'? NUMBER | STRING))?
-# formerly: discretioDecl
 # [057] discretio_decl
 discretio_decl ::= '分支聯集' IDENTIFIER generic_params? '{' union_member* variant (',' variant)* '}'
-# formerly: unionMember
 # [058] union_member
 union_member ::= annotation* field_decl
 # [059] variant
 variant ::= IDENTIFIER ('{' variant_fields '}')?
-# formerly: variantFields
 # [060] variant_fields
 variant_fields ::= (type_annotation IDENTIFIER)*
-# formerly: importDecl
 # [061] importa_decl
 importa_decl ::= importa_record | importa_sugar
-# formerly: importRecord
 # [062] importa_record
 importa_record ::= '匯入' '{' import_field_list? '}'
-# formerly: importFieldList
 # [063] import_field_list
 import_field_list ::= import_field (',' import_field)*
-# formerly: importField
 # [064] import_field
 import_field ::= ex_field | visibilitas_field | nomen_field | ut_field | omnia_field
-# formerly: importSourceField
 # [065] ex_field
 ex_field ::= '取自' '=' STRING
-# formerly: importVisibilityField
 # [066] visibilitas_field
 visibilitas_field ::= 'visibilitas' '=' publica
-# formerly: importNameField
 # [067] nomen_field
 nomen_field ::= '名稱' '=' IDENTIFIER
-# formerly: importAliasField
 # [068] ut_field
 ut_field ::= '作為' '=' IDENTIFIER
-# formerly: importWildcardField
 # [069] omnia_field
 omnia_field ::= '全部' '=' IDENTIFIER
-# formerly: importSugar
 # [070] importa_sugar
 importa_sugar ::= '匯入' '取自' STRING publica? (named_import | wildcard_import | selective_import)?
-# formerly: visibility
 # [071] publica
 publica ::= '公開'
-# formerly: namedImport
 # [072] named_import
 named_import ::= IDENTIFIER ('作為' IDENTIFIER)?
-# formerly: wildcardImport
 # [073] wildcard_import
 wildcard_import ::= '*' '作為' IDENTIFIER
 # [074] selective_import
 selective_import ::= '定值' import_value_binding (',' import_value_binding)*
 # [075] import_value_binding
 import_value_binding ::= IDENTIFIER ('作為' IDENTIFIER)?
-# formerly: typeAnnotation
 # [076] type_annotation
 type_annotation ::= intersection_type ('∪' intersection_type)*
 # [077] intersection_type
 intersection_type ::= owned_type ('∩' owned_type)*
-# formerly: ownedType
 # [078] owned_type
 owned_type ::= ('從' | '傳入' | '擁有' | '拷貝')? base_type
-# formerly: baseType
 # [079] base_type
 base_type ::= hole_type | function_type | width_type_sugar | ratio_type | qualified_type type_arguments? | '(' type_annotation ')'
 # [080] ratio_type
 ratio_type ::= 'ratio' '<' labeled_type_argument (',' labeled_type_argument)* '>'
-# formerly: holeType
 # [081] hole_type
 hole_type ::= '_' | '∪'
-# formerly: qualifiedType
 # [082] qualified_type
 qualified_type ::= IDENTIFIER ('.' IDENTIFIER)*
-# formerly: typeArguments
 # [083] type_arguments
 type_arguments ::= '<' type_argument (',' type_argument)* '>'
-# formerly: typeArgument
 # [084] type_argument
 type_argument ::= labeled_type_argument | type_annotation | NATURAL | '[' figura_list? ']'
-# formerly: labeledTypeArgument
 # [085] labeled_type_argument
 labeled_type_argument ::= IDENTIFIER ':' type_annotation
-# formerly: widthTypeSugar
 # [086] width_type_sugar
 width_type_sugar ::= WIDTH_MARKER | LISTA_WIDTH_SUGAR | (TENSOR_WIDTH_SUGAR | SPARSA_WIDTH_SUGAR | VECTOR_WIDTH_SUGAR) shape_suffix? | MATRIX_WIDTH_SUGAR shape_suffix
-# formerly: shapeSuffix
 # [087] shape_suffix
 shape_suffix ::= '[' figura_list? ']'
 # [088] figura
 figura ::= '_' | NATURAL | IDENTIFIER | '[' figura_list? ']'
-# formerly: figuraList
 # [089] figura_list
 figura_list ::= figura (',' figura)*
-# formerly: functionType
 # [090] function_type
 function_type ::= '(' type_list? ')' '→' type_annotation alternate_exit_clause?
-# formerly: typeList
 # [091] type_list
 type_list ::= type_annotation (',' type_annotation)*
-# formerly: ifStmt
 # [092] si_stmt
 si_stmt ::= '若' expression arm ('否則若' si_stmt | secus_clause)?
-# formerly: elseClause
 # [093] secus_clause
 secus_clause ::= '否則' else_arm
 # [094] arm
 arm ::= (block_stmt | ergo_joint statement) cape_clause?
-# formerly: elseArm
 # [095] else_arm
 else_arm ::= (block_stmt | ergo_joint statement) cape_clause?
-# formerly: whileStmt
 # [096] dum_stmt
 dum_stmt ::= '當' expression (block_stmt | ergo_joint statement) cape_clause?
-# formerly: iteraStmt
 # [097] itera_stmt
 itera_stmt ::= '遍歷' ('取自' expression (',' expression)* | '從' expression | '範圍' expression (',' expression)*) apud_clause? ('定值' | '變值') itera_binding (block_stmt | ergo_joint statement) cape_clause?
 # [098] itera_binding
 itera_binding ::= array_pattern | object_pattern | IDENTIFIER (',' IDENTIFIER)*
 # [099] apud_clause
 apud_clause ::= '於' '[' IDENTIFIER (',' IDENTIFIER)* ']'
-# formerly: eligeStmt
 # [100] elige_stmt
 elige_stmt ::= '選擇' expression '{' casu_elige_clause* ceterum_clause? '}' cape_clause?
-# formerly: eligeCase
 # [101] casu_elige_clause
 casu_elige_clause ::= '分支' expression (block_stmt | ergo_joint statement)
-# formerly: defaultCase
 # [102] ceterum_clause
 ceterum_clause ::= '預設' (block_stmt | ergo_joint statement)
-# formerly: discerneStmt
 # [103] discerne_stmt
 discerne_stmt ::= '比對' '全部'? discriminants '{' casu_variant_clause* ceterum_clause? '}'
 # [104] discriminants
 discriminants ::= expression (',' expression)*
-# formerly: variantCase
 # [105] casu_variant_clause
 casu_variant_clause ::= '分支' patterns (block_stmt | ergo_joint statement)
 # [106] patterns
@@ -312,73 +225,50 @@ patterns ::= pattern ((',' | '且') pattern)*
 pattern ::= '_' | literal | type_pattern | (IDENTIFIER ut_pattern?)
 # [108] type_pattern
 type_pattern ::= IDENTIFIER type_arguments? ut_pattern?
-# formerly: patternBind
 # [109] ut_pattern
 ut_pattern ::= ('作為' IDENTIFIER) | (('定值' | '變值') pattern_binding (',' pattern_binding)*)
-# formerly: patternBinding
 # [110] pattern_binding
 pattern_binding ::= IDENTIFIER ('作為' IDENTIFIER)?
-# formerly: guardStmt
 # [111] custodi_stmt
 custodi_stmt ::= '守衛' '{' si_guard_clause+ '}'
-# formerly: guardClause
 # [112] si_guard_clause
 si_guard_clause ::= '若' expression (block_stmt | ergo_joint statement)
-# formerly: curaStmt
 # [113] cura_stmt
 cura_stmt ::= '資源' STRING ('定值' | '變值') type_annotation IDENTIFIER block_stmt cape_clause?
-# formerly: extractStmt
 # [114] ex_stmt
 ex_stmt ::= '取自' expression ('定值' | '變值') extract_fields
-# formerly: extractFields
 # [115] extract_fields
 extract_fields ::= extract_field (',' extract_field)* (',' ceteri_field)? | ceteri_field
-# formerly: extractField
 # [116] extract_field
 extract_field ::= IDENTIFIER ('作為' IDENTIFIER)?
-# formerly: restField
 # [117] ceteri_field
 ceteri_field ::= '其餘' IDENTIFIER
-# formerly: returnStmt
 # [118] redde_stmt
 redde_stmt ::= '傳回' expression?
-# formerly: returnAwaitStmt
 # [119] reddet_stmt
 reddet_stmt ::= '等返' expression
-# formerly: awaitDiscardStmt
 # [120] tacebit_stmt
 tacebit_stmt ::= '等棄' expression
-# formerly: yieldStmt
 # [121] cede_stmt
 cede_stmt ::= '讓出' expression
-# formerly: breakStmt
 # [122] rumpe_stmt
 rumpe_stmt ::= '中斷'
-# formerly: continueStmt
 # [123] perge_stmt
 perge_stmt ::= '繼續'
-# formerly: noopStmt
 # [124] tacet_stmt
 tacet_stmt ::= '靜默'
-# formerly: throwStmt
 # [125] iace_stmt
 iace_stmt ::= iace_expr | iace_guarded_expr
-# formerly: bareThrow
 # [126] iace_expr
 iace_expr ::= ('拋出' | '崩潰') expression
-# formerly: guardedThrowSugar
 # [127] iace_guarded_expr
 iace_guarded_expr ::= ('拋出' | '崩潰') expression NO_NEWLINE '若' expression
-# formerly: catchClause
 # [128] cape_clause
 cape_clause ::= '捕捉' IDENTIFIER block_stmt
-# formerly: assertStmt
 # [129] adfirma_stmt
 adfirma_stmt ::= '斷言' expression ('崩潰' expression)?
-# formerly: requiritStmt
 # [130] requirit_stmt
 requirit_stmt ::= '需要' expression '拋出' expression
-# formerly: reiceStmt
 # [131] reice_stmt
 reice_stmt ::= '拒絕' expression '拋出' expression
 # [132] expression
@@ -387,165 +277,116 @@ expression ::= assignment
 transfer ::= ternary ('⇇' ternary)*
 # [134] assignment
 assignment ::= transfer ('←' assignment | '↤' assignment inline_recovery?)?
-# formerly: incDecStmt
 # [135] inc_dec_stmt
 inc_dec_stmt ::= place ('↑' | '↓')
 # [136] place
 place ::= call_expr
 # [137] ternary
 ternary ::= aut_expr (('?' expression ':' | '如此' expression '否則') ternary)?
-# formerly: or
 # [138] aut_expr
 aut_expr ::= et_expr (('或') et_expr)*
-# formerly: and
 # [139] et_expr
 et_expr ::= equality (('且') equality)*
 # [140] equality
 equality ::= comparison equality_tail*
-# formerly: equalityTail
 # [141] equality_tail
 equality_tail ::= ('≡' | '≢' | '≠' | '≅' | '≇' | '≈' | '≉' | '是' | '非' '是') comparison
 # [142] comparison
 comparison ::= bitwise_or_expr (('≺' | '≻' | '≤' | '≥' | '內含' | '之間') bitwise_or_expr)*
-# formerly: bitwiseOr
 # [143] bitwise_or_expr
 bitwise_or_expr ::= bitwise_xor_expr ('∨' bitwise_xor_expr)*
-# formerly: bitwiseXor
 # [144] bitwise_xor_expr
 bitwise_xor_expr ::= bitwise_and_expr ('⊻' bitwise_and_expr)*
-# formerly: bitwiseAnd
 # [145] bitwise_and_expr
 bitwise_and_expr ::= shift_expr ('∧' shift_expr)*
-# formerly: shift
 # [146] shift_expr
 shift_expr ::= range_expr (('⇐' | '⇒') range_expr)*
-# formerly: range
 # [147] range_expr
 range_expr ::= additive_expr range_tail?
-# formerly: rangeTail
 # [148] range_tail
 range_tail ::= ('‥' | '…' | '之前' | '直到') additive_expr ('每' additive_expr)?
-# formerly: additive
 # [149] additive_expr
 additive_expr ::= multiplicative_expr (('+' | '-') multiplicative_expr)*
-# formerly: multiplicative
 # [150] multiplicative_expr
 multiplicative_expr ::= vel_expr (('*' | '/' | '%' | '·' | '×' | '⊗' | '⊙') vel_expr)*
-# formerly: coalesce
 # [151] vel_expr
 vel_expr ::= unary_expr ('或取' vel_rhs)*
-# formerly: velRhs
 # [152] vel_rhs
 vel_rhs ::= unary_expr vel_range_tail?
-# formerly: velRangeTail
 # [153] vel_range_tail
 vel_range_tail ::= ('‥' | '…' | '之前' | '直到') unary_expr ('每' unary_expr)?
-# formerly: unary
 # [154] unary_expr
 unary_expr ::= ('-' | '¬' | '非') unary_expr | finge_expr | cast_expr
-# formerly: gradientExpr
 # [155] gradient_expr
 gradient_expr ::= call_expr ('∇' gradient_selection?)?
-# formerly: gradientSelection
 # [156] gradient_selection
 gradient_selection ::= '[' gradient_place (',' gradient_place)* ']'
-# formerly: gradientPlace
 # [157] gradient_place
 gradient_place ::= expression
-# formerly: cast
 # [158] cast_expr
 cast_expr ::= gradient_expr ('∷' type_annotation | conversio_expr)*
-# formerly: conversio
 # [159] conversio_expr
 conversio_expr ::= '↦' type_annotation inline_recovery?
-# formerly: inlineRecovery
 # [160] inline_recovery
 inline_recovery ::= '⇥' unary_expr
-# formerly: call
 # [161] call_expr
 call_expr ::= primary (call_suffix | member_suffix | optional_suffix | non_null_suffix)*
-# formerly: callSuffix
 # [162] call_suffix
 call_suffix ::= call_type_args? '(' argument_list ')'
-# formerly: memberSuffix
 # [163] member_suffix
 member_suffix ::= '.' IDENTIFIER | '[' expression ']'
-# formerly: optionalSuffix
 # [164] optional_suffix
 optional_suffix ::= '?.' IDENTIFIER | '?[' expression ']' | '?(' argument_list ')'
-# formerly: nonNullSuffix
 # [165] non_null_suffix
 non_null_suffix ::= '!.' IDENTIFIER | '![' expression ']' | '!(' argument_list ')'
-# formerly: argumentList
 # [166] argument_list
 argument_list ::= (argument (',' argument)*)?
 # [167] argument
 argument ::= template_argument | '展開'? expression
-# formerly: templateArgument
 # [168] template_argument
 template_argument ::= '展開'? IDENTIFIER ':' expression
 # [169] literal
 literal ::= NUMBER | STRING | ASCII_STRING | BACKTICK_STRING | OCTETI_STRING | '真' | '假' | '空'
 # [170] primary
 primary ::= IDENTIFIER | literal | '自身' | array_literal | json_literal | typed_constructor | iuncta_expr | ad_expr | clausura_expr | praefixum_expr | scriptum_expr | lege_expr | first_match_expr | summa_expr | '(' expression ')'
-# formerly: adExpr
 # [171] ad_expr
 ad_expr ::= '端點' ASCII_STRING ad_opener?
-# formerly: adOpener
 # [172] ad_opener
 ad_opener ::= '(' expression ')'
-# formerly: arrayLiteral
 # [173] array_literal
 array_literal ::= '[' argument_list? ']'
-# formerly: iunctaExpr
 # [174] iuncta_expr
 iuncta_expr ::= '元組' type_arguments '[' argument_list? ']'
-# formerly: jsonLiteral
 # [175] json_literal
 json_literal ::= '{' (json_member (',' json_member)*)? '}'
-# formerly: jsonMember
 # [176] json_member
 json_member ::= STRING ':' json_value
-# formerly: typedConstructor
 # [177] typed_constructor
 typed_constructor ::= type_annotation '{' field_list? '}'
-# formerly: fieldList
 # [178] field_list
 field_list ::= field_init (',' field_init)*
-# formerly: fieldInit
 # [179] field_init
 field_init ::= ('展開' expression) | (field_key '=' expression) | IDENTIFIER
-# formerly: fieldKey
 # [180] field_key
 field_key ::= IDENTIFIER | STRING | '[' expression ']'
-# formerly: jsonValue
 # [181] json_value
 json_value ::= json_object | json_array | json_string | json_number | 'true' | 'false' | 'null'
-# formerly: jsonObject
 # [182] json_object
 json_object ::= '{' (json_member (',' json_member)*)? '}'
-# formerly: jsonArray
 # [183] json_array
 json_array ::= '[' (json_value (',' json_value)*)? ']'
-# formerly: jsonString
 # [184] json_string
 json_string ::= STRING
-# formerly: jsonNumber
 # [185] json_number
 json_number ::= NUMBER
-# formerly: fingeExpr
 # [186] finge_expr
 finge_expr ::= '虛構' qualified_ident ('{' field_list '}')? ('∷' type_annotation)?
-# formerly: qualifiedIdent
 # [187] qualified_ident
 qualified_ident ::= IDENTIFIER ('.' IDENTIFIER)*
-# formerly: praefixumExpr
 # [188] praefixum_expr
 praefixum_expr ::= '前綴' (block_stmt | '(' expression ')')
-# formerly: scriptumExpr
 # [189] scriptum_expr
 scriptum_expr ::= '格式文字' '(' STRING (',' expression)* ')'
-# formerly: legeExpr
 # [190] lege_expr
 lege_expr ::= '讀取' '行'?
 # [191] first_match_expr
@@ -554,46 +395,32 @@ first_match_expr ::= '首個匹配' '(' expression apud_clause? ',' '其中' IDE
 summa_expr ::= '求和' '取自' expression apud_clause? filum_clause? ('定值' | '變值') IDENTIFIER block_stmt
 # [193] filum_clause
 filum_clause ::= '執行緒' IDENTIFIER
-# formerly: objectPattern
 # [194] object_pattern
 object_pattern ::= '{' pattern_property (',' pattern_property)* '}'
-# formerly: patternProperty
 # [195] pattern_property
 pattern_property ::= '其餘'? IDENTIFIER ('作為' IDENTIFIER)?
-# formerly: arrayPattern
 # [196] array_pattern
 array_pattern ::= '[' array_pattern_element (',' array_pattern_element)* ']'
-# formerly: arrayPatternElement
 # [197] array_pattern_element
 array_pattern_element ::= '_' | '其餘'? IDENTIFIER
-# formerly: outputStmt
 # [198] nota_stmt
 nota_stmt ::= ('註記' | '檢視' | '警告' | '寫出') expression (',' expression)*
-# formerly: entryHeader
 # [199] entry_header
 entry_header ::= ('引數' IDENTIFIER)? ('出口' expression)?
-# formerly: incipitStmt
 # [200] incipit_stmt
 incipit_stmt ::= '入口' entry_header block_stmt
-# formerly: incipietStmt
 # [201] incipiet_stmt
 incipiet_stmt ::= '非同步入口' entry_header block_stmt
-# formerly: probandumDecl
 # [202] probandum_decl
 probandum_decl ::= '測試規格' STRING proba_modifier* '{' probandum_body '}'
-# formerly: probandumBody
 # [203] probandum_body
 probandum_body ::= (praepara_block | probandum_decl | proba_stmt)*
-# formerly: probaStmt
 # [204] proba_stmt
 proba_stmt ::= '測試' STRING proba_modifier* block_stmt
-# formerly: probaModifier
 # [205] proba_modifier
 proba_modifier ::= '略過' STRING | '預期' STRING | '僅限' | '標籤' STRING | '時限' NUMBER | '測量' | '重複' NUMBER | '脆弱' NUMBER | '僅限於' STRING
-# formerly: praeparaBlock
 # [206] praepara_block
 praepara_block ::= ('準備' | '準備非同步' | '後置準備' | '後置準備非同步') '全部'? block_stmt
-# formerly: facBlockStmt
 # [207] fac_stmt
 fac_stmt ::= '執行' block_stmt cape_clause? ('當' expression)?
 # [208] IDENTIFIER
@@ -662,213 +489,213 @@ NO_NEWLINE ::=
 | [`ANNOTATION_FIELD_NAME`](#annotation-field-name) | `#annotation-field-name` | capture-pending | — |
 | [`NON_NEWLINE_TOKEN`](#non-newline-token) | `#非-newline-token` | capture-pending | — |
 | [`NO_NEWLINE`](#no-newline) | `#no-newline` | capture-pending | — |
-| [`fab_file`](#fab-file) | `#fab-file` | live | fabFile |
+| [`fab_file`](#fab-file) | `#fab-file` | live | — |
 | [`frontmatter`](#frontmatter) | `#frontmatter` | live | — |
 | [`program`](#program) | `#program` | live | — |
 | [`statement`](#statement) | `#statement` | live | — |
-| [`statement_core`](#statement-core) | `#statement-core` | live | statementCore |
-| [`binding_decl`](#binding-decl) | `#binding-decl` | live | bindingDecl |
-| [`expr_stmt`](#expr-stmt) | `#expr-stmt` | live | exprStmt |
-| [`block_stmt`](#block-stmt) | `#block-stmt` | live | blockStmt |
-| [`fixum_decl`](#fixum-decl) | `#定值-decl` | live | varDecl |
-| [`figendum_decl`](#figendum-decl) | `#等定-decl` | live | awaitVarDecl |
-| [`sit_decl`](#sit-decl) | `#設為-decl` | live | sitDecl |
-| [`array_destruct`](#array-destruct) | `#array-destruct` | live | arrayDestruct |
-| [`object_destruct`](#object-destruct) | `#object-destruct` | live | objectDestruct |
-| [`functio_decl`](#functio-decl) | `#函式-decl` | live | funcDecl |
-| [`param_list`](#param-list) | `#param-list` | live | paramList |
-| [`generic_params`](#generic-params) | `#generic-params` | live | genericParams |
-| [`generic_param`](#generic-param) | `#generic-param` | live | genericParam |
+| [`statement_core`](#statement-core) | `#statement-core` | live | — |
+| [`binding_decl`](#binding-decl) | `#binding-decl` | live | — |
+| [`expr_stmt`](#expr-stmt) | `#expr-stmt` | live | — |
+| [`block_stmt`](#block-stmt) | `#block-stmt` | live | — |
+| [`fixum_decl`](#fixum-decl) | `#定值-decl` | live | — |
+| [`figendum_decl`](#figendum-decl) | `#等定-decl` | live | — |
+| [`sit_decl`](#sit-decl) | `#設為-decl` | live | — |
+| [`array_destruct`](#array-destruct) | `#array-destruct` | live | — |
+| [`object_destruct`](#object-destruct) | `#object-destruct` | live | — |
+| [`functio_decl`](#functio-decl) | `#函式-decl` | live | — |
+| [`param_list`](#param-list) | `#param-list` | live | — |
+| [`generic_params`](#generic-params) | `#generic-params` | live | — |
+| [`generic_param`](#generic-param) | `#generic-param` | live | — |
 | [`generic_type_default`](#generic-type-default) | `#generic-type-default` | live | — |
 | [`generic_size_default`](#generic-size-default) | `#generic-size-default` | live | — |
-| [`call_type_args`](#call-type-args) | `#call-type-args` | live | callTypeArgs |
+| [`call_type_args`](#call-type-args) | `#call-type-args` | live | — |
 | [`parameter`](#parameter) | `#parameter` | live | — |
-| [`func_modifier`](#func-modifier) | `#func-modifier` | live | funcModifier |
-| [`callable_posture`](#callable-posture) | `#callable-posture` | live | callablePosture |
-| [`return_clause`](#return-clause) | `#return-clause` | live | returnClause |
-| [`alternate_exit_clause`](#alternate-exit-clause) | `#alternate-exit-clause` | live | alternateExitClause |
-| [`ergo_joint`](#ergo-joint) | `#則-joint` | live | stmtBodyJoint |
-| [`clausura_joint`](#clausura-joint) | `#閉包-joint` | live | clausuraJoint |
-| [`clausura_expr`](#clausura-expr) | `#閉包-expr` | live | clausuraExpr |
-| [`compact_clausura_expr`](#compact-clausura-expr) | `#compact-閉包-expr` | live | compactClausuraExpr |
-| [`clausura_signature`](#clausura-signature) | `#閉包-signature` | live | clausuraSignature |
+| [`func_modifier`](#func-modifier) | `#func-modifier` | live | — |
+| [`callable_posture`](#callable-posture) | `#callable-posture` | live | — |
+| [`return_clause`](#return-clause) | `#return-clause` | live | — |
+| [`alternate_exit_clause`](#alternate-exit-clause) | `#alternate-exit-clause` | live | — |
+| [`ergo_joint`](#ergo-joint) | `#則-joint` | live | — |
+| [`clausura_joint`](#clausura-joint) | `#閉包-joint` | live | — |
+| [`clausura_expr`](#clausura-expr) | `#閉包-expr` | live | — |
+| [`compact_clausura_expr`](#compact-clausura-expr) | `#compact-閉包-expr` | live | — |
+| [`clausura_signature`](#clausura-signature) | `#閉包-signature` | live | — |
 | [`closure_modifier`](#closure-modifier) | `#closure-modifier` | live | — |
-| [`fac_block`](#fac-block) | `#執行-block` | live | closureFacBlock |
-| [`clausura_legacy_expr`](#clausura-legacy-expr) | `#閉包-legacy-expr` | live | legacyClausuraExpr |
-| [`clausura_params`](#clausura-params) | `#閉包-params` | live | clausuraParams |
-| [`clausura_param`](#clausura-param) | `#閉包-param` | live | clausuraParam |
-| [`genus_decl`](#genus-decl) | `#類型-decl` | live | genusDecl |
-| [`genus_member`](#genus-member) | `#類型-member` | live | genusMember |
-| [`field_decl`](#field-decl) | `#field-decl` | live | fieldDecl |
-| [`functio_method_decl`](#functio-method-decl) | `#函式-method-decl` | live | methodDecl |
+| [`fac_block`](#fac-block) | `#執行-block` | live | — |
+| [`clausura_legacy_expr`](#clausura-legacy-expr) | `#閉包-legacy-expr` | live | — |
+| [`clausura_params`](#clausura-params) | `#閉包-params` | live | — |
+| [`clausura_param`](#clausura-param) | `#閉包-param` | live | — |
+| [`genus_decl`](#genus-decl) | `#類型-decl` | live | — |
+| [`genus_member`](#genus-member) | `#類型-member` | live | — |
+| [`field_decl`](#field-decl) | `#field-decl` | live | — |
+| [`functio_method_decl`](#functio-method-decl) | `#函式-method-decl` | live | — |
 | [`annotation`](#annotation) | `#annotation` | live | — |
-| [`annotation_name`](#annotation-name) | `#annotation-name` | live | annotationName |
-| [`braced_annotation`](#braced-annotation) | `#braced-annotation` | live | bracedAnnotation |
-| [`annotation_field_list`](#annotation-field-list) | `#annotation-field-list` | live | annotationFieldList |
-| [`annotation_field`](#annotation-field) | `#annotation-field` | live | annotationField |
-| [`annotation_sugar`](#annotation-sugar) | `#annotation-sugar` | live | annotationSugar |
-| [`nucleum_annotation`](#nucleum-annotation) | `#內核-annotation` | live | nucleumAnnotation |
-| [`nucleum_sugar`](#nucleum-sugar) | `#內核-sugar` | live | nucleumSugar |
-| [`nucleum_braced`](#nucleum-braced) | `#內核-braced` | live | nucleumBraced |
-| [`nucleum_modifier`](#nucleum-modifier) | `#內核-modifier` | live | nucleumModifier |
-| [`nucleum_field_list`](#nucleum-field-list) | `#內核-field-list` | live | nucleumFieldList |
-| [`nucleum_field`](#nucleum-field) | `#內核-field` | live | nucleumField |
-| [`implendum_decl`](#implendum-decl) | `#待實作介面-decl` | live | implendumDecl |
-| [`implendum_method_decl`](#implendum-method-decl) | `#待實作介面-method-decl` | live | implendumMethod |
-| [`typus_decl`](#typus-decl) | `#型別-decl` | live | typeAliasDecl |
-| [`ordo_decl`](#ordo-decl) | `#列舉-decl` | live | enumDecl |
-| [`enum_member`](#enum-member) | `#enum-member` | live | enumMember |
-| [`discretio_decl`](#discretio-decl) | `#分支聯集-decl` | live | discretioDecl |
-| [`union_member`](#union-member) | `#union-member` | live | unionMember |
+| [`annotation_name`](#annotation-name) | `#annotation-name` | live | — |
+| [`braced_annotation`](#braced-annotation) | `#braced-annotation` | live | — |
+| [`annotation_field_list`](#annotation-field-list) | `#annotation-field-list` | live | — |
+| [`annotation_field`](#annotation-field) | `#annotation-field` | live | — |
+| [`annotation_sugar`](#annotation-sugar) | `#annotation-sugar` | live | — |
+| [`nucleum_annotation`](#nucleum-annotation) | `#內核-annotation` | live | — |
+| [`nucleum_sugar`](#nucleum-sugar) | `#內核-sugar` | live | — |
+| [`nucleum_braced`](#nucleum-braced) | `#內核-braced` | live | — |
+| [`nucleum_modifier`](#nucleum-modifier) | `#內核-modifier` | live | — |
+| [`nucleum_field_list`](#nucleum-field-list) | `#內核-field-list` | live | — |
+| [`nucleum_field`](#nucleum-field) | `#內核-field` | live | — |
+| [`implendum_decl`](#implendum-decl) | `#待實作介面-decl` | live | — |
+| [`implendum_method_decl`](#implendum-method-decl) | `#待實作介面-method-decl` | live | — |
+| [`typus_decl`](#typus-decl) | `#型別-decl` | live | — |
+| [`ordo_decl`](#ordo-decl) | `#列舉-decl` | live | — |
+| [`enum_member`](#enum-member) | `#enum-member` | live | — |
+| [`discretio_decl`](#discretio-decl) | `#分支聯集-decl` | live | — |
+| [`union_member`](#union-member) | `#union-member` | live | — |
 | [`variant`](#variant) | `#variant` | live | — |
-| [`variant_fields`](#variant-fields) | `#variant-fields` | live | variantFields |
-| [`importa_decl`](#importa-decl) | `#匯入-decl` | live | importDecl |
-| [`importa_record`](#importa-record) | `#匯入-record` | live | importRecord |
-| [`import_field_list`](#import-field-list) | `#import-field-list` | live | importFieldList |
-| [`import_field`](#import-field) | `#import-field` | live | importField |
-| [`ex_field`](#ex-field) | `#取自-field` | live | importSourceField |
-| [`visibilitas_field`](#visibilitas-field) | `#visibilitas-field` | live | importVisibilityField |
-| [`nomen_field`](#nomen-field) | `#名稱-field` | live | importNameField |
-| [`ut_field`](#ut-field) | `#作為-field` | live | importAliasField |
-| [`omnia_field`](#omnia-field) | `#全部-field` | live | importWildcardField |
-| [`importa_sugar`](#importa-sugar) | `#匯入-sugar` | live | importSugar |
-| [`公開`](#publica) | `#公開` | live | visibility |
-| [`named_import`](#named-import) | `#named-import` | live | namedImport |
-| [`wildcard_import`](#wildcard-import) | `#wildcard-import` | live | wildcardImport |
+| [`variant_fields`](#variant-fields) | `#variant-fields` | live | — |
+| [`importa_decl`](#importa-decl) | `#匯入-decl` | live | — |
+| [`importa_record`](#importa-record) | `#匯入-record` | live | — |
+| [`import_field_list`](#import-field-list) | `#import-field-list` | live | — |
+| [`import_field`](#import-field) | `#import-field` | live | — |
+| [`ex_field`](#ex-field) | `#取自-field` | live | — |
+| [`visibilitas_field`](#visibilitas-field) | `#visibilitas-field` | live | — |
+| [`nomen_field`](#nomen-field) | `#名稱-field` | live | — |
+| [`ut_field`](#ut-field) | `#作為-field` | live | — |
+| [`omnia_field`](#omnia-field) | `#全部-field` | live | — |
+| [`importa_sugar`](#importa-sugar) | `#匯入-sugar` | live | — |
+| [`公開`](#publica) | `#公開` | live | — |
+| [`named_import`](#named-import) | `#named-import` | live | — |
+| [`wildcard_import`](#wildcard-import) | `#wildcard-import` | live | — |
 | [`selective_import`](#selective-import) | `#selective-import` | live | — |
 | [`import_value_binding`](#import-value-binding) | `#import-value-binding` | live | — |
-| [`type_annotation`](#type-annotation) | `#type-annotation` | live | typeAnnotation |
+| [`type_annotation`](#type-annotation) | `#type-annotation` | live | — |
 | [`intersection_type`](#intersection-type) | `#intersection-type` | live | — |
-| [`owned_type`](#owned-type) | `#owned-type` | live | ownedType |
-| [`base_type`](#base-type) | `#base-type` | live | baseType |
+| [`owned_type`](#owned-type) | `#owned-type` | live | — |
+| [`base_type`](#base-type) | `#base-type` | live | — |
 | [`ratio_type`](#ratio-type) | `#ratio-type` | live | — |
-| [`hole_type`](#hole-type) | `#hole-type` | live | holeType |
-| [`qualified_type`](#qualified-type) | `#qualified-type` | live | qualifiedType |
-| [`type_arguments`](#type-arguments) | `#type-arguments` | live | typeArguments |
-| [`type_argument`](#type-argument) | `#type-argument` | live | typeArgument |
-| [`labeled_type_argument`](#labeled-type-argument) | `#labeled-type-argument` | live | labeledTypeArgument |
-| [`width_type_sugar`](#width-type-sugar) | `#width-type-sugar` | live | widthTypeSugar |
-| [`shape_suffix`](#shape-suffix) | `#shape-suffix` | live | shapeSuffix |
+| [`hole_type`](#hole-type) | `#hole-type` | live | — |
+| [`qualified_type`](#qualified-type) | `#qualified-type` | live | — |
+| [`type_arguments`](#type-arguments) | `#type-arguments` | live | — |
+| [`type_argument`](#type-argument) | `#type-argument` | live | — |
+| [`labeled_type_argument`](#labeled-type-argument) | `#labeled-type-argument` | live | — |
+| [`width_type_sugar`](#width-type-sugar) | `#width-type-sugar` | live | — |
+| [`shape_suffix`](#shape-suffix) | `#shape-suffix` | live | — |
 | [`figura`](#figura) | `#figura` | live | — |
-| [`figura_list`](#figura-list) | `#figura-list` | live | figuraList |
-| [`function_type`](#function-type) | `#function-type` | live | functionType |
-| [`type_list`](#type-list) | `#type-list` | live | typeList |
-| [`si_stmt`](#si-stmt) | `#若-stmt` | live | ifStmt |
-| [`secus_clause`](#secus-clause) | `#否則-clause` | live | elseClause |
+| [`figura_list`](#figura-list) | `#figura-list` | live | — |
+| [`function_type`](#function-type) | `#function-type` | live | — |
+| [`type_list`](#type-list) | `#type-list` | live | — |
+| [`si_stmt`](#si-stmt) | `#若-stmt` | live | — |
+| [`secus_clause`](#secus-clause) | `#否則-clause` | live | — |
 | [`arm`](#arm) | `#arm` | live | — |
-| [`else_arm`](#else-arm) | `#else-arm` | live | elseArm |
-| [`dum_stmt`](#dum-stmt) | `#當-stmt` | live | whileStmt |
-| [`itera_stmt`](#itera-stmt) | `#遍歷-stmt` | live | iteraStmt |
+| [`else_arm`](#else-arm) | `#else-arm` | live | — |
+| [`dum_stmt`](#dum-stmt) | `#當-stmt` | live | — |
+| [`itera_stmt`](#itera-stmt) | `#遍歷-stmt` | live | — |
 | [`itera_binding`](#itera-binding) | `#遍歷-binding` | live | — |
 | [`apud_clause`](#apud-clause) | `#於-clause` | live | — |
-| [`elige_stmt`](#elige-stmt) | `#選擇-stmt` | live | eligeStmt |
-| [`casu_elige_clause`](#casu-elige-clause) | `#分支-選擇-clause` | live | eligeCase |
-| [`ceterum_clause`](#ceterum-clause) | `#預設-clause` | live | defaultCase |
-| [`discerne_stmt`](#discerne-stmt) | `#比對-stmt` | live | discerneStmt |
+| [`elige_stmt`](#elige-stmt) | `#選擇-stmt` | live | — |
+| [`casu_elige_clause`](#casu-elige-clause) | `#分支-選擇-clause` | live | — |
+| [`ceterum_clause`](#ceterum-clause) | `#預設-clause` | live | — |
+| [`discerne_stmt`](#discerne-stmt) | `#比對-stmt` | live | — |
 | [`discriminants`](#discriminants) | `#discriminants` | live | — |
-| [`casu_variant_clause`](#casu-variant-clause) | `#分支-variant-clause` | live | variantCase |
+| [`casu_variant_clause`](#casu-variant-clause) | `#分支-variant-clause` | live | — |
 | [`patterns`](#patterns) | `#patterns` | live | — |
 | [`pattern`](#pattern) | `#pattern` | live | — |
 | [`type_pattern`](#type-pattern) | `#type-pattern` | live | — |
-| [`ut_pattern`](#ut-pattern) | `#作為-pattern` | live | patternBind |
-| [`pattern_binding`](#pattern-binding) | `#pattern-binding` | live | patternBinding |
-| [`custodi_stmt`](#custodi-stmt) | `#守衛-stmt` | live | guardStmt |
-| [`si_guard_clause`](#si-guard-clause) | `#若-guard-clause` | live | guardClause |
-| [`cura_stmt`](#cura-stmt) | `#資源-stmt` | live | curaStmt |
-| [`ex_stmt`](#ex-stmt) | `#取自-stmt` | live | extractStmt |
-| [`extract_fields`](#extract-fields) | `#extract-fields` | live | extractFields |
-| [`extract_field`](#extract-field) | `#extract-field` | live | extractField |
-| [`ceteri_field`](#ceteri-field) | `#其餘-field` | live | restField |
-| [`redde_stmt`](#redde-stmt) | `#傳回-stmt` | live | returnStmt |
-| [`reddet_stmt`](#reddet-stmt) | `#等返-stmt` | live | returnAwaitStmt |
-| [`tacebit_stmt`](#tacebit-stmt) | `#等棄-stmt` | live | awaitDiscardStmt |
-| [`cede_stmt`](#cede-stmt) | `#讓出-stmt` | live | yieldStmt |
-| [`rumpe_stmt`](#rumpe-stmt) | `#中斷-stmt` | live | breakStmt |
-| [`perge_stmt`](#perge-stmt) | `#繼續-stmt` | live | continueStmt |
-| [`tacet_stmt`](#tacet-stmt) | `#靜默-stmt` | live | noopStmt |
-| [`iace_stmt`](#iace-stmt) | `#拋出-stmt` | live | throwStmt |
-| [`iace_expr`](#iace-expr) | `#拋出-expr` | live | bareThrow |
-| [`iace_guarded_expr`](#iace-guarded-expr) | `#拋出-guarded-expr` | live | guardedThrowSugar |
-| [`cape_clause`](#cape-clause) | `#捕捉-clause` | live | catchClause |
-| [`adfirma_stmt`](#adfirma-stmt) | `#斷言-stmt` | live | assertStmt |
-| [`requirit_stmt`](#requirit-stmt) | `#需要-stmt` | live | requiritStmt |
-| [`reice_stmt`](#reice-stmt) | `#拒絕-stmt` | live | reiceStmt |
+| [`ut_pattern`](#ut-pattern) | `#作為-pattern` | live | — |
+| [`pattern_binding`](#pattern-binding) | `#pattern-binding` | live | — |
+| [`custodi_stmt`](#custodi-stmt) | `#守衛-stmt` | live | — |
+| [`si_guard_clause`](#si-guard-clause) | `#若-guard-clause` | live | — |
+| [`cura_stmt`](#cura-stmt) | `#資源-stmt` | live | — |
+| [`ex_stmt`](#ex-stmt) | `#取自-stmt` | live | — |
+| [`extract_fields`](#extract-fields) | `#extract-fields` | live | — |
+| [`extract_field`](#extract-field) | `#extract-field` | live | — |
+| [`ceteri_field`](#ceteri-field) | `#其餘-field` | live | — |
+| [`redde_stmt`](#redde-stmt) | `#傳回-stmt` | live | — |
+| [`reddet_stmt`](#reddet-stmt) | `#等返-stmt` | live | — |
+| [`tacebit_stmt`](#tacebit-stmt) | `#等棄-stmt` | live | — |
+| [`cede_stmt`](#cede-stmt) | `#讓出-stmt` | live | — |
+| [`rumpe_stmt`](#rumpe-stmt) | `#中斷-stmt` | live | — |
+| [`perge_stmt`](#perge-stmt) | `#繼續-stmt` | live | — |
+| [`tacet_stmt`](#tacet-stmt) | `#靜默-stmt` | live | — |
+| [`iace_stmt`](#iace-stmt) | `#拋出-stmt` | live | — |
+| [`iace_expr`](#iace-expr) | `#拋出-expr` | live | — |
+| [`iace_guarded_expr`](#iace-guarded-expr) | `#拋出-guarded-expr` | live | — |
+| [`cape_clause`](#cape-clause) | `#捕捉-clause` | live | — |
+| [`adfirma_stmt`](#adfirma-stmt) | `#斷言-stmt` | live | — |
+| [`requirit_stmt`](#requirit-stmt) | `#需要-stmt` | live | — |
+| [`reice_stmt`](#reice-stmt) | `#拒絕-stmt` | live | — |
 | [`expression`](#expression) | `#expression` | live | — |
 | [`transfer`](#transfer) | `#transfer` | live | — |
 | [`assignment`](#assignment) | `#assignment` | live | — |
-| [`inc_dec_stmt`](#inc-dec-stmt) | `#inc-dec-stmt` | live | incDecStmt |
+| [`inc_dec_stmt`](#inc-dec-stmt) | `#inc-dec-stmt` | live | — |
 | [`place`](#place) | `#place` | live | — |
 | [`ternary`](#ternary) | `#ternary` | live | — |
-| [`aut_expr`](#aut-expr) | `#或-expr` | live | or |
-| [`et_expr`](#et-expr) | `#且-expr` | live | and |
+| [`aut_expr`](#aut-expr) | `#或-expr` | live | — |
+| [`et_expr`](#et-expr) | `#且-expr` | live | — |
 | [`equality`](#equality) | `#equality` | live | — |
-| [`equality_tail`](#equality-tail) | `#equality-tail` | live | equalityTail |
+| [`equality_tail`](#equality-tail) | `#equality-tail` | live | — |
 | [`comparison`](#comparison) | `#comparison` | live | — |
-| [`bitwise_or_expr`](#bitwise-or-expr) | `#bitwise-or-expr` | live | bitwiseOr |
-| [`bitwise_xor_expr`](#bitwise-xor-expr) | `#bitwise-xor-expr` | live | bitwiseXor |
-| [`bitwise_and_expr`](#bitwise-and-expr) | `#bitwise-and-expr` | live | bitwiseAnd |
-| [`shift_expr`](#shift-expr) | `#shift-expr` | live | shift |
-| [`range_expr`](#range-expr) | `#range-expr` | live | range |
-| [`range_tail`](#range-tail) | `#range-tail` | live | rangeTail |
-| [`additive_expr`](#additive-expr) | `#additive-expr` | live | additive |
-| [`multiplicative_expr`](#multiplicative-expr) | `#multiplicative-expr` | live | multiplicative |
-| [`vel_expr`](#vel-expr) | `#或取-expr` | live | coalesce |
-| [`vel_rhs`](#vel-rhs) | `#或取-rhs` | live | velRhs |
-| [`vel_range_tail`](#vel-range-tail) | `#或取-range-tail` | live | velRangeTail |
-| [`unary_expr`](#unary-expr) | `#unary-expr` | live | unary |
-| [`gradient_expr`](#gradient-expr) | `#gradient-expr` | live | gradientExpr |
-| [`gradient_selection`](#gradient-selection) | `#gradient-selection` | live | gradientSelection |
-| [`gradient_place`](#gradient-place) | `#gradient-place` | live | gradientPlace |
-| [`cast_expr`](#cast-expr) | `#cast-expr` | live | cast |
-| [`conversio_expr`](#conversio-expr) | `#conversio-expr` | live | conversio |
-| [`inline_recovery`](#inline-recovery) | `#inline-recovery` | live | inlineRecovery |
-| [`call_expr`](#call-expr) | `#call-expr` | live | call |
-| [`call_suffix`](#call-suffix) | `#call-suffix` | live | callSuffix |
-| [`member_suffix`](#member-suffix) | `#member-suffix` | live | memberSuffix |
-| [`optional_suffix`](#optional-suffix) | `#optional-suffix` | live | optionalSuffix |
-| [`non_null_suffix`](#non-null-suffix) | `#非-null-suffix` | live | nonNullSuffix |
-| [`argument_list`](#argument-list) | `#argument-list` | live | argumentList |
+| [`bitwise_or_expr`](#bitwise-or-expr) | `#bitwise-or-expr` | live | — |
+| [`bitwise_xor_expr`](#bitwise-xor-expr) | `#bitwise-xor-expr` | live | — |
+| [`bitwise_and_expr`](#bitwise-and-expr) | `#bitwise-and-expr` | live | — |
+| [`shift_expr`](#shift-expr) | `#shift-expr` | live | — |
+| [`range_expr`](#range-expr) | `#range-expr` | live | — |
+| [`range_tail`](#range-tail) | `#range-tail` | live | — |
+| [`additive_expr`](#additive-expr) | `#additive-expr` | live | — |
+| [`multiplicative_expr`](#multiplicative-expr) | `#multiplicative-expr` | live | — |
+| [`vel_expr`](#vel-expr) | `#或取-expr` | live | — |
+| [`vel_rhs`](#vel-rhs) | `#或取-rhs` | live | — |
+| [`vel_range_tail`](#vel-range-tail) | `#或取-range-tail` | live | — |
+| [`unary_expr`](#unary-expr) | `#unary-expr` | live | — |
+| [`gradient_expr`](#gradient-expr) | `#gradient-expr` | live | — |
+| [`gradient_selection`](#gradient-selection) | `#gradient-selection` | live | — |
+| [`gradient_place`](#gradient-place) | `#gradient-place` | live | — |
+| [`cast_expr`](#cast-expr) | `#cast-expr` | live | — |
+| [`conversio_expr`](#conversio-expr) | `#conversio-expr` | live | — |
+| [`inline_recovery`](#inline-recovery) | `#inline-recovery` | live | — |
+| [`call_expr`](#call-expr) | `#call-expr` | live | — |
+| [`call_suffix`](#call-suffix) | `#call-suffix` | live | — |
+| [`member_suffix`](#member-suffix) | `#member-suffix` | live | — |
+| [`optional_suffix`](#optional-suffix) | `#optional-suffix` | live | — |
+| [`non_null_suffix`](#non-null-suffix) | `#非-null-suffix` | live | — |
+| [`argument_list`](#argument-list) | `#argument-list` | live | — |
 | [`argument`](#argument) | `#argument` | live | — |
-| [`template_argument`](#template-argument) | `#template-argument` | live | templateArgument |
+| [`template_argument`](#template-argument) | `#template-argument` | live | — |
 | [`literal`](#literal) | `#literal` | live | — |
 | [`primary`](#primary) | `#primary` | live | — |
-| [`ad_expr`](#ad-expr) | `#端點-expr` | live | adExpr |
-| [`ad_opener`](#ad-opener) | `#端點-opener` | live | adOpener |
-| [`array_literal`](#array-literal) | `#array-literal` | live | arrayLiteral |
-| [`iuncta_expr`](#iuncta-expr) | `#元組-expr` | live | iunctaExpr |
-| [`json_literal`](#json-literal) | `#json-literal` | live | jsonLiteral |
-| [`json_member`](#json-member) | `#json-member` | live | jsonMember |
-| [`typed_constructor`](#typed-constructor) | `#typed-constructor` | live | typedConstructor |
-| [`field_list`](#field-list) | `#field-list` | live | fieldList |
-| [`field_init`](#field-init) | `#field-init` | live | fieldInit |
-| [`field_key`](#field-key) | `#field-key` | live | fieldKey |
-| [`json_value`](#json-value) | `#json-value` | live | jsonValue |
-| [`json_object`](#json-object) | `#json-object` | live | jsonObject |
-| [`json_array`](#json-array) | `#json-array` | live | jsonArray |
-| [`json_string`](#json-string) | `#json-string` | live | jsonString |
-| [`json_number`](#json-number) | `#json-number` | live | jsonNumber |
-| [`finge_expr`](#finge-expr) | `#虛構-expr` | live | fingeExpr |
-| [`qualified_ident`](#qualified-ident) | `#qualified-ident` | live | qualifiedIdent |
-| [`praefixum_expr`](#praefixum-expr) | `#前綴-expr` | live | praefixumExpr |
-| [`scriptum_expr`](#scriptum-expr) | `#格式文字-expr` | live | scriptumExpr |
-| [`lege_expr`](#lege-expr) | `#讀取-expr` | live | legeExpr |
+| [`ad_expr`](#ad-expr) | `#端點-expr` | live | — |
+| [`ad_opener`](#ad-opener) | `#端點-opener` | live | — |
+| [`array_literal`](#array-literal) | `#array-literal` | live | — |
+| [`iuncta_expr`](#iuncta-expr) | `#元組-expr` | live | — |
+| [`json_literal`](#json-literal) | `#json-literal` | live | — |
+| [`json_member`](#json-member) | `#json-member` | live | — |
+| [`typed_constructor`](#typed-constructor) | `#typed-constructor` | live | — |
+| [`field_list`](#field-list) | `#field-list` | live | — |
+| [`field_init`](#field-init) | `#field-init` | live | — |
+| [`field_key`](#field-key) | `#field-key` | live | — |
+| [`json_value`](#json-value) | `#json-value` | live | — |
+| [`json_object`](#json-object) | `#json-object` | live | — |
+| [`json_array`](#json-array) | `#json-array` | live | — |
+| [`json_string`](#json-string) | `#json-string` | live | — |
+| [`json_number`](#json-number) | `#json-number` | live | — |
+| [`finge_expr`](#finge-expr) | `#虛構-expr` | live | — |
+| [`qualified_ident`](#qualified-ident) | `#qualified-ident` | live | — |
+| [`praefixum_expr`](#praefixum-expr) | `#前綴-expr` | live | — |
+| [`scriptum_expr`](#scriptum-expr) | `#格式文字-expr` | live | — |
+| [`lege_expr`](#lege-expr) | `#讀取-expr` | live | — |
 | [`first_match_expr`](#first-match-expr) | `#first-match-expr` | live | — |
 | [`summa_expr`](#summa-expr) | `#求和-expr` | live | — |
 | [`filum_clause`](#filum-clause) | `#執行緒-clause` | live | — |
-| [`object_pattern`](#object-pattern) | `#object-pattern` | live | objectPattern |
-| [`pattern_property`](#pattern-property) | `#pattern-property` | live | patternProperty |
-| [`array_pattern`](#array-pattern) | `#array-pattern` | live | arrayPattern |
-| [`array_pattern_element`](#array-pattern-element) | `#array-pattern-element` | live | arrayPatternElement |
-| [`nota_stmt`](#nota-stmt) | `#註記-stmt` | live | outputStmt |
-| [`entry_header`](#entry-header) | `#entry-header` | live | entryHeader |
-| [`incipit_stmt`](#incipit-stmt) | `#入口-stmt` | live | incipitStmt |
-| [`incipiet_stmt`](#incipiet-stmt) | `#非同步入口-stmt` | live | incipietStmt |
-| [`probandum_decl`](#probandum-decl) | `#測試規格-decl` | live | probandumDecl |
-| [`probandum_body`](#probandum-body) | `#測試規格-body` | live | probandumBody |
-| [`proba_stmt`](#proba-stmt) | `#測試-stmt` | live | probaStmt |
-| [`proba_modifier`](#proba-modifier) | `#測試-modifier` | live | probaModifier |
-| [`praepara_block`](#praepara-block) | `#準備-block` | live | praeparaBlock |
-| [`fac_stmt`](#fac-stmt) | `#執行-stmt` | live | facBlockStmt |
+| [`object_pattern`](#object-pattern) | `#object-pattern` | live | — |
+| [`pattern_property`](#pattern-property) | `#pattern-property` | live | — |
+| [`array_pattern`](#array-pattern) | `#array-pattern` | live | — |
+| [`array_pattern_element`](#array-pattern-element) | `#array-pattern-element` | live | — |
+| [`nota_stmt`](#nota-stmt) | `#註記-stmt` | live | — |
+| [`entry_header`](#entry-header) | `#entry-header` | live | — |
+| [`incipit_stmt`](#incipit-stmt) | `#入口-stmt` | live | — |
+| [`incipiet_stmt`](#incipiet-stmt) | `#非同步入口-stmt` | live | — |
+| [`probandum_decl`](#probandum-decl) | `#測試規格-decl` | live | — |
+| [`probandum_body`](#probandum-body) | `#測試規格-body` | live | — |
+| [`proba_stmt`](#proba-stmt) | `#測試-stmt` | live | — |
+| [`proba_modifier`](#proba-modifier) | `#測試-modifier` | live | — |
+| [`praepara_block`](#praepara-block) | `#準備-block` | live | — |
+| [`fac_stmt`](#fac-stmt) | `#執行-stmt` | live | — |
 
 ## Lexicon Appendix {#lexicon}
 
