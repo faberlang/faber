@@ -76,8 +76,6 @@ pub mod device_export;
 pub mod diagnostics;
 pub mod driver;
 pub mod file_interface;
-#[cfg(test)]
-pub mod forma_render;
 pub mod hir;
 pub(crate) mod import_resolve;
 pub mod intrinsics;
