@@ -4,8 +4,7 @@
 //! and reuses the run-stats meter rows. The artifact is diagnostic-only.
 
 use super::run_stats::{
-    self, CLOCK, DURATION_METHOD, DURATION_SIZE, FaberMetadata, FORMAT_VERSION, FunctionMetadata,
-    IntrinsicMetadata, MeterMetadata, NOTE, PackageMetadata, ROUTE, SELF_TIME,
+    self, FaberMetadata, FunctionMetadata, IntrinsicMetadata, MeterMetadata, PackageMetadata,
 };
 use proba::{CaseOutcome, CaseResult, ProbaReport};
 use radix_mir_runner::RunnerStats;
@@ -15,6 +14,7 @@ use std::io;
 use std::path::PathBuf;
 
 pub(crate) const STATS_MARKER: &str = "--- faber-test-stats ---";
+
 /// The binding's `format_version: 1` test-run artifact.
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
