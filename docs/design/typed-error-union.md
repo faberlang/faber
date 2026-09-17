@@ -271,7 +271,9 @@ explicit per-function error contract — to solve what B1 solves library-side.
 - The old cross-module variant boundary (once pinned as defect-sprint
   registry rows 1 and 9) is resolved: imported-union consumer matching and
   qualified variant construction check green in radix — landed by the
-  `union-variant-namespace` goal (2026-08-10); live proofs in
+  `union-variant-first-class` goal (uvf-u1–u4 — registry rows 1, 2, 8, 9 +
+  G1; 2026-08-10), with the declaration-side twin `union-variant-namespace`
+  (uvn-u1–u3) scoping variant names to their parent union; live proofs in
   `radix/crates/radix-semantic/src/passes/typecheck/union_pattern_test.rs`
   and `union_construction_test.rs`. The `SEM001`/`SEM041` codes earlier
   drafts of this section cited now name unrelated live diagnostics
