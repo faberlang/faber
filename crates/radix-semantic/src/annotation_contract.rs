@@ -19,7 +19,7 @@ use radix_syntax::{
     Annotation, AnnotationField, AnnotationFieldValue, AnnotationKind, BracedAnnotation, ClassDecl,
     ClassMemberKind, ExprKind, FieldDecl, Literal, Program, Stmt, StmtKind, TypeExpr, TypeExprKind,
 };
-use rustc_hash::FxHashMap;
+use rustc_hash::{FxHashMap, FxHashSet};
 
 /// Compiler-owned seed that marks a genus as an annotation contract.
 const FAMILY_ANNOTATIO: &str = "annotatio";
@@ -660,9 +660,9 @@ fn reject_commune_field_uniqueness(stmt: &Stmt, errors: &mut Vec<SemanticError>)
     let StmtKind::Union(union) = &stmt.kind else {
         return;
     };
-    let mut seen = Vec::new();
+    let mut seen = FxHashSet::default();
     for field in &union.shared_fields {
-        if seen.contains(&field.field.name.name) {
+        if !seen.insert(field.field.name.name) {
             errors.push(
                 SemanticError::structured(
                     SemanticErrorKind::DefinitionDuplicate,
@@ -670,8 +670,6 @@ fn reject_commune_field_uniqueness(stmt: &Stmt, errors: &mut Vec<SemanticError>)
                 )
                 .with_arg("issue", ISSUE_DUPLICATE_COMMUNE_FIELD),
             );
-        } else {
-            seen.push(field.field.name.name);
         }
     }
     for variant in &union.variants {

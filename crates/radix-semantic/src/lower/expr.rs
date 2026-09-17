@@ -39,6 +39,7 @@ use radix_hir::{
 use radix_syntax::{
     BinaryExpr, Expr, ExprKind, GenericArgExpr, Literal, TypeExpr, TypeExprKind, UnaryExpr,
 };
+use rustc_hash::FxHashSet;
 
 /// Lower one AST expression into the HIR expression contract.
 ///
@@ -518,16 +519,20 @@ impl Lowerer<'_> {
         }
 
         if has_labeled && !has_unlabeled {
-            for (label, _) in &lowered {
-                let Some(label) = *label else {
-                    continue;
-                };
-                let name = self.interner.resolve(label).to_owned();
-                if analysis.label_position(&name).is_none() {
+            let labeled_actual_names: Vec<String> = lowered
+                .iter()
+                .filter_map(|(label, _)| {
+                    label.map(|symbol| self.interner.resolve(symbol).to_owned())
+                })
+                .collect();
+            let filled_labels: FxHashSet<&str> =
+                labeled_actual_names.iter().map(String::as_str).collect();
+            for name in &labeled_actual_names {
+                if analysis.label_position(name).is_none() {
                     self.error_with_args_at(
                         vec![
                             DiagnosticArg::new("issue", "unknown_template_hole_label"),
-                            DiagnosticArg::new("label", name),
+                            DiagnosticArg::new("label", name.clone()),
                         ],
                         call_span,
                     );
@@ -535,9 +540,7 @@ impl Lowerer<'_> {
                 }
             }
             for name in analysis.label_positions.keys() {
-                let filled = lowered.iter().any(|(label, _)| {
-                    label.is_some_and(|symbol| self.interner.resolve(symbol) == name)
-                });
+                let filled = filled_labels.contains(name.as_str());
                 if !filled {
                     self.error_with_args_at(
                         vec![
