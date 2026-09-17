@@ -14,10 +14,10 @@ fn config() -> ScanConfig {
 
 const BUDGETS: Budgets = Budgets {
     unwrap: 0,
-    // WHY: derived from the post-R1 production scan. Four expects remain in
-    // the retained product sources; the moved dense/KV proof files contribute
-    // none to this production-root count.
-    expect: 4,
+    // WHY: derived from the post-R2 production scan. Two expects remain in
+    // the retained product sources; the moved proof files contribute none to
+    // this production-root count.
+    expect: 2,
     // WHY: two fail-closed device-wire layout guards in package/device/wire.rs
     // (dense matmul + packed storage): the mirrored scalar/packed layout is
     // not on the accepted wire and the mapping must not guess.
