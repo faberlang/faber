@@ -14,8 +14,100 @@ pub use registry::{
     NamespaceIntrinsic, NamespaceReturnKind,
 };
 
+use std::collections::HashMap;
+use std::sync::OnceLock;
+
 use radix_types::{MirAtomicOp, MirCollectionOp};
 use radix_types::{Primitive, Type, TypeId, TypeTable};
+
+/// Once-built key index over [`INTRINSICS`]: catalog row positions grouped by
+/// `(receiver, faber_name)`, every bucket in catalog order. The static catalog
+/// stays the single source of truth; `registry.rs` is never mutated.
+fn method_index() -> &'static HashMap<IntrinsicReceiver, HashMap<&'static str, Vec<usize>>> {
+    static INDEX: OnceLock<HashMap<IntrinsicReceiver, HashMap<&'static str, Vec<usize>>>> =
+        OnceLock::new();
+    INDEX.get_or_init(|| {
+        let mut index: HashMap<IntrinsicReceiver, HashMap<&'static str, Vec<usize>>> =
+            HashMap::new();
+        for (position, entry) in INTRINSICS.iter().enumerate() {
+            index
+                .entry(entry.receiver)
+                .or_default()
+                .entry(entry.faber_name)
+                .or_default()
+                .push(position);
+        }
+        index
+    })
+}
+
+/// Bucket positions for a `(receiver, name)` key, empty when unregistered.
+fn method_positions(receiver: IntrinsicReceiver, method: &str) -> &'static [usize] {
+    method_index()
+        .get(&receiver)
+        .and_then(|rows| rows.get(method))
+        .map_or(&[], Vec::as_slice)
+}
+
+/// Once-built key index over [`NAMESPACE_INTRINSICS`]: catalog row positions
+/// grouped by `(namespace, faber_name)`, every bucket in catalog order.
+fn namespace_index() -> &'static HashMap<&'static str, HashMap<&'static str, Vec<usize>>> {
+    static INDEX: OnceLock<HashMap<&'static str, HashMap<&'static str, Vec<usize>>>> =
+        OnceLock::new();
+    INDEX.get_or_init(|| {
+        let mut index: HashMap<&'static str, HashMap<&'static str, Vec<usize>>> = HashMap::new();
+        for (position, entry) in NAMESPACE_INTRINSICS.iter().enumerate() {
+            index
+                .entry(entry.namespace)
+                .or_default()
+                .entry(entry.faber_name)
+                .or_default()
+                .push(position);
+        }
+        index
+    })
+}
+
+/// Bucket positions for a `(namespace, name)` key, empty when unregistered.
+fn namespace_positions(namespace: &str, method: &str) -> &'static [usize] {
+    namespace_index()
+        .get(namespace)
+        .and_then(|rows| rows.get(method))
+        .map_or(&[], Vec::as_slice)
+}
+
+/// Unique-row semantics over a keyed bucket: `None` when the bucket holds
+/// more than one row passing the filter.
+fn unique_bucket_row<'a, T>(
+    bucket: &[usize],
+    catalog: &'a [T],
+    keep: impl Fn(&T) -> bool,
+) -> Option<&'a T> {
+    let mut found = None;
+    for &position in bucket {
+        let entry = &catalog[position];
+        if keep(entry) {
+            if found.is_some() {
+                return None;
+            }
+            found = Some(entry);
+        }
+    }
+    found
+}
+
+/// First-match semantics over a keyed bucket: the earliest row in bucket
+/// (catalog) order passing the filter.
+fn first_bucket_row<'a, T>(
+    bucket: &[usize],
+    catalog: &'a [T],
+    keep: impl Fn(&T) -> bool,
+) -> Option<&'a T> {
+    bucket
+        .iter()
+        .map(|&position| &catalog[position])
+        .find(|entry| keep(entry))
+}
 
 /// Lookup a promoted intrinsic by receiver family, Faber name, and value arity.
 ///
@@ -30,17 +122,9 @@ pub fn lookup_method(
     method: &str,
     arg_count: usize,
 ) -> Option<&'static MethodIntrinsic> {
-    let mut found = None;
-    for entry in INTRINSICS {
-        if entry.receiver == receiver && entry.faber_name == method && entry.arg_count == arg_count
-        {
-            if found.is_some() {
-                return None;
-            }
-            found = Some(entry);
-        }
-    }
-    found
+    unique_bucket_row(method_positions(receiver, method), INTRINSICS, |entry| {
+        entry.arg_count == arg_count
+    })
 }
 
 /// Lookup the unique row for a receiver and name, ignoring value arity.
@@ -51,16 +135,7 @@ pub fn lookup_method_named(
     receiver: IntrinsicReceiver,
     method: &str,
 ) -> Option<&'static MethodIntrinsic> {
-    let mut found = None;
-    for entry in INTRINSICS {
-        if entry.receiver == receiver && entry.faber_name == method {
-            if found.is_some() {
-                return None;
-            }
-            found = Some(entry);
-        }
-    }
-    found
+    unique_bucket_row(method_positions(receiver, method), INTRINSICS, |_| true)
 }
 
 /// Lookup a promoted intrinsic by receiver, name, generic arity, and value arity.
@@ -71,11 +146,8 @@ pub fn lookup_method_generic(
     generic_count: usize,
     arg_count: usize,
 ) -> Option<&'static MethodIntrinsic> {
-    INTRINSICS.iter().find(|entry| {
-        entry.receiver == receiver
-            && entry.faber_name == method
-            && entry.generic.len() == generic_count
-            && entry.arg_count == arg_count
+    first_bucket_row(method_positions(receiver, method), INTRINSICS, |entry| {
+        entry.generic.len() == generic_count && entry.arg_count == arg_count
     })
 }
 
@@ -86,19 +158,11 @@ pub fn lookup_namespace_method(
     method: &str,
     arg_count: usize,
 ) -> Option<&'static NamespaceIntrinsic> {
-    let mut found = None;
-    for entry in NAMESPACE_INTRINSICS {
-        if entry.namespace == namespace
-            && entry.faber_name == method
-            && entry.arg_count == arg_count
-        {
-            if found.is_some() {
-                return None;
-            }
-            found = Some(entry);
-        }
-    }
-    found
+    unique_bucket_row(
+        namespace_positions(namespace, method),
+        NAMESPACE_INTRINSICS,
+        |entry| entry.arg_count == arg_count,
+    )
 }
 
 /// Lookup a namespace/struct catalog row by name, ignoring value arity.
@@ -107,16 +171,11 @@ pub fn lookup_namespace_method_by_name(
     namespace: &str,
     method: &str,
 ) -> Option<&'static NamespaceIntrinsic> {
-    let mut found = None;
-    for entry in NAMESPACE_INTRINSICS {
-        if entry.namespace == namespace && entry.faber_name == method {
-            if found.is_some() {
-                return None;
-            }
-            found = Some(entry);
-        }
-    }
-    found
+    unique_bucket_row(
+        namespace_positions(namespace, method),
+        NAMESPACE_INTRINSICS,
+        |_| true,
+    )
 }
 
 /// Map a normalized semantic receiver type to intrinsic receiver families.
