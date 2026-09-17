@@ -1145,13 +1145,14 @@ incipit {
         let fixture = analyze_source_for_target(
             r#"
 @ radix lane "air"
-functio generic_rope<magnitudo D>(tf32[2, D] x) → tf32[2, D] {
-    redde x.rope_norm<D>(0)
+functio generic_rope<magnitudo D>(tf32[2, D] x, tf32[2, 4, 3] table) → tf32[2, D] {
+    redde x.rope_norm<D>(0, table)
 }
 
 incipit {
     fixum tf32[2, 8] x ← vacua
-    fixum tf32[2, 8] y ← generic_rope(x)
+    fixum tf32[2, 4, 3] table ← vacua
+    fixum tf32[2, 8] y ← generic_rope(x, table)
 }
 "#,
             Target::MirWasm,
