@@ -35,12 +35,11 @@ use std::cell::RefCell;
 use std::rc::Rc;
 use std::time::Instant;
 use value::{
-    GradientStorage, TensorValue, add_values, compare_values, decimal_numeric_binop,
-    int_bitwise_binop, modular_word_bitnot, modular_word_bitwise_binop,
-    modular_word_compare_values, modular_word_neg, modular_word_numeric_binop, numeric_binop,
-    uint_width_checked_div, uint_width_checked_mul, uint_width_checked_neg, uint_width_checked_rem,
-    uint_width_checked_sub, values_equal, width_checked_div, width_checked_mul, width_checked_neg,
-    width_checked_rem, width_checked_sub,
+    GradientStorage, add_values, compare_values, decimal_numeric_binop, int_bitwise_binop,
+    modular_word_bitnot, modular_word_bitwise_binop, modular_word_compare_values, modular_word_neg,
+    modular_word_numeric_binop, numeric_binop, uint_width_checked_div, uint_width_checked_mul,
+    uint_width_checked_neg, uint_width_checked_rem, uint_width_checked_sub, values_equal,
+    width_checked_div, width_checked_mul, width_checked_neg, width_checked_rem, width_checked_sub,
 };
 
 pub(crate) const RUNNER_UNSUPPORTED_PREFIX: &str = "faberscript unsupported";
@@ -1722,29 +1721,18 @@ impl<H: Host + ?Sized> Runner<'_, H> {
                 Value::Float(_) => Err(RunnerError::internal(span, "sqrt of negative float")),
                 Value::Int(v) if v >= 0 => Ok(Value::Float((v as f64).sqrt())),
                 Value::UInt(v) => Ok(Value::Float((v as f64).sqrt())),
-                Value::Tensor(cell) => {
-                    let borrow = cell.borrow();
-                    let data = borrow
-                        .data
-                        .iter()
-                        .map(|v| match v {
-                            Value::Float(f) if *f >= 0.0 => Ok(Value::Float(f.sqrt())),
-                            Value::Float(_) => {
-                                Err(RunnerError::internal(span, "tensor sqrt of negative float"))
-                            }
-                            Value::Int(i) if *i >= 0 => Ok(Value::Float((*i as f64).sqrt())),
-                            Value::UInt(u) => Ok(Value::Float((*u as f64).sqrt())),
-                            _ => Err(RunnerError::internal(
-                                span,
-                                "tensor sqrt element type mismatch",
-                            )),
-                        })
-                        .collect::<Result<Vec<_>, _>>()?;
-                    Ok(Value::Tensor(Rc::new(RefCell::new(TensorValue {
-                        data,
-                        shape: borrow.shape.clone(),
-                    }))))
-                }
+                Value::Tensor(tensor) => self.map_tensor_unary(tensor, &mut |v| match v {
+                    Value::Float(f) if *f >= 0.0 => Ok(Value::Float(f.sqrt())),
+                    Value::Float(_) => {
+                        Err(RunnerError::internal(span, "tensor sqrt of negative float"))
+                    }
+                    Value::Int(i) if *i >= 0 => Ok(Value::Float((*i as f64).sqrt())),
+                    Value::UInt(u) => Ok(Value::Float((*u as f64).sqrt())),
+                    _ => Err(RunnerError::internal(
+                        span,
+                        "tensor sqrt element type mismatch",
+                    )),
+                }),
                 _ => Err(RunnerError::internal(
                     span,
                     "sqrt requires non-negative numeric",
@@ -1757,46 +1745,24 @@ impl<H: Host + ?Sized> Runner<'_, H> {
             },
             MirUnOp::Gelu => match value {
                 Value::Float(v) => Ok(Value::Float(gelu_f64(v))),
-                Value::Tensor(cell) => {
-                    let borrow = cell.borrow();
-                    let data = borrow
-                        .data
-                        .iter()
-                        .map(|v| match v {
-                            Value::Float(f) => Ok(Value::Float(gelu_f64(*f))),
-                            _ => Err(RunnerError::internal(
-                                span,
-                                "tensor gelu element type mismatch",
-                            )),
-                        })
-                        .collect::<Result<Vec<_>, _>>()?;
-                    Ok(Value::Tensor(Rc::new(RefCell::new(TensorValue {
-                        data,
-                        shape: borrow.shape.clone(),
-                    }))))
-                }
+                Value::Tensor(tensor) => self.map_tensor_unary(tensor, &mut |v| match v {
+                    Value::Float(f) => Ok(Value::Float(gelu_f64(*f))),
+                    _ => Err(RunnerError::internal(
+                        span,
+                        "tensor gelu element type mismatch",
+                    )),
+                }),
                 _ => Err(RunnerError::internal(span, "gelu requires float operand")),
             },
             MirUnOp::Tanh => match value {
                 Value::Float(v) => Ok(Value::Float(v.tanh())),
-                Value::Tensor(cell) => {
-                    let borrow = cell.borrow();
-                    let data = borrow
-                        .data
-                        .iter()
-                        .map(|v| match v {
-                            Value::Float(f) => Ok(Value::Float(f.tanh())),
-                            _ => Err(RunnerError::internal(
-                                span,
-                                "tensor tanh element type mismatch",
-                            )),
-                        })
-                        .collect::<Result<Vec<_>, _>>()?;
-                    Ok(Value::Tensor(Rc::new(RefCell::new(TensorValue {
-                        data,
-                        shape: borrow.shape.clone(),
-                    }))))
-                }
+                Value::Tensor(tensor) => self.map_tensor_unary(tensor, &mut |v| match v {
+                    Value::Float(f) => Ok(Value::Float(f.tanh())),
+                    _ => Err(RunnerError::internal(
+                        span,
+                        "tensor tanh element type mismatch",
+                    )),
+                }),
                 _ => Err(RunnerError::internal(span, "tanh requires float operand")),
             },
             MirUnOp::Exp => {
@@ -1804,30 +1770,21 @@ impl<H: Host + ?Sized> Runner<'_, H> {
                     Value::Float(v) => v.exp(),
                     Value::Int(v) => (v as f64).exp(),
                     Value::UInt(v) => (v as f64).exp(),
-                    Value::Tensor(cell) => {
-                        let borrow = cell.borrow();
-                        let data = borrow
-                            .data
-                            .iter()
-                            .map(|v| match v {
-                                Value::Float(f) => {
-                                    let r = f.exp();
-                                    if r.is_finite() {
-                                        Ok(Value::Float(r))
-                                    } else {
-                                        Err(RunnerError::internal(span, "tensor exp overflow"))
-                                    }
+                    Value::Tensor(tensor) => {
+                        return self.map_tensor_unary(tensor, &mut |v| match v {
+                            Value::Float(f) => {
+                                let r = f.exp();
+                                if r.is_finite() {
+                                    Ok(Value::Float(r))
+                                } else {
+                                    Err(RunnerError::internal(span, "tensor exp overflow"))
                                 }
-                                _ => Err(RunnerError::internal(
-                                    span,
-                                    "tensor exp element type mismatch",
-                                )),
-                            })
-                            .collect::<Result<Vec<_>, _>>()?;
-                        return Ok(Value::Tensor(Rc::new(RefCell::new(TensorValue {
-                            data,
-                            shape: borrow.shape.clone(),
-                        }))));
+                            }
+                            _ => Err(RunnerError::internal(
+                                span,
+                                "tensor exp element type mismatch",
+                            )),
+                        });
                     }
                     _ => return Err(RunnerError::internal(span, "exp requires numeric operand")),
                 };
@@ -1869,23 +1826,14 @@ impl<H: Host + ?Sized> Runner<'_, H> {
                     Value::Float(v) => Ok(Value::Float(f16_round_f64(v))),
                     Value::Int(v) => Ok(Value::Float(f16_round_f64(v as f64))),
                     Value::UInt(v) => Ok(Value::Float(f16_round_f64(v as f64))),
-                    Value::Tensor(cell) => {
-                        let borrow = cell.borrow();
-                        let data = borrow
-                            .data
-                            .iter()
-                            .map(|element| match element {
-                                Value::Float(v) => Ok(Value::Float(f16_round_f64(*v))),
-                                _ => Err(RunnerError::internal(
-                                    span,
-                                    "tensor f16-round element type mismatch",
-                                )),
-                            })
-                            .collect::<Result<Vec<_>, _>>()?;
-                        Ok(Value::Tensor(Rc::new(RefCell::new(TensorValue {
-                            data,
-                            shape: borrow.shape.clone(),
-                        }))))
+                    Value::Tensor(tensor) => {
+                        self.map_tensor_unary(tensor, &mut |element| match element {
+                            Value::Float(v) => Ok(Value::Float(f16_round_f64(*v))),
+                            _ => Err(RunnerError::internal(
+                                span,
+                                "tensor f16-round element type mismatch",
+                            )),
+                        })
                     }
                     _ => Err(RunnerError::internal(
                         span,

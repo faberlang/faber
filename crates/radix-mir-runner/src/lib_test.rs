@@ -5083,3 +5083,230 @@ fn pd25_row_softmax_preserves_values_and_errors() {
     };
     assert_eq!(entropia_short.to_bits(), 0);
 }
+
+#[test]
+#[rustfmt::skip]
+fn pd25_map_tensor_unary_preserves_values_and_errors
+() {
+    use crate::value::TensorValue;
+
+    fn tensor(data: Vec<Value>, shape: Vec<i64>) -> Value {
+        Value::Tensor(Rc::new(RefCell::new(TensorValue { data, shape })))
+    }
+
+    fn assert_tensor(result: Value, expected: Vec<Value>, shape: &[i64]) {
+        let Value::Tensor(cell) = result else {
+            panic!("expected tensor output");
+        };
+        let output = cell.borrow();
+        assert_eq!(output.shape, shape);
+        assert_eq!(output.data, expected);
+    }
+
+    fn assert_internal(result: Result<Value, RunnerError>, message: &'static str) {
+        let error = result.expect_err("malformed tensor should fail");
+        assert_eq!(error.message, message);
+        assert_eq!(error.issue, super::runner_issue(message));
+        assert_eq!(error.code, RUNNER_CODE_INTERNAL);
+        assert_eq!(error.args, vec![("detail".to_owned(), message.to_owned())]);
+        assert_eq!(error.span, Span::default());
+    }
+
+    let mut host = BufferHost::default();
+    let types = TypeTable::default();
+    let interner = Interner::new();
+    let context = MirValidationContext::new(&types);
+    let mut program = MirProgram::new();
+    program.functions.push(make_function());
+    let mut runner = Runner::new(&program, &context, &types, &interner, &mut host);
+    runner.push_frame(MirFunctionId(0), MirBlockId(0));
+    let operand = MirOperand::Value(MirValueId(0));
+    let result_ty = MirType::semantic(TypeId(0));
+
+    runner.frames.last_mut().unwrap().values.insert(
+        MirValueId(0),
+        tensor(
+            vec![Value::Float(1.0), Value::Float(4.0), Value::Float(9.0)],
+            vec![3],
+        ),
+    );
+    assert_tensor(
+        runner
+            .eval_unop(MirUnOp::Sqrt, &operand, result_ty, Span::default())
+            .unwrap(),
+        vec![Value::Float(1.0), Value::Float(2.0), Value::Float(3.0)],
+        &[3],
+    );
+
+    let float_inputs = vec![Value::Float(-2.0), Value::Float(0.5), Value::Float(2.0)];
+    runner
+        .frames
+        .last_mut()
+        .unwrap()
+        .values
+        .insert(MirValueId(0), tensor(float_inputs.clone(), vec![3]));
+    assert_tensor(
+        runner
+            .eval_unop(MirUnOp::Gelu, &operand, result_ty, Span::default())
+            .unwrap(),
+        float_inputs
+            .iter()
+            .map(|value| match value {
+                Value::Float(value) => Value::Float(gelu_f64(*value)),
+                _ => unreachable!(),
+            })
+            .collect(),
+        &[3],
+    );
+
+    runner.frames.last_mut().unwrap().values.insert(
+        MirValueId(0),
+        tensor(
+            vec![Value::Float(-1.0), Value::Float(0.0), Value::Float(1.0)],
+            vec![3],
+        ),
+    );
+    assert_tensor(
+        runner
+            .eval_unop(MirUnOp::Tanh, &operand, result_ty, Span::default())
+            .unwrap(),
+        vec![
+            Value::Float((-1.0_f64).tanh()),
+            Value::Float(0.0),
+            Value::Float(1.0_f64.tanh()),
+        ],
+        &[3],
+    );
+
+    runner.frames.last_mut().unwrap().values.insert(
+        MirValueId(0),
+        tensor(
+            vec![Value::Float(-1.0), Value::Float(0.0), Value::Float(1.0)],
+            vec![3],
+        ),
+    );
+    assert_tensor(
+        runner
+            .eval_unop(MirUnOp::Exp, &operand, result_ty, Span::default())
+            .unwrap(),
+        vec![
+            Value::Float((-1.0_f64).exp()),
+            Value::Float(1.0),
+            Value::Float(1.0_f64.exp()),
+        ],
+        &[3],
+    );
+
+    let f16_inputs = vec![Value::Float(-1.1), Value::Float(0.0), Value::Float(1.1)];
+    runner
+        .frames
+        .last_mut()
+        .unwrap()
+        .values
+        .insert(MirValueId(0), tensor(f16_inputs.clone(), vec![3]));
+    assert_tensor(
+        runner
+            .eval_unop(MirUnOp::F16Round, &operand, result_ty, Span::default())
+            .unwrap(),
+        f16_inputs
+            .iter()
+            .map(|value| match value {
+                Value::Float(value) => Value::Float(f16_round_f64(*value)),
+                _ => unreachable!(),
+            })
+            .collect(),
+        &[3],
+    );
+
+    let unary_errors = [
+        (MirUnOp::Sqrt, "tensor sqrt element type mismatch"),
+        (MirUnOp::Gelu, "tensor gelu element type mismatch"),
+        (MirUnOp::Tanh, "tensor tanh element type mismatch"),
+        (MirUnOp::Exp, "tensor exp element type mismatch"),
+        (MirUnOp::F16Round, "tensor f16-round element type mismatch"),
+    ];
+    for &(op, message) in &unary_errors {
+        runner.frames.last_mut().unwrap().values.insert(
+            MirValueId(0),
+            tensor(
+                vec![
+                    Value::Float(1.0),
+                    Value::Str("bad".to_owned()),
+                    Value::Float(2.0),
+                ],
+                vec![3],
+            ),
+        );
+        assert_internal(
+            runner.eval_unop(op, &operand, result_ty, Span::default()),
+            message,
+        );
+    }
+
+    let collection_cases = [
+        (
+            MirCollectionOp::TensorNeg,
+            "tensor neg element type mismatch",
+            "tensor neg arity",
+            vec![Value::Int(-2), Value::Int(0), Value::Int(3)],
+            vec![Value::Int(2), Value::Int(0), Value::Int(-3)],
+        ),
+        (
+            MirCollectionOp::TensorGelu,
+            "tensor gelu element type mismatch",
+            "tensor gelu arity",
+            vec![Value::Float(-1.0), Value::Float(0.0), Value::Float(1.0)],
+            vec![
+                Value::Float(gelu_f64(-1.0)),
+                Value::Float(gelu_f64(0.0)),
+                Value::Float(gelu_f64(1.0)),
+            ],
+        ),
+        (
+            MirCollectionOp::TensorRelu,
+            "tensor relu element type mismatch",
+            "tensor relu arity",
+            vec![Value::Float(-1.0), Value::Float(0.0), Value::Float(2.0)],
+            vec![Value::Float(0.0), Value::Float(0.0), Value::Float(2.0)],
+        ),
+    ];
+    for &(op, element_message, arity_message, ref inputs, ref expected) in &collection_cases {
+        runner
+            .frames
+            .last_mut()
+            .unwrap()
+            .values
+            .insert(MirValueId(0), tensor(inputs.clone(), vec![3]));
+        let call = MirRuntimeCall {
+            intrinsic: MirIntrinsic::Collection(op),
+            args: vec![operand.clone()],
+            return_ty: result_ty,
+        };
+        assert_tensor(
+            runner.eval_runtime_call(&call, Span::default()).unwrap(),
+            expected.clone(),
+            &[3],
+        );
+
+        runner.frames.last_mut().unwrap().values.insert(
+            MirValueId(0),
+            tensor(
+                vec![Value::Float(1.0), Value::Bool(true), Value::Float(2.0)],
+                vec![3],
+            ),
+        );
+        assert_internal(
+            runner.eval_runtime_call(&call, Span::default()),
+            element_message,
+        );
+
+        let arity_call = MirRuntimeCall {
+            args: vec![],
+            ..call
+        };
+        assert_internal(
+            runner.eval_runtime_call(&arity_call, Span::default()),
+            arity_message,
+        );
+    }
+}
