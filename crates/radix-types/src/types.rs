@@ -1051,15 +1051,15 @@ impl TypeTable {
 
     fn union_members_equal(&self, a_types: &[TypeId], b_types: &[TypeId]) -> bool {
         if a_types.len() != b_types.len() {
-            return false;
+            return self.union_members_equal_semantic(a_types, b_types);
         }
         if a_types.is_empty() {
             return true;
         }
 
         // Sort by the semantic key used for union deduplication. Semantically
-        // equal members share a key, so matching can stay within corresponding
-        // key runs instead of scanning the entire other union.
+        // equal members usually share a key, so matching can stay within
+        // corresponding key runs instead of scanning the entire other union.
         let mut a_sorted: Vec<TypeId> = a_types.to_vec();
         let mut b_sorted: Vec<TypeId> = b_types.to_vec();
         a_sorted.sort_unstable_by_key(|id| (self.union_member_sort_key(*id).0, id.0));
@@ -1072,47 +1072,90 @@ impl TypeTable {
 
         // Equal keys are only a necessary condition: aliases and numeric
         // coercions still need semantic matching, and duplicate members must
-        // consume distinct entries on the other side.
+        // consume distinct entries on the other side. A keyed-path failure
+        // must fall back because equals can coerce at any nesting depth.
         let mut a_start = 0;
         let mut b_start = 0;
-        while a_start < a_sorted.len() {
-            let a_key = self.union_member_sort_key(a_sorted[a_start]);
-            let a_end = a_sorted[a_start..]
-                .iter()
-                .position(|id| self.union_member_sort_key(*id) != a_key)
-                .map_or(a_sorted.len(), |offset| a_start + offset);
+        let keyed_match = 'keyed: {
+            while a_start < a_sorted.len() {
+                let a_key = self.union_member_sort_key(a_sorted[a_start]);
+                let a_end = a_sorted[a_start..]
+                    .iter()
+                    .position(|id| self.union_member_sort_key(*id) != a_key)
+                    .map_or(a_sorted.len(), |offset| a_start + offset);
 
-            if b_start == b_sorted.len() || self.union_member_sort_key(b_sorted[b_start]) != a_key {
-                return false;
-            }
-            let b_end = b_sorted[b_start..]
-                .iter()
-                .position(|id| self.union_member_sort_key(*id) != a_key)
-                .map_or(b_sorted.len(), |offset| b_start + offset);
-            if a_end - a_start != b_end - b_start {
-                return false;
-            }
+                if b_start == b_sorted.len()
+                    || self.union_member_sort_key(b_sorted[b_start]) != a_key
+                {
+                    break 'keyed false;
+                }
+                let b_end = b_sorted[b_start..]
+                    .iter()
+                    .position(|id| self.union_member_sort_key(*id) != a_key)
+                    .map_or(b_sorted.len(), |offset| b_start + offset);
+                if a_end - a_start != b_end - b_start {
+                    break 'keyed false;
+                }
 
-            let mut matched = vec![false; b_end - b_start];
-            for a_ty in &a_sorted[a_start..a_end] {
-                let Some(index) =
-                    b_sorted[b_start..b_end]
-                        .iter()
-                        .enumerate()
-                        .find_map(|(index, b_ty)| {
-                            (!matched[index] && self.equals(*a_ty, *b_ty)).then_some(index)
-                        })
-                else {
-                    return false;
-                };
-                matched[index] = true;
-            }
+                let mut matched = vec![false; b_end - b_start];
+                for a_ty in &a_sorted[a_start..a_end] {
+                    let Some(index) =
+                        b_sorted[b_start..b_end]
+                            .iter()
+                            .enumerate()
+                            .find_map(|(index, b_ty)| {
+                                (!matched[index] && self.equals(*a_ty, *b_ty)).then_some(index)
+                            })
+                    else {
+                        break 'keyed false;
+                    };
+                    matched[index] = true;
+                }
 
-            a_start = a_end;
-            b_start = b_end;
+                a_start = a_end;
+                b_start = b_end;
+            }
+            b_start == b_sorted.len()
+        };
+
+        if keyed_match {
+            return true;
         }
 
-        b_start == b_sorted.len()
+        self.union_members_equal_semantic(a_types, b_types)
+    }
+
+    /// Full semantic multiset matching used when the keyed positive path cannot
+    /// establish equality. The key is only an optimization and never proves
+    /// inequality because nested coercions can make different keys equal.
+    fn union_members_equal_semantic(&self, a_types: &[TypeId], b_types: &[TypeId]) -> bool {
+        if a_types.len() != b_types.len() {
+            return false;
+        }
+        if a_types.is_empty() {
+            return true;
+        }
+
+        let mut a_sorted: Vec<TypeId> = a_types.to_vec();
+        let mut b_sorted: Vec<TypeId> = b_types.to_vec();
+        a_sorted.sort_unstable_by_key(|id| id.0);
+        b_sorted.sort_unstable_by_key(|id| id.0);
+
+        if a_sorted == b_sorted {
+            return true;
+        }
+
+        let mut matched = vec![false; b_sorted.len()];
+        for a_ty in &a_sorted {
+            let Some(index) = b_sorted.iter().enumerate().find_map(|(index, b_ty)| {
+                (!matched[index] && self.equals(*a_ty, *b_ty)).then_some(index)
+            }) else {
+                return false;
+            };
+            matched[index] = true;
+        }
+
+        true
     }
 
     fn type_param_constraint_equal(
