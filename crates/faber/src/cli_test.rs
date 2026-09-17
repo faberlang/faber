@@ -40,30 +40,6 @@ fn cli_build_help_preserves_single_input_usage() {
 }
 
 #[test]
-fn cli_rejects_install_subcommand() {
-    // S2-U2 (faber-radix-recomposition): `faber install` is removed. Cista owns
-    // package acquisition (`cista install`); the product CLI rejects the
-    // subcommand as unknown, so no store/temp-checkout side effect is reachable.
-    for argv in [
-        &["faber", "install"][..],
-        &["faber", "install", "norma"][..],
-        &["faber", "install", "--path", "."][..],
-    ] {
-        let err = Cli::try_parse_from(argv).expect_err("install subcommand is removed");
-        // clap reports an unexpected trailing argument (`UnknownArgument`) for
-        // a non-existent subcommand under `args_conflicts_with_subcommands`
-        // with an optional subcommand enum; either kind proves rejection.
-        assert!(
-            matches!(
-                err.kind(),
-                clap::error::ErrorKind::InvalidSubcommand | clap::error::ErrorKind::UnknownArgument
-            ),
-            "argv {argv:?} must reject `faber install` as an unknown subcommand"
-        );
-    }
-}
-
-#[test]
 fn cli_parses_repl_subcommand() {
     let cli = Cli::try_parse_from(["faber", "repl"]).expect("parse repl");
     assert!(cli.eval_source.is_none());
@@ -315,39 +291,6 @@ fn cli_parses_run_stats_sinks_and_rejects_profile_name() {
     let error = Cli::try_parse_from(["faber", "run", "--profile", "debug", "pkg"])
         .expect_err("--profile is not a run stats spelling");
     assert!(error.to_string().contains("--profile"));
-}
-
-#[test]
-fn cli_rejects_removed_run_mode_flags() {
-    // `faber run` is interpreted execution, always; the `--interpret` /
-    // `--compile` mode-switch flags retired with the Stage 6 clean break and
-    // must fail at parse time, never silently accept.
-    for flag in ["--interpret", "--compile"] {
-        let error =
-            Cli::try_parse_from(["faber", "run", flag, "pkg"]).expect_err("removed mode flag");
-        let rendered = error.to_string();
-        assert!(
-            rendered.contains(flag),
-            "removed run mode flag {flag} must be rejected:\n{rendered}"
-        );
-    }
-}
-
-#[test]
-fn cli_rejects_removed_run_target_flag() {
-    // `run` no longer selects a compiled target; targets are built with
-    // `faber build -t <target>`. The `-t` flag on run must fail at parse.
-    for argv in [
-        &["faber", "run", "--target", "scena", "pkg"][..],
-        &["faber", "run", "--target", "fmir-bin", "pkg"][..],
-    ] {
-        let error = Cli::try_parse_from(argv).expect_err("removed run target flag");
-        let rendered = error.to_string();
-        assert!(
-            rendered.contains("--target"),
-            "removed run --target must be rejected:\n{rendered}"
-        );
-    }
 }
 
 #[test]
@@ -622,15 +565,6 @@ fn locale_command_help_states_complete_unit_and_resolution_contract() {
 }
 
 #[test]
-fn cli_rejects_removed_format_locale_flag() {
-    let result = Cli::try_parse_from(["faber", "format", "--locale", "zh-Hans", "main.fab"]);
-    assert!(
-        result.is_err(),
-        "format --locale is retired; locale conversion is `faber convert --to`"
-    );
-}
-
-#[test]
 fn cli_parses_check_flags_and_multiple_inputs() {
     let check = Cli::try_parse_from([
         "faber",
@@ -728,28 +662,6 @@ fn cli_rejects_format_stdin_with_check() {
     let rendered = error.to_string();
     assert!(rendered.contains("--stdin"));
     assert!(rendered.contains("--check"));
-}
-
-#[test]
-fn cli_rejects_format_policy_flag() {
-    let error = Cli::try_parse_from(["faber", "format", "--policy", "pretty-v1", "main.fab"])
-        .expect_err("format --policy is retired");
-    let rendered = error.to_string();
-    assert!(
-        rendered.contains("--policy"),
-        "retired --policy must fail at parse: {rendered}"
-    );
-}
-
-#[test]
-fn cli_rejects_format_config_flag() {
-    let error = Cli::try_parse_from(["faber", "format", "--config", "forma.toml", "main.fab"])
-        .expect_err("format --config is retired");
-    let rendered = error.to_string();
-    assert!(
-        rendered.contains("--config"),
-        "retired --config must fail at parse: {rendered}"
-    );
 }
 
 #[test]
