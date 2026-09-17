@@ -796,7 +796,7 @@ impl InstantiateWalk for &mut TypeTable {
         _span: Span,
         index: &ExistingTypeIndex,
     ) -> Result<TypeId, MirGenericError> {
-        Ok(intern_or_find(*self, candidate, index))
+        Ok(intern_or_find(self, candidate, index))
     }
 
     fn substitute_index(
@@ -805,7 +805,7 @@ impl InstantiateWalk for &mut TypeTable {
         shape_bindings: &MirShapeBindings,
         _span: Span,
     ) -> Result<IndexId, MirGenericError> {
-        Ok(substitute_index_params(*self, index_id, shape_bindings))
+        Ok(substitute_index_params(self, index_id, shape_bindings))
     }
 }
 

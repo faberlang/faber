@@ -29,6 +29,35 @@ struct TensorNormFlags {
     beta: bool,
 }
 
+#[derive(Clone, Copy)]
+enum TensorConstExemption {
+    None,
+    ShapeSize,
+}
+
+impl TensorConstExemption {
+    fn applies(self, constant: &MirConstant) -> bool {
+        match self {
+            Self::None => false,
+            Self::ShapeSize => matches!(constant, MirConstant::ShapeSize { .. }),
+        }
+    }
+}
+
+struct TensorConstValidation {
+    kind: TensorConstKind,
+    label: &'static str,
+    name: &'static str,
+    message: &'static str,
+    exemption: TensorConstExemption,
+}
+
+struct TensorNormSpec {
+    label: &'static str,
+    receiver_label: &'static str,
+    flags: TensorNormFlags,
+}
+
 impl Validator<'_, '_> {
     pub(crate) fn validate_runtime_call(
         &mut self,
@@ -1730,32 +1759,33 @@ impl Validator<'_, '_> {
 
     /// Axis/epsilon literals often arrive as temps after sized-fractus lowering.
     /// Those operands stay valid; only a wrong constant kind is rejected.
-    fn validate_tensor_const_arg<E, P>(
+    fn validate_tensor_const_arg<P>(
         &mut self,
         scope: &FunctionScope<'_, '_>,
         arg: &MirOperand,
         span: Span,
-        kind: TensorConstKind,
-        label: &'static str,
-        name: &'static str,
-        message: &'static str,
-        exempt: E,
+        validation: TensorConstValidation,
         predicate: P,
     ) where
-        E: Fn(&MirConstant) -> bool,
         P: FnOnce(&mut Self, &MirConstant),
     {
         let _ = self.validate_operand(scope, arg, span);
         let MirOperand::Constant(constant) = arg else {
             return;
         };
-        if exempt(constant) {
+        if validation.exemption.applies(constant) {
             return;
         }
-        match (kind, constant) {
+        match (validation.kind, constant) {
             (TensorConstKind::Int, MirConstant::Int(_))
             | (TensorConstKind::Float, MirConstant::Float(_)) => predicate(self, constant),
-            _ => self.error(span, format!("tensor {label} {name} must be {message}")),
+            _ => self.error(
+                span,
+                format!(
+                    "tensor {} {} must be {}",
+                    validation.label, validation.name, validation.message
+                ),
+            ),
         }
     }
 
@@ -1771,12 +1801,14 @@ impl Validator<'_, '_> {
             scope,
             arg,
             span,
-            TensorConstKind::Int,
-            label,
-            "axis",
-            "an int constant or temp",
-            |_| false,
-            |this, constant| {
+            TensorConstValidation {
+                kind: TensorConstKind::Int,
+                label,
+                name: "axis",
+                message: "an int constant or temp",
+                exemption: TensorConstExemption::None,
+            },
+            |this: &mut Self, constant: &MirConstant| {
                 let MirConstant::Int(axis_val) = constant else {
                     unreachable!("integer tensor constant expected")
                 };
@@ -1801,12 +1833,14 @@ impl Validator<'_, '_> {
             scope,
             arg,
             span,
-            TensorConstKind::Float,
-            label,
-            "epsilon",
-            "a float constant or temp",
-            |_| false,
-            |this, constant| {
+            TensorConstValidation {
+                kind: TensorConstKind::Float,
+                label,
+                name: "epsilon",
+                message: "a float constant or temp",
+                exemption: TensorConstExemption::None,
+            },
+            |this: &mut Self, constant: &MirConstant| {
                 let MirConstant::Float(f) = constant else {
                     unreachable!("float tensor constant expected")
                 };
@@ -1830,12 +1864,14 @@ impl Validator<'_, '_> {
             scope,
             arg,
             span,
-            TensorConstKind::Int,
-            "rope",
-            "pos",
-            "an int constant or temp",
-            |_| false,
-            |this, constant| {
+            TensorConstValidation {
+                kind: TensorConstKind::Int,
+                label: "rope",
+                name: "pos",
+                message: "an int constant or temp",
+                exemption: TensorConstExemption::None,
+            },
+            |this: &mut Self, constant: &MirConstant| {
                 let MirConstant::Int(pos_val) = constant else {
                     unreachable!("integer tensor constant expected")
                 };
@@ -1860,12 +1896,14 @@ impl Validator<'_, '_> {
             scope,
             arg,
             span,
-            TensorConstKind::Int,
-            "rope",
-            "dim",
-            "an int constant or temp",
-            |constant| matches!(constant, MirConstant::ShapeSize { .. }),
-            |this, constant| {
+            TensorConstValidation {
+                kind: TensorConstKind::Int,
+                label: "rope",
+                name: "dim",
+                message: "an int constant or temp",
+                exemption: TensorConstExemption::ShapeSize,
+            },
+            |this: &mut Self, constant: &MirConstant| {
                 let MirConstant::Int(dim_val) = constant else {
                     unreachable!("integer tensor constant expected")
                 };
@@ -1914,12 +1952,14 @@ impl Validator<'_, '_> {
             first_arg_ty,
             call,
             span,
-            "layernorm",
-            "input",
-            TensorNormFlags {
-                rank_1_or_2: true,
-                layernorm_arity_gate: true,
-                beta: true,
+            TensorNormSpec {
+                label: "layernorm",
+                receiver_label: "input",
+                flags: TensorNormFlags {
+                    rank_1_or_2: true,
+                    layernorm_arity_gate: true,
+                    beta: true,
+                },
             },
         );
     }
@@ -1936,12 +1976,14 @@ impl Validator<'_, '_> {
             first_arg_ty,
             call,
             span,
-            "rms_norm",
-            "receiver",
-            TensorNormFlags {
-                rank_1_or_2: false,
-                layernorm_arity_gate: false,
-                beta: false,
+            TensorNormSpec {
+                label: "rms_norm",
+                receiver_label: "receiver",
+                flags: TensorNormFlags {
+                    rank_1_or_2: false,
+                    layernorm_arity_gate: false,
+                    beta: false,
+                },
             },
         );
     }
@@ -1952,10 +1994,13 @@ impl Validator<'_, '_> {
         first_arg_ty: Option<MirType>,
         call: &MirRuntimeCall,
         span: Span,
-        label: &'static str,
-        receiver_label: &'static str,
-        flags: TensorNormFlags,
+        spec: TensorNormSpec,
     ) {
+        let TensorNormSpec {
+            label,
+            receiver_label,
+            flags,
+        } = spec;
         let Some(receiver_ty) = first_arg_ty else {
             return;
         };
