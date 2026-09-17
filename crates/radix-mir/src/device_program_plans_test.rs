@@ -1331,6 +1331,7 @@ fn elementwise_device_program() -> DeviceProgram {
     let kernel = KernelUnit {
         function: MirFunctionId(0),
         entry: "addita".to_owned(),
+        library_operation: crate::device_plan_compiler::LibraryOperation::Generated,
         plan: CollectionKernelPlan::Elementwise,
         resources: vec![
             resource(
@@ -1367,6 +1368,36 @@ fn elementwise_device_program() -> DeviceProgram {
             cadence: ObservationCadence::EndOfRun,
         }],
     }
+}
+
+#[test]
+fn elementwise_library_selection_uses_typed_operation() {
+    let mut program = elementwise_device_program();
+    program.kernels[0].entry = "unrelated_symbol".to_owned();
+    program.kernels[0].library_operation = crate::device_plan_compiler::LibraryOperation::SwiGlu;
+    assert_eq!(
+        executor_plan_extension(&program).selections[0]
+            .library_entry
+            .as_deref(),
+        Some("swiglu")
+    );
+
+    program.kernels[0].library_operation =
+        crate::device_plan_compiler::LibraryOperation::ResidualRmsNorm;
+    assert_eq!(
+        executor_plan_extension(&program).selections[0]
+            .library_entry
+            .as_deref(),
+        Some("residual")
+    );
+
+    program.kernels[0].library_operation = crate::device_plan_compiler::LibraryOperation::Generated;
+    assert_eq!(
+        executor_plan_extension(&program).selections[0]
+            .library_entry
+            .as_deref(),
+        None
+    );
 }
 
 // -----------------------------------------------------------------------
@@ -2176,6 +2207,7 @@ fn transformer_plans_report_zero_shared_memory() {
     let kernel = KernelUnit {
         function: MirFunctionId(0),
         entry: "softmaxa".to_owned(),
+        library_operation: crate::device_plan_compiler::LibraryOperation::Generated,
         plan: CollectionKernelPlan::RowSoftmax(crate::kernel_plan::RowSoftmaxPlan {
             axis: 1,
             batched: None,
@@ -2504,6 +2536,7 @@ fn reduction_kernel_descriptor_reports_recipe_and_shared_memory() {
     let kernel = KernelUnit {
         function: MirFunctionId(0),
         entry: "summa".to_owned(),
+        library_operation: crate::device_plan_compiler::LibraryOperation::Generated,
         plan: carried_reduction_plan(1024, 256, 4),
         resources: vec![
             resource(
@@ -2578,6 +2611,7 @@ fn matmul_kernel_descriptor_reports_tiled_matmul_recipe() {
     let kernel = KernelUnit {
         function: MirFunctionId(0),
         entry: "multiplico".to_owned(),
+        library_operation: crate::device_plan_compiler::LibraryOperation::Generated,
         plan: CollectionKernelPlan::TiledMatMul(matmul_plan),
         resources: vec![
             resource(
@@ -3881,6 +3915,7 @@ fn dual_output_kernel_program() -> DeviceProgram {
     let kernel = KernelUnit {
         function: MirFunctionId(0),
         entry: "dual_output".to_owned(),
+        library_operation: crate::device_plan_compiler::LibraryOperation::Generated,
         plan: CollectionKernelPlan::Elementwise,
         resources: vec![
             resource(
@@ -4085,6 +4120,7 @@ fn executor_plan_exposes_packed_region_and_decode_gemv_facts() {
     let kernel = KernelUnit {
         function: MirFunctionId(0),
         entry: "qmm".to_owned(),
+        library_operation: crate::device_plan_compiler::LibraryOperation::Generated,
         plan,
         resources: vec![
             resource(

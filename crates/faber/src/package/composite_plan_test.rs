@@ -84,6 +84,7 @@ fn fixture_program() -> DeviceProgram {
     let kernel = KernelUnit {
         function: MirFunctionId(7),
         entry: "matmul".to_owned(),
+        library_operation: radix_mir::device_plan_compiler::LibraryOperation::Generated,
         plan: CollectionKernelPlan::Elementwise,
         resources: vec![
             DeviceResource {

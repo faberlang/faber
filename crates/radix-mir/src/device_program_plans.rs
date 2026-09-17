@@ -17,6 +17,7 @@ use crate::abi::{
     PackedStorageLayout, StorageBufferLimitRecord, collection_op_contract,
     device_view_element_count, storage_buffer_limit_error,
 };
+use crate::device_plan_compiler::LibraryOperation;
 use crate::device_program::{
     Binding, BufferRole, DeviceProgram, DeviceProgramError, DeviceResource, KernelUnit,
 };
@@ -2154,12 +2155,11 @@ fn library_entry_for_kernel(kernel: &KernelUnit, recipe: RecipeKind) -> Option<S
         RecipeKind::RmsNormalization => Some("rms"),
         RecipeKind::Rope => Some("rope"),
         RecipeKind::RowSoftmax | RecipeKind::CausalMaskedSoftmax => Some("softmax"),
-        RecipeKind::Elementwise if kernel.entry.starts_with("swiglu") => Some("swiglu"),
-        RecipeKind::Elementwise
-            if kernel.entry.contains("residual") || kernel.entry.starts_with("sum_o_") =>
-        {
-            Some("residual")
-        }
+        RecipeKind::Elementwise => match kernel.library_operation {
+            LibraryOperation::SwiGlu => Some("swiglu"),
+            LibraryOperation::ResidualRmsNorm => Some("residual"),
+            _ => None,
+        },
         _ => None,
     }?;
     Some(entry.to_owned())

@@ -771,6 +771,7 @@ fn wire_kernel(kernel: &WireKernelUnit) -> Result<KernelUnit, FmirImageError> {
     Ok(KernelUnit {
         function: MirFunctionId(kernel.function),
         entry: kernel.entry.clone(),
+        library_operation: radix_mir::device_plan_compiler::LibraryOperation::Generated,
         plan: wire_kernel_plan(&kernel.plan),
         resources: kernel
             .resources

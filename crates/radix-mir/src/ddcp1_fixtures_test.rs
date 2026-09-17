@@ -149,6 +149,7 @@ fn chain_program_with_semantics() -> (DeviceProgram, DeviceSemantics) {
             KernelUnit {
                 function: MirFunctionId(0),
                 entry: "chain_producer".to_owned(),
+                library_operation: crate::device_plan_compiler::LibraryOperation::Generated,
                 plan: CollectionKernelPlan::Elementwise,
                 resources: vec![DeviceResource {
                     buffer: mid.clone(),
@@ -164,6 +165,7 @@ fn chain_program_with_semantics() -> (DeviceProgram, DeviceSemantics) {
             KernelUnit {
                 function: MirFunctionId(1),
                 entry: "chain_consumer".to_owned(),
+                library_operation: crate::device_plan_compiler::LibraryOperation::Generated,
                 plan: CollectionKernelPlan::Elementwise,
                 resources: vec![
                     DeviceResource {
@@ -321,6 +323,7 @@ fn oracle_subject() -> (DeviceProgram, DeviceSemantics) {
             KernelUnit {
                 function: MirFunctionId(0),
                 entry: "forward".to_owned(),
+                library_operation: crate::device_plan_compiler::LibraryOperation::Generated,
                 plan: CollectionKernelPlan::Elementwise,
                 resources: vec![DeviceResource {
                     buffer: mid.clone(),
@@ -336,6 +339,7 @@ fn oracle_subject() -> (DeviceProgram, DeviceSemantics) {
             KernelUnit {
                 function: MirFunctionId(1),
                 entry: "backward".to_owned(),
+                library_operation: crate::device_plan_compiler::LibraryOperation::Generated,
                 plan: CollectionKernelPlan::Elementwise,
                 resources: vec![
                     DeviceResource {
@@ -507,6 +511,7 @@ fn fixture_1_multi_output_materializes_and_fails_closed_on_domain_conflict() {
         kernels: vec![KernelUnit {
             function: MirFunctionId(0),
             entry: "multi_output".to_owned(),
+            library_operation: crate::device_plan_compiler::LibraryOperation::Generated,
             plan: CollectionKernelPlan::Elementwise,
             resources: vec![
                 DeviceResource {
@@ -692,6 +697,7 @@ fn fixture_2_shape_change_is_new_version_and_rebind_fails_closed() {
             KernelUnit {
                 function: MirFunctionId(0),
                 entry: "write_v1".to_owned(),
+                library_operation: crate::device_plan_compiler::LibraryOperation::Generated,
                 plan: CollectionKernelPlan::Elementwise,
                 resources: vec![DeviceResource {
                     buffer: resized.clone(),
@@ -707,6 +713,7 @@ fn fixture_2_shape_change_is_new_version_and_rebind_fails_closed() {
             KernelUnit {
                 function: MirFunctionId(1),
                 entry: "write_v2".to_owned(),
+                library_operation: crate::device_plan_compiler::LibraryOperation::Generated,
                 plan: CollectionKernelPlan::Elementwise,
                 resources: vec![DeviceResource {
                     buffer: resized,
@@ -855,6 +862,7 @@ fn fixture_4_repeated_step_materializes_and_cadence_mismatch_fails_closed() {
             KernelUnit {
                 function: MirFunctionId(0),
                 entry: "forward".to_owned(),
+                library_operation: crate::device_plan_compiler::LibraryOperation::Generated,
                 plan: CollectionKernelPlan::Elementwise,
                 resources: vec![
                     DeviceResource {
@@ -881,6 +889,7 @@ fn fixture_4_repeated_step_materializes_and_cadence_mismatch_fails_closed() {
             KernelUnit {
                 function: MirFunctionId(1),
                 entry: "finalize".to_owned(),
+                library_operation: crate::device_plan_compiler::LibraryOperation::Generated,
                 plan: CollectionKernelPlan::Elementwise,
                 resources: vec![
                     DeviceResource {
@@ -1212,6 +1221,7 @@ fn materialize_recipe_kernel(
         kernels: vec![KernelUnit {
             function: MirFunctionId(0),
             entry: "recipe_kernel".to_owned(),
+            library_operation: crate::device_plan_compiler::LibraryOperation::Generated,
             plan,
             resources: vec![
                 DeviceResource {
@@ -1433,6 +1443,7 @@ fn causal_masked_softmax_whole_and_decomposed_seam() {
         kernels: vec![KernelUnit {
             function: MirFunctionId(0),
             entry: "attention_v_projection".to_owned(),
+            library_operation: crate::device_plan_compiler::LibraryOperation::Generated,
             plan: decomposed,
             resources: vec![
                 DeviceResource {

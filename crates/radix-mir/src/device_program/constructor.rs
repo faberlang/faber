@@ -17,6 +17,7 @@ use crate::abi::{
     MirKernelSignature, collection_op_contract,
 };
 use crate::device::{MirCompanionMap, MirDeviceFunctionMetadataMap};
+use crate::device_plan_compiler::LibraryOperation;
 use crate::device_program_plans::{
     is_transformer_recipe_op, kernel_plan_for_function,
     subchain_signature_for_emission_with_source,
@@ -175,6 +176,7 @@ struct ResourceBuild {
 struct KernelBuild {
     function: MirFunctionId,
     entry: String,
+    library_operation: LibraryOperation,
     plan: CollectionKernelPlan,
     launch: KernelLaunchPlan,
     resources: Vec<ResourceBuild>,
@@ -590,6 +592,7 @@ pub fn build_device_program(
         device_program.kernels.push(KernelUnit {
             function: build.function,
             entry: build.entry.clone(),
+            library_operation: build.library_operation,
             plan: build.plan.clone(),
             resources: device_resources,
             launch: build.launch,
@@ -1151,6 +1154,10 @@ impl<'a> KernelBuilder<'a> {
         self.builds.push(KernelBuild {
             function: kernel_source.id,
             entry,
+            // This MIR→DeviceProgram path has no compiled library selection
+            // carrier. Keep the no-library fact explicit rather than infer it
+            // from the function name or body shape.
+            library_operation: LibraryOperation::Generated,
             plan,
             launch,
             resources,
