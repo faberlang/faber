@@ -795,7 +795,7 @@ fn compile_rejects_line_start_section_directive() {
         result
             .diagnostics
             .iter()
-            .any(|d| d.is_error() && d.code == Some("LEX005") && d.issue() == Some("removed_section_directive"))
+            .any(|d| d.is_error() && d.code == Some("LEX004") && d.issue() == Some("unexpected_character"))
     );
 }
 
@@ -851,7 +851,7 @@ fn compile_reports_parse_errors() {
 }
 
 #[test]
-fn compile_rejects_retired_itera_pro_mode() {
+fn compile_rejects_itera_pro_mode() {
     let session = test_session(Target::HirRust);
     let source = "incipit {\n  fixum _ xs ← [1, 2, 3]\n  itera pro fixum x de xs {\n    nota x\n  }\n}";
     let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
@@ -1193,19 +1193,13 @@ fn regex_conversio_no_longer_reports_unsupported_lowering_error() {
 }
 
 #[test]
-fn retired_sed_fails_without_targeted_diagnostic() {
+fn sed_expression_fails_with_generic_unknown_identifier() {
     let session = test_session(Target::HirRust);
     let source = r#"incipit { fixum _ r ← sed "\d+" g }"#;
     let result = compile(&session, "sed-retired.fab", source, ModuleCompileRequest::default());
-    // `sed` is a plain identifier now; the source fails with generic
-    // unknown-identifier errors, never the retired `PARSE030.retired_sed`.
+    // `sed` is a plain identifier; the source fails with generic
+    // unknown-identifier errors.
     assert!(!result.success());
-    assert!(
-        !result
-            .diagnostics
-            .iter()
-            .any(|diag| diag.code == Some("PARSE030") && diag.issue() == Some("retired_sed"))
-    );
     assert!(
         result
             .diagnostics
@@ -1368,7 +1362,7 @@ incipit {
 // ── retired syntax / legacy ──
 
 #[test]
-fn retired_ab_pipeline_is_not_active_rust_syntax() {
+fn ab_pipeline_is_not_active_rust_syntax() {
     let session = test_session(Target::HirRust);
     let source = r"incipit {
   fixum _ users ← [{ activus = verum }]
@@ -1384,19 +1378,12 @@ fn retired_ab_pipeline_is_not_active_rust_syntax() {
 #[test]
 fn triple_quote_is_not_a_block_string_surface() {
     let session = test_session(Target::HirRust);
-    // A bare `"""` is no longer a retired block-string special case: it fails
-    // as an ordinary unterminated string, never with the retired
-    // `unsupported_triple_quote_string` diagnostic.
+    // A bare `"""` fails as an ordinary unterminated string.
     let source = "incipit {\n  fixum _ value ← \"\"\"\n  nota value\n}";
     let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
 
     assert!(!result.success());
-    assert!(
-        !result
-            .diagnostics
-            .iter()
-            .any(|d| d.code == Some("LEX004") && d.issue() == Some("unsupported_triple_quote_string"))
-    );
+    assert!(result.diagnostics.iter().any(|d| d.code == Some("LEX001")));
 }
 
 #[test]

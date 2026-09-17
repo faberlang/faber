@@ -283,14 +283,6 @@ help = "刪除該字元，或在需要作為字面值時進行跳脫"
 message = "非預期字元：{char}"
 help = "刪除該字元，或在需要作為字面值時進行跳脫"
 
-[diagnostics.LEX005]
-message = "已移除的區段指示詞"
-help = "將檔案中繼資料放入第 1 行的 +++ TOML frontmatter，而不是行首區段指示詞"
-
-[diagnostics.LEX005.issues.removed_section_directive]
-message = "檔案層級 § 指示詞已移除；請使用 +++ frontmatter"
-help = "將檔案中繼資料放入第 1 行的 +++ TOML frontmatter，而不是行首 § 指示詞"
-
 [diagnostics.LEX006]
 message = "無效註解語法"
 help = "註解請以 # 開頭，而不是 // 或 /* */"
@@ -386,10 +378,6 @@ help = "加入逗號和形狀，例如 matrix<T, [4, 4]>"
 [diagnostics.PARSE001.issues.atomic_single_element]
 message = "atomic 只接受一個元素型別"
 help = "移除多餘的型別參數；使用 atomic<T>"
-
-[diagnostics.PARSE001.issues.retired_type_call_constructor]
-message = "型別呼叫建構函式不是 Faber 語法"
-help = "使用 value ↦ Type 或具名函式庫建構函式"
 
 [diagnostics.PARSE001.issues.retired_prefix_predicate]
 message = "{predicate} 已不再是前置述詞語法"
@@ -507,17 +495,9 @@ help = "在 {genus} 宣告標頭後加入程式碼區塊"
 message = "無效參數"
 help = "檢查參數語法和順序"
 
-[diagnostics.PARSE015.issues.removed_fixus]
-message = "{keyword} 已移除；可選槽位使用 {optional_marker}，延後不可變區域變數使用 {immutable_marker}"
-help = "在名稱後用 {optional_marker} 標記可選參數或欄位槽位"
-
 [diagnostics.PARSE016]
 message = "無效型別參數"
 help = "檢查型別參數列表中的逗號和識別符"
-
-[diagnostics.PARSE016.issues.removed_prae_typus]
-message = "'{keyword}' 已移除；使用角括號宣告泛型：{replacement}"
-help = "把泛型參數寫在參數列表之前，例如 {replacement}"
 
 [diagnostics.PARSE016.issues.type_param_after_magnitudo]
 message = "型別參數必須位於泛型列表中的 {size_param} 參數之前"
@@ -654,10 +634,6 @@ help = "檢查型別語法"
 [diagnostics.PARSE040.issues.expected_type_name]
 message = "需要型別名稱"
 help = "以識別符、_ 或函式型別開頭"
-
-[diagnostics.PARSE040.issues.postfix_array_syntax]
-message = "postfix T[] 語法已移除"
-help = "使用 lista<T>"
 
 [diagnostics.PARSE040.issues.lista_sugar_bracket_form]
 message = "lista 糖沒有括號形式"
@@ -963,7 +939,6 @@ help = "修正用於降階的 AST 結構"
 message = "cursor 需要一個型別參數"
 help = "修正用於降階的 AST 結構"
 
-
 [diagnostics.SEM008.issues.queue_arity]
 message = "queue requires one or two type parameters"
 help = "use queue<T> or queue<T, N>"
@@ -1206,10 +1181,6 @@ help = "修正用於降階的 AST 結構"
 
 [diagnostics.SEM008.issues.radix_typus_unknown_generic]
 message = "@ radix typus 命名了未知的泛型參數"
-help = "修正用於降階的 AST 結構"
-
-[diagnostics.SEM008.issues.retired_bare_object_literal]
-message = "裸物件字面值已淘汰；請使用 {object_literal_forms}"
 help = "修正用於降階的 AST 結構"
 
 [diagnostics.SEM008.issues.schema_nested_column]
@@ -2092,10 +2063,6 @@ help = "先傳入填充值，再傳入形狀"
 message = "tensor.structa_forma 已移除；請使用 tensor.structa<CompleteTensorType>(data)"
 help = "使用 tensor.structa<CompleteTensorType>(data)"
 
-[diagnostics.SEM011.issues.tensor_creata_runtime_shape_removed]
-message = "tensor.creata 不再接受執行期形狀引數；請使用 tensor.creata<CompleteTensorType>(fill)"
-help = "使用 tensor.creata<CompleteTensorType>(fill)"
-
 [diagnostics.SEM011.issues.tensor_creata_complete_type_arg_required]
 message = "tensor.creata 需要完整的張量型別引數；請使用 tensor.creata<CompleteTensorType>(fill)"
 help = "提供完整的張量型別引數"
@@ -2632,7 +2599,6 @@ help = "若需要變更，請將參數宣告為 'in'"
 message = "無法指派給 `de` 參數"
 help = "若需要變更，請將參數宣告為 'in'"
 
-
 [diagnostics.SEM056.issues.mutating_receiver_through_ref]
 message = "cannot call a mutating receiver through a `ref` view"
 help = "drop the `ref` marker, or use a non-mutating method"
@@ -2648,7 +2614,6 @@ help = "使呼叫端與被呼叫端的參數模式一致"
 [diagnostics.SEM057.issues.de_to_in_or_ex_position]
 message = "無法將 `de` 參數傳入 `in` 或 `ex` 位置"
 help = "使呼叫端與被呼叫端的參數模式一致"
-
 
 [diagnostics.SEM057.issues.ref_to_mut_or_own_position]
 message = "cannot pass a `ref` value to a `mut` or `own` position"
@@ -2969,7 +2934,6 @@ help = "如果只意在單一類型，請使用 `_`"
 [llm]
 system_prompt_snippet = "Emit Traditional Chinese reader-locale Faber using Traditional Chinese keywords where the pack overrides Simplified Chinese rows, while preserving universal Faber glyph syntax."
 exemplars = ["./exemplars/salve-munde.zh-Hant.fab"]
-
 
 # Queue/stack C2 named-method rows and the lista omnia/quilibet predicate
 # twins. These compiler-owned names remain canonical in every reader pack;

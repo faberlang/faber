@@ -18,7 +18,6 @@ pub(crate) const LEX_ERROR_KINDS: &[LexErrorKind] = &[
     LexErrorKind::NumberInvalid,
     LexErrorKind::EscapeInvalid,
     LexErrorKind::CharacterUnexpected,
-    LexErrorKind::RemovedSectionDirective,
     LexErrorKind::CommentSyntaxInvalid,
     LexErrorKind::InlineComment,
 ];
@@ -84,12 +83,6 @@ pub fn lex_spec(kind: LexErrorKind) -> DiagnosticSpec {
         LexErrorKind::CharacterUnexpected => DiagnosticSpec {
             code: "LEX004",
             help: Some("remove the character or escape it if it should be literal"),
-        },
-        LexErrorKind::RemovedSectionDirective => DiagnosticSpec {
-            code: "LEX005",
-            help: Some(
-                "put file metadata in +++ TOML frontmatter on line 1 instead of line-start § directives",
-            ),
         },
         LexErrorKind::CommentSyntaxInvalid => DiagnosticSpec {
             code: "LEX006",
@@ -295,9 +288,6 @@ pub fn lex_message(kind: LexErrorKind, args: &[DiagnosticArg]) -> Option<String>
             }
             _ => None,
         },
-        LexErrorKind::RemovedSectionDirective => {
-            Some("file-scope § directives were removed; use +++ frontmatter".to_owned())
-        }
         LexErrorKind::CommentSyntaxInvalid => match issue? {
             "c_style_line_comment" => Some(
                 "C-style // comments are not valid in Faber; use # for line comments".to_owned(),
@@ -444,14 +434,6 @@ pub fn parse_help(kind: ParseErrorKind, args: &[DiagnosticArg]) -> Option<String
 fn invalid_parameter_message(args: &[DiagnosticArg]) -> Option<String> {
     let issue = arg_value(args, "issue")?;
     match issue {
-        "removed_fixus" => {
-            let keyword = arg_value(args, "keyword")?;
-            let optional_marker = arg_value(args, "optional_marker")?;
-            let immutable_marker = arg_value(args, "immutable_marker")?;
-            Some(format!(
-                "{keyword} was removed; use {optional_marker} for optional slots and {immutable_marker} for deferred immutable locals"
-            ))
-        }
         "parameter_access_modifier_pair" => {
             Some("parameter carries both a mode prefix and a type marker; use one".to_owned())
         }
@@ -462,12 +444,6 @@ fn invalid_parameter_message(args: &[DiagnosticArg]) -> Option<String> {
 fn invalid_parameter_help(args: &[DiagnosticArg]) -> Option<String> {
     let issue = arg_value(args, "issue")?;
     match issue {
-        "removed_fixus" => {
-            let optional_marker = arg_value(args, "optional_marker")?;
-            Some(format!(
-                "mark optional parameter or field slots with {optional_marker} after the name"
-            ))
-        }
         "parameter_access_modifier_pair" => Some(
             "write either the parameter mode prefix or the type-position marker, not both"
                 .to_owned(),
@@ -492,13 +468,6 @@ fn invalid_statement_message(args: &[DiagnosticArg]) -> Option<String> {
 fn invalid_type_parameter_message(args: &[DiagnosticArg]) -> Option<String> {
     let issue = arg_value(args, "issue")?;
     match issue {
-        "removed_prae_typus" => {
-            let keyword = quote_arg(args, "keyword")?;
-            let replacement = arg_value(args, "replacement")?;
-            Some(format!(
-                "{keyword} was removed; declare generics with angle brackets: {replacement}"
-            ))
-        }
         "type_param_after_magnitudo" => {
             let size_param = arg_value(args, "size_param")?;
             Some(format!(
@@ -512,12 +481,6 @@ fn invalid_type_parameter_message(args: &[DiagnosticArg]) -> Option<String> {
 fn invalid_type_parameter_help(args: &[DiagnosticArg]) -> Option<String> {
     let issue = arg_value(args, "issue")?;
     match issue {
-        "removed_prae_typus" => {
-            let replacement = arg_value(args, "replacement")?;
-            Some(format!(
-                "write generic parameters before the parameter list, for example {replacement}"
-            ))
-        }
         "type_param_after_magnitudo" => {
             let size_param = arg_value(args, "size_param")?;
             Some(format!(
@@ -583,9 +546,6 @@ fn expected_message(args: &[DiagnosticArg]) -> Option<String> {
             }
             "atomic_single_element" => {
                 return Some("atomic accepts exactly one element type".to_owned());
-            }
-            "retired_type_call_constructor" => {
-                return Some("type-call constructors are not Faber syntax".to_owned());
             }
             "retired_prefix_predicate" => {
                 let predicate = arg_value(args, "predicate")?;
@@ -684,9 +644,6 @@ fn expected_help(args: &[DiagnosticArg]) -> Option<String> {
             }
             "atomic_single_element" => {
                 return Some("remove the extra type parameter; use atomic<T>".to_owned());
-            }
-            "retired_type_call_constructor" => {
-                return Some("use value ↦ Type or a named library constructor".to_owned());
             }
             "retired_prefix_predicate" => {
                 let replacement = arg_value(args, "replacement")?;
@@ -843,7 +800,6 @@ fn invalid_type_message(args: &[DiagnosticArg]) -> Option<String> {
                 "type `{ty}` is not declared on this reader surface"
             ))
         }
-        "postfix_array_syntax" => Some("postfix T[] syntax is removed".to_owned()),
         "lista_sugar_bracket_form" => Some("lista sugar has no bracket form".to_owned()),
         "matrix_sugar_missing_shape" => {
             Some("matrix sugar requires a two-dimensional bracket shape".to_owned())
@@ -868,7 +824,6 @@ fn invalid_type_help(args: &[DiagnosticArg]) -> Option<String> {
         "wrong_locale_type" => {
             Some("use the type spelling declared by this reader locale".to_owned())
         }
-        "postfix_array_syntax" => Some("use lista<T>".to_owned()),
         "lista_sugar_bracket_form" => Some("use tensor sugar for shaped buffers".to_owned()),
         "matrix_sugar_missing_shape" => Some("write matrix sugar as mf32[4, 4]".to_owned()),
         "lista_sugar_angle_bracket_form" => {

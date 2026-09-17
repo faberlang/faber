@@ -207,7 +207,7 @@ pub enum TokenKind {
     Sub,
     // === Keywords: Type operations ===
     Conversio, // ↦
-    Verte,     // ∷ postfix ascription; qua/innatum/novum removed
+    Verte,     // ∷ postfix ascription
     // === Keywords: Output ===
     Mone,
     Nota,

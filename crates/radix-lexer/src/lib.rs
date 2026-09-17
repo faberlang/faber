@@ -19,8 +19,7 @@
 //!   identity. Literal and comment payloads keep source bytes (no NFKC).
 //! - Language keywords lex as identifiers. The scanner records latin identity
 //!   keys for registered spellings; the parser claims them by identity.
-//!   Line-start `§` file directives were removed; `§` remains valid only
-//!   inside string templates.
+//!   `§` is valid only inside string templates.
 //! - The lexer does not own grammar recovery. It emits `Error` tokens and
 //!   structured [`LexError`] values; parser and diagnostic layers decide how to
 //!   present or recover from the surrounding syntax.

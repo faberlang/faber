@@ -1089,9 +1089,6 @@ fn semantic_invalid_operand_types_message(args: &[DiagnosticArg]) -> Option<Stri
         "tensor_structa_forma_removed" => {
             Some(crate::tensor_type_directed::TENSOR_STRUCTA_FORMA_OLD_FORM_MSG.to_owned())
         }
-        "tensor_creata_runtime_shape_removed" => {
-            Some(crate::tensor_type_directed::TENSOR_CREATA_OLD_FORM_MSG.to_owned())
-        }
         "tensor_creata_complete_type_arg_required" => Some(
             "tensor.creata requires a complete tensor type argument; use tensor.creata<CompleteTensorType>(fill)"
                 .to_owned(),
@@ -1302,7 +1299,6 @@ fn semantic_invalid_operand_types_help(args: &[DiagnosticArg]) -> Option<String>
         }
         "tensor_crea_argument_order" => Some("pass fill before shape".to_owned()),
         "tensor_structa_forma_removed" => Some("use tensor.structa<CompleteTensorType>(data)".to_owned()),
-        "tensor_creata_runtime_shape_removed" => Some("use tensor.creata<CompleteTensorType>(fill)".to_owned()),
         "tensor_creata_complete_type_arg_required" => Some("provide a complete tensor type argument".to_owned()),
         "tensor_formata_complete_type_arg_required" => Some("provide a complete tensor type argument".to_owned()),
         "tensor_formata_forbids_value_args" => Some("use grid.forma(shape) for runtime reshape".to_owned()),
@@ -2032,10 +2028,6 @@ fn semantic_lowering_error_message(args: &[DiagnosticArg]) -> Option<String> {
         }
         "radix_typus_unknown_generic" => {
             Some("@ radix typus names an unknown generic parameter".to_owned())
-        }
-        "retired_bare_object_literal" => {
-            let forms = arg_value(args, "object_literal_forms")?;
-            Some(format!("bare object literal is retired; use {forms}"))
         }
         "scalar_access_marker" => Some(
             "`ref`/`mut` apply to scalar parameter types only; `own`/`copy` do not apply to scalar types, and bind declarations reject all access markers"

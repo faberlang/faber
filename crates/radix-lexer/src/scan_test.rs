@@ -257,8 +257,8 @@ fn rejects_line_start_section_directive() {
     let result = lex("§ sectio \"smoke\"\n");
     assert!(!result.success());
     assert!(result.errors.iter().any(|err| {
-        err.kind == LexErrorKind::RemovedSectionDirective
-            && has_arg(err, "issue", "removed_section_directive")
+        err.kind == LexErrorKind::CharacterUnexpected
+            && has_arg(err, "issue", "unexpected_character")
     }));
 }
 
@@ -1490,7 +1490,7 @@ fn lexes_shift_arrow_glyphs() {
 }
 
 #[test]
-fn rejects_retired_shift_glyphs() {
+fn rejects_shift_glyphs() {
     for src in ["1 ≪ 4", "16 ≫ 2"] {
         let result = lex(src);
         assert!(
@@ -1498,33 +1498,32 @@ fn rejects_retired_shift_glyphs() {
                 .errors
                 .iter()
                 .any(|err| err.kind == LexErrorKind::CharacterUnexpected),
-            "retired shift glyph in {src:?} should be a scan error"
+            "shift glyph in {src:?} should be a scan error"
         );
     }
 }
 
 #[test]
-fn rejects_retired_verte_arrow() {
+fn rejects_verte_arrow_glyph() {
     let result = lex("x ⇢ textus");
     assert!(
         result
             .errors
             .iter()
             .any(|err| err.kind == LexErrorKind::CharacterUnexpected),
-        "retired ⇢ glyph should no longer lex as a type-ascription operator"
+        "the ⇢ glyph must not lex as a type-ascription operator"
     );
 }
 
 #[test]
-fn removed_verte_aliases_now_lex_as_identifiers() {
-    // Post verte-alias-clean-break: qua/innatum/novum are ordinary identifiers in normal mode.
+fn verte_alias_spellings_lex_as_identifiers() {
     // Only the ∷ glyph produces TokenKind::Verte.
     for word in &["qua", "innatum", "novum"] {
         let result = lex(&format!("x {word} textus"));
         assert!(result.errors.is_empty(), "failed for word: {word}");
         assert!(
             matches!(&result.tokens[1].kind, TokenKind::Ident(_)),
-            "'{word}' should now lex as Ident (Verte aliases removed)",
+            "'{word}' should lex as Ident",
         );
     }
 }
@@ -1799,10 +1798,9 @@ fn unterminated_guillemet_literal_at_eof_recovers() {
 }
 
 #[test]
-fn retired_block_string_glyph_is_unexpected_character() {
-    // Guillemets `«...»` are the only block-string spelling. The retired `❝`
-    // opener must fail as a plain unexpected character, not a block-string
-    // token with a targeted replacement diagnostic.
+fn block_string_opener_glyph_is_unexpected_character() {
+    // Guillemets `«...»` are the only block-string spelling; `❝` fails as a
+    // plain unexpected character.
     let result = lex("❝legacy❞");
     assert!(
         result
@@ -1810,26 +1808,20 @@ fn retired_block_string_glyph_is_unexpected_character() {
             .iter()
             .any(|err| has_arg(err, "issue", "unexpected_character"))
     );
-    assert!(!result.errors.iter().any(|err| has_arg(
-        err,
-        "issue",
-        "retired_block_string_delimiter"
-    )));
     assert!(matches!(result.tokens[0].kind, TokenKind::Error));
 }
 
 #[test]
 fn triple_quote_is_not_a_special_lex_surface() {
-    // The retired `"""` triple-quote pre-check is gone: `"""` must fail as an
-    // ordinary string lex error (unterminated at EOF), never with the retired
-    // `unsupported_triple_quote_string` diagnostic.
+    // `"""` fails as an ordinary string lex error (unterminated at EOF).
     let result = lex("\"\"\"");
     assert!(!result.success());
-    assert!(!result.errors.iter().any(|err| has_arg(
-        err,
-        "issue",
-        "unsupported_triple_quote_string"
-    )));
+    assert!(
+        result
+            .errors
+            .iter()
+            .any(|err| err.kind == LexErrorKind::UnterminatedString)
+    );
 }
 
 #[test]

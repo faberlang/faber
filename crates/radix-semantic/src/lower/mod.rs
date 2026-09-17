@@ -1102,13 +1102,6 @@ fn issue_args(issue: &'static str) -> Vec<DiagnosticArg> {
     vec![DiagnosticArg::new("issue", issue)]
 }
 
-fn retired_bare_object_literal_args() -> Vec<DiagnosticArg> {
-    vec![
-        DiagnosticArg::new("issue", "retired_bare_object_literal"),
-        DiagnosticArg::new("object_literal_forms", "JSON { ... } or Type { ... }"),
-    ]
-}
-
 #[cfg(test)]
 #[path = "authored_form_test.rs"]
 mod authored_form_test;

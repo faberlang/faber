@@ -315,10 +315,6 @@ impl Parser {
             }
         };
 
-        if self.check(&TokenKind::LBracket) {
-            return Err(self.invalid_type_error("postfix_array_syntax"));
-        }
-
         let span = start.merge(self.previous_span());
         let core = TypeExpr {
             nullable: false,

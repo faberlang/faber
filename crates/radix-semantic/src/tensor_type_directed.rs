@@ -14,7 +14,6 @@ pub struct CompleteTensorType {
 }
 
 pub const TENSOR_TYPE_ARG_INCOMPLETE_MSG: &str = "tensor type argument must be a complete tensor type such as tf32[2, 2] or tensor<numerus, [4]>";
-pub const TENSOR_CREATA_OLD_FORM_MSG: &str = "tensor.creata no longer accepts a runtime shape argument; use tensor.creata<CompleteTensorType>(fill)";
 pub const TENSOR_STRUCTA_FORMA_OLD_FORM_MSG: &str =
     "tensor.structa_forma was removed; use tensor.structa<CompleteTensorType>(data)";
 pub const TENSOR_RECEIVER_CREATA_TYPE_ARGS_MSG: &str = "tensor receiver creata does not accept type arguments; use tensor.creata<CompleteTensorType>(fill)";

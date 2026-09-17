@@ -283,14 +283,6 @@ help = "xóa ký tự này hoặc escape nếu cần dùng như ký tự literal
 message = "ký tự không mong đợi: {char}"
 help = "xóa ký tự này hoặc escape nếu cần dùng như ký tự literal"
 
-[diagnostics.LEX005]
-message = "chỉ thị section đã bị gỡ bỏ"
-help = "đặt metadata tệp trong frontmatter TOML +++ ở dòng 1 thay cho chỉ thị section đầu dòng"
-
-[diagnostics.LEX005.issues.removed_section_directive]
-message = "chỉ thị § ở phạm vi tệp đã bị gỡ bỏ; dùng frontmatter +++"
-help = "đặt metadata tệp trong frontmatter TOML +++ ở dòng 1 thay cho chỉ thị § đầu dòng"
-
 [diagnostics.LEX006]
 message = "cú pháp comment không hợp lệ"
 help = "đặt # trước comment thay cho // hoặc /* */"
@@ -386,10 +378,6 @@ help = "thêm dấu phẩy và shape, ví dụ matrix<T, [4, 4]>"
 [diagnostics.PARSE001.issues.atomic_single_element]
 message = "atomic nhận đúng một kiểu phần tử"
 help = "xóa tham số kiểu thừa; dùng atomic<T>"
-
-[diagnostics.PARSE001.issues.retired_type_call_constructor]
-message = "constructor gọi kiểu không phải cú pháp Faber"
-help = "dùng value ↦ Type hoặc constructor thư viện có tên"
 
 [diagnostics.PARSE001.issues.retired_prefix_predicate]
 message = "{predicate} không còn là cú pháp predicate tiền tố"
@@ -507,17 +495,9 @@ help = "thêm block sau header declaration '{genus}'"
 message = "parameter không hợp lệ"
 help = "kiểm tra syntax và thứ tự parameter"
 
-[diagnostics.PARSE015.issues.removed_fixus]
-message = "{keyword} đã bị gỡ bỏ; dùng {optional_marker} cho slot optional và {immutable_marker} cho local immutable trì hoãn"
-help = "đánh dấu slot parameter hoặc field optional bằng {optional_marker} sau tên"
-
 [diagnostics.PARSE016]
 message = "type parameter không hợp lệ"
 help = "kiểm tra danh sách type parameter về comma và identifier"
-
-[diagnostics.PARSE016.issues.removed_prae_typus]
-message = "'{keyword}' đã bị gỡ bỏ; khai báo generics bằng angle brackets: {replacement}"
-help = "viết generic parameters trước danh sách parameter, ví dụ {replacement}"
 
 [diagnostics.PARSE016.issues.type_param_after_magnitudo]
 message = "type parameters phải đứng trước parameters {size_param} trong danh sách generic"
@@ -654,10 +634,6 @@ help = "kiểm tra cú pháp kiểu"
 [diagnostics.PARSE040.issues.expected_type_name]
 message = "cần tên kiểu"
 help = "bắt đầu kiểu bằng một định danh, _, hoặc kiểu hàm"
-
-[diagnostics.PARSE040.issues.postfix_array_syntax]
-message = "cú pháp T[] hậu tố đã bị loại bỏ"
-help = "dùng lista<T>"
 
 [diagnostics.PARSE040.issues.lista_sugar_bracket_form]
 message = "cú pháp đường tắt lista không có dạng ngoặc vuông"
@@ -963,7 +939,6 @@ help = "sửa cấu trúc AST để hạ mức"
 message = "cursor yêu cầu một tham số kiểu"
 help = "sửa cấu trúc AST để hạ mức"
 
-
 [diagnostics.SEM008.issues.queue_arity]
 message = "queue requires one or two type parameters"
 help = "use queue<T> or queue<T, N>"
@@ -1206,10 +1181,6 @@ help = "sửa cấu trúc AST để hạ mức"
 
 [diagnostics.SEM008.issues.radix_typus_unknown_generic]
 message = "@ radix typus chỉ đến một tham số generic không xác định"
-help = "sửa cấu trúc AST để hạ mức"
-
-[diagnostics.SEM008.issues.retired_bare_object_literal]
-message = "literal đối tượng trần đã ngừng dùng; dùng {object_literal_forms}"
 help = "sửa cấu trúc AST để hạ mức"
 
 [diagnostics.SEM008.issues.schema_nested_column]
@@ -2092,10 +2063,6 @@ help = "truyền fill trước shape"
 message = "tensor.structa_forma đã bị xóa; dùng tensor.structa<CompleteTensorType>(data)"
 help = "dùng tensor.structa<CompleteTensorType>(data)"
 
-[diagnostics.SEM011.issues.tensor_creata_runtime_shape_removed]
-message = "tensor.creata không còn nhận đối số shape runtime; dùng tensor.creata<CompleteTensorType>(fill)"
-help = "dùng tensor.creata<CompleteTensorType>(fill)"
-
 [diagnostics.SEM011.issues.tensor_creata_complete_type_arg_required]
 message = "tensor.creata cần đối số kiểu tensor đầy đủ; dùng tensor.creata<CompleteTensorType>(fill)"
 help = "cung cấp một đối số kiểu tensor đầy đủ"
@@ -2632,7 +2599,6 @@ help = "khai báo tham số là 'in' nếu muốn thay đổi nó"
 message = "không thể gán cho tham số `de`"
 help = "khai báo tham số là 'in' nếu muốn thay đổi nó"
 
-
 [diagnostics.SEM056.issues.mutating_receiver_through_ref]
 message = "cannot call a mutating receiver through a `ref` view"
 help = "drop the `ref` marker, or use a non-mutating method"
@@ -2648,7 +2614,6 @@ help = "đồng bộ chế độ tham số giữa bên gọi và bên được g
 [diagnostics.SEM057.issues.de_to_in_or_ex_position]
 message = "không thể truyền tham số `de` vào vị trí `in` hoặc `ex`"
 help = "đồng bộ chế độ tham số giữa bên gọi và bên được gọi"
-
 
 [diagnostics.SEM057.issues.ref_to_mut_or_own_position]
 message = "cannot pass a `ref` value to a `mut` or `own` position"
@@ -2969,7 +2934,6 @@ help = "dùng `_` nếu chỉ một type được chủ đích"
 [llm]
 system_prompt_snippet = "Emit Vietnamese reader-locale Faber using Vietnamese keywords for declarations, control flow, loops, returns, booleans, common primitive types, and list/map collections. Keep Faber glyph syntax unchanged and preserve Vietnamese tone marks."
 exemplars = ["./exemplars/salve-munde.vi.fab"]
-
 
 # Queue/stack C2 named-method rows and the lista omnia/quilibet predicate
 # twins. These compiler-owned names remain canonical in every reader pack;

@@ -283,14 +283,6 @@ help = "删除该字符，或在需要作为字面量时进行转义"
 message = "意外字符：{char}"
 help = "删除该字符，或在需要作为字面量时进行转义"
 
-[diagnostics.LEX005]
-message = "已移除 section directive"
-help = "把文件元数据放进第 1 行的 +++ TOML frontmatter，而不是行首 section directives"
-
-[diagnostics.LEX005.issues.removed_section_directive]
-message = "文件级 § directives 已移除；请使用 +++ frontmatter"
-help = "把文件元数据放进第 1 行的 +++ TOML frontmatter，而不是行首 § directives"
-
 [diagnostics.LEX006]
 message = "无效注释语法"
 help = "注释请加 # 前缀，而不是 // 或 /* */"
@@ -386,10 +378,6 @@ help = "添加逗号和 shape，例如 matrix<T, [4, 4]>"
 [diagnostics.PARSE001.issues.atomic_single_element]
 message = "atomic 只接受一个 element type"
 help = "移除多余的 type parameter；使用 atomic<T>"
-
-[diagnostics.PARSE001.issues.retired_type_call_constructor]
-message = "type-call constructors 不是 Faber 语法"
-help = "使用 value ↦ Type 或命名 library constructor"
 
 [diagnostics.PARSE001.issues.retired_prefix_predicate]
 message = "{predicate} 已不再是 prefix predicate 语法"
@@ -507,17 +495,9 @@ help = "在 {genus} 声明头后添加代码块"
 message = "无效参数"
 help = "检查参数语法和顺序"
 
-[diagnostics.PARSE015.issues.removed_fixus]
-message = "{keyword} 已移除；可选槽位使用 {optional_marker}，延后不可变局部量使用 {immutable_marker}"
-help = "在名称后用 {optional_marker} 标记可选参数或字段槽位"
-
 [diagnostics.PARSE016]
 message = "无效类型参数"
 help = "检查类型参数列表中的逗号和标识符"
-
-[diagnostics.PARSE016.issues.removed_prae_typus]
-message = "'{keyword}' 已移除；使用尖括号声明泛型：{replacement}"
-help = "把泛型参数写在参数列表之前，例如 {replacement}"
 
 [diagnostics.PARSE016.issues.type_param_after_magnitudo]
 message = "类型参数必须位于泛型列表中的 {size_param} 参数之前"
@@ -654,10 +634,6 @@ help = "检查类型语法"
 [diagnostics.PARSE040.issues.expected_type_name]
 message = "需要类型名"
 help = "以 identifier、_ 或 function type 开始类型"
-
-[diagnostics.PARSE040.issues.postfix_array_syntax]
-message = "postfix T[] 语法已移除"
-help = "使用 lista<T>"
 
 [diagnostics.PARSE040.issues.lista_sugar_bracket_form]
 message = "lista sugar 没有 bracket 形式"
@@ -963,7 +939,6 @@ help = "修正用于 lowering 的 AST construct"
 message = "cursor 需要一个 type parameter"
 help = "修正用于 lowering 的 AST construct"
 
-
 [diagnostics.SEM008.issues.queue_arity]
 message = "queue requires one or two type parameters"
 help = "use queue<T> or queue<T, N>"
@@ -1206,10 +1181,6 @@ help = "修正用于 lowering 的 AST construct"
 
 [diagnostics.SEM008.issues.radix_typus_unknown_generic]
 message = "@ radix typus 命名了未知的 generic parameter"
-help = "修正用于 lowering 的 AST construct"
-
-[diagnostics.SEM008.issues.retired_bare_object_literal]
-message = "bare object literal 已退役；请使用 {object_literal_forms}"
 help = "修正用于 lowering 的 AST construct"
 
 [diagnostics.SEM008.issues.schema_nested_column]
@@ -2092,10 +2063,6 @@ help = "fill 写在 shape 之前"
 message = "tensor.structa_forma 已移除；请使用 tensor.structa<CompleteTensorType>(data)"
 help = "使用 tensor.structa<CompleteTensorType>(data)"
 
-[diagnostics.SEM011.issues.tensor_creata_runtime_shape_removed]
-message = "tensor.creata 不再接受 runtime shape argument；请使用 tensor.creata<CompleteTensorType>(fill)"
-help = "使用 tensor.creata<CompleteTensorType>(fill)"
-
 [diagnostics.SEM011.issues.tensor_creata_complete_type_arg_required]
 message = "tensor.creata 需要完整的 tensor type argument；请使用 tensor.creata<CompleteTensorType>(fill)"
 help = "提供完整的 tensor type argument"
@@ -2632,7 +2599,6 @@ help = "若有意修改，请把 parameter 声明为 'in'"
 message = "不能向 `de` parameter 赋值"
 help = "若有意修改，请把 parameter 声明为 'in'"
 
-
 [diagnostics.SEM056.issues.mutating_receiver_through_ref]
 message = "cannot call a mutating receiver through a `ref` view"
 help = "drop the `ref` marker, or use a non-mutating method"
@@ -2648,7 +2614,6 @@ help = "在 caller 与 callee 之间对齐 parameter modes"
 [diagnostics.SEM057.issues.de_to_in_or_ex_position]
 message = "不能把 `de` parameter 传给 `in` 或 `ex` position"
 help = "在 caller 与 callee 之间对齐 parameter modes"
-
 
 [diagnostics.SEM057.issues.ref_to_mut_or_own_position]
 message = "cannot pass a `ref` value to a `mut` or `own` position"
@@ -2969,7 +2934,6 @@ help = "如果只意在一个类型，请使用 `_`"
 [llm]
 system_prompt_snippet = "Emit Simplified Chinese reader-locale Faber using Chinese keywords for declarations, control flow, loops, returns, booleans, common primitive types, and list/map collections. Keep Faber glyph syntax unchanged."
 exemplars = ["./exemplars/salve-munde.zh-Hans.fab"]
-
 
 # Queue/stack C2 named-method rows and the lista omnia/quilibet predicate
 # twins. These compiler-owned names remain canonical in every reader pack;

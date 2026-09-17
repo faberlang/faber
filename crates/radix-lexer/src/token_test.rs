@@ -9,11 +9,11 @@ fn span_merge_covers_both_inputs() {
 }
 
 #[test]
-fn retired_spellings_are_plain_identifiers() {
+fn unregistered_statement_spellings_are_plain_identifiers() {
     use crate::{lex, lookup_keyword_spec};
 
-    // tempta / demum / emitte / pro are no longer keyword tokens; each must
-    // lex as an ordinary identifier with no keyword spec behind it.
+    // tempta / demum / emitte / pro have no keyword spec behind them; each
+    // must lex as an ordinary identifier.
     for spelling in ["tempta", "demum", "emitte", "pro"] {
         assert!(
             lookup_keyword_spec(spelling).is_none(),

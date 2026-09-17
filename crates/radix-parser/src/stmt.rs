@@ -781,7 +781,7 @@ impl Parser {
         }))
     }
 
-    /// Statement-level `ad` is no longer supported; use expression-form `ad`.
+    /// Statement-level `ad` is not a valid statement form; use expression-form `ad`.
     pub(super) fn parse_ad_stmt(&mut self) -> Result<StmtKind, ParseError> {
         let keyword_span = self.current_span();
         self.expect_keyword_ident(TokenKind::Ad, "expected 'ad'")?;

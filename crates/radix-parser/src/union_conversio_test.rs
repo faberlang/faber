@@ -124,20 +124,13 @@ fn conversio_marker_stacks_with_a_preceding_annotation() {
 }
 
 #[test]
-fn retired_union_arm_form_is_rejected() {
+fn union_arm_form_is_rejected() {
     let latin = parse_la("discretio Dest { @ conversio Source err {} Variant }");
     assert!(!latin.success());
     let english = parse_en("union Dest { @ conversion Source err {} Variant }");
     assert!(!english.success());
-    // The retracted after-variant latch diagnostic is gone with the arm form.
     let after_variant = parse(lex("discretio Dest { First, @ conversio Source {} }"));
     assert!(!after_variant.success());
-    assert!(!after_variant.errors.iter().any(|error| {
-        error
-            .args
-            .iter()
-            .any(|arg| arg.name == "issue" && arg.value == "union_conversio_after_variant")
-    }));
 }
 
 #[test]

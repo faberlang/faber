@@ -513,14 +513,6 @@ impl<'a> Lexer<'a> {
             ':' => TokenKind::Colon,
             ';' => TokenKind::Semicolon,
             '@' => TokenKind::At,
-            '§' => {
-                self.emit_error(
-                    LexErrorKind::RemovedSectionDirective,
-                    start,
-                    vec![DiagnosticArg::new("issue", "removed_section_directive")],
-                );
-                TokenKind::Error
-            }
             '#' => return self.scan_hash_comment(start),
             '"' => return self.scan_string(start),
             '\'' => return self.scan_ascii_string(start),

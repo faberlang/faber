@@ -20,23 +20,13 @@
 //! | `fixum ratio<g: f32> r ← ratio<g: f32> { g = 1.0 }` (la) | keeps parsing |
 //! | `fixum record<g: int> r ← record<g: int> { g = 1 }` (en pack) | constructs; head canonicalizes to `ratio` |
 //! | `record < 5` (la) | parses (unmapped spelling, comparison) |
-//! | `textus(5)` | rejected: retired type-call constructor |
-//! | `string(5)` (en pack) | rejected: retired type-call constructor (ruling) |
+//! | `textus(5)` | parses; check-phase name resolution rejects the type-name callee |
+//! | `string(5)` (en pack) | parses; check-phase name resolution rejects the type-name callee |
 //! | undefined ordinary identifier + `<` | parses; definedness is a check-phase matter |
 //!
-//! # Locale ruling (operator rider)
-//!
-//! The retired-call guards (`reject_retired_bare_type_call_constructor`,
-//! `reject_retired_angle_type_call_constructor`) resolve the callee's surface
-//! spelling to its latin identity via `reader_type_latin_keys` before the
-//! conversio-type match — the same mapping `can_start_type_name` already
-//! applies. Ruling: **map in both guards, not neither.** Calling a type name
-//! is the retired constructor shape regardless of locale spelling; mapping
-//! only `can_start_type_name` made `textus(5)` rejected while `string(5)` (the
-//! en spelling of the same type) passed as an ordinary call inside the same
-//! en file, which breaks locale invariance of the grammar. With the mapping,
-//! `string(5)` under a reader pack is rejected exactly like `textus(5)`; on
-//! the plain Latin surface `string` is unmapped and stays an ordinary call.
+//! Type-name call spellings parse as ordinary calls; the conversio surface is
+//! `value ↦ Type`, and check-phase name resolution rejects a type-name callee
+//! under every locale spelling.
 
 use crate::parse;
 use crate::test_support::parse_ok;
@@ -208,40 +198,6 @@ fn iuncta_stays_rejected_as_declaration_name() {
     assert!(
         !result.success(),
         "`iuncta` is a lexer keyword and must stay rejected as a declaration name"
-    );
-}
-
-#[test]
-fn retired_bare_type_call_is_rejected_on_latin_surface() {
-    crate::test_support::assert_parse_error_issue(
-        "incipit {\n    textus(5)\n}",
-        "retired_type_call_constructor",
-    );
-}
-
-#[test]
-fn retired_bare_type_call_is_rejected_for_mapped_spelling_under_pack() {
-    // Locale ruling: map-in-both guards. `string` is the en spelling of
-    // `textus`, so `string(5)` is the same retired shape as `textus(5)`.
-    let result = parse_with_en_like_pack("incipit {\n    string(5)\n}");
-    assert!(
-        result.errors.iter().any(|err| crate::test_support::has_arg(
-            err,
-            "issue",
-            "retired_type_call_constructor"
-        )),
-        "expected retired_type_call_constructor under en-like pack, got {:?}",
-        result.errors
-    );
-    let result = parse_with_en_like_pack("incipit {\n    textus(5)\n}");
-    assert!(
-        result.errors.iter().any(|err| crate::test_support::has_arg(
-            err,
-            "issue",
-            "retired_type_call_constructor"
-        )),
-        "latin spelling must stay rejected under a reader pack, got {:?}",
-        result.errors
     );
 }
 

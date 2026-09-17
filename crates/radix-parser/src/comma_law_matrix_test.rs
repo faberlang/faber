@@ -204,16 +204,13 @@ functio f() → vacuum { }"#,
     accept(14, "fixum _ g ← loss(x, y) ∇ [x, y]"),
     trailing(14, "gradient_selectors", "fixum _ g ← loss(x, y) ∇ [x, y,]"),
     missing(14, "gradient_selectors", "fixum _ g ← loss(x, y) ∇ [x y]"),
-    // 15. tensor/sparsa/vector/matrix shape-sugar separator (expr retired-constructor path)
+    // 15. tensor/sparsa/vector/matrix shape-sugar separator (call-position type
+    // args parse as ordinary generic calls; type-name callees reject in check)
     accept(
         15,
         "functio f(tensor<fractus<f32>, [2, 3]> value) → vacuum { }",
     ),
-    fixed_issue(
-        15,
-        "tensor_figura_after_element",
-        "fixum _ t ← tensor<fractus<f32>>(x)",
-    ),
+    accept(15, "fixum _ t ← tensor<fractus<f32>>(x)"),
     rejected(15, "fixum _ t ← tensor<fractus<f32>, [2],>(x)"),
     // 16. finge named field initializers
     accept(
