@@ -14,10 +14,9 @@ fn config() -> ScanConfig {
 
 const BUDGETS: Budgets = Budgets {
     unwrap: 0,
-    // WHY: three documented static invariants — device slot-buffer
-    // registration (program.rs), and the two prefill registered-input/query-head
-    // invariants (prefill_run.rs). cargo.rs / path_deps.rs carry zero expects
-    // (fail-closed paths); dense_full_model_run.rs reports missing inputs.
+    // WHY: derived from the post-R1 production scan. Four expects remain in
+    // the retained product sources; the moved dense/KV proof files contribute
+    // none to this production-root count.
     expect: 4,
     // WHY: two fail-closed device-wire layout guards in package/device/wire.rs
     // (dense matmul + packed storage): the mirrored scalar/packed layout is
@@ -35,9 +34,9 @@ const BUDGETS: Budgets = Budgets {
     // runner-only MIR surface; without the feature both stay unused).
     let_underscore: 6,
     inline_test_modules: 0,
-    // WHY: one feature-gated ignored device-runtime probe remains in
-    // dense_full_model_run.rs; its owner is handling that production test surface.
-    test_attr_in_production: 1,
+    // WHY: the feature-gated ignored device-runtime probe moved out of the
+    // production source root with the dense/KV proof lane.
+    test_attr_in_production: 0,
 };
 
 #[test]
