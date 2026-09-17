@@ -1,13 +1,9 @@
 use super::device::{
-    EXECUTOR_PLAN_SECTION_VERSION, FmirDeviceSection, FmirExecutorPlanSection,
-    FmirExecutorPlanSectionV2, FmirSessionSection, FmirSessionSectionV2,
+    EXECUTOR_PLAN_SECTION_VERSION, FmirDeviceSection, FmirExecutorPlanSection, FmirSessionSection,
     WIRE_SESSION_SECTION_VERSION,
 };
 use super::distributed::{
     FmirDistributedExecutionSection, expected_plan_for_section, wire_plan_to_plan,
-};
-use super::executor_plan_admission::{
-    ExecutorPlanAdmissionError, admit_executor_plan_section_v2_with_version,
 };
 use super::requirements::{
     ArtifactCompatibilityTable, default_compatibility_table, validate_artifact_combination,
@@ -19,7 +15,6 @@ use super::{
     FmirDeviceBackend, FmirDeviceSelection, MaterializationStage, PACKAGE_MIR_ARTIFACT_VERSION,
     WIRE_DEVICE_PROGRAM_VERSION, WIRE_DISTRIBUTED_SECTION_VERSION, logical_distributed_plan_hash,
     validate_wire_distributed_section, validate_wire_program, validate_wire_session_section,
-    validate_wire_session_section_v2,
 };
 use crate::schema::ARTIFACT_ABI_VERSION;
 
@@ -483,58 +478,6 @@ pub(crate) fn admit_session_section(
     Ok(())
 }
 
-/// Admit the complete KV-cache v2 boundary before host construction.
-///
-/// A4V carries the semantic and runtime records as separate, explicitly
-/// versioned carriers. This function is the shared FMIR integration point:
-/// it checks both carrier versions first, validates the A4S semantic record
-/// against the delivered program, and delegates every runtime fact to B2's
-/// focused helper rather than reproducing its arithmetic/source checks.
-///
-/// The runtime section is required here because a semantic session without
-/// its fixed-capacity runtime bindings is not an admitted KV route.
-#[allow(dead_code)]
-pub(crate) fn admit_session_section_v2(
-    section: &FmirSessionSectionV2,
-    executor_plan: &FmirExecutorPlanSectionV2,
-    wire_program: &WireDeviceProgram,
-) -> Result<(), crate::error::FmirImageError> {
-    if section.v != WIRE_SESSION_SECTION_VERSION {
-        return Err(
-            crate::error::FmirImageError::SessionSectionVersionMismatch {
-                actual: section.v,
-                expected: WIRE_SESSION_SECTION_VERSION,
-            },
-        );
-    }
-
-    // Consume B2's outer-section and payload-version gates before interpreting
-    // runtime fields. Its focused helper owns source closure and checked
-    // allocation/view/launch arithmetic.
-    admit_executor_plan_section_v2_with_version(
-        executor_plan.v,
-        &executor_plan.runtime_bindings,
-        wire_program.kernels.len(),
-    )
-    .map_err(map_executor_plan_admission_error)?;
-
-    validate_wire_session_section_v2(section, wire_program)
-}
-
-#[allow(dead_code)]
-fn map_executor_plan_admission_error(
-    error: ExecutorPlanAdmissionError,
-) -> crate::error::FmirImageError {
-    match error {
-        ExecutorPlanAdmissionError::UnsupportedSectionVersion { actual, expected } => {
-            crate::error::FmirImageError::ExecutorPlanSectionVersionMismatch { actual, expected }
-        }
-        other => crate::error::FmirImageError::ExecutorPlanSectionInvalid {
-            detail: other.to_string(),
-        },
-    }
-}
-
 /// Fail-closed admission of the optional distributed execution section
 /// (MD2-W1). Runs when the section is present, in order:
 ///
@@ -620,7 +563,3 @@ pub(crate) fn equivalence_gate(
     }
     Ok(())
 }
-
-#[cfg(test)]
-#[path = "admit_test.rs"]
-mod tests;

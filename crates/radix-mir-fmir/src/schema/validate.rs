@@ -6,14 +6,13 @@
 //! reconstructed distributed plan belongs to the fail-before-launch gate.
 
 use super::SHA256_IDENTITY_PREFIX;
-use super::device::{FmirSessionSection, FmirSessionSectionV2};
+use super::device::FmirSessionSection;
 use super::distributed::FmirDistributedExecutionSection;
 use super::wire::{
     WireBroadcastDeclaration, WireBufferIdentity, WireBufferLifetime, WireCollectionKernelPlan,
     WireDeviceProgram, WireInitializationPolicy, WireInputUpdateCadence, WireInvocationMode,
-    WireKvCacheCapacityPolicy, WireKvCacheDtype, WireKvCacheRopePairing, WireKvCacheSemanticV2,
-    WireObservationCadence, WireProgramLifetime, WireReduceOp, WireReducedProjection,
-    WireResourceAccess, WireSessionInput, WireSessionObservationCadence,
+    WireKvCacheDtype, WireObservationCadence, WireProgramLifetime, WireReduceOp,
+    WireReducedProjection, WireResourceAccess, WireSessionInput, WireSessionObservationCadence,
 };
 
 // ---------------------------------------------------------------------------
@@ -856,117 +855,6 @@ pub(crate) fn validate_wire_session_section(
         section.observation_cadence,
         wire,
     )
-}
-
-/// Admit the A4S v2 static semantic record and the shared session schedule.
-///
-/// The v2 carrier is intentionally separate from the legacy layout carrier:
-/// no field is defaulted or inferred from `WireKvCacheLayout`. The semantic
-/// version is checked before any model fact is interpreted, then every typed
-/// fact is checked against the closed KV contract.
-#[allow(dead_code)]
-pub(crate) fn validate_wire_session_section_v2(
-    section: &FmirSessionSectionV2,
-    wire: &WireDeviceProgram,
-) -> Result<(), crate::error::FmirImageError> {
-    validate_wire_kv_cache_semantic_v2(&section.semantic)?;
-    validate_session_schedule(
-        &section.inputs,
-        &section.invocation_modes,
-        section.observation_cadence,
-        wire,
-    )
-}
-
-#[allow(dead_code)]
-fn validate_wire_kv_cache_semantic_v2(
-    semantic: &WireKvCacheSemanticV2,
-) -> Result<(), crate::error::FmirImageError> {
-    if semantic.semantic_contract_version != super::wire::WIRE_KV_CACHE_SEMANTIC_CONTRACT_VERSION {
-        return Err(session_invalid(format!(
-            "KV semantic contract version {} is unsupported; expected {}",
-            semantic.semantic_contract_version,
-            super::wire::WIRE_KV_CACHE_SEMANTIC_CONTRACT_VERSION
-        )));
-    }
-    if !matches!(semantic.kv_dtype_k, WireKvCacheDtype::F32)
-        || !matches!(semantic.kv_dtype_v, WireKvCacheDtype::F32)
-    {
-        return Err(session_invalid(format!(
-            "KV semantic record carries K dtype {} and V dtype {}; both distinct dtype facts must be present on the closed f32 surface",
-            semantic.kv_dtype_k.spelling(),
-            semantic.kv_dtype_v.spelling()
-        )));
-    }
-    for (name, value) in [
-        ("query_head_count", semantic.query_head_count),
-        ("kv_head_count", semantic.kv_head_count),
-        ("head_dim", semantic.head_dim),
-        ("layer_count", semantic.layer_count),
-        ("context_capacity", semantic.context_capacity),
-    ] {
-        if value == 0 {
-            return Err(session_invalid(format!(
-                "KV semantic record declares `{name}` 0; {name} must be positive"
-            )));
-        }
-    }
-    if !semantic
-        .query_head_count
-        .is_multiple_of(semantic.kv_head_count)
-    {
-        return Err(session_invalid(format!(
-            "KV semantic record declares query_head_count {} not divisible by kv_head_count {}; GQA requires an integral query-to-KV head ratio",
-            semantic.query_head_count, semantic.kv_head_count
-        )));
-    }
-    if !matches!(semantic.capacity_policy, WireKvCacheCapacityPolicy::Fixed) {
-        return Err(session_invalid(format!(
-            "KV semantic record declares capacity policy {}; only fixed-capacity caches are admitted",
-            semantic.capacity_policy.spelling()
-        )));
-    }
-    if !semantic.rope_frequency_base.is_finite() || semantic.rope_frequency_base <= 0.0 {
-        return Err(session_invalid(format!(
-            "KV semantic record declares RoPE frequency base {}; it must be finite and positive",
-            semantic.rope_frequency_base
-        )));
-    }
-    if !semantic.rope_frequency_scale.is_finite() || semantic.rope_frequency_scale <= 0.0 {
-        return Err(session_invalid(format!(
-            "KV semantic record declares RoPE frequency scale {}; it must be finite and positive",
-            semantic.rope_frequency_scale
-        )));
-    }
-    if semantic.rope_dimension == 0 {
-        return Err(session_invalid(
-            "KV semantic record declares `rope_dimension` 0; the rotated dimension must be positive"
-                .to_owned(),
-        ));
-    }
-    if semantic.rope_dimension > semantic.head_dim {
-        return Err(session_invalid(format!(
-            "KV semantic record declares rope_dimension {} larger than head_dim {}; RoPE cannot address dimensions outside one head",
-            semantic.rope_dimension, semantic.head_dim
-        )));
-    }
-    let pairing_requires_pairs = match semantic.rope_pairing {
-        WireKvCacheRopePairing::ConsecutivePair | WireKvCacheRopePairing::RotateHalf => true,
-    };
-    if pairing_requires_pairs && !semantic.rope_dimension.is_multiple_of(2) {
-        return Err(session_invalid(format!(
-            "KV semantic record declares rope_dimension {} with {} pairing; the typed pairing requires an even rotated dimension",
-            semantic.rope_dimension,
-            semantic.rope_pairing.spelling()
-        )));
-    }
-    if !semantic.k_stored_post_rope {
-        return Err(session_invalid(
-            "KV semantic record declares cached K before RoPE; the contract requires K stored after RoPE"
-                .to_owned(),
-        ));
-    }
-    Ok(())
 }
 
 fn validate_session_schedule(
