@@ -576,41 +576,20 @@ fn generate_output(
             ],
         }
         .into()),
-        Target::HirRust => {
-            codegen::generate_from_analyzed_with_options(target, analysis, surface, output_mode, module_name)
-                .map_err(std::convert::Into::into)
-        }
-        Target::HirFaber => {
+        // S7-U5: Swift's fixed-width carriers and wrapping operators lifted its
+        // modular-word gate. S7-U6: TS's per-width wrapping and passing fixtures
+        // lifted its stale gate. Both targets now share the forwarding path.
+        Target::HirRust
+        | Target::HirFaber
+        | Target::HirSwift
+        | Target::HirHaskell
+        | Target::HirTypeScript
+        | Target::HirPython => {
             codegen::generate_from_analyzed_with_options(target, analysis, surface, output_mode, module_name)
                 .map_err(std::convert::Into::into)
         }
         Target::HirGo => {
             reject_modular_word_target(analysis, "Go")?;
-            codegen::generate_from_analyzed_with_options(target, analysis, surface, output_mode, module_name)
-                .map_err(std::convert::Into::into)
-        }
-        Target::HirSwift => {
-            // S7-U5: modulus<W> is now emitted by the Swift leaf (fixed-width
-            // UInt8/16/32/64 carriers + wrapping `&+`/`&<<` etc.), so the
-            // modular-word gate no longer applies to Swift. Go/Wasm/LLVM/
-            // Metal/WGSL still reject (matrix cells R).
-            codegen::generate_from_analyzed_with_options(target, analysis, surface, output_mode, module_name)
-                .map_err(std::convert::Into::into)
-        }
-        Target::HirHaskell => {
-            codegen::generate_from_analyzed_with_options(target, analysis, surface, output_mode, module_name)
-                .map_err(std::convert::Into::into)
-        }
-        Target::HirTypeScript => {
-            // S7-U6 sweep (hand-5 S7-U5 residual): the matrix claims TS=S for
-            // modulus<W> (TS4-1 `0ad139a55` — the six modular-word fixtures
-            // typecheck/run/match on the exempla TS lane via driver::Session),
-            // but this emit path still gated. The gate is stale — lifted to
-            // match the matrix (the TS emitter emits per-width wrapping).
-            codegen::generate_from_analyzed_with_options(target, analysis, surface, output_mode, module_name)
-                .map_err(std::convert::Into::into)
-        }
-        Target::HirPython => {
             codegen::generate_from_analyzed_with_options(target, analysis, surface, output_mode, module_name)
                 .map_err(std::convert::Into::into)
         }
