@@ -479,8 +479,14 @@ pub fn prepare_program_module(
         frontmatter_locale_pack_from_source(&path.display().to_string(), source)
             .or_else(|| session.config.locale_pack.clone())
     };
-    if let Some(ref mut pack) = pack {
-        merge_library_locale_packs_for_source(pack, path, source, templates).map_err(|err| {
+    let parsed = parse_program_for_namespace_exports(&path.display().to_string(), source, pack.as_ref());
+    let import = parsed
+        .as_ref()
+        .map_or_else(ImportContract::default, |(program, interner)| {
+            import_contract_for_parsed_file(path, program, interner, pack.as_ref(), templates)
+        });
+    if let Some(pack) = pack.as_mut() {
+        crate::locale::merge_library_locale_packs(pack, &import.library_package_roots).map_err(|err| {
             Box::new(
                 crate::Diagnostic::error(format!(
                     "failed to load library locale pack: {}",
@@ -493,7 +499,6 @@ pub fn prepare_program_module(
             )
         })?;
     }
-    let import = import_contract_for_file(path, source, pack.as_ref(), templates);
     // Fail-closed import-site propagation (KPC-WIRE done_when (i), advisory
     // D2): a parse-failed imported library stops the compile with its named
     // diagnostic instead of degrading to an interfaceless namespace. The
@@ -508,7 +513,10 @@ pub fn prepare_program_module(
     Ok(PreparedProgramModule {
         session: crate::driver::Session::new(config),
         contract: import.into_module_contract(),
-        package_identities: package_import_identities_for_file(path, source, pack.as_ref(), templates),
+        package_identities: parsed.as_ref().and_then(|(program, interner)| {
+            package_identity_facts_for_parsed_file(path, program, interner, pack.as_ref(), templates)
+                .filter(|facts| !facts.imports.is_empty())
+        }),
     })
 }
 
@@ -693,9 +701,22 @@ pub(crate) fn import_contract_for_file(
         // that report.
         return ImportContract::default();
     };
+    import_contract_for_parsed_file(path, &program, &interner, resolved_pack.as_ref(), templates)
+}
 
+/// Build an import contract from a program that has already been parsed.
+///
+/// Keeping the parsed program and interner together lets callers that need
+/// several program-layer facts share the same pre-parse.
+pub(crate) fn import_contract_for_parsed_file(
+    path: &Path,
+    program: &Program,
+    interner: &crate::lexer::Interner,
+    resolved_pack: ReaderPackRef<'_>,
+    templates: Option<&BTreeMap<String, String>>,
+) -> ImportContract {
     let mut contract = ImportContract::default();
-    let pack_key = resolved_pack.as_ref().map(|pack| pack.metadata.id.clone());
+    let pack_key = resolved_pack.map(|pack| pack.metadata.id.clone());
     let mut transitive_visited: BTreeSet<PathBuf> = BTreeSet::new();
     let mut transitive_interfaces: Vec<(String, FileInterface)> = Vec::new();
     for stmt in &program.statements {
@@ -710,7 +731,7 @@ pub(crate) fn import_contract_for_file(
         if !import_contract_path_allowed(import_path, templates) {
             continue;
         }
-        let target = cached_import_target(path, import_path, pack_key.as_ref(), resolved_pack.as_ref(), templates);
+        let target = cached_import_target(path, import_path, pack_key.as_ref(), resolved_pack, templates);
         let target = match target {
             ImportTargetLookup::Parsed(target) => target,
             ImportTargetLookup::Unparsable(target_path) => {
@@ -829,22 +850,6 @@ fn collect_transitive_relative_interfaces(
         out.push((binding, target.interface.clone()));
         collect_transitive_relative_interfaces(&target.target_path, pack_key, templates, visited, out);
     }
-}
-
-/// Overlay library-owned member fragments for the consumer locale onto `pack`.
-///
-/// # Errors
-///
-/// Returns [`crate::locale::LocalePackLoadError`] when a present library pack
-/// cannot be loaded. Missing library packs are not an error.
-pub(crate) fn merge_library_locale_packs_for_source(
-    pack: &mut crate::locale::LocalePack,
-    source_path: &Path,
-    source: &str,
-    templates: Option<&BTreeMap<String, String>>,
-) -> Result<(), crate::locale::LocalePackLoadError> {
-    let contract = import_contract_for_file(source_path, source, Some(pack), templates);
-    crate::locale::merge_library_locale_packs(pack, &contract.library_package_roots)
 }
 
 /// Resolve the frontmatter `locale` reader pack when the caller supplied none.
@@ -991,19 +996,6 @@ fn package_effective_reader_pack(
 /// Local sibling imports are the `./rel` form only: `norma:*` and other
 /// provider-module imports are library identities, not user-code cross-module
 /// calls.
-fn package_import_identities_for_file(
-    path: &Path,
-    source: &str,
-    code_pack: ReaderPackRef<'_>,
-    templates: Option<&BTreeMap<String, String>>,
-) -> Option<crate::driver::PackageImportIdentities> {
-    let facts = package_identity_facts_for_file(path, source, code_pack, templates)?;
-    if facts.imports.is_empty() {
-        return None;
-    }
-    Some(facts)
-}
-
 fn package_identity_facts_for_file(
     path: &Path,
     source: &str,
@@ -1012,6 +1004,17 @@ fn package_identity_facts_for_file(
 ) -> Option<crate::driver::PackageImportIdentities> {
     let path = absolute_cli_path(path);
     let (program, interner) = parse_program_for_namespace_exports(&path.display().to_string(), source, code_pack)?;
+    package_identity_facts_for_parsed_file(&path, &program, &interner, code_pack, templates)
+}
+
+fn package_identity_facts_for_parsed_file(
+    path: &Path,
+    program: &Program,
+    interner: &crate::lexer::Interner,
+    code_pack: ReaderPackRef<'_>,
+    templates: Option<&BTreeMap<String, String>>,
+) -> Option<crate::driver::PackageImportIdentities> {
+    let path = absolute_cli_path(path);
     let package_root = match crate::import_resolve::find_package_root(&path) {
         Some(root) => root,
         None => path.parent()?.to_path_buf(),
