@@ -143,8 +143,7 @@ fn package_mir_mixed_shape_generic_instances_are_distinct() {
         &crate::test_support::test_mir_seams(),
         |lowered| {
             let types = lowered.validated.validation().types;
-            let mut family_shapes = lowered
-                .program
+            let mut family_shapes = lowered.validated.program()
                 .functions
                 .iter()
                 .filter(|function| {

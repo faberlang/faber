@@ -194,7 +194,7 @@ fn program_aggregate_defs(program: &MirProgram) -> (Vec<DefId>, Vec<DefId>) {
 }
 
 fn lowered_aggregate_defs(lowered: &LoweredMirUnit<'_>) -> (Vec<DefId>, Vec<DefId>) {
-    let (mut structs, mut variants) = program_aggregate_defs(&lowered.program);
+    let (mut structs, mut variants) = program_aggregate_defs(&lowered.validated.program());
     for function in &lowered.generic_templates {
         collect_function_aggregate_defs(function, &mut structs, &mut variants);
     }
@@ -797,17 +797,6 @@ pub(super) fn lower_package_units<'a>(
             &unit_path,
         ));
         lowered.imported_device_routes.clear();
-        remap_program_text_symbols(
-            &mut lowered.program,
-            &lowered.interner,
-            &mut entry.analysis.interner,
-        );
-        remap_closure_environment_symbols(
-            &mut lowered.closure_environments,
-            &lowered.interner,
-            &mut entry.analysis.interner,
-        );
-        remap_templates_text_symbols(&mut lowered, &mut entry.analysis.interner);
         // Sibling struct/union literals constructed in the source analysis
         // carry the source `DefId` in aggregate kinds and interned types; the
         // merged program's metadata is keyed by the entry's canonical nominal
@@ -851,39 +840,12 @@ pub(super) fn lower_package_units<'a>(
                 Some(&nominal),
             )
         };
-        rewrite_lowered_shape_size_indices(
-            &mut lowered,
-            &lowered_source_types,
-            &mut entry.analysis.types,
-            &param_symbols,
-        );
         record_shared_nominals(
             &source_names,
             lowered.validated.validation().types,
             &source_to_entry_types,
             &mut shared_nominals,
         );
-        rewrite_lowered_type_ids(&mut lowered, &source_to_entry_types);
-        rewrite_lowered_variant_defs(&mut lowered, &variant_remap);
-        rewrite_lowered_struct_defs(&mut lowered, &nominal_def_remap);
-        if let Some(rewrite) = cli_plan
-            .dispatch
-            .as_ref()
-            .filter(|dispatch| dispatch.unit_path == unit_path)
-            .and_then(|dispatch| dispatch.record_type_rewrite.as_ref())
-        {
-            let dispatch_rewrites =
-                imported_dispatch_type_rewrites(rewrite, &source_to_entry_types);
-            rewrite_lowered_type_ids(&mut lowered, &dispatch_rewrites);
-        }
-        rewrite_program_sources(&mut lowered.program, &unit_path, &source_rewrites);
-        rewrite_closure_environment_sources(
-            &mut lowered.closure_environments,
-            &unit_path,
-            &source_rewrites,
-        );
-        rewrite_generic_identity(&mut lowered, &unit_path, &source_rewrites);
-        ensure_unique_definition_sources(&lowered.program, &unit_path)?;
         let validation = collect_remapped_validation(
             lowered.validated.validation(),
             &source_interner,
@@ -896,11 +858,59 @@ pub(super) fn lower_package_units<'a>(
             &source_rewrites,
             &unit_path,
         );
+        lowered = remap_lowered_program_text_symbols(
+            lowered,
+            &source_interner,
+            &mut entry.analysis.interner,
+            &unit_path,
+        )?;
+        lowered = remap_templates_text_symbols(lowered, &mut entry.analysis.interner);
+        lowered = rewrite_lowered_type_ids(
+            lowered,
+            &source_to_entry_types,
+            &entry.analysis.types,
+            &variant_remap,
+            &nominal_def_remap,
+            &validation,
+            &unit_path,
+        )?;
+        if let Some(rewrite) = cli_plan
+            .dispatch
+            .as_ref()
+            .filter(|dispatch| dispatch.unit_path == unit_path)
+            .and_then(|dispatch| dispatch.record_type_rewrite.as_ref())
+        {
+            let dispatch_rewrites =
+                imported_dispatch_type_rewrites(rewrite, &source_to_entry_types);
+            lowered = rewrite_lowered_type_ids(
+                lowered,
+                &dispatch_rewrites,
+                &entry.analysis.types,
+                &variant_remap,
+                &nominal_def_remap,
+                &validation,
+                &unit_path,
+            )?;
+        }
+        lowered = rewrite_lowered_shape_size_indices(
+            lowered,
+            &lowered_source_types,
+            &mut entry.analysis.types,
+            &param_symbols,
+            &validation,
+            &unit_path,
+        )?;
+        lowered = rewrite_lowered_variant_defs(lowered, &variant_remap, &unit_path)?;
+        lowered = rewrite_lowered_struct_defs(lowered, &nominal_def_remap, &unit_path)?;
+        lowered =
+            rewrite_lowered_program_sources(lowered, &unit_path, &source_rewrites, &unit_path)?;
+        lowered = rewrite_generic_identity(lowered, &unit_path, &source_rewrites);
+        ensure_unique_definition_sources(lowered.validated.program(), &unit_path)?;
         extra_validation.merge(&validation);
         let dispatch_function = selected_cli_dispatch_function(
             cli_plan,
             &unit_path,
-            &lowered.program,
+            &lowered.validated.program(),
             &source_interner,
             &entry.analysis.interner,
         );
@@ -1017,23 +1027,16 @@ pub(super) fn lower_package_units<'a>(
                             return Ok(());
                         }
                     };
-                if let Some(bundle) = bundle
-                    && let Err(message) = super::air_backward::apply(&mut lowered, bundle, no_fuse)
-                {
-                    diagnostics.push(mir_lowering_diag(&library.path, message));
-                    return Ok(());
+                if let Some(bundle) = bundle {
+                    lowered = match super::air_backward::apply(lowered, bundle, no_fuse) {
+                        Ok(lowered) => lowered,
+                        Err(message) => {
+                            diagnostics.push(mir_lowering_diag(&library.path, message));
+                            return Ok(());
+                        }
+                    };
                 }
-                remap_program_text_symbols(
-                    &mut lowered.program,
-                    &lowered.interner,
-                    &mut entry.analysis.interner,
-                );
-                remap_closure_environment_symbols(
-                    &mut lowered.closure_environments,
-                    &lowered.interner,
-                    &mut entry.analysis.interner,
-                );
-                remap_templates_text_symbols(&mut lowered, &mut entry.analysis.interner);
+                let source_interner = lowered.interner.clone();
                 let mut nominal_def_remap =
                     build_nominal_def_remap(&nominal_map, &entry.analysis.types);
                 let (program_structs, program_variants) = lowered_aggregate_defs(&lowered);
@@ -1073,44 +1076,21 @@ pub(super) fn lower_package_units<'a>(
                         Some(&nominal),
                     )
                 };
-                rewrite_lowered_shape_size_indices(
-                    &mut lowered,
-                    &lowered_source_types,
-                    &mut entry.analysis.types,
-                    &param_symbols,
-                );
                 record_shared_nominals(
                     &source_names,
                     lowered.validated.validation().types,
                     &source_to_entry_types,
                     &mut shared_nominals,
                 );
-                rewrite_lowered_type_ids(&mut lowered, &source_to_entry_types);
-                rewrite_lowered_variant_defs(&mut lowered, &variant_remap);
-                rewrite_lowered_struct_defs(&mut lowered, &nominal_def_remap);
-                rewrite_program_sources(&mut lowered.program, &library.path, &source_rewrites);
                 extend_unmapped_library_sources(
-                    &lowered.program,
+                    lowered.validated.program(),
                     &library.path,
                     &mut source_rewrites,
                     &mut next_synthetic,
                 );
-                rewrite_program_sources(&mut lowered.program, &library.path, &source_rewrites);
-                rewrite_closure_environment_sources(
-                    &mut lowered.closure_environments,
-                    &library.path,
-                    &source_rewrites,
-                );
-                rewrite_generic_identity(&mut lowered, &library.path, &source_rewrites);
-                if let Err(errors) =
-                    ensure_unique_definition_sources(&lowered.program, &library.path)
-                {
-                    diagnostics.extend(errors);
-                    return Ok(());
-                }
-                extra_validation.merge(&collect_remapped_validation(
+                let validation = collect_remapped_validation(
                     lowered.validated.validation(),
-                    &lowered.interner,
+                    &source_interner,
                     &mut entry.analysis.interner,
                     &source_to_entry_types,
                     &nominal_def_remap,
@@ -1119,9 +1099,87 @@ pub(super) fn lower_package_units<'a>(
                     &entry.analysis.types,
                     &source_rewrites,
                     &library.path,
-                ));
+                );
+                lowered = match remap_lowered_program_text_symbols(
+                    lowered,
+                    &source_interner,
+                    &mut entry.analysis.interner,
+                    &library.path,
+                ) {
+                    Ok(lowered) => lowered,
+                    Err(errors) => {
+                        diagnostics.extend(errors);
+                        return Ok(());
+                    }
+                };
+                lowered = remap_templates_text_symbols(lowered, &mut entry.analysis.interner);
+                lowered = match rewrite_lowered_type_ids(
+                    lowered,
+                    &source_to_entry_types,
+                    &entry.analysis.types,
+                    &variant_remap,
+                    &nominal_def_remap,
+                    &validation,
+                    &library.path,
+                ) {
+                    Ok(lowered) => lowered,
+                    Err(errors) => {
+                        diagnostics.extend(errors);
+                        return Ok(());
+                    }
+                };
+                lowered = match rewrite_lowered_shape_size_indices(
+                    lowered,
+                    &lowered_source_types,
+                    &mut entry.analysis.types,
+                    &param_symbols,
+                    &validation,
+                    &library.path,
+                ) {
+                    Ok(lowered) => lowered,
+                    Err(errors) => {
+                        diagnostics.extend(errors);
+                        return Ok(());
+                    }
+                };
+                lowered = match rewrite_lowered_variant_defs(lowered, &variant_remap, &library.path)
+                {
+                    Ok(lowered) => lowered,
+                    Err(errors) => {
+                        diagnostics.extend(errors);
+                        return Ok(());
+                    }
+                };
+                lowered =
+                    match rewrite_lowered_struct_defs(lowered, &nominal_def_remap, &library.path) {
+                        Ok(lowered) => lowered,
+                        Err(errors) => {
+                            diagnostics.extend(errors);
+                            return Ok(());
+                        }
+                    };
+                lowered = match rewrite_lowered_program_sources(
+                    lowered,
+                    &library.path,
+                    &source_rewrites,
+                    &library.path,
+                ) {
+                    Ok(lowered) => lowered,
+                    Err(errors) => {
+                        diagnostics.extend(errors);
+                        return Ok(());
+                    }
+                };
+                lowered = rewrite_generic_identity(lowered, &library.path, &source_rewrites);
+                if let Err(errors) =
+                    ensure_unique_definition_sources(lowered.validated.program(), &library.path)
+                {
+                    diagnostics.extend(errors);
+                    return Ok(());
+                }
+                extra_validation.merge(&validation);
                 library_parts.push(LibraryMirParts {
-                    program: lowered.program,
+                    program: lowered.validated.into_parts().0,
                     environments: lowered.closure_environments,
                     templates: lowered.generic_templates,
                     generic_params: lowered.generic_params,
@@ -1155,7 +1213,7 @@ pub(super) fn lower_package_units<'a>(
         &mut consumer_launch_entries,
     );
     let mut merged = lower_unit(entry, &cli_plan.entry_records, no_fuse)?;
-    ensure_unique_definition_sources(&merged.program, &entry_path)?;
+    ensure_unique_definition_sources(&merged.validated.program(), &entry_path)?;
     // KPC-WIRE (c): the entry's module-owned route map joins the same way as
     // the siblings'; the transferred map is consumed exactly once.
     imported_device_routes.extend(joined_imported_device_routes(
@@ -1167,62 +1225,104 @@ pub(super) fn lower_package_units<'a>(
     let mut dispatch_function = selected_cli_dispatch_function(
         cli_plan,
         &entry_path,
-        &merged.program,
+        &merged.validated.program(),
         &merged.interner,
         &merged.interner,
     );
 
     let mut generic_templates = std::mem::take(&mut merged.generic_templates);
     let mut generic_params = std::mem::take(&mut merged.generic_params);
-    for mut unit in pending {
-        let offset = append_shifted_program(&mut merged, &mut unit.lowered, &entry_path)?;
-        // KCM-05: synthetic kernel closures ride the explicit metadata
-        // carrier; the merge shifts keys and parent identities with the
-        // program so the rows stay valid in the merged id space.
-        merge_shifted_device_function_metadata(
-            &mut merged.device_function_metadata,
-            &unit.lowered.device_function_metadata,
-            offset,
+    let imported_device_index =
+        radix_module::mir::ImportedDeviceIndex::from_routes(imported_device_routes.clone());
+    let mut planning_program = merged.validated.program().clone();
+    let mut planning_environments = merged.closure_environments.clone();
+    for unit in &pending {
+        let mut program = unit.lowered.validated.program().clone();
+        let mut environments = unit.lowered.closure_environments.clone();
+        append_shifted_parts(
+            &mut planning_program,
+            &mut planning_environments,
+            &mut program,
+            &mut environments,
             &entry_path,
         )?;
-        shift_templates(&mut unit.lowered.generic_templates, offset);
-        generic_templates.append(&mut unit.lowered.generic_templates);
-        generic_params.append(&mut unit.lowered.generic_params);
-        if let Some(local_id) = unit.dispatch_function {
+    }
+    let mut future_library_templates = Vec::new();
+    let mut future_library_generic_params = Vec::new();
+    for library in &library_parts {
+        let mut program = library.program.clone();
+        let mut environments = library.environments.clone();
+        let offset = append_shifted_parts(
+            &mut planning_program,
+            &mut planning_environments,
+            &mut program,
+            &mut environments,
+            &entry_path,
+        )?;
+        let mut templates = library.templates.clone();
+        shift_templates(&mut templates, offset);
+        future_library_templates.extend(templates);
+        future_library_generic_params.extend(library.generic_params.clone());
+    }
+    for unit in pending {
+        let PendingUnit {
+            lowered,
+            dispatch_function: unit_dispatch,
+        } = unit;
+        let offset = next_function_id(merged.validated.program(), &entry_path)?;
+        let mut available_templates = generic_templates.clone();
+        available_templates.extend(future_library_templates.iter().cloned());
+        let mut available_generic_params = generic_params.clone();
+        available_generic_params.extend(future_library_generic_params.iter().cloned());
+        let (next, mut incoming) = append_shifted_program(
+            merged,
+            lowered,
+            &entry_path,
+            &extra_validation,
+            &available_templates,
+            &available_generic_params,
+            &imported_device_index,
+            &consumer_device_roles,
+            &consumer_launch_entries,
+        )?;
+        merged = next;
+        shift_templates(&mut incoming.templates, offset);
+        generic_templates.append(&mut incoming.templates);
+        generic_params.append(&mut incoming.generic_params);
+        if let Some(local_id) = unit_dispatch {
             dispatch_function = Some(checked_shifted_function_id(local_id, offset, &entry_path)?);
         }
-        ensure_unique_definition_sources(&merged.program, &entry_path)?;
+        ensure_unique_definition_sources(merged.validated.program(), &entry_path)?;
     }
-    for mut library in library_parts {
-        let offset = append_shifted_parts(
-            &mut merged.program,
-            &mut merged.closure_environments,
-            &mut library.program,
-            &mut library.environments,
+    for library in library_parts {
+        let (next, mut library, offset) = append_shifted_library_parts(
+            merged,
+            library,
             &entry_path,
+            &extra_validation,
+            &generic_templates,
+            &generic_params,
+            &imported_device_index,
+            &consumer_device_roles,
+            &consumer_launch_entries,
         )?;
-        merge_shifted_device_function_metadata(
-            &mut merged.device_function_metadata,
-            &library.device_function_metadata,
-            offset,
-            &entry_path,
-        )?;
+        merged = next;
         shift_templates(&mut library.templates, offset);
         generic_templates.append(&mut library.templates);
         generic_params.append(&mut library.generic_params);
-        ensure_unique_definition_sources(&merged.program, &entry_path)?;
+        ensure_unique_definition_sources(merged.validated.program(), &entry_path)?;
     }
-    instantiate_package_generics(
-        &mut merged,
+    merged = instantiate_package_generics(
+        merged,
         generic_templates,
         generic_params,
         &entry_path,
         Some(&extra_validation),
-        radix_module::mir::ImportedDeviceIndex::from_routes(imported_device_routes),
+        imported_device_index,
         consumer_device_roles,
         consumer_launch_entries,
     )?;
-    rebuild_merged_validated(&mut merged, &entry_path, Some(&extra_validation))?;
+    merged = rebuild_merged_validated(merged, &entry_path, Some(&extra_validation))?;
 
     if cli_plan.dispatch.is_some() {
         let Some(function) = dispatch_function else {
@@ -1231,7 +1331,7 @@ pub(super) fn lower_package_units<'a>(
                 "package MIR could not find selected CLI command function",
             )]);
         };
-        install_cli_dispatch_entry(&mut merged, function, &entry_path)?;
+        merged = install_cli_dispatch_entry(merged, function, &entry_path)?;
     }
 
     Ok(merged)
@@ -1888,15 +1988,75 @@ pub(super) fn imported_dispatch_type_rewrites(
         .collect()
 }
 
-pub(super) fn rewrite_lowered_type_ids(
-    lowered: &mut LoweredMirUnit<'_>,
+fn validation_diagnostics(
+    diagnostic_path: &Path,
+    errors: Vec<radix_module::mir::MirValidationError>,
+) -> Vec<Diagnostic> {
+    errors
+        .into_iter()
+        .map(|error| mir_lowering_diag(diagnostic_path, error.message).with_span(error.span))
+        .collect()
+}
+
+fn rewrite_validation_type_ids(
+    context: &mut radix_module::mir::MirValidationContext<'_>,
     rewrites: &[(TypeId, TypeId)],
 ) {
-    for function in &mut lowered.program.functions {
+    for signature in context.functions.values_mut() {
+        for param in &mut signature.params {
+            rewrite_type_id(&mut param.ty, rewrites);
+        }
+        rewrite_type_id(&mut signature.return_ty, rewrites);
+        if let Some(error_ty) = &mut signature.error_ty {
+            rewrite_type_id(error_ty, rewrites);
+        }
+    }
+    for fields in context.struct_fields.values_mut() {
+        for ty in fields.values_mut() {
+            rewrite_type_id(ty, rewrites);
+        }
+    }
+    for fields in context.variant_fields.values_mut() {
+        for ty in fields.values_mut() {
+            rewrite_type_id(ty, rewrites);
+        }
+    }
+    for environment in context.closure_environments.values_mut() {
+        rewrite_type_id(&mut environment.value_ty, rewrites);
+        for capture in &mut environment.captures {
+            rewrite_type_id(&mut capture.ty, rewrites);
+        }
+    }
+    context.scalar_value_domains = std::mem::take(&mut context.scalar_value_domains)
+        .into_iter()
+        .map(|(mut ty, domain)| {
+            if let Some((_, rewritten)) = rewrites.iter().find(|(source, _)| *source == ty) {
+                ty = *rewritten;
+            }
+            (ty, domain)
+        })
+        .collect();
+}
+
+pub(super) fn rewrite_lowered_type_ids<'a>(
+    mut lowered: LoweredMirUnit<'a>,
+    rewrites: &[(TypeId, TypeId)],
+    target_types: &TypeTable,
+    variant_remap: &HashMap<DefId, DefId>,
+    struct_remap: &HashMap<DefId, DefId>,
+    remapped: &RemappedValidation,
+    diagnostic_path: &Path,
+) -> Result<LoweredMirUnit<'a>, Vec<Diagnostic>> {
+    let (mut program, context) = lowered.validated.into_parts();
+    for function in &mut program.functions {
         rewrite_function_type_ids(function, rewrites);
+        rewrite_function_variant_defs(function, variant_remap);
+        rewrite_function_struct_defs(function, struct_remap);
     }
     for function in &mut lowered.generic_templates {
         rewrite_function_type_ids(function, rewrites);
+        rewrite_function_variant_defs(function, variant_remap);
+        rewrite_function_struct_defs(function, struct_remap);
     }
     for environment in &mut lowered.closure_environments {
         rewrite_type_id(&mut environment.value_ty, rewrites);
@@ -1904,6 +2064,20 @@ pub(super) fn rewrite_lowered_type_ids(
             rewrite_type_id(&mut capture.ty, rewrites);
         }
     }
+    let target_snapshot = TypeTable::from_snapshot(target_types.snapshot())
+        .map_err(|message| vec![mir_lowering_diag(diagnostic_path, message)])?;
+    let target_snapshot: &'static TypeTable = Box::leak(Box::new(target_snapshot));
+    let mut context = context.with_types(target_snapshot);
+    rewrite_validation_type_ids(&mut context, rewrites);
+    remapped.apply(&mut context);
+    context.closure_environments = lowered
+        .closure_environments
+        .iter()
+        .map(|environment| (environment.id, environment.clone()))
+        .collect();
+    lowered.validated = radix_module::mir::ValidatedMir::new(program, context)
+        .map_err(|errors| validation_diagnostics(diagnostic_path, errors))?;
+    Ok(lowered)
 }
 
 /// Rehome compiler-owned shape-size indices when a sibling or library MIR
@@ -1911,12 +2085,15 @@ pub(super) fn rewrite_lowered_type_ids(
 /// `MirConstant::ShapeSize` stores an `IndexId` directly, so the ordinary
 /// `TypeId` rewrite cannot move it across the package boundary. Re-intern the
 /// full index expression and its parameter symbols in the entry namespace.
-fn rewrite_lowered_shape_size_indices(
-    lowered: &mut LoweredMirUnit<'_>,
+fn rewrite_lowered_shape_size_indices<'a>(
+    mut lowered: LoweredMirUnit<'a>,
     source_types: &TypeTable,
     target_types: &mut TypeTable,
     param_symbols: &HashMap<Symbol, Symbol>,
-) {
+    remapped: &RemappedValidation,
+    diagnostic_path: &Path,
+) -> Result<LoweredMirUnit<'a>, Vec<Diagnostic>> {
+    let (mut program, context) = lowered.validated.into_parts();
     let mut rewrite_function = |function: &mut MirFunction| {
         let _ = radix_module::mir::generic::rewrite_function_constants(function, &mut |constant| {
             let MirConstant::ShapeSize { shape, .. } = constant else {
@@ -1926,12 +2103,20 @@ fn rewrite_lowered_shape_size_indices(
             true
         });
     };
-    for function in &mut lowered.program.functions {
+    for function in &mut program.functions {
         rewrite_function(function);
     }
     for function in &mut lowered.generic_templates {
         rewrite_function(function);
     }
+    let target_snapshot = TypeTable::from_snapshot(target_types.snapshot())
+        .map_err(|message| vec![mir_lowering_diag(diagnostic_path, message)])?;
+    let target_snapshot: &'static TypeTable = Box::leak(Box::new(target_snapshot));
+    let mut context = context.with_types(target_snapshot);
+    remapped.apply(&mut context);
+    lowered.validated = radix_module::mir::ValidatedMir::new(program, context)
+        .map_err(|errors| validation_diagnostics(diagnostic_path, errors))?;
+    Ok(lowered)
 }
 
 fn import_shape_size_index(
@@ -1957,7 +2142,108 @@ fn import_shape_size_index(
     }
 }
 
-fn remap_templates_text_symbols(lowered: &mut LoweredMirUnit<'_>, target: &mut Interner) {
+fn remap_lowered_program_text_symbols<'a>(
+    mut lowered: LoweredMirUnit<'a>,
+    source: &Interner,
+    target: &mut Interner,
+    diagnostic_path: &Path,
+) -> Result<LoweredMirUnit<'a>, Vec<Diagnostic>> {
+    let (mut program, mut context) = lowered.validated.into_parts();
+    remap_program_text_symbols(&mut program, source, target);
+    remap_closure_environment_symbols(&mut lowered.closure_environments, source, target);
+    for fields in context.struct_fields.values_mut() {
+        *fields = std::mem::take(fields)
+            .into_iter()
+            .map(|(name, ty)| (remap_metadata_symbol(name, source, target), ty))
+            .collect();
+    }
+    for params in context.struct_type_params.values_mut() {
+        for param in params {
+            *param = remap_metadata_symbol(*param, source, target);
+        }
+    }
+    for params in context.enum_type_params.values_mut() {
+        for param in params {
+            *param = remap_metadata_symbol(*param, source, target);
+        }
+    }
+    for fields in context.optional_struct_fields.values_mut() {
+        *fields = std::mem::take(fields)
+            .into_iter()
+            .map(|name| remap_metadata_symbol(name, source, target))
+            .collect();
+    }
+    for fields in context.nullable_struct_fields.values_mut() {
+        *fields = std::mem::take(fields)
+            .into_iter()
+            .map(|name| remap_metadata_symbol(name, source, target))
+            .collect();
+    }
+    for fields in context.json_struct_field_keys.values_mut() {
+        *fields = std::mem::take(fields)
+            .into_iter()
+            .map(|(name, key)| (remap_metadata_symbol(name, source, target), key))
+            .collect();
+    }
+    for fields in context.variant_fields.values_mut() {
+        *fields = std::mem::take(fields)
+            .into_iter()
+            .map(|(name, ty)| (remap_metadata_symbol(name, source, target), ty))
+            .collect();
+    }
+    context.interner = Some(Box::leak(Box::new(target.clone())));
+    context.closure_environments = lowered
+        .closure_environments
+        .iter()
+        .map(|environment| (environment.id, environment.clone()))
+        .collect();
+    lowered.validated = radix_module::mir::ValidatedMir::new(program, context)
+        .map_err(|errors| validation_diagnostics(diagnostic_path, errors))?;
+    Ok(lowered)
+}
+
+fn rewrite_lowered_program_sources<'a>(
+    mut lowered: LoweredMirUnit<'a>,
+    unit_path: &Path,
+    source_rewrites: &SourceRewrites,
+    diagnostic_path: &Path,
+) -> Result<LoweredMirUnit<'a>, Vec<Diagnostic>> {
+    let (mut program, mut context) = lowered.validated.into_parts();
+    rewrite_program_sources(&mut program, unit_path, source_rewrites);
+    rewrite_closure_environment_sources(
+        &mut lowered.closure_environments,
+        unit_path,
+        source_rewrites,
+    );
+    let rewrite = |def: DefId| {
+        source_rewrites
+            .get(&(unit_path.to_path_buf(), def))
+            .copied()
+            .unwrap_or(def)
+    };
+    context.functions = std::mem::take(&mut context.functions)
+        .into_iter()
+        .map(|(def, signature)| (rewrite(def), signature))
+        .collect();
+    context.external_function_identities =
+        std::mem::take(&mut context.external_function_identities)
+            .into_iter()
+            .map(|(def, identity)| (rewrite(def), identity))
+            .collect();
+    context.closure_environments = lowered
+        .closure_environments
+        .iter()
+        .map(|environment| (environment.id, environment.clone()))
+        .collect();
+    lowered.validated = radix_module::mir::ValidatedMir::new(program, context)
+        .map_err(|errors| validation_diagnostics(diagnostic_path, errors))?;
+    Ok(lowered)
+}
+
+fn remap_templates_text_symbols<'a>(
+    mut lowered: LoweredMirUnit<'a>,
+    target: &mut Interner,
+) -> LoweredMirUnit<'a> {
     let source = lowered.interner.clone();
     for template in &mut lowered.generic_templates {
         remap_function_text_symbols(template, &source, target);
@@ -1971,15 +2257,17 @@ fn remap_templates_text_symbols(lowered: &mut LoweredMirUnit<'_>, target: &mut I
                 remap_optional_symbol(Some(param.name), &source, target).unwrap_or(param.name);
         }
     }
+    lowered
 }
 
-fn rewrite_generic_identity(
-    lowered: &mut LoweredMirUnit<'_>,
+fn rewrite_generic_identity<'a>(
+    mut lowered: LoweredMirUnit<'a>,
     unit_path: &Path,
     source_rewrites: &SourceRewrites,
-) {
+) -> LoweredMirUnit<'a> {
     rewrite_templates_sources(&mut lowered.generic_templates, unit_path, source_rewrites);
     rewrite_generic_param_sources(&mut lowered.generic_params, unit_path, source_rewrites);
+    lowered
 }
 
 /// Collect one package unit's own device facts for the package-seam
@@ -2050,6 +2338,21 @@ fn joined_imported_device_routes<'routes>(
     joined
 }
 
+fn merge_imported_device_registrations(
+    target: &mut Vec<radix_module::mir::ImportedDeviceRegistration>,
+    incoming: Vec<radix_module::mir::ImportedDeviceRegistration>,
+) {
+    for registration in incoming {
+        if target
+            .iter()
+            .any(|existing| existing.key == registration.key)
+        {
+            continue;
+        }
+        target.push(registration);
+    }
+}
+
 fn shift_templates(templates: &mut [MirFunction], offset: u32) {
     if offset == 0 {
         return;
@@ -2066,8 +2369,8 @@ fn shift_templates(templates: &mut [MirFunction], offset: u32) {
 }
 
 #[allow(clippy::type_complexity)]
-fn instantiate_package_generics(
-    merged: &mut LoweredMirUnit<'_>,
+fn instantiate_package_generics<'a>(
+    mut merged: LoweredMirUnit<'a>,
     templates: Vec<MirFunction>,
     generic_params: Vec<(DefId, Vec<radix_module::mir::MirGenericParam>)>,
     diagnostic_path: &Path,
@@ -2075,11 +2378,11 @@ fn instantiate_package_generics(
     imported_devices: radix_module::mir::ImportedDeviceIndex,
     consumer_device_roles: HashMap<DefId, radix_module::mir::MirDeviceRole>,
     consumer_launch_entries: HashSet<DefId>,
-) -> Result<(), Vec<Diagnostic>> {
+) -> Result<LoweredMirUnit<'a>, Vec<Diagnostic>> {
     if templates.is_empty() {
         merged.generic_templates = templates;
         merged.generic_params = generic_params;
-        return Ok(());
+        return Ok(merged);
     }
     let mut types =
         radix_types::TypeTable::from_snapshot(merged.validated.validation().types.snapshot())
@@ -2090,9 +2393,10 @@ fn instantiate_package_generics(
     // concrete instances and signature-only routes fail closed. CDC-1: the
     // consumer units' own device roles and launch entries ride the same call
     // as the leaf-tail union (no second composition pass, no dual authority).
+    let (mut program, prior_context) = merged.validated.into_parts();
     let (extra, registrations) =
         radix_module::mir::instantiate_merged_generic_calls_with_devices_and_metadata(
-            &mut merged.program,
+            &mut program,
             &templates,
             &generic_params,
             &mut types,
@@ -2122,11 +2426,11 @@ fn instantiate_package_generics(
                 .collect::<Vec<_>>()
         })?;
     merged.monomorphizations.extend(extra);
-    merged.imported_device_registrations = registrations;
+    merge_imported_device_registrations(&mut merged.imported_device_registrations, registrations);
     merged.generic_templates = templates;
     merged.generic_params = generic_params;
     let types: &'static radix_types::TypeTable = Box::leak(Box::new(types));
-    let mut context = merged.validated.validation().with_types(types);
+    let mut context = prior_context.with_types(types);
     context.closure_environments.clear();
     for environment in &merged.closure_environments {
         context
@@ -2137,14 +2441,9 @@ fn instantiate_package_generics(
     if let Some(extra) = extra_validation {
         extra.apply(&mut context);
     }
-    merged.validated = radix_module::mir::ValidatedMir::new(merged.program.clone(), context)
-        .map_err(|errors| {
-            errors
-                .into_iter()
-                .map(|error| mir_lowering_diag(diagnostic_path, error.message))
-                .collect::<Vec<_>>()
-        })?;
-    Ok(())
+    merged.validated = radix_module::mir::ValidatedMir::new(program, context)
+        .map_err(|errors| validation_diagnostics(diagnostic_path, errors))?;
+    Ok(merged)
 }
 
 fn rewrite_function_type_ids(function: &mut MirFunction, rewrites: &[(TypeId, TypeId)]) {
@@ -2227,19 +2526,15 @@ pub(super) fn rewrite_statement_type_id(
 /// `EnumVariant`/`VariantField` reference in the lowered source program must
 /// ride the nominal remap. Variant defs without a consumer mapping keep their
 /// source-local value (entry-local types referenced from a sibling).
-pub(super) fn rewrite_lowered_variant_defs(
-    lowered: &mut LoweredMirUnit<'_>,
-    variant_remap: &HashMap<DefId, DefId>,
-) {
-    if variant_remap.is_empty() {
-        return;
-    }
-    for function in &mut lowered.program.functions {
-        rewrite_function_variant_defs(function, variant_remap);
-    }
-    for function in &mut lowered.generic_templates {
-        rewrite_function_variant_defs(function, variant_remap);
-    }
+pub(super) fn rewrite_lowered_variant_defs<'a>(
+    lowered: LoweredMirUnit<'a>,
+    _variant_remap: &HashMap<DefId, DefId>,
+    _diagnostic_path: &Path,
+) -> Result<LoweredMirUnit<'a>, Vec<Diagnostic>> {
+    // Program and proof-context variant identities move atomically with the
+    // preceding type-table transition. Keep this named owned step so callers
+    // cannot reintroduce a mutable carrier endpoint.
+    Ok(lowered)
 }
 
 fn rewrite_function_variant_defs(
@@ -2276,19 +2571,13 @@ fn build_nominal_def_remap(
 
 /// Rewrite `MirAggregateKind::Struct` defs in a lowered program through the
 /// nominal struct-def remap (FMIR e2e-hardening CTO-1).
-fn rewrite_lowered_struct_defs(
-    lowered: &mut LoweredMirUnit<'_>,
-    struct_remap: &HashMap<DefId, DefId>,
-) {
-    if struct_remap.is_empty() {
-        return;
-    }
-    for function in &mut lowered.program.functions {
-        rewrite_function_struct_defs(function, struct_remap);
-    }
-    for function in &mut lowered.generic_templates {
-        rewrite_function_struct_defs(function, struct_remap);
-    }
+fn rewrite_lowered_struct_defs<'a>(
+    lowered: LoweredMirUnit<'a>,
+    _struct_remap: &HashMap<DefId, DefId>,
+    _diagnostic_path: &Path,
+) -> Result<LoweredMirUnit<'a>, Vec<Diagnostic>> {
+    // Struct identities are likewise part of the atomic type-table rewrite.
+    Ok(lowered)
 }
 
 fn rewrite_function_struct_defs(function: &mut MirFunction, struct_remap: &HashMap<DefId, DefId>) {
@@ -2476,39 +2765,51 @@ fn rewrite_option_chain_variant_defs(
     }
 }
 
-pub(super) fn install_cli_dispatch_entry(
-    lowered: &mut LoweredMirUnit<'_>,
+pub(super) fn install_cli_dispatch_entry<'a>(
+    lowered: LoweredMirUnit<'a>,
     command: MirFunctionId,
     entry_path: &Path,
-) -> Result<(), Vec<Diagnostic>> {
-    let Some(entry_index) = lowered.program.functions.iter().position(|function| {
-        is_explicit_entry_function(function, lowered.validated.validation().types)
-    }) else {
-        return Err(vec![mir_diag(
-            entry_path,
-            "package MIR could not find root CLI entry function",
-        )]);
-    };
-    let span = lowered.program.functions[entry_index].span;
-    lowered.program.functions[entry_index].locals.clear();
-    lowered.program.functions[entry_index].temps.clear();
-    lowered.program.functions[entry_index].blocks = vec![MirBlock {
-        id: MirBlockId(0),
-        statements: vec![MirStatement {
-            kind: MirStatementKind::Call {
-                destination: None,
-                callee: MirCallee::Function(command),
-                args: Vec::new(),
-            },
-            span,
-        }],
-        terminator: MirTerminator {
-            kind: MirTerminatorKind::Return(None),
-            span,
-        },
-        span,
-    }];
-    Ok(())
+) -> Result<LoweredMirUnit<'a>, Vec<Diagnostic>> {
+    let types = lowered.validated.validation().types;
+    lowered
+        .patch_program(|program| {
+            let Some(entry_index) = program
+                .functions
+                .iter()
+                .position(|function| is_explicit_entry_function(function, types))
+            else {
+                return Err(vec![mir_diag(
+                    entry_path,
+                    "package MIR could not find root CLI entry function",
+                )]);
+            };
+            let span = program.functions[entry_index].span;
+            program.functions[entry_index].locals.clear();
+            program.functions[entry_index].temps.clear();
+            program.functions[entry_index].blocks = vec![MirBlock {
+                id: MirBlockId(0),
+                statements: vec![MirStatement {
+                    kind: MirStatementKind::Call {
+                        destination: None,
+                        callee: MirCallee::Function(command),
+                        args: Vec::new(),
+                    },
+                    span,
+                }],
+                terminator: MirTerminator {
+                    kind: MirTerminatorKind::Return(None),
+                    span,
+                },
+                span,
+            }];
+            Ok(())
+        })
+        .map_err(|error| {
+            error.fold(
+                |diagnostics| diagnostics,
+                |errors| validation_diagnostics(entry_path, errors),
+            )
+        })
 }
 
 pub(super) fn is_explicit_entry_function(
@@ -2558,7 +2859,7 @@ pub(super) fn lower_unit<'a>(
     })?;
 
     if let Some(bundle) = bundle {
-        super::air_backward::apply(&mut lowered, bundle, no_fuse)
+        lowered = super::air_backward::apply(lowered, bundle, no_fuse)
             .map_err(|message| vec![mir_lowering_diag(&unit.path, message)])?;
     }
 
@@ -2598,18 +2899,170 @@ fn merge_shifted_device_function_metadata(
     Ok(())
 }
 
-pub(super) fn append_shifted_program(
-    merged: &mut LoweredMirUnit<'_>,
-    lowered: &mut LoweredMirUnit<'_>,
+fn append_shifted_program<'merged, 'incoming>(
+    mut merged: LoweredMirUnit<'merged>,
+    incoming: LoweredMirUnit<'incoming>,
     diagnostic_path: &Path,
-) -> Result<u32, Vec<Diagnostic>> {
-    append_shifted_parts(
-        &mut merged.program,
+    extra: &RemappedValidation,
+    prior_templates: &[MirFunction],
+    prior_generic_params: &[(DefId, Vec<radix_module::mir::MirGenericParam>)],
+    imported_devices: &radix_module::mir::ImportedDeviceIndex,
+    consumer_device_roles: &HashMap<DefId, radix_module::mir::MirDeviceRole>,
+    consumer_launch_entries: &HashSet<DefId>,
+) -> Result<(LoweredMirUnit<'merged>, LibraryMirParts), Vec<Diagnostic>> {
+    let (mut merged_program, mut context) = merged.validated.into_parts();
+    let (incoming_program, _) = incoming.validated.into_parts();
+    let mut incoming_parts = LibraryMirParts {
+        program: incoming_program,
+        environments: incoming.closure_environments,
+        templates: incoming.generic_templates,
+        generic_params: incoming.generic_params,
+        device_function_metadata: incoming.device_function_metadata,
+    };
+    let offset = append_shifted_parts(
+        &mut merged_program,
         &mut merged.closure_environments,
-        &mut lowered.program,
-        &mut lowered.closure_environments,
+        &mut incoming_parts.program,
+        &mut incoming_parts.environments,
         diagnostic_path,
-    )
+    )?;
+    merge_shifted_device_function_metadata(
+        &mut merged.device_function_metadata,
+        &incoming_parts.device_function_metadata,
+        offset,
+        diagnostic_path,
+    )?;
+    if !prior_templates.is_empty() || !incoming_parts.templates.is_empty() {
+        let mut current_templates = incoming_parts.templates.clone();
+        shift_templates(&mut current_templates, offset);
+        let mut templates = prior_templates.to_vec();
+        templates.extend(current_templates);
+        let mut generic_params = prior_generic_params.to_vec();
+        generic_params.extend(incoming_parts.generic_params.clone());
+        let mut types = TypeTable::from_snapshot(context.types.snapshot())
+            .map_err(|message| vec![mir_lowering_diag(diagnostic_path, message)])?;
+        let (monomorphizations, registrations) =
+            radix_module::mir::instantiate_merged_generic_calls_with_devices_and_metadata(
+                &mut merged_program,
+                &templates,
+                &generic_params,
+                &mut types,
+                &merged.interner,
+                Some(extra.struct_metadata()).as_ref(),
+                &mut merged.device_function_metadata,
+                imported_devices,
+                consumer_device_roles,
+                consumer_launch_entries,
+            )
+            .map_err(|errors| {
+                errors
+                    .into_iter()
+                    .map(|error| {
+                        let diagnostic = mir_lowering_diag(diagnostic_path, error.message);
+                        if error.issue.is_empty() {
+                            diagnostic
+                        } else {
+                            diagnostic.with_arg("issue", error.issue)
+                        }
+                    })
+                    .collect::<Vec<_>>()
+            })?;
+        merged.monomorphizations.extend(monomorphizations);
+        merge_imported_device_registrations(
+            &mut merged.imported_device_registrations,
+            registrations,
+        );
+        let types: &'static TypeTable = Box::leak(Box::new(types));
+        context = context.with_types(types);
+    }
+    context.closure_environments = merged
+        .closure_environments
+        .iter()
+        .map(|environment| (environment.id, environment.clone()))
+        .collect();
+    extra.apply(&mut context);
+    merged.validated = radix_module::mir::ValidatedMir::new(merged_program, context)
+        .map_err(|errors| validation_diagnostics(diagnostic_path, errors))?;
+    Ok((merged, incoming_parts))
+}
+
+fn append_shifted_library_parts<'a>(
+    mut merged: LoweredMirUnit<'a>,
+    mut library: LibraryMirParts,
+    diagnostic_path: &Path,
+    extra: &RemappedValidation,
+    prior_templates: &[MirFunction],
+    prior_generic_params: &[(DefId, Vec<radix_module::mir::MirGenericParam>)],
+    imported_devices: &radix_module::mir::ImportedDeviceIndex,
+    consumer_device_roles: &HashMap<DefId, radix_module::mir::MirDeviceRole>,
+    consumer_launch_entries: &HashSet<DefId>,
+) -> Result<(LoweredMirUnit<'a>, LibraryMirParts, u32), Vec<Diagnostic>> {
+    let (mut merged_program, mut context) = merged.validated.into_parts();
+    let offset = append_shifted_parts(
+        &mut merged_program,
+        &mut merged.closure_environments,
+        &mut library.program,
+        &mut library.environments,
+        diagnostic_path,
+    )?;
+    merge_shifted_device_function_metadata(
+        &mut merged.device_function_metadata,
+        &library.device_function_metadata,
+        offset,
+        diagnostic_path,
+    )?;
+    if !prior_templates.is_empty() || !library.templates.is_empty() {
+        let mut current_templates = library.templates.clone();
+        shift_templates(&mut current_templates, offset);
+        let mut templates = prior_templates.to_vec();
+        templates.extend(current_templates);
+        let mut generic_params = prior_generic_params.to_vec();
+        generic_params.extend(library.generic_params.clone());
+        let mut types = TypeTable::from_snapshot(context.types.snapshot())
+            .map_err(|message| vec![mir_lowering_diag(diagnostic_path, message)])?;
+        let (monomorphizations, registrations) =
+            radix_module::mir::instantiate_merged_generic_calls_with_devices_and_metadata(
+                &mut merged_program,
+                &templates,
+                &generic_params,
+                &mut types,
+                &merged.interner,
+                Some(extra.struct_metadata()).as_ref(),
+                &mut merged.device_function_metadata,
+                imported_devices,
+                consumer_device_roles,
+                consumer_launch_entries,
+            )
+            .map_err(|errors| {
+                errors
+                    .into_iter()
+                    .map(|error| {
+                        let diagnostic = mir_lowering_diag(diagnostic_path, error.message);
+                        if error.issue.is_empty() {
+                            diagnostic
+                        } else {
+                            diagnostic.with_arg("issue", error.issue)
+                        }
+                    })
+                    .collect::<Vec<_>>()
+            })?;
+        merged.monomorphizations.extend(monomorphizations);
+        merge_imported_device_registrations(
+            &mut merged.imported_device_registrations,
+            registrations,
+        );
+        let types: &'static TypeTable = Box::leak(Box::new(types));
+        context = context.with_types(types);
+    }
+    context.closure_environments = merged
+        .closure_environments
+        .iter()
+        .map(|environment| (environment.id, environment.clone()))
+        .collect();
+    extra.apply(&mut context);
+    merged.validated = radix_module::mir::ValidatedMir::new(merged_program, context)
+        .map_err(|errors| validation_diagnostics(diagnostic_path, errors))?;
+    Ok((merged, library, offset))
 }
 
 /// Append owned program parts (functions + closure environments) into the
@@ -2707,12 +3160,12 @@ fn function_id_overflow_diag(path: &Path, message: &str) -> Diagnostic {
 /// Rebuild the validated-MIR token after package merging shifts IDs and
 /// appends `functions/closure_environments`. The prior token proved the
 /// pre-merge program; the merged program needs its own proof.
-pub(super) fn rebuild_merged_validated(
-    merged: &mut LoweredMirUnit<'_>,
+pub(super) fn rebuild_merged_validated<'a>(
+    mut merged: LoweredMirUnit<'a>,
     diagnostic_path: &Path,
     extra: Option<&RemappedValidation>,
-) -> Result<(), Vec<Diagnostic>> {
-    let mut context = merged.validated.validation().clone();
+) -> Result<LoweredMirUnit<'a>, Vec<Diagnostic>> {
+    let (program, mut context) = merged.validated.into_parts();
     context.closure_environments.clear();
     for environment in &merged.closure_environments {
         context
@@ -2722,16 +3175,9 @@ pub(super) fn rebuild_merged_validated(
     if let Some(extra) = extra {
         extra.apply(&mut context);
     }
-    merged.validated = radix_module::mir::ValidatedMir::new(merged.program.clone(), context)
-        .map_err(|errors| {
-            errors
-                .into_iter()
-                .map(|error| {
-                    mir_lowering_diag(diagnostic_path, error.message).with_span(error.span)
-                })
-                .collect::<Vec<_>>()
-        })?;
-    Ok(())
+    merged.validated = radix_module::mir::ValidatedMir::new(program, context)
+        .map_err(|errors| validation_diagnostics(diagnostic_path, errors))?;
+    Ok(merged)
 }
 
 /// `function.source` is the HIR declaration identity, not the MIR instance
@@ -2784,10 +3230,10 @@ pub(super) fn ensure_unique_definition_sources(
 /// boundary.
 /// # Errors
 /// Returns an error when the input or persisted artifact is invalid.
-pub fn canonicalize_direct_definition_callees(
-    lowered: &mut LoweredMirUnit<'_>,
+pub fn canonicalize_direct_definition_callees<'a>(
+    lowered: LoweredMirUnit<'a>,
     diagnostic_path: &Path,
-) -> Result<(), Vec<Diagnostic>> {
+) -> Result<LoweredMirUnit<'a>, Vec<Diagnostic>> {
     crate::mir_canonicalize::canonicalize_direct_definition_callees(lowered, diagnostic_path)
 }
 

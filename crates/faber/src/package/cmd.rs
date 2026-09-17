@@ -999,7 +999,7 @@ pub(super) fn compile_package_metal_text(
         &super::mir::faber_mir_seams(),
         |lowered| -> Result<String, Vec<radix::module::Diagnostic>> {
             let mut local_entry_roles = radix::module::semantic::FxHashMap::default();
-            for function in &lowered.program.functions {
+            for function in &lowered.validated.program().functions {
                 if let Some(source) = function.source
                     && let Some(role) = lowered
                         .device_function_metadata
@@ -1012,7 +1012,7 @@ pub(super) fn compile_package_metal_text(
             let device_roles = radix_mir::device::merge_imported_entry_roles(
                 local_entry_roles,
                 &radix::program::mir::imported_entry_facts(lowered),
-                &lowered.program,
+                &lowered.validated.program(),
             )
             .map_err(|error| {
                 vec![

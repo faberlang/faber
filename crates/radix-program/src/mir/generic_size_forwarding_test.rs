@@ -72,7 +72,8 @@ fn named_function_shapes<'a>(
 ) -> Vec<(Option<Vec<i64>>, Option<Vec<i64>>)> {
     let types = lowered.validated.validation().types;
     lowered
-        .program
+        .validated
+        .program()
         .functions
         .iter()
         .filter(|function| {

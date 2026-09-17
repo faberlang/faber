@@ -2128,7 +2128,7 @@ main {
         &Config::default().with_library_home(dev_norma_library_home()),
         &entry,
         |lowered| {
-            assert!(!lowered.program.functions.is_empty());
+            assert!(!lowered.validated.program().functions.is_empty());
             assert!(lowered.validated.validation().interner.is_some());
             true
         },

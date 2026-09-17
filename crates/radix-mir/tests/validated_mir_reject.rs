@@ -4,7 +4,10 @@
 //! proves that `ValidatedMir::new` rejects it. `ValidatedMir` is the single
 //! validation gate consumed by every public MIR entry point.
 
+use std::convert::Infallible;
+
 use radix_lexer::Span;
+use radix_mir::validate::PatchProgramError;
 use radix_mir::{
     MirBlock, MirBlockId, MirFunction, MirFunctionId, MirProgram, MirTerminator, MirTerminatorKind,
     MirType, MirValidationContext, ValidatedMir,
@@ -114,6 +117,50 @@ fn rejects_empty_context_with_duplicate_function_id() {
         errors.iter().any(|e| e.message.contains("duplicate")),
         "expected duplicate function ID error, got: {errors:?}"
     );
+}
+
+// ── Consuming mutation ─────────────────────────────────────────────────────
+
+#[test]
+fn patch_program_returns_a_token_only_after_revalidation() {
+    let types = TypeTable::default();
+    let nihil = MirType::semantic(types.primitive(Primitive::Nihil));
+    let valid_function = func(0, vec![block(0, MirTerminatorKind::Return(None))], nihil);
+
+    let empty = ValidatedMir::new(
+        MirProgram { functions: vec![] },
+        MirValidationContext::new(&types),
+    )
+    .expect("empty MIR program validates");
+    let patched = empty
+        .patch_program(|program| {
+            program.functions.push(valid_function.clone());
+            Ok::<(), Infallible>(())
+        })
+        .expect("valid patch returns a replacement proof token");
+    assert_eq!(patched.program().functions.len(), 1);
+
+    let separate = ValidatedMir::new(
+        MirProgram {
+            functions: vec![valid_function.clone()],
+        },
+        MirValidationContext::new(&types),
+    )
+    .expect("single-function MIR program validates");
+    let rejected = separate.patch_program(|program| {
+        program.functions.push(valid_function);
+        Ok::<(), Infallible>(())
+    });
+    match rejected {
+        Err(PatchProgramError::Validation(errors)) => assert!(
+            errors
+                .iter()
+                .any(|error| error.message.contains("duplicate")),
+            "expected duplicate function ID rejection, got: {errors:?}"
+        ),
+        Err(PatchProgramError::Patch(never)) => match never {},
+        Ok(_) => panic!("invalid patch must not return a proof token"),
+    }
 }
 
 // ── Edge cases ─────────────────────────────────────────────────────────────

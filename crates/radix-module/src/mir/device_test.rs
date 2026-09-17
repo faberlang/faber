@@ -165,8 +165,8 @@ fn classify_source(source: &str) -> radix_types::Lowerability {
     let mut validation = lowered.validated.validation().clone();
     attach_device_tensor_layouts(&mut validation);
     let mut context = MirDeviceContext::from_hir_roles(roles);
-    context.attach_program(&lowered.program);
-    let validated = ValidatedMir::new(lowered.program.clone(), validation).expect("valid test MIR");
+    context.attach_program(&lowered.validated.program());
+    let validated = ValidatedMir::new(lowered.validated.program().clone(), validation).expect("valid test MIR");
     classify_device_safe(&validated, &context)
 }
 
@@ -2355,7 +2355,7 @@ functio k(fractus<f32> x) → fractus<f32> {
         .expect("legal fragment call must compose");
     assert!(
         crate::mir::fragment_composition::surviving_fragment_calls_with_metadata(
-            &lowered.program.functions,
+            &lowered.validated.program().functions,
             &[],
             &roles,
             &crate::mir::MirDeviceFunctionMetadataMap::default(),

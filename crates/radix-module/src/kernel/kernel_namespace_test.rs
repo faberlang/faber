@@ -168,7 +168,7 @@ incipit {
 "#;
     let mut unit = analyze_source(&session, "kernel-import.fab", source, AnalyzeRequest::default()).expect("analysis");
     let program = lower_analyzed_unit(&mut unit, MirLoweringOptions::default())
-        .map(|lowered| lowered.program)
+        .map(|lowered| lowered.validated.into_parts().0)
         .expect("lower");
 
     let mut saw_kernel_processus = false;
@@ -203,7 +203,7 @@ incipit {
     let mut unit =
         analyze_source(&session, "kernel-toml-import.fab", source, AnalyzeRequest::default()).expect("analysis");
     let program = lower_analyzed_unit(&mut unit, MirLoweringOptions::default())
-        .map(|lowered| lowered.program)
+        .map(|lowered| lowered.validated.into_parts().0)
         .expect("lower");
 
     let mut saw_kernel_toml = false;
@@ -239,7 +239,7 @@ incipit {
     let mut unit =
         analyze_source(&session, "kernel-glob-import.fab", source, AnalyzeRequest::default()).expect("analysis");
     let program = lower_analyzed_unit(&mut unit, MirLoweringOptions::default())
-        .map(|lowered| lowered.program)
+        .map(|lowered| lowered.validated.into_parts().0)
         .expect("lower");
 
     let mut saw_json = false;

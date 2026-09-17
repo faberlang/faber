@@ -138,7 +138,8 @@ fn sibling_generic_kernel_registers_with_ordered_use_site_bindings() {
             // the merged synthetic template source.
             assert!(
                 lowered
-                    .program
+                    .validated
+                    .program()
                     .functions
                     .iter()
                     .any(|function| function.id == registration.function),

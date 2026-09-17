@@ -227,7 +227,8 @@ fn imported_twin_instance_records_key_route_registration_and_visibility() {
             );
             assert!(
                 lowered
-                    .program
+                    .validated
+                    .program()
                     .functions
                     .iter()
                     .any(|function| function.id == twin_add.function),

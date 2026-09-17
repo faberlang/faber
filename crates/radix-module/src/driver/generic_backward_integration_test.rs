@@ -90,20 +90,24 @@ incipit {
     let mut analysis = analyze_source(&session, "generic_backward_concrete.fab", &source, AnalyzeRequest::default())
         .expect("concrete generic backward reduction should analyze cleanly");
 
-    let mut lowered = expect_codegen_ok(
+    let lowered = expect_codegen_ok(
         lower_mir_with_context_for_target(&mut analysis, false),
         "concrete generic backward reduction should finalize after bundle application",
     );
     assert!(
         lowered
-            .program
+            .validated
+            .program()
             .functions
-            .iter_mut()
-            .all(|function| !crate::mir::generic::function_contains_shape_size(function)),
+            .iter()
+            .all(|function| {
+                let mut function = function.clone();
+                !crate::mir::generic::function_contains_shape_size(&mut function)
+            }),
         "the final whole executable MIR program must contain no ShapeSize survivor"
     );
 
-    let names = mir_function_names(&lowered.program, &lowered.interner);
+    let names = mir_function_names(&lowered.validated.program(), &lowered.interner);
     assert!(
         names.iter().any(|name| name == "loss_backward"),
         "concrete call site must install the generated companion; got functions: {names:?}"
@@ -129,7 +133,7 @@ fn unresolved_generic_backward_template_is_not_executable() {
     let lowered =
         lower_analyzed_unit(&mut analysis, MirLoweringOptions::default()).expect("template lowering succeeds");
     assert!(
-        lowered.program.functions.is_empty(),
+        lowered.validated.program().functions.is_empty(),
         "generic AIR templates do not enter executable MIR"
     );
     assert!(
@@ -175,7 +179,10 @@ fn generic_backward_template_stays_out_of_executable_mir() {
     assert!(bundle.is_none(), "no concrete call means no generated companion");
     let lowered =
         lower_analyzed_unit(&mut analysis, MirLoweringOptions::default()).expect("generic primal should lower to MIR");
-    assert!(lowered.program.functions.is_empty(), "the generic primal is not executable MIR");
+    assert!(
+        lowered.validated.program().functions.is_empty(),
+        "the generic primal is not executable MIR"
+    );
     assert!(
         lowered.generic_templates.is_empty(),
         "source templates stay in HIR/FHIR, not MIR"
@@ -281,15 +288,15 @@ incipit {
          by prepare_air_backward_bundle (ensure_broadcast_reduction_types wiring)"
     );
 
-    let mut lowered = lower_analyzed_unit(&mut analysis, MirLoweringOptions::default())
+    let lowered = lower_analyzed_unit(&mut analysis, MirLoweringOptions::default())
         .expect("generic broadcast primal should lower to MIR");
-    expect_codegen_ok(
-        apply_air_backward_bundle(&mut lowered, bundle, false),
+    let lowered = expect_codegen_ok(
+        apply_air_backward_bundle(lowered, bundle, false),
         "broadcast-using generic primal companion must generate without \
          reverse_ad_broadcast_reduction_missing_type",
     );
 
-    let names = mir_function_names(&lowered.program, &lowered.interner);
+    let names = mir_function_names(&lowered.validated.program(), &lowered.interner);
     assert!(
         names.iter().any(|name| name == "broad_loss_backward"),
         "companion 'broad_loss_backward' must be installed in the lowered MIR; got functions: {names:?}"
@@ -338,14 +345,14 @@ functio lane_sum(tensor<f32, [4]> x) → f32 {
         "full-prefix unroll must reach reverse_ad as a guard-free straight line"
     );
 
-    let mut lowered =
+    let lowered =
         lower_analyzed_unit(&mut analysis, MirLoweringOptions::default()).expect("unrolled primal should lower to MIR");
-    expect_codegen_ok(
-        apply_air_backward_bundle(&mut lowered, bundle, false),
+    let lowered = expect_codegen_ok(
+        apply_air_backward_bundle(lowered, bundle, false),
         "unrolled full-prefix body must generate a reverse_ad companion",
     );
 
-    let names = mir_function_names(&lowered.program, &lowered.interner);
+    let names = mir_function_names(&lowered.validated.program(), &lowered.interner);
     assert!(
         names.iter().any(|name| name == "lane_sum_backward"),
         "companion 'lane_sum_backward' must be installed in the lowered MIR; got functions: {names:?}"
@@ -379,21 +386,25 @@ incipit {
     let session = test_session(Target::MirLlvm);
     let mut analysis = analyze_source(&session, "generic_unroll_lane_sum.fab", source, AnalyzeRequest::default())
         .expect("generic full-prefix range must analyze after concrete specialization");
-    let mut lowered = expect_codegen_ok(
+    let lowered = expect_codegen_ok(
         lower_mir_with_context_for_target(&mut analysis, false),
         "generic full-prefix range must reach the concrete backward companion",
     );
-    let names = mir_function_names(&lowered.program, &lowered.interner);
+    let names = mir_function_names(&lowered.validated.program(), &lowered.interner);
     assert!(
         names.iter().any(|name| name == "generic_lane_sum_backward"),
         "generic concrete companion must be installed in MIR; got functions: {names:?}"
     );
     assert!(
         lowered
-            .program
+            .validated
+            .program()
             .functions
-            .iter_mut()
-            .all(|function| !crate::mir::generic::function_contains_shape_size(function)),
+            .iter()
+            .all(|function| {
+                let mut function = function.clone();
+                !crate::mir::generic::function_contains_shape_size(&mut function)
+            }),
         "generic concrete primal and companion must have no ShapeSize survivor"
     );
 }
@@ -494,13 +505,13 @@ incipit {
         "the concrete generic instance must retain the caller-built mask multiply"
     );
 
-    let mut lowered = lower_analyzed_unit(&mut analysis, MirLoweringOptions::default())
+    let lowered = lower_analyzed_unit(&mut analysis, MirLoweringOptions::default())
         .expect("generic masked primal should lower to MIR");
-    expect_codegen_ok(
-        apply_air_backward_bundle(&mut lowered, bundle, false),
+    let lowered = expect_codegen_ok(
+        apply_air_backward_bundle(lowered, bundle, false),
         "generic caller-mask body must generate a reverse-AD companion",
     );
-    let names = mir_function_names(&lowered.program, &lowered.interner);
+    let names = mir_function_names(&lowered.validated.program(), &lowered.interner);
     assert!(
         names
             .iter()
@@ -549,14 +560,14 @@ functio masked_lane_mean(tensor<f32, [4]> x, tensor<f32, [4]> mask) → f32 {
         "mask-mode unroll must reach reverse_ad as a guard-free straight line"
     );
 
-    let mut lowered =
+    let lowered =
         lower_analyzed_unit(&mut analysis, MirLoweringOptions::default()).expect("masked primal should lower to MIR");
-    expect_codegen_ok(
-        apply_air_backward_bundle(&mut lowered, bundle, false),
+    let lowered = expect_codegen_ok(
+        apply_air_backward_bundle(lowered, bundle, false),
         "masked unrolled body must generate a reverse_ad companion",
     );
 
-    let names = mir_function_names(&lowered.program, &lowered.interner);
+    let names = mir_function_names(&lowered.validated.program(), &lowered.interner);
     assert!(
         names.iter().any(|name| name == "masked_mean_backward"),
         "companion 'masked_mean_backward' must be installed in the lowered MIR; got functions: {names:?}"

@@ -24,7 +24,9 @@ use rustc_hash::{FxHashMap, FxHashSet};
 /// `ValidatedMir` wraps a [`MirProgram`] together with the
 /// [`MirValidationContext`] that proved it well-formed. It can only be
 /// constructed by passing the program and context through
-/// [`validate_program`]; there is no escape hatch.
+/// [`validate_program`]. Consuming [`ValidatedMir::into_parts`] forfeits the
+/// proof token; [`ValidatedMir::patch_program`] restores one only after the
+/// patched program passes validation again.
 ///
 /// Callers that already hold a program and a known-good context can call
 /// [`ValidatedMir::new`], which re-runs validation to produce the token.
@@ -40,6 +42,31 @@ pub struct ValidatedMir<'a> {
     program: MirProgram,
     function_index: MirFunctionIndex,
     validation: MirValidationContext<'a>,
+}
+
+/// Failure from a consuming [`ValidatedMir::patch_program`] transition.
+///
+/// Neither variant retains the consumed program, validation context, or proof
+/// token, so a rejected patch cannot expose mutated MIR as validated.
+#[derive(Debug)]
+pub enum PatchProgramError<E> {
+    Patch(E),
+    Validation(Vec<MirValidationError>),
+}
+
+impl<E> PatchProgramError<E> {
+    /// Consume this error through caller-specific patch and validation
+    /// adapters without exposing the consumed program, context, or token.
+    pub fn fold<T>(
+        self,
+        patch: impl FnOnce(E) -> T,
+        validation: impl FnOnce(Vec<MirValidationError>) -> T,
+    ) -> T {
+        match self {
+            Self::Patch(error) => patch(error),
+            Self::Validation(errors) => validation(errors),
+        }
+    }
 }
 
 impl std::fmt::Debug for ValidatedMir<'_> {
@@ -140,6 +167,30 @@ impl<'a> ValidatedMir<'a> {
     #[must_use]
     pub fn validation(&self) -> &MirValidationContext<'a> {
         &self.validation
+    }
+
+    /// Consume this proof token and return its now-unvalidated parts.
+    ///
+    /// Access to [`Self::program`] and [`Self::validation`] is forfeited until
+    /// the caller constructs a new token by validating the resulting program.
+    #[must_use]
+    pub fn into_parts(self) -> (MirProgram, MirValidationContext<'a>) {
+        (self.program, self.validation)
+    }
+
+    /// Consume this proof token, patch the unvalidated program, and validate
+    /// it before returning a replacement token.
+    ///
+    /// # Errors
+    /// Returns only the patch or validation error. The consumed program,
+    /// context, and proof token are never returned on rejection.
+    pub fn patch_program<E>(
+        self,
+        patch: impl FnOnce(&mut MirProgram) -> Result<(), E>,
+    ) -> Result<Self, PatchProgramError<E>> {
+        let (mut program, context) = self.into_parts();
+        patch(&mut program).map_err(PatchProgramError::Patch)?;
+        Self::new(program, context).map_err(PatchProgramError::Validation)
     }
 }
 

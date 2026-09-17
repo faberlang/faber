@@ -753,14 +753,14 @@ functio outer(fractus<f32> x) → fractus<f32> {
         .expect("Entry→Entry must compose");
     assert!(
         crate::mir::fragment_composition::surviving_fragment_calls_with_metadata(
-            &lowered.program.functions,
+            &lowered.validated.program().functions,
             &[],
             &roles,
             &crate::mir::MirDeviceFunctionMetadataMap::default(),
         )
         .is_empty(),
         "no device call may survive composition: {:#?}",
-        lowered.program.functions
+        lowered.validated.program().functions
     );
 }
 
@@ -785,7 +785,7 @@ functio k(fractus<f32> x) → fractus<f32> {
         .expect("legal Entry→Fragment must compose");
     assert!(
         crate::mir::fragment_composition::surviving_fragment_calls_with_metadata(
-            &lowered.program.functions,
+            &lowered.validated.program().functions,
             &[],
             &roles,
             &crate::mir::MirDeviceFunctionMetadataMap::default(),

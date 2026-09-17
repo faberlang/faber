@@ -170,7 +170,8 @@ fn package_mir_registers_imported_device_instances() {
             // keyed by the same source as the merged synthetic template.
             assert!(
                 lowered
-                    .program
+                    .validated
+                    .program()
                     .functions
                     .iter()
                     .any(|function| function.id == kadd.function),

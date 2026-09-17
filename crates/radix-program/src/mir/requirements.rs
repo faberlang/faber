@@ -64,7 +64,7 @@ pub(super) fn collect_package_runtime_requirements(
     if cli_plan.exit_code.is_some() {
         requirements.insert("host:exit".to_owned());
     }
-    for function in &lowered.program.functions {
+    for function in &lowered.validated.program().functions {
         for block in &function.blocks {
             for statement in &block.statements {
                 let MirStatementKind::RuntimeCall { call, .. } = &statement.kind else {

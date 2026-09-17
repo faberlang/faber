@@ -238,7 +238,8 @@ kind = "bin"
 
 fn function_by_name<'a>(lowered: &'a LoweredMirUnit<'_>, name: &str) -> &'a MirFunction {
     lowered
-        .program
+        .validated
+        .program()
         .functions
         .iter()
         .find(|function| {
@@ -317,7 +318,8 @@ fn library_import_composes_consumer_local_kernel_caller() {
             // composition — present and keyed by the registration's join.
             assert!(
                 lowered
-                    .program
+                    .validated
+                    .program()
                     .functions
                     .iter()
                     .any(|function| function.id == instance.function
@@ -431,7 +433,8 @@ fn sibling_import_composes_consumer_local_kernel_caller() {
             // The sibling's instantiated public kernel stays a launch symbol:
             // its synthetic source survives in the merged program.
             let instance_sources: Vec<_> = lowered
-                .program
+                .validated
+                .program()
                 .functions
                 .iter()
                 .filter_map(|function| function.source)
@@ -616,7 +619,8 @@ fn host_caller_of_imported_instance_is_never_composed() {
             // The instance body itself is present (never composed away).
             assert!(
                 lowered
-                    .program
+                    .validated
+                    .program()
                     .functions
                     .iter()
                     .any(|function| function.id == instance.function),

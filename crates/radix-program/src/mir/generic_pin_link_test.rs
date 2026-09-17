@@ -91,7 +91,8 @@ fn literal_dims(
 fn gather_instance<'a>(lowered: &'a LoweredMirUnit<'_>) -> &'a radix_module::mir::MirFunction {
     let types = lowered.validated.validation().types;
     lowered
-        .program
+        .validated
+        .program()
         .functions
         .iter()
         .filter(|function| {

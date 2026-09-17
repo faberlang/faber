@@ -674,7 +674,7 @@ fn merged_target_entry_roles(
         .iter()
         .map(imported_target_entry_fact)
         .collect::<Vec<_>>();
-    radix_mir::device::merge_imported_entry_roles(local, &facts, &lowered.program)
+    radix_mir::device::merge_imported_entry_roles(local, &facts, &lowered.validated.program())
 }
 
 /// Spanned carrier for a KPC-EMIT merge failure (the `issue` diagnostic arg
@@ -919,12 +919,14 @@ fn generate_wgsl_text_output(
             let (vertex_mir, fragment_mir, mir_validation, mir_interner) = match &mir_result {
                 Ok(mir) => {
                     let v = mir
-                        .program
+                        .validated
+                        .program()
                         .functions
                         .iter()
                         .find(|f| f.shader_stage == Some(crate::mir::MirKernelShaderStage::Vertex));
                     let f = mir
-                        .program
+                        .validated
+                        .program()
                         .functions
                         .iter()
                         .find(|f| f.shader_stage == Some(crate::mir::MirKernelShaderStage::Fragment));
@@ -1395,16 +1397,23 @@ pub fn prepare_air_backward_bundle(
 /// Returns a [`SpannedCodegenError`] when AIR replacement or companion
 /// generation fails.
 #[cfg(feature = "device")]
-pub fn apply_air_backward_bundle(
-    lowered: &mut crate::mir::LoweredMirUnit<'_>,
+pub fn apply_air_backward_bundle<'a>(
+    lowered: crate::mir::LoweredMirUnit<'a>,
     bundle: AirBackwardBundle,
     no_fuse: bool,
-) -> Result<(), SpannedCodegenError> {
+) -> Result<crate::mir::LoweredMirUnit<'a>, SpannedCodegenError> {
     use crate::air::reverse_ad_callgraph::generate_companions_bottom_up;
     use rustc_hash::FxHashMap;
 
-    replace_air_lane_mir(lowered, bundle.air_mir)?;
-    let mut fresh_ids = FreshMirFunctionIds::after(lowered.program.functions.iter().map(|function| function.id));
+    let mut lowered = replace_air_lane_mir(lowered, bundle.air_mir)?;
+    let mut fresh_ids = FreshMirFunctionIds::after(
+        lowered
+            .validated
+            .program()
+            .functions
+            .iter()
+            .map(|function| function.id),
+    );
 
     // Build maps for bottom-up companion generation from the snapshots.
     let backward_def_ids: Vec<crate::hir::DefId> = bundle.snapshots.iter().map(|s| s.primal_def_id).collect();
@@ -1477,7 +1486,9 @@ pub fn apply_air_backward_bundle(
         // S3-A2: the returned entry carries the primal→companion facts onto
         // the lowered unit (the owned carrier), so the device-program
         // constructor can materialize the companion as device kernels.
-        let entry = generate_air_lane_backward_with_companion(snapshot, companion, lowered, &mut fresh_ids, no_fuse)?;
+        let (next, entry) =
+            generate_air_lane_backward_with_companion(snapshot, companion, lowered, &mut fresh_ids, no_fuse)?;
+        lowered = next;
         // Fail-closed carrier insertion (Stage 3R F4): duplicate or
         // contradictory relation rows for one primal are a hard error, never
         // a silent overwrite.
@@ -1495,6 +1506,7 @@ pub fn apply_air_backward_bundle(
     // companions for functions that are called but not themselves annotated
     // with @ radix backward.  They must be lowered to MIR so the backward
     // sub-companion Call targets are available at link time.
+    let mut unannotated_functions = Vec::new();
     for companion in &generated.unannotated_companions {
         let companion_program = crate::air::AirProgram { functions: vec![companion.clone()] };
         crate::air::validate_program(&companion_program).map_err(|errors| {
@@ -1522,9 +1534,34 @@ pub fn apply_air_backward_bundle(
         })?;
         for mut function in companion_mir.functions {
             function.id = fresh_ids.next();
-            lowered.program.functions.push(function);
+            unannotated_functions.push(function);
         }
     }
+    lowered = lowered
+        .patch_program(|program| {
+            program.functions.extend(unannotated_functions);
+            Ok::<(), std::convert::Infallible>(())
+        })
+        .map_err(|error| match error {
+            radix_mir::validate::PatchProgramError::Patch(never) => match never {},
+            radix_mir::validate::PatchProgramError::Validation(errors) => {
+                let messages = errors
+                    .iter()
+                    .map(|error| error.message.clone())
+                    .collect::<Vec<_>>();
+                SpannedCodegenError {
+                    message: format!(
+                        "MIR validation after backward companion addition failed: {}",
+                        messages.join("; ")
+                    ),
+                    args: vec![DiagnosticArg::new(
+                        "issue",
+                        "mir_validation_after_companion_addition_failed",
+                    )],
+                    span: None,
+                }
+            }
+        })?;
 
     finalize_air_backward_shapes(lowered)
 }
@@ -1538,7 +1575,9 @@ pub fn apply_air_backward_bundle(
 /// against a concrete primal instance therefore recovers the exact
 /// `magnitudo` bindings without a backend-specific policy.
 #[cfg(feature = "device")]
-fn finalize_air_backward_shapes(lowered: &mut crate::mir::LoweredMirUnit<'_>) -> Result<(), SpannedCodegenError> {
+fn finalize_air_backward_shapes<'a>(
+    mut lowered: crate::mir::LoweredMirUnit<'a>,
+) -> Result<crate::mir::LoweredMirUnit<'a>, SpannedCodegenError> {
     use crate::mir::MirMonomorphizationKey;
     use crate::mir::generic::MirShapeBindings;
 
@@ -1550,7 +1589,8 @@ fn finalize_air_backward_shapes(lowered: &mut crate::mir::LoweredMirUnit<'_>) ->
         .map(|entry| entry.companion)
         .collect::<rustc_hash::FxHashSet<_>>();
     let mut companion_templates = lowered
-        .program
+        .validated
+        .program()
         .functions
         .iter()
         .filter(|function| {
@@ -1560,9 +1600,10 @@ fn finalize_air_backward_shapes(lowered: &mut crate::mir::LoweredMirUnit<'_>) ->
         })
         .cloned()
         .collect::<Vec<_>>();
-    carry_air_backward_templates(lowered, &companion_templates);
+    lowered = carry_air_backward_templates(lowered, &companion_templates);
     if companion_templates.is_empty() {
-        return reject_shape_size_survivors(&mut lowered.program.functions, UNRESOLVED_SHAPE_SIZE_SURVIVOR);
+        reject_shape_size_survivors(&lowered.validated.program().functions, UNRESOLVED_SHAPE_SIZE_SURVIVOR)?;
+        return Ok(lowered);
     }
 
     let concrete_shapes = lowered
@@ -1575,7 +1616,7 @@ fn finalize_air_backward_shapes(lowered: &mut crate::mir::LoweredMirUnit<'_>) ->
         // A symbolic companion with no concrete call-site instance is a
         // template, not executable MIR. It stays available for later package
         // linking and is outside the whole-executable-program survivor net.
-        return Ok(());
+        return Ok(lowered);
     }
 
     let types = lowered.validated.validation().types;
@@ -1590,7 +1631,14 @@ fn finalize_air_backward_shapes(lowered: &mut crate::mir::LoweredMirUnit<'_>) ->
     // append-only clone for the compilation lifetime rather than teaching
     // backends to rebuild semantic metadata.
     let types: &'static mut crate::semantic::TypeTable = Box::leak(Box::new(types));
-    let mut next_ids = FreshMirFunctionIds::after(lowered.program.functions.iter().map(|function| function.id));
+    let mut next_ids = FreshMirFunctionIds::after(
+        lowered
+            .validated
+            .program()
+            .functions
+            .iter()
+            .map(|function| function.id),
+    );
     let mut instances = Vec::new();
     let mut monomorphizations = Vec::new();
     let mut instance_ids = rustc_hash::FxHashMap::default();
@@ -1621,46 +1669,47 @@ fn finalize_air_backward_shapes(lowered: &mut crate::mir::LoweredMirUnit<'_>) ->
     }
 
     if instances.is_empty() {
-        return reject_shape_size_survivors(&mut lowered.program.functions, UNRESOLVED_SHAPE_SIZE_SURVIVOR);
+        reject_shape_size_survivors(&lowered.validated.program().functions, UNRESOLVED_SHAPE_SIZE_SURVIVOR)?;
+        return Ok(lowered);
     }
 
     let template_ids = companion_templates
         .iter()
         .map(|function| function.id)
         .collect::<rustc_hash::FxHashSet<_>>();
+    let (mut program, validation) = lowered.validated.into_parts();
     rewrite_air_backward_calls(
-        &mut lowered.program.functions,
+        &mut program.functions,
         types,
         &companion_sources,
         &instance_ids,
         &instance_return_types,
     )?;
-    let concrete_validation = lowered.validated.validation().with_types(types);
-    lowered
-        .program
+    program
         .functions
         .retain(|function| !template_ids.contains(&function.id));
-    lowered.program.functions.extend(instances);
+    program.functions.extend(instances);
+    reject_shape_size_survivors(&program.functions, UNRESOLVED_SHAPE_SIZE_SURVIVOR)?;
+    let concrete_validation = validation.with_types(types);
+    lowered.validated = crate::mir::ValidatedMir::new(program, concrete_validation).map_err(|errors| {
+        let messages = errors
+            .iter()
+            .map(|error| error.message.clone())
+            .collect::<Vec<_>>();
+        SpannedCodegenError {
+            message: format!(
+                "MIR validation after backward shape finalization failed: {}",
+                messages.join("; ")
+            ),
+            args: vec![DiagnosticArg::new(
+                "issue",
+                "mir_validation_after_shape_finalization_failed",
+            )],
+            span: errors.first().map(|error| error.span),
+        }
+    })?;
     lowered.monomorphizations.extend(monomorphizations);
-    lowered.validated =
-        crate::mir::ValidatedMir::new(lowered.program.clone(), concrete_validation).map_err(|errors| {
-            let messages = errors
-                .iter()
-                .map(|error| error.message.clone())
-                .collect::<Vec<_>>();
-            SpannedCodegenError {
-                message: format!(
-                    "MIR validation after backward shape finalization failed: {}",
-                    messages.join("; ")
-                ),
-                args: vec![DiagnosticArg::new(
-                    "issue",
-                    "mir_validation_after_shape_finalization_failed",
-                )],
-                span: errors.first().map(|error| error.span),
-            }
-        })?;
-    reject_shape_size_survivors(&mut lowered.program.functions, UNRESOLVED_SHAPE_SIZE_SURVIVOR)
+    Ok(lowered)
 }
 
 #[cfg(feature = "device")]
@@ -1806,7 +1855,10 @@ fn rewrite_air_backward_calls(
 }
 
 #[cfg(feature = "device")]
-fn carry_air_backward_templates(lowered: &mut crate::mir::LoweredMirUnit<'_>, templates: &[crate::mir::MirFunction]) {
+fn carry_air_backward_templates<'a>(
+    mut lowered: crate::mir::LoweredMirUnit<'a>,
+    templates: &[crate::mir::MirFunction],
+) -> crate::mir::LoweredMirUnit<'a> {
     // AIR companions are generated after ordinary unit monomorphization, so
     // the lowerer cannot place them in `generic_templates` itself. Package
     // linking sees only that sidecar when it must instantiate a companion for
@@ -1842,6 +1894,7 @@ fn carry_air_backward_templates(lowered: &mut crate::mir::LoweredMirUnit<'_>, te
                 .collect(),
         ));
     }
+    lowered
 }
 
 #[cfg(feature = "device")]
@@ -1981,11 +2034,12 @@ fn instantiate_air_backward_type(
 
 #[cfg(feature = "device")]
 fn reject_shape_size_survivors(
-    functions: &mut [crate::mir::MirFunction],
+    functions: &[crate::mir::MirFunction],
     message: &str,
 ) -> Result<(), SpannedCodegenError> {
     for function in functions {
-        if crate::mir::generic::function_contains_shape_size(function) {
+        let mut function = function.clone();
+        if crate::mir::generic::function_contains_shape_size(&mut function) {
             return Err(SpannedCodegenError {
                 message: message.to_owned(),
                 args: vec![DiagnosticArg::new(
@@ -2026,10 +2080,9 @@ fn lower_mir_with_context_for_target(
         .map_err(mir_errors_to_spanned)?;
     #[cfg(feature = "device")]
     if let Some(bundle) = bundle {
-        apply_air_backward_bundle(&mut lowered, bundle, no_fuse)?;
-        // Re-construct ValidatedMir after backward companions were added to lowered.program.
-        let context = lowered.validated.validation().clone();
-        let program = lowered.program.clone();
+        lowered = apply_air_backward_bundle(lowered, bundle, no_fuse)?;
+        // Re-construct the proof token after backward companions were added.
+        let (program, context) = lowered.validated.into_parts();
         lowered.validated = crate::mir::ValidatedMir::new(program, context).map_err(|errors| {
             let messages: Vec<String> = errors.iter().map(|e| e.message.clone()).collect();
             SpannedCodegenError {
@@ -2087,37 +2140,41 @@ impl FreshMirFunctionIds {
 }
 
 #[cfg(feature = "device")]
-fn replace_air_lane_mir(
-    lowered: &mut crate::mir::LoweredMirUnit<'_>,
+fn replace_air_lane_mir<'a>(
+    lowered: crate::mir::LoweredMirUnit<'a>,
     air_mir: crate::mir::MirProgram,
-) -> Result<(), SpannedCodegenError> {
-    let mut fresh_ids = FreshMirFunctionIds::after(lowered.program.functions.iter().map(|function| function.id));
-    for mut function in air_mir.functions {
-        let Some(source) = function.source else {
-            continue;
-        };
-        if let Some(index) = lowered
-            .program
-            .functions
-            .iter()
-            .position(|candidate| candidate.source == Some(source))
-        {
-            function.id = lowered.program.functions[index].id;
-            // S3-A2: a differentiable device kernel (nucleum + `@ radix
-            // backward`) is replaced by its AIR-lowered form but must KEEP its
-            // kernel shader stage — the forward kernel is the primal itself.
-            if function.shader_stage.is_none() {
-                function.shader_stage = lowered.program.functions[index].shader_stage;
+) -> Result<crate::mir::LoweredMirUnit<'a>, SpannedCodegenError> {
+    lowered
+        .patch_program(|program| {
+            let mut fresh_ids = FreshMirFunctionIds::after(program.functions.iter().map(|function| function.id));
+            for mut function in air_mir.functions {
+                let Some(source) = function.source else {
+                    continue;
+                };
+                if let Some(index) = program
+                    .functions
+                    .iter()
+                    .position(|candidate| candidate.source == Some(source))
+                {
+                    function.id = program.functions[index].id;
+                    // S3-A2: a differentiable device kernel (nucleum + `@ radix
+                    // backward`) is replaced by its AIR-lowered form but must KEEP its
+                    // kernel shader stage — the forward kernel is the primal itself.
+                    if function.shader_stage.is_none() {
+                        function.shader_stage = program.functions[index].shader_stage;
+                    }
+                    program.functions[index] = function;
+                } else {
+                    function.id = fresh_ids.next();
+                    program.functions.push(function);
+                }
             }
-            lowered.program.functions[index] = function;
-        } else {
-            function.id = fresh_ids.next();
-            lowered.program.functions.push(function);
-        }
-    }
-
-    crate::mir::validate_program(&lowered.program, lowered.validated.validation())
-        .map_err(mir_validation_errors_to_spanned)
+            Ok::<(), std::convert::Infallible>(())
+        })
+        .map_err(|error| match error {
+            radix_mir::validate::PatchProgramError::Patch(never) => match never {},
+            radix_mir::validate::PatchProgramError::Validation(errors) => mir_validation_errors_to_spanned(errors),
+        })
 }
 
 /// Snapshot of a backward-annotated function's metadata, captured before MIR
@@ -2246,13 +2303,13 @@ fn prepare_air_backward_snapshots(
 /// generation in the caller, so this function receives the finished companion
 /// and needs no callee map of its own.
 #[cfg(feature = "device")]
-fn generate_air_lane_backward_with_companion(
+fn generate_air_lane_backward_with_companion<'a>(
     snapshot: &AirBackwardSnapshot,
     companion: crate::air::AirFunction,
-    lowered: &mut crate::mir::LoweredMirUnit<'_>,
+    lowered: crate::mir::LoweredMirUnit<'a>,
     fresh_ids: &mut FreshMirFunctionIds,
     no_fuse: bool,
-) -> Result<crate::mir::device::LosslessMirCompanionEntry, codegen::CodegenError> {
+) -> Result<(crate::mir::LoweredMirUnit<'a>, crate::mir::device::LosslessMirCompanionEntry), codegen::CodegenError> {
     use crate::air::{
         AirCompanionDerivativeKind, AirCompanionErrorChannel, AirCompanionOracleRef, AirCompanionRelation,
         AirCompanionSelectedInput, AirCompanionSelectedOutput, AirGradientCheckAdmissionInputs,
@@ -2351,11 +2408,12 @@ fn generate_air_lane_backward_with_companion(
     admit_generated_gradient_check(admission_inputs)
         .map_err(|errors| air_proof_errors_to_codegen("gradient check admission", &errors))?;
 
-    // Merge the generated backward MIR functions into the lowered unit.
+    // Prepare the generated backward MIR functions for the consuming patch.
     let backward_mir = mir_validation.mir;
+    let mut backward_functions = Vec::with_capacity(backward_mir.functions.len());
     for mut function in backward_mir.functions {
         function.id = fresh_ids.next();
-        lowered.program.functions.push(function);
+        backward_functions.push(function);
     }
 
     // S3-A2 / Stage 3R F4: the relation facts are CARRIED forward (not
@@ -2381,14 +2439,39 @@ fn generate_air_lane_backward_with_companion(
         .collect();
     let selected_outputs: Vec<MirCompanionSelectedOutput> =
         vec![MirCompanionSelectedOutput { position: 0, ty: snapshot.ret_ty, upstream_gradient_ty: snapshot.ret_ty }];
-    Ok(LosslessMirCompanionEntry {
+    let entry = LosslessMirCompanionEntry {
         primal: snapshot.primal_def_id,
         companion: snapshot.companion_def_id,
         derivative: MirCompanionDerivativeKind::ReverseModeVjp,
         device_resident: snapshot.device_resident,
         selected_inputs,
         selected_outputs,
-    })
+    };
+    let lowered = lowered
+        .patch_program(|program| {
+            program.functions.extend(backward_functions);
+            Ok::<(), std::convert::Infallible>(())
+        })
+        .map_err(|error| match error {
+            radix_mir::validate::PatchProgramError::Patch(never) => match never {},
+            radix_mir::validate::PatchProgramError::Validation(errors) => {
+                let messages = errors
+                    .iter()
+                    .map(|error| error.message.clone())
+                    .collect::<Vec<_>>();
+                codegen::CodegenError {
+                    message: format!(
+                        "MIR validation after backward companion addition failed: {}",
+                        messages.join("; ")
+                    ),
+                    args: vec![DiagnosticArg::new(
+                        "issue",
+                        "mir_validation_after_companion_addition_failed",
+                    )],
+                }
+            }
+        })?;
+    Ok((lowered, entry))
 }
 
 /// Convert AIR proof-chain error vectors into a single `CodegenError`.

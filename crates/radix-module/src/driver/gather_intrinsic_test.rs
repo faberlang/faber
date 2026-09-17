@@ -316,7 +316,8 @@ incipit {
     let lowered = crate::mir::lower_analyzed_unit(&mut analysis, MirLoweringOptions::default())
         .expect("exact tensor OOB source should lower");
     let tensor_get = lowered
-        .program
+        .validated
+        .program()
         .functions
         .iter()
         .flat_map(|function| &function.blocks)
@@ -483,7 +484,7 @@ incipit {
         analyze_source(&runner_session(), "gather_empty.fab", source, AnalyzeRequest::default()).expect("frontend");
     let lowered = crate::mir::lower_analyzed_unit(&mut analysis, MirLoweringOptions::default()).expect("lowering");
 
-    let mut empty_program = lowered.program.clone();
+    let mut empty_program = lowered.validated.program().clone();
     let emptied = empty_tensor_gather_ids(&mut empty_program);
     assert_eq!(emptied, 1, "the gather id-vector construct must be found and emptied");
 

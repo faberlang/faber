@@ -18,12 +18,13 @@ use std::path::Path;
 /// Generic or ambiguous edges remain definitions and are rejected by that
 /// boundary when they cross it.
 pub(crate) fn canonicalize_direct_definition_callees(
-    lowered: &mut LoweredMirUnit<'_>,
-    diagnostic_path: &Path,
-) -> Result<(), Vec<Diagnostic>> {
+    mut lowered: LoweredMirUnit<'_>,
+    diagnostic_path: impl AsRef<Path>,
+) -> Result<LoweredMirUnit<'_>, Vec<Diagnostic>> {
+    let diagnostic_path = diagnostic_path.as_ref();
     let mut direct_sources = HashMap::new();
     let mut ambiguous = HashSet::new();
-    for function in &lowered.program.functions {
+    for function in &lowered.validated.program().functions {
         let Some(source) = function.source else {
             continue;
         };
@@ -36,7 +37,8 @@ pub(crate) fn canonicalize_direct_definition_callees(
         }
     }
 
-    for function in &mut lowered.program.functions {
+    let (mut program, mut context) = lowered.validated.into_parts();
+    for function in &mut program.functions {
         for block in &mut function.blocks {
             for statement in &mut block.statements {
                 let MirStatementKind::Call { callee, .. } = &mut statement.kind else {
@@ -55,15 +57,14 @@ pub(crate) fn canonicalize_direct_definition_callees(
         }
     }
 
-    let mut context = lowered.validated.validation().clone();
     context.closure_environments.clear();
     for environment in &lowered.closure_environments {
         context
             .closure_environments
             .insert(environment.id, environment.clone());
     }
-    lowered.validated = radix_module::mir::ValidatedMir::new(lowered.program.clone(), context)
-        .map_err(|errors| {
+    lowered.validated =
+        radix_module::mir::ValidatedMir::new(program, context).map_err(|errors| {
             errors
                 .into_iter()
                 .map(|error| {
@@ -74,5 +75,5 @@ pub(crate) fn canonicalize_direct_definition_callees(
                 })
                 .collect::<Vec<_>>()
         })?;
-    Ok(())
+    Ok(lowered)
 }
