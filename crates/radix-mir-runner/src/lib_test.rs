@@ -3547,8 +3547,8 @@ fn tensor_rms_norm_rank2_with_gamma() {
     );
 }
 
-/// CCI-1: `rope_norm` applies the NORM consecutive-pair rotation with
-/// `freq_base` 100000 and preserves no trailing remainder when dim == width.
+/// CCI-1: `rope_norm` applies the supplied table's NORM consecutive-pair
+/// rotation and preserves no trailing remainder when dim == width.
 #[test]
 fn tensor_rope_rank1_norm_pairs() {
     let input = tensor_value(
@@ -3566,30 +3566,32 @@ fn tensor_rope_rank1_norm_pairs() {
             MirOperand::Value(MirValueId(0)),          // input tensor
             MirOperand::Constant(MirConstant::Int(1)), // pos
             MirOperand::Constant(MirConstant::Int(4)), // dim
+            MirOperand::Value(MirValueId(1)),          // [rows, dim/2, 3] table
         ],
         return_ty: MirType::semantic(TypeId(0)),
     };
-    let result = evaluate_collection_call(&call, vec![(MirValueId(0), input)])
-        .expect("rope dispatch should succeed");
+    let table = tensor_value(
+        vec![
+            Value::Float(11.0),
+            Value::Float(0.0),
+            Value::Float(1.0),
+            Value::Float(13.0),
+            Value::Float(1.0),
+            Value::Float(0.0),
+        ],
+        vec![1, 2, 3],
+    );
+    let result =
+        evaluate_collection_call(&call, vec![(MirValueId(0), input), (MirValueId(1), table)])
+            .expect("rope dispatch should succeed");
     let output = match result {
         Value::Tensor(tensor) => tensor,
         other => panic!("expected tensor output, got {other:?}"),
     };
     let out = output.borrow();
     assert_eq!(out.shape, vec![4], "output shape must match input shape");
-    // NORM consecutive-pair rotation, freq_base=100000, pos=1, dim=4:
-    // theta[0] = 1·100000^0 = 1; theta[1] = 1·100000^(−1/2) ≈ 0.0031623.
-    let c0 = 1.0_f64.cos();
-    let s0 = 1.0_f64.sin();
-    let theta1 = 1.0_f64 * 100_000.0_f64.powf(-(2.0 * 1.0) / 4.0);
-    let c1 = theta1.cos();
-    let s1 = theta1.sin();
-    let expected = [
-        1.0 * c0 - 2.0 * s0,
-        1.0 * s0 + 2.0 * c0,
-        3.0 * c1 - 4.0 * s1,
-        3.0 * s1 + 4.0 * c1,
-    ];
+    // The supplied table rotates the first pair by π/2 and leaves the second.
+    let expected = [-2.0, 1.0, 3.0, 4.0];
     assert_numeric_close(&out.data, &expected, 1e-4);
 }
 
@@ -3613,20 +3615,24 @@ fn tensor_rope_preserves_remainder_beyond_dim() {
             MirOperand::Value(MirValueId(0)),
             MirOperand::Constant(MirConstant::Int(1)),
             MirOperand::Constant(MirConstant::Int(2)), // rotate only the first pair
+            MirOperand::Value(MirValueId(1)),
         ],
         return_ty: MirType::semantic(TypeId(0)),
     };
-    let result = evaluate_collection_call(&call, vec![(MirValueId(0), input)])
-        .expect("rope dispatch should succeed");
+    let table = tensor_value(
+        vec![Value::Float(17.0), Value::Float(0.0), Value::Float(1.0)],
+        vec![1, 1, 3],
+    );
+    let result =
+        evaluate_collection_call(&call, vec![(MirValueId(0), input), (MirValueId(1), table)])
+            .expect("rope dispatch should succeed");
     let output = match result {
         Value::Tensor(tensor) => tensor,
         other => panic!("expected tensor output, got {other:?}"),
     };
     let out = output.borrow();
     assert_eq!(out.shape, vec![6]);
-    let c0 = 1.0_f64.cos();
-    let s0 = 1.0_f64.sin();
-    let expected = [1.0 * c0 - 2.0 * s0, 1.0 * s0 + 2.0 * c0, 3.0, 4.0, 5.0, 6.0];
+    let expected = [-2.0, 1.0, 3.0, 4.0, 5.0, 6.0];
     assert_numeric_close(&out.data, &expected, 1e-4);
 }
 
@@ -3650,28 +3656,31 @@ fn tensor_rope_half_rank1_rotate_half_pairs() {
             MirOperand::Value(MirValueId(0)),
             MirOperand::Constant(MirConstant::Int(1)),
             MirOperand::Constant(MirConstant::Int(4)),
+            MirOperand::Value(MirValueId(1)),
         ],
         return_ty: MirType::semantic(TypeId(0)),
     };
-    let result = evaluate_collection_call(&call, vec![(MirValueId(0), input)])
-        .expect("rope_half dispatch should succeed");
+    let table = tensor_value(
+        vec![
+            Value::Float(19.0),
+            Value::Float(0.0),
+            Value::Float(1.0),
+            Value::Float(23.0),
+            Value::Float(1.0),
+            Value::Float(0.0),
+        ],
+        vec![1, 2, 3],
+    );
+    let result =
+        evaluate_collection_call(&call, vec![(MirValueId(0), input), (MirValueId(1), table)])
+            .expect("rope_half dispatch should succeed");
     let output = match result {
         Value::Tensor(tensor) => tensor,
         other => panic!("expected tensor output, got {other:?}"),
     };
     let out = output.borrow();
     assert_eq!(out.shape, vec![4]);
-    let c0 = 1.0_f64.cos();
-    let s0 = 1.0_f64.sin();
-    let theta1 = 1.0_f64 * 100_000.0_f64.powf(-(2.0 * 1.0) / 4.0);
-    let c1 = theta1.cos();
-    let s1 = theta1.sin();
-    let expected = [
-        1.0 * c0 - 0.0 * s0,
-        0.0 * c1 - 0.0 * s1,
-        1.0 * s0 + 0.0 * c0,
-        0.0 * s1 + 0.0 * c1,
-    ];
+    let expected = [0.0, 0.0, 1.0, 0.0];
     assert_numeric_close(&out.data, &expected, 1e-4);
 }
 
