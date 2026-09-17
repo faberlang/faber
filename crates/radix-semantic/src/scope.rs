@@ -693,6 +693,8 @@ pub struct Resolver {
     builtin_tuus_def_id: Option<DefId>,
     builtin_status_variants: Vec<(DefId, LexSymbol)>,
     variant_parents: FxHashMap<DefId, DefId>,
+    variants_by_parent_name: FxHashMap<(DefId, LexSymbol), DefId>,
+    variants_by_name: FxHashMap<LexSymbol, Vec<DefId>>,
     /// O(1) GPU builtin lookup by definition id (hot path in call checking).
     gpu_builtins: FxHashMap<DefId, radix_types::MirKernelBuiltin>,
     /// Insertion-order mirror of `gpu_builtins` for callers that need a slice.
@@ -806,6 +808,8 @@ impl Resolver {
             builtin_tuus_def_id: None,
             builtin_status_variants: Vec::new(),
             variant_parents: FxHashMap::default(),
+            variants_by_parent_name: FxHashMap::default(),
+            variants_by_name: FxHashMap::default(),
             gpu_builtins: FxHashMap::default(),
             gpu_builtins_order: Vec::new(),
             lookup_shadow: FxHashMap::default(),
@@ -2934,6 +2938,15 @@ impl Resolver {
 
     pub(crate) fn register_variant_parent(&mut self, variant_def_id: DefId, enum_def_id: DefId) {
         self.variant_parents.insert(variant_def_id, enum_def_id);
+        if let Some(symbol) = self.symbols.get(&variant_def_id) {
+            self.variants_by_parent_name
+                .entry((enum_def_id, symbol.name))
+                .or_insert(variant_def_id);
+            self.variants_by_name
+                .entry(symbol.name)
+                .or_default()
+                .push(variant_def_id);
+        }
     }
 
     /// Register a variant under its parent union/enum identity.
@@ -2968,6 +2981,13 @@ impl Resolver {
             },
         );
         self.variant_parents.insert(def_id, parent_def_id);
+        self.variants_by_parent_name
+            .entry((parent_def_id, name))
+            .or_insert(def_id);
+        self.variants_by_name
+            .entry(name)
+            .or_default()
+            .push(def_id);
         Some(def_id)
     }
 
@@ -2983,16 +3003,9 @@ impl Resolver {
                 .find(|variant| variant.name == variant_name)
                 .map(|variant| variant.def_id);
         }
-        self.variant_parents
-            .iter()
-            .find_map(|(variant_def_id, parent_def_id)| {
-                if *parent_def_id != enum_def_id {
-                    return None;
-                }
-                let symbol = self.symbols.get(variant_def_id)?;
-                (symbol.kind == SymbolKind::Variant && symbol.name == variant_name)
-                    .then_some(*variant_def_id)
-            })
+        self.variants_by_parent_name
+            .get(&(enum_def_id, variant_name))
+            .copied()
     }
 
     /// Resolve a bare variant name against the per-union variant namespace.
@@ -3019,7 +3032,7 @@ impl Resolver {
         let mut local_unions = 0usize;
         let mut single: Option<DefId> = None;
         let mut defining_unions = 0usize;
-        for &variant_def_id in self.variant_parents.keys() {
+        for &variant_def_id in self.variants_by_name.get(&name).into_iter().flatten() {
             let Some(symbol) = self.symbols.get(&variant_def_id) else {
                 continue;
             };
@@ -3541,6 +3554,8 @@ impl Resolver {
             builtin_tuus_def_id: None,
             builtin_status_variants: Vec::new(),
             variant_parents: FxHashMap::default(),
+            variants_by_parent_name: FxHashMap::default(),
+            variants_by_name: FxHashMap::default(),
             gpu_builtins: FxHashMap::default(),
             gpu_builtins_order: Vec::new(),
             lookup_shadow: FxHashMap::default(),

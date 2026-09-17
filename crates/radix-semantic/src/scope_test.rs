@@ -18,6 +18,55 @@ fn symbol(def_id: DefId, name: LexSymbol, kind: SymbolKind) -> Symbol {
     }
 }
 
+fn linear_variant_child(
+    resolver: &Resolver,
+    parent_def_id: DefId,
+    variant_name: LexSymbol,
+) -> Option<DefId> {
+    resolver
+        .variant_parents_all()
+        .into_iter()
+        .find_map(|(variant_def_id, candidate_parent)| {
+            if candidate_parent != parent_def_id {
+                return None;
+            }
+            let symbol = resolver.get_symbol(variant_def_id)?;
+            (symbol.kind == SymbolKind::Variant && symbol.name == variant_name)
+                .then_some(variant_def_id)
+        })
+}
+
+fn linear_lookup_variant_bare(resolver: &Resolver, name: LexSymbol) -> super::BareVariantLookup {
+    let mut local_variant: Option<DefId> = None;
+    let mut local_unions = 0usize;
+    let mut single: Option<DefId> = None;
+    let mut defining_unions = 0usize;
+    for (variant_def_id, _parent_def_id) in resolver.variant_parents_all() {
+        let Some(symbol) = resolver.get_symbol(variant_def_id) else {
+            continue;
+        };
+        if symbol.kind == SymbolKind::Variant && symbol.name == name {
+            defining_unions += 1;
+            single = Some(variant_def_id);
+            local_unions += 1;
+            local_variant = Some(variant_def_id);
+        }
+    }
+    if local_unions > 0 {
+        return match local_variant {
+            Some(def_id) if local_unions == 1 => super::BareVariantLookup::Single(def_id),
+            _ => super::BareVariantLookup::Ambiguous {
+                defining_unions: local_unions,
+            },
+        };
+    }
+    match (defining_unions, single) {
+        (0, _) => super::BareVariantLookup::None,
+        (1, Some(def_id)) => super::BareVariantLookup::Single(def_id),
+        _ => super::BareVariantLookup::Ambiguous { defining_unions },
+    }
+}
+
 #[test]
 fn rejects_duplicate_names_in_same_scope() {
     let mut resolver = Resolver::new();
@@ -235,6 +284,47 @@ fn lookup_variant_bare_is_single_for_one_defining_union() {
         resolver.lookup_variant_bare(missing),
         super::BareVariantLookup::None
     );
+}
+
+#[test]
+fn indexed_variant_lookups_match_linear_reference() {
+    let mut resolver = Resolver::new();
+    let union_a = resolver.fresh_def_id();
+    let union_b = resolver.fresh_def_id();
+    let union_c = resolver.fresh_def_id();
+    let x_name = LexSymbol(104);
+    let y_name = LexSymbol(105);
+
+    let a_x = resolver
+        .define_variant(union_a, x_name, Span::default())
+        .expect("A.X registers");
+    let b_x = resolver
+        .define_variant(union_b, x_name, Span::default())
+        .expect("B.X registers");
+    let c_y = resolver
+        .define_variant(union_c, y_name, Span::default())
+        .expect("C.Y registers");
+
+    for (parent_def_id, variant_name) in [
+        (union_a, x_name),
+        (union_b, x_name),
+        (union_c, y_name),
+        (union_a, y_name),
+    ] {
+        assert_eq!(
+            resolver.variant_child(parent_def_id, variant_name),
+            linear_variant_child(&resolver, parent_def_id, variant_name),
+        );
+    }
+    for name in [x_name, y_name, LexSymbol(106)] {
+        assert_eq!(
+            resolver.lookup_variant_bare(name),
+            linear_lookup_variant_bare(&resolver, name),
+        );
+    }
+    assert_eq!(resolver.variant_child(union_a, x_name), Some(a_x));
+    assert_eq!(resolver.variant_child(union_b, x_name), Some(b_x));
+    assert_eq!(resolver.variant_child(union_c, y_name), Some(c_y));
 }
 
 #[cfg(feature = "hir-fhir")]
