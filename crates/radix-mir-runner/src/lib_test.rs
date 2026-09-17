@@ -4779,3 +4779,307 @@ fn direct_kernel_function_run_refuses_with_stable_identity() {
     assert_eq!(errors.len(), 1);
     assert_eq!(errors[0].issue, RUNNER_KERNEL_REFUSED_ISSUE);
 }
+
+fn eval_tensor_intrinsic(
+    intrinsic: MirCollectionOp,
+    inputs: Vec<Value>,
+    span: Span,
+) -> Result<Value, RunnerError> {
+    use crate::host::BufferHost;
+    use radix_lexer::Interner;
+    use radix_mir::MirValidationContext;
+    use radix_types::TypeTable;
+
+    let mut host = BufferHost::default();
+    let type_table = TypeTable::default();
+    let interner = Interner::new();
+    let context = MirValidationContext::new(&type_table);
+    let mut program = MirProgram::new();
+    program.functions.push(make_function());
+    let mut runner = Runner::new(&program, &context, &type_table, &interner, &mut host);
+    let function = program.functions.first().unwrap();
+    runner.push_frame(function.id, MirBlockId(0));
+    for (index, input) in inputs.into_iter().enumerate() {
+        runner
+            .frames
+            .last_mut()
+            .unwrap()
+            .values
+            .insert(MirValueId(index as u32), input);
+    }
+    let args = (0..runner.frames.last().unwrap().values.len())
+        .map(|index| MirOperand::Value(MirValueId(index as u32)))
+        .collect();
+    runner.eval_runtime_call(
+        &MirRuntimeCall {
+            intrinsic: MirIntrinsic::Collection(intrinsic),
+            args,
+            return_ty: MirType::semantic(TypeId(0)),
+        },
+        span,
+    )
+}
+
+fn tensor(data: Vec<Value>, shape: Vec<i64>) -> Value {
+    Value::Tensor(Rc::new(RefCell::new(crate::value::TensorValue {
+        data,
+        shape,
+    })))
+}
+
+#[test]
+fn pd25_row_softmax_preserves_values_and_errors() {
+    let span = Span::new(17, 23);
+    let rank1 = eval_tensor_intrinsic(
+        MirCollectionOp::TensorSoftmax,
+        vec![tensor(
+            vec![Value::Float(1.0), Value::Float(2.0), Value::Float(3.0)],
+            vec![3],
+        )],
+        span,
+    )
+    .expect("rank-1 softmax");
+    let Value::Tensor(rank1) = rank1 else {
+        panic!("rank-1 softmax must return a tensor");
+    };
+    let rank1 = rank1.borrow();
+    assert_eq!(rank1.shape, vec![3]);
+    let rank1_values: Vec<f64> = rank1
+        .data
+        .iter()
+        .map(|value| match value {
+            Value::Float(value) => *value,
+            other => panic!("expected float, got {other:?}"),
+        })
+        .collect();
+    assert_eq!(
+        rank1_values
+            .iter()
+            .map(|value| value.to_bits())
+            .collect::<Vec<_>>(),
+        vec![
+            4591151807155678170,
+            4597985292698930127,
+            4604167177386354576
+        ],
+    );
+
+    let rank2 = eval_tensor_intrinsic(
+        MirCollectionOp::TensorSoftmax,
+        vec![tensor(
+            vec![
+                Value::Float(1.0),
+                Value::Float(2.0),
+                Value::Float(3.0),
+                Value::Float(1.0),
+                Value::Float(2.0),
+                Value::Float(3.0),
+            ],
+            vec![2, 3],
+        )],
+        span,
+    )
+    .expect("rank-2 softmax");
+    let Value::Tensor(rank2) = rank2 else {
+        panic!("rank-2 softmax must return a tensor");
+    };
+    let rank2 = rank2.borrow();
+    assert_eq!(rank2.shape, vec![2, 3]);
+    assert_eq!(
+        rank2
+            .data
+            .iter()
+            .map(|value| match value {
+                Value::Float(value) => value.to_bits(),
+                other => panic!("expected float, got {other:?}"),
+            })
+            .collect::<Vec<_>>(),
+        vec![
+            4591151807155678170,
+            4597985292698930127,
+            4604167177386354576,
+            4591151807155678170,
+            4597985292698930127,
+            4604167177386354576,
+        ],
+    );
+
+    let entropia = eval_tensor_intrinsic(
+        MirCollectionOp::TensorCruxEntropia,
+        vec![
+            tensor(
+                vec![
+                    Value::Float(2.0),
+                    Value::Float(1.0),
+                    Value::Float(0.0),
+                    Value::Float(1.0),
+                    Value::Float(2.0),
+                    Value::Float(1.0),
+                ],
+                vec![2, 3],
+            ),
+            tensor(
+                vec![
+                    Value::Float(1.0),
+                    Value::Float(0.0),
+                    Value::Float(0.0),
+                    Value::Float(0.0),
+                    Value::Float(1.0),
+                    Value::Float(0.0),
+                ],
+                vec![2, 3],
+            ),
+        ],
+        span,
+    )
+    .expect("entropia");
+    let Value::Float(entropia) = entropia else {
+        panic!("entropia must return a float");
+    };
+    assert_eq!(entropia.to_bits(), 4599430525009988060);
+
+    let cases = [
+        (
+            MirCollectionOp::TensorSoftmax,
+            vec![],
+            "tensor softmax arity",
+        ),
+        (
+            MirCollectionOp::TensorSoftmax,
+            vec![Value::Int(7)],
+            "tensor receiver type mismatch: Int(7)",
+        ),
+        (
+            MirCollectionOp::TensorSoftmax,
+            vec![tensor(vec![], vec![])],
+            "tensor softmax requires non-empty tensor",
+        ),
+        (
+            MirCollectionOp::TensorSoftmax,
+            vec![tensor(vec![Value::Float(1.0)], vec![1, 1, 1])],
+            "tensor softmax requires rank-1 or rank-2 tensor",
+        ),
+        (
+            MirCollectionOp::TensorSoftmax,
+            vec![tensor(vec![], vec![2, 0])],
+            "tensor softmax requires all dimensions to be positive",
+        ),
+        (
+            MirCollectionOp::TensorSoftmax,
+            vec![tensor(vec![Value::Bool(true)], vec![1])],
+            "tensor numeric element type mismatch",
+        ),
+        (
+            MirCollectionOp::TensorCruxEntropia,
+            vec![],
+            "tensor crux_entropia arity",
+        ),
+        (
+            MirCollectionOp::TensorCruxEntropia,
+            vec![Value::Int(7), Value::Int(8)],
+            "tensor receiver type mismatch: Int(7)",
+        ),
+        (
+            MirCollectionOp::TensorCruxEntropia,
+            vec![tensor(vec![], vec![])],
+            "tensor crux_entropia arity",
+        ),
+    ];
+    for (intrinsic, inputs, detail) in cases {
+        let error = eval_tensor_intrinsic(intrinsic, inputs, span).expect_err(detail);
+        assert_eq!(error, RunnerError::internal(span, detail));
+    }
+
+    let error = eval_tensor_intrinsic(
+        MirCollectionOp::TensorCruxEntropia,
+        vec![tensor(vec![], vec![]), tensor(vec![], vec![])],
+        span,
+    )
+    .expect_err("empty entropia tensor");
+    assert_eq!(
+        error,
+        RunnerError::internal(span, "tensor crux_entropia requires non-empty tensor")
+    );
+
+    let error = eval_tensor_intrinsic(
+        MirCollectionOp::TensorCruxEntropia,
+        vec![
+            tensor(vec![Value::Float(1.0)], vec![1, 1, 1]),
+            tensor(vec![Value::Float(1.0)], vec![1, 1, 1]),
+        ],
+        span,
+    )
+    .expect_err("rank-three entropia tensor");
+    assert_eq!(
+        error,
+        RunnerError::internal(
+            span,
+            "tensor crux_entropia requires rank-1 or rank-2 tensor"
+        )
+    );
+
+    let error = eval_tensor_intrinsic(
+        MirCollectionOp::TensorCruxEntropia,
+        vec![tensor(vec![], vec![2, 0]), tensor(vec![], vec![2, 0])],
+        span,
+    )
+    .expect_err("zero-width entropia tensor");
+    assert_eq!(
+        error,
+        RunnerError::internal(
+            span,
+            "tensor crux_entropia requires all dimensions to be positive"
+        )
+    );
+
+    let error = eval_tensor_intrinsic(
+        MirCollectionOp::TensorCruxEntropia,
+        vec![
+            tensor(vec![Value::Bool(true)], vec![1]),
+            tensor(vec![Value::Float(1.0)], vec![1]),
+        ],
+        span,
+    )
+    .expect_err("nonnumeric entropia row");
+    assert_eq!(
+        error,
+        RunnerError::internal(span, "tensor numeric element type mismatch")
+    );
+
+    let error = eval_tensor_intrinsic(
+        MirCollectionOp::TensorCruxEntropia,
+        vec![
+            tensor(vec![Value::Float(1.0), Value::Float(2.0)], vec![2]),
+            tensor(vec![Value::Float(1.0)], vec![1]),
+        ],
+        span,
+    )
+    .expect_err("entropia shape mismatch");
+    assert_eq!(
+        error,
+        RunnerError::internal(span, "tensor crux_entropia shape mismatch")
+    );
+
+    let Value::Tensor(softmax_short) = eval_tensor_intrinsic(
+        MirCollectionOp::TensorSoftmax,
+        vec![tensor(vec![Value::Float(1.0)], vec![2])],
+        span,
+    )
+    .expect("softmax short backing is outside the computed row count") else {
+        panic!("softmax must return a tensor");
+    };
+    assert!(softmax_short.borrow().data.is_empty());
+
+    let Value::Float(entropia_short) = eval_tensor_intrinsic(
+        MirCollectionOp::TensorCruxEntropia,
+        vec![
+            tensor(vec![Value::Float(1.0)], vec![2]),
+            tensor(vec![Value::Float(1.0)], vec![2]),
+        ],
+        span,
+    )
+    .expect("entropia short backing is outside the computed row count") else {
+        panic!("entropia must return a float");
+    };
+    assert_eq!(entropia_short.to_bits(), 0);
+}
