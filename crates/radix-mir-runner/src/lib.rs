@@ -37,9 +37,10 @@ use std::time::Instant;
 use value::{
     GradientStorage, add_values, compare_values, decimal_numeric_binop, int_bitwise_binop,
     modular_word_bitnot, modular_word_bitwise_binop, modular_word_compare_values, modular_word_neg,
-    modular_word_numeric_binop, numeric_binop, uint_width_checked_div, uint_width_checked_mul,
-    uint_width_checked_neg, uint_width_checked_rem, uint_width_checked_sub, values_equal,
-    width_checked_div, width_checked_mul, width_checked_neg, width_checked_rem, width_checked_sub,
+    modular_word_numeric_binop, numeric_binop, round_float, uint_width_checked_div,
+    uint_width_checked_mul, uint_width_checked_neg, uint_width_checked_rem, uint_width_checked_sub,
+    values_equal, width_checked_div, width_checked_mul, width_checked_neg, width_checked_rem,
+    width_checked_sub,
 };
 
 pub(crate) const RUNNER_UNSUPPORTED_PREFIX: &str = "faberscript unsupported";
@@ -1279,6 +1280,9 @@ impl<H: Host + ?Sized> Runner<'_, H> {
             MirValueKind::Option(op) => self.eval_option_value(op, span)?,
         };
         let computed = self.normalize_decimal_value(computed, value.ty.semantic_id(), span)?;
+        // WHY: Value::Float is an f64 carrier. Declared f32 (and other
+        // non-f64 float) width has to land at this store, not at `≡`.
+        let computed = self.apply_declared_float_width(computed, value.ty.semantic_id());
         if let Some(frame) = self.frames.last_mut() {
             frame.values.insert(value.id, computed.clone());
         }
@@ -1345,6 +1349,33 @@ impl<H: Host + ?Sized> Runner<'_, H> {
                 Self::element_float_width(*elem, types, depth + 1)
             }
             _ => None,
+        }
+    }
+
+    /// Apply declared float width to a newly stored scalar.
+    ///
+    /// Collection values stay untouched here so a list copy keeps its `Rc`.
+    /// List/vector/matrix *elements* round in `eval_construct`.
+    fn apply_declared_float_width(&self, value: Value, ty: TypeId) -> Value {
+        let Value::Float(v) = value else {
+            return value;
+        };
+        match effective_width(self.types, ty) {
+            Some(width) if width.is_float() => Value::Float(round_float(v, width)),
+            _ => Value::Float(v),
+        }
+    }
+
+    fn apply_element_float_width(&self, items: Vec<Value>, ty: TypeId) -> Vec<Value> {
+        match Self::element_float_width(ty, self.types, 0) {
+            Some(width) if width.is_float() => items
+                .into_iter()
+                .map(|item| match item {
+                    Value::Float(v) => Value::Float(round_float(v, width)),
+                    other => other,
+                })
+                .collect(),
+            _ => items,
         }
     }
 

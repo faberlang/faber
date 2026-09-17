@@ -879,7 +879,7 @@ pub fn uint_width_checked_rem(
 /// WHY: `Value::Float` is a single f64 carrier, but Faber scalar arithmetic
 /// still executes at the declared width. The fuzzy-value path uses this same
 /// f32-round-trip policy for every non-f64 width.
-fn round_float(value: f64, width: NumericWidth) -> f64 {
+pub(crate) fn round_float(value: f64, width: NumericWidth) -> f64 {
     if matches!(width, NumericWidth::F64) {
         value
     } else {

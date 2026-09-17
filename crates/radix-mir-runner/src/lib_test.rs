@@ -2550,6 +2550,103 @@ fn f029_float_tensor_div_zero_allowed() {
     );
 }
 
+/// Direct f32 materialization occupies f32 width: a bound literal, a mul-by-one
+/// product, and a list element of the same decimal compare equal.
+#[test]
+fn f32_const_bind_matches_mul_by_one_and_list_element() {
+    use crate::host::BufferHost;
+    use radix_lexer::Interner;
+    use radix_mir::{
+        MirAggregate, MirAggregateFields, MirAggregateItem, MirAggregateKind, MirBlockId,
+        MirOperand, MirProgram, MirType, MirValidationContext, MirValueId,
+    };
+    use radix_types::{NumericWidth, Primitive, Type, TypeTable};
+
+    let decimal = 0.70710678_f64;
+    let f32_bits = f64::from(decimal as f32);
+    assert_ne!(
+        decimal, f32_bits,
+        "probe decimal must keep extra f64 fraction so the store-width gap is observable"
+    );
+
+    let mut type_table = TypeTable::new();
+    let f32_ty = type_table.sized_numeric(Primitive::Fractus, NumericWidth::F32);
+    let f64_ty = type_table.sized_numeric(Primitive::Fractus, NumericWidth::F64);
+    let list_f32_ty = type_table.intern(Type::Array(f32_ty));
+    let context = MirValidationContext::new(&type_table);
+    let mut program = MirProgram::new();
+    program.functions.push(make_function());
+
+    let mut host = BufferHost::default();
+    let interner = Interner::new();
+    let mut runner = crate::Runner::new(&program, &context, &type_table, &interner, &mut host);
+    let fn0 = program.functions.first().unwrap();
+    runner.push_frame(fn0.id, MirBlockId(0));
+
+    let span = Span::default();
+    let expected = Value::Float(f32_bits);
+
+    let literal = runner
+        .eval_value(
+            &MirValue {
+                id: MirValueId(0),
+                kind: MirValueKind::Operand(MirOperand::Constant(MirConstant::Float(decimal))),
+                ty: MirType::semantic(f32_ty),
+                span,
+            },
+            span,
+        )
+        .expect("f32 const bind");
+    let product = runner
+        .eval_value(
+            &MirValue {
+                id: MirValueId(1),
+                kind: MirValueKind::Binary {
+                    op: MirBinOp::Mul,
+                    lhs: MirOperand::Constant(MirConstant::Float(decimal)),
+                    rhs: MirOperand::Constant(MirConstant::Float(1.0)),
+                },
+                ty: MirType::semantic(f32_ty),
+                span,
+            },
+            span,
+        )
+        .expect("f32 mul-by-one");
+    let wide = runner
+        .eval_value(
+            &MirValue {
+                id: MirValueId(2),
+                kind: MirValueKind::Operand(MirOperand::Constant(MirConstant::Float(decimal))),
+                ty: MirType::semantic(f64_ty),
+                span,
+            },
+            span,
+        )
+        .expect("f64 const bind");
+    let list = runner
+        .eval_construct(
+            &MirAggregate {
+                kind: MirAggregateKind::Array,
+                ty: MirType::semantic(list_f32_ty),
+                fields: MirAggregateFields::Ordered(vec![MirAggregateItem::Operand(
+                    MirOperand::Constant(MirConstant::Float(decimal)),
+                )]),
+            },
+            span,
+        )
+        .expect("f32 list construct");
+
+    assert_eq!(literal, expected);
+    assert_eq!(product, expected);
+    assert!(values_equal(&literal, &product));
+    assert_eq!(wide, Value::Float(decimal));
+    assert!(!values_equal(&wide, &literal));
+    let Value::Array(items) = list else {
+        panic!("expected array, got {list:?}");
+    };
+    assert_eq!(items.borrow().as_slice(), [expected]);
+}
+
 // ---------------------------------------------------------------------------
 // F-082…F-087: red-green tests
 // ---------------------------------------------------------------------------
