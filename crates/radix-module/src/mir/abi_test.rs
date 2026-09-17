@@ -1761,17 +1761,79 @@ fn kernel_reflection_rejects_resource_byte_length_overflow() {
 }
 
 #[test]
-fn indexed_tensor_view_kernel_abi_rejects_scalar_resources() {
+fn indexed_tensor_view_kernel_abi_binds_and_reflects_scalar_resources() {
     let mut types = TypeTable::new();
+    let (tensor_ty, _) = rank1_tf32_type(&mut types);
     let scalar_ty = f32_type(&mut types);
     let index_ty = u32_type(&mut types);
     let vacuum_ty = MirType::semantic(types.primitive(Primitive::Vacuum));
-    let function = indexed_kernel_function(scalar_ty, index_ty, vacuum_ty);
+    let mut function = multi_input_indexed_kernel_function(tensor_ty, index_ty, vacuum_ty);
+    let mut interner = Interner::new();
+    // Runtime-varying epsilon remains a parameter, rather than a literal or
+    // specialization fact. Its ABI resource must therefore survive binding,
+    // reflection, and launch-plan projection.
+    function.params[1].ty = scalar_ty;
+    function.params[1].name = Some(interner.intern("epsilon"));
     let validation = validation_with_device_tensor_layouts(&types);
-    let error = MirKernelSignature::storage_buffer_kernel(&function, &validation)
-        .expect_err("indexed kernel resources must be tensor device views");
+    let signature = MirKernelSignature::storage_buffer_kernel_with_interner(&function, &validation, &interner)
+        .expect("indexed kernel accepts a count-one scalar resource");
 
+    let epsilon = &signature.extra_inputs[0];
+    assert_eq!(epsilon.binding, 1);
+    assert_eq!(epsilon.kind, MirKernelResourceKind::StorageBuffer);
+    assert_eq!(epsilon.role, MirKernelResourceRole::Input);
+    assert_eq!(epsilon.access, MirKernelResourceAccess::Read);
+    assert_eq!(epsilon.element_ty, scalar_ty);
+    assert_eq!(epsilon.element_count, 1);
+    assert_eq!(epsilon.source_local, Some(MirLocalId(1)));
+    assert_eq!(epsilon.source_name.as_deref(), Some("epsilon"));
+
+    let reflection =
+        MirKernelReflection::from_signature("rmsnorm", &signature, &validation).expect("scalar binding reflects");
+    let epsilon = reflection
+        .resources
+        .iter()
+        .find(|resource| resource.source_name.as_deref() == Some("epsilon"))
+        .expect("runtime epsilon resource reflection");
+    assert_eq!(epsilon.kind, MirKernelResourceKind::StorageBuffer);
+    assert_eq!(epsilon.element_layout, MirScalarLayout::F32);
+    assert_eq!(epsilon.element_count, 1);
+    assert_eq!(epsilon.buffer_byte_len, 4);
+
+    let launch = reflection.launch_plan();
+    assert_eq!(launch.bind_groups[0].resource_kinds[1], MirKernelResourceKind::StorageBuffer);
+    assert_eq!(launch.bind_groups[0].resource_roles[1], MirKernelResourceRole::Input);
+
+    // The former indexed-view rejection still applies to scalar layouts that
+    // are not device-safe kernel elements; accepting f32 must not make f64
+    // inputs fail open as count-one resources.
+    function.params[1].ty = fractus_type(&types);
+    let error = MirKernelSignature::storage_buffer_kernel_with_interner(&function, &validation, &interner)
+        .expect_err("unsupported scalar input remains outside the indexed ABI");
     assert_eq!(error.issue, "mir_indexed_kernel_resource_not_device_view");
+}
+
+#[test]
+fn multi_input_return_buffer_kernel_binds_scalar_resources_without_tensor_count_matching() {
+    let mut types = TypeTable::new();
+    let (tensor_ty, _) = rank1_tf32_type(&mut types);
+    let scalar_ty = f32_type(&mut types);
+    let index_ty = u32_type(&mut types);
+    let vacuum_ty = MirType::semantic(types.primitive(Primitive::Vacuum));
+    let mut function = multi_input_indexed_kernel_function(tensor_ty, index_ty, vacuum_ty);
+    function.params.pop();
+    function.params[1].ty = scalar_ty;
+    function.return_ty = tensor_ty;
+    let validation = validation_with_device_tensor_layouts(&types);
+
+    let signature = MirKernelSignature::storage_buffer_kernel(&function, &validation)
+        .expect("multi-input return ABI accepts a count-one scalar resource");
+    let epsilon = &signature.extra_inputs[0];
+    assert_eq!(epsilon.binding, 1);
+    assert_eq!(epsilon.kind, MirKernelResourceKind::StorageBuffer);
+    assert_eq!(epsilon.element_ty, scalar_ty);
+    assert_eq!(epsilon.element_count, 1);
+    assert_eq!(signature.output.binding, 3);
 }
 
 #[test]

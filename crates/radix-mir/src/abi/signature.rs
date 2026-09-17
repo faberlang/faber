@@ -859,10 +859,15 @@ impl MirKernelSignature {
         for (binding, input) in inputs.iter().enumerate() {
             let input_element_ty =
                 buffer_element_type(input.ty, validation, allow_host_owned_tensor_entry)?;
-            require_same_element_type(input_element_ty, return_element_ty, validation)?;
             let input_element_count = buffer_element_count(input.ty, validation)?;
-            if input_element_count != return_element_count {
-                return Err(MirAbiError::new(ERR_KERNEL_IO_ELEMENT_MISMATCH));
+            // A device-safe scalar is a count-one input resource. It does
+            // not participate in the tensor elementwise equality law: its
+            // value is supplied once and broadcast by the kernel body.
+            if !Self::is_kernel_scalar_input(input.ty, validation)? {
+                require_same_element_type(input_element_ty, return_element_ty, validation)?;
+                if input_element_count != return_element_count {
+                    return Err(MirAbiError::new(ERR_KERNEL_IO_ELEMENT_MISMATCH));
+                }
             }
             input_resources.push(MirKernelResource {
                 group: DEFAULT_KERNEL_RESOURCE_GROUP,
@@ -916,6 +921,22 @@ impl MirKernelSignature {
         // picked the ABI arm (shared ABI law, all compute targets).
         apply_collection_op_contract(function, &mut signature, validation)?;
         Ok(signature)
+    }
+
+    /// True when `ty` is a device-safe scalar represented as a count-one
+    /// storage resource rather than a tensor device view.
+    fn is_kernel_scalar_input(
+        ty: MirType,
+        validation: &MirValidationContext<'_>,
+    ) -> Result<bool, MirAbiError> {
+        let layout = validation
+            .layouts
+            .layout_for_type(ty)
+            .map_err(|error| MirAbiError::new(error.message))?;
+        Ok(matches!(
+            layout.kind,
+            MirLayoutKind::Scalar(scalar) if crate::tensor_type::is_kernel_element_layout(scalar)
+        ))
     }
 
     fn indexed_view_kernel(
@@ -1035,19 +1056,36 @@ impl MirKernelSignature {
                 });
                 continue;
             }
-            let input_element_ty = device_view_element_type(
-                input.ty,
-                validation,
-                context.allow_host_owned_tensor_entry,
-            )?;
-            require_indexed_element_compatibility(
-                function,
-                input_element_ty,
-                output_element_ty,
-                validation,
-                binding == 0,
-            )?;
-            let input_element_count = device_view_element_count(input.ty, validation)?;
+            let (input_element_ty, input_element_count) =
+                if Self::is_kernel_scalar_input(input.ty, validation)? {
+                    // Indexed kernels may carry explicit scalar resources beside
+                    // their device-view inputs. The count-one resource is bound
+                    // and reflected like every other input; only tensor inputs
+                    // must satisfy indexed-view compatibility with the output.
+                    (
+                        buffer_element_type(
+                            input.ty,
+                            validation,
+                            context.allow_host_owned_tensor_entry,
+                        )?,
+                        buffer_element_count(input.ty, validation)?,
+                    )
+                } else {
+                    let input_element_ty = device_view_element_type(
+                        input.ty,
+                        validation,
+                        context.allow_host_owned_tensor_entry,
+                    )?;
+                    require_indexed_element_compatibility(
+                        function,
+                        input_element_ty,
+                        output_element_ty,
+                        validation,
+                        binding == 0,
+                    )?;
+                    let input_element_count = device_view_element_count(input.ty, validation)?;
+                    (input_element_ty, input_element_count)
+                };
             input_resources.push(MirKernelResource {
                 group: DEFAULT_KERNEL_RESOURCE_GROUP,
                 binding: u32::try_from(binding)
