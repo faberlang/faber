@@ -691,7 +691,12 @@ impl Lowerer<'_> {
                 .iter()
                 .map(|param| (param.def_id, param.name, param.kind)),
         );
-        let annotations = self.lower_item_annotations(def_id, &stmt.annotations);
+        let mut annotations = Vec::new();
+        for annotation in &stmt.annotations {
+            if !self.annotation_ast_family_is(annotation, "annotatio") {
+                annotations.push(self.lower_annotation(annotation));
+            }
+        }
 
         let mut fields = Vec::new();
         let mut methods = Vec::new();
