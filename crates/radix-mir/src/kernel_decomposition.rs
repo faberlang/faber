@@ -70,6 +70,8 @@ use radix_types::{Type, TypeId, TypeTable};
 use rustc_hash::FxHashSet;
 use std::collections::{BTreeMap, BTreeSet};
 
+const PD18_MAX_CANDIDATES: usize = 25;
+
 /// One decomposed kernel subchain: a contiguous statement slice of the
 /// source function carrying exactly one recipe (or an elementwise-only
 /// body), plus the data-flow edges that connect it to the rest of the chain.
@@ -715,16 +717,36 @@ fn split_oversized_elementwise_body(
         .map(|&index| statement_temp_sets(&block.statements[index]))
         .collect();
 
-    // suffix_reads[k] = the union of reads at positions >= k (the locals a
-    // statement range's writes are consumed by when the range ends at k).
-    let mut suffix_reads: Vec<BTreeSet<MirLocalId>> = Vec::with_capacity(n + 1);
-    let mut suffix = BTreeSet::new();
+    // Precomputed suffix aggregates keep the tail check O(1) in the number
+    // of statements. `suffix_reads[k]` is the union of reads at positions
+    // >= k; the other sets describe the same range's writes and params.
+    let mut suffix_reads = vec![BTreeSet::new(); n + 1];
+    let mut suffix_written = vec![BTreeSet::new(); n + 1];
+    let mut suffix_params = vec![BTreeSet::new(); n + 1];
+    let mut suffix_temp_references = vec![BTreeSet::new(); n + 1];
     for i in (0..n).rev() {
-        suffix.extend(reads_at[i].iter().copied());
-        suffix_reads.push(suffix.clone());
+        suffix_reads[i] = suffix_reads[i + 1].clone();
+        suffix_reads[i].extend(reads_at[i].iter().copied());
+
+        suffix_written[i] = suffix_written[i + 1].clone();
+        if let Some(local) = written_at[i] {
+            suffix_written[i].insert(local);
+        }
+        suffix_params[i] = suffix_params[i + 1].clone();
+        if let Some(local) = written_at[i] {
+            suffix_params[i].remove(&local);
+        }
+        suffix_params[i].extend(
+            reads_at[i]
+                .iter()
+                .copied()
+                .filter(|local| !suffix_written[i].contains(local)),
+        );
+        suffix_params[i].retain(|local| !suffix_written[i].contains(local));
+
+        suffix_temp_references[i] = suffix_temp_references[i + 1].clone();
+        suffix_temp_references[i].extend(temps_referenced_at[i].iter().copied());
     }
-    suffix_reads.push(BTreeSet::new());
-    suffix_reads.reverse();
 
     // The first field-writing statement. The statements before it are the
     // "pre" range; the statements from it onward are the field range (field
@@ -793,12 +815,21 @@ fn split_oversized_elementwise_body(
     // The intermediate-slice validity predicate: the range [start..end)
     // fits the budget, exposes at least the minimum consumed-output count,
     // carries no non-kernel-surface consumed local, and never separates a
-    // temp definition from its forward.
-    let intermediate_valid = |start: usize, end: usize| -> bool {
-        if !temp_closed_range(&temps_defined_at, &temps_referenced_at, start, end) {
+    // temp definition from its forward. The range state is maintained by
+    // the descending candidate scan below.
+    let intermediate_valid = |params: &BTreeSet<MirLocalId>,
+                              written: &BTreeSet<MirLocalId>,
+                              defined: &BTreeSet<MirTempId>,
+                              referenced: &BTreeSet<MirTempId>,
+                              end: usize|
+     -> bool {
+        if !referenced.is_subset(defined)
+            || defined
+                .iter()
+                .any(|temp| suffix_temp_references[end].contains(temp))
+        {
             return false;
         }
-        let (params, written) = range_params_and_written(&written_at, &reads_at, start, end);
         let consumed: BTreeSet<MirLocalId> =
             written.intersection(&suffix_reads[end]).copied().collect();
         let consumed_count = consumed.len();
@@ -829,9 +860,9 @@ fn split_oversized_elementwise_body(
     // caller's result-tuple output slots alias only the params its own
     // update statements read).
     let last_field_valid = |start: usize| -> bool {
-        let (params, written) = range_params_and_written(&written_at, &reads_at, start, n);
-        let fields_written = written.intersection(&field_set).count();
-        fields_written >= 1 && params.len() + fields.len() <= limit.max_storage_buffers
+        let fields_written = suffix_written[start].intersection(&field_set).count();
+        fields_written >= 1
+            && suffix_params[start].len() + fields.len() <= limit.max_storage_buffers
     };
 
     // Split the statement stream: the pre range (before the first field
@@ -855,6 +886,21 @@ fn split_oversized_elementwise_body(
         )));
     };
 
+    let pre_window_states = split_window_states(
+        first_field,
+        &written_at,
+        &reads_at,
+        &temps_defined_at,
+        &temps_referenced_at,
+    );
+    let field_window_states = split_window_states(
+        last_field_position,
+        &written_at,
+        &reads_at,
+        &temps_defined_at,
+        &temps_referenced_at,
+    );
+
     let mut split: Vec<Vec<usize>> = Vec::new();
     let mut start = 0;
     while start < n {
@@ -874,11 +920,39 @@ fn split_oversized_elementwise_body(
         };
         let mut end = max_end.min(n.saturating_sub(1));
         let mut best: Option<usize> = None;
+        let mut candidate_count = 0;
+        let mut candidate_state = SplitRangeState::default();
+        if end > start {
+            candidate_state = if start < first_field {
+                pre_window_states[start].clone()
+            } else {
+                field_window_states[start].clone()
+            };
+        }
         while end > start {
-            if intermediate_valid(start, end) {
+            candidate_count += 1;
+            if candidate_count > PD18_MAX_CANDIDATES {
+                return Err(PlanMappingError::mapping(
+                    "elementwise split candidate window exceeded (maximum 25 candidate ends)",
+                ));
+            }
+            if intermediate_valid(
+                &candidate_state.params,
+                &candidate_state.written,
+                &candidate_state.defined,
+                &candidate_state.referenced,
+                end,
+            ) {
                 best = Some(end);
                 break;
             }
+            let slot = end - 1;
+            candidate_state.remove(
+                written_at[slot],
+                &reads_at[slot],
+                &temps_defined_at[slot],
+                &temps_referenced_at[slot],
+            );
             end -= 1;
         }
         let Some(end) = best else {
@@ -959,59 +1033,121 @@ fn statement_temp_sets(statement: &MirStatement) -> (BTreeSet<MirTempId>, BTreeS
     (defined, referenced)
 }
 
-/// Whether a range [start..end) is temp-closed: every temp referenced in the
-/// range is defined in it, and every temp defined in it is referenced only
-/// inside it (a temp defined in the range but referenced after it would be
-/// undefined in the following sub-slice's synthetic).
-fn temp_closed_range(
-    temps_defined_at: &[BTreeSet<MirTempId>],
-    temps_referenced_at: &[BTreeSet<MirTempId>],
-    start: usize,
-    end: usize,
-) -> bool {
-    let mut defined = BTreeSet::new();
-    let mut referenced = BTreeSet::new();
-    for (defined_at, referenced_at) in temps_defined_at[start..end]
-        .iter()
-        .zip(&temps_referenced_at[start..end])
-    {
-        defined.extend(defined_at.iter().copied());
-        referenced.extend(referenced_at.iter().copied());
-    }
-    if !referenced.is_subset(&defined) {
-        return false;
-    }
-    for referenced_at in &temps_referenced_at[end..] {
-        if referenced_at.iter().any(|temp| defined.contains(temp)) {
-            return false;
-        }
-    }
-    true
+#[derive(Clone, Default)]
+struct SplitRangeState {
+    read_counts: BTreeMap<MirLocalId, usize>,
+    written_counts: BTreeMap<MirLocalId, usize>,
+    params: BTreeSet<MirLocalId>,
+    written: BTreeSet<MirLocalId>,
+    defined_counts: BTreeMap<MirTempId, usize>,
+    referenced_counts: BTreeMap<MirTempId, usize>,
+    defined: BTreeSet<MirTempId>,
+    referenced: BTreeSet<MirTempId>,
 }
 
-/// The data-flow params (read locals not written) and the written locals of
-/// a statement range [start..end).
-fn range_params_and_written(
-    written_at: &[Option<MirLocalId>],
-    reads_at: &[Vec<MirLocalId>],
-    start: usize,
-    end: usize,
-) -> (BTreeSet<MirLocalId>, BTreeSet<MirLocalId>) {
-    let mut written = BTreeSet::new();
-    for &written_at_slot in &written_at[start..end] {
-        if let Some(local) = written_at_slot {
-            written.insert(local);
+impl SplitRangeState {
+    fn add(
+        &mut self,
+        written: Option<MirLocalId>,
+        reads: &[MirLocalId],
+        defined: &BTreeSet<MirTempId>,
+        referenced: &BTreeSet<MirTempId>,
+    ) {
+        for &local in reads {
+            *self.read_counts.entry(local).or_default() += 1;
+            if !self.written.contains(&local) {
+                self.params.insert(local);
+            }
+        }
+        if let Some(local) = written {
+            *self.written_counts.entry(local).or_default() += 1;
+            self.written.insert(local);
+            self.params.remove(&local);
+        }
+        for &temp in defined {
+            *self.defined_counts.entry(temp).or_default() += 1;
+            self.defined.insert(temp);
+        }
+        for &temp in referenced {
+            *self.referenced_counts.entry(temp).or_default() += 1;
+            self.referenced.insert(temp);
         }
     }
-    let mut params = BTreeSet::new();
-    for reads_at_slot in &reads_at[start..end] {
-        for &local in reads_at_slot {
-            if !written.contains(&local) {
-                params.insert(local);
+
+    fn remove(
+        &mut self,
+        written: Option<MirLocalId>,
+        reads: &[MirLocalId],
+        defined: &BTreeSet<MirTempId>,
+        referenced: &BTreeSet<MirTempId>,
+    ) {
+        for &local in reads {
+            decrement_count(&mut self.read_counts, local);
+        }
+        if let Some(local) = written {
+            decrement_count(&mut self.written_counts, local);
+            if !self.written_counts.contains_key(&local) {
+                self.written.remove(&local);
+            }
+        }
+        for &local in reads {
+            self.refresh_param(local);
+        }
+        if let Some(local) = written {
+            self.refresh_param(local);
+        }
+        for &temp in defined {
+            decrement_count(&mut self.defined_counts, temp);
+            if !self.defined_counts.contains_key(&temp) {
+                self.defined.remove(&temp);
+            }
+        }
+        for &temp in referenced {
+            decrement_count(&mut self.referenced_counts, temp);
+            if !self.referenced_counts.contains_key(&temp) {
+                self.referenced.remove(&temp);
             }
         }
     }
-    (params, written)
+
+    fn refresh_param(&mut self, local: MirLocalId) {
+        if self.read_counts.contains_key(&local) && !self.written.contains(&local) {
+            self.params.insert(local);
+        } else {
+            self.params.remove(&local);
+        }
+    }
+}
+
+fn decrement_count<K: Ord>(counts: &mut BTreeMap<K, usize>, key: K) {
+    if let Some(count) = counts.get_mut(&key) {
+        if *count > 1 {
+            *count -= 1;
+        } else {
+            counts.remove(&key);
+        }
+    }
+}
+
+fn split_window_states(
+    max_end: usize,
+    written_at: &[Option<MirLocalId>],
+    reads_at: &[Vec<MirLocalId>],
+    temps_defined_at: &[BTreeSet<MirTempId>],
+    temps_referenced_at: &[BTreeSet<MirTempId>],
+) -> Vec<SplitRangeState> {
+    let mut states = vec![SplitRangeState::default(); max_end + 1];
+    let mut state = SplitRangeState::default();
+    for start in (0..max_end).rev() {
+        state.add(
+            written_at[start],
+            &reads_at[start],
+            &temps_defined_at[start],
+            &temps_referenced_at[start],
+        );
+        states[start] = state.clone();
+    }
+    states
 }
 
 /// The temp operand of an operand, if the operand is a plain temp.
