@@ -16,6 +16,19 @@ enum ElementwiseCollectionKind {
     Stack,
 }
 
+#[derive(Clone, Copy)]
+enum TensorConstKind {
+    Int,
+    Float,
+}
+
+#[derive(Clone, Copy)]
+struct TensorNormFlags {
+    rank_1_or_2: bool,
+    layernorm_arity_gate: bool,
+    beta: bool,
+}
+
 impl Validator<'_, '_> {
     pub(crate) fn validate_runtime_call(
         &mut self,
@@ -1717,6 +1730,38 @@ impl Validator<'_, '_> {
 
     /// Axis/epsilon literals often arrive as temps after sized-fractus lowering.
     /// Those operands stay valid; only a wrong constant kind is rejected.
+    fn validate_tensor_const_arg<E, P>(
+        &mut self,
+        scope: &FunctionScope<'_, '_>,
+        arg: &MirOperand,
+        span: Span,
+        kind: TensorConstKind,
+        label: &'static str,
+        name: &'static str,
+        message: &'static str,
+        exempt: E,
+        predicate: P,
+    ) where
+        E: Fn(&MirConstant) -> bool,
+        P: FnOnce(&mut Self, &MirConstant),
+    {
+        let _ = self.validate_operand(scope, arg, span);
+        let MirOperand::Constant(constant) = arg else {
+            return;
+        };
+        if exempt(constant) {
+            return;
+        }
+        match (kind, constant) {
+            (TensorConstKind::Int, MirConstant::Int(_))
+            | (TensorConstKind::Float, MirConstant::Float(_)) => predicate(self, constant),
+            _ => self.error(
+                span,
+                format!("tensor {label} {name} must be {message}"),
+            ),
+        }
+    }
+
     pub(crate) fn validate_tensor_axis_const(
         &mut self,
         scope: &FunctionScope<'_, '_>,
@@ -1725,24 +1770,27 @@ impl Validator<'_, '_> {
         span: Span,
         label: &'static str,
     ) {
-        let _ = self.validate_operand(scope, arg, span);
-        match arg {
-            MirOperand::Constant(MirConstant::Int(axis_val)) => {
+        self.validate_tensor_const_arg(
+            scope,
+            arg,
+            span,
+            TensorConstKind::Int,
+            label,
+            "axis",
+            "an int constant or temp",
+            |_| false,
+            |this, constant| {
+                let MirConstant::Int(axis_val) = constant else {
+                    unreachable!("integer tensor constant expected")
+                };
                 if usize::try_from(*axis_val).map_or(true, |axis| axis >= rank) {
-                    self.error(
+                    this.error(
                         span,
                         format!("tensor {label} axis {axis_val} is out of range for rank {rank}"),
                     );
                 }
-            }
-            MirOperand::Value(_) | MirOperand::Temp(_) | MirOperand::Place(_) => {}
-            MirOperand::Constant(_) => {
-                self.error(
-                    span,
-                    format!("tensor {label} axis must be an int constant or temp"),
-                );
-            }
-        }
+            },
+        );
     }
 
     pub(crate) fn validate_tensor_epsilon_const(
@@ -1752,24 +1800,109 @@ impl Validator<'_, '_> {
         span: Span,
         label: &'static str,
     ) {
-        let _ = self.validate_operand(scope, arg, span);
-        match arg {
-            MirOperand::Constant(MirConstant::Float(f)) => {
+        self.validate_tensor_const_arg(
+            scope,
+            arg,
+            span,
+            TensorConstKind::Float,
+            label,
+            "epsilon",
+            "a float constant or temp",
+            |_| false,
+            |this, constant| {
+                let MirConstant::Float(f) = constant else {
+                    unreachable!("float tensor constant expected")
+                };
                 if *f <= 0.0 || !f.is_finite() {
-                    self.error(
+                    this.error(
                         span,
                         format!("tensor {label} epsilon must be positive and finite"),
                     );
                 }
-            }
-            MirOperand::Value(_) | MirOperand::Temp(_) | MirOperand::Place(_) => {}
-            MirOperand::Constant(_) => {
-                self.error(
-                    span,
-                    format!("tensor {label} epsilon must be a float constant or temp"),
-                );
-            }
-        }
+            },
+        );
+    }
+
+    fn validate_tensor_rope_pos_const(
+        &mut self,
+        scope: &FunctionScope<'_, '_>,
+        arg: &MirOperand,
+        span: Span,
+    ) {
+        self.validate_tensor_const_arg(
+            scope,
+            arg,
+            span,
+            TensorConstKind::Int,
+            "rope",
+            "pos",
+            "an int constant or temp",
+            |_| false,
+            |this, constant| {
+                let MirConstant::Int(pos_val) = constant else {
+                    unreachable!("integer tensor constant expected")
+                };
+                if *pos_val < 0 {
+                    this.error(
+                        span,
+                        format!("tensor rope pos {pos_val} must be non-negative"),
+                    );
+                }
+            },
+        );
+    }
+
+    fn validate_tensor_rope_dim_const(
+        &mut self,
+        scope: &FunctionScope<'_, '_>,
+        arg: &MirOperand,
+        receiver_ty: MirType,
+        span: Span,
+    ) {
+        self.validate_tensor_const_arg(
+            scope,
+            arg,
+            span,
+            TensorConstKind::Int,
+            "rope",
+            "dim",
+            "an int constant or temp",
+            |constant| matches!(constant, MirConstant::ShapeSize { .. }),
+            |this, constant| {
+                let MirConstant::Int(dim_val) = constant else {
+                    unreachable!("integer tensor constant expected")
+                };
+                if *dim_val <= 0 {
+                    this.error(span, format!("tensor rope dim {dim_val} must be positive"));
+                }
+                if *dim_val % 2 != 0 {
+                    this.error(span, format!("tensor rope dim {dim_val} must be even"));
+                }
+                // Elements past `dim` stay; only the last-axis width is a bound.
+                let last_extent = match this.type_kind(receiver_ty) {
+                    Type::Tensor(_, shape) => match this.context.types.get_index(*shape) {
+                        IndexExpr::Tuple(dims) => {
+                            dims.last()
+                                .and_then(|dim| match this.context.types.get_index(*dim) {
+                                    IndexExpr::Literal(count) => i64::try_from(*count).ok(),
+                                    _ => None,
+                                })
+                        }
+                        IndexExpr::Literal(count) => i64::try_from(*count).ok(),
+                        _ => None,
+                    },
+                    _ => None,
+                };
+                if last_extent.is_some_and(|extent| *dim_val > extent) {
+                    this.error(
+                        span,
+                        format!(
+                            "tensor rope dim {dim_val} exceeds the last-axis extent {last_extent:?}"
+                        ),
+                    );
+                }
+            },
+        );
     }
 
     pub(crate) fn validate_tensor_layernorm(
@@ -1779,51 +1912,18 @@ impl Validator<'_, '_> {
         call: &MirRuntimeCall,
         span: Span,
     ) {
-        let Some(input_ty) = first_arg_ty else {
-            return;
-        };
-        if !matches!(self.type_kind(input_ty), Type::Tensor(_, _)) {
-            self.error(span, "tensor layernorm input is not tensor");
-            return;
-        }
-        // Unresolved shapes skip rank-dependent checks; the call remains typed.
-        let Some(rank) = self.static_tensor_rank(input_ty) else {
-            return;
-        };
-        if rank != 1 && rank != 2 {
-            self.error(span, "tensor layernorm input must have rank 1 or 2");
-            return;
-        }
-        // Arity failure is recorded earlier and does not return.
-        if call.args.len() < 3 {
-            return;
-        }
-        if let Some(arg) = call.args.get(1) {
-            self.validate_tensor_axis_const(scope, arg, rank, span, "layernorm");
-        }
-        if let Some(arg) = call.args.get(2) {
-            self.validate_tensor_epsilon_const(scope, arg, span, "layernorm");
-        }
-        if call.args.len() >= 4
-            && let Some(gamma_ty) = call
-                .args
-                .get(3)
-                .and_then(|arg| self.validate_operand(scope, arg, span))
-        {
-            self.require_tensor_type(gamma_ty, span, "tensor layernorm gamma is not tensor");
-        }
-        if call.args.len() >= 5
-            && let Some(beta_ty) = call
-                .args
-                .get(4)
-                .and_then(|arg| self.validate_operand(scope, arg, span))
-        {
-            self.require_tensor_type(beta_ty, span, "tensor layernorm beta is not tensor");
-        }
-        self.require_tensor_type(
-            call.return_ty,
+        self.validate_tensor_norm(
+            scope,
+            first_arg_ty,
+            call,
             span,
-            "tensor layernorm result is not tensor",
+            "layernorm",
+            "input",
+            TensorNormFlags {
+                rank_1_or_2: true,
+                layernorm_arity_gate: true,
+                beta: true,
+            },
         );
     }
 
@@ -1834,30 +1934,90 @@ impl Validator<'_, '_> {
         call: &MirRuntimeCall,
         span: Span,
     ) {
+        self.validate_tensor_norm(
+            scope,
+            first_arg_ty,
+            call,
+            span,
+            "rms_norm",
+            "receiver",
+            TensorNormFlags {
+                rank_1_or_2: false,
+                layernorm_arity_gate: false,
+                beta: false,
+            },
+        );
+    }
+
+    fn validate_tensor_norm(
+        &mut self,
+        scope: &FunctionScope<'_, '_>,
+        first_arg_ty: Option<MirType>,
+        call: &MirRuntimeCall,
+        span: Span,
+        label: &'static str,
+        receiver_label: &'static str,
+        flags: TensorNormFlags,
+    ) {
         let Some(receiver_ty) = first_arg_ty else {
             return;
         };
         if !matches!(self.type_kind(receiver_ty), Type::Tensor(_, _)) {
-            self.error(span, "tensor rms_norm receiver is not tensor");
+            self.error(
+                span,
+                format!("tensor {label} {receiver_label} is not tensor"),
+            );
             return;
         }
         let Some(rank) = self.static_tensor_rank(receiver_ty) else {
             return;
         };
+        if flags.rank_1_or_2 && rank != 1 && rank != 2 {
+            self.error(span, "tensor layernorm input must have rank 1 or 2");
+            return;
+        }
+        // Arity failure is recorded earlier and does not return for rms_norm.
+        if flags.layernorm_arity_gate && call.args.len() < 3 {
+            return;
+        }
         if let Some(arg) = call.args.get(1) {
-            self.validate_tensor_axis_const(scope, arg, rank, span, "rms_norm");
+            self.validate_tensor_axis_const(scope, arg, rank, span, label);
         }
         if let Some(arg) = call.args.get(2) {
-            self.validate_tensor_epsilon_const(scope, arg, span, "rms_norm");
+            self.validate_tensor_epsilon_const(scope, arg, span, label);
         }
-        if let Some(gamma_ty) = call
-            .args
-            .get(3)
-            .and_then(|arg| self.validate_operand(scope, arg, span))
+        if call.args.len() >= 4
+            && let Some(gamma_ty) = call
+                .args
+                .get(3)
+                .and_then(|arg| self.validate_operand(scope, arg, span))
         {
-            self.require_tensor_type(gamma_ty, span, "tensor rms_norm gamma is not tensor");
+            self.require_tensor_type(
+                gamma_ty,
+                span,
+                match label {
+                    "layernorm" => "tensor layernorm gamma is not tensor",
+                    _ => "tensor rms_norm gamma is not tensor",
+                },
+            );
         }
-        self.require_tensor_type(call.return_ty, span, "tensor rms_norm result is not tensor");
+        if flags.beta
+            && call.args.len() >= 5
+            && let Some(beta_ty) = call
+                .args
+                .get(4)
+                .and_then(|arg| self.validate_operand(scope, arg, span))
+        {
+            self.require_tensor_type(beta_ty, span, "tensor layernorm beta is not tensor");
+        }
+        self.require_tensor_type(
+            call.return_ty,
+            span,
+            match label {
+                "layernorm" => "tensor layernorm result is not tensor",
+                _ => "tensor rms_norm result is not tensor",
+            },
+        );
     }
 
     pub(crate) fn validate_tensor_rope(
@@ -1872,66 +2032,10 @@ impl Validator<'_, '_> {
         };
         self.require_tensor_type(receiver_ty, span, "tensor rope receiver is not tensor");
         if let Some(arg) = call.args.get(1) {
-            let _ = self.validate_operand(scope, arg, span);
-            match arg {
-                MirOperand::Constant(MirConstant::Int(pos_val)) => {
-                    if *pos_val < 0 {
-                        self.error(
-                            span,
-                            format!("tensor rope pos {pos_val} must be non-negative"),
-                        );
-                    }
-                }
-                MirOperand::Value(_) | MirOperand::Temp(_) | MirOperand::Place(_) => {}
-                MirOperand::Constant(_) => {
-                    self.error(span, "tensor rope pos must be an int constant or temp");
-                }
-            }
+            self.validate_tensor_rope_pos_const(scope, arg, span);
         }
         if let Some(arg) = call.args.get(2) {
-            let _ = self.validate_operand(scope, arg, span);
-            match arg {
-                MirOperand::Constant(MirConstant::Int(dim_val)) => {
-                    if *dim_val <= 0 {
-                        self.error(span, format!("tensor rope dim {dim_val} must be positive"));
-                    }
-                    if *dim_val % 2 != 0 {
-                        self.error(span, format!("tensor rope dim {dim_val} must be even"));
-                    }
-                    // Elements past `dim` stay; only the last-axis width is a bound.
-                    let last_extent = match self.type_kind(receiver_ty) {
-                        Type::Tensor(_, shape) => match self.context.types.get_index(*shape) {
-                            IndexExpr::Tuple(dims) => dims.last().and_then(|dim| {
-                                match self.context.types.get_index(*dim) {
-                                    IndexExpr::Literal(count) => i64::try_from(*count).ok(),
-                                    _ => None,
-                                }
-                            }),
-                            IndexExpr::Literal(count) => i64::try_from(*count).ok(),
-                            _ => None,
-                        },
-                        _ => None,
-                    };
-                    if last_extent.is_some_and(|extent| *dim_val > extent) {
-                        self.error(
-                            span,
-                            format!(
-                                "tensor rope dim {dim_val} exceeds the last-axis extent {last_extent:?}"
-                            ),
-                        );
-                    }
-                }
-                // Symbolic size-param dims ride in as ShapeSize on generic
-                // templates; the instantiate seam folds them to Int before
-                // link, so numeric checks wait for the concrete value.
-                MirOperand::Value(_)
-                | MirOperand::Temp(_)
-                | MirOperand::Place(_)
-                | MirOperand::Constant(MirConstant::ShapeSize { .. }) => {}
-                MirOperand::Constant(_) => {
-                    self.error(span, "tensor rope dim must be an int constant or temp");
-                }
-            }
+            self.validate_tensor_rope_dim_const(scope, arg, receiver_ty, span);
         }
         if let Some(table_ty) = call
             .args
