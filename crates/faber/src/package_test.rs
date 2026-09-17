@@ -687,10 +687,17 @@ main {
     let Some(Output::Rust(output)) = result.output else {
         panic!("expected rust output");
     };
+    assert!(output.code.contains("pub mod json"));
     assert!(output.code.contains("fn parse"));
     assert!(output.code.contains("fn stringify"));
+    assert!(output.code.contains("crate::json::solve::parse"));
+    assert!(output.code.contains("crate::json::serialize::stringify"));
+    assert!(output.code.contains("pub mod solve"));
+    assert!(output.code.contains("pub mod serialize"));
+    assert!(output.code.contains("fn parse_value"));
+    assert!(output.code.contains("fn encode"));
     assert!(
-        output
+        !output
             .code
             .contains("deferred pending runtime codec dispatch")
     );
@@ -9715,8 +9722,17 @@ main {
     let Some(Output::Rust(output)) = result.output else {
         panic!("expected rust output");
     };
+    assert!(output.code.contains("pub mod json"));
+    assert!(output.code.contains("fn parse"));
+    assert!(output.code.contains("fn stringify"));
+    assert!(output.code.contains("crate::json::solve::parse"));
+    assert!(output.code.contains("crate::json::serialize::stringify"));
+    assert!(output.code.contains("pub mod solve"));
+    assert!(output.code.contains("pub mod serialize"));
+    assert!(output.code.contains("fn parse_value"));
+    assert!(output.code.contains("fn encode"));
     assert!(
-        output
+        !output
             .code
             .contains("deferred pending runtime codec dispatch")
     );
