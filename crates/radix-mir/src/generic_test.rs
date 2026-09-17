@@ -1125,3 +1125,45 @@ fn substitute_shape_size_fails_closed_on_infer_and_unspecified_dims() {
     );
     assert!(function_contains_shape_size(&mut function));
 }
+
+#[test]
+fn existing_and_mutable_instantiation_walks_are_equivalent() {
+    let mut types = TypeTable::new();
+    let element = f32_ty(&mut types);
+    let generic_shape = shape_bd(&mut types);
+    let param = types.intern(Type::Param(Symbol(240)));
+    let generic_tensor = types.intern(Type::Tensor(param, generic_shape));
+    let generic = types.tuple(vec![generic_tensor]);
+
+    let concrete_shape = shape_2x8(&mut types);
+    let concrete_tensor = types.intern(Type::Tensor(element, concrete_shape));
+    let concrete = types.tuple(vec![concrete_tensor]);
+
+    let mut generic_bindings = MirGenericBindings::default();
+    generic_bindings.insert(Symbol(240), MirType::semantic(element));
+    let mut shape_bindings = MirShapeBindings::default();
+    let lit2 = types.intern_index(IndexExpr::Literal(2));
+    let lit8 = types.intern_index(IndexExpr::Literal(8));
+    shape_bindings.insert(Symbol(200), lit2);
+    shape_bindings.insert(Symbol(201), lit8);
+
+    let existing = instantiate_existing_generic_type_with_shapes(
+        &types,
+        MirType::semantic(generic),
+        &generic_bindings,
+        &shape_bindings,
+        Span::default(),
+    )
+    .expect("read-only instantiation must resolve the interned concrete type");
+    let mutable = instantiate_generic_type_with_shapes(
+        &mut types,
+        MirType::semantic(generic),
+        &generic_bindings,
+        &shape_bindings,
+        Span::default(),
+    )
+    .expect("mutable instantiation must resolve the same concrete type");
+
+    assert_eq!(existing.semantic_id(), concrete);
+    assert_eq!(mutable, existing);
+}
