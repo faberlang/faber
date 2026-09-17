@@ -674,7 +674,7 @@ fn merged_target_entry_roles(
         .iter()
         .map(imported_target_entry_fact)
         .collect::<Vec<_>>();
-    radix_mir::device::merge_imported_entry_roles(local, &facts, &lowered.validated.program())
+    radix_mir::device::merge_imported_entry_roles(local, &facts, lowered.validated.program())
 }
 
 /// Spanned carrier for a KPC-EMIT merge failure (the `issue` diagnostic arg
