@@ -5,12 +5,16 @@
 //! extracts; this file proves the catalog's own contracts without the
 //! compiler driver.
 
+use std::collections::HashSet;
+
 use super::{
     CatalogGenericParam, INTRINSICS, IntrinsicMirKind, IntrinsicParamKind, IntrinsicReceiver,
-    IntrinsicReturnKind, MethodIntrinsic, NAMESPACE_INTRINSICS, is_atomic_operator_method,
-    is_mutating_receiver, lookup_method, lookup_method_for_type, lookup_method_for_type_id,
-    lookup_method_generic, lookup_namespace_method, lookup_namespace_method_by_name, mir_atomic_op,
-    mir_collection_op, mir_is_higher_order_lista, receivers_for_type, receivers_for_type_id,
+    IntrinsicReturnKind, MethodIntrinsic, NAMESPACE_INTRINSICS, NamespaceIntrinsic,
+    first_bucket_row, is_atomic_operator_method, is_mutating_receiver, lookup_method,
+    lookup_method_for_type, lookup_method_for_type_id, lookup_method_generic, lookup_method_named,
+    lookup_namespace_method, lookup_namespace_method_by_name, method_index, method_positions,
+    mir_atomic_op, mir_collection_op, mir_is_higher_order_lista, namespace_index,
+    namespace_positions, receivers_for_type, receivers_for_type_id, unique_bucket_row,
 };
 use radix_types::{
     GenericParamSort, IndexExpr, MirAtomicOp, MirCollectionOp, Primitive, SemanticMutability, Type,
@@ -418,4 +422,265 @@ fn air_ratchet_rows_are_absent_from_the_tensor_catalog() {
             );
         }
     }
+}
+
+// PD-9: the five keyed lookups must stay byte-identical to the catalog's
+// linear-scan semantics. The references below mirror the pre-index scan
+// bodies exactly; catalog rows carry no `PartialEq`, so results are compared
+// as catalog positions (pointer identity into the static catalog).
+
+fn method_position(entry: Option<&'static MethodIntrinsic>) -> Option<usize> {
+    entry.map(|row| {
+        INTRINSICS
+            .iter()
+            .position(|candidate| std::ptr::eq(candidate, row))
+            .expect("row is a catalog member")
+    })
+}
+
+fn namespace_position(entry: Option<&'static NamespaceIntrinsic>) -> Option<usize> {
+    entry.map(|row| {
+        NAMESPACE_INTRINSICS
+            .iter()
+            .position(|candidate| std::ptr::eq(candidate, row))
+            .expect("namespace row is a catalog member")
+    })
+}
+
+fn linear_lookup_method(
+    receiver: IntrinsicReceiver,
+    method: &str,
+    arg_count: usize,
+) -> Option<&'static MethodIntrinsic> {
+    let mut found = None;
+    for entry in INTRINSICS {
+        if entry.receiver == receiver && entry.faber_name == method && entry.arg_count == arg_count
+        {
+            if found.is_some() {
+                return None;
+            }
+            found = Some(entry);
+        }
+    }
+    found
+}
+
+fn linear_lookup_method_named(
+    receiver: IntrinsicReceiver,
+    method: &str,
+) -> Option<&'static MethodIntrinsic> {
+    let mut found = None;
+    for entry in INTRINSICS {
+        if entry.receiver == receiver && entry.faber_name == method {
+            if found.is_some() {
+                return None;
+            }
+            found = Some(entry);
+        }
+    }
+    found
+}
+
+fn linear_lookup_method_generic(
+    receiver: IntrinsicReceiver,
+    method: &str,
+    generic_count: usize,
+    arg_count: usize,
+) -> Option<&'static MethodIntrinsic> {
+    INTRINSICS.iter().find(|entry| {
+        entry.receiver == receiver
+            && entry.faber_name == method
+            && entry.generic.len() == generic_count
+            && entry.arg_count == arg_count
+    })
+}
+
+fn linear_lookup_namespace_method(
+    namespace: &str,
+    method: &str,
+    arg_count: usize,
+) -> Option<&'static NamespaceIntrinsic> {
+    let mut found = None;
+    for entry in NAMESPACE_INTRINSICS {
+        if entry.namespace == namespace
+            && entry.faber_name == method
+            && entry.arg_count == arg_count
+        {
+            if found.is_some() {
+                return None;
+            }
+            found = Some(entry);
+        }
+    }
+    found
+}
+
+fn linear_lookup_namespace_method_by_name(
+    namespace: &str,
+    method: &str,
+) -> Option<&'static NamespaceIntrinsic> {
+    let mut found = None;
+    for entry in NAMESPACE_INTRINSICS {
+        if entry.namespace == namespace && entry.faber_name == method {
+            if found.is_some() {
+                return None;
+            }
+            found = Some(entry);
+        }
+    }
+    found
+}
+
+#[test]
+fn keyed_lookups_match_linear_scan_reference_across_the_full_key_space() {
+    let receivers: HashSet<IntrinsicReceiver> =
+        INTRINSICS.iter().map(|entry| entry.receiver).collect();
+    let mut method_names: Vec<&str> = INTRINSICS.iter().map(|entry| entry.faber_name).collect();
+    method_names.extend(["nonexistent", "unregistra"]);
+    for receiver in &receivers {
+        for name in &method_names {
+            for arg_count in 0..=5 {
+                assert_eq!(
+                    method_position(lookup_method(*receiver, name, arg_count)),
+                    method_position(linear_lookup_method(*receiver, name, arg_count)),
+                    "lookup_method({receiver:?}, {name}, {arg_count}) drifted from the linear reference"
+                );
+                assert_eq!(
+                    method_position(lookup_method_named(*receiver, name)),
+                    method_position(linear_lookup_method_named(*receiver, name)),
+                    "lookup_method_named({receiver:?}, {name}) drifted from the linear reference"
+                );
+            }
+            for generic_count in 0..=2 {
+                for arg_count in 0..=5 {
+                    assert_eq!(
+                        method_position(lookup_method_generic(
+                            *receiver,
+                            name,
+                            generic_count,
+                            arg_count
+                        )),
+                        method_position(linear_lookup_method_generic(
+                            *receiver,
+                            name,
+                            generic_count,
+                            arg_count
+                        )),
+                        "lookup_method_generic({receiver:?}, {name}, {generic_count}, {arg_count}) drifted from the linear reference"
+                    );
+                }
+            }
+        }
+    }
+
+    let namespaces: HashSet<&str> = NAMESPACE_INTRINSICS
+        .iter()
+        .map(|entry| entry.namespace)
+        .collect();
+    let mut namespace_names: Vec<&str> = NAMESPACE_INTRINSICS
+        .iter()
+        .map(|entry| entry.faber_name)
+        .collect();
+    namespace_names.extend(["nonexistent", "unregistra"]);
+    for namespace in &namespaces {
+        for name in &namespace_names {
+            for arg_count in 0..=3 {
+                assert_eq!(
+                    namespace_position(lookup_namespace_method(namespace, name, arg_count)),
+                    namespace_position(linear_lookup_namespace_method(namespace, name, arg_count)),
+                    "lookup_namespace_method({namespace}, {name}, {arg_count}) drifted from the linear reference"
+                );
+                assert_eq!(
+                    namespace_position(lookup_namespace_method_by_name(namespace, name)),
+                    namespace_position(linear_lookup_namespace_method_by_name(namespace, name)),
+                    "lookup_namespace_method_by_name({namespace}, {name}) drifted from the linear reference"
+                );
+            }
+        }
+    }
+}
+
+#[test]
+fn keyed_index_buckets_keep_catalog_order_and_full_membership() {
+    for (receiver, rows) in method_index() {
+        for (name, positions) in rows {
+            assert!(!positions.is_empty(), "empty bucket {receiver:?}/{name}");
+            for pair in positions.windows(2) {
+                assert!(
+                    pair[0] < pair[1],
+                    "bucket {receiver:?}/{name} left catalog order"
+                );
+            }
+            for &position in positions {
+                let row = &INTRINSICS[position];
+                assert_eq!(row.receiver, *receiver);
+                assert_eq!(row.faber_name, *name);
+            }
+        }
+    }
+    for (position, entry) in INTRINSICS.iter().enumerate() {
+        assert!(
+            method_positions(entry.receiver, entry.faber_name).contains(&position),
+            "row {position} ({:?}/{}) missing from its key bucket",
+            entry.receiver,
+            entry.faber_name
+        );
+    }
+
+    for (namespace, rows) in namespace_index() {
+        for (name, positions) in rows {
+            assert!(!positions.is_empty(), "empty bucket {namespace}/{name}");
+            for pair in positions.windows(2) {
+                assert!(
+                    pair[0] < pair[1],
+                    "bucket {namespace}/{name} left catalog order"
+                );
+            }
+            for &position in positions {
+                let row = &NAMESPACE_INTRINSICS[position];
+                assert_eq!(row.namespace, *namespace);
+                assert_eq!(row.faber_name, *name);
+            }
+        }
+    }
+    for (position, entry) in NAMESPACE_INTRINSICS.iter().enumerate() {
+        assert!(
+            namespace_positions(entry.namespace, entry.faber_name).contains(&position),
+            "namespace row {position} ({}/{}) missing from its key bucket",
+            entry.namespace,
+            entry.faber_name
+        );
+    }
+}
+
+#[test]
+fn synthetic_duplicates_return_none_and_first_match_keeps_catalog_position() {
+    // The real catalogs cannot carry duplicate keys (uniqueness invariants
+    // above), so the duplicate-key and first-match semantics are pinned on a
+    // synthetic twin pair through the shared bucket helpers.
+    let template = *lookup_method(IntrinsicReceiver::Lista, "longitudo", 0).expect("template row");
+    let catalog: &[MethodIntrinsic] = &[
+        MethodIntrinsic { ..template },
+        MethodIntrinsic { ..template },
+    ];
+
+    assert!(
+        unique_bucket_row(&[0, 1], catalog, |_| true).is_none(),
+        "a duplicate-key bucket must resolve to None"
+    );
+    assert!(std::ptr::eq(
+        unique_bucket_row(&[1], catalog, |_| true).expect("unique row"),
+        &catalog[1]
+    ));
+    assert!(std::ptr::eq(
+        first_bucket_row(&[0, 1], catalog, |_| true).expect("first match"),
+        &catalog[0]
+    ));
+    assert!(
+        std::ptr::eq(
+            first_bucket_row(&[1, 0], catalog, |_| true).expect("first match"),
+            &catalog[1]
+        ),
+        "first match follows bucket (catalog) order, not row identity"
+    );
 }
