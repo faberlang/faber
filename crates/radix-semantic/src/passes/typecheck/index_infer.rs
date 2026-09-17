@@ -4,7 +4,7 @@
 
 use crate::index::IndexExpr;
 use crate::index::IndexId;
-use crate::{IndexConstraint, IndexInferError, SemanticErrorKind};
+use crate::{IndexConstraint, SemanticErrorKind};
 use radix_lexer::Span;
 
 #[allow(clippy::wildcard_imports)]
@@ -64,25 +64,6 @@ impl TypeChecker<'_> {
                 span,
             );
             None
-        }
-    }
-
-    #[allow(dead_code)] // Wired when tensor finalize reports hole-specific diagnostics.
-    pub fn finalize_index(&mut self, id: IndexId, span: Span, issue: &'static str) -> IndexId {
-        match self.index_infer.finalize(self.types, id) {
-            Ok(canonical) => canonical,
-            Err(IndexInferError::UnboundHole) => {
-                self.missing_type_annotation(issue, span);
-                id
-            }
-            Err(IndexInferError::Mismatch | IndexInferError::Occurs) => {
-                self.error_issue(
-                    SemanticErrorKind::TypeMismatch,
-                    ISSUE_INCOMPATIBLE_TENSOR_INDEX,
-                    span,
-                );
-                id
-            }
         }
     }
 
