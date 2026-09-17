@@ -523,7 +523,7 @@ pub fn derive_partition_record_with_metadata(
             entry: None,
         })
         .chain(partition.device_kernels.iter().map(|function| {
-            let entry = program
+            let entry = validated
                 .function_by_id(*function)
                 .map(|function| kernel_entry_name(function, interner));
             PartitionMember {
@@ -544,7 +544,7 @@ pub fn derive_partition_record_with_metadata(
             .kernels
             .iter()
             .map(|kernel| {
-                program.function_by_id(*kernel).map_or_else(
+                validated.function_by_id(*kernel).map_or_else(
                     || format!("kernel{}", kernel.0),
                     |function| kernel_entry_name(function, interner),
                 )
@@ -557,7 +557,7 @@ pub fn derive_partition_record_with_metadata(
         });
         // The callsite mapping: every call statement of the host function
         // that targets a member kernel of this region (typed MIR fact).
-        if let Some(host) = program.function_by_id(call.host) {
+        if let Some(host) = validated.function_by_id(call.host) {
             for block in &host.blocks {
                 for (statement_index, statement) in block.statements.iter().enumerate() {
                     let MirStatementKind::Call { callee, .. } = &statement.kind else {

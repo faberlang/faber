@@ -11,8 +11,8 @@ use crate::device::{
 };
 use crate::visit::MirVisitor;
 use crate::{
-    MirBlock, MirBlockId, MirFunction, MirFunctionId, MirGenericBindings, MirLocal, MirLocalId,
-    MirParam, MirProgram, MirTemp, MirTempId, MirType, MirValueId,
+    MirBlock, MirBlockId, MirFunction, MirFunctionId, MirFunctionIndex, MirGenericBindings,
+    MirLocal, MirLocalId, MirParam, MirProgram, MirTemp, MirTempId, MirType, MirValueId,
 };
 use radix_hir::DefId;
 use radix_lexer::Span;
@@ -38,6 +38,7 @@ use rustc_hash::{FxHashMap, FxHashSet};
 /// must clone the context, modify the clone, and construct a fresh token.
 pub struct ValidatedMir<'a> {
     program: MirProgram,
+    function_index: MirFunctionIndex,
     validation: MirValidationContext<'a>,
 }
 
@@ -53,6 +54,7 @@ impl Clone for ValidatedMir<'_> {
     fn clone(&self) -> Self {
         Self {
             program: self.program.clone(),
+            function_index: self.function_index.clone(),
             validation: self.validation.clone(),
         }
     }
@@ -71,6 +73,7 @@ impl<'a> ValidatedMir<'a> {
         context.rebuild_variant_positions();
         validate_program(&program, &context)?;
         Ok(Self {
+            function_index: program.function_index(),
             program,
             validation: context,
         })
@@ -115,6 +118,7 @@ impl<'a> ValidatedMir<'a> {
         context.rebuild_variant_positions();
         validate_program_with_device_roles_and_metadata(&program, &context, roles, metadata)?;
         Ok(Self {
+            function_index: program.function_index(),
             program,
             validation: context,
         })
@@ -124,6 +128,12 @@ impl<'a> ValidatedMir<'a> {
     #[must_use]
     pub fn program(&self) -> &MirProgram {
         &self.program
+    }
+
+    /// Resolve a function through the immutable index captured with validation.
+    #[must_use]
+    pub fn function_by_id(&self, id: MirFunctionId) -> Option<&MirFunction> {
+        self.program.indexed_function(&self.function_index, id)
     }
 
     /// The proving validation context consumed during construction.

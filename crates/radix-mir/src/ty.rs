@@ -10,7 +10,8 @@
 //! gathering produce side effects beyond the result type).
 
 use crate::{
-    MirConstant, MirFunctionId, MirLocalId, MirPlace, MirPlaceBase, MirProgram, MirTempId, MirType,
+    MirConstant, MirFunctionId, MirFunctionIndex, MirLocalId, MirPlace, MirPlaceBase, MirProgram,
+    MirTempId, MirType,
 };
 use radix_types::{IndexExpr, NumericWidth, Primitive, Type, TypeId, TypeTable};
 
@@ -127,6 +128,20 @@ pub fn constant_ty(
     types: &TypeTable,
     program: &MirProgram,
 ) -> Result<MirType, MirTypeError> {
+    let function_index = program.function_index();
+    constant_ty_with_index(constant, types, program, &function_index)
+}
+
+/// Resolve a constant using a caller-owned function-id index.
+///
+/// This is the repeated-lookup form used by immutable backend probes. The
+/// compatibility [`constant_ty`] wrapper remains for one-shot raw callers.
+pub fn constant_ty_with_index(
+    constant: &MirConstant,
+    types: &TypeTable,
+    program: &MirProgram,
+    function_index: &MirFunctionIndex,
+) -> Result<MirType, MirTypeError> {
     let primitive = match constant {
         MirConstant::Int(_) => Primitive::Numerus,
         MirConstant::UInt(_) => {
@@ -146,7 +161,7 @@ pub fn constant_ty(
         MirConstant::Octeti(_) => Primitive::Octeti,
         MirConstant::Regex { .. } => Primitive::Regex,
         MirConstant::Function(id) => {
-            return program.function_by_id(*id).map_or_else(
+            return program.indexed_function(function_index, *id).map_or_else(
                 || Err(MirTypeError::unknown_function(*id)),
                 |function| Ok(function.return_ty),
             );

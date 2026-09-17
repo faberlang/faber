@@ -469,7 +469,7 @@ pub fn build_device_program(
         param_updates,
     );
     for function_id in &ordered_ids {
-        let function = folded_program
+        let function = folded
             .function_by_id(*function_id)
             .expect("selected function ids came from the validated MIR");
         builder.build_function(function)?;

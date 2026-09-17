@@ -752,12 +752,13 @@ pub fn validate_boundary_abi(
     calls: &[BoundaryCall],
     validation: &MirValidationContext<'_>,
 ) -> Result<(), BoundaryAbiError> {
+    let function_index = program.function_index();
     for call in calls {
-        let Some(host_function) = program.function_by_id(call.host) else {
+        let Some(host_function) = program.indexed_function(&function_index, call.host) else {
             continue;
         };
         for &kernel in &call.region.kernels {
-            let Some(kernel_function) = program.function_by_id(kernel) else {
+            let Some(kernel_function) = program.indexed_function(&function_index, kernel) else {
                 continue;
             };
             validate_host_calls(host_function, kernel_function, program, validation)?;
