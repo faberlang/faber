@@ -62,8 +62,6 @@ mod packed_negative_matrix;
 mod param_mode_test;
 /// Shared statement/value read analysis for device-program lowering.
 mod read_analysis;
-#[allow(dead_code)]
-mod tensor_bracket;
 
 /// Shared lista→tensor shape helpers used by validation and the MIR runner.
 pub mod lista_tensor_conversio;

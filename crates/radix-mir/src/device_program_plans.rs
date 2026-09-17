@@ -31,7 +31,7 @@ use crate::{
 };
 use radix_types::{NumericWidth, Primitive, Type, TypeId};
 use rustc_hash::FxHashMap;
-use std::{borrow::Borrow, fmt};
+use std::fmt;
 
 /// A typed plan-mapping failure (contract resolution, operand shapes, or a
 /// recipe mismatch). Carries a stable message; the emitters map it onto their
@@ -1835,35 +1835,23 @@ impl ExecutorPlanExtensionV2 {
 /// # Errors
 /// Returns `ExecutorPlanV2Error` when any allocation, view, or launch binding
 /// fails validation against the typed program.
-pub fn executor_plan_extension_v2<B: Borrow<ExecutorPlanV2Facts>>(
+pub fn executor_plan_extension_v2(
     program: &DeviceProgram,
-    facts: B,
+    facts: ExecutorPlanV2Facts,
 ) -> Result<ExecutorPlanExtensionV2, ExecutorPlanV2Error> {
-    let facts = facts.borrow();
     facts.validate_for_program(program)?;
     let static_plan = executor_plan_extension(program);
     let extension = ExecutorPlanExtensionV2 {
         abi_version: EXECUTOR_PLAN_RUNTIME_BIND_ABI_VERSION,
         selections: static_plan.selections,
-        allocations: facts.allocations.clone(),
-        views: facts.views.clone(),
-        launch_bindings: facts.launch_bindings.clone(),
+        allocations: facts.allocations,
+        views: facts.views,
+        launch_bindings: facts.launch_bindings,
     };
     extension
         .validate_for_kernel_count(program.kernels.len())
         .map_err(|detail| ExecutorPlanV2Error::SelectionSkew { detail })?;
     Ok(extension)
-}
-
-/// Descriptive alias for callers at the runtime-binding seam.
-///
-/// # Errors
-/// Returns `ExecutorPlanV2Error` when the v2 producer rejects the program.
-pub fn executor_plan_extension_with_runtime_bindings<B: Borrow<ExecutorPlanV2Facts>>(
-    program: &DeviceProgram,
-    facts: B,
-) -> Result<ExecutorPlanExtensionV2, ExecutorPlanV2Error> {
-    executor_plan_extension_v2(program, facts)
 }
 
 /// One typed buffer slot in a launch descriptor.
@@ -2750,15 +2738,25 @@ pub fn contract_shape_signature(
             workgroup_x,
             partials,
         } => {
-            let reduce_op = if is_recipe_op_scan(function, MirCollectionOp::TensorMean) {
-                MirCollectionOp::TensorMean
-            } else if is_recipe_op_scan(function, MirCollectionOp::TensorMax) {
-                MirCollectionOp::TensorMax
-            } else if is_recipe_op_scan(function, MirCollectionOp::TensorMin) {
-                MirCollectionOp::TensorMin
-            } else {
-                MirCollectionOp::Sum
-            };
+            let mut reduce_op = MirCollectionOp::Sum;
+            find_collection_call(function, |op, _, _| {
+                match op {
+                    MirCollectionOp::TensorMean => reduce_op = MirCollectionOp::TensorMean,
+                    MirCollectionOp::TensorMax if reduce_op != MirCollectionOp::TensorMean => {
+                        reduce_op = MirCollectionOp::TensorMax;
+                    }
+                    MirCollectionOp::TensorMin
+                        if !matches!(
+                            reduce_op,
+                            MirCollectionOp::TensorMean | MirCollectionOp::TensorMax
+                        ) =>
+                    {
+                        reduce_op = MirCollectionOp::TensorMin;
+                    }
+                    _ => {}
+                }
+                None::<()>
+            });
             let operand_ty = recipe_operand_ty(function, reduce_op)?;
             let element_ty = tensor_element_ty(operand_ty, validation)?;
             signature.input = storage_input(0, element_ty, length);
@@ -2926,11 +2924,10 @@ pub fn contract_shape_signature(
         // generic 1D dispatch — a rows grid would under-cover the extra
         // output writes (the R6 P1 union-dispatch law).
         CollectionOpContract::RowReduction { rows, width } => {
-            let op = if is_recipe_op_scan(function, MirCollectionOp::TensorRmsNorm) {
-                MirCollectionOp::TensorRmsNorm
-            } else {
-                MirCollectionOp::TensorCausalMaskedSoftmax
-            };
+            let op = find_collection_call(function, |op, _, _| {
+                (op == MirCollectionOp::TensorRmsNorm).then_some(op)
+            })
+            .unwrap_or(MirCollectionOp::TensorCausalMaskedSoftmax);
             let operand_ty = recipe_operand_ty(function, op)?;
             let element_ty = tensor_element_ty(operand_ty, validation)?;
             let extent = rows.saturating_mul(width);
@@ -3924,12 +3921,6 @@ fn function_local_ty(
             "subchain output local {local:?} has no type in the subchain body"
         ))
     })
-}
-
-/// Whether the body's op-set scan carries the given recipe op (the
-/// reduction-operator disambiguation for [`contract_shape_signature`]).
-fn is_recipe_op_scan(function: &MirFunction, op: MirCollectionOp) -> bool {
-    first_collection_call(function, |found| found == op).is_some()
 }
 
 // ---------------------------------------------------------------------------

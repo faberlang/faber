@@ -4224,7 +4224,7 @@ fn v2_facts_for_elementwise() -> ExecutorPlanV2Facts {
 fn runtime_bindings_emit_v2_with_typed_sources_and_views() {
     let program = elementwise_device_program();
     let facts = v2_facts_for_elementwise();
-    let extension = executor_plan_extension_v2(&program, &facts)
+    let extension = executor_plan_extension_v2(&program, facts)
         .expect("typed allocation/view facts should produce a v2 plan");
 
     assert_eq!(
@@ -4258,7 +4258,7 @@ fn overflowing_view_span_fails_before_v2_emission() {
         static_base: 0,
         maximum_span: u64::MAX,
     };
-    let error = executor_plan_extension_v2(&program, &facts)
+    let error = executor_plan_extension_v2(&program, facts)
         .expect_err("overflowing logical span must be rejected before emission");
     assert!(
         error.to_string().contains("overflows"),
@@ -4272,7 +4272,7 @@ fn overflowing_launch_span_fails_before_v2_emission() {
     let mut facts = v2_facts_for_elementwise();
     facts.launch_bindings[0].byte_offset = u64::MAX - 1;
     facts.launch_bindings[0].view_span = 2;
-    let error = executor_plan_extension_v2(&program, &facts)
+    let error = executor_plan_extension_v2(&program, facts)
         .expect_err("overflowing launch span must be rejected before emission");
     assert!(
         error.to_string().contains("overflows"),
@@ -4285,7 +4285,7 @@ fn untagged_static_sources_do_not_claim_v2_runtime_bindings() {
     let program = elementwise_device_program();
     let mut facts = v2_facts_for_elementwise();
     facts.launch_bindings[0].runtime_source = ExecutorPlanSource::constant(UniformType::U32, 7);
-    let error = executor_plan_extension_v2(&program, &facts)
+    let error = executor_plan_extension_v2(&program, facts)
         .expect_err("a static-only binding set must stay on the v1 producer");
     assert_eq!(error, ExecutorPlanV2Error::MissingRuntimeSource);
 }
