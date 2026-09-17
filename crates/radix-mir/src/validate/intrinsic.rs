@@ -29,27 +29,11 @@ struct TensorNormFlags {
     beta: bool,
 }
 
-#[derive(Clone, Copy)]
-enum TensorConstExemption {
-    None,
-    ShapeSize,
-}
-
-impl TensorConstExemption {
-    fn applies(self, constant: &MirConstant) -> bool {
-        match self {
-            Self::None => false,
-            Self::ShapeSize => matches!(constant, MirConstant::ShapeSize { .. }),
-        }
-    }
-}
-
 struct TensorConstValidation {
     kind: TensorConstKind,
     label: &'static str,
     name: &'static str,
     message: &'static str,
-    exemption: TensorConstExemption,
 }
 
 struct TensorNormSpec {
@@ -1773,9 +1757,6 @@ impl Validator<'_, '_> {
         let MirOperand::Constant(constant) = arg else {
             return;
         };
-        if validation.exemption.applies(constant) {
-            return;
-        }
         match (validation.kind, constant) {
             (TensorConstKind::Int, MirConstant::Int(_))
             | (TensorConstKind::Float, MirConstant::Float(_)) => predicate(self, constant),
@@ -1806,7 +1787,6 @@ impl Validator<'_, '_> {
                 label,
                 name: "axis",
                 message: "an int constant or temp",
-                exemption: TensorConstExemption::None,
             },
             |this: &mut Self, constant: &MirConstant| {
                 let MirConstant::Int(axis_val) = constant else {
@@ -1838,7 +1818,6 @@ impl Validator<'_, '_> {
                 label,
                 name: "epsilon",
                 message: "a float constant or temp",
-                exemption: TensorConstExemption::None,
             },
             |this: &mut Self, constant: &MirConstant| {
                 let MirConstant::Float(f) = constant else {
@@ -1869,7 +1848,6 @@ impl Validator<'_, '_> {
                 label: "rope",
                 name: "pos",
                 message: "an int constant or temp",
-                exemption: TensorConstExemption::None,
             },
             |this: &mut Self, constant: &MirConstant| {
                 let MirConstant::Int(pos_val) = constant else {
