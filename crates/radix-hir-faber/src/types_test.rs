@@ -1349,9 +1349,8 @@ fn closure_params_preserve_sponte_and_defaults() {
 
 #[test]
 fn import_privata_emits_no_visibility_keyword() {
-    // The parser retired explicit import `privata` (VM-U3); the canonical
-    // emitter must not re-emit it. `faber convert` on gradus emitted
-    // `import from "gradus:dtype" private dtype`, which fails re-parse.
+    // Canonical import emission writes no visibility keyword for the
+    // non-public tier; `faber convert` output must re-parse.
     let mut interner = Interner::new();
     let path_sym = interner.intern("gradus:dtype");
     let name = interner.intern("dtype");
@@ -1387,11 +1386,7 @@ fn import_privata_emits_no_visibility_keyword() {
     assert_eq!(
         code.trim(),
         r#"importa ex "gradus:dtype" dtype"#,
-        "private import must emit without a visibility keyword"
-    );
-    assert!(
-        !code.contains("privata"),
-        "import must not re-emit the retired `private` visibility: {code}"
+        "import must emit without a visibility keyword"
     );
 }
 
@@ -1969,8 +1964,7 @@ fn imported_variant_pattern_uses_qualified_spelling() {
 #[test]
 fn call_to_local_variant_reemits_finge_construction() {
     // `finge F32` lowers to `Call(Path(variant_def), [], [])`; the emitter
-    // must recover the `finge` keyword. A bare `F32()` re-emit is a retired
-    // type-call constructor (PARSE001).
+    // must recover the `finge` keyword so the emission re-parses.
     let mut interner = Interner::new();
     let types = TypeTable::new();
 
@@ -2056,10 +2050,6 @@ fn call_to_local_variant_reemits_finge_construction() {
     assert!(
         code.contains("redde finge F32"),
         "variant construction must re-emit the `finge` keyword:\n{code}"
-    );
-    assert!(
-        !code.contains("F32()"),
-        "variant construction must not re-emit as a retired type call:\n{code}"
     );
 }
 

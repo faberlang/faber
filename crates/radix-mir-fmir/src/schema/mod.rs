@@ -152,8 +152,8 @@ pub const ARTIFACT_ABI_VERSION: u32 = 8;
 /// projection** (`axis_extent` + `inner_stride`) so consumers never
 /// reconstruct the reduced-buffer mapping from element count), and `8 → 9`
 /// by GEA3-A2f: the fixed composed matmul wire variant was carried as a
-/// transitional shape. The `9 → 10` kernel-codegen break retired that
-/// variant (generic multi-child programs are the sole representation).
+/// transitional shape; `9 → 10` (kernel-codegen) makes generic multi-child
+/// programs the sole representation.
 /// The current kernel-codegen clean break is `10 → 11` (S2): the batched
 /// plan variants — `BatchedTiledMatMul` (U1), `BatchedRowSoftmax` (U2),
 /// `BatchedTranspose` (U3) — landed as new wire enum variants inside

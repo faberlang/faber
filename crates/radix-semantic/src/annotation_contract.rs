@@ -973,9 +973,8 @@ fn is_compiler_owned_family(name: &str) -> bool {
             | "imperia"
             | "json"
             | "versio"
-            // Shader and doc families. The retired external-binding family is
-            // deliberately not allowed here — the retired-surface guardrail
-            // rejects active references to it.
+            // Shader and doc families. External-binding spellings are absent
+            // from this allowlist, so active references are rejected.
             | "vertex"
             | "fragment"
             | "shader_contract"
