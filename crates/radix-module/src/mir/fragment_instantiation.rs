@@ -13,7 +13,7 @@ use crate::lexer::Span;
 use crate::mir::{
     MirCallee, MirDeviceRole, MirFunction, MirFunctionId, MirFunctionOrigin, MirKernelShaderStage, MirLayoutTable,
     MirMonomorphization, MirOperand, MirParamMode, MirPlace, MirPlaceBase, MirStatementKind, MirTerminatorKind,
-    MirType, type_contains_param,
+    MirType, MirValueId, type_contains_param,
 };
 use crate::semantic::{
     Primitive, Type, TypeId, TypeTable,
@@ -95,8 +95,29 @@ pub fn check_with_metadata(
     summaries: Option<&FragmentEffectTable>,
     metadata: &MirDeviceFunctionMetadataMap,
 ) -> Vec<FragmentInstantiationError> {
+    let mut functions_by_id = FxHashMap::with_capacity_and_hasher(functions.len(), rustc_hash::FxBuildHasher);
+    let mut functions_by_source = FxHashMap::default();
+    let mut value_types = FxHashMap::default();
+    for function in functions {
+        functions_by_id.entry(function.id).or_insert(function);
+        if let Some(source) = function.source {
+            functions_by_source.entry(source).or_insert(function);
+        }
+        for block in &function.blocks {
+            for statement in &block.statements {
+                if let MirStatementKind::Assign { value, .. } = &statement.kind {
+                    value_types
+                        .entry((function.id, value.id))
+                        .or_insert(value.ty);
+                }
+            }
+        }
+    }
     let mut checker = InstantiationChecker {
         functions,
+        functions_by_id,
+        functions_by_source,
+        value_types,
         monomorphizations,
         layouts,
         types,
@@ -111,6 +132,9 @@ pub fn check_with_metadata(
 
 struct InstantiationChecker<'a> {
     functions: &'a [MirFunction],
+    functions_by_id: FxHashMap<MirFunctionId, &'a MirFunction>,
+    functions_by_source: FxHashMap<DefId, &'a MirFunction>,
+    value_types: FxHashMap<(MirFunctionId, MirValueId), MirType>,
     monomorphizations: &'a [MirMonomorphization],
     layouts: &'a MirLayoutTable,
     types: &'a TypeTable,
@@ -406,11 +430,7 @@ impl<'a> InstantiationChecker<'a> {
                 .iter()
                 .find(|mono| mono.key.source == *source && (type_args.is_empty() || &mono.key.type_args == type_args))
                 .and_then(|mono| self.function_by_id(mono.function))
-                .or_else(|| {
-                    self.functions
-                        .iter()
-                        .find(|function| function.source == Some(*source))
-                })?,
+                .or_else(|| self.functions_by_source.get(source).copied())?,
             MirCallee::Closure(_) | MirCallee::Value(_) => return None,
         };
         Some((function.id, self.role_of_function(function), function.span))
@@ -442,19 +462,14 @@ impl<'a> InstantiationChecker<'a> {
     }
 
     fn function_by_id(&self, id: MirFunctionId) -> Option<&'a MirFunction> {
-        self.functions.iter().find(|function| function.id == id)
+        self.functions_by_id.get(&id).copied()
     }
 
     fn operand_ty(&self, function: &MirFunction, operand: &MirOperand) -> Option<MirType> {
         match operand {
             MirOperand::Place(place) => self.place_ty(function, place),
             MirOperand::Temp(id) => function.temp_ty(*id),
-            MirOperand::Value(id) => function.blocks.iter().find_map(|block| {
-                block.statements.iter().find_map(|stmt| match &stmt.kind {
-                    MirStatementKind::Assign { value, .. } if value.id == *id => Some(value.ty),
-                    _ => None,
-                })
-            }),
+            MirOperand::Value(id) => self.value_types.get(&(function.id, *id)).copied(),
             MirOperand::Constant(_) => None,
         }
     }
