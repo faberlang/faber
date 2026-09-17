@@ -788,6 +788,16 @@ def source_lexicon_rows(source_text: str) -> list[tuple[str, str, str]]:
 
 def canonical_source_grammar(source_text: str, source_path: Path) -> Grammar:
     grammar = parse_source(source_text, path=display_path(source_path))
+    retired = [
+        production.name
+        for production in grammar.productions
+        if "formerly" in production.metadata
+    ]
+    if retired:
+        raise ValueError(
+            f"retired @formerly annotation in {display_path(source_path)} "
+            f"on {len(retired)} production(s); remove all @formerly annotations"
+        )
     payload = validate_dialect(grammar)
     if not payload["ok"]:
         raise ValueError(
@@ -805,7 +815,6 @@ def jsonl_records(
     keyword_counts = keyword_literals(grammar)
     records: list[dict[str, object]] = []
     for production in grammar.productions:
-        formerly = production.metadata.get("formerly", [])
         record = {
             "schema": TRIPLE_SCHEMA,
             "grammar": grammar.grammar_n,
@@ -815,7 +824,6 @@ def jsonl_records(
             "line": production.line,
             "rhs": " ".join(production.rhs.split()),
             "status": (production.metadata.get("status") or ["live"])[-1],
-            "formerly": formerly,
             "keywords": sorted(
                 literal
                 for literal in rhs_literals(production.rhs)
@@ -850,9 +858,6 @@ def grammar_fence(grammar: Grammar) -> str:
         if production.region != "rewrite"
     ]
     for index, production in enumerate(ordered, start=1):
-        if production.metadata.get("formerly"):
-            aliases = ", ".join(production.metadata["formerly"])
-            lines.append(f"# formerly: {aliases}")
         rhs = " ".join(production.rhs.split())
         lines.append(f"# [{index:03d}] {production.name}")
         lines.append(f"{production.name} ::= {rhs}".rstrip())
@@ -1195,16 +1200,15 @@ def render_identity(
         [
             "## Production Index {#production-index}",
             "",
-            "| ID | Anchor | Status | Former names |",
-            "|---|---|---|---|",
+            "| ID | Anchor | Status |",
+            "|---|---|---|",
         ]
     )
     for production in grammar.productions:
         status = (production.metadata.get("status") or ["live"])[-1]
-        former = ", ".join(production.metadata.get("formerly", [])) or "—"
         anchor = production_anchor(production.name)
         lines.append(
-            f"| [`{production.name}`](#{anchor}) | `#{anchor}` | {status} | {former} |"
+            f"| [`{production.name}`](#{anchor}) | `#{anchor}` | {status} |"
         )
     lines.extend(["", "## Lexicon Appendix {#lexicon}", ""])
     lines.extend(
