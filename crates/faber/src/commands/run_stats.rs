@@ -12,13 +12,13 @@ use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 pub(crate) const STATS_MARKER: &str = "--- faber-run-stats ---";
-const FORMAT_VERSION: u32 = 1;
-const ROUTE: &str = "scena";
-const CLOCK: &str = "monotonic-ns";
-const DURATION_METHOD: &str = "reservoir";
-const DURATION_SIZE: u32 = 256;
-const SELF_TIME: &str = "child-subtracted via call stack";
-const NOTE: &str = "diagnostic only — never a bench-gate input";
+pub(crate) const FORMAT_VERSION: u32 = 1;
+pub(crate) const ROUTE: &str = "scena";
+pub(crate) const CLOCK: &str = "monotonic-ns";
+pub(crate) const DURATION_METHOD: &str = "reservoir";
+pub(crate) const DURATION_SIZE: u32 = 256;
+pub(crate) const SELF_TIME: &str = "child-subtracted via call stack";
+pub(crate) const NOTE: &str = "diagnostic only — never a bench-gate input";
 
 /// The binding's `format_version: 1` runner artifact.
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
