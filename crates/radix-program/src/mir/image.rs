@@ -227,7 +227,7 @@ pub(super) fn fmir_package_image_from_lowered(
         exit_code: prepared.cli_exit_code,
         types,
         interner,
-        program: lowered.program.clone(),
+        program: lowered.validated.program().clone(),
         device,
         source_hashes,
         validation: snapshot_validation_metadata(lowered.validated.validation()),
@@ -496,12 +496,13 @@ pub(super) fn package_fmir_text_image(
     package_root: &Path,
     seams: &MirSeams,
 ) -> Result<String, Vec<Diagnostic>> {
-    let program_json = serde_json::to_string_pretty(&lowered.program).map_err(|error| {
-        vec![mir_diag(
-            &prepared.entry_path,
-            format!("could not encode fmir-text program: {error}"),
-        )]
-    })?;
+    let program_json =
+        serde_json::to_string_pretty(&lowered.validated.program()).map_err(|error| {
+            vec![mir_diag(
+                &prepared.entry_path,
+                format!("could not encode fmir-text program: {error}"),
+            )]
+        })?;
     let image = fmir_image_header(
         prepared,
         lowered,
@@ -525,7 +526,7 @@ pub(super) fn package_fmir_binary_image(
     seams: &MirSeams,
 ) -> Result<Vec<u8>, Vec<Diagnostic>> {
     let image = fmir_image_header(prepared, lowered, package_root, FMIR_TARGET_NAME, seams)?
-        .into_binary_image(lowered.program.clone());
+        .into_binary_image(lowered.validated.program().clone());
     encode_binary_image(&image).map_err(|error| {
         vec![mir_diag(
             &prepared.entry_path,

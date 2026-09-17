@@ -23,7 +23,8 @@ fn initializer_shape(source: &str, function_name: &str, names: &[&str]) -> Vec<S
         .expect("fixture analyzes");
     let lowered = lower_analyzed_unit(&mut unit, MirLoweringOptions::default()).expect("fixture lowers to MIR");
     let function = lowered
-        .program
+        .validated
+        .program()
         .functions
         .iter()
         .find(|function| {
@@ -110,7 +111,7 @@ fn assert_lowered_and_valid(source: &str) {
     let mut unit = analyze_source(&session(), "itera-destructure.fab", source, AnalyzeRequest::default())
         .expect("fixture analyzes");
     let lowered = lower_analyzed_unit(&mut unit, MirLoweringOptions::default()).expect("fixture lowers to MIR");
-    validate_program(&lowered.program, lowered.validated.validation()).expect("fixture MIR validates");
+    validate_program(&lowered.validated.program(), lowered.validated.validation()).expect("fixture MIR validates");
 }
 
 fn run(source: &str) -> Vec<String> {

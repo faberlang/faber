@@ -135,14 +135,16 @@ pub fn with_linked_test_package_mir<R>(
         &cli_plan,
         config.no_fuse,
     )?;
-    canonicalize_direct_definition_callees(&mut lowered, &anchor_path)?;
-    validate_program(&lowered.program, lowered.validated.validation()).map_err(|errors| {
-        errors
-            .into_iter()
-            .map(|error| mir_lowering_diag(&anchor_path, error.message))
-            .collect::<Vec<_>>()
-    })?;
-    bridge_norma_providers_to_kernel(&mut lowered, &anchor_path)?;
+    lowered = canonicalize_direct_definition_callees(lowered, &anchor_path)?;
+    validate_program(lowered.validated.program(), lowered.validated.validation()).map_err(
+        |errors| {
+            errors
+                .into_iter()
+                .map(|error| mir_lowering_diag(&anchor_path, error.message))
+                .collect::<Vec<_>>()
+        },
+    )?;
+    lowered = bridge_norma_providers_to_kernel(lowered, &anchor_path)?;
     let function_ids = linked_test_function_ids(&lowered, &links, scope, &anchor_path)?;
     Ok(run(&lowered.validated, &function_ids))
 }
@@ -301,15 +303,17 @@ fn prepare_package_mir<R>(
     // boundary-ABI lane only admits direct-call shapes, so unambiguous
     // single-target definition edges are canonicalized to `Function` callees
     // before the final validation gate.
-    canonicalize_direct_definition_callees(&mut lowered, &entry_path)?;
-    validate_program(&lowered.program, lowered.validated.validation()).map_err(|errors| {
-        errors
-            .into_iter()
-            .map(|error| mir_lowering_diag(&entry_path, error.message))
-            .collect::<Vec<_>>()
-    })?;
+    lowered = canonicalize_direct_definition_callees(lowered, &entry_path)?;
+    validate_program(lowered.validated.program(), lowered.validated.validation()).map_err(
+        |errors| {
+            errors
+                .into_iter()
+                .map(|error| mir_lowering_diag(&entry_path, error.message))
+                .collect::<Vec<_>>()
+        },
+    )?;
     if consumer == PackageMirConsumer::Interpreted {
-        bridge_norma_providers_to_kernel(&mut lowered, &entry_path)?;
+        lowered = bridge_norma_providers_to_kernel(lowered, &entry_path)?;
     }
     let runtime_requirements = collect_package_runtime_requirements(&lowered, &cli_plan);
     let device_config = device_config()?;
@@ -443,7 +447,8 @@ fn linked_test_function_ids(
             .copied()
             .unwrap_or(*original);
         let matches = lowered
-            .program
+            .validated
+            .program()
             .functions
             .iter()
             .filter(|function| function.source == Some(source))
@@ -527,63 +532,79 @@ pub(super) fn is_bridged_norma_import_path(path: &str) -> bool {
 ///
 /// RETIRE: delete this pass once core-stdlib Stage 8 routes `norma:*` over
 /// `ad` to the Rust frame runtime in the runner.
-pub(super) fn bridge_norma_providers_to_kernel(
-    lowered: &mut LoweredMirUnit,
+pub(super) fn bridge_norma_providers_to_kernel<'a>(
+    lowered: LoweredMirUnit<'a>,
     entry_path: &Path,
-) -> Result<(), Vec<Diagnostic>> {
+) -> Result<LoweredMirUnit<'a>, Vec<Diagnostic>> {
     let Some(interner) = lowered.validated.validation().interner else {
         return Err(vec![mir_diag(
             entry_path,
             "package MIR kernel bridge requires interner context",
         )]);
     };
-    let mut diagnostics = Vec::new();
-    for function in &mut lowered.program.functions {
-        for block in &mut function.blocks {
-            for statement in &mut block.statements {
-                let MirStatementKind::RuntimeCall { call, .. } = &mut statement.kind else {
-                    continue;
-                };
-                let MirRuntimeCall {
-                    intrinsic: MirIntrinsic::Provider(provider),
-                    ..
-                } = call
-                else {
-                    continue;
-                };
-                if !matches!(provider.kind, MirProviderKind::Package) {
-                    continue;
-                }
-                let Some(path_symbol) = provider.module.first() else {
-                    continue;
-                };
-                let Some(norma_module) = interner.resolve(*path_symbol).strip_prefix("norma:")
-                else {
-                    continue;
-                };
-                let Some(module) = radix_module::kernel::resolve_kernel_module_name(norma_module)
-                else {
-                    // Non-manifest `norma:*` stays as Package; the runner's
-                    // `host.provider()` reports it unsupported.
-                    continue;
-                };
-                let verb = interner.resolve(provider.name);
-                if radix_module::kernel::kernel_module_supports_verb(module, verb) {
-                    provider.kind = MirProviderKind::Kernel(module);
-                } else {
-                    diagnostics.push(mir_diag(
-                        entry_path,
-                        format!(
-                            "package MIR kernel bridge does not support `norma:{norma_module}.{verb}`; use compiled package execution for this surface"
-                        ),
-                    ));
+    lowered
+        .patch_program(|program| {
+            let mut diagnostics = Vec::new();
+            for function in &mut program.functions {
+                for block in &mut function.blocks {
+                    for statement in &mut block.statements {
+                        let MirStatementKind::RuntimeCall { call, .. } = &mut statement.kind else {
+                            continue;
+                        };
+                        let MirRuntimeCall {
+                            intrinsic: MirIntrinsic::Provider(provider),
+                            ..
+                        } = call
+                        else {
+                            continue;
+                        };
+                        if !matches!(provider.kind, MirProviderKind::Package) {
+                            continue;
+                        }
+                        let Some(path_symbol) = provider.module.first() else {
+                            continue;
+                        };
+                        let Some(norma_module) = interner.resolve(*path_symbol).strip_prefix("norma:")
+                        else {
+                            continue;
+                        };
+                        let Some(module) = radix_module::kernel::resolve_kernel_module_name(norma_module)
+                        else {
+                            // Non-manifest `norma:*` stays as Package; the runner's
+                            // `host.provider()` reports it unsupported.
+                            continue;
+                        };
+                        let verb = interner.resolve(provider.name);
+                        if radix_module::kernel::kernel_module_supports_verb(module, verb) {
+                            provider.kind = MirProviderKind::Kernel(module);
+                        } else {
+                            diagnostics.push(mir_diag(
+                                entry_path,
+                                format!(
+                                    "package MIR kernel bridge does not support `norma:{norma_module}.{verb}`; use compiled package execution for this surface"
+                                ),
+                            ));
+                        }
+                    }
                 }
             }
-        }
-    }
-    if diagnostics.is_empty() {
-        Ok(())
-    } else {
-        Err(diagnostics)
-    }
+            if diagnostics.is_empty() {
+                Ok(())
+            } else {
+                Err(diagnostics)
+            }
+        })
+        .map_err(|error| {
+            error.fold(
+                |diagnostics| diagnostics,
+                |errors| {
+                    errors
+                        .into_iter()
+                        .map(|error| {
+                            mir_lowering_diag(entry_path, error.message).with_span(error.span)
+                        })
+                        .collect()
+                },
+            )
+        })
 }

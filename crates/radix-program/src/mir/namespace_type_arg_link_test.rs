@@ -109,7 +109,8 @@ fn literal_dims(
 fn first_param_shape(lowered: &LoweredMirUnit<'_>, function_name: &str) -> Option<Vec<i64>> {
     let types = lowered.validated.validation().types;
     lowered
-        .program
+        .validated
+        .program()
         .functions
         .iter()
         .filter(|function| {
@@ -130,7 +131,8 @@ fn first_param_shape(lowered: &LoweredMirUnit<'_>, function_name: &str) -> Optio
 fn named_param_shapes(lowered: &LoweredMirUnit<'_>, function_name: &str) -> Vec<Vec<i64>> {
     let types = lowered.validated.validation().types;
     lowered
-        .program
+        .validated
+        .program()
         .functions
         .iter()
         .filter(|function| {

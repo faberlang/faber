@@ -631,14 +631,14 @@ functio k(fractus<f32> x) → fractus<f32> {
         .expect("composition must succeed");
     assert!(
         surviving_fragment_calls_with_metadata(
-            &lowered.program.functions,
+            &lowered.validated.program().functions,
             &[],
             &roles,
             &MirDeviceFunctionMetadataMap::default(),
         )
         .is_empty(),
         "no fragment call may survive lowering: {:#?}",
-        lowered.program.functions
+        lowered.validated.program().functions
     );
 }
 
@@ -971,17 +971,18 @@ functio k(fractus<f32> x) → fractus<f32> {
         .expect("kernel helper must compose");
     assert!(
         surviving_fragment_calls_with_metadata(
-            &lowered.program.functions,
+            &lowered.validated.program().functions,
             &[],
             &roles,
             &MirDeviceFunctionMetadataMap::default(),
         )
         .is_empty(),
         "no device call may survive lowering: {:#?}",
-        lowered.program.functions
+        lowered.validated.program().functions
     );
     let kernel_symbols = lowered
-        .program
+        .validated
+        .program()
         .functions
         .iter()
         .filter(|function| {
@@ -991,9 +992,10 @@ functio k(fractus<f32> x) → fractus<f32> {
         })
         .count();
     assert_eq!(
-        kernel_symbols, 1,
+        kernel_symbols,
+        1,
         "only the uncalled entry kernel may remain; the composed helper is pruned: {:#?}",
-        lowered.program.functions
+        lowered.validated.program().functions
     );
 }
 
@@ -1199,7 +1201,8 @@ functio k(fractus<f32> x) → fractus<f32> {
     let lowered = crate::mir::lower_analyzed_unit(&mut analysis, MirLoweringOptions::default())
         .expect("composition must succeed");
     let kernel = lowered
-        .program
+        .validated
+        .program()
         .functions
         .iter()
         .find(|function| {

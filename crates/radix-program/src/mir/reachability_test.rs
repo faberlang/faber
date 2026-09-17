@@ -61,7 +61,8 @@ reachlib = "1.0.0"
 /// imports, so synthetic sources are exactly the linked library's).
 fn library_function_names(lowered: &LoweredMirUnit<'_>) -> Vec<String> {
     lowered
-        .program
+        .validated
+        .program()
         .functions
         .iter()
         .filter(|function| {

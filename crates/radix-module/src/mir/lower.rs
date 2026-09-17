@@ -55,6 +55,7 @@ use crate::mir::{
 };
 use crate::semantic::{ConversionPair, IndexExpr, IndexId, NumericWidth, Primitive, Type, TypeId, TypeTable};
 use radix_mir::device::{MirDeviceFunctionMetadata, MirDeviceFunctionMetadataMap, is_public_entry};
+use radix_mir::validate::PatchProgramError;
 use radix_types::{MirCollectionOp, MirKernelBuiltin};
 use rustc_hash::{FxHashMap, FxHashSet};
 use std::sync::Arc;
@@ -162,9 +163,6 @@ fn mir_lower_issue(prefix: &str, detail: &str) -> String {
 
 /// MIR output plus the proving validated-MIR token and auxiliary lowering data.
 pub struct LoweredMirUnit<'a> {
-    /// Unvalidated program copy for backward-compat mutation (driver post-lower patches).
-    /// Prefer [`Self::validated`] for any path that feeds MIR entry points.
-    pub program: MirProgram,
     /// Complete symbol table after lowering-added runtime and diagnostic symbols.
     pub interner: Interner,
     pub monomorphizations: Vec<MirMonomorphization>,
@@ -173,7 +171,7 @@ pub struct LoweredMirUnit<'a> {
     /// device functions. Consumers must use this carrier rather than infer
     /// private status from a missing source definition or compute stage alone.
     pub device_function_metadata: MirDeviceFunctionMetadataMap,
-    /// Generic source bodies removed from [`Self::program`] after unit
+    /// Generic source bodies removed from [`Self::validated`] after unit
     /// monomorphization. Package linking keeps them so a later unit can
     /// instantiate a shape the defining unit never called.
     pub generic_templates: Vec<MirFunction>,
@@ -181,7 +179,7 @@ pub struct LoweredMirUnit<'a> {
     /// keyed by the template's `function.source` (rewritten to a synthetic
     /// def at package link). `is_shape` is `magnitudo`; otherwise `typus`.
     pub generic_params: Vec<(DefId, Vec<MirGenericParam>)>,
-    /// Validated MIR token: proof that `program` (or a clone of it) passed
+    /// Validated MIR token and sole owner of the program that passed
     /// [`validate_program`] against the enclosed context.
     pub validated: ValidatedMir<'a>,
     /// Owned companion-relation carrier (S3-A2): primal → companion device
@@ -206,11 +204,50 @@ pub struct LoweredMirUnit<'a> {
     pub imported_device_registrations: Vec<ImportedDeviceRegistration>,
 }
 
+impl<'a> LoweredMirUnit<'a> {
+    /// Consume this carrier, patch its unvalidated program, and return a
+    /// replacement carrier only after validation succeeds.
+    ///
+    /// # Errors
+    /// Returns only the patch or validation error; the consumed carrier and
+    /// proof token are not recoverable on rejection.
+    pub fn patch_program<E>(
+        self,
+        patch: impl FnOnce(&mut MirProgram) -> Result<(), E>,
+    ) -> Result<Self, PatchProgramError<E>> {
+        let Self {
+            interner,
+            monomorphizations,
+            closure_environments,
+            device_function_metadata,
+            generic_templates,
+            generic_params,
+            validated,
+            companions,
+            imported_device_routes,
+            imported_device_registrations,
+        } = self;
+        let validated = validated.patch_program(patch)?;
+        Ok(Self {
+            interner,
+            monomorphizations,
+            closure_environments,
+            device_function_metadata,
+            generic_templates,
+            generic_params,
+            validated,
+            companions,
+            imported_device_routes,
+            imported_device_registrations,
+        })
+    }
+}
+
 impl std::fmt::Debug for LoweredMirUnit<'_> {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         formatter
             .debug_struct("LoweredMirUnit")
-            .field("program", &self.program)
+            .field("validated", &self.validated)
             .field("monomorphizations", &self.monomorphizations)
             .field("closure_environments", &self.closure_environments)
             .field("device_function_metadata", &self.device_function_metadata)
@@ -404,14 +441,13 @@ pub fn lower_analyzed_unit(
             .iter()
             .map(|environment| (environment.id, environment.clone()))
             .collect();
-        let validated = ValidatedMir::new(program.clone(), validation).map_err(|errors| {
+        let validated = ValidatedMir::new(program, validation).map_err(|errors| {
             errors
                 .into_iter()
                 .map(|error| MirError::validation(error.span, error.message))
                 .collect::<Vec<_>>()
         })?;
         Ok(LoweredMirUnit {
-            program,
             interner,
             monomorphizations,
             closure_environments,
@@ -634,7 +670,7 @@ fn cli_type_zero_operand(interner: &mut Interner, ty: &CliType) -> MirOperand {
 /// Returns `MirError` values for unsupported HIR surfaces, missing semantic
 /// types, sealed-block misuse, and post-lowering validation failures.
 pub fn dump_analyzed_unit(unit: &mut AnalyzedModule) -> Result<String, Vec<MirError>> {
-    lower_analyzed_unit(unit, MirLoweringOptions::default()).map(|lowered| dump_program(&lowered.program))
+    lower_analyzed_unit(unit, MirLoweringOptions::default()).map(|lowered| dump_program(&lowered.validated.program()))
 }
 
 fn ensure_map_iteration_array_types(types: &mut TypeTable) {

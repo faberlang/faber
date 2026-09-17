@@ -18,7 +18,7 @@ incipit {
         .expect("analysis succeeds");
     let textus = unit.types.primitive(crate::semantic::Primitive::Textus);
     let lowered = lower_analyzed_unit(&mut unit, MirLoweringOptions::default()).expect("MIR lowering succeeds");
-    let function = &lowered.program.functions[0];
+    let function = &lowered.validated.program().functions[0];
 
     assert_eq!(function.params[0].mode, MirParamMode::Owned);
     assert_eq!(function.params[0].ty, MirType::semantic(textus));

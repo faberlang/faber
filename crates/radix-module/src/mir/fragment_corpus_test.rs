@@ -59,7 +59,7 @@ fn analyze(source: &str) -> Result<crate::driver::AnalyzedModule, Vec<Diagnostic
 fn lower(source: &str) -> Result<(crate::driver::AnalyzedModule, MirProgram), Vec<crate::mir::MirError>> {
     let mut analysis = analyze(source).unwrap_or_else(|errors| panic!("analyze must succeed: {errors:?}"));
     let lowered = crate::mir::lower_analyzed_unit(&mut analysis, MirLoweringOptions::default())?;
-    let program = lowered.program.clone();
+    let program = lowered.validated.program().clone();
     drop(lowered);
     Ok((analysis, program))
 }

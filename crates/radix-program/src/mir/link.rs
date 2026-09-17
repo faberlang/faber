@@ -2992,7 +2992,8 @@ kind = "bin"
 
     fn linked_function_id(lowered: &LoweredMirUnit<'_>, name: &str) -> MirFunctionId {
         lowered
-            .program
+            .validated
+            .program()
             .functions
             .iter()
             .find(|function| {
@@ -3020,7 +3021,7 @@ kind = "bin"
                 linked_function_id(lowered, "row_max");
                 linked_function_id(lowered, "col_max");
                 linked_function_id(lowered, "emit_cell");
-                let dump = dump_program(&lowered.program);
+                let dump = dump_program(&lowered.validated.program());
                 // The entry's only plain calls are the two extent calls plus
                 // the body call: one linked call per rewritten product source
                 // and one for the rewritten body.
