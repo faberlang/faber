@@ -310,6 +310,7 @@ pub fn lower_analyzed_unit(
         functions: Vec::new(),
         closure_environments: Vec::new(),
         device_function_metadata: MirDeviceFunctionMetadataMap::default(),
+        struct_field_types: None,
     };
     lowerer.lower();
 
@@ -768,6 +769,9 @@ struct MirLowerer<'a> {
     functions: Vec<MirFunction>,
     closure_environments: Vec<MirClosureEnvironment>,
     device_function_metadata: MirDeviceFunctionMetadataMap,
+    /// Struct field types collected during the body-lowering walk and retained
+    /// for generic monomorphization, avoiding a second HIR traversal.
+    struct_field_types: Option<Arc<FxHashMap<DefId, FxHashMap<Symbol, MirType>>>>,
 }
 
 /// MIR locals, CFG, and side-effect functions produced by one callable lowering pass.
@@ -820,6 +824,7 @@ impl<'a> MirLowerer<'a> {
         let context_maps = LoweringContextMaps::collect(self.unit);
         let struct_fields = Arc::new(struct_field_map(self.unit));
         let struct_field_types = Arc::new(context_maps.validation.struct_fields.clone());
+        self.struct_field_types = Some(Arc::clone(&struct_field_types));
         let function_params = Arc::new(function_param_map(self.unit));
         let body_ctx = BodyLoweringContext {
             context_maps: &context_maps,
