@@ -3545,7 +3545,9 @@ pub fn transformer_subchain_signature_for_emission_with_source(
     // RoPE's table resource is already part of the recipe-shaped signature;
     // mark its explicit call operand bound so generic data-flow discovery does
     // not append a duplicate input.
-    if let Some(table_local) = rope_table_local(function, op) {
+    if op.is_rope()
+        && let Some(table_local) = rope_table_local(function, op)
+    {
         if let Some(extra) = signature
             .extra_inputs
             .iter_mut()
