@@ -203,6 +203,8 @@ pub struct Scope {
     pub parent: Option<ScopeId>,
     pub kind: ScopeKind,
     pub symbols: FxHashMap<LexSymbol, ScopeEntry>,
+    /// Prior nearest-name values for bindings introduced in this frame.
+    pub shadow_deltas: Vec<(LexSymbol, Option<DefId>)>,
 }
 
 impl Scope {
@@ -213,6 +215,7 @@ impl Scope {
             parent,
             kind,
             symbols: FxHashMap::default(),
+            shadow_deltas: Vec::new(),
         }
     }
 }
@@ -2804,6 +2807,7 @@ impl Resolver {
         def_id: DefId,
         kind: SymbolKind,
     ) -> Result<(), LexSymbol> {
+        let previous = self.lookup_shadow.get(&name).copied();
         let scope = &mut self.scopes[self.current_scope.0 as usize];
         if let Some(existing) = scope.symbols.get(&name) {
             // A module import lives in the value namespace and may shadow a
@@ -2817,27 +2821,10 @@ impl Resolver {
             }
         }
         scope.symbols.insert(name, ScopeEntry { def_id, kind });
+        scope.shadow_deltas.push((name, previous));
         // Innermost binding wins for value lookup.
         self.lookup_shadow.insert(name, def_id);
         Ok(())
-    }
-
-    /// Rebuild the nearest-name shadow map from the current scope chain.
-    ///
-    /// Root-to-current walk so inner frames overwrite outer ones.
-    fn rebuild_lookup_shadow(&mut self) {
-        self.lookup_shadow.clear();
-        let mut chain = Vec::new();
-        let mut scope_id = Some(self.current_scope);
-        while let Some(id) = scope_id {
-            chain.push(id);
-            scope_id = self.scopes[id.0 as usize].parent;
-        }
-        for id in chain.into_iter().rev() {
-            for (&name, entry) in &self.scopes[id.0 as usize].symbols {
-                self.lookup_shadow.insert(name, entry.def_id);
-            }
-        }
     }
 
     /// Return the reserved builtin `forma` genus id when registered.
@@ -3141,10 +3128,22 @@ impl Resolver {
 
     /// Exit the current scope, staying at global if there is no parent.
     pub fn exit_scope(&mut self) {
-        if let Some(parent) = self.scopes[self.current_scope.0 as usize].parent {
+        let dropped_scope = self.current_scope;
+        if let Some(parent) = self.scopes[dropped_scope.0 as usize].parent {
             self.current_scope = parent;
-            // Dropping a frame can unshadow outer names — rebuild nearest map.
-            self.rebuild_lookup_shadow();
+            let deltas = std::mem::take(
+                &mut self.scopes[dropped_scope.0 as usize].shadow_deltas,
+            );
+            for (name, previous) in deltas.into_iter().rev() {
+                match previous {
+                    Some(def_id) => {
+                        self.lookup_shadow.insert(name, def_id);
+                    }
+                    None => {
+                        self.lookup_shadow.remove(&name);
+                    }
+                }
+            }
         }
     }
 
