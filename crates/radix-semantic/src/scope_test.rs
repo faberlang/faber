@@ -60,6 +60,50 @@ fn lookup_uses_nearest_shadowing_scope() {
 }
 
 #[test]
+fn exit_scope_restores_shadow_deltas_in_reverse() {
+    let mut resolver = Resolver::new();
+    let name = LexSymbol(20);
+    let outer = resolver.fresh_def_id();
+    assert_eq!(
+        resolver.define(symbol(outer, name, SymbolKind::Local)),
+        Ok(outer)
+    );
+
+    resolver.enter_scope(ScopeKind::Block);
+    let inner = resolver.fresh_def_id();
+    assert_eq!(
+        resolver.define(symbol(inner, name, SymbolKind::Param)),
+        Ok(inner)
+    );
+    let inner_only_name = LexSymbol(21);
+    let inner_only = resolver.fresh_def_id();
+    assert_eq!(
+        resolver.define(symbol(inner_only, inner_only_name, SymbolKind::Local)),
+        Ok(inner_only)
+    );
+    assert_eq!(resolver.lookup(name), Some(inner));
+    assert_eq!(resolver.lookup(inner_only_name), Some(inner_only));
+    resolver.exit_scope();
+    assert_eq!(resolver.lookup(name), Some(outer));
+    assert_eq!(resolver.lookup(inner_only_name), None);
+
+    resolver.enter_scope(ScopeKind::Block);
+    let type_def = resolver.fresh_def_id();
+    assert_eq!(
+        resolver.define(symbol(type_def, name, SymbolKind::Struct)),
+        Ok(type_def)
+    );
+    let module_def = resolver.fresh_def_id();
+    assert_eq!(
+        resolver.define(symbol(module_def, name, SymbolKind::Module)),
+        Ok(module_def)
+    );
+    assert_eq!(resolver.lookup(name), Some(module_def));
+    resolver.exit_scope();
+    assert_eq!(resolver.lookup(name), Some(outer));
+}
+
+#[test]
 fn lookup_type_skips_value_shadowing() {
     let mut resolver = Resolver::new();
     let name = LexSymbol(3);
