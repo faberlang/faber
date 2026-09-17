@@ -2959,6 +2959,7 @@ fn rope_accepts_whole_number_float_dim() {
         vec![
             MirOperand::Constant(MirConstant::Int(1)),
             MirOperand::Constant(MirConstant::Float(4.0)),
+            MirOperand::Place(MirPlace::local(MirLocalId(1))),
         ],
         return_ty,
     );
@@ -2979,6 +2980,7 @@ fn rope_accepts_uint_dim() {
         vec![
             MirOperand::Constant(MirConstant::Int(1)),
             MirOperand::Constant(MirConstant::UInt(4)),
+            MirOperand::Place(MirPlace::local(MirLocalId(1))),
         ],
         return_ty,
     );
@@ -3000,6 +3002,7 @@ fn rope_rejects_odd_whole_number_float_dim() {
         vec![
             MirOperand::Constant(MirConstant::Int(1)),
             MirOperand::Constant(MirConstant::Float(3.0)),
+            MirOperand::Place(MirPlace::local(MirLocalId(1))),
         ],
         return_ty,
     );
@@ -3022,6 +3025,7 @@ fn rope_rejects_odd_uint_dim() {
         vec![
             MirOperand::Constant(MirConstant::Int(1)),
             MirOperand::Constant(MirConstant::UInt(3)),
+            MirOperand::Place(MirPlace::local(MirLocalId(1))),
         ],
         return_ty,
     );
