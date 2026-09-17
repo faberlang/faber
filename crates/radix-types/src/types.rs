@@ -1082,9 +1082,7 @@ impl TypeTable {
                 .position(|id| self.union_member_sort_key(*id) != a_key)
                 .map_or(a_sorted.len(), |offset| a_start + offset);
 
-            if b_start == b_sorted.len()
-                || self.union_member_sort_key(b_sorted[b_start]) != a_key
-            {
+            if b_start == b_sorted.len() || self.union_member_sort_key(b_sorted[b_start]) != a_key {
                 return false;
             }
             let b_end = b_sorted[b_start..]
@@ -1097,12 +1095,13 @@ impl TypeTable {
 
             let mut matched = vec![false; b_end - b_start];
             for a_ty in &a_sorted[a_start..a_end] {
-                let Some(index) = b_sorted[b_start..b_end]
-                    .iter()
-                    .enumerate()
-                    .find_map(|(index, b_ty)| {
-                        (!matched[index] && self.equals(*a_ty, *b_ty)).then_some(index)
-                    })
+                let Some(index) =
+                    b_sorted[b_start..b_end]
+                        .iter()
+                        .enumerate()
+                        .find_map(|(index, b_ty)| {
+                            (!matched[index] && self.equals(*a_ty, *b_ty)).then_some(index)
+                        })
                 else {
                     return false;
                 };

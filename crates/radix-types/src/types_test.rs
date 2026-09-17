@@ -179,8 +179,7 @@ fn union_equality_matches_semantic_duplicates_by_sort_key_run() {
     let second = types.intern(Type::Union(vec![textus, numerus, textus, numerus]));
     assert!(types.equals(first, second));
 
-    let different_multiplicity =
-        types.intern(Type::Union(vec![numerus, textus, textus, textus]));
+    let different_multiplicity = types.intern(Type::Union(vec![numerus, textus, textus, textus]));
     assert!(!types.equals(first, different_multiplicity));
 }
 

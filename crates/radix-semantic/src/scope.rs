@@ -3131,9 +3131,7 @@ impl Resolver {
         let dropped_scope = self.current_scope;
         if let Some(parent) = self.scopes[dropped_scope.0 as usize].parent {
             self.current_scope = parent;
-            let deltas = std::mem::take(
-                &mut self.scopes[dropped_scope.0 as usize].shadow_deltas,
-            );
+            let deltas = std::mem::take(&mut self.scopes[dropped_scope.0 as usize].shadow_deltas);
             for (name, previous) in deltas.into_iter().rev() {
                 match previous {
                     Some(def_id) => {
