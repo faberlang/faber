@@ -1338,6 +1338,80 @@ fn wider_lane_keeps_oversized_elementwise_body_whole() {
     );
 }
 
+/// A deliberately out-of-window shape for the fixed candidate policy. The
+/// extra pre-range statements put the first field boundary at 51. The
+/// existing temp at position 0 is referenced again at position 25, so ends
+/// 1..=25 are invalid; end 26 closes that temp and is valid under the former
+/// unbounded scan. A second temp defined at position 26 is referenced by the
+/// first field-range call, so ends 27..=51 are invalid. The guard must fire
+/// before the 26th candidate (end 26) can be accepted.
+fn oversized_elementwise_candidate_window(types: &mut TypeTable) -> MirFunction {
+    let tensor = rank1_tensor_ty(types, 8);
+    let mut function = oversized_elementwise_train_step(types);
+    let mut extra = vec![
+        assign_statement(54, 0, 1, tensor),
+        assign_statement(55, 0, 1, tensor),
+    ];
+    let extra_temp = MirTempId(25);
+    extra.push(MirStatement {
+        kind: MirStatementKind::RuntimeCall {
+            destination: Some(MirPlace {
+                base: MirPlaceBase::Temp(extra_temp),
+                projections: Vec::new(),
+            }),
+            call: MirRuntimeCall {
+                intrinsic: MirIntrinsic::Collection(MirCollectionOp::TensorAdd),
+                args: vec![
+                    MirOperand::Place(MirPlace::local(MirLocalId(0))),
+                    MirOperand::Place(MirPlace::local(MirLocalId(1))),
+                ],
+                return_ty: tensor,
+            },
+        },
+        span: test_span(),
+    });
+    for destination in 56..80u32 {
+        extra.push(assign_statement(destination, 0, 1, tensor));
+    }
+    function.blocks[0].statements.splice(24..24, extra);
+    // The temp's forward must be in the field range, just beyond the largest
+    // pre-range candidate, so every candidate above end 26 stays unclosed.
+    let first_field_call = &mut function.blocks[0].statements[51];
+    let MirStatementKind::RuntimeCall { call, .. } = &mut first_field_call.kind else {
+        panic!("the first field-range statement must be the update call");
+    };
+    call.args[1] = MirOperand::Temp(extra_temp);
+    function.temps.push(MirTemp {
+        id: extra_temp,
+        ty: tensor,
+        span: test_span(),
+    });
+    for id in 54..80u32 {
+        function.locals.push(MirLocal {
+            id: MirLocalId(id),
+            name: None,
+            ty: tensor,
+            mutable: false,
+            span: test_span(),
+        });
+    }
+    function
+}
+
+#[test]
+fn oversized_elementwise_candidate_window_rejects_26th_candidate() {
+    let mut types = TypeTable::new();
+    let function = oversized_elementwise_candidate_window(&mut types);
+    let validation = MirValidationContext::new(&types);
+    let error = decompose_kernel_function(&function, &validation)
+        .expect_err("the 26th candidate must fail closed before the old valid split");
+
+    assert_eq!(
+        error.message,
+        "elementwise split candidate window exceeded (maximum 25 candidate ends)"
+    );
+}
+
 #[test]
 fn oversized_elementwise_body_splits_within_the_buffer_budget() {
     let mut types = TypeTable::new();
