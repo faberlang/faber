@@ -317,31 +317,23 @@ fn faber_target_capabilities(target: crate::codegen::Target) -> TargetCapabiliti
             package: true,
             note: "portable FHIR package envelope via `faber build --target fhir`; load and lower to FMIR for run (Rust stays explicit)",
         },
-        // Differentiable-GPU campaign N1.8 (S1-6 → Stage 7, accepted): the
-        // ordinary-command gate (E5) then the RC gates (E6 — RC binary on
-        // both machines; E7 — clean-room extracted-archive on both machines)
-        // passed on the named machines at the pinned revisions (Metal on
-        // Apple M5 Max / build host; CUDA on NVIDIA RTX 5070 / build host; faber
-        // 1.6.0-rc.1), so the Metal and CUDA device-execution rows carry
-        // `run=yes` and `package=yes` at RC level (RC-local posture). No E8,
-        // no stable-publication, no broad-hardware wording: the rows are
-        // scoped to the named machines at the pinned revisions. The `-t`
-        // emit surface is unchanged: device execution is selected by
-        // `faber run --backend <metal|cuda>` or the archive FMIR image
-        // runner, never by `-t metal-text` / `-t llvm-text` (A6).
+        // Faber device execution uses runtime backends rather than
+        // target-specific text emitters. These rows describe the runtime
+        // surface: `faber run --backend <metal|cuda>` or a compiled FMIR
+        // image runner; `-t metal-text` / `-t llvm-text` remain emit-only.
         crate::codegen::Target::MirMetal => TargetCapabilities {
             check: true,
             build: true,
             run: true,
             package: true,
-            note: "Metal device execution at RC level on Apple M5 Max / build host (faber 1.6.0-rc.1, pinned revisions; E6/E7 receipts): `faber run --backend metal` + archive compiled FMIR images; `-t metal-text` remains emit-only",
+            note: "Metal device execution via `faber run --backend metal` or a compiled FMIR image runner; `-t metal-text` remains emit-only",
         },
         crate::codegen::Target::MirLlvm => TargetCapabilities {
             check: true,
             build: true,
             run: true,
             package: true,
-            note: "CUDA device execution at RC level on NVIDIA RTX 5070 / build host (faber 1.6.0-rc.1, pinned revisions; E6/E7 receipts): `faber run --backend cuda` + archive compiled FMIR images; `-t llvm-text` remains emit-only",
+            note: "CUDA device execution via `faber run --backend cuda` or a compiled FMIR image runner; `-t llvm-text` remains emit-only",
         },
         crate::codegen::Target::HirRust => capabilities,
         // Stage 9 (llvm-host-parity product slice): llvm-host is the native
