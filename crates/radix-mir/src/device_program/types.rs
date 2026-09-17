@@ -3,6 +3,7 @@ use crate::abi::{
     MirKernelResourceRole, MirKernelSignature, MirKernelWorkgroupCount, MirWorkgroupSize,
     collection_op_workgroup_count,
 };
+use crate::device_plan_compiler::LibraryOperation;
 use crate::kernel_plan::CollectionKernelPlan;
 use crate::layout::MirTensorStorageLayout;
 use crate::{MirFunction, MirFunctionId, MirType};
@@ -303,6 +304,12 @@ pub struct KernelUnit {
     pub function: MirFunctionId,
     /// Target-neutral logical entry name.
     pub entry: String,
+    /// Compiler-owned library operation, when a typed producer admitted one.
+    ///
+    /// This is deliberately carried beside the recipe rather than in the
+    /// recipe payload: fusion owns the latter, while dispatch selection owns
+    /// this bounded bridge fact. It is compiler-internal and is not serialized.
+    pub library_operation: LibraryOperation,
     /// Shared algorithmic recipe (elementwise, matmul, reduction).
     pub plan: CollectionKernelPlan,
     /// Typed buffer slots bound by this kernel.

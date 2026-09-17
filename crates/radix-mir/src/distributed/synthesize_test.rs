@@ -94,6 +94,7 @@ fn single_device_program() -> DeviceProgram {
         KernelUnit {
             function: MirFunctionId(0),
             entry: "proj".to_owned(),
+            library_operation: crate::device_plan_compiler::LibraryOperation::Generated,
             plan: CollectionKernelPlan::Elementwise,
             resources: vec![
                 DeviceResource {
@@ -120,6 +121,7 @@ fn single_device_program() -> DeviceProgram {
         KernelUnit {
             function: MirFunctionId(0),
             entry: "epilogue".to_owned(),
+            library_operation: crate::device_plan_compiler::LibraryOperation::Generated,
             plan: CollectionKernelPlan::Elementwise,
             resources: vec![
                 DeviceResource {

@@ -84,6 +84,7 @@ fn kernel(entry: &str, resources: Vec<DeviceResource>) -> KernelUnit {
     KernelUnit {
         function: MirFunctionId(0),
         entry: entry.to_owned(),
+        library_operation: crate::device_plan_compiler::LibraryOperation::Generated,
         plan: CollectionKernelPlan::Elementwise,
         resources,
         launch: launch_plan(),

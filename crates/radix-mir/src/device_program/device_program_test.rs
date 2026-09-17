@@ -292,6 +292,7 @@ fn reduction_kernel(
     KernelUnit {
         function: signature.function,
         entry: "reduction_kernel".to_owned(),
+        library_operation: crate::device_plan_compiler::LibraryOperation::Generated,
         plan,
         resources: vec![input_resource, output_resource],
         // dispatch 16 / workgroup 8 -> grid 2 for the standard fixture.
@@ -366,6 +367,7 @@ fn program_fields_and_ordered_kernels() {
     let ew_kernel = KernelUnit {
         function: ew_signature.function,
         entry: "elementwise_kernel".to_owned(),
+        library_operation: crate::device_plan_compiler::LibraryOperation::Generated,
         plan: CollectionKernelPlan::Elementwise,
         resources: vec![
             DeviceResource::from_kernel_resource(
@@ -471,6 +473,7 @@ fn elementwise_plan_accepted() {
     let kernel = KernelUnit {
         function: signature.function,
         entry: "elementwise_kernel".to_owned(),
+        library_operation: crate::device_plan_compiler::LibraryOperation::Generated,
         plan: CollectionKernelPlan::Elementwise,
         resources: vec![
             DeviceResource::from_kernel_resource(
@@ -742,6 +745,7 @@ fn shape_change_is_new_version() {
     program.kernels.push(KernelUnit {
         function: MirFunctionId(0),
         entry: "write_v1".to_owned(),
+        library_operation: crate::device_plan_compiler::LibraryOperation::Generated,
         plan: CollectionKernelPlan::Elementwise,
         resources: vec![DeviceResource {
             buffer: b_identity.clone(),
@@ -761,6 +765,7 @@ fn shape_change_is_new_version() {
     program.kernels.push(KernelUnit {
         function: MirFunctionId(1),
         entry: "write_v2".to_owned(),
+        library_operation: crate::device_plan_compiler::LibraryOperation::Generated,
         plan: CollectionKernelPlan::Elementwise,
         resources: vec![DeviceResource {
             buffer: b_identity.clone(),
@@ -1238,6 +1243,7 @@ fn result_cadence_must_match_buffer_lifetime() {
         program.kernels.push(KernelUnit {
             function: MirFunctionId(0),
             entry: "addita".to_owned(),
+            library_operation: crate::device_plan_compiler::LibraryOperation::Generated,
             plan: CollectionKernelPlan::Elementwise,
             resources: vec![
                 DeviceResource {
@@ -1359,6 +1365,7 @@ fn registry_chain_and_data_flow_pairs() {
     program.kernels.push(KernelUnit {
         function: MirFunctionId(0),
         entry: "producer".to_owned(),
+        library_operation: crate::device_plan_compiler::LibraryOperation::Generated,
         plan: CollectionKernelPlan::Elementwise,
         resources: vec![
             DeviceResource {
@@ -1389,6 +1396,7 @@ fn registry_chain_and_data_flow_pairs() {
     program.kernels.push(KernelUnit {
         function: MirFunctionId(1),
         entry: "consumer".to_owned(),
+        library_operation: crate::device_plan_compiler::LibraryOperation::Generated,
         plan: CollectionKernelPlan::Elementwise,
         resources: vec![
             DeviceResource {
@@ -1694,6 +1702,7 @@ fn chain_program_with_semantics() -> (DeviceProgram, DeviceSemantics) {
         KernelUnit {
             function: MirFunctionId(0),
             entry: "chain_producer".to_owned(),
+            library_operation: crate::device_plan_compiler::LibraryOperation::Generated,
             plan: CollectionKernelPlan::Elementwise,
             resources: vec![DeviceResource {
                 buffer: intermediate.clone(),
@@ -1709,6 +1718,7 @@ fn chain_program_with_semantics() -> (DeviceProgram, DeviceSemantics) {
         KernelUnit {
             function: MirFunctionId(1),
             entry: "chain_consumer".to_owned(),
+            library_operation: crate::device_plan_compiler::LibraryOperation::Generated,
             plan: CollectionKernelPlan::Elementwise,
             resources: vec![
                 DeviceResource {
@@ -2116,6 +2126,7 @@ fn three_chain_program_with_middle_observation() -> (DeviceProgram, DeviceSemant
         KernelUnit {
             function: MirFunctionId(0),
             entry: "k0".to_owned(),
+            library_operation: crate::device_plan_compiler::LibraryOperation::Generated,
             plan: CollectionKernelPlan::Elementwise,
             resources: vec![DeviceResource {
                 buffer: b0.clone(),
@@ -2131,6 +2142,7 @@ fn three_chain_program_with_middle_observation() -> (DeviceProgram, DeviceSemant
         KernelUnit {
             function: MirFunctionId(1),
             entry: "k1".to_owned(),
+            library_operation: crate::device_plan_compiler::LibraryOperation::Generated,
             plan: CollectionKernelPlan::Elementwise,
             resources: vec![
                 DeviceResource {
@@ -2157,6 +2169,7 @@ fn three_chain_program_with_middle_observation() -> (DeviceProgram, DeviceSemant
         KernelUnit {
             function: MirFunctionId(2),
             entry: "k2".to_owned(),
+            library_operation: crate::device_plan_compiler::LibraryOperation::Generated,
             plan: CollectionKernelPlan::Elementwise,
             resources: vec![
                 DeviceResource {
@@ -2436,6 +2449,7 @@ fn branched_program_with_disconnecting_middle_observation() -> (DeviceProgram, D
         KernelUnit {
             function: MirFunctionId(0),
             entry: "k0".to_owned(),
+            library_operation: crate::device_plan_compiler::LibraryOperation::Generated,
             plan: CollectionKernelPlan::Elementwise,
             resources: vec![DeviceResource {
                 buffer: b0.clone(),
@@ -2452,6 +2466,7 @@ fn branched_program_with_disconnecting_middle_observation() -> (DeviceProgram, D
         KernelUnit {
             function: MirFunctionId(1),
             entry: "k1".to_owned(),
+            library_operation: crate::device_plan_compiler::LibraryOperation::Generated,
             plan: CollectionKernelPlan::Elementwise,
             resources: vec![
                 DeviceResource {
@@ -2479,6 +2494,7 @@ fn branched_program_with_disconnecting_middle_observation() -> (DeviceProgram, D
         KernelUnit {
             function: MirFunctionId(2),
             entry: "k2".to_owned(),
+            library_operation: crate::device_plan_compiler::LibraryOperation::Generated,
             plan: CollectionKernelPlan::Elementwise,
             resources: vec![
                 DeviceResource {
@@ -2506,6 +2522,7 @@ fn branched_program_with_disconnecting_middle_observation() -> (DeviceProgram, D
         KernelUnit {
             function: MirFunctionId(3),
             entry: "k3".to_owned(),
+            library_operation: crate::device_plan_compiler::LibraryOperation::Generated,
             plan: CollectionKernelPlan::Elementwise,
             resources: vec![
                 DeviceResource {
@@ -2533,6 +2550,7 @@ fn branched_program_with_disconnecting_middle_observation() -> (DeviceProgram, D
         KernelUnit {
             function: MirFunctionId(4),
             entry: "k4".to_owned(),
+            library_operation: crate::device_plan_compiler::LibraryOperation::Generated,
             plan: CollectionKernelPlan::Elementwise,
             resources: vec![
                 DeviceResource {
@@ -2560,6 +2578,7 @@ fn branched_program_with_disconnecting_middle_observation() -> (DeviceProgram, D
         KernelUnit {
             function: MirFunctionId(5),
             entry: "k5".to_owned(),
+            library_operation: crate::device_plan_compiler::LibraryOperation::Generated,
             plan: CollectionKernelPlan::Elementwise,
             resources: vec![
                 DeviceResource {
