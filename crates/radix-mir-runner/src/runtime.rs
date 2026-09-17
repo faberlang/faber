@@ -2172,29 +2172,39 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
         Ok(Value::Float(result))
     }
 
+    #[rustfmt::skip]
+    pub(super)
+    fn map_tensor_unary(
+        &self,
+        tensor: Rc<RefCell<TensorValue>>,
+        op: &mut dyn FnMut(&Value) -> Result<Value, RunnerError>,
+    ) -> Result<Value, RunnerError> {
+        let borrow = tensor.borrow();
+        let data = borrow
+            .data
+            .iter()
+            .map(&mut *op)
+            .collect::<Result<Vec<_>, _>>()?;
+        Ok(tensor_value(data, borrow.shape.clone()))
+    }
+
     fn tensor_neg(&mut self, args: &[MirOperand], span: Span) -> Result<Value, RunnerError> {
         let [receiver] = args else {
             return Err(RunnerError::internal(span, "tensor neg arity"));
         };
         let tensor = self.tensor_arg(receiver, span)?;
-        let borrow = tensor.borrow();
-        let data = borrow
-            .data
-            .iter()
-            .map(|v| {
-                Ok(match v {
-                    Value::Int(n) => Value::Int(-n),
-                    Value::Float(f) => Value::Float(-f),
-                    _ => {
-                        return Err(RunnerError::internal(
-                            span,
-                            "tensor neg element type mismatch",
-                        ));
-                    }
-                })
+        self.map_tensor_unary(tensor, &mut |v| {
+            Ok(match v {
+                Value::Int(n) => Value::Int(-n),
+                Value::Float(f) => Value::Float(-f),
+                _ => {
+                    return Err(RunnerError::internal(
+                        span,
+                        "tensor neg element type mismatch",
+                    ));
+                }
             })
-            .collect::<Result<Vec<_>, _>>()?;
-        Ok(tensor_value(data, borrow.shape.clone()))
+        })
     }
 
     fn tensor_gelu(&mut self, args: &[MirOperand], span: Span) -> Result<Value, RunnerError> {
@@ -2202,19 +2212,13 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
             return Err(RunnerError::internal(span, "tensor gelu arity"));
         };
         let tensor = self.tensor_arg(receiver, span)?;
-        let borrow = tensor.borrow();
-        let data = borrow
-            .data
-            .iter()
-            .map(|v| match v {
-                Value::Float(f) => Ok(Value::Float(gelu_f64(*f))),
-                _ => Err(RunnerError::internal(
-                    span,
-                    "tensor gelu element type mismatch",
-                )),
-            })
-            .collect::<Result<Vec<_>, _>>()?;
-        Ok(tensor_value(data, borrow.shape.clone()))
+        self.map_tensor_unary(tensor, &mut |v| match v {
+            Value::Float(f) => Ok(Value::Float(gelu_f64(*f))),
+            _ => Err(RunnerError::internal(
+                span,
+                "tensor gelu element type mismatch",
+            )),
+        })
     }
 
     fn tensor_relu(&mut self, args: &[MirOperand], span: Span) -> Result<Value, RunnerError> {
@@ -2222,20 +2226,14 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
             return Err(RunnerError::internal(span, "tensor relu arity"));
         };
         let tensor = self.tensor_arg(receiver, span)?;
-        let borrow = tensor.borrow();
-        let data = borrow
-            .data
-            .iter()
-            .map(|v| match v {
-                Value::Float(f) => Ok(Value::Float(f.max(0.0))),
-                Value::Int(i) => Ok(Value::Int((*i).max(0))),
-                _ => Err(RunnerError::internal(
-                    span,
-                    "tensor relu element type mismatch",
-                )),
-            })
-            .collect::<Result<Vec<_>, _>>()?;
-        Ok(tensor_value(data, borrow.shape.clone()))
+        self.map_tensor_unary(tensor, &mut |v| match v {
+            Value::Float(f) => Ok(Value::Float(f.max(0.0))),
+            Value::Int(i) => Ok(Value::Int((*i).max(0))),
+            _ => Err(RunnerError::internal(
+                span,
+                "tensor relu element type mismatch",
+            )),
+        })
     }
 
     /// Softmax: `exp(x_i` - max(x)) / `sum(exp(x_j` - max(x))) with numerical
