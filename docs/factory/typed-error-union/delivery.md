@@ -45,7 +45,11 @@ binds — not activity-shaped.
   `docs/factory/compiler-defect-sprint/compiler-defect-sprint-delivery.md`
   lowers them as `cds-u1-union-match` (row 1, P0/S4, wave 1) and
   `cds-u7-generic-construction` + `cds-u8-import-binding-collisions`
-  (row 9, S3+S4) — none implemented at HEAD. Exhaustiveness verified:
+  (row 9, S3+S4) — none implemented at HEAD. *(2026-09-17: rows 1+9 are
+  resolved — landed 2026-08-10 by radix `union-variant-first-class`
+  (uvf-u1–u4) with twin `union-variant-namespace` (uvn-u1–u3), both
+  `Status: done`, now under `radix/docs/archived/`; the cds-u* pointers
+  above do not match live evidence.)* Exhaustiveness verified:
   `crates/radix-semantic/src/passes/exhaustive.rs:118-166` (omnia contract),
   `:241-257` (`NonExhaustiveMatch`). Emitter leaves: `radix-hir-ts`,
   `radix-hir-rust`, `radix-hir-go`, `radix-hir-swift`, `radix-hir-python`,
@@ -167,7 +171,7 @@ convention (1–5).
 
 | Field | Value |
 | --- | --- |
-| `outcome` | `gradus/docs/api-shape-policy.md` "Cross-module variant constraint" is re-framed: SEM001/SEM041 were pinned radix defects (registry rows 1+9, `walk.rs:372-399`), fixed by `compiler-defect-sprint` cds-u1/cds-u7/cds-u8 — not a language law. Downstream conventions that cited the law (DType single-module + factory functions; accessor discipline) are marked as choices to revisit, not repealed here. |
+| `outcome` | `gradus/docs/api-shape-policy.md` "Cross-module variant constraint" is re-framed: SEM001/SEM041 were pinned radix defects (registry rows 1+9, `walk.rs:372-399`), fixed by the radix `union-variant-first-class` goal (uvf-u1–u4, rows 1/2/8/9 + G1; twin `union-variant-namespace` uvn-u1–u3), landed 2026-08-10, both `Status: done` (now under `radix/docs/archived/`) — not a language law. Downstream conventions that cited the law (DType single-module + factory functions; accessor discipline) are marked as choices to revisit, not repealed here. |
 | `write_scope` | gradus: `docs/api-shape-policy.md` (the constraint section only). |
 | `done_when` | No "a language constraint, recorded PML1" claim remains; the section cites the registry rows, the fixing units, and the date; conventions are marked revisit-not-repealed. |
 | `sanity` | Doc renders; grep for the stale phrase is empty. |
@@ -189,13 +193,15 @@ convention (1–5).
 | `integrable` | yes. |
 | effort | 1 |
 
-**External dependency X1** (never implemented here): radix
-`docs/factory/compiler-defect-sprint/` — `cds-u1-union-match` (registry row
-1, SEM001 imported-union match, P0/S4) and `cds-u7-generic-construction` +
+**External dependency X1 — RESOLVED (2026-08-10)**: originally pointed at
+radix `docs/factory/compiler-defect-sprint/` — `cds-u1-union-match` (registry
+row 1, SEM001 imported-union match, P0/S4) and `cds-u7-generic-construction` +
 `cds-u8-import-binding-collisions` (registry row 9, G3 qualified variant
-construction, S3+S4). Blocks TEU7 and TEU8. If X1's units re-slice before
-landing, Mind re-points these deps at the successor unit ids — no amendment
-to this delivery needed for a re-point.
+construction, S3+S4). The verified landing record: rows 1+9 resolved by radix
+`union-variant-first-class` (uvf-u1–u4) with twin `union-variant-namespace`
+(uvn-u1–u3), both `Status: done` (now under `radix/docs/archived/`); live
+proofs `crates/radix-semantic/src/passes/typecheck/union_pattern_test.rs` and
+`union_construction_test.rs`. TEU7 and TEU8 are unblocked.
 
 ## Implementation Work
 
@@ -215,7 +221,8 @@ X1 (external, compiler-defect-sprint) ─┬───────┤
 - TEU6 taskable the moment TEU3 lands (gradus checks/emits on the primary
   lane); TEU4 may trail TEU6 without blocking it — gradus does not gate on
   tail targets, only the TEU9 matrix check needs TEU4 shipped.
-- TEU7/TEU8 taskable only when X1's owning goal reports its rows fixed.
+- TEU7/TEU8 taskable only when X1's owning goal reports its rows fixed
+  (satisfied 2026-08-10 — X1 resolved, see the X1 note above).
 
 ## Checkpoints and Gates
 

@@ -44,9 +44,10 @@ The settled error idiom — failable operations return `T ⇥ XError` over a
 
 2. **The remap chain.** Cross-module variant matching was recorded as a
    language constraint (`SEM001`/`SEM041`, recorded PML1 and in
-   `gradus/docs/api-shape-policy.md`): a caller cannot match another module's
-   variants, so `message()` text is the only cross-module error-identity
-   surface. Wrappers therefore recover error identity by string comparison —
+   `gradus/docs/api-shape-policy.md`): under that recorded constraint a
+   caller could not match another module's variants, so `message()` text was
+   the only cross-module error-identity surface. At audit time the wrappers
+   recovered error identity by string comparison —
    `_map_error` chains at `gradus/src/transformer.fab:259`,
    `gradus/src/gradus.fab:160` (relocates to `src/mlp.fab` under the O6
    facade split), and `_map_cached` in `gradus/src/model/dense.fab`. Text
@@ -125,6 +126,22 @@ recheck trigger:
 Consequences: the remap chains work around a bug, not a settled constraint;
 and `gradus/docs/api-shape-policy.md`'s PML1 note ("a language constraint,
 recorded PML1") needs correcting when the defect rows land.
+
+**Currency note (2026-09-17)**: the boundary above is resolved. Live proofs:
+`radix/crates/radix-semantic/src/passes/typecheck/union_pattern_test.rs`
+(imported-union consumer match, `discerne`/`casu`) and
+`union_construction_test.rs` (qualified imported-union construction) check
+green; landed 2026-08-10 by the radix goal `union-variant-first-class`
+(uvf-u1–u4 — registry rows 1, 2, 8, 9 + G1; `Status: done`,
+`radix/docs/archived/union-variant-first-class/`), with the declaration-side
+twin `union-variant-namespace` (uvn-u1–u3, also done) scoping variant names
+to their parent union. The `SEM001`/`SEM041` codes this section cites now
+name unrelated live diagnostics (`VariableUndefined` / `UnreachablePattern`,
+`radix/crates/radix-semantic/src/catalog_semantic.rs`). The `walk.rs` policy
+rows remain recorded, but their recheck triggers hold green per the tests.
+gradus's PML1 note has since been re-framed (`gradus/docs/api-shape-policy.md`
+v1.1.0: cross-module matching works in the compiler; the per-module union
+policy is a deliberate gradus choice).
 
 ### `omnia` / `match all` — the existing exhaustiveness promise
 
@@ -212,8 +229,9 @@ Semantics:
   shared field; variants keep their own payload fields alongside commune
   ones (see `ElementMismatch` above).
 - `e.message` is member access on a typed value, not variant resolution —
-  it works across module boundaries under SEM001 as it stands today,
-  replacing the mirror's cross-module render role.
+  it works across module boundaries (the cross-module variant boundary is
+  resolved, 2026-08-10 — see the SEM-section currency note), replacing the
+  mirror's cross-module render role.
 - Read-only through the projection, initially.
 - A variant redeclaring/shadowing a commune field: reject.
 - `@ commune` + `sponte`: deferred (the projection type becomes
@@ -226,7 +244,8 @@ untouched; `mod.message(e)` call sites become `e.message`.
 
 ### Fork 3 remainder: gradus policy choice (open)
 
-Once the radix defect rows land, gradus chooses:
+With the radix defect rows landed (2026-08-10 — see the SEM-section currency
+note), gradus chooses:
 
 - **B1 — shared package error union.** `gradus:error` owns `GradusError`;
   all modules import it and throw its variants directly. The remap chains
@@ -279,8 +298,9 @@ Answered in session (2026-08-21):
 
 Still open:
 
-- **B1 vs B2** — gradus policy ruling; can be made before the radix defect
-  fix lands, mechanically blocked on it.
+- **B1 vs B2** — gradus policy ruling; the radix defect fix it waited on
+  landed 2026-08-10 (see the SEM-section currency note), so it is no longer
+  mechanically blocked.
 - **Emitter cost** — commune fields materialize into every variant payload
   per target (Rust enum struct-variants, TS discriminated unions, …); the
   per-target work is the bulk of the implementation.
