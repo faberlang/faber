@@ -1,10 +1,9 @@
 // Package rt is the Faber Go runtime display surface for generated programs.
 //
-// S5-U1 extraction (faber-target-runtime): the display helper family that the
-// HIR-Go emitter previously hoisted into every generated file
-// (faberValorDisplay, faberVerum, faberListDisplay, and the per-type display
-// renderers) lives here as a native Go module. Generated programs import
-// `faber/rt` and call the exported surface with `rt.` qualification.
+// The display helper family (ValorDisplay, Verum, ListDisplay, and the
+// per-type display renderers) lives here as a native Go module. Generated
+// programs import `faber/rt` and call the exported surface with `rt.`
+// qualification.
 //
 // Package identity (inventory §7): `faber/runtime/go/` — Go module
 // `faber/rt`, materialized offline by the Faber build tool (core-support

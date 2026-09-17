@@ -32,9 +32,8 @@ asked. Container law: [`../AGENTS.md`](../AGENTS.md).
 - Package-store mutation and lock writing: `faberlang/cista`.
 
 Keep target packages independent of private Radix source and concrete host
-implementations. The Cargo package name is `faber` (lib name `faber`). The
-retired standalone runtime repository is gone; this package lives at
-`runtime/rust/`.
+implementations. The Cargo package name is `faber` (lib name `faber`). This
+package lives at `runtime/rust/`.
 
 ## Validation
 
