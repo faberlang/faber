@@ -902,7 +902,7 @@ pub(super) fn lower_package_units<'a>(
             &unit_path,
             &lowered.program,
             &source_interner,
-            &entry.analysis.interner.clone(),
+            &entry.analysis.interner,
         );
         pending.push(PendingUnit {
             lowered,
