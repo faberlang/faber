@@ -418,6 +418,35 @@ pub fn carried_plan_agrees(
     }
 }
 
+fn carried_resources_agree_impl(
+    carried: &[DeviceResource],
+    signature: &MirKernelSignature,
+    allow_extra: bool,
+) -> bool {
+    let mut expected: FxHashMap<(u32, u32), &MirKernelResource> = FxHashMap::default();
+    for resource in signature
+        .resources()
+        .filter(|resource| resource.kind == MirKernelResourceKind::StorageBuffer)
+    {
+        expected.insert((resource.group, resource.binding), resource);
+    }
+    for resource in carried {
+        let key = (resource.binding.group, resource.binding.binding);
+        let Some(signature_resource) = expected.remove(&key) else {
+            if !allow_extra {
+                return false;
+            }
+            // A binding outside the carrier signature is a host-dispatch
+            // fact of the library body.
+            continue;
+        };
+        if !carried_slot_agrees(resource, signature_resource) {
+            return false;
+        }
+    }
+    expected.is_empty()
+}
+
 /// Whether a device program's carried resource list agrees with the
 /// signature re-derived from the kernel function's typed facts.
 ///
@@ -431,26 +460,7 @@ pub fn carried_plan_agrees(
 /// `None` for them.
 #[must_use]
 pub fn carried_resources_agree(carried: &[DeviceResource], signature: &MirKernelSignature) -> bool {
-    let mut expected: FxHashMap<(u32, u32), &MirKernelResource> = FxHashMap::default();
-    for resource in signature
-        .resources()
-        .filter(|resource| resource.kind == MirKernelResourceKind::StorageBuffer)
-    {
-        expected.insert((resource.group, resource.binding), resource);
-    }
-    if carried.len() != expected.len() {
-        return false;
-    }
-    for resource in carried {
-        let key = (resource.binding.group, resource.binding.binding);
-        let Some(signature_resource) = expected.remove(&key) else {
-            return false;
-        };
-        if !carried_slot_agrees(resource, signature_resource) {
-            return false;
-        }
-    }
-    true
+    carried_resources_agree_impl(carried, signature, false)
 }
 
 /// Whether a library-dispatch kernel's carried resource list agrees with the
@@ -468,25 +478,7 @@ pub fn carried_resources_agree_for_library_dispatch(
     carried: &[DeviceResource],
     signature: &MirKernelSignature,
 ) -> bool {
-    let mut expected: FxHashMap<(u32, u32), &MirKernelResource> = FxHashMap::default();
-    for resource in signature
-        .resources()
-        .filter(|resource| resource.kind == MirKernelResourceKind::StorageBuffer)
-    {
-        expected.insert((resource.group, resource.binding), resource);
-    }
-    for resource in carried {
-        let key = (resource.binding.group, resource.binding.binding);
-        let Some(signature_resource) = expected.remove(&key) else {
-            // A binding outside the carrier signature is a host-dispatch
-            // fact of the library body.
-            continue;
-        };
-        if !carried_slot_agrees(resource, signature_resource) {
-            return false;
-        }
-    }
-    expected.is_empty()
+    carried_resources_agree_impl(carried, signature, true)
 }
 
 /// One carried slot against one signature slot — the shared per-slot law of
