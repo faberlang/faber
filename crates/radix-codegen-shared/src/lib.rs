@@ -27,6 +27,7 @@
 pub mod conversio_arm;
 pub mod decimal;
 pub mod hygiene;
+pub mod ident;
 pub mod names;
 pub mod text_literal;
 pub use text_literal::unescape_faber_text;
@@ -236,6 +237,7 @@ pub trait Codegen {
 }
 
 pub use validation::{find_error_expr_in_program, reject_hir_errors};
+pub use ident::{output_resource_name, sanitize_ident};
 
 #[cfg(test)]
 #[path = "writer_test.rs"]
