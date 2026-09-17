@@ -168,6 +168,21 @@ fn union_equality_ignores_member_order() {
 }
 
 #[test]
+fn union_equality_falls_back_when_nested_numeric_keys_differ() {
+    let mut types = TypeTable::new();
+    let numerus = types.primitive(Primitive::Numerus);
+    let numerus_i64 = types.sized_numeric(Primitive::Numerus, NumericWidth::I64);
+    let textus = types.primitive(Primitive::Textus);
+    let lista_numerus = types.array(numerus);
+    let lista_numerus_i64 = types.array(numerus_i64);
+
+    let first = types.intern(Type::Union(vec![lista_numerus_i64, textus]));
+    let second = types.intern(Type::Union(vec![lista_numerus, textus]));
+
+    assert!(types.equals(first, second));
+}
+
+#[test]
 fn union_equality_matches_semantic_duplicates_by_sort_key_run() {
     let mut types = TypeTable::new();
     let numerus = types.primitive(Primitive::Numerus);
