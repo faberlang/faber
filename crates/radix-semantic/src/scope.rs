@@ -2984,10 +2984,7 @@ impl Resolver {
         self.variants_by_parent_name
             .entry((parent_def_id, name))
             .or_insert(def_id);
-        self.variants_by_name
-            .entry(name)
-            .or_default()
-            .push(def_id);
+        self.variants_by_name.entry(name).or_default().push(def_id);
         Some(def_id)
     }
 

@@ -1076,47 +1076,45 @@ impl TypeTable {
         // must fall back because equals can coerce at any nesting depth.
         let mut a_start = 0;
         let mut b_start = 0;
-        let keyed_match = 'keyed: {
-            while a_start < a_sorted.len() {
-                let a_key = self.union_member_sort_key(a_sorted[a_start]);
-                let a_end = a_sorted[a_start..]
-                    .iter()
-                    .position(|id| self.union_member_sort_key(*id) != a_key)
-                    .map_or(a_sorted.len(), |offset| a_start + offset);
+        let keyed_match =
+            'keyed: {
+                while a_start < a_sorted.len() {
+                    let a_key = self.union_member_sort_key(a_sorted[a_start]);
+                    let a_end = a_sorted[a_start..]
+                        .iter()
+                        .position(|id| self.union_member_sort_key(*id) != a_key)
+                        .map_or(a_sorted.len(), |offset| a_start + offset);
 
-                if b_start == b_sorted.len()
-                    || self.union_member_sort_key(b_sorted[b_start]) != a_key
-                {
-                    break 'keyed false;
-                }
-                let b_end = b_sorted[b_start..]
-                    .iter()
-                    .position(|id| self.union_member_sort_key(*id) != a_key)
-                    .map_or(b_sorted.len(), |offset| b_start + offset);
-                if a_end - a_start != b_end - b_start {
-                    break 'keyed false;
-                }
-
-                let mut matched = vec![false; b_end - b_start];
-                for a_ty in &a_sorted[a_start..a_end] {
-                    let Some(index) =
-                        b_sorted[b_start..b_end]
-                            .iter()
-                            .enumerate()
-                            .find_map(|(index, b_ty)| {
-                                (!matched[index] && self.equals(*a_ty, *b_ty)).then_some(index)
-                            })
-                    else {
+                    if b_start == b_sorted.len()
+                        || self.union_member_sort_key(b_sorted[b_start]) != a_key
+                    {
                         break 'keyed false;
-                    };
-                    matched[index] = true;
-                }
+                    }
+                    let b_end = b_sorted[b_start..]
+                        .iter()
+                        .position(|id| self.union_member_sort_key(*id) != a_key)
+                        .map_or(b_sorted.len(), |offset| b_start + offset);
+                    if a_end - a_start != b_end - b_start {
+                        break 'keyed false;
+                    }
 
-                a_start = a_end;
-                b_start = b_end;
-            }
-            b_start == b_sorted.len()
-        };
+                    let mut matched = vec![false; b_end - b_start];
+                    for a_ty in &a_sorted[a_start..a_end] {
+                        let Some(index) = b_sorted[b_start..b_end].iter().enumerate().find_map(
+                            |(index, b_ty)| {
+                                (!matched[index] && self.equals(*a_ty, *b_ty)).then_some(index)
+                            },
+                        ) else {
+                            break 'keyed false;
+                        };
+                        matched[index] = true;
+                    }
+
+                    a_start = a_end;
+                    b_start = b_end;
+                }
+                b_start == b_sorted.len()
+            };
 
         if keyed_match {
             return true;
