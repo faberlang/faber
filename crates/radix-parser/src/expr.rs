@@ -30,7 +30,7 @@ use std::collections::HashSet;
 /// Internal HIR bridge for the source-only `ᵀ` suffix. Semantic checking
 /// rewrites this marker to the canonical `transpone` intrinsic after applying
 /// the glyph's stricter rank law.
-const GLYPH_TRANSPOSE_METHOD: &str = "__faber_glyph_transpose";
+pub(super) const GLYPH_TRANSPOSE_METHOD: &str = "__faber_glyph_transpose";
 
 // EXPRESSION ENTRY POINT
 
@@ -957,13 +957,12 @@ impl Parser {
     fn parse_transpose_postfix(&mut self, start: Span, object: Expr) -> Expr {
         let glyph_span = self.current_span();
         self.advance();
-        // Keep the private marker and canonical intrinsic spelling in the
-        // source interner so semantic checking can rewrite the HIR method name
-        // without inventing a second registry or plan entry.
-        self.interner.intern("transpone");
-        self.interner.intern("transpose");
+        // The private marker and canonical intrinsic spellings are already in
+        // the source interner (interned once at parser construction) so
+        // semantic checking can rewrite the HIR method name without inventing
+        // a second registry or plan entry.
         let method = Ident {
-            name: self.interner.intern(GLYPH_TRANSPOSE_METHOD),
+            name: self.transpose_marker_glyph_method,
             span: glyph_span,
         };
         let callee = Expr {
