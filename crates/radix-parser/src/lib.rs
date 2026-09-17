@@ -92,6 +92,11 @@ pub struct Parser {
     errors: Vec<ParseError>,
     next_node_id: NodeId,
     interner: Interner,
+    /// `ᵀ` postfix method marker, interned once at construction so
+    /// `parse_transpose_postfix` does no per-occurrence interning. The
+    /// canonical intrinsic spellings are interned alongside it for the
+    /// semantic marker rewrite but only this handle is read back.
+    transpose_marker_glyph_method: Symbol,
     options: ParseOptions,
     keyword_surface: KeywordSurfaceMode,
     reader_keyword_latin_keys: HashMap<String, String>,
@@ -230,6 +235,12 @@ impl Parser {
             .enumerate()
             .filter_map(|(i, tok)| (!tok.kind.is_trivia()).then_some(i))
             .collect();
+        let mut interner = interner;
+        // The glyph marker names the parsed Ident; the canonical intrinsic
+        // spellings exist for the semantic rewrite and are never read back.
+        interner.intern("transpone");
+        interner.intern("transpose");
+        let transpose_marker_glyph_method = interner.intern(expr::GLYPH_TRANSPOSE_METHOD);
         let mut parser = Self {
             tokens,
             pos: 0,
@@ -238,6 +249,7 @@ impl Parser {
             errors: Vec::new(),
             next_node_id: 0,
             interner,
+            transpose_marker_glyph_method,
             options,
             keyword_surface,
             reader_keyword_latin_keys,
