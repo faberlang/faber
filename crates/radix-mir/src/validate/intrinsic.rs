@@ -22,15 +22,6 @@ enum TensorConstKind {
     Float,
 }
 
-impl TensorConstKind {
-    fn as_str(self) -> &'static str {
-        match self {
-            Self::Int => "int",
-            Self::Float => "float",
-        }
-    }
-}
-
 #[derive(Clone, Copy)]
 struct TensorNormFlags {
     rank_1_or_2: bool,
@@ -1747,6 +1738,7 @@ impl Validator<'_, '_> {
         kind: TensorConstKind,
         label: &'static str,
         name: &'static str,
+        message: &'static str,
         exempt: E,
         predicate: P,
     ) where
@@ -1765,10 +1757,7 @@ impl Validator<'_, '_> {
             | (TensorConstKind::Float, MirConstant::Float(_)) => predicate(self, constant),
             _ => self.error(
                 span,
-                format!(
-                    "tensor {label} {name} must be a {} constant or temp",
-                    kind.as_str()
-                ),
+                format!("tensor {label} {name} must be {message}"),
             ),
         }
     }
@@ -1788,6 +1777,7 @@ impl Validator<'_, '_> {
             TensorConstKind::Int,
             label,
             "axis",
+            "an int constant or temp",
             |_| false,
             |this, constant| {
                 let MirConstant::Int(axis_val) = constant else {
@@ -1817,6 +1807,7 @@ impl Validator<'_, '_> {
             TensorConstKind::Float,
             label,
             "epsilon",
+            "a float constant or temp",
             |_| false,
             |this, constant| {
                 let MirConstant::Float(f) = constant else {
@@ -1845,6 +1836,7 @@ impl Validator<'_, '_> {
             TensorConstKind::Int,
             "rope",
             "pos",
+            "an int constant or temp",
             |_| false,
             |this, constant| {
                 let MirConstant::Int(pos_val) = constant else {
@@ -1874,6 +1866,7 @@ impl Validator<'_, '_> {
             TensorConstKind::Int,
             "rope",
             "dim",
+            "an int constant or temp",
             |constant| matches!(constant, MirConstant::ShapeSize { .. }),
             |this, constant| {
                 let MirConstant::Int(dim_val) = constant else {
