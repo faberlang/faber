@@ -9,8 +9,8 @@
 // parent module provides shared imports for lowering
 use super::*;
 use crate::mir::generic::{
-    MirShapeBindings, bind_generic_type_witness_with_shapes, canonical_index, function_contains_shape_size,
-    instantiate_generic_type_with_shapes, substitute_shape_size_constants,
+    ExistingTypeIndex, MirShapeBindings, bind_generic_type_witness_with_shapes, canonical_index,
+    function_contains_shape_size, instantiate_generic_type_with_shapes_with_index, substitute_shape_size_constants,
     substitute_tensor_from_flat_shape_size_constants,
 };
 use crate::mir::ty::index_projection_result_ty;
@@ -1131,6 +1131,7 @@ pub(super) fn finalize_monomorphized_shapes(
     let mut errors = Vec::new();
     let param_order = generic_param_order(unit);
     let type_bindings = MirGenericBindings::default();
+    let index = ExistingTypeIndex::build(&unit.types);
     for monomorphization in monomorphizations {
         let Some(params) = param_order.get(&monomorphization.key.source) else {
             continue;
@@ -1148,7 +1149,7 @@ pub(super) fn finalize_monomorphized_shapes(
                 shape_bindings.insert(param.name, concrete);
             }
         }
-        if !finalize_function_shapes(unit, function, &type_bindings, &shape_bindings, &mut errors) {
+        if !finalize_function_shapes(unit, function, &type_bindings, &shape_bindings, &index, &mut errors) {
             continue;
         }
         if function_contains_param(&unit.types, function) {
@@ -1181,42 +1182,45 @@ fn finalize_function_shapes(
     function: &mut MirFunction,
     type_bindings: &MirGenericBindings,
     shape_bindings: &MirShapeBindings,
+    index: &ExistingTypeIndex,
     errors: &mut Vec<MirError>,
 ) -> bool {
     let span = function.span;
     for param in &mut function.params {
-        param.ty = match finalize_type_shapes(unit, param.ty, type_bindings, shape_bindings, span, errors) {
+        param.ty = match finalize_type_shapes(unit, param.ty, type_bindings, shape_bindings, span, index, errors) {
             Some(ty) => ty,
             None => return false,
         };
     }
     for local in &mut function.locals {
-        local.ty = match finalize_type_shapes(unit, local.ty, type_bindings, shape_bindings, span, errors) {
+        local.ty = match finalize_type_shapes(unit, local.ty, type_bindings, shape_bindings, span, index, errors) {
             Some(ty) => ty,
             None => return false,
         };
     }
     for temp in &mut function.temps {
-        temp.ty = match finalize_type_shapes(unit, temp.ty, type_bindings, shape_bindings, span, errors) {
+        temp.ty = match finalize_type_shapes(unit, temp.ty, type_bindings, shape_bindings, span, index, errors) {
             Some(ty) => ty,
             None => return false,
         };
     }
     function.return_ty =
-        match finalize_type_shapes(unit, function.return_ty, type_bindings, shape_bindings, span, errors) {
+        match finalize_type_shapes(unit, function.return_ty, type_bindings, shape_bindings, span, index, errors) {
             Some(ty) => ty,
             None => return false,
         };
     function.error_ty = match function.error_ty {
-        Some(error_ty) => match finalize_type_shapes(unit, error_ty, type_bindings, shape_bindings, span, errors) {
-            Some(error_ty) => Some(error_ty),
-            None => return false,
-        },
+        Some(error_ty) => {
+            match finalize_type_shapes(unit, error_ty, type_bindings, shape_bindings, span, index, errors) {
+                Some(error_ty) => Some(error_ty),
+                None => return false,
+            }
+        }
         None => None,
     };
     for block in &mut function.blocks {
         for statement in &mut block.statements {
-            if !finalize_statement_shapes(unit, statement, type_bindings, shape_bindings, span, errors) {
+            if !finalize_statement_shapes(unit, statement, type_bindings, shape_bindings, span, index, errors) {
                 return false;
             }
         }
@@ -1238,41 +1242,55 @@ fn finalize_statement_shapes(
     type_bindings: &MirGenericBindings,
     shape_bindings: &MirShapeBindings,
     span: Span,
+    index: &ExistingTypeIndex,
     errors: &mut Vec<MirError>,
 ) -> bool {
     match &mut statement.kind {
         MirStatementKind::Assign { value, .. } => {
-            value.ty = match finalize_type_shapes(unit, value.ty, type_bindings, shape_bindings, span, errors) {
+            value.ty = match finalize_type_shapes(unit, value.ty, type_bindings, shape_bindings, span, index, errors) {
                 Some(ty) => ty,
                 None => return false,
             };
         }
         MirStatementKind::RuntimeCall { call, .. } => {
             call.return_ty =
-                match finalize_type_shapes(unit, call.return_ty, type_bindings, shape_bindings, span, errors) {
+                match finalize_type_shapes(unit, call.return_ty, type_bindings, shape_bindings, span, index, errors) {
                     Some(ty) => ty,
                     None => return false,
                 };
             if let MirIntrinsic::Convert(conversion) = &mut call.intrinsic {
-                conversion.source_ty =
-                    match finalize_type_shapes(unit, conversion.source_ty, type_bindings, shape_bindings, span, errors)
-                    {
-                        Some(ty) => ty,
-                        None => return false,
-                    };
-                conversion.target_ty =
-                    match finalize_type_shapes(unit, conversion.target_ty, type_bindings, shape_bindings, span, errors)
-                    {
-                        Some(ty) => ty,
-                        None => return false,
-                    };
+                conversion.source_ty = match finalize_type_shapes(
+                    unit,
+                    conversion.source_ty,
+                    type_bindings,
+                    shape_bindings,
+                    span,
+                    index,
+                    errors,
+                ) {
+                    Some(ty) => ty,
+                    None => return false,
+                };
+                conversion.target_ty = match finalize_type_shapes(
+                    unit,
+                    conversion.target_ty,
+                    type_bindings,
+                    shape_bindings,
+                    span,
+                    index,
+                    errors,
+                ) {
+                    Some(ty) => ty,
+                    None => return false,
+                };
             }
         }
         MirStatementKind::Construct { aggregate, .. } => {
-            aggregate.ty = match finalize_type_shapes(unit, aggregate.ty, type_bindings, shape_bindings, span, errors) {
-                Some(ty) => ty,
-                None => return false,
-            };
+            aggregate.ty =
+                match finalize_type_shapes(unit, aggregate.ty, type_bindings, shape_bindings, span, index, errors) {
+                    Some(ty) => ty,
+                    None => return false,
+                };
         }
         MirStatementKind::Call { .. } => {}
     }
@@ -1285,9 +1303,17 @@ fn finalize_type_shapes(
     type_bindings: &MirGenericBindings,
     shape_bindings: &MirShapeBindings,
     span: Span,
+    index: &ExistingTypeIndex,
     errors: &mut Vec<MirError>,
 ) -> Option<MirType> {
-    match instantiate_generic_type_with_shapes(&mut unit.types, ty, type_bindings, shape_bindings, span) {
+    match instantiate_generic_type_with_shapes_with_index(
+        &mut unit.types,
+        ty,
+        type_bindings,
+        shape_bindings,
+        span,
+        index,
+    ) {
         Ok(ty) => Some(ty),
         Err(error) => {
             errors.push(MirError::validation(error.span, error.message));
