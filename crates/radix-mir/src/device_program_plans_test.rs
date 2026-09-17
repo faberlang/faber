@@ -1089,6 +1089,108 @@ fn layer_norm_function(types: &mut TypeTable) -> MirFunction {
     )
 }
 
+/// A rank-2 affine layer-norm kernel: `t = layernorm(x, 1, 1e-5, gamma, beta)`
+/// over `[4,4]` with rank-1 `[4]` affine peers — the const layout
+/// `[x, axis, eps, gamma, beta]`. The `args[3]` gamma occupies the same
+/// operand slot `rope_table_local` reads, so this is the non-RoPE shape the
+/// `is_rope()` guard (3933dcd00) exists for.
+fn layer_norm_affine_function(types: &mut TypeTable) -> MirFunction {
+    let input = rank2_tensor_ty(types, [4, 4]);
+    let affine = tensor_ty(types, 4);
+    MirFunction {
+        id: MirFunctionId(0),
+        source: None,
+        name: None,
+        params: vec![
+            MirParam {
+                local: MirLocalId(0),
+                name: None,
+                ty: input,
+                mode: MirParamMode::Owned,
+                span: test_span(),
+            },
+            MirParam {
+                local: MirLocalId(1),
+                name: None,
+                ty: affine,
+                mode: MirParamMode::Owned,
+                span: test_span(),
+            },
+            MirParam {
+                local: MirLocalId(2),
+                name: None,
+                ty: affine,
+                mode: MirParamMode::Owned,
+                span: test_span(),
+            },
+        ],
+        locals: vec![
+            MirLocal {
+                id: MirLocalId(0),
+                name: None,
+                ty: input,
+                mutable: false,
+                span: test_span(),
+            },
+            MirLocal {
+                id: MirLocalId(1),
+                name: None,
+                ty: affine,
+                mutable: false,
+                span: test_span(),
+            },
+            MirLocal {
+                id: MirLocalId(2),
+                name: None,
+                ty: affine,
+                mutable: false,
+                span: test_span(),
+            },
+            MirLocal {
+                id: MirLocalId(3),
+                name: None,
+                ty: input,
+                mutable: false,
+                span: test_span(),
+            },
+        ],
+        temps: Vec::new(),
+        blocks: vec![MirBlock {
+            id: MirBlockId(0),
+            statements: vec![MirStatement {
+                kind: MirStatementKind::RuntimeCall {
+                    destination: Some(MirPlace::local(MirLocalId(3))),
+                    call: MirRuntimeCall {
+                        intrinsic: MirIntrinsic::Collection(MirCollectionOp::TensorLayerNorm),
+                        args: vec![
+                            MirOperand::Place(MirPlace::local(MirLocalId(0))),
+                            MirOperand::Constant(MirConstant::Int(1)),
+                            MirOperand::Constant(MirConstant::Float(1e-5)),
+                            MirOperand::Place(MirPlace::local(MirLocalId(1))),
+                            MirOperand::Place(MirPlace::local(MirLocalId(2))),
+                        ],
+                        return_ty: input,
+                    },
+                },
+                span: test_span(),
+            }],
+            terminator: MirTerminator {
+                kind: MirTerminatorKind::Return(Some(MirOperand::Place(MirPlace::local(
+                    MirLocalId(3),
+                )))),
+                span: test_span(),
+            },
+            span: test_span(),
+        }],
+        return_ty: input,
+        error_ty: None,
+        is_async: false,
+        is_generator: false,
+        shader_stage: None,
+        span: test_span(),
+    }
+}
+
 /// `t = transpose(x)` — the S5-U1 transpose-bearing kernel shape over a
 /// rank-2 `[4,4]` operand (the MLP 4×4 matmul-VJP transpose).
 fn transpose_rank2_function(types: &mut TypeTable) -> MirFunction {
@@ -2335,6 +2437,60 @@ fn rms_norm_signature_binds_gamma_as_a_kernel_resource() {
         )
         .is_some()
     );
+}
+
+#[test]
+fn layer_norm_affine_emission_signature_binds_the_affine_peers() {
+    // 3933dcd00's guard: `rope_table_local` reads `args[3]`, which an affine
+    // layer-norm call fills with its GAMMA peer. Without the `is_rope()`
+    // guard the gamma was mistaken for a RoPE table operand and marked
+    // bound, so the data-flow tail dropped it from the emitted signature —
+    // a non-RoPE call silently missing its affine input buffer. The
+    // emission signature must carry BOTH affine peers as read inputs.
+    let mut types = TypeTable::new();
+    let function = layer_norm_affine_function(&mut types);
+    let validation = MirValidationContext::new(&types);
+    let signature = transformer_subchain_signature_for_emission(
+        &function,
+        MirCollectionOp::TensorLayerNorm,
+        &validation,
+        &[MirLocalId(3)],
+    )
+    .expect("affine layer-norm emission signature resolves");
+    assert_eq!(
+        signature.input.source_local,
+        Some(MirLocalId(0)),
+        "the recipe operand x stays the primary read input"
+    );
+    assert_eq!(
+        signature
+            .extra_inputs
+            .iter()
+            .filter(|resource| resource.source_local == Some(MirLocalId(1)))
+            .count(),
+        1,
+        "gamma (args[3]) must be bound as a read input, never swallowed as a \
+         RoPE table operand"
+    );
+    assert_eq!(
+        signature
+            .extra_inputs
+            .iter()
+            .filter(|resource| resource.source_local == Some(MirLocalId(2)))
+            .count(),
+        1,
+        "beta (args[4]) must be bound as a read input"
+    );
+    assert_eq!(signature.extra_inputs.len(), 2);
+    assert_eq!(signature.extra_inputs[0].binding, 1);
+    assert_eq!(signature.extra_inputs[0].element_count, 4);
+    assert_eq!(signature.extra_inputs[1].binding, 2);
+    assert_eq!(signature.extra_inputs[1].element_count, 4);
+    assert_eq!(
+        signature.output.binding, 3,
+        "the output binds after both affine peers"
+    );
+    assert_eq!(signature.output.source_local, Some(MirLocalId(3)));
 }
 
 #[test]
