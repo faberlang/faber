@@ -162,6 +162,7 @@ fn lookup_intrinsic_row(
         receivers_for_type(receiver_ty)
             .iter()
             .find_map(|family| lookup_method_named(*family, method))
+            .filter(|entry| !entry.generic.is_empty())
     })
 }
 
