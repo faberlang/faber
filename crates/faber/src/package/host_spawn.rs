@@ -1106,7 +1106,7 @@ fn execute_distributed_at(
     })
 }
 
-fn elapsed_us(start: std::time::Instant) -> u64 {
+pub(crate) fn elapsed_us(start: std::time::Instant) -> u64 {
     u64::try_from(start.elapsed().as_micros()).unwrap_or(u64::MAX)
 }
 
