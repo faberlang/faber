@@ -106,7 +106,7 @@ struct MonomorphizationState<'lowerer, 'unit> {
     lowerer: &'lowerer mut MirLowerer<'unit>,
     templates: FxHashMap<DefId, MirFunction>,
     generic_param_order: FxHashMap<DefId, Vec<OrderedParam>>,
-    struct_fields: FxHashMap<DefId, FxHashMap<Symbol, MirType>>,
+    struct_fields: Arc<FxHashMap<DefId, FxHashMap<Symbol, MirType>>>,
     monomorphizations: Vec<MirMonomorphization>,
     instance_index: FxHashMap<MirMonomorphizationKey, MirFunctionId>,
     next_id: MirFunctionId,
@@ -115,9 +115,10 @@ struct MonomorphizationState<'lowerer, 'unit> {
 impl<'lowerer, 'unit> MonomorphizationState<'lowerer, 'unit> {
     fn new(lowerer: &'lowerer mut MirLowerer<'unit>) -> Self {
         let generic_param_order = generic_param_order(lowerer.unit);
-        let struct_fields = LoweringContextMaps::collect(lowerer.unit)
-            .validation
-            .struct_fields;
+        let struct_fields = lowerer
+            .struct_field_types
+            .take()
+            .expect("struct field types retained during lowering");
         let templates = lowerer
             .functions
             .iter()
