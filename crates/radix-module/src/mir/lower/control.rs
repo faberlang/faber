@@ -748,18 +748,7 @@ impl FunctionBuilder<'_> {
         let mut default_body = None;
 
         for arm in arms {
-            if arm.guard.is_some() {
-                self.errors
-                    .push(MirError::unsupported(arm.span, "guarded discerne before switch MIR lowering"));
-                return None;
-            }
-            let [pattern] = arm.patterns.as_slice() else {
-                self.errors.push(MirError::unsupported(
-                    arm.span,
-                    "multi-pattern discerne arm before switch MIR lowering",
-                ));
-                return None;
-            };
+            let Some(pattern) = self.discerne_switch_arm_pattern(arm) else { return None; };
             match pattern {
                 HirPattern::Literal(literal) => {
                     let constant = self.literal_switch_constant(literal, arm.span)?;
@@ -1014,18 +1003,7 @@ impl FunctionBuilder<'_> {
         let mut reaches_join = false;
 
         for arm in arms {
-            if arm.guard.is_some() {
-                self.errors
-                    .push(MirError::unsupported(arm.span, "guarded discerne before switch MIR lowering"));
-                return None;
-            }
-            let [pattern] = arm.patterns.as_slice() else {
-                self.errors.push(MirError::unsupported(
-                    arm.span,
-                    "multi-pattern discerne arm before switch MIR lowering",
-                ));
-                return None;
-            };
+            let Some(pattern) = self.discerne_switch_arm_pattern(arm) else { return None; };
             match pattern {
                 HirPattern::Variant(variant, fields) => {
                     self.lower_unit_variant_arm(
@@ -1091,6 +1069,25 @@ impl FunctionBuilder<'_> {
             self.seal_unreachable(join_id, expr.span);
             None
         }
+    }
+
+    /// Shared prelude for the discerne switch loops: reject guarded arms and
+    /// multi-pattern arms with their standing diagnostics, or yield the arm's
+    /// single pattern.
+    fn discerne_switch_arm_pattern<'a>(&mut self, arm: &'a HirCasuArm) -> Option<&'a HirPattern> {
+        if arm.guard.is_some() {
+            self.errors
+                .push(MirError::unsupported(arm.span, "guarded discerne before switch MIR lowering"));
+            return None;
+        }
+        let [pattern] = arm.patterns.as_slice() else {
+            self.errors.push(MirError::unsupported(
+                arm.span,
+                "multi-pattern discerne arm before switch MIR lowering",
+            ));
+            return None;
+        };
+        Some(pattern)
     }
 
     /// Lower one unit-variant arm: probe the scrutinee, branch on equality with
