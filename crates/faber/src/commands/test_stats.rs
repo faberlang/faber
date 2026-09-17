@@ -14,13 +14,6 @@ use std::io;
 use std::path::PathBuf;
 
 pub(crate) const STATS_MARKER: &str = "--- faber-test-stats ---";
-const FORMAT_VERSION: u32 = 1;
-const ROUTE: &str = "scena";
-const CLOCK: &str = "monotonic-ns";
-const DURATION_METHOD: &str = "reservoir";
-const DURATION_SIZE: u32 = 256;
-const SELF_TIME: &str = "child-subtracted via call stack";
-const NOTE: &str = "diagnostic only — never a bench-gate input";
 
 /// The binding's `format_version: 1` test-run artifact.
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
@@ -81,14 +74,14 @@ impl TestStatsArtifact {
         cases.sort_by(|left, right| left.path.cmp(&right.path));
         Self {
             kind: "faber-test-stats".to_owned(),
-            format_version: FORMAT_VERSION,
+            format_version: run_stats::FORMAT_VERSION,
             generated_at: run_stats::generated_at(),
             faber: FaberMetadata {
                 version: env!("CARGO_PKG_VERSION").to_owned(),
                 commit: None,
             },
             package,
-            route: ROUTE.to_owned(),
+            route: run_stats::ROUTE.to_owned(),
             run: TestRunMetadata {
                 wall_ms,
                 exit,
@@ -98,14 +91,14 @@ impl TestStatsArtifact {
                 skipped: report.skipped(),
             },
             meter: MeterMetadata {
-                clock: CLOCK.to_owned(),
+                clock: run_stats::CLOCK.to_owned(),
                 durations: run_stats::DurationMetadata {
-                    method: DURATION_METHOD.to_owned(),
-                    size: DURATION_SIZE,
+                    method: run_stats::DURATION_METHOD.to_owned(),
+                    size: run_stats::DURATION_SIZE,
                     exact: false,
                 },
-                self_time: SELF_TIME.to_owned(),
-                note: NOTE.to_owned(),
+                self_time: run_stats::SELF_TIME.to_owned(),
+                note: run_stats::NOTE.to_owned(),
             },
             cases,
         }
