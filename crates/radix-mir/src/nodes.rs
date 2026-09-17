@@ -21,6 +21,7 @@ use crate::{MirAtomicOp, MirCollectionOp, MirKernelBuiltin, MirKernelShaderStage
 use radix_hir::DefId;
 use radix_lexer::{Span, Symbol};
 use radix_types::{IndexId, TypeId};
+use rustc_hash::FxHashMap;
 use serde::{Deserialize, Serialize};
 
 /// Stable identifier for a MIR function within one `MirProgram`.
@@ -192,6 +193,37 @@ impl MirType {
     }
 }
 
+/// Function-id to vector-position index for one immutable MIR program.
+///
+/// Producers may append or reorder functions after allocating their stable
+/// IDs, so consumers that perform repeated lookups should build this map once
+/// and use [`MirProgram::indexed_function`].
+#[derive(Debug, Clone, Default)]
+pub struct MirFunctionIndex {
+    positions: FxHashMap<MirFunctionId, usize>,
+}
+
+impl MirFunctionIndex {
+    #[must_use]
+    pub fn for_program(program: &MirProgram) -> Self {
+        let mut positions = FxHashMap::default();
+        for (position, function) in program.functions.iter().enumerate() {
+            positions.entry(function.id).or_insert(position);
+        }
+        Self { positions }
+    }
+
+    #[must_use]
+    pub fn position(&self, id: MirFunctionId) -> Option<usize> {
+        self.positions.get(&id).copied()
+    }
+
+    #[must_use]
+    pub fn get(&self, id: &MirFunctionId) -> Option<&usize> {
+        self.positions.get(id)
+    }
+}
+
 /// Complete MIR unit emitted for one analyzed source/package entry.
 ///
 /// Function order is stable output order for dumps and probes. Do not treat the
@@ -210,9 +242,29 @@ impl MirProgram {
         }
     }
 
-    /// O(1) lookup when `id.0` matches the dense vector index (the common
-    /// lowering allocation order). Falls back to a linear scan when IDs are
-    /// sparse or reordered.
+    #[must_use]
+    pub fn function_index(&self) -> MirFunctionIndex {
+        MirFunctionIndex::for_program(self)
+    }
+
+    /// O(1) lookup through a caller-owned index built for this program.
+    #[must_use]
+    pub fn indexed_function(
+        &self,
+        index: &MirFunctionIndex,
+        id: MirFunctionId,
+    ) -> Option<&MirFunction> {
+        let position = index.position(id)?;
+        self.functions
+            .get(position)
+            .filter(|function| function.id == id)
+    }
+
+    /// Lookup for callers that do not retain an immutable program index.
+    ///
+    /// Long-lived production paths should use [`Self::function_index`] and
+    /// [`Self::indexed_function`]. This compatibility method retains its
+    /// dense fast path and sparse fallback for raw or mutable program users.
     #[must_use]
     pub fn function_by_id(&self, id: MirFunctionId) -> Option<&MirFunction> {
         if let Some(function) = self.functions.get(id.0 as usize)

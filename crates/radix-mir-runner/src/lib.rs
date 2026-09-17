@@ -25,9 +25,9 @@ use radix_hir::DefId;
 use radix_lexer::{Interner, Span, Symbol};
 use radix_mir::{
     MirBinOp, MirBlock, MirBlockId, MirCallee, MirConstant, MirFunction, MirFunctionId,
-    MirKernelShaderStage, MirLocalId, MirOperand, MirParamMode, MirPlace, MirPlaceBase, MirProgram,
-    MirStatementKind, MirTempId, MirTerminatorKind, MirType, MirUnOp, MirValidationContext,
-    MirValue, MirValueId, MirValueKind, ValidatedMir,
+    MirFunctionIndex, MirKernelShaderStage, MirLocalId, MirOperand, MirParamMode, MirPlace,
+    MirPlaceBase, MirProgram, MirStatementKind, MirTempId, MirTerminatorKind, MirType, MirUnOp,
+    MirValidationContext, MirValue, MirValueId, MirValueKind, ValidatedMir,
 };
 use radix_types::{NumericWidth, Primitive, Type, TypeId, TypeTable, effective_width};
 use rustc_hash::{FxHashMap, FxHashSet};
@@ -205,6 +205,7 @@ pub struct RunnerRunOutcome {
 
 pub(crate) struct Runner<'a, H: Host + ?Sized> {
     program: &'a MirProgram,
+    function_index: MirFunctionIndex,
     context: &'a MirValidationContext<'a>,
     types: &'a TypeTable,
     interner: &'a Interner,
@@ -270,6 +271,7 @@ impl<'a, H: Host + ?Sized> Runner<'a, H> {
             }
         }
         Self {
+            function_index: program.function_index(),
             program,
             context,
             types,
@@ -539,13 +541,13 @@ fn run_function_with_explicit_limits_and_stats<H: Host + ?Sized>(
             "runner requires interner context",
         )]
     })?;
-    if program.function_by_id(function_id).is_none() {
+    if validated.function_by_id(function_id).is_none() {
         return Err(vec![RunnerError::internal(
             Span::default(),
             format!("no MIR function with id {}", function_id.0),
         )]);
     }
-    if let Some(function) = program.function_by_id(function_id)
+    if let Some(function) = validated.function_by_id(function_id)
         && function.shader_stage == Some(MirKernelShaderStage::Compute)
     {
         return Err(vec![kernel_refused(function.span)]);
@@ -710,7 +712,10 @@ fn half_to_f32(bits: u16) -> f32 {
 
 impl<H: Host + ?Sized> Runner<'_, H> {
     fn push_frame(&mut self, function_id: MirFunctionId, entry_block: MirBlockId) {
-        let locals = match self.program.function_by_id(function_id) {
+        let locals = match self
+            .program
+            .indexed_function(&self.function_index, function_id)
+        {
             Some(function) => {
                 let mut locals = FxHashMap::default();
                 for param in &function.params {
@@ -753,9 +758,9 @@ impl<H: Host + ?Sized> Runner<'_, H> {
     }
 
     fn function_by_id(&self, id: MirFunctionId, span: Span) -> Result<&MirFunction, RunnerError> {
-        // Prefer dense O(1) via MirProgram::function_by_id (BO-M-3).
+        // Use the immutable function-id index captured at runner construction.
         self.program
-            .function_by_id(id)
+            .indexed_function(&self.function_index, id)
             .ok_or_else(|| RunnerError::internal(span, format!("missing function f{}", id.0)))
     }
 
@@ -1294,18 +1299,24 @@ impl<H: Host + ?Sized> Runner<'_, H> {
     fn operand_float_width(&self, operand: &MirOperand) -> Option<NumericWidth> {
         let ty = match operand {
             MirOperand::Temp(id) => {
-                let function = self.program.function_by_id(self.frames.last()?.function)?;
+                let function = self
+                    .program
+                    .indexed_function(&self.function_index, self.frames.last()?.function)?;
                 function.temps.iter().find(|t| t.id == *id).map(|t| t.ty)
             }
             MirOperand::Place(place) => match place.base {
                 MirPlaceBase::Temp(id) => {
-                    let function = self.program.function_by_id(self.frames.last()?.function)?;
+                    let function = self
+                        .program
+                        .indexed_function(&self.function_index, self.frames.last()?.function)?;
                     function.temps.iter().find(|t| t.id == id).map(|t| t.ty)
                 }
                 // Locals and projections may narrow away from the numeric
                 // element; only a projection-free numeric base resolves.
                 MirPlaceBase::Local(id) if place.projections.is_empty() => {
-                    let function = self.program.function_by_id(self.frames.last()?.function)?;
+                    let function = self
+                        .program
+                        .indexed_function(&self.function_index, self.frames.last()?.function)?;
                     function.locals.iter().find(|l| l.id == id).map(|l| l.ty)
                 }
                 MirPlaceBase::Local(_) => None,
