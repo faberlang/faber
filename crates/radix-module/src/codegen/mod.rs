@@ -261,14 +261,19 @@ pub fn generate_from_analyzed_with_options(
                 // unwrapping: an `ad`-verb provider function emits `Result`
                 // even without a declared `⇥` channel, so widen the imported
                 // namespace effects for those members.
+                let mut provider_failable_exports = rustc_hash::FxHashMap::default();
+                for (name, _, failable_exports) in &provider_modules {
+                    provider_failable_exports
+                        .entry(name.as_str())
+                        .or_insert(failable_exports);
+                }
                 for ((def_id, member), effects) in &mut namespace_info.function_effects {
                     let Some(modules) = namespace_info.modules.get(def_id) else {
                         continue;
                     };
-                    if let Some(failable_exports) = provider_modules
+                    if let Some(failable_exports) = modules
                         .iter()
-                        .find(|(name, _, _)| modules.iter().any(|segment| segment == name))
-                        .map(|(_, _, failable_exports)| failable_exports)
+                        .find_map(|segment| provider_failable_exports.get(segment.as_str()))
                         && failable_exports.contains(member)
                     {
                         effects.is_failable = true;
