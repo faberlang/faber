@@ -1666,8 +1666,8 @@ fn wire_reconstruction_preserves_legacy_elementwise_library_selection() {
         dependencies: Vec::new(),
         relations: Vec::new(),
     };
-    let program = crate::schema::wire_program_to_program(&wire)
-        .expect("fixture wire program reconstructs");
+    let program =
+        crate::schema::wire_program_to_program(&wire).expect("fixture wire program reconstructs");
     let extension = radix_mir::device_program_plans::executor_plan_extension(&program);
     assert_eq!(extension.selections.len(), cases.len());
     for ((entry, expected), selection) in cases.iter().zip(extension.selections.iter()) {

@@ -723,7 +723,7 @@ pub(crate) fn import_contract_for_parsed_file(
         let StmtKind::Import(decl) = &stmt.kind else {
             continue;
         };
-        let Some(binding) = import_binding(&interner, &decl.kind) else {
+        let Some(binding) = import_binding(interner, &decl.kind) else {
             continue;
         };
         let import_path = interner.resolve(decl.path);
@@ -1028,7 +1028,7 @@ fn package_identity_facts_for_parsed_file(
         let StmtKind::Import(decl) = &stmt.kind else {
             continue;
         };
-        let Some(binding) = import_binding(&interner, &decl.kind) else {
+        let Some(binding) = import_binding(interner, &decl.kind) else {
             continue;
         };
         let import_path = interner.resolve(decl.path);
