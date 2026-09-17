@@ -767,11 +767,34 @@ fn wire_packed_layout(layout: WirePackedStorageLayout) -> PackedStorageLayout {
     }
 }
 
+/// Decode the legacy name-keyed Elementwise discriminant off the wire into
+/// the canonical typed tag, exactly once, at this boundary (head-cto PD-29
+/// ruling, Option A). The persisted entry name is the wire ABI; the
+/// predecessor contract applies verbatim: `swiglu*` selects SwiGlu,
+/// `*residual*` and `sum_o_*` select ResidualRmsNorm. In-memory selection
+/// stays typed-only.
+fn wire_library_operation(
+    kernel: &WireKernelUnit,
+) -> radix_mir::device_plan_compiler::LibraryOperation {
+    use radix_mir::device_plan_compiler::LibraryOperation;
+    if !matches!(kernel.plan, WireCollectionKernelPlan::Elementwise) {
+        return LibraryOperation::Generated;
+    }
+    let entry = kernel.entry.as_str();
+    if entry.starts_with("swiglu") {
+        LibraryOperation::SwiGlu
+    } else if entry.contains("residual") || entry.starts_with("sum_o_") {
+        LibraryOperation::ResidualRmsNorm
+    } else {
+        LibraryOperation::Generated
+    }
+}
+
 fn wire_kernel(kernel: &WireKernelUnit) -> Result<KernelUnit, FmirImageError> {
     Ok(KernelUnit {
         function: MirFunctionId(kernel.function),
         entry: kernel.entry.clone(),
-        library_operation: radix_mir::device_plan_compiler::LibraryOperation::Generated,
+        library_operation: wire_library_operation(kernel),
         plan: wire_kernel_plan(&kernel.plan),
         resources: kernel
             .resources

@@ -1608,3 +1608,73 @@ fn gea3_program_rejects_missing_edges_or_undeclared_facts() {
     plan.axis = 0;
     assert!(admit_gea3_full_model_program(&wrong_geometry, false).is_err());
 }
+
+#[test]
+fn wire_reconstruction_preserves_legacy_elementwise_library_selection() {
+    // PD-29 oracle (head-cto ruling, Option A): the persisted wire entry name
+    // is the legacy ABI discriminant. A wire-reconstructed Elementwise unit
+    // must select the same library body it selected before the typed-tag
+    // bridge; the assertion is on the selection outcome, not the tag field.
+    let cases: [(&str, Option<&str>); 5] = [
+        ("swiglu", Some("swiglu")),
+        ("swiglu_gate_up", Some("swiglu")),
+        ("residual_add", Some("residual")),
+        ("sum_o_partial", Some("residual")),
+        ("vector_scale", None),
+    ];
+    let mut kernels = Vec::new();
+    let mut launches = Vec::new();
+    let mut semantic_values = Vec::new();
+    for (index, (entry, _)) in cases.iter().enumerate() {
+        let id = u32::try_from(index + 1).expect("fixture buffer ids fit u32");
+        let buffer = gea2_wire_buffer(
+            id,
+            format!("{entry}_io"),
+            WireBufferRole::InOut,
+            WireBufferLifetime::PerProgram,
+        );
+        gea2_add_semantic_value(&mut semantic_values, &buffer);
+        kernels.push(WireKernelUnit {
+            function: u32::try_from(index).expect("fixture function ids fit u32"),
+            entry: (*entry).to_owned(),
+            plan: WireCollectionKernelPlan::Elementwise,
+            resources: vec![gea2_wire_resource(
+                &buffer,
+                16,
+                0,
+                WireResourceAccess::ReadWrite,
+                WireInitializationPolicy::ZeroFill,
+            )],
+            launch: WireKernelLaunchPlan {
+                workgroup: WireWorkgroupSize { x: 1, y: 1, z: 1 },
+                dispatch_size: WireDispatchSize { x: 16, y: 1, z: 1 },
+                workgroup_count: WireWorkgroupCount { x: 16, y: 1, z: 1 },
+            },
+        });
+        launches.push(WireLaunchUnit {
+            id: u32::try_from(index + 1).expect("fixture launch ids fit u32"),
+            kernel_index: u32::try_from(index).expect("fixture kernel indices fit u32"),
+        });
+    }
+    let wire = WireDeviceProgram {
+        kernels,
+        launches,
+        lifetime: WireProgramLifetime::SingleRun,
+        results: Vec::new(),
+        semantic_values,
+        roots: Vec::new(),
+        dependencies: Vec::new(),
+        relations: Vec::new(),
+    };
+    let program = crate::schema::wire_program_to_program(&wire)
+        .expect("fixture wire program reconstructs");
+    let extension = radix_mir::device_program_plans::executor_plan_extension(&program);
+    assert_eq!(extension.selections.len(), cases.len());
+    for ((entry, expected), selection) in cases.iter().zip(extension.selections.iter()) {
+        assert_eq!(
+            selection.library_entry.as_deref(),
+            *expected,
+            "wire-reconstructed elementwise entry {entry} must select its legacy library body"
+        );
+    }
+}
