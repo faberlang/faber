@@ -670,7 +670,7 @@ fn cli_type_zero_operand(interner: &mut Interner, ty: &CliType) -> MirOperand {
 /// Returns `MirError` values for unsupported HIR surfaces, missing semantic
 /// types, sealed-block misuse, and post-lowering validation failures.
 pub fn dump_analyzed_unit(unit: &mut AnalyzedModule) -> Result<String, Vec<MirError>> {
-    lower_analyzed_unit(unit, MirLoweringOptions::default()).map(|lowered| dump_program(&lowered.validated.program()))
+    lower_analyzed_unit(unit, MirLoweringOptions::default()).map(|lowered| dump_program(lowered.validated.program()))
 }
 
 fn ensure_map_iteration_array_types(types: &mut TypeTable) {
