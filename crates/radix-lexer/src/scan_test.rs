@@ -448,6 +448,18 @@ fn normalizes_interned_identifiers_to_nfkc() {
 }
 
 #[test]
+fn lookup_finds_interned_string_without_appending() {
+    // Reverse lookup reads the existing table: byte-exact keys, no
+    // normalization, never an insertion.
+    let mut interner = Interner::new();
+    let sym = interner.intern_raw("sunt");
+
+    assert_eq!(interner.lookup("sunt"), Some(sym));
+    assert_eq!(interner.lookup("numquam"), None);
+    assert_eq!(interner.strings().len(), 1, "lookup must never append");
+}
+
+#[test]
 fn string_literal_payloads_preserve_source_bytes() {
     // PRP-013 R3: full-width parens inside a string literal must not collapse
     // via NFKC. Literal payloads preserve source bytes; only identifiers use NFKC.
