@@ -254,8 +254,8 @@ pub enum MirCollectionOp {
     /// operands in the `MirRuntimeCall::args` list, NOT a payload struct —
     /// `MirIntrinsic::Collection` is a bare discriminant.
     TensorLayerNorm,
-    /// Root-mean-square normalization (the CCI-1 `rms_norm` source contract;
-    /// `decoder_ops::rms_norm` semantics): `y = x·(1/sqrt(mean(x²)+eps))·gamma`,
+    /// Root-mean-square normalization (the CCI-1 `rms_norm` source contract):
+    /// `y = x·(1/sqrt(mean(x²)+eps))·gamma`,
     /// no mean subtraction, f64 sum-of-squares → f32 mean. Axis and epsilon
     /// are trailing const operands (`[x, axis, eps, gamma]`), gamma is the
     /// mandatory affine peer operand — mirroring `TensorLayerNorm`'s const

@@ -2827,8 +2827,7 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
         let norm_dim = shape[rank - 1] as usize;
         let batch = total_len / norm_dim;
 
-        // Gamma is the mandatory affine peer: rank-1, width == axis extent
-        // (the `decoder_ops::rms_norm` weight-length contract).
+        // Gamma is the mandatory affine peer: rank-1, width == axis extent.
         let gamma = self.tensor_arg(gamma_arg, span)?;
         require_rank1_extent(
             &gamma.borrow(),
@@ -2839,8 +2838,8 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
         let g_borrow = gamma.borrow();
 
         // rms_norm: y = x·(1/sqrt(mean(x²)+eps))·gamma, no mean subtraction.
-        // f64 sum of squares → f32 mean → f32 scale (the pinned
-        // `decoder_ops::rms_norm` operation order).
+        // f64 sum of squares → f32 mean → f32 scale (the in-repo
+        // `rms_norm_reference` operation order).
         let mut output = Vec::with_capacity(total_len);
         for row in 0..batch {
             let base = row * norm_dim;
