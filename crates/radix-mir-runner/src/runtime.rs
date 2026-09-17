@@ -56,6 +56,43 @@ use rustc_hash::FxHashMap;
 use std::cell::RefCell;
 use std::rc::Rc;
 
+#[derive(Clone, Copy)]
+enum RowSoftmaxAccess {
+    Safe,
+    Direct,
+}
+
+fn row_softmax(
+    values: &[Value],
+    base: usize,
+    last_dim: usize,
+    access: RowSoftmaxAccess,
+    span: Span,
+) -> Result<Vec<f64>, RunnerError> {
+    let value_at = |index| match access {
+        RowSoftmaxAccess::Safe => values
+            .get(index)
+            .ok_or_else(|| RunnerError::internal(span, "tensor softmax index out of bounds")),
+        RowSoftmaxAccess::Direct => Ok(&values[index]),
+    };
+
+    // Subtract max before exp so the row softmax stays finite.
+    let mut max_val = f64::NEG_INFINITY;
+    for i in 0..last_dim {
+        let value = value_at(base + i)?;
+        max_val = max_val.max(numeric_as_f64(value, span)?);
+    }
+    let mut exps = Vec::with_capacity(last_dim);
+    let mut exp_sum = 0.0_f64;
+    for i in 0..last_dim {
+        let value = value_at(base + i)?;
+        let exp_val = (numeric_as_f64(value, span)? - max_val).exp();
+        exps.push(exp_val);
+        exp_sum += exp_val;
+    }
+    Ok(exps.into_iter().map(|exp_val| exp_val / exp_sum).collect())
+}
+
 impl<H: super::Host + ?Sized> Runner<'_, H> {
     // RUNTIME CALL DISPATCH
 
@@ -2275,29 +2312,8 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
         let mut out_data = Vec::with_capacity(borrow.data.len());
         for b in 0..batch {
             let base = b * last_dim;
-            // Subtract max before exp so the row softmax stays finite.
-            let mut max_val = f64::NEG_INFINITY;
-            for i in 0..last_dim {
-                if let Some(v) = borrow.data.get(base + i) {
-                    max_val = max_val.max(numeric_as_f64(v, span)?);
-                }
-            }
-            let mut exps = Vec::with_capacity(last_dim);
-            let mut exp_sum = 0.0_f64;
-            for i in 0..last_dim {
-                let v = numeric_as_f64(
-                    borrow.data.get(base + i).ok_or_else(|| {
-                        RunnerError::internal(span, "tensor softmax index out of bounds")
-                    })?,
-                    span,
-                )?;
-                let exp_val = (v - max_val).exp();
-                exps.push(exp_val);
-                exp_sum += exp_val;
-            }
-            for exp_val in exps {
-                out_data.push(Value::Float(exp_val / exp_sum));
-            }
+            let row = row_softmax(&borrow.data, base, last_dim, RowSoftmaxAccess::Safe, span)?;
+            out_data.extend(row.into_iter().map(Value::Float));
         }
         Ok(tensor_value(out_data, shape.clone()))
     }
@@ -2353,25 +2369,16 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
         let mut total_loss = 0.0_f64;
         for b in 0..batch {
             let base = b * last_dim;
-            // Find max for numerical stability of softmax.
-            let mut max_val = f64::NEG_INFINITY;
-            for i in 0..last_dim {
-                let v = numeric_as_f64(&logits_borrow.data[base + i], span)?;
-                max_val = max_val.max(v);
-            }
-            // Compute softmax: exp(x - max) / sum(exp(x - max))
-            let mut exp_vals = Vec::with_capacity(last_dim);
-            let mut exp_sum = 0.0_f64;
-            for i in 0..last_dim {
-                let v = numeric_as_f64(&logits_borrow.data[base + i], span)?;
-                let exp_val = (v - max_val).exp();
-                exp_vals.push(exp_val);
-                exp_sum += exp_val;
-            }
+            let softmax = row_softmax(
+                &logits_borrow.data,
+                base,
+                last_dim,
+                RowSoftmaxAccess::Direct,
+                span,
+            )?;
             // Compute cross-entropy: -sum(targets * log(softmax + eps))
             let mut row_loss = 0.0_f64;
-            for (i, exp_val) in exp_vals.iter().enumerate() {
-                let softmax_val = exp_val / exp_sum;
+            for (i, softmax_val) in softmax.iter().enumerate() {
                 let target = numeric_as_f64(&targets_borrow.data[base + i], span)?;
                 row_loss -= target * (softmax_val + eps).ln();
             }
