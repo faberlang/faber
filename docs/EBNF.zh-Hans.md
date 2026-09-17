@@ -467,235 +467,235 @@ NO_NEWLINE ::=
 
 ## Production Index {#production-index}
 
-| ID | Anchor | Status | Former names |
-|---|---|---|---|
-| [`IDENTIFIER`](#identifier) | `#identifier` | capture-pending | — |
-| [`NUMBER`](#number) | `#number` | capture-pending | — |
-| [`NATURAL`](#natural) | `#natural` | capture-pending | — |
-| [`STRING`](#string) | `#string` | capture-pending | — |
-| [`ASCII_STRING`](#ascii-string) | `#ascii-string` | capture-pending | — |
-| [`BACKTICK_STRING`](#backtick-string) | `#backtick-string` | capture-pending | — |
-| [`OCTETI_STRING`](#octeti-string) | `#octeti-string` | capture-pending | — |
-| [`NEWLINE`](#newline) | `#newline` | capture-pending | — |
-| [`WIDTH_MARKER`](#width-marker) | `#width-marker` | capture-pending | — |
-| [`LISTA_WIDTH_SUGAR`](#lista-width-sugar) | `#lista-width-sugar` | capture-pending | — |
-| [`TENSOR_WIDTH_SUGAR`](#tensor-width-sugar) | `#tensor-width-sugar` | capture-pending | — |
-| [`SPARSA_WIDTH_SUGAR`](#sparsa-width-sugar) | `#sparsa-width-sugar` | capture-pending | — |
-| [`VECTOR_WIDTH_SUGAR`](#vector-width-sugar) | `#vector-width-sugar` | capture-pending | — |
-| [`MATRIX_WIDTH_SUGAR`](#matrix-width-sugar) | `#matrix-width-sugar` | capture-pending | — |
-| [`FRONTMATTER_DELIMITER`](#frontmatter-delimiter) | `#frontmatter-delimiter` | capture-pending | — |
-| [`TOML_LINES`](#toml-lines) | `#toml-lines` | capture-pending | — |
-| [`ANNOTATION_NAME`](#annotation-name) | `#annotation-name` | capture-pending | — |
-| [`ANNOTATION_FIELD_NAME`](#annotation-field-name) | `#annotation-field-name` | capture-pending | — |
-| [`NON_NEWLINE_TOKEN`](#non-newline-token) | `#非-newline-token` | capture-pending | — |
-| [`NO_NEWLINE`](#no-newline) | `#no-newline` | capture-pending | — |
-| [`fab_file`](#fab-file) | `#fab-file` | live | — |
-| [`frontmatter`](#frontmatter) | `#frontmatter` | live | — |
-| [`program`](#program) | `#program` | live | — |
-| [`statement`](#statement) | `#statement` | live | — |
-| [`statement_core`](#statement-core) | `#statement-core` | live | — |
-| [`binding_decl`](#binding-decl) | `#binding-decl` | live | — |
-| [`expr_stmt`](#expr-stmt) | `#expr-stmt` | live | — |
-| [`block_stmt`](#block-stmt) | `#block-stmt` | live | — |
-| [`fixum_decl`](#fixum-decl) | `#常量-decl` | live | — |
-| [`figendum_decl`](#figendum-decl) | `#等定-decl` | live | — |
-| [`sit_decl`](#sit-decl) | `#设-decl` | live | — |
-| [`array_destruct`](#array-destruct) | `#array-destruct` | live | — |
-| [`object_destruct`](#object-destruct) | `#object-destruct` | live | — |
-| [`functio_decl`](#functio-decl) | `#函数-decl` | live | — |
-| [`param_list`](#param-list) | `#param-list` | live | — |
-| [`generic_params`](#generic-params) | `#generic-params` | live | — |
-| [`generic_param`](#generic-param) | `#generic-param` | live | — |
-| [`generic_type_default`](#generic-type-default) | `#generic-type-default` | live | — |
-| [`generic_size_default`](#generic-size-default) | `#generic-size-default` | live | — |
-| [`call_type_args`](#call-type-args) | `#call-type-args` | live | — |
-| [`parameter`](#parameter) | `#parameter` | live | — |
-| [`func_modifier`](#func-modifier) | `#func-modifier` | live | — |
-| [`callable_posture`](#callable-posture) | `#callable-posture` | live | — |
-| [`return_clause`](#return-clause) | `#return-clause` | live | — |
-| [`alternate_exit_clause`](#alternate-exit-clause) | `#alternate-exit-clause` | live | — |
-| [`ergo_joint`](#ergo-joint) | `#则-joint` | live | — |
-| [`clausura_joint`](#clausura-joint) | `#闭包-joint` | live | — |
-| [`clausura_expr`](#clausura-expr) | `#闭包-expr` | live | — |
-| [`compact_clausura_expr`](#compact-clausura-expr) | `#compact-闭包-expr` | live | — |
-| [`clausura_signature`](#clausura-signature) | `#闭包-signature` | live | — |
-| [`closure_modifier`](#closure-modifier) | `#closure-modifier` | live | — |
-| [`fac_block`](#fac-block) | `#执行-block` | live | — |
-| [`clausura_legacy_expr`](#clausura-legacy-expr) | `#闭包-legacy-expr` | live | — |
-| [`clausura_params`](#clausura-params) | `#闭包-params` | live | — |
-| [`clausura_param`](#clausura-param) | `#闭包-param` | live | — |
-| [`genus_decl`](#genus-decl) | `#类-decl` | live | — |
-| [`genus_member`](#genus-member) | `#类-member` | live | — |
-| [`field_decl`](#field-decl) | `#field-decl` | live | — |
-| [`functio_method_decl`](#functio-method-decl) | `#函数-method-decl` | live | — |
-| [`annotation`](#annotation) | `#annotation` | live | — |
-| [`annotation_name`](#annotation-name) | `#annotation-name` | live | — |
-| [`braced_annotation`](#braced-annotation) | `#braced-annotation` | live | — |
-| [`annotation_field_list`](#annotation-field-list) | `#annotation-field-list` | live | — |
-| [`annotation_field`](#annotation-field) | `#annotation-field` | live | — |
-| [`annotation_sugar`](#annotation-sugar) | `#annotation-sugar` | live | — |
-| [`nucleum_annotation`](#nucleum-annotation) | `#内核-annotation` | live | — |
-| [`nucleum_sugar`](#nucleum-sugar) | `#内核-sugar` | live | — |
-| [`nucleum_braced`](#nucleum-braced) | `#内核-braced` | live | — |
-| [`nucleum_modifier`](#nucleum-modifier) | `#内核-modifier` | live | — |
-| [`nucleum_field_list`](#nucleum-field-list) | `#内核-field-list` | live | — |
-| [`nucleum_field`](#nucleum-field) | `#内核-field` | live | — |
-| [`implendum_decl`](#implendum-decl) | `#契约-decl` | live | — |
-| [`implendum_method_decl`](#implendum-method-decl) | `#契约-method-decl` | live | — |
-| [`typus_decl`](#typus-decl) | `#类型-decl` | live | — |
-| [`ordo_decl`](#ordo-decl) | `#枚举-decl` | live | — |
-| [`enum_member`](#enum-member) | `#enum-member` | live | — |
-| [`discretio_decl`](#discretio-decl) | `#判别-decl` | live | — |
-| [`union_member`](#union-member) | `#union-member` | live | — |
-| [`variant`](#variant) | `#variant` | live | — |
-| [`variant_fields`](#variant-fields) | `#variant-fields` | live | — |
-| [`importa_decl`](#importa-decl) | `#导入-decl` | live | — |
-| [`importa_record`](#importa-record) | `#导入-record` | live | — |
-| [`import_field_list`](#import-field-list) | `#import-field-list` | live | — |
-| [`import_field`](#import-field) | `#import-field` | live | — |
-| [`ex_field`](#ex-field) | `#取自-field` | live | — |
-| [`visibilitas_field`](#visibilitas-field) | `#visibilitas-field` | live | — |
-| [`nomen_field`](#nomen-field) | `#名称-field` | live | — |
-| [`ut_field`](#ut-field) | `#作为-field` | live | — |
-| [`omnia_field`](#omnia-field) | `#全部-field` | live | — |
-| [`importa_sugar`](#importa-sugar) | `#导入-sugar` | live | — |
-| [`公开`](#publica) | `#公开` | live | — |
-| [`named_import`](#named-import) | `#named-import` | live | — |
-| [`wildcard_import`](#wildcard-import) | `#wildcard-import` | live | — |
-| [`selective_import`](#selective-import) | `#selective-import` | live | — |
-| [`import_value_binding`](#import-value-binding) | `#import-value-binding` | live | — |
-| [`type_annotation`](#type-annotation) | `#type-annotation` | live | — |
-| [`intersection_type`](#intersection-type) | `#intersection-type` | live | — |
-| [`owned_type`](#owned-type) | `#owned-type` | live | — |
-| [`base_type`](#base-type) | `#base-type` | live | — |
-| [`ratio_type`](#ratio-type) | `#ratio-type` | live | — |
-| [`hole_type`](#hole-type) | `#hole-type` | live | — |
-| [`qualified_type`](#qualified-type) | `#qualified-type` | live | — |
-| [`type_arguments`](#type-arguments) | `#type-arguments` | live | — |
-| [`type_argument`](#type-argument) | `#type-argument` | live | — |
-| [`labeled_type_argument`](#labeled-type-argument) | `#labeled-type-argument` | live | — |
-| [`width_type_sugar`](#width-type-sugar) | `#width-type-sugar` | live | — |
-| [`shape_suffix`](#shape-suffix) | `#shape-suffix` | live | — |
-| [`figura`](#figura) | `#figura` | live | — |
-| [`figura_list`](#figura-list) | `#figura-list` | live | — |
-| [`function_type`](#function-type) | `#function-type` | live | — |
-| [`type_list`](#type-list) | `#type-list` | live | — |
-| [`si_stmt`](#si-stmt) | `#如果-stmt` | live | — |
-| [`secus_clause`](#secus-clause) | `#否则-clause` | live | — |
-| [`arm`](#arm) | `#arm` | live | — |
-| [`else_arm`](#else-arm) | `#else-arm` | live | — |
-| [`dum_stmt`](#dum-stmt) | `#当-stmt` | live | — |
-| [`itera_stmt`](#itera-stmt) | `#遍历-stmt` | live | — |
-| [`itera_binding`](#itera-binding) | `#遍历-binding` | live | — |
-| [`apud_clause`](#apud-clause) | `#于-clause` | live | — |
-| [`elige_stmt`](#elige-stmt) | `#选择-stmt` | live | — |
-| [`casu_elige_clause`](#casu-elige-clause) | `#情况-选择-clause` | live | — |
-| [`ceterum_clause`](#ceterum-clause) | `#默认-clause` | live | — |
-| [`discerne_stmt`](#discerne-stmt) | `#匹配-stmt` | live | — |
-| [`discriminants`](#discriminants) | `#discriminants` | live | — |
-| [`casu_variant_clause`](#casu-variant-clause) | `#情况-variant-clause` | live | — |
-| [`patterns`](#patterns) | `#patterns` | live | — |
-| [`pattern`](#pattern) | `#pattern` | live | — |
-| [`type_pattern`](#type-pattern) | `#type-pattern` | live | — |
-| [`ut_pattern`](#ut-pattern) | `#作为-pattern` | live | — |
-| [`pattern_binding`](#pattern-binding) | `#pattern-binding` | live | — |
-| [`custodi_stmt`](#custodi-stmt) | `#守护-stmt` | live | — |
-| [`si_guard_clause`](#si-guard-clause) | `#如果-guard-clause` | live | — |
-| [`cura_stmt`](#cura-stmt) | `#管护-stmt` | live | — |
-| [`ex_stmt`](#ex-stmt) | `#取自-stmt` | live | — |
-| [`extract_fields`](#extract-fields) | `#extract-fields` | live | — |
-| [`extract_field`](#extract-field) | `#extract-field` | live | — |
-| [`ceteri_field`](#ceteri-field) | `#其余-field` | live | — |
-| [`redde_stmt`](#redde-stmt) | `#返回-stmt` | live | — |
-| [`reddet_stmt`](#reddet-stmt) | `#等返-stmt` | live | — |
-| [`tacebit_stmt`](#tacebit-stmt) | `#等弃-stmt` | live | — |
-| [`cede_stmt`](#cede-stmt) | `#让出-stmt` | live | — |
-| [`rumpe_stmt`](#rumpe-stmt) | `#中断-stmt` | live | — |
-| [`perge_stmt`](#perge-stmt) | `#继续-stmt` | live | — |
-| [`tacet_stmt`](#tacet-stmt) | `#静默-stmt` | live | — |
-| [`iace_stmt`](#iace-stmt) | `#抛错-stmt` | live | — |
-| [`iace_expr`](#iace-expr) | `#抛错-expr` | live | — |
-| [`iace_guarded_expr`](#iace-guarded-expr) | `#抛错-guarded-expr` | live | — |
-| [`cape_clause`](#cape-clause) | `#捕获-clause` | live | — |
-| [`adfirma_stmt`](#adfirma-stmt) | `#断言-stmt` | live | — |
-| [`requirit_stmt`](#requirit-stmt) | `#需求-stmt` | live | — |
-| [`reice_stmt`](#reice-stmt) | `#拒绝-stmt` | live | — |
-| [`expression`](#expression) | `#expression` | live | — |
-| [`transfer`](#transfer) | `#transfer` | live | — |
-| [`assignment`](#assignment) | `#assignment` | live | — |
-| [`inc_dec_stmt`](#inc-dec-stmt) | `#inc-dec-stmt` | live | — |
-| [`place`](#place) | `#place` | live | — |
-| [`ternary`](#ternary) | `#ternary` | live | — |
-| [`aut_expr`](#aut-expr) | `#或-expr` | live | — |
-| [`et_expr`](#et-expr) | `#且-expr` | live | — |
-| [`equality`](#equality) | `#equality` | live | — |
-| [`equality_tail`](#equality-tail) | `#equality-tail` | live | — |
-| [`comparison`](#comparison) | `#comparison` | live | — |
-| [`bitwise_or_expr`](#bitwise-or-expr) | `#bitwise-or-expr` | live | — |
-| [`bitwise_xor_expr`](#bitwise-xor-expr) | `#bitwise-xor-expr` | live | — |
-| [`bitwise_and_expr`](#bitwise-and-expr) | `#bitwise-and-expr` | live | — |
-| [`shift_expr`](#shift-expr) | `#shift-expr` | live | — |
-| [`range_expr`](#range-expr) | `#range-expr` | live | — |
-| [`range_tail`](#range-tail) | `#range-tail` | live | — |
-| [`additive_expr`](#additive-expr) | `#additive-expr` | live | — |
-| [`multiplicative_expr`](#multiplicative-expr) | `#multiplicative-expr` | live | — |
-| [`vel_expr`](#vel-expr) | `#兜底-expr` | live | — |
-| [`vel_rhs`](#vel-rhs) | `#兜底-rhs` | live | — |
-| [`vel_range_tail`](#vel-range-tail) | `#兜底-range-tail` | live | — |
-| [`unary_expr`](#unary-expr) | `#unary-expr` | live | — |
-| [`gradient_expr`](#gradient-expr) | `#gradient-expr` | live | — |
-| [`gradient_selection`](#gradient-selection) | `#gradient-selection` | live | — |
-| [`gradient_place`](#gradient-place) | `#gradient-place` | live | — |
-| [`cast_expr`](#cast-expr) | `#cast-expr` | live | — |
-| [`conversio_expr`](#conversio-expr) | `#conversio-expr` | live | — |
-| [`inline_recovery`](#inline-recovery) | `#inline-recovery` | live | — |
-| [`call_expr`](#call-expr) | `#call-expr` | live | — |
-| [`call_suffix`](#call-suffix) | `#call-suffix` | live | — |
-| [`member_suffix`](#member-suffix) | `#member-suffix` | live | — |
-| [`optional_suffix`](#optional-suffix) | `#optional-suffix` | live | — |
-| [`non_null_suffix`](#non-null-suffix) | `#非-null-suffix` | live | — |
-| [`argument_list`](#argument-list) | `#argument-list` | live | — |
-| [`argument`](#argument) | `#argument` | live | — |
-| [`template_argument`](#template-argument) | `#template-argument` | live | — |
-| [`literal`](#literal) | `#literal` | live | — |
-| [`primary`](#primary) | `#primary` | live | — |
-| [`ad_expr`](#ad-expr) | `#调用-expr` | live | — |
-| [`ad_opener`](#ad-opener) | `#调用-opener` | live | — |
-| [`array_literal`](#array-literal) | `#array-literal` | live | — |
-| [`iuncta_expr`](#iuncta-expr) | `#元组-expr` | live | — |
-| [`json_literal`](#json-literal) | `#json-literal` | live | — |
-| [`json_member`](#json-member) | `#json-member` | live | — |
-| [`typed_constructor`](#typed-constructor) | `#typed-constructor` | live | — |
-| [`field_list`](#field-list) | `#field-list` | live | — |
-| [`field_init`](#field-init) | `#field-init` | live | — |
-| [`field_key`](#field-key) | `#field-key` | live | — |
-| [`json_value`](#json-value) | `#json-value` | live | — |
-| [`json_object`](#json-object) | `#json-object` | live | — |
-| [`json_array`](#json-array) | `#json-array` | live | — |
-| [`json_string`](#json-string) | `#json-string` | live | — |
-| [`json_number`](#json-number) | `#json-number` | live | — |
-| [`finge_expr`](#finge-expr) | `#构造-expr` | live | — |
-| [`qualified_ident`](#qualified-ident) | `#qualified-ident` | live | — |
-| [`praefixum_expr`](#praefixum-expr) | `#前缀-expr` | live | — |
-| [`scriptum_expr`](#scriptum-expr) | `#格式化-expr` | live | — |
-| [`lege_expr`](#lege-expr) | `#读取-expr` | live | — |
-| [`first_match_expr`](#first-match-expr) | `#first-match-expr` | live | — |
-| [`summa_expr`](#summa-expr) | `#求和-expr` | live | — |
-| [`filum_clause`](#filum-clause) | `#线程-clause` | live | — |
-| [`object_pattern`](#object-pattern) | `#object-pattern` | live | — |
-| [`pattern_property`](#pattern-property) | `#pattern-property` | live | — |
-| [`array_pattern`](#array-pattern) | `#array-pattern` | live | — |
-| [`array_pattern_element`](#array-pattern-element) | `#array-pattern-element` | live | — |
-| [`nota_stmt`](#nota-stmt) | `#显示-stmt` | live | — |
-| [`entry_header`](#entry-header) | `#entry-header` | live | — |
-| [`incipit_stmt`](#incipit-stmt) | `#入口-stmt` | live | — |
-| [`incipiet_stmt`](#incipiet-stmt) | `#异步入口-stmt` | live | — |
-| [`probandum_decl`](#probandum-decl) | `#验题-decl` | live | — |
-| [`probandum_body`](#probandum-body) | `#验题-body` | live | — |
-| [`proba_stmt`](#proba-stmt) | `#测试-stmt` | live | — |
-| [`proba_modifier`](#proba-modifier) | `#测试-modifier` | live | — |
-| [`praepara_block`](#praepara-block) | `#备置-block` | live | — |
-| [`fac_stmt`](#fac-stmt) | `#执行-stmt` | live | — |
+| ID | Anchor | Status |
+|---|---|---|
+| [`IDENTIFIER`](#identifier) | `#identifier` | capture-pending |
+| [`NUMBER`](#number) | `#number` | capture-pending |
+| [`NATURAL`](#natural) | `#natural` | capture-pending |
+| [`STRING`](#string) | `#string` | capture-pending |
+| [`ASCII_STRING`](#ascii-string) | `#ascii-string` | capture-pending |
+| [`BACKTICK_STRING`](#backtick-string) | `#backtick-string` | capture-pending |
+| [`OCTETI_STRING`](#octeti-string) | `#octeti-string` | capture-pending |
+| [`NEWLINE`](#newline) | `#newline` | capture-pending |
+| [`WIDTH_MARKER`](#width-marker) | `#width-marker` | capture-pending |
+| [`LISTA_WIDTH_SUGAR`](#lista-width-sugar) | `#lista-width-sugar` | capture-pending |
+| [`TENSOR_WIDTH_SUGAR`](#tensor-width-sugar) | `#tensor-width-sugar` | capture-pending |
+| [`SPARSA_WIDTH_SUGAR`](#sparsa-width-sugar) | `#sparsa-width-sugar` | capture-pending |
+| [`VECTOR_WIDTH_SUGAR`](#vector-width-sugar) | `#vector-width-sugar` | capture-pending |
+| [`MATRIX_WIDTH_SUGAR`](#matrix-width-sugar) | `#matrix-width-sugar` | capture-pending |
+| [`FRONTMATTER_DELIMITER`](#frontmatter-delimiter) | `#frontmatter-delimiter` | capture-pending |
+| [`TOML_LINES`](#toml-lines) | `#toml-lines` | capture-pending |
+| [`ANNOTATION_NAME`](#annotation-name) | `#annotation-name` | capture-pending |
+| [`ANNOTATION_FIELD_NAME`](#annotation-field-name) | `#annotation-field-name` | capture-pending |
+| [`NON_NEWLINE_TOKEN`](#non-newline-token) | `#非-newline-token` | capture-pending |
+| [`NO_NEWLINE`](#no-newline) | `#no-newline` | capture-pending |
+| [`fab_file`](#fab-file) | `#fab-file` | live |
+| [`frontmatter`](#frontmatter) | `#frontmatter` | live |
+| [`program`](#program) | `#program` | live |
+| [`statement`](#statement) | `#statement` | live |
+| [`statement_core`](#statement-core) | `#statement-core` | live |
+| [`binding_decl`](#binding-decl) | `#binding-decl` | live |
+| [`expr_stmt`](#expr-stmt) | `#expr-stmt` | live |
+| [`block_stmt`](#block-stmt) | `#block-stmt` | live |
+| [`fixum_decl`](#fixum-decl) | `#常量-decl` | live |
+| [`figendum_decl`](#figendum-decl) | `#等定-decl` | live |
+| [`sit_decl`](#sit-decl) | `#设-decl` | live |
+| [`array_destruct`](#array-destruct) | `#array-destruct` | live |
+| [`object_destruct`](#object-destruct) | `#object-destruct` | live |
+| [`functio_decl`](#functio-decl) | `#函数-decl` | live |
+| [`param_list`](#param-list) | `#param-list` | live |
+| [`generic_params`](#generic-params) | `#generic-params` | live |
+| [`generic_param`](#generic-param) | `#generic-param` | live |
+| [`generic_type_default`](#generic-type-default) | `#generic-type-default` | live |
+| [`generic_size_default`](#generic-size-default) | `#generic-size-default` | live |
+| [`call_type_args`](#call-type-args) | `#call-type-args` | live |
+| [`parameter`](#parameter) | `#parameter` | live |
+| [`func_modifier`](#func-modifier) | `#func-modifier` | live |
+| [`callable_posture`](#callable-posture) | `#callable-posture` | live |
+| [`return_clause`](#return-clause) | `#return-clause` | live |
+| [`alternate_exit_clause`](#alternate-exit-clause) | `#alternate-exit-clause` | live |
+| [`ergo_joint`](#ergo-joint) | `#则-joint` | live |
+| [`clausura_joint`](#clausura-joint) | `#闭包-joint` | live |
+| [`clausura_expr`](#clausura-expr) | `#闭包-expr` | live |
+| [`compact_clausura_expr`](#compact-clausura-expr) | `#compact-闭包-expr` | live |
+| [`clausura_signature`](#clausura-signature) | `#闭包-signature` | live |
+| [`closure_modifier`](#closure-modifier) | `#closure-modifier` | live |
+| [`fac_block`](#fac-block) | `#执行-block` | live |
+| [`clausura_legacy_expr`](#clausura-legacy-expr) | `#闭包-legacy-expr` | live |
+| [`clausura_params`](#clausura-params) | `#闭包-params` | live |
+| [`clausura_param`](#clausura-param) | `#闭包-param` | live |
+| [`genus_decl`](#genus-decl) | `#类-decl` | live |
+| [`genus_member`](#genus-member) | `#类-member` | live |
+| [`field_decl`](#field-decl) | `#field-decl` | live |
+| [`functio_method_decl`](#functio-method-decl) | `#函数-method-decl` | live |
+| [`annotation`](#annotation) | `#annotation` | live |
+| [`annotation_name`](#annotation-name) | `#annotation-name` | live |
+| [`braced_annotation`](#braced-annotation) | `#braced-annotation` | live |
+| [`annotation_field_list`](#annotation-field-list) | `#annotation-field-list` | live |
+| [`annotation_field`](#annotation-field) | `#annotation-field` | live |
+| [`annotation_sugar`](#annotation-sugar) | `#annotation-sugar` | live |
+| [`nucleum_annotation`](#nucleum-annotation) | `#内核-annotation` | live |
+| [`nucleum_sugar`](#nucleum-sugar) | `#内核-sugar` | live |
+| [`nucleum_braced`](#nucleum-braced) | `#内核-braced` | live |
+| [`nucleum_modifier`](#nucleum-modifier) | `#内核-modifier` | live |
+| [`nucleum_field_list`](#nucleum-field-list) | `#内核-field-list` | live |
+| [`nucleum_field`](#nucleum-field) | `#内核-field` | live |
+| [`implendum_decl`](#implendum-decl) | `#契约-decl` | live |
+| [`implendum_method_decl`](#implendum-method-decl) | `#契约-method-decl` | live |
+| [`typus_decl`](#typus-decl) | `#类型-decl` | live |
+| [`ordo_decl`](#ordo-decl) | `#枚举-decl` | live |
+| [`enum_member`](#enum-member) | `#enum-member` | live |
+| [`discretio_decl`](#discretio-decl) | `#判别-decl` | live |
+| [`union_member`](#union-member) | `#union-member` | live |
+| [`variant`](#variant) | `#variant` | live |
+| [`variant_fields`](#variant-fields) | `#variant-fields` | live |
+| [`importa_decl`](#importa-decl) | `#导入-decl` | live |
+| [`importa_record`](#importa-record) | `#导入-record` | live |
+| [`import_field_list`](#import-field-list) | `#import-field-list` | live |
+| [`import_field`](#import-field) | `#import-field` | live |
+| [`ex_field`](#ex-field) | `#取自-field` | live |
+| [`visibilitas_field`](#visibilitas-field) | `#visibilitas-field` | live |
+| [`nomen_field`](#nomen-field) | `#名称-field` | live |
+| [`ut_field`](#ut-field) | `#作为-field` | live |
+| [`omnia_field`](#omnia-field) | `#全部-field` | live |
+| [`importa_sugar`](#importa-sugar) | `#导入-sugar` | live |
+| [`公开`](#publica) | `#公开` | live |
+| [`named_import`](#named-import) | `#named-import` | live |
+| [`wildcard_import`](#wildcard-import) | `#wildcard-import` | live |
+| [`selective_import`](#selective-import) | `#selective-import` | live |
+| [`import_value_binding`](#import-value-binding) | `#import-value-binding` | live |
+| [`type_annotation`](#type-annotation) | `#type-annotation` | live |
+| [`intersection_type`](#intersection-type) | `#intersection-type` | live |
+| [`owned_type`](#owned-type) | `#owned-type` | live |
+| [`base_type`](#base-type) | `#base-type` | live |
+| [`ratio_type`](#ratio-type) | `#ratio-type` | live |
+| [`hole_type`](#hole-type) | `#hole-type` | live |
+| [`qualified_type`](#qualified-type) | `#qualified-type` | live |
+| [`type_arguments`](#type-arguments) | `#type-arguments` | live |
+| [`type_argument`](#type-argument) | `#type-argument` | live |
+| [`labeled_type_argument`](#labeled-type-argument) | `#labeled-type-argument` | live |
+| [`width_type_sugar`](#width-type-sugar) | `#width-type-sugar` | live |
+| [`shape_suffix`](#shape-suffix) | `#shape-suffix` | live |
+| [`figura`](#figura) | `#figura` | live |
+| [`figura_list`](#figura-list) | `#figura-list` | live |
+| [`function_type`](#function-type) | `#function-type` | live |
+| [`type_list`](#type-list) | `#type-list` | live |
+| [`si_stmt`](#si-stmt) | `#如果-stmt` | live |
+| [`secus_clause`](#secus-clause) | `#否则-clause` | live |
+| [`arm`](#arm) | `#arm` | live |
+| [`else_arm`](#else-arm) | `#else-arm` | live |
+| [`dum_stmt`](#dum-stmt) | `#当-stmt` | live |
+| [`itera_stmt`](#itera-stmt) | `#遍历-stmt` | live |
+| [`itera_binding`](#itera-binding) | `#遍历-binding` | live |
+| [`apud_clause`](#apud-clause) | `#于-clause` | live |
+| [`elige_stmt`](#elige-stmt) | `#选择-stmt` | live |
+| [`casu_elige_clause`](#casu-elige-clause) | `#情况-选择-clause` | live |
+| [`ceterum_clause`](#ceterum-clause) | `#默认-clause` | live |
+| [`discerne_stmt`](#discerne-stmt) | `#匹配-stmt` | live |
+| [`discriminants`](#discriminants) | `#discriminants` | live |
+| [`casu_variant_clause`](#casu-variant-clause) | `#情况-variant-clause` | live |
+| [`patterns`](#patterns) | `#patterns` | live |
+| [`pattern`](#pattern) | `#pattern` | live |
+| [`type_pattern`](#type-pattern) | `#type-pattern` | live |
+| [`ut_pattern`](#ut-pattern) | `#作为-pattern` | live |
+| [`pattern_binding`](#pattern-binding) | `#pattern-binding` | live |
+| [`custodi_stmt`](#custodi-stmt) | `#守护-stmt` | live |
+| [`si_guard_clause`](#si-guard-clause) | `#如果-guard-clause` | live |
+| [`cura_stmt`](#cura-stmt) | `#管护-stmt` | live |
+| [`ex_stmt`](#ex-stmt) | `#取自-stmt` | live |
+| [`extract_fields`](#extract-fields) | `#extract-fields` | live |
+| [`extract_field`](#extract-field) | `#extract-field` | live |
+| [`ceteri_field`](#ceteri-field) | `#其余-field` | live |
+| [`redde_stmt`](#redde-stmt) | `#返回-stmt` | live |
+| [`reddet_stmt`](#reddet-stmt) | `#等返-stmt` | live |
+| [`tacebit_stmt`](#tacebit-stmt) | `#等弃-stmt` | live |
+| [`cede_stmt`](#cede-stmt) | `#让出-stmt` | live |
+| [`rumpe_stmt`](#rumpe-stmt) | `#中断-stmt` | live |
+| [`perge_stmt`](#perge-stmt) | `#继续-stmt` | live |
+| [`tacet_stmt`](#tacet-stmt) | `#静默-stmt` | live |
+| [`iace_stmt`](#iace-stmt) | `#抛错-stmt` | live |
+| [`iace_expr`](#iace-expr) | `#抛错-expr` | live |
+| [`iace_guarded_expr`](#iace-guarded-expr) | `#抛错-guarded-expr` | live |
+| [`cape_clause`](#cape-clause) | `#捕获-clause` | live |
+| [`adfirma_stmt`](#adfirma-stmt) | `#断言-stmt` | live |
+| [`requirit_stmt`](#requirit-stmt) | `#需求-stmt` | live |
+| [`reice_stmt`](#reice-stmt) | `#拒绝-stmt` | live |
+| [`expression`](#expression) | `#expression` | live |
+| [`transfer`](#transfer) | `#transfer` | live |
+| [`assignment`](#assignment) | `#assignment` | live |
+| [`inc_dec_stmt`](#inc-dec-stmt) | `#inc-dec-stmt` | live |
+| [`place`](#place) | `#place` | live |
+| [`ternary`](#ternary) | `#ternary` | live |
+| [`aut_expr`](#aut-expr) | `#或-expr` | live |
+| [`et_expr`](#et-expr) | `#且-expr` | live |
+| [`equality`](#equality) | `#equality` | live |
+| [`equality_tail`](#equality-tail) | `#equality-tail` | live |
+| [`comparison`](#comparison) | `#comparison` | live |
+| [`bitwise_or_expr`](#bitwise-or-expr) | `#bitwise-or-expr` | live |
+| [`bitwise_xor_expr`](#bitwise-xor-expr) | `#bitwise-xor-expr` | live |
+| [`bitwise_and_expr`](#bitwise-and-expr) | `#bitwise-and-expr` | live |
+| [`shift_expr`](#shift-expr) | `#shift-expr` | live |
+| [`range_expr`](#range-expr) | `#range-expr` | live |
+| [`range_tail`](#range-tail) | `#range-tail` | live |
+| [`additive_expr`](#additive-expr) | `#additive-expr` | live |
+| [`multiplicative_expr`](#multiplicative-expr) | `#multiplicative-expr` | live |
+| [`vel_expr`](#vel-expr) | `#兜底-expr` | live |
+| [`vel_rhs`](#vel-rhs) | `#兜底-rhs` | live |
+| [`vel_range_tail`](#vel-range-tail) | `#兜底-range-tail` | live |
+| [`unary_expr`](#unary-expr) | `#unary-expr` | live |
+| [`gradient_expr`](#gradient-expr) | `#gradient-expr` | live |
+| [`gradient_selection`](#gradient-selection) | `#gradient-selection` | live |
+| [`gradient_place`](#gradient-place) | `#gradient-place` | live |
+| [`cast_expr`](#cast-expr) | `#cast-expr` | live |
+| [`conversio_expr`](#conversio-expr) | `#conversio-expr` | live |
+| [`inline_recovery`](#inline-recovery) | `#inline-recovery` | live |
+| [`call_expr`](#call-expr) | `#call-expr` | live |
+| [`call_suffix`](#call-suffix) | `#call-suffix` | live |
+| [`member_suffix`](#member-suffix) | `#member-suffix` | live |
+| [`optional_suffix`](#optional-suffix) | `#optional-suffix` | live |
+| [`non_null_suffix`](#non-null-suffix) | `#非-null-suffix` | live |
+| [`argument_list`](#argument-list) | `#argument-list` | live |
+| [`argument`](#argument) | `#argument` | live |
+| [`template_argument`](#template-argument) | `#template-argument` | live |
+| [`literal`](#literal) | `#literal` | live |
+| [`primary`](#primary) | `#primary` | live |
+| [`ad_expr`](#ad-expr) | `#调用-expr` | live |
+| [`ad_opener`](#ad-opener) | `#调用-opener` | live |
+| [`array_literal`](#array-literal) | `#array-literal` | live |
+| [`iuncta_expr`](#iuncta-expr) | `#元组-expr` | live |
+| [`json_literal`](#json-literal) | `#json-literal` | live |
+| [`json_member`](#json-member) | `#json-member` | live |
+| [`typed_constructor`](#typed-constructor) | `#typed-constructor` | live |
+| [`field_list`](#field-list) | `#field-list` | live |
+| [`field_init`](#field-init) | `#field-init` | live |
+| [`field_key`](#field-key) | `#field-key` | live |
+| [`json_value`](#json-value) | `#json-value` | live |
+| [`json_object`](#json-object) | `#json-object` | live |
+| [`json_array`](#json-array) | `#json-array` | live |
+| [`json_string`](#json-string) | `#json-string` | live |
+| [`json_number`](#json-number) | `#json-number` | live |
+| [`finge_expr`](#finge-expr) | `#构造-expr` | live |
+| [`qualified_ident`](#qualified-ident) | `#qualified-ident` | live |
+| [`praefixum_expr`](#praefixum-expr) | `#前缀-expr` | live |
+| [`scriptum_expr`](#scriptum-expr) | `#格式化-expr` | live |
+| [`lege_expr`](#lege-expr) | `#读取-expr` | live |
+| [`first_match_expr`](#first-match-expr) | `#first-match-expr` | live |
+| [`summa_expr`](#summa-expr) | `#求和-expr` | live |
+| [`filum_clause`](#filum-clause) | `#线程-clause` | live |
+| [`object_pattern`](#object-pattern) | `#object-pattern` | live |
+| [`pattern_property`](#pattern-property) | `#pattern-property` | live |
+| [`array_pattern`](#array-pattern) | `#array-pattern` | live |
+| [`array_pattern_element`](#array-pattern-element) | `#array-pattern-element` | live |
+| [`nota_stmt`](#nota-stmt) | `#显示-stmt` | live |
+| [`entry_header`](#entry-header) | `#entry-header` | live |
+| [`incipit_stmt`](#incipit-stmt) | `#入口-stmt` | live |
+| [`incipiet_stmt`](#incipiet-stmt) | `#异步入口-stmt` | live |
+| [`probandum_decl`](#probandum-decl) | `#验题-decl` | live |
+| [`probandum_body`](#probandum-body) | `#验题-body` | live |
+| [`proba_stmt`](#proba-stmt) | `#测试-stmt` | live |
+| [`proba_modifier`](#proba-modifier) | `#测试-modifier` | live |
+| [`praepara_block`](#praepara-block) | `#备置-block` | live |
+| [`fac_stmt`](#fac-stmt) | `#执行-stmt` | live |
 
 ## Lexicon Appendix {#lexicon}
 

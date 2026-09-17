@@ -467,235 +467,235 @@ NO_NEWLINE ::=
 
 ## Production Index {#production-index}
 
-| ID | Anchor | Status | Former names |
-|---|---|---|---|
-| [`IDENTIFIER`](#identifier) | `#identifier` | capture-pending | — |
-| [`NUMBER`](#number) | `#number` | capture-pending | — |
-| [`NATURAL`](#natural) | `#natural` | capture-pending | — |
-| [`STRING`](#string) | `#string` | capture-pending | — |
-| [`ASCII_STRING`](#ascii-string) | `#ascii-string` | capture-pending | — |
-| [`BACKTICK_STRING`](#backtick-string) | `#backtick-string` | capture-pending | — |
-| [`OCTETI_STRING`](#octeti-string) | `#octeti-string` | capture-pending | — |
-| [`NEWLINE`](#newline) | `#newline` | capture-pending | — |
-| [`WIDTH_MARKER`](#width-marker) | `#width-marker` | capture-pending | — |
-| [`LISTA_WIDTH_SUGAR`](#lista-width-sugar) | `#lista-width-sugar` | capture-pending | — |
-| [`TENSOR_WIDTH_SUGAR`](#tensor-width-sugar) | `#tensor-width-sugar` | capture-pending | — |
-| [`SPARSA_WIDTH_SUGAR`](#sparsa-width-sugar) | `#sparsa-width-sugar` | capture-pending | — |
-| [`VECTOR_WIDTH_SUGAR`](#vector-width-sugar) | `#vector-width-sugar` | capture-pending | — |
-| [`MATRIX_WIDTH_SUGAR`](#matrix-width-sugar) | `#matrix-width-sugar` | capture-pending | — |
-| [`FRONTMATTER_DELIMITER`](#frontmatter-delimiter) | `#frontmatter-delimiter` | capture-pending | — |
-| [`TOML_LINES`](#toml-lines) | `#toml-lines` | capture-pending | — |
-| [`ANNOTATION_NAME`](#annotation-name) | `#annotation-name` | capture-pending | — |
-| [`ANNOTATION_FIELD_NAME`](#annotation-field-name) | `#annotation-field-name` | capture-pending | — |
-| [`NON_NEWLINE_TOKEN`](#non-newline-token) | `#ليس-newline-token` | capture-pending | — |
-| [`NO_NEWLINE`](#no-newline) | `#no-newline` | capture-pending | — |
-| [`fab_file`](#fab-file) | `#fab-file` | live | — |
-| [`frontmatter`](#frontmatter) | `#frontmatter` | live | — |
-| [`program`](#program) | `#program` | live | — |
-| [`statement`](#statement) | `#statement` | live | — |
-| [`statement_core`](#statement-core) | `#statement-core` | live | — |
-| [`binding_decl`](#binding-decl) | `#binding-decl` | live | — |
-| [`expr_stmt`](#expr-stmt) | `#expr-stmt` | live | — |
-| [`block_stmt`](#block-stmt) | `#block-stmt` | live | — |
-| [`fixum_decl`](#fixum-decl) | `#ثابت-decl` | live | — |
-| [`figendum_decl`](#figendum-decl) | `#انتظر_ثابت-decl` | live | — |
-| [`sit_decl`](#sit-decl) | `#ليكن-decl` | live | — |
-| [`array_destruct`](#array-destruct) | `#array-destruct` | live | — |
-| [`object_destruct`](#object-destruct) | `#object-destruct` | live | — |
-| [`functio_decl`](#functio-decl) | `#دالة-decl` | live | — |
-| [`param_list`](#param-list) | `#param-list` | live | — |
-| [`generic_params`](#generic-params) | `#generic-params` | live | — |
-| [`generic_param`](#generic-param) | `#generic-param` | live | — |
-| [`generic_type_default`](#generic-type-default) | `#generic-type-default` | live | — |
-| [`generic_size_default`](#generic-size-default) | `#generic-size-default` | live | — |
-| [`call_type_args`](#call-type-args) | `#call-type-args` | live | — |
-| [`parameter`](#parameter) | `#parameter` | live | — |
-| [`func_modifier`](#func-modifier) | `#func-modifier` | live | — |
-| [`callable_posture`](#callable-posture) | `#callable-posture` | live | — |
-| [`return_clause`](#return-clause) | `#return-clause` | live | — |
-| [`alternate_exit_clause`](#alternate-exit-clause) | `#alternate-exit-clause` | live | — |
-| [`ergo_joint`](#ergo-joint) | `#إذن-joint` | live | — |
-| [`clausura_joint`](#clausura-joint) | `#إغلاق-joint` | live | — |
-| [`clausura_expr`](#clausura-expr) | `#إغلاق-expr` | live | — |
-| [`compact_clausura_expr`](#compact-clausura-expr) | `#compact-إغلاق-expr` | live | — |
-| [`clausura_signature`](#clausura-signature) | `#إغلاق-signature` | live | — |
-| [`closure_modifier`](#closure-modifier) | `#closure-modifier` | live | — |
-| [`fac_block`](#fac-block) | `#افعل-block` | live | — |
-| [`clausura_legacy_expr`](#clausura-legacy-expr) | `#إغلاق-legacy-expr` | live | — |
-| [`clausura_params`](#clausura-params) | `#إغلاق-params` | live | — |
-| [`clausura_param`](#clausura-param) | `#إغلاق-param` | live | — |
-| [`genus_decl`](#genus-decl) | `#صنف-decl` | live | — |
-| [`genus_member`](#genus-member) | `#صنف-member` | live | — |
-| [`field_decl`](#field-decl) | `#field-decl` | live | — |
-| [`functio_method_decl`](#functio-method-decl) | `#دالة-method-decl` | live | — |
-| [`annotation`](#annotation) | `#annotation` | live | — |
-| [`annotation_name`](#annotation-name) | `#annotation-name` | live | — |
-| [`braced_annotation`](#braced-annotation) | `#braced-annotation` | live | — |
-| [`annotation_field_list`](#annotation-field-list) | `#annotation-field-list` | live | — |
-| [`annotation_field`](#annotation-field) | `#annotation-field` | live | — |
-| [`annotation_sugar`](#annotation-sugar) | `#annotation-sugar` | live | — |
-| [`nucleum_annotation`](#nucleum-annotation) | `#نواة-annotation` | live | — |
-| [`nucleum_sugar`](#nucleum-sugar) | `#نواة-sugar` | live | — |
-| [`nucleum_braced`](#nucleum-braced) | `#نواة-braced` | live | — |
-| [`nucleum_modifier`](#nucleum-modifier) | `#نواة-modifier` | live | — |
-| [`nucleum_field_list`](#nucleum-field-list) | `#نواة-field-list` | live | — |
-| [`nucleum_field`](#nucleum-field) | `#نواة-field` | live | — |
-| [`implendum_decl`](#implendum-decl) | `#عقد-decl` | live | — |
-| [`implendum_method_decl`](#implendum-method-decl) | `#عقد-method-decl` | live | — |
-| [`typus_decl`](#typus-decl) | `#نمط-decl` | live | — |
-| [`ordo_decl`](#ordo-decl) | `#ترتيب-decl` | live | — |
-| [`enum_member`](#enum-member) | `#enum-member` | live | — |
-| [`discretio_decl`](#discretio-decl) | `#تمايز-decl` | live | — |
-| [`union_member`](#union-member) | `#union-member` | live | — |
-| [`variant`](#variant) | `#variant` | live | — |
-| [`variant_fields`](#variant-fields) | `#variant-fields` | live | — |
-| [`importa_decl`](#importa-decl) | `#استورد-decl` | live | — |
-| [`importa_record`](#importa-record) | `#استورد-record` | live | — |
-| [`import_field_list`](#import-field-list) | `#import-field-list` | live | — |
-| [`import_field`](#import-field) | `#import-field` | live | — |
-| [`ex_field`](#ex-field) | `#من-field` | live | — |
-| [`visibilitas_field`](#visibilitas-field) | `#visibilitas-field` | live | — |
-| [`nomen_field`](#nomen-field) | `#اسم-field` | live | — |
-| [`ut_field`](#ut-field) | `#كـ-field` | live | — |
-| [`omnia_field`](#omnia-field) | `#جميع-field` | live | — |
-| [`importa_sugar`](#importa-sugar) | `#استورد-sugar` | live | — |
-| [`عام`](#publica) | `#عام` | live | — |
-| [`named_import`](#named-import) | `#named-import` | live | — |
-| [`wildcard_import`](#wildcard-import) | `#wildcard-import` | live | — |
-| [`selective_import`](#selective-import) | `#selective-import` | live | — |
-| [`import_value_binding`](#import-value-binding) | `#import-value-binding` | live | — |
-| [`type_annotation`](#type-annotation) | `#type-annotation` | live | — |
-| [`intersection_type`](#intersection-type) | `#intersection-type` | live | — |
-| [`owned_type`](#owned-type) | `#owned-type` | live | — |
-| [`base_type`](#base-type) | `#base-type` | live | — |
-| [`ratio_type`](#ratio-type) | `#ratio-type` | live | — |
-| [`hole_type`](#hole-type) | `#hole-type` | live | — |
-| [`qualified_type`](#qualified-type) | `#qualified-type` | live | — |
-| [`type_arguments`](#type-arguments) | `#type-arguments` | live | — |
-| [`type_argument`](#type-argument) | `#type-argument` | live | — |
-| [`labeled_type_argument`](#labeled-type-argument) | `#labeled-type-argument` | live | — |
-| [`width_type_sugar`](#width-type-sugar) | `#width-type-sugar` | live | — |
-| [`shape_suffix`](#shape-suffix) | `#shape-suffix` | live | — |
-| [`figura`](#figura) | `#figura` | live | — |
-| [`figura_list`](#figura-list) | `#figura-list` | live | — |
-| [`function_type`](#function-type) | `#function-type` | live | — |
-| [`type_list`](#type-list) | `#type-list` | live | — |
-| [`si_stmt`](#si-stmt) | `#إذا-stmt` | live | — |
-| [`secus_clause`](#secus-clause) | `#وإلا-clause` | live | — |
-| [`arm`](#arm) | `#arm` | live | — |
-| [`else_arm`](#else-arm) | `#else-arm` | live | — |
-| [`dum_stmt`](#dum-stmt) | `#طالما-stmt` | live | — |
-| [`itera_stmt`](#itera-stmt) | `#كرر-stmt` | live | — |
-| [`itera_binding`](#itera-binding) | `#كرر-binding` | live | — |
-| [`apud_clause`](#apud-clause) | `#عند-clause` | live | — |
-| [`elige_stmt`](#elige-stmt) | `#اختر-stmt` | live | — |
-| [`casu_elige_clause`](#casu-elige-clause) | `#حالة-اختر-clause` | live | — |
-| [`ceterum_clause`](#ceterum-clause) | `#افتراضي-clause` | live | — |
-| [`discerne_stmt`](#discerne-stmt) | `#طابق-stmt` | live | — |
-| [`discriminants`](#discriminants) | `#discriminants` | live | — |
-| [`casu_variant_clause`](#casu-variant-clause) | `#حالة-variant-clause` | live | — |
-| [`patterns`](#patterns) | `#patterns` | live | — |
-| [`pattern`](#pattern) | `#pattern` | live | — |
-| [`type_pattern`](#type-pattern) | `#type-pattern` | live | — |
-| [`ut_pattern`](#ut-pattern) | `#كـ-pattern` | live | — |
-| [`pattern_binding`](#pattern-binding) | `#pattern-binding` | live | — |
-| [`custodi_stmt`](#custodi-stmt) | `#احرس-stmt` | live | — |
-| [`si_guard_clause`](#si-guard-clause) | `#إذا-guard-clause` | live | — |
-| [`cura_stmt`](#cura-stmt) | `#اعتن-stmt` | live | — |
-| [`ex_stmt`](#ex-stmt) | `#من-stmt` | live | — |
-| [`extract_fields`](#extract-fields) | `#extract-fields` | live | — |
-| [`extract_field`](#extract-field) | `#extract-field` | live | — |
-| [`ceteri_field`](#ceteri-field) | `#باقي-field` | live | — |
-| [`redde_stmt`](#redde-stmt) | `#أعد-stmt` | live | — |
-| [`reddet_stmt`](#reddet-stmt) | `#أعد_منتظرا-stmt` | live | — |
-| [`tacebit_stmt`](#tacebit-stmt) | `#انتظر-stmt` | live | — |
-| [`cede_stmt`](#cede-stmt) | `#سلم-stmt` | live | — |
-| [`rumpe_stmt`](#rumpe-stmt) | `#اكسر-stmt` | live | — |
-| [`perge_stmt`](#perge-stmt) | `#تابع-stmt` | live | — |
-| [`tacet_stmt`](#tacet-stmt) | `#صمت-stmt` | live | — |
-| [`iace_stmt`](#iace-stmt) | `#ارم-stmt` | live | — |
-| [`iace_expr`](#iace-expr) | `#ارم-expr` | live | — |
-| [`iace_guarded_expr`](#iace-guarded-expr) | `#ارم-guarded-expr` | live | — |
-| [`cape_clause`](#cape-clause) | `#التقط-clause` | live | — |
-| [`adfirma_stmt`](#adfirma-stmt) | `#أكد-stmt` | live | — |
-| [`requirit_stmt`](#requirit-stmt) | `#يتطلب-stmt` | live | — |
-| [`reice_stmt`](#reice-stmt) | `#ارفض-stmt` | live | — |
-| [`expression`](#expression) | `#expression` | live | — |
-| [`transfer`](#transfer) | `#transfer` | live | — |
-| [`assignment`](#assignment) | `#assignment` | live | — |
-| [`inc_dec_stmt`](#inc-dec-stmt) | `#inc-dec-stmt` | live | — |
-| [`place`](#place) | `#place` | live | — |
-| [`ternary`](#ternary) | `#ternary` | live | — |
-| [`aut_expr`](#aut-expr) | `#أو-expr` | live | — |
-| [`et_expr`](#et-expr) | `#و-expr` | live | — |
-| [`equality`](#equality) | `#equality` | live | — |
-| [`equality_tail`](#equality-tail) | `#equality-tail` | live | — |
-| [`comparison`](#comparison) | `#comparison` | live | — |
-| [`bitwise_or_expr`](#bitwise-or-expr) | `#bitwise-or-expr` | live | — |
-| [`bitwise_xor_expr`](#bitwise-xor-expr) | `#bitwise-xor-expr` | live | — |
-| [`bitwise_and_expr`](#bitwise-and-expr) | `#bitwise-and-expr` | live | — |
-| [`shift_expr`](#shift-expr) | `#shift-expr` | live | — |
-| [`range_expr`](#range-expr) | `#range-expr` | live | — |
-| [`range_tail`](#range-tail) | `#range-tail` | live | — |
-| [`additive_expr`](#additive-expr) | `#additive-expr` | live | — |
-| [`multiplicative_expr`](#multiplicative-expr) | `#multiplicative-expr` | live | — |
-| [`vel_expr`](#vel-expr) | `#عوض-expr` | live | — |
-| [`vel_rhs`](#vel-rhs) | `#عوض-rhs` | live | — |
-| [`vel_range_tail`](#vel-range-tail) | `#عوض-range-tail` | live | — |
-| [`unary_expr`](#unary-expr) | `#unary-expr` | live | — |
-| [`gradient_expr`](#gradient-expr) | `#gradient-expr` | live | — |
-| [`gradient_selection`](#gradient-selection) | `#gradient-selection` | live | — |
-| [`gradient_place`](#gradient-place) | `#gradient-place` | live | — |
-| [`cast_expr`](#cast-expr) | `#cast-expr` | live | — |
-| [`conversio_expr`](#conversio-expr) | `#conversio-expr` | live | — |
-| [`inline_recovery`](#inline-recovery) | `#inline-recovery` | live | — |
-| [`call_expr`](#call-expr) | `#call-expr` | live | — |
-| [`call_suffix`](#call-suffix) | `#call-suffix` | live | — |
-| [`member_suffix`](#member-suffix) | `#member-suffix` | live | — |
-| [`optional_suffix`](#optional-suffix) | `#optional-suffix` | live | — |
-| [`non_null_suffix`](#non-null-suffix) | `#ليس-null-suffix` | live | — |
-| [`argument_list`](#argument-list) | `#argument-list` | live | — |
-| [`argument`](#argument) | `#argument` | live | — |
-| [`template_argument`](#template-argument) | `#template-argument` | live | — |
-| [`literal`](#literal) | `#literal` | live | — |
-| [`primary`](#primary) | `#primary` | live | — |
-| [`ad_expr`](#ad-expr) | `#اتصل-expr` | live | — |
-| [`ad_opener`](#ad-opener) | `#اتصل-opener` | live | — |
-| [`array_literal`](#array-literal) | `#array-literal` | live | — |
-| [`iuncta_expr`](#iuncta-expr) | `#توبل-expr` | live | — |
-| [`json_literal`](#json-literal) | `#json-literal` | live | — |
-| [`json_member`](#json-member) | `#json-member` | live | — |
-| [`typed_constructor`](#typed-constructor) | `#typed-constructor` | live | — |
-| [`field_list`](#field-list) | `#field-list` | live | — |
-| [`field_init`](#field-init) | `#field-init` | live | — |
-| [`field_key`](#field-key) | `#field-key` | live | — |
-| [`json_value`](#json-value) | `#json-value` | live | — |
-| [`json_object`](#json-object) | `#json-object` | live | — |
-| [`json_array`](#json-array) | `#json-array` | live | — |
-| [`json_string`](#json-string) | `#json-string` | live | — |
-| [`json_number`](#json-number) | `#json-number` | live | — |
-| [`finge_expr`](#finge-expr) | `#أنشئ-expr` | live | — |
-| [`qualified_ident`](#qualified-ident) | `#qualified-ident` | live | — |
-| [`praefixum_expr`](#praefixum-expr) | `#بادئة-expr` | live | — |
-| [`scriptum_expr`](#scriptum-expr) | `#حرر-expr` | live | — |
-| [`lege_expr`](#lege-expr) | `#اقرأ-expr` | live | — |
-| [`first_match_expr`](#first-match-expr) | `#first-match-expr` | live | — |
-| [`summa_expr`](#summa-expr) | `#مجموع-expr` | live | — |
-| [`filum_clause`](#filum-clause) | `#خيط-clause` | live | — |
-| [`object_pattern`](#object-pattern) | `#object-pattern` | live | — |
-| [`pattern_property`](#pattern-property) | `#pattern-property` | live | — |
-| [`array_pattern`](#array-pattern) | `#array-pattern` | live | — |
-| [`array_pattern_element`](#array-pattern-element) | `#array-pattern-element` | live | — |
-| [`nota_stmt`](#nota-stmt) | `#اعرض-stmt` | live | — |
-| [`entry_header`](#entry-header) | `#entry-header` | live | — |
-| [`incipit_stmt`](#incipit-stmt) | `#بداية-stmt` | live | — |
-| [`incipiet_stmt`](#incipiet-stmt) | `#استهلال-stmt` | live | — |
-| [`probandum_decl`](#probandum-decl) | `#مختبر-decl` | live | — |
-| [`probandum_body`](#probandum-body) | `#مختبر-body` | live | — |
-| [`proba_stmt`](#proba-stmt) | `#اختبر-stmt` | live | — |
-| [`proba_modifier`](#proba-modifier) | `#اختبر-modifier` | live | — |
-| [`praepara_block`](#praepara-block) | `#جهز-block` | live | — |
-| [`fac_stmt`](#fac-stmt) | `#افعل-stmt` | live | — |
+| ID | Anchor | Status |
+|---|---|---|
+| [`IDENTIFIER`](#identifier) | `#identifier` | capture-pending |
+| [`NUMBER`](#number) | `#number` | capture-pending |
+| [`NATURAL`](#natural) | `#natural` | capture-pending |
+| [`STRING`](#string) | `#string` | capture-pending |
+| [`ASCII_STRING`](#ascii-string) | `#ascii-string` | capture-pending |
+| [`BACKTICK_STRING`](#backtick-string) | `#backtick-string` | capture-pending |
+| [`OCTETI_STRING`](#octeti-string) | `#octeti-string` | capture-pending |
+| [`NEWLINE`](#newline) | `#newline` | capture-pending |
+| [`WIDTH_MARKER`](#width-marker) | `#width-marker` | capture-pending |
+| [`LISTA_WIDTH_SUGAR`](#lista-width-sugar) | `#lista-width-sugar` | capture-pending |
+| [`TENSOR_WIDTH_SUGAR`](#tensor-width-sugar) | `#tensor-width-sugar` | capture-pending |
+| [`SPARSA_WIDTH_SUGAR`](#sparsa-width-sugar) | `#sparsa-width-sugar` | capture-pending |
+| [`VECTOR_WIDTH_SUGAR`](#vector-width-sugar) | `#vector-width-sugar` | capture-pending |
+| [`MATRIX_WIDTH_SUGAR`](#matrix-width-sugar) | `#matrix-width-sugar` | capture-pending |
+| [`FRONTMATTER_DELIMITER`](#frontmatter-delimiter) | `#frontmatter-delimiter` | capture-pending |
+| [`TOML_LINES`](#toml-lines) | `#toml-lines` | capture-pending |
+| [`ANNOTATION_NAME`](#annotation-name) | `#annotation-name` | capture-pending |
+| [`ANNOTATION_FIELD_NAME`](#annotation-field-name) | `#annotation-field-name` | capture-pending |
+| [`NON_NEWLINE_TOKEN`](#non-newline-token) | `#ليس-newline-token` | capture-pending |
+| [`NO_NEWLINE`](#no-newline) | `#no-newline` | capture-pending |
+| [`fab_file`](#fab-file) | `#fab-file` | live |
+| [`frontmatter`](#frontmatter) | `#frontmatter` | live |
+| [`program`](#program) | `#program` | live |
+| [`statement`](#statement) | `#statement` | live |
+| [`statement_core`](#statement-core) | `#statement-core` | live |
+| [`binding_decl`](#binding-decl) | `#binding-decl` | live |
+| [`expr_stmt`](#expr-stmt) | `#expr-stmt` | live |
+| [`block_stmt`](#block-stmt) | `#block-stmt` | live |
+| [`fixum_decl`](#fixum-decl) | `#ثابت-decl` | live |
+| [`figendum_decl`](#figendum-decl) | `#انتظر_ثابت-decl` | live |
+| [`sit_decl`](#sit-decl) | `#ليكن-decl` | live |
+| [`array_destruct`](#array-destruct) | `#array-destruct` | live |
+| [`object_destruct`](#object-destruct) | `#object-destruct` | live |
+| [`functio_decl`](#functio-decl) | `#دالة-decl` | live |
+| [`param_list`](#param-list) | `#param-list` | live |
+| [`generic_params`](#generic-params) | `#generic-params` | live |
+| [`generic_param`](#generic-param) | `#generic-param` | live |
+| [`generic_type_default`](#generic-type-default) | `#generic-type-default` | live |
+| [`generic_size_default`](#generic-size-default) | `#generic-size-default` | live |
+| [`call_type_args`](#call-type-args) | `#call-type-args` | live |
+| [`parameter`](#parameter) | `#parameter` | live |
+| [`func_modifier`](#func-modifier) | `#func-modifier` | live |
+| [`callable_posture`](#callable-posture) | `#callable-posture` | live |
+| [`return_clause`](#return-clause) | `#return-clause` | live |
+| [`alternate_exit_clause`](#alternate-exit-clause) | `#alternate-exit-clause` | live |
+| [`ergo_joint`](#ergo-joint) | `#إذن-joint` | live |
+| [`clausura_joint`](#clausura-joint) | `#إغلاق-joint` | live |
+| [`clausura_expr`](#clausura-expr) | `#إغلاق-expr` | live |
+| [`compact_clausura_expr`](#compact-clausura-expr) | `#compact-إغلاق-expr` | live |
+| [`clausura_signature`](#clausura-signature) | `#إغلاق-signature` | live |
+| [`closure_modifier`](#closure-modifier) | `#closure-modifier` | live |
+| [`fac_block`](#fac-block) | `#افعل-block` | live |
+| [`clausura_legacy_expr`](#clausura-legacy-expr) | `#إغلاق-legacy-expr` | live |
+| [`clausura_params`](#clausura-params) | `#إغلاق-params` | live |
+| [`clausura_param`](#clausura-param) | `#إغلاق-param` | live |
+| [`genus_decl`](#genus-decl) | `#صنف-decl` | live |
+| [`genus_member`](#genus-member) | `#صنف-member` | live |
+| [`field_decl`](#field-decl) | `#field-decl` | live |
+| [`functio_method_decl`](#functio-method-decl) | `#دالة-method-decl` | live |
+| [`annotation`](#annotation) | `#annotation` | live |
+| [`annotation_name`](#annotation-name) | `#annotation-name` | live |
+| [`braced_annotation`](#braced-annotation) | `#braced-annotation` | live |
+| [`annotation_field_list`](#annotation-field-list) | `#annotation-field-list` | live |
+| [`annotation_field`](#annotation-field) | `#annotation-field` | live |
+| [`annotation_sugar`](#annotation-sugar) | `#annotation-sugar` | live |
+| [`nucleum_annotation`](#nucleum-annotation) | `#نواة-annotation` | live |
+| [`nucleum_sugar`](#nucleum-sugar) | `#نواة-sugar` | live |
+| [`nucleum_braced`](#nucleum-braced) | `#نواة-braced` | live |
+| [`nucleum_modifier`](#nucleum-modifier) | `#نواة-modifier` | live |
+| [`nucleum_field_list`](#nucleum-field-list) | `#نواة-field-list` | live |
+| [`nucleum_field`](#nucleum-field) | `#نواة-field` | live |
+| [`implendum_decl`](#implendum-decl) | `#عقد-decl` | live |
+| [`implendum_method_decl`](#implendum-method-decl) | `#عقد-method-decl` | live |
+| [`typus_decl`](#typus-decl) | `#نمط-decl` | live |
+| [`ordo_decl`](#ordo-decl) | `#ترتيب-decl` | live |
+| [`enum_member`](#enum-member) | `#enum-member` | live |
+| [`discretio_decl`](#discretio-decl) | `#تمايز-decl` | live |
+| [`union_member`](#union-member) | `#union-member` | live |
+| [`variant`](#variant) | `#variant` | live |
+| [`variant_fields`](#variant-fields) | `#variant-fields` | live |
+| [`importa_decl`](#importa-decl) | `#استورد-decl` | live |
+| [`importa_record`](#importa-record) | `#استورد-record` | live |
+| [`import_field_list`](#import-field-list) | `#import-field-list` | live |
+| [`import_field`](#import-field) | `#import-field` | live |
+| [`ex_field`](#ex-field) | `#من-field` | live |
+| [`visibilitas_field`](#visibilitas-field) | `#visibilitas-field` | live |
+| [`nomen_field`](#nomen-field) | `#اسم-field` | live |
+| [`ut_field`](#ut-field) | `#كـ-field` | live |
+| [`omnia_field`](#omnia-field) | `#جميع-field` | live |
+| [`importa_sugar`](#importa-sugar) | `#استورد-sugar` | live |
+| [`عام`](#publica) | `#عام` | live |
+| [`named_import`](#named-import) | `#named-import` | live |
+| [`wildcard_import`](#wildcard-import) | `#wildcard-import` | live |
+| [`selective_import`](#selective-import) | `#selective-import` | live |
+| [`import_value_binding`](#import-value-binding) | `#import-value-binding` | live |
+| [`type_annotation`](#type-annotation) | `#type-annotation` | live |
+| [`intersection_type`](#intersection-type) | `#intersection-type` | live |
+| [`owned_type`](#owned-type) | `#owned-type` | live |
+| [`base_type`](#base-type) | `#base-type` | live |
+| [`ratio_type`](#ratio-type) | `#ratio-type` | live |
+| [`hole_type`](#hole-type) | `#hole-type` | live |
+| [`qualified_type`](#qualified-type) | `#qualified-type` | live |
+| [`type_arguments`](#type-arguments) | `#type-arguments` | live |
+| [`type_argument`](#type-argument) | `#type-argument` | live |
+| [`labeled_type_argument`](#labeled-type-argument) | `#labeled-type-argument` | live |
+| [`width_type_sugar`](#width-type-sugar) | `#width-type-sugar` | live |
+| [`shape_suffix`](#shape-suffix) | `#shape-suffix` | live |
+| [`figura`](#figura) | `#figura` | live |
+| [`figura_list`](#figura-list) | `#figura-list` | live |
+| [`function_type`](#function-type) | `#function-type` | live |
+| [`type_list`](#type-list) | `#type-list` | live |
+| [`si_stmt`](#si-stmt) | `#إذا-stmt` | live |
+| [`secus_clause`](#secus-clause) | `#وإلا-clause` | live |
+| [`arm`](#arm) | `#arm` | live |
+| [`else_arm`](#else-arm) | `#else-arm` | live |
+| [`dum_stmt`](#dum-stmt) | `#طالما-stmt` | live |
+| [`itera_stmt`](#itera-stmt) | `#كرر-stmt` | live |
+| [`itera_binding`](#itera-binding) | `#كرر-binding` | live |
+| [`apud_clause`](#apud-clause) | `#عند-clause` | live |
+| [`elige_stmt`](#elige-stmt) | `#اختر-stmt` | live |
+| [`casu_elige_clause`](#casu-elige-clause) | `#حالة-اختر-clause` | live |
+| [`ceterum_clause`](#ceterum-clause) | `#افتراضي-clause` | live |
+| [`discerne_stmt`](#discerne-stmt) | `#طابق-stmt` | live |
+| [`discriminants`](#discriminants) | `#discriminants` | live |
+| [`casu_variant_clause`](#casu-variant-clause) | `#حالة-variant-clause` | live |
+| [`patterns`](#patterns) | `#patterns` | live |
+| [`pattern`](#pattern) | `#pattern` | live |
+| [`type_pattern`](#type-pattern) | `#type-pattern` | live |
+| [`ut_pattern`](#ut-pattern) | `#كـ-pattern` | live |
+| [`pattern_binding`](#pattern-binding) | `#pattern-binding` | live |
+| [`custodi_stmt`](#custodi-stmt) | `#احرس-stmt` | live |
+| [`si_guard_clause`](#si-guard-clause) | `#إذا-guard-clause` | live |
+| [`cura_stmt`](#cura-stmt) | `#اعتن-stmt` | live |
+| [`ex_stmt`](#ex-stmt) | `#من-stmt` | live |
+| [`extract_fields`](#extract-fields) | `#extract-fields` | live |
+| [`extract_field`](#extract-field) | `#extract-field` | live |
+| [`ceteri_field`](#ceteri-field) | `#باقي-field` | live |
+| [`redde_stmt`](#redde-stmt) | `#أعد-stmt` | live |
+| [`reddet_stmt`](#reddet-stmt) | `#أعد_منتظرا-stmt` | live |
+| [`tacebit_stmt`](#tacebit-stmt) | `#انتظر-stmt` | live |
+| [`cede_stmt`](#cede-stmt) | `#سلم-stmt` | live |
+| [`rumpe_stmt`](#rumpe-stmt) | `#اكسر-stmt` | live |
+| [`perge_stmt`](#perge-stmt) | `#تابع-stmt` | live |
+| [`tacet_stmt`](#tacet-stmt) | `#صمت-stmt` | live |
+| [`iace_stmt`](#iace-stmt) | `#ارم-stmt` | live |
+| [`iace_expr`](#iace-expr) | `#ارم-expr` | live |
+| [`iace_guarded_expr`](#iace-guarded-expr) | `#ارم-guarded-expr` | live |
+| [`cape_clause`](#cape-clause) | `#التقط-clause` | live |
+| [`adfirma_stmt`](#adfirma-stmt) | `#أكد-stmt` | live |
+| [`requirit_stmt`](#requirit-stmt) | `#يتطلب-stmt` | live |
+| [`reice_stmt`](#reice-stmt) | `#ارفض-stmt` | live |
+| [`expression`](#expression) | `#expression` | live |
+| [`transfer`](#transfer) | `#transfer` | live |
+| [`assignment`](#assignment) | `#assignment` | live |
+| [`inc_dec_stmt`](#inc-dec-stmt) | `#inc-dec-stmt` | live |
+| [`place`](#place) | `#place` | live |
+| [`ternary`](#ternary) | `#ternary` | live |
+| [`aut_expr`](#aut-expr) | `#أو-expr` | live |
+| [`et_expr`](#et-expr) | `#و-expr` | live |
+| [`equality`](#equality) | `#equality` | live |
+| [`equality_tail`](#equality-tail) | `#equality-tail` | live |
+| [`comparison`](#comparison) | `#comparison` | live |
+| [`bitwise_or_expr`](#bitwise-or-expr) | `#bitwise-or-expr` | live |
+| [`bitwise_xor_expr`](#bitwise-xor-expr) | `#bitwise-xor-expr` | live |
+| [`bitwise_and_expr`](#bitwise-and-expr) | `#bitwise-and-expr` | live |
+| [`shift_expr`](#shift-expr) | `#shift-expr` | live |
+| [`range_expr`](#range-expr) | `#range-expr` | live |
+| [`range_tail`](#range-tail) | `#range-tail` | live |
+| [`additive_expr`](#additive-expr) | `#additive-expr` | live |
+| [`multiplicative_expr`](#multiplicative-expr) | `#multiplicative-expr` | live |
+| [`vel_expr`](#vel-expr) | `#عوض-expr` | live |
+| [`vel_rhs`](#vel-rhs) | `#عوض-rhs` | live |
+| [`vel_range_tail`](#vel-range-tail) | `#عوض-range-tail` | live |
+| [`unary_expr`](#unary-expr) | `#unary-expr` | live |
+| [`gradient_expr`](#gradient-expr) | `#gradient-expr` | live |
+| [`gradient_selection`](#gradient-selection) | `#gradient-selection` | live |
+| [`gradient_place`](#gradient-place) | `#gradient-place` | live |
+| [`cast_expr`](#cast-expr) | `#cast-expr` | live |
+| [`conversio_expr`](#conversio-expr) | `#conversio-expr` | live |
+| [`inline_recovery`](#inline-recovery) | `#inline-recovery` | live |
+| [`call_expr`](#call-expr) | `#call-expr` | live |
+| [`call_suffix`](#call-suffix) | `#call-suffix` | live |
+| [`member_suffix`](#member-suffix) | `#member-suffix` | live |
+| [`optional_suffix`](#optional-suffix) | `#optional-suffix` | live |
+| [`non_null_suffix`](#non-null-suffix) | `#ليس-null-suffix` | live |
+| [`argument_list`](#argument-list) | `#argument-list` | live |
+| [`argument`](#argument) | `#argument` | live |
+| [`template_argument`](#template-argument) | `#template-argument` | live |
+| [`literal`](#literal) | `#literal` | live |
+| [`primary`](#primary) | `#primary` | live |
+| [`ad_expr`](#ad-expr) | `#اتصل-expr` | live |
+| [`ad_opener`](#ad-opener) | `#اتصل-opener` | live |
+| [`array_literal`](#array-literal) | `#array-literal` | live |
+| [`iuncta_expr`](#iuncta-expr) | `#توبل-expr` | live |
+| [`json_literal`](#json-literal) | `#json-literal` | live |
+| [`json_member`](#json-member) | `#json-member` | live |
+| [`typed_constructor`](#typed-constructor) | `#typed-constructor` | live |
+| [`field_list`](#field-list) | `#field-list` | live |
+| [`field_init`](#field-init) | `#field-init` | live |
+| [`field_key`](#field-key) | `#field-key` | live |
+| [`json_value`](#json-value) | `#json-value` | live |
+| [`json_object`](#json-object) | `#json-object` | live |
+| [`json_array`](#json-array) | `#json-array` | live |
+| [`json_string`](#json-string) | `#json-string` | live |
+| [`json_number`](#json-number) | `#json-number` | live |
+| [`finge_expr`](#finge-expr) | `#أنشئ-expr` | live |
+| [`qualified_ident`](#qualified-ident) | `#qualified-ident` | live |
+| [`praefixum_expr`](#praefixum-expr) | `#بادئة-expr` | live |
+| [`scriptum_expr`](#scriptum-expr) | `#حرر-expr` | live |
+| [`lege_expr`](#lege-expr) | `#اقرأ-expr` | live |
+| [`first_match_expr`](#first-match-expr) | `#first-match-expr` | live |
+| [`summa_expr`](#summa-expr) | `#مجموع-expr` | live |
+| [`filum_clause`](#filum-clause) | `#خيط-clause` | live |
+| [`object_pattern`](#object-pattern) | `#object-pattern` | live |
+| [`pattern_property`](#pattern-property) | `#pattern-property` | live |
+| [`array_pattern`](#array-pattern) | `#array-pattern` | live |
+| [`array_pattern_element`](#array-pattern-element) | `#array-pattern-element` | live |
+| [`nota_stmt`](#nota-stmt) | `#اعرض-stmt` | live |
+| [`entry_header`](#entry-header) | `#entry-header` | live |
+| [`incipit_stmt`](#incipit-stmt) | `#بداية-stmt` | live |
+| [`incipiet_stmt`](#incipiet-stmt) | `#استهلال-stmt` | live |
+| [`probandum_decl`](#probandum-decl) | `#مختبر-decl` | live |
+| [`probandum_body`](#probandum-body) | `#مختبر-body` | live |
+| [`proba_stmt`](#proba-stmt) | `#اختبر-stmt` | live |
+| [`proba_modifier`](#proba-modifier) | `#اختبر-modifier` | live |
+| [`praepara_block`](#praepara-block) | `#جهز-block` | live |
+| [`fac_stmt`](#fac-stmt) | `#افعل-stmt` | live |
 
 ## Lexicon Appendix {#lexicon}
 
