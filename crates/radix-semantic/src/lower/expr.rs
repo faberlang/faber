@@ -26,7 +26,7 @@
 //! records the operation and source structure; typecheck decides whether the
 //! operation is valid, and codegen decides how a valid operation is emitted.
 
-use super::{Lowerer, retired_bare_object_literal_args};
+use super::{Lowerer, issue_args};
 use crate::builtins::forma::{self as builtin_forma};
 use crate::template_holes::{TemplateHoleAnalysis, analyze_template};
 use crate::{Primitive, TypeId};
@@ -73,11 +73,10 @@ pub fn lower_expr(lowerer: &mut Lowerer, expr: &Expr) -> HirExpression {
         ExprKind::Cede(cede_expr) => lowerer.lower_cede(cede_expr),
         ExprKind::Array(array) => lowerer.lower_serie(array),
         ExprKind::Object(_) => {
-            // WHY: anonymous Faber object literals are retired (literal-family
-            // Stage 6). Bare `{ }` is now JSON valor; `ExprKind::Object` survives
+            // WHY: bare `{ }` is a JSON valor; `ExprKind::Object` survives
             // only inside `Verte` for genus construction, lowered by `lower_verte`.
             // Reaching this arm means a parser invariant broke.
-            lowerer.error_with_args(retired_bare_object_literal_args());
+            lowerer.error_with_args(issue_args("unknown_lowering_error"));
             HirExpressionKind::Error
         }
         ExprKind::Finge(finge) => lowerer.lower_finge(finge, id),

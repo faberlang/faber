@@ -601,10 +601,6 @@ impl Parser {
     ///
     /// Generic parameters live in the angle-bracket list before `(`.
     fn parse_param_list(&mut self) -> Result<Vec<Param>, ParseError> {
-        if self.check_keyword_ident(TokenKind::Prae) {
-            return Err(self.removed_prae_typus_error());
-        }
-
         let mut params = Vec::new();
 
         while !self.check(&TokenKind::RParen) && !self.is_at_end() {
@@ -702,9 +698,6 @@ impl Parser {
 
     /// Parse the optional post-name `sponte` marker shared by parameters and fields.
     fn parse_post_name_marker(&mut self) -> Result<bool, ParseError> {
-        if self.eat_identifier_text("fixus") {
-            return Err(self.removed_fixus_error());
-        }
         Ok(self.eat_keyword_ident(TokenKind::Sponte))
     }
 
@@ -1471,9 +1464,6 @@ impl Parser {
     }
 
     fn parse_import_visibility_value(&mut self) -> Result<Visibility, ParseError> {
-        if self.check_keyword_ident(TokenKind::Privata) {
-            return Err(Self::removed_import_visibility_error(self.current_span()));
-        }
         if self.eat_keyword_ident(TokenKind::Publica) {
             Ok(Visibility::Publica)
         } else {
@@ -2875,21 +2865,6 @@ impl Parser {
             .with_arg("sort", Self::generic_default_sort(kind))
             .with_arg("parameter", self.interner.resolve(name.name).to_owned())
             .with_arg("expected", Self::generic_default_expectation(kind))
-    }
-
-    fn removed_prae_typus_error(&self) -> ParseError {
-        ParseError::structured(ParseErrorKind::TypeParameterInvalid, self.current_span())
-            .with_arg("issue", "removed_prae_typus")
-            .with_arg("keyword", "prae typus")
-            .with_arg("replacement", "functio name<T>(...)")
-    }
-
-    fn removed_fixus_error(&self) -> ParseError {
-        ParseError::structured(ParseErrorKind::ParameterInvalid, self.current_span())
-            .with_arg("issue", "removed_fixus")
-            .with_arg("keyword", "fixus")
-            .with_arg("optional_marker", "sponte")
-            .with_arg("immutable_marker", "fixum")
     }
 
     fn type_param_after_magnitudo_error(&self) -> ParseError {

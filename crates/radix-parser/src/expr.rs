@@ -641,7 +641,6 @@ impl Parser {
         let start = self.current_span();
 
         self.reject_retired_literal_prefix_predicate()?;
-        self.reject_retired_required_prefix_predicate()?;
 
         let op = match self.peek().kind {
             TokenKind::Minus => Some(UnOp::Neg),
@@ -779,43 +778,6 @@ impl Parser {
         }
     }
 
-    fn reject_retired_required_prefix_predicate(&self) -> Result<(), ParseError> {
-        let Some((predicate, replacement)) = self.required_prefix_predicate_replacement() else {
-            return Ok(());
-        };
-        // Only the retired predicate form (`negativum <value>`) fires: a bare
-        // identifier use of the same spelling (e.g. a variable named
-        // `negative`) followed by anything that does not start a value operand
-        // is an ordinary expression. The retired form is a legacy single-line
-        // expression, so the operand must start on the same line.
-        if !self.peek_at_one_starts_prefix_operand()
-            || self.looks_like_following_field_member()
-            || !self.operand_starts_same_line()
-        {
-            return Ok(());
-        }
-        Err(self
-            .expected_expression_error("retired_prefix_predicate")
-            .with_arg("predicate", predicate)
-            .with_arg("replacement", replacement))
-    }
-
-    fn required_prefix_predicate_replacement(&self) -> Option<(&'static str, &'static str)> {
-        if self.check_keyword_ident(TokenKind::Nulla) {
-            Some(("nulla", "value est nihil"))
-        } else if self.check_keyword_ident(TokenKind::Nonnulla) {
-            Some(("nonnulla", "value non est nihil"))
-        } else if self.check_keyword_ident(TokenKind::Nonnihil) {
-            Some(("nonnihil", "value non est nihil"))
-        } else if self.check_keyword_ident(TokenKind::Negativum) {
-            Some(("negativum", "value < 0"))
-        } else if self.check_keyword_ident(TokenKind::Positivum) {
-            Some(("positivum", "value > 0"))
-        } else {
-            None
-        }
-    }
-
     fn looks_like_following_field_member(&self) -> bool {
         self.can_start_type_name(&self.peek_at(1).kind)
             && matches!(self.peek_at(2).kind, TokenKind::Ident(_))
@@ -864,7 +826,6 @@ impl Parser {
 
         loop {
             if self.check(&TokenKind::LtAscii) {
-                self.reject_retired_angle_type_call_constructor(&expr)?;
                 let checkpoint = self.checkpoint();
                 if let Ok(type_args) = self.parse_call_type_args()
                     && self.check(&TokenKind::LParen)
@@ -875,12 +836,10 @@ impl Parser {
                 self.restore(checkpoint);
                 break;
             } else if self.check(&TokenKind::LParen) {
-                self.reject_retired_bare_type_call_constructor(&expr)?;
                 expr = self.parse_call_postfix(start, expr, Vec::new())?;
             } else if self.check(&TokenKind::Dot) {
                 expr = self.parse_member_postfix(start, expr)?;
             } else if self.check(&TokenKind::LBracket) {
-                self.reject_retired_shape_sugar_type_call_constructor(&expr)?;
                 expr = self.parse_index_postfix(start, expr)?;
             } else if self.check(&TokenKind::Transpose) {
                 expr = self.parse_transpose_postfix(start, expr);
@@ -1133,117 +1092,6 @@ impl Parser {
                 ty,
             }),
         ))
-    }
-
-    fn reject_retired_bare_type_call_constructor(
-        &mut self,
-        callee: &Expr,
-    ) -> Result<(), ParseError> {
-        let Some(name) = self.callee_ident_name(callee) else {
-            return Ok(());
-        };
-
-        // Locale ruling: retired-call guards resolve the surface spelling to
-        // its latin identity before the conversio-type match, mirroring
-        // `can_start_type_name` — `string(5)` under the en pack is the same
-        // retired type-call shape as `textus(5)` and is rejected under every
-        // locale (map-in-both, not neither).
-        let latin = self
-            .reader_type_latin_keys
-            .get(name)
-            .map_or(name, String::as_str);
-        if !Self::is_conversio_type_keyword(latin) {
-            return Ok(());
-        }
-
-        Err(self.expected_expression_error("retired_type_call_constructor"))
-    }
-
-    fn reject_retired_angle_type_call_constructor(
-        &mut self,
-        callee: &Expr,
-    ) -> Result<(), ParseError> {
-        let Some(name) = self.callee_ident_name(callee) else {
-            return Ok(());
-        };
-        // Same locale ruling as the bare-call guard: map-in-both.
-        let latin = self
-            .reader_type_latin_keys
-            .get(name)
-            .map_or(name, String::as_str);
-        if !Self::is_conversio_type_keyword(latin) {
-            return Ok(());
-        }
-        // Capture shape kind before mutable token ops so the intern borrow ends.
-        let shape_issue = match latin {
-            "tensor" => Some("tensor_figura_after_element"),
-            "sparsa" => Some("sparsa_figura_after_element"),
-            "matrix" => Some("matrix_figura_after_element"),
-            "vector" => Some("vector_width_after_element"),
-            _ => None,
-        };
-
-        let checkpoint = self.checkpoint();
-        self.expect(&TokenKind::LtAscii, "expected '<'")?;
-        // Speculative tail: a malformed parse means this `<` is a comparison
-        // operator, not a type-argument list (`textus < 5`) — restore and fall
-        // through instead of propagating past the checkpoint. The shape-sugar
-        // figura-law errors (missing comma after the element type) are genuine
-        // diagnostics and still propagate.
-        if let Some(issue) = shape_issue {
-            let malformed = if self.parse_type().is_err() {
-                true
-            } else {
-                if !self.eat(&TokenKind::Comma) {
-                    return Err(self.expected_expression_error(issue));
-                }
-                self.parse_figura().is_err() || !self.eat(&TokenKind::GtAscii)
-            };
-            if malformed {
-                self.restore(checkpoint);
-                return Ok(());
-            }
-        } else if self.finish_type_args_list().is_err() {
-            self.restore(checkpoint);
-            return Ok(());
-        }
-
-        if self.check(&TokenKind::LParen) {
-            return Err(self.expected_expression_error("retired_type_call_constructor"));
-        }
-        self.restore(checkpoint);
-        Ok(())
-    }
-
-    fn reject_retired_shape_sugar_type_call_constructor(
-        &mut self,
-        callee: &Expr,
-    ) -> Result<(), ParseError> {
-        let Some(name) = self.callee_ident_name(callee) else {
-            return Ok(());
-        };
-        if radix_types::numeric_width::tensor_sugar_width_marker(name).is_none()
-            && radix_types::numeric_width::vector_sugar_width_marker(name).is_none()
-            && radix_types::numeric_width::matrix_sugar_width_marker(name).is_none()
-            && radix_types::numeric_width::sparsa_sugar_width_marker(name).is_none()
-        {
-            return Ok(());
-        }
-
-        let checkpoint = self.checkpoint();
-        let _width = self.parse_figura()?;
-        if self.check(&TokenKind::LParen) {
-            return Err(self.expected_expression_error("retired_type_call_constructor"));
-        }
-        self.restore(checkpoint);
-        Ok(())
-    }
-
-    fn callee_ident_name<'a>(&'a self, callee: &Expr) -> Option<&'a str> {
-        let ExprKind::Ident(ident) = &callee.kind else {
-            return None;
-        };
-        Some(self.interner.resolve(ident.name))
     }
 
     /// Parse `↦ type [<params>] [⇥ recovery]` bound to an already-parsed operand.

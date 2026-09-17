@@ -283,14 +283,6 @@ help = "इस वर्ण को हटाएं या literal होना �
 message = "अनपेक्षित वर्ण: {char}"
 help = "इस वर्ण को हटाएं या literal होना चाहिए तो इसे escape करें"
 
-[diagnostics.LEX005]
-message = "हटाया गया section directive"
-help = "line-start section directives के बजाय line 1 पर +++ TOML frontmatter में file metadata रखें"
-
-[diagnostics.LEX005.issues.removed_section_directive]
-message = "file-scope § directives हटा दिए गए हैं; +++ frontmatter का उपयोग करें"
-help = "line-start § directives के बजाय line 1 पर +++ TOML frontmatter में file metadata रखें"
-
 [diagnostics.LEX006]
 message = "अमान्य comment syntax"
 help = "comments के आगे // या /* */ के बजाय # लगाएं"
@@ -386,10 +378,6 @@ help = "comma और shape जोड़ें, जैसे matrix<T, [4, 4]>"
 [diagnostics.PARSE001.issues.atomic_single_element]
 message = "atomic को ठीक एक element type स्वीकार है"
 help = "अतिरिक्त type parameter हटाएं; atomic<T> का उपयोग करें"
-
-[diagnostics.PARSE001.issues.retired_type_call_constructor]
-message = "type-call constructors Faber syntax नहीं हैं"
-help = "value ↦ Type या named library constructor का उपयोग करें"
 
 [diagnostics.PARSE001.issues.retired_prefix_predicate]
 message = "{predicate} अब prefix predicate syntax नहीं है"
@@ -507,17 +495,9 @@ help = "'{genus}' declaration header के बाद block जोड़ें"
 message = "अमान्य parameter"
 help = "parameter syntax और order जांचें"
 
-[diagnostics.PARSE015.issues.removed_fixus]
-message = "{keyword} हटा दिया गया; optional slots के लिए {optional_marker} और deferred immutable locals के लिए {immutable_marker} का उपयोग करें"
-help = "नाम के बाद {optional_marker} लगाकर optional parameter या field slots चिह्नित करें"
-
 [diagnostics.PARSE016]
 message = "अमान्य type parameter"
 help = "type parameter list में commas और identifiers जांचें"
-
-[diagnostics.PARSE016.issues.removed_prae_typus]
-message = "'{keyword}' हटा दिया गया; angle brackets से generics घोषित करें: {replacement}"
-help = "parameter list से पहले generic parameters लिखें, उदाहरण के लिए {replacement}"
 
 [diagnostics.PARSE016.issues.type_param_after_magnitudo]
 message = "generic lists में type parameters को {size_param} parameters से पहले होना चाहिए"
@@ -654,10 +634,6 @@ help = "प्रकार syntax जांचें"
 [diagnostics.PARSE040.issues.expected_type_name]
 message = "प्रकार नाम अपेक्षित है"
 help = "प्रकार को identifier, _, या function type से शुरू करें"
-
-[diagnostics.PARSE040.issues.postfix_array_syntax]
-message = "postfix T[] syntax हटा दिया गया है"
-help = "lista<T> उपयोग करें"
 
 [diagnostics.PARSE040.issues.lista_sugar_bracket_form]
 message = "lista sugar का bracket form नहीं है"
@@ -975,7 +951,6 @@ help = "lowering के लिए AST construct ठीक करें"
 message = "cursor के लिए एक type parameter आवश्यक है"
 help = "lowering के लिए AST construct ठीक करें"
 
-
 [diagnostics.SEM008.issues.queue_arity]
 message = "queue requires one or two type parameters"
 help = "use queue<T> or queue<T, N>"
@@ -1218,10 +1193,6 @@ help = "lowering के लिए AST construct ठीक करें"
 
 [diagnostics.SEM008.issues.radix_typus_unknown_generic]
 message = "@ radix typus अज्ञात generic parameter का नाम देता है"
-help = "lowering के लिए AST construct ठीक करें"
-
-[diagnostics.SEM008.issues.retired_bare_object_literal]
-message = "bare object literal retired है; {object_literal_forms} का उपयोग करें"
 help = "lowering के लिए AST construct ठीक करें"
 
 [diagnostics.SEM008.issues.schema_nested_column]
@@ -2104,10 +2075,6 @@ help = "shape से पहले fill दें"
 message = "tensor.structa_forma हटा दिया गया है; tensor.structa<CompleteTensorType>(data) का उपयोग करें"
 help = "tensor.structa<CompleteTensorType>(data) का उपयोग करें"
 
-[diagnostics.SEM011.issues.tensor_creata_runtime_shape_removed]
-message = "tensor.creata अब runtime shape argument स्वीकार नहीं करता; tensor.creata<CompleteTensorType>(fill) का उपयोग करें"
-help = "tensor.creata<CompleteTensorType>(fill) का उपयोग करें"
-
 [diagnostics.SEM011.issues.tensor_creata_complete_type_arg_required]
 message = "tensor.creata के लिए complete tensor type argument आवश्यक है; tensor.creata<CompleteTensorType>(fill) का उपयोग करें"
 help = "complete tensor type argument दें"
@@ -2644,7 +2611,6 @@ help = "यदि mutation अपेक्षित है, तो parameter क
 message = "`de` parameter को assign नहीं कर सकते"
 help = "यदि mutation अपेक्षित है, तो parameter को 'in' के रूप में घोषित करें"
 
-
 [diagnostics.SEM056.issues.mutating_receiver_through_ref]
 message = "cannot call a mutating receiver through a `ref` view"
 help = "drop the `ref` marker, or use a non-mutating method"
@@ -2660,7 +2626,6 @@ help = "caller और callee के बीच parameter modes को एक ज�
 [diagnostics.SEM057.issues.de_to_in_or_ex_position]
 message = "`de` parameter को `in` या `ex` position में pass नहीं कर सकते"
 help = "caller और callee के बीच parameter modes को एक जैसा करें"
-
 
 [diagnostics.SEM057.issues.ref_to_mut_or_own_position]
 message = "cannot pass a `ref` value to a `mut` or `own` position"
@@ -2981,7 +2946,6 @@ help = "यदि केवल एक type अभिप्रेत है त�
 [llm]
 system_prompt_snippet = "Emit Hindi reader-locale Faber using Hindi keywords for declarations, control flow, loops, returns, booleans, common primitive types, and list/map collections. Keep Faber glyph syntax unchanged."
 exemplars = ["./exemplars/salve-munde.hi.fab"]
-
 
 # Queue/stack C2 named-method rows and the lista omnia/quilibet predicate
 # twins. These compiler-owned names remain canonical in every reader pack;

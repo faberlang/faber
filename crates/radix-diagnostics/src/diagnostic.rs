@@ -118,9 +118,6 @@ pub enum LexErrorKind {
     /// Character had no token meaning in the current lexer mode.
     CharacterUnexpected,
 
-    /// Line-start `§` file directives were removed in favor of `+++` frontmatter.
-    RemovedSectionDirective,
-
     /// C-style `//` or `/* */` comments are not part of the Faber lexical contract.
     CommentSyntaxInvalid,
 

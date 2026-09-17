@@ -4,7 +4,7 @@
 //! INPUT: Tensor namespace method calls (creata, structa, formata) and tensor
 //! receiver methods (crea, forma) with resolved DefIds and explicit type arguments
 //! OUTPUT: Checked call sites with finalized TypeIds on tensor values; structured
-//! diagnostics for removed or stale API shapes (structa, creata type args, argument order)
+//! diagnostics for stale API shapes (structa, creata type args, argument order)
 
 use super::TypeChecker;
 use crate::tensor_type_directed::complete_tensor_type;
@@ -17,7 +17,6 @@ const ISSUE_TENSOR_RECEIVER_STRUCTA_RENAMED: &str = "tensor_receiver_structa_ren
 const ISSUE_TENSOR_RECEIVER_CREATA_TYPE_ARGS: &str = "tensor_receiver_creata_type_args";
 const ISSUE_TENSOR_CREA_ARGUMENT_ORDER: &str = "tensor_crea_argument_order";
 const ISSUE_TENSOR_STRUCTA_FORMA_REMOVED: &str = "tensor_structa_forma_removed";
-const ISSUE_TENSOR_CREATA_RUNTIME_SHAPE_REMOVED: &str = "tensor_creata_runtime_shape_removed";
 
 impl TypeChecker<'_> {
     pub fn is_tensor_namespace(&self, module_def_id: radix_hir::DefId) -> bool {
@@ -84,11 +83,7 @@ impl TypeChecker<'_> {
             self.typecheck_call_arg_exprs(args);
             return Some(self.error_type);
         }
-        if method_name == "creata" && explicit_type_args.is_empty() && args.len() == 2 {
-            self.invalid_operand_types(ISSUE_TENSOR_CREATA_RUNTIME_SHAPE_REMOVED, span);
-            self.typecheck_call_arg_exprs(args);
-            return Some(self.error_type);
-        }
+
         let Some(entry) = radix_intrinsics::lookup_namespace_method_by_name("tensor", method_name)
         else {
             return None;

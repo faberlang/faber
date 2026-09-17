@@ -498,14 +498,6 @@ help = "remove the character or escape it if it should be literal"
 message = "unexpected character: {char}"
 help = "remove the character or escape it if it should be literal"
 
-[diagnostics.LEX005]
-message = "removed section directive"
-help = "put file metadata in +++ TOML frontmatter on line 1 instead of line-start section directives"
-
-[diagnostics.LEX005.issues.removed_section_directive]
-message = "file-scope § directives were removed; use +++ frontmatter"
-help = "put file metadata in +++ TOML frontmatter on line 1 instead of line-start § directives"
-
 [diagnostics.LEX006]
 message = "invalid comment syntax"
 help = "prefix comments with # instead of // or /* */"
@@ -601,10 +593,6 @@ help = "add a comma and shape, such as matrix<T, [4, 4]>"
 [diagnostics.PARSE001.issues.atomic_single_element]
 message = "atomic accepts exactly one element type"
 help = "remove the extra type parameter; use atomic<T>"
-
-[diagnostics.PARSE001.issues.retired_type_call_constructor]
-message = "type-call constructors are not Faber syntax"
-help = "use value ↦ Type or a named library constructor"
 
 [diagnostics.PARSE001.issues.retired_prefix_predicate]
 message = "{predicate} is no longer prefix predicate syntax"
@@ -734,10 +722,6 @@ help = "add a block after the '{genus}' declaration header"
 message = "invalid parameter"
 help = "check parameter syntax and order"
 
-[diagnostics.PARSE015.issues.removed_fixus]
-message = "{keyword} was removed; use {optional_marker} for optional slots and {immutable_marker} for deferred immutable locals"
-help = "mark optional parameter or field slots with {optional_marker} after the name"
-
 [diagnostics.PARSE015.issues.parameter_access_modifier_pair]
 message = "parameter carries both a mode prefix and a type marker; use one"
 help = "write either the parameter mode prefix or the type-position marker, not both"
@@ -745,10 +729,6 @@ help = "write either the parameter mode prefix or the type-position marker, not 
 [diagnostics.PARSE016]
 message = "invalid type parameter"
 help = "check type parameter list for commas and identifiers"
-
-[diagnostics.PARSE016.issues.removed_prae_typus]
-message = "'{keyword}' was removed; declare generics with angle brackets: {replacement}"
-help = "write generic parameters before the parameter list, for example {replacement}"
 
 [diagnostics.PARSE016.issues.type_param_after_magnitudo]
 message = "type parameters must precede {size_param} parameters in generic lists"
@@ -901,10 +881,6 @@ help = "check type syntax"
 [diagnostics.PARSE040.issues.expected_type_name]
 message = "expected type name"
 help = "start the type with an identifier, _, or function type"
-
-[diagnostics.PARSE040.issues.postfix_array_syntax]
-message = "postfix T[] syntax is removed"
-help = "use {lista}<T>"
 
 [diagnostics.PARSE040.issues.lista_sugar_bracket_form]
 message = "{lista} sugar has no bracket form"
@@ -1266,7 +1242,6 @@ help = "fix the AST construct for lowering"
 message = "cursor requires one type parameter"
 help = "fix the AST construct for lowering"
 
-
 [diagnostics.SEM008.issues.queue_arity]
 message = "queue requires one or two type parameters"
 help = "use queue<T> or queue<T, N>"
@@ -1533,10 +1508,6 @@ help = "fix the AST construct for lowering"
 
 [diagnostics.SEM008.issues.radix_typus_unknown_generic]
 message = "@ radix typus names an unknown generic parameter"
-help = "fix the AST construct for lowering"
-
-[diagnostics.SEM008.issues.retired_bare_object_literal]
-message = "bare object literal is retired; use {object_literal_forms}"
 help = "fix the AST construct for lowering"
 
 [diagnostics.SEM008.issues.schema_nested_column]
@@ -2482,10 +2453,6 @@ help = "pass fill before shape"
 [diagnostics.SEM011.issues.tensor_structa_forma_removed]
 message = "tensor.structa_forma was removed; use tensor.structa<CompleteTensorType>(data)"
 help = "use tensor.structa<CompleteTensorType>(data)"
-
-[diagnostics.SEM011.issues.tensor_creata_runtime_shape_removed]
-message = "tensor.creata no longer accepts a runtime shape argument; use tensor.creata<CompleteTensorType>(fill)"
-help = "use tensor.creata<CompleteTensorType>(fill)"
 
 [diagnostics.SEM011.issues.tensor_creata_complete_type_arg_required]
 message = "tensor.creata requires a complete tensor type argument; use tensor.creata<CompleteTensorType>(fill)"

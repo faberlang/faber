@@ -1,6 +1,6 @@
 //! Integration tests for parser → diagnostic conversion.
 //!
-//! These tests cover retired-form rejection and structured-diagnostic conversion
+//! These tests cover invalid-form rejection and structured-diagnostic conversion
 //! paths that depend on `DiagnosticConvert` (defined in `radix_module::diagnostics`)
 //! and the driver. They stayed in the radix crate when the parser core moved
 //! to the `radix-parser` sibling crate because the diagnostic-conversion trait
@@ -49,7 +49,7 @@ fn conversio_vel_fallback_reports_migration_diagnostic() {
 }
 
 // =============================================================================
-// Retired prefix predicate diagnostics
+// Prefix predicate diagnostics (literal-prefix guard)
 // =============================================================================
 
 fn assert_retired_prefix_predicate(source: &str, predicate: &str, replacement: &str) {
@@ -82,16 +82,37 @@ fn assert_retired_prefix_predicate(source: &str, predicate: &str, replacement: &
     );
 }
 
+fn assert_semantic_rejection(source: &str) {
+    let session = crate::driver::Session::new(crate::driver::Config::default());
+    let result = crate::driver::analyze_source(&session, "test.fab", source, AnalyzeRequest::default());
+    let Some(diags) = result.err() else {
+        panic!("expected semantic rejection, got ok for: {source}")
+    };
+    assert!(
+        diags.iter().any(|d| d.code == Some("SEM001")),
+        "expected SEM001 name-resolution rejection for: {source}, got: {diags:?}"
+    );
+}
+
 #[test]
 fn retired_prefix_predicates_emit_rewrite_diagnostics() {
     assert_retired_prefix_predicate("fixum _ x ← falsum disabled", "falsum", "value est falsum");
     assert_retired_prefix_predicate("fixum _ x ← verum enabled", "verum", "value est verum");
     assert_retired_prefix_predicate("fixum _ x ← nihil maybe", "nihil", "value est nihil");
-    assert_retired_prefix_predicate("fixum _ x ← nonnihil maybe", "nonnihil", "value non est nihil");
-    assert_retired_prefix_predicate("fixum _ x ← nulla maybe", "nulla", "value est nihil");
-    assert_retired_prefix_predicate("fixum _ x ← nonnulla maybe", "nonnulla", "value non est nihil");
-    assert_retired_prefix_predicate("fixum _ x ← negativum count", "negativum", "value < 0");
-    assert_retired_prefix_predicate("fixum _ x ← positivum count", "positivum", "value > 0");
+}
+
+#[test]
+fn required_prefix_predicates_stay_rejected() {
+    assert_semantic_rejection("incipit { fixum _ x ← nonnihil maybe }");
+    assert_semantic_rejection("incipit { fixum _ x ← nulla maybe }");
+    assert_semantic_rejection("incipit { fixum _ x ← nonnulla maybe }");
+    assert_semantic_rejection("incipit { fixum _ x ← negativum count }");
+    assert_semantic_rejection("incipit { fixum _ x ← positivum count }");
+}
+
+#[test]
+fn postfix_array_variable_type_is_rejected() {
+    assert_semantic_rejection("incipit { fixum textus[] words ← vacua }");
 }
 
 // =============================================================================
@@ -170,50 +191,32 @@ fn json_literal_rejects_faber_keywords_as_values() {
 }
 
 // =============================================================================
-// Retired type-call constructor diagnostics
+// Type-call constructor rejection (semantic name resolution)
 // =============================================================================
-
-fn assert_retired_type_call_constructor(source: &str) {
-    let result = parse(lex(source));
-    let err = result
-        .errors
-        .iter()
-        .find(|err| {
-            err.kind == ParseErrorKind::Expected
-                && err
-                    .args
-                    .iter()
-                    .any(|arg| arg.name == "issue" && arg.value == "retired_type_call_constructor")
-        })
-        .expect("retired type-call constructor diagnostic");
-    let diagnostic = Diagnostic::from_parse_error("test.fab", source, err);
-    assert_eq!(diagnostic.code, Some("PARSE001"));
-    assert_eq!(diagnostic.issue(), Some("retired_type_call_constructor"));
-}
 
 #[test]
 fn scalar_type_call_constructor_is_rejected() {
-    assert_retired_type_call_constructor(r#"fixum _ n ← numerus("42")"#);
+    assert_semantic_rejection(r#"incipit { fixum _ n ← numerus("42") }"#);
 }
 
 #[test]
 fn lista_type_call_constructor_is_rejected() {
-    assert_retired_type_call_constructor("fixum _ xs ← lista<numerus>([1, 2])");
+    assert_semantic_rejection("incipit { fixum _ xs ← lista<numerus>([1, 2]) }");
 }
 
 #[test]
 fn tensor_long_constructor_is_rejected() {
-    assert_retired_type_call_constructor("fixum _ t ← tensor<f32, [2]>([1.0, 2.0])");
+    assert_semantic_rejection("incipit { fixum _ t ← tensor<f32, [2]>([1.0, 2.0]) }");
 }
 
 #[test]
 fn vector_long_constructor_is_rejected() {
-    assert_retired_type_call_constructor("fixum _ v ← vector<f32, 4>(1.0, 2.0, 3.0, 4.0)");
+    assert_semantic_rejection("incipit { fixum _ v ← vector<f32, 4>(1.0, 2.0, 3.0, 4.0) }");
 }
 
 #[test]
 fn matrix_long_constructor_is_rejected() {
-    assert_retired_type_call_constructor("fixum _ m ← matrix<f32, [2, 2]>(1.0, 0.0, 0.0, 1.0)");
+    assert_semantic_rejection("incipit { fixum _ m ← matrix<f32, [2, 2]>(1.0, 0.0, 0.0, 1.0) }");
 }
 
 // =============================================================================
@@ -221,28 +224,8 @@ fn matrix_long_constructor_is_rejected() {
 // =============================================================================
 
 #[test]
-fn vector_long_constructor_requires_width_issue() {
-    let source = "fixum _ v ← vector<f32>(1.0)";
-    let result = parse(lex(source));
-    let err = result
-        .errors
-        .iter()
-        .find(|err| {
-            err.kind == ParseErrorKind::Expected
-                && err
-                    .args
-                    .iter()
-                    .any(|arg| arg.name == "issue" && arg.value == "vector_width_after_element")
-        })
-        .expect("vector width diagnostic");
-    assert!(
-        args_have_no_legacy_message(&err.args),
-        "migrated diagnostic should not choose prose at emit site"
-    );
-
-    let diagnostic = Diagnostic::from_parse_error("test.fab", source, err);
-    assert_eq!(diagnostic.code, Some("PARSE001"));
-    assert_eq!(diagnostic.issue(), Some("vector_width_after_element"));
+fn vector_long_constructor_without_width_is_rejected() {
+    assert_semantic_rejection("incipit { fixum _ v ← vector<f32>(1.0) }");
 }
 
 // =============================================================================
@@ -251,17 +234,32 @@ fn vector_long_constructor_requires_width_issue() {
 
 #[test]
 fn tensor_sugar_constructor_is_rejected() {
-    assert_retired_type_call_constructor("fixum _ t ← tf32[2]([1.0, 2.0])");
+    assert_semantic_rejection("incipit { fixum _ t ← tf32[2]([1.0, 2.0]) }");
 }
 
 #[test]
 fn vector_sugar_constructor_is_rejected() {
-    assert_retired_type_call_constructor("fixum _ v ← vf32[4](1.0, 2.0, 3.0, 4.0)");
+    assert_semantic_rejection("incipit { fixum _ v ← vf32[4](1.0, 2.0, 3.0, 4.0) }");
 }
 
 #[test]
 fn matrix_sugar_constructor_is_rejected() {
-    assert_retired_type_call_constructor("fixum _ m ← mf32[2, 2](1.0, 0.0, 0.0, 1.0)");
+    // `mf32[2, 2](...)` fails as an ordinary parse error: an index list
+    // takes one expression, so the comma cannot appear inside the brackets.
+    let session = crate::driver::Session::new(crate::driver::Config::default());
+    let result = crate::driver::analyze_source(
+        &session,
+        "test.fab",
+        "incipit { fixum _ m ← mf32[2, 2](1.0, 0.0, 0.0, 1.0) }",
+        AnalyzeRequest::default(),
+    );
+    let Some(diags) = result.err() else {
+        panic!("expected rejection, got ok");
+    };
+    assert!(
+        diags.iter().any(|d| d.code == Some("PARSE001")),
+        "expected generic parse rejection, got: {diags:?}"
+    );
 }
 
 // =============================================================================

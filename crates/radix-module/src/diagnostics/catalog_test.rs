@@ -89,7 +89,6 @@ fn lex_error_codes_are_stable() {
         (LexErrorKind::NumberInvalid, "LEX002"),
         (LexErrorKind::EscapeInvalid, "LEX003"),
         (LexErrorKind::CharacterUnexpected, "LEX004"),
-        (LexErrorKind::RemovedSectionDirective, "LEX005"),
         (LexErrorKind::CommentSyntaxInvalid, "LEX006"),
         (LexErrorKind::InlineComment, "LEX007"),
     ];

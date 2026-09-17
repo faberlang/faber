@@ -1356,7 +1356,7 @@ fn import_record_privata_visibility_rejected() {
     );
     assert_parse_error_matches(
         r#"importa { ex = "norma:solum", visibilitas = privata, nomen = solum }"#,
-        ParseExpectation::Issue("import_privata_removed"),
+        ParseExpectation::Issue("invalid_import_visibility"),
     );
 }
 
@@ -3128,7 +3128,7 @@ functio f(textus segmentum) → vacuum {
 }
 
 #[test]
-fn rejects_retired_itera_pro_mode() {
+fn rejects_itera_pro_mode() {
     assert_parse_error_matches(
         r"itera pro 0‥3 fixum i { nota i }",
         ParseExpectation::Arg {
@@ -3304,69 +3304,6 @@ fn cape_keyword_usable_as_identifier_after_block() {
     let result = parse_ok(r"functio f() → vacuum { { tacet } cape }");
     let program = result.program.as_ref().expect("program");
     assert_eq!(program.statements.len(), 1);
-}
-
-#[test]
-fn removed_tempta_is_ordinary_identifier() {
-    // `tempta` is not a registered keyword; it must parse as an ordinary
-    // identifier expression with no targeted retired-statement diagnostic.
-    let source = r"functio f() → vacuum { tempta }";
-    let result = parse_program(source);
-    assert!(result.success());
-    assert!(
-        !result
-            .errors
-            .iter()
-            .any(|err| has_arg(err, "issue", "retired_statement")),
-        "removed tempta must not emit a retired_statement diagnostic"
-    );
-}
-
-#[test]
-fn removed_demum_is_an_identifier_without_targeted_diagnostic() {
-    // `demum` is now an ordinary identifier: `demum { tacet }` parses as an
-    // expression statement plus a block, and later phases reject the unknown
-    // identifier generically. No targeted `retired_statement` diagnostic.
-    let source = r"functio old() → vacuum { fac { tacet } cape err { tacet } demum { tacet } }";
-    let result = parse_program(source);
-    assert!(result.success());
-    assert!(
-        !result
-            .errors
-            .iter()
-            .any(|err| has_arg(err, "issue", "retired_statement")),
-        "removed demum must not emit a retired_statement diagnostic"
-    );
-}
-
-#[test]
-fn removed_emitte_is_an_identifier_without_targeted_diagnostic() {
-    // `emitte "hello"` parses as adjacent expression statements; the retired
-    // statement keyword and its `retired_statement_form` diagnostic are gone.
-    let result = parse_program("incipit { emitte \"hello\" }");
-    assert!(result.success());
-    assert!(
-        !result
-            .errors
-            .iter()
-            .any(|err| has_arg(err, "issue", "retired_statement_form")),
-        "removed emitte must not emit a retired_statement_form diagnostic"
-    );
-}
-
-#[test]
-fn removed_sed_is_an_identifier_without_targeted_diagnostic() {
-    // `sed "\d+" g` parses as adjacent expression statements; the spelling gate
-    // and its `retired_sed` diagnostic are gone.
-    let result = parse_program(r#"incipit { fixum _ r ← sed "\d+" g }"#);
-    assert!(result.success());
-    assert!(
-        !result
-            .errors
-            .iter()
-            .any(|err| has_arg(err, "issue", "retired_sed")),
-        "removed sed must not emit a retired_sed diagnostic"
-    );
 }
 
 #[test]
@@ -3952,49 +3889,25 @@ fn legacy_question_mark_in_type_alias_rejected() {
 }
 
 #[test]
-fn removed_fixus_in_param_rejected() {
-    assert_parse_error_matches(
-        r"functio f(textus name fixus) → vacuum {}",
-        ParseExpectation::Issue("removed_fixus"),
-    );
+fn fixus_in_param_rejected() {
     let result = parse_program(r"functio f(textus name fixus) → vacuum {}");
-    let err = result
-        .errors
-        .iter()
-        .find(|err| {
-            err.kind == ParseErrorKind::ParameterInvalid
-                && err
-                    .args
-                    .iter()
-                    .any(|arg| arg.name == "issue" && arg.value == "removed_fixus")
-        })
-        .expect("removed fixus diagnostic");
-    assert_parse_error_has_no_legacy_message(err);
-    assert_eq!(err.args[1].name, "keyword");
-    assert_eq!(err.args[1].value, "fixus");
+    assert!(
+        !result.success(),
+        "fixus parameter marker must be rejected, got {:?}",
+        result.errors
+    );
+    assert_parse_error_has_no_legacy_message(result.errors.first().expect("parse diagnostic"));
 }
 
 #[test]
-fn removed_fixus_in_genus_field_rejected() {
-    assert_parse_error_matches(
-        r"genus User { textus email fixus }",
-        ParseExpectation::Issue("removed_fixus"),
-    );
+fn fixus_in_genus_field_rejected() {
     let result = parse_program(r"genus User { textus email fixus }");
-    let err = result
-        .errors
-        .iter()
-        .find(|err| {
-            err.kind == ParseErrorKind::ParameterInvalid
-                && err
-                    .args
-                    .iter()
-                    .any(|arg| arg.name == "issue" && arg.value == "removed_fixus")
-        })
-        .expect("removed fixus diagnostic");
-    assert_parse_error_has_no_legacy_message(err);
-    assert_eq!(err.args[1].name, "keyword");
-    assert_eq!(err.args[1].value, "fixus");
+    assert!(
+        !result.success(),
+        "fixus field marker must be rejected, got {:?}",
+        result.errors
+    );
+    assert_parse_error_has_no_legacy_message(result.errors.first().expect("parse diagnostic"));
 }
 
 fn assert_parameter_access_modifier_pair_rejected(source: &str) {
@@ -4032,47 +3945,29 @@ fn mut_mut_parameter_pair_is_parse_rejected() {
     );
 }
 
-fn assert_retired_parameter_prefix_rejected(source: &str) {
+fn assert_parameter_prefix_rejected(source: &str) {
     let result = parse_program(source);
     assert!(
         !result.success(),
-        "retired parameter prefix must be a parse error, got {:?}",
+        "parameter prefix must be a parse error, got {:?}",
         result.errors
     );
     assert_parse_error_has_no_legacy_message(
         result
             .errors
             .first()
-            .expect("retired prefix parse diagnostic"),
+            .expect("parameter prefix parse diagnostic"),
     );
 }
 
 #[test]
-fn ex_parameter_prefix_is_retired() {
-    assert_retired_parameter_prefix_rejected(
-        "functio consume(ex lista<numerus> values) → vacuum {}",
-    );
+fn ex_parameter_prefix_is_invalid() {
+    assert_parameter_prefix_rejected("functio consume(ex lista<numerus> values) → vacuum {}");
 }
 
 #[test]
-fn from_parameter_prefix_is_retired() {
-    assert_retired_parameter_prefix_rejected("functio consume(from string buffer) → string {}");
-}
-
-#[test]
-fn removed_sed_expression_is_an_identifier_without_targeted_diagnostic() {
-    // `sed "x"` is retired: no spelling gate, so the spellings parse as
-    // ordinary identifiers and the generic unknown-identifier path applies —
-    // never a targeted `retired_sed` diagnostic.
-    let result = parse_program(r#"incipit { fixum _ r ← sed "\d+" g }"#);
-    assert!(result.success());
-    assert!(
-        !result
-            .errors
-            .iter()
-            .any(|err| has_arg(err, "issue", "retired_sed")),
-        "removed sed must not emit a retired_sed diagnostic"
-    );
+fn from_parameter_prefix_is_invalid() {
+    assert_parameter_prefix_rejected("functio consume(from string buffer) → string {}");
 }
 
 #[test]
@@ -4186,24 +4081,11 @@ fn parses_tensor_bridge_member_method_names() {
 }
 
 #[test]
-fn rejects_removed_prae_typus_in_param_lists() {
+fn rejects_prae_typus_in_param_lists() {
     let source = "functio old(prae typus T, T x) → T {}";
     let result = parse_program(source);
     assert!(!result.success());
-    let err = result
-        .errors
-        .iter()
-        .find(|err| {
-            err.kind == ParseErrorKind::TypeParameterInvalid
-                && err
-                    .args
-                    .iter()
-                    .any(|arg| arg.name == "issue" && arg.value == "removed_prae_typus")
-        })
-        .expect("removed prae typus diagnostic");
-    assert_parse_error_has_no_legacy_message(err);
-    assert_eq!(err.args[1].name, "keyword");
-    assert_eq!(err.args[1].value, "prae typus");
+    assert_parse_error_has_no_legacy_message(result.errors.first().expect("parse diagnostic"));
 }
 
 #[test]

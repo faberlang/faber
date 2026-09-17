@@ -283,14 +283,6 @@ help = "أزل المحرف أو اهربه إذا كان يجب أن يكون �
 message = "محرف غير متوقع: {char}"
 help = "أزل المحرف أو اهربه إذا كان يجب أن يكون حرفيا"
 
-[diagnostics.LEX005]
-message = "توجيه section أزيل"
-help = "ضع البيانات الوصفية للملف في +++ TOML frontmatter على السطر 1 بدلا من توجيهات section في بداية السطر"
-
-[diagnostics.LEX005.issues.removed_section_directive]
-message = "توجيهات § على مستوى الملف أزيلت؛ استخدم +++ frontmatter"
-help = "ضع البيانات الوصفية للملف في +++ TOML frontmatter على السطر 1 بدلا من توجيهات § في بداية السطر"
-
 [diagnostics.LEX006]
 message = "صياغة تعليق غير صالحة"
 help = "استخدم # لبدء التعليقات بدلا من // أو /* */"
@@ -386,10 +378,6 @@ help = "أضف فاصلة و shape، مثل matrix<T, [4, 4]>"
 [diagnostics.PARSE001.issues.atomic_single_element]
 message = "atomic يقبل element type واحدا بالضبط"
 help = "أزل معامل النوع الإضافي؛ استخدم atomic<T>"
-
-[diagnostics.PARSE001.issues.retired_type_call_constructor]
-message = "type-call constructors ليست صياغة Faber"
-help = "استخدم value ↦ Type أو named library constructor"
 
 [diagnostics.PARSE001.issues.retired_prefix_predicate]
 message = "{predicate} لم يعد prefix predicate syntax"
@@ -507,17 +495,9 @@ help = "أضف كتلة بعد ترويسة تصريح {genus}"
 message = "معامل غير صالح"
 help = "تحقق من صياغة المعامل وترتيبه"
 
-[diagnostics.PARSE015.issues.removed_fixus]
-message = "أزيل {keyword}؛ استخدم {optional_marker} للخانات الاختيارية و {immutable_marker} للمحليات الثابتة المؤجلة"
-help = "علم خانات المعاملات أو الحقول الاختيارية بـ {optional_marker} بعد الاسم"
-
 [diagnostics.PARSE016]
 message = "معامل نوع غير صالح"
 help = "تحقق من قائمة معاملات النوع للفواصل والمعرفات"
-
-[diagnostics.PARSE016.issues.removed_prae_typus]
-message = "أزيل '{keyword}'؛ صرح عن generics بأقواس زاوية: {replacement}"
-help = "اكتب generic parameters قبل قائمة المعاملات، مثل {replacement}"
 
 [diagnostics.PARSE016.issues.type_param_after_magnitudo]
 message = "يجب أن تسبق معاملات النوع معاملات {size_param} في قوائم generic"
@@ -654,10 +634,6 @@ help = "تحقق من صياغة النوع"
 [diagnostics.PARSE040.issues.expected_type_name]
 message = "اسم نوع مطلوب"
 help = "ابدأ النوع بمعرف أو _ أو function type"
-
-[diagnostics.PARSE040.issues.postfix_array_syntax]
-message = "صياغة postfix T[] أزيلت"
-help = "استخدم {lista}<T>"
 
 [diagnostics.PARSE040.issues.lista_sugar_bracket_form]
 message = "{lista} sugar ليس لها شكل bracket"
@@ -963,7 +939,6 @@ help = "أصلح تركيب AST للتخفيض"
 message = "{cursor} يتطلب معامل نوع واحدا"
 help = "أصلح تركيب AST للتخفيض"
 
-
 [diagnostics.SEM008.issues.queue_arity]
 message = "queue requires one or two type parameters"
 help = "use queue<T> or queue<T, N>"
@@ -1206,10 +1181,6 @@ help = "أصلح تركيب AST للتخفيض"
 
 [diagnostics.SEM008.issues.radix_typus_unknown_generic]
 message = "@ radix typus يسمي generic parameter غير معروف"
-help = "أصلح تركيب AST للتخفيض"
-
-[diagnostics.SEM008.issues.retired_bare_object_literal]
-message = "bare object literal متقاعد؛ استخدم {object_literal_forms}"
 help = "أصلح تركيب AST للتخفيض"
 
 [diagnostics.SEM008.issues.schema_nested_column]
@@ -2092,10 +2063,6 @@ help = "مرر fill قبل shape"
 message = "tensor.structa_forma أزيل؛ استخدم tensor.structa<CompleteTensorType>(data)"
 help = "استخدم tensor.structa<CompleteTensorType>(data)"
 
-[diagnostics.SEM011.issues.tensor_creata_runtime_shape_removed]
-message = "tensor.creata لم يعد يقبل runtime shape argument؛ استخدم tensor.creata<CompleteTensorType>(fill)"
-help = "استخدم tensor.creata<CompleteTensorType>(fill)"
-
 [diagnostics.SEM011.issues.tensor_creata_complete_type_arg_required]
 message = "tensor.creata يتطلب complete tensor type argument؛ استخدم tensor.creata<CompleteTensorType>(fill)"
 help = "قدم complete tensor type argument"
@@ -2632,7 +2599,6 @@ help = "صرح عن parameter كـ '{in}' إذا كان التعديل مقصو�
 message = "لا يمكن الإسناد إلى `{de}` parameter"
 help = "صرح عن parameter كـ '{in}' إذا كان التعديل مقصودا"
 
-
 [diagnostics.SEM056.issues.mutating_receiver_through_ref]
 message = "cannot call a mutating receiver through a `ref` view"
 help = "drop the `ref` marker, or use a non-mutating method"
@@ -2648,7 +2614,6 @@ help = "طابق parameter modes بين caller و callee"
 [diagnostics.SEM057.issues.de_to_in_or_ex_position]
 message = "لا يمكن تمرير `{de}` parameter إلى `{in}` أو `{ex}` position"
 help = "طابق parameter modes بين caller و callee"
-
 
 [diagnostics.SEM057.issues.ref_to_mut_or_own_position]
 message = "cannot pass a `ref` value to a `mut` or `own` position"
@@ -2969,7 +2934,6 @@ help = "استخدم `_` إذا كان type واحد فقط مقصودا"
 [llm]
 system_prompt_snippet = "Emit Arabic reader-locale Faber using Arabic keywords for declarations, control flow, loops, returns, booleans, common primitive types, and list/map collections. Keep Faber glyph syntax unchanged and keep source in logical order."
 exemplars = ["./exemplars/salve-munde.ar.fab"]
-
 
 # Queue/stack C2 named-method rows and the lista omnia/quilibet predicate
 # twins. These compiler-owned names remain canonical in every reader pack;

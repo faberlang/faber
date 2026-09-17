@@ -71,10 +71,10 @@ fn lex_error_conversion_preserves_typed_kind_round_trip() {
 fn parser_lex_bridge_normalization_preserves_lexer_identity() {
     use radix_diagnostics::PhaseErrorKind;
 
-    let source = "§ removed\n";
+    let source = "// removed\n";
     let mut err = ParseError::structured(ParseErrorKind::LexError, Span { start: 0, end: 2 });
-    err.error_kind = Some(PhaseErrorKind::Lex(LexErrorKind::RemovedSectionDirective));
-    err = err.with_arg("issue", "removed_section_directive");
+    err.error_kind = Some(PhaseErrorKind::Lex(LexErrorKind::CommentSyntaxInvalid));
+    err = err.with_arg("issue", "c_style_line_comment");
 
     let diagnostic = from_parse_error("bridge.fab", source, &err);
 
@@ -82,11 +82,11 @@ fn parser_lex_bridge_normalization_preserves_lexer_identity() {
         &diagnostic,
         Severity::Error,
         DiagnosticPhase::Lex,
-        "LEX005",
-        Some("removed_section_directive"),
-        &[DiagnosticArg::new("issue", "removed_section_directive")],
+        "LEX006",
+        Some("c_style_line_comment"),
+        &[DiagnosticArg::new("issue", "c_style_line_comment")],
     );
-    assert_eq!(diagnostic.lex_kind(), Some(LexErrorKind::RemovedSectionDirective));
+    assert_eq!(diagnostic.lex_kind(), Some(LexErrorKind::CommentSyntaxInvalid));
 }
 
 #[test]

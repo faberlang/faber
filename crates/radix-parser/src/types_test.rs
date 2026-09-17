@@ -56,20 +56,19 @@ fn generic_arg_type(arg: &radix_syntax::GenericArgExpr) -> &radix_syntax::TypeEx
 
 #[test]
 fn rejects_postfix_array_param_type() {
-    parse_errors_include_issue(
-        "functio sum(numerus[] items) → numerus { redde 0 }",
-        ParseErrorKind::TypeInvalid,
-        "postfix_array_syntax",
+    let result = parse(lex("functio sum(numerus[] items) → numerus { redde 0 }"));
+    assert!(
+        !result.success(),
+        "postfix array param type must be rejected, got {:?}",
+        result.errors
     );
-}
-
-#[test]
-fn rejects_postfix_array_variable_type() {
-    parse_errors_include_issue(
-        "fixum textus[] words ← vacua",
-        ParseErrorKind::TypeInvalid,
-        "postfix_array_syntax",
-    );
+    assert!(result.errors.iter().any(|err| {
+        err.kind == ParseErrorKind::Expected
+            && err
+                .args
+                .iter()
+                .any(|arg| arg.name == "expected" && arg.value == "identifier")
+    }));
 }
 
 #[test]

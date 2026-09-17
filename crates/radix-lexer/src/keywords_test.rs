@@ -230,18 +230,6 @@ fn no_keyword_has_global_scope() {
 }
 
 #[test]
-fn retired_statement_spellings_are_not_registered_keywords() {
-    // tempta / demum / emitte / pro were retired as statement/token surfaces;
-    // after the clean break they are ordinary identifiers with no keyword spec.
-    for spelling in ["tempta", "demum", "emitte", "pro"] {
-        assert!(
-            lookup_keyword_spec(spelling).is_none(),
-            "{spelling} must not be a KeywordSpec"
-        );
-    }
-}
-
-#[test]
 fn identifier_like_owner_policy_is_shared_across_keyword_scopes() {
     // TestOwned and Alias keywords are usable as identifiers in
     // declaration/parameter/member positions (identifier-like owners); the

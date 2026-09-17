@@ -105,25 +105,18 @@ fn block_string_literal_uses_guillemets() {
 }
 
 #[test]
-fn retired_block_string_glyphs_are_rejected() {
+fn block_string_opener_glyphs_are_rejected() {
     let session = test_session(Target::HirRust);
     let source = "incipit {\n  fixum _ quote ← ❝he said \"salve\"❞\n  nota quote\n}";
     let result = compile(&session, "test.fab", source, ModuleCompileRequest::default());
 
     assert!(!result.success());
-    // `❝` is an unexpected character, not a block-string token with a
-    // targeted replacement diagnostic.
+    // `❝` is an unexpected character, not a block-string token.
     assert!(
         result
             .diagnostics
             .iter()
             .any(|d| { d.is_error() && d.code == Some("LEX004") && d.issue() == Some("unexpected_character") })
-    );
-    assert!(
-        !result
-            .diagnostics
-            .iter()
-            .any(|d| d.issue() == Some("retired_block_string_delimiter"))
     );
 }
 

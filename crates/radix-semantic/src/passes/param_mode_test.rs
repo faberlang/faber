@@ -99,7 +99,7 @@ typus Handler = (de textus, own lista<numerus>, numerus) → vacuum
 }
 
 #[test]
-fn retired_parameter_prefix_is_a_parse_error() {
+fn parameter_prefix_is_a_parse_error() {
     let result = analyze_source(
         r"
 functio legacy(ex lista<numerus> values) → vacuum {
@@ -109,7 +109,7 @@ functio legacy(ex lista<numerus> values) → vacuum {
     );
     assert!(
         !result.is_ok(),
-        "retired parameter prefix must reject, got {:?}",
+        "parameter prefix must reject, got {:?}",
         result.diagnostics
     );
 }

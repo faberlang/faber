@@ -2,7 +2,7 @@
 //!
 //! These tests lock the typecheck behaviour for `tensor.creata()`, `tensor.structa()`,
 //! `tensor.formata()`, and receiver-based alternatives (`crea`, `forma`, `formata`).
-//! They also verify that removed/stale API shapes produce structured diagnostics.
+//! They also verify that stale API shapes produce structured diagnostics.
 
 use radix_diagnostics::DiagnosticArg;
 
@@ -107,7 +107,7 @@ fn rejects_old_tensor_creata_with_runtime_shape() {
             + r"incipit {
   fixum _ grid ← tensor.creata(0.0, [2, 2])
 }"),
-        "tensor_creata_runtime_shape_removed",
+        "tensor_creata_complete_type_arg_required",
     );
 }
 
