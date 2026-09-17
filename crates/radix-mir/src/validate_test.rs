@@ -2852,6 +2852,52 @@ fn rope_rejects_odd_dim_const() {
 }
 
 #[test]
+fn rope_rejects_negative_pos_const() {
+    let mut types = TypeTable::new();
+    let return_ty = tensor_mty(&mut types, &[8]);
+    let program = cci_collection_program(
+        &mut types,
+        MirCollectionOp::TensorRope,
+        vec![
+            MirOperand::Constant(MirConstant::Int(-1)),
+            MirOperand::Constant(MirConstant::Int(2)),
+            MirOperand::Place(MirPlace::local(MirLocalId(1))),
+        ],
+        return_ty,
+    );
+    let errors = validate(&program, &types);
+    assert!(
+        errors
+            .iter()
+            .any(|e| e.contains("tensor rope pos -1 must be non-negative")),
+        "expected rope position bound error, got: {errors:?}"
+    );
+}
+
+#[test]
+fn rope_rejects_non_int_pos_const() {
+    let mut types = TypeTable::new();
+    let return_ty = tensor_mty(&mut types, &[8]);
+    let program = cci_collection_program(
+        &mut types,
+        MirCollectionOp::TensorRope,
+        vec![
+            MirOperand::Constant(MirConstant::Float(1.0)),
+            MirOperand::Constant(MirConstant::Int(2)),
+            MirOperand::Place(MirPlace::local(MirLocalId(1))),
+        ],
+        return_ty,
+    );
+    let errors = validate(&program, &types);
+    assert!(
+        errors
+            .iter()
+            .any(|e| e.contains("tensor rope pos must be an int constant or temp")),
+        "expected rope position constant-kind error, got: {errors:?}"
+    );
+}
+
+#[test]
 fn rope_accepts_symbolic_shape_size_dim() {
     // Generic templates carry `Param(d)` dims as symbolic ShapeSize; the
     // validator must admit them like a temp and wait for instantiate fold.
