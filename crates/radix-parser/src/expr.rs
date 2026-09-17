@@ -32,6 +32,19 @@ use std::collections::HashSet;
 /// the glyph's stricter rank law.
 pub(super) const GLYPH_TRANSPOSE_METHOD: &str = "__faber_glyph_transpose";
 
+#[derive(Clone, Copy)]
+enum PostfixFamily {
+    Optional,
+    NonNull,
+}
+
+#[derive(Clone, Copy)]
+enum PostfixPayload {
+    Member,
+    Index,
+    Call,
+}
+
 // EXPRESSION ENTRY POINT
 
 impl Parser {
@@ -874,17 +887,47 @@ impl Parser {
             } else if self.check(&TokenKind::Nabla) {
                 expr = self.parse_gradient_postfix(start, expr)?;
             } else if self.check(&TokenKind::QuestionDot) {
-                expr = self.parse_optional_member_postfix(start, expr)?;
+                expr = self.parse_postfix_payload(
+                    start,
+                    expr,
+                    PostfixFamily::Optional,
+                    PostfixPayload::Member,
+                )?;
             } else if self.check(&TokenKind::QuestionBracket) {
-                expr = self.parse_optional_index_postfix(start, expr)?;
+                expr = self.parse_postfix_payload(
+                    start,
+                    expr,
+                    PostfixFamily::Optional,
+                    PostfixPayload::Index,
+                )?;
             } else if self.check(&TokenKind::QuestionParen) {
-                expr = self.parse_optional_call_postfix(start, expr)?;
+                expr = self.parse_postfix_payload(
+                    start,
+                    expr,
+                    PostfixFamily::Optional,
+                    PostfixPayload::Call,
+                )?;
             } else if self.check(&TokenKind::BangDot) {
-                expr = self.parse_non_null_member_postfix(start, expr)?;
+                expr = self.parse_postfix_payload(
+                    start,
+                    expr,
+                    PostfixFamily::NonNull,
+                    PostfixPayload::Member,
+                )?;
             } else if self.check(&TokenKind::BangBracket) {
-                expr = self.parse_non_null_index_postfix(start, expr)?;
+                expr = self.parse_postfix_payload(
+                    start,
+                    expr,
+                    PostfixFamily::NonNull,
+                    PostfixPayload::Index,
+                )?;
             } else if self.check(&TokenKind::BangParen) {
-                expr = self.parse_non_null_call_postfix(start, expr)?;
+                expr = self.parse_postfix_payload(
+                    start,
+                    expr,
+                    PostfixFamily::NonNull,
+                    PostfixPayload::Call,
+                )?;
             } else if self.check_keyword(TokenKind::Verte) {
                 expr = self.parse_verte_postfix(start, expr)?;
             } else if allow_conversio && self.check_keyword(TokenKind::Conversio) {
@@ -1024,88 +1067,60 @@ impl Parser {
         ))
     }
 
-    fn parse_optional_member_postfix(
+    fn parse_postfix_payload(
         &mut self,
         start: Span,
         object: Expr,
+        family: PostfixFamily,
+        payload: PostfixPayload,
     ) -> Result<Expr, ParseError> {
         self.advance();
-        let member = self.parse_member_ident()?;
-        Ok(self.optional_chain_expr(start, object, OptionalChainKind::Member(member)))
-    }
-
-    fn parse_optional_index_postfix(
-        &mut self,
-        start: Span,
-        object: Expr,
-    ) -> Result<Expr, ParseError> {
-        self.advance();
-        let index = Box::new(self.parse_expression()?);
-        self.expect(&TokenKind::RBracket, "expected ']'")?;
-        Ok(self.optional_chain_expr(start, object, OptionalChainKind::Index(index)))
-    }
-
-    fn parse_optional_call_postfix(
-        &mut self,
-        start: Span,
-        object: Expr,
-    ) -> Result<Expr, ParseError> {
-        self.advance();
-        let args = self.parse_argument_list(false)?;
-        self.expect(&TokenKind::RParen, "expected ')'")?;
-        Ok(self.optional_chain_expr(start, object, OptionalChainKind::Call(args)))
-    }
-
-    fn optional_chain_expr(&mut self, start: Span, object: Expr, chain: OptionalChainKind) -> Expr {
-        self.postfix_expr(
-            start,
-            ExprKind::OptionalChain(OptionalChainExpr {
-                object: Box::new(object),
-                chain,
-            }),
-        )
-    }
-
-    fn parse_non_null_member_postfix(
-        &mut self,
-        start: Span,
-        object: Expr,
-    ) -> Result<Expr, ParseError> {
-        self.advance();
-        let member = self.parse_member_ident()?;
-        Ok(self.non_null_expr(start, object, NonNullKind::Member(member)))
-    }
-
-    fn parse_non_null_index_postfix(
-        &mut self,
-        start: Span,
-        object: Expr,
-    ) -> Result<Expr, ParseError> {
-        self.advance();
-        let index = Box::new(self.parse_expression()?);
-        self.expect(&TokenKind::RBracket, "expected ']'")?;
-        Ok(self.non_null_expr(start, object, NonNullKind::Index(index)))
-    }
-
-    fn parse_non_null_call_postfix(
-        &mut self,
-        start: Span,
-        object: Expr,
-    ) -> Result<Expr, ParseError> {
-        self.advance();
-        let args = self.parse_argument_list(false)?;
-        self.expect(&TokenKind::RParen, "expected ')'")?;
-        Ok(self.non_null_expr(start, object, NonNullKind::Call(args)))
-    }
-
-    fn non_null_expr(&mut self, start: Span, object: Expr, chain: NonNullKind) -> Expr {
-        self.postfix_expr(
-            start,
-            ExprKind::NonNull(NonNullExpr {
-                object: Box::new(object),
-                chain,
-            }),
-        )
+        match family {
+            PostfixFamily::Optional => {
+                let chain = match payload {
+                    PostfixPayload::Member => OptionalChainKind::Member(self.parse_member_ident()?),
+                    PostfixPayload::Index => {
+                        let index = Box::new(self.parse_expression()?);
+                        self.expect(&TokenKind::RBracket, "expected ']'")?;
+                        OptionalChainKind::Index(index)
+                    }
+                    PostfixPayload::Call => {
+                        let args = self.parse_argument_list(false)?;
+                        self.expect(&TokenKind::RParen, "expected ')'")?;
+                        OptionalChainKind::Call(args)
+                    }
+                };
+                Ok(self.postfix_expr(
+                    start,
+                    ExprKind::OptionalChain(OptionalChainExpr {
+                        object: Box::new(object),
+                        chain,
+                    }),
+                ))
+            }
+            PostfixFamily::NonNull => {
+                let chain = match payload {
+                    PostfixPayload::Member => NonNullKind::Member(self.parse_member_ident()?),
+                    PostfixPayload::Index => {
+                        let index = Box::new(self.parse_expression()?);
+                        self.expect(&TokenKind::RBracket, "expected ']'")?;
+                        NonNullKind::Index(index)
+                    }
+                    PostfixPayload::Call => {
+                        let args = self.parse_argument_list(false)?;
+                        self.expect(&TokenKind::RParen, "expected ')'")?;
+                        NonNullKind::Call(args)
+                    }
+                };
+                Ok(self.postfix_expr(
+                    start,
+                    ExprKind::NonNull(NonNullExpr {
+                        object: Box::new(object),
+                        chain,
+                    }),
+                ))
+            }
+        }
     }
 
     fn parse_verte_postfix(&mut self, start: Span, expr: Expr) -> Result<Expr, ParseError> {

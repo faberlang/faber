@@ -4,14 +4,16 @@
 //! Contract: new expressions parse to the expected `ExprKind` variant; retired surface forms
 //! emit structured diagnostics.
 
+use crate::ParseErrorKind;
 use crate::ParseResult;
 use crate::parse;
 use crate::test_support::args_have_no_legacy_message;
-use crate::test_support::{assert_parse_error_issue, parse_ok, parse_program};
+use crate::test_support::{assert_parse_error_issue, parse_ok, parse_program, span_for};
+use radix_diagnostics::Span;
 use radix_lexer::lex;
 use radix_syntax::{
-    AssignOp, BinOp, ConversioTarget, ExprKind, FiguraExpr, JsonValue, Literal, StmtKind,
-    TypeExprKind,
+    AssignOp, BinOp, ConversioTarget, ExprKind, FiguraExpr, JsonValue, Literal, NonNullKind,
+    OptionalChainKind, StmtKind, TypeExprKind,
 };
 
 fn generic_arg_type(arg: &radix_syntax::GenericArgExpr) -> &radix_syntax::TypeExpr {
@@ -1640,6 +1642,136 @@ fn empty_gradient_selector_list_fails_parse() {
         "fixum _ g ← loss(x, y) ∇ []",
         "gradient_empty_selector_list",
     );
+}
+
+#[test]
+fn pd26_optional_non_null_postfix_matrix() {
+    let forms = [
+        ("fixum _ value ← object?.member", true, "member"),
+        ("fixum _ value ← object?[index]", true, "index"),
+        ("fixum _ value ← object?(argument)", true, "call"),
+        ("fixum _ value ← object!.member", false, "member"),
+        ("fixum _ value ← object![index]", false, "index"),
+        ("fixum _ value ← object!(argument)", false, "call"),
+    ];
+
+    for (source, optional, payload) in forms {
+        let result = parse_ok(source);
+        let program = result.program.as_ref().expect("program");
+        let StmtKind::Var(var) = &program.statements[0].kind else {
+            panic!("expected variable declaration");
+        };
+        let expr = var.init.as_deref().expect("initializer");
+        assert_eq!(
+            expr.span,
+            span_for(source, source.split_once("← ").unwrap().1)
+        );
+
+        if optional {
+            let ExprKind::OptionalChain(chain) = &expr.kind else {
+                panic!("expected optional-chain expression, got {:?}", expr.kind);
+            };
+            match (&chain.chain, payload) {
+                (OptionalChainKind::Member(member), "member") => {
+                    assert_eq!(result.interner.resolve(member.name), "member");
+                }
+                (OptionalChainKind::Index(index), "index") => {
+                    assert!(matches!(index.kind, ExprKind::Ident(_)));
+                }
+                (OptionalChainKind::Call(args), "call") => {
+                    assert_eq!(args.len(), 1);
+                }
+                (chain, payload) => panic!("unexpected optional {payload} payload: {chain:?}"),
+            }
+        } else {
+            let ExprKind::NonNull(chain) = &expr.kind else {
+                panic!("expected non-null expression, got {:?}", expr.kind);
+            };
+            match (&chain.chain, payload) {
+                (NonNullKind::Member(member), "member") => {
+                    assert_eq!(result.interner.resolve(member.name), "member");
+                }
+                (NonNullKind::Index(index), "index") => {
+                    assert!(matches!(index.kind, ExprKind::Ident(_)));
+                }
+                (NonNullKind::Call(args), "call") => {
+                    assert_eq!(args.len(), 1);
+                }
+                (chain, payload) => panic!("unexpected non-null {payload} payload: {chain:?}"),
+            }
+        }
+    }
+
+    let source = "fixum _ value ← object?.member![index](argument) + offset";
+    let result = parse_ok(source);
+    let program = result.program.as_ref().expect("program");
+    let StmtKind::Var(var) = &program.statements[0].kind else {
+        panic!("expected variable declaration");
+    };
+    let expr = var.init.as_deref().expect("initializer");
+    assert_eq!(
+        expr.span,
+        span_for(source, "object?.member![index](argument) + offset")
+    );
+    let ExprKind::Binary(binary) = &expr.kind else {
+        panic!("postfix must bind tighter than infix, got {:?}", expr.kind);
+    };
+    assert_eq!(binary.op, BinOp::Add);
+    let ExprKind::Call(call) = &binary.lhs.kind else {
+        panic!(
+            "call must be the outermost postfix, got {:?}",
+            binary.lhs.kind
+        );
+    };
+    assert_eq!(call.args.len(), 1);
+    assert_eq!(call.callee.span, span_for(source, "object?.member![index]"));
+    let ExprKind::NonNull(non_null) = &call.callee.kind else {
+        panic!(
+            "non-null index must wrap optional member, got {:?}",
+            call.callee.kind
+        );
+    };
+    let NonNullKind::Index(index) = &non_null.chain else {
+        panic!("expected non-null index payload, got {:?}", non_null.chain);
+    };
+    assert_eq!(index.span, span_for(source, "index"));
+    assert_eq!(non_null.object.span, span_for(source, "object?.member"));
+    let ExprKind::OptionalChain(optional) = &non_null.object.kind else {
+        panic!(
+            "expected optional member inside non-null index, got {:?}",
+            non_null.object.kind
+        );
+    };
+    assert_eq!(optional.object.span, span_for(source, "object"));
+    assert!(matches!(optional.chain, OptionalChainKind::Member(_)));
+
+    for (source, expected) in [
+        ("fixum _ value ← a?.", "identifier"),
+        ("fixum _ value ← a?[0", "']'"),
+        ("fixum _ value ← a?(1", "')'"),
+        ("fixum _ value ← a!.", "identifier"),
+        ("fixum _ value ← a![0", "']'"),
+        ("fixum _ value ← a!(1", "')'"),
+    ] {
+        let result = parse_program(source);
+        let error = result
+            .errors
+            .iter()
+            .find(|error| {
+                error.kind == ParseErrorKind::Expected
+                    && error
+                        .args
+                        .iter()
+                        .any(|arg| arg.name == "expected" && arg.value == expected)
+            })
+            .unwrap_or_else(|| panic!("expected {expected:?} error, got {:?}", result.errors));
+        let expected_span = if expected == "identifier" {
+            span_for(source, if source.contains("?.") { "?." } else { "!." })
+        } else {
+            Span::new(source.len() as u32, source.len() as u32)
+        };
+        assert_eq!(error.span, expected_span, "source={source:?}");
+    }
 }
 
 #[test]
