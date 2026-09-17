@@ -748,7 +748,9 @@ impl FunctionBuilder<'_> {
         let mut default_body = None;
 
         for arm in arms {
-            let Some(pattern) = self.discerne_switch_arm_pattern(arm) else { return None; };
+            let Some(pattern) = self.discerne_switch_arm_pattern(arm) else {
+                return None;
+            };
             match pattern {
                 HirPattern::Literal(literal) => {
                     let constant = self.literal_switch_constant(literal, arm.span)?;
@@ -1003,7 +1005,9 @@ impl FunctionBuilder<'_> {
         let mut reaches_join = false;
 
         for arm in arms {
-            let Some(pattern) = self.discerne_switch_arm_pattern(arm) else { return None; };
+            let Some(pattern) = self.discerne_switch_arm_pattern(arm) else {
+                return None;
+            };
             match pattern {
                 HirPattern::Variant(variant, fields) => {
                     self.lower_unit_variant_arm(
