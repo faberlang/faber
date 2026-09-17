@@ -16,6 +16,7 @@ use radix_types::{
     FuncSig, IndexExpr, IndexId, ParamType, Type, TypeId, TypeTable, i64s_from_literal_index,
 };
 use rustc_hash::{FxHashMap, FxHashSet, FxHasher};
+use std::cell::RefCell;
 use std::hash::{Hash, Hasher};
 
 pub type MirGenericBindings = FxHashMap<Symbol, MirType>;
@@ -621,13 +622,38 @@ pub fn instantiate_generic_type_with_shapes(
     span: Span,
 ) -> Result<MirType, MirGenericError> {
     let index = ExistingTypeIndex::build(types);
+    instantiate_generic_type_with_shapes_with_index(
+        types,
+        ty,
+        generic_bindings,
+        shape_bindings,
+        span,
+        &index,
+    )
+}
+
+/// Instantiate a generic type with shape substitution using a batch-scoped
+/// index. The index records newly interned types, so it remains equivalent to
+/// rebuilding it from the growing type table while avoiding per-occurrence
+/// full-table scans.
+///
+/// # Errors
+/// Returns [`MirGenericError`] when a type parameter is unbound.
+pub fn instantiate_generic_type_with_shapes_with_index(
+    types: &mut TypeTable,
+    ty: MirType,
+    generic_bindings: &MirGenericBindings,
+    shape_bindings: &MirShapeBindings,
+    span: Span,
+    index: &ExistingTypeIndex,
+) -> Result<MirType, MirGenericError> {
     let instantiated = instantiate_mutable_type_id(
         types,
         ty.semantic_id(),
         generic_bindings,
         shape_bindings,
         span,
-        &index,
+        index,
     )?;
     Ok(MirType::semantic(instantiated))
 }
@@ -637,36 +663,66 @@ pub fn instantiate_generic_type_with_shapes(
 /// Fingerprints use child `TypeId` identity (not [`TypeTable::equals`]). Exact
 /// shape hits are O(1); equals-only matches (alias peel, numeric coercion) fall
 /// back to a linear `type_matches_candidate` scan so behavior is preserved.
-struct ExistingTypeIndex {
-    by_fingerprint: FxHashMap<u64, Vec<TypeId>>,
+/// The candidate memo keeps positive results permanently and drops misses when
+/// the mutable path interns a new type.
+pub struct ExistingTypeIndex {
+    by_fingerprint: RefCell<FxHashMap<u64, Vec<TypeId>>>,
+    candidate_resolutions: RefCell<FxHashMap<Type, Option<TypeId>>>,
 }
 
 impl ExistingTypeIndex {
-    fn build(types: &TypeTable) -> Self {
+    #[must_use]
+    pub fn build(types: &TypeTable) -> Self {
         let mut by_fingerprint: FxHashMap<u64, Vec<TypeId>> = FxHashMap::default();
         for index in 0..types.type_count() {
             let id = type_id_at(index);
             let fingerprint = type_fingerprint(types.get(id));
             by_fingerprint.entry(fingerprint).or_default().push(id);
         }
-        Self { by_fingerprint }
+        Self {
+            by_fingerprint: RefCell::new(by_fingerprint),
+            candidate_resolutions: RefCell::new(FxHashMap::default()),
+        }
     }
 
     fn find(&self, types: &TypeTable, candidate: &Type) -> Option<TypeId> {
-        let fingerprint = type_fingerprint(candidate);
-        if let Some(ids) = self.by_fingerprint.get(&fingerprint) {
-            for &id in ids {
-                if type_matches_candidate(types, id, candidate) {
-                    return Some(id);
-                }
-            }
+        if let Some(&resolution) = self.candidate_resolutions.borrow().get(candidate) {
+            return resolution;
         }
-        // Equals-based matches can differ in child TypeId identity from the
-        // fingerprint key; preserve prior semantics with a full scan.
-        (0..types.type_count()).find_map(|index| {
-            let id = type_id_at(index);
-            type_matches_candidate(types, id, candidate).then_some(id)
-        })
+        let fingerprint = type_fingerprint(candidate);
+        let resolution = self
+            .by_fingerprint
+            .borrow()
+            .get(&fingerprint)
+            .into_iter()
+            .flatten()
+            .find_map(|&id| type_matches_candidate(types, id, candidate).then_some(id))
+            .or_else(|| {
+                // Equals-based matches can differ in child TypeId identity from
+                // the fingerprint key; preserve prior semantics with a full scan.
+                (0..types.type_count()).find_map(|index| {
+                    let id = type_id_at(index);
+                    type_matches_candidate(types, id, candidate).then_some(id)
+                })
+            });
+        self.candidate_resolutions
+            .borrow_mut()
+            .insert(candidate.clone(), resolution);
+        resolution
+    }
+
+    fn record_intern(&self, types: &TypeTable, candidate: &Type, id: TypeId) {
+        self.candidate_resolutions
+            .borrow_mut()
+            .retain(|_, resolution| resolution.is_some());
+        self.candidate_resolutions
+            .borrow_mut()
+            .insert(candidate.clone(), Some(id));
+        self.by_fingerprint
+            .borrow_mut()
+            .entry(type_fingerprint(types.get(id)))
+            .or_default()
+            .push(id);
     }
 }
 
@@ -1260,9 +1316,12 @@ pub fn substitute_index_params(
 /// the first occurrence interns the candidate so the monomorphized instance
 /// carries a valid type graph.
 fn intern_or_find(types: &mut TypeTable, candidate: &Type, index: &ExistingTypeIndex) -> TypeId {
-    index
-        .find(types, candidate)
-        .unwrap_or_else(|| types.intern(candidate.clone()))
+    if let Some(id) = index.find(types, candidate) {
+        return id;
+    }
+    let id = types.intern(candidate.clone());
+    index.record_intern(types, candidate, id);
+    id
 }
 
 /// Mutable mirror of [`instantiate_existing_type_id`] with shape substitution.
