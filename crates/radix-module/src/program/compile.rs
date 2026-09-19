@@ -770,15 +770,20 @@ pub(crate) fn import_contract_for_parsed_file(
         {
             contract.library_package_roots.insert(root);
         }
-        // Seed the transitive relative-import walk from every direct relative
-        // import target (MRL-4): a module's public surface can name sibling
-        // nominals through its own relative imports (`list<p.Punctum>` in a
-        // `Catena` field), and a consumer that imports only the outer module
-        // cannot remap those fields without the sibling's nominal
-        // registrations.
-        if import_path.starts_with("./") {
-            collect_transitive_relative_interfaces(
+        // Seed the transitive same-package walk from every resolvable direct
+        // import target (MRL-4, extended to package-form nested edges): a
+        // module's public surface can name sibling nominals through its own
+        // relative or package-form imports (`list<p.Punctum>` in a `Catena`
+        // field, `capsule.Capsule` in an `admit_capsule` signature), and a
+        // consumer that imports only the outer module cannot remap those
+        // fields without the sibling's nominal registrations. Relative
+        // targets seed with a derived identity only when their own edge
+        // carries one; provider-form targets seed with the identity derived
+        // from their provider spelling.
+        if import_path.starts_with("./") || import_path.contains(':') {
+            collect_transitive_same_package_interfaces(
                 &target.target_path,
+                target.interface.identity.as_ref(),
                 pack_key.as_ref(),
                 templates,
                 &mut transitive_visited,
@@ -796,16 +801,25 @@ pub(crate) fn import_contract_for_parsed_file(
     contract
 }
 
-/// Collect file interfaces for the relative imports of an imported module,
-/// transitively (MRL-4).
+/// Collect file interfaces for the same-package imports of an imported
+/// module, transitively (MRL-4).
 ///
-/// Only relative-import edges are followed: provider/library imports keep
-/// their own seam machinery. `visited` guards cycles (a module diamond or a
-/// genuine import cycle both stop at the first visit). Interfaces are keyed
-/// by the producer-side binding; the caller decides precedence against the
-/// consumer's own bindings.
-fn collect_transitive_relative_interfaces(
+/// Only relative (`./sibling`) and package-form (bare source-root) edges are
+/// followed: provider/library imports keep their own seam machinery.
+/// `visited` guards cycles (a module diamond or a genuine import cycle both
+/// stop at the first visit). Interfaces are keyed by the producer-side
+/// binding; the caller decides precedence against the consumer's own
+/// bindings.
+///
+/// `from_identity` is the importing module's own canonical identity. Each
+/// collected interface is re-keyed to the identity the importer's snapshot
+/// context derives for the edge (`import_target_identity(edge,
+/// from_identity)`) — the install and the snapshot must agree on the
+/// canonical key or the consumer's identity lookup fails closed (WARN014
+/// export skip).
+fn collect_transitive_same_package_interfaces(
     from_file: &Path,
+    from_identity: Option<&InterfaceLibraryIdentity>,
     pack_key: Option<&String>,
     templates: Option<&BTreeMap<String, String>>,
     visited: &mut BTreeSet<PathBuf>,
@@ -826,10 +840,21 @@ fn collect_transitive_relative_interfaces(
             continue;
         };
         let import_path = interner.resolve(decl.path);
-        if !import_path.starts_with("./") {
+        let is_relative = import_path.starts_with("./");
+        let is_package_form = !is_relative && !import_path.contains(':') && !import_path.starts_with('§');
+        if !is_relative && !is_package_form {
             continue;
         }
-        if !import_contract_path_allowed(import_path, templates) {
+        // Relative edges must match the consumer's own SEM006-validated
+        // scheme set; package-form edges belong to the imported module's own
+        // AST, which the consumer's SEM006 pass never revalidates — only the
+        // shared traversal/absolute guards apply there.
+        let path_allowed = if is_relative {
+            import_contract_path_allowed(import_path, templates)
+        } else {
+            import_path_shape_allowed(import_path)
+        };
+        if !path_allowed {
             continue;
         }
         let Some(binding) = import_binding(&interner, &decl.kind) else {
@@ -838,17 +863,47 @@ fn collect_transitive_relative_interfaces(
         // An unparsable transitive target contributes no interface here; the
         // module that directly imports it reports the named import-site
         // failure through its own contract walk.
-        let Some(target) = (match cached_import_target(from_file, import_path, pack_key, pack_ref, templates) {
-            ImportTargetLookup::Parsed(target) => Some(target),
-            ImportTargetLookup::Unparsable(_) | ImportTargetLookup::Unresolved => None,
-        }) else {
+        let target = if is_relative {
+            match cached_import_target(from_file, import_path, pack_key, pack_ref, templates) {
+                ImportTargetLookup::Parsed(target) => Some(target),
+                ImportTargetLookup::Unparsable(_) | ImportTargetLookup::Unresolved => None,
+            }
+        } else {
+            // Package-form edges do not resolve through
+            // `resolve_namespace_import`; resolve against the source root and
+            // re-derive the parse/snapshot through the equivalent relative
+            // spelling (same candidate, same memo keys). The re-derivation
+            // anchors on a synthetic file whose parent is the source root —
+            // only `.parent()` of the anchor is consulted. The edge identity
+            // is re-keyed below from the importer's own identity either way.
+            crate::import_resolve::resolve_source_root_import(from_file, import_path).and_then(|(base, _resolved)| {
+                let anchor = base.join("anchor.fab");
+                match cached_import_target(&anchor, &format!("./{import_path}"), pack_key, pack_ref, templates) {
+                    ImportTargetLookup::Parsed(target) => Some(target),
+                    ImportTargetLookup::Unparsable(_) | ImportTargetLookup::Unresolved => None,
+                }
+            })
+        };
+        let Some(target) = target else {
             continue;
         };
         if !visited.insert(target.target_path.clone()) {
             continue;
         }
-        out.push((binding, target.interface.clone()));
-        collect_transitive_relative_interfaces(&target.target_path, pack_key, templates, visited, out);
+        let mut interface = target.interface.clone();
+        if let Some(identity) = import_target_identity(import_path, from_identity) {
+            interface.identity = Some(identity);
+        }
+        let child_identity = interface.identity.clone();
+        out.push((binding, interface));
+        collect_transitive_same_package_interfaces(
+            &target.target_path,
+            child_identity.as_ref(),
+            pack_key,
+            templates,
+            visited,
+            out,
+        );
     }
 }
 
@@ -1184,6 +1239,29 @@ fn import_target_identity(
                 .filter(|segment| !segment.is_empty() && *segment != ".")
                 .map(str::to_owned),
         );
+        return Some(InterfaceLibraryIdentity {
+            provider: identity.provider.clone(),
+            package: identity.package.clone(),
+            module_path,
+        });
+    }
+    // Package-form (source-root) import: bare spelling — no provider colon,
+    // no `./` prefix, no `§` template. The target lives in the same package
+    // as the importing module, so the identity shares the module's provider
+    // and package, with the module path spelled from the source root. This
+    // is the same canonical key the provider-form spelling of the same
+    // target derives; leaving it None here makes package-form snapshots
+    // fail closed at the consumer's canonical lookup (WARN014 export skip).
+    if !import_path.starts_with('§') {
+        let identity = module_identity?;
+        let module_path: Vec<String> = import_path
+            .split('/')
+            .filter(|segment| !segment.is_empty() && *segment != ".")
+            .map(str::to_owned)
+            .collect();
+        if module_path.is_empty() {
+            return None;
+        }
         return Some(InterfaceLibraryIdentity {
             provider: identity.provider.clone(),
             package: identity.package.clone(),
@@ -2221,11 +2299,20 @@ fn export_name(stmt: &Stmt, interner: &crate::lexer::Interner) -> Option<String>
 /// reject, so resolution + filesystem I/O never touch policy-illegal targets.
 ///
 /// Mirrors the checks in `crate::semantic::passes::import_path::validate_import_paths`.
+/// Traversal and absolute-path guards shared by the direct contract walk and
+/// the transitive same-package walk. Scheme allowlisting stays in
+/// [`import_contract_path_allowed`].
+fn import_path_shape_allowed(path: &str) -> bool {
+    !(path == ".."
+        || path.starts_with("../")
+        || path.contains("/../")
+        || path.ends_with("/..")
+        || path.starts_with('/')
+        || path.chars().nth(1) == Some(':'))
+}
+
 fn import_contract_path_allowed(path: &str, templates: Option<&BTreeMap<String, String>>) -> bool {
-    if path == ".." || path.starts_with("../") || path.contains("/../") || path.ends_with("/..") {
-        return false;
-    }
-    if path.starts_with('/') || path.chars().nth(1) == Some(':') {
+    if !import_path_shape_allowed(path) {
         return false;
     }
     if path.starts_with('§') {

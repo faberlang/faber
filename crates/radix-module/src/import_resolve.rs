@@ -284,6 +284,30 @@ fn contains_path_traversal(path: &str) -> bool {
     path.starts_with('/') || path == ".." || path.starts_with("../") || path.contains("/../") || path.ends_with("/..")
 }
 
+/// Resolve a package-form import (`math`, `lib/util` — bare source-root
+/// spelling) against the importing file's package source root.
+///
+/// The CLI-path mirror of the package machinery's source-root form: the
+/// candidate is resolved from the discovered package root's `[paths].source`
+/// (`src` by default, `.` for package-root sources; other source roots are
+/// not part of the supported set and fail closed). Returns the source root
+/// used and the resolved target file, so callers can re-derive the same
+/// resolution through the relative-import spelling.
+pub(crate) fn resolve_source_root_import(from_file: &Path, import_path: &str) -> Option<(PathBuf, PathBuf)> {
+    if contains_path_traversal(import_path) {
+        return None;
+    }
+    let package_root = find_package_root(from_file)?;
+    let manifest = std::fs::read_to_string(package_root.join("faber.toml")).ok()?;
+    let base = match parse_paths_config(&manifest).source.as_deref() {
+        None | Some("src") => package_root.join("src"),
+        Some(".") => package_root.clone(),
+        Some(_) => return None,
+    };
+    let resolved = resolve_fab_file(&base.join(import_path))?;
+    Some((base, resolved))
+}
+
 /// Walk up from `from_file.parent()` until a `faber.toml` is found.
 ///
 /// Results are memoized for the thread (compile session). First resolution for

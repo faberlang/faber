@@ -1727,6 +1727,196 @@ incipit {
     );
 }
 
+/// WARN014 provider-identity residual (capsule+gguf_manifest+gguf A2 shape):
+/// a provider module whose sibling imports are spelled in PACKAGE form
+/// (source-root, no provider colon) still snapshots its exports with the
+/// same canonical identities the provider-form spelling derives, and a
+/// consumer that imports only the outer module installs the siblings
+/// transitively — the callable must not be export-skipped (WARN014) nor
+/// leave false SEM010s at its call site. The direct-import-everything
+/// spelling is the commune-pin dodge and is covered there.
+#[test]
+fn package_form_sibling_typed_exports_clean_without_direct_imports() {
+    let (_td, home) = temp_dir("a2-package-form");
+    let provider = home.join("demo");
+    fs::create_dir_all(provider.join("src")).expect("demo src");
+    fs::write(
+        provider.join("faber.toml"),
+        r#"[package]
+name = "demo"
+[library]
+provider = "demo"
+[reader]
+locale = "en"
+[paths]
+source = "src"
+[build]
+kind = "lib"
+targets = ["rust"]
+"#,
+    )
+    .expect("manifest");
+    fs::write(
+        provider.join("src/capsule.fab"),
+        r#"
+@ public
+class Capsule {
+    string schema
+}
+
+@ public
+fn construct_manifest(string schema) → Capsule ⇥ AdmissionError {
+    return Capsule { schema = schema }
+}
+
+@ public
+union AdmissionError {
+    @ shared
+    string message
+
+    UnknownVersion,
+    BadManifest
+}
+"#,
+    )
+    .expect("capsule");
+    fs::write(
+        provider.join("src/gguf_manifest.fab"),
+        r#"
+@ public
+union GgufManifestError {
+    @ shared
+    string message
+
+    BadFormat,
+    Truncated,
+    BadWire
+}
+"#,
+    )
+    .expect("gguf_manifest");
+    // The gguf module imports its siblings in PACKAGE form (bare
+    // source-root spelling) — the shape the commune pin dodges.
+    fs::write(
+        provider.join("src/gguf.fab"),
+        r#"
+import from "capsule" capsule
+import from "gguf_manifest" gguf_manifest
+
+@ public
+union GgufError {
+    @ shared
+    string message
+
+    BadCapsule,
+    ManifestError {
+        gguf_manifest.GgufManifestError inner
+    }
+}
+
+@ conversion
+fn from_gguf_manifest_error(gguf_manifest.GgufManifestError err) → GgufError {
+    return variant ManifestError {message = err.message, inner = err}
+}
+
+@ public
+fn admit_capsule(string schema) → capsule.Capsule ⇥ GgufError {
+    do {
+        const capsule.Capsule c ← capsule.construct_manifest(schema)
+        return c
+    }
+    catch err {
+        throw variant BadCapsule {message = "capsule construction failed: §"(err.message)}
+    }
+}
+"#,
+    )
+    .expect("gguf");
+
+    let app = home.join("app.fab");
+    fs::write(
+        &app,
+        r#"+++
+locale = "en"
++++
+
+import from "demo:gguf" gguf
+
+fn use_admit() → string {
+    do {
+        let c ← gguf.admit_capsule("schema-2")
+        return c.schema
+    }
+    catch err {
+        return err.message
+    }
+}
+
+main {
+    print use_admit()
+}
+"#,
+    )
+    .expect("app");
+    let source = fs::read_to_string(&app).expect("read app");
+
+    let _guard = LibraryHomeGuard::set(&home);
+    // (a) the gguf snapshot derives package-form edge identities from the
+    // provider-form direct edge — the one package-form identity lookup.
+    let contract = import_contract_for_file(&app, &source, None, None);
+    let interface = contract
+        .file_interfaces
+        .get("gguf")
+        .expect("gguf interface");
+    assert!(
+        interface.exports.contains_key("admit_capsule"),
+        "admit_capsule must appear in the snapshot, got {:?}",
+        interface.exports.keys().collect::<Vec<_>>()
+    );
+    let crate::file_interface::FileExportKind::Function(admit) = &interface.exports["admit_capsule"].kind else {
+        panic!("admit_capsule must be a function export");
+    };
+    assert!(
+        matches!(admit.ret.as_ref(), crate::file_interface::InterfaceTypeSnapshot::Nominal(n)
+            if n.name == "Capsule" && n.identity.is_some()),
+        "package-form qualified ref must carry the sibling identity, got {:?}",
+        admit.ret
+    );
+    // (b) the package-form siblings install transitively under their
+    // producer bindings so the consumer can remap them.
+    for binding in ["capsule", "gguf_manifest"] {
+        assert!(
+            contract.file_interfaces.contains_key(binding),
+            "package-form sibling {binding} must install transitively, got {:?}",
+            contract.file_interfaces.keys().collect::<Vec<_>>()
+        );
+    }
+
+    let result = crate::services::check_diagnostics_for_source(&app.display().to_string(), &source, false);
+    assert!(
+        result.success,
+        "gguf-only consumer must typecheck against package-form siblings: {:?}",
+        result
+            .diagnostics
+            .iter()
+            .map(|d| (d.code, d.issue(), d.args.clone()))
+            .collect::<Vec<_>>()
+    );
+    assert!(
+        !result
+            .diagnostics
+            .iter()
+            .any(|d| d.code == Some("WARN014") && d.issue() == Some("file_interface_export_skipped")),
+        "no export may be skipped on the package-form sibling shape: {:?}",
+        result.diagnostics
+    );
+    assert!(
+        !result.diagnostics.iter().any(|d| d.code == Some("SEM010")),
+        "no false SEM010 may surface on the package-form sibling shape: {:?}",
+        result.diagnostics
+    );
+}
+
 /// cds-u6 snapshot-nomen-collision (extension-lib `Scopulum` shape): two
 /// providers each export a same-named class and class-returning functions.
 /// Same-named local classes must not cascade-skip both providers' exports
