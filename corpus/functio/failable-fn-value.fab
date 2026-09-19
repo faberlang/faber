@@ -20,8 +20,8 @@ locale = "en"
 #   • Related keywords: functio, ⇥, iace, redde
 #
 # Common mistakes:
-#   • Passing a failable closure instead of a named ⇥ function — rust emit
-#     rejects failable closures (`rust_failable_closure_unsupported`).
+#   • Assuming a failable closure cannot be passed — the old
+#     `rust_failable_closure_unsupported` rust-emit rejection is gone.
 #
 # See also: functio, ⇥, iace, redde
 # =============================================================================
