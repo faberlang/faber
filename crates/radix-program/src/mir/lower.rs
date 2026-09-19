@@ -615,6 +615,73 @@ mod tests {
         assert!(remapped.variant_fields.contains_key(&variant_dest));
         assert!(!remapped.variant_fields.contains_key(&struct_dest));
     }
+
+    #[test]
+    fn rewrite_validation_def_ids_moves_source_local_fields_off_remapped_dests() {
+        // dtype.fab after remap: DType.I32 dest is 4116 (empty payload), while
+        // source-local DTypeError.UnknownName still occupies DefId 4116 with
+        // commune `message`. Applying remapped metadata without moving keys
+        // contaminates the unit-variant slot.
+        let i32_source = DefId(4100);
+        let unknown_name_source = DefId(4116);
+        let i32_dest = DefId(4116);
+        let unknown_name_dest = DefId(4119);
+        let dtype = DefId(4096);
+        let dtype_error = DefId(4115);
+        let dtype_dest = DefId(4112);
+        let dtype_error_dest = DefId(4118);
+
+        let types = TypeTable::new();
+        let text = types.primitive(Primitive::Textus);
+        let mut context = radix_module::mir::MirValidationContext::new(&types);
+        let mut interner = Interner::new();
+        let message = interner.intern("message");
+        context.variant_fields.entry(i32_source).or_default();
+        context
+            .variant_fields
+            .entry(unknown_name_source)
+            .or_default()
+            .insert(message, MirType::semantic(text));
+        context.variant_parents.insert(i32_source, dtype);
+        context
+            .variant_parents
+            .insert(unknown_name_source, dtype_error);
+        context.enum_variants.insert(dtype, vec![i32_source]);
+        context
+            .enum_variants
+            .insert(dtype_error, vec![unknown_name_source]);
+
+        let mut variant_remap = HashMap::new();
+        variant_remap.insert(i32_source, i32_dest);
+        variant_remap.insert(unknown_name_source, unknown_name_dest);
+        let mut struct_remap = HashMap::new();
+        struct_remap.insert(dtype, dtype_dest);
+        struct_remap.insert(dtype_error, dtype_error_dest);
+
+        rewrite_validation_def_ids(&mut context, &variant_remap, &struct_remap);
+
+        let i32_fields = context
+            .variant_fields
+            .get(&i32_dest)
+            .expect("remapped DType.I32 keeps a field slot");
+        assert!(
+            !i32_fields.contains_key(&message),
+            "commune message must not remain on the remapped unit-variant dest"
+        );
+        assert_eq!(
+            context
+                .variant_fields
+                .get(&unknown_name_dest)
+                .map(|fields| fields.contains_key(&message)),
+            Some(true),
+            "DTypeError.UnknownName must keep message at its remapped dest"
+        );
+        assert_eq!(context.variant_parents.get(&i32_dest), Some(&dtype_dest));
+        assert_eq!(
+            context.variant_parents.get(&unknown_name_dest),
+            Some(&dtype_error_dest)
+        );
+    }
 }
 
 pub(super) fn lower_package_units<'a>(
@@ -2038,6 +2105,49 @@ fn rewrite_validation_type_ids(
         .collect();
 }
 
+/// Move validation-context DefId keys through the same variant/nominal remap
+/// as the program's `EnumVariant` aggregates.
+///
+/// Each unit allocates user DefIds from `USER_DEF_ID_BASE`. After the program
+/// rewrite, a source-local `DTypeError.UnknownName` can still occupy the same
+/// numeric id as the consumer's remapped `DType.I32`. `remapped.apply` then
+/// `or_insert`s commune fields onto that slot, so a unit-variant construction
+/// fails as "named aggregate is missing required field". Rewrite the keys
+/// first so leftover source-local metadata cannot alias a remapped dest.
+fn rewrite_validation_def_ids(
+    context: &mut radix_module::mir::MirValidationContext<'_>,
+    variant_remap: &HashMap<DefId, DefId>,
+    struct_remap: &HashMap<DefId, DefId>,
+) {
+    let remap_variant = |id: DefId| variant_remap.get(&id).copied().unwrap_or(id);
+    let remap_nominal = |id: DefId| struct_remap.get(&id).copied().unwrap_or(id);
+
+    for (def, fields) in std::mem::take(&mut context.variant_fields) {
+        let slot = context
+            .variant_fields
+            .entry(remap_variant(def))
+            .or_default();
+        for (name, ty) in fields {
+            slot.entry(name).or_insert(ty);
+        }
+    }
+
+    for (variant, parent) in std::mem::take(&mut context.variant_parents) {
+        context
+            .variant_parents
+            .entry(remap_variant(variant))
+            .or_insert(remap_nominal(parent));
+    }
+
+    for (enum_def, variants) in std::mem::take(&mut context.enum_variants) {
+        context
+            .enum_variants
+            .entry(remap_nominal(enum_def))
+            .or_insert_with(|| variants.into_iter().map(remap_variant).collect());
+    }
+    context.rebuild_variant_positions();
+}
+
 pub(super) fn rewrite_lowered_type_ids<'a>(
     mut lowered: LoweredMirUnit<'a>,
     rewrites: &[(TypeId, TypeId)],
@@ -2069,6 +2179,7 @@ pub(super) fn rewrite_lowered_type_ids<'a>(
     let target_snapshot: &'static TypeTable = Box::leak(Box::new(target_snapshot));
     let mut context = context.with_types(target_snapshot);
     rewrite_validation_type_ids(&mut context, rewrites);
+    rewrite_validation_def_ids(&mut context, variant_remap, struct_remap);
     remapped.apply(&mut context);
     context.closure_environments = lowered
         .closure_environments

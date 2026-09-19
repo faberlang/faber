@@ -141,6 +141,15 @@ impl FunctionBuilder<'_> {
         if let Some(lowered) = self.lower_numeric_operator_method(receiver, &method_name, args, expr) {
             return Some(lowered);
         }
+        // WHY: scalar `.to_text()` is the scribe `"§"(value)` render. Package
+        // MIR test helpers stringify numbers this way; the collection-method
+        // fallback would fail closed after the unit-variant metadata remap.
+        if (method_name == "to_text" || method_name == "ad_textum") && args.is_empty() {
+            let rec_ty = self.expr_ty(receiver)?;
+            let value = self.lower_expr_value(receiver)?;
+            let text_ty = self.expr_ty(expr)?;
+            return Some(self.render_scribe_value_text(value, rec_ty, text_ty, expr.span));
+        }
         if let Some(lowered) = self.lower_atomic_method(receiver, &method_name, args, expr) {
             return Some(lowered);
         }
