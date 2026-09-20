@@ -886,6 +886,7 @@ version = "0.1.0"
 dependencies = [
  "handroll",
  "postcard",
+ "radix-codegen-shared",
  "radix-mir-fmir",
  "radix-module",
  "radix-types",

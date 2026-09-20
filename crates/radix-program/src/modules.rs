@@ -51,37 +51,13 @@ fn module_segments(source_root: &Path, file: &Path) -> Vec<String> {
         .collect()
 }
 
-/// Map a filesystem or frontmatter path segment to a valid Rust module identifier.
-///
-/// Worktree packet slugs (`faber-hir-v1`) and other non-ident path characters must
-/// not appear raw in `pub mod …` emission — Rust rejects `-` inside idents.
-///
-/// Policy:
-/// - keep ASCII alphanumeric and `_`
-/// - every other character (including `-`) becomes `_`
-/// - empty / all-separator → `m`
-/// - leading digit → prefix `m_`
-#[must_use]
-pub fn sanitize_rust_module_ident(segment: &str) -> String {
-    let mut out = String::with_capacity(segment.len().max(1));
-    for c in segment.chars() {
-        if c.is_ascii_alphanumeric() || c == '_' {
-            out.push(c);
-        } else {
-            out.push('_');
-        }
-    }
-    let trimmed = out.trim_matches('_');
-    let mut ident = if trimmed.is_empty() {
-        "m".to_owned()
-    } else {
-        trimmed.to_owned()
-    };
-    if ident.chars().next().is_some_and(|c| c.is_ascii_digit()) {
-        ident = format!("m_{ident}");
-    }
-    ident
-}
+/// Single module-naming policy for the Rust module tree and use-line
+/// emission (S-B2): `pub mod` names here and `use crate::<segment>::…`
+/// path segments in the Rust HIR backend derive from one definition, so a
+/// use line can neither inject foreign Rust text nor dangle away from the
+/// module tree this crate generates. Policy doc lives on the definition in
+/// `radix_codegen_shared::ident`.
+pub use radix_codegen_shared::sanitize_rust_module_ident;
 
 #[cfg(test)]
 #[path = "modules_test.rs"]

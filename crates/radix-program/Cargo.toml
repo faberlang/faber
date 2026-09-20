@@ -13,6 +13,10 @@ license = "MIT"
 # Target-only lanes use radix-module directly and must not inherit the package
 # runner or FMIR leaves through this dependency.
 radix-module = { path = "../radix-module", default-features = false }
+# S-B2: the single module-naming policy (sanitize_rust_module_ident) lives in
+# the shared codegen leaf so the package module tree and the Rust backend's
+# use-line segments derive from one definition.
+radix-codegen-shared = { path = "../radix-codegen-shared" }
 # RP2a: the compiler view of faber.toml and faber.lock parses here (toml)
 # with the same serde derive surface faber's product view uses.
 serde = { version = "1.0.228", features = ["derive"] }
