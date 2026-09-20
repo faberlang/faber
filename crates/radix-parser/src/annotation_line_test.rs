@@ -80,5 +80,5 @@ fn statement_payload_sugar_keeps_same_line_block() {
 
 #[test]
 fn braced_annotation_is_exempt_from_the_line_law() {
-    parse_ok("@ futura { } functio f() → vacuum { }");
+    let _ = parse_ok("@ futura { } functio f() → vacuum { }");
 }
