@@ -1,18 +1,10 @@
 use super::*;
+use crate::cli::FaberCliTarget;
+use clap::ValueEnum;
 
 /// The compiled feature set of a hir-rust-only small build.
 fn small_compiled() -> BTreeSet<&'static str> {
     ["hir-rust"].into_iter().collect()
-}
-
-/// The feature set the default (full-targets) build compiles: every
-/// emit-target feature. `device-runtime` and `host-macos-arm64` left
-/// full-targets and are opt-in only.
-fn full_compiled() -> BTreeSet<&'static str> {
-    FABER_TARGET_ROWS
-        .iter()
-        .map(|(_, _, feature)| *feature)
-        .collect()
 }
 
 fn row<'a>(rows: &'a [TargetRow], name: &str) -> &'a TargetRow {
@@ -54,6 +46,7 @@ fn small_build_reports_only_compiled_capabilities() {
         "wgsl-text",
         "sexp",
         "ts",
+        "swift",
     ] {
         let r = row(&rows, name);
         assert!(
@@ -78,7 +71,10 @@ fn small_build_reports_only_compiled_capabilities() {
 
 #[test]
 fn default_build_reports_full_surface() {
-    let rows = target_rows(&full_compiled());
+    // The test binary builds under default features (full-targets), so the
+    // real cfg!-derived compiled set is the full emit surface — no
+    // table-derived expectation (that circularity hid `swift`).
+    let rows = target_rows(&compiled_features());
     // All emit rows; no capability rows compile under the default build
     // (device-runtime / host-macos-arm64 since the S3-U2 cut) — both are
     // opt-in and report no row.
@@ -135,9 +131,63 @@ fn rendered_table_contains_capability_rows_under_full_build() {
     }
 }
 
+/// The CLI-selectable target universe: every `FaberCliTarget` variant except
+/// the deliberately hidden `scena` spelling. Row-table completeness derives
+/// from this set (the CLI grammar's own enumeration), never from the table
+/// under test.
+fn selectable_cli_targets() -> Vec<radix::module::codegen::Target> {
+    FaberCliTarget::value_variants()
+        .iter()
+        .filter(|variant| !matches!(variant, FaberCliTarget::MirScena))
+        .map(|variant| variant.to_radix())
+        .collect()
+}
+
 #[test]
-fn compiled_features_match_full_row_keys_in_default_test_build() {
-    // The test binary builds under default features (full-targets): the
-    // cfg!-derived compiled set must cover every row key the tables reference.
-    assert_eq!(compiled_features(), full_compiled());
+fn every_cli_selectable_target_has_a_row() {
+    let selectable = selectable_cli_targets();
+    assert!(
+        !selectable.is_empty(),
+        "FaberCliTarget::value_variants() must enumerate the CLI grammar"
+    );
+    for target in &selectable {
+        assert!(
+            FABER_TARGET_ROWS
+                .iter()
+                .any(|&(row_target, _, _)| row_target == *target),
+            "FABER_TARGET_ROWS must report CLI-selectable target {target:?} \
+             (faber targets must not silently omit a live backend)",
+        );
+    }
+}
+
+#[test]
+fn every_row_target_is_cli_selectable() {
+    // The reverse direction: a row whose Target no CLI spelling selects lies
+    // to the reader about selectability. MirWasm's double row
+    // (`wasm`/`wasm-text`) is fine — both rows share the MirWasm variant.
+    let selectable = selectable_cli_targets();
+    for &(target, name, _) in FABER_TARGET_ROWS {
+        assert!(
+            selectable.contains(&target),
+            "row {name} reports {target:?}, which no FaberCliTarget variant selects"
+        );
+    }
+}
+
+#[test]
+fn every_row_feature_is_compiled_in_the_default_test_build() {
+    // The test binary builds under default features (full-targets): every
+    // row's feature string must name a feature this build actually compiled.
+    // Catches both a stale feature string and a `cfg!` arm missing from
+    // compiled_features() — the two omissions that hid `swift`.
+    let compiled = compiled_features();
+    for &(_, name, feature) in FABER_TARGET_ROWS {
+        assert!(
+            compiled.contains(feature),
+            "row {name} names feature {feature}, which the default \
+             (full-targets) build did not compile: stale row feature string \
+             or missing cfg! arm in compiled_features()"
+        );
+    }
 }
