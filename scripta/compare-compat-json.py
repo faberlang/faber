@@ -1,15 +1,25 @@
 #!/usr/bin/env python3
-"""Compare compatibility measurements without pinning reference totals.
+"""Compare compatibility measurements for equality against the committed record.
 
 A measurement change is classified by the capability it carries:
 
-* new rows and larger capable/analyzable counts are additive and pass;
-* a capable/analyzable row or count going down is regressive and fails;
-* other valid measurement changes are recorded but do not turn a reference
-  number into a gate.
+* the committed record must EQUAL the regenerated measurement for all
+  emitter-owned content (summary, per-term, and per-cell capability /
+  analyzable / tier counts, and ``measured`` flags): equality is the only
+  state reported as fresh;
+* a regenerated measurement ahead of the record (new rows, larger counts,
+  tier upgrades, ``measured`` false -> true) is ADDITIVE DRIFT: it fails by
+  default with the loud ``superset of tree: N additive cells uncommitted``
+  state and passes only under an explicit ``--accept`` that records the
+  drift — recommit the regenerated JSON in the same change instead whenever
+  the measured baseline is meant to move;
+* a capability regression (smaller counts, lost rows, tier downgrades,
+  ``measured`` true -> false) ALWAYS fails, with or without ``--accept``;
+* non-capability content (``rule`` text, ``disagreements.json`` row order)
+  is the only listed allowance: recorded, never fatal, still fresh.
 
 The comparison is keyed by term or conversion cell, so output ordering and
-summary totals cannot hide the exact row that regressed.
+summary totals cannot hide the exact row that drifted.
 """
 
 from __future__ import annotations
@@ -24,8 +34,14 @@ from typing import Any
 
 @dataclass
 class DiffResult:
+    # Additive drift: the regenerated measurement is ahead of the committed
+    # record (or churned it without capability loss).  Fails by default as
+    # `superset of tree: N additive cells uncommitted`; --accept records it.
     additions: list[str] = field(default_factory=list)
+    # Capability loss.  Always fails; --accept never applies.
     regressions: list[str] = field(default_factory=list)
+    # The narrow listed allowance (non-capability content: rule text,
+    # disagreements.json rows).  Recorded, never fatal, still fresh.
     changes: list[str] = field(default_factory=list)
 
 
@@ -89,9 +105,10 @@ def _compare_counter(
     detail = f"{rel} {label} {old} -> {new}"
     if new < old and regressive:
         result.regressions.append(detail)
-    elif new < old:
-        result.changes.append(detail)
     else:
+        # Non-regressive counters (conversio tier totals) drift in either
+        # direction without implying capability loss: any diff is additive
+        # drift, never an allowed silent change.
         result.additions.append(detail)
 
 
@@ -166,7 +183,9 @@ def _compare_compat(
             ):
                 result.regressions.append(f"{rel} {label}: row removed")
             else:
-                result.changes.append(f"{rel} {label}: unmeasured row removed")
+                # No capability lost, but the record still differs from the
+                # tree: additive drift, not a silent pass.
+                result.additions.append(f"{rel} {label}: unmeasured row removed")
             continue
         for key in ("capable", "analyzable"):
             old_value = _int_field(old, key, rel, label, result)
@@ -215,8 +234,6 @@ def _compare_tier(
         result.additions.append(
             f"{rel} {label} tier {old_tier} -> {new_tier}"
         )
-    elif old_tier != new_tier:
-        result.changes.append(f"{rel} {label} tier {old_tier} -> {new_tier}")
 
     old_measured = old.get("measured")
     new_measured = new.get("measured")
@@ -265,7 +282,11 @@ def _compare_conversion(
             elif TIER_RANK[old_tier] > TIER_RANK["not-emitted"]:
                 result.regressions.append(f"{rel} {label}: conversion row removed")
             else:
-                result.changes.append(f"{rel} {label}: unmeasured conversion row removed")
+                # No capability lost, but the record still differs from the
+                # tree: additive drift, not a silent pass.
+                result.additions.append(
+                    f"{rel} {label}: unmeasured conversion row removed"
+                )
             continue
         _compare_tier(old, new, rel, label, result)
 
@@ -315,16 +336,27 @@ def compare_roots(baseline_root: Path, candidate_root: Path) -> DiffResult:
     return result
 
 
-def format_report(result: DiffResult) -> str:
+def format_report(result: DiffResult, *, accept_drift: bool = False) -> str:
     if result.regressions:
+        # Regressions dominate and are never acceptable, --accept or not.
         state = "FAIL (regressive delta)"
+    elif result.additions and not accept_drift:
+        state = (
+            f"FAIL (superset of tree: "
+            f"{len(result.additions)} additive cells uncommitted)"
+        )
     elif result.additions:
-        state = "PASS (additive-only)"
+        state = (
+            f"PASS (superset of tree: "
+            f"{len(result.additions)} additive cells uncommitted)"
+        )
     elif result.changes:
-        state = "PASS (non-capability changes recorded)"
+        state = "PASS (fresh; non-capability allowances recorded)"
     else:
         state = "PASS (fresh)"
     lines = [f"class-aware measurement diff: {state}"]
+    if result.additions and accept_drift and not result.regressions:
+        lines.append("recorded additive drift (accepted)")
     for heading, rows in (
         ("recorded additive delta", result.additions),
         ("recorded non-capability change", result.changes),
@@ -338,14 +370,26 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("baseline", type=Path)
     parser.add_argument("candidate", type=Path)
+    parser.add_argument(
+        "--accept",
+        action="store_true",
+        help="record additive drift instead of failing it "
+        "(capability regressions still fail)",
+    )
     args = parser.parse_args(argv)
     try:
         result = compare_roots(args.baseline, args.candidate)
     except (OSError, ValueError) as error:
         print(f"class-aware measurement diff: FAIL (comparison error): {error}", file=sys.stderr)
         return 1
-    print(format_report(result), file=sys.stderr if result.regressions else sys.stdout)
-    return 1 if result.regressions else 0
+    failed = bool(result.regressions) or (
+        bool(result.additions) and not args.accept
+    )
+    print(
+        format_report(result, accept_drift=args.accept),
+        file=sys.stderr if failed else sys.stdout,
+    )
+    return 1 if failed else 0
 
 
 if __name__ == "__main__":

@@ -1,10 +1,15 @@
 #!/usr/bin/env bash
 # Freshness gate for radix/corpus/measurement/*.json (compat + conversio).
 #
-# Regenerates the measurement JSON to a temp root and classifies it against
-# the committed files. Additive measurement growth is recorded and passes;
-# capability regressions fail. Wired into ./scripta/check-measurement-gates
-# (stage 4a) so a regressed measurement fails before later stages run.
+# Regenerates the measurement JSON to a temp root and requires it to EQUAL the
+# committed files for emitter-owned content ("fresh" means regenerated ==
+# committed). Additive drift — the tree ahead of the committed JSON — is a
+# loud distinct state (`superset of tree: N additive cells uncommitted`) and
+# fails by default; pass --accept to record it (`recorded additive drift
+# (accepted)`). Capability regressions always fail, with or without --accept.
+# Recommit the regenerated JSON in the same change when the measured baseline
+# is meant to move. Wired into ./scripta/check-measurement-gates (stage 4a)
+# so a drifted or regressed measurement fails before later stages run.
 #
 # Cache envs (skip cargo):
 #   EBNF_MATRIX_HIR_LOG / EBNF_MATRIX_MIR_LOG / CONVERSIO_MATRIX_LOG
@@ -12,6 +17,14 @@
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
+
+accept_flag=""
+if [[ "${1:-}" == "--accept" ]]; then
+  accept_flag="--accept"
+elif [[ -n "${1:-}" ]]; then
+  echo "usage: $0 [--accept]" >&2
+  exit 2
+fi
 
 if [[ -n "${EBNF_MATRIX_HIR_LOG:-}" ]]; then export EBNF_MATRIX_HIR_LOG; fi
 if [[ -n "${EBNF_MATRIX_MIR_LOG:-}" ]]; then export EBNF_MATRIX_MIR_LOG; fi
@@ -37,9 +50,16 @@ if ! COMPAT_OUT="$tmp" ./scripta/emit-compat-json.py >"$emit_log" 2>&1; then
   exit 1
 fi
 
-if ! python3 ./scripta/compare-compat-json.py corpus/measurement "$tmp"; then
-  echo "error: corpus/measurement contains a regressive capability delta" >&2
+# accept_flag is a fixed literal: empty expands to no argument.
+if ! python3 ./scripta/compare-compat-json.py $accept_flag corpus/measurement "$tmp"; then
+  echo "error: corpus/measurement is not fresh (capability regression, or additive drift needing a JSON recommit or an explicit --accept)" >&2
   exit 1
 fi
 
-echo "compat measurement json fresh"
+if [[ -z "$accept_flag" ]]; then
+  echo "compat measurement json fresh"
+else
+  # Under --accept the comparator's PASS state line above already names the
+  # state (fresh, or superset-of-tree drift recorded as accepted).
+  echo "compat measurement json checked (drift accepted where present)"
+fi
