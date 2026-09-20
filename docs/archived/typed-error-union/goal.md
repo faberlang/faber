@@ -1,6 +1,6 @@
 # GOAL: typed-error-union — `@ commune` shared variant fields + typed error identity
 
-**Status**: active — 6/9 units landed: TEU1 (`a5140f879`+`b258b80`), TEU2 (`d6e869059`), TEU3 (`9f3ae1dce`), TEU5 (`6fb6897`), TEU4 (`25919c4c6` — all eight tail leaves + fire-9 enumeration), TEU6 (`04fe8156` + `2443bb6`); TEU7/8 remain gated on X1 defect-sprint; TEU9 closeout last
+**Status**: deferred — shelved at the 2026-09-20 registry reboot; frozen on X1 compiler-defect-sprint since 2026-08-29; TEU7/8 remap-chain residue extracted to vivi wants; recoverable
 **Created**: 2026-08-21
 **Campaign:** `—` (standalone; operator design session 2026-08-21)
 **Source:** [`docs/design/typed-error-union.md`](../../design/typed-error-union.md) (operator session decisions; 316 lines); Vivi task `c72f9481`; origin chain `be9013ce` → `0606c6d6` → `b0bb1fb8` → `640db2ff`

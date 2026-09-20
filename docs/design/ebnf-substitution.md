@@ -1,6 +1,6 @@
 # EBNF locale substitution — `§{…}` keyed rendering
 
-**Status**: design locked 2026-08-20 (operator session); pre-implementation
+**Status**: done — implemented (grammar-pipeline.py §{…} keyed substitution + GLOSSARY_SCHEMA cite this doc); status corrected at the 2026-09-20 registry reboot
 **Syntax authority**: [`radix/docs/factory/named-template-holes/goal.md`](../../radix/docs/factory/named-template-holes/goal.md) — the marker is the language's named-template-hole syntax; this document owns only its use in docs rendering
 **Consumers**: the grammar render pipeline (`faber/docs/EBNF.md` source → locale grammar surfaces; today's hand-maintained `faberlang.dev/generator/grammar/EBNF.{locale}.md` files are its pre-implementation stand-ins)
 

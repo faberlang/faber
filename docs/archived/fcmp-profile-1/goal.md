@@ -1,6 +1,6 @@
 # GOAL: FCMP profile 1 — envelope rules, registry, and conformance (draft; consumer-gated)
 
-**Status**: planned — re-scoped 2026-08-18 after the FCMP restructure; protocol doc units landed (U-1/2/2a, PRE-1, PRE-2); remainder gated on fhir-package-format FS-3; freeze withdrawn as blocked-by-design
+**Status**: deferred — shelved at the 2026-09-20 registry reboot; stalled on a stale gate (consumer fhir-package-format archived done 2026-08-23); recoverable
 **Created**: 2026-08-17
 **Re-scoped**: 2026-08-18 (task `97367613`; restructure mail `08252f89`)
 **Campaign:** `—` (standalone)
