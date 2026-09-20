@@ -287,8 +287,6 @@ pub struct PassConfig {
     pub borrow_analysis: bool,
     pub exhaustiveness: bool,
     pub lint: bool,
-    /// When true, reject legacy `norma:*` imports superseded by `faber:*` kernel paths.
-    pub script_kernel_mode: bool,
     /// Namespace member names exported through imported file bindings.
     pub namespace_exports:
         BTreeMap<String, BTreeMap<String, crate::passes::visibility_annotation::VisibilityTier>>,
@@ -327,7 +325,6 @@ impl PassConfig {
             borrow_analysis: false,
             exhaustiveness: true,
             lint: true,
-            script_kernel_mode: false,
             namespace_exports: BTreeMap::new(),
             namespace_seams: BTreeMap::new(),
             namespace_declarations: BTreeMap::new(),
@@ -510,13 +507,6 @@ pub fn analyze_with_cli(
         interner,
         config.import_path_templates.as_ref(),
     ) {
-        diagnostics.extend(e);
-    }
-
-    if config.script_kernel_mode
-        && let Err(e) =
-            passes::kernel_namespace::validate_script_kernel_library_imports(program, interner)
-    {
         diagnostics.extend(e);
     }
 

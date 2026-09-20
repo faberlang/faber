@@ -1,10 +1,9 @@
 //! Coverage for kernel-namespace import validation.
 //!
 //! These tests prove that known `faber:*` modules and glob imports pass,
-//! while unknown modules, invalid paths, glob re-exports, and legacy
-//! `norma:json` in script mode are rejected.
+//! while unknown modules, invalid paths, and glob re-exports are rejected.
 
-use super::kernel_namespace::{validate_kernel_imports, validate_script_kernel_library_imports};
+use super::kernel_namespace::validate_kernel_imports;
 use crate::test_support::args_have_no_legacy_message;
 use crate::{SemanticError, SemanticErrorKind};
 use radix_parser;
@@ -20,13 +19,6 @@ fn parse_program(source: &str) -> (radix_syntax::Program, radix_lexer::Interner)
 fn analyze_imports(source: &str) -> Vec<SemanticError> {
     let (program, interner) = parse_program(source);
     validate_kernel_imports(&program, &interner)
-        .err()
-        .unwrap_or_default()
-}
-
-fn analyze_script_kernel_library_imports(source: &str) -> Vec<SemanticError> {
-    let (program, interner) = parse_program(source);
-    validate_script_kernel_library_imports(&program, &interner)
         .err()
         .unwrap_or_default()
 }
@@ -109,21 +101,6 @@ fn nested_faber_path_is_invalid() {
                 "reason",
                 "kernel import paths are flat (`faber:<module>` only)",
             ),
-        ],
-    );
-}
-
-#[test]
-fn script_mode_rejects_norma_json_with_kernel_replacement() {
-    let errors = analyze_script_kernel_library_imports(r#"importa ex "norma:json" json"#);
-    assert_eq!(errors.len(), 1);
-    expect_structured_error(
-        &errors,
-        SemanticErrorKind::ImportAbsent,
-        &[
-            ("issue", "kernel_norma_json_in_script"),
-            ("script_path", "faber:json"),
-            ("library_path", "norma:json"),
         ],
     );
 }

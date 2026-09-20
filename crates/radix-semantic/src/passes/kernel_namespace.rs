@@ -1,8 +1,7 @@
 //! Validate `faber:*` kernel import paths during script-mode semantic analysis.
 //!
 //! Boundary: pre-collect AST pass. Rejects unknown or malformed `faber:*`
-//! import paths (glob re-exports, non-flat paths, unknown modules) and flags
-//! legacy stdlib imports (`norma:json`) that have kernel replacements. Collect
+//! import paths (glob re-exports, non-flat paths, unknown modules). Collect
 //! and later passes never see invalid kernel imports.
 
 use crate::kernel::{
@@ -65,39 +64,6 @@ pub fn validate_kernel_imports(
                 }
             };
             errors.push(diagnostic);
-        }
-    }
-
-    if errors.is_empty() {
-        Ok(())
-    } else {
-        Err(errors)
-    }
-}
-
-/// Reject legacy stdlib imports superseded by kernel paths in script mode.
-///
-/// # Errors
-///
-/// Returns [`SemanticError`]s for each legacy import (e.g. `norma:json`)
-/// that should be replaced by the corresponding `faber:` kernel path.
-pub fn validate_script_kernel_library_imports(
-    program: &Program,
-    interner: &Interner,
-) -> Result<(), Vec<SemanticError>> {
-    let mut errors = Vec::new();
-    for stmt in &program.statements {
-        let StmtKind::Import(decl) = &stmt.kind else {
-            continue;
-        };
-        let path = interner.resolve(decl.path);
-        if path == "norma:json" {
-            errors.push(
-                SemanticError::structured(SemanticErrorKind::ImportAbsent, decl.span)
-                    .with_arg("issue", "kernel_norma_json_in_script")
-                    .with_arg("script_path", "faber:json")
-                    .with_arg("library_path", "norma:json"),
-            );
         }
     }
 
