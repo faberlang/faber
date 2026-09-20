@@ -365,6 +365,22 @@ impl Validator<'_, '_> {
             }
             Type::Primitive(Primitive::Textus) => {
                 if let Some((_, index_ty)) = index {
+                    // A range index is a window read, not a scalar numerus key
+                    // (mirrors the octeti arm above): bounds must still be
+                    // integer-valued, and the window stays a textus substring.
+                    let range_bound = match self.type_kind(index_ty) {
+                        Type::Intervallum(bound) => Some(*bound),
+                        _ => None,
+                    };
+                    if let Some(range_bound) = range_bound {
+                        self.require_assignable(
+                            MirType::semantic(range_bound),
+                            self.primitive(Primitive::Numerus),
+                            span,
+                            "textus index range bounds are not numerus",
+                        );
+                        return Some(self.primitive(Primitive::Textus));
+                    }
                     self.require_assignable(
                         index_ty,
                         self.primitive(Primitive::Numerus),

@@ -3167,6 +3167,27 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                     .ok_or_else(|| RunnerError::internal(span, "tuple index out of bounds"))
             }
             Value::Str(text) => {
+                // A range index is a char-window read (`textus[lo‥hi]` stays a
+                // textus substring). Mirrors the octeti window above, but walks
+                // chars and truncates past the end like Rust codegen's
+                // `chars().skip(lo).take(hi - lo)` — no out-of-bounds trap.
+                if let Ok((start, end, inclusive)) = interval_parts(&index, span) {
+                    let start = start.as_index(span)?;
+                    let end = end.as_index(span)?;
+                    let end = if inclusive {
+                        end.checked_add(1).ok_or_else(|| {
+                            RunnerError::internal(span, "textus index out of bounds")
+                        })?
+                    } else {
+                        end
+                    };
+                    let window: String = text
+                        .chars()
+                        .skip(start)
+                        .take(end.saturating_sub(start))
+                        .collect();
+                    return Ok(Value::Str(window));
+                }
                 let idx = index.as_index(span)?;
                 crate::value::scalar_text_index(&text, idx, span)
             }
