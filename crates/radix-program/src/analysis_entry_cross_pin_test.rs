@@ -173,6 +173,14 @@ const EXPECTED: &[(&str, Variant, Classification)] = &[
         Variant::Bare,
         Classification::FailClosed,
     ),
+    // `export_device_instance` (device_export.rs): the device-instance
+    // export seam compiles one standalone entry source through the
+    // single-unit route — no package facts exist for it by construction.
+    (
+        "crates/radix-module/src/device_export.rs",
+        Variant::Bare,
+        Classification::FailClosed,
+    ),
     // `mir_output_for_source` (services inspect, one source).
     (
         "crates/radix-module/src/services/inspect.rs",
