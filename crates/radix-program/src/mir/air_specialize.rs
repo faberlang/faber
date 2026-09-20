@@ -3,14 +3,16 @@
 //! Single-module semantic analysis can see direct calls in its own HIR. A
 //! package caller sees an imported namespace call until the package linker
 //! rewrites it, so the provider's AIR template needs a second, package-owned
-//! discovery step before per-unit MIR lowering. This module only discovers
-//! sibling source-package calls; external FMIR/library bodies do not have the
-//! analyzed HIR required by the AIR contract and remain fail-closed at their
-//! existing boundary.
+//! discovery step before per-unit MIR lowering. This module discovers both
+//! sibling source-package calls and calls into linked-library generic AIR
+//! targets: library bodies are analyzed HIR in the library interface cache,
+//! so their concrete instances materialize in the cached library analysis at
+//! link time and the calls retarget to package synthetic instance identities.
 
 use super::{
-    AnalyzedProgram, BTreeMap, DefId, Diagnostic, DiagnosticPhase, HashMap, PackageMirLinks, Path,
-    PathBuf, TypeId,
+    AnalyzedProgram, BTreeMap, DefId, Diagnostic, DiagnosticPhase, HashMap, LibraryImportBinding,
+    LibraryInterfaceCache, LibraryResolver, PackageMirLinks, Path, PathBuf, TypeId,
+    library_cached_analysis, with_library_cached_analysis_mut,
 };
 use radix_module::DiagnosticConvert;
 use radix_module::hir::visit::{HirVisitor, HirVisitorMut, walk_expr, walk_expr_mut, walk_program};
@@ -32,16 +34,24 @@ struct NamespaceGenericCall {
     explicit_args: Vec<TypeId>,
     caller_types: radix_types::TypeTableSnapshot,
     caller_interner: radix_module::lexer::Interner,
+    /// Owning linked-library import when the target is a linked-library body
+    /// (`None` for in-package sibling targets).
+    library: Option<LibraryImportBinding>,
+    /// The generic AIR primal template when this call targets a declared
+    /// `@ radix backward` companion (`None` for direct template calls).
+    companion_primal: Option<DefId>,
 }
 
-/// Discover sibling namespace calls that target generic AIR functions,
-/// materialize their concrete provider-owned instances, and assign each
-/// instance a package synthetic source identity.
+/// Discover package namespace calls that target generic AIR functions (sibling
+/// units and linked libraries), materialize their concrete provider-owned
+/// instances, and assign each instance a package synthetic source identity.
 pub(super) fn plan_package_instances(
     package: &mut AnalyzedProgram,
     links: &mut PackageMirLinks,
+    library_resolver: &LibraryResolver,
+    library_cache: &mut LibraryInterfaceCache,
 ) -> Result<(), Vec<Diagnostic>> {
-    let calls = discover_calls(package, links);
+    let calls = discover_calls(package, links, library_resolver, library_cache);
     if calls.is_empty() {
         return Ok(());
     }
@@ -52,7 +62,11 @@ pub(super) fn plan_package_instances(
         if !request_for_call(&call) {
             errors.push(missing_instance_diagnostic(
                 &call.target_path,
-                "generic_air_instance_missing_concrete_binding",
+                if call.library.is_some() {
+                    "generic_air_library_instance_missing_concrete_binding"
+                } else {
+                    "generic_air_instance_missing_concrete_binding"
+                },
             ));
             continue;
         }
@@ -66,6 +80,17 @@ pub(super) fn plan_package_instances(
     }
 
     for (target_path, calls) in grouped {
+        if calls.first().is_some_and(|call| call.library.is_some()) {
+            plan_linked_library_instances(
+                &target_path,
+                calls,
+                links,
+                library_resolver,
+                library_cache,
+                &mut errors,
+            );
+            continue;
+        }
         let Some((_, target)) = package.node_by_path_mut(&target_path) else {
             continue;
         };
@@ -201,7 +226,211 @@ pub(super) fn rewrite_package_instance_calls(
     }
 }
 
-fn discover_calls(package: &AnalyzedProgram, links: &PackageMirLinks) -> Vec<NamespaceGenericCall> {
+/// One materialized concrete instance in a linked library's cached analysis.
+struct LibraryInstancePlan {
+    /// Instance key → concrete HIR instance def in the library analysis.
+    instance_by_key: HashMap<radix_module::semantic::passes::air_specialize::AirInstanceKey, DefId>,
+    /// Instance def → its generated backward companion def (present when the
+    /// template carried a `@ radix backward` row).
+    companions: HashMap<DefId, DefId>,
+    /// The call rows the plan was requested for, paired with their resolved
+    /// instance keys (owned clones; the closure must not borrow the caller's
+    /// call vector).
+    planned_calls: Vec<(
+        radix_module::semantic::passes::air_specialize::AirInstanceKey,
+        NamespaceGenericCall,
+    )>,
+}
+
+/// Materialize concrete instances for package calls into one linked library's
+/// generic AIR templates, inside that library's cached analysis.
+///
+/// The library body is analyzed HIR in the interface cache, so the same
+/// provider-owned specialization contract as the sibling path applies: the
+/// callee's module stays the owner of substitution, named unroll, and AIR
+/// purity, and each materialized instance (plus its backward companion, when
+/// the template declares one) receives a package synthetic source identity
+/// the caller's calls are retargeted to.
+fn plan_linked_library_instances(
+    target_path: &Path,
+    calls: Vec<NamespaceGenericCall>,
+    links: &mut PackageMirLinks,
+    library_resolver: &LibraryResolver,
+    library_cache: &mut LibraryInterfaceCache,
+    errors: &mut Vec<Diagnostic>,
+) {
+    let Some(import) = calls.first().and_then(|call| call.library.clone()) else {
+        return;
+    };
+
+    let mut semantic_errors = Vec::new();
+    let result = with_library_cached_analysis_mut(
+        &import,
+        library_resolver,
+        library_cache,
+        |analysis, _| {
+            let mut requests = Vec::with_capacity(calls.len());
+            let mut planned_calls = Vec::with_capacity(calls.len());
+            for call in &calls {
+                let Some(bindings) = request_for_target(call, &mut analysis.types) else {
+                    semantic_errors.push(missing_instance_diagnostic(
+                        target_path,
+                        "generic_air_library_instance_type_rehome_failed",
+                    ));
+                    continue;
+                };
+                let template = call.companion_primal.unwrap_or(call.target_def);
+                planned_calls.push((
+                    radix_module::semantic::passes::air_specialize::AirInstanceKey {
+                        template,
+                        witnesses: bindings.iter().map(|binding| binding.witness).collect(),
+                    },
+                    call.clone(),
+                ));
+                requests.push(
+                    radix_module::semantic::passes::air_specialize::AirSpecializationRequest {
+                        template,
+                        bindings,
+                    },
+                );
+            }
+            if !semantic_errors.is_empty() || requests.is_empty() {
+                return Ok(LibraryInstancePlan {
+                    instance_by_key: HashMap::new(),
+                    companions: HashMap::new(),
+                    planned_calls,
+                });
+            }
+
+            let report = radix_module::semantic::passes::air_specialize::specialize_requested(
+                &mut analysis.hir,
+                &mut analysis.radix_lanes,
+                &mut analysis.types,
+                &mut analysis.interner,
+                &requests,
+            );
+
+            // The library's ordinary semantic pipeline has already run; the
+            // newly materialized clones must pass the same concrete-only gates
+            // before the package lowers the library unit to AIR/MIR.
+            if let Err(instance_errors) = radix_module::semantic::passes::air_unroll::unroll(
+                &mut analysis.hir,
+                &mut analysis.presentation,
+                &analysis.radix_lanes,
+                &mut analysis.interner,
+                &analysis.types,
+            ) {
+                semantic_errors.extend(instance_errors.into_iter().map(|error| {
+                    Diagnostic::from_semantic_error(&target_path.display().to_string(), "", &error)
+                }));
+            }
+            if let Err(instance_errors) = radix_module::semantic::passes::air_purity::check(
+                &mut analysis.hir,
+                &mut analysis.radix_lanes,
+                &mut analysis.interner,
+                &analysis.types,
+            ) {
+                semantic_errors.extend(instance_errors.into_iter().map(|error| {
+                    Diagnostic::from_semantic_error(&target_path.display().to_string(), "", &error)
+                }));
+            }
+
+            let mut companions = HashMap::new();
+            for (_, instance) in &report.instance_defs {
+                if let Some(backward) = analysis.radix_lanes.backward_for(*instance) {
+                    companions.insert(*instance, backward.companion_def_id);
+                }
+            }
+            Ok(LibraryInstancePlan {
+                instance_by_key: report.instance_defs.iter().cloned().collect(),
+                companions,
+                planned_calls,
+            })
+        },
+    );
+
+    let plan = match result {
+        Ok(plan) => plan,
+        Err(diagnostic) => {
+            errors.push(diagnostic);
+            return;
+        }
+    };
+    if !semantic_errors.is_empty() {
+        errors.extend(semantic_errors);
+        return;
+    }
+
+    let mut materialization_missing = false;
+    for (key, _) in &plan.planned_calls {
+        if !plan.instance_by_key.contains_key(key) {
+            errors.push(missing_instance_diagnostic(
+                target_path,
+                "generic_air_library_instance_materialization_failed",
+            ));
+            materialization_missing = true;
+        }
+    }
+    if materialization_missing {
+        return;
+    }
+
+    // Register every materialized instance (including nested-call instances
+    // the specialization pass discovered inside the library) and each
+    // instance's backward companion under package synthetic source identities.
+    let mut synthetic_of = HashMap::new();
+    for (_, instance) in &plan.instance_by_key {
+        let synthetic = DefId(links.next_synthetic);
+        links.next_synthetic = links.next_synthetic.saturating_add(1);
+        links
+            .sources
+            .insert((target_path.to_path_buf(), *instance), synthetic);
+        synthetic_of.insert(*instance, synthetic);
+    }
+    let mut companion_synthetic_of = HashMap::new();
+    for (instance, companion) in &plan.companions {
+        let synthetic = DefId(links.next_synthetic);
+        links.next_synthetic = links.next_synthetic.saturating_add(1);
+        links
+            .sources
+            .insert((target_path.to_path_buf(), *companion), synthetic);
+        companion_synthetic_of.insert(*instance, synthetic);
+    }
+
+    for (key, call) in plan.planned_calls {
+        let Some(instance) = plan.instance_by_key.get(&key).copied() else {
+            continue;
+        };
+        let target = if call.companion_primal.is_some() {
+            if !plan.companions.contains_key(&instance) {
+                errors.push(missing_instance_diagnostic(
+                    target_path,
+                    "generic_air_library_instance_companion_missing",
+                ));
+                continue;
+            }
+            companion_synthetic_of[&instance]
+        } else {
+            synthetic_of[&instance]
+        };
+        links.air_calls.insert(
+            (
+                call.caller_path.clone(),
+                call.call_span.start,
+                call.call_span.end,
+                call.old_target,
+            ),
+            target,
+        );
+    }
+}
+
+fn discover_calls(
+    package: &AnalyzedProgram,
+    links: &PackageMirLinks,
+    library_resolver: &LibraryResolver,
+    library_cache: &mut LibraryInterfaceCache,
+) -> Vec<NamespaceGenericCall> {
     let mut calls = Vec::new();
     for unit in package.nodes.values() {
         let mut collector = NamespaceCallCollector {
@@ -219,15 +448,58 @@ fn discover_calls(package: &AnalyzedProgram, links: &PackageMirLinks) -> Vec<Nam
             else {
                 continue;
             };
-            let Some(target_node) = package.node_by_path(&target_path).map(|(_, node)| node) else {
-                continue;
-            };
-            let Some(target_params) = generic_air_params(
-                &target_node.analysis.hir,
-                &target_node.analysis.radix_lanes,
-                target_def,
-            ) else {
-                continue;
+            let mut library = None;
+            let mut companion_primal = None;
+            let target_params = if let Some(target_node) =
+                package.node_by_path(&target_path).map(|(_, node)| node)
+            {
+                let Some(target_params) = generic_air_params(
+                    &target_node.analysis.hir,
+                    &target_node.analysis.radix_lanes,
+                    target_def,
+                ) else {
+                    continue;
+                };
+                target_params
+            } else {
+                // A linked-library body: classified against its cached
+                // analysis (already resident from the link pass).
+                let Some(target) = links
+                    .libraries
+                    .iter()
+                    .find(|library| library.path == target_path)
+                    .map(|library| library.import.clone())
+                else {
+                    continue;
+                };
+                let Ok(analysis) =
+                    library_cached_analysis(&target, library_resolver, library_cache)
+                else {
+                    continue;
+                };
+                let params =
+                    match generic_air_params(&analysis.hir, &analysis.radix_lanes, target_def) {
+                        Some(params) => params,
+                        None => {
+                            // Not a template call: a declared `@ radix
+                            // backward` companion of a generic AIR template
+                            // plans through its primal's instance.
+                            let Some(primal) =
+                                declared_companion_primal(&analysis.radix_lanes, target_def)
+                            else {
+                                continue;
+                            };
+                            let Some(params) =
+                                generic_air_params(&analysis.hir, &analysis.radix_lanes, primal)
+                            else {
+                                continue;
+                            };
+                            companion_primal = Some(primal);
+                            params
+                        }
+                    };
+                library = Some(target);
+                params
             };
             let resolved = unit
                 .analysis
@@ -248,10 +520,23 @@ fn discover_calls(package: &AnalyzedProgram, links: &PackageMirLinks) -> Vec<Nam
                 explicit_args: raw.explicit_args,
                 caller_types: unit.analysis.types.snapshot(),
                 caller_interner: unit.analysis.interner.clone(),
+                library,
+                companion_primal,
             });
         }
     }
     calls
+}
+
+/// The generic AIR primal owning a declared backward companion def, when the
+/// companion's own DefId names a `@ radix backward` row.
+fn declared_companion_primal(
+    lanes: &radix_module::semantic::RadixLaneMetadata,
+    companion_def: DefId,
+) -> Option<DefId> {
+    lanes.iter_backward().find_map(|(primal, backward)| {
+        (backward.companion_def_id == companion_def).then_some(primal)
+    })
 }
 
 #[derive(Clone)]

@@ -112,7 +112,12 @@ pub fn with_linked_test_package_mir<R>(
         &mut library_cache,
         None,
     )?;
-    air_specialize::plan_package_instances(&mut package, &mut links)?;
+    air_specialize::plan_package_instances(
+        &mut package,
+        &mut links,
+        &library_resolver,
+        &mut library_cache,
+    )?;
     reserve_test_scope_sources(&package, &anchor_path, &mut links);
     for unit in package.nodes.values_mut() {
         rewrite_unit_namespace_calls(
@@ -267,7 +272,12 @@ fn prepare_package_mir<R>(
         &mut library_cache,
         loaded_links,
     )?;
-    air_specialize::plan_package_instances(&mut package, &mut links)?;
+    air_specialize::plan_package_instances(
+        &mut package,
+        &mut links,
+        &library_resolver,
+        &mut library_cache,
+    )?;
     let entry_id = select_entry_node(&package)?;
     let entry_path = package
         .nodes
