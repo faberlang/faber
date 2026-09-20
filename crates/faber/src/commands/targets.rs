@@ -86,6 +86,11 @@ const FABER_TARGET_ROWS: &[(radix::module::codegen::Target, &str, &str)] = &[
         "ts",
         "hir-ts",
     ),
+    (
+        radix::module::codegen::Target::HirSwift,
+        "swift",
+        "hir-swift",
+    ),
 ];
 
 /// Compiled-only capability rows for the device/host-leaf/device-runtime
@@ -235,6 +240,9 @@ fn compiled_features() -> BTreeSet<&'static str> {
     }
     if cfg!(feature = "hir-haskell") {
         compiled.insert("hir-haskell");
+    }
+    if cfg!(feature = "hir-swift") {
+        compiled.insert("hir-swift");
     }
     if cfg!(feature = "mir-wasm") {
         compiled.insert("mir-wasm");
