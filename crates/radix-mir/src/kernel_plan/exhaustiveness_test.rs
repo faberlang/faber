@@ -7,11 +7,9 @@
 //!
 //! This test is the deny-unknown lock:
 //! - [`variant_coverage`] is exhaustive — a new variant fails compilation
-//!   until it is named here against every known match family.
+//!   until it is named here.
 //! - [`KNOWN_VARIANTS`] is the closed name set — a new name that is not
 //!   listed, or a listed name with no representative, is a red test.
-//! - every family flag must be `true`. `false` is the F1 silent-escape
-//!   posture and must not land.
 //!
 //! Match-family sites a new variant must visit in the same change:
 //! python lower (`radix-mir-python/src/lower.rs`), dump (`dump.rs` /
@@ -45,88 +43,27 @@ const KNOWN_VARIANTS: &[&str] = &[
     "DistributedSum",
 ];
 
-/// Known match families that must name every [`CollectionKernelPlan`] variant.
-/// Adding a family is a deliberate deny-unknown list change.
-const MATCH_FAMILIES: &[&str] = &[
-    "python_lower",
-    "dump",
-    "wasm_import_names",
-    "nvvm",
-    "distributed_validate",
-    "pipeline_shape_name",
-];
-
-/// Per-variant coverage against the known match families.
-struct FamilyCoverage {
-    variant: &'static str,
-    python_lower: bool,
-    dump: bool,
-    wasm_import_names: bool,
-    nvvm: bool,
-    distributed_validate: bool,
-    pipeline_shape_name: bool,
-}
-
-impl FamilyCoverage {
-    fn all_families_named(&self) -> bool {
-        self.python_lower
-            && self.dump
-            && self.wasm_import_names
-            && self.nvvm
-            && self.distributed_validate
-            && self.pipeline_shape_name
-    }
-
-    fn missing_families(&self) -> Vec<&'static str> {
-        MATCH_FAMILIES
-            .iter()
-            .copied()
-            .zip([
-                self.python_lower,
-                self.dump,
-                self.wasm_import_names,
-                self.nvvm,
-                self.distributed_validate,
-                self.pipeline_shape_name,
-            ])
-            .filter_map(|(family, covered)| (!covered).then_some(family))
-            .collect()
-    }
-}
-
-/// Exhaustive coverage row. A new [`CollectionKernelPlan`] variant without
-/// an arm here fails compilation — that is the owning-crate F1 lock.
-fn variant_coverage(plan: &CollectionKernelPlan) -> FamilyCoverage {
+/// Exhaustive variant naming. A new [`CollectionKernelPlan`] variant
+/// without an arm here fails compilation — that is the owning-crate F1 lock.
+fn variant_coverage(plan: &CollectionKernelPlan) -> &'static str {
     match plan {
-        CollectionKernelPlan::Elementwise => covered("Elementwise"),
-        CollectionKernelPlan::TiledMatMul(_) => covered("TiledMatMul"),
-        CollectionKernelPlan::TreeReduction(_) => covered("TreeReduction"),
-        CollectionKernelPlan::Transpose(_) => covered("Transpose"),
-        CollectionKernelPlan::AxisReduction(_) => covered("AxisReduction"),
-        CollectionKernelPlan::RowSoftmax(_) => covered("RowSoftmax"),
-        CollectionKernelPlan::LayerNormalization(_) => covered("LayerNormalization"),
-        CollectionKernelPlan::Gather(_) => covered("Gather"),
-        CollectionKernelPlan::RmsNormalization(_) => covered("RmsNormalization"),
-        CollectionKernelPlan::Rope(_) => covered("Rope"),
-        CollectionKernelPlan::CausalMaskedSoftmax(_) => covered("CausalMaskedSoftmax"),
-        CollectionKernelPlan::QuantizedMatMul(_) => covered("QuantizedMatMul"),
-        CollectionKernelPlan::GroupedMatMul(_) => covered("GroupedMatMul"),
-        CollectionKernelPlan::BatchedAttention(_) => covered("BatchedAttention"),
-        CollectionKernelPlan::SsmConv1d(_) => covered("SsmConv1d"),
-        CollectionKernelPlan::SsmScan(_) => covered("SsmScan"),
-        CollectionKernelPlan::DistributedSum(_) => covered("DistributedSum"),
-    }
-}
-
-fn covered(variant: &'static str) -> FamilyCoverage {
-    FamilyCoverage {
-        variant,
-        python_lower: true,
-        dump: true,
-        wasm_import_names: true,
-        nvvm: true,
-        distributed_validate: true,
-        pipeline_shape_name: true,
+        CollectionKernelPlan::Elementwise => "Elementwise",
+        CollectionKernelPlan::TiledMatMul(_) => "TiledMatMul",
+        CollectionKernelPlan::TreeReduction(_) => "TreeReduction",
+        CollectionKernelPlan::Transpose(_) => "Transpose",
+        CollectionKernelPlan::AxisReduction(_) => "AxisReduction",
+        CollectionKernelPlan::RowSoftmax(_) => "RowSoftmax",
+        CollectionKernelPlan::LayerNormalization(_) => "LayerNormalization",
+        CollectionKernelPlan::Gather(_) => "Gather",
+        CollectionKernelPlan::RmsNormalization(_) => "RmsNormalization",
+        CollectionKernelPlan::Rope(_) => "Rope",
+        CollectionKernelPlan::CausalMaskedSoftmax(_) => "CausalMaskedSoftmax",
+        CollectionKernelPlan::QuantizedMatMul(_) => "QuantizedMatMul",
+        CollectionKernelPlan::GroupedMatMul(_) => "GroupedMatMul",
+        CollectionKernelPlan::BatchedAttention(_) => "BatchedAttention",
+        CollectionKernelPlan::SsmConv1d(_) => "SsmConv1d",
+        CollectionKernelPlan::SsmScan(_) => "SsmScan",
+        CollectionKernelPlan::DistributedSum(_) => "DistributedSum",
     }
 }
 
@@ -312,7 +249,7 @@ fn dummy_distributed_sum() -> DistributedSumPlan {
 }
 
 #[test]
-fn collection_kernel_plan_match_families_deny_unknown_variants() {
+fn collection_kernel_plan_deny_unknown_variants() {
     let plans = representative_plans();
     assert_eq!(
         plans.len(),
@@ -322,32 +259,21 @@ fn collection_kernel_plan_match_families_deny_unknown_variants() {
 
     let mut seen = vec![false; KNOWN_VARIANTS.len()];
     for plan in &plans {
-        let coverage = variant_coverage(plan);
-        let Some(index) = KNOWN_VARIANTS
-            .iter()
-            .position(|name| *name == coverage.variant)
-        else {
+        let variant = variant_coverage(plan);
+        let Some(index) = KNOWN_VARIANTS.iter().position(|name| *name == variant) else {
             panic!(
-                "unknown CollectionKernelPlan variant `{}`; add it to KNOWN_VARIANTS \
-                 and cover MATCH_FAMILIES {MATCH_FAMILIES:?}",
-                coverage.variant
+                "unknown CollectionKernelPlan variant `{}`; add it to KNOWN_VARIANTS",
+                variant
             );
         };
         assert!(
-            coverage.all_families_named(),
-            "CollectionKernelPlan::{} is uncovered in match families {:?}; \
-             visit {MATCH_FAMILIES:?}",
-            coverage.variant,
-            coverage.missing_families()
-        );
-        assert!(
             !seen[index],
             "duplicate representative for CollectionKernelPlan::{}",
-            coverage.variant
+            variant
         );
         seen[index] = true;
         assert_eq!(
-            coverage.variant, KNOWN_VARIANTS[index],
+            variant, KNOWN_VARIANTS[index],
             "representative order must match KNOWN_VARIANTS"
         );
     }
