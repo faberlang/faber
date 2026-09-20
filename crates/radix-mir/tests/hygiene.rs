@@ -36,7 +36,12 @@ const BUDGETS: Budgets = Budgets {
     // exhaustive over selections verified before dispatch.
     // Re-baselined 5→7: the package shape-size substitution finalizer
     // (3729cbb6c) added two exhaustive-selection arms without this bump.
-    unreachable: 7,
+    // Re-baselined 7→10: the tensor const validation refactor (9b62da240)
+    // added four fail-closed unreachable! guards in validate/intrinsic.rs
+    // (kinds pre-matched by the dispatcher — provably unreachable
+    // invariants), and deleting the stale TensorConstExemption machinery
+    // (f29cb5063) removed one; net +3 without this bump.
+    unreachable: 10,
     todo: 0,
     unimplemented: 0,
     // WHY: minted at D-03 baseline; frozen, not audited here.
