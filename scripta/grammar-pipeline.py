@@ -1536,10 +1536,22 @@ def run_emit(args: argparse.Namespace) -> tuple[str, Path]:
 
 
 def run_check(args: argparse.Namespace) -> tuple[dict[str, object], int]:
-    source_path = (args.source or default_source_path()).resolve()
-    sidecar_path = (args.sidecar or default_sidecar_path()).resolve()
-    ebnf_path = (args.ebnf or default_ebnf_path()).resolve()
-    jsonl_path = (args.jsonl or default_jsonl_path()).resolve()
+    # Resolve defaults inside the gate's own failure reporting: a missing
+    # sibling checkout is a one-line FAIL, never a Python traceback (S14-3).
+    try:
+        source_path = (args.source or default_source_path()).resolve()
+        sidecar_path = (args.sidecar or default_sidecar_path()).resolve()
+        ebnf_path = (args.ebnf or default_ebnf_path()).resolve()
+        jsonl_path = (args.jsonl or default_jsonl_path()).resolve()
+    except OSError as exc:
+        return {
+            "schema": TRIPLE_SCHEMA,
+            "ok": False,
+            "source": None,
+            "render": None,
+            "jsonl": None,
+            "mismatches": [str(exc)],
+        }, 1
     try:
         ok, payload = check_triple(source_path, sidecar_path, ebnf_path, jsonl_path)
     except (OSError, ValueError, tomllib.TOMLDecodeError) as exc:

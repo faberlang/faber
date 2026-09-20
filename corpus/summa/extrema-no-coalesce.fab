@@ -1,7 +1,7 @@
 +++
 term = "summa"
 kind = "concept"
-grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "main_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "shape_suffix", "expression", "maxima_expr", "literal", "array_literal", "conversio_expr", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "nota_stmt"]
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "shape_suffix", "expression", "literal", "array_literal", "conversio_expr", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "nota_stmt"]
 category = "collection"
 summary = "Maximum and minimum reductions without a coalesce tail on a non-empty tensor."
 syntax = "max from <tensor> | min from <tensor>"

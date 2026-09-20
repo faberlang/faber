@@ -1,6 +1,12 @@
 #!/usr/bin/env bash
-# Stage-1 normative grammar gate: validate source.fg and compare the generated
+# Normative grammar gate: validate source.fg and compare the generated
 # identity EBNF.md, grammar.jsonl, and locale EBNF.{locale}.md renders.
+#
+# Reads the sibling public faber checkout (faber/docs/) — run by
+# scripta/check-ecosystem-gates, which skips the grammar family with a
+# one-line notice when the sibling is absent (hard-fails under strict /
+# --full / --release). A missing sibling is reported here as a one-line
+# gate failure (grammar-pipeline.py run_check), never a traceback.
 
 set -euo pipefail
 

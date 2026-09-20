@@ -1,7 +1,7 @@
 +++
 term = "summa"
 kind = "concept"
-grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "shape_suffix", "apud_clause", "fixum_decl", "redde_stmt", "expression", "maxima_expr", "incipit_stmt", "literal"]
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "shape_suffix", "apud_clause", "fixum_decl", "redde_stmt", "expression", "incipit_stmt", "literal"]
 category = "collection"
 summary = "Maximum and minimum reductions over shaped tensors, optionally carrying coordinates for index-aware operands, with caller-stated coalesce identities and nihil on empty."
 syntax = "max from <tensor> [at [i]] [coalesce <identity>]"

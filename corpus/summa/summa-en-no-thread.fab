@@ -1,7 +1,7 @@
 +++
 term = "summa"
 kind = "concept"
-grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "main_stmt", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "shape_suffix", "redde_stmt", "fixum_decl", "expression", "summa_expr", "apud_clause", "literal", "nota_stmt", "conversio_expr"]
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "type_arguments", "type_argument", "shape_suffix", "redde_stmt", "fixum_decl", "expression", "summa_expr", "apud_clause", "literal", "nota_stmt", "conversio_expr"]
 category = "collection"
 summary = "Sequential English sum reduction without the distributed thread clause."
 syntax = "sum from <tensor> at [i] const s { return <term> }"
