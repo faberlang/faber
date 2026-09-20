@@ -893,6 +893,11 @@ pub(super) fn lower_package_units<'a>(
             &lowered.interner,
             &mut entry.analysis.interner,
         );
+        let record_field_symbols = super::intern_record_field_symbols(
+            lowered.validated.validation().types,
+            &lowered.interner,
+            &mut entry.analysis.interner,
+        );
         let source_to_entry_types = {
             let nominal = NominalImportContext {
                 nominal_map: &nominal_map,
@@ -900,6 +905,7 @@ pub(super) fn lower_package_units<'a>(
                 source_names: &source_names,
                 shared_nominals: &shared_nominals,
                 param_symbols: &param_symbols,
+                record_field_symbols: &record_field_symbols,
             };
             import_lowered_semantic_types(
                 lowered.validated.validation().types,
@@ -1129,6 +1135,11 @@ pub(super) fn lower_package_units<'a>(
                     &lowered.interner,
                     &mut entry.analysis.interner,
                 );
+                let record_field_symbols = super::intern_record_field_symbols(
+                    lowered.validated.validation().types,
+                    &lowered.interner,
+                    &mut entry.analysis.interner,
+                );
                 let source_to_entry_types = {
                     let nominal = NominalImportContext {
                         nominal_map: &nominal_map,
@@ -1136,6 +1147,7 @@ pub(super) fn lower_package_units<'a>(
                         source_names: &source_names,
                         shared_nominals: &shared_nominals,
                         param_symbols: &param_symbols,
+                        record_field_symbols: &record_field_symbols,
                     };
                     import_lowered_semantic_types(
                         lowered.validated.validation().types,
@@ -1557,12 +1569,18 @@ fn transplant_data_member(
     let empty_shared_nominals = HashMap::new();
     let param_symbols =
         super::intern_param_symbols(source_types, source_interner, &mut target.analysis.interner);
+    let record_field_symbols = super::intern_record_field_symbols(
+        source_types,
+        source_interner,
+        &mut target.analysis.interner,
+    );
     let nominal = NominalImportContext {
         nominal_map: &nominal_map,
         def_remap: &empty_def_remap,
         source_names: &empty_source_names,
         shared_nominals: &empty_shared_nominals,
         param_symbols: &param_symbols,
+        record_field_symbols: &record_field_symbols,
     };
     let konst = HirConst {
         name: remap_symbol(
@@ -2301,6 +2319,26 @@ fn remap_lowered_program_text_symbols<'a>(
             .into_iter()
             .map(|(name, ty)| (remap_metadata_symbol(name, source, target), ty))
             .collect();
+    }
+    // Record field identities are the one field population that lives in the
+    // TYPE ARENA (`Type::Record`), not in the metadata maps above: remap their
+    // name symbols through the same source→target text mapping so the
+    // re-validation below resolves the record aggregates and `args.<field>`
+    // projections this remap just re-interned (mounted-command CLI records —
+    // the hazard `selected_cli_dispatch_function` documents for command
+    // symbols). The snapshot rebuild keeps every `TypeId` slot-in-place, so
+    // the program's still-source type ids resolve unchanged.
+    let has_records = (0..context.types.type_count())
+        .any(|index| matches!(context.types.get(TypeId(index as u32)), Type::Record(_)));
+    if has_records {
+        let mut snapshot = context.types.snapshot();
+        snapshot.remap_record_field_symbols(|symbol| {
+            remap_optional_symbol(Some(symbol), source, target).expect("symbol is present")
+        });
+        let remapped_types = TypeTable::from_snapshot(snapshot)
+            .map_err(|message| vec![mir_lowering_diag(diagnostic_path, message)])?;
+        let remapped_types: &'static TypeTable = Box::leak(Box::new(remapped_types));
+        context = context.with_types(remapped_types);
     }
     context.interner = Some(Box::leak(Box::new(target.clone())));
     context.closure_environments = lowered

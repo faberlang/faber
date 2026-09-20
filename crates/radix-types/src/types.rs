@@ -134,6 +134,26 @@ impl TypeTableSnapshot {
     pub fn indices(&self) -> &[IndexExpr] {
         &self.indices
     }
+
+    /// Re-intern `Type::Record` field-name symbols through `remap`,
+    /// slot-in-place.
+    ///
+    /// Record field identities live in this arena (not in a side metadata
+    /// map), so a cross-interner merge remaps them here: every `TypeId`
+    /// keeps its slot, and a table rebuilt from the mutated snapshot
+    /// resolves every pre-remap `TypeId` to the same (re-interned) type.
+    /// `remap` decides per symbol; returning the input unchanged (the
+    /// generated-identity-token guard) leaves the symbol untouched.
+    pub fn remap_record_field_symbols(&mut self, mut remap: impl FnMut(LexSymbol) -> LexSymbol) {
+        for ty in &mut self.types {
+            if let Type::Record(fields) = ty {
+                *fields = std::mem::take(fields)
+                    .into_iter()
+                    .map(|(name, field_ty)| (remap(name), field_ty))
+                    .collect();
+            }
+        }
+    }
 }
 
 impl TypeTable {

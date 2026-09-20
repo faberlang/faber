@@ -965,6 +965,14 @@ pub(super) struct NominalImportContext<'a> {
     /// (`Param("2")`) lands as the merged interner's unrelated symbol and
     /// forwarded type args on merged generic calls garble.
     pub param_symbols: &'a HashMap<Symbol, Symbol>,
+    /// Source record field-name symbol → merged-interner symbol. Record
+    /// field identities live in the type arena (`Type::Record`), not in a
+    /// validation metadata map, so the import re-interns them by name —
+    /// after package text remapping the merged program's record aggregates
+    /// and field projections carry merged-interner symbols, and a record
+    /// imported with source-local symbols would fail re-validation with
+    /// unknown/missing field diagnostics.
+    pub record_field_symbols: &'a HashMap<Symbol, Symbol>,
 }
 
 /// Pre-intern every `Type::Param` and `IndexExpr::Param` symbol of a source
@@ -997,6 +1005,32 @@ pub(super) fn intern_param_symbols(
         {
             let remapped = intern_by_name(*symbol);
             map.insert(*symbol, remapped);
+        }
+    }
+    map
+}
+
+/// Pre-intern every `Type::Record` field-name symbol of a source type table
+/// into the merged interner. Generated identity tokens outside the source
+/// string table stay as-is (same guard as [`remap_optional_symbol`]); the
+/// import's `Type::Record` arm then re-interns field names through this map
+/// so imported records validate against the text-remapped merged program.
+pub(super) fn intern_record_field_symbols(
+    source_types: &TypeTable,
+    source_interner: &Interner,
+    target_interner: &mut Interner,
+) -> HashMap<Symbol, Symbol> {
+    let mut map = HashMap::new();
+    for index in 0..source_types.type_count() {
+        let Type::Record(fields) = source_types.get(TypeId(index as u32)) else {
+            continue;
+        };
+        for name in fields.keys() {
+            if name.0 as usize >= source_interner.strings().len() {
+                continue;
+            }
+            let remapped = target_interner.intern(source_interner.resolve(*name));
+            map.insert(*name, remapped);
         }
     }
     map
@@ -1324,6 +1358,13 @@ pub(super) fn import_semantic_type_with_nominal(
             let fields = fields
                 .into_iter()
                 .map(|(name, field_ty)| {
+                    // Record field names are interner-local: re-intern through
+                    // the prebuilt symbol map so the imported record's field
+                    // identities match the text-remapped merged program (the
+                    // `param_symbols` law, applied to record fields).
+                    let name = nominal
+                        .and_then(|context| context.record_field_symbols.get(&name).copied())
+                        .unwrap_or(name);
                     (
                         name,
                         import_semantic_type_with_nominal(

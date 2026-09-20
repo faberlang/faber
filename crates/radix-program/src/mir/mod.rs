@@ -554,9 +554,9 @@ pub fn source_identity(
 use cli_bind::bind_fmir_text_runtime_cli;
 use cli_plan::{
     NominalImportContext, build_nominal_remap, build_variant_remap, exported_nominal_names,
-    import_semantic_type_with_nominal, intern_param_symbols, parse_cli_arguments, plan_cli_package,
-    planned_cli_operands, planned_cli_options, push_type_rewrite, record_shared_nominals,
-    source_nominal_names,
+    import_semantic_type_with_nominal, intern_param_symbols, intern_record_field_symbols,
+    parse_cli_arguments, plan_cli_package, planned_cli_operands, planned_cli_options,
+    push_type_rewrite, record_shared_nominals, source_nominal_names,
 };
 use cli_values::{
     cli_default_value, cli_operand_consumes_many, cli_operand_record_fields,
