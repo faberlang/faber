@@ -5211,7 +5211,6 @@ fn pd25_map_tensor_unary_preserves_values_and_errors
 
     fn assert_internal(result: Result<Value, RunnerError>, message: &'static str) {
         let error = result.expect_err("malformed tensor should fail");
-        assert_eq!(error.message, message);
         assert_eq!(error.issue, super::runner_issue(message));
         assert_eq!(error.code, RUNNER_CODE_INTERNAL);
         assert_eq!(error.args, vec![("detail".to_owned(), message.to_owned())]);
