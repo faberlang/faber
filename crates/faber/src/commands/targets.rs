@@ -8,90 +8,83 @@
 //! Row-set policy (decision #6): emit-target rows always list with honest
 //! per-row availability; device/host-leaf/device-runtime capability rows are
 //! **compiled-only** — a build without the feature reports no row for it.
+//!
+//! The emit-target row set is **derived** (defect-audit S09-3 / B3-2), never
+//! hand-typed: the universe is the CLI grammar's own enumeration
+//! ([`FaberCliTarget::value_variants`], minus the hidden `scena` spelling),
+//! row names come from [`Target`]'s `Display` (the CLI spellings), and each
+//! row's feature gate from [`Target::required_feature`] with the documented
+//! faber-specific overrides below. A target added to the CLI joins this
+//! report by construction.
 
+use crate::cli::FaberCliTarget;
+use clap::ValueEnum;
+use radix::module::codegen::Target;
 use radix::services::{TargetCapabilities, TargetCommandSurface, target_capabilities_for_surface};
 use std::collections::BTreeSet;
 
-/// Emit-target rows keyed to the faber feature that must be compiled for the
-/// row to be available.
+/// One derived emit-target row: the backend target, its CLI spelling, and
+/// the faber feature that must be compiled for the row to be available.
+struct FaberTargetRowSpec {
+    target: Target,
+    name: String,
+    feature: &'static str,
+}
+
+/// The emit-target row set, derived from the CLI grammar (S09-3).
 ///
-/// The `available` flag is faber-side (`cfg!` on the faber feature), never
-/// radix's target availability — a faber build can omit a radix target radix
-/// considers always-compiled (e.g. `MirLlvm`), and only faber knows its own
-/// feature gates. When a row's feature is not compiled, build/run/package are
-/// forced off so no row claims a capability the build did not compile.
-const FABER_TARGET_ROWS: &[(radix::module::codegen::Target, &str, &str)] = &[
-    (radix::module::codegen::Target::HirRust, "rust", "hir-rust"),
-    (radix::module::codegen::Target::HirFhir, "fhir", "hir-fhir"),
-    (
-        radix::module::codegen::Target::MirFmir,
-        "fmir-text",
-        "mir-fmir",
-    ),
-    (
-        radix::module::codegen::Target::MirFmirBinary,
-        "fmir",
-        "mir-fmir",
-    ),
-    (
-        radix::module::codegen::Target::MirFmirBundle,
-        "fmir-bin",
-        "mir-fmir",
-    ),
-    (
-        radix::module::codegen::Target::HirFaber,
-        "faber",
-        "hir-faber",
-    ),
-    (radix::module::codegen::Target::HirGo, "go", "hir-go"),
-    (
-        radix::module::codegen::Target::HirPython,
-        "python",
-        "hir-python",
-    ),
-    (
-        radix::module::codegen::Target::HirHaskell,
-        "haskell",
-        "hir-haskell",
-    ),
-    (radix::module::codegen::Target::MirWasm, "wasm", "mir-wasm"),
-    (
-        radix::module::codegen::Target::MirWasm,
-        "wasm-text",
-        "mir-wasm",
-    ),
-    (
-        radix::module::codegen::Target::MirLlvm,
-        "llvm-text",
-        "mir-llvm",
-    ),
-    (
-        radix::module::codegen::Target::MirLlvmHost,
-        "llvm-host",
-        "mir-llvm",
-    ),
-    (
-        radix::module::codegen::Target::MirMetal,
-        "metal-text",
-        "mir-metal",
-    ),
-    (
-        radix::module::codegen::Target::MirWgsl,
-        "wgsl-text",
-        "mir-wgsl",
-    ),
-    (radix::module::codegen::Target::MirSexp, "sexp", "mir-sexp"),
-    (
-        radix::module::codegen::Target::HirTypeScript,
-        "ts",
-        "hir-ts",
-    ),
-    (
-        radix::module::codegen::Target::HirSwift,
-        "swift",
-        "hir-swift",
-    ),
-];
+/// The only literal rows left are documented overrides:
+///
+/// - the fmir family's shared feature gate ([`faber_row_feature`]); and
+/// - MirWasm's compatibility alias row (`wasm`): the CLI keeps two live
+///   spellings — primary `wasm-text` and the `wasm` alias — so the report
+///   carries both rows with identical capability truth (goal Open question 4
+///   ruling: the double row may stay explicit).
+fn faber_target_row_specs() -> Vec<FaberTargetRowSpec> {
+    let mut rows = Vec::new();
+    for variant in FaberCliTarget::value_variants() {
+        if matches!(variant, FaberCliTarget::MirScena) {
+            // Hidden CLI spelling (legacy source-backed scena runtime) — not
+            // a discoverable `faber targets` row.
+            continue;
+        }
+        let target = variant.to_radix();
+        rows.push(FaberTargetRowSpec {
+            target,
+            name: target.to_string(),
+            feature: faber_row_feature(target),
+        });
+        if matches!(variant, FaberCliTarget::MirWasm) {
+            rows.push(FaberTargetRowSpec {
+                target,
+                name: "wasm".to_string(),
+                feature: faber_row_feature(target),
+            });
+        }
+    }
+    rows
+}
+
+/// The faber feature gating one emit-target row.
+///
+/// Delegates to [`Target::required_feature`] (the feature strings forward
+/// 1:1 into faber's own Cargo features), with one documented faber-specific
+/// override: the fmir package-image family (`fmir-text` / `fmir` /
+/// `fmir-bin`) is faber-build-gated on the shared `mir-fmir` feature, which
+/// radix's neutral mapping leaves ungated (`None`) because the runner
+/// consumes images whenever any emit surface is present.
+fn faber_row_feature(target: Target) -> &'static str {
+    match target {
+        Target::MirFmir | Target::MirFmirBinary | Target::MirFmirBundle => "mir-fmir",
+        other => other.required_feature().unwrap_or_else(|| {
+            panic!(
+                "CLI target {other} has no faber feature mapping: every \
+                 `faber targets` row must name a faber feature (extend \
+                 faber_row_feature's overrides)"
+            )
+        }),
+    }
+}
 
 /// Compiled-only capability rows for the device/host-leaf/device-runtime
 /// surfaces. Each row appears only when its faber feature is compiled; a
@@ -113,7 +106,7 @@ const FABER_CAPABILITY_ROWS: &[(&str, &str, &str)] = &[
 
 /// One rendered capability row.
 struct TargetRow {
-    name: &'static str,
+    name: String,
     available: bool,
     capabilities: TargetCapabilities,
 }
@@ -137,13 +130,20 @@ impl TargetRow {
 ///
 /// Emit-target rows always list (honest per-row availability); device/
 /// host-leaf/device-runtime capability rows list only when compiled.
+///
+/// The `available` flag is faber-side (`cfg!` on the faber feature), never
+/// radix's target availability — a faber build can omit a radix target radix
+/// considers always-compiled (e.g. `MirLlvm`), and only faber knows its own
+/// feature gates. When a row's feature is not compiled, build/run/package are
+/// forced off so no row claims a capability the build did not compile.
 fn target_rows(compiled: &BTreeSet<&'static str>) -> Vec<TargetRow> {
-    let mut rows = Vec::with_capacity(FABER_TARGET_ROWS.len() + FABER_CAPABILITY_ROWS.len());
-    for &(target, name, feature) in FABER_TARGET_ROWS {
-        let available = compiled.contains(feature);
+    let specs = faber_target_row_specs();
+    let mut rows = Vec::with_capacity(specs.len() + FABER_CAPABILITY_ROWS.len());
+    for spec in specs {
+        let available = compiled.contains(spec.feature);
         let mut capabilities = faber_surface_capabilities(
-            target,
-            target_capabilities_for_surface(TargetCommandSurface::Faber, target),
+            spec.target,
+            target_capabilities_for_surface(TargetCommandSurface::Faber, spec.target),
         );
         if !available {
             // Capability truth: a row whose feature is not compiled claims no
@@ -154,7 +154,7 @@ fn target_rows(compiled: &BTreeSet<&'static str>) -> Vec<TargetRow> {
             capabilities.package = false;
         }
         rows.push(TargetRow {
-            name,
+            name: spec.name,
             available,
             capabilities,
         });
@@ -164,7 +164,7 @@ fn target_rows(compiled: &BTreeSet<&'static str>) -> Vec<TargetRow> {
             continue;
         }
         rows.push(TargetRow {
-            name,
+            name: name.to_string(),
             available: true,
             capabilities: TargetCapabilities {
                 check: false,
@@ -188,25 +188,25 @@ fn target_rows(compiled: &BTreeSet<&'static str>) -> Vec<TargetRow> {
 /// package surface truth (capability truth T1 — what faber can express, not a
 /// shipping promise).
 fn faber_surface_capabilities(
-    target: radix::module::codegen::Target,
+    target: Target,
     capabilities: TargetCapabilities,
 ) -> TargetCapabilities {
     match target {
-        radix::module::codegen::Target::MirFmir => TargetCapabilities {
+        Target::MirFmir => TargetCapabilities {
             check: true,
             build: true,
             run: true,
             package: true,
             note: "faber package MIR image target: `faber build --target fmir-text`",
         },
-        radix::module::codegen::Target::MirFmirBinary => TargetCapabilities {
+        Target::MirFmirBinary => TargetCapabilities {
             check: true,
             build: true,
             run: true,
             package: true,
             note: "faber package MIR image target: `faber build --target fmir`",
         },
-        radix::module::codegen::Target::MirFmirBundle => TargetCapabilities {
+        Target::MirFmirBundle => TargetCapabilities {
             check: true,
             build: true,
             run: true,

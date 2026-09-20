@@ -13,6 +13,102 @@ fn row<'a>(rows: &'a [TargetRow], name: &str) -> &'a TargetRow {
         .unwrap_or_else(|| panic!("missing row {name}"))
 }
 
+fn row_spec<'a>(specs: &'a [FaberTargetRowSpec], name: &str) -> &'a FaberTargetRowSpec {
+    specs
+        .iter()
+        .find(|s| s.name == name)
+        .unwrap_or_else(|| panic!("missing row spec {name}"))
+}
+
+/// The CLI-selectable target universe: every `FaberCliTarget` variant except
+/// the deliberately hidden `scena` spelling.
+fn selectable_cli_targets() -> Vec<Target> {
+    FaberCliTarget::value_variants()
+        .iter()
+        .filter(|variant| !matches!(variant, FaberCliTarget::MirScena))
+        .map(|variant| variant.to_radix())
+        .collect()
+}
+
+/// The primary CLI spelling of each selectable variant, read from the clap
+/// value metadata — independent of the row builder's `Target`-`Display`
+/// source, so the set-equality test also catches `Display`↔CLI-name drift.
+fn selectable_cli_names() -> BTreeSet<String> {
+    FaberCliTarget::value_variants()
+        .iter()
+        .filter(|variant| !matches!(variant, FaberCliTarget::MirScena))
+        .map(|variant| {
+            variant
+                .to_possible_value()
+                .expect("FaberCliTarget variants declare a clap value name")
+                .get_name()
+                .to_string()
+        })
+        .collect()
+}
+
+#[test]
+fn row_set_equals_cli_selectable_variant_set() {
+    // S09-3: the derived row set must equal the CLI grammar's own variant
+    // set minus the hidden `scena` spelling — a target added to
+    // `FaberCliTarget` joins `faber targets` by construction, and a row no
+    // CLI spelling selects cannot appear.
+    let specs = faber_target_row_specs();
+    let mut names: BTreeSet<String> = specs.iter().map(|s| s.name.clone()).collect();
+
+    // Documented override (goal Open question 4 ruling): MirWasm keeps two
+    // live CLI spellings — primary `wasm-text` and the compatibility alias
+    // `wasm` — so the `wasm` alias row stays explicit.
+    assert!(
+        names.remove("wasm"),
+        "the MirWasm `wasm` alias row must stay (documented OQ-4 override)"
+    );
+
+    assert_eq!(
+        names,
+        selectable_cli_names(),
+        "row set must equal the FaberCliTarget variant set minus hidden scena"
+    );
+
+    // Every row — including the wasm alias — maps to a CLI-selectable target.
+    let selectable = selectable_cli_targets();
+    for spec in &specs {
+        assert!(
+            selectable.contains(&spec.target),
+            "row {} reports {:?}, which no selectable FaberCliTarget variant selects",
+            spec.name,
+            spec.target
+        );
+    }
+}
+
+#[test]
+fn mirwasm_double_row_shares_target_and_feature() {
+    // OQ-4: the `wasm`/`wasm-text` double row stays explicit; both rows must
+    // carry identical target and feature truth.
+    let specs = faber_target_row_specs();
+    let wasm = row_spec(&specs, "wasm");
+    let wasm_text = row_spec(&specs, "wasm-text");
+    assert_eq!(wasm.target, Target::MirWasm);
+    assert_eq!(wasm_text.target, Target::MirWasm);
+    assert_eq!(wasm.feature, wasm_text.feature);
+}
+
+#[test]
+fn fmir_family_rows_share_the_fmir_feature_override() {
+    // The documented faber-specific override: radix's `required_feature()`
+    // leaves the fmir family ungated; faber gates all three package-image
+    // targets on its `mir-fmir` feature.
+    for name in ["fmir-text", "fmir", "fmir-bin"] {
+        let specs = faber_target_row_specs();
+        let spec = row_spec(&specs, name);
+        assert_eq!(
+            spec.feature, "mir-fmir",
+            "{name} must keep the fmir-family feature override"
+        );
+    }
+}
+
 #[test]
 fn small_build_reports_only_compiled_capabilities() {
     let rows = target_rows(&small_compiled());
@@ -29,33 +125,18 @@ fn small_build_reports_only_compiled_capabilities() {
         rust.render()
     );
 
-    // Emit rows whose feature is not compiled claim no capability.
-    for name in [
-        "fhir",
-        "fmir-text",
-        "fmir",
-        "fmir-bin",
-        "faber",
-        "go",
-        "haskell",
-        "wasm",
-        "wasm-text",
-        "llvm-text",
-        "llvm-host",
-        "metal-text",
-        "wgsl-text",
-        "sexp",
-        "ts",
-        "swift",
-    ] {
-        let r = row(&rows, name);
-        assert!(
-            !r.available,
-            "{name} must not be available in a small build"
-        );
+    // Every other derived row is unavailable and claims no capability —
+    // derived from the row set itself, so a future CLI variant joins this
+    // check by construction.
+    for r in &rows {
+        if r.name == "rust" {
+            continue;
+        }
+        assert!(!r.available, "{} must not be available in a small build", r.name);
         assert!(
             !r.capabilities.build && !r.capabilities.run && !r.capabilities.package,
-            "{name} must claim no build/run/package capability in a small build:\n{}",
+            "{} must claim no build/run/package capability in a small build:\n{}",
+            r.name,
             r.render()
         );
     }
@@ -75,13 +156,18 @@ fn default_build_reports_full_surface() {
     // real cfg!-derived compiled set is the full emit surface — no
     // table-derived expectation (that circularity hid `swift`).
     let rows = target_rows(&compiled_features());
-    // All emit rows; no capability rows compile under the default build
-    // (device-runtime / host-macos-arm64 since the S3-U2 cut) — both are
-    // opt-in and report no row.
-    assert_eq!(rows.len(), FABER_TARGET_ROWS.len());
+    let specs = faber_target_row_specs();
+    // All derived emit rows; no capability rows compile under the default
+    // build (device-runtime / host-macos-arm64 since the S3-U2 cut) — both
+    // are opt-in and report no row.
+    assert_eq!(rows.len(), specs.len());
 
-    for &(_, name, _) in FABER_TARGET_ROWS {
-        assert!(row(&rows, name).available, "{name} must be available");
+    for spec in &specs {
+        assert!(
+            row(&rows, &spec.name).available,
+            "{} must be available",
+            spec.name
+        );
     }
     for name in ["device-runtime", "host-macos-arm64"] {
         assert!(
@@ -131,63 +217,22 @@ fn rendered_table_contains_capability_rows_under_full_build() {
     }
 }
 
-/// The CLI-selectable target universe: every `FaberCliTarget` variant except
-/// the deliberately hidden `scena` spelling. Row-table completeness derives
-/// from this set (the CLI grammar's own enumeration), never from the table
-/// under test.
-fn selectable_cli_targets() -> Vec<radix::module::codegen::Target> {
-    FaberCliTarget::value_variants()
-        .iter()
-        .filter(|variant| !matches!(variant, FaberCliTarget::MirScena))
-        .map(|variant| variant.to_radix())
-        .collect()
-}
-
-#[test]
-fn every_cli_selectable_target_has_a_row() {
-    let selectable = selectable_cli_targets();
-    assert!(
-        !selectable.is_empty(),
-        "FaberCliTarget::value_variants() must enumerate the CLI grammar"
-    );
-    for target in &selectable {
-        assert!(
-            FABER_TARGET_ROWS
-                .iter()
-                .any(|&(row_target, _, _)| row_target == *target),
-            "FABER_TARGET_ROWS must report CLI-selectable target {target:?} \
-             (faber targets must not silently omit a live backend)",
-        );
-    }
-}
-
-#[test]
-fn every_row_target_is_cli_selectable() {
-    // The reverse direction: a row whose Target no CLI spelling selects lies
-    // to the reader about selectability. MirWasm's double row
-    // (`wasm`/`wasm-text`) is fine — both rows share the MirWasm variant.
-    let selectable = selectable_cli_targets();
-    for &(target, name, _) in FABER_TARGET_ROWS {
-        assert!(
-            selectable.contains(&target),
-            "row {name} reports {target:?}, which no FaberCliTarget variant selects"
-        );
-    }
-}
-
 #[test]
 fn every_row_feature_is_compiled_in_the_default_test_build() {
     // The test binary builds under default features (full-targets): every
     // row's feature string must name a feature this build actually compiled.
-    // Catches both a stale feature string and a `cfg!` arm missing from
-    // compiled_features() — the two omissions that hid `swift`.
+    // Catches a stale `required_feature` mapping, a drifted fmir override,
+    // and a `cfg!` arm missing from compiled_features() — the omissions that
+    // hid `swift` (P6-2).
     let compiled = compiled_features();
-    for &(_, name, feature) in FABER_TARGET_ROWS {
+    for spec in faber_target_row_specs() {
         assert!(
-            compiled.contains(feature),
-            "row {name} names feature {feature}, which the default \
-             (full-targets) build did not compile: stale row feature string \
-             or missing cfg! arm in compiled_features()"
+            compiled.contains(spec.feature),
+            "row {} names feature {}, which the default \
+             (full-targets) build did not compile: stale feature mapping \
+             or missing cfg! arm in compiled_features()",
+            spec.name,
+            spec.feature
         );
     }
 }
