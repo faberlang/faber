@@ -6,7 +6,7 @@
 //! `--to` is required, unknown locales fail closed listing embedded packs.
 //! See `docs/operator/convert-command.md`.
 
-use crate::package::available_locales;
+use faber_cli::package::available_locales;
 use std::fs;
 use std::io::Read;
 use std::path::{Path, PathBuf};

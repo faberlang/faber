@@ -140,7 +140,7 @@ pub(super) fn convert_single_doc(
     let session = match format_session(path, from, source) {
         Ok(session) => session,
         Err(diagnostic) => {
-            crate::postprocess::print_diagnostics(
+            faber_cli::postprocess::print_diagnostics(
                 &[(*diagnostic).clone()],
                 radix::services::DiagnosticMode::Normal,
                 None,
@@ -148,10 +148,10 @@ pub(super) fn convert_single_doc(
             return Err(());
         }
     };
-    let emit_pack = match crate::package::embedded_conversion_locale_pack(to) {
+    let emit_pack = match faber_cli::package::embedded_conversion_locale_pack(to) {
         Ok(pack) => pack,
         Err(diagnostic) => {
-            crate::postprocess::print_diagnostics(
+            faber_cli::postprocess::print_diagnostics(
                 &[(*diagnostic).clone()],
                 radix::services::DiagnosticMode::Normal,
                 None,
@@ -164,7 +164,7 @@ pub(super) fn convert_single_doc(
         .diagnostics
         .iter()
         .any(radix::module::diagnostics::Diagnostic::is_error);
-    crate::postprocess::print_diagnostics(
+    faber_cli::postprocess::print_diagnostics(
         &result.diagnostics,
         radix::services::DiagnosticMode::Normal,
         None,
@@ -219,7 +219,7 @@ fn format_single_doc(path: &Path, source: &str) -> Result<String, ()> {
     let session = match format_session(path, None, source) {
         Ok(session) => session,
         Err(diagnostic) => {
-            crate::postprocess::print_diagnostics(
+            faber_cli::postprocess::print_diagnostics(
                 &[(*diagnostic).clone()],
                 radix::services::DiagnosticMode::Normal,
                 None,
@@ -230,7 +230,7 @@ fn format_single_doc(path: &Path, source: &str) -> Result<String, ()> {
     let Some(emit_pack) = session.config.locale_pack.as_ref() else {
         // format_session always installs a resolved reader pack; reaching this
         // means the session invariant broke, so fail closed as a diagnostic.
-        crate::postprocess::print_diagnostics(
+        faber_cli::postprocess::print_diagnostics(
             &[radix::module::diagnostics::Diagnostic::error(
                 "format session did not resolve a source locale pack",
             )
@@ -247,7 +247,7 @@ fn format_single_doc(path: &Path, source: &str) -> Result<String, ()> {
         .diagnostics
         .iter()
         .any(radix::module::diagnostics::Diagnostic::is_error);
-    crate::postprocess::print_diagnostics(
+    faber_cli::postprocess::print_diagnostics(
         &result.diagnostics,
         radix::services::DiagnosticMode::Normal,
         None,
@@ -298,11 +298,11 @@ pub(super) fn format_session(
     };
     let selected_locale = source_override.or(frontmatter_locale.as_deref());
     let pack = if path.is_file() {
-        crate::package::load_locale_pack_for_input(path, selected_locale)?
+        faber_cli::package::load_locale_pack_for_input(path, selected_locale)?
     } else {
-        crate::package::locale_pack_for_emit_with_diagnostic(
+        faber_cli::package::locale_pack_for_emit_with_diagnostic(
             &[],
-            Some(selected_locale.unwrap_or(crate::package::DEFAULT_CODE_LOCALE)),
+            Some(selected_locale.unwrap_or(faber_cli::package::DEFAULT_CODE_LOCALE)),
         )?
     }
     .ok_or_else(|| {

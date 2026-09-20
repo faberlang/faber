@@ -384,7 +384,7 @@ fn package_mir_run_with_selection_auto_stays_on_cpu_route() {
         &radix::module::driver::Config::default(),
         &entry,
         DeviceSelection::Auto,
-        &crate::package::mir::faber_mir_seams(),
+        &faber_cli::package::mir::faber_mir_seams(),
         &mut host,
     )
     .expect("auto selection must keep the CPU route");

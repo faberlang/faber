@@ -3,7 +3,7 @@ use std::process::Command;
 
 use super::doctor::{doctor_report_for, render_doctor_report};
 use super::format_test::faber_binary;
-use crate::library::LibraryHomeSource;
+use faber_cli::library::LibraryHomeSource;
 
 fn kv(report: &str, key: &str) -> String {
     let prefix = format!("{key}=");

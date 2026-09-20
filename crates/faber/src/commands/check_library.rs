@@ -14,7 +14,7 @@ use radix::program::discovery::PackageSpec;
 use radix::program::library::is_valid_provider_segment;
 
 use crate::cli::CheckLibraryArgs;
-use crate::library::{
+use faber_cli::library::{
     FABER_LIBRARY_HOME_ENV, LibraryRootRule, ResolvedLibraryHome, library_root_rule,
     resolved_library_home, specifier_identity,
 };
@@ -139,7 +139,7 @@ fn spec_for_root_rule(
     match root_rule {
         LibraryRootRule::FaberToml => {
             let manifest_path = provider_repo.join("faber.toml");
-            let manifest = crate::package::read_manifest(&manifest_path)
+            let manifest = faber_cli::package::read_manifest(&manifest_path)
                 .map_err(CheckLibraryError::Diagnostic)?;
             if manifest.build.kind != "lib" {
                 return Err(CheckLibraryError::NotALibrary {
@@ -147,7 +147,7 @@ fn spec_for_root_rule(
                     kind: manifest.build.kind,
                 });
             }
-            let mut spec = crate::package::discover_package(provider_repo)
+            let mut spec = faber_cli::package::discover_package(provider_repo)
                 .map_err(CheckLibraryError::Diagnostic)?;
             // Full interface graph: every `*.fab` under the source root, not
             // an application entry. This is not `faber check` package mode.
@@ -184,7 +184,7 @@ fn check_target(provider_repo: &Path, root_rule: LibraryRootRule) -> Target {
         return Target::HirRust;
     }
     let manifest_path = provider_repo.join("faber.toml");
-    let Ok(manifest) = crate::package::read_manifest(&manifest_path) else {
+    let Ok(manifest) = faber_cli::package::read_manifest(&manifest_path) else {
         return Target::HirRust;
     };
     radix::program::manifest::manifest_build_target(
@@ -202,12 +202,12 @@ pub(crate) fn check_dev_library(checkout: &DevLibraryCheckout) -> Vec<Diagnostic
     };
     let target = check_target(&checkout.provider_repo, checkout.root_rule);
     let (config, _locale_pack) =
-        match crate::package::config_with_locale(target, locale_input, None, None) {
+        match faber_cli::package::config_with_locale(target, locale_input, None, None) {
             Ok(pair) => pair,
             Err(diag) => return vec![*diag],
         };
     let resolver =
-        match crate::package::library_resolver_for_package(&config, &checkout.spec.package_root) {
+        match faber_cli::package::library_resolver_for_package(&config, &checkout.spec.package_root) {
             Ok(resolver) => resolver,
             Err(diagnostics) => return diagnostics,
         };
@@ -217,7 +217,7 @@ pub(crate) fn check_dev_library(checkout: &DevLibraryCheckout) -> Vec<Diagnostic
         &resolver,
         false,
         None,
-        &crate::package::faber_analysis_seams(),
+        &faber_cli::package::faber_analysis_seams(),
     ) {
         Ok(program) => program.diagnostics,
         Err(diagnostics) => diagnostics,

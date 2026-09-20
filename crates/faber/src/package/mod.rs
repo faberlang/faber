@@ -52,7 +52,7 @@ mod library_link;
 mod llvm_host;
 mod locale;
 mod manifest;
-pub(crate) mod mir;
+pub mod mir;
 mod packed_projection;
 mod product;
 mod runtime_dependency;
@@ -62,72 +62,53 @@ mod rust_runtime_dependency;
 mod test_route;
 
 #[cfg(feature = "hir-rust")]
-#[allow(unused_imports)]
+#[cfg(test)]
 pub(crate) use binding::verify_library_binding_shapes;
-#[allow(unused_imports)]
 pub use binding::verify_library_bindings;
-#[allow(unused_imports)]
-pub(crate) use cargo::emit_generated_crate_with_runtime_plan;
-#[allow(unused_imports)]
-pub(crate) use cargo::invoke_cargo_build;
 pub(crate) use cargo::{
     RustRuntimePlan, package_host_selection_diagnostic, rust_runtime_plan_for_package,
 };
-pub use cargo::{emit_generated_crate, invoke_cargo_test};
+#[cfg(test)]
+pub(crate) use cargo::{emit_generated_crate_with_runtime_plan, invoke_cargo_build};
+// S09-4 (register row, docs/audits/radix-defect-audit-2026-09-20): the
+// retired Cargo test executor stays exported for its deletion unit only —
+// `invoke_cargo_test` has no consumer in bin, lib, or tests (body retained,
+// deletion is S09-4's fix); `emit_generated_crate` is consumed only by
+// `package_test.rs`, hence the cfg(test) gate.
+#[cfg(test)]
+pub use cargo::emit_generated_crate;
 pub use cmd::{
     cmd_build, cmd_check_package, cmd_emit_package, should_treat_as_package_from_args,
     use_package_compiler_from_args,
 };
 #[cfg(feature = "device-runtime")]
-#[allow(unused_imports)]
 pub(crate) use device::execute_device_route;
 #[cfg(feature = "device-runtime")]
-#[allow(unused_imports)]
+#[cfg(test)]
 pub(crate) use device::host_partition_for_lowered;
-#[cfg(feature = "device-runtime")]
-#[allow(unused_imports)]
-pub(crate) use device::{
-    admit_device_program_section, device_program_for_lowered, device_section_for_program,
-};
 pub(crate) use dispatch::{
     ProviderManifest, load_provider_manifests, selected_providers_for_routes,
 };
 #[cfg(feature = "hir-go")]
-#[allow(unused_imports)]
+#[cfg(test)]
 pub(crate) use go_build::{GoBuildLayout, emit_go_module, invoke_go_build};
-#[cfg(all(feature = "device-runtime", feature = "host-macos-arm64"))]
-#[allow(unused_imports)]
-pub(crate) use host_factory::{
-    BackendDiscoveryReceipt, E_BACKEND_UNAVAILABLE, E_DEVICE_ABI_MISMATCH, E_DEVICE_DESCRIPTOR,
-    E_DEVICE_DTYPE_MISMATCH, E_DEVICE_ENTRY_MISMATCH, E_DEVICE_SHAPE_MISMATCH, E_NO_DEVICE_PROGRAM,
-    admitted_backends, construct_composite_host, create_program_session, discovery_receipt,
-    effective_backend_selection, execute_device_descriptor, host_error_diagnostic,
-    missing_backend_artifact, missing_device_descriptor, resolve_backend_selection,
-};
-#[allow(unused_imports)]
-pub(crate) use library_link::emit_linked_library_crates;
 #[cfg(feature = "mir-llvm")]
-#[allow(unused_imports)]
 pub use llvm_host::{
     LlvmHostBuild, LlvmHostProfile, build_host_program, compile_nvvm_to_ptx,
     discover_llvm_host_toolchain, ensure_llvm_runtime_archive, host_llvm_target_triple,
     host_triple_for,
 };
 #[cfg(feature = "runner")]
-#[allow(unused_imports)]
-pub(crate) use manifest::manifest_backend_selection;
+pub use manifest::manifest_backend_selection;
 pub(crate) use manifest::validate_manifest;
 pub use manifest::{
     FaberManifest, ManifestProduct, ManifestProductEmit, ManifestProductKind,
     ManifestProductShaders, read_manifest,
 };
-#[allow(unused_imports)]
-pub(crate) use manifest::{manifest_build_target_for_input, manifest_device_inputs};
+pub(crate) use manifest::manifest_device_inputs;
 #[cfg(feature = "runner")]
-#[allow(unused_imports)]
 pub use mir::run_fmir_image_bytes_with_stdio;
 #[cfg(feature = "runner")]
-#[allow(unused_imports)]
 pub use mir::with_lowered_package_mir;
 pub(crate) use product::build_browser_product_with_postprocess;
 #[cfg(test)]
@@ -138,8 +119,7 @@ use radix::module::driver::Config;
 use radix::program::discovery::PackageSpec;
 use radix::program::library::{LibraryInterfaceCache, LibraryResolver, LockedLibraryPackage};
 use std::path::{Path, PathBuf};
-#[allow(dead_code, unused_imports)]
-pub(crate) use test_route::{analyze_package_for_tests, test_source_filter_for_input};
+pub use test_route::{analyze_package_for_tests, test_source_filter_for_input};
 
 /// ONE-EFFECTIVE-TARGET SEAM — executed lane (TARGETLANE001 executed-lane
 /// routing; authoritative decision record
@@ -164,7 +144,7 @@ pub(crate) use test_route::{analyze_package_for_tests, test_source_filter_for_in
 /// from the same source, so the two targets cannot diverge (ABI source-of-
 /// truth invariant). The radix-side TARGETLANE001 guard is unchanged — this
 /// only fixes the executed route's target selection.
-pub(crate) fn executed_lane_analysis_target(config: &Config, input: &Path) -> Target {
+pub fn executed_lane_analysis_target(config: &Config, input: &Path) -> Target {
     if is_mir_backed_target(config.target) {
         return config.target;
     }
@@ -196,16 +176,10 @@ fn is_mir_backed_target(target: Target) -> bool {
     )
 }
 
-#[allow(unused_imports)]
-pub(crate) use embedded_locale::{
-    EMBEDDED_LOCALE_IDS, EmbeddedLocaleError, load_embedded_locale_pack,
-};
-#[allow(unused_imports)]
+pub(crate) use embedded_locale::{EMBEDDED_LOCALE_IDS, load_embedded_locale_pack};
 pub use locale::available_locales;
-#[allow(unused_imports)]
 pub use locale::locale_pack_for_emit;
-#[allow(unused_imports)]
-pub(crate) use locale::{
+pub use locale::{
     DEFAULT_CODE_LOCALE, config_with_locale, default_config_with_locale,
     embedded_conversion_locale_pack, load_locale_pack_for_input,
     locale_pack_for_emit_with_diagnostic,
@@ -219,7 +193,7 @@ fn resolution_base() -> std::path::PathBuf {
     )
 }
 
-pub(crate) fn missing_package_path_diagnostic(path: &Path) -> Box<Diagnostic> {
+pub fn missing_package_path_diagnostic(path: &Path) -> Box<Diagnostic> {
     let path = absolutize_path(path);
     let base = resolution_base();
     let error = std::io::Error::from_raw_os_error(2);
@@ -243,7 +217,7 @@ pub(crate) fn missing_package_path_diagnostic(path: &Path) -> Box<Diagnostic> {
 ///
 /// The package code and issue remain owned by the originating diagnostic. This
 /// adapter only fills the stable path/base/artifact facts at the CLI boundary.
-pub(crate) fn attach_path_diagnostic_context(mut diagnostic: Box<Diagnostic>) -> Box<Diagnostic> {
+pub fn attach_path_diagnostic_context(mut diagnostic: Box<Diagnostic>) -> Box<Diagnostic> {
     if ["path", "base", "artifact"]
         .iter()
         .all(|name| diagnostic.args.iter().any(|arg| arg.name == *name))
@@ -313,7 +287,7 @@ fn locale_pack_path_from_diagnostic(message: &str) -> Option<PathBuf> {
 /// `faber test` shares this seam because package discovery requires absolute
 /// inputs: a raw `.` lexically normalizes to an empty path and fails as
 /// `cannot read '.'` (rdx-s05-1).
-pub(crate) fn absolutize_path(path: &Path) -> std::path::PathBuf {
+pub fn absolutize_path(path: &Path) -> std::path::PathBuf {
     let path = if path.is_absolute() {
         path.to_path_buf()
     } else {
@@ -322,7 +296,7 @@ pub(crate) fn absolutize_path(path: &Path) -> std::path::PathBuf {
     radix::program::paths::normalize_path(&path)
 }
 
-pub(crate) fn discover_package(input: &Path) -> Result<PackageSpec, Box<Diagnostic>> {
+pub fn discover_package(input: &Path) -> Result<PackageSpec, Box<Diagnostic>> {
     let path = absolutize_path(input);
     let spec = radix::program::discovery::discover_package_with_base(&path, &resolution_base())?;
     if spec.manifest_backed {
@@ -337,11 +311,10 @@ pub(crate) fn discover_package(input: &Path) -> Result<PackageSpec, Box<Diagnost
 
 /// `faber test` execution route selected from the input path.
 ///
-/// Used by the `faber` binary `cmd_test` (a separate crate graph from this
-/// lib) and by package-route tests.
+/// Used by the `faber` binary `cmd_test` through the `faber_cli` lib seam and
+/// by package-route tests.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[allow(dead_code)]
-pub(crate) enum TestInputRoute {
+pub enum TestInputRoute {
     /// Bare single-file MIR runner (no package graph).
     SingleFile,
     /// Package analysis + linking, including a single file under a package root.
@@ -351,11 +324,9 @@ pub(crate) enum TestInputRoute {
 }
 
 /// Guiding diagnostic for E1: `faber test .` in a library tree without a manifest.
-#[allow(dead_code)]
-pub(crate) const MANIFEST_LESS_TEST_MESSAGE: &str =
+pub const MANIFEST_LESS_TEST_MESSAGE: &str =
     "no faber.toml found; testing a library requires a package root";
 
-#[allow(dead_code)]
 fn is_test_source_file(path: &Path) -> bool {
     path.is_file()
         && path
@@ -370,8 +341,7 @@ fn is_test_source_file(path: &Path) -> bool {
 /// analysis so in-package imports resolve. `--no-package` keeps the bare
 /// single-file route. A directory without `faber.toml` is rejected with
 /// [`MANIFEST_LESS_TEST_MESSAGE`] instead of the legacy `main.fab` fallback.
-#[allow(dead_code)]
-pub(crate) fn test_input_route(path: &Path, no_package: bool) -> TestInputRoute {
+pub fn test_input_route(path: &Path, no_package: bool) -> TestInputRoute {
     let path = absolutize_path(path);
     if is_test_source_file(&path) && no_package {
         return TestInputRoute::SingleFile;
@@ -384,14 +354,13 @@ pub(crate) fn test_input_route(path: &Path, no_package: bool) -> TestInputRoute 
     }
 }
 
-pub(crate) fn discover_build_layout(
+pub fn discover_build_layout(
     input: &Path,
 ) -> Result<radix::program::discovery::BuildLayout, Box<Diagnostic>> {
     radix::program::discovery::discover_build_layout(&absolutize_path(input))
 }
 
-#[allow(dead_code)]
-pub(crate) fn is_manifest_backed_or_directory_package_input(input: &Path) -> bool {
+pub fn is_manifest_backed_or_directory_package_input(input: &Path) -> bool {
     radix::program::discovery::is_manifest_backed_or_directory_package_input(&absolutize_path(
         input,
     ))
@@ -423,7 +392,7 @@ pub(crate) fn library_resolver_from_config(
 
 /// Build a library resolver for a package root, attaching `faber.toml`
 /// dependencies and `faber.lock` interface roots when present.
-pub(crate) fn library_resolver_for_package(
+pub fn library_resolver_for_package(
     config: &radix::module::driver::Config,
     package_root: &std::path::Path,
 ) -> Result<LibraryResolver, Vec<Diagnostic>> {

@@ -257,7 +257,7 @@ pub(crate) fn manifest_check_section(input: &Path) -> Option<ManifestCheck> {
 /// default `auto`. An unsupported spelling fails closed with a structured
 /// diagnostic (never silently ignored).
 #[cfg(feature = "runner")]
-pub(crate) fn manifest_backend_selection(
+pub fn manifest_backend_selection(
     backend: Option<&str>,
     path: &Path,
 ) -> Result<Option<DeviceSelection>, Box<Diagnostic>> {

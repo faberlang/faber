@@ -47,7 +47,7 @@ use bin_runner::write_fmir_bin_runner;
 /// moved compiler subset needs enters as an explicit function — no ambient
 /// reads inside `radix-program`.
 #[cfg(feature = "runner")]
-pub(crate) fn faber_mir_seams() -> radix::program::mir::MirSeams {
+pub fn faber_mir_seams() -> radix::program::mir::MirSeams {
     radix::program::mir::MirSeams {
         analysis: super::faber_analysis_seams(),
         executed_lane_target: super::executed_lane_analysis_target,
@@ -296,7 +296,7 @@ pub(crate) fn with_interpreted_lowered_package_mir<R>(
 /// Link an already-analyzed package test scope once, then lend its validated
 /// MIR and original test-function identity map to the runner consumer.
 #[cfg(feature = "runner")]
-pub(crate) fn with_linked_test_package_mir<R>(
+pub fn with_linked_test_package_mir<R>(
     package: radix::program::analyze::AnalyzedProgram,
     scope: &radix::program::mir::TestPackageScope,
     config: &Config,

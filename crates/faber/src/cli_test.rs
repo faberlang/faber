@@ -940,7 +940,7 @@ fn verify_library_missing_manifest_names_sought_faber_toml_path() {
     ));
     std::fs::create_dir_all(&dir).expect("create manifest-less dir");
     let sought = dir.join("faber.toml");
-    let diagnostics = crate::package::verify_library_bindings(&dir, "rust")
+    let diagnostics = faber_cli::package::verify_library_bindings(&dir, "rust")
         .expect_err("manifest-less dir must fail at faber.toml");
     std::fs::remove_dir_all(&dir).ok();
 

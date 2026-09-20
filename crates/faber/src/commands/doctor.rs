@@ -6,7 +6,7 @@
 use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
 
-use crate::library::{
+use faber_cli::library::{
     KNOWN_LIBRARIES, LibraryAvailability, LibraryHomeSource, LibraryRootRule, library_availability,
     library_root_rule, resolved_library_home, specifier_identity,
 };
@@ -105,7 +105,7 @@ fn library_row(library_home: Option<&Path>, name: &str) -> DoctorLibraryRow {
 }
 
 fn interface_root_for_faber_checkout(provider_repo: &Path) -> Option<PathBuf> {
-    let spec = crate::package::discover_package(provider_repo).ok()?;
+    let spec = faber_cli::package::discover_package(provider_repo).ok()?;
     Some(spec.source_root)
 }
 

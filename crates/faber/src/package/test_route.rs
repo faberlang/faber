@@ -28,7 +28,7 @@ const MAX_DESCENT_NAMES: usize = 24;
 /// A named `.proba` file replaces `--include` so the package route cannot
 /// walk sibling suites. `--exclude` is preserved. Directory / package-root
 /// inputs keep the caller's include/exclude as given.
-pub(crate) fn test_source_filter_for_input(
+pub fn test_source_filter_for_input(
     input: &Path,
     include: Vec<String>,
     exclude: Vec<String>,
@@ -51,7 +51,7 @@ pub(crate) fn test_source_filter_for_input(
 }
 
 /// Analyze a package for `faber test` with auto-filter and a wall-clock budget.
-pub(crate) fn analyze_package_for_tests(
+pub fn analyze_package_for_tests(
     config: &Config,
     input: &Path,
     proba_filter: Option<&TestSourceFilter>,

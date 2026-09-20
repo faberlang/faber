@@ -20,7 +20,7 @@
 //! - `histogram[]`: `class`, `count`
 
 use crate::cli::CostArgs;
-use crate::package;
+use faber_cli::package;
 use radix::module::codegen::Target;
 use radix::module::diagnostics::Diagnostic;
 use radix_mir::{
