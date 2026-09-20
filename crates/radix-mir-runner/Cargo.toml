@@ -8,6 +8,7 @@ publish = false
 
 [dependencies]
 handroll = { path = "../handroll" }
+radix-codegen-shared = { path = "../radix-codegen-shared" }
 radix-hir = { path = "../radix-hir" }
 radix-lexer = { path = "../radix-lexer" }
 radix-mir = { path = "../radix-mir" }

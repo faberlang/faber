@@ -29,7 +29,6 @@ use radix_mir::MirClosureEnvironmentId;
 use radix_mir::{MirBinOp, MirFunctionId};
 use radix_runtime_contract::display::{display_bivalens, display_fractus, display_text_payload};
 use radix_runtime_contract::instans::Instans;
-use radix_runtime_contract::{D32_SCALE, D64_SCALE};
 use radix_types::NumericWidth;
 use rustc_hash::{FxHashMap, FxHashSet};
 use std::cell::RefCell;
@@ -586,51 +585,13 @@ pub fn int_width_range(width: NumericWidth) -> (i128, i128) {
     }
 }
 
-/// Decimal scale as an integer factor (`d32 = 10^7`, `d64 = 10^9`).
-///
-/// The decimal runner stores the scaled integer in the ordinary `Value::Int`
-/// carrier. Keeping the factor here, next to the width bounds, makes every
-/// arithmetic path use the same representation contract.
-#[must_use]
-pub(crate) fn decimal_scale_factor(width: NumericWidth) -> Option<i128> {
-    match width {
-        NumericWidth::D32 => Some(i128::from(D32_SCALE)),
-        NumericWidth::D64 => Some(i128::from(D64_SCALE)),
-        _ => None,
-    }
-}
-
-/// Pure round-half-even quotient for values whose intermediate arithmetic has
-/// already been checked. Rust integer division truncates toward zero, so the
-/// remainder decides whether the quotient moves away from zero. A midpoint
-/// moves only when the truncated quotient is odd.
-#[must_use]
-pub(crate) fn round_half_even_quotient(numerator: i128, denominator: i128) -> Option<i128> {
-    if denominator == 0 {
-        return None;
-    }
-    let quotient = numerator / denominator;
-    let remainder = numerator % denominator;
-    if remainder == 0 {
-        return Some(quotient);
-    }
-
-    let remainder_abs = remainder.unsigned_abs();
-    let denominator_abs = denominator.unsigned_abs();
-    let twice_remainder = remainder_abs.checked_mul(2)?;
-    let rounds = twice_remainder > denominator_abs
-        || (twice_remainder == denominator_abs && quotient % 2 != 0);
-    if !rounds {
-        return Some(quotient);
-    }
-
-    let step = if (numerator < 0) == (denominator < 0) {
-        1
-    } else {
-        -1
-    };
-    quotient.checked_add(step)
-}
+// S07-12: the runner carries no local decimal carrier math. The scale factor
+// and the pure round-half-even quotient are `radix_codegen_shared::decimal`'s
+// — the one copy every tier (literal folding, emitted runtime code, this
+// runner) computes through. Re-exported here so `conversio` and the decimal
+// tests keep their `crate::value` import paths.
+pub(crate) use radix_codegen_shared::decimal::decimal_scale_factor;
+pub(crate) use radix_codegen_shared::decimal::round_half_even_quotient;
 
 /// Checked round-half-even division with the runner's standard arithmetic
 /// diagnostics. Decimal parsing uses the pure quotient helper so it can
