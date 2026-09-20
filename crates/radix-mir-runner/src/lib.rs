@@ -2189,6 +2189,10 @@ mod value_test;
 mod decimal_test;
 
 #[cfg(test)]
+#[path = "decimal_shared_agreement_test.rs"]
+mod decimal_shared_agreement_test;
+
+#[cfg(test)]
 #[cfg(test)]
 #[path = "extremum_test.rs"]
 mod extremum_test;

@@ -1214,42 +1214,24 @@ fn decimal_widen_carrier(
 }
 
 fn decimal_text_to_carrier(text: &str, width: NumericWidth) -> Result<i64, DecimalTextError> {
-    let (negative, digits) = match text.strip_prefix('-') {
-        Some(digits) => (true, digits),
-        None => (false, text.strip_prefix('+').unwrap_or(text)),
+    // S07-12: the carrier math lives only in `radix_codegen_shared::decimal`.
+    // The shared tier reports every failure as `None`; the runner's boundary
+    // keeps its two recoverable messages distinct (SA-002) — malformed digit
+    // text vs a carrier the width cannot hold — by asking the shared parse
+    // oracle (`radix_types`) whether the text was well formed, never by
+    // re-computing the carrier.
+    if let Some(carrier) = radix_codegen_shared::decimal::decimal_text_to_carrier(text, width) {
+        return Ok(carrier);
+    }
+    let digits = match text.strip_prefix('-') {
+        Some(digits) => digits,
+        None => text.strip_prefix('+').unwrap_or(text),
     };
-    let Some((mantissa, exponent)) = radix_types::numeric_width::decimal_text_to_scaled(digits)
-    else {
-        return Err(DecimalTextError::Invalid);
-    };
-    let mantissa = if negative { -mantissa } else { mantissa };
-    let scale_digits = width.decimal_scale().ok_or(DecimalTextError::OutOfRange)?;
-    let shift = exponent
-        .checked_add(i32::try_from(scale_digits).unwrap_or(i32::MAX))
-        .ok_or(DecimalTextError::OutOfRange)?;
-    let carrier = if shift >= 0 {
-        let factor = 10_i128
-            .checked_pow(u32::try_from(shift).map_err(|_| DecimalTextError::OutOfRange)?)
-            .ok_or(DecimalTextError::OutOfRange)?;
-        mantissa
-            .checked_mul(factor)
-            .ok_or(DecimalTextError::OutOfRange)?
+    if radix_types::numeric_width::decimal_text_to_scaled(digits).is_some() {
+        Err(DecimalTextError::OutOfRange)
     } else {
-        let Some(power) = shift
-            .checked_neg()
-            .and_then(|power| u32::try_from(power).ok())
-        else {
-            return Ok(0);
-        };
-        let Some(divisor) = 10_i128.checked_pow(power) else {
-            // The parsed mantissa fits i128, so a decimal denominator beyond
-            // i128 cannot produce a non-zero rounded carrier.
-            return Ok(0);
-        };
-        super::super::value::round_half_even_quotient(mantissa, divisor)
-            .ok_or(DecimalTextError::OutOfRange)?
-    };
-    decimal_carrier_from_raw(carrier, width)
+        Err(DecimalTextError::Invalid)
+    }
 }
 
 fn format_decimal_carrier(value: i64, width: NumericWidth) -> String {

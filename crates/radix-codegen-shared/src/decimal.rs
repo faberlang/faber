@@ -63,12 +63,6 @@ pub fn round_half_even_quotient(numerator: i128, denominator: i128) -> Option<i1
     quotient.checked_add(step)
 }
 
-/// Checked i128 multiplication that reports overflow through `None`.
-#[must_use]
-pub fn checked_mul(left: i128, right: i128) -> Option<i128> {
-    left.checked_mul(right)
-}
-
 /// Convert decimal digit text into the scaled carrier for `width`, mirroring
 /// the MIR runner's `decimal_text_to_carrier` exactly (round-half-even when the
 /// text has more fractional digits than the width scale).
