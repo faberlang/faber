@@ -353,6 +353,7 @@ fn prove_linked_bodies() {
             let interner = validated
                 .validation()
                 .interner
+                .as_interner()
                 .expect("linked test MIR has an interner");
             let leftover = validated
                 .program()

@@ -154,8 +154,10 @@ impl Validator<'_, '_> {
                 let (element_ty, expected_len) =
                     if let Type::Matrix(inner, shape) = self.type_kind(aggregate.ty).clone() {
                         let expected_len = if let Some((rows, columns)) =
-                            crate::matrix_shape::literal_matrix_shape(shape, self.context.types)
-                        {
+                            crate::matrix_shape::literal_matrix_shape(
+                                shape,
+                                self.context.types.as_table(),
+                            ) {
                             Some(usize::from(rows) * usize::from(columns))
                         } else {
                             self.error(span, "matrix aggregate shape is not literal");

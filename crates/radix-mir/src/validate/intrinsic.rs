@@ -2244,7 +2244,7 @@ impl Validator<'_, '_> {
     ) {
         let source = source_ty.semantic_id();
         let target = target_ty.semantic_id();
-        if validate_lista_to_tensor_source(source, target, self.context.types).is_ok() {
+        if validate_lista_to_tensor_source(source, target, self.context.types.as_table()).is_ok() {
             self.error(
                 span,
                 "eligible lista-to-tensor conversio must lower to tensor_from_flat, not runtime convert",

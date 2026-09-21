@@ -101,7 +101,7 @@ kind = "bin"
 /// sibling's nominal def was interned as-is, producing a second (coincident)
 /// TypeId; the canonical remap collapses same-nominal references to one.
 fn count_merged_nominals(lowered: &LoweredMirUnit<'_>, kind: &str) -> usize {
-    let types = lowered.validated.validation().types;
+    let types = lowered.validated.validation().types.as_table();
     let validation = lowered.validated.validation();
     let mut seen = std::collections::HashSet::new();
     for index in 0..types.type_count() {

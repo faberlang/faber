@@ -814,7 +814,7 @@ impl<'a> KernelBuilder<'a> {
             let synthetic = decomposition.subchain_function(
                 function,
                 subchain_index,
-                subchain_validation.types,
+                subchain_validation.types.as_table(),
             );
             let contract =
                 collection_op_contract(&synthetic, &subchain_validation).map_err(|error| {

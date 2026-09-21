@@ -574,8 +574,11 @@ fn forward_and_backward_kernels_share_one_program_without_tape() {
     let subchain_validation = validation.with_types(&subchain_types);
     let mut synthetics = Vec::new();
     for position in 0..decomposition.subchains.len() {
-        let mut synthetic =
-            decomposition.subchain_function(&companion, position, subchain_validation.types);
+        let mut synthetic = decomposition.subchain_function(
+            &companion,
+            position,
+            subchain_validation.types.as_table(),
+        );
         if matches!(
             synthetic.blocks[0].terminator.kind,
             MirTerminatorKind::Return(None)

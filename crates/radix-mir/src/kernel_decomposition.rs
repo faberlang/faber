@@ -462,8 +462,14 @@ pub fn decompose_kernel_function_with_limit(
     let mut recipe_results: Vec<Option<MirLocalId>> = Vec::new();
     for (position, indices) in slices.iter().enumerate() {
         let is_last = position + 1 == slices.len();
-        let mut synthetic =
-            build_subchain_function(function, indices, &[], is_last, false, validation.types);
+        let mut synthetic = build_subchain_function(
+            function,
+            indices,
+            &[],
+            is_last,
+            false,
+            validation.types.as_table(),
+        );
         // The S3-A5 dead filter resolves reads against the SOURCE function
         // (the subchain's produced local is consumed by a later subchain,
         // invisible inside the slice itself).
@@ -486,7 +492,7 @@ pub fn decompose_kernel_function_with_limit(
                     &[],
                     is_last,
                     true,
-                    validation.types,
+                    validation.types.as_table(),
                 );
                 plan_elementwise(&synthetic, validation).ok()
             }

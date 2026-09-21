@@ -2136,7 +2136,14 @@ main {
         &entry,
         |lowered| {
             assert!(!lowered.validated.program().functions.is_empty());
-            assert!(lowered.validated.validation().interner.is_some());
+            assert!(
+                lowered
+                    .validated
+                    .validation()
+                    .interner
+                    .as_interner()
+                    .is_some()
+            );
             true
         },
     )
@@ -2164,6 +2171,7 @@ fn assert_package_corpus_llvm_smoke(relative: &str, label: &str) {
             .validated
             .validation()
             .interner
+            .as_interner()
             .expect("package MIR carries interner");
         radix::module::mir::emit_llvm_text_probe(radix::module::mir::LlvmEmitRequest::new(
             &lowered.validated,

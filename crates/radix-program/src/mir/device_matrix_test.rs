@@ -218,7 +218,9 @@ fn imported_twin_instance_records_key_route_registration_and_visibility() {
                 .key
                 .shape_args
                 .iter()
-                .filter_map(|index| literal_shape(lowered.validated.validation().types, *index))
+                .filter_map(|index| {
+                    literal_shape(lowered.validated.validation().types.as_table(), *index)
+                })
                 .collect::<Vec<_>>();
             assert_eq!(
                 shapes,

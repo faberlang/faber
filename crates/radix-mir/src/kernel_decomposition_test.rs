@@ -1439,8 +1439,11 @@ fn oversized_elementwise_body_splits_within_the_buffer_budget() {
             CollectionKernelPlan::Elementwise,
             "every split sub-slice stays elementwise-only"
         );
-        let synthetic =
-            decomposition.subchain_function(&function, position, subchain_validation.types);
+        let synthetic = decomposition.subchain_function(
+            &function,
+            position,
+            subchain_validation.types.as_table(),
+        );
         let outputs = if position + 1 == subchain_count {
             // The temp-based return keeps the source assembly: the signature
             // binds the FULL result-tuple count.

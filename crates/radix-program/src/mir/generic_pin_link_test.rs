@@ -89,7 +89,7 @@ fn literal_dims(
 
 /// The instantiated `gather` imported at the concrete `[3, 4]` signature.
 fn gather_instance<'a>(lowered: &'a LoweredMirUnit<'_>) -> &'a radix_module::mir::MirFunction {
-    let types = lowered.validated.validation().types;
+    let types = lowered.validated.validation().types.as_table();
     lowered
         .validated
         .program()

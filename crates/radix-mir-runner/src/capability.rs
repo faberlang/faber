@@ -118,8 +118,8 @@ pub fn classify_runner_lowerability(validated: &ValidatedMir<'_>) -> Lowerabilit
     // WHY: entry-function absence is the first rejection site in `run_entry`.
     // Structural classification must mirror it so the structural tier never
     // approves a program the run tier rejects for lacking an incipit.
-    if let Some(interner) = validation.interner {
-        let names = MirNames::new(program, validation.types, interner);
+    if let Some(interner) = validation.interner.as_interner() {
+        let names = MirNames::new(program, validation.types.as_table(), interner);
         if names.explicit_entry_function().is_none() {
             push_gap(
                 &mut gaps,
@@ -135,7 +135,12 @@ pub fn classify_runner_lowerability(validated: &ValidatedMir<'_>) -> Lowerabilit
     for function in &program.functions {
         for block in &function.blocks {
             for statement in &block.statements {
-                classify_statement(&statement.kind, validation.interner, &mut gaps, &mut seen);
+                classify_statement(
+                    &statement.kind,
+                    validation.interner.as_interner(),
+                    &mut gaps,
+                    &mut seen,
+                );
             }
             classify_terminator(&block.terminator.kind, &mut gaps, &mut seen);
         }

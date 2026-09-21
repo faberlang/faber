@@ -66,6 +66,79 @@ pub enum MirEnumRepresentation {
     },
 }
 
+/// Borrowed-or-owned type-table storage for [`MirValidationContext`].
+///
+/// Most contexts borrow the analyzed unit's table ([`Self::Borrowed`]).
+/// Phases that legitimately extend the arena after analysis — MIR
+/// monomorphization's shape finalization and AIR backward shape
+/// finalization — clone the table once, intern into the clone, and hand it
+/// to the context as [`Self::Owned`], so the validation token carries its
+/// own table for as long as it lives instead of borrowing a table some
+/// phase would have to leak.
+///
+/// The variant dereferences to [`TypeTable`], so existing `types.get(…)`
+/// style reads are unchanged; reads that need the reference itself use
+/// [`Self::as_table`].
+#[derive(Clone)]
+pub enum MirTypeTable<'a> {
+    /// Table borrowed from the phase that owns it (the analyzed unit or a
+    /// test fixture).
+    Borrowed(&'a TypeTable),
+    /// Table owned by the validation context — the post-analysis extension
+    /// path (lowering-owned type arena). Shared ownership: cloning the
+    /// context shares the table, and the last drop frees it, so the token's
+    /// table is bounded without any phase leaking one.
+    Owned(std::sync::Arc<TypeTable>),
+}
+
+impl MirTypeTable<'_> {
+    /// The table reference, regardless of storage.
+    #[must_use]
+    pub fn as_table(&self) -> &TypeTable {
+        match self {
+            Self::Borrowed(table) => table,
+            Self::Owned(table) => table,
+        }
+    }
+}
+
+impl std::ops::Deref for MirTypeTable<'_> {
+    type Target = TypeTable;
+
+    fn deref(&self) -> &TypeTable {
+        self.as_table()
+    }
+}
+
+/// Borrowed, owned, or absent interner storage for [`MirValidationContext`].
+///
+/// Mirrors [`MirTypeTable`]: most contexts borrow the analyzed unit's
+/// interner; the lowering path hands the context the lowering-owned interner
+/// clone (which carries the runtime/diagnostic symbols lowering interns) as
+/// [`Self::Owned`], so tokens that escape lowering resolve every symbol their
+/// MIR references without any phase leaking an interner.
+#[derive(Clone)]
+pub enum MirInterner<'a> {
+    /// No interner carried (contexts built from bare type tables).
+    Absent,
+    /// Interner borrowed from the phase that owns it.
+    Borrowed(&'a Interner),
+    /// Interner owned by the validation context.
+    Owned(std::sync::Arc<Interner>),
+}
+
+impl MirInterner<'_> {
+    /// The interner reference, or `None` when absent.
+    #[must_use]
+    pub fn as_interner(&self) -> Option<&Interner> {
+        match self {
+            Self::Absent => None,
+            Self::Borrowed(interner) => Some(*interner),
+            Self::Owned(interner) => Some(interner.as_ref()),
+        }
+    }
+}
+
 /// Metadata needed to validate MIR against the semantic world it was lowered from.
 ///
 /// `types` is authoritative for assignability and primitive IDs. Function and
@@ -73,9 +146,9 @@ pub enum MirEnumRepresentation {
 /// only carries `DefId`s and symbols.
 #[derive(Clone)]
 pub struct MirValidationContext<'a> {
-    pub types: &'a TypeTable,
+    pub types: MirTypeTable<'a>,
     pub layouts: MirLayoutTable,
-    pub interner: Option<&'a Interner>,
+    pub interner: MirInterner<'a>,
     pub functions: FxHashMap<DefId, MirFunctionSignature>,
     pub external_function_identities: FxHashMap<DefId, MirExternalFunctionIdentity>,
     /// Current package product identity (package-aware compiles only).
@@ -109,9 +182,9 @@ impl<'a> MirValidationContext<'a> {
     #[must_use]
     pub fn new(types: &'a TypeTable) -> Self {
         Self {
-            types,
+            types: MirTypeTable::Borrowed(types),
             layouts: MirLayoutTable::from_types(types),
-            interner: None,
+            interner: MirInterner::Absent,
             functions: FxHashMap::default(),
             external_function_identities: FxHashMap::default(),
             package_product: None,
@@ -158,7 +231,7 @@ impl<'a> MirValidationContext<'a> {
         'a: 'b,
     {
         let mut context = MirValidationContext::<'b>::new(types);
-        context.interner = self.interner;
+        context.interner = self.interner.clone();
         context.functions.clone_from(&self.functions);
         context
             .external_function_identities
@@ -192,6 +265,63 @@ impl<'a> MirValidationContext<'a> {
             .closure_environments
             .clone_from(&self.closure_environments);
         context
+    }
+
+    /// Consume this context and rehome its metadata onto a table it owns.
+    ///
+    /// This is the owned-table counterpart of [`Self::with_types`] for the
+    /// phases that extend the type arena after analysis: they clone the
+    /// analyzed table, intern their synthesized shapes into the clone
+    /// (monomorphization shape finalization, AIR backward shape
+    /// finalization), then hand the clone here. Every other typed fact moves
+    /// with the context — no re-clone — and layouts are rebuilt against the
+    /// owned table so freshly interned types resolve exactly like the
+    /// originals. The returned context carries its own table; no caller
+    /// needs to leak one for the compilation lifetime.
+    #[must_use]
+    pub fn with_owned_types(self, types: TypeTable) -> Self {
+        let Self {
+            interner,
+            functions,
+            external_function_identities,
+            package_product,
+            struct_fields,
+            struct_type_params,
+            enum_type_params,
+            optional_struct_fields,
+            nullable_struct_fields,
+            opaque_structs,
+            json_struct_field_keys,
+            variant_parents,
+            enum_variants,
+            variant_positions,
+            variant_fields,
+            scalar_value_domains,
+            closure_environments,
+            ..
+        } = self;
+        let layouts = MirLayoutTable::from_types(&types);
+        Self {
+            types: MirTypeTable::Owned(std::sync::Arc::new(types)),
+            layouts,
+            interner,
+            functions,
+            external_function_identities,
+            package_product,
+            struct_fields,
+            struct_type_params,
+            enum_type_params,
+            optional_struct_fields,
+            nullable_struct_fields,
+            opaque_structs,
+            json_struct_field_keys,
+            variant_parents,
+            enum_variants,
+            variant_positions,
+            variant_fields,
+            scalar_value_domains,
+            closure_environments,
+        }
     }
 
     #[must_use]
@@ -259,7 +389,7 @@ impl<'a> MirValidationContext<'a> {
                 .iter()
                 .map(|(field, field_ty)| {
                     instantiate_existing_generic_type(
-                        self.types,
+                        self.types.as_table(),
                         *field_ty,
                         &bindings,
                         Span::default(),

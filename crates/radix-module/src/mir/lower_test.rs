@@ -4976,7 +4976,7 @@ incipit {
             .count(),
         1
     );
-    let types = lowered.validated.validation().types;
+    let types = lowered.validated.validation().types.as_table();
     assert!(
         lowered
             .validated
@@ -5121,7 +5121,7 @@ incipit {
         .iter()
         .find(|function| function.id == instance_id)
         .expect("monomorphized instance exists");
-    let types = lowered.validated.validation().types;
+    let types = lowered.validated.validation().types.as_table();
     assert!(
         instance
             .params
@@ -5281,7 +5281,10 @@ incipit {
     let mut instances_per_source = std::collections::HashMap::new();
     for monomorphization in &lowered.monomorphizations {
         assert_eq!(monomorphization.key.shape_args.len(), 1);
-        assert_literal_shape_arg(lowered.validated.validation().types, monomorphization.key.shape_args[0]);
+        assert_literal_shape_arg(
+            lowered.validated.validation().types.as_table(),
+            monomorphization.key.shape_args[0],
+        );
         *instances_per_source
             .entry(monomorphization.key.source)
             .or_insert(0usize) += 1;
@@ -5318,7 +5321,10 @@ incipit {
     assert_eq!(lowered.monomorphizations.len(), 2);
     for monomorphization in &lowered.monomorphizations {
         assert_eq!(monomorphization.key.shape_args.len(), 1);
-        assert_literal_shape_arg(lowered.validated.validation().types, monomorphization.key.shape_args[0]);
+        assert_literal_shape_arg(
+            lowered.validated.validation().types.as_table(),
+            monomorphization.key.shape_args[0],
+        );
     }
     assert!(
         lowered
@@ -5418,7 +5424,7 @@ functio copy(tf32[4] input, tf32[4] output) → vacuum {
         .find(|param| param.mode == MirParamMode::Lane)
         .expect("lane is a synthetic MIR parameter");
     assert_eq!(lowered.interner.resolve(lane.name.expect("lane name")), "pos");
-    let types = lowered.validated.validation().types;
+    let types = lowered.validated.validation().types.as_table();
     let u32_ty = types
         .find_sized_numeric(Primitive::Numerus, NumericWidth::U32)
         .expect("u32 lane type is interned");

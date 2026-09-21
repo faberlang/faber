@@ -169,7 +169,7 @@ fn source_nominal_defs(source: &radix_module::mir::MirValidationContext<'_>) -> 
     let mut defs: Vec<DefId> = source.struct_fields.keys().copied().collect();
     defs.extend(source.enum_variants.keys().copied());
     defs.extend(source.variant_parents.values().copied());
-    defs.extend(program_nominal_defs_from_types(source.types));
+    defs.extend(program_nominal_defs_from_types(source.types.as_table()));
     defs.sort_by_key(|def| def.0);
     defs.dedup();
     defs
@@ -889,12 +889,12 @@ pub(super) fn lower_package_units<'a>(
         let mut def_remap = nominal_def_remap.clone();
         def_remap.extend(variant_remap.iter().map(|(key, dest)| (*key, *dest)));
         let param_symbols = super::intern_param_symbols(
-            lowered.validated.validation().types,
+            lowered.validated.validation().types.as_table(),
             &lowered.interner,
             &mut entry.analysis.interner,
         );
         let record_field_symbols = super::intern_record_field_symbols(
-            lowered.validated.validation().types,
+            lowered.validated.validation().types.as_table(),
             &lowered.interner,
             &mut entry.analysis.interner,
         );
@@ -908,14 +908,14 @@ pub(super) fn lower_package_units<'a>(
                 record_field_symbols: &record_field_symbols,
             };
             import_lowered_semantic_types(
-                lowered.validated.validation().types,
+                lowered.validated.validation().types.as_table(),
                 &mut entry.analysis.types,
                 Some(&nominal),
             )
         };
         record_shared_nominals(
             &source_names,
-            lowered.validated.validation().types,
+            lowered.validated.validation().types.as_table(),
             &source_to_entry_types,
             &mut shared_nominals,
         );
@@ -1101,7 +1101,7 @@ pub(super) fn lower_package_units<'a>(
                         }
                     };
                 if let Some(bundle) = bundle {
-                    lowered = match super::air_backward::apply(lowered, bundle, no_fuse) {
+                    lowered = match super::air_backward::apply(lowered, bundle, analysis, no_fuse) {
                         Ok(lowered) => lowered,
                         Err(message) => {
                             diagnostics.push(mir_lowering_diag(&library.path, message));
@@ -1131,12 +1131,12 @@ pub(super) fn lower_package_units<'a>(
                 let mut def_remap = nominal_def_remap.clone();
                 def_remap.extend(variant_remap.iter().map(|(key, dest)| (*key, *dest)));
                 let param_symbols = super::intern_param_symbols(
-                    lowered.validated.validation().types,
+                    lowered.validated.validation().types.as_table(),
                     &lowered.interner,
                     &mut entry.analysis.interner,
                 );
                 let record_field_symbols = super::intern_record_field_symbols(
-                    lowered.validated.validation().types,
+                    lowered.validated.validation().types.as_table(),
                     &lowered.interner,
                     &mut entry.analysis.interner,
                 );
@@ -1150,14 +1150,14 @@ pub(super) fn lower_package_units<'a>(
                         record_field_symbols: &record_field_symbols,
                     };
                     import_lowered_semantic_types(
-                        lowered.validated.validation().types,
+                        lowered.validated.validation().types.as_table(),
                         &mut entry.analysis.types,
                         Some(&nominal),
                     )
                 };
                 record_shared_nominals(
                     &source_names,
-                    lowered.validated.validation().types,
+                    lowered.validated.validation().types.as_table(),
                     &source_to_entry_types,
                     &mut shared_nominals,
                 );
@@ -2337,10 +2337,9 @@ fn remap_lowered_program_text_symbols<'a>(
         });
         let remapped_types = TypeTable::from_snapshot(snapshot)
             .map_err(|message| vec![mir_lowering_diag(diagnostic_path, message)])?;
-        let remapped_types: &'static TypeTable = Box::leak(Box::new(remapped_types));
-        context = context.with_types(remapped_types);
+        context = context.with_owned_types(remapped_types);
     }
-    context.interner = Some(Box::leak(Box::new(target.clone())));
+    context.interner = radix_module::mir::MirInterner::Owned(std::sync::Arc::new(target.clone()));
     context.closure_environments = lowered
         .closure_environments
         .iter()
@@ -2919,13 +2918,13 @@ pub(super) fn install_cli_dispatch_entry<'a>(
     command: MirFunctionId,
     entry_path: &Path,
 ) -> Result<LoweredMirUnit<'a>, Vec<Diagnostic>> {
-    let types = lowered.validated.validation().types;
+    let types = lowered.validated.validation().types.clone();
     lowered
         .patch_program(|program| {
             let Some(entry_index) = program
                 .functions
                 .iter()
-                .position(|function| is_explicit_entry_function(function, types))
+                .position(|function| is_explicit_entry_function(function, &types))
             else {
                 return Err(vec![mir_diag(
                     entry_path,
@@ -2988,7 +2987,7 @@ pub(super) fn lower_unit<'a>(
             .cloned()
             .unwrap_or_default();
         lower_analyzed_unit(
-            &mut unit.analysis,
+            &unit.analysis,
             radix_module::mir::MirLoweringOptions {
                 cli_record_fields_by_local: std::sync::Arc::new(fields.into_iter().collect()),
                 ..Default::default()
@@ -2996,7 +2995,7 @@ pub(super) fn lower_unit<'a>(
         )
     } else {
         lower_analyzed_unit(
-            &mut unit.analysis,
+            &unit.analysis,
             radix_module::mir::MirLoweringOptions::default(),
         )
     };
@@ -3008,7 +3007,7 @@ pub(super) fn lower_unit<'a>(
     })?;
 
     if let Some(bundle) = bundle {
-        lowered = super::air_backward::apply(lowered, bundle, no_fuse)
+        lowered = super::air_backward::apply(lowered, bundle, &unit.analysis, no_fuse)
             .map_err(|message| vec![mir_lowering_diag(&unit.path, message)])?;
     }
 

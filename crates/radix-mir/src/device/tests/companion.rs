@@ -158,8 +158,11 @@ fn decomposed_mlp_companion_six_tuple_passes_target_entry_gate() {
     let subchain_validation = validation.with_types(&subchain_types);
     let mut synthetics = Vec::new();
     for position in 0..decomposition.subchains.len() {
-        let mut synthetic =
-            decomposition.subchain_function(&function, position, subchain_validation.types);
+        let mut synthetic = decomposition.subchain_function(
+            &function,
+            position,
+            subchain_validation.types.as_table(),
+        );
         // The CUDA artifact's Vacuum override for `Return(None)` synthetics.
         if matches!(
             synthetic.blocks[0].terminator.kind,
@@ -311,8 +314,11 @@ fn decomposed_companion_result_tuple_in_temp_passes_target_entry_gate() {
     let subchain_validation = validation.with_types(&subchain_types);
     let mut synthetics = Vec::new();
     for position in 0..decomposition.subchains.len() {
-        let mut synthetic =
-            decomposition.subchain_function(&function, position, subchain_validation.types);
+        let mut synthetic = decomposition.subchain_function(
+            &function,
+            position,
+            subchain_validation.types.as_table(),
+        );
         // The CUDA artifact's Vacuum override for `Return(None)` synthetics.
         if matches!(
             synthetic.blocks[0].terminator.kind,

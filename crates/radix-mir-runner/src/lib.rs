@@ -313,13 +313,13 @@ pub fn run_entry<H: Host + ?Sized>(
 ) -> Result<(), Vec<RunnerError>> {
     let context = validated.validation();
     let program = validated.program();
-    let interner = context.interner.ok_or_else(|| {
+    let interner = context.interner.as_interner().ok_or_else(|| {
         vec![RunnerError::internal(
             Span::default(),
             "runner requires interner context",
         )]
     })?;
-    let names = radix_mir::names::MirNames::new(program, context.types, interner);
+    let names = radix_mir::names::MirNames::new(program, context.types.as_table(), interner);
     let Some(entry) = names.explicit_entry_function() else {
         return Err(vec![RunnerError::internal(
             Span::default(),
@@ -345,13 +345,13 @@ pub fn run_entry_with_stats<H: Host + ?Sized>(
 ) -> Result<RunnerRunOutcome, Vec<RunnerError>> {
     let context = validated.validation();
     let program = validated.program();
-    let interner = context.interner.ok_or_else(|| {
+    let interner = context.interner.as_interner().ok_or_else(|| {
         vec![RunnerError::internal(
             Span::default(),
             "runner requires interner context",
         )]
     })?;
-    let names = radix_mir::names::MirNames::new(program, context.types, interner);
+    let names = radix_mir::names::MirNames::new(program, context.types.as_table(), interner);
     let Some(entry) = names.explicit_entry_function() else {
         return Err(vec![RunnerError::internal(
             Span::default(),
@@ -536,7 +536,7 @@ fn run_function_with_explicit_limits_and_stats<H: Host + ?Sized>(
 ) -> Result<RunnerRunOutcome, Vec<RunnerError>> {
     let context = validated.validation();
     let program = validated.program();
-    let interner = context.interner.ok_or_else(|| {
+    let interner = context.interner.as_interner().ok_or_else(|| {
         vec![RunnerError::internal(
             Span::default(),
             "runner requires interner context",
@@ -554,12 +554,12 @@ fn run_function_with_explicit_limits_and_stats<H: Host + ?Sized>(
         return Err(vec![kernel_refused(function.span)]);
     }
     if let Some((function, reason)) = program.functions.iter().find_map(|function| {
-        function_unsupported_bounded_carrier(function, context.types)
+        function_unsupported_bounded_carrier(function, context.types.as_table())
             .map(|reason| (function, reason))
     }) {
         return Err(vec![RunnerError::unsupported(function.span, reason)]);
     }
-    let mut runner = Runner::new(program, context, context.types, interner, host);
+    let mut runner = Runner::new(program, context, context.types.as_table(), interner, host);
     runner.step_limit = step_limit;
     runner.deadline = deadline;
     if collect_stats {

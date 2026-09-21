@@ -114,7 +114,7 @@ struct MonomorphizationState<'lowerer, 'unit> {
 
 impl<'lowerer, 'unit> MonomorphizationState<'lowerer, 'unit> {
     fn new(lowerer: &'lowerer mut MirLowerer<'unit>) -> Self {
-        let generic_param_order = generic_param_order(lowerer.unit);
+        let generic_param_order = generic_param_order(&lowerer.unit.hir);
         let struct_fields = lowerer
             .struct_field_types
             .take()
@@ -512,7 +512,7 @@ impl<'lowerer, 'unit> MonomorphizationState<'lowerer, 'unit> {
             return None;
         };
         let sym = *sym;
-        radix_types::parse_natural_capacity(self.lowerer.unit.interner.resolve(sym))
+        radix_types::parse_natural_capacity(self.lowerer.interner.resolve(sym))
     }
 
     /// Index witness of an explicit magnitudo argument: a NATURAL spelling
@@ -914,7 +914,7 @@ impl<'lowerer, 'unit> MonomorphizationState<'lowerer, 'unit> {
                         .unit
                         .types
                         .find_sized_numeric(Primitive::Numerus, crate::semantic::NumericWidth::U64)
-                        .unwrap_or_else(|| self.lowerer.unit.types.primitive(Primitive::Numerus)),
+                        .unwrap_or_else(|| self.lowerer.types.primitive(Primitive::Numerus)),
                 ));
             }
             MirConstant::Float(_) => Primitive::Fractus,
@@ -938,7 +938,7 @@ impl<'lowerer, 'unit> MonomorphizationState<'lowerer, 'unit> {
             // A shape-size scalar is a float-sized compile-time value.
             MirConstant::ShapeSize { .. } => Primitive::Fractus,
         };
-        Some(MirType::semantic(self.lowerer.unit.types.primitive(primitive)))
+        Some(MirType::semantic(self.lowerer.types.primitive(primitive)))
     }
 
     fn is_template_function(&self, function: &MirFunction) -> bool {
@@ -948,14 +948,14 @@ impl<'lowerer, 'unit> MonomorphizationState<'lowerer, 'unit> {
     }
 
     fn types(&self) -> &TypeTable {
-        &self.lowerer.unit.types
+        self.lowerer.types
     }
 
     fn format_ty(&self, ty: MirType) -> String {
-        crate::semantic::format_faber_type(ty.semantic_id(), self.types(), &self.lowerer.unit.interner, &|def_id| {
+        crate::semantic::format_faber_type(ty.semantic_id(), self.types(), self.lowerer.interner, &|def_id| {
             self.lowerer.unit.resolver.get_symbol(def_id).map_or_else(
                 || format!("def{}", def_id.0),
-                |symbol| self.lowerer.unit.interner.resolve(symbol.name).to_owned(),
+                |symbol| self.lowerer.interner.resolve(symbol.name).to_owned(),
             )
         })
     }
@@ -992,9 +992,9 @@ struct OrderedParam {
     kind: ParamKind,
 }
 
-fn generic_param_order(unit: &AnalyzedModule) -> FxHashMap<DefId, Vec<OrderedParam>> {
+fn generic_param_order(hir: &crate::hir::HirModule) -> FxHashMap<DefId, Vec<OrderedParam>> {
     let mut order = FxHashMap::default();
-    for item in &unit.hir.items {
+    for item in &hir.items {
         match &item.kind {
             HirItemKind::Function(function) => {
                 let params = generic_param_names(&function.type_params);
@@ -1113,11 +1113,12 @@ pub(super) fn function_by_id_mut(functions: &mut [MirFunction], id: MirFunctionI
 
 /// Concretize shape params in monomorphized instances (4A, final pass).
 ///
-/// The lowerer holds `&unit` (immutable), so shape substitution — which interns
-/// concrete shapes/types into the type arena — runs here, after the lowerer is
-/// dropped and `&mut unit.types` is available again. Each instance's shape
-/// params are bound from its key's `shape_args` (D1) and substituted to literal
-/// dims; any function still carrying a param afterwards is rejected (D6 net).
+/// Shape substitution interns the concrete shapes/types each instance carries
+/// into `types` — the lowering-owned extension arena cloned from the analyzed
+/// unit's table at the lowering entry point, so the analyzed unit's arena is
+/// never written. Each instance's shape params are bound from its key's
+/// `shape_args` (D1) and substituted to literal dims; any function still
+/// carrying a param afterwards is rejected (D6 net).
 ///
 /// Phase-4 producer fact: every `MirConstant::ShapeSize` operand/constant in
 /// an instance is also rewritten to the concrete `Float` it denotes from that
@@ -1125,14 +1126,15 @@ pub(super) fn function_by_id_mut(functions: &mut [MirFunction], id: MirFunctionI
 /// scalar that substitution could not concretize (missing/unresolved/
 /// infer/unspecified/out-of-range binding) before any backend runs.
 pub(super) fn finalize_monomorphized_shapes(
-    unit: &mut AnalyzedModule,
+    hir: &crate::hir::HirModule,
+    types: &mut TypeTable,
     functions: &mut [MirFunction],
     monomorphizations: &[MirMonomorphization],
 ) -> Vec<MirError> {
     let mut errors = Vec::new();
-    let param_order = generic_param_order(unit);
+    let param_order = generic_param_order(hir);
     let type_bindings = MirGenericBindings::default();
-    let index = ExistingTypeIndex::build(&unit.types);
+    let index = ExistingTypeIndex::build(types);
     for monomorphization in monomorphizations {
         let Some(params) = param_order.get(&monomorphization.key.source) else {
             continue;
@@ -1150,10 +1152,10 @@ pub(super) fn finalize_monomorphized_shapes(
                 shape_bindings.insert(param.name, concrete);
             }
         }
-        if !finalize_function_shapes(unit, function, &type_bindings, &shape_bindings, &index, &mut errors) {
+        if !finalize_function_shapes(types, function, &type_bindings, &shape_bindings, &index, &mut errors) {
             continue;
         }
-        if function_contains_param(&unit.types, function) {
+        if function_contains_param(types, function) {
             errors.push(MirError::validation(
                 function.span,
                 format!("function f{} contains unresolved generic type parameter", function.id.0),
@@ -1179,7 +1181,7 @@ pub(super) fn finalize_monomorphized_shapes(
 const UNRESOLVED_SHAPE_SIZE_SURVIVOR: &str = "unresolved shape-size constant survives monomorphization";
 
 fn finalize_function_shapes(
-    unit: &mut AnalyzedModule,
+    types: &mut TypeTable,
     function: &mut MirFunction,
     type_bindings: &MirGenericBindings,
     shape_bindings: &MirShapeBindings,
@@ -1188,31 +1190,31 @@ fn finalize_function_shapes(
 ) -> bool {
     let span = function.span;
     for param in &mut function.params {
-        param.ty = match finalize_type_shapes(unit, param.ty, type_bindings, shape_bindings, span, index, errors) {
+        param.ty = match finalize_type_shapes(types, param.ty, type_bindings, shape_bindings, span, index, errors) {
             Some(ty) => ty,
             None => return false,
         };
     }
     for local in &mut function.locals {
-        local.ty = match finalize_type_shapes(unit, local.ty, type_bindings, shape_bindings, span, index, errors) {
+        local.ty = match finalize_type_shapes(types, local.ty, type_bindings, shape_bindings, span, index, errors) {
             Some(ty) => ty,
             None => return false,
         };
     }
     for temp in &mut function.temps {
-        temp.ty = match finalize_type_shapes(unit, temp.ty, type_bindings, shape_bindings, span, index, errors) {
+        temp.ty = match finalize_type_shapes(types, temp.ty, type_bindings, shape_bindings, span, index, errors) {
             Some(ty) => ty,
             None => return false,
         };
     }
     function.return_ty =
-        match finalize_type_shapes(unit, function.return_ty, type_bindings, shape_bindings, span, index, errors) {
+        match finalize_type_shapes(types, function.return_ty, type_bindings, shape_bindings, span, index, errors) {
             Some(ty) => ty,
             None => return false,
         };
     function.error_ty = match function.error_ty {
         Some(error_ty) => {
-            match finalize_type_shapes(unit, error_ty, type_bindings, shape_bindings, span, index, errors) {
+            match finalize_type_shapes(types, error_ty, type_bindings, shape_bindings, span, index, errors) {
                 Some(error_ty) => Some(error_ty),
                 None => return false,
             }
@@ -1221,7 +1223,7 @@ fn finalize_function_shapes(
     };
     for block in &mut function.blocks {
         for statement in &mut block.statements {
-            if !finalize_statement_shapes(unit, statement, type_bindings, shape_bindings, span, index, errors) {
+            if !finalize_statement_shapes(types, statement, type_bindings, shape_bindings, span, index, errors) {
                 return false;
             }
         }
@@ -1232,13 +1234,13 @@ fn finalize_function_shapes(
     // source-local shape index against the finalized result type before the
     // general walk. Terms that cannot fold stay untouched and are rejected by
     // the post-finalize survivor net (one stable diagnostic).
-    let _ = substitute_tensor_from_flat_shape_size_constants(&mut unit.types, function, shape_bindings);
-    let _ = substitute_shape_size_constants(&mut unit.types, function, shape_bindings);
+    let _ = substitute_tensor_from_flat_shape_size_constants(types, function, shape_bindings);
+    let _ = substitute_shape_size_constants(types, function, shape_bindings);
     true
 }
 
 fn finalize_statement_shapes(
-    unit: &mut AnalyzedModule,
+    types: &mut TypeTable,
     statement: &mut MirStatement,
     type_bindings: &MirGenericBindings,
     shape_bindings: &MirShapeBindings,
@@ -1248,20 +1250,20 @@ fn finalize_statement_shapes(
 ) -> bool {
     match &mut statement.kind {
         MirStatementKind::Assign { value, .. } => {
-            value.ty = match finalize_type_shapes(unit, value.ty, type_bindings, shape_bindings, span, index, errors) {
+            value.ty = match finalize_type_shapes(types, value.ty, type_bindings, shape_bindings, span, index, errors) {
                 Some(ty) => ty,
                 None => return false,
             };
         }
         MirStatementKind::RuntimeCall { call, .. } => {
             call.return_ty =
-                match finalize_type_shapes(unit, call.return_ty, type_bindings, shape_bindings, span, index, errors) {
+                match finalize_type_shapes(types, call.return_ty, type_bindings, shape_bindings, span, index, errors) {
                     Some(ty) => ty,
                     None => return false,
                 };
             if let MirIntrinsic::Convert(conversion) = &mut call.intrinsic {
                 conversion.source_ty = match finalize_type_shapes(
-                    unit,
+                    types,
                     conversion.source_ty,
                     type_bindings,
                     shape_bindings,
@@ -1273,7 +1275,7 @@ fn finalize_statement_shapes(
                     None => return false,
                 };
                 conversion.target_ty = match finalize_type_shapes(
-                    unit,
+                    types,
                     conversion.target_ty,
                     type_bindings,
                     shape_bindings,
@@ -1288,7 +1290,7 @@ fn finalize_statement_shapes(
         }
         MirStatementKind::Construct { aggregate, .. } => {
             aggregate.ty =
-                match finalize_type_shapes(unit, aggregate.ty, type_bindings, shape_bindings, span, index, errors) {
+                match finalize_type_shapes(types, aggregate.ty, type_bindings, shape_bindings, span, index, errors) {
                     Some(ty) => ty,
                     None => return false,
                 };
@@ -1299,7 +1301,7 @@ fn finalize_statement_shapes(
 }
 
 fn finalize_type_shapes(
-    unit: &mut AnalyzedModule,
+    types: &mut TypeTable,
     ty: MirType,
     type_bindings: &MirGenericBindings,
     shape_bindings: &MirShapeBindings,
@@ -1307,14 +1309,7 @@ fn finalize_type_shapes(
     index: &ExistingTypeIndex,
     errors: &mut Vec<MirError>,
 ) -> Option<MirType> {
-    match instantiate_generic_type_with_shapes_with_index(
-        &mut unit.types,
-        ty,
-        type_bindings,
-        shape_bindings,
-        span,
-        index,
-    ) {
+    match instantiate_generic_type_with_shapes_with_index(types, ty, type_bindings, shape_bindings, span, index) {
         Ok(ty) => Some(ty),
         Err(error) => {
             errors.push(MirError::validation(error.span, error.message));

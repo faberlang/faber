@@ -120,8 +120,8 @@ pub use radix_mir::device::{
 pub use radix_mir::{CapabilityGap, Lowerability};
 pub use radix_mir::{
     INTEGER_PAYLOAD_I64_SENTINEL, INTEGER_PAYLOAD_U8_SENTINEL, INTEGER_PAYLOAD_U64_SENTINEL, MirEnumRepresentation,
-    MirFunctionSignature, MirParamSignature, MirScalarValueDomain, MirValidationContext, MirValidationError,
-    ValidatedMir, validate_program,
+    MirFunctionSignature, MirInterner, MirParamSignature, MirScalarValueDomain, MirTypeTable, MirValidationContext,
+    MirValidationError, ValidatedMir, validate_program,
 };
 pub use radix_mir::{
     InferenceBlockerKind, InferenceBlockerRow, InferenceBlockerStatus, InferenceNonClaim, InferenceNonClaimKind,

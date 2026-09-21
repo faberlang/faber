@@ -546,7 +546,8 @@ pub(super) fn bridge_norma_providers_to_kernel<'a>(
     lowered: LoweredMirUnit<'a>,
     entry_path: &Path,
 ) -> Result<LoweredMirUnit<'a>, Vec<Diagnostic>> {
-    let Some(interner) = lowered.validated.validation().interner else {
+    let interner = lowered.validated.validation().interner.clone();
+    let Some(interner) = interner.as_interner() else {
         return Err(vec![mir_diag(
             entry_path,
             "package MIR kernel bridge requires interner context",

@@ -57,7 +57,7 @@ pub(super) fn collect_package_runtime_requirements(
     cli_plan: &CliPackagePlan,
 ) -> Vec<String> {
     let mut requirements = BTreeSet::new();
-    let interner = lowered.validated.validation().interner;
+    let interner = lowered.validated.validation().interner.as_interner();
     if cli_plan.uses_cli_runtime {
         requirements.insert("host:argv".to_owned());
     }

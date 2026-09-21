@@ -216,7 +216,7 @@ impl StatsCollector {
         context: &MirValidationContext<'_>,
         interner: &Interner,
     ) -> Self {
-        let names = radix_mir::names::MirNames::new(program, context.types, interner);
+        let names = radix_mir::names::MirNames::new(program, context.types.as_table(), interner);
         let function_names = program
             .functions
             .iter()

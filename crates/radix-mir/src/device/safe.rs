@@ -166,7 +166,7 @@ struct DeviceSafeClassifier<'a> {
 impl<'a> DeviceSafeClassifier<'a> {
     fn new(validation: &'a MirValidationContext<'a>, device: &'a MirDeviceContext) -> Self {
         Self {
-            types: validation.types,
+            types: validation.types.as_table(),
             layouts: &validation.layouts,
             device,
             in_device_function: false,

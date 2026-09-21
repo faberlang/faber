@@ -199,12 +199,17 @@ impl<'a> LoweringContextMaps<'a> {
                 gpu_builtins: Arc::new(FxHashMap::default()),
             },
             validation: MirValidationContext {
-                types: &unit.types,
+                // Interim borrow of the analyzed unit's arena; the lowering
+                // entry point replaces it with the lowering-owned extension
+                // table (via `with_owned_types`) before the context escapes.
+                // Walk-time reads here (primitives, declared structs) resolve
+                // identically in both tables.
+                types: radix_mir::MirTypeTable::Borrowed(&unit.types),
                 // Placeholder: body lowering never reads `.layouts`; the real
                 // table is built once at the lowering entry point and moved
                 // into the escaping context via `validation_context`.
                 layouts: MirLayoutTable::default(),
-                interner: Some(&unit.interner),
+                interner: radix_mir::MirInterner::Borrowed(&unit.interner),
                 functions: FxHashMap::default(),
                 external_function_identities: FxHashMap::default(),
                 package_product: None,
