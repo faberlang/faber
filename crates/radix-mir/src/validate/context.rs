@@ -88,7 +88,7 @@ pub enum MirTypeTable<'a> {
     /// path (lowering-owned type arena). Shared ownership: cloning the
     /// context shares the table, and the last drop frees it, so the token's
     /// table is bounded without any phase leaking one.
-    Owned(std::sync::Arc<TypeTable>),
+    Owned(std::rc::Rc<TypeTable>),
 }
 
 impl MirTypeTable<'_> {
@@ -302,7 +302,7 @@ impl<'a> MirValidationContext<'a> {
         } = self;
         let layouts = MirLayoutTable::from_types(&types);
         Self {
-            types: MirTypeTable::Owned(std::sync::Arc::new(types)),
+            types: MirTypeTable::Owned(std::rc::Rc::new(types)),
             layouts,
             interner,
             functions,
