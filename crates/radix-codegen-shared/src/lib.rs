@@ -1,8 +1,11 @@
 //! Shared text-emit utilities for Radix codegen and MIR text backends.
 //!
-//! This crate is the first workspace leaf of the radix crate DAG. It must stay
-//! free of HIR, semantic, and driver dependencies so backend crates can depend
-//! on it without pulling the monolith.
+//! This crate is the first workspace leaf of the radix crate DAG. It must never
+//! depend on `radix-semantic`, `radix-parser`, or `radix-module`, so any
+//! backend can use it without pulling the pipeline. `radix-hir` is an admitted
+//! input surface: the `Codegen` trait takes `&HirModule`, and `names.rs` /
+//! `validation.rs` walk HIR with `HirVisitor`. The crate must never construct,
+//! lower, or re-derive HIR.
 //!
 //! # `CodeWriter`
 //!
