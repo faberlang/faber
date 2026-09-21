@@ -315,6 +315,33 @@ fn all_prefixed_families_round_trip_at_their_own_level() {
 }
 
 #[test]
+fn literal_width_fused_sugar_re_emits_bracketed() {
+    // ON-S1: lowering interns `vf32[4]`'s width as a bare Literal, not a
+    // one-element Tuple; the literal path must still emit the bracketed
+    // sugar (`vf32[4]`), never the concatenated `vf324`, which re-analysis
+    // rejects as an unknown type.
+    let mut fx = fixture();
+    let lit4 = fx.types.intern_index(IndexExpr::Literal(4));
+    let vector = fx.types.vector_with_width(fx.f32_ty, lit4);
+    let codegen = codegen_with_forms(
+        &fx,
+        vec![(
+            declared_site(1),
+            semantic_form(
+                TypeFormLevel::SHORT,
+                vector,
+                vec![type_arg(short_width(fx.f32_ty))],
+            ),
+        ),
+        ],
+    );
+    assert_eq!(
+        render_at(&codegen, &declared_site(1), vector, &LaSurface),
+        "vf32[4]"
+    );
+}
+
+#[test]
 fn fused_short_roots_without_figura_stay_bare() {
     // `vf32` authored without brackets lowers to an inferred width and
     // re-emits without brackets.

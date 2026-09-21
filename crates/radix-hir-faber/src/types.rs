@@ -992,12 +992,16 @@ fn sorted_record_fields(
 
 /// Fused short spelling: the figura string is already bracketed by
 /// `format_figura` (`[2, 3]`); an inference hole (authored without brackets)
-/// emits the bare fused token.
+/// emits the bare fused token. A single-literal figura prints unbracketed
+/// from `format_figura` (lowering interns `vf32[4]`'s width as a bare
+/// `Literal`), so bracket it here — the sugar grammar has no `vf324` form.
 fn fused_with_figura(prefix: &str, marker: &str, figura: &str) -> String {
     if figura == "_" {
         format!("{prefix}{marker}")
-    } else {
+    } else if figura.starts_with('[') {
         format!("{prefix}{marker}{figura}")
+    } else {
+        format!("{prefix}{marker}[{figura}]")
     }
 }
 
