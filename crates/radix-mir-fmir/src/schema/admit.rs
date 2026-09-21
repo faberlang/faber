@@ -72,7 +72,12 @@ pub(crate) fn check_toolchain(
 /// digest fails admission. The stage/provenance rule is enforced too: a
 /// `FinalizedBinary` artifact MUST carry its hash-bound parent
 /// `compiler_input_packet_sha256` (never silently replaced), a
-/// `CompilerInput` artifact MUST NOT.
+/// `CompilerInput` artifact MUST NOT. The parent digest is also verified
+/// against the section, not just spelled: it must be the `packet_sha256`
+/// of the `CompilerInput` sibling the artifact names (same backend and
+/// target — the finalize step may change the format by design, `msl` →
+/// `metallib`), and a wrong-parent digest or a missing sibling fails
+/// admission.
 pub(crate) fn check_artifact_digests(
     device: &FmirDeviceSection,
 ) -> Result<(), crate::error::FmirImageError> {
@@ -115,6 +120,57 @@ pub(crate) fn check_artifact_digests(
                                 .to_owned(),
                     });
                 }
+            }
+        }
+    }
+    // Hash-bound parent verification (P3-1): the spelled parent digest must
+    // be the packet identity of the `CompilerInput` sibling the finalized
+    // binary names — same backend and target (the finalize step may change
+    // the format by design: `msl` → `metallib`). A wrong-parent digest, a
+    // missing sibling, or an ambiguous sibling set fails closed; the
+    // `sha256:` prefix test above stays only as the cheap pre-check.
+    for artifact in &device.artifacts.artifact {
+        if artifact.stage != MaterializationStage::FinalizedBinary {
+            continue;
+        }
+        // The per-artifact stage rule above already rejected a missing
+        // parent digest; here the spelled value must name a sibling.
+        let Some(parent) = artifact.compiler_input_packet_sha256.as_deref() else {
+            continue;
+        };
+        let backend = artifact.backend.spelling();
+        let mut named: Option<&str> = None;
+        for input in
+            device.artifacts.artifact.iter().filter(|input| {
+                input.stage == MaterializationStage::CompilerInput
+                    && input.backend.spelling() == backend
+                    && input.target.id == artifact.target.id
+            })
+        {
+            match named {
+                None => named = Some(input.packet_sha256.as_str()),
+                Some(sibling) if sibling == input.packet_sha256 => {}
+                Some(_) => {
+                    return Err(crate::error::FmirImageError::CompilerInputProvenance {
+                        backend,
+                        detail: "the section names more than one compiler-input sibling for the finalized binary (ambiguous hash-bound parent)".to_owned(),
+                    });
+                }
+            }
+        }
+        match named {
+            Some(sibling) if parent == sibling => {}
+            Some(_) => {
+                return Err(crate::error::FmirImageError::CompilerInputProvenance {
+                    backend,
+                    detail: "the finalized binary's compiler_input_packet_sha256 does not match the packet_sha256 of the compiler-input sibling it names (hash-bound parent verified, not spelled)".to_owned(),
+                });
+            }
+            None => {
+                return Err(crate::error::FmirImageError::CompilerInputProvenance {
+                    backend,
+                    detail: "the finalized binary's compiler_input_packet_sha256 names no compiler-input sibling artifact in this section (hash-bound parent verified, not spelled)".to_owned(),
+                });
             }
         }
     }
