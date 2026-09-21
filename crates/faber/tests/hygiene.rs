@@ -21,7 +21,11 @@ const BUDGETS: Budgets = Budgets {
     // WHY: two fail-closed device-wire layout guards in package/device/wire.rs
     // (dense matmul + packed storage): the mirrored scalar/packed layout is
     // not on the accepted wire and the mapping must not guess.
-    panic: 2,
+    // Re-baselined 2→3: 5963f47de (derive targets rows from FaberCliTarget,
+    // B3-2/S09-3) added the faber_row_feature guard in commands/targets.rs —
+    // every `faber targets` row must name a faber feature, so an unmapped
+    // CLI target refuses instead of guessing a feature gate.
+    panic: 3,
     // WHY: one exhaustive-match arm in CLI dispatch (cmd.rs) plus one
     // exhaustiveness guard in the mir lowering path (mir/lower.rs).
     unreachable: 2,

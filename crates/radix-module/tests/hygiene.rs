@@ -58,7 +58,15 @@ const BUDGETS: Budgets = Budgets {
     // Re-baselined 11→12: elementwise lista arithmetic lowering (1a6329505)
     // added the runtime.rs collection-op dispatch guards — operator mapping
     // is exhaustive over the arithmetic set checked above, same guard rationale.
-    unreachable: 12,
+    // Re-baselined 12→13: 5e21c4ac2b (lista all-any predicate twins) added
+    // the two TransformKind::All | Any arms in collection_higher_order.rs —
+    // predicate folds route through lower_collection_predicate before these
+    // matches, so the arms are fail-closed caller-contract guards; and
+    // 6f73336977 (carry analyzed provider units on the driver output,
+    // ARCH-U4/B6-U4) added the codegen/mod.rs lock_unit exhaustiveness
+    // guard — lock_unit returning None implies the Failed marker the inner
+    // let-else re-matches. Same guard rationale.
+    unreachable: 13,
     todo: 0,
     unimplemented: 0,
     // WHY: deliberate Result discards in dump formatters (air/dump.rs),
