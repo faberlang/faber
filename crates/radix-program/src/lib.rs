@@ -3,8 +3,53 @@
 //! `radix-program` is the whole-program layer consumed by the `radix` façade.
 //! It composes the existing single-unit compiler into package analysis and
 //! artifact assembly through module-level typed seams. The crate owns package
-//! orchestration — never a second lexer/parser/typechecker, never global or
-//! thread-local state, never a hidden output root.
+//! orchestration — never a second lexer/parser/typechecker, never a hidden
+//! output root — and its own modules own no global or thread-local state
+//! (ARCH-2 Ruling 5 / B6-A5).
+//!
+//! # Session-memo register
+//!
+//! `radix-program` depends on the whole `radix-module` monolith, so while that
+//! edge exists this charter promises no absence of transitive thread-locals.
+//! What it records is the memo set of the program-phase helpers — the
+//! compilation surfaces physically homed in `radix-module` (cycle law:
+//! `radix-module` cannot depend on `radix-program`) that package analysis
+//! reaches through. Every entry carries its key and its invalidation rule.
+//!
+//! Driver-run memos — cells on `radix_module::driver::Session`'s
+//! `SessionMemos` (ARCH-U3 / S01-9), shared across `Session` re-wraps;
+//! invalidation is dropping the last `Rc` handle, so nothing outlives the
+//! driver run that filled it:
+//!
+//! - `import_targets` (cell declared in `radix-module/src/driver/session.rs`,
+//!   key type from `radix-module/src/program/compile.rs`): parse-once memo for
+//!   import targets, keyed by `(reader-pack id, target path)`.
+//! - `package_roots` (cell declared in `radix-module/src/driver/session.rs`,
+//!   filled by `find_package_root_with_session` in
+//!   `radix-module/src/import_resolve.rs`): package-root ancestor-walk memo,
+//!   keyed by the directory that started the walk; every intermediate
+//!   directory visited is filled, so later imports from the same package pay
+//!   O(1). The session-less `find_package_root` is the unmemoized discovery
+//!   form.
+//!
+//! Process-wide memos — `OnceLock`s in `radix-module/src/import_resolve.rs`,
+//! environment-keyed with honest process scope: neither the environment nor
+//! the installed library layout changes during a compilation session, so
+//! production never invalidates them (override/clearing is test-only):
+//!
+//! - `LIBRARY_HOME_CACHE`: `FABER_LIBRARY_HOME` env var plus the workspace
+//!   ancestor walk → the library home path.
+//! - `PROVIDER_NAME_MEMO`: library home path → provider segment → provider
+//!   repo directory.
+//!
+//! History — ARCH-2 Ruling 5 originally recorded five memos. Three
+//! thread-locals were retired by defect-audit batch 6:
+//! `IMPORTED_DEVICE_INTERFACES` (device interfaces now ride the per-unit
+//! identity carrier, so the map's lifetime is the unit's — cross-package
+//! service is impossible by construction; B6-U2, `6203c62ca`) and
+//! `IMPORT_TARGET_CACHE` / `PACKAGE_ROOT_CACHE` (absorbed into `SessionMemos`;
+//! B6-U3, `2918d57f4`). The two entries in each group above are the surviving
+//! set this register is responsible for.
 
 use std::path::PathBuf;
 
