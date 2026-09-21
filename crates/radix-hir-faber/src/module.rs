@@ -9,7 +9,7 @@ use radix_hir::{
     HirItem, HirItemKind, HirModule, HirModuleEnd, HirPresentation, HirSourceAnchorId, HirTypeForm,
     HirTypeSite,
 };
-use radix_lexer::{Interner, Span, TokenKind};
+use radix_lexer::{Interner, Span, Symbol, TokenKind};
 use radix_types::{TypeId, TypeTable};
 use rustc_hash::{FxHashMap, FxHashSet};
 use std::cell::RefCell;
@@ -86,6 +86,10 @@ pub struct FaberCodegen<'a> {
     /// exactly these authored long/short/named shapes; sites absent from the
     /// map keep the canonical fallback spelling.
     pub(crate) authored_type_forms: FxHashMap<HirTypeSite, HirTypeForm>,
+    /// Authored labels of by-label `iuncta` reads, keyed by the rewritten
+    /// index node's `HirId`: those nodes re-emit as `.label`, every other
+    /// index read keeps `[i]`.
+    pub(crate) tuple_label_accesses: FxHashMap<radix_hir::HirId, Symbol>,
     /// First malformed authored type form observed during emission.
     type_emission_error: RefCell<Option<CodegenError>>,
 }
@@ -132,6 +136,7 @@ impl<'a> FaberCodegen<'a> {
             await_assignment_bindings: FxHashSet::default(),
             ordo_enums: FxHashMap::default(),
             authored_type_forms: FxHashMap::default(),
+            tuple_label_accesses: FxHashMap::default(),
             type_emission_error: RefCell::new(None),
         }
     }
@@ -188,6 +193,7 @@ pub fn empty_presentation() -> HirPresentation {
         ordo_enums: Vec::new(),
         variant_paths: Vec::new(),
         authored_types: Vec::new(),
+        tuple_label_accesses: Vec::new(),
     }
 }
 
@@ -246,6 +252,11 @@ impl FaberCodegen<'_> {
             .authored_types
             .iter()
             .map(|authored| (authored.site.clone(), authored.form.clone()))
+            .collect();
+        self.tuple_label_accesses = presentation
+            .tuple_label_accesses
+            .iter()
+            .map(|access| (access.expr_id, access.label))
             .collect();
 
         let mut writer = CodeWriter::new();

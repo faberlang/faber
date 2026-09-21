@@ -252,6 +252,7 @@ impl<'a> Lowerer<'a> {
                 ordo_enums: Vec::new(),
                 variant_paths: Vec::new(),
                 authored_types: Vec::new(),
+                tuple_label_accesses: Vec::new(),
             },
             form_frames: Vec::new(),
             annotation_capture: None,

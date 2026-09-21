@@ -3001,6 +3001,21 @@ pub(crate) fn validate_referential_integrity(
             check_index,
         )?;
 
+        // Each by-label `iuncta` read annotates exactly one rewritten index
+        // node. A dangling or duplicated id is a producer defect: emission
+        // would otherwise silently keep the numeric spelling.
+        let mut label_access_ids: FxHashSet<radix_hir::HirId> = FxHashSet::default();
+        for access in &presentation.tuple_label_accesses {
+            check_symbol(access.label)?;
+            check_hir(access.expr_id)?;
+            if !label_access_ids.insert(access.expr_id) {
+                return Err(HirArtifactError::InvalidPresentation {
+                    issue: "duplicate_tuple_label_access",
+                    anchor: access.expr_id.0,
+                });
+            }
+        }
+
         Ok(())
     }
 

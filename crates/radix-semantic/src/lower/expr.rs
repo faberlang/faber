@@ -63,7 +63,7 @@ pub fn lower_expr(lowerer: &mut Lowerer, expr: &Expr) -> HirExpression {
         ExprKind::Unary(unary) => lowerer.lower_unarius(unary),
         ExprKind::Ternary(ternary) => lowerer.lower_ternary(ternary),
         ExprKind::Call(call) => lowerer.lower_vocare(call),
-        ExprKind::Member(member) => lowerer.lower_membrum(member),
+        ExprKind::Member(member) => lowerer.lower_membrum(member, id),
         ExprKind::Index(index) => lowerer.lower_index(index),
         ExprKind::Gradient(gradient) => lowerer.lower_gradient(gradient),
         ExprKind::OptionalChain(optional) => lowerer.lower_optional_chain(optional),
@@ -687,8 +687,13 @@ impl Lowerer<'_> {
     /// If the left side is a known enum and the member names a known variant,
     /// this is a path to the variant constructor rather than a field access.
     /// Receiver-field legality remains a typecheck concern for every other
-    /// member expression.
-    fn lower_membrum(&mut self, member: &radix_syntax::MemberExpr) -> HirExpressionKind {
+    /// member expression. `id` is the member expression's own `HirId`, which a
+    /// by-label tuple read records as its presentation anchor.
+    fn lower_membrum(
+        &mut self,
+        member: &radix_syntax::MemberExpr,
+        id: radix_hir::HirId,
+    ) -> HirExpressionKind {
         if let radix_syntax::ExprKind::Ident(base) = &member.object.kind
             && let Some(base_def) = self.lookup_name(base.name)
             && let Some(base_symbol) = self.resolver.get_symbol(base_def)
@@ -743,7 +748,7 @@ impl Lowerer<'_> {
 
         let object = lower_expr(self, &member.object);
         let field = self.canonicalize_namespace_member(&object, member.member.name);
-        if let Some(kind) = self.lower_tuple_label_member(&object, field, member.member.span) {
+        if let Some(kind) = self.lower_tuple_label_member(&object, field, member.member.span, id) {
             return kind;
         }
 
@@ -752,11 +757,16 @@ impl Lowerer<'_> {
 
     /// Rewrite `p.gx` on a labeled `iuncta` binding to the same constant-index
     /// node as `p[0]`. Unknown labels emit `unknown_tuple_element_label`.
+    ///
+    /// The authored label is identity-erased by the rewrite, so it is recorded
+    /// against the rewritten node's `HirId`; emission re-sugars exactly those
+    /// ids back to `.gx`.
     fn lower_tuple_label_member(
         &mut self,
         object: &radix_hir::HirExpression,
         label: radix_lexer::Symbol,
         member_span: radix_lexer::Span,
+        id: radix_hir::HirId,
     ) -> Option<HirExpressionKind> {
         let radix_hir::HirExpressionKind::Path(def_id) = &object.kind else {
             return None;
@@ -772,6 +782,9 @@ impl Lowerer<'_> {
                 ty: None,
                 span: member_span,
             };
+            self.presentation
+                .tuple_label_accesses
+                .push(radix_hir::HirTupleLabelAccess { expr_id: id, label });
             return Some(HirExpressionKind::Index(
                 Box::new(object.clone()),
                 Box::new(index),

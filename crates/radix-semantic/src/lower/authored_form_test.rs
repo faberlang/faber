@@ -182,6 +182,40 @@ fn alias_uses_carry_named_heads_and_alias_bodies_stay_semantic() {
     assert_eq!(Some(use_form.ty), local_ty, "witness equals HIR type");
 }
 
+/// An authored `iuncta` element label rides the labeled child form, and the
+/// by-label read records its authored label against the rewritten index node.
+#[test]
+fn iuncta_labels_ride_the_form_and_by_label_reads_record_their_label() {
+    let fixture = analyze_ok(concat!(
+        "functio probe() {\n",
+        "    fixum iuncta<gx: numerus, gw: numerus> par ← iuncta<numerus, numerus> [1, 2]\n",
+        "    fixum numerus w ← par.gw\n",
+        "}\n"
+    ));
+
+    let (form, _) = first_declared_form(&fixture, "par");
+    let labels: Vec<Option<String>> = form
+        .args
+        .iter()
+        .map(|arg| match arg {
+            HirTypeFormArg::Type(child) => child
+                .label
+                .map(|symbol| fixture.interner.resolve(symbol).to_owned()),
+            HirTypeFormArg::Size(_) | HirTypeFormArg::Name(_) => None,
+        })
+        .collect();
+    assert_eq!(labels, vec![Some("gx".to_owned()), Some("gw".to_owned())]);
+
+    let read_labels: Vec<String> = fixture
+        .result
+        .presentation
+        .tuple_label_accesses
+        .iter()
+        .map(|access| fixture.interner.resolve(access.label).to_owned())
+        .collect();
+    assert_eq!(read_labels, vec!["gw".to_owned()]);
+}
+
 #[test]
 fn witness_canonicalization_survives_inference_solving() {
     let fixture = analyze_ok("functio probe() {\n    fixum u32 bare ← 1\n}");

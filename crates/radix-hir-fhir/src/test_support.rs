@@ -66,6 +66,7 @@ pub(crate) fn stub_artifact() -> HirArtifact {
         ordo_enums: Vec::new(),
         variant_paths: Vec::new(),
         authored_types: Vec::new(),
+        tuple_label_accesses: Vec::new(),
     };
     let types = TypeTable::new();
     HirArtifact {

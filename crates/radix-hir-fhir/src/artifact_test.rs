@@ -105,7 +105,11 @@ fn selective_import_field_kept_schema_v4_wire_breaks_ratchet_version() {
     // the wire. Schema 14 (provider-import-parity repair) carries analyzed
     // provider carriage per unit — a serialized addition, so the wire breaks
     // and there is no compatibility decoder for schema-v13 artifacts.
-    assert_eq!(SCHEMA_VERSION, 14);
+    // Schema 15 adds the authored `iuncta` element label on
+    // `HirTypeForm` and `HirPresentation::tuple_label_accesses` so authored
+    // named-tuple labels and by-label reads survive re-emission — both are
+    // serialized presentation additions, so schema-v14 artifacts fail closed.
+    assert_eq!(SCHEMA_VERSION, 15);
 }
 
 // ── EOT-3W transfer wire contract ────────────────────────────────────────

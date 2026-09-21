@@ -113,6 +113,7 @@ impl Lowerer<'_> {
                 ty: ty_id,
                 head: radix_hir::HirTypeFormHead::Semantic(ty.form),
                 args: Vec::new(),
+                label: None,
             },
         };
         self.presentation
@@ -254,9 +255,13 @@ impl Lowerer<'_> {
                             radix_syntax::TypeFormLevel::LONG,
                         ),
                         args: vec![radix_hir::HirTypeFormArg::Type(Box::new(form))],
+                        label: None,
                     };
                 }
             }
+            // The label belongs to this node's position in its parent (the
+            // `gx` of `iuncta<gx: int, …>`), so it rides the outermost form.
+            form.label = ty.iuncta_label.as_ref().map(|ident| ident.name);
             // A parent frame always exists during capture: the marker frame
             // pushed by `lower_authored_type` sits at the bottom of the stack.
             if let Some(parent) = self.form_frames.last_mut() {
@@ -296,7 +301,14 @@ impl Lowerer<'_> {
             }
             _ => frame.args,
         };
-        radix_hir::HirTypeForm { ty, head, args }
+        radix_hir::HirTypeForm {
+            ty,
+            head,
+            args,
+            // The label is position-owned: `lower_type_with_context` stamps it
+            // on the completed node, where the parent frame reads it.
+            label: None,
+        }
     }
 
     /// Normalize a source union into the canonical semantic union/option shape.

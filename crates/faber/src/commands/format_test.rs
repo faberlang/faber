@@ -411,6 +411,65 @@ fn format_stdin_en_source_keeps_english_surface() {
     assert_canonical_reparses_with(body, "en types stdin", Some(&english_pack())).expect("reparse");
 }
 
+/// Need: the named-tuple loss probe, verbatim. Labels are an
+/// identity-erased alias layer, so canonical re-emission used to rewrite
+/// `tuple<gx: int, gw: int>` to `tuple<int, int>` and `pair.gw` to `pair[1]`.
+const NAMED_TUPLE_LABEL_PROBE: &str = "+++\nlocale = \"en\"\n+++\nmain {\n    const tuple<gx: int, gw: int> pair ← tuple<gx: int, gw: int> [1, 2]\n    print pair.gw\n}\n";
+
+/// The live Gradus shape the loss was first found in
+/// (`gradus/src/gradient.fab`): generic shape parameters, tensor element
+/// types, a labeled tuple binding, and a by-label read. The genus field and
+/// the generic return type also cover the named aggregate positions.
+const GRADUS_SHAPED_TUPLE_LABEL_PROBE: &str = "+++\nlocale = \"en\"\n+++\nclass GradPack<size R, size C> {\n    tuple<grad_x: tensor<f32, [R, C]>, grad_w: tensor<f32, [R, C]>> grads\n}\n\nfn backward<size R, size C>(tensor<f32, [R, C]> x, tensor<f32, [R, C]> w) → tuple<grad_x: tensor<f32, [R, C]>, grad_w: tensor<f32, [R, C]>> {\n    const tuple<grad_x: tensor<f32, [R, C]>, grad_w: tensor<f32, [R, C]>> grads ← tuple<grad_x: tensor<f32, [R, C]>, grad_w: tensor<f32, [R, C]>> [x, w]\n    return grads\n}\n\nfn pick_w<size R, size C>(tensor<f32, [R, C]> x, tensor<f32, [R, C]> w) → tensor<f32, [R, C]> {\n    const tuple<grad_x: tensor<f32, [R, C]>, grad_w: tensor<f32, [R, C]>> grads ← tuple<grad_x: tensor<f32, [R, C]>, grad_w: tensor<f32, [R, C]>> [x, w]\n    return grads.grad_w\n}\n";
+
+/// A source that already is canonical output must format to itself — for the
+/// named-tuple probes that is exactly the labels-and-label-access assertion.
+fn assert_format_fixed_point(source: &str, what: &str) -> String {
+    let (stdout, stderr, success) = run_faber_format_stdin(source);
+    assert!(success, "faber format --stdin must accept {what}: {stderr}");
+    assert_eq!(
+        stdout, source,
+        "{what} must be a formatting fixed point:\n{stdout}"
+    );
+    stdout
+}
+
+#[test]
+fn format_stdin_preserves_named_tuple_labels_and_label_access() {
+    let formatted = assert_format_fixed_point(NAMED_TUPLE_LABEL_PROBE, "the named-tuple probe");
+    for needle in ["tuple<gx: int, gw: int>", "pair.gw"] {
+        assert!(
+            formatted.contains(needle),
+            "named-tuple format must retain {needle:?}:\n{formatted}"
+        );
+    }
+    assert!(
+        !formatted.contains("pair[1]"),
+        "named-tuple format must not rewrite the label read to an index:\n{formatted}"
+    );
+}
+
+#[test]
+fn format_stdin_preserves_gradus_shaped_generic_tuple_labels() {
+    let formatted =
+        assert_format_fixed_point(GRADUS_SHAPED_TUPLE_LABEL_PROBE, "the Gradus-shaped probe");
+    for needle in [
+        // Genus field annotation and local binding annotation.
+        "tuple<grad_x: tensor<f32, [R, C]>, grad_w: tensor<f32, [R, C]>> grads",
+        // By-label read.
+        "grads.grad_w",
+    ] {
+        assert!(
+            formatted.contains(needle),
+            "Gradus-shaped format must retain {needle:?}:\n{formatted}"
+        );
+    }
+    assert!(
+        !formatted.contains("grads[1]"),
+        "Gradus-shaped format must not rewrite the label read to an index:\n{formatted}"
+    );
+}
+
 fn run_faber_format_stdin(source: &str) -> (String, String, bool) {
     let mut child = Command::new(faber_binary())
         .args(["format", "--stdin"])
