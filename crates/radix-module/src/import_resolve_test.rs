@@ -353,8 +353,8 @@ fn resolve_namespace_import_relative_symlink_escape_rejected() {
     let from = pkg.join("app.fab");
     std::fs::write(&from, "").unwrap();
 
-    let error = resolve_namespace_import(&fresh_session(), &from, "./link", None)
-        .expect_err("symlink escape must be rejected");
+    let error =
+        resolve_namespace_import(&fresh_session(), &from, "./link", None).expect_err("symlink escape must be rejected");
     assert_eq!(error.issue, "import_resolve_escape", "{error:?}");
 }
 

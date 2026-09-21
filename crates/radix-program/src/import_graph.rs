@@ -600,7 +600,10 @@ fn contain_local_import(
         import_escape_diagnostic(
             from_file,
             import_path,
-            &format!("import target {} cannot be resolved: {error}", target.display()),
+            &format!(
+                "import target {} cannot be resolved: {error}",
+                target.display()
+            ),
         )
     })?;
     if declared_import_roots(spec)

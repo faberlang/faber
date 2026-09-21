@@ -26,12 +26,21 @@ fn lock_fixture() -> tempfile::TempDir {
     fs::create_dir_all(&good_interfaces).expect("create good interfaces");
     fs::create_dir_all(&evil_interfaces).expect("create evil interfaces");
     fs::create_dir_all(&norma_interfaces).expect("create norma interfaces");
-    fs::write(good_interfaces.join("module.fab"), "func good() → int { return 1 }")
-        .expect("write good interface");
-    fs::write(evil_interfaces.join("module.fab"), "func evil() → int { return 1 }")
-        .expect("write evil interface");
-    fs::write(norma_interfaces.join("module.fab"), "func norma_fn() → int { return 1 }")
-        .expect("write norma interface");
+    fs::write(
+        good_interfaces.join("module.fab"),
+        "func good() → int { return 1 }",
+    )
+    .expect("write good interface");
+    fs::write(
+        evil_interfaces.join("module.fab"),
+        "func evil() → int { return 1 }",
+    )
+    .expect("write evil interface");
+    fs::write(
+        norma_interfaces.join("module.fab"),
+        "func norma_fn() → int { return 1 }",
+    )
+    .expect("write norma interface");
 
     fs::write(
         app.join("faber.toml"),
@@ -79,8 +88,11 @@ rustc = ""
     )
     .expect("write lock");
 
-    fs::write(app.join("src/module.fab"), "func entry() → int { return 0 }")
-        .expect("write self module");
+    fs::write(
+        app.join("src/module.fab"),
+        "func entry() → int { return 0 }",
+    )
+    .expect("write self module");
     root
 }
 

@@ -260,15 +260,12 @@ fn contain_relative_import(
         message: format!("relative import '{import_path}' {reason}"),
         issue: "import_resolve_escape",
     };
-    let canonical_root = root.canonicalize().map_err(|error| {
-        escape_error(format!(
-            "package root {} cannot be resolved: {error}",
-            root.display()
-        ))
-    })?;
-    let canonical_target = target.canonicalize().map_err(|error| {
-        escape_error(format!("target cannot be resolved: {error}"))
-    })?;
+    let canonical_root = root
+        .canonicalize()
+        .map_err(|error| escape_error(format!("package root {} cannot be resolved: {error}", root.display())))?;
+    let canonical_target = target
+        .canonicalize()
+        .map_err(|error| escape_error(format!("target cannot be resolved: {error}")))?;
     if !canonical_target.starts_with(&canonical_root) {
         return Err(escape_error(format!(
             "resolves outside the package root: {}",
