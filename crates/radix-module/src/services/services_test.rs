@@ -350,15 +350,25 @@ fn discoverable_targets_equal_universe_minus_hidden() {
     // P6-3: the discoverable row list is a selection of the variant
     // universe, never an independent enumeration. The delta must be
     // exactly the deliberately hidden variants — MirAmd (internal until
-    // the leaf proves a truthful baseline, OQ2) and MirScena (hidden
-    // legacy runtime). A variant added to `Target::ALL` fails this test
-    // until it joins the row list or is named hidden here: a new backend
-    // can no longer silently vanish from `radix targets` / `faber targets`.
+    // the leaf proves a truthful baseline, OQ2), MirScena (hidden legacy
+    // runtime), and MirStepper (no CLI spelling exists; S10-12 removed it
+    // from discovery, its capability note keeps steering users at
+    // `faber script`/`faber test`). A variant added to `Target::ALL` fails
+    // this test until it joins the row list or is named hidden here: a new
+    // backend can no longer silently vanish from `radix targets` /
+    // `faber targets`.
     let discoverable = discoverable_targets();
     let universe_minus_hidden: Vec<crate::codegen::Target> = crate::codegen::Target::ALL
         .iter()
         .copied()
-        .filter(|target| !matches!(target, crate::codegen::Target::MirAmd | crate::codegen::Target::MirScena))
+        .filter(|target| {
+            !matches!(
+                target,
+                crate::codegen::Target::MirAmd
+                    | crate::codegen::Target::MirScena
+                    | crate::codegen::Target::MirStepper
+            )
+        })
         .collect();
 
     for target in &universe_minus_hidden {
@@ -456,6 +466,26 @@ fn amd_target_has_no_discoverable_row_and_gates_workflows() {
         assert!(!row.run, "amd cannot run when mir-amd is not compiled in");
         assert!(!row.package, "amd cannot package when mir-amd is not compiled in");
     }
+}
+
+#[test]
+fn stepper_target_has_no_discoverable_row_and_keeps_note() {
+    // S10-12 (goal Open question 2 ruling): no CLI surface spells
+    // `MirStepper`, so it is not a discoverable `radix targets` row — the
+    // report must not overstate the selectable set. The capability note is
+    // the surviving steer: the real entry points are `faber script` /
+    // `faber test`, and the `radix targets` printer surfaces this note as
+    // a footnote under the row list.
+    assert!(
+        !discoverable_targets().contains(&crate::codegen::Target::MirStepper),
+        "the stepper target has no CLI spelling and must not appear in the discoverable target rows (S10-12)"
+    );
+    let row = target_capabilities(crate::codegen::Target::MirStepper);
+    assert!(
+        row.note.contains("faber script") && row.note.contains("faber test"),
+        "the hidden stepper row must keep steering users at faber script/faber test: {}",
+        row.note
+    );
 }
 
 #[test]

@@ -13,13 +13,16 @@
 /// [`Target::ALL`](crate::codegen::Target::ALL), not an independent
 /// enumeration: the delta is exactly the deliberately hidden variants
 /// (`MirAmd`, internal until the leaf proves a truthful baseline; `MirScena`,
-/// hidden legacy runtime), and `discoverable_targets_equal_universe_minus_hidden`
+/// hidden legacy runtime) plus `MirStepper`, which no CLI can select — no
+/// `CliTarget`/`FaberCliTarget` spelling exists for it, so it is not a
+/// discoverable `radix targets` row (defect-audit S10-12; goal Open
+/// question 2 ruling: removed from discovery, note kept steering users at
+/// `faber script`/`faber test`). `discoverable_targets_equal_universe_minus_hidden`
 /// pins that set-equality. A `Target` variant added to the universe fails
 /// this test until it joins this list or is named hidden — the list can no
 /// longer silently drop a backend. The order is the report's presentation
 /// order and is preserved verbatim for the printed row output.
-const DISCOVERABLE_TARGET_ROWS: [crate::codegen::Target; 18] = [
-    crate::codegen::Target::MirStepper,
+const DISCOVERABLE_TARGET_ROWS: [crate::codegen::Target; 17] = [
     crate::codegen::Target::HirRust,
     crate::codegen::Target::MirFmir,
     crate::codegen::Target::MirFmirBinary,
@@ -99,6 +102,14 @@ pub fn target_extension(target: crate::codegen::Target) -> &'static str {
 /// here and re-exported through the `radix` façade; the `radix-cli`
 /// private duplicate is gone). Spellings equal `Target`'s `Display`;
 /// `target_name_table_matches_display` pins that agreement.
+///
+/// The `MirAmd`, `MirScena`, and `MirStepper` spellings have no
+/// CLI-selectable row (they are the hidden delta of
+/// [`DISCOVERABLE_TARGET_ROWS`]), but the arms stay exhaustive and are
+/// **reachable by construction** (defect-audit S10-12):
+/// `target_name_table_matches_display` walks all of `Target::ALL` and
+/// executes every arm, and the table is a public API callable with any
+/// variant.
 #[must_use]
 pub fn target_name(target: crate::codegen::Target) -> &'static str {
     match target {
