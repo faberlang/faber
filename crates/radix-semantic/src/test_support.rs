@@ -103,6 +103,8 @@ pub fn analyze_source_with_config(source: &str, config: PassConfig) -> AnalyzedF
                 crate::Resolver::new(),
                 crate::RadixLaneMetadata::default(),
                 crate::AnnotationContractMetadata::default(),
+                // Parse failure: region inference never ran.
+                None,
                 diagnostics,
             ),
             interner: parsed.interner,

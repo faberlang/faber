@@ -3703,7 +3703,7 @@ fn analyzed_unit_from_semantic(
         radix_lanes: semantic_result.radix_lanes,
         gpu_builtins: semantic_result.gpu_builtins,
         access_facts,
-        region_facts: None,
+        region_facts: semantic_result.region_facts,
         semantic_diagnostics: semantic_result.diagnostics,
     };
 

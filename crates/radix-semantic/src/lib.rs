@@ -244,6 +244,14 @@ pub struct SemanticResult {
     /// the table consumed by the region handoff.
     pub access_facts: Option<AccessFactTable>,
 
+    /// Region facts from the same run's single region-engine handoff. A
+    /// failed pre-HIR result carries `None`; every successful result carries
+    /// the facts the borrow passes already consumed (`None` only when the
+    /// engine rejected an unsupported control-flow shape). The analyzed
+    /// application consumes these carried facts instead of re-running the
+    /// engine.
+    pub region_facts: Option<crate::passes::borrow_region::RegionFacts>,
+
     /// Presentation sidecar produced by the same lowering pass that produced
     /// `hir`. Travels with the HIR value into the driver's `AnalyzedModule`; the
     /// semantic passes themselves stay trivia-blind.
@@ -545,6 +553,8 @@ pub fn analyze_with_cli(
             resolver,
             radix_lanes,
             annotation_contracts,
+            // Region inference has not run at this failure point.
+            None,
             diagnostics,
         );
     }
@@ -576,6 +586,8 @@ pub fn analyze_with_cli(
             resolver,
             radix_lanes,
             annotation_contracts,
+            // Region inference has not run at this failure point.
+            None,
             diagnostics,
         );
     }
@@ -727,6 +739,7 @@ pub fn analyze_with_cli(
     SemanticResult {
         hir: Some(hir),
         access_facts: Some(access_facts),
+        region_facts,
         presentation: lowered.presentation,
         types,
         radix_lanes,
@@ -743,11 +756,15 @@ pub(crate) fn early_semantic_result(
     resolver: Resolver,
     radix_lanes: RadixLaneMetadata,
     annotation_contracts: AnnotationContractMetadata,
+    // Region inference runs after typecheck, so every early-failure caller
+    // has no region facts to carry and passes `None` here.
+    region_facts: Option<crate::passes::borrow_region::RegionFacts>,
     diagnostics: Vec<SemanticError>,
 ) -> SemanticResult {
     SemanticResult {
         hir: None,
         access_facts: None,
+        region_facts,
         presentation: empty_presentation(),
         types,
         radix_lanes,

@@ -36,7 +36,7 @@ fn analyze_parts(source: &str) -> (AnalyzedApplicationParts, Interner) {
         radix_lanes: result.radix_lanes,
         gpu_builtins: result.gpu_builtins,
         access_facts: result.access_facts.expect("access facts"),
-        region_facts: None,
+        region_facts: result.region_facts,
         semantic_diagnostics: result.diagnostics,
     };
     (parts, parsed.interner)
@@ -387,9 +387,9 @@ incipit { }
 #[test]
 fn unavailable_region_facts_are_an_absent_required_summary() {
     // The reducer's Unavailable path (no region facts for a borrow-returning
-    // function) is what build maps to AbsentRequiredFacts; a build with no
-    // engine failure cannot fixture it end-to-end, so prove the mapping at
-    // the reduction boundary it composes from.
+    // function) is what build maps to AbsentRequiredFacts; prove the mapping
+    // at the reduction boundary it composes from (build now only sees absent
+    // facts when the engine itself could not run).
     let (parts, _interner) = analyze_parts(
         r"
 functio mutator() → in lista<numerus> {

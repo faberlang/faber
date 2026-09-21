@@ -95,12 +95,13 @@ pub struct AnalyzedApplicationParts {
     pub radix_lanes: RadixLaneMetadata,
     pub gpu_builtins: Vec<(radix_hir::DefId, radix_types::MirKernelBuiltin)>,
     pub access_facts: AccessFactTable,
-    /// Optional caller-supplied region facts from the same analysis run.
+    /// Region facts carried from the pipeline's single region-engine run on
+    /// this same analysis snapshot; `build` never re-runs the engine.
     ///
-    /// When `None`, `build` runs the region engine itself exactly once over
-    /// the snapshot's own HIR/types/access facts. Supplying facts from a
-    /// different run is a snapshot-coherence violation and fails closed at
-    /// the reduction boundary.
+    /// `None` means the engine could not run (unsupported control-flow
+    /// shape); reduction then fails closed for borrow-returning functions.
+    /// Supplying facts from a different run is a snapshot-coherence violation
+    /// and fails closed at the reduction boundary.
     pub region_facts: Option<crate::passes::borrow_region::RegionFacts>,
     pub semantic_diagnostics: Vec<SemanticError>,
 }
@@ -179,16 +180,11 @@ impl AnalyzedApplication {
             });
         }
 
-        // SCR-04: reduce flow-sensitive regions to durable provenance
-        // summaries over this snapshot's own facts. Region facts supplied by
-        // the caller replace the engine run; both paths share the one
-        // reduction and its fail-closed law.
-        let regions = match parts.region_facts {
-            Some(facts) => Some(facts),
-            None => {
-                crate::passes::borrow_region::analyze(&parts.hir, &parts.types, &access_facts).ok()
-            }
-        };
+        // SCR-04: reduce the region facts carried from the pipeline's single
+        // engine run on this same snapshot — `build` never re-runs the engine.
+        // Absent facts (the engine rejected an unsupported shape) and facts
+        // from a foreign run share the one reduction and its fail-closed law.
+        let regions = parts.region_facts;
         let provenance = match crate::passes::borrow_region::reduce(
             &parts.hir,
             &parts.types,
