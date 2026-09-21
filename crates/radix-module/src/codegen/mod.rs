@@ -446,7 +446,7 @@ fn generate_swift_from_analyzed(
     output_mode: OutputMode,
     module_name: Option<&str>,
 ) -> Result<crate::Output, CodegenError> {
-    let mut r#gen = swift::SwiftCodegen::new(&analysis.hir, &analysis.interner);
+    let mut r#gen = swift::SwiftCodegen::new(&analysis.hir, &analysis.types, &analysis.interner);
     r#gen.set_failable_facts(&swift_failable_facts(&analysis.function_facts));
     r#gen.set_output_mode(
         match output_mode {
