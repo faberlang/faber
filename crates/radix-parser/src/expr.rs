@@ -694,7 +694,15 @@ impl Parser {
 
         if let Some(op) = op {
             self.advance();
-            let operand = Box::new(self.parse_unary_inner(allow_conversio)?);
+            // A prefix chain nests one `unary` level per operator and never
+            // re-enters `parse_expression`, so the depth budget is charged at
+            // this recursion rather than at the function entry — the same shape
+            // as the right-associative `? :` and `←` recursions.
+            let operand = Box::new(self.nested(
+                ParseErrorKind::ExpressionInvalid,
+                start,
+                |parser| parser.parse_unary_inner(allow_conversio),
+            )?);
             let span = start.merge(self.previous_span());
             let id = self.next_id();
             return Ok(Expr {
@@ -2459,7 +2467,19 @@ impl Parser {
     /// Parse one JSON value: object, array, string, number, `true`, `false`,
     /// `null`. The wire tokens `true`/`false`/`null` arrive as `Ident` because
     /// only `verum`/`falsum`/`nihil` are Faber keywords.
+    ///
+    /// Nested objects and arrays re-enter here through
+    /// [`Parser::parse_json_object_value`] and [`Parser::parse_json_array_value`],
+    /// so the depth budget is charged at this entry point.
     fn parse_json_value(&mut self) -> Result<JsonValue, ParseError> {
+        let start = self.current_span();
+        self.nested(ParseErrorKind::ExpressionInvalid, start, |parser| {
+            parser.parse_json_value_body()
+        })
+    }
+
+    /// JSON value body beneath the depth budget; see [`Parser::parse_json_value`].
+    fn parse_json_value_body(&mut self) -> Result<JsonValue, ParseError> {
         match &self.peek().kind {
             TokenKind::LBrace => {
                 self.advance();

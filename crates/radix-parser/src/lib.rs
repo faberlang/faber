@@ -79,9 +79,10 @@ impl ParseResult {
 /// precedence chain of Rust frames per level, so an unbounded descent aborts the
 /// process on the stack long before any later phase can report anything. Depth
 /// is checked at the recursive entry points (`parse_expression`, `parse_type`,
-/// `parse_block`, plus the right-associative `? :` and `←` recursions) and a
-/// rejected subtree becomes an ordinary parse diagnostic through the usual
-/// recovery path.
+/// `parse_block`, `parse_json_value`) and at the recursions that sidestep those
+/// entries (`? :`, `←`, the unary prefix chain, the nested array binding
+/// pattern); a rejected subtree becomes an ordinary parse diagnostic through the
+/// usual recovery path.
 ///
 /// Sized from measurement, not taste. With the guard removed, a parenthesized
 /// nest overflows a 2 MiB test-thread stack between 32 and 48 levels and an
