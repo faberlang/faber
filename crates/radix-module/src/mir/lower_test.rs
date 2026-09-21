@@ -93,6 +93,68 @@ functio aequalis(numerus<d32> a, numerus<d64> b) → bivalens {
 }
 
 #[test]
+fn lowers_decimal_literal_text_to_the_exact_carrier_across_mir() {
+    // need: the original digit text — not the f64 re-derivation —
+    // must decide the MIR constant. 9223372036.854775807 × 10⁹ is exactly
+    // i64::MAX; a carrier derived from the rounded f64 leaves the width.
+    let dump = dump_source(
+        r"
+functio exacta() → numerus<d64> {
+    fixum numerus<d64> x ← 9223372036.854775807
+    redde x
+}
+",
+    );
+    assert!(
+        dump.contains("const int 9223372036854775807"),
+        "the exact scaled carrier must reach MIR:\n{dump}"
+    );
+    assert!(
+        !dump.contains("const float"),
+        "no float constant may intermediate on the decimal path:\n{dump}"
+    );
+}
+
+#[test]
+fn decimal_literal_executes_at_the_exact_scaled_carrier() {
+    // need: the accepted literal runs at its exact carrier; any f64
+    // intermediation rounds and the runner's re-derivation lands out of range.
+    let mut host = crate::mir::BufferHost::default();
+    crate::mir::run_source(
+        &Session::new(Config::default().with_target(Target::HirTypeScript)),
+        "decimal-exact-carrier.fab",
+        r"incipit {
+    fixum numerus<d64> x ← 9223372036.854775807
+    nota x
+}",
+        &mut host,
+    )
+    .unwrap_or_else(|error| panic!("exact decimal carrier must run: {error:?}"));
+    assert_eq!(host.stdout_lines, ["9223372036854775807"]);
+}
+
+#[test]
+fn decimal_literal_switch_matches_at_the_exact_carrier() {
+    // need: patterns lower through the same exact-carrier seam as
+    // the scrutinee, so the case compares Int carrier against Int carrier.
+    let mut host = crate::mir::BufferHost::default();
+    crate::mir::run_source(
+        &Session::new(Config::default().with_target(Target::HirTypeScript)),
+        "decimal-exact-switch.fab",
+        r#"incipit {
+    fixum numerus<d64> x ← 4.2
+    discerne x {
+        casu 4.2 { nota "hit" }
+        ceterum { nota "miss" }
+    }
+}"#,
+        &mut host,
+    )
+    .unwrap_or_else(|error| panic!("decimal switch must run: {error:?}"));
+    assert_eq!(host.stdout_lines, ["hit"]);
+}
+
+#[test]
 fn lowers_decimal_fuzzy_equality_through_the_d64_scaled_carrier() {
     let dump = dump_source(
         r"

@@ -34,9 +34,9 @@ pub(crate) enum MissingFieldPolicy {
 
 impl<H: super::Host + ?Sized> Runner<'_, H> {
     /// Normalize a typed decimal MIR value into the scaled `Value::Int`
-    /// carrier. D1 still lowers decimal literals through the float constant
-    /// seam, so this boundary re-derives the exact decimal text before D4
-    /// arithmetic touches it.
+    /// carrier. Decimal literals lower to exact carriers at the MIR literal
+    /// seam; this boundary re-derives from the f64 field only
+    /// for legacy float-constant values that still reach a decimal slot.
     pub(crate) fn normalize_decimal_value(
         &mut self,
         value: Value,

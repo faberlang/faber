@@ -751,7 +751,8 @@ impl FunctionBuilder<'_> {
             let pattern = self.discerne_switch_arm_pattern(arm)?;
             match pattern {
                 HirPattern::Literal(literal) => {
-                    let constant = self.literal_switch_constant(literal, arm.span)?;
+                    let scrutinee_ty = self.expr_ty(scrutinee).map(|ty| ty.semantic_id());
+                    let constant = self.literal_switch_constant(literal, scrutinee_ty, arm.span)?;
                     let target = self.fresh_block(arm.span);
                     cases.push(MirSwitchCase { value: constant, target });
                     bodies.push((target, &arm.body, arm.span));
@@ -1308,7 +1309,12 @@ impl FunctionBuilder<'_> {
         Some(())
     }
 
-    fn literal_switch_constant(&mut self, literal: &HirLiteral, span: Span) -> Option<MirConstant> {
+    fn literal_switch_constant(
+        &mut self,
+        literal: &HirLiteral,
+        scrutinee_ty: Option<TypeId>,
+        span: Span,
+    ) -> Option<MirConstant> {
         match literal {
             HirLiteral::Int(value) => match i64::try_from(*value) {
                 Ok(value) => Some(MirConstant::Int(value)),
@@ -1316,7 +1322,25 @@ impl FunctionBuilder<'_> {
                 // the upper half of u64; carry them exactly as `UInt`.
                 Err(_) => Some(MirConstant::UInt(*value)),
             },
-            // decimal-widths D1: text-carrying decimals lower via the f64 path.
+            // decimal-widths D1 successor: a decimal-typed
+            // text pattern carries the exact scaled carrier, so the case
+            // compares against the same Int carrier the scrutinee stores.
+            HirLiteral::FloatText { text, .. } if self.decimal_literal_width(scrutinee_ty).is_some() => {
+                let width = self
+                    .decimal_literal_width(scrutinee_ty)
+                    .expect("guarded above");
+                let carrier = self.context.interner.and_then(|interner| {
+                    radix_codegen_shared::decimal::decimal_text_to_carrier(interner.resolve(*text), width)
+                });
+                let Some(carrier) = carrier else {
+                    self.errors.push(MirError::unsupported(
+                        span,
+                        "decimal literal pattern carrier is outside the declared width",
+                    ));
+                    return None;
+                };
+                Some(MirConstant::Int(carrier))
+            }
             HirLiteral::Float(value) | HirLiteral::FloatText { value, .. } => Some(MirConstant::Float(*value)),
             HirLiteral::String(symbol) => Some(MirConstant::String(*symbol)),
             HirLiteral::Ascii(symbol) => Some(MirConstant::Ascii(*symbol)),
