@@ -346,6 +346,56 @@ fn cmd_targets_discovery_hides_legacy_scena() {
 }
 
 #[test]
+fn discoverable_targets_equal_universe_minus_hidden() {
+    // P6-3: the discoverable row list is a selection of the variant
+    // universe, never an independent enumeration. The delta must be
+    // exactly the deliberately hidden variants — MirAmd (internal until
+    // the leaf proves a truthful baseline, OQ2) and MirScena (hidden
+    // legacy runtime). A variant added to `Target::ALL` fails this test
+    // until it joins the row list or is named hidden here: a new backend
+    // can no longer silently vanish from `radix targets` / `faber targets`.
+    let discoverable = discoverable_targets();
+    let universe_minus_hidden: Vec<crate::codegen::Target> = crate::codegen::Target::ALL
+        .iter()
+        .copied()
+        .filter(|target| !matches!(target, crate::codegen::Target::MirAmd | crate::codegen::Target::MirScena))
+        .collect();
+
+    for target in &universe_minus_hidden {
+        assert!(
+            discoverable.contains(target),
+            "{target:?} is in the target universe and not hidden, but has no discoverable row"
+        );
+    }
+    for target in discoverable {
+        assert!(
+            universe_minus_hidden.contains(target),
+            "{target:?} has a discoverable row but is hidden or absent from the target universe"
+        );
+    }
+    assert_eq!(
+        discoverable.len(),
+        universe_minus_hidden.len(),
+        "discoverable rows must not hold duplicates"
+    );
+}
+
+#[test]
+fn target_name_table_matches_display() {
+    // P6-3: the name table is the single canonical copy, and it must agree
+    // with `Target`'s `Display` — `faber targets` derives row names from
+    // `Display` while `radix targets` prints this table, so drift would
+    // split the two reports' spellings of the same backend.
+    for target in crate::codegen::Target::ALL {
+        assert_eq!(
+            target_name(*target),
+            target.to_string(),
+            "target_name must spell {target:?} exactly as Display does"
+        );
+    }
+}
+
+#[test]
 fn cmd_targets_reports_known_capabilities() {
     // U5.1 done_when §6: fhir is among known/discoverable targets with correct F8 values.
     let names: Vec<&str> = discoverable_targets()
