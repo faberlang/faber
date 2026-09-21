@@ -155,12 +155,6 @@ const EXPECTED: &[(&str, Variant, Classification)] = &[
         Variant::Bare,
         Classification::FailClosed,
     ),
-    // Provider-module analysis for codegen (one module source).
-    (
-        "crates/radix-module/src/codegen/mod.rs",
-        Variant::Bare,
-        Classification::FailClosed,
-    ),
     // `analyze_prepared_program_path`/`_name` — documented fail-closed
     // module analysis for path-shaped e2e/interpret/verify callers.
     (
@@ -168,6 +162,15 @@ const EXPECTED: &[(&str, Variant, Classification)] = &[
         Variant::Bare,
         Classification::FailClosed,
     ),
+    (
+        "crates/radix-module/src/program/compile.rs",
+        Variant::Bare,
+        Classification::FailClosed,
+    ),
+    // `provider_unit_for_target` — one parsed provider target analyzed
+    // under the provider's own contract (carried-provider carriage, moved
+    // here from codegen/mod.rs by 6f7333697); no package facts by
+    // construction.
     (
         "crates/radix-module/src/program/compile.rs",
         Variant::Bare,
