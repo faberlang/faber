@@ -193,10 +193,11 @@ type MethodCallTargets = HashMap<PathBuf, HashMap<(DefId, String), DefId>>;
 type CliRecordFieldsByLocal = HashMap<Symbol, Vec<MirRuntimeRecordField>>;
 type CliEntryRecords = HashMap<PathBuf, CliRecordFieldsByLocal>;
 
-// HIR lowering allocates generated DefIds starting at 1_000_000. Package MIR
-// linked function-source ids must live above that range or rewritten namespace
-// calls can collide with import/local bindings and lower as indirect calls.
-pub const PACKAGE_MIR_SYNTHETIC_DEF_BASE: u32 = 2_000_000_000;
+// Package-MIR linked function-source ids live above every HIR-lowering band
+// (band table in `radix_types::def_id`) or rewritten namespace calls can
+// collide with import/local bindings and lower as indirect calls. The
+// constant's home is `radix_types`.
+pub use radix_types::PACKAGE_MIR_SYNTHETIC_DEF_BASE;
 pub const PACKAGE_MIR_TARGET_NAME: &str = "scena";
 pub const PACKAGE_MIR_ARTIFACT_DIR: &str = "faber-mir";
 pub const FMIR_BIN_ARTIFACT_DIR: &str = "exe";

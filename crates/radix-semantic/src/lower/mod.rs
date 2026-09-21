@@ -257,7 +257,7 @@ impl<'a> Lowerer<'a> {
             annotation_capture: None,
             annotation_ordinal: None,
             annotation_field_ordinal: 0,
-            next_def_id: 1_000_000,
+            next_def_id: radix_types::HIR_SYNTHETIC_DEF_ID_BASE,
             errors: Vec::new(),
             current_span: Span::default(),
             local_scopes: Vec::new(),

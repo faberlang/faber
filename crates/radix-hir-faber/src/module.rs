@@ -446,7 +446,7 @@ impl FaberCodegen<'_> {
 /// at `USER_DEF_ID_BASE`. The range check is structural and covers every
 /// builtin allocated through the standard mechanism, regardless of its name.
 fn is_compiler_injected_item(item: &HirItem) -> bool {
-    item.def_id.0 < radix_types::USER_DEF_ID_BASE
+    item.def_id.is_builtin()
 }
 
 /// Whether `generate_item` will re-emit the item's annotation sequence.

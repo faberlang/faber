@@ -35,7 +35,10 @@ pub use capability::{
     SolvedIndexedIdentity, TypeCapabilityAnswer, TypeCapabilityKind, TypeCapabilityProof,
     TypeCapabilitySummary,
 };
-pub use def_id::DefId;
+pub use def_id::{
+    CLOSURE_LIFT_DEF_ID_BASE, COMPANION_DEF_ID_FLAG, DefId, HIR_SYNTHETIC_DEF_ID_BASE,
+    PACKAGE_MIR_SYNTHETIC_DEF_BASE, PROVIDER_DEF_ID_BASE,
+};
 pub use filtrum::{
     CapabilityRequirement, ColumnRef, ComparisonOp, FILTRUM_ENCODING_VERSION_V1, FiltrumPlan,
     OrderRow, Predicate, PredicateValue, SortDirection, SourceIdentity, Window, WindowError,

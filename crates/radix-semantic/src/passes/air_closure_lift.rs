@@ -130,7 +130,7 @@ impl<'a> LiftVisitor<'a> {
             module_defs: index.module_defs,
             names: index.names,
             used_defs: index.used_defs,
-            next_def_id: 0x4000_0000,
+            next_def_id: radix_types::CLOSURE_LIFT_DEF_ID_BASE,
             next_hir_id: index.max_hir_id.saturating_add(1),
             lanes,
             interner,
@@ -146,7 +146,7 @@ impl<'a> LiftVisitor<'a> {
             let candidate = DefId(self.next_def_id);
             self.next_def_id = self.next_def_id.saturating_add(1);
             if candidate != DefId::INVALID
-                && candidate.0 & 0x8000_0000 == 0
+                && !candidate.is_companion()
                 && self.used_defs.insert(candidate)
             {
                 return candidate;
