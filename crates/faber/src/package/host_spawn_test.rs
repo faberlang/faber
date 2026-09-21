@@ -1,7 +1,7 @@
 use super::{
     DeviceExecuteInvocation, DeviceExecuteInvocationMode, DeviceExecuteProgram,
     DeviceExecuteProtocol, DeviceExecuteReceipt, DeviceExecuteRequest, DeviceExecuteV2Request,
-    DistributedExecuteRequest, DistributedPrepareReceipt, HostSpawnError, WeightFileRange,
+    DistributedExecuteRequest, DistributedPrepareReceipt, HostSpawnError, WeightFileRange, WorkDir,
     decode_device_inputs, encode_device_execute_invocation, encode_device_inputs,
     encode_weight_map, execute_device_at, execute_distributed_at, open_device_session_at,
     resolve_host_cli_at, resolve_host_cli_at_root, start_device_session_at,
@@ -655,4 +655,64 @@ fn spawn_inputs_round_trip_smollm2_packed_prefix() {
         .map(|c| f32::from_le_bytes([c[0], c[1], c[2], c[3]]))
         .collect();
     assert_bit_exact(&BTreeMap::from([(7, values)]));
+}
+
+/// A preplanted directory or symlink at a candidate temp-root name must be
+/// neither written through nor clobbered: the device-execute work directory
+/// is created exclusively under a nonce name.
+#[test]
+fn work_dir_create_uses_exclusive_root_and_ignores_planted_entries() {
+    let guard = tempfile::tempdir().expect("tempdir");
+    let parent = guard.path();
+    let sentinel = parent.join("sentinel");
+    std::fs::create_dir(&sentinel).expect("sentinel dir");
+    let planted_dir = parent.join("planted-workdir");
+    std::fs::create_dir(&planted_dir).expect("planted dir");
+    #[cfg(unix)]
+    std::os::unix::fs::symlink(&sentinel, parent.join("planted-symlink")).expect("symlink");
+
+    let work = WorkDir::create_in(parent).expect("work dir");
+
+    let meta = std::fs::symlink_metadata(&work.path).expect("work dir metadata");
+    assert!(meta.file_type().is_dir(), "work dir must be a directory");
+    assert!(
+        !meta.file_type().is_symlink(),
+        "work dir must not be a symlink"
+    );
+    assert!(work.path.starts_with(parent));
+    assert_ne!(work.path, planted_dir);
+    #[cfg(unix)]
+    assert_ne!(
+        std::fs::canonicalize(&work.path).expect("canonical work dir"),
+        std::fs::canonicalize(&sentinel).expect("canonical sentinel"),
+        "work dir must not resolve into the symlink target"
+    );
+    assert!(
+        std::fs::read_dir(&sentinel)
+            .expect("sentinel")
+            .next()
+            .is_none(),
+        "nothing may be written through the planted symlink"
+    );
+    assert!(
+        std::fs::read_dir(&planted_dir)
+            .expect("planted dir")
+            .next()
+            .is_none(),
+        "the planted directory must not be clobbered or written into"
+    );
+    assert!(
+        work.path
+            .file_name()
+            .expect("work dir name")
+            .to_string_lossy()
+            .starts_with(".faber-device-execute.tmp-"),
+        "work dir must use the exclusive nonce scheme, not a predictable name"
+    );
+
+    let work_path = work.path.clone();
+    drop(work);
+    assert!(!work_path.exists(), "drop removes only the exclusive root");
+    assert!(sentinel.exists(), "planted entries survive the drop");
+    assert!(planted_dir.exists(), "planted entries survive the drop");
 }

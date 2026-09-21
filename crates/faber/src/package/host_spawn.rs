@@ -16,7 +16,6 @@ use std::fs;
 use std::io::{BufRead, BufReader, Write};
 use std::path::{Path, PathBuf};
 use std::process::{Child, ChildStdin, ChildStdout, Command, Stdio};
-use std::time::{SystemTime, UNIX_EPOCH};
 
 #[cfg(feature = "device-runtime")]
 use radix_mir_fmir::{
@@ -1694,22 +1693,33 @@ fn path_text(path: &Path) -> Result<String, HostSpawnError> {
         })
 }
 
+/// Exclusive temp-root creation for the whole crate. `mod cargo` is private
+/// to `package`, so crate-external users (postprocess) reach the shared
+/// helper through this re-export rather than a second mechanism.
+pub(crate) use super::cargo::unique_temp_sibling;
+
 struct WorkDir {
     path: PathBuf,
 }
 
 impl WorkDir {
     fn create() -> Result<Self, HostSpawnError> {
-        let nanos = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .map_or(0, |elapsed| elapsed.as_nanos());
-        let path = std::env::temp_dir().join(format!(
-            "faber-device-execute-{}-{nanos}",
-            std::process::id()
-        ));
-        fs::create_dir_all(&path).map_err(|error| HostSpawnError {
-            code: "E_HOST_SPAWN".to_owned(),
-            message: format!("failed to create {}: {error}", path.display()),
+        Self::create_in(&std::env::temp_dir())
+    }
+
+    /// Create the work directory through the shared exclusive-create retry
+    /// mechanism — never `create_dir_all` on a predictable name, so a
+    /// preplanted directory or symlink at a candidate name is neither
+    /// written through nor clobbered.
+    fn create_in(parent: &Path) -> Result<Self, HostSpawnError> {
+        let path = unique_temp_sibling(parent, "faber-device-execute").map_err(|error| {
+            HostSpawnError {
+                code: "E_HOST_SPAWN".to_owned(),
+                message: format!(
+                    "failed to create unique temporary work directory: {}",
+                    error.message
+                ),
+            }
         })?;
         Ok(Self { path })
     }
