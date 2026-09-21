@@ -366,3 +366,23 @@ functio probe(Tabulatio t) → numerus {
     );
     assert_en_output_compiles("nominal-receiver.en.fab", &code);
 }
+
+#[test]
+fn deferred_hole_binding_converts_without_materializing_the_inferred_type() {
+    // ON-S1: an initializer-free `sit` binding re-emits as a `_` hole.
+    // Materializing the inferred type (`const string label`) changes the
+    // authored surface and fails output re-validation with
+    // `authored_type_form_map_diverged`, which blocked every reader-locale
+    // render of the devsite's deferred-binding fence.
+    let source = "+++\nlocale = \"la\"\n+++\nincipit {\n    sit label\n    label ← \"deferred\"\n}\n";
+    let code = convert_to_en(source);
+    assert!(
+        code.contains("const _ label"),
+        "initializer-free hole binding must re-emit as `_`, not a materialized type:\n{code}"
+    );
+    assert!(
+        !code.contains("string label"),
+        "materialized inferred type must not appear in the converted surface:\n{code}"
+    );
+    assert_en_output_compiles("deferred-hole.fab", &code);
+}

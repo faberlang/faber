@@ -560,26 +560,17 @@ impl super::FaberCodegen<'_> {
             slot: HirTypeSlot::Declared,
         };
         if let Some(ty) = local.ty {
-            let hole_authored = self.authored_type_forms.get(&site).is_some_and(|form| {
-                matches!(
-                    form.head,
-                    radix_hir::HirTypeFormHead::Infer | radix_hir::HirTypeFormHead::UnionHole
-                )
-            });
-            if local.init.is_some() || !hole_authored {
-                // The authored form at this site is the sole authority for
-                // concrete versus hole spelling. An absent site falls back to
-                // the canonical concrete type in `type_to_faber_at`.
-                let rendered = self
-                    .type_to_faber_at(&site, ty, names, surface)
-                    .unwrap_or_else(|error| self.record_type_emission_error(error));
-                writer.write(&rendered);
-            } else {
-                // An initializer-free hole is materialized so the bare
-                // binding still type-checks, preserving the existing
-                // re-check-safety policy.
-                writer.write(&self.type_to_faber(ty, names, surface));
-            }
+            // The authored form at this site is the sole authority for
+            // concrete versus hole spelling. An absent site falls back to
+            // the canonical concrete type in `type_to_faber_at`. An
+            // initializer-free authored hole re-emits as `_`: a bare hole
+            // binding with a later assignment type-checks, so materializing
+            // the inferred type would change the authored surface and fail
+            // output re-validation.
+            let rendered = self
+                .type_to_faber_at(&site, ty, names, surface)
+                .unwrap_or_else(|error| self.record_type_emission_error(error));
+            writer.write(&rendered);
             writer.write(" ");
         } else if local.init.is_some() {
             // A pre-finalization or hand-built local may not have a semantic
