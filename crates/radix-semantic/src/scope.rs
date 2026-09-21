@@ -350,6 +350,12 @@ pub struct ImportedEnumVariant {
     /// Payload fields in declaration order (consumer type table); empty for
     /// unit variants.
     pub fields: Vec<ImportedFileStructField>,
+    /// True when at least one payload field failed consumer-side remap and is
+    /// omitted from `fields`. The row stays visible so the commune projection
+    /// can arm the variant (its pattern binds only the shared field), but
+    /// [`Resolver::variant_child`] excludes the row so the package-MIR merge
+    /// still fails closed on the unknown payload identity (council-11).
+    pub payload_unresolved: bool,
 }
 
 /// One `@ commune` field on a union, local or imported.
@@ -1462,6 +1468,7 @@ impl Resolver {
                     def_id: variant_def,
                     name: variant_name,
                     fields: Vec::new(),
+                    payload_unresolved: false,
                 }
             })
             .collect();
@@ -1485,13 +1492,14 @@ impl Resolver {
         }))
     }
 
-    /// Remap enum variant payload fields (phase 2 of file import), dropping
-    /// any variant whose payload references a type the consumer cannot
-    /// resolve. Fail-closed mirror of the struct-field policy: a variant that
-    /// would retain an unknown identity must not stay visible to the consumer
-    /// analysis — the package-MIR merge then fails closed on it instead of
-    /// silently keeping the library's source-local variant (council-11
-    /// correct_before_next_phase).
+    /// Remap enum variant payload fields (phase 2 of file import). Payload
+    /// fields that fail consumer-side remap are omitted from the row, but the
+    /// row itself always stays, flagged `payload_unresolved`: the commune
+    /// projection arms every variant from these rows and its pattern binds
+    /// only the shared field, so a dropped row would leave that variant to
+    /// the runtime trap fallback, while `variant_child`
+    /// excludes flagged rows so the package-MIR merge still fails closed on
+    /// the unknown payload identity (council-11 correct_before_next_phase).
     fn import_enum_variants_partial(
         &mut self,
         enum_def: DefId,
@@ -1505,28 +1513,34 @@ impl Resolver {
         let remapped = existing
             .iter()
             .zip(nominal.variants.iter())
-            .filter_map(|(existing_variant, snapshot_variant)| {
+            .map(|(existing_variant, snapshot_variant)| {
+                let mut payload_unresolved = false;
                 let fields = snapshot_variant
                     .fields
                     .iter()
-                    .map(|field| {
-                        import_interface_type_with_resolver(&field.ty, types, interner, self).map(
-                            |ty| ImportedFileStructField {
+                    .filter_map(|field| {
+                        match import_interface_type_with_resolver(&field.ty, types, interner, self)
+                        {
+                            Ok(ty) => Some(ImportedFileStructField {
                                 name: interner.intern(&field.name),
                                 ty,
                                 optional: field.optional,
                                 required: field.required,
                                 init: field.default.clone(),
-                            },
-                        )
+                            }),
+                            Err(_) => {
+                                payload_unresolved = true;
+                                None
+                            }
+                        }
                     })
-                    .collect::<Result<Vec<_>, FileInterfaceError>>()
-                    .ok()?;
-                Some(ImportedEnumVariant {
+                    .collect::<Vec<_>>();
+                ImportedEnumVariant {
                     def_id: existing_variant.def_id,
                     name: existing_variant.name,
                     fields,
-                })
+                    payload_unresolved,
+                }
             })
             .collect();
         self.imported_enum_variants.insert(enum_def, remapped);
@@ -3043,13 +3057,15 @@ impl Resolver {
     #[must_use]
     pub fn variant_child(&self, enum_def_id: DefId, variant_name: LexSymbol) -> Option<DefId> {
         // Imported enums' variant membership is the `imported_enum_variants`
-        // table, not the parent link: phase-2 drops a variant whose payload
-        // cannot be remapped, and the stale parent link must not resurrect it
-        // (the package-MIR merge depends on the drop to fail closed).
+        // table, not the parent link: a variant whose payload cannot be
+        // remapped stays in the table (the commune projection arms it from the
+        // row) but is flagged `payload_unresolved` and must not resolve as a
+        // member here — the package-MIR merge depends on that exclusion to
+        // fail closed on the unknown payload identity.
         if let Some(variants) = self.imported_enum_variants.get(&enum_def_id) {
             return variants
                 .iter()
-                .find(|variant| variant.name == variant_name)
+                .find(|variant| variant.name == variant_name && !variant.payload_unresolved)
                 .map(|variant| variant.def_id);
         }
         self.variants_by_parent_name
