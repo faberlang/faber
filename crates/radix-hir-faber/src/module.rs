@@ -23,11 +23,17 @@ pub struct FaberOutput {
 
 /// Canonical Faber code generator.
 ///
-/// Carries the resolved trivia index for the current generation; render
-/// methods read it through `&self`, so a fresh [`FaberCodegen::default`] with
-/// an empty index reproduces trivia-free canonical output exactly.
-#[derive(Debug, Default)]
-pub struct FaberCodegen {
+/// Carries the per-unit fact pair — the analyzed [`TypeTable`] and the
+/// [`Interner`] — on the context itself (installed once at
+/// [`FaberCodegen::new`]) plus the resolved trivia index for the current
+/// generation; render methods read them through `&self`, so a fresh
+/// [`FaberCodegen::new`] with empty spellings reproduces trivia-free
+/// canonical output exactly.
+pub struct FaberCodegen<'a> {
+    /// Analyzed type facts for the unit being emitted.
+    pub(crate) types: &'a TypeTable,
+    /// The unit's interner (symbol spelling resolution).
+    pub(crate) interner: &'a Interner,
     /// Flattened trivia attachments for the presentation being generated.
     pub(crate) trivia: TriviaIndex,
     /// `TypeId` → qualified source spelling (`base.Vector3`) for imported
@@ -84,42 +90,76 @@ pub struct FaberCodegen {
     type_emission_error: RefCell<Option<CodegenError>>,
 }
 
-/// Emit canonical Faber source from analyzed HIR and its presentation.
-///
-/// The presentation sidecar is inseparable from the HIR value it annotates;
-/// an [`empty_presentation`] reproduces trivia-free canonical output.
-///
-/// `imported_type_spellings` / `imported_def_spellings` map imported nominal
-/// `TypeId`s and `DefId`s to their qualified source spelling (`base.Vector3`);
-/// pass empty maps when no import contract is available and imported types
-/// fall back to `def_N`.
-///
-/// # Errors
-///
-/// Returns `CodegenError` if the HIR program contains error expressions that
-/// cannot be represented in canonical Faber output.
-///
-/// `FxHashMap` parameters are intentional (mirrors `TypeTable` / interner maps);
-/// do not generalize over `BuildHasher` for call-site simplicity.
-#[allow(clippy::implicit_hasher)]
-#[allow(clippy::too_many_arguments)]
-pub fn emit(
-    hir: &HirModule,
-    presentation: &HirPresentation,
-    types: &TypeTable,
-    interner: &Interner,
-    surface: &impl KeywordSurface,
-    imported_type_spellings: &FxHashMap<TypeId, String>,
-    imported_def_spellings: &FxHashMap<DefId, String>,
-    imported_pattern_spellings: &FxHashMap<DefId, String>,
-) -> Result<FaberOutput, CodegenError> {
-    let mut codegen = FaberCodegen {
-        imported_type_spellings: imported_type_spellings.clone(),
-        imported_def_spellings: imported_def_spellings.clone(),
-        imported_pattern_spellings: imported_pattern_spellings.clone(),
-        ..Default::default()
-    };
-    codegen.generate(hir, presentation, types, interner, surface)
+impl std::fmt::Debug for FaberCodegen<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        // The borrowed fact pair (`types`, `interner`) is arena-large and not
+        // `Debug`; the emission state below it is what a debug dump needs.
+        f.debug_struct("FaberCodegen")
+            .field("imported_type_spellings", &self.imported_type_spellings)
+            .field("imported_def_spellings", &self.imported_def_spellings)
+            .field(
+                "imported_pattern_spellings",
+                &self.imported_pattern_spellings,
+            )
+            .field("type_emission_error", &self.type_emission_error)
+            .finish_non_exhaustive()
+    }
+}
+
+impl<'a> FaberCodegen<'a> {
+    /// Build a code generator for one emission over the given analyzed facts.
+    ///
+    /// The type table and interner ride the context for the generator's
+    /// lifetime instead of threading through every emit signature; emission
+    /// methods read them through `&self`.
+    #[must_use]
+    pub fn new(types: &'a TypeTable, interner: &'a Interner) -> Self {
+        Self {
+            types,
+            interner,
+            trivia: TriviaIndex::default(),
+            imported_type_spellings: FxHashMap::default(),
+            imported_def_spellings: FxHashMap::default(),
+            imported_pattern_spellings: FxHashMap::default(),
+            authored_variant_spellings: FxHashMap::default(),
+            self_def_ids: FxHashSet::default(),
+            variant_def_ids: FxHashSet::default(),
+            qualified_local_variants: FxHashMap::default(),
+            imported_variant_union_path_ids: FxHashSet::default(),
+            guard_si_ids: FxHashSet::default(),
+            elige_expr_ids: FxHashSet::default(),
+            discard_bindings: FxHashMap::default(),
+            await_assignment_bindings: FxHashSet::default(),
+            ordo_enums: FxHashMap::default(),
+            authored_type_forms: FxHashMap::default(),
+            type_emission_error: RefCell::new(None),
+        }
+    }
+
+    /// Install the import-contract spellings before [`Self::generate`].
+    ///
+    /// `imported_type_spellings` / `imported_def_spellings` /
+    /// `imported_pattern_spellings` map imported nominal [`TypeId`]s and
+    /// [`DefId`]s to their qualified source spelling (`base.Vector3`); pass
+    /// empty maps when no import contract is available and imported types
+    /// fall back to `def_N`.
+    ///
+    /// `FxHashMap` parameters are intentional (mirrors `TypeTable` /
+    /// interner maps); do not generalize over `BuildHasher` for call-site
+    /// simplicity.
+    #[allow(clippy::implicit_hasher)]
+    #[must_use]
+    pub fn with_imported_spellings(
+        mut self,
+        imported_type_spellings: &FxHashMap<TypeId, String>,
+        imported_def_spellings: &FxHashMap<DefId, String>,
+        imported_pattern_spellings: &FxHashMap<DefId, String>,
+    ) -> Self {
+        self.imported_type_spellings = imported_type_spellings.clone();
+        self.imported_def_spellings = imported_def_spellings.clone();
+        self.imported_pattern_spellings = imported_pattern_spellings.clone();
+        self
+    }
 }
 
 /// An empty presentation: no owners, no attachments, and a structural program
@@ -151,7 +191,7 @@ pub fn empty_presentation() -> HirPresentation {
     }
 }
 
-impl FaberCodegen {
+impl FaberCodegen<'_> {
     /// Generate canonical Faber source from analyzed HIR and its presentation.
     ///
     /// Item trivia renders before each item (and before its annotation
@@ -166,8 +206,6 @@ impl FaberCodegen {
         &mut self,
         hir: &HirModule,
         presentation: &HirPresentation,
-        types: &TypeTable,
-        interner: &Interner,
         surface: &impl KeywordSurface,
     ) -> Result<FaberOutput, CodegenError> {
         radix_codegen_shared::reject_hir_errors(hir)?;
@@ -198,7 +236,7 @@ impl FaberCodegen {
                 let spelling = path
                     .path
                     .iter()
-                    .map(|segment| interner.resolve(*segment))
+                    .map(|segment| self.interner.resolve(*segment))
                     .collect::<Vec<_>>()
                     .join(".");
                 (path.def_id, spelling)
@@ -236,18 +274,17 @@ impl FaberCodegen {
         // positional call — not re-parseable, not check-green source.
         self.variant_def_ids
             .extend(self.imported_pattern_spellings.keys().copied());
-        self.qualified_local_variants = self.ambiguous_local_variant_spellings(hir, interner);
-        self.imported_variant_union_path_ids =
-            self.imported_variants_needing_union_path(hir, interner);
+        self.qualified_local_variants = self.ambiguous_local_variant_spellings(hir);
+        self.imported_variant_union_path_ids = self.imported_variants_needing_union_path(hir);
 
         let mut rendered_any_item = false;
         for (idx, item) in hir.items.iter().enumerate() {
             if is_compiler_injected_item(item) {
                 continue;
             }
-            self.write_item_trivia(item, !rendered_any_item, interner, &mut writer);
+            self.write_item_trivia(item, !rendered_any_item, &mut writer);
             rendered_any_item = true;
-            self.generate_item(item, types, &names, interner, surface, &mut writer);
+            self.generate_item(item, &names, surface, &mut writer);
             // Canonical blank separator between items. When the following slot
             // carries leading trivia, the trivia run owns the boundary: this
             // separator would otherwise double the line break the run already
@@ -260,18 +297,9 @@ impl FaberCodegen {
         self.write_entry_trivia(
             !rendered_any_item,
             !hir.entry_annotations.is_empty(),
-            interner,
             &mut writer,
         );
-        self.write_hir_annotations(
-            &hir.entry_annotations,
-            types,
-            &names,
-            interner,
-            surface,
-            None,
-            &mut writer,
-        );
+        self.write_hir_annotations(&hir.entry_annotations, &names, surface, None, &mut writer);
 
         if let Some(entry) = &hir.entry {
             // Fidelity: an implicit entry (top-level statements with no
@@ -293,24 +321,20 @@ impl FaberCodegen {
                     writer.write(" ");
                     writer.write(surface.keyword(TokenKind::Argumenta));
                     writer.write(" ");
-                    writer.write(&self.symbol_to_string(args, interner));
+                    writer.write(&self.symbol_to_string(args));
                 }
                 writer.writeln(" {");
                 writer.indented(|writer| {
-                    self.write_block(entry, types, &names, interner, surface, writer);
-                    self.write_block_end_trivia(entry, interner, writer);
+                    self.write_block(entry, &names, surface, writer);
+                    self.write_block_end_trivia(entry, writer);
                 });
                 writer.writeln("}");
             } else {
-                self.write_block(entry, types, &names, interner, surface, &mut writer);
+                self.write_block(entry, &names, surface, &mut writer);
             }
         }
 
-        self.write_program_end_trivia(
-            !rendered_any_item && hir.entry.is_none(),
-            interner,
-            &mut writer,
-        );
+        self.write_program_end_trivia(!rendered_any_item && hir.entry.is_none(), &mut writer);
 
         if let Some(error) = self.type_emission_error.borrow_mut().take() {
             return Err(error);
@@ -345,13 +369,7 @@ impl FaberCodegen {
     }
 
     /// Emit item leading trivia before the item (and before its annotations).
-    fn write_item_trivia(
-        &self,
-        item: &HirItem,
-        file_start: bool,
-        interner: &Interner,
-        writer: &mut CodeWriter,
-    ) {
+    fn write_item_trivia(&self, item: &HirItem, file_start: bool, writer: &mut CodeWriter) {
         let Some(trivia) = self.trivia.for_hir(item.id) else {
             return;
         };
@@ -370,7 +388,7 @@ impl FaberCodegen {
         } else {
             trivia
         };
-        write_leading_trivia(trivia, interner, writer);
+        write_leading_trivia(trivia, self.interner, writer);
     }
 
     /// Whether the next top-level slot carries leading trivia.
@@ -391,13 +409,7 @@ impl FaberCodegen {
     }
 
     /// Emit entry (`incipit`) leading trivia before the entry keyword.
-    fn write_entry_trivia(
-        &self,
-        file_start: bool,
-        has_annotations: bool,
-        interner: &Interner,
-        writer: &mut CodeWriter,
-    ) {
+    fn write_entry_trivia(&self, file_start: bool, has_annotations: bool, writer: &mut CodeWriter) {
         let Some(trivia) = self.trivia.entry_trivia() else {
             return;
         };
@@ -411,23 +423,18 @@ impl FaberCodegen {
         } else {
             trivia
         };
-        write_leading_trivia(trivia, interner, writer);
+        write_leading_trivia(trivia, self.interner, writer);
     }
 
     /// Emit program-end trivia before EOF.
-    fn write_program_end_trivia(
-        &self,
-        file_start: bool,
-        interner: &Interner,
-        writer: &mut CodeWriter,
-    ) {
+    fn write_program_end_trivia(&self, file_start: bool, writer: &mut CodeWriter) {
         if let Some(trivia) = self.trivia.program_end_trivia() {
             let trivia = if file_start {
                 crate::trivia::at_file_start(trivia)
             } else {
                 trivia
             };
-            write_leading_trivia(trivia, interner, writer);
+            write_leading_trivia(trivia, self.interner, writer);
         }
     }
 }

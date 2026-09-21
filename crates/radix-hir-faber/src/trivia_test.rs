@@ -1,8 +1,9 @@
 //! Leaf tests for presentation-trivia placement in canonical Faber emission
 //! (goal Stage 5, unit U-5).
 //!
-//! These tests drive `emit(hir, presentation, types, interner, surface)` with
-//! synthetic HIR + presentation data so the render-slot contract is provable
+//! These tests drive `FaberCodegen::new(types, interner).generate(hir,
+//! presentation, surface)` with synthetic HIR + presentation data so the
+//! render-slot contract is provable
 //! without lowering or FHIR loading (which land in U-3/U-4):
 //! - statement, block-end, and program-end comments land at their structural
 //!   positions;
@@ -14,7 +15,7 @@
 //! - rendering is deterministic for the same inputs.
 
 use crate::surface::TypeBindingKind;
-use crate::{KeywordSurface, emit};
+use crate::{FaberCodegen, KeywordSurface};
 use radix_hir::{
     DefId, HirAnnotation, HirBlock, HirBlockEnd, HirExpression, HirExpressionKind, HirField,
     HirFunction, HirId, HirItem, HirItemKind, HirLiteral, HirMethod, HirModule, HirModuleEnd,
@@ -25,7 +26,6 @@ use radix_lexer::{Interner, Span, TokenKind};
 use radix_syntax::CallablePosture;
 use radix_types::TypeTable;
 use radix_types::USER_DEF_ID_BASE;
-use rustc_hash::FxHashMap;
 
 /// Minimal Latin surface for leaf tests (no reader-pack machinery).
 struct TestSurface;
@@ -220,18 +220,10 @@ fn program(items: Vec<HirItem>, entry: Option<HirBlock>) -> HirModule {
 
 fn render(hir: &HirModule, presentation: &HirPresentation, interner: &Interner) -> String {
     let types = TypeTable::new();
-    emit(
-        hir,
-        presentation,
-        &types,
-        interner,
-        &TestSurface,
-        &FxHashMap::default(),
-        &FxHashMap::default(),
-        &FxHashMap::default(),
-    )
-    .expect("emit should succeed")
-    .code
+    FaberCodegen::new(&types, interner)
+        .generate(hir, presentation, &TestSurface)
+        .expect("emit should succeed")
+        .code
 }
 
 // ── Render slots ──
@@ -552,18 +544,10 @@ fn emits_member_trivia_for_struct_fields_and_methods() {
         authored_types: Vec::new(),
     };
 
-    let code = emit(
-        &hir,
-        &presentation,
-        &types,
-        &interner,
-        &TestSurface,
-        &FxHashMap::default(),
-        &FxHashMap::default(),
-        &FxHashMap::default(),
-    )
-    .expect("emit should succeed")
-    .code;
+    let code = FaberCodegen::new(&types, &interner)
+        .generate(&hir, &presentation, &TestSurface)
+        .expect("emit should succeed")
+        .code;
     assert!(
         code.contains("# field comment\n    textus name"),
         "field trivia must render before the field:\n{code}"

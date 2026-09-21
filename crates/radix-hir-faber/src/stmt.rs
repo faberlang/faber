@@ -24,11 +24,10 @@ use radix_hir::{
     DefId, HirBlock, HirCape, HirExpression, HirExpressionKind, HirLocal, HirOwnerRef,
     HirStatement, HirStatementKind, HirTypeSite, HirTypeSlot,
 };
-use radix_lexer::{Interner, Symbol, TokenKind};
-use radix_types::TypeTable;
+use radix_lexer::{Symbol, TokenKind};
 use rustc_hash::FxHashMap;
 
-impl super::FaberCodegen {
+impl super::FaberCodegen<'_> {
     /// Recognize the normalized HIR shape for a `fac ... dum` loop.
     ///
     /// The parser represents this as a body followed by a final conditional
@@ -119,29 +118,19 @@ impl super::FaberCodegen {
         self.return_expr(block)
     }
 
-    pub(super) fn write_statement_trivia(
-        &self,
-        stmt: &HirStatement,
-        interner: &Interner,
-        writer: &mut CodeWriter,
-    ) {
+    pub(super) fn write_statement_trivia(&self, stmt: &HirStatement, writer: &mut CodeWriter) {
         if let Some(trivia) = self.trivia.for_hir(stmt.id) {
-            crate::trivia::write_leading_trivia(trivia, interner, writer);
+            crate::trivia::write_leading_trivia(trivia, self.interner, writer);
         }
     }
 
     /// Emit a block's structural-end trivia immediately before its closing
     /// brace. Synthesized blocks (no authored end) render nothing.
-    pub(super) fn write_block_end_trivia(
-        &self,
-        block: &HirBlock,
-        interner: &Interner,
-        writer: &mut CodeWriter,
-    ) {
+    pub(super) fn write_block_end_trivia(&self, block: &HirBlock, writer: &mut CodeWriter) {
         if let Some(end) = &block.end
             && let Some(trivia) = self.trivia.for_anchor(&end.id)
         {
-            crate::trivia::write_leading_trivia(trivia, interner, writer);
+            crate::trivia::write_leading_trivia(trivia, self.interner, writer);
         }
     }
 
@@ -186,16 +175,14 @@ impl super::FaberCodegen {
         then_block: &HirBlock,
         catch: Option<&HirCape>,
         else_block: Option<&HirBlock>,
-        types: &TypeTable,
         names: &FxHashMap<DefId, Symbol>,
-        interner: &Interner,
         surface: &impl KeywordSurface,
         writer: &mut CodeWriter,
     ) {
         writer.write(surface.contextual_keyword("si"));
         writer.write(" ");
-        self.write_expr(cond, types, names, interner, surface, writer);
-        self.write_si_branch_body(then_block, types, names, interner, surface, writer);
+        self.write_expr(cond, names, surface, writer);
+        self.write_si_branch_body(then_block, names, surface, writer);
 
         if let Some(catch) = catch {
             writer.newline();
@@ -204,9 +191,7 @@ impl super::FaberCodegen {
             self.write_cape_block_named(
                 &catch.body,
                 Some(catch.binding_name),
-                types,
                 names,
-                interner,
                 surface,
                 writer,
             );
@@ -218,12 +203,12 @@ impl super::FaberCodegen {
             if let Some((sin_cond, sin_then, sin_else)) = self.as_sin_branch(block) {
                 writer.write(surface.contextual_keyword("sin"));
                 writer.write(" ");
-                self.write_expr(sin_cond, types, names, interner, surface, writer);
-                self.write_si_branch_body(sin_then, types, names, interner, surface, writer);
+                self.write_expr(sin_cond, names, surface, writer);
+                self.write_si_branch_body(sin_then, names, surface, writer);
                 next_else = sin_else;
             } else {
                 writer.write(surface.contextual_keyword("secus"));
-                self.write_si_branch_body(block, types, names, interner, surface, writer);
+                self.write_si_branch_body(block, names, surface, writer);
                 break;
             }
         }
@@ -236,14 +221,11 @@ impl super::FaberCodegen {
     /// negated condition marks `requirit`; the plain condition marks `reice`.
     /// Returns `false` when the shape is not a guard, leaving the caller to
     /// emit the ordinary conditional.
-    #[allow(clippy::too_many_arguments)]
     pub(super) fn write_guard_stmt(
         &self,
         cond: &HirExpression,
         then_block: &HirBlock,
-        types: &TypeTable,
         names: &FxHashMap<DefId, Symbol>,
-        interner: &Interner,
         surface: &impl KeywordSurface,
         writer: &mut CodeWriter,
     ) -> bool {
@@ -263,16 +245,16 @@ impl super::FaberCodegen {
         if let HirExpressionKind::Unary(radix_hir::HirUnOp::Not, inner) = &cond.kind {
             writer.write(surface.keyword(TokenKind::Requirit));
             writer.write(" ");
-            self.write_expr(inner, types, names, interner, surface, writer);
+            self.write_expr(inner, names, surface, writer);
         } else {
             writer.write(surface.keyword(TokenKind::Reice));
             writer.write(" ");
-            self.write_expr(cond, types, names, interner, surface, writer);
+            self.write_expr(cond, names, surface, writer);
         }
         writer.write(" ");
         writer.write(surface.keyword(TokenKind::Iace));
         writer.write(" ");
-        self.write_expr(error, types, names, interner, surface, writer);
+        self.write_expr(error, names, surface, writer);
         true
     }
 
@@ -281,15 +263,12 @@ impl super::FaberCodegen {
     /// Returns `false` when either branch needs block syntax. Callers then fall
     /// back to the ordinary conditional form, which preserves grammar validity
     /// without pretending arbitrary blocks are expressions.
-    #[allow(clippy::too_many_arguments)]
     pub(super) fn write_sic_secus_chain(
         &self,
         cond: &HirExpression,
         then_block: &HirBlock,
         else_block: Option<&HirBlock>,
-        types: &TypeTable,
         names: &FxHashMap<DefId, Symbol>,
-        interner: &Interner,
         surface: &impl KeywordSurface,
         writer: &mut CodeWriter,
     ) -> bool {
@@ -304,25 +283,24 @@ impl super::FaberCodegen {
             return false;
         };
 
-        self.write_expr_prec(cond, 2, types, names, interner, surface, writer);
+        self.write_expr_prec(cond, 2, names, surface, writer);
         writer.write(" ");
         writer.write(surface.keyword(TokenKind::Sic));
         writer.write(" ");
-        self.write_expr_prec(then_expr, 2, types, names, interner, surface, writer);
+        self.write_expr_prec(then_expr, 2, names, surface, writer);
         writer.write(" ");
         writer.write(surface.contextual_keyword("secus"));
         writer.write(" ");
 
         if let Some((sin_cond, sin_then, sin_else)) = self.as_sin_branch(else_block) {
-            return self.write_sic_secus_chain(
-                sin_cond, sin_then, sin_else, types, names, interner, surface, writer,
-            );
+            return self
+                .write_sic_secus_chain(sin_cond, sin_then, sin_else, names, surface, writer);
         }
 
         let Some(else_expr) = self.tail_expression(else_block) else {
             return false;
         };
-        self.write_expr_prec(else_expr, 2, types, names, interner, surface, writer);
+        self.write_expr_prec(else_expr, 2, names, surface, writer);
         true
     }
 
@@ -356,9 +334,7 @@ impl super::FaberCodegen {
     pub(super) fn write_si_branch_body(
         &self,
         block: &HirBlock,
-        types: &TypeTable,
         names: &FxHashMap<DefId, Symbol>,
-        interner: &Interner,
         surface: &impl KeywordSurface,
         writer: &mut CodeWriter,
     ) {
@@ -368,28 +344,25 @@ impl super::FaberCodegen {
             writer.write(" ");
             writer.write(surface.contextual_keyword("redde"));
             writer.write(" ");
-            self.write_expr(return_expr, types, names, interner, surface, writer);
+            self.write_expr(return_expr, names, surface, writer);
             return;
         }
 
         writer.writeln(" {");
         writer.indented(|writer| {
-            self.write_block(block, types, names, interner, surface, writer);
-            self.write_block_end_trivia(block, interner, writer);
+            self.write_block(block, names, surface, writer);
+            self.write_block_end_trivia(block, writer);
         });
         writer.write("}");
     }
 
     /// Write a `cape` handler body, using `binding_name` when HIR carries it
     /// outside the block's leading local (structured `fac`/`cape` forms).
-    #[allow(clippy::too_many_arguments)]
     pub(super) fn write_cape_block_named(
         &self,
         block: &HirBlock,
         binding_name: Option<Symbol>,
-        types: &TypeTable,
         names: &FxHashMap<DefId, Symbol>,
-        interner: &Interner,
         surface: &impl KeywordSurface,
         writer: &mut CodeWriter,
     ) {
@@ -408,7 +381,7 @@ impl super::FaberCodegen {
         });
 
         if let Some(name) = name {
-            writer.write(&self.symbol_to_string(name, interner));
+            writer.write(&self.symbol_to_string(name));
             writer.writeln(" {");
             writer.indented(|writer| {
                 for stmt in block
@@ -416,13 +389,13 @@ impl super::FaberCodegen {
                     .iter()
                     .skip(usize::from(skip_binding_local))
                 {
-                    self.write_stmt(stmt, types, names, interner, surface, writer);
+                    self.write_stmt(stmt, names, surface, writer);
                 }
                 if let Some(expr) = &block.expr {
-                    self.write_expr(expr, types, names, interner, surface, writer);
+                    self.write_expr(expr, names, surface, writer);
                     writer.newline();
                 }
-                self.write_block_end_trivia(block, interner, writer);
+                self.write_block_end_trivia(block, writer);
             });
             writer.write("}");
             return;
@@ -430,8 +403,8 @@ impl super::FaberCodegen {
 
         writer.writeln("_ {");
         writer.indented(|writer| {
-            self.write_block(block, types, names, interner, surface, writer);
-            self.write_block_end_trivia(block, interner, writer);
+            self.write_block(block, names, surface, writer);
+            self.write_block_end_trivia(block, writer);
         });
         writer.write("}");
     }
@@ -443,9 +416,7 @@ impl super::FaberCodegen {
     pub(super) fn write_block(
         &self,
         block: &HirBlock,
-        types: &TypeTable,
         names: &FxHashMap<DefId, Symbol>,
-        interner: &Interner,
         surface: &impl KeywordSurface,
         writer: &mut CodeWriter,
     ) {
@@ -457,10 +428,10 @@ impl super::FaberCodegen {
             {
                 continue;
             }
-            self.write_stmt(stmt, types, names, interner, surface, writer);
+            self.write_stmt(stmt, names, surface, writer);
         }
         if let Some(expr) = &block.expr {
-            self.write_expr(expr, types, names, interner, surface, writer);
+            self.write_expr(expr, names, surface, writer);
             writer.newline();
         }
     }
@@ -468,16 +439,14 @@ impl super::FaberCodegen {
     pub(super) fn write_stmt(
         &self,
         stmt: &HirStatement,
-        types: &TypeTable,
         names: &FxHashMap<DefId, Symbol>,
-        interner: &Interner,
         surface: &impl KeywordSurface,
         writer: &mut CodeWriter,
     ) {
-        self.write_statement_trivia(stmt, interner, writer);
+        self.write_statement_trivia(stmt, writer);
         match &stmt.kind {
             HirStatementKind::Local(local) => {
-                self.write_local_stmt(local, types, names, interner, surface, writer);
+                self.write_local_stmt(local, names, surface, writer);
             }
             HirStatementKind::Expr(expr) => {
                 // Authored discard binding (`fixum T _ ← expr`): lowering drops
@@ -497,17 +466,17 @@ impl super::FaberCodegen {
                             slot: HirTypeSlot::DiscardBinding,
                         };
                         let rendered = self
-                            .type_to_faber_at(&site, ty, types, names, interner, surface)
+                            .type_to_faber_at(&site, ty, names, surface)
                             .unwrap_or_else(|error| self.record_type_emission_error(error));
                         writer.write(&rendered);
                         writer.write(" ");
                     }
                     writer.write("_ ← ");
-                    self.write_expr(expr, types, names, interner, surface, writer);
+                    self.write_expr(expr, names, surface, writer);
                     writer.newline();
                     return;
                 }
-                self.write_expr(expr, types, names, interner, surface, writer);
+                self.write_expr(expr, names, surface, writer);
                 writer.newline();
             }
             HirStatementKind::Redde(value) => {
@@ -518,14 +487,14 @@ impl super::FaberCodegen {
                 {
                     writer.write(surface.contextual_keyword("reddet"));
                     writer.write(" ");
-                    self.write_expr(future, types, names, interner, surface, writer);
+                    self.write_expr(future, names, surface, writer);
                     writer.newline();
                     return;
                 }
                 writer.write(surface.contextual_keyword("redde"));
                 if let Some(expr) = value {
                     writer.write(" ");
-                    self.write_expr(expr, types, names, interner, surface, writer);
+                    self.write_expr(expr, names, surface, writer);
                 }
                 writer.newline();
             }
@@ -539,7 +508,7 @@ impl super::FaberCodegen {
                 writer.writeln(surface.contextual_keyword("tacet"));
             }
             HirStatementKind::IncDec(inc_dec) => {
-                self.write_expr(&inc_dec.target, types, names, interner, surface, writer);
+                self.write_expr(&inc_dec.target, names, surface, writer);
                 writer.write(match inc_dec.op {
                     radix_hir::HirIncDecOp::Inc => " ↑",
                     radix_hir::HirIncDecOp::Dec => " ↓",
@@ -553,11 +522,11 @@ impl super::FaberCodegen {
                     for clause in &custodi.clauses {
                         writer.write(surface.contextual_keyword("si"));
                         writer.write(" ");
-                        self.write_expr(&clause.cond, types, names, interner, surface, writer);
+                        self.write_expr(&clause.cond, names, surface, writer);
                         writer.writeln(" {");
                         writer.indented(|writer| {
-                            self.write_block(&clause.body, types, names, interner, surface, writer);
-                            self.write_block_end_trivia(&clause.body, interner, writer);
+                            self.write_block(&clause.body, names, surface, writer);
+                            self.write_block_end_trivia(&clause.body, writer);
                         });
                         writer.writeln("}");
                     }
@@ -571,9 +540,7 @@ impl super::FaberCodegen {
     fn write_local_stmt(
         &self,
         local: &HirLocal,
-        types: &TypeTable,
         names: &FxHashMap<DefId, Symbol>,
-        interner: &Interner,
         surface: &impl KeywordSurface,
         writer: &mut CodeWriter,
     ) {
@@ -604,14 +571,14 @@ impl super::FaberCodegen {
                 // concrete versus hole spelling. An absent site falls back to
                 // the canonical concrete type in `type_to_faber_at`.
                 let rendered = self
-                    .type_to_faber_at(&site, ty, types, names, interner, surface)
+                    .type_to_faber_at(&site, ty, names, surface)
                     .unwrap_or_else(|error| self.record_type_emission_error(error));
                 writer.write(&rendered);
             } else {
                 // An initializer-free hole is materialized so the bare
                 // binding still type-checks, preserving the existing
                 // re-check-safety policy.
-                writer.write(&self.type_to_faber(ty, types, names, interner, surface));
+                writer.write(&self.type_to_faber(ty, names, surface));
             }
             writer.write(" ");
         } else if local.init.is_some() {
@@ -620,13 +587,13 @@ impl super::FaberCodegen {
             // use its witness for the same site-aware render path.
             if let Some(form_ty) = self.authored_type_forms.get(&site).map(|form| form.ty) {
                 let rendered = self
-                    .type_to_faber_at(&site, form_ty, types, names, interner, surface)
+                    .type_to_faber_at(&site, form_ty, names, surface)
                     .unwrap_or_else(|error| self.record_type_emission_error(error));
                 writer.write(&rendered);
                 writer.write(" ");
             }
         }
-        writer.write(&self.symbol_to_string(local.name, interner));
+        writer.write(&self.symbol_to_string(local.name));
         if let Some(init) = &local.init {
             if let HirExpressionKind::ConversioAssign {
                 source, recovery, ..
@@ -637,14 +604,14 @@ impl super::FaberCodegen {
                 // `binding ↤ source [⇥ recovery]` — never `binding ← binding
                 // ↤ source`.
                 writer.write(" ↤ ");
-                self.write_expr_prec(source, 1, types, names, interner, surface, writer);
+                self.write_expr_prec(source, 1, names, surface, writer);
                 if let Some(recovery) = recovery {
                     writer.write(" ⇥ ");
-                    self.write_expr_prec(recovery, 12, types, names, interner, surface, writer);
+                    self.write_expr_prec(recovery, 12, names, surface, writer);
                 }
             } else {
                 writer.write(if await_assignment { " ↢ " } else { " ← " });
-                self.write_expr(init, types, names, interner, surface, writer);
+                self.write_expr(init, names, surface, writer);
             }
         }
         writer.newline();

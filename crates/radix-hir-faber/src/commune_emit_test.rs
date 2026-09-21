@@ -84,15 +84,9 @@ fn emit_shape_error() -> String {
         entry_args_name: None,
         entry_is_async: false,
     };
-    let mut codegen = FaberCodegen::default();
+    let mut codegen = FaberCodegen::new(&types, &interner);
     codegen
-        .generate(
-            &hir,
-            &empty_presentation(),
-            &types,
-            &interner,
-            &LatinSurface,
-        )
+        .generate(&hir, &empty_presentation(), &LatinSurface)
         .expect("faber commune emit succeeds")
         .code
 }

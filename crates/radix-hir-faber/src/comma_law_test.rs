@@ -170,21 +170,9 @@ fn int(interner: &Interner, value: u64) -> HirExpression {
     }
 }
 
-fn render_expr(
-    codegen: &FaberCodegen,
-    expr: &HirExpression,
-    types: &TypeTable,
-    interner: &Interner,
-) -> String {
+fn render_expr(codegen: &FaberCodegen<'_>, expr: &HirExpression) -> String {
     let mut writer = CodeWriter::new();
-    codegen.write_expr(
-        expr,
-        types,
-        &FxHashMap::default(),
-        interner,
-        &TestSurface,
-        &mut writer,
-    );
+    codegen.write_expr(expr, &FxHashMap::default(), &TestSurface, &mut writer);
     writer.finish()
 }
 
@@ -203,7 +191,6 @@ fn closure_modifier_is_preserved_by_faber_reemission() {
         default: None,
         span: span(),
     };
-    let codegen = FaberCodegen::default();
 
     for (modifier, spelling) in [
         (ClosureModifier::Libera, "libera"),
@@ -227,7 +214,7 @@ fn closure_modifier_is_preserved_by_faber_reemission() {
             span: span(),
         };
         assert_eq!(
-            render_expr(&codegen, &closure, &types, &interner),
+            render_expr(&FaberCodegen::new(&types, &interner), &closure),
             format!("numerus value {spelling} ∴ 1")
         );
     }
@@ -275,9 +262,9 @@ fn empty_function(
     }
 }
 
-fn emit_program(hir: &radix_hir::HirModule, types: &TypeTable, interner: &Interner) -> String {
-    FaberCodegen::default()
-        .generate(hir, &empty_presentation(), types, interner, &TestSurface)
+fn emit_program(hir: &radix_hir::HirModule, codegen: &mut FaberCodegen<'_>) -> String {
+    codegen
+        .generate(hir, &empty_presentation(), &TestSurface)
         .expect("canonical Faber emission")
         .code
 }
@@ -295,7 +282,6 @@ fn assert_no_trailing_separator(output: &str) {
 fn expression_item_lists_emit_between_only() {
     let mut interner = Interner::new();
     let types = TypeTable::new();
-    let mut codegen = FaberCodegen::default();
 
     let gradient = HirExpression {
         id: radix_hir::HirId(1),
@@ -307,7 +293,7 @@ fn expression_item_lists_emit_between_only() {
         span: span(),
     };
     assert_eq!(
-        render_expr(&codegen, &gradient, &types, &interner),
+        render_expr(&FaberCodegen::new(&types, &interner), &gradient),
         "0 ∇ [1, 2, 3]"
     );
 
@@ -322,7 +308,7 @@ fn expression_item_lists_emit_between_only() {
         span: span(),
     };
     assert_eq!(
-        render_expr(&codegen, &array, &types, &interner),
+        render_expr(&FaberCodegen::new(&types, &interner), &array),
         "[1, 2, 3]"
     );
 
@@ -340,7 +326,7 @@ fn expression_item_lists_emit_between_only() {
         span: span(),
     };
     assert_eq!(
-        render_expr(&codegen, &typed_object, &types, &interner),
+        render_expr(&FaberCodegen::new(&types, &interner), &typed_object),
         "def_10 { a = 1, b = 2, c = 3 }"
     );
 
@@ -364,7 +350,7 @@ fn expression_item_lists_emit_between_only() {
         span: span(),
     };
     assert_eq!(
-        render_expr(&codegen, &json, &types, &interner),
+        render_expr(&FaberCodegen::new(&types, &interner), &json),
         "{ \"a\": 1, \"b\": 2 }"
     );
 
@@ -379,7 +365,7 @@ fn expression_item_lists_emit_between_only() {
         span: span(),
     };
     assert_eq!(
-        render_expr(&codegen, &json_array, &types, &interner),
+        render_expr(&FaberCodegen::new(&types, &interner), &json_array),
         "[1, 2, 3]"
     );
 
@@ -400,7 +386,7 @@ fn expression_item_lists_emit_between_only() {
         span: span(),
     };
     assert_eq!(
-        render_expr(&codegen, &call, &types, &interner),
+        render_expr(&FaberCodegen::new(&types, &interner), &call),
         "def_20(1, 2)"
     );
 
@@ -424,7 +410,7 @@ fn expression_item_lists_emit_between_only() {
         span: span(),
     };
     assert_eq!(
-        render_expr(&codegen, &call_with_type_args, &types, &interner),
+        render_expr(&FaberCodegen::new(&types, &interner), &call_with_type_args),
         "def_21<numerus, textus>(1, 2)"
     );
 
@@ -463,7 +449,7 @@ fn expression_item_lists_emit_between_only() {
         span: span(),
     };
     assert_eq!(
-        render_expr(&codegen, &closure, &types, &interner),
+        render_expr(&FaberCodegen::new(&types, &interner), &closure),
         "(numerus a, textus b) → numerus ∴ 0"
     );
     let single_closure = HirExpression {
@@ -488,7 +474,7 @@ fn expression_item_lists_emit_between_only() {
         span: span(),
     };
     assert_eq!(
-        render_expr(&codegen, &single_closure, &types, &interner),
+        render_expr(&FaberCodegen::new(&types, &interner), &single_closure),
         "numerus only ∴ 0"
     );
 
@@ -502,7 +488,7 @@ fn expression_item_lists_emit_between_only() {
         span: span(),
     };
     assert_eq!(
-        render_expr(&codegen, &tuple, &types, &interner),
+        render_expr(&FaberCodegen::new(&types, &interner), &tuple),
         "[1, 2, 3]"
     );
 
@@ -516,7 +502,7 @@ fn expression_item_lists_emit_between_only() {
         span: span(),
     };
     assert_eq!(
-        render_expr(&codegen, &scribe, &types, &interner),
+        render_expr(&FaberCodegen::new(&types, &interner), &scribe),
         "nota 1, 2, 3"
     );
 
@@ -530,11 +516,10 @@ fn expression_item_lists_emit_between_only() {
         span: span(),
     };
     assert_eq!(
-        render_expr(&codegen, &template, &types, &interner),
+        render_expr(&FaberCodegen::new(&types, &interner), &template),
         "scriptum(\"message\", 1, 2)"
     );
 
-    codegen.variant_def_ids.insert(DefId(30));
     let finge = HirExpression {
         id: radix_hir::HirId(11),
         kind: HirExpressionKind::Call(
@@ -564,8 +549,10 @@ fn expression_item_lists_emit_between_only() {
         ty: None,
         span: span(),
     };
+    let mut finge_codegen = FaberCodegen::new(&types, &interner);
+    finge_codegen.variant_def_ids.insert(DefId(30));
     assert_eq!(
-        render_expr(&codegen, &finge, &types, &interner),
+        render_expr(&finge_codegen, &finge),
         "finge def_30 { x = 1, y = 2 }"
     );
 
@@ -579,7 +566,7 @@ fn expression_item_lists_emit_between_only() {
         ty: None,
         span: span(),
     };
-    let discerne_output = render_expr(&codegen, &discerne, &types, &interner);
+    let discerne_output = render_expr(&FaberCodegen::new(&types, &interner), &discerne);
     assert!(discerne_output.starts_with("discerne 1, 2, 3 {"));
 
     for output in [
@@ -798,7 +785,7 @@ fn declaration_and_annotation_lists_emit_between_only() {
         entry_is_async: false,
     };
 
-    let output = emit_program(&hir, &types, &interner);
+    let output = emit_program(&hir, &mut FaberCodegen::new(&types, &interner));
     assert!(
         output.contains("<T, U, magnitudo N>"),
         "generic separators missing:\n{output}"
@@ -827,7 +814,6 @@ fn declaration_and_annotation_lists_emit_between_only() {
 
 #[test]
 fn type_positions_pin_fixed_and_item_shape_separators() {
-    let codegen = FaberCodegen::default();
     let names = FxHashMap::default();
     let mut interner = Interner::new();
     let surface = TestSurface;
@@ -867,40 +853,33 @@ fn type_positions_pin_fixed_and_item_shape_separators() {
         is_generator: false,
     }));
 
+    let tensor = types.tensor_with_shape(i32_ty, shape);
+    let atomic = types.atomic(i32_ty);
+    let promissum_failable = types.promissum_failable(textus, numerus);
+
+    let codegen = FaberCodegen::new(&types, &interner);
     assert_eq!(
-        codegen.type_to_faber(applied, &types, &names, &interner, &surface),
+        codegen.type_to_faber(applied, &names, &surface),
         "Result<textus, numerus>"
     );
     assert_eq!(
-        codegen.type_to_faber(tuple, &types, &names, &interner, &surface),
+        codegen.type_to_faber(tuple, &names, &surface),
         "iuncta<textus, numerus>"
     );
     assert_eq!(
-        codegen.type_to_faber(function, &types, &names, &interner, &surface),
+        codegen.type_to_faber(function, &names, &surface),
         "(textus, numerus) → numerus<i32>"
     );
     assert_eq!(
-        codegen.type_to_faber(
-            types.tensor_with_shape(i32_ty, shape),
-            &types,
-            &names,
-            &interner,
-            &surface
-        ),
+        codegen.type_to_faber(tensor, &names, &surface),
         "tensor<numerus<i32>, [2, 3]>"
     );
     assert_eq!(
-        codegen.type_to_faber(types.atomic(i32_ty), &types, &names, &interner, &surface),
+        codegen.type_to_faber(atomic, &names, &surface),
         "atomic<numerus<i32>>"
     );
     assert_eq!(
-        codegen.type_to_faber(
-            types.promissum_failable(textus, numerus),
-            &types,
-            &names,
-            &interner,
-            &surface,
-        ),
+        codegen.type_to_faber(promissum_failable, &names, &surface),
         "promissum<textus ⇥ numerus>"
     );
     assert_no_trailing_separator("Result<textus, numerus>");
@@ -912,19 +891,18 @@ fn type_positions_pin_fixed_and_item_shape_separators() {
 #[test]
 fn pattern_positions_pin_between_only_and_no_trailing() {
     let mut interner = Interner::new();
-    let mut writer = CodeWriter::new();
-    let codegen = FaberCodegen::default();
+    let types = TypeTable::new();
     let names = FxHashMap::default();
     let patterns = vec![
         HirPattern::Binding(DefId(1), interner.intern("r")),
         HirPattern::Binding(DefId(2), interner.intern("g")),
         HirPattern::Binding(DefId(3), interner.intern("b")),
     ];
+    let mut writer = CodeWriter::new();
+    let codegen = FaberCodegen::new(&types, &interner);
     codegen.write_pattern(
         &HirPattern::Variant(DefId(10), patterns.clone()),
-        &TypeTable::new(),
         &names,
-        &interner,
         &TestSurface,
         &mut writer,
     );
@@ -939,15 +917,7 @@ fn pattern_positions_pin_between_only_and_no_trailing() {
         span: span(),
     };
     let mut writer = CodeWriter::new();
-    codegen.write_match_arms(
-        &[arm],
-        false,
-        &TypeTable::new(),
-        &names,
-        &interner,
-        &TestSurface,
-        &mut writer,
-    );
+    codegen.write_match_arms(&[arm], false, &names, &TestSurface, &mut writer);
     let arm_output = writer.finish();
     assert!(arm_output.contains("casu r, g, b {"));
     assert_no_trailing_separator(&arm_output);
@@ -998,8 +968,8 @@ fn canonical_reemission_is_idempotent_for_the_cs1_fixture() {
         entry_args_name: None,
         entry_is_async: false,
     };
-    let first = emit_program(&hir, &types, &interner);
-    let second = emit_program(&hir, &types, &interner);
+    let first = emit_program(&hir, &mut FaberCodegen::new(&types, &interner));
+    let second = emit_program(&hir, &mut FaberCodegen::new(&types, &interner));
     assert_eq!(
         first, second,
         "canonical format/convert output is not idempotent"
@@ -1017,7 +987,6 @@ fn tuple_without_type_args_derives_iuncta_prefix_from_expression_type() {
     let mut types = TypeTable::new();
     let numerus = types.primitive(Primitive::Numerus);
     let one_tuple = types.intern(Type::Tuple(vec![numerus]));
-    let codegen = FaberCodegen::default();
 
     let rest_tuple = HirExpression {
         id: radix_hir::HirId(60),
@@ -1026,7 +995,7 @@ fn tuple_without_type_args_derives_iuncta_prefix_from_expression_type() {
         span: span(),
     };
     assert_eq!(
-        render_expr(&codegen, &rest_tuple, &types, &interner),
+        render_expr(&FaberCodegen::new(&types, &interner), &rest_tuple),
         "iuncta<numerus> [7]"
     );
 
@@ -1037,5 +1006,8 @@ fn tuple_without_type_args_derives_iuncta_prefix_from_expression_type() {
         ty: None,
         span: span(),
     };
-    assert_eq!(render_expr(&codegen, &untyped, &types, &interner), "[1]");
+    assert_eq!(
+        render_expr(&FaberCodegen::new(&types, &interner), &untyped),
+        "[1]"
+    );
 }

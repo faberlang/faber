@@ -12,7 +12,7 @@ use radix_hir::{
     HirModule, HirOwnerRef, HirStatement, HirStatementKind, HirTypeSlot,
 };
 use radix_lexer::{Span, TokenKind};
-use radix_types::{IndexExpr, InferVar, NumericWidth};
+use radix_types::{IndexExpr, InferVar, NumericWidth, TypeTable};
 
 /// Latin reader surface (`la`): the canonical built-in vocabulary.
 struct LaSurface;
@@ -98,29 +98,20 @@ fn type_arg(form: HirTypeForm) -> HirTypeFormArg {
     HirTypeFormArg::Type(Box::new(form))
 }
 
-fn codegen_with_forms(forms: Vec<(HirTypeSite, HirTypeForm)>) -> FaberCodegen {
-    let mut codegen = FaberCodegen::default();
+fn codegen_with_forms(fx: &Fixture, forms: Vec<(HirTypeSite, HirTypeForm)>) -> FaberCodegen<'_> {
+    let mut codegen = FaberCodegen::new(&fx.types, &fx.interner);
     codegen.authored_type_forms = forms.into_iter().collect();
     codegen
 }
 
 fn render_at(
-    codegen: &FaberCodegen,
+    codegen: &FaberCodegen<'_>,
     site: &HirTypeSite,
     type_id: TypeId,
-    types: &TypeTable,
-    interner: &Interner,
     surface: &impl KeywordSurface,
 ) -> String {
     codegen
-        .type_to_faber_at(
-            site,
-            type_id,
-            types,
-            &FxHashMap::default(),
-            interner,
-            surface,
-        )
+        .type_to_faber_at(site, type_id, &FxHashMap::default(), surface)
         .expect("form must render")
 }
 
@@ -131,81 +122,40 @@ fn short_width(ty: TypeId) -> HirTypeForm {
 #[test]
 fn missing_presentation_falls_back_to_canonical() {
     let fx = fixture();
-    let codegen = FaberCodegen::default();
+    let codegen = FaberCodegen::new(&fx.types, &fx.interner);
     let site = declared_site(1);
 
     // No form at the site: exact canonical/default spelling, including the
     // presentation-absent defaults (sized fractus stays the bare width).
     assert_eq!(
-        render_at(
-            &codegen,
-            &site,
-            fx.lista_u32,
-            &fx.types,
-            &fx.interner,
-            &LaSurface
-        ),
+        render_at(&codegen, &site, fx.lista_u32, &LaSurface),
         "lista<numerus<u32>>"
     );
     assert_eq!(
-        codegen.type_to_faber(
-            fx.lista_u32,
-            &fx.types,
-            &FxHashMap::default(),
-            &fx.interner,
-            &LaSurface
-        ),
-        render_at(
-            &codegen,
-            &site,
-            fx.lista_u32,
-            &fx.types,
-            &fx.interner,
-            &LaSurface
-        )
+        codegen.type_to_faber(fx.lista_u32, &FxHashMap::default(), &LaSurface),
+        render_at(&codegen, &site, fx.lista_u32, &LaSurface)
     );
-    assert_eq!(
-        render_at(
-            &codegen,
-            &site,
-            fx.f32_ty,
-            &fx.types,
-            &fx.interner,
-            &LaSurface
-        ),
-        "f32"
-    );
+    assert_eq!(render_at(&codegen, &site, fx.f32_ty, &LaSurface), "f32");
 }
 
 #[test]
 fn scalar_long_and_short_stay_distinct_over_one_type_id() {
     let fx = fixture();
-    let long = codegen_with_forms(vec![(
-        declared_site(1),
-        semantic_form(TypeFormLevel::LONG, fx.u32_ty, Vec::new()),
-    )]);
-    let short = codegen_with_forms(vec![(declared_site(2), short_width(fx.u32_ty))]);
+    let long = codegen_with_forms(
+        &fx,
+        vec![(
+            declared_site(1),
+            semantic_form(TypeFormLevel::LONG, fx.u32_ty, Vec::new()),
+        )],
+    );
+    let short = codegen_with_forms(&fx, vec![(declared_site(2), short_width(fx.u32_ty))]);
 
     assert_eq!(
-        render_at(
-            &long,
-            &declared_site(1),
-            fx.u32_ty,
-            &fx.types,
-            &fx.interner,
-            &LaSurface
-        ),
+        render_at(&long, &declared_site(1), fx.u32_ty, &LaSurface),
         "numerus<u32>"
     );
     assert_eq!(
-        render_at(
-            &short,
-            &declared_site(2),
-            fx.u32_ty,
-            &fx.types,
-            &fx.interner,
-            &LaSurface
-        ),
+        render_at(&short, &declared_site(2), fx.u32_ty, &LaSurface),
         "u32"
     );
 }
@@ -213,69 +163,51 @@ fn scalar_long_and_short_stay_distinct_over_one_type_id() {
 #[test]
 fn list_three_way_keeps_root_and_child_levels_exact() {
     let fx = fixture();
-    let codegen = codegen_with_forms(vec![
-        (
-            declared_site(1),
-            semantic_form(
-                TypeFormLevel::LONG,
-                fx.lista_u32,
-                vec![type_arg(semantic_form(
+    let codegen = codegen_with_forms(
+        &fx,
+        vec![
+            (
+                declared_site(1),
+                semantic_form(
                     TypeFormLevel::LONG,
-                    fx.u32_ty,
-                    Vec::new(),
-                ))],
+                    fx.lista_u32,
+                    vec![type_arg(semantic_form(
+                        TypeFormLevel::LONG,
+                        fx.u32_ty,
+                        Vec::new(),
+                    ))],
+                ),
             ),
-        ),
-        (
-            declared_site(2),
-            semantic_form(
-                TypeFormLevel::LONG,
-                fx.lista_u32,
-                vec![type_arg(short_width(fx.u32_ty))],
+            (
+                declared_site(2),
+                semantic_form(
+                    TypeFormLevel::LONG,
+                    fx.lista_u32,
+                    vec![type_arg(short_width(fx.u32_ty))],
+                ),
             ),
-        ),
-        (
-            declared_site(3),
-            semantic_form(
-                TypeFormLevel::SHORT,
-                fx.lista_u32,
-                vec![type_arg(short_width(fx.u32_ty))],
+            (
+                declared_site(3),
+                semantic_form(
+                    TypeFormLevel::SHORT,
+                    fx.lista_u32,
+                    vec![type_arg(short_width(fx.u32_ty))],
+                ),
             ),
-        ),
-    ]);
+        ],
+    );
 
     // Three authored spellings over one interned `lista<u32>`.
     assert_eq!(
-        render_at(
-            &codegen,
-            &declared_site(1),
-            fx.lista_u32,
-            &fx.types,
-            &fx.interner,
-            &LaSurface
-        ),
+        render_at(&codegen, &declared_site(1), fx.lista_u32, &LaSurface),
         "lista<numerus<u32>>"
     );
     assert_eq!(
-        render_at(
-            &codegen,
-            &declared_site(2),
-            fx.lista_u32,
-            &fx.types,
-            &fx.interner,
-            &LaSurface
-        ),
+        render_at(&codegen, &declared_site(2), fx.lista_u32, &LaSurface),
         "lista<u32>"
     );
     assert_eq!(
-        render_at(
-            &codegen,
-            &declared_site(3),
-            fx.lista_u32,
-            &fx.types,
-            &fx.interner,
-            &LaSurface
-        ),
+        render_at(&codegen, &declared_site(3), fx.lista_u32, &LaSurface),
         "lu32"
     );
 }
@@ -294,35 +226,27 @@ fn tensor_two_way_keeps_long_and_short_roots() {
             HirTypeFormArg::Size(shape),
         ]
     };
-    let long = codegen_with_forms(vec![(
-        declared_site(1),
-        semantic_form(TypeFormLevel::LONG, tensor, args()),
-    )]);
-    let short = codegen_with_forms(vec![(
-        declared_site(2),
-        semantic_form(TypeFormLevel::SHORT, tensor, args()),
-    )]);
+    let long = codegen_with_forms(
+        &fx,
+        vec![(
+            declared_site(1),
+            semantic_form(TypeFormLevel::LONG, tensor, args()),
+        )],
+    );
+    let short = codegen_with_forms(
+        &fx,
+        vec![(
+            declared_site(2),
+            semantic_form(TypeFormLevel::SHORT, tensor, args()),
+        )],
+    );
 
     assert_eq!(
-        render_at(
-            &long,
-            &declared_site(1),
-            tensor,
-            &fx.types,
-            &fx.interner,
-            &LaSurface
-        ),
+        render_at(&long, &declared_site(1), tensor, &LaSurface),
         "tensor<f32, [2, 3]>"
     );
     assert_eq!(
-        render_at(
-            &short,
-            &declared_site(2),
-            tensor,
-            &fx.types,
-            &fx.interner,
-            &LaSurface
-        ),
+        render_at(&short, &declared_site(2), tensor, &LaSurface),
         "tf32[2, 3]"
     );
 }
@@ -337,67 +261,55 @@ fn all_prefixed_families_round_trip_at_their_own_level() {
 
     // vector<f32, [4]> authored as `vf32[4]`.
     let vector = fx.types.vector_with_width(fx.f32_ty, width4);
-    let vector_codegen = codegen_with_forms(vec![(
-        declared_site(1),
-        semantic_form(
-            TypeFormLevel::SHORT,
-            vector,
-            vec![type_arg(short_width(fx.f32_ty))],
-        ),
-    )]);
+    let vector_codegen = codegen_with_forms(
+        &fx,
+        vec![(
+            declared_site(1),
+            semantic_form(
+                TypeFormLevel::SHORT,
+                vector,
+                vec![type_arg(short_width(fx.f32_ty))],
+            ),
+        )],
+    );
     assert_eq!(
-        render_at(
-            &vector_codegen,
-            &declared_site(1),
-            vector,
-            &fx.types,
-            &fx.interner,
-            &LaSurface
-        ),
+        render_at(&vector_codegen, &declared_site(1), vector, &LaSurface),
         "vf32[4]"
     );
 
     // matrix<f32, [2, 2]> authored as `mf32[2, 2]`.
     let matrix = fx.types.matrix_with_shape(fx.f32_ty, square);
-    let matrix_codegen = codegen_with_forms(vec![(
-        declared_site(2),
-        semantic_form(
-            TypeFormLevel::SHORT,
-            matrix,
-            vec![type_arg(short_width(fx.f32_ty))],
-        ),
-    )]);
+    let matrix_codegen = codegen_with_forms(
+        &fx,
+        vec![(
+            declared_site(2),
+            semantic_form(
+                TypeFormLevel::SHORT,
+                matrix,
+                vec![type_arg(short_width(fx.f32_ty))],
+            ),
+        )],
+    );
     assert_eq!(
-        render_at(
-            &matrix_codegen,
-            &declared_site(2),
-            matrix,
-            &fx.types,
-            &fx.interner,
-            &LaSurface
-        ),
+        render_at(&matrix_codegen, &declared_site(2), matrix, &LaSurface),
         "mf32[2, 2]"
     );
 
     // sparsa<f32, [2, 2]> authored as `sf32[2, 2]`.
     let sparsa = fx.types.sparsa_with_shape(fx.f32_ty, square);
-    let sparsa_codegen = codegen_with_forms(vec![(
-        declared_site(3),
-        semantic_form(
-            TypeFormLevel::SHORT,
-            sparsa,
-            vec![type_arg(short_width(fx.f32_ty))],
-        ),
-    )]);
+    let sparsa_codegen = codegen_with_forms(
+        &fx,
+        vec![(
+            declared_site(3),
+            semantic_form(
+                TypeFormLevel::SHORT,
+                sparsa,
+                vec![type_arg(short_width(fx.f32_ty))],
+            ),
+        )],
+    );
     assert_eq!(
-        render_at(
-            &sparsa_codegen,
-            &declared_site(3),
-            sparsa,
-            &fx.types,
-            &fx.interner,
-            &LaSurface
-        ),
+        render_at(&sparsa_codegen, &declared_site(3), sparsa, &LaSurface),
         "sf32[2, 2]"
     );
 }
@@ -410,23 +322,19 @@ fn fused_short_roots_without_figura_stay_bare() {
     let var = fx.types.fresh_index_infer_var();
     let width = fx.types.intern_index(IndexExpr::Infer(var));
     let vector = fx.types.vector_with_width(fx.f32_ty, width);
-    let codegen = codegen_with_forms(vec![(
-        declared_site(1),
-        semantic_form(
-            TypeFormLevel::SHORT,
-            vector,
-            vec![type_arg(short_width(fx.f32_ty))],
-        ),
-    )]);
+    let codegen = codegen_with_forms(
+        &fx,
+        vec![(
+            declared_site(1),
+            semantic_form(
+                TypeFormLevel::SHORT,
+                vector,
+                vec![type_arg(short_width(fx.f32_ty))],
+            ),
+        )],
+    );
     assert_eq!(
-        render_at(
-            &codegen,
-            &declared_site(1),
-            vector,
-            &fx.types,
-            &fx.interner,
-            &LaSurface
-        ),
+        render_at(&codegen, &declared_site(1), vector, &LaSurface),
         "vf32"
     );
 }
@@ -446,27 +354,23 @@ fn deep_nesting_changes_only_the_inner_node() {
     );
     let list_of_lista = fx.types.array(fx.lista_u32);
     let list_of_list = fx.types.array(list_of_lista);
-    let list_fused = codegen_with_forms(vec![(
-        declared_site(1),
-        semantic_form(
-            TypeFormLevel::LONG,
-            list_of_list,
-            vec![type_arg(semantic_form(
+    let list_fused = codegen_with_forms(
+        &fx,
+        vec![(
+            declared_site(1),
+            semantic_form(
                 TypeFormLevel::LONG,
-                list_of_lista,
-                vec![type_arg(fused_lista)],
-            ))],
-        ),
-    )]);
+                list_of_list,
+                vec![type_arg(semantic_form(
+                    TypeFormLevel::LONG,
+                    list_of_lista,
+                    vec![type_arg(fused_lista)],
+                ))],
+            ),
+        )],
+    );
     assert_eq!(
-        render_at(
-            &list_fused,
-            &declared_site(1),
-            list_of_list,
-            &fx.types,
-            &fx.interner,
-            &LaSurface
-        ),
+        render_at(&list_fused, &declared_site(1), list_of_list, &LaSurface),
         "lista<lista<lu32>>"
     );
 
@@ -496,35 +400,27 @@ fn deep_nesting_changes_only_the_inner_node() {
             ))],
         )
     };
-    let long = codegen_with_forms(vec![(
-        declared_site(2),
-        wrap(semantic_form(TypeFormLevel::LONG, tensor, tensor_args())),
-    )]);
-    let short = codegen_with_forms(vec![(
-        declared_site(3),
-        wrap(semantic_form(TypeFormLevel::SHORT, tensor, tensor_args())),
-    )]);
+    let long = codegen_with_forms(
+        &fx,
+        vec![(
+            declared_site(2),
+            wrap(semantic_form(TypeFormLevel::LONG, tensor, tensor_args())),
+        )],
+    );
+    let short = codegen_with_forms(
+        &fx,
+        vec![(
+            declared_site(3),
+            wrap(semantic_form(TypeFormLevel::SHORT, tensor, tensor_args())),
+        )],
+    );
 
     assert_eq!(
-        render_at(
-            &long,
-            &declared_site(2),
-            outer_list,
-            &fx.types,
-            &fx.interner,
-            &LaSurface
-        ),
+        render_at(&long, &declared_site(2), outer_list, &LaSurface),
         "lista<lista<lista<tensor<f32, [2, 2]>>>>"
     );
     assert_eq!(
-        render_at(
-            &short,
-            &declared_site(3),
-            outer_list,
-            &fx.types,
-            &fx.interner,
-            &LaSurface
-        ),
+        render_at(&short, &declared_site(3), outer_list, &LaSurface),
         "lista<lista<lista<tf32[2, 2]>>>"
     );
 }
@@ -535,34 +431,30 @@ fn shared_type_id_branches_keep_independent_forms() {
     // yet keep their own authored form at their own site.
     let mut fx = fixture();
     let map = fx.types.map(fx.lista_u32, fx.lista_u32);
-    let codegen = codegen_with_forms(vec![(
-        declared_site(1),
-        semantic_form(
-            TypeFormLevel::LONG,
-            map,
-            vec![
-                type_arg(semantic_form(
-                    TypeFormLevel::LONG,
-                    fx.lista_u32,
-                    vec![type_arg(short_width(fx.u32_ty))],
-                )),
-                type_arg(semantic_form(
-                    TypeFormLevel::SHORT,
-                    fx.lista_u32,
-                    vec![type_arg(short_width(fx.u32_ty))],
-                )),
-            ],
-        ),
-    )]);
+    let codegen = codegen_with_forms(
+        &fx,
+        vec![(
+            declared_site(1),
+            semantic_form(
+                TypeFormLevel::LONG,
+                map,
+                vec![
+                    type_arg(semantic_form(
+                        TypeFormLevel::LONG,
+                        fx.lista_u32,
+                        vec![type_arg(short_width(fx.u32_ty))],
+                    )),
+                    type_arg(semantic_form(
+                        TypeFormLevel::SHORT,
+                        fx.lista_u32,
+                        vec![type_arg(short_width(fx.u32_ty))],
+                    )),
+                ],
+            ),
+        )],
+    );
     assert_eq!(
-        render_at(
-            &codegen,
-            &declared_site(1),
-            map,
-            &fx.types,
-            &fx.interner,
-            &LaSurface
-        ),
+        render_at(&codegen, &declared_site(1), map, &LaSurface),
         "tabula<lista<u32>, lu32>"
     );
 }
@@ -582,16 +474,9 @@ fn named_heads_render_authored_paths_and_args() {
         },
         args: vec![type_arg(short_width(fx.u32_ty))],
     };
-    let codegen = codegen_with_forms(vec![(declared_site(1), form)]);
+    let codegen = codegen_with_forms(&fx, vec![(declared_site(1), form)]);
     assert_eq!(
-        render_at(
-            &codegen,
-            &declared_site(1),
-            alias_ty,
-            &fx.types,
-            &fx.interner,
-            &LaSurface
-        ),
+        render_at(&codegen, &declared_site(1), alias_ty, &LaSurface),
         "module.Word<u32>"
     );
 }
@@ -609,15 +494,13 @@ fn named_head_over_unrelated_def_fails_closed() {
         },
         args: Vec::new(),
     };
-    let codegen = codegen_with_forms(vec![(declared_site(1), form)]);
+    let codegen = codegen_with_forms(&fx, vec![(declared_site(1), form)]);
     assert!(
         codegen
             .type_to_faber_at(
                 &declared_site(1),
                 alias_ty,
-                &fx.types,
                 &FxHashMap::default(),
-                &fx.interner,
                 &LaSurface
             )
             .is_err(),
@@ -628,123 +511,70 @@ fn named_head_over_unrelated_def_fails_closed() {
 #[test]
 fn locale_projection_changes_vocabulary_and_preserves_levels() {
     let fx = fixture();
-    let codegen = codegen_with_forms(vec![
-        (
-            declared_site(1),
-            semantic_form(
-                TypeFormLevel::LONG,
-                fx.lista_u32,
-                vec![type_arg(semantic_form(
+    let codegen = codegen_with_forms(
+        &fx,
+        vec![
+            (
+                declared_site(1),
+                semantic_form(
                     TypeFormLevel::LONG,
-                    fx.u32_ty,
-                    Vec::new(),
-                ))],
+                    fx.lista_u32,
+                    vec![type_arg(semantic_form(
+                        TypeFormLevel::LONG,
+                        fx.u32_ty,
+                        Vec::new(),
+                    ))],
+                ),
             ),
-        ),
-        (
-            declared_site(2),
-            semantic_form(
-                TypeFormLevel::SHORT,
-                fx.lista_u32,
-                vec![type_arg(short_width(fx.u32_ty))],
+            (
+                declared_site(2),
+                semantic_form(
+                    TypeFormLevel::SHORT,
+                    fx.lista_u32,
+                    vec![type_arg(short_width(fx.u32_ty))],
+                ),
             ),
-        ),
-        (
-            declared_site(3),
-            semantic_form(TypeFormLevel::LONG, fx.u32_ty, Vec::new()),
-        ),
-        (declared_site(4), short_width(fx.u32_ty)),
-    ]);
+            (
+                declared_site(3),
+                semantic_form(TypeFormLevel::LONG, fx.u32_ty, Vec::new()),
+            ),
+            (declared_site(4), short_width(fx.u32_ty)),
+        ],
+    );
 
     // en: built-in vocabulary projects; compression levels survive.
     assert_eq!(
-        render_at(
-            &codegen,
-            &declared_site(1),
-            fx.lista_u32,
-            &fx.types,
-            &fx.interner,
-            &EnSurface
-        ),
+        render_at(&codegen, &declared_site(1), fx.lista_u32, &EnSurface),
         "list<int<u32>>"
     );
     assert_eq!(
-        render_at(
-            &codegen,
-            &declared_site(2),
-            fx.lista_u32,
-            &fx.types,
-            &fx.interner,
-            &EnSurface
-        ),
+        render_at(&codegen, &declared_site(2), fx.lista_u32, &EnSurface),
         "lu32"
     );
     assert_eq!(
-        render_at(
-            &codegen,
-            &declared_site(3),
-            fx.u32_ty,
-            &fx.types,
-            &fx.interner,
-            &EnSurface
-        ),
+        render_at(&codegen, &declared_site(3), fx.u32_ty, &EnSurface),
         "int<u32>"
     );
     assert_eq!(
-        render_at(
-            &codegen,
-            &declared_site(4),
-            fx.u32_ty,
-            &fx.types,
-            &fx.interner,
-            &EnSurface
-        ),
+        render_at(&codegen, &declared_site(4), fx.u32_ty, &EnSurface),
         "u32"
     );
 
     // la: same forms, canonical vocabulary.
     assert_eq!(
-        render_at(
-            &codegen,
-            &declared_site(1),
-            fx.lista_u32,
-            &fx.types,
-            &fx.interner,
-            &LaSurface
-        ),
+        render_at(&codegen, &declared_site(1), fx.lista_u32, &LaSurface),
         "lista<numerus<u32>>"
     );
     assert_eq!(
-        render_at(
-            &codegen,
-            &declared_site(2),
-            fx.lista_u32,
-            &fx.types,
-            &fx.interner,
-            &LaSurface
-        ),
+        render_at(&codegen, &declared_site(2), fx.lista_u32, &LaSurface),
         "lu32"
     );
     assert_eq!(
-        render_at(
-            &codegen,
-            &declared_site(3),
-            fx.u32_ty,
-            &fx.types,
-            &fx.interner,
-            &LaSurface
-        ),
+        render_at(&codegen, &declared_site(3), fx.u32_ty, &LaSurface),
         "numerus<u32>"
     );
     assert_eq!(
-        render_at(
-            &codegen,
-            &declared_site(4),
-            fx.u32_ty,
-            &fx.types,
-            &fx.interner,
-            &LaSurface
-        ),
+        render_at(&codegen, &declared_site(4), fx.u32_ty, &LaSurface),
         "u32"
     );
 }
@@ -755,55 +585,43 @@ fn registry_renders_special_and_sized_heads() {
 
     // `octeti` is its own primitive: L0-only (delivery Settled Decision 1).
     let octeti = fx.types.primitive(Primitive::Octeti);
-    let octeti_codegen = codegen_with_forms(vec![(
-        declared_site(1),
-        semantic_form(TypeFormLevel::LONG, octeti, Vec::new()),
-    )]);
+    let octeti_codegen = codegen_with_forms(
+        &fx,
+        vec![(
+            declared_site(1),
+            semantic_form(TypeFormLevel::LONG, octeti, Vec::new()),
+        )],
+    );
     assert_eq!(
-        render_at(
-            &octeti_codegen,
-            &declared_site(1),
-            octeti,
-            &fx.types,
-            &fx.interner,
-            &LaSurface
-        ),
+        render_at(&octeti_codegen, &declared_site(1), octeti, &LaSurface),
         "octeti"
     );
 
     // modulus<u32>: contextual keyword + unsigned width marker.
     let word = fx.types.intern(Type::ModularWord(NumericWidth::U32));
-    let word_codegen = codegen_with_forms(vec![(
-        declared_site(2),
-        semantic_form(TypeFormLevel::LONG, word, Vec::new()),
-    )]);
+    let word_codegen = codegen_with_forms(
+        &fx,
+        vec![(
+            declared_site(2),
+            semantic_form(TypeFormLevel::LONG, word, Vec::new()),
+        )],
+    );
     assert_eq!(
-        render_at(
-            &word_codegen,
-            &declared_site(2),
-            word,
-            &fx.types,
-            &fx.interner,
-            &LaSurface
-        ),
+        render_at(&word_codegen, &declared_site(2), word, &LaSurface),
         "modulus<u32>"
     );
 
     // LONG fractus keeps its wrapped spelling; only the presentation-absent
     // default emits the bare marker.
-    let fractus_long = codegen_with_forms(vec![(
-        declared_site(3),
-        semantic_form(TypeFormLevel::LONG, fx.f32_ty, Vec::new()),
-    )]);
+    let fractus_long = codegen_with_forms(
+        &fx,
+        vec![(
+            declared_site(3),
+            semantic_form(TypeFormLevel::LONG, fx.f32_ty, Vec::new()),
+        )],
+    );
     assert_eq!(
-        render_at(
-            &fractus_long,
-            &declared_site(3),
-            fx.f32_ty,
-            &fx.types,
-            &fx.interner,
-            &LaSurface
-        ),
+        render_at(&fractus_long, &declared_site(3), fx.f32_ty, &LaSurface),
         "fractus<f32>"
     );
 }
@@ -813,44 +631,33 @@ fn hole_heads_render_the_authored_hole() {
     let mut fx = fixture();
     let infer_ty = fx.types.intern(Type::Infer(InferVar(0)));
     let union_ty = fx.types.intern(Type::InferUnion(InferVar(1)));
-    let codegen = codegen_with_forms(vec![
-        (
-            declared_site(1),
-            HirTypeForm {
-                ty: infer_ty,
-                head: HirTypeFormHead::Infer,
-                args: Vec::new(),
-            },
-        ),
-        (
-            declared_site(2),
-            HirTypeForm {
-                ty: union_ty,
-                head: HirTypeFormHead::UnionHole,
-                args: Vec::new(),
-            },
-        ),
-    ]);
+    let codegen = codegen_with_forms(
+        &fx,
+        vec![
+            (
+                declared_site(1),
+                HirTypeForm {
+                    ty: infer_ty,
+                    head: HirTypeFormHead::Infer,
+                    args: Vec::new(),
+                },
+            ),
+            (
+                declared_site(2),
+                HirTypeForm {
+                    ty: union_ty,
+                    head: HirTypeFormHead::UnionHole,
+                    args: Vec::new(),
+                },
+            ),
+        ],
+    );
     assert_eq!(
-        render_at(
-            &codegen,
-            &declared_site(1),
-            infer_ty,
-            &fx.types,
-            &fx.interner,
-            &LaSurface
-        ),
+        render_at(&codegen, &declared_site(1), infer_ty, &LaSurface),
         "_"
     );
     assert_eq!(
-        render_at(
-            &codegen,
-            &declared_site(2),
-            union_ty,
-            &fx.types,
-            &fx.interner,
-            &LaSurface
-        ),
+        render_at(&codegen, &declared_site(2), union_ty, &LaSurface),
         "∪"
     );
 }
@@ -859,23 +666,19 @@ fn hole_heads_render_the_authored_hole() {
 fn witness_mismatch_fails_closed() {
     let mut fx = fixture();
     let other = fx.types.array(fx.f32_ty);
-    let codegen = codegen_with_forms(vec![(
-        declared_site(1),
-        semantic_form(
-            TypeFormLevel::LONG,
-            fx.lista_u32,
-            vec![type_arg(short_width(fx.u32_ty))],
-        ),
-    )]);
+    let codegen = codegen_with_forms(
+        &fx,
+        vec![(
+            declared_site(1),
+            semantic_form(
+                TypeFormLevel::LONG,
+                fx.lista_u32,
+                vec![type_arg(short_width(fx.u32_ty))],
+            ),
+        )],
+    );
     let err = codegen
-        .type_to_faber_at(
-            &declared_site(1),
-            other,
-            &fx.types,
-            &FxHashMap::default(),
-            &fx.interner,
-            &LaSurface,
-        )
+        .type_to_faber_at(&declared_site(1), other, &FxHashMap::default(), &LaSurface)
         .expect_err("witness mismatch must fail closed");
     assert!(
         err.args
@@ -984,17 +787,10 @@ fn illegal_levels_and_arity_fail_closed() {
     ];
 
     for (site, type_id, form) in rejects {
-        let codegen = codegen_with_forms(vec![(site.clone(), form)]);
+        let codegen = codegen_with_forms(&fx, vec![(site.clone(), form)]);
         assert!(
             codegen
-                .type_to_faber_at(
-                    &site,
-                    type_id,
-                    &fx.types,
-                    &FxHashMap::default(),
-                    &fx.interner,
-                    &LaSurface
-                )
+                .type_to_faber_at(&site, type_id, &FxHashMap::default(), &LaSurface)
                 .is_err(),
             "malformed form at {site:?} must fail closed"
         );
@@ -1047,8 +843,8 @@ fn generate_local_hole_uses_authored_form_without_legacy_flags() {
         },
     });
 
-    let output = FaberCodegen::default()
-        .generate(&hir, &presentation, &fx.types, &fx.interner, &LaSurface)
+    let output = FaberCodegen::new(&fx.types, &fx.interner)
+        .generate(&hir, &presentation, &LaSurface)
         .expect("authored hole must emit");
     assert!(
         output.code.contains("fixum _ x ←"),
@@ -1075,9 +871,9 @@ fn generate_builds_the_type_site_index_from_presentation() {
         entry_args_name: None,
         entry_is_async: false,
     };
-    let mut codegen = FaberCodegen::default();
+    let mut codegen = FaberCodegen::new(&fx.types, &fx.interner);
     codegen
-        .generate(&hir, &presentation, &fx.types, &fx.interner, &LaSurface)
+        .generate(&hir, &presentation, &LaSurface)
         .expect("empty program must emit");
     assert_eq!(
         codegen.authored_type_forms.get(&site),
@@ -1090,9 +886,9 @@ fn generate_builds_the_type_site_index_from_presentation() {
 
     // Empty presentation keeps everything canonical.
     let empty = empty_presentation();
-    let mut fresh = FaberCodegen::default();
+    let mut fresh = FaberCodegen::new(&fx.types, &fx.interner);
     fresh
-        .generate(&hir, &empty, &fx.types, &fx.interner, &LaSurface)
+        .generate(&hir, &empty, &LaSurface)
         .expect("empty program must emit");
     assert!(fresh.authored_type_forms.is_empty());
 }

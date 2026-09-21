@@ -42,5 +42,5 @@ mod itera_range_emit_test;
 #[cfg(test)]
 mod trivia_test;
 
-pub use module::{FaberCodegen, FaberOutput, emit, empty_presentation};
+pub use module::{FaberCodegen, FaberOutput, empty_presentation};
 pub use surface::{KeywordSurface, TypeBindingKind};
