@@ -292,15 +292,24 @@ fn lint_rust_code(code: &str) -> Result<String, String> {
 }
 
 fn write_temp_rust_project(code: &str) -> Result<(std::path::PathBuf, std::path::PathBuf), String> {
+    write_temp_rust_project_in(&std::env::temp_dir(), code)
+}
+
+/// Create the lint temp root through the shared exclusive-create retry
+/// mechanism — never `create_dir_all` on a predictable name, so a preplanted
+/// directory or symlink at a candidate name is neither written through nor
+/// clobbered.
+fn write_temp_rust_project_in(
+    parent: &std::path::Path,
+    code: &str,
+) -> Result<(std::path::PathBuf, std::path::PathBuf), String> {
     use std::fs;
 
-    let nanos = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map_or(0, |d| d.as_nanos());
-    let temp_dir = std::env::temp_dir().join(format!("faber-lint-{nanos}"));
+    let temp_dir = crate::package::host_spawn::unique_temp_sibling(parent, "faber-lint")
+        .map_err(|err| format!("failed to create temp src dir: {}", err.message))?;
     let src_dir = temp_dir.join("src");
 
-    fs::create_dir_all(&src_dir).map_err(|e| format!("failed to create temp src dir: {e}"))?;
+    fs::create_dir(&src_dir).map_err(|e| format!("failed to create temp src dir: {e}"))?;
 
     let main_rs = src_dir.join("main.rs");
     fs::write(&main_rs, code).map_err(|e| format!("failed to write temp main.rs: {e}"))?;

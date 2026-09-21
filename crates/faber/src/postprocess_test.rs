@@ -1,4 +1,67 @@
-use super::parse_eslint_output;
+use super::{parse_eslint_output, write_temp_rust_project_in};
+
+/// A preplanted directory or symlink at a candidate temp-root name must be
+/// neither written through nor clobbered: the lint temp root is created
+/// exclusively under a nonce name.
+#[test]
+fn lint_temp_root_is_exclusive_and_ignores_planted_entries() {
+    let guard = tempfile::tempdir().expect("tempdir");
+    let parent = guard.path();
+    let sentinel = parent.join("sentinel");
+    std::fs::create_dir(&sentinel).expect("sentinel dir");
+    let planted_dir = parent.join("planted-dir");
+    std::fs::create_dir(&planted_dir).expect("planted dir");
+    #[cfg(unix)]
+    let planted_symlink = parent.join("planted-symlink");
+    #[cfg(unix)]
+    std::os::unix::fs::symlink(&sentinel, &planted_symlink).expect("symlink");
+
+    let code = "fn main() {}\n";
+    let (temp_dir, main_rs) = write_temp_rust_project_in(parent, code).expect("temp rust project");
+
+    let meta = std::fs::symlink_metadata(&temp_dir).expect("root metadata");
+    assert!(meta.file_type().is_dir(), "temp root must be a directory");
+    assert!(
+        !meta.file_type().is_symlink(),
+        "temp root must not be a symlink"
+    );
+    assert!(temp_dir.starts_with(parent));
+    assert_ne!(temp_dir, planted_dir);
+    #[cfg(unix)]
+    assert_ne!(
+        std::fs::canonicalize(&temp_dir).expect("canonical root"),
+        std::fs::canonicalize(&sentinel).expect("canonical sentinel"),
+        "temp root must not resolve into the symlink target"
+    );
+
+    assert_eq!(main_rs, temp_dir.join("src").join("main.rs"));
+    assert_eq!(std::fs::read_to_string(&main_rs).expect("main.rs"), code);
+    assert!(temp_dir.join("Cargo.toml").is_file());
+
+    assert!(
+        std::fs::read_dir(&sentinel)
+            .expect("sentinel")
+            .next()
+            .is_none(),
+        "nothing may be written through the planted symlink"
+    );
+    assert!(
+        std::fs::read_dir(&planted_dir)
+            .expect("planted dir")
+            .next()
+            .is_none(),
+        "the planted directory must not be clobbered or written into"
+    );
+
+    assert!(
+        temp_dir
+            .file_name()
+            .expect("root name")
+            .to_string_lossy()
+            .starts_with(".faber-lint.tmp-"),
+        "temp root must use the exclusive nonce scheme, not a predictable name"
+    );
+}
 
 #[test]
 fn eslint_output_uses_fixed_source_when_present() {
