@@ -438,7 +438,13 @@ impl Parser {
                 self.advance();
                 BindingPattern::Wildcard(span)
             } else if let TokenKind::LBracket = self.peek().kind {
-                self.parse_array_binding_pattern()?
+                // A nested pattern nests one `array_binding_pattern` level and
+                // never re-enters the expression grammar, so the depth budget is
+                // charged at this recursion.
+                let span = self.current_span();
+                self.nested(ParseErrorKind::StatementInvalid, span, |parser| {
+                    parser.parse_array_binding_pattern()
+                })?
             } else {
                 BindingPattern::Ident(self.parse_ident()?)
             };

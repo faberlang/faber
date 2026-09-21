@@ -5,8 +5,10 @@
 //! parses and yields a tree the AST walker admits without reporting
 //! [`DepthExceeded`].
 
-use crate::test_support::{ParseExpectation, assert_parse_error_matches, parse_ok, parse_program};
-use crate::{MAX_PARSE_DEPTH, MAX_PARSE_OPERATORS, ParseErrorKind, ParseResult};
+use crate::test_support::{
+    ParseExpectation, assert_parse_error_matches, has_arg, parse_ok, parse_program,
+};
+use crate::{MAX_PARSE_DEPTH, MAX_PARSE_OPERATORS, ParseError, ParseErrorKind, ParseResult};
 use radix_syntax::{DepthExceeded, Visitor};
 
 /// Depth past the budget used by the rejection pins. Well below the point where
@@ -15,6 +17,13 @@ const OVER_BUDGET_DEPTH: usize = MAX_PARSE_DEPTH as usize + 64;
 
 /// Folded operators past the budget used by the rejection pins.
 const OVER_BUDGET_OPERATORS: usize = MAX_PARSE_OPERATORS + 64;
+
+/// Stack the hostile-shape probes run on: a quarter of the 2 MiB test thread and
+/// a sixteenth of the 8 MiB production stack. The unguarded parser aborts on it
+/// at the probe depth (measured, 768 levels; on 256 KiB it already aborts
+/// between 64 and 128), so a probe that returns at all has proved the budget
+/// fired instead of the stack.
+const PROBE_STACK_BYTES: usize = 512 * 1024;
 
 /// One nesting shape under test: a name and a source generator for a depth.
 type NestingShape = (&'static str, fn(usize) -> String);
@@ -50,6 +59,29 @@ fn nested_types(depth: usize) -> String {
     )
 }
 
+/// Prefix-unary chain: `-` recurses through the unary level, which is not an
+/// expression entry point, so a chain nests the `unary` rule without entering
+/// the budgeted expression entry.
+fn unary_prefix_chain(depth: usize) -> String {
+    format!("fixum _ value ← {}1", "-".repeat(depth))
+}
+
+/// Nested JSON arrays inside one bare `{ }` literal. The island's values are
+/// parsed by the dedicated JSON parser, which never re-enters the expression
+/// grammar.
+fn nested_json_arrays(depth: usize) -> String {
+    format!(
+        "fixum _ value ← {{\"k\": {}1{}}}",
+        "[".repeat(depth),
+        "]".repeat(depth)
+    )
+}
+
+/// Nested array binding pattern: `[[[target]]]`.
+fn nested_array_pattern(depth: usize) -> String {
+    format!("fixum {}target{} ← 0", "[".repeat(depth), "]".repeat(depth))
+}
+
 fn flat_fold_chain(operators: usize) -> String {
     format!("fixum _ value ← 1{}", " + 1".repeat(operators))
 }
@@ -70,6 +102,23 @@ impl Visitor for DepthProbe {
     fn on_depth_exceeded(&mut self, exceeded: DepthExceeded) {
         self.exceeded = Some(exceeded.depth);
     }
+}
+
+/// Parse `source` on a thread with an explicit stack size and return the
+/// diagnostics it reported.
+///
+/// Running the hostile shapes here rather than on the test thread makes "small
+/// stack" the probe's own measured property. A panic from the join means the
+/// probe thread aborted instead of failing closed, which is the defect the pin
+/// exists to catch.
+fn parse_on_stack(source: &str, stack_bytes: usize) -> Vec<ParseError> {
+    let source = source.to_owned();
+    std::thread::Builder::new()
+        .stack_size(stack_bytes)
+        .spawn(move || parse_program(&source).errors)
+        .expect("probe thread spawns")
+        .join()
+        .expect("probe must fail closed, not abort: the budget must fire before the stack does")
 }
 
 /// Walk a parsed program and return the depth the walker refused to enter.
@@ -140,6 +189,61 @@ fn type_nesting_past_the_budget_reports_a_nesting_diagnostic() {
     );
 }
 
+/// The three recursions that do not pass through a budgeted entry point — the
+/// unary prefix chain, the JSON island, and the nested array pattern — each
+/// report the depth diagnostic rather than exhausting the stack.
+///
+/// They run on [`PROBE_STACK_BYTES`] so the abort an unguarded descent produces
+/// is a real measurement of this probe, not a claim about it: the same input
+/// aborted the pre-change parser, and the guarded one returns a single
+/// diagnostic however deep it is.
+fn assert_recursion_fails_closed(name: &str, build: fn(usize) -> String) {
+    let errors = parse_on_stack(&build(OVER_BUDGET_DEPTH * 8), PROBE_STACK_BYTES);
+    assert_eq!(
+        errors.len(),
+        1,
+        "{name}: a spent budget reports exactly once, got {errors:?}"
+    );
+    assert!(
+        has_arg(&errors[0], "issue", "nesting_too_deep"),
+        "{name}: the refusal must carry the nesting diagnostic, got {:?}",
+        errors[0]
+    );
+}
+
+#[test]
+fn unary_prefix_chain_past_the_budget_reports_a_nesting_diagnostic() {
+    let source = unary_prefix_chain(OVER_BUDGET_DEPTH);
+    assert_parse_error_matches(&source, ParseExpectation::Issue("nesting_too_deep"));
+    assert_parse_error_matches(
+        &source,
+        ParseExpectation::Kind(ParseErrorKind::ExpressionInvalid),
+    );
+    assert_recursion_fails_closed("unary_prefix_chain", unary_prefix_chain);
+}
+
+#[test]
+fn json_value_nesting_past_the_budget_reports_a_nesting_diagnostic() {
+    let source = nested_json_arrays(OVER_BUDGET_DEPTH);
+    assert_parse_error_matches(&source, ParseExpectation::Issue("nesting_too_deep"));
+    assert_parse_error_matches(
+        &source,
+        ParseExpectation::Kind(ParseErrorKind::ExpressionInvalid),
+    );
+    assert_recursion_fails_closed("nested_json_arrays", nested_json_arrays);
+}
+
+#[test]
+fn array_binding_pattern_nesting_past_the_budget_reports_a_nesting_diagnostic() {
+    let source = nested_array_pattern(OVER_BUDGET_DEPTH);
+    assert_parse_error_matches(&source, ParseExpectation::Issue("nesting_too_deep"));
+    assert_parse_error_matches(
+        &source,
+        ParseExpectation::Kind(ParseErrorKind::StatementInvalid),
+    );
+    assert_recursion_fails_closed("nested_array_pattern", nested_array_pattern);
+}
+
 /// The count budget, not the depth counter, must reject an iteratively folded
 /// chain: `1 + 1 + …` costs no parser recursion, so a flat source can build a
 /// tree far deeper than the grammar nests.
@@ -183,6 +287,9 @@ fn nesting_and_folding_within_the_budgets_parse_clean() {
     let _ = parse_ok(&assignment_chain(MAX_PARSE_DEPTH as usize / 4));
     let _ = parse_ok(&nested_blocks(MAX_PARSE_DEPTH as usize / 4));
     let _ = parse_ok(&nested_types(MAX_PARSE_DEPTH as usize / 4));
+    let _ = parse_ok(&unary_prefix_chain(MAX_PARSE_DEPTH as usize / 4));
+    let _ = parse_ok(&nested_json_arrays(MAX_PARSE_DEPTH as usize / 4));
+    let _ = parse_ok(&nested_array_pattern(MAX_PARSE_DEPTH as usize / 4));
     let _ = parse_ok(&flat_fold_chain(MAX_PARSE_OPERATORS / 4));
 }
 
@@ -190,12 +297,15 @@ fn nesting_and_folding_within_the_budgets_parse_clean() {
 /// every nesting shape is walked without reporting the depth limit.
 #[test]
 fn deepest_admitted_nesting_stays_inside_the_walker_budget() {
-    let shapes: [NestingShape; 5] = [
+    let shapes: [NestingShape; 8] = [
         ("parens", nested_parens),
         ("ternary", ternary_chain),
         ("assignment", assignment_chain),
         ("blocks", nested_blocks),
         ("types", nested_types),
+        ("unary", unary_prefix_chain),
+        ("json", nested_json_arrays),
+        ("pattern", nested_array_pattern),
     ];
     for (name, build) in shapes {
         let (admitted, result) = deepest_admitted_within(build, OVER_BUDGET_DEPTH);
