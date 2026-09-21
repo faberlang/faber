@@ -79,6 +79,9 @@ struct FrozenMaps<'a> {
 /// only after a complete [`MirProgram`] exists.
 pub(super) struct LoweringContextMaps<'a> {
     interner: &'a Interner,
+    /// Semantic resolver of the analyzed unit: publishes the canonical merged
+    /// heritage field views (`struct_heritage_fields`) consumed below.
+    resolver: &'a crate::semantic::Resolver,
     function_errors: FxHashMap<DefId, MirType>,
     function_async: FxHashMap<DefId, bool>,
     function_generator: FxHashMap<DefId, bool>,
@@ -146,6 +149,7 @@ impl<'a> LoweringContextMaps<'a> {
     pub(super) fn collect(unit: &'a AnalyzedModule) -> Self {
         let mut maps = Self {
             interner: &unit.interner,
+            resolver: &unit.resolver,
             function_errors: FxHashMap::default(),
             function_async: FxHashMap::default(),
             function_generator: FxHashMap::default(),
@@ -403,18 +407,41 @@ impl<'a> LoweringContextMaps<'a> {
         let mut nullable_fields = FxHashSet::default();
         let mut json_field_keys = FxHashMap::default();
         let is_json_struct = annotations_contain_family(annotations, self.interner, "json");
-        for field in &strukt.fields {
-            if !field.is_static {
-                fields.insert(field.name, MirType::semantic(field.ty));
-                if field.sponte || field.init.is_some() {
-                    optional_fields.insert(field.name);
-                }
-                if field.sponte {
-                    nullable_fields.insert(field.name);
-                }
-                if is_json_struct {
+        // JSON key surfaces stay keyed by this genus's own declarations; an
+        // inherited field's key annotation belongs to its declaring genus.
+        if is_json_struct {
+            for field in &strukt.fields {
+                if !field.is_static {
                     let key = json_annotation_nomen(&field.annotations, self.interner).unwrap_or(field.name);
                     json_field_keys.insert(field.name, self.interner.resolve(key).to_owned());
+                }
+            }
+        }
+        let heritage_rows = self.resolver.struct_heritage_fields(def_id);
+        if !heritage_rows.is_empty() {
+            // The semantic merged heritage view is the admission authority:
+            // inherited fields participate in aggregate construction and
+            // projection exactly like own fields (ON-R8). Snapshot-loaded
+            // units carry no table and keep the own-field view.
+            for row in heritage_rows {
+                fields.insert(row.name, MirType::semantic(row.ty));
+                if !row.required {
+                    optional_fields.insert(row.name);
+                }
+                if row.optional {
+                    nullable_fields.insert(row.name);
+                }
+            }
+        } else {
+            for field in &strukt.fields {
+                if !field.is_static {
+                    fields.insert(field.name, MirType::semantic(field.ty));
+                    if field.sponte || field.init.is_some() {
+                        optional_fields.insert(field.name);
+                    }
+                    if field.sponte {
+                        nullable_fields.insert(field.name);
+                    }
                 }
             }
         }
@@ -891,19 +918,37 @@ pub(super) fn struct_field_map(unit: &AnalyzedModule) -> FxHashMap<DefId, Vec<&H
     // WHY: this map intentionally keeps borrowed field nodes for default
     // initializer lowering. `HirVisitor::visit_item` cannot store those
     // borrows with the unit lifetime, so this remains an explicit unit scan.
-    let mut structs = FxHashMap::default();
+    let mut structs_by_def: FxHashMap<DefId, &HirStruct> = FxHashMap::default();
     for item in &unit.hir.items {
-        let HirItemKind::Struct(strukt) = &item.kind else {
-            continue;
-        };
-        structs.insert(
-            item.def_id,
+        if let HirItemKind::Struct(strukt) = &item.kind {
+            structs_by_def.insert(item.def_id, strukt);
+        }
+    }
+    let mut structs = FxHashMap::default();
+    for (def_id, strukt) in &structs_by_def {
+        let heritage_rows = unit.resolver.struct_heritage_fields(*def_id);
+        let fields = if heritage_rows.is_empty() {
             strukt
                 .fields
                 .iter()
                 .filter(|field| !field.is_static)
-                .collect(),
-        );
+                .collect()
+        } else {
+            // The semantic merged view decides which fields the genus admits;
+            // each row resolves to its owning declaration's HIR node so
+            // default initializers stay lowerable. No chain walk here.
+            heritage_rows
+                .iter()
+                .filter_map(|row| {
+                    structs_by_def
+                        .get(&row.owner)?
+                        .fields
+                        .iter()
+                        .find(|field| field.name == row.name)
+                })
+                .collect()
+        };
+        structs.insert(*def_id, fields);
     }
     structs
 }

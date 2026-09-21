@@ -206,7 +206,8 @@ pub use resolved_use::{
 };
 pub use scope::{
     BareVariantLookup, CommuneField, ConversionPair, ConversionRow, ConversionRowConflict,
-    QualifiedVariantPathLookup, Resolver, Scope, ScopeId, ScopeKind, Symbol, SymbolKind,
+    QualifiedVariantPathLookup, Resolver, Scope, ScopeId, ScopeKind, StructHeritageFieldRow,
+    Symbol, SymbolKind,
 };
 use std::collections::BTreeMap;
 pub use types::{
@@ -606,7 +607,7 @@ pub fn analyze_with_cli(
         interner,
     );
 
-    if let Err(e) = passes::typecheck::typecheck_with_config(
+    match passes::typecheck::typecheck_with_config(
         &mut hir,
         &resolver,
         &mut types,
@@ -615,9 +616,15 @@ pub fn analyze_with_cli(
         Some(&companion_signatures),
         Some(&mut lowered.presentation),
     ) {
-        diagnostics.extend(e);
+        // The merged heritage view is the checker's admission authority for
+        // genus literals and field access; publish it so MIR aggregate
+        // lowering/validation reuse the one view instead of re-deriving
+        // parent-flattening.
+        Ok(merged_heritage_fields) => {
+            resolver.register_struct_heritage_fields(merged_heritage_fields);
+        }
+        Err(e) => diagnostics.extend(e),
     }
-
     // Concrete generic AIR instances must exist before named unroll: symbolic
     // templates remain source/FHIR facts, while their reachable concrete clones
     // expose literal shapes and bounds to the existing transform.
