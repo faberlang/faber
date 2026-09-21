@@ -765,7 +765,10 @@ exemplars = ["./exemplars/salve-munde.fab"]
 
     assert_eq!(issue_render.message, "ISSUE:numerus:textus");
     assert_eq!(issue_render.help.as_deref(), Some("ISSUEHELP"));
-    assert_eq!(fallback_render.message, "CODE:numerus:textus");
+    assert_eq!(
+        fallback_render.message,
+        "CODE:numerus:textus [locale pack missing row: SEM010.other_type_mismatch]"
+    );
     assert_eq!(fallback_render.help.as_deref(), Some("CODEHELP"));
 }
 
