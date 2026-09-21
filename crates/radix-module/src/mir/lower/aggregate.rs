@@ -235,23 +235,14 @@ impl FunctionBuilder<'_> {
                 ))
             }
             Type::Map(_, _) => {
-                // An object source carries keyed entries; an empty array
-                // source (`[] ∷ tabula<K, V>`) carries none, so both spell
-                // the same construction. A non-empty array has no key/value
-                // pairing to lower and fails closed.
-                let fields = match entries {
-                    Some(entries) => self.lower_map_object_fields(entries, expr.span)?,
-                    None if matches!(&source.kind, HirExpressionKind::Array(elements) if elements.is_empty()) => {
-                        Vec::new()
-                    }
-                    None => {
-                        self.errors.push(MirError::unsupported(
-                            expr.span,
-                            "map construction without object entries before aggregate MIR lowering",
-                        ));
-                        return None;
-                    }
+                let Some(entries) = entries else {
+                    self.errors.push(MirError::unsupported(
+                        expr.span,
+                        "map construction without object entries before aggregate MIR lowering",
+                    ));
+                    return None;
                 };
+                let fields = self.lower_map_object_fields(entries, expr.span)?;
                 let ty = MirType::semantic(target);
                 Some(self.construct_temp(MirAggregateKind::Map, MirAggregateFields::Keyed(fields), ty, expr.span))
             }
