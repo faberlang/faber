@@ -5,7 +5,7 @@
 
 use super::{
     render_expanded, render_expanded_diagnostics, render_expanded_diagnostics_with_pack, render_expanded_with_pack,
-    render_plain, render_plain_with_pack,
+    render_one_text, render_plain, render_plain_with_pack,
 };
 use crate::diagnostics::{Diagnostic, DiagnosticArg, DiagnosticPhase, Severity};
 use crate::lexer::Span;
@@ -100,6 +100,109 @@ fn text_render_escapes_bidi_controls_in_message_and_help() {
     assert!(!expanded.contains(raw), "{expanded:?}");
     assert!(plain.contains("U+202E"), "{plain:?}");
     assert!(expanded.contains("U+202E"), "{expanded:?}");
+}
+
+/// A hostile source line must not drive the terminal: OSC, C0, and DEL bytes
+/// render as their `U+XXXX` spellings, and bidi isolation still wraps the snippet.
+#[test]
+fn plain_render_escapes_osc_c0_and_del_bytes_in_source_line() {
+    let line = "ok \u{1B}]0;pwned\u{7}x \u{1}mid\u{7F}";
+    let diagnostic = Diagnostic::error("bad token")
+        .with_phase(DiagnosticPhase::Parse)
+        .with_file("evil.fab")
+        .with_span(Span { start: 0, end: 1 })
+        .with_source_line(line);
+
+    let rendered = render_plain(&diagnostic);
+
+    assert!(
+        !rendered.contains('\u{1B}')
+            && !rendered.contains('\u{7}')
+            && !rendered.contains('\u{1}')
+            && !rendered.contains('\u{7F}'),
+        "raw control byte survived: {rendered:?}"
+    );
+    assert!(
+        rendered.contains("U+001B]0;pwnedU+0007x U+0001midU+007F"),
+        "escaped form missing: {rendered:?}"
+    );
+    assert!(
+        rendered.contains('\u{2068}'),
+        "bidi isolation must still wrap the snippet: {rendered:?}"
+    );
+}
+
+#[test]
+fn expanded_render_escapes_osc_c0_and_del_bytes_in_source_line() {
+    let diagnostic = Diagnostic::error("bad token")
+        .with_phase(DiagnosticPhase::Parse)
+        .with_file("evil.fab")
+        .with_span(Span { start: 0, end: 1 })
+        .with_source_line("ok \u{1B}]0;pwned\u{7}x \u{1}mid\u{7F}");
+
+    let rendered = render_expanded(&diagnostic);
+
+    assert!(
+        !rendered.contains('\u{1B}') && !rendered.contains('\u{7}') && !rendered.contains('\u{7F}'),
+        "raw control byte survived: {rendered:?}"
+    );
+    assert!(
+        rendered.contains("source: \u{2068}ok U+001B]0;pwnedU+0007x U+0001midU+007F\u{2069}"),
+        "escaped, isolated source line missing: {rendered:?}"
+    );
+}
+
+/// The ariadne path reads the raw source (span offsets stay byte-exact) and
+/// the control policy is applied to what it rendered. The renderer's own SGR
+/// color sequences must survive; every attacker escape use loses its ESC.
+#[test]
+fn ariadne_render_escapes_source_controls_and_keeps_labeled_span() {
+    let source = "main {\n  let evil = \"a\u{1B}]0;pwned\u{7}b\";\n}\n";
+    let diagnostic = Diagnostic::error("bad token")
+        .with_phase(DiagnosticPhase::Parse)
+        .with_file("evil.fab")
+        .with_span(Span { start: 20, end: 22 });
+
+    let rendered = render_one_text(&diagnostic, &[("evil.fab".to_owned(), source.to_owned())], None)
+        .expect("ariadne render");
+
+    assert!(!rendered.contains('\u{7}'), "raw BEL survived: {rendered:?}");
+    assert!(!rendered.contains("\u{1B}]"), "raw OSC survived: {rendered:?}");
+
+    let visible = strip_sgr_sequences(&rendered);
+    assert!(
+        visible.contains("U+001B]0;pwnedU+0007"),
+        "escaped form missing: {visible:?}"
+    );
+    assert!(
+        visible.contains("let evil"),
+        "raw-source echo missing (spans must stay on raw offsets): {visible:?}"
+    );
+    assert!(
+        visible.contains("evil.fab:2:14"),
+        "span label must land on the raw-offset line:column: {visible:?}"
+    );
+    assert!(
+        visible.contains("bad token"),
+        "span label message missing: {visible:?}"
+    );
+}
+
+/// Drop well-formed SGR sequences so assertions see the report's visible text.
+fn strip_sgr_sequences(text: &str) -> String {
+    let mut out = String::new();
+    let mut rest = text;
+    while !rest.is_empty() {
+        let sgr_len = if rest.starts_with('\u{1B}') { super::sgr_sequence_len(rest) } else { 0 };
+        if sgr_len > 0 {
+            rest = &rest[sgr_len..];
+        } else {
+            let ch = rest.chars().next().expect("non-empty rest");
+            out.push(ch);
+            rest = &rest[ch.len_utf8()..];
+        }
+    }
+    out
 }
 
 #[test]

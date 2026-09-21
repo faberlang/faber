@@ -1,4 +1,5 @@
-use super::{Diagnostic, DiagnosticPhase, Span, offset_to_line};
+use super::{Diagnostic, DiagnosticPhase, Span, get_line_at_offset, offset_to_line};
+use crate::diagnostic::MAX_SOURCE_LINE_CHARS;
 use std::path::Path;
 
 #[test]
@@ -51,6 +52,29 @@ fn offset_to_line_clamps_past_eof_to_physical_length() {
     assert_eq!(physical, 3);
     assert_eq!(offset_to_line(source, 1846), physical);
     assert_eq!(offset_to_line("", 0), 1);
+}
+
+#[test]
+fn get_line_at_offset_returns_whole_short_line_unclipped() {
+    let source = "prima\nsecunda\ntertia\n";
+    assert_eq!(get_line_at_offset(source, 8), "secunda");
+}
+
+/// One hostile multi-megabyte line must not drive renderer output volume:
+/// the return clips at the documented cap with a trailing ellipsis marker.
+#[test]
+fn get_line_at_offset_clips_multi_megabyte_line_at_documented_cap() {
+    let source = "a".repeat(2_000_000);
+
+    let clipped = get_line_at_offset(&source, 1_999_999);
+
+    assert_eq!(
+        clipped.chars().count(),
+        MAX_SOURCE_LINE_CHARS + "…".chars().count(),
+        "clip cap with ellipsis marker: {clipped:?}"
+    );
+    assert!(clipped.ends_with('…'), "ellipsis marker missing: {clipped:?}");
+    assert!(clipped.starts_with("aaa"), "head of the line is kept: {clipped:?}");
 }
 
 #[test]
