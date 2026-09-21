@@ -236,7 +236,10 @@ pub trait Codegen {
     ) -> Result<Self::Output, CodegenError>;
 }
 
-pub use ident::{output_resource_name, sanitize_ident, sanitize_rust_module_ident};
+pub use ident::{
+    SCALAR_LOOP_CANDIDATES, SCALAR_LOOP_FALLBACK, VALUE_JOIN_CANDIDATES, VALUE_JOIN_FALLBACK,
+    output_resource_name, sanitize_ident, sanitize_rust_module_ident, unclaimed_name,
+};
 pub use validation::{find_error_expr_in_program, reject_hir_errors};
 
 #[cfg(test)]
