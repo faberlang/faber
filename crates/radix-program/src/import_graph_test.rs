@@ -185,7 +185,11 @@ fn resolve_import_relative_inside_template_base_resolves() {
     let shared = root.join("shared/gnu");
     fs::create_dir_all(&pkg).unwrap();
     fs::create_dir_all(&shared).unwrap();
-    fs::write(shared.join("format.fab"), "functio f() → vacuum { tacet }\n").unwrap();
+    fs::write(
+        shared.join("format.fab"),
+        "functio f() → vacuum { tacet }\n",
+    )
+    .unwrap();
     let from_file = shared.join("stdio.fab");
     let mut package = spec(pkg.clone(), pkg.join("main.fab"));
     package.templates.insert("gnu".to_owned(), shared.clone());

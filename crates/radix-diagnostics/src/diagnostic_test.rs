@@ -73,8 +73,14 @@ fn get_line_at_offset_clips_multi_megabyte_line_at_documented_cap() {
         MAX_SOURCE_LINE_CHARS + "…".chars().count(),
         "clip cap with ellipsis marker: {clipped:?}"
     );
-    assert!(clipped.ends_with('…'), "ellipsis marker missing: {clipped:?}");
-    assert!(clipped.starts_with("aaa"), "head of the line is kept: {clipped:?}");
+    assert!(
+        clipped.ends_with('…'),
+        "ellipsis marker missing: {clipped:?}"
+    );
+    assert!(
+        clipped.starts_with("aaa"),
+        "head of the line is kept: {clipped:?}"
+    );
 }
 
 #[test]

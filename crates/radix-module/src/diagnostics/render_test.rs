@@ -163,17 +163,14 @@ fn ariadne_render_escapes_source_controls_and_keeps_labeled_span() {
         .with_file("evil.fab")
         .with_span(Span { start: 20, end: 22 });
 
-    let rendered = render_one_text(&diagnostic, &[("evil.fab".to_owned(), source.to_owned())], None)
-        .expect("ariadne render");
+    let rendered =
+        render_one_text(&diagnostic, &[("evil.fab".to_owned(), source.to_owned())], None).expect("ariadne render");
 
     assert!(!rendered.contains('\u{7}'), "raw BEL survived: {rendered:?}");
     assert!(!rendered.contains("\u{1B}]"), "raw OSC survived: {rendered:?}");
 
     let visible = strip_sgr_sequences(&rendered);
-    assert!(
-        visible.contains("U+001B]0;pwnedU+0007"),
-        "escaped form missing: {visible:?}"
-    );
+    assert!(visible.contains("U+001B]0;pwnedU+0007"), "escaped form missing: {visible:?}");
     assert!(
         visible.contains("let evil"),
         "raw-source echo missing (spans must stay on raw offsets): {visible:?}"
@@ -182,10 +179,7 @@ fn ariadne_render_escapes_source_controls_and_keeps_labeled_span() {
         visible.contains("evil.fab:2:14"),
         "span label must land on the raw-offset line:column: {visible:?}"
     );
-    assert!(
-        visible.contains("bad token"),
-        "span label message missing: {visible:?}"
-    );
+    assert!(visible.contains("bad token"), "span label message missing: {visible:?}");
 }
 
 /// Drop well-formed SGR sequences so assertions see the report's visible text.
@@ -193,7 +187,11 @@ fn strip_sgr_sequences(text: &str) -> String {
     let mut out = String::new();
     let mut rest = text;
     while !rest.is_empty() {
-        let sgr_len = if rest.starts_with('\u{1B}') { super::sgr_sequence_len(rest) } else { 0 };
+        let sgr_len = if rest.starts_with('\u{1B}') {
+            super::sgr_sequence_len(rest)
+        } else {
+            0
+        };
         if sgr_len > 0 {
             rest = &rest[sgr_len..];
         } else {
