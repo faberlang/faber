@@ -13,4 +13,6 @@ pub use compile::{
     prepare_program_module_for_name, resolve_package_mode, should_treat_as_package,
 };
 
-pub use crate::import_resolve::{FABER_LIBRARY_HOME_ENV, find_package_root, library_home};
+pub use crate::import_resolve::{
+    FABER_LIBRARY_HOME_ENV, find_package_root, find_package_root_with_session, library_home,
+};

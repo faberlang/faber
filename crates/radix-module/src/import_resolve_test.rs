@@ -244,61 +244,61 @@ fn resolve_fab_file_returns_none_for_nonexistent_directory_module() {
 
 #[test]
 fn resolve_namespace_import_returns_err_for_empty_import() {
-    let result = resolve_namespace_import(Path::new("test.fab"), "", None);
+    let result = resolve_namespace_import(&fresh_session(), Path::new("test.fab"), "", None);
     assert!(result.is_err());
 }
 
 #[test]
 fn resolve_namespace_import_returns_err_for_malformed_provider() {
-    let result = resolve_namespace_import(Path::new("test.fab"), ":module", None);
+    let result = resolve_namespace_import(&fresh_session(), Path::new("test.fab"), ":module", None);
     assert!(result.is_err());
 }
 
 #[test]
 fn resolve_namespace_import_returns_err_for_empty_provider() {
-    let result = resolve_namespace_import(Path::new("test.fab"), ":", None);
+    let result = resolve_namespace_import(&fresh_session(), Path::new("test.fab"), ":", None);
     assert!(result.is_err());
 }
 
 #[test]
 fn resolve_namespace_import_returns_err_for_norma_stdlib_nonexistent() {
-    let result = resolve_namespace_import(Path::new("test.fab"), "norma:nonexistent_module", None);
+    let result = resolve_namespace_import(&fresh_session(), Path::new("test.fab"), "norma:nonexistent_module", None);
     assert!(result.is_err());
 }
 
 #[test]
 fn resolve_namespace_import_returns_err_for_unknown_provider() {
-    let result = resolve_namespace_import(Path::new("test.fab"), "xeno:module", None);
+    let result = resolve_namespace_import(&fresh_session(), Path::new("test.fab"), "xeno:module", None);
     assert!(result.is_err());
 }
 
 #[test]
 fn resolve_namespace_import_returns_err_for_provider_with_colon() {
-    let result = resolve_namespace_import(Path::new("test.fab"), "provider:module:extra", None);
+    let result = resolve_namespace_import(&fresh_session(), Path::new("test.fab"), "provider:module:extra", None);
     assert!(result.is_err());
 }
 
 #[test]
 fn resolve_namespace_import_returns_err_for_non_import_identifier() {
-    let result = resolve_namespace_import(Path::new("test.fab"), "just_a_name", None);
+    let result = resolve_namespace_import(&fresh_session(), Path::new("test.fab"), "just_a_name", None);
     assert!(result.is_err());
 }
 
 #[test]
 fn resolve_namespace_import_returns_err_for_nonexistent_relative_path() {
-    let result = resolve_namespace_import(Path::new("/tmp/test.fab"), "./nonexistent", None);
+    let result = resolve_namespace_import(&fresh_session(), Path::new("/tmp/test.fab"), "./nonexistent", None);
     assert!(result.is_err());
 }
 
 #[test]
 fn resolve_namespace_import_returns_err_for_parent_relative_nonexistent() {
-    let result = resolve_namespace_import(Path::new("/tmp/sub/test.fab"), "../nonexistent", None);
+    let result = resolve_namespace_import(&fresh_session(), Path::new("/tmp/sub/test.fab"), "../nonexistent", None);
     assert!(result.is_err());
 }
 
 #[test]
 fn resolve_namespace_import_returns_err_for_unadorned_relative_looking_path() {
-    let result = resolve_namespace_import(Path::new("/tmp/test.fab"), "relative/path", None);
+    let result = resolve_namespace_import(&fresh_session(), Path::new("/tmp/test.fab"), "relative/path", None);
     assert!(result.is_err());
 }
 
@@ -379,9 +379,15 @@ fn parse_paths_config_empty_paths_section() {
 
 // ── PRP-066 BO-D-1 package root memo ────────────────────────────────────────
 
+/// One session per test = one driver run (ARCH-U3): the package-root memo
+/// lives on the session, so memoization asserts share one session.
+fn fresh_session() -> Session {
+    crate::driver::Session::new(crate::driver::Config::default())
+}
+
 #[test]
 fn package_root_is_memoized_for_same_package() {
-    clear_package_root_cache();
+    let session = fresh_session();
     let dir = crate::test_support::test_temp_dir("pkg-root-memo");
     let root = dir.path();
     std::fs::write(root.join("faber.toml"), "[package]\nname = \"demo\"\n").unwrap();
@@ -392,8 +398,8 @@ fn package_root_is_memoized_for_same_package() {
     std::fs::write(&file_a, "").unwrap();
     std::fs::write(&file_b, "").unwrap();
 
-    let first = find_package_root(&file_a);
-    let second = find_package_root(&file_b);
+    let first = find_package_root_with_session(&session, &file_a);
+    let second = find_package_root_with_session(&session, &file_b);
     assert_eq!(first.as_deref(), Some(root));
     assert_eq!(first, second);
 
@@ -402,12 +408,12 @@ fn package_root_is_memoized_for_same_package() {
     std::fs::create_dir_all(&deeper).unwrap();
     let file_c = deeper.join("three.fab");
     std::fs::write(&file_c, "").unwrap();
-    assert_eq!(find_package_root(&file_c), first);
+    assert_eq!(find_package_root_with_session(&session, &file_c), first);
 }
 
 #[test]
 fn package_root_distinct_packages_are_not_confused() {
-    clear_package_root_cache();
+    let session = fresh_session();
     let outer = crate::test_support::test_temp_dir("pkg-root-multi");
     let pkg_a = outer.path().join("a");
     let pkg_b = outer.path().join("b");
@@ -420,8 +426,14 @@ fn package_root_distinct_packages_are_not_confused() {
     std::fs::write(&file_a, "").unwrap();
     std::fs::write(&file_b, "").unwrap();
 
-    assert_eq!(find_package_root(&file_a).as_deref(), Some(pkg_a.as_path()));
-    assert_eq!(find_package_root(&file_b).as_deref(), Some(pkg_b.as_path()));
+    assert_eq!(
+        find_package_root_with_session(&session, &file_a).as_deref(),
+        Some(pkg_a.as_path())
+    );
+    assert_eq!(
+        find_package_root_with_session(&session, &file_b).as_deref(),
+        Some(pkg_b.as_path())
+    );
 }
 
 // ── BO-D-1 library_home memo ────────────────────────────────────────────────
@@ -524,7 +536,7 @@ fn resolve_template_import_rejects_absolute_rest() {
     let mut templates = BTreeMap::new();
     templates.insert("src".to_owned(), "src".to_owned());
 
-    let result = resolve_namespace_import(&from, "§src//etc/passwd", Some(&templates));
+    let result = resolve_namespace_import(&fresh_session(), &from, "§src//etc/passwd", Some(&templates));
     assert!(result.is_err(), "absolute rest must be rejected");
 }
 
@@ -540,7 +552,7 @@ fn resolve_template_import_rejects_rest_bare_dotdot() {
     let mut templates = BTreeMap::new();
     templates.insert("src".to_owned(), "src".to_owned());
 
-    let result = resolve_namespace_import(&from, "§src/..", Some(&templates));
+    let result = resolve_namespace_import(&fresh_session(), &from, "§src/..", Some(&templates));
     assert!(result.is_err(), "bare .. rest must be rejected");
 }
 
@@ -556,7 +568,7 @@ fn resolve_template_import_rejects_rest_dotdot_prefix() {
     let mut templates = BTreeMap::new();
     templates.insert("src".to_owned(), "src".to_owned());
 
-    let result = resolve_namespace_import(&from, "§src/../escape", Some(&templates));
+    let result = resolve_namespace_import(&fresh_session(), &from, "§src/../escape", Some(&templates));
     assert!(result.is_err(), ".. prefix in rest must be rejected");
 }
 
@@ -572,7 +584,7 @@ fn resolve_template_import_rejects_rest_embedded_dotdot() {
     let mut templates = BTreeMap::new();
     templates.insert("src".to_owned(), "src".to_owned());
 
-    let result = resolve_namespace_import(&from, "§src/a/../b", Some(&templates));
+    let result = resolve_namespace_import(&fresh_session(), &from, "§src/a/../b", Some(&templates));
     assert!(result.is_err(), "embedded .. in rest must be rejected");
 }
 
@@ -588,7 +600,7 @@ fn resolve_template_import_rejects_rest_trailing_dotdot() {
     let mut templates = BTreeMap::new();
     templates.insert("src".to_owned(), "src".to_owned());
 
-    let result = resolve_namespace_import(&from, "§src/a/..", Some(&templates));
+    let result = resolve_namespace_import(&fresh_session(), &from, "§src/a/..", Some(&templates));
     assert!(result.is_err(), "trailing .. in rest must be rejected");
 }
 
@@ -606,7 +618,7 @@ fn resolve_template_import_allows_clean_rest() {
     let mut templates = BTreeMap::new();
     templates.insert("src".to_owned(), "src".to_owned());
 
-    let result = resolve_namespace_import(&from, "§src/sub/module", Some(&templates));
+    let result = resolve_namespace_import(&fresh_session(), &from, "§src/sub/module", Some(&templates));
     assert_eq!(result, Ok(target));
 }
 

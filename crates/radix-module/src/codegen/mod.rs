@@ -502,8 +502,16 @@ fn emit_provider_modules(
     use std::collections::BTreeMap;
     use std::path::Path;
 
+    // One emit call = one scoped run (ARCH-U3): the provider fleet shares one
+    // memo identity, and each per-provider analysis below re-wraps this
+    // session for its own contract config instead of minting a fresh run.
+    let session = crate::driver::Session::new(
+        crate::driver::Config::default()
+            .with_bodyless_functions()
+            .with_dev_locale_root(),
+    );
     let mut modules = BTreeMap::new();
-    collect_provider_modules(analysis, Path::new("."), &mut modules)?;
+    collect_provider_modules(analysis, &session, Path::new("."), &mut modules)?;
     Ok(modules
         .into_iter()
         .map(|(name, (code, failable))| (name, code, failable))
@@ -513,6 +521,7 @@ fn emit_provider_modules(
 #[cfg(feature = "hir-rust")]
 fn collect_provider_modules(
     analysis: &crate::driver::AnalyzedModule,
+    session: &crate::driver::Session,
     from_file: &std::path::Path,
     modules: &mut std::collections::BTreeMap<String, (String, std::collections::BTreeSet<String>)>,
 ) -> Result<(), CodegenError> {
@@ -533,13 +542,14 @@ fn collect_provider_modules(
             if modules.contains_key(&module_name) {
                 continue;
             }
-            let provider_path = resolve_namespace_import(from_file, import_path, None).map_err(|err| CodegenError {
-                message: format!("cannot resolve provider import `{import_path}` for Rust module emission: {err}"),
-                args: vec![
-                    DiagnosticArg::new("issue", "provider_import_resolution_failed"),
-                    DiagnosticArg::new("import_path", import_path),
-                ],
-            })?;
+            let provider_path =
+                resolve_namespace_import(session, from_file, import_path, None).map_err(|err| CodegenError {
+                    message: format!("cannot resolve provider import `{import_path}` for Rust module emission: {err}"),
+                    args: vec![
+                        DiagnosticArg::new("issue", "provider_import_resolution_failed"),
+                        DiagnosticArg::new("import_path", import_path),
+                    ],
+                })?;
             let source = std::fs::read_to_string(&provider_path).map_err(|err| CodegenError {
                 message: format!("cannot read provider source {}: {err}", provider_path.display()),
                 args: vec![
@@ -554,13 +564,14 @@ fn collect_provider_modules(
             // `tela:valida`) is threaded as a non-explicit session pack so
             // an English provider stays English under an otherwise
             // Latin-default session instead of failing PARSE001.
-            let mut config = crate::driver::Config::default()
-                .with_bodyless_functions()
-                .with_dev_locale_root();
-            if let Some(pack) = crate::program::compile::package_reader_locale_pack(&provider_path) {
+            let mut config = session.config.clone();
+            if let Some(pack) = crate::program::compile::package_reader_locale_pack(session, &provider_path) {
                 config = config.with_locale_pack(pack);
             }
-            let session = crate::driver::Session::new(config);
+            // Per-provider re-wrap (ARCH-U3): the provider's analysis session
+            // carries its own contract config but shares the emit call's memo
+            // identity, so provider targets parse once per emit run.
+            let session = session.re_wrap(config);
             let name = provider_path.display().to_string();
             let prepared =
                 crate::program::compile::prepare_program_module(&provider_path, &source, &session).map_err(|diag| {
@@ -613,7 +624,7 @@ fn collect_provider_modules(
             let nested_from = provider_path
                 .parent()
                 .map_or_else(|| std::path::Path::new(".").to_path_buf(), std::path::Path::to_path_buf);
-            collect_provider_modules(&unit, &nested_from, modules)?;
+            collect_provider_modules(&unit, &session, &nested_from, modules)?;
             let namespace_info = rust::build_file_import_namespaces(
                 &unit.hir,
                 &unit.interner,
