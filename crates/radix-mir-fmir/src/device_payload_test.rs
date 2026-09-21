@@ -80,6 +80,7 @@ fn sample_wire_program() -> WireDeviceProgram {
                         version: 1,
                         element_ty: "f32".to_owned(),
                         element_count: 4,
+                        shape: None,
                         reduced_projection: None,
                     },
                     binding: WireBinding {
@@ -96,6 +97,7 @@ fn sample_wire_program() -> WireDeviceProgram {
                         version: 1,
                         element_ty: "f32".to_owned(),
                         element_count: 4,
+                        shape: None,
                         reduced_projection: None,
                     },
                     binding: WireBinding {
@@ -124,6 +126,7 @@ fn sample_wire_program() -> WireDeviceProgram {
                 version: 1,
                 element_ty: "f32".to_owned(),
                 element_count: 4,
+                shape: None,
                 reduced_projection: None,
             },
             role: WireBufferRole::Output,
@@ -2046,6 +2049,7 @@ fn two_kernel_chain_program() -> WireDeviceProgram {
                         version: 1,
                         element_ty: "f32".to_owned(),
                         element_count: 4,
+                        shape: None,
                         reduced_projection: None,
                     },
                     binding: WireBinding {
@@ -2073,6 +2077,7 @@ fn two_kernel_chain_program() -> WireDeviceProgram {
                             version: 1,
                             element_ty: "f32".to_owned(),
                             element_count: 4,
+                            shape: None,
                             reduced_projection: None,
                         },
                         binding: WireBinding {
@@ -2089,6 +2094,7 @@ fn two_kernel_chain_program() -> WireDeviceProgram {
                             version: 1,
                             element_ty: "f32".to_owned(),
                             element_count: 4,
+                            shape: None,
                             reduced_projection: None,
                         },
                         binding: WireBinding {
@@ -2124,6 +2130,7 @@ fn two_kernel_chain_program() -> WireDeviceProgram {
                 version: 1,
                 element_ty: "f32".to_owned(),
                 element_count: 4,
+                shape: None,
                 reduced_projection: None,
             },
             role: WireBufferRole::Output,
@@ -2178,6 +2185,7 @@ fn four_kernel_chain_program() -> WireDeviceProgram {
         version: 1,
         element_ty: "f32".to_owned(),
         element_count: count,
+        shape: None,
         reduced_projection: None,
     };
     let resource = |buffer, access, initialization| {
@@ -2498,6 +2506,7 @@ fn faber_projected_two_kernel_wire() -> WireDeviceProgram {
         version: 1,
         element_ty: "f32".to_owned(),
         element_count: 4,
+        shape: None,
         reduced_projection: None,
     };
     WireDeviceProgram {
@@ -3171,7 +3180,7 @@ fn gi3_inference_recipe_plans_round_trip_on_the_wire() {
 /// semantic facts, no version bump.
 #[test]
 fn r_pack_packed_kernel_plans_round_trip_on_the_wire() {
-    assert_eq!(WIRE_DEVICE_PROGRAM_VERSION, 11);
+    assert_eq!(WIRE_DEVICE_PROGRAM_VERSION, 12);
     let plans = [
         WireCollectionKernelPlan::QuantizedMatMul(WireQuantizedMatMulPlan {
             m: 8,
@@ -3228,7 +3237,7 @@ fn r_pack_packed_kernel_plans_round_trip_on_the_wire() {
 /// wire-10 un-ratcheted; the S2 clean break records it at wire 11.
 #[test]
 fn batched_matmul_wire_plan_round_trips_with_batch_facts() {
-    assert_eq!(WIRE_DEVICE_PROGRAM_VERSION, 11);
+    assert_eq!(WIRE_DEVICE_PROGRAM_VERSION, 12);
     let shared = || WireMatMulSharedMemory {
         shared_a: WireSharedMemoryLayout {
             element_byte_width: 4,
@@ -3342,7 +3351,7 @@ fn batched_matmul_wire_plan_batch_law_fails_closed() {
 /// records it at wire 11.
 #[test]
 fn batched_softmax_wire_plan_round_trips_with_batch_facts() {
-    assert_eq!(WIRE_DEVICE_PROGRAM_VERSION, 11);
+    assert_eq!(WIRE_DEVICE_PROGRAM_VERSION, 12);
     // Decode attention: scores [5,3,1,76] + declared-length mask [1,76].
     let decode = WireCollectionKernelPlan::BatchedRowSoftmax(WireBatchedRowSoftmaxPlan {
         axis: 3,
@@ -3415,7 +3424,7 @@ fn batched_softmax_wire_plan_batch_law_fails_closed() {
 /// records it at wire 11.
 #[test]
 fn batched_transpose_wire_plan_round_trips_with_batch_facts() {
-    assert_eq!(WIRE_DEVICE_PROGRAM_VERSION, 11);
+    assert_eq!(WIRE_DEVICE_PROGRAM_VERSION, 12);
     // Decode attention: K [5,76,64] → Kᵀ [5,64,76] over the row-major
     // [76,320] arena.
     let decode = WireCollectionKernelPlan::BatchedTranspose(WireBatchedTransposePlan {

@@ -80,18 +80,21 @@ fn wire_program_fixture() -> WireDeviceProgram {
         version: 1,
         element_ty: "f32".to_owned(),
         element_count: 64,
+        shape: None,
         reduced_projection: None,
     };
     let v_m = WireBufferVersion {
         version: 1,
         element_ty: "f32".to_owned(),
         element_count: 128,
+        shape: None,
         reduced_projection: None,
     };
     let v_o = WireBufferVersion {
         version: 1,
         element_ty: "f32".to_owned(),
         element_count: 32,
+        shape: None,
         reduced_projection: None,
     };
     let launch = WireKernelLaunchPlan {

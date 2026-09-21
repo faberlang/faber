@@ -127,6 +127,7 @@ fn weights_version() -> BufferVersion {
         version: 1,
         element_ty: MirType::semantic(TypeId(0)),
         element_count: 4,
+        shape: None,
         reduced_projection: None,
     }
 }
@@ -136,6 +137,7 @@ fn scores_version() -> BufferVersion {
         version: 1,
         element_ty: MirType::semantic(TypeId(0)),
         element_count: 2,
+        shape: None,
         reduced_projection: None,
     }
 }

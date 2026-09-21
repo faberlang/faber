@@ -385,6 +385,7 @@ pub fn resource_reflection_from_shader_contract(
         element_layout: binding.element_layout,
         element_byte_width: binding.element_byte_width,
         element_count: binding.element_count,
+        shape: None,
         buffer_byte_len: binding
             .element_count
             .saturating_mul(u64::from(binding.element_byte_width)),

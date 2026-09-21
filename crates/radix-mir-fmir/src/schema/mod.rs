@@ -160,18 +160,26 @@ pub const ARTIFACT_ABI_VERSION: u32 = 8;
 /// wire-10 without a ratchet; an older wire-10 consumer cannot interpret
 /// them, so the bump records them. A stale wire-10 device section fails
 /// nested admission before field interpretation — no compat projection.
+/// The current clean break is `11 → 12` (the wire-shape widening): every
+/// buffer version carries the producer-stamped **parameter shape vector**
+/// (`shape: [dim, …]`, declaration-order literal dims) beside the flattened
+/// `element_count`, so consumers never reconstruct rank or dims from the
+/// count (`[4,4]` and `[16]` share one); admission rejects a carried shape
+/// whose product disagrees with the count. A stale wire-11 device section
+/// fails nested admission before field interpretation — no compat
+/// projection.
 /// Admitted independently of the outer image version:
 /// [`admit_device_section`] rejects a mismatched nested version before any
 /// field-level interpretation, with a focused diagnostic
 /// ([`UnsupportedDeviceProgramVersion`](crate::error::FmirImageError::DeviceProgramVersionMismatch)).
-pub const WIRE_DEVICE_PROGRAM_VERSION: u32 = 11;
+pub const WIRE_DEVICE_PROGRAM_VERSION: u32 = 12;
 
 /// The version ratchet of the optional distributed execution section
 /// (MD2-W1 A7). The section carries its OWN nested version, admitted
 /// fail-closed **before field interpretation** (the `admit_device_section`
 /// pattern, FC4) — independently of the nested device-program wire version
 /// and the outer image version. The first distributed-section shape is v1;
-/// the nested `WIRE_DEVICE_PROGRAM_VERSION = 11` and the outer
+/// the nested `WIRE_DEVICE_PROGRAM_VERSION` and the outer
 /// `PACKAGE_MIR_ARTIFACT_VERSION = 7` stay untouched (FC1).
 pub const WIRE_DISTRIBUTED_SECTION_VERSION: u32 = 1;
 

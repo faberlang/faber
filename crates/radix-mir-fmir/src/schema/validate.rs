@@ -36,6 +36,7 @@ pub(crate) fn validate_wire_program(
     validate_wire_row_softmax_batch_facts(wire)?;
     validate_wire_transpose_batch_facts(wire)?;
     validate_wire_reduced_projections(wire)?;
+    validate_wire_buffer_shapes(wire)?;
     Ok(())
 }
 
@@ -274,6 +275,41 @@ fn validate_carried_reduced_projection(
             "{carrier} element count {element_count} is not divisible by its carried projection's inner stride {} ({projection:?}); the keep-dims mapping cannot address the buffer (council-8 CB-3)",
             projection.inner_stride
         )));
+    }
+    Ok(())
+}
+
+/// Admit every carried parameter shape vector fail-closed: the dims are the
+/// producer-stamped declaration-order fact (the wire-shape widening), and
+/// their product must equal the carried `element_count` — the vector and
+/// the count are two views of one declaration, so a disagreement is a
+/// producer defect, never a consumer inference.
+fn validate_wire_buffer_shapes(
+    wire: &WireDeviceProgram,
+) -> Result<(), crate::error::FmirImageError> {
+    let rows = wire
+        .kernels
+        .iter()
+        .flat_map(|kernel| kernel.resources.iter())
+        .map(|resource| (&resource.buffer.name, &resource.version))
+        .chain(
+            wire.results
+                .iter()
+                .map(|result| (&result.buffer.name, &result.version)),
+        );
+    for (name, version) in rows {
+        let Some(shape) = &version.shape else {
+            continue;
+        };
+        let product = shape
+            .iter()
+            .try_fold(1u64, |acc, dim| acc.checked_mul(*dim));
+        if product != Some(version.element_count) {
+            return Err(wire_invalid(format!(
+                "buffer '{name}' carries shape {shape:?} whose product does not equal its element count {} (the wire-shape widening); a carried shape that disagrees with the flattened count is a producer defect",
+                version.element_count
+            )));
+        }
     }
     Ok(())
 }

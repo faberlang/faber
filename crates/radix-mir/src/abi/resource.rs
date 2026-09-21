@@ -27,6 +27,12 @@ pub struct MirKernelResourceReflection {
     pub element_layout: MirScalarLayout,
     pub element_byte_width: u16,
     pub element_count: u64,
+    /// The declaring kernel parameter's concrete shape vector
+    /// (declaration-order literal dims), stamped by the producers that can
+    /// resolve the parameter; `None` for rows with no declared tensor
+    /// parameter. Carried beside `element_count` because the flattened
+    /// count cannot distinguish `[4,4]` from `[16]`.
+    pub shape: Option<Vec<u64>>,
     pub buffer_byte_len: u64,
     pub source_local: Option<MirLocalId>,
     pub source_name: Option<String>,
@@ -312,6 +318,7 @@ pub(crate) fn reflect_kernel_resource(
         element_layout,
         element_byte_width,
         element_count: resource.element_count,
+        shape: None,
         buffer_byte_len,
         source_local: resource.source_local,
         source_name: resource.source_name.clone(),
@@ -326,6 +333,51 @@ pub(crate) fn kernel_buffer_byte_len(
     u64::from(element_byte_width)
         .checked_mul(element_count)
         .ok_or_else(|| MirAbiError::new(ERR_KERNEL_REFLECTION_BYTE_OVERFLOW))
+}
+
+/// The concrete shape vector of one reflected resource's declaring kernel
+/// parameter: the declaration-order literal dims of the parameter's tensor
+/// type, resolved from the type table. `None` when the slot declares no
+/// tensor parameter (a synthetic buffer, a scalar, the runtime-extent count
+/// channel) — a flattened `element_count` cannot reconstruct rank or dims,
+/// so nothing is inferred here (the wire-shape ruling: no source-text
+/// parsing, no static shape table).
+#[must_use]
+pub fn kernel_param_shape(
+    source_local: Option<MirLocalId>,
+    function: &MirFunction,
+    validation: &MirValidationContext<'_>,
+) -> Option<Vec<u64>> {
+    let local = source_local?;
+    let param = function.params.iter().find(|param| param.local == local)?;
+    tensor_param_shape_dims(param.ty, validation)
+}
+
+fn tensor_param_shape_dims(
+    ty: MirType,
+    validation: &MirValidationContext<'_>,
+) -> Option<Vec<u64>> {
+    match validation.types.get(ty.semantic_id()) {
+        Type::Tensor(_, shape) => tensor_shape_dims(*shape, validation),
+        Type::Alias(_, target) => {
+            tensor_param_shape_dims(MirType::semantic(*target), validation)
+        }
+        _ => None,
+    }
+}
+
+fn tensor_shape_dims(shape: IndexId, validation: &MirValidationContext<'_>) -> Option<Vec<u64>> {
+    match validation.types.get_index(shape) {
+        IndexExpr::Literal(count) => Some(vec![*count]),
+        IndexExpr::Tuple(dims) => dims
+            .iter()
+            .map(|dim| match validation.types.get_index(*dim) {
+                IndexExpr::Literal(count) => Some(*count),
+                _ => None,
+            })
+            .collect(),
+        _ => None,
+    }
 }
 
 pub(crate) fn reflect_kernel_builtin_input(

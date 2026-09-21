@@ -238,6 +238,13 @@ pub struct WireBufferVersion {
     pub element_ty: String,
     /// Element count of this version's shape.
     pub element_count: u64,
+    /// The declaring kernel parameter's concrete shape vector
+    /// (declaration-order literal dims) the producer stamped on this
+    /// version; `None` when the buffer binds no declared tensor parameter.
+    /// Carried beside `element_count` because the flattened count cannot
+    /// distinguish `[4,4]` from `[16]` (the wire-shape widening); admitted
+    /// fail-closed against the count.
+    pub shape: Option<Vec<u64>>,
     /// The producer-defined reduced-buffer projection (council-8 CB-3):
     /// present when this version is the reduced output of an axis
     /// reduction — the mapping a keep-dims consumer uses to address the

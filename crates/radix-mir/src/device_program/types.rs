@@ -158,6 +158,13 @@ pub struct BufferVersion {
     pub element_ty: MirType,
     /// Element count of this version's shape.
     pub element_count: u64,
+    /// The declaring kernel parameter's concrete shape vector
+    /// (declaration-order literal dims) when the buffer binds one; `None`
+    /// otherwise. Carried beside `element_count` because the flattened
+    /// count cannot distinguish `[4,4]` from `[16]` (the wire-shape
+    /// ruling); the constructor reconciles one fact per buffer and fails
+    /// closed on contradictions.
+    pub shape: Option<Vec<u64>>,
     /// The producer-defined reduced-buffer projection (council-8 CB-3):
     /// present only when this version is the reduced output of an axis
     /// reduction — the mapping a keep-dims consumer uses to address the
