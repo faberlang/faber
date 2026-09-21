@@ -43,6 +43,7 @@ use radix_hir::{
     HirStatementKind, HirTypeSite, HirTypeSlot, HirUnOp,
 };
 use radix_lexer::{Interner, Span, Symbol};
+use radix_types::HIR_SYNTHETIC_DEF_ID_BASE;
 use rustc_hash::{FxHashMap, FxHashSet};
 
 /// Unroll budget. Same constant as `MAX_MONOMORPHIZATIONS` in MIR lowering.
@@ -2557,7 +2558,10 @@ impl IdGen {
         walk_program(&mut census, hir);
         Self {
             next_hir: census.max_hir.saturating_add(1),
-            next_def: census.max_def.saturating_add(1).max(1_000_000),
+            next_def: census
+                .max_def
+                .saturating_add(1)
+                .max(HIR_SYNTHETIC_DEF_ID_BASE),
         }
     }
 

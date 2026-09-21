@@ -2414,7 +2414,7 @@ impl ShadowedAliasRewriter<'_> {
         // never a name sweep across the unit's imports (which rewrites any
         // ordinary method call on a local whose method happens to match an
         // imported module's export, e.g. `h1b.gelu()` → `nn.gelu(h1b)`).
-        if def.0 >= 1_000_000 {
+        if def.is_hir_synthetic() {
             let Some(binding_name) = self.local_names.get(def).copied() else {
                 return None;
             };

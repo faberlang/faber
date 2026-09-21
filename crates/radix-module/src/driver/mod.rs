@@ -2811,8 +2811,8 @@ pub struct AnalyzedModule {
     /// import-path spelling (ARCH-U4 / S01-3; see [`ProviderUnitView`]).
     /// Populated by the program-layer contract walk where each target already
     /// parses; backend emission maps over the view instead of re-entering the
-    /// front half from disk. Empty for plain single-file compiles and
-    /// artifact-loaded units.
+    /// front half from disk. Empty for plain single-file compiles; carried
+    /// on load from the unit artifact (wire schema 14).
     pub provider_units: ProviderUnitView,
 
     /// Compiler lane metadata collected from `@ radix lane ...` annotations.
