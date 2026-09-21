@@ -17,7 +17,7 @@ use crate::surface::KeywordSurface;
 use radix_hir::{HirBinOp, HirExpression, HirExpressionKind, HirUnOp};
 use radix_lexer::TokenKind;
 
-impl super::FaberCodegen {
+impl super::FaberCodegen<'_> {
     /// Return the binding strength used by the pretty-printer.
     ///
     /// Lower numbers bind more weakly. The expression writer parenthesizes a

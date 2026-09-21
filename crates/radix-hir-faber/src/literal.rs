@@ -21,8 +21,7 @@
 use crate::surface::KeywordSurface;
 use radix_codegen_shared::CodeWriter;
 use radix_hir::{DefId, HirLiteral, HirObjectField, HirObjectKey};
-use radix_lexer::{Interner, Symbol, TokenKind};
-use radix_types::TypeTable;
+use radix_lexer::{Symbol, TokenKind};
 use rustc_hash::FxHashMap;
 
 /// Key/value separator for genus vs JSON object-field spellings.
@@ -42,57 +41,34 @@ impl ObjectFieldStyle {
     }
 }
 
-impl super::FaberCodegen {
+impl super::FaberCodegen<'_> {
     /// Write one genus/struct field (`field = value`).
     pub(super) fn write_genus_field(
         &self,
         field: &HirObjectField,
-        types: &TypeTable,
         names: &FxHashMap<DefId, Symbol>,
-        interner: &Interner,
         surface: &impl KeywordSurface,
         writer: &mut CodeWriter,
     ) {
-        self.write_object_field(
-            field,
-            ObjectFieldStyle::Genus,
-            types,
-            names,
-            interner,
-            surface,
-            writer,
-        );
+        self.write_object_field(field, ObjectFieldStyle::Genus, names, surface, writer);
     }
 
     /// Write one JSON valor / tabula field (`"key": value`).
     pub(super) fn write_json_field(
         &self,
         field: &HirObjectField,
-        types: &TypeTable,
         names: &FxHashMap<DefId, Symbol>,
-        interner: &Interner,
         surface: &impl KeywordSurface,
         writer: &mut CodeWriter,
     ) {
-        self.write_object_field(
-            field,
-            ObjectFieldStyle::Json,
-            types,
-            names,
-            interner,
-            surface,
-            writer,
-        );
+        self.write_object_field(field, ObjectFieldStyle::Json, names, surface, writer);
     }
 
-    #[allow(clippy::too_many_arguments)]
     fn write_object_field(
         &self,
         field: &HirObjectField,
         style: ObjectFieldStyle,
-        types: &TypeTable,
         names: &FxHashMap<DefId, Symbol>,
-        interner: &Interner,
         surface: &impl KeywordSurface,
         writer: &mut CodeWriter,
     ) {
@@ -100,30 +76,30 @@ impl super::FaberCodegen {
             HirObjectKey::Ident(name) | HirObjectKey::String(name) => {
                 match style {
                     ObjectFieldStyle::Genus => {
-                        writer.write(&self.symbol_to_string(*name, interner));
+                        writer.write(&self.symbol_to_string(*name));
                     }
                     ObjectFieldStyle::Json => {
-                        self.write_quoted_symbol(*name, interner, writer);
+                        self.write_quoted_symbol(*name, writer);
                     }
                 }
                 if let Some(value) = &field.value {
                     writer.write(style.value_separator());
-                    self.write_expr(value, types, names, interner, surface, writer);
+                    self.write_expr(value, names, surface, writer);
                 }
             }
             HirObjectKey::Computed(expr) => {
                 writer.write("[");
-                self.write_expr(expr, types, names, interner, surface, writer);
+                self.write_expr(expr, names, surface, writer);
                 writer.write("]");
                 if let Some(value) = &field.value {
                     writer.write(style.value_separator());
-                    self.write_expr(value, types, names, interner, surface, writer);
+                    self.write_expr(value, names, surface, writer);
                 }
             }
             HirObjectKey::Spread(expr) => {
                 writer.write(surface.keyword(TokenKind::Sparge));
                 writer.write(" ");
-                self.write_expr(expr, types, names, interner, surface, writer);
+                self.write_expr(expr, names, surface, writer);
             }
         }
     }
@@ -132,7 +108,6 @@ impl super::FaberCodegen {
     pub(super) fn write_literal(
         &self,
         lit: &HirLiteral,
-        interner: &Interner,
         surface: &impl KeywordSurface,
         writer: &mut CodeWriter,
     ) {
@@ -147,22 +122,22 @@ impl super::FaberCodegen {
                     writer.write(&self.format_float_literal(*value));
                 }
             }
-            HirLiteral::String(sym) => self.write_textus_literal(*sym, interner, writer),
+            HirLiteral::String(sym) => self.write_textus_literal(*sym, writer),
             HirLiteral::Ascii(sym) => {
                 writer.write("'");
-                writer.write(interner.resolve(*sym));
+                writer.write(self.interner.resolve(*sym));
                 writer.write("'");
             }
             HirLiteral::Octeti(sym) => {
                 writer.write("|");
-                writer.write(interner.resolve(*sym));
+                writer.write(self.interner.resolve(*sym));
                 writer.write("|");
             }
             HirLiteral::JsonValor(value) => {
-                self.write_json_valor(value, interner, writer);
+                self.write_json_valor(value, writer);
             }
             HirLiteral::Regex(pattern, _flags) => {
-                self.write_quoted_symbol(*pattern, interner, writer);
+                self.write_quoted_symbol(*pattern, writer);
                 writer.write(" ↦ regex");
             }
             HirLiteral::Bool(value) => {
@@ -173,19 +148,14 @@ impl super::FaberCodegen {
     }
 
     /// Emit a `textus` literal, preferring guillemets when `"..."` would break.
-    pub(super) fn write_textus_literal(
-        &self,
-        sym: Symbol,
-        interner: &Interner,
-        writer: &mut CodeWriter,
-    ) {
-        let text = interner.resolve(sym);
+    pub(super) fn write_textus_literal(&self, sym: Symbol, writer: &mut CodeWriter) {
+        let text = self.interner.resolve(sym);
         if text.contains('\n') || text.contains('"') {
             writer.write("«");
             writer.write_raw(text);
             writer.write("»");
         } else {
-            self.write_quoted_symbol(sym, interner, writer);
+            self.write_quoted_symbol(sym, writer);
         }
     }
 
@@ -211,25 +181,15 @@ impl super::FaberCodegen {
     }
 
     /// Quote interned source text without adding or normalizing escapes.
-    pub(super) fn write_quoted_symbol(
-        &self,
-        sym: Symbol,
-        interner: &Interner,
-        writer: &mut CodeWriter,
-    ) {
+    pub(super) fn write_quoted_symbol(&self, sym: Symbol, writer: &mut CodeWriter) {
         writer.write("\"");
-        writer.write(interner.resolve(sym));
+        writer.write(self.interner.resolve(sym));
         writer.write("\"");
     }
 
     /// Round-trip a compile-time JSON valor literal back to bare `{ ... }` JSON
     /// syntax. See `docs/factory/inline-json-valor/contract.md`.
-    fn write_json_valor(
-        &self,
-        value: &radix_syntax::JsonValue,
-        interner: &Interner,
-        writer: &mut CodeWriter,
-    ) {
+    fn write_json_valor(&self, value: &radix_syntax::JsonValue, writer: &mut CodeWriter) {
         use radix_syntax::JsonValue;
         match value {
             JsonValue::Object(members) => {
@@ -240,9 +200,9 @@ impl super::FaberCodegen {
                         if index > 0 {
                             writer.write(", ");
                         }
-                        self.write_quoted_symbol(member.key, interner, writer);
+                        self.write_quoted_symbol(member.key, writer);
                         writer.write(": ");
-                        self.write_json_valor(&member.value, interner, writer);
+                        self.write_json_valor(&member.value, writer);
                     }
                     writer.write(" ");
                 }
@@ -254,11 +214,11 @@ impl super::FaberCodegen {
                     if index > 0 {
                         writer.write(", ");
                     }
-                    self.write_json_valor(element, interner, writer);
+                    self.write_json_valor(element, writer);
                 }
                 writer.write("]");
             }
-            JsonValue::String(sym) => self.write_quoted_symbol(*sym, interner, writer),
+            JsonValue::String(sym) => self.write_quoted_symbol(*sym, writer),
             JsonValue::Numerus(n) => writer.write(&n.to_string()),
             JsonValue::Fractus(n) => writer.write(&self.format_float_literal(*n)),
             JsonValue::Bool(b) => writer.write(if *b { "true" } else { "false" }),
@@ -274,14 +234,9 @@ impl super::FaberCodegen {
     }
 
     /// Quote a symbol after resolving it through the backend name policy.
-    pub(super) fn write_symbol_literal(
-        &self,
-        symbol: Symbol,
-        interner: &Interner,
-        writer: &mut CodeWriter,
-    ) {
+    pub(super) fn write_symbol_literal(&self, symbol: Symbol, writer: &mut CodeWriter) {
         writer.write("\"");
-        writer.write(&self.symbol_to_string(symbol, interner));
+        writer.write(&self.symbol_to_string(symbol));
         writer.write("\"");
     }
 }

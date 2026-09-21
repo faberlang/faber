@@ -80,17 +80,10 @@ impl Ctx {
     }
 
     fn render(&self, expr: &HirExpression) -> String {
-        let codegen = crate::FaberCodegen::default();
         let types = TypeTable::new();
+        let codegen = crate::FaberCodegen::new(&types, &self.interner);
         let mut writer = CodeWriter::new();
-        codegen.write_expr(
-            expr,
-            &types,
-            &self.names,
-            &self.interner,
-            &LatinSurface,
-            &mut writer,
-        );
+        codegen.write_expr(expr, &self.names, &LatinSurface, &mut writer);
         writer.finish()
     }
 }

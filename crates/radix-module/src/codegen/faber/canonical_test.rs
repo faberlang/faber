@@ -27,8 +27,8 @@ fn span() -> Span {
 fn generate_faber(program: &HirModule, types: &TypeTable, interner: &Interner) -> String {
     let latin = crate::locale::latin_locale_pack();
     let surface = LocaleKeywordBridge(crate::locale::KeywordSurface::new(&latin));
-    FaberCodegen::default()
-        .generate(program, &super::empty_presentation(), types, interner, &surface)
+    FaberCodegen::new(types, interner)
+        .generate(program, &super::empty_presentation(), &surface)
         .expect("codegen")
         .code
 }
@@ -340,10 +340,10 @@ fn rejects_hir_error_nodes_in_direct_faber_codegen() {
         entry_is_async: false,
     };
 
-    let mut r#gen = FaberCodegen::default();
+    let mut r#gen = FaberCodegen::new(&types, &interner);
     let latin = crate::locale::latin_locale_pack();
     let surface = LocaleKeywordBridge(crate::locale::KeywordSurface::new(&latin));
-    let Err(error) = r#gen.generate(&program, &super::empty_presentation(), &types, &interner, &surface) else {
+    let Err(error) = r#gen.generate(&program, &super::empty_presentation(), &surface) else {
         panic!("expected faber codegen error");
     };
     assert!(

@@ -93,7 +93,7 @@ fn function(name: &str, type_params: Vec<HirTypeParam>, interner: &mut Interner)
     }
 }
 
-fn emit_items(items: Vec<HirItem>, interner: &Interner, types: &TypeTable) -> String {
+fn emit_items(items: Vec<HirItem>, codegen: &mut FaberCodegen<'_>) -> String {
     let hir = HirModule {
         items,
         entry: None,
@@ -101,9 +101,8 @@ fn emit_items(items: Vec<HirItem>, interner: &Interner, types: &TypeTable) -> St
         entry_args_name: None,
         entry_is_async: false,
     };
-    let mut codegen = FaberCodegen::default();
     codegen
-        .generate(&hir, &empty_presentation(), types, interner, &TestSurface)
+        .generate(&hir, &empty_presentation(), &TestSurface)
         .expect("hand-built module must emit")
         .code
 }
@@ -162,7 +161,10 @@ fn declared_defaults_reemit_on_generic_params() {
         &mut interner,
     );
 
-    let code = emit_items(vec![pick, tag, identitas], &interner, &types);
+    let code = emit_items(
+        vec![pick, tag, identitas],
+        &mut FaberCodegen::new(&types, &interner),
+    );
 
     assert!(
         code.contains("functio pick<T = textus, magnitudo D = 64>("),

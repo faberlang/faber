@@ -39,7 +39,7 @@ fn lit(n: u64) -> HirExpression {
 }
 
 struct Ctx {
-    codegen: crate::FaberCodegen,
+    types: TypeTable,
     interner: Interner,
     names: FxHashMap<DefId, Symbol>,
 }
@@ -47,10 +47,15 @@ struct Ctx {
 impl Ctx {
     fn new() -> Self {
         Self {
-            codegen: crate::FaberCodegen::default(),
+            types: TypeTable::new(),
             interner: Interner::new(),
             names: FxHashMap::default(),
         }
+    }
+
+    /// A code generator borrowing this context's tables.
+    fn codegen(&self) -> crate::FaberCodegen<'_> {
+        crate::FaberCodegen::new(&self.types, &self.interner)
     }
 
     fn def(&mut self, name: &str) -> DefId {
@@ -70,16 +75,9 @@ impl Ctx {
     }
 
     fn render(&self, expr: &HirExpression) -> String {
-        let types = TypeTable::new();
+        let codegen = self.codegen();
         let mut writer = CodeWriter::new();
-        self.codegen.write_expr(
-            expr,
-            &types,
-            &self.names,
-            &self.interner,
-            &TestSurface,
-            &mut writer,
-        );
+        codegen.write_expr(expr, &self.names, &TestSurface, &mut writer);
         writer.finish()
     }
 }
@@ -109,7 +107,6 @@ fn struct_instance_empty_stays_tight() {
 fn finge_variant_named_fields_get_inner_brace_spaces() {
     let mut ctx = Ctx::new();
     let def_id = ctx.def("DtypeMismatch");
-    ctx.codegen.variant_def_ids.insert(def_id);
     let key = ctx.interner.intern("message");
     let value = ctx.interner.intern("boom");
     let arg = HirCallArg {
@@ -118,13 +115,18 @@ fn finge_variant_named_fields_get_inner_brace_spaces() {
         expr: expr(HirExpressionKind::Literal(HirLiteral::String(value))),
         span: Span::new(0, 0),
     };
+    let call = expr(HirExpressionKind::Call(
+        Box::new(expr(HirExpressionKind::Path(def_id))),
+        Vec::new(),
+        vec![arg],
+        None,
+    ));
+    let mut codegen = ctx.codegen();
+    codegen.variant_def_ids.insert(def_id);
+    let mut writer = CodeWriter::new();
+    codegen.write_expr(&call, &ctx.names, &TestSurface, &mut writer);
     assert_eq!(
-        ctx.render(&expr(HirExpressionKind::Call(
-            Box::new(expr(HirExpressionKind::Path(def_id))),
-            Vec::new(),
-            vec![arg],
-            None,
-        ))),
+        writer.finish(),
         "keyword DtypeMismatch { message = \"boom\" }"
     );
 }

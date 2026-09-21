@@ -8,6 +8,7 @@ use radix_hir::{
     HirSchemaColumn, HirStatement, HirStatementKind, HirStruct, HirTypeAlias, HirVariant,
 };
 use radix_lexer::{Interner, Span, TokenKind};
+use radix_types::TypeTable;
 
 /// Minimal Latin surface so the leaf crate can unit-test without the façade pack.
 struct LatinSurface;
@@ -128,52 +129,46 @@ fn type_to_faber_prints_imported_qualified_spelling() {
     // Regression: an imported nominal (`base.Vector3`) has no local def
     // name, so the emitter printed the `def_N` fallback. The qualified
     // spelling carried from the import contract must win.
-    let mut codegen = FaberCodegen::default();
     let mut types = TypeTable::new();
     let names = FxHashMap::default();
     let interner = Interner::new();
     let surface = LatinSurface;
 
     let type_id = types.intern(Type::Struct(DefId(0x9000_0001)));
+    let mut codegen = FaberCodegen::new(&types, &interner);
     codegen
         .imported_type_spellings
         .insert(type_id, "base.Vector3".to_owned());
     assert_eq!(
-        codegen.type_to_faber(type_id, &types, &names, &interner, &surface),
+        codegen.type_to_faber(type_id, &names, &surface),
         "base.Vector3"
     );
 }
 
 #[test]
 fn type_to_faber_renders_primitives_lista_and_option() {
-    let codegen = FaberCodegen::default();
     let mut types = TypeTable::new();
     let names = FxHashMap::default();
     let interner = Interner::new();
     let surface = LatinSurface;
 
     let textus = types.primitive(Primitive::Textus);
-    assert_eq!(
-        codegen.type_to_faber(textus, &types, &names, &interner, &surface),
-        "textus"
-    );
-
     let numerus = types.primitive(Primitive::Numerus);
     let lista = types.array(numerus);
+    let option = types.option(textus);
+    let i32_ty = types.sized_numeric(Primitive::Numerus, radix_types::NumericWidth::I32);
+    let codegen = FaberCodegen::new(&types, &interner);
+    assert_eq!(codegen.type_to_faber(textus, &names, &surface), "textus");
     assert_eq!(
-        codegen.type_to_faber(lista, &types, &names, &interner, &surface),
+        codegen.type_to_faber(lista, &names, &surface),
         "lista<numerus>"
     );
-
-    let option = types.option(textus);
     assert_eq!(
-        codegen.type_to_faber(option, &types, &names, &interner, &surface),
+        codegen.type_to_faber(option, &names, &surface),
         "textus ∪ nihil"
     );
-
-    let i32_ty = types.sized_numeric(Primitive::Numerus, radix_types::NumericWidth::I32);
     assert_eq!(
-        codegen.type_to_faber(i32_ty, &types, &names, &interner, &surface),
+        codegen.type_to_faber(i32_ty, &names, &surface),
         "numerus<i32>"
     );
 }
@@ -181,7 +176,6 @@ fn type_to_faber_renders_primitives_lista_and_option() {
 #[test]
 fn type_to_faber_emits_fn_type_param_modes() {
     use radix_types::{FuncSig, ParamType, SemanticParamMode};
-    let codegen = FaberCodegen::default();
     let mut types = TypeTable::new();
     let names = FxHashMap::default();
     let interner = Interner::new();
@@ -206,10 +200,6 @@ fn type_to_faber_emits_fn_type_param_modes() {
         is_generator: false,
     };
     let func_ty = types.intern(radix_types::Type::Func(sig));
-    assert_eq!(
-        codegen.type_to_faber(func_ty, &types, &names, &interner, &surface),
-        "(de textus) → vacuum"
-    );
 
     // A mode that is not encoded on the type (e.g. `own` move) gets an
     // explicit type-position marker instead of being silently dropped.
@@ -226,21 +216,27 @@ fn type_to_faber_emits_fn_type_param_modes() {
         is_generator: false,
     };
     let move_func_ty = types.intern(radix_types::Type::Func(owned_sig));
+    let codegen = FaberCodegen::new(&types, &interner);
     assert_eq!(
-        codegen.type_to_faber(move_func_ty, &types, &names, &interner, &surface),
+        codegen.type_to_faber(func_ty, &names, &surface),
+        "(de textus) → vacuum"
+    );
+    assert_eq!(
+        codegen.type_to_faber(move_func_ty, &names, &surface),
         "(own textus) → vacuum"
     );
 }
 
 #[test]
 fn flatten_option_strips_nested_wrappers() {
-    let codegen = FaberCodegen::default();
     let mut types = TypeTable::new();
     let textus = types.primitive(Primitive::Textus);
     let once = types.option(textus);
     let twice = types.option(once);
-    assert_eq!(codegen.flatten_option(twice, &types), textus);
-    assert_eq!(codegen.flatten_option(textus, &types), textus);
+    let interner = Interner::new();
+    let codegen = FaberCodegen::new(&types, &interner);
+    assert_eq!(codegen.flatten_option(twice), textus);
+    assert_eq!(codegen.flatten_option(textus), textus);
 }
 
 #[test]
@@ -254,17 +250,9 @@ fn emit_empty_hir_program_succeeds() {
     };
     let types = TypeTable::new();
     let interner = Interner::new();
-    let out = crate::emit(
-        &hir,
-        &empty_presentation(),
-        &types,
-        &interner,
-        &LatinSurface,
-        &FxHashMap::default(),
-        &FxHashMap::default(),
-        &FxHashMap::default(),
-    )
-    .expect("empty HIR must emit");
+    let out = FaberCodegen::new(&types, &interner)
+        .generate(&hir, &empty_presentation(), &LatinSurface)
+        .expect("empty HIR must emit");
     assert!(
         out.code.is_empty(),
         "empty program should emit empty source, got {:?}",
@@ -307,7 +295,6 @@ impl KeywordSurface for ProbeSurface {
 
 #[test]
 fn tensor_family_type_emit_routes_through_type_surface() {
-    let codegen = FaberCodegen::default();
     let mut types = TypeTable::new();
     let names = FxHashMap::default();
     let interner = Interner::new();
@@ -319,59 +306,36 @@ fn tensor_family_type_emit_routes_through_type_surface() {
     let width4 = types.intern_index(radix_types::IndexExpr::Tuple(vec![lit4]));
     let lit2 = types.intern_index(radix_types::IndexExpr::Literal(2));
     let square = types.intern_index(radix_types::IndexExpr::Tuple(vec![lit2, lit2]));
+    let tensor = types.tensor_with_shape(i32_ty, rank0);
+    let vector = types.vector_with_width(i32_ty, width4);
+    let matrix = types.matrix_with_shape(i32_ty, square);
+    let sparsa = types.sparsa_with_shape(i32_ty, rank0);
+    let atomic = types.atomic(i32_ty);
+    let intervallum = types.intervallum(types.primitive(Primitive::Numerus));
+    let codegen = FaberCodegen::new(&types, &interner);
 
     assert_eq!(
-        codegen.type_to_faber(
-            types.tensor_with_shape(i32_ty, rank0),
-            &types,
-            &names,
-            &interner,
-            &surface
-        ),
+        codegen.type_to_faber(tensor, &names, &surface),
         "TENSOR_MARKER<numerus<i32>, []>"
     );
     assert_eq!(
-        codegen.type_to_faber(
-            types.vector_with_width(i32_ty, width4),
-            &types,
-            &names,
-            &interner,
-            &surface
-        ),
+        codegen.type_to_faber(vector, &names, &surface),
         "VECTOR_MARKER<numerus<i32>, [4]>"
     );
     assert_eq!(
-        codegen.type_to_faber(
-            types.matrix_with_shape(i32_ty, square),
-            &types,
-            &names,
-            &interner,
-            &surface
-        ),
+        codegen.type_to_faber(matrix, &names, &surface),
         "MATRIX_MARKER<numerus<i32>, [2, 2]>"
     );
     assert_eq!(
-        codegen.type_to_faber(
-            types.sparsa_with_shape(i32_ty, rank0),
-            &types,
-            &names,
-            &interner,
-            &surface
-        ),
+        codegen.type_to_faber(sparsa, &names, &surface),
         "SPARSA_MARKER<numerus<i32>, []>"
     );
     assert_eq!(
-        codegen.type_to_faber(types.atomic(i32_ty), &types, &names, &interner, &surface),
+        codegen.type_to_faber(atomic, &names, &surface),
         "ATOMIC_MARKER<numerus<i32>>"
     );
     assert_eq!(
-        codegen.type_to_faber(
-            types.intervallum(types.primitive(Primitive::Numerus)),
-            &types,
-            &names,
-            &interner,
-            &surface
-        ),
+        codegen.type_to_faber(intervallum, &names, &surface),
         "INTERVALLUM_MARKER<numerus>"
     );
 }
@@ -403,17 +367,9 @@ fn vacua_emit_routes_through_contextual_keyword() {
         entry_is_async: false,
     };
     let types = TypeTable::new();
-    let out = crate::emit(
-        &hir,
-        &empty_presentation(),
-        &types,
-        &interner,
-        &ProbeSurface,
-        &FxHashMap::default(),
-        &FxHashMap::default(),
-        &FxHashMap::default(),
-    )
-    .expect("vacua program must emit");
+    let out = FaberCodegen::new(&types, &interner)
+        .generate(&hir, &empty_presentation(), &ProbeSurface)
+        .expect("vacua program must emit");
     assert!(
         out.code.contains("VACUA_MARKER"),
         "Vacua emit must route through contextual_keyword, got:\n{}",
@@ -462,17 +418,9 @@ fn vacua_emit_uses_canonical_when_surface_spelling_is_bound() {
         entry_is_async: false,
     };
     let types = TypeTable::new();
-    let out = crate::emit(
-        &hir,
-        &empty_presentation(),
-        &types,
-        &interner,
-        &ProbeSurface,
-        &FxHashMap::default(),
-        &FxHashMap::default(),
-        &FxHashMap::default(),
-    )
-    .expect("shadowed vacua program must emit");
+    let out = FaberCodegen::new(&types, &interner)
+        .generate(&hir, &empty_presentation(), &ProbeSurface)
+        .expect("shadowed vacua program must emit");
     assert!(
         out.code.contains("← VACUA_MARKER"),
         "Vacua emit must stay canonical when a same-spelled binding exists, got:\n{}",
@@ -489,18 +437,17 @@ fn span() -> Span {
     Span::default()
 }
 
-fn generate_faber(program: &HirModule, types: &TypeTable, interner: &Interner) -> String {
-    generate_faber_with_presentation(program, &empty_presentation(), types, interner)
+fn generate_faber(program: &HirModule, codegen: &mut FaberCodegen<'_>) -> String {
+    generate_faber_with_presentation(program, &empty_presentation(), codegen)
 }
 
 fn generate_faber_with_presentation(
     program: &HirModule,
     presentation: &HirPresentation,
-    types: &TypeTable,
-    interner: &Interner,
+    codegen: &mut FaberCodegen<'_>,
 ) -> String {
-    FaberCodegen::default()
-        .generate(program, presentation, types, interner, &LatinSurface)
+    codegen
+        .generate(program, presentation, &LatinSurface)
         .expect("codegen")
         .code
 }
@@ -571,7 +518,7 @@ fn multi_import_emits_all_items() {
         entry_is_async: false,
     };
 
-    let code = generate_faber(&program, &types, &interner);
+    let code = generate_faber(&program, &mut FaberCodegen::new(&types, &interner));
     assert!(
         code.contains("alpha") && code.contains("beta"),
         "multi-import must emit all items, got:\n{code}"
@@ -667,7 +614,7 @@ fn discerne_omnia_preserves_exhaustiveness() {
         entry_is_async: false,
     };
 
-    let code = generate_faber(&program, &types, &interner);
+    let code = generate_faber(&program, &mut FaberCodegen::new(&types, &interner));
     assert!(
         code.contains("omnia"),
         "exhaustive discerne must emit `omnia` keyword, got:\n{code}"
@@ -796,7 +743,7 @@ fn si_with_cape_preserves_cape_keyword() {
         entry_is_async: false,
     };
 
-    let code = generate_faber(&program, &types, &interner);
+    let code = generate_faber(&program, &mut FaberCodegen::new(&types, &interner));
     assert!(
         code.contains("cape"),
         "si with then_catch + else_block must emit `cape` keyword, got:\n{code}"
@@ -927,7 +874,7 @@ fn si_cape_else_with_compact_else_preserves_cape() {
         entry_is_async: false,
     };
 
-    let code = generate_faber(&program, &types, &interner);
+    let code = generate_faber(&program, &mut FaberCodegen::new(&types, &interner));
     assert!(
         code.contains("cape"),
         "si with then_catch + else_block must emit `cape` keyword, got:\n{code}"
@@ -1073,7 +1020,7 @@ fn fac_loop_detection_long_body() {
         entry_is_async: false,
     };
 
-    let code = generate_faber(&program, &types, &interner);
+    let code = generate_faber(&program, &mut FaberCodegen::new(&types, &interner));
     assert!(
         code.contains("fac"),
         "multi-statement loop body must be recognized as fac, got:\n{code}"
@@ -1087,7 +1034,6 @@ fn fac_loop_detection_long_body() {
 #[test]
 fn record_type_preserves_field_names() {
     // Record types must emit field names, not just value type de-duplication.
-    let codegen = FaberCodegen::default();
     let mut types = TypeTable::new();
     let names = FxHashMap::default();
     let mut interner = Interner::new();
@@ -1104,14 +1050,14 @@ fn record_type_preserves_field_names() {
     fields.insert(desc_sym, textus);
     fields.insert(age_sym, numerus);
     let record_id = types.intern(radix_types::Type::Record(fields));
+    let codegen = FaberCodegen::new(&types, &interner);
 
-    let result = codegen.type_to_faber(record_id, &types, &names, &interner, &surface);
+    let result = codegen.type_to_faber(record_id, &names, &surface);
     assert_eq!(result, "ratio<age: numerus, desc: textus, name: textus>");
 }
 
 #[test]
 fn record_type_renders_as_sorted_ratio() {
-    let codegen = FaberCodegen::default();
     let mut types = TypeTable::new();
     let names = FxHashMap::default();
     let mut interner = Interner::new();
@@ -1122,9 +1068,10 @@ fn record_type_renders_as_sorted_ratio() {
     let f32_ty = types.sized_numeric(Primitive::Fractus, radix_types::NumericWidth::F32);
     let numerus = types.primitive(Primitive::Numerus);
     let record = types.record([(w, numerus), (g, f32_ty)]);
+    let codegen = FaberCodegen::new(&types, &interner);
 
     assert_eq!(
-        codegen.type_to_faber(record, &types, &names, &interner, &surface),
+        codegen.type_to_faber(record, &names, &surface),
         "ratio<g: f32, w: numerus>"
     );
 }
@@ -1199,7 +1146,7 @@ fn record_construction_emits_sorted_ratio_form_and_reparses() {
         entry_is_async: false,
     };
 
-    let code = generate_faber(&program, &types, &interner);
+    let code = generate_faber(&program, &mut FaberCodegen::new(&types, &interner));
     assert!(
         code.contains("ratio<g: f32, w: numerus> r ← ratio<g: f32, w: numerus> {"),
         "ratio construction must emit the sorted typed constructor, got:\n{code}"
@@ -1330,7 +1277,7 @@ fn closure_params_preserve_sponte_and_defaults() {
         entry_is_async: false,
     };
 
-    let code = generate_faber(&program, &types, &interner);
+    let code = generate_faber(&program, &mut FaberCodegen::new(&types, &interner));
     assert!(
         code.contains("sponte"),
         "closure param with sponte must emit 'sponte', got:\n{code}"
@@ -1382,7 +1329,7 @@ fn import_privata_emits_no_visibility_keyword() {
         entry_is_async: false,
     };
 
-    let code = generate_faber(&program, &types, &interner);
+    let code = generate_faber(&program, &mut FaberCodegen::new(&types, &interner));
     assert_eq!(
         code.trim(),
         r#"importa ex "gradus:dtype" dtype"#,
@@ -1463,7 +1410,7 @@ fn selective_import_emits_ordered_fixum_member_list() {
     let program = selective_import_program(&mut interner, false);
     let types = TypeTable::new();
 
-    let code = generate_faber(&program, &types, &interner);
+    let code = generate_faber(&program, &mut FaberCodegen::new(&types, &interner));
     assert_eq!(
         code.trim(),
         r#"importa ex "norma:consolum" fixum dic ut output, funde"#,
@@ -1477,7 +1424,7 @@ fn selective_import_publica_emits_visibility_before_fixum() {
     let program = selective_import_program(&mut interner, true);
     let types = TypeTable::new();
 
-    let code = generate_faber(&program, &types, &interner);
+    let code = generate_faber(&program, &mut FaberCodegen::new(&types, &interner));
     assert_eq!(
         code.trim(),
         r#"importa ex "norma:consolum" publica fixum dic ut output, funde"#,
@@ -1494,14 +1441,8 @@ fn selective_import_localized_surface_projects_fixum_keyword() {
     let program = selective_import_program(&mut interner, false);
     let types = TypeTable::new();
 
-    let code = FaberCodegen::default()
-        .generate(
-            &program,
-            &empty_presentation(),
-            &types,
-            &interner,
-            &LocaleSurface,
-        )
+    let code = FaberCodegen::new(&types, &interner)
+        .generate(&program, &empty_presentation(), &LocaleSurface)
         .expect("codegen")
         .code;
     assert_eq!(
@@ -1546,7 +1487,7 @@ fn selective_import_identity_alias_collapses_to_member_name() {
     };
 
     let types = TypeTable::new();
-    let code = generate_faber(&program, &types, &interner);
+    let code = generate_faber(&program, &mut FaberCodegen::new(&types, &interner));
     assert_eq!(
         code.trim(),
         r#"importa ex "pkg" fixum funde"#,
@@ -1596,7 +1537,7 @@ fn union_last_variant_has_no_trailing_comma() {
         entry_is_async: false,
     };
 
-    let code = generate_faber(&program, &types, &interner);
+    let code = generate_faber(&program, &mut FaberCodegen::new(&types, &interner));
     assert!(
         code.contains("F32,\n    F16\n"),
         "earlier variants keep the comma separator, last carries none:\n{code}"
@@ -1641,7 +1582,7 @@ fn struct_publica_annotation_reemits() {
         entry_is_async: false,
     };
 
-    let code = generate_faber(&program, &types, &interner);
+    let code = generate_faber(&program, &mut FaberCodegen::new(&types, &interner));
     let publica_line = code
         .lines()
         .find(|line| line.contains("publica"))
@@ -1691,7 +1632,7 @@ fn enum_publica_annotation_reemits() {
         entry_is_async: false,
     };
 
-    let code = generate_faber(&program, &types, &interner);
+    let code = generate_faber(&program, &mut FaberCodegen::new(&types, &interner));
     let publica_line = code
         .lines()
         .find(|line| line.contains("publica"))
@@ -1738,7 +1679,10 @@ fn function_publica_annotation_reemits() {
         span: span(),
     };
 
-    let code = generate_faber(&module_with_item(item), &types, &interner);
+    let code = generate_faber(
+        &module_with_item(item),
+        &mut FaberCodegen::new(&types, &interner),
+    );
     assert_publica_precedes(&code, "functio saluta");
 }
 
@@ -1778,8 +1722,11 @@ fn ordo_publica_annotation_reemits() {
         }],
     });
 
-    let code =
-        generate_faber_with_presentation(&module_with_item(item), &presentation, &types, &interner);
+    let code = generate_faber_with_presentation(
+        &module_with_item(item),
+        &presentation,
+        &mut FaberCodegen::new(&types, &interner),
+    );
     assert_publica_precedes(&code, "ordo Color");
 }
 
@@ -1811,7 +1758,10 @@ fn interface_publica_annotation_reemits() {
         span: span(),
     };
 
-    let code = generate_faber(&module_with_item(item), &types, &interner);
+    let code = generate_faber(
+        &module_with_item(item),
+        &mut FaberCodegen::new(&types, &interner),
+    );
     assert_publica_precedes(&code, "implendum Legibile");
 }
 
@@ -1835,7 +1785,10 @@ fn type_alias_publica_annotation_reemits() {
         span: span(),
     };
 
-    let code = generate_faber(&module_with_item(item), &types, &interner);
+    let code = generate_faber(
+        &module_with_item(item),
+        &mut FaberCodegen::new(&types, &interner),
+    );
     assert_publica_precedes(&code, "typus Alias");
 }
 
@@ -1865,7 +1818,10 @@ fn schema_publica_annotation_reemits() {
         span: span(),
     };
 
-    let code = generate_faber(&module_with_item(item), &types, &interner);
+    let code = generate_faber(
+        &module_with_item(item),
+        &mut FaberCodegen::new(&types, &interner),
+    );
     assert_publica_precedes(&code, "schema Quaerenda");
 }
 
@@ -1897,7 +1853,10 @@ fn constant_publica_annotation_reemits() {
         span: span(),
     };
 
-    let code = generate_faber(&module_with_item(item), &types, &interner);
+    let code = generate_faber(
+        &module_with_item(item),
+        &mut FaberCodegen::new(&types, &interner),
+    );
     assert_publica_precedes(&code, "fixum numerus VALOR");
 }
 
@@ -1927,7 +1886,10 @@ fn import_publica_annotation_reemits() {
         span: span(),
     };
 
-    let code = generate_faber(&module_with_item(item), &types, &interner);
+    let code = generate_faber(
+        &module_with_item(item),
+        &mut FaberCodegen::new(&types, &interner),
+    );
     assert_publica_precedes(&code, "importa ex");
 }
 
@@ -1937,20 +1899,19 @@ fn imported_variant_pattern_uses_qualified_spelling() {
     // variant (`manifestum.Cognita`) re-emitted as the `def_N` fallback,
     // which the converted module re-parse rejected with SEM001. The
     // import contract's qualified spelling must win.
-    let mut codegen = FaberCodegen::default();
     let names = FxHashMap::default();
     let interner = Interner::new();
     let surface = LatinSurface;
+    let types = TypeTable::new();
     let mut writer = radix_codegen_shared::CodeWriter::new();
     let variant_def = DefId(0x9000_0001);
+    let mut codegen = FaberCodegen::new(&types, &interner);
     codegen
         .imported_def_spellings
         .insert(variant_def, "manifestum.Cognita".to_owned());
     codegen.write_pattern(
         &HirPattern::Variant(variant_def, Vec::new()),
-        &TypeTable::new(),
         &names,
-        &interner,
         &surface,
         &mut writer,
     );
@@ -2046,7 +2007,7 @@ fn call_to_local_variant_reemits_finge_construction() {
         entry_is_async: false,
     };
 
-    let code = generate_faber(&program, &types, &interner);
+    let code = generate_faber(&program, &mut FaberCodegen::new(&types, &interner));
     assert!(
         code.contains("redde finge F32"),
         "variant construction must re-emit the `finge` keyword:\n{code}"
@@ -2152,7 +2113,7 @@ fn finge_with_named_fields_reemits_braced_fields() {
         entry_is_async: false,
     };
 
-    let code = generate_faber(&program, &types, &interner);
+    let code = generate_faber(&program, &mut FaberCodegen::new(&types, &interner));
     assert!(
         code.contains("iace finge FormaInvalida { causa = def_9 }"),
         "named finge fields must re-emit in the braced form:\n{code}"
@@ -2263,14 +2224,8 @@ fn intrinsic_method_call_localizes_through_surface() {
         entry_is_async: false,
     };
 
-    let code = FaberCodegen::default()
-        .generate(
-            &program,
-            &empty_presentation(),
-            &types,
-            &interner,
-            &IntrinsicProbeSurface,
-        )
+    let code = FaberCodegen::new(&types, &interner)
+        .generate(&program, &empty_presentation(), &IntrinsicProbeSurface)
         .expect("codegen")
         .code;
     assert!(
@@ -2395,7 +2350,7 @@ fn cape_handler_keeps_leading_author_local() {
         entry_is_async: false,
     };
 
-    let code = generate_faber(&program, &types, &interner);
+    let code = generate_faber(&program, &mut FaberCodegen::new(&types, &interner));
     assert!(
         code.contains("cape err {") && code.contains("fixum textus c ← \"x\""),
         "cape handler must keep its leading authored local:\n{code}"
@@ -2488,7 +2443,7 @@ fn transfer_emits_glyph_chain_canonical() {
     let program = transfer_program(&mut interner);
     let types = TypeTable::new();
 
-    let code = generate_faber(&program, &types, &interner);
+    let code = generate_faber(&program, &mut FaberCodegen::new(&types, &interner));
     assert!(
         code.contains(r#"funde ⇇ "alpha" ⇇ "beta""#),
         "transfer must re-emit the flat glyph chain, got:\n{code}"
@@ -2503,14 +2458,8 @@ fn transfer_glyph_is_locale_invariant() {
     let program = transfer_program(&mut interner);
     let types = TypeTable::new();
 
-    let code = FaberCodegen::default()
-        .generate(
-            &program,
-            &empty_presentation(),
-            &types,
-            &interner,
-            &LocaleSurface,
-        )
+    let code = FaberCodegen::new(&types, &interner)
+        .generate(&program, &empty_presentation(), &LocaleSurface)
         .expect("codegen")
         .code;
     assert!(
@@ -2543,7 +2492,6 @@ fn bounded_types_print_via_the_surface() {
     // The bounded buffer/collection heads are ordinary type identities: they
     // must localize through the reader surface like their unbounded twins
     // (`list<T>` / `text<N>`), not stay hardcoded Latin.
-    let codegen = FaberCodegen::default();
     let mut types = TypeTable::new();
     let names = FxHashMap::default();
     let interner = Interner::new();
@@ -2556,32 +2504,23 @@ fn bounded_types_print_via_the_surface() {
         (types.bounded_ascii(four), "ascii<4>"),
         (types.bounded_octeti(four), "octeti<4>"),
     ];
+    let latin_bounded_array = types.bounded_array(numerus, four);
+    let latin_bounded_textus = types.bounded_textus(four);
+    let codegen = FaberCodegen::new(&types, &interner);
     for (type_id, expected) in cases {
         assert_eq!(
-            codegen.type_to_faber(type_id, &types, &names, &interner, &LocalizedTypeSurface),
+            codegen.type_to_faber(type_id, &names, &LocalizedTypeSurface),
             expected
         );
     }
 
     // Latin surface keeps the canonical spellings.
     assert_eq!(
-        codegen.type_to_faber(
-            types.bounded_array(numerus, four),
-            &types,
-            &names,
-            &interner,
-            &LatinSurface
-        ),
+        codegen.type_to_faber(latin_bounded_array, &names, &LatinSurface),
         "lista<numerus, 4>"
     );
     assert_eq!(
-        codegen.type_to_faber(
-            types.bounded_textus(four),
-            &types,
-            &names,
-            &interner,
-            &LatinSurface
-        ),
+        codegen.type_to_faber(latin_bounded_textus, &names, &LatinSurface),
         "textus<4>"
     );
 }
@@ -2590,24 +2529,27 @@ fn bounded_types_print_via_the_surface() {
 fn marker_hole_prints_its_family() {
     // A marker hole's family is identity (`fractus<_>` is not `numerus<_>`);
     // re-emission must keep the family the semantic layer interned.
-    let codegen = FaberCodegen::default();
     let mut types = TypeTable::new();
     let names = FxHashMap::default();
     let interner = Interner::new();
 
-    for (family, expected) in [
+    let holes = [
         (MarkerFamily::Numerus, "numerus<_>"),
         (MarkerFamily::Fractus, "fractus<_>"),
         (MarkerFamily::Modulus, "modulus<_>"),
         (MarkerFamily::Instans, "instans<_>"),
-    ] {
-        let hole = types.intern(radix_types::Type::MarkerHole {
-            family,
-            var: radix_types::InferVar(0),
-        });
-        assert_eq!(
-            codegen.type_to_faber(hole, &types, &names, &interner, &LatinSurface),
-            expected
-        );
+    ]
+    .map(|(family, expected)| {
+        (
+            types.intern(radix_types::Type::MarkerHole {
+                family,
+                var: radix_types::InferVar(0),
+            }),
+            expected,
+        )
+    });
+    let codegen = FaberCodegen::new(&types, &interner);
+    for (hole, expected) in holes {
+        assert_eq!(codegen.type_to_faber(hole, &names, &LatinSurface), expected);
     }
 }

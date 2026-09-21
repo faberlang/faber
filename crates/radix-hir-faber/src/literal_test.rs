@@ -1,6 +1,6 @@
 use super::*;
 use crate::surface::{KeywordSurface, TypeBindingKind};
-use radix_lexer::TokenKind;
+use radix_lexer::{Interner, TokenKind};
 
 struct LatinSurface;
 
@@ -35,10 +35,11 @@ impl KeywordSurface for EnglishSurface {
 }
 
 fn render(literal: &HirLiteral, surface: &impl KeywordSurface) -> String {
-    let codegen = crate::FaberCodegen::default();
+    let types = radix_types::TypeTable::new();
     let interner = Interner::new();
+    let codegen = crate::FaberCodegen::new(&types, &interner);
     let mut writer = CodeWriter::new();
-    codegen.write_literal(literal, &interner, surface, &mut writer);
+    codegen.write_literal(literal, surface, &mut writer);
     writer.finish()
 }
 

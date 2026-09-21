@@ -143,17 +143,10 @@ impl Ctx {
     }
 
     fn render(&self, product: &HirExpression, surface: &impl KeywordSurface) -> String {
-        let codegen = crate::FaberCodegen::default();
         let types = TypeTable::new();
+        let codegen = crate::FaberCodegen::new(&types, &self.interner);
         let mut writer = CodeWriter::new();
-        codegen.write_expr(
-            product,
-            &types,
-            &self.names,
-            &self.interner,
-            surface,
-            &mut writer,
-        );
+        codegen.write_expr(product, &self.names, surface, &mut writer);
         writer.finish()
     }
 }

@@ -86,16 +86,10 @@ pub fn reemit_faber(source_session: &Session, emit_pack: &LocalePack, name: &str
             .resolver
             .generated_companion_spellings(&analysis.interner),
     );
-    match super::emit(
-        &analysis.hir,
-        &analysis.presentation,
-        &analysis.types,
-        &analysis.interner,
-        &super::LocaleKeywordBridge(surface),
-        &imported_spellings.by_type,
-        &by_def,
-        &imported_spellings.by_def_pattern,
-    ) {
+    match super::FaberCodegen::new(&analysis.types, &analysis.interner)
+        .with_imported_spellings(&imported_spellings.by_type, &by_def, &imported_spellings.by_def_pattern)
+        .generate(&analysis.hir, &analysis.presentation, &super::LocaleKeywordBridge(surface))
+    {
         Ok(output) => {
             let output = FaberOutput { code: output.code };
             match revalidate_emitted_output(&session, name, &output.code, &analysis, emit_pack) {
@@ -518,7 +512,7 @@ fn type_form_signature(analysis: &AnalyzedModule, form: &HirTypeForm) -> String 
             HirTypeFormArg::Type(child) => format!("type({})", type_form_signature(analysis, child)),
             HirTypeFormArg::Size(index) => format!(
                 "size({})",
-                radix_hir_faber::figura::format_figura(*index, &analysis.types, &analysis.interner)
+                crate::semantic::format_figura(*index, &analysis.types, &analysis.interner)
             ),
             HirTypeFormArg::Name(symbol) => {
                 format!("name({})", analysis.interner.resolve(*symbol))
@@ -539,31 +533,31 @@ fn canonical_type_shape(analysis: &AnalyzedModule, type_id: TypeId, active: &mut
         Type::BoundedArray { element, capacity } => format!(
             "bounded-array<{},{}>",
             canonical_type_shape(analysis, *element, active),
-            radix_hir_faber::figura::format_figura(*capacity, &analysis.types, &analysis.interner)
+            crate::semantic::format_figura(*capacity, &analysis.types, &analysis.interner)
         ),
         Type::Queue(element) => format!("queue<{}>", canonical_type_shape(analysis, *element, active)),
         Type::BoundedQueue { element, capacity } => format!(
             "bounded-queue<{},{}>",
             canonical_type_shape(analysis, *element, active),
-            radix_hir_faber::figura::format_figura(*capacity, &analysis.types, &analysis.interner)
+            crate::semantic::format_figura(*capacity, &analysis.types, &analysis.interner)
         ),
         Type::Stack(element) => format!("stack<{}>", canonical_type_shape(analysis, *element, active)),
         Type::BoundedStack { element, capacity } => format!(
             "bounded-stack<{},{}>",
             canonical_type_shape(analysis, *element, active),
-            radix_hir_faber::figura::format_figura(*capacity, &analysis.types, &analysis.interner)
+            crate::semantic::format_figura(*capacity, &analysis.types, &analysis.interner)
         ),
         Type::BoundedTextus { capacity } => format!(
             "bounded-textus<{}>",
-            radix_hir_faber::figura::format_figura(*capacity, &analysis.types, &analysis.interner)
+            crate::semantic::format_figura(*capacity, &analysis.types, &analysis.interner)
         ),
         Type::BoundedAscii { capacity } => format!(
             "bounded-ascii<{}>",
-            radix_hir_faber::figura::format_figura(*capacity, &analysis.types, &analysis.interner)
+            crate::semantic::format_figura(*capacity, &analysis.types, &analysis.interner)
         ),
         Type::BoundedOcteti { capacity } => format!(
             "bounded-octeti<{}>",
-            radix_hir_faber::figura::format_figura(*capacity, &analysis.types, &analysis.interner)
+            crate::semantic::format_figura(*capacity, &analysis.types, &analysis.interner)
         ),
         Type::Map(key, value) => format!(
             "map<{},{}>",
@@ -600,22 +594,22 @@ fn canonical_type_shape(analysis: &AnalyzedModule, type_id: TypeId, active: &mut
         Type::Tensor(element, shape) => format!(
             "tensor<{},{}>",
             canonical_type_shape(analysis, *element, active),
-            radix_hir_faber::figura::format_figura(*shape, &analysis.types, &analysis.interner)
+            crate::semantic::format_figura(*shape, &analysis.types, &analysis.interner)
         ),
         Type::Vector(element, width) => format!(
             "vector<{},{}>",
             canonical_type_shape(analysis, *element, active),
-            radix_hir_faber::figura::format_figura(*width, &analysis.types, &analysis.interner)
+            crate::semantic::format_figura(*width, &analysis.types, &analysis.interner)
         ),
         Type::Matrix(element, shape) => format!(
             "matrix<{},{}>",
             canonical_type_shape(analysis, *element, active),
-            radix_hir_faber::figura::format_figura(*shape, &analysis.types, &analysis.interner)
+            crate::semantic::format_figura(*shape, &analysis.types, &analysis.interner)
         ),
         Type::Sparsa(element, shape) => format!(
             "sparsa<{},{}>",
             canonical_type_shape(analysis, *element, active),
-            radix_hir_faber::figura::format_figura(*shape, &analysis.types, &analysis.interner)
+            crate::semantic::format_figura(*shape, &analysis.types, &analysis.interner)
         ),
         Type::Atomic(element) => format!("atomic<{}>", canonical_type_shape(analysis, *element, active)),
         Type::Intervallum(bound) => format!("intervallum<{}>", canonical_type_shape(analysis, *bound, active)),
@@ -661,7 +655,7 @@ fn canonical_type_shape(analysis: &AnalyzedModule, type_id: TypeId, active: &mut
                 .map(|arg| match arg {
                     AppliedArg::Type(ty) => canonical_type_shape(analysis, *ty, active),
                     AppliedArg::Size(index) => {
-                        radix_hir_faber::figura::format_figura(*index, &analysis.types, &analysis.interner)
+                        crate::semantic::format_figura(*index, &analysis.types, &analysis.interner)
                     }
                 })
                 .collect::<Vec<_>>()
@@ -782,15 +776,10 @@ pub fn emit_from_analyzed(
     let latin = latin_locale_pack();
     let surface = KeywordSurface::new(&latin);
     // No presentation sidecar on this loose entry: render trivia-free.
-    let output = super::emit(
+    let output = super::FaberCodegen::new(types, interner).generate(
         hir,
         &super::empty_presentation(),
-        types,
-        interner,
         &super::LocaleKeywordBridge(surface),
-        &rustc_hash::FxHashMap::default(),
-        &rustc_hash::FxHashMap::default(),
-        &rustc_hash::FxHashMap::default(),
     )?;
     Ok(FaberOutput { code: output.code })
 }

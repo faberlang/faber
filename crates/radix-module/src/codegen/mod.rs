@@ -352,16 +352,9 @@ pub fn generate_from_analyzed_with_options(
                     .resolver
                     .generated_companion_spellings(&analysis.interner),
             );
-            let output = faber::emit(
-                &analysis.hir,
-                &presentation,
-                &analysis.types,
-                &analysis.interner,
-                &faber::LocaleKeywordBridge(*surface),
-                &imported_spellings.by_type,
-                &by_def,
-                &imported_spellings.by_def_pattern,
-            )?;
+            let output = faber::FaberCodegen::new(&analysis.types, &analysis.interner)
+                .with_imported_spellings(&imported_spellings.by_type, &by_def, &imported_spellings.by_def_pattern)
+                .generate(&analysis.hir, &presentation, &faber::LocaleKeywordBridge(*surface))?;
             Ok(crate::Output::Faber(crate::FaberOutput { code: output.code }))
         }
         #[cfg(not(feature = "hir-faber"))]
@@ -771,15 +764,10 @@ pub fn generate_with_options(
             let surface = KeywordSurface::new(&latin);
             // Loose HIR+types entry: no presentation sidecar, so render with
             // an empty presentation (trivia-free canonical output).
-            let output = faber::emit(
+            let output = faber::FaberCodegen::new(types, interner).generate(
                 hir,
                 &faber::empty_presentation(),
-                types,
-                interner,
                 &faber::LocaleKeywordBridge(surface),
-                &rustc_hash::FxHashMap::default(),
-                &rustc_hash::FxHashMap::default(),
-                &rustc_hash::FxHashMap::default(),
             )?;
             Ok(crate::Output::Faber(crate::FaberOutput { code: output.code }))
         }

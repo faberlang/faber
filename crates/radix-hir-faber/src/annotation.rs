@@ -11,18 +11,14 @@ use radix_hir::{
     DefId, HirAnnotation, HirAnnotationField, HirAnnotationValue, HirExpression, HirExpressionKind,
     HirLiteral, HirOwnerRef, HirTypeSite, HirTypeSlot,
 };
-use radix_lexer::{Interner, Symbol, Token, TokenKind, lookup_keyword_spec};
-use radix_types::TypeTable;
+use radix_lexer::{Symbol, Token, TokenKind, lookup_keyword_spec};
 use rustc_hash::FxHashMap;
 
-impl super::FaberCodegen {
-    #[allow(clippy::too_many_arguments)]
+impl super::FaberCodegen<'_> {
     pub(super) fn write_hir_annotations(
         &self,
         annotations: &[HirAnnotation],
-        types: &TypeTable,
         names: &FxHashMap<DefId, Symbol>,
-        interner: &Interner,
         surface: &impl KeywordSurface,
         owner: Option<DefId>,
         writer: &mut CodeWriter,
@@ -32,9 +28,7 @@ impl super::FaberCodegen {
                 annotation,
                 owner,
                 self.slot_ordinal(annotation_ordinal, "annotation count"),
-                types,
                 names,
-                interner,
                 surface,
                 writer,
             );
@@ -43,21 +37,18 @@ impl super::FaberCodegen {
     }
 
     // Site-threaded authored-form emission carries owner/slot beside the
-    // shared rendering context; the arity is the policy, not an accident.
-    #[allow(clippy::too_many_arguments)]
+    // shared rendering context.
     pub(super) fn write_hir_annotation(
         &self,
         annotation: &HirAnnotation,
         owner: Option<DefId>,
         annotation_ordinal: u32,
-        types: &TypeTable,
         names: &FxHashMap<DefId, Symbol>,
-        interner: &Interner,
         surface: &impl KeywordSurface,
         writer: &mut CodeWriter,
     ) {
         writer.write("@ ");
-        writer.write(&self.annotation_surface_spelling(annotation.family, interner, surface));
+        writer.write(&self.annotation_surface_spelling(annotation.family, surface));
 
         if annotation.fields.is_empty() && annotation.raw_args.is_empty() {
             // Only an authored empty braced record re-emits braces; a bare
@@ -65,8 +56,7 @@ impl super::FaberCodegen {
             // its parser production accepts no braced record, so the braced
             // form fails PARSE018 on re-parse and breaks the locale round
             // trip.
-            if annotation.brace_authored
-                && self.symbol_to_string(annotation.family, interner) != "conversio"
+            if annotation.brace_authored && self.symbol_to_string(annotation.family) != "conversio"
             {
                 writer.write(" { }");
             }
@@ -92,9 +82,7 @@ impl super::FaberCodegen {
                     owner,
                     annotation_ordinal,
                     field_ordinal,
-                    types,
                     names,
-                    interner,
                     surface,
                     writer,
                 );
@@ -109,7 +97,7 @@ impl super::FaberCodegen {
 
         for token in &annotation.raw_args {
             writer.write(" ");
-            self.write_annotation_token(token, interner, surface, writer);
+            self.write_annotation_token(token, surface, writer);
         }
     }
 
@@ -117,13 +105,8 @@ impl super::FaberCodegen {
     ///
     /// Registered keyword identities use [`KeywordSurface::contextual_keyword`];
     /// unknown / user contract names pass through unchanged.
-    fn annotation_surface_spelling(
-        &self,
-        symbol: Symbol,
-        interner: &Interner,
-        surface: &impl KeywordSurface,
-    ) -> String {
-        let spelling = self.symbol_to_string(symbol, interner);
+    fn annotation_surface_spelling(&self, symbol: Symbol, surface: &impl KeywordSurface) -> String {
+        let spelling = self.symbol_to_string(symbol);
         if let Some(spec) = lookup_keyword_spec(&spelling) {
             surface.contextual_keyword(spec.text).to_owned()
         } else {
@@ -131,6 +114,8 @@ impl super::FaberCodegen {
         }
     }
 
+    // Site-threaded authored-form emission carries owner/slot beside the
+    // shared rendering context; the arity is the policy, not an accident.
     #[allow(clippy::too_many_arguments)]
     fn write_hir_annotation_field(
         &self,
@@ -138,22 +123,18 @@ impl super::FaberCodegen {
         owner: Option<DefId>,
         annotation_ordinal: u32,
         field_ordinal: Option<u32>,
-        types: &TypeTable,
         names: &FxHashMap<DefId, Symbol>,
-        interner: &Interner,
         surface: &impl KeywordSurface,
         writer: &mut CodeWriter,
     ) {
-        writer.write(&self.annotation_surface_spelling(field.name, interner, surface));
+        writer.write(&self.annotation_surface_spelling(field.name, surface));
         writer.write(" = ");
         self.write_hir_annotation_value(
             &field.value,
             owner,
             annotation_ordinal,
             field_ordinal,
-            types,
             names,
-            interner,
             surface,
             writer,
         );
@@ -166,15 +147,13 @@ impl super::FaberCodegen {
         owner: Option<DefId>,
         annotation_ordinal: u32,
         field_ordinal: Option<u32>,
-        types: &TypeTable,
         names: &FxHashMap<DefId, Symbol>,
-        interner: &Interner,
         surface: &impl KeywordSurface,
         writer: &mut CodeWriter,
     ) {
         match value {
-            HirAnnotationValue::String(sym) => self.write_textus_literal(*sym, interner, writer),
-            HirAnnotationValue::Symbol(sym) => writer.write(&self.symbol_to_string(*sym, interner)),
+            HirAnnotationValue::String(sym) => self.write_textus_literal(*sym, writer),
+            HirAnnotationValue::Symbol(sym) => writer.write(&self.symbol_to_string(*sym)),
             HirAnnotationValue::Bool(true) => writer.write(surface.contextual_keyword("verum")),
             HirAnnotationValue::Bool(false) => writer.write(surface.contextual_keyword("falsum")),
             HirAnnotationValue::Int(n) => writer.write(&n.to_string()),
@@ -190,15 +169,15 @@ impl super::FaberCodegen {
                                 field,
                             },
                         };
-                        self.type_to_faber_at(&site, *ty, types, names, interner, surface)
+                        self.type_to_faber_at(&site, *ty, names, surface)
                             .unwrap_or_else(|error| self.record_type_emission_error(error))
                     }
-                    _ => self.type_to_faber(*ty, types, names, interner, surface),
+                    _ => self.type_to_faber(*ty, names, surface),
                 };
                 writer.write(&rendered);
             }
             HirAnnotationValue::Expr(expr) => {
-                self.write_hir_annotation_expr(expr, types, names, interner, surface, writer);
+                self.write_hir_annotation_expr(expr, names, surface, writer);
             }
         }
     }
@@ -206,23 +185,20 @@ impl super::FaberCodegen {
     fn write_hir_annotation_expr(
         &self,
         expr: &HirExpression,
-        types: &TypeTable,
         names: &FxHashMap<DefId, Symbol>,
-        interner: &Interner,
         surface: &impl KeywordSurface,
         writer: &mut CodeWriter,
     ) {
         if let HirExpressionKind::Literal(HirLiteral::String(sym)) = &expr.kind {
-            self.write_textus_literal(*sym, interner, writer);
+            self.write_textus_literal(*sym, writer);
             return;
         }
-        self.write_expr(expr, types, names, interner, surface, writer);
+        self.write_expr(expr, names, surface, writer);
     }
 
     fn write_annotation_token(
         &self,
         token: &Token,
-        interner: &Interner,
         surface: &impl KeywordSurface,
         writer: &mut CodeWriter,
     ) {
@@ -230,7 +206,7 @@ impl super::FaberCodegen {
             TokenKind::String(sym)
             | TokenKind::AsciiString(sym)
             | TokenKind::BacktickString(sym) => {
-                self.write_textus_literal(*sym, interner, writer);
+                self.write_textus_literal(*sym, writer);
             }
             TokenKind::Integer(value) => writer.write(&value.to_string()),
             // decimal-widths D1: emit paths stay byte-identical (f64 spelling).
@@ -238,7 +214,7 @@ impl super::FaberCodegen {
                 writer.write(&value.to_string());
             }
             TokenKind::Ident(sym) | TokenKind::Underscore(sym) => {
-                let spelling = interner.resolve(*sym);
+                let spelling = self.interner.resolve(*sym);
                 // Tokenless keyword values (e.g. `verum` since Batch C) still
                 // emit through the localized surface, matching the old
                 // token-shaped path.
