@@ -6,7 +6,7 @@
 //! once those types are co-located; until then free functions are used through
 //! the façade re-exports.
 
-use crate::lexer::{LexError, LocaleSuggestion};
+use crate::lexer::{LexError, LocaleSuggestion, MixedScriptAdvisory};
 use crate::parser::ParseError;
 use crate::semantic::SemanticError;
 use radix_diagnostics::{Diagnostic, DiagnosticArg, DiagnosticPhase, PhaseErrorKind, Severity, diagnostic_identity};
@@ -43,6 +43,21 @@ pub fn convert_from_locale_suggestion(file: &str, source: &str, suggestion: &Loc
             DiagnosticArg::new("suggestion", suggestion.suggestion.clone()),
         ])
         .with_source_context(file, source, suggestion.span)
+}
+
+/// Normalize a mixed-script identifier advisory into a non-fatal warning.
+#[must_use]
+pub fn convert_from_mixed_script_advisory(file: &str, source: &str, advisory: &MixedScriptAdvisory) -> Diagnostic {
+    let spec = radix_diagnostics::mixed_script_identifier_spec();
+
+    Diagnostic::warning(diagnostic_identity(spec.code, &[]))
+        .with_phase(DiagnosticPhase::Tool)
+        .with_code(spec.code)
+        .with_args(vec![
+            DiagnosticArg::new("identifier", advisory.spelling.clone()),
+            DiagnosticArg::new("scripts", advisory.scripts.join(", ")),
+        ])
+        .with_source_context(file, source, advisory.span)
 }
 
 /// Normalize a parser error using the diagnostic code catalog.
@@ -98,6 +113,9 @@ pub trait DiagnosticConvert {
     /// Normalize a reader-locale spelling suggestion into a non-fatal warning.
     fn from_locale_suggestion(file: &str, source: &str, suggestion: &LocaleSuggestion) -> Diagnostic;
 
+    /// Normalize a mixed-script identifier advisory into a non-fatal warning.
+    fn from_mixed_script_advisory(file: &str, source: &str, advisory: &MixedScriptAdvisory) -> Diagnostic;
+
     /// Normalize a parser error using the diagnostic code catalog.
     fn from_parse_error(file: &str, source: &str, err: &ParseError) -> Diagnostic;
 
@@ -112,6 +130,10 @@ impl DiagnosticConvert for Diagnostic {
 
     fn from_locale_suggestion(file: &str, source: &str, suggestion: &LocaleSuggestion) -> Diagnostic {
         convert_from_locale_suggestion(file, source, suggestion)
+    }
+
+    fn from_mixed_script_advisory(file: &str, source: &str, advisory: &MixedScriptAdvisory) -> Diagnostic {
+        convert_from_mixed_script_advisory(file, source, advisory)
     }
 
     fn from_parse_error(file: &str, source: &str, err: &ParseError) -> Diagnostic {

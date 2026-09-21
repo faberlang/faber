@@ -31,12 +31,13 @@
 use super::cursor::Cursor;
 use super::keywords::{keyword_specs, keyword_token_kind};
 use super::token::{Span, Symbol, Token, TokenKind};
-use super::{LexError, LexErrorKind, LexResult, LocaleSuggestion};
+use super::{LexError, LexErrorKind, LexResult, LocaleSuggestion, MixedScriptAdvisory};
 use crate::KeywordPack;
 use radix_diagnostics::DiagnosticArg;
 use rustc_hash::FxHashMap;
 use std::collections::HashMap;
 use unicode_normalization::UnicodeNormalization;
+use unicode_script::UnicodeScript;
 
 /// Lexer issue when `#` follows other tokens on the same logical line.
 /// Stable `issue` fact for inline `#` comments after code (tests + catalogs).
@@ -210,6 +211,7 @@ pub struct Lexer<'a> {
     tokens: Vec<Token>,
     errors: Vec<LexError>,
     locale_suggestions: Vec<LocaleSuggestion>,
+    mixed_script_advisories: Vec<MixedScriptAdvisory>,
     reader_keyword_latin_keys: HashMap<String, String>,
     reader_keyword_surfaces: HashMap<String, String>,
     reader_type_latin_keys: HashMap<String, String>,
@@ -229,6 +231,7 @@ impl<'a> Lexer<'a> {
             tokens: Vec::new(),
             errors: Vec::new(),
             locale_suggestions: Vec::new(),
+            mixed_script_advisories: Vec::new(),
             reader_keyword_latin_keys: HashMap::new(),
             reader_keyword_surfaces: HashMap::new(),
             reader_type_latin_keys: HashMap::new(),
@@ -266,6 +269,7 @@ impl<'a> Lexer<'a> {
             tokens: self.tokens,
             errors: self.errors,
             locale_suggestions: self.locale_suggestions,
+            mixed_script_advisories: self.mixed_script_advisories,
             reader_keyword_latin_keys: self.reader_keyword_latin_keys,
             reader_keyword_surfaces: self.reader_keyword_surfaces,
             reader_type_latin_keys: self.reader_type_latin_keys,
@@ -962,7 +966,16 @@ impl<'a> Lexer<'a> {
             return;
         }
         let normalized: String = text.nfkc().collect();
-        let kind = self.keyword_or_ident(&normalized, Span::new(start, self.cursor.pos()));
+        let span = Span::new(start, self.cursor.pos());
+        // Non-fatal advisory (S-A5): the identifier still lexes normally.
+        if let Some(scripts) = mixed_script_names(&normalized) {
+            self.mixed_script_advisories.push(MixedScriptAdvisory {
+                spelling: normalized.clone(),
+                scripts,
+                span,
+            });
+        }
+        let kind = self.keyword_or_ident(&normalized, span);
         self.emit_token(kind, start);
     }
 
@@ -1033,6 +1046,38 @@ fn homoglyph_identifier_suggestion(text: &str) -> Option<&'static str> {
     // T operator. Reject the source token with the same locale-invariant
     // did-you-mean fact as other rejected glyphs.
     (text == "ᵗ").then_some("ᵀ")
+}
+
+/// Classify the distinct visible Unicode scripts of `text` (already
+/// NFKC-normalized by [`Lexer::scan_identifier`]).
+///
+/// Common and Inherited characters — digits, `_`, combining marks — carry no
+/// script of their own and never count toward the mix, so `α_1` stays a
+/// single-script name. Unassigned codepoints (`Script::Unknown`) are skipped
+/// for the same reason. Returns `Some` only when the name spans two or more
+/// scripts: the mixed-script confusable shape.
+fn mixed_script_names(text: &str) -> Option<Vec<String>> {
+    let mut scripts: Vec<&'static str> = Vec::new();
+    for c in text.chars() {
+        let script = c.script();
+        if matches!(
+            script,
+            unicode_script::Script::Common
+                | unicode_script::Script::Inherited
+                | unicode_script::Script::Unknown
+        ) {
+            continue;
+        }
+        let name = script.full_name();
+        if !scripts.contains(&name) {
+            scripts.push(name);
+        }
+    }
+    if scripts.len() < 2 {
+        return None;
+    }
+    scripts.sort_unstable();
+    Some(scripts.into_iter().map(str::to_owned).collect())
 }
 
 fn homoglyph_suggestion(c: char) -> Option<&'static str> {

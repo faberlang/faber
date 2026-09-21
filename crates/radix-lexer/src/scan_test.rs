@@ -428,6 +428,57 @@ fn unexpected_bidi_control_diagnostic_uses_codepoint_not_raw_control() {
 }
 
 #[test]
+fn mixed_script_identifier_advises_and_still_lexes_as_ident() {
+    // Cyrillic `а` beside Latin `dd`: the defined-confusable shape that was
+    // silent before the S-A5 screen. Advisory only — no error token.
+    let result = lex("аdd");
+    assert!(result.errors.is_empty(), "errors: {:?}", result.errors);
+    assert_eq!(
+        result.mixed_script_advisories.len(),
+        1,
+        "expected one mixed-script advisory"
+    );
+    let advisory = &result.mixed_script_advisories[0];
+    assert_eq!(advisory.spelling, "аdd");
+    assert_eq!(
+        advisory.scripts,
+        vec!["Cyrillic".to_string(), "Latin".to_string()],
+        "scripts sorted, Common/Inherited excluded"
+    );
+    assert_eq!(advisory.span, crate::Span::new(0, 4));
+    assert!(matches!(result.tokens[0].kind, TokenKind::Ident(_)));
+}
+
+#[test]
+fn single_script_identifiers_yield_no_mixed_script_advisory() {
+    // Pure Latin, pure Cyrillic, pure Greek: one visible script each.
+    for source in ["add", "значення", "μεταβλητη"] {
+        let result = lex(source);
+        assert!(
+            result.mixed_script_advisories.is_empty(),
+            "{source} should not advise: {:?}",
+            result.mixed_script_advisories
+        );
+        assert!(result.errors.is_empty(), "errors: {:?}", result.errors);
+    }
+}
+
+#[test]
+fn mixed_script_with_common_characters_yields_no_advisory() {
+    // Digits and `_` are Common: a Greek name with ASCII digits/underscore
+    // stays single-script under the S-A5 screen.
+    for source in ["α_1", "β12", "_x"] {
+        let result = lex(source);
+        assert!(
+            result.mixed_script_advisories.is_empty(),
+            "{source} should not advise: {:?}",
+            result.mixed_script_advisories
+        );
+        assert!(result.errors.is_empty(), "errors: {:?}", result.errors);
+    }
+}
+
+#[test]
 fn normalizes_interned_identifiers_to_nfkc() {
     // Canonical NFC equivalence (composed vs decomposed) still holds under NFKC.
     let mut interner = Interner::new();

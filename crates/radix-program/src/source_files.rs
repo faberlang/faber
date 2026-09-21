@@ -225,6 +225,12 @@ pub fn load_package_source(
             .iter()
             .map(|suggestion| Diagnostic::from_locale_suggestion(&display_name, &body, suggestion)),
     );
+    diagnostics.extend(
+        lex_result
+            .mixed_script_advisories
+            .iter()
+            .map(|advisory| Diagnostic::from_mixed_script_advisory(&display_name, &body, advisory)),
+    );
     if !lex_result.success() {
         diagnostics.extend(
             lex_result

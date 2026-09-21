@@ -71,3 +71,16 @@ pub fn locale_unknown_spec() -> DiagnosticSpec {
         ),
     }
 }
+
+/// Return the stable diagnostic spec for an identifier whose visible
+/// characters span two or more Unicode scripts. Non-fatal by ruling: the
+/// advisory observes look-alike risk without rejecting the spelling.
+#[must_use]
+pub fn mixed_script_identifier_spec() -> DiagnosticSpec {
+    DiagnosticSpec {
+        code: "LOCALE004",
+        help: Some(
+            "check for look-alike characters from another alphabet; the name is accepted as written",
+        ),
+    }
+}

@@ -5,7 +5,8 @@
 
 use super::{
     DiagnosticConvert, convert_from_lex_error as from_lex_error,
-    convert_from_locale_suggestion as from_locale_suggestion, convert_from_parse_error as from_parse_error,
+    convert_from_locale_suggestion as from_locale_suggestion,
+    convert_from_mixed_script_advisory as from_mixed_script_advisory, convert_from_parse_error as from_parse_error,
     convert_from_semantic_error as from_semantic_error,
 };
 use crate::diagnostics::{DiagnosticPhase, Severity};
@@ -283,6 +284,84 @@ fn lex_error_at_end_of_file_has_no_source_line() {
         let diagnostic = from_lex_error("eof.fab", source, err);
         assert_eq!(diagnostic.file, "eof.fab");
     }
+}
+
+fn first_mixed_script_advisory(source: &str) -> crate::lexer::MixedScriptAdvisory {
+    lex(source)
+        .mixed_script_advisories
+        .first()
+        .expect("mixed-script advisory")
+        .clone()
+}
+
+#[test]
+fn mixed_script_advisory_normalizes_to_nonfatal_warning() {
+    let source = "const аdd ← 1\n";
+    let advisory = first_mixed_script_advisory(source);
+
+    let diagnostic = from_mixed_script_advisory("advisory.fab", source, &advisory);
+
+    assert_transport(
+        &diagnostic,
+        Severity::Warning,
+        DiagnosticPhase::Tool,
+        "LOCALE004",
+        None,
+        &[
+            DiagnosticArg::new("identifier", "аdd"),
+            DiagnosticArg::new("scripts", "Cyrillic, Latin"),
+        ],
+    );
+    assert_eq!(diagnostic.source_line.as_deref(), Some("const аdd ← 1"));
+}
+
+#[test]
+fn mixed_script_advisory_renders_prose_in_every_installed_pack() {
+    let source = "const аdd ← 1\n";
+    let advisory = first_mixed_script_advisory(source);
+    let diagnostic = from_mixed_script_advisory("advisory.fab", source, &advisory);
+
+    for locale in ["ar", "en", "hi", "la", "th-TH", "vi", "zh-Hans", "zh-Hant"] {
+        let path = crate::locale::workspace_locale_pack_path(locale);
+        let pack = crate::locale::LocalePack::from_toml_path(path)
+            .unwrap_or_else(|err| panic!("installed {locale} pack should load: {err:?}"));
+        let rendered = pack
+            .render_diagnostic_text(&diagnostic)
+            .expect("render should not error")
+            .unwrap_or_else(|| panic!("{locale} pack must own a LOCALE004 prose row"));
+        assert!(
+            rendered.message.contains("аdd"),
+            "{locale} prose must substitute the identifier: {}",
+            rendered.message
+        );
+    }
+}
+
+#[test]
+fn mixed_script_compile_yields_warning_and_still_parses_and_analyzes() {
+    // Cyrillic `а` beside Latin `dd`, defined and called: the S-A5 shape.
+    // Advisory only — check succeeds with no error-severity diagnostic.
+    let source =
+        "+++\nlocale = \"en\"\n+++\nfn аdd(int n) → int {\n    return n + 1\n}\n\nmain {\n    print аdd(41)\n}\n";
+
+    let result = crate::services::check_diagnostics_for_source("confusable.fab", source, false);
+
+    assert!(result.success, "advisory must not fail check: {:?}", result.diagnostics);
+    assert!(
+        !result
+            .diagnostics
+            .iter()
+            .any(|d| d.severity == Severity::Error),
+        "no error-severity diagnostics expected: {:?}",
+        result.diagnostics
+    );
+    let warnings: Vec<_> = result
+        .diagnostics
+        .iter()
+        .filter(|d| d.code == Some("LOCALE004"))
+        .collect();
+    assert_eq!(warnings.len(), 2, "definition and call each advise: {:?}", result.diagnostics);
+    assert_eq!(warnings[0].severity, Severity::Warning);
 }
 
 /// Assert conversion identity on the structured surfaces: code + issue + args.

@@ -3392,6 +3392,12 @@ fn parse_frontend_source<'a>(
             .iter()
             .map(|suggestion| Diagnostic::from_locale_suggestion(name, body, suggestion)),
     );
+    diagnostics.extend(
+        lex_result
+            .mixed_script_advisories
+            .iter()
+            .map(|advisory| Diagnostic::from_mixed_script_advisory(name, body, advisory)),
+    );
     if !lex_result.success() {
         for err in &lex_result.errors {
             diagnostics.push(Diagnostic::from_lex_error(name, body, err));

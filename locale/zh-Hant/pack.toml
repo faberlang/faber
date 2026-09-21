@@ -215,6 +215,10 @@ help = "為此程式庫識別使用讀者語言包中宣告的成員拼寫"
 message = "讀者語言包 '{pack}' 發現類似關鍵字的寫法 '{spelling}'"
 help = "若本意是關鍵字請使用 '{suggestion}'；'{spelling}' 按原樣是合法名稱"
 
+[diagnostics.LOCALE004]
+message = "識別碼 '{identifier}' 混用了多種文字：{scripts}"
+help = "請檢查是否有來自其他字母體系的形近字元；該名稱按原樣仍然合法"
+
 [diagnostics.LEX001]
 message = "未結束的字串字面值"
 help = "在行尾或檔案結束前結束字串字面值"
