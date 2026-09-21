@@ -649,15 +649,13 @@ fn lista_to_tabula_conversio_rejects() {
 
 #[test]
 fn array_ascription_to_generic_map_key_rejects() {
-    // Operator ruling (2026-09-21): an array's only map projection is
-    // index-keyed, which forces an integer key type. A generic key is
-    // constrained by nothing in the source, so the ascription is wrong even
-    // under the reading where `∷` converts.
+    // Operator ruling (2026-09-21, total): an array is not a map, so an
+    // array-to-map ascription is rejected whatever the key type is.
     test_support::assert_rejects_with_issue(
         r"functio selecta<K, V>() → tabula<K, V> {
   redde [] ∷ tabula<K, V>
 }",
-        "array_ascription_to_non_index_map",
+        "array_ascription_to_map",
     );
 }
 
@@ -668,7 +666,7 @@ fn generic_genus_field_array_ascription_to_generic_map_key_rejects() {
         r"genus SortedMap<K, V> {
   tabula<K, V> entries = [] ∷ tabula<K, V>
 }",
-        "array_ascription_to_non_index_map",
+        "array_ascription_to_map",
     );
 }
 
@@ -679,67 +677,70 @@ fn lista_source_ascription_to_generic_map_key_rejects() {
         r"functio selecta<K, V>(lista<numerus> src) → tabula<K, V> {
   redde src ∷ tabula<K, V>
 }",
-        "array_ascription_to_non_index_map",
+        "array_ascription_to_map",
     );
 }
 
 #[test]
 fn array_ascription_to_holed_map_key_rejects() {
-    // `tabula<_, V>` leaves the key uninferred: same unconstrained shape.
+    // `tabula<_, V>` leaves the key uninferred: same array-to-map family.
     test_support::assert_rejects_with_issue(
         "incipit { fixum tabula<_, numerus> m ← [] ∷ tabula<_, numerus> }",
-        "array_ascription_to_non_index_map",
+        "array_ascription_to_map",
     );
 }
 
 #[test]
-fn index_keyed_array_ascription_to_map_typechecks() {
-    // Deliberately left accepted: the index-keyed form is the only coherent
-    // array-to-map conversion, and whether it should be legal is a separate
-    // unmade decision.
-    test_support::assert_accepts(
+fn index_keyed_array_ascription_to_map_rejects() {
+    // The ruling's named shape: "even if technically it's a conversion that
+    // should be allowed by treating the indexes as the key values, it's
+    // still a conversion." Index-keyedness does not make the ascription
+    // true.
+    test_support::assert_rejects_with_issue(
         "incipit { fixum tabula<numerus, numerus> m ← [] ∷ tabula<numerus, numerus> }",
+        "array_ascription_to_map",
     );
 }
 
 #[test]
 fn concrete_key_array_ascription_to_map_rejects() {
-    // Widened ruling (2026-09-21): the operator's argument is not about
-    // genericity — an array supplies no key type of its own, only element
-    // positions, so a textus key is as impossible to derive as a `K`.
+    // Totality is not about genericity: a concrete key is rejected too.
     test_support::assert_rejects_with_issue(
         "incipit { fixum tabula<textus, numerus> m ← [] ∷ tabula<textus, numerus> }",
-        "array_ascription_to_non_index_map",
+        "array_ascription_to_map",
     );
 }
 
 #[test]
 fn fractus_key_array_ascription_to_map_rejects() {
-    // Any concrete non-integer key family is the same impossibility; the
-    // rule is not a textus special case.
+    // Any concrete key family is the same rejection; the rule is not a
+    // textus special case.
     test_support::assert_rejects_with_issue(
         "incipit { fixum tabula<fractus, numerus> m ← [] ∷ tabula<fractus, numerus> }",
-        "array_ascription_to_non_index_map",
+        "array_ascription_to_map",
     );
 }
 
 #[test]
-fn sized_integer_key_array_ascription_to_map_typechecks() {
-    // The index-keyed family is the integer family bracket access itself
-    // accepts, so a sized integer key is as index-keyed as bare numerus.
-    test_support::assert_accepts(
+fn sized_integer_key_array_ascription_to_map_rejects() {
+    // A sized integer key is as index-keyed as bare numerus, and the ruling
+    // rejects the index-keyed reading itself.
+    test_support::assert_rejects_with_issue(
         "incipit { fixum tabula<u32, numerus> m ← [] ∷ tabula<u32, numerus> }",
+        "array_ascription_to_map",
     );
 }
 
 #[test]
 fn sanctioned_empty_and_keyed_map_construction_typechecks() {
     // `vacua` is the la-pack marker (`empty` is its en twin, covered by the
-    // corpus); the keyed literal stays the typed construction path.
+    // corpus); the keyed literal and the empty object literal stay the typed
+    // construction paths.
     test_support::assert_accepts(
         r#"incipit {
   fixum tabula<textus, numerus> a ← vacua
   fixum tabula<textus, numerus> b ← { "alpha": 1 }
+  fixum tabula<textus, numerus> c ← {}
 }"#,
     );
 }

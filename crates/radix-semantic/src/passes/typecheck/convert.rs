@@ -109,7 +109,7 @@ const ISSUE_MAP_SPREAD_KEY_TYPE_MISMATCH: &str = "map_spread_key_type_mismatch";
 const ISSUE_MAP_SPREAD_VALUE_TYPE_MISMATCH: &str = "map_spread_value_type_mismatch";
 const ISSUE_MAP_VALUE_TYPE_MISMATCH: &str = "map_value_type_mismatch";
 const ISSUE_LISTA_TO_TABULA_UNSUPPORTED: &str = "lista_to_tabula_unsupported";
-const ISSUE_ARRAY_ASCRIPTION_TO_NON_INDEX_MAP: &str = "array_ascription_to_non_index_map";
+const ISSUE_ARRAY_ASCRIPTION_TO_MAP: &str = "array_ascription_to_map";
 const ISSUE_CROSS_COLLECTION_UNSUPPORTED: &str = "cross_collection_unsupported";
 const ISSUE_LISTA_TO_TENSOR_NESTED: &str = "lista_to_tensor_nested";
 const ISSUE_LISTA_TO_TENSOR_ELEMENT_MISMATCH: &str = "lista_to_tensor_element_mismatch";
@@ -2631,8 +2631,8 @@ impl TypeChecker<'_> {
                 self.check_verte_vector_target(source, elem_ty, width, span);
             }
             Type::ModularWord(_) => {}
-            Type::Map(key, _) => {
-                self.check_array_source_map_ascription(source_resolved, key, span);
+            Type::Map(..) => {
+                self.check_array_source_map_ascription(source_resolved, span);
             }
             // Non-collection targets already typechecked the source above
             // (with the effective target as constructor context when the
@@ -2643,35 +2643,20 @@ impl TypeChecker<'_> {
         effective_target
     }
 
-    /// Reject an array source ascribed to any map whose key the source cannot
-    /// supply.
+    /// Reject an array source ascribed to a map, whatever the key type.
     ///
-    /// An array's only map projection is index-keyed: it yields element
-    /// positions, so the one key family it determines is the integer family
-    /// its own bracket access accepts. Every other target key — a generic
-    /// parameter (`tabula<K, V>`), a hole, or a concrete non-integer type
-    /// such as `tabula<textus, V>` — names keys the source has none of, so
-    /// the ascription is wrong both as an assertion and as a conversion
-    /// (operator ruling 2026-09-21). The index-keyed form stays accepted;
-    /// whether it should itself be legal is an unmade decision.
-    fn check_array_source_map_ascription(
-        &mut self,
-        source: TypeId,
-        key: TypeId,
-        span: radix_lexer::Span,
-    ) {
-        if !matches!(
+    /// An array is not a map: `∷` asserts a type the expression already has,
+    /// and an array-to-map — even index-keyed, treating the element positions
+    /// as key values — is a conversion, never an ascription (operator ruling
+    /// 2026-09-21, total over the array-to-map family). The sanctioned
+    /// spellings for an empty map are the empty-collection marker (`empty` in
+    /// `en`, `vacua` in `la`) and the keyed literal.
+    fn check_array_source_map_ascription(&mut self, source: TypeId, span: radix_lexer::Span) {
+        if matches!(
             self.types.get(source),
             Type::Array(_) | Type::BoundedArray { .. }
         ) {
-            return;
-        }
-        let resolved = self.resolve_inferred_type(key);
-        if matches!(self.types.get(resolved), Type::Error) {
-            return;
-        }
-        if !self.is_integer(resolved) {
-            self.invalid_conversion(ISSUE_ARRAY_ASCRIPTION_TO_NON_INDEX_MAP, span);
+            self.invalid_conversion(ISSUE_ARRAY_ASCRIPTION_TO_MAP, span);
         }
     }
 

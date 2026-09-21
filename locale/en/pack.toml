@@ -2746,9 +2746,9 @@ help = "add `@ json` to the class or convert through `{valor}` explicitly"
 message = "{lista} to map conversion has no default key/value derivation; use a map constructor verb or `.in.map(k, v)`; pair-destructuring default deferred"
 help = "construct the map with explicit key/value selection"
 
-[diagnostics.SEM016.issues.array_ascription_to_non_index_map]
-message = "an array supplies no keys but its own element positions, so a {lista} source can only become a map with an integer key type"
-help = "name the integer key type the array's indices provide (`map<numerus, V>`), or build the map with `empty` or a keyed literal"
+[diagnostics.SEM016.issues.array_ascription_to_map]
+message = "an array is not a map: `∷` asserts a type the expression already has, and treating an array's indexes as the key values is still a conversion"
+help = "write the map with `empty`, an empty or keyed object literal, or convert explicitly with `↦`"
 
 [diagnostics.SEM016.issues.cross_collection_unsupported]
 message = "cross-collection conversion has no default `↦` meaning; use an explicit stdlib verb"

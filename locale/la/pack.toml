@@ -2537,9 +2537,9 @@ help = "add `@ json` to the genus or convert through `{valor}` explicitly"
 message = "{lista} to tabula conversion has no default key/value derivation; use a tabula constructor verb or `.in.tabula(k, v)`; pair-destructuring default deferred"
 help = "construct the tabula with explicit key/value selection"
 
-[diagnostics.SEM016.issues.array_ascription_to_non_index_map]
-message = "an array supplies no keys but its own element positions, so a {lista} source can only become a tabula with an integer key type"
-help = "name the integer key type the array's indices provide (`tabula<numerus, V>`), or build the tabula with `vacua` or a keyed literal"
+[diagnostics.SEM016.issues.array_ascription_to_map]
+message = "an array is not a tabula: `∷` asserts a type the expression already has, and treating an array's indexes as the key values is still a conversion"
+help = "write the tabula with `vacua`, an empty or keyed object literal, or convert explicitly with `↦`"
 
 [diagnostics.SEM016.issues.cross_collection_unsupported]
 message = "cross-collection conversion has no default `↦` meaning; use an explicit stdlib verb"
