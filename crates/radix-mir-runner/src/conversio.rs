@@ -6,8 +6,8 @@
 //! source `Value` shape disagrees with typed contracts (e.g. `textus ↦ bivalens`).
 
 use super::value::{
-    MapKey, SermoValue, TensorValue, Value, decimal_scale_factor, int_width_range,
-    modular_word_mask, modular_word_result, round_half_even_division,
+    MapKey, SermoValue, TensorValue, Value, decimal_scale_factor, float_to_numerus_width,
+    int_width_range, modular_word_mask, modular_word_result, round_half_even_division,
 };
 use super::{Runner, RunnerError, runtime_regex_pattern};
 use radix_lexer::{Span, Symbol};

@@ -585,6 +585,39 @@ pub fn int_width_range(width: NumericWidth) -> (i128, i128) {
     }
 }
 
+/// Saturate a float carrier at the declared `numerus<W>` width, with Rust `as`
+/// cast semantics: truncate toward zero, clamp at the width's bounds, NaN to
+/// zero, negative-to-unsigned to zero, and the carrier follows the width's
+/// signedness (`u64::MAX` has no `Value::Int` carrier).
+///
+/// WHY: every codegen tier emits the declared-width `as` cast for both `↦` and
+/// `∷` (`300.0 ↦ numerus<i8>` is `300.0 as i8`), so a runner cast must saturate
+/// at `W` rather than at the width-agnostic i64 carrier it happens to hold.
+/// FORK-2 (mail 2fb79900 / memo) keeps casts saturating while integer
+/// arithmetic errors; this is the cast half of that split, not a change to it.
+#[must_use]
+pub fn float_to_numerus_width(value: f64, width: NumericWidth) -> Value {
+    match width {
+        NumericWidth::I8 => Value::Int(i64::from(value as i8)),
+        NumericWidth::I16 => Value::Int(i64::from(value as i16)),
+        NumericWidth::I32 => Value::Int(i64::from(value as i32)),
+        NumericWidth::I64 => Value::Int(value as i64),
+        NumericWidth::U8 => Value::UInt(u64::from(value as u8)),
+        NumericWidth::U16 => Value::UInt(u64::from(value as u16)),
+        NumericWidth::U32 => Value::UInt(u64::from(value as u32)),
+        NumericWidth::U64 => Value::UInt(value as u64),
+        // Float and decimal widths keep the width-agnostic saturating carrier:
+        // `numerus<W, Bits>` reinterprets bits before reaching a numeric cast,
+        // and decimals convert through the decimal carrier path.
+        NumericWidth::F16
+        | NumericWidth::BF16
+        | NumericWidth::F32
+        | NumericWidth::F64
+        | NumericWidth::D32
+        | NumericWidth::D64 => Value::Int(value as i64),
+    }
+}
+
 // S07-12: the runner carries no local decimal carrier math. The scale factor
 // and the pure round-half-even quotient are `radix_codegen_shared::decimal`'s
 // — the one copy every tier (literal folding, emitted runtime code, this
