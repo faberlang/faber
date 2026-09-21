@@ -7,8 +7,8 @@ use faber_cli::input_shape::locale_without_package_error;
 use faber_cli::package;
 use proba::{
     CaseOutcome, CaseResult, ProbaCase, ProbaReport, TestSelection, format_summary,
-    has_solum_cases, inventory_cases, is_harness_filter_match, run_proba_on_validated,
-    run_proba_on_validated_with_function_ids, selection_skip_reason, source_skip_reason,
+    has_solum_cases, inventory_cases, run_proba_on_validated,
+    run_proba_on_validated_with_function_ids, source_skip_reason,
 };
 use radix::module::driver::{Config, Session};
 use radix::program::test_source_filter::TestSourceFilter;
@@ -358,38 +358,6 @@ fn focused_cases(cases: &[ProbaCase]) -> Vec<ProbaCase> {
         .collect()
 }
 
-fn append_focus_skips(
-    report: &mut ProbaReport,
-    unit_path: &Path,
-    cases: &[ProbaCase],
-    focused: bool,
-    selection: &TestSelection,
-    harness_filter: Option<&str>,
-    exact: bool,
-    include_ignored: bool,
-) {
-    if !focused || !include_ignored {
-        return;
-    }
-    for case in cases {
-        if is_solum_case(case) || !is_harness_filter_match(case, harness_filter, exact) {
-            continue;
-        }
-        let Some(reason) = selection_skip_reason(case, selection, true) else {
-            continue;
-        };
-        report.results.push(CaseResult {
-            unit_path: unit_path.to_path_buf(),
-            name: case.name.clone(),
-            suite_path: case.suite_path.clone(),
-            outcome: CaseOutcome::Skipped { reason },
-            stdout: Vec::new(),
-            stderr: Vec::new(),
-            stats: None,
-        });
-    }
-}
-
 fn run_package_with_options(
     config: &Config,
     input: &Path,
@@ -491,102 +459,6 @@ fn run_package_with_options(
         }
     }
     (combined, false, metadata)
-}
-
-fn run_package(
-    config: &Config,
-    input: &Path,
-    selection: &TestSelection,
-    proba_filter: Option<&TestSourceFilter>,
-    harness_filter: Option<&str>,
-    exact: bool,
-    include_ignored: bool,
-    focused: bool,
-) -> (ProbaReport, bool) {
-    let package = match package::analyze_package_for_tests(config, input, proba_filter) {
-        Ok(package) => package,
-        Err(diagnostics) => fail_package_analysis(&diagnostics),
-    };
-
-    if package
-        .diagnostics
-        .iter()
-        .any(radix::module::diagnostics::Diagnostic::is_error)
-    {
-        fail_package_analysis(&package.diagnostics);
-    }
-
-    let unmatched_include = proba_filter.is_some_and(|filter| {
-        unmatched_include_filter(
-            &filter.include,
-            package.nodes.values().map(|unit| &unit.path),
-        )
-    });
-    if unmatched_include {
-        return (ProbaReport::default(), true);
-    }
-
-    let mut test_units = Vec::new();
-    for unit in package.nodes.values() {
-        let cases = inventory_cases(&unit.analysis.hir, &unit.analysis.interner);
-        if cases.is_empty() {
-            continue;
-        }
-        test_units.push((unit.path.clone(), cases));
-    }
-
-    // A `solum` marker anywhere in the package makes focus a package-wide
-    // decision. The per-unit runner still owns linking, but every unit receives
-    // the same focused case set instead of deciding focus from local inventory.
-    let focused = focused || test_units.iter().any(|(_, cases)| has_solum_cases(cases));
-
-    // Link and lower each test unit independently. A package-level link would
-    // let one unsupported unit poison every otherwise runnable case (E10).
-    // Re-analysis gives each unit a fresh owned package graph; the helper then
-    // narrows that graph to the unit's local import closure before linking.
-    let combined = if test_units.is_empty() {
-        ProbaReport::default()
-    } else {
-        let mut combined = ProbaReport::default();
-        for (unit_path, cases) in test_units {
-            match run_package_test_unit(
-                config,
-                input,
-                proba_filter,
-                &unit_path,
-                selection,
-                harness_filter,
-                exact,
-                include_ignored,
-                focused,
-            ) {
-                Ok(report) => combined.results.extend(report.results),
-                Err(diagnostics) => {
-                    super::eprint_compile_diagnostics(&diagnostics);
-                    eprintln!(
-                        "error: package MIR test link failed for {}",
-                        unit_path.display()
-                    );
-                    combined.results.extend(
-                        blocked_unit_report(
-                            &unit_path,
-                            cases,
-                            selection,
-                            harness_filter,
-                            exact,
-                            include_ignored,
-                            focused,
-                            &unit_link_block_reason(&diagnostics),
-                        )
-                        .results,
-                    );
-                }
-            }
-        }
-        combined
-    };
-
-    (combined, false)
 }
 
 /// Analyze, isolate, link, and run one test unit.
@@ -694,111 +566,6 @@ fn run_package_test_unit_with_options(
     )
 }
 
-fn run_package_test_unit(
-    config: &Config,
-    input: &Path,
-    proba_filter: Option<&TestSourceFilter>,
-    unit_path: &Path,
-    selection: &TestSelection,
-    harness_filter: Option<&str>,
-    exact: bool,
-    include_ignored: bool,
-    focused: bool,
-) -> Result<ProbaReport, Vec<radix::module::diagnostics::Diagnostic>> {
-    let mut package = package::analyze_package_for_tests(config, input, proba_filter)?;
-    if package
-        .diagnostics
-        .iter()
-        .any(radix::module::diagnostics::Diagnostic::is_error)
-    {
-        return Err(package.diagnostics);
-    }
-
-    let Some((root_id, _)) = package.node_by_path(unit_path) else {
-        return Err(vec![
-            radix::module::diagnostics::Diagnostic::error(format!(
-                "test unit disappeared during package re-analysis: {}",
-                unit_path.display()
-            ))
-            .with_file(unit_path.display().to_string()),
-        ]);
-    };
-    let root_id = root_id.clone();
-    let included = package.imports.local_closure(std::iter::once(&root_id));
-    package.nodes.retain(|id, _| included.contains(id));
-    package.entry = Some(root_id.clone());
-    package.roots = vec![root_id.clone()];
-
-    let Some(unit) = package.nodes.get(&root_id) else {
-        return Err(vec![
-            radix::module::diagnostics::Diagnostic::error(format!(
-                "test unit was not retained in its local package closure: {}",
-                unit_path.display()
-            ))
-            .with_file(unit_path.display().to_string()),
-        ]);
-    };
-    let all_cases = inventory_cases(&unit.analysis.hir, &unit.analysis.interner);
-    if all_cases.is_empty() {
-        return Ok(ProbaReport::default());
-    }
-    let cases = if focused {
-        focused_cases(&all_cases)
-    } else {
-        all_cases.clone()
-    };
-    if cases.is_empty() {
-        let mut report = ProbaReport::default();
-        append_focus_skips(
-            &mut report,
-            unit_path,
-            &all_cases,
-            focused,
-            selection,
-            harness_filter,
-            exact,
-            include_ignored,
-        );
-        return Ok(report);
-    }
-    let functions = cases
-        .iter()
-        .map(|case| (unit.path.clone(), case.def_id))
-        .collect();
-    let scope = radix::program::mir::TestPackageScope::for_program(&package, functions);
-
-    package::mir::with_linked_test_package_mir(
-        package,
-        &scope,
-        config,
-        |validated, function_ids| {
-            let mut report = run_proba_on_validated_with_function_ids(
-                validated,
-                unit_path,
-                &cases,
-                function_ids,
-                selection,
-                harness_filter,
-                exact,
-                include_ignored,
-                None,
-                false,
-            );
-            append_focus_skips(
-                &mut report,
-                unit_path,
-                &all_cases,
-                focused,
-                selection,
-                harness_filter,
-                exact,
-                include_ignored,
-            );
-            report
-        },
-    )
-}
-
 fn blocked_unit_report_with_options(
     unit_path: &Path,
     cases: &[ProbaCase],
@@ -814,67 +581,6 @@ fn blocked_unit_report_with_options(
     let mut report = ProbaReport::default();
     for case in available {
         if !case_matches_options(unit_path, &case, options) {
-            continue;
-        }
-        if let Some(skip_reason) = source_skip_reason(&case) {
-            report.results.push(CaseResult {
-                unit_path: unit_path.to_path_buf(),
-                name: case.name,
-                suite_path: case.suite_path,
-                outcome: CaseOutcome::Skipped {
-                    reason: skip_reason,
-                },
-                stdout: Vec::new(),
-                stderr: Vec::new(),
-                stats: None,
-            });
-            continue;
-        }
-        report.results.push(CaseResult {
-            unit_path: unit_path.to_path_buf(),
-            name: case.name,
-            suite_path: case.suite_path,
-            outcome: CaseOutcome::Blocked {
-                reason: format!("{reason} ({})", unit_path.display()),
-            },
-            stdout: Vec::new(),
-            stderr: Vec::new(),
-            stats: None,
-        });
-    }
-    report
-}
-
-fn blocked_unit_report(
-    unit_path: &Path,
-    cases: Vec<ProbaCase>,
-    selection: &TestSelection,
-    harness_filter: Option<&str>,
-    exact: bool,
-    include_ignored: bool,
-    focused: bool,
-    reason: &str,
-) -> ProbaReport {
-    let has_solum = focused || has_solum_cases(&cases);
-    let mut report = ProbaReport::default();
-    for case in cases {
-        if !is_harness_filter_match(&case, harness_filter, exact) {
-            continue;
-        }
-        if let Some(skip_reason) = selection_skip_reason(&case, selection, has_solum) {
-            if include_ignored {
-                report.results.push(CaseResult {
-                    unit_path: unit_path.to_path_buf(),
-                    name: case.name,
-                    suite_path: case.suite_path,
-                    outcome: CaseOutcome::Skipped {
-                        reason: skip_reason,
-                    },
-                    stdout: Vec::new(),
-                    stderr: Vec::new(),
-                    stats: None,
-                });
-            }
             continue;
         }
         if let Some(skip_reason) = source_skip_reason(&case) {
