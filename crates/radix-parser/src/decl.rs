@@ -611,7 +611,7 @@ impl Parser {
 
             let name = self.parse_param_name()?;
 
-            let sponte = self.parse_post_name_marker()?;
+            let sponte = self.parse_post_name_marker();
 
             let alias = if self.eat_keyword_ident(TokenKind::Ut) {
                 Some(self.parse_param_name()?)
@@ -697,8 +697,8 @@ impl Parser {
     }
 
     /// Parse the optional post-name `sponte` marker shared by parameters and fields.
-    fn parse_post_name_marker(&mut self) -> Result<bool, ParseError> {
-        Ok(self.eat_keyword_ident(TokenKind::Sponte))
+    fn parse_post_name_marker(&mut self) -> bool {
+        self.eat_keyword_ident(TokenKind::Sponte)
     }
 
     // CLASS DECLARATIONS
@@ -805,7 +805,7 @@ impl Parser {
         let is_bound = self.eat_keyword_ident(TokenKind::Nexum);
         let ty = self.parse_type()?;
         let name = self.parse_param_name()?;
-        let sponte = self.parse_post_name_marker()?;
+        let sponte = self.parse_post_name_marker();
         let init = if self.eat(&TokenKind::Eq) {
             Some(Box::new(self.parse_expression()?))
         } else {

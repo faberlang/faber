@@ -1677,6 +1677,8 @@ fn expect_unary(expr: &ElementwiseExpr, op: ElementwiseOp) -> &ElementwiseExpr {
 }
 
 #[test]
+// Comparing the embedded literal 1.0: exact by construction.
+#[allow(clippy::float_cmp)]
 fn real_lowered_mlp_join_child_carries_typed_expression_plan() {
     let mut types = TypeTable::new();
     let function =

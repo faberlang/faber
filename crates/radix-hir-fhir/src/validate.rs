@@ -23,6 +23,9 @@ fn register_type_site(
         .or_insert(ty);
 }
 
+// Slot ordinals count HIR children (params, fields, annotations); a live HIR
+// node never approaches u32::MAX slots, so the usize->u32 casts cannot truncate.
+#[allow(clippy::cast_possible_truncation)]
 fn register_function_type_sites(
     sites: &mut FxHashMap<radix_hir::HirTypeSite, radix_types::TypeId>,
     owner: radix_types::DefId,
@@ -62,9 +65,10 @@ fn register_function_type_sites(
     }
 }
 
+#[allow(clippy::cast_possible_truncation)]
 fn register_annotation_type_sites(
     sites: &mut FxHashMap<radix_hir::HirTypeSite, radix_types::TypeId>,
-    owner: radix_hir::HirOwnerRef,
+    owner: &radix_hir::HirOwnerRef,
     annotations: &[radix_hir::HirAnnotation],
 ) {
     for (annotation, ann) in annotations.iter().enumerate() {
@@ -101,9 +105,11 @@ impl TypeSiteCollector {
 }
 
 impl radix_hir::visit::HirVisitor for TypeSiteCollector {
+    // Slot ordinals count HIR children; never near u32::MAX in a live node.
+    #[allow(clippy::cast_possible_truncation)]
     fn visit_item(&mut self, item: &radix_hir::HirItem) {
         let owner = radix_hir::HirOwnerRef::Def(item.def_id);
-        register_annotation_type_sites(&mut self.sites, owner.clone(), &item.annotations);
+        register_annotation_type_sites(&mut self.sites, &owner, &item.annotations);
         match &item.kind {
             radix_hir::HirItemKind::Function(function) => {
                 register_function_type_sites(&mut self.sites, item.def_id, function);
@@ -124,7 +130,7 @@ impl radix_hir::visit::HirVisitor for TypeSiteCollector {
                     );
                     register_annotation_type_sites(
                         &mut self.sites,
-                        radix_hir::HirOwnerRef::Def(field.def_id),
+                        &radix_hir::HirOwnerRef::Def(field.def_id),
                         &field.annotations,
                     );
                 }
@@ -198,7 +204,7 @@ impl radix_hir::visit::HirVisitor for TypeSiteCollector {
         register_function_type_sites(&mut self.sites, method.def_id, &method.func);
         register_annotation_type_sites(
             &mut self.sites,
-            radix_hir::HirOwnerRef::Def(method.def_id),
+            &radix_hir::HirOwnerRef::Def(method.def_id),
             &method.annotations,
         );
         radix_hir::visit::walk_method(self, method);
@@ -216,6 +222,8 @@ impl radix_hir::visit::HirVisitor for TypeSiteCollector {
         radix_hir::visit::walk_local(self, local);
     }
 
+    // Slot ordinals count HIR children; never near u32::MAX in a live node.
+    #[allow(clippy::cast_possible_truncation)]
     fn visit_expr(&mut self, expr: &radix_hir::HirExpression) {
         let previous = self.current_expr.replace(expr.id);
         match &expr.kind {
@@ -2033,7 +2041,7 @@ pub(crate) fn validate_referential_integrity(
     // A `Typus` default names a concrete type arena slot; `Magnitudo` defaults
     // are literals and carry no reference.
     fn validate_type_param_default(
-        default: &Option<radix_types::SemanticGenericParamDefault>,
+        default: Option<&radix_types::SemanticGenericParamDefault>,
         check_type: &dyn Fn(radix_types::TypeId) -> Result<(), HirArtifactError>,
     ) -> Result<(), HirArtifactError> {
         if let Some(radix_types::SemanticGenericParamDefault::Typus(ty)) = default {
@@ -2077,7 +2085,7 @@ pub(crate) fn validate_referential_integrity(
                     check_type(*ty)?;
                 }
             }
-            validate_type_param_default(&tp.default, check_type)?;
+            validate_type_param_default(tp.default.as_ref(), check_type)?;
         }
         for param in &func.params {
             check_def(param.def_id)?;
@@ -2140,7 +2148,7 @@ pub(crate) fn validate_referential_integrity(
                             check_type(*ty)?;
                         }
                     }
-                    validate_type_param_default(&tp.default, check_type)?;
+                    validate_type_param_default(tp.default.as_ref(), check_type)?;
                 }
                 for field in &s.fields {
                     check_def(field.def_id)?;
@@ -2183,7 +2191,7 @@ pub(crate) fn validate_referential_integrity(
                             check_type(*ty)?;
                         }
                     }
-                    validate_type_param_default(&tp.default, check_type)?;
+                    validate_type_param_default(tp.default.as_ref(), check_type)?;
                 }
                 for field in &e.commune_fields {
                     check_symbol(field.name)?;
@@ -2208,7 +2216,7 @@ pub(crate) fn validate_referential_integrity(
                             check_type(*ty)?;
                         }
                     }
-                    validate_type_param_default(&tp.default, check_type)?;
+                    validate_type_param_default(tp.default.as_ref(), check_type)?;
                 }
                 for method in &iface.methods {
                     for a in &method.availability {
@@ -2247,7 +2255,7 @@ pub(crate) fn validate_referential_integrity(
                             check_type(*ty)?;
                         }
                     }
-                    validate_type_param_default(&tp.default, check_type)?;
+                    validate_type_param_default(tp.default.as_ref(), check_type)?;
                 }
                 check_type(a.ty)?;
             }

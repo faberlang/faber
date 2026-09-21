@@ -546,12 +546,10 @@ impl super::FaberCodegen<'_> {
     ) {
         let await_assignment = self.await_assignment_bindings.contains(&local.def_id);
         let keyword = match (local.is_await, await_assignment, local.mutable) {
-            (true, true, false) => surface.contextual_keyword("fixum"),
-            (true, true, true) => surface.contextual_keyword("varia"),
+            (true, true, false) | (false, _, false) => surface.contextual_keyword("fixum"),
+            (true, true, true) | (false, _, true) => surface.contextual_keyword("varia"),
             (true, false, false) => surface.contextual_keyword("figendum"),
             (true, false, true) => surface.contextual_keyword("variandum"),
-            (false, _, false) => surface.contextual_keyword("fixum"),
-            (false, _, true) => surface.contextual_keyword("varia"),
         };
         writer.write(keyword);
         writer.write(" ");

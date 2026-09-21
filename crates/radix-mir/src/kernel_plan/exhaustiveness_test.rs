@@ -261,15 +261,11 @@ fn collection_kernel_plan_deny_unknown_variants() {
     for plan in &plans {
         let variant = variant_coverage(plan);
         let Some(index) = KNOWN_VARIANTS.iter().position(|name| *name == variant) else {
-            panic!(
-                "unknown CollectionKernelPlan variant `{}`; add it to KNOWN_VARIANTS",
-                variant
-            );
+            panic!("unknown CollectionKernelPlan variant `{variant}`; add it to KNOWN_VARIANTS");
         };
         assert!(
             !seen[index],
-            "duplicate representative for CollectionKernelPlan::{}",
-            variant
+            "duplicate representative for CollectionKernelPlan::{variant}",
         );
         seen[index] = true;
         assert_eq!(

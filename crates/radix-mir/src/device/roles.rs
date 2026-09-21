@@ -45,6 +45,9 @@ pub enum MirDeviceRole {
     Fragment,
 }
 
+// `by_*` fields key different id spaces (function id, def id, function
+// metadata) into the same role context; the prefix is the convention.
+#[allow(clippy::struct_field_names)]
 #[derive(Debug, Clone, Default)]
 pub struct MirDeviceContext {
     pub(super) by_function_id: FxHashMap<MirFunctionId, MirDeviceRole>,
@@ -355,6 +358,10 @@ impl MirImportedEntryError {
 /// Fails closed with [`MirImportedEntryError`] when a launchable fact's
 /// concrete instance is not present in `program` (unresolved instance) or a
 /// local role already disagrees for the same source.
+// FxHashMap parameters are intentional (mirrors `MirDeviceContext` /
+// interner maps); do not generalize over `BuildHasher` for call-site
+// simplicity.
+#[allow(clippy::implicit_hasher)]
 pub fn merge_imported_entry_roles(
     mut roles_by_def: FxHashMap<DefId, MirDeviceRole>,
     facts: &[MirImportedEntryFact],

@@ -811,7 +811,7 @@ pub fn collection_op_contract(
                         validation,
                         op,
                         crate::kernel_plan::rmsnorm_row_reduction_admission,
-                    )? {
+                    ) {
                         return Ok(Some(contract));
                     }
                 }
@@ -832,7 +832,7 @@ pub fn collection_op_contract(
                         validation,
                         op,
                         crate::kernel_plan::causal_softmax_row_reduction_admission,
-                    )? {
+                    ) {
                         return Ok(Some(contract));
                     }
                 }
@@ -842,7 +842,7 @@ pub fn collection_op_contract(
                         validation,
                         op,
                         crate::kernel_plan::causal_softmax_row_reduction_admission,
-                    )? {
+                    ) {
                         return Ok(Some(contract));
                     }
                 }
@@ -856,7 +856,7 @@ pub fn collection_op_contract(
 /// PGC-R5: resolve the `RowReduction` contract for a row-reduction-family
 /// op from the recipe's typed shape facts (the same
 /// [`crate::kernel_plan::transformer_recipe_shape`] scan the plan pass
-/// uses), under the op's own admission predicate. `Ok(None)` when the
+/// uses), under the op's own admission predicate. `None` when the
 /// shape is not admitted or the recipe facts do not resolve — the caller
 /// keeps scanning and the kernel keeps the generic 1D contract.
 fn row_reduction_contract(
@@ -864,7 +864,7 @@ fn row_reduction_contract(
     validation: &MirValidationContext<'_>,
     op: MirCollectionOp,
     admission: fn(u64, u64) -> Option<crate::kernel_plan::RowReductionFacts>,
-) -> Result<Option<CollectionOpContract>, MirAbiError> {
+) -> Option<CollectionOpContract> {
     // PGC-R5: the additive-idiom softmax reads an elementwise TEMP
     // (`(x + mask)`), whose type lives in the temps table — the shared
     // `transformer_recipe_shape` resolves local operands only, so the dims
@@ -873,27 +873,18 @@ fn row_reduction_contract(
     let dims = match crate::kernel_plan::transformer_recipe_shape(function, validation, op) {
         Some((dims, _)) => dims,
         None if op == MirCollectionOp::TensorSoftmax => {
-            let Some(args) = function_temp_operand_args(function) else {
-                return Ok(None);
-            };
-            let Some(ty) = temp_operand_ty(function, &args[0]) else {
-                return Ok(None);
-            };
-            match crate::tensor_type::tensor_literal_dims(ty, validation) {
-                Ok(dims) => dims,
-                Err(_) => return Ok(None),
-            }
+            let args = function_temp_operand_args(function)?;
+            let ty = temp_operand_ty(function, &args[0])?;
+            crate::tensor_type::tensor_literal_dims(ty, validation).ok()?
         }
-        None => return Ok(None),
+        None => return None,
     };
     if dims.len() != 2 {
-        return Ok(None);
+        return None;
     }
     let (rows, width) = (dims[0], dims[1]);
-    if admission(rows, width).is_none() {
-        return Ok(None);
-    }
-    Ok(Some(CollectionOpContract::RowReduction { rows, width }))
+    admission(rows, width)?;
+    Some(CollectionOpContract::RowReduction { rows, width })
 }
 
 /// PGC-R5: the `TensorSoftmax` statement's args (the additive-idiom twin's
