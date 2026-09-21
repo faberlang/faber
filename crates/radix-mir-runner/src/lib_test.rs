@@ -4682,7 +4682,7 @@ fn validated_loop_function<'a>(
     let name = interner.intern("case");
     let vacuum = MirType::semantic(types.primitive(radix_types::Primitive::Vacuum));
     let mut context = MirValidationContext::new(types);
-    context.interner = Some(interner);
+    context.interner = radix_mir::MirInterner::Borrowed(interner);
     let function = MirFunction {
         id: MirFunctionId(0),
         source: None,
@@ -4846,7 +4846,7 @@ fn direct_kernel_function_run_refuses_with_stable_identity() {
     let marked = interner.intern("marked");
     let types = radix_types::TypeTable::new();
     let mut context = MirValidationContext::new(&types);
-    context.interner = Some(&interner);
+    context.interner = radix_mir::MirInterner::Borrowed(&interner);
     let vacuum = MirType::semantic(types.primitive(radix_types::Primitive::Vacuum));
     let function = MirFunction {
         id: MirFunctionId(0),

@@ -300,6 +300,14 @@ pub enum MirRuntimeRecordValue {
 
 /// Lower a semantically analyzed HIR unit into a validated MIR unit.
 ///
+/// The unit is read immutably: every shape lowering synthesizes — the
+/// `ensure_*` scanners below, CLI record field types, and monomorphization's
+/// concrete shapes — goes into a lowering-owned extension table cloned from
+/// the unit's arena once per call. Upstream phases own what they created, so
+/// lowering never mutates the analyzed unit's `TypeTable` or `Interner`, and
+/// the returned token carries its own table through
+/// [`MirValidationContext::with_owned_types`].
+///
 /// The returned unit carries a program that has already passed MIR validation,
 /// along with the validation token and lowering metadata. Lowering failures and
 /// validation failures share the same error type so callers can treat the MIR
@@ -307,39 +315,51 @@ pub enum MirRuntimeRecordValue {
 ///
 /// # Errors
 /// Returns `MirError` values for unsupported HIR surfaces, missing semantic
-/// types, sealed-block misuse, and post-lowering validation failures.
+/// types, sealed-block misuse, a corrupt type arena, and post-lowering
+/// validation failures.
 pub fn lower_analyzed_unit(
-    unit: &mut AnalyzedModule,
+    unit: &AnalyzedModule,
     options: MirLoweringOptions,
 ) -> Result<LoweredMirUnit<'_>, Vec<MirError>> {
-    ensure_map_iteration_array_types(&mut unit.types);
-    ensure_itera_coordinate_array_types(&unit.hir, &mut unit.types);
-    ensure_tensor_bracket_index_array_types(&unit.hir, &mut unit.types);
+    // Lowering-owned extension arena: one clone of the analyzed table per
+    // call; every synthesized shape below interns into this table, never
+    // into the unit's.
+    let mut types = TypeTable::from_snapshot(unit.types.snapshot()).map_err(|message| {
+        vec![MirError {
+            message: format!("MIR lowering could not clone the type arena: {message}"),
+            issue: "mir_type_arena_clone_failed".to_owned(),
+            span: Span::default(),
+            definition_span: None,
+        }]
+    })?;
+    // Same law for the interner: lowering-added runtime and diagnostic
+    // symbols intern into this clone, so the analyzed unit's interner keeps
+    // exactly the symbols upstream phases produced.
+    let mut interner = unit.interner.clone();
+    ensure_map_iteration_array_types(&mut types);
+    ensure_itera_coordinate_array_types(&unit.hir, &mut types);
+    ensure_tensor_bracket_index_array_types(&unit.hir, &mut types);
     // The layout table is rebuilt after monomorphization's shape finalization
     // so it covers the concrete shapes/type graph the instances carry.
-    prepare_mir_lowering_interner(&mut unit.interner);
+    prepare_mir_lowering_interner(&mut interner);
     // Merge the caller-supplied CLI record fields (parsed argv, adapter, or
     // package-MIR runtime records) with descriptor-derived fields keyed by the
     // `argumenta` record type: the shared default-path lowering fills every
     // CLI record from the analyzed `CliProgram` surface (option/operand
     // binding + typed defaults) so CLI programs lower through the same program
     // graph without caller input. Caller-supplied fields win per local.
-    let cli_record_fields_by_type = cli_descriptor_record_fields_by_type(unit);
-    let empty_textus = unit.interner.intern("");
+    let cli_record_fields_by_type = cli_descriptor_record_fields_by_type(unit, &mut interner, &mut types);
+    let empty_textus = interner.intern("");
     let diagnostics = DiagnosticSymbols {
-        format_templates: [
-            unit.interner.intern("§"),
-            unit.interner.intern("§ §"),
-            unit.interner.intern("§ § §"),
-        ],
-        separator: unit.interner.intern(" "),
-        nihil: unit.interner.intern("nihil"),
-        lockstep_length_mismatch: unit
-            .interner
-            .intern("itera lockstep sources must have equal length"),
+        format_templates: [interner.intern("§"), interner.intern("§ §"), interner.intern("§ § §")],
+        separator: interner.intern(" "),
+        nihil: interner.intern("nihil"),
+        lockstep_length_mismatch: interner.intern("itera lockstep sources must have equal length"),
     };
     let mut lowerer = MirLowerer {
         unit,
+        types: &types,
+        interner: &interner,
         options: MirLoweringOptions { cli_record_fields_by_type, ..options },
         empty_textus,
         diagnostics,
@@ -362,14 +382,18 @@ pub fn lower_analyzed_unit(
         let functions = std::mem::take(&mut lowerer.functions);
         let closure_environments = std::mem::take(&mut lowerer.closure_environments);
         let device_function_metadata = std::mem::take(&mut lowerer.device_function_metadata);
-        let interner = lowerer.unit.interner.clone();
+        let lowering_interner = interner.clone();
         drop(lowerer);
         let mut program = MirProgram { functions };
-        // Shape substitution interns concrete shapes/types into the type
-        // arena, which requires `&mut unit.types` — unavailable while the
-        // lowerer's immutable unit borrow is alive. Finalize runs now.
-        let finalize_errors =
-            monomorphize::finalize_monomorphized_shapes(unit, &mut program.functions, &monomorphizations);
+        // Shape substitution interns the concrete shapes/types each instance
+        // carries into the lowering-owned arena before layouts and validation
+        // read them back.
+        let finalize_errors = monomorphize::finalize_monomorphized_shapes(
+            &unit.hir,
+            &mut types,
+            &mut program.functions,
+            &monomorphizations,
+        );
         if !finalize_errors.is_empty() {
             return Err(finalize_errors);
         }
@@ -381,20 +405,19 @@ pub fn lower_analyzed_unit(
         // DFV2-4: launch entries are the public `@ nucleum` sources — the
         // only device functions that stay program symbols when device code
         // also calls them; composed private helpers are pruned.
-        let launch_entries = crate::mir::device_entry_roles_from_hir(&unit.hir, &unit.interner)
+        let launch_entries = crate::mir::device_entry_roles_from_hir(&unit.hir, &interner)
             .into_iter()
             .filter(|(_, role)| *role == crate::mir::MirDeviceRole::Kernel)
             .map(|(source, _)| source)
             .collect::<FxHashSet<_>>();
-        let layouts = MirLayoutTable::from_types(&unit.types);
+        let layouts = MirLayoutTable::from_types(&types);
         let summaries =
-            crate::semantic::passes::fragment_definition::check(&unit.hir, &unit.resolver, &unit.types, &unit.interner)
-                .summaries;
+            crate::semantic::passes::fragment_definition::check(&unit.hir, &unit.resolver, &types, &interner).summaries;
         let instantiation_errors = super::fragment_instantiation::check_with_metadata(
             &program.functions,
             &monomorphizations,
             &layouts,
-            &unit.types,
+            &types,
             &roles,
             Some(&summaries),
             &device_function_metadata,
@@ -416,7 +439,7 @@ pub fn lower_analyzed_unit(
             &roles,
             &device_function_metadata,
             super::fragment_composition::active_budget(),
-            Some(&unit.interner),
+            Some(&interner),
             &launch_entries,
         );
         if !composition_errors.is_empty() {
@@ -436,11 +459,20 @@ pub fn lower_analyzed_unit(
         let imported_device_routes = maps.take_imported_device_routes();
         let mut validation = maps.validation;
         align_function_signatures_with_mir_params(&mut validation, &program.functions);
-        validation.layouts = MirLayoutTable::from_types(&unit.types);
+        validation.layouts = MirLayoutTable::from_types(&types);
         validation.closure_environments = closure_environments
             .iter()
             .map(|environment| (environment.id, environment.clone()))
             .collect();
+        // The escaping context resolves MIR symbols through the lowering-owned
+        // interner clone — it carries the runtime/diagnostic symbols this
+        // lowering interned (format templates, the lockstep panic text), which
+        // the analyzed unit's interner no longer gains by mutation.
+        validation.interner = radix_mir::MirInterner::Owned(std::sync::Arc::new(interner.clone()));
+        // Ownership hand-off: the validation token takes the lowering-owned
+        // arena, so the returned unit carries its own table and borrows
+        // nothing from the lowering call itself.
+        let validation = validation.with_owned_types(types);
         let validated = ValidatedMir::new(program, validation).map_err(|errors| {
             errors
                 .into_iter()
@@ -448,7 +480,7 @@ pub fn lower_analyzed_unit(
                 .collect::<Vec<_>>()
         })?;
         Ok(LoweredMirUnit {
-            interner,
+            interner: lowering_interner,
             monomorphizations,
             closure_environments,
             device_function_metadata,
@@ -503,7 +535,9 @@ pub fn prepare_mir_lowering_interner(interner: &mut Interner) {
 /// command surfaces that share a binding name (e.g. `cli/cli.fab` entry and
 /// `greet` both bind `args`) from colliding.
 fn cli_descriptor_record_fields_by_type(
-    unit: &mut AnalyzedModule,
+    unit: &AnalyzedModule,
+    interner: &mut Interner,
+    types: &mut TypeTable,
 ) -> Arc<FxHashMap<TypeId, Vec<MirRuntimeRecordField>>> {
     let Some(cli) = unit.cli_program.as_ref() else {
         return Arc::new(FxHashMap::default());
@@ -511,8 +545,8 @@ fn cli_descriptor_record_fields_by_type(
     let mut fields_by_type = FxHashMap::default();
     if let Some(entry_ty) = cli_entry_args_type(unit) {
         let fields = cli_descriptor_record_fields(
-            &mut unit.interner,
-            &mut unit.types,
+            interner,
+            types,
             cli.global_options.iter().chain(cli.options.iter()),
             cli.global_operands.iter().chain(cli.operands.iter()),
         );
@@ -526,8 +560,8 @@ fn cli_descriptor_record_fields_by_type(
             continue;
         };
         let fields = cli_descriptor_record_fields(
-            &mut unit.interner,
-            &mut unit.types,
+            interner,
+            types,
             cli.global_options.iter().chain(command.options.iter()),
             cli.global_operands.iter().chain(command.operands.iter()),
         );
@@ -669,7 +703,7 @@ fn cli_type_zero_operand(interner: &mut Interner, ty: &CliType) -> MirOperand {
 /// # Errors
 /// Returns `MirError` values for unsupported HIR surfaces, missing semantic
 /// types, sealed-block misuse, and post-lowering validation failures.
-pub fn dump_analyzed_unit(unit: &mut AnalyzedModule) -> Result<String, Vec<MirError>> {
+pub fn dump_analyzed_unit(unit: &AnalyzedModule) -> Result<String, Vec<MirError>> {
     lower_analyzed_unit(unit, MirLoweringOptions::default()).map(|lowered| dump_program(lowered.validated.program()))
 }
 
@@ -798,6 +832,13 @@ struct DiagnosticSymbols {
 
 struct MirLowerer<'a> {
     unit: &'a AnalyzedModule,
+    /// Lowering-owned extension arena (a per-call clone of `unit.types` that
+    /// this lowering alone extends). Every type read during the walk goes
+    /// through this table so synthesized shapes resolve like analyzed ones.
+    types: &'a TypeTable,
+    /// Lowering-owned interner clone: same law as [`Self::types`] for the
+    /// runtime/diagnostic symbols lowering interns.
+    interner: &'a Interner,
     options: MirLoweringOptions,
     empty_textus: Symbol,
     diagnostics: DiagnosticSymbols,
@@ -929,7 +970,7 @@ impl<'a> MirLowerer<'a> {
                 .push(MirError::missing_type(method.span, "method return type"));
             return;
         };
-        let Some(receiver_ty) = self.unit.types.find_struct(struct_item.def_id) else {
+        let Some(receiver_ty) = self.types.find_struct(struct_item.def_id) else {
             self.errors
                 .push(MirError::missing_type(method.span, "method receiver type"));
             return;
@@ -1007,7 +1048,7 @@ impl<'a> MirLowerer<'a> {
                     identity: MirSyntheticFunctionIdentity { parent: parent_function_id, ordinal: 0 },
                     role,
                     shader_stage,
-                    visibility: if is_public_entry(annotations, &self.unit.interner) {
+                    visibility: if is_public_entry(annotations, self.interner) {
                         MirFunctionVisibility::Public
                     } else {
                         MirFunctionVisibility::Private
@@ -1042,7 +1083,7 @@ impl<'a> MirLowerer<'a> {
     /// is named explicitly.
     fn builder_context(&self, body_ctx: &BodyLoweringContext<'_, 'a>) -> FunctionBuilderContext<'a> {
         body_ctx.context_maps.builder_context(
-            &self.unit.interner,
+            self.interner,
             body_ctx.empty_textus,
             body_ctx.diagnostics,
             Arc::clone(&body_ctx.struct_fields),
@@ -1070,7 +1111,7 @@ impl<'a> MirLowerer<'a> {
             CallableLoweringTarget::Method { method, .. } => shader_stage_for_function(&method.func),
         };
         let mut builder = FunctionBuilder::for_function(
-            &self.unit.types,
+            self.types,
             config.error_ty,
             context,
             config.parent_function_id,
@@ -1086,7 +1127,7 @@ impl<'a> MirLowerer<'a> {
                 for param in &function.params {
                     builder.add_param(param.def_id, param.name, param.ty, param.mode, param.span);
                 }
-                let explicit_lane = lane_binding_local(function, config.annotations, &self.unit.interner);
+                let explicit_lane = lane_binding_local(function, config.annotations, self.interner);
                 if let Some((def_id, name, ty, span)) = explicit_lane {
                     builder.add_lane_param(def_id, name, ty, span);
                 }
@@ -1107,7 +1148,7 @@ impl<'a> MirLowerer<'a> {
                     builder.add_param(param.def_id, param.name, param.ty, param.mode, param.span);
                 }
                 if let Some((def_id, name, ty, span)) =
-                    lane_binding_local(&method.func, config.annotations, &self.unit.interner)
+                    lane_binding_local(&method.func, config.annotations, self.interner)
                 {
                     builder.add_lane_param(def_id, name, ty, span);
                 }
@@ -1147,7 +1188,7 @@ impl<'a> MirLowerer<'a> {
     /// stays target-neutral and unsupported entry contents fail through the same
     /// diagnostics as unsupported function contents.
     fn lower_entry(&mut self, entry: &HirBlock, body_ctx: &BodyLoweringContext<'_, '_>) {
-        let vacuum = self.unit.types.primitive(Primitive::Vacuum);
+        let vacuum = self.types.primitive(Primitive::Vacuum);
         let context = self.builder_context(body_ctx);
         #[expect(
             clippy::cast_possible_truncation,
@@ -1155,8 +1196,7 @@ impl<'a> MirLowerer<'a> {
         )]
         let parent_function_id = MirFunctionId(self.functions.len() as u32);
         let (locals, temps, blocks, errors, synthetics, closure_environments, device_function_metadata) = {
-            let mut builder =
-                FunctionBuilder::for_function(&self.unit.types, None, context, parent_function_id, None, None);
+            let mut builder = FunctionBuilder::for_function(self.types, None, context, parent_function_id, None, None);
             let entry_block = builder.fresh_block(entry.span);
             builder.switch_to(entry_block);
             let mut consts_lowered = true;

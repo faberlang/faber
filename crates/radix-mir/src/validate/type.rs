@@ -111,9 +111,14 @@ impl Validator<'_, '_> {
                     .copied()
                     .zip(type_args.into_iter().map(MirType::semantic))
                     .collect::<MirGenericBindings>();
-                instantiate_existing_generic_type(self.context.types, raw_field_ty, &bindings, span)
-                    .map_err(|error| self.error(error.span, error.message))
-                    .ok()
+                instantiate_existing_generic_type(
+                    self.context.types.as_table(),
+                    raw_field_ty,
+                    &bindings,
+                    span,
+                )
+                .map_err(|error| self.error(error.span, error.message))
+                .ok()
             }
             Type::Map(key, value) => {
                 self.require_assignable(
@@ -212,7 +217,7 @@ impl Validator<'_, '_> {
             self.error(span, "matrix cell projection base is not matrix");
             return None;
         };
-        match crate::matrix_shape::literal_matrix_shape(shape, self.context.types) {
+        match crate::matrix_shape::literal_matrix_shape(shape, self.context.types.as_table()) {
             Some((rows, columns)) if row < rows && column < columns => {
                 Some(MirType::semantic(element))
             }
@@ -232,7 +237,7 @@ impl Validator<'_, '_> {
         base_ty: MirType,
         field: Symbol,
     ) -> bool {
-        let Some(interner) = self.context.interner else {
+        let Some(interner) = self.context.interner.as_interner() else {
             return false;
         };
         if interner.resolve(field) != crate::HANDLER_MESSAGE_FIELD {
@@ -337,7 +342,8 @@ impl Validator<'_, '_> {
                         "bounded buffer index is not numerus",
                     );
                 }
-                match crate::ty::index_projection_result_ty(base_ty, self.context.types) {
+                match crate::ty::index_projection_result_ty(base_ty, self.context.types.as_table())
+                {
                     Ok(ty) => Some(ty),
                     Err(error) => {
                         self.error(span, error.message);
@@ -415,7 +421,8 @@ impl Validator<'_, '_> {
                         "octeti index is not numerus",
                     );
                 }
-                match crate::ty::index_projection_result_ty(base_ty, self.context.types) {
+                match crate::ty::index_projection_result_ty(base_ty, self.context.types.as_table())
+                {
                     Ok(ty) => Some(ty),
                     Err(error) => {
                         self.error(span, error.message);

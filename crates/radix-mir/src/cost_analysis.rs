@@ -419,7 +419,7 @@ pub struct CostFunctionRollup {
 /// hot tag. Package `Definition` calls and `Provider` runtime calls are U.
 #[must_use]
 pub fn cost_sites(validated: &ValidatedMir<'_>) -> Vec<CostSite> {
-    let types = validated.validation().types;
+    let types = validated.validation().types.as_table();
     let mut sites = Vec::new();
     for function in &validated.program().functions {
         let hot_blocks = loop_member_blocks(function);

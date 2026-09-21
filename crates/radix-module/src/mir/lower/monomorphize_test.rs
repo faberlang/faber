@@ -148,7 +148,7 @@ functio add_tensors<magnitudo B, magnitudo D>(tensor<f32, [B, D]> a, tensor<f32,
         key: MirMonomorphizationKey { source, type_args: Vec::new(), shape_args: vec![lit2, lit8] },
         function: MirFunctionId(0),
     };
-    let errors = finalize_monomorphized_shapes(&mut unit, &mut functions, &[monomorphization]);
+    let errors = finalize_monomorphized_shapes(&unit.hir, &mut unit.types, &mut functions, &[monomorphization]);
     assert!(errors.is_empty(), "concrete shape args must finalize cleanly: {errors:?}");
 
     // Every shape-size scalar rewrote to the concrete Float representation
@@ -203,7 +203,7 @@ functio add_tensors<magnitudo B, magnitudo D>(tensor<f32, [B, D]> a, tensor<f32,
         key: MirMonomorphizationKey { source, type_args: Vec::new(), shape_args: vec![lit2, lit8] },
         function: MirFunctionId(0),
     };
-    let errors = finalize_monomorphized_shapes(&mut unit, &mut functions, &[monomorphization]);
+    let errors = finalize_monomorphized_shapes(&unit.hir, &mut unit.types, &mut functions, &[monomorphization]);
     assert_eq!(errors.len(), 1, "one stable survivor diagnostic: {errors:?}");
     assert_eq!(
         errors[0].issue, "invalid_mir_unresolved_shape_size_constant_survives_monomorphization",
@@ -236,7 +236,8 @@ functio add_tensors<magnitudo B, magnitudo D>(tensor<f32, [B, D]> a, tensor<f32,
     // Missing binding for `D`: the key carries only one of two shape args.
     let mut functions = vec![shape_size_instance(symbolic_shape, source)];
     let errors = finalize_monomorphized_shapes(
-        &mut unit,
+        &unit.hir,
+        &mut unit.types,
         &mut functions,
         &[MirMonomorphization {
             key: MirMonomorphizationKey { source, type_args: Vec::new(), shape_args: vec![lit2] },
@@ -253,7 +254,8 @@ functio add_tensors<magnitudo B, magnitudo D>(tensor<f32, [B, D]> a, tensor<f32,
     // never fold to a concrete dimension.
     let mut functions = vec![shape_size_instance(symbolic_shape, source)];
     let errors = finalize_monomorphized_shapes(
-        &mut unit,
+        &unit.hir,
+        &mut unit.types,
         &mut functions,
         &[MirMonomorphization {
             key: MirMonomorphizationKey { source, type_args: Vec::new(), shape_args: vec![infer_shape, lit2] },
@@ -285,7 +287,8 @@ fn assert_unbound_shape_size_survivor(surface: &str, source_text: &str, function
     let symbolic_shape = unit.types.intern_index(IndexExpr::Tuple(shape_dims));
     let mut functions = vec![shape_size_instance(symbolic_shape, source)];
     let errors = finalize_monomorphized_shapes(
-        &mut unit,
+        &unit.hir,
+        &mut unit.types,
         &mut functions,
         &[MirMonomorphization {
             key: MirMonomorphizationKey {

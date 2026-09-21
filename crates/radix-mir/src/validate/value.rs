@@ -443,7 +443,12 @@ impl Validator<'_, '_> {
                     generic_bindings,
                     shape_bindings,
                     span,
-                    call_argument_mismatch(self.context.types, index, expected.ty, arg_ty),
+                    call_argument_mismatch(
+                        self.context.types.as_table(),
+                        index,
+                        expected.ty,
+                        arg_ty,
+                    ),
                 );
                 if let Some(expected_ty) = self.instantiate_generic_type(
                     expected.ty,
@@ -455,7 +460,12 @@ impl Validator<'_, '_> {
                         arg_ty,
                         expected_ty,
                         span,
-                        call_argument_mismatch(self.context.types, index, expected_ty, arg_ty),
+                        call_argument_mismatch(
+                            self.context.types.as_table(),
+                            index,
+                            expected_ty,
+                            arg_ty,
+                        ),
                     );
                 }
             }
@@ -472,7 +482,7 @@ impl Validator<'_, '_> {
         message: impl Into<String>,
     ) {
         if crate::generic::bind_generic_type_witness_with_shapes(
-            self.context.types,
+            self.context.types.as_table(),
             expected,
             actual,
             generic_bindings,
@@ -491,7 +501,7 @@ impl Validator<'_, '_> {
         span: Span,
     ) -> Option<MirType> {
         match crate::generic::instantiate_existing_generic_type_with_shapes(
-            self.context.types,
+            self.context.types.as_table(),
             ty,
             generic_bindings,
             shape_bindings,

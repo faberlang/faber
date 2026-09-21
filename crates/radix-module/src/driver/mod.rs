@@ -1424,22 +1424,119 @@ fn prepare_mir_lowering_interner(analysis: &mut AnalyzedModule) {
     crate::mir::prepare_mir_lowering_interner(&mut analysis.interner);
 }
 
-/// Pre-lowered AIR MIR program and backward-generation snapshots, bundled
-/// for installation after HIR→MIR lowering completes.  Separating preparation
-/// from installation avoids the NLL conflict where `LoweredMirUnit` borrows
-/// `analysis.types` while the backward snapshots still need mutable access
-/// to the type table for gradient-tuple interning.
+/// Pre-lowered AIR MIR program and backward-generation facts, bundled for
+/// installation after HIR→MIR lowering completes. Preparation runs before
+/// lowering because AIR-side pre-interning (gradient tuples, transposed and
+/// broadcast-reduction tensor types) must land in the analyzed unit's table
+/// before lowering clones it into the lowering-owned extension arena;
+/// installation runs after lowering, re-deriving each backward-annotated
+/// primal's metadata from the analyzed unit — lowering holds the unit
+/// immutably now, so there is no borrow conflict to snapshot around.
 #[cfg(feature = "device")]
 pub struct AirBackwardBundle {
     pub air_mir: crate::mir::MirProgram,
     pub air_program: crate::air::AirProgram,
-    pub snapshots: Vec<AirBackwardSnapshot>,
     /// Global `(operand_ty → transposed_ty)` map for MatMul VJP operand
     /// types, merged from every AIR function (annotated primals + unannotated
     /// callees). The reverse-AD transform resolves the transposed type in
     /// O(1) via this map instead of scanning the whole `TypeTable`
     /// (D-BO-M-4-1).
     pub matmul_transpose_types: rustc_hash::FxHashMap<crate::semantic::TypeId, crate::semantic::TypeId>,
+}
+
+/// Backward-annotated primal metadata derived live from the analyzed unit at
+/// the phase that needs it (pre-interning in [`prepare_air_backward_bundle`],
+/// companion installation in [`apply_air_backward_bundle`]).
+#[cfg(feature = "device")]
+struct AirBackwardPrimal {
+    primal_def_id: crate::hir::DefId,
+    companion_def_id: crate::hir::DefId,
+    /// Types of selected differentiable inputs, in parameter declaration order.
+    selected_input_types: Vec<crate::semantic::TypeId>,
+    /// DefIds of selected differentiable input parameters, in declaration order.
+    selected_param_sources: Vec<crate::hir::DefId>,
+    ret_ty: crate::semantic::TypeId,
+    /// Annotated companion name from @ radix backward "name".
+    companion_name: crate::lexer::Symbol,
+    /// The primal is an explicitly device-resident forward kernel (S3-A2,
+    /// placement fact A5): recorded from the primal's HIR device role so the
+    /// companion-aware materializer can join the companion to the same
+    /// `DeviceProgram`.
+    device_resident: bool,
+}
+
+/// Derive the backward-annotated primal metadata from the analyzed unit and
+/// the already-lowered AIR program. Returns an empty `Vec` when no
+/// backward-annotated AIR function meets the same-shape elementwise shape
+/// requirements.
+#[cfg(feature = "device")]
+fn backward_primal_metadata(analysis: &AnalyzedModule, air_program: &crate::air::AirProgram) -> Vec<AirBackwardPrimal> {
+    use crate::hir::HirItemKind;
+
+    let mut primals = Vec::new();
+
+    // Build a lookup from DefId to AirFunction from the already-lowered AIR.
+    let air_functions: rustc_hash::FxHashMap<crate::hir::DefId, &crate::air::AirFunction> = air_program
+        .functions
+        .iter()
+        .map(|f| (f.source, f))
+        .collect();
+
+    for (primal_def_id, backward) in analysis.radix_lanes.iter_backward() {
+        // The primal must have an AIR-lowered function (generic declarations
+        // that never specialized have none).
+        if !air_functions.contains_key(&primal_def_id) {
+            continue;
+        }
+
+        // Get the HIR function for this backward-annotated def.
+        let hir_function = analysis
+            .hir
+            .items
+            .iter()
+            .find(|item| item.def_id == primal_def_id)
+            .and_then(|item| match &item.kind {
+                HirItemKind::Function(f) => Some(f),
+                _ => None,
+            });
+
+        let Some(hir_function) = hir_function else {
+            continue;
+        };
+
+        // Same-shape elementwise requires a return type, at least 1 tensor param.
+        let Some(ret_ty) = hir_function.ret_ty else {
+            continue;
+        };
+        if hir_function.params.is_empty() {
+            continue;
+        }
+
+        // Collect differentiable tensor params dynamically.
+        let mut selected_input_types = Vec::new();
+        let mut selected_param_sources = Vec::new();
+        for param in &hir_function.params {
+            if crate::semantic::tensor_type_directed::is_tensor_type(param.ty, &analysis.types) {
+                selected_input_types.push(param.ty);
+                selected_param_sources.push(param.def_id);
+            }
+        }
+        if selected_input_types.is_empty() {
+            continue;
+        }
+
+        primals.push(AirBackwardPrimal {
+            primal_def_id,
+            companion_def_id: backward.companion_def_id,
+            selected_input_types,
+            selected_param_sources,
+            ret_ty,
+            companion_name: backward.companion_name,
+            device_resident: hir_function.is_kernel,
+        });
+    }
+
+    primals
 }
 
 /// Prepare AIR backward companion data *before* HIR→MIR lowering.
@@ -1501,8 +1598,7 @@ pub fn prepare_air_backward_bundle(
     // Pre-intern transposed tensor types for MatMul operands across ALL
     // functions (annotated primals + unannotated callees) so the reverse-AD
     // transform can resolve them during bottom-up companion generation
-    // (D-BO-M-4-1). This replaces the per-annotated-function call that used
-    // to run inside `prepare_air_backward_snapshots`; covering every function
+    // (D-BO-M-4-1). Covering every function
     // makes MatMul VJP coverage deterministic for unannotated callees that
     // today only succeed when a whole-table scan finds the type by accident.
     // Each function's map merges into one global (operand_ty → transposed_ty)
@@ -1526,21 +1622,29 @@ pub fn prepare_air_backward_bundle(
         crate::air::reverse_ad::ensure_broadcast_reduction_types(function, &mut analysis.types);
     }
 
-    let snapshots = prepare_air_backward_snapshots(analysis, Some(&air_program))?;
+    // Pre-intern types needed by the reverse AD transform: the unit type
+    // (empty tuple) for the residual bundle parameter, then the gradient
+    // tuple for each backward-annotated primal. `transform_reverse_ad` runs
+    // against `&TypeTable` views that cannot intern, so every shape it may
+    // look up must already be in the analyzed table here — lowering then
+    // clones this table into its lowering-owned extension arena, keeping the
+    // interned shapes visible along the whole lowering path.
+    analysis.types.unit();
+    for primal in backward_primal_metadata(analysis, &air_program) {
+        analysis.types.tuple(primal.selected_input_types.clone());
+    }
 
-    Ok(Some(AirBackwardBundle {
-        air_mir,
-        air_program,
-        snapshots,
-        matmul_transpose_types,
-    }))
+    Ok(Some(AirBackwardBundle { air_mir, air_program, matmul_transpose_types }))
 }
 
 /// Install AIR-lane MIR replacements and backward companion functions into
 /// an already-lowered [`LoweredMirUnit`].
 ///
 /// Call this *after* [`lower_analyzed_unit`] (or the CLI-aware
-/// variant) has produced the HIR→MIR program and validation context.
+/// variant) has produced the HIR→MIR program and validation context. The
+/// analyzed unit is read immutably here — lowering no longer borrows it
+/// mutably, so each backward-annotated primal's metadata is derived live
+/// from `analysis` instead of being snapshotted ahead of lowering.
 ///
 /// # Errors
 ///
@@ -1550,6 +1654,7 @@ pub fn prepare_air_backward_bundle(
 pub fn apply_air_backward_bundle<'a>(
     lowered: crate::mir::LoweredMirUnit<'a>,
     bundle: AirBackwardBundle,
+    analysis: &AnalyzedModule,
     no_fuse: bool,
 ) -> Result<crate::mir::LoweredMirUnit<'a>, SpannedCodegenError> {
     use crate::air::reverse_ad_callgraph::generate_companions_bottom_up;
@@ -1565,17 +1670,16 @@ pub fn apply_air_backward_bundle<'a>(
             .map(|function| function.id),
     );
 
-    // Build maps for bottom-up companion generation from the snapshots.
-    let backward_def_ids: Vec<crate::hir::DefId> = bundle.snapshots.iter().map(|s| s.primal_def_id).collect();
+    // Build maps for bottom-up companion generation from the derived primals.
+    let primals = backward_primal_metadata(analysis, &bundle.air_program);
+    let backward_def_ids: Vec<crate::hir::DefId> = primals.iter().map(|s| s.primal_def_id).collect();
 
-    let companion_names: FxHashMap<crate::hir::DefId, crate::lexer::Symbol> = bundle
-        .snapshots
+    let companion_names: FxHashMap<crate::hir::DefId, crate::lexer::Symbol> = primals
         .iter()
         .map(|s| (s.primal_def_id, s.companion_name))
         .collect();
 
-    let predeclared_companions: FxHashMap<crate::hir::DefId, crate::hir::DefId> = bundle
-        .snapshots
+    let predeclared_companions: FxHashMap<crate::hir::DefId, crate::hir::DefId> = primals
         .iter()
         .map(|s| (s.primal_def_id, s.companion_def_id))
         .collect();
@@ -1590,7 +1694,7 @@ pub fn apply_air_backward_bundle<'a>(
         &companion_names,
         &predeclared_companions,
         &mut names,
-        lowered.validated.validation().types,
+        lowered.validated.validation().types.as_table(),
         &bundle.matmul_transpose_types,
         &mut lowered.interner,
     )
@@ -1603,20 +1707,20 @@ pub fn apply_air_backward_bundle<'a>(
         }
     })?;
 
-    // Index annotated companions by primal DefId for snapshot matching.
+    // Index annotated companions by primal DefId for primal matching.
     let annotated_by_primal: FxHashMap<crate::hir::DefId, &crate::air::AirFunction> = {
         // Companions use their own DefId as `source` (not the primal's). Build an
-        // O(1) source→companion map once (BO-D-6), then resolve each snapshot.
+        // O(1) source→companion map once (BO-D-6), then resolve each primal.
         let companions_by_source: FxHashMap<crate::hir::DefId, &crate::air::AirFunction> = generated
             .annotated_companions
             .iter()
             .map(|companion| (companion.source, companion))
             .collect();
         let mut map = FxHashMap::default();
-        for snapshot in &bundle.snapshots {
-            let companion_def_id = snapshot.companion_def_id;
+        for primal in &primals {
+            let companion_def_id = primal.companion_def_id;
             if let Some(&companion) = companions_by_source.get(&companion_def_id) {
-                map.insert(snapshot.primal_def_id, companion);
+                map.insert(primal.primal_def_id, companion);
             }
         }
         map
@@ -1624,10 +1728,10 @@ pub fn apply_air_backward_bundle<'a>(
 
     // For each annotated primal, run the validation/installation chain using the
     // generated companion and the populated callee_info map.
-    for snapshot in &bundle.snapshots {
-        let Some(companion) = annotated_by_primal.get(&snapshot.primal_def_id) else {
+    for primal in &primals {
+        let Some(companion) = annotated_by_primal.get(&primal.primal_def_id) else {
             return Err(SpannedCodegenError {
-                message: format!("companion not found for annotated primal DefId({})", snapshot.primal_def_id.0),
+                message: format!("companion not found for annotated primal DefId({})", primal.primal_def_id.0),
                 args: vec![DiagnosticArg::new("issue", "air_companion_missing_for_primal")],
                 span: None,
             });
@@ -1637,7 +1741,7 @@ pub fn apply_air_backward_bundle<'a>(
         // the lowered unit (the owned carrier), so the device-program
         // constructor can materialize the companion as device kernels.
         let (next, entry) =
-            generate_air_lane_backward_with_companion(snapshot, companion, lowered, &mut fresh_ids, no_fuse)?;
+            generate_air_lane_backward_with_companion(primal, companion, lowered, &mut fresh_ids, no_fuse)?;
         lowered = next;
         // Fail-closed carrier insertion (Stage 3R F4): duplicate or
         // contradictory relation rows for one primal are a hard error, never
@@ -1671,7 +1775,7 @@ pub fn apply_air_backward_bundle<'a>(
             &companion_program,
             &crate::air::AirToMirContext::with_interner_and_types(
                 &lowered.interner,
-                lowered.validated.validation().types,
+                lowered.validated.validation().types.as_table(),
             ),
         )
         .map_err(|errors| {
@@ -1769,18 +1873,20 @@ fn finalize_air_backward_shapes<'a>(
         return Ok(lowered);
     }
 
-    let types = lowered.validated.validation().types;
-    let types = radix_types::TypeTable::from_snapshot(types.snapshot()).map_err(|message| SpannedCodegenError {
-        message: format!("MIR type metadata clone failed: {message}"),
-        args: vec![DiagnosticArg::new("issue", "mir_type_metadata_clone_failed")],
-        span: None,
-    })?;
-    // Generated concrete tuple/index carriers must outlive the returned
-    // `ValidatedMir` token. The analyzed unit owns the original table, but AIR
-    // insertion occurs after lowering has borrowed it immutably. Leak this one
-    // append-only clone for the compilation lifetime rather than teaching
-    // backends to rebuild semantic metadata.
-    let types: &'static mut crate::semantic::TypeTable = Box::leak(Box::new(types));
+    // Clone the token's table once: AIR shape finalization interns the
+    // concrete tuple/index carriers the generated companion instances carry,
+    // and that extension must not write the table the current token still
+    // validates against. The clone is handed back to the re-validated token
+    // as its owned table below, so its lifetime is bounded by the token —
+    // no compilation-lifetime leak.
+    let mut types =
+        radix_types::TypeTable::from_snapshot(lowered.validated.validation().types.snapshot()).map_err(|message| {
+            SpannedCodegenError {
+                message: format!("MIR type metadata clone failed: {message}"),
+                args: vec![DiagnosticArg::new("issue", "mir_type_metadata_clone_failed")],
+                span: None,
+            }
+        })?;
     let mut next_ids = FreshMirFunctionIds::after(
         lowered
             .validated
@@ -1795,7 +1901,7 @@ fn finalize_air_backward_shapes<'a>(
     let mut instance_return_types = rustc_hash::FxHashMap::default();
 
     for template in &mut companion_templates {
-        let symbols = companion_shape_symbols(types, template);
+        let symbols = companion_shape_symbols(&types, template);
         for shape_args in &concrete_shapes {
             if symbols.len() != shape_args.len() {
                 continue;
@@ -1805,7 +1911,7 @@ fn finalize_air_backward_shapes<'a>(
                 .copied()
                 .zip(shape_args.iter().copied())
                 .collect::<MirShapeBindings>();
-            let Some(mut instance) = finalize_air_backward_instance(types, template, &bindings) else {
+            let Some(mut instance) = finalize_air_backward_instance(&mut types, template, &bindings) else {
                 continue;
             };
             instance.id = next_ids.next();
@@ -1830,7 +1936,7 @@ fn finalize_air_backward_shapes<'a>(
     let (mut program, validation) = lowered.validated.into_parts();
     rewrite_air_backward_calls(
         &mut program.functions,
-        types,
+        &types,
         &companion_sources,
         &instance_ids,
         &instance_return_types,
@@ -1840,7 +1946,7 @@ fn finalize_air_backward_shapes<'a>(
         .retain(|function| !template_ids.contains(&function.id));
     program.functions.extend(instances);
     reject_shape_size_survivors(&program.functions, UNRESOLVED_SHAPE_SIZE_SURVIVOR)?;
-    let concrete_validation = validation.with_types(types);
+    let concrete_validation = validation.with_owned_types(types);
     lowered.validated = crate::mir::ValidatedMir::new(program, concrete_validation).map_err(|errors| {
         let messages = errors
             .iter()
@@ -2017,7 +2123,7 @@ fn carry_air_backward_templates<'a>(
     // stays in `program` for the standalone route; package instantiation uses
     // this copy as the template and its canonical key discipline.
     let carried = {
-        let types = lowered.validated.validation().types;
+        let types = lowered.validated.validation().types.as_table();
         templates
             .iter()
             .filter_map(|template| {
@@ -2230,7 +2336,7 @@ fn lower_mir_with_context_for_target(
         .map_err(mir_errors_to_spanned)?;
     #[cfg(feature = "device")]
     if let Some(bundle) = bundle {
-        lowered = apply_air_backward_bundle(lowered, bundle, no_fuse)?;
+        lowered = apply_air_backward_bundle(lowered, bundle, analysis, no_fuse)?;
         // Re-construct the proof token after backward companions were added.
         let (program, context) = lowered.validated.into_parts();
         lowered.validated = crate::mir::ValidatedMir::new(program, context).map_err(|errors| {
@@ -2327,124 +2433,6 @@ fn replace_air_lane_mir<'a>(
         })
 }
 
-/// Snapshot of a backward-annotated function's metadata, captured before MIR
-/// lowering borrows `analysis`. This avoids the NLL conflict where
-/// `LoweredMirUnit` holds a reference to `analysis.types` through
-/// `MirValidationContext`.
-#[cfg(feature = "device")]
-pub struct AirBackwardSnapshot {
-    pub primal_def_id: crate::hir::DefId,
-    pub companion_def_id: crate::hir::DefId,
-    /// Types of selected differentiable inputs, in parameter declaration order.
-    pub selected_input_types: Vec<crate::semantic::TypeId>,
-    /// DefIds of selected differentiable input parameters, in declaration order.
-    pub selected_param_sources: Vec<crate::hir::DefId>,
-    pub ret_ty: crate::semantic::TypeId,
-    /// The already-lowered primal AirFunction for reverse AD transform.
-    pub air_function: crate::air::AirFunction,
-    /// Annotated companion name from @ radix backward "name".
-    pub companion_name: crate::lexer::Symbol,
-    /// The primal is an explicitly device-resident forward kernel (S3-A2,
-    /// placement fact A5): recorded from the primal's HIR device role so the
-    /// companion-aware materializer can join the companion to the same
-    /// `DeviceProgram`.
-    pub device_resident: bool,
-}
-
-/// Pre-extract backward-generation data from `analysis` for every
-/// backward-annotated function before lowering consumes the mutable borrow.
-/// Returns an empty `Vec` when no backward-annotated AIR function meets the
-/// same-shape elementwise shape requirements.
-///
-/// Stage 2 replaces the Stage 1 hardcoded "first AIR-lane function" lookup
-/// with metadata-driven iteration over all `@ radix backward "name"` annotated
-/// functions.
-#[cfg(feature = "device")]
-fn prepare_air_backward_snapshots(
-    analysis: &mut AnalyzedModule,
-    air_program: Option<&crate::air::AirProgram>,
-) -> Result<Vec<AirBackwardSnapshot>, codegen::CodegenError> {
-    use crate::hir::HirItemKind;
-
-    let mut snapshots = Vec::new();
-
-    // Pre-intern types needed by the reverse AD transform.
-    // Unit type (empty tuple) for the residual bundle parameter.
-    analysis.types.unit();
-    // The gradient tuple for each snapshot will be interned below.
-
-    // Build a lookup from DefId to AirFunction from the already-lowered AIR.
-    let air_functions: rustc_hash::FxHashMap<crate::hir::DefId, &crate::air::AirFunction> =
-        if let Some(air_program) = air_program {
-            air_program
-                .functions
-                .iter()
-                .map(|f| (f.source, f))
-                .collect()
-        } else {
-            rustc_hash::FxHashMap::default()
-        };
-
-    for (primal_def_id, backward) in analysis.radix_lanes.iter_backward() {
-        // Look up the AirFunction by primal DefId.
-        let Some(air_function) = air_functions.get(&primal_def_id).copied() else {
-            continue;
-        };
-
-        // Get the HIR function for this backward-annotated def.
-        let hir_function = analysis
-            .hir
-            .items
-            .iter()
-            .find(|item| item.def_id == primal_def_id)
-            .and_then(|item| match &item.kind {
-                HirItemKind::Function(f) => Some(f),
-                _ => None,
-            });
-
-        let Some(hir_function) = hir_function else {
-            continue;
-        };
-
-        // Same-shape elementwise requires a return type, at least 1 tensor param.
-        let Some(ret_ty) = hir_function.ret_ty else {
-            continue;
-        };
-        if hir_function.params.is_empty() {
-            continue;
-        }
-
-        // Collect differentiable tensor params dynamically.
-        let mut selected_input_types = Vec::new();
-        let mut selected_param_sources = Vec::new();
-        for param in &hir_function.params {
-            if crate::semantic::tensor_type_directed::is_tensor_type(param.ty, &analysis.types) {
-                selected_input_types.push(param.ty);
-                selected_param_sources.push(param.def_id);
-            }
-        }
-        if selected_input_types.is_empty() {
-            continue;
-        }
-
-        // Pre-intern the gradient tuple type for the reverse AD transform.
-        analysis.types.tuple(selected_input_types.clone());
-
-        snapshots.push(AirBackwardSnapshot {
-            primal_def_id,
-            companion_def_id: backward.companion_def_id,
-            selected_input_types,
-            selected_param_sources,
-            ret_ty,
-            air_function: air_function.clone(),
-            companion_name: backward.companion_name,
-            device_resident: hir_function.is_kernel,
-        });
-    }
-
-    Ok(snapshots)
-}
-
 /// Accepts a pre-built companion (from [`generate_companions_bottom_up`])
 /// and runs the validation/installation chain instead of calling
 /// [`transform_reverse_ad`] directly.
@@ -2454,7 +2442,7 @@ fn prepare_air_backward_snapshots(
 /// and needs no callee map of its own.
 #[cfg(feature = "device")]
 fn generate_air_lane_backward_with_companion<'a>(
-    snapshot: &AirBackwardSnapshot,
+    primal: &AirBackwardPrimal,
     companion: crate::air::AirFunction,
     lowered: crate::mir::LoweredMirUnit<'a>,
     fresh_ids: &mut FreshMirFunctionIds,
@@ -2467,7 +2455,7 @@ fn generate_air_lane_backward_with_companion<'a>(
         validate_generated_backward_to_mir_from_function, validate_mir_backward_result_contract,
     };
 
-    let types_ref = lowered.validated.validation().types;
+    let types_ref = lowered.validated.validation().types.as_table();
 
     // Run fusion pass on the companion body (unless disabled).
     use crate::air::fusion::{FusionTable, fuse_companion};
@@ -2487,11 +2475,11 @@ fn generate_air_lane_backward_with_companion<'a>(
         },
     };
 
-    // Build selected inputs dynamically from the snapshot.
-    let selected_inputs: Vec<AirCompanionSelectedInput> = snapshot
+    // Build selected inputs dynamically from the derived primal metadata.
+    let selected_inputs: Vec<AirCompanionSelectedInput> = primal
         .selected_param_sources
         .iter()
-        .zip(snapshot.selected_input_types.iter())
+        .zip(primal.selected_input_types.iter())
         .enumerate()
         .map(|(position, (&source, &ty))| AirCompanionSelectedInput {
             source,
@@ -2503,12 +2491,11 @@ fn generate_air_lane_backward_with_companion<'a>(
     let selected_inputs: &'static [AirCompanionSelectedInput] = selected_inputs.leak();
 
     let selected_outputs: &'static [AirCompanionSelectedOutput] =
-        vec![AirCompanionSelectedOutput { position: 0, ty: snapshot.ret_ty, upstream_gradient_ty: snapshot.ret_ty }]
-            .leak();
+        vec![AirCompanionSelectedOutput { position: 0, ty: primal.ret_ty, upstream_gradient_ty: primal.ret_ty }].leak();
 
     let relation = AirCompanionRelation {
-        primal: snapshot.primal_def_id,
-        companion: snapshot.companion_def_id,
+        primal: primal.primal_def_id,
+        companion: primal.companion_def_id,
         derivative: AirCompanionDerivativeKind::ReverseModeVjp,
         selected_inputs,
         selected_outputs,
@@ -2588,12 +2575,12 @@ fn generate_air_lane_backward_with_companion<'a>(
         })
         .collect();
     let selected_outputs: Vec<MirCompanionSelectedOutput> =
-        vec![MirCompanionSelectedOutput { position: 0, ty: snapshot.ret_ty, upstream_gradient_ty: snapshot.ret_ty }];
+        vec![MirCompanionSelectedOutput { position: 0, ty: primal.ret_ty, upstream_gradient_ty: primal.ret_ty }];
     let entry = LosslessMirCompanionEntry {
-        primal: snapshot.primal_def_id,
-        companion: snapshot.companion_def_id,
+        primal: primal.primal_def_id,
+        companion: primal.companion_def_id,
         derivative: MirCompanionDerivativeKind::ReverseModeVjp,
-        device_resident: snapshot.device_resident,
+        device_resident: primal.device_resident,
         selected_inputs,
         selected_outputs,
     };

@@ -121,7 +121,7 @@ fn sibling_generic_kernel_registers_with_ordered_use_site_bindings() {
 
             // Ordered bindings from the use site: M, K, N = 2, 2, 2 in
             // declaration order.
-            let types = lowered.validated.validation().types;
+            let types = lowered.validated.validation().types.as_table();
             let shapes = registration
                 .key
                 .shape_args

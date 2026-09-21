@@ -209,7 +209,7 @@ fn literal_dims(
 }
 
 fn instantiated_param_shape(lowered: &LoweredMirUnit<'_>, function_name: &str) -> Option<Vec<i64>> {
-    let types = lowered.validated.validation().types;
+    let types = lowered.validated.validation().types.as_table();
     lowered
         .validated
         .program()

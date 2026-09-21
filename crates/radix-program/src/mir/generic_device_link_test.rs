@@ -122,7 +122,7 @@ fn package_mir_registers_imported_device_instances() {
                 "imported generic device instances must register for the compiling package"
             );
 
-            let types = lowered.validated.validation().types;
+            let types = lowered.validated.validation().types.as_table();
             let registration_of = |verb: &str| {
                 lowered
                     .imported_device_registrations

@@ -262,7 +262,7 @@ pub(super) fn run_fmir_package_image<H: Host + ?Sized>(
         &image.diagnostic_path,
     )?;
     let mut validation = radix_module::mir::MirValidationContext::new(&types);
-    validation.interner = Some(&interner);
+    validation.interner = radix_module::mir::MirInterner::Borrowed(&interner);
     apply_validation_metadata(&mut validation, &image.validation);
     let validated = radix_module::mir::ValidatedMir::new(image.program.clone(), validation)
         .map_err(|errors| {
@@ -314,7 +314,7 @@ pub(super) fn run_fmir_package_image_with_stats<H: Host + ?Sized>(
         &image.diagnostic_path,
     )?;
     let mut validation = radix_module::mir::MirValidationContext::new(&types);
-    validation.interner = Some(&interner);
+    validation.interner = radix_module::mir::MirInterner::Borrowed(&interner);
     apply_validation_metadata(&mut validation, &image.validation);
     let validated = radix_module::mir::ValidatedMir::new(image.program.clone(), validation)
         .map_err(|errors| {
@@ -358,6 +358,7 @@ pub(super) fn snapshot_context(lowered: &LoweredMirUnit<'_>) -> (TypeTableSnapsh
             .validated
             .validation()
             .interner
+            .as_interner()
             .map(|interner| interner.strings().to_vec())
             .unwrap_or_default(),
     )

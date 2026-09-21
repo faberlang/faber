@@ -613,7 +613,7 @@ fn tensor_literal_dims(ty: MirType, validation: &MirValidationContext<'_>) -> Op
     let Type::Tensor(_, shape) = validation.types.get(ty.semantic_id()) else {
         return None;
     };
-    i64s_from_literal_index(*shape, validation.types)
+    i64s_from_literal_index(*shape, validation.types.as_table())
 }
 
 /// The element type of a tensor type.

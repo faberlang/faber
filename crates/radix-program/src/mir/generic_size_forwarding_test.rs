@@ -70,7 +70,7 @@ fn named_function_shapes<'a>(
     lowered: &'a LoweredMirUnit<'_>,
     function_name: &str,
 ) -> Vec<(Option<Vec<i64>>, Option<Vec<i64>>)> {
-    let types = lowered.validated.validation().types;
+    let types = lowered.validated.validation().types.as_table();
     lowered
         .validated
         .program()

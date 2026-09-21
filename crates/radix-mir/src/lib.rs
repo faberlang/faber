@@ -225,9 +225,9 @@ pub use ty::{
 };
 pub use validate::{
     INTEGER_PAYLOAD_I64_SENTINEL, INTEGER_PAYLOAD_U8_SENTINEL, INTEGER_PAYLOAD_U64_SENTINEL,
-    MirEnumRepresentation, MirFunctionSignature, MirParamSignature, MirScalarValueDomain,
-    MirValidationContext, MirValidationError, ValidatedMir, validate_program,
-    validate_program_with_device_roles,
+    MirEnumRepresentation, MirFunctionSignature, MirInterner, MirParamSignature,
+    MirScalarValueDomain, MirTypeTable, MirValidationContext, MirValidationError, ValidatedMir,
+    validate_program, validate_program_with_device_roles,
 };
 pub use visit::{
     terminator_successors, walk_operand, walk_place, walk_stmt, walk_terminator, walk_value,
