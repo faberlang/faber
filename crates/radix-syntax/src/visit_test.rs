@@ -1,4 +1,4 @@
-use super::{MAX_VISIT_DEPTH, Visitor, walk_expr, walk_stmt, walk_type_expr};
+use super::{DepthExceeded, MAX_VISIT_DEPTH, Visitor, walk_expr, walk_stmt, walk_type_expr};
 use crate::TypeFormLevel;
 use crate::{AstMutability, ExField, PathPattern};
 use crate::{
@@ -27,8 +27,8 @@ impl DepthProbe {
 }
 
 impl Visitor for DepthProbe {
-    fn on_depth_exceeded(&mut self, depth: usize) {
-        self.exceeded_at = Some(depth);
+    fn on_depth_exceeded(&mut self, exceeded: DepthExceeded) {
+        self.exceeded_at = Some(exceeded.depth);
     }
 
     fn visit_expr(&mut self, expr: &Expr) {
@@ -157,17 +157,72 @@ fn type_expr_at_max_depth_succeeds() {
     assert_eq!(probe.type_visits, MAX_VISIT_DEPTH + 1);
 }
 
+/// Default hook: a walk past [`MAX_VISIT_DEPTH`] stops descending and returns
+/// cleanly, so the depth limit can never abort the process.
 #[test]
-fn default_on_depth_exceeded_panics() {
-    struct PanicVisitor;
-    impl Visitor for PanicVisitor {}
+fn default_on_depth_exceeded_stops_descending() {
+    struct DefaultVisitor {
+        exprs: usize,
+        visited_spine_foot: bool,
+    }
+
+    impl Visitor for DefaultVisitor {
+        fn visit_expr(&mut self, expr: &Expr) {
+            self.exprs += 1;
+            // The spine foot is the one node below the limit: `deep_binary_chain`
+            // gives it id 0 and buries it `depth` levels down.
+            self.visited_spine_foot |= expr.id == 0;
+            walk_expr(self, expr);
+        }
+    }
+
+    let expr = deep_binary_chain(MAX_VISIT_DEPTH + 8);
+    let mut visitor = DefaultVisitor {
+        exprs: 0,
+        visited_spine_foot: false,
+    };
+    visitor.visit_expr(&expr);
+
+    // Walked the spine down to the limit, then stopped instead of panicking.
+    assert!(visitor.exprs > MAX_VISIT_DEPTH, "walk must reach the limit");
+    assert!(
+        !visitor.visited_spine_foot,
+        "the walk must stop at the limit, not descend past it"
+    );
+    // Each admitted level contributes the spine node plus its rhs leaf.
+    assert!(
+        visitor.exprs <= 2 * (MAX_VISIT_DEPTH + 2),
+        "walk must not expand past the limit, got {} visits",
+        visitor.exprs
+    );
+}
+
+/// The default hook reports the limit it stopped at.
+#[test]
+fn default_on_depth_exceeded_reports_the_limit() {
+    struct DepthReport {
+        exceeded: Option<(usize, usize)>,
+    }
+
+    impl Visitor for DepthReport {
+        fn on_depth_exceeded(&mut self, exceeded: DepthExceeded) {
+            self.exceeded = Some((exceeded.depth, exceeded.limit));
+        }
+
+        fn visit_expr(&mut self, expr: &Expr) {
+            walk_expr(self, expr);
+        }
+    }
 
     let expr = deep_binary_chain(MAX_VISIT_DEPTH + 1);
-    let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-        let mut v = PanicVisitor;
-        v.visit_expr(&expr);
-    }));
-    assert!(result.is_err(), "default on_depth_exceeded must panic");
+    let mut visitor = DepthReport { exceeded: None };
+    visitor.visit_expr(&expr);
+
+    assert_eq!(
+        visitor.exceeded,
+        Some((MAX_VISIT_DEPTH + 1, MAX_VISIT_DEPTH)),
+        "the hook must report the depth and the limit that stopped the walk"
+    );
 }
 
 fn test_ident(sym: u32) -> Ident {
