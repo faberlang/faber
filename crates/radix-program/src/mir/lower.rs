@@ -682,6 +682,114 @@ mod tests {
             Some(&dtype_error_dest)
         );
     }
+
+    #[test]
+    fn rewrite_lowered_type_ids_applies_remapped_validation_off_rewritten_keys() {
+        // Full production path for dtype.fab: the sibling unit's context goes
+        // through rewrite_lowered_type_ids, which must move source-local keys
+        // BEFORE remapped.apply. Source-local DTypeError.UnknownName still
+        // occupies DefId 4116 with commune `message`, and the consumer's
+        // DType.I32 remaps onto 4116; apply runs or_insert, so unrewritten
+        // keys leave message on the unit-variant slot.
+        let i32_source = DefId(4100);
+        let unknown_name_source = DefId(4116);
+        let i32_dest = DefId(4116);
+        let unknown_name_dest = DefId(4119);
+        let dtype = DefId(4096);
+        let dtype_error = DefId(4115);
+        let dtype_dest = DefId(4112);
+        let dtype_error_dest = DefId(4118);
+
+        let types = TypeTable::new();
+        let text = types.primitive(Primitive::Textus);
+        let mut source = radix_module::mir::MirValidationContext::new(&types);
+        let mut interner = Interner::new();
+        let message = interner.intern("message");
+        source.variant_fields.entry(i32_source).or_default();
+        source
+            .variant_fields
+            .entry(unknown_name_source)
+            .or_default()
+            .insert(message, MirType::semantic(text));
+        source.variant_parents.insert(i32_source, dtype);
+        source
+            .variant_parents
+            .insert(unknown_name_source, dtype_error);
+        source.enum_variants.insert(dtype, vec![i32_source]);
+        source
+            .enum_variants
+            .insert(dtype_error, vec![unknown_name_source]);
+
+        let validated = radix_module::mir::ValidatedMir::new(MirProgram::new(), source.clone())
+            .expect("sibling dtype unit validates before the rewrite");
+        let lowered = LoweredMirUnit {
+            interner: Interner::new(),
+            monomorphizations: Vec::new(),
+            closure_environments: Vec::new(),
+            device_function_metadata: MirDeviceFunctionMetadataMap::default(),
+            generic_templates: Vec::new(),
+            generic_params: Vec::new(),
+            validated,
+            companions: Default::default(),
+            imported_device_routes: Default::default(),
+            imported_device_registrations: Vec::new(),
+        };
+
+        let mut variant_remap = HashMap::new();
+        variant_remap.insert(i32_source, i32_dest);
+        variant_remap.insert(unknown_name_source, unknown_name_dest);
+        let mut struct_remap = HashMap::new();
+        struct_remap.insert(dtype, dtype_dest);
+        struct_remap.insert(dtype_error, dtype_error_dest);
+
+        let mut entry_interner = Interner::new();
+        let remapped = collect_remapped_validation(
+            &source,
+            &interner,
+            &mut entry_interner,
+            &[],
+            &struct_remap,
+            &variant_remap,
+            &HashMap::new(),
+            &types,
+            &SourceRewrites::new(),
+            Path::new("dtype.fab"),
+        );
+
+        let rewritten = rewrite_lowered_type_ids(
+            lowered,
+            &[],
+            &types,
+            &variant_remap,
+            &struct_remap,
+            &remapped,
+            Path::new("dtype.fab"),
+        )
+        .expect("rewrite + remapped.apply must revalidate the sibling unit");
+
+        let validation = rewritten.validated.validation();
+        let i32_fields = validation
+            .variant_fields
+            .get(&i32_dest)
+            .expect("remapped DType.I32 keeps a field slot");
+        assert!(
+            !i32_fields.contains_key(&message),
+            "commune message must not land on the remapped unit-variant dest through rewrite + apply"
+        );
+        assert_eq!(
+            validation
+                .variant_fields
+                .get(&unknown_name_dest)
+                .map(|fields| fields.contains_key(&message)),
+            Some(true),
+            "DTypeError.UnknownName must keep message at its remapped dest"
+        );
+        assert_eq!(validation.variant_parents.get(&i32_dest), Some(&dtype_dest));
+        assert_eq!(
+            validation.variant_parents.get(&unknown_name_dest),
+            Some(&dtype_error_dest)
+        );
+    }
 }
 
 pub(super) fn lower_package_units<'a>(
