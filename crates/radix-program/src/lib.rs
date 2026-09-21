@@ -44,12 +44,6 @@ pub mod wasm;
 #[cfg(all(test, feature = "package-mir"))]
 pub(crate) mod test_support;
 
-pub use radix_module::program::{
-    FABER_LIBRARY_HOME_ENV, PreparedProgramModule, analyze_prepared_program_name,
-    analyze_prepared_program_path, compile_prepared_program_path, find_package_root, library_home,
-    package_identity_facts_for_path, prepare_program_module, prepare_program_module_for_name,
-};
-
 pub(crate) const MANIFEST_FILE: &str = "faber.toml";
 
 /// One loaded package source file.

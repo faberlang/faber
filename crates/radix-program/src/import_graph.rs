@@ -488,7 +488,7 @@ fn is_self_package_interface(spec: &PackageSpec, interface: &Path) -> bool {
     // Prefix match is not package identity: a stdlib/library checkout nested
     // under the consumer directory has its own `faber.toml` and must stay a
     // library (Latin identity fallback), not a consumer-locale local unit.
-    match crate::find_package_root(&interface) {
+    match radix_module::program::find_package_root(&interface) {
         Some(root) => normalize_path(&root) == normalize_path(&spec.package_root),
         None => true,
     }

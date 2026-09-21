@@ -593,7 +593,7 @@ fn single_file_rust_runtime_plan(
     input_path: &Path,
 ) -> Result<super::RustRuntimePlan, Vec<radix::module::Diagnostic>> {
     use radix::module::driver::Session;
-    use radix::services::analyze_prepared_program_path;
+    use radix::program::analyze_prepared_program_path;
     use std::fs;
 
     let source = fs::read_to_string(input_path).map_err(|err| {

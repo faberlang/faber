@@ -64,11 +64,9 @@ pub mod program {
 /// Admitted typed services: values + diagnostics, no printing or process exit.
 pub mod services {
     pub use radix_module::program::{
-        PreparedProgramModule, analyze_prepared_program_name, analyze_prepared_program_path,
         compile_cli_input, compile_cli_input_with_locale_pack,
         compile_cli_input_with_locale_pack_explicit, compile_cli_path,
-        compile_cli_path_with_locale_pack, package_identity_facts_for_path, prepare_program_module,
-        prepare_program_module_for_name, resolve_package_mode, should_treat_as_package,
+        compile_cli_path_with_locale_pack, resolve_package_mode, should_treat_as_package,
     };
     pub use radix_module::services::{
         BuildCommand, CheckCommand, CheckDiagnosticsResult, DiagnosticMode, EmitCommand,
