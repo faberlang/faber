@@ -548,16 +548,25 @@ impl LocalePack {
         let Some(template) = self.diagnostics.get(code) else {
             return Ok(None);
         };
-        let template = issue_arg(&diagnostic.args)
-            .and_then(|issue| template.issues.get(issue))
-            .unwrap_or(template);
+        // A missing issue row must stay observable: silently rendering the
+        // base row is how the LEX004 homoglyph prose was lost (DEF S14-1).
+        let (template, missing_issue) = match issue_arg(&diagnostic.args) {
+            Some(issue) => match template.issues.get(issue) {
+                Some(row) => (row, None),
+                None => (template, Some(issue)),
+            },
+            None => (template, None),
+        };
 
-        let message = self.render_template(
+        let mut message = self.render_template(
             code,
             TemplateField::Message,
             &template.message,
             &diagnostic.args,
         )?;
+        if let Some(issue) = missing_issue {
+            message.push_str(&format!(" [locale pack missing row: {code}.{issue}]"));
+        }
         let help = template
             .help
             .as_ref()

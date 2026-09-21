@@ -112,6 +112,21 @@ fn embedded_nonlatin_pack_resolves_diagnostic_issue_structurally() {
 }
 
 #[test]
+fn embedded_default_pack_resolves_lex004_homoglyph_did_you_mean() {
+    let explanation = lookup_embedded_diagnostic("LEX004.homoglyph_did_you_mean", None)
+        .expect("embedded lookup should not fail")
+        .expect("LEX004.homoglyph_did_you_mean should resolve in the default pack");
+
+    assert_eq!(explanation.code, "LEX004");
+    assert_eq!(explanation.issue.as_deref(), Some("homoglyph_did_you_mean"));
+    assert!(
+        explanation.message.contains("did you mean"),
+        "explanation must carry the did-you-mean prose: {:?}",
+        explanation.message
+    );
+}
+
+#[test]
 fn diagnostic_plain_render_exposes_lookup_contract() {
     let pack = synthetic_pack();
     let explanation = lookup_diagnostic_in_pack("SEM010.initializer_annotation_mismatch", &pack)

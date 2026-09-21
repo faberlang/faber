@@ -283,6 +283,10 @@ help = "ลบอักขระนี้ หรือ escape หากต้อ
 message = "พบอักขระที่ไม่คาดคิด: {char}"
 help = "ลบอักขระนี้ หรือ escape หากต้องการให้เป็นลิเทอรัล"
 
+[diagnostics.LEX004.issues.homoglyph_did_you_mean]
+message = "พบอักขระที่ไม่คาดคิด: '{char}'; หมายถึง '{suggestion}' หรือไม่"
+help = "แทนที่ '{char}' ด้วยการสะกดมาตรฐาน '{suggestion}'"
+
 [diagnostics.LEX006]
 message = "ไวยากรณ์คอมเมนต์ไม่ถูกต้อง"
 help = "ขึ้นต้นคอมเมนต์ด้วย # แทน // หรือ /* */"

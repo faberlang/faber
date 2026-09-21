@@ -498,6 +498,10 @@ help = "remove the character or escape it if it should be literal"
 message = "unexpected character: {char}"
 help = "remove the character or escape it if it should be literal"
 
+[diagnostics.LEX004.issues.homoglyph_did_you_mean]
+message = "unexpected character: '{char}'; did you mean '{suggestion}'?"
+help = "replace '{char}' with the canonical spelling '{suggestion}'"
+
 [diagnostics.LEX006]
 message = "invalid comment syntax"
 help = "prefix comments with # instead of // or /* */"

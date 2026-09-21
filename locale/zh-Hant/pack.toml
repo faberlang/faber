@@ -283,6 +283,10 @@ help = "刪除該字元，或在需要作為字面值時進行跳脫"
 message = "非預期字元：{char}"
 help = "刪除該字元，或在需要作為字面值時進行跳脫"
 
+[diagnostics.LEX004.issues.homoglyph_did_you_mean]
+message = "非預期字元：'{char}'；你是想輸入 '{suggestion}' 嗎？"
+help = "請將 '{char}' 替換為規範寫法 '{suggestion}'"
+
 [diagnostics.LEX006]
 message = "無效註解語法"
 help = "註解請以 # 開頭，而不是 // 或 /* */"

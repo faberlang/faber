@@ -283,6 +283,10 @@ help = "删除该字符，或在需要作为字面量时进行转义"
 message = "意外字符：{char}"
 help = "删除该字符，或在需要作为字面量时进行转义"
 
+[diagnostics.LEX004.issues.homoglyph_did_you_mean]
+message = "意外字符：'{char}'；你是想输入 '{suggestion}' 吗？"
+help = "请将 '{char}' 替换为规范写法 '{suggestion}'"
+
 [diagnostics.LEX006]
 message = "无效注释语法"
 help = "注释请加 # 前缀，而不是 // 或 /* */"

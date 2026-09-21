@@ -283,6 +283,10 @@ help = "xóa ký tự này hoặc escape nếu cần dùng như ký tự literal
 message = "ký tự không mong đợi: {char}"
 help = "xóa ký tự này hoặc escape nếu cần dùng như ký tự literal"
 
+[diagnostics.LEX004.issues.homoglyph_did_you_mean]
+message = "ký tự không mong đợi: '{char}'; có phải bạn ý là '{suggestion}' không?"
+help = "thay '{char}' bằng chính tả chuẩn '{suggestion}'"
+
 [diagnostics.LEX006]
 message = "cú pháp comment không hợp lệ"
 help = "đặt # trước comment thay cho // hoặc /* */"

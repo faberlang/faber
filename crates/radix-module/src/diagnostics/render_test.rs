@@ -241,6 +241,135 @@ exemplars = ["./exemplars/salve-munde.fab"]
     );
 }
 
+/// The issue row owns the prose; the base row is only for code-only diagnostics.
+#[test]
+fn render_with_pack_uses_issue_row_when_present() {
+    let pack = LocalePack::from_toml_str(
+        r#"
+[pack]
+id = "la-test"
+fallback = ["la"]
+
+[diagnostics.LEX004]
+message = "unexpected character"
+help = "remove the character"
+
+[diagnostics.LEX004.issues.homoglyph_did_you_mean]
+message = "unexpected character: '{char}'; did you mean '{suggestion}'?"
+help = "replace '{char}' with the canonical spelling '{suggestion}'"
+
+[llm]
+system_prompt_snippet = "emit Latin Faber"
+exemplars = ["./exemplars/salve-munde.fab"]
+"#,
+    )
+    .expect("pack should validate");
+    let diagnostic = Diagnostic::error("unexpected character")
+        .with_phase(DiagnosticPhase::Parse)
+        .with_code("LEX004")
+        .with_args(vec![
+            DiagnosticArg::new("issue", "homoglyph_did_you_mean"),
+            DiagnosticArg::new("char", "ᵗ"),
+            DiagnosticArg::new("suggestion", "ᵀ"),
+        ]);
+
+    let rendered = pack
+        .render_diagnostic_text(&diagnostic)
+        .expect("issue row should render")
+        .expect("LEX004 template row");
+    assert_eq!(
+        rendered.message,
+        "unexpected character: 'ᵗ'; did you mean 'ᵀ'?"
+    );
+    assert_eq!(
+        rendered.help.as_deref(),
+        Some("replace 'ᵗ' with the canonical spelling 'ᵀ'")
+    );
+}
+
+/// A missing issue row must degrade loudly (DEF S14-1): silently rendering the
+/// base row is how the shipped homoglyph prose became invisible.
+#[test]
+fn render_with_pack_names_missing_issue_row_instead_of_silent_base_fallback() {
+    let pack = LocalePack::from_toml_str(
+        r#"
+[pack]
+id = "la-test"
+fallback = ["la"]
+
+[diagnostics.LEX004]
+message = "unexpected character"
+help = "remove the character"
+
+[llm]
+system_prompt_snippet = "emit Latin Faber"
+exemplars = ["./exemplars/salve-munde.fab"]
+"#,
+    )
+    .expect("pack should validate");
+    let diagnostic = Diagnostic::error("unexpected character")
+        .with_phase(DiagnosticPhase::Parse)
+        .with_code("LEX004")
+        .with_args(vec![
+            DiagnosticArg::new("issue", "homoglyph_did_you_mean"),
+            DiagnosticArg::new("char", "ᵗ"),
+            DiagnosticArg::new("suggestion", "ᵀ"),
+        ]);
+
+    let rendered = pack
+        .render_diagnostic_text(&diagnostic)
+        .expect("base row should render")
+        .expect("LEX004 template row");
+    assert!(
+        rendered.message.contains("LEX004.homoglyph_did_you_mean"),
+        "missing issue row must be named in the rendered message: {:?}",
+        rendered.message
+    );
+    assert!(
+        !rendered.message.contains("did you mean"),
+        "base row must not masquerade as issue prose: {:?}",
+        rendered.message
+    );
+}
+
+/// Every installed reader pack carries the LEX004 homoglyph did-you-mean row
+/// and renders it with the emitted `{char}`/`{suggestion}` facts.
+#[test]
+fn every_installed_pack_renders_homoglyph_did_you_mean() {
+    const INSTALLED_LOCALES: &[&str] =
+        &["en", "la", "ar", "hi", "th-TH", "vi", "zh-Hans", "zh-Hant"];
+    let diagnostic = Diagnostic::error("unexpected character")
+        .with_phase(DiagnosticPhase::Parse)
+        .with_code("LEX004")
+        .with_args(vec![
+            DiagnosticArg::new("issue", "homoglyph_did_you_mean"),
+            DiagnosticArg::new("char", "ᵗ"),
+            DiagnosticArg::new("suggestion", "ᵀ"),
+        ]);
+
+    for locale in INSTALLED_LOCALES {
+        let source = std::fs::read_to_string(crate::locale::workspace_locale_pack_path(locale))
+            .unwrap_or_else(|err| panic!("read installed {locale} pack: {err:?}"));
+        let pack = LocalePack::from_toml_str(&source)
+            .unwrap_or_else(|err| panic!("installed {locale} pack should parse: {err:?}"));
+
+        let rendered = pack
+            .render_diagnostic_text(&diagnostic)
+            .unwrap_or_else(|err| panic!("{locale} LEX004 should render: {err:?}"))
+            .expect("LEX004 template row");
+        assert!(
+            rendered.message.contains("'ᵗ'") && rendered.message.contains("'ᵀ'"),
+            "{locale} LEX004 homoglyph_did_you_mean must name the char and the canonical suggestion: {:?}",
+            rendered.message
+        );
+        assert!(
+            !rendered.message.contains("missing row"),
+            "{locale} must carry the homoglyph_did_you_mean row: {:?}",
+            rendered.message
+        );
+    }
+}
+
 fn token_pack() -> LocalePack {
     LocalePack::from_toml_str(
         r#"
