@@ -209,8 +209,10 @@ pub struct LayerNormalizationPlan {
 /// Row-gather recipe plan (GI3-1: name frozen in this unit, S6-N1
 /// precedent). The typed facts resolve from the `TensorGather` statement:
 /// the rank-2 `[V, D]` table dims and the id-vector length `T` (the output
-/// `[T, D]` row count, resolved from the statement's return-type dims — the
-/// ids' literal values were statically validated at the source surface).
+/// `[T, D]` row count, resolved from the statement's return-type dims). The
+/// CCI-1 source contract validated the ids' *literal* values only, so the
+/// emitted body bounds-checks the runtime token against `table_rows`
+/// (SEC-G1).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct GatherPlan {
     /// Table rows `V` (the first axis of `token_embd.weight` for the

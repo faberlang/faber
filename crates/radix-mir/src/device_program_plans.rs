@@ -3211,8 +3211,9 @@ pub fn transformer_shape_signature(
     // GI3-1: the row-gather recipe binds its id vector as the signature's
     // first extra input (binding 1, the kernel-index element type) at the
     // id count resolved from the return-type dims; the output moves to
-    // binding 2. The ids' literal values were statically validated at the
-    // source surface — the count is a typed fact, never inferred.
+    // binding 2. The CCI-1 contract validated the ids' literal values only
+    // — the count is a typed fact, never inferred — and the emitted body
+    // bounds-checks the runtime token against the table row count (SEC-G1).
     if op == MirCollectionOp::TensorGather {
         let ids_local = gather_ids_local(function).ok_or_else(|| {
             PlanMappingError::mapping(
@@ -3271,13 +3272,13 @@ fn gather_id_count(
 }
 
 /// The id vector's device element type (GI3-1): the ids are a
-/// `lista<numerus>` whose literal values were statically validated as
-/// non-negative at the source surface, so the device buffer binds at the
-/// kernel `numerus<u32>` index layout (the ABI's index surface) — resolved
-/// read-only via [`radix_types::TypeTable::find_sized_numeric`] (the "GPU
-/// builtin registry interns numerus<u32>" precedent). A non-numerus ids
-/// element, or a table without the canonical index layout, stays fail-closed
-/// with a typed diagnostic.
+/// `lista<numerus>` bound at the kernel `numerus<u32>` index layout (the
+/// ABI's index surface) — resolved read-only via
+/// [`radix_types::TypeTable::find_sized_numeric`] (the "GPU builtin registry
+/// interns numerus<u32>" precedent). The ids' values are runtime tokens; the
+/// emitted body bounds-checks each against the table row count (SEC-G1). A
+/// non-numerus ids element, or a table without the canonical index layout,
+/// stays fail-closed with a typed diagnostic.
 fn gather_ids_element_ty(
     ids_ty: MirType,
     validation: &MirValidationContext<'_>,

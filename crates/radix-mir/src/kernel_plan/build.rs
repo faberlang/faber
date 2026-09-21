@@ -1417,9 +1417,10 @@ fn const_non_negative(operand: &MirOperand) -> Option<u64> {
 /// The `TensorGather` recipe facts (GI3-1): the rank-2 `[V, D]` table dims
 /// and the id-vector length `T`. `T` resolves from the gather statement's
 /// return-type dims (`[T, D]`, the shape-transforming result of the CCI-1
-/// source contract) divided by the table row width — the ids' literal
-/// values were statically validated at the source surface, so the plan
-/// carries the count as a typed fact, never inferred from text (A3).
+/// source contract) divided by the table row width — the CCI-1 contract
+/// validated the ids' *literal* values only, so the plan carries the count
+/// as a typed fact, never inferred from text (A3); the emitted body
+/// bounds-checks the runtime token against the table row count (SEC-G1).
 /// `None` when the table is not rank-2, the return shape is not `[T, D]`,
 /// or the width does not divide evenly.
 fn gather_recipe_facts(
