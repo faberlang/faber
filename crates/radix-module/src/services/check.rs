@@ -162,6 +162,12 @@ fn collect_locale_diagnostics(
             .iter()
             .map(|suggestion| crate::diagnostics::Diagnostic::from_locale_suggestion(name, source, suggestion)),
     );
+    diagnostics.extend(
+        lex_result
+            .mixed_script_advisories
+            .iter()
+            .map(|advisory| crate::diagnostics::Diagnostic::from_mixed_script_advisory(name, source, advisory)),
+    );
 }
 
 fn collect_lex_diagnostics(

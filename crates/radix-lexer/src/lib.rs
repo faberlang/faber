@@ -196,6 +196,9 @@ pub struct LexResult {
     /// Non-fatal reader-locale spelling suggestions collected while scanning.
     pub locale_suggestions: Vec<LocaleSuggestion>,
 
+    /// Non-fatal mixed-script identifier advisories collected while scanning.
+    pub mixed_script_advisories: Vec<MixedScriptAdvisory>,
+
     /// Exact source spelling → Latin contextual keyword identity, for parser-owned slots.
     pub reader_keyword_latin_keys: HashMap<String, String>,
 
@@ -264,5 +267,24 @@ pub struct LocaleSuggestion {
     pub suggestion: String,
 
     /// Byte span of the misspelled source spelling in the original source.
+    pub span: Span,
+}
+
+/// One identifier whose visible characters span two or more Unicode scripts.
+///
+/// The screen only observes the NFKC-normalized text (S-A5): the token still
+/// lexes as a normal identifier, so no compile that succeeds today can start
+/// failing. The defect addressed is silence — a Cyrillic `а` beside Latin
+/// `dd` now produces this advisory instead of passing unnoticed.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct MixedScriptAdvisory {
+    /// NFKC-normalized identifier text that triggered the advisory.
+    pub spelling: String,
+
+    /// Distinct visible script names, sorted; at least two. Common/Inherited
+    /// characters (digits, `_`, combining marks) are excluded.
+    pub scripts: Vec<String>,
+
+    /// Byte span of the identifier in the original source.
     pub span: Span,
 }

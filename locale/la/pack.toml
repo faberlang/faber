@@ -221,6 +221,10 @@ help = "use '{suggestion}' if you meant that keyword; '{spelling}' is a valid na
 message = "unknown or invalid reader locale '{locale_id}' in frontmatter"
 help = "check the locale id is a valid reader locale directory name under the standard library reader path"
 
+[diagnostics.LOCALE004]
+message = "identifier '{identifier}' mixes scripts: {scripts}"
+help = "check for look-alike characters from another alphabet; the name is accepted as written"
+
 [diagnostics.LEX001]
 message = "unterminated string literal"
 help = "close the string literal before the end of the line or file"

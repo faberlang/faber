@@ -215,6 +215,10 @@ help = "dùng chính tả thành viên được khai báo trong gói đọc cho 
 message = "gói đọc '{pack}' thấy cách viết giống từ khóa '{spelling}'"
 help = "dùng '{suggestion}' nếu bạn muốn từ khóa đó; '{spelling}' vẫn là tên hợp lệ như đã viết"
 
+[diagnostics.LOCALE004]
+message = "định danh '{identifier}' trộn nhiều hệ chữ viết: {scripts}"
+help = "kiểm tra ký tự có hình dạng giống từ bảng chữ khác; tên vẫn hợp lệ như đã viết"
+
 [diagnostics.LEX001]
 message = "literal chuỗi chưa được kết thúc"
 help = "đóng literal chuỗi trước cuối dòng hoặc tệp"

@@ -104,6 +104,7 @@ pub fn all_diagnostic_specs() -> Vec<DiagnosticSpec> {
         radix_diagnostics::unresolved_library_member_spec(),
         radix_diagnostics::locale_suggestion_spec(),
         radix_diagnostics::locale_unknown_spec(),
+        radix_diagnostics::mixed_script_identifier_spec(),
     ];
     specs.extend(
         catalog_syntax::LEX_ERROR_KINDS

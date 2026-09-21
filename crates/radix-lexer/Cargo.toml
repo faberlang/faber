@@ -12,6 +12,7 @@ rustc-hash = "2"
 serde = { version = "1.0.228", features = ["derive"] }
 unicode-ident = "1"
 unicode-normalization = "0.1"
+unicode-script = "0.5"
 
 [lints]
 workspace = true

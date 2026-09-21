@@ -215,6 +215,10 @@ help = "为此库标识使用读者语言包中声明的成员拼写"
 message = "读者语言包 {pack} 发现类似关键字的写法 {spelling}"
 help = "若本意是关键字请使用 {suggestion}；{spelling} 按原样是合法名称"
 
+[diagnostics.LOCALE004]
+message = "标识符 {identifier} 混用了多种文字：{scripts}"
+help = "请检查是否有来自其他字母体系的形近字符；该名称按原样仍然合法"
+
 [diagnostics.LEX001]
 message = "未闭合字符串字面量"
 help = "在行尾或文件结束前闭合字符串字面量"
