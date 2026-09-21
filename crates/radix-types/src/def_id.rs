@@ -120,4 +120,4 @@ const _: () = assert!(HIR_SYNTHETIC_DEF_ID_BASE < CLOSURE_LIFT_DEF_ID_BASE);
 const _: () = assert!(CLOSURE_LIFT_DEF_ID_BASE < PACKAGE_MIR_SYNTHETIC_DEF_BASE);
 const _: () = assert!(PACKAGE_MIR_SYNTHETIC_DEF_BASE < PROVIDER_DEF_ID_BASE);
 const _: () = assert!(PROVIDER_DEF_ID_BASE < COMPANION_DEF_ID_FLAG);
-const _: () = assert!(COMPANION_DEF_ID_FLAG.count_ones() == 1);
+const _: () = assert!(COMPANION_DEF_ID_FLAG.is_power_of_two());

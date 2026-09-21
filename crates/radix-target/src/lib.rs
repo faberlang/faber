@@ -174,11 +174,11 @@ impl Target {
             Target::MirLlvm | Target::MirLlvmHost => Some("mir-llvm"),
             // Ungated variants, named (no `_`) so a future variant without
             // arms here is a compile error, never a silent `None`.
-            Target::MirStepper => None,
-            Target::MirScena => None,
-            Target::MirFmir => None,
-            Target::MirFmirBinary => None,
-            Target::MirFmirBundle => None,
+            Target::MirStepper
+            | Target::MirScena
+            | Target::MirFmir
+            | Target::MirFmirBinary
+            | Target::MirFmirBundle => None,
         }
     }
 
@@ -205,11 +205,11 @@ impl Target {
             Target::MirLlvm | Target::MirLlvmHost => cfg!(feature = "mir-llvm"),
             // Ungated variants, named (no `_`) so a future variant without
             // arms here is a compile error, never a silent `true`.
-            Target::MirStepper => true,
-            Target::MirScena => true,
-            Target::MirFmir => true,
-            Target::MirFmirBinary => true,
-            Target::MirFmirBundle => true,
+            Target::MirStepper
+            | Target::MirScena
+            | Target::MirFmir
+            | Target::MirFmirBinary
+            | Target::MirFmirBundle => true,
         }
     }
 }
