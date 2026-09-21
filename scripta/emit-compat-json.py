@@ -26,8 +26,10 @@ Env:
 
 The freshness gate (scripta/check-compat-json-freshness, wired into
 check-measurement-gates / stage 4a) regenerates to a temp root and runs the
-class-aware diff. Additive measurement deltas are recorded and pass; capability
-regressions fail. Commit regenerated JSON when the measured baseline is meant
+class-aware diff. Equality with the committed record is the only state
+reported fresh; additive drift fails by default (recorded only under an
+explicit --accept) and capability regressions always fail. Commit the
+regenerated JSON in the same change when the measured baseline is meant
 to move.
 """
 
