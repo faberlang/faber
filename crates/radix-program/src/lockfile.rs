@@ -42,6 +42,12 @@ pub struct LockedPackage {
     #[serde(rename = "crate")]
     pub crate_name: String,
     pub rustc: String,
+    /// SHA-256 over the installed package snapshot (see the `faber.lock`
+    /// contract); absent for locks written before the field existed. A
+    /// present value must be 64 lowercase hexadecimal characters and is
+    /// rejected with `locked_content_sha256_malformed` otherwise.
+    #[serde(default)]
+    pub content_sha256: Option<String>,
 }
 
 impl LockedPackage {
@@ -112,7 +118,8 @@ pub fn read_lock(package_root: &Path) -> Result<Option<FaberLock>, Box<Diagnosti
 
 /// Index locked packages by name.
 /// # Errors
-/// Returns an error when the input or persisted artifact is invalid.
+/// Returns an error when the input or persisted artifact is invalid, a
+/// package name is duplicated, or a `content_sha256` value is malformed.
 pub fn lock_index(
     lock_path: &Path,
     lock: &FaberLock,
@@ -131,12 +138,34 @@ pub fn lock_index(
                 .with_arg("package", package.name.clone()),
             );
         }
+        if let Some(digest) = &package.content_sha256
+            && !is_canonical_sha256(digest)
+        {
+            diagnostics.push(
+                package_diagnostic_error(format!(
+                    "{LOCK_FILE} package `{}` has malformed `content_sha256` `{digest}`; expected 64 lowercase hexadecimal characters",
+                    package.name
+                ))
+                .with_file(lock_path.display().to_string())
+                .with_arg("issue", "locked_content_sha256_malformed")
+                .with_arg("package", package.name.clone()),
+            );
+        }
     }
     if diagnostics.is_empty() {
         Ok(map)
     } else {
         Err(diagnostics)
     }
+}
+
+/// `content_sha256` shape per the `faber.lock` contract: exactly 64
+/// lowercase hexadecimal characters.
+fn is_canonical_sha256(value: &str) -> bool {
+    value.len() == 64
+        && value
+            .bytes()
+            .all(|byte| matches!(byte, b'0'..=b'9' | b'a'..=b'f'))
 }
 
 /// Validate that declared exact dependencies are present in the lock with matching versions
