@@ -305,13 +305,11 @@ targets = ["rust"]
     )
     .expect("plain unit");
 
-    let (report, unmatched_include) = super::run_package(
+    let (report, unmatched_include, _metadata) = super::run_package_with_options(
         &Config::default(),
         &root,
-        &TestSelection::default(),
+        &super::TestRunOptions::default(),
         None,
-        None,
-        false,
         false,
         false,
     );
@@ -363,13 +361,11 @@ targets = ["rust"]
     )
     .expect("unsupported unit");
 
-    let (report, unmatched_include) = super::run_package(
+    let (report, unmatched_include, _metadata) = super::run_package_with_options(
         &Config::default(),
         &root,
-        &TestSelection::default(),
+        &super::TestRunOptions::default(),
         None,
-        None,
-        false,
         false,
         false,
     );
