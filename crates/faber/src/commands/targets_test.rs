@@ -132,7 +132,11 @@ fn small_build_reports_only_compiled_capabilities() {
         if r.name == "rust" {
             continue;
         }
-        assert!(!r.available, "{} must not be available in a small build", r.name);
+        assert!(
+            !r.available,
+            "{} must not be available in a small build",
+            r.name
+        );
         assert!(
             !r.capabilities.build && !r.capabilities.run && !r.capabilities.package,
             "{} must claim no build/run/package capability in a small build:\n{}",

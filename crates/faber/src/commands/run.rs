@@ -13,11 +13,11 @@
 //! The `-c` one-liner and `faber repl` are the other runner entry modes.
 
 use crate::cli::{BackendSelection, FmirRunArgs, ReplArgs, RunArgs};
-use faber_cli::input_shape::locale_without_package_error;
-use faber_cli::package;
 use crate::script::{
     interpret_source, interpret_source_or_exit, print_run_source_error, raw_exit_code,
 };
+use faber_cli::input_shape::locale_without_package_error;
+use faber_cli::package;
 use radix::module::diagnostics::Diagnostic;
 use radix::module::mir::StdioHost;
 use radix::program::mir::DeviceSelection;

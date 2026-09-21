@@ -364,9 +364,7 @@ fn discoverable_targets_equal_universe_minus_hidden() {
         .filter(|target| {
             !matches!(
                 target,
-                crate::codegen::Target::MirAmd
-                    | crate::codegen::Target::MirScena
-                    | crate::codegen::Target::MirStepper
+                crate::codegen::Target::MirAmd | crate::codegen::Target::MirScena | crate::codegen::Target::MirStepper
             )
         })
         .collect();
