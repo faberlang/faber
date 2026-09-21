@@ -1003,6 +1003,20 @@ fn fixture_02_binary_payload_round_trips_with_declared_spelling() {
         "fixture-02 content_sha256 recomputes over the DECODED bytes"
     );
     section.artifacts.artifact = vec![artifact];
+    // The metallib's hash-bound parent names the compiler-input sibling
+    // carried in the same section (P3-1): fixture-04's msl packet.
+    let mut parent = metal_artifact(FIXTURE_MSL_TEXT);
+    parent.entrypoints = vec![FmirDeviceSymbol {
+        entry: "scale_kernel".to_owned(),
+        symbol: "scale_kernel".to_owned(),
+    }];
+    let parent = with_computed_digests(parent);
+    assert_eq!(
+        parent.packet_sha256,
+        "sha256:ce6abbcc288b78bb53bae05edd5676f9a634d036195794c99587753434d5470e",
+        "the sibling is fixture-04's compiler-input packet (the recorded parent)"
+    );
+    section.artifacts.artifact.push(parent);
     assert_packet_round_trips(section, 0);
 }
 
@@ -2969,19 +2983,48 @@ fn explicit_selection_without_the_selected_artifact_fails_closed() {
 }
 
 #[test]
-fn finalized_artifact_preserves_parent_provenance() {
+fn finalized_artifact_parent_provenance_is_hash_bound() {
     // DDCP2-U3 / contract §IdentityDomains rule 5: a finalized-binary
     // artifact MUST carry its hash-bound parent compiler_input_packet_sha256
     // (provenance never silently replaced); a compiler-input artifact must
-    // not. Both directions fail closed with the named diagnostic.
+    // not. The parent is verified against the section, not just spelled
+    // (P3-1): it must be the packet_sha256 of the compiler-input sibling the
+    // binary names — a wrong-parent digest, a missing sibling, or no parent
+    // at all fails closed with the named diagnostic.
     let blob = "ptx finalized";
-    let mut section = sample_device_section();
 
-    // Finalized without the parent provenance → fail closed.
+    // The compiler-input sibling the finalized binary names.
+    let parent_input = cuda_artifact(".version 8.7\n.target sm_120\n.entry add() {}\n");
+    let parent_packet = parent_input.packet_sha256.clone();
+
+    // The canonical chain: sibling + finalized naming its packet → admits.
     let mut finalized = cuda_artifact(blob);
     finalized.stage = MaterializationStage::FinalizedBinary;
+    finalized.compiler_input_packet_sha256 = Some(parent_packet.clone());
     finalized.packet_sha256 = finalized.compute_packet_sha256();
-    finalized.compiler_input_packet_sha256 = None;
+    let mut chain = sample_device_section();
+    chain.artifacts.artifact = vec![parent_input.clone(), finalized.clone()];
+    let image = binary_image_with_device(Some(chain));
+    let bytes = encode_binary_image(&image).expect("encode binary image");
+    decode_binary_image(&bytes, TOOLCHAIN)
+        .expect("a finalized binary naming its sibling's packet admits");
+
+    // P3-1 pin: a well-formed `sha256:` parent that is NOT the sibling's
+    // packet digest fails closed — wrongness, not just absence.
+    let mut wrong_parent = finalized.clone();
+    wrong_parent.compiler_input_packet_sha256 = Some(content_sha256(b"an unrelated packet"));
+    wrong_parent.packet_sha256 = wrong_parent.compute_packet_sha256();
+    let mut section = sample_device_section();
+    section.artifacts.artifact = vec![parent_input.clone(), wrong_parent];
+    let image = binary_image_with_device(Some(section));
+    let bytes = encode_binary_image(&image).expect("encode binary image");
+    assert!(matches!(
+        decode_binary_image(&bytes, TOOLCHAIN),
+        Err(FmirImageError::CompilerInputProvenance { backend, .. }) if backend == "cuda"
+    ));
+
+    // A well-formed parent naming NO sibling in the section fails closed.
+    let mut section = sample_device_section();
     section.artifacts.artifact = vec![finalized.clone()];
     let image = binary_image_with_device(Some(section));
     let bytes = encode_binary_image(&image).expect("encode binary image");
@@ -2990,17 +3033,18 @@ fn finalized_artifact_preserves_parent_provenance() {
         Err(FmirImageError::CompilerInputProvenance { backend, .. }) if backend == "cuda"
     ));
 
-    // Finalized WITH the canonical parent provenance → admits cleanly.
-    let mut with_parent = finalized;
-    with_parent.compiler_input_packet_sha256 =
-        Some(content_sha256(b"parent-compiler-input-packet"));
-    with_parent.packet_sha256 = with_parent.compute_packet_sha256();
-    let mut section2 = sample_device_section();
-    section2.artifacts.artifact = vec![with_parent];
-    let image2 = binary_image_with_device(Some(section2));
-    let bytes2 = encode_binary_image(&image2).expect("encode binary image");
-    decode_binary_image(&bytes2, TOOLCHAIN)
-        .expect("finalized artifact with parent provenance admits");
+    // Finalized without the parent provenance → fail closed.
+    let mut finalized = finalized;
+    finalized.compiler_input_packet_sha256 = None;
+    finalized.packet_sha256 = finalized.compute_packet_sha256();
+    let mut section = sample_device_section();
+    section.artifacts.artifact = vec![finalized];
+    let image = binary_image_with_device(Some(section));
+    let bytes = encode_binary_image(&image).expect("encode binary image");
+    assert!(matches!(
+        decode_binary_image(&bytes, TOOLCHAIN),
+        Err(FmirImageError::CompilerInputProvenance { backend, .. }) if backend == "cuda"
+    ));
 }
 
 // ---------------------------------------------------------------------------
