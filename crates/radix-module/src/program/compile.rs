@@ -36,6 +36,14 @@ pub(crate) struct CachedImportTarget {
     /// consumer without a fresh filesystem resolution, which would fail once
     /// the target has been deleted and change the contract across calls.
     target_path: PathBuf,
+    /// Analyzed unit carried for HIR emission (ARCH-U4 / S01-3): the target
+    /// is analyzed once per driver run, right where this entry parses it,
+    /// under the contract codegen needs — backend emission maps over carried
+    /// units instead of re-entering the front half from disk. `None` only in
+    /// the transient window between the parse-memo insert (the recursion
+    /// brake) and the analysis back-patch, and for targets a cyclic import
+    /// re-enters during that window.
+    provider_unit: Option<crate::driver::CarriedProviderUnit>,
 }
 
 /// Memoized outcome for one import target (KPC-WIRE, advisory D2).
@@ -339,6 +347,11 @@ pub(crate) struct ImportContract {
     /// Package roots of resolved `provider:module` imports. Used to load
     /// library-owned `locale/<consumer-locale>/pack.toml` fragments.
     pub(crate) library_package_roots: BTreeSet<PathBuf>,
+    /// Analyzed provider units for this module's direct import edges, keyed
+    /// by import-path spelling (ARCH-U4 / S01-3): carriage for backend
+    /// emission, not a resolver fact — `into_module_contract` leaves it here
+    /// and the program-layer entries move it onto the analyzed output.
+    pub(crate) provider_units: crate::driver::ProviderUnitView,
     /// Fail-closed import-site facts (KPC-WIRE, advisory D2): imported
     /// libraries that resolved and read but did not parse. The binding's
     /// namespace surface stays uninstalled — it stops silently matching — and
@@ -402,6 +415,7 @@ pub fn compile_prepared_program_path(
             crate::driver::ModuleCompileRequest {
                 contract: prepared.contract,
                 package_identities: prepared.package_identities,
+                provider_units: prepared.provider_units,
             },
         ),
         Err(diagnostic) => crate::CompileResult { output: None, diagnostics: vec![*diagnostic] },
@@ -412,6 +426,11 @@ pub struct PreparedProgramModule {
     pub session: crate::driver::Session,
     pub contract: crate::driver::ModuleImportContract,
     pub package_identities: Option<crate::driver::PackageImportIdentities>,
+    /// Analyzed provider units for this module's import edges (ARCH-U4 /
+    /// S01-3): carriage for the analyzed output — the program-layer analysis
+    /// entries install it on the returned unit, and `compile_prepared_*`
+    /// threads it through [`crate::driver::ModuleCompileRequest`].
+    pub provider_units: crate::driver::ProviderUnitView,
 }
 
 /// Build caller-supplied analysis inputs from a real file path.
@@ -462,6 +481,7 @@ pub fn prepare_program_module(
     if let Some(pack) = pack.as_ref() {
         config = config.with_resolved_locale_pack(pack.clone());
     }
+    let provider_units = import.provider_units.clone();
     Ok(PreparedProgramModule {
         // Per-module re-wrap of the caller's session (ARCH-U3): the prepared
         // module's session carries the resolved pack config but shares memo
@@ -473,6 +493,7 @@ pub fn prepare_program_module(
             package_identity_facts_for_parsed_file(session, path, program, interner, pack.as_ref(), templates)
                 .filter(|facts| !facts.imports.is_empty())
         }),
+        provider_units,
     })
 }
 
@@ -495,6 +516,7 @@ pub fn prepare_program_module_for_name(
             session: session.re_wrap(session.config.clone()),
             contract: crate::driver::ModuleImportContract::default(),
             package_identities: None,
+            provider_units: crate::driver::ProviderUnitView::default(),
         })
     }
 }
@@ -511,12 +533,18 @@ pub fn analyze_prepared_program_path(
     source: &str,
 ) -> Result<crate::driver::AnalyzedModule, Vec<crate::Diagnostic>> {
     let prepared = prepare_program_module(path, source, session).map_err(|diagnostic| vec![*diagnostic])?;
-    crate::driver::analyze_source(
-        &prepared.session,
+    let PreparedProgramModule { session: analysis_session, contract, package_identities: _, provider_units } = prepared;
+    let mut unit = crate::driver::analyze_source(
+        &analysis_session,
         &path.display().to_string(),
         source,
-        crate::driver::AnalyzeRequest { cli_program: None, contract: prepared.contract },
-    )
+        crate::driver::AnalyzeRequest { cli_program: None, contract },
+    )?;
+    // Carry the analyzed provider units on the analyzed output (ARCH-U4 /
+    // S01-3): backend emission maps over the view instead of re-entering the
+    // front half from disk.
+    unit.provider_units = provider_units;
+    Ok(unit)
 }
 
 /// Analyze a diagnostic name after program-layer discovery when `name` is a file.
@@ -530,12 +558,17 @@ pub fn analyze_prepared_program_name(
     source: &str,
 ) -> Result<crate::driver::AnalyzedModule, Vec<crate::Diagnostic>> {
     let prepared = prepare_program_module_for_name(name, source, session).map_err(|diagnostic| vec![*diagnostic])?;
-    crate::driver::analyze_source(
-        &prepared.session,
+    let PreparedProgramModule { session: analysis_session, contract, package_identities: _, provider_units } = prepared;
+    let mut unit = crate::driver::analyze_source(
+        &analysis_session,
         name,
         source,
-        crate::driver::AnalyzeRequest { cli_program: None, contract: prepared.contract },
-    )
+        crate::driver::AnalyzeRequest { cli_program: None, contract },
+    )?;
+    // Carry the analyzed provider units on the analyzed output (ARCH-U4 /
+    // S01-3), mirroring `analyze_prepared_program_path`.
+    unit.provider_units = provider_units;
+    Ok(unit)
 }
 
 /// Resolve and parse one import target through the session cache.
@@ -627,16 +660,115 @@ fn cached_import_target(
     let declarations = sorted_declaration_surface(&target_program, &target_interner);
     let module_identity = import_target_identity(import_path, None);
     let interface = file_interface_for_program(&target_program, &target_interner, module_identity.as_ref());
-    let cached = CachedImportTarget { exports, declarations, interface, target_path };
+    let cached =
+        CachedImportTarget { exports, declarations, interface, target_path: target_path.clone(), provider_unit: None };
     {
         let mut cache = session.memos.import_targets.borrow_mut();
         let entry = CachedImportTargetEntry::Parsed(cached.clone());
-        cache.insert(raw_key, entry.clone());
-        if let Some(key) = canonical_key {
+        cache.insert(raw_key.clone(), entry.clone());
+        if let Some(key) = canonical_key.clone() {
             cache.insert(key, entry);
         }
     }
-    ImportTargetLookup::Parsed(cached)
+    // Analyze the target under the contract codegen needs and carry the unit
+    // on this memo entry (ARCH-U4 / S01-3): emission maps over carried units
+    // instead of re-entering the front half from disk at every codegen call.
+    // The parse entry above is inserted first because the analysis re-enters
+    // contract discovery for the target's own imports — a provider import
+    // cycle must hit the memo instead of recursing.
+    let provider_unit = provider_unit_for_target(session, &target_path, &target_source);
+    {
+        let mut cache = session.memos.import_targets.borrow_mut();
+        for key in std::iter::once(raw_key).chain(canonical_key) {
+            if let Some(CachedImportTargetEntry::Parsed(entry)) = cache.get_mut(&key) {
+                entry.provider_unit = Some(provider_unit.clone());
+            }
+        }
+    }
+    ImportTargetLookup::Parsed(CachedImportTarget { provider_unit: Some(provider_unit), ..cached })
+}
+
+/// Analyze one parsed import target under the contract codegen needs
+/// (ARCH-U4 / S01-3): bodyless functions, the dev locale root, and the target
+/// package's `[reader] locale` pack — the exact configuration the Rust
+/// provider-module emitter analyzed under when it re-entered the front half
+/// from disk, aligned rather than forked, so carried emission facts cannot
+/// differ from the analysis-time facts they replace. Failures are carried as
+/// the marker, never propagated: the consumer's compile path does not analyze
+/// providers today and must not start failing on their diagnostics; emission
+/// fails closed on the marker instead.
+fn provider_unit_for_target(
+    session: &crate::driver::Session,
+    target_path: &Path,
+    target_source: &str,
+) -> crate::driver::CarriedProviderUnit {
+    use crate::driver::CarriedProviderUnit;
+
+    let mut config = crate::driver::Config::default()
+        .with_bodyless_functions()
+        .with_dev_locale_root();
+    // The package `[reader] locale` (e.g. tela's `locale = "en"` for
+    // `tela:valida`) is threaded as a non-explicit session pack so an English
+    // provider stays English under an otherwise Latin-default session instead
+    // of failing PARSE001.
+    if let Some(pack) = package_reader_locale_pack(session, target_path) {
+        config = config.with_locale_pack(pack);
+    }
+    // Per-provider re-wrap (ARCH-U3): the provider's analysis session carries
+    // its own contract config but shares the driver run's memo identity, so
+    // the provider's own contract walk reuses the run's parse-once cells.
+    let provider_session = session.re_wrap(config);
+    let name = target_path.display().to_string();
+    let prepared = match prepare_program_module(target_path, target_source, &provider_session) {
+        Ok(prepared) => prepared,
+        Err(diagnostic) => {
+            return CarriedProviderUnit::Failed {
+                message: format!("contract discovery failed: {}", diagnostic.message),
+            };
+        }
+    };
+    let crate::program::PreparedProgramModule {
+        session: analysis_session,
+        contract,
+        provider_units,
+        package_identities: _,
+    } = prepared;
+    let mut unit = match crate::driver::analyze_source(
+        &analysis_session,
+        &name,
+        target_source,
+        crate::driver::AnalyzeRequest { cli_program: None, contract },
+    ) {
+        Ok(unit) => unit,
+        Err(diagnostics) => {
+            return CarriedProviderUnit::Failed {
+                message: format!(
+                    "failed analysis: {}",
+                    diagnostics
+                        .iter()
+                        .map(|diagnostic| diagnostic.message.as_str())
+                        .collect::<Vec<_>>()
+                        .join("; ")
+                ),
+            };
+        }
+    };
+    // The provider's own nested imports ride its carried unit the same way
+    // the consumer's ride its own — the emitter recurses through this view.
+    unit.provider_units = provider_units;
+    // Reduce the analyzed unit to the facts emission maps over. The arenas
+    // move as-is; the shared handle keeps `AnalyzedModule` `Send` (the
+    // `faber test` budget thread sends analyzed programs across a channel).
+    let crate::driver::AnalyzedModule { hir, types, interner, resolver, diagnostics, provider_units: nested, .. } =
+        unit;
+    CarriedProviderUnit::Unit(std::sync::Arc::new(std::sync::Mutex::new(crate::driver::ProviderUnit {
+        hir,
+        types,
+        interner,
+        resolver,
+        diagnostics,
+        nested,
+    })))
 }
 
 /// Build namespace export names and typed file interfaces for a source file's imports.
@@ -748,6 +880,14 @@ pub(crate) fn import_contract_for_parsed_file(
         contract
             .namespace_seams
             .insert(binding.clone(), crate::import_resolve::same_package(session, path, target_path));
+        // Carry the analyzed unit for this edge (ARCH-U4 / S01-3): the walk
+        // is the one place the import-path spelling and the parsed target are
+        // in hand together, and every file-interface binding it installs gets
+        // its carried unit here — HIR emission maps over the view instead of
+        // re-resolving providers from disk at emit time.
+        if let Some(unit) = target.provider_unit.clone() {
+            contract.provider_units.insert(import_path, unit);
+        }
         if import_path.contains(':')
             && let Some(root) = crate::import_resolve::find_package_root_with_session(session, target_path)
         {
