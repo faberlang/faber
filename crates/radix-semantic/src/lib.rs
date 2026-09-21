@@ -89,7 +89,7 @@ pub mod catalog;
 pub mod catalog_semantic;
 pub mod catalog_syntax;
 pub use catalog::{arg_value, quote_arg};
-pub use catalog_semantic::{semantic_message, semantic_spec};
+pub use catalog_semantic::semantic_spec;
 pub use catalog_syntax::{lex_spec, parse_message, parse_spec};
 
 use radix_diagnostics::DiagnosticSpec;

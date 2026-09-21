@@ -23,7 +23,7 @@ pub use radix_diagnostics::{
     unresolved_keyword_spec, unresolved_library_member_spec,
 };
 pub use radix_semantic::{
-    all_diagnostic_specs, arg_value, lex_spec, parse_message, parse_spec, quote_arg, semantic_message, semantic_spec,
+    all_diagnostic_specs, arg_value, lex_spec, parse_message, parse_spec, quote_arg, semantic_spec,
 };
 pub use render::{
     render_diagnostics, render_diagnostics_with_pack, render_expanded, render_expanded_diagnostics,

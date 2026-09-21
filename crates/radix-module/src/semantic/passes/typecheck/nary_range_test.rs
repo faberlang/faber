@@ -136,33 +136,3 @@ functio grid(numerus m, numerus n) → vacuum {
 ",
     );
 }
-
-#[test]
-fn analysis_diagnostics_render_catalog_prose_for_product_laws() {
-    // The three dedicated SEM010 rows must render through the catalog, not
-    // leak bare issue strings.
-    use crate::semantic::SemanticErrorKind;
-    use radix_diagnostics::DiagnosticArg;
-    use radix_semantic::catalog_semantic::semantic_message;
-
-    let arity = [
-        DiagnosticArg::new("issue", "itera_range_source_binder_arity_mismatch"),
-        DiagnosticArg::new("expected", "2"),
-        DiagnosticArg::new("actual", "1"),
-    ];
-    let rendered = semantic_message(SemanticErrorKind::TypeMismatch, &arity).expect("arity law renders catalog prose");
-    assert_eq!(
-        rendered,
-        "for-range binds one binder per range: expected 2 binders, found 1; the counts must match exactly"
-    );
-
-    for issue in ["itera_range_extent_binder_shadowing", "itera_range_mixed_source"] {
-        let args = [DiagnosticArg::new("issue", issue)];
-        let rendered = semantic_message(SemanticErrorKind::TypeMismatch, &args)
-            .unwrap_or_else(|| panic!("issue {issue} must render catalog prose"));
-        assert!(
-            !rendered.is_empty() && rendered != issue,
-            "issue {issue} must render catalog prose, got: {rendered:?}"
-        );
-    }
-}

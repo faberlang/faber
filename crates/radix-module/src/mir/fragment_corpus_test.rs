@@ -13,7 +13,7 @@ use crate::mir::{
     MirBinOp, MirDeviceRole, MirFunction, MirOperand, MirParamMode, MirPlaceBase, MirProgram, MirStatementKind,
     MirValue, MirValueKind, device_roles_from_hir,
 };
-use crate::semantic::SemanticErrorKind;
+use crate::test_support::test_span;
 
 // 5c7541f86 (DIE D-02-04): issue values are lowercase.
 const ISSUE_CONTEXT: &str = "nucleum_fragment_context";
@@ -721,25 +721,26 @@ functio k(fractus<f32> x) → fractus<f32> {
 }
 
 #[test]
-fn catalog_identities_stay_stable() {
-    use crate::diagnostics::{DiagnosticArg, semantic_message};
-    let definition = vec![
-        DiagnosticArg::new("issue", ISSUE_CONTEXT),
-        DiagnosticArg::new("reason", "host_callable"),
-        DiagnosticArg::new("site", "definition"),
-    ];
+fn message_identities_stay_stable() {
+    use crate::diagnostics::DiagnosticArg;
+    use crate::mir::fragment_instantiation::FragmentInstantiationError;
+    let definition = FragmentInstantiationError {
+        issue: ISSUE_CONTEXT,
+        reason: "host_callable",
+        span: test_span(),
+        definition_span: None,
+        args: Vec::new(),
+    };
     assert_eq!(
-        semantic_message(SemanticErrorKind::OperandTypesInvalid, &definition).as_deref(),
-        Some("@ nucleum fragment cannot call a host function or other non-device-safe callable")
+        definition.message(),
+        "@ nucleum fragment cannot call a host function or other non-device-safe callable"
     );
-    let instantiation = vec![
-        DiagnosticArg::new("issue", ISSUE_CONTEXT),
-        DiagnosticArg::new("reason", "host_callable"),
-        DiagnosticArg::new("caller", "host"),
-        DiagnosticArg::new("site", "call"),
-    ];
-    assert_eq!(
-        semantic_message(SemanticErrorKind::OperandTypesInvalid, &instantiation).as_deref(),
-        Some("host code cannot call an @ nucleum fragment")
-    );
+    let instantiation = FragmentInstantiationError {
+        issue: ISSUE_CONTEXT,
+        reason: "host_callable",
+        span: test_span(),
+        definition_span: None,
+        args: vec![DiagnosticArg::new("caller", "host")],
+    };
+    assert_eq!(instantiation.message(), "host code cannot call an @ nucleum fragment");
 }
