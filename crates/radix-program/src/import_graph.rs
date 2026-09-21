@@ -177,7 +177,7 @@ fn import_aliases(spec: &PackageSpec, file: &PackageFile) -> ImportAliases {
             continue;
         };
         let import_path = file.interner.resolve(decl.path);
-        let Some(target) = resolve_local_import(spec, &file.path, import_path) else {
+        let Ok(Some(target)) = resolve_local_import(spec, &file.path, import_path) else {
             continue;
         };
         match &decl.kind {
@@ -393,7 +393,7 @@ pub fn detect_import_cycles(spec: &PackageSpec, files: &[PackageFile]) -> Vec<Di
                 continue;
             };
             let import_path = file.interner.resolve(decl.path);
-            if let Some(target) = resolve_local_import(spec, &file.path, import_path) {
+            if let Ok(Some(target)) = resolve_local_import(spec, &file.path, import_path) {
                 edges.push((normalize_path(&target), decl.span));
             }
         }
@@ -467,17 +467,19 @@ pub fn resolve_import(
         Err(err) => return ImportResolution::Error(library_resolve_diagnostic(from_file, err)),
     }
 
-    if let Some(target) = resolve_local_import(spec, from_file, import_path) {
-        if crate::source_files::is_proba_source_path(&target) {
-            return ImportResolution::Error(proba_import_forbidden_diagnostic(
-                from_file,
-                import_path,
-            ));
+    match resolve_local_import(spec, from_file, import_path) {
+        Ok(Some(target)) => {
+            if crate::source_files::is_proba_source_path(&target) {
+                return ImportResolution::Error(proba_import_forbidden_diagnostic(
+                    from_file,
+                    import_path,
+                ));
+            }
+            ImportResolution::Local(target)
         }
-        return ImportResolution::Local(target);
+        Ok(None) => ImportResolution::Unsupported,
+        Err(diagnostic) => ImportResolution::Error(diagnostic),
     }
-
-    ImportResolution::Unsupported
 }
 
 fn is_self_package_interface(spec: &PackageSpec, interface: &Path) -> bool {
@@ -554,21 +556,91 @@ fn resolve_local_import(
     spec: &PackageSpec,
     from_file: &Path,
     import_path: &str,
-) -> Option<PathBuf> {
+) -> Result<Option<PathBuf>, Diagnostic> {
     // Template form: §name/rest → templates[name]/rest
     if import_path.starts_with('§') {
-        return resolve_template_import(spec, import_path);
+        return Ok(resolve_template_import(spec, import_path));
     }
 
     if import_path.starts_with('.') {
-        return resolve_module_candidates(&from_file.parent()?.join(import_path));
+        let Some(parent) = from_file.parent() else {
+            return Ok(None);
+        };
+        let Some(target) = resolve_module_candidates(&parent.join(import_path)) else {
+            return Ok(None);
+        };
+        return contain_local_import(spec, from_file, import_path, target).map(Some);
     }
 
     if import_path.starts_with('@') || import_path.contains("://") {
-        return None;
+        return Ok(None);
     }
 
-    resolve_module_candidates(&spec.source_root.join(import_path))
+    let Some(target) = resolve_module_candidates(&spec.source_root.join(import_path)) else {
+        return Ok(None);
+    };
+    contain_local_import(spec, from_file, import_path, target).map(Some)
+}
+
+/// Contain a resolved relative/source-root import under the package's declared
+/// surface.
+///
+/// Containment is decided on the canonicalized target, never on the spelling:
+/// a legal in-package `../` import keeps resolving and a module reached through
+/// a `§template` base keeps resolving its own siblings, while a `..` escape or
+/// a symlink pointing outside every declared root is rejected before the
+/// target is read.
+fn contain_local_import(
+    spec: &PackageSpec,
+    from_file: &Path,
+    import_path: &str,
+    target: PathBuf,
+) -> Result<PathBuf, Diagnostic> {
+    let resolved = std::fs::canonicalize(&target).map_err(|error| {
+        import_escape_diagnostic(
+            from_file,
+            import_path,
+            &format!("import target {} cannot be resolved: {error}", target.display()),
+        )
+    })?;
+    if declared_import_roots(spec)
+        .iter()
+        .any(|root| resolved.starts_with(root))
+    {
+        return Ok(target);
+    }
+    Err(import_escape_diagnostic(
+        from_file,
+        import_path,
+        &format!("resolves outside the package root: {}", resolved.display()),
+    ))
+}
+
+/// Canonical roots an import may resolve into: the package root plus every
+/// manifest-declared `§template` base.
+///
+/// Template bases escape the package root by design (`gnu =
+/// "../../common/gnu"`), so a module reached through one imports its siblings
+/// relative to that base. The manifest is the package's own declared surface;
+/// source-level specifiers stay contained to it.
+fn declared_import_roots(spec: &PackageSpec) -> Vec<PathBuf> {
+    let mut roots = Vec::new();
+    if let Ok(root) = std::fs::canonicalize(&spec.package_root) {
+        roots.push(root);
+    }
+    for template in spec.templates.values() {
+        if let Ok(base) = std::fs::canonicalize(template) {
+            roots.push(base);
+        }
+    }
+    roots
+}
+
+fn import_escape_diagnostic(from_file: &Path, import_path: &str, reason: &str) -> Diagnostic {
+    crate::package_diagnostic_error(format!("import '{import_path}' {reason}"))
+        .with_file(from_file.display().to_string())
+        .with_arg("issue", "package_import_escape")
+        .with_arg("import", import_path.to_owned())
 }
 
 /// Resolve `§name/rest` against `[paths.templates]`.
