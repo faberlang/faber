@@ -238,4 +238,57 @@ fn build_target_rejects_unsupported_spelling() {
             .map(|arg| arg.value.as_str()),
         Some("cobol")
     );
+    // The diagnostic names the accepted vocabulary (S09-7): a rejected
+    // spelling must tell the declarer what the manifest does accept.
+    assert!(err.message.contains("is not a build target; use one of:"));
+    assert!(err.message.contains("go"));
+    assert!(err.message.contains("fmir-bin"));
+}
+
+#[test]
+fn build_target_accepts_the_cli_vocabulary() {
+    // S09-7: every canonical spelling the product CLI accepts for `-t` is
+    // declarable — the manifest cannot know less than the build command.
+    for (spelling, expected) in [
+        ("go", Target::HirGo),
+        ("swift", Target::HirSwift),
+        ("python", Target::HirPython),
+        ("haskell", Target::HirHaskell),
+        ("faber", Target::HirFaber),
+        ("wasm-text", Target::MirWasm),
+        ("llvm-text", Target::MirLlvm),
+        ("metal-text", Target::MirMetal),
+        ("wgsl-text", Target::MirWgsl),
+        ("sexp", Target::MirSexp),
+    ] {
+        assert_eq!(
+            manifest_build_target(Some(spelling), Path::new("faber.toml"))
+                .unwrap_or_else(|err| panic!("spelling '{spelling}' rejected: {err:?}")),
+            expected
+        );
+    }
+}
+
+#[test]
+fn build_target_rejects_internal_targets_with_the_rule_named() {
+    // S09-7: the only exclusions are compiler-internal targets with no
+    // package build route, and the diagnostic says why.
+    for internal in ["stepper", "amd"] {
+        let err = manifest_build_target(Some(internal), Path::new("faber.toml"))
+            .expect_err("internal spelling must be rejected");
+        assert_eq!(err.code, Some("PKG001"));
+        assert_eq!(err.issue(), Some("package_build_target_internal"));
+        assert_eq!(
+            err.args
+                .iter()
+                .find(|arg| arg.name == "target")
+                .map(|arg| arg.value.as_str()),
+            Some(internal)
+        );
+        assert!(
+            err.message.contains("internal compiler target"),
+            "diagnostic must name the exclusion rule: {}",
+            err.message
+        );
+    }
 }

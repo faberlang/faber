@@ -1331,3 +1331,23 @@ fn test_stats_flags_parse() {
         Some(std::path::Path::new("out.json"))
     );
 }
+
+#[test]
+fn manifest_build_target_vocabulary_matches_the_cli() {
+    // S09-7: the manifest's `[build] target` vocabulary is exactly the CLI's
+    // `-t` vocabulary over canonical spellings — the manifest cannot know
+    // less than `faber build`.
+    use clap::ValueEnum;
+    use radix::program::manifest::manifest_build_target;
+
+    for target in radix::module::codegen::Target::ALL {
+        let spelling = target.to_string();
+        let manifest_accepts =
+            manifest_build_target(Some(&spelling), std::path::Path::new("faber.toml")).is_ok();
+        let cli_accepts = FaberCliTarget::from_str(&spelling, false).is_ok();
+        assert_eq!(
+            manifest_accepts, cli_accepts,
+            "manifest and `-t` disagree on '{spelling}'"
+        );
+    }
+}
