@@ -1,10 +1,23 @@
 //! Target capability tables and metadata for `radix targets` and `faber targets`.
 //!
-//! Owns [`cmd_targets`], [`discoverable_targets`], [`target_capabilities`] /
-//! `*_for_surface`, [`target_name`], and [`target_extension`]. Capability rows
-//! describe CLI support (check, build, run, package) per backend. Delegates no
-//! compilation; this is a static metadata registry with terminal output only.
+//! Owns [`discoverable_targets`], [`target_capabilities`] /
+//! `*_for_surface`, [`target_name`], and [`target_extension`]; the
+//! `cmd_targets` printers in `radix-cli` and `faber` consume these items
+//! through the `radix` façade. Capability rows describe CLI support (check,
+//! build, run, package) per backend. Delegates no compilation; this is a
+//! static metadata registry with terminal output only.
 
+/// The discoverable row list — the **single** copy (defect-audit P6-3).
+///
+/// This is a selection from the variant universe
+/// [`Target::ALL`](crate::codegen::Target::ALL), not an independent
+/// enumeration: the delta is exactly the deliberately hidden variants
+/// (`MirAmd`, internal until the leaf proves a truthful baseline; `MirScena`,
+/// hidden legacy runtime), and `discoverable_targets_equal_universe_minus_hidden`
+/// pins that set-equality. A `Target` variant added to the universe fails
+/// this test until it joins this list or is named hidden — the list can no
+/// longer silently drop a backend. The order is the report's presentation
+/// order and is preserved verbatim for the printed row output.
 const DISCOVERABLE_TARGET_ROWS: [crate::codegen::Target; 18] = [
     crate::codegen::Target::MirStepper,
     crate::codegen::Target::HirRust,
@@ -46,6 +59,11 @@ pub enum TargetCommandSurface {
     Faber,
 }
 
+/// The discoverable target rows, shared by the `radix targets` and
+/// `faber targets` printers (re-exported through the `radix` façade).
+/// One owner: this list plus [`DISCOVERABLE_TARGET_ROWS`]'s
+/// set-equality test against the variant universe — no consumer keeps
+/// its own copy.
 #[must_use]
 pub fn discoverable_targets() -> &'static [crate::codegen::Target] {
     &DISCOVERABLE_TARGET_ROWS
@@ -77,6 +95,10 @@ pub fn target_extension(target: crate::codegen::Target) -> &'static str {
     }
 }
 
+/// The canonical CLI spelling table (defect-audit P6-3: one copy, owned
+/// here and re-exported through the `radix` façade; the `radix-cli`
+/// private duplicate is gone). Spellings equal `Target`'s `Display`;
+/// `target_name_table_matches_display` pins that agreement.
 #[must_use]
 pub fn target_name(target: crate::codegen::Target) -> &'static str {
     match target {

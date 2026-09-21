@@ -1,8 +1,9 @@
 //! Neutral compilation-target identity for Radix.
 //!
-//! Owns the [`Target`] enum, its CLI spelling ([`fmt::Display`]), and the
-//! feature-gate mapping ([`Target::required_feature`] /
-//! [`Target::is_available`]). Target identity is a std-only contract shared
+//! Owns the [`Target`] enum, the variant universe ([`Target::ALL`]), its
+//! CLI spelling ([`fmt::Display`]), and the feature-gate mapping
+//! ([`Target::required_feature`] / [`Target::is_available`]). Target
+//! identity is a std-only contract shared
 //! by semantic policy, the driver, services, and tests; it must not depend
 //! on HIR, MIR, codegen, diagnostics, or any backend leaf.
 //!
@@ -120,6 +121,39 @@ impl fmt::Display for Target {
 }
 
 impl Target {
+    /// Every variant of this enum, in declaration order — the single owned
+    /// source of the target universe (defect-audit P6-3).
+    ///
+    /// Any surface that must enumerate targets (report rows, completeness
+    /// tests, discovery lists) starts from this list instead of keeping a
+    /// second hand-typed copy. The list cannot silently drift from the
+    /// enum: [`all_is_exactly_the_variant_set`] walks the variant domain
+    /// through an exhaustive match with no wildcard arm, so adding or
+    /// removing a variant fails that test's compilation and the assertion
+    /// then fails until `ALL` matches the domain exactly.
+    pub const ALL: &'static [Self] = &[
+        Target::MirStepper,
+        Target::HirRust,
+        Target::HirTypeScript,
+        Target::HirGo,
+        Target::HirSwift,
+        Target::HirPython,
+        Target::HirHaskell,
+        Target::HirFaber,
+        Target::HirFhir,
+        Target::MirWasm,
+        Target::MirLlvm,
+        Target::MirLlvmHost,
+        Target::MirAmd,
+        Target::MirMetal,
+        Target::MirWgsl,
+        Target::MirSexp,
+        Target::MirScena,
+        Target::MirFmir,
+        Target::MirFmirBinary,
+        Target::MirFmirBundle,
+    ];
+
     /// Feature that enables this target when it is feature-gated.
     #[must_use]
     pub fn required_feature(self) -> Option<&'static str> {
@@ -165,5 +199,83 @@ impl Target {
             Target::MirLlvm | Target::MirLlvmHost => cfg!(feature = "mir-llvm"),
             _ => true,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::Target;
+
+    /// One arm per variant, no wildcard: adding a `Target` variant fails
+    /// this function's compilation, forcing the variant into the walk;
+    /// removing one fails the same compilation. This match is the domain
+    /// anchor that keeps [`Target::ALL`] honest.
+    fn universe_spelling(target: Target) -> &'static str {
+        match target {
+            Target::MirStepper => "stepper",
+            Target::HirRust => "rust",
+            Target::HirTypeScript => "ts",
+            Target::HirGo => "go",
+            Target::HirSwift => "swift",
+            Target::HirPython => "python",
+            Target::HirHaskell => "haskell",
+            Target::HirFaber => "faber",
+            Target::HirFhir => "fhir",
+            Target::MirWasm => "wasm-text",
+            Target::MirLlvm => "llvm-text",
+            Target::MirLlvmHost => "llvm-host",
+            Target::MirAmd => "amd",
+            Target::MirMetal => "metal-text",
+            Target::MirWgsl => "wgsl-text",
+            Target::MirSexp => "sexp",
+            Target::MirScena => "scena",
+            Target::MirFmir => "fmir-text",
+            Target::MirFmirBinary => "fmir",
+            Target::MirFmirBundle => "fmir-bin",
+        }
+    }
+
+    /// `ALL` set-equals the variant domain named by the exhaustive match
+    /// (defect-audit P6-3/P6-4 guard shape). A variant missing from `ALL`
+    /// drops its spelling; a duplicate or stale entry changes the vector —
+    /// both fail here. Spellings are pinned to `Display` so the walk and
+    /// the CLI spelling cannot drift apart either.
+    #[test]
+    fn all_is_exactly_the_variant_set() {
+        let expected: Vec<&'static str> = [
+            "stepper",
+            "rust",
+            "ts",
+            "go",
+            "swift",
+            "python",
+            "haskell",
+            "faber",
+            "fhir",
+            "wasm-text",
+            "llvm-text",
+            "llvm-host",
+            "amd",
+            "metal-text",
+            "wgsl-text",
+            "sexp",
+            "scena",
+            "fmir-text",
+            "fmir",
+            "fmir-bin",
+        ]
+        .into();
+        let all: Vec<&'static str> = Target::ALL
+            .iter()
+            .map(|target| {
+                let spelling = universe_spelling(*target);
+                assert_eq!(spelling, target.to_string(), "spelling must match Display");
+                spelling
+            })
+            .collect();
+        assert_eq!(
+            all, expected,
+            "Target::ALL must be exactly the variant domain the exhaustive match names"
+        );
     }
 }
