@@ -121,6 +121,39 @@ impl fmt::Display for Target {
 }
 
 impl Target {
+    /// Parse a canonical target spelling into a [`Target`].
+    ///
+    /// Exact inverse of [`fmt::Display`]: every canonical spelling
+    /// round-trips, and nothing else is accepted. Caller-surface aliases
+    /// (`typescript` for `ts`, `wasm` for `wasm-text`, …) are CLI
+    /// conveniences owned by the caller, not canonical spellings.
+    #[must_use]
+    pub fn from_spelling(spelling: &str) -> Option<Self> {
+        match spelling {
+            "stepper" => Some(Self::MirStepper),
+            "rust" => Some(Self::HirRust),
+            "ts" => Some(Self::HirTypeScript),
+            "go" => Some(Self::HirGo),
+            "swift" => Some(Self::HirSwift),
+            "python" => Some(Self::HirPython),
+            "haskell" => Some(Self::HirHaskell),
+            "faber" => Some(Self::HirFaber),
+            "fhir" => Some(Self::HirFhir),
+            "wasm-text" => Some(Self::MirWasm),
+            "llvm-text" => Some(Self::MirLlvm),
+            "llvm-host" => Some(Self::MirLlvmHost),
+            "amd" => Some(Self::MirAmd),
+            "metal-text" => Some(Self::MirMetal),
+            "wgsl-text" => Some(Self::MirWgsl),
+            "sexp" => Some(Self::MirSexp),
+            "scena" => Some(Self::MirScena),
+            "fmir-text" => Some(Self::MirFmir),
+            "fmir" => Some(Self::MirFmirBinary),
+            "fmir-bin" => Some(Self::MirFmirBundle),
+            _ => None,
+        }
+    }
+
     /// Every variant of this enum, in declaration order — the single owned
     /// source of the target universe (defect-audit P6-3).
     ///
@@ -289,5 +322,40 @@ mod tests {
             all, expected,
             "Target::ALL must be exactly the variant domain the exhaustive match names"
         );
+    }
+
+    /// `from_spelling` is the exact inverse of `Display`: every canonical
+    /// spelling round-trips through the full universe, and no non-canonical
+    /// input is accepted.
+    #[test]
+    fn from_spelling_round_trips_every_display_spelling() {
+        for target in Target::ALL {
+            let spelling = universe_spelling(*target);
+            assert_eq!(
+                Target::from_spelling(spelling),
+                Some(*target),
+                "spelling '{spelling}' must round-trip"
+            );
+        }
+    }
+
+    #[test]
+    fn from_spelling_rejects_non_canonical_input() {
+        for spelling in [
+            "",
+            "rust ",
+            "Rust",
+            "TS",
+            "typescript",
+            "wasm",
+            "llvm",
+            "cobol",
+        ] {
+            assert_eq!(
+                Target::from_spelling(spelling),
+                None,
+                "spelling '{spelling}' must not parse"
+            );
+        }
     }
 }

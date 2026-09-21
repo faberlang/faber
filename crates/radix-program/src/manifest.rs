@@ -218,28 +218,62 @@ fn default_build_kind() -> String {
     "bin".to_owned()
 }
 
+/// Whether a [`Target`] has a package build route the product can honour.
+///
+/// `MirStepper` (the internal MIR interpreter lane) and `MirAmd` (an
+/// internal emit-family probe) are compiler-internal targets with no
+/// `-t` spelling on the product CLI, so the manifest rejects them by name
+/// instead of accepting a build nothing can execute.
+fn is_manifest_build_target(target: Target) -> bool {
+    !matches!(target, Target::MirStepper | Target::MirAmd)
+}
+
+/// The accepted `[build] target` spellings, in [`Target::ALL`] order — the
+/// same vocabulary the product CLI accepts for `-t`, derived from the
+/// variant universe instead of a second hand-typed list.
+fn manifest_build_target_spellings() -> String {
+    Target::ALL
+        .iter()
+        .copied()
+        .filter(|target| is_manifest_build_target(*target))
+        .map(|target| target.to_string())
+        .collect::<Vec<_>>()
+        .join(", ")
+}
+
 /// Map a manifest `[build] target` value (or `None` for the implicit portable
 /// default) to a compiler [`Target`].
 /// # Errors
 /// Returns an error when the input or persisted artifact is invalid.
 pub fn manifest_build_target(target: Option<&str>, path: &Path) -> Result<Target, Box<Diagnostic>> {
-    match target.map(str::trim) {
-        None => Ok(Target::HirFhir),
-        Some("rust") => Ok(Target::HirRust),
-        Some("fhir") => Ok(Target::HirFhir),
-        Some("ts" | "typescript") => Ok(Target::HirTypeScript),
-        Some("scena") => Ok(Target::MirScena),
-        Some("fmir-text") => Ok(Target::MirFmir),
-        Some("fmir") => Ok(Target::MirFmirBinary),
-        Some("fmir-bin") => Ok(Target::MirFmirBundle),
-        Some("llvm-host") => Ok(Target::MirLlvmHost),
-        Some(unsupported) => Err(Box::new(
+    let Some(raw) = target.map(str::trim) else {
+        return Ok(Target::HirFhir);
+    };
+    // `typescript` predates the canonical `ts` spelling; manifests already in
+    // the wild keep parsing.
+    let spelling = if raw == "typescript" { "ts" } else { raw };
+    match Target::from_spelling(spelling) {
+        None => Err(Box::new(
             crate::package_diagnostic_error(format!(
-                "faber.toml build.target '{unsupported}' is not supported for package builds"
+                "faber.toml build.target '{raw}' is not a build target; use one of: {}",
+                manifest_build_target_spellings()
             ))
             .with_file(path.display().to_string())
             .with_arg("issue", "package_build_target_unsupported")
-            .with_arg("target", unsupported.to_owned()),
+            .with_arg("target", raw.to_owned()),
+        )),
+        Some(target) if is_manifest_build_target(target) => Ok(target),
+        // Only `MirStepper` / `MirAmd` reach this arm (the guard above takes
+        // every eligible target).
+        Some(internal) => Err(Box::new(
+            crate::package_diagnostic_error(format!(
+                "faber.toml build.target '{internal}' is an internal compiler target with no \
+                 package build route; use one of: {}",
+                manifest_build_target_spellings()
+            ))
+            .with_file(path.display().to_string())
+            .with_arg("issue", "package_build_target_internal")
+            .with_arg("target", internal.to_string()),
         )),
     }
 }

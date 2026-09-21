@@ -7989,6 +7989,8 @@ fn thai_reader_locale_example_compiles_from_manifest() {
     assert!(rust.contains("นับถอยหลัง(3)"));
 }
 
+// S09-7: `go` is a supported manifest target; the fail-closed case uses a
+// spelling nothing supports.
 #[test]
 fn compile_package_rejects_unsupported_manifest_target() {
     let dir = test_temp_dir("manifest-target");
@@ -8005,7 +8007,7 @@ name = "bad-target"
 entry = "main.fab"
 
 [build]
-target = "go"
+target = "cobol"
 "#,
     )
     .expect("write manifest");
@@ -8015,7 +8017,7 @@ target = "go"
     assert!(result.diagnostics.iter().any(|diag| diagnostic_has_issue(
         diag,
         "package_build_target_unsupported"
-    ) && diagnostic_has_arg(diag, "target", "go")));
+    ) && diagnostic_has_arg(diag, "target", "cobol")));
 }
 
 #[test]
