@@ -1,6 +1,7 @@
 use super::*;
 use crate::driver::AnalyzeRequest;
 use radix_hir_fhir::HirArtifact;
+use std::collections::BTreeMap;
 use std::error::Error;
 
 #[test]
@@ -125,6 +126,7 @@ fn minimal_test_artifact() -> HirArtifact {
         analysis_stamp: 1,
         gpu_builtins: Vec::new(),
         capability_provenance: radix_hir_fhir::FunctionProvenanceTableWire::default(),
+        provider_units: BTreeMap::new(),
     }
 }
 
@@ -1143,6 +1145,7 @@ fn build_artifact_from_unit(unit: &AnalyzedModule) -> HirArtifact {
             .map(|(def_id, builtin)| (*def_id, gpu_builtin_to_wire(*builtin)))
             .collect(),
         capability_provenance: crate::hir::serialize::from_analyzed(unit, "x", "x").capability_provenance,
+        provider_units: crate::hir::serialize::from_analyzed(unit, "x", "x").provider_units,
     }
 }
 

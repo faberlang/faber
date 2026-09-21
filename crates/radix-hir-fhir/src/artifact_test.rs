@@ -102,8 +102,10 @@ fn selective_import_field_kept_schema_v4_wire_breaks_ratchet_version() {
     // SCR-04 ratchets to 8 (capability-provenance summaries join the wire),
     // and ATF-5 ratchets to 9 because authored type forms join presentation,
     // and GPD-5 ratchets to 10 because resolved generic binding vectors join
-    // the wire.
-    assert_eq!(SCHEMA_VERSION, 13);
+    // the wire. Schema 14 (provider-import-parity repair) carries analyzed
+    // provider carriage per unit — a serialized addition, so the wire breaks
+    // and there is no compatibility decoder for schema-v13 artifacts.
+    assert_eq!(SCHEMA_VERSION, 14);
 }
 
 // ── EOT-3W transfer wire contract ────────────────────────────────────────

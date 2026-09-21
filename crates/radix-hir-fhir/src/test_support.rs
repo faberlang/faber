@@ -15,6 +15,7 @@ use radix_hir::{
 };
 use radix_lexer::{Span, Symbol};
 use radix_types::{DefId, TypeTable};
+use std::collections::BTreeMap;
 
 /// A minimal schema-v2 artifact that passes referential-integrity validation.
 pub(crate) fn stub_artifact() -> HirArtifact {
@@ -97,6 +98,7 @@ pub(crate) fn stub_artifact() -> HirArtifact {
         analysis_stamp: 42,
         gpu_builtins: Vec::new(),
         capability_provenance: FunctionProvenanceTableWire::default(),
+        provider_units: BTreeMap::new(),
     }
 }
 

@@ -185,9 +185,11 @@ impl ProviderUnitView {
         self.units.get(import_path)
     }
 
-    /// Record the carried unit for one import edge (program-layer contract
-    /// walk; crate-internal writer).
-    pub(crate) fn insert(&mut self, import_path: &str, unit: CarriedProviderUnit) {
+    /// Record the carried unit for one import edge. Writers are the
+    /// program-layer contract walk and the package-analysis carriage
+    /// (radix-program installs per-file views after minting through
+    /// [`crate::program::provider_unit_for_target`]).
+    pub fn insert(&mut self, import_path: &str, unit: CarriedProviderUnit) {
         self.units.insert(import_path.to_owned(), unit);
     }
 

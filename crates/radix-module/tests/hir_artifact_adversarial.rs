@@ -105,6 +105,7 @@ fn minimal_test_artifact() -> radix_hir_fhir::HirArtifact {
         analysis_stamp: 1,
         gpu_builtins: Vec::new(),
         capability_provenance: FunctionProvenanceTableWire::default(),
+        provider_units: std::collections::BTreeMap::new(),
     }
 }
 

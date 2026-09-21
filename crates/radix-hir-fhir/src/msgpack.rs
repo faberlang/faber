@@ -42,8 +42,8 @@ use serde::{Deserialize, Deserializer, Serialize};
 
 use crate::artifact::{
     CliProgramWire, FunctionFactTableWire, FunctionFactWire, FunctionProvenanceTableWire,
-    GpuBuiltinWire, HirArtifact, RadixLaneEntryWire, ResolvedUseWire, ResolverSnapshot,
-    SCHEMA_VERSION, SourceIdentity,
+    GpuBuiltinWire, HirArtifact, ProviderCarriageEntryWire, RadixLaneEntryWire, ResolvedUseWire,
+    ResolverSnapshot, SCHEMA_VERSION, SourceIdentity,
 };
 use crate::decode::{decode as decode_unit_bytes, encode as encode_unit_bytes};
 use crate::error::HirArtifactError;
@@ -55,6 +55,7 @@ use crate::package::{
 use crate::validate::validate_referential_integrity;
 use radix_hir::{HirModule, HirPresentation, LibraryRegistry};
 use radix_types::{DefId, ResolvedGenericCall, TypeTableSnapshot};
+use std::collections::BTreeMap;
 
 /// Maximum nesting depth accepted when parsing a `MessagePack` document.
 ///
@@ -1225,7 +1226,7 @@ struct FunctionFactTableDto {
     entry: Option<FunctionFactWire>,
 }
 
-/// Unit-value wire shape: the 13 spec §2 named keys in declaration order
+/// Unit-value wire shape: the unit's named keys in declaration order
 /// (`schema_version` first, §1.2), with the two tuple families converted.
 #[derive(Serialize, Deserialize)]
 struct HirArtifactDto {
@@ -1245,6 +1246,7 @@ struct HirArtifactDto {
     analysis_stamp: u64,
     gpu_builtins: Vec<GpuBuiltinEntryDto>,
     capability_provenance: FunctionProvenanceTableWire,
+    provider_units: BTreeMap<String, ProviderCarriageEntryWire>,
 }
 
 impl From<&HirArtifact> for HirArtifactDto {
@@ -1284,6 +1286,7 @@ impl From<&HirArtifact> for HirArtifactDto {
                 })
                 .collect(),
             capability_provenance: artifact.capability_provenance.clone(),
+            provider_units: artifact.provider_units.clone(),
         }
     }
 }
@@ -1319,6 +1322,7 @@ impl From<HirArtifactDto> for HirArtifact {
                 .map(|entry| (entry.def_id, entry.builtin))
                 .collect(),
             capability_provenance: dto.capability_provenance,
+            provider_units: dto.provider_units,
         }
     }
 }

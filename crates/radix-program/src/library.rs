@@ -1002,6 +1002,16 @@ fn load_cached_library_interface<'a>(
     })
 }
 
+/// Peeled Faber body of one cached library interface module — the provider
+/// source the package-analysis carriage analyzes under the codegen contract.
+pub(crate) fn library_interface_source(
+    module: &ResolvedLibraryModule,
+    library_cache: &mut LibraryInterfaceCache,
+) -> Result<String, Diagnostic> {
+    let cached = load_cached_library_interface(module, library_cache)?;
+    Ok(cached.peeled_body.clone())
+}
+
 /// # Errors
 /// Returns an error when the input or persisted artifact is invalid.
 pub fn library_cached_file_interface(
