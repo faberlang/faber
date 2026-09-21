@@ -428,7 +428,7 @@ fn ts_gpu_builtins(
 
 #[cfg(feature = "hir-go")]
 fn generate_go_from_analyzed(analysis: &crate::driver::AnalyzedModule) -> Result<crate::Output, CodegenError> {
-    let mut r#gen = go::GoCodegen::new(&analysis.hir, &analysis.interner);
+    let mut r#gen = go::GoCodegen::new(&analysis.hir, &analysis.types, &analysis.interner);
     r#gen.set_failable_facts(&go_failable_facts(&analysis.function_facts));
     r#gen.set_library_registry(&analysis.libraries);
     let output = r#gen.generate(&analysis.hir, &analysis.types, &analysis.interner)?;
