@@ -116,18 +116,20 @@ pub fn indexed_switch(cases: &[SwitchArmLines], default_lines: &[String], indent
         if !rendered.is_empty() {
             rendered.push(' ');
         }
-        let _ = write!(
+        write!(
             rendered,
             "{indent}{prefix} ({}) {{\n{}\n{indent}}}",
             case.condition,
             case.lines.join("\n")
-        );
+        )
+        .ok();
     }
-    let _ = write!(
+    write!(
         rendered,
         " else {{\n{}\n{indent}}}",
         default_lines.join("\n")
-    );
+    )
+    .ok();
     rendered
 }
 
@@ -147,17 +149,19 @@ pub fn scalar_switch(
             rendered.push(' ');
         }
         let store_line = output_assign(&case.expr);
-        let _ = write!(
+        write!(
             rendered,
             "{indent}{prefix} ({}) {{\n{indent}{indent}{store_line}\n{indent}}}",
             case.condition
-        );
+        )
+        .ok();
     }
     let default_line = output_assign(default_expr);
-    let _ = write!(
+    write!(
         rendered,
         " else {{\n{indent}{indent}{default_line}\n{indent}}}"
-    );
+    )
+    .ok();
     rendered
 }
 
@@ -181,7 +185,7 @@ pub fn while_loop(
         format!("{indent}{declaration}\n{indent}while ({condition}) {{\n{body_text}\n{indent}}}");
     if let Some(exit_expr) = exit_expr {
         let exit_line = output_assign(exit_expr);
-        let _ = write!(rendered, "\n{indent}{exit_line}");
+        write!(rendered, "\n{indent}{exit_line}").ok();
     }
     rendered
 }
