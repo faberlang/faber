@@ -46,7 +46,7 @@
 
 use crate::error::WarningKind;
 use crate::instans_precision::InstansPrecisionError;
-use crate::numeric_width::WidthError;
+use crate::numeric_width::{WidthError, WidthLowerIssue};
 use crate::{
     BareVariantLookup, CollectionKind, FuncSig, GenericParamDescriptor, GenericParamSort,
     IndexExpr, ParamType, Primitive, QualifiedVariantPathLookup, Resolver, SchemaColumnDef,
@@ -73,10 +73,10 @@ const ISSUE_ATOMIC_ELEMENT: &str = "atomic_element";
 const ISSUE_ATOMIC_INCOMPLETE: &str = "atomic_incomplete";
 const ISSUE_FIGURA_UNKNOWN_INDEX: &str = "figura_unknown_index";
 const ISSUE_FIGURA_TYPE_PARAM_IN_INDEX: &str = "figura_type_param_in_index";
-const ISSUE_INVALID_FRACTUS_WIDTH_MARKER: &str = "invalid_fractus_width_marker";
-const ISSUE_INVALID_NUMERUS_WIDTH_MARKER: &str = "invalid_numerus_width_marker";
+const ISSUE_INVALID_FRACTUS_WIDTH_MARKER: &str = WidthLowerIssue::INVALID_FRACTUS_WIDTH_MARKER;
+const ISSUE_INVALID_NUMERUS_WIDTH_MARKER: &str = WidthLowerIssue::INVALID_NUMERUS_WIDTH_MARKER;
 const ISSUE_INVALID_PRECISION_MARKER: &str = "invalid_precision_marker";
-const ISSUE_INVALID_WIDTH_MARKER: &str = "invalid_width_marker";
+const ISSUE_INVALID_WIDTH_MARKER: &str = WidthLowerIssue::INVALID_WIDTH_MARKER;
 const ISSUE_INTERVALLUM_ARITY: &str = "intervallum_arity";
 const ISSUE_INTERVALLUM_BOUND: &str = "intervallum_bound";
 const ISSUE_MATRIX_INCOMPLETE: &str = "matrix_incomplete";
@@ -128,8 +128,8 @@ const ISSUE_UNKNOWN_VARIANT: &str = "unknown_variant";
 const ISSUE_VECTOR_INCOMPLETE: &str = "vector_incomplete";
 const ISSUE_VECTOR_MISSING_WIDTH: &str = "vector_missing_width";
 const ISSUE_VECTOR_WIDTH_SINGLE_DIM: &str = "vector_width_single_dim";
-const ISSUE_WIDTH_MARKER_PARAMS: &str = "width_marker_params";
-const ISSUE_WIDTH_MARKER_SHAPE: &str = "width_marker_shape";
+const ISSUE_WIDTH_MARKER_PARAMS: &str = WidthLowerIssue::WIDTH_MARKER_PARAMS;
+const ISSUE_WIDTH_MARKER_SHAPE: &str = WidthLowerIssue::WIDTH_MARKER_SHAPE;
 
 /// Resolve AST-level names and type aliases after declaration collection.
 ///
@@ -3284,6 +3284,11 @@ fn lower_type_expr_with_context(
     Ok(ty_id)
 }
 
+/// Map residual shared-helper messages to issue identity.
+///
+/// Width-family helpers report typed `WidthLowerIssue` values, so this
+/// handles only helpers that still cross the phase boundary as message
+/// constants (figura, matrix, vector, atomic) or instans precision prose.
 fn type_lower_error_from_message(message: &str) -> TypeLowerError {
     let issue = match message {
         crate::FIGURA_NOT_INDEX_PARAM_MSG => ISSUE_FIGURA_NOT_INDEX_PARAM,
@@ -3292,35 +3297,11 @@ fn type_lower_error_from_message(message: &str) -> TypeLowerError {
         crate::MATRIX_SHAPE_TWO_DIM_MSG => ISSUE_MATRIX_SHAPE_TWO_DIM,
         crate::ATOMIC_ELEMENT_MSG => ISSUE_ATOMIC_ELEMENT,
         crate::VECTOR_WIDTH_SINGLE_DIM_MSG => ISSUE_VECTOR_WIDTH_SINGLE_DIM,
-        "f16, f32, f64, and bf16 are fractus widths; use fractus<f16>, fractus<f32>, fractus<f64>, or fractus<bf16>" => {
-            "float_width_on_numerus"
-        }
-        "fractus accepts at most one width marker" => "fractus_width_params",
-        "fractus accepts only f16, f32, f64, or bf16" => "invalid_fractus_width_marker",
-        "integer width markers are numerus widths; use numerus<…>" => "integer_width_on_fractus",
         "instans accepts at most one precision marker" => "instans_precision_params",
         "instans accepts only ms, us, or ns as a precision marker" => {
             ISSUE_INVALID_PRECISION_MARKER
         }
-        "numerus accepts at most one width marker" => "numerus_width_params",
         "precision marker must be a bare spelling such as ms or us" => ISSUE_PRECISION_MARKER_SHAPE,
-        "primitive accepts at most one width marker" => "primitive_width_params",
-        "unknown width marker for numerus" => "invalid_numerus_width_marker",
-        "unknown width marker for this family" => ISSUE_INVALID_WIDTH_MARKER,
-        "width marker cannot accept parameters" => ISSUE_WIDTH_MARKER_PARAMS,
-        "width marker must be a bare spelling such as i32 or u8" => ISSUE_WIDTH_MARKER_SHAPE,
-        "modulus requires exactly one unsigned width marker; use modulus<u8>, modulus<u16>, modulus<u32>, or modulus<u64>" => {
-            "modular_word_width_required"
-        }
-        "modulus width marker must be a bare unsigned spelling such as u32" => {
-            "modular_word_width_shape"
-        }
-        "modulus accepts only unsigned width markers u8, u16, u32, or u64" => {
-            "unsupported_modular_word_width"
-        }
-        "modulus requires an unsigned integer width marker" => {
-            "modular_word_unsigned_width_required"
-        }
         _ => ISSUE_UNKNOWN_TYPE_LOWERING,
     };
     TypeLowerError::Issue(issue)
@@ -3604,12 +3585,12 @@ fn lower_named_type(
             &type_params,
             interner,
             types,
-            &mut |message| {
-                error = Some(message.to_owned());
+            &mut |issue| {
+                error = Some(issue);
             },
         );
-        if let Some(message) = error {
-            return Err(type_lower_error_from_message(&message));
+        if let Some(issue) = error {
+            return Err(TypeLowerError::Issue(issue.issue()));
         }
         return Ok(ty);
     }
@@ -3641,12 +3622,12 @@ fn lower_named_type(
                 &type_params,
                 interner,
                 types,
-                &mut |message| {
-                    error = Some(message.to_owned());
+                &mut |issue| {
+                    error = Some(issue);
                 },
             );
-            if let Some(message) = error {
-                return Err(type_lower_error_from_message(&message));
+            if let Some(issue) = error {
+                return Err(TypeLowerError::Issue(issue.issue()));
             }
             return Ok(ty);
         }
@@ -3708,12 +3689,12 @@ fn lower_named_type(
         name_str,
         &type_params,
         types,
-        &mut |message| {
-            width_error = Some(message.to_owned());
+        &mut |issue| {
+            width_error = Some(issue);
         },
     ) {
-        if let Some(message) = width_error {
-            return Err(type_lower_error_from_message(&message));
+        if let Some(issue) = width_error {
+            return Err(TypeLowerError::Issue(issue.issue()));
         }
         return Ok(ty);
     }

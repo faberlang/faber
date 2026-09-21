@@ -38,6 +38,83 @@ pub enum WidthError {
     TooManyParams,
 }
 
+/// Typed failure identity for width-family type lowering.
+///
+/// Producers report this value instead of prose so callers attach the
+/// diagnostic issue directly; locale packs own the user-facing sentences.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum WidthLowerIssue {
+    /// Width sugar (`f32`, `tf32`, …) cannot accept type parameters.
+    Params,
+    /// Width marker must be a bare reserved spelling.
+    Shape,
+    /// Float marker applied to `numerus`.
+    FloatOnNumerus,
+    /// Integer marker applied to `fractus`.
+    IntOnFractus,
+    /// Unrecognized marker for the primitive family.
+    InvalidMarker(Primitive),
+    /// Too many width markers for the primitive.
+    TooManyParams(Primitive),
+    /// `modulus` requires exactly one width marker.
+    ModularWordRequired,
+    /// `modulus` argument is not a bare width marker.
+    ModularWordShape,
+    /// `modulus` marker is not one of u8/u16/u32/u64.
+    ModularWordUnsupported,
+    /// `modulus` marker is a float spelling.
+    ModularWordUnsignedRequired,
+}
+
+impl WidthLowerIssue {
+    /// Canonical issue names; locale packs key diagnostic prose on these.
+    pub const WIDTH_MARKER_PARAMS: &str = "width_marker_params";
+    pub const WIDTH_MARKER_SHAPE: &str = "width_marker_shape";
+    pub const FLOAT_WIDTH_ON_NUMERUS: &str = "float_width_on_numerus";
+    pub const INTEGER_WIDTH_ON_FRACTUS: &str = "integer_width_on_fractus";
+    pub const INVALID_NUMERUS_WIDTH_MARKER: &str = "invalid_numerus_width_marker";
+    pub const INVALID_FRACTUS_WIDTH_MARKER: &str = "invalid_fractus_width_marker";
+    pub const INVALID_WIDTH_MARKER: &str = "invalid_width_marker";
+    pub const NUMERUS_WIDTH_PARAMS: &str = "numerus_width_params";
+    pub const FRACTUS_WIDTH_PARAMS: &str = "fractus_width_params";
+    pub const PRIMITIVE_WIDTH_PARAMS: &str = "primitive_width_params";
+    pub const MODULAR_WORD_WIDTH_REQUIRED: &str = "modular_word_width_required";
+    pub const MODULAR_WORD_WIDTH_SHAPE: &str = "modular_word_width_shape";
+    pub const UNSUPPORTED_MODULAR_WORD_WIDTH: &str = "unsupported_modular_word_width";
+    pub const MODULAR_WORD_UNSIGNED_WIDTH_REQUIRED: &str = "modular_word_unsigned_width_required";
+
+    /// Diagnostic issue identity for this failure.
+    #[must_use]
+    pub fn issue(self) -> &'static str {
+        match self {
+            Self::Params => Self::WIDTH_MARKER_PARAMS,
+            Self::Shape => Self::WIDTH_MARKER_SHAPE,
+            Self::FloatOnNumerus => Self::FLOAT_WIDTH_ON_NUMERUS,
+            Self::IntOnFractus => Self::INTEGER_WIDTH_ON_FRACTUS,
+            Self::InvalidMarker(Primitive::Numerus) => Self::INVALID_NUMERUS_WIDTH_MARKER,
+            Self::InvalidMarker(Primitive::Fractus) => Self::INVALID_FRACTUS_WIDTH_MARKER,
+            Self::InvalidMarker(_) => Self::INVALID_WIDTH_MARKER,
+            Self::TooManyParams(Primitive::Numerus) => Self::NUMERUS_WIDTH_PARAMS,
+            Self::TooManyParams(Primitive::Fractus) => Self::FRACTUS_WIDTH_PARAMS,
+            Self::TooManyParams(_) => Self::PRIMITIVE_WIDTH_PARAMS,
+            Self::ModularWordRequired => Self::MODULAR_WORD_WIDTH_REQUIRED,
+            Self::ModularWordShape => Self::MODULAR_WORD_WIDTH_SHAPE,
+            Self::ModularWordUnsupported => Self::UNSUPPORTED_MODULAR_WORD_WIDTH,
+            Self::ModularWordUnsignedRequired => Self::MODULAR_WORD_UNSIGNED_WIDTH_REQUIRED,
+        }
+    }
+}
+
+/// Producer-side mapping from a width parse failure to its lowering identity.
+fn width_lower_issue(err: WidthError, prim: Primitive) -> WidthLowerIssue {
+    match err {
+        WidthError::FloatOnNumerus => WidthLowerIssue::FloatOnNumerus,
+        WidthError::IntOnFractus => WidthLowerIssue::IntOnFractus,
+        WidthError::UnrecognizedMarker => WidthLowerIssue::InvalidMarker(prim),
+        WidthError::TooManyParams => WidthLowerIssue::TooManyParams(prim),
+    }
+}
+
 impl NumericWidth {
     /// Default width for bare `numerus` / `fractus`.
     ///
@@ -224,34 +301,6 @@ impl NumericWidth {
     }
 }
 
-impl WidthError {
-    #[must_use]
-    pub fn message(self, prim: Primitive) -> &'static str {
-        match (self, prim) {
-            (WidthError::FloatOnNumerus, _) => {
-                "f16, f32, f64, and bf16 are fractus widths; use fractus<f16>, fractus<f32>, fractus<f64>, or fractus<bf16>"
-            }
-            (WidthError::IntOnFractus, _) => {
-                "integer width markers are numerus widths; use numerus<…>"
-            }
-            (WidthError::TooManyParams, Primitive::Numerus) => {
-                "numerus accepts at most one width marker"
-            }
-            (WidthError::TooManyParams, Primitive::Fractus) => {
-                "fractus accepts at most one width marker"
-            }
-            (WidthError::TooManyParams, _) => "primitive accepts at most one width marker",
-            (WidthError::UnrecognizedMarker, Primitive::Numerus) => {
-                "unknown width marker for numerus"
-            }
-            (WidthError::UnrecognizedMarker, Primitive::Fractus) => {
-                "fractus accepts only f16, f32, f64, or bf16"
-            }
-            (WidthError::UnrecognizedMarker, _) => "unknown width marker for this family",
-        }
-    }
-}
-
 /// Parse decimal digit text into an exact scaled representation:
 /// `(mantissa, exp10)` with `value == mantissa × 10^exp10` (decimal-widths D1).
 ///
@@ -383,11 +432,11 @@ pub fn lower_standalone_width_type(
     name: &str,
     params: &[radix_syntax::TypeExpr],
     types: &mut TypeTable,
-    report: &mut dyn FnMut(&str),
+    report: &mut dyn FnMut(WidthLowerIssue),
 ) -> Option<TypeId> {
     let (prim, width) = standalone_width_type(name)?;
     if !params.is_empty() {
-        report("width marker cannot accept parameters");
+        report(WidthLowerIssue::Params);
         return Some(types.intern(Type::Error));
     }
     Some(types.sized_numeric(prim, width))
@@ -399,7 +448,7 @@ pub fn lower_sized_primitive(
     params: &[radix_syntax::TypeExpr],
     interner: &radix_lexer::Interner,
     types: &mut TypeTable,
-    report: &mut dyn FnMut(&str),
+    report: &mut dyn FnMut(WidthLowerIssue),
 ) -> TypeId {
     match params.len() {
         0 => types.primitive(prim),
@@ -409,7 +458,7 @@ pub fn lower_sized_primitive(
                     Primitive::Numerus => crate::MarkerFamily::Numerus,
                     Primitive::Fractus => crate::MarkerFamily::Fractus,
                     _ => {
-                        report("width marker must be a bare spelling such as i32 or u8");
+                        report(WidthLowerIssue::Shape);
                         return types.intern(Type::Error);
                     }
                 };
@@ -422,17 +471,17 @@ pub fn lower_sized_primitive(
                 match NumericWidth::from_marker(marker, prim) {
                     Ok(width) => types.sized_numeric(prim, width),
                     Err(err) => {
-                        report(err.message(prim));
+                        report(width_lower_issue(err, prim));
                         types.intern(Type::Error)
                     }
                 }
             } else {
-                report("width marker must be a bare spelling such as i32 or u8");
+                report(WidthLowerIssue::Shape);
                 types.intern(Type::Error)
             }
         }
         _ => {
-            report(WidthError::TooManyParams.message(prim));
+            report(WidthLowerIssue::TooManyParams(prim));
             types.intern(Type::Error)
         }
     }
@@ -447,12 +496,10 @@ pub fn lower_modular_word(
     params: &[radix_syntax::TypeExpr],
     interner: &radix_lexer::Interner,
     types: &mut TypeTable,
-    report: &mut dyn FnMut(&str),
+    report: &mut dyn FnMut(WidthLowerIssue),
 ) -> TypeId {
     if params.len() != 1 {
-        report(
-            "modulus requires exactly one unsigned width marker; use modulus<u8>, modulus<u16>, modulus<u32>, or modulus<u64>",
-        );
+        report(WidthLowerIssue::ModularWordRequired);
         return types.intern(Type::Error);
     }
     if matches!(params[0].kind, radix_syntax::TypeExprKind::Infer) {
@@ -462,21 +509,21 @@ pub fn lower_modular_word(
         });
     }
     let Some(marker) = type_expr_width_marker(&params[0], interner) else {
-        report("modulus width marker must be a bare unsigned spelling such as u32");
+        report(WidthLowerIssue::ModularWordShape);
         return types.intern(Type::Error);
     };
     match NumericWidth::from_marker(marker, Primitive::Numerus) {
         Ok(width) if width.is_unsigned_int() => types.intern(Type::ModularWord(width)),
         Ok(_) => {
-            report("modulus accepts only unsigned width markers u8, u16, u32, or u64");
+            report(WidthLowerIssue::ModularWordUnsupported);
             types.intern(Type::Error)
         }
         Err(WidthError::FloatOnNumerus) => {
-            report("modulus requires an unsigned integer width marker");
+            report(WidthLowerIssue::ModularWordUnsignedRequired);
             types.intern(Type::Error)
         }
         Err(_) => {
-            report("modulus accepts only unsigned width markers u8, u16, u32, or u64");
+            report(WidthLowerIssue::ModularWordUnsupported);
             types.intern(Type::Error)
         }
     }

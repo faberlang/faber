@@ -697,18 +697,18 @@ impl Lowerer<'_> {
                 self.error("generic_size_argument_in_type_position");
                 return self.types.intern(Type::Error);
             };
-            let mut messages = Vec::new();
+            let mut issues = Vec::new();
             let Some(ty) = crate::numeric_width::lower_standalone_width_type(
                 name_str,
                 &type_params,
                 self.types,
-                &mut |message| messages.push(message.to_owned()),
+                &mut |issue| issues.push(issue),
             ) else {
                 self.error("standalone_width_internal");
                 return self.types.intern(Type::Error);
             };
-            if let Some(message) = messages.first() {
-                self.error_from_message(message);
+            if let Some(issue) = issues.first() {
+                self.error(issue.issue());
             }
             return ty;
         }
@@ -962,16 +962,16 @@ impl Lowerer<'_> {
             return self.types.intern(Type::Error);
         };
         if matches!(prim, Primitive::Numerus | Primitive::Fractus) {
-            let mut messages = Vec::new();
+            let mut issues = Vec::new();
             let ty = crate::numeric_width::lower_sized_primitive(
                 prim,
                 &type_params,
                 self.interner,
                 self.types,
-                &mut |message| messages.push(message.to_owned()),
+                &mut |issue| issues.push(issue),
             );
-            if let Some(message) = messages.first() {
-                self.error_from_message(message);
+            if let Some(issue) = issues.first() {
+                self.error(issue.issue());
             }
             return ty;
         }
@@ -1056,17 +1056,17 @@ impl Lowerer<'_> {
             self.error("generic_size_argument_in_type_position");
             return self.types.intern(Type::Error);
         };
-        let mut messages = Vec::new();
+        let mut issues = Vec::new();
         let ty = crate::numeric_width::lower_modular_word(
             &type_params,
             self.interner,
             self.types,
-            &mut |message| {
-                messages.push(message.to_owned());
+            &mut |issue| {
+                issues.push(issue);
             },
         );
-        if let Some(message) = messages.first() {
-            self.error_from_message(message);
+        if let Some(issue) = issues.first() {
+            self.error(issue.issue());
         }
         ty
     }
