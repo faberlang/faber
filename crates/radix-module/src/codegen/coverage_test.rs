@@ -129,7 +129,25 @@ fn from_target_excludes_mir_targets() {
 
 #[test]
 fn all_targets_listed() {
-    assert_eq!(HirCoverageTarget::ALL.len(), 4);
+    // Membership, not length (defect-audit P6-4): `universe_spelling` names
+    // every variant with no wildcard arm, so a new variant is a compile
+    // error there, and this set-equality fails until `ALL` carries it.
+    let expected: Vec<&'static str> = ["rust", "go", "ts", "faber"].into();
+    for target in HirCoverageTarget::ALL {
+        assert_eq!(
+            target.universe_spelling(),
+            target.name(),
+            "{target:?} anchor spelling must match name()"
+        );
+    }
+    let all: Vec<&'static str> = HirCoverageTarget::ALL
+        .iter()
+        .map(|target| target.universe_spelling())
+        .collect();
+    assert_eq!(
+        all, expected,
+        "HirCoverageTarget::ALL must be exactly the variant domain the exhaustive anchor names"
+    );
 }
 
 #[test]

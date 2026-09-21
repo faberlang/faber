@@ -32,10 +32,49 @@ fn tier_names_are_distinct() {
 
 #[test]
 fn family_universe_is_complete_and_named() {
-    assert_eq!(ConversioTypeFamily::ALL.len(), 21);
+    // Membership, not length (defect-audit B6-T3): `universe_spelling` names
+    // every family with no wildcard arm, so a new family is a compile error
+    // there, and this set-equality fails until `ALL` carries it.
+    let expected: Vec<&'static str> = [
+        "numerus",
+        "fractus",
+        "bivalens",
+        "textus",
+        "ascii",
+        "octeti",
+        "regex",
+        "json",
+        "valor",
+        "instans",
+        "modulus",
+        "lista",
+        "tabula",
+        "copia",
+        "intervallum",
+        "tensor",
+        "vector",
+        "matrix",
+        "sparsa",
+        "cursor",
+        "promissum",
+    ]
+    .into();
     for family in ConversioTypeFamily::ALL {
+        assert_eq!(
+            family.universe_spelling(),
+            family.name(),
+            "{family:?} anchor spelling must match name()"
+        );
         assert!(!family.name().is_empty(), "{family:?} has no name");
     }
+    let all: Vec<&'static str> = ConversioTypeFamily::ALL
+        .iter()
+        .map(|family| family.universe_spelling())
+        .collect();
+    assert_eq!(
+        all, expected,
+        "ConversioTypeFamily::ALL must be exactly the variant domain the exhaustive anchor names"
+    );
 }
 
 #[test]
