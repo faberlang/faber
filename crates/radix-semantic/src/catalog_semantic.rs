@@ -433,6 +433,12 @@ fn semantic_invalid_conversion_help(args: &[DiagnosticArg]) -> Option<String> {
         }
         "valor_verte_unsupported" => Some("use runtime `↦ T` conversion with `⇥` recovery instead".to_owned()),
         "lista_to_tabula_unsupported" => Some("construct the tabula with explicit key/value selection".to_owned()),
+        "array_ascription_to_generic_map" => Some(
+            "an array has no key type to give a generic map: name the key type the array's indices \
+             provide (`tabula<numerus, V>`), or build the map with `empty`, `vacua`, or a keyed \
+             literal"
+                .to_owned(),
+        ),
         "cross_collection_unsupported" => Some("use an explicit stdlib conversion verb".to_owned()),
         "lista_to_tensor_nested" => Some("flatten the nested lista before converting to tensor".to_owned()),
         "lista_to_tensor_element_mismatch" => {

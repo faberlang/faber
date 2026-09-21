@@ -648,6 +648,89 @@ fn lista_to_tabula_conversio_rejects() {
 }
 
 #[test]
+fn array_ascription_to_generic_map_key_rejects() {
+    // Operator ruling (2026-09-21): an array's only map projection is
+    // index-keyed, which forces an integer key type. A generic key is
+    // constrained by nothing in the source, so the ascription is wrong even
+    // under the reading where `∷` converts.
+    test_support::assert_rejects_with_issue(
+        r"functio selecta<K, V>() → tabula<K, V> {
+  redde [] ∷ tabula<K, V>
+}",
+        "array_ascription_to_generic_map",
+    );
+}
+
+#[test]
+fn generic_genus_field_array_ascription_to_generic_map_key_rejects() {
+    // The norma `SortedMap<K, V>` shape: a generic class field default.
+    test_support::assert_rejects_with_issue(
+        r"genus SortedMap<K, V> {
+  tabula<K, V> entries = [] ∷ tabula<K, V>
+}",
+        "array_ascription_to_generic_map",
+    );
+}
+
+#[test]
+fn lista_source_ascription_to_generic_map_key_rejects() {
+    // The rule keys on the source's container family, not on literal syntax.
+    test_support::assert_rejects_with_issue(
+        r"functio selecta<K, V>(lista<numerus> src) → tabula<K, V> {
+  redde src ∷ tabula<K, V>
+}",
+        "array_ascription_to_generic_map",
+    );
+}
+
+#[test]
+fn array_ascription_to_holed_map_key_rejects() {
+    // `tabula<_, V>` leaves the key uninferred: same unconstrained shape.
+    test_support::assert_rejects_with_issue(
+        "incipit { fixum tabula<_, numerus> m ← [] ∷ tabula<_, numerus> }",
+        "array_ascription_to_generic_map",
+    );
+}
+
+#[test]
+fn index_keyed_array_ascription_to_map_typechecks() {
+    // Deliberately left accepted: the index-keyed form is the only coherent
+    // array-to-map conversion, and whether it should be legal is a separate
+    // unmade decision.
+    test_support::assert_accepts(
+        "incipit { fixum tabula<numerus, numerus> m ← [] ∷ tabula<numerus, numerus> }",
+    );
+}
+
+#[test]
+fn concrete_key_array_ascription_to_map_typechecks() {
+    // A concrete key type is constrained by the written target; the ruling
+    // covers only the unconstrained key.
+    test_support::assert_accepts(
+        "incipit { fixum tabula<textus, numerus> m ← [] ∷ tabula<textus, numerus> }",
+    );
+}
+
+#[test]
+fn sanctioned_empty_and_keyed_map_construction_typechecks() {
+    // `vacua` is the la-pack marker (`empty` is its en twin, covered by the
+    // corpus); the keyed literal stays the typed construction path.
+    test_support::assert_accepts(
+        r#"incipit {
+  fixum tabula<textus, numerus> a ← vacua
+  fixum tabula<textus, numerus> b ← { "alpha": 1 }
+}"#,
+    );
+}
+
+#[test]
+fn array_ascription_to_lista_still_typechecks() {
+    test_support::assert_accepts(
+        "incipit { fixum lista<numerus> xs ← [1, 2, 3] ∷ lista<numerus> }",
+    );
+}
+
+#[test]
 fn sync_to_promissum_conversio_rejects() {
     test_support::assert_rejects_with_issue(
         "incipit { fixum _ p ← 42 ↦ promissum<numerus> }",
