@@ -98,8 +98,10 @@ fn create_temp_root(archive: &Path) -> ArchiveResult<PathBuf> {
     }
 
     Err(Box::new(
-        faber_cli::package_diagnostic_error("could not create a unique archive extraction directory")
-            .with_file(archive.display().to_string()),
+        faber_cli::package_diagnostic_error(
+            "could not create a unique archive extraction directory",
+        )
+        .with_file(archive.display().to_string()),
     ))
 }
 

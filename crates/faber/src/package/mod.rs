@@ -100,12 +100,12 @@ pub use llvm_host::{
 };
 #[cfg(feature = "runner")]
 pub use manifest::manifest_backend_selection;
+pub(crate) use manifest::manifest_device_inputs;
 pub(crate) use manifest::validate_manifest;
 pub use manifest::{
     FaberManifest, ManifestProduct, ManifestProductEmit, ManifestProductKind,
     ManifestProductShaders, read_manifest,
 };
-pub(crate) use manifest::manifest_device_inputs;
 #[cfg(feature = "runner")]
 pub use mir::run_fmir_image_bytes_with_stdio;
 #[cfg(feature = "runner")]

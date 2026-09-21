@@ -45,8 +45,10 @@ pub fn cmd_emit_with_locale(command: EmitCommand, format: bool, linter: bool) {
     };
     let diagnostic_pack = match command.diagnostics_locale.as_deref() {
         Some(locale) => {
-            match faber_cli::package::locale_pack_for_emit_with_diagnostic(&command.input, Some(locale))
-            {
+            match faber_cli::package::locale_pack_for_emit_with_diagnostic(
+                &command.input,
+                Some(locale),
+            ) {
                 Ok(pack) => pack,
                 Err(diagnostic) => report_locale_diagnostic(&diagnostic),
             }
@@ -100,7 +102,13 @@ pub fn cmd_emit_with_locale(command: EmitCommand, format: bool, linter: bool) {
     }
 
     if let Some(path) = command.output {
-        faber_cli::postprocess::write_output_artifact(&path, output, command.target, format, linter);
+        faber_cli::postprocess::write_output_artifact(
+            &path,
+            output,
+            command.target,
+            format,
+            linter,
+        );
         return;
     }
 

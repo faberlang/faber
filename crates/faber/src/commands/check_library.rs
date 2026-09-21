@@ -206,11 +206,13 @@ pub(crate) fn check_dev_library(checkout: &DevLibraryCheckout) -> Vec<Diagnostic
             Ok(pair) => pair,
             Err(diag) => return vec![*diag],
         };
-    let resolver =
-        match faber_cli::package::library_resolver_for_package(&config, &checkout.spec.package_root) {
-            Ok(resolver) => resolver,
-            Err(diagnostics) => return diagnostics,
-        };
+    let resolver = match faber_cli::package::library_resolver_for_package(
+        &config,
+        &checkout.spec.package_root,
+    ) {
+        Ok(resolver) => resolver,
+        Err(diagnostics) => return diagnostics,
+    };
     match radix::program::analyze::analyze_package_spec(
         &config,
         clone_spec(&checkout.spec),

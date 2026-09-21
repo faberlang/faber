@@ -58,9 +58,9 @@ mod test_stats;
 mod test_stats_test;
 
 use crate::cli::Command;
+use clap::Parser;
 use faber_cli::input_shape::{locale_without_package_error, verify_input_is_package_shaped};
 use faber_cli::package;
-use clap::Parser;
 use radix::services::{BuildCommand, CheckCommand, DiagnosticMode, EmitCommand, VerifyCommand};
 
 use check_library::cmd_check_library;
