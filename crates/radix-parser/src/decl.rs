@@ -23,7 +23,7 @@
 
 use super::{ParseError, ParseErrorKind, Parser};
 use radix_lexer::{
-    KeywordKind, KeywordOwner, KeywordScope, TokenKind, keyword_allowed_as_ident,
+    KeywordKind, KeywordOwner, KeywordScope, Span, TokenKind, keyword_allowed_as_ident,
     keyword_spelling_for_token, lookup_keyword_spec,
 };
 #[allow(clippy::wildcard_imports)]
@@ -2691,12 +2691,22 @@ impl Parser {
     ///
     /// Block recovery passes `stop_at_rbrace = true` so a bad inner statement can
     /// be skipped without consuming the `}` that returns control to the caller.
+    ///
+    /// Nested blocks re-enter here through `parse_stmt`, so the depth budget is
+    /// charged at this entry point.
     pub(super) fn parse_block(&mut self) -> Result<BlockStmt, ParseError> {
         let start = self.current_span();
+        self.nested(ParseErrorKind::StatementInvalid, start, |parser| {
+            parser.parse_block_body(start)
+        })
+    }
+
+    /// Block body beneath the depth budget; see [`Parser::parse_block`].
+    fn parse_block_body(&mut self, start: Span) -> Result<BlockStmt, ParseError> {
         self.expect(&TokenKind::LBrace, "expected '{'")?;
 
         let mut stmts = Vec::new();
-        while !self.check(&TokenKind::RBrace) && !self.is_at_end() {
+        while !self.check(&TokenKind::RBrace) && !self.is_at_end() && !self.budget_exhausted {
             match self.parse_stmt() {
                 Ok(stmt) => stmts.push(stmt),
                 Err(e) => {
@@ -2704,6 +2714,18 @@ impl Parser {
                     self.synchronize(true);
                 }
             }
+        }
+
+        // A spent budget leaves the rest of this block unparsed: close the block
+        // positionally instead of adding one "expected '}'" per enclosing level
+        // to the single budget diagnostic that already stops the parse.
+        if self.budget_exhausted {
+            let span = start.merge(self.previous_span());
+            return Ok(BlockStmt {
+                statements: stmts,
+                end_trivia: Vec::new(),
+                span,
+            });
         }
 
         // Trivia immediately before the consuming `}` has no following

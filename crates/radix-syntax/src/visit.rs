@@ -17,10 +17,11 @@
 //!   that node family.
 //! - Calling a `walk_*` function continues traversal after custom visitor logic.
 //! - Traversal has no semantic side effects beyond what the visitor performs.
-//! - Walkers enforce [`MAX_VISIT_DEPTH`] fail-closed: deeper nesting calls
-//!   [`Visitor::on_depth_exceeded`] (default: panic) instead of overflowing the
-//!   stack. Depth is tracked inside the walk functions so existing `Visitor`
-//!   overrides that call `walk_*` keep working without signature changes.
+//! - Walkers enforce [`MAX_VISIT_DEPTH`] fail-closed: deeper nesting reports
+//!   [`DepthExceeded`] through [`Visitor::on_depth_exceeded`] and stops
+//!   descending instead of overflowing the stack. Depth is tracked inside the
+//!   walk functions so existing `Visitor` overrides that call `walk_*` keep
+//!   working without signature changes.
 
 use std::cell::Cell;
 
@@ -36,6 +37,20 @@ use super::ast::{
 /// build stays safely under a typical ~2 MiB thread stack. Realistic Faber
 /// ASTs are far shallower.
 pub const MAX_VISIT_DEPTH: usize = 1024;
+
+/// Depth-limit diagnostic handed to [`Visitor::on_depth_exceeded`].
+///
+/// A walker that reports this stops descending, so the reported node's subtree
+/// is never entered. A visitor whose answer feeds compilation must treat the
+/// report as an incomplete walk: the missing subtree is unknown, not absent.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct DepthExceeded {
+    /// Depth the walker refused to enter (one past [`MAX_VISIT_DEPTH`]).
+    pub depth: usize,
+
+    /// Depth limit that stopped the walk.
+    pub limit: usize,
+}
 
 thread_local! {
     /// Nesting depth of the active `walk_*` chain on this thread.
@@ -55,7 +70,10 @@ impl DepthFrame {
     fn enter<V: Visitor>(visitor: &mut V) -> Option<Self> {
         let depth = VISIT_DEPTH.with(Cell::get);
         if depth > MAX_VISIT_DEPTH {
-            visitor.on_depth_exceeded(depth);
+            visitor.on_depth_exceeded(DepthExceeded {
+                depth,
+                limit: MAX_VISIT_DEPTH,
+            });
             return None;
         }
         VISIT_DEPTH.with(|cell| cell.set(depth + 1));
@@ -81,10 +99,14 @@ impl Drop for DepthFrame {
 pub trait Visitor: Sized {
     /// Called when a walker would nest deeper than [`MAX_VISIT_DEPTH`].
     ///
-    /// Default: panic with a diagnostic. Override to fail closed without
-    /// unwinding (e.g. record a diagnostic and stop descending).
-    fn on_depth_exceeded(&mut self, depth: usize) {
-        panic!("AST visitor exceeded maximum depth of {MAX_VISIT_DEPTH} at node depth {depth}");
+    /// The walker stops descending immediately after this call — the subtree at
+    /// the reported depth is never entered — so the default is a clean
+    /// fail-closed stop rather than a panic, and a deep AST can never abort the
+    /// process from this hook. Override to carry the failure to the caller
+    /// (see [`DepthExceeded`]); a visitor on a compile path must do so, because
+    /// an unreported stop reads as "nothing found" in the pruned subtree.
+    fn on_depth_exceeded(&mut self, exceeded: DepthExceeded) {
+        let _ = exceeded;
     }
 
     fn visit_program(&mut self, program: &Program) {

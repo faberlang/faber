@@ -52,14 +52,42 @@ impl Parser {
     ///
     /// GRAMMAR:
     ///   expression := assignment
+    ///
+    /// Every nested expression (`(...)`, call arguments, initializers) enters
+    /// here again, so this is where the depth budget is charged. The operator
+    /// budget resets only at a new root, so sub-expressions accumulate into it.
     pub(super) fn parse_expression(&mut self) -> Result<Expr, ParseError> {
-        self.parse_assignment()
+        let start = self.current_span();
+        if self.expression_contexts == 0 {
+            self.folded_operators = 0;
+        }
+        self.expression_contexts = self.expression_contexts.saturating_add(1);
+        let result = self.nested(
+            ParseErrorKind::ExpressionInvalid,
+            start,
+            Self::parse_assignment,
+        );
+        self.expression_contexts = self.expression_contexts.saturating_sub(1);
+        result
     }
 
-    fn binary_expr(&mut self, start: Span, lhs: Expr, op: BinOp, rhs: Expr) -> Expr {
+    /// Fold one left-associative binary node.
+    ///
+    /// The fold charges the operator budget here so every tier that folds in a
+    /// loop (`and`/`or`/comparison/bitwise/shift as well as additive and
+    /// multiplicative) is bounded by the same counter — see
+    /// [`MAX_PARSE_OPERATORS`].
+    fn binary_expr(
+        &mut self,
+        start: Span,
+        lhs: Expr,
+        op: BinOp,
+        rhs: Expr,
+    ) -> Result<Expr, ParseError> {
+        self.charge_fold(start)?;
         let span = start.merge(self.previous_span());
         let id = self.next_id();
-        Expr {
+        Ok(Expr {
             id,
             kind: ExprKind::Binary(BinaryExpr {
                 op,
@@ -67,7 +95,7 @@ impl Parser {
                 rhs: Box::new(rhs),
             }),
             span,
-        }
+        })
     }
 
     // PRECEDENCE CLIMBING
@@ -146,7 +174,11 @@ impl Parser {
         };
 
         self.advance();
-        let value = Box::new(self.parse_assignment()?);
+        let value = Box::new(self.nested(
+            ParseErrorKind::ExpressionInvalid,
+            self.current_span(),
+            Self::parse_assignment,
+        )?);
 
         let recovery = if matches!(op, AssignOp::ConversioAssign) {
             if self.eat(&TokenKind::ExitArrow) {
@@ -185,7 +217,8 @@ impl Parser {
     ///   ternary := or ['?' expr ':' ternary | `sic` expr `secus` ternary]
     ///
     /// WHY: Faber supports both C-style (? :) and keyword-style (sic secus) ternary.
-    /// Right-associative via recursion on else branch.
+    /// Right-associative via recursion on else branch, so the else recursion is
+    /// where the depth budget is charged for `? :` chains.
     fn parse_ternary(&mut self) -> Result<Expr, ParseError> {
         let start = self.current_span();
         let cond = self.parse_or()?;
@@ -193,7 +226,12 @@ impl Parser {
         if self.eat(&TokenKind::Question) {
             let then = Box::new(self.parse_expression()?);
             self.expect(&TokenKind::Colon, "expected ':' in ternary")?;
-            let else_ = Box::new(self.parse_ternary()?);
+            let else_span = self.current_span();
+            let else_ = Box::new(self.nested(
+                ParseErrorKind::ExpressionInvalid,
+                else_span,
+                Self::parse_ternary,
+            )?);
             let span = start.merge(self.previous_span());
             let id = self.next_id();
             return Ok(Expr {
@@ -211,7 +249,12 @@ impl Parser {
         if self.eat_keyword_ident(TokenKind::Sic) {
             let then = Box::new(self.parse_expression()?);
             self.expect_keyword_ident(TokenKind::Secus, "expected 'secus' after 'sic'")?;
-            let else_ = Box::new(self.parse_ternary()?);
+            let else_span = self.current_span();
+            let else_ = Box::new(self.nested(
+                ParseErrorKind::ExpressionInvalid,
+                else_span,
+                Self::parse_ternary,
+            )?);
             let span = start.merge(self.previous_span());
             let id = self.next_id();
             return Ok(Expr {
@@ -237,7 +280,7 @@ impl Parser {
         while self.check_keyword_ident(TokenKind::Aut) {
             self.advance();
             let right = self.parse_and()?;
-            left = self.binary_expr(start, left, BinOp::Or, right);
+            left = self.binary_expr(start, left, BinOp::Or, right)?;
         }
 
         Ok(left)
@@ -250,7 +293,7 @@ impl Parser {
         while self.check_keyword_ident(TokenKind::Et) {
             self.advance();
             let right = self.parse_equality()?;
-            left = self.binary_expr(start, left, BinOp::And, right);
+            left = self.binary_expr(start, left, BinOp::And, right)?;
         }
 
         Ok(left)
@@ -308,7 +351,7 @@ impl Parser {
             }
 
             let right = self.parse_comparison()?;
-            left = self.binary_expr(start, left, op, right);
+            left = self.binary_expr(start, left, op, right)?;
         }
 
         Ok(left)
@@ -333,7 +376,7 @@ impl Parser {
             };
             self.advance();
             let right = self.parse_bitwise_or()?;
-            left = self.binary_expr(start, left, op, right);
+            left = self.binary_expr(start, left, op, right)?;
         }
 
         Ok(left)
@@ -346,7 +389,7 @@ impl Parser {
         while self.check(&TokenKind::BitwiseOr) {
             self.advance();
             let right = self.parse_bitwise_xor()?;
-            left = self.binary_expr(start, left, BinOp::BitOr, right);
+            left = self.binary_expr(start, left, BinOp::BitOr, right)?;
         }
 
         Ok(left)
@@ -359,7 +402,7 @@ impl Parser {
         while self.check(&TokenKind::BitwiseXor) {
             self.advance();
             let right = self.parse_bitwise_and()?;
-            left = self.binary_expr(start, left, BinOp::BitXor, right);
+            left = self.binary_expr(start, left, BinOp::BitXor, right)?;
         }
 
         Ok(left)
@@ -372,7 +415,7 @@ impl Parser {
         while self.check(&TokenKind::BitwiseAnd) {
             self.advance();
             let right = self.parse_shift()?;
-            left = self.binary_expr(start, left, BinOp::BitAnd, right);
+            left = self.binary_expr(start, left, BinOp::BitAnd, right)?;
         }
 
         Ok(left)
@@ -394,7 +437,7 @@ impl Parser {
             };
 
             let right = self.parse_range_with_conversio()?;
-            left = self.binary_expr(start, left, op, right);
+            left = self.binary_expr(start, left, op, right)?;
         }
 
         Ok(left)
@@ -481,7 +524,7 @@ impl Parser {
             };
             self.advance();
             let right = self.parse_multiplicative_inner(allow_conversio)?;
-            left = self.binary_expr(start, left, op, right);
+            left = self.binary_expr(start, left, op, right)?;
         }
 
         Ok(left)
@@ -516,7 +559,7 @@ impl Parser {
             };
             self.advance();
             let right = self.parse_coalesce_inner(allow_conversio)?;
-            let binary = self.binary_expr(start, left, op, right);
+            let binary = self.binary_expr(start, left, op, right)?;
             left = self.reassociate_gradient_selection(binary);
         }
 
@@ -572,7 +615,7 @@ impl Parser {
         while self.check_keyword_ident(TokenKind::Vel) {
             self.advance();
             let right = self.parse_vel_rhs(allow_conversio)?;
-            left = self.binary_expr(start, left, BinOp::Coalesce, right);
+            left = self.binary_expr(start, left, BinOp::Coalesce, right)?;
         }
 
         Ok(left)

@@ -76,8 +76,18 @@ impl Parser {
     /// Declaration-level optional slots are parsed outside this module as
     /// `sponte` markers after the binding name. `nihil` is accepted here as a
     /// keyword-backed type name because it also exists as a value literal.
+    ///
+    /// Nested types (function-type parameters, generic arguments) re-enter
+    /// here, so the depth budget is charged at this entry point.
     pub(super) fn parse_type(&mut self) -> Result<TypeExpr, ParseError> {
         let start = self.current_span();
+        self.nested(ParseErrorKind::TypeInvalid, start, |parser| {
+            parser.parse_type_body(start)
+        })
+    }
+
+    /// Type body beneath the depth budget; see [`Parser::parse_type`].
+    fn parse_type_body(&mut self, start: Span) -> Result<TypeExpr, ParseError> {
         let core = self.parse_type_atom(start)?;
         let core = self.parse_intersection_tail(core, start)?;
         self.parse_union_tail(core, start)

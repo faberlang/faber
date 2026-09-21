@@ -73,6 +73,38 @@ impl ParseResult {
     }
 }
 
+/// Maximum grammar nesting depth before the parser fails closed.
+///
+/// Source nesting is attacker-controlled, and recursive descent spends a whole
+/// precedence chain of Rust frames per level, so an unbounded descent aborts the
+/// process on the stack long before any later phase can report anything. Depth
+/// is checked at the recursive entry points (`parse_expression`, `parse_type`,
+/// `parse_block`, plus the right-associative `? :` and `←` recursions) and a
+/// rejected subtree becomes an ordinary parse diagnostic through the usual
+/// recovery path.
+///
+/// Sized from measurement, not taste. With the guard removed, a parenthesized
+/// nest overflows a 2 MiB test-thread stack between 32 and 48 levels and an
+/// 8 MiB stack between 128 and 144 (tens of KB of parser stack per level in a
+/// debug build), so a budget above 32 could not be reached before that abort on
+/// the smallest stack this front end runs on. It is ~3x the deepest bracket
+/// nesting in the corpus (`product-corpus/format/long-lines.fab`, 11 levels),
+/// and it leaves the shared 8 MiB compile stacks (`faber` main thread, package
+/// analysis) room to lower and walk the admitted tree.
+pub const MAX_PARSE_DEPTH: u32 = 32;
+
+/// Maximum folded infix operators in one expression root before the parser
+/// fails closed.
+///
+/// A depth counter alone does not bound this shape: `parse_additive_inner` and
+/// its sibling tiers fold left-associatively in a loop, so `1+1+1+…` costs the
+/// parser no extra stack frame while building a left spine one node deep per
+/// operator. That spine is walked node by node, so the count is charged in
+/// `binary_expr` — the fold constructor every tier shares — and accumulates
+/// across the sub-expressions of one root, keeping the admitted tree inside the
+/// AST walker's `MAX_VISIT_DEPTH` (1024).
+pub const MAX_PARSE_OPERATORS: usize = 512;
+
 /// Mutable state for one parser invocation.
 ///
 /// Subparser modules extend this type instead of each owning token state. That
@@ -116,6 +148,32 @@ pub struct Parser {
     /// still routes to `TypeCheck`. Cross-file imported types are not visible
     /// here; those keep today's `Binary(Is)` value-equality classification.
     declared_type_names: HashSet<String>,
+    /// Grammar nesting levels currently open, bounded by [`MAX_PARSE_DEPTH`].
+    ///
+    /// Raised and lowered around each recursive entry point, so a rejected
+    /// subtree leaves the count as it found it.
+    nesting_depth: u32,
+    /// Folded infix operators charged against the current expression root.
+    ///
+    /// Reset when an expression root opens, bounded by [`MAX_PARSE_OPERATORS`].
+    folded_operators: usize,
+    /// Number of `parse_expression` contexts currently open.
+    ///
+    /// A count of zero marks the next `parse_expression` call as a new root.
+    expression_contexts: u32,
+    /// Set once either budget is exhausted; parsing then stops descending.
+    ///
+    /// A budget diagnostic is raised where the budget was spent, which can be a
+    /// position the statement loops would otherwise re-enter and fail on again
+    /// without consuming a token. Stopping the enclosing statement/program
+    /// loops keeps the failed parse linear and one-diagnostic-per-run.
+    budget_exhausted: bool,
+    /// The diagnostic that spent the budget.
+    ///
+    /// Kept so every later refusal reports the construct that actually crossed
+    /// the budget: a speculative sub-parse may discard the crossing error and
+    /// continue, and a synthetic "budget spent" report would hide the cause.
+    budget_diagnostic: Option<ParseError>,
 }
 
 /// Contextual parser policy supplied by compiler frontends.
@@ -258,6 +316,11 @@ impl Parser {
             has_latin_fallback,
             abstract_class_depth: 0,
             declared_type_names: HashSet::new(),
+            nesting_depth: 0,
+            folded_operators: 0,
+            expression_contexts: 0,
+            budget_exhausted: false,
+            budget_diagnostic: None,
         };
         parser.declared_type_names = parser.scan_declared_type_names();
         parser
@@ -325,7 +388,7 @@ impl Parser {
         let start = self.current_span();
         let mut stmts = Vec::new();
 
-        while !self.is_at_end() {
+        while !self.is_at_end() && !self.budget_exhausted {
             match self.parse_stmt() {
                 Ok(stmt) => stmts.push(stmt),
                 Err(e) => {
@@ -349,8 +412,12 @@ impl Parser {
         };
 
         // Claimed-comment accounting: every `LineComment` token is either
-        // present in a legal syntax trivia carrier or reported here.
-        claim::check(self, &program);
+        // present in a legal syntax trivia carrier or reported here. A spent
+        // parse budget leaves the rest of the source unparsed, so comment
+        // placement there is not a finding: the budget diagnostic is the report.
+        if !self.budget_exhausted {
+            claim::check(self, &program);
+        }
 
         ParseResult {
             program: Some(program),
@@ -391,6 +458,82 @@ impl Parser {
     /// Align `non_trivia_cursor` to the first non-trivia index ≥ `pos`.
     fn sync_non_trivia_cursor(&mut self) {
         self.non_trivia_cursor = self.non_trivia_indices.partition_point(|&i| i < self.pos);
+    }
+
+    // RESOURCE BUDGETS
+    //
+    // Both budgets fail closed with a parse diagnostic: the rejected subtree
+    // travels the ordinary error path (statement recovery), so deep or long
+    // input becomes a reportable diagnostic instead of a stack abort.
+
+    /// Run `parse` one grammar nesting level deeper, failing closed past
+    /// [`MAX_PARSE_DEPTH`].
+    ///
+    /// The level is released on every exit, including the failing one, so a
+    /// rejected subtree never leaves the count inflated for its siblings. The
+    /// first failure stops the enclosing statement loops (see
+    /// [`Parser::budget_exhausted`]) and no later call descends again, so an
+    /// over-budget source costs one pass, not one pass per nesting level.
+    fn nested<T>(
+        &mut self,
+        kind: ParseErrorKind,
+        span: Span,
+        parse: impl FnOnce(&mut Self) -> Result<T, ParseError>,
+    ) -> Result<T, ParseError> {
+        if self.budget_exhausted {
+            return Err(self.spent_budget_error(kind, span));
+        }
+        self.nesting_depth = self.nesting_depth.saturating_add(1);
+        let result = if self.nesting_depth > MAX_PARSE_DEPTH {
+            Err(self.spend_budget(Self::nesting_too_deep_error(kind, span)))
+        } else {
+            parse(self)
+        };
+        self.nesting_depth = self.nesting_depth.saturating_sub(1);
+        result
+    }
+
+    /// Charge one folded infix operator against the current expression root,
+    /// failing closed past [`MAX_PARSE_OPERATORS`].
+    ///
+    /// Charged where the fold builds its node (see [`MAX_PARSE_OPERATORS`]) so
+    /// every left-associative tier is bounded by the same counter.
+    fn charge_fold(&mut self, span: Span) -> Result<(), ParseError> {
+        if self.budget_exhausted {
+            return Err(self.spent_budget_error(ParseErrorKind::ExpressionInvalid, span));
+        }
+        self.folded_operators = self.folded_operators.saturating_add(1);
+        if self.folded_operators > MAX_PARSE_OPERATORS {
+            let error = ParseError::structured(ParseErrorKind::ExpressionInvalid, span)
+                .with_arg("issue", "expression_too_long")
+                .with_arg("limit", MAX_PARSE_OPERATORS.to_string());
+            return Err(self.spend_budget(error));
+        }
+        Ok(())
+    }
+
+    /// Mark the budget spent and hand back the diagnostic that spent it.
+    fn spend_budget(&mut self, error: ParseError) -> ParseError {
+        self.budget_exhausted = true;
+        self.budget_diagnostic = Some(error.clone());
+        error
+    }
+
+    /// Diagnostic for any construct reached after a budget was already spent.
+    fn spent_budget_error(&self, kind: ParseErrorKind, span: Span) -> ParseError {
+        self.budget_diagnostic
+            .clone()
+            .unwrap_or_else(|| ParseError::structured(kind, span))
+    }
+
+    /// Diagnostic for source nesting past [`MAX_PARSE_DEPTH`].
+    ///
+    /// `kind` is the grammar area the nesting was found in, so the report keeps
+    /// the expression/type/statement classification the catalog already uses.
+    fn nesting_too_deep_error(kind: ParseErrorKind, span: Span) -> ParseError {
+        ParseError::structured(kind, span)
+            .with_arg("issue", "nesting_too_deep")
+            .with_arg("limit", MAX_PARSE_DEPTH.to_string())
     }
 
     fn peek(&self) -> &Token {
@@ -1305,3 +1448,7 @@ mod union_conversio_test;
 #[cfg(test)]
 #[path = "non_trivia_index_test.rs"]
 mod non_trivia_index_test;
+
+#[cfg(test)]
+#[path = "nesting_budget_test.rs"]
+mod nesting_budget_test;

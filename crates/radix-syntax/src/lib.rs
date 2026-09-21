@@ -46,4 +46,4 @@ pub use braced_annotation::{
 };
 pub use span::Spanned;
 pub use trivia::{CommentLine, Newline, Trivia};
-pub use visit::{Visitor, walk_expr, walk_stmt};
+pub use visit::{DepthExceeded, MAX_VISIT_DEPTH, Visitor, walk_expr, walk_stmt};

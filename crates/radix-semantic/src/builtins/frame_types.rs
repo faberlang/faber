@@ -238,16 +238,39 @@ pub fn directional_view_payload_type_id(
 }
 
 /// Return whether the parsed program needs compiler-owned frame types registered.
+///
+/// Answers fail-closed: if the walker refuses to descend past its depth limit
+/// the scan is incomplete, so the builtins are registered rather than reporting
+/// "not used" for a subtree that was never read. The refused depth is recorded
+/// on the visitor for callers that can report it.
 #[must_use]
 pub fn program_needs_frame_types(program: &radix_syntax::Program, interner: &Interner) -> bool {
-    use radix_syntax::{ExprKind, StmtKind, Visitor, walk_stmt};
+    use radix_syntax::{DepthExceeded, ExprKind, Program, StmtKind, Visitor, walk_stmt};
 
     struct FrameUsageVisitor<'a> {
         interner: &'a Interner,
         found: bool,
+        /// Depth the walker refused to enter, if it stopped short.
+        depth_exceeded: Option<DepthExceeded>,
+    }
+
+    impl FrameUsageVisitor<'_> {
+        /// Walk the program, stopping at the first `ad`/`meus`/`tuus` use.
+        fn scan(&mut self, program: &Program) {
+            for stmt in &program.statements {
+                self.visit_stmt(stmt);
+                if self.found {
+                    break;
+                }
+            }
+        }
     }
 
     impl Visitor for FrameUsageVisitor<'_> {
+        fn on_depth_exceeded(&mut self, exceeded: DepthExceeded) {
+            self.depth_exceeded = Some(exceeded);
+        }
+
         fn visit_stmt(&mut self, stmt: &radix_syntax::Stmt) {
             if self.found {
                 return;
@@ -286,14 +309,10 @@ pub fn program_needs_frame_types(program: &radix_syntax::Program, interner: &Int
     let mut visitor = FrameUsageVisitor {
         interner,
         found: false,
+        depth_exceeded: None,
     };
-    for stmt in &program.statements {
-        visitor.visit_stmt(stmt);
-        if visitor.found {
-            break;
-        }
-    }
-    visitor.found
+    visitor.scan(program);
+    visitor.found || visitor.depth_exceeded.is_some()
 }
 
 /// Append builtin frame type items to lowered HIR when the program uses them.
@@ -475,4 +494,78 @@ fn inject_sermo(
         }),
         span: Span::default(),
     });
+}
+
+// In-file pin for the scan above.
+#[cfg(test)]
+mod frame_usage_budget_test {
+    use super::program_needs_frame_types;
+    use radix_lexer::{Interner, Span};
+    use radix_syntax::{
+        BinOp, BinaryExpr, Expr, ExprKind, ExprStmt, Literal, MAX_VISIT_DEPTH, Program, Stmt,
+        StmtKind,
+    };
+
+    /// Left-nested `1 + (1 + (…))` spine; its deepest leaf is `depth` nodes down.
+    fn deep_spine(depth: usize) -> Expr {
+        let mut expr = Expr {
+            id: 0,
+            kind: ExprKind::Literal(Literal::Int(1)),
+            span: Span::default(),
+        };
+        for i in 0..depth {
+            let id = u32::try_from(i).unwrap_or(u32::MAX);
+            expr = Expr {
+                id,
+                kind: ExprKind::Binary(BinaryExpr {
+                    op: BinOp::Add,
+                    lhs: Box::new(expr),
+                    rhs: Box::new(Expr {
+                        id,
+                        kind: ExprKind::Literal(Literal::Int(1)),
+                        span: Span::default(),
+                    }),
+                }),
+                span: Span::default(),
+            };
+        }
+        expr
+    }
+
+    fn program_with(expr: Expr) -> Program {
+        Program {
+            statements: vec![Stmt {
+                id: 0,
+                kind: StmtKind::Expr(ExprStmt {
+                    expr: Box::new(expr),
+                }),
+                span: Span::default(),
+                annotations: Vec::new(),
+                leading_trivia: Vec::new(),
+            }],
+            span: Span::default(),
+            end_trivia: Vec::new(),
+        }
+    }
+
+    #[test]
+    fn shallow_program_without_frame_use_registers_nothing() {
+        let interner = Interner::new();
+        let program = program_with(Expr {
+            id: 0,
+            kind: ExprKind::Literal(Literal::Int(1)),
+            span: Span::default(),
+        });
+        assert!(!program_needs_frame_types(&program, &interner));
+    }
+
+    #[test]
+    fn scan_fails_closed_when_the_walker_stops() {
+        let interner = Interner::new();
+        let program = program_with(deep_spine(MAX_VISIT_DEPTH + 8));
+        assert!(
+            program_needs_frame_types(&program, &interner),
+            "an incomplete scan must register the builtins rather than report no frame use"
+        );
+    }
 }

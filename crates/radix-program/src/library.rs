@@ -1672,7 +1672,7 @@ fn library_interface_items(
         if has_private_visibility(&stmt.annotations, &cached.interner) {
             continue;
         }
-        if let Some(mut item) = library_interface_item(stmt, &cached.interner) {
+        if let Some(mut item) = library_interface_item(stmt, &cached.interner)? {
             item.is_async = cached
                 .file_interface
                 .as_ref()
@@ -1812,11 +1812,23 @@ fn stmt_export_name(stmt: &radix_module::syntax::Stmt, interner: &Interner) -> O
 
 /// True when a function body opens a host stream (`ad`) so package codegen can
 /// mark the library item failable (Result + fac/cape) without requiring ⇥.
-fn function_body_contains_ad(body: Option<&radix_module::syntax::BlockStmt>) -> bool {
+///
+/// Fails closed: the walker refusing to descend past its depth limit is
+/// reported, not read as "no `ad`", because this answer decides the exported
+/// interface's failure shape.
+fn function_body_contains_ad(
+    body: Option<&radix_module::syntax::BlockStmt>,
+) -> Result<bool, Diagnostic> {
     struct AdFinder {
         found: bool,
+        /// Depth the walker refused to enter, if it stopped short.
+        depth_exceeded: Option<radix_module::syntax::DepthExceeded>,
     }
     impl Visitor for AdFinder {
+        fn on_depth_exceeded(&mut self, exceeded: radix_module::syntax::DepthExceeded) {
+            self.depth_exceeded = Some(exceeded);
+        }
+
         fn visit_expr(&mut self, expr: &Expr) {
             if self.found {
                 return;
@@ -1829,17 +1841,26 @@ fn function_body_contains_ad(body: Option<&radix_module::syntax::BlockStmt>) -> 
         }
     }
     let Some(body) = body else {
-        return false;
+        return Ok(false);
     };
-    let mut finder = AdFinder { found: false };
+    let mut finder = AdFinder {
+        found: false,
+        depth_exceeded: None,
+    };
     finder.visit_block(body);
-    finder.found
+    if let Some(exceeded) = finder.depth_exceeded {
+        return Err(crate::package_diagnostic_error(format!(
+            "function body exceeds the AST walk depth limit ({}): cannot decide whether it opens a host stream",
+            exceeded.limit
+        )));
+    }
+    Ok(finder.found)
 }
 
 fn library_interface_item(
     stmt: &radix_module::syntax::Stmt,
     interner: &Interner,
-) -> Option<LibraryInterfaceItem> {
+) -> Result<Option<LibraryInterfaceItem>, Diagnostic> {
     let (name, kind, is_failable) = match &stmt.kind {
         StmtKind::Interface(interface) => (
             interner.resolve(interface.name.name),
@@ -1850,7 +1871,7 @@ fn library_interface_item(
             interner.resolve(func.name.name),
             LibraryItemKind::Function,
             // Declared ⇥ or host `ad` materialize (codegen-failable for fac/cape).
-            func.err.is_some() || function_body_contains_ad(func.body.as_ref()),
+            func.err.is_some() || function_body_contains_ad(func.body.as_ref())?,
         ),
         StmtKind::TypeAlias(alias) => (
             interner.resolve(alias.name.name),
@@ -1874,19 +1895,19 @@ fn library_interface_item(
         ),
         StmtKind::Var(var) => {
             let radix_module::syntax::BindingPattern::Ident(ident) = &var.binding else {
-                return None;
+                return Ok(None);
             };
             (interner.resolve(ident.name), LibraryItemKind::Const, false)
         }
-        _ => return None,
+        _ => return Ok(None),
     };
-    Some(LibraryInterfaceItem {
+    Ok(Some(LibraryInterfaceItem {
         exported_name: name.to_owned(),
         local_name: name.to_owned(),
         kind,
         is_failable,
         is_async: false,
-    })
+    }))
 }
 
 fn hir_item_name_and_kind(
@@ -1925,3 +1946,87 @@ fn hir_item_name_and_kind(
 #[cfg(test)]
 #[path = "library_test.rs"]
 mod tests;
+
+// In-file pin for the interface scan above.
+#[cfg(test)]
+mod ad_finder_budget_test {
+    use super::function_body_contains_ad;
+    use radix_module::lexer::{Span, Symbol};
+    use radix_module::syntax::{
+        AdExpr, BinOp, BinaryExpr, BlockStmt, Expr, ExprKind, ExprStmt, Literal, MAX_VISIT_DEPTH,
+        Stmt, StmtKind,
+    };
+
+    fn literal() -> Expr {
+        Expr {
+            id: 0,
+            kind: ExprKind::Literal(Literal::Int(1)),
+            span: Span::default(),
+        }
+    }
+
+    /// Left-nested `1 + (1 + (…))` spine; its deepest leaf is `depth` nodes down.
+    fn deep_spine(depth: usize) -> Expr {
+        let mut expr = literal();
+        for i in 0..depth {
+            let id = u32::try_from(i).unwrap_or(u32::MAX);
+            expr = Expr {
+                id,
+                kind: ExprKind::Binary(BinaryExpr {
+                    op: BinOp::Add,
+                    lhs: Box::new(expr),
+                    rhs: Box::new(literal()),
+                }),
+                span: Span::default(),
+            };
+        }
+        expr
+    }
+
+    fn block_with(expr: Expr) -> BlockStmt {
+        BlockStmt {
+            statements: vec![Stmt {
+                id: 0,
+                kind: StmtKind::Expr(ExprStmt {
+                    expr: Box::new(expr),
+                }),
+                span: Span::default(),
+                annotations: Vec::new(),
+                leading_trivia: Vec::new(),
+            }],
+            end_trivia: Vec::new(),
+            span: Span::default(),
+        }
+    }
+
+    #[test]
+    fn body_without_host_stream_is_not_failable() {
+        let block = block_with(literal());
+        assert!(!function_body_contains_ad(Some(&block)).expect("shallow scan answers"));
+    }
+
+    #[test]
+    fn body_with_host_stream_is_failable() {
+        let block = block_with(Expr {
+            id: 0,
+            kind: ExprKind::Ad(Box::new(AdExpr {
+                path: Symbol(0),
+                opener: None,
+                span: Span::default(),
+            })),
+            span: Span::default(),
+        });
+        assert!(function_body_contains_ad(Some(&block)).expect("shallow scan answers"));
+    }
+
+    #[test]
+    fn body_the_walker_stops_in_is_reported() {
+        let block = block_with(deep_spine(MAX_VISIT_DEPTH + 8));
+        let result = function_body_contains_ad(Some(&block));
+        let diagnostic = result.expect_err("an incomplete scan must be reported, not guessed");
+        assert!(
+            diagnostic.is_error(),
+            "the incomplete scan must be reported as an error diagnostic"
+        );
+    }
+}
