@@ -52,6 +52,24 @@ impl HirCoverageTarget {
 
     /// All `HIR` coverage targets in canonical order.
     pub const ALL: &[Self] = &[Self::Rust, Self::Go, Self::TypeScript, Self::Faber];
+
+    /// Exhaustive domain anchor for [`ALL`](Self::ALL): one arm per variant,
+    /// no wildcard (defect-audit P6-4 / B6-T3).
+    ///
+    /// Adding a variant fails this match's compilation, and the coverage
+    /// tests then fail until `ALL` carries the new variant — the `ALL.len()`
+    /// assertion this replaces stayed green when `ALL` lagged the enum. The
+    /// tests pin each spelling to [`name`](Self::name) so this anchor and
+    /// the display name cannot drift apart.
+    #[must_use]
+    pub fn universe_spelling(self) -> &'static str {
+        match self {
+            Self::Rust => "rust",
+            Self::TypeScript => "ts",
+            Self::Go => "go",
+            Self::Faber => "faber",
+        }
+    }
 }
 
 /// Map a [`Target`] to its `HIR` coverage counterpart, if one exists.

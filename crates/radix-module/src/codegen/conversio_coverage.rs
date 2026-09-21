@@ -145,6 +145,41 @@ impl ConversioTypeFamily {
         Self::Promissum,
     ];
 
+    /// Exhaustive domain anchor for [`ALL`](Self::ALL): one arm per family,
+    /// no wildcard (defect-audit B6-T3).
+    ///
+    /// Adding a family fails this match's compilation, and the coverage
+    /// tests then fail until `ALL` carries the new family — the `ALL.len()`
+    /// assertion this replaces stayed green when `ALL` lagged the enum. The
+    /// tests pin each spelling to [`name`](Self::name) so this anchor and
+    /// the display name cannot drift apart.
+    #[must_use]
+    pub fn universe_spelling(self) -> &'static str {
+        match self {
+            Self::Numerus => "numerus",
+            Self::Fractus => "fractus",
+            Self::Bivalens => "bivalens",
+            Self::Textus => "textus",
+            Self::Ascii => "ascii",
+            Self::Octeti => "octeti",
+            Self::Regex => "regex",
+            Self::Json => "json",
+            Self::Valor => "valor",
+            Self::Instans => "instans",
+            Self::Modulus => "modulus",
+            Self::Lista => "lista",
+            Self::Tabula => "tabula",
+            Self::Copia => "copia",
+            Self::Intervallum => "intervallum",
+            Self::Tensor => "tensor",
+            Self::Vector => "vector",
+            Self::Matrix => "matrix",
+            Self::Sparsa => "sparsa",
+            Self::Cursor => "cursor",
+            Self::Promissum => "promissum",
+        }
+    }
+
     /// Display name matching the matrix column/row labels.
     #[must_use]
     pub fn name(self) -> &'static str {
