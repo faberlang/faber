@@ -2988,6 +2988,28 @@ functio lectio() → numerus {
 }
 
 #[test]
+fn edge_empty_tabula_ascribed_from_empty_lista_lowers_to_construct_map() {
+    let dump = dump_source(
+        r#"
+incipit {
+    varia tabula<textus, numerus> vides ← [] ∷ tabula<textus, numerus>
+    vides["alpha"] ← 10
+    nota vides["alpha"]
+}
+"#,
+    );
+
+    assert!(
+        dump.contains("construct map:"),
+        "an empty lista ascribed to tabula is the no-entry spelling and must construct the empty map: {dump}"
+    );
+    assert!(
+        !dump.contains("map construction without object entries"),
+        "the empty lista ascription must not fail closed: {dump}"
+    );
+}
+
+#[test]
 fn lowers_field_and_index_assignment_places() {
     let field_dump = dump_source(
         r#"
