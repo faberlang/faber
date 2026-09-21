@@ -3581,14 +3581,10 @@ fn lower_named_type(
             ));
         };
         let mut error = None;
-        let ty = crate::numeric_width::lower_modular_word(
-            &type_params,
-            interner,
-            types,
-            &mut |issue| {
+        let ty =
+            crate::numeric_width::lower_modular_word(&type_params, interner, types, &mut |issue| {
                 error = Some(issue);
-            },
-        );
+            });
         if let Some(issue) = error {
             return Err(TypeLowerError::Issue(issue.issue()));
         }

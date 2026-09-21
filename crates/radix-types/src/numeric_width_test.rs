@@ -317,24 +317,22 @@ fn marker_expr(spelling: &str, interner: &mut Interner) -> TypeExpr {
     generic_marker_expr(spelling, Vec::new(), interner)
 }
 
-fn generic_marker_expr(spelling: &str, args: Vec<GenericArgExpr>, interner: &mut Interner) -> TypeExpr {
+fn generic_marker_expr(
+    spelling: &str,
+    args: Vec<GenericArgExpr>,
+    interner: &mut Interner,
+) -> TypeExpr {
     TypeExpr {
         nullable: false,
         mode: None,
         kind: TypeExprKind::Named(
             Ident {
                 name: interner.intern(spelling),
-                span: Span {
-                    start: 0,
-                    end: 0,
-                },
+                span: Span { start: 0, end: 0 },
             },
             args,
         ),
-        span: Span {
-            start: 0,
-            end: 0,
-        },
+        span: Span { start: 0, end: 0 },
         form: TypeFormLevel::LONG,
         iuncta_label: None,
     }
@@ -398,7 +396,10 @@ fn sized_primitive_lowering_reports_typed_issues() {
         ),
         (
             Primitive::Numerus,
-            vec![marker_expr("i32", &mut interner), marker_expr("i64", &mut interner)],
+            vec![
+                marker_expr("i32", &mut interner),
+                marker_expr("i64", &mut interner),
+            ],
             WidthLowerIssue::TooManyParams(Primitive::Numerus),
             "numerus_width_params",
         ),
@@ -416,13 +417,9 @@ fn sized_primitive_lowering_reports_typed_issues() {
 
     for (prim, params, expected, issue_name) in cases {
         let mut reported = Vec::new();
-        lower_sized_primitive(
-            prim,
-            &params,
-            &interner,
-            &mut types,
-            &mut |issue| reported.push(issue),
-        );
+        lower_sized_primitive(prim, &params, &interner, &mut types, &mut |issue| {
+            reported.push(issue)
+        });
         assert_eq!(reported, vec![expected], "issue name {issue_name}");
         assert_eq!(reported[0].issue(), issue_name);
     }
@@ -434,7 +431,9 @@ fn modular_word_lowering_reports_typed_issues() {
     let mut types = TypeTable::new();
 
     let mut reported = Vec::new();
-    lower_modular_word(&[], &interner, &mut types, &mut |issue| reported.push(issue));
+    lower_modular_word(&[], &interner, &mut types, &mut |issue| {
+        reported.push(issue)
+    });
     assert_eq!(reported, vec![WidthLowerIssue::ModularWordRequired]);
     assert_eq!(reported[0].issue(), "modular_word_width_required");
 

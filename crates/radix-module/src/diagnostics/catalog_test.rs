@@ -304,9 +304,6 @@ fn width_issue_prose_names_fractus_bf16_guidance() {
         let args = vec![DiagnosticArg::new("issue", issue)];
         let message = semantic_message(SemanticErrorKind::TypeUndefined, &args)
             .unwrap_or_else(|| panic!("catalog row missing for {issue}"));
-        assert!(
-            message.contains("bf16"),
-            "{issue} prose should name bf16: {message}"
-        );
+        assert!(message.contains("bf16"), "{issue} prose should name bf16: {message}");
     }
 }
