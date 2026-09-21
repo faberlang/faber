@@ -18,6 +18,7 @@ pub mod json;
 pub mod lista_bounded;
 pub mod octeti_bounded;
 pub mod or_recovery;
+pub mod queue_stack;
 pub mod regex;
 pub mod sparsa;
 pub mod tensor;
@@ -48,6 +49,7 @@ pub use or_recovery::{
     valor_get_array_or, valor_get_ascii_or, valor_get_f64_or, valor_get_genus_or, valor_get_i1_or,
     valor_get_i64_or, valor_get_map_or, valor_get_octeti_or, valor_get_text_or,
 };
+pub use queue_stack::{Queue, QueueN, QueueStackError, QueueStackOverflow, Stack, StackN};
 pub use regex::Regex;
 pub use sparsa::Sparsa;
 pub use tensor::Tensor;
