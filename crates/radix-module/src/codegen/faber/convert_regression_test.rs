@@ -386,3 +386,34 @@ fn deferred_hole_binding_converts_without_materializing_the_inferred_type() {
     );
     assert_en_output_compiles("deferred-hole.fab", &code);
 }
+
+#[test]
+fn reader_keyword_reverse_lookup_matches_nfkc_normalized_text() {
+    // ON-S1: the th-TH `fac` row spells SARA AM composed (U+0E33), which the
+    // scanner NFKC-decomposes before keyword lookup; the pack reverse maps
+    // must carry NFKC keys or the spelling lexes as an identifier and the
+    // fac/cape recovery fence fails re-validation in that locale.
+    let source = "+++\nlocale = \"la\"\n+++\nfunctio tutum(numerus a, numerus b) → numerus {\n    fac {\n        redde a / b\n    }\n    cape err {\n        mone err\n        redde 0\n    }\n}\n";
+    let pack = crate::locale::LocalePack::from_toml_path(crate::locale::workspace_locale_pack_path("th-TH"))
+        .expect("th-TH pack should load");
+    let session = Session::new(
+        Config::default()
+            .with_target(Target::HirFaber)
+            .with_dev_locale_root(),
+    );
+    let result = reemit_faber(&session, &pack, "test.fab", source);
+    assert!(
+        result.success(),
+        "la→th-TH recovery fence must convert cleanly: {:?}",
+        result
+            .diagnostics
+            .iter()
+            .map(|d| (d.code, d.issue(), d.args.clone()))
+            .collect::<Vec<_>>()
+    );
+    let code = result.output.expect("successful convert carries output").code;
+    assert!(
+        code.contains("\u{0E17}\u{0E33}"),
+        "th-TH output must carry the pack's composed fac spelling:\n{code}"
+    );
+}
