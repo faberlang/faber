@@ -78,6 +78,7 @@ pub mod driver;
 pub mod file_interface;
 pub mod hir;
 pub(crate) mod import_resolve;
+pub use import_resolve::contains_path_traversal;
 pub mod intrinsics;
 pub mod kernel;
 pub mod lexer;

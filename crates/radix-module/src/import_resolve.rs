@@ -266,8 +266,9 @@ fn resolve_template_import(
 /// an intended directory scope.
 ///
 /// Shared by the template-value sanitization in [`parse_paths_config`] and
-/// the `rest` portion of a `§name/rest` template import.
-fn contains_path_traversal(path: &str) -> bool {
+/// the `rest` portion of both `§name/rest` template resolvers (CLI and
+/// package loader; F-046 / S10-1).
+pub fn contains_path_traversal(path: &str) -> bool {
     path.starts_with('/') || path == ".." || path.starts_with("../") || path.contains("/../") || path.ends_with("/..")
 }
 

@@ -304,6 +304,50 @@ fn resolve_import_library_resolve_error_is_diagnostic() {
     let _ = fs::remove_dir_all(&root);
 }
 
+// ── template import traversal (S10-1, F-046 parity) ───────────────────────
+
+#[test]
+fn resolve_template_import_rejects_traversal_in_rest() {
+    // resolve_template_import joins the manifest value as-is, so pin an
+    // absolute base; the base escapes the package root by design (live
+    // fixture: gnu=../../common/gnu), only the rest segment is guarded.
+    let root = temp_root("template-traversal");
+    let pkg = root.join("pkg");
+    fs::create_dir_all(pkg.join("src")).unwrap();
+    fs::create_dir_all(root.join("shared/gnu")).unwrap();
+    fs::write(
+        root.join("shared/gnu/inner.fab"),
+        "functio f() → vacuum { tacet }\n",
+    )
+    .unwrap();
+    // The traversal target exists on disk, so only the resolver guard can
+    // reject the import.
+    fs::write(root.join("outside.fab"), "functio f() → vacuum { tacet }\n").unwrap();
+
+    let mut package = spec(pkg.clone(), pkg.join("src/main.fab"));
+    package
+        .templates
+        .insert("gnu".to_owned(), root.join("shared/gnu"));
+    let resolver = LibraryResolver::with_optional_home(None);
+    let from_file = pkg.join("src/main.fab");
+
+    match resolve_import(&package, &resolver, &from_file, "§gnu/inner.fab") {
+        ImportResolution::Local(target) => {
+            assert!(target.ends_with("inner.fab"), "target: {target:?}")
+        }
+        other => panic!("expected escaping base with clean rest to resolve, got {other:?}"),
+    }
+
+    match resolve_import(&package, &resolver, &from_file, "§gnu/../../outside.fab") {
+        ImportResolution::Unsupported => {}
+        ImportResolution::Local(target) => {
+            panic!("template rest traversal resolved outside its scope: {target:?}")
+        }
+        other => panic!("expected traversal rest to be rejected, got {other:?}"),
+    }
+    let _ = fs::remove_dir_all(&root);
+}
+
 // ── cycle detection ────────────────────────────────────────────────────────
 
 #[test]
