@@ -1748,7 +1748,7 @@ impl Validator<'_, '_> {
         scope: &FunctionScope<'_, '_>,
         arg: &MirOperand,
         span: Span,
-        validation: TensorConstValidation,
+        validation: &TensorConstValidation,
         predicate: P,
     ) where
         P: FnOnce(&mut Self, &MirConstant),
@@ -1782,7 +1782,7 @@ impl Validator<'_, '_> {
             scope,
             arg,
             span,
-            TensorConstValidation {
+            &TensorConstValidation {
                 kind: TensorConstKind::Int,
                 label,
                 name: "axis",
@@ -1813,7 +1813,7 @@ impl Validator<'_, '_> {
             scope,
             arg,
             span,
-            TensorConstValidation {
+            &TensorConstValidation {
                 kind: TensorConstKind::Float,
                 label,
                 name: "epsilon",
@@ -1843,7 +1843,7 @@ impl Validator<'_, '_> {
             scope,
             arg,
             span,
-            TensorConstValidation {
+            &TensorConstValidation {
                 kind: TensorConstKind::Int,
                 label: "rope",
                 name: "pos",
@@ -1863,6 +1863,12 @@ impl Validator<'_, '_> {
         );
     }
 
+    // Shape dims are exact by contract: finite, integral, and i64-round-trip
+    // verified before any cast, and `fract() == 0.0` is an exact integrality
+    // test — the comparisons are intentional, not epsilon candidates.
+    #[allow(clippy::float_cmp)]
+    #[allow(clippy::cast_precision_loss)]
+    #[allow(clippy::cast_possible_truncation)]
     fn validate_tensor_rope_dim_const(
         &mut self,
         scope: &FunctionScope<'_, '_>,
@@ -1941,7 +1947,7 @@ impl Validator<'_, '_> {
             first_arg_ty,
             call,
             span,
-            TensorNormSpec {
+            &TensorNormSpec {
                 label: "layernorm",
                 receiver_label: "input",
                 flags: TensorNormFlags {
@@ -1965,7 +1971,7 @@ impl Validator<'_, '_> {
             first_arg_ty,
             call,
             span,
-            TensorNormSpec {
+            &TensorNormSpec {
                 label: "rms_norm",
                 receiver_label: "receiver",
                 flags: TensorNormFlags {
@@ -1983,13 +1989,11 @@ impl Validator<'_, '_> {
         first_arg_ty: Option<MirType>,
         call: &MirRuntimeCall,
         span: Span,
-        spec: TensorNormSpec,
+        spec: &TensorNormSpec,
     ) {
-        let TensorNormSpec {
-            label,
-            receiver_label,
-            flags,
-        } = spec;
+        let label = spec.label;
+        let receiver_label = spec.receiver_label;
+        let flags = spec.flags;
         let Some(receiver_ty) = first_arg_ty else {
             return;
         };

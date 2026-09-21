@@ -166,60 +166,6 @@ pub fn decompose_kernel_function_with_limit(
     validation: &MirValidationContext<'_>,
     limit: StorageBufferLimitRecord,
 ) -> Result<KernelDecomposition, PlanMappingError> {
-    if function.blocks.len() != 1 {
-        return Err(PlanMappingError::mapping(
-            "device function body has control flow and cannot decompose into subchain kernels \
-             (subchains are straight-line statement slices)",
-        ));
-    }
-    let block = &function.blocks[0];
-
-    // Slice the statement stream at recipe boundaries AND along producer
-    // lineages. `current` holds the source statement indices of the open
-    // subchain; `current_has_recipe` tracks whether it adopted a recipe;
-    // `current_lineage` tracks the closed subchains whose written locals the
-    // open slice reads. Source adjacency is not a dependency: an elementwise
-    // statement folds into the open slice only when it introduces no NEW
-    // lineage — an elementwise join of an independent producer lineage
-    // becomes its own elementwise subchain (fork/join truth, so the plan
-    // never manufactures an edge between independent roots). A recipe
-    // arriving at a lineage-carrying slice starts a new subchain instead of
-    // adopting the completed join; the lineage-free elementwise prefix
-    // still folds into the recipe it feeds (S3-B1). The returned tuple
-    // assembly folds by ABI contract (D-6), not by adjacency.
-    let mut slices: Vec<Vec<usize>> = Vec::new();
-    let mut current: Vec<usize> = Vec::new();
-    let mut current_has_recipe = false;
-    let mut current_lineage: BTreeSet<usize> = BTreeSet::new();
-    let mut current_writes: BTreeSet<MirLocalId> = BTreeSet::new();
-    let mut current_temp_defs: BTreeSet<MirTempId> = BTreeSet::new();
-    let mut lineage_of_local: BTreeMap<MirLocalId, usize> = BTreeMap::new();
-    let mut lineage_of_temp: BTreeMap<MirTempId, usize> = BTreeMap::new();
-
-    // The returned place base: the tuple-return assembly is the ABI's
-    // output boundary, not a schedulable join.
-    let returned_base: Option<MirPlaceBase> = match &block.terminator.kind {
-        MirTerminatorKind::Return(Some(MirOperand::Place(place))) => Some(place.base.clone()),
-        MirTerminatorKind::Return(Some(MirOperand::Temp(temp))) => Some(MirPlaceBase::Temp(*temp)),
-        _ => None,
-    };
-    let is_return_assembly = |statement: &MirStatement| -> bool {
-        matches!(
-            statement.kind,
-            MirStatementKind::Construct {
-                aggregate: MirAggregate {
-                    kind: MirAggregateKind::Tuple,
-                    ..
-                },
-                ..
-            }
-        ) && matches!(
-            statement.kind,
-            MirStatementKind::Construct { ref destination, .. }
-            if Some(&destination.base) == returned_base.as_ref()
-        )
-    };
-
     // The closed lineages a statement's reads resolve to (params and the
     // open slice's own writes contribute nothing; temps resolve to the
     // slice containing their definition).
@@ -304,6 +250,60 @@ pub fn decompose_kernel_function_with_limit(
         let (defined, _) = statement_temp_sets(statement);
         current_temp_defs.extend(defined);
     }
+
+    if function.blocks.len() != 1 {
+        return Err(PlanMappingError::mapping(
+            "device function body has control flow and cannot decompose into subchain kernels \
+             (subchains are straight-line statement slices)",
+        ));
+    }
+    let block = &function.blocks[0];
+
+    // Slice the statement stream at recipe boundaries AND along producer
+    // lineages. `current` holds the source statement indices of the open
+    // subchain; `current_has_recipe` tracks whether it adopted a recipe;
+    // `current_lineage` tracks the closed subchains whose written locals the
+    // open slice reads. Source adjacency is not a dependency: an elementwise
+    // statement folds into the open slice only when it introduces no NEW
+    // lineage — an elementwise join of an independent producer lineage
+    // becomes its own elementwise subchain (fork/join truth, so the plan
+    // never manufactures an edge between independent roots). A recipe
+    // arriving at a lineage-carrying slice starts a new subchain instead of
+    // adopting the completed join; the lineage-free elementwise prefix
+    // still folds into the recipe it feeds (S3-B1). The returned tuple
+    // assembly folds by ABI contract (D-6), not by adjacency.
+    let mut slices: Vec<Vec<usize>> = Vec::new();
+    let mut current: Vec<usize> = Vec::new();
+    let mut current_has_recipe = false;
+    let mut current_lineage: BTreeSet<usize> = BTreeSet::new();
+    let mut current_writes: BTreeSet<MirLocalId> = BTreeSet::new();
+    let mut current_temp_defs: BTreeSet<MirTempId> = BTreeSet::new();
+    let mut lineage_of_local: BTreeMap<MirLocalId, usize> = BTreeMap::new();
+    let mut lineage_of_temp: BTreeMap<MirTempId, usize> = BTreeMap::new();
+
+    // The returned place base: the tuple-return assembly is the ABI's
+    // output boundary, not a schedulable join.
+    let returned_base: Option<MirPlaceBase> = match &block.terminator.kind {
+        MirTerminatorKind::Return(Some(MirOperand::Place(place))) => Some(place.base.clone()),
+        MirTerminatorKind::Return(Some(MirOperand::Temp(temp))) => Some(MirPlaceBase::Temp(*temp)),
+        _ => None,
+    };
+    let is_return_assembly = |statement: &MirStatement| -> bool {
+        matches!(
+            statement.kind,
+            MirStatementKind::Construct {
+                aggregate: MirAggregate {
+                    kind: MirAggregateKind::Tuple,
+                    ..
+                },
+                ..
+            }
+        ) && matches!(
+            statement.kind,
+            MirStatementKind::Construct { ref destination, .. }
+            if Some(&destination.base) == returned_base.as_ref()
+        )
+    };
 
     // Walk the statement stream. An elementwise statement (value math or
     // an elementwise collection op) folds into the open slice only when its
@@ -730,6 +730,9 @@ fn split_oversized_elementwise_body(
     let mut suffix_written = vec![BTreeSet::new(); n + 1];
     let mut suffix_params = vec![BTreeSet::new(); n + 1];
     let mut suffix_temp_references = vec![BTreeSet::new(); n + 1];
+    // Destination slots are empty and written once here: `clone_from` cannot
+    // borrow the same Vec through IndexMut and has no allocation to reuse.
+    #[allow(clippy::assigning_clones)]
     for i in (0..n).rev() {
         suffix_reads[i] = suffix_reads[i + 1].clone();
         suffix_reads[i].extend(reads_at[i].iter().copied());
@@ -1088,10 +1091,10 @@ impl SplitRangeState {
         referenced: &BTreeSet<MirTempId>,
     ) {
         for &local in reads {
-            decrement_count(&mut self.read_counts, local);
+            decrement_count(&mut self.read_counts, &local);
         }
         if let Some(local) = written {
-            decrement_count(&mut self.written_counts, local);
+            decrement_count(&mut self.written_counts, &local);
             if !self.written_counts.contains_key(&local) {
                 self.written.remove(&local);
             }
@@ -1103,13 +1106,13 @@ impl SplitRangeState {
             self.refresh_param(local);
         }
         for &temp in defined {
-            decrement_count(&mut self.defined_counts, temp);
+            decrement_count(&mut self.defined_counts, &temp);
             if !self.defined_counts.contains_key(&temp) {
                 self.defined.remove(&temp);
             }
         }
         for &temp in referenced {
-            decrement_count(&mut self.referenced_counts, temp);
+            decrement_count(&mut self.referenced_counts, &temp);
             if !self.referenced_counts.contains_key(&temp) {
                 self.referenced.remove(&temp);
             }
@@ -1125,12 +1128,12 @@ impl SplitRangeState {
     }
 }
 
-fn decrement_count<K: Ord>(counts: &mut BTreeMap<K, usize>, key: K) {
-    if let Some(count) = counts.get_mut(&key) {
+fn decrement_count<K: Ord>(counts: &mut BTreeMap<K, usize>, key: &K) {
+    if let Some(count) = counts.get_mut(key) {
         if *count > 1 {
             *count -= 1;
         } else {
-            counts.remove(&key);
+            counts.remove(key);
         }
     }
 }

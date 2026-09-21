@@ -1,3 +1,8 @@
+// similar_names only honors module-level allows (fn/statement allows are
+// ignored in this clippy); `callee`/`caller` below are the standard domain
+// pair and the similarity is deliberate.
+#![allow(clippy::similar_names)]
+
 use super::*;
 use crate::{
     MirAggregate, MirAggregateFields, MirAggregateItem, MirAggregateKind, MirBinOp, MirBlock,
@@ -3578,6 +3583,8 @@ fn mlp_shape_mismatch_program(types: &mut TypeTable) -> MirProgram {
     let actual = MirType::semantic(types.tensor_with_shape(element, actual_shape));
     let vacuum = MirType::semantic(types.primitive(Primitive::Vacuum));
 
+    // `callee`/`caller` are the standard domain pair; the similarity is deliberate.
+    #[allow(clippy::similar_names)]
     let callee = MirFunction {
         id: MirFunctionId(1),
         source: None,
@@ -3610,6 +3617,7 @@ fn mlp_shape_mismatch_program(types: &mut TypeTable) -> MirProgram {
         span: Span::default(),
     };
 
+    #[allow(clippy::similar_names)]
     let caller = MirFunction {
         id: MirFunctionId(0),
         source: None,

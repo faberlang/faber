@@ -1768,7 +1768,8 @@ fn pd26_optional_non_null_postfix_matrix() {
         let expected_span = if expected == "identifier" {
             span_for(source, if source.contains("?.") { "?." } else { "!." })
         } else {
-            Span::new(source.len() as u32, source.len() as u32)
+            let end = u32::try_from(source.len()).unwrap();
+            Span::new(end, end)
         };
         assert_eq!(error.span, expected_span, "source={source:?}");
     }

@@ -136,6 +136,11 @@ pub fn constant_ty(
 ///
 /// This is the repeated-lookup form used by immutable backend probes. The
 /// compatibility [`constant_ty`] wrapper remains for one-shot raw callers.
+///
+/// # Errors
+///
+/// Returns [`MirTypeError`] when a `MirConstant::Function` id is absent from
+/// `function_index`.
 pub fn constant_ty_with_index(
     constant: &MirConstant,
     types: &TypeTable,

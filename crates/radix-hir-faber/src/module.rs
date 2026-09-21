@@ -160,9 +160,12 @@ impl<'a> FaberCodegen<'a> {
         imported_def_spellings: &FxHashMap<DefId, String>,
         imported_pattern_spellings: &FxHashMap<DefId, String>,
     ) -> Self {
-        self.imported_type_spellings = imported_type_spellings.clone();
-        self.imported_def_spellings = imported_def_spellings.clone();
-        self.imported_pattern_spellings = imported_pattern_spellings.clone();
+        self.imported_type_spellings
+            .clone_from(imported_type_spellings);
+        self.imported_def_spellings
+            .clone_from(imported_def_spellings);
+        self.imported_pattern_spellings
+            .clone_from(imported_pattern_spellings);
         self
     }
 }
