@@ -1387,8 +1387,16 @@ fn library_imports_from_cached(
                     import_path,
                 ));
             }
-            Err(err) => diagnostics
-                .push(library_resolve_diagnostic(interface_path, err).with_span(decl.span)),
+            // Source context, not a bare span: a bare span renders its byte
+            // offset as the location (`file:2589` for line 40), sending the
+            // reader to a line that does not exist. Spans
+            // are peeled-body relative — the cached program was lexed from
+            // `peeled_body` — so the mapping source is the peeled body.
+            Err(err) => diagnostics.push(library_resolve_diagnostic(interface_path, err).with_source_context(
+                &interface_path.display().to_string(),
+                &cached.peeled_body,
+                decl.span,
+            )),
         }
     }
 

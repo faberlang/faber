@@ -720,12 +720,23 @@ pub fn library_resolve_diagnostic(file: &Path, err: LibraryResolveError) -> Diag
         .with_arg("provider", package)
         .with_arg("expected_path", expected_path.display().to_string())
         .with_arg("known_modules", known_modules.join(",")),
-        LibraryResolveError::LibraryHomeMissing { specifier, hint } => crate::package_diagnostic_error(format!(
-            "library import `{specifier}` needs a public library home; {hint}"
-        ))
-        .with_file(file.display().to_string())
-        .with_arg("issue", "missing_library_home")
-        .with_arg("specifier", specifier),
+        // Uncoded on purpose: the standing renderer contract prints prose
+        // for coded non-Codegen diagnostics only through locale-pack
+        // templates, and no pack carries a PKG001 template — coding this arm
+        // renders an empty `error[PKG001:missing_library_home]: <file>`
+        // body (same contract as `file_interface::interface_error`). The
+        // issue/specifier args keep the failure machine-identifiable, and
+        // the hint stays in the message: a missing home blocks the build,
+        // so the actionable sentence must not hide behind a flag.
+        LibraryResolveError::LibraryHomeMissing { specifier, hint } => {
+            Diagnostic::error(format!(
+                "library import `{specifier}` needs a public library home; {hint}"
+            ))
+            .with_phase(radix_module::diagnostics::DiagnosticPhase::Analysis)
+            .with_file(file.display().to_string())
+            .with_arg("issue", "missing_library_home")
+            .with_arg("specifier", specifier)
+        }
         LibraryResolveError::LockedPackageMissing {
             specifier,
             provider,
@@ -816,3 +827,7 @@ pub fn import_unsupported_diagnostic(
 #[cfg(test)]
 #[path = "import_graph_test.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "library_home_missing_render_test.rs"]
+mod library_home_missing_render_test;
