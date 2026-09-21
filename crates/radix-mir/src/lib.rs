@@ -49,6 +49,8 @@ pub mod visit;
 
 mod figura;
 #[cfg(test)]
+mod function_index_test;
+#[cfg(test)]
 mod layout_test;
 #[cfg(test)]
 mod packed_dense_projection_probe;

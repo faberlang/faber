@@ -20,7 +20,7 @@ use crate::mir::generic::{
     substitute_tensor_from_flat_shape_size_constants,
 };
 use crate::mir::{
-    MirCallee, MirDeviceFunctionMetadataMap, MirExternalFunctionIdentity, MirFunction, MirFunctionId,
+    MirCallee, MirDeviceFunctionMetadataMap, MirExternalFunctionIdentity, MirFunction, MirFunctionId, MirFunctionIndex,
     MirGenericBindings, MirMonomorphization, MirMonomorphizationKey, MirOperand, MirPlace, MirPlaceBase, MirProgram,
     MirProjection, MirStatementKind, MirTerminatorKind, MirType, type_contains_param,
 };
@@ -261,6 +261,12 @@ pub fn instantiate_merged_generic_calls_with_devices_and_metadata(
     if templates.is_empty() {
         return Ok((Vec::new(), Vec::new()));
     }
+    let next_id = MirProgram::allocate_function_id(&program.functions).map_err(|_| {
+        vec![MirError::validation(
+            Span::new(0, 0),
+            "package MIR function id space is exhausted",
+        )]
+    })?;
     let mut state = PackageInstantiate {
         types,
         interner,
@@ -272,7 +278,7 @@ pub fn instantiate_merged_generic_calls_with_devices_and_metadata(
         generic_params: generic_params.iter().cloned().collect(),
         instance_index: FxHashMap::default(),
         monomorphizations: Vec::new(),
-        next_id: next_function_id(&program.functions),
+        next_id,
         errors: Vec::new(),
         created: Vec::new(),
         imported_devices: imported_devices.clone(),
@@ -393,14 +399,6 @@ fn mir_role(role: InterfaceDeviceRole) -> crate::mir::MirDeviceRole {
     }
 }
 
-fn next_function_id(functions: &[MirFunction]) -> MirFunctionId {
-    functions
-        .iter()
-        .map(|function| function.id.0)
-        .max()
-        .map_or(MirFunctionId(0), |id| MirFunctionId(id + 1))
-}
-
 struct PackageInstantiate<'a> {
     types: &'a mut TypeTable,
     interner: &'a Interner,
@@ -519,6 +517,10 @@ impl PackageInstantiate<'_> {
     }
 
     fn rewrite_program(&mut self, program: &mut MirProgram) {
+        // One index per scope: `program.functions` is frozen for the whole
+        // loop; newly created instances ride `self.created` until the caller
+        // appends them after this pass.
+        let function_index = program.function_index();
         let mut worklist: Vec<MirFunctionId> = program
             .functions
             .iter()
@@ -533,7 +535,8 @@ impl PackageInstantiate<'_> {
                 return;
             }
             let calls = {
-                let Some(function) = super::monomorphize::function_by_id(&program.functions, function_id)
+                let Some(function) = program
+                    .indexed_function(&function_index, function_id)
                     .cloned()
                     .or_else(|| {
                         self.created
@@ -551,7 +554,7 @@ impl PackageInstantiate<'_> {
             };
             for call in calls {
                 if let Some(target) = self.instantiate_call(&call) {
-                    self.apply_rewrite(program, &call, target);
+                    self.apply_rewrite(program, &function_index, &call, target);
                     if self.created.iter().any(|function| function.id == target) {
                         worklist.push(target);
                     }
@@ -1080,8 +1083,14 @@ impl PackageInstantiate<'_> {
         }
     }
 
-    fn apply_rewrite(&mut self, program: &mut MirProgram, call: &PendingCall, target: MirFunctionId) {
-        if let Some(function) = super::monomorphize::function_by_id_mut(&mut program.functions, call.function) {
+    fn apply_rewrite(
+        &mut self,
+        program: &mut MirProgram,
+        function_index: &MirFunctionIndex,
+        call: &PendingCall,
+        target: MirFunctionId,
+    ) {
+        if let Some(function) = program.indexed_function_mut(function_index, call.function) {
             rewrite_call_callee(function, call, target);
             return;
         }
@@ -1198,6 +1207,7 @@ impl PackageInstantiate<'_> {
     }
 
     fn finalize_new_instances(&mut self, program: &mut MirProgram, new_ids: &FxHashSet<MirFunctionId>) {
+        let function_index = program.function_index();
         let to_finalize: Vec<(MirFunctionId, MirMonomorphizationKey)> = self
             .monomorphizations
             .iter()
@@ -1206,7 +1216,7 @@ impl PackageInstantiate<'_> {
             .collect();
         for (function_id, key) in to_finalize {
             let shape_bindings = self.shape_bindings_from_key(&key);
-            let Some(function) = super::monomorphize::function_by_id_mut(&mut program.functions, function_id) else {
+            let Some(function) = program.indexed_function_mut(&function_index, function_id) else {
                 continue;
             };
             let type_bindings = MirGenericBindings::default();

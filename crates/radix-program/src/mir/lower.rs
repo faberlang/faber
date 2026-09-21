@@ -1348,7 +1348,14 @@ pub(super) fn lower_package_units<'a>(
             lowered,
             dispatch_function: unit_dispatch,
         } = unit;
-        let offset = next_function_id(merged.validated.program(), &entry_path)?;
+        let offset = MirProgram::allocate_function_id(&merged.validated.program().functions)
+            .map_err(|_| {
+                vec![function_id_overflow_diag(
+                    &entry_path,
+                    "package MIR function id space is exhausted",
+                )]
+            })?
+            .0;
         let mut available_templates = generic_templates.clone();
         available_templates.extend(future_library_templates.iter().cloned());
         let mut available_generic_params = generic_params.clone();
@@ -3222,7 +3229,14 @@ pub(super) fn append_shifted_parts(
     closure_environments: &mut Vec<MirClosureEnvironment>,
     diagnostic_path: &Path,
 ) -> Result<u32, Vec<Diagnostic>> {
-    let offset = next_function_id(merged_program, diagnostic_path)?;
+    let offset = MirProgram::allocate_function_id(&merged_program.functions)
+        .map_err(|_| {
+            vec![function_id_overflow_diag(
+                diagnostic_path,
+                "package MIR function id space is exhausted",
+            )]
+        })?
+        .0;
     ensure_shift_fits(program, closure_environments, offset, diagnostic_path)?;
     shift_program_ids(program, closure_environments, offset);
     // Closure environments are collected on the Vec and folded into a fresh
@@ -3230,22 +3244,6 @@ pub(super) fn append_shifted_parts(
     merged_closure_environments.append(closure_environments);
     merged_program.functions.append(&mut program.functions);
     Ok(offset)
-}
-
-fn next_function_id(program: &MirProgram, path: &Path) -> Result<u32, Vec<Diagnostic>> {
-    program
-        .functions
-        .iter()
-        .map(|function| function.id.0)
-        .max()
-        .map_or(Ok(0), |maximum| {
-            maximum.checked_add(1).ok_or_else(|| {
-                vec![function_id_overflow_diag(
-                    path,
-                    "package MIR function id space is exhausted",
-                )]
-            })
-        })
 }
 
 /// Closure-environment capture names are lowering-interner symbols like

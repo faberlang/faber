@@ -219,10 +219,7 @@ fn resource_identity_and_mutation_rules_survive_to_device_program() {
     let program = u11_program(&mut types, &mut interner);
     let context = MirValidationContext::new(&types);
     let validated = ValidatedMir::new(program, context).expect("the U11 MIR fixture validates");
-    let kernel = validated
-        .program()
-        .function_by_id(MirFunctionId(1))
-        .unwrap();
+    let kernel = validated.function_by_id(MirFunctionId(1)).unwrap();
 
     // The semantic facts: the shared ABI synthesis from the kernel function
     // (the source of truth — the same typed path the emitters consume).

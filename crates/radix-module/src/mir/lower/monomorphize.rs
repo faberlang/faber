@@ -15,8 +15,8 @@ use crate::mir::generic::{
 };
 use crate::mir::ty::index_projection_result_ty;
 use crate::mir::{
-    MirGenericBindings, MirMonomorphization, MirMonomorphizationKey, MirPlaceBase, instantiate_existing_generic_type,
-    type_contains_param,
+    MirFunctionIndex, MirGenericBindings, MirMonomorphization, MirMonomorphizationKey, MirPlaceBase, MirProgram,
+    instantiate_existing_generic_type, type_contains_param,
 };
 use crate::semantic::IndexId;
 
@@ -109,6 +109,9 @@ struct MonomorphizationState<'lowerer, 'unit> {
     struct_fields: Arc<FxHashMap<DefId, FxHashMap<Symbol, MirType>>>,
     monomorphizations: Vec<MirMonomorphization>,
     instance_index: FxHashMap<MirMonomorphizationKey, MirFunctionId>,
+    /// Function-id resolution over `lowerer.functions`; every append records
+    /// its position so fresh instances resolve like the seed set.
+    function_index: MirFunctionIndex,
     next_id: MirFunctionId,
 }
 
@@ -129,12 +132,19 @@ impl<'lowerer, 'unit> MonomorphizationState<'lowerer, 'unit> {
                     .then_some((source, function.clone()))
             })
             .collect();
-        let next_id = lowerer
-            .functions
-            .iter()
-            .map(|function| function.id.0)
-            .max()
-            .map_or(MirFunctionId(0), |id| MirFunctionId(id + 1));
+        let next_id = match MirProgram::allocate_function_id(&lowerer.functions) {
+            Ok(id) => id,
+            Err(_) => {
+                // Unreachable minting: `run` aborts on lowering errors before
+                // any instance allocation.
+                lowerer.errors.push(MirError::validation(
+                    Span::new(0, 0),
+                    "package MIR function id space is exhausted",
+                ));
+                MirFunctionId(u32::MAX)
+            }
+        };
+        let function_index = MirFunctionIndex::for_functions(&lowerer.functions);
         Self {
             lowerer,
             templates,
@@ -142,6 +152,7 @@ impl<'lowerer, 'unit> MonomorphizationState<'lowerer, 'unit> {
             struct_fields,
             monomorphizations: Vec::new(),
             instance_index: FxHashMap::default(),
+            function_index,
             next_id,
         }
     }
@@ -157,7 +168,10 @@ impl<'lowerer, 'unit> MonomorphizationState<'lowerer, 'unit> {
                 break;
             }
             let call_sites = {
-                let Some(function) = function_by_id(&self.lowerer.functions, function_id) else {
+                let Some(function) = self
+                    .function_index
+                    .function(&self.lowerer.functions, function_id)
+                else {
                     continue;
                 };
                 self.collect_call_sites(function)
@@ -580,6 +594,7 @@ impl<'lowerer, 'unit> MonomorphizationState<'lowerer, 'unit> {
             return None;
         }
 
+        self.function_index.insert(id, self.lowerer.functions.len());
         self.lowerer.functions.push(instance);
         // Device-role rows are keyed by function id, so a minted instance
         // starts without the template's explicit facts. Copy (not move) the
@@ -766,7 +781,10 @@ impl<'lowerer, 'unit> MonomorphizationState<'lowerer, 'unit> {
 
     fn apply_rewrites(&mut self, rewrites: Vec<Rewrite>) {
         for rewrite in rewrites {
-            let Some(function) = function_by_id_mut(&mut self.lowerer.functions, rewrite.function) else {
+            let Some(function) = self
+                .function_index
+                .function_mut(&mut self.lowerer.functions, rewrite.function)
+            else {
                 continue;
             };
             let Some(block) = function.blocks.get_mut(rewrite.block_index) else {
@@ -926,7 +944,9 @@ impl<'lowerer, 'unit> MonomorphizationState<'lowerer, 'unit> {
             MirConstant::Octeti(_) => Primitive::Octeti,
             MirConstant::Regex { .. } => Primitive::Regex,
             MirConstant::Function(id) => {
-                return function_by_id(&self.lowerer.functions, *id)
+                return self
+                    .function_index
+                    .function(&self.lowerer.functions, *id)
                     .map(|function| function.return_ty)
                     .or_else(|| {
                         self.lowerer
@@ -1089,28 +1109,6 @@ fn generic_param_names(params: &[crate::hir::HirTypeParam]) -> Vec<OrderedParam>
         .collect()
 }
 
-/// O(1) when `id.0` matches the dense vector index (common lowering order).
-/// Linear fallback keeps sparse/reordered IDs correct after template removal.
-pub(super) fn function_by_id(functions: &[MirFunction], id: MirFunctionId) -> Option<&MirFunction> {
-    if let Some(function) = functions.get(id.0 as usize)
-        && function.id == id
-    {
-        return Some(function);
-    }
-    functions.iter().find(|function| function.id == id)
-}
-
-/// Mutable variant of [`function_by_id`] for monomorphization rewrites.
-pub(super) fn function_by_id_mut(functions: &mut [MirFunction], id: MirFunctionId) -> Option<&mut MirFunction> {
-    if functions
-        .get(id.0 as usize)
-        .is_some_and(|function| function.id == id)
-    {
-        return functions.get_mut(id.0 as usize);
-    }
-    functions.iter_mut().find(|function| function.id == id)
-}
-
 /// Concretize shape params in monomorphized instances (4A, final pass).
 ///
 /// Shape substitution interns the concrete shapes/types each instance carries
@@ -1135,11 +1133,12 @@ pub(super) fn finalize_monomorphized_shapes(
     let param_order = generic_param_order(hir);
     let type_bindings = MirGenericBindings::default();
     let index = ExistingTypeIndex::build(types);
+    let function_index = MirFunctionIndex::for_functions(functions);
     for monomorphization in monomorphizations {
         let Some(params) = param_order.get(&monomorphization.key.source) else {
             continue;
         };
-        let Some(function) = function_by_id_mut(functions, monomorphization.function) else {
+        let Some(function) = function_index.function_mut(functions, monomorphization.function) else {
             continue;
         };
         let mut shape_bindings = MirShapeBindings::default();

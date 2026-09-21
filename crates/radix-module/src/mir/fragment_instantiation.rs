@@ -11,9 +11,9 @@ use crate::diagnostics::DiagnosticArg;
 use crate::hir::DefId;
 use crate::lexer::Span;
 use crate::mir::{
-    MirCallee, MirDeviceRole, MirFunction, MirFunctionId, MirFunctionOrigin, MirKernelShaderStage, MirLayoutTable,
-    MirMonomorphization, MirOperand, MirParamMode, MirPlace, MirPlaceBase, MirStatementKind, MirTerminatorKind,
-    MirType, MirValueId, type_contains_param,
+    MirCallee, MirDeviceRole, MirFunction, MirFunctionId, MirFunctionIndex, MirFunctionOrigin, MirKernelShaderStage,
+    MirLayoutTable, MirMonomorphization, MirOperand, MirParamMode, MirPlace, MirPlaceBase, MirStatementKind,
+    MirTerminatorKind, MirType, MirValueId, type_contains_param,
 };
 use crate::semantic::{
     Primitive, Type, TypeId, TypeTable,
@@ -95,11 +95,9 @@ pub fn check_with_metadata(
     summaries: Option<&FragmentEffectTable>,
     metadata: &MirDeviceFunctionMetadataMap,
 ) -> Vec<FragmentInstantiationError> {
-    let mut functions_by_id = FxHashMap::with_capacity_and_hasher(functions.len(), rustc_hash::FxBuildHasher);
     let mut functions_by_source = FxHashMap::default();
     let mut value_types = FxHashMap::default();
     for function in functions {
-        functions_by_id.entry(function.id).or_insert(function);
         if let Some(source) = function.source {
             functions_by_source.entry(source).or_insert(function);
         }
@@ -115,7 +113,7 @@ pub fn check_with_metadata(
     }
     let mut checker = InstantiationChecker {
         functions,
-        functions_by_id,
+        function_index: MirFunctionIndex::for_functions(functions),
         functions_by_source,
         value_types,
         monomorphizations,
@@ -132,7 +130,7 @@ pub fn check_with_metadata(
 
 struct InstantiationChecker<'a> {
     functions: &'a [MirFunction],
-    functions_by_id: FxHashMap<MirFunctionId, &'a MirFunction>,
+    function_index: MirFunctionIndex,
     functions_by_source: FxHashMap<DefId, &'a MirFunction>,
     value_types: FxHashMap<(MirFunctionId, MirValueId), MirType>,
     monomorphizations: &'a [MirMonomorphization],
@@ -462,7 +460,7 @@ impl<'a> InstantiationChecker<'a> {
     }
 
     fn function_by_id(&self, id: MirFunctionId) -> Option<&'a MirFunction> {
-        self.functions_by_id.get(&id).copied()
+        self.function_index.function(self.functions, id)
     }
 
     fn operand_ty(&self, function: &MirFunction, operand: &MirOperand) -> Option<MirType> {

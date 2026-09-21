@@ -18,39 +18,6 @@ fn stub_function(id: u32) -> MirFunction {
     }
 }
 
-#[test]
-fn function_by_id_hits_dense_index() {
-    let functions = vec![stub_function(0), stub_function(1), stub_function(2)];
-    let found = function_by_id(&functions, MirFunctionId(1)).expect("dense hit");
-    assert_eq!(found.id, MirFunctionId(1));
-    assert_eq!(found.return_ty.semantic_id(), TypeId(1));
-}
-
-#[test]
-fn function_by_id_falls_back_when_ids_are_sparse() {
-    // After template retain, vector index need not equal id.0.
-    let functions = vec![stub_function(0), stub_function(5), stub_function(9)];
-    let found = function_by_id(&functions, MirFunctionId(9)).expect("sparse fallback");
-    assert_eq!(found.id, MirFunctionId(9));
-    assert!(function_by_id(&functions, MirFunctionId(1)).is_none());
-}
-
-#[test]
-fn function_by_id_mut_rewrites_dense_and_sparse() {
-    let mut functions = vec![stub_function(0), stub_function(3)];
-    {
-        let f = function_by_id_mut(&mut functions, MirFunctionId(0)).expect("dense mut");
-        f.name = Some(Symbol(1));
-    }
-    {
-        let f = function_by_id_mut(&mut functions, MirFunctionId(3)).expect("sparse mut");
-        f.name = Some(Symbol(2));
-    }
-    assert_eq!(functions[0].name, Some(Symbol(1)));
-    assert_eq!(functions[1].name, Some(Symbol(2)));
-    assert!(function_by_id_mut(&mut functions, MirFunctionId(2)).is_none());
-}
-
 // ── Phase-4 producer fact: instance shape-size substitution ──────────────
 
 use crate::codegen::Target;

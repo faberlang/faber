@@ -28,6 +28,11 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
 pub struct MirFunctionId(pub u32);
 
+/// The `u32` function-id space is exhausted; [`MirProgram::allocate_function_id`]
+/// cannot mint another id.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct MirFunctionIdOverflow;
+
 /// Parent-relative identity for a synthetic kernel closure.
 ///
 /// The identity is independent of the source-less MIR function's position in
@@ -193,24 +198,36 @@ impl MirType {
     }
 }
 
-/// Function-id to vector-position index for one immutable MIR program.
+/// Function-id to vector-position index over one function set.
 ///
-/// Producers may append or reorder functions after allocating their stable
-/// IDs, so consumers that perform repeated lookups should build this map once
-/// and use [`MirProgram::indexed_function`].
+/// This is the crate's single function-id resolution mechanism. Producers may
+/// append or reorder functions after allocating their stable IDs, so
+/// consumers that perform repeated lookups build this map once and resolve
+/// through [`Self::function`] / [`Self::function_mut`] (or the
+/// [`MirProgram`] wrappers [`MirProgram::indexed_function`] /
+/// [`MirProgram::indexed_function_mut`]). Producers that append functions
+/// record each append with [`Self::insert`].
 #[derive(Debug, Clone, Default)]
 pub struct MirFunctionIndex {
     positions: FxHashMap<MirFunctionId, usize>,
 }
 
 impl MirFunctionIndex {
+    /// Build from any function set (a program's, or an in-flight lowering
+    /// vec that has no `MirProgram` yet).
     #[must_use]
-    pub fn for_program(program: &MirProgram) -> Self {
+    pub fn for_functions(functions: &[MirFunction]) -> Self {
         let mut positions = FxHashMap::default();
-        for (position, function) in program.functions.iter().enumerate() {
+        for (position, function) in functions.iter().enumerate() {
             positions.entry(function.id).or_insert(position);
         }
         Self { positions }
+    }
+
+    /// Record one appended function's position. The first position for an id
+    /// wins, matching [`Self::for_functions`].
+    pub fn insert(&mut self, id: MirFunctionId, position: usize) {
+        self.positions.entry(id).or_insert(position);
     }
 
     #[must_use]
@@ -221,6 +238,30 @@ impl MirFunctionIndex {
     #[must_use]
     pub fn get(&self, id: &MirFunctionId) -> Option<&usize> {
         self.positions.get(id)
+    }
+
+    /// Resolve an id against the function set this index was built for.
+    #[must_use]
+    pub fn function<'a>(
+        &self,
+        functions: &'a [MirFunction],
+        id: MirFunctionId,
+    ) -> Option<&'a MirFunction> {
+        let position = self.position(id)?;
+        functions.get(position).filter(|function| function.id == id)
+    }
+
+    /// Mutable variant of [`Self::function`].
+    #[must_use]
+    pub fn function_mut<'a>(
+        &self,
+        functions: &'a mut [MirFunction],
+        id: MirFunctionId,
+    ) -> Option<&'a mut MirFunction> {
+        let position = self.position(id)?;
+        functions
+            .get_mut(position)
+            .filter(|function| function.id == id)
     }
 }
 
@@ -244,7 +285,7 @@ impl MirProgram {
 
     #[must_use]
     pub fn function_index(&self) -> MirFunctionIndex {
-        MirFunctionIndex::for_program(self)
+        MirFunctionIndex::for_functions(&self.functions)
     }
 
     /// O(1) lookup through a caller-owned index built for this program.
@@ -254,25 +295,45 @@ impl MirProgram {
         index: &MirFunctionIndex,
         id: MirFunctionId,
     ) -> Option<&MirFunction> {
-        let position = index.position(id)?;
-        self.functions
-            .get(position)
-            .filter(|function| function.id == id)
+        index.function(&self.functions, id)
     }
 
-    /// Lookup for callers that do not retain an immutable program index.
-    ///
-    /// Long-lived production paths should use [`Self::function_index`] and
-    /// [`Self::indexed_function`]. This compatibility method retains its
-    /// dense fast path and sparse fallback for raw or mutable program users.
+    /// Mutable lookup through a caller-owned index built for this program.
     #[must_use]
-    pub fn function_by_id(&self, id: MirFunctionId) -> Option<&MirFunction> {
-        if let Some(function) = self.functions.get(id.0 as usize)
-            && function.id == id
-        {
-            return Some(function);
-        }
-        self.functions.iter().find(|function| function.id == id)
+    pub fn indexed_function_mut(
+        &mut self,
+        index: &MirFunctionIndex,
+        id: MirFunctionId,
+    ) -> Option<&mut MirFunction> {
+        index.function_mut(&mut self.functions, id)
+    }
+
+    /// Derive the next unused function id from a function set: `max + 1`,
+    /// or `0` when the set is empty. This is the workspace's only
+    /// function-id allocator; the checked overflow policy cannot be bypassed
+    /// by a copy.
+    ///
+    /// Named debt: every call scans the set, so allocation is O(N), and the
+    /// merge/specialization loops allocate inside a loop. Swap trigger: seed
+    /// a counter inside this function alone (never a `MirProgram` counter
+    /// field — public fields, serde, and hand-pushed ids make that worse)
+    /// when profiling implicates merge/monomorphize, or a package with ≥10³
+    /// linked functions exists.
+    ///
+    /// # Errors
+    /// Returns [`MirFunctionIdOverflow`] when no function id remains.
+    pub fn allocate_function_id(
+        functions: &[MirFunction],
+    ) -> Result<MirFunctionId, MirFunctionIdOverflow> {
+        functions.iter().map(|function| function.id.0).max().map_or(
+            Ok(MirFunctionId(0)),
+            |maximum| {
+                maximum
+                    .checked_add(1)
+                    .map(MirFunctionId)
+                    .ok_or(MirFunctionIdOverflow)
+            },
+        )
     }
 }
 
