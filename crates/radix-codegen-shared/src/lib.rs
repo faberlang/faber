@@ -27,6 +27,7 @@
 //! - Finalization consumes the writer so no later writes can silently diverge
 //!   from the returned source string.
 
+pub mod breakable;
 pub mod conversio_arm;
 pub mod decimal;
 pub mod frame;
