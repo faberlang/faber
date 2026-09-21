@@ -3551,6 +3551,27 @@ functio legebatur(demo.Sample value) → numerus {
 }
 
 #[test]
+fn lowers_cross_family_scalar_ascription_to_a_cast_conversion() {
+    // `∷` states the target family, so the MIR has to carry the conversion the
+    // codegen emits (`1.9 ∷ numerus` is `1.9 as i64`, `300.0 ∷ numerus<i8>` is
+    // `300.0 as i8`). A pass-through operand left the runner storing the raw
+    // float carrier in a numerus slot; same-family ascriptions
+    // stay pass-through and keep no conversion.
+    let dump = dump_source(
+        r"
+functio ascriptiones() → numerus {
+  fixum numerus truncatum ← 1.9 ∷ numerus
+  fixum numerus<i8> saturatum ← 300.0 ∷ numerus<i8>
+  fixum numerus<i32> idem ← 7 ∷ numerus<i32>
+  redde truncatum
+}",
+    );
+
+    assert_eq!(dump.matches("runtime convert cast").count(), 2, "{dump}");
+    assert!(!dump.contains("runtime convert runtime"), "{dump}");
+}
+
+#[test]
 // ===========================================================================
 // Section I: Collection runtime methods — lista, tabula, copia, textus, intervallum
 // ===========================================================================

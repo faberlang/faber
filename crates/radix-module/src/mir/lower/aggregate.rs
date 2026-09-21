@@ -324,9 +324,53 @@ impl FunctionBuilder<'_> {
                 }
                 let operand = self.lower_expr_value(source)?;
                 let ty = MirType::semantic(target);
+                if let Some(conversion) = self.scalar_ascription_cast(source.ty, target) {
+                    return Some(self.runtime_call_value(
+                        MirIntrinsic::Convert(conversion),
+                        vec![operand],
+                        ty,
+                        expr.span,
+                    ));
+                }
                 Some(self.assign_temp(MirValueKind::Operand(operand), ty, expr.span))
             }
         }
+    }
+
+    /// The `∷` ascription cast for a cross-family scalar pair, or `None` for
+    /// every other target.
+    ///
+    /// WHY: an ascription states the target family, and every codegen tier
+    /// emits the declared conversion for it (`1.9 ∷ numerus<i64>` is
+    /// `1.9 as i64`), so the MIR has to carry the conversion too — otherwise
+    /// the runner stores a float carrier in a numerus slot and executes the
+    /// raw source value. Only the pairs the cast surfaces implement are
+    /// emitted; same-family ascriptions and aggregate targets stay operand
+    /// pass-through.
+    fn scalar_ascription_cast(&self, source: Option<TypeId>, target: TypeId) -> Option<MirConversion> {
+        let source = source?;
+        if !matches!(
+            self.normalized_type(target),
+            Type::Primitive(Primitive::Numerus) | Type::SizedNumeric(Primitive::Numerus, _)
+        ) {
+            return None;
+        }
+        if !matches!(
+            self.normalized_type(source),
+            Type::Primitive(Primitive::Fractus)
+                | Type::SizedNumeric(Primitive::Fractus, _)
+                | Type::Primitive(Primitive::Bivalens)
+        ) {
+            return None;
+        }
+        Some(MirConversion {
+            flavor: MirConversionFlavor::Cast,
+            source_ty: MirType::semantic(source),
+            target_ty: MirType::semantic(target),
+            params: Vec::new(),
+            recovery: None,
+            struct_defaults: Vec::new(),
+        })
     }
 
     fn lower_struct_object_fields(

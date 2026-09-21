@@ -194,7 +194,7 @@ impl<H: super::super::Host + ?Sized> Runner<'_, H> {
                     self.recover_or_fail(recovery, span, "textus to numerus conversion failed")
                 }
             },
-            Value::Float(v) => Ok(Value::Int(v as i64)),
+            Value::Float(v) => Ok(float_to_numerus_width(v, width)),
             Value::Bool(v) => Ok(Value::Int(if v { 1 } else { 0 })),
             Value::Int(v) => {
                 // GT-3: conversion never wraps (DEFER-116 boundary contract).
