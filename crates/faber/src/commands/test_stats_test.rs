@@ -106,6 +106,25 @@ fn framed_artifact(stdout: &[u8]) -> (Vec<u8>, TestStatsArtifact) {
     (prefix, artifact)
 }
 
+/// Collapse per-case durations (`(N ms)`) so report comparison tolerates
+/// scheduler jitter while every other stdout byte must still match.
+fn normalize_report(stdout: &[u8]) -> String {
+    let text = String::from_utf8_lossy(stdout);
+    let mut out = String::with_capacity(text.len());
+    let mut rest = &*text;
+    while let Some(end) = rest.find(" ms)") {
+        let (head, tail) = rest.split_at(end);
+        let digits = head
+            .len()
+            .saturating_sub(head.trim_end_matches(|c: char| c.is_ascii_digit()).len());
+        out.push_str(&head[..head.len() - digits]);
+        out.push_str("<d> ms)");
+        rest = &tail[" ms)".len()..];
+    }
+    out.push_str(rest);
+    out
+}
+
 #[test]
 fn success_stats_frames_after_report_and_writes_equivalent_file() {
     let (dir, _) = write_package("ok");
@@ -126,8 +145,9 @@ fn success_stats_frames_after_report_and_writes_equivalent_file() {
         file_only
     );
     assert_eq!(
-        file_only.stdout, baseline.stdout,
-        "file-only stats must preserve ordinary stdout byte-for-byte"
+        normalize_report(&file_only.stdout),
+        normalize_report(&baseline.stdout),
+        "file-only stats must preserve ordinary stdout except per-case durations"
     );
     let file_artifact: TestStatsArtifact =
         serde_json::from_slice(&fs::read(&stats_file).expect("stats file")).expect("file schema");
@@ -144,8 +164,9 @@ fn success_stats_frames_after_report_and_writes_equivalent_file() {
     assert!(dual.status.success(), "dual stats test failed: {:?}", dual);
     let (prefix, stdout_artifact) = framed_artifact(&dual.stdout);
     assert_eq!(
-        prefix, baseline.stdout,
-        "stats framing must preserve report prefix"
+        normalize_report(&prefix),
+        normalize_report(&baseline.stdout),
+        "stats framing must preserve report prefix except per-case durations"
     );
     let dual_file_artifact: TestStatsArtifact =
         serde_json::from_slice(&fs::read(&dual_file).expect("dual stats file"))
@@ -173,6 +194,23 @@ fn success_stats_frames_after_report_and_writes_equivalent_file() {
     assert_eq!(parked.status, "skipped");
     assert!(parked.functions.is_empty());
     assert!(parked.intrinsics.is_empty());
+}
+
+#[test]
+fn report_comparison_collapses_only_durations() {
+    let zero_ms = b"ok   src/main.fab (0 ms)\nskip src/main.fab (not a unit fixture; 0 ms)\n";
+    let one_ms = b"ok   src/main.fab (1 ms)\nskip src/main.fab (not a unit fixture; 2 ms)\n";
+    assert_eq!(
+        normalize_report(zero_ms),
+        normalize_report(one_ms),
+        "same report with different durations must compare equal"
+    );
+    let failed = b"ok   src/main.fab (0 ms)\nFAIL src/main.fab (0 ms)\n";
+    assert_ne!(
+        normalize_report(zero_ms),
+        normalize_report(failed),
+        "non-timing stdout change must still fail the comparison"
+    );
 }
 
 #[test]
