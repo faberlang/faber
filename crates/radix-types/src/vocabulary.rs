@@ -277,9 +277,11 @@ pub enum MirCollectionOp {
     /// Row gather over the first axis (the CCI-1 `gather` source contract):
     /// `table[V,D]` + `ids[T]` → `[T,D]` with `out[t] = table[ids[t]]`,
     /// repeated/out-of-order ids preserved. The ids vector is a plain
-    /// operand (`[x, ids]`); out-of-range/negative ids fail closed at the
-    /// source surface (no silent clamping). Shape-transforming — not
-    /// `TensorGet`/`TensorSlice`.
+    /// operand (`[x, ids]`); out-of-range/negative *literal* ids fail closed
+    /// at the source surface (no silent clamping), and the emitted kernel
+    /// body bounds-checks a *runtime* token against the table row count
+    /// (out of range ⇒ zero output, never an out-of-bounds table read).
+    /// Shape-transforming — not `TensorGet`/`TensorSlice`.
     TensorGather,
     /// Causal masked-row softmax (GI3-1): numerically stable row softmax
     /// over the causal attention scores with zero probability above the
