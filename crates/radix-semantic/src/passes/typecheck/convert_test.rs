@@ -732,6 +732,73 @@ fn sized_integer_key_array_ascription_to_map_rejects() {
 }
 
 #[test]
+fn shape_matching_array_ascription_to_tensor_rejects() {
+    // The falsifier the second ruling names: rank and lengths agree, and it
+    // is still a conversion — "it assumes that the internal structure of the
+    // array matches with the internal structure of the tensor", which the
+    // source does not establish (signed-to-unsigned cast analogy, operator
+    // ruling 2026-09-21).
+    test_support::assert_rejects_with_issue(
+        "incipit { fixum tensor<fractus, [2, 2]> t ← [[1.0, 0.0], [0.0, 2.0]] ∷ tensor<fractus, [2, 2]> }",
+        "array_ascription_to_tensor",
+    );
+}
+
+#[test]
+fn flat_array_ascription_to_tensor_rejects() {
+    // Total over shapes: a flat, exact-length literal is the same
+    // cross-container-kind conversion.
+    test_support::assert_rejects_with_issue(
+        "incipit { fixum tensor<numerus, [3]> t ← [1, 2, 3] ∷ tensor<numerus, [3]> }",
+        "array_ascription_to_tensor",
+    );
+}
+
+#[test]
+fn shape_mismatched_array_ascription_to_tensor_rejects() {
+    // The rejection is unconditional: a disagreeing shape does not get a
+    // gentler ruling than an agreeing one — both are conversions.
+    test_support::assert_rejects_with_issue(
+        "incipit { fixum tensor<numerus, [8]> t ← [1, 2, 3] ∷ tensor<numerus, [8]> }",
+        "array_ascription_to_tensor",
+    );
+}
+
+#[test]
+fn empty_array_ascription_to_tensor_rejects() {
+    // The norma tensor.fab shape: `[]` is a definite array literal, so the
+    // rule fires even with nothing to shape-match.
+    test_support::assert_rejects_with_issue(
+        "incipit { fixum tensor<fractus, [8]> t ← [] ∷ tensor<fractus, [8]> }",
+        "array_ascription_to_tensor",
+    );
+}
+
+#[test]
+fn lista_source_ascription_to_tensor_rejects() {
+    // As on the map side, the rule keys on the source's container family,
+    // not on literal syntax: a typed lista identifier is a definite
+    // cross-family source (bounded lista included).
+    test_support::assert_rejects_with_issue(
+        r"functio selecta(lista<fractus, 4> src) → tensor<fractus, [4]> {
+  redde src ∷ tensor<fractus, [4]>
+}",
+        "array_ascription_to_tensor",
+    );
+}
+
+#[test]
+fn unresolved_source_ascription_to_tensor_typechecks() {
+    // The boundary that is not a loophole: an identifier or unresolved-type
+    // source is exactly what ascription is for, so the rule must not fire.
+    test_support::assert_accepts(
+        r"functio asserta<T>(T raw) → tensor<fractus, [8]> {
+  redde raw ∷ tensor<fractus, [8]>
+}",
+    );
+}
+
+#[test]
 fn sanctioned_empty_and_keyed_map_construction_typechecks() {
     // `vacua` is the la-pack marker (`empty` is its en twin, covered by the
     // corpus); the keyed literal and the empty object literal stay the typed
