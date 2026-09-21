@@ -1250,10 +1250,18 @@ functio ragged(lista<lista<f32>> pairs) → f32 {
 "#,
     );
     // Ragged `lista<lista<T>>` fails closed at the shaped-iterable rule;
-    // the loop is never unrolled, so the AIR purity pass reports the whole
-    // `itera` instead of a per-lane decline.
+    // the loop is never unrolled. With typecheck failed the AIR purity pass
+    // is skipped (S03-9: it would read unreliable types), so the decline is
+    // the shaped-iterable error alone — no `itera_loop` stacked on top.
     expect_issue(&result.diagnostics, "itera_apud_requires_shaped_iterable");
-    expect_issue(&result.diagnostics, "itera_loop");
+    assert!(
+        !result
+            .diagnostics
+            .iter()
+            .any(|err| err.issue() == Some("itera_loop")),
+        "purity decline must not stack on the failed typecheck: {:?}",
+        result.diagnostics
+    );
     let hir = result.hir.as_ref().expect("typed HIR despite the decline");
     assert!(has_itera(hir), "ragged apud iteration must remain whole");
 }
