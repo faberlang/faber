@@ -363,6 +363,29 @@ pub struct CommuneField {
     pub span: Span,
 }
 
+/// One merged instance field of a local genus, recorded by the typecheck
+/// heritage merge: the canonical merged field view the checker itself admits
+/// literals and access against, carried so later stages (MIR aggregate
+/// lowering/validation) reuse it instead of re-deriving flattening.
+#[derive(Debug, Clone, Copy)]
+pub struct StructHeritageFieldRow {
+    pub name: LexSymbol,
+
+    /// Declared field type in the type table (the declaring ancestor's).
+    pub ty: TypeId,
+
+    /// Whether the field is `sponte` (optional and nullable).
+    pub optional: bool,
+
+    /// Whether a literal must supply the field explicitly.
+    pub required: bool,
+
+    /// Genus whose declaration contributed the field (nearest declaration
+    /// wins). The MIR context resolves default initializers from this
+    /// genus's HIR item.
+    pub owner: DefId,
+}
+
 /// Ordered concrete conversion-pair identity: exactly `(source → destination)`.
 ///
 /// `(A, B)` and `(B, A)` are distinct rows. Generic helpers cannot key rows;
@@ -745,6 +768,14 @@ pub struct Resolver {
     /// by typecheck (variant references) and the MIR lowering context (variant
     /// aggregates).
     imported_enum_variants: FxHashMap<DefId, Vec<ImportedEnumVariant>>,
+    /// Merged instance-field view over each local genus's `extends` closure,
+    /// published by the typecheck heritage merge (ancestors first, own fields
+    /// last, nearest declaration wins). The one canonical merged field view:
+    /// semantic literals admit against it, and the MIR lowering context reads
+    /// it for aggregate validation instead of re-deriving flattening.
+    /// Runtime-only: excluded from FHIR snapshots (single-unit facts; a loaded
+    /// artifact re-falls back to own-field views).
+    struct_heritage_fields: FxHashMap<DefId, Vec<StructHeritageFieldRow>>,
     /// `@ commune` fields keyed by the union's `DefId` (local after lowering,
     /// imported after file-interface install). Runtime-only: FHIR snapshots
     /// rebuild imported rows from the interface; TEU3 carries the region on
@@ -823,6 +854,7 @@ impl Resolver {
             canonical_imported_nominal_types: FxHashMap::default(),
             canonical_imported_nominal_defs: FxHashMap::default(),
             imported_enum_variants: FxHashMap::default(),
+            struct_heritage_fields: FxHashMap::default(),
             commune_fields: FxHashMap::default(),
             conversion_rows: FxHashMap::default(),
             imported_type_def_ids: FxHashSet::default(),
@@ -2379,6 +2411,26 @@ impl Resolver {
         self.commune_fields.insert(enum_def, fields);
     }
 
+    /// Install the merged heritage field views for every local genus, as
+    /// produced by the typecheck heritage merge. Replaces any prior table.
+    pub fn register_struct_heritage_fields(
+        &mut self,
+        table: FxHashMap<DefId, Vec<StructHeritageFieldRow>>,
+    ) {
+        self.struct_heritage_fields = table;
+    }
+
+    /// The merged instance-field view of one local genus: ancestors first,
+    /// own fields last, nearest declaration wins. Empty when the genus has no
+    /// heritage closure (or the table was not published — snapshot-loaded
+    /// units fall back to own-field views).
+    #[must_use]
+    pub fn struct_heritage_fields(&self, def_id: DefId) -> &[StructHeritageFieldRow] {
+        self.struct_heritage_fields
+            .get(&def_id)
+            .map_or(&[], Vec::as_slice)
+    }
+
     /// Commune fields declared on `enum_def`, empty when the union has no region.
     #[must_use]
     pub fn commune_fields(&self, enum_def: DefId) -> &[CommuneField] {
@@ -3564,6 +3616,9 @@ impl Resolver {
             canonical_imported_nominal_types: FxHashMap::default(),
             canonical_imported_nominal_defs: FxHashMap::default(),
             imported_enum_variants: FxHashMap::default(),
+            // Runtime-only: rebuilt by the typecheck heritage merge, never
+            // carried through snapshots.
+            struct_heritage_fields: FxHashMap::default(),
             commune_fields: FxHashMap::default(),
             conversion_rows,
             imported_type_def_ids: FxHashSet::default(),

@@ -62,7 +62,8 @@ use crate::{
     FuncSig, GenericBindingSource, GenericParamSort, GenericWitness, IndexExpr, IndexInferState,
     MarkerFamily, NumericWidth, ParamType, Primitive, ResolvedGenericBinding, ResolvedGenericCall,
     Resolver, SemanticError, SemanticErrorKind, SemanticGenericParamDefault, SemanticParamMode,
-    Type, TypeId, TypeParamConstraint, TypeTable, WarningKind, types::InferVar,
+    StructHeritageFieldRow, Type, TypeId, TypeParamConstraint, TypeTable, WarningKind,
+    types::InferVar,
 };
 use radix_hir::{
     DefId, HirArrayElement, HirAvailability, HirBinOp, HirBlock, HirCape, HirCasuArm,
@@ -293,6 +294,16 @@ pub(crate) struct TypeChecker<'a> {
     /// resolution walks and reports in a deterministic sequence.
     pub struct_order: Vec<(DefId, radix_lexer::Span)>,
 
+    /// Own instance-field declaration order per genus (statics excluded).
+    /// The order seed for the canonical merged field view.
+    pub own_instance_fields: FxHashMap<DefId, Vec<Symbol>>,
+
+    /// Canonical merged instance-field rows per genus, built by the heritage
+    /// merge (ancestors first, own fields last, nearest declaration wins) and
+    /// published to the resolver after checking so MIR aggregate
+    /// lowering/validation reuse the view the checker admitted against.
+    pub merged_heritage_fields: FxHashMap<DefId, Vec<StructHeritageFieldRow>>,
+
     /// Transitive `extends` chain (nearest ancestor first), keyed by struct
     /// def. Cycle-cut and kind-checked during heritage resolution.
     pub ancestor_structs: FxHashMap<DefId, Vec<DefId>>,
@@ -468,10 +479,13 @@ pub(crate) fn typecheck_with_interner(
     interner: Option<&Interner>,
 ) -> Result<(), Vec<SemanticError>> {
     let config = crate::PassConfig::for_target(Target::HirRust);
-    typecheck_with_config(hir, resolver, types, interner, &config, None, None)
+    typecheck_with_config(hir, resolver, types, interner, &config, None, None).map(|_| ())
 }
 
 /// Typecheck HIR with a caller-supplied [`PassConfig`].
+///
+/// On success returns the canonical merged heritage field view per local
+/// genus, for publication onto the resolver.
 ///
 /// # Errors
 ///
@@ -484,7 +498,7 @@ pub(crate) fn typecheck_with_config(
     config: &crate::PassConfig,
     companion_signatures: Option<&crate::passes::companion_signature::CompanionSignatures>,
     presentation: Option<&mut HirPresentation>,
-) -> Result<(), Vec<SemanticError>> {
+) -> Result<FxHashMap<DefId, Vec<StructHeritageFieldRow>>, Vec<SemanticError>> {
     let mut checker = TypeChecker::new(resolver, types, interner, config.target);
     checker.locale_pack = config.locale_pack.as_ref();
     checker.collect_imported_file_structs();
@@ -500,7 +514,7 @@ pub(crate) fn typecheck_with_config(
     }
 
     if checker.errors.is_empty() {
-        Ok(())
+        Ok(std::mem::take(&mut checker.merged_heritage_fields))
     } else {
         Err(checker.errors)
     }
@@ -533,6 +547,8 @@ impl<'a> TypeChecker<'a> {
             interfaces: FxHashMap::default(),
             struct_heritage: FxHashMap::default(),
             struct_order: Vec::new(),
+            own_instance_fields: FxHashMap::default(),
+            merged_heritage_fields: FxHashMap::default(),
             ancestor_structs: FxHashMap::default(),
             implemented_interfaces: FxHashMap::default(),
             alias_type_params: FxHashMap::default(),

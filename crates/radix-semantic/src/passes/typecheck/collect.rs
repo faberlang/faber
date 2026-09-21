@@ -113,6 +113,10 @@ impl TypeChecker<'_> {
             self.json_structs.insert(def_id);
         }
 
+        // Declaration order is the merged-view order seed: the MIR aggregate
+        // view keeps ancestors-first, own-fields-last ordering, which the
+        // hash-map field table loses.
+        let mut own_instance_fields = Vec::new();
         for field in &struct_item.fields {
             fields.insert(
                 field.name,
@@ -123,7 +127,12 @@ impl TypeChecker<'_> {
                     span: field.span,
                 },
             );
+            if !field.is_static {
+                own_instance_fields.push(field.name);
+            }
         }
+        self.own_instance_fields
+            .insert(def_id, own_instance_fields);
 
         for method in &struct_item.methods {
             let sig = self.function_signature(&method.func);
@@ -576,7 +585,18 @@ impl TypeChecker<'_> {
             .remove(&def_id)
             .expect("collected struct present during heritage merge");
 
+        let own_instance_names: Vec<Symbol> = self
+            .own_instance_fields
+            .get(&def_id)
+            .cloned()
+            .unwrap_or_default();
+
         let mut diagnostics: Vec<SemanticError> = Vec::new();
+        // The canonical merged field view: the parent's already-merged rows
+        // minus names this genus redeclares, then own instance fields in
+        // declaration order. Published to the resolver so MIR aggregate
+        // lowering/validation reuse it instead of re-deriving flattening.
+        let mut heritage_rows: Vec<StructHeritageFieldRow> = Vec::new();
         if let Some(parent) = parent {
             let parent_info = self.structs.get(&parent).expect("parent collected");
             let parent_fields = parent_info.fields.clone();
@@ -598,6 +618,20 @@ impl TypeChecker<'_> {
                         SemanticError::structured(SemanticErrorKind::DefinitionDuplicate, span)
                             .with_arg("issue", ISSUE_FIELD_REDECLARATION),
                     );
+                }
+            }
+            for row in self
+                .merged_heritage_fields
+                .get(&parent)
+                .into_iter()
+                .flatten()
+                .copied()
+                .collect::<Vec<_>>()
+            {
+                // Nearest declaration wins: a name this genus redeclares is
+                // dropped here and supplied by the own-field rows below.
+                if !own_instance_names.contains(&row.name) {
+                    heritage_rows.push(row);
                 }
             }
             for (name, sig) in parent_methods {
@@ -627,6 +661,22 @@ impl TypeChecker<'_> {
         } else {
             info.bodyless_methods.clone_from(&info.own_bodyless);
         }
+
+        for name in own_instance_names {
+            let field = info
+                .fields
+                .get(&name)
+                .copied()
+                .expect("own instance field present in merged table");
+            heritage_rows.push(StructHeritageFieldRow {
+                name,
+                ty: field.ty,
+                optional: field.optional,
+                required: field.required,
+                owner: def_id,
+            });
+        }
+        self.merged_heritage_fields.insert(def_id, heritage_rows);
 
         self.structs.insert(def_id, info);
         self.errors.extend(diagnostics);
