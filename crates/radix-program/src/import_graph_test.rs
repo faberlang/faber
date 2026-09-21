@@ -93,6 +93,113 @@ fn resolve_import_local_source_root_form() {
     let _ = fs::remove_dir_all(&root);
 }
 
+// ── G1-U1: canonicalize-and-contain on local import arms ───────────────────
+
+#[test]
+fn resolve_import_local_parent_import_inside_package_resolves() {
+    // Containment is decided on the resolved path, not the spelling: a legal
+    // in-package `../` import must keep resolving.
+    let root = temp_root("local-parent-inside");
+    fs::create_dir_all(root.join("sub")).unwrap();
+    fs::write(root.join("b.fab"), "functio f() → vacuum { tacet }\n").unwrap();
+    let from_file = root.join("sub/a.fab");
+    let package = spec(root.clone(), from_file.clone());
+    let resolver = LibraryResolver::with_optional_home(None);
+
+    match resolve_import(&package, &resolver, &from_file, "../b") {
+        ImportResolution::Local(target) => {
+            assert!(target.ends_with("b.fab"), "target: {target:?}")
+        }
+        other => panic!("expected in-package parent import to resolve, got {other:?}"),
+    }
+    let _ = fs::remove_dir_all(&root);
+}
+
+#[test]
+fn resolve_import_local_parent_escape_rejected() {
+    // The escape target exists on disk, so only containment can reject it.
+    let root = temp_root("local-parent-escape");
+    fs::create_dir_all(root.join("pkg")).unwrap();
+    fs::write(root.join("outside.fab"), "functio f() → vacuum { tacet }\n").unwrap();
+    let from_file = root.join("pkg/main.fab");
+    let package = spec(root.join("pkg"), from_file.clone());
+    let resolver = LibraryResolver::with_optional_home(None);
+
+    match resolve_import(&package, &resolver, &from_file, "../outside") {
+        ImportResolution::Error(diag) => {
+            assert_eq!(diag.issue(), Some("package_import_escape"), "{diag:?}")
+        }
+        other => panic!("expected parent-escape rejection, got {other:?}"),
+    }
+    let _ = fs::remove_dir_all(&root);
+}
+
+#[test]
+fn resolve_import_bare_escape_rejected() {
+    // Bare source-root arm: a specifier that normalizes out of the source root
+    // is rejected even though it begins with no traversal-looking prefix.
+    let root = temp_root("bare-escape");
+    fs::create_dir_all(root.join("src/a")).unwrap();
+    fs::write(root.join("outside.fab"), "functio f() → vacuum { tacet }\n").unwrap();
+    let from_file = root.join("src/main.fab");
+    let package = spec(root.join("src"), from_file.clone());
+    let resolver = LibraryResolver::with_optional_home(None);
+
+    match resolve_import(&package, &resolver, &from_file, "a/../../outside") {
+        ImportResolution::Error(diag) => {
+            assert_eq!(diag.issue(), Some("package_import_escape"), "{diag:?}")
+        }
+        other => panic!("expected bare-escape rejection, got {other:?}"),
+    }
+    let _ = fs::remove_dir_all(&root);
+}
+
+#[cfg(unix)]
+#[test]
+fn resolve_import_local_symlink_escape_rejected() {
+    // An in-tree symlink whose target lives outside the package root resolves
+    // through `is_file` but must be rejected before the target is read.
+    let root = temp_root("local-symlink-escape");
+    fs::create_dir_all(root.join("pkg")).unwrap();
+    fs::write(root.join("secret.fab"), "functio f() → vacuum { tacet }\n").unwrap();
+    std::os::unix::fs::symlink(root.join("secret.fab"), root.join("pkg/link.fab")).unwrap();
+    let from_file = root.join("pkg/main.fab");
+    let package = spec(root.join("pkg"), from_file.clone());
+    let resolver = LibraryResolver::with_optional_home(None);
+
+    match resolve_import(&package, &resolver, &from_file, "./link") {
+        ImportResolution::Error(diag) => {
+            assert_eq!(diag.issue(), Some("package_import_escape"), "{diag:?}")
+        }
+        other => panic!("expected symlink-escape rejection, got {other:?}"),
+    }
+    let _ = fs::remove_dir_all(&root);
+}
+
+#[test]
+fn resolve_import_relative_inside_template_base_resolves() {
+    // A module reached through a §template base lives outside the package root
+    // by design; its own relative sibling imports must keep resolving.
+    let root = temp_root("template-base-relative");
+    let pkg = root.join("pkg");
+    let shared = root.join("shared/gnu");
+    fs::create_dir_all(&pkg).unwrap();
+    fs::create_dir_all(&shared).unwrap();
+    fs::write(shared.join("format.fab"), "functio f() → vacuum { tacet }\n").unwrap();
+    let from_file = shared.join("stdio.fab");
+    let mut package = spec(pkg.clone(), pkg.join("main.fab"));
+    package.templates.insert("gnu".to_owned(), shared.clone());
+    let resolver = LibraryResolver::with_optional_home(None);
+
+    match resolve_import(&package, &resolver, &from_file, "./format") {
+        ImportResolution::Local(target) => {
+            assert!(target.ends_with("format.fab"), "target: {target:?}")
+        }
+        other => panic!("expected template-base sibling import to resolve, got {other:?}"),
+    }
+    let _ = fs::remove_dir_all(&root);
+}
+
 #[test]
 fn resolve_import_self_provider_module_is_local() {
     let root = temp_root("self-provider");

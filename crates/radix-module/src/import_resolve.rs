@@ -220,10 +220,62 @@ pub fn resolve_namespace_import(
         });
     };
     let candidate = base.join(import_path);
-    resolve_fab_file(&candidate).ok_or_else(|| ImportResolveError {
-        message: format!("relative import '{import_path}' not found from '{}'", from_file.display()),
-        issue: "import_resolve_file_not_found",
-    })
+    let Some(target) = resolve_fab_file(&candidate) else {
+        return Err(ImportResolveError {
+            message: format!("relative import '{import_path}' not found from '{}'", from_file.display()),
+            issue: "import_resolve_file_not_found",
+        });
+    };
+    contain_relative_import(session, from_file, import_path, target)
+}
+
+/// Contain a resolved relative import under the resolving package's canonical
+/// root.
+///
+/// Containment is decided on the canonicalized target, never on the spelling:
+/// an in-package `../` import resolves, while a `..` escape or a symlink
+/// pointing outside the root is rejected before the target is read.
+/// Manifestless loose files use their own directory as the root, mirroring
+/// package discovery for direct-file input; a file with no directory has no
+/// boundary to enforce.
+fn contain_relative_import(
+    session: &Session,
+    from_file: &Path,
+    import_path: &str,
+    target: PathBuf,
+) -> Result<PathBuf, ImportResolveError> {
+    let root = find_package_root_with_session(session, from_file).or_else(|| {
+        from_file.parent().map(|parent| {
+            if parent.as_os_str().is_empty() {
+                PathBuf::from(".")
+            } else {
+                parent.to_path_buf()
+            }
+        })
+    });
+    let Some(root) = root else {
+        return Ok(target);
+    };
+    let escape_error = |reason: String| ImportResolveError {
+        message: format!("relative import '{import_path}' {reason}"),
+        issue: "import_resolve_escape",
+    };
+    let canonical_root = root.canonicalize().map_err(|error| {
+        escape_error(format!(
+            "package root {} cannot be resolved: {error}",
+            root.display()
+        ))
+    })?;
+    let canonical_target = target.canonicalize().map_err(|error| {
+        escape_error(format!("target cannot be resolved: {error}"))
+    })?;
+    if !canonical_target.starts_with(&canonical_root) {
+        return Err(escape_error(format!(
+            "resolves outside the package root: {}",
+            canonical_target.display()
+        )));
+    }
+    Ok(target)
 }
 
 /// Resolve a `§name/rest` template import.

@@ -302,6 +302,62 @@ fn resolve_namespace_import_returns_err_for_unadorned_relative_looking_path() {
     assert!(result.is_err());
 }
 
+// ── G1-U1: canonicalize-and-contain on the relative arm ─────────────────────
+
+#[test]
+fn resolve_namespace_import_relative_parent_inside_package_resolves() {
+    // Containment is decided on the resolved path, not the spelling: a legal
+    // in-package `../` import must keep resolving.
+    let dir = crate::test_support::test_temp_dir("rel-parent-inside");
+    let root = dir.path();
+    std::fs::write(root.join("faber.toml"), "[package]\nname = \"demo\"\n").unwrap();
+    std::fs::create_dir_all(root.join("src")).unwrap();
+    std::fs::write(root.join("b.fab"), "functio f() → vacuum { }\n").unwrap();
+    let from = root.join("src").join("a.fab");
+    std::fs::write(&from, "functio g() → vacuum { }\n").unwrap();
+
+    let result = resolve_namespace_import(&fresh_session(), &from, "../b", None);
+    let target = result.expect("in-package parent import must resolve");
+    assert!(target.ends_with("b.fab"), "target: {target:?}");
+}
+
+#[test]
+fn resolve_namespace_import_relative_parent_escape_rejected() {
+    // The escape target exists on disk, so only containment can reject it.
+    let dir = crate::test_support::test_temp_dir("rel-parent-escape");
+    let root = dir.path();
+    let pkg = root.join("pkg");
+    std::fs::create_dir_all(&pkg).unwrap();
+    std::fs::write(pkg.join("faber.toml"), "[package]\nname = \"demo\"\n").unwrap();
+    std::fs::write(root.join("outside.fab"), "functio f() → vacuum { }\n").unwrap();
+    let from = pkg.join("app.fab");
+    std::fs::write(&from, "").unwrap();
+
+    let error = resolve_namespace_import(&fresh_session(), &from, "../outside", None)
+        .expect_err("parent escape must be rejected");
+    assert_eq!(error.issue, "import_resolve_escape", "{error:?}");
+}
+
+#[cfg(unix)]
+#[test]
+fn resolve_namespace_import_relative_symlink_escape_rejected() {
+    // An in-tree symlink whose target lives outside the package root resolves
+    // through `is_file` but must be rejected before the target is read.
+    let dir = crate::test_support::test_temp_dir("rel-symlink-escape");
+    let root = dir.path();
+    let pkg = root.join("pkg");
+    std::fs::create_dir_all(&pkg).unwrap();
+    std::fs::write(pkg.join("faber.toml"), "[package]\nname = \"demo\"\n").unwrap();
+    std::fs::write(root.join("secret.fab"), "functio f() → vacuum { }\n").unwrap();
+    std::os::unix::fs::symlink(root.join("secret.fab"), pkg.join("link.fab")).unwrap();
+    let from = pkg.join("app.fab");
+    std::fs::write(&from, "").unwrap();
+
+    let error = resolve_namespace_import(&fresh_session(), &from, "./link", None)
+        .expect_err("symlink escape must be rejected");
+    assert_eq!(error.issue, "import_resolve_escape", "{error:?}");
+}
+
 // ── resolve_fab_file with temp directory ────────────────────────────────────
 
 #[test]
