@@ -396,6 +396,7 @@ fn authored_type_artifact() -> crate::artifact::HirArtifact {
                 ty: u32_ty,
                 head: radix_hir::HirTypeFormHead::Semantic(TypeFormLevel::LONG),
                 args: Vec::new(),
+                label: None,
             },
         },
         radix_hir::HirAuthoredTypeUse {
@@ -411,9 +412,11 @@ fn authored_type_artifact() -> crate::artifact::HirArtifact {
                         ty: f32_ty,
                         head: radix_hir::HirTypeFormHead::Semantic(TypeFormLevel::SHORT),
                         args: Vec::new(),
+                        label: None,
                     })),
                     radix_hir::HirTypeFormArg::Size(shape),
                 ],
+                label: None,
             },
         },
         radix_hir::HirAuthoredTypeUse {
@@ -428,6 +431,7 @@ fn authored_type_artifact() -> crate::artifact::HirArtifact {
                     path: vec![Symbol(2)],
                 },
                 args: Vec::new(),
+                label: None,
             },
         },
         radix_hir::HirAuthoredTypeUse {
@@ -439,6 +443,7 @@ fn authored_type_artifact() -> crate::artifact::HirArtifact {
                 ty: u32_ty,
                 head: radix_hir::HirTypeFormHead::Infer,
                 args: Vec::new(),
+                label: None,
             },
         },
     ];
@@ -508,6 +513,29 @@ fn nonexistent_type_slot_fails_closed() {
             ..
         }
     ));
+}
+
+/// A by-label `iuncta` read must name a real node; a dangling `HirId` is a
+/// producer defect and fails closed instead of silently keeping `[i]`.
+#[test]
+fn dangling_tuple_label_access_fails_closed() {
+    let mut artifact = authored_type_artifact();
+    artifact
+        .presentation
+        .tuple_label_accesses
+        .push(radix_hir::HirTupleLabelAccess {
+            expr_id: radix_hir::HirId(9_999),
+            label: Symbol(1),
+        });
+    let err = crate::decode(&crate::encode(&artifact).expect("encode"))
+        .expect_err("a dangling label-access id must fail closed");
+    assert!(
+        matches!(
+            err,
+            crate::error::HirArtifactError::DanglingIndex { kind: "HirId", .. }
+        ),
+        "dangling label access must surface as a HirId DanglingIndex: {err:?}"
+    );
 }
 
 #[test]

@@ -51,7 +51,7 @@ impl super::FaberCodegen<'_> {
                 );
             }
             HirItemKind::Struct(s) => {
-                self.generate_struct(s, names, surface, writer);
+                self.generate_struct(item.def_id, s, names, surface, writer);
             }
             HirItemKind::Enum(e) => {
                 self.generate_enum(item.def_id, e, names, surface, writer);
@@ -81,10 +81,19 @@ impl super::FaberCodegen<'_> {
                 writer.write(&self.symbol_to_string(schema.name));
                 writer.writeln(" {");
                 writer.indented(|writer| {
-                    for column in &schema.columns {
+                    for (ordinal, column) in schema.columns.iter().enumerate() {
                         writer.write(surface.keyword(TokenKind::Columna));
                         writer.write(" ");
-                        writer.write(&self.type_to_faber(column.ty, names, surface));
+                        let site = HirTypeSite {
+                            owner: HirOwnerRef::Def(item.def_id),
+                            slot: HirTypeSlot::Field(
+                                self.slot_ordinal(ordinal, "schema column count"),
+                            ),
+                        };
+                        let rendered = self
+                            .type_to_faber_at(&site, column.ty, names, surface)
+                            .unwrap_or_else(|error| self.record_type_emission_error(error));
+                        writer.write(&rendered);
                         writer.write(" ");
                         writer.write(&self.symbol_to_string(column.name));
                         if column.source != column.name {
@@ -288,8 +297,12 @@ impl super::FaberCodegen<'_> {
         crate::trivia::write_leading_trivia(trivia, self.interner, writer);
     }
 
+    /// `def_id` is the struct item's own definition; struct field type sites
+    /// are keyed by it with the field ordinal (see the presentation witness
+    /// registry), so field annotations re-emit their authored forms.
     pub(super) fn generate_struct(
         &self,
+        def_id: DefId,
         s: &HirStruct,
         names: &FxHashMap<DefId, Symbol>,
         surface: &impl KeywordSurface,
@@ -322,13 +335,20 @@ impl super::FaberCodegen<'_> {
 
         writer.writeln(" {");
         writer.indented(|writer| {
-            for field in &s.fields {
+            for (ordinal, field) in s.fields.iter().enumerate() {
                 self.write_member_trivia(field.def_id, false, writer);
                 if field.is_static {
                     writer.write(surface.keyword(TokenKind::Generis));
                     writer.write(" ");
                 }
-                writer.write(&self.type_to_faber(field.ty, names, surface));
+                let site = HirTypeSite {
+                    owner: HirOwnerRef::Def(def_id),
+                    slot: HirTypeSlot::Field(self.slot_ordinal(ordinal, "struct field count")),
+                };
+                let rendered = self
+                    .type_to_faber_at(&site, field.ty, names, surface)
+                    .unwrap_or_else(|error| self.record_type_emission_error(error));
+                writer.write(&rendered);
                 writer.write(" ");
                 writer.write(&self.symbol_to_string(field.name));
                 self.write_sponte_marker(field.sponte, surface, writer);
@@ -443,8 +463,15 @@ impl super::FaberCodegen<'_> {
                 writer.write("@ ");
                 writer.write(surface.contextual_keyword("commune"));
                 writer.newline();
-                for field in &e.commune_fields {
-                    writer.write(&self.type_to_faber(field.ty, names, surface));
+                for (ordinal, field) in e.commune_fields.iter().enumerate() {
+                    let site = HirTypeSite {
+                        owner: HirOwnerRef::Def(def_id),
+                        slot: HirTypeSlot::Field(self.slot_ordinal(ordinal, "commune field count")),
+                    };
+                    let rendered = self
+                        .type_to_faber_at(&site, field.ty, names, surface)
+                        .unwrap_or_else(|error| self.record_type_emission_error(error));
+                    writer.write(&rendered);
                     writer.write(" ");
                     writer.write(&self.symbol_to_string(field.name));
                     writer.newline();
@@ -471,8 +498,17 @@ impl super::FaberCodegen<'_> {
                 if !variant.fields.is_empty() {
                     writer.writeln(" {");
                     writer.indented(|writer| {
-                        for field in &variant.fields {
-                            writer.write(&self.type_to_faber(field.ty, names, surface));
+                        for (ordinal, field) in variant.fields.iter().enumerate() {
+                            let site = HirTypeSite {
+                                owner: HirOwnerRef::Def(variant.def_id),
+                                slot: HirTypeSlot::Field(
+                                    self.slot_ordinal(ordinal, "variant field count"),
+                                ),
+                            };
+                            let rendered = self
+                                .type_to_faber_at(&site, field.ty, names, surface)
+                                .unwrap_or_else(|error| self.record_type_emission_error(error));
+                            writer.write(&rendered);
                             writer.write(" ");
                             writer.write(&self.symbol_to_string(field.name));
                             writer.newline();

@@ -91,6 +91,7 @@ fn semantic_form(level: TypeFormLevel, ty: TypeId, args: Vec<HirTypeFormArg>) ->
         ty,
         head: HirTypeFormHead::Semantic(level),
         args,
+        label: None,
     }
 }
 
@@ -117,6 +118,27 @@ fn render_at(
 
 fn short_width(ty: TypeId) -> HirTypeForm {
     semantic_form(TypeFormLevel::SHORT, ty, Vec::new())
+}
+
+/// An authored `iuncta` element label rides the child form and re-emits as
+/// `label: type`; unlabeled slots keep the bare spelling.
+#[test]
+fn labeled_iuncta_elements_render_with_their_authored_labels() {
+    let mut fx = fixture();
+    let tuple_ty = fx.types.tuple(vec![fx.u32_ty, fx.f32_ty]);
+    let mut labeled = semantic_form(TypeFormLevel::LONG, fx.u32_ty, Vec::new());
+    labeled.label = Some(fx.interner.intern("gx"));
+    let form = semantic_form(
+        TypeFormLevel::LONG,
+        tuple_ty,
+        vec![type_arg(labeled), type_arg(short_width(fx.f32_ty))],
+    );
+    let site = declared_site(1);
+    let codegen = codegen_with_forms(&fx, vec![(site.clone(), form)]);
+    assert_eq!(
+        render_at(&codegen, &site, tuple_ty, &LaSurface),
+        "iuncta<gx: numerus<u32>, f32>"
+    );
 }
 
 #[test]
@@ -500,6 +522,7 @@ fn named_heads_render_authored_paths_and_args() {
             path: vec![module, word],
         },
         args: vec![type_arg(short_width(fx.u32_ty))],
+        label: None,
     };
     let codegen = codegen_with_forms(&fx, vec![(declared_site(1), form)]);
     assert_eq!(
@@ -520,6 +543,7 @@ fn named_head_over_unrelated_def_fails_closed() {
             path: vec![word],
         },
         args: Vec::new(),
+        label: None,
     };
     let codegen = codegen_with_forms(&fx, vec![(declared_site(1), form)]);
     assert!(
@@ -667,6 +691,7 @@ fn hole_heads_render_the_authored_hole() {
                     ty: infer_ty,
                     head: HirTypeFormHead::Infer,
                     args: Vec::new(),
+                    label: None,
                 },
             ),
             (
@@ -675,6 +700,7 @@ fn hole_heads_render_the_authored_hole() {
                     ty: union_ty,
                     head: HirTypeFormHead::UnionHole,
                     args: Vec::new(),
+                    label: None,
                 },
             ),
         ],
@@ -809,6 +835,7 @@ fn illegal_levels_and_arity_fail_closed() {
                 ty: fx.u32_ty,
                 head: HirTypeFormHead::Infer,
                 args: vec![type_arg(short_width(fx.u32_ty))],
+                label: None,
             },
         ),
     ];
@@ -867,6 +894,7 @@ fn generate_local_hole_uses_authored_form_without_legacy_flags() {
             ty: infer_ty,
             head: HirTypeFormHead::Infer,
             args: Vec::new(),
+            label: None,
         },
     });
 

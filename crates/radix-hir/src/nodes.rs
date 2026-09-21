@@ -1781,6 +1781,12 @@ pub struct HirPresentation {
     /// records are validated fail-closed at emission and in FHIR.
     #[serde(default)]
     pub authored_types: Vec<HirAuthoredTypeUse>,
+
+    /// Authored by-label member reads (`p.gw`) that lowering rewrote to the
+    /// constant-index node for the same position. Emission re-sugars exactly
+    /// these ids back to the label spelling; `p[1]` keeps its index form.
+    #[serde(default)]
+    pub tuple_label_accesses: Vec<HirTupleLabelAccess>,
 }
 
 /// Authored type-form facts for one source type position.
@@ -1792,6 +1798,20 @@ pub struct HirPresentation {
 pub struct HirAuthoredTypeUse {
     pub site: HirTypeSite,
     pub form: HirTypeForm,
+}
+
+/// One authored by-label member read on a labeled `iuncta` binding.
+///
+/// Lowering rewrites `p.gw` to the same constant-index node as `p[1]`, so the
+/// label survives only as presentation data. Emission re-sugars exactly the
+/// recorded ids back to `.gw`; every other index read keeps its `[i]`
+/// spelling. `expr_id` is the rewritten index expression's `HirId`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct HirTupleLabelAccess {
+    pub expr_id: HirId,
+
+    /// Authored member name, as it appeared before the rewrite.
+    pub label: Symbol,
 }
 
 impl HirPresentation {
@@ -1867,6 +1887,17 @@ pub struct HirTypeForm {
     pub ty: TypeId,
     pub head: HirTypeFormHead,
     pub args: Vec<HirTypeFormArg>,
+
+    /// Authored element label for this node, when the source spelled one —
+    /// the `gx` of `iuncta<gx: int, gw: int>`. Mirrors the parser's
+    /// per-position `iuncta_label`, which rides the labeled child node; the
+    /// absence of a label is the unlabeled form.
+    ///
+    /// Semantic identity stays label-blind (`Type::Tuple` is positional), so
+    /// the label is presentation data: emission restores the authored
+    /// spelling, and no pass may read it as a type fact.
+    #[serde(default)]
+    pub label: Option<Symbol>,
 }
 
 /// How one authored type node was spelled.

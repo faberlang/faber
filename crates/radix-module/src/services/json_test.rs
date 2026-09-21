@@ -68,6 +68,7 @@ fn presentation_json_exposes_owners_attachments_and_ends() {
         ordo_enums: Vec::new(),
         variant_paths: Vec::new(),
         authored_types: Vec::new(),
+        tuple_label_accesses: Vec::new(),
     };
 
     let json = presentation_json(&presentation, &interner);
@@ -137,6 +138,7 @@ fn presentation_json_emits_null_semantic_refs_and_null_entry_anchor() {
         ordo_enums: Vec::new(),
         variant_paths: Vec::new(),
         authored_types: Vec::new(),
+        tuple_label_accesses: Vec::new(),
     };
 
     let json = presentation_json(&presentation, &interner);
@@ -170,6 +172,7 @@ fn presentation_json_escapes_comment_payloads() {
         ordo_enums: Vec::new(),
         variant_paths: Vec::new(),
         authored_types: Vec::new(),
+        tuple_label_accesses: Vec::new(),
     };
 
     let json = presentation_json(&presentation, &interner);

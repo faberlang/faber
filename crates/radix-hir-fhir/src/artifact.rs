@@ -501,8 +501,12 @@ pub struct FunctionProvenanceTableWire {
 /// (carriage) for a unit's library/file import edges so loaded-surface HIR
 /// emission maps over carried units exactly as the direct surface does; a
 /// serialized HIR addition is a wire break, so there is no compatibility
-/// decoder for schema-v13 artifacts.
-pub const SCHEMA_VERSION: u32 = 14;
+/// decoder for schema-v13 artifacts. Version 15 adds the authored `iuncta`
+/// element label on `HirTypeForm` and `HirPresentation::tuple_label_accesses`
+/// (by-label `p.gw` reads lowered to constant-index nodes): both are
+/// serialized HIR presentation additions, so schema-v14 artifacts fail closed
+/// at the schema gate as usual.
+pub const SCHEMA_VERSION: u32 = 15;
 
 /// Serializable snapshot of one analyzed provider unit carried for HIR
 /// emission (ARCH-U4 carriage).

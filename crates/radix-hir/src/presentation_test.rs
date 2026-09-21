@@ -81,6 +81,7 @@ fn sample_presentation() -> HirPresentation {
         ordo_enums: Vec::new(),
         variant_paths: Vec::new(),
         authored_types: Vec::new(),
+        tuple_label_accesses: Vec::new(),
     }
 }
 
@@ -323,6 +324,7 @@ fn semantic_form(ty: TypeId, level: TypeFormLevel) -> HirTypeForm {
         ty,
         head: HirTypeFormHead::Semantic(level),
         args: Vec::new(),
+        label: None,
     }
 }
 
@@ -343,6 +345,7 @@ fn same_type_id_keeps_independent_forms_at_distinct_sites() {
                 shared_ty,
                 TypeFormLevel::LONG,
             )))],
+            label: None,
         },
     };
     let short_site = HirAuthoredTypeUse {
@@ -357,6 +360,7 @@ fn same_type_id_keeps_independent_forms_at_distinct_sites() {
                 shared_ty,
                 TypeFormLevel::SHORT,
             )))],
+            label: None,
         },
     };
     let mut presentation = sample_presentation();
@@ -458,6 +462,7 @@ fn postcard_round_trip_preserves_authored_type_forms() {
                 HirTypeFormArg::Name(Symbol(33)),
                 HirTypeFormArg::Size(IndexId(3)),
             ],
+            label: None,
         },
     }];
 

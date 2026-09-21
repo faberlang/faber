@@ -698,8 +698,7 @@ impl super::FaberCodegen<'_> {
                 Ok(format!("{prefix} {inner}"))
             }
             Type::Tuple(members) => {
-                let rendered =
-                    self.exact_type_form_children(form, members.len(), names, surface)?;
+                let rendered = self.labeled_iuncta_children(form, members.len(), names, surface)?;
                 Ok(format!(
                     "{}<{}>",
                     surface.contextual_keyword("iuncta"),
@@ -786,6 +785,38 @@ impl super::FaberCodegen<'_> {
             .iter()
             .map(|child| self.type_form_to_faber(child, names, surface))
             .collect()
+    }
+
+    /// Authored element label recorded at one `iuncta` element site, if the
+    /// source spelled one there. Construction type arguments record each
+    /// element as its own root form, so the label sits on that root.
+    pub(super) fn authored_element_label(&self, site: &HirTypeSite) -> Option<Symbol> {
+        self.authored_type_forms.get(site)?.label
+    }
+
+    /// Render the `iuncta` element list, restoring each child's authored
+    /// element label (`iuncta<gx: int, gw: int>`). The label rides the child
+    /// node; unlabeled slots render bare.
+    fn labeled_iuncta_children(
+        &self,
+        form: &HirTypeForm,
+        count: usize,
+        names: &FxHashMap<DefId, Symbol>,
+        surface: &impl KeywordSurface,
+    ) -> Result<Vec<String>, CodegenError> {
+        let rendered = self.exact_type_form_children(form, count, names, surface)?;
+        Ok(form
+            .args
+            .iter()
+            .zip(rendered)
+            .map(|(arg, spelling)| match arg {
+                HirTypeFormArg::Type(child) => match child.label {
+                    Some(label) => format!("{}: {spelling}", self.symbol_to_string(label)),
+                    None => spelling,
+                },
+                HirTypeFormArg::Size(_) | HirTypeFormArg::Name(_) => spelling,
+            })
+            .collect())
     }
 
     /// The element child of a tensor-form node, whose lowering records the

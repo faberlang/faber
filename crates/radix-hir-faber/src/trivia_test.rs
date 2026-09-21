@@ -141,6 +141,7 @@ fn empty_presentation() -> HirPresentation {
         ordo_enums: Vec::new(),
         variant_paths: Vec::new(),
         authored_types: Vec::new(),
+        tuple_label_accesses: Vec::new(),
     }
 }
 
@@ -278,6 +279,7 @@ fn emits_statement_trivia_before_each_statement() {
         ordo_enums: Vec::new(),
         variant_paths: Vec::new(),
         authored_types: Vec::new(),
+        tuple_label_accesses: Vec::new(),
     };
 
     let code = render(&hir, &presentation, &interner);
@@ -326,6 +328,7 @@ fn emits_block_end_trivia_before_closing_brace() {
         ordo_enums: Vec::new(),
         variant_paths: Vec::new(),
         authored_types: Vec::new(),
+        tuple_label_accesses: Vec::new(),
     };
 
     let code = render(&hir, &presentation, &interner);
@@ -369,6 +372,7 @@ fn emits_program_end_trivia_before_eof() {
         ordo_enums: Vec::new(),
         variant_paths: Vec::new(),
         authored_types: Vec::new(),
+        tuple_label_accesses: Vec::new(),
     };
 
     let code = render(&hir, &presentation, &interner);
@@ -413,6 +417,7 @@ fn emits_item_trivia_before_item() {
         ordo_enums: Vec::new(),
         variant_paths: Vec::new(),
         authored_types: Vec::new(),
+        tuple_label_accesses: Vec::new(),
     };
 
     let code = render(&hir, &presentation, &interner);
@@ -444,6 +449,7 @@ fn emits_entry_trivia_before_incipit_keyword() {
         ordo_enums: Vec::new(),
         variant_paths: Vec::new(),
         authored_types: Vec::new(),
+        tuple_label_accesses: Vec::new(),
     };
 
     let code = render(&hir, &presentation, &interner);
@@ -542,6 +548,7 @@ fn emits_member_trivia_for_struct_fields_and_methods() {
         ordo_enums: Vec::new(),
         variant_paths: Vec::new(),
         authored_types: Vec::new(),
+        tuple_label_accesses: Vec::new(),
     };
 
     let code = FaberCodegen::new(&types, &interner)
@@ -601,6 +608,7 @@ fn emits_trivia_before_annotation_sequence() {
         ordo_enums: Vec::new(),
         variant_paths: Vec::new(),
         authored_types: Vec::new(),
+        tuple_label_accesses: Vec::new(),
     };
 
     let code = render(&hir, &presentation, &interner);
@@ -674,6 +682,7 @@ fn comment_bearing_branch_stays_braced_not_ergo() {
         ordo_enums: Vec::new(),
         variant_paths: Vec::new(),
         authored_types: Vec::new(),
+        tuple_label_accesses: Vec::new(),
     };
 
     let code = render(&hir, &presentation, &interner);
@@ -780,6 +789,7 @@ fn comment_bearing_branch_prevents_sic_secus_compaction() {
         ordo_enums: Vec::new(),
         variant_paths: Vec::new(),
         authored_types: Vec::new(),
+        tuple_label_accesses: Vec::new(),
     };
 
     let code = render(&hir, &presentation, &interner);
@@ -898,6 +908,7 @@ fn boundary_newline_normalization_does_not_manufacture_blank_lines() {
         ordo_enums: Vec::new(),
         variant_paths: Vec::new(),
         authored_types: Vec::new(),
+        tuple_label_accesses: Vec::new(),
     };
 
     let code = render(&hir, &presentation, &interner);
@@ -956,6 +967,7 @@ fn file_start_trivia_keeps_no_leading_blank_lines() {
         ordo_enums: Vec::new(),
         variant_paths: Vec::new(),
         authored_types: Vec::new(),
+        tuple_label_accesses: Vec::new(),
     };
 
     let code = render(&hir, &presentation, &interner);
@@ -1011,6 +1023,7 @@ fn explicit_tacet_prints_implicit_ends_do_not() {
         ordo_enums: Vec::new(),
         variant_paths: Vec::new(),
         authored_types: Vec::new(),
+        tuple_label_accesses: Vec::new(),
     };
 
     let code = render(&hir, &presentation, &interner);
@@ -1072,6 +1085,7 @@ fn rendering_is_deterministic() {
         ordo_enums: Vec::new(),
         variant_paths: Vec::new(),
         authored_types: Vec::new(),
+        tuple_label_accesses: Vec::new(),
     };
 
     let first = render(&hir, &presentation, &interner);

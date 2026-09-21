@@ -3924,6 +3924,7 @@ fn empty_presentation() -> HirPresentation {
         ordo_enums: Vec::new(),
         variant_paths: Vec::new(),
         authored_types: Vec::new(),
+        tuple_label_accesses: Vec::new(),
     }
 }
 

@@ -197,9 +197,17 @@ impl super::FaberCodegen<'_> {
             }
             HirExpressionKind::Index(object, index) => {
                 self.write_expr_prec(object, 13, names, surface, writer);
-                writer.write("[");
-                self.write_expr(index, names, surface, writer);
-                writer.write("]");
+                // A by-label read on a labeled tuple was lowered to the same
+                // constant-index node as `p[1]`; the recorded label restores
+                // the authored `.gw`. Index reads keep their bracket form.
+                if let Some(label) = self.tuple_label_accesses.get(&expr.id) {
+                    writer.write(".");
+                    writer.write(&self.symbol_to_string(*label));
+                } else {
+                    writer.write("[");
+                    self.write_expr(index, names, surface, writer);
+                    writer.write("]");
+                }
             }
             HirExpressionKind::Gradient {
                 call,
@@ -638,6 +646,12 @@ impl super::FaberCodegen<'_> {
                         let rendered = self
                             .type_to_faber_at(&site, *ty, names, surface)
                             .unwrap_or_else(|error| self.record_type_emission_error(error));
+                        // Each construction type argument is its own authored
+                        // root, so the element label rides that root.
+                        if let Some(label) = self.authored_element_label(&site) {
+                            writer.write(&self.symbol_to_string(label));
+                            writer.write(": ");
+                        }
                         writer.write(&rendered);
                     }
                     writer.write("> ");
