@@ -83,6 +83,7 @@ fn single_device_program() -> DeviceProgram {
         version: 1,
         element_ty: f32,
         element_count: 64,
+        shape: None,
         reduced_projection: None,
     };
     let input = identity(1, "input", BufferRole::Input, BufferLifetime::PerProgram);

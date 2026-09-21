@@ -461,6 +461,10 @@ fn wire_buffer_version(version: &WireBufferVersion) -> Result<BufferVersion, Fmi
         version: version.version,
         element_ty: mir_type_from_spelling(&version.element_ty)?,
         element_count: version.element_count,
+        // The carried parameter shape vector (the wire-shape widening) rides
+        // the wire version explicitly — the reverse arm maps it, never
+        // defaults it.
+        shape: version.shape.clone(),
         // The carried reduced-resource projection (council-8 CB-3) rides the
         // wire version explicitly — the reverse arm maps it, never defaults
         // it.

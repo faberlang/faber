@@ -80,18 +80,21 @@ fn wire_program_fixture() -> WireDeviceProgram {
         version: 1,
         element_ty: "f32".to_owned(),
         element_count: 64,
+        shape: None,
         reduced_projection: None,
     };
     let v_t = WireBufferVersion {
         version: 1,
         element_ty: "f32".to_owned(),
         element_count: 1,
+        shape: None,
         reduced_projection: None,
     };
     let v_o = WireBufferVersion {
         version: 1,
         element_ty: "f32".to_owned(),
         element_count: 32,
+        shape: None,
         reduced_projection: None,
     };
     let launch = WireKernelLaunchPlan {
@@ -598,7 +601,7 @@ fn session_section_version_ratchet_is_declared() {
     assert_eq!(EXECUTOR_PLAN_SECTION_VERSION, 2);
     assert_eq!(EXECUTOR_PLAN_V2_VERSION, 2);
     assert_eq!(LEGACY_EXECUTOR_PLAN_SECTION_VERSION, 1);
-    assert_eq!(WIRE_DEVICE_PROGRAM_VERSION, 11);
+    assert_eq!(WIRE_DEVICE_PROGRAM_VERSION, 12);
     assert_eq!(PACKAGE_MIR_ARTIFACT_VERSION, 7);
     assert_eq!(WIRE_DISTRIBUTED_SECTION_VERSION, 1);
 }

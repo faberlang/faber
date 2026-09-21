@@ -1394,6 +1394,7 @@ fn version(number: u32, ty: MirType, count: u64) -> BufferVersion {
         version: number,
         element_ty: ty,
         element_count: count,
+        shape: None,
         reduced_projection: None,
     }
 }

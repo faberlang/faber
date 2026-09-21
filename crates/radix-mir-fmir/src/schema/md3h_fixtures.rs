@@ -46,6 +46,7 @@ fn version(element_count: u64) -> WireBufferVersion {
         version: 1,
         element_ty: "f32".to_owned(),
         element_count,
+        shape: None,
         reduced_projection: None,
     }
 }

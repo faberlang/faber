@@ -105,6 +105,15 @@ pub enum DeviceProgramBuildError {
         /// The contradictory projection fact.
         second: String,
     },
+    /// One buffer version received contradictory parameter shape vectors.
+    BufferShape {
+        /// The affected program buffer.
+        buffer: BufferId,
+        /// The first shape fact.
+        first: String,
+        /// The contradictory shape fact.
+        second: String,
+    },
     /// The composed program or semantic facts failed the shared schema.
     Program(DeviceProgramError),
 }
@@ -149,6 +158,15 @@ impl fmt::Display for DeviceProgramBuildError {
                 "buffer {} carries conflicting reduced-resource projections ({first} vs {second})",
                 buffer.0
             ),
+            Self::BufferShape {
+                buffer,
+                first,
+                second,
+            } => write!(
+                f,
+                "buffer {} carries conflicting parameter shape vectors ({first} vs {second})",
+                buffer.0
+            ),
             Self::Program(error) => {
                 write!(f, "device program construction failed validation: {error}")
             }
@@ -168,6 +186,9 @@ struct ResourceBuild {
     element_ty: MirType,
     element_count: u64,
     reduced_projection: Option<crate::abi::ReducedProjection>,
+    /// The slot's declared parameter shape vector (`None` when the slot has
+    /// none) — reconciled to one fact per buffer in pass 1.
+    shape: Option<Vec<u64>>,
 }
 
 /// One kernel's build: signature/plan facts plus its resource slots (buffer
@@ -189,6 +210,9 @@ struct ProgramBuffer {
     name: String,
     element_ty: MirType,
     element_count: u64,
+    /// First carried parameter shape vector among the joining slots; the
+    /// pass-1 reconcile owns contradiction detection.
+    shape: Option<Vec<u64>>,
     role: BufferRole,
     written: bool,
     consumed: bool,
@@ -545,6 +569,30 @@ pub fn build_device_program(
         }
     }
 
+    // Wire-shape widening: the parameter shape vector is a fact of the
+    // BUFFER VERSION, defined by its producing slot — reconciled to ONE fact
+    // per (buffer, version); two distinct `Some` facts fail closed, exactly
+    // like the reduced projection above.
+    let mut shape_by_buffer: BTreeMap<BufferId, Option<Vec<u64>>> = BTreeMap::new();
+    for build in &builder.builds {
+        for resource in &build.resources {
+            let Some(shape) = &resource.shape else {
+                continue;
+            };
+            if let Some(previous) = shape_by_buffer.get(&resource.buffer_id) {
+                if previous.as_deref() != Some(shape.as_slice()) {
+                    return Err(DeviceProgramBuildError::BufferShape {
+                        buffer: resource.buffer_id,
+                        first: format!("{previous:?}"),
+                        second: format!("Some({shape:?})"),
+                    });
+                }
+            } else {
+                shape_by_buffer.insert(resource.buffer_id, Some(shape.clone()));
+            }
+        }
+    }
+
     // Pass 2: materialize the program with the merged identity facts. Launch
     // ids are assigned in declaration order; the launch SEQUENCE is
     // re-ordered afterwards to follow the carried dependency graph.
@@ -577,6 +625,11 @@ pub fn build_device_program(
                         .copied()
                         .flatten()
                         .or(resource.reduced_projection),
+                    shape: shape_by_buffer
+                        .get(&resource.buffer_id)
+                        .cloned()
+                        .flatten()
+                        .or_else(|| resource.shape.clone()),
                 };
                 DeviceResource {
                     buffer: identity,
@@ -623,6 +676,7 @@ pub fn build_device_program(
         &device_program,
         &builder.buffers,
         &projection_by_buffer,
+        &shape_by_buffer,
         training_program,
         per_step_observation,
         &train_step_gradients,
@@ -965,6 +1019,8 @@ impl<'a> KernelBuilder<'a> {
             .resources()
             .filter(|resource| resource.kind == MirKernelResourceKind::StorageBuffer)
         {
+            let shape =
+                crate::abi::kernel_param_shape(resource.source_local, kernel_source, self.validation);
             let role =
                 BufferRole::from_abi_role(resource.role, resource.access).ok_or_else(|| {
                     DeviceProgramBuildError::BufferRole {
@@ -1069,7 +1125,7 @@ impl<'a> KernelBuilder<'a> {
                 });
                 same_local_identity && unify_roles(entry.role, role)
             }) {
-                merge_slot_facts(entry, role, resource, is_param_input);
+                merge_slot_facts(entry, role, resource, shape.as_deref(), is_param_input);
                 entry.id
             } else if let Some(entry) = self.buffers.iter_mut().find(|entry| {
                 // The name+shape wiring is a data-flow continuation, never a
@@ -1081,7 +1137,7 @@ impl<'a> KernelBuilder<'a> {
                     && unify_roles(entry.role, role)
                     && (resource.access == MirKernelResourceAccess::Read || !entry.written)
             }) {
-                merge_slot_facts(entry, role, resource, is_param_input);
+                merge_slot_facts(entry, role, resource, shape.as_deref(), is_param_input);
                 entry.id
             } else {
                 let id = BufferId(self.next_buffer_id);
@@ -1091,6 +1147,7 @@ impl<'a> KernelBuilder<'a> {
                     name,
                     element_ty: resource.element_ty,
                     element_count: resource.element_count,
+                    shape: shape.clone(),
                     role: if is_param_input {
                         BufferRole::InOut
                     } else {
@@ -1144,6 +1201,7 @@ impl<'a> KernelBuilder<'a> {
                 element_ty: resource.element_ty,
                 element_count: resource.element_count,
                 reduced_projection: resource.reduced_projection,
+                shape,
             });
         }
         // The launch binds buffers in binding order (inputs first, output
@@ -1278,6 +1336,7 @@ fn merge_slot_facts(
     entry: &mut ProgramBuffer,
     role: BufferRole,
     resource: &MirKernelResource,
+    shape: Option<&[u64]>,
     is_param_input: bool,
 ) {
     entry.role = if is_param_input {
@@ -1285,6 +1344,9 @@ fn merge_slot_facts(
     } else {
         merge_buffer_roles(entry.role, role)
     };
+    if entry.shape.is_none() {
+        entry.shape = shape.map(<[u64]>::to_vec);
+    }
     entry.written |= matches!(
         resource.access,
         MirKernelResourceAccess::Write | MirKernelResourceAccess::ReadWrite
@@ -1511,6 +1573,7 @@ fn declared_result_rows(
     program: &DeviceProgram,
     buffers: &[ProgramBuffer],
     projection_by_buffer: &BTreeMap<BufferId, Option<crate::abi::ReducedProjection>>,
+    shape_by_buffer: &BTreeMap<BufferId, Option<Vec<u64>>>,
     training_program: bool,
     per_step_observation: Option<BufferId>,
     train_step_gradients: &BTreeSet<BufferId>,
@@ -1552,6 +1615,7 @@ fn declared_result_rows(
                 element_ty: buffer.element_ty,
                 element_count: buffer.element_count,
                 reduced_projection: projection_by_buffer.get(&buffer.id).copied().flatten(),
+                shape: shape_by_buffer.get(&buffer.id).cloned().flatten(),
             },
             role: buffer.role,
             produced_by,
