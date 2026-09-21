@@ -137,6 +137,21 @@ fn rectangular_lista_literal_analyzer_rejects_shape_mismatch() {
     ));
 }
 
+#[test]
+fn rectangular_lista_literal_analyzer_sizes_from_walked_leaves_not_declared_dims() {
+    let mut types = TypeTable::new();
+    let numerus = types.primitive(Primitive::Numerus);
+    // The declared col is a valid i64 dim, so it passes `dim_to_usize`; sizing
+    // the buffer from it aborts before the per-row mismatch is ever reported.
+    let target = tensor_type(&mut types, numerus, &[1, 9_223_372_036_854_775_800]);
+    let expr = nested_int_literal(&mut types, numerus, &[&[1]]);
+
+    assert!(matches!(
+        analyze_rectangular_lista_literal(&expr, target, &types),
+        Err(RectangularListaLiteralError::RowLengthMismatch)
+    ));
+}
+
 fn tensor_type(types: &mut TypeTable, elem: crate::TypeId, dims: &[u64]) -> crate::TypeId {
     let mut dim_ids = Vec::with_capacity(dims.len());
     for dim in dims {

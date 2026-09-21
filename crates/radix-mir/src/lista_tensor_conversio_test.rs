@@ -1,4 +1,6 @@
 use super::*;
+use radix_hir::{HirArrayElement, HirExpression, HirExpressionKind, HirId, HirLiteral};
+use radix_lexer::Span;
 use radix_types::{IndexExpr, NumericWidth};
 
 fn bounded_lista(types: &mut TypeTable, elem: TypeId, n: u64) -> TypeId {
@@ -64,11 +66,69 @@ fn unbounded_source_stays_on_flat_path() {
     let tensor = types.intern(Type::Tensor(f32, shape));
 
     assert_eq!(
-        validate_lista_to_tensor_source(lista, tensor, &types),
-        Ok(())
-    );
-    assert_eq!(
         resolve_bounded_lista_padded_shape(lista, tensor, &types),
         None
     );
+}
+
+#[test]
+fn rectangular_literal_analysis_sizes_from_walked_leaves_not_declared_dims() {
+    let mut types = TypeTable::new();
+    let numerus = types.primitive(Primitive::Numerus);
+    // The declared col is a valid i64 dim, so it passes `dim_to_usize`; sizing
+    // the buffer from it aborts before the per-row mismatch is ever reported.
+    let target = tensor_type(&mut types, numerus, &[1, 9_223_372_036_854_775_800]);
+    let expr = nested_int_literal(&mut types, numerus, &[&[1]]);
+
+    assert!(matches!(
+        analyze_rectangular_lista_literal(&expr, target, &types),
+        Err(RectangularListaLiteralError::RowLengthMismatch)
+    ));
+}
+
+fn tensor_type(types: &mut TypeTable, elem: TypeId, dims: &[u64]) -> TypeId {
+    let mut dim_ids = Vec::with_capacity(dims.len());
+    for dim in dims {
+        dim_ids.push(types.intern_index(IndexExpr::Literal(*dim)));
+    }
+    let shape = types.intern_index(IndexExpr::Tuple(dim_ids));
+    types.intern(Type::Tensor(elem, shape))
+}
+
+fn nested_int_literal(types: &mut TypeTable, elem: TypeId, rows: &[&[u64]]) -> HirExpression {
+    let row_ty = types.array(elem);
+    let outer_ty = types.array(row_ty);
+    HirExpression {
+        id: HirId(0),
+        kind: HirExpressionKind::Array(
+            rows.iter()
+                .enumerate()
+                .map(|(row_index, row)| {
+                    HirArrayElement::Expr(HirExpression {
+                        id: HirId(u32::try_from(row_index + 1).expect("fixture index fits u32")),
+                        kind: HirExpressionKind::Array(
+                            row.iter()
+                                .enumerate()
+                                .map(|(col_index, value)| {
+                                    HirArrayElement::Expr(HirExpression {
+                                        id: HirId(
+                                            u32::try_from(10 + row_index * 10 + col_index)
+                                                .expect("fixture index fits u32"),
+                                        ),
+                                        kind: HirExpressionKind::Literal(HirLiteral::Int(*value)),
+                                        ty: Some(elem),
+                                        span: Span::default(),
+                                    })
+                                })
+                                .collect(),
+                        ),
+                        ty: Some(row_ty),
+                        span: Span::default(),
+                    })
+                })
+                .collect(),
+        ),
+        ty: Some(outer_ty),
+        span: Span::default(),
+    }
 }

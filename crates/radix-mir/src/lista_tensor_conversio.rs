@@ -194,8 +194,9 @@ pub fn analyze_rectangular_lista_literal<'a>(
         return Err(RectangularListaLiteralError::ShapeMismatch);
     }
 
-    let mut flat_leaves =
-        Vec::with_capacity(literal_target.rows.saturating_mul(literal_target.cols));
+    // Capacity from the walked leaves only — declared dims are untrusted
+    // input and must never size an allocation (SEC-A6).
+    let mut flat_leaves = Vec::new();
     for row in rows {
         collect_literal_row_leaves(
             row,
