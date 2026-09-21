@@ -148,10 +148,13 @@ functio loss(numerus x) → numerus {
 
 #[test]
 fn rejects_expression_ad_in_air_lane() {
+    // `ad` types as `sermo`, so this probe typechecks cleanly — the decline
+    // is proven in a healthy compilation, not stacked on a type error
+    // (air_purity is skipped once typecheck has failed).
     let errors = air_errors(
         r#"
 @ radix lane "air"
-functio send() → vacuum {
+functio send() → sermo {
     redde ad 'runtime:echo' ("x")
 }
 "#,
@@ -1156,13 +1159,16 @@ functio loop_with_handler() → f32 {
 #[test]
 fn air_lane_method_call_allowlist_keep_out_unchanged() {
     // air_unroll/allowlist fact pin (read-only): handler work adds no
-    // `method_call` allowlist rows — an arbitrary method on a typed tensor
-    // receiver still declines with the stable `method_call` cause.
+    // `method_call` allowlist rows — a resolving method on a typed tensor
+    // receiver still declines with the stable `method_call` cause. The probe
+    // must typecheck (`foobar` would stack the decline on unknown_method,
+    // which the purity gate now skips), so it names a real catalog method
+    // that stays off the AIR allowlist.
     let errors = air_errors(
         r#"
 @ radix lane "air"
-functio loss(tf32[2, 2] x) → tf32[2, 2] {
-    redde x.foobar()
+functio loss(tf32[2, 2] x) → numerus {
+    redde x.longitudo()
 }
 "#,
     );
@@ -1171,7 +1177,7 @@ functio loss(tf32[2, 2] x) → tf32[2, 2] {
     assert!(
         err.args
             .iter()
-            .any(|arg| arg.name == "method" && arg.value == "foobar"),
+            .any(|arg| arg.name == "method" && arg.value == "longitudo"),
         "method_call decline must name the method: {:?}",
         err.args
     );
@@ -1295,4 +1301,40 @@ functio grid(numerus m, numerus n) → numerus {
 "#,
     );
     expect_air_issue(&itera, "itera_loop");
+}
+
+// ---------------------------------------------------------------------------
+// S03-9: `air_purity` runs on HIR whose types are known-unreliable once
+// typecheck has failed — the same reason `air_unroll` above it is skipped.
+// A wrong decline must not stack on the real type error.
+// ---------------------------------------------------------------------------
+
+#[test]
+fn suppresses_purity_declines_once_typecheck_has_failed() {
+    // `x + flag` fails typecheck (tf32 + bivalens) and leaves the binary
+    // expression error-typed, so the `primus_quem` source has no reliable
+    // tensor shape. The purity gate must be skipped rather than read that
+    // broken type and stack `first_match_unbounded_source` on the type
+    // error — the same skip `air_unroll` above it already applies.
+    let errors = analyze(
+        r#"
+@ radix lane "air"
+functio pick(tf32[2, 2] x, bivalens flag) → fractus ∪ nihil {
+    redde primus_quem(x + flag, ubi v { v > 0.0 })
+}
+"#,
+    );
+
+    assert!(
+        errors
+            .iter()
+            .any(|err| err.is_error() && err.kind != SemanticErrorKind::AirPurityViolation),
+        "probe must carry a real typecheck error: {errors:?}"
+    );
+    assert!(
+        !errors
+            .iter()
+            .any(|err| err.kind == SemanticErrorKind::AirPurityViolation),
+        "purity gate must be skipped once typecheck failed: {errors:?}"
+    );
 }

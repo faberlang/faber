@@ -661,7 +661,12 @@ pub fn analyze_with_cli(
         diagnostics.extend(e);
     }
 
-    if let Err(e) = passes::air_purity::check(&mut hir, &mut radix_lanes, interner, &types) {
+    // Skip when typecheck already failed — admission here is decided from
+    // those same (unreliable) types, so a decline would describe a purity
+    // problem the program does not have.
+    if !diagnostics.iter().any(SemanticError::is_error)
+        && let Err(e) = passes::air_purity::check(&mut hir, &mut radix_lanes, interner, &types)
+    {
         diagnostics.extend(e);
     }
 

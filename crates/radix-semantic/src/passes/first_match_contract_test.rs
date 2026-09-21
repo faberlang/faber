@@ -152,6 +152,11 @@ functio pick(tf32[2, 2] x) → fractus ∪ nihil {
 
 #[test]
 fn filtrata_primus_composition_is_not_air_admitted_end_to_end() {
+    // `filtrata`/`primus` are lista methods, so the composition only
+    // typechecks on a `lista` receiver — on a tensor it stacked the pinned
+    // decline on unknown_method, which the purity gate now skips once
+    // typecheck has failed. The `.primus()` method-row decline itself is
+    // unchanged.
     let errors = air_errors(
         r#"
 @ radix lane "air"
@@ -160,8 +165,8 @@ functio keep(fractus x) → bivalens {
 }
 
 @ radix lane "air"
-functio pick(tf32[2, 2] x) → fractus ∪ nihil {
-    redde x.filtrata(keep).primus()
+functio pick(lista<f32> xs) → fractus ∪ nihil {
+    redde xs.filtrata(keep).primus()
 }
 "#,
     );
