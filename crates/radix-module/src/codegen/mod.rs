@@ -96,7 +96,7 @@ use crate::diagnostics::DiagnosticArg;
 use crate::hir::HirModule;
 use crate::lexer::Interner;
 use crate::locale::KeywordSurface;
-#[cfg(all(test, feature = "hir-faber"))]
+#[cfg(test)]
 use crate::locale::latin_locale_pack;
 use crate::semantic::TypeTable;
 #[cfg(feature = "hir-rust")]
@@ -652,6 +652,64 @@ fn collect_provider_modules(
     }
 
     Ok(())
+}
+
+/// Loose-parts test seam (register row S01-2, batch 4b unit B4B-3): assemble a
+/// real [`crate::driver::AnalyzedModule`] from hand-constructed arenas and
+/// dispatch through the production entry.
+///
+/// Synthetic-HIR fixtures — shapes source-level analysis helpers cannot
+/// express, including dangling-`DefId` error proofs — are packed with the pub
+/// artifact-loader constructor [`crate::driver::AnalyzedModule::from_loaded`]
+/// (empty resolver/registry side tables) plus
+/// [`crate::semantic::analyze_function_facts`], the same fact computation the
+/// retired test-only entry performed, and then forwarded to
+/// [`generate_from_analyzed_with_options`] with the driver-default latin
+/// keyword surface and application output mode.
+///
+/// This seam is a constructor plus one forward: no per-target dispatch lives
+/// here, so tests exercise the single production chain and its five effect
+/// seams (library registry, GPU builtins, intrinsic surface, cross-file
+/// defids, used imports) exactly as package builds do.
+///
+/// # Errors
+///
+/// Returns [`CodegenError`] as [`generate_from_analyzed_with_options`] does
+/// for the synthetic module.
+#[cfg(test)]
+pub fn generate_from_loose_parts(
+    target: Target,
+    hir: &HirModule,
+    types: &TypeTable,
+    interner: &Interner,
+) -> Result<crate::Output, CodegenError> {
+    let analysis = crate::driver::AnalyzedModule::from_loaded(
+        // Synthetic modules never join a real analysis snapshot; stamp 0 is
+        // unreachable for analyzed units (`AnalysisStamp::next` starts at 1).
+        crate::semantic::AnalysisStamp::from_persisted(0),
+        interner.clone(),
+        // `TypeTable` is not `Clone`; the snapshot round-trip is the copy
+        // path (it can only fail on tables missing primitives that
+        // `TypeTable::new()` preloads, so a live table always round-trips).
+        TypeTable::from_snapshot(types.snapshot()).expect("type table snapshot round-trip"),
+        crate::semantic::Resolver::default(),
+        hir.clone(),
+        None,
+        crate::hir::LibraryRegistry::default(),
+        crate::semantic::AnnotationContractMetadata::default(),
+        crate::semantic::analyze_function_facts(hir, types),
+        crate::semantic::ResolvedUseIndex::default(),
+        crate::semantic::QualifiedIdentityTable::default(),
+        crate::semantic::FunctionProvenanceTable::default(),
+        crate::semantic::RadixLaneMetadata::default(),
+        Vec::new(),
+        #[cfg(feature = "mir-core")]
+        crate::driver::GraphicsSourceFacts::default(),
+        Vec::new(),
+    );
+    let latin = latin_locale_pack();
+    let surface = KeywordSurface::new(&latin);
+    generate_from_analyzed_with_options(target, &analysis, &surface, OutputMode::Application, None)
 }
 
 /// Loose `HIR`+types entry used by unit tests and transitional callers.
