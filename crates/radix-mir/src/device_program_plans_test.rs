@@ -3427,8 +3427,10 @@ fn rope_function_for_op(
 /// A row-gather kernel: `t = gather(table, ids)` over the pinned `[960, 49152]`
 /// token-embedding table with 9 ids → `[9, 49152]` (the tied output head
 /// doubles as the embedding table). The ids vector is a `lista<numerus>`
-/// operand; the CCI-1 source contract statically validated its literal
-/// values, so the plan resolves the count from the return-type dims.
+/// operand; the CCI-1 source contract validated its *literal* values only,
+/// so the plan resolves the count from the return-type dims while the
+/// emitted kernel body bounds-checks the runtime token against the table
+/// row count (SEC-G1).
 fn gather_function(types: &mut TypeTable) -> MirFunction {
     let table = rank2_tensor_ty(types, [960, 49152]);
     let output = rank2_tensor_ty(types, [9, 49152]);
