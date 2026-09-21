@@ -2589,7 +2589,7 @@ fn is_cli_scalar_type(ty: &crate::cli::CliType) -> bool {
 /// `(product, module_path, item)` identities (campaign D-PA1). `None` keeps
 /// the legacy provider routing: raw import spelling + interner indices, which
 /// are meaningless across the module boundary.
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
+#[derive(Debug, Clone, Default, PartialEq)]
 pub struct PackageImportIdentities {
     /// Package identity: manifest `package.name`, or package-root-derived
     /// fallback (the package root directory name).
@@ -2602,6 +2602,14 @@ pub struct PackageImportIdentities {
     /// target file's canonical module segments`) for local sibling imports —
     /// mirror of `resolve_import` + `module_segments_for_file`.
     pub imports: BTreeMap<String, Vec<String>>,
+    /// Body-bearing file interface per import binding, for imports whose
+    /// target exports at least one device function (DFV2-3). Recorded by the
+    /// same package-identity pass that fills `imports` and read by the MIR
+    /// provider-route seam. Per-unit by construction: the map rides this
+    /// value through `ModuleCompileRequest` into `AnalyzedModule` and dies
+    /// with it, so an interface resolved for one unit can never serve
+    /// another package's or module's unit (S01-7).
+    pub device_interfaces: BTreeMap<String, crate::file_interface::FileInterface>,
 }
 
 /// One coherent module analysis shared by codegen and package-level tooling.

@@ -3550,7 +3550,9 @@ import from "./kernels" k
         Some(&["kernels".to_owned()][..])
     );
 
-    let interface = super::imported_device_interface_for(&identities.module_segments, "k")
+    let interface = identities
+        .device_interfaces
+        .get("k")
         .expect("device-bearing sibling interface recorded for the consumer");
     let export = interface.exports.get("scala").expect("scala export");
     let FileExportKind::Function(callable) = &export.kind else {

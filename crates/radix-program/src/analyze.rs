@@ -843,6 +843,7 @@ fn package_import_identities_for_file(
         product,
         module_segments: file.module_segments.clone(),
         imports,
+        device_interfaces: BTreeMap::new(),
     }
 }
 
