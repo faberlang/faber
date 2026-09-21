@@ -283,6 +283,10 @@ help = "इस वर्ण को हटाएं या literal होना �
 message = "अनपेक्षित वर्ण: {char}"
 help = "इस वर्ण को हटाएं या literal होना चाहिए तो इसे escape करें"
 
+[diagnostics.LEX004.issues.homoglyph_did_you_mean]
+message = "अनपेक्षित वर्ण: '{char}'; क्या आपका आशय '{suggestion}' था?"
+help = "'{char}' को मानक वर्तनी '{suggestion}' से बदलें"
+
 [diagnostics.LEX006]
 message = "अमान्य comment syntax"
 help = "comments के आगे // या /* */ के बजाय # लगाएं"

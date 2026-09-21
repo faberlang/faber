@@ -283,6 +283,10 @@ help = "أزل المحرف أو اهربه إذا كان يجب أن يكون �
 message = "محرف غير متوقع: {char}"
 help = "أزل المحرف أو اهربه إذا كان يجب أن يكون حرفيا"
 
+[diagnostics.LEX004.issues.homoglyph_did_you_mean]
+message = "محرف غير متوقع: '{char}'؛ هل تقصد '{suggestion}'؟"
+help = "استبدل '{char}' بالكتابة القياسية '{suggestion}'"
+
 [diagnostics.LEX006]
 message = "صياغة تعليق غير صالحة"
 help = "استخدم # لبدء التعليقات بدلا من // أو /* */"
