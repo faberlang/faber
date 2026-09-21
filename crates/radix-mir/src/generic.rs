@@ -516,6 +516,8 @@ fn try_bind_function_signature(
     seen: &mut FxHashSet<TypeId>,
 ) -> bool {
     expected_sig.params.len() == actual_sig.params.len()
+        && expected_sig.is_async == actual_sig.is_async
+        && expected_sig.is_generator == actual_sig.is_generator
         && expected_sig
             .params
             .iter()

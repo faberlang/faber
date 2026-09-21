@@ -1,5 +1,5 @@
 use super::*;
-use radix_types::{DefId, Primitive};
+use radix_types::{DefId, Primitive, SemanticParamMode};
 
 /// Build a self-referential Alias: `Alias(_, TypeId(n))` interned at index `n`.
 fn self_cyclic_alias(types: &mut TypeTable, def: u32) -> TypeId {
@@ -1166,4 +1166,89 @@ fn existing_and_mutable_instantiation_walks_are_equivalent() {
 
     assert_eq!(existing.semantic_id(), concrete);
     assert_eq!(mutable, existing);
+}
+
+/// One owned param plus ret, with explicit async/generator modifiers.
+fn func_sig(param: TypeId, ret: TypeId, is_async: bool, is_generator: bool) -> FuncSig {
+    FuncSig {
+        type_params: Vec::new(),
+        params: vec![ParamType {
+            ty: param,
+            mode: SemanticParamMode::Owned,
+            optional: false,
+        }],
+        ret,
+        err: None,
+        is_async,
+        is_generator,
+    }
+}
+
+#[test]
+fn function_sig_binder_rejects_async_mismatch() {
+    let types = TypeTable::new();
+    let numerus = types.primitive(Primitive::Numerus);
+    let expected = func_sig(numerus, numerus, true, false);
+    let actual = func_sig(numerus, numerus, false, false);
+    let mut generic_bindings = MirGenericBindings::default();
+    let mut shape_bindings = MirShapeBindings::default();
+    let mut seen = FxHashSet::default();
+
+    assert!(!try_bind_function_signature(
+        &types,
+        &expected,
+        &actual,
+        &mut generic_bindings,
+        &mut shape_bindings,
+        &mut seen,
+    ));
+}
+
+#[test]
+fn function_sig_binder_rejects_generator_mismatch() {
+    let types = TypeTable::new();
+    let numerus = types.primitive(Primitive::Numerus);
+    let expected = func_sig(numerus, numerus, false, true);
+    let actual = func_sig(numerus, numerus, false, false);
+    let mut generic_bindings = MirGenericBindings::default();
+    let mut shape_bindings = MirShapeBindings::default();
+    let mut seen = FxHashSet::default();
+
+    assert!(!try_bind_function_signature(
+        &types,
+        &expected,
+        &actual,
+        &mut generic_bindings,
+        &mut shape_bindings,
+        &mut seen,
+    ));
+}
+
+#[test]
+fn function_sig_binder_binds_matching_modifiers() {
+    // With modifiers equal on both sides, generic binding still proceeds.
+    let mut types = TypeTable::new();
+    let param = types.intern(Type::Param(Symbol(77)));
+    let numerus = types.primitive(Primitive::Numerus);
+    let expected = func_sig(numerus, param, true, true);
+    let actual = func_sig(numerus, numerus, true, true);
+    let mut generic_bindings = MirGenericBindings::default();
+    let mut shape_bindings = MirShapeBindings::default();
+    let mut seen = FxHashSet::default();
+
+    assert!(try_bind_function_signature(
+        &types,
+        &expected,
+        &actual,
+        &mut generic_bindings,
+        &mut shape_bindings,
+        &mut seen,
+    ));
+    assert_eq!(
+        generic_bindings
+            .get(&Symbol(77))
+            .copied()
+            .map(MirType::semantic_id),
+        Some(numerus)
+    );
 }
