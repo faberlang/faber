@@ -29,6 +29,7 @@
 
 pub mod conversio_arm;
 pub mod decimal;
+pub mod frame;
 pub mod hygiene;
 pub mod ident;
 pub mod names;
