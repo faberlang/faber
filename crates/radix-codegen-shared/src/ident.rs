@@ -1,5 +1,6 @@
 //! Shared identifier sanitation and output-resource naming for text emitters.
 
+#[must_use]
 pub fn sanitize_ident(raw: &str, fallback: &str) -> String {
     let mut out = String::new();
     for (idx, ch) in raw.chars().enumerate() {
@@ -54,6 +55,7 @@ pub fn sanitize_rust_module_ident(segment: &str) -> String {
 
 /// Returns the output resource name, avoiding collision with the kernel input
 /// parameter when the parameter happens to be named `output`.
+#[must_use]
 pub fn output_resource_name(param_name: &str) -> &'static str {
     if param_name == "output" {
         "output_buffer"
