@@ -773,12 +773,12 @@ impl<'a> LoweringContextMaps<'a> {
                 // device function (the spike-3 shape, skipped from the
                 // concrete identity table above) keeps its device fact; the
                 // route is consumed by the concrete composition pass, never
-                // by a signature-only call.
-                if let Some(interface) =
-                    crate::program::compile::imported_device_interface_for(&package_identities.module_segments, binding)
-                {
+                // by a signature-only call. The interface is served from the
+                // unit's own `PackageImportIdentities` — a fact about this
+                // unit's imports, not a process-wide registry (S01-7).
+                if let Some(interface) = package_identities.device_interfaces.get(binding) {
                     let routes =
-                        ImportedDeviceRoute::from_interface(&package_identities.product, target_segments, &interface);
+                        ImportedDeviceRoute::from_interface(&package_identities.product, target_segments, interface);
                     if !routes.is_empty() {
                         self.imported_device_routes
                             .insert(import_item.def_id, routes);
