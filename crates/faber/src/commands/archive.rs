@@ -98,7 +98,7 @@ fn create_temp_root(archive: &Path) -> ArchiveResult<PathBuf> {
     }
 
     Err(Box::new(
-        crate::package_diagnostic_error("could not create a unique archive extraction directory")
+        faber_cli::package_diagnostic_error("could not create a unique archive extraction directory")
             .with_file(archive.display().to_string()),
     ))
 }
@@ -127,7 +127,7 @@ fn extract_zip(archive: &Path, temp_root: &Path) -> ArchiveResult<()> {
         fs::File::open(archive).map_err(|err| Box::new(Diagnostic::io_error(archive, &err)))?;
     let mut zip = zip::ZipArchive::new(file).map_err(|err| {
         Box::new(
-            crate::package_diagnostic_error(format!("cannot read zip archive: {err}"))
+            faber_cli::package_diagnostic_error(format!("cannot read zip archive: {err}"))
                 .with_file(archive.display().to_string()),
         )
     })?;
@@ -135,7 +135,7 @@ fn extract_zip(archive: &Path, temp_root: &Path) -> ArchiveResult<()> {
     for index in 0..zip.len() {
         let mut entry = zip.by_index(index).map_err(|err| {
             Box::new(
-                crate::package_diagnostic_error(format!(
+                faber_cli::package_diagnostic_error(format!(
                     "cannot read zip archive entry {index}: {err}"
                 ))
                 .with_file(archive.display().to_string()),
@@ -195,7 +195,7 @@ fn safe_archive_path(name: &str) -> Result<PathBuf, ()> {
 
 fn unsafe_entry_diagnostic(archive: &Path, entry: &str) -> Box<Diagnostic> {
     Box::new(
-        crate::package_diagnostic_error(format!("unsafe archive entry `{entry}`"))
+        faber_cli::package_diagnostic_error(format!("unsafe archive entry `{entry}`"))
             .with_file(archive.display().to_string()),
     )
 }
@@ -211,7 +211,7 @@ fn select_package_root(archive: &Path, temp_root: &Path) -> ArchiveResult<PathBu
     }
 
     Err(Box::new(
-        crate::package_diagnostic_error(
+        faber_cli::package_diagnostic_error(
             "archive package root must contain `faber.toml`, `main.fab`, or one top-level package directory",
         )
         .with_file(archive.display().to_string()),

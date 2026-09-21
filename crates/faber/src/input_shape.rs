@@ -1,4 +1,4 @@
-pub(crate) fn verify_input_is_package_shaped(input: &[String], _force_package: bool) -> bool {
+pub fn verify_input_is_package_shaped(input: &[String], _force_package: bool) -> bool {
     let Some(first) = input.first() else {
         return false;
     };
@@ -29,7 +29,7 @@ pub(crate) fn locale_supports_input(input: &[String], force_package: bool) -> bo
         .is_some_and(|ext| ext == "fab")
 }
 
-pub(crate) fn locale_without_package_error(
+pub fn locale_without_package_error(
     locale: Option<&str>,
     input: &[String],
     force_package: bool,

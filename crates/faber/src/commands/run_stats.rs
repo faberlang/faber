@@ -190,9 +190,9 @@ impl From<IntrinsicStats> for IntrinsicMetadata {
 pub(crate) fn package_metadata(
     input: &Path,
 ) -> Result<PackageMetadata, Box<radix::module::diagnostics::Diagnostic>> {
-    let spec = crate::package::discover_package(input)?;
+    let spec = faber_cli::package::discover_package(input)?;
     let name = if spec.manifest_backed {
-        let manifest = crate::package::read_manifest(&spec.package_root.join("faber.toml"))?;
+        let manifest = faber_cli::package::read_manifest(&spec.package_root.join("faber.toml"))?;
         manifest.package.name
     } else {
         spec.package_root

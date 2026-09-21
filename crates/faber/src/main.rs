@@ -1,16 +1,13 @@
 //! User-facing Faber project and package tool (`faber` binary).
 //!
 //! Clap shapes live in [`cli`]; handlers live in [`commands`]. Package-aware
-//! compilation routes through [`package`]; single-file compiler inspection
-//! delegates to typed `radix::module::services`.
+//! compilation routes through the `faber_cli` lib's `package` module (S09-2:
+//! the shared modules — `package`, `library`, `input_shape`, `io_buf`,
+//! `postprocess` — are declared only in the lib and compiled once); single-file
+//! compiler inspection delegates to typed `radix::module::services`.
 
 mod cli;
 mod commands;
-mod input_shape;
-mod io_buf;
-mod library;
-mod package;
-mod postprocess;
 mod script;
 
 #[cfg(test)]
@@ -18,18 +15,8 @@ mod script;
 mod cli_test;
 
 #[cfg(test)]
-#[path = "input_shape_test.rs"]
-mod input_shape_test;
-
-#[cfg(test)]
 #[path = "script_test.rs"]
 mod script_test;
-
-const PACKAGE_DIAGNOSTIC_CODE: &str = "PKG001";
-
-fn package_diagnostic_error(message: impl Into<String>) -> radix::module::diagnostics::Diagnostic {
-    radix::module::diagnostics::Diagnostic::error(message).with_code(PACKAGE_DIAGNOSTIC_CODE)
-}
 
 fn main() {
     commands::run();

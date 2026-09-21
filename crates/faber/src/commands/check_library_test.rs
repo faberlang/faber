@@ -5,7 +5,7 @@ use super::check_library::{
     CheckLibraryError, check_dev_library, render_checkout, resolve_dev_library_from,
 };
 use super::format_test::faber_binary;
-use crate::library::{
+use faber_cli::library::{
     LibraryHomeSource, LibraryRootRule, ResolvedLibraryHome, SpecifierIdentity, specifier_identity,
 };
 

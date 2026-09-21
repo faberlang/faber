@@ -58,8 +58,8 @@ mod test_stats;
 mod test_stats_test;
 
 use crate::cli::Command;
-use crate::input_shape::{locale_without_package_error, verify_input_is_package_shaped};
-use crate::package;
+use faber_cli::input_shape::{locale_without_package_error, verify_input_is_package_shaped};
+use faber_cli::package;
 use clap::Parser;
 use radix::services::{BuildCommand, CheckCommand, DiagnosticMode, EmitCommand, VerifyCommand};
 
@@ -561,7 +561,7 @@ fn cmd_check_file(command: CheckCommand, air: bool, json: bool) {
         deny_codes: command.deny_codes.clone(),
     };
     radix::module::driver::apply_warn_policy(&mut result.diagnostics, &warn_policy);
-    crate::postprocess::print_diagnostics(&result.diagnostics, command.diagnostic_mode, None);
+    faber_cli::postprocess::print_diagnostics(&result.diagnostics, command.diagnostic_mode, None);
     if air {
         if let Some(rows) = check_air::advisory_rows(&name, &source) {
             let mut out = std::io::stdout().lock();

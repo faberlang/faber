@@ -3,8 +3,8 @@
 use super::run_stats;
 use super::test_stats::{self, TestStatsArtifact};
 use crate::cli::{TestArgs, TestOutputFormat};
-use crate::input_shape::locale_without_package_error;
-use crate::package;
+use faber_cli::input_shape::locale_without_package_error;
+use faber_cli::package;
 use proba::{
     CaseOutcome, CaseResult, ProbaCase, ProbaReport, TestSelection, format_summary,
     has_solum_cases, inventory_cases, is_harness_filter_match, run_proba_on_validated,
@@ -44,7 +44,7 @@ pub(super) fn cmd_test(args: &TestArgs) {
     // Package discovery requires absolute inputs; absolutizing here (same seam
     // as the package build/check/run routes) keeps `.`, relative, and absolute
     // paths resolving to one package root (rdx-s05-1).
-    let input_path = crate::package::absolutize_path(&args.path);
+    let input_path = faber_cli::package::absolutize_path(&args.path);
     if let Some(message) = locale_without_package_error(
         args.locale.as_deref(),
         &[args.path.display().to_string()],

@@ -10,11 +10,11 @@ use super::manifest::{FaberManifest, manifest_for_spec};
 use radix::program::discovery::PackageSpec;
 use radix::program::paths::normalize_path;
 
-pub(crate) const DEFAULT_CODE_LOCALE: &str = "en";
+pub const DEFAULT_CODE_LOCALE: &str = "en";
 
 /// Load a conversion target from the embedded pack set. Conversion targets
 /// are command-wide and must not vary with the first input package.
-pub(crate) fn embedded_conversion_locale_pack(locale: &str) -> Result<LocalePack, Box<Diagnostic>> {
+pub fn embedded_conversion_locale_pack(locale: &str) -> Result<LocalePack, Box<Diagnostic>> {
     load_embedded_locale_pack(locale).map_err(|err| Box::new(embedded_load_diagnostic(locale, err)))
 }
 
@@ -31,7 +31,7 @@ fn embedded_load_diagnostic(locale: &str, err: EmbeddedLocaleError) -> Diagnosti
 }
 
 /// Build the product-default code config for inputs without package context.
-pub(crate) fn default_config_with_locale(target: Target) -> Result<Config, Box<Diagnostic>> {
+pub fn default_config_with_locale(target: Target) -> Result<Config, Box<Diagnostic>> {
     let pack = load_embedded_locale_pack(DEFAULT_CODE_LOCALE)
         .map_err(|err| Box::new(embedded_load_diagnostic(DEFAULT_CODE_LOCALE, err)))?;
     Ok(Config::default().with_target(target).with_locale_pack(pack))
@@ -44,7 +44,7 @@ pub(crate) fn default_config_with_locale(target: Target) -> Result<Config, Box<D
 /// message templates only. When diagnostics locale is omitted, the code pack is
 /// reused for rendering. When no code locale is selected explicitly, the
 /// product default is the English `en` code pack.
-pub(crate) fn config_with_locale(
+pub fn config_with_locale(
     target: Target,
     input: &Path,
     cli_locale: Option<&str>,
@@ -88,7 +88,7 @@ pub(crate) fn resolve_diagnostics_locale_pack(
 }
 
 /// Load the reader pack selected by CLI locale or package manifest.
-pub(crate) fn load_locale_pack_for_input(
+pub fn load_locale_pack_for_input(
     input: &Path,
     cli_locale: Option<&str>,
 ) -> Result<Option<LocalePack>, Box<Diagnostic>> {
@@ -222,7 +222,7 @@ fn package_root_for_selection(spec: &PackageSpec, manifest_path: Option<&Path>) 
 /// package-local pack, else the embedded pack); stdin uses the embedded pack
 /// directly, since there is no package context to consult. An omitted locale
 /// selects the product-default `en` pack.
-pub(crate) fn locale_pack_for_emit_with_diagnostic(
+pub fn locale_pack_for_emit_with_diagnostic(
     input: &[String],
     cli_locale: Option<&str>,
 ) -> Result<Option<LocalePack>, Box<Diagnostic>> {
@@ -255,7 +255,6 @@ pub(crate) fn locale_pack_for_emit_with_diagnostic(
 /// Compatibility wrapper for library callers that only need the normalized
 /// message. The CLI uses [`locale_pack_for_emit_with_diagnostic`] so it can
 /// preserve structured package-path failures.
-#[allow(dead_code)]
 pub fn locale_pack_for_emit(
     input: &[String],
     cli_locale: Option<&str>,

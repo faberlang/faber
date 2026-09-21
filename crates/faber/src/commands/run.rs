@@ -13,8 +13,8 @@
 //! The `-c` one-liner and `faber repl` are the other runner entry modes.
 
 use crate::cli::{BackendSelection, FmirRunArgs, ReplArgs, RunArgs};
-use crate::input_shape::locale_without_package_error;
-use crate::package;
+use faber_cli::input_shape::locale_without_package_error;
+use faber_cli::package;
 use crate::script::{
     interpret_source, interpret_source_or_exit, print_run_source_error, raw_exit_code,
 };
@@ -365,7 +365,7 @@ fn resolve_route_selection(
         let selection = backend.selection();
         if stats_requested && selection != DeviceSelection::Auto {
             return Err(Box::new(
-                crate::package_diagnostic_error(format!(
+                faber_cli::package_diagnostic_error(format!(
                     "run statistics (`--stats`/`--stats-file`) require the interpreted CPU route; `--backend {}` executes a device route that never runs the interpreter, so the stats request is refused",
                     selection.spelling()
                 ))
@@ -465,7 +465,7 @@ pub(super) fn cmd_repl(args: ReplArgs) {
     let mut stdout = io::stdout();
 
     loop {
-        crate::io_buf::write_prompt(&mut stdout, "faber> ");
+        faber_cli::io_buf::write_prompt(&mut stdout, "faber> ");
         let mut line = String::new();
         match stdin.read_line(&mut line) {
             Ok(0) => break,

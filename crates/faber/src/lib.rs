@@ -7,14 +7,17 @@
 //! close to user workflows.
 //!
 //! The public modules intentionally mirror user-facing capabilities: `package`
-//! for project compilation and `explain` for language reference lookup. Private
-//! helpers stay crate-local so lower-level compiler APIs do not inherit package
-//! tool assumptions.
+//! for project compilation and `explain` for language reference lookup. The
+//! `faber` binary and the `exempla` crate are both consumers of this lib
+//! (S09-2: `package/` compiles once, into `faber_cli`; the bin declares only
+//! its own `cli`/`commands`/`script` modules). Private helpers stay
+//! crate-local so lower-level compiler APIs do not inherit package tool
+//! assumptions.
 
 mod explain_render;
-mod input_shape;
-mod io_buf;
-pub(crate) mod library;
+pub mod input_shape;
+pub mod io_buf;
+pub mod library;
 
 mod reference_parse;
 
@@ -24,9 +27,9 @@ pub mod package;
 pub mod postprocess;
 pub mod reference;
 
-pub(crate) const PACKAGE_DIAGNOSTIC_CODE: &str = "PKG001";
+pub const PACKAGE_DIAGNOSTIC_CODE: &str = "PKG001";
 
-pub(crate) fn package_diagnostic_error(
+pub fn package_diagnostic_error(
     message: impl Into<String>,
 ) -> radix::module::diagnostics::Diagnostic {
     radix::module::diagnostics::Diagnostic::error(message).with_code(PACKAGE_DIAGNOSTIC_CODE)
