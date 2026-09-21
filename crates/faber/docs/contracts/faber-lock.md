@@ -14,7 +14,7 @@ The file contract is the **field set as it exists today**: **13
 + 1 `packages` container on `FaberLock`),
 field-identical across both live structs: the Faber reader
 (`radix/crates/radix-program/src/lockfile.rs`) and the Cista writer
-(`cista/src/faber_lock.rs` @ `9355288`).
+(`cista/src/faber_lock.rs` `LockedPackage` @ `bc384b4`).
 
 | # | TOML key | Rust field (both sides) | Semantics (from the reader's consumers + writer's builder) |
 | --- | --- | --- | --- |
@@ -35,7 +35,7 @@ field-identical across both live structs: the Faber reader
 
 ## Both-struct cross-check
 
-| Check | Faber reader (`radix/crates/radix-program/src/lockfile.rs`) | Cista writer (`cista/src/faber_lock.rs` @ `9355288`) | Match |
+| Check | Faber reader (`radix/crates/radix-program/src/lockfile.rs`) | Cista writer (`cista/src/faber_lock.rs` `LockedPackage` @ `bc384b4`) | Match |
 | --- | --- | --- | --- |
 | `LockedPackage` field set | `name`, `version`, `source`, `package_root`, `kind`, `target_language`, `target_triple`, `target_manifest`, `interface_root`, `artifact`, `crate_name`, `rustc`, `content_sha256` — **13 fields** (12 required + optional `content_sha256`) | identical set and order — **13 fields** | **identical** |
 | `FaberLock` container | `packages: Vec<LockedPackage>` (`#[serde(default, rename = "package")]`) | same (`#[serde(default, rename = "package")]`) | **identical** |
