@@ -368,6 +368,8 @@ impl MirCollectionOp {
 /// One gap per rejection site. Categories are the five named in
 /// `goals/02-target-capability-validation.md`; the owning stage column is the
 /// campaign stage that supplies the missing fact or removes the rejection.
+/// [`CapabilityGap::RuntimePanic`] is the exception: it reports a crash in the
+/// classification run itself, not a verdict about the target.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum CapabilityGap {
     /// A MIR shape the target does not print at all (e.g. indirect value
@@ -389,6 +391,11 @@ pub enum CapabilityGap {
     /// The target deliberately rejects a shape by policy (e.g. device-subset
     /// forbids host-integration helpers). Owner: target policy / MIR GPU.
     TargetPolicyRejection { shape: String, slug: &'static str },
+    /// The classification run crashed — the runner panicked with a payload
+    /// that is not one of the harness's own traps. This is a defect signal:
+    /// "this target broke", never "this target cannot do it". Consumers must
+    /// fail the row rather than count it as a capability refusal.
+    RuntimePanic { shape: String, slug: &'static str },
 }
 
 /// Pre-emission lowerability verdict for a MIR program against one target.
@@ -415,7 +422,8 @@ impl CapabilityGap {
             | Self::MissingLayoutFact { shape, .. }
             | Self::MissingAbiFact { shape, .. }
             | Self::MissingRuntimeBoundary { shape, .. }
-            | Self::TargetPolicyRejection { shape, .. } => shape,
+            | Self::TargetPolicyRejection { shape, .. }
+            | Self::RuntimePanic { shape, .. } => shape,
         }
     }
 
@@ -428,7 +436,8 @@ impl CapabilityGap {
             | Self::MissingLayoutFact { slug, .. }
             | Self::MissingAbiFact { slug, .. }
             | Self::MissingRuntimeBoundary { slug, .. }
-            | Self::TargetPolicyRejection { slug, .. } => slug,
+            | Self::TargetPolicyRejection { slug, .. }
+            | Self::RuntimePanic { slug, .. } => slug,
         }
     }
 
