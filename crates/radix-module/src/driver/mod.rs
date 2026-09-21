@@ -93,6 +93,151 @@ pub struct ModuleImportContract {
         BTreeMap<String, BTreeMap<String, crate::semantic::passes::visibility_annotation::VisibilityTier>>,
 }
 
+/// The analyzed facts HIR provider-module emission maps over (ARCH-U4 /
+/// S01-3): one import target's unit, analyzed once per driver run where the
+/// import-contract walk already parses it, under the contract codegen needs
+/// (bodyless functions + library-registry defaults). This is the same fact
+/// set the Rust provider-module emitter used to re-derive from disk at every
+/// codegen call.
+pub struct ProviderUnit {
+    /// Lowered program of the provider module.
+    pub hir: HirModule,
+    /// Type information produced by the provider's semantic analysis.
+    pub types: semantic::TypeTable,
+    /// Symbol table owning the provider's names.
+    pub interner: Interner,
+    /// Resolver metadata carrying the provider's own file interfaces.
+    pub resolver: Resolver,
+    /// Warnings and informational diagnostics from the provider's analysis;
+    /// emission fails closed when any is an error.
+    pub diagnostics: Vec<Diagnostic>,
+    /// Carried units for the provider's own nested namespace imports.
+    pub nested: ProviderUnitView,
+}
+
+/// One analyzed provider module carried for HIR emission (ARCH-U4 / S01-3).
+///
+/// The unit is shared by every import edge that resolved to the same target
+/// in one driver run. It sits behind a [`std::sync::Mutex`] for one reason:
+/// [`AnalyzedModule`] is `Send` (the `faber test` budget thread sends whole
+/// analyzed programs across a channel), and shared ownership of the
+/// `!Sync` analysis arenas would take that contract away. The lock is
+/// uncontended in the single-threaded compile — it preserves the existing
+/// `Send` surface, it does not introduce parallelism. A target that resolved
+/// and parsed but failed contract analysis carries its failure instead —
+/// emission fails closed on the marker rather than re-entering the front half
+/// to rediscover the failure.
+#[derive(Clone)]
+pub enum CarriedProviderUnit {
+    /// Analyzed unit shared across the driver run's import edges.
+    Unit(std::sync::Arc<std::sync::Mutex<ProviderUnit>>),
+    /// Contract discovery or analysis failed for this target; `message` is
+    /// the fail-closed emission error's tail clause.
+    Failed {
+        /// What failed and the leading diagnostic message.
+        message: String,
+    },
+}
+
+impl CarriedProviderUnit {
+    /// Lock and borrow the analyzed unit, or `None` for a failed-carriage
+    /// marker. Poison-tolerant: a panic inside emission does not cascade
+    /// into later locks (the compile contract is single-threaded).
+    #[must_use]
+    pub fn lock_unit(&self) -> Option<ProviderUnitGuard<'_>> {
+        match self {
+            Self::Unit(unit) => Some(ProviderUnitGuard(unit.lock().unwrap_or_else(|poisoned| poisoned.into_inner()))),
+            Self::Failed { .. } => None,
+        }
+    }
+}
+
+/// Borrowed view of one carried provider unit (see
+/// [`CarriedProviderUnit::lock_unit`]).
+pub struct ProviderUnitGuard<'a>(std::sync::MutexGuard<'a, ProviderUnit>);
+
+impl std::ops::Deref for ProviderUnitGuard<'_> {
+    type Target = ProviderUnit;
+
+    fn deref(&self) -> &ProviderUnit {
+        &self.0
+    }
+}
+
+/// Per-module view of analyzed provider units, keyed by import-path spelling
+/// (ARCH-U4 / S01-3).
+///
+/// One entry per direct import edge that resolved and parsed during this
+/// module's contract walk; the driver carries the view on the analyzed output
+/// and HIR emission maps over it instead of re-reading providers from disk —
+/// the O(consumers × providers) front-half re-runs end and the codegen tree
+/// loses its last filesystem dependency.
+#[derive(Clone, Default)]
+pub struct ProviderUnitView {
+    /// Carried units by import-path spelling as written by the importer.
+    pub(crate) units: BTreeMap<String, CarriedProviderUnit>,
+}
+
+impl ProviderUnitView {
+    /// The carried unit for one import-path spelling, when the edge resolved.
+    #[must_use]
+    pub fn get(&self, import_path: &str) -> Option<&CarriedProviderUnit> {
+        self.units.get(import_path)
+    }
+
+    /// Record the carried unit for one import edge (program-layer contract
+    /// walk; crate-internal writer).
+    pub(crate) fn insert(&mut self, import_path: &str, unit: CarriedProviderUnit) {
+        self.units.insert(import_path.to_owned(), unit);
+    }
+
+    /// Whether no provider units are carried (plain single-file units).
+    #[must_use]
+    pub fn is_empty(&self) -> bool {
+        self.units.is_empty()
+    }
+}
+
+impl std::fmt::Debug for ProviderUnitView {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        // Deliberately lock-free: Debug must not block on (or panic through)
+        // a unit some emission thread is holding.
+        f.debug_map()
+            .entries(self.units.iter().map(|(path, unit)| {
+                let kind = match unit {
+                    CarriedProviderUnit::Unit(_) => "Unit",
+                    CarriedProviderUnit::Failed { .. } => "Failed",
+                };
+                (path, kind)
+            }))
+            .finish()
+    }
+}
+
+impl PartialEq for ProviderUnitView {
+    /// Carriage identity, not surface equality: two views are equal when they
+    /// carry the same edges, with `Unit` entries compared by shared identity
+    /// (the same driver run parses a target once) and `Failed` entries by
+    /// message.
+    fn eq(&self, other: &Self) -> bool {
+        self.units.len() == other.units.len()
+            && self
+                .units
+                .iter()
+                .all(|(path, unit)| match other.units.get(path) {
+                    Some(CarriedProviderUnit::Unit(other_unit)) => match unit {
+                        CarriedProviderUnit::Unit(unit) => std::sync::Arc::ptr_eq(unit, other_unit),
+                        CarriedProviderUnit::Failed { .. } => false,
+                    },
+                    Some(CarriedProviderUnit::Failed { message }) => match unit {
+                        CarriedProviderUnit::Unit(_) => false,
+                        CarriedProviderUnit::Failed { message: own } => own == message,
+                    },
+                    None => false,
+                })
+    }
+}
+
 /// Caller-supplied inputs for the single [`compile`] entry.
 ///
 /// The contract drives fail-closed module analysis; package-aware callers that
@@ -105,6 +250,10 @@ pub struct ModuleCompileRequest {
     pub contract: ModuleImportContract,
     /// Package-local import identity facts, when already resolved.
     pub package_identities: Option<PackageImportIdentities>,
+    /// Analyzed provider units for this module's import edges (ARCH-U4 /
+    /// S01-3), carried from the program-layer contract walk so backend
+    /// emission maps over them instead of re-analyzing providers from disk.
+    pub provider_units: ProviderUnitView,
 }
 
 /// Run analysis and code generation for one source unit.
@@ -118,10 +267,11 @@ pub struct ModuleCompileRequest {
 /// collected before codegen are preserved on success.
 #[must_use]
 pub fn compile(session: &Session, name: &str, source: &str, request: ModuleCompileRequest) -> CompileResult {
-    let ModuleCompileRequest { contract, package_identities } = request;
+    let ModuleCompileRequest { contract, package_identities, provider_units } = request;
     let mut analysis = match analyze_source(session, name, source, AnalyzeRequest { cli_program: None, contract }) {
         Ok(mut analysis) => {
             analysis.package_import_identities = package_identities;
+            analysis.provider_units = provider_units;
             analysis
         }
         Err(mut diagnostics) => {
@@ -2668,6 +2818,14 @@ pub struct AnalyzedModule {
     /// compiles.
     pub package_import_identities: Option<PackageImportIdentities>,
 
+    /// Analyzed provider units for this module's import edges, keyed by
+    /// import-path spelling (ARCH-U4 / S01-3; see [`ProviderUnitView`]).
+    /// Populated by the program-layer contract walk where each target already
+    /// parses; backend emission maps over the view instead of re-entering the
+    /// front half from disk. Empty for plain single-file compiles and
+    /// artifact-loaded units.
+    pub provider_units: ProviderUnitView,
+
     /// Compiler lane metadata collected from `@ radix lane ...` annotations.
     pub radix_lanes: RadixLaneMetadata,
 
@@ -2770,6 +2928,7 @@ impl AnalyzedModule {
             qualified_identities,
             provenance,
             package_import_identities: None,
+            provider_units: ProviderUnitView::default(),
             radix_lanes,
             gpu_builtins,
             #[cfg(feature = "mir-core")]
@@ -3744,6 +3903,7 @@ fn analyzed_unit_from_semantic(
         qualified_identities: fields.qualified_identities,
         provenance: fields.provenance,
         package_import_identities: None,
+        provider_units: ProviderUnitView::default(),
         radix_lanes: fields.radix_lanes,
         gpu_builtins: fields.gpu_builtins,
         #[cfg(feature = "mir-core")]

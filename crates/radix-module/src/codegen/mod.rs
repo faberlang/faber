@@ -494,117 +494,96 @@ fn generate_haskell_from_analyzed(_analysis: &crate::driver::AnalyzedModule) -> 
     Err(unavailable_target_error(Target::HirHaskell))
 }
 
-/// Analyze and emit each distinct file-namespace provider binding as a module.
+/// Emit each distinct file-namespace provider binding as a module, mapping
+/// over the analyzed provider units carried on the driver's output
+/// (ARCH-U4 / S01-3).
+///
+/// The units were analyzed once per driver run where the import-contract walk
+/// already parses each target, under the contract codegen needs (bodyless
+/// functions + library-registry defaults). This function no longer re-reads
+/// providers from disk, re-runs the front half, or resolves imports
+/// CWD-relatively: the codegen tree's last filesystem dependency is gone and
+/// the O(consumers × providers) re-analysis ends.
 #[cfg(feature = "hir-rust")]
 fn emit_provider_modules(
     analysis: &crate::driver::AnalyzedModule,
 ) -> Result<Vec<(String, String, std::collections::BTreeSet<String>)>, CodegenError> {
     use std::collections::BTreeMap;
-    use std::path::Path;
 
-    // One emit call = one scoped run (ARCH-U3): the provider fleet shares one
-    // memo identity, and each per-provider analysis below re-wraps this
-    // session for its own contract config instead of minting a fresh run.
-    let session = crate::driver::Session::new(
-        crate::driver::Config::default()
-            .with_bodyless_functions()
-            .with_dev_locale_root(),
-    );
     let mut modules = BTreeMap::new();
-    collect_provider_modules(analysis, &session, Path::new("."), &mut modules)?;
+    map_provider_modules(
+        &analysis.hir,
+        &analysis.interner,
+        &analysis.resolver,
+        &analysis.provider_units,
+        &mut modules,
+    )?;
     Ok(modules
         .into_iter()
         .map(|(name, (code, failable))| (name, code, failable))
         .collect())
 }
 
+/// Walk one analyzed unit's imports and emit every distinct file-namespace
+/// provider binding carried for it as a Rust module.
+///
+/// The same walk serves the consumer unit and each carried provider: the
+/// provider's own `nested` view supplies its nested namespace imports
+/// (`norma:valor` → `norma:chorda` emit as sibling modules), and the
+/// `modules` map is the cycle brake. A binding with a file interface but no
+/// carried unit fails closed — by construction the same contract walk
+/// installed the interface and the carriage, so this only fires for a mid-run
+/// inconsistency (or a cyclic import that interrupted carriage), where the
+/// previous disk-based path failed too.
 #[cfg(feature = "hir-rust")]
-fn collect_provider_modules(
-    analysis: &crate::driver::AnalyzedModule,
-    session: &crate::driver::Session,
-    from_file: &std::path::Path,
+fn map_provider_modules(
+    hir: &crate::hir::HirModule,
+    interner: &crate::lexer::Interner,
+    resolver: &crate::semantic::Resolver,
+    view: &crate::driver::ProviderUnitView,
     modules: &mut std::collections::BTreeMap<String, (String, std::collections::BTreeSet<String>)>,
 ) -> Result<(), CodegenError> {
     use crate::hir::HirItemKind;
-    use crate::import_resolve::resolve_namespace_import;
 
-    for item in &analysis.hir.items {
+    for item in &hir.items {
         let HirItemKind::Import(import) = &item.kind else {
             continue;
         };
-        let import_path = analysis.interner.resolve(import.path);
+        let import_path = interner.resolve(import.path);
         for import_item in &import.items {
             let binding = import_item.alias.unwrap_or(import_item.name);
-            if !analysis.resolver.namespace_has_file_interface(binding) {
+            if !resolver.namespace_has_file_interface(binding) {
                 continue;
             }
-            let module_name = analysis.interner.resolve(binding).replace('-', "_");
+            let module_name = interner.resolve(binding).replace('-', "_");
             if modules.contains_key(&module_name) {
                 continue;
             }
-            let provider_path =
-                resolve_namespace_import(session, from_file, import_path, None).map_err(|err| CodegenError {
-                    message: format!("cannot resolve provider import `{import_path}` for Rust module emission: {err}"),
+            let Some(carried) = view.get(import_path) else {
+                return Err(CodegenError {
+                    message: format!(
+                        "cannot resolve provider import `{import_path}` for Rust module emission: \
+                         no analyzed provider unit is carried for this import"
+                    ),
                     args: vec![
                         DiagnosticArg::new("issue", "provider_import_resolution_failed"),
                         DiagnosticArg::new("import_path", import_path),
                     ],
-                })?;
-            let source = std::fs::read_to_string(&provider_path).map_err(|err| CodegenError {
-                message: format!("cannot read provider source {}: {err}", provider_path.display()),
-                args: vec![
-                    DiagnosticArg::new("issue", "provider_source_read_failed"),
-                    DiagnosticArg::new("path", provider_path.display().to_string()),
-                ],
-            })?;
-            // Re-analysis is a program-layer entry: discover contracts from
-            // the provider path, then fail-closed module analysis. Nested
-            // imports (norma:valor → norma:chorda) stay empty without this.
-            // The package `[reader] locale` (e.g. tela's `locale = "en"` for
-            // `tela:valida`) is threaded as a non-explicit session pack so
-            // an English provider stays English under an otherwise
-            // Latin-default session instead of failing PARSE001.
-            let mut config = session.config.clone();
-            if let Some(pack) = crate::program::compile::package_reader_locale_pack(session, &provider_path) {
-                config = config.with_locale_pack(pack);
-            }
-            // Per-provider re-wrap (ARCH-U3): the provider's analysis session
-            // carries its own contract config but shares the emit call's memo
-            // identity, so provider targets parse once per emit run.
-            let session = session.re_wrap(config);
-            let name = provider_path.display().to_string();
-            let prepared =
-                crate::program::compile::prepare_program_module(&provider_path, &source, &session).map_err(|diag| {
-                    CodegenError {
-                        message: format!("cannot prepare provider module `{module_name}`: {}", diag.message),
-                        args: vec![
-                            DiagnosticArg::new("issue", "provider_module_prepare_failed"),
-                            DiagnosticArg::new("module", module_name.clone()),
-                        ],
-                    }
-                })?;
-            let unit = crate::driver::analyze_source(
-                &prepared.session,
-                &name,
-                &source,
-                crate::driver::AnalyzeRequest { cli_program: None, contract: prepared.contract },
-            )
-            .map_err(|diags| CodegenError {
-                message: format!(
-                    "provider module `{}` failed analysis: {}",
-                    module_name,
-                    diags
-                        .iter()
-                        .map(|d| d.message.as_str())
-                        .collect::<Vec<_>>()
-                        .join("; ")
-                ),
-                args: vec![
-                    DiagnosticArg::new("issue", "provider_module_analysis_failed"),
-                    DiagnosticArg::new("module", module_name.clone()),
-                ],
-            })?;
-            if unit
+                });
+            };
+            let Some(provider) = carried.lock_unit() else {
+                let crate::driver::CarriedProviderUnit::Failed { message } = carried else {
+                    unreachable!("lock_unit returned None for a non-Failed marker");
+                };
+                return Err(CodegenError {
+                    message: format!("provider module `{module_name}` {message}"),
+                    args: vec![
+                        DiagnosticArg::new("issue", "provider_module_analysis_failed"),
+                        DiagnosticArg::new("module", module_name.clone()),
+                    ],
+                });
+            };
+            if provider
                 .diagnostics
                 .iter()
                 .any(radix_diagnostics::Diagnostic::is_error)
@@ -621,20 +600,17 @@ fn collect_provider_modules(
             // norma:text) emit their own sibling modules; the provider's own
             // namespace calls then target `crate::<module>::…` paths that
             // exist. The `contains_key` guard above is the cycle brake.
-            let nested_from = provider_path
-                .parent()
-                .map_or_else(|| std::path::Path::new(".").to_path_buf(), std::path::Path::to_path_buf);
-            collect_provider_modules(&unit, &session, &nested_from, modules)?;
+            map_provider_modules(&provider.hir, &provider.interner, &provider.resolver, &provider.nested, modules)?;
             let namespace_info = rust::build_file_import_namespaces(
-                &unit.hir,
-                &unit.interner,
-                &rust::ResolverImportsBridge(&unit.resolver),
+                &provider.hir,
+                &provider.interner,
+                &rust::ResolverImportsBridge(&provider.resolver),
             );
             let module_out = radix_hir_rust::generate_with_library_registry_test_selection_and_imports(
                 radix_hir_rust::ModuleGenerationRequest {
-                    hir: &unit.hir,
-                    types: &unit.types,
-                    interner: &unit.interner,
+                    hir: &provider.hir,
+                    types: &provider.types,
+                    interner: &provider.interner,
                     libraries: &radix_hir::LibraryRegistry::default(),
                     test_selection: None,
                     function_facts: None,
@@ -650,7 +626,7 @@ fn collect_provider_modules(
             // The provider's emitted signatures (not its Faber declarations)
             // decide importer call-site unwrapping: `ad`-verb functions emit
             // `Result` even without a declared `⇥` channel.
-            let failable_exports = radix_hir_rust::provider_failable_export_names(&unit.hir, &unit.interner);
+            let failable_exports = radix_hir_rust::provider_failable_export_names(&provider.hir, &provider.interner);
             modules.insert(module_name, (module_out.code, failable_exports));
         }
     }
