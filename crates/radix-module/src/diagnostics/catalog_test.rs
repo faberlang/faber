@@ -11,7 +11,7 @@ use radix_diagnostics::{
     unresolved_keyword_spec, unresolved_library_member_spec,
 };
 use radix_semantic::catalog::{arg_value, quote_arg};
-use radix_semantic::catalog_semantic::semantic_spec;
+use radix_semantic::catalog_semantic::{semantic_help, semantic_spec};
 use radix_semantic::catalog_syntax::{lex_message, lex_spec, parse_message, parse_spec};
 use std::collections::HashSet;
 
@@ -297,16 +297,11 @@ fn is_known_diagnostic_code_rejects_unknown_codes() {
 
 #[test]
 fn width_issue_prose_names_fractus_bf16_guidance() {
-    // S03-1: width lowering helpers report typed issues, not prose; these
-    // catalog rows are the surviving message-template authority for the
-    // fractus bf16 guidance that `WidthError::message` used to pin.
-    for issue in ["float_width_on_numerus", "invalid_fractus_width_marker"] {
-        let args = vec![DiagnosticArg::new("issue", issue)];
-        let message = semantic_message(SemanticErrorKind::TypeUndefined, &args)
-            .unwrap_or_else(|| panic!("catalog row missing for {issue}"));
-        assert!(
-            message.contains("bf16"),
-            "{issue} prose should name bf16: {message}"
-        );
-    }
+    // S03-1: width lowering helpers report typed issues, not prose; S03-3
+    // then removed the TypeUndefined message tables, so the surviving
+    // catalog authority for width-family bf16 guidance is this help twin.
+    let args = vec![DiagnosticArg::new("issue", "bits_pair_width_mismatch")];
+    let help = semantic_help(SemanticErrorKind::ConversionInvalid, &args)
+        .unwrap_or_else(|| panic!("catalog help missing for bits_pair_width_mismatch"));
+    assert!(help.contains("bf16"), "width prose should name bf16: {help}");
 }
