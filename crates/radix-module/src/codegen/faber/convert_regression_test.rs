@@ -411,7 +411,10 @@ fn reader_keyword_reverse_lookup_matches_nfkc_normalized_text() {
             .map(|d| (d.code, d.issue(), d.args.clone()))
             .collect::<Vec<_>>()
     );
-    let code = result.output.expect("successful convert carries output").code;
+    let code = result
+        .output
+        .expect("successful convert carries output")
+        .code;
     assert!(
         code.contains("\u{0E17}\u{0E33}"),
         "th-TH output must carry the pack's composed fac spelling:\n{code}"

@@ -131,8 +131,7 @@ impl TypeChecker<'_> {
                 own_instance_fields.push(field.name);
             }
         }
-        self.own_instance_fields
-            .insert(def_id, own_instance_fields);
+        self.own_instance_fields.insert(def_id, own_instance_fields);
 
         for method in &struct_item.methods {
             let sig = self.function_signature(&method.func);

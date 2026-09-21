@@ -1019,8 +1019,11 @@ impl<'a> KernelBuilder<'a> {
             .resources()
             .filter(|resource| resource.kind == MirKernelResourceKind::StorageBuffer)
         {
-            let shape =
-                crate::abi::kernel_param_shape(resource.source_local, kernel_source, self.validation);
+            let shape = crate::abi::kernel_param_shape(
+                resource.source_local,
+                kernel_source,
+                self.validation,
+            );
             let role =
                 BufferRole::from_abi_role(resource.role, resource.access).ok_or_else(|| {
                     DeviceProgramBuildError::BufferRole {

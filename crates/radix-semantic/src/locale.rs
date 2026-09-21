@@ -704,7 +704,10 @@ fn build_keyword_latin_key_by_spelling(
         // text, so reverse-map keys must be NFKC too: a pack spelling with a
         // compatibility-decomposable character (Thai SARA AM `ำ`) otherwise
         // never matches its own source form and lexes as an identifier.
-        map.insert(binding.canonical.nfkc().collect::<String>(), binding.key.clone());
+        map.insert(
+            binding.canonical.nfkc().collect::<String>(),
+            binding.key.clone(),
+        );
         for alias in &binding.aliases {
             map.insert(alias.nfkc().collect::<String>(), binding.key.clone());
         }

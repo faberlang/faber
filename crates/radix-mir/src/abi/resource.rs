@@ -353,15 +353,10 @@ pub fn kernel_param_shape(
     tensor_param_shape_dims(param.ty, validation)
 }
 
-fn tensor_param_shape_dims(
-    ty: MirType,
-    validation: &MirValidationContext<'_>,
-) -> Option<Vec<u64>> {
+fn tensor_param_shape_dims(ty: MirType, validation: &MirValidationContext<'_>) -> Option<Vec<u64>> {
     match validation.types.get(ty.semantic_id()) {
         Type::Tensor(_, shape) => tensor_shape_dims(*shape, validation),
-        Type::Alias(_, target) => {
-            tensor_param_shape_dims(MirType::semantic(*target), validation)
-        }
+        Type::Alias(_, target) => tensor_param_shape_dims(MirType::semantic(*target), validation),
         _ => None,
     }
 }

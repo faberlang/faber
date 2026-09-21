@@ -254,8 +254,7 @@ fn zero_element_reduced_buffer_rejected() {
 fn carried_shape_vector_admits_when_product_matches_count() {
     let mut wire = reduced_projection_fixture();
     wire.kernels[0].resources[0].version.shape = Some(vec![8, 8]);
-    validate_wire_program(&wire)
-        .expect("a shape vector consistent with the element count admits");
+    validate_wire_program(&wire).expect("a shape vector consistent with the element count admits");
 }
 
 /// A carried shape vector whose product disagrees with the element count
@@ -267,7 +266,9 @@ fn shape_vector_product_mismatch_rejected() {
     let error = validate_wire_program(&wire)
         .expect_err("a shape vector that disagrees with the flattened count fails closed");
     assert!(
-        error.to_string().contains("does not equal its element count"),
+        error
+            .to_string()
+            .contains("does not equal its element count"),
         "the fail-closed diagnostic names the count disagreement: {error}"
     );
 }
@@ -286,7 +287,11 @@ fn wire_buffer_version_shape_round_trips_json() {
     let bytes = serde_json::to_vec(&version).expect("buffer version serializes");
     let reloaded: WireBufferVersion =
         serde_json::from_slice(&bytes).expect("buffer version reloads");
-    assert_eq!(reloaded.shape, Some(vec![4, 4]), "shape vector survives the wire");
+    assert_eq!(
+        reloaded.shape,
+        Some(vec![4, 4]),
+        "shape vector survives the wire"
+    );
     assert_eq!(reloaded.element_ty, "f32", "dtype survives the wire");
     assert_eq!(reloaded.element_count, 16);
 }

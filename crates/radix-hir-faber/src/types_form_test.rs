@@ -354,8 +354,7 @@ fn literal_width_fused_sugar_re_emits_bracketed() {
                 vector,
                 vec![type_arg(short_width(fx.f32_ty))],
             ),
-        ),
-        ],
+        )],
     );
     assert_eq!(
         render_at(&codegen, &declared_site(1), vector, &LaSurface),
