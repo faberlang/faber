@@ -1652,15 +1652,17 @@ fn lower_conversio_target_type(
                 Some(first) => std::slice::from_ref(first),
                 None => &[],
             };
-            let mut messages = Vec::new();
+            let mut issues = Vec::new();
             let ty_id = crate::numeric_width::lower_sized_primitive(
                 prim,
                 width_params,
                 lowerer.interner,
                 lowerer.types,
-                &mut |message| messages.push(message.to_owned()),
+                &mut |issue| issues.push(issue),
             );
-            emit_first_target_lowering_message(lowerer, &messages);
+            if let Some(issue) = issues.first() {
+                lowerer.error(issue.issue());
+            }
             apply_type_target_wrappers(lowerer, ty, ty_id)
         }
         radix_syntax::TypeExprKind::Named(ident, target_params)

@@ -189,22 +189,6 @@ fn prefix_closure_law_bf16_never_decomposes() {
 }
 
 #[test]
-fn width_error_strings_mention_bf16() {
-    assert!(
-        WidthError::FloatOnNumerus
-            .message(Primitive::Numerus)
-            .contains("bf16"),
-        "FloatOnNumerus message should name bf16"
-    );
-    assert!(
-        WidthError::UnrecognizedMarker
-            .message(Primitive::Fractus)
-            .contains("bf16"),
-        "UnrecognizedMarker message for fractus should name bf16"
-    );
-}
-
-#[test]
 fn widening_lattice_allows_i32_to_i64() {
     assert!(NumericWidth::is_widening_assignable(
         NumericWidth::I32,
@@ -319,4 +303,166 @@ fn ascii_format_hints_are_hex_bin_oct_only() {
         );
         assert!(is_conversio_radix_hint(marker));
     }
+}
+
+// S03-1: lowering failures cross the producer boundary as typed issues, not
+// prose that downstream tables re-parse into a diagnostic identity.
+use crate::numeric_width::{
+    WidthLowerIssue, lower_modular_word, lower_sized_primitive, lower_standalone_width_type,
+};
+use radix_lexer::{Interner, Span};
+use radix_syntax::{GenericArgExpr, Ident, TypeExpr, TypeExprKind, TypeFormLevel};
+
+fn marker_expr(spelling: &str, interner: &mut Interner) -> TypeExpr {
+    generic_marker_expr(spelling, Vec::new(), interner)
+}
+
+fn generic_marker_expr(spelling: &str, args: Vec<GenericArgExpr>, interner: &mut Interner) -> TypeExpr {
+    TypeExpr {
+        nullable: false,
+        mode: None,
+        kind: TypeExprKind::Named(
+            Ident {
+                name: interner.intern(spelling),
+                span: Span {
+                    start: 0,
+                    end: 0,
+                },
+            },
+            args,
+        ),
+        span: Span {
+            start: 0,
+            end: 0,
+        },
+        form: TypeFormLevel::LONG,
+        iuncta_label: None,
+    }
+}
+
+#[test]
+fn width_lowering_failures_report_typed_issues() {
+    let mut interner = Interner::new();
+    let mut types = TypeTable::new();
+
+    let mut reported = Vec::new();
+    let params = [marker_expr("u8", &mut interner)];
+    assert!(
+        lower_standalone_width_type("f32", &params, &mut types, &mut |issue| {
+            reported.push(issue)
+        })
+        .is_some()
+    );
+    assert_eq!(reported, vec![WidthLowerIssue::Params]);
+    assert_eq!(reported[0].issue(), "width_marker_params");
+
+    let mut reported = Vec::new();
+    assert!(
+        lower_standalone_width_type("f32", &[], &mut types, &mut |issue| {
+            reported.push(issue)
+        })
+        .is_some()
+    );
+    assert!(reported.is_empty());
+}
+
+#[test]
+fn sized_primitive_lowering_reports_typed_issues() {
+    let mut interner = Interner::new();
+    let mut types = TypeTable::new();
+
+    let cases: [(Primitive, Vec<TypeExpr>, WidthLowerIssue, &str); 6] = [
+        (
+            Primitive::Numerus,
+            vec![marker_expr("f32", &mut interner)],
+            WidthLowerIssue::FloatOnNumerus,
+            "float_width_on_numerus",
+        ),
+        (
+            Primitive::Fractus,
+            vec![marker_expr("i32", &mut interner)],
+            WidthLowerIssue::IntOnFractus,
+            "integer_width_on_fractus",
+        ),
+        (
+            Primitive::Numerus,
+            vec![marker_expr("u128", &mut interner)],
+            WidthLowerIssue::InvalidMarker(Primitive::Numerus),
+            "invalid_numerus_width_marker",
+        ),
+        (
+            Primitive::Fractus,
+            vec![marker_expr("x9", &mut interner)],
+            WidthLowerIssue::InvalidMarker(Primitive::Fractus),
+            "invalid_fractus_width_marker",
+        ),
+        (
+            Primitive::Numerus,
+            vec![marker_expr("i32", &mut interner), marker_expr("i64", &mut interner)],
+            WidthLowerIssue::TooManyParams(Primitive::Numerus),
+            "numerus_width_params",
+        ),
+        (
+            Primitive::Numerus,
+            vec![generic_marker_expr(
+                "foo",
+                vec![GenericArgExpr::Size(radix_syntax::FiguraExpr::Literal(1))],
+                &mut interner,
+            )],
+            WidthLowerIssue::Shape,
+            "width_marker_shape",
+        ),
+    ];
+
+    for (prim, params, expected, issue_name) in cases {
+        let mut reported = Vec::new();
+        lower_sized_primitive(
+            prim,
+            &params,
+            &interner,
+            &mut types,
+            &mut |issue| reported.push(issue),
+        );
+        assert_eq!(reported, vec![expected], "issue name {issue_name}");
+        assert_eq!(reported[0].issue(), issue_name);
+    }
+}
+
+#[test]
+fn modular_word_lowering_reports_typed_issues() {
+    let mut interner = Interner::new();
+    let mut types = TypeTable::new();
+
+    let mut reported = Vec::new();
+    lower_modular_word(&[], &interner, &mut types, &mut |issue| reported.push(issue));
+    assert_eq!(reported, vec![WidthLowerIssue::ModularWordRequired]);
+    assert_eq!(reported[0].issue(), "modular_word_width_required");
+
+    let mut reported = Vec::new();
+    let params = [marker_expr("i32", &mut interner)];
+    lower_modular_word(&params, &interner, &mut types, &mut |issue| {
+        reported.push(issue)
+    });
+    assert_eq!(reported, vec![WidthLowerIssue::ModularWordUnsupported]);
+    assert_eq!(reported[0].issue(), "unsupported_modular_word_width");
+
+    let mut reported = Vec::new();
+    let params = [marker_expr("f32", &mut interner)];
+    lower_modular_word(&params, &interner, &mut types, &mut |issue| {
+        reported.push(issue)
+    });
+    assert_eq!(reported, vec![WidthLowerIssue::ModularWordUnsignedRequired]);
+    assert_eq!(reported[0].issue(), "modular_word_unsigned_width_required");
+
+    let mut reported = Vec::new();
+    let params = [generic_marker_expr(
+        "foo",
+        vec![GenericArgExpr::Size(radix_syntax::FiguraExpr::Literal(1))],
+        &mut interner,
+    )];
+    lower_modular_word(&params, &interner, &mut types, &mut |issue| {
+        reported.push(issue)
+    });
+    assert_eq!(reported, vec![WidthLowerIssue::ModularWordShape]);
+    assert_eq!(reported[0].issue(), "modular_word_width_shape");
 }

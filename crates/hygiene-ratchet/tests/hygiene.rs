@@ -472,13 +472,6 @@ fn diagnostic_text_assertion_allowlisted(root: &Path, path: &Path) -> bool {
         || rel == "crates/radix-mir/src/kernel_decomposition_test.rs"
         || rel == "crates/radix-mir/src/static_shape_fold_test.rs"
         || rel == "crates/radix-mir-llvm/tests/device_mode.rs"
-        // Renderer-contract misclassification (hygiene 4b repair):
-        // `width_error_strings_mention_bf16` asserts the WidthError message
-        // TEMPLATE itself — the guidance prose naming every fractus width —
-        // a message-template contract like render_test/locale_test, not a
-        // code/issue surface. WidthError carries no structured fields to
-        // migrate onto.
-        || rel == "crates/radix-types/src/numeric_width_test.rs"
 }
 
 fn display_relative(root: &Path, path: &Path) -> String {

@@ -295,3 +295,19 @@ fn is_known_diagnostic_code_rejects_unknown_codes() {
     assert!(!is_known_diagnostic_code(""));
     assert!(!is_known_diagnostic_code("CODEGEN001"));
 }
+
+#[test]
+fn width_issue_prose_names_fractus_bf16_guidance() {
+    // S03-1: width lowering helpers report typed issues, not prose; these
+    // catalog rows are the surviving message-template authority for the
+    // fractus bf16 guidance that `WidthError::message` used to pin.
+    for issue in ["float_width_on_numerus", "invalid_fractus_width_marker"] {
+        let args = vec![DiagnosticArg::new("issue", issue)];
+        let message = semantic_message(SemanticErrorKind::TypeUndefined, &args)
+            .unwrap_or_else(|| panic!("catalog row missing for {issue}"));
+        assert!(
+            message.contains("bf16"),
+            "{issue} prose should name bf16: {message}"
+        );
+    }
+}
