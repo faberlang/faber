@@ -277,14 +277,8 @@ exemplars = ["./exemplars/salve-munde.fab"]
         .render_diagnostic_text(&diagnostic)
         .expect("issue row should render")
         .expect("LEX004 template row");
-    assert_eq!(
-        rendered.message,
-        "unexpected character: 'ᵗ'; did you mean 'ᵀ'?"
-    );
-    assert_eq!(
-        rendered.help.as_deref(),
-        Some("replace 'ᵗ' with the canonical spelling 'ᵀ'")
-    );
+    assert_eq!(rendered.message, "unexpected character: 'ᵗ'; did you mean 'ᵀ'?");
+    assert_eq!(rendered.help.as_deref(), Some("replace 'ᵗ' with the canonical spelling 'ᵀ'"));
 }
 
 /// A missing issue row must degrade loudly (DEF S14-1): silently rendering the
@@ -336,8 +330,7 @@ exemplars = ["./exemplars/salve-munde.fab"]
 /// and renders it with the emitted `{char}`/`{suggestion}` facts.
 #[test]
 fn every_installed_pack_renders_homoglyph_did_you_mean() {
-    const INSTALLED_LOCALES: &[&str] =
-        &["en", "la", "ar", "hi", "th-TH", "vi", "zh-Hans", "zh-Hant"];
+    const INSTALLED_LOCALES: &[&str] = &["en", "la", "ar", "hi", "th-TH", "vi", "zh-Hans", "zh-Hant"];
     let diagnostic = Diagnostic::error("unexpected character")
         .with_phase(DiagnosticPhase::Parse)
         .with_code("LEX004")

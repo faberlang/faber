@@ -140,13 +140,11 @@ pub(crate) fn check_artifact_digests(
         };
         let backend = artifact.backend.spelling();
         let mut named: Option<&str> = None;
-        for input in
-            device.artifacts.artifact.iter().filter(|input| {
-                input.stage == MaterializationStage::CompilerInput
-                    && input.backend.spelling() == backend
-                    && input.target.id == artifact.target.id
-            })
-        {
+        for input in device.artifacts.artifact.iter().filter(|input| {
+            input.stage == MaterializationStage::CompilerInput
+                && input.backend.spelling() == backend
+                && input.target.id == artifact.target.id
+        }) {
             match named {
                 None => named = Some(input.packet_sha256.as_str()),
                 Some(sibling) if sibling == input.packet_sha256 => {}
