@@ -390,6 +390,15 @@ pub(crate) fn library_resolver_from_config(
     crate::library::default_library_resolver()
 }
 
+/// S-D3: lock rows the manifest does not declare must not enter the
+/// resolver — an undeclared row would make its absolute interface root
+/// importable. Platform-default providers are the producer-sanctioned
+/// exception (`cista/src/commands/install.rs` `PLATFORM_DEFAULT_PACKAGES`
+/// rewrites their lock rows without a `[dependencies]` entry). Absolute
+/// store paths are lock contract (`faber-lock.md` fields 4/8/9/10), never
+/// a rejection case.
+const PLATFORM_DEFAULT_PROVIDERS: &[&str] = &["norma"];
+
 /// Build a library resolver for a package root, attaching `faber.toml`
 /// dependencies and `faber.lock` interface roots when present.
 pub fn library_resolver_for_package(
@@ -425,6 +434,11 @@ pub fn library_resolver_for_package(
             lock,
         )?;
         for package in lock_index.values() {
+            let declared = manifest.dependencies.contains_key(&package.name)
+                || PLATFORM_DEFAULT_PROVIDERS.contains(&package.name.as_str());
+            if !declared {
+                continue;
+            }
             locked.insert(
                 package.name.clone(),
                 LockedLibraryPackage {
@@ -483,6 +497,9 @@ fn validate_product_manifest_for_spec(spec: &PackageSpec) -> Result<(), Box<Diag
 
 #[cfg(test)]
 mod test_support;
+
+#[cfg(test)]
+mod library_resolver_lock_test;
 
 #[cfg(test)]
 #[cfg(feature = "device-runtime")]
