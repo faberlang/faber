@@ -24,6 +24,9 @@ const ISSUE_EXPRESSION_TYPE_MISMATCH: &str = "expression_type_mismatch";
 /// GPD-3: an explicit generic argument whose spelling does not match the
 /// declared sort of the positional parameter it would bind.
 const ISSUE_GENERIC_TYPE_ARG_SORT: &str = "generic_type_arg_sort";
+/// A magnitudo default that cannot unify with the already-inferred hole shares
+/// the shape-constraint sites' incompatibility code.
+const ISSUE_INCOMPATIBLE_TENSOR_INDEX: &str = "incompatible_tensor_index";
 
 /// Diagnostic issue for a shape param left unbound at a call site (D6).
 ///
@@ -798,7 +801,7 @@ impl TypeChecker<'_> {
                         } else if let Some(SemanticGenericParamDefault::Magnitudo(value)) =
                             param.default
                         {
-                            let bound = self.bind_size_param_default(resolved, value);
+                            let bound = self.bind_size_param_default(resolved, value, span)?;
                             (
                                 GenericBindingSource::Defaulted,
                                 GenericWitness::Magnitudo(bound),
@@ -858,11 +861,26 @@ impl TypeChecker<'_> {
     }
 
     /// Solve one still-unsolved index hole to its declared natural default.
-    fn bind_size_param_default(&mut self, hole: IndexId, value: u64) -> IndexId {
+    /// Returns `None` when the bind failed and reported its own diagnostic.
+    fn bind_size_param_default(
+        &mut self,
+        hole: IndexId,
+        value: u64,
+        span: radix_lexer::Span,
+    ) -> Option<IndexId> {
         let literal = self.types.intern_index(IndexExpr::Literal(value));
         let mut unifier = self.index_infer.unifier(self.types);
-        let _ = unifier.unify(hole, literal);
-        literal
+        match unifier.unify(hole, literal) {
+            Ok(bound) => Some(bound),
+            Err(_) => {
+                self.error_issue(
+                    SemanticErrorKind::TypeMismatch,
+                    ISSUE_INCOMPATIBLE_TENSOR_INDEX,
+                    span,
+                );
+                None
+            }
+        }
     }
 
     /// Allocate one fresh index hole per distinct shape-param symbol (D1).
@@ -902,5 +920,50 @@ impl TypeChecker<'_> {
             rejected = true;
         }
         rejected
+    }
+}
+
+#[cfg(test)]
+mod size_default_unify_test {
+    use super::*;
+    use radix_lexer::{Interner, Span};
+    use radix_target::Target;
+
+    /// S00-4: a magnitudo default that cannot unify with the already-inferred
+    /// hole value must report a diagnostic, never return the default as if it
+    /// bound. `constrain_index_equal` stands in for any inference source that
+    /// substituted the hole before the default bind runs.
+    #[test]
+    fn size_default_conflicting_with_inferred_value_reports() {
+        let mut types = TypeTable::new();
+        let resolver = Resolver::new();
+        let interner = Interner::new();
+        let mut checker = TypeChecker::new(&resolver, &mut types, Some(&interner), Target::HirRust);
+        let hole = checker.fresh_index_hole();
+        let inferred = checker.types.intern_index(IndexExpr::Literal(3));
+        checker.constrain_index_equal(hole, inferred, Span::default());
+        assert!(
+            checker.errors.is_empty(),
+            "setup must not emit diagnostics: {:?}",
+            checker.errors
+        );
+
+        let bound = checker.bind_size_param_default(hole, 4, Span::default());
+
+        assert!(
+            bound.is_none(),
+            "failed default bind must not yield a witness id"
+        );
+        assert!(
+            checker.errors.iter().any(|error| {
+                error.kind == SemanticErrorKind::TypeMismatch
+                    && error
+                        .args
+                        .iter()
+                        .any(|arg| arg.name == "issue" && arg.value == "incompatible_tensor_index")
+            }),
+            "expected incompatible_tensor_index diagnostic, got: {:?}",
+            checker.errors
+        );
     }
 }
