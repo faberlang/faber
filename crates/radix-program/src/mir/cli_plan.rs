@@ -976,21 +976,16 @@ pub(super) struct NominalImportContext<'a> {
 }
 
 /// Pre-intern every `Type::Param` and `IndexExpr::Param` symbol of a source
-/// type table into the merged interner. Generated identity tokens outside
-/// the source string table stay as-is (same guard as
-/// [`remap_optional_symbol`]).
+/// type table into the merged interner. A `Symbol` always means text in its
+/// named interner (ARCH2-2), so the re-intern is unconditional.
 pub(super) fn intern_param_symbols(
     source_types: &TypeTable,
     source_interner: &Interner,
     target_interner: &mut Interner,
 ) -> HashMap<Symbol, Symbol> {
     let mut map = HashMap::new();
-    let mut intern_by_name = |symbol: Symbol| -> Symbol {
-        if symbol.0 as usize >= source_interner.strings().len() {
-            return symbol;
-        }
-        target_interner.intern(source_interner.resolve(symbol))
-    };
+    let mut intern_by_name =
+        |symbol: Symbol| -> Symbol { target_interner.intern(source_interner.resolve(symbol)) };
     for index in 0..source_types.type_count() {
         if let Type::Param(symbol) = source_types.get(TypeId(index as u32)) {
             let remapped = intern_by_name(*symbol);
@@ -1011,10 +1006,9 @@ pub(super) fn intern_param_symbols(
 }
 
 /// Pre-intern every `Type::Record` field-name symbol of a source type table
-/// into the merged interner. Generated identity tokens outside the source
-/// string table stay as-is (same guard as [`remap_optional_symbol`]); the
-/// import's `Type::Record` arm then re-interns field names through this map
-/// so imported records validate against the text-remapped merged program.
+/// into the merged interner; the import's `Type::Record` arm then re-interns
+/// field names through this map so imported records validate against the
+/// text-remapped merged program.
 pub(super) fn intern_record_field_symbols(
     source_types: &TypeTable,
     source_interner: &Interner,
@@ -1026,9 +1020,6 @@ pub(super) fn intern_record_field_symbols(
             continue;
         };
         for name in fields.keys() {
-            if name.0 as usize >= source_interner.strings().len() {
-                continue;
-            }
             let remapped = target_interner.intern(source_interner.resolve(*name));
             map.insert(*name, remapped);
         }

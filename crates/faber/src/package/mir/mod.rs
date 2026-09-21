@@ -141,12 +141,7 @@ fn device_section_builder(
             else {
                 continue;
             };
-            let has_anonymous_param = function.params.iter().any(|param| {
-                param.name.is_none()
-                    || param.name.is_some_and(|symbol| {
-                        (symbol.0 as usize) >= lowered.interner.strings().len()
-                    })
-            });
+            let has_anonymous_param = function.params.iter().any(|param| param.name.is_none());
             if has_anonymous_param {
                 for program_name in kernel.resources.iter().filter(|resource| {
                     resource.buffer.role == radix_mir::device_program::BufferRole::Input
