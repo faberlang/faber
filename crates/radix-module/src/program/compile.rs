@@ -697,7 +697,10 @@ fn cached_import_target(
 /// the marker, never propagated: the consumer's compile path does not analyze
 /// providers today and must not start failing on their diagnostics; emission
 /// fails closed on the marker instead.
-fn provider_unit_for_target(
+///
+/// Public so the package-analysis path (radix-program) mints carriage through
+/// this same entry instead of forking the provider analysis config.
+pub fn provider_unit_for_target(
     session: &crate::driver::Session,
     target_path: &Path,
     target_source: &str,

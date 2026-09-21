@@ -26,10 +26,12 @@ pub const PACKAGE_TEST_ANALYSIS_BUDGET: Duration = Duration::from_secs(30);
 
 use radix_module::diagnostics::Diagnostic;
 use radix_module::driver::{
-    AnalyzeRequest, AnalyzedModule, Config, ModuleImportContract, PackageKernelTemplateAdmissions,
-    Session, analyze_source_with_kernel_template_admissions,
+    AnalyzeRequest, AnalyzedModule, CarriedProviderUnit, Config, ModuleImportContract,
+    PackageKernelTemplateAdmissions, ProviderUnitView, Session,
+    analyze_source_with_kernel_template_admissions,
 };
 use radix_module::lexer::Interner;
+use radix_module::program::provider_unit_for_target;
 use radix_module::semantic::passes::visibility_annotation::VisibilityTier;
 use radix_module::syntax::{ImportDecl, ImportKind, StmtKind};
 
@@ -43,7 +45,8 @@ use crate::library::{
     LibraryInterfaceCache, LibraryResolver, LocaleLoader, analysis_source_for_file,
     attach_library_provenance_with_links, expand_library_imports, library_cached_file_interface,
     library_interface_declaration_surface, library_interface_export_surface,
-    library_interface_has_module, program_declaration_surface, program_export_surface,
+    library_interface_has_module, library_interface_source, program_declaration_surface,
+    program_export_surface,
 };
 use crate::manifest::read_manifest;
 use crate::modules::module_segments_for_file;
@@ -446,6 +449,9 @@ fn analyze_package_spec_with_deadline(
         LibraryInterfaceCache::with_config(&session.config).with_locale_loader(seams.locale_loader);
     let mut nodes = BTreeMap::new();
     let mut analyzed_interfaces_by_path = BTreeMap::new();
+    // Carriage minted per import target within this package run (ARCH-U4):
+    // every edge to the same target shares one analyzed provider unit.
+    let mut provider_carriage_minted: BTreeMap<PathBuf, CarriedProviderUnit> = BTreeMap::new();
     // Native-binding crates are derived from the package root and lockfile at
     // the compiler-owned consumer; no product seam or analyzed-package shell
     // is needed to carry this artifact-plan fact.
@@ -590,6 +596,20 @@ fn analyze_package_spec_with_deadline(
                     &mut analysis.diagnostics,
                     &file.raw_source,
                     file.body_byte_offset,
+                );
+                // Carry the analyzed provider units for this file's import
+                // edges (ARCH-U4 parity on the package-analysis path):
+                // backend emission maps over the view instead of re-entering
+                // the front half from disk, on this surface exactly as on the
+                // program-layer walk.
+                analysis.provider_units = provider_carriage_for_file(
+                    &spec,
+                    file,
+                    &files_by_path,
+                    library_resolver,
+                    &mut library_cache,
+                    &session,
+                    &mut provider_carriage_minted,
                 );
                 analysis
             }
@@ -1181,6 +1201,64 @@ fn visit_package_analysis_file<'a>(
 /// Resolve every import binding's cross-unit interface for a file.
 ///
 /// RP3: moved from `crates/faber/src/package/compile.rs`.
+/// Mint the provider carriage for one file's direct import edges (ARCH-U4
+/// parity on the package-analysis path).
+///
+/// Every edge that resolves to a real target gets its analyzed provider unit
+/// — or its fail-closed `Failed` marker — under the same codegen contract the
+/// program-layer walk uses: [`provider_unit_for_target`], not a forked
+/// config. Local siblings mint from their on-disk source, library modules
+/// from the cached interface body the package path already resolves. Edges
+/// that stay unresolved (`Unsupported`/`Error`, unreadable library source)
+/// install no carriage, matching the surfaceless-by-design posture: their
+/// bindings get no file interface either, so provider emission never
+/// consults them.
+fn provider_carriage_for_file(
+    spec: &PackageSpec,
+    file: &PackageFile,
+    files_by_path: &BTreeMap<PathBuf, &PackageFile>,
+    library_resolver: &LibraryResolver,
+    library_cache: &mut LibraryInterfaceCache,
+    session: &Session,
+    minted: &mut BTreeMap<PathBuf, CarriedProviderUnit>,
+) -> ProviderUnitView {
+    let mut view = ProviderUnitView::default();
+    for stmt in &file.program.statements {
+        let StmtKind::Import(decl) = &stmt.kind else {
+            continue;
+        };
+        let import_path = file.interner.resolve(decl.path);
+        let (target_path, target_source) =
+            match resolve_import(spec, library_resolver, &file.path, import_path) {
+                ImportResolution::Local(target) => {
+                    let Some(target_file) = files_by_path.get(&target) else {
+                        continue;
+                    };
+                    (target, target_file.raw_source.clone())
+                }
+                ImportResolution::Library(module) => {
+                    let Some(import) = library_import_binding(&file.interner, decl, module) else {
+                        continue;
+                    };
+                    match library_interface_source(&import.module, library_cache) {
+                        Ok(source) => (import.module.interface_path.clone(), source),
+                        Err(_) => continue,
+                    }
+                }
+                ImportResolution::Unsupported | ImportResolution::Error(_) => continue,
+            };
+        let carried = match minted.entry(target_path) {
+            std::collections::btree_map::Entry::Occupied(occupied) => occupied.into_mut(),
+            std::collections::btree_map::Entry::Vacant(vacant) => {
+                let unit = provider_unit_for_target(session, vacant.key(), &target_source);
+                vacant.insert(unit)
+            }
+        };
+        view.insert(import_path, carried.clone());
+    }
+    view
+}
+
 fn file_interfaces_for_file(
     spec: &PackageSpec,
     file: &PackageFile,

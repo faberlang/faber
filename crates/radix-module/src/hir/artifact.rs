@@ -20,6 +20,7 @@ use radix_hir_fhir::{
 use radix_lexer::Interner;
 use radix_types::TypeTable;
 use rustc_hash::{FxHashMap, FxHashSet};
+use std::collections::BTreeMap;
 
 // ---------------------------------------------------------------------------
 // Wire → live type mappings (F18, F20)
@@ -357,7 +358,9 @@ pub(crate) fn reconstruct_unit(artifact: radix_hir_fhir::HirArtifact) -> Result<
             (entry.def_id, lane, backward)
         }));
 
-    Ok(AnalyzedModule::from_loaded_with_presentation(
+    let provider_units = provider_units_live(artifact.provider_units)?;
+
+    let mut unit = AnalyzedModule::from_loaded_with_presentation(
         analysis_stamp,
         interner,
         types,
@@ -375,7 +378,47 @@ pub(crate) fn reconstruct_unit(artifact: radix_hir_fhir::HirArtifact) -> Result<
         gpu_builtins,
         GraphicsSourceFacts::default(),
         Vec::new(), // diagnostics
-    ))
+    );
+    // Reinstall the provider carriage (schema v14, ARCH-U4): the loaded
+    // surface must emit provider imports from carried units exactly as the
+    // direct surface does, with no disk re-derivation.
+    unit.provider_units = provider_units;
+    Ok(unit)
+}
+
+/// Rebuild a live [`crate::driver::ProviderUnitView`] from its wire form,
+/// recursing through each fragment's nested view. Diagnostics are not wire
+/// facts: carriage units carry warnings-only diagnostics by construction and
+/// the emitter's fail-closed error check reads them only for `Failed`-free
+/// entries, so loaded carriage units reconstruct with empty diagnostics — the
+/// same treatment the loader gives the consumer unit's own diagnostics.
+fn provider_units_live(
+    wire: BTreeMap<String, radix_hir_fhir::ProviderCarriageEntryWire>,
+) -> Result<crate::driver::ProviderUnitView, HirArtifactError> {
+    use crate::driver::{CarriedProviderUnit, ProviderUnit};
+
+    let mut units = BTreeMap::new();
+    for (import_path, entry) in wire {
+        let carried = match entry {
+            radix_hir_fhir::ProviderCarriageEntryWire::Failed { message } => CarriedProviderUnit::Failed { message },
+            radix_hir_fhir::ProviderCarriageEntryWire::Unit(fragment) => {
+                let mut types = TypeTable::from_snapshot(fragment.types)
+                    .map_err(|msg| HirArtifactError::MalformedSnapshot { kind: "types", detail: msg })?;
+                types.resolved_generic_calls = fragment.resolved_generic_calls;
+                let nested = provider_units_live(fragment.nested)?;
+                CarriedProviderUnit::Unit(std::sync::Arc::new(std::sync::Mutex::new(ProviderUnit {
+                    hir: fragment.hir,
+                    types,
+                    interner: Interner::from_string_table(fragment.interner),
+                    resolver: Resolver::from_snapshot(fragment.resolver),
+                    diagnostics: Vec::new(),
+                    nested,
+                })))
+            }
+        };
+        units.insert(import_path, carried);
+    }
+    Ok(crate::driver::ProviderUnitView { units })
 }
 
 // ---------------------------------------------------------------------------

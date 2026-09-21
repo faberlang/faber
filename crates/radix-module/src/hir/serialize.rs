@@ -15,6 +15,7 @@ use radix_hir_fhir::{
 };
 use radix_types::{AppliedArg, Type, TypeId, TypeTable};
 use rustc_hash::FxHashMap;
+use std::collections::BTreeMap;
 
 // ── Entry point ───────────────────────────────────────────────────────────
 
@@ -79,7 +80,43 @@ pub fn from_analyzed(unit: &AnalyzedModule, content_hash: &str, relative_path: &
             .map(|(def_id, builtin)| (*def_id, gpu_builtin_to_wire(*builtin)))
             .collect(),
         capability_provenance: provenance_table_to_wire(&unit.provenance),
+        provider_units: provider_units_wire(&unit.provider_units),
     }
+}
+
+// ── Provider carriage (ARCH-U4 / schema v14) ───────────────────────────────
+
+/// Map one analyzed unit's carried provider view onto the wire, recursing
+/// through each provider's nested view so the loaded surface can re-emit
+/// nested namespace imports as sibling modules exactly as the direct surface
+/// does. Diagnostics are not wire facts: a carried unit's diagnostics are
+/// warnings-only by construction (analysis errors travel as `Failed`
+/// markers), so the wire omits them.
+fn provider_units_wire(
+    view: &crate::driver::ProviderUnitView,
+) -> BTreeMap<String, radix_hir_fhir::ProviderCarriageEntryWire> {
+    view.units
+        .iter()
+        .map(|(import_path, carried)| {
+            let entry = match carried {
+                crate::driver::CarriedProviderUnit::Failed { message } => {
+                    radix_hir_fhir::ProviderCarriageEntryWire::Failed { message: message.clone() }
+                }
+                crate::driver::CarriedProviderUnit::Unit(unit) => {
+                    let provider = unit.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+                    radix_hir_fhir::ProviderCarriageEntryWire::Unit(radix_hir_fhir::ProviderUnitWire {
+                        hir: provider.hir.clone(),
+                        types: provider.types.snapshot(),
+                        resolved_generic_calls: provider.types.resolved_generic_calls.clone(),
+                        interner: provider.interner.to_string_table(),
+                        resolver: provider.resolver.to_snapshot(),
+                        nested: provider_units_wire(&provider.nested),
+                    })
+                }
+            };
+            (import_path.clone(), entry)
+        })
+        .collect()
 }
 
 // ── Authored presentation witness reconciliation ─────────────────────────

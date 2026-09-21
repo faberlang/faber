@@ -26,6 +26,7 @@ use radix_types::{
     DefId, FuncSig, ResolvedGenericCall, SemanticParamMode, TypeId, TypeTableSnapshot,
 };
 use serde::{Deserialize, Serialize};
+use std::collections::BTreeMap;
 
 // ---------------------------------------------------------------------------
 // Nominal kind for serialization (mirrors radix::file_interface::InterfaceNominalKind)
@@ -496,8 +497,64 @@ pub struct FunctionProvenanceTableWire {
 /// mistaken for ordinary HIR-only functions or silently bypass AIR admission.
 /// Version 12 records authored `↢` await-directed binding spellings in the
 /// presentation sidecar. Version 13 preserves imported structs' JSON conversion
-/// opt-in in resolver snapshots.
-pub const SCHEMA_VERSION: u32 = 13;
+/// opt-in in resolver snapshots. Version 14 carries analyzed provider units
+/// (carriage) for a unit's library/file import edges so loaded-surface HIR
+/// emission maps over carried units exactly as the direct surface does; a
+/// serialized HIR addition is a wire break, so there is no compatibility
+/// decoder for schema-v13 artifacts.
+pub const SCHEMA_VERSION: u32 = 14;
+
+/// Serializable snapshot of one analyzed provider unit carried for HIR
+/// emission (ARCH-U4 carriage).
+///
+/// Carries exactly the arenas the Rust provider-module emitter maps over —
+/// HIR, type table, interner, resolver (namespace bridge + failable-export
+/// facts), and the provider's own nested carriage. Provider diagnostics and
+/// the presentation sidecar are not wire facts (matching the unit artifact's
+/// frozen field set): a carried unit's diagnostics are warnings-only by
+/// construction (an analysis error travels as a `Failed` carriage marker
+/// instead), and provider emission is trivia-blind.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ProviderUnitWire {
+    /// Lowered program of the provider module.
+    pub hir: radix_hir::HirModule,
+
+    /// Type information produced by the provider's semantic analysis.
+    pub types: TypeTableSnapshot,
+
+    /// Complete resolved generic vectors for the provider's checked generic
+    /// calls, restored onto the reconstructed type table (schema v10
+    /// treatment, per fragment).
+    pub resolved_generic_calls: Vec<ResolvedGenericCall>,
+
+    /// Ordered string interner table owning the provider's names.
+    pub interner: Vec<String>,
+
+    /// Resolver snapshot carrying the provider's own file interfaces.
+    pub resolver: ResolverSnapshot,
+
+    /// Carriage for the provider's own nested namespace imports
+    /// (`norma:valor` → `norma:chorda` emit as sibling modules).
+    pub nested: BTreeMap<String, ProviderCarriageEntryWire>,
+}
+
+/// One carried provider unit on the wire, keyed by import-path spelling.
+///
+/// `Failed` preserves the failures-as-markers semantics across the artifact:
+/// a provider whose carriage analysis failed at build time keeps failing
+/// emission with its named message after load instead of silently degrading
+/// to a missing-carriage error.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub enum ProviderCarriageEntryWire {
+    /// Analyzed provider unit.
+    Unit(ProviderUnitWire),
+    /// Contract discovery or analysis failed for this target; `message` is
+    /// the fail-closed emission error's tail clause.
+    Failed {
+        /// What failed and the leading diagnostic message.
+        message: String,
+    },
+}
 
 /// Serializable snapshot of one analyzed compilation unit (F1, F2, F4).
 ///
@@ -577,6 +634,11 @@ pub struct HirArtifact {
     /// Durable borrow-provenance and last-use summaries for every function
     /// boundary (SCR-04: wire DTO; F-CAP-04/05 authority on the wire).
     pub capability_provenance: FunctionProvenanceTableWire,
+
+    /// Analyzed provider units for this unit's import edges, keyed by
+    /// import-path spelling (schema v14; ARCH-U4 carriage). Empty for units
+    /// whose import edges carry no provider imports.
+    pub provider_units: BTreeMap<String, ProviderCarriageEntryWire>,
 }
 
 // ---------------------------------------------------------------------------
