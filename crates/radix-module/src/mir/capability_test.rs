@@ -58,6 +58,11 @@ fn capability_gap_shape_and_slug_round_trip_across_variants() {
             "c",
             "target-policy-rejection",
         ),
+        (
+            CapabilityGap::RuntimePanic { shape: "runner panic: index out of bounds".to_owned(), slug: "runtime-panic" },
+            "runner panic: index out of bounds",
+            "runtime-panic",
+        ),
     ];
     for (gap, want_shape, want_slug) in cases {
         assert_eq!(gap.shape(), want_shape);
