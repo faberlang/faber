@@ -2013,8 +2013,14 @@ fn transplant_literal(
                 .map(|flags| remap_symbol(*flags, source_interner, entry_interner)),
         ),
         HirLiteral::Int(value) => HirLiteral::Int(*value),
-        // decimal-widths D1: text does not cross the MIR boundary (f64 path).
-        HirLiteral::Float(value) | HirLiteral::FloatText { value, .. } => HirLiteral::Float(*value),
+        // decimal-widths D1 successor: the digit text crosses
+        // the boundary remapped, so the entry unit's MIR lowering still
+        // derives the exact scaled carrier; the f64 field alone cannot.
+        HirLiteral::Float(value) => HirLiteral::Float(*value),
+        HirLiteral::FloatText { value, text } => HirLiteral::FloatText {
+            value: *value,
+            text: remap_symbol(*text, source_interner, entry_interner),
+        },
         HirLiteral::JsonValor(value) => HirLiteral::JsonValor(value.clone()),
         HirLiteral::Bool(value) => HirLiteral::Bool(*value),
         HirLiteral::Nil => HirLiteral::Nil,

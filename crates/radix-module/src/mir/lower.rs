@@ -2269,7 +2269,28 @@ impl<'a> FunctionBuilder<'a> {
                 ));
                 None
             }
-            // decimal-widths D1: text-carrying decimals lower via the f64 path.
+            // decimal-widths D1 successor: a decimal-typed
+            // text literal lowers to its exact scaled carrier through the one
+            // shared text→carrier conversion; the f64 field never intermediates.
+            HirLiteral::FloatText { value, text } if self.decimal_literal_width(ty).is_some() => {
+                let width = self.decimal_literal_width(ty).expect("guarded above");
+                let Some(interner) = self.context.interner else {
+                    // Without the interner the digit text is unreadable; keep
+                    // the historical float constant instead of guessing.
+                    return Some(MirOperand::Constant(MirConstant::Float(*value)));
+                };
+                match radix_codegen_shared::decimal::decimal_text_to_carrier(interner.resolve(*text), width) {
+                    Some(carrier) => Some(MirOperand::Constant(MirConstant::Int(carrier))),
+                    None => {
+                        self.errors.push(MirError::unsupported(
+                            span,
+                            "decimal literal carrier is outside the declared width",
+                        ));
+                        None
+                    }
+                }
+            }
+            // Non-decimal text literals keep the historical float constant.
             HirLiteral::Float(value) | HirLiteral::FloatText { value, .. } => {
                 let operand = MirOperand::Constant(MirConstant::Float(*value));
                 match self.sized_fractus_literal_ty(ty) {
@@ -2295,6 +2316,21 @@ impl<'a> FunctionBuilder<'a> {
             match self.types.get(ty) {
                 Type::Alias(_, inner) => ty = *inner,
                 Type::SizedNumeric(Primitive::Fractus, _) => return Some(MirType::semantic(ty)),
+                _ => return None,
+            }
+        }
+    }
+
+    /// The decimal width of a literal's target type, if any.
+    ///
+    /// Decimal widths ride `Numerus` (the scaled-integer carrier), not
+    /// `Fractus`; mirrors the rust backend's decimal-literal detection.
+    fn decimal_literal_width(&self, ty: Option<TypeId>) -> Option<NumericWidth> {
+        let mut ty = ty?;
+        loop {
+            match self.types.get(ty) {
+                Type::Alias(_, inner) => ty = *inner,
+                Type::SizedNumeric(Primitive::Numerus, width) if width.is_decimal() => return Some(*width),
                 _ => return None,
             }
         }
