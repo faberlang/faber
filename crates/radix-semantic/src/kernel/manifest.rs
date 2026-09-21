@@ -95,13 +95,14 @@ const MANIFEST: &[KernelManifestEntry] = &[
         import_path: "faber:processus",
         provider_module: "faber/kernel/processus",
         // English canonicals (Pass B): argumenta→argv, lege→read_env,
-        // scribe→write_env, sedes→cwd, muta→chdir, identitas→pid,
-        // exi→exit_process, exsequi→exec, genera→spawn. The runner
-        // dispatch speaks the same names.
+        // sedes→cwd, muta→chdir, identitas→pid, exi→exit_process,
+        // exsequi→exec, genera→spawn. The runner dispatch speaks the same
+        // names. scribe→write_env is not advertised: hosts dropped the
+        // processus:scribe route (7098458) and norma removed its wrapper
+        // (b62153e).
         verbs: &[
             "argv",
             "read_env",
-            "write_env",
             "cwd",
             "chdir",
             "pid",
