@@ -40,15 +40,6 @@ use crate::mir::MirProviderKind;
 use crate::mir::{MirFunctionSignature, MirLayoutTable, MirParamSignature};
 use std::sync::Arc;
 
-/// Def-id base for synthesized user-module external definitions (D-PA1).
-///
-/// Package-aware lowering allocates one id per imported file-interface verb.
-/// The base sits far above any plausible resolver/user id range
-/// (`USER_DEF_ID_BASE` = `0x0000_1000` and grows by at most thousands), so it
-/// never collides with real declaration ids; `DefId::INVALID` stays
-/// unreachable.
-const SYNTHETIC_PROVIDER_DEF_ID_BASE: u32 = 0x7FFF_F000;
-
 /// Callable parameter metadata preserved for MIR call lowering.
 #[derive(Debug, Clone)]
 pub(super) struct CallableParamMeta<'a> {
@@ -718,7 +709,7 @@ impl<'a> LoweringContextMaps<'a> {
         if package_identities.imports.is_empty() {
             return;
         }
-        let mut next_synthetic = SYNTHETIC_PROVIDER_DEF_ID_BASE;
+        let mut next_synthetic = radix_types::PROVIDER_DEF_ID_BASE;
         for item in &unit.hir.items {
             let HirItemKind::Import(import) = &item.kind else {
                 continue;

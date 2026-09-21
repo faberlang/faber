@@ -155,7 +155,7 @@ impl<'a> LintContext<'a> {
         for item in &hir.items {
             match &item.kind {
                 HirItemKind::Import(import) => self.collect_import(import),
-                HirItemKind::Function(func) if item.def_id.0 < 1_000_000 => {
+                HirItemKind::Function(func) if !item.def_id.is_hir_synthetic() => {
                     self.functions.push((
                         item.def_id,
                         func.body.as_ref().map_or(item.span, |b| b.span),

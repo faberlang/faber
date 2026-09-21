@@ -106,7 +106,8 @@ impl HirVisitor for DecisionPointCounter {
 ///
 /// Scores top-level functions and struct methods (both carry a
 /// [`HirFunction`]); bodyless interface methods and compiler-synthesized
-/// items (def ids ≥ 1_000_000, e.g. lifted AIR closures) are skipped.
+/// items (HIR-synthetic def ids, ≥ [`radix_types::HIR_SYNTHETIC_DEF_ID_BASE`],
+/// e.g. lifted AIR closures) are skipped.
 #[must_use]
 pub fn complexity(
     hir: &HirModule,
@@ -141,7 +142,7 @@ pub fn complexity(
 
     for item in &hir.items {
         match &item.kind {
-            HirItemKind::Function(func) if item.def_id.0 < 1_000_000 => {
+            HirItemKind::Function(func) if !item.def_id.is_hir_synthetic() => {
                 consider(func, item.span);
             }
             HirItemKind::Struct(strukt) => {

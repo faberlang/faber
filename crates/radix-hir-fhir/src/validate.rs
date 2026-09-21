@@ -1993,8 +1993,8 @@ pub(crate) fn validate_referential_integrity(
         Ok(())
     };
     let check_def = |def_id: radix_types::DefId| -> Result<(), HirArtifactError> {
-        // Builtin range [1, USER_DEF_ID_BASE) is always valid.
-        if def_id.0 > 0 && def_id.0 < radix_types::USER_DEF_ID_BASE {
+        // Builtin ids are always valid.
+        if def_id.is_builtin() {
             return Ok(());
         }
         if !def_registry.contains(&def_id) {

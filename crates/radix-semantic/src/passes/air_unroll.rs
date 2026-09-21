@@ -2596,7 +2596,7 @@ impl HirVisitor for IdCensus {
     }
 
     fn visit_def(&mut self, def_id: DefId, _name: Symbol) {
-        if def_id.0 < 0x8000_0000 {
+        if !def_id.is_companion() {
             self.max_def = self.max_def.max(def_id.0);
         }
     }

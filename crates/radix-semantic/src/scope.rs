@@ -2121,7 +2121,7 @@ impl Resolver {
     ) -> FxHashMap<DefId, String> {
         let mut spellings = FxHashMap::default();
         for (def_id, symbol) in &self.symbols {
-            if (def_id.0 & 0x8000_0000) != 0 {
+            if def_id.is_companion() {
                 spellings.insert(*def_id, interner.resolve(symbol.name).to_owned());
             }
         }
