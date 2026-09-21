@@ -776,7 +776,7 @@ fn is_named_mir_gap(message: &str) -> bool {
 }
 
 /// Stable MIR-gap identity for census grouping. Strips the unit-path suffix
-/// `blocked_unit_report*` appends and known diagnostic prefixes.
+/// `blocked_unit_report_with_options` appends and known diagnostic prefixes.
 fn blocking_gap(reason: &str) -> String {
     classify_blocking_gap(strip_trailing_unit_path(reason))
 }
