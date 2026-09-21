@@ -66,6 +66,10 @@ fn unbounded_source_stays_on_flat_path() {
     let tensor = types.intern(Type::Tensor(f32, shape));
 
     assert_eq!(
+        validate_lista_to_tensor_source(lista, tensor, &types),
+        Ok(())
+    );
+    assert_eq!(
         resolve_bounded_lista_padded_shape(lista, tensor, &types),
         None
     );
