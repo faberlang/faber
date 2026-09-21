@@ -44,6 +44,9 @@ pub(crate) mod remap;
 mod remap_test;
 
 #[cfg(test)]
+mod remap_sentinel_test;
+
+#[cfg(test)]
 mod json_import_test;
 pub(crate) mod requirements;
 pub(crate) mod routes;

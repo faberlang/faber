@@ -9,27 +9,20 @@ use super::{
 use radix_module::mir::{MirFilumSumOp, MirIntrinsic, MirSermoOp};
 
 /// Remap a name symbol from the lowering interner into the merged interner.
-/// A symbol outside the source interner's string table is a GENERATED
-/// identity token (the HIR-lowering synthetic range), not a text name —
-/// it stays as-is (the value carries no text meaning either interner).
+/// A `Symbol` always means text in its named interner (ARCH2-2), so the
+/// re-intern is unconditional: generated identity tokens and positional
+/// indices carry their own types and can never reach this walker.
 pub(super) fn remap_optional_symbol(
     name: Option<Symbol>,
     source: &Interner,
     target: &mut Interner,
 ) -> Option<Symbol> {
-    name.map(|symbol| {
-        if (symbol.0 as usize) < source.strings().len() {
-            target.intern(source.resolve(symbol))
-        } else {
-            symbol
-        }
-    })
+    name.map(|symbol| target.intern(source.resolve(symbol)))
 }
 
-/// Remap a name symbol that is always present; the generated-identity guard of
-/// [`remap_optional_symbol`] applies unchanged.
+/// Remap a name symbol that is always present; see [`remap_optional_symbol`].
 fn remap_symbol(name: Symbol, source: &Interner, target: &mut Interner) -> Symbol {
-    remap_optional_symbol(Some(name), source, target).expect("symbol is present")
+    target.intern(source.resolve(name))
 }
 
 pub(super) fn remap_function_text_symbols(
@@ -124,8 +117,9 @@ pub(super) fn remap_terminator_text_symbols(
             destination,
             callee,
             args,
+            ok_block: _,
             error_place,
-            ..
+            error_block: _,
         } => {
             if let Some(destination) = destination {
                 remap_place_text_symbols(destination, source, target);
@@ -136,10 +130,18 @@ pub(super) fn remap_terminator_text_symbols(
             }
             remap_place_text_symbols(error_place, source, target);
         }
-        MirTerminatorKind::Branch { condition, .. } => {
+        MirTerminatorKind::Branch {
+            condition,
+            then_block: _,
+            else_block: _,
+        } => {
             remap_operand_text_symbols(condition, source, target);
         }
-        MirTerminatorKind::Switch { value, cases, .. } => {
+        MirTerminatorKind::Switch {
+            value,
+            cases,
+            default: _,
+        } => {
             remap_operand_text_symbols(value, source, target);
             for case in cases {
                 remap_constant_text_symbols(&mut case.value, source, target);
@@ -161,8 +163,10 @@ pub(super) fn remap_value_text_symbols(
         MirValueKind::Closure(closure) => {
             remap_operand_text_symbols(&mut closure.environment, source, target);
         }
-        MirValueKind::Unary { operand, .. } => remap_operand_text_symbols(operand, source, target),
-        MirValueKind::Binary { lhs, rhs, .. } => {
+        MirValueKind::Unary { op: _, operand } => {
+            remap_operand_text_symbols(operand, source, target)
+        }
+        MirValueKind::Binary { op: _, lhs, rhs } => {
             remap_operand_text_symbols(lhs, source, target);
             remap_operand_text_symbols(rhs, source, target);
         }
@@ -192,13 +196,16 @@ pub(super) fn remap_place_text_symbols(
             MirProjection::Field(field) => {
                 *field = target.intern(source.resolve(*field));
             }
-            MirProjection::VariantField { field, .. } => {
+            MirProjection::VariantField { variant: _, field } => {
                 *field = target.intern(source.resolve(*field));
             }
             MirProjection::Index(operand) => remap_operand_text_symbols(operand, source, target),
-            MirProjection::ClosureCapture { .. }
+            MirProjection::ClosureCapture {
+                environment: _,
+                source: _,
+            }
             | MirProjection::VectorLane(_)
-            | MirProjection::MatrixCell { .. } => {}
+            | MirProjection::MatrixCell { row: _, column: _ } => {}
         }
     }
 }
@@ -213,7 +220,11 @@ pub(super) fn remap_callee_text_symbols(
             remap_operand_text_symbols(&mut closure.environment, source, target);
         }
         MirCallee::Value(operand) => remap_operand_text_symbols(operand, source, target),
-        MirCallee::Function(_) | MirCallee::Definition { .. } => {}
+        MirCallee::Function(_)
+        | MirCallee::Definition {
+            source: _,
+            type_args: _,
+        } => {}
     }
 }
 
@@ -277,7 +288,14 @@ pub(super) fn remap_runtime_call_text_symbols(
 /// either misses that map or indexes an unrelated string.
 fn remap_sermo_text_symbols(op: &mut MirSermoOp, source: &Interner, target: &mut Interner) {
     match op {
-        MirSermoOp::Receive { data_field, .. } | MirSermoOp::Cursor { data_field, .. } => {
+        MirSermoOp::Receive {
+            frame: _,
+            data_field,
+        }
+        | MirSermoOp::Cursor {
+            frame: _,
+            data_field,
+        } => {
             *data_field = remap_symbol(*data_field, source, target);
         }
         MirSermoOp::ViewMeus
@@ -345,7 +363,7 @@ pub(super) fn remap_option_text_symbols(
         MirOptionOp::Some(operand)
         | MirOptionOp::IsNil(operand)
         | MirOptionOp::IsNotNil(operand) => remap_operand_text_symbols(operand, source, target),
-        MirOptionOp::Unwrap { value, .. } => remap_operand_text_symbols(value, source, target),
+        MirOptionOp::Unwrap { value, mode: _ } => remap_operand_text_symbols(value, source, target),
         MirOptionOp::Coalesce { value, fallback } => {
             remap_operand_text_symbols(value, source, target);
             remap_operand_text_symbols(fallback, source, target);
@@ -374,7 +392,7 @@ pub(super) fn remap_option_chain_text_symbols(
         MirOptionChainLink::Field(field) => {
             *field = target.intern(source.resolve(*field));
         }
-        MirOptionChainLink::VariantField { field, .. } => {
+        MirOptionChainLink::VariantField { variant: _, field } => {
             *field = target.intern(source.resolve(*field));
         }
     }
@@ -403,6 +421,6 @@ pub(super) fn remap_constant_text_symbols(
         | MirConstant::Unit
         | MirConstant::Octeti(_)
         | MirConstant::Function(_)
-        | MirConstant::ShapeSize { .. } => {}
+        | MirConstant::ShapeSize { shape: _, axis: _ } => {}
     }
 }

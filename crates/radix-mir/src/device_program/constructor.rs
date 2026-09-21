@@ -1307,7 +1307,7 @@ fn buffer_slot_name(
             .iter()
             .find(|param| param.local == local)
             .and_then(|param| param.name)
-            .and_then(|symbol| safe_interner_name(interner, symbol))
+            .map(|symbol| interner.resolve(symbol).to_owned())
         {
             return name;
         }
@@ -1316,7 +1316,7 @@ fn buffer_slot_name(
             .iter()
             .find(|local_info| local_info.id == local)
             .and_then(|local_info| local_info.name)
-            .and_then(|symbol| safe_interner_name(interner, symbol))
+            .map(|symbol| interner.resolve(symbol).to_owned())
         {
             return name;
         }
@@ -1324,17 +1324,6 @@ fn buffer_slot_name(
     match resource.role {
         MirKernelResourceRole::Input => format!("input_{}", resource.binding),
         MirKernelResourceRole::Output => format!("output_{}", resource.binding),
-    }
-}
-
-/// Resolve a symbol name safely: an uninterned synthetic symbol falls back to
-/// `None` instead of indexing past the interner's string table — the caller
-/// then uses the role-based fallback name.
-fn safe_interner_name(interner: &Interner, symbol: radix_lexer::Symbol) -> Option<String> {
-    if (symbol.0 as usize) < interner.strings().len() {
-        Some(interner.resolve(symbol).to_owned())
-    } else {
-        None
     }
 }
 

@@ -1622,16 +1622,9 @@ pub(crate) fn buffer_binding_type_for_shader_access(
 }
 
 pub(crate) fn param_source_name(param: &MirParam, interner: Option<&Interner>) -> Option<String> {
-    // A synthetic symbol outside the interner's string table (the reverse-AD
-    // residual/upstream placeholders of a generated companion, S3-A2) is
-    // treated as unnamed rather than indexing out of bounds.
     let name = param.name?;
     let interner = interner?;
-    if (name.0 as usize) < interner.strings().len() {
-        Some(interner.resolve(name).to_owned())
-    } else {
-        None
-    }
+    Some(interner.resolve(name).to_owned())
 }
 
 pub(crate) fn named_builtin_for_param(
