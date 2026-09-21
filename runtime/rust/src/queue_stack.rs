@@ -622,7 +622,8 @@ mod tests {
         let queue: Queue<i64> = Queue::from(vec![1, 2, 3]);
         let scaled: Queue<i64> = queue.sparge(&10, |value, scalar| value * scalar);
         assert_eq!(scaled.to_vec(), vec![10, 20, 30]);
-        let from_left: Queue<i64> = Queue::sparge_sinistra(&10, &queue, |scalar, value| scalar - value);
+        let from_left: Queue<i64> =
+            Queue::sparge_sinistra(&10, &queue, |scalar, value| scalar - value);
         assert_eq!(from_left.to_vec(), vec![9, 8, 7]);
 
         let stack: Stack<i64> = Stack::from(vec![1, 2, 3]);
@@ -635,7 +636,8 @@ mod tests {
         assert_eq!(scaled.to_vec(), vec![3, 6, 9]);
 
         let bounded: StackN<i64, 4> = StackN::try_from_vec(vec![1, 2, 3]).unwrap();
-        let scaled: StackN<i64, 4> = StackN::sparge_sinistra(&3, &bounded, |scalar, value| scalar * value);
+        let scaled: StackN<i64, 4> =
+            StackN::sparge_sinistra(&3, &bounded, |scalar, value| scalar * value);
         assert_eq!(scaled.capacitas(), Some(4));
         assert_eq!(scaled.to_vec(), vec![3, 6, 9]);
     }
@@ -712,7 +714,10 @@ mod tests {
     fn iteration_follows_the_access_discipline() {
         let queue: Queue<i64> = Queue::from(vec![1, 2, 3]);
         assert_eq!(queue.iter().copied().collect::<Vec<_>>(), vec![1, 2, 3]);
-        assert_eq!((&queue).into_iter().copied().collect::<Vec<_>>(), vec![1, 2, 3]);
+        assert_eq!(
+            (&queue).into_iter().copied().collect::<Vec<_>>(),
+            vec![1, 2, 3]
+        );
 
         let stack: Stack<i64> = Stack::from(vec![1, 2, 3]);
         assert_eq!(stack.iter().copied().collect::<Vec<_>>(), vec![3, 2, 1]);
