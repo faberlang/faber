@@ -408,10 +408,14 @@ fn analyze_package_spec_with_deadline(
     deadline: Option<Instant>,
     seams: &AnalysisSeams,
 ) -> Result<AnalyzedProgram, Vec<Diagnostic>> {
-    let files = load_package_with_config(
+    // One package analysis = one driver run (ARCH-U3): the session minted
+    // here owns the parse-once memo identity shared by loading, mount
+    // planning, and every per-file analysis below (through re-wraps).
+    let session = Session::new(config.clone());
+    let files = load_package_with_session(
         &spec,
         library_resolver,
-        config,
+        &session,
         include_proba,
         proba_filter,
         seams,
@@ -433,7 +437,9 @@ fn analyze_package_spec_with_deadline(
         }
         config.import_path_templates = Some(templates);
     }
-    let session = Session::new(config);
+    // Re-wrap, not a fresh run: the templates-bearing config keeps the memo
+    // identity the load phase already filled.
+    let session = session.re_wrap(config);
     let mount_plan = build_mount_plan(&spec, &files)?;
     let mut diagnostics = Vec::new();
     let mut library_cache =
@@ -543,14 +549,17 @@ fn analyze_package_spec_with_deadline(
                 continue;
             }
         };
+        // Per-file re-wrap (ARCH-U3): the file's own reader pack config keeps
+        // the package run's memo identity, so targets shared across files
+        // parse once for the whole package analysis.
         let file_session = match file.locale_pack.as_ref() {
-            Some(pack) => Session::new(
+            Some(pack) => session.re_wrap(
                 session
                     .config
                     .clone()
                     .with_resolved_locale_pack(pack.clone()),
             ),
-            None => Session::new(session.config.clone()),
+            None => session.re_wrap(session.config.clone()),
         };
         // PKG-ADM: the file's own package export surface is the admission
         // fact for exported size-generic kernel templates — registered here,
@@ -853,12 +862,41 @@ fn package_import_identities_for_file(
 /// composition). Manifests are validated through the caller-supplied product
 /// seam; source loading, import resolution, library expansion, and cycle
 /// detection are compiler-owned here.
+///
+/// Session-less entry (product harnesses, tests): one call mints its own
+/// driver-run session, so its memo scope ends with the load. The package
+/// analysis run threads its own shared session through
+/// [`load_package_with_session`] instead (ARCH-U3).
 /// # Errors
 /// Returns an error when the input or persisted artifact is invalid.
 pub fn load_package_with_config(
     spec: &PackageSpec,
     library_resolver: &LibraryResolver,
     config: &Config,
+    include_proba: bool,
+    proba_filter: Option<&TestSourceFilter>,
+    seams: &AnalysisSeams,
+) -> Result<Vec<PackageFile>, Vec<Diagnostic>> {
+    let session = Session::new(config.clone());
+    load_package_with_session(
+        spec,
+        library_resolver,
+        &session,
+        include_proba,
+        proba_filter,
+        seams,
+    )
+}
+
+/// Session-carrying loader half: `session` owns the parse-once memo identity
+/// for the load (package-root walks during library-locale merging share the
+/// caller's driver run).
+/// # Errors
+/// Returns an error when the input or persisted artifact is invalid.
+fn load_package_with_session(
+    spec: &PackageSpec,
+    library_resolver: &LibraryResolver,
+    session: &Session,
     include_proba: bool,
     proba_filter: Option<&TestSourceFilter>,
     seams: &AnalysisSeams,
@@ -947,7 +985,7 @@ pub fn load_package_with_config(
         let Some(loaded) = load_package_source(
             &canonical,
             compiler_manifest.as_ref(),
-            config,
+            &session.config,
             seams.locale_loader,
             &mut diagnostics,
         ) else {
@@ -1028,7 +1066,7 @@ pub fn load_package_with_config(
                 &mut library_cache,
                 &mut diagnostics,
             );
-            if let Err(diagnostic) = merge_library_locale_pack_for_file(file) {
+            if let Err(diagnostic) = merge_library_locale_pack_for_file(session, file) {
                 diagnostics.push(diagnostic);
             }
         }
@@ -1047,7 +1085,10 @@ pub fn load_package_with_config(
 /// so this projection happens after library expansion but before any unit is
 /// handed to semantic analysis. The same pack then drives the semantic import
 /// projection and keeps the parser's source identities unchanged.
-fn merge_library_locale_pack_for_file(file: &mut PackageFile) -> Result<(), Diagnostic> {
+fn merge_library_locale_pack_for_file(
+    session: &Session,
+    file: &mut PackageFile,
+) -> Result<(), Diagnostic> {
     let Some(pack) = file.locale_pack.as_mut() else {
         return Ok(());
     };
@@ -1056,7 +1097,12 @@ fn merge_library_locale_pack_for_file(file: &mut PackageFile) -> Result<(), Diag
         .library_imports
         .iter()
         .chain(file.expanded_library_imports.iter())
-        .filter_map(|import| crate::find_package_root(&import.module.interface_path))
+        .filter_map(|import| {
+            radix_module::program::find_package_root_with_session(
+                session,
+                &import.module.interface_path,
+            )
+        })
         .collect::<BTreeSet<_>>();
     radix_module::locale::merge_library_locale_packs(pack, roots).map_err(|err| {
         crate::package_diagnostic_error(format!(

@@ -183,7 +183,8 @@ fn same_package_root_is_same_seam() {
     let from = root.join("src/consumer.fab");
     let target = root.join("src/probe.fab");
     fs::write(&from, "importa ex \"./probe\" probe\n").expect("consumer");
-    assert!(crate::import_resolve::same_package(&from, &target));
+    let session = crate::driver::Session::new(crate::driver::Config::default());
+    assert!(crate::import_resolve::same_package(&session, &from, &target));
     assert_eq!(seam_from_flag(true), ImportSeam::SamePackage);
 }
 
@@ -195,7 +196,12 @@ fn different_package_roots_are_cross_seam() {
     write_target_lib(&probe, "probe");
     let app = home.join("app.fab");
     fs::write(&app, "importa ex \"probe:probe\" probe\n").expect("app");
-    assert!(!crate::import_resolve::same_package(&app, &probe.join("src/probe.fab")));
+    let session = crate::driver::Session::new(crate::driver::Config::default());
+    assert!(!crate::import_resolve::same_package(
+        &session,
+        &app,
+        &probe.join("src/probe.fab")
+    ));
     assert_eq!(seam_from_flag(false), ImportSeam::CrossPackage);
 }
 

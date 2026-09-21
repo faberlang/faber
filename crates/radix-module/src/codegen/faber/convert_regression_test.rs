@@ -9,7 +9,6 @@
 use super::reemit_faber;
 use crate::codegen::Target;
 use crate::driver::{Config, Session};
-use crate::program::compile::clear_import_target_cache;
 use crate::services::check_diagnostics_for_source_with_locale_pack;
 use std::fs;
 
@@ -299,7 +298,6 @@ functio passus(numerus p) → numerus {
         manifest.replace("locale = \"la\"", "locale = \"en\""),
     )
     .expect("flip manifest locale");
-    clear_import_target_cache();
     assert_en_output_compiles(&parameter_name, &parameter_code);
     assert_en_output_compiles(&consumer_name, &consumer_code);
 }

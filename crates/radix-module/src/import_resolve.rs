@@ -5,21 +5,12 @@
 //! `[`paths`].source`).
 
 use rustc_hash::FxHashMap;
-use std::cell::RefCell;
 use std::collections::BTreeMap;
 use std::fmt;
 use std::path::{Path, PathBuf};
 use std::sync::{Mutex, OnceLock};
 
-thread_local! {
-    /// Session-scoped memo for [`find_package_root`] (PRP-066 / BO-D-1).
-    ///
-    /// Keyed by the directory that started the walk. Every intermediate directory
-    /// visited during a successful (or failed) walk is filled so later imports
-    /// from the same package pay O(1) instead of O(depth) `faber.toml` probes.
-    static PACKAGE_ROOT_CACHE: RefCell<FxHashMap<PathBuf, Option<PathBuf>>> =
-        RefCell::new(FxHashMap::default());
-}
+use crate::driver::Session;
 
 /// Process-wide memo for [`library_home`]'s production path (BO-D-1).
 ///
@@ -55,12 +46,6 @@ pub(crate) fn clear_provider_name_memo() {
     if let Ok(mut memo) = provider_name_memo().lock() {
         memo.clear();
     }
-}
-
-/// Clear the package-root memo (tests only).
-#[cfg(test)]
-pub(crate) fn clear_package_root_cache() {
-    PACKAGE_ROOT_CACHE.with(|cache| cache.borrow_mut().clear());
 }
 
 /// Environment variable for installed provider roots (`<home>/<provider>/…`).
@@ -182,13 +167,14 @@ impl fmt::Display for ImportResolveError {
 /// to missing infrastructure (library home not configured, template not found,
 /// provider directory missing) or when the target file does not exist.
 pub fn resolve_namespace_import(
+    session: &Session,
     from_file: &Path,
     import_path: &str,
     templates: Option<&BTreeMap<String, String>>,
 ) -> Result<PathBuf, ImportResolveError> {
     // §name/rest template resolution.
     if let Some(rest) = import_path.strip_prefix('§') {
-        return resolve_template_import(from_file, rest, templates).ok_or_else(|| ImportResolveError {
+        return resolve_template_import(session, from_file, rest, templates).ok_or_else(|| ImportResolveError {
             message: format!("template import '§{rest}' could not be resolved"),
             issue: "import_resolve_template_not_found",
         });
@@ -249,6 +235,7 @@ pub fn resolve_namespace_import(
 ///    directory containing `faber.toml`).
 /// 5. Call `resolve_fab_file` on the candidate.
 fn resolve_template_import(
+    session: &Session,
     from_file: &Path,
     spec: &str,
     templates: Option<&BTreeMap<String, String>>,
@@ -269,7 +256,7 @@ fn resolve_template_import(
     }
 
     let template_value = templates.get(name)?;
-    let package_root = find_package_root(from_file)?;
+    let package_root = find_package_root_with_session(session, from_file)?;
 
     let candidate = package_root.join(template_value).join(rest);
     resolve_fab_file(&candidate)
@@ -293,11 +280,15 @@ fn contains_path_traversal(path: &str) -> bool {
 /// not part of the supported set and fail closed). Returns the source root
 /// used and the resolved target file, so callers can re-derive the same
 /// resolution through the relative-import spelling.
-pub(crate) fn resolve_source_root_import(from_file: &Path, import_path: &str) -> Option<(PathBuf, PathBuf)> {
+pub(crate) fn resolve_source_root_import(
+    session: &Session,
+    from_file: &Path,
+    import_path: &str,
+) -> Option<(PathBuf, PathBuf)> {
     if contains_path_traversal(import_path) {
         return None;
     }
-    let package_root = find_package_root(from_file)?;
+    let package_root = find_package_root_with_session(session, from_file)?;
     let manifest = std::fs::read_to_string(package_root.join("faber.toml")).ok()?;
     let base = match parse_paths_config(&manifest).source.as_deref() {
         None | Some("src") => package_root.join("src"),
@@ -310,18 +301,21 @@ pub(crate) fn resolve_source_root_import(from_file: &Path, import_path: &str) ->
 
 /// Walk up from `from_file.parent()` until a `faber.toml` is found.
 ///
-/// Results are memoized for the thread (compile session). First resolution for
-/// a directory pays the ancestor walk; later calls from the same package return
-/// the cached root without additional filesystem probes.
+/// Results are memoized on the driver-run [`Session`] (ARCH-U3 / S01-9): first
+/// resolution for a directory pays the ancestor walk; later calls from the
+/// same package return the cached root without additional filesystem probes.
 /// Same-package when both files resolve to the same `faber.toml` root.
 ///
 /// Program/discovery helper. Module analysis must not call this; it consumes
 /// caller-supplied [`crate::semantic::PassConfig::namespace_seams`] only.
 #[must_use]
-pub(crate) fn same_package(from_file: &Path, target_file: &Path) -> bool {
+pub(crate) fn same_package(session: &Session, from_file: &Path, target_file: &Path) -> bool {
     let from = absolute_path(from_file);
     let target = absolute_path(target_file);
-    match (find_package_root(&from), find_package_root(&target)) {
+    match (
+        find_package_root_with_session(session, &from),
+        find_package_root_with_session(session, &target),
+    ) {
         (Some(from_root), Some(target_root)) => from_root == target_root,
         _ => false,
     }
@@ -335,34 +329,67 @@ fn absolute_path(path: &Path) -> PathBuf {
     }
 }
 
+/// Walk up from `from_file.parent()` until a `faber.toml` is found (PRP-066 /
+/// BO-D-1).
+///
+/// Session-less discovery form: performs the ancestor walk without a memo,
+/// because the caller has no driver run to trust (package-graph discovery,
+/// product harnesses). Compile-path callers — which own a [`Session`] — use
+/// the memoized [`find_package_root_with_session`] so one driver run pays the
+/// walk once per directory.
 #[must_use]
 pub fn find_package_root(from_file: &Path) -> Option<PathBuf> {
     let start = from_file.parent()?.to_path_buf();
-    PACKAGE_ROOT_CACHE.with(|cache| {
-        let mut cache = cache.borrow_mut();
-        if let Some(hit) = cache.get(&start) {
-            return hit.clone();
-        }
+    walk_up_to_manifest(&start)
+}
 
-        let mut walked = Vec::new();
-        let mut candidate = start;
-        let result = loop {
-            if let Some(hit) = cache.get(&candidate) {
-                break hit.clone();
-            }
-            walked.push(candidate.clone());
-            if candidate.join("faber.toml").is_file() {
-                break Some(candidate);
-            }
-            if !candidate.pop() {
-                break None;
-            }
-        };
-        for dir in walked {
-            cache.insert(dir, result.clone());
+/// Session-memoized form of [`find_package_root`] for the compile path
+/// (ARCH-U3 / S01-9).
+///
+/// Every intermediate directory visited during a successful (or failed) walk
+/// is filled into the session's package-root cell so later imports from the
+/// same package pay O(1) instead of O(depth) `faber.toml` probes, and the
+/// memo dies with the driver run that filled it.
+#[must_use]
+pub fn find_package_root_with_session(session: &Session, from_file: &Path) -> Option<PathBuf> {
+    let start = from_file.parent()?.to_path_buf();
+    let mut cache = session.memos.package_roots.borrow_mut();
+    if let Some(hit) = cache.get(&start) {
+        return hit.clone();
+    }
+
+    let mut walked = Vec::new();
+    let mut candidate = start;
+    let result = loop {
+        if let Some(hit) = cache.get(&candidate) {
+            break hit.clone();
         }
-        result
-    })
+        walked.push(candidate.clone());
+        if candidate.join("faber.toml").is_file() {
+            break Some(candidate);
+        }
+        if !candidate.pop() {
+            break None;
+        }
+    };
+    for dir in walked {
+        cache.insert(dir, result.clone());
+    }
+    result
+}
+
+/// One ancestor walk to the nearest `faber.toml`, shared by both
+/// [`find_package_root`] entry forms.
+fn walk_up_to_manifest(start: &Path) -> Option<PathBuf> {
+    let mut candidate = start.to_path_buf();
+    loop {
+        if candidate.join("faber.toml").is_file() {
+            return Some(candidate);
+        }
+        if !candidate.pop() {
+            return None;
+        }
+    }
 }
 
 fn is_valid_provider_segment(provider: &str) -> bool {

@@ -25,7 +25,10 @@
 use crate::codegen::{OutputMode, Target};
 use crate::diagnostics::Severity;
 use crate::locale::LocalePack;
+use rustc_hash::FxHashMap;
+use std::cell::RefCell;
 use std::path::PathBuf;
+use std::rc::Rc;
 
 /// Policy for promoting warning diagnostics to errors at the compilation boundary.
 ///
@@ -288,22 +291,79 @@ fn discover_dev_locale_root() -> Option<PathBuf> {
     candidate.is_dir().then_some(candidate)
 }
 
+/// Driver-run-scoped parse-once memo for import targets.
+///
+/// Keyed by `(reader-pack id, target path)`. Each unique import target is
+/// read+parsed at most once per driver run; later imports of the same physical
+/// file return the cached exports and [`FileInterface`](crate::file_interface::FileInterface).
+pub(crate) type ImportTargetMemo = crate::program::compile::ImportTargetCache;
+
+/// Driver-run-scoped memo for package-root walks.
+///
+/// Keyed by the directory that started the walk. Every intermediate directory
+/// visited during a successful (or failed) walk is filled so later imports
+/// from the same package pay O(1) instead of O(depth) `faber.toml` probes.
+pub(crate) type PackageRootMemo = FxHashMap<PathBuf, Option<PathBuf>>;
+
+/// Shared interior-mutable memo cells for one driver run (ARCH-1 Ruling 1,
+/// tier 1; ARCH-U3 / S01-9).
+///
+/// One [`Session`] = one driver run. Sites that mint per-module `Session`
+/// values (a file-scoped locale pack, a provider analysis config) clone the
+/// `Rc` handles through [`Session::re_wrap`], so every re-wrap shares memo
+/// identity and cross-module parse-once behavior survives a re-wrap instead of
+/// being silently lost per module. Dropping the last handle is the
+/// invalidation: nothing outlives the driver run that filled it.
+///
+/// `RefCell` keeps the current single-threaded compile contract explicit at
+/// the carrier — `Session` stays `!Sync`, so the compiler cannot accidentally
+/// share it across threads. A future parallel-compile admission is field-local
+/// (`RefCell` → `Mutex` on the named cells), not carrier surgery.
+#[derive(Clone, Default)]
+pub struct SessionMemos {
+    /// Import-target parse-once memo (absorbs the retired
+    /// `IMPORT_TARGET_CACHE` thread-local of `program/compile.rs`).
+    pub(crate) import_targets: Rc<RefCell<ImportTargetMemo>>,
+    /// Package-root walk memo (absorbs the retired `PACKAGE_ROOT_CACHE`
+    /// thread-local of `import_resolve.rs`).
+    pub(crate) package_roots: Rc<RefCell<PackageRootMemo>>,
+}
+
 /// Per-compilation driver state.
 ///
-/// The session currently wraps immutable config only. It exists as a deliberate
-/// extension point so future cached or incremental state can travel with the
-/// same driver API instead of widening phase signatures.
+/// The session pairs immutable [`Config`] policy with the driver-run-scoped
+/// [`SessionMemos`] cells: config travels by value across re-wraps, memos
+/// travel by shared identity, so every `Session` value minted for one driver
+/// run — the root session, per-module re-wraps, provider re-wraps — parses
+/// each import target and walks each package root at most once.
 pub struct Session {
     /// Configuration shared by all phases of this compilation.
     pub config: Config,
+    /// Driver-run-scoped memo cells shared across re-wraps.
+    pub(crate) memos: SessionMemos,
 }
 
 impl Session {
     /// Create a session from caller-supplied configuration.
+    ///
+    /// Mints fresh memo cells: a new session is a new driver run. Use
+    /// [`Session::re_wrap`] to mint the next per-module session value for the
+    /// same run.
     #[must_use]
     // public constructor: moves config into session
     pub fn new(config: Config) -> Self {
-        Self { config }
+        Self { config, memos: SessionMemos::default() }
+    }
+
+    /// Mint the next per-module session value for the same driver run.
+    ///
+    /// The returned `Session` owns `config` (a file-scoped locale pack, a
+    /// provider analysis contract) but shares memo identity with `self`, so
+    /// import-target and package-root lookups issued through the re-wrap hit
+    /// the same parse-once cells the rest of the run fills.
+    #[must_use]
+    pub fn re_wrap(&self, config: Config) -> Self {
+        Self { config, memos: self.memos.clone() }
     }
 }
 

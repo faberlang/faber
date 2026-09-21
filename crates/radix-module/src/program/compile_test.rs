@@ -1,6 +1,5 @@
 //! Provider-import contract tests (Triga SEM002 residual).
 
-use super::clear_import_target_cache;
 use super::import_contract_for_file;
 use super::package_identity_facts_for_path;
 use crate::driver::AnalyzeRequest;
@@ -48,7 +47,6 @@ impl Drop for LibraryHomeGuard {
 
 #[test]
 fn emit_route_imported_generic_call_size_inference() {
-    clear_import_target_cache();
     let (_td, home) = temp_dir("gmt-emit-inference");
     let provider = home.join("probevectors");
     fs::create_dir_all(provider.join("src")).expect("provider src");
@@ -278,7 +276,12 @@ targets = ["rust"]
     .expect("source");
 
     let _guard = LibraryHomeGuard::set(&home);
-    let resolved = resolve_namespace_import(PathBuf::from("/tmp/app.fab").as_path(), "triga:triga", None);
+    let resolved = resolve_namespace_import(
+        &crate::driver::Session::new(crate::driver::Config::default()),
+        PathBuf::from("/tmp/app.fab").as_path(),
+        "triga:triga",
+        None,
+    );
     let path = resolved.expect("triga:triga should resolve");
     assert!(path.ends_with("triga/src/triga.fab"), "got {}", path.display());
 }
@@ -2130,36 +2133,57 @@ fn import_contract_for_nonexistent_file_returns_empty() {
 }
 
 #[test]
-fn import_contract_session_cache_dedups_across_calls() {
-    // BO-D-2 U2: the session-scoped import-target cache must survive across
-    // `import_contract_for_file` calls. Deleting the target between the two
-    // calls proves the second contract was served from the session cache:
-    // the import binding survives without the target file on disk.
-    clear_import_target_cache();
-    let (_td, home) = temp_dir("session-cache");
+fn session_memos_parse_once_across_modules_one_driver_run() {
+    // ARCH-U3 / S01-9 done_when (ii): two modules importing the same target
+    // parse it once through one driver run. The run is one `Session` whose
+    // per-module re-wraps share memo identity; deleting the target after the
+    // first module's contract proves the second module was served from the
+    // shared memo — no re-read, no re-parse — rather than re-resolving a file
+    // that no longer exists.
+    let (_td, home) = temp_dir("session-memos-parse-once");
     fs::write(home.join("util.fab"), "functio salve() → textus { redde \"salve\" }\n").expect("write util");
-    let app_file = home.join("app.fab");
-    fs::write(
-        &app_file,
-        r#"
+    let app_a = home.join("app_a.fab");
+    let app_b = home.join("app_b.fab");
+    for app in [&app_a, &app_b] {
+        fs::write(
+            app,
+            r#"
 importa ex "./util" util
 incipit {}
 "#,
-    )
-    .expect("write app");
-    let source = fs::read_to_string(&app_file).expect("read app");
+        )
+        .expect("write app");
+    }
+    let source_a = fs::read_to_string(&app_a).expect("read app a");
+    let source_b = fs::read_to_string(&app_b).expect("read app b");
 
-    let contract_a = import_contract_for_file(&app_file, &source, None, None);
+    let session = crate::driver::Session::new(crate::driver::Config::default());
+    let prepared_a =
+        crate::program::compile::prepare_program_module(&app_a, &source_a, &session).expect("prepare first module");
+    // The second module enters through a re-wrap of the same run — the shape
+    // the package driver uses per file — so the pin also proves re-wraps keep
+    // memo identity instead of minting a fresh parse-once scope.
+    let module_session = session.re_wrap(session.config.clone());
     fs::remove_file(home.join("util.fab")).expect("delete target");
-    let contract_b = import_contract_for_file(&app_file, &source, None, None);
+    let prepared_b = crate::program::compile::prepare_program_module(&app_b, &source_b, &module_session)
+        .expect("prepare second module from the shared memo");
 
+    let binding_a = prepared_a
+        .contract
+        .namespace_exports
+        .keys()
+        .find(|binding| binding.as_str() == "util")
+        .cloned();
+    let binding_b = prepared_b
+        .contract
+        .namespace_exports
+        .keys()
+        .find(|binding| binding.as_str() == "util")
+        .cloned();
+    assert_eq!(binding_a.as_deref(), Some("util"), "first module installs the target");
     assert_eq!(
-        contract_a, contract_b,
-        "contract must survive target deletion via the session cache"
-    );
-    assert!(
-        contract_b.namespace_exports.contains_key("util"),
-        "second call must serve the import binding from the session cache"
+        binding_b, binding_a,
+        "second module must serve the import binding through the shared session memo"
     );
 }
 
@@ -2169,7 +2193,6 @@ incipit {}
 /// them, so importers typecheck `module.nunc()` against `instans<ns>`.
 #[test]
 fn import_contract_preserves_sized_and_bare_instans_exports() {
-    clear_import_target_cache();
     let (_td, home) = temp_dir("instans-contract");
     let provider = home.join("probe");
     fs::create_dir_all(provider.join("src")).expect("provider src");
@@ -2334,7 +2357,12 @@ fn resolve_provider_segment_via_manifest_provider_name() {
     fs::write(provider.join("src/dom.fab"), LA_DOM_SOURCE).expect("source");
 
     let _guard = LibraryHomeGuard::set(&home);
-    let resolved = resolve_namespace_import(PathBuf::from("/tmp/app.fab").as_path(), "web:dom", None);
+    let resolved = resolve_namespace_import(
+        &crate::driver::Session::new(crate::driver::Config::default()),
+        PathBuf::from("/tmp/app.fab").as_path(),
+        "web:dom",
+        None,
+    );
     let path = resolved.expect("web:dom should resolve via the manifest provider name");
     assert!(path.ends_with("faber-web/src/dom.fab"), "got {}", path.display());
 }
@@ -3572,7 +3600,6 @@ import from "./kernels" k
 /// ignotum route.
 #[test]
 fn import_contract_failcloses_on_unparsable_library() {
-    clear_import_target_cache();
     let (_td, home) = temp_dir("import-site-failure");
     let provider = home.join("probe");
     fs::create_dir_all(provider.join("src")).expect("provider src");
@@ -3636,7 +3663,6 @@ targets = ["rust"]
 /// surfaceless — the 11 bare-driver/kernel-manifest regressions must hold.
 #[test]
 fn import_site_gate_ignores_surfaceless_namespaces() {
-    clear_import_target_cache();
     let (_td, home) = temp_dir("import-site-surfaceless");
     let app = home.join("app.fab");
     fs::write(&app, "importa ex \"faber:processus\" processus\n").expect("app");
@@ -3658,7 +3684,6 @@ fn import_site_gate_ignores_surfaceless_namespaces() {
 /// channel (advisory D3 — no interface-type change).
 #[test]
 fn prepare_program_module_fails_closed_on_unparsable_library() {
-    clear_import_target_cache();
     let (_td, home) = temp_dir("import-site-prepare");
     fs::write(home.join("math.fab"), "functio addere(f32 a, f32 b) → f32 {\n    redde a + b\n").expect("broken lib");
     let app = home.join("app.fab");

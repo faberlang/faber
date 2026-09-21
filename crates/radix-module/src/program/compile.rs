@@ -20,7 +20,6 @@ use crate::syntax::{
     ImportKind, Literal, Program, Stmt, StmtKind, TypeExpr, TypeExprKind,
 };
 use rustc_hash::FxHashMap;
-use std::cell::RefCell;
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
 
@@ -28,7 +27,7 @@ use std::path::{Path, PathBuf};
 /// surface, full declaration tiers (including module-private), interface, and
 /// the resolved target path.
 #[derive(Clone)]
-struct CachedImportTarget {
+pub(crate) struct CachedImportTarget {
     exports: BTreeMap<String, VisibilityTier>,
     declarations: BTreeMap<String, VisibilityTier>,
     interface: FileInterface,
@@ -44,11 +43,11 @@ struct CachedImportTarget {
 /// `Parsed` serves the cached surface. `Unparsable` records a target that
 /// resolved and read but produced no parseable program: the failure is
 /// memoized with the surface so a repeated import of the same physical file
-/// reports the same named import-site failure once per session instead of
-/// silently matching no namespace (advisory D5 — the thread-local memo both
+/// reports the same named import-site failure once per driver run instead of
+/// silently matching no namespace (advisory D5 — the session memo both
 /// scopes and deduplicates the failure).
 #[derive(Clone)]
-enum CachedImportTargetEntry {
+pub(crate) enum CachedImportTargetEntry {
     Parsed(CachedImportTarget),
     Unparsable(PathBuf),
 }
@@ -65,24 +64,9 @@ enum ImportTargetLookup {
     Unresolved,
 }
 
-type ImportTargetCache = FxHashMap<(Option<String>, PathBuf), CachedImportTargetEntry>;
-
-thread_local! {
-    /// Session-scoped memo for import-target exports and interfaces.
-    ///
-    /// Keyed by `(reader-pack id, target path)`. Each unique import target is
-    /// read+parsed at most once per process session; later imports of the same
-    /// physical file return the cached exports and [`FileInterface`].
-    /// Mirrors `PACKAGE_ROOT_CACHE` in `import_resolve.rs`.
-    static IMPORT_TARGET_CACHE: RefCell<ImportTargetCache> =
-        RefCell::new(FxHashMap::default());
-}
-
-/// Clear the import-target memo (tests only).
-#[cfg(test)]
-pub(crate) fn clear_import_target_cache() {
-    IMPORT_TARGET_CACHE.with(|cache| cache.borrow_mut().clear());
-}
+/// Map type of the driver-run-scoped import-target memo cell carried by
+/// [`SessionMemos`](crate::driver::SessionMemos) (ARCH-U3 / S01-9).
+pub(crate) type ImportTargetCache = FxHashMap<(Option<String>, PathBuf), CachedImportTargetEntry>;
 
 /// True when the file interface exports at least one device-bearing
 /// function — the only imports whose interface the provider route carries
@@ -451,7 +435,7 @@ pub fn prepare_program_module(
     let import = parsed
         .as_ref()
         .map_or_else(ImportContract::default, |(program, interner)| {
-            import_contract_for_parsed_file(path, program, interner, pack.as_ref(), templates)
+            import_contract_for_parsed_file(session, path, program, interner, pack.as_ref(), templates)
         });
     if let Some(pack) = pack.as_mut() {
         crate::locale::merge_library_locale_packs(pack, &import.library_package_roots).map_err(|err| {
@@ -479,10 +463,14 @@ pub fn prepare_program_module(
         config = config.with_resolved_locale_pack(pack.clone());
     }
     Ok(PreparedProgramModule {
-        session: crate::driver::Session::new(config),
+        // Per-module re-wrap of the caller's session (ARCH-U3): the prepared
+        // module's session carries the resolved pack config but shares memo
+        // identity with the driver run, so target parses performed during
+        // contract discovery serve the analysis that follows.
+        session: session.re_wrap(config),
         contract: import.into_module_contract(),
         package_identities: parsed.as_ref().and_then(|(program, interner)| {
-            package_identity_facts_for_parsed_file(path, program, interner, pack.as_ref(), templates)
+            package_identity_facts_for_parsed_file(session, path, program, interner, pack.as_ref(), templates)
                 .filter(|facts| !facts.imports.is_empty())
         }),
     })
@@ -502,7 +490,9 @@ pub fn prepare_program_module_for_name(
         prepare_program_module(path, source, session)
     } else {
         Ok(PreparedProgramModule {
-            session: crate::driver::Session::new(session.config.clone()),
+            // Re-wrap, not a fresh run: in-memory names keep the driver's
+            // memo identity even without a contract walk (ARCH-U3).
+            session: session.re_wrap(session.config.clone()),
             contract: crate::driver::ModuleImportContract::default(),
             package_identities: None,
         })
@@ -565,6 +555,7 @@ pub fn analyze_prepared_program_name(
 /// [`ImportTargetLookup::Unresolved`] — that is the surfaceless-by-design
 /// surface the fail-closed gate must not fire on.
 fn cached_import_target(
+    session: &crate::driver::Session,
     from_file: &Path,
     import_path: &str,
     pack_key: Option<&String>,
@@ -586,43 +577,50 @@ fn cached_import_target(
         };
         let candidate = parent.join(import_path);
         let probe_key = (pack_key.cloned(), candidate.with_extension("fab"));
-        if let Some(lookup) = serve(IMPORT_TARGET_CACHE.with(|cache| cache.borrow().get(&probe_key).cloned())) {
+        if let Some(lookup) = serve(
+            session
+                .memos
+                .import_targets
+                .borrow()
+                .get(&probe_key)
+                .cloned(),
+        ) {
             return lookup;
         }
     }
-    let Ok(target_path) = resolve_namespace_import(from_file, import_path, templates) else {
+    let Ok(target_path) = resolve_namespace_import(session, from_file, import_path, templates) else {
         return ImportTargetLookup::Unresolved;
     };
     let raw_key = (pack_key.cloned(), target_path.clone());
-    if let Some(lookup) = serve(IMPORT_TARGET_CACHE.with(|cache| cache.borrow().get(&raw_key).cloned())) {
+    if let Some(lookup) = serve(session.memos.import_targets.borrow().get(&raw_key).cloned()) {
         return lookup;
     }
     let canonical_key = std::fs::canonicalize(&target_path)
         .ok()
         .map(|canonical| (pack_key.cloned(), canonical));
     if let Some(key) = &canonical_key
-        && let Some(lookup) = serve(IMPORT_TARGET_CACHE.with(|cache| cache.borrow().get(key).cloned()))
+        && let Some(lookup) = serve(session.memos.import_targets.borrow().get(key).cloned())
     {
         return lookup;
     }
     let Ok(target_source) = std::fs::read_to_string(&target_path) else {
         return ImportTargetLookup::Unresolved;
     };
-    let target_pack = import_target_locale_pack(&target_path, &target_source, code_pack);
+    let target_pack = import_target_locale_pack(session, &target_path, &target_source, code_pack);
     let Some((target_program, target_interner)) =
         parse_program_for_namespace_exports(&target_path.display().to_string(), &target_source, target_pack.as_ref())
     else {
         // Fail-closed parse-failure propagation (KPC-WIRE, advisory D2): the
         // library has content but no parseable program. Memoize the failure
         // under both path keys so a repeated import reports once.
-        IMPORT_TARGET_CACHE.with(|cache| {
-            let mut cache = cache.borrow_mut();
+        {
+            let mut cache = session.memos.import_targets.borrow_mut();
             let entry = CachedImportTargetEntry::Unparsable(target_path.clone());
             cache.insert(raw_key, entry.clone());
             if let Some(key) = canonical_key {
                 cache.insert(key, entry);
             }
-        });
+        }
         return ImportTargetLookup::Unparsable(target_path);
     };
     let exports = sorted_export_surface(&target_program, &target_interner);
@@ -630,14 +628,14 @@ fn cached_import_target(
     let module_identity = import_target_identity(import_path, None);
     let interface = file_interface_for_program(&target_program, &target_interner, module_identity.as_ref());
     let cached = CachedImportTarget { exports, declarations, interface, target_path };
-    IMPORT_TARGET_CACHE.with(|cache| {
-        let mut cache = cache.borrow_mut();
+    {
+        let mut cache = session.memos.import_targets.borrow_mut();
         let entry = CachedImportTargetEntry::Parsed(cached.clone());
         cache.insert(raw_key, entry.clone());
         if let Some(key) = canonical_key {
             cache.insert(key, entry);
         }
-    });
+    }
     ImportTargetLookup::Parsed(cached)
 }
 
@@ -646,6 +644,21 @@ fn cached_import_target(
 /// Resolves relative paths, `norma:*`, and other `provider:module` imports via
 /// [`FABER_LIBRARY_HOME_ENV`].
 pub(crate) fn import_contract_for_file(
+    path: &Path,
+    source: &str,
+    code_pack: ReaderPackRef<'_>,
+    templates: Option<&BTreeMap<String, String>>,
+) -> ImportContract {
+    // Session-less entry (check path, tests): one call is its own driver run,
+    // so it mints a fresh session and its memo scope ends with the call. The
+    // compile path threads the driver's own session through
+    // `import_contract_for_parsed_file` instead.
+    let session = crate::driver::Session::new(crate::driver::Config::default());
+    import_contract_for_session(&session, path, source, code_pack, templates)
+}
+
+fn import_contract_for_session(
+    session: &crate::driver::Session,
     path: &Path,
     source: &str,
     code_pack: ReaderPackRef<'_>,
@@ -669,14 +682,16 @@ pub(crate) fn import_contract_for_file(
         // that report.
         return ImportContract::default();
     };
-    import_contract_for_parsed_file(path, &program, &interner, resolved_pack.as_ref(), templates)
+    import_contract_for_parsed_file(session, path, &program, &interner, resolved_pack.as_ref(), templates)
 }
 
 /// Build an import contract from a program that has already been parsed.
 ///
 /// Keeping the parsed program and interner together lets callers that need
-/// several program-layer facts share the same pre-parse.
+/// several program-layer facts share the same pre-parse. The session is the
+/// driver-run carrier: every target lookup in the walk shares its memo cells.
 pub(crate) fn import_contract_for_parsed_file(
+    session: &crate::driver::Session,
     path: &Path,
     program: &Program,
     interner: &crate::lexer::Interner,
@@ -699,7 +714,7 @@ pub(crate) fn import_contract_for_parsed_file(
         if !import_contract_path_allowed(import_path, templates) {
             continue;
         }
-        let target = cached_import_target(path, import_path, pack_key.as_ref(), resolved_pack, templates);
+        let target = cached_import_target(session, path, import_path, pack_key.as_ref(), resolved_pack, templates);
         let target = match target {
             ImportTargetLookup::Parsed(target) => target,
             ImportTargetLookup::Unparsable(target_path) => {
@@ -732,9 +747,9 @@ pub(crate) fn import_contract_for_parsed_file(
         let target_path = &target.target_path;
         contract
             .namespace_seams
-            .insert(binding.clone(), crate::import_resolve::same_package(path, target_path));
+            .insert(binding.clone(), crate::import_resolve::same_package(session, path, target_path));
         if import_path.contains(':')
-            && let Some(root) = crate::import_resolve::find_package_root(target_path)
+            && let Some(root) = crate::import_resolve::find_package_root_with_session(session, target_path)
         {
             contract.library_package_roots.insert(root);
         }
@@ -750,6 +765,7 @@ pub(crate) fn import_contract_for_parsed_file(
         // from their provider spelling.
         if import_path.starts_with("./") || import_path.contains(':') {
             collect_transitive_same_package_interfaces(
+                session,
                 &target.target_path,
                 target.interface.identity.as_ref(),
                 pack_key.as_ref(),
@@ -786,6 +802,7 @@ pub(crate) fn import_contract_for_parsed_file(
 /// canonical key or the consumer's identity lookup fails closed (WARN014
 /// export skip).
 fn collect_transitive_same_package_interfaces(
+    session: &crate::driver::Session,
     from_file: &Path,
     from_identity: Option<&InterfaceLibraryIdentity>,
     pack_key: Option<&String>,
@@ -796,7 +813,7 @@ fn collect_transitive_same_package_interfaces(
     let Ok(source) = std::fs::read_to_string(from_file) else {
         return;
     };
-    let pack = import_target_locale_pack(from_file, &source, None);
+    let pack = import_target_locale_pack(session, from_file, &source, None);
     let pack_ref = pack.as_ref();
     let Some((program, interner)) =
         parse_program_for_namespace_exports(&from_file.display().to_string(), &source, pack_ref)
@@ -832,7 +849,7 @@ fn collect_transitive_same_package_interfaces(
         // module that directly imports it reports the named import-site
         // failure through its own contract walk.
         let target = if is_relative {
-            match cached_import_target(from_file, import_path, pack_key, pack_ref, templates) {
+            match cached_import_target(session, from_file, import_path, pack_key, pack_ref, templates) {
                 ImportTargetLookup::Parsed(target) => Some(target),
                 ImportTargetLookup::Unparsable(_) | ImportTargetLookup::Unresolved => None,
             }
@@ -844,13 +861,22 @@ fn collect_transitive_same_package_interfaces(
             // anchors on a synthetic file whose parent is the source root —
             // only `.parent()` of the anchor is consulted. The edge identity
             // is re-keyed below from the importer's own identity either way.
-            crate::import_resolve::resolve_source_root_import(from_file, import_path).and_then(|(base, _resolved)| {
-                let anchor = base.join("anchor.fab");
-                match cached_import_target(&anchor, &format!("./{import_path}"), pack_key, pack_ref, templates) {
-                    ImportTargetLookup::Parsed(target) => Some(target),
-                    ImportTargetLookup::Unparsable(_) | ImportTargetLookup::Unresolved => None,
-                }
-            })
+            crate::import_resolve::resolve_source_root_import(session, from_file, import_path).and_then(
+                |(base, _resolved)| {
+                    let anchor = base.join("anchor.fab");
+                    match cached_import_target(
+                        session,
+                        &anchor,
+                        &format!("./{import_path}"),
+                        pack_key,
+                        pack_ref,
+                        templates,
+                    ) {
+                        ImportTargetLookup::Parsed(target) => Some(target),
+                        ImportTargetLookup::Unparsable(_) | ImportTargetLookup::Unresolved => None,
+                    }
+                },
+            )
         };
         let Some(target) = target else {
             continue;
@@ -865,6 +891,7 @@ fn collect_transitive_same_package_interfaces(
         let child_identity = interface.identity.clone();
         out.push((binding, interface));
         collect_transitive_same_package_interfaces(
+            session,
             &target.target_path,
             child_identity.as_ref(),
             pack_key,
@@ -930,19 +957,23 @@ pub fn explicit_locale_pack(locale: Option<&str>) -> Result<Option<crate::locale
 ///    `--locale` behavior).
 /// 4. `None` — the built-in Latin surface.
 pub(crate) fn import_target_locale_pack(
+    session: &crate::driver::Session,
     target_path: &Path,
     target_source: &str,
     reader_pack: ReaderPackRef<'_>,
 ) -> Option<crate::locale::LocalePack> {
     frontmatter_locale_pack_from_source(&target_path.display().to_string(), target_source)
-        .or_else(|| package_reader_locale_pack(target_path))
+        .or_else(|| package_reader_locale_pack(session, target_path))
         .or_else(|| reader_pack.cloned())
 }
 
 /// Resolve the `[reader] locale` reader pack declared by the package
 /// `faber.toml` containing `path`, when present.
-pub(crate) fn package_reader_locale_pack(path: &Path) -> Option<crate::locale::LocalePack> {
-    let package_root = crate::import_resolve::find_package_root(path)?;
+pub(crate) fn package_reader_locale_pack(
+    session: &crate::driver::Session,
+    path: &Path,
+) -> Option<crate::locale::LocalePack> {
+    let package_root = crate::import_resolve::find_package_root_with_session(session, path)?;
     let manifest_path = package_root.join("faber.toml");
     let manifest = std::fs::read_to_string(manifest_path).ok()?;
     let locale_id = parse_reader_locale_from_toml(&manifest)?;
@@ -996,9 +1027,14 @@ pub fn package_identity_facts_for_path(
     path: &Path,
     config: &crate::driver::Config,
 ) -> Option<crate::driver::PackageImportIdentities> {
+    // Session-less entry (exempla harness, tests): one call is its own driver
+    // run, so it mints a fresh session for the memo scope. The compile path
+    // threads the driver's own session through
+    // `package_identity_facts_for_parsed_file` instead.
+    let session = crate::driver::Session::new(config.clone());
     let source = std::fs::read_to_string(path).ok()?;
     let code_pack = package_effective_reader_pack(path, &source, config);
-    package_identity_facts_for_file(path, &source, code_pack.as_ref(), None)
+    package_identity_facts_for_file(&session, path, &source, code_pack.as_ref(), None)
 }
 
 fn package_effective_reader_pack(
@@ -1020,6 +1056,7 @@ fn package_effective_reader_pack(
 /// provider-module imports are library identities, not user-code cross-module
 /// calls.
 fn package_identity_facts_for_file(
+    session: &crate::driver::Session,
     path: &Path,
     source: &str,
     code_pack: ReaderPackRef<'_>,
@@ -1027,10 +1064,11 @@ fn package_identity_facts_for_file(
 ) -> Option<crate::driver::PackageImportIdentities> {
     let path = absolute_cli_path(path);
     let (program, interner) = parse_program_for_namespace_exports(&path.display().to_string(), source, code_pack)?;
-    package_identity_facts_for_parsed_file(&path, &program, &interner, code_pack, templates)
+    package_identity_facts_for_parsed_file(session, &path, &program, &interner, code_pack, templates)
 }
 
 fn package_identity_facts_for_parsed_file(
+    session: &crate::driver::Session,
     path: &Path,
     program: &Program,
     interner: &crate::lexer::Interner,
@@ -1038,7 +1076,7 @@ fn package_identity_facts_for_parsed_file(
     templates: Option<&BTreeMap<String, String>>,
 ) -> Option<crate::driver::PackageImportIdentities> {
     let path = absolute_cli_path(path);
-    let package_root = match crate::import_resolve::find_package_root(&path) {
+    let package_root = match crate::import_resolve::find_package_root_with_session(session, &path) {
         Some(root) => root,
         None => path.parent()?.to_path_buf(),
     };
@@ -1062,7 +1100,7 @@ fn package_identity_facts_for_parsed_file(
         if !import_contract_path_allowed(import_path, templates) {
             continue;
         }
-        let Ok(target) = crate::import_resolve::resolve_namespace_import(&path, import_path, templates) else {
+        let Ok(target) = crate::import_resolve::resolve_namespace_import(session, &path, import_path, templates) else {
             continue;
         };
         // DFV2-3: record the target's device-bearing interface for this
@@ -1075,7 +1113,7 @@ fn package_identity_facts_for_parsed_file(
         // failed closed with the named import-site diagnostic.
         let pack_key = code_pack.map(|pack| pack.metadata.id.clone());
         if let ImportTargetLookup::Parsed(linked) =
-            cached_import_target(&path, import_path, pack_key.as_ref(), code_pack, templates)
+            cached_import_target(session, &path, import_path, pack_key.as_ref(), code_pack, templates)
         {
             if interface_bears_device(&linked.interface) {
                 device_interfaces.insert(binding.clone(), linked.interface.clone());
