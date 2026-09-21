@@ -470,7 +470,7 @@ fn generate_swift_from_analyzed(
 
 #[cfg(feature = "hir-python")]
 fn generate_python_from_analyzed(analysis: &crate::driver::AnalyzedModule) -> Result<crate::Output, CodegenError> {
-    let mut r#gen = python::PythonCodegen::new(&analysis.hir, &analysis.interner);
+    let mut r#gen = python::PythonCodegen::new(&analysis.hir, &analysis.types, &analysis.interner);
     r#gen.set_failable_facts(&python_failable_facts(&analysis.function_facts));
     let output = r#gen.generate(&analysis.hir, &analysis.types, &analysis.interner)?;
     Ok(crate::Output::Python(crate::PythonOutput { code: output.code }))
