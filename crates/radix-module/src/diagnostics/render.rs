@@ -17,6 +17,10 @@
 //! - Severity controls both ariadne report kind and label color.
 //! - Embedded source text is wrapped in bidi isolation at deterministic text
 //!   rendering boundaries; compiler spans and lexing stay in logical order.
+//! - Source-derived snippet text has C0/C1/DEL and bidi controls escaped as
+//!   `U+XXXX` before terminal output; ariadne reads raw source (spans stay
+//!   byte-exact) and its rendered output is sanitized after the fact, with
+//!   the renderer's own SGR color sequences preserved.
 
 use super::{Diagnostic, DiagnosticPhase, Severity};
 use crate::locale::{DiagnosticTemplateRenderError, LocalePack};
@@ -63,6 +67,20 @@ fn render_one(
     sources: &[(String, String)],
     pack: Option<&LocalePack>,
 ) -> Result<(), DiagnosticTemplateRenderError> {
+    let rendered = render_one_text(diag, sources, pack)?;
+    eprint!("{rendered}");
+    Ok(())
+}
+
+/// Render one diagnostic through ariadne to sanitized text (the eprint payload).
+///
+/// The report reads the raw source so span offsets stay byte-exact; the
+/// control-character policy applies to what ariadne rendered, after the fact.
+fn render_one_text(
+    diag: &Diagnostic,
+    sources: &[(String, String)],
+    pack: Option<&LocalePack>,
+) -> Result<String, DiagnosticTemplateRenderError> {
     let text = diagnostic_display_text(diag, pack)?;
     let label = diag.display_label();
     let safe_text = SanitizedDiagnosticText::from_display_text(text.as_ref());
@@ -93,11 +111,12 @@ fn render_one(
         builder = builder.with_help(help);
     }
 
+    let mut rendered = Vec::new();
     builder
         .finish()
-        .eprint((&diag.file, Source::from(source)))
+        .write((&diag.file, Source::from(source)), &mut rendered)
         .ok();
-    Ok(())
+    Ok(sanitize_rendered_output(&String::from_utf8_lossy(&rendered)))
 }
 
 /// Render one diagnostic as deterministic plain text without terminal colors.
@@ -133,7 +152,7 @@ fn render_plain_text(diag: &Diagnostic, pack: Option<&LocalePack>) -> Result<Str
     let mut output = plain_header(severity, label.as_deref(), &location, safe_text.message());
 
     if let Some(line) = &diag.source_line {
-        write!(output, "\n  | {}", bidi_isolate_code(line)).ok();
+        write!(output, "\n  | {}", bidi_isolate_code(&sanitize_snippet_text(line))).ok();
     }
 
     if let Some(help) = safe_text.help() {
@@ -186,7 +205,7 @@ fn render_expanded_text(diag: &Diagnostic, pack: Option<&LocalePack>) -> Result<
     let mut output = expanded_header(severity, &label, diag.phase, file, &span, safe_text.message());
 
     if let Some(line) = &diag.source_line {
-        write!(output, "\nsource: {}", bidi_isolate_code(line)).ok();
+        write!(output, "\nsource: {}", bidi_isolate_code(&sanitize_snippet_text(line))).ok();
     }
 
     if let Some(help) = safe_text.help() {
@@ -339,6 +358,69 @@ fn expanded_header(
 
 fn bidi_isolate_code(text: &str) -> String {
     format!("{FIRST_STRONG_ISOLATE}{text}{POP_DIRECTIONAL_ISOLATE}")
+}
+
+/// Longest SGR parameter run the rendered-output sanitizer passes intact.
+const MAX_SGR_PARAMS: usize = 32;
+
+/// Escape C0/C1/DEL and bidi controls in source-derived snippet text as
+/// `U+XXXX` (the `diagnostic_char` shape) before terminal output.
+fn sanitize_snippet_text(text: &str) -> String {
+    let mut out = String::with_capacity(text.len());
+    for ch in text.chars() {
+        if ch.is_control() || is_bidi_control(ch) {
+            write!(out, "U+{:04X}", ch as u32).ok();
+        } else {
+            out.push(ch);
+        }
+    }
+    out
+}
+
+/// Escape C0/C1/DEL and bidi controls in ariadne's rendered report while
+/// passing the renderer's own SGR color sequences and layout newlines through
+/// intact; every other escape use (OSC, cursor movement, device queries)
+/// loses its ESC.
+fn sanitize_rendered_output(text: &str) -> String {
+    let mut out = String::with_capacity(text.len());
+    let mut rest = text;
+    while let Some(ch) = rest.chars().next() {
+        let sgr_len = if ch == '\u{1B}' { sgr_sequence_len(rest) } else { 0 };
+        if sgr_len > 0 {
+            out.push_str(&rest[..sgr_len]);
+            rest = &rest[sgr_len..];
+            continue;
+        }
+        if ch != '\n' && (ch.is_control() || is_bidi_control(ch)) {
+            write!(out, "U+{:04X}", ch as u32).ok();
+        } else {
+            out.push(ch);
+        }
+        rest = &rest[ch.len_utf8()..];
+    }
+    out
+}
+
+/// Length of a well-formed SGR sequence (`ESC [ <digits/;> m`) at the start of
+/// `text`, or 0 when the ESC begins anything else or the run is unterminated.
+fn sgr_sequence_len(text: &str) -> usize {
+    let bytes = text.as_bytes();
+    if bytes.first() != Some(&0x1B) || bytes.get(1) != Some(&b'[') {
+        return 0;
+    }
+    let mut params = 0;
+    let mut i = 2;
+    while i < bytes.len() {
+        match bytes[i] {
+            b'0'..=b'9' | b';' => {
+                params += 1;
+                i += 1;
+            }
+            b'm' => return if params <= MAX_SGR_PARAMS { i + 1 } else { 0 },
+            _ => return 0,
+        }
+    }
+    0
 }
 
 fn sanitize_diagnostic_text(text: &str) -> String {

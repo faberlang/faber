@@ -653,6 +653,15 @@ pub fn parse_arg_value(args: &[DiagnosticArg], name: &str) -> Option<String> {
         .map(|arg| arg.value.clone())
 }
 
+/// Longest line [`get_line_at_offset`] returns, in characters.
+///
+/// A hostile single-line input (multi-megabyte, newline-free) must not drive
+/// renderer output volume; longer lines clip to this head plus an ellipsis
+/// marker. Documented SEC-A1 default — Mind may pin an exact value later.
+pub const MAX_SOURCE_LINE_CHARS: usize = 400;
+
+const SOURCE_LINE_ELLIPSIS: &str = "…";
+
 #[must_use]
 pub fn get_line_at_offset(source: &str, offset: usize) -> String {
     let offset = nearest_char_boundary(source, offset);
@@ -660,7 +669,11 @@ pub fn get_line_at_offset(source: &str, offset: usize) -> String {
     let end = source[offset..]
         .find('\n')
         .map_or(source.len(), |i| offset + i);
-    source[start..end].to_owned()
+    let line = &source[start..end];
+    match line.char_indices().nth(MAX_SOURCE_LINE_CHARS) {
+        Some((cut, _)) => format!("{}{SOURCE_LINE_ELLIPSIS}", &line[..cut]),
+        None => line.to_owned(),
+    }
 }
 
 /// One-based physical line for a byte offset, clamped to the real source length.
