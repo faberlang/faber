@@ -114,8 +114,7 @@ tar -xzf <archive>.tar.gz
 ./bin/faber --version
 ```
 
-Published targets: `aarch64-apple-darwin`, `x86_64-unknown-linux-gnu`, each
-with a `.sha256` checksum.
+Pick the archive and `.sha256` checksum for your platform from that page.
 
 Each archive ships a `bin/` and a `share/` tree — keep them together so the
 reader packs resolve beside the binary. Package acquisition is owned by
