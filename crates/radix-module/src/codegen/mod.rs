@@ -319,9 +319,9 @@ pub fn generate_from_analyzed_with_options(
                 let ts_surface = ts::TsKeywordSurfaceBridge(*surface);
                 let r#gen = if output_mode == OutputMode::Library {
                     let namespace = module_interner.intern(module_name.unwrap_or("FaberModule"));
-                    ts::TsCodegen::new_module(&analysis.hir, &module_interner, namespace)
+                    ts::TsCodegen::new_module(&analysis.hir, &analysis.types, &module_interner, namespace)
                 } else {
-                    ts::TsCodegen::new(&analysis.hir, &module_interner)
+                    ts::TsCodegen::new(&analysis.hir, &analysis.types, &module_interner)
                 };
                 let mut r#gen = r#gen;
                 r#gen.set_failable_facts(&ts_failable_facts(&analysis.function_facts));
@@ -750,7 +750,7 @@ fn generate_ts_with_facts(
     interner: &Interner,
     facts: &crate::semantic::FunctionFactTable,
 ) -> Result<crate::Output, CodegenError> {
-    let mut r#gen = ts::TsCodegen::new(hir, interner);
+    let mut r#gen = ts::TsCodegen::new(hir, types, interner);
     r#gen.set_failable_facts(&ts_failable_facts(facts));
     let output = r#gen.generate(hir, types, interner)?;
     Ok(crate::Output::TypeScript(crate::TypeScriptOutput { code: output.code }))
