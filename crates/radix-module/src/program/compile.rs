@@ -1254,10 +1254,9 @@ fn package_identity_facts_for_parsed_file(
         let pack_key = code_pack.map(|pack| pack.metadata.id.clone());
         if let ImportTargetLookup::Parsed(linked) =
             cached_import_target(session, &path, import_path, pack_key.as_ref(), code_pack, templates)
+            && interface_bears_device(&linked.interface)
         {
-            if interface_bears_device(&linked.interface) {
-                device_interfaces.insert(binding.clone(), linked.interface.clone());
-            }
+            device_interfaces.insert(binding.clone(), linked.interface.clone());
         }
         imports.insert(binding.clone(), module_segments_relative_to(&package_root, &target));
     }
