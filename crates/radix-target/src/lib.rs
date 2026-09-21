@@ -172,7 +172,13 @@ impl Target {
             Target::MirWasm => Some("mir-wasm"),
             Target::MirWgsl => Some("mir-wgsl"),
             Target::MirLlvm | Target::MirLlvmHost => Some("mir-llvm"),
-            _ => None,
+            // Ungated variants, named (no `_`) so a future variant without
+            // arms here is a compile error, never a silent `None`.
+            Target::MirStepper => None,
+            Target::MirScena => None,
+            Target::MirFmir => None,
+            Target::MirFmirBinary => None,
+            Target::MirFmirBundle => None,
         }
     }
 
@@ -197,7 +203,13 @@ impl Target {
             Target::MirWasm => cfg!(feature = "mir-wasm"),
             Target::MirWgsl => cfg!(feature = "mir-wgsl"),
             Target::MirLlvm | Target::MirLlvmHost => cfg!(feature = "mir-llvm"),
-            _ => true,
+            // Ungated variants, named (no `_`) so a future variant without
+            // arms here is a compile error, never a silent `true`.
+            Target::MirStepper => true,
+            Target::MirScena => true,
+            Target::MirFmir => true,
+            Target::MirFmirBinary => true,
+            Target::MirFmirBundle => true,
         }
     }
 }
