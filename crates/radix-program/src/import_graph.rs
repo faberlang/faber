@@ -12,6 +12,7 @@ use std::path::{Path, PathBuf};
 use crate::discovery::PackageSpec;
 use crate::library::{LibraryResolveError, LibraryResolver, ResolvedLibraryModule};
 use crate::{LibraryImportBinding, PackageFile};
+use radix_module::contains_path_traversal;
 use radix_module::diagnostics::Diagnostic;
 use radix_module::lexer::{Interner, Span, TokenKind};
 use radix_module::syntax::{AnnotationKind, ImportDecl, ImportKind, StmtKind};
@@ -582,6 +583,11 @@ fn resolve_template_import(spec: &PackageSpec, import_path: &str) -> Option<Path
         None => (after, ""),
     };
     if name.is_empty() {
+        return None;
+    }
+    // The template base escapes the package root by design; only the rest
+    // segment is traversal-guarded (F-046 parity with the CLI resolver).
+    if contains_path_traversal(rest) {
         return None;
     }
     let base = spec.templates.get(name)?;
