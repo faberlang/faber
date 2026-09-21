@@ -1408,6 +1408,8 @@ Retired predicate keywords are not prefix unary syntax. Use `expr เป็น �
 `expr เป็น เท็จ`, `expr เป็น ว่าง`, `expr ไม่ เป็น ว่าง`, `expr ≺ 0`, or
 `expr ≻ 0`.
 
+The legacy ASCII spellings `<` and `>` are not productions of this grammar — both remain generic delimiters — though the shipped parser still accepts them as comparisons during the glyph migration; prefer the canonical `≺` and `≻`.
+
 **Static type ascription (`∷` / verte):**
 
 The `∷` glyph (U+2237, "proportion") explicitly ascribes a target type to an expression. Use it when the source expression already exists and the compiler needs a static target shape:
