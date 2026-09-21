@@ -7,7 +7,7 @@
 //! graphics stages) and host callers of fragments. Errors are call-site
 //! primary; the callee definition is a secondary span.
 
-use crate::diagnostics::DiagnosticArg;
+use crate::diagnostics::{DiagnosticArg, arg_value};
 use crate::hir::DefId;
 use crate::lexer::Span;
 use crate::mir::{
@@ -38,23 +38,67 @@ pub struct FragmentInstantiationError {
 impl FragmentInstantiationError {
     #[must_use]
     pub fn message(&self) -> String {
-        crate::diagnostics::semantic_message(
-            crate::semantic::SemanticErrorKind::OperandTypesInvalid,
-            &self.catalog_args(),
-        )
-        .unwrap_or_else(|| format!("{}: {}", self.issue, self.reason))
+        let rendered = match self.issue {
+            ISSUE_CONTEXT => nucleum_fragment_context_message(self.reason, &self.args),
+            ISSUE_TYPE => nucleum_fragment_type_message(self.reason, &self.args),
+            _ => None,
+        };
+        rendered.unwrap_or_else(|| format!("{}: {}", self.issue, self.reason))
     }
+}
 
-    #[must_use]
-    pub fn catalog_args(&self) -> Vec<DiagnosticArg> {
-        let mut args = vec![
-            DiagnosticArg::new("issue", self.issue),
-            DiagnosticArg::new("reason", self.reason),
-            DiagnosticArg::new("site", "call"),
-        ];
-        args.extend(self.args.iter().cloned());
-        args
-    }
+/// Message prose for this module's issues lives here; the semantic catalog
+/// carries only the code and help text for them.
+fn nucleum_fragment_context_message(reason: &str, args: &[DiagnosticArg]) -> Option<String> {
+    let caller = arg_value(args, "caller");
+    Some(
+        match (caller, reason) {
+            (_, "entry_callee") => "@ nucleum fragment cannot call an @ nucleum entry",
+            (_, "nested_dispatch") => "@ nucleum cannot call another @ nucleum entry",
+            (Some("entry"), "graphics_stage") => "@ nucleum cannot call a graphics @ fragment or @ vertex",
+            (_, "graphics_stage") => "@ nucleum fragment cannot call a graphics @ fragment or @ vertex",
+            (Some("host"), "host_callable") => "host code cannot call an @ nucleum fragment",
+            (Some("entry"), "host_callable") => {
+                "@ nucleum cannot call a host function or other non-device-safe callable"
+            }
+            (_, "host_callable") => "@ nucleum fragment cannot call a host function or other non-device-safe callable",
+            _ => "@ nucleum fragment call is not legal in this context",
+        }
+        .to_owned(),
+    )
+}
+
+fn nucleum_fragment_type_message(reason: &str, args: &[DiagnosticArg]) -> Option<String> {
+    let expected = arg_value(args, "expected");
+    let actual = arg_value(args, "actual");
+    Some(match (reason, expected, actual) {
+        ("bindings", _, _) => "@ nucleum fragment call has unsolved generic or magnitudo bindings".to_owned(),
+        ("shape", Some(expected), Some(actual)) => {
+            format!("@ nucleum fragment call shape {actual} does not match specialized shape {expected}")
+        }
+        ("shape", _, _) => "@ nucleum fragment call does not satisfy the specialized shape constraints".to_owned(),
+        ("layout", Some(expected), Some(actual)) => {
+            format!("@ nucleum fragment call layout {actual} does not match specialized layout {expected}")
+        }
+        ("layout", _, _) => "@ nucleum fragment call does not satisfy the specialized layout constraints".to_owned(),
+        ("argument", Some(expected), Some(actual)) => {
+            format!("@ nucleum fragment argument has type {actual}, expected {expected}")
+        }
+        ("argument", _, _) => "@ nucleum fragment argument does not match the specialized signature".to_owned(),
+        ("mode", Some(expected), Some(actual)) => {
+            format!("@ nucleum fragment argument mode {actual} is not valid for {expected}")
+        }
+        ("mode", _, _) => "@ nucleum fragment argument mode does not match the specialized signature".to_owned(),
+        ("target", _, _) => {
+            "@ nucleum fragment specialized types are not legal for the current device target".to_owned()
+        }
+        ("return", Some(expected), Some(actual)) => {
+            format!("@ nucleum fragment returns {actual}, which does not fit caller type {expected}")
+        }
+        ("return", _, _) => "@ nucleum fragment return does not fit the caller".to_owned(),
+        ("effect", _, _) => "@ nucleum fragment specialized effect summary does not fit the caller".to_owned(),
+        _ => return None,
+    })
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

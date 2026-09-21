@@ -4,7 +4,7 @@ use super::{
     ExpansionBudget, FragmentCompositionError, ISSUE_CYCLE, ISSUE_EXPANSION, compose_with_metadata,
     reject_surviving_fragment_calls_with_metadata, surviving_fragment_calls_with_metadata,
 };
-use crate::diagnostics::{DiagnosticArg, semantic_message};
+use crate::diagnostics::DiagnosticArg;
 use crate::driver::{self, AnalyzeRequest, Config, Session};
 use crate::hir::DefId;
 use crate::lexer::{Interner, Span};
@@ -15,7 +15,7 @@ use crate::mir::{
     MirMonomorphization, MirOperand, MirParam, MirParamMode, MirPlace, MirStatement, MirStatementKind,
     MirSyntheticFunctionIdentity, MirTerminator, MirTerminatorKind, MirType, MirValue, MirValueId, MirValueKind,
 };
-use crate::semantic::{SemanticErrorKind, TypeTable};
+use crate::semantic::TypeTable;
 use crate::test_support::{test_span, test_span_between};
 use rustc_hash::{FxHashMap, FxHashSet};
 
@@ -586,27 +586,31 @@ fn instance_budget_fails_closed() {
 }
 
 #[test]
-fn catalog_emits_cycle_and_expansion() {
-    let cycle_args = vec![
-        DiagnosticArg::new("issue", ISSUE_CYCLE),
-        DiagnosticArg::new("reason", "cycle"),
-        DiagnosticArg::new("cycle", "ping → pong → ping"),
-    ];
+fn message_carries_cycle_and_expansion() {
+    let cycle_error = FragmentCompositionError {
+        issue: ISSUE_CYCLE,
+        reason: "cycle",
+        span: test_span(),
+        definition_span: None,
+        args: vec![DiagnosticArg::new("cycle", "ping → pong → ping")],
+    };
+    assert_eq!(cycle_error.message(), "nucleum fragment call cycle: ping → pong → ping");
+
+    let expansion_error = FragmentCompositionError {
+        issue: ISSUE_EXPANSION,
+        reason: "depth",
+        span: test_span(),
+        definition_span: None,
+        args: vec![
+            DiagnosticArg::new("kind", "depth"),
+            DiagnosticArg::new("observed", "17"),
+            DiagnosticArg::new("limit", "16"),
+            DiagnosticArg::new("chain", "k → a → b"),
+        ],
+    };
     assert_eq!(
-        semantic_message(SemanticErrorKind::OperandTypesInvalid, &cycle_args).as_deref(),
-        Some("nucleum fragment call cycle: ping → pong → ping")
-    );
-    let expansion_args = vec![
-        DiagnosticArg::new("issue", ISSUE_EXPANSION),
-        DiagnosticArg::new("reason", "depth"),
-        DiagnosticArg::new("kind", "depth"),
-        DiagnosticArg::new("observed", "17"),
-        DiagnosticArg::new("limit", "16"),
-        DiagnosticArg::new("chain", "k → a → b"),
-    ];
-    assert_eq!(
-        semantic_message(SemanticErrorKind::OperandTypesInvalid, &expansion_args).as_deref(),
-        Some("nucleum fragment expansion exceeds depth limit 16 (observed 17) along k → a → b")
+        expansion_error.message(),
+        "nucleum fragment expansion exceeds depth limit 16 (observed 17) along k → a → b"
     );
 }
 

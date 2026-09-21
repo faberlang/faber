@@ -1,7 +1,7 @@
 //! Coverage for nucleum-fragment instantiation checking and the call-legality matrix.
 
 use super::{FragmentInstantiationError, ISSUE_CONTEXT, ISSUE_TYPE, check_with_metadata};
-use crate::diagnostics::{DiagnosticArg, semantic_message};
+use crate::diagnostics::DiagnosticArg;
 use crate::driver::{self, AnalyzeRequest, Config, Session};
 use crate::hir::DefId;
 use crate::lexer::Span;
@@ -12,7 +12,7 @@ use crate::mir::{
     MirOperand, MirParam, MirParamMode, MirPlace, MirStatement, MirStatementKind, MirTerminator, MirTerminatorKind,
     MirType,
 };
-use crate::semantic::{SemanticErrorKind, TypeTable};
+use crate::semantic::TypeTable;
 use crate::test_support::{test_span, test_span_between};
 
 /// Plain-wrapper stand-in for the deleted production `check` (merge-16):
@@ -706,28 +706,27 @@ fn monomorphized_definition_callee_uses_specialized_instance() {
 }
 
 #[test]
-fn catalog_emits_type_and_call_site_context() {
-    let type_args = vec![
-        DiagnosticArg::new("issue", ISSUE_TYPE),
-        DiagnosticArg::new("reason", "argument"),
-        DiagnosticArg::new("expected", "f32"),
-        DiagnosticArg::new("actual", "u32"),
-    ];
-    assert_eq!(
-        semantic_message(SemanticErrorKind::OperandTypesInvalid, &type_args).as_deref(),
-        Some("@ nucleum fragment argument has type u32, expected f32")
-    );
+fn message_carries_type_and_call_site_context() {
+    let type_error = FragmentInstantiationError {
+        issue: ISSUE_TYPE,
+        reason: "argument",
+        span: test_span(),
+        definition_span: None,
+        args: vec![
+            DiagnosticArg::new("expected", "f32"),
+            DiagnosticArg::new("actual", "u32"),
+        ],
+    };
+    assert_eq!(type_error.message(), "@ nucleum fragment argument has type u32, expected f32");
 
-    let context_args = vec![
-        DiagnosticArg::new("issue", ISSUE_CONTEXT),
-        DiagnosticArg::new("reason", "nested_dispatch"),
-        DiagnosticArg::new("caller", "entry"),
-        DiagnosticArg::new("site", "call"),
-    ];
-    assert_eq!(
-        semantic_message(SemanticErrorKind::OperandTypesInvalid, &context_args).as_deref(),
-        Some("@ nucleum cannot call another @ nucleum entry")
-    );
+    let context_error = FragmentInstantiationError {
+        issue: ISSUE_CONTEXT,
+        reason: "nested_dispatch",
+        span: test_span(),
+        definition_span: None,
+        args: vec![DiagnosticArg::new("caller", "entry")],
+    };
+    assert_eq!(context_error.message(), "@ nucleum cannot call another @ nucleum entry");
 }
 
 #[test]

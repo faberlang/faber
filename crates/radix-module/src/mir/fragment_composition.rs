@@ -17,7 +17,7 @@
 //! - 1_024 concrete instances per `Entry`
 //! - 1 inline per call site
 
-use crate::diagnostics::DiagnosticArg;
+use crate::diagnostics::{DiagnosticArg, arg_value};
 use crate::hir::DefId;
 use crate::lexer::{Interner, Span};
 use crate::mir::{
@@ -78,23 +78,39 @@ pub struct FragmentCompositionError {
 impl FragmentCompositionError {
     #[must_use]
     pub fn message(&self) -> String {
-        crate::diagnostics::semantic_message(
-            crate::semantic::SemanticErrorKind::OperandTypesInvalid,
-            &self.catalog_args(),
-        )
-        .unwrap_or_else(|| format!("{}: {}", self.issue, self.reason))
+        let rendered = match self.issue {
+            ISSUE_CYCLE => nucleum_fragment_cycle_message(&self.args),
+            ISSUE_EXPANSION => nucleum_fragment_expansion_message(self.reason, &self.args),
+            _ => None,
+        };
+        rendered.unwrap_or_else(|| format!("{}: {}", self.issue, self.reason))
     }
+}
 
-    #[must_use]
-    pub fn catalog_args(&self) -> Vec<DiagnosticArg> {
-        let mut args = vec![
-            DiagnosticArg::new("issue", self.issue),
-            DiagnosticArg::new("reason", self.reason),
-            DiagnosticArg::new("site", "compose"),
-        ];
-        args.extend(self.args.iter().cloned());
-        args
-    }
+/// Message prose for this module's issues lives here; the semantic catalog
+/// carries only the code and help text for them.
+fn nucleum_fragment_cycle_message(args: &[DiagnosticArg]) -> Option<String> {
+    let cycle = arg_value(args, "cycle").or_else(|| arg_value(args, "chain"))?;
+    Some(format!("nucleum fragment call cycle: {cycle}"))
+}
+
+fn nucleum_fragment_expansion_message(reason: &str, args: &[DiagnosticArg]) -> Option<String> {
+    let kind = arg_value(args, "kind").or(Some(reason));
+    let observed = arg_value(args, "observed");
+    let limit = arg_value(args, "limit");
+    let chain = arg_value(args, "chain");
+    Some(match (kind, observed, limit, chain) {
+        (Some("survived"), _, _, _) => "nucleum fragment call survived composition".to_owned(),
+        (Some("unresolved"), _, _, _) => "nucleum fragment call could not be resolved for composition".to_owned(),
+        (Some("failable"), _, _, _) => "nucleum fragment call cannot use a failable terminator".to_owned(),
+        (Some(kind), Some(observed), Some(limit), Some(chain)) => {
+            format!("nucleum fragment expansion exceeds {kind} limit {limit} (observed {observed}) along {chain}")
+        }
+        (Some(kind), Some(observed), Some(limit), _) => {
+            format!("nucleum fragment expansion exceeds {kind} limit {limit} (observed {observed})")
+        }
+        _ => "nucleum fragment expansion exceeds the documented budget".to_owned(),
+    })
 }
 
 /// Compose every device call into its caller with the explicit metadata

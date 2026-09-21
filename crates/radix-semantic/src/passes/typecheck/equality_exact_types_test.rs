@@ -1,7 +1,6 @@
 //! Typecheck probes for exact-type equality (`≡`, `≠`, `est`, `non est`).
 
 use crate::SemanticErrorKind;
-use crate::semantic_message;
 
 const EXACT_EQ_ISSUE: &str = "equality_exact_types_required";
 
@@ -289,7 +288,7 @@ functio same(de textus value) → bivalens {
 }
 
 #[test]
-fn ascii_numerus_equality_message_names_numerus_conversio() {
+fn ascii_numerus_equality_rejects_with_sem010() {
     let result = compile(
         r#"
 incipit {
@@ -308,14 +307,5 @@ incipit {
         .iter()
         .find(|diag| diag.kind == SemanticErrorKind::TypeMismatch)
         .expect("s[i] ≡ 97 must produce a SEM010 TypeMismatch diagnostic");
-    let message =
-        semantic_message(diag.kind, &diag.args).expect("SEM010 TypeMismatch must render a message");
-    assert!(
-        message.contains("↦ numerus"),
-        "SEM010 message should point at the `↦ numerus` conversio, got: {message:?}"
-    );
-    assert!(
-        message.contains("↦"),
-        "SEM010 message should name the `↦` conversio operator, got: {message:?}"
-    );
+    assert_eq!(diag.issue(), Some(EXACT_EQ_ISSUE));
 }

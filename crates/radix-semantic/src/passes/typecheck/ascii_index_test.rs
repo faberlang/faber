@@ -10,7 +10,6 @@
 //! bounded `ascii<N>` carriers.
 
 use super::TypeChecker;
-use crate::semantic_message;
 use crate::{IndexExpr, Primitive, Resolver, SemanticErrorKind, Type, TypeTable};
 use radix_lexer::{Interner, Span};
 use radix_target::Target;
@@ -149,9 +148,9 @@ fn range_index_still_textus() {
 }
 
 /// `s[i] ≡ 97` stays a strict SEM010 exact-types error (live naming
-/// `SemanticErrorKind::TypeMismatch`) whose message points at `↦ numerus`.
+/// `SemanticErrorKind::TypeMismatch`).
 #[test]
-fn scalar_index_eq_numerus_rejects_with_sem010_pointer() {
+fn scalar_index_eq_numerus_rejects_with_sem010() {
     let result = compile(
         r#"incipit {
     fixum textus s ← "ab"
@@ -169,12 +168,6 @@ fn scalar_index_eq_numerus_rejects_with_sem010_pointer() {
         .find(|diag| diag.kind == SemanticErrorKind::TypeMismatch)
         .expect("s[i] ≡ 97 must produce a SEM010 TypeMismatch diagnostic");
     assert_eq!(diag.issue(), Some(EXACT_EQ_ISSUE));
-    let message =
-        semantic_message(diag.kind, &diag.args).expect("SEM010 TypeMismatch must render a message");
-    assert!(
-        message.contains("↦ numerus"),
-        "SEM010 message should point at the `↦ numerus` conversio, got: {message:?}"
-    );
 }
 
 /// Bare ascii is unbounded: 64-byte and 65-byte literals both typecheck.

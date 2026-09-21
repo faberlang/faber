@@ -11,7 +11,7 @@ use radix_diagnostics::{
     unresolved_keyword_spec, unresolved_library_member_spec,
 };
 use radix_semantic::catalog::{arg_value, quote_arg};
-use radix_semantic::catalog_semantic::{semantic_message, semantic_spec};
+use radix_semantic::catalog_semantic::semantic_spec;
 use radix_semantic::catalog_syntax::{lex_message, lex_spec, parse_message, parse_spec};
 use std::collections::HashSet;
 
@@ -44,7 +44,6 @@ fn legacy_message_arg_is_not_a_catalog_rendering_fallback() {
     let args = vec![DiagnosticArg::new("legacy_message", "do not render me")];
 
     assert_eq!(parse_message(ParseErrorKind::Expected, &args), None);
-    assert_eq!(semantic_message(SemanticErrorKind::TypeMismatch, &args), None);
 }
 
 #[test]
