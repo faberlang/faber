@@ -787,7 +787,7 @@ incipit { }
         radix_lanes: result.radix_lanes,
         gpu_builtins: result.gpu_builtins,
         access_facts: result.access_facts.expect("access facts"),
-        region_facts: None,
+        region_facts: result.region_facts,
         semantic_diagnostics: result.diagnostics,
     };
     let app = crate::AnalyzedApplication::build(parts, &parsed.interner).expect("build");
