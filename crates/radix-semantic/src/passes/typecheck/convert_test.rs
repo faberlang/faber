@@ -657,7 +657,7 @@ fn array_ascription_to_generic_map_key_rejects() {
         r"functio selecta<K, V>() → tabula<K, V> {
   redde [] ∷ tabula<K, V>
 }",
-        "array_ascription_to_generic_map",
+        "array_ascription_to_non_index_map",
     );
 }
 
@@ -668,7 +668,7 @@ fn generic_genus_field_array_ascription_to_generic_map_key_rejects() {
         r"genus SortedMap<K, V> {
   tabula<K, V> entries = [] ∷ tabula<K, V>
 }",
-        "array_ascription_to_generic_map",
+        "array_ascription_to_non_index_map",
     );
 }
 
@@ -679,7 +679,7 @@ fn lista_source_ascription_to_generic_map_key_rejects() {
         r"functio selecta<K, V>(lista<numerus> src) → tabula<K, V> {
   redde src ∷ tabula<K, V>
 }",
-        "array_ascription_to_generic_map",
+        "array_ascription_to_non_index_map",
     );
 }
 
@@ -688,7 +688,7 @@ fn array_ascription_to_holed_map_key_rejects() {
     // `tabula<_, V>` leaves the key uninferred: same unconstrained shape.
     test_support::assert_rejects_with_issue(
         "incipit { fixum tabula<_, numerus> m ← [] ∷ tabula<_, numerus> }",
-        "array_ascription_to_generic_map",
+        "array_ascription_to_non_index_map",
     );
 }
 
@@ -703,11 +703,32 @@ fn index_keyed_array_ascription_to_map_typechecks() {
 }
 
 #[test]
-fn concrete_key_array_ascription_to_map_typechecks() {
-    // A concrete key type is constrained by the written target; the ruling
-    // covers only the unconstrained key.
-    test_support::assert_accepts(
+fn concrete_key_array_ascription_to_map_rejects() {
+    // Widened ruling (2026-09-21): the operator's argument is not about
+    // genericity — an array supplies no key type of its own, only element
+    // positions, so a textus key is as impossible to derive as a `K`.
+    test_support::assert_rejects_with_issue(
         "incipit { fixum tabula<textus, numerus> m ← [] ∷ tabula<textus, numerus> }",
+        "array_ascription_to_non_index_map",
+    );
+}
+
+#[test]
+fn fractus_key_array_ascription_to_map_rejects() {
+    // Any concrete non-integer key family is the same impossibility; the
+    // rule is not a textus special case.
+    test_support::assert_rejects_with_issue(
+        "incipit { fixum tabula<fractus, numerus> m ← [] ∷ tabula<fractus, numerus> }",
+        "array_ascription_to_non_index_map",
+    );
+}
+
+#[test]
+fn sized_integer_key_array_ascription_to_map_typechecks() {
+    // The index-keyed family is the integer family bracket access itself
+    // accepts, so a sized integer key is as index-keyed as bare numerus.
+    test_support::assert_accepts(
+        "incipit { fixum tabula<u32, numerus> m ← [] ∷ tabula<u32, numerus> }",
     );
 }
 

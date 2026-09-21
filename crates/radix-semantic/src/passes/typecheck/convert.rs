@@ -109,7 +109,7 @@ const ISSUE_MAP_SPREAD_KEY_TYPE_MISMATCH: &str = "map_spread_key_type_mismatch";
 const ISSUE_MAP_SPREAD_VALUE_TYPE_MISMATCH: &str = "map_spread_value_type_mismatch";
 const ISSUE_MAP_VALUE_TYPE_MISMATCH: &str = "map_value_type_mismatch";
 const ISSUE_LISTA_TO_TABULA_UNSUPPORTED: &str = "lista_to_tabula_unsupported";
-const ISSUE_ARRAY_ASCRIPTION_TO_GENERIC_MAP: &str = "array_ascription_to_generic_map";
+const ISSUE_ARRAY_ASCRIPTION_TO_NON_INDEX_MAP: &str = "array_ascription_to_non_index_map";
 const ISSUE_CROSS_COLLECTION_UNSUPPORTED: &str = "cross_collection_unsupported";
 const ISSUE_LISTA_TO_TENSOR_NESTED: &str = "lista_to_tensor_nested";
 const ISSUE_LISTA_TO_TENSOR_ELEMENT_MISMATCH: &str = "lista_to_tensor_element_mismatch";
@@ -2643,17 +2643,17 @@ impl TypeChecker<'_> {
         effective_target
     }
 
-    /// Reject an array source ascribed to a map whose key type the source
-    /// cannot supply.
+    /// Reject an array source ascribed to any map whose key the source cannot
+    /// supply.
     ///
-    /// An array's only map projection is index-keyed, so the key type must be
-    /// an integer family the source itself determines. A key left as a generic
-    /// parameter (`tabula<K, V>`) or a hole (`tabula<_, V>`) is evidence about
-    /// nothing: the array carries no key type, so the ascription is wrong both
-    /// as an assertion and as a conversion. Concrete key types and the
-    /// index-keyed form stay accepted — this rule covers only the unconstrained
-    /// key, and whether `[] ∷ tabula<numerus, V>` should itself be legal is an
-    /// unmade decision.
+    /// An array's only map projection is index-keyed: it yields element
+    /// positions, so the one key family it determines is the integer family
+    /// its own bracket access accepts. Every other target key — a generic
+    /// parameter (`tabula<K, V>`), a hole, or a concrete non-integer type
+    /// such as `tabula<textus, V>` — names keys the source has none of, so
+    /// the ascription is wrong both as an assertion and as a conversion
+    /// (operator ruling 2026-09-21). The index-keyed form stays accepted;
+    /// whether it should itself be legal is an unmade decision.
     fn check_array_source_map_ascription(
         &mut self,
         source: TypeId,
@@ -2666,11 +2666,12 @@ impl TypeChecker<'_> {
         ) {
             return;
         }
-        if matches!(
-            self.types.get(self.resolve_inferred_type(key)),
-            Type::Param(_) | Type::Infer(_) | Type::InferUnion(_)
-        ) {
-            self.invalid_conversion(ISSUE_ARRAY_ASCRIPTION_TO_GENERIC_MAP, span);
+        let resolved = self.resolve_inferred_type(key);
+        if matches!(self.types.get(resolved), Type::Error) {
+            return;
+        }
+        if !self.is_integer(resolved) {
+            self.invalid_conversion(ISSUE_ARRAY_ASCRIPTION_TO_NON_INDEX_MAP, span);
         }
     }
 
