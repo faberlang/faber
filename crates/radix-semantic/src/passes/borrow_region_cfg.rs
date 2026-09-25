@@ -28,7 +28,8 @@ pub enum CfgEdgeKind {
     LoopBack,
     /// Edge leaving a loop through `rumpe` or an iterator exhaustion path.
     LoopExit,
-    /// Explicit `perge` transfer to the active loop header.
+    /// Explicit `perge` transfer to the active loop's continue point: the
+    /// condition for `dum` and `fac … dum`, the next iteration for `itera`.
     Continue,
     /// Explicit `rumpe` transfer to the active loop exit.
     Break,
@@ -492,6 +493,9 @@ impl Builder {
                     CfgNodeKind::Join,
                     location(Some(expression.id), None, expression.span),
                 );
+                if let Some((statements, test, _)) = body.fac_dum_parts() {
+                    return self.build_fac_dum(header, exit, statements, test);
+                }
                 let body_fragment = self.build_block(body, Some(LoopContext))?;
                 if let Some(body_entry) = body_fragment.entry {
                     self.cfg.add_edge(header, body_entry, CfgEdgeKind::Next);
@@ -546,6 +550,35 @@ impl Builder {
                 location(Some(expression.id), None, expression.span),
             ))),
         }
+    }
+
+    /// Ruling R3: `perge` lands at the end of a `fac … dum` body, so the
+    /// synthesized `si non c { rumpe }` test runs next. Body fallthrough and
+    /// every `perge` edge into the test; the test's `rumpe` leaves the loop and
+    /// its fallthrough returns to the header. Mirrors MIR `lower_loop_expr`.
+    fn build_fac_dum(
+        &mut self,
+        header: CfgNodeId,
+        exit: CfgNodeId,
+        statements: &[HirStatement],
+        test: &HirStatement,
+    ) -> Result<Fragment, CfgError> {
+        let mut body_fragment = Fragment::empty();
+        for statement in statements {
+            let next = self.build_statement(statement, Some(LoopContext))?;
+            self.sequence(&mut body_fragment, next);
+        }
+        let test_fragment = self.build_statement(test, Some(LoopContext))?;
+        let test_entry = test_fragment
+            .entry
+            .expect("fac … dum test statement has a condition entry");
+        let body_entry = body_fragment.entry.unwrap_or(test_entry);
+        self.cfg.add_edge(header, body_entry, CfgEdgeKind::Next);
+        self.connect_normals(&body_fragment, test_entry, CfgEdgeKind::Next);
+        self.connect_transfers(&body_fragment, test_entry, exit);
+        self.connect_normals(&test_fragment, header, CfgEdgeKind::LoopBack);
+        self.connect_transfers(&test_fragment, header, exit);
+        Ok(Fragment::terminal_with_entry(header, exit))
     }
 
     fn sequence(&mut self, previous: &mut Fragment, next: Fragment) {

@@ -466,3 +466,137 @@ incipit { }
         borrow_region::ProvenanceError::Incoherent { .. }
     ));
 }
+
+// ── Ruling R3: `perge` in `fac … dum` lands on the condition test ──────────
+
+/// Collect the `perge` statement ids and the synthesized `dum` test condition
+/// of the (single) `fac … dum` loop in the program.
+#[derive(Default)]
+struct FacDumShape {
+    perges: Vec<HirId>,
+    test_condition: Option<HirId>,
+}
+
+impl HirVisitor for FacDumShape {
+    fn visit_expr(&mut self, expression: &HirExpression) {
+        if let HirExpressionKind::Loop(body) = &expression.kind {
+            let (_, test, _) = body.fac_dum_parts().expect("fac … dum loop parts");
+            let radix_hir::HirStatementKind::Expr(test) = &test.kind else {
+                unreachable!("fac_dum_parts returns an expression test");
+            };
+            let HirExpressionKind::Si { cond, .. } = &test.kind else {
+                unreachable!("fac_dum_parts returns a si test");
+            };
+            self.test_condition = Some(cond.id);
+        }
+        walk_expr(self, expression);
+    }
+
+    fn visit_stmt(&mut self, statement: &radix_hir::HirStatement) {
+        if matches!(statement.kind, radix_hir::HirStatementKind::Perge) {
+            self.perges.push(statement.id);
+        }
+        radix_hir::visit::walk_stmt(self, statement);
+    }
+}
+
+fn assert_perge_edges_target_dum_test(source: &str) {
+    let result = analyze_source(source);
+    let hir = result.hir.as_ref().expect("HIR");
+    let mut shape = FacDumShape::default();
+    shape.visit_program(hir);
+    assert!(!shape.perges.is_empty(), "fixture must contain perge");
+    let facts = borrow_region::analyze(
+        hir,
+        &result.types,
+        result.access_facts.as_ref().expect("access facts"),
+    )
+    .expect("fac … dum CFG");
+    let cfg = facts.cfg();
+    let test = cfg
+        .node_for_hir_id(shape.test_condition.expect("dum test"))
+        .expect("dum test condition node");
+    for perge in shape.perges {
+        let perge = cfg.node_for_hir_id(perge).expect("perge node");
+        let targets: Vec<_> = cfg
+            .successors(perge)
+            .filter(|edge| edge.kind == CfgEdgeKind::Continue)
+            .map(|edge| edge.to)
+            .collect();
+        assert_eq!(
+            targets,
+            vec![test],
+            "perge must continue to the dum condition test (ruling R3)"
+        );
+    }
+}
+
+#[test]
+fn fac_dum_perge_edge_targets_condition_test() {
+    assert_perge_edges_target_dum_test(
+        r"
+incipit {
+    varia numerus n ← 0
+    fac {
+        n ← n + 1
+        si n < 3 {
+            perge
+        }
+        nota n
+    } dum n < 5
+}
+",
+    );
+}
+
+#[test]
+fn fac_dum_perge_through_bare_fac_block_targets_condition_test() {
+    assert_perge_edges_target_dum_test(
+        r"
+incipit {
+    varia numerus n ← 0
+    fac {
+        n ← n + 1
+        fac {
+            si n < 3 {
+                perge
+            }
+        }
+        nota n
+    } dum n < 5
+}
+",
+    );
+}
+
+#[test]
+fn fac_dum_perge_keeps_borrow_live_into_condition() {
+    // The only path from the write to the condition is `perge`. Under ruling
+    // R3 the condition runs next and reads `view`, so the loan is live at the
+    // write and SEM052 must fire.
+    let result = analyze_source(
+        r"
+incipit {
+    varia lista<numerus> xs ← [1, 2, 3]
+    varia numerus n ← 0
+    varia in lista<numerus> view ← xs
+    fac {
+        n ← n + 1
+        si n < 3 {
+            xs.appende(4)
+            perge
+        }
+        rumpe
+    } dum view.longitudo() < 10
+}
+",
+    );
+    assert!(
+        result.diagnostics.iter().any(|diagnostic| {
+            diagnostic.kind == SemanticErrorKind::MutableBorrowConflict
+                && issue(diagnostic) == Some("write_while_borrowed")
+        }),
+        "borrow read by the dum condition must be live at a write before perge; diagnostics: {:?}",
+        result.diagnostics
+    );
+}
