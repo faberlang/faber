@@ -28,46 +28,13 @@ use radix_lexer::{Symbol, TokenKind};
 use rustc_hash::FxHashMap;
 
 impl super::FaberCodegen<'_> {
-    /// Recognize the normalized HIR shape for a `fac ... dum` loop.
-    ///
-    /// The parser represents this as a body followed by a final conditional
-    /// break on the negated loop condition. Re-emission only treats that as
-    /// `fac`/`dum` when the final block is exactly the synthetic `rumpe`.
-    ///
-    /// Also accepts `else_block: Some(empty)` when the compiler produces an
-    /// empty else clause for the break condition.
+    /// Recognize the normalized HIR shape for a `fac ... dum` loop
+    /// (see [`HirBlock::fac_dum_parts`]).
     pub(super) fn as_fac_loop<'a>(
         &self,
         block: &'a HirBlock,
     ) -> Option<(&'a [HirStatement], &'a HirExpression)> {
-        let last = block.statements.last()?;
-        let HirStatementKind::Expr(expr) = &last.kind else {
-            return None;
-        };
-        let HirExpressionKind::Si {
-            cond,
-            then_block,
-            then_catch: None,
-            else_block,
-        } = &expr.kind
-        else {
-            return None;
-        };
-        if let Some(eb) = else_block
-            && (!eb.statements.is_empty() || eb.expr.is_some())
-        {
-            return None;
-        }
-        let HirExpressionKind::Unary(radix_hir::HirUnOp::Not, inner) = &cond.kind else {
-            return None;
-        };
-        if then_block.expr.is_some() || then_block.statements.len() != 1 {
-            return None;
-        }
-        if !matches!(then_block.statements[0].kind, HirStatementKind::Rumpe) {
-            return None;
-        }
-        Some((&block.statements[..block.statements.len() - 1], inner))
+        block.fac_dum_parts().map(|(body, _, cond)| (body, cond))
     }
 
     /// Return the expression represented by a single-expression return block.

@@ -167,6 +167,21 @@ pub fn fac_statement_body(stmt: &HirStatement) -> Option<&HirBlock> {
 /// at loops (they own their `perge`) and closures (`perge` never crosses one).
 #[must_use]
 pub fn passthrough_perge_sites(body: &HirBlock) -> Vec<HirId> {
+    perge_sites(&body.statements, body.expr.as_deref())
+}
+
+/// Whether a `fac … dum` body (the statements before its synthesized test,
+/// see [`HirBlock::fac_dum_parts`]) has a `perge` that continues this loop,
+/// directly or through nested `fac` blocks (ruling R3).
+///
+/// Such a body needs a loop shape whose `continue` evaluates the condition;
+/// the C-family `loop { body; if !c { break } }` form would restart the body.
+#[must_use]
+pub fn fac_dum_body_has_perge(body: &[HirStatement]) -> bool {
+    !perge_sites(body, None).is_empty()
+}
+
+fn perge_sites(statements: &[HirStatement], tail: Option<&HirExpression>) -> Vec<HirId> {
     struct PergeSites {
         sites: Vec<HirId>,
     }
@@ -214,10 +229,10 @@ pub fn passthrough_perge_sites(body: &HirBlock) -> Vec<HirId> {
     }
 
     let mut finder = PergeSites { sites: Vec::new() };
-    for stmt in &body.statements {
+    for stmt in statements {
         finder.visit_stmt(stmt);
     }
-    if let Some(expr) = body.expr.as_deref() {
+    if let Some(expr) = tail {
         finder.visit_expr(expr);
     }
     finder.sites
@@ -281,6 +296,15 @@ impl PergeRoutes {
             },
         );
         Some(route)
+    }
+
+    /// Claim a fresh hygiene index for a `fac … dum` condition flag. It
+    /// shares the route counter, so the flag name never collides with a
+    /// route flag or label ([`crate::hygiene::perge_route`]).
+    pub fn fac_dum_flag(&self) -> u32 {
+        let index = self.next.get();
+        self.next.set(index + 1);
+        index
     }
 
     /// Release a route opened by [`PergeRoutes::open`].
