@@ -2705,6 +2705,14 @@ help = "use '{perge}' inside a loop"
 message = "{keyword} outside {context}"
 help = "use '{perge}' inside a loop"
 
+[diagnostics.SEM060]
+message = "perge intra fac"
+help = "'{perge}' ad '{fac}' proximum pertinet, quod non iteratur; per '{si}'/'{secus}' restrue, aut '{perge}' extra '{fac}' move"
+
+[diagnostics.SEM060.issues.continue_inside_fac]
+message = "{perge} intra {fac}"
+help = "'{perge}' ad '{fac}' proximum pertinet, quod non iteratur; per '{si}'/'{secus}' restrue, aut '{perge}' extra '{fac}' move"
+
 [diagnostics.SEM032]
 message = "return outside function"
 help = "use '{redde}' inside a function"

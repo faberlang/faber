@@ -2479,6 +2479,14 @@ help = "استخدم '{perge}' داخل حلقة"
 message = "{keyword} خارج {context}"
 help = "استخدم '{perge}' داخل حلقة"
 
+[diagnostics.SEM060]
+message = "{perge} داخل كتلة do"
+help = "'{perge}' سيستهدف كتلة '{fac}' المحيطة، وهي لا تتكرر؛ أعد البناء باستخدام '{si}'/'{secus}'، أو انقل '{perge}' خارج كتلة '{fac}'"
+
+[diagnostics.SEM060.issues.continue_inside_fac]
+message = "{perge} داخل كتلة {fac}"
+help = "'{perge}' سيستهدف كتلة '{fac}' المحيطة، وهي لا تتكرر؛ أعد البناء باستخدام '{si}'/'{secus}'، أو انقل '{perge}' خارج كتلة '{fac}'"
+
 [diagnostics.SEM032]
 message = "{keyword} خارج دالة"
 help = "استخدم '{redde}' داخل دالة"

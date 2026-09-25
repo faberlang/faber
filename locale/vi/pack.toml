@@ -2479,6 +2479,14 @@ help = "sử dụng 'perge' bên trong một vòng lặp"
 message = "{keyword} nằm ngoài {context}"
 help = "sử dụng 'perge' bên trong một vòng lặp"
 
+[diagnostics.SEM060]
+message = "continue nằm trong khối do"
+help = "'{perge}' sẽ nhắm tới khối '{fac}' bao quanh, vốn không lặp lại; hãy viết lại bằng '{si}'/'{secus}', hoặc chuyển '{perge}' ra ngoài khối '{fac}'"
+
+[diagnostics.SEM060.issues.continue_inside_fac]
+message = "{perge} nằm trong khối {fac}"
+help = "'{perge}' sẽ nhắm tới khối '{fac}' bao quanh, vốn không lặp lại; hãy viết lại bằng '{si}'/'{secus}', hoặc chuyển '{perge}' ra ngoài khối '{fac}'"
+
 [diagnostics.SEM032]
 message = "return nằm ngoài hàm"
 help = "sử dụng 'redde' bên trong một hàm"

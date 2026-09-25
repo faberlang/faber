@@ -297,6 +297,7 @@ pub enum SemanticErrorKind {
     // Control flow
     BreakOutsideBreakable,
     ContinueOutsideLoop,
+    ContinueInsideFac,
     ReturnOutsideFunction,
     ReturnAbsent,
 
