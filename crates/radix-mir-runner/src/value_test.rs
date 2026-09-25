@@ -196,3 +196,28 @@ fn ordering_and_arithmetic_accept_the_same_mixed_operand_mixes() {
         );
     }
 }
+
+/// IEEE 754 ordered comparison (operator ruling 2026-09-24): every ordered
+/// predicate against NaN is false and never traps; `≡` is false and `≠` true.
+#[test]
+fn float_compare_with_nan_is_ieee_ordered_false() {
+    let span = Span::default();
+    let nan = f64::NAN;
+    let pairs = [
+        (Value::Float(nan), Value::Float(1.0)),
+        (Value::Float(1.0), Value::Float(nan)),
+        (Value::Float(nan), Value::Float(nan)),
+        (Value::Float(nan), Value::Int(1)),
+        (Value::Int(1), Value::Float(nan)),
+        (Value::Float(nan), Value::UInt(1)),
+        (Value::UInt(1), Value::Float(nan)),
+    ];
+    for (left, right) in pairs {
+        for op in [MirBinOp::Lt, MirBinOp::Gt, MirBinOp::LtEq, MirBinOp::GtEq] {
+            let result = compare_values(left.clone(), right.clone(), op, span)
+                .unwrap_or_else(|error| panic!("{left:?} {op:?} {right:?} trapped: {error:?}"));
+            assert_eq!(result, Value::Bool(false), "{left:?} {op:?} {right:?}");
+        }
+        assert!(!values_equal(&left, &right), "{left:?} ≡ {right:?}");
+    }
+}

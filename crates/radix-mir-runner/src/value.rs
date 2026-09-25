@@ -965,54 +965,44 @@ pub fn compare_values(
     op: MirBinOp,
     span: Span,
 ) -> Result<Value, RunnerError> {
+    // IEEE 754 (operator ruling 2026-09-24): float pairs yield `None` when
+    // either side is NaN, and every ordered predicate is then false — NaN
+    // flows through comparisons, it never traps.
     let ordering = match (&left, &right) {
-        (Value::Int(a), Value::Int(b)) => a.cmp(b),
-        (Value::UInt(a), Value::UInt(b)) => a.cmp(b),
-        (Value::UInt(a), Value::Int(b)) => {
-            if *b < 0 {
-                std::cmp::Ordering::Greater
-            } else {
-                a.cmp(&(*b as u64))
-            }
-        }
-        (Value::Int(a), Value::UInt(b)) => {
-            if *a < 0 {
-                std::cmp::Ordering::Less
-            } else {
-                (*a as u64).cmp(b)
-            }
-        }
-        (Value::Float(a), Value::Float(b)) => a
-            .partial_cmp(b)
-            .ok_or_else(|| RunnerError::internal(span, "float compare"))?,
+        (Value::Int(a), Value::Int(b)) => Some(a.cmp(b)),
+        (Value::UInt(a), Value::UInt(b)) => Some(a.cmp(b)),
+        (Value::UInt(a), Value::Int(b)) => Some(if *b < 0 {
+            std::cmp::Ordering::Greater
+        } else {
+            a.cmp(&(*b as u64))
+        }),
+        (Value::Int(a), Value::UInt(b)) => Some(if *a < 0 {
+            std::cmp::Ordering::Less
+        } else {
+            (*a as u64).cmp(b)
+        }),
+        (Value::Float(a), Value::Float(b)) => a.partial_cmp(b),
         // Mixed integer/float ordering joins at the float carrier — the same
         // promotion `numeric_binop` applies to `+ - * /`, so `a < b` accepts
         // exactly the operand mixes `a + b` accepts (join-cast ruling).
-        (Value::Int(a), Value::Float(b)) => (*a as f64)
-            .partial_cmp(b)
-            .ok_or_else(|| RunnerError::internal(span, "float compare"))?,
-        (Value::UInt(a), Value::Float(b)) => (*a as f64)
-            .partial_cmp(b)
-            .ok_or_else(|| RunnerError::internal(span, "float compare"))?,
-        (Value::Float(a), Value::Int(b)) => a
-            .partial_cmp(&(*b as f64))
-            .ok_or_else(|| RunnerError::internal(span, "float compare"))?,
-        (Value::Float(a), Value::UInt(b)) => a
-            .partial_cmp(&(*b as f64))
-            .ok_or_else(|| RunnerError::internal(span, "float compare"))?,
-        (Value::Str(a), Value::Str(b)) => a.cmp(b),
-        (Value::Ascii(a), Value::Ascii(b)) => a.cmp(b),
-        (Value::Bool(a), Value::Bool(b)) => a.cmp(b),
-        (Value::Instans(a), Value::Instans(b)) => a
-            .partial_cmp_at_coarser(*b)
-            .ok_or_else(|| RunnerError::internal(span, "instans compare"))?,
+        (Value::Int(a), Value::Float(b)) => (*a as f64).partial_cmp(b),
+        (Value::UInt(a), Value::Float(b)) => (*a as f64).partial_cmp(b),
+        (Value::Float(a), Value::Int(b)) => a.partial_cmp(&(*b as f64)),
+        (Value::Float(a), Value::UInt(b)) => a.partial_cmp(&(*b as f64)),
+        (Value::Str(a), Value::Str(b)) => Some(a.cmp(b)),
+        (Value::Ascii(a), Value::Ascii(b)) => Some(a.cmp(b)),
+        (Value::Bool(a), Value::Bool(b)) => Some(a.cmp(b)),
+        (Value::Instans(a), Value::Instans(b)) => Some(
+            a.partial_cmp_at_coarser(*b)
+                .ok_or_else(|| RunnerError::internal(span, "instans compare"))?,
+        ),
         _ => return Err(RunnerError::internal(span, "comparison type mismatch")),
     };
     let result = match op {
-        MirBinOp::Lt => ordering.is_lt(),
-        MirBinOp::Gt => ordering.is_gt(),
-        MirBinOp::LtEq => ordering.is_le(),
-        MirBinOp::GtEq => ordering.is_ge(),
+        MirBinOp::Lt => ordering.is_some_and(std::cmp::Ordering::is_lt),
+        MirBinOp::Gt => ordering.is_some_and(std::cmp::Ordering::is_gt),
+        MirBinOp::LtEq => ordering.is_some_and(std::cmp::Ordering::is_le),
+        MirBinOp::GtEq => ordering.is_some_and(std::cmp::Ordering::is_ge),
         _ => return Err(RunnerError::internal(span, "invalid comparison operator")),
     };
     Ok(Value::Bool(result))
