@@ -1709,6 +1709,105 @@ fn reports_continue_outside_loop() {
 }
 
 #[test]
+fn reports_perge_whose_nearest_breakable_is_fac_cape() {
+    let source = r"
+incipit {
+    itera ab 0‥3 fixum i {
+        fac {
+            si i ≡ 1 { perge }
+            nota i
+        } cape err { }
+    }
+}
+";
+    let diagnostics = compile_and_expect(source, "SEM060", "continue_inside_fac");
+    let err = expect_diagnostic(&diagnostics, "SEM060", "continue_inside_fac");
+    assert!(err.is_error());
+    assert!(
+        err.args
+            .iter()
+            .any(|arg| arg.name == "keyword" && arg.value == "perge")
+    );
+}
+
+#[test]
+fn reports_perge_inside_plain_fac_within_loop() {
+    let source = r"
+incipit {
+    itera ab 0‥3 fixum i {
+        fac { perge }
+    }
+}
+";
+    compile_and_expect(source, "SEM060", "continue_inside_fac");
+}
+
+#[test]
+fn reports_perge_inside_closure_fac_body() {
+    let source = r"
+incipit {
+    itera ab 0‥3 fixum i {
+        fixum _ f ← (numerus a) ∴ fac { perge }
+    }
+}
+";
+    compile_and_expect(source, "SEM060", "continue_inside_fac");
+}
+
+#[test]
+fn accepts_perge_in_loop_nested_inside_fac() {
+    let result = compile_ok(
+        r"
+incipit {
+    fac {
+        itera ab 0‥3 fixum i {
+            si i ≡ 1 { perge }
+            nota i
+        }
+    } cape err { }
+}
+",
+    );
+    assert!(result.is_ok(), "{:?}", result.diagnostics);
+}
+
+#[test]
+fn accepts_perge_in_cape_arm_inside_loop() {
+    let result = compile_ok(
+        r#"
+incipit {
+    itera ab 0‥3 fixum i {
+        fac {
+            si i ≡ 1 { iace "x" }
+        } cape err {
+            perge
+        }
+        nota i
+    }
+}
+"#,
+    );
+    assert!(result.is_ok(), "{:?}", result.diagnostics);
+}
+
+#[test]
+fn accepts_perge_inside_fac_dum_loop() {
+    let result = compile_ok(
+        r"
+incipit {
+    varia numerus i ← 0
+    fac {
+        i ← i + 1
+        si i ≡ 2 { perge }
+        nota i
+    } dum i ≺ 4
+}
+",
+    );
+    assert!(result.is_ok(), "{:?}", result.diagnostics);
+}
+
+#[test]
 fn accepts_rumpe_inside_fac_body() {
     let source = r"
 functio exemplo() → numerus {
@@ -1780,7 +1879,10 @@ functio exemplo(bivalens condicio) → numerus {
 }
 
 #[test]
-fn accepts_perge_inside_fac_without_dum() {
+fn reports_perge_inside_fac_without_dum() {
+    // Operator ruling 2026-09-24: `rumpe` leaves a plain `fac`, and `perge`
+    // targets the same construct, so `perge` in a non-repeating `fac` is an
+    // error rather than a silent no-op or an escape to an outer loop.
     let source = r"
 functio exemplo() → numerus {
     fac {
@@ -1789,28 +1891,7 @@ functio exemplo() → numerus {
     redde 1
 }
 ";
-    let lex_result = radix_lexer::lex(source);
-    let parse_result = radix_parser::parse(lex_result);
-    assert!(
-        parse_result.success(),
-        "parse failed: {:?}",
-        parse_result
-            .errors
-            .iter()
-            .map(|e| format!("{e:?}"))
-            .collect::<Vec<_>>()
-    );
-    let program = parse_result.program.expect("parsed program");
-    let interner = parse_result.interner;
-
-    let mut resolver = Resolver::new();
-    let mut types = TypeTable::new();
-    let _ = collect::collect(&program, &mut resolver, &mut types);
-    let result = resolve::resolve(&program, &mut resolver, &interner, &mut types);
-    assert!(
-        result.is_ok(),
-        "perge inside fac should resolve: {result:?}"
-    );
+    compile_and_expect(source, "SEM060", "continue_inside_fac");
 }
 
 fn resolve_source(source: &str) -> Vec<crate::SemanticError> {

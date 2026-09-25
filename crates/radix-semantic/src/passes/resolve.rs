@@ -48,10 +48,10 @@ use crate::error::WarningKind;
 use crate::instans_precision::InstansPrecisionError;
 use crate::numeric_width::{WidthError, WidthLowerIssue};
 use crate::{
-    BareVariantLookup, CollectionKind, FuncSig, GenericParamDescriptor, GenericParamSort,
-    IndexExpr, ParamType, Primitive, QualifiedVariantPathLookup, Resolver, SchemaColumnDef,
-    SchemaDef, ScopeKind, SemanticError, SemanticErrorKind, SemanticGenericParamDefault,
-    SemanticParamMode, Symbol, SymbolKind, Type, TypeId, TypeTable,
+    BareVariantLookup, CollectionKind, ContinueTarget, FuncSig, GenericParamDescriptor,
+    GenericParamSort, IndexExpr, ParamType, Primitive, QualifiedVariantPathLookup, Resolver,
+    SchemaColumnDef, SchemaDef, ScopeKind, SemanticError, SemanticErrorKind,
+    SemanticGenericParamDefault, SemanticParamMode, Symbol, SymbolKind, Type, TypeId, TypeTable,
 };
 use radix_hir::DefId;
 use radix_lexer::Interner;
@@ -545,7 +545,7 @@ fn resolve_stmt(
             }
         }
         StmtKind::Fac(stmt) => {
-            resolver.enter_scope(ScopeKind::Loop);
+            resolver.enter_scope(fac_scope_kind(stmt));
             resolve_block(resolver, interner, &stmt.body, errors);
             resolver.exit_scope();
             if let Some(catch) = &stmt.catch {
@@ -581,16 +581,21 @@ fn resolve_stmt(
                 );
             }
         }
-        StmtKind::Perge(stmt) => {
-            if !resolver.in_loop() {
-                errors.push(
-                    SemanticError::structured(SemanticErrorKind::ContinueOutsideLoop, stmt.span)
-                        .with_arg("issue", "continue_outside_loop")
-                        .with_arg("keyword", "perge")
-                        .with_arg("context", "loop"),
-                );
-            }
-        }
+        StmtKind::Perge(stmt) => match resolver.continue_target() {
+            ContinueTarget::Loop => {}
+            ContinueTarget::FacBlock => errors.push(
+                SemanticError::structured(SemanticErrorKind::ContinueInsideFac, stmt.span)
+                    .with_arg("issue", "continue_inside_fac")
+                    .with_arg("keyword", "perge")
+                    .with_arg("context", "fac"),
+            ),
+            ContinueTarget::None => errors.push(
+                SemanticError::structured(SemanticErrorKind::ContinueOutsideLoop, stmt.span)
+                    .with_arg("issue", "continue_outside_loop")
+                    .with_arg("keyword", "perge")
+                    .with_arg("context", "loop"),
+            ),
+        },
         StmtKind::Iace(stmt) => resolve_expr(resolver, interner, &stmt.value, errors),
         StmtKind::Mori(stmt) => resolve_expr(resolver, interner, &stmt.value, errors),
         StmtKind::Tacet(_) => {}
@@ -780,6 +785,16 @@ fn resolve_block(
 
 /// Resolve one `cape` clause: bind its error local in a fresh block scope and
 /// resolve the handler body.
+/// Scope kind for a `fac` body: `fac … dum` repeats, so it is a loop; a
+/// plain `fac` block (with or without `cape`) is breakable only.
+fn fac_scope_kind(stmt: &radix_syntax::FacStmt) -> ScopeKind {
+    if stmt.while_.is_some() {
+        ScopeKind::Loop
+    } else {
+        ScopeKind::Breakable
+    }
+}
+
 fn resolve_catch_binding(
     resolver: &mut Resolver,
     interner: &Interner,
@@ -1327,7 +1342,7 @@ fn resolve_expr(
                 ClausuraBody::Expr(expr) => resolve_expr(resolver, interner, expr, errors),
                 ClausuraBody::Block(block) => resolve_block(resolver, interner, block, errors),
                 ClausuraBody::Fac(stmt) => {
-                    resolver.enter_scope(ScopeKind::Loop);
+                    resolver.enter_scope(fac_scope_kind(stmt));
                     resolve_block(resolver, interner, &stmt.body, errors);
                     resolver.exit_scope();
                     if let Some(catch) = &stmt.catch {

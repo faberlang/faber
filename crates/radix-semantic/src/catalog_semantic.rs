@@ -38,6 +38,7 @@ pub(crate) const SEMANTIC_ERROR_KINDS: &[SemanticErrorKind] = &[
     SemanticErrorKind::UseBeforeInit,
     SemanticErrorKind::BreakOutsideBreakable,
     SemanticErrorKind::ContinueOutsideLoop,
+    SemanticErrorKind::ContinueInsideFac,
     SemanticErrorKind::ReturnOutsideFunction,
     SemanticErrorKind::ReturnAbsent,
     SemanticErrorKind::NonExhaustiveMatch,
@@ -198,6 +199,12 @@ pub fn semantic_spec(kind: SemanticErrorKind) -> DiagnosticSpec {
         SemanticErrorKind::ContinueOutsideLoop => DiagnosticSpec {
             code: "SEM031",
             help: Some("use 'perge' inside a loop"),
+        },
+        SemanticErrorKind::ContinueInsideFac => DiagnosticSpec {
+            code: "SEM060",
+            help: Some(
+                "'perge' here targets the enclosing 'fac' block, which does not repeat; restructure with 'si'/'secus', or move 'perge' outside the 'fac' block",
+            ),
         },
         SemanticErrorKind::ReturnOutsideFunction => DiagnosticSpec {
             code: "SEM032",

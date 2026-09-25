@@ -1,0 +1,36 @@
++++
+term = "perge"
+kind = "reject"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "itera_stmt", "itera_binding", "range_expr", "range_tail", "fac_stmt", "cape_clause", "si_stmt", "arm", "perge_stmt", "equality", "equality_tail", "expression", "literal", "nota_stmt"]
+category = "transfer"
+summary = "Reject harness: perge whose nearest breakable construct is a fac block is a compile error (SEM060)."
+syntax = "for range 0‥3 const i { do { if i ≡ 1 { continue } } catch err { } }"
+related = ["rumpe", "fac", "cape"]
+locale = "en"
++++
+# =============================================================================
+# perge — reject harness: perge inside a fac block
+# =============================================================================
+# This exemplum intentionally fails to compile. The sibling .expected file
+# pins only the stable diagnostic identity, not paths or rendered prose.
+#
+# `rumpe` inside a `fac` block leaves the `fac` (see rumpe/fac-si-rumpe.fab).
+# `perge` targets the same construct as `rumpe`, and a `fac` block does not
+# repeat, so `perge` here has no meaning even though a loop encloses the
+# `fac`. Restructure with `si`/`secus`, or move `perge` outside the `fac`.
+# `perge` inside a loop nested in the `fac`, inside the `cape` arm, or inside
+# `fac … dum` stays legal.
+
+main {
+    for range 0‥3 const i {
+        do {
+            if i ≡ 1 {
+                continue
+            }
+            print i
+        }
+        catch err {
+            print "caught"
+        }
+    }
+}

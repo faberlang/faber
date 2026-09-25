@@ -2491,6 +2491,14 @@ help = "loop के भीतर 'perge' का उपयोग करें"
 message = "{keyword}, {context} के बाहर"
 help = "loop के भीतर 'perge' का उपयोग करें"
 
+[diagnostics.SEM060]
+message = "do block के भीतर continue"
+help = "'{perge}' बाहरी '{fac}' block को लक्षित करेगा, जो दोहराता नहीं है; '{si}'/'{secus}' से पुनर्गठित करें, या '{perge}' को '{fac}' block के बाहर ले जाएँ"
+
+[diagnostics.SEM060.issues.continue_inside_fac]
+message = "{perge} {fac} block के भीतर"
+help = "'{perge}' बाहरी '{fac}' block को लक्षित करेगा, जो दोहराता नहीं है; '{si}'/'{secus}' से पुनर्गठित करें, या '{perge}' को '{fac}' block के बाहर ले जाएँ"
+
 [diagnostics.SEM032]
 message = "function के बाहर return"
 help = "function के भीतर 'redde' का उपयोग करें"

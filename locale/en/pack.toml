@@ -2914,6 +2914,14 @@ help = "use '{perge}' inside a loop"
 message = "{keyword} outside {context}"
 help = "use '{perge}' inside a loop"
 
+[diagnostics.SEM060]
+message = "continue inside do block"
+help = "'{perge}' would target the enclosing '{fac}' block, which does not repeat; restructure with '{si}'/'{secus}', or move '{perge}' outside the '{fac}' block"
+
+[diagnostics.SEM060.issues.continue_inside_fac]
+message = "{perge} inside a {fac} block"
+help = "'{perge}' would target the enclosing '{fac}' block, which does not repeat; restructure with '{si}'/'{secus}', or move '{perge}' outside the '{fac}' block"
+
 [diagnostics.SEM032]
 message = "return outside function"
 help = "use '{redde}' inside a function"

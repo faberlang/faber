@@ -174,6 +174,7 @@ fn semantic_error_codes_are_stable() {
         (SemanticErrorKind::AssignmentTargetInvalid, "SEM021"),
         (SemanticErrorKind::BreakOutsideBreakable, "SEM030"),
         (SemanticErrorKind::ContinueOutsideLoop, "SEM031"),
+        (SemanticErrorKind::ContinueInsideFac, "SEM060"),
         (SemanticErrorKind::ReturnOutsideFunction, "SEM032"),
         (SemanticErrorKind::ReturnAbsent, "SEM033"),
         (SemanticErrorKind::NonExhaustiveMatch, "SEM040"),
