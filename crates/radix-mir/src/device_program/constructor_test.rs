@@ -1128,3 +1128,71 @@ fn constructor_declares_observation_cadence_and_effective_steps() {
         assert_eq!(plain_steps, 7, "no training facts → the declared count");
     });
 }
+
+/// An elementwise-only body is ONE whole-function kernel whose resources bind
+/// in the source parameter order — the order every emitter lays out the
+/// kernel's buffer indices in. `rk(x, v) = v ⊙ v + x` reads `v` before `x`;
+/// the read-order decomposition synthetic would bind `v` at slot 0 while the
+/// emitted kernel reads `x` there, silently swapping the operands on device.
+#[test]
+fn elementwise_only_body_binds_resources_in_source_param_order() {
+    let mut types = TypeTable::new();
+    let mut interner = Interner::new();
+    let tensor = rank1_tensor_ty(&mut types, 8);
+    let mut function = device_function(
+        1,
+        &mut interner,
+        "rk",
+        &[
+            (0, "x", tensor),
+            (1, "v", tensor),
+            (2, "t", tensor),
+            (3, "r", tensor),
+        ],
+        &[0, 1],
+        vec![
+            collection_statement(MirCollectionOp::TensorMul, &[1, 1], 2, tensor),
+            collection_statement(MirCollectionOp::TensorAdd, &[2, 0], 3, tensor),
+        ],
+        Some(MirOperand::Place(MirPlace::local(MirLocalId(3)))),
+        Vec::new(),
+        tensor,
+        true,
+    );
+    function.source = Some(DefId(1));
+    let validated = validated(&types, vec![function]);
+
+    let (program, _semantics, _steps) = build_device_program(
+        &validated,
+        &interner,
+        &MirCompanionMap::default(),
+        None,
+        DeviceProgramLifetime::SingleRun,
+        0,
+        &fixture_metadata(&validated.program().functions),
+    )
+    .expect("elementwise body materializes");
+
+    assert_eq!(program.kernels.len(), 1);
+    let kernel = &program.kernels[0];
+    assert_eq!(kernel.plan, CollectionKernelPlan::Elementwise);
+    let slots: Vec<(u32, &str, BufferRole)> = kernel
+        .resources
+        .iter()
+        .map(|resource| {
+            (
+                resource.binding.binding,
+                resource.buffer.name.as_str(),
+                resource.buffer.role,
+            )
+        })
+        .collect();
+    assert_eq!(
+        slots[..2],
+        [(0, "x", BufferRole::Input), (1, "v", BufferRole::Input)],
+        "input slots must follow the source parameter order"
+    );
+    assert_eq!(slots.len(), 3);
+    assert_eq!(slots[2].0, 2);
+    assert_eq!(slots[2].2, BufferRole::Output);
+}

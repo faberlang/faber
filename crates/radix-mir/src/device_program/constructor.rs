@@ -807,9 +807,17 @@ impl<'a> KernelBuilder<'a> {
                 function: function.id,
                 detail: error.message,
             });
+        // `Ok(None)` is the plan pass's elementwise-only verdict: the body
+        // carries no recipe and is ONE Elementwise kernel over the full ABI —
+        // the same reading the emitters' whole-function cross-check applies
+        // (`carried_plan_agrees(Elementwise, None)`). Routing it through the
+        // decomposition instead binds the read-order synthetic's params,
+        // which disagree with the whole-function buffer indices the emitters
+        // lay out (`v ⊙ v + x` would bind `v` at slot 0).
         if let Ok(signature) = &whole_signature
-            && let Ok(Some(plan)) = kernel_plan_for_function(function, signature, self.validation)
+            && let Ok(plan) = kernel_plan_for_function(function, signature, self.validation)
         {
+            let plan = plan.unwrap_or(CollectionKernelPlan::Elementwise);
             return self.emit_subchain(
                 function,
                 function,
