@@ -6,10 +6,26 @@
 //! (Go), `while (true) { … break; }` (TypeScript), `repeat { … break } while
 //! true` (Swift). Failable closures must emit their success value **after**
 //! the loop, not inside it before the `break`.
+//!
+//! PERGE THROUGH A FAC (ruling R3)
+//! ===============================
+//! `perge` targets the nearest loop; a plain `fac` block is not a loop, so
+//! `perge` inside a `fac` body continues the enclosing loop. The one-shot
+//! wrapper loop (and, on Go/TypeScript, the handled-body closure) would
+//! capture a bare `continue`, so such a `fac` statement is emitted as:
+//! declare a flag, label the wrapper, and lower each pass-through `perge` to
+//! "set flag; break wrapper". After the statement, `if flag { perge }`
+//! re-issues the `perge` in the enclosing context (which may itself be an
+//! outer `fac` wrapper). [`PergeRoutes`] carries that bookkeeping for one
+//! backend; only `fac` bodies with a pass-through `perge` change shape.
 
 use crate::CodeWriter;
 use radix_hir::visit::HirVisitor;
-use radix_hir::{HirBlock, HirStatementKind};
+use radix_hir::{
+    HirBlock, HirExpression, HirExpressionKind, HirId, HirStatement, HirStatementKind,
+};
+use rustc_hash::{FxHashMap, FxHashSet};
+use std::cell::{Cell, RefCell};
 
 /// Breakable-scope loop shape for each C-family backend.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -21,6 +37,14 @@ pub enum BreakableLoopStyle {
 }
 
 impl BreakableLoopStyle {
+    /// Label prefix for a labeled wrapper loop (`'k0: loop {`, `k0: for {`).
+    fn label_prefix(self, label: &str) -> String {
+        match self {
+            Self::Rust => format!("'{label}: "),
+            _ => format!("{label}: "),
+        }
+    }
+
     fn header(self) -> &'static str {
         match self {
             Self::Rust => "loop {",
@@ -95,6 +119,207 @@ pub fn block_contains_rumpe(block: &HirBlock) -> bool {
     finder.found
 }
 
+/// Whether control may leave `block`'s wrapper loop early: a `rumpe`, or a
+/// `perge` that passes through this `fac` body (ruling R3). Either path
+/// resumes after the wrapper, so post-wrapper glue must stay reachable.
+#[must_use]
+pub fn block_may_exit_early(block: &HirBlock) -> bool {
+    block_contains_rumpe(block) || !passthrough_perge_sites(block).is_empty()
+}
+
+/// Body of a plain `fac` expression (with or without `cape`): a breakable
+/// block, possibly wrapped as the effective body of a handled expression.
+#[must_use]
+pub fn fac_expr_body(expr: &HirExpression) -> Option<&HirBlock> {
+    match &expr.kind {
+        HirExpressionKind::Block(block) if block.breakable.is_some() => Some(block),
+        HirExpressionKind::Handled { body, .. } => {
+            if body.breakable.is_some() {
+                return Some(body);
+            }
+            if body.statements.is_empty()
+                && let Some(inner) = body.expr.as_deref()
+                && let HirExpressionKind::Block(block) = &inner.kind
+                && block.breakable.is_some()
+            {
+                return Some(block);
+            }
+            None
+        }
+        _ => None,
+    }
+}
+
+/// [`fac_expr_body`] for an expression statement.
+#[must_use]
+pub fn fac_statement_body(stmt: &HirStatement) -> Option<&HirBlock> {
+    match &stmt.kind {
+        HirStatementKind::Expr(expr) => fac_expr_body(expr),
+        _ => None,
+    }
+}
+
+/// Statements inside a `fac` body whose `perge` passes through that body to
+/// an enclosing loop (ruling R3).
+///
+/// Returns the ids of `perge` statements, plus nested `fac` statements that
+/// re-issue a pass-through `perge` after their own wrapper. The search stops
+/// at loops (they own their `perge`) and closures (`perge` never crosses one).
+#[must_use]
+pub fn passthrough_perge_sites(body: &HirBlock) -> Vec<HirId> {
+    struct PergeSites {
+        sites: Vec<HirId>,
+    }
+
+    impl HirVisitor for PergeSites {
+        fn visit_stmt(&mut self, stmt: &HirStatement) {
+            if matches!(stmt.kind, HirStatementKind::Perge) {
+                self.sites.push(stmt.id);
+                return;
+            }
+            if let Some(inner) = fac_statement_body(stmt)
+                && !passthrough_perge_sites(inner).is_empty()
+            {
+                // The nested `fac` routes its own body; its re-issue and its
+                // `cape` arm run in this body.
+                self.sites.push(stmt.id);
+                if let HirStatementKind::Expr(expr) = &stmt.kind
+                    && let HirExpressionKind::Handled { catch, .. } = &expr.kind
+                {
+                    self.visit_block(&catch.body);
+                }
+                return;
+            }
+            radix_hir::visit::walk_stmt(self, stmt);
+        }
+
+        fn visit_expr(&mut self, expr: &HirExpression) {
+            if matches!(
+                expr.kind,
+                HirExpressionKind::Loop(_)
+                    | HirExpressionKind::Dum(..)
+                    | HirExpressionKind::Itera(..)
+                    | HirExpressionKind::IteraLockstep { .. }
+                    | HirExpressionKind::IteraRange { .. }
+                    | HirExpressionKind::Summa { .. }
+                    | HirExpressionKind::Extremum { .. }
+                    | HirExpressionKind::FirstMatch { .. }
+                    | HirExpressionKind::Ad { .. }
+                    | HirExpressionKind::Clausura(..)
+            ) {
+                return;
+            }
+            radix_hir::visit::walk_expr(self, expr);
+        }
+    }
+
+    let mut finder = PergeSites { sites: Vec::new() };
+    for stmt in &body.statements {
+        finder.visit_stmt(stmt);
+    }
+    if let Some(expr) = body.expr.as_deref() {
+        finder.visit_expr(expr);
+    }
+    finder.sites
+}
+
+/// Per-backend routing state for `perge` through `fac` bodies (ruling R3).
+///
+/// [`PergeRoutes::open`] claims a `fac` statement with a pass-through
+/// `perge` and returns its route index; the backend then emits the flag
+/// declaration, the statement (its wrapper labeled via
+/// [`PergeRoutes::wrapper`], each routed `perge` lowered as "set flag; break
+/// wrapper"), and the re-issue, and finally calls [`PergeRoutes::close`].
+#[derive(Debug, Default)]
+pub struct PergeRoutes {
+    next: Cell<u32>,
+    sites: RefCell<FxHashMap<HirId, u32>>,
+    wrappers: RefCell<FxHashMap<usize, u32>>,
+    opened: RefCell<FxHashSet<HirId>>,
+    owned: RefCell<FxHashMap<u32, OpenRoute>>,
+}
+
+/// What one open route claimed: the `fac` statement, its wrapper body key,
+/// and its pass-through sites.
+#[derive(Debug)]
+struct OpenRoute {
+    stmt_id: HirId,
+    wrapper_key: usize,
+    sites: Vec<HirId>,
+}
+
+impl PergeRoutes {
+    /// Claim `stmt` when it is a `fac` statement whose body a `perge`
+    /// passes through. Returns `None` for every other statement, and for a
+    /// statement already open (the backend's re-entrant emission call).
+    pub fn open(&self, stmt: &HirStatement) -> Option<u32> {
+        if self.opened.borrow().contains(&stmt.id) {
+            return None;
+        }
+        let body = fac_statement_body(stmt)?;
+        let sites = passthrough_perge_sites(body);
+        if sites.is_empty() {
+            return None;
+        }
+        let route = self.next.get();
+        self.next.set(route + 1);
+        let key = std::ptr::from_ref(body) as usize;
+        self.opened.borrow_mut().insert(stmt.id);
+        self.wrappers.borrow_mut().insert(key, route);
+        {
+            let mut map = self.sites.borrow_mut();
+            for site in &sites {
+                map.insert(*site, route);
+            }
+        }
+        self.owned.borrow_mut().insert(
+            route,
+            OpenRoute {
+                stmt_id: stmt.id,
+                wrapper_key: key,
+                sites,
+            },
+        );
+        Some(route)
+    }
+
+    /// Release a route opened by [`PergeRoutes::open`].
+    pub fn close(&self, route: u32) {
+        let Some(OpenRoute {
+            stmt_id,
+            wrapper_key: key,
+            sites,
+        }) = self.owned.borrow_mut().remove(&route)
+        else {
+            return;
+        };
+        self.opened.borrow_mut().remove(&stmt_id);
+        self.wrappers.borrow_mut().remove(&key);
+        let mut map = self.sites.borrow_mut();
+        for site in sites {
+            if map.get(&site) == Some(&route) {
+                map.remove(&site);
+            }
+        }
+    }
+
+    /// Route for a `perge` (or a nested `fac` re-issue): `Some(route)` when
+    /// it exits an open `fac` wrapper, `None` when a plain `continue` works.
+    #[must_use]
+    pub fn route(&self, stmt_id: HirId) -> Option<u32> {
+        self.sites.borrow().get(&stmt_id).copied()
+    }
+
+    /// Route whose wrapper loop is `block`, when that wrapper needs a label.
+    #[must_use]
+    pub fn wrapper(&self, block: &HirBlock) -> Option<u32> {
+        self.wrappers
+            .borrow()
+            .get(&(std::ptr::from_ref(block) as usize))
+            .copied()
+    }
+}
+
 /// Whether a breakable loop needs a fallthrough `break` after the inner body.
 ///
 /// `redde` lowers to a return inside the handled closure, so a trailing
@@ -105,7 +330,7 @@ pub fn block_needs_fallthrough_break(block: &HirBlock) -> bool {
     if block_is_immediate_rumpe(block) {
         return false;
     }
-    if block_contains_rumpe(block) {
+    if block_may_exit_early(block) {
         return true;
     }
     if block
@@ -132,7 +357,27 @@ pub fn write_breakable_scope<F>(
 where
     F: FnOnce(&mut CodeWriter),
 {
+    write_labeled_breakable_scope(block, writer, loop_style, None, emit_inner)
+}
+
+/// [`write_breakable_scope`] with an optional wrapper-loop label.
+///
+/// The label is set only for a `fac` body with a pass-through `perge` (see
+/// [`PergeRoutes::wrapper`]); every other body keeps the unlabeled shape.
+pub fn write_labeled_breakable_scope<F>(
+    block: &HirBlock,
+    writer: &mut CodeWriter,
+    loop_style: BreakableLoopStyle,
+    label: Option<&str>,
+    emit_inner: F,
+) -> bool
+where
+    F: FnOnce(&mut CodeWriter),
+{
     if block.breakable.is_some() {
+        if let Some(label) = label {
+            writer.write(&loop_style.label_prefix(label));
+        }
         writer.writeln(loop_style.header());
         writer.indented(emit_inner);
         if block_needs_fallthrough_break(block) {

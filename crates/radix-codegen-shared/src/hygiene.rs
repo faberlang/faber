@@ -154,6 +154,13 @@ pub fn rune_index(scope: u32) -> String {
     format!("n{scope}")
 }
 
+/// `perge`-through-`fac` flag and wrapper-loop label (ruling R3). Labels
+/// live in their own namespace on every target, so one name serves both.
+#[must_use]
+pub fn perge_route(route: u32) -> String {
+    format!("k{route}")
+}
+
 /// Left/right operand bindings for an IEEE 754 float `minimum`/`maximum`.
 #[must_use]
 pub fn extremum_operands(id: u32) -> (String, String) {

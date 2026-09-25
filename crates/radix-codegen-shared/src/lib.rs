@@ -127,6 +127,13 @@ impl CodeWriter {
         self.write("\n");
     }
 
+    /// End the current line unless the writer already sits at a line start.
+    pub fn ensure_line_start(&mut self) {
+        if !self.at_line_start {
+            self.newline();
+        }
+    }
+
     /// Increase indentation for subsequent lines.
     pub fn indent(&mut self) {
         self.indent += 1;

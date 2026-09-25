@@ -165,3 +165,90 @@ fn plain_block_wraps_except_swift() {
     assert!(!wrapped);
     assert_eq!(writer.finish(), "stmt\n");
 }
+
+fn expr_stmt(id: u32, kind: HirExpressionKind) -> HirStatement {
+    HirStatement {
+        id: HirId(id),
+        kind: HirStatementKind::Expr(HirExpression {
+            id: HirId(id + 1000),
+            kind,
+            ty: None,
+            span: Span::new(0, 0),
+        }),
+        span: Span::new(0, 0),
+    }
+}
+
+/// Ruling R3: a `perge` directly in a `fac` body passes through it.
+#[test]
+fn perge_in_fac_body_is_a_passthrough_site() {
+    let body = breakable_block(vec![perge_stmt()]);
+    assert_eq!(passthrough_perge_sites(&body), vec![HirId(2)]);
+    assert!(block_may_exit_early(&body));
+}
+
+/// A `perge` inside a loop nested in the `fac` targets that loop.
+#[test]
+fn perge_in_nested_loop_is_not_a_passthrough_site() {
+    let body = breakable_block(vec![expr_stmt(
+        10,
+        HirExpressionKind::Loop(plain_block(vec![perge_stmt()])),
+    )]);
+    assert!(passthrough_perge_sites(&body).is_empty());
+    assert!(!block_may_exit_early(&body));
+}
+
+/// A nested `fac` with a pass-through `perge` is a re-issue site of the
+/// outer body; its own `perge` belongs to the nested route.
+#[test]
+fn nested_fac_with_passthrough_perge_is_a_reissue_site() {
+    let inner = breakable_block(vec![perge_stmt()]);
+    let outer = breakable_block(vec![expr_stmt(20, HirExpressionKind::Block(inner))]);
+    assert_eq!(passthrough_perge_sites(&outer), vec![HirId(20)]);
+}
+
+/// Opening a route registers its sites and wrapper; closing releases them.
+#[test]
+fn perge_routes_open_route_and_close() {
+    let stmt = expr_stmt(
+        30,
+        HirExpressionKind::Block(breakable_block(vec![perge_stmt()])),
+    );
+    let routes = PergeRoutes::default();
+    let route = routes
+        .open(&stmt)
+        .expect("fac with pass-through perge opens");
+    assert_eq!(routes.route(HirId(2)), Some(route));
+    let body = fac_statement_body(&stmt).expect("fac body");
+    assert_eq!(routes.wrapper(body), Some(route));
+    assert_eq!(routes.open(&stmt), None, "re-entrant open is a no-op");
+    routes.close(route);
+    assert_eq!(routes.route(HirId(2)), None);
+    assert_eq!(routes.wrapper(body), None);
+
+    let plain = expr_stmt(
+        40,
+        HirExpressionKind::Block(breakable_block(vec![rumpe_stmt()])),
+    );
+    assert_eq!(routes.open(&plain), None, "no pass-through perge, no route");
+}
+
+/// A routed wrapper carries its label in each target's syntax.
+#[test]
+fn labeled_breakable_scope_prefixes_the_wrapper() {
+    for (style, expected) in [
+        (BreakableLoopStyle::Rust, "'k0: loop {\n    body\n}"),
+        (BreakableLoopStyle::Go, "k0: for {\n    body\n}"),
+        (
+            BreakableLoopStyle::TypeScript,
+            "k0: while (true) {\n    body\n}",
+        ),
+    ] {
+        let block = breakable_block(vec![rumpe_stmt()]);
+        let mut writer = CodeWriter::new();
+        write_labeled_breakable_scope(&block, &mut writer, style, Some("k0"), |w| {
+            w.writeln("body");
+        });
+        assert_eq!(writer.finish(), expected, "{style:?}");
+    }
+}
