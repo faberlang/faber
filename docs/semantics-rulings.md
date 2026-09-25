@@ -30,13 +30,22 @@ needed. Precedence is unchanged: `coalesce` binds tighter than the
 multiplicative operators, and its right operand is a unary expression
 (`vel_expr`, `vel_rhs`).
 
-## R3. `continue` cannot target a `do` block (2026-09-24)
+## R3. `break` stops at a `do` block; `continue` passes through it (2026-09-25)
 
-`break` inside a `do { } catch` block leaves the `do` block. `break` and
-`continue` must target the same construct, and continuing a `do` block has no
-meaning. So a `continue` whose nearest enclosing breakable construct is a `do`
-block is a compile error. A `continue` inside a loop that is itself nested in
-the `do` block stays legal.
+Supersedes the 2026-09-24 draft, which rejected `continue` inside a `do` block.
+
+- **`break`** (la `rumpe`) targets the nearest breakable construct: a loop or
+  a `do` block. `break` inside `do { } catch` leaves the `do` block.
+- **`continue`** (la `perge`) targets the nearest loop in the same function.
+  `do … while` is a loop. A bare `do` block is not a loop, so `continue`
+  passes through it, and through `catch` arms, to the enclosing loop. It does
+  not cross a function or closure boundary. With no loop in the same function,
+  `continue` is a compile error.
+- Leaving a `do … catch` by `break` or `continue` does not run the `catch`,
+  because neither is an error.
+
+The two words mean different things: `break` leaves a block, and `continue`
+starts the next iteration. A `do` block has no iterations.
 
 ## R4. Closures share the enclosing scope unless marked `free` (2026-09-24)
 
