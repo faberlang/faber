@@ -907,6 +907,12 @@ pub enum MirIntrinsic {
     /// argument is the source tensor operand; the result is the broadcast
     /// sum.
     FilumSum(MirFilumSumOp),
+    /// Deep duplicate-then-own for the `copy` access marker (mutability
+    /// engine D-6): the lone argument is the source value; the result is an
+    /// independent deep copy of the same payload type — no container, field,
+    /// or element storage is shared with the source, which stays live.
+    /// Lowered at `copy` bind initialization and `copy` parameter entry.
+    Duplicate,
 }
 
 /// Filum declaration facts carried by [`MirIntrinsic::FilumSum`] (SFR-5):

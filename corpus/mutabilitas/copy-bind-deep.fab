@@ -1,0 +1,29 @@
++++
+term = "mutabilitas"
+kind = "concept"
+grammar = ["fab_file", "program", "incipit_stmt", "statement", "statement_core", "block_stmt", "binding_decl", "fixum_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "genus_decl", "genus_member", "field_decl", "expression", "assignment", "place", "literal", "typed_constructor", "field_list", "field_init", "expr_stmt", "call_expr", "member_suffix", "nota_stmt", "type_arguments", "type_argument", "array_literal"]
+category = "type"
+summary = "D-6: a copy bind deep-duplicates its source; list fields inside are not shared."
+syntax = "var copy V3 b ← a"
+related = ["genus", "lista"]
+locale = "en"
++++
+# =============================================================================
+# mutabilitas — deep copy bind (D-6)
+# =============================================================================
+
+class Holder {
+    f64 x = 0.0
+    list<int> marks = []
+}
+
+main {
+    const Holder a ← Holder { x = 1.0 }
+    var copy Holder b ← a
+    b.x ← 5.0
+    b.marks.append(1)
+    print a.x
+    print a.marks.length()
+    print b.x
+    print b.marks.length()
+}

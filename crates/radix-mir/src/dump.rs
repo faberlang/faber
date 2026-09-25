@@ -443,6 +443,7 @@ fn intrinsic(value: &MirIntrinsic) -> String {
             op.term_binder_name.map_or(0, |s| s.0),
             op.coordinates.len()
         ),
+        MirIntrinsic::Duplicate => "duplicate".to_owned(),
     }
 }
 

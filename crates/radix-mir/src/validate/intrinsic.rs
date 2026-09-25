@@ -253,6 +253,14 @@ impl Validator<'_, '_> {
                     self.error(span, "filum lane width must be a positive power of two");
                 }
             }
+            // `copy` duplicate: one source operand; the result keeps the
+            // source payload type (access markers are source-level wrappers).
+            MirIntrinsic::Duplicate => {
+                self.require_arg_count(call.args.len(), 1, span, "duplicate runtime call");
+                if let Some(arg) = call.args.first() {
+                    self.validate_operand(scope, arg, span);
+                }
+            }
         }
     }
 

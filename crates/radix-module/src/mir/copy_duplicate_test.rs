@@ -1,0 +1,154 @@
+//! `copy` marker semantics on the MIR path (mutability-engine D-6; operator
+//! ruling 2026-09-24): a `copy` bind or parameter is a deep duplicate at
+//! acquisition and the source stays live. Unmarked binds alias (D-1).
+
+use crate::codegen::Target;
+use crate::driver::{Config, Session};
+use crate::mir::{BufferHost, RunSourceError, run_source};
+
+fn run(name: &str, source: &str) -> Vec<String> {
+    let session = Session::new(Config::default().with_target(Target::HirTypeScript));
+    let mut host = BufferHost::default();
+    match run_source(&session, name, source, &mut host) {
+        Ok(()) => host.stdout_lines,
+        Err(RunSourceError::Frontend(errors)) => panic!("fixture frontend errors: {errors:?}"),
+        Err(RunSourceError::Mir(errors)) => panic!("fixture MIR errors: {errors:?}"),
+        Err(RunSourceError::Stepper(errors)) => panic!("fixture runner errors: {errors:?}"),
+    }
+}
+
+fn dump(source: &str) -> String {
+    let session = Session::new(Config::default().with_target(Target::HirTypeScript));
+    let mut unit =
+        crate::driver::analyze_source(&session, "copy.fab", source, crate::driver::AnalyzeRequest::default())
+            .unwrap_or_else(|diagnostics| panic!("analysis succeeds: {diagnostics:?}"));
+    crate::mir::dump_analyzed_unit(&mut unit).unwrap_or_else(|errors| panic!("MIR lowering succeeds: {errors:?}"))
+}
+
+const COPY_PARAM: &str = r#"+++
+locale = "en"
++++
+fn take(copy list<int> xs) → int {
+    xs.append(5)
+    return xs.length()
+}
+main {
+    const list<int> a ← [1, 2]
+    print take(a)
+    print a.length()
+}
+"#;
+
+#[test]
+fn copy_param_duplicates_at_entry() {
+    assert!(dump(COPY_PARAM).contains("runtime duplicate(_0)"));
+    assert_eq!(run("copy-param.fab", COPY_PARAM), vec!["3", "2"]);
+}
+
+const COPY_BIND_DEEP: &str = r#"+++
+locale = "en"
++++
+class V3 {
+    f64 x = 0.0
+    list<int> ys = []
+}
+main {
+    var V3 a ← V3 { x = 1.0 }
+    var copy V3 b ← a
+    b.x ← 5.0
+    b.ys.append(1)
+    print a.x
+    print a.ys.length()
+    print b.x
+    print b.ys.length()
+}
+"#;
+
+#[test]
+fn copy_bind_duplicates_deeply() {
+    assert!(dump(COPY_BIND_DEEP).contains("runtime duplicate(_0)"));
+    assert_eq!(run("copy-bind.fab", COPY_BIND_DEEP), vec!["1.0", "0", "5.0", "1"]);
+}
+
+const COPY_GENUS_PARAM: &str = r#"+++
+locale = "en"
++++
+class C {
+    int n = 0
+    fn inc() → void {
+        self.n ← self.n + 1
+    }
+}
+fn bumpcopy(copy C c) → void {
+    c.inc()
+    print c.n
+}
+main {
+    var C c ← C {}
+    c.inc()
+    bumpcopy(c)
+    print c.n
+}
+"#;
+
+#[test]
+fn copy_genus_param_leaves_caller_untouched() {
+    assert_eq!(run("copy-genus-param.fab", COPY_GENUS_PARAM), vec!["2", "1"]);
+}
+
+const GENUS_BIND_ALIAS: &str = r#"+++
+locale = "en"
++++
+class V3 {
+    f64 x = 0.0
+}
+main {
+    var V3 a ← V3 { x = 1.0 }
+    var V3 b ← a
+    b.x ← 5.0
+    print a.x
+}
+"#;
+
+#[test]
+fn unmarked_genus_bind_aliases() {
+    assert_eq!(run("genus-alias.fab", GENUS_BIND_ALIAS), vec!["5.0"]);
+}
+
+#[cfg(feature = "mir-llvm")]
+fn llvm_text(name: &str, source: &str) -> String {
+    let result = crate::program::compile_cli_source(name, source, crate::codegen::Target::MirLlvm);
+    for diagnostic in &result.diagnostics {
+        assert!(!diagnostic.is_error(), "fixture {name} failed: {diagnostic:?}");
+    }
+    match result.output {
+        Some(crate::Output::LlvmText(out)) => out.code,
+        _ => panic!("no LLVM text for {name}: {:?}", result.diagnostics),
+    }
+}
+
+/// LLVM genus locals are inline aggregates; the alias bind must address the
+/// source slot instead of copying the aggregate into a fresh alloca.
+#[cfg(feature = "mir-llvm")]
+#[test]
+fn llvm_genus_bind_addresses_source_slot() {
+    let code = llvm_text("genus-alias.fab", GENUS_BIND_ALIAS);
+    let main = code
+        .find("define")
+        .map_or(code.as_str(), |start| &code[start..]);
+    assert!(
+        main.contains("%l1.addr = getelementptr inbounds { double }, ptr %l0.addr, i32 0"),
+        "alias bind must address the source slot:\n{main}"
+    );
+    assert!(!main.contains("%l1.addr = alloca"), "an alias bind owns no storage:\n{main}");
+}
+
+#[cfg(feature = "mir-llvm")]
+#[test]
+fn llvm_copy_param_clones_the_lista() {
+    let code = llvm_text("copy-param.fab", COPY_PARAM);
+    assert!(
+        code.contains("@__faber_rt_v1_array_clone("),
+        "copy parameter entry must clone the lista:\n{code}"
+    );
+}
