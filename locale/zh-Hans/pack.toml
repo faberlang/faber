@@ -559,6 +559,10 @@ help = "使用有效语句形式"
 message = "ad 只能用于表达式位置"
 help = "使用 {replacement}"
 
+[diagnostics.PARSE020.issues.fac_cape_after_dum]
+message = "在 '{fac}' 循环中，'{cape}' 必须位于 '{dum}' 之前"
+help = "将处理器写在条件之前：{fac} … {cape} … {dum} …"
+
 [diagnostics.PARSE021]
 message = "缺少条件"
 help = "添加条件表达式"

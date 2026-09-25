@@ -559,6 +559,10 @@ help = "dùng dạng câu lệnh hợp lệ"
 message = "ad chỉ hợp lệ ở vị trí biểu thức"
 help = "dùng {replacement}"
 
+[diagnostics.PARSE020.issues.fac_cape_after_dum]
+message = "'{cape}' phải đứng trước '{dum}' trong vòng lặp '{fac}'"
+help = "viết trình xử lý trước điều kiện: {fac} … {cape} … {dum} …"
+
 [diagnostics.PARSE021]
 message = "thiếu điều kiện"
 help = "thêm một biểu thức điều kiện"

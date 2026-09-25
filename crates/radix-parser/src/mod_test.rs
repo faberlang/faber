@@ -3259,6 +3259,32 @@ fn closure_fac_body_dum_rejected() {
 }
 
 #[test]
+fn fac_cape_after_dum_rejected_at_cape() {
+    // Grammar order is `fac block cape_clause? (dum expression)?`; a handler
+    // written after the loop condition is a parse error at the `cape` token,
+    // never a stray `cape err { … }` statement of unknown identifiers.
+    let source = "fac { tacet } dum verum cape err { tacet }";
+    let result = parse_program(source);
+    let err = result
+        .errors
+        .iter()
+        .find(|err| {
+            err.kind == ParseErrorKind::StatementInvalid
+                && err
+                    .args
+                    .iter()
+                    .any(|arg| arg.name == "issue" && arg.value == "fac_cape_after_dum")
+        })
+        .unwrap_or_else(|| panic!("expected fac_cape_after_dum, got {:?}", result.errors));
+    assert_parse_error_has_no_legacy_message(err);
+    let cape_at = u32::try_from(source.find("cape").expect("cape token")).expect("offset fits");
+    assert_eq!(
+        err.span.start, cape_at,
+        "diagnostic must point at the cape token"
+    );
+}
+
+#[test]
 fn parses_structured_cape_attachment_targets() {
     let result = parse_ok(
         r"

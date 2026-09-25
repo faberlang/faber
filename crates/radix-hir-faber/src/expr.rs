@@ -1286,10 +1286,10 @@ impl super::FaberCodegen<'_> {
                 }
                 self.write_block_end_trivia(loop_block, writer);
             });
-            writer.write("} ");
-            writer.write(surface.contextual_keyword("dum"));
-            writer.write(" ");
-            self.write_expr(cond, names, surface, writer);
+            // Grammar order is `fac block cape_clause? (dum expression)?`:
+            // the handler precedes the loop condition. Writing `cape` after
+            // `dum cond` is rejected on re-parse (PARSE020 `fac_cape_after_dum`).
+            writer.write("}");
             writer.newline();
             writer.write(surface.keyword(TokenKind::Cape));
             writer.write(" ");
@@ -1300,6 +1300,10 @@ impl super::FaberCodegen<'_> {
                 surface,
                 writer,
             );
+            writer.write(" ");
+            writer.write(surface.contextual_keyword("dum"));
+            writer.write(" ");
+            self.write_expr(cond, names, surface, writer);
             return;
         }
 

@@ -559,6 +559,10 @@ help = "ใช้รูปแบบคำสั่งที่ถูกต้อ
 message = "ad ใช้ได้เฉพาะในตำแหน่งนิพจน์"
 help = "ใช้ {replacement}"
 
+[diagnostics.PARSE020.issues.fac_cape_after_dum]
+message = "ในลูป '{fac}' ต้องเขียน '{cape}' ก่อน '{dum}'"
+help = "เขียนตัวจัดการก่อนเงื่อนไข: {fac} … {cape} … {dum} …"
+
 [diagnostics.PARSE021]
 message = "ขาดเงื่อนไข"
 help = "เพิ่มนิพจน์เงื่อนไข"

@@ -185,33 +185,116 @@ impl super::FaberCodegen<'_> {
         self.write_si_branch_body(then_block, names, surface, writer);
 
         if let Some(catch) = catch {
-            writer.newline();
-            writer.write(surface.keyword(TokenKind::Cape));
-            writer.write(" ");
-            self.write_cape_block_named(
-                &catch.body,
-                Some(catch.binding_name),
-                names,
-                surface,
-                writer,
-            );
+            self.write_arm_cape(catch, names, surface, writer);
         }
 
         let mut next_else = else_block;
         while let Some(block) = next_else {
             writer.newline();
-            if let Some((sin_cond, sin_then, sin_else)) = self.as_sin_branch(block) {
+            if let Some((sin_cond, sin_then, sin_catch, sin_else)) = self.as_sin_arm(block) {
                 writer.write(surface.contextual_keyword("sin"));
                 writer.write(" ");
                 self.write_expr(sin_cond, names, surface, writer);
                 self.write_si_branch_body(sin_then, names, surface, writer);
+                if let Some(sin_catch) = sin_catch {
+                    self.write_arm_cape(sin_catch, names, surface, writer);
+                }
                 next_else = sin_else;
+            } else if let Some((body, else_catch)) = self.as_secus_arm_catch(block) {
+                // The handled body is the authored arm block itself; bracing
+                // it keeps the handler attached to the `secus` arm instead of
+                // compacting the synthetic tail into `ergo redde fac …`.
+                writer.write(surface.contextual_keyword("secus"));
+                writer.writeln(" {");
+                writer.indented(|writer| {
+                    self.write_block(body, names, surface, writer);
+                    self.write_block_end_trivia(body, writer);
+                });
+                writer.write("}");
+                self.write_arm_cape(else_catch, names, surface, writer);
+                break;
             } else {
                 writer.write(surface.contextual_keyword("secus"));
                 self.write_si_branch_body(block, names, surface, writer);
                 break;
             }
         }
+    }
+
+    /// Write an arm-attached `cape` clause on its own line after the arm body.
+    fn write_arm_cape(
+        &self,
+        catch: &HirCape,
+        names: &FxHashMap<DefId, Symbol>,
+        surface: &impl KeywordSurface,
+        writer: &mut CodeWriter,
+    ) {
+        writer.newline();
+        writer.write(surface.keyword(TokenKind::Cape));
+        writer.write(" ");
+        self.write_cape_block_named(
+            &catch.body,
+            Some(catch.binding_name),
+            names,
+            surface,
+            writer,
+        );
+    }
+
+    /// Detect an else-block that is a `sin` arm, with or without its own
+    /// arm-attached `cape` handler.
+    ///
+    /// Unlike [`FaberCodegen::as_sin_branch`] (the compact `sic … secus …`
+    /// gate, which has no handler slot), the statement chain can carry a
+    /// per-arm `cape`, so a nested conditional with `then_catch` still
+    /// flattens to `sin cond { … } cape err { … }`.
+    #[allow(clippy::type_complexity)]
+    fn as_sin_arm<'a>(
+        &self,
+        block: &'a HirBlock,
+    ) -> Option<(
+        &'a HirExpression,
+        &'a HirBlock,
+        Option<&'a HirCape>,
+        Option<&'a HirBlock>,
+    )> {
+        if !block.statements.is_empty() {
+            return None;
+        }
+        let expr = block.expr.as_ref()?;
+        if let HirExpressionKind::Si {
+            cond,
+            then_block,
+            then_catch,
+            else_block,
+        } = &expr.kind
+        {
+            Some((cond, then_block, then_catch.as_deref(), else_block.as_ref()))
+        } else {
+            None
+        }
+    }
+
+    /// Detect a `secus { … } cape err { … }` arm.
+    ///
+    /// Lowering wraps a handled else-arm as a block whose only content is a
+    /// tail `Handled` expression over the authored arm block. The authored
+    /// arm block never carries a tail expression, which separates it from a
+    /// `fac` statement (whose `Handled` body wraps a tail `Block`/`Loop`)
+    /// and from an authored `secus { fac { … } cape … }` (a statement, not a
+    /// tail).
+    fn as_secus_arm_catch<'a>(&self, block: &'a HirBlock) -> Option<(&'a HirBlock, &'a HirCape)> {
+        if !block.statements.is_empty() {
+            return None;
+        }
+        let expr = block.expr.as_ref()?;
+        let HirExpressionKind::Handled { body, catch } = &expr.kind else {
+            return None;
+        };
+        if body.expr.is_some() {
+            return None;
+        }
+        Some((body, catch))
     }
 
     /// Re-sugar a guard-desugared conditional back to `requirit`/`reice`.

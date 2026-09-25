@@ -17,6 +17,10 @@ mod convert_regression_test;
 #[path = "canonical_test.rs"]
 mod canonical_test;
 
+#[cfg(test)]
+#[path = "cape_roundtrip_test.rs"]
+mod cape_roundtrip_test;
+
 use crate::lexer::TokenKind;
 use crate::locale::{self, TypeBindingKind};
 use radix_hir_faber::KeywordSurface as LeafKeywordSurface;
