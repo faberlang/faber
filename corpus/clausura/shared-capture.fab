@@ -1,0 +1,81 @@
++++
+term = "clausura"
+kind = "keyword"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "functio_decl", "incipit_stmt", "fixum_decl", "clausura_expr", "compact_clausura_expr", "clausura_signature", "clausura_param", "clausura_params", "clausura_joint", "return_clause", "fac_block", "expr_stmt", "assignment", "itera_stmt", "expression", "additive_expr", "multiplicative_expr", "call_expr", "call_suffix", "argument_list", "argument", "member_suffix", "literal", "nota_stmt"]
+category = "function"
+canonical = false
+summary = "An unmarked closure shares the enclosing scope: captured names are the enclosing bindings, by reference."
+syntax = "(<params>) → <type> ∴ <expression>"
+aliases = ["shared capture", "capture by reference"]
+related = ["clausura", "libera", "∴"]
+locale = "en"
++++
+# =============================================================================
+# clausura — shared capture (captured names are the enclosing bindings)
+# =============================================================================
+#
+# What this teaches:
+#   • By reference — an unmarked closure does not copy what it captures; a
+#     captured name IS the enclosing binding, so a later outer write is
+#     visible inside the closure
+#   • Writes flow out — a closure that assigns a captured `var` changes the
+#     enclosing binding; an escaping closure (`counter`) keeps its own
+#     binding alive
+#   • Fresh loop bindings — `for … const i` binds a new `i` each iteration,
+#     so closures made in a loop each see their own value
+#   • Capture-free — mark a closure `free` (la `libera`) to forbid capture
+#
+# Common mistakes:
+#   • expecting a snapshot — capture is not a copy; read the value into a
+#     `const` first if a snapshot is wanted
+#
+# See also: clausura, libera, ∴
+# =============================================================================
+
+# clausura — shared capture
+#
+# EXPECTED OUTPUT:
+#   shared-capture.expected
+
+fn counter() → () → int {
+    var int c ← 0
+    return () → int ∴ do {
+        c ← c + 1
+        return c
+    }
+}
+
+fn adder(int k) → (int) → int {
+    return int x → int ∴ x + k
+}
+
+main {
+    # An outer write after capture is visible inside.
+    var int n ← 1
+    const () → int peek ← () → int ∴ n
+    n ← 5
+    print peek()
+
+    # A closure write is visible outside.
+    const () → vacuum bump ← () → vacuum ∴ do { n ← n + 1 }
+    bump()
+    print n
+
+    # Each escaping counter owns its binding.
+    const () → int k ← counter()
+    const () → int j ← counter()
+    print k()
+    print k()
+    print j()
+
+    # Loop bindings are fresh per iteration.
+    var list<() → int> fs ← empty
+    for range 0‥3 const i {
+        fs.append(() → int ∴ i * 10)
+    }
+    for from fs const f { print f() }
+
+    # An escaping closure keeps its captured parameter.
+    const (int) → int add5 ← adder(5)
+    print add5(1)
+}
