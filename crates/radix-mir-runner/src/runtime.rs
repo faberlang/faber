@@ -158,6 +158,12 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
             MirIntrinsic::CursorStream(stream) => self.eval_cursor_stream(stream, &call.args, span),
             MirIntrinsic::Gradient(op) => self.eval_gradient(*op, &call.args, span),
             MirIntrinsic::TypeCheck(op) => self.eval_type_check(op, &call.args, span),
+            MirIntrinsic::Duplicate => {
+                let [source] = call.args.as_slice() else {
+                    return Err(RunnerError::internal(span, "duplicate runtime arity"));
+                };
+                Ok(self.eval_operand(source, span)?.deep_copy())
+            }
             other => Err(RunnerError::unsupported(
                 span,
                 &format!("intrinsic {other:?}"),

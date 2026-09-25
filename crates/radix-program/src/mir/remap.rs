@@ -276,7 +276,8 @@ pub(super) fn remap_runtime_call_text_symbols(
         | MirIntrinsic::GpuBuiltin(_)
         | MirIntrinsic::CursorStream(_)
         | MirIntrinsic::Gradient(_)
-        | MirIntrinsic::TypeCheck(_) => {}
+        | MirIntrinsic::TypeCheck(_)
+        | MirIntrinsic::Duplicate => {}
     }
     for arg in &mut call.args {
         remap_operand_text_symbols(arg, source, target);

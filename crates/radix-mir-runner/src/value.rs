@@ -137,6 +137,112 @@ pub enum MapKey {
 }
 
 impl Value {
+    /// Deep duplicate for the `copy` access marker (D-6): every container,
+    /// genus, and record cell reachable from `self` is rebuilt, so no storage
+    /// is shared with the source. Sharing *within* the copied graph (two
+    /// fields naming one list, or a cycle) is preserved through a memo keyed
+    /// on the source cell. Opaque handles (functions, closures, sermo
+    /// conversations, gradients) are identities, not payloads, and stay shared.
+    #[must_use]
+    pub fn deep_copy(&self) -> Value {
+        self.deep_copy_memo(&mut FxHashMap::default())
+    }
+
+    fn deep_copy_memo(&self, memo: &mut FxHashMap<*const (), Value>) -> Value {
+        fn cell<T>(
+            rc: &Rc<RefCell<T>>,
+            memo: &mut FxHashMap<*const (), Value>,
+            wrap: impl Fn(Rc<RefCell<T>>) -> Value,
+            copy: impl FnOnce(&T, &mut FxHashMap<*const (), Value>) -> T,
+            empty: impl FnOnce() -> T,
+        ) -> Value {
+            let key = Rc::as_ptr(rc).cast::<()>();
+            if let Some(done) = memo.get(&key) {
+                return done.clone();
+            }
+            // Register the fresh cell before descending so a cycle back to
+            // this source cell resolves to the copy under construction.
+            let fresh = Rc::new(RefCell::new(empty()));
+            memo.insert(key, wrap(Rc::clone(&fresh)));
+            let copied = copy(&rc.borrow(), memo);
+            *fresh.borrow_mut() = copied;
+            wrap(fresh)
+        }
+        fn fields(
+            source: &FxHashMap<Symbol, Value>,
+            memo: &mut FxHashMap<*const (), Value>,
+        ) -> FxHashMap<Symbol, Value> {
+            source
+                .iter()
+                .map(|(name, value)| (*name, value.deep_copy_memo(memo)))
+                .collect()
+        }
+        fn elements(source: &[Value], memo: &mut FxHashMap<*const (), Value>) -> Vec<Value> {
+            source
+                .iter()
+                .map(|value| value.deep_copy_memo(memo))
+                .collect()
+        }
+        match self {
+            Value::Array(rc) => cell(rc, memo, Value::Array, |v, m| elements(v, m), Vec::new),
+            Value::Vector(rc) => cell(rc, memo, Value::Vector, |v, m| elements(v, m), Vec::new),
+            Value::Tensor(rc) => cell(
+                rc,
+                memo,
+                Value::Tensor,
+                |t, m| TensorValue {
+                    data: elements(&t.data, m),
+                    shape: t.shape.clone(),
+                },
+                || TensorValue {
+                    data: Vec::new(),
+                    shape: Vec::new(),
+                },
+            ),
+            Value::Matrix(rc) => {
+                let source = rc.borrow();
+                let mut copied = source.clone();
+                copied.data = elements(&source.data, memo);
+                Value::Matrix(Rc::new(RefCell::new(copied)))
+            }
+            Value::Map(rc) => cell(
+                rc,
+                memo,
+                Value::Map,
+                |map, m| {
+                    map.iter()
+                        .map(|(key, value)| (key.clone(), value.deep_copy_memo(m)))
+                        .collect()
+                },
+                FxHashMap::default,
+            ),
+            Value::Set(rc) => Value::Set(Rc::new(RefCell::new(rc.borrow().clone()))),
+            Value::Record(rc) => cell(rc, memo, Value::Record, fields, FxHashMap::default),
+            Value::Struct(def, rc) => {
+                let def = *def;
+                cell(
+                    rc,
+                    memo,
+                    move |r| Value::Struct(def, r),
+                    fields,
+                    FxHashMap::default,
+                )
+            }
+            Value::EnumVariant(def, rc) => {
+                let def = *def;
+                cell(
+                    rc,
+                    memo,
+                    move |r| Value::EnumVariant(def, r),
+                    fields,
+                    FxHashMap::default,
+                )
+            }
+            Value::Tuple(items) => Value::Tuple(elements(items, memo)),
+            other => other.clone(),
+        }
+    }
+
     pub fn as_bool(&self, span: Span) -> Result<bool, RunnerError> {
         match self {
             Value::Bool(value) => Ok(*value),

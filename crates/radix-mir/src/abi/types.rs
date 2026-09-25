@@ -83,6 +83,7 @@ pub enum MirRuntimeAbiFamily {
     RuntimeGradient,
     RuntimeTypeCheck,
     RuntimeFilumSum,
+    RuntimeDuplicate,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -180,6 +181,12 @@ impl MirRuntimeAbi {
             // pass resolves it); host lanes reject it by target policy.
             MirIntrinsic::FilumSum(_) => (
                 MirRuntimeAbiFamily::RuntimeFilumSum,
+                MirRuntimeAbiKind::CoreSemantics,
+                false,
+            ),
+            // `copy` marker duplication is core value semantics.
+            MirIntrinsic::Duplicate => (
+                MirRuntimeAbiFamily::RuntimeDuplicate,
                 MirRuntimeAbiKind::CoreSemantics,
                 false,
             ),

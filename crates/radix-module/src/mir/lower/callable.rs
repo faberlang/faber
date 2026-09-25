@@ -271,6 +271,7 @@ impl FunctionBuilder<'_> {
         } else {
             let entry = nested.fresh_block(body.span);
             nested.switch_to(entry);
+            nested.emit_copy_param_entries();
             if let Some(value) = nested.lower_expr_value(body) {
                 nested.terminate_current(MirTerminatorKind::Return(Some(value)), body.span);
             }

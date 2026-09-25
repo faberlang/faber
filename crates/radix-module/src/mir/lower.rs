@@ -56,7 +56,7 @@ use crate::mir::{
 use crate::semantic::{ConversionPair, IndexExpr, IndexId, NumericWidth, Primitive, Type, TypeId, TypeTable};
 use radix_mir::device::{MirDeviceFunctionMetadata, MirDeviceFunctionMetadataMap, is_public_entry};
 use radix_mir::validate::PatchProgramError;
-use radix_types::{MirCollectionOp, MirKernelBuiltin};
+use radix_types::{MirCollectionOp, MirKernelBuiltin, SemanticMutability};
 use rustc_hash::{FxHashMap, FxHashSet};
 use std::sync::Arc;
 
@@ -1664,6 +1664,9 @@ struct FunctionBuilder<'a> {
     parent_function_id: MirFunctionId,
     device_role: Option<MirDeviceRole>,
     shader_stage: Option<MirKernelShaderStage>,
+    /// `copy` parameters (D-6): `(param local, owned duplicate local, type,
+    /// span)`. The body binds the duplicate; entry emits the deep copy.
+    copy_param_entries: Vec<(MirLocalId, MirLocalId, MirType, Span)>,
 }
 
 impl<'a> FunctionBuilder<'a> {
@@ -1713,6 +1716,7 @@ impl<'a> FunctionBuilder<'a> {
             parent_function_id,
             device_role,
             shader_stage,
+            copy_param_entries: Vec::new(),
         }
     }
 
@@ -1745,9 +1749,9 @@ impl<'a> FunctionBuilder<'a> {
         // storage domain. Every type-position access marker is a source-level
         // wrapper, including `own`/`copy` even though HIR collapses those to
         // value-owned mode.
-        let storage_ty = match self.normalized_type(ty) {
-            Type::Ref(_, inner) => *inner,
-            _ => ty,
+        let (copy_param, storage_ty) = match self.normalized_type(ty) {
+            Type::Ref(mutability, inner) => (*mutability == SemanticMutability::Copy, *inner),
+            _ => (false, ty),
         };
         let mir_ty = MirType::semantic(storage_ty);
         // Keep the MIR ABI mode and local mutability paired. In particular,
@@ -1763,8 +1767,33 @@ impl<'a> FunctionBuilder<'a> {
             .push(MirParam { local, name: Some(name), ty: mir_ty, mode: mir_mode, span });
         self.locals
             .push(MirLocalDecl { id: local, name: Some(name), ty: mir_ty, mutable, span });
+        if copy_param {
+            // `copy` (D-6): the callee receives a fresh owned duplicate at
+            // entry; the caller's value is never shared with the body.
+            let duplicate = self.next_local_id();
+            self.locals
+                .push(MirLocalDecl { id: duplicate, name: Some(name), ty: mir_ty, mutable: true, span });
+            self.copy_param_entries
+                .push((local, duplicate, mir_ty, span));
+            self.bindings
+                .insert(def_id, LocalBinding { local: duplicate, ty: mir_ty });
+            return;
+        }
         self.bindings
             .insert(def_id, LocalBinding { local, ty: mir_ty });
+    }
+
+    /// Emit the entry deep copy for every `copy` parameter (D-6).
+    fn emit_copy_param_entries(&mut self) {
+        for (param, duplicate, ty, span) in std::mem::take(&mut self.copy_param_entries) {
+            self.runtime_call_to_place(
+                Some(MirPlace::local(duplicate)),
+                MirIntrinsic::Duplicate,
+                vec![MirOperand::Place(MirPlace::local(param))],
+                ty,
+                span,
+            );
+        }
     }
 
     fn add_lane_param(&mut self, def_id: DefId, name: crate::lexer::Symbol, ty: TypeId, span: Span) {
@@ -1815,6 +1844,7 @@ impl<'a> FunctionBuilder<'a> {
     fn lower_body_with_cli_args(&mut self, body: &HirBlock, cli_args: Option<&crate::hir::HirParam>) -> Vec<MirBlock> {
         let entry = self.fresh_block(body.span);
         self.switch_to(entry);
+        self.emit_copy_param_entries();
         if let Some(cli_args) = cli_args {
             self.add_runtime_record_local(cli_args);
         }
@@ -1935,7 +1965,14 @@ impl<'a> FunctionBuilder<'a> {
             return None;
         };
 
-        let mir_ty = MirType::semantic(ty);
+        // A `copy` bind elaborates to an exclusive owned value (D-6): the
+        // local stores the payload type, like a `copy` parameter.
+        let copy_bind = self.types.is_copy_view(ty);
+        let mir_ty = if copy_bind {
+            MirType::semantic(self.types.peel_access_marker(ty).1)
+        } else {
+            MirType::semantic(ty)
+        };
         let id = self.next_local_id();
         self.locals
             .push(MirLocalDecl { id, name: Some(local.name), ty: mir_ty, mutable: local.mutable, span });
@@ -1954,6 +1991,17 @@ impl<'a> FunctionBuilder<'a> {
                     span,
                     init,
                 )?;
+            } else if copy_bind {
+                // `copy` bind (D-6): deep-duplicate the initializer; the
+                // source stays live and shares nothing with the binding.
+                let source = self.lower_expr_value(init)?;
+                self.runtime_call_to_place(
+                    Some(MirPlace::local(id)),
+                    MirIntrinsic::Duplicate,
+                    vec![source],
+                    mir_ty,
+                    span,
+                );
             } else {
                 self.lower_expr_to_destination(init, MirPlace::local(id), mir_ty)?;
             }
