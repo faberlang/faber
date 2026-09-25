@@ -365,7 +365,8 @@ fn collect_place_variant_defs(place: &MirPlace, variants: &mut Vec<DefId>) {
             MirProjection::Field(_)
             | MirProjection::ClosureCapture { .. }
             | MirProjection::VectorLane(_)
-            | MirProjection::MatrixCell { .. } => {}
+            | MirProjection::MatrixCell { .. }
+            | MirProjection::SharedCell => {}
         }
     }
 }
@@ -2959,7 +2960,8 @@ fn rewrite_place_variant_defs(place: &mut MirPlace, variant_remap: &HashMap<DefI
             MirProjection::Field(_)
             | MirProjection::ClosureCapture { .. }
             | MirProjection::VectorLane(_)
-            | MirProjection::MatrixCell { .. } => {}
+            | MirProjection::MatrixCell { .. }
+            | MirProjection::SharedCell => {}
         }
     }
 }
@@ -3042,11 +3044,10 @@ pub(super) fn install_cli_dispatch_entry<'a>(
     let types = lowered.validated.validation().types.clone();
     lowered
         .patch_program(|program| {
-            let Some(entry_index) = program
-                .functions
-                .iter()
-                .position(|function| is_explicit_entry_function(function, &types))
-            else {
+            let referenced = radix_module::mir::names::referenced_functions(program);
+            let Some(entry_index) = program.functions.iter().position(|function| {
+                is_explicit_entry_function(function, &types) && !referenced.contains(&function.id)
+            }) else {
                 return Err(vec![mir_diag(
                     entry_path,
                     "package MIR could not find root CLI entry function",
@@ -3623,7 +3624,8 @@ pub(super) fn shift_place_ids(place: &mut MirPlace, offset: u32) {
             MirProjection::Field(_)
             | MirProjection::VariantField { .. }
             | MirProjection::VectorLane(_)
-            | MirProjection::MatrixCell { .. } => {}
+            | MirProjection::MatrixCell { .. }
+            | MirProjection::SharedCell => {}
         }
     }
 }
@@ -3667,7 +3669,8 @@ pub(super) fn shift_aggregate_ids(aggregate: &mut MirAggregate, offset: u32) {
         | MirAggregateKind::SparseTensor
         | MirAggregateKind::Interval { .. }
         | MirAggregateKind::Vector
-        | MirAggregateKind::Matrix => {}
+        | MirAggregateKind::Matrix
+        | MirAggregateKind::SharedCell => {}
     }
     match &mut aggregate.fields {
         MirAggregateFields::Ordered(items) => {
@@ -4212,7 +4215,8 @@ fn scan_place_references(place: &MirPlace, scan: &mut MirReferenceScan) {
             MirProjection::Field(_)
             | MirProjection::VariantField { .. }
             | MirProjection::VectorLane(_)
-            | MirProjection::MatrixCell { .. } => {}
+            | MirProjection::MatrixCell { .. }
+            | MirProjection::SharedCell => {}
         }
     }
 }

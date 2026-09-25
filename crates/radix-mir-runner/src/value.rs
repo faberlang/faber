@@ -57,6 +57,10 @@ pub enum Value {
         MirClosureEnvironmentId,
         Rc<RefCell<FxHashMap<Symbol, Value>>>,
     ),
+    /// Storage of a binding shared by reference with closures
+    /// (`MirAggregateKind::SharedCell`); read and written through
+    /// `MirProjection::SharedCell`, never observed as a value.
+    SharedCell(Rc<RefCell<Value>>),
     Array(Rc<RefCell<Vec<Value>>>),
     Tensor(Rc<RefCell<TensorValue>>),
     /// Register-class vector: lane-ordered cells matching `VectorLane(i)`.
@@ -208,6 +212,7 @@ impl Value {
                 format!("closure f{} env{}", id.0, environment.0)
             }
             Value::ClosureEnvironment(id, _) => format!("closure env{}", id.0),
+            Value::SharedCell(cell) => cell.borrow().display_typed(interner, span, float_width)?,
             Value::Array(items) => display_list(&items.borrow(), interner, span, float_width)?,
             Value::Tensor(tensor) => {
                 display_list(&tensor.borrow().data, interner, span, float_width)?

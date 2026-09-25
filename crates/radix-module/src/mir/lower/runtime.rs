@@ -2269,7 +2269,9 @@ impl FunctionBuilder<'_> {
         // Callable value: a local binding or non-path expression. Positional args,
         // indirect call via MirCallee::Value.
         let value_callee = match &callee.kind {
-            HirExpressionKind::Path(def_id) if self.bindings.contains_key(def_id) => {
+            HirExpressionKind::Path(def_id)
+                if self.bindings.contains_key(def_id) || self.captured_bindings.contains_key(def_id) =>
+            {
                 Some(self.lower_path(*def_id, callee)?)
             }
             HirExpressionKind::Path(_) => None,

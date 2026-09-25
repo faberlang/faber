@@ -43,15 +43,16 @@ use crate::hir::{
 use crate::lexer::{Interner, Span, Symbol};
 use crate::mir::{
     MirAggregate, MirAggregateFields, MirAggregateItem, MirAggregateKind, MirBinOp, MirBlock, MirBlockId, MirCallee,
-    MirClosureCallee, MirClosureCapture, MirClosureEnvironment, MirClosureEnvironmentId, MirClosureValue, MirConstant,
-    MirConversion, MirConversionFlavor, MirDeviceRole, MirDiagnosticKind, MirFilumCoordinate, MirFilumSumOp,
-    MirFunction, MirFunctionId, MirFunctionOrigin, MirFunctionVisibility, MirGenericBindings, MirIntrinsic,
-    MirKernelShaderStage, MirKeyValueOperand, MirLayoutTable, MirLocal as MirLocalDecl, MirLocalId,
-    MirMonomorphization, MirNamedOperand, MirOperand, MirOptionChainLink, MirOptionOp, MirOptionUnwrapMode, MirParam,
-    MirParamMode, MirPlace, MirPlaceBase, MirProgram, MirProjection, MirProvider, MirProviderKind, MirRuntimeCall,
-    MirStatement, MirStatementKind, MirStructFieldDefaults, MirSwitchCase, MirSyntheticFunctionIdentity, MirTemp,
-    MirTempId, MirTerminator, MirTerminatorKind, MirType, MirTypeCheckOp, MirUnOp, MirValidationContext, MirValue,
-    MirValueId, MirValueKind, ValidatedMir, dump_program, instantiate_existing_generic_type, type_contains_param,
+    MirCaptureMode, MirClosureCallee, MirClosureCapture, MirClosureEnvironment, MirClosureEnvironmentId,
+    MirClosureValue, MirConstant, MirConversion, MirConversionFlavor, MirDeviceRole, MirDiagnosticKind,
+    MirFilumCoordinate, MirFilumSumOp, MirFunction, MirFunctionId, MirFunctionOrigin, MirFunctionVisibility,
+    MirGenericBindings, MirIntrinsic, MirKernelShaderStage, MirKeyValueOperand, MirLayoutTable,
+    MirLocal as MirLocalDecl, MirLocalId, MirMonomorphization, MirNamedOperand, MirOperand, MirOptionChainLink,
+    MirOptionOp, MirOptionUnwrapMode, MirParam, MirParamMode, MirPlace, MirPlaceBase, MirProgram, MirProjection,
+    MirProvider, MirProviderKind, MirRuntimeCall, MirStatement, MirStatementKind, MirStructFieldDefaults,
+    MirSwitchCase, MirSyntheticFunctionIdentity, MirTemp, MirTempId, MirTerminator, MirTerminatorKind, MirType,
+    MirTypeCheckOp, MirUnOp, MirValidationContext, MirValue, MirValueId, MirValueKind, ValidatedMir, dump_program,
+    instantiate_existing_generic_type, type_contains_param,
 };
 use crate::semantic::{ConversionPair, IndexExpr, IndexId, NumericWidth, Primitive, Type, TypeId, TypeTable};
 use radix_mir::device::{MirDeviceFunctionMetadata, MirDeviceFunctionMetadataMap, is_public_entry};
@@ -1197,6 +1198,7 @@ impl<'a> MirLowerer<'a> {
         let parent_function_id = MirFunctionId(self.functions.len() as u32);
         let (locals, temps, blocks, errors, synthetics, closure_environments, device_function_metadata) = {
             let mut builder = FunctionBuilder::for_function(self.types, None, context, parent_function_id, None, None);
+            builder.shared_bindings = radix_hir::capture::CaptureFacts::for_block(entry).shared;
             let entry_block = builder.fresh_block(entry.span);
             builder.switch_to(entry_block);
             let mut consts_lowered = true;
@@ -1657,6 +1659,15 @@ struct FunctionBuilder<'a> {
     kernel_local_callees: FxHashMap<MirLocalId, MirFunctionId>,
     captured_bindings: FxHashMap<DefId, MirPlace>,
     captured_binding_metadata: FxHashMap<DefId, (Symbol, MirType)>,
+    /// `var` locals of this body that closures capture and that are rebound
+    /// somewhere: their storage is a shared cell (operator ruling 2026-09-24,
+    /// unmarked closures share the enclosing scope).
+    shared_bindings: FxHashSet<DefId>,
+    /// In-scope shared bindings → the place holding the cell itself (the
+    /// declaring local, or a closure-environment capture slot). Paths read and
+    /// write the content through `captured_bindings` (`cell.SharedCell`);
+    /// nested closures capture the cell from here.
+    shared_cells: FxHashMap<DefId, MirPlace>,
     /// Enclosing callable's `magnitudo` parameters, def → name. A body path
     /// to one of these defs lowers to the symbolic size operand, never a
     /// runtime local (sgr C2a).
@@ -1709,6 +1720,8 @@ impl<'a> FunctionBuilder<'a> {
             kernel_local_callees: FxHashMap::default(),
             captured_bindings: FxHashMap::default(),
             captured_binding_metadata: FxHashMap::default(),
+            shared_bindings: FxHashSet::default(),
+            shared_cells: FxHashMap::default(),
             size_params: FxHashMap::default(),
             parent_function_id,
             device_role,
@@ -1813,6 +1826,7 @@ impl<'a> FunctionBuilder<'a> {
     }
 
     fn lower_body_with_cli_args(&mut self, body: &HirBlock, cli_args: Option<&crate::hir::HirParam>) -> Vec<MirBlock> {
+        self.shared_bindings = radix_hir::capture::CaptureFacts::for_block(body).shared;
         let entry = self.fresh_block(body.span);
         self.switch_to(entry);
         if let Some(cli_args) = cli_args {
@@ -1940,6 +1954,10 @@ impl<'a> FunctionBuilder<'a> {
         self.locals
             .push(MirLocalDecl { id, name: Some(local.name), ty: mir_ty, mutable: local.mutable, span });
 
+        if local.mutable && self.shared_bindings.contains(&local.def_id) {
+            return self.lower_shared_local(local, id, ty, mir_ty, span);
+        }
+
         if let Some(init) = &local.init {
             if let HirExpressionKind::ConversioAssign { source, recovery, .. } = &init.kind {
                 // Typed `↤` initializer (`fixum numerus n ↤ "42"`): the node's
@@ -1968,6 +1986,65 @@ impl<'a> FunctionBuilder<'a> {
             self.assign(MirPlace::local(id), zero, mir_ty, span);
         }
         // `fixum`/`sit` deferred-init (`!mutable`, no init`) stays unassigned until `←`.
+        self.bindings
+            .insert(local.def_id, LocalBinding { local: id, ty: mir_ty });
+        Some(())
+    }
+
+    /// Declare a captured-and-rebound `var` as a fresh shared cell.
+    ///
+    /// The initializer (or type zero) lowers into a staging temp, then one
+    /// `SharedCell` construct stores the cell in the declared local. The
+    /// construct runs at every execution of the declaration, so a loop body
+    /// gets a fresh cell per iteration. Every path to the binding then goes
+    /// through `local.SharedCell`, and closures capture the cell itself.
+    fn lower_shared_local(
+        &mut self,
+        local: &HirLocal,
+        id: MirLocalId,
+        ty: TypeId,
+        mir_ty: MirType,
+        span: Span,
+    ) -> Option<()> {
+        let staging = self.push_temp(mir_ty, span);
+        let staging_place = MirPlace::temp(staging);
+        if let Some(init) = &local.init {
+            if let HirExpressionKind::ConversioAssign { source, recovery, .. } = &init.kind {
+                self.lower_conversio_assign_to_destination(
+                    source,
+                    recovery.as_deref(),
+                    staging_place.clone(),
+                    mir_ty,
+                    span,
+                    init,
+                )?;
+            } else {
+                self.lower_expr_to_destination(init, staging_place.clone(), mir_ty)?;
+            }
+        } else {
+            let zero = self.type_zero_operand(ty, span)?;
+            self.assign(staging_place.clone(), zero, mir_ty, span);
+        }
+        self.append_stmt(MirStatement {
+            kind: MirStatementKind::Construct {
+                destination: MirPlace::local(id),
+                aggregate: MirAggregate {
+                    kind: MirAggregateKind::SharedCell,
+                    ty: mir_ty,
+                    fields: MirAggregateFields::Ordered(vec![MirAggregateItem::Operand(MirOperand::Place(
+                        staging_place,
+                    ))]),
+                },
+            },
+            span,
+        });
+        let cell = MirPlace::local(id);
+        let mut content = cell.clone();
+        content.projections.push(MirProjection::SharedCell);
+        self.captured_bindings.insert(local.def_id, content);
+        self.captured_binding_metadata
+            .insert(local.def_id, (local.name, mir_ty));
+        self.shared_cells.insert(local.def_id, cell);
         self.bindings
             .insert(local.def_id, LocalBinding { local: id, ty: mir_ty });
         Some(())
@@ -2145,6 +2222,16 @@ impl<'a> FunctionBuilder<'a> {
     ) -> Option<(MirPlace, MirType)> {
         match &expr.kind {
             HirExpressionKind::Path(def_id) => {
+                if let Some(place) = self.captured_bindings.get(def_id).cloned() {
+                    let Some((_, ty)) = self.captured_binding_metadata.get(def_id).copied() else {
+                        self.errors.push(MirError::unsupported(
+                            expr.span,
+                            "assignment target capture is missing metadata",
+                        ));
+                        return None;
+                    };
+                    return Some((place, ty));
+                }
                 let Some(binding) = self.bindings.get(def_id).copied() else {
                     self.errors.push(MirError::unsupported(
                         expr.span,

@@ -177,6 +177,7 @@ fn value_to_json(value: &Value, span: Span) -> Result<serde_json::Value, RunnerE
         Value::Function(_)
         | Value::Closure(_, _, _)
         | Value::ClosureEnvironment(_, _)
+        | Value::SharedCell(_)
         | Value::Regex(_)
         | Value::Sermo(_)
         | Value::Set(_)

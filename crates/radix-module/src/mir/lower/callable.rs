@@ -241,16 +241,25 @@ impl FunctionBuilder<'_> {
             let value_ty = value_ty.unwrap_or_else(|| MirType::semantic(self.types.primitive(Primitive::Ignotum)));
             let environment_local = nested.add_hidden_closure_environment_local(value_ty, span);
             for capture in captures {
-                nested.captured_bindings.insert(
-                    capture.source,
-                    MirPlace {
-                        base: MirPlaceBase::Local(environment_local),
-                        projections: vec![MirProjection::ClosureCapture {
-                            environment: environment_id,
-                            source: capture.source,
-                        }],
-                    },
-                );
+                let slot = MirPlace {
+                    base: MirPlaceBase::Local(environment_local),
+                    projections: vec![MirProjection::ClosureCapture {
+                        environment: environment_id,
+                        source: capture.source,
+                    }],
+                };
+                let binding_place = match capture.mode {
+                    MirCaptureMode::Value => slot,
+                    MirCaptureMode::Shared => {
+                        let mut content = slot.clone();
+                        content.projections.push(MirProjection::SharedCell);
+                        nested.shared_cells.insert(capture.source, slot);
+                        content
+                    }
+                };
+                nested
+                    .captured_bindings
+                    .insert(capture.source, binding_place);
                 nested
                     .captured_binding_metadata
                     .insert(capture.source, (capture.name, capture.ty));
@@ -269,6 +278,7 @@ impl FunctionBuilder<'_> {
         let blocks = if let HirExpressionKind::Block(block) = &body.kind {
             nested.lower_body(block)
         } else {
+            nested.shared_bindings = radix_hir::capture::CaptureFacts::for_expr(body).shared;
             let entry = nested.fresh_block(body.span);
             nested.switch_to(entry);
             if let Some(value) = nested.lower_expr_value(body) {
@@ -548,6 +558,21 @@ impl ClosureCaptureCollector<'_, '_> {
         if self.params.contains(&def_id) || !self.seen.insert(def_id) {
             return;
         }
+        // A shared binding is captured as its cell, so the closure and the
+        // enclosing scope alias one storage location.
+        if let (Some(cell), Some((name, ty))) = (
+            self.parent.shared_cells.get(&def_id),
+            self.parent.captured_binding_metadata.get(&def_id),
+        ) {
+            self.captures.push(MirClosureCapture {
+                source: def_id,
+                name: *name,
+                ty: *ty,
+                source_place: cell.clone(),
+                mode: MirCaptureMode::Shared,
+            });
+            return;
+        }
         if let (Some(source_place), Some((name, ty))) = (
             self.parent.captured_bindings.get(&def_id),
             self.parent.captured_binding_metadata.get(&def_id),
@@ -557,6 +582,7 @@ impl ClosureCaptureCollector<'_, '_> {
                 name: *name,
                 ty: *ty,
                 source_place: source_place.clone(),
+                mode: MirCaptureMode::Value,
             });
             return;
         }
@@ -579,6 +605,7 @@ impl ClosureCaptureCollector<'_, '_> {
             name,
             ty: binding.ty,
             source_place: MirPlace::local(binding.local),
+            mode: MirCaptureMode::Value,
         });
     }
 }

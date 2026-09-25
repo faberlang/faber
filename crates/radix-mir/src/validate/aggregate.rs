@@ -344,10 +344,37 @@ impl Validator<'_, '_> {
                     }
                 }
             }
+            (MirAggregateKind::SharedCell, MirAggregateFields::Ordered(items)) => {
+                self.validate_shared_cell_aggregate(scope, aggregate.ty, items, span);
+            }
             _ => self.error(
                 span,
                 "aggregate payload shape does not match aggregate kind",
             ),
+        }
+    }
+
+    /// A shared cell holds exactly one positional value of the cell's
+    /// (content) type.
+    fn validate_shared_cell_aggregate(
+        &mut self,
+        scope: &FunctionScope<'_, '_>,
+        cell_ty: MirType,
+        items: &[MirAggregateItem],
+        span: Span,
+    ) {
+        let [MirAggregateItem::Operand(value)] = items else {
+            self.error(span, "shared cell aggregate requires exactly one operand");
+            return;
+        };
+        if let Some(value_ty) = self.validate_operand(scope, value, span) {
+            self.require_assignable_or_fitting_constant(
+                value,
+                value_ty,
+                cell_ty,
+                span,
+                "shared cell content type mismatch",
+            );
         }
     }
 

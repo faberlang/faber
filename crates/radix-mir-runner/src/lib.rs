@@ -1622,10 +1622,27 @@ impl<H: Host + ?Sized> Runner<'_, H> {
                 }
                 _ => Err(RunnerError::internal(span, "matrix cell write base")),
             },
-            radix_mir::MirProjection::ClosureCapture { .. } => Err(RunnerError::unsupported(
-                span,
-                "closure capture projection write",
-            )),
+            radix_mir::MirProjection::SharedCell => match value {
+                Value::SharedCell(cell) => {
+                    *cell.borrow_mut() = assigned;
+                    Ok(Value::SharedCell(cell))
+                }
+                _ => Err(RunnerError::internal(
+                    span,
+                    "shared cell write base is not a cell",
+                )),
+            },
+            // A write through a capture only ever re-stores the same shared
+            // cell handle (the parent of a `SharedCell` projection), so the
+            // environment slot is left untouched. Value captures stay
+            // read-only.
+            radix_mir::MirProjection::ClosureCapture { .. } => match (value, assigned) {
+                (value @ Value::ClosureEnvironment(..), Value::SharedCell(_)) => Ok(value),
+                _ => Err(RunnerError::unsupported(
+                    span,
+                    "closure capture projection write",
+                )),
+            },
         }
     }
 
