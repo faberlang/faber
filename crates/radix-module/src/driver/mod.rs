@@ -4239,3 +4239,7 @@ mod heritage_field_tests;
 #[cfg(test)]
 #[path = "amd_target_test.rs"]
 mod amd_target_tests;
+
+#[cfg(test)]
+#[path = "closure_shared_capture_test.rs"]
+mod closure_shared_capture_tests;

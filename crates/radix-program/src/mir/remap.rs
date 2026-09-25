@@ -205,7 +205,8 @@ pub(super) fn remap_place_text_symbols(
                 source: _,
             }
             | MirProjection::VectorLane(_)
-            | MirProjection::MatrixCell { row: _, column: _ } => {}
+            | MirProjection::MatrixCell { row: _, column: _ }
+            | MirProjection::SharedCell => {}
         }
     }
 }

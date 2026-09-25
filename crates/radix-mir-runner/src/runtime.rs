@@ -672,6 +672,16 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                     },
                 ))))
             }
+            MirAggregateKind::SharedCell => {
+                let mut items = self.eval_ordered_fields(&aggregate.fields, span)?;
+                let (Some(content), true) = (items.pop(), items.is_empty()) else {
+                    return Err(RunnerError::internal(
+                        span,
+                        "shared cell construct requires exactly one item",
+                    ));
+                };
+                Ok(Value::SharedCell(Rc::new(RefCell::new(content))))
+            }
             MirAggregateKind::ClosureEnvironment(environment_id) => {
                 let map = self.eval_named_fields(
                     &aggregate.fields,
@@ -3812,6 +3822,13 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                 environment,
                 source,
             } => self.project_closure_capture(value, *environment, *source, span),
+            radix_mir::MirProjection::SharedCell => match value {
+                Value::SharedCell(cell) => Ok(cell.borrow().clone()),
+                _ => Err(RunnerError::internal(
+                    span,
+                    "shared cell projection base is not a cell",
+                )),
+            },
         }
     }
 

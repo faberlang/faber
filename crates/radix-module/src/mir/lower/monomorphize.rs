@@ -882,6 +882,7 @@ impl<'lowerer, 'unit> MonomorphizationState<'lowerer, 'unit> {
                 ));
                 None
             }
+            MirProjection::SharedCell => Some(base_ty),
             MirProjection::VectorLane(_) => {
                 self.lowerer.errors.push(MirError::validation(
                     span,

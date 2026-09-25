@@ -8,6 +8,7 @@
 //! [`DefId`] is defined in `radix-types` and re-exported here so existing
 //! `hir::DefId` paths keep working.
 
+pub mod capture;
 pub mod failable;
 #[cfg(test)]
 mod failable_pin_test;

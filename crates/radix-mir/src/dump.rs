@@ -266,6 +266,7 @@ fn aggregate_fmt(aggregate: &MirAggregate) -> String {
         MirAggregateKind::Array => "array".to_owned(),
         MirAggregateKind::Record => "record".to_owned(),
         MirAggregateKind::ClosureEnvironment(id) => format!("closure_env {}", closure_env_id(id)),
+        MirAggregateKind::SharedCell => "shared_cell".to_owned(),
         MirAggregateKind::Map => "map".to_owned(),
         MirAggregateKind::Set => "set".to_owned(),
         MirAggregateKind::Tensor => "tensor".to_owned(),
@@ -378,6 +379,7 @@ fn place_fmt(place: &MirPlace) -> String {
             } => {
                 let _ = write!(out, ".{}.def#{}", closure_env_id(*environment), source.0);
             }
+            MirProjection::SharedCell => out.push_str(".cell"),
             MirProjection::Index(index) => {
                 let _ = write!(out, "[{}]", operand(index));
             }

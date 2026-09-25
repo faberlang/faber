@@ -13,13 +13,14 @@
 
 use std::fmt::Write;
 
+use crate::visit::{MirVisitor, walk_callee, walk_operand, walk_value};
 use crate::{
-    MirBlockId, MirExternalFunctionIdentity, MirFunction, MirFunctionId, MirLocalId, MirProgram,
-    MirTempId, MirType, MirValueId,
+    MirBlockId, MirCallee, MirConstant, MirExternalFunctionIdentity, MirFunction, MirFunctionId,
+    MirLocalId, MirOperand, MirProgram, MirTempId, MirType, MirValue, MirValueId, MirValueKind,
 };
 use radix_lexer::{Interner, Symbol};
 use radix_types::{Primitive, Type, TypeTable};
-use rustc_hash::FxHashMap;
+use rustc_hash::{FxHashMap, FxHashSet};
 
 /// Wasm/sexp dispatch local holding the active `b{N}` block id.
 pub const DISPATCH: &str = "p0";
@@ -40,6 +41,8 @@ pub struct MirNames<'a> {
     interner: &'a Interner,
     /// Precomputed function spellings: O(F) once at construction, O(1) per query.
     function_names: FxHashMap<MirFunctionId, String>,
+    /// Functions some MIR node calls or takes as a value; never the entry.
+    referenced: FxHashSet<MirFunctionId>,
 }
 
 impl<'a> MirNames<'a> {
@@ -50,6 +53,7 @@ impl<'a> MirNames<'a> {
             types,
             interner,
             function_names: FxHashMap::default(),
+            referenced: referenced_functions(program),
         };
         // Precompute all spellings once so `function()` never re-scans the program.
         let function_names = program
@@ -130,6 +134,7 @@ impl<'a> MirNames<'a> {
             && function.name.is_none()
             && function.params.is_empty()
             && self.is_vacuum_ty(function.return_ty)
+            && !self.referenced.contains(&function.id)
     }
 
     #[must_use]
@@ -296,4 +301,52 @@ fn import_component(component: &str) -> String {
 #[must_use]
 pub fn llvm_block_ref(id: MirBlockId) -> String {
     format!("%{}", MirNames::block(id))
+}
+
+/// Functions some MIR node references: called directly, or taken as a
+/// function constant or closure value.
+///
+/// A program entry is never referenced. Synthetic closure functions share the
+/// entry's shape (no source, no name, no params, `vacuum` return for
+/// `() → vacuum ∴ …`), so entry selection must exclude referenced functions
+/// or a param-less vacuum closure is mistaken for `incipit`.
+#[must_use]
+pub fn referenced_functions(program: &MirProgram) -> FxHashSet<MirFunctionId> {
+    let mut collector = ReferencedFunctions::default();
+    collector.visit_program(program);
+    collector.functions
+}
+
+#[derive(Default)]
+struct ReferencedFunctions {
+    functions: FxHashSet<MirFunctionId>,
+}
+
+impl MirVisitor for ReferencedFunctions {
+    fn visit_operand(&mut self, operand: &MirOperand) {
+        if let MirOperand::Constant(MirConstant::Function(id)) = operand {
+            self.functions.insert(*id);
+        }
+        walk_operand(self, operand);
+    }
+
+    fn visit_value(&mut self, value: &MirValue) {
+        if let MirValueKind::Closure(closure) = &value.kind {
+            self.functions.insert(closure.function);
+        }
+        walk_value(self, value);
+    }
+
+    fn visit_callee(&mut self, callee: &MirCallee) {
+        match callee {
+            MirCallee::Function(id) => {
+                self.functions.insert(*id);
+            }
+            MirCallee::Closure(closure) => {
+                self.functions.insert(closure.function);
+            }
+            MirCallee::Definition { .. } | MirCallee::Value(_) => {}
+        }
+        walk_callee(self, callee);
+    }
 }

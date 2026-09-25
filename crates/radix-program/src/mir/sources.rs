@@ -251,7 +251,8 @@ pub(super) fn rewrite_place_sources(
             }
             MirProjection::Field(_)
             | MirProjection::VectorLane(_)
-            | MirProjection::MatrixCell { .. } => {}
+            | MirProjection::MatrixCell { .. }
+            | MirProjection::SharedCell => {}
         }
     }
 }

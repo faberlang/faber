@@ -582,6 +582,7 @@ impl Validator<'_, '_> {
                     environment,
                     source,
                 } => self.project_closure_capture(*environment, *source, span)?,
+                MirProjection::SharedCell => ty,
                 MirProjection::Index(index) => {
                     let index_ty = self.validate_operand(scope, index, span);
                     self.project_index(ty, index_ty.map(|ty| (index, ty)), span)?
@@ -591,7 +592,10 @@ impl Validator<'_, '_> {
                     self.project_matrix_cell(ty, *row, *column, span)?
                 }
             };
-            if !matches!(projection, MirProjection::ClosureCapture { .. }) {
+            if !matches!(
+                projection,
+                MirProjection::ClosureCapture { .. } | MirProjection::SharedCell
+            ) {
                 self.validate_projection_representation(base_ty, ty, projection, span);
             }
         }

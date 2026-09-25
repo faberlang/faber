@@ -135,12 +135,36 @@ pub struct MirClosureEnvironment {
 }
 
 /// One captured binding stored in a closure environment aggregate.
+///
+/// An unmarked closure shares its enclosing scope (operator ruling
+/// 2026-09-24): a captured name IS the enclosing binding. `ty` is always the
+/// binding's value type. `mode` says how the environment slot carries it:
+///
+/// - [`MirCaptureMode::Value`] — the binding is never rebound after its
+///   declaration, so a copy at capture is observably identical to sharing it;
+///   `source_place` reads the value.
+/// - [`MirCaptureMode::Shared`] — the binding is rebound somewhere (outside
+///   or inside a closure). Its storage is a shared cell
+///   ([`MirAggregateKind::SharedCell`]); `source_place` names the cell itself
+///   and the environment slot holds that same cell. Reads and writes through
+///   the capture project [`MirProjection::SharedCell`].
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct MirClosureCapture {
     pub source: DefId,
     pub name: Symbol,
     pub ty: MirType,
     pub source_place: MirPlace,
+    pub mode: MirCaptureMode,
+}
+
+/// How a closure environment slot carries one captured binding.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum MirCaptureMode {
+    /// Copy of a binding that is never rebound after declaration.
+    Value,
+    /// The binding's shared cell; the closure and its enclosing scope alias
+    /// one storage location.
+    Shared,
 }
 
 /// Runtime closure value pairing a synthetic function with its environment.
@@ -696,6 +720,10 @@ pub enum MirProjection {
         environment: MirClosureEnvironmentId,
         source: DefId,
     },
+    /// Content of a shared cell built by [`MirAggregateKind::SharedCell`].
+    /// Type-preserving: a local that holds a cell is typed with the cell's
+    /// content type, and this projection reads or writes that content.
+    SharedCell,
     Index(MirOperand),
     VectorLane(u8),
     MatrixCell {
@@ -1088,11 +1116,18 @@ pub enum MirAggregateKind {
     Array,
     Record,
     ClosureEnvironment(MirClosureEnvironmentId),
+    /// Fresh shared cell holding one positional item: the storage of a
+    /// binding captured by reference and rebound somewhere. Executed at the
+    /// binding's declaration, so each declaration execution (e.g. each loop
+    /// iteration) gets its own cell. The aggregate type is the content type.
+    SharedCell,
     Map,
     Set,
     Tensor,
     SparseTensor,
-    Interval { inclusive: bool },
+    Interval {
+        inclusive: bool,
+    },
     Vector,
     Matrix,
     Struct(DefId),
