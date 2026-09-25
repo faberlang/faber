@@ -1582,6 +1582,27 @@ fn lowers_perge_inside_fac_to_enclosing_loop_head() {
 }
 
 #[test]
+fn lowers_perge_inside_fac_dum_to_the_condition_test() {
+    // Ruling R3 (where `perge` lands): in `fac { } dum c`, `perge` goes to the
+    // end of the body, so `c` is tested. The perge edge must goto the block
+    // that evaluates the condition, never back to the body head.
+    let dump = dump_source(
+        "functio f(numerus n) → numerus { varia numerus i ← 0 fac { i ← i + 1 si i ≡ 2 ergo perge } dum i < n redde i }",
+    );
+    let cond_block = dump
+        .split("\n  bb")
+        .find(|block| block.contains("_1 < _0"))
+        .and_then(|block| block.split(':').next())
+        .unwrap_or_else(|| panic!("condition block: {dump}"));
+    let cond_edge = format!("goto bb{cond_block}\n");
+    assert_eq!(
+        dump.matches(&cond_edge).count(),
+        2,
+        "fallthrough and perge both reach the condition test (bb{cond_block}): {dump}"
+    );
+}
+
+#[test]
 fn closed_si_arms_do_not_emit_spurious_join_edges() {
     let dump = dump_source(
         "functio opta(numerus n) → numerus { varia numerus x ← n si x > 0 { redde x } secus { x ← x + 1 } redde x }",

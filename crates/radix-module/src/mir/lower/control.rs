@@ -1588,11 +1588,12 @@ impl FunctionBuilder<'_> {
         Some(())
     }
 
-    /// Lower an unconditional `Loop` block (`fac { } dum cond` body) into a
-    /// self-jumping body block plus an after block.
+    /// Lower a `Loop` block (`fac { } dum cond`) into body, test, and after
+    /// blocks.
     ///
-    /// `rumpe` jumps to the after block through the loop context pushed while
-    /// lowering the body; the body block unconditionally jumps back to itself.
+    /// `rumpe` jumps to the after block and `perge` to the test block through
+    /// the loop context pushed while lowering the body; the test jumps back
+    /// to the body head.
     pub(super) fn lower_loop_expr(&mut self, block: &HirBlock, expr: &HirExpression) -> Option<MirOperand> {
         let ty = self.expr_ty(expr)?;
         if !self.is_vacuum(ty) {
@@ -1605,13 +1606,38 @@ impl FunctionBuilder<'_> {
         let after_id = self.fresh_block(expr.span);
 
         self.terminate_current(MirTerminatorKind::Goto(body_id), expr.span);
+        self.switch_to(body_id);
+        let Some((body, test, _)) = block.fac_dum_parts() else {
+            self.breakables.push(BreakableContext {
+                perge_target: Some(body_id),
+                rumpe_target: after_id,
+                rumpe_used: false,
+            });
+            self.visit_block(block);
+            self.breakables.pop();
+            self.terminate_open_current(MirTerminatorKind::Goto(body_id), expr.span);
+            self.switch_to(after_id);
+            return Some(MirOperand::Constant(MirConstant::Unit));
+        };
+
+        // Ruling R3: `perge` lands at the end of the body, so the `dum` test
+        // runs next. The test gets its own block; body fallthrough and every
+        // `perge` goto it, and its `rumpe` leaves the loop.
+        let test_id = self.fresh_block(test.span);
         self.breakables.push(BreakableContext {
-            perge_target: Some(body_id),
+            perge_target: Some(test_id),
             rumpe_target: after_id,
             rumpe_used: false,
         });
-        self.switch_to(body_id);
-        self.visit_block(block);
+        for stmt in body {
+            if !self.current_is_open() {
+                break;
+            }
+            self.visit_stmt(stmt);
+        }
+        self.terminate_open_current(MirTerminatorKind::Goto(test_id), test.span);
+        self.switch_to(test_id);
+        self.visit_stmt(test);
         self.breakables.pop();
         self.terminate_open_current(MirTerminatorKind::Goto(body_id), expr.span);
         self.switch_to(after_id);

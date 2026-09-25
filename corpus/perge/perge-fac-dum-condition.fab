@@ -1,0 +1,51 @@
++++
+term = "perge"
+kind = "keyword"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "varia_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "fac_stmt", "si_stmt", "arm", "secus_clause", "perge_stmt", "postfix_update", "place", "comparison", "equality", "equality_tail", "multiplicative_expr", "expression", "literal", "nota_stmt"]
+category = "transfer"
+canonical = false
+summary = "perge in a fac … dum body tests the dum condition before the next iteration."
+syntax = "do { if skip { continue } } while cond"
+related = ["fac", "dum", "rumpe"]
+locale = "en"
++++
+# =============================================================================
+# perge — perge in a fac … dum body lands on the condition test
+# =============================================================================
+#
+# What this teaches:
+#   • `perge` goes to the end of the nearest loop's body. For `fac … dum c`
+#     the condition `c` is tested next, exactly as when the body finishes
+#     normally. `perge` never restarts the body without that test.
+#   • A plain `fac` block is not a loop. `perge` inside nested plain `fac`
+#     blocks leaves every one of them and lands on the enclosing `dum` test.
+#
+# Common mistakes:
+#   • Expecting `perge` to jump back to the top of a `fac … dum` body — the
+#     condition is always tested first, so the first loop below stops at 4.
+#
+# See also: perge, fac, dum, rumpe
+# =============================================================================
+
+main {
+    # perge at n ≥ 2 still tests `n < 4`, so the loop ends when n reaches 4.
+    var int n ← 0
+    do {
+        n ↑
+        if n ≥ 2 { continue }
+        print n
+    } while n < 4
+    print "done"
+
+    # perge passes through two plain fac blocks to the dum test.
+    var int m ← 0
+    do {
+        do {
+            do {
+                m ↑
+                if m % 2 ≡ 1 { continue } else { print m }
+            }
+        }
+    } while m < 6
+    print "end"
+}

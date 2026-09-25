@@ -870,6 +870,44 @@ impl HirBlock {
             end: None,
         }
     }
+
+    /// Split a [`HirExpressionKind::Loop`] block into its `fac … dum` parts.
+    ///
+    /// `fac { body } dum c` is the only producer of `Loop`: it lowers to the
+    /// body statements followed by a synthesized test `si non c { rumpe }`.
+    /// Returns `(body, test, c)` when the block ends in that test. Ruling R3:
+    /// `perge` in the body lands on `test`, never on the body head.
+    #[must_use]
+    pub fn fac_dum_parts(&self) -> Option<(&[HirStatement], &HirStatement, &HirExpression)> {
+        let (test, body) = self.statements.split_last()?;
+        let HirStatementKind::Expr(expr) = &test.kind else {
+            return None;
+        };
+        let HirExpressionKind::Si {
+            cond,
+            then_block,
+            then_catch: None,
+            else_block,
+        } = &expr.kind
+        else {
+            return None;
+        };
+        if else_block
+            .as_ref()
+            .is_some_and(|block| !block.statements.is_empty() || block.expr.is_some())
+        {
+            return None;
+        }
+        let HirExpressionKind::Unary(HirUnOp::Not, inner) = &cond.kind else {
+            return None;
+        };
+        if then_block.expr.is_some()
+            || !matches!(then_block.statements.as_slice(), [only] if matches!(only.kind, HirStatementKind::Rumpe))
+        {
+            return None;
+        }
+        Some((body, test, inner))
+    }
 }
 
 /// Statement node with stable analysis identity.
