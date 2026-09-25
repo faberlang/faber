@@ -35,7 +35,7 @@ test "dum counts down to zero" {
 #   • Ascending and descending loops — counting up from 0 or down from N until the condition is falsum.
 #
 # Common mistakes:
-#   • Using `rumpe` or `perge` outside a loop — both are only valid inside `dum`, `itera`, `fac`, `meus`, or `tuus` blocks (SEM030, SEM031).
+#   • Using `rumpe` or `perge` outside a loop — `perge` needs an enclosing loop (`dum`, `itera`, `fac … dum`) in the same function (SEM031); `rumpe` also accepts a plain `fac` block (SEM030).
 #
 # See also: si, ergo, fac
 # =============================================================================

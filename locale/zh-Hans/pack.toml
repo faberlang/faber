@@ -2479,14 +2479,6 @@ help = "在循环内使用 'perge'"
 message = "{keyword} 出现在 {context} 之外"
 help = "在循环内使用 'perge'"
 
-[diagnostics.SEM060]
-message = "continue 位于 do 块之内"
-help = "'{perge}' 会指向外层的 '{fac}' 块，而该块不会重复；请用 '{si}'/'{secus}' 重构，或将 '{perge}' 移到 '{fac}' 块之外"
-
-[diagnostics.SEM060.issues.continue_inside_fac]
-message = "{perge} 位于 {fac} 块之内"
-help = "'{perge}' 会指向外层的 '{fac}' 块，而该块不会重复；请用 '{si}'/'{secus}' 重构，或将 '{perge}' 移到 '{fac}' 块之外"
-
 [diagnostics.SEM032]
 message = "return 出现在函数之外"
 help = "在函数内使用 'redde'"

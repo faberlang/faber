@@ -182,17 +182,6 @@ pub enum ScopeKind {
     Match,
 }
 
-/// What `perge` would target from a given resolver context.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum ContinueTarget {
-    /// Nearest breakable construct is a loop; `perge` is valid.
-    Loop,
-    /// Nearest breakable construct is a `fac` block; `perge` has no meaning.
-    FacBlock,
-    /// No breakable construct inside the current function.
-    None,
-}
-
 /// One name binding inside a lexical frame.
 ///
 /// `kind` is stored at define time so type-namespace lookup can decide
@@ -3423,32 +3412,26 @@ impl Resolver {
     }
 
     /// Return whether the current context is inside a loop in this function.
+    ///
+    /// `perge` targets the nearest loop (ruling R3): a plain `fac` block is
+    /// [`ScopeKind::Breakable`], not a loop, so the search passes through it.
+    /// A function or closure boundary stops the search.
     #[must_use]
     pub fn in_loop(&self) -> bool {
-        self.continue_target() == ContinueTarget::Loop
-    }
-
-    /// Classify what `perge` would target from the current context.
-    ///
-    /// `perge` and `rumpe` target the same construct: the nearest enclosing
-    /// breakable scope. A `fac` block (without `dum`) is breakable but has no
-    /// next iteration, so it shadows any outer loop for `perge`.
-    #[must_use]
-    pub fn continue_target(&self) -> ContinueTarget {
         let mut scope_id = Some(self.current_scope);
 
         while let Some(id) = scope_id {
             let scope = &self.scopes[id.0 as usize];
-            match scope.kind {
-                ScopeKind::Loop => return ContinueTarget::Loop,
-                ScopeKind::Breakable => return ContinueTarget::FacBlock,
-                ScopeKind::Function => return ContinueTarget::None,
-                _ => {}
+            if scope.kind == ScopeKind::Loop {
+                return true;
+            }
+            if scope.kind == ScopeKind::Function {
+                return false;
             }
             scope_id = scope.parent;
         }
 
-        ContinueTarget::None
+        false
     }
 
     /// Return whether `rumpe` may target an enclosing breakable scope.

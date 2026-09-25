@@ -1,0 +1,46 @@
++++
+term = "perge"
+kind = "keyword"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "itera_stmt", "itera_binding", "range_expr", "range_tail", "fac_stmt", "cape_clause", "si_stmt", "arm", "perge_stmt", "equality", "equality_tail", "expression", "literal", "nota_stmt"]
+category = "transfer"
+canonical = false
+summary = "perge inside a fac block continues the enclosing loop without entering cape."
+syntax = "for range 0‥3 const i { do { if i ≡ 1 { continue } } catch err { } }"
+related = ["rumpe", "fac", "cape"]
+locale = "en"
++++
+# =============================================================================
+# perge — perge passes through a fac block to the enclosing loop
+# =============================================================================
+#
+# What this teaches:
+#   • `perge` targets the nearest loop in the same function. A plain `fac`
+#     block (with or without `cape`) is not a loop, so `perge` inside it
+#     leaves the `fac` and starts the next iteration of the enclosing loop.
+#   • Leaving a `fac` by `perge` is not an error, so the `cape` handler does
+#     not run.
+#   • Contrast `rumpe`, which stops at the `fac` block itself
+#     (see rumpe/fac-si-rumpe.fab).
+#
+# Common mistakes:
+#   • Expecting `perge` to restart the `fac` block — a `fac` block has no
+#     iterations; only `fac … dum` repeats.
+#   • `perge` in a `fac` with no enclosing loop in the same function is SEM031.
+#
+# See also: rumpe, fac, cape
+# =============================================================================
+
+main {
+    for range 0‥3 const i {
+        do {
+            if i ≡ 1 {
+                continue
+            }
+            print i
+        }
+        catch err {
+            print "caught"
+        }
+        print "after"
+    }
+}

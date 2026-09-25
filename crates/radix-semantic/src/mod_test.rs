@@ -95,7 +95,6 @@ fn gate_classification_is_conservative() {
         SemanticErrorKind::ReturnOutsideFunction,
         SemanticErrorKind::BreakOutsideBreakable,
         SemanticErrorKind::ContinueOutsideLoop,
-        SemanticErrorKind::ContinueInsideFac,
         SemanticErrorKind::UseBeforeInit,
         SemanticErrorKind::NonExhaustiveMatch,
         SemanticErrorKind::ReturnAbsent,

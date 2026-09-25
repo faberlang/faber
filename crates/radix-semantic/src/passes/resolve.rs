@@ -48,10 +48,10 @@ use crate::error::WarningKind;
 use crate::instans_precision::InstansPrecisionError;
 use crate::numeric_width::{WidthError, WidthLowerIssue};
 use crate::{
-    BareVariantLookup, CollectionKind, ContinueTarget, FuncSig, GenericParamDescriptor,
-    GenericParamSort, IndexExpr, ParamType, Primitive, QualifiedVariantPathLookup, Resolver,
-    SchemaColumnDef, SchemaDef, ScopeKind, SemanticError, SemanticErrorKind,
-    SemanticGenericParamDefault, SemanticParamMode, Symbol, SymbolKind, Type, TypeId, TypeTable,
+    BareVariantLookup, CollectionKind, FuncSig, GenericParamDescriptor, GenericParamSort,
+    IndexExpr, ParamType, Primitive, QualifiedVariantPathLookup, Resolver, SchemaColumnDef,
+    SchemaDef, ScopeKind, SemanticError, SemanticErrorKind, SemanticGenericParamDefault,
+    SemanticParamMode, Symbol, SymbolKind, Type, TypeId, TypeTable,
 };
 use radix_hir::DefId;
 use radix_lexer::Interner;
@@ -581,21 +581,16 @@ fn resolve_stmt(
                 );
             }
         }
-        StmtKind::Perge(stmt) => match resolver.continue_target() {
-            ContinueTarget::Loop => {}
-            ContinueTarget::FacBlock => errors.push(
-                SemanticError::structured(SemanticErrorKind::ContinueInsideFac, stmt.span)
-                    .with_arg("issue", "continue_inside_fac")
-                    .with_arg("keyword", "perge")
-                    .with_arg("context", "fac"),
-            ),
-            ContinueTarget::None => errors.push(
-                SemanticError::structured(SemanticErrorKind::ContinueOutsideLoop, stmt.span)
-                    .with_arg("issue", "continue_outside_loop")
-                    .with_arg("keyword", "perge")
-                    .with_arg("context", "loop"),
-            ),
-        },
+        StmtKind::Perge(stmt) => {
+            if !resolver.in_loop() {
+                errors.push(
+                    SemanticError::structured(SemanticErrorKind::ContinueOutsideLoop, stmt.span)
+                        .with_arg("issue", "continue_outside_loop")
+                        .with_arg("keyword", "perge")
+                        .with_arg("context", "loop"),
+                );
+            }
+        }
         StmtKind::Iace(stmt) => resolve_expr(resolver, interner, &stmt.value, errors),
         StmtKind::Mori(stmt) => resolve_expr(resolver, interner, &stmt.value, errors),
         StmtKind::Tacet(_) => {}
@@ -783,10 +778,9 @@ fn resolve_block(
     resolver.exit_scope();
 }
 
-/// Resolve one `cape` clause: bind its error local in a fresh block scope and
-/// resolve the handler body.
 /// Scope kind for a `fac` body: `fac … dum` repeats, so it is a loop; a
-/// plain `fac` block (with or without `cape`) is breakable only.
+/// plain `fac` block (with or without `cape`) is breakable only, so `rumpe`
+/// stops there and `perge` passes through to the enclosing loop (ruling R3).
 fn fac_scope_kind(stmt: &radix_syntax::FacStmt) -> ScopeKind {
     if stmt.while_.is_some() {
         ScopeKind::Loop
@@ -795,6 +789,8 @@ fn fac_scope_kind(stmt: &radix_syntax::FacStmt) -> ScopeKind {
     }
 }
 
+/// Resolve one `cape` clause: bind its error local in a fresh block scope and
+/// resolve the handler body.
 fn resolve_catch_binding(
     resolver: &mut Resolver,
     interner: &Interner,

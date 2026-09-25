@@ -2491,14 +2491,6 @@ help = "ใช้ 'perge' ภายในลูป"
 message = "{keyword} อยู่นอก {context}"
 help = "ใช้ 'perge' ภายในลูป"
 
-[diagnostics.SEM060]
-message = "continue อยู่ภายในบล็อก do"
-help = "'{perge}' จะชี้ไปยังบล็อก '{fac}' ที่ครอบอยู่ ซึ่งไม่วนซ้ำ; ให้ปรับโครงสร้างด้วย '{si}'/'{secus}' หรือย้าย '{perge}' ออกไปนอกบล็อก '{fac}'"
-
-[diagnostics.SEM060.issues.continue_inside_fac]
-message = "{perge} อยู่ภายในบล็อก {fac}"
-help = "'{perge}' จะชี้ไปยังบล็อก '{fac}' ที่ครอบอยู่ ซึ่งไม่วนซ้ำ; ให้ปรับโครงสร้างด้วย '{si}'/'{secus}' หรือย้าย '{perge}' ออกไปนอกบล็อก '{fac}'"
-
 [diagnostics.SEM032]
 message = "return อยู่นอกฟังก์ชัน"
 help = "ใช้ 'redde' ภายในฟังก์ชัน"

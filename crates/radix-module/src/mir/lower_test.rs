@@ -1567,6 +1567,21 @@ function f0 -> ty#1 {
 }
 
 #[test]
+fn lowers_perge_inside_fac_to_enclosing_loop_head() {
+    // Ruling R3: `perge` passes through a plain `fac` block to the enclosing
+    // loop. The perge edge must goto the dum head (bb1), never the cape block.
+    let dump = dump_source(
+        "functio f(numerus n) → numerus { varia numerus i ← 0 dum i < n { i ← i + 1 fac { si i ≡ 2 ergo perge } cape err { redde 0 } } redde i }",
+    );
+    assert!(dump.contains("bb1:\n    %0 = _1 < _0"), "dum head must be bb1: {dump}");
+    let perge_edges = dump.matches("goto bb1").count();
+    assert!(
+        perge_edges >= 2,
+        "perge inside fac must jump to the loop head alongside the back edge: {dump}"
+    );
+}
+
+#[test]
 fn closed_si_arms_do_not_emit_spurious_join_edges() {
     let dump = dump_source(
         "functio opta(numerus n) → numerus { varia numerus x ← n si x > 0 { redde x } secus { x ← x + 1 } redde x }",

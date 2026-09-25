@@ -2479,14 +2479,6 @@ help = "在迴圈中使用 'perge'"
 message = "{keyword} 位於 {context} 之外"
 help = "在迴圈中使用 'perge'"
 
-[diagnostics.SEM060]
-message = "continue 位於 do 區塊之內"
-help = "'{perge}' 會指向外層的 '{fac}' 區塊，而該區塊不會重複；請用 '{si}'/'{secus}' 重構，或將 '{perge}' 移到 '{fac}' 區塊之外"
-
-[diagnostics.SEM060.issues.continue_inside_fac]
-message = "{perge} 位於 {fac} 區塊之內"
-help = "'{perge}' 會指向外層的 '{fac}' 區塊，而該區塊不會重複；請用 '{si}'/'{secus}' 重構，或將 '{perge}' 移到 '{fac}' 區塊之外"
-
 [diagnostics.SEM032]
 message = "return 位於函式之外"
 help = "在函式中使用 'redde'"

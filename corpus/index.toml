@@ -992,7 +992,7 @@ phase = 2
 action = "review"
 rule = "keyword"
 primary = "perge/perge.fab"
-paths = ["perge/perge-in-fac-reject.fab", "perge/perge.fab"]
+paths = ["perge/perge-through-fac.fab", "perge/perge.fab"]
 
 [[terms]]
 term = "⊚"
@@ -3813,9 +3813,9 @@ kind = "keyword"
 category = "range"
 
 [[files]]
-path = "perge/perge-in-fac-reject.fab"
+path = "perge/perge-through-fac.fab"
 term = "perge"
-kind = "reject"
+kind = "keyword"
 category = "transfer"
 
 [[files]]

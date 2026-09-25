@@ -1708,9 +1708,14 @@ fn reports_continue_outside_loop() {
     );
 }
 
+// Ruling R3 (2026-09-25): `perge` targets the nearest loop in the same
+// function. A plain `fac` block is not a loop, so `perge` passes through it
+// (and through `cape` arms) to the enclosing loop; it never crosses a closure.
+
 #[test]
-fn reports_perge_whose_nearest_breakable_is_fac_cape() {
-    let source = r"
+fn accepts_perge_through_fac_cape_to_enclosing_loop() {
+    let result = compile_ok(
+        r"
 incipit {
     itera ab 0‥3 fixum i {
         fac {
@@ -1719,31 +1724,27 @@ incipit {
         } cape err { }
     }
 }
-";
-    let diagnostics = compile_and_expect(source, "SEM060", "continue_inside_fac");
-    let err = expect_diagnostic(&diagnostics, "SEM060", "continue_inside_fac");
-    assert!(err.is_error());
-    assert!(
-        err.args
-            .iter()
-            .any(|arg| arg.name == "keyword" && arg.value == "perge")
+",
     );
+    assert!(result.is_ok(), "{:?}", result.diagnostics);
 }
 
 #[test]
-fn reports_perge_inside_plain_fac_within_loop() {
-    let source = r"
+fn accepts_perge_through_plain_fac_within_loop() {
+    let result = compile_ok(
+        r"
 incipit {
     itera ab 0‥3 fixum i {
         fac { perge }
     }
 }
-";
-    compile_and_expect(source, "SEM060", "continue_inside_fac");
+",
+    );
+    assert!(result.is_ok(), "{:?}", result.diagnostics);
 }
 
 #[test]
-fn reports_perge_inside_closure_fac_body() {
+fn reports_perge_in_closure_fac_body_with_loop_outside_closure() {
     let source = r"
 incipit {
     itera ab 0‥3 fixum i {
@@ -1751,7 +1752,7 @@ incipit {
     }
 }
 ";
-    compile_and_expect(source, "SEM060", "continue_inside_fac");
+    compile_and_expect(source, "SEM031", "continue_outside_loop");
 }
 
 #[test]
@@ -1879,10 +1880,9 @@ functio exemplo(bivalens condicio) → numerus {
 }
 
 #[test]
-fn reports_perge_inside_fac_without_dum() {
-    // Operator ruling 2026-09-24: `rumpe` leaves a plain `fac`, and `perge`
-    // targets the same construct, so `perge` in a non-repeating `fac` is an
-    // error rather than a silent no-op or an escape to an outer loop.
+fn reports_perge_inside_fac_without_dum_and_no_loop() {
+    // Ruling R3: a plain `fac` is not a loop, so with no loop in the function
+    // `perge` is the ordinary SEM031 error.
     let source = r"
 functio exemplo() → numerus {
     fac {
@@ -1891,7 +1891,7 @@ functio exemplo() → numerus {
     redde 1
 }
 ";
-    compile_and_expect(source, "SEM060", "continue_inside_fac");
+    compile_and_expect(source, "SEM031", "continue_outside_loop");
 }
 
 fn resolve_source(source: &str) -> Vec<crate::SemanticError> {

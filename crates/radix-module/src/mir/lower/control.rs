@@ -3110,7 +3110,11 @@ impl FunctionBuilder<'_> {
         // and `rumpe` both goto `exit_id`. This must run before the epilogue is
         // built so the predecessor stays the active cursor and body statements
         // are not emitted into a sealed block.
-        let context = BreakableContext { perge_target: None, rumpe_target: exit_id, rumpe_used: false };
+        // Ruling R3: a breakable block is not a loop. `rumpe` stops here, but
+        // `perge` passes through to the enclosing loop's continue edge (or
+        // stays unset when no loop encloses the block in this function).
+        let perge_target = self.breakables.last().and_then(|outer| outer.perge_target);
+        let context = BreakableContext { perge_target, rumpe_target: exit_id, rumpe_used: false };
         self.breakables.push(context);
         self.visit_block_statements(block);
         // WHY: read back the context so `rumpe_used` reflects any `rumpe` that
