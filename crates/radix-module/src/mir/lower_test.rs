@@ -706,6 +706,50 @@ fn lowers_non_nullable_coalesce_without_requiring_nullable_lhs() {
 }
 
 #[test]
+fn lowers_coalesce_with_effectful_fallback_to_a_nil_branch() {
+    // Operator ruling 2026-09-24: `vel` short-circuits like `et`/`aut` — the
+    // fallback runs only when the left operand is `nihil`, so an effectful
+    // fallback must lower into its own block behind a nil check.
+    let dump = dump_source(
+        r"
+functio forte() → numerus ∪ nihil { redde nihil }
+functio latus() → numerus {
+    nota 1
+    redde 9
+}
+incipit {
+  fixum numerus x ← forte() vel latus()
+  nota x
+}",
+    );
+    let entry = dump.split("function f2").nth(1).unwrap_or_default();
+    assert!(!entry.contains("option coalesce("), "{entry}");
+    assert!(entry.contains("= is_nil %"), "{entry}");
+    assert!(entry.contains("option unwrap_assume("), "{entry}");
+    let calls: Vec<usize> = entry
+        .lines()
+        .enumerate()
+        .filter(|(_, l)| l.contains("= call def#"))
+        .map(|(i, _)| i)
+        .collect();
+    let branch_line = entry
+        .lines()
+        .position(|l| l.trim_start().starts_with("branch "));
+    assert_eq!(calls.len(), 2, "{entry}");
+    assert!(
+        branch_line.is_some_and(|b| calls[0] < b && b < calls[1]),
+        "fallback call must sit behind the nil branch:\n{entry}"
+    );
+}
+
+#[test]
+fn lowers_coalesce_with_literal_fallback_as_single_option_op() {
+    let dump = dump_source(r#"functio maybe(textus ∪ nihil name) → textus { redde name vel "ignotus" }"#);
+    assert!(dump.contains("option coalesce(_0, const string sym#"), "{dump}");
+    assert!(!dump.contains("branch "), "{dump}");
+}
+
+#[test]
 fn lowers_optional_chain_on_known_present_base() {
     let dump = dump_source(
         r#"genus Address {

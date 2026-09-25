@@ -2761,11 +2761,85 @@ impl<'a> FunctionBuilder<'a> {
         self.assign_temp(MirValueKind::Unary { op, operand }, result_ty, span)
     }
 
+    /// `vel` short-circuits (operator ruling 2026-09-24): the fallback is
+    /// evaluated only when the left operand is `nihil`. An effect-free
+    /// fallback (literal, path) keeps the single `option coalesce` op, since
+    /// eager evaluation is unobservable; any other fallback lowers behind a
+    /// nil branch, mirroring `lower_logical_short_circuit`.
     fn lower_coalesce(&mut self, lhs: &HirExpression, rhs: &HirExpression, expr: &HirExpression) -> Option<MirOperand> {
-        let value = self.lower_expr_value(lhs)?;
-        let fallback = self.lower_expr_value(rhs)?;
+        if rhs.is_effect_free_operand() {
+            let value = self.lower_expr_value(lhs)?;
+            let fallback = self.lower_expr_value(rhs)?;
+            let ty = self.expr_ty(expr)?;
+            return Some(self.assign_temp(
+                MirValueKind::Option(MirOptionOp::Coalesce { value, fallback }),
+                ty,
+                expr.span,
+            ));
+        }
+        self.lower_coalesce_short_circuit(lhs, rhs, expr)
+    }
+
+    fn lower_coalesce_short_circuit(
+        &mut self,
+        lhs: &HirExpression,
+        rhs: &HirExpression,
+        expr: &HirExpression,
+    ) -> Option<MirOperand> {
         let ty = self.expr_ty(expr)?;
-        Some(self.assign_temp(MirValueKind::Option(MirOptionOp::Coalesce { value, fallback }), ty, expr.span))
+        let result = self.push_temp(ty, expr.span);
+        let result_place = MirPlace::temp(result);
+        let value = self.lower_expr_value(lhs)?;
+        let bivalens = MirType::semantic(self.types.primitive(Primitive::Bivalens));
+        let is_nil = self.assign_temp(
+            MirValueKind::Unary { op: MirUnOp::IsNil, operand: value.clone() },
+            bivalens,
+            lhs.span,
+        );
+
+        let fallback_id = self.fresh_block(rhs.span);
+        let present_id = self.fresh_block(lhs.span);
+        let join_id = self.fresh_block(expr.span);
+        self.terminate_current(
+            MirTerminatorKind::Branch { condition: is_nil, then_block: fallback_id, else_block: present_id },
+            expr.span,
+        );
+
+        self.switch_to(fallback_id);
+        let fallback = self.lower_expr_value(rhs)?;
+        self.assign(result_place.clone(), fallback, ty, rhs.span);
+        let fallback_reaches = self.terminate_open_current(MirTerminatorKind::Goto(join_id), expr.span);
+
+        self.switch_to(present_id);
+        // WHY: a nullable result (`T ∪ nihil vel T ∪ nihil`) keeps the option
+        // carrier; a non-nullable result takes the proven-present payload.
+        let result_nullable = expr.ty.is_some_and(|ty| {
+            self.types.nullable_inner(ty).is_some()
+                || self
+                    .types
+                    .equals(ty, self.types.primitive(Primitive::Nihil))
+        });
+        let lhs_nullable = lhs
+            .ty
+            .is_some_and(|ty| self.types.nullable_inner(ty).is_some());
+        let present = if lhs_nullable && !result_nullable {
+            self.assign_temp(
+                MirValueKind::Option(MirOptionOp::Unwrap { value, mode: MirOptionUnwrapMode::Assume }),
+                ty,
+                lhs.span,
+            )
+        } else {
+            value
+        };
+        self.assign(result_place, present, ty, lhs.span);
+        let present_reaches = self.terminate_open_current(MirTerminatorKind::Goto(join_id), expr.span);
+
+        if fallback_reaches || present_reaches {
+            self.switch_to(join_id);
+        } else {
+            self.seal_unreachable(join_id, expr.span);
+        }
+        Some(MirOperand::Temp(result))
     }
 
     fn assign(&mut self, place: MirPlace, operand: MirOperand, ty: MirType, span: Span) {

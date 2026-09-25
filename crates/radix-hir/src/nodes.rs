@@ -983,6 +983,27 @@ pub struct HirExpression {
     pub span: Span,
 }
 
+impl HirExpression {
+    /// Whether evaluating this expression can have no observable effect —
+    /// no call, no trap, no allocation-visible state: a literal, a resolved
+    /// path, or a unary operator over a literal (`-1`).
+    ///
+    /// WHY: short-circuiting operators (`vel`) may evaluate such an operand
+    /// eagerly without changing program meaning, which keeps backends free
+    /// to emit a single select/`unwrap_or` for the common constant fallback
+    /// instead of a branch.
+    #[must_use]
+    pub fn is_effect_free_operand(&self) -> bool {
+        match &self.kind {
+            HirExpressionKind::Literal(_) | HirExpressionKind::Path(_) => true,
+            HirExpressionKind::Unary(_, operand) => {
+                matches!(operand.kind, HirExpressionKind::Literal(_))
+            }
+            _ => false,
+        }
+    }
+}
+
 /// Function or method call argument.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct HirCallArg {
