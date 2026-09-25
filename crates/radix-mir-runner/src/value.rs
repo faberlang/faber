@@ -959,6 +959,62 @@ pub fn add_values(
     }
 }
 
+/// Sort comparator for `lista` `.sort()`/`.sorted()`: a total order over
+/// runner scalars (floats by IEEE 754 totalOrder).
+pub(crate) fn compare_sort_values(left: &Value, right: &Value) -> std::cmp::Ordering {
+    match (left, right) {
+        (Value::Int(a), Value::Int(b)) => a.cmp(b),
+        (Value::UInt(a), Value::UInt(b)) => a.cmp(b),
+        // Mixed carriers order by numeric value: a negative signed value
+        // sorts below every unsigned value, a non-negative signed value
+        // compares by magnitude (same rule as `compare_values`).
+        (Value::Int(a), Value::UInt(b)) => {
+            if *a < 0 {
+                std::cmp::Ordering::Less
+            } else {
+                (*a as u64).cmp(b)
+            }
+        }
+        (Value::UInt(a), Value::Int(b)) => {
+            if *b < 0 {
+                std::cmp::Ordering::Greater
+            } else {
+                a.cmp(&(*b as u64))
+            }
+        }
+        // IEEE 754 totalOrder (operator ruling 2026-09-24): -NaN < -∞ < … <
+        // -0.0 < +0.0 < … < +∞ < +NaN, so NaN never scrambles a float sort.
+        (Value::Float(a), Value::Float(b)) => a.total_cmp(b),
+        (Value::Str(a), Value::Str(b)) => a.cmp(b),
+        (Value::Bool(a), Value::Bool(b)) => a.cmp(b),
+        _ => format!("{left:?}").cmp(&format!("{right:?}")),
+    }
+}
+
+/// IEEE 754-2019 `minimum` (operator ruling 2026-09-24): NaN in either
+/// operand propagates, and -0.0 orders below +0.0.
+pub(crate) fn ieee_minimum(a: f64, b: f64) -> f64 {
+    if a.is_nan() || b.is_nan() {
+        a + b
+    } else if a < b || (a == b && a.is_sign_negative()) {
+        a
+    } else {
+        b
+    }
+}
+
+/// IEEE 754-2019 `maximum` (operator ruling 2026-09-24): NaN in either
+/// operand propagates, and +0.0 orders above -0.0.
+pub(crate) fn ieee_maximum(a: f64, b: f64) -> f64 {
+    if a.is_nan() || b.is_nan() {
+        a + b
+    } else if a > b || (a == b && a.is_sign_positive()) {
+        a
+    } else {
+        b
+    }
+}
+
 pub fn compare_values(
     left: Value,
     right: Value,

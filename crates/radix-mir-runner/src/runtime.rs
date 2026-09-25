@@ -1272,7 +1272,7 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
                 match receiver {
                     Value::Array(cell) => {
                         let mut next = cell.borrow().clone();
-                        next.sort_by(Self::compare_sort_values);
+                        next.sort_by(super::value::compare_sort_values);
                         Ok(Value::Array(Rc::new(RefCell::new(next))))
                     }
                     _ => Err(RunnerError::internal(span, "sort receiver type mismatch")),
@@ -1345,12 +1345,20 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
             }
             MirCollectionOp::Absolute => self.map_numeric(args, span, return_ty, f64::abs),
             MirCollectionOp::Signum => self.map_numeric(args, span, return_ty, f64::signum),
-            MirCollectionOp::Minimum => {
-                self.numeric_extremum(args, span, return_ty, numeric_min, f64::min)
-            }
-            MirCollectionOp::Maximum => {
-                self.numeric_extremum(args, span, return_ty, numeric_max, f64::max)
-            }
+            MirCollectionOp::Minimum => self.numeric_extremum(
+                args,
+                span,
+                return_ty,
+                numeric_min,
+                super::value::ieee_minimum,
+            ),
+            MirCollectionOp::Maximum => self.numeric_extremum(
+                args,
+                span,
+                return_ty,
+                numeric_max,
+                super::value::ieee_maximum,
+            ),
             MirCollectionOp::Approximate => self.approximate_fractus(args, span),
             MirCollectionOp::Sum => self.sum_numeric_array(args, return_ty, span),
             MirCollectionOp::ArgMax => self.arg_extremum_index(args, span, true),
@@ -3914,36 +3922,6 @@ impl<H: super::Host + ?Sized> Runner<'_, H> {
         }
     }
 
-    fn compare_sort_values(left: &Value, right: &Value) -> std::cmp::Ordering {
-        match (left, right) {
-            (Value::Int(a), Value::Int(b)) => a.cmp(b),
-            (Value::UInt(a), Value::UInt(b)) => a.cmp(b),
-            // Mixed carriers order by numeric value: a negative signed value
-            // sorts below every unsigned value, a non-negative signed value
-            // compares by magnitude (same rule as `compare_values`).
-            (Value::Int(a), Value::UInt(b)) => {
-                if *a < 0 {
-                    std::cmp::Ordering::Less
-                } else {
-                    (*a as u64).cmp(b)
-                }
-            }
-            (Value::UInt(a), Value::Int(b)) => {
-                if *b < 0 {
-                    std::cmp::Ordering::Greater
-                } else {
-                    a.cmp(&(*b as u64))
-                }
-            }
-            (Value::Float(a), Value::Float(b)) => {
-                a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal)
-            }
-            (Value::Str(a), Value::Str(b)) => a.cmp(b),
-            (Value::Bool(a), Value::Bool(b)) => a.cmp(b),
-            _ => format!("{left:?}").cmp(&format!("{right:?}")),
-        }
-    }
-
     fn key_to_value(key: &MapKey) -> Value {
         match key {
             MapKey::Int(v) => Value::Int(*v),
@@ -4568,7 +4546,7 @@ fn numeric_min(
         span,
         |a, b, _, _| Ok(a.min(b)),
         |a, b, _, _| Ok(a.min(b)),
-        f64::min,
+        super::value::ieee_minimum,
     )
 }
 
@@ -4585,6 +4563,6 @@ fn numeric_max(
         span,
         |a, b, _, _| Ok(a.max(b)),
         |a, b, _, _| Ok(a.max(b)),
-        f64::max,
+        super::value::ieee_maximum,
     )
 }

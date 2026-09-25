@@ -154,6 +154,12 @@ pub fn rune_index(scope: u32) -> String {
     format!("n{scope}")
 }
 
+/// Left/right operand bindings for an IEEE 754 float `minimum`/`maximum`.
+#[must_use]
+pub fn extremum_operands(id: u32) -> (String, String) {
+    (format!("b{id}"), format!("r{id}"))
+}
+
 #[cfg(test)]
 #[path = "hygiene_test.rs"]
 mod tests;

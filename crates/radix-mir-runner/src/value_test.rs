@@ -221,3 +221,71 @@ fn float_compare_with_nan_is_ieee_ordered_false() {
         assert!(!values_equal(&left, &right), "{left:?} ≡ {right:?}");
     }
 }
+
+/// IEEE 754-2019 `minimum`/`maximum` (operator ruling 2026-09-24): NaN
+/// propagates from either operand, and -0.0 orders below +0.0.
+#[test]
+fn float_minimum_maximum_propagate_nan_and_order_signed_zero() {
+    let nan = f64::NAN;
+    for (a, b) in [(nan, 1.0), (1.0, nan), (nan, nan)] {
+        assert!(ieee_minimum(a, b).is_nan(), "minimum({a}, {b})");
+        assert!(ieee_maximum(a, b).is_nan(), "maximum({a}, {b})");
+    }
+    for (a, b) in [(-0.0, 0.0), (0.0, -0.0)] {
+        let min = ieee_minimum(a, b);
+        let max = ieee_maximum(a, b);
+        assert!(
+            min == 0.0 && min.is_sign_negative(),
+            "minimum({a}, {b}) = {min}"
+        );
+        assert!(
+            max == 0.0 && max.is_sign_positive(),
+            "maximum({a}, {b}) = {max}"
+        );
+    }
+    assert_eq!(ieee_minimum(2.0, 3.0), 2.0);
+    assert_eq!(ieee_maximum(2.0, 3.0), 3.0);
+    assert_eq!(ieee_minimum(f64::NEG_INFINITY, -1.0), f64::NEG_INFINITY);
+    assert_eq!(ieee_maximum(f64::INFINITY, 1.0), f64::INFINITY);
+}
+
+/// IEEE 754 totalOrder (operator ruling 2026-09-24): sorting floats orders
+/// -NaN < -∞ < … < -0.0 < +0.0 < … < +∞ < +NaN.
+#[test]
+fn float_sort_order_is_ieee_total_order() {
+    let neg_nan = -f64::NAN;
+    let mut values = vec![
+        Value::Float(3.5),
+        Value::Float(f64::NAN),
+        Value::Float(1.0),
+        Value::Float(0.0),
+        Value::Float(f64::NEG_INFINITY),
+        Value::Float(neg_nan),
+        Value::Float(-0.0),
+        Value::Float(f64::INFINITY),
+        Value::Float(-2.0),
+    ];
+    values.sort_by(compare_sort_values);
+    let bits: Vec<u64> = values
+        .iter()
+        .map(|value| match value {
+            Value::Float(v) => v.to_bits(),
+            other => panic!("non-float {other:?}"),
+        })
+        .collect();
+    let expected: Vec<u64> = [
+        neg_nan,
+        f64::NEG_INFINITY,
+        -2.0,
+        -0.0,
+        0.0,
+        1.0,
+        3.5,
+        f64::INFINITY,
+        f64::NAN,
+    ]
+    .iter()
+    .map(|v| v.to_bits())
+    .collect();
+    assert_eq!(bits, expected);
+}

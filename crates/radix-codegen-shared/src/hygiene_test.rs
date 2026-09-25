@@ -42,6 +42,7 @@ fn hygiene_closure_and_text_names_have_expected_format() {
     assert_eq!(text_old(7), "o7");
     assert_eq!(text_new(8), "p8");
     assert_eq!(rune_index(9), "n9");
+    assert_eq!(extremum_operands(4), ("b4".to_owned(), "r4".to_owned()));
 }
 
 #[test]
