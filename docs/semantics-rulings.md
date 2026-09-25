@@ -43,6 +43,11 @@ Supersedes the 2026-09-24 draft, which rejected `continue` inside a `do` block.
   `continue` is a compile error.
 - Leaving a `do … catch` by `break` or `continue` does not run the `catch`,
   because neither is an error.
+- **Where `continue` lands** (2026-09-25): `continue` transfers control to the
+  end of the nearest loop's body, skipping the rest of every block it leaves.
+  For `do … while c` and `while c` the condition `c` is then tested; for a
+  `for` loop the next iteration begins. `continue` never jumps back to the top
+  of a body without the loop's own step or test.
 
 The two words mean different things: `break` leaves a block, and `continue`
 starts the next iteration. A `do` block has no iterations.
