@@ -1,7 +1,7 @@
 +++
 term = "vel"
 kind = "operator-group"
-grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "sit_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "vel_expr", "vel_rhs", "proba_stmt", "adfirma_stmt", "equality", "equality_tail", "expression", "literal", "nota_stmt"]
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "incipit_stmt", "fixum_decl", "sit_decl", "type_annotation", "owned_type", "base_type", "qualified_type", "functio_decl", "param_list", "parameter", "return_clause", "redde_stmt", "si_stmt", "call_expr", "call_suffix", "argument_list", "argument", "vel_expr", "vel_rhs", "proba_stmt", "adfirma_stmt", "equality", "equality_tail", "expression", "literal", "nota_stmt"]
 category = "logic"
 canonical = true
 summary = "Provides a default when the left side is null."
@@ -39,6 +39,7 @@ test "vel chains to the first non-nihil value" {
 # What this teaches:
 #   • Nullish coalescing — `vel` supplies a fallback when the left operand is `nihil`
 #   • Chaining — multiple `vel` expressions fall through until the first non-`nihil` value
+#   • Short-circuit — like `et`/`aut`, the right operand runs only when the left is `nihil`
 #
 # Common mistakes:
 #   • confusing vel (nullish coalescing, checks nihil only) with aut (logical OR), or using vel for conversio recovery instead of ⇥
@@ -57,7 +58,17 @@ test "vel chains to the first non-nihil value" {
 #   coalesceExpr :← expr 'vel' expr
 #
 # EXPECTED OUTPUT:
-#   ignotus, Marcus, 0, false, defectum, inventum (vel.expected).
+#   ignotus, Marcus, 0, false, defectum, inventum, 7, supplementum, 9 (vel.expected).
+
+fn fortasse(bool adest) → int ∪ null {
+    if adest { return 7 }
+    return null
+}
+
+fn supplementum(int valor) → int {
+    print "supplementum"
+    return valor
+}
 
 main {
     # Basic nihil coalescing
@@ -94,4 +105,10 @@ main {
     const string primum ← ((a coalesce b) coalesce c) coalesce "nihil"
     # "inventum"
     print primum
+
+    # Short-circuit: the fallback runs only when the left side is nihil
+    # 7 (no "supplementum" line)
+    print fortasse(true) coalesce supplementum(9)
+    # "supplementum", then 9
+    print fortasse(false) coalesce supplementum(9)
 }
