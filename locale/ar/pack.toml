@@ -559,6 +559,10 @@ help = "استخدم صيغة عبارة صالحة"
 message = "{ad} صالح فقط في موضع تعبير"
 help = "استخدم {replacement}"
 
+[diagnostics.PARSE020.issues.fac_cape_after_dum]
+message = "يجب أن يأتي '{cape}' قبل '{dum}' في حلقة '{fac}'"
+help = "اكتب المعالج قبل الشرط: {fac} … {cape} … {dum} …"
+
 [diagnostics.PARSE021]
 message = "شرط مفقود"
 help = "أضف تعبير شرط"

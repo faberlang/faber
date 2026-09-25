@@ -806,6 +806,10 @@ help = "use a valid statement form"
 message = "ad is only valid in expression position"
 help = "use {replacement}"
 
+[diagnostics.PARSE020.issues.fac_cape_after_dum]
+message = "'{cape}' must come before '{dum}' in a '{fac}' loop"
+help = "write the handler before the condition: {fac} … {cape} … {dum} …"
+
 [diagnostics.PARSE021]
 message = "missing condition"
 help = "add a condition expression"

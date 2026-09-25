@@ -559,6 +559,10 @@ help = "मान्य कथन रूप उपयोग करें"
 message = "ad केवल अभिव्यक्ति स्थान पर मान्य है"
 help = "{replacement} उपयोग करें"
 
+[diagnostics.PARSE020.issues.fac_cape_after_dum]
+message = "'{fac}' लूप में '{cape}' को '{dum}' से पहले आना चाहिए"
+help = "हैंडलर को शर्त से पहले लिखें: {fac} … {cape} … {dum} …"
+
 [diagnostics.PARSE021]
 message = "शर्त गायब है"
 help = "एक शर्त अभिव्यक्ति जोड़ें"

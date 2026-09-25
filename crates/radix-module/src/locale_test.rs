@@ -2079,3 +2079,31 @@ fn format_locale_pack_load_error_lists_validation_issues() {
     let rendered = format_locale_pack_load_error(&err);
     assert!(rendered.contains("EmptyLlm"), "got {rendered}");
 }
+
+/// `fac { … } dum cond cape err { … }` reports PARSE020 `fac_cape_after_dum`;
+/// every installed pack owns the row and renders it with its own `cape`/`dum`
+/// spellings so the fix (handler before condition) reads in-locale.
+#[test]
+fn every_installed_pack_renders_fac_cape_after_dum() {
+    for locale in ["la", "en", "th-TH", "zh-Hans", "zh-Hant", "ar", "hi", "vi"] {
+        assert_issue_template(&owned_pack(locale), "PARSE020", "fac_cape_after_dum");
+        let pack = installed_pack(locale);
+        let diagnostic = parse_diagnostic(
+            ParseErrorKind::StatementInvalid,
+            vec![diagnostic_arg("issue", "fac_cape_after_dum")],
+        );
+        let rendered = pack
+            .render_diagnostic_text(&diagnostic)
+            .unwrap_or_else(|err| panic!("{locale} template should render: {err:?}"))
+            .unwrap_or_else(|| panic!("{locale} PARSE020 row should exist"));
+        assert!(!rendered.message.contains("missing row"), "{locale}: {}", rendered.message);
+        for keyword in ["cape", "dum"] {
+            let spelling = &pack.keywords.get(keyword).expect("keyword row").canonical;
+            assert!(
+                rendered.message.contains(spelling.as_str()),
+                "{locale} message must name `{spelling}`: {}",
+                rendered.message
+            );
+        }
+    }
+}

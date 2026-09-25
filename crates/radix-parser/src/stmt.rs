@@ -412,7 +412,19 @@ impl Parser {
             if !allow_while {
                 return Err(self.invalid_expression_error("closure_fac_body_dum"));
             }
-            Some(Box::new(self.parse_expression()?))
+            let cond = self.parse_expression()?;
+            // Grammar order is `fac block cape_clause? (dum expression)?`: a
+            // handler after the condition would otherwise re-enter statement
+            // parsing as bare identifiers (`cape`, `err`) and surface as
+            // misleading unknown-name errors.
+            if self.check_keyword_ident(TokenKind::Cape) {
+                return Err(ParseError::structured(
+                    ParseErrorKind::StatementInvalid,
+                    self.current_span(),
+                )
+                .with_arg("issue", "fac_cape_after_dum"));
+            }
+            Some(Box::new(cond))
         } else {
             None
         };
