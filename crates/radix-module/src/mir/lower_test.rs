@@ -3983,9 +3983,9 @@ incipit {
 #[test]
 fn lowers_potentia_to_exponentiation_identity() {
     // `potentia` is a CodegenOnly numeric registry row (no `MirCollectionOp`
-    // surface). It lowers to the codegen-lane exponentiation identity
-    // (`base ≤ 0 → 0`, else `(exp · ln(base)).exp()`) composed from existing
-    // MIR ops plus a guard branch — no new MIR op. Regression for the PKG001
+    // surface). Fractus receivers lower to IEEE 754 `pow` (operator ruling
+    // 2026-09-24) composed from existing MIR ops — special-case branches, an
+    // exact squaring path, and `(y · ln(x)).exp()` — no new MIR op. Regression for the PKG001
     // "method call before runtime/provider MIR lowering" the gradus nn.fab
     // `_exponens` (`(2.718281828459045 ∷ f32).potentia(x)`) tripped on the
     // PML4 FMIR lane (fails on revert of the `lower_potentia` arm).
@@ -3997,7 +3997,7 @@ functio _exponens(f32 x) → f32 {
     let mut unit = analyze(source);
     let lowered = lower_analyzed_unit(&mut unit, MirLoweringOptions::default()).expect("MIR lowering succeeds");
     validate_program(&lowered.validated.program(), lowered.validated.validation())
-        .expect("the exponentiation-identity MIR must validate (guard/power/join blocks reachable)");
+        .expect("the IEEE pow MIR must validate (special-case/power/join blocks reachable)");
     let dump = dump_program(&lowered.validated.program());
     assert!(
         !dump.contains("method call before runtime/provider MIR lowering"),
@@ -4007,7 +4007,7 @@ functio _exponens(f32 x) → f32 {
         dump.contains("log ") && dump.contains("exp "),
         "the exponentiation identity (exp(exp·ln(base))) must compose from MIR unary ops: {dump}"
     );
-    assert!(dump.contains("branch "), "the base ≤ 0 guard branch must appear: {dump}");
+    assert!(dump.contains("branch "), "the IEEE special-case branches must appear: {dump}");
 }
 
 #[test]

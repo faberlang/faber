@@ -180,7 +180,7 @@ incipit {
 
 #[cfg(feature = "hir-rust")]
 #[test]
-fn potentia_receiver_codegen_applies_non_positive_base_guard() {
+fn potentia_receiver_codegen_uses_ieee_powf() {
     let session = Session::new(Config::default());
     let source = r"incipit {
     fixum fractus b ← -2.0
@@ -192,9 +192,10 @@ fn potentia_receiver_codegen_applies_non_positive_base_guard() {
         "potentia receiver should typecheck"
     );
 
+    // IEEE 754 pow (operator ruling 2026-09-24): no silent `base ≤ 0 → 0` guard.
     let code = compile_rust("potentia-guard.fab", source);
-    assert!(code.contains("<= 0.0") || code.contains("<=0.0"));
-    assert!(!code.contains(".powf("));
+    assert!(code.contains(".powf("), "fractus potentia must use Rust powf:\n{code}");
+    assert!(!code.contains("<= 0.0") && !code.contains("<=0.0"), "no base guard:\n{code}");
 }
 
 #[cfg(feature = "hir-rust")]

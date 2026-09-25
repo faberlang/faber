@@ -1871,12 +1871,10 @@ impl FunctionBuilder<'_> {
         }
 
         // `potentia` is a CodegenOnly registry row (no `MirCollectionOp`
-        // surface). Fractus receivers use the exponentiation identity the Rust
-        // codegen uses (`emit_potentia_expr`): `base ≤ 0 → 0`, else
-        // `(exp · ln(base)).exp()` — the "e^x via exponentiation intrinsic"
-        // identity gradus nn.fab `_exponens` documents. Numerus receivers use
-        // exact integer exponentiation below; both paths compose into ordinary
-        // MIR so the runner does not see a late provider method call.
+        // surface). Fractus receivers lower to IEEE 754 `pow` composed from
+        // existing MIR ops (`fractus_potentia.rs`); numerus receivers use exact
+        // integer exponentiation below. Both compose into ordinary MIR so the
+        // runner does not see a late provider method call.
         if method_name == "potentia" {
             return self.lower_potentia(receiver, receiver_ty, args, expr);
         }
@@ -2085,70 +2083,6 @@ impl FunctionBuilder<'_> {
 
         self.switch_to(done);
         self.assign(MirPlace::temp(destination), MirOperand::Place(accumulator_place), ty, expr.span);
-        Some(MirOperand::Temp(destination))
-    }
-
-    /// Lower `potentia` for a fractus-family receiver as the exponentiation
-    /// identity (see the call site in [`Self::lower_numeric_operator_method`]).
-    ///
-    /// Shape: `base ≤ 0 → 0`, else `(exp · ln(base)).exp()`, composed from
-    /// existing `MirUnOp::{Log, Exp}`, `MirBinOp::{LtEq, Mul}`, and a guard
-    /// branch. The guard is mandatory: the runner's `MirUnOp::Log` rejects
-    /// non-positive input, and the Rust codegen lane returns `0` for
-    /// `base ≤ 0` — matching it keeps lanes aligned.
-    fn lower_fractus_potentia(
-        &mut self,
-        receiver: &HirExpression,
-        args: &[HirCallArg],
-        expr: &HirExpression,
-    ) -> Option<MirOperand> {
-        let ty = self.expr_ty(expr)?;
-        let base = self.lower_expr_value(receiver)?;
-        let [arg] = args else {
-            return None;
-        };
-        let exponent = self.lower_expr_value(&arg.expr)?;
-
-        let destination = self.push_temp(ty, expr.span);
-        let place = MirPlace::temp(destination);
-
-        let bool_ty = MirType::semantic(self.types.primitive(Primitive::Bivalens));
-        let condition = self.assign_temp(
-            MirValueKind::Binary {
-                op: MirBinOp::LtEq,
-                lhs: base.clone(),
-                rhs: MirOperand::Constant(MirConstant::Float(0.0)),
-            },
-            bool_ty,
-            expr.span,
-        );
-
-        let guard_block = self.fresh_block(expr.span);
-        let power_block = self.fresh_block(expr.span);
-        let join = self.fresh_block(expr.span);
-        self.terminate_current(
-            MirTerminatorKind::Branch { condition, then_block: guard_block, else_block: power_block },
-            expr.span,
-        );
-
-        // base ≤ 0 → 0
-        self.switch_to(guard_block);
-        self.assign(place.clone(), MirOperand::Constant(MirConstant::Float(0.0)), ty, expr.span);
-        self.terminate_current(MirTerminatorKind::Goto(join), expr.span);
-
-        // base > 0 → (exponent · ln(base)).exp()
-        self.switch_to(power_block);
-        let log = self.assign_temp(MirValueKind::Unary { op: MirUnOp::Log, operand: base }, ty, expr.span);
-        let product = self.assign_temp(
-            MirValueKind::Binary { op: MirBinOp::Mul, lhs: exponent, rhs: log },
-            ty,
-            expr.span,
-        );
-        let raised = self.assign_temp(MirValueKind::Unary { op: MirUnOp::Exp, operand: product }, ty, expr.span);
-        self.assign(place, raised, ty, expr.span);
-        self.terminate_current(MirTerminatorKind::Goto(join), expr.span);
-
-        self.switch_to(join);
         Some(MirOperand::Temp(destination))
     }
 
