@@ -128,3 +128,27 @@ fn param_less_vacuum_closure_is_not_the_entry() {
     );
     assert_eq!(out, ["outer", "inner"]);
 }
+
+#[test]
+fn shared_text_rebinding_reads_before_it_stores() {
+    let out = run_en(
+        "main {\n    var string s ← \"a\"\n    const () → vacuum grow ← () → vacuum ∴ do { s ← s + \"b\" }\n    grow()\n    grow()\n    print s\n}\n",
+    );
+    assert_eq!(out, ["abb"]);
+}
+
+#[test]
+fn increment_through_a_captured_var() {
+    let out = run_en(
+        "main {\n    var int n ← 0\n    const () → vacuum tick ← () → vacuum ∴ do { n↑ }\n    tick()\n    tick()\n    tick()\n    print n\n}\n",
+    );
+    assert_eq!(out, ["3"]);
+}
+
+#[test]
+fn captured_list_mutated_after_capture_is_visible_inside() {
+    let out = run_en(
+        "main {\n    var list<int> xs ← [1]\n    const () → int f ← () → int ∴ xs.length()\n    xs.append(2)\n    xs.append(3)\n    print f()\n}\n",
+    );
+    assert_eq!(out, ["3"]);
+}

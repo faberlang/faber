@@ -8,27 +8,37 @@
 //! never rebound can be copied at capture with identical behavior, so it
 //! keeps the cheap value capture.
 //!
-//! Scope of the facts: `var` locals declared in the walked body (including
-//! locals declared inside nested closures). Parameters and loop bindings are
-//! not tracked; `for … const i` bindings are fresh per iteration and never
+//! Scope of the facts: locals declared in the walked body (including locals
+//! declared inside nested closures). Parameters and loop bindings are not
+//! tracked; `for … const i` bindings are fresh per iteration and never
 //! rebound, so a closure created in a loop sees its own `i`.
+//!
+//! Backends whose aggregates are reference carriers (the MIR runner) only
+//! need [`CaptureFacts::shared`]. Backends with value-semantics carriers (Rust
+//! `Vec`/`String`) also consult [`CaptureFacts::content_mutated`]: a captured
+//! aggregate whose content is mutated in place must share storage too.
 
 use crate::nodes::{
-    HirBlock, HirExpression, HirExpressionKind, HirLocal, HirParam, HirStatement, HirStatementKind,
+    HirBlock, HirExpression, HirExpressionKind, HirLocal, HirModule, HirParam, HirStatement,
+    HirStatementKind,
 };
 use crate::visit::{HirVisitor, walk_expr, walk_local, walk_stmt};
 use radix_types::DefId;
 use rustc_hash::{FxHashMap, FxHashSet};
 
-/// Capture facts for one callable body.
+/// Capture facts for one callable body (or a whole module).
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
 pub struct CaptureFacts {
-    /// `var` locals referenced from inside a closure nested deeper than the
-    /// declaration.
+    /// Locals (`const` or `var`) referenced from inside a closure nested
+    /// deeper than the declaration.
     pub captured: FxHashSet<DefId>,
     /// Captured `var` locals that are also rebound (`←`, `↤`, `↑`/`↓` on the
     /// bare name) somewhere in the body. These need shared-cell storage.
     pub shared: FxHashSet<DefId>,
+    /// Captured locals that are the root of an in-place content mutation: a
+    /// method-call receiver (`xs.append(…)`) or a field/index assignment
+    /// target (`xs[0] ← …`). Conservative: any method call counts.
+    pub content_mutated: FxHashSet<DefId>,
 }
 
 impl CaptureFacts {
@@ -48,6 +58,14 @@ impl CaptureFacts {
         collector.finish()
     }
 
+    /// Facts for every callable body and the entry block of a module.
+    #[must_use]
+    pub fn for_module(module: &HirModule) -> Self {
+        let mut collector = CaptureCollector::default();
+        collector.visit_program(module);
+        collector.finish()
+    }
+
     #[must_use]
     pub fn is_shared(&self, def_id: DefId) -> bool {
         self.shared.contains(&def_id)
@@ -57,11 +75,14 @@ impl CaptureFacts {
 #[derive(Default)]
 struct CaptureCollector {
     depth: u32,
-    /// Closure depth at which each tracked `var` local is declared.
+    /// Closure depth at which each tracked local is declared.
     declared: FxHashMap<DefId, u32>,
+    /// Tracked locals declared `var`.
+    mutable: FxHashSet<DefId>,
     /// Deepest closure depth at which each def is referenced.
     deepest_use: FxHashMap<DefId, u32>,
     rebound: FxHashSet<DefId>,
+    content_mutated: FxHashSet<DefId>,
 }
 
 impl CaptureCollector {
@@ -79,14 +100,41 @@ impl CaptureCollector {
         let shared = captured
             .iter()
             .copied()
-            .filter(|def_id| self.rebound.contains(def_id))
+            .filter(|def_id| self.mutable.contains(def_id) && self.rebound.contains(def_id))
             .collect();
-        CaptureFacts { captured, shared }
+        let content_mutated = captured
+            .iter()
+            .copied()
+            .filter(|def_id| self.content_mutated.contains(def_id))
+            .collect();
+        CaptureFacts {
+            captured,
+            shared,
+            content_mutated,
+        }
     }
 
     fn note_rebind(&mut self, target: &HirExpression) {
-        if let HirExpressionKind::Path(def_id) = &target.kind {
-            self.rebound.insert(*def_id);
+        match &target.kind {
+            HirExpressionKind::Path(def_id) => {
+                self.rebound.insert(*def_id);
+            }
+            HirExpressionKind::Field(base, _) | HirExpressionKind::Index(base, _) => {
+                self.note_content_mutation(base);
+            }
+            _ => {}
+        }
+    }
+
+    fn note_content_mutation(&mut self, place: &HirExpression) {
+        match &place.kind {
+            HirExpressionKind::Path(def_id) => {
+                self.content_mutated.insert(*def_id);
+            }
+            HirExpressionKind::Field(base, _) | HirExpressionKind::Index(base, _) => {
+                self.note_content_mutation(base);
+            }
+            _ => {}
         }
     }
 
@@ -109,8 +157,9 @@ impl HirVisitor for CaptureCollector {
     }
 
     fn visit_local(&mut self, local: &HirLocal) {
+        self.declared.insert(local.def_id, self.depth);
         if local.mutable {
-            self.declared.insert(local.def_id, self.depth);
+            self.mutable.insert(local.def_id);
         }
         walk_local(self, local);
     }
@@ -125,6 +174,7 @@ impl HirVisitor for CaptureCollector {
             | HirExpressionKind::ConversioAssign { target, .. } => {
                 self.note_rebind(target);
             }
+            HirExpressionKind::MethodCall(receiver, ..) => self.note_content_mutation(receiver),
             HirExpressionKind::Clausura(params, _, _, body, _) => {
                 self.visit_closure(params, body);
                 return;
