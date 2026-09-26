@@ -700,6 +700,7 @@ impl Lowerer<'_> {
             && base_symbol.kind == crate::SymbolKind::Enum
         {
             if let Some(variant_def) = self.resolver.variant_child(base_def, member.member.name) {
+                self.record_variant_path(variant_def, &[base.name, member.member.name]);
                 return HirExpressionKind::Path(variant_def);
             }
             self.error("unknown_variant");

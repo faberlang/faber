@@ -1,7 +1,7 @@
 //! Reader-locale round trips for every `cape` attachment form.
 //!
 //! `cape` attaches to `fac` (with or without `dum`), conditional arms (`si`,
-//! `sin`, `secus`), `dum`, `itera`, `elige`, and `cura`. Each source converts
+//! `sin`, `secus`), `dum`, `itera`, `elige`, and `cura` (refused: see below). Each source converts
 //! en→la and back la→en through [`reemit_faber`] (which re-validates every
 //! emitted body), and en→en format must agree with the round-tripped en so the
 //! handler attachment is preserved rather than moved to a stray statement.
@@ -99,9 +99,30 @@ fn loop_and_switch_catches_round_trip() {
     ));
 }
 
+/// `cura … cape` has no re-emittable form: the emitter can only write the
+/// lowered body as `fac { … } cape`, which makes the body a breakable scope
+/// the source never declared. D8.9: the formatter refuses instead of writing
+/// a different program (this test used to accept that rewrite).
 #[test]
-fn with_catch_round_trips() {
-    assert_round_trips(
-        "main {\n    with \"arena\" const any alloc {\n        print \"in arena\"\n    } catch err {\n        print \"caught\"\n    }\n}\n",
+fn with_catch_is_refused_rather_than_rewritten() {
+    let source = "+++\nlocale = \"en\"\n+++\nmain {\n    with \"arena\" const any alloc {\n        print \"in arena\"\n    } catch err {\n        print \"caught\"\n    }\n}\n";
+    let session = Session::new(
+        Config::default()
+            .with_target(Target::HirFaber)
+            .with_dev_locale_root(),
+    );
+    let result = reemit_faber(&session, &pack("la"), "test.fab", source);
+    assert!(result.output.is_none(), "cura re-emit must be refused");
+    assert!(
+        result
+            .diagnostics
+            .iter()
+            .any(|d| d.code == Some("CODEGEN006") && d.issue() == Some("hir_meaning_diverged")),
+        "{:?}",
+        result
+            .diagnostics
+            .iter()
+            .map(|d| (d.code, d.issue()))
+            .collect::<Vec<_>>()
     );
 }

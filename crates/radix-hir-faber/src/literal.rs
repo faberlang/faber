@@ -113,8 +113,12 @@ impl super::FaberCodegen<'_> {
     ) {
         match lit {
             HirLiteral::Int(value) => writer.write(&value.to_string()),
-            // decimal-widths D1: source emit stays byte-identical (f64 spelling);
-            // exact digit text reaches typing, not the Faber emitter.
+            // D8.9: the authored digit text is what typing reads for decimal
+            // widths, so re-emit it verbatim; an f64 re-spelling could round
+            // a `decimal` literal or rewrite `1e-5` as `0.00001`.
+            HirLiteral::FloatText { value, text } if !value.is_nan() => {
+                writer.write(self.interner.resolve(*text));
+            }
             HirLiteral::Float(value) | HirLiteral::FloatText { value, .. } => {
                 if value.is_nan() {
                     writer.write(surface.contextual_keyword("nonnumerus"));

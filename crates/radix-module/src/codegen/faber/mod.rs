@@ -4,6 +4,7 @@
 pub use radix_hir_faber::{FaberCodegen, FaberOutput, empty_presentation};
 
 pub mod compile;
+mod meaning;
 pub use compile::{FaberReemitResult, emit_from_analyzed, reemit_faber};
 
 #[doc(hidden)]
