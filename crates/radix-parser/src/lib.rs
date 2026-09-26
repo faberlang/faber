@@ -1172,6 +1172,7 @@ impl Parser {
                     TokenKind::Discretio
                         | TokenKind::Fixum
                         | TokenKind::Varia
+                        | TokenKind::Generis
                         | TokenKind::Functio
                         | TokenKind::Genus
                         | TokenKind::Implendum
@@ -1388,6 +1389,10 @@ mod inheritance_removed_test;
 #[cfg(test)]
 #[path = "nexum_removed_test.rs"]
 mod nexum_removed_test;
+
+#[cfg(test)]
+#[path = "static_decl_test.rs"]
+mod static_decl_test;
 
 #[cfg(test)]
 #[path = "construction_spread_removed_test.rs"]

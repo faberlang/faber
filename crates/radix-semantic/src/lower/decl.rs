@@ -462,6 +462,9 @@ impl Lowerer<'_> {
                 value,
                 mutable: decl.mutability == AstMutability::Mutable,
                 is_await: decl.is_await(),
+                statica: decl
+                    .is_static
+                    .then_some(radix_hir::HirStatic { authored: None }),
             }),
             span: stmt.span,
         };

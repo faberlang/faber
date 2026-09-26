@@ -67,6 +67,7 @@ pub mod lint;
 pub mod live_tuus_cursor_escape;
 pub mod resolve;
 pub mod return_path;
+pub mod statica;
 pub(crate) mod typecheck;
 pub mod visibility_annotation;
 
@@ -220,8 +221,12 @@ mod ratio_test;
 mod ratio_hole_test;
 
 #[cfg(test)]
+#[path = "statica_test.rs"]
+mod statica_test;
+#[cfg(test)]
 #[path = "summa_disambiguation_test.rs"]
 mod summa_disambiguation_test;
+
 #[cfg(test)]
 #[path = "visibility_annotation_test.rs"]
 mod visibility_annotation_test;

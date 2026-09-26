@@ -108,7 +108,15 @@ impl super::FaberCodegen<'_> {
             }
             HirItemKind::Constant(c) => {
                 let await_assignment = self.await_assignment_bindings.contains(&item.def_id);
-                writer.write(surface.contextual_keyword(if c.mutable { "varia" } else { "fixum" }));
+                if c.statica.is_some() {
+                    writer.write(surface.keyword(TokenKind::Generis));
+                } else {
+                    writer.write(surface.contextual_keyword(if c.mutable {
+                        "varia"
+                    } else {
+                        "fixum"
+                    }));
+                }
                 writer.write(" ");
                 if let Some(ty) = c.ty {
                     let site = HirTypeSite {
@@ -139,6 +147,12 @@ impl super::FaberCodegen<'_> {
                         writer.write(" ⊥ ");
                         self.write_expr_prec(recovery, 12, names, surface, writer);
                     }
+                } else if let Some(statica) = &c.statica {
+                    // A static is a compile-time fact: `generis T NAME = value`,
+                    // re-emitted from its authored (unfolded) initializer.
+                    writer.write(" = ");
+                    let value = statica.authored.as_deref().unwrap_or(&c.value);
+                    self.write_expr(value, names, surface, writer);
                 } else {
                     writer.write(if await_assignment { " ↢ " } else { " ← " });
                     self.write_expr(&c.value, names, surface, writer);

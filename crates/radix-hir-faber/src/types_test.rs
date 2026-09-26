@@ -1845,6 +1845,7 @@ fn constant_publica_annotation_reemits() {
             },
             mutable: false,
             is_await: false,
+            statica: None,
         }),
         span: span(),
     };

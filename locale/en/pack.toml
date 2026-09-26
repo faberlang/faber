@@ -727,6 +727,22 @@ help = "keep schemas as plain relational headings"
 message = "a schema cannot declare a method"
 help = "declare the method on a class instead"
 
+[diagnostics.PARSE010.issues.static_not_top_level]
+message = "a {generis} static is a top-level declaration; it cannot appear inside a block"
+help = "move the static to top level, or use {fixum} for a local binding"
+
+[diagnostics.PARSE010.issues.static_initializer_eq]
+message = "a {generis} static is initialized with `=`, not `←`"
+help = "write `{generis} T NAME = value`; a static is a compile-time fact"
+
+[diagnostics.PARSE010.issues.static_initializer_required]
+message = "a {generis} static needs an initializer"
+help = "write `{generis} T NAME = value`"
+
+[diagnostics.PARSE010.issues.static_sponte]
+message = "a {generis} static cannot be {sponte}"
+help = "remove {sponte}; a static always has its compile-time value"
+
 [diagnostics.PARSE011]
 message = "expected function name after '{functio}'"
 help = "add a function name after '{functio}'"
@@ -1254,6 +1270,10 @@ help = "break the cycle between modules"
 [diagnostics.SEM007.issues.type_alias_cycle]
 message = "type alias cycle"
 help = "break the cycle between modules"
+
+[diagnostics.SEM007.issues.static_cycle]
+message = "static `{name}` depends on itself"
+help = "break the cycle between the static initializers"
 
 [diagnostics.SEM008]
 message = "lowering error"
@@ -3351,6 +3371,22 @@ help = "keep the v1 AIR subset pure: immutable locals, pure expressions, AIR-lan
 message = "@ radix lane \"{lane}\" rejects this function body: `tacet` is outside the v1 AIR subset"
 help = "keep the v1 AIR subset pure: immutable locals, pure expressions, AIR-lane calls, and tensor arithmetic intrinsics only"
 
+[diagnostics.SEM060]
+message = "invalid static initializer"
+help = "move the computation into a function, or use `{praefixum}` (planned)"
+
+[diagnostics.SEM060.issues.static_initializer_not_constant]
+message = "the initializer of static `{name}` is not a compile-time constant"
+help = "a static allows literals, arithmetic, text, collection literals of those, and other statics; move the computation into a function, or use `{praefixum}` (planned)"
+
+[diagnostics.SEM060.issues.static_arithmetic_overflow]
+message = "the initializer of static `{name}` overflows its type"
+help = "use a wider type or a smaller value"
+
+[diagnostics.SEM060.issues.static_division_by_zero]
+message = "the initializer of static `{name}` divides by zero"
+help = "fix the divisor"
+
 [diagnostics.WARN001]
 message = "unused variable"
 help = "remove the variable or prefix it with '_'"
@@ -3542,3 +3578,11 @@ help = "add a '{ceterum}' arm, or split the match so each pattern kind is checka
 [diagnostics.WARN029.issues.coverage_unchecked]
 message = "coverage of this match could not be computed for its pattern kinds; exhaustiveness was not checked"
 help = "add a '{ceterum}' arm, or split the match so each pattern kind is checkable"
+
+[diagnostics.WARN030]
+message = "top-level binding"
+help = "use `{generis} T X = …` for a compile-time constant, or move the binding into a function"
+
+[diagnostics.WARN030.issues.top_level_binding]
+message = "top-level `{name}`: module-level mutable state does not exist"
+help = "use `{generis} T X = …` for a compile-time constant, or move the binding into a function"
