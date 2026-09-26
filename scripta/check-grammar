@@ -12,4 +12,10 @@ set -euo pipefail
 
 cd "$(dirname "$0")/.."
 
-exec python3 scripta/grammar-pipeline.py --check "$@"
+status=0
+python3 scripta/grammar-pipeline.py --check "$@" || status=$?
+if [ "$status" -ne 0 ]; then
+  echo "check-grammar: the generated grammar renders drifted from docs/grammar/source.fg." >&2
+  echo "check-grammar: move hand edits into source.fg; don't regenerate over them." >&2
+fi
+exit "$status"
