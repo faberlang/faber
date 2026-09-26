@@ -105,9 +105,7 @@ pub trait Visitor: Sized {
     /// process from this hook. Override to carry the failure to the caller
     /// (see [`DepthExceeded`]); a visitor on a compile path must do so, because
     /// an unreported stop reads as "nothing found" in the pruned subtree.
-    fn on_depth_exceeded(&mut self, exceeded: DepthExceeded) {
-        let _ = exceeded;
-    }
+    fn on_depth_exceeded(&mut self, _exceeded: DepthExceeded) {}
 
     fn visit_program(&mut self, program: &Program) {
         walk_program(self, program);
