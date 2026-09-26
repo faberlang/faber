@@ -974,6 +974,10 @@ help = "check the union's `@ commune` field name"
 message = "union member '{member}' is not common; lacking in: {lacking}"
 help = "narrow the receiver (`est M` branch, `discerne`) to recover per-member access"
 
+[diagnostics.SEM004.issues.union_member_differs]
+message = "union member '{member}' differs: {detail}"
+help = "give every union member the same signature or type, or narrow the receiver (`est M`, `discerne`)"
+
 [diagnostics.SEM005]
 message = "duplicate definition"
 help = "rename one of the definitions"
@@ -3293,14 +3297,6 @@ help = "narrow with a member the union declares, or fix the tested type"
 [diagnostics.WARN023.issues.type_test_member_absent]
 message = "type test `{type}` is dead: not a member of `{union}`"
 help = "narrow with a member the union declares, or fix the tested type"
-
-[diagnostics.WARN024]
-message = "union of nominal members guarantees only the common members"
-help = "narrow with `est`/`discerne` to recover per-member access; both-at-once is `∩`"
-
-[diagnostics.WARN024.issues.union_nominal_members]
-message = "union `{union}` guarantees only the common members; narrow to recover per-member access"
-help = "narrow with `est`/`discerne` to recover per-member access; both-at-once is `∩`"
 
 [diagnostics.WARN025]
 message = "union shares no members; store-only until narrowed"

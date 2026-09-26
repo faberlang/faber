@@ -121,6 +121,9 @@ mod type_pattern_test;
 #[path = "union_member_refinement_test.rs"]
 mod union_member_refinement_test;
 #[cfg(test)]
+#[path = "union_overlap_access_test.rs"]
+mod union_overlap_access_test;
+#[cfg(test)]
 #[path = "width_pattern_test.rs"]
 mod width_pattern_test;
 

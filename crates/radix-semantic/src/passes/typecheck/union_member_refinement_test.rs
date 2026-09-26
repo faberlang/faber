@@ -58,14 +58,14 @@ fn union_common_field_has_real_signature() {
 #[test]
 fn union_field_type_disagreement_is_not_common() {
     // Same field name, different types across constituents: not a common
-    // member (falls out of the computation, no extra rule).
+    // member; D9.2 names each constituent's type.
     test_support::assert_rejects_with_issue(
         concat!(
             "genus A {\n    textus commune\n}\n\n",
             "genus B {\n    numerus commune\n}\n\n",
             "functio f(A ∪ B r) → textus { redde r.commune }",
         ),
-        "union_member_not_common",
+        "union_member_differs",
     );
 }
 
@@ -82,15 +82,15 @@ fn union_common_method_has_real_signature() {
 
 #[test]
 fn union_shadowed_method_is_not_common() {
-    // Incompatible same-name signatures silently removed the method from the
-    // common set; the call now rejects with attribution.
+    // Incompatible same-name signatures remove the method from the common
+    // set; the call rejects naming each constituent's signature (D9.2).
     test_support::assert_rejects_with_issue(
         concat!(
             "genus A {\n    functio code(numerus n) → numerus { redde n }\n}\n\n",
             "genus B {\n    functio code(textus s) → numerus { redde 1 }\n}\n\n",
             "functio f(A ∪ B r) → numerus { redde r.code(5) }",
         ),
-        "union_member_not_common",
+        "union_member_differs",
     );
 }
 
@@ -264,15 +264,6 @@ fn est_value_equality_stays_untouched() {
 // ---------------------------------------------------------------------------
 
 #[test]
-fn nominal_union_annotation_teaches_member_rule() {
-    // Guardrail 1: ≥2 nominal members warns at the written annotation.
-    test_support::assert_warns_with_issue(
-        &errata_bonum("functio f(Errata ∪ Bonum r) → textus { redde \"\" }"),
-        "union_nominal_members",
-    );
-}
-
-#[test]
 fn empty_common_member_union_warns_store_only() {
     // Guardrail 3: constituents sharing no members are store-only.
     test_support::assert_warns_with_issue(
@@ -282,14 +273,15 @@ fn empty_common_member_union_warns_store_only() {
 }
 
 #[test]
-fn shared_field_union_warns_only_teach() {
-    // Common members exist, so guardrail 3 stays quiet.
+fn shared_field_union_is_quiet() {
+    // Common members exist, so guardrail 3 stays quiet, and the retired
+    // guardrail 1 (WARN024) no longer teaches narrowing (D9.2).
     let result = test_support::analyze_and_get_diagnostics(concat!(
         "genus A {\n    textus commune\n}\n\n",
         "genus B {\n    textus commune\n}\n\n",
         "functio f(A ∪ B r) → textus { redde r.commune }",
     ));
-    assert!(result
+    assert!(!result
         .iter()
         .any(|err| !err.is_error() && test_support::issue(err) == Some("union_nominal_members")));
     assert!(
@@ -316,7 +308,7 @@ fn shadowed_method_union_warns_at_annotation() {
 
 #[test]
 fn primitive_union_annotation_does_not_warn() {
-    // Guardrails 1/3/4 are the ∪-of-nominal family: a primitive union has no
+    // Guardrails 3/4 are the ∪-of-nominal family: a primitive union has no
     // nominal members and no declared-member view, so nothing fires.
     let result =
         test_support::analyze_and_get_diagnostics("functio f(numerus ∪ textus u) { nota u }");

@@ -74,7 +74,6 @@ pub(crate) const WARNING_KINDS: &[WarningKind] = &[
     WarningKind::EmptyMarkerShadowing,
     WarningKind::UnboundedTextusIndex,
     WarningKind::TypeTestMemberAbsent,
-    WarningKind::UnionOfNominalMembers,
     WarningKind::UnionNoCommonMembers,
     WarningKind::UnionMethodSignatureShadowed,
     WarningKind::ComplexityBudgetExceeded,
@@ -294,9 +293,7 @@ pub fn semantic_help(kind: SemanticErrorKind, args: &[DiagnosticArg]) -> Option<
             Some("narrow with a member the union declares, or fix the tested type".to_owned())
         }
         SemanticErrorKind::Warning(
-            WarningKind::UnionOfNominalMembers
-            | WarningKind::UnionNoCommonMembers
-            | WarningKind::UnionMethodSignatureShadowed,
+            WarningKind::UnionNoCommonMembers | WarningKind::UnionMethodSignatureShadowed,
         ) => semantic_union_guardrail_help(args),
         _ => None,
     }
@@ -1092,12 +1089,6 @@ fn warning_spec(kind: WarningKind) -> DiagnosticSpec {
             code: "WARN023",
             help: Some("narrow with a member the union declares, or fix the tested type"),
         },
-        WarningKind::UnionOfNominalMembers => DiagnosticSpec {
-            code: "WARN024",
-            help: Some(
-                "narrow with `est`/`discerne` to recover per-member access; both-at-once is `∩`",
-            ),
-        },
         WarningKind::UnionNoCommonMembers => DiagnosticSpec {
             code: "WARN025",
             help: Some(
@@ -1143,10 +1134,6 @@ fn semantic_union_hole_solved_monomorphically_help(args: &[DiagnosticArg]) -> Op
 
 fn semantic_union_guardrail_help(args: &[DiagnosticArg]) -> Option<String> {
     match arg_value(args, "issue")? {
-        "union_nominal_members" => Some(
-            "narrow with `est`/`discerne` to recover per-member access; both-at-once is `∩`"
-                .to_owned(),
-        ),
         "union_no_common_members" => Some(
             "narrow with `est`/`discerne` before any member access; the union itself is store-only"
                 .to_owned(),

@@ -51,8 +51,8 @@ const ISSUE_METHOD_CALL_TYPE_ARGS: &str = "method_call_type_args";
 const ISSUE_OCTETI_LITERAL_TEMPLATE_APPLICATION: &str = "octeti_literal_template_application";
 const ISSUE_TEMPLATE_APPLICATION_TYPE_ARGS: &str = "template_application_type_args";
 const ISSUE_UNION_MEMBER_NOT_COMMON: &str = "union_member_not_common";
-const ISSUE_UNION_NOMINAL_MEMBERS: &str = "union_nominal_members";
 const ISSUE_UNION_NO_COMMON_MEMBERS: &str = "union_no_common_members";
+const ISSUE_UNION_MEMBER_DIFFERS: &str = "union_member_differs";
 const ISSUE_UNION_METHOD_SIGNATURE_SHADOWED: &str = "union_method_signature_shadowed";
 const ISSUE_VARIANT_CONSTRUCTOR_TYPE_ARGS: &str = "variant_constructor_type_args";
 
@@ -512,14 +512,28 @@ impl TypeChecker<'_> {
             }
             self.typecheck_call_arg_exprs(args);
             let lacking = self.union_lacking_constituents(&members, *name);
-            self.undefined_member_with_args(
-                ISSUE_UNION_MEMBER_NOT_COMMON,
-                receiver.span,
-                &[
-                    ("member", self.method_display_name(*name)),
-                    ("lacking", lacking.join(", ")),
-                ],
-            );
+            if lacking.is_empty() {
+                // D9.2: every member declares the method, but the
+                // signatures differ — name each member's signature.
+                let detail = self.union_method_signature_detail(&members, *name);
+                self.undefined_member_with_args(
+                    ISSUE_UNION_MEMBER_DIFFERS,
+                    receiver.span,
+                    &[
+                        ("member", self.method_display_name(*name)),
+                        ("detail", detail),
+                    ],
+                );
+            } else {
+                self.undefined_member_with_args(
+                    ISSUE_UNION_MEMBER_NOT_COMMON,
+                    receiver.span,
+                    &[
+                        ("member", self.method_display_name(*name)),
+                        ("lacking", lacking.join(", ")),
+                    ],
+                );
+            }
             return self.error_type;
         }
 
@@ -1250,6 +1264,42 @@ impl TypeChecker<'_> {
         })
     }
 
+    /// Per-member signature listing for `union_member_differs` (D9.2):
+    /// "`() → fractus` in Circulus, `() → numerus` in Quadratum".
+    fn union_method_signature_detail(&self, members: &[TypeId], name: Symbol) -> String {
+        members
+            .iter()
+            .filter_map(|member| {
+                let sig = self.lookup_method_signature(*member, name)?;
+                Some(format!(
+                    "`{}` in {}",
+                    self.format_func_sig(&sig),
+                    self.display_union_constituent(*member)
+                ))
+            })
+            .collect::<Vec<_>>()
+            .join(", ")
+    }
+
+    /// Faber-surface spelling of a method signature for diagnostics.
+    fn format_func_sig(&self, sig: &FuncSig) -> String {
+        let params = sig
+            .params
+            .iter()
+            .map(|param| self.format_union_constituent_type(param.ty))
+            .collect::<Vec<_>>()
+            .join(", ");
+        let mut text = format!(
+            "({params}) → {}",
+            self.format_union_constituent_type(sig.ret)
+        );
+        if let Some(err) = sig.err {
+            text.push_str(" ⇥ ");
+            text.push_str(&self.format_union_constituent_type(err));
+        }
+        text
+    }
+
     /// Display names of the union constituents that do not declare `name`
     /// (U1R attribution for the common-member miss).
     fn union_lacking_constituents(&self, members: &[TypeId], name: Symbol) -> Vec<String> {
@@ -1262,12 +1312,13 @@ impl TypeChecker<'_> {
     }
 
     /// Union-of-nominal guardrail warnings at a written `∪` annotation
-    /// (U1R guardrails 1, 3, 4).
+    /// (U1R guardrails 3, 4).
     ///
-    /// Guardrail 1 teaches the member rule whenever a written union has two
-    /// or more nominal members. Guardrails 3 and 4 compute over the
-    /// declared member views and stay confined to all-nominal unions
-    /// — a mixed or primitive union has no honest declared-member view.
+    /// Guardrails 3 and 4 compute over the declared member views and stay
+    /// confined to unions with two or more nominal members — a mixed or
+    /// primitive union has no honest declared-member view. The former
+    /// guardrail 1 (WARN024, "narrow to recover per-member access") retired
+    /// with D9.2: overlap access is plain and access outside it is an error.
     pub fn warn_union_annotation_guardrails(
         &mut self,
         annotation_ty: TypeId,
@@ -1289,13 +1340,6 @@ impl TypeChecker<'_> {
             .map(|member| self.display_union_constituent(*member))
             .collect::<Vec<_>>()
             .join(" ∪ ");
-        // Guardrail 1: teach the member rule at the moment of writing.
-        self.push_warning(
-            WarningKind::UnionOfNominalMembers,
-            ISSUE_UNION_NOMINAL_MEMBERS,
-            span,
-            &[("union", display.clone())],
-        );
         // Guardrail 3: an all-nominal union sharing no members is store-only.
         if self.union_common_member_names(&members).is_empty() {
             self.push_warning(

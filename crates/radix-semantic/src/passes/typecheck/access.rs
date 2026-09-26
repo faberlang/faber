@@ -390,12 +390,13 @@ impl TypeChecker<'_> {
         self.error_type
     }
 
-    /// Common-member field access on a `∪` receiver (U1R).
+    /// Overlap field access on a `∪` receiver (U1R, D9.2).
     ///
     /// Every constituent must expose the field (through the same declared
-    /// member views single-receiver access uses) with one agreeing type;
-    /// otherwise the member is not common and the diagnostic names the
-    /// constituents that lack it, teaching the narrowing recovery (`est M`).
+    /// member views single-receiver access uses) with exactly the same type.
+    /// A constituent that lacks the field is named in
+    /// `union_member_not_common`; when every constituent has it but the types
+    /// disagree, `union_member_differs` names each constituent's type.
     fn check_union_field_from_type(
         &mut self,
         members: &[TypeId],
@@ -403,35 +404,53 @@ impl TypeChecker<'_> {
         span: radix_lexer::Span,
     ) -> TypeId {
         let mut lacking: Vec<String> = Vec::new();
-        let mut common: Option<TypeId> = None;
+        let mut found: Vec<(TypeId, TypeId)> = Vec::new();
         for member in members {
             match self.union_constituent_field_type(*member, name) {
-                Some(field_ty) => match common {
-                    None => common = Some(field_ty),
-                    Some(existing) => {
-                        if !self.member_type_equals(existing, field_ty) {
-                            common = None;
-                            break;
-                        }
-                    }
-                },
+                Some(field_ty) => found.push((*member, field_ty)),
                 None => lacking.push(self.display_union_constituent(*member)),
             }
         }
-        match common {
-            Some(field_ty) if lacking.is_empty() => field_ty,
-            _ => {
-                self.undefined_member_with_args(
-                    "union_member_not_common",
-                    span,
-                    &[
-                        ("member", self.member_display_name(name)),
-                        ("lacking", lacking.join(", ")),
-                    ],
-                );
-                self.error_type
-            }
+        if !lacking.is_empty() {
+            self.undefined_member_with_args(
+                "union_member_not_common",
+                span,
+                &[
+                    ("member", self.member_display_name(name)),
+                    ("lacking", lacking.join(", ")),
+                ],
+            );
+            return self.error_type;
         }
+        let Some(&(_, common)) = found.first() else {
+            return self.error_type;
+        };
+        if found
+            .iter()
+            .all(|(_, field_ty)| self.member_type_equals(common, *field_ty))
+        {
+            return common;
+        }
+        let detail = found
+            .iter()
+            .map(|(member, field_ty)| {
+                format!(
+                    "`{}` in {}",
+                    self.format_union_constituent_type(*field_ty),
+                    self.display_union_constituent(*member)
+                )
+            })
+            .collect::<Vec<_>>()
+            .join(", ");
+        self.undefined_member_with_args(
+            "union_member_differs",
+            span,
+            &[
+                ("member", self.member_display_name(name)),
+                ("detail", detail),
+            ],
+        );
+        self.error_type
     }
 
     /// Project a field carried by one enum variant represented as a nominal
