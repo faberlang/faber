@@ -1,0 +1,39 @@
++++
+term = "ad"
+kind = "annotation"
+grammar = ["fab_file", "program", "statement", "statement_core", "block_stmt", "annotation", "functio_decl", "param_list", "parameter", "return_clause", "type_annotation", "owned_type", "base_type", "qualified_type", "redde_stmt", "incipit_stmt", "fixum_decl", "ad_expr", "ad_opener", "conversio_expr", "expression", "literal", "nota_stmt"]
+category = "endpoint"
+canonical = true
+summary = "@ ad serves a route from a Faber function; a caller ads the route and materializes the one reply frame."
+syntax = "@ ad 'prefix:name' functio f(O o) → R { … }"
+related = ["ad", "sermo", "conversio"]
+locale = "la"
++++
+# =============================================================================
+# ad — `@ ad '<route>'` serves a route from a Faber function.
+# =============================================================================
+#
+# What this teaches:
+#   • Serving a route — `@ ad 'salutatio:saluta'` registers `saluta` as the
+#     program's handler for that route; no host is needed for it
+#   • The caller side is unchanged — `ad 'salutatio:saluta' ("munde")` opens a
+#     sermo and `↦ textus` materializes the reply
+#   • Plain return — a handler that returns one value answers one item frame,
+#     then done
+#
+# Common mistakes:
+#   • giving a handler two parameters — a handler takes zero or one opener;
+#     pass a genus to send several values
+#
+# See also: ad, sermo, conversio
+# =============================================================================
+
+@ ad 'salutatio:saluta'
+functio saluta(textus nomen) → textus {
+    redde "salve, " + nomen
+}
+
+incipit {
+    fixum textus responsum ← ad 'salutatio:saluta' ("munde") ↦ textus
+    nota responsum
+}
