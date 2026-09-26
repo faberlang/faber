@@ -27,6 +27,7 @@ role_table = [
   "comparison",
   "conditional",
   "conversion",
+  "default",
   "equality",
   "generic",
   "gradient",
@@ -126,7 +127,7 @@ glyph = "@"
 codepoint = "U+0040"
 unicode_name = "COMMERCIAL AT"
 role = "annotation"
-claiming_slots = ["annotation_sugar", "braced_annotation", "nucleum_braced", "nucleum_sugar", "radix_annotation"]
+claiming_slots = ["ad_annotation", "annotation_sugar", "braced_annotation", "nucleum_braced", "nucleum_sugar", "radix_annotation"]
 
 [[glyphs]]
 glyph = "¬"
@@ -231,7 +232,14 @@ glyph = "⇥"
 codepoint = "U+21E5"
 unicode_name = "RIGHTWARDS ARROW TO BAR"
 role = "alternate_exit"
-claiming_slots = ["alternate_exit_clause", "inline_recovery"]
+claiming_slots = ["alternate_exit_clause"]
+
+[[glyphs]]
+glyph = "⊥"
+codepoint = "U+22A5"
+unicode_name = "UP TACK"
+role = "default"
+claiming_slots = ["inline_default"]
 
 [[glyphs]]
 glyph = "↢"
@@ -609,14 +617,13 @@ note = "EBNF and corpus claim the tensor Hadamard glyph; tree-sitter's operator 
 explain_consumer = "radix/corpus/**/*.fab via faber explain"
 explain_symbolic_gaps = []
 tree_sitter_extra = ["!", "⊜"]
-tree_sitter_missing = ["·", "×", "∇", "≺", "≻", "⊗", "⊙"]
+tree_sitter_missing = ["·", "×", "∇", "≺", "≻", "⊗", "⊙", "⊥"]
 @keywords
 ## Keyword Reference
 #
 # Derived table (GSD-4): every quoted latin keyword literal from the productions.
 # | Category | Faber | Meaning |
 # | --- | --- | --- |
-# | Declarations | `abstractus` | abstract genus modifier |
 # | Declarations | `discretio` | tagged union |
 # | Declarations | `fixum` | immutable binding |
 # | Declarations | `functio` | function |
@@ -638,8 +645,6 @@ tree_sitter_missing = ["·", "×", "∇", "≺", "≻", "⊗", "⊙"]
 # | Declarations | `visibilitas` | visibility field |
 # | Genus | `generis` | static member |
 # | Genus | `implet` | implements |
-# | Genus | `nexum` | link field |
-# | Genus | `sub` | extends |
 # | Control | `casu` | case |
 # | Control | `ceterum` | default case |
 # | Control | `custodi` | guard |
@@ -848,7 +853,7 @@ binding_decl   := fixum_decl | sit_decl | array_destruct | object_destruct | fig
 expr_stmt      := expression
 block_stmt     := '{' statement* '}'
 
-fixum_decl      := ('fixum' | 'varia') type_annotation IDENTIFIER (('←' expression) | ('↤' assignment inline_recovery?) | ('↢' expression))?
+fixum_decl      := ('fixum' | 'varia') type_annotation IDENTIFIER (('←' expression) | ('↤' assignment inline_default?) | ('↢' expression))?
 figendum_decl := ('figendum' | 'variandum') type_annotation IDENTIFIER '←' expression
 sit_decl      := 'sit' IDENTIFIER (('←' | '↢') expression)?
 array_destruct := ('fixum' | 'varia') array_pattern '←' expression
@@ -878,12 +883,12 @@ clausura_legacy_expr := 'clausura' clausura_params? closure_modifier? ('→' typ
 clausura_params := clausura_param (',' clausura_param)*
 clausura_param  := type_annotation IDENTIFIER
 
-genus_decl    := 'abstractus'? 'genus' IDENTIFIER generic_params? ('sub' IDENTIFIER)? ('implet' IDENTIFIER ((',' | '∩') IDENTIFIER)*)? '{' genus_member* '}'
+genus_decl    := 'genus' IDENTIFIER generic_params? ('implet' IDENTIFIER ((',' | '∩') IDENTIFIER)*)? '{' genus_member* '}'
 genus_member  := annotation* (field_decl | functio_method_decl)
-field_decl    := 'generis'? 'nexum'? type_annotation IDENTIFIER 'sponte'? ('=' expression)?
+field_decl    := 'generis'? type_annotation IDENTIFIER 'sponte'? ('=' expression)?
 functio_method_decl   := 'functio' IDENTIFIER generic_params? '(' param_list ')' func_modifier* callable_posture? return_clause? alternate_exit_clause? block_stmt
 
-annotation            := nucleum_annotation | radix_annotation | braced_annotation | annotation_sugar
+annotation            := nucleum_annotation | radix_annotation | ad_annotation | braced_annotation | annotation_sugar
 annotation_name        := ANNOTATION_NAME
 braced_annotation      := '@' annotation_name '{' annotation_field_list? '}'
 annotation_field_list   := annotation_field (',' annotation_field)*
@@ -901,6 +906,9 @@ nucleum_field          := 'fragment' '=' ('verum' | 'falsum')
 # and `@ radix { param = IDENT, allowed = TYPE, ... }` use braced_annotation.
 radix_annotation       := '@' 'radix' radix_directive NEWLINE
 radix_directive        := 'lane' STRING | 'backward' STRING | 'typus' IDENTIFIER 'in' type_annotation+
+# `@ ad '<route>'` (en `@ call`) registers a top-level `functio` as the handler
+# for one exact route. Pattern routes (`@ ad sed "…"`) are deferred.
+ad_annotation          := '@' 'ad' ASCII_STRING NEWLINE
 
 implendum_decl   := 'implendum' IDENTIFIER generic_params? '{' implendum_method_decl* '}'
 implendum_method_decl := annotation* 'functio' IDENTIFIER '(' param_list ')' func_modifier* callable_posture? return_clause? alternate_exit_clause?
@@ -1027,7 +1035,7 @@ expression := assignment
 # Exact-output transfer (EOT-3): sink ⇇ payload chains bind above assignment
 # and below ternary; operands are complete before transfer.
 transfer   := ternary ('⇇' ternary)*
-assignment := transfer ('←' assignment | '↤' assignment inline_recovery?)?
+assignment := transfer ('←' assignment | '↤' assignment inline_default?)?
 inc_dec_stmt := place ('↑' | '↓')
 place      := call_expr  (* semantic analysis requires an assignable target *)
 ternary    := aut_expr (('?' expression ':' | 'sic' expression 'secus') ternary)?
@@ -1069,8 +1077,10 @@ gradient_expr := call_expr ('∇' gradient_selection?)?
 gradient_selection := '[' gradient_place (',' gradient_place)* ']'
 gradient_place := expression  (* semantic analysis requires a direct call_expr argument place *)
 cast_expr       := gradient_expr ('∷' type_annotation | conversio_expr)*
-conversio_expr        := '↦' type_annotation inline_recovery?
-inline_recovery   := '⇥' unary_expr
+conversio_expr        := '↦' type_annotation inline_default?
+# `⊥` (U+22A5) is the default channel (D17.7): it binds looser than `↦ T`.
+# `⇥` only ever names an error type; it never carries a value.
+inline_default    := '⊥' unary_expr
 
 call_expr          := primary (call_suffix | member_suffix | transpose_suffix | optional_suffix | non_null_suffix)*
 call_suffix    := call_type_args? '(' argument_list ')'
@@ -1105,7 +1115,7 @@ json_literal := '{' (json_member (',' json_member)*)? '}'
 json_member  := STRING ':' json_value
 typed_constructor := type_annotation '{' field_list? '}'
 field_list := field_init (',' field_init)*
-field_init := ('sparge' expression) | (field_key '=' expression) | IDENTIFIER
+field_init := (field_key '=' expression) | IDENTIFIER
 field_key := IDENTIFIER | STRING | '[' expression ']'
 # JSON values: constants only (no Faber expressions, no variable references).
 json_value := json_object | json_array | json_string | json_number | 'true' | 'false' | 'null'
