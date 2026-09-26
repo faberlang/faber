@@ -2905,11 +2905,11 @@ help = "thêm nhánh `casu nihil` rõ ràng để xử lý trường hợp null 
 
 [diagnostics.WARN013]
 message = "varia không cần thiết"
-help = "dùng `fixum` khi binding không bao giờ được gán lại hoặc thay đổi"
+help = "dùng `fixum` khi binding không bao giờ được gán lại"
 
 [diagnostics.WARN013.issues.unnecessary_varia]
-message = "varia không cần thiết: binding không bao giờ được gán lại hoặc thay đổi"
-help = "dùng `fixum` khi binding không bao giờ được gán lại hoặc thay đổi"
+message = "varia không cần thiết: binding không bao giờ được gán lại"
+help = "dùng `fixum` khi binding không bao giờ được gán lại"
 
 [diagnostics.WARN014]
 message = "file interface đã bỏ qua export không được hỗ trợ"

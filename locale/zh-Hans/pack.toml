@@ -2905,11 +2905,11 @@ help = "添加显式 `casu nihil` arm，使 null case 得到刻意处理"
 
 [diagnostics.WARN013]
 message = "不必要的 varia"
-help = "当 binding 从未重新赋值或修改时，请使用 `fixum`"
+help = "当 binding 从未重新赋值时，请使用 `fixum`"
 
 [diagnostics.WARN013.issues.unnecessary_varia]
-message = "不必要的 varia：binding 从未重新赋值或修改"
-help = "当 binding 从未重新赋值或修改时，请使用 `fixum`"
+message = "不必要的 varia：binding 从未重新赋值"
+help = "当 binding 从未重新赋值时，请使用 `fixum`"
 
 [diagnostics.WARN014]
 message = "file interface 跳过了不支持的 export"

@@ -2905,11 +2905,11 @@ help = "請加入明確的 `casu nihil` 分支，以刻意處理 null 情況"
 
 [diagnostics.WARN013]
 message = "不必要的 varia"
-help = "若綁定從未被重新指派或變更，請使用 `fixum`"
+help = "若綁定從未被重新指派，請使用 `fixum`"
 
 [diagnostics.WARN013.issues.unnecessary_varia]
-message = "不必要的 varia：綁定從未被重新指派或變更"
-help = "若綁定從未被重新指派或變更，請使用 `fixum`"
+message = "不必要的 varia：綁定從未被重新指派"
+help = "若綁定從未被重新指派，請使用 `fixum`"
 
 [diagnostics.WARN014]
 message = "檔案介面略過不受支援的匯出"

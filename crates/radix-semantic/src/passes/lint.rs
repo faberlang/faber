@@ -35,10 +35,9 @@ use radix_hir::{
     HirItemKind, HirLiteral, HirLocal, HirModule, HirParam, HirStatement, HirStatementKind,
 };
 use radix_intrinsics::{
-    IntrinsicReturnKind, is_numeric_imperativus_operator, lookup_method_for_type, mir_collection_op,
+    IntrinsicReturnKind, is_numeric_imperativus_operator, lookup_method_for_type,
 };
 use radix_lexer::{Interner, Span};
-use radix_types::MirCollectionOp;
 use rustc_hash::FxHashSet;
 
 const ISSUE_EMPTY_MARKER_SHADOWING: &str = "empty_marker_shadowing";
@@ -429,12 +428,22 @@ impl<'a> LintContext<'a> {
         }
     }
 
-    fn mark_receiver_mutated_if_needed(
+    /// D16.4(2): WARN013 means "never reassigned". `fixum` is shallow
+    /// (mutability-engine D-1), so a mutating method on the receiver — a list
+    /// `appende`, a user method writing `ego` — is legal on a `fixum` local and
+    /// does not count. The one method form that rewrites the binding's own
+    /// value is a `Vacuum`-returning numeric imperativus (`n.adde(1)`), which
+    /// typecheck rejects on a `fixum` receiver.
+    fn mark_receiver_reassigned_if_needed(
         &mut self,
         receiver: &HirExpression,
         method: radix_lexer::Symbol,
         arg_count: usize,
     ) {
+        let method_name = self.interner.resolve(method);
+        if !is_numeric_imperativus_operator(method_name) {
+            return;
+        }
         let Some(def_id) = root_place_def_id(receiver) else {
             return;
         };
@@ -442,20 +451,14 @@ impl<'a> LintContext<'a> {
             return;
         }
 
-        let method_name = self.interner.resolve(method);
-        let Some(receiver_ty) = receiver.ty.map(|ty| self.types.get(ty)) else {
-            self.mutated.insert(def_id);
-            return;
-        };
-        let Some(intrinsic) = lookup_method_for_type(receiver_ty, method_name, arg_count) else {
-            self.mutated.insert(def_id);
-            return;
-        };
-
-        if intrinsic.return_kind == IntrinsicReturnKind::Vacuum
-            || is_numeric_imperativus_operator(method_name)
-            || mir_collection_op(intrinsic).is_some_and(is_mutating_collection_op)
-        {
+        // Unknown receiver type or intrinsic: stay conservative and treat the
+        // imperativus name as a reassignment, so WARN013 never suggests a
+        // `fixum` that typecheck would reject.
+        let reassigns = receiver
+            .ty
+            .and_then(|ty| lookup_method_for_type(self.types.get(ty), method_name, arg_count))
+            .is_none_or(|intrinsic| intrinsic.return_kind == IntrinsicReturnKind::Vacuum);
+        if reassigns {
             self.mutated.insert(def_id);
         }
     }
@@ -644,7 +647,7 @@ impl HirVisitor for LintContext<'_> {
                 }
             }
             HirExpressionKind::MethodCall(receiver, method, _, args, _) => {
-                self.mark_receiver_mutated_if_needed(receiver, *method, args.len());
+                self.mark_receiver_reassigned_if_needed(receiver, *method, args.len());
                 self.visit_expr(receiver);
                 for arg in args {
                     self.visit_expr(&arg.expr);
@@ -703,17 +706,4 @@ fn root_place_def_id(expr: &HirExpression) -> Option<radix_hir::DefId> {
         }
         _ => None,
     }
-}
-
-fn is_mutating_collection_op(op: MirCollectionOp) -> bool {
-    matches!(
-        op,
-        MirCollectionOp::Append
-            | MirCollectionOp::Put
-            | MirCollectionOp::Delete
-            | MirCollectionOp::RemoveFirst
-            | MirCollectionOp::ReverseInPlace
-            | MirCollectionOp::TensorSet
-            | MirCollectionOp::TensorFill
-    )
 }

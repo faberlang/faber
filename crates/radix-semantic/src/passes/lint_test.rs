@@ -300,14 +300,17 @@ fn does_not_warn_on_varia_local_reassigned() {
     );
 }
 
-#[test]
-fn does_not_warn_on_varia_local_mutated_by_intrinsic_method() {
+/// Lint a program that declares `varia <receiver_ty> x` and then only calls
+/// `x.<method>(1)`; returns whether WARN013 (`UnnecessaryVaria`) fired.
+fn varia_local_warns_after_method_call(
+    method_name: &str,
+    receiver: fn(&mut TypeTable) -> TypeId,
+) -> bool {
     let mut interner = Interner::new();
-    let method = interner.intern("appende");
+    let method = interner.intern(method_name);
     let def_id = radix_hir::DefId(1);
     let mut types = TypeTable::new();
-    let numerus = types.primitive(Primitive::Numerus);
-    let lista_numerus = types.array(numerus);
+    let receiver_ty = receiver(&mut types);
     let program = HirModule {
         items: Vec::new(),
         entry: Some(HirBlock {
@@ -317,11 +320,11 @@ fn does_not_warn_on_varia_local_mutated_by_intrinsic_method() {
                     kind: HirStatementKind::Local(HirLocal {
                         def_id,
                         name: radix_lexer::Symbol(1),
-                        ty: Some(lista_numerus),
+                        ty: Some(receiver_ty),
                         init: Some(HirExpression {
                             id: radix_hir::HirId(2),
                             kind: HirExpressionKind::Vacua,
-                            ty: Some(lista_numerus),
+                            ty: Some(receiver_ty),
                             span: test_span(),
                         }),
                         mutable: true,
@@ -338,7 +341,7 @@ fn does_not_warn_on_varia_local_mutated_by_intrinsic_method() {
                             Box::new(HirExpression {
                                 id: radix_hir::HirId(5),
                                 kind: HirExpressionKind::Path(def_id),
-                                ty: Some(lista_numerus),
+                                ty: Some(receiver_ty),
                                 span: test_span(),
                             }),
                             method,
@@ -367,11 +370,41 @@ fn does_not_warn_on_varia_local_mutated_by_intrinsic_method() {
     };
 
     let errors = lint(&program, &Resolver::new(), &types, &interner, None);
-    assert!(
-        !errors
-            .iter()
-            .any(|err| err.kind == SemanticErrorKind::Warning(WarningKind::UnnecessaryVaria))
-    );
+    errors
+        .iter()
+        .any(|err| err.kind == SemanticErrorKind::Warning(WarningKind::UnnecessaryVaria))
+}
+
+fn lista_numerus(types: &mut TypeTable) -> TypeId {
+    let numerus = types.primitive(Primitive::Numerus);
+    types.array(numerus)
+}
+
+fn numerus(types: &mut TypeTable) -> TypeId {
+    types.primitive(Primitive::Numerus)
+}
+
+// D16.4(2): WARN013 means "never reassigned". `fixum` is shallow
+// (mutability-engine D-1), so a list that is only appended to could be `fixum`.
+#[test]
+fn warns_on_varia_list_only_appended() {
+    assert!(varia_local_warns_after_method_call(
+        "appende",
+        lista_numerus
+    ));
+}
+
+// A non-intrinsic (user) method on the receiver is not a reassignment either.
+#[test]
+fn warns_on_varia_local_only_receiving_unknown_method() {
+    assert!(varia_local_warns_after_method_call("auge", lista_numerus));
+}
+
+// Numeric imperativus methods (`n.adde(1)`) rewrite the scalar value itself and
+// require a `varia` receiver, so they count as reassignment.
+#[test]
+fn does_not_warn_on_varia_numerus_updated_by_imperativus_method() {
+    assert!(!varia_local_warns_after_method_call("adde", numerus));
 }
 
 #[test]
