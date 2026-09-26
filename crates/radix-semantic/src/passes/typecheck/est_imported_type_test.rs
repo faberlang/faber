@@ -10,8 +10,8 @@ use std::collections::BTreeMap;
 
 use crate::Primitive;
 use crate::file_interface::{
-    FileExport, FileExportKind, FileInterface, InterfaceStructExport, InterfaceStructField,
-    InterfaceTypeSnapshot,
+    FileExport, FileExportKind, FileInterface, InterfaceLibraryIdentity, InterfaceStructExport,
+    InterfaceStructField, InterfaceTypeSnapshot,
 };
 use crate::passes::visibility_annotation::VisibilityTier;
 use crate::test_support;
@@ -40,6 +40,12 @@ fn genus(name: &str) -> FileExport {
 
 fn aux_interface() -> FileInterface {
     let mut interface = FileInterface::new();
+    // One module identity, so the namespace and path installs unify.
+    interface.identity = Some(InterfaceLibraryIdentity {
+        provider: "faber".to_owned(),
+        package: Some("demo".to_owned()),
+        module_path: vec!["aux".to_owned()],
+    });
     interface.insert(genus("Felis"));
     interface.insert(genus("Canis"));
     interface.insert(FileExport {
@@ -150,4 +156,128 @@ functio f(textus x) → bivalens {
 incipit { tacet }"#,
     );
     assert!(!has_issue(&result, ISSUE), "{:?}", result.diagnostics);
+}
+
+// ---------------------------------------------------------------------------
+// D22.5: selective imports bind types as well as values
+// ---------------------------------------------------------------------------
+
+#[test]
+fn selective_type_import_binds_a_type_name() {
+    let result = analyze(
+        r#"importa ex "./aux" fixum Canis
+
+functio nomen(Canis c) → textus {
+    redde c.nomen
+}
+
+incipit { tacet }"#,
+    );
+    assert!(
+        !result
+            .diagnostics
+            .iter()
+            .any(crate::SemanticError::is_error),
+        "{:?}",
+        result.diagnostics
+    );
+}
+
+#[test]
+fn selective_type_import_alias_binds_the_local_name() {
+    let result = analyze(
+        r#"importa ex "./aux" fixum Canis ut Hund
+
+functio nomen(Hund c) → textus {
+    redde c.nomen
+}
+
+incipit { tacet }"#,
+    );
+    assert!(
+        !result
+            .diagnostics
+            .iter()
+            .any(crate::SemanticError::is_error),
+        "{:?}",
+        result.diagnostics
+    );
+}
+
+#[test]
+fn selective_type_import_is_the_imported_type() {
+    // The bare selective name and the qualified path are one type: a value of
+    // one flows into a slot of the other with no conversion.
+    let result = analyze(
+        r#"importa ex "./aux" aux
+importa ex "./aux" fixum Canis
+
+functio nomen(Canis c) → textus {
+    redde c.nomen
+}
+
+functio f(aux.Canis c) → textus {
+    redde nomen(c)
+}
+
+incipit { tacet }"#,
+    );
+    assert!(
+        !result
+            .diagnostics
+            .iter()
+            .any(crate::SemanticError::is_error),
+        "{:?}",
+        result.diagnostics
+    );
+}
+
+#[test]
+fn est_selective_imported_type_is_an_error() {
+    assert_est_imported_type(
+        r#"importa ex "./aux" fixum Felis, Canis
+
+functio f(Felis ∪ Canis x) → bivalens {
+    redde x est Canis
+}
+
+incipit { tacet }"#,
+    );
+}
+
+#[test]
+fn selective_value_import_still_binds_a_value() {
+    let result = analyze(
+        r#"importa ex "./aux" fixum NOMEN
+
+functio f() → textus {
+    redde NOMEN
+}
+
+incipit { tacet }"#,
+    );
+    assert!(
+        !result
+            .diagnostics
+            .iter()
+            .any(crate::SemanticError::is_error),
+        "{:?}",
+        result.diagnostics
+    );
+}
+
+#[test]
+fn selective_type_import_is_not_a_value() {
+    let result = analyze(
+        r#"importa ex "./aux" fixum Canis
+
+incipit {
+    nota Canis
+}"#,
+    );
+    assert!(
+        has_issue(&result, "name_not_value"),
+        "{:?}",
+        result.diagnostics
+    );
 }

@@ -835,6 +835,18 @@ impl Lowerer<'_> {
         }
 
         let Some(def_id) = self.resolver.lookup_type(name.name) else {
+            // A selectively imported type (D22.5) is the imported `TypeId`
+            // itself, exactly as its qualified `module.Type` path lowers.
+            if let Some(type_id) = self.resolver.lookup_selective_import_type(name.name) {
+                if params.is_empty() {
+                    return type_id;
+                }
+                let decl_kinds = self
+                    .resolver
+                    .lookup_selective_import_decl_param_kinds(name.name);
+                let args = self.lower_applied_args_directed(decl_kinds.as_deref(), params);
+                return self.types.intern(Type::Applied(type_id, args));
+            }
             self.error("unknown_type_name");
             return self.types.intern(Type::Error);
         };

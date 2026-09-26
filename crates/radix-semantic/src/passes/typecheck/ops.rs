@@ -1935,8 +1935,14 @@ impl TypeChecker<'_> {
     /// in the same file; an imported type reaches here as `Binary(Is)` value
     /// equality. Until `type-algebra-error-lifecycle` open row 8 designs
     /// cross-file type tests, that shape is rejected by name (D18.1) rather
-    /// than compared as a value. Const exports stay values.
+    /// than compared as a value. Const exports stay values. Both spellings
+    /// qualify: the qualified `module.Type` path and a selective import
+    /// binding that names a type (D22.5).
     fn imported_type_est_target(&self, rhs: &HirExpression) -> Option<Symbol> {
+        if let HirExpressionKind::Path(def_id) = rhs.kind {
+            self.resolver.selective_import_type(def_id)?;
+            return self.resolver.get_symbol(def_id).map(|symbol| symbol.name);
+        }
         let HirExpressionKind::Field(base, member) = &rhs.kind else {
             return None;
         };

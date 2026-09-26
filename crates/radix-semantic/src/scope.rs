@@ -819,6 +819,12 @@ pub struct Resolver {
     ///
     /// Labels never enter `Type::Tuple`. Runtime-only; excluded from snapshots.
     tuple_element_labels: FxHashMap<DefId, Vec<Option<LexSymbol>>>,
+    /// Selective imports that bind a type export (D22.5), keyed by the
+    /// caller-owned binding `DefId` → (import path, exported spelling). The
+    /// binding names the imported type itself: type positions resolve it to
+    /// the same `TypeId` as the qualified path. Runtime-only; excluded from
+    /// snapshots (type positions are resolved before the artifact is cut).
+    selective_type_imports: FxHashMap<DefId, (LexSymbol, LexSymbol)>,
 }
 
 impl Resolver {
@@ -870,6 +876,7 @@ impl Resolver {
             shadowed_builtins: FxHashMap::default(),
             scribe_family_surfaces: FxHashSet::default(),
             tuple_element_labels: FxHashMap::default(),
+            selective_type_imports: FxHashMap::default(),
         }
     }
 
@@ -1790,6 +1797,41 @@ impl Resolver {
     #[must_use]
     pub fn namespace_has_file_interface(&self, namespace: LexSymbol) -> bool {
         self.file_interfaces.contains_key(&namespace)
+    }
+
+    /// Record that a selective import binding names an imported type export.
+    pub fn bind_selective_type_import(
+        &mut self,
+        binding: DefId,
+        path: LexSymbol,
+        member: LexSymbol,
+    ) {
+        self.selective_type_imports.insert(binding, (path, member));
+    }
+
+    /// The imported type a selective import binding names, if it binds one.
+    #[must_use]
+    pub fn selective_import_type(&self, binding: DefId) -> Option<TypeId> {
+        let (path, member) = self.selective_type_imports.get(&binding)?;
+        self.namespace_file_type(*path, *member)
+    }
+
+    /// The imported type the visible name `name` binds through a selective
+    /// import, if the nearest binding of `name` is one.
+    #[must_use]
+    pub fn lookup_selective_import_type(&self, name: LexSymbol) -> Option<TypeId> {
+        self.selective_import_type(self.lookup(name)?)
+    }
+
+    /// Declaration parameter kinds of the imported type the visible name
+    /// `name` binds through a selective import.
+    #[must_use]
+    pub fn lookup_selective_import_decl_param_kinds(
+        &self,
+        name: LexSymbol,
+    ) -> Option<Vec<radix_syntax::GenericParamKind>> {
+        let (path, member) = self.selective_type_imports.get(&self.lookup(name)?)?;
+        self.namespace_file_decl_param_kinds(*path, *member)
     }
 
     /// Return the remapped function signature for an imported file namespace member.
@@ -3648,6 +3690,7 @@ impl Resolver {
             shadowed_builtins: FxHashMap::default(),
             scribe_family_surfaces: FxHashSet::default(),
             tuple_element_labels: FxHashMap::default(),
+            selective_type_imports: FxHashMap::default(),
         }
     }
 

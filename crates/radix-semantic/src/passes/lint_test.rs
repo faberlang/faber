@@ -1094,7 +1094,7 @@ incipit { nota output }"#,
     );
     assert!(
         result.is_ok(),
-        "EOT-2M lint red driver must analyze selective bindings; current diagnostics={:?}; expected later issues include `selective_import_missing_member`, `selective_import_type_not_value`, and `selective_import_duplicate_alias`",
+        "EOT-2M lint red driver must analyze selective bindings; current diagnostics={:?}; expected later issues include `selective_import_missing_member`, and `selective_import_duplicate_alias`",
         result.diagnostics
     );
 }
