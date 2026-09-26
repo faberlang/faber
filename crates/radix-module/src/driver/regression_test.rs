@@ -41,7 +41,7 @@ genus Circle implet Drawable {
 #[test]
 #[cfg(feature = "hir-faber")]
 fn annotation_strings_with_quotes_and_newlines_roundtrip_through_faber_codegen() {
-    let source = r#"@ doc "a \"hello\" world"
+    let source = r#"@ verte "a \"hello\" world"
 incipit {}"#;
     let result = super::faber_emit("test.fab", source);
 
