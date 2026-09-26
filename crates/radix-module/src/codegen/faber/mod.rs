@@ -21,6 +21,10 @@ mod canonical_test;
 #[path = "cape_roundtrip_test.rs"]
 mod cape_roundtrip_test;
 
+#[cfg(test)]
+#[path = "ad_annotation_roundtrip_test.rs"]
+mod ad_annotation_roundtrip_test;
+
 use crate::lexer::TokenKind;
 use crate::locale::{self, TypeBindingKind};
 use radix_hir_faber::KeywordSurface as LeafKeywordSurface;

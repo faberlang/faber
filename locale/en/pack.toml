@@ -796,6 +796,18 @@ help = "use `@ nucleum lane \"position\"` or braced `lane = \"position\"`"
 message = "@ nucleum lane value must be a string literal"
 help = "use `@ nucleum lane \"position\"` or braced `lane = \"position\"`"
 
+[diagnostics.PARSE018.issues.ad_annotation_route]
+message = "`@ {ad}` requires a single-quoted ASCII route"
+help = "write `@ {ad} 'prefix:name'` before the handler {functio}"
+
+[diagnostics.PARSE018.issues.ad_pattern_route_deferred]
+message = "pattern routes after `@ {ad}` are deferred"
+help = "serve one exact route: `@ {ad} 'prefix:name'`"
+
+[diagnostics.PARSE018.issues.ad_annotation_requires_functio]
+message = "`@ {ad}` must annotate a {functio} declaration"
+help = "place `@ {ad} 'prefix:name'` directly before a top-level {functio}"
+
 [diagnostics.PARSE018.issues.wrong_locale_annotation]
 message = "annotation `@ {annotation}` is not declared on this reader surface"
 help = "use `@ {expected}` for this file's reader locale"

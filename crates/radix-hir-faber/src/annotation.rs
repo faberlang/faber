@@ -50,6 +50,15 @@ impl super::FaberCodegen<'_> {
         writer.write("@ ");
         writer.write(&self.annotation_surface_spelling(annotation.family, surface));
 
+        // `@ ad '<route>'` re-emits its single-quoted ASCII route literal —
+        // the parser production has no braced record form.
+        if let Some(route) = annotation.ad_route(self.interner) {
+            writer.write(" '");
+            writer.write(self.interner.resolve(route));
+            writer.write("'");
+            return;
+        }
+
         if annotation.fields.is_empty() && annotation.raw_args.is_empty() {
             // Only an authored empty braced record re-emits braces; a bare
             // marker (`@ public`) stays bare. `@ conversio` is always bare:

@@ -1936,6 +1936,7 @@ impl Parser {
             AnnotationKind::Privata => "privata",
             AnnotationKind::Interna => "interna",
             AnnotationKind::Conversio => "conversio",
+            AnnotationKind::Ad(_) => "ad",
             _ => "annotation",
         };
         format!("@ {name}")
@@ -2035,6 +2036,12 @@ impl Parser {
             return Ok(AnnotationKind::Conversio);
         }
 
+        // `@ ad '<route>'` is compiler-owned route-handler registration
+        // (D6.15): a structured form, never a generic statement annotation.
+        if matches!(annotation_identity, Some(TokenKind::Ad)) {
+            return self.parse_ad_annotation();
+        }
+
         if self.interner.resolve(name.name) == "commune" {
             self.expect_annotation_end("unexpected token after @ commune")?;
             return Ok(AnnotationKind::Statement(AnnotationStmt {
@@ -2084,6 +2091,31 @@ impl Parser {
         }
 
         Ok(AnnotationKind::Statement(AnnotationStmt { name, args }))
+    }
+
+    /// Parse the payload of `@ ad '<route>'` after the annotation name.
+    ///
+    /// GRAMMAR:
+    ///   adAnnotation := `@` `ad` asciiLiteral NEWLINE (annotation NEWLINE)* functioDecl
+    ///
+    /// Only exact routes exist: `@ ad sed "…"` pattern routes are deferred
+    /// (D6.2). The annotated declaration must be a `functio` (possibly after
+    /// further stacked annotations); every other legality rule — top-level
+    /// placement, handler shape, reserved routes — is semantic policy.
+    fn parse_ad_annotation(&mut self) -> Result<AnnotationKind, ParseError> {
+        if self.next_word_is("sed") {
+            return Err(self.invalid_annotation_error("ad_pattern_route_deferred"));
+        }
+        let TokenKind::AsciiString(route) = self.peek().kind else {
+            return Err(self.invalid_annotation_error("ad_annotation_route"));
+        };
+        let route_span = self.current_span();
+        self.advance();
+        self.expect_annotation_end("unexpected token after @ ad")?;
+        if !self.check(&TokenKind::At) && self.current_keyword_ident() != Some(TokenKind::Functio) {
+            return Err(self.invalid_annotation_error("ad_annotation_requires_functio"));
+        }
+        Ok(AnnotationKind::Ad(AdAnnotation { route, route_span }))
     }
 
     fn parse_braced_annotation(&mut self, name: Ident) -> Result<AnnotationKind, ParseError> {

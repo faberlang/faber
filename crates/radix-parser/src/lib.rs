@@ -1450,6 +1450,10 @@ mod union_commune_test;
 mod union_conversio_test;
 
 #[cfg(test)]
+#[path = "ad_annotation_test.rs"]
+mod ad_annotation_test;
+
+#[cfg(test)]
 #[path = "non_trivia_index_test.rs"]
 mod non_trivia_index_test;
 

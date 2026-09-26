@@ -338,7 +338,11 @@ const EXPRESSION_INTRODUCER: &[KeywordOwner] = &[KeywordOwner::ExpressionIntrodu
 const RANGE_OPERATOR: &[KeywordOwner] = &[KeywordOwner::RangeOperator];
 const STATEMENT_INTRODUCER: &[KeywordOwner] = &[KeywordOwner::StatementIntroducer];
 const DECLARATION_MARKER: &[KeywordOwner] = &[KeywordOwner::DeclarationMarker];
-const ROUTE_EXPRESSION: &[KeywordOwner] = &[KeywordOwner::RouteExpression];
+// WHY: `ad` opens the route expression and names the compiler-owned
+// `@ ad '<route>'` handler annotation; claiming the annotation slot seals the
+// locale surface (`@ ad` under an en reader is `wrong_locale_annotation`).
+const ROUTE_EXPRESSION_OR_ANNOTATION: &[KeywordOwner] =
+    &[KeywordOwner::RouteExpression, KeywordOwner::AnnotationName];
 const ANNOTATION_MODIFIER: &[KeywordOwner] = &[KeywordOwner::AnnotationModifier];
 // WHY: test annotation spellings are valid after `@` and as import/decl names
 // (`privata solum`), but not as bare type or binding identifiers (`fixum solum x`).
@@ -989,7 +993,7 @@ pub static KEYWORD_SPECS: &[KeywordSpec] = &[
     KeywordSpec {
         text: "ad",
         token_kind: Some(TokenKind::Ad),
-        scope: KeywordScope::Contextual(ROUTE_EXPRESSION),
+        scope: KeywordScope::Contextual(ROUTE_EXPRESSION_OR_ANNOTATION),
         category: KeywordKind::Endpoint,
     },
     // === Keywords: Misc ===

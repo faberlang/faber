@@ -587,6 +587,18 @@ help = "use `@ nucleum lane \"position\"` or braced `lane = \"position\"`"
 message = "@ nucleum lane value must be a string literal"
 help = "use `@ nucleum lane \"position\"` or braced `lane = \"position\"`"
 
+[diagnostics.PARSE018.issues.ad_annotation_route]
+message = "`@ {ad}` viam ASCII inter apostrophos requirit"
+help = "scribe `@ {ad} 'praefixum:nomen'` ante {functio} tractatricem"
+
+[diagnostics.PARSE018.issues.ad_pattern_route_deferred]
+message = "viae per exemplar post `@ {ad}` differuntur"
+help = "unam viam exactam servi: `@ {ad} 'praefixum:nomen'`"
+
+[diagnostics.PARSE018.issues.ad_annotation_requires_functio]
+message = "`@ {ad}` declarationem {functio} notare debet"
+help = "pone `@ {ad} 'praefixum:nomen'` directe ante {functio} summi gradus"
+
 [diagnostics.PARSE018.issues.wrong_locale_annotation]
 message = "annotatio `@ {annotation}` non est declarata in hac superficie lectoris"
 help = "utere `@ {expected}` pro lingua lectoris huius fasciculi"
