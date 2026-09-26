@@ -22,8 +22,9 @@ locale = "en"
 # Common mistakes:
 #   • Treating the loop character as a number: it is a one-character text
 #     value, not a code point.
-#   • Iterating non-ASCII text: today a non-ASCII character traps, exactly as
-#     `textus[i]` does.
+#   • Iterating non-ASCII text: not yet uniform across backends (the runner
+#     and Rust trap like `textus[i]`; Go, TS and Swift pass the character
+#     through) until the `littera` element type lands. Keep this ASCII.
 #
 # See also: ex, de, textus
 # =============================================================================
